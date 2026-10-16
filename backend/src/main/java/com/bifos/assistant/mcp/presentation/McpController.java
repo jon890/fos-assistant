@@ -51,6 +51,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class McpController {
     private static final Pattern UUID_TEXT = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final String INVALID_ARGUMENTS = "인자 형식이 올바르지 않습니다.";
+    private static final String SEARCH_RESTART = "검색 순위가 앞 페이지와 달라졌습니다. cursor 없이 다시 검색하세요.";
     private static final String MEMORY_READ = "memory_read";
     private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
@@ -261,7 +262,14 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         MemorySearchArguments value = parsed.get();
-        return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.cursor()));
+        try {
+            return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.cursor()));
+        } catch (ApiException ex) {
+            if (ex.code() != ErrorCode.VALIDATION_FAILED) {
+                throw ex;
+            }
+            return invalidParams(id, SEARCH_RESTART);
+        }
     }
 
 

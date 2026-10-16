@@ -106,9 +106,9 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         snapshotRows.deleteAll();
         jobRows.deleteAll();
         String profile = "preview-" + UUID.randomUUID();
-        person = people.save(AllowedPerson.of(owner.email(), "주인", profile, NOW));
+        person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
         var agent = agents.save(Agent.of(profile, "preview", profile, "http://localhost", CostMode.SUBSCRIPTION,
-            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id(), NOW));
+            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id()));
         var connection = ConnectorConnection.pending(owner.id(), "snapshot-test", NOW);
         connection.ready(NOW);
         connection = connections.save(connection);

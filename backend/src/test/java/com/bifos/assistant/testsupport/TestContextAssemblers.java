@@ -7,6 +7,7 @@ import com.bifos.assistant.context.MemorySearchSectionProperties;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties;
+import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import java.time.Clock;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -23,7 +24,7 @@ public final class TestContextAssemblers {
     public static ContextAssembler of(
         MemoryService memories, ContextProperties properties, Clock clock, MemorySearchSectionProperties search) {
         MemorySearchSection section = new MemorySearchSection(
-            MemoryRelevance.keywordOnly(MemoryRelevanceProperties.defaults()), search);
+            MemoryRelevance.keywordOnly(MemoryRelevanceProperties.defaults()), search, QueryEmbedder.disabled());
         return new ContextAssembler(memories, properties, clock, section);
     }
 }

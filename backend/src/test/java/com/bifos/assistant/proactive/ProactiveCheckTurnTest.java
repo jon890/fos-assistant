@@ -173,7 +173,7 @@ class ProactiveCheckTurnTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(AppUser.of("check-" + suffix + "@example.com", "점검", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("check-" + suffix + "@example.com", "점검", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "check-" + suffix;
         agent = agents.save(Agent.of(
@@ -184,8 +184,7 @@ class ProactiveCheckTurnTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
@@ -705,8 +704,7 @@ class ProactiveCheckTurnTest {
             TOPIC_KEY,
             "Kafka 정확히 한 번 처리",
             SOURCE_URL,
-            Instant.now().minusSeconds(60),
-            Instant.now().minusSeconds(30)));
+            Instant.now().minusSeconds(60)));
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
 
         runCheck();

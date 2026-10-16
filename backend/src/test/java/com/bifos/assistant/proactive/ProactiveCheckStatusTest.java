@@ -117,8 +117,7 @@ class ProactiveCheckStatusTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id(),
-            NOW));
+            owner.id()));
         createdAgents.add(saved.id());
         return saved;
     }

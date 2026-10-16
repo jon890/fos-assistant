@@ -105,7 +105,7 @@ class FailedExecutionUsageRoutesTest {
     void setUp() {
         String unique = UUID.randomUUID().toString();
         AppUser saved = users.save(
-            AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agent = Agent.of(
             "failed-usage-" + unique,
@@ -115,8 +115,7 @@ class FailedExecutionUsageRoutesTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            user.id(),
-            Instant.now());
+            user.id());
         agent.changeDefaultModel("requested-provider", "requested-model", null);
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));

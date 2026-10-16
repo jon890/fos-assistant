@@ -22,7 +22,6 @@ import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import com.bifos.assistant.user.application.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -69,7 +68,7 @@ class FirstAgentCreatorTest {
         agents.deleteAll();
         users.deleteAll();
         people.deleteAll();
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
     }
 
 

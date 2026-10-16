@@ -14,7 +14,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -39,7 +38,6 @@ public class ArtifactService {
 
     private final ArtifactStore store;
     private final ChatArtifactRepository artifacts;
-    private final Clock clock;
 
 
     /**
@@ -104,7 +102,7 @@ public class ArtifactService {
             }
             try {
                 artifacts.save(
-                    ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize(), clock.instant()));
+                    ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize()));
             } catch (RuntimeException ex) {
                 // 한 파일이 실패해도 나머지는 묶는다. 경로가 칸 길이를 넘는 것도 여기로 온다.
                 log.warn("could not record an artifact conversationId={} messageId={}", conversationId, messageId, ex);

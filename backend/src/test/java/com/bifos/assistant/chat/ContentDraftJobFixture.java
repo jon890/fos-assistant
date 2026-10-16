@@ -147,9 +147,9 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
         jobRows.deleteAll();
         snapshotRows.deleteAll();
         String profile = "save-" + UUID.randomUUID().toString().substring(0, 8);
-        person = people.save(AllowedPerson.of(owner.email(), "주인", profile, NOW));
+        person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
         var agent = agents.save(Agent.of(profile, "save", profile, "http://localhost", CostMode.SUBSCRIPTION,
-            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id(), NOW));
+            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id()));
         var connection = ConnectorConnection.pending(owner.id(), CONNECTOR, NOW);
         connection.ready(NOW);
         connection = connections.save(connection);

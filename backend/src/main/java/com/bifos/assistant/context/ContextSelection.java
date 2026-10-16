@@ -11,6 +11,8 @@ package com.bifos.assistant.context;
  * <li>{@value #INDEX_BY_ID}: 색인 층. 번호 순으로 싣는다. 질문이 있으면 점수가 없는 항목에 붙고, 점수가 있는 항목 뒤에 번호 순으로 싣는다
  * <li>{@value #SEARCH_KEYWORD}: 질문과 관련된 기억 구역. 키워드 점수 순으로 고르고 그 차례로 싣는다. 순위는 관련 있는 항목 전체 안의 차례다
  * <li>{@value #INDEX_KEYWORD}: 색인 층 가운데 키워드 점수가 있는 항목. 구역에 싣지 못한 항목을 점수 순으로 색인 맨 앞에 싣는다
+ * <li>{@value #SEARCH_HYBRID}: 질문과 관련된 기억 구역. 키워드 순위와 의미 순위를 RRF 로 합친 점수 순으로 고른다. 질문 임베딩이 실패하면 {@value #SEARCH_KEYWORD} 로 물러난다
+ * <li>{@value #INDEX_HYBRID}: 색인 층 가운데 합친 점수가 있는 항목. 구역에 싣지 못한 항목을 합친 점수 순으로 색인 맨 앞에 싣는다
  * </ul>
  *
  * @param selector 고른 규칙의 이름과 버전. 32자 이하다
@@ -33,10 +35,17 @@ public record ContextSelection(String selector, int rank, Double keywordScore, D
 
     public static final String INDEX_KEYWORD = "index-keyword-v1";
 
+    public static final String SEARCH_HYBRID = "search-hybrid-v1";
+
+    public static final String INDEX_HYBRID = "index-hybrid-v1";
+
     /** 질문과 관련된 기억 구역의 규칙에 짝지은 색인의 규칙이다. */
     static String indexSelectorOf(String searchSelector) {
         if (SEARCH_KEYWORD.equals(searchSelector)) {
             return INDEX_KEYWORD;
+        }
+        if (SEARCH_HYBRID.equals(searchSelector)) {
+            return INDEX_HYBRID;
         }
         throw new IllegalArgumentException("unknown search selector: " + searchSelector);
     }

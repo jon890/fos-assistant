@@ -36,6 +36,12 @@ assistant:
       # 운영 값이 아니다. 글자 0123456789abcdef0123456789abcdef 의 base64 다
       active-key-id: test-1
       keys: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+    embedding:
+      # 주소를 비워 임베딩을 끈다. 켜는 검사는 가짜 클라이언트와 설정을 따로 준다
+      base-url: ""
+      model: ""
+      # 채우는 작업이 검사 도중 스스로 돌지 않게 한다. 검사는 refreshOnce 를 직접 부른다
+      refresh-delay: 1h
   starters:
     # 추천 실행이 대역 Hermes 의 받은 명령과 응답 큐를 함께 써 다른 검사의 단언을 흔든다.
     # 추천을 보는 검사만 켠다

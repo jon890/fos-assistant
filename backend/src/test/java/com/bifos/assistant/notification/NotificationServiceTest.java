@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -53,6 +54,9 @@ class NotificationServiceTest {
 
     @Autowired
     NotificationService service;
+
+    @Autowired
+    TestClock contextClock;
 
     @Autowired
     NotificationRepository notifications;
@@ -242,6 +246,7 @@ class NotificationServiceTest {
     void storedTimesMatchDatabasePrecisionWhenClockHasNanos() {
         // Linux 의 시스템 시계는 나노초까지 주지만 칸은 DATETIME(6) 이다. 그 시계를 고정해 macOS 에서도 재현한다.
         Instant nanos = Instant.parse("2026-10-01T00:00:00.123456789Z");
+        contextClock.set(nanos);
         NotificationService nanoService = new NotificationService(notifications, hub, Clock.fixed(nanos, ZoneOffset.UTC), transactionManager);
         Instant micros = Instant.parse("2026-10-01T00:00:00.123456Z");
 
@@ -284,7 +289,7 @@ class NotificationServiceTest {
     /** 만든 시각을 정해 읽지 않은 줄 하나를 넣는다. */
     private Notification stored(long userId, Instant createdAt) {
         return notifications.save(
-            Notification.of(userId, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null, createdAt));
+            Notification.of(userId, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null));
     }
 
 

@@ -133,8 +133,7 @@ public class AgentLifecycleService {
                 peopleProperties.defaultCostMode(),
                 CredentialScope.SHARED_HOUSEHOLD,
                 effectiveVisibility,
-                user.id(),
-                clock.instant());
+                user.id());
             agent.markManagedProfile();
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);

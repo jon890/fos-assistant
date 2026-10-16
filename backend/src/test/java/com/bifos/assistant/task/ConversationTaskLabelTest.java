@@ -88,7 +88,7 @@ class ConversationTaskLabelTest {
     @BeforeEach
     void setUp() {
         String email = "task-label-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, BASE));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "task-label-" + UUID.randomUUID().toString().substring(0, 8);
         agent = agents.save(Agent.of(
@@ -99,8 +99,7 @@ class ConversationTaskLabelTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            BASE));
+            owner.id()));
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(owner);
         controller = new ChatController(
@@ -159,7 +158,7 @@ class ConversationTaskLabelTest {
 
     private Task task(String title) {
         return tasks.save(Task.create(
-            owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS, BASE));
+            owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS));
     }
 
 

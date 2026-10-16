@@ -75,7 +75,7 @@ public class AgentMemoryCollectionService {
     public void grantDefaultCollection(AgentCreated created) {
         Agent agent = created.agent();
         grants.save(
-            AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
+            AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false));
     }
 
 
@@ -141,7 +141,7 @@ public class AgentMemoryCollectionService {
             AgentMemoryCollection row = current.get(key);
             boolean allow = Boolean.TRUE.equals(next.get(key));
             if (row == null) {
-                grants.save(AgentMemoryCollection.of(agentId, key, allow, now));
+                grants.save(AgentMemoryCollection.of(agentId, key, allow));
                 record(agentId, key, AgentMemoryCollectionChangeType.GRANTED, allow, changedByUserId, now);
                 granted.add(key);
             } else if (!next.containsKey(key)) {

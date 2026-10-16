@@ -8,7 +8,6 @@ import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -51,7 +50,7 @@ class AgentPortsWiringTest {
     @DisplayName("허용 목록에 저장한 profile 이름은 쥐고 있다고 답한다")
     void reportsProfileNameHeldByAllowedPerson() {
         String profile = uniqueProfile();
-        saved.add(people.save(AllowedPerson.of(profile + "@example.com", "x", profile, Instant.now())));
+        saved.add(people.save(AllowedPerson.of(profile + "@example.com", "x", profile)));
 
         assertThat(reservedProfileNames.reservedByPerson(profile))
             .as("허용 목록에 저장한 profile %s", profile)

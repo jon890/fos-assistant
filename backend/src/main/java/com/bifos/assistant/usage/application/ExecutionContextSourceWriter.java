@@ -2,8 +2,6 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +32,6 @@ public class ExecutionContextSourceWriter {
 
     private final ExecutionContextSourceRepository contextSources;
     private final PlatformTransactionManager transactionManager;
-    private final Clock clock;
 
 
     /** 참조가 없으면 아무것도 하지 않는다. 있으면 position 0 부터 실은 순서대로 적는다. */
@@ -42,7 +39,6 @@ public class ExecutionContextSourceWriter {
         if (sources.isEmpty()) {
             return;
         }
-        Instant now = clock.instant();
         List<ExecutionContextSource> rows = new ArrayList<>(sources.size());
         for (int position = 0; position < sources.size(); position++) {
             ContextSourceRef ref = sources.get(position);
@@ -57,8 +53,7 @@ public class ExecutionContextSourceWriter {
                 ref.selectionRank(),
                 ref.keywordScore(),
                 ref.semanticScore(),
-                ref.selectionScore(),
-                now));
+                ref.selectionScore()));
         }
         try {
             new TransactionTemplate(transactionManager, NEW_TRANSACTION)
@@ -87,8 +82,7 @@ public class ExecutionContextSourceWriter {
                         ref.source(),
                         ref.ref(),
                         ref.bodyMode(),
-                        ref.freshness(),
-                        clock.instant()));
+                        ref.freshness()));
                 });
                 return;
             } catch (DataIntegrityViolationException ex) {

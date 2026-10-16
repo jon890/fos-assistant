@@ -306,8 +306,7 @@ public class MemoryCaptureService {
             request.executionId(),
             kind,
             base,
-            previousStatus,
-            clock.instant()));
+            previousStatus));
         log.info(
             "memory captured userId={} memoryId={} executionId={} kind={}",
             user.id(),

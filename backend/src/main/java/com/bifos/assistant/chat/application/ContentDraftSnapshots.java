@@ -15,7 +15,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +81,7 @@ public class ContentDraftSnapshots {
                 row = snapshots.saveAndFlush(new ContentDraftSnapshot(UUID.randomUUID(), now.revisionId(), user.id(), conversationId,
                     now.originExecutionId(), stamp.agentId(), stamp.connectionId(), stamp.bindingId(), stamp.connectionUpdatedAt(), stamp.bindingUpdatedAt(),
                     stamp.policyFingerprint(), 1, "content-compiler-v1", result.path("payloadFingerprint").stringValue(),
-                    result.path("snapshotHash").stringValue(), authorization, clock.instant().truncatedTo(ChronoUnit.MICROS), now.expiresAt()));
+                    result.path("snapshotHash").stringValue(), authorization, now.expiresAt()));
             }
             requireStamp(row, now.binding());
             if (!row.originExecutionId().equals(now.originExecutionId()) || !row.expiresAt().equals(now.expiresAt())) {

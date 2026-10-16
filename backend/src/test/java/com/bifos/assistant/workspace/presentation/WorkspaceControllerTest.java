@@ -341,8 +341,7 @@ class WorkspaceControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            ownerUserId,
-            Instant.parse("2026-10-09T00:00:00Z")));
+            ownerUserId));
         createdAgents.add(code);
         return code;
     }

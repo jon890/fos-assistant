@@ -142,8 +142,7 @@ class SkillUsageQueryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            dad.id(),
-            Instant.now()));
+            dad.id()));
         dadFirst = conversations.save(Conversation.startedBy(dad.id(), "장보기 첫째", agent.id(), Instant.now()));
         dadSecond = conversations.save(Conversation.startedBy(dad.id(), "장보기 둘째", agent.id(), Instant.now()));
         kidOnly = conversations.save(Conversation.startedBy(kid.id(), "아이 장보기", agent.id(), Instant.now()));
@@ -172,7 +171,7 @@ class SkillUsageQueryTest {
 
     private CurrentUser user(String email, String name) {
         AppUser user = users.findByEmail(email)
-            .orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now())));
+            .orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER)));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

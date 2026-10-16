@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -40,7 +41,7 @@ import org.springframework.data.domain.Persistable;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorActionExecution implements Persistable<Long> {
+public class ConnectorActionExecution extends CreatedAtEntity implements Persistable<Long> {
     @Transient
     private boolean persisted;
 
@@ -105,9 +106,6 @@ public class ConnectorActionExecution implements Persistable<Long> {
     @Column(name = "consumed_at")
     private Instant consumedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
 
     /** 검증하고 암호화한 값을 담는다. 원래 action의 인자와 상태를 바꾸지 않는다. */
     public static ConnectorActionExecution stored(
@@ -123,8 +121,7 @@ public class ConnectorActionExecution implements Persistable<Long> {
         String executionArgsSha256,
         String scopeSha256,
         String requestKey,
-        String protocol,
-        Instant now) {
+        String protocol) {
         ConnectorActionExecution row = new ConnectorActionExecution();
         row.action = Objects.requireNonNull(action);
         row.actionId = Objects.requireNonNull(action.id());
@@ -140,7 +137,6 @@ public class ConnectorActionExecution implements Persistable<Long> {
         row.scopeSha256 = Objects.requireNonNull(scopeSha256);
         row.requestKey = Objects.requireNonNull(requestKey);
         row.protocol = Objects.requireNonNull(protocol);
-        row.createdAt = Objects.requireNonNull(now);
         return row;
     }
 

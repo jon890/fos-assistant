@@ -101,8 +101,7 @@ class ValueEvaluationStoreTest {
                     candidate.risk(),
                     null,
                     candidate.evidence(),
-                    candidate.evidenceCheckedAt(),
-                    DecisionFixtures.NOW));
+                    candidate.evidenceCheckedAt()));
             }
             problems.save(ProactiveCheckProblem.of(
                 check.id(),
@@ -120,8 +119,7 @@ class ValueEvaluationStoreTest {
                 null,
                 null,
                 List.of(),
-                null,
-                DecisionFixtures.NOW));
+                null));
         });
         service = new ValueEvaluationService(
             List.of(provider("fixture-a"), provider("fixture-b")), new ValueEvaluator(), store);
@@ -162,8 +160,7 @@ class ValueEvaluationStoreTest {
                 null,
                 null,
                 candidate.evidence(),
-                candidate.evidenceCheckedAt(),
-                DecisionFixtures.NOW));
+                candidate.evidenceCheckedAt()));
         });
         ValueEvaluation second = service.replay(OWNER, first.id(), "fixture-b");
         ValueEvaluation third = service.replay(OWNER, first.id(), "fixture-a");

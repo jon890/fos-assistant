@@ -71,8 +71,7 @@ class AgentRunnerSubmitFailureTest {
         CostMode.API,
         CredentialScope.DEDICATED,
         AgentVisibility.PRIVATE,
-        1L,
-        Instant.now());
+        1L);
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution failed = mock(AgentExecution.class);
     private AgentRunner runner;

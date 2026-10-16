@@ -64,6 +64,9 @@ VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-
 INSERT INTO memory_collection (group_id, collection_key, display_name, sort_order, created_at)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
+INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)
+VALUES (900000001, 'coverage-900000001', 1, X'0000000000000000000000000000000000000000000000000000000000000000', X'0000803F', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
+
 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, sensitivity, changed_at)
 VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
 

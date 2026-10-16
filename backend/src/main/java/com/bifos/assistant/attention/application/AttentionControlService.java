@@ -95,8 +95,8 @@ public class AttentionControlService {
             user,
             card,
             itemKey,
-            entry -> entry.rehide(stateKey, now),
-            () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey, now));
+            entry -> entry.rehide(stateKey),
+            () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey));
         recordInCard(user, snapshot, card, itemKey, stateKey, AttentionEventType.HIDDEN);
         suggestions.controlled(user, candidate, FeedbackEventType.DISMISSED, FeedbackLabeler.ATTENTION_HIDE, now);
     }
@@ -121,8 +121,8 @@ public class AttentionControlService {
             user,
             card,
             itemKey,
-            entry -> entry.resnooze(until, now),
-            () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until, now));
+            entry -> entry.resnooze(until),
+            () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until));
         // 미루기 요청에는 상태가 없어 그 카드 후보의 지금 상태로 사건을 남긴다.
         recordInCard(user, snapshot, card, itemKey, candidate.stateKey(), AttentionEventType.SNOOZED);
         suggestions.controlled(user, candidate, FeedbackEventType.POSTPONED, FeedbackLabeler.ATTENTION_SNOOZE, now);

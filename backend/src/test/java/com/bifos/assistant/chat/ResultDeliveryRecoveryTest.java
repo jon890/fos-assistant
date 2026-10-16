@@ -174,7 +174,7 @@ class ResultDeliveryRecoveryTest {
         memories.deleteAll();
         users.deleteAll();
 
-        dad = users.save(AppUser.of("recovery-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        dad = users.save(AppUser.of("recovery-dad@example.com", "dad", 1L, UserRole.MEMBER));
         chief = agents.save(agent("dad", "비서"));
         worker = agents.save(agent("worker", "조사원"));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
@@ -457,8 +457,7 @@ class ResultDeliveryRecoveryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            dad.id(),
-            Instant.now());
+            dad.id());
     }
 
 

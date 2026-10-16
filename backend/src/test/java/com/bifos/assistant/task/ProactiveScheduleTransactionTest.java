@@ -125,7 +125,7 @@ class ProactiveScheduleTransactionTest {
     void disablesScheduleAndPreventsFutureChecksAfterRuntimeRecovers(String band, ErrorCode errorCode) {
         Fixture fixture = activeSchedule();
         TaskTrigger trigger = triggers.findByTaskId(fixture.task().id()).orElseThrow();
-        trigger.moveNext(DUE, NOW);
+        trigger.moveNext(DUE);
         triggers.saveAndFlush(trigger);
         TaskRun queued = runs.saveAndFlush(TaskRun.queued(
             fixture.task().id(), trigger.id(), fixture.owner().id(), DUE, NOW));
@@ -181,7 +181,7 @@ class ProactiveScheduleTransactionTest {
     private Fixture activeSchedule() {
         String suffix = UUID.randomUUID().toString();
         String email = "schedule-" + suffix + "@example.com";
-        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(owner.id());
         Agent agent = agents.save(Agent.of(
             "schedule-" + suffix,
@@ -191,8 +191,7 @@ class ProactiveScheduleTransactionTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
         createdAgents.add(agent.id());
         CurrentUser currentUser = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
 

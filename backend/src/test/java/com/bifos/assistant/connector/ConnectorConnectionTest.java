@@ -48,7 +48,7 @@ class ConnectorConnectionTest {
         assertThat(connection.undeclaredTools()).isZero();
         assertThat(connection.checkedAt()).isEqualTo(LATER);
         assertThat(connection.updatedAt()).isEqualTo(LATER);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
     }
 
 
@@ -97,7 +97,7 @@ class ConnectorConnectionTest {
     @DisplayName("상태 전이는 인자로 받은 시각을 적는다")
     void transitionsRecordTheGivenInstant() {
         ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
         assertThat(connection.checkedAt()).isNull();
 
         connection.ready(LATER);
@@ -105,7 +105,7 @@ class ConnectorConnectionTest {
         assertThat(connection.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(connection.checkedAt()).isEqualTo(LATER);
         assertThat(connection.updatedAt()).isEqualTo(LATER);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
     }
 
 
@@ -118,8 +118,7 @@ class ConnectorConnectionTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+            1L);
 
         return agent;
     }

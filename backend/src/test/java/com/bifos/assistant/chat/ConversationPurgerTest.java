@@ -125,7 +125,7 @@ class ConversationPurgerTest {
     @BeforeEach
     void setUp() {
         String email = "purge-" + UUID.randomUUID() + "@example.test";
-        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         String code = "purge-" + UUID.randomUUID().toString().substring(0, 8);
         agent = agents.save(Agent.of(
             code,
@@ -135,8 +135,7 @@ class ConversationPurgerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
     }
 
 
@@ -330,7 +329,7 @@ class ConversationPurgerTest {
         execution.recordOutput("위임한 답 본문");
         executions.save(execution);
         messages.save(ChatMessage.fromAssistant(conversation.id(), "식단을 조절해 보세요", execution.id(), NOW));
-        questions.save(ExecutionQuestion.of(execution.id(), question.id(), NOW));
+        questions.save(ExecutionQuestion.of(execution.id(), question.id()));
         events.save(ExecutionEvent.builder()
             .executionId(execution.id())
             .sequence(1)
@@ -340,7 +339,7 @@ class ConversationPurgerTest {
             .occurredAt(NOW)
             .build());
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-            conversation.id(), owner.id(), "검진표.png", "image/png", 3, NOW.plus(Duration.ofDays(30)), NOW));
+            conversation.id(), owner.id(), "검진표.png", "image/png", 3, NOW.plus(Duration.ofDays(30))));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         attachmentStore.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));

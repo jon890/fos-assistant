@@ -23,6 +23,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -65,6 +66,9 @@ class ProactiveCheckRepositoryTest {
 
     @Autowired
     ProactiveCheckService service;
+
+    @Autowired
+    TestClock contextClock;
 
     private final List<Long> createdConversations = new ArrayList<>();
 
@@ -240,8 +244,7 @@ class ProactiveCheckRepositoryTest {
             "k".repeat(121),
             titleSplittingPair,
             "https://example.com/" + "p".repeat(2000),
-            null,
-            NOW)));
+            null)));
 
         ProactiveCheckFinding read = transactions.execute(status -> findings.findById(saved.id()).orElseThrow());
 
@@ -270,6 +273,7 @@ class ProactiveCheckRepositoryTest {
 
     private ProactiveCheckFinding saveFinding(
         ProactiveCheck check, long conversationId, FindingKind kind, String topicKey, Instant createdAt) {
+        contextClock.set(createdAt);
         ProactiveCheckFinding finding = ProactiveCheckFinding.of(
             check.id(),
             conversationId,
@@ -279,7 +283,6 @@ class ProactiveCheckRepositoryTest {
             topicKey,
             "제목 " + topicKey,
             "https://example.com/" + topicKey,
-            createdAt,
             createdAt);
         return transactions.execute(status -> findings.save(finding));
     }

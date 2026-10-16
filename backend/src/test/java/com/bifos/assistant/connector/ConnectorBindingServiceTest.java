@@ -1151,8 +1151,7 @@ class ConnectorBindingServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now()));
+            null));
 
         assertCode(() -> service.confirmApplied(administrator, code, DEMO, null), ErrorCode.AGENT_NOT_FOUND);
     }
@@ -1257,14 +1256,13 @@ class ConnectorBindingServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
     private CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("binding-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("binding-" + suffix + "@example.com", suffix, groupId, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 

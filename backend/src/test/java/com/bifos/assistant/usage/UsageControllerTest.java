@@ -96,8 +96,7 @@ class UsageControllerTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now())));
+                USER_ID)));
         controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
@@ -395,8 +394,7 @@ class UsageControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now()));
+            USER_ID));
         AgentExecution kept = execution(null, null);
         AgentExecution orphaned = executions.save(AgentExecution.builder()
             .userId(USER_ID)

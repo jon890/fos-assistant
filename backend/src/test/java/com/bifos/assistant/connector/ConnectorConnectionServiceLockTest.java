@@ -296,7 +296,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
             pool.submit(() -> transactions.executeWithoutResult(status -> {
                 users.findByIdForUpdate(target.owner().id()).orElseThrow();
-                AllowedPerson person = people.save(AllowedPerson.of(target.owner().email(), "검사", "revoked-" + target.owner().id(), clock.instant()));
+                AllowedPerson person = people.save(AllowedPerson.of(target.owner().email(), "검사", "revoked-" + target.owner().id()));
                 person.disable();
             })).get(10, TimeUnit.SECONDS);
             release.countDown();
@@ -571,7 +571,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         Observed before = observe(target.bindingId());
         transactions.executeWithoutResult(status -> {
             users.findByIdForUpdate(target.owner().id()).orElseThrow();
-            AllowedPerson person = people.save(AllowedPerson.of(target.owner().email(), "검사", "revoked-" + target.owner().id(), clock.instant()));
+            AllowedPerson person = people.save(AllowedPerson.of(target.owner().email(), "검사", "revoked-" + target.owner().id()));
             person.disable();
         });
         clearInvocations(connector);

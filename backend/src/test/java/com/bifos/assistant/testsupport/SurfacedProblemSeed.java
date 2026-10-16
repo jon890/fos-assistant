@@ -96,8 +96,7 @@ public class SurfacedProblemSeed {
             null,
             null,
             List.of(),
-            null,
-            spec.at()));
+            null));
         ValueEvaluation evaluation = evaluations.save(ValueEvaluation.of(
             checkId,
             user.id(),

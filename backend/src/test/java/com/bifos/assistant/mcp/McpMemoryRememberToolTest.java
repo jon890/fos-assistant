@@ -127,7 +127,7 @@ class McpMemoryRememberToolTest {
     void setUp() {
         clear();
         String email = "mcp-memory-remember-" + UUID.randomUUID() + "@example.com";
-        dad = users.save(AppUser.of(email, "아빠", 1L, UserRole.ADMIN, Instant.now()));
+        dad = users.save(AppUser.of(email, "아빠", 1L, UserRole.ADMIN));
         dadToken = tokens.issue(PROFILE, "memory-remember").rawToken();
         Agent agent = McpCallSigner.agentFor(agents, PROFILE);
         conversation = conversations.save(Conversation.startedBy(dad.id(), "기억 검사 대화", agent.id(), Instant.now()));
@@ -351,8 +351,7 @@ class McpMemoryRememberToolTest {
         questions.save(ExecutionQuestion.of(
             earlier.id(),
             messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()))
-                .id(),
-            Instant.now()));
+                .id()));
         toolStarted(earlier.id(), ExecutionEventType.TOOL_STARTED, "mcp__gmail__read_message");
         askedInThisTurn();
 
@@ -417,7 +416,7 @@ class McpMemoryRememberToolTest {
     @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
     void proposesWhenQuestionIsOthers() throws Exception {
         ChatMessage foreign = messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
-        questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id(), Instant.now()));
+        questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id()));
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
             .isEqualTo(PROPOSED);
@@ -634,7 +633,7 @@ class McpMemoryRememberToolTest {
 
     private void askedInThisTurn(String text) {
         ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), text, Instant.now()));
-        questions.save(ExecutionQuestion.of(dadRun.id(), question.id(), Instant.now()));
+        questions.save(ExecutionQuestion.of(dadRun.id(), question.id()));
     }
 
 
@@ -643,7 +642,7 @@ class McpMemoryRememberToolTest {
         String root = McpCallSigner.newRoot();
         AgentExecution run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
         ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
-        questions.save(ExecutionQuestion.of(run.id(), question.id(), Instant.now()));
+        questions.save(ExecutionQuestion.of(run.id(), question.id()));
         return root;
     }
 

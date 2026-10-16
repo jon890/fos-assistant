@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -36,7 +37,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserBrowser {
+public class UserBrowser extends CreatedAtEntity {
 
     /** {@code last_active_at} 을 다시 쓰기까지의 최소 간격이다. 화면 입력마다 줄을 고치지 않게 한다. */
     public static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
@@ -70,9 +71,6 @@ public class UserBrowser {
     @Column(name = "started_at")
     private Instant startedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -87,7 +85,6 @@ public class UserBrowser {
         browser.userId = userId;
         browser.profileKey = profileKey;
         browser.status = UserBrowserStatus.STOPPED;
-        browser.createdAt = now;
         browser.updatedAt = now;
         return browser;
     }

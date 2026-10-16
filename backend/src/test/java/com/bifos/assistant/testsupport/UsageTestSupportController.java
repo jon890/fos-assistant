@@ -64,7 +64,7 @@ public class UsageTestSupportController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "test admin user already exists");
         }
         users.save(AppUser.of(
-            requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN, Instant.now()));
+            requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN));
         return requested;
     }
 

@@ -362,7 +362,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 jdbc.update("delete from agent_execution where id = ?", context.originExecutionId());
             case "owner" -> {
                 var other = users.saveAndFlush(
-                    AppUser.of(UUID.randomUUID() + "@example.test", "다른 주인", 1L, UserRole.MEMBER, NOW));
+                    AppUser.of(UUID.randomUUID() + "@example.test", "다른 주인", 1L, UserRole.MEMBER));
                 jdbc.update("update connector_connection set user_id = ? where id = ?", other.id(), f.connection());
             }
             case "originUser", "originAgent" -> {
@@ -787,9 +787,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
     Fixture fixture(Instant approvalExpiry) {
         return tx().execute(status -> {
             String id = UUID.randomUUID().toString();
-            var user = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER, NOW));
+            var user = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER));
             String profile = "claim-" + id;
-            people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile, NOW));
+            people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile));
             var agent = agents.saveAndFlush(Agent.of(
                 "claim-" + id,
                 "검사",
@@ -798,8 +798,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(),
-                NOW));
+                user.id()));
             var connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
             connection.connected(new ConnectionFields(Map.of("account", "000007"), Map.of()), NOW);
             connection.ready(NOW);

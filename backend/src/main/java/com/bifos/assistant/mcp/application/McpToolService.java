@@ -12,6 +12,7 @@ import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
+import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationResult;
@@ -70,6 +71,7 @@ public class McpToolService {
     private static final String DUE_AT_FORMAT = "due_at 은 2026-10-05 나 2026-10-05T18:00 형식이다.";
 
     private final MemoryService memories;
+    private final QueryEmbedder queryEmbedder;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
     private final ExecutionDeliveryWriter deliveryWriter;
@@ -126,8 +128,11 @@ public class McpToolService {
 
     /** 제목만 반환한다. 본문 사용 기록은 뒤이은 성공한 memory_read가 남긴다. */
     public Map<String, Object> searchMemory(McpCaller caller, String query, int limit, MemorySearchCursor cursor) {
+        // 질문 임베딩은 검색의 2초 트랜잭션 밖에서 한다. 늦거나 실패하면 키워드 점수만 쓴다
+        // 키워드만으로 매긴 검색의 다음 페이지는 같은 규칙으로 잇도록 임베딩하지 않는다
+        Optional<float[]> queryVector = cursor.needsQueryVector() ? queryEmbedder.embed(query) : Optional.empty();
         MemorySearchPage page = memories.searchFor(
-            caller.user(), memories.accessOf(caller.originExecution().agentId()), query, limit, cursor);
+            caller.user(), memories.accessOf(caller.originExecution().agentId()), query, limit, cursor, queryVector);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("items", page.items());
         data.put("nextCursor", page.nextCursor());

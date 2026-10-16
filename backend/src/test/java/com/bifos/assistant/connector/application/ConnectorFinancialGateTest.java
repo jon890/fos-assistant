@@ -150,8 +150,8 @@ class ConnectorFinancialGateTest {
     @Test
     @DisplayName("scope 계좌의 항목 메일이 줄 주인의 메일과 대소문자 없이 같을 때만 지나고 다른 사용자와 없는 사용자는 닫는다")
     void requiresAccountOwnedByUser() {
-        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of("Owner@Example.Test", "주인", 1L, UserRole.MEMBER, NOW)));
-        when(users.findById(10L)).thenReturn(Optional.of(AppUser.of("other@example.test", "다른 사람", 1L, UserRole.MEMBER, NOW)));
+        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of("Owner@Example.Test", "주인", 1L, UserRole.MEMBER)));
+        when(users.findById(10L)).thenReturn(Optional.of(AppUser.of("other@example.test", "다른 사람", 1L, UserRole.MEMBER)));
         var gate = gate(open("1", "1", "1"));
         assertThatCode(() -> gate.requireAccounts(9L, List.of("7"))).doesNotThrowAnyException();
         assertThatCode(() -> gate.requireScope(9L, "{\"account_seq\":\"7\"}")).doesNotThrowAnyException();
@@ -166,7 +166,7 @@ class ConnectorFinancialGateTest {
     @Test
     @DisplayName("000007 항목이 있어도 scope 7 은 맞지 않고 scope 000007 만 지난다")
     void comparesAccountTextExactly() {
-        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of(OWNER, "주인", 1L, UserRole.MEMBER, NOW)));
+        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of(OWNER, "주인", 1L, UserRole.MEMBER)));
         var limits = new ConnectorFinancialProperties(List.of("000007:" + OWNER), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
             BigDecimal.ONE, BigDecimal.ONE, KEY);
         var gate = gate(limits);

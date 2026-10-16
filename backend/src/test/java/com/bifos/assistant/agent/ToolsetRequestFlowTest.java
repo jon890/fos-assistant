@@ -117,8 +117,7 @@ class ToolsetRequestFlowTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now())));
+            owner.id())));
         when(hermes.readCatalog())
             .thenReturn(List.of(
                 new ToolsetCatalogEntry("web", "검색", "검색"),
@@ -296,7 +295,7 @@ class ToolsetRequestFlowTest {
             case "revoked" ->
                 transactions.executeWithoutResult(status -> {
                     AllowedPerson person = people.save(
-                        AllowedPerson.of(owner.email(), "사용자", "revoked-" + agent.code(), Instant.now()));
+                        AllowedPerson.of(owner.email(), "사용자", "revoked-" + agent.code()));
                     person.disable();
                     people.saveAndFlush(person);
                 });
@@ -410,7 +409,7 @@ class ToolsetRequestFlowTest {
 
 
     private CurrentUser user(String local, UserRole role, Long userGroup) {
-        AppUser row = users.saveAndFlush(AppUser.of(local + "@example.com", "검사 사용자", userGroup, role, Instant.now()));
+        AppUser row = users.saveAndFlush(AppUser.of(local + "@example.com", "검사 사용자", userGroup, role));
         return new CurrentUser(row.id(), row.email(), row.displayName(), row.groupId(), row.role());
     }
 

@@ -82,7 +82,7 @@ class AgentMemoryCollectionServiceTest {
     void savingAnExistingAgentAgainDoesNotResetItsGrants() {
         Agent agent = agents.save(agent());
         // 관리자가 core 의 민감 허용을 켰다. 사건이 다시 나가면 이 줄이 거짓으로 덮인다.
-        grants.save(AgentMemoryCollection.of(agent.id(), "core", true, NOW));
+        grants.save(AgentMemoryCollection.of(agent.id(), "core", true));
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
         assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("core");
@@ -107,8 +107,8 @@ class AgentMemoryCollectionServiceTest {
     @DisplayName("관리자가 넓힌 collection 과 민감 허용을 그대로 낸다")
     void returnsWidenedCollectionsAndSensitiveAllowance() {
         Agent agent = agents.save(agent());
-        grants.save(AgentMemoryCollection.of(agent.id(), "career", false, NOW));
-        grants.save(AgentMemoryCollection.of(agent.id(), "identity", true, NOW));
+        grants.save(AgentMemoryCollection.of(agent.id(), "career", false));
+        grants.save(AgentMemoryCollection.of(agent.id(), "identity", true));
 
         AgentMemoryGrants granted = service.grantsOf(agent.id());
 
@@ -228,7 +228,7 @@ class AgentMemoryCollectionServiceTest {
         assertThat(service.recentChangesOf(agent.id())).isEmpty();
 
         // 목록에서 빠졌지만 지금 받는 줄은 그대로 두고 민감 허용도 바꿀 수 있다.
-        grants.save(AgentMemoryCollection.of(agent.id(), "identity", false, NOW));
+        grants.save(AgentMemoryCollection.of(agent.id(), "identity", false));
         service.replace(agent.id(), Map.of("core", false, "identity", true), LISTED, ADMIN_ID);
 
         assertThat(service.grantsOf(agent.id()).collections()).containsExactlyInAnyOrder("core", "identity");
@@ -336,7 +336,6 @@ class AgentMemoryCollectionServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.GROUP,
-            null,
-            Instant.now());
+            null);
     }
 }

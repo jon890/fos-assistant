@@ -154,7 +154,7 @@ class ApprovalNotificationTest {
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
             .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
 
-        owner = users.save(AppUser.of("approval-notice@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("approval-notice@example.com", "주인", 1L, UserRole.MEMBER));
         me = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         agent = Agent.of(
             "notice-" + UUID.randomUUID(),
@@ -164,8 +164,7 @@ class ApprovalNotificationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now());
+            owner.id());
 
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "승인 대화", agent.id(), Instant.now()));

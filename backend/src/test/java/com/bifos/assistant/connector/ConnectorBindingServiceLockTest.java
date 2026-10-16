@@ -295,14 +295,13 @@ class ConnectorBindingServiceLockTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
     protected CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("lock-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("lock-" + suffix + "@example.com", suffix, groupId, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

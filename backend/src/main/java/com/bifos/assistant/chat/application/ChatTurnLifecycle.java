@@ -237,7 +237,7 @@ class ChatTurnLifecycle {
             return;
         }
         try {
-            executionQuestions.save(ExecutionQuestion.of(executionId, questionId, clock.instant()));
+            executionQuestions.save(ExecutionQuestion.of(executionId, questionId));
         } catch (RuntimeException ex) {
             log.warn("could not link the turn question executionId={}", executionId, ex);
         }

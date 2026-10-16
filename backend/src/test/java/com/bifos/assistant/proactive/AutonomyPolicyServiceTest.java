@@ -135,8 +135,7 @@ class AutonomyPolicyServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                OWNER.id(),
-                now));
+                OWNER.id()));
             conversation = conversations.save(Conversation.startedForCheck(OWNER.id(), "행동 정책", agent.id(), now));
             source = succeeded(CheckTrigger.MANUAL, now);
             started = succeeded(CheckTrigger.AUTONOMY, now);
@@ -396,8 +395,7 @@ class AutonomyPolicyServiceTest {
             null,
             null,
             List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
-            now.minusSeconds(60),
-            now)));
+            now.minusSeconds(60))));
     }
 
 

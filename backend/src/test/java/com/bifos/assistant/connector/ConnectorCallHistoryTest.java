@@ -58,7 +58,7 @@ class ConnectorCallHistoryTest {
     @Test
     @DisplayName("자식의 커넥터 호출을 루트에서 찾되 호출 전과 다른 트리에는 적용하지 않는다")
     void findsChildCallWithTimestampAndTreeBoundary() {
-        AppUser user = users.save(AppUser.of("history@example.com", "history", 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of("history@example.com", "history", 1L, UserRole.MEMBER));
         Agent agent = agents.save(Agent.of(
             "history",
             "history",
@@ -67,8 +67,7 @@ class ConnectorCallHistoryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            NOW));
+            user.id()));
         AgentExecution root = execution(user, agent, null, null);
         AgentExecution child = execution(user, agent, root.id(), root.id());
         AgentExecution otherRoot = execution(user, agent, null, null);

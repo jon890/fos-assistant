@@ -161,7 +161,7 @@ class ProactiveCheckEndTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(AppUser.of("end-" + suffix + "@example.com", "끝", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("end-" + suffix + "@example.com", "끝", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agent = agents.save(agent("end-" + suffix, "커리어"));
         Agent connected = agent("end-connector-" + suffix, "채용 연결");
@@ -410,8 +410,7 @@ class ProactiveCheckEndTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner == null ? null : owner.id(),
-            Instant.now());
+            owner == null ? null : owner.id());
     }
 
 

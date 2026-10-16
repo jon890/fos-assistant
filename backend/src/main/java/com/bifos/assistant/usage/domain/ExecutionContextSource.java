@@ -1,5 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -7,7 +8,6 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,7 +31,7 @@ import org.springframework.data.domain.Persistable;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ExecutionContextSource implements Persistable<ExecutionContextSourceId> {
+public class ExecutionContextSource extends CreatedAtEntity implements Persistable<ExecutionContextSourceId> {
 
     @EmbeddedId
     private ExecutionContextSourceId id;
@@ -66,9 +66,6 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
     @Column(name = "selection_score")
     private Double selectionScore;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     /** 데이터베이스에 있는 줄이다. 읽어 왔거나 방금 넣었을 때 참이 된다. */
     @Transient
     private boolean persisted;
@@ -80,14 +77,12 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
         String source,
         String sourceRef,
         String bodyMode,
-        String freshness,
-        Instant createdAt) {
+        String freshness) {
         this.id = new ExecutionContextSourceId(executionId, position);
         this.source = source;
         this.sourceRef = sourceRef;
         this.bodyMode = bodyMode;
         this.freshness = freshness;
-        this.createdAt = createdAt;
     }
 
 
@@ -97,9 +92,8 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
         String source,
         String sourceRef,
         String bodyMode,
-        String freshness,
-        Instant createdAt) {
-        return new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness, createdAt);
+        String freshness) {
+        return new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness);
     }
 
 
@@ -115,9 +109,8 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
         Integer selectionRank,
         Double keywordScore,
         Double semanticScore,
-        Double selectionScore,
-        Instant createdAt) {
-        ExecutionContextSource row = new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness, createdAt);
+        Double selectionScore) {
+        ExecutionContextSource row = new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness);
         row.selector = selector;
         row.selectionRank = selectionRank;
         row.keywordScore = keywordScore;

@@ -153,9 +153,9 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
             tx().executeWithoutResult(status -> {
                 var run = runs.findById(origin).orElseThrow();
                 var task = tasks.save(Task.create(user.id(), run.agentId(), "매일 상한", "상한 올려 줘", ConversationMode.NEW_PER_RUN,
-                    NotifyPolicy.NEVER, now));
+                    NotifyPolicy.NEVER));
                 var trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", ZoneId.of("Asia/Seoul"), MissedPolicy.RUN_ONCE,
-                    now, now));
+                    now));
                 var taskRun = TaskRun.queued(task.id(), trigger.id(), user.id(), now, now);
                 taskRun.useConversation(run.conversationId());
                 taskRun.start(now);

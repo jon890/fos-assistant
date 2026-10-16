@@ -181,8 +181,8 @@ class McpAgentToolsTest {
         CODES.forEach(code -> agents.findByCode(code).ifPresent(agents::delete));
         tokenRepository.deleteAll();
         users.deleteAll();
-        userA = users.save(AppUser.of("tools-a@example.com", "가", 1L, UserRole.MEMBER, Instant.now()));
-        userB = users.save(AppUser.of("tools-b@example.com", "나", 1L, UserRole.MEMBER, Instant.now()));
+        userA = users.save(AppUser.of("tools-a@example.com", "가", 1L, UserRole.MEMBER));
+        userB = users.save(AppUser.of("tools-b@example.com", "나", 1L, UserRole.MEMBER));
         sharedToken = tokens.issue(SHARED, "shared").rawToken();
         privateAToken = tokens.issue(PRIVATE_A, "private").rawToken();
         agents.save(agent(GROUP_CODE, "함께 쓰는 조사원", AgentVisibility.GROUP, userA.id()));
@@ -1526,8 +1526,7 @@ class McpAgentToolsTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             visibility,
-            ownerUserId,
-            Instant.now());
+            ownerUserId);
     }
 
 

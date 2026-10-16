@@ -33,7 +33,6 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -73,11 +72,11 @@ class ChatInterimTest {
     void setUp() {
         ((StubHermesRunsClient)hermes).reset();
         agentCode = "interim-" + UUID.randomUUID().toString().substring(0, 8);
-        var saved = users.save(AppUser.of(agentCode + "@example.com", "안내 검사", 1L, UserRole.MEMBER, Instant.now()));
+        var saved = users.save(AppUser.of(agentCode + "@example.com", "안내 검사", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(agentCode, agentCode, agentCode, "http://agent-runtime.test",
             CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE,
-            user.id(), Instant.now()));
+            user.id()));
     }
 
 

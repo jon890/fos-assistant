@@ -95,7 +95,7 @@ class ConnectorActionDeliveryWithoutWakeTest {
         jdbc.update("DELETE FROM connector_action");
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         AppUser user = users.save(
-            AppUser.of("no-wake-" + UUID.randomUUID() + "@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("no-wake-" + UUID.randomUUID() + "@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "no-wake-" + UUID.randomUUID();
         chief = agents.save(Agent.of(
@@ -106,8 +106,7 @@ class ConnectorActionDeliveryWithoutWakeTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            Instant.now()));
+            user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
             .userId(dad.id())

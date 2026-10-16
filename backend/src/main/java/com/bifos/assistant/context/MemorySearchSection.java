@@ -1,6 +1,7 @@
 package com.bifos.assistant.context;
 
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
+import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.application.relevance.RelevanceResult;
 import com.bifos.assistant.memory.application.relevance.RelevanceScore;
@@ -38,6 +39,7 @@ public class MemorySearchSection {
 
     private final MemoryRelevance relevance;
     private final MemorySearchSectionProperties properties;
+    private final QueryEmbedder queryEmbedder;
 
 
     /**
@@ -57,7 +59,9 @@ public class MemorySearchSection {
         if (question == null || question.isBlank() || candidates.isEmpty() || properties.maxItems() == 0) {
             return MemorySearchPlacement.byId(candidates);
         }
-        RelevanceResult result = relevance.score(question.strip(), candidates.stream().map(MemorySearchSection::candidateOf).toList());
+        String stripped = question.strip();
+        RelevanceResult result = relevance.score(
+            stripped, queryEmbedder.embed(stripped), candidates.stream().map(MemorySearchSection::candidateOf).toList());
         if (result.ranked().isEmpty()) {
             return MemorySearchPlacement.byId(candidates);
         }

@@ -1,10 +1,10 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +21,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ExecutionQuestion {
+public class ExecutionQuestion extends CreatedAtEntity {
 
     @Id
     @Column(name = "execution_id")
@@ -30,15 +30,11 @@ public class ExecutionQuestion {
     @Column(name = "message_id", nullable = false)
     private Long messageId;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
-
-    public static ExecutionQuestion of(Long executionId, Long messageId, Instant now) {
+    public static ExecutionQuestion of(Long executionId, Long messageId) {
         ExecutionQuestion question = new ExecutionQuestion();
         question.executionId = executionId;
         question.messageId = messageId;
-        question.createdAt = now;
         return question;
     }
 }

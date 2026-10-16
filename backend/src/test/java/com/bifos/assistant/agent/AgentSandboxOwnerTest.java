@@ -45,8 +45,7 @@ class AgentSandboxOwnerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            ownerUserId,
-            NOW);
+            ownerUserId);
         ReflectionTestUtils.setField(agent, "id", id);
         return agent;
     }
