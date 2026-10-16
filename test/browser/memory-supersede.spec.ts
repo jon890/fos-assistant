@@ -158,3 +158,28 @@ test("대체 제안을 거절하면 카드가 사라지고 기억은 그대로�
     memoryRow(page, OLD_TITLE).getByTestId("memory-superseded"),
   ).toHaveCount(0);
 });
+
+test("다른 곳에서 이미 정한 제안을 누르면 목록을 다시 읽어 카드가 사라진다", async ({
+  page,
+}) => {
+  const state = { superseded: false, pending: true };
+  await page.route("**/api/memory-links/61/accept", (route: Route) => {
+    state.pending = false;
+    state.superseded = true;
+    return route.fulfill({
+      status: 409,
+      json: { code: "MEMORY_LINK_STATE_CONFLICT", message: "conflict" },
+    });
+  });
+  await showStubs(page, state);
+
+  await page
+    .getByTestId("memory-supersede-proposal")
+    .getByRole("button", { name: "받아들이기" })
+    .click();
+
+  await expect(page.getByTestId("memory-supersede-proposal")).toHaveCount(0);
+  await expect(
+    memoryRow(page, OLD_TITLE).getByTestId("memory-superseded"),
+  ).toHaveText("대체됨");
+});

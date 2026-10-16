@@ -36,6 +36,8 @@ export function MemorySupersedeProposal({
     }
     if (!response.ok) {
       setError("제안을 처리하지 못했어요.");
+      // 다른 탭이나 다른 관리자가 이미 정했거나 지운 제안이다. 목록을 다시 읽어 지금 상태를 보인다.
+      if (response.status === 404 || response.status === 409) await onChanged();
       return;
     }
     await onChanged();

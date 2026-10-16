@@ -36,6 +36,8 @@ export function MemorySuperseded({
     }
     if (!response.ok) {
       setError("대체를 되돌리지 못했어요.");
+      // 다른 탭에서 이미 되돌렸거나 연결이 지워졌다. 목록을 다시 읽어 지금 상태를 보인다.
+      if (response.status === 404 || response.status === 409) await onChanged();
       return;
     }
     await onChanged();
