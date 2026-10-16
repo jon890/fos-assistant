@@ -47,7 +47,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 「합성 측정」 이 갖는다.
  *
  * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출, 기준 파일보다 나빠진
- * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
+ * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것, 대체 연결을 넣은 조립의
+ * {@code KNOWLEDGE_UPDATE} 오기억 노출률이 연결 없는 조립보다 낮지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
  */
 @BackendIntegrationTest
 class MemoryRecallEvalTest {
@@ -59,6 +60,7 @@ class MemoryRecallEvalTest {
     private static final String QUESTION_OFF = "questionOff";
     private static final String FACTS_OFF = "factsOff";
     private static final String FACTS_ON = "factsOn";
+    private static final String LINKS_OFF = "linksOff";
     private static final String FULL_INJECTION = "fullInjection";
 
     @Autowired
@@ -109,12 +111,14 @@ class MemoryRecallEvalTest {
         assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
         assemblies.put(FACTS_OFF, factsOff::assemble);
         assemblies.put(FACTS_ON, factsOn::assemble);
+        // linksOff 는 factsOn 과 같은 조립에 대체 연결만 넣지 않은 단계 1 의 구조다. 연결이 옛 사실의 노출을 줄였는지 견준다
+        assemblies.put(LINKS_OFF, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
         for (Case each : DATASET.cases()) {
             scoreboard.add(NONE, noneVerdictOf(each));
             assemblies.forEach((mode, assembly) -> {
-                Map<String, Long> ids = fixture.seed(each);
+                Map<String, Long> ids = fixture.seed(each, !LINKS_OFF.equals(mode));
                 AssembledContext context = assembly.assemble(
                     fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
                 scoreboard.add(mode, verdictOf(each, ids, context));
@@ -129,7 +133,7 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
-        for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, FULL_INJECTION)) {
+        for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, LINKS_OFF, FULL_INJECTION)) {
             assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
         }
         Double gapWithQuestion = scoreboard.metrics(FACTS_ON, MemoryEvalDataset.Category.RECALL_GAP).recallAt5().rate();
@@ -138,6 +142,14 @@ class MemoryRecallEvalTest {
             .as("RECALL_GAP recall@5: factsOn=%s questionOff=%s", gapWithQuestion, gapWithoutQuestion)
             .isNotNull()
             .isGreaterThan(gapWithoutQuestion);
+        Double updateWithLinks = scoreboard.metrics(FACTS_ON, MemoryEvalDataset.Category.KNOWLEDGE_UPDATE)
+            .falseMemoryExposure().rate();
+        Double updateWithoutLinks = scoreboard.metrics(LINKS_OFF, MemoryEvalDataset.Category.KNOWLEDGE_UPDATE)
+            .falseMemoryExposure().rate();
+        assertThat(updateWithLinks)
+            .as("KNOWLEDGE_UPDATE 오기억 노출률: factsOn=%s linksOff=%s", updateWithLinks, updateWithoutLinks)
+            .isNotNull()
+            .isLessThan(updateWithoutLinks);
         MemoryEvalScoreboard.Metrics factsOnMetrics = scoreboard.metrics(FACTS_ON, null);
         if (Boolean.getBoolean(MemoryEvalBaseline.WRITE_PROPERTY)) {
             MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOnMetrics).write(MemoryEvalBaseline.SOURCE);

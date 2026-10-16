@@ -486,7 +486,8 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `none` | 기억을 싣지 않는다. 아래쪽 기준선이다 |
 | `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
 | `questionOff` | 질문을 넘기지 않은 운영 기본값의 조립. 질문 기반 선별이 무엇을 더했는지 견주는 기준선이다 |
-| `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 게이트는 이 모드에만 건다 |
+| `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 사례의 `supersedes` 마다 사람이 받아들인 대체 연결을 넣는다. 기준 파일 게이트는 이 모드에만 건다 |
+| `linksOff` | `factsOn` 과 같은 조립에 대체 연결만 넣지 않는다. 연결이 옛 사실의 노출을 얼마나 줄였는지 견주는 기준선이다 |
 | `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
 
 #### 사례 묶음
@@ -507,7 +508,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `RECALL_GAP` | 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목 |
 
 `forbidden` 의 `BOUNDARY` 항목은 묶음에 있으면 `OMITTED` 여도 실패다. 고르는 단계를 지났다는 뜻이기 때문이다.
-`SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. 연결과 대체가 들어오면 이 값으로 「대체함」 링크를 만든다.
+`SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. `MemoryEvalFixture` 가 이 값으로 효력 있는 `SUPERSEDES` 연결(`origin=HUMAN`)을 넣는다.
 `judge` 는 답 판정이 쓰는 「예, 아니오」 질문과 기대 답이다. 조립 측정은 읽지 않는다.
 
 #### 지표(Memory 회수 측정)
@@ -526,11 +527,12 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 `MEMORY_SEARCH` 항목을 앞에 세는 것은 그 구역만 관련도 순으로 고른 본문이라서다. 개인 사실 구역은 최근 순으로 고르므로, 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5위 밖에 놓인다.
 임베딩을 켠 조립은 CI 에서 재지 않는다. 임베딩 서비스를 띄운 개발 머신에서 `./gradlew memoryEmbeddingEval` 이 같은 사례 묶음으로 `hybrid` 모드를 재고 `factsOn` 과 나란히 보고서만 남긴다(`MEMORY_EMBEDDING_BASE_URL` 이 없으면 건너뛰고, `MEMORY_EMBEDDING_MODEL` 이 없으면 운영 기본 모델 이름을 쓴다). 질문 임베딩 지연의 p50 과 p95 도 쓴다. 모델 후보를 견주고 `semantic-min-similarity` 를 정할 때 쓴다.
 
-**실패 조건은 셋이다.**
+**실패 조건은 넷이다.**
 
 - 어느 모드에서든 권한 경계 노출이 0 이 아니다
 - `factsOn` 모드의 전체 recall@5 가 기준 파일보다 낮거나, 전체 오기억 노출률이 기준 파일보다 높다
 - `factsOn` 모드의 `RECALL_GAP` recall@5 가 `questionOff` 보다 높지 않다
+- `factsOn` 모드의 `KNOWLEDGE_UPDATE` 오기억 노출률이 `linksOff` 보다 낮지 않다
 
 #### 기준 파일
 
