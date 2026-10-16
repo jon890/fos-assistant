@@ -18,6 +18,7 @@ import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -33,8 +34,8 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -112,12 +113,12 @@ class McpMemorySearchToolTest {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         repository.deleteAll();
         AppUser owner = users.save(AppUser.of(
-            "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN, Instant.now()));
+            "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         token = tokens.issue(PROFILE, "합성 검사").rawToken();
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), 1L, PROFILE, root);
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
         mvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -128,7 +129,7 @@ class McpMemorySearchToolTest {
     @DisplayName("작은 조립 예산으로 빠진 항목을 검색한 뒤 읽어야 MEMORY_READ 한 줄을 남긴다")
     void discoversActuallyOmittedItemAndRecordsOnlySuccessfulRead() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
-        ContextAssembler small = new ContextAssembler(
+        ContextAssembler small = TestContextAssemblers.of(
             memories, new ContextProperties(32, 4, null, null, Map.of(), 0, 200), Clock.systemUTC());
         AssembledContext assembled = small.assemble(user, run.agentId());
         assertThat(assembled.omittedMemoryIds()).containsExactly(memory.id());
@@ -159,7 +160,7 @@ class McpMemorySearchToolTest {
             assertThat(item.propertyNames()).containsExactlyInAnyOrder("id", "title", "revision", "updatedAt");
             assertThat(item.path("id").asLong()).isEqualTo(memory.id());
             assertThat(item.path("title").asString()).isEqualTo(TITLE);
-            assertThat(data.path("nextAfterId").isNull()).isTrue();
+            assertThat(data.path("nextCursor").isNull()).isTrue();
             assertThat(response.toString()).doesNotContain(BODY, "ownerUserId", "contentKeyId");
             assertThat(sources.findByIdExecutionIdOrderByIdPositionAsc(run.id()))
                 .extracting(ExecutionContextSource::source)
@@ -172,7 +173,8 @@ class McpMemorySearchToolTest {
                 .containsExactly("memory:" + memory.id());
             assertThat(logs.list)
                 .extracting(ILoggingEvent::getFormattedMessage)
-                .allSatisfy(message -> assertThat(message).doesNotContain(QUERY, TITLE, BODY));
+                .allSatisfy(message -> assertThat(message).doesNotContain(QUERY, TITLE, BODY))
+                .anySatisfy(message -> assertThat(message).contains("selector=search-keyword-v1"));
         } finally {
             logger.detachAppender(logs);
             logs.stop();
@@ -197,7 +199,7 @@ class McpMemorySearchToolTest {
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
             .path("items"))
                 .isEmpty();
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
         jdbc.update("UPDATE memory SET status = 'REJECTED' WHERE id = ?", memory.id());
         assertUnavailable(memory.id());
         jdbc.update("UPDATE memory SET status = 'ACCEPTED' WHERE id = ?", memory.id());
@@ -238,7 +240,7 @@ class McpMemorySearchToolTest {
 
 
     @Test
-    @DisplayName("형식 길이 범위와 모르는 키는 MCP의 인자 오류이며 페이지 끝 번호는 null이다")
+    @DisplayName("형식 길이 범위와 모르는 키와 읽을 수 없거나 다른 질문의 커서는 MCP의 인자 오류이며 마지막 페이지의 커서는 null이다")
     void rejectsInvalidArgumentsAndSerializesLastPage() throws Exception {
         List<ObjectNode> invalid = List.of(
             arguments(),
@@ -251,10 +253,13 @@ class McpMemorySearchToolTest {
             arguments().put("query", QUERY).put("limit", 1.5),
             arguments().put("query", QUERY).putNull("limit"),
             arguments().put("query", QUERY).put("limit", "10"),
-            arguments().put("query", QUERY).put("after_id", 0),
-            arguments().put("query", QUERY).put("after_id", -1),
-            arguments().put("query", QUERY).put("after_id", 1.5),
-            arguments().put("query", QUERY).putNull("after_id"),
+            arguments().put("query", QUERY).put("after_id", 1),
+            arguments().put("query", QUERY).put("cursor", 1),
+            arguments().put("query", QUERY).putNull("cursor"),
+            arguments().put("query", QUERY).put("cursor", ""),
+            arguments().put("query", QUERY).put("cursor", "깨진-커서"),
+            arguments().put("query", QUERY).put("cursor", new MemorySearchCursor(MemorySearchCursor.fingerprintOf("다른 질문"), 1).encode()),
+            arguments().put("query", QUERY).put("cursor", new MemorySearchCursor(MemorySearchCursor.fingerprintOf(QUERY), 200).encode()),
             arguments().put("query", QUERY).put("user_id", user.id()),
             arguments().put("query", QUERY).put("profile", PROFILE),
             arguments().put("query", QUERY).put("collection", "career"));
@@ -262,21 +267,19 @@ class McpMemorySearchToolTest {
             assertThat(call("memory_search", value).path("error").path("code").asInt())
                 .isEqualTo(-32602);
         }
-        ObjectNode oversized = arguments().put("query", QUERY);
-        oversized.set("after_id", json.readTree("9223372036854775808"));
-        assertThat(call("memory_search", oversized).path("error").path("code").asInt())
-            .isEqualTo(-32602);
         Memory first = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         Memory second = memories.create(user, MemoryScope.USER, TITLE + " 둘", BODY, false);
         JsonNode page = searchData(call("memory_search", arguments().put("query", QUERY).put("limit", 1)));
-        assertThat(page.path("nextAfterId").asLong()).isEqualTo(first.id());
+        assertThat(page.path("items").get(0).path("id").asLong()).isEqualTo(first.id());
+        assertThat(page.path("nextCursor").isString()).isTrue();
         JsonNode last = searchData(call(
-            "memory_search", arguments().put("query", QUERY).put("limit", 1).put("after_id", first.id())));
+            "memory_search",
+            arguments().put("query", "  " + QUERY + " ").put("limit", 1).put("cursor", page.path("nextCursor").asString())));
         assertThat(last.path("items").get(0).path("id").asLong()).isEqualTo(second.id());
-        assertThat(last.path("nextAfterId").isNull()).isTrue();
-        JsonNode empty = searchData(call("memory_search", arguments().put("query", "없는 제목")));
+        assertThat(last.path("nextCursor").isNull()).isTrue();
+        JsonNode empty = searchData(call("memory_search", arguments().put("query", "주말 날씨")));
         assertThat(empty.path("items")).isEmpty();
-        assertThat(empty.path("nextAfterId").isNull()).isTrue();
+        assertThat(empty.path("nextCursor").isNull()).isTrue();
     }
 
 

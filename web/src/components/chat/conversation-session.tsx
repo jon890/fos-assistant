@@ -91,10 +91,8 @@ export function ConversationSession(props: ConversationSessionProps) {
   const starters = useStarterSuggestions(
     startScreen && currentAgent ? currentAgent.code : null,
   );
-  // 흐름이 붙은 에이전트는 사진을 받지 않고 커맨드도 해석하지 않는다. 사진 단추를 숨기는 기준과 같게 이 값으로 가린다.
-  const commandAgentCode = currentAgent?.acceptsAttachments
-    ? currentAgent.code
-    : null;
+  const skillCommandsEnabled = currentAgent !== undefined;
+  const commandAgentCode = skillCommandsEnabled ? currentAgent.code : null;
   const skillNames =
     commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
       ? skillCommands.names
@@ -135,6 +133,7 @@ export function ConversationSession(props: ConversationSessionProps) {
       agentMissing={agentMissing}
       currentAgent={currentAgent}
       startScreen={startScreen}
+      skillCommandsEnabled={skillCommandsEnabled}
       skillNames={skillNames}
       starters={starters}
     />

@@ -15,15 +15,16 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.notification")
 public record NotificationProperties(
-        @DefaultValue("90d") Duration retention,
-        @DefaultValue("0 30 4 * * *") String cleanupCron,
-        @DefaultValue("20s") Duration streamHeartbeat) {
+    @DefaultValue("90d") Duration retention,
+    @DefaultValue("0 30 4 * * *") String cleanupCron,
+    @DefaultValue("20s") Duration streamHeartbeat) {
 
     /** 시간 가운데 하나라도 0 이하이면 기동을 멈춘다. 만들자마자 지우거나 주석 줄을 쉬지 않고 보내는데 기동은 성공해 알아채지 못한다. */
     public NotificationProperties {
         requirePositive("retention", retention);
         requirePositive("stream-heartbeat", streamHeartbeat);
     }
+
 
     private static void requirePositive(String name, Duration value) {
         if (value == null || value.isZero() || value.isNegative()) {

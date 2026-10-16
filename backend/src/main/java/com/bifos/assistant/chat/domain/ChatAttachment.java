@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +23,7 @@ import lombok.experimental.Accessors;
 @Table(name = "chat_attachment")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class ChatAttachment {
+public class ChatAttachment extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -80,42 +81,40 @@ public class ChatAttachment {
     @Getter
     private Instant deletionRequestedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     private ChatAttachment(
-            Long conversationId,
-            Long uploadedByUserId,
-            String originalName,
-            String contentType,
-            long byteSize,
-            Instant expiresAt,
-            Instant now) {
+        Long conversationId,
+        Long uploadedByUserId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        Instant expiresAt) {
         this.conversationId = conversationId;
         this.uploadedByUserId = uploadedByUserId;
         this.originalName = originalName;
         this.contentType = contentType;
         this.byteSize = byteSize;
         this.expiresAt = expiresAt;
-        this.createdAt = now;
     }
+
 
     /** 아직 메시지에 묶이지 않은 첨부를 만든다. 디스크 이름은 번호를 받은 뒤 채운다. */
     public static ChatAttachment of(
-            Long conversationId,
-            Long uploadedByUserId,
-            String originalName,
-            String contentType,
-            long byteSize,
-            Instant expiresAt,
-            Instant now) {
+        Long conversationId,
+        Long uploadedByUserId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        Instant expiresAt) {
         return new ChatAttachment(
-                conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt, now);
+            conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
     }
+
 
     public void nameStoredFile(String storedName) {
         this.storedName = storedName;
     }
+
 
     /** 파일을 지웠다고 적는다. 이미 적혀 있으면 처음 시각을 그대로 둔다. */
     public void markDeleted(Instant now) {
@@ -124,9 +123,11 @@ public class ChatAttachment {
         }
     }
 
+
     public boolean isVisible() {
         return deletedAt == null && deletionRequestedAt == null;
     }
+
 
     public void requestDeletion(Instant now) {
         if (deletionRequestedAt == null) {

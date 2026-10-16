@@ -22,19 +22,16 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -47,16 +44,11 @@ import org.springframework.data.domain.PageRequest;
 /**
  * 같은 대화를 연 다른 창이 도는 turn 을 알아보는 조회를 본다.
  *
- * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 흐름은 루트 줄이 끝난 뒤에도 자식이
- * 돌기 때문이다. 가짜 Hermes 가 결과를 돌려주기 전에 조회해 turn 이 도는 순간을 붙잡는다.
+ * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 가짜 Hermes 가 결과를 돌려주기 전에
+ * 조회해 turn 이 도는 순간을 붙잡는다.
  */
 @BackendIntegrationTest
 class ChatRunningTurnTest {
-
-    /** 흐름의 Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */
-    private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
-
-    private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
 
     @Autowired
     ChatService chat;
@@ -88,9 +80,11 @@ class ChatRunningTurnTest {
     @Autowired
     HermesRunsClient hermes;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void reset() {
@@ -104,45 +98,42 @@ class ChatRunningTurnTest {
         users.deleteAll();
     }
 
-    private CurrentUser member(String name) {
-        return member(name, null);
-    }
 
-    private CurrentUser member(String name, String flow) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+    private CurrentUser member(String name) {
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         Agent agent = Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now());
-        if (flow != null) {
-            agent.assignFlow(flow);
-        }
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id());
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private AgentExecution latestExecution(CurrentUser user) {
         return executions
-                .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
-                .getFirst();
+            .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
+            .getFirst();
     }
+
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(runId, "session", "completed", output, "model", "provider", TokenUsage.empty());
     }
 
+
     private static void assertNotFound(Runnable call) {
         assertThatThrownBy(call::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("도는 turn이 없는 내 대화는 돌지 않는다고 답한다")
@@ -152,6 +143,7 @@ class ChatRunningTurnTest {
 
         assertThat(chat.running(dad, conversation.id())).isEqualTo(new RunningTurn(false, null, null));
     }
+
 
     @Test
     @DisplayName("도는 turn이 있으면 루트 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
@@ -169,12 +161,13 @@ class ChatRunningTurnTest {
         ChatTurn turn = chat.send(dad, null, "질문", "dad");
 
         assertThat(whileRunning.get())
-                .isEqualTo(
-                        new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
+            .isEqualTo(
+                new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
         assertThat(whileRunning.get().executionId()).isEqualTo(turn.executionId());
         assertThat(whileRunning.get().startedAt()).isNotNull();
         assertThat(chat.running(dad, turn.conversationId())).isEqualTo(new RunningTurn(false, null, null));
     }
+
 
     @Test
     @DisplayName("표시는 있는데 실행 번호가 붙기 전이면 돈다고만 답한다")
@@ -189,77 +182,35 @@ class ChatRunningTurnTest {
         }
     }
 
-    @Test
-    @DisplayName("흐름에서 Chief가 끝나 루트 줄이 SUCCEEDED여도 자식이 도는 동안은 루트 번호로 돈다고 답한다")
-    void reportsRunningWithRootIdWhileChildRunsEvenIfRootRowSucceeded() {
-        CurrentUser dad = member("flow-dad", ResearchAndBuildFlow.NAME);
-        AtomicReference<RunningTurn> whileChildRuns = new AtomicReference<>();
-        AtomicReference<ExecutionStatus> rootStatus = new AtomicReference<>();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        stub().willAnswer(command -> {
-            String input = command.input();
-            if (input.contains(CHIEF_MARK)) {
-                return completed("run-chief", SPLIT_JSON);
-            }
-            if (input.contains("조사해")) {
-                // 자식 단계는 다른 스레드에서 돈다. 여기서 난 실패는 따로 담아 본 스레드에서 단언한다.
-                try {
-                    AgentExecution child = latestExecution(dad);
-                    RunningTurn running = chat.running(dad, child.conversationId());
-                    whileChildRuns.set(running);
-                    rootStatus.set(executions
-                            .findById(running.executionId())
-                            .orElseThrow()
-                            .status());
-                } catch (Throwable ex) {
-                    failure.set(ex);
-                }
-                return completed("run-researcher", "조사한 것");
-            }
-            if (input.contains("만든다")) {
-                return completed("run-engineer", "만든 것");
-            }
-            return completed("run-synthesizer", "합친 답");
-        });
-
-        ChatTurn turn = chat.send(dad, null, "보조금 비교해 줘", "flow-dad");
-
-        assertThat(failure.get()).isNull();
-        assertThat(rootStatus.get()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(whileChildRuns.get().running()).isTrue();
-        assertThat(whileChildRuns.get().executionId()).isEqualTo(turn.executionId());
-        assertThat(chat.running(dad, turn.conversationId()).running()).isFalse();
-    }
 
     @Test
     @DisplayName("막히면 넘기지 않고 실패하고 turn이 끝난다")
     void blockedFailsWithoutFallbackAndEndsTurn() {
         CurrentUser dad = member("dad");
         stub().willReturnInOrder(
-                        new HermesRunResult(
-                                "run-blocked",
-                                "session",
-                                "failed",
-                                "",
-                                null,
-                                null,
-                                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
-                                TokenUsage.empty()),
-                        completed("run-next", "답"));
+            new HermesRunResult(
+                "run-blocked",
+                "session",
+                "failed",
+                "",
+                null,
+                null,
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                TokenUsage.empty()),
+            completed("run-next", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
-        stub().beforeAwait(() ->
-                whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
+        stub().beforeAwait(() -> whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(dad, null, "막힌 모델로 보내 줘", "dad", relayed::add))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         List<Long> started = relayed.stream()
-                .filter(event -> event.type().equals("started"))
-                .map(ChatEvent::executionId)
-                .toList();
+            .filter(event -> event.type().equals("started"))
+            .map(ChatEvent::executionId)
+            .toList();
         assertThat(started).as("started 사건의 실행 번호").hasSize(1);
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
         assertThat(whileRunning.get().executionId()).isEqualTo(started.getFirst());
@@ -268,6 +219,7 @@ class ChatRunningTurnTest {
         assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
         assertThat(chat.running(dad, failed.conversationId()).running()).isFalse();
     }
+
 
     @Test
     @DisplayName("남의 대화는 도는 turn이 있어도 찾을 수 없다고 답한다")
@@ -289,9 +241,10 @@ class ChatRunningTurnTest {
         chat.send(dad, null, "질문", "dad");
 
         assertThat(momSaw.get()).isInstanceOf(ApiException.class);
-        assertThat(((ApiException) momSaw.get()).code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(((ApiException)momSaw.get()).code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
         assertNotFound(() -> chat.running(mom, dadConversation.get()));
     }
+
 
     @Test
     @DisplayName("지운 대화와 없는 대화는 찾을 수 없다고 답한다")

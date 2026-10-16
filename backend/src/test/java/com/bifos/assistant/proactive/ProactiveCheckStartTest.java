@@ -135,24 +135,26 @@ class ProactiveCheckStartTest {
     private CurrentUser owner;
     private Agent agent;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
         stub().reset();
         stub().willReturn(HermesRunResult.of(
-                "run-start",
-                null,
-                "completed",
-                "<fos-check-result>{\"version\":1,\"outcome\":\"NOTHING_NEW\"}</fos-check-result>",
-                "model",
-                "provider",
-                TokenUsage.empty()));
+            "run-start",
+            null,
+            "completed",
+            "<fos-check-result>{\"version\":1,\"outcome\":\"NOTHING_NEW\"}</fos-check-result>",
+            "model",
+            "provider",
+            TokenUsage.empty()));
         mvc = MockMvcBuilders.standaloneSetup(new ProactiveCheckController(service, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         owner = user("owner");
@@ -160,27 +162,28 @@ class ProactiveCheckStartTest {
         when(currentUser.require()).thenReturn(owner);
     }
 
+
     @AfterEach
     void tearDown() {
         held.forEach(turns::close);
         List<Conversation> owned = conversations.findAll().stream()
-                .filter(conversation -> createdUsers.contains(conversation.userId()))
-                .toList();
+            .filter(conversation -> createdUsers.contains(conversation.userId()))
+            .toList();
         owned.forEach(conversation -> awaitIdle(conversation.id()));
         List<Long> conversationIds = owned.stream().map(Conversation::id).toList();
         findings.deleteAll(findings.findAll().stream()
-                .filter(finding -> conversationIds.contains(finding.conversationId()))
-                .toList());
+            .filter(finding -> conversationIds.contains(finding.conversationId()))
+            .toList());
         checks.deleteAll(checks.findAll().stream()
-                .filter(check -> createdUsers.contains(check.userId()))
-                .toList());
+            .filter(check -> createdUsers.contains(check.userId()))
+            .toList());
         List<AgentExecution> ownExecutions = executions.findAll().stream()
-                .filter(execution -> createdUsers.contains(execution.userId()))
-                .toList();
+            .filter(execution -> createdUsers.contains(execution.userId()))
+            .toList();
         executionEvents.deleteAll(executionEvents.findAll().stream()
-                .filter(event -> ownExecutions.stream()
-                        .anyMatch(execution -> execution.id().equals(event.executionId())))
-                .toList());
+            .filter(event -> ownExecutions.stream()
+                .anyMatch(execution -> execution.id().equals(event.executionId())))
+            .toList());
         executions.deleteAll(ownExecutions);
         transactions.executeWithoutResult(status -> {
             conversationIds.forEach(id -> messages.deleteAll(messages.findByConversationIdOrderByIdAsc(id)));
@@ -189,6 +192,7 @@ class ProactiveCheckStartTest {
         agents.deleteAllById(createdAgents);
         users.deleteAllById(createdUsers);
     }
+
 
     @Test
     @DisplayName("시작하면 202 와 점검 대화 식별자를 주고 두 번째 시작은 같은 점검 대화를 쓴다")
@@ -203,12 +207,13 @@ class ProactiveCheckStartTest {
         Conversation conversation = checkConversation();
         assertThat(conversation.publicId()).isEqualTo(first);
         assertThat(checks.findAll().stream()
-                        .filter(check -> check.conversationId().equals(conversation.id()))
-                        .map(ProactiveCheck::status)
-                        .toList())
+            .filter(check -> check.conversationId().equals(conversation.id()))
+            .map(ProactiveCheck::status)
+            .toList())
                 .as("두 살펴보기 줄")
                 .hasSize(2);
     }
+
 
     @Test
     @DisplayName("막는 까닭이 있으면 409 PROACTIVE_CHECK_UNAVAILABLE 이고 점검 대화를 만들지 않는다")
@@ -216,12 +221,13 @@ class ProactiveCheckStartTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal"));
 
         mvc.perform(post("/api/v1/agents/{code}/proactive-check/runs", agent.code()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("PROACTIVE_CHECK_UNAVAILABLE"));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("PROACTIVE_CHECK_UNAVAILABLE"));
 
         assertThat(ownersConversations()).as("만든 대화").isEmpty();
         assertThat(stub().received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("쓰기 허용을 켠 에이전트는 terminal 이 켜져 있어도 202 로 시작하고 살펴보기 줄에 그 값을 옮겨 적는다")
@@ -235,115 +241,117 @@ class ProactiveCheckStartTest {
 
         Conversation conversation = checkConversation();
         assertThat(checks.findAll().stream()
-                        .filter(check -> check.conversationId().equals(conversation.id()))
-                        .map(ProactiveCheck::writesAllowed)
-                        .toList())
+            .filter(check -> check.conversationId().equals(conversation.id()))
+            .map(ProactiveCheck::writesAllowed)
+            .toList())
                 .as("살펴보기 줄의 쓰기 허용 값")
                 .containsExactly(true);
     }
+
 
     @Test
     @DisplayName("사용자 자리가 없으면 409 USER_BUSY 이고 새 점검 대화가 남지 않는다")
     void rejectsUserBusyWithoutLeavingConversation() throws Exception {
         Conversation first = conversations.save(Conversation.startedBy(owner.id(), "첫 대화", agent.id(), Instant.now()));
-        Conversation second =
-                conversations.save(Conversation.startedBy(owner.id(), "둘째 대화", agent.id(), Instant.now()));
+        Conversation second = conversations.save(Conversation.startedBy(owner.id(), "둘째 대화", agent.id(), Instant.now()));
         held.add(turns.open(owner.id(), first.id()));
         held.add(turns.open(owner.id(), second.id()));
 
         mvc.perform(post("/api/v1/agents/{code}/proactive-check/runs", agent.code()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("USER_BUSY"));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("USER_BUSY"));
 
         assertThat(ownersConversations())
-                .extracting(Conversation::id)
-                .containsExactlyInAnyOrder(first.id(), second.id());
+            .extracting(Conversation::id)
+            .containsExactlyInAnyOrder(first.id(), second.id());
         assertThat(stub().received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("점검 대화에 도는 turn 이 있으면 409 CONVERSATION_BUSY 이고 살펴보기 줄을 남기지 않는다")
     void rejectsConversationBusy() throws Exception {
         Conversation existing = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
         held.add(turns.open(owner.id(), existing.id()));
 
         mvc.perform(post("/api/v1/agents/{code}/proactive-check/runs", agent.code()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("CONVERSATION_BUSY"));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CONVERSATION_BUSY"));
 
         assertThat(checks.findAll())
-                .filteredOn(check -> check.conversationId().equals(existing.id()))
-                .isEmpty();
+            .filteredOn(check -> check.conversationId().equals(existing.id()))
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("삭제된 점검 대화의 미열람 보고는 새 점검 대화의 예약 실행을 막지 않는다")
     void deletedConversationReportDoesNotBlockNextScheduledCheck() {
-        Conversation deleted =
-                conversations.save(Conversation.startedForCheck(owner.id(), "삭제할 점검", agent.id(), Instant.now()));
-        ProactiveCheck old =
-                ProactiveCheck.started(owner.id(), agent.id(), deleted.id(), CheckTrigger.MANUAL, false, Instant.now());
+        Conversation deleted = conversations.save(Conversation.startedForCheck(owner.id(), "삭제할 점검", agent.id(), Instant.now()));
+        ProactiveCheck old = ProactiveCheck.started(owner.id(), agent.id(), deleted.id(), CheckTrigger.MANUAL, false, Instant.now());
         old.succeed(
-                CheckOutcome.FINDINGS,
-                0,
-                0,
-                new CheckReport(List.of("지난 보고"), List.of(), List.of(), List.of(), List.of()),
-                0,
-                0,
-                0,
-                0,
-                0,
-                Instant.now());
+            CheckOutcome.FINDINGS,
+            0,
+            0,
+            new CheckReport(List.of("지난 보고"), List.of(), List.of(), List.of(), List.of()),
+            0,
+            0,
+            0,
+            0,
+            0,
+            Instant.now());
         checks.save(old);
         transactions.executeWithoutResult(
-                status -> conversations.deleteIfActive(deleted.id(), owner.id(), Instant.now()));
+            status -> conversations.deleteIfActive(deleted.id(), owner.id(), Instant.now()));
 
         UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
         Conversation created = ownersConversations().stream()
-                .filter(conversation -> conversation.publicId().equals(returned))
-                .findFirst()
-                .orElseThrow();
+            .filter(conversation -> conversation.publicId().equals(returned))
+            .findFirst()
+            .orElseThrow();
         awaitIdle(created.id());
 
         ProactiveCheck current = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
-                .orElseThrow();
+            .orElseThrow();
         assertThat(returned).isEqualTo(created.publicId()).isNotEqualTo(deleted.publicId());
         assertThat(current.skippedReason()).isNull();
         assertThat(current.rootExecutionId()).isNotNull();
         assertThat(stub().received()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("열지 않은 보고가 있으면 예약 살펴보기는 모델을 부르지 않고 UNREAD_REPORT로 끝난다")
     void skipsScheduledCheckWhenReportIsUnread() {
         Conversation conversation = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
         ProactiveCheck report = checks.save(ProactiveCheck.started(
-                owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now()));
+            owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now()));
         report.succeed(
-                CheckOutcome.FINDINGS,
-                0,
-                0,
-                new CheckReport(List.of("바뀜"), List.of(), List.of(), List.of(), List.of()),
-                0,
-                0,
-                0,
-                0,
-                0,
-                Instant.now());
+            CheckOutcome.FINDINGS,
+            0,
+            0,
+            new CheckReport(List.of("바뀜"), List.of(), List.of(), List.of(), List.of()),
+            0,
+            0,
+            0,
+            0,
+            0,
+            Instant.now());
         checks.save(report);
         int receivedBefore = stub().received().size();
 
         UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
 
         ProactiveCheck skipped = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
-                .orElseThrow();
+            .orElseThrow();
         assertThat(returned).isEqualTo(conversation.publicId());
         assertThat(skipped.skippedReason()).isEqualTo(CheckSkippedReason.UNREAD_REPORT);
         assertThat(skipped.rootExecutionId()).isNull();
         assertThat(stub().received()).hasSize(receivedBefore);
     }
+
 
     @Test
     @DisplayName("다른 사용자의 비공개 에이전트는 404 AGENT_NOT_FOUND 이고 Hermes 를 부르지 않는다")
@@ -352,22 +360,24 @@ class ProactiveCheckStartTest {
         when(currentUser.require()).thenReturn(other);
 
         mvc.perform(post("/api/v1/agents/{code}/proactive-check/runs", agent.code()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
 
         verifyNoInteractions(toolsets, skillClient);
         assertThat(stub().received()).isEmpty();
     }
 
+
     private UUID started() throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/agents/{code}/proactive-check/runs", agent.code()))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.conversationId").exists())
-                .andReturn();
+            .andExpect(status().isAccepted())
+            .andExpect(jsonPath("$.conversationId").exists())
+            .andReturn();
         return UUID.fromString(JSON.readTree(result.getResponse().getContentAsString())
-                .get("conversationId")
-                .asString());
+            .get("conversationId")
+            .asString());
     }
+
 
     private Conversation checkConversation() {
         List<Conversation> found = ownersConversations();
@@ -375,35 +385,37 @@ class ProactiveCheckStartTest {
         return found.getFirst();
     }
 
+
     private List<Conversation> ownersConversations() {
         return conversations.findAll().stream()
-                .filter(conversation -> conversation.userId().equals(owner.id()))
-                .toList();
+            .filter(conversation -> conversation.userId().equals(owner.id()))
+            .toList();
     }
+
 
     private CurrentUser user(String name) {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser saved =
-                users.save(AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER));
         createdUsers.add(saved.id());
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
+
     private Agent agent(CurrentUser user, AgentVisibility visibility) {
         String code = "start-" + UUID.randomUUID();
         Agent saved = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                user.id(),
-                Instant.now()));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            user.id()));
         createdAgents.add(saved.id());
         return saved;
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

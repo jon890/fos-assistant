@@ -52,15 +52,16 @@ public class ProactiveScheduleService {
     private final TaskProperties taskProperties;
     private final Clock clock;
 
+
     @Transactional(readOnly = true)
     public ProactiveSchedule get(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
         Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(user.id(), agent.id(), TaskKind.CHECK)
-                .orElse(null);
-        TaskTrigger trigger =
-                task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
+            .orElse(null);
+        TaskTrigger trigger = task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
         return view(user, agent, task, trigger, displayBlockers(agent));
     }
+
 
     /** 발화 직전에 현재 toolset과 격리 실행 공간 조건을 다시 확인한다. */
     @Transactional(readOnly = true)
@@ -68,60 +69,63 @@ public class ProactiveScheduleService {
         return blockers(agents.requireStartable(user, agentCode)).isEmpty();
     }
 
+
     @Transactional
     public ProactiveSchedule update(CurrentUser user, String agentCode, boolean enabled, String time, String timeZone) {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
         ZoneId zone = TaskSchedule.parseZone(requiredTimeZone(timeZone));
         LocalTime localTime = parseTime(time);
         Task task = tasks.findByOwnerUserIdAndAgentIdAndKindForUpdate(user.id(), agent.id(), TaskKind.CHECK)
-                .orElse(null);
+            .orElse(null);
         Instant now = clock.instant();
         String cron = cron(localTime);
         Instant next = TaskSchedule.nextAfter(TaskSchedule.parseCron(cron), zone, now);
         List<CheckBlocker> checkedBlockers = enabled ? blockers(agent) : unknownReadiness();
         if (enabled && !checkedBlockers.isEmpty()) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
+                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
         }
         if (task == null) {
-            task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE, now));
-            triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next, now));
+            task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE));
+            triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next));
         } else {
             TaskTrigger trigger = requireTrigger(task);
-            trigger.reschedule(TriggerType.CRON, cron, null, zone, next, now);
-            trigger.changeMissedPolicy(MissedPolicy.SKIP, now);
+            trigger.reschedule(TriggerType.CRON, cron, null, zone, next);
+            trigger.changeMissedPolicy(MissedPolicy.SKIP);
         }
         if (enabled) {
-            task.changeCheckEnabled(true, now);
+            task.changeCheckEnabled(true);
         } else {
-            task.changeCheckEnabled(false, now);
+            task.changeCheckEnabled(false);
         }
         TaskTrigger trigger = task == null ? null : requireTrigger(task);
         return view(user, agent, task, trigger, checkedBlockers);
     }
 
+
     private ProactiveSchedule view(
-            CurrentUser user, Agent agent, Task task, TaskTrigger trigger, List<CheckBlocker> blockers) {
+        CurrentUser user, Agent agent, Task task, TaskTrigger trigger, List<CheckBlocker> blockers) {
         ProactiveCheck last = checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
-                        user.id(), agent.id(), CheckTrigger.AUTONOMY)
-                .orElse(null);
+            user.id(), agent.id(), CheckTrigger.AUTONOMY)
+            .orElse(null);
         return new ProactiveSchedule(
-                task != null && task.state() == TaskState.ACTIVE,
-                trigger == null ? DEFAULT_TIME : timeOf(trigger),
-                trigger == null ? taskProperties.defaultZone().getId() : trigger.timeZone(),
-                task == null || task.state() != TaskState.ACTIVE || trigger == null ? null : trigger.nextFireAt(),
-                last == null
-                        ? null
-                        : new ProactiveSchedule.LastCheck(
-                                last.status(),
-                                last.outcome(),
-                                last.invalidReason(),
-                                last.skippedReason(),
-                                last.startedAt(),
-                                last.finishedAt()),
-                blockers.isEmpty(),
-                blockers);
+            task != null && task.state() == TaskState.ACTIVE,
+            trigger == null ? DEFAULT_TIME : timeOf(trigger),
+            trigger == null ? taskProperties.defaultZone().getId() : trigger.timeZone(),
+            task == null || task.state() != TaskState.ACTIVE || trigger == null ? null : trigger.nextFireAt(),
+            last == null
+                ? null
+                : new ProactiveSchedule.LastCheck(
+                    last.status(),
+                    last.outcome(),
+                    last.invalidReason(),
+                    last.skippedReason(),
+                    last.startedAt(),
+                    last.finishedAt()),
+            blockers.isEmpty(),
+            blockers);
     }
+
 
     /** 저장된 설정은 Hermes 장애 중에도 읽도록 준비 상태 조회 실패만 화면용 차단 사유로 바꾼다. */
     private List<CheckBlocker> displayBlockers(Agent agent) {
@@ -129,8 +133,8 @@ public class ProactiveScheduleService {
             return blockers(agent);
         } catch (ApiException ex) {
             boolean runtimeUnavailable = ex.code() == ErrorCode.HERMES_UNAVAILABLE
-                    || ex.code() == ErrorCode.HERMES_BUSY
-                    || ex.code() == ErrorCode.HERMES_PROFILE_KEY_MISSING;
+                || ex.code() == ErrorCode.HERMES_BUSY
+                || ex.code() == ErrorCode.HERMES_PROFILE_KEY_MISSING;
             if (!runtimeUnavailable) {
                 throw ex;
             }
@@ -138,23 +142,20 @@ public class ProactiveScheduleService {
         }
     }
 
+
     private static List<CheckBlocker> unknownReadiness() {
         return List.of(CheckBlocker.of(CheckBlockerCode.READINESS_UNKNOWN));
     }
 
+
     private List<CheckBlocker> blockers(Agent agent) {
         CheckReadiness checked = readiness.check(agent);
         List<CheckBlocker> blockers = new ArrayList<>(checked.blockers());
-        boolean unsupported =
-                blockers.stream().anyMatch(blocker -> blocker.code() == CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        if (unsupported) {
-            return List.copyOf(blockers);
-        }
         if (!properties.isolatedExecutionEnabled()) {
             List<String> unsafe = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                    .filter(ISOLATION_REQUIRED_TOOLSETS::contains)
-                    .sorted()
-                    .toList();
+                .filter(ISOLATION_REQUIRED_TOOLSETS::contains)
+                .sorted()
+                .toList();
             if (!unsafe.isEmpty()) {
                 blockers.add(new CheckBlocker(CheckBlockerCode.ISOLATED_EXECUTION_REQUIRED, unsafe));
             }
@@ -162,10 +163,12 @@ public class ProactiveScheduleService {
         return List.copyOf(blockers);
     }
 
+
     private TaskTrigger requireTrigger(Task task) {
         return triggers.findByTaskId(task.id())
-                .orElseThrow(() -> new IllegalStateException("proactive schedule task has no trigger"));
+            .orElseThrow(() -> new IllegalStateException("proactive schedule task has no trigger"));
     }
+
 
     private static String requiredTimeZone(String timeZone) {
         if (timeZone == null || timeZone.isBlank()) {
@@ -174,6 +177,7 @@ public class ProactiveScheduleService {
         return timeZone.strip();
     }
 
+
     private static LocalTime parseTime(String time) {
         if (time == null || !time.matches("(?:[01]\\d|2[0-3]):[0-5]\\d")) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "time must use HH:mm");
@@ -181,9 +185,11 @@ public class ProactiveScheduleService {
         return LocalTime.parse(time, DateTimeFormatter.ISO_LOCAL_TIME);
     }
 
+
     private static String cron(LocalTime time) {
         return time.getMinute() + " " + time.getHour() + " * * *";
     }
+
 
     private static String timeOf(TaskTrigger trigger) {
         String[] fields = trigger.cronExpr().split("\\s+");

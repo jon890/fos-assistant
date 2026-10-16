@@ -53,6 +53,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
     @Autowired
     DecisionFeedbackExporter exporter;
 
+
     @Test
     @DisplayName("동의한 사용자의 매일 깨우기 하나에 시도 줄 하나가 DECIDED 이고 평가 하나와 후보별 판정이 남으며 알림은 늘지 않는다")
     void decidesOnceForConsentedScheduledCheck() throws InterruptedException {
@@ -64,19 +65,17 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
 
         ProactiveCheck check = checks.findById(checkId).orElseThrow();
         assertThat(check.status()).as("살펴보기 상태").isEqualTo(CheckStatus.SUCCEEDED);
-        List<ProactiveCheckProblem> accepted =
-                problems.findByCheckIdAndStatusOrderByIdAsc(checkId, ProblemStatus.ACCEPTED);
+        List<ProactiveCheckProblem> accepted = problems.findByCheckIdAndStatusOrderByIdAsc(checkId, ProblemStatus.ACCEPTED);
         assertThat(accepted).as("받아들인 문제 후보").hasSize(1);
         List<ValueEvaluation> judged = evaluations.findByUserIdAndCheckIdInOrderByIdAsc(user.id(), List.of(checkId));
         assertThat(judged).as("평가 줄").hasSize(1);
         ValueEvaluation evaluation = judged.getFirst();
         assertThat(evaluation.outcome()).as("평가 결과").isEqualTo(DecisionOutcome.EVALUATED);
-        List<AutonomyDecision> decided =
-                decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(user.id(), List.of(evaluation.id()));
+        List<AutonomyDecision> decided = decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(user.id(), List.of(evaluation.id()));
         assertThat(decided)
-                .as("후보마다 판정 한 줄")
-                .extracting(AutonomyDecision::candidateId)
-                .containsExactly(accepted.getFirst().id());
+            .as("후보마다 판정 한 줄")
+            .extracting(AutonomyDecision::candidateId)
+            .containsExactly(accepted.getFirst().id());
 
         List<ProactiveLoopRun> runs = runsOf(user);
         assertThat(runs).as("시도 줄").hasSize(1);
@@ -91,15 +90,16 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(notificationCount(user)).as("알림 수").isZero();
 
         DecisionRecord record = exporter.export(user, Duration.ofDays(1)).records().stream()
-                .filter(each -> each.decisionKey().equals("check:" + checkId))
-                .findFirst()
-                .orElseThrow();
+            .filter(each -> each.decisionKey().equals("check:" + checkId))
+            .findFirst()
+            .orElseThrow();
         Loop loop = record.situation().loop();
         assertThat(loop).as("export 의 시도").isNotNull();
         assertThat(loop.runId()).isEqualTo(run.id());
         assertThat(loop.status()).isEqualTo(LoopRunStatus.DECIDED);
         assertThat(loop.evaluationId()).isEqualTo(evaluation.id());
     }
+
 
     @Test
     @DisplayName("같은 살펴보기의 끝 사건을 다시 내도 시도, 평가, 판정 수가 늘지 않는다")
@@ -121,6 +121,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(decisionCount(user)).as("판정 수").isEqualTo(decisionsBefore);
     }
 
+
     @Test
     @DisplayName("설정 줄이 없으면 시도 줄과 평가가 없다")
     void leavesNoRunWithoutSetting() throws InterruptedException {
@@ -132,6 +133,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(runsOf(user)).as("시도 줄").isEmpty();
         assertThat(evaluationCount(user)).as("평가 수").isZero();
     }
+
 
     @Test
     @DisplayName("설정 줄이 꺼져 있으면 시도 줄과 평가가 없다")
@@ -146,6 +148,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(evaluationCount(user)).as("평가 수").isZero();
     }
 
+
     @Test
     @DisplayName("단추로 연 살펴보기는 동의했어도 시도 줄과 평가가 없다")
     void leavesNoRunForManualCheck() throws InterruptedException {
@@ -159,6 +162,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(evaluationCount(user)).as("평가 수").isZero();
     }
 
+
     @Test
     @DisplayName("쉬는 중이면 후보가 있어도 SKIPPED/SNOOZED 이고 평가가 없다")
     void skipsWhileSnoozed() throws InterruptedException {
@@ -171,6 +175,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertSkipped(user, checkId, LoopSkippedReason.SNOOZED);
     }
 
+
     @Test
     @DisplayName("대역 답이 NOTHING_NEW 면 SKIPPED/NO_CANDIDATE 이고 평가가 없다")
     void skipsWithoutAcceptedCandidate() throws InterruptedException {
@@ -181,10 +186,11 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         Long checkId = wake(user, agent, nothingNewOutput());
 
         assertThat(checks.findById(checkId).orElseThrow().outcome())
-                .as("살펴보기 결과")
-                .isEqualTo(CheckOutcome.NOTHING_NEW);
+            .as("살펴보기 결과")
+            .isEqualTo(CheckOutcome.NOTHING_NEW);
         assertSkipped(user, checkId, LoopSkippedReason.NO_CANDIDATE);
     }
+
 
     @Test
     @DisplayName("19시간 전에 판정까지 간 시도가 있으면 SKIPPED/DAILY_LIMIT 이고 평가가 없다")
@@ -198,6 +204,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
 
         assertSkipped(user, checkId, LoopSkippedReason.DAILY_LIMIT);
     }
+
 
     @Test
     @DisplayName("앞선 시도가 23시간 전이면 어제보다 일찍 끝난 오늘 깨우기도 DECIDED 다")
@@ -214,6 +221,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(evaluationCount(user)).as("평가 수").isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("19시간 안에 건너뛴 시도만 있으면 하루 상한에 세지 않아 DECIDED 다")
     void ignoresSkippedRunsForDailyLimit() throws InterruptedException {
@@ -229,6 +237,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
         assertThat(evaluationCount(user)).as("평가 수").isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("하루 상한에 닿았어도 받아들인 후보가 없으면 NO_CANDIDATE 가 먼저다")
     void prefersNoCandidateOverDailyLimit() throws InterruptedException {
@@ -241,6 +250,7 @@ class ProactiveLoopCoordinatorTest extends ProactiveLoopTestSupport {
 
         assertSkipped(user, checkId, LoopSkippedReason.NO_CANDIDATE);
     }
+
 
     private void assertSkipped(CurrentUser user, Long checkId, LoopSkippedReason reason) {
         ProactiveLoopRun run = loopRuns.findBySourceCheckId(checkId).orElseThrow();

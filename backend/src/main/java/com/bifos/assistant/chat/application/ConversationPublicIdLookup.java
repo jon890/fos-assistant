@@ -24,14 +24,16 @@ public class ConversationPublicIdLookup implements ConversationPublicIds, Active
 
     private final ConversationRepository conversations;
 
+
     @Override
     public Map<Long, UUID> publicIdsOf(Collection<Long> conversationIds) {
         if (conversationIds.isEmpty()) {
             return Map.of();
         }
         return conversations.findAllById(conversationIds).stream()
-                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
+            .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
     }
+
 
     @Override
     public Map<Long, UUID> activePublicIdsOf(Collection<Long> conversationIds) {
@@ -39,7 +41,7 @@ public class ConversationPublicIdLookup implements ConversationPublicIds, Active
             return Map.of();
         }
         return conversations.findAllById(conversationIds).stream()
-                .filter(conversation -> conversation.deletedAt() == null)
-                .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
+            .filter(conversation -> conversation.deletedAt() == null)
+            .collect(Collectors.toMap(Conversation::id, Conversation::publicId));
     }
 }

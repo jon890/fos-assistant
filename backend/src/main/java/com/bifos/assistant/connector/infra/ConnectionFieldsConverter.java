@@ -22,6 +22,7 @@ public class ConnectionFieldsConverter implements AttributeConverter<ConnectionF
     private static final String VALUES = "values";
     private static final String SECRET_PREFIXES = "secretPrefixes";
 
+
     @Override
     public String convertToDatabaseColumn(ConnectionFields attribute) {
         ConnectionFields fields = attribute == null ? ConnectionFields.empty() : attribute;
@@ -30,6 +31,7 @@ public class ConnectionFieldsConverter implements AttributeConverter<ConnectionF
         fields.secretPrefixes().forEach(root.putObject(SECRET_PREFIXES)::put);
         return MAPPER.writeValueAsString(root);
     }
+
 
     @Override
     public ConnectionFields convertToEntityAttribute(String column) {
@@ -44,6 +46,7 @@ public class ConnectionFieldsConverter implements AttributeConverter<ConnectionF
             throw new IllegalStateException("connector_connection.fields is not valid JSON");
         }
     }
+
 
     private static Map<String, String> texts(JsonNode node) {
         Map<String, String> result = new LinkedHashMap<>();

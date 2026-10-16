@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// 코드 규칙: rule-44. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 // 파일 전체 길이는 빈 줄과 주석을 포함한다. 기존 긴 파일은 기준값보다 늘어나지 못한다.
 // 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이, 기능 문서의 한도는 ADR-20261009 / feature-docs 가 정하고, 넘으면 실패가 아니라 알림이다.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

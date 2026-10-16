@@ -99,16 +99,17 @@ class ProactiveCheckRecoveryTest {
     private Agent connector;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         stub().reset();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        user = users.save(AppUser.of("recovery-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER, STARTED));
+        user = users.save(AppUser.of("recovery-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER));
         agent = agents.save(agent("recovery-" + suffix, false));
         connector = agents.save(agent("recovery-connector-" + suffix, true));
-        conversation =
-                conversations.save(Conversation.startedForCheck(user.id(), "먼저 살펴보기 · 커리어", agent.id(), STARTED));
+        conversation = conversations.save(Conversation.startedForCheck(user.id(), "먼저 살펴보기 · 커리어", agent.id(), STARTED));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -122,6 +123,7 @@ class ProactiveCheckRecoveryTest {
         agents.deleteById(agent.id());
         users.deleteById(user.id());
     }
+
 
     @Test
     @DisplayName("RUNNING 으로 남은 살펴보기는 FAILED 와 INTERRUPTED 로 닫히고 그 트리의 도는 자식과 끝난 자식에 전달 표시가 붙는다")
@@ -138,18 +140,19 @@ class ProactiveCheckRecoveryTest {
         assertThat(closed.errorCode()).isEqualTo("INTERRUPTED");
         assertThat(closed.finishedAt()).isEqualTo(NOW);
         assertThat(executions.findById(runningChild.id()).orElseThrow().resultDeliveredAt())
-                .as("도는 자식의 전달 표시")
-                .isEqualTo(NOW);
+            .as("도는 자식의 전달 표시")
+            .isEqualTo(NOW);
         assertThat(executions.findById(finishedChild.id()).orElseThrow().resultDeliveredAt())
-                .as("끝난 자식의 전달 표시")
-                .isEqualTo(NOW);
+            .as("끝난 자식의 전달 표시")
+            .isEqualTo(NOW);
         assertThat(executions.findUndeliveredResults(conversation.id()))
-                .as("점검 대화에 전할 위임 결과")
-                .isEmpty();
+            .as("점검 대화에 전할 위임 결과")
+            .isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .as("대화에 남은 알림 줄")
-                .isEmpty();
+            .as("대화에 남은 알림 줄")
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("닫은 살펴보기 트리에서 run 번호가 있는 도는 위임 자식에만 Hermes 중지가 가고 다시 붙을 루트 turn 은 멈추지 않는다")
@@ -162,20 +165,20 @@ class ProactiveCheckRecoveryTest {
         newRecovery().start();
 
         assertThat(stub().stopped())
-                .as("Hermes 에 보낸 중지")
-                .containsExactly(runningChild.hermesRunId())
-                .doesNotContain(root.hermesRunId(), finishedChild.hermesRunId());
+            .as("Hermes 에 보낸 중지")
+            .containsExactly(runningChild.hermesRunId())
+            .doesNotContain(root.hermesRunId(), finishedChild.hermesRunId());
         assertThat(executions.findById(root.id()).orElseThrow().status())
-                .as("루트 turn 은 기동 정리가 다시 붙는다")
-                .isEqualTo(ExecutionStatus.RUNNING);
+            .as("루트 turn 은 기동 정리가 다시 붙는다")
+            .isEqualTo(ExecutionStatus.RUNNING);
     }
+
 
     @Test
     @DisplayName("루트 실행이 생기기 전에 남은 살펴보기도 닫고 이미 끝난 살펴보기는 그대로 둔다")
     void closesCheckWithoutRootAndLeavesEndedCheck() {
         ProactiveCheck withoutRoot = check(null);
-        ProactiveCheck ended =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
+        ProactiveCheck ended = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         ended.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 3, 0, 0, 0, 0, STARTED.plusSeconds(60));
         ended = checks.save(ended);
         createdChecks.add(ended.id());
@@ -192,29 +195,32 @@ class ProactiveCheckRecoveryTest {
         assertThat(stub().stopped()).as("루트가 없으면 멈출 자식도 없다").isEmpty();
     }
 
+
     @Test
     @DisplayName("복구는 기동 정리보다 앞선 lifecycle 단계에서 시작하고 이미 시작돼 있다")
     void startsBeforeRestartReconciler() {
         assertThat(recovery.getPhase())
-                .as("복구의 단계 %d 는 기동 정리의 단계 %d 보다 앞선다", recovery.getPhase(), reconciler.getPhase())
-                .isLessThan(reconciler.getPhase());
+            .as("복구의 단계 %d 는 기동 정리의 단계 %d 보다 앞선다", recovery.getPhase(), reconciler.getPhase())
+            .isLessThan(reconciler.getPhase());
         assertThat(recovery.isAutoStartup()).isTrue();
         assertThat(recovery.isRunning()).isTrue();
     }
 
+
     private ProactiveCheckRecovery newRecovery() {
         return new ProactiveCheckRecovery(
-                checks, deliveryWriter, events, mock(CheckFeedback.class), Clock.fixed(NOW, ZoneOffset.UTC));
+            checks, deliveryWriter, events, mock(CheckFeedback.class), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     /** 점검 대화의 {@code RUNNING} 살펴보기 줄이다. {@code root} 가 null 이면 루트 실행이 생기기 전이다. */
     private ProactiveCheck check(AgentExecution root) {
-        ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
+        ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         if (root != null) {
             check.attachRoot(root.id(), root.hermesSessionId());
         }
@@ -223,41 +229,44 @@ class ProactiveCheckRecoveryTest {
         return saved;
     }
 
+
     /** 점검 대화에서 돌던 살펴보기 turn 의 실행 줄이다. */
     private AgentExecution rootTurn() {
         return keep(AgentExecution.builder()
-                .userId(user.id())
-                .agentId(agent.id())
-                .conversationId(conversation.id())
-                .profileName(agent.hermesProfile())
-                .hermesSessionId("fos-" + UUID.randomUUID())
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(STARTED)
-                .build());
+            .userId(user.id())
+            .agentId(agent.id())
+            .conversationId(conversation.id())
+            .profileName(agent.hermesProfile())
+            .hermesSessionId("fos-" + UUID.randomUUID())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(STARTED)
+            .build());
     }
 
-    /** 그 살펴보기 turn 이 커넥터 에이전트에 맡긴 위임 자식이다. */
+
+    /** 그 살펴보기 turn이 과거에 맡긴 위임 자식이다. */
     private AgentExecution child(AgentExecution root, ExecutionStatus status) {
         AgentExecution child = AgentExecution.builder()
-                .userId(user.id())
-                .agentId(connector.id())
-                .conversationId(conversation.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.id())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName(connector.hermesProfile())
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(STARTED)
-                .build();
+            .userId(user.id())
+            .agentId(connector.id())
+            .conversationId(conversation.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName(connector.hermesProfile())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(STARTED)
+            .build();
         if (status != ExecutionStatus.RUNNING) {
             child.recordOutput("커리어 문서를 읽은 결과");
         }
         return keep(child);
     }
+
 
     private AgentExecution keep(AgentExecution execution) {
         AgentExecution saved = executions.save(execution);
@@ -265,20 +274,17 @@ class ProactiveCheckRecoveryTest {
         return saved;
     }
 
-    private Agent agent(String code, boolean connectorManaged) {
+
+    private Agent agent(String code, boolean childAgent) {
         Agent created = Agent.of(
-                code,
-                connectorManaged ? "채용 연결" : "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                STARTED);
-        if (connectorManaged) {
-            created.markConnectorManaged();
-        }
+            code,
+            childAgent ? "과거 위임 대상" : "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id());
         return created;
     }
 }

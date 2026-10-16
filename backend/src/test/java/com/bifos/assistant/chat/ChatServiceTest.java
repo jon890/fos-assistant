@@ -52,7 +52,6 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -250,7 +249,7 @@ class ChatServiceTest {
 
 
     private CurrentUser member(String email, String profileName) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         if (profileName != null) {
             agents.save(Agent.of(
                 profileName,
@@ -260,8 +259,7 @@ class ChatServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+                user.id()));
         }
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -422,28 +420,28 @@ class ChatServiceTest {
 
 
     @Test
-    @DisplayName("커넥터 대화는 Memory 없이 공통 표 지침을 보내고 길이와 해시를 기록한다")
-    void sendsNoMemoryToHermesForConnectorAgentTurn() {
+    @DisplayName("사용자 turn 은 질문과 관련된 기억 줄과 근거를 실행에 남기고 예약 작업 turn 은 남기지 않는다")
+    void recordsSearchSourceOnlyForUserTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
-        Agent connector = agents.findAll().getFirst();
-        connector.markConnectorManaged();
-        agents.save(connector);
-        memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
+        // 본문이 개인 사실 구역의 상한(200자)을 넘어 그 구역의 후보가 아니다
+        Memory tires = memories.create(
+            dad, MemoryScope.USER, "자동차 관리", "타이어는 작년 11월에 네 짝을 모두 갈았다. " + "차".repeat(200), false);
         stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
 
-        ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
+        ChatTurn turn = chat.send(dad, null, "타이어 언제 갈았지", "dad");
 
-        String instructions = stub().received().getFirst().instructions();
-        assertThat(instructions)
-            .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
-            .doesNotContain("국수는 맵지 않게 먹는다")
-            .contains("GFM", "구분 줄")
-            .endsWith("\n\n" + AskFormat.GUIDE);
-        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + AskFormat.GUIDE));
-        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
-        assertThat(execution.instructionsHash())
-            .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(turn.executionId()))
+            .filteredOn(row -> row.source().equals("MEMORY_SEARCH"))
+            .extracting(ExecutionContextSource::sourceRef, ExecutionContextSource::bodyMode, ExecutionContextSource::selector)
+            .containsExactly(tuple("memory:" + tires.id(), "INLINE", "search-keyword-v1"));
+
+        ChatTurn scheduled = chat.runScheduledTurn(dad, turn.conversationId(), null, "예약 작업", "타이어 언제 갈았지", event -> {
+        });
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(scheduled.executionId()))
+            .extracting(ExecutionContextSource::source)
+            .doesNotContain("MEMORY_SEARCH")
+            .contains("MEMORY_INDEX");
     }
 
 
@@ -558,23 +556,6 @@ class ChatServiceTest {
             .isEqualTo(EventObservation.INCOMPLETE);
         assertThat(typesOf(eventsOf(turn.executionId())))
             .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
-    }
-
-
-    @Test
-    @DisplayName("옛 커넥터 에이전트의 turn 은 모든 도구를 가리는 범위로 사건 스트림을 연다")
-    void opensEventStreamHidingAllToolsForLegacyConnectorAgent() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent legacy = agents.findByCode("dad").orElseThrow();
-        legacy.markConnectorManaged();
-        agents.save(legacy);
-        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
-
-        chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {
-        });
-
-        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), argThat(ToolDetailScope::hideAll));
     }
 
 
@@ -1322,35 +1303,6 @@ class ChatServiceTest {
 
         assertThat(stub().received()).isEmpty();
         assertThat(executions.count()).isZero();
-    }
-
-
-    @Test
-    @DisplayName("흐름이 붙은 에이전트는 커맨드를 해석하지 않고 글 그대로 보낸다")
-    void flowAgentSendsTextAsIsWithoutInterpretingCommands() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent agent = agents.findByCode("dad").orElseThrow();
-        agent.assignFlow(ResearchAndBuildFlow.NAME);
-        agents.save(agent);
-        stub().willAnswer(command -> {
-            if (command.input().contains("조사할 것과 만들 것을 나눈다")) {
-                return answered("chief", "{\"research\":\"자료\",\"build\":\"구현\"}");
-            }
-            return answered("step", "단계 답");
-        });
-
-        ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
-
-        assertThat(stub().received())
-            .as("Hermes 에 보낸 것")
-            .isNotEmpty()
-            .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view(name="));
-        assertThat(stub().received())
-            .anySatisfy(command -> assertThat(command.input()).contains("/shopping 이번 주"));
-        assertThat(skillUses.count()).as("스킬 이력").isZero();
-        assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
-            .first()
-            .satisfies(message -> assertThat(message.content()).isEqualTo("/shopping 이번 주"));
     }
 
 

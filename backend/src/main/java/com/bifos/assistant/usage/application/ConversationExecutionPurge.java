@@ -25,6 +25,7 @@ public class ConversationExecutionPurge {
     private final ExecutionEventRepository events;
     private final SubagentUsageJobRepository usageJobs;
 
+
     /**
      * 그 대화의 실행이 모두 끝났고 자식 사용량도 다 읽었는가.
      *
@@ -34,16 +35,18 @@ public class ConversationExecutionPurge {
     @Transactional(readOnly = true)
     public boolean settled(Long conversationId, Instant now) {
         return !executions.existsByConversationIdAndStatus(conversationId, ExecutionStatus.RUNNING)
-                && !usageJobs.existsWaitingInConversation(conversationId)
-                && !events.existsUnscheduledChildInConversation(
-                        conversationId, now.minus(SubagentUsageReconciler.DISCOVERY_WINDOW));
+            && !usageJobs.existsWaitingInConversation(conversationId)
+            && !events.existsUnscheduledChildInConversation(
+                conversationId, now.minus(SubagentUsageReconciler.DISCOVERY_WINDOW));
     }
+
 
     /** 그 대화의 실행이 보낸 Hermes session 을 겹치지 않게 낸다. */
     @Transactional(readOnly = true)
     public List<ExecutionSessionRef> sessions(Long conversationId) {
         return executions.findSessionRefs(conversationId);
     }
+
 
     /** 답 본문과 사건의 {@code detail} 을 비운다. 대화 줄을 잠근 부르는 쪽의 트랜잭션 안에서만 돈다. */
     @Transactional(propagation = Propagation.MANDATORY)

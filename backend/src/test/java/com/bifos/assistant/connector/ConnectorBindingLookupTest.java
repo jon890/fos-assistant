@@ -48,6 +48,7 @@ class ConnectorBindingLookupTest {
     @Autowired
     HermesConnectorClient connector;
 
+
     @AfterEach
     void tearDown() {
         bindings.deleteAll();
@@ -56,11 +57,12 @@ class ConnectorBindingLookupTest {
         users.deleteAll();
     }
 
+
     @Test
     @DisplayName("붙은 연결의 서버 이름과 등록 이름 앞부분을 바인딩 행으로 만들고 카탈로그를 부르지 않는다")
     void readsServersAndPrefixesFromBindingRowsWithoutCatalog() {
         AppUser owner = user();
-        Agent agent = agent(owner, false);
+        Agent agent = agent(owner);
         bind(agent, connection(owner, "demo-notes"), "demo-notes");
         bind(agent, connection(owner, "demo-mail"), "mail");
 
@@ -71,12 +73,13 @@ class ConnectorBindingLookupTest {
         verifyNoInteractions(connector);
     }
 
+
     @Test
     @DisplayName("붙은 연결이 없으면 비어 있고, 이름을 모르는 옛 바인딩은 있다고만 답한다")
     void returnsEmptyWithoutBindingsAndSkipsUnnamedLegacyBinding() {
         AppUser owner = user();
-        Agent plain = agent(owner, false);
-        Agent legacy = agent(owner, true);
+        Agent plain = agent(owner);
+        Agent legacy = agent(owner);
         bind(legacy, connection(owner, "demo-notes"), null);
 
         assertThat(lookup.hasBindings(plain.id())).isFalse();
@@ -87,45 +90,46 @@ class ConnectorBindingLookupTest {
         verifyNoInteractions(connector);
     }
 
+
     @Test
     @DisplayName("등록 이름이 잘리는 긴 서버 이름의 앞부분은 Hermes 가 남기는 55자까지다")
     void cutsPrefixOfLongServerNameAtKeptLength() {
         AppUser owner = user();
-        Agent agent = agent(owner, false);
+        Agent agent = agent(owner);
         String server = "s".repeat(60);
         bind(agent, connection(owner, "demo-long"), server);
 
         assertThat(lookup.connectorToolPrefixes(agent.id())).containsExactly(("mcp__" + server).substring(0, 55));
     }
 
+
     private void bind(Agent agent, ConnectorConnection connection, String server) {
         bindings.save(ConnectorBinding.pending(agent, connection, server, NOW));
     }
+
 
     private ConnectorConnection connection(AppUser owner, String connectorId) {
         return connections.save(ConnectorConnection.pending(owner.id(), connectorId, NOW));
     }
 
-    private Agent agent(AppUser owner, boolean connectorManaged) {
+
+    private Agent agent(AppUser owner) {
         String code = "lookup-" + UUID.randomUUID().toString().substring(0, 12);
         Agent agent = Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW);
-        if (connectorManaged) {
-            agent.markConnectorManaged();
-        }
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id());
         return agents.save(agent);
     }
 
+
     private AppUser user() {
         String suffix = UUID.randomUUID().toString();
-        return users.save(AppUser.of("lookup-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER, NOW));
+        return users.save(AppUser.of("lookup-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER));
     }
 }

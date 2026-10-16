@@ -1,10 +1,10 @@
 package com.bifos.assistant.agent.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +21,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AgentMemoryCollection {
+public class AgentMemoryCollection extends CreatedAtEntity {
 
     /** 새 에이전트가 처음부터 받는 collection 이다. */
     public static final String DEFAULT_COLLECTION = "core";
@@ -33,22 +33,22 @@ public class AgentMemoryCollection {
     @Column(name = "allow_sensitive", nullable = false)
     private boolean allowSensitive;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
-    private AgentMemoryCollection(Long agentId, String collection, boolean allowSensitive, Instant now) {
+    private AgentMemoryCollection(Long agentId, String collection, boolean allowSensitive) {
         this.id = new AgentMemoryCollectionId(agentId, collection);
         this.allowSensitive = allowSensitive;
-        this.createdAt = now;
     }
 
-    public static AgentMemoryCollection of(Long agentId, String collection, boolean allowSensitive, Instant now) {
-        return new AgentMemoryCollection(agentId, collection, allowSensitive, now);
+
+    public static AgentMemoryCollection of(Long agentId, String collection, boolean allowSensitive) {
+        return new AgentMemoryCollection(agentId, collection, allowSensitive);
     }
+
 
     public String collection() {
         return id.collection();
     }
+
 
     /** 민감 항목까지 받을지 바꾼다. 붙인 시각은 그대로 둔다. */
     public void changeAllowSensitive(boolean allowSensitive) {

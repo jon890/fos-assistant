@@ -21,6 +21,7 @@ import tools.jackson.databind.JsonNode;
 public class AttachmentInspectController {
     private final AttachmentInspectService inspections;
 
+
     @PostMapping("/internal/hermes/attachment-inspect")
     public ResponseEntity<byte[]> inspect(@AuthenticationPrincipal Object principal, @RequestBody JsonNode body) {
         if (!(principal instanceof McpPrincipal mcp)) {
@@ -28,11 +29,12 @@ public class AttachmentInspectController {
         }
         InspectedImage image = inspections.inspect(mcp, body);
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .contentType(MediaType.parseMediaType(image.contentType()))
-                .contentLength(image.bytes().length)
-                .body(image.bytes());
+            .cacheControl(CacheControl.noStore())
+            .contentType(MediaType.parseMediaType(image.contentType()))
+            .contentLength(image.bytes().length)
+            .body(image.bytes());
     }
+
 
     @PostMapping("/internal/hermes/attachment-inspect/validate")
     public ResponseEntity<Void> validate(@AuthenticationPrincipal Object principal, @RequestBody JsonNode body) {

@@ -1,10 +1,5 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
-import {
-  expect,
-  FLOW_AGENT_CODE,
-  PERSONA_AGENT_CODE,
-  test,
-} from "./fixtures.ts";
+import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
@@ -158,6 +153,38 @@ test.describe("스킬을 올린 에이전트", () => {
     ).toBeVisible();
     await expect(input).toHaveValue("");
     await expect(page.getByTestId("skill-command-notice")).toHaveCount(0);
+  });
+
+  test("사진을 받지 않는 GROUP 에이전트도 스킬 목록과 보낸 커맨드의 칩을 보인다", async ({
+    page,
+  }) => {
+    // 화면의 공개 범위·사진 수신 값만 바꾼다. 실제 스킬 실행은 올려 둔 같은 에이전트로 왕복한다.
+    await page.route("**/api/agents", async (route) => {
+      const response = await route.fetch();
+      const agents = await response.json();
+      await route.fulfill({
+        response,
+        json: agents.map((agent: { code: string }) =>
+          agent.code === SKILL_AGENT_CODE
+            ? { ...agent, visibility: "GROUP", acceptsAttachments: false }
+            : agent,
+        ),
+      });
+    });
+    await startWith(page, SKILL_AGENT_NAME);
+    const input = composer(page);
+    await input.fill("/");
+    await expect(
+      skillList(page).getByRole("option", { name: `/${NAME}` }),
+    ).toBeVisible();
+    await input.fill(`/${NAME} 그룹 계획`);
+    await input.press("Enter");
+    await expect(
+      page.getByTestId("user-message").last().getByTestId("skill-chip"),
+    ).toHaveText(`/${NAME}`);
+    await expect(
+      page.getByRole("button", { name: "답 다시 만들기" }),
+    ).toBeVisible();
   });
 
   test("목록에서 숨긴 기본 스킬도 이름을 직접 입력하면 커맨드로 실행한다", async ({
@@ -333,20 +360,4 @@ test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 스킬이 �
   await page.goto("/");
   await composer(page).fill("/");
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
-});
-
-test("흐름이 붙은 에이전트에서는 스킬 목록을 읽지 않고 / 목록을 띄우지 않는다", async ({
-  page,
-}) => {
-  const skillReads: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes(`/api/agents/${FLOW_AGENT_CODE}/skills`))
-      skillReads.push(request.url());
-  });
-  await startWith(page, "흐름 비서");
-  await composer(page).fill("/");
-  // 사진 단추가 없어진 것으로 흐름 에이전트가 반영된 것을 확인한 뒤에 목록이 없는지 본다.
-  await expect(page.getByRole("button", { name: "사진 첨부" })).toHaveCount(0);
-  await expect(skillList(page)).toHaveCount(0);
-  expect(skillReads).toEqual([]);
 });

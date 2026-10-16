@@ -18,6 +18,7 @@ public record ReasoningCapability(Support support, Support disable) {
         UNKNOWN
     }
 
+
     /** Hermes 가 아무것도 밝히지 않은 모델이다. */
     public static final ReasoningCapability UNKNOWN_ALL = new ReasoningCapability(Support.UNKNOWN, Support.UNKNOWN);
 }

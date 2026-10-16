@@ -19,11 +19,13 @@ public class WakeRetryThreads {
     private final BlockingQueue<Thread> threads = new LinkedBlockingQueue<>();
     private volatile boolean collecting;
 
+
     /** 모은 것을 비우고 이 뒤의 재시도 사건을 모은다. */
     public void start() {
         threads.clear();
         collecting = true;
     }
+
 
     /** 끄고 모은 것을 비운다. */
     public void reset() {
@@ -31,12 +33,14 @@ public class WakeRetryThreads {
         threads.clear();
     }
 
+
     @EventListener
     public void onWakeRetryDue(WakeRetryDue event) {
         if (collecting) {
             threads.add(Thread.currentThread());
         }
     }
+
 
     /** 재시도 사건 하나가 나고 그 스레드가 끝날 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     public void awaitOne(Duration limit) throws InterruptedException {

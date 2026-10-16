@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,7 +23,7 @@ import lombok.experimental.Accessors;
 @Table(name = "chat_artifact")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class ChatArtifact {
+public class ChatArtifact extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -49,26 +50,24 @@ public class ChatArtifact {
     @Getter
     private long byteSize;
 
-    @Column(name = "created_at", nullable = false)
-    @Getter
-    private Instant createdAt;
-
     /** 보관 기간이 지나 파일을 지운 시각. 비어 있으면 아직 파일이 있다. */
     @Column(name = "deleted_at")
     @Getter
     private Instant deletedAt;
 
-    private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
+
+    private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
         this.conversationId = conversationId;
         this.messageId = messageId;
         this.path = path;
         this.byteSize = byteSize;
-        this.createdAt = now;
     }
 
-    public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
-        return new ChatArtifact(conversationId, messageId, path, byteSize, now);
+
+    public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize) {
+        return new ChatArtifact(conversationId, messageId, path, byteSize);
     }
+
 
     public boolean isDeleted() {
         return deletedAt != null;

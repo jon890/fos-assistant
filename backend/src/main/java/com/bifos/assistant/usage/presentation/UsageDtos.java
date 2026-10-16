@@ -42,7 +42,7 @@ public final class UsageDtos {
      * @param estimatedCostMicros 환산 금액의 합. 금액이 있는 native 자식을 포함한다
      * @param unpricedExecutions 가격을 찾지 못해 합계에 들어가지 못한 실행 수
      * @param actualCostMicros 실제 청구액의 합. 구독 경로에서는 종량 경로였다면 낼 금액이 청구되지 않는다.
-     *     금액이 있는 native 자식을 포함한다
+     * 금액이 있는 native 자식을 포함한다
      * @param subscriptionExecutions 구독 경로로 돈 실행 수
      * @param pricedSubagents 금액이 합계에 든 native 자식 수
      * @param pendingSubagents 사용량을 아직 확인하는 중인 native 자식 수
@@ -51,19 +51,19 @@ public final class UsageDtos {
      * @param totalExecutions 그 달 실행 건수. 가격을 찾은 것과 찾지 못한 것의 합이고 모두에게 싣는다
      */
     public record MonthlyCostView(
-            String month,
-            String currency,
-            Long estimatedCostMicros,
-            Long pricedExecutions,
-            Long unpricedExecutions,
-            Long actualCostMicros,
-            Long subscriptionExecutions,
-            Long pricedSubagents,
-            Long pendingSubagents,
-            Long unconfirmedSubagents,
-            Long unpricedSubagents,
-            Long observationIncompleteExecutions,
-            long totalExecutions) {
+        String month,
+        String currency,
+        Long estimatedCostMicros,
+        Long pricedExecutions,
+        Long unpricedExecutions,
+        Long actualCostMicros,
+        Long subscriptionExecutions,
+        Long pricedSubagents,
+        Long pendingSubagents,
+        Long unconfirmedSubagents,
+        Long unpricedSubagents,
+        Long observationIncompleteExecutions,
+        long totalExecutions) {
 
         /**
          * 한 달치 합계를 보는 사람에 맞춰 옮긴다.
@@ -74,22 +74,22 @@ public final class UsageDtos {
             long total = cost.pricedExecutions() + cost.unpricedExecutions();
             if (!internal) {
                 return new MonthlyCostView(
-                        month, null, null, null, null, null, null, null, null, null, null, null, total);
+                    month, null, null, null, null, null, null, null, null, null, null, null, total);
             }
             return new MonthlyCostView(
-                    month,
-                    "USD",
-                    cost.estimatedMicros(),
-                    cost.pricedExecutions(),
-                    cost.unpricedExecutions(),
-                    cost.actualMicros(),
-                    cost.subscriptionExecutions(),
-                    cost.pricedSubagents(),
-                    cost.pendingSubagents(),
-                    cost.unconfirmedSubagents(),
-                    cost.unpricedSubagents(),
-                    cost.observationIncompleteExecutions(),
-                    total);
+                month,
+                "USD",
+                cost.estimatedMicros(),
+                cost.pricedExecutions(),
+                cost.unpricedExecutions(),
+                cost.actualMicros(),
+                cost.subscriptionExecutions(),
+                cost.pricedSubagents(),
+                cost.pendingSubagents(),
+                cost.unconfirmedSubagents(),
+                cost.unpricedSubagents(),
+                cost.observationIncompleteExecutions(),
+                total);
         }
     }
 
@@ -99,7 +99,8 @@ public final class UsageDtos {
      * @param axis 어느 축으로 묶었는지
      * @param rows 묶음 줄. 축마다 정렬 기준이 다르고 그 순서대로 준다
      */
-    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {}
+    public record BreakdownView(String axis, String month, String currency, List<BreakdownRow> rows) {
+    }
 
     /**
      * 묶음 한 줄이다. 네 축이 같은 모양을 쓴다.
@@ -112,92 +113,96 @@ public final class UsageDtos {
      * @param avgContextChars 문맥 글자 수 평균. 남긴 실행이 하나도 없으면 null
      */
     public record BreakdownRow(
-            String key,
-            String label,
-            String detail,
-            Long executions,
-            Long subagents,
-            Long estimatedCostMicros,
-            Long actualCostMicros,
-            Long inputTokens,
-            Long outputTokens,
-            Long avgContextChars,
-            Instant firstSeenAt,
-            Instant lastSeenAt) {
+        String key,
+        String label,
+        String detail,
+        Long executions,
+        Long subagents,
+        Long estimatedCostMicros,
+        Long actualCostMicros,
+        Long inputTokens,
+        Long outputTokens,
+        Long avgContextChars,
+        Instant firstSeenAt,
+        Instant lastSeenAt) {
 
         static BreakdownRow ofAgent(BreakdownLine<CostByAgent> line) {
             CostByAgent cost = line.cost();
             String code = cost.agentId() == null
-                    ? "system-decision"
-                    : cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
+                ? "system-decision"
+                : cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
             String label = cost.agentId() == null ? "시스템 판단" : cost.agentName() == null ? "지운 에이전트" : cost.agentName();
             return new BreakdownRow(
-                    code,
-                    label,
-                    cost.agentCode(),
-                    cost.executions(),
-                    line.subagents(),
-                    cost.estimatedMicros(),
-                    cost.actualMicros(),
-                    cost.inputTokens(),
-                    cost.outputTokens(),
-                    round(cost.avgContextChars()),
-                    cost.firstSeenAt(),
-                    cost.lastSeenAt());
+                code,
+                label,
+                cost.agentCode(),
+                cost.executions(),
+                line.subagents(),
+                cost.estimatedMicros(),
+                cost.actualMicros(),
+                cost.inputTokens(),
+                cost.outputTokens(),
+                round(cost.avgContextChars()),
+                cost.firstSeenAt(),
+                cost.lastSeenAt());
         }
+
 
         static BreakdownRow ofModel(BreakdownLine<CostByModel> line) {
             CostByModel cost = line.cost();
             String model = cost.model() == null ? "모델 없음" : cost.model();
             return new BreakdownRow(
-                    cost.provider() + "/" + model,
-                    model,
-                    cost.provider(),
-                    cost.executions(),
-                    line.subagents(),
-                    cost.estimatedMicros(),
-                    cost.actualMicros(),
-                    cost.inputTokens(),
-                    cost.outputTokens(),
-                    round(cost.avgContextChars()),
-                    cost.firstSeenAt(),
-                    cost.lastSeenAt());
+                cost.provider() + "/" + model,
+                model,
+                cost.provider(),
+                cost.executions(),
+                line.subagents(),
+                cost.estimatedMicros(),
+                cost.actualMicros(),
+                cost.inputTokens(),
+                cost.outputTokens(),
+                round(cost.avgContextChars()),
+                cost.firstSeenAt(),
+                cost.lastSeenAt());
         }
+
 
         static BreakdownRow ofDay(BreakdownLine<CostByDay> line) {
             CostByDay cost = line.cost();
             String day = cost.day().toString();
             return new BreakdownRow(
-                    day,
-                    day,
-                    null,
-                    cost.executions(),
-                    line.subagents(),
-                    cost.estimatedMicros(),
-                    cost.actualMicros(),
-                    cost.inputTokens(),
-                    cost.outputTokens(),
-                    round(cost.avgContextChars()),
-                    cost.firstSeenAt(),
-                    cost.lastSeenAt());
+                day,
+                day,
+                null,
+                cost.executions(),
+                line.subagents(),
+                cost.estimatedMicros(),
+                cost.actualMicros(),
+                cost.inputTokens(),
+                cost.outputTokens(),
+                round(cost.avgContextChars()),
+                cost.firstSeenAt(),
+                cost.lastSeenAt());
         }
+
 
         static BreakdownRow ofFingerprint(BreakdownLine<CostByFingerprint> line) {
             CostByFingerprint cost = line.cost();
             return new BreakdownRow(
-                    cost.fingerprint(),
-                    cost.fingerprint(),
-                    null,
-                    cost.executions(),
-                    line.subagents(),
-                    cost.estimatedMicros(),
-                    cost.actualMicros(),
-                    cost.inputTokens(),
-                    cost.outputTokens(),
-                    round(cost.avgContextChars()),
-                    cost.firstSeenAt(),
-                    cost.lastSeenAt());
+                cost.fingerprint(),
+                cost.fingerprint(),
+                null,
+                cost.executions(),
+                line.subagents(),
+                cost.estimatedMicros(),
+                cost.actualMicros(),
+                cost.inputTokens(),
+                cost.outputTokens(),
+                round(cost.avgContextChars()),
+                cost.firstSeenAt(),
+                cost.lastSeenAt());
         }
+
 
         private static Long round(Double average) {
             return average == null ? null : Math.round(average);
@@ -211,21 +216,21 @@ public final class UsageDtos {
      * @param lastConversationId 마지막 호출이 속한 대화의 공개 식별자. 그 대화를 지웠으면 null
      */
     public record MySkillUsageView(
-            String agentCode,
-            String agentName,
-            String skillName,
-            long count,
-            Instant lastInvokedAt,
-            UUID lastConversationId) {
+        String agentCode,
+        String agentName,
+        String skillName,
+        long count,
+        Instant lastInvokedAt,
+        UUID lastConversationId) {
 
         static MySkillUsageView from(UserSkillUsage usage, boolean internal) {
             return new MySkillUsageView(
-                    internal ? usage.agentCode() : null,
-                    usage.agentName(),
-                    usage.skillName(),
-                    usage.count(),
-                    usage.lastInvokedAt(),
-                    usage.lastConversationId());
+                internal ? usage.agentCode() : null,
+                usage.agentName(),
+                usage.skillName(),
+                usage.count(),
+                usage.lastInvokedAt(),
+                usage.lastConversationId());
         }
     }
 
@@ -238,33 +243,33 @@ public final class UsageDtos {
      * @param skillNames 이 실행에서 쓴 스킬 이름. 없으면 빈 목록
      */
     public record ExecutionView(
-            Long id,
-            UUID conversationId,
-            String agentCode,
-            String agentName,
-            String provider,
-            String model,
-            String reasoningEffort,
-            String costMode,
-            String status,
-            String errorCode,
-            Long inputTokens,
-            Long cachedInputTokens,
-            Long outputTokens,
-            Long totalTokens,
-            Long latencyMs,
-            Long contextChars,
-            Integer contextOmittedItems,
-            String runtimeFingerprint,
-            String instructionsHash,
-            Long estimatedCostMicros,
-            Long actualCostMicros,
-            String costCurrency,
-            String pricingVersion,
-            Instant startedAt,
-            boolean hasChildren,
-            Long retryOfExecutionId,
-            List<String> skillNames) {
+        Long id,
+        UUID conversationId,
+        String agentCode,
+        String agentName,
+        String provider,
+        String model,
+        String reasoningEffort,
+        String costMode,
+        String status,
+        String errorCode,
+        Long inputTokens,
+        Long cachedInputTokens,
+        Long outputTokens,
+        Long totalTokens,
+        Long latencyMs,
+        Long contextChars,
+        Integer contextOmittedItems,
+        String runtimeFingerprint,
+        String instructionsHash,
+        Long estimatedCostMicros,
+        Long actualCostMicros,
+        String costCurrency,
+        String pricingVersion,
+        Instant startedAt,
+        boolean hasChildren,
+        Long retryOfExecutionId,
+        List<String> skillNames) {
 
         /**
          * 자식 여부와 스킬 이름을 받아서만 만든다.
@@ -278,40 +283,40 @@ public final class UsageDtos {
          * 오류 코드와 걸린 시간과 스킬 이름은 그대로 싣는다.
          */
         static ExecutionView from(
-                AgentExecution execution,
-                Agent agent,
-                UUID conversationPublicId,
-                boolean hasChildren,
-                List<String> skillNames,
-                boolean internal) {
+            AgentExecution execution,
+            Agent agent,
+            UUID conversationPublicId,
+            boolean hasChildren,
+            List<String> skillNames,
+            boolean internal) {
             return new ExecutionView(
-                    execution.id(),
-                    conversationPublicId,
-                    !internal || agent == null ? null : agent.code(),
-                    agent == null ? null : agent.name(),
-                    internal ? execution.provider() : null,
-                    internal ? execution.model() : null,
-                    internal ? execution.reasoningEffort() : null,
-                    internal ? execution.costMode().name() : null,
-                    execution.status().name(),
-                    execution.errorCode(),
-                    internal ? execution.inputTokens() : null,
-                    internal ? execution.cachedInputTokens() : null,
-                    internal ? execution.outputTokens() : null,
-                    internal ? execution.totalTokens() : null,
-                    execution.latencyMs(),
-                    internal ? execution.contextChars() : null,
-                    internal ? execution.contextOmittedItems() : null,
-                    internal ? execution.runtimeFingerprint() : null,
-                    internal ? execution.instructionsHash() : null,
-                    internal ? execution.estimatedCostMicros() : null,
-                    internal ? execution.actualCostMicros() : null,
-                    internal ? execution.costCurrency() : null,
-                    internal ? execution.pricingVersion() : null,
-                    execution.startedAt(),
-                    hasChildren,
-                    execution.retryOfExecutionId(),
-                    skillNames);
+                execution.id(),
+                conversationPublicId,
+                !internal || agent == null ? null : agent.code(),
+                agent == null ? null : agent.name(),
+                internal ? execution.provider() : null,
+                internal ? execution.model() : null,
+                internal ? execution.reasoningEffort() : null,
+                internal ? execution.costMode().name() : null,
+                execution.status().name(),
+                execution.errorCode(),
+                internal ? execution.inputTokens() : null,
+                internal ? execution.cachedInputTokens() : null,
+                internal ? execution.outputTokens() : null,
+                internal ? execution.totalTokens() : null,
+                execution.latencyMs(),
+                internal ? execution.contextChars() : null,
+                internal ? execution.contextOmittedItems() : null,
+                internal ? execution.runtimeFingerprint() : null,
+                internal ? execution.instructionsHash() : null,
+                internal ? execution.estimatedCostMicros() : null,
+                internal ? execution.actualCostMicros() : null,
+                internal ? execution.costCurrency() : null,
+                internal ? execution.pricingVersion() : null,
+                execution.startedAt(),
+                hasChildren,
+                execution.retryOfExecutionId(),
+                skillNames);
         }
     }
 }

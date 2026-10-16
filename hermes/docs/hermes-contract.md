@@ -433,7 +433,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
@@ -1133,11 +1133,9 @@ Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 k
 `gateway.max_concurrent_sessions` 는 다른 것이다.
 그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
 
-**에이전트를 나눈 한 턴이 같은 순간에 쓰는 자리는 최대 2 이고, 나누지 않은 대화는 1 이다.**
-`ResearchAndBuildFlow` 는 한 턴을 Chief, Researcher 와 Engineer, Synthesizer 의 세 단계로 나눈다.
-Control Plane 이 앞 단계의 실행이 끝난 뒤에 다음 단계를 띄우므로 단계끼리 겹치지 않는다.
+대화 실행 하나는 자리 하나를 쓴다.
+에이전트가 `agent_delegate` 로 자식을 맡기면 부모와 자식이 같은 listener의 한도를 함께 쓴다.
 부모가 자식을 기다리는 동안에는 자리를 잡지 않는다.
-둘이 겹치는 것은 Researcher 와 Engineer 뿐이다.
 
 ### 한도 위에 thread pool 이 하나 더 있다
 
@@ -1819,7 +1817,7 @@ MCP 서버의 실제 등록 도구 목록을 열거하지 않는다.
 `GET /api/mcp/servers`도 저장된 설정의 요약이다.
 [MCP 대시보드 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/mcp.py)가 근거다.
 
-probe 성공과 설치 응답의 재시작 불필요를 연결 준비 판정에 쓸 수 있다.
+probe 성공과 바인딩 응답의 `restart_required: false`, `reload_pending: false`를 함께 연결 준비 판정에 쓸 수 있다. `restart_required`가 참이면 같은 이름의 기존 MCP 연결을 다시 만들려 gateway 재시작을 기다리고, `reload_pending`이 참이면 gateway의 다음 설정 맞추기 주기를 기다린다.
 이 판정은 공유 gateway의 요청 profile에서 실제로 등록된 도구를 확인한 결과와 다르다.
 실제 가계부 도구와 Control Plane MCP 도구를 호출하는 운영 확인이 따로 필요하다.
 gateway 재시작은 다른 profile의 실행에도 영향을 주므로 요청 처리에서 자동 실행하지 않는다.
@@ -1868,8 +1866,18 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
 읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
 
-**Hermes 예약 작업은 기본 profile 의 설정과 cron 저장소를 따른다.** Control Plane 예약 작업으로 옮긴다([ADR-20261008 / cron-to-task](../../docs/adr/ADR-20261008-cron-to-task.md)).
-named profile 저장은 기본 profile 설정과 cron 저장소를 바꾸지 않는다.
+### Hermes 예약 작업
+
+**기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다**([ADR-20261008 / cron-to-task](../../docs/adr/ADR-20261008-cron-to-task.md)).
+Hermes 자체의 예약 작업은 기본 profile의 설정과 cron 저장소를 따르며, named profile 저장은 이를 바꾸지 않는다.
+`cronjob` 도구 차단과 본문 없는 cron 진단 계약은 유지한다.
+
+v0.21.6(`818c13be1dc4fd28987e1e881a9408224afd4535`)의 [`hermes_cli/config.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config.py)의 `load_config`와 `load_config_readonly`는 기본값과 사용자 설정을 합쳐 읽는다.
+[`config_defaults.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config_defaults.py)의 `DEFAULT_CONFIG`와 실행 코드에는 `agent.scheduled_tasks.enabled`를 읽는 곳이 없다.
+Hermes v0.21.6 소스 전체에서 키 이름을 검색해 소비자가 없음을 확인했다.
+[`gateway/run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/run.py)의 `_start_gateway_start_cron_and_housekeeping`도 이 키를 보지 않고 `cron.scheduler_provider.resolve_cron_scheduler`로 실행기를 고른다.
+따라서 이 키는 profile 틀에서 제거했으며 cron 실행기를 끄는 설정으로 취급하지 않는다.
+
 예약 작업 이름이나 지시문에 역할 이름을 넣어도 실행 profile 은 바뀌지 않는다.
 script 를 지정한 예약 작업의 subprocess 는 Hermes 프로세스에서 돈다. terminal backend 를 바꾸는 것으로 격리되지 않는다.
 Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile 을 쓰는 별도 기능이다.
@@ -2847,6 +2855,16 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-contract.sh <tag>` 를 돌린다.
 새 사건이 있으면 `HermesRunEventStream.WIRE_EVENTS`와 버전별 공유 wire를 함께 갱신한다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
+
+#### 바인딩 설치의 파일 복원과 소유 기록 복구
+
+바인딩 설치는 `config.yaml` 다음에 `.fos-connectors.json`을 교체한다.
+각 파일은 원자적으로 교체하지만 파일 묶음은 원자적이지 않다.
+일반 예외에서는 교체 직후 실패한 파일을 포함해 이번 요청이 쓴 값만 역순으로 복원하며, 복원 하나가 실패해도 나머지를 계속 처리한다.
+외부에서 바꾼 값은 복원으로 덮어쓰지 않는다. 프로세스 강제 종료와 지속적인 디스크 오류까지 복원을 보장하지 않는다.
+재설치는 기존 소유 기록이 있고 현재 서버 설정이 이번 요청의 새 정의와 정확히 같으며 기록과의 차이가 `tools.exclude`뿐이면 기록을 복구한다.
+이 복구는 `restart_required: true`로 답한다. 설정 파일이 이미 새 정의여도 살아 있는 연결은 옛 정의일 수 있다.
+기록이 없거나 다른 서버 설정이 달라진 경우는 409로 남긴다.
 
 #### MCP 설정 맞추기와 스킬 색인 캐시 키
 

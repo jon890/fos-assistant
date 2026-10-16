@@ -15,13 +15,16 @@ public record CallResult(JsonNode result, ConnectorCallError error, ConnectorErr
         return new CallResult(result, null, null);
     }
 
+
     public static CallResult failure(ConnectorCallError error) {
         return new CallResult(null, error, null);
     }
 
+
     public static CallResult failure(ConnectorCallError error, ConnectorErrorDetail detail) {
         return new CallResult(null, error, detail);
     }
+
 
     public boolean ok() {
         return error == null;

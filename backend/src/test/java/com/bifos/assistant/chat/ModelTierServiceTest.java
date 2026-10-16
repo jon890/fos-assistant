@@ -19,7 +19,6 @@ import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
-import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ModelVisibilityService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
@@ -38,6 +37,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +54,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Conversation conversation = mock(Conversation.class);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
@@ -74,7 +74,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
         when(users.findById(1L)).thenReturn(Optional.empty());
@@ -189,7 +189,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser member = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> service.saveGroup(member, List.of(), null))
@@ -208,7 +208,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         List<ModelTierOptions.Tier> incomplete = List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", "low"));
 
@@ -228,7 +228,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         doAnswer(invocation -> {
             List<ModelTierDefinition> saved = invocation.getArgument(0);
@@ -269,7 +269,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
 
         assertThatThrownBy(() -> service.saveGroup(
@@ -312,7 +312,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
 
         assertThatThrownBy(() -> service.saveGroup(
@@ -331,42 +331,13 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("배포 단계 설정은 provider만 또는 model만 채운 부분 mapping으로 기동하지 못한다")
-    void rejectsPartialConfiguredTierMapping() {
-        assertThatThrownBy(() -> new ModelTierProperties.Tier("openai-codex", null, null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("model and reasoning-effort");
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("model and reasoning-effort");
-    }
-
-
-    @Test
-    @DisplayName("배포 단계 설정은 지원하지 않는 effort와 칸 길이를 넘는 값을 기동 전에 거절한다")
-    void rejectsInvalidConfiguredTierValues() {
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", "banana"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("reasoning-effort");
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(
-            "p".repeat(ModelChoice.PROVIDER_MAX_LENGTH + 1), "example-fast", "low"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("provider");
-        assertThatThrownBy(
-            () -> new ModelTierProperties.Tier(null, "m".repeat(ModelChoice.MODEL_MAX_LENGTH + 1), "low"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("model");
-    }
-
-
-    @Test
     @DisplayName("저장 단계와 에이전트 기본값이 모두 비어 있으면 단계 기록을 남기고 profile 기본값으로 돈다")
     void emptyTierMappingFallsBackToProfileDefault() {
         ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
 
@@ -385,7 +356,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent fastAgent = mock(Agent.class);
         Agent balancedAgent = mock(Agent.class);
@@ -412,7 +383,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Agent agent = mock(Agent.class);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(storedDefinitions());
@@ -490,7 +461,7 @@ class ModelTierServiceTest {
             .when(visibility)
             .requireVisible(any(), any());
         ModelTierService service = new ModelTierService(
-            fixtures.definitions(), fixtures.settings(), fixtures.users(), fixtures.options(), visibility);
+            fixtures.definitions(), fixtures.settings(), fixtures.users(), fixtures.options(), visibility, Clock.systemUTC());
         when(fixtures.options().optionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
 
         assertThatThrownBy(() -> service.resolveTier(fixtures.user(), ModelTier.DEEP, fixtures.agent()))
@@ -539,7 +510,7 @@ class ModelTierServiceTest {
         ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden());
+        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.ADMIN);
         when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
         when(users.findById(1L)).thenReturn(Optional.empty());
@@ -714,7 +685,7 @@ class ModelTierServiceTest {
             mock(ModelTierGroupSettingRepository.class),
             mock(AppUserRepository.class),
             mock(ModelOptionsService.class),
-            visibility);
+            visibility, Clock.systemUTC());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
         Conversation conversation = mock(Conversation.class);
         ModelChoice choice = ModelChoice.stored("openai-codex", "hidden-model", null);
@@ -740,7 +711,7 @@ class ModelTierServiceTest {
             mock(ModelTierGroupSettingRepository.class),
             mock(AppUserRepository.class),
             mock(ModelOptionsService.class),
-            visibility);
+            visibility, Clock.systemUTC());
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
             .when(visibility)
@@ -959,7 +930,7 @@ class ModelTierServiceTest {
                 mock(ModelTierGroupSettingRepository.class),
                 mock(AppUserRepository.class),
                 options,
-                visibility),
+                visibility, Clock.systemUTC()),
             definitions,
             options,
             new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER),
@@ -1006,7 +977,7 @@ class ModelTierServiceTest {
                     Map.of())),
                 List.of()));
         return new TierFixtures(
-            new ModelTierService(definitions, settings, users, options, nothingHidden()),
+            new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC()),
             definitions,
             settings,
             users,

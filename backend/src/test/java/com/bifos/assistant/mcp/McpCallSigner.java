@@ -37,18 +37,21 @@ public final class McpCallSigner {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
 
+
     /** 새 루트 session 이다. 검사마다 새로 만들어 다른 검사가 남긴 줄과 겹치지 않게 한다. */
     static String newRoot() {
         return "fos-" + UUID.randomUUID();
     }
+
 
     /** 루트 session 과 같은 session 에서 부른 호출의 {@code _fos_ctx} 다. {@code tool_call_id} 는 호출마다 새 값이다. */
     public static ObjectNode context(String rawToken, String toolName, String rootSessionId) {
         return context(rawToken, toolName, rootSessionId, rootSessionId, "call_" + UUID.randomUUID());
     }
 
+
     static ObjectNode context(
-            String rawToken, String toolName, String rootSessionId, String sessionId, String toolCallId) {
+        String rawToken, String toolName, String rootSessionId, String sessionId, String toolCallId) {
         ObjectNode context = JSON.createObjectNode();
         context.put("v", 1);
         context.put("root_session_id", rootSessionId);
@@ -58,6 +61,7 @@ public final class McpCallSigner {
         return context;
     }
 
+
     /**
      * 플러그인이 {@code subagent_start} hook 에서 보내는 하위 에이전트 session 등록 본문이다.
      *
@@ -65,7 +69,7 @@ public final class McpCallSigner {
      * {@code v1-subagent\n<parent_root>\n<parent>\n<child>} 다. 서명하지 않는 두 칸은 hook 이 받은 모양대로 채운다.
      */
     static ObjectNode subagentBody(
-            String rawToken, String parentRootSessionId, String parentSessionId, String childSessionId) {
+        String rawToken, String parentRootSessionId, String parentSessionId, String childSessionId) {
         ObjectNode body = JSON.createObjectNode();
         body.put("v", 1);
         body.put("parent_session_id", parentSessionId);
@@ -74,10 +78,11 @@ public final class McpCallSigner {
         body.put("child_subagent_id", "sa-" + UUID.randomUUID());
         body.putNull("parent_subagent_id");
         body.put(
-                "sig",
-                sign(rawToken, String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)));
+            "sig",
+            sign(rawToken, String.join("\n", "v1-subagent", parentRootSessionId, parentSessionId, childSessionId)));
         return body;
     }
+
 
     /**
      * 플러그인이 커넥터 도구 호출 전에 보내는 판정 요청 본문이다.
@@ -87,13 +92,13 @@ public final class McpCallSigner {
      * {@code tool} 은 서명하지 않는다. null 이면 JSON null 로 싣는다.
      */
     public static ObjectNode policyBody(
-            String rawToken,
-            String hermesTool,
-            String tool,
-            String rootSessionId,
-            String sessionId,
-            String toolCallId,
-            String argsJson) {
+        String rawToken,
+        String hermesTool,
+        String tool,
+        String rootSessionId,
+        String sessionId,
+        String toolCallId,
+        String argsJson) {
         ObjectNode body = JSON.createObjectNode();
         body.put("v", 1);
         body.put("root_session_id", rootSessionId);
@@ -107,19 +112,20 @@ public final class McpCallSigner {
         }
         body.put("args_json", argsJson);
         body.put(
-                "sig",
-                sign(
-                        rawToken,
-                        String.join(
-                                "\n",
-                                "v1-connector-policy",
-                                hermesTool,
-                                rootSessionId,
-                                sessionId,
-                                toolCallId,
-                                sha256(argsJson))));
+            "sig",
+            sign(
+                rawToken,
+                String.join(
+                    "\n",
+                    "v1-connector-policy",
+                    hermesTool,
+                    rootSessionId,
+                    sessionId,
+                    toolCallId,
+                    sha256(argsJson))));
         return body;
     }
+
 
     /**
      * 요청 본문이 {@code tools/call} 이고 인자에 {@code _fos_ctx} 가 없으면 서명한 값을 붙인다.
@@ -127,7 +133,7 @@ public final class McpCallSigner {
      * <p>인자 검사를 보는 검사가 요청자 판정에서 먼저 막히지 않게 쓴다. 그 밖의 요청은 그대로 돌려준다.
      */
     static String withContext(String request, String rawToken, String rootSessionId) {
-        ObjectNode body = (ObjectNode) JSON.readTree(request);
+        ObjectNode body = (ObjectNode)JSON.readTree(request);
         if (!"tools/call".equals(body.path("method").asString())) {
             return request;
         }
@@ -144,15 +150,17 @@ public final class McpCallSigner {
         return JSON.writeValueAsString(body);
     }
 
+
     /** 그 profile 로 루트 session 에서 도는 실행 줄을 만든다. */
     public static AgentExecution running(
-            AgentExecutionRepository executions,
-            Long userId,
-            Long conversationId,
-            String profileName,
-            String rootSessionId) {
+        AgentExecutionRepository executions,
+        Long userId,
+        Long conversationId,
+        String profileName,
+        String rootSessionId) {
         return save(executions, userId, conversationId, profileName, rootSessionId, ExecutionStatus.RUNNING);
     }
+
 
     /**
      * 그 profile 의 에이전트로 루트 session 에서 도는 실행 줄을 만든다.
@@ -161,58 +169,60 @@ public final class McpCallSigner {
      * 아무것도 읽지 못하므로, Memory 를 읽는 검사는 이 메서드로 실행을 만든다.
      */
     public static AgentExecution running(
-            AgentExecutionRepository executions,
-            AgentRepository agents,
-            Long userId,
-            Long conversationId,
-            String profileName,
-            String rootSessionId) {
+        AgentExecutionRepository executions,
+        AgentRepository agents,
+        Long userId,
+        Long conversationId,
+        String profileName,
+        String rootSessionId) {
         return executions.save(AgentExecution.builder()
-                .userId(userId)
-                .agentId(agentFor(agents, profileName).id())
-                .conversationId(conversationId)
-                .profileName(profileName)
-                .hermesSessionId(rootSessionId)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(STARTED)
-                .build());
+            .userId(userId)
+            .agentId(agentFor(agents, profileName).id())
+            .conversationId(conversationId)
+            .profileName(profileName)
+            .hermesSessionId(rootSessionId)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(STARTED)
+            .build());
     }
+
 
     /** 그 profile 을 가리키는 에이전트를 찾고, 없으면 만든다. 새로 저장한 에이전트는 core collection 을 받는다. */
     public static Agent agentFor(AgentRepository agents, String profileName) {
         return agents.findAll().stream()
-                .filter(agent -> profileName.equals(agent.hermesProfile()))
-                .findFirst()
-                .orElseGet(() -> agents.save(Agent.of(
-                        profileName,
-                        profileName,
-                        profileName,
-                        "http://runtime.test/p/" + profileName,
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.GROUP,
-                        null,
-                        Instant.now())));
+            .filter(agent -> profileName.equals(agent.hermesProfile()))
+            .findFirst()
+            .orElseGet(() -> agents.save(Agent.of(
+                profileName,
+                profileName,
+                profileName,
+                "http://runtime.test/p/" + profileName,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.GROUP,
+                null)));
     }
 
+
     public static AgentExecution save(
-            AgentExecutionRepository executions,
-            Long userId,
-            Long conversationId,
-            String profileName,
-            String rootSessionId,
-            ExecutionStatus status) {
+        AgentExecutionRepository executions,
+        Long userId,
+        Long conversationId,
+        String profileName,
+        String rootSessionId,
+        ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
-                .userId(userId)
-                .conversationId(conversationId)
-                .profileName(profileName)
-                .hermesSessionId(rootSessionId)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(STARTED)
-                .build());
+            .userId(userId)
+            .conversationId(conversationId)
+            .profileName(profileName)
+            .hermesSessionId(rootSessionId)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(STARTED)
+            .build());
     }
+
 
     /**
      * 그 검사가 쓰는 profile 의 하위 에이전트 session 등록 줄과 실행 줄을 지운다.
@@ -228,6 +238,7 @@ public final class McpCallSigner {
         }
     }
 
+
     /**
      * profile 이 빈 토큰 한 줄을 넣고 그 번호를 돌려준다.
      *
@@ -236,12 +247,13 @@ public final class McpCallSigner {
     static long insertUnboundToken(JdbcTemplate jdbc, String rawToken, String label) {
         String tokenHash = sha256(rawToken);
         jdbc.update(
-                "INSERT INTO agent_token (token_hash, label, created_at) VALUES (?, ?, ?)",
-                tokenHash,
-                label,
-                Timestamp.from(Instant.now()));
+            "INSERT INTO agent_token (token_hash, label, created_at) VALUES (?, ?, ?)",
+            tokenHash,
+            label,
+            Timestamp.from(Instant.now()));
         return jdbc.queryForObject("SELECT id FROM agent_token WHERE token_hash = ?", Long.class, tokenHash);
     }
+
 
     private static String sign(String rawToken, String text) {
         try {
@@ -253,10 +265,11 @@ public final class McpCallSigner {
         }
     }
 
+
     private static String sha256(String raw) {
         try {
             return HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
+                .formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }

@@ -91,6 +91,7 @@ class ConversationMissingAgentTest {
     private MockMvc mvc;
     private CurrentUser dad;
 
+
     @BeforeEach
     void setUp() {
         executionEvents.deleteAll();
@@ -101,45 +102,48 @@ class ConversationMissingAgentTest {
         memories.deleteAll();
         users.deleteAll();
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
-                        chat,
-                        currentUser,
-                        new UserDisplayNameService(users),
-                        agentService,
-                        access,
-                        new ChatEventStreams(Duration.ofSeconds(20)),
-                        null,
-                        mock(ModelTierService.class),
-                        List.of(),
-                        mock(SourceReadSummaries.class)))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+            chat,
+            currentUser,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class)))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         when(currentUser.require()).thenReturn(dad);
     }
 
+
     private Agent agent(String code) {
         return agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now()));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id()));
     }
+
 
     private UUID conversationOf(Long agentId, String title) {
         return conversations
-                .save(Conversation.startedBy(dad.id(), title, agentId, Instant.now()))
-                .publicId();
+            .save(Conversation.startedBy(dad.id(), title, agentId, Instant.now()))
+            .publicId();
     }
+
 
     private String sendBody(UUID conversationId) {
         return "{\"conversationId\":\"" + conversationId + "\",\"text\":\"이어 묻기\"}";
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 대화도 목록에 오고 그 줄의 에이전트 칸만 비어 있다")
@@ -151,19 +155,20 @@ class ConversationMissingAgentTest {
         agents.deleteById(gone.id());
 
         mvc.perform(get("/api/v1/chat/conversations"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(2))
-                .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentCode")
-                        .value("kept"))
-                .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentName")
-                        .value("kept"))
-                .andExpect(
-                        jsonPath("$.items[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
-                .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentCode")
-                        .value(Matchers.contains((Object) null)))
-                .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentName")
-                        .value(Matchers.contains((Object) null)));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentCode")
+                .value("kept"))
+            .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentName")
+                .value("kept"))
+            .andExpect(
+                jsonPath("$.items[?(@.id == '" + orphanId + "')].title").value("행이 없는 대화"))
+            .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentCode")
+                .value(Matchers.contains((Object)null)))
+            .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentName")
+                .value(Matchers.contains((Object)null)));
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 대화의 이름을 바꾸면 에이전트 칸이 빈 줄을 돌려준다")
@@ -173,13 +178,14 @@ class ConversationMissingAgentTest {
         agents.deleteById(gone.id());
 
         mvc.perform(patch("/api/v1/chat/conversations/{id}", id)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"새 이름\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()))
-                .andExpect(jsonPath("$.title").value("새 이름"))
-                .andExpect(jsonPath("$.agentCode").value(nullValue()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"새 이름\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id.toString()))
+            .andExpect(jsonPath("$.title").value("새 이름"))
+            .andExpect(jsonPath("$.agentCode").value(nullValue()));
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 대화에 보내면 없는 에이전트로 거절한다")
@@ -189,11 +195,12 @@ class ConversationMissingAgentTest {
         agents.deleteById(gone.id());
 
         mvc.perform(post("/api/v1/chat/messages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(sendBody(id)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_NOT_FOUND.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(sendBody(id)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 대화의 메시지 목록은 읽힌다")
@@ -203,9 +210,10 @@ class ConversationMissingAgentTest {
         agents.deleteById(gone.id());
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/messages", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(0));
     }
+
 
     @Test
     @DisplayName("에이전트 번호가 없는 대화도 목록에 오고 보내면 없는 에이전트로 거절한다")
@@ -213,15 +221,15 @@ class ConversationMissingAgentTest {
         UUID id = conversationOf(null, "에이전트 없는 대화");
 
         mvc.perform(get("/api/v1/chat/conversations"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].id").value(id.toString()))
-                .andExpect(jsonPath("$.items[0].agentCode").value(nullValue()))
-                .andExpect(jsonPath("$.items[0].agentName").value(nullValue()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].id").value(id.toString()))
+            .andExpect(jsonPath("$.items[0].agentCode").value(nullValue()))
+            .andExpect(jsonPath("$.items[0].agentName").value(nullValue()));
         mvc.perform(post("/api/v1/chat/messages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(sendBody(id)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_NOT_FOUND.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(sendBody(id)))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_NOT_FOUND.name()));
     }
 }

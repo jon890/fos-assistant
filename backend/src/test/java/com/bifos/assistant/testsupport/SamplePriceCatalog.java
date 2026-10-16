@@ -18,4 +18,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties("assistant.pricing.catalog-path=${" + IntegrationTestDoubles.SAMPLE_PRICE_CATALOG_PATH + "}")
-public @interface SamplePriceCatalog {}
+public @interface SamplePriceCatalog {
+}

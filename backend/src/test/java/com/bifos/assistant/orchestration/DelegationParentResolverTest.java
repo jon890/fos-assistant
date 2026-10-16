@@ -27,8 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @BackendIntegrationTest
 class DelegationParentResolverTest {
 
-    private static final List<String> MY_EMAILS =
-            List.of("parent-resolver-dad@example.com", "parent-resolver-kid@example.com");
+    private static final List<String> MY_EMAILS = List.of("parent-resolver-dad@example.com", "parent-resolver-kid@example.com");
     private static final String PROFILE = "parent-resolver";
     private static final String OTHER_PROFILE = "parent-resolver-other";
     private static final Instant STARTED = Instant.parse("2026-09-29T00:00:00Z");
@@ -49,6 +48,7 @@ class DelegationParentResolverTest {
     private AppUser kid;
     private String root;
 
+
     /**
      * 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 이 검사가 쓰는 profile 의 실행 줄만 지운다.
      *
@@ -61,10 +61,11 @@ class DelegationParentResolverTest {
             jdbc.update("DELETE FROM agent_execution WHERE profile_name = ?", profile);
         }
         MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(users::delete));
-        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER, Instant.now()));
-        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER, Instant.now()));
+        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
+        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER));
         root = "fos-" + UUID.randomUUID();
     }
+
 
     @Test
     @DisplayName("도는 부모가 하나면 그 실행을 돌려준다")
@@ -76,6 +77,7 @@ class DelegationParentResolverTest {
         assertThat(resolver.resolve(PROFILE, root).id()).isEqualTo(running.id());
     }
 
+
     @Test
     @DisplayName("끝난 실행만 있으면 실패한다")
     void failsWhenOnlyFinishedRunsExist() {
@@ -85,6 +87,7 @@ class DelegationParentResolverTest {
         assertRejected(PROFILE, root);
     }
 
+
     @Test
     @DisplayName("다른 profile 의 도는 실행은 부모가 되지 못한다")
     void runningRunOfOtherProfileCannotBeParent() {
@@ -92,6 +95,7 @@ class DelegationParentResolverTest {
 
         assertRejected(PROFILE, root);
     }
+
 
     @Test
     @DisplayName("같은 profile 에서 사용자가 다른 실행 둘은 루트가 다르면 각자 찾는다")
@@ -109,6 +113,7 @@ class DelegationParentResolverTest {
         assertThat(forKid.userId()).isEqualTo(kid.id());
     }
 
+
     @Test
     @DisplayName("같은 session 의 도는 줄이 둘이면 가장 최근을 고르지 않고 실패한다")
     void failsWithoutPickingLatestWhenTwoRunningRowsShareSession() {
@@ -117,6 +122,7 @@ class DelegationParentResolverTest {
 
         assertRejected(PROFILE, root);
     }
+
 
     @Test
     @DisplayName("비어 있는 루트 session 이나 profile 은 session 이 없는 줄을 고르지 않는다")
@@ -129,22 +135,24 @@ class DelegationParentResolverTest {
         assertRejected("", root);
     }
 
+
     private AgentExecution save(AppUser user, String profileName, String hermesSessionId, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
-                .userId(user.id())
-                .conversationId(1L)
-                .profileName(profileName)
-                .hermesSessionId(hermesSessionId)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(STARTED)
-                .build());
+            .userId(user.id())
+            .conversationId(1L)
+            .profileName(profileName)
+            .hermesSessionId(hermesSessionId)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(STARTED)
+            .build());
     }
+
 
     private void assertRejected(String profileName, String rootSessionId) {
         assertThatThrownBy(() -> resolver.resolve(profileName, rootSessionId))
-                .as("profile=%s root=%s", profileName, rootSessionId)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+            .as("profile=%s root=%s", profileName, rootSessionId)
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 }

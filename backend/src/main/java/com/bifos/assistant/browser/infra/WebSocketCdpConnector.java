@@ -58,16 +58,19 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
     private final int maxMessageChars;
     private final AtomicLong connections = new AtomicLong();
 
+
     @Autowired
     public WebSocketCdpConnector() {
         this(COMMAND_TIMEOUT, MAX_MESSAGE_CHARS);
     }
+
 
     WebSocketCdpConnector(Duration commandTimeout, int maxMessageChars) {
         this.client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
         this.commandTimeout = commandTimeout;
         this.maxMessageChars = maxMessageChars;
     }
+
 
     @Override
     public CdpConnection connect(URI cdp, String targetId, Consumer<CdpEvent> events, Runnable closed) {
@@ -77,8 +80,7 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
         }
         URI address = URI.create("ws://" + cdp.getRawAuthority() + "/devtools/page/" + targetId);
         Session session = new Session(events, closed);
-        CompletableFuture<WebSocket> opening =
-                client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, session);
+        CompletableFuture<WebSocket> opening = client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, session);
         try {
             WebSocket socket = opening.get(CONNECT_TIMEOUT.toMillis() * 2, TimeUnit.MILLISECONDS);
             session.attach(socket);
@@ -93,6 +95,7 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
         }
     }
 
+
     /** 붙기를 포기한다. 사건과 닫힘 알림을 부르지 않게 끝내고, 늦게 열린 소켓은 닫는다. */
     private static void abandon(CompletableFuture<WebSocket> opening, Session session) {
         session.end(false);
@@ -103,10 +106,12 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
         });
     }
 
+
     @Override
     public void close() {
         client.shutdownNow();
     }
+
 
     /** 연결 하나의 상태다. WebSocket 의 듣는 쪽과 명령을 보내는 쪽을 함께 맡는다. */
     private final class Session implements WebSocket.Listener, CdpConnection {
@@ -127,6 +132,7 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
         /** JDK WebSocket 은 앞의 보내기가 끝나야 다음을 받는다. 보내기를 차례로 잇는다. */
         private CompletableFuture<?> sending = CompletableFuture.completedFuture(null);
 
+
         Session(Consumer<CdpEvent> events, Runnable closed) {
             this.events = events;
             this.closed = closed;
@@ -138,9 +144,11 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             });
         }
 
+
         void attach(WebSocket webSocket) {
             this.socket = webSocket;
         }
+
 
         @Override
         public void onOpen(WebSocket webSocket) {
@@ -151,6 +159,7 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             }
             webSocket.request(1);
         }
+
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
@@ -178,16 +187,19 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             return null;
         }
 
+
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             end(true);
             return null;
         }
 
+
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             end(true);
         }
+
 
         @Override
         public CompletableFuture<JsonNode> send(String method, Map<String, Object> params) {
@@ -211,17 +223,16 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             }
             pending.put(id, result);
             result.orTimeout(commandTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .whenComplete((value, error) -> pending.remove(id));
+                .whenComplete((value, error) -> pending.remove(id));
             synchronized (this) {
                 sending = sending.handle((value, error) -> null)
-                        // 시간 초과 등으로 이미 끝난 명령은 보내지 않는다
-                        .thenCompose(ignored ->
-                                result.isDone() ? CompletableFuture.completedFuture(null) : socket.sendText(text, true))
-                        .whenComplete((value, error) -> {
-                            if (error != null) {
-                                result.completeExceptionally(new IllegalStateException("cdp send failed " + method));
-                            }
-                        });
+                    // 시간 초과 등으로 이미 끝난 명령은 보내지 않는다
+                    .thenCompose(ignored -> result.isDone() ? CompletableFuture.completedFuture(null) : socket.sendText(text, true))
+                    .whenComplete((value, error) -> {
+                        if (error != null) {
+                            result.completeExceptionally(new IllegalStateException("cdp send failed " + method));
+                        }
+                    });
             }
             // 연결이 그 사이 끊겼으면 end 가 이 명령을 보지 못했을 수 있다
             if (ended.get()) {
@@ -230,12 +241,14 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             return result;
         }
 
+
         @Override
         public void close() {
             if (end(false)) {
                 socket.abort();
             }
         }
+
 
         private void dispatch(String message) {
             JsonNode node;
@@ -246,15 +259,14 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
                 return;
             }
             if (node.has("id")) {
-                CompletableFuture<JsonNode> waiting =
-                        pending.remove(node.path("id").asLong());
+                CompletableFuture<JsonNode> waiting = pending.remove(node.path("id").asLong());
                 if (waiting == null) {
                     return;
                 }
                 // 완료 뒤의 사슬이 읽는 스레드에서 돌지 않게 다른 스레드에서 완료한다
                 if (node.has("error")) {
                     IllegalStateException error = new IllegalStateException("cdp command failed code="
-                            + node.path("error").path("code").asInt());
+                        + node.path("error").path("code").asInt());
                     CompletableFuture.runAsync(() -> waiting.completeExceptionally(error));
                 } else {
                     waiting.completeAsync(() -> node.path("result"));
@@ -269,6 +281,7 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
             handle(() -> events.accept(event), "event " + method);
         }
 
+
         /** 처리기 스레드에 넘긴다. 이미 닫았거나 그 스레드가 끝났으면 버린다. */
         private void handle(Runnable handler, String what) {
             try {
@@ -280,15 +293,16 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
                         handler.run();
                     } catch (RuntimeException ex) {
                         log.warn(
-                                "cdp {} handler failed error={}",
-                                what,
-                                ex.getClass().getSimpleName());
+                            "cdp {} handler failed error={}",
+                            what,
+                            ex.getClass().getSimpleName());
                     }
                 });
             } catch (RejectedExecutionException ex) {
                 log.debug("cdp handler dropped after end");
             }
         }
+
 
         /** 한 번만 끝낸다. 기다리던 명령을 실패로 끝내고, 상대가 끊었으면 닫힘을 알린다. 처음 끝냈으면 참이다. */
         private boolean end(boolean notify) {

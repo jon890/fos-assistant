@@ -45,7 +45,6 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +67,7 @@ class ModelSelectionTest {
 
     /** 그 provider 의 계정이 전부 막혔을 때 Hermes 가 돌려주는 글이다. 실측한 문장이다. */
     private static final String BLOCKED_ERROR = HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX
-            + " No Codex credentials stored. Run `hermes auth` to authenticate.";
+        + " No Codex credentials stored. Run `hermes auth` to authenticate.";
 
     /** reasoning 끄기를 받는다고 Hermes 가 밝힌 모델이다. */
     private static final String CAN_DISABLE_MODEL = "example-model-off";
@@ -86,19 +85,19 @@ class ModelSelectionTest {
      * {@code UNSUPPORTED} 인 모델을 한 목록에 모두 둔다. {@code example-model} 은 항목이 없어 {@code UNKNOWN} 으로 읽힌다.
      */
     private static final HermesModelCatalog PROFILE_CATALOG = new HermesModelCatalog(
+        "example-provider",
+        "example-model",
+        List.of(new HermesModelCatalog.Provider(
             "example-provider",
-            "example-model",
-            List.of(new HermesModelCatalog.Provider(
-                    "example-provider",
-                    "example-provider",
-                    List.of("example-model", CAN_DISABLE_MODEL, DISABLE_UNKNOWN_MODEL, CANNOT_DISABLE_MODEL),
-                    Map.of(
-                            CAN_DISABLE_MODEL,
-                            new ReasoningCapability(Support.SUPPORTED, Support.SUPPORTED),
-                            DISABLE_UNKNOWN_MODEL,
-                            new ReasoningCapability(Support.SUPPORTED, Support.UNKNOWN),
-                            CANNOT_DISABLE_MODEL,
-                            new ReasoningCapability(Support.SUPPORTED, Support.UNSUPPORTED)))));
+            "example-provider",
+            List.of("example-model", CAN_DISABLE_MODEL, DISABLE_UNKNOWN_MODEL, CANNOT_DISABLE_MODEL),
+            Map.of(
+                CAN_DISABLE_MODEL,
+                new ReasoningCapability(Support.SUPPORTED, Support.SUPPORTED),
+                DISABLE_UNKNOWN_MODEL,
+                new ReasoningCapability(Support.SUPPORTED, Support.UNKNOWN),
+                CANNOT_DISABLE_MODEL,
+                new ReasoningCapability(Support.SUPPORTED, Support.UNSUPPORTED)))));
 
     /** 가격표에 있는 모델로 돌았다면 금액이 나오는 사용량이다. */
     private static final TokenUsage PRICED_USAGE = new TokenUsage(1_000L, 0L, 500L, 1_500L);
@@ -144,9 +143,11 @@ class ModelSelectionTest {
 
     private CurrentUser user;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -159,19 +160,19 @@ class ModelSelectionTest {
         agents.findByCode(AGENT_CODE).ifPresent(agents::delete);
         users.findByEmail("selection@example.com").ifPresent(users::delete);
 
-        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(
-                AGENT_CODE,
-                "고름",
-                AGENT_CODE,
-                "http://agent-runtime.test/p/" + AGENT_CODE,
-                CostMode.API,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                saved.id(),
-                Instant.now()));
+            AGENT_CODE,
+            "고름",
+            AGENT_CODE,
+            "http://agent-runtime.test/p/" + AGENT_CODE,
+            CostMode.API,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            saved.id()));
     }
+
 
     @Test
     @DisplayName("고르지 않은 대화는 provider 모델 effort 를 모두 빼고 보낸다")
@@ -186,8 +187,9 @@ class ModelSelectionTest {
             assertThat(command.reasoningEffort()).as("reasoning effort").isNull();
         });
         assertThat(executions.findById(turn.executionId()).orElseThrow().reasoningEffort())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("모델과 effort 를 고르면 요청에 셋이 실리고 실행 줄에 effort 가 남는다")
@@ -208,6 +210,7 @@ class ModelSelectionTest {
         assertThat(execution.model()).isEqualTo("example-model-large");
     }
 
+
     /** 실행 조회의 {@code model} 이 아니라 세션 조회의 값이 기록돼야 한다. */
     @Test
     @DisplayName("세션이 고른 것과 다른 모델을 답하면 그 값을 적는다")
@@ -225,6 +228,7 @@ class ModelSelectionTest {
         assertThat(stub().sessionLookups()).extracting(SessionLookup::sessionId).containsExactly("sess-1");
     }
 
+
     @Test
     @DisplayName("기본값으로 보냈고 세션이 답하지 못하면 provider 모델 금액이 비어 있다")
     void leavesProviderModelAndAmountEmptyWhenDefaultSentAndSessionSilent() {
@@ -240,20 +244,21 @@ class ModelSelectionTest {
         assertThat(execution.estimatedCostMicros()).as("estimated cost").isNull();
     }
 
+
     @Test
     @DisplayName("세션이 provider 를 주지 않아도 실행의 runtime 으로 provider 와 모델을 적는다")
     void recordsProviderAndModelFromRuntimeEvenIfSessionGivesNoProvider() {
         // v0.21.5 의 세션 조회는 model 만 주고 provider 를 주지 않는다. 실행 조회의 runtime 이 실제로 돈 값을 준다.
         stub().willReturn(new HermesRunResult(
-                "run-1",
-                "sess-1",
-                "completed",
-                "네",
-                "dad",
-                null,
-                null,
-                PRICED_USAGE,
-                new SessionRuntime("example-model-large", "anthropic")));
+            "run-1",
+            "sess-1",
+            "completed",
+            "네",
+            "dad",
+            null,
+            null,
+            PRICED_USAGE,
+            new SessionRuntime("example-model-large", "anthropic")));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", null));
 
         ChatTurn turn = chat.send(user, null, "안녕", AGENT_CODE);
@@ -262,9 +267,10 @@ class ModelSelectionTest {
         assertThat(execution.provider()).isEqualTo("anthropic");
         assertThat(execution.model()).isEqualTo("example-model-large");
         assertThat(execution.estimatedCostMicros())
-                .as("provider 와 모델을 알면 금액을 적는다")
-                .isNotNull();
+            .as("provider 와 모델을 알면 금액을 적는다")
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("기본값으로 보냈어도 세션이 답하면 그 모델로 금액을 적는다")
@@ -280,6 +286,7 @@ class ModelSelectionTest {
         assertThat(execution.estimatedCostMicros()).as("estimated cost").isNotNull();
     }
 
+
     @Test
     @DisplayName("provider 가 막히면 넘기지 않고 PROVIDER BLOCKED 로 실패한다")
     void providerBlockedFailsAsProviderBlockedWithoutFallback() {
@@ -287,9 +294,9 @@ class ModelSelectionTest {
         stub().willReturnInOrder(blocked("run-1", "sess-1"), succeeded("run-2", "sess-1"));
 
         assertThatThrownBy(() -> chat.send(user, conversationId, "안녕", null))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
         List<AgentExecution> recorded = executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10));
@@ -299,12 +306,13 @@ class ModelSelectionTest {
             assertThat(failed.provider()).isEqualTo("openai-codex");
         });
         List<ExecutionEvent> events = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(
-                List.of(recorded.getFirst().id()));
+            List.of(recorded.getFirst().id()));
         assertThat(events)
-                .extracting(ExecutionEvent::eventType)
-                .doesNotContain(ExecutionEventType.PROVIDER_SWITCHED)
-                .contains(ExecutionEventType.RUN_FAILED);
+            .extracting(ExecutionEvent::eventType)
+            .doesNotContain(ExecutionEventType.PROVIDER_SWITCHED)
+            .contains(ExecutionEventType.RUN_FAILED);
     }
+
 
     @Test
     @DisplayName("스트리밍에서 막혀도 넘김 알림과 조각 지우기를 보내지 않는다")
@@ -314,33 +322,35 @@ class ModelSelectionTest {
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(user, conversationId, "안녕", null, relayed::add))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         assertThat(relayed).extracting(ChatEvent::type).contains("started").doesNotContain("switched", "reset");
     }
+
 
     @Test
     @DisplayName("다른 실패는 넘기지 않고 한 번만 실패한다")
     void otherFailuresFailOnceWithoutFallback() {
         stub().willReturn(new HermesRunResult(
-                "run-1",
-                "sess-1",
-                "failed",
-                null,
-                "example-model",
-                "openai-codex",
-                "HTTP 404: 404 page not found",
-                TokenUsage.empty()));
+            "run-1",
+            "sess-1",
+            "failed",
+            null,
+            "example-model",
+            "openai-codex",
+            "HTTP 404: 404 page not found",
+            TokenUsage.empty()));
 
         assertThatThrownBy(() -> chat.send(user, null, "안녕", AGENT_CODE))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_RUN_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_RUN_FAILED);
 
         assertThat(stub().received()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("선택을 바꾼 뒤 이어 보내면 바꾼 값이 실린다")
@@ -360,6 +370,7 @@ class ModelSelectionTest {
         });
     }
 
+
     @Test
     @DisplayName("profile 의 기본 모델을 숨기면 모델을 싣지 않는 실행을 제출하지 않고 MODEL HIDDEN 으로 남기며 숨김을 비우면 다시 돈다")
     void rejectsDefaultRunWhileProfileDefaultModelIsHiddenAndRunsAgainAfterUnhiding() {
@@ -368,17 +379,17 @@ class ModelSelectionTest {
         hiddenModels.save(ModelHidden.of(user.groupId(), "example-provider", "example-model"));
         try {
             assertThatThrownBy(() -> chat.send(user, conversationId, "안녕", null))
-                    .isInstanceOf(ApiException.class)
-                    .extracting(ex -> ((ApiException) ex).code())
-                    .isEqualTo(ErrorCode.MODEL_HIDDEN);
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException)ex).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
 
             assertThat(stub().received()).as("숨긴 동안 Hermes 에 제출한 수").isEmpty();
             assertThat(executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10)))
-                    .singleElement()
-                    .satisfies(failed -> {
-                        assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
-                        assertThat(failed.errorCode()).isEqualTo(ErrorCode.MODEL_HIDDEN.name());
-                    });
+                .singleElement()
+                .satisfies(failed -> {
+                    assertThat(failed.status()).isEqualTo(ExecutionStatus.FAILED);
+                    assertThat(failed.errorCode()).isEqualTo(ErrorCode.MODEL_HIDDEN.name());
+                });
         } finally {
             // 이 그룹은 다른 검사도 쓴다. 숨김이 남으면 그 검사들의 기본값 실행이 막힌다.
             hiddenModels.deleteAll(hiddenModels.findByGroupIdOrderByProviderAscModelAsc(user.groupId()));
@@ -387,35 +398,37 @@ class ModelSelectionTest {
         ChatTurn turn = chat.send(user, conversationId, "안녕", null);
 
         assertThat(executions.findById(turn.executionId()).orElseThrow().status())
-                .isEqualTo(ExecutionStatus.SUCCEEDED);
+            .isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.provider()).as("provider").isNull();
             assertThat(command.model()).as("model").isNull();
         });
     }
 
+
     @Test
     @DisplayName("요청 effort 는 none 을 받고 minimal 은 VALIDATION FAILED 로 거절한다")
     void acceptsNoneAndRejectsMinimalAsRequestEffort() {
         assertThat(ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none").reasoningEffort())
-                .isEqualTo("none");
+            .isEqualTo("none");
         assertThatThrownBy(() -> ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "minimal"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
+
 
     @Test
     @DisplayName("끄기 지원이 SUPPORTED 인 모델은 대화에 none 을 저장한다")
     void storesNoneForModelThatSupportsDisabling() {
         Long conversationId = chat.startEmpty(user, AGENT_CODE).id();
 
-        Conversation saved =
-                chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none"));
+        Conversation saved = chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none"));
 
         assertThat(saved.modelChoice().model()).isEqualTo(CAN_DISABLE_MODEL);
         assertThat(saved.modelChoice().reasoningEffort()).isEqualTo("none");
     }
+
 
     @Test
     @DisplayName("끄기 지원이 UNKNOWN 이나 UNSUPPORTED 인 모델은 none 을 VALIDATION FAILED 로 거절하고 저장된 값을 남긴다")
@@ -423,46 +436,46 @@ class ModelSelectionTest {
         Long conversationId = conversationChoosing(ModelChoice.of("example-provider", "example-model", "high"));
 
         for (String model : List.of(DISABLE_UNKNOWN_MODEL, CANNOT_DISABLE_MODEL)) {
-            assertThatThrownBy(() ->
-                            chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", model, "none")))
-                    .as("모델 %s", model)
-                    .isInstanceOf(ApiException.class)
-                    .extracting(ex -> ((ApiException) ex).code())
-                    .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            assertThatThrownBy(() -> chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", model, "none")))
+                .as("모델 %s", model)
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException)ex).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
         }
 
-        ModelChoice stored =
-                conversations.findById(conversationId).orElseThrow().modelChoice();
+        ModelChoice stored = conversations.findById(conversationId).orElseThrow().modelChoice();
         assertThat(stored.model()).isEqualTo("example-model");
         assertThat(stored.reasoningEffort()).isEqualTo("high");
     }
+
 
     @Test
     @DisplayName("none 을 저장한 대화의 실행은 none 을 요청 값으로 적고 Hermes 가 다른 모델을 알려도 effort 를 바꾸지 않는다")
     void recordsNoneAsRequestedEffortEvenWhenHermesReportsOtherModel() {
         Long conversationId = conversationChoosing(ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none"));
         stub().willReturn(new HermesRunResult(
-                "run-1",
-                "sess-1",
-                "completed",
-                "네",
-                "dad",
-                null,
-                null,
-                PRICED_USAGE,
-                new SessionRuntime("example-model-large", "anthropic")));
+            "run-1",
+            "sess-1",
+            "completed",
+            "네",
+            "dad",
+            null,
+            null,
+            PRICED_USAGE,
+            new SessionRuntime("example-model-large", "anthropic")));
         stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
 
         ChatTurn turn = chat.send(user, conversationId, "안녕", null);
 
         assertThat(stub().received())
-                .singleElement()
-                .satisfies(command -> assertThat(command.reasoningEffort()).isEqualTo("none"));
+            .singleElement()
+            .satisfies(command -> assertThat(command.reasoningEffort()).isEqualTo("none"));
         AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
         assertThat(execution.model()).as("실제로 돈 모델").isEqualTo("example-model-large");
         assertThat(execution.reasoningEffort()).as("보낸 effort").isEqualTo("none");
         assertThat(execution.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
     }
+
 
     /** 빈 대화를 만들어 모델을 고른다. 화면이 첫 메시지 전에 고를 때 밟는 길이다. */
     private Long conversationChoosing(ModelChoice choice) {
@@ -471,12 +484,14 @@ class ModelSelectionTest {
         return conversation.id();
     }
 
+
     private static HermesRunResult succeeded(String runId, String sessionId) {
         return HermesRunResult.of(runId, sessionId, "completed", "네", "example-model", null, PRICED_USAGE);
     }
 
+
     private static HermesRunResult blocked(String runId, String sessionId) {
         return new HermesRunResult(
-                runId, sessionId, "failed", null, "example-model", null, BLOCKED_ERROR, TokenUsage.empty());
+            runId, sessionId, "failed", null, "example-model", null, BLOCKED_ERROR, TokenUsage.empty());
     }
 }

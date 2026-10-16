@@ -44,8 +44,8 @@ import tools.jackson.databind.node.ArrayNode;
 @Slf4j
 @RestController
 @RequestMapping(
-        value = "/internal/browser-gateway/{token}",
-        headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"})
+    value = "/internal/browser-gateway/{token}",
+    headers = {"Upgrade!=websocket", "Upgrade!=WebSocket"})
 @RequiredArgsConstructor
 public class BrowserGatewayController {
 
@@ -60,6 +60,7 @@ public class BrowserGatewayController {
     private final BrowserGateway gateway;
     private final CdpGatewayHttp cdp;
 
+
     /** Chrome 의 버전 정보다. 브라우저 대상의 WebSocket 주소를 중계 주소로 바꾼다. */
     @GetMapping("/json/version")
     public ResponseEntity<byte[]> version(@PathVariable String token, HttpServletRequest request) {
@@ -69,6 +70,7 @@ public class BrowserGatewayController {
         return forward(token, target -> rewritten(cdp.get(target.cdp(), "/json/version"), token));
     }
 
+
     /** 대상 목록이다. 줄마다 WebSocket 주소를 중계 주소로 바꾼다. */
     @GetMapping({"/json", "/json/list"})
     public ResponseEntity<byte[]> list(@PathVariable String token, HttpServletRequest request) {
@@ -77,6 +79,7 @@ public class BrowserGatewayController {
         }
         return forward(token, target -> rewritten(cdp.get(target.cdp(), "/json/list"), token));
     }
+
 
     /**
      * 새 탭을 연다. 쿼리를 푼 주소가 {@code http}, {@code https}, {@code about:blank} 일 때만 넘기고, 넘길 때는 받은 원문 쿼리를 그대로
@@ -94,19 +97,22 @@ public class BrowserGatewayController {
         return forward(token, target -> rewritten(cdp.put(target.cdp(), "/json/new?" + query), token));
     }
 
+
     /** 탭을 닫는다. 번호가 영문자와 숫자가 아니면 404 다. Chrome 의 글을 그대로 준다. */
     @GetMapping("/json/close/{id}")
     public ResponseEntity<byte[]> close(
-            @PathVariable String token, @PathVariable String id, HttpServletRequest request) {
+        @PathVariable String token, @PathVariable String id, HttpServletRequest request) {
         return tabCommand(token, "/json/close/", id, request);
     }
+
 
     /** 탭을 앞으로 가져온다. 번호가 영문자와 숫자가 아니면 404 다. Chrome 의 글을 그대로 준다. */
     @GetMapping("/json/activate/{id}")
     public ResponseEntity<byte[]> activate(
-            @PathVariable String token, @PathVariable String id, HttpServletRequest request) {
+        @PathVariable String token, @PathVariable String id, HttpServletRequest request) {
         return tabCommand(token, "/json/activate/", id, request);
     }
+
 
     /**
      * 그 밖의 경로는 모든 메서드에 빈 404 다.
@@ -124,6 +130,7 @@ public class BrowserGatewayController {
         return empty(fromPage(request) ? HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND);
     }
 
+
     private ResponseEntity<byte[]> tabCommand(String token, String path, String id, HttpServletRequest request) {
         if (fromPage(request)) {
             return empty(HttpStatus.FORBIDDEN);
@@ -133,6 +140,7 @@ public class BrowserGatewayController {
         }
         return forward(token, target -> passThrough(cdp.get(target.cdp(), path + id)));
     }
+
 
     /**
      * 표식을 확인하고 주인의 브라우저에 넘긴다. 실패는 빈 본문의 상태 코드로 바꾼다.
@@ -159,6 +167,7 @@ public class BrowserGatewayController {
         }
     }
 
+
     /** 활동을 기록한다. 기록하지 못해도 Chrome 의 답은 이미 받았으므로 응답을 바꾸지 않는다. */
     private void touch(GatewayTarget target) {
         try {
@@ -168,6 +177,7 @@ public class BrowserGatewayController {
         }
     }
 
+
     /** Chrome 의 JSON 을 중계 주소로 바꿔 준다. 목록이면 줄마다 바꾼다. Chrome 이 200 이 아니면 502 다. */
     private ResponseEntity<byte[]> rewritten(CdpReply reply, String token) {
         if (reply.status() != OK) {
@@ -175,7 +185,7 @@ public class BrowserGatewayController {
             return empty(HttpStatus.BAD_GATEWAY);
         }
         String relayBase = gateway.relayBase(token)
-                .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_DISABLED, "browser gateway is disabled"));
+            .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_DISABLED, "browser gateway is disabled"));
         JsonNode body = JSON.readTree(reply.body());
         JsonNode result;
         if (body.isArray()) {
@@ -190,6 +200,7 @@ public class BrowserGatewayController {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(JSON.writeValueAsBytes(result));
     }
 
+
     private static ResponseEntity<byte[]> passThrough(CdpReply reply) {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(reply.status());
         if (reply.contentType() != null) {
@@ -197,6 +208,7 @@ public class BrowserGatewayController {
         }
         return builder.body(reply.body());
     }
+
 
     /** 쿼리를 푼 주소가 {@code http}, {@code https} 이거나 {@code about:blank} 인가. 풀지 못하면 받지 않는다. */
     private static boolean allowedAddress(String query) {
@@ -212,6 +224,7 @@ public class BrowserGatewayController {
         return address.startsWith("http://") || address.startsWith("https://") || "about:blank".equals(address);
     }
 
+
     /**
      * 브라우저가 보낸 요청이다. 커넥터는 {@code Origin} 도 {@code Sec-Fetch-*} 도 보내지 않는다.
      *
@@ -220,9 +233,10 @@ public class BrowserGatewayController {
      */
     private static boolean fromPage(HttpServletRequest request) {
         return request.getHeader(HttpHeaders.ORIGIN) != null
-                || request.getHeader(SEC_FETCH_SITE) != null
-                || request.getHeader(SEC_FETCH_MODE) != null;
+            || request.getHeader(SEC_FETCH_SITE) != null
+            || request.getHeader(SEC_FETCH_MODE) != null;
     }
+
 
     private static ResponseEntity<byte[]> empty(HttpStatus status) {
         return ResponseEntity.status(status).build();

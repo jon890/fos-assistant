@@ -20,6 +20,7 @@ public class DelegationOutput implements DelegationOutputClip {
 
     private final LiveProperties<DelegationProperties> delegation;
 
+
     /**
      * 위임 답을 상한까지 자르고 잘렸다는 한 줄을 붙인다. 답이 null 이면 빈 글이다.
      *
@@ -37,6 +38,7 @@ public class DelegationOutput implements DelegationOutputClip {
         int end = max > 0 && Character.isHighSurrogate(output.charAt(max - 1)) ? max - 1 : max;
         return output.substring(0, end) + "\n\n" + String.format(TRUNCATED_NOTICE, max);
     }
+
 
     /** 멈춘 위임 실행이 그때까지 받은 답이다. 받은 답이 없으면 null 이라 실행 줄의 답을 비워 둔다. */
     @Override

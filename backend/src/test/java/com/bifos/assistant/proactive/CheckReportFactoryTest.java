@@ -29,23 +29,23 @@ class CheckReportFactoryTest {
         CheckReportApprovalSource approvals = rootId -> List.of(approval);
         CheckReportFactory factory = new CheckReportFactory(approvals);
         CheckResultBlock block = new CheckResultBlock(
-                2,
-                CheckOutcome.FINDINGS,
-                null,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                new CheckResultBlock.ReportDraft(List.of("바뀜"), List.of("확인"), List.of("다음")),
-                List.of());
+            2,
+            CheckOutcome.FINDINGS,
+            null,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            new CheckResultBlock.ReportDraft(List.of("바뀜"), List.of("확인"), List.of("다음")),
+            List.of());
         List<JudgedFinding> judged = List.of(
-                new JudgedFinding(
-                        null, FindingKind.REFERENCE, FindingReason.CLOSED, "https://example.com/closed", null),
-                judged("https://example.com/a"),
-                judged("https://example.com/a"),
-                judged("https://example.com/b"),
-                judged("https://example.com/c"),
-                judged("https://example.com/d"));
+            new JudgedFinding(
+                null, FindingKind.REFERENCE, FindingReason.CLOSED, "https://example.com/closed", null),
+            judged("https://example.com/a"),
+            judged("https://example.com/a"),
+            judged("https://example.com/b"),
+            judged("https://example.com/c"),
+            judged("https://example.com/d"));
 
         CheckReport report = factory.create(block, judged, 31L);
 
@@ -53,13 +53,15 @@ class CheckReportFactoryTest {
         assertThat(report.done()).containsExactly("확인");
         assertThat(report.next()).containsExactly("다음");
         assertThat(report.evidence())
-                .containsExactly("https://example.com/a", "https://example.com/b", "https://example.com/c");
+            .containsExactly("https://example.com/a", "https://example.com/b", "https://example.com/c");
         assertThat(report.needsApproval()).containsExactly(approval.toString());
     }
+
 
     private static JudgedFinding judged(String sourceUrl) {
         return new JudgedFinding(null, FindingKind.NEW, null, sourceUrl, null);
     }
+
 
     @Test
     @DisplayName("버전 1 보고는 요약과 NEW 발견으로 만들고 마감된 발견은 근거와 다음 일에서 뺀다")
@@ -78,8 +80,8 @@ class CheckReportFactoryTest {
                 """).block();
         Instant now = Instant.parse("2026-10-05T00:00:00Z");
         List<JudgedFinding> judged = block.findings().stream()
-                .map(finding -> FindingJudgement.judge(finding, now, now, Set.of(), Set.of()))
-                .toList();
+            .map(finding -> FindingJudgement.judge(finding, now, now, Set.of(), Set.of()))
+            .toList();
 
         CheckReport report = new CheckReportFactory(rootId -> List.of()).create(block, judged, null);
 

@@ -2,8 +2,11 @@ package com.bifos.assistant.mcp.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Logger;
@@ -15,6 +18,12 @@ import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
+import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
+import com.bifos.assistant.memory.application.model.MemorySearchPage;
+import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
+import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -25,13 +34,16 @@ import com.bifos.assistant.usage.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
 class McpToolServiceTest {
@@ -42,6 +54,7 @@ class McpToolServiceTest {
     private final MemoryService memories = mock(MemoryService.class);
     private final McpToolService tools = new McpToolService(
         memories,
+        QueryEmbedder.disabled(),
         artifacts,
         mock(AgentDelegationService.class),
         mock(ExecutionDeliveryWriter.class),
@@ -70,6 +83,63 @@ class McpToolServiceTest {
     @AfterEach
     void stopCapturingLogs() {
         logger().detachAppender(logs);
+    }
+
+
+    @Test
+    @DisplayName("기억 검색은 질문 임베딩을 먼저 만들어 넘기고 임베딩이 실패하면 빈 벡터로 키워드 검색을 한다")
+    void embedsQuestionBeforeSearchAndFallsBackOnFailure() {
+        MemoryEmbeddingProperties enabled = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+        when(memories.searchFor(any(), any(), any(), anyInt(), any(), any()))
+            .thenReturn(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_HYBRID));
+        MemorySearchCursor cursor = MemorySearchCursor.first("바퀴 언제 바꿨지");
+
+        toolsWith(new QueryEmbedder(enabled, (inputs, timeout) -> List.of(new float[] {1f, 0f})))
+            .searchMemory(caller, "바퀴 언제 바꿨지", 10, cursor);
+        toolsWith(new QueryEmbedder(enabled, (inputs, timeout) -> {
+            throw new EmbeddingUnavailableException("fake failure");
+        })).searchMemory(caller, "바퀴 언제 바꿨지", 10, cursor);
+
+        ArgumentCaptor<Optional<float[]>> vectors = ArgumentCaptor.captor();
+        verify(memories, times(2)).searchFor(any(), any(), eq("바퀴 언제 바꿨지"), eq(10), eq(cursor), vectors.capture());
+        assertThat(vectors.getAllValues().get(0)).hasValueSatisfying(vector -> assertThat(vector).containsExactly(1f, 0f));
+        assertThat(vectors.getAllValues().get(1)).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("키워드만으로 매긴 검색의 다음 페이지는 질문을 임베딩하지 않는다")
+    void skipsQueryEmbeddingForKeywordContinuation() {
+        MemoryEmbeddingProperties enabled = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+        when(memories.searchFor(any(), any(), any(), anyInt(), any(), any()))
+            .thenReturn(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
+        List<String> embedded = new ArrayList<>();
+        MemorySearchCursor keywordNext = new MemorySearchCursor(MemorySearchCursor.fingerprintOf("바퀴"), 10, false);
+
+        toolsWith(new QueryEmbedder(enabled, (inputs, timeout) -> {
+            embedded.addAll(inputs);
+            return List.of(new float[] {1f});
+        })).searchMemory(caller, "바퀴", 10, keywordNext);
+
+        assertThat(embedded).isEmpty();
+        verify(memories).searchFor(any(), any(), eq("바퀴"), eq(10), eq(keywordNext), eq(Optional.empty()));
+    }
+
+
+    private McpToolService toolsWith(QueryEmbedder embedder) {
+        return new McpToolService(
+            memories,
+            embedder,
+            artifacts,
+            mock(AgentDelegationService.class),
+            mock(ExecutionDeliveryWriter.class),
+            mock(ExecutionContextSourceWriter.class),
+            mock(AgentRepository.class),
+            mock(AgentConnectorBindings.class),
+            mock(FollowUpService.class),
+            mock(McpMemoryRemember.class),
+            mock(McpToolCatalog.class),
+            Clock.systemUTC());
     }
 
 

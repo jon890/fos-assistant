@@ -84,36 +84,37 @@ class ConversationTaskLabelTest {
     private Agent agent;
     private ChatController controller;
 
+
     @BeforeEach
     void setUp() {
         String email = "task-label-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, BASE));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "task-label-" + UUID.randomUUID().toString().substring(0, 8);
         agent = agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                BASE));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(owner);
         controller = new ChatController(
-                chat,
-                provider,
-                new UserDisplayNameService(users),
-                agentService,
-                access,
-                new ChatEventStreams(Duration.ofSeconds(20)),
-                null,
-                mock(ModelTierService.class),
-                taskLabels,
-                mock(SourceReadSummaries.class));
+            chat,
+            provider,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            taskLabels,
+            mock(SourceReadSummaries.class));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -121,12 +122,12 @@ class ConversationTaskLabelTest {
         tasks.deleteAll();
     }
 
+
     @Test
     @DisplayName("작업이 만든 대화는 목록, 단건, 이름 바꾸기, 모델 고르기 응답에 작업 번호와 이름을 싣고 보통 대화는 둘 다 비운다")
     void taskConversationCarriesTaskLabelInEveryResponse() {
         Task task = task("매달 커리어 정리");
-        Conversation fromTask =
-                conversation(Conversation.startedForTask(owner.id(), task.title(), agent.id(), task.id(), BASE));
+        Conversation fromTask = conversation(Conversation.startedForTask(owner.id(), task.title(), agent.id(), task.id(), BASE));
         Conversation plain = conversation(Conversation.startedBy(owner.id(), "보통 대화", agent.id(), BASE.plusSeconds(1)));
 
         List<ConversationView> listed = controller.conversations(null, 30).items();
@@ -141,23 +142,25 @@ class ConversationTaskLabelTest {
         assertLabel(controller.chooseModel(fromTask.publicId(), new ChooseModelRequest(null, null, null)), task);
     }
 
+
     @Test
     @DisplayName("지운 작업이 만든 대화도 작업 이름을 싣는다")
     void archivedTaskConversationStillCarriesTitle() {
         Task task = task("지운 작업");
         task.archive(BASE.plusSeconds(60));
         tasks.save(task);
-        Conversation fromTask =
-                conversation(Conversation.startedForTask(owner.id(), task.title(), agent.id(), task.id(), BASE));
+        Conversation fromTask = conversation(Conversation.startedForTask(owner.id(), task.title(), agent.id(), task.id(), BASE));
 
         assertLabel(viewOf(controller.conversations(null, 30).items(), fromTask), task);
         assertLabel(controller.conversation(fromTask.publicId()), task);
     }
 
+
     private Task task(String title) {
         return tasks.save(Task.create(
-                owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS, BASE));
+            owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS));
     }
+
 
     private Conversation conversation(Conversation conversation) {
         Conversation saved = conversations.save(conversation);
@@ -165,17 +168,20 @@ class ConversationTaskLabelTest {
         return saved;
     }
 
+
     private static ConversationView viewOf(List<ConversationView> views, Conversation conversation) {
         return views.stream()
-                .filter(view -> view.id().equals(conversation.publicId()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("목록에 대화가 없다: " + conversation.publicId()));
+            .filter(view -> view.id().equals(conversation.publicId()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("목록에 대화가 없다: " + conversation.publicId()));
     }
+
 
     private static void assertLabel(ConversationView view, Task task) {
         assertThat(view.taskId()).as("대화 %s 의 taskId", view.id()).isEqualTo(task.publicId());
         assertThat(view.taskTitle()).as("대화 %s 의 taskTitle", view.id()).isEqualTo(task.title());
     }
+
 
     private static void assertNoLabel(ConversationView view) {
         assertThat(view.taskId()).as("보통 대화 %s 의 taskId", view.id()).isNull();

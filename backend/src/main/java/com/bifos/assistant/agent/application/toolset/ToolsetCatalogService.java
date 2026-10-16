@@ -25,6 +25,7 @@ public class ToolsetCatalogService {
     private final HermesToolsetClient toolsets;
     private final AgentRepository agents;
 
+
     public List<ToolsetCatalogView> read(CurrentUser user) {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "only admins can read the toolset catalog");
@@ -32,26 +33,26 @@ public class ToolsetCatalogService {
         Set<String> hidden = visibility.hiddenFor(user.groupId());
         Map<String, ToolsetCatalogEntry> catalog = new LinkedHashMap<>();
         toolsets.readCatalog().stream()
-                .filter(entry -> AgentToolPolicy.isKnown(entry.name()))
-                .forEach(entry -> catalog.put(entry.name(), entry));
+            .filter(entry -> AgentToolPolicy.isKnown(entry.name()))
+            .forEach(entry -> catalog.put(entry.name(), entry));
         // Hermes에서 사라진 도구도 숨김을 해제할 수 있도록 설정에 남은 이름을 보인다.
         hidden.stream().sorted().forEach(name -> catalog.putIfAbsent(name, new ToolsetCatalogEntry(name, name, "")));
         Map<Agent, List<String>> enabled = new LinkedHashMap<>();
-        for (Agent agent : agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc()) {
+        for (Agent agent : agents.findByDeletedAtIsNullOrderByCodeAsc()) {
             enabled.put(agent, toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()));
         }
         // 읽지 못한 profile을 0개로 세지 않는다. Hermes 오류는 그대로 전달해 다시 읽게 한다.
         return catalog.values().stream()
-                .map(entry -> new ToolsetCatalogView(
-                        entry.name(),
-                        entry.label(),
-                        entry.description(),
-                        hidden.contains(entry.name()),
-                        enabled.entrySet().stream()
-                                .filter(row -> row.getValue().contains(entry.name()))
-                                .map(row -> new EnabledToolsetAgent(
-                                        row.getKey().code(), row.getKey().name()))
-                                .toList()))
-                .toList();
+            .map(entry -> new ToolsetCatalogView(
+                entry.name(),
+                entry.label(),
+                entry.description(),
+                hidden.contains(entry.name()),
+                enabled.entrySet().stream()
+                    .filter(row -> row.getValue().contains(entry.name()))
+                    .map(row -> new EnabledToolsetAgent(
+                        row.getKey().code(), row.getKey().name()))
+                    .toList()))
+            .toList();
     }
 }

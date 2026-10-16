@@ -1,7 +1,9 @@
 package com.bifos.assistant.task.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.TriggerType;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,13 +31,14 @@ import lombok.experimental.Accessors;
  * <p>시각 칸은 {@code DATETIME(6)} 이라 마이크로초까지만 둔다.
  */
 @Entity
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false))
 @Table(
-        name = "task_trigger",
-        uniqueConstraints = @UniqueConstraint(name = "uk_task_trigger_task", columnNames = "task_id"))
+    name = "task_trigger",
+    uniqueConstraints = @UniqueConstraint(name = "uk_task_trigger_task", columnNames = "task_id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class TaskTrigger {
+public class TaskTrigger extends AuditedEntity {
 
     public static final int CRON_MAX = 100;
 
@@ -74,27 +77,24 @@ public class TaskTrigger {
     @Column(name = "last_fired_at")
     private Instant lastFiredAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
 
     /** 반복 시각이다. cron 과 다음 시각의 검사는 부르는 쪽이 끝낸다. */
     public static TaskTrigger cron(
-            Long taskId, String cronExpr, ZoneId zone, MissedPolicy missed, Instant nextFireAt, Instant now) {
-        TaskTrigger trigger = created(taskId, missed, now);
-        trigger.reschedule(TriggerType.CRON, Objects.requireNonNull(cronExpr, "cronExpr"), null, zone, nextFireAt, now);
+        Long taskId, String cronExpr, ZoneId zone, MissedPolicy missed, Instant nextFireAt) {
+        TaskTrigger trigger = created(taskId, missed);
+        trigger.reschedule(TriggerType.CRON, Objects.requireNonNull(cronExpr, "cronExpr"), null, zone, nextFireAt);
         return trigger;
     }
 
+
     /** 한 번 도는 시각이다. 다음 예정 시각은 그 시각이다. */
-    public static TaskTrigger once(Long taskId, Instant fireAt, ZoneId zone, MissedPolicy missed, Instant now) {
-        TaskTrigger trigger = created(taskId, missed, now);
+    public static TaskTrigger once(Long taskId, Instant fireAt, ZoneId zone, MissedPolicy missed) {
+        TaskTrigger trigger = created(taskId, missed);
         Objects.requireNonNull(fireAt, "fireAt");
-        trigger.reschedule(TriggerType.ONCE, null, fireAt, zone, fireAt, now);
+        trigger.reschedule(TriggerType.ONCE, null, fireAt, zone, fireAt);
         return trigger;
     }
+
 
     /**
      * 시각을 바꾼다. 종류에 맞지 않는 칸은 비운다.
@@ -104,26 +104,26 @@ public class TaskTrigger {
      * @param nextFireAt 새 시각으로 계산한 다음 예정 시각. 없으면 null
      */
     public void reschedule(
-            TriggerType type, String cronExpr, Instant fireAt, ZoneId zone, Instant nextFireAt, Instant now) {
+        TriggerType type, String cronExpr, Instant fireAt, ZoneId zone, Instant nextFireAt) {
         this.type = Objects.requireNonNull(type, "type");
         this.cronExpr = type == TriggerType.CRON ? cronExpr : null;
         this.fireAt = type == TriggerType.ONCE ? micros(fireAt) : null;
         this.timeZone = Objects.requireNonNull(zone, "zone").getId();
         this.nextFireAt = micros(nextFireAt);
-        this.updatedAt = micros(now);
     }
+
 
     /** 놓친 발화를 어떻게 다룰지 바꾼다. 시각은 그대로다. */
-    public void changeMissedPolicy(MissedPolicy missed, Instant now) {
+    public void changeMissedPolicy(MissedPolicy missed) {
         this.missedPolicy = Objects.requireNonNull(missed, "missed");
-        this.updatedAt = micros(now);
     }
 
+
     /** 다음 예정 시각만 다시 정한다. 다시 켤 때 쓴다. 없으면 null 이다. */
-    public void moveNext(Instant nextFireAt, Instant now) {
+    public void moveNext(Instant nextFireAt) {
         this.nextFireAt = micros(nextFireAt);
-        this.updatedAt = micros(now);
     }
+
 
     /**
      * 예정 시각 하나를 처리했다고 적고 다음 시각으로 옮긴다.
@@ -131,24 +131,25 @@ public class TaskTrigger {
      * @param lastFired 처리한 예정 시각
      * @param next 그 뒤의 다음 예정 시각. {@code ONCE} 와 다음 시각이 없는 cron 은 null
      */
-    public void advance(Instant lastFired, Instant next, Instant now) {
+    public void advance(Instant lastFired, Instant next) {
         this.lastFiredAt = micros(Objects.requireNonNull(lastFired, "lastFired"));
         this.nextFireAt = micros(next);
-        this.updatedAt = micros(now);
     }
+
 
     /** 저장된 시간대 이름을 읽은 값이다. */
     public ZoneId zone() {
         return ZoneId.of(timeZone);
     }
 
-    private static TaskTrigger created(Long taskId, MissedPolicy missed, Instant now) {
+
+    private static TaskTrigger created(Long taskId, MissedPolicy missed) {
         TaskTrigger trigger = new TaskTrigger();
         trigger.taskId = Objects.requireNonNull(taskId, "taskId");
         trigger.missedPolicy = Objects.requireNonNull(missed, "missed");
-        trigger.createdAt = micros(Objects.requireNonNull(now, "now"));
         return trigger;
     }
+
 
     private static Instant micros(Instant instant) {
         return instant == null ? null : instant.truncatedTo(ChronoUnit.MICROS);

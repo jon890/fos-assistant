@@ -110,9 +110,11 @@ class DelegationWakeUserLimitTest {
     private Conversation conversation;
     private AgentExecution root;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -127,28 +129,30 @@ class DelegationWakeUserLimitTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         Agent chief = agents.save(agent("dad", "비서", user.id()));
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         stub().willReturn(HermesRunResult.of(
-                "auto", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty()));
+            "auto", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty()));
     }
+
 
     @AfterEach
     void tearDown() {
         awaitAllIdle();
     }
+
 
     @Test
     @DisplayName("한도에 닿아 자동 turn 이 거절되면 결과를 전하지 않은 채 남기고 30초 뒤 재시도를 예약한다")
@@ -160,16 +164,17 @@ class DelegationWakeUserLimitTest {
         finished(done);
 
         assertThat(scheduler.startTimes())
-                .as("예약한 재시도")
-                .singleElement()
-                .satisfies(at -> assertThat(at).as("예약 시각").isAfterOrEqualTo(before.plus(Duration.ofSeconds(30))));
+            .as("예약한 재시도")
+            .singleElement()
+            .satisfies(at -> assertThat(at).as("예약 시각").isAfterOrEqualTo(before.plus(Duration.ofSeconds(30))));
         assertThat(turns.markOf(conversation.id()).running()).as("열린 turn").isFalse();
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("전했다는 표시")
-                .isNull();
+            .as("전했다는 표시")
+            .isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
         assertThat(stub().received()).as("Hermes 제출").isEmpty();
     }
+
 
     @Test
     @DisplayName("한도에 닿은 거절이 10번을 넘으면 5분 간격으로 이어 예약하고 자리가 나면 결과를 전한다")
@@ -187,8 +192,8 @@ class DelegationWakeUserLimitTest {
         Instant shortRetry = times.get(times.size() - 2);
         Instant longRetry = times.getLast();
         assertThat(longRetry)
-                .as("10번을 넘긴 뒤의 예약 시각")
-                .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
+            .as("10번을 넘긴 뒤의 예약 시각")
+            .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
         assertThat(shortRetry).as("10번째 예약 시각").isBefore(Instant.now().plus(Duration.ofMinutes(1)));
 
         List<Runnable> slow = scheduler.drain();
@@ -197,20 +202,21 @@ class DelegationWakeUserLimitTest {
         List<Runnable> again = scheduler.drain();
         assertThat(again).as("여전히 막히면 다시 건 예약").hasSize(1);
         assertThat(scheduler.startTimes().getLast())
-                .as("이어 건 예약도 5분 간격")
-                .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
+            .as("이어 건 예약도 5분 간격")
+            .isAfterOrEqualTo(Instant.now().plus(Duration.ofMinutes(5)).minus(WAIT_LIMIT));
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("막혀 있는 동안 전했다는 표시")
-                .isNull();
+            .as("막혀 있는 동안 전했다는 표시")
+            .isNull();
         assertThat(stub().received()).as("막혀 있는 동안 Hermes 제출").isEmpty();
 
         executions.deleteAll(fillers);
         runRetry(again.getFirst());
         awaitIdle(conversation.id());
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("자리가 난 뒤 전했다는 표시")
-                .isNotNull();
+            .as("자리가 난 뒤 전했다는 표시")
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("자리가 난 뒤 예약한 재시도가 돌면 결과를 전한다")
@@ -226,14 +232,15 @@ class DelegationWakeUserLimitTest {
         awaitIdle(conversation.id());
 
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("전했다는 표시")
-                .isNotNull();
+            .as("전했다는 표시")
+            .isNotNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(scheduler.drain()).as("결과를 전한 뒤의 예약").isEmpty();
         assertThat(limiter.used(dad.id())).as("자동 turn 이 끝난 뒤 쥔 자리").isZero();
     }
+
 
     @Test
     @DisplayName("예약 뒤 다른 실패가 시각을 새로 적었으면 재시도가 그 시각을 지우지 않는다")
@@ -254,8 +261,8 @@ class DelegationWakeUserLimitTest {
         awaitIdle(conversation.id());
 
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("새 실패의 유예 안에 앞 재시도가 전한 표시")
-                .isNull();
+            .as("새 실패의 유예 안에 앞 재시도가 전한 표시")
+            .isNull();
         assertThat(stub().received()).as("새 실패의 유예 안의 Hermes 제출").isEmpty();
         assertThat(scheduler.drain()).as("유예 안에 막힌 재시도가 더 건 예약").isEmpty();
 
@@ -263,9 +270,10 @@ class DelegationWakeUserLimitTest {
         awaitIdle(conversation.id());
 
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("새 시각을 적은 쪽의 재시도가 전한 표시")
-                .isNotNull();
+            .as("새 시각을 적은 쪽의 재시도가 전한 표시")
+            .isNotNull();
     }
+
 
     /** 예약한 재시도 작업을 돌리고, 그 작업이 띄운 스레드가 사건을 내고 끝날 때까지 기다린다. */
     private void runRetry(Runnable task) throws InterruptedException {
@@ -273,63 +281,68 @@ class DelegationWakeUserLimitTest {
         retryThreads.awaitOne(WAIT_LIMIT);
     }
 
+
     /** 대화 turn 의 루트가 아닌 RUNNING 줄 둘로 dad 의 자리를 채운다. 대화가 없어 결과로 전해지지 않는다. */
     private List<AgentExecution> fillSlots() {
         List<AgentExecution> fillers = new ArrayList<>();
         for (int index = 0; index < 2; index++) {
             fillers.add(executions.save(AgentExecution.builder()
-                    .userId(dad.id())
-                    .agentId(worker.id())
-                    .parentExecutionId(root.id())
-                    .rootExecutionId(root.id())
-                    .profileName("worker")
-                    .costMode(CostMode.SUBSCRIPTION)
-                    .status(ExecutionStatus.RUNNING)
-                    .startedAt(Instant.now())
-                    .build()));
+                .userId(dad.id())
+                .agentId(worker.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.id())
+                .profileName("worker")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now())
+                .build()));
         }
         assertThat(limiter.used(dad.id())).as("채운 뒤 dad 가 쥔 자리").isEqualTo(2);
         return fillers;
     }
 
+
     private void finished(AgentExecution execution) {
         publisher.publishEvent(new DelegationFinished(conversation.id(), execution.id()));
     }
 
+
     /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. */
     private AgentExecution delegated(ExecutionStatus status, String output) {
         AgentExecution execution = AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.id())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName("worker")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(Instant.now())
-                .build();
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(Instant.now())
+            .build();
         execution.recordOutput(output);
         return executions.save(execution);
     }
 
+
     private static Agent agent(String code, String name, Long ownerId) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId);
     }
+
 
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

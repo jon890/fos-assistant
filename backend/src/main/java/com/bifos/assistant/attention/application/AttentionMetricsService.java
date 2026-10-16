@@ -37,6 +37,7 @@ public class AttentionMetricsService {
     private final AttentionEventRepository events;
     private final Clock clock;
 
+
     /**
      * 지금부터 {@code days} 일 전 이후의 사건을 센다.
      *
@@ -54,27 +55,31 @@ public class AttentionMetricsService {
         Map<AttentionTrigger, Tally> tallies = new EnumMap<>(AttentionTrigger.class);
         for (List<AttentionEvent> itemEvents : byItem.values()) {
             firstOf(itemEvents, AttentionEventType.SHOWN)
-                    .ifPresent(shown -> tallies.computeIfAbsent(shown.trigger(), trigger -> new Tally())
-                            .add(itemEvents, shown));
+                .ifPresent(shown -> tallies.computeIfAbsent(shown.trigger(), trigger -> new Tally())
+                    .add(itemEvents, shown));
         }
         List<AttentionMetric> rows = new ArrayList<>();
         tallies.forEach((trigger, tally) -> rows.add(tally.toMetric(trigger)));
         return List.copyOf(rows);
     }
 
+
     private static String identity(AttentionEvent event) {
         return event.userId() + "|" + event.itemKey() + "|" + event.stateKey();
     }
 
+
     private static Optional<AttentionEvent> firstOf(List<AttentionEvent> events, AttentionEventType... types) {
         return events.stream()
-                .filter(event -> List.of(types).contains(event.eventType()))
-                .min(Comparator.comparing(AttentionEvent::createdAt).thenComparing(AttentionEvent::id));
+            .filter(event -> List.of(types).contains(event.eventType()))
+            .min(Comparator.comparing(AttentionEvent::createdAt).thenComparing(AttentionEvent::id));
     }
+
 
     private static boolean has(List<AttentionEvent> events, AttentionEventType type) {
         return events.stream().anyMatch(event -> event.eventType() == type);
     }
+
 
     /** 한 {@code trigger} 의 항목을 세는 그릇이다. 이 클래스 밖에서 쓰이지 않는다. */
     private static final class Tally {
@@ -87,12 +92,12 @@ public class AttentionMetricsService {
         private long staleShown;
         private final List<Long> secondsToFirstAction = new ArrayList<>();
 
+
         /** 한 항목의 사건을 더한다. {@code firstShown} 은 그 항목의 첫 {@code SHOWN} 이다. */
         void add(List<AttentionEvent> itemEvents, AttentionEvent firstShown) {
             shown++;
             boolean wasHidden = has(itemEvents, AttentionEventType.HIDDEN);
-            Optional<AttentionEvent> firstAction =
-                    firstOf(itemEvents, AttentionEventType.OPENED, AttentionEventType.ACTED);
+            Optional<AttentionEvent> firstAction = firstOf(itemEvents, AttentionEventType.OPENED, AttentionEventType.ACTED);
             if (wasHidden) {
                 hidden++;
             }
@@ -102,13 +107,12 @@ public class AttentionMetricsService {
             firstAction.ifPresent(action -> {
                 acted++;
                 secondsToFirstAction.add(Math.max(
-                        0,
-                        Duration.between(firstShown.createdAt(), action.createdAt())
-                                .toSeconds()));
+                    0,
+                    Duration.between(firstShown.createdAt(), action.createdAt())
+                        .toSeconds()));
             });
             boolean shownAsNow = itemEvents.stream()
-                    .anyMatch(event ->
-                            event.eventType() == AttentionEventType.SHOWN && event.level() == AttentionLevel.NOW);
+                .anyMatch(event -> event.eventType() == AttentionEventType.SHOWN && event.level() == AttentionLevel.NOW);
             if (shownAsNow) {
                 nowShown++;
                 if (wasHidden && firstAction.isEmpty()) {
@@ -120,18 +124,20 @@ public class AttentionMetricsService {
             }
         }
 
+
         AttentionMetric toMetric(AttentionTrigger trigger) {
             return new AttentionMetric(
-                    trigger,
-                    shown,
-                    hidden,
-                    snoozed,
-                    acted,
-                    nowShown,
-                    nowHiddenWithoutAction,
-                    staleShown,
-                    median(secondsToFirstAction));
+                trigger,
+                shown,
+                hidden,
+                snoozed,
+                acted,
+                nowShown,
+                nowHiddenWithoutAction,
+                staleShown,
+                median(secondsToFirstAction));
         }
+
 
         /** 짝수 개면 가운데 둘의 평균을 내림한다. 없으면 null 이다. */
         private static Long median(List<Long> values) {

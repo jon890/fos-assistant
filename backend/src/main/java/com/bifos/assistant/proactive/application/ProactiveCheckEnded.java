@@ -8,4 +8,5 @@ package com.bifos.assistant.proactive.application;
  *
  * @param rootExecutionId 살펴보기 turn 의 실행 줄. 그 트리의 루트다
  */
-public record ProactiveCheckEnded(Long rootExecutionId) {}
+public record ProactiveCheckEnded(Long rootExecutionId) {
+}

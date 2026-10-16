@@ -78,6 +78,7 @@ class AttachmentUploadLimitTest {
     private Long conversationId;
     private UUID conversationPublicId;
 
+
     @BeforeEach
     void setUp() throws IOException {
         attachments.deleteAll();
@@ -85,11 +86,12 @@ class AttachmentUploadLimitTest {
         // 겹치지 않게 비운다.
         deleteTree(Path.of(properties.root()).toAbsolutePath());
         user = users.findByEmail(EMAIL)
-                .orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER, Instant.now())));
+            .orElseGet(() -> users.save(AppUser.of(EMAIL, "올리는 사람", 1L, UserRole.MEMBER)));
         Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "사진 대화", null, Instant.now()));
         conversationId = conversation.id();
         conversationPublicId = conversation.publicId();
     }
+
 
     @Test
     @DisplayName("실제 HTTP 요청으로 사진 서른 장은 올리고 서른한 번째는 입력 오류로 거절한다")
@@ -107,6 +109,7 @@ class AttachmentUploadLimitTest {
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(properties.maxFiles());
     }
 
+
     @Test
     @DisplayName("같은 대화에 동시에 올린 서른두 요청은 서른 개만 성공한다")
     void concurrentUploadsKeepTheUnboundAttachmentLimit() throws Exception {
@@ -116,34 +119,34 @@ class AttachmentUploadLimitTest {
             CountDownLatch ready = new CountDownLatch(32);
             CountDownLatch start = new CountDownLatch(1);
             List<Future<HttpResponse<String>>> responses = IntStream.rangeClosed(1, 32)
-                    .mapToObj(number -> executor.submit(() -> {
-                        ready.countDown();
-                        start.await();
-                        return upload(number, 1);
-                    }))
-                    .toList();
+                .mapToObj(number -> executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return upload(number, 1);
+                }))
+                .toList();
             ready.await();
             start.countDown();
 
-            List<HttpResponse<String>> completed =
-                    responses.stream().map(this::await).toList();
+            List<HttpResponse<String>> completed = responses.stream().map(this::await).toList();
             assertThat(completed).extracting(HttpResponse::statusCode).containsOnly(200, 400);
             assertThat(completed)
-                    .filteredOn(response -> response.statusCode() == 200)
-                    .hasSize(30);
+                .filteredOn(response -> response.statusCode() == 200)
+                .hasSize(30);
             assertThat(completed)
-                    .filteredOn(response -> response.statusCode() == 400)
-                    .hasSize(2);
+                .filteredOn(response -> response.statusCode() == 400)
+                .hasSize(2);
             assertThat(completed)
-                    .filteredOn(response -> response.statusCode() == 400)
-                    .extracting(this::code)
-                    .containsOnly("VALIDATION_FAILED");
+                .filteredOn(response -> response.statusCode() == 400)
+                .extracting(this::code)
+                .containsOnly("VALIDATION_FAILED");
             assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId))
-                    .hasSize(30);
+                .hasSize(30);
         } finally {
             executor.shutdownNow();
         }
     }
+
 
     @Test
     @DisplayName("실제 HTTP 요청으로 한도인 20MB 사진이 올라간다")
@@ -155,6 +158,7 @@ class AttachmentUploadLimitTest {
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
 
+
     @Test
     @DisplayName("한 장 상한을 조금 넘으면 서비스가 입력 오류로 거절한다")
     void serviceRejectsAsInputErrorWhenSlightlyOverPerImageLimit() throws Exception {
@@ -164,6 +168,7 @@ class AttachmentUploadLimitTest {
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
     }
+
 
     @Test
     @DisplayName("요청 상한을 넘어도 500 이 아니라 입력 오류다")
@@ -178,6 +183,7 @@ class AttachmentUploadLimitTest {
         assertThat(code(response)).isEqualTo("VALIDATION_FAILED");
         assertThat(attachments.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
+
 
     @Test
     @DisplayName("실제 PNG 를 올리면 원본 옆에 줄인 사본이 생기고 이미지가 아닌 바이트는 사본 없이 올라간다")
@@ -195,88 +201,95 @@ class AttachmentUploadLimitTest {
         assertThat(conversationDirectory().resolve(brokenId + ".small.jpg")).doesNotExist();
     }
 
+
     @Test
     @DisplayName("동시에 올린 사진 여섯 장 모두 차례를 기다려 줄인 사본이 생긴다")
     void createsSmallCopiesForConcurrentUploads() throws Exception {
         int count = 6;
         byte[] content = png(2400, 1800);
-        assertThat((long) content.length).as("업로드 상한 안").isLessThan(properties.maxBytes());
+        assertThat((long)content.length).as("업로드 상한 안").isLessThan(properties.maxBytes());
         ExecutorService executor = Executors.newFixedThreadPool(count);
         try {
             CountDownLatch ready = new CountDownLatch(count);
             CountDownLatch start = new CountDownLatch(1);
             List<Future<HttpResponse<String>>> responses = IntStream.rangeClosed(1, count)
-                    .mapToObj(number -> executor.submit(() -> {
-                        ready.countDown();
-                        start.await();
-                        return upload(number, content, "image/png");
-                    }))
-                    .toList();
+                .mapToObj(number -> executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+                    return upload(number, content, "image/png");
+                }))
+                .toList();
             ready.await();
             start.countDown();
 
-            List<HttpResponse<String>> completed =
-                    responses.stream().map(this::await).toList();
+            List<HttpResponse<String>> completed = responses.stream().map(this::await).toList();
             assertThat(completed).extracting(HttpResponse::statusCode).containsOnly(200);
             assertThat(completed)
-                    .extracting(response -> conversationDirectory().resolve(id(response) + ".small.jpg"))
-                    .hasSize(count)
-                    .allSatisfy(small -> assertThat(small).exists());
+                .extracting(response -> conversationDirectory().resolve(id(response) + ".small.jpg"))
+                .hasSize(count)
+                .allSatisfy(small -> assertThat(small).exists());
         } finally {
             executor.shutdownNow();
         }
     }
 
+
     private HttpResponse<String> upload(int size) throws Exception {
         return upload(size, size);
     }
+
 
     private HttpResponse<String> upload(int requestNumber, int size) throws Exception {
         return upload(requestNumber, new byte[size], "image/jpeg");
     }
 
+
     private HttpResponse<String> upload(int requestNumber, byte[] content, String contentType) throws Exception {
         return upload(requestNumber, content, contentType, new byte[0]);
     }
 
+
     private HttpResponse<String> upload(int requestNumber, byte[] content, String contentType, byte[] extra)
-            throws Exception {
+        throws Exception {
         String boundary = "attachment-boundary-" + requestNumber + "-" + content.length;
         ByteArrayOutputStream body = new ByteArrayOutputStream(content.length + 512);
         body.write(("--" + boundary + "\r\n"
-                        + "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
-                        + "Content-Type: " + contentType + "\r\n\r\n")
+            + "Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\n"
+            + "Content-Type: " + contentType + "\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
         body.write(content);
         if (extra.length > 0) {
             body.write(("\r\n--" + boundary + "\r\n"
-                            + "Content-Disposition: form-data; name=\"extra\"; filename=\"extra.bin\"\r\n"
-                            + "Content-Type: application/octet-stream\r\n\r\n")
+                + "Content-Disposition: form-data; name=\"extra\"; filename=\"extra.bin\"\r\n"
+                + "Content-Type: application/octet-stream\r\n\r\n")
                     .getBytes(StandardCharsets.UTF_8));
             body.write(extra);
         }
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
 
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
-                        + "/api/v1/chat/conversations/" + conversationPublicId + "/attachments"))
-                .header("Authorization", "Bearer " + jwt())
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
-                .build();
+            + "/api/v1/chat/conversations/" + conversationPublicId + "/attachments"))
+            .header("Authorization", "Bearer " + jwt())
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+            .build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
+
 
     private long id(HttpResponse<String> response) {
         return json.readTree(response.body()).path("id").asLong();
     }
 
+
     private Path conversationDirectory() {
         return Path.of(properties.root())
-                .toAbsolutePath()
-                .resolve("users")
-                .resolve(AttachmentStore.userDirectoryKey(user.id()))
-                .resolve(conversationId.toString());
+            .toAbsolutePath()
+            .resolve("users")
+            .resolve(AttachmentStore.userDirectoryKey(user.id()))
+            .resolve(conversationId.toString());
     }
+
 
     /** 가로세로 그라데이션을 그린 실제 PNG 다. */
     private static byte[] png(int width, int height) throws IOException {
@@ -291,10 +304,12 @@ class AttachmentUploadLimitTest {
         return out.toByteArray();
     }
 
+
     private String code(HttpResponse<String> response) {
         JsonNode node = json.readTree(response.body());
         return node.path("code").asString();
     }
+
 
     private HttpResponse<String> await(Future<HttpResponse<String>> response) {
         try {
@@ -304,16 +319,18 @@ class AttachmentUploadLimitTest {
         }
     }
 
+
     private String jwt() {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.email())
-                .claim("name", user.displayName())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(600)))
-                .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
-                .compact();
+            .subject(user.email())
+            .claim("name", user.displayName())
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
     }
+
 
     private static void deleteTree(Path path) throws IOException {
         if (!Files.exists(path)) {

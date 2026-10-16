@@ -9,4 +9,5 @@ package com.bifos.assistant.connector.domain;
  * @param agentId 바인딩의 에이전트 번호
  * @param userId 바인딩의 연결 사용자 번호. 붙이기 규칙으로 에이전트 주인과 같다
  */
-public record DueBinding(Long bindingId, Long agentId, Long userId) {}
+public record DueBinding(Long bindingId, Long agentId, Long userId) {
+}

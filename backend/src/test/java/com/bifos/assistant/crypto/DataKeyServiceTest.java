@@ -11,6 +11,7 @@ import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import jakarta.persistence.EntityManager;
@@ -55,6 +56,9 @@ class DataKeyServiceTest {
     @Autowired
     ApplicationContext context;
 
+    @Autowired
+    TestClock clock;
+
 
     @Test
     @DisplayName("crypto 엔티티의 JPA 이름과 실제 클래스 및 저장소 빈은 유일하다")
@@ -78,11 +82,12 @@ class DataKeyServiceTest {
 
 
     @Test
-    @DisplayName("기존 factory 의 값과 생성 시각은 저장한 뒤 두 조회 경로에서 보존된다")
+    @DisplayName("factory의 값과 저장 callback의 생성 시각은 두 조회 경로에서 보존된다")
     void preservesFactoryValuesThroughRepository() {
         Long userId = anyUserId();
         Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
-        UserDataKey saved = keys.saveAndFlush(UserDataKey.wrapped(userId, "synthetic-kek", "synthetic-wrapped", createdAt));
+        clock.set(createdAt);
+        UserDataKey saved = keys.saveAndFlush(UserDataKey.wrapped(userId, "synthetic-kek", "synthetic-wrapped"));
         entityManager.clear();
         assertThat(saved.id()).isNotNull();
         assertThat(keys.findById(saved.id())).get().satisfies(row -> {
@@ -176,7 +181,7 @@ class DataKeyServiceTest {
         byte[] dataKey = new byte[32];
         Arrays.fill(dataKey, (byte)3);
         UserDataKey row = keys.saveAndFlush(UserDataKey.wrapped(
-            userId, "test-kek-0", oldKeks.wrap(dataKey, UserDataKey.wrapBinding(userId)), Instant.now()));
+            userId, "test-kek-0", oldKeks.wrap(dataKey, UserDataKey.wrapBinding(userId))));
         String sealed = AesGcm.seal(
             new SecretKeySpec(dataKey, "AES"),
             PLAIN.getBytes(StandardCharsets.UTF_8),

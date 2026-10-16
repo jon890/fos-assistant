@@ -44,6 +44,7 @@ class BrowserGatewayTest {
     private UserBrowserService browsers;
     private BrowserUsage usage;
 
+
     @BeforeEach
     void setUp() {
         revoked.clear();
@@ -53,19 +54,20 @@ class BrowserGatewayTest {
         usage = new BrowserUsage();
     }
 
+
     @Test
     @DisplayName("바인딩 표식은 그 연결 주인의 브라우저를 켜고 활동을 기록한 뒤 넘길 곳을 준다")
     void opensOwnersBrowserForBindingToken() {
         BrowserGatewayTokens tokens = tokens(BASE, SECRET);
         BrowserGateway gateway = gateway(tokens);
 
-        GatewayTarget target =
-                gateway.open(token(tokens.bindingAddress(BINDING_ID).orElseThrow()));
+        GatewayTarget target = gateway.open(token(tokens.bindingAddress(BINDING_ID).orElseThrow()));
 
         assertThat(target).isEqualTo(new GatewayTarget(OWNER, BROWSER_ID, CDP));
         verify(browsers).ensureRunning(OWNER);
         verify(browsers).touch(OWNER);
     }
+
 
     @Test
     @DisplayName("호출 표식은 그 사용자의 브라우저를 켜고 쥔 핸들은 닫을 때까지 사용 중으로 센다")
@@ -82,6 +84,7 @@ class BrowserGatewayTest {
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
     }
 
+
     @Test
     @DisplayName("주인이 허용 목록에서 꺼졌으면 BROWSER_NOT_FOUND 이고 브라우저를 켜지 않는다")
     void rejectsRevokedOwner() {
@@ -89,11 +92,12 @@ class BrowserGatewayTest {
         revoked.add(OWNER);
 
         assertCode(
-                () -> gateway(tokens)
-                        .open(token(tokens.bindingAddress(BINDING_ID).orElseThrow())),
-                ErrorCode.BROWSER_NOT_FOUND);
+            () -> gateway(tokens)
+                .open(token(tokens.bindingAddress(BINDING_ID).orElseThrow())),
+            ErrorCode.BROWSER_NOT_FOUND);
         verify(browsers, never()).ensureRunning(anyLong());
     }
+
 
     @Test
     @DisplayName("바인딩이 없으면 서명이 맞아도 BROWSER_NOT_FOUND 이고 브라우저를 켜지 않는다")
@@ -101,17 +105,19 @@ class BrowserGatewayTest {
         BrowserGatewayTokens tokens = tokens(BASE, SECRET);
 
         assertCode(
-                () -> gateway(tokens)
-                        .open(token(tokens.bindingAddress(BINDING_ID + 1).orElseThrow())),
-                ErrorCode.BROWSER_NOT_FOUND);
+            () -> gateway(tokens)
+                .open(token(tokens.bindingAddress(BINDING_ID + 1).orElseThrow())),
+            ErrorCode.BROWSER_NOT_FOUND);
         verify(browsers, never()).ensureRunning(anyLong());
     }
+
 
     @Test
     @DisplayName("모양이 틀린 표식은 BROWSER_NOT_FOUND 다")
     void rejectsMalformedToken() {
         assertCode(() -> gateway(tokens(BASE, SECRET)).open("b42.nope"), ErrorCode.BROWSER_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("중계 설정이 비었거나 기능이 꺼졌으면 BROWSER_DISABLED 다")
@@ -125,57 +131,62 @@ class BrowserGatewayTest {
         verify(browsers, never()).ensureRunning(anyLong());
     }
 
+
     @Test
     @DisplayName("브라우저를 켜다 난 오류는 그대로 던진다")
     void propagatesStartFailure() {
         BrowserGatewayTokens tokens = tokens(BASE, SECRET);
         when(browsers.ensureRunning(OWNER))
-                .thenThrow(new ApiException(ErrorCode.BROWSER_CAPACITY, "too many browsers are running"));
+            .thenThrow(new ApiException(ErrorCode.BROWSER_CAPACITY, "too many browsers are running"));
 
         assertCode(
-                () -> gateway(tokens)
-                        .open(token(tokens.bindingAddress(BINDING_ID).orElseThrow())),
-                ErrorCode.BROWSER_CAPACITY);
+            () -> gateway(tokens)
+                .open(token(tokens.bindingAddress(BINDING_ID).orElseThrow())),
+            ErrorCode.BROWSER_CAPACITY);
         verify(browsers, never()).touch(OWNER);
     }
+
 
     private BrowserGateway gateway(BrowserGatewayTokens tokens) {
         BrowserGrantOwners owners = bindingId -> Optional.ofNullable(bindingOwners.get(bindingId));
         return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage);
     }
 
+
     private static BrowserGatewayTokens tokens(String baseUrl, String secret) {
         BrowserProperties properties = new BrowserProperties(
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                1024,
-                null,
-                null,
-                null,
-                2,
-                Duration.ofMinutes(10),
-                Duration.ofSeconds(30),
-                Duration.ofMinutes(30),
-                baseUrl,
-                secret);
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1024,
+            null,
+            null,
+            null,
+            2,
+            Duration.ofMinutes(10),
+            Duration.ofSeconds(30),
+            Duration.ofMinutes(30),
+            baseUrl,
+            secret);
         return new BrowserGatewayTokens(
-                LiveProperties.fixed(BrowserProperties.class, properties),
-                Clock.fixed(Instant.parse("2026-10-08T00:00:00Z"), ZoneOffset.UTC));
+            LiveProperties.fixed(BrowserProperties.class, properties),
+            Clock.fixed(Instant.parse("2026-10-08T00:00:00Z"), ZoneOffset.UTC));
     }
+
 
     private static String token(String address) {
         return address.substring(BASE.length() + 1);
     }
 
+
     private static void assertCode(ThrowingCallable call, ErrorCode code) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(code));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(code));
     }
 }

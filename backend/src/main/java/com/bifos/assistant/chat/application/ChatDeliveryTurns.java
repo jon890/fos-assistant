@@ -41,7 +41,6 @@ class ChatDeliveryTurns {
     private final AgentService agents;
     private final AgentExecutionRepository executionRepository;
     private final ExecutionDeliveryWriter deliveryWriter;
-    private final FlowRegistry flows;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -51,6 +50,7 @@ class ChatDeliveryTurns {
     private final ChatTurnRunner chatTurnRunner;
     private final ChatTurnRouting chatTurnRouting;
     private final ChatDeliveryInput chatDeliveryInput;
+
 
     /**
      * 아직 전하지 않은 끝난 위임 결과와 승인한 동작의 결과를 모아 사용자의 질문 없이 turn 하나를 돌린다(ADR-040,
@@ -84,34 +84,29 @@ class ChatDeliveryTurns {
             extras.addAll(extra);
             extra.forEach(result -> notices.add(result.notice()));
             deliveries.add(new AutoTurnDelivery(
-                    source, extra.stream().map(AutoTurnResult::key).toList()));
+                source, extra.stream().map(AutoTurnResult::key).toList()));
         }
         if (notices.isEmpty()) {
             return;
         }
         DeliveryInput delivery = ChatDeliveryInput.deliveryInput(
-                results,
-                resultAgents,
-                chatDeliveryInput.externalAgentsOf(resultAgents),
-                extras,
-                clock.instant(),
-                contextProperties.resultStaleAfter());
+            results,
+            resultAgents,
+            chatDeliveryInput.externalAgentsOf(resultAgents),
+            extras,
+            clock.instant(),
+            contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
-        if (routed.flow() != null) {
-            // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
-            // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
-            log.warn("흐름이 붙은 대화라 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
-            return;
-        }
         Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
         runDeliveryTurn(
-                owner,
-                routed,
-                delivery.input(),
-                new TurnIntent.DelegationResults(attemptId, false, delivery.items()),
-                handle,
-                onEvent);
+            owner,
+            routed,
+            delivery.input(),
+            new TurnIntent.DelegationResults(attemptId, false, delivery.items()),
+            handle,
+            onEvent);
     }
+
 
     /**
      * 저장된 결과만 다시 읽어 전달 묶음 하나를 부모에 다시 넘긴다(ADR-075). 자식 실행과 커넥터 호출은 다시 하지 않는다.
@@ -124,8 +119,8 @@ class ChatDeliveryTurns {
      *
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      * @throws ApiException {@code CONVERSATION_NOT_FOUND}, {@code DELIVERY_NOT_FOUND}, {@code DELIVERY_NOT_RETRYABLE},
-     *     {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_BUSY}, {@code USER_BUSY}. 이 예외들은 묶음을
-     *     바꾸지 않는다
+     * {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_BUSY}, {@code USER_BUSY}. 이 예외들은 묶음을
+     * 바꾸지 않는다
      */
     void retryDelivery(CurrentUser user, Long conversationId, Long deliveryId, Consumer<ChatEvent> onEvent) {
         Conversation conversation = access.requireOwn(user, conversationId);
@@ -139,34 +134,28 @@ class ChatDeliveryTurns {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        if (flows.find(agent.flow()) != null) {
-            throw ResultDeliveryRecorder.notRetryable();
-        }
+
         // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
         TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
-            DeliveryInput delivery =
-                    chatDeliveryInput.retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
+            DeliveryInput delivery = chatDeliveryInput.retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
             Routed routed = chatTurnRouting.route(user, conversation.id(), delivery.input(), null, List.of());
-            // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
-            if (routed.flow() != null) {
-                throw ResultDeliveryRecorder.notRetryable();
-            }
             if (!routed.agent().isReadableBy(user.id())) {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
             }
             Long attemptId = recordRetry(routed.conversation(), deliveryId, onEvent);
             runDeliveryTurn(
-                    user,
-                    routed,
-                    delivery.input(),
-                    new TurnIntent.DelegationResults(attemptId, true, delivery.items()),
-                    handle,
-                    onEvent);
+                user,
+                routed,
+                delivery.input(),
+                new TurnIntent.DelegationResults(attemptId, true, delivery.items()),
+                handle,
+                onEvent);
         } finally {
             turns.close(handle);
         }
     }
+
 
     /**
      * 그 대화의 알림 줄 번호마다 그 줄이 마지막 시도의 마지막 알림 줄인 묶음의 번호와 상태다. 이력 API 가 쓴다.
@@ -177,6 +166,7 @@ class ChatDeliveryTurns {
         return resultDeliveries.statesByNotice(conversationId);
     }
 
+
     /**
      * 다시 전달을 시작한다. 묶음을 {@code DELIVERING} 으로 바꾸는 조건부 update, 알림 줄 저장, 새 시도 저장, 자동 turn 수
      * 초기화를 한 트랜잭션에 적고 새 시도의 번호를 돌려준다. 커밋한 뒤 알림 줄의 {@code system} 사건을 낸다.
@@ -184,7 +174,8 @@ class ChatDeliveryTurns {
      * <p>그 사이 다른 요청이 묶음을 먼저 바꿨으면 {@code DELIVERY_NOT_RETRYABLE} 로 되돌아가 알림 줄도 시도도 남지 않는다.
      */
     Long recordRetry(Conversation conversation, Long deliveryId, Consumer<ChatEvent> onEvent) {
-        record Saved(ChatMessage line, Long attemptId) {}
+        record Saved(ChatMessage line, Long attemptId) {
+        }
         Saved saved = transactions.execute(status -> {
             Instant now = Instant.now(clock);
             int attemptNo = resultDeliveries.claimRetry(deliveryId, now);
@@ -195,9 +186,10 @@ class ChatDeliveryTurns {
             return new Saved(line, attemptId);
         });
         onEvent.accept(ChatEvent.system(
-                conversation.publicId(), saved.line().id(), saved.line().content()));
+            conversation.publicId(), saved.line().id(), saved.line().content()));
         return saved.attemptId();
     }
+
 
     /**
      * 알림 줄, 전했다는 표시, 자동 turn 수, 전달 묶음과 항목과 첫 시도를 한 트랜잭션에 적고 그 시도의 번호를 돌려준다.
@@ -206,33 +198,34 @@ class ChatDeliveryTurns {
      * 그 뒤로 결과를 낸 쪽의 순서대로다. 저장한 알림 줄마다 {@code system} 사건을 낸다.
      */
     Long recordDelivery(
-            Conversation conversation,
-            List<AgentExecution> results,
-            List<String> notices,
-            List<AutoTurnDelivery> deliveries,
-            Consumer<ChatEvent> onEvent) {
+        Conversation conversation,
+        List<AgentExecution> results,
+        List<String> notices,
+        List<AutoTurnDelivery> deliveries,
+        Consumer<ChatEvent> onEvent) {
         List<DeliveryItemRef> items = new ArrayList<>();
-        results.forEach(result ->
-                items.add(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(result.id()))));
+        results.forEach(result -> items.add(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(result.id()))));
         deliveries.forEach(delivery -> delivery.keys()
-                .forEach(key -> items.add(new DeliveryItemRef(delivery.source().source(), key))));
-        record Saved(List<ChatMessage> lines, Long attemptId) {}
+            .forEach(key -> items.add(new DeliveryItemRef(delivery.source().source(), key))));
+        record Saved(List<ChatMessage> lines, Long attemptId) {
+        }
         Saved saved = transactions.execute(status -> {
             Instant deliveredAt = Instant.now(clock);
             List<ChatMessage> lines = notices.stream()
-                    .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
-                    .toList();
+                .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
+                .toList();
             results.forEach(result -> deliveryWriter.markResultDelivered(result.id(), deliveredAt));
             deliveries.forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
             conversationWriter.incrementAutoTurns(conversation.id());
             ResultDeliveryStart start = resultDeliveries.open(
-                    conversation.id(), items, lines.getLast().id(), deliveredAt);
+                conversation.id(), items, lines.getLast().id(), deliveredAt);
             return new Saved(lines, start.attemptId());
         });
         saved.lines()
-                .forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
+            .forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
         return saved.attemptId();
     }
+
 
     /**
      * 전달 시도 하나로 부모 turn 을 돌리고, 그 turn 이 끝난 방식으로 시도를 닫은 뒤 끝 사건을 낸다(ADR-075).
@@ -244,12 +237,12 @@ class ChatDeliveryTurns {
      * <p>끝 사건은 시도를 닫은 뒤에 낸다. 화면이 끝 사건을 받고 이력을 다시 읽을 때 묶음 상태가 이미 바뀌어 있어야 한다.
      */
     void runDeliveryTurn(
-            CurrentUser owner,
-            Routed routed,
-            String input,
-            TurnIntent.DelegationResults intent,
-            TurnHandle handle,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser owner,
+        Routed routed,
+        String input,
+        TurnIntent.DelegationResults intent,
+        TurnHandle handle,
+        Consumer<ChatEvent> onEvent) {
         Long attemptId = intent.attemptId();
         boolean closed = false;
         ChatTurn turn;
@@ -257,9 +250,9 @@ class ChatDeliveryTurns {
             turn = chatTurnRunner.runTurn(owner, routed, input, intent, onEvent, true, handle);
             closed = true;
             closeAttempt(
-                    attemptId,
-                    turn.cancelled() ? DeliveryAttemptStatus.STOPPED : DeliveryAttemptStatus.SUCCEEDED,
-                    null);
+                attemptId,
+                turn.cancelled() ? DeliveryAttemptStatus.STOPPED : DeliveryAttemptStatus.SUCCEEDED,
+                null);
         } catch (RuntimeException ex) {
             closed = true;
             if (turns.isStopConfirmed(handle)) {
@@ -275,10 +268,11 @@ class ChatDeliveryTurns {
             }
         }
         onEvent.accept(
-                turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            turn.cancelled()
+                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
     }
+
 
     /**
      * 전달 시도를 닫는다. 닫다 실패해도 turn 의 결과나 원래 예외를 바꾸지 않고 경고 로그만 남긴다.

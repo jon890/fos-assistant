@@ -56,16 +56,17 @@ public class AttentionControlService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     // 생성자를 직접 쓴다. 제어 줄을 저장하는 트랜잭션을 여기서 만든다.
     public AttentionControlService(
-            AttentionService attention,
-            AttentionControlRepository controls,
-            AttentionEventRepository events,
-            AttentionEventWriter writer,
-            AttentionProperties properties,
-            SuggestionFeedback suggestions,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        AttentionService attention,
+        AttentionControlRepository controls,
+        AttentionEventRepository events,
+        AttentionEventWriter writer,
+        AttentionProperties properties,
+        SuggestionFeedback suggestions,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.attention = attention;
         this.controls = controls;
         this.events = events;
@@ -75,6 +76,7 @@ public class AttentionControlService {
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
+
 
     /**
      * 그 카드에서 클라이언트가 본 상태가 바뀔 때까지 숨긴다. 서버가 지금의 상태로 바꿔 넣지 않는다. 보고 누르는 사이에 상태가
@@ -90,14 +92,15 @@ public class AttentionControlService {
         AttentionCandidate candidate = requireCandidate(snapshot, card, itemKey);
         Instant now = snapshot.now();
         saveControl(
-                user,
-                card,
-                itemKey,
-                entry -> entry.rehide(stateKey, now),
-                () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey, now));
+            user,
+            card,
+            itemKey,
+            entry -> entry.rehide(stateKey),
+            () -> AttentionControlEntry.hide(user.id(), card, itemKey, stateKey));
         recordInCard(user, snapshot, card, itemKey, stateKey, AttentionEventType.HIDDEN);
         suggestions.controlled(user, candidate, FeedbackEventType.DISMISSED, FeedbackLabeler.ATTENTION_HIDE, now);
     }
+
 
     /**
      * 그 카드에서 {@code until} 까지 미룬다. {@code until} 은 지금보다 뒤이고 지금부터 {@code snooze-max} 안이어야 한다.
@@ -115,15 +118,16 @@ public class AttentionControlService {
         AttentionCandidate candidate = requireCandidate(snapshot, card, itemKey);
         Instant now = snapshot.now();
         saveControl(
-                user,
-                card,
-                itemKey,
-                entry -> entry.resnooze(until, now),
-                () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until, now));
+            user,
+            card,
+            itemKey,
+            entry -> entry.resnooze(until),
+            () -> AttentionControlEntry.snooze(user.id(), card, itemKey, until));
         // 미루기 요청에는 상태가 없어 그 카드 후보의 지금 상태로 사건을 남긴다.
         recordInCard(user, snapshot, card, itemKey, candidate.stateKey(), AttentionEventType.SNOOZED);
         suggestions.controlled(user, candidate, FeedbackEventType.POSTPONED, FeedbackLabeler.ATTENTION_SNOOZE, now);
     }
+
 
     /**
      * 그 카드의 그 항목의 숨기기와 미루기를 지운다. 지운 것이 없어도 끝난다.
@@ -134,8 +138,9 @@ public class AttentionControlService {
         requireItemKey(itemKey);
         requireCard(card);
         transactions.executeWithoutResult(
-                status -> controls.deleteByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey));
+            status -> controls.deleteByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey));
     }
+
 
     /**
      * 사용자가 항목을 열었거나({@code OPENED}) 단추로 동작한({@code ACTED}) 사건을 남긴다.
@@ -154,11 +159,12 @@ public class AttentionControlService {
         }
         AttentionSnapshot snapshot = attention.snapshot(user);
         Judged judged = judgedInCards(snapshot, List.of(CardKey.values()), itemKey)
-                .or(() -> lastShownInState(user, itemKey, stateKey))
-                .or(() -> suppressedInCandidates(snapshot, List.of(CardKey.values()), itemKey))
-                .orElseThrow(AttentionControlService::notFound);
+            .or(() -> lastShownInState(user, itemKey, stateKey))
+            .or(() -> suppressedInCandidates(snapshot, List.of(CardKey.values()), itemKey))
+            .orElseThrow(AttentionControlService::notFound);
         writer.recordOnce(event(user, itemKey, stateKey, judged, type, snapshot.now()));
     }
+
 
     /**
      * 제어 줄을 고치거나 만든다. 같은 요청이 동시에 와 유일 제약에 걸리면 먼저 들어간 줄을 다시 읽어 한 번 더 고친다.
@@ -167,15 +173,14 @@ public class AttentionControlService {
      * @param create 줄이 없을 때 만드는 방법
      */
     private void saveControl(
-            CurrentUser user,
-            CardKey card,
-            String itemKey,
-            Consumer<AttentionControlEntry> change,
-            Supplier<AttentionControlEntry> create) {
+        CurrentUser user,
+        CardKey card,
+        String itemKey,
+        Consumer<AttentionControlEntry> change,
+        Supplier<AttentionControlEntry> create) {
         try {
             transactions.executeWithoutResult(status -> {
-                Optional<AttentionControlEntry> existing =
-                        controls.findByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey);
+                Optional<AttentionControlEntry> existing = controls.findByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey);
                 if (existing.isPresent()) {
                     change.accept(existing.get());
                 } else {
@@ -184,24 +189,26 @@ public class AttentionControlService {
             });
         } catch (DataIntegrityViolationException ex) {
             transactions.executeWithoutResult(
-                    status -> change.accept(controls.findByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey)
-                            .orElseThrow(() -> ex)));
+                status -> change.accept(controls.findByUserIdAndCardKeyAndItemKey(user.id(), card, itemKey)
+                    .orElseThrow(() -> ex)));
         }
     }
 
+
     /** 숨기기와 미루기의 사건이다. 판정 칸은 요청의 카드 안에서만 찾고, 없으면 가장 최근 {@code SHOWN} 을 본다. */
     private void recordInCard(
-            CurrentUser user,
-            AttentionSnapshot snapshot,
-            CardKey card,
-            String itemKey,
-            String stateKey,
-            AttentionEventType type) {
+        CurrentUser user,
+        AttentionSnapshot snapshot,
+        CardKey card,
+        String itemKey,
+        String stateKey,
+        AttentionEventType type) {
         judgedInCards(snapshot, List.of(card), itemKey)
-                .or(() -> lastShown(user, itemKey))
-                .or(() -> suppressedInCandidates(snapshot, List.of(card), itemKey))
-                .ifPresent(judged -> writer.recordOnce(event(user, itemKey, stateKey, judged, type, snapshot.now())));
+            .or(() -> lastShown(user, itemKey))
+            .or(() -> suppressedInCandidates(snapshot, List.of(card), itemKey))
+            .ifPresent(judged -> writer.recordOnce(event(user, itemKey, stateKey, judged, type, snapshot.now())));
     }
+
 
     /** 판정 결과의 그 카드들에 그 항목이 있으면, {@link CardKey} 선언 순서로 처음 나온 항목의 {@code trigger} 와 판정이다. */
     private static Optional<Judged> judgedInCards(AttentionSnapshot snapshot, List<CardKey> keys, String itemKey) {
@@ -220,6 +227,7 @@ public class AttentionControlService {
         return Optional.empty();
     }
 
+
     /**
      * 그 요청자의 그 항목의 가장 최근 {@code SHOWN} 사건의 {@code trigger} 와 판정이다.
      *
@@ -228,37 +236,42 @@ public class AttentionControlService {
      */
     private Optional<Judged> lastShown(CurrentUser user, String itemKey) {
         return events.findFirstByUserIdAndItemKeyAndEventTypeOrderByIdDesc(user.id(), itemKey, AttentionEventType.SHOWN)
-                .map(shown -> new Judged(shown.trigger(), shown.level()));
+            .map(shown -> new Judged(shown.trigger(), shown.level()));
     }
+
 
     /** 요청자의 {@code SHOWN} 사건 가운데 항목과 상태가 같은 가장 최근 것의 {@code trigger} 와 판정이다. */
     private Optional<Judged> lastShownInState(CurrentUser user, String itemKey, String stateKey) {
         return events.findFirstByUserIdAndItemKeyAndStateKeyAndEventTypeOrderByIdDesc(
-                        user.id(), itemKey, stateKey, AttentionEventType.SHOWN)
-                .map(shown -> new Judged(shown.trigger(), shown.level()));
+            user.id(), itemKey, stateKey, AttentionEventType.SHOWN)
+            .map(shown -> new Judged(shown.trigger(), shown.level()));
     }
+
 
     /** 억제 전 후보에만 있으면(숨겼거나 미뤘다) 그 후보의 {@code trigger} 와 {@code SUPPRESSED} 다. */
     private static Optional<Judged> suppressedInCandidates(
-            AttentionSnapshot snapshot, List<CardKey> keys, String itemKey) {
+        AttentionSnapshot snapshot, List<CardKey> keys, String itemKey) {
         return keys.stream()
-                .flatMap(key -> snapshot.candidates().getOrDefault(key, List.of()).stream())
-                .filter(candidate -> candidate.itemKey().equals(itemKey))
-                .findFirst()
-                .map(candidate -> new Judged(candidate.trigger(), AttentionLevel.SUPPRESSED));
+            .flatMap(key -> snapshot.candidates().getOrDefault(key, List.of()).stream())
+            .filter(candidate -> candidate.itemKey().equals(itemKey))
+            .findFirst()
+            .map(candidate -> new Judged(candidate.trigger(), AttentionLevel.SUPPRESSED));
     }
+
 
     private static AttentionCandidate requireCandidate(AttentionSnapshot snapshot, CardKey card, String itemKey) {
         return snapshot.candidates().getOrDefault(card, List.of()).stream()
-                .filter(candidate -> candidate.itemKey().equals(itemKey))
-                .findFirst()
-                .orElseThrow(AttentionControlService::notFound);
+            .filter(candidate -> candidate.itemKey().equals(itemKey))
+            .findFirst()
+            .orElseThrow(AttentionControlService::notFound);
     }
 
+
     private static AttentionEvent event(
-            CurrentUser user, String itemKey, String stateKey, Judged judged, AttentionEventType type, Instant now) {
+        CurrentUser user, String itemKey, String stateKey, Judged judged, AttentionEventType type, Instant now) {
         return AttentionEvent.of(user.id(), itemKey, stateKey, judged.trigger(), judged.level(), type, false, now);
     }
+
 
     private static void requireItemKey(String itemKey) {
         if (itemKey == null || itemKey.isBlank() || itemKey.length() > ITEM_KEY_MAX) {
@@ -266,11 +279,13 @@ public class AttentionControlService {
         }
     }
 
+
     private static void requireStateKey(String stateKey) {
         if (stateKey == null || stateKey.isBlank() || stateKey.length() > STATE_KEY_MAX) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "stateKey must be 1 to 64 characters");
         }
     }
+
 
     private static void requireCard(CardKey card) {
         if (card == null) {
@@ -278,10 +293,13 @@ public class AttentionControlService {
         }
     }
 
+
     private static ApiException notFound() {
         return new ApiException(ErrorCode.ATTENTION_ITEM_NOT_FOUND, "attention item not found");
     }
 
+
     /** 사건에 남길 판정 칸이다. 이 클래스 밖에서 쓰이지 않는다. */
-    private record Judged(AttentionTrigger trigger, AttentionLevel level) {}
+    private record Judged(AttentionTrigger trigger, AttentionLevel level) {
+    }
 }

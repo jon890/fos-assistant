@@ -66,20 +66,22 @@ class AttachmentCleanerTest {
     private Path root;
     private Long conversationId;
 
+
     @BeforeEach
     void setUp() throws IOException {
         clock.set(NOW);
         if (jdbc.queryForObject("select count(*) from app_user where id=9201", Long.class) == 0) {
             jdbc.update("insert into app_user(id,email,display_name,group_id,role,created_at)"
-                    + " values (9201,'cleaner@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
+                + " values (9201,'cleaner@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
         }
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
         conversationId = conversations
-                .save(Conversation.startedBy(9201L, "정리 대화", null, Instant.now()))
-                .id();
+            .save(Conversation.startedBy(9201L, "정리 대화", null, Instant.now()))
+            .id();
     }
+
 
     @Test
     @DisplayName("기간이 지난 것만 파일을 지우고 행에 지운 시각을 적는다")
@@ -96,6 +98,7 @@ class AttachmentCleanerTest {
         assertThat(reload(live).deletedAt()).isNull();
     }
 
+
     @Test
     @DisplayName("이미 지운 것은 다시 지우지 않는다")
     void doesNotDeleteAlreadyDeletedAgain() {
@@ -110,6 +113,7 @@ class AttachmentCleanerTest {
         assertThat(deleted).isZero();
         assertThat(reload(gone).deletedAt()).isEqualTo(firstDeletion);
     }
+
 
     @Test
     @DisplayName("메시지에 묶였든 아니든 기간이 지났으면 함께 지운다")
@@ -127,6 +131,7 @@ class AttachmentCleanerTest {
         assertThat(reload(unbound).isVisible()).isFalse();
     }
 
+
     @Test
     @DisplayName("지운 대화의 보내지 않은 첨부도 기간이 지나면 지운다")
     void deletesExpiredUnsentAttachmentsOfDeletedConversation() {
@@ -139,6 +144,7 @@ class AttachmentCleanerTest {
         assertThat(fileOf(unbound)).doesNotExist();
         assertThat(reload(unbound).deletedAt()).isEqualTo(NOW);
     }
+
 
     @Test
     @DisplayName("한 건이 실패해도 나머지를 지운다")
@@ -160,25 +166,29 @@ class AttachmentCleanerTest {
         assertThat(reload(fine).deletedAt()).isEqualTo(NOW);
     }
 
+
     private ChatAttachment stored(Instant expiresAt) {
         ChatAttachment attachment = attachments.save(
-                ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
+            ChatAttachment.of(conversationId, 9201L, "photo.png", "image/png", 3, expiresAt));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         store.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));
         return attachment;
     }
 
+
     private ChatAttachment reload(ChatAttachment attachment) {
         return attachments.findById(attachment.id()).orElseThrow();
     }
 
+
     private Path fileOf(ChatAttachment attachment) {
         return root.resolve("users")
-                .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
-                .resolve(String.valueOf(conversationId))
-                .resolve(attachment.id() + ".png");
+            .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
+            .resolve(String.valueOf(conversationId))
+            .resolve(attachment.id() + ".png");
     }
+
 
     private static void deleteTree(Path path) throws IOException {
         if (!Files.exists(path)) {

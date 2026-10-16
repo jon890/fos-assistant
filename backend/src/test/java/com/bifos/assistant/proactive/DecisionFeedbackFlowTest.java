@@ -151,8 +151,7 @@ class DecisionFeedbackFlowTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            now));
+            owner.id()));
         checkConversation = conversations.save(Conversation.startedForCheck(owner.id(), "커리어 살펴보기", career.id(), now));
         root = executions.save(execution(null, now));
         reported = ProactiveCheck.started(
@@ -461,7 +460,7 @@ class DecisionFeedbackFlowTest {
 
     private CurrentUser member(Instant now) {
         String email = "decision-feedback-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, now));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 }

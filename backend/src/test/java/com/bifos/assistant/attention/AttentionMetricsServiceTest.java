@@ -57,16 +57,19 @@ class AttentionMetricsServiceTest {
     @Autowired
     AttentionEventRepository events;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
         events.deleteAll();
     }
 
+
     @AfterEach
     void tearDown() {
         events.deleteAll();
     }
+
 
     @Test
     @DisplayName("NOW 로 보인 실패 둘 가운데 하나는 10초 뒤 열고 하나는 행동 없이 숨기면 그대로 센다")
@@ -88,9 +91,10 @@ class AttentionMetricsServiceTest {
         assertThat(row.nowHiddenWithoutAction()).as("nowHiddenWithoutAction").isEqualTo(1);
         assertThat(row.staleShown()).as("staleShown").isZero();
         assertThat(row.medianSecondsToFirstAction())
-                .as("medianSecondsToFirstAction")
-                .isEqualTo(10L);
+            .as("medianSecondsToFirstAction")
+            .isEqualTo(10L);
     }
+
 
     @Test
     @DisplayName("91일 전 사건은 30일 지표에 들지 않고 정리가 지운 뒤 지운 수 1 을 돌려준다")
@@ -106,15 +110,17 @@ class AttentionMetricsServiceTest {
         assertThat(events.findAll()).extracting(AttentionEvent::itemKey).containsExactly("conversation:new");
     }
 
+
     @ParameterizedTest
     @ValueSource(ints = {0, 91})
     @DisplayName("기간이 1 부터 90 밖이면 VALIDATION_FAILED 다")
     void rejectsDaysOutsideRange(int days) {
         assertThatThrownBy(() -> metrics.metrics(days))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
+
 
     @Test
     @DisplayName("MEMBER 역할이 지표를 부르면 FORBIDDEN 이고 ADMIN 역할은 받는다")
@@ -126,9 +132,9 @@ class AttentionMetricsServiceTest {
 
         when(currentUser.require()).thenReturn(new CurrentUser(USER, "member@example.com", "아빠", 1L, UserRole.MEMBER));
         assertThatThrownBy(() -> controller.metrics(30))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.FORBIDDEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.FORBIDDEN);
 
         when(currentUser.require()).thenReturn(new CurrentUser(USER, "admin@example.com", "엄마", 1L, UserRole.ADMIN));
         MetricsResponse response = controller.metrics(30);
@@ -139,18 +145,20 @@ class AttentionMetricsServiceTest {
         });
     }
 
+
     /** 실패 trigger 의 {@code NOW} 사건 한 줄을 넣는다. 상태는 항목마다 하나로 둔다. */
     private void save(String itemKey, AttentionEventType type, Instant at) {
         events.save(AttentionEvent.of(
-                USER,
-                itemKey,
-                "state-" + itemKey,
-                AttentionTrigger.EXECUTION_FAILED,
-                AttentionLevel.NOW,
-                type,
-                false,
-                at));
+            USER,
+            itemKey,
+            "state-" + itemKey,
+            AttentionTrigger.EXECUTION_FAILED,
+            AttentionLevel.NOW,
+            type,
+            false,
+            at));
     }
+
 
     private static AttentionMetric onlyRow(List<AttentionMetric> rows) {
         assertThat(rows).as("지표 줄").hasSize(1);

@@ -49,8 +49,6 @@ public enum ErrorCode {
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */
     MEMORY_REVISION_CONFLICT(HttpStatus.CONFLICT),
-    /** 없는 서비스 토큰과 남의 서비스 토큰을 같은 응답으로 숨긴다(ADR-056). */
-    SERVICE_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND),
     /**
      * 민감 항목은 Memory 목록의 수정 경로로 고치지 못한다. 목록이 본문을 싣지 않아 그 요청이 본문을 읽지 않은 채
      * 덮어쓴다(ADR-055).
@@ -121,11 +119,7 @@ public enum ErrorCode {
      * <p>실행 줄에 남는 이름이기도 하다.
      */
     PROVIDER_BLOCKED(HttpStatus.BAD_GATEWAY),
-    /** 자식 실행이 다시 자식을 부르려 했다. 깊이를 1로 제한한다. */
-    ORCHESTRATION_DEPTH_EXCEEDED(HttpStatus.CONFLICT),
-    /** 흐름의 한 단계가 정한 출력 계약을 지키지 않았다. 원문을 그대로 다음 단계로 넘기지 않는다. */
-    ORCHESTRATION_CONTRACT_BROKEN(HttpStatus.BAD_GATEWAY),
-    /** 흐름의 한 단계가 실패했다. 어느 단계인지는 실행 줄의 {@code error_code} 가 적는다. */
+    /** 하위 에이전트 실행이 실패했다. 실행 줄의 {@code error_code}에도 적는다. */
     ORCHESTRATION_STEP_FAILED(HttpStatus.BAD_GATEWAY),
     /**
      * 화면이 보고 있던 본문이 지금 본문이 아니다.
@@ -282,8 +276,6 @@ public enum ErrorCode {
     TASK_LIMIT_REACHED(HttpStatus.CONFLICT),
     /** 예약 작업의 시각을 읽지 못했거나, 다음 시각이 없거나, 최소 간격보다 짧거나, 이미 지났다(ADR-079). */
     TASK_SCHEDULE_INVALID(HttpStatus.BAD_REQUEST),
-    /** 흐름이 붙은 에이전트로는 예약 작업을 만들지 않는다. */
-    TASK_AGENT_NOT_SUPPORTED(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     /** 없는 평가와 남의 평가, 지운 대화의 평가를 같은 응답으로 숨긴다. */

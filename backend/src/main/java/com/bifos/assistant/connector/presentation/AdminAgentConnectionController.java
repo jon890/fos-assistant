@@ -23,11 +23,12 @@ public class AdminAgentConnectionController {
     private final ConnectorBindingService bindings;
     private final CurrentUserProvider currentUser;
 
+
     /** 본문은 관리자 목록에서 본 그 바인딩의 재시작 대기 시작 시각이다. 그 뒤에 다시 설치됐으면 거절한다. */
     @PostMapping("/{code}/connections/{connectorId}/confirm")
     public AgentConnectionResponse confirm(
-            @PathVariable String code, @PathVariable String connectorId, @RequestBody ConfirmRequest request) {
+        @PathVariable String code, @PathVariable String connectorId, @RequestBody ConfirmRequest request) {
         return AgentConnectionResponse.from(
-                bindings.confirmApplied(currentUser.requireAdmin(), code, connectorId, request.restartRequiredSince()));
+            bindings.confirmApplied(currentUser.requireAdmin(), code, connectorId, request.restartRequiredSince()));
     }
 }

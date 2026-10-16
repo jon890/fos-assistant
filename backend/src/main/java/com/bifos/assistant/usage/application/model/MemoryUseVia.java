@@ -6,6 +6,8 @@ public enum MemoryUseVia {
     ALWAYS,
     /** 개인 사실 구역에 본문까지 실었다. */
     FACTS,
+    /** 질문과 관련된 기억 구역에 본문까지 실었다. */
+    SEARCH,
     /** {@code memory_read} 로 본문을 읽었다. */
     READ
 }

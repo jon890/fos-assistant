@@ -28,13 +28,14 @@ final class ConnectorErrors {
         };
     }
 
+
     /** 관리자 반영 완료가 {@code READY} 를 확인하지 못한 까닭을 오류로 바꾼다. {@code READY} 는 오류가 아니어서 받지 않는다. */
     static ApiException notApplied(ResyncOutcome outcome) {
         return switch (outcome) {
             case CALL_FAILED -> new ConnectorOperationFailure();
             case NOT_INSTALLED, POLICY_HOOK_OFF ->
                 new ApiException(ErrorCode.CONNECTOR_INSTALL_MISMATCH, "the installed connector does not match");
-            case PROBE_FAILED, NO_TOOLS, TOOLSETS_DIFFER ->
+            case PROBE_FAILED, NO_TOOLS ->
                 new ApiException(ErrorCode.CONNECTOR_TOOLS_UNVERIFIED, "the connector tools could not be verified");
             case APPLY_SCHEDULED ->
                 new ApiException(ErrorCode.CONNECTOR_APPLY_SCHEDULED, "the connector is still being applied");
@@ -45,13 +46,16 @@ final class ConnectorErrors {
         };
     }
 
+
     static ApiException notFound() {
         return new ApiException(ErrorCode.CONNECTOR_NOT_FOUND, "no such connector");
     }
 
+
     static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "connector values are invalid");
     }
+
 
     static ApiException unavailable() {
         return new ApiException(ErrorCode.CONNECTOR_UNAVAILABLE, "the connector is unavailable");

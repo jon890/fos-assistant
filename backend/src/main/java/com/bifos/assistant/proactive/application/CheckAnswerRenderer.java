@@ -43,13 +43,14 @@ public class CheckAnswerRenderer {
     private static final String NO_NEW_LINE = "새로 알릴 것은 없어요";
 
     private static final Map<FindingReason, String> REASON_TEXT = Map.of(
-            FindingReason.NO_SOURCE, "원문을 확인하지 못했어요",
-            FindingReason.NOT_CHECKED_NOW, "이번에 다시 확인하지 않았어요",
-            FindingReason.CLOSED, "이미 마감됐어요",
-            FindingReason.STALE, "오래된 소식이에요",
-            FindingReason.FRESHNESS_UNKNOWN, "지금도 유효한지 모르겠어요",
-            FindingReason.INCOMPLETE, "근거가 부족해요",
-            FindingReason.REPEATED, "이미 알린 것이에요");
+        FindingReason.NO_SOURCE, "원문을 확인하지 못했어요",
+        FindingReason.NOT_CHECKED_NOW, "이번에 다시 확인하지 않았어요",
+        FindingReason.CLOSED, "이미 마감됐어요",
+        FindingReason.STALE, "오래된 소식이에요",
+        FindingReason.FRESHNESS_UNKNOWN, "지금도 유효한지 모르겠어요",
+        FindingReason.INCOMPLETE, "근거가 부족해요",
+        FindingReason.REPEATED, "이미 알린 것이에요");
+
 
     /**
      * 결과를 그린다. 빈 절은 그리지 않는다.
@@ -61,16 +62,16 @@ public class CheckAnswerRenderer {
         return render(block, judged, null);
     }
 
+
     /** v2 보고가 있으면 다섯 칸으로 먼저 그린다. URL과 승인 번호는 Control Plane 이 채운 값만 쓴다. */
     public String render(CheckResultBlock block, List<JudgedFinding> judged, CheckReport report) {
         if (report != null) {
             return report(report) + "\n\n" + render(block, judged);
         }
-        List<JudgedFinding> fresh =
-                judged.stream().filter(each -> each.kind() == FindingKind.NEW).toList();
+        List<JudgedFinding> fresh = judged.stream().filter(each -> each.kind() == FindingKind.NEW).toList();
         List<JudgedFinding> references = judged.stream()
-                .filter(each -> each.kind() == FindingKind.REFERENCE)
-                .toList();
+            .filter(each -> each.kind() == FindingKind.REFERENCE)
+            .toList();
 
         List<String> parts = new ArrayList<>();
         if (!fresh.isEmpty()) {
@@ -90,22 +91,25 @@ public class CheckAnswerRenderer {
         return String.join("\n\n", parts);
     }
 
+
     private static String report(CheckReport report) {
         List<String> parts = new ArrayList<>();
         addSection(parts, "바뀐 점", report.changed());
         addSection(parts, "한 일", report.done());
         if (!report.evidence().isEmpty()) {
             parts.add("**근거**\n"
-                    + report.evidence().stream().map(url -> "- " + link(url)).collect(Collectors.joining("\n")));
+                + report.evidence().stream().map(url -> "- " + link(url)).collect(Collectors.joining("\n")));
         }
         addSection(parts, "남은 승인", report.needsApproval());
         addSection(parts, "다음에 볼 것", report.next());
         return String.join("\n\n", parts);
     }
 
+
     private static String link(String url) {
         return "[" + escape(hostOf(url)) + "](" + linkDestination(url) + ")";
     }
+
 
     private static String newFindings(List<JudgedFinding> fresh) {
         List<String> blocks = new ArrayList<>();
@@ -114,6 +118,7 @@ public class CheckAnswerRenderer {
         }
         return String.join("\n", blocks);
     }
+
 
     private static String newFinding(int number, JudgedFinding judged) {
         Finding finding = judged.finding();
@@ -129,11 +134,12 @@ public class CheckAnswerRenderer {
         addIfPresent(lines, line("추정", joinEscaped(finding.inferences())));
         addIfPresent(lines, line("아직 모르는 것", joinEscaped(finding.unknowns())));
         addIfPresent(
-                lines,
-                line("지난번과 달라진 점", finding.changeSinceLast() == null ? null : escape(finding.changeSinceLast())));
+            lines,
+            line("지난번과 달라진 점", finding.changeSinceLast() == null ? null : escape(finding.changeSinceLast())));
         addIfPresent(lines, line("할 일 후보 또는 논의할 질문", escape(finding.next().text())));
         return String.join("\n", lines);
     }
+
 
     /** 원문 링크와 확인 시각 줄이다. 시각은 모델이 준 시각대 그대로 적는다. */
     private static String sourceLine(Finding finding, JudgedFinding judged) {
@@ -146,6 +152,7 @@ public class CheckAnswerRenderer {
         return checkedAt == null ? line : line + " · 확인 " + checkedAt;
     }
 
+
     private static String formatCheckedAt(String value) {
         if (value == null) {
             return null;
@@ -157,6 +164,7 @@ public class CheckAnswerRenderer {
         }
     }
 
+
     private static String hostOf(String url) {
         try {
             return new URI(url).getHost();
@@ -165,33 +173,39 @@ public class CheckAnswerRenderer {
         }
     }
 
+
     /** 주소 안의 괄호는 링크를 일찍 닫을 수 있어 퍼센트 인코딩한다. 주소가 가리키는 곳은 같다. */
     private static String linkDestination(String url) {
         return url.replace("(", "%28").replace(")", "%29");
     }
 
+
     private static String referenceLines(List<JudgedFinding> references) {
         return references.stream()
-                .map(each -> "- " + titleOf(each.finding()) + ": " + REASON_TEXT.get(each.reason()))
-                .collect(Collectors.joining("\n"));
+            .map(each -> "- " + titleOf(each.finding()) + ": " + REASON_TEXT.get(each.reason()))
+            .collect(Collectors.joining("\n"));
     }
+
 
     /** 참고로 내린 발견은 제목이 없을 수 있다. */
     private static String titleOf(Finding finding) {
         return finding.title() == null ? NO_TITLE : escape(finding.title());
     }
 
+
     private static void addSection(List<String> parts, String heading, List<String> items) {
         if (items.isEmpty()) {
             return;
         }
         parts.add("**" + heading + "**\n"
-                + items.stream().map(item -> "- " + escape(item)).collect(Collectors.joining("\n")));
+            + items.stream().map(item -> "- " + escape(item)).collect(Collectors.joining("\n")));
     }
+
 
     private static String line(String label, String value) {
         return value == null ? null : "   - " + label + ": " + value;
     }
+
 
     private static String joinEscaped(List<String> items) {
         if (items.isEmpty()) {
@@ -200,11 +214,13 @@ public class CheckAnswerRenderer {
         return items.stream().map(CheckAnswerRenderer::escape).collect(Collectors.joining(ITEM_JOINER));
     }
 
+
     private static void addIfPresent(List<String> target, String value) {
         if (value != null) {
             target.add(value);
         }
     }
+
 
     /**
      * 모델이 쓴 글을 평문으로 만든다. 줄바꿈과 연속 공백을 한 칸으로 합쳐 줄 머리의 문법을 막고, 문법 글자 앞에 백슬래시를

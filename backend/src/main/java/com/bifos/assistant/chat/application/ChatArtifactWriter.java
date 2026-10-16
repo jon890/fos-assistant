@@ -19,11 +19,13 @@ public class ChatArtifactWriter {
 
     private final ChatArtifactRepository repository;
 
+
     /** 그 파일을 가리키는 행 모두에 지운 시각을 적는다. 뜻은 {@link ChatArtifactRepository#markDeleted} 가 적는다. */
     @Transactional
     public int markDeleted(Long conversationId, String path, Instant now, Instant createdBefore) {
         return repository.markDeleted(conversationId, path, now, createdBefore);
     }
+
 
     /** 지운 표시가 없고 {@code createdBefore} 보다 앞서 만든 행이다. */
     @Transactional(readOnly = true)

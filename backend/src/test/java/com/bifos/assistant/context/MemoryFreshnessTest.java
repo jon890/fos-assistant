@@ -29,6 +29,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -128,7 +129,7 @@ class MemoryFreshnessTest {
             MemoryRetrieval.SEARCH,
             MemorySensitivity.NORMAL);
         clock.set(NOW);
-        ContextAssembler configured = new ContextAssembler(
+        ContextAssembler configured = TestContextAssemblers.of(
             memories,
             new ContextProperties(
                 8_000,
@@ -162,7 +163,7 @@ class MemoryFreshnessTest {
         when(memory.sealed()).thenReturn(false);
         when(mockedMemories.alwaysInjectedFor(any(), any())).thenReturn(List.of(memory));
         when(mockedMemories.indexedFor(any(), any())).thenReturn(List.of());
-        ContextAssembler mockedAssembler = new ContextAssembler(
+        ContextAssembler mockedAssembler = TestContextAssemblers.of(
             mockedMemories,
             new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of(), null, null),
             Clock.fixed(NOW, ZoneOffset.UTC));
@@ -182,7 +183,7 @@ class MemoryFreshnessTest {
         Memory unknown = memories.create(
             USER, MemoryScope.USER, "판정 없는 기억", "본문", "disabled", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         clock.set(NOW);
-        ContextAssembler configured = new ContextAssembler(
+        ContextAssembler configured = TestContextAssemblers.of(
             memories,
             new ContextProperties(
                 8_000,
@@ -224,7 +225,6 @@ class MemoryFreshnessTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER.id(),
-            NOW);
+            USER.id());
     }
 }

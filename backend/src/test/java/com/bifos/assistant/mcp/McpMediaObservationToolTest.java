@@ -168,8 +168,8 @@ class McpMediaObservationToolTest {
         attachments.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update("delete from allowed_person where hermes_profile=?", PROFILE);
-        user = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER, clock.instant()));
-        people.save(AllowedPerson.of(user.email(), "주인", PROFILE, clock.instant()));
+        user = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER));
+        people.save(AllowedPerson.of(user.email(), "주인", PROFILE));
         agent = McpCallSigner.agentFor(agents, PROFILE);
         jdbc.update(
             "update agent set enabled=true, deleted_at=null, visibility='GROUP', owner_user_id=null, hermes_profile=? where id=?",

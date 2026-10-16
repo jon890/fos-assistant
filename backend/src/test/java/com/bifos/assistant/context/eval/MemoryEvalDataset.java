@@ -11,15 +11,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Memory 회수 합성 측정의 시험 세트다. 칸의 뜻은 {@code docs/features/memory.md} 의 「시험 세트」 가 갖는다. 모든 값은 합성이다.
+ * Memory 회수 합성 측정의 사례 묶음이다. 칸의 뜻은 {@code docs/features/memory.md} 의 「사례 묶음」 이 갖는다. 모든 값은 합성이다.
  *
  * @param version 시험 세트 형식의 판
  * @param note 시험 세트의 안내 글
@@ -113,6 +116,46 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
                 seen.add(forbidden.memory()),
                 where + "한 Memory 가 expect 와 forbidden 에 겹쳐 있거나 두 번 적혔다: " + forbidden.memory());
         }
+        validateSupersedes(where, each);
+        Set<String> checkIds = new HashSet<>();
+        for (JudgeCheck check : each.judge()) {
+            require(
+                check.id() != null && !check.id().isBlank() && checkIds.add(check.id()),
+                where + "judge 의 id 가 비었거나 겹친다: " + check.id());
+            require(check.question() != null && !check.question().isBlank(), where + "judge 의 question 이 비었다");
+        }
+    }
+
+
+    /**
+     * {@code supersedes} 는 같은 사례의 같은 주인 항목을 가리키고, 가리키는 항목과 {@code SUPERSEDED} 오답지가 서로 맞아야 한다. 단계 2 가
+     * 이 값으로 「대체함」 링크를 만들기 때문이다.
+     */
+    private static void validateSupersedes(String where, Case each) {
+        Map<String, MemorySeed> byKey = new HashMap<>();
+        each.memories().forEach(memory -> byKey.put(memory.key(), memory));
+        Set<String> superseded = new HashSet<>();
+        for (MemorySeed memory : each.memories()) {
+            if (memory.supersedes() == null) {
+                continue;
+            }
+            MemorySeed old = byKey.get(memory.supersedes());
+            require(old != null, where + "supersedes 가 없는 Memory 를 가리킨다: " + memory.supersedes());
+            require(!old.key().equals(memory.key()), where + "supersedes 가 자기 자신을 가리킨다: " + memory.key());
+            require(
+                old.scope() == memory.scope()
+                    && Objects.equals(old.owner(), memory.owner())
+                    && Objects.equals(old.group(), memory.group()),
+                where + "supersedes 가 범위나 주인이 다른 Memory 를 가리킨다: " + memory.supersedes());
+            superseded.add(old.key());
+        }
+        Set<String> forbiddenSuperseded = new HashSet<>();
+        each.forbidden().stream()
+            .filter(forbidden -> forbidden.kind() == ForbiddenKind.SUPERSEDED)
+            .forEach(forbidden -> forbiddenSuperseded.add(forbidden.memory()));
+        require(
+            superseded.equals(forbiddenSuperseded),
+            where + "supersedes 가 가리키는 항목 " + superseded + " 와 SUPERSEDED 오답지 " + forbiddenSuperseded + " 가 다르다");
     }
 
 
@@ -178,10 +221,11 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
 
     /**
      * @param id 사례 번호
-     * @param question 사람이 읽으라고 둔 질문. 판정에 쓰지 않는다
+     * @param question 사례의 질문. 조립에 넘기고 판정에는 쓰지 않는다
      * @param filler 판정 대상이 아닌 보조 항목
      * @param expect 답에 필요한 Memory 의 key
      * @param forbidden 실리면 안 되는 Memory
+     * @param judge 답 판정이 묻는 「예, 아니오」 질문. 조립 측정은 읽지 않는다
      */
     record Case(
         String id,
@@ -192,13 +236,25 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         List<MemorySeed> memories,
         Filler filler,
         List<String> expect,
-        List<Forbidden> forbidden) {
+        List<Forbidden> forbidden,
+        List<JudgeCheck> judge) {
 
         Case {
             memories = memories == null ? List.of() : List.copyOf(memories);
             expect = expect == null ? List.of() : List.copyOf(expect);
             forbidden = forbidden == null ? List.of() : List.copyOf(forbidden);
+            judge = judge == null ? List.of() : List.copyOf(judge);
         }
+    }
+
+    /**
+     * 답 판정이 판정 모델에 묻는 질문 하나다. 답 글만 보고 판정할 수 있게 쓴다.
+     *
+     * @param id 사례 안에서 겹치지 않는 이름
+     * @param question 「예, 아니오」 로 답할 판정 질문
+     * @param expect 기억이 제대로 쓰인 답에서 기대하는 판정
+     */
+    record JudgeCheck(String id, String question, boolean expect) {
     }
 
     /**
@@ -208,6 +264,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param owner {@code USER} 항목의 주인 사용자 key
      * @param group {@code GROUP} 항목의 그룹 이름
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
+     * @param supersedes 이 항목이 대체하는 같은 사례의 옛 항목 key. 없으면 null
      */
     record MemorySeed(
         String key,
@@ -222,7 +279,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         MemorySensitivity sensitivity,
         MemoryEntryType entryType,
         String documentKey,
-        int updatedDaysAgo) {
+        int updatedDaysAgo,
+        String supersedes) {
 
         MemorySeed {
             scope = scope == null ? MemoryScope.USER : scope;
@@ -269,6 +327,10 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         TEMPORAL,
         ABSTENTION,
         BOUNDARY,
-        LOAD
+        LOAD,
+        /** 선호를 무시하면 답이 어긋나는 질문에 그 선호가 실린다(PrefEval). */
+        PREFERENCE,
+        /** 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목. */
+        RECALL_GAP
     }
 }

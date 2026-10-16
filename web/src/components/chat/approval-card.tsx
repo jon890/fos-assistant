@@ -15,7 +15,7 @@ import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card"
 import {
   approvalBlocked,
   financialView,
-  FinancialSummaryView,
+  FinancialLineView,
 } from "@/components/chat/financial-summary";
 import { toolRiskLabel } from "@/lib/connection";
 import {
@@ -164,25 +164,13 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
 
 /** 카드 본문이다. 금융 줄은 요약을, 그 밖의 줄은 인자를 그리고 승인할 수 없는 까닭을 안내한다. */
 function ApprovalContent({ action }: { action: ConnectorAction }) {
-  const { line, summary, closed } = financialView(action);
   return (
     <>
-      {line ? (
-        summary ? (
-          <FinancialSummaryView summary={summary} />
-        ) : null
+      {financialView(action).line ? (
+        <FinancialLineView action={action} />
       ) : (
         <ApprovalArgsView action={action} />
       )}
-      {closed ? (
-        <Notice
-          variant="warning"
-          role="status"
-          data-testid="approval-financial-unavailable"
-        >
-          주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.
-        </Notice>
-      ) : null}
       {action.status === "PENDING" && action.hiddenArgs ? (
         <HiddenArgsNotice action={action} />
       ) : null}

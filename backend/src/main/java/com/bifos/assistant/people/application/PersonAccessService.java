@@ -20,11 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 허용 목록에서 사람을 켜고 끈다.
+ * 허용 목록에서 사용자를 켜고 끈다.
  *
- * <p>끄는 저장과 {@link UserAccessRevoked} 를 받는 쪽의 폐기가 한 트랜잭션이다. 이벤트는 동기로 전달되므로
- * 폐기가 실패하면 끄기도 함께 되돌아간다(ADR-056). 컨트롤러에서 저장과 이벤트를 따로 두면 저장이 먼저
- * 커밋돼 폐기가 실패해도 꺼진 채 토큰이 남는다.
+ * <p>끄는 변경과 {@link UserAccessRevoked} 발행을 같은 트랜잭션에서 처리한다. 브라우저 정리는 커밋 뒤에
+ * 사건을 받아 실행하며, 실패하면 다음 점검에서 다시 시도한다. 사용자 JWT는 매 요청 허용 목록을 확인해 거절한다(ADR-059).
  */
 @Service
 @RequiredArgsConstructor
@@ -65,10 +64,10 @@ public class PersonAccessService {
 
 
     /**
-     * 들어올 수 있는지를 올리거나 내린다. 내리면 그 사용자가 가진 것을 거두는 사건을 낸다.
+     * 들어올 수 있는지를 올리거나 내린다. 내리면 그 사용자의 접근 해제 사건을 낸다.
      *
-     * <p>app_user 는 정규화한 주소로 찾는다. 원문 주소를 그대로 비교하면 대소문자가 달라 찾지 못하고, 토큰이
-     * 폐기되지 않은 채 남는다.
+     * <p>app_user 는 정규화한 주소로 찾는다. 원문 주소를 그대로 비교하면 대소문자가 달라 사건을 보낼 사용자를
+     * 빠뜨릴 수 있다.
      *
      * @throws ApiException 그 사람이 없으면 PERSON_NOT_FOUND
      */
@@ -90,7 +89,7 @@ public class PersonAccessService {
         AllowedPerson saved = people.save(person);
         List<AppUser> joined = users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(saved.email()));
         if (!enabled) {
-            // 아직 로그인한 적이 없는 사람은 app_user 가 없어 거둘 토큰도 없다
+            // 아직 로그인한 적이 없는 사용자는 app_user가 없어 정리 사건을 보낼 대상도 없다.
             joined.forEach(found -> events.publishEvent(new UserAccessRevoked(found.id())));
         }
         Instant lastConversationAt = joined.isEmpty()

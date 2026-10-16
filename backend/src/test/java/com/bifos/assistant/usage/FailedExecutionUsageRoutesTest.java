@@ -100,54 +100,55 @@ class FailedExecutionUsageRoutesTest {
     private Agent agent;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         String unique = UUID.randomUUID().toString();
         AppUser saved = users.save(
-                AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("failed-usage-" + unique + "@example.com", "사용자", 4_201L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agent = Agent.of(
-                "failed-usage-" + unique,
-                "실패 사용량 검사",
-                "failed-usage-" + unique,
-                "http://agent-runtime.test/p/failed-usage",
-                CostMode.API,
-                CredentialScope.DEDICATED,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now());
+            "failed-usage-" + unique,
+            "실패 사용량 검사",
+            "failed-usage-" + unique,
+            "http://agent-runtime.test/p/failed-usage",
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            user.id());
         agent.changeDefaultModel("requested-provider", "requested-model", null);
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
         doReturn(Optional.of(new CatalogPrice(
-                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
-                        PRICING_VERSION)))
+            new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
+            PRICING_VERSION)))
                 .when(prices)
                 .find(PROVIDER, MODEL);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
     @DisplayName("일반 대화는 실패 응답의 사용량과 실제 모델 비용을 남기고 원래 오류를 전달한다")
     void preservesUsageAndCostWhenConversationReceivesFailedResult(String errorCode) {
         hermes.willReturn(failedResult(errorCode));
-        ErrorCode expected =
-                "PROVIDER_BLOCKED".equals(errorCode) ? ErrorCode.PROVIDER_BLOCKED : ErrorCode.HERMES_RUN_FAILED;
+        ErrorCode expected = "PROVIDER_BLOCKED".equals(errorCode) ? ErrorCode.PROVIDER_BLOCKED : ErrorCode.HERMES_RUN_FAILED;
 
         assertThatThrownBy(() -> chat.send(user, conversation.id(), "질문", null))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(expected);
 
         assertThat(executions.findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 10)))
-                .singleElement()
-                .satisfies(execution -> assertFailedUsage(execution, errorCode));
+            .singleElement()
+            .satisfies(execution -> assertFailedUsage(execution, errorCode));
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .singleElement()
-                .satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
+            .singleElement()
+            .satisfies(message -> assertThat(message.role()).isEqualTo(MessageRole.USER));
         assertThat(chat.running(user, conversation.id()).running()).isFalse();
         assertThat(hermes.received()).as("Hermes 에 보낸 실행").hasSize(1);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"FAILED", "PROVIDER_BLOCKED"})
@@ -156,24 +157,25 @@ class FailedExecutionUsageRoutesTest {
         hermes.willReturn(failedResult(errorCode));
         AgentExecution parent = recorder.start(user, conversation.executionConversation(), agent, null, null, 0L);
         RunSession session = RunSession.fresh();
-        DelegationKey key =
-                DelegationKey.of(agent.hermesProfile(), "fos-root", "fos-root", "call_" + UUID.randomUUID());
+        DelegationKey key = DelegationKey.of(agent.hermesProfile(), "fos-root", "fos-root", "call_" + UUID.randomUUID());
 
         AgentRun run;
         try {
             run = runner.run(
-                    user,
-                    conversation,
-                    agent,
-                    "위임한 일",
-                    parent.id(),
-                    parent.id(),
-                    session,
-                    execution -> {},
-                    (execution, runId) -> {},
-                    () -> false,
-                    null,
-                    key);
+                user,
+                conversation,
+                agent,
+                "위임한 일",
+                parent.id(),
+                parent.id(),
+                session,
+                execution -> {
+                },
+                (execution, runId) -> {
+                },
+                () -> false,
+                null,
+                key);
         } finally {
             recorder.fail(parent, "CHILD_FAILED");
         }
@@ -189,6 +191,7 @@ class FailedExecutionUsageRoutesTest {
         assertThat(run.result().output()).isNull();
         assertThat(hermes.received()).as("Hermes 에 보낸 실행").hasSize(1);
     }
+
 
     private void assertFailedUsage(AgentExecution execution, String errorCode) {
         assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
@@ -208,27 +211,28 @@ class FailedExecutionUsageRoutesTest {
         assertThat(execution.latencyMs()).isNotNegative();
         assertThat(execution.outputText()).isNull();
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(execution.id())))
-                .satisfiesExactly(
-                        started -> assertThat(started.eventType()).isEqualTo(ExecutionEventType.RUN_STARTED),
-                        failed -> {
-                            assertThat(failed.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
-                            assertThat(failed.detail()).isEqualTo(errorCode);
-                        });
+            .satisfiesExactly(
+                started -> assertThat(started.eventType()).isEqualTo(ExecutionEventType.RUN_STARTED),
+                failed -> {
+                    assertThat(failed.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
+                    assertThat(failed.detail()).isEqualTo(errorCode);
+                });
     }
+
 
     private static HermesRunResult failedResult(String errorCode) {
         String error = "PROVIDER_BLOCKED".equals(errorCode)
-                ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account"
-                : "provider stopped after generating tokens";
+            ? HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account"
+            : "provider stopped after generating tokens";
         return new HermesRunResult(
-                RUN_ID,
-                "session-failed",
-                "failed",
-                "끝나지 않은 답",
-                "echoed-request-model",
-                "echoed-request-provider",
-                error,
-                new TokenUsage(1_000L, 800L, 500L, 1_500L),
-                new SessionRuntime(MODEL, PROVIDER));
+            RUN_ID,
+            "session-failed",
+            "failed",
+            "끝나지 않은 답",
+            "echoed-request-model",
+            "echoed-request-provider",
+            error,
+            new TokenUsage(1_000L, 800L, 500L, 1_500L),
+            new SessionRuntime(MODEL, PROVIDER));
     }
 }

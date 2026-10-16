@@ -2,8 +2,6 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -30,32 +28,41 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ExecutionContextSourceWriter {
 
-    private static final TransactionDefinition NEW_TRANSACTION =
-            new DefaultTransactionDefinition(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    private static final TransactionDefinition NEW_TRANSACTION = new DefaultTransactionDefinition(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
     private final ExecutionContextSourceRepository contextSources;
     private final PlatformTransactionManager transactionManager;
-    private final Clock clock;
+
 
     /** 참조가 없으면 아무것도 하지 않는다. 있으면 position 0 부터 실은 순서대로 적는다. */
     public void write(Long executionId, List<ContextSourceRef> sources) {
         if (sources.isEmpty()) {
             return;
         }
-        Instant now = clock.instant();
         List<ExecutionContextSource> rows = new ArrayList<>(sources.size());
         for (int position = 0; position < sources.size(); position++) {
             ContextSourceRef ref = sources.get(position);
             rows.add(ExecutionContextSource.of(
-                    executionId, position, ref.source(), ref.ref(), ref.bodyMode(), ref.freshness(), now));
+                executionId,
+                position,
+                ref.source(),
+                ref.ref(),
+                ref.bodyMode(),
+                ref.freshness(),
+                ref.selector(),
+                ref.selectionRank(),
+                ref.keywordScore(),
+                ref.semanticScore(),
+                ref.selectionScore()));
         }
         try {
             new TransactionTemplate(transactionManager, NEW_TRANSACTION)
-                    .executeWithoutResult(status -> contextSources.saveAll(rows));
+                .executeWithoutResult(status -> contextSources.saveAll(rows));
         } catch (RuntimeException ex) {
             log.warn("execution context sources not recorded executionId={} count={}", executionId, sources.size(), ex);
         }
     }
+
 
     /**
      * 그 실행의 마지막 줄 뒤에 한 줄을 덧붙인다. 줄이 없으면 position 0 이다. 도구 처리가 실행 도중에 부른다.
@@ -65,18 +72,17 @@ public class ExecutionContextSourceWriter {
      */
     public void append(Long executionId, ContextSourceRef ref) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager, NEW_TRANSACTION);
-        for (int attempt = 1; ; attempt++) {
+        for (int attempt = 1;; attempt++) {
             try {
                 transaction.executeWithoutResult(status -> {
                     Integer last = contextSources.lastPosition(executionId);
                     contextSources.saveAndFlush(ExecutionContextSource.of(
-                            executionId,
-                            last == null ? 0 : last + 1,
-                            ref.source(),
-                            ref.ref(),
-                            ref.bodyMode(),
-                            ref.freshness(),
-                            clock.instant()));
+                        executionId,
+                        last == null ? 0 : last + 1,
+                        ref.source(),
+                        ref.ref(),
+                        ref.bodyMode(),
+                        ref.freshness()));
                 });
                 return;
             } catch (DataIntegrityViolationException ex) {

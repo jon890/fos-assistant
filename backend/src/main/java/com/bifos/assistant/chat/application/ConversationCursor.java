@@ -18,14 +18,17 @@ record ConversationCursor(Instant updatedAt, long id) {
 
     private static final char SEPARATOR = '_';
 
+
     static ConversationCursor of(Conversation last) {
         return new ConversationCursor(last.updatedAt(), last.id());
     }
+
 
     String encode() {
         String raw = updatedAt + String.valueOf(SEPARATOR) + id;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /** 읽을 수 없는 값은 {@code VALIDATION_FAILED} 다. */
     static ConversationCursor decode(String encoded) {

@@ -20,7 +20,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
-import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,10 +40,12 @@ class PersonaServiceTest {
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
     private final PersonaService personas = new PersonaService(new AgentService(agents), dashboard);
 
+
     @BeforeEach
     void setUp() {
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent("dad", "dad-profile", OWNER.id())));
     }
+
 
     @Test
     @DisplayName("지금 본문과 그 해시를 돌려준다")
@@ -58,6 +59,7 @@ class PersonaServiceTest {
         assertThat(snapshot.editable()).isTrue();
     }
 
+
     @Test
     @DisplayName("파일이 없는 profile 은 본문이 빈 문자열이다")
     void returnsEmptyBodyForProfileWithoutFile() {
@@ -66,6 +68,7 @@ class PersonaServiceTest {
         assertThat(snapshot.body()).isEmpty();
         assertThat(snapshot.bodyHash()).isEqualTo(Sha256.hex16(""));
     }
+
 
     @Test
     @DisplayName("맞는 해시로 쓰면 그 본문이 그 profile 로 넘어간다")
@@ -79,6 +82,7 @@ class PersonaServiceTest {
         assertThat(written.bodyHash()).isEqualTo(Sha256.hex16("새 성격"));
     }
 
+
     @Test
     @DisplayName("한 글자 다른 해시로 쓰면 거절하고 쓰지 않는다")
     void rejectsWriteWithOneCharDifferentHash() {
@@ -86,11 +90,12 @@ class PersonaServiceTest {
         String wrong = "0" + Sha256.hex16(SOUL).substring(1);
 
         assertThatThrownBy(() -> personas.write(OWNER, "dad", "새 성격", wrong))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PERSONA_STALE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PERSONA_STALE);
         assertThat(dashboard.soulWrites()).isEmpty();
     }
+
 
     @Test
     @DisplayName("지금 본문이 있는데 해시가 비어 있으면 거절한다")
@@ -98,11 +103,12 @@ class PersonaServiceTest {
         dashboard.seedSoul("dad-profile", SOUL);
 
         assertThatThrownBy(() -> personas.write(OWNER, "dad", "새 성격", ""))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PERSONA_STALE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PERSONA_STALE);
         assertThat(dashboard.soulWrites()).isEmpty();
     }
+
 
     @Test
     @DisplayName("파일이 없는 profile 에는 해시 없이 처음 쓸 수 있다")
@@ -112,17 +118,19 @@ class PersonaServiceTest {
         assertThat(dashboard.soulWrites()).containsExactly(new SoulWrite("dad-profile", "새 성격"));
     }
 
+
     @Test
     @DisplayName("공백만 있는 본문은 거절하고 쓰지 않는다")
     void rejectsWhitespaceOnlyBodyWithoutWriting() {
         dashboard.seedSoul("dad-profile", SOUL);
 
         assertThatThrownBy(() -> personas.write(OWNER, "dad", "   \n ", Sha256.hex16(SOUL)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThat(dashboard.soulWrites()).isEmpty();
     }
+
 
     @Test
     @DisplayName("앞뒤 공백은 떼고 쓴다")
@@ -135,6 +143,7 @@ class PersonaServiceTest {
         assertThat(written.body()).isEqualTo("새 성격");
     }
 
+
     @Test
     @DisplayName("줄바꿈으로 끝나는 본문을 읽어 그대로 되보내면 저장된다")
     void savesBodyEndingWithNewlineWhenReadAndSentBackUnchanged() {
@@ -146,6 +155,7 @@ class PersonaServiceTest {
         assertThat(dashboard.soulWrites()).containsExactly(new SoulWrite("dad-profile", "새 성격"));
     }
 
+
     @Test
     @DisplayName("대시보드에는 code 가 아니라 그 에이전트의 profile 이름이 넘어간다")
     void sendsAgentProfileNameToDashboardInsteadOfCode() {
@@ -156,16 +166,16 @@ class PersonaServiceTest {
         assertThat(dashboard.soulWrites()).extracting(SoulWrite::profile).containsExactly("dad-profile");
     }
 
+
     private static Agent agent(String code, String profile, Long ownerUserId) {
         return Agent.of(
-                code,
-                "아빠",
-                profile,
-                "http://127.0.0.1:1/p/" + profile,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerUserId,
-                Instant.now());
+            code,
+            "아빠",
+            profile,
+            "http://127.0.0.1:1/p/" + profile,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerUserId);
     }
 }

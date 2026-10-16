@@ -31,6 +31,7 @@ final class TopLevelPackageEdges {
     /** 패키지마다 이름 순으로 첫 클래스. 그 패키지의 간선 위반은 이 클래스에서만 낸다. */
     private final Map<String, String> reportingClass = new TreeMap<>();
 
+
     static TopLevelPackageEdges of(Collection<JavaClass> classes) {
         TopLevelPackageEdges result = new TopLevelPackageEdges();
         for (JavaClass javaClass : classes) {
@@ -42,26 +43,29 @@ final class TopLevelPackageEdges {
             result.reportingClass.merge(source.get(), javaClass.getName(), (a, b) -> a.compareTo(b) <= 0 ? a : b);
             for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                 topLevelPackageOf(dependency.getTargetClass().getBaseComponentType())
-                        .filter(target -> !target.equals(source.get()))
-                        .ifPresent(target -> {
-                            result.edges.get(source.get()).add(target);
-                            result.edges.computeIfAbsent(target, ignored -> new TreeSet<>());
-                        });
+                    .filter(target -> !target.equals(source.get()))
+                    .ifPresent(target -> {
+                        result.edges.get(source.get()).add(target);
+                        result.edges.computeIfAbsent(target, ignored -> new TreeSet<>());
+                    });
             }
         }
         return result;
     }
 
+
     Map<String, SortedSet<String>> edges() {
         return Collections.unmodifiableMap(edges);
     }
 
+
     /** 그 클래스가 자기 최상위 패키지에서 이름 순으로 첫 클래스인지 돌려준다. */
     boolean reports(JavaClass item) {
         return topLevelPackageOf(item)
-                .map(source -> item.getName().equals(reportingClass.get(source)))
-                .orElse(false);
+            .map(source -> item.getName().equals(reportingClass.get(source)))
+            .orElse(false);
     }
+
 
     static Optional<String> topLevelPackageOf(JavaClass javaClass) {
         String packageName = javaClass.getPackageName();

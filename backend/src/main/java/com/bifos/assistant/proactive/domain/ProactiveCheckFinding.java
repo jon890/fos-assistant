@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ import lombok.experimental.Accessors;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class ProactiveCheckFinding {
+public class ProactiveCheckFinding extends CreatedAtEntity {
 
     static final int AREA_MAX_LENGTH = 40;
     static final int TOPIC_KEY_MAX_LENGTH = 120;
@@ -74,21 +75,18 @@ public class ProactiveCheckFinding {
     @Column(name = "checked_at")
     private Instant checkedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
 
     /** 칸 길이를 넘는 글은 잘라 넣는다. 모델이 쓴 글이라 길이를 믿지 않는다. */
     public static ProactiveCheckFinding of(
-            Long checkId,
-            Long conversationId,
-            FindingKind kind,
-            FindingReason reason,
-            String area,
-            String topicKey,
-            String title,
-            String sourceUrl,
-            Instant checkedAt,
-            Instant now) {
+        Long checkId,
+        Long conversationId,
+        FindingKind kind,
+        FindingReason reason,
+        String area,
+        String topicKey,
+        String title,
+        String sourceUrl,
+        Instant checkedAt) {
         ProactiveCheckFinding finding = new ProactiveCheckFinding();
         finding.checkId = checkId;
         finding.conversationId = conversationId;
@@ -99,9 +97,9 @@ public class ProactiveCheckFinding {
         finding.title = truncate(title, TITLE_MAX_LENGTH);
         finding.sourceUrl = truncate(sourceUrl, SOURCE_URL_MAX_LENGTH);
         finding.checkedAt = checkedAt;
-        finding.createdAt = now;
         return finding;
     }
+
 
     /** 칸 길이까지만 남긴다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private static String truncate(String value, int maxLength) {

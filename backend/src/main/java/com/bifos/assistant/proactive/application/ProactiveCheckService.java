@@ -1,6 +1,5 @@
 package com.bifos.assistant.proactive.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
@@ -54,7 +53,6 @@ public class ProactiveCheckService {
     static final String FAILED_NOTICE = "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요";
 
     private final AgentService agents;
-    private final AgentConnectorBindings connectorBindings;
     private final ProactiveCheckReadiness readiness;
     private final CheckConversations checkConversations;
     private final ProactiveCheckRepository checks;
@@ -80,6 +78,7 @@ public class ProactiveCheckService {
     private final TransactionTemplate transactions;
     private final BackgroundTasks backgroundTasks;
 
+
     /**
      * 살펴보기를 할 수 있는지, 요청자의 점검 대화, 요청자의 마지막 살펴보기를 읽는다.
      *
@@ -90,15 +89,16 @@ public class ProactiveCheckService {
         Agent agent = agents.requireStartable(user, agentCode);
         CheckReadiness checked = readiness.check(agent);
         return new CheckStatusView(
-                checked,
-                checkConversations
-                        .find(user.id(), agent.id())
-                        .map(Conversation::publicId)
-                        .orElse(null),
-                checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
-                                user.id(), agent.id(), CheckTrigger.AUTONOMY)
-                        .orElse(null));
+            checked,
+            checkConversations
+                .find(user.id(), agent.id())
+                .map(Conversation::publicId)
+                .orElse(null),
+            checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
+                user.id(), agent.id(), CheckTrigger.AUTONOMY)
+                .orElse(null));
     }
+
 
     /**
      * 살펴보기를 시작하고 점검 대화의 공개 식별자를 돌려준다. 결과는 그 대화의 SSE 와 이력으로 간다.
@@ -107,16 +107,19 @@ public class ProactiveCheckService {
      * 거절은 그 전에 예외로 나간다. 사용자 자리가 없어 거절하면 이번에 만든 점검 대화를 지운다.
      *
      * @throws ApiException {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code PROACTIVE_CHECK_UNAVAILABLE},
-     *     {@code USER_BUSY}, {@code CONVERSATION_BUSY}
+     * {@code USER_BUSY}, {@code CONVERSATION_BUSY}
      */
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger) {
-        return start(user, agentCode, trigger, ignored -> {});
+        return start(user, agentCode, trigger, ignored -> {
+        });
     }
+
 
     /** 예약 작업이 점검 줄을 자기 실행 기록에 잇는 전용 진입점이다. */
     public UUID startScheduled(CurrentUser user, String agentCode, Consumer<ProactiveCheck> beforeRun) {
         return start(user, agentCode, CheckTrigger.SCHEDULED, beforeRun);
     }
+
 
     /**
      * 행동 정책의 {@code EXECUTE} 가 쓰는 진입점이다(ADR-20261007 autonomy-policy). 그 에이전트에 쓰기 도구 허용이 켜져 있으면 Hermes 를
@@ -127,6 +130,7 @@ public class ProactiveCheckService {
     public UUID startAutonomous(CurrentUser user, String agentCode, Consumer<ProactiveCheck> beforeRun) {
         return start(user, agentCode, CheckTrigger.AUTONOMY, beforeRun);
     }
+
 
     /**
      * 예약 작업이 자기 {@code task_run}에 정확히 그 점검 줄을 잇도록, Hermes 호출 전에 저장한 점검 줄을 넘긴다.
@@ -139,12 +143,12 @@ public class ProactiveCheckService {
         Conversation conversation = opened.conversation();
         if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
             ProactiveCheck skipped = ProactiveCheck.started(
-                    user.id(),
-                    agent.id(),
-                    conversation.id(),
-                    trigger,
-                    agent.proactiveCheckWritesAllowed(),
-                    clock.instant());
+                user.id(),
+                agent.id(),
+                conversation.id(),
+                trigger,
+                agent.proactiveCheckWritesAllowed(),
+                clock.instant());
             skipped.skip(CheckSkippedReason.UNREAD_REPORT, clock.instant());
             saveLinked(skipped, beforeRun);
             return conversation.publicId();
@@ -152,8 +156,8 @@ public class ProactiveCheckService {
         TurnHandle handle;
         try {
             handle = trigger.unattended()
-                    ? turns.openBackground(user.id(), conversation.id())
-                    : turns.open(user.id(), conversation.id());
+                ? turns.openBackground(user.id(), conversation.id())
+                : turns.open(user.id(), conversation.id());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.USER_BUSY && opened.created()) {
                 checkConversations.deleteCreated(conversation.id());
@@ -164,20 +168,17 @@ public class ProactiveCheckService {
         try {
             // 그 에이전트의 쓰기 허용 값을 지금 옮겨 적는다. 이 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082).
             ProactiveCheck started = ProactiveCheck.started(
-                    user.id(),
-                    agent.id(),
-                    conversation.id(),
-                    trigger,
-                    agent.proactiveCheckWritesAllowed(),
-                    clock.instant());
+                user.id(),
+                agent.id(),
+                conversation.id(),
+                trigger,
+                agent.proactiveCheckWritesAllowed(),
+                clock.instant());
             check = saveLinked(started, beforeRun);
-            // 붙은 연결이 있는지는 시작할 때 한 번 정한다. 살펴보기 도중에 붙이거나 떼도 지시는 바뀌지 않는다.
-            boolean directConnectors =
-                    !connectorBindings.connectorServers(agent.id()).isEmpty();
             ProactiveCheckRun run = new ProactiveCheckRun(
-                    user, agent.id(), check, renewsSession(conversation), directConnectors, deps());
+                user, agent.id(), check, renewsSession(conversation), deps());
             backgroundTasks.start(
-                    "proactive-check-" + conversation.id(), () -> runCheck(user, conversation.id(), handle, run));
+                "proactive-check-" + conversation.id(), () -> runCheck(user, conversation.id(), handle, run));
         } catch (RuntimeException | Error ex) {
             log.warn("살펴보기를 시작하지 못했다 conversationId={}", conversation.id(), ex);
             if (check != null) {
@@ -189,6 +190,7 @@ public class ProactiveCheckService {
         return conversation.publicId();
     }
 
+
     /**
      * 점검 대화를 찾거나 만든다. 자동 실행은 사용자가 지운 점검 대화를 다시 만들지 않는다. 빈 대화가 목록에 나타나기 때문이다.
      */
@@ -197,12 +199,13 @@ public class ProactiveCheckService {
             return checkConversations.findOrCreate(user, agent);
         }
         return checkConversations
-                .find(user.id(), agent.id())
-                .map(conversation -> new OpenedCheck(conversation, false))
-                .orElseThrow(() -> new ApiException(
-                        ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
-                        "an autonomous check needs an existing check conversation"));
+            .find(user.id(), agent.id())
+            .map(conversation -> new OpenedCheck(conversation, false))
+            .orElseThrow(() -> new ApiException(
+                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
+                "an autonomous check needs an existing check conversation"));
     }
+
 
     /**
      * 시작 전 점검을 통과해야 한다. 자동 실행은 쓰기 도구 허용이 켜진 에이전트를 Hermes 를 부르기 전에 거절한다. 판정 뒤 관리자가 켠 경우도
@@ -211,27 +214,30 @@ public class ProactiveCheckService {
     private void requireReady(Agent agent, CheckTrigger trigger) {
         if (trigger == CheckTrigger.AUTONOMY && agent.proactiveCheckWritesAllowed()) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
-                    "an autonomous check runs only within the read-only boundary");
+                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
+                "an autonomous check runs only within the read-only boundary");
         }
         if (!readiness.check(agent).available()) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
+                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");
         }
     }
+
 
     /** 보고를 연 사용자만 시각을 적는다. 이미 연 보고를 다시 열어도 첫 시각을 보존한다. */
     @Transactional
     public void openReport(CurrentUser user, Long checkId) {
         ProactiveCheck check = checks.findByIdAndUserIdAndReportIsNotNull(checkId, user.id())
-                .orElseThrow(
-                        () -> new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such proactive check report"));
+            .orElseThrow(
+                () -> new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such proactive check report"));
         check.openReport(clock.instant());
     }
+
 
     private boolean hasUnreadReport(Long conversationId) {
         return checks.existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(conversationId);
     }
+
 
     /** 점검 줄 저장과 예약 실행 줄 연결은 Hermes 호출보다 먼저 같은 짧은 트랜잭션에서 끝낸다. */
     private ProactiveCheck saveLinked(ProactiveCheck check, Consumer<ProactiveCheck> beforeRun) {
@@ -242,13 +248,14 @@ public class ProactiveCheckService {
         });
     }
 
+
     /** 같은 루트 session 으로 보낸 살펴보기가 상한에 닿았으면 참이다. 루트 session 이 비었으면 바꾸지 않는다. */
     private boolean renewsSession(Conversation conversation) {
         String rootSession = conversation.hermesRootSessionId();
         return rootSession != null
-                && checks.countByConversationIdAndHermesRootSessionId(conversation.id(), rootSession)
-                        >= properties.current().sessionMaxChecks();
+            && checks.countByConversationIdAndHermesRootSessionId(conversation.id(), rootSession) >= properties.current().sessionMaxChecks();
     }
+
 
     /**
      * turn 을 돌리고, 어떻게 끝나든 잠금을 풀기 전에 끝을 정리한다. 정리는 {@link #finish} 가 한다. 정리가 실패해도 잠금은 푼다.
@@ -271,6 +278,7 @@ public class ProactiveCheckService {
         settled(owner, conversationId, run);
     }
 
+
     /**
      * 잠금을 푼 뒤 끝났다는 사건을 낸다. 받는 쪽(매일 루프)이 실패해도 로그만 남기고 살펴보기의 끝은 바꾸지 않는다. 잠금을 푼 뒤라 받는 쪽이
      * 같은 점검 대화의 잠금을 다시 잡을 수 있다.
@@ -284,12 +292,13 @@ public class ProactiveCheckService {
             events.publishEvent(new ProactiveCheckSettled(owner, checkId));
         } catch (RuntimeException ex) {
             log.warn(
-                    "끝난 살펴보기의 뒤처리가 실패했다 conversationId={} checkId={} error={}",
-                    conversationId,
-                    checkId,
-                    ex.getClass().getSimpleName());
+                "끝난 살펴보기의 뒤처리가 실패했다 conversationId={} checkId={} error={}",
+                conversationId,
+                checkId,
+                ex.getClass().getSimpleName());
         }
     }
+
 
     /**
      * 끝난 살펴보기를 문서의 「끝날 때」 순서로 정리한다. 잠금을 풀기 전에 부른다. 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정하므로,
@@ -305,7 +314,7 @@ public class ProactiveCheckService {
      * @param failure turn 이 던진 예외. 돌아왔거나 {@link Error} 로 끝났으면 null 이다
      */
     private void finish(
-            Long conversationId, TurnHandle handle, ProactiveCheckRun run, boolean returned, RuntimeException failure) {
+        Long conversationId, TurnHandle handle, ProactiveCheckRun run, boolean returned, RuntimeException failure) {
         recordQuietly(run::close, conversationId);
         Long rootId = run.rootExecutionId();
         int delegations = rootId == null ? 0 : countDelegations(rootId, conversationId);
@@ -321,10 +330,10 @@ public class ProactiveCheckService {
             }
             recordQuietly(() -> run.record(delegations), conversationId);
             recordQuietly(
-                    () -> notices.publicIdOf(conversationId)
-                            .ifPresent(
-                                    publicId -> hub.publish(conversationId, ChatEvent.stopped(publicId, null, rootId))),
-                    conversationId);
+                () -> notices.publicIdOf(conversationId)
+                    .ifPresent(
+                        publicId -> hub.publish(conversationId, ChatEvent.stopped(publicId, null, rootId))),
+                conversationId);
         } else {
             String code = failure instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
             log.warn("살펴보기가 실패했다 conversationId={} code={}", conversationId, code, failure);
@@ -342,6 +351,7 @@ public class ProactiveCheckService {
         }
     }
 
+
     /** 그 트리에서 맡긴 위임 자식 수. 세지 못하면 0 으로 적는다. */
     private int countDelegations(Long rootId, Long conversationId) {
         try {
@@ -352,6 +362,7 @@ public class ProactiveCheckService {
         }
     }
 
+
     private void markFailed(ProactiveCheck check, String errorCode) {
         try {
             check.fail(errorCode, 0, 0, clock.instant());
@@ -360,6 +371,7 @@ public class ProactiveCheckService {
             log.warn("시작하지 못한 살펴보기를 실패로 적지 못했다 checkId={}", check.id(), ex);
         }
     }
+
 
     /** 끝난 뒤의 기록이 실패해도 잠금 풀기와 다음 기록으로 넘어간다. */
     private static void recordQuietly(Runnable work, Long conversationId) {
@@ -370,22 +382,23 @@ public class ProactiveCheckService {
         }
     }
 
+
     private ProactiveCheckRun.Deps deps() {
         return new ProactiveCheckRun.Deps(
-                properties,
-                checks,
-                findings,
-                problems,
-                followUps,
-                reactions,
-                messages,
-                executions,
-                contextAssembler,
-                parser,
-                renderer,
-                reportFactory,
-                chat,
-                clock,
-                backgroundTasks);
+            properties,
+            checks,
+            findings,
+            problems,
+            followUps,
+            reactions,
+            messages,
+            executions,
+            contextAssembler,
+            parser,
+            renderer,
+            reportFactory,
+            chat,
+            clock,
+            backgroundTasks);
     }
 }

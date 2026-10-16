@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -21,12 +22,12 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "connector_tool_grant",
-        indexes = @Index(name = "idx_connector_tool_grant_lookup", columnList = "user_id, connector_id, tool_name"))
+    name = "connector_tool_grant",
+    indexes = @Index(name = "idx_connector_tool_grant_lookup", columnList = "user_id, connector_id, tool_name"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorToolGrant {
+public class ConnectorToolGrant extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,23 +46,21 @@ public class ConnectorToolGrant {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     /** 사용자가 거두었거나 연결을 해제한 시각이다. */
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+
     public static ConnectorToolGrant of(
-            Long userId, String connectorId, String toolName, Instant expiresAt, Instant now) {
+        Long userId, String connectorId, String toolName, Instant expiresAt) {
         ConnectorToolGrant grant = new ConnectorToolGrant();
         grant.userId = userId;
         grant.connectorId = connectorId;
         grant.toolName = toolName;
         grant.expiresAt = expiresAt;
-        grant.createdAt = now;
         return grant;
     }
+
 
     /** 이미 거둔 허락은 처음 거둔 시각을 그대로 둔다. */
     public void revoke(Instant now) {

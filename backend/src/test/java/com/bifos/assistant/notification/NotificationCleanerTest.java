@@ -8,6 +8,7 @@ import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,15 +34,21 @@ class NotificationCleanerTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    TestClock contextClock;
+
+
     @BeforeEach
     void setUp() {
         notifications.deleteAll();
     }
 
+
     @AfterEach
     void tearDown() {
         notifications.deleteAll();
     }
+
 
     @Test
     @DisplayName("보관 기간보다 오래된 줄은 읽었든 읽지 않았든 지우고, 기간 경계의 줄과 그 뒤의 줄은 남긴다")
@@ -52,10 +59,10 @@ class NotificationCleanerTest {
         Notification atCutoff = stored(cutoff, false);
         Notification fresh = stored(NOW.minus(Duration.ofDays(1)), false);
         NotificationCleaner cleaner = new NotificationCleaner(
-                notifications,
-                new NotificationProperties(RETENTION, "-", Duration.ofSeconds(20)),
-                transactionManager,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+            notifications,
+            new NotificationProperties(RETENTION, "-", Duration.ofSeconds(20)),
+            transactionManager,
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
         cleaner.runScheduled();
 
@@ -65,9 +72,10 @@ class NotificationCleanerTest {
         assertThat(notifications.findById(fresh.id())).as("기간 안의 줄").isPresent();
     }
 
+
     private Notification stored(Instant createdAt, boolean read) {
-        Notification notification =
-                Notification.of(USER, NotificationKind.APPROVAL_EXPIRED, "승인 요청이 만료됐어요", "", null, createdAt);
+        contextClock.set(createdAt);
+        Notification notification = Notification.of(USER, NotificationKind.APPROVAL_EXPIRED, "승인 요청이 만료됐어요", "", null);
         if (read) {
             notification.markRead(createdAt.plusSeconds(60));
         }

@@ -12,4 +12,5 @@ import java.util.UUID;
  * @param proposed 아직 받아들이지 않은 제안인가
  * @param agentProposed 실행 ID로 판정한 에이전트 출처인가
  */
-public record AttentionFollowUpRef(UUID id, Instant dueAt, boolean waiting, boolean proposed, boolean agentProposed) {}
+public record AttentionFollowUpRef(UUID id, Instant dueAt, boolean waiting, boolean proposed, boolean agentProposed) {
+}

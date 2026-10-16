@@ -11,6 +11,10 @@
   같은 측정에서 ADR-016 의 사실 둘이 이 버전에서 틀린 것도 드러났다.
   자세한 것은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 - 2026-09-30 에 「도구 넷과 한도」 의 `agent_status` 범위를 실행 트리에서 같은 대화로 넓혔다.
+- **대체된 부분**: 운영의 `agent.flow` 값이 모두 NULL임을 확인한 뒤 2026-10-15 사용자가 `ResearchAndBuildFlow` 참조 구현과 `agent.flow` 설정 삭제를 결정했다.
+  기존의 운영 왕복과 동등 E2E를 확인한 뒤 삭제한다는 조건은 이 결정으로 대체한다.
+  이 문서가 정한 Hermes 주도 위임은 유지한다. 기존 운영 Hermes 왕복과 같은 E2E 경로를 이번 작업에서
+  다시 확인했다는 뜻은 아니다.
 
 ### 결정
 
@@ -193,11 +197,8 @@ profile 플러그인의 hook 이 루트 session 과 `tool_call_id` 를 도구 �
 
 ### `ResearchAndBuildFlow` 의 자리
 
-**참조 구현으로 유지하고 넓히지 않는다.**
-기반이 서는 것을 보여 준 실험이고 그 역할은 끝났다.
-
-`agent_delegate` 가 들어온 뒤에도 바로 지우지 않는다.
-그 흐름을 쓰는 에이전트가 운영에 있고, 흐름의 e2e 가 자식 실행의 기록과 트리를 함께 검사한다.
-**Chief 가 `agent_delegate` 로 같은 일(조사를 맡기고 결과를 합쳐 만든다)을 하는 것을 운영에서 한 번 확인하고, e2e 가 그 경로로 같은 검사를 하게 되면 지운다.**
+`ResearchAndBuildFlow` 는 기반을 확인한 참조 구현이었다.
+운영의 `agent.flow` 값이 모두 NULL임을 확인한 뒤 2026-10-15 사용자 결정으로 `agent.flow` 칸과 함께 삭제한다.
+이 삭제는 위임 경로의 운영 Hermes 왕복이나 동등 E2E 검증을 이번 작업에서 완료했다는 뜻이 아니다.
 
 새 흐름을 Java 로 더하지 않는다.

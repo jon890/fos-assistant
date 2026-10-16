@@ -6,4 +6,5 @@ package com.bifos.assistant.attention.application.model;
  * @param id 실행 번호
  * @param status 실행 상태 이름({@code RUNNING}, {@code SUCCEEDED}, {@code FAILED}, {@code CANCELLED})
  */
-public record AttentionExecutionRef(Long id, String status) {}
+public record AttentionExecutionRef(Long id, String status) {
+}

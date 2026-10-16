@@ -16,6 +16,7 @@ class AgentSandboxOwnerTest {
 
     private static final Instant NOW = Instant.parse("2026-10-05T00:00:00Z");
 
+
     @Test
     @DisplayName("주인이 있으면 u 와 사용자 번호다")
     void ownedAgentUsesUserKey() {
@@ -23,6 +24,7 @@ class AgentSandboxOwnerTest {
 
         assertThat(agent.sandboxOwner()).isEqualTo("u7");
     }
+
 
     @Test
     @DisplayName("주인이 없으면 a 와 에이전트 번호다")
@@ -33,17 +35,17 @@ class AgentSandboxOwnerTest {
         assertThat(agent.acceptsAttachments()).isFalse();
     }
 
+
     private static Agent agentWith(Long id, AgentVisibility visibility, Long ownerUserId) {
         Agent agent = Agent.of(
-                "sandbox",
-                "실행 공간",
-                "sandbox-profile",
-                "http://agent-runtime.test/p/sandbox-profile",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                ownerUserId,
-                NOW);
+            "sandbox",
+            "실행 공간",
+            "sandbox-profile",
+            "http://agent-runtime.test/p/sandbox-profile",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            ownerUserId);
         ReflectionTestUtils.setField(agent, "id", id);
         return agent;
     }

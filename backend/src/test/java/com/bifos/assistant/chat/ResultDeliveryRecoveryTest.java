@@ -150,9 +150,11 @@ class ResultDeliveryRecoveryTest {
     private Agent worker;
     private Conversation conversation;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -172,17 +174,19 @@ class ResultDeliveryRecoveryTest {
         memories.deleteAll();
         users.deleteAll();
 
-        dad = users.save(AppUser.of("recovery-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        dad = users.save(AppUser.of("recovery-dad@example.com", "dad", 1L, UserRole.MEMBER));
         chief = agents.save(agent("dad", "비서"));
         worker = agents.save(agent("worker", "조사원"));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         stub().willReturn(result("completed", "정리한 답"));
     }
 
+
     @AfterEach
     void tearDown() {
         awaitAllIdle();
     }
+
 
     @Test
     @DisplayName("실행 줄 없이 남은 시도는 FAILED 와 INTERRUPTED 로 닫히고 묶음도 FAILED 가 된다")
@@ -199,6 +203,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
+
     @Test
     @DisplayName("기준 시각과 같거나 뒤에 시작한 시도는 이 프로세스의 것이라 RUNNING 과 DELIVERING 으로 남는다")
     void keepsAttemptsStartedAtOrAfterStartup() {
@@ -211,12 +216,13 @@ class ResultDeliveryRecoveryTest {
         for (ResultDeliveryAttempt left : List.of(atStart, afterStart)) {
             ResultDeliveryAttempt attempt = reload(left);
             assertThat(attempt.status())
-                    .as("%s 에 시작한 시도", attempt.startedAt())
-                    .isEqualTo(DeliveryAttemptStatus.RUNNING);
+                .as("%s 에 시작한 시도", attempt.startedAt())
+                .isEqualTo(DeliveryAttemptStatus.RUNNING);
             assertThat(attempt.finishedAt()).isNull();
             assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERING);
         }
     }
+
 
     @Test
     @DisplayName("실행 줄은 성공으로 끝났는데 시도가 남았으면 시도는 SUCCEEDED, 묶음은 DELIVERED 로 닫힌다")
@@ -234,6 +240,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 
+
     @Test
     @DisplayName("실행 줄이 취소로 끝났으면 시도와 묶음이 STOPPED 로 닫힌다")
     void closesLeftoverOfCancelledExecutionAsStopped() {
@@ -247,6 +254,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(attempt.errorCode()).isNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.STOPPED);
     }
+
 
     @Test
     @DisplayName("이은 실행 줄이 지워졌으면 FAILED 와 INTERRUPTED 로 닫힌다")
@@ -262,6 +270,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(attempt.errorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
+
 
     @Test
     @DisplayName("실행 줄이 아직 돌면 기동 때 건너뛰고, 기동 정리가 실패로 정할 때 시도가 그 오류 코드로 닫힌다")
@@ -285,6 +294,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
+
     @Test
     @DisplayName("기동 정리가 성공으로 정하면 실행 줄과 답과 함께 시도는 SUCCEEDED, 묶음은 DELIVERED 로 닫힌다")
     void closesAttemptWhenRestartReconcileSettlesSucceeded() {
@@ -296,14 +306,15 @@ class ResultDeliveryRecoveryTest {
         assertThat(written).isTrue();
         assertThat(executions.findById(parent.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .filteredOn(message -> message.role() == MessageRole.ASSISTANT)
-                .extracting(ChatMessage::content, ChatMessage::executionId)
-                .containsExactly(tuple("다시 붙어 받은 답", parent.id()));
+            .filteredOn(message -> message.role() == MessageRole.ASSISTANT)
+            .extracting(ChatMessage::content, ChatMessage::executionId)
+            .containsExactly(tuple("다시 붙어 받은 답", parent.id()));
         ResultDeliveryAttempt attempt = reload(left);
         assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
         assertThat(attempt.errorCode()).isNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
+
 
     @Test
     @DisplayName("닫은 묶음의 결과는 기동 뒤 깨우기가 다시 열지 않고, 전하지 않은 결과만 연다")
@@ -313,7 +324,7 @@ class ResultDeliveryRecoveryTest {
         deliveryWriter.markResultDelivered(child.id(), BEFORE_START);
         ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, null);
         deliveryItems.save(ResultDeliveryItem.of(
-                left.deliveryId(), ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(child.id())));
+            left.deliveryId(), ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(child.id())));
 
         recorder.closeLeftovers(STARTED_AT);
         dispatcher.dispatchAfterStartup();
@@ -333,6 +344,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(stub().received()).as("대조 대화까지 깨운 뒤 전체 제출 수").hasSize(1);
     }
 
+
     @Test
     @DisplayName("기동 이벤트에서 빈을 만든 시각 전에 시작한 시도만 닫는다")
     void closesOnlyAttemptsStartedBeforeBeanCreationOnStartup() {
@@ -347,6 +359,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(reload(after).status()).isEqualTo(DeliveryAttemptStatus.RUNNING);
     }
 
+
     @Test
     @DisplayName("기동 때 정리가 예외를 던져도 기동 이벤트는 예외 없이 끝난다")
     void keepsStartupRunningWhenClosingFails() {
@@ -356,6 +369,7 @@ class ResultDeliveryRecoveryTest {
 
         assertThatCode(recovery::closeAfterStartup).doesNotThrowAnyException();
     }
+
 
     @Test
     @DisplayName("한 시도를 닫다 실패해도 나머지 시도는 닫고 닫은 수만 센다")
@@ -373,6 +387,7 @@ class ResultDeliveryRecoveryTest {
         assertThat(deliveryOf(fine).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
+
     /** 이전 프로세스가 남긴 것처럼 도는 중인 묶음과 첫 시도를 만든다. 실행 번호가 있으면 시도에 잇는다. */
     private ResultDeliveryAttempt leftover(Conversation owner, Instant startedAt, Long executionId) {
         ResultDelivery delivery = deliveries.save(ResultDelivery.opened(owner.id(), startedAt));
@@ -383,70 +398,78 @@ class ResultDeliveryRecoveryTest {
         return attempt;
     }
 
+
     private ResultDeliveryAttempt reload(ResultDeliveryAttempt attempt) {
         return attempts.findById(attempt.id()).orElseThrow();
     }
+
 
     private ResultDelivery deliveryOf(ResultDeliveryAttempt attempt) {
         return deliveries.findById(attempt.deliveryId()).orElseThrow();
     }
 
+
     private AgentExecution chatTurn(ExecutionStatus status) {
         return chatTurn(conversation, status);
     }
 
+
     /** 대화 turn 의 루트 줄이다. 기동 정리가 물을 수 있게 run 번호를 둔다. */
     private AgentExecution chatTurn(Conversation owner, ExecutionStatus status) {
         return executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(owner.id())
-                .agentId(chief.id())
-                .profileName(chief.hermesProfile())
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(BEFORE_START)
-                .build());
+            .userId(dad.id())
+            .conversationId(owner.id())
+            .agentId(chief.id())
+            .profileName(chief.hermesProfile())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(BEFORE_START)
+            .build());
     }
+
 
     /** 대화 turn 이 직접 맡겨 성공으로 끝난 위임 실행 줄이다. 전했다는 표시는 비어 있다. */
     private AgentExecution delegated(Conversation owner, AgentExecution root) {
         AgentExecution execution = AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(owner.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName(worker.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(BEFORE_START)
-                .build();
+            .userId(dad.id())
+            .conversationId(owner.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName(worker.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(BEFORE_START)
+            .build();
         execution.recordOutput("조사 결과");
         return executions.save(execution);
     }
 
+
     private Agent agent(String code, String name) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id());
     }
+
 
     private static HermesRunResult result(String status, String output) {
         return HermesRunResult.of("run-1", "sess-1", status, output, "model", "provider", TokenUsage.empty());
     }
 
+
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

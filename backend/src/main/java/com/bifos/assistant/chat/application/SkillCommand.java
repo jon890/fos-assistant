@@ -17,6 +17,7 @@ public record SkillCommand(String name, String rest) {
 
     private static final Pattern COMMAND = Pattern.compile("^/([a-z0-9][a-z0-9-]{0,63})(\\s|$)");
 
+
     /** 메시지가 커맨드 모양이면 그 이름과 나머지 글을 낸다. 아니면 빈 값이다. */
     public static Optional<SkillCommand> parse(String text) {
         if (text == null) {
@@ -28,6 +29,7 @@ public record SkillCommand(String name, String rest) {
         }
         return Optional.of(new SkillCommand(matcher.group(1), text.substring(matcher.end()).strip()));
     }
+
 
     /**
      * Hermes 에 보낼 입력이다. API server 는 입력의 {@code /} 를 해석하지 않으므로 모델이 {@code skill_view} 로

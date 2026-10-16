@@ -102,27 +102,29 @@ class ValueEvaluationOverviewTest {
     private final List<Long> createdChecks = new ArrayList<>();
     private MockMvc mvc;
 
+
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new ValueEvaluationAdminController(overviews, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         when(currentUser.require()).thenReturn(admin);
     }
+
 
     @AfterEach
     void tearDown() {
         transactions.executeWithoutResult(status -> {
             for (Long checkId : createdChecks) {
                 evaluations.findAll().stream()
-                        .filter(row -> row.checkId().equals(checkId))
-                        .forEach(row -> {
-                            decisions.deleteAll(decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(
-                                    row.userId(), List.of(row.id())));
-                            evaluations.delete(row);
-                        });
+                    .filter(row -> row.checkId().equals(checkId))
+                    .forEach(row -> {
+                        decisions.deleteAll(decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(
+                            row.userId(), List.of(row.id())));
+                        evaluations.delete(row);
+                    });
                 problems.deleteAll(problems.findByCheckIdAndStatusOrderByIdAsc(checkId, ProblemStatus.ACCEPTED));
             }
             checks.deleteAllById(createdChecks);
@@ -131,17 +133,19 @@ class ValueEvaluationOverviewTest {
         });
     }
 
+
     @Test
     @DisplayName("고를 살펴보기가 없으면 check 와 evaluation 이 null 이고 decisions 가 빈 배열이다")
     void emptyOverviewWhenNothingToPick() throws Exception {
         Agent agent = agent();
 
         latest(agent)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.check", nullValue()))
-                .andExpect(jsonPath("$.evaluation", nullValue()))
-                .andExpect(jsonPath("$.decisions", hasSize(0)));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.check", nullValue()))
+            .andExpect(jsonPath("$.evaluation", nullValue()))
+            .andExpect(jsonPath("$.decisions", hasSize(0)));
     }
+
 
     @Test
     @DisplayName("받아들인 후보가 있는 살펴보기를 평가하고 판정한 묶음을 201 로 주고 이어 읽으면 같은 묶음이다")
@@ -152,34 +156,35 @@ class ValueEvaluationOverviewTest {
         accepted(check, conversation, "합성 문제");
 
         String body = run(check)
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.check.id").value(check.id()))
-                .andExpect(jsonPath("$.check.trigger").value("MANUAL"))
-                .andExpect(jsonPath("$.check.acceptedCandidates").value(1))
-                .andExpect(jsonPath("$.evaluation.outcome").value("FALLBACK"))
-                .andExpect(jsonPath("$.evaluation.failure").value("PROVIDER_UNAVAILABLE"))
-                .andExpect(jsonPath("$.evaluation.candidates", hasSize(1)))
-                .andExpect(jsonPath("$.evaluation.candidates[0].problem").value("합성 문제"))
-                .andExpect(jsonPath("$.decisions", hasSize(1)))
-                .andExpect(jsonPath("$.decisions[0].level").value("IGNORE"))
-                .andExpect(jsonPath("$.decisions[0].reasons", hasItem("EVALUATION_NOT_USABLE")))
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.check.id").value(check.id()))
+            .andExpect(jsonPath("$.check.trigger").value("MANUAL"))
+            .andExpect(jsonPath("$.check.acceptedCandidates").value(1))
+            .andExpect(jsonPath("$.evaluation.outcome").value("FALLBACK"))
+            .andExpect(jsonPath("$.evaluation.failure").value("PROVIDER_UNAVAILABLE"))
+            .andExpect(jsonPath("$.evaluation.candidates", hasSize(1)))
+            .andExpect(jsonPath("$.evaluation.candidates[0].problem").value("합성 문제"))
+            .andExpect(jsonPath("$.decisions", hasSize(1)))
+            .andExpect(jsonPath("$.decisions[0].level").value("IGNORE"))
+            .andExpect(jsonPath("$.decisions[0].reasons", hasItem("EVALUATION_NOT_USABLE")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
         assertThat(body).doesNotContain("rootExecutionId", "executionId", "inputs");
-        long evaluationId = ((Number) JsonPath.read(body, "$.evaluation.id")).longValue();
-        long decisionId = ((Number) JsonPath.read(body, "$.decisions[0].id")).longValue();
+        long evaluationId = ((Number)JsonPath.read(body, "$.evaluation.id")).longValue();
+        long decisionId = ((Number)JsonPath.read(body, "$.decisions[0].id")).longValue();
 
         latest(agent)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.check.id").value(check.id()))
-                .andExpect(jsonPath("$.evaluation.id").value(evaluationId))
-                .andExpect(jsonPath("$.evaluation.outcome").value("FALLBACK"))
-                .andExpect(jsonPath("$.decisions", hasSize(1)))
-                .andExpect(jsonPath("$.decisions[0].id").value(decisionId))
-                .andExpect(jsonPath("$.decisions[0].level").value("IGNORE"))
-                .andExpect(jsonPath("$.decisions[0].reasons", hasItem("EVALUATION_NOT_USABLE")));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.check.id").value(check.id()))
+            .andExpect(jsonPath("$.evaluation.id").value(evaluationId))
+            .andExpect(jsonPath("$.evaluation.outcome").value("FALLBACK"))
+            .andExpect(jsonPath("$.decisions", hasSize(1)))
+            .andExpect(jsonPath("$.decisions[0].id").value(decisionId))
+            .andExpect(jsonPath("$.decisions[0].level").value("IGNORE"))
+            .andExpect(jsonPath("$.decisions[0].reasons", hasItem("EVALUATION_NOT_USABLE")));
     }
+
 
     @Test
     @DisplayName("더 늦은 자동 실행 살펴보기와 후보 없이 건너뛴 살펴보기가 있어도 받아들인 후보가 있는 앞의 사람 살펴보기를 고른다")
@@ -190,16 +195,16 @@ class ValueEvaluationOverviewTest {
         accepted(manual, conversation, "합성 문제");
         ProactiveCheck autonomy = succeeded(agent, conversation, CheckTrigger.AUTONOMY);
         accepted(autonomy, conversation, "자동 실행 문제");
-        ProactiveCheck skipped =
-                ProactiveCheck.started(admin.id(), agent.id(), conversation.id(), CheckTrigger.SCHEDULED, false, now());
+        ProactiveCheck skipped = ProactiveCheck.started(admin.id(), agent.id(), conversation.id(), CheckTrigger.SCHEDULED, false, now());
         skipped.skip(CheckSkippedReason.UNREAD_REPORT, now());
         createdChecks.add(checks.save(skipped).id());
 
         latest(agent)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.check.id").value(manual.id()))
-                .andExpect(jsonPath("$.check.acceptedCandidates").value(1));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.check.id").value(manual.id()))
+            .andExpect(jsonPath("$.check.acceptedCandidates").value(1));
     }
+
 
     @Test
     @DisplayName("고른 살펴보기의 점검 대화를 지우면 check 가 null 이다")
@@ -213,6 +218,7 @@ class ValueEvaluationOverviewTest {
         latest(agent).andExpect(status().isOk()).andExpect(jsonPath("$.check", nullValue()));
     }
 
+
     @Test
     @DisplayName("MEMBER 역할이 두 경로를 부르면 403 FORBIDDEN 이다")
     void memberIsForbidden() throws Exception {
@@ -223,15 +229,16 @@ class ValueEvaluationOverviewTest {
         when(currentUser.require()).thenReturn(member);
 
         latest(agent)
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         run(check)
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         assertThat(evaluations.findFirstByUserIdAndCheckIdOrderByIdDesc(member.id(), check.id()))
-                .as("거절된 요청은 평가를 남기지 않는다")
-                .isEmpty();
+            .as("거절된 요청은 평가를 남기지 않는다")
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("같은 평가를 두 번 판정하면 읽기는 뒤 묶음만 준다")
@@ -242,19 +249,20 @@ class ValueEvaluationOverviewTest {
         accepted(check, conversation, "합성 문제");
         run(check).andExpect(status().isCreated());
         Long evaluationId = evaluations
-                .findFirstByUserIdAndCheckIdOrderByIdDesc(admin.id(), check.id())
-                .orElseThrow()
-                .id();
+            .findFirstByUserIdAndCheckIdOrderByIdDesc(admin.id(), check.id())
+            .orElseThrow()
+            .id();
         var second = autonomy.decide(admin, evaluationId);
         assertThat(decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(admin.id(), List.of(evaluationId)))
-                .as("두 번 판정해 두 묶음이 쌓였다")
-                .hasSize(2);
+            .as("두 번 판정해 두 묶음이 쌓였다")
+            .hasSize(2);
 
         latest(agent)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.decisions", hasSize(1)))
-                .andExpect(jsonPath("$.decisions[0].id").value(second.getFirst().id()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.decisions", hasSize(1)))
+            .andExpect(jsonPath("$.decisions[0].id").value(second.getFirst().id()));
     }
+
 
     @Test
     @DisplayName("다른 사용자의 살펴보기에 판정을 요청하면 404 VALUE_EVALUATION_NOT_FOUND 이고 평가를 남기지 않는다")
@@ -265,45 +273,50 @@ class ValueEvaluationOverviewTest {
         accepted(othersCheck, othersConversation, "합성 문제");
 
         run(othersCheck)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("VALUE_EVALUATION_NOT_FOUND"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("VALUE_EVALUATION_NOT_FOUND"));
         assertThat(evaluations.findFirstByUserIdAndCheckIdOrderByIdDesc(admin.id(), othersCheck.id()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     private ResultActions latest(Agent agent) throws Exception {
         return mvc.perform(get("/api/v1/admin/agents/{code}/value-evaluation", agent.code()));
     }
 
+
     private ResultActions run(ProactiveCheck check) throws Exception {
         return mvc.perform(post("/api/v1/admin/proactive-checks/{checkId}/value-evaluation-runs", check.id())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(BODY));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(BODY));
     }
+
 
     private static Instant now() {
         return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
+
     private Agent agent() {
         String code = "overview-" + UUID.randomUUID();
         Agent saved = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                admin.id(),
-                now()));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            admin.id()));
         createdAgents.add(saved.id());
         return saved;
     }
 
+
     private Conversation conversation(Agent agent) {
         return conversationOf(admin, agent);
     }
+
 
     private Conversation conversationOf(CurrentUser user, Agent agent) {
         Conversation saved = conversations.save(Conversation.startedForCheck(user.id(), "점검", agent.id(), now()));
@@ -311,9 +324,11 @@ class ValueEvaluationOverviewTest {
         return saved;
     }
 
+
     private ProactiveCheck succeeded(Agent agent, Conversation conversation, CheckTrigger trigger) {
         return checkOf(admin, agent, conversation, trigger);
     }
+
 
     private ProactiveCheck checkOf(CurrentUser user, Agent agent, Conversation conversation, CheckTrigger trigger) {
         Instant now = now();
@@ -324,26 +339,26 @@ class ValueEvaluationOverviewTest {
         return saved;
     }
 
+
     private void accepted(ProactiveCheck check, Conversation conversation, String problem) {
         Instant now = now();
         String key = "study:" + UUID.randomUUID();
         problems.save(ProactiveCheckProblem.of(
-                check.id(),
-                conversation.id(),
-                ProblemStatus.ACCEPTED,
-                null,
-                key,
-                problem,
-                "합성 목표",
-                "ACTION",
-                "합성 행동",
-                "HIGH",
-                "합성 효과",
-                "NONE",
-                null,
-                null,
-                List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
-                now.minusSeconds(60),
-                now));
+            check.id(),
+            conversation.id(),
+            ProblemStatus.ACCEPTED,
+            null,
+            key,
+            problem,
+            "합성 목표",
+            "ACTION",
+            "합성 행동",
+            "HIGH",
+            "합성 효과",
+            "NONE",
+            null,
+            null,
+            List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
+            now.minusSeconds(60)));
     }
 }

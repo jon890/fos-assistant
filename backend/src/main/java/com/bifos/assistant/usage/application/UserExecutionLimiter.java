@@ -54,6 +54,7 @@ public class UserExecutionLimiter {
     private final Set<Long> backgroundConversations = ConcurrentHashMap.newKeySet();
     private final Map<Long, Set<Long>> remoteEndHolds = new ConcurrentHashMap<>();
 
+
     /**
      * 대화 turn 의 자리를 얻는다.
      *
@@ -74,10 +75,12 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /** 매일 깨우기의 turn 자리를 얻으며 사용자 대화를 위한 자리를 적어도 하나 남긴다. */
     public TurnSlot acquireBackgroundTurn(Long userId) {
         return acquireBackgroundTurn(userId, null);
     }
+
 
     /** 점검 대화를 함께 등록해 그 실행의 위임 자식도 사용자 대화 자리를 남기게 한다. */
     public TurnSlot acquireBackgroundTurn(Long userId, Long conversationId) {
@@ -100,10 +103,12 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /** 그 대화가 현재 매일 깨우기의 turn 자리를 쥐고 있다. */
     public boolean isBackgroundConversation(Long conversationId) {
         return conversationId != null && backgroundConversations.contains(conversationId);
     }
+
 
     /** 한도를 보지 않고 turn 자리를 얻는다. 기동 정리 전용이다. 그 turn 은 이미 Hermes 에서 돌고 있어 거절할 수 없다. */
     public TurnSlot acquireRecoveredTurn(Long userId) {
@@ -115,6 +120,7 @@ public class UserExecutionLimiter {
             lock.unlock();
         }
     }
+
 
     /**
      * 실행 줄을 만들기 전에 사용자 한도를 보고, 통과하면 같은 잠금 안에서 {@code create} 를 부른다.
@@ -131,7 +137,7 @@ public class UserExecutionLimiter {
         }
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException(
-                    "execution rows for " + admission + " must be created outside a transaction");
+                "execution rows for " + admission + " must be created outside a transaction");
         }
         ReentrantLock lock = lockOf(userId);
         lock.lock();
@@ -139,8 +145,8 @@ public class UserExecutionLimiter {
             UserExecutionProperties settings = properties.current();
             Usage usage = usage(userId);
             int reserve = admission == ExecutionAdmission.BACKGROUND_CHILD
-                    ? Math.max(1, settings.backgroundReserve())
-                    : settings.backgroundReserve();
+                ? Math.max(1, settings.backgroundReserve())
+                : settings.backgroundReserve();
             boolean full;
             if (admission == ExecutionAdmission.CHILD) {
                 full = usage.total() >= settings.maxRunning();
@@ -156,6 +162,7 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /** turn 자리가 하나 남았는지 본다. 자리를 만들지 않는다. */
     public boolean hasTurnRoom(Long userId) {
         ReentrantLock lock = lockOf(userId);
@@ -166,6 +173,7 @@ public class UserExecutionLimiter {
             lock.unlock();
         }
     }
+
 
     /** 그 사용자가 지금 쥔 자리 수다. turn 자리, 원격 종료 확인 자리, 대화 turn 의 루트가 아닌 {@code RUNNING} 실행 줄의 합이다. */
     public int used(Long userId) {
@@ -178,6 +186,7 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /**
      * Hermes 에서 끝났는지 모르는 run 의 자리를 그 run 이 끝날 때까지 쥔다(ADR-069).
      *
@@ -189,12 +198,12 @@ public class UserExecutionLimiter {
      * @param stopAlreadySent 부르는 쪽이 이미 중지를 보냈다. 참이면 다시 보내지 않는다
      */
     public void holdUntilRemoteEnds(
-            Long userId,
-            Long executionId,
-            String apiBaseUrl,
-            String profileName,
-            String runId,
-            boolean stopAlreadySent) {
+        Long userId,
+        Long executionId,
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        boolean stopAlreadySent) {
         if (runId == null || runId.isBlank()) {
             return;
         }
@@ -210,13 +219,14 @@ public class UserExecutionLimiter {
         }
         try {
             backgroundTasks.start(
-                    "remote-end-" + executionId,
-                    () -> followRemoteEnd(userId, executionId, apiBaseUrl, profileName, runId, stopAlreadySent));
+                "remote-end-" + executionId,
+                () -> followRemoteEnd(userId, executionId, apiBaseUrl, profileName, runId, stopAlreadySent));
         } catch (RuntimeException | Error ex) {
             log.warn("Hermes 에서 끝났는지 확인할 스레드를 띄우지 못해 사용자 자리를 곧바로 돌려준다 executionId={} runId={}", executionId, runId, ex);
             releaseRemoteEnd(userId, executionId);
         }
     }
+
 
     /** {@link TurnSlot#release()} 가 부른다. 0 이 되면 맵에서 지운다. */
     void releaseTurn(Long userId, Long backgroundConversationId) {
@@ -232,14 +242,15 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /** 어느 경우든 끝나면 자리를 돌려준다. */
     private void followRemoteEnd(
-            Long userId,
-            Long executionId,
-            String apiBaseUrl,
-            String profileName,
-            String runId,
-            boolean stopAlreadySent) {
+        Long userId,
+        Long executionId,
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        boolean stopAlreadySent) {
         try {
             if (!stopAlreadySent) {
                 sendStop(executionId, apiBaseUrl, profileName, runId);
@@ -250,6 +261,7 @@ public class UserExecutionLimiter {
         }
     }
 
+
     /** 보내지 못해도 묻기는 이어 간다. 그 run 이 스스로 끝나면 자리를 돌려줄 수 있다. */
     private void sendStop(Long executionId, String apiBaseUrl, String profileName, String runId) {
         try {
@@ -258,6 +270,7 @@ public class UserExecutionLimiter {
             log.warn("끝났는지 모르는 run 에 중지를 보내지 못했다 executionId={} runId={}", executionId, runId, ex);
         }
     }
+
 
     /**
      * Hermes 가 그 run 이 끝났다거나 모른다고 답할 때까지, 또는 상한까지 묻는다.
@@ -295,12 +308,14 @@ public class UserExecutionLimiter {
         }
     }
 
+
     private Duration remoteEndMaxWait() {
         UserExecutionProperties settings = properties.current();
         return settings.remoteEndMaxWait() == null
-                ? hermesProperties.current().runTimeout()
-                : settings.remoteEndMaxWait();
+            ? hermesProperties.current().runTimeout()
+            : settings.remoteEndMaxWait();
     }
+
 
     /** 모음에서 빼고, 빈 모음은 맵에서 지운다. */
     private void releaseRemoteEnd(Long userId, Long executionId) {
@@ -316,15 +331,18 @@ public class UserExecutionLimiter {
         }
     }
 
+
     private ReentrantLock lockOf(Long userId) {
         return locks.computeIfAbsent(userId, id -> new ReentrantLock());
     }
+
 
     /** 잠금을 쥔 채 부른다. */
     private TurnSlot addTurn(Long userId) {
         turnSlots.merge(userId, 1, Integer::sum);
         return new TurnSlot(this, userId);
     }
+
 
     /** 잠금을 쥔 채 부른다. */
     private Usage usage(Long userId) {
@@ -334,17 +352,19 @@ public class UserExecutionLimiter {
         return new Usage(turns, remote, rows);
     }
 
+
     private ApiException reject(Long userId, String kind, Usage usage, int maxRunning) {
         log.info(
-                "사용자 실행 한도에 닿아 거절했다 userId={} kind={} turnSlots={} remoteEndHolds={} runningRows={} maxRunning={}",
-                userId,
-                kind,
-                usage.turns(),
-                usage.remote(),
-                usage.rows(),
-                maxRunning);
+            "사용자 실행 한도에 닿아 거절했다 userId={} kind={} turnSlots={} remoteEndHolds={} runningRows={} maxRunning={}",
+            userId,
+            kind,
+            usage.turns(),
+            usage.remote(),
+            usage.rows(),
+            maxRunning);
         return new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
     }
+
 
     /** 한 번 센 세 값이다. 잠금 밖으로 나가지 않는다. */
     private record Usage(int turns, int remote, long rows) {

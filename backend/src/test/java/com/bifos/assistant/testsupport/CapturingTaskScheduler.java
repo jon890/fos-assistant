@@ -20,11 +20,13 @@ public class CapturingTaskScheduler extends ThreadPoolTaskScheduler {
     private final List<Instant> startTimes = new CopyOnWriteArrayList<>();
     private volatile boolean capturing;
 
+
     /** 모아 둔 것을 비우고 이 뒤의 시각 예약을 모은다. */
     public void capture() {
         clear();
         capturing = true;
     }
+
 
     @Override
     public ScheduledFuture<?> schedule(Runnable task, Instant startTime) {
@@ -36,6 +38,7 @@ public class CapturingTaskScheduler extends ThreadPoolTaskScheduler {
         return null;
     }
 
+
     /** 모아 둔 작업을 꺼내 비운다. */
     public List<Runnable> drain() {
         List<Runnable> tasks = new ArrayList<>(scheduled);
@@ -43,16 +46,19 @@ public class CapturingTaskScheduler extends ThreadPoolTaskScheduler {
         return tasks;
     }
 
+
     /** 모은 예약의 시각이다. 예약한 순서다. */
     public List<Instant> startTimes() {
         return startTimes;
     }
+
 
     /** 모아 둔 작업과 시각을 비운다. 켜 둔 상태는 그대로다. */
     public void clear() {
         scheduled.clear();
         startTimes.clear();
     }
+
 
     /** 끄고 모아 둔 것을 비운다. */
     public void reset() {

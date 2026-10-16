@@ -77,8 +77,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @BackendIntegrationTest
 @LongProactiveCheckTimeouts
 @OverrideProperties({
-    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
-    "assistant.memory.propose.enabled=false"
+    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS
 })
 class ProactiveCheckLimitTest {
 
@@ -151,9 +150,11 @@ class ProactiveCheckLimitTest {
     private Agent agent;
     private Conversation conversation;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -161,38 +162,37 @@ class ProactiveCheckLimitTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user =
-                users.save(AppUser.of("limit-" + suffix + "@example.com", "한도", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("limit-" + suffix + "@example.com", "한도", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "limit-" + suffix;
         agent = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now()));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
         conversation = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
     }
+
 
     @AfterEach
     void tearDown() {
         awaitIdle(conversation.id());
         stub().reset();
         checks.deleteAll(checks.findAll().stream()
-                .filter(check -> check.userId().equals(owner.id()))
-                .toList());
+            .filter(check -> check.userId().equals(owner.id()))
+            .toList());
         List<AgentExecution> ownExecutions = executions.findAll().stream()
-                .filter(execution -> execution.userId().equals(owner.id()))
-                .toList();
+            .filter(execution -> execution.userId().equals(owner.id()))
+            .toList();
         executionEvents.deleteAll(executionEvents.findAll().stream()
-                .filter(event -> ownExecutions.stream()
-                        .anyMatch(execution -> execution.id().equals(event.executionId())))
-                .toList());
+            .filter(event -> ownExecutions.stream()
+                .anyMatch(execution -> execution.id().equals(event.executionId())))
+            .toList());
         executions.deleteAll(ownExecutions);
         transactions.executeWithoutResult(status -> {
             pendingMessages.deleteAllOf(conversation.id());
@@ -202,6 +202,7 @@ class ProactiveCheckLimitTest {
         agents.deleteById(agent.id());
         users.deleteById(owner.id());
     }
+
 
     @Test
     @DisplayName("도구 호출이 max-tool-calls 를 넘으면 Hermes 에 중지가 가고 CHECK_TOOL_LIMIT 와 도구 호출 한도 알림 줄만 남는다")
@@ -219,10 +220,11 @@ class ProactiveCheckLimitTest {
         assertThat(check.finishedAt()).isNotNull();
         assertThat(stub().stopped()).as("살펴보기 turn 의 run 에 간 중지").contains(rootRunId(check));
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .as("시작 줄과 멈춤 줄뿐이고 답 조각은 남지 않는다")
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.SYSTEM, START_NOTICE), tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE));
+            .as("시작 줄과 멈춤 줄뿐이고 답 조각은 남지 않는다")
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.SYSTEM, START_NOTICE), tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE));
     }
+
 
     @Test
     @DisplayName("도구 호출이 max-tool-calls 와 같으면 멈추지 않고 SUCCEEDED 로 끝난다")
@@ -239,6 +241,7 @@ class ProactiveCheckLimitTest {
         assertThat(stub().stopped()).as("Hermes 에 간 중지").isEmpty();
     }
 
+
     @Test
     @DisplayName("상한으로 멈춘 살펴보기는 대기 메시지를 멈추지 않고 그 메시지가 다음 turn 으로 나간다")
     void sendsPendingMessagesAfterLimitStop() {
@@ -249,35 +252,35 @@ class ProactiveCheckLimitTest {
             // 살펴보기 turn 이 도는 동안 사용자가 대기 메시지를 보낸다.
             if (queued.compareAndSet(false, true)) {
                 pendingMessages.save(
-                        ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
+                    ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
             }
             await(stopReceived);
         });
-        stub().willAnswer(command ->
-                command.input().contains(PENDING_TEXT) ? completed(PENDING_ANSWER) : cancelled("멈춘 답"));
+        stub().willAnswer(command -> command.input().contains(PENDING_TEXT) ? completed(PENDING_ANSWER) : cancelled("멈춘 답"));
         hermesStreams(toolEvents(MAX_TOOL_CALLS + 1));
 
         runCheck();
         awaitUntil(
-                () -> !turns.markOf(conversation.id()).running()
-                        && messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                                .anyMatch(message -> PENDING_ANSWER.equals(message.content())),
-                "대기 메시지 turn 이 끝난다");
+            () -> !turns.markOf(conversation.id()).running()
+                && messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
+                    .anyMatch(message -> PENDING_ANSWER.equals(message.content())),
+            "대기 메시지 turn 이 끝난다");
 
         ProactiveCheck check = onlyCheck();
         assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
         assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .as("보낸 대기 줄은 남지 않는다")
-                .isEmpty();
+            .as("보낸 대기 줄은 남지 않는다")
+            .isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(
-                        tuple(MessageRole.SYSTEM, START_NOTICE),
-                        tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE),
-                        tuple(MessageRole.USER, PENDING_TEXT),
-                        tuple(MessageRole.ASSISTANT, PENDING_ANSWER));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(
+                tuple(MessageRole.SYSTEM, START_NOTICE),
+                tuple(MessageRole.SYSTEM, TOOL_LIMIT_NOTICE),
+                tuple(MessageRole.USER, PENDING_TEXT),
+                tuple(MessageRole.ASSISTANT, PENDING_ANSWER));
     }
+
 
     @Test
     @DisplayName("사용자가 중지로 멈추면 오류 코드 없이 STOPPED 와 멈춤 알림 줄이 남고 대기 줄이 멈춘다")
@@ -293,10 +296,10 @@ class ProactiveCheckLimitTest {
 
         service.start(owner, agent.code(), CheckTrigger.MANUAL);
         assertThat(awaiting.await(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS))
-                .as("살펴보기 turn 이 완료 대기에 들어섰다")
-                .isTrue();
+            .as("살펴보기 turn 이 완료 대기에 들어섰다")
+            .isTrue();
         pendingMessages.save(
-                ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
+            ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
         // POST /api/v1/executions/{executionId}/stop 이 부르는 자리다.
         chat.stop(owner, turns.markOf(conversation.id()).executionId());
         awaitIdle(conversation.id());
@@ -305,15 +308,16 @@ class ProactiveCheckLimitTest {
         assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
         assertThat(check.errorCode()).as("사용자가 멈춘 살펴보기의 오류 코드").isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly(START_NOTICE, USER_STOP_NOTICE);
+            .extracting(ChatMessage::content)
+            .containsExactly(START_NOTICE, USER_STOP_NOTICE);
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
-                .containsExactly(tuple(PENDING_TEXT, true));
+            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+            .containsExactly(tuple(PENDING_TEXT, true));
         assertThat(stub().received())
-                .as("대기 메시지로 연 turn")
-                .noneMatch(command -> command.input().contains(PENDING_TEXT));
+            .as("대기 메시지로 연 turn")
+            .noneMatch(command -> command.input().contains(PENDING_TEXT));
     }
+
 
     @Test
     @DisplayName("상한으로 멈춘 뒤 완료 대기가 ApiException 으로 끝나도 알림 줄은 시작 줄과 멈춤 줄 둘이다")
@@ -334,18 +338,19 @@ class ProactiveCheckLimitTest {
         assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
         assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
+            .extracting(ChatMessage::content)
+            .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
     }
+
 
     @Test
     @DisplayName("상한 중지가 한 번 HERMES_UNAVAILABLE 로 실패하면 다시 멈춰 CHECK_TOOL_LIMIT 와 도구 호출 한도 알림 줄로 끝난다")
     void retriesLimitStopAfterFailedStop() {
         holdUntilStopped();
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run"))
-                .doCallRealMethod()
-                .when(chat)
-                .stop(any(), any());
+            .doCallRealMethod()
+            .when(chat)
+            .stop(any(), any());
         stub().willAnswer(command -> cancelled("<fos-check-result>{\"version\":1"));
         hermesStreams(toolEvents(MAX_TOOL_CALLS + 1));
 
@@ -356,20 +361,21 @@ class ProactiveCheckLimitTest {
         assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
         assertThat(stub().stopped()).as("다시 시도해 살펴보기 turn 의 run 에 간 중지").containsExactly(rootRunId(check));
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
+            .extracting(ChatMessage::content)
+            .containsExactly(START_NOTICE, TOOL_LIMIT_NOTICE);
     }
+
 
     @Test
     @DisplayName("상한 중지가 계속 실패한 뒤 turn 이 예외로 끝나면 상한 까닭 없이 FAILED 와 그 오류 코드와 실패 알림 줄이 남는다")
     void recordsFailureWhenLimitStopKeepsFailingAndTurnThrows() {
         CountDownLatch attempts = new CountDownLatch(STOP_ATTEMPTS);
         doAnswer(invocation -> {
-                    attempts.countDown();
-                    throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
-                })
-                .when(chat)
-                .stop(any(), any());
+            attempts.countDown();
+            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not stop every Hermes run");
+        })
+            .when(chat)
+            .stop(any(), any());
         stub().beforeAwait(() -> {
             // 멈추기 시도를 모두 쓴 뒤 turn 이 실패한다. 마지막 시도가 까닭을 되돌릴 틈을 둔다.
             await(attempts);
@@ -386,9 +392,10 @@ class ProactiveCheckLimitTest {
         assertThat(check.status()).isEqualTo(CheckStatus.FAILED);
         assertThat(check.errorCode()).as("상한 까닭이 아니라 turn 의 오류 코드").isEqualTo("HERMES_RUN_FAILED");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly(START_NOTICE, FAILED_NOTICE);
+            .extracting(ChatMessage::content)
+            .containsExactly(START_NOTICE, FAILED_NOTICE);
     }
+
 
     /** 살펴보기를 시작하고 그 대화의 잠금이 풀릴 때까지 기다린다. */
     private void runCheck() {
@@ -396,17 +403,20 @@ class ProactiveCheckLimitTest {
         awaitIdle(conversation.id());
     }
 
+
     private ProactiveCheck onlyCheck() {
         List<ProactiveCheck> found = checks.findAll().stream()
-                .filter(check -> check.conversationId().equals(conversation.id()))
-                .toList();
+            .filter(check -> check.conversationId().equals(conversation.id()))
+            .toList();
         assertThat(found).as("점검 대화의 살펴보기 줄").hasSize(1);
         return found.getFirst();
     }
 
+
     private String rootRunId(ProactiveCheck check) {
         return executions.findById(check.rootExecutionId()).orElseThrow().hermesRunId();
     }
+
 
     /** 완료를 기다리는 자리에서 중지가 올 때까지 멈춰 둔다. 오지 않아도 10초 뒤에는 이어진다. */
     private void holdUntilStopped() {
@@ -414,6 +424,7 @@ class ProactiveCheckLimitTest {
         stub().onStop(runId -> stopReceived.countDown());
         stub().beforeAwait(() -> await(stopReceived));
     }
+
 
     private static void await(CountDownLatch latch) {
         try {
@@ -423,6 +434,7 @@ class ProactiveCheckLimitTest {
         }
     }
 
+
     private static void pause(Duration duration) {
         try {
             Thread.sleep(duration);
@@ -430,6 +442,7 @@ class ProactiveCheckLimitTest {
             Thread.currentThread().interrupt();
         }
     }
+
 
     private static RunEvent[] toolEvents(int count) {
         List<RunEvent> events = new ArrayList<>();
@@ -440,37 +453,43 @@ class ProactiveCheckLimitTest {
         return events.toArray(RunEvent[]::new);
     }
 
+
     private static String block(String json) {
         return "블록 밖의 글\n<fos-check-result>\n" + json + "\n</fos-check-result>";
     }
 
+
     private static HermesRunResult completed(String output) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
+            "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
     }
+
 
     /** 중지를 받은 Hermes run 의 끝이다. 그때까지의 답을 싣는다. */
     private static HermesRunResult cancelled(String output) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(), null, "cancelled", output, "model", "provider", TokenUsage.empty());
+            "run-" + UUID.randomUUID(), null, "cancelled", output, "model", "provider", TokenUsage.empty());
     }
+
 
     /** Hermes 가 스트림으로 이 사건들을 차례로 보낸 것처럼 만든다. */
     private void hermesStreams(RunEvent... events) {
         doAnswer(invocation -> {
-                    Consumer<RunEvent> onEvent = invocation.getArgument(3);
-                    for (RunEvent event : events) {
-                        onEvent.accept(event);
-                    }
-                    return null;
-                })
-                .when(eventStream)
-                .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
+            Consumer<RunEvent> onEvent = invocation.getArgument(3);
+            for (RunEvent event : events) {
+                onEvent.accept(event);
+            }
+            return null;
+        })
+            .when(eventStream)
+            .open(any(), any(), any(), any(), any(), any(ToolDetailScope.class));
     }
+
 
     private void awaitIdle(Long conversationId) {
         awaitUntil(() -> !turns.markOf(conversationId).running(), "대화 " + conversationId + " 의 turn 이 끝난다");
     }
+
 
     /** 조건이 참이 될 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private static void awaitUntil(BooleanSupplier condition, String description) {

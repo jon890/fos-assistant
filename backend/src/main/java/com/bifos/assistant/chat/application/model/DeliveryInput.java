@@ -16,6 +16,7 @@ public record DeliveryInput(String input, List<ContextItem> items) {
         items = items == null ? List.of() : List.copyOf(items);
     }
 
+
     /** 본문이 로그에 남지 않게 글자 수와 항목 수만 낸다. */
     @Override
     public String toString() {

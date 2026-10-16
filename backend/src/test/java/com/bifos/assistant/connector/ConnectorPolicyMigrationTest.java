@@ -30,24 +30,25 @@ class ConnectorPolicyMigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-policy-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrate("44");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             for (int id = READY; id <= PENDING_ON; id++) {
                 boolean on = id == READY || id == PLAIN || id == PENDING_ON;
                 statement.executeUpdate("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                        + " VALUES (" + id + ", 'u" + id + "@example.com', 'u" + id + "', 1, 'MEMBER',"
-                        + " CURRENT_TIMESTAMP(6))");
+                    + " VALUES (" + id + ", 'u" + id + "@example.com', 'u" + id + "', 1, 'MEMBER',"
+                    + " CURRENT_TIMESTAMP(6))");
                 statement.executeUpdate("INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
-                        + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed,"
-                        + " connector_attachments)"
-                        + " VALUES (" + id + ", 'c" + id + "', 'n', 'p" + id + "', 'http://localhost',"
-                        + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', " + id + ", " + on + ","
-                        + " CURRENT_TIMESTAMP(6), " + (id != PLAIN) + ", "
-                        + (id == READY || id == PENDING_ON) + ")");
+                    + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed,"
+                    + " connector_attachments)"
+                    + " VALUES (" + id + ", 'c" + id + "', 'n', 'p" + id + "', 'http://localhost',"
+                    + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', " + id + ", " + on + ","
+                    + " CURRENT_TIMESTAMP(6), " + (id != PLAIN) + ", "
+                    + (id == READY || id == PENDING_ON) + ")");
             }
             // READY 는 재시작 대기가 풀린 상태다. PENDING 은 재시작 대기로 두어 그 값이 남는지 본다.
             statement.executeUpdate(row(READY, "READY", false, true));
@@ -58,11 +59,13 @@ class ConnectorPolicyMigrationTest {
         migrate("45");
     }
 
+
     @Test
     @DisplayName("V45는 READY 이던 연결을 PENDING 으로 내리고 재시작 대기와 활성화 후보는 그대로 둔다")
     void v41LowersReadyConnectionToPendingWithoutTouchingRestart() throws SQLException {
         assertThat(connection(READY)).isEqualTo(new Row("PENDING", false, true, 0));
     }
+
 
     @Test
     @DisplayName("V45는 READY 가 아니던 연결의 상태와 재시작 대기를 바꾸지 않는다")
@@ -70,6 +73,7 @@ class ConnectorPolicyMigrationTest {
         assertThat(connection(PENDING)).isEqualTo(new Row("PENDING", true, true, 0));
         assertThat(connection(DISCONNECTED)).isEqualTo(new Row("DISCONNECTED", false, false, 0));
     }
+
 
     @Test
     @DisplayName("V45는 READY 이던 연결의 에이전트만 끄고 사진 받기를 내린다")
@@ -81,6 +85,7 @@ class ConnectorPolicyMigrationTest {
         assertThat(agent(PLAIN)).isEqualTo(new AgentRow(true, false));
     }
 
+
     @Test
     @DisplayName("V45는 READY 가 아니던 연결의 에이전트가 켜져 있고 사진을 받아도 그대로 둔다")
     void v41LeavesEnabledAgentOfConnectionThatWasNotReady() throws SQLException {
@@ -88,46 +93,51 @@ class ConnectorPolicyMigrationTest {
         assertThat(connection(PENDING_ON)).isEqualTo(new Row("PENDING", false, true, 0));
     }
 
+
     private void migrate(String target) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(target)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(target)
+            .load()
+            .migrate();
     }
+
 
     private static String row(int id, String status, boolean restart, boolean desired) {
         return "INSERT INTO connector_connection (user_id, connector_id, agent_id, status, fields,"
-                + " restart_required, desired_enabled, checked_at, created_at, updated_at) VALUES ("
-                + id + ", 'demo-notes', " + id + ", '" + status + "', '{\"values\":{},\"secretPrefixes\":{}}', "
-                + restart + ", " + desired + ", NULL, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))";
+            + " restart_required, desired_enabled, checked_at, created_at, updated_at) VALUES ("
+            + id + ", 'demo-notes', " + id + ", '" + status + "', '{\"values\":{},\"secretPrefixes\":{}}', "
+            + restart + ", " + desired + ", NULL, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))";
     }
 
-    private record Row(String status, boolean restartRequired, boolean desiredEnabled, int undeclaredTools) {}
 
-    private record AgentRow(boolean enabled, boolean attachments) {}
+    private record Row(String status, boolean restartRequired, boolean desiredEnabled, int undeclaredTools) {
+    }
+
+    private record AgentRow(boolean enabled, boolean attachments) {
+    }
+
 
     private Row connection(int userId) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row =
-                        statement.executeQuery("SELECT status, restart_required, desired_enabled, undeclared_tools"
-                                + " FROM connector_connection WHERE user_id = " + userId)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT status, restart_required, desired_enabled, undeclared_tools"
+                + " FROM connector_connection WHERE user_id = " + userId)) {
             assertThat(row.next()).as("사용자 %d 의 연결", userId).isTrue();
             return new Row(
-                    row.getString("status"),
-                    row.getBoolean("restart_required"),
-                    row.getBoolean("desired_enabled"),
-                    row.getInt("undeclared_tools"));
+                row.getString("status"),
+                row.getBoolean("restart_required"),
+                row.getBoolean("desired_enabled"),
+                row.getInt("undeclared_tools"));
         }
     }
 
+
     private AgentRow agent(int id) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row =
-                        statement.executeQuery("SELECT enabled, connector_attachments FROM agent WHERE id = " + id)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT enabled, connector_attachments FROM agent WHERE id = " + id)) {
             assertThat(row.next()).as("에이전트 %d", id).isTrue();
             return new AgentRow(row.getBoolean("enabled"), row.getBoolean("connector_attachments"));
         }

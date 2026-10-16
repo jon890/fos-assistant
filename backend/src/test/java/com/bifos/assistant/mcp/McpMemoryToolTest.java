@@ -133,8 +133,8 @@ class McpMemoryToolTest {
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
-        dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN, Instant.now()));
-        kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        dad = users.save(AppUser.of("dad@example.com", "아빠", 1L, UserRole.ADMIN));
+        kid = users.save(AppUser.of("kid@example.com", "아이", 1L, UserRole.MEMBER));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
         dadRun = McpCallSigner.running(executions, agents, dad.id(), 1L, PROFILE, dadRoot);
@@ -193,7 +193,7 @@ class McpMemoryToolTest {
         assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
         assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("query");
         JsonNode fields = schema.path("properties");
-        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "after_id");
+        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "cursor");
         assertThat(fields.path("query").path("type").asString()).isEqualTo("string");
         assertThat(fields.path("query").path("minLength").asInt()).isEqualTo(1);
         assertThat(fields.path("query").path("maxLength").asInt()).isEqualTo(200);
@@ -201,8 +201,9 @@ class McpMemoryToolTest {
         assertThat(fields.path("limit").path("minimum").asInt()).isEqualTo(1);
         assertThat(fields.path("limit").path("maximum").asInt()).isEqualTo(50);
         assertThat(fields.path("limit").path("default").asInt()).isEqualTo(10);
-        assertThat(fields.path("after_id").path("type").asString()).isEqualTo("integer");
-        assertThat(fields.path("after_id").path("minimum").asInt()).isEqualTo(1);
+        assertThat(fields.path("cursor").path("type").asString()).isEqualTo("string");
+        assertThat(fields.path("cursor").path("minLength").asInt()).isEqualTo(1);
+        assertThat(fields.path("cursor").path("maxLength").asInt()).isEqualTo(200);
         HttpResponse<String> notification = mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);
         assertThat(notification.body()).isEmpty();
@@ -232,9 +233,9 @@ class McpMemoryToolTest {
         Instant assembledAt = Instant.parse("2026-10-01T00:00:00Z");
         contextSources.saveAll(List.of(
             ExecutionContextSource.of(
-                dadRun.id(), 0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH", assembledAt),
+                dadRun.id(), 0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH"),
             ExecutionContextSource.of(
-                dadRun.id(), 1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH", assembledAt)));
+                dadRun.id(), 1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH")));
 
         assertThat(body(call(dadToken, hidden.id(), null))
             .path("result")
@@ -338,7 +339,7 @@ class McpMemoryToolTest {
             "core",
             MemoryRetrieval.SEARCH,
             MemorySensitivity.SENSITIVE);
-        agentCollections.save(AgentMemoryCollection.of(dadRun.agentId(), "core", true, Instant.now()));
+        agentCollections.save(AgentMemoryCollection.of(dadRun.agentId(), "core", true));
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, sensitive.id()))
             .doesNotContain("민감 본문");

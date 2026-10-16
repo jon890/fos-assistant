@@ -3,6 +3,7 @@ package com.bifos.assistant.user.infra;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,7 +16,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByGroupIdAndRole(Long groupId, UserRole role);
 
+
     Optional<AppUser> findByEmail(String email);
+
 
     /**
      * 정규화한 메일 주소로 찾는다. {@code app_user.email} 은 로그인한 원문이라 대소문자와 공백이 허용 목록의
@@ -24,10 +27,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Query("select u from AppUser u where lower(trim(u.email)) = :normalizedEmail")
     List<AppUser> findAllByNormalizedEmail(@Param("normalizedEmail") String normalizedEmail);
 
+
     boolean existsByGroupId(Long groupId);
 
-    @Query("select distinct u.groupId from AppUser u")
-    List<Long> findDistinctGroupIds();
 
     /**
      * 사용자 한 줄을 쓰기 잠금으로 읽는다.
@@ -40,7 +42,13 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Query("select u from AppUser u where u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") Long id);
 
-    @Modifying
-    @Query("update AppUser u set u.modelDefaultTier = :tier where u.id = :userId")
-    int updateModelDefaultTier(@Param("userId") Long userId, @Param("tier") String tier);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update AppUser u set u.modelDefaultTier = :tier, u.updatedAt = :at
+            where u.id = :userId and (u.modelDefaultTier <> :tier
+                or (u.modelDefaultTier is null and :tier is not null)
+                or (u.modelDefaultTier is not null and :tier is null))
+            """)
+    int updateModelDefaultTier(@Param("userId") Long userId, @Param("tier") String tier, @Param("at") Instant at);
 }

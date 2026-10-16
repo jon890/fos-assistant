@@ -113,8 +113,6 @@ class ConnectorConversationGrantTest {
         List.of(),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null, List.of(), null, Map.of(), false),
@@ -193,7 +191,7 @@ class ConnectorConversationGrantTest {
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
             .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
 
-        owner = users.save(AppUser.of("conversation-grant@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("conversation-grant@example.com", "주인", 1L, UserRole.MEMBER));
         me = currentUser(owner);
         agent = agents.save(agent(PROFILE));
         other = agents.save(agent(OTHER_PROFILE));
@@ -236,7 +234,7 @@ class ConnectorConversationGrantTest {
         assertThat(conversationGrants.findAll()).singleElement().satisfies(grant -> {
             assertThat(grant.conversationId()).isEqualTo(conversation.id());
             assertThat(grant.agentId()).isEqualTo(agent.id());
-            assertThat(Duration.between(grant.createdAt(), grant.expiresAt())).isEqualTo(Duration.ofHours(24));
+            assertThat(grant.expiresAt()).isEqualTo(actions.findById(grant.actionId()).orElseThrow().decidedAt().plus(Duration.ofHours(24)));
         });
         assertThat(service.conversationGrants(me, conversation.id()))
             .singleElement()
@@ -396,7 +394,7 @@ class ConnectorConversationGrantTest {
         service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
         Long grantId = service.conversationGrants(me, conversation.id()).getFirst().grantId();
         CurrentUser stranger = currentUser(
-            users.save(AppUser.of("conversation-grant-other@example.com", "다른 사람", 1L, UserRole.ADMIN, Instant.now())));
+            users.save(AppUser.of("conversation-grant-other@example.com", "다른 사람", 1L, UserRole.ADMIN)));
 
         assertCode(() -> service.revokeConversationGrant(stranger, conversation.id(), grantId),
             ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
@@ -445,8 +443,6 @@ class ConnectorConversationGrantTest {
             DECLARING.fields(),
             DECLARING.verifyTool(),
             DECLARING.mcpServer(),
-            DECLARING.toolsets(),
-            DECLARING.attachments(),
             DECLARING.schema(),
             DECLARING.tools(),
             DECLARING.skills(),
@@ -488,8 +484,6 @@ class ConnectorConversationGrantTest {
             DECLARING.fields(),
             DECLARING.verifyTool(),
             DECLARING.mcpServer(),
-            DECLARING.toolsets(),
-            DECLARING.attachments(),
             DECLARING.schema(),
             DECLARING.tools().stream()
                 .map(tool -> WRITE.equals(tool.name())
@@ -613,8 +607,7 @@ class ConnectorConversationGrantTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now());
+            owner.id());
     }
 
 

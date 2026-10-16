@@ -1,7 +1,8 @@
 # backend 패키지
 
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
-방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
+방향 규칙은 `ArchitectureRules.java` 가 강제하고, 까닭과 예외는 [코드 규칙 목록](../../docs/code-rules/INDEX.md)에서 찾는다.
+이 파일은 모듈 책임과 흐름, 검사 실행 및 기준 갱신 절차를 갖는다.
 
 ## 관찰 연결의 모듈 배치
 
@@ -20,23 +21,33 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 
 ## JPA 생성 시각
 
-`memory.domain.entity.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
-`shared.config.JpaAuditingConfig`는 `@EnableJpaAuditing(dateTimeProviderRef="auditingDateTimeProvider")`로 활성화한다.
-같은 이름의 `DateTimeProvider` 빈은 기존 `Clock`을 주입받고 `Instant`를 `ChronoUnit.MICROS`로 잘라 돌려준다.
-운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
-`ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`이 검사한다. 실제 callback과 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
-설정·provider 선언과 대상 엔티티는 각각 하나다. 다른 필드·getter의 auditing annotation과 `@LastModifiedDate`는 허용하지 않는다.
-다른 운영 타입의 `AuditingEntityListener` 선언과 Spring Data `Auditable` 구현·상속도 거절한다.
-`AbstractAuditable` 상속도 여기에 포함한다. 기존 JPA 업무 시각과 다른 listener는 그대로 허용한다.
+순수 저장 시각은 `shared.domain.CreatedAtEntity`와 `AuditedEntity`의 JPA auditing으로 기록한다.
+생성 전용은 25개, 생성·변경은 7개다. 엔티티별 적용과 업무 시각 제외 판정은
+[ADR-20261016 / jpa-auditing-base](adr/ADR-20261016-jpa-auditing-base.md)가 소유한다.
+base는 id·권한·행위자를 갖지 않는다. 생성 전용 엔티티에 변경 시각을 추가하지 않는다.
 
-`defaultsFor(groupId)`가 만든 객체는 생성 시각이 null이다. 복합 ID로 `saveAll`이 merge할 때는 반환된 managed 객체를 사용한다.
-`PrePersist` 시각과 트랜잭션 commit 완료 시각은 다르다. rollback하면 시각이 채워졌어도 행은 남지 않는다.
-서비스는 기존 목록이 있으면 새 기본 객체를 만들지 않는다. DB에서 읽은 기존 객체의 detach/merge와 no-op은 기존 생성 시각을 유지한다.
-생성 시각이 null인 기본 객체를 이미 존재하는 ID에 merge하는 경우는 서비스 계약에 포함하지 않는다.
+기존 `shared.config.JpaAuditingConfig`의 `auditingDateTimeProvider`만 쓴다.
+주입된 `Clock`에서 읽은 `Instant`를 `ChronoUnit.MICROS`로 자르며, 새 시계 빈이나 AuditorAware를 두지 않는다.
+새 객체의 감사 시각은 저장 전 NULL이다. persist/flush callback은 commit 완료 시각과 다르며 rollback하면 DB에 남지 않는다.
+일반 dirty update에서 C는 보존하고 U만 바뀐다. 조회·no-op·기존 detached 객체의 merge는 C를 보존한다.
+복합 ID와 지정 ID의 신규 merge에서는 반환된 managed 객체를 사용한다.
+DB에 있는 ID에 C가 NULL인 새 factory 객체를 merge하는 경로는 허용하지 않는다.
 
-다른 엔티티 및 `MemoryRevision.changedAt`, `AgentMemoryCollectionChange.changedAt` 같은 업무 시각은 전달받은 값을 유지한다.
-native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 시각을 정한다. 기존 마이그레이션은 수정하지 않는다.
-[Spring Data auditing](https://docs.spring.io/spring-data/jpa/reference/auditing.html)의 엔티티별 listener와 provider 설정을 따른다.
+대화 활동·커넥터 권한 snapshot·revision·사건·큐 수명 시각은 기존 인자로 전달한다.
+생성 C만 자동화한 Conversation·ConnectorConnection·ConnectorBinding·Memory·ResultDelivery·UserBrowser의 U는 업무 필드로 남는다.
+생성 시각을 기준으로 목록을 읽는 커서와 기간 정리는 저장 시각을 계속 사용한다. 별도의 사건 발생 시각을 이 값으로 바꾸지 않는다.
+
+JPQL/native bulk는 listener를 거치지 않는다. AppUser 모델 기본값, 사용자 금융 상한, Task 대화 연결 bulk는 U를 직접 기록한다.
+금융 `limit_updated_at`은 별도 업무 값이며 감사 `updated_at`만 MICROS로 맞춘다.
+AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 U를 움직이지 않는다.
+나머지 생성 전용 엔티티의 사용·폐기·삭제·claim bulk는 각 업무 시각만 바꾸고 C를 보존한다.
+목록과 각 쓰기 경계는 위 ADR의 bulk 표가 갖는다.
+
+검사는 기준 파일 없는 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`과 `JpaAuditingPlacementTest`가 맡는다.
+두 base, 엔티티별 상속, 45개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
+`Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
+`JpaAuditingTest`, `JpaAuditingMysqlTest`, 기존 `MemoryCollectionAuditingTest`와 MySQL 하위 클래스가 확인한다.
+`JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
 
 ## 패키지와 책임
 
@@ -57,14 +68,14 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
-| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록, 첨부 관찰 revision과 요청 alias |
+| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision과 요청 alias |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
 | `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
-| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
+| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
-| `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
+| `orchestration` | 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 스킬 zip 묶음의 받기와 검사, 미리보기와 올리기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/features/schedule.md`](../../docs/features/schedule.md)) |
@@ -220,8 +231,7 @@ domain과 infra는 admin을 import하지 않는다.
 entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
 entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
 
-`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`,
-`ServiceToken`, `ServiceTokenCollection`과 복합 ID 세 타입을 소유한다.
+`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`과 복합 ID 두 타입을 소유한다.
 기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
 다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
 새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
@@ -266,7 +276,6 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
 | `AgentPurgeParticipant` | 지운 에이전트를 정리할 때 바인딩을 지우고, 연결과 승인 줄의 `agent_id` 를 비운다 | `ConnectorAgentPurge` | 지운 에이전트 정리 |
 
-옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 특정 서비스 이름이 코드에 들어왔는지는 `test/unit/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
 계약은 [커넥터 연결](../../docs/features/connector.md)에 있다.
@@ -302,7 +311,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 `ChatService`는 일반·예약·살펴보기·대기 메시지·다시 생성 turn의 종료 사건을 `ChatTurnCompletion`으로 만든다.
 이 helper는 저장을 마친 `ChatTurn`의 취소 여부와 식별자만 읽어 `done` 또는 `stopped`를 고른다.
-사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 흐름 실행의 종료 사건은 `ChatTurnRunner`가 보낸다.
+사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 종료 사건은 `ChatTurnCompletion.eventOf`로 만든다.
 
 실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
 `ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.
@@ -563,7 +572,8 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 `MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
 writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
 민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
-`MemoryTitleSearch`는 제목 검색의 입력 검사와 repository 조회를 맡는다. repository만 주입받고
+`MemoryRelevanceSearch`는 기억 검색의 입력 검사와 관련도 점수, 커서 위치에서 자르기를 맡는다.
+권한 조건을 건 후보 SQL은 `memory.infra`의 `MemorySearchCandidates`가 맡는다. 둘 다
 `MemoryService.searchFor`의 읽기 전용 `REQUIRES_NEW`, 2초 제한 트랜잭션 안에서 실행한다.
 MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션의 제한을 물려받지 않는다.
 외부 호출자는 기존 facade를 그대로 사용한다.

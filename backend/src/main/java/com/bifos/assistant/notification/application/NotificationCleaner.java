@@ -23,23 +23,26 @@ public class NotificationCleaner {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     // 생성자를 직접 쓴다. 일정이 이 객체를 직접 부르므로 지우는 쿼리의 트랜잭션을 여기서 연다.
     public NotificationCleaner(
-            NotificationRepository notifications,
-            NotificationProperties properties,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        NotificationRepository notifications,
+        NotificationProperties properties,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.notifications = notifications;
         this.properties = properties;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
+
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.notification.cleanup-cron}")
     public void runScheduled() {
         cleanExpired(clock.instant());
     }
+
 
     /**
      * {@code now} 에서 보관 기간보다 먼저 만든 줄을 지운다.
@@ -48,7 +51,7 @@ public class NotificationCleaner {
      */
     public int cleanExpired(Instant now) {
         Integer result = transactions.execute(
-                status -> notifications.deleteByCreatedAtBefore(now.minus(properties.retention())));
+            status -> notifications.deleteByCreatedAtBefore(now.minus(properties.retention())));
         int deleted = result == null ? 0 : result;
         log.info("expired notifications cleaned deleted={}", deleted);
         return deleted;

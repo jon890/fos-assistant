@@ -41,27 +41,28 @@ class FollowUpProposalSaveFailureTest {
     private FollowUpRepository repository;
     private FollowUpService followUps;
 
+
     @BeforeEach
     void setUp() {
         repository = mock(FollowUpRepository.class);
         ConversationAccess conversations = mock(ConversationAccess.class);
         when(conversations.requireOwn(DAD, 11L)).thenReturn(Conversation.startedBy(DAD.id(), "대화", 1L, NOW));
         followUps = new FollowUpService(
-                repository,
-                conversations,
-                mock(ConversationPublicIdLookup.class),
-                mock(DecisionFeedbackRecorder.class),
-                mock(PlatformTransactionManager.class),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+            repository,
+            conversations,
+            mock(ConversationPublicIdLookup.class),
+            mock(DecisionFeedbackRecorder.class),
+            mock(PlatformTransactionManager.class),
+            Clock.fixed(NOW, ZoneOffset.UTC));
     }
+
 
     @Test
     @DisplayName("저장이 교착으로 끊겨도 다시 읽어 같은 제목의 줄이 있으면 DUPLICATE 다")
     void answersDuplicateWhenLockFailureLeavesSameTitleRow() {
-        FollowUp winner =
-                FollowUp.proposed(DAD.id(), 11L, 22L, TITLE, FollowUpService.titleKey(TITLE), null, false, NOW);
+        FollowUp winner = FollowUp.proposed(DAD.id(), 11L, 22L, TITLE, FollowUpService.titleKey(TITLE), null, false, NOW);
         when(repository.findByUserIdAndTitleKeyAndOpenMarker(anyLong(), anyString(), any()))
-                .thenReturn(Optional.empty(), Optional.of(winner));
+            .thenReturn(Optional.empty(), Optional.of(winner));
         when(repository.saveAndFlush(any())).thenThrow(new CannotAcquireLockException("deadlock"));
 
         FollowUpProposalOutcome outcome = followUps.propose(DAD, 11L, 33L, TITLE, null, false);
@@ -69,15 +70,16 @@ class FollowUpProposalSaveFailureTest {
         assertThat(outcome).isEqualTo(FollowUpProposalOutcome.DUPLICATE);
     }
 
+
     @Test
     @DisplayName("유일 제약에 걸렸는데 다시 읽어도 같은 제목의 줄이 없으면 저장 실패를 그대로 던진다")
     void rethrowsWhenNoSameTitleRowAfterIntegrityViolation() {
         DataIntegrityViolationException failure = new DataIntegrityViolationException("public_id");
         when(repository.findByUserIdAndTitleKeyAndOpenMarker(anyLong(), anyString(), any()))
-                .thenReturn(Optional.empty());
+            .thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenThrow(failure);
 
         assertThatThrownBy(() -> followUps.propose(DAD, 11L, 33L, TITLE, null, false))
-                .isSameAs(failure);
+            .isSameAs(failure);
     }
 }

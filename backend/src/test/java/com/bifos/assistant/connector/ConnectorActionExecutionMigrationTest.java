@@ -24,18 +24,20 @@ import org.junit.jupiter.api.TestInstance;
 class ConnectorActionExecutionMigrationTest {
     private String url;
 
+
     @BeforeAll
     void migrate() throws SQLException {
         url = "jdbc:h2:mem:financial-execution-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .outOfOrder(true)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .outOfOrder(true)
+            .load()
+            .migrate();
         execute("INSERT INTO app_user (id,email,display_name,group_id,role,created_at)"
-                + " VALUES (901,'financial@example.com','주인',1,'MEMBER',CURRENT_TIMESTAMP(6))");
+            + " VALUES (901,'financial@example.com','주인',1,'MEMBER',CURRENT_TIMESTAMP(6))");
     }
+
 
     @BeforeEach
     void actions() throws SQLException {
@@ -43,20 +45,20 @@ class ConnectorActionExecutionMigrationTest {
         execute("DELETE FROM connector_action");
         for (int id = 1; id <= 3; id++) {
             execute("INSERT INTO connector_action"
-                    + " (id,public_id,user_id,connector_id,hermes_tool,risk,approval_mode,decision,passed,"
-                    + "origin_execution_id,dedupe_key,args_sha256,created_at) VALUES (" + id
-                    + ",X'0000000000000000000000000000000" + id
-                    + "',901,'demo-financial','mcp__demo__place_order','FINANCIAL','ALWAYS','DENIED',FALSE,1,'"
-                    + String.valueOf(id).repeat(64) + "','" + "a".repeat(64) + "',CURRENT_TIMESTAMP(6))");
+                + " (id,public_id,user_id,connector_id,hermes_tool,risk,approval_mode,decision,passed,"
+                + "origin_execution_id,dedupe_key,args_sha256,created_at) VALUES (" + id
+                + ",X'0000000000000000000000000000000" + id
+                + "',901,'demo-financial','mcp__demo__place_order','FINANCIAL','ALWAYS','DENIED',FALSE,1,'"
+                + String.valueOf(id).repeat(64) + "','" + "a".repeat(64) + "',CURRENT_TIMESTAMP(6))");
         }
     }
+
 
     @Test
     @DisplayName("저장 컬럼, NULL 여부와 본문 타입을 실제 DDL에서 확인한다")
     void columnContract() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                ResultSet columns =
-                        connection.getMetaData().getColumns(null, null, "CONNECTOR_ACTION_EXECUTION", null)) {
+            ResultSet columns = connection.getMetaData().getColumns(null, null, "CONNECTOR_ACTION_EXECUTION", null)) {
             Map<String, Integer> nullable = new HashMap<>();
             Map<String, Integer> sizes = new HashMap<>();
             while (columns.next()) {
@@ -65,7 +67,8 @@ class ConnectorActionExecutionMigrationTest {
             }
             assertThat(nullable).hasSize(18);
             for (String name : new String[] {
-                "CONTENT_KEY_ID", "SUPERSEDES_UNKNOWN_ACTION_ID", "TICKET_ID", "TICKET_EXPIRES_AT", "CONSUMED_AT"
+                "CONTENT_KEY_ID", "SUPERSEDES_UNKNOWN_ACTION_ID", "TICKET_ID", "TICKET_EXPIRES_AT", "CONSUMED_AT",
+                "EXECUTION_ARGS_JSON", "SUMMARY_JSON", "SCOPE_JSON"
             }) {
                 assertThat(nullable.get(name)).as(name).isEqualTo(DatabaseMetaData.columnNullable);
             }
@@ -75,9 +78,6 @@ class ConnectorActionExecutionMigrationTest {
                 "BINDING_ID",
                 "CONNECTION_UPDATED_AT",
                 "BINDING_UPDATED_AT",
-                "EXECUTION_ARGS_JSON",
-                "SUMMARY_JSON",
-                "SCOPE_JSON",
                 "EXECUTION_ARGS_SHA256",
                 "SCOPE_SHA256",
                 "REQUEST_KEY",
@@ -92,6 +92,7 @@ class ConnectorActionExecutionMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("action PK와 ticket UUID UNIQUE는 중복을 막고 NULL ticket은 여러 줄을 허용한다")
     void primaryKeyAndNullableTicketUnique() throws SQLException {
@@ -99,12 +100,13 @@ class ConnectorActionExecutionMigrationTest {
         execute(row(2, "NULL", "NULL"));
         assertThatThrownBy(() -> execute(row(1, "NULL", "NULL"))).isInstanceOf(SQLException.class);
         execute(
-                "UPDATE connector_action_execution SET ticket_id = X'00000000000040008000000000000001' WHERE action_id = 1");
+            "UPDATE connector_action_execution SET ticket_id = X'00000000000040008000000000000001' WHERE action_id = 1");
         assertThatThrownBy(() -> execute("UPDATE connector_action_execution"
-                        + " SET ticket_id = X'00000000000040008000000000000001' WHERE action_id = 2"))
+            + " SET ticket_id = X'00000000000040008000000000000001' WHERE action_id = 2"))
                 .isInstanceOf(SQLException.class);
         assertThat(count()).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("supersedes는 선조 FK 없이 이력 번호를 예약하고 중복 선조만 막는다")
@@ -112,12 +114,11 @@ class ConnectorActionExecutionMigrationTest {
         execute(row(1, "NULL", "9999"));
         execute(row(2, "NULL", "NULL"));
         assertThatThrownBy(
-                        () -> execute(
-                                "UPDATE connector_action_execution SET supersedes_unknown_action_id = 9999 WHERE action_id = 2"))
-                .isInstanceOf(SQLException.class);
+            () -> execute(
+                "UPDATE connector_action_execution SET supersedes_unknown_action_id = 9999 WHERE action_id = 2"))
+                    .isInstanceOf(SQLException.class);
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                ResultSet imported =
-                        connection.getMetaData().getImportedKeys(null, null, "CONNECTOR_ACTION_EXECUTION")) {
+            ResultSet imported = connection.getMetaData().getImportedKeys(null, null, "CONNECTOR_ACTION_EXECUTION")) {
             assertThat(imported.next()).isTrue();
             assertThat(imported.getString("FKCOLUMN_NAME")).isEqualTo("ACTION_ID");
             assertThat(imported.getString("PKTABLE_NAME")).isEqualTo("CONNECTOR_ACTION");
@@ -125,6 +126,7 @@ class ConnectorActionExecutionMigrationTest {
             assertThat(imported.next()).isFalse();
         }
     }
+
 
     @Test
     @DisplayName("없는 action은 거절하고 action을 지우면 연결된 실행 내용도 지운다")
@@ -135,6 +137,7 @@ class ConnectorActionExecutionMigrationTest {
         assertThat(count()).isZero();
     }
 
+
     @Test
     @DisplayName("request_key는 중복을 허용하는 일반 조회 인덱스다")
     void requestKeyIndexIsNotUnique() throws SQLException {
@@ -142,8 +145,7 @@ class ConnectorActionExecutionMigrationTest {
         execute(row(2, "NULL", "NULL"));
         assertThat(count()).isEqualTo(2);
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                ResultSet indexes =
-                        connection.getMetaData().getIndexInfo(null, null, "CONNECTOR_ACTION_EXECUTION", false, false)) {
+            ResultSet indexes = connection.getMetaData().getIndexInfo(null, null, "CONNECTOR_ACTION_EXECUTION", false, false)) {
             boolean found = false;
             while (indexes.next()) {
                 if ("IDX_CONNECTOR_ACTION_EXECUTION_REQUEST".equals(indexes.getString("INDEX_NAME"))) {
@@ -156,35 +158,45 @@ class ConnectorActionExecutionMigrationTest {
         }
     }
 
+
     @Test
-    @DisplayName("필수 본문과 두 revision의 NULL은 거절한다")
-    void mandatoryValuesCannotBeNull() {
-        for (String value : new String[] {"'{}'", "CURRENT_TIMESTAMP(6)"}) {
-            assertThatThrownBy(() -> execute(row(1, "NULL", "NULL").replace(value, "NULL")))
-                    .isInstanceOf(SQLException.class);
+    @DisplayName("purge용 본문 NULL은 허용하고 revision과 해시 등 감사 칸의 NULL은 거절한다")
+    void allowsErasedBodiesButRejectsMissingAuditValues() throws SQLException {
+        execute(row(1, "NULL", "NULL"));
+        execute("UPDATE connector_action_execution"
+            + " SET execution_args_json = NULL, summary_json = NULL, scope_json = NULL, content_key_id = NULL WHERE action_id = 1");
+        assertThat(count()).isEqualTo(1);
+        for (String column : new String[] {
+            "connection_updated_at", "binding_updated_at", "created_at", "execution_args_sha256", "scope_sha256", "request_key", "protocol"
+        }) {
+            assertThatThrownBy(() -> execute("UPDATE connector_action_execution SET " + column + " = NULL WHERE action_id = 1"))
+                .isInstanceOf(SQLException.class);
         }
     }
 
+
     private static String row(int action, String ticket, String previous) {
         return "INSERT INTO connector_action_execution (action_id,connection_id,binding_id,connection_updated_at,"
-                + "binding_updated_at,execution_args_json,summary_json,scope_json,execution_args_sha256,scope_sha256,"
-                + "request_key,supersedes_unknown_action_id,protocol,ticket_id,created_at) VALUES (" + action
-                + ",701,801,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),'{}','{}','{}','" + "a".repeat(64) + "','"
-                + "b".repeat(64) + "','" + "c".repeat(64) + "'," + previous + ",'approval-claim-v1'," + ticket
-                + ",CURRENT_TIMESTAMP(6))";
+            + "binding_updated_at,execution_args_json,summary_json,scope_json,execution_args_sha256,scope_sha256,"
+            + "request_key,supersedes_unknown_action_id,protocol,ticket_id,created_at) VALUES (" + action
+            + ",701,801,CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6),'{}','{}','{}','" + "a".repeat(64) + "','"
+            + "b".repeat(64) + "','" + "c".repeat(64) + "'," + previous + ",'approval-claim-v1'," + ticket
+            + ",CURRENT_TIMESTAMP(6))";
     }
+
 
     private void execute(String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
         }
     }
 
+
     private int count() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM connector_action_execution")) {
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM connector_action_execution")) {
             rows.next();
             return rows.getInt(1);
         }

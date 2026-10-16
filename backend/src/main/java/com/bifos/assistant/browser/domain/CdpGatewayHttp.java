@@ -13,6 +13,7 @@ public interface CdpGatewayHttp {
     /** {@code path} 를 GET 으로 부른다. {@code /} 로 시작한다. */
     CdpReply get(URI cdp, String path);
 
+
     /** {@code pathAndQuery} 를 본문 없는 PUT 으로 부른다. 쿼리는 받은 원문 그대로다. */
     CdpReply put(URI cdp, String pathAndQuery);
 }

@@ -110,6 +110,38 @@ class ExecutionContextSourceTest {
 
 
     @Test
+    @DisplayName("선택 근거를 실은 참조는 다섯 칸을 함께 남기고 근거 없는 참조와 덧붙인 MEMORY_READ 줄은 비워 둔다")
+    void storesSelectionColumnsOnlyWhenPresent() {
+        List<ContextSourceRef> sources = List.of(
+            new ContextSourceRef("MEMORY_FACTS", "memory:9201", "INLINE", "FRESH", "facts-recent-v1", 1, 0.5, 0.25, 0.75),
+            new ContextSourceRef("MEMORY_INDEX", "memory:9202", "TITLE_ONLY", "FRESH"));
+        AgentExecution execution = recorder.start(
+            adminUser(),
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(120L, null, null, 0, sources));
+        new ExecutionContextSourceWriter(contextSources, transactionManager)
+            .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9202", "INLINE", "UNKNOWN"));
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
+            .as("실행 %s 에 남은 선택 근거", execution.id())
+            .extracting(
+                ExecutionContextSource::source,
+                ExecutionContextSource::selector,
+                ExecutionContextSource::selectionRank,
+                ExecutionContextSource::keywordScore,
+                ExecutionContextSource::semanticScore,
+                ExecutionContextSource::selectionScore)
+            .containsExactly(
+                tuple("MEMORY_FACTS", "facts-recent-v1", 1, 0.5, 0.25, 0.75),
+                tuple("MEMORY_INDEX", null, null, null, null, null),
+                tuple("MEMORY_READ", null, null, null, null, null));
+    }
+
+
+    @Test
     @DisplayName("참조가 없는 스냅숏이면 아무 줄도 남기지 않는다")
     void storesNothingWhenSnapshotHasNoSources() {
         AgentExecution execution = recorder.start(
@@ -134,7 +166,7 @@ class ExecutionContextSourceTest {
             clock,
             executions,
             limiter,
-            new ExecutionContextSourceWriter(failing, transactionManager, clock),
+            new ExecutionContextSourceWriter(failing, transactionManager),
             completion);
 
         AgentExecution execution = start(swapped, adminUser());
@@ -177,7 +209,7 @@ class ExecutionContextSourceTest {
         // 처음 읽은 마지막 position 은 다른 호출이 줄을 넣기 전 값이다. 그 다음 읽기는 실제 값을 본다
         ExecutionContextSourceRepository racing = racingRepository(execution.id(), 1, true);
 
-        new ExecutionContextSourceWriter(racing, transactionManager, clock)
+        new ExecutionContextSourceWriter(racing, transactionManager)
             .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9104", "INLINE", "UNKNOWN"));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
@@ -197,7 +229,7 @@ class ExecutionContextSourceTest {
         AgentExecution execution = start(recorder, adminUser());
         ExecutionContextSourceRepository racing = racingRepository(execution.id(), 0, false);
 
-        new ExecutionContextSourceWriter(racing, transactionManager, clock)
+        new ExecutionContextSourceWriter(racing, transactionManager)
             .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9104", "INLINE", "UNKNOWN"));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
@@ -281,7 +313,6 @@ class ExecutionContextSourceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 }

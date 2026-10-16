@@ -91,16 +91,19 @@ class TaskServiceTest {
     @Autowired
     AgentRepository agents;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
         clean();
     }
 
+
     @AfterEach
     void tearDown() {
         clean();
     }
+
 
     @Test
     @DisplayName("만들면 작업과 시각이 함께 생기고 다음 시각은 지금 뒤의 첫 예정 시각이다")
@@ -126,6 +129,7 @@ class TaskServiceTest {
         assertThat(trigger.createdAt()).isEqualTo(created.trigger().createdAt());
     }
 
+
     @Test
     @DisplayName("한 번 도는 작업의 다음 시각은 그 시각이고, 이미 지난 시각은 TASK_SCHEDULE_INVALID 다")
     void onceUsesFireAtAndRejectsPast() {
@@ -137,9 +141,10 @@ class TaskServiceTest {
         assertThat(created.trigger().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
         assertThat(created.trigger().fireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
         assertCode(
-                () -> service.create(owner, once("지난 알림", agent, LocalDateTime.parse("2026-10-04T08:59"))),
-                ErrorCode.TASK_SCHEDULE_INVALID);
+            () -> service.create(owner, once("지난 알림", agent, LocalDateTime.parse("2026-10-04T08:59"))),
+            ErrorCode.TASK_SCHEDULE_INVALID);
     }
+
 
     @Test
     @DisplayName("다음 시각이 없는 cron 과 15분보다 촘촘한 cron 은 TASK_SCHEDULE_INVALID 다")
@@ -150,8 +155,9 @@ class TaskServiceTest {
         assertCode(() -> service.create(owner, cron("2월 31일", agent, "0 9 31 2 *")), ErrorCode.TASK_SCHEDULE_INVALID);
         assertCode(() -> service.create(owner, cron("5분마다", agent, "*/5 * * * *")), ErrorCode.TASK_SCHEDULE_INVALID);
         assertThat(tasks.countByOwnerUserIdAndKindAndStateNot(owner.id(), TaskKind.TURN, TaskState.ARCHIVED))
-                .isZero();
+            .isZero();
     }
+
 
     @Test
     @DisplayName("11번째 작업은 TASK_LIMIT_REACHED 이고 하나를 지우면 다시 만들 수 있다")
@@ -172,6 +178,7 @@ class TaskServiceTest {
         assertThat(service.list(owner)).hasSize(10);
     }
 
+
     @Test
     @DisplayName("작업이 10개인 사용자도 기존 작업을 고칠 수 있다")
     void updatesExistingTaskAtLimit() {
@@ -187,23 +194,21 @@ class TaskServiceTest {
         assertThat(updated.task().title()).isEqualTo("고친 이름");
     }
 
+
     @Test
-    @DisplayName("꺼진 에이전트는 AGENT_DISABLED, 흐름 에이전트는 TASK_AGENT_NOT_SUPPORTED, 남의 비공개 에이전트는 AGENT_NOT_FOUND 다")
+    @DisplayName("꺼진 에이전트는 AGENT_DISABLED, 남의 비공개 에이전트는 AGENT_NOT_FOUND 다")
     void rejectsUnusableAgents() {
         CurrentUser owner = member();
         CurrentUser other = member();
         Agent off = agentOf(owner, AgentVisibility.PRIVATE);
         off.changeAccess(false, AgentVisibility.PRIVATE, owner.id());
         agents.save(off);
-        Agent flowed = agentOf(owner, AgentVisibility.PRIVATE);
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
         Agent othersPrivate = agentOf(other, AgentVisibility.PRIVATE);
 
         assertCode(() -> service.create(owner, cron("꺼짐", off, "0 9 * * *")), ErrorCode.AGENT_DISABLED);
-        assertCode(() -> service.create(owner, cron("흐름", flowed, "0 9 * * *")), ErrorCode.TASK_AGENT_NOT_SUPPORTED);
         assertCode(() -> service.create(owner, cron("남의 것", othersPrivate, "0 9 * * *")), ErrorCode.AGENT_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("남의 작업은 조회, 고치기, 멈추기, 다시 켜기, 지우기, 발화 기록이 모두 TASK_NOT_FOUND 다")
@@ -223,10 +228,11 @@ class TaskServiceTest {
         assertCode(() -> service.get(owner, UUID.randomUUID()), ErrorCode.TASK_NOT_FOUND);
         assertThat(service.list(other)).isEmpty();
         assertThat(tasks.findByPublicIdAndOwnerUserIdAndKind(taskId, owner.id(), TaskKind.TURN)
-                        .orElseThrow()
-                        .title())
+            .orElseThrow()
+            .title())
                 .isEqualTo("내 작업");
     }
+
 
     @Test
     @DisplayName("지운 작업은 목록과 조회에서 빠지고 줄은 ARCHIVED 로 남는다")
@@ -244,13 +250,13 @@ class TaskServiceTest {
         assertCode(() -> service.get(owner, created.task().publicId()), ErrorCode.TASK_NOT_FOUND);
     }
 
+
     @Test
     @DisplayName("멈춘 뒤 사흘 지나 다시 켜면 다음 시각은 그 뒤의 첫 예정 시각이다")
     void resumeRecomputesNextFromNow() {
         CurrentUser owner = member();
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
-        UUID taskId =
-                service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
+        UUID taskId = service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
         assertThat(service.get(owner, taskId).trigger().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail paused = service.pause(owner, taskId);
@@ -262,30 +268,31 @@ class TaskServiceTest {
 
         assertThat(resumed.task().state()).isEqualTo(TaskState.ACTIVE);
         assertThat(triggers.findByTaskId(resumed.task().id()).orElseThrow().nextFireAt())
-                .isEqualTo(Instant.parse("2026-10-08T00:00:00Z"));
+            .isEqualTo(Instant.parse("2026-10-08T00:00:00Z"));
         assertThat(service.resume(owner, taskId).task().state()).isEqualTo(TaskState.ACTIVE);
     }
+
 
     @Test
     @DisplayName("이름만 고치면 다음 시각이 그대로이고, cron 을 고치면 다시 계산한다")
     void updateKeepsNextUnlessScheduleChanges() {
         CurrentUser owner = member();
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
-        UUID taskId =
-                service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
+        UUID taskId = service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
         clock.set(Instant.parse("2026-10-06T03:00:00Z"));
 
         TaskDetail renamed = service.update(owner, taskId, cron("새 이름", agent, "0 9 * * *"));
 
         assertThat(renamed.task().title()).isEqualTo("새 이름");
         assertThat(triggers.findByTaskId(renamed.task().id()).orElseThrow().nextFireAt())
-                .isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
+            .isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail moved = service.update(owner, taskId, cron("새 이름", agent, "0 10 * * *"));
 
         assertThat(triggers.findByTaskId(moved.task().id()).orElseThrow().nextFireAt())
-                .isEqualTo(Instant.parse("2026-10-07T01:00:00Z"));
+            .isEqualTo(Instant.parse("2026-10-07T01:00:00Z"));
     }
+
 
     @Test
     @DisplayName("이미 발화한 한 번 도는 작업도 같은 시각을 보내며 이름을 고칠 수 있다")
@@ -295,7 +302,7 @@ class TaskServiceTest {
         LocalDateTime fireAt = LocalDateTime.parse("2026-10-04T12:00");
         TaskDetail created = service.create(owner, once("한 번", agent, fireAt));
         TaskTrigger trigger = triggers.findByTaskId(created.task().id()).orElseThrow();
-        trigger.advance(trigger.fireAt(), null, Instant.parse("2026-10-04T03:00:00Z"));
+        trigger.advance(trigger.fireAt(), null);
         triggers.save(trigger);
         clock.set(Instant.parse("2026-10-05T00:00:00Z"));
 
@@ -306,9 +313,10 @@ class TaskServiceTest {
         assertThat(stored.nextFireAt()).isNull();
         assertThat(stored.lastFiredAt()).isEqualTo(Instant.parse("2026-10-04T03:00:00Z"));
         assertCode(
-                () -> service.update(owner, created.task().publicId(), once("고친 이름", agent, fireAt.minusHours(1))),
-                ErrorCode.TASK_SCHEDULE_INVALID);
+            () -> service.update(owner, created.task().publicId(), once("고친 이름", agent, fireAt.minusHours(1))),
+            ErrorCode.TASK_SCHEDULE_INVALID);
     }
+
 
     @Test
     @DisplayName("모델 단계를 골라 만든 작업은 그 단계를 저장한다")
@@ -320,8 +328,9 @@ class TaskServiceTest {
 
         assertThat(created.task().modelTier()).isEqualTo(ModelTier.BALANCED);
         assertThat(tasks.findById(created.task().id()).orElseThrow().modelTier())
-                .isEqualTo(ModelTier.BALANCED);
+            .isEqualTo(ModelTier.BALANCED);
     }
+
 
     @Test
     @DisplayName("단계를 비우고 고치면 작업의 단계가 지워진다")
@@ -334,17 +343,19 @@ class TaskServiceTest {
 
         assertThat(updated.task().modelTier()).isNull();
         assertThat(tasks.findById(created.task().id()).orElseThrow().modelTier())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("매일 깨우기 작업은 모델 단계를 고를 수 없다")
     void rejectsModelTierForCheckTask() {
-        Task check = Task.check(1L, 1L, "매일 깨우기", NOW);
+        Task check = Task.check(1L, 1L, "매일 깨우기");
 
-        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST, NOW)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST)).isInstanceOf(IllegalStateException.class);
         assertThat(check.modelTier()).isNull();
     }
+
 
     @Test
     @DisplayName("발화 기록의 limit 은 1 이상 100 이하이고 밖이면 VALIDATION_FAILED 다")
@@ -359,6 +370,7 @@ class TaskServiceTest {
         assertCode(() -> service.runs(owner, taskId, 101), ErrorCode.VALIDATION_FAILED);
     }
 
+
     @Test
     @DisplayName("고치기가 시작 단계가 적은 대화 번호를 되돌리지 않는다")
     void preservesConversationRecordedWhileUpdateWaits() throws Exception {
@@ -366,8 +378,7 @@ class TaskServiceTest {
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
         LocalDateTime fireAt = LocalDateTime.parse("2026-10-04T12:00");
         Task task = service.create(owner, once("한 번", agent, fireAt)).task();
-        Conversation conversation =
-                conversations.save(Conversation.startedForTask(owner.id(), "합성 대화", agent.id(), task.id(), NOW));
+        Conversation conversation = conversations.save(Conversation.startedForTask(owner.id(), "합성 대화", agent.id(), task.id(), NOW));
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch updating = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -407,69 +418,75 @@ class TaskServiceTest {
         assertThat(stored.title()).isEqualTo("고친 이름");
     }
 
+
     private TaskInput monthly(String title, CurrentUser owner) {
         Agent agent = agents.findAll().stream()
-                .filter(it -> owner.id().equals(it.ownerUserId()) && it.enabled() && it.flow() == null)
-                .findFirst()
-                .orElseThrow();
+            .filter(it -> owner.id().equals(it.ownerUserId()) && it.enabled())
+            .findFirst()
+            .orElseThrow();
         return cron(title, agent, "0 9 1 * *");
     }
 
+
     private static TaskInput cron(String title, Agent agent, String cron) {
         return new TaskInput(
-                title,
-                agent.code(),
-                "지난달 기록을 보고 정리해 줘",
-                new ScheduleInput(TriggerType.CRON, cron, null, null),
-                null,
-                null,
-                null,
-                null);
+            title,
+            agent.code(),
+            "지난달 기록을 보고 정리해 줘",
+            new ScheduleInput(TriggerType.CRON, cron, null, null),
+            null,
+            null,
+            null,
+            null);
     }
+
 
     private static TaskInput once(String title, Agent agent, LocalDateTime fireAt) {
         return new TaskInput(
-                title,
-                agent.code(),
-                "알려 줘",
-                new ScheduleInput(TriggerType.ONCE, null, fireAt, SEOUL.getId()),
-                ConversationMode.SINGLE,
-                MissedPolicy.SKIP,
-                NotifyPolicy.ON_FAILURE,
-                null);
+            title,
+            agent.code(),
+            "알려 줘",
+            new ScheduleInput(TriggerType.ONCE, null, fireAt, SEOUL.getId()),
+            ConversationMode.SINGLE,
+            MissedPolicy.SKIP,
+            NotifyPolicy.ON_FAILURE,
+            null);
     }
+
 
     private static TaskInput withTier(TaskInput input, ModelTier tier) {
         return new TaskInput(
-                input.title(),
-                input.agentCode(),
-                input.instruction(),
-                input.schedule(),
-                input.conversationMode(),
-                input.missedPolicy(),
-                input.notifyPolicy(),
-                tier);
+            input.title(),
+            input.agentCode(),
+            input.instruction(),
+            input.schedule(),
+            input.conversationMode(),
+            input.missedPolicy(),
+            input.notifyPolicy(),
+            tier);
     }
+
 
     private CurrentUser member() {
         String email = "task-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
+
 
     private Agent agentOf(CurrentUser owner, AgentVisibility visibility) {
         String code = "task-" + UUID.randomUUID().toString().substring(0, 8);
         return agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                NOW));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id()));
     }
+
 
     private void clean() {
         runs.deleteAll();
@@ -477,9 +494,10 @@ class TaskServiceTest {
         tasks.deleteAll();
     }
 
+
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 }

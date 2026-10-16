@@ -22,7 +22,6 @@ import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.agent.application.ProfileSkillFiles;
@@ -40,7 +39,6 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +56,6 @@ class AgentApiBaseUrlUpdateTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final HermesToolsetClient hermesToolsets = mock(HermesToolsetClient.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final KnownFlows flows = mock(KnownFlows.class);
 
     /** 그룹 공개 검사는 실제 서비스가 한다. 도구 목록을 읽는 대역만 이 테스트가 정한다. */
     private final AgentLifecycleService lifecycle = new AgentLifecycleService(
@@ -83,9 +80,7 @@ class AgentApiBaseUrlUpdateTest {
             users,
             lifecycle,
             endpointProbe,
-            flows,
-            mock(AgentConnectorBindings.class),
-            Clock.systemUTC()),
+            mock(AgentConnectorBindings.class)),
         currentUser);
 
     private Agent agent;
@@ -101,8 +96,7 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now());
+            null);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
@@ -176,8 +170,7 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+            1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "invalid toolset response"))
@@ -205,8 +198,7 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+            1L);
         when(agents.findByCode("dad")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("dad")).thenAnswer(call -> Optional.of(agent));
         when(hermesToolsets.readEnabled("http://127.0.0.1:2/p/dad", "dad")).thenReturn(List.of("terminal"));
@@ -237,7 +229,6 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
             null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException)ex).code())
@@ -370,8 +361,7 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            code + "@example.com",
-            null);
+            code + "@example.com");
     }
 
 

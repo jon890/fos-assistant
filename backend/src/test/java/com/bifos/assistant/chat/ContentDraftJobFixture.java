@@ -147,9 +147,9 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
         jobRows.deleteAll();
         snapshotRows.deleteAll();
         String profile = "save-" + UUID.randomUUID().toString().substring(0, 8);
-        person = people.save(AllowedPerson.of(owner.email(), "주인", profile, NOW));
+        person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
         var agent = agents.save(Agent.of(profile, "save", profile, "http://localhost", CostMode.SUBSCRIPTION,
-            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id(), NOW));
+            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id()));
         var connection = ConnectorConnection.pending(owner.id(), CONNECTOR, NOW);
         connection.ready(NOW);
         connection = connections.save(connection);
@@ -210,7 +210,7 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
         var tools = List.of(new ConnectorTool("verify", "READ", "none", null, null),
             new ConnectorTool("save_draft", "WRITE", "required", "임시저장", null));
         when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest(CONNECTOR, "검사", "", List.of(), "verify", CONNECTOR,
-            List.of(), false, 2, tools, List.of(), null, false, false, null, null, null, declaration)));
+            2, tools, List.of(), null, false, false, null, null, null, declaration)));
         try {
             var field = cache.getClass().getDeclaredField("readAt");
             field.setAccessible(true);

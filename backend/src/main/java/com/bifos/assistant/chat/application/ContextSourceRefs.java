@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.ContextSelection;
 import com.bifos.assistant.usage.application.ContextSourceRef;
 import java.util.List;
 import lombok.AccessLevel;
@@ -21,14 +22,31 @@ public final class ContextSourceRefs {
         return of(context.bundle().items());
     }
 
+
     /** 항목을 받은 순서 그대로 옮긴다. 결과를 전하는 turn 이 Memory 항목 뒤로 결과 항목을 이을 때 쓴다. */
     public static List<ContextSourceRef> of(List<ContextItem> items) {
         return items.stream()
-                .map(item -> new ContextSourceRef(
-                        item.source().name(),
-                        item.ref(),
-                        item.bodyMode().name(),
-                        item.freshness().name()))
-                .toList();
+            .map(ContextSourceRefs::refOf)
+            .toList();
+    }
+
+
+    /** 선택 근거가 있으면 함께 옮긴다. */
+    private static ContextSourceRef refOf(ContextItem item) {
+        ContextSelection selection = item.selection();
+        if (selection == null) {
+            return new ContextSourceRef(
+                item.source().name(), item.ref(), item.bodyMode().name(), item.freshness().name());
+        }
+        return new ContextSourceRef(
+            item.source().name(),
+            item.ref(),
+            item.bodyMode().name(),
+            item.freshness().name(),
+            selection.selector(),
+            selection.rank(),
+            selection.keywordScore(),
+            selection.semanticScore(),
+            selection.score());
     }
 }

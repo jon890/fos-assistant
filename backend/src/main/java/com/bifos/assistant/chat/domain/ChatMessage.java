@@ -79,16 +79,18 @@ public class ChatMessage {
     @Getter
     private Instant createdAt;
 
+
     protected ChatMessage() {}
 
+
     private ChatMessage(
-            Long conversationId,
-            MessageRole role,
-            String content,
-            Long senderUserId,
-            Long executionId,
-            Long replacesMessageId,
-            Instant now) {
+        Long conversationId,
+        MessageRole role,
+        String content,
+        Long senderUserId,
+        Long executionId,
+        Long replacesMessageId,
+        Instant now) {
         this.conversationId = conversationId;
         this.role = role;
         this.storedContent = content;
@@ -97,6 +99,7 @@ public class ChatMessage {
         this.replacesMessageId = replacesMessageId;
         this.createdAt = now;
     }
+
 
     /**
      * 본문을 낸다. 암호문이면 처음 부를 때 풀어 둔다. 풀지 못하면 {@link #UNREADABLE_CONTENT} 다.
@@ -115,9 +118,11 @@ public class ChatMessage {
         return opened;
     }
 
+
     public void attachOpener(MessageContentOpener opener) {
         this.opener = opener;
     }
+
 
     /**
      * 처음 저장하기 전에 평문을 칸에서 빼 둔다. 칸에는 빈 글이 들어간다.
@@ -134,28 +139,33 @@ public class ChatMessage {
         return detached;
     }
 
+
     /** 암호문과 그 데이터 key 를 적는다. 푼 본문은 그대로 둔다. */
     public void seal(String sealedContent, Long keyId) {
         this.storedContent = sealedContent;
         this.contentKeyId = keyId;
     }
 
+
     public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content, Instant now) {
         return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
     }
 
+
     public static ChatMessage fromAssistant(Long conversationId, String content, Long executionId, Instant now) {
         return new ChatMessage(conversationId, MessageRole.ASSISTANT, content, null, executionId, null, now);
     }
+
 
     /** Control Plane 이 적는 메시지다. 보낸 사용자도, 만든 실행도, 대신한 메시지도 없다. */
     public static ChatMessage fromSystem(Long conversationId, String content, Instant now) {
         return new ChatMessage(conversationId, MessageRole.SYSTEM, content, null, null, null, now);
     }
 
+
     public static ChatMessage regeneratedAnswer(
-            Long conversationId, String content, Long executionId, Long replacesMessageId, Instant now) {
+        Long conversationId, String content, Long executionId, Long replacesMessageId, Instant now) {
         return new ChatMessage(
-                conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId, now);
+            conversationId, MessageRole.ASSISTANT, content, null, executionId, replacesMessageId, now);
     }
 }

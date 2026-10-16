@@ -21,7 +21,7 @@ const STATE_ORDER: Record<AgentChoiceState, number> = {
 /**
  * 연결을 마친 뒤 고를 수 있는 내 에이전트 목록을 만든다.
  *
- * <p>붙이기는 주인만 하고 예전 방식의 연결 에이전트는 다른 연결을 받지 않으므로 둘을 뺀다. 그룹에 공개한 에이전트는
+ * <p>붙이기는 주인만 한다. 그룹에 공개한 에이전트는
  * 붙일 수 없지만 까닭을 보이려고 남긴다. 순서는 `preferred` 가 맨 앞이고, 그다음 붙일 수 있는 것, 붙은 것, 그룹
  * 공개 순서다. 같은 상태 안에서는 받은 순서를 지킨다.
  */
@@ -32,7 +32,7 @@ export function agentChoices(
 ): AgentChoice[] {
   const bound = new Set(bindings.map((binding) => binding.agentCode));
   return agents
-    .filter((agent) => agent.ownedByMe && !agent.connectorManaged)
+    .filter((agent) => agent.ownedByMe)
     .map((agent): AgentChoice => {
       const state: AgentChoiceState = bound.has(agent.code)
         ? "BOUND"

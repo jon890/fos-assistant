@@ -107,8 +107,6 @@ class ConnectorPolicyEndpointTest {
         List.of(),
         "read_inbox",
         "mail",
-        List.of(),
-        false,
         2,
         List.of(new ConnectorTool("read_inbox", "READ", "none", null, null)));
 
@@ -174,7 +172,7 @@ class ConnectorPolicyEndpointTest {
         ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING, MAIL_MANIFEST));
 
-        owner = users.save(AppUser.of("policy-owner@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("policy-owner@example.com", "주인", 1L, UserRole.MEMBER));
         agent = Agent.of(
             "policy-" + UUID.randomUUID(),
             "검사용 메모",
@@ -183,9 +181,8 @@ class ConnectorPolicyEndpointTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now());
-        agent.markConnectorManaged();
+            owner.id());
+
         agent = agents.save(agent);
         token = tokens.issue(PROFILE, "owner").rawToken();
         root = "fos-" + UUID.randomUUID();
@@ -259,8 +256,8 @@ class ConnectorPolicyEndpointTest {
     void toolWithClosedGrantIsBlockedEvenWithValidGrantRow() throws Exception {
         connect(true);
         Instant later = NOW.plus(Duration.ofDays(3650));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "mail_note", later, NOW));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", later, NOW));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "mail_note", later));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", later));
 
         HttpResponse<String> closed = ask("mcp__demo__mail_note", "mail_note");
         // 같은 모양의 허락 줄이 닫지 않은 도구는 통과시킨다. 위의 block 이 선언 때문임을 확인한다.
@@ -747,7 +744,7 @@ class ConnectorPolicyEndpointTest {
     @Test
     @DisplayName("연결의 주인이 실행의 사용자와 다르면 block 이고 줄을 남기지 않는다")
     void connectionOfAnotherUserIsBlockedWithoutRow() throws Exception {
-        AppUser other = users.save(AppUser.of("policy-other@example.com", "다른 사람", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser other = users.save(AppUser.of("policy-other@example.com", "다른 사람", 1L, UserRole.MEMBER));
         bind(agent, connection(other, DEMO, true), true);
 
         HttpResponse<String> response = ask("mcp__demo__list_scopes", "list_scopes");
@@ -855,7 +852,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("살펴보기 트리에서 READ 와 required 로 선언한 도구는 상시 허락이 있어도 READ_ONLY_RUN 이고 승인 줄과 알림이 없다")
     void readToolDeclaringApprovalInCheckTreeIsDeniedEvenWithGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650)), NOW));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650))));
         String checkRoot = startCheckTreeChild();
 
         HttpResponse<String> response = askIn(checkRoot, "mcp__demo__peek_note", "peek_note", ARGS);
@@ -889,7 +886,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("같은 사용자의 보통 turn 에서는 쓰기 도구가 지금처럼 승인 필요이고 상시 허락한 READ 와 required 도구는 allow 다")
     void sameUserNormalTurnKeepsApprovalAndGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650)), NOW));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650))));
         startCheckTreeChild();
         String normalRoot = startNormalRun();
 
@@ -941,7 +938,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("쓰기를 허용한 살펴보기에서 쓰기 도구는 상시 허락이 있어도 action_id 와 PENDING 승인 줄과 승인 알림을 만든다")
     void writeToolInWritesAllowedCheckTreeAsksApprovalEvenWithGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", NOW.plus(Duration.ofDays(3650)), NOW));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", NOW.plus(Duration.ofDays(3650))));
         String checkRoot = startCheckTreeChild(true);
 
         HttpResponse<String> response = askIn(checkRoot, "mcp__demo__write_note", "write_note", ARGS);
@@ -1161,8 +1158,7 @@ class ConnectorPolicyEndpointTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
@@ -1259,7 +1255,7 @@ class ConnectorPolicyEndpointTest {
 
     private static ConnectorManifest manifest(int schema, List<ConnectorTool> tools) {
         return new ConnectorManifest(
-            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, schema, tools);
+            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", schema, tools);
     }
 
 

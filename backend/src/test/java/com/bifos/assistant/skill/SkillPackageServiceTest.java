@@ -43,7 +43,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,6 +95,7 @@ class SkillPackageServiceTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+
     @BeforeEach
     void setUp() {
         for (String profile : List.of(OWNED_PROFILE, GROUP_PROFILE)) {
@@ -110,11 +110,11 @@ class SkillPackageServiceTest {
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", true)));
     }
 
+
     @Test
     @DisplayName("새 스킬 미리보기는 모든 파일이 ADDED 이고 지문이 없으며 아무것도 쓰지 않는다")
     void previewOfNewSkillIsAllAddedAndWritesNothing() throws IOException {
-        SkillPackagePreview preview =
-                packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("weekly-plan"), "references/guide.md", "안내"));
+        SkillPackagePreview preview = packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("weekly-plan"), "references/guide.md", "안내"));
 
         assertThat(preview.name()).isEqualTo("weekly-plan");
         assertThat(preview.description()).isEqualTo("이번 주 계획을 세운다");
@@ -124,66 +124,69 @@ class SkillPackageServiceTest {
         assertThat(preview.hasScripts()).isFalse();
         assertThat(preview.problems()).isEmpty();
         assertThat(preview.files())
-                .containsExactly(
-                        new SkillPackageFile("SKILL.md", utf8(skillMd("weekly-plan")), ADDED),
-                        new SkillPackageFile("references/guide.md", 6L, ADDED));
+            .containsExactly(
+                new SkillPackageFile("SKILL.md", utf8(skillMd("weekly-plan")), ADDED),
+                new SkillPackageFile("references/guide.md", 6L, ADDED));
         assertThat(store.currentVersion(OWNED_PROFILE)).as("미리보기 뒤 지금 버전").isEmpty();
         verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
     }
+
 
     @Test
     @DisplayName("새 스킬 묶음을 올리면 저장되고 Hermes 설정 쓰기가 불린다")
     void uploadOfNewSkillSavesAndPublishes() throws IOException {
         SkillDetail saved = packages.upload(
-                OWNER, OWNED, zip("SKILL.md", skillMd("weekly-plan"), "references/guide.md", "안내"), null);
+            OWNER, OWNED, zip("SKILL.md", skillMd("weekly-plan"), "references/guide.md", "안내"), null);
 
         assertThat(saved.name()).isEqualTo("weekly-plan");
         assertThat(saved.previousSavedAt()).isNull();
         assertThat(store.readCurrent(OWNED_PROFILE))
-                .containsEntry(
-                        "weekly-plan",
-                        new SkillBundle(
-                                "weekly-plan",
-                                skillMd("weekly-plan"),
-                                List.of(new SkillFile("references/guide.md", "안내"))));
+            .containsEntry(
+                "weekly-plan",
+                new SkillBundle(
+                    "weekly-plan",
+                    skillMd("weekly-plan"),
+                    List.of(new SkillFile("references/guide.md", "안내"))));
         verify(skillClient).publish(eq(OWNED_PROFILE), anyList(), any(), eq("u" + OWNER.id()));
     }
+
 
     @Test
     @DisplayName("같은 이름의 다른 묶음은 바뀜을 파일마다 주고, 그 지문으로 올리면 덮어쓰며 첫 내용이 이전 버전이 된다")
     void overwriteWithPreviewDigestKeepsFirstContentAsPrevious() throws IOException {
         skills.save(
-                OWNER,
-                OWNED,
-                "weekly-plan",
-                skillMd("weekly-plan"),
-                List.of(new SkillFileInput("references/a.md", "가"), new SkillFileInput("references/b.md", "나나")));
+            OWNER,
+            OWNED,
+            "weekly-plan",
+            skillMd("weekly-plan"),
+            List.of(new SkillFileInput("references/a.md", "가"), new SkillFileInput("references/b.md", "나나")));
         SkillBundle first = store.readCurrent(OWNED_PROFILE).get("weekly-plan");
         byte[] zip = zip(
-                "SKILL.md", skillMd("weekly-plan"),
-                "references/a.md", "가 고침",
-                "references/c.md", "다");
+            "SKILL.md", skillMd("weekly-plan"),
+            "references/a.md", "가 고침",
+            "references/c.md", "다");
 
         SkillPackagePreview preview = packages.preview(OWNER, OWNED, zip);
 
         assertThat(preview.existing()).isTrue();
         assertThat(preview.baseDigest()).isEqualTo(first.digest());
         assertThat(preview.files())
-                .containsExactly(
-                        new SkillPackageFile("SKILL.md", utf8(skillMd("weekly-plan")), SAME),
-                        new SkillPackageFile("references/a.md", utf8("가 고침"), CHANGED),
-                        new SkillPackageFile("references/c.md", 3L, ADDED),
-                        new SkillPackageFile("references/b.md", 6L, REMOVED));
+            .containsExactly(
+                new SkillPackageFile("SKILL.md", utf8(skillMd("weekly-plan")), SAME),
+                new SkillPackageFile("references/a.md", utf8("가 고침"), CHANGED),
+                new SkillPackageFile("references/c.md", 3L, ADDED),
+                new SkillPackageFile("references/b.md", 6L, REMOVED));
 
         SkillDetail saved = packages.upload(OWNER, OWNED, zip, preview.baseDigest());
 
         assertThat(saved.previousSavedAt()).isNotNull();
         assertThat(previousStore.readPrevious(OWNED_PROFILE, "weekly-plan").map(PreviousSkill::bundle))
-                .contains(first);
+            .contains(first);
         assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").files())
-                .extracting(SkillFile::path)
-                .containsExactly("references/a.md", "references/c.md");
+            .extracting(SkillFile::path)
+            .containsExactly("references/a.md", "references/c.md");
     }
+
 
     @Test
     @DisplayName("지문 없이 덮어쓰거나, 미리보기 뒤 고친 스킬에 옛 지문으로 올리면 SKILL_CHANGED 이고 지금 버전이 그대로다")
@@ -197,13 +200,14 @@ class SkillPackageServiceTest {
         assertCode(() -> packages.upload(OWNER, OWNED, zip, null), ErrorCode.SKILL_CHANGED);
         assertCode(() -> packages.upload(OWNER, OWNED, zip, staleDigest), ErrorCode.SKILL_CHANGED);
         assertCode(
-                () -> packages.upload(OWNER, OWNED, zip("SKILL.md", skillMd("shopping")), staleDigest),
-                ErrorCode.SKILL_CHANGED);
+            () -> packages.upload(OWNER, OWNED, zip("SKILL.md", skillMd("shopping")), staleDigest),
+            ErrorCode.SKILL_CHANGED);
 
         assertThat(store.currentVersion(OWNED_PROFILE)).isEqualTo(version);
         assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd())
-                .endsWith("\n편집기");
+            .endsWith("\n편집기");
     }
+
 
     @Test
     @DisplayName("terminal 이 꺼진 에이전트에 scripts 묶음은 미리보기에 SCRIPTS_NEED_SANDBOX, 올리기는 SKILL_SCRIPTS_NEED_SANDBOX 다")
@@ -214,24 +218,26 @@ class SkillPackageServiceTest {
 
         assertThat(preview.hasScripts()).isTrue();
         assertThat(preview.problems())
-                .containsExactly(new SkillPackageProblem(SkillPackageReason.SCRIPTS_NEED_SANDBOX, null));
+            .containsExactly(new SkillPackageProblem(SkillPackageReason.SCRIPTS_NEED_SANDBOX, null));
         assertCode(() -> packages.upload(OWNER, OWNED, zip, null), ErrorCode.SKILL_SCRIPTS_NEED_SANDBOX);
         assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
     }
+
 
     @Test
     @DisplayName("새 스킬의 설명은 60자까지 받고 61자면 DESCRIPTION_TOO_LONG, Hermes 기본 스킬과 같은 이름은 NAME_TAKEN 이다")
     void newSkillRulesShowAsProblems() throws IOException {
         assertThat(packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("sixty", "가".repeat(60))))
-                        .problems())
+            .problems())
                 .isEmpty();
         assertThat(packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("sixty-one", "가".repeat(61))))
-                        .problems())
+            .problems())
                 .containsExactly(new SkillPackageProblem(SkillPackageReason.DESCRIPTION_TOO_LONG, "SKILL.md"));
         assertThat(packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("hermes-help")))
-                        .problems())
+            .problems())
                 .containsExactly(new SkillPackageProblem(SkillPackageReason.NAME_TAKEN, null));
     }
+
 
     @Test
     @DisplayName("편집자가 아니면 zip 을 보기 전에 미리보기와 올리기, 큰 zip 경로 모두 FORBIDDEN 이다")
@@ -244,6 +250,7 @@ class SkillPackageServiceTest {
         assertCode(() -> packages.uploadTooLarge(MEMBER, GROUP), ErrorCode.FORBIDDEN);
     }
 
+
     @Test
     @DisplayName("문제가 있는 묶음을 올리면 SKILL_PACKAGE_INVALID 이고 메시지에 첫 문제가 있으며 지금 버전이 그대로다")
     void invalidPackageUploadNamesFirstProblem() throws IOException {
@@ -252,15 +259,16 @@ class SkillPackageServiceTest {
         byte[] withoutSkillMd = zip("references/a.md", "안내");
 
         assertMessage(
-                () -> packages.upload(OWNER, OWNED, withSecret, null),
-                ErrorCode.SKILL_PACKAGE_INVALID,
-                "SECRET_VALUE: references/a.md");
+            () -> packages.upload(OWNER, OWNED, withSecret, null),
+            ErrorCode.SKILL_PACKAGE_INVALID,
+            "SECRET_VALUE: references/a.md");
         assertMessage(
-                () -> packages.upload(OWNER, OWNED, withoutSkillMd, null),
-                ErrorCode.SKILL_PACKAGE_INVALID,
-                "NO_SKILL_MD");
+            () -> packages.upload(OWNER, OWNED, withoutSkillMd, null),
+            ErrorCode.SKILL_PACKAGE_INVALID,
+            "NO_SKILL_MD");
         assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
     }
+
 
     @Test
     @DisplayName("올린 스킬이 한도에 닿으면 새 스킬 미리보기는 LIMIT_REACHED 이고 이미 있는 스킬은 문제가 없다")
@@ -273,37 +281,40 @@ class SkillPackageServiceTest {
         store.markPublished(OWNED_PROFILE, store.writeVersion(OWNED_PROFILE, bundles));
 
         assertThat(packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("weekly-plan")))
-                        .problems())
+            .problems())
                 .containsExactly(new SkillPackageProblem(SkillPackageReason.LIMIT_REACHED, null));
         assertThat(packages.preview(OWNER, OWNED, zip("SKILL.md", skillMd("skill-01") + "\n고침"))
-                        .problems())
+            .problems())
                 .isEmpty();
     }
+
 
     @Test
     @DisplayName("크기 상한을 넘은 zip 은 편집자에게 미리보기의 ZIP_TOO_LARGE 와 올리기의 SKILL_PACKAGE_INVALID 다")
     void tooLargeZipForEditor() {
         assertThat(packages.previewTooLarge(OWNER, OWNED).problems())
-                .containsExactly(new SkillPackageProblem(SkillPackageReason.ZIP_TOO_LARGE, null));
+            .containsExactly(new SkillPackageProblem(SkillPackageReason.ZIP_TOO_LARGE, null));
         assertMessage(
-                () -> {
-                    throw packages.uploadTooLarge(OWNER, OWNED);
-                },
-                ErrorCode.SKILL_PACKAGE_INVALID,
-                "ZIP_TOO_LARGE");
+            () -> {
+                throw packages.uploadTooLarge(OWNER, OWNED);
+            },
+            ErrorCode.SKILL_PACKAGE_INVALID,
+            "ZIP_TOO_LARGE");
     }
+
 
     @Test
     @DisplayName("묶음 검사를 거치지 않고 비밀 요청 칸이 있는 묶음을 바로 저장하면 VALIDATION_FAILED 이고 저장하지 않는다")
     void saveUploadedRejectsSecretRequestWithoutPackageCheck() {
         String skillMd = "---\nname: weekly-plan\ndescription: 이번 주 계획을 세운다\n"
-                + "required_environment_variables:\n  - name: EXAMPLE_TOKEN\n---\n# 본문\n";
+            + "required_environment_variables:\n  - name: EXAMPLE_TOKEN\n---\n# 본문\n";
         SkillBundle bundle = new SkillBundle("weekly-plan", skillMd, List.of());
 
         assertCode(() -> skills.saveUploaded(OWNER, OWNED, bundle, null), ErrorCode.VALIDATION_FAILED);
         assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
         assertThat(store.readPending(OWNED_PROFILE)).isEmpty();
     }
+
 
     @Test
     @DisplayName("지문이 빈 문자열이거나 공백뿐인 새 스킬 올리기는 지문이 없는 것으로 보고 저장한다")
@@ -313,6 +324,7 @@ class SkillPackageServiceTest {
 
         assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("weekly-plan", "shopping");
     }
+
 
     /** 경로와 내용을 번갈아 받아 그 차례대로 항목을 쓴 zip 이다. */
     private static byte[] zip(String... pathsAndContents) throws IOException {
@@ -327,43 +339,48 @@ class SkillPackageServiceTest {
         return bytes.toByteArray();
     }
 
+
     private static long utf8(String text) {
         return text.getBytes(StandardCharsets.UTF_8).length;
     }
+
 
     private static String skillMd(String name) {
         return skillMd(name, "이번 주 계획을 세운다");
     }
 
+
     private static String skillMd(String name, String description) {
         return "---\nname: " + name + "\ndescription: " + description + "\n---\n# " + name + "\n";
     }
 
+
     private static Agent agent(String code, String profile, AgentVisibility visibility) {
         return Agent.of(
-                code,
-                code,
-                profile,
-                "http://agent-runtime.test/p/" + profile,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                OWNER.id(),
-                Instant.now());
+            code,
+            code,
+            profile,
+            "http://agent-runtime.test/p/" + profile,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            OWNER.id());
     }
+
 
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(expected);
     }
+
 
     private static void assertMessage(ThrowingCallable call, ErrorCode expected, String message) {
         assertThatThrownBy(call)
-                .isInstanceOf(ApiException.class)
-                .hasMessage(message)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .hasMessage(message)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(expected);
     }
 }

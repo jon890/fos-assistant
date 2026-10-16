@@ -40,6 +40,7 @@ public final class WorkspaceUsageWalker {
         return new WorkspaceMeasured(counter.bytes, counter.entries, counter.partial);
     }
 
+
     /** 링크를 따라가지 않는 방문자다. 예외를 던지지 않고 실패를 {@code partial} 로 남긴다. */
     private static final class Counter extends SimpleFileVisitor<Path> {
         private final Path start;
@@ -50,12 +51,14 @@ public final class WorkspaceUsageWalker {
         private long entries;
         private boolean partial;
 
+
         private Counter(Path start, long maxEntries, Instant deadline, Clock clock) {
             this.start = start;
             this.maxEntries = maxEntries;
             this.deadline = deadline;
             this.clock = clock;
         }
+
 
         @Override
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attributes) {
@@ -65,10 +68,12 @@ public final class WorkspaceUsageWalker {
             return count(0);
         }
 
+
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
             return count(attributes.isRegularFile() ? attributes.size() : 0);
         }
+
 
         /** 읽지 못한 항목이다. 항목으로 세고, 디렉터리면 그 아래를 세지 못했으므로 일부만 센 것이다. */
         @Override
@@ -77,6 +82,7 @@ public final class WorkspaceUsageWalker {
             return file.equals(start) ? FileVisitResult.CONTINUE : count(0);
         }
 
+
         @Override
         public FileVisitResult postVisitDirectory(Path dir, IOException ex) {
             if (ex != null) {
@@ -84,6 +90,7 @@ public final class WorkspaceUsageWalker {
             }
             return FileVisitResult.CONTINUE;
         }
+
 
         private FileVisitResult count(long size) {
             if (entries >= maxEntries || clock.instant().isAfter(deadline)) {

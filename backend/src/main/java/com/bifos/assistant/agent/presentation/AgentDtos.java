@@ -61,12 +61,10 @@ public final class AgentDtos {
      * 사용자가 대화를 시작할 때 고르는 에이전트 한 줄.
      *
      * @param acceptsAttachments 이 에이전트의 대화에 사진을 붙일 수 있다. 화면이 이때만 사진 단추를
-     * 둔다. 흐름 이름은 내보내지 않는다
+     * 둔다
      * @param editable 요청자가 이 에이전트를 관리할 수 있다. 주인과 {@code ADMIN} 이다. 화면이 공개와 삭제를
      * 보일지 이 값으로 정한다
      * @param ownedByMe 요청자가 이 에이전트의 주인이다
-     * @param connectorManaged 커넥터 연결이 만든 에이전트다. 화면이 도구와 스킬 편집을 그리지 않는다
-     * @param runsTasks 예약 작업을 돌릴 수 있다. 흐름이 붙은 에이전트는 거짓이다. 화면이 작업의 에이전트 목록을 이 값으로 거른다
      */
     public record AgentView(
         String code,
@@ -74,19 +72,15 @@ public final class AgentDtos {
         String visibility,
         boolean acceptsAttachments,
         boolean editable,
-        boolean ownedByMe,
-        boolean connectorManaged,
-        boolean runsTasks) {
-        static AgentView from(Agent agent, boolean editable, boolean ownedByMe, boolean runsTasks) {
+        boolean ownedByMe) {
+        static AgentView from(Agent agent, boolean editable, boolean ownedByMe) {
             return new AgentView(
                 agent.code(),
                 agent.name(),
                 agent.visibility().name(),
                 agent.acceptsAttachments(),
                 editable,
-                ownedByMe,
-                agent.connectorManaged(),
-                runsTasks);
+                ownedByMe);
         }
     }
 

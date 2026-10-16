@@ -42,28 +42,28 @@ class RootExecutionQueryTest {
 
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
         agent = agents.findByCode("root-query-dad")
-                .orElseGet(() -> agents.save(Agent.of(
-                        "root-query-dad",
-                        "루트 조회 아빠",
-                        // profile 이름은 유일하다. 다른 검사가 남긴 dad 에이전트와 겹치지 않게 이 검사만의 이름을 쓴다
-                        "root-query-dad",
-                        "http://127.0.0.1:1/p/dad",
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        USER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                "root-query-dad",
+                "루트 조회 아빠",
+                // profile 이름은 유일하다. 다른 검사가 남긴 dad 에이전트와 겹치지 않게 이 검사만의 이름을 쓴다
+                "root-query-dad",
+                "http://127.0.0.1:1/p/dad",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID)));
     }
+
 
     @Test
     @DisplayName("루트만 번호 내림차순으로 담고 자식을 가진 루트와 대화의 공개 식별자를 붙인다")
     void pageHoldsRootsNewestFirstWithChildrenAndPublicIds() {
-        Conversation conversation =
-                conversations.save(Conversation.startedBy(USER_ID, "대화", agent.id(), Instant.now()));
+        Conversation conversation = conversations.save(Conversation.startedBy(USER_ID, "대화", agent.id(), Instant.now()));
         AgentExecution first = execution(USER_ID, conversation.id(), null, null);
         AgentExecution second = execution(USER_ID, conversation.id(), null, null);
         execution(USER_ID, conversation.id(), first.id(), first.id());
@@ -74,6 +74,7 @@ class RootExecutionQueryTest {
         assertThat(page.idsHavingChildren()).containsExactly(first.id());
         assertThat(page.conversationPublicIds()).hasSize(1).containsEntry(conversation.id(), conversation.publicId());
     }
+
 
     @Test
     @DisplayName("실행이 하나도 없는 사용자는 세 칸이 모두 빈다")
@@ -87,6 +88,7 @@ class RootExecutionQueryTest {
         assertThat(page.conversationPublicIds()).isEmpty();
     }
 
+
     @Test
     @DisplayName("size 가 1 이면 가장 최근 루트 하나만 온다")
     void sizeOneReturnsOnlyNewestRoot() {
@@ -98,17 +100,18 @@ class RootExecutionQueryTest {
         assertThat(page.executions()).extracting(AgentExecution::id).containsExactly(newest.id());
     }
 
+
     private AgentExecution execution(Long userId, Long conversationId, Long parentId, Long rootId) {
         return executions.save(AgentExecution.builder()
-                .userId(userId)
-                .conversationId(conversationId)
-                .agentId(agent.id())
-                .parentExecutionId(parentId)
-                .rootExecutionId(rootId)
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(userId)
+            .conversationId(conversationId)
+            .agentId(agent.id())
+            .parentExecutionId(parentId)
+            .rootExecutionId(rootId)
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
 }

@@ -106,9 +106,9 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         snapshotRows.deleteAll();
         jobRows.deleteAll();
         String profile = "preview-" + UUID.randomUUID();
-        person = people.save(AllowedPerson.of(owner.email(), "주인", profile, NOW));
+        person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
         var agent = agents.save(Agent.of(profile, "preview", profile, "http://localhost", CostMode.SUBSCRIPTION,
-            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id(), NOW));
+            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id()));
         var connection = ConnectorConnection.pending(owner.id(), "snapshot-test", NOW);
         connection.ready(NOW);
         connection = connections.save(connection);
@@ -122,8 +122,8 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             Map.of("compile", true, "start", false, "status", false));
         when(catalog.readCatalog()).thenAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test", List.of(),
-                false, 1, List.of(), List.of(), null, false, false, null, null, null, declaration));
+            return List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test",
+                1, List.of(), List.of(), null, false, false, null, null, null, declaration));
         });
         doAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
@@ -380,8 +380,8 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     void recoversAfterPolicyChangeAndRequiresCallerComparison() throws Exception {
         var first = preview();
         var prepared = bindingAccess.prepare(owner, binding.agent().id(), binding.id());
-        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test", List.of(),
-            false, 1, List.of(), List.of(), null, false, false, null, null, null,
+        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test",
+            1, List.of(), List.of(), null, false, false, null, null, null,
             new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_changed", "start_snapshot", "status_snapshot",
                 Map.of("compile", true, "start", false, "status", false)))));
         var field = cache.getClass().getDeclaredField("readAt");

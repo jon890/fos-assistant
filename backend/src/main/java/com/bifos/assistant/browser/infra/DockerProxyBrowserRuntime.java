@@ -50,25 +50,28 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
     private final LiveProperties<BrowserProperties> properties;
     private final RestClient client;
 
+
     @Autowired
     public DockerProxyBrowserRuntime(LiveProperties<BrowserProperties> properties) {
         this(properties, RestClient.builder().requestFactory(requestFactory()));
     }
+
 
     DockerProxyBrowserRuntime(LiveProperties<BrowserProperties> properties, RestClient.Builder builder) {
         this.properties = properties;
         this.client = builder.build();
     }
 
+
     @Override
     public String create(String profileKey) {
         JsonNode body = call(
-                "create",
-                () -> client.post()
-                        .uri(path("/containers/create"))
-                        .body(createBody(profileKey))
-                        .retrieve()
-                        .body(JsonNode.class));
+            "create",
+            () -> client.post()
+                .uri(path("/containers/create"))
+                .body(createBody(profileKey))
+                .retrieve()
+                .body(JsonNode.class));
         String id = body == null ? "" : body.path("Id").asString("");
         if (id.isBlank()) {
             throw new IllegalStateException("browser proxy create returned no container id");
@@ -76,51 +79,56 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         return id;
     }
 
+
     @Override
     public void start(String containerId) {
         call(
-                "start",
-                () -> client.post()
-                        .uri(path("/containers/{id}/start"), containerId)
-                        .retrieve()
-                        .toBodilessEntity());
+            "start",
+            () -> client.post()
+                .uri(path("/containers/{id}/start"), containerId)
+                .retrieve()
+                .toBodilessEntity());
     }
+
 
     @Override
     public void stop(String containerId) {
         ignoringMissing(
-                "stop",
-                () -> client.post()
-                        .uri(path("/containers/{id}/stop?t=10"), containerId)
-                        .retrieve()
-                        .toBodilessEntity());
+            "stop",
+            () -> client.post()
+                .uri(path("/containers/{id}/stop?t=10"), containerId)
+                .retrieve()
+                .toBodilessEntity());
     }
+
 
     @Override
     public void remove(String containerId) {
         ignoringMissing(
-                "remove",
-                () -> client.delete()
-                        .uri(path("/containers/{id}?force=1"), containerId)
-                        .retrieve()
-                        .toBodilessEntity());
+            "remove",
+            () -> client.delete()
+                .uri(path("/containers/{id}?force=1"), containerId)
+                .retrieve()
+                .toBodilessEntity());
     }
+
 
     @Override
     public Optional<URI> cdpAddress(String containerId) {
         BrowserProperties settings = properties.current();
         String ip = inspect(containerId)
-                .map(body -> body.path("NetworkSettings")
-                        .path("Networks")
-                        .path(settings.network())
-                        .path("IPAddress")
-                        .asString(""))
-                .orElse("");
+            .map(body -> body.path("NetworkSettings")
+                .path("Networks")
+                .path(settings.network())
+                .path("IPAddress")
+                .asString(""))
+            .orElse("");
         if (ip.isBlank()) {
             return Optional.empty();
         }
         return Optional.of(URI.create("http://" + ip + ":" + settings.cdpPort()));
     }
+
 
     /** 끝난 컨테이너는 Docker 가 {@code exited} 나 {@code dead} 로 보여 준다. 그 밖의 상태는 아직 끝나지 않은 것이다. */
     @Override
@@ -133,14 +141,15 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         return OptionalInt.of(state.get().path("ExitCode").asInt(-1));
     }
 
+
     @Override
     public List<RuntimeContainer> list() {
         URI uri = UriComponentsBuilder.fromUriString(path("/containers/json"))
-                .queryParam("all", "1")
-                .queryParam("filters", "{filters}")
-                .encode()
-                .buildAndExpand(LABEL_FILTER)
-                .toUri();
+            .queryParam("all", "1")
+            .queryParam("filters", "{filters}")
+            .encode()
+            .buildAndExpand(LABEL_FILTER)
+            .toUri();
         JsonNode body = call("list", () -> client.get().uri(uri).retrieve().body(JsonNode.class));
         List<RuntimeContainer> containers = new ArrayList<>();
         if (body == null || !body.isArray()) {
@@ -149,12 +158,13 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         for (JsonNode node : body) {
             String key = node.path("Labels").path(USER_LABEL).asString("");
             containers.add(new RuntimeContainer(
-                    node.path("Id").asString(""),
-                    key.isBlank() ? null : key,
-                    "running".equals(node.path("State").asString(""))));
+                node.path("Id").asString(""),
+                key.isBlank() ? null : key,
+                "running".equals(node.path("State").asString(""))));
         }
         return containers;
     }
+
 
     /** proxy 정책과 맞춘 생성 본문이다. 칸의 순서는 뜻이 없다. */
     Map<String, Object> createBody(String profileKey) {
@@ -162,9 +172,9 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         long memory = settings.memoryMb() * MIB;
         Map<String, Object> hostConfig = new LinkedHashMap<>();
         hostConfig.put(
-                "Binds",
-                List.of(trimSlash(settings.profileHostRoot()) + "/" + profileKey + ":" + settings.profileMount()
-                        + ":rw"));
+            "Binds",
+            List.of(trimSlash(settings.profileHostRoot()) + "/" + profileKey + ":" + settings.profileMount()
+                + ":rw"));
         hostConfig.put("NetworkMode", settings.network());
         hostConfig.put("Memory", memory);
         hostConfig.put("MemorySwap", memory);
@@ -182,19 +192,21 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         return body;
     }
 
+
     /** 그 컨테이너의 inspect 본문이다. proxy 가 그 컨테이너를 모르면 비어 있다. */
     private Optional<JsonNode> inspect(String containerId) {
         try {
             return Optional.ofNullable(call(
-                    "inspect",
-                    () -> client.get()
-                            .uri(path("/containers/{id}/json"), containerId)
-                            .retrieve()
-                            .body(JsonNode.class)));
+                "inspect",
+                () -> client.get()
+                    .uri(path("/containers/{id}/json"), containerId)
+                    .retrieve()
+                    .body(JsonNode.class)));
         } catch (MissingContainer ex) {
             return Optional.empty();
         }
     }
+
 
     private String path(String path) {
         String base = properties.current().proxyUrl();
@@ -204,6 +216,7 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         return trimSlash(base) + path;
     }
 
+
     private void ignoringMissing(String action, Supplier<?> request) {
         try {
             call(action, request);
@@ -211,6 +224,7 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
             log.debug("browser container already gone action={}", action);
         }
     }
+
 
     private static <T> T call(String action, Supplier<T> request) {
         try {
@@ -225,15 +239,18 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         }
     }
 
+
     private static IllegalStateException failed(String action, RestClientResponseException ex) {
         int status = ex.getStatusCode().value();
         log.warn("browser proxy request failed action={} status={}", action, status);
         return new IllegalStateException("browser proxy " + action + " failed with status " + status);
     }
 
+
     private static String trimSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
+
 
     private static BufferingClientHttpRequestFactory requestFactory() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -241,6 +258,7 @@ public class DockerProxyBrowserRuntime implements BrowserRuntime {
         factory.setReadTimeout(READ_TIMEOUT);
         return new BufferingClientHttpRequestFactory(factory);
     }
+
 
     /** proxy 가 그 컨테이너를 모른다고 답했다. 멈추기와 지우기에서는 성공으로 본다. */
     private static final class MissingContainer extends RuntimeException {

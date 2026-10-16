@@ -23,35 +23,39 @@ public class ValueEvaluationService {
     private final ValueEvaluator evaluator;
     private final ValueEvaluationStore store;
 
+
     public ValueEvaluation evaluate(CurrentUser user, Long checkId, String providerId) {
         DecisionProvider provider = provider(providerId);
         return run(user, store.begin(user.id(), checkId, provider.id()), provider);
     }
+
 
     public ValueEvaluation replay(CurrentUser user, Long sourceId, String providerId) {
         DecisionProvider provider = provider(providerId);
         return run(user, store.beginReplay(user.id(), sourceId, provider.id()), provider);
     }
 
+
     public ValueEvaluation read(CurrentUser user, Long id) {
         return store.read(user.id(), id);
     }
 
+
     private ValueEvaluation run(CurrentUser user, ValueEvaluation row, DecisionProvider provider) {
         DecisionEvidence input = row.evidence();
-        DecisionResponse response =
-                evaluator.evaluate(input.state(), input.questions(), provider, new DecisionRequest(user));
+        DecisionResponse response = evaluator.evaluate(input.state(), input.questions(), provider, new DecisionRequest(user));
         store.finish(
-                user.id(),
-                row.id(),
-                new DecisionEvidence(input.state(), input.questions(), response.provider(), response.result()));
+            user.id(),
+            row.id(),
+            new DecisionEvidence(input.state(), input.questions(), response.provider(), response.result()));
         return store.read(user.id(), row.id());
     }
 
+
     private DecisionProvider provider(String id) {
         return providers.stream()
-                .filter(each -> each.id().equals(id))
-                .findFirst()
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown decision provider"));
+            .filter(each -> each.id().equals(id))
+            .findFirst()
+            .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown decision provider"));
     }
 }

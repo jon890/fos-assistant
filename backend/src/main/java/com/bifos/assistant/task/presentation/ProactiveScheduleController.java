@@ -22,15 +22,17 @@ public class ProactiveScheduleController {
     private final CurrentUserProvider currentUser;
     private final ProactiveScheduleService schedules;
 
+
     @GetMapping
     public ProactiveScheduleView get(@PathVariable String code) {
         return ProactiveScheduleView.from(schedules.get(currentUser.require(), code));
     }
 
+
     @PutMapping
     public ProactiveScheduleView update(
-            @PathVariable String code, @Valid @RequestBody ProactiveScheduleRequest request) {
+        @PathVariable String code, @Valid @RequestBody ProactiveScheduleRequest request) {
         return ProactiveScheduleView.from(
-                schedules.update(currentUser.require(), code, request.enabled(), request.time(), request.timezone()));
+            schedules.update(currentUser.require(), code, request.enabled(), request.time(), request.timezone()));
     }
 }

@@ -26,8 +26,8 @@ class ArtifactControllerNotModifiedTest {
     private static final String ETAG = "W/\"1f-19a2b3c4d5e\"";
 
     private static final Instant SECOND = Instant.parse("2026-09-01T10:00:00Z");
-    private static final String SECOND_AS_HEADER =
-            DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC).format(SECOND);
+    private static final String SECOND_AS_HEADER = DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneOffset.UTC).format(SECOND);
+
 
     /**
      * 이 경우만 Spring 과 다르다. Spring 7 은 GET 의 {@code If-None-Match: *} 를 맞지 않은 것으로 보아 200 을 준다.
@@ -43,19 +43,22 @@ class ArtifactControllerNotModifiedTest {
         assertThat(spring(ETAG, SECOND, "If-None-Match", "*")).isFalse();
     }
 
+
     @Test
     @DisplayName("쉼표로 나열한 값 가운데 하나가 맞으면 참이다")
     void trueWhenOneOfCommaSeparatedValuesMatches() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", " + ETAG + ", W/\"another\""))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("요청에만 W 가 있어도 참이다")
     void trueEvenIfOnlyRequestHasWeakPrefix() {
         assertThat(judged("\"1f-19a2b3c4d5e\"", SECOND, "If-None-Match", "W/\"1f-19a2b3c4d5e\""))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("현재 값에만 W 가 있어도 참이다")
@@ -63,50 +66,57 @@ class ArtifactControllerNotModifiedTest {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"1f-19a2b3c4d5e\"")).isTrue();
     }
 
+
     @Test
     @DisplayName("어느 값도 맞지 않으면 거짓이다")
     void falseWhenNoValueMatches() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\", W/\"another\""))
-                .isFalse();
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("If None Match 가 맞지 않으면 If Modified Since 가 맞아도 거짓이다")
     void falseWhenIfNoneMatchMismatchesEvenIfIfModifiedSinceMatches() {
         assertThat(judged(ETAG, SECOND, "If-None-Match", "\"other\"", "If-Modified-Since", SECOND_AS_HEADER))
-                .isFalse();
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("If None Match 가 맞으면 If Modified Since 가 옛날이어도 참이다")
     void trueWhenIfNoneMatchMatchesEvenIfIfModifiedSinceIsOld() {
         String yearBefore = DateTimeFormatter.RFC_1123_DATE_TIME
-                .withZone(ZoneOffset.UTC)
-                .format(SECOND.minusSeconds(365L * 24 * 60 * 60));
+            .withZone(ZoneOffset.UTC)
+            .format(SECOND.minusSeconds(365L * 24 * 60 * 60));
 
         assertThat(judged(ETAG, SECOND, "If-None-Match", ETAG, "If-Modified-Since", yearBefore))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("수정 시각이 If Modified Since 와 같은 초의 999ms 면 참이다")
     void trueWhenModifiedTimeIs999MsWithinSameSecondAsIfModifiedSince() {
         assertThat(judged(ETAG, SECOND.plusMillis(999), "If-Modified-Since", SECOND_AS_HEADER))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("수정 시각이 If Modified Since 의 다음 초면 거짓이다")
     void falseWhenModifiedTimeIsSecondAfterIfModifiedSince() {
         assertThat(judged(ETAG, SECOND.plusSeconds(1), "If-Modified-Since", SECOND_AS_HEADER))
-                .isFalse();
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("조건 머리글이 둘 다 없으면 거짓이다")
     void falseWhenBothConditionalHeadersAreAbsent() {
         assertThat(judged(ETAG, SECOND)).isFalse();
     }
+
 
     /**
      * 이 머리글로 우리 판정을 내리고, 같은 머리글의 GET 요청에 Spring 이 내리는 판정과 같은지 확인한 뒤 돌려준다.
@@ -118,12 +128,13 @@ class ArtifactControllerNotModifiedTest {
         boolean spring = spring(etag, lastModified, headerPairs);
 
         assertThat(ours)
-                .as(
-                        "머리글 %s, ETag %s, 수정 시각 %s 에서 우리 판정 %s 가 Spring 판정 %s 와 다르다",
-                        String.join(" ", headerPairs), etag, lastModified, ours, spring)
-                .isEqualTo(spring);
+            .as(
+                "머리글 %s, ETag %s, 수정 시각 %s 에서 우리 판정 %s 가 Spring 판정 %s 와 다르다",
+                String.join(" ", headerPairs), etag, lastModified, ours, spring)
+            .isEqualTo(spring);
         return ours;
     }
+
 
     private static boolean ours(String etag, Instant lastModified, String... headerPairs) {
         HttpHeaders headers = new HttpHeaders();
@@ -133,6 +144,7 @@ class ArtifactControllerNotModifiedTest {
         return ArtifactController.notModified(headers, etag, lastModified);
     }
 
+
     /** 200 으로 돌려준 GET 응답을 Spring 이 다시 판정할 때와 같은 호출이다. */
     private static boolean spring(String etag, Instant lastModified, String... headerPairs) {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/chat/files/index.html");
@@ -140,6 +152,6 @@ class ArtifactControllerNotModifiedTest {
             request.addHeader(headerPairs[i], headerPairs[i + 1]);
         }
         return new ServletWebRequest(request, new MockHttpServletResponse())
-                .checkNotModified(etag, lastModified.toEpochMilli());
+            .checkNotModified(etag, lastModified.toEpochMilli());
     }
 }

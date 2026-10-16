@@ -48,7 +48,7 @@ class ConnectorConnectionTest {
         assertThat(connection.undeclaredTools()).isZero();
         assertThat(connection.checkedAt()).isEqualTo(LATER);
         assertThat(connection.updatedAt()).isEqualTo(LATER);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
     }
 
 
@@ -68,10 +68,10 @@ class ConnectorConnectionTest {
 
 
     @Test
-    @DisplayName("연결의 메서드는 바인딩으로 붙은 옛 커넥터 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
+    @DisplayName("연결의 메서드는 바인딩으로 붙은 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
     void connectionMethodsLeaveAgentUntouched() {
         Agent enabled = agent();
-        enabled.acceptConnectorAttachments(true);
+
         ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
         ConnectorBinding.pending(enabled, connection, "demo", CREATED);
 
@@ -97,7 +97,7 @@ class ConnectorConnectionTest {
     @DisplayName("상태 전이는 인자로 받은 시각을 적는다")
     void transitionsRecordTheGivenInstant() {
         ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
         assertThat(connection.checkedAt()).isNull();
 
         connection.ready(LATER);
@@ -105,7 +105,7 @@ class ConnectorConnectionTest {
         assertThat(connection.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(connection.checkedAt()).isEqualTo(LATER);
         assertThat(connection.updatedAt()).isEqualTo(LATER);
-        assertThat(connection.createdAt()).isEqualTo(CREATED);
+        assertThat(connection.createdAt()).isNull();
     }
 
 
@@ -118,9 +118,8 @@ class ConnectorConnectionTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
-        agent.markConnectorManaged();
+            1L);
+
         return agent;
     }
 

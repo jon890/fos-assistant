@@ -10,7 +10,6 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.user.application.FirstSignInListener;
 import com.bifos.assistant.user.domain.AppUser;
-import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -37,7 +36,6 @@ public class FirstAgentCreator implements FirstSignInListener {
     private final PeopleProperties peopleProperties;
     private final AgentDefaultToolsets defaultToolsets;
     private final BackgroundTasks backgroundTasks;
-    private final Clock clock;
 
 
     /** 허용 목록에서 그 사람을 찾으면 에이전트를 만들고, 찾지 못하면 아무것도 만들지 않는다. */
@@ -62,8 +60,7 @@ public class FirstAgentCreator implements FirstSignInListener {
             peopleProperties.defaultCostMode(),
             peopleProperties.defaultCredentialScope(),
             AgentVisibility.PRIVATE,
-            owner.id(),
-            clock.instant()));
+            owner.id()));
         afterCommit(() -> backgroundTasks.start(
             "default-toolsets-" + saved.code(),
             () -> defaultToolsets.apply(saved, peopleProperties.defaultToolsets())));

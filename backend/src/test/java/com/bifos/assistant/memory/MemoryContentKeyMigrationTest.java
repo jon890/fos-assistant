@@ -25,7 +25,7 @@ class MemoryContentKeyMigrationTest {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrate(url, "52");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO memory (
                         scope, owner_user_id, group_id, title, content, always_inject, status,
@@ -53,12 +53,13 @@ class MemoryContentKeyMigrationTest {
         }
     }
 
+
     private static void migrate(String url, String target) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(target)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(target)
+            .load()
+            .migrate();
     }
 }

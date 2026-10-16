@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -31,12 +32,12 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "user_browser",
-        uniqueConstraints = @UniqueConstraint(name = "uk_user_browser_user", columnNames = "user_id"))
+    name = "user_browser",
+    uniqueConstraints = @UniqueConstraint(name = "uk_user_browser_user", columnNames = "user_id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class UserBrowser {
+public class UserBrowser extends CreatedAtEntity {
 
     /** {@code last_active_at} 을 다시 쓰기까지의 최소 간격이다. 화면 입력마다 줄을 고치지 않게 한다. */
     public static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
@@ -70,9 +71,6 @@ public class UserBrowser {
     @Column(name = "started_at")
     private Instant startedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -80,16 +78,17 @@ public class UserBrowser {
     @Column(name = "version", nullable = false)
     private Long version;
 
+
     /** 새 브라우저다. 컨테이너 없이 {@code STOPPED} 로 생긴다. */
     public static UserBrowser create(Long userId, String profileKey, Instant now) {
         UserBrowser browser = new UserBrowser();
         browser.userId = userId;
         browser.profileKey = profileKey;
         browser.status = UserBrowserStatus.STOPPED;
-        browser.createdAt = now;
         browser.updatedAt = now;
         return browser;
     }
+
 
     /** 켜기를 시작한다. 멈춰 있거나 실패한 줄만 켠다. */
     public void beginStart(Instant now) {
@@ -99,6 +98,7 @@ public class UserBrowser {
         this.lastError = null;
         this.updatedAt = now;
     }
+
 
     /** CDP 가 답했다. 켠 시각과 마지막 활동 시각을 지금으로 둔다. */
     public void markRunning(String containerId, Instant now) {
@@ -111,6 +111,7 @@ public class UserBrowser {
         this.updatedAt = now;
     }
 
+
     /** 켜거나 멈추다 실패했다. 컨테이너 번호는 그대로 두어 다음 끄기가 지울 수 있게 한다. */
     public void markFailed(String code, Instant now) {
         require(UserBrowserStatus.STARTING, UserBrowserStatus.STOPPING);
@@ -119,6 +120,7 @@ public class UserBrowser {
         this.updatedAt = now;
     }
 
+
     /** 끄다 실패해 남은 컨테이너를 지웠다. 줄은 {@code FAILED} 로 두고 컨테이너 번호만 비운다. */
     public void clearLeftoverContainer(Instant now) {
         require(UserBrowserStatus.FAILED);
@@ -126,12 +128,14 @@ public class UserBrowser {
         this.updatedAt = now;
     }
 
+
     /** 끄기를 시작한다. 켜져 있거나 실패한 줄만 끈다. */
     public void beginStop(Instant now) {
         require(UserBrowserStatus.RUNNING, UserBrowserStatus.FAILED);
         this.status = UserBrowserStatus.STOPPING;
         this.updatedAt = now;
     }
+
 
     /** 컨테이너를 지웠다. */
     public void markStopped(Instant now) {
@@ -142,6 +146,7 @@ public class UserBrowser {
         this.lastError = null;
         this.updatedAt = now;
     }
+
 
     /**
      * 실제 컨테이너가 없거나 꺼져 있어 {@code STOPPED} 로 맞춘다. 상태 맞추기만 부른다.
@@ -158,6 +163,7 @@ public class UserBrowser {
         this.updatedAt = now;
     }
 
+
     /**
      * 화면 입력이나 중계 통신이 있었다. 마지막 기록에서 {@link #TOUCH_INTERVAL} 이 지나지 않았으면 쓰지 않는다.
      *
@@ -172,11 +178,12 @@ public class UserBrowser {
         return true;
     }
 
+
     private void require(UserBrowserStatus... expected) {
         if (!Arrays.asList(expected).contains(status)) {
             throw new ApiException(
-                    ErrorCode.BROWSER_BUSY,
-                    "user browser must be one of " + Arrays.toString(expected) + " but is " + status);
+                ErrorCode.BROWSER_BUSY,
+                "user browser must be one of " + Arrays.toString(expected) + " but is " + status);
         }
     }
 }

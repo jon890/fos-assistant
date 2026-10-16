@@ -133,8 +133,7 @@ public class AgentLifecycleService {
                 peopleProperties.defaultCostMode(),
                 CredentialScope.SHARED_HOUSEHOLD,
                 effectiveVisibility,
-                user.id(),
-                clock.instant());
+                user.id());
             agent.markManagedProfile();
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);
@@ -281,7 +280,7 @@ public class AgentLifecycleService {
     private void requireBelowLimit(CurrentUser user) {
         users.findByIdForUpdate(user.id())
             .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
-        if (agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(user.id()) >= properties.maxPerUser()) {
+        if (agents.countByOwnerUserIdAndDeletedAtIsNull(user.id()) >= properties.maxPerUser()) {
             throw new ApiException(
                 ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of " + properties.maxPerUser() + " was reached");
         }

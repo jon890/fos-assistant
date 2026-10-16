@@ -7,4 +7,5 @@ package com.bifos.assistant.browser.domain;
  * @param title 탭 제목
  * @param url 탭 주소
  */
-public record CdpTarget(String id, String title, String url) {}
+public record CdpTarget(String id, String title, String url) {
+}

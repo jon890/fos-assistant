@@ -6,4 +6,5 @@ package com.bifos.assistant.workspace.application.model;
  * @param maxBytes 미리보기로 줄 수 있는 가장 큰 크기
  * @param html HTML 미리보기다
  */
-public record WorkspacePreview(String contentType, long maxBytes, boolean html) {}
+public record WorkspacePreview(String contentType, long maxBytes, boolean html) {
+}

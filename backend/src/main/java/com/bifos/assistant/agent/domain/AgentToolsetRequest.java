@@ -22,10 +22,9 @@ import org.hibernate.type.SqlTypes;
 /** 도구 사용 요청과 결정 이력이다. PENDING만 pendingSlot을 채워 DB에서도 중복을 막는다. */
 @Entity
 @Table(
-        name = "agent_toolset_request",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        columnNames = {"group_id", "agent_id", "requester_user_id", "toolset", "pending_slot"}))
+    name = "agent_toolset_request",
+    uniqueConstraints = @UniqueConstraint(
+        columnNames = {"group_id", "agent_id", "requester_user_id", "toolset", "pending_slot"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -69,6 +68,7 @@ public class AgentToolsetRequest {
     @Column(length = 200)
     private String reason;
 
+
     public static AgentToolsetRequest of(Long groupId, Long agentId, Long requester, String toolset, Instant now) {
         AgentToolsetRequest row = new AgentToolsetRequest();
         row.publicId = UUID.randomUUID();
@@ -81,6 +81,7 @@ public class AgentToolsetRequest {
         row.requestedAt = now;
         return row;
     }
+
 
     public void finish(ToolsetRequestStatus result, Long decider, String reason, Instant now) {
         if (status != ToolsetRequestStatus.PENDING || result == ToolsetRequestStatus.PENDING) {

@@ -17,7 +17,6 @@ import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -27,8 +26,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,10 +41,9 @@ class AgentAdminServiceTest {
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final KnownFlows flows = mock(KnownFlows.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
-    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
+    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, connectorBindings);
 
 
     @BeforeEach
@@ -201,8 +197,7 @@ class AgentAdminServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
         when(agents.findByCodeForUpdate("dad")).thenReturn(Optional.of(agent));
         return agent;
     }
@@ -222,7 +217,6 @@ class AgentAdminServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
             null);
     }
 }

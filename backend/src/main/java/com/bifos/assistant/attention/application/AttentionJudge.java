@@ -30,9 +30,10 @@ public class AttentionJudge {
 
     /** 카드 안의 순서. {@code NOW} 먼저, 그다음 최근 순, 같으면 항목 열쇠 글 순이다. */
     private static final Comparator<AttentionItem> ITEM_ORDER = Comparator.comparing(
-                    (AttentionItem item) -> item.level() != AttentionLevel.NOW)
-            .thenComparing(AttentionItem::at, Comparator.nullsLast(Comparator.reverseOrder()))
-            .thenComparing(AttentionItem::itemKey);
+        (AttentionItem item) -> item.level() != AttentionLevel.NOW)
+        .thenComparing(AttentionItem::at, Comparator.nullsLast(Comparator.reverseOrder()))
+        .thenComparing(AttentionItem::itemKey);
+
 
     /**
      * @param candidates 카드마다 모은 후보
@@ -43,12 +44,12 @@ public class AttentionJudge {
      * @return 카드 다섯. {@code NOW} 항목이 있는 카드가 먼저이고, 같은 무리 안에서는 {@link CardKey} 선언 순서다
      */
     public List<AttentionCard> judge(
-            Map<CardKey, List<AttentionCandidate>> candidates,
-            Set<CardKey> unavailable,
-            List<AttentionControl> controls,
-            Instant now,
-            int maxItemsPerCard,
-            int continueCount) {
+        Map<CardKey, List<AttentionCandidate>> candidates,
+        Set<CardKey> unavailable,
+        List<AttentionControl> controls,
+        Instant now,
+        int maxItemsPerCard,
+        int continueCount) {
         Set<String> keptKeys = new HashSet<>();
         List<AttentionCard> withNow = new ArrayList<>();
         List<AttentionCard> withoutNow = new ArrayList<>();
@@ -67,14 +68,15 @@ public class AttentionJudge {
         return List.copyOf(ordered);
     }
 
+
     /** 한 카드의 후보를 억제 신호로 거르고, 판정을 붙여 줄 세운 뒤 상한으로 자른다. 남은 열쇠를 {@code keptKeys} 에 더한다. */
     private static AttentionCard judgeCard(
-            CardKey card,
-            List<AttentionCandidate> candidates,
-            List<AttentionControl> controls,
-            Instant now,
-            int limit,
-            Set<String> keptKeys) {
+        CardKey card,
+        List<AttentionCandidate> candidates,
+        List<AttentionControl> controls,
+        Instant now,
+        int limit,
+        Set<String> keptKeys) {
         List<AttentionItem> items = new ArrayList<>();
         for (AttentionCandidate candidate : candidates) {
             if (suppressed(card, candidate, controls, now, keptKeys)) {
@@ -84,21 +86,22 @@ public class AttentionJudge {
         }
         items.forEach(item -> keptKeys.add(item.itemKey()));
         items.sort(ITEM_ORDER);
-        int nowCount = (int) items.stream()
-                .filter(item -> item.level() == AttentionLevel.NOW)
-                .count();
+        int nowCount = (int)items.stream()
+            .filter(item -> item.level() == AttentionLevel.NOW)
+            .count();
         int moreCount = Math.max(0, items.size() - limit);
         List<AttentionItem> shown = List.copyOf(items.subList(0, Math.min(limit, items.size())));
         return new AttentionCard(card, CardStatus.OK, nowCount, moreCount, shown);
     }
 
+
     /** 억제 신호를 위에서부터 본다. 숨김, 미룸, 해결됨, 앞선 카드와의 중복이다. */
     private static boolean suppressed(
-            CardKey card,
-            AttentionCandidate candidate,
-            List<AttentionControl> controls,
-            Instant now,
-            Set<String> keptKeys) {
+        CardKey card,
+        AttentionCandidate candidate,
+        List<AttentionControl> controls,
+        Instant now,
+        Set<String> keptKeys) {
         for (AttentionControl control : controls) {
             if (control.card() != card || !control.itemKey().equals(candidate.itemKey())) {
                 continue;
@@ -113,23 +116,24 @@ public class AttentionJudge {
         return candidate.resolved() || keptKeys.contains(candidate.itemKey());
     }
 
+
     private static AttentionItem item(AttentionCandidate candidate) {
         boolean now = candidate.nowSignal() && candidate.confidence() != AttentionConfidence.MODEL_INFERRED;
         return new AttentionItem(
-                candidate.itemKey(),
-                candidate.stateKey(),
-                now ? AttentionLevel.NOW : AttentionLevel.LATER,
-                AttentionChannel.IN_APP,
-                candidate.trigger(),
-                candidate.title(),
-                candidate.conversationId(),
-                candidate.agentName(),
-                candidate.at(),
-                new AttentionWhy(candidate.trigger(), candidate.signals(), candidate.confidence(), candidate.sources()),
-                candidate.execution(),
-                candidate.actionId(),
-                candidate.followUp(),
-                candidate.report(),
-                candidate.problem());
+            candidate.itemKey(),
+            candidate.stateKey(),
+            now ? AttentionLevel.NOW : AttentionLevel.LATER,
+            AttentionChannel.IN_APP,
+            candidate.trigger(),
+            candidate.title(),
+            candidate.conversationId(),
+            candidate.agentName(),
+            candidate.at(),
+            new AttentionWhy(candidate.trigger(), candidate.signals(), candidate.confidence(), candidate.sources()),
+            candidate.execution(),
+            candidate.actionId(),
+            candidate.followUp(),
+            candidate.report(),
+            candidate.problem());
     }
 }

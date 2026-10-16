@@ -13,7 +13,7 @@ import java.util.List;
  * @param previousSavedAt 이전 버전을 남긴 시각. 이전 버전이 없으면 {@code null} 이다
  */
 public record SkillDetail(
-        String name, String description, String body, List<SkillFileInfo> files, Instant previousSavedAt) {
+    String name, String description, String body, List<SkillFileInfo> files, Instant previousSavedAt) {
 
     public SkillDetail {
         files = files == null ? List.of() : List.copyOf(files);

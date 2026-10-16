@@ -19,11 +19,14 @@ public interface ResultDeliveryRepository extends JpaRepository<ResultDelivery, 
     @Query("update ResultDelivery d set d.status = :status, d.updatedAt = :at where d.id = :id")
     int changeStatus(@Param("id") Long id, @Param("status") DeliveryStatus status, @Param("at") Instant at);
 
+
     /** 그 대화의 묶음이다. 다른 대화의 묶음이면 빈 값이다. */
     Optional<ResultDelivery> findByIdAndConversationId(Long id, Long conversationId);
 
+
     /** 그 대화의 묶음들이다. 순서는 정하지 않는다. */
     List<ResultDelivery> findByConversationId(Long conversationId);
+
 
     /**
      * 묶음이 그 상태들 가운데 하나일 때만 {@code DELIVERING} 으로 바꾸고 시도 수를 하나 늘린다. 바뀐 행 수를 돌려준다.
@@ -32,9 +35,10 @@ public interface ResultDeliveryRepository extends JpaRepository<ResultDelivery, 
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ResultDelivery d set d.status = com.bifos.assistant.chat.domain.type.DeliveryStatus.DELIVERING,"
-            + " d.attemptCount = d.attemptCount + 1, d.updatedAt = :at"
-            + " where d.id = :id and d.status in :from")
+        + " d.attemptCount = d.attemptCount + 1, d.updatedAt = :at"
+        + " where d.id = :id and d.status in :from")
     int claimRetry(@Param("id") Long id, @Param("from") Collection<DeliveryStatus> from, @Param("at") Instant at);
+
 
     /**
      * 그 사용자의 지우지 않은 대화에서 {@code FAILED} 이고 {@code since} 뒤에 바뀐 묶음을 최근 순으로 읽는다.
@@ -42,10 +46,10 @@ public interface ResultDeliveryRepository extends JpaRepository<ResultDelivery, 
      * <p>묶음에는 사용자 칸이 없어 대화의 {@code user_id} 로 잇는다. 먼저 알리기의 실패 카드가 읽는다.
      */
     @Query("select d from ResultDelivery d"
-            + " where d.status = com.bifos.assistant.chat.domain.type.DeliveryStatus.FAILED"
-            + " and d.updatedAt >= :since"
-            + " and exists (select c.id from Conversation c"
-            + " where c.id = d.conversationId and c.userId = :userId and c.deletedAt is null)"
-            + " order by d.id desc")
+        + " where d.status = com.bifos.assistant.chat.domain.type.DeliveryStatus.FAILED"
+        + " and d.updatedAt >= :since"
+        + " and exists (select c.id from Conversation c"
+        + " where c.id = d.conversationId and c.userId = :userId and c.deletedAt is null)"
+        + " order by d.id desc")
     List<ResultDelivery> findFailedOfUser(@Param("userId") Long userId, @Param("since") Instant since);
 }

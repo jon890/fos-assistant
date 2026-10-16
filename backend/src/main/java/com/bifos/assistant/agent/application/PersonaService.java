@@ -26,13 +26,15 @@ public class PersonaService {
     private final AgentService agents;
     private final HermesDashboardClient dashboard;
 
+
     /** 그 에이전트의 지금 본문과 요청자가 고칠 수 있는지를 돌려준다. */
     public PersonaSnapshot read(CurrentUser user, String code) {
         Agent agent = agents.requireReadable(user, code);
         SoulDocument soul = dashboard.readSoul(agent.hermesProfile());
         return new PersonaSnapshot(
-                soul.content(), Sha256.hex16(soul.content()), agents.isEditableBy(user, agent));
+            soul.content(), Sha256.hex16(soul.content()), agents.isEditableBy(user, agent));
     }
+
 
     /**
      * 본문을 쓰고 쓴 결과를 돌려준다.
@@ -48,7 +50,7 @@ public class PersonaService {
         Agent agent = agents.requireReadable(user, code);
         if (!agents.isEditableBy(user, agent)) {
             throw new ApiException(
-                    ErrorCode.FORBIDDEN, "only the owner of this agent or the group admin can edit it");
+                ErrorCode.FORBIDDEN, "only the owner of this agent or the group admin can edit it");
         }
         String trimmed = body == null ? "" : body.strip();
         if (trimmed.isEmpty()) {
@@ -58,6 +60,7 @@ public class PersonaService {
         dashboard.putSoul(agent.hermesProfile(), trimmed);
         return new PersonaSnapshot(trimmed, Sha256.hex16(trimmed), true);
     }
+
 
     /**
      * 읽어 둔 본문이 지금 본문과 같은지 본다.
@@ -81,8 +84,9 @@ public class PersonaService {
         }
     }
 
+
     private static ApiException stale() {
         return new ApiException(
-                ErrorCode.PERSONA_STALE, "this persona changed since it was read; read it again");
+            ErrorCode.PERSONA_STALE, "this persona changed since it was read; read it again");
     }
 }

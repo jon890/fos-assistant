@@ -101,11 +101,13 @@ class ProactiveScheduleTransactionTest {
     private final List<Long> createdAgents = new ArrayList<>();
     private final List<Long> createdUsers = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -116,16 +118,17 @@ class ProactiveScheduleTransactionTest {
         users.deleteAllById(createdUsers);
     }
 
+
     @ParameterizedTest(name = "{0} 중에도 매일 깨우기를 끈다")
     @MethodSource("runtimeFailures")
     @DisplayName("Hermes 장애 중에도 ACTIVE 매일 깨우기를 끄면 DB에 PAUSED로 커밋되고 복구 뒤 새 CHECK를 시작하지 않는다")
     void disablesScheduleAndPreventsFutureChecksAfterRuntimeRecovers(String band, ErrorCode errorCode) {
         Fixture fixture = activeSchedule();
         TaskTrigger trigger = triggers.findByTaskId(fixture.task().id()).orElseThrow();
-        trigger.moveNext(DUE, NOW);
+        trigger.moveNext(DUE);
         triggers.saveAndFlush(trigger);
         TaskRun queued = runs.saveAndFlush(TaskRun.queued(
-                fixture.task().id(), trigger.id(), fixture.owner().id(), DUE, NOW));
+            fixture.task().id(), trigger.id(), fixture.owner().id(), DUE, NOW));
         createdRuns.add(queued.id());
 
         reset(toolsets, skills);
@@ -134,15 +137,14 @@ class ProactiveScheduleTransactionTest {
 
         var read = schedules.get(fixture.currentUser(), fixture.agent().code());
 
-        assertThatThrownBy(() ->
-                        schedules.update(fixture.currentUser(), fixture.agent().code(), true, "09:00", "Asia/Seoul"))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(errorCode);
+        assertThatThrownBy(() -> schedules.update(fixture.currentUser(), fixture.agent().code(), true, "09:00", "Asia/Seoul"))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(errorCode);
         assertThatThrownBy(() -> schedules.schedulingAvailable(
-                        fixture.currentUser(), fixture.agent().code()))
+            fixture.currentUser(), fixture.agent().code()))
                 .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
+                .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(errorCode);
 
         clearInvocations(toolsets, skills);
@@ -151,13 +153,13 @@ class ProactiveScheduleTransactionTest {
         assertThat(read.enabled()).isTrue();
         assertThat(read.time()).isEqualTo("09:00");
         assertThat(read.blockers())
-                .extracting(blocker -> blocker.code())
-                .containsExactly(CheckBlockerCode.READINESS_UNKNOWN);
+            .extracting(blocker -> blocker.code())
+            .containsExactly(CheckBlockerCode.READINESS_UNKNOWN);
         assertThat(disabled.enabled()).isFalse();
         assertThat(disabled.time()).isEqualTo("09:00");
         assertThat(disabled.blockers())
-                .extracting(blocker -> blocker.code())
-                .containsExactly(CheckBlockerCode.READINESS_UNKNOWN);
+            .extracting(blocker -> blocker.code())
+            .containsExactly(CheckBlockerCode.READINESS_UNKNOWN);
         assertThat(tasks.findById(fixture.task().id()).orElseThrow().state()).isEqualTo(TaskState.PAUSED);
         verifyNoInteractions(toolsets, skills);
 
@@ -168,49 +170,51 @@ class ProactiveScheduleTransactionTest {
         assertThat(firing.fireDue(DUE)).as("복구 뒤 새 CHECK 발화").isZero();
         assertThat(starter.startQueued(DUE)).as("기존 QUEUED CHECK 시작").isZero();
         assertThat(runs.findById(queued.id()).orElseThrow())
-                .extracting(TaskRun::status, TaskRun::reason, TaskRun::proactiveCheckId)
-                .containsExactly(TaskRunStatus.SKIPPED, TaskRunReason.PAUSED, null);
+            .extracting(TaskRun::status, TaskRun::reason, TaskRun::proactiveCheckId)
+            .containsExactly(TaskRunStatus.SKIPPED, TaskRunReason.PAUSED, null);
         assertThat(checks.findFirstByUserIdAndAgentIdOrderByIdDesc(
-                        fixture.owner().id(), fixture.agent().id()))
+            fixture.owner().id(), fixture.agent().id()))
                 .isEmpty();
     }
+
 
     private Fixture activeSchedule() {
         String suffix = UUID.randomUUID().toString();
         String email = "schedule-" + suffix + "@example.com";
-        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(owner.id());
         Agent agent = agents.save(Agent.of(
-                "schedule-" + suffix,
-                "일정 에이전트",
-                "schedule-" + suffix,
-                "http://agent-runtime.test/p/" + suffix,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            "schedule-" + suffix,
+            "일정 에이전트",
+            "schedule-" + suffix,
+            "http://agent-runtime.test/p/" + suffix,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
         createdAgents.add(agent.id());
-        CurrentUser currentUser =
-                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+        CurrentUser currentUser = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
 
         assertThat(schedules
-                        .update(currentUser, agent.code(), true, "09:00", "Asia/Seoul")
-                        .enabled())
+            .update(currentUser, agent.code(), true, "09:00", "Asia/Seoul")
+            .enabled())
                 .isTrue();
         Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(owner.id(), agent.id(), TaskKind.CHECK)
-                .orElseThrow();
+            .orElseThrow();
         createdTasks.add(task.id());
         createdTriggers.add(triggers.findByTaskId(task.id()).orElseThrow().id());
         return new Fixture(owner, agent, currentUser, task);
     }
 
+
     private static Stream<Arguments> runtimeFailures() {
         return Stream.of(
-                Arguments.of("timeout", ErrorCode.HERMES_UNAVAILABLE),
-                Arguments.of("429", ErrorCode.HERMES_BUSY),
-                Arguments.of("503", ErrorCode.HERMES_UNAVAILABLE));
+            Arguments.of("timeout", ErrorCode.HERMES_UNAVAILABLE),
+            Arguments.of("429", ErrorCode.HERMES_BUSY),
+            Arguments.of("503", ErrorCode.HERMES_UNAVAILABLE));
     }
 
-    private record Fixture(AppUser owner, Agent agent, CurrentUser currentUser, Task task) {}
+
+    private record Fixture(AppUser owner, Agent agent, CurrentUser currentUser, Task task) {
+    }
 }

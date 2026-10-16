@@ -12,10 +12,13 @@ import org.springframework.data.repository.query.Param;
 public interface SubagentUsageJobRepository extends JpaRepository<SubagentUsageJob, Long> {
     boolean existsByProfileNameAndChildSessionId(String profileName, String childSessionId);
 
+
     List<SubagentUsageJob> findByExecutionIdIn(Collection<Long> executionIds);
 
+
     List<SubagentUsageJob> findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc(
-            String status, Instant at);
+        String status, Instant at);
+
 
     /**
      * 한 구간에 시작한 실행의 native 자식 원장 줄을 부모 실행의 축 값과 함께 읽는다.
@@ -47,7 +50,8 @@ public interface SubagentUsageJobRepository extends JpaRepository<SubagentUsageJ
             order by j.id
             """)
     List<SubagentLedgerRow> findLedgerRows(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /** 그 대화의 실행이 낳은 자식 사용량을 아직 읽는 중인가. 다 읽기 전에 Hermes session 을 지우면 사용량을 잃는다. */
     @Query("""

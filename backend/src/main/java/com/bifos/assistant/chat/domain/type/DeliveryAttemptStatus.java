@@ -7,6 +7,7 @@ public enum DeliveryAttemptStatus {
     FAILED,
     STOPPED;
 
+
     /** 이 상태로 시도가 끝나면 묶음이 갖는 상태다. */
     public DeliveryStatus deliveryStatus() {
         return switch (this) {

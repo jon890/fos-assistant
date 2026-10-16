@@ -27,15 +27,17 @@ import org.junit.jupiter.api.Test;
 class ChatPendingMessageMigrationTest {
     private String url;
 
+
     @BeforeEach
     void setUp() {
         url = "jdbc:h2:mem:chat-pending-message-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
     }
+
 
     @Test
     @DisplayName("대기 메시지 표에는 비어 있을 수 없는 여섯 칸이 있고 held 의 기본값은 거짓이다")
@@ -43,7 +45,7 @@ class ChatPendingMessageMigrationTest {
         Map<String, String> nullableByColumn = new LinkedHashMap<>();
         String heldDefault = null;
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                ResultSet columns = connection.getMetaData().getColumns(null, null, "CHAT_PENDING_MESSAGE", null)) {
+            ResultSet columns = connection.getMetaData().getColumns(null, null, "CHAT_PENDING_MESSAGE", null)) {
             while (columns.next()) {
                 String name = columns.getString("COLUMN_NAME");
                 nullableByColumn.put(name, columns.getString("IS_NULLABLE"));
@@ -54,19 +56,20 @@ class ChatPendingMessageMigrationTest {
         }
 
         assertThat(nullableByColumn.keySet())
-                .as("chat_pending_message 의 칸")
-                .containsExactlyInAnyOrder("ID", "CONVERSATION_ID", "USER_ID", "CONTENT", "HELD", "CREATED_AT");
+            .as("chat_pending_message 의 칸")
+            .containsExactlyInAnyOrder("ID", "CONVERSATION_ID", "USER_ID", "CONTENT", "HELD", "CREATED_AT");
         assertThat(nullableByColumn.values())
-                .as("칸마다 NULL 허용 여부 %s", nullableByColumn)
-                .containsOnly("NO");
+            .as("칸마다 NULL 허용 여부 %s", nullableByColumn)
+            .containsOnly("NO");
         assertThat(heldDefault).as("held 의 기본값").isEqualToIgnoringCase("FALSE");
     }
+
 
     @Test
     @DisplayName("held 를 주지 않고 넣은 대기 메시지는 멈추지 않은 것으로 저장된다")
     void storesRowWithoutHeldAsNotHeld() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO chat_pending_message (conversation_id, user_id, content, created_at)
                     VALUES (1, 1, 'queued', TIMESTAMP '2026-01-01 00:00:00')
@@ -79,6 +82,7 @@ class ChatPendingMessageMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("대화별 색인의 칸 순서는 conversation id, id 다")
     void indexesConversationIdThenId() throws SQLException {
@@ -86,15 +90,16 @@ class ChatPendingMessageMigrationTest {
             DatabaseMetaData meta = connection.getMetaData();
 
             assertThat(indexColumns(meta, "CHAT_PENDING_MESSAGE", "IDX_CHAT_PENDING_MESSAGE_CONVERSATION"))
-                    .containsExactly("CONVERSATION_ID", "ID");
+                .containsExactly("CONVERSATION_ID", "ID");
         }
     }
+
 
     @Test
     @DisplayName("content 가 NULL 인 대기 메시지는 거절된다")
     void rejectsNullContent() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             assertThatThrownBy(() -> statement.executeUpdate("""
                             INSERT INTO chat_pending_message (conversation_id, user_id, content, created_at)
                             VALUES (1, 1, NULL, TIMESTAMP '2026-01-01 00:00:00')
@@ -106,6 +111,7 @@ class ChatPendingMessageMigrationTest {
             }
         }
     }
+
 
     /** 그 색인의 칸을 색인 안 순서대로 돌려준다. */
     private static List<String> indexColumns(DatabaseMetaData meta, String table, String index) throws SQLException {

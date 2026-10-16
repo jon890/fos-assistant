@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -57,11 +58,11 @@ public class FinancialOrderLimits {
     /** 그 사용자에게 지금 적용하는 상한이다. 운영 최대치가 사용자 값보다 작으면 최대치가 이긴다. */
     public FinancialLimitValues effective(Long userId) {
         var maximums = maximumsOf(properties.current()).maximums();
-        var stored = userId == null ? null : limits.findById(userId).orElse(null);
+        var stored = userId == null ? FinancialOrderLimit.NONE : limits.findByUserId(userId).orElse(FinancialOrderLimit.NONE);
         var values = new EnumMap<FinancialLimitKind, BigDecimal>(FinancialLimitKind.class);
         var custom = EnumSet.noneOf(FinancialLimitKind.class);
         for (FinancialLimitKind kind : FinancialLimitKind.values()) {
-            BigDecimal own = stored == null ? null : stored.value(kind);
+            BigDecimal own = stored.value(kind);
             BigDecimal maximum = maximums.get(kind);
             values.put(kind, own == null ? maximum : own.min(maximum));
             if (own != null) {
@@ -102,10 +103,14 @@ public class FinancialOrderLimits {
     }
 
 
-    /** 사용자 값을 바꾼다. 호출자는 같은 트랜잭션에서 사용자 행을 먼저 잠그고 값을 검사한다. */
+    /**
+     * 사용자 값을 바꾼다. 호출자는 같은 트랜잭션에서 사용자 행을 먼저 잠그고 값을 검사한다.
+     * 잠근 뒤 다시 읽으므로 다른 종류의 값을 옛 값으로 덮지 않는다.
+     */
     void store(Long userId, FinancialLimitKind kind, BigDecimal value, Instant now) {
-        FinancialOrderLimit row = limits.findById(userId).orElseGet(() -> FinancialOrderLimit.of(userId, now));
-        row.set(kind, value, now);
-        limits.save(row);
+        FinancialOrderLimit row = limits.findByUserId(userId).orElseThrow(() -> new IllegalStateException("no user"))
+            .with(kind, value);
+        limits.store(userId, row.orderAmountKrw(), row.orderAmountUsd(), row.orderQuantity(), row.dailyAmountKrw(),
+            row.dailyAmountUsd(), now, now.truncatedTo(ChronoUnit.MICROS));
     }
 }

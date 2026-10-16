@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TrackingBackgroundTasks implements BackgroundTasks {
     private final Set<Thread> threads = ConcurrentHashMap.newKeySet();
 
+
     @Override
     public Thread start(String name, Runnable task) {
         Thread thread = unstarted(name, task);
@@ -22,12 +23,14 @@ public final class TrackingBackgroundTasks implements BackgroundTasks {
         return thread;
     }
 
+
     @Override
     public Thread unstarted(String name, Runnable task) {
         Thread thread = Thread.ofVirtual().name(name).unstarted(task);
         threads.add(thread);
         return thread;
     }
+
 
     /**
      * 쥔 스레드가 모두 끝날 때까지 차례로 join 한다.
@@ -51,12 +54,11 @@ public final class TrackingBackgroundTasks implements BackgroundTasks {
             for (Thread thread : alive) {
                 long left = deadline - System.nanoTime();
                 if (left <= 0 || !thread.join(Duration.ofNanos(left))) {
-                    List<Thread> stuck =
-                            threads.stream().filter(Thread::isAlive).toList();
+                    List<Thread> stuck = threads.stream().filter(Thread::isAlive).toList();
                     threads.removeAll(stuck);
                     throw new AssertionError("상한 " + limit + " 이 지나도 이 검사가 남긴 백그라운드 작업이 끝나지 않았다. "
-                            + "정리할 수 없어 추적에서 뺀다. threads="
-                            + stuck.stream().map(Thread::getName).sorted().toList());
+                        + "정리할 수 없어 추적에서 뺀다. threads="
+                        + stuck.stream().map(Thread::getName).sorted().toList());
                 }
                 threads.remove(thread);
             }

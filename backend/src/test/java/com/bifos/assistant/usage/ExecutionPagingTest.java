@@ -40,21 +40,22 @@ class ExecutionPagingTest {
 
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
         agent = agents.findByCode("execution-page-agent")
-                .orElseGet(() -> agents.save(Agent.of(
-                        "execution-page-agent",
-                        "실행 페이지 에이전트",
-                        "execution-page-agent",
-                        "http://127.0.0.1:1/p/execution-page",
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        USER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                "execution-page-agent",
+                "실행 페이지 에이전트",
+                "execution-page-agent",
+                "http://127.0.0.1:1/p/execution-page",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID)));
     }
+
 
     @Test
     @DisplayName("동일 시각은 번호 역순으로 나누고 마지막과 빈 목록에는 다음 커서가 없다")
@@ -77,6 +78,7 @@ class ExecutionPagingTest {
         assertThat(empty.nextCursor()).isNull();
     }
 
+
     @Test
     @DisplayName("커서 뒤에는 다른 사용자와 그 사이에 새로 생긴 실행이 섞이지 않는다")
     void cursorKeepsUserScopeAndExcludesRowsInsertedBeforeCursor() {
@@ -94,6 +96,7 @@ class ExecutionPagingTest {
         assertThat(next.executions()).extracting(AgentExecution::id).doesNotContain(inserted.id());
     }
 
+
     @Test
     @DisplayName("다른 사용자의 커서를 받아도 자기 루트만 시작 시각 순서로 읽고 자식은 뺀다")
     void foreignCursorStillReturnsOnlyOwnRootsInStartedAtOrder() {
@@ -109,38 +112,41 @@ class ExecutionPagingTest {
         RootExecutionPage page = query.page(USER_ID, 10, otherPage.nextCursor());
 
         assertThat(page.executions())
-                .extracting(AgentExecution::id)
-                .containsExactly(newer.id(), olderWithHigherId.id(), root.id())
-                .doesNotContain(child.id());
+            .extracting(AgentExecution::id)
+            .containsExactly(newer.id(), olderWithHigherId.id(), root.id())
+            .doesNotContain(child.id());
     }
+
 
     @Test
     @DisplayName("비었거나 잘못된 커서는 VALIDATION_FAILED 다")
     void invalidCursorIsRejected() {
         assertThatThrownBy(() -> query.page(USER_ID, 1, "invalid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> query.page(USER_ID, 1, ""))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
+
 
     private AgentExecution execution(Long userId, Instant startedAt) {
         return execution(userId, startedAt, null, null);
     }
 
+
     private AgentExecution execution(Long userId, Instant startedAt, Long parentExecutionId, Long rootExecutionId) {
         return executions.save(AgentExecution.builder()
-                .userId(userId)
-                .agentId(agent.id())
-                .parentExecutionId(parentExecutionId)
-                .rootExecutionId(rootExecutionId)
-                .profileName("execution-page")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(startedAt)
-                .build());
+            .userId(userId)
+            .agentId(agent.id())
+            .parentExecutionId(parentExecutionId)
+            .rootExecutionId(rootExecutionId)
+            .profileName("execution-page")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(startedAt)
+            .build());
     }
 }

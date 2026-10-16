@@ -82,7 +82,7 @@ public class NotificationService {
         NotificationTarget target,
         UUID sourcePublicId) {
         Notification saved = notifications.saveAndFlush(
-            Notification.of(userId, kind, title, body, target, clock.instant()).caused(sourcePublicId));
+            Notification.of(userId, kind, title, body, target).caused(sourcePublicId));
         afterCommit(userId, unread -> NotificationEvent.created(saved.publicId(), unread));
         return saved;
     }

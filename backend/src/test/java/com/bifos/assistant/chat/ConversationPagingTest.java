@@ -85,6 +85,7 @@ class ConversationPagingTest {
     @Autowired
     ConversationAccess access;
 
+
     @BeforeEach
     void reset() {
         executionEvents.deleteAll();
@@ -96,20 +97,21 @@ class ConversationPagingTest {
         users.deleteAll();
     }
 
+
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
+
 
     /** 대화를 만들고 바뀐 시각을 정한다. 같은 시각을 주면 id 가 순서를 정한다. */
     private Conversation started(CurrentUser user, long secondsAfterBase) {
@@ -118,9 +120,11 @@ class ConversationPagingTest {
         return conversations.findById(made.id()).orElseThrow();
     }
 
+
     private static List<Long> ids(ConversationPage page) {
         return page.items().stream().map(Conversation::id).toList();
     }
+
 
     @Test
     @DisplayName("쪽을 이어 읽으면 겹치거나 빠지는 줄 없이 최근 것부터 모두 나온다")
@@ -145,6 +149,7 @@ class ConversationPagingTest {
         assertThat(pages).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("바뀐 시각이 같으면 id 가 큰 줄이 앞에 오고 쪽 경계에서도 빠지지 않는다")
     void sameUpdatedAtIsOrderedByIdAcrossPageBoundary() {
@@ -161,6 +166,7 @@ class ConversationPagingTest {
         assertThat(tail.nextCursor()).isNull();
     }
 
+
     @Test
     @DisplayName("딱 한 쪽만큼이면 다음 쪽이 없다고 알린다")
     void exactlyOnePageHasNoNextCursor() {
@@ -170,6 +176,7 @@ class ConversationPagingTest {
 
         assertThat(chat.conversationsOf(dad, null, 2).nextCursor()).isNull();
     }
+
 
     @Test
     @DisplayName("지운 대화와 남의 대화는 쪽에 나오지 않는다")
@@ -184,6 +191,7 @@ class ConversationPagingTest {
         assertThat(ids(chat.conversationsOf(dad, null, 10))).containsExactly(kept);
     }
 
+
     @Test
     @DisplayName("목록에서 숨긴 대화는 첫 쪽과 다음 쪽 어디에도 나오지 않고 숨김을 풀면 다시 나온다")
     void excludesHiddenConversationFromEveryPageUntilShown() {
@@ -192,8 +200,8 @@ class ConversationPagingTest {
         Long hidden = started(dad, 2).id();
         Long newest = started(dad, 3).id();
         assertThat(conversationWriter.hideFromList(hidden, BASE.plusSeconds(10)))
-                .as("숨긴 대화 수")
-                .isEqualTo(1);
+            .as("숨긴 대화 수")
+            .isEqualTo(1);
 
         ConversationPage all = chat.conversationsOf(dad, null, 10);
         ConversationPage head = chat.conversationsOf(dad, null, 1);
@@ -209,6 +217,7 @@ class ConversationPagingTest {
         assertThat(ids(chat.conversationsOf(dad, null, 10))).as("숨김을 푼 뒤 첫 쪽").containsExactly(newest, hidden, oldest);
     }
 
+
     @Test
     @DisplayName("한 쪽의 크기는 상한을 넘지 않고 1 보다 작아지지 않는다")
     void limitIsClamped() {
@@ -221,6 +230,7 @@ class ConversationPagingTest {
         assertThat(chat.conversationsOf(dad, null, 0).items()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("목록 응답의 한 줄은 보통 대화이면 purpose 가 CHAT 이다")
     void listResponseCarriesChatPurpose() {
@@ -229,23 +239,24 @@ class ConversationPagingTest {
         CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
         when(currentUser.require()).thenReturn(dad);
         ChatController controller = new ChatController(
-                chat,
-                currentUser,
-                new UserDisplayNameService(users),
-                agentService,
-                access,
-                new ChatEventStreams(Duration.ofSeconds(20)),
-                null,
-                mock(ModelTierService.class),
-                List.of(),
-                mock(SourceReadSummaries.class));
+            chat,
+            currentUser,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class));
 
         ConversationPageView page = controller.conversations(null, 10);
 
         assertThat(page.items()).extracting(ConversationView::purpose).containsExactly(ConversationPurpose.CHAT);
         assertThat(conversations.findById(started).orElseThrow().publicId())
-                .isEqualTo(page.items().getFirst().id());
+            .isEqualTo(page.items().getFirst().id());
     }
+
 
     @Test
     @DisplayName("읽을 수 없는 cursor 는 VALIDATION_FAILED 다")
@@ -253,8 +264,8 @@ class ConversationPagingTest {
         CurrentUser dad = member("paging-dad");
 
         assertThatThrownBy(() -> chat.conversationsOf(dad, "not-a-cursor", 10))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 }

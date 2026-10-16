@@ -13,10 +13,12 @@ public record SubagentProviderLookup(String provider, String model, boolean unav
         return new SubagentProviderLookup(provider, model, false);
     }
 
+
     /** 대시보드가 답했지만 provider 가 없다. 다시 읽어도 달라지지 않는다. */
     public static SubagentProviderLookup absent() {
         return new SubagentProviderLookup(null, null, false);
     }
+
 
     /** 대시보드에 닿지 못했다. */
     public static SubagentProviderLookup unreachable() {

@@ -49,7 +49,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -85,25 +84,20 @@ class ConnectorBindingDriftTest {
     private static final long GROUP = 7_301L;
 
     private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
-            List.of());
-    private static final ConnectorManifest PLAIN_MANIFEST =
-            new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
+        "list_scopes",
+        "demo",
+        2,
+        List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
+        List.of());
+    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", 1, List.of());
     /** 반영 맞추기의 설치 판정을 통과하는 설치 상태다. */
-    private static final ConnectorState INSTALLED =
-            new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND);
+    private static final ConnectorState INSTALLED = new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND);
     /** manifest 가 바뀌어 그 커넥터 항목만 {@code configured} 가 거짓인 설치 상태다. */
-    private static final ConnectorState DRIFTED =
-            new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND);
+    private static final ConnectorState DRIFTED = new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND);
 
     private static final String RESTART_BODY = "공유 gateway 를 재시작한 뒤";
     private static final String CONFIRM_ONLY_BODY = "반영을 확인하지 못했어요";
@@ -161,13 +155,14 @@ class ConnectorBindingDriftTest {
     private ConnectorBinding demo;
     private ConnectorBinding plain;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST, PLAIN_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(connector.readConnector(anyString(), anyString())).thenReturn(INSTALLED);
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
 
@@ -176,7 +171,7 @@ class ConnectorBindingDriftTest {
         revokedAdmin = user(UserRole.ADMIN);
         transactions.executeWithoutResult(status -> {
             AllowedPerson person = people.save(
-                    AllowedPerson.of(revokedAdmin.email(), "사용자", "revoked-" + revokedAdmin.id(), Instant.now()));
+                AllowedPerson.of(revokedAdmin.email(), "사용자", "revoked-" + revokedAdmin.id()));
             person.disable();
             people.saveAndFlush(person);
         });
@@ -187,19 +182,20 @@ class ConnectorBindingDriftTest {
         service.bind(owner, agent.code(), PLAIN);
         // 붙이기는 재시작 대기로 끝난다. 관리자가 반영 완료를 마친 READY 바인딩으로 둔다.
         jdbc.update(
-                "UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
-                        + " restart_required_since = NULL, apply_due_at = NULL WHERE agent_id = ?",
-                agent.id());
+            "UPDATE agent_connector_binding SET status = 'READY', restart_required = FALSE,"
+                + " restart_required_since = NULL, apply_due_at = NULL WHERE agent_id = ?",
+            agent.id());
         demo = binding(DEMO);
         plain = binding(PLAIN);
         // 점검은 READY 바인딩 전체를 읽는다. 다른 검사가 남긴 것이 있으면 읽는 순서와 호출 수가 달라진다.
         assertThat(bindings.findReadyAfter(BindingStatus.READY, 0L, PageRequest.of(0, 100)))
-                .extracting(ReadyBinding::bindingId)
-                .as("이 검사가 만든 READY 바인딩만 있다")
-                .containsExactly(demo.id(), plain.id());
+            .extracting(ReadyBinding::bindingId)
+            .as("이 검사가 만든 READY 바인딩만 있다")
+            .containsExactly(demo.id(), plain.id());
         applier = applier(properties);
         clearInvocations(connector);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -211,6 +207,7 @@ class ConnectorBindingDriftTest {
         jdbc.update("DELETE FROM app_user WHERE group_id = ?", GROUP);
     }
 
+
     @Test
     @DisplayName("같은 profile 의 READY 바인딩 가운데 설치가 어긋난 하나만 다시 설치하고 차단되지 않은 관리자에게만 재시작 안내를 알린다")
     void reinstallsOnlyDriftedBindingAndNotifiesActiveAdmins(CapturedOutput output) {
@@ -219,9 +216,9 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).isEqualTo(1);
 
         verify(connector, times(1))
-                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
         verify(connector, never())
-                .bindConnector(anyString(), eq(PLAIN), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), eq(PLAIN), anyString(), anyString(), nullable(String.class));
         ConnectorBinding drifted = reload(demo);
         assertThat(drifted.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(drifted.restartRequired()).as("재시작 대기").isTrue();
@@ -239,6 +236,7 @@ class ConnectorBindingDriftTest {
         assertThat(output.getAll()).contains("connector " + DEMO + " drifted: NOT_INSTALLED");
     }
 
+
     @Test
     @DisplayName("다시 맞춘 바인딩은 READY 가 아니어서 다음 점검이 설치를 다시 보내지 않고 알림도 늘지 않는다")
     void doesNotReinstallAgainOnNextRun() {
@@ -249,17 +247,18 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).isZero();
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
         assertThat(notificationsOf(admin.id())).hasSize(1);
     }
+
 
     @Test
     @DisplayName("다시 보낸 설치가 바뀐 것이 없다고 답하고 probe 가 실패하면 PENDING 이고 알림은 반영 완료만 안내한다")
     void asksOnlyForConfirmWhenProbeFailsAfterReinstall() {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED, INSTALLED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
 
         assertThat(applier.resyncDrifted()).isEqualTo(1);
@@ -272,12 +271,13 @@ class ConnectorBindingDriftTest {
         assertThat(sent.get(0).body()).contains(CONFIRM_ONLY_BODY).doesNotContain(RESTART_BODY);
     }
 
+
     @Test
     @DisplayName("다시 보낸 설치가 reload_pending 이면 반영 예정 확인이 맡으므로 알림을 만들지 않는다")
     void doesNotNotifyWhenReinstallIsPendingReload() {
         when(connector.readConnector(agent.hermesProfile(), DEMO)).thenReturn(DRIFTED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
 
         assertThat(applier.resyncDrifted()).isEqualTo(1);
 
@@ -287,6 +287,7 @@ class ConnectorBindingDriftTest {
         assertThat(notificationsOf(admin.id())).isEmpty();
     }
 
+
     @Test
     @DisplayName("설치 상태를 읽지 못하면 그 바인딩만 건너뛰어 READY 로 남고 설치를 보내지 않는다")
     void skipsBindingWhenInstallStateReadFails(CapturedOutput output) {
@@ -295,21 +296,22 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).isZero();
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
         assertThat(reload(plain).status()).isEqualTo(BindingStatus.READY);
         assertThat(notificationsOf(admin.id())).isEmpty();
         assertThat(output.getAll()).contains("connector " + DEMO + " failed at drift-check: IllegalStateException");
     }
 
+
     @Test
     @DisplayName("다시 맞춰 READY 가 된 뒤 또 어긋나기를 세 번 되풀이하면 세 번째는 설치를 보내지 않고 PENDING 으로 두고 알린다")
     void stopsReinstallingOnThirdConsecutiveDrift() {
         // 주기마다 점검의 읽기는 어긋나고, 다시 보낸 뒤의 읽기는 맞는다. 세 번째 주기는 점검의 읽기만 한다.
         when(connector.readConnector(agent.hermesProfile(), DEMO))
-                .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED, DRIFTED);
+            .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED, DRIFTED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
 
         assertThat(applier.resyncDrifted()).as("첫 번째").isEqualTo(1);
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
@@ -320,21 +322,22 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).as("세 번째").isZero();
 
         verify(connector, times(2))
-                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.PENDING);
         List<Notification> sent = notificationsOf(admin.id());
         assertThat(sent).hasSize(1);
         assertThat(sent.get(0).body()).contains(CONFIRM_ONLY_BODY);
     }
 
+
     @Test
     @DisplayName("상한으로 PENDING 이 된 바인딩이 관리자 반영 완료로 READY 가 된 뒤 다시 어긋나면 1 부터 세어 설치를 다시 보낸다")
     void countsFromOneAfterLimitPendingBindingBecomesReadyAgain() {
         // 앞 세 주기는 상한 시험과 같다. 네 번째 주기는 READY 로 되돌린 뒤 어긋난 읽기와 다시 보낸 뒤 맞는 읽기다.
         when(connector.readConnector(agent.hermesProfile(), DEMO))
-                .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED, DRIFTED, DRIFTED, INSTALLED);
+            .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED, DRIFTED, DRIFTED, INSTALLED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         assertThat(applier.resyncDrifted()).as("첫 번째").isEqualTo(1);
         assertThat(applier.resyncDrifted()).as("두 번째").isEqualTo(1);
         assertThat(applier.resyncDrifted()).as("상한").isZero();
@@ -344,9 +347,10 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).as("READY 로 되돌린 뒤 첫 어긋남").isEqualTo(1);
 
         verify(connector, times(3))
-                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
     }
+
 
     @Test
     @DisplayName("잠금 확인에 실패해 건너뛴 주기는 연속 어긋남에 들지 않아 확인이 통과한 첫 주기에 설치를 다시 보낸다")
@@ -358,29 +362,30 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).as("첫 번째 건너뜀").isZero();
         assertThat(applier.resyncDrifted()).as("두 번째 건너뜀").isZero();
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
 
         jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", owner.id(), agent.id());
 
         assertThat(applier.resyncDrifted()).as("확인이 통과한 첫 주기").isEqualTo(1);
         verify(connector, times(1))
-                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("잠근 뒤 READY 가 아니게 된 바인딩은 연속 어긋남을 지워 다시 READY 가 되면 처음부터 센다")
     void resetsStreakWhenBindingIsNoLongerReadyAfterLock() {
         // 두 주기는 다시 맞춰 READY 가 된다. 세 번째 주기는 점검이 읽은 뒤 잠그기 전에 다른 경로가 PENDING 으로 바꾼다.
         when(connector.readConnector(agent.hermesProfile(), DEMO))
-                .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED)
-                .thenAnswer(invocation -> {
-                    setStatus(demo, BindingStatus.PENDING);
-                    return DRIFTED;
-                })
-                .thenReturn(DRIFTED, INSTALLED);
+            .thenReturn(DRIFTED, INSTALLED, DRIFTED, INSTALLED)
+            .thenAnswer(invocation -> {
+                setStatus(demo, BindingStatus.PENDING);
+                return DRIFTED;
+            })
+            .thenReturn(DRIFTED, INSTALLED);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         assertThat(applier.resyncDrifted()).as("첫 번째").isEqualTo(1);
         assertThat(applier.resyncDrifted()).as("두 번째").isEqualTo(1);
         assertThat(applier.resyncDrifted()).as("READY 가 아니게 된 주기").isZero();
@@ -390,10 +395,11 @@ class ConnectorBindingDriftTest {
         assertThat(applier.resyncDrifted()).as("다시 READY 가 된 뒤 첫 어긋남").isEqualTo(1);
 
         verify(connector, times(3))
-                .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
+            .bindConnector(eq(agent.hermesProfile()), eq(DEMO), anyString(), anyString(), nullable(String.class));
         assertThat(reload(demo).status()).isEqualTo(BindingStatus.READY);
         assertThat(notificationsOf(admin.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("한 주기에 읽는 수가 1 이면 READY 바인딩을 번호 순으로 하나씩 보고 끝까지 읽은 뒤 처음으로 돌아간다")
@@ -415,60 +421,68 @@ class ConnectorBindingDriftTest {
         verify(connector).readConnector(agent.hermesProfile(), DEMO);
     }
 
+
     @Test
     @DisplayName("drift-batch 가 1 미만이면 설정을 만들지 못해 기동이 멈춘다")
     void rejectsDriftBatchBelowOne() {
         assertThatThrownBy(() -> new ConnectorBindingProperties(Duration.ofSeconds(150), 0))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("drift-batch");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("drift-batch");
     }
+
 
     private ConnectorBindingApplier applier(ConnectorBindingProperties settings) {
         return new ConnectorBindingApplier(
-                service, bindings, agents, users, connector, transactions, clock, notifications, access, settings);
+            service, bindings, agents, users, connector, transactions, clock, notifications, access, settings);
     }
+
 
     private void setStatus(ConnectorBinding binding, BindingStatus status) {
         jdbc.update("UPDATE agent_connector_binding SET status = ? WHERE id = ?", status.name(), binding.id());
     }
 
+
     private ConnectorBinding binding(String connectorId) {
         Long connectionId = connections
-                .findByUserIdAndConnectorId(owner.id(), connectorId)
-                .orElseThrow()
-                .id();
+            .findByUserIdAndConnectorId(owner.id(), connectorId)
+            .orElseThrow()
+            .id();
         return bindings.findByAgentIdAndConnectionId(agent.id(), connectionId).orElseThrow();
     }
+
 
     private ConnectorBinding reload(ConnectorBinding binding) {
         return bindings.findById(binding.id()).orElseThrow();
     }
 
+
     private List<Notification> notificationsOf(Long userId) {
         return notificationRows.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, 10));
     }
 
+
     private Agent agent(CurrentUser user) {
         String code = "drift-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
     }
+
 
     private CurrentUser member() {
         AppUser saved = user(UserRole.MEMBER);
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
+
     private AppUser user(UserRole role) {
         String suffix = UUID.randomUUID().toString();
-        return users.save(AppUser.of("drift-" + suffix + "@example.com", suffix, GROUP, role, Instant.now()));
+        return users.save(AppUser.of("drift-" + suffix + "@example.com", suffix, GROUP, role));
     }
 }

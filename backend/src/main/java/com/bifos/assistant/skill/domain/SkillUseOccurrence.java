@@ -14,5 +14,5 @@ import java.time.Instant;
  * @param occurredAt 쓰인 시각
  */
 public record SkillUseOccurrence(
-        Long executionId, Long agentId, Long conversationId, String skillName, Instant occurredAt) {
+    Long executionId, Long agentId, Long conversationId, String skillName, Instant occurredAt) {
 }

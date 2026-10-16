@@ -17,7 +17,8 @@ class ProactiveCheckPropertiesTest {
     private static final Duration MINUTE = Duration.ofMinutes(1);
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(BindBoth.class, ProactiveCheckProperties.RunTimeoutCheck.class);
+        .withUserConfiguration(BindBoth.class, ProactiveCheckProperties.RunTimeoutCheck.class);
+
 
     @Test
     @DisplayName("설정을 적지 않으면 기본값으로 뜬다")
@@ -35,44 +36,48 @@ class ProactiveCheckPropertiesTest {
         });
     }
 
+
     @Test
     @DisplayName("max-duration 이 hermes.run-timeout 과 같거나 길면 기동이 실패한다")
     void failsToStartWhenMaxDurationIsNotShorterThanRunTimeout() {
         for (String maxDuration : new String[] {"2m", "3m"}) {
             runner.withPropertyValues("hermes.run-timeout=2m", "assistant.proactive-check.max-duration=" + maxDuration)
-                    .run(context -> assertThat(context)
-                            .as("max-duration=%s, run-timeout=2m", maxDuration)
-                            .getFailure()
-                            .rootCause()
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessageContaining("max-duration")
-                            .hasMessageContaining("hermes.run-timeout"));
+                .run(context -> assertThat(context)
+                    .as("max-duration=%s, run-timeout=2m", maxDuration)
+                    .getFailure()
+                    .rootCause()
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("max-duration")
+                    .hasMessageContaining("hermes.run-timeout"));
         }
     }
+
 
     @Test
     @DisplayName("max-duration 이 hermes.run-timeout 보다 짧으면 뜬다")
     void startsWhenMaxDurationIsShorterThanRunTimeout() {
         runner.withPropertyValues("hermes.run-timeout=1s", "assistant.proactive-check.max-duration=999ms")
-                .run(context -> assertThat(context).hasNotFailed());
+            .run(context -> assertThat(context).hasNotFailed());
     }
+
 
     @Test
     @DisplayName("정수 한도가 하한보다 작으면 어느 값인지 알리며 멈춘다")
     void stopsNamingWhichValueWhenIntegerIsBelowMinimum() {
         assertThatThrownBy(() -> new ProactiveCheckProperties(true, MINUTE, 0, 3, 14, MINUTE, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("max-tool-calls");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-tool-calls");
         assertThatThrownBy(() -> new ProactiveCheckProperties(true, MINUTE, 40, -1, 14, MINUTE, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("max-delegations");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-delegations");
         assertThatThrownBy(() -> new ProactiveCheckProperties(true, MINUTE, 40, 3, 0, MINUTE, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("session-max-checks");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("session-max-checks");
         assertThatThrownBy(() -> new ProactiveCheckProperties(true, MINUTE, 40, 3, 14, MINUTE, 0))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("digest-max-items");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("digest-max-items");
     }
+
 
     @Test
     @DisplayName("위임 한도는 0 이어도 받는다")
@@ -82,22 +87,25 @@ class ProactiveCheckPropertiesTest {
         assertThat(properties.maxDelegations()).isZero();
     }
 
+
     @Test
     @DisplayName("시간이 없거나 0 이하이면 멈춘다")
     void stopsWhenDurationIsMissingOrNotPositive() {
         for (Duration invalid : new Duration[] {null, Duration.ZERO, Duration.ofMillis(-1)}) {
             assertThatThrownBy(() -> new ProactiveCheckProperties(true, invalid, 40, 3, 14, MINUTE, 20))
-                    .as("max-duration=%s", invalid)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("max-duration");
+                .as("max-duration=%s", invalid)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("max-duration");
             assertThatThrownBy(() -> new ProactiveCheckProperties(true, MINUTE, 40, 3, 14, invalid, 20))
-                    .as("digest-window=%s", invalid)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("digest-window");
+                .as("digest-window=%s", invalid)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("digest-window");
         }
     }
 
+
     /** 앱의 설정 검색 대신 두 설정 묶음만 묶는다. */
     @EnableConfigurationProperties({ProactiveCheckProperties.class, HermesProperties.class})
-    static class BindBoth {}
+    static class BindBoth {
+    }
 }

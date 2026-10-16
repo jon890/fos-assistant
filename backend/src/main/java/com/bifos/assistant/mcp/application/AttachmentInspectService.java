@@ -28,46 +28,49 @@ public class AttachmentInspectService {
     private final Clock clock;
     private final Map<Long, Budget> budgets = new HashMap<>();
 
+
     public InspectedImage inspect(McpPrincipal principal, JsonNode body) {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
         McpCaller caller = authorize(principal, body, request);
         AgentExecution execution = caller.originExecution();
         consume(caller, request.attachmentId());
         InspectedImage result = request.overview()
-                ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
-                : attachments.inspect(
-                        caller.user(),
-                        execution.conversationId(),
-                        request.attachmentId(),
-                        request.region(),
-                        () -> active(execution.id()));
+            ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
+            : attachments.inspect(
+                caller.user(),
+                execution.conversationId(),
+                request.attachmentId(),
+                request.region(),
+                () -> active(execution.id()));
         if (!active(execution.id())) {
             throw invalid();
         }
         return result;
     }
 
+
     /** 원래 proof를 재검증하며 조회 예산과 파일에는 손대지 않는다. */
     public void validate(McpPrincipal principal, JsonNode body) {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
         McpCaller caller = authorize(principal, body, request);
         attachments.validateInspection(
-                caller.user(), caller.originExecution().conversationId(), request.attachmentId());
+            caller.user(), caller.originExecution().conversationId(), request.attachmentId());
         if (!active(caller.executionId())) {
             throw invalid();
         }
     }
 
+
     private McpCaller authorize(McpPrincipal principal, JsonNode body, AttachmentInspectRequest request) {
         JsonNode proof = body.get("_fos_inspect");
         if (proof == null
-                || !proof.isObject()
-                || !proof.has("top_level")
-                || !proof.get("top_level").isBoolean()) {
+            || !proof.isObject()
+            || !proof.has("top_level")
+            || !proof.get("top_level").isBoolean()) {
             throw invalid();
         }
         McpCaller caller = callers.resolveAttachmentInspection(
-                principal, body.get("_fos_ctx"), proof.get("top_level").booleanValue());
+            principal, body.get("_fos_ctx"), proof.get("top_level").booleanValue());
         AgentExecution execution = caller.originExecution();
         requireRunning(execution);
         verify(principal, caller, request, body.get("_fos_inspect"));
@@ -77,15 +80,17 @@ public class AttachmentInspectService {
         return caller;
     }
 
+
     private boolean active(Long executionId) {
         AgentExecution execution = executions.findById(executionId).orElseThrow(AttachmentInspectService::invalid);
         if (!executions.existsByIdAndStatus(executionId, ExecutionStatus.RUNNING)) {
             return false;
         }
         return execution.rootExecutionId() == null
-                || (executions.existsById(execution.rootExecutionId())
-                        && !executions.existsByIdAndStatus(execution.rootExecutionId(), ExecutionStatus.CANCELLED));
+            || (executions.existsById(execution.rootExecutionId())
+                && !executions.existsByIdAndStatus(execution.rootExecutionId(), ExecutionStatus.CANCELLED));
     }
+
 
     private void verify(McpPrincipal principal, McpCaller caller, AttachmentInspectRequest request, JsonNode proof) {
         if (proof == null || !proof.isObject()) {
@@ -94,37 +99,38 @@ public class AttachmentInspectService {
         JsonNode issued = proof.get("issued_at_ms");
         JsonNode sig = proof.get("sig");
         if (issued == null
-                || !issued.isIntegralNumber()
-                || !issued.canConvertToLong()
-                || sig == null
-                || !sig.isTextual()
-                || !McpCallContext.SIGNATURE.matcher(sig.asString()).matches()) {
+            || !issued.isIntegralNumber()
+            || !issued.canConvertToLong()
+            || sig == null
+            || !sig.isTextual()
+            || !McpCallContext.SIGNATURE.matcher(sig.asString()).matches()) {
             throw invalid();
         }
         long timestamp = issued.longValue();
         long now = clock.millis();
         if (Instant.ofEpochMilli(timestamp).isBefore(caller.originExecution().startedAt())
-                || timestamp > now
-                || timestamp < now - 60_000
-                || caller.originExecution().startedAt().isBefore(clock.instant().minusSeconds(3600))) {
+            || timestamp > now
+            || timestamp < now - 60_000
+            || caller.originExecution().startedAt().isBefore(clock.instant().minusSeconds(3600))) {
             throw invalid();
         }
         McpCallContext context = caller.context();
         String signed = String.join(
-                "\n",
-                "v1-attachment-inspect",
-                context.rootSessionId(),
-                context.sessionId(),
-                context.toolCallId(),
-                Long.toString(timestamp),
-                request.digest(),
-                proof.get("top_level").booleanValue() ? "1" : "0");
+            "\n",
+            "v1-attachment-inspect",
+            context.rootSessionId(),
+            context.sessionId(),
+            context.toolCallId(),
+            Long.toString(timestamp),
+            request.digest(),
+            proof.get("top_level").booleanValue() ? "1" : "0");
         if (!MessageDigest.isEqual(
-                McpCallContext.hmac(principal.tokenHash(), signed),
-                HexFormat.of().parseHex(sig.asString()))) {
+            McpCallContext.hmac(principal.tokenHash(), signed),
+            HexFormat.of().parseHex(sig.asString()))) {
             throw invalid();
         }
     }
+
 
     private synchronized void consume(McpCaller caller, long attachmentId) {
         Instant now = clock.instant();
@@ -144,21 +150,25 @@ public class AttachmentInspectService {
         budget.total++;
     }
 
+
     private static void requireRunning(AgentExecution execution) {
         if (execution.status() != ExecutionStatus.RUNNING || execution.conversationId() == null) {
             throw invalid();
         }
     }
 
+
     private static ApiException invalid() {
         return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
+
 
     private static final class Budget {
         private final Instant expires;
         private final Map<String, Integer> calls = new HashMap<>();
         private final Map<Long, Integer> photos = new HashMap<>();
         private int total;
+
 
         private Budget(Instant expires) {
             this.expires = expires;

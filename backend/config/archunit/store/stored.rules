@@ -2,7 +2,6 @@
 #Wed Oct 07 16:06:48 KST 2026
 ConfigurationProperties\ \uD074\uB798\uC2A4\uC5D0\uB294\ Validated\ \uAC00\ \uBD99\uB294\uB2E4=f875bef7-581f-41c7-8e85-cf4b3d36f833
 Enumerated\ \uD544\uB4DC\uC758\ \uD0C0\uC785\uC740\ domain.type\ \uC5D0\ \uC788\uB2E4=2c9d047b-fb3f-4e7d-b83b-975d0be92766
-Executors.newVirtualThreadPerTaskExecutor\ \uB294\ ResearchAndBuildFlow\ \uB9CC\ \uBD80\uB978\uB2E4=b956377f-5712-4099-bac3-c1966cf911e5
 Instant.now()\ \uB97C\ \uC9C1\uC811\ \uBD80\uB974\uC9C0\ \uC54A\uB294\uB2E4=d3d721a0-86e5-4069-8051-dd3e7adf2c55
 Jackson\ 2\ \uC758\ core\ \uC640\ databind\ \uC5D0\ \uC758\uC874\uD558\uC9C0\ \uC54A\uB294\uB2E4=5f79dd7c-de4a-4c30-921f-73f0c7a81711
 MessageDigest.getInstance\ \uB294\ Sha256\ \uB9CC\ \uBD80\uB978\uB2E4=d3f00600-4e52-412f-ab23-2abb80f9eefd

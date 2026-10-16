@@ -31,10 +31,12 @@ class AgentTokenServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @BeforeEach
     void setUp() {
         tokenRepository.deleteAll();
     }
+
 
     @Test
     @DisplayName("발급한 원문은 응답에만 있고 저장된 행에는 없다")
@@ -47,10 +49,11 @@ class AgentTokenServiceTest {
         for (Field field : AgentToken.class.getDeclaredFields()) {
             if (field.getType() == String.class) {
                 field.setAccessible(true);
-                assertThat((String) field.get(saved)).doesNotContain(issued.rawToken());
+                assertThat((String)field.get(saved)).doesNotContain(issued.rawToken());
             }
         }
     }
+
 
     @Test
     @DisplayName("profile 로 발급한 토큰은 사용자를 갖지 않는다")
@@ -61,6 +64,7 @@ class AgentTokenServiceTest {
         assertThat(saved.profileName()).isEqualTo("hermes-profile");
     }
 
+
     @Test
     @DisplayName("profile 이름 규칙을 어기면 발급하지 않는다")
     void doesNotIssueWhenProfileNameBreaksRule() {
@@ -70,9 +74,10 @@ class AgentTokenServiceTest {
         }
         assertValidationFailed(() -> tokens.issue(null, "hermes"), null);
         assertThat(tokens.issue("a".repeat(64), "hermes").profileName())
-                .as("64자까지는 받는다")
-                .hasSize(64);
+            .as("64자까지는 받는다")
+            .hasSize(64);
     }
+
 
     @Test
     @DisplayName("폐기해도 행은 남고 폐기 시각이 채워진다")
@@ -80,25 +85,27 @@ class AgentTokenServiceTest {
         var issued = tokens.issue("hermes-profile", "hermes");
         tokens.revoke(issued.token().id());
         assertThat(tokenRepository.findById(issued.token().id()))
-                .isPresent()
-                .get()
-                .extracting(AgentToken::revokedAt)
-                .isNotNull();
+            .isPresent()
+            .get()
+            .extracting(AgentToken::revokedAt)
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("인증하면 마지막 사용 시각을 갱신하고 profile 을 증명한다")
     void authenticationUpdatesLastUsedTimeAndProvesProfile() {
         var issued = tokens.issue("hermes-profile", "hermes");
         assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
-                .isNull();
+            .isNull();
         McpPrincipal principal = tokens.authenticate(issued.rawToken());
         assertThat(tokenRepository.findById(issued.token().id()).orElseThrow().lastUsedAt())
-                .isNotNull();
+            .isNotNull();
         assertThat(principal.profileName()).isEqualTo("hermes-profile");
         assertThat(principal.tokenHash()).isEqualTo(AgentTokenService.hash(issued.rawToken()));
         assertThat(principal.toString()).doesNotContain(principal.tokenHash());
     }
+
 
     @Test
     @DisplayName("profile 이 빈 토큰은 인증하지 않고 사용 시각을 남기지 않는다")
@@ -106,23 +113,25 @@ class AgentTokenServiceTest {
         String raw = "unbound-" + UUID.randomUUID();
         long id = McpCallSigner.insertUnboundToken(jdbc, raw, "unbound");
         assertThatThrownBy(() -> tokens.authenticate(raw))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.UNAUTHENTICATED));
         assertThat(tokenRepository.findById(id).orElseThrow().lastUsedAt()).isNull();
     }
+
 
     @Test
     @DisplayName("hash 는 SHA-256 전체를 소문자 16진수로 돌려주고 null 은 거절한다")
     void hashIsFullSha256AndRejectsNull() {
         assertThat(AgentTokenService.hash("abc"))
-                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+            .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
         assertThatThrownBy(() -> AgentTokenService.hash(null)).isInstanceOf(NullPointerException.class);
     }
 
+
     private static void assertValidationFailed(ThrowingCallable call, String input) {
         assertThatThrownBy(call)
-                .as("입력 %s", input)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .as("입력 %s", input)
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

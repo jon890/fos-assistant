@@ -1,7 +1,6 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -44,7 +43,6 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -72,19 +70,17 @@ class AgentConnectionControllerTest {
 
     private static final String SERVER_NAME = "memo-server-internal";
     private static final ConnectorManifest MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(new ConnectorField("token", ENV_NAME, "토큰", "", true, true, null, null)),
-            "list_scopes",
-            SERVER_NAME,
-            List.of(),
-            false,
-            2,
-            List.of(
-                    new ConnectorTool("list_scopes", "READ", "none", null, null),
-                    new ConnectorTool("write_note", "WRITE", "required", null, null)),
-            List.of());
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(new ConnectorField("token", ENV_NAME, "토큰", "", true, true, null, null)),
+        "list_scopes",
+        SERVER_NAME,
+        2,
+        List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool("write_note", "WRITE", "required", null, null)),
+        List.of());
 
     @Autowired
     ConnectorBindingService service;
@@ -119,25 +115,25 @@ class AgentConnectionControllerTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MockMvc mvc;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-                .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of());
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web"));
         mvc = MockMvcBuilders.standaloneSetup(new AgentConnectionController(service, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -147,6 +143,7 @@ class AgentConnectionControllerTest {
         agents.deleteAll();
         users.deleteAll();
     }
+
 
     @Test
     @DisplayName("주인은 연결을 붙이고 떼며 응답에 env 이름과 보관 파일 이름과 서버 이름이 없다")
@@ -158,31 +155,31 @@ class AgentConnectionControllerTest {
         String path = "/api/v1/agents/" + agent.code() + "/connections";
 
         mvc.perform(get(path))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.blockedReason").doesNotExist())
-                .andExpect(jsonPath("$.connections[0].connectorId").value(DEMO))
-                .andExpect(jsonPath("$.connections[0].bound").value(false))
-                .andExpect(jsonPath("$.connections[0].status").doesNotExist());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.blockedReason").doesNotExist())
+            .andExpect(jsonPath("$.connections[0].connectorId").value(DEMO))
+            .andExpect(jsonPath("$.connections[0].bound").value(false))
+            .andExpect(jsonPath("$.connections[0].status").doesNotExist());
 
         String bound = mvc.perform(put(path + "/" + DEMO))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connectorId").value(DEMO))
-                .andExpect(jsonPath("$.title").value("검사용 메모"))
-                .andExpect(jsonPath("$.connectionStatus").value("READY"))
-                .andExpect(jsonPath("$.bound").value(true))
-                .andExpect(jsonPath("$.status").value("PENDING"))
-                .andExpect(jsonPath("$.restartRequired").value(true))
-                .andExpect(jsonPath("$.toolCount").value(2))
-                .andExpect(jsonPath("$.vault").doesNotExist())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connectorId").value(DEMO))
+            .andExpect(jsonPath("$.title").value("검사용 메모"))
+            .andExpect(jsonPath("$.connectionStatus").value("READY"))
+            .andExpect(jsonPath("$.bound").value(true))
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andExpect(jsonPath("$.restartRequired").value(true))
+            .andExpect(jsonPath("$.toolCount").value(2))
+            .andExpect(jsonPath("$.vault").doesNotExist())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
         String listed = mvc.perform(get(path))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connections[0].bound").value(true))
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connections[0].bound").value(true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
         assertThat(bound + listed).doesNotContain(ENV_NAME, SERVER_NAME, connection.vault(), TOKEN);
         verify(connector).bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner(), null);
 
@@ -191,9 +188,10 @@ class AgentConnectionControllerTest {
         verify(connector).unbindConnector(agent.hermesProfile(), DEMO);
         assertThat(bindings.findByAgentId(agent.id())).isEmpty();
         mvc.perform(get(path))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connections[0].bound").value(false));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connections[0].bound").value(false));
     }
+
 
     @Test
     @DisplayName("남의 비공개 에이전트에 붙이면 AGENT_NOT_FOUND 다")
@@ -205,11 +203,12 @@ class AgentConnectionControllerTest {
         signIn(other);
 
         mvc.perform(put("/api/v1/agents/" + agent.code() + "/connections/" + DEMO))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("읽을 수 있는 남의 그룹 공개 에이전트에 붙이면 FORBIDDEN 이다")
@@ -221,11 +220,12 @@ class AgentConnectionControllerTest {
         signIn(other);
 
         mvc.perform(put("/api/v1/agents/" + agent.code() + "/connections/" + DEMO))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("관리자도 남의 비공개 에이전트의 연결 목록은 FORBIDDEN 이다")
@@ -236,9 +236,10 @@ class AgentConnectionControllerTest {
         signIn(admin);
 
         mvc.perform(get("/api/v1/agents/" + agent.code() + "/connections"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
+
 
     @Test
     @DisplayName("연결이 없는 주인의 그룹 공개 에이전트는 빈 목록과 붙일 수 없는 까닭을 준다")
@@ -248,38 +249,40 @@ class AgentConnectionControllerTest {
         signIn(owner);
 
         mvc.perform(get("/api/v1/agents/" + agent.code() + "/connections"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connections").isEmpty())
-                .andExpect(jsonPath("$.blockedReason").value("AGENT_NOT_PRIVATE"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connections").isEmpty())
+            .andExpect(jsonPath("$.blockedReason").value("AGENT_NOT_PRIVATE"));
     }
+
 
     private void signIn(CurrentUser user) {
         when(currentUser.require()).thenReturn(user);
     }
+
 
     private ConnectorConnection connect(CurrentUser owner) {
         connectionService.register(owner, DEMO, Map.of("token", TOKEN));
         return connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow();
     }
 
+
     private Agent agent(CurrentUser owner, AgentVisibility visibility) {
         String code = "conn-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id()));
     }
+
 
     private CurrentUser user(UserRole role) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved =
-                users.save(AppUser.of("agent-connection-" + suffix + "@example.com", suffix, 1L, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("agent-connection-" + suffix + "@example.com", suffix, 1L, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

@@ -24,11 +24,13 @@ public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
     private final ConversationRepository conversations;
     private final ChatMessageContents contents;
 
+
     @Override
     public <S extends ChatMessage> S save(S message) {
         Conversation conversation = lockConversation(message.conversationId());
         return persistOrMerge(message, conversation);
     }
+
 
     @Override
     public <S extends ChatMessage> S saveAndFlush(S message) {
@@ -37,6 +39,7 @@ public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
         return saved;
     }
 
+
     @Override
     public <S extends ChatMessage> List<S> saveAll(Iterable<S> messages) {
         List<S> batch = new ArrayList<>();
@@ -44,14 +47,15 @@ public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
         // 서로 반대 순서로 받은 묶음도 대화 잠금은 번호 순서로 얻는다. 반환 순서는 입력과 같다.
         Map<Long, Conversation> locked = new HashMap<>();
         batch.stream()
-                .map(ChatMessage::conversationId)
-                .distinct()
-                .sorted()
-                .forEach(id -> locked.put(id, lockConversation(id)));
+            .map(ChatMessage::conversationId)
+            .distinct()
+            .sorted()
+            .forEach(id -> locked.put(id, lockConversation(id)));
         List<S> saved = new ArrayList<>(batch.size());
         batch.forEach(message -> saved.add(persistOrMerge(message, locked.get(message.conversationId()))));
         return saved;
     }
+
 
     @Override
     public <S extends ChatMessage> List<S> saveAllAndFlush(Iterable<S> messages) {
@@ -60,13 +64,15 @@ public class ChatMessageWritesImpl implements ChatMessageWrites<ChatMessage> {
         return saved;
     }
 
+
     /** 본문을 지운 대화에는 남기지 않는다. 늦게 끝난 실행의 답이 지운 대화에 다시 평문으로 쌓이지 않게 한다. */
     private Conversation lockConversation(Long conversationId) {
         return conversations
-                .findByIdForMessageWrite(conversationId)
-                .filter(conversation -> conversation.purgedAt() == null)
-                .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다"));
+            .findByIdForMessageWrite(conversationId)
+            .filter(conversation -> conversation.purgedAt() == null)
+            .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다"));
     }
+
 
     /**
      * 새 메시지는 본문을 빼고 넣은 뒤 줄 번호로 AAD 를 만들어 같은 트랜잭션에서 암호문을 적는다(ADR-20261008 / data-encryption).

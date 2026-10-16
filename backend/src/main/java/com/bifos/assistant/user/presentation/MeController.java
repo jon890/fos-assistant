@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeController {
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public MeView read() {
         return MeView.from(currentUser.require());

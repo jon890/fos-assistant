@@ -28,9 +28,11 @@ class ConversationPublicIdLookupTest {
     @Autowired
     ConversationRepository conversations;
 
+
     private Conversation newConversation() {
         return conversations.save(Conversation.startedBy(LOOKUP_USER_ID, "", null, Instant.now()));
     }
+
 
     @Test
     @DisplayName("대화 둘을 저장하면 publicIdsOf 가 각 번호를 그 대화의 공개 식별자로 잇는다")
@@ -39,10 +41,11 @@ class ConversationPublicIdLookupTest {
         Conversation second = newConversation();
 
         assertThat(lookup.publicIdsOf(List.of(first.id(), second.id())))
-                .containsEntry(first.id(), first.publicId())
-                .containsEntry(second.id(), second.publicId())
-                .hasSize(2);
+            .containsEntry(first.id(), first.publicId())
+            .containsEntry(second.id(), second.publicId())
+            .hasSize(2);
     }
+
 
     @Test
     @DisplayName("하나를 지우면 publicIdsOf 는 둘 다 담고 activePublicIdsOf 는 지우지 않은 하나만 담는다")
@@ -55,6 +58,7 @@ class ConversationPublicIdLookupTest {
         assertThat(lookup.publicIdsOf(ids)).containsOnlyKeys(kept.id(), deleted.id());
         assertThat(lookup.activePublicIdsOf(ids)).containsOnlyKeys(kept.id()).containsEntry(kept.id(), kept.publicId());
     }
+
 
     @Test
     @DisplayName("번호 목록이 비면 두 조회 모두 빈 표를 돌려준다")

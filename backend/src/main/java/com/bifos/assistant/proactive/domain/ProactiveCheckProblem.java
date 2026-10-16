@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.proactive.domain.type.ProblemDropReason;
 import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import jakarta.persistence.Column;
@@ -31,7 +32,7 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class ProactiveCheckProblem {
+public class ProactiveCheckProblem extends CreatedAtEntity {
 
     static final int PROBLEM_KEY_MAX_LENGTH = 120;
     static final int PROBLEM_MAX_LENGTH = 300;
@@ -103,28 +104,25 @@ public class ProactiveCheckProblem {
     @Column(name = "evidence_checked_at")
     private Instant evidenceCheckedAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
 
     /** 검사한 후보 하나를 줄로 만든다. 칸 길이를 넘는 글은 잘라 넣는다. 모델이 쓴 글이라 길이를 믿지 않는다. */
     public static ProactiveCheckProblem of(
-            Long checkId,
-            Long conversationId,
-            ProblemStatus status,
-            ProblemDropReason dropReason,
-            String problemKey,
-            String problem,
-            String relatedGoal,
-            String actionType,
-            String actionText,
-            String confidence,
-            String expectedBenefit,
-            String sideEffect,
-            String risk,
-            String changeSinceLast,
-            List<ProblemEvidence> evidence,
-            Instant evidenceCheckedAt,
-            Instant now) {
+        Long checkId,
+        Long conversationId,
+        ProblemStatus status,
+        ProblemDropReason dropReason,
+        String problemKey,
+        String problem,
+        String relatedGoal,
+        String actionType,
+        String actionText,
+        String confidence,
+        String expectedBenefit,
+        String sideEffect,
+        String risk,
+        String changeSinceLast,
+        List<ProblemEvidence> evidence,
+        Instant evidenceCheckedAt) {
         ProactiveCheckProblem row = new ProactiveCheckProblem();
         row.checkId = checkId;
         row.conversationId = conversationId;
@@ -142,9 +140,9 @@ public class ProactiveCheckProblem {
         row.changeSinceLast = truncate(changeSinceLast, CHANGE_SINCE_LAST_MAX_LENGTH);
         row.evidence = evidence == null ? List.of() : List.copyOf(evidence);
         row.evidenceCheckedAt = evidenceCheckedAt;
-        row.createdAt = now;
         return row;
     }
+
 
     /** 칸 길이까지만 남긴다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private static String truncate(String value, int maxLength) {

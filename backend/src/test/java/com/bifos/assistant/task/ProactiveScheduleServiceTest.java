@@ -45,6 +45,7 @@ class ProactiveScheduleServiceTest {
     private final Agent agent = mock(Agent.class);
     private final CurrentUser user = new CurrentUser(10L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
 
+
     @Test
     @DisplayName("Hermes 준비 조회가 실패해도 일정 조회는 확인 불가 상태로 응답한다")
     void returnsUnknownReadinessWhenHermesIsUnavailable() {
@@ -58,6 +59,7 @@ class ProactiveScheduleServiceTest {
         assertThat(schedule.blockers()).containsExactly(CheckBlocker.of(CheckBlockerCode.READINESS_UNKNOWN));
     }
 
+
     @Test
     @DisplayName("일정 조회는 Hermes 장애와 관계없는 오류를 숨기지 않는다")
     void propagatesUnrelatedReadinessFailure() {
@@ -67,17 +69,6 @@ class ProactiveScheduleServiceTest {
         assertThatThrownBy(() -> service(false).get(user, "career")).isInstanceOf(ApiException.class);
     }
 
-    @Test
-    @DisplayName("지원하지 않는 에이전트의 일정 조회는 Hermes 도구 목록을 호출하지 않는다")
-    void unsupportedAgentReturnsBlockerWithoutHermesCalls() {
-        when(agents.requireReadable(user, "connector")).thenReturn(agent);
-        when(readiness.check(agent))
-                .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
-
-        assertThat(service(false).get(user, "connector").blockers())
-                .containsExactly(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED));
-        verifyNoInteractions(toolsets);
-    }
 
     @Test
     @DisplayName("격리 실행 공간이 없고 터미널 도구가 켜져 있으면 매일 깨우기를 켜지 못한다")
@@ -90,13 +81,14 @@ class ProactiveScheduleServiceTest {
         when(toolsets.readEnabled("http://agent-runtime.test", "career")).thenReturn(List.of("terminal"));
 
         assertThatThrownBy(() -> service.update(user, "career", true, "09:00", "Asia/Seoul"))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE);
 
         verify(tasks, never()).save(any());
         verifyNoInteractions(triggers, checks);
     }
+
 
     @Test
     @DisplayName("격리 실행 공간이 없을 때 터미널 도구는 화면에 막는 까닭과 함께 보인다")
@@ -115,6 +107,7 @@ class ProactiveScheduleServiceTest {
         });
     }
 
+
     @Test
     @DisplayName("격리 실행 공간을 확인한 설정이 켜지면 매일 깨우기 발화가 격리 제한을 통과한다")
     void allowsScheduledCheckWhenIsolationIsConfirmed() {
@@ -125,34 +118,36 @@ class ProactiveScheduleServiceTest {
         verifyNoInteractions(toolsets);
     }
 
+
     @Test
-    @DisplayName("격리 설정을 켜도 다른 매일 깨우기 차단 사유는 유지한다")
+    @DisplayName("격리 설정을 켜도 스킬이 없는 에이전트의 매일 깨우기 차단 사유는 유지한다")
     void retainsReadinessBlockerWhenIsolationIsConfirmed() {
         when(agents.requireStartable(user, "career")).thenReturn(agent);
         when(readiness.check(agent))
-                .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
+            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING))));
 
         assertThat(service(true).schedulingAvailable(user, "career")).isFalse();
         verifyNoInteractions(toolsets);
     }
 
+
     private ProactiveScheduleService service(boolean isolatedExecutionEnabled) {
         return new ProactiveScheduleService(
-                agents,
-                readiness,
-                toolsets,
-                new ProactiveScheduleProperties(isolatedExecutionEnabled),
-                tasks,
-                triggers,
-                checks,
-                new TaskProperties(
-                        "-",
-                        Duration.ofMinutes(2),
-                        Duration.ofMinutes(10),
-                        10,
-                        Duration.ofMinutes(15),
-                        48,
-                        ZoneOffset.UTC.getId()),
-                Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneOffset.UTC));
+            agents,
+            readiness,
+            toolsets,
+            new ProactiveScheduleProperties(isolatedExecutionEnabled),
+            tasks,
+            triggers,
+            checks,
+            new TaskProperties(
+                "-",
+                Duration.ofMinutes(2),
+                Duration.ofMinutes(10),
+                10,
+                Duration.ofMinutes(15),
+                48,
+                ZoneOffset.UTC.getId()),
+            Clock.fixed(Instant.parse("2026-10-05T00:00:00Z"), ZoneOffset.UTC));
     }
 }

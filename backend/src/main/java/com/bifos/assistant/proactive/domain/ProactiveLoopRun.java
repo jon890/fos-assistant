@@ -24,8 +24,8 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "proactive_loop_run",
-        uniqueConstraints = @UniqueConstraint(name = "uk_proactive_loop_run_source", columnNames = "source_check_id"))
+    name = "proactive_loop_run",
+    uniqueConstraints = @UniqueConstraint(name = "uk_proactive_loop_run_source", columnNames = "source_check_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
@@ -67,6 +67,7 @@ public class ProactiveLoopRun {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+
     /** 평가와 판정을 부르기 전에 저장하는 시도다. */
     public static ProactiveLoopRun running(Long userId, Long sourceCheckId, Instant now) {
         ProactiveLoopRun row = new ProactiveLoopRun();
@@ -76,6 +77,7 @@ public class ProactiveLoopRun {
         row.createdAt = now;
         return row;
     }
+
 
     /** 평가하지 않고 건너뛴 시도다. 저장하는 순간 끝난다. */
     public static ProactiveLoopRun skipped(Long userId, Long sourceCheckId, LoopSkippedReason reason, Instant now) {
@@ -89,11 +91,13 @@ public class ProactiveLoopRun {
         return row;
     }
 
+
     public void decided(Long evaluationId, Instant now) {
         this.status = LoopRunStatus.DECIDED;
         this.evaluationId = evaluationId;
         this.finishedAt = now;
     }
+
 
     public void failed(String errorCode, Long evaluationId, Instant now) {
         this.status = LoopRunStatus.FAILED;

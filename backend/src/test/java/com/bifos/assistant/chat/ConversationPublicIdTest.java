@@ -45,7 +45,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -106,18 +105,19 @@ class ConversationPublicIdTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private MockMvc mvc;
 
+
     @BeforeEach
     void setUp() {
-        ((StubHermesRunsClient) hermes).reset();
-        ((StubHermesRunsClient) hermes)
-                .willReturn(HermesRunResult.of(
-                        "run-one",
-                        "session-one",
-                        "completed",
-                        "답",
-                        "example-model-large",
-                        "anthropic",
-                        TokenUsage.empty()));
+        ((StubHermesRunsClient)hermes).reset();
+        ((StubHermesRunsClient)hermes)
+            .willReturn(HermesRunResult.of(
+                "run-one",
+                "session-one",
+                "completed",
+                "답",
+                "example-model-large",
+                "anthropic",
+                TokenUsage.empty()));
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -126,58 +126,62 @@ class ConversationPublicIdTest {
         memories.deleteAll();
         users.deleteAll();
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
-                        chat,
-                        currentUser,
-                        new UserDisplayNameService(users),
-                        agentService,
-                        access,
-                        new ChatEventStreams(Duration.ofSeconds(20)),
-                        null,
-                        mock(ModelTierService.class),
-                        List.of(),
-                        mock(SourceReadSummaries.class)))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            chat,
+            currentUser,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class)))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
 
+
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
+
 
     private void signedIn(CurrentUser user) {
         when(currentUser.require()).thenReturn(user);
     }
 
+
     /** 보내기로 새 대화를 만들고 응답의 공개 식별자를 돌려준다. */
     private UUID started(CurrentUser user) throws Exception {
         signedIn(user);
         String body = mvc.perform(post("/api/v1/chat/messages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"text\":\"첫 질문\",\"agentCode\":\"" + user.displayName() + "\"}"))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString(StandardCharsets.UTF_8);
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"첫 질문\",\"agentCode\":\"" + user.displayName() + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
         return UUID.fromString(json.readTree(body).path("conversationId").asString());
     }
 
+
     private Conversation stored(UUID publicId) {
         return conversations.findAll().stream()
-                .filter(conversation -> publicId.equals(conversation.publicId()))
-                .findFirst()
-                .orElseThrow();
+            .filter(conversation -> publicId.equals(conversation.publicId()))
+            .findFirst()
+            .orElseThrow();
     }
+
 
     @Test
     @DisplayName("새 대화는 v7 공개 식별자를 받고 목록이 같은 식별자를 낸다")
@@ -187,9 +191,10 @@ class ConversationPublicIdTest {
 
         assertThat(id.version()).isEqualTo(7);
         mvc.perform(get("/api/v1/chat/conversations"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(id.toString()));
     }
+
 
     @Test
     @DisplayName("대화 한 줄을 공개 식별자로 읽고 남의 대화는 없는 대화로 답한다")
@@ -200,13 +205,14 @@ class ConversationPublicIdTest {
 
         signedIn(dad);
         mvc.perform(get("/api/v1/chat/conversations/{id}", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id.toString()));
         signedIn(kid);
         mvc.perform(get("/api/v1/chat/conversations/{id}", id))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("공개 식별자로 메시지를 읽고 이름을 바꾸고 지운다")
@@ -215,22 +221,23 @@ class ConversationPublicIdTest {
         UUID id = started(dad);
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/messages", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].content").value("첫 질문"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].content").value("첫 질문"));
         mvc.perform(patch("/api/v1/chat/conversations/{id}", id)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"새 이름\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()))
-                .andExpect(jsonPath("$.title").value("새 이름"));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"title\":\"새 이름\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id.toString()))
+            .andExpect(jsonPath("$.title").value("새 이름"));
         mvc.perform(delete("/api/v1/chat/conversations/{id}", id)).andExpect(status().isNoContent());
 
         assertThat(stored(id).deletedAt()).isNotNull();
         mvc.perform(get("/api/v1/chat/conversations/{id}/messages", id))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("남의 대화의 공개 식별자는 없는 대화와 같다")
@@ -241,13 +248,14 @@ class ConversationPublicIdTest {
         signedIn(kid);
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/messages", id))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
         mvc.perform(delete("/api/v1/chat/conversations/{id}", id))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
         assertThat(stored(id).deletedAt()).isNull();
     }
+
 
     @Test
     @DisplayName("모양이 틀린 식별자는 입력 오류다")
@@ -255,9 +263,10 @@ class ConversationPublicIdTest {
         signedIn(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/abc/messages"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
     }
+
 
     @Test
     @DisplayName("공개 식별자로 도는 turn을 물으면 돌지 않는 대화는 running이 false이고 나머지는 null이다")
@@ -265,11 +274,12 @@ class ConversationPublicIdTest {
         UUID id = started(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/running", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.running").value(false))
-                .andExpect(jsonPath("$.executionId").doesNotExist())
-                .andExpect(jsonPath("$.startedAt").doesNotExist());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.running").value(false))
+            .andExpect(jsonPath("$.executionId").doesNotExist())
+            .andExpect(jsonPath("$.startedAt").doesNotExist());
     }
+
 
     @Test
     @DisplayName("도는 turn을 물을 때 모양이 틀린 식별자는 입력 오류다")
@@ -277,9 +287,10 @@ class ConversationPublicIdTest {
         signedIn(member("public-dad"));
 
         mvc.perform(get("/api/v1/chat/conversations/abc/running"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
     }
+
 
     @Test
     @DisplayName("옛 번호로는 주인에게만 공개 식별자를 알려 준다")
@@ -293,16 +304,17 @@ class ConversationPublicIdTest {
         mvc.perform(delete("/api/v1/chat/conversations/{id}", gone)).andExpect(status().isNoContent());
 
         mvc.perform(get("/api/v1/chat/conversations/by-number/{number}", number))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id.toString()));
         mvc.perform(get("/api/v1/chat/conversations/by-number/{number}", goneNumber))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
         signedIn(kid);
         mvc.perform(get("/api/v1/chat/conversations/by-number/{number}", number))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("스트리밍 보내기의 started 와 done 이 같은 공개 식별자를 싣는다")
@@ -311,8 +323,8 @@ class ConversationPublicIdTest {
         UUID id = started(dad);
 
         List<JsonNode> events = streamed(post("/api/v1/chat/messages/stream")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"conversationId\":\"" + id + "\",\"text\":\"이어 묻기\"}"));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"" + id + "\",\"text\":\"이어 묻기\"}"));
 
         JsonNode first = events.getFirst();
         JsonNode last = events.getLast();
@@ -322,6 +334,7 @@ class ConversationPublicIdTest {
         assertThat(last.path("conversationId").asString()).isEqualTo(id.toString());
     }
 
+
     @Test
     @DisplayName("스트리밍 보내기에서 남의 대화는 error 사건이다")
     void streamSendToOthersConversationIsErrorEvent() throws Exception {
@@ -329,8 +342,8 @@ class ConversationPublicIdTest {
         signedIn(member("public-kid"));
 
         List<JsonNode> events = streamed(post("/api/v1/chat/messages/stream")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"conversationId\":\"" + id + "\",\"text\":\"끼어들기\"}"));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"" + id + "\",\"text\":\"끼어들기\"}"));
 
         assertThat(events).singleElement().satisfies(event -> {
             assertThat(event.path("type").asString()).isEqualTo("error");
@@ -338,14 +351,13 @@ class ConversationPublicIdTest {
         });
     }
 
+
     /** SSE 응답을 끝까지 받아 {@code data:} 줄마다 사건 하나로 읽는다. */
     private List<JsonNode> streamed(RequestBuilder builder) throws Exception {
-        MvcResult result =
-                mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
+        MvcResult result = mvc.perform(builder).andExpect(request().asyncStarted()).andReturn();
         // 스트림은 가상 스레드에서 돈다. 끝날 때까지 기다린 뒤 응답을 읽는다.
         result.getAsyncResult(10_000);
-        String body =
-                mvc.perform(asyncDispatch(result)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String body = mvc.perform(asyncDispatch(result)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         List<JsonNode> events = new ArrayList<>();
         for (String line : body.split("\n")) {
             if (line.startsWith("data:")) {

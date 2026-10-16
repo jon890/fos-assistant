@@ -11,7 +11,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +45,7 @@ class RevokedUserTest {
     @Autowired
     HermesModelClient hermesModels;
 
+
     @BeforeEach
     void setUp() {
         agents.deleteAll();
@@ -53,11 +53,13 @@ class RevokedUserTest {
         people.deleteAll();
     }
 
+
     private AllowedPerson saveDisabledPerson() {
-        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now());
+        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE);
         person.disable();
         return people.save(person);
     }
+
 
     @Test
     @DisplayName("꺼진 주소는 비어 있는 값을 받고 사용자가 생기지 않는다")
@@ -71,6 +73,7 @@ class RevokedUserTest {
         assertThat(users.count()).isZero();
     }
 
+
     @Test
     @DisplayName("꺼진 주소를 대문자를 섞어 넘겨도 비어 있는 값을 받는다")
     void returnsEmptyForDisabledAddressInMixedCase() {
@@ -82,16 +85,18 @@ class RevokedUserTest {
         assertThat(users.count()).isZero();
     }
 
+
     @Test
     @DisplayName("켜진 줄이 있는 주소는 사용자가 생긴다")
     void createsUserForEnabledAddress() {
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
 
         Optional<AppUser> resolved = resolver.resolveAllowed(EMAIL, NAME);
 
         assertThat(resolved).map(AppUser::email).contains(EMAIL);
         assertThat(users.findByEmail(EMAIL)).isPresent();
     }
+
 
     @Test
     @DisplayName("허용 목록에 줄이 없는 주소는 막지 않고 사용자가 생긴다")
@@ -102,10 +107,11 @@ class RevokedUserTest {
         assertThat(users.findByEmail("stranger@example.com")).isPresent();
     }
 
+
     @Test
     @DisplayName("이미 들어온 사용자의 줄을 끄면 막히고 다시 켜면 같은 사용자가 돌아온다")
     void blocksJoinedUserWhenDisabledAndReturnsSameUserWhenEnabledAgain() {
-        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
         AppUser joined = resolver.resolveAllowed(EMAIL, NAME).orElseThrow();
 
         person.disable();
@@ -120,21 +126,23 @@ class RevokedUserTest {
         assertThat(users.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("허용된 주소는 저장된 사용자와 칸이 같은 CurrentUser 를 받는다")
     void resolvesCurrentUserMatchingStoredUserForEnabledAddress() {
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
 
         Optional<CurrentUser> resolved = resolver.resolveCurrentUser(EMAIL, NAME);
 
         AppUser stored = users.findByEmail(EMAIL).orElseThrow();
         assertThat(resolved)
-                .contains(new CurrentUser(
-                        stored.id(), stored.email(), stored.displayName(), stored.groupId(), stored.role()));
+            .contains(new CurrentUser(
+                stored.id(), stored.email(), stored.displayName(), stored.groupId(), stored.role()));
         assertThat(resolved).map(CurrentUser::email).contains(EMAIL);
         assertThat(resolved).map(CurrentUser::displayName).contains(NAME);
         assertThat(users.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("꺼진 주소는 CurrentUser 를 받지 못하고 사용자가 생기지 않는다")

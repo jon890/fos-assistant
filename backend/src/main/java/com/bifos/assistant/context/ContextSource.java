@@ -10,6 +10,8 @@ public enum ContextSource {
     MEMORY_ALWAYS,
     /** 본문까지 싣는 Memory 개인 사실 구역의 줄. */
     MEMORY_FACTS,
+    /** 본문까지 싣는 Memory 질문과 관련된 기억 구역의 줄. */
+    MEMORY_SEARCH,
     /** 제목만 싣는 Memory 색인 층의 줄. */
     MEMORY_INDEX,
     /** memory_read 로 본문을 읽은 항목. 조립이 아니라 도구 처리가 실행 기록에 덧붙인다. */

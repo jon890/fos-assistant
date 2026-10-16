@@ -42,8 +42,6 @@
       "tool": "get_profile"
     },
     "mcp_server": "gmail",
-    "toolsets": [],
-    "attachments": false,
     "owner_browser": false,
     "owner_browser_login_url": null,
     "single_binding": false,
@@ -326,8 +324,6 @@
       "tool": "session_status"
     },
     "mcp_server": "naver-blog",
-    "toolsets": [],
-    "attachments": false,
     "owner_browser": true,
     "owner_browser_login_url": "https://nid.naver.com/nidlogin.login",
     "single_binding": false,

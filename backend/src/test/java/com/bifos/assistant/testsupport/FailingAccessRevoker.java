@@ -12,14 +12,17 @@ import org.springframework.context.event.EventListener;
 public class FailingAccessRevoker {
     private volatile boolean failing;
 
+
     /** 이 뒤의 폐기 사건에서 예외를 던진다. */
     public void fail() {
         failing = true;
     }
 
+
     public void reset() {
         failing = false;
     }
+
 
     @EventListener
     public void on(UserAccessRevoked event) {

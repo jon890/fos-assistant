@@ -31,43 +31,45 @@ public class RecentConversationCandidates implements AttentionCandidates {
     private final AgentService agents;
     private final AttentionProperties properties;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.CONTINUE);
     }
 
+
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
         List<Conversation> recent = chats.conversationsOf(
-                        user, null, properties.continueCount() + properties.maxItemsPerCard())
-                .items();
-        Map<Long, Agent> agentById =
-                agents.byIds(recent.stream().map(Conversation::agentId).toList());
+            user, null, properties.continueCount() + properties.maxItemsPerCard())
+            .items();
+        Map<Long, Agent> agentById = agents.byIds(recent.stream().map(Conversation::agentId).toList());
         return recent.stream()
-                .map(conversation -> candidate(conversation, agentById.get(conversation.agentId())))
-                .toList();
+            .map(conversation -> candidate(conversation, agentById.get(conversation.agentId())))
+            .toList();
     }
+
 
     private static AttentionCandidate candidate(Conversation conversation, Agent agent) {
         String itemKey = "conversation:" + conversation.publicId();
         return new AttentionCandidate(
-                CardKey.CONTINUE,
-                itemKey,
-                AttentionCandidates.stateKey(
-                        AttentionTrigger.CONVERSATION_RECENT,
-                        conversation.updatedAt().toString()),
+            CardKey.CONTINUE,
+            itemKey,
+            AttentionCandidates.stateKey(
                 AttentionTrigger.CONVERSATION_RECENT,
-                false,
-                false,
-                List.of(),
-                AttentionConfidence.CONTROL_PLANE,
-                conversation.title(),
-                conversation.publicId(),
-                agent == null ? null : agent.name(),
-                conversation.updatedAt(),
-                List.of(new AttentionSourceRef("CONVERSATION", itemKey, conversation.updatedAt())),
-                null,
-                null,
-                null);
+                conversation.updatedAt().toString()),
+            AttentionTrigger.CONVERSATION_RECENT,
+            false,
+            false,
+            List.of(),
+            AttentionConfidence.CONTROL_PLANE,
+            conversation.title(),
+            conversation.publicId(),
+            agent == null ? null : agent.name(),
+            conversation.updatedAt(),
+            List.of(new AttentionSourceRef("CONVERSATION", itemKey, conversation.updatedAt())),
+            null,
+            null,
+            null);
     }
 }

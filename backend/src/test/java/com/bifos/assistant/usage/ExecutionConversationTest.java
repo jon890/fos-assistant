@@ -56,17 +56,19 @@ class ExecutionConversationTest {
 
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
         conversation = conversations.save(Conversation.startedBy(USER_ID, "실행", null, Instant.now()));
     }
 
+
     @Test
     @DisplayName("대화가 effort 를 골랐으면 그 값을 담아 내고 실행 줄의 출처는 REQUESTED 다")
     void carriesEffortChosenByConversationAndRecordsRequestedSource() {
         transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-                conversation.id(), USER_ID, PROVIDER, MODEL, CHOSEN_EFFORT, ModelSelectionMode.CUSTOM));
+            conversation.id(), USER_ID, PROVIDER, MODEL, CHOSEN_EFFORT, ModelSelectionMode.CUSTOM));
         Conversation chosen = conversations.findById(conversation.id()).orElseThrow();
 
         ExecutionConversation value = chosen.executionConversation();
@@ -77,6 +79,7 @@ class ExecutionConversationTest {
         assertThat(saved(execution).conversationId()).isEqualTo(conversation.id());
         assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
     }
+
 
     @Test
     @DisplayName("대화가 effort 를 고르지 않았으면 null 을 담아 내고 실행 줄의 출처는 AGENT DEFAULT 다")
@@ -90,6 +93,7 @@ class ExecutionConversationTest {
         assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
     }
 
+
     @Test
     @DisplayName("대화 없이 시작한 실행 줄은 대화 번호가 비고 출처는 AGENT DEFAULT 다")
     void leavesConversationIdEmptyWhenStartedWithoutConversation() {
@@ -99,41 +103,44 @@ class ExecutionConversationTest {
         assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
     }
 
+
     /** 단계 없이 effort 를 실어 보낸 실행을 시작한다. 인자 열둘을 받는 판이라야 보낸 값과 단계를 함께 정한다. */
     private AgentExecution start(ExecutionConversation value) {
         return recorder.start(
-                user(),
-                value,
-                agent(),
-                null,
-                null,
-                ExecutionContextSnapshot.ofChars(0L),
-                SENT,
-                null,
-                null,
-                null,
-                null,
-                null);
+            user(),
+            value,
+            agent(),
+            null,
+            null,
+            ExecutionContextSnapshot.ofChars(0L),
+            SENT,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     private AgentExecution saved(AgentExecution execution) {
         return executions.findById(execution.id()).orElseThrow();
     }
 
+
     private static CurrentUser user() {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
+
     private static Agent agent() {
         return Agent.of(
-                "dad",
-                "Dad",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now());
+            "dad",
+            "Dad",
+            "dad",
+            "http://127.0.0.1:1/p/dad",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            USER_ID);
     }
 }

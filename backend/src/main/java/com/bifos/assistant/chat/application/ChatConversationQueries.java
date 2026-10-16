@@ -50,6 +50,7 @@ class ChatConversationQueries {
     private final Clock clock;
     private final List<CheckReportReads> checkReportReads;
 
+
     /**
      * 이 실행들 중 자식을 가진 것을 낸다.
      *
@@ -59,29 +60,31 @@ class ChatConversationQueries {
      */
     Set<Long> executionIdsHavingChildren(List<ChatMessage> history) {
         List<Long> executionIds = history.stream()
-                .map(ChatMessage::executionId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+            .map(ChatMessage::executionId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
         if (executionIds.isEmpty()) {
             return Set.of();
         }
         return Set.copyOf(executions.idsHavingChildren(executionIds));
     }
 
+
     /** 답 메시지의 실행 상태를 한 번에 읽는다. */
     Map<Long, ExecutionStatus> statuses(List<ChatMessage> history) {
         List<Long> ids = history.stream()
-                .map(ChatMessage::executionId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+            .map(ChatMessage::executionId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         return executionRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(AgentExecution::id, AgentExecution::status));
+            .collect(Collectors.toMap(AgentExecution::id, AgentExecution::status));
     }
+
 
     /**
      * 이 답들 중 막혀서 넘어간 것에 넘어간 곳의 provider 와 모델을 붙인다.
@@ -96,10 +99,10 @@ class ChatConversationQueries {
             return Map.of();
         }
         List<Long> executionIds = history.stream()
-                .map(ChatMessage::executionId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+            .map(ChatMessage::executionId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
         if (executionIds.isEmpty()) {
             return Map.of();
         }
@@ -112,25 +115,25 @@ class ChatConversationQueries {
         return labels;
     }
 
+
     /** 답마다 도구와 하위 에이전트 사건을 한 번에 읽어 작업 과정 요약을 만든다. */
     Map<Long, ActivitySummary> activitySummaries(List<ChatMessage> history) {
         List<Long> rootIds = history.stream()
-                .map(ChatMessage::executionId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+            .map(ChatMessage::executionId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
         if (rootIds.isEmpty()) {
             return Map.of();
         }
         Map<Long, AgentExecution> roots = executionRepository.findAllById(rootIds).stream()
-                .collect(Collectors.toMap(AgentExecution::id, it -> it));
+            .collect(Collectors.toMap(AgentExecution::id, it -> it));
         List<AgentExecution> descendants = executionRepository.findByRootExecutionIdIn(rootIds);
         Map<Long, Long> rootByExecution = new HashMap<>();
         rootIds.forEach(id -> rootByExecution.put(id, id));
         descendants.forEach(it -> rootByExecution.put(it.id(), it.rootExecutionId()));
-        Map<Long, List<ExecutionEvent>> eventsByExecution =
-                executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(rootByExecution.keySet()).stream()
-                        .collect(Collectors.groupingBy(ExecutionEvent::executionId));
+        Map<Long, List<ExecutionEvent>> eventsByExecution = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(rootByExecution.keySet()).stream()
+            .collect(Collectors.groupingBy(ExecutionEvent::executionId));
         Map<Long, ActivitySummary> summaries = new HashMap<>();
         for (Long rootId : rootIds) {
             AgentExecution root = roots.get(rootId);
@@ -140,8 +143,8 @@ class ChatConversationQueries {
             List<AgentExecution> tree = new ArrayList<>();
             tree.add(root);
             descendants.stream()
-                    .filter(it -> rootId.equals(it.rootExecutionId()))
-                    .forEach(tree::add);
+                .filter(it -> rootId.equals(it.rootExecutionId()))
+                .forEach(tree::add);
             int toolCount = 0;
             int subagentCount = 0;
             Instant latestFinish = null;
@@ -155,7 +158,8 @@ class ChatConversationQueries {
                         case TOOL_STARTED -> toolStarts++;
                         case TOOL_COMPLETED -> toolCompletes++;
                         case SUBAGENT_STARTED -> subagentStarts++;
-                        default -> {}
+                        default -> {
+                        }
                     }
                 }
                 toolCount += Math.max(toolStarts, toolCompletes);
@@ -164,19 +168,20 @@ class ChatConversationQueries {
                     subagentCount++;
                 }
                 if (execution.finishedAt() != null
-                        && (latestFinish == null || execution.finishedAt().isAfter(latestFinish))) {
+                    && (latestFinish == null || execution.finishedAt().isAfter(latestFinish))) {
                     latestFinish = execution.finishedAt();
                 }
             }
             if (toolCount + subagentCount > 0) {
                 Long durationMs = latestFinish == null
-                        ? null
-                        : Duration.between(root.startedAt(), latestFinish).toMillis();
+                    ? null
+                    : Duration.between(root.startedAt(), latestFinish).toMillis();
                 summaries.put(rootId, new ActivitySummary(toolCount, subagentCount, durationMs));
             }
         }
         return summaries;
     }
+
 
     /**
      * 이 대화의 첨부를 메시지 번호로 나눈다. 아직 메시지에 묶이지 않은 것은 뺀다.
@@ -187,9 +192,10 @@ class ChatConversationQueries {
     Map<Long, List<ChatAttachment>> attachmentsByMessage(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
         return attachments.allOf(conversation.id()).stream()
-                .filter(it -> it.messageId() != null)
-                .collect(Collectors.groupingBy(ChatAttachment::messageId));
+            .filter(it -> it.messageId() != null)
+            .collect(Collectors.groupingBy(ChatAttachment::messageId));
     }
+
 
     /**
      * 답 메시지마다 그 turn 이 만든 결과물을 한 번에 읽는다. 사용자 메시지는 결과물이 없어 묻지 않는다.
@@ -198,10 +204,11 @@ class ChatConversationQueries {
      */
     Map<Long, List<ChatArtifact>> artifactsByMessage(List<ChatMessage> history) {
         return artifacts.byMessage(history.stream()
-                .filter(message -> message.role() == MessageRole.ASSISTANT)
-                .map(ChatMessage::id)
-                .toList());
+            .filter(message -> message.role() == MessageRole.ASSISTANT)
+            .map(ChatMessage::id)
+            .toList());
     }
+
 
     /** 주인을 확인하고 메시지를 읽는다. 점검 대화면 그 대화의 열지 않은 보고를 연 것으로 적는다. */
     List<ChatMessage> history(CurrentUser user, Long conversationId) {
@@ -209,6 +216,7 @@ class ChatConversationQueries {
         markCheckReportsRead(user, conversation);
         return messages.findByConversationIdOrderByIdAsc(conversation.id());
     }
+
 
     /** 사용자가 점검 대화를 읽었거나 그 대화에 질문을 남겼다. 보고 열람 기록은 대화를 막지 않으므로 실패해도 넘어간다. */
     void markCheckReportsRead(CurrentUser user, Conversation conversation) {
@@ -224,11 +232,12 @@ class ChatConversationQueries {
         }
     }
 
+
     /**
      * 대화에 지금 도는 turn 을 알려 준다.
      *
      * <p>주인 확인을 표시보다 먼저 한다. 남의 대화에 도는 turn 이 있는지 새지 않게 하려는 것이다.
-     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 루트 줄이 끝난 뒤에도 자식이 돈다.
+     * 도는지는 실행 줄의 상태가 아니라 turn 잠금의 메모리 표시로 본다.
      */
     RunningTurn running(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
@@ -240,11 +249,12 @@ class ChatConversationQueries {
             return new RunningTurn(true, null, null);
         }
         Instant startedAt = executionRepository
-                .findById(mark.executionId())
-                .map(AgentExecution::startedAt)
-                .orElse(null);
+            .findById(mark.executionId())
+            .map(AgentExecution::startedAt)
+            .orElse(null);
         return new RunningTurn(true, mark.executionId(), startedAt);
     }
+
 
     /**
      * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
@@ -259,7 +269,7 @@ class ChatConversationQueries {
         List<Conversation> rows;
         if (cursor == null) {
             rows = conversations.findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
-                    user.id(), window);
+                user.id(), window);
         } else {
             ConversationCursor from = ConversationCursor.decode(cursor);
             rows = conversations.findPageAfter(user.id(), from.updatedAt(), from.id(), window);
@@ -269,8 +279,9 @@ class ChatConversationQueries {
         }
         List<Conversation> items = rows.subList(0, size);
         return new ConversationPage(
-                items, ConversationCursor.of(items.getLast()).encode());
+            items, ConversationCursor.of(items.getLast()).encode());
     }
+
 
     /** 사용자의 대화 한 줄을 읽는다. 없거나 남의 것이면 같은 응답으로 숨긴다. */
     Conversation conversationOf(CurrentUser user, UUID publicId) {

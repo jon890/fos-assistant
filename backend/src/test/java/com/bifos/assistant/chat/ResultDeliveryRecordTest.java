@@ -151,9 +151,11 @@ class ResultDeliveryRecordTest {
     private Conversation conversation;
     private AgentExecution root;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -172,28 +174,30 @@ class ResultDeliveryRecordTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         Agent chief = agents.save(agent("dad", "비서", user.id()));
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         stub().willReturn(result("auto", "completed", "정리한 답"));
     }
+
 
     @AfterEach
     void tearDown() {
         awaitAllIdle();
         testResults.reset();
     }
+
 
     @Test
     @DisplayName("부모 turn 이 답을 남기면 묶음은 DELIVERED, 시도는 SUCCEEDED 로 닫히고 실행 줄과 알림 줄을 가리킨다")
@@ -207,8 +211,8 @@ class ResultDeliveryRecordTest {
         assertThat(delivery.status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(delivery.attemptCount()).isEqualTo(1);
         assertThat(deliveryItems.findByDeliveryIdOrderByIdAsc(delivery.id()))
-                .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
-                .containsExactly(tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())));
+            .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
+            .containsExactly(tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())));
 
         ChatMessage notice = onlyMessage(MessageRole.SYSTEM);
         ChatMessage answer = onlyMessage(MessageRole.ASSISTANT);
@@ -221,6 +225,7 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.errorCode()).isNull();
         assertThat(attempt.finishedAt()).isNotNull();
     }
+
 
     @Test
     @DisplayName("provider 가 실패하면 시도와 묶음이 FAILED 로 남고 같은 결과로 다시 제출하지 않는다")
@@ -237,8 +242,8 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.finishedAt()).isNotNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("도착 알림 줄 저장은 그대로 남는다")
-                .isNotNull();
+            .as("도착 알림 줄 저장은 그대로 남는다")
+            .isNotNull();
         assertThat(stub().received()).hasSize(1);
 
         // 실패 유예 30초를 기다리지 않고 다시 깨운다. 전했다고 적힌 결과라 다시 제출하지 않는다.
@@ -250,13 +255,14 @@ class ResultDeliveryRecordTest {
         assertThat(attempts.findAll()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("실행 줄을 만들기 전에 실패하면 시도는 실행 줄 없이 FAILED 로 닫히고 알림 줄은 남는다")
     void closesAttemptWithoutExecutionWhenTurnFailsBeforeExecution() {
         doThrow(new IllegalStateException("문맥을 조립하지 못했다"))
-                .doCallRealMethod()
-                .when(contextAssembler)
-                .assemble(any(), any());
+            .doCallRealMethod()
+            .when(contextAssembler)
+            .assemble(any(), any(), any());
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
 
         finished(done);
@@ -268,10 +274,11 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.errorCode()).isEqualTo("INTERNAL_ERROR");
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(attempt.noticeMessageId())
-                .as("남은 알림 줄")
-                .isEqualTo(onlyMessage(MessageRole.SYSTEM).id());
+            .as("남은 알림 줄")
+            .isEqualTo(onlyMessage(MessageRole.SYSTEM).id());
         assertThat(stub().received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("사용자가 부모 turn 을 중지하면 시도와 묶음이 STOPPED 로 남는다")
@@ -288,6 +295,7 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.finishedAt()).isNotNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.STOPPED);
     }
+
 
     @Test
     @DisplayName("중지를 확정한 뒤 완료 대기가 던지면 실행 줄은 CANCELLED, 시도와 묶음은 STOPPED 로 남는다")
@@ -307,16 +315,17 @@ class ResultDeliveryRecordTest {
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.STOPPED);
         assertThat(attempt.executionId()).isNotNull();
         assertThat(executions.findById(attempt.executionId()).orElseThrow().status())
-                .isEqualTo(ExecutionStatus.CANCELLED);
+            .isEqualTo(ExecutionStatus.CANCELLED);
     }
+
 
     @Test
     @DisplayName("시도에 실행 줄을 잇다 실패해도 turn 은 답을 남기고 시도는 SUCCEEDED 로 닫힌다")
     void keepsTurnResultWhenAttachingExecutionFails() {
         doThrow(new IllegalStateException("시도를 잇지 못했다"))
-                .doCallRealMethod()
-                .when(recorder)
-                .attachExecution(any(), any());
+            .doCallRealMethod()
+            .when(recorder)
+            .attachExecution(any(), any());
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
 
         finished(done);
@@ -328,6 +337,7 @@ class ResultDeliveryRecordTest {
         assertThat(attempt.executionId()).isNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
+
 
     @Test
     @DisplayName("위임 결과와 다른 출처의 결과를 함께 전하면 한 묶음에 위임 결과부터 차례로 항목을 둔다")
@@ -341,15 +351,16 @@ class ResultDeliveryRecordTest {
 
         ResultDelivery delivery = onlyDelivery();
         assertThat(deliveryItems.findByDeliveryIdOrderByIdAsc(delivery.id()))
-                .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
-                .containsExactly(
-                        tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())),
-                        tuple(TEST_SOURCE, key));
+            .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
+            .containsExactly(
+                tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())),
+                tuple(TEST_SOURCE, key));
         assertThat(onlyAttempt().noticeMessageId())
-                .as("마지막 알림 줄")
-                .isEqualTo(messagesOf(MessageRole.SYSTEM).getLast().id());
+            .as("마지막 알림 줄")
+            .isEqualTo(messagesOf(MessageRole.SYSTEM).getLast().id());
         assertThat(testResults.undelivered(conversation.id())).as("전했다고 적힌다").isEmpty();
     }
+
 
     @Test
     @DisplayName("같은 결과의 종료 사건이 겹쳐 와도 묶음과 시도와 답과 제출은 하나다")
@@ -381,6 +392,7 @@ class ResultDeliveryRecordTest {
         assertThat(stub().received()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("같은 결과를 두 묶음에 넣으려 하면 유일 제약으로 실패하고 그 트랜잭션이 되돌아간다")
     void rejectsSameResultInTwoDeliveries() {
@@ -388,15 +400,16 @@ class ResultDeliveryRecordTest {
         Instant now = Instant.now();
 
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
-                    recorder.open(conversation.id(), items, null, now);
-                    recorder.open(conversation.id(), items, null, now);
-                }))
-                .isInstanceOf(DataIntegrityViolationException.class);
+            recorder.open(conversation.id(), items, null, now);
+            recorder.open(conversation.id(), items, null, now);
+        }))
+            .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(deliveries.findAll()).as("첫 묶음도 함께 되돌아간다").isEmpty();
         assertThat(deliveryItems.findAll()).isEmpty();
         assertThat(attempts.findAll()).isEmpty();
     }
+
 
     private ResultDelivery onlyDelivery() {
         List<ResultDelivery> rows = deliveries.findAll();
@@ -404,17 +417,20 @@ class ResultDeliveryRecordTest {
         return rows.getFirst();
     }
 
+
     private ResultDeliveryAttempt onlyAttempt() {
         List<ResultDeliveryAttempt> rows = attempts.findAll();
         assertThat(rows).as("전달 시도").hasSize(1);
         return rows.getFirst();
     }
 
+
     private List<ChatMessage> messagesOf(MessageRole role) {
         return messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                .filter(message -> message.role() == role)
-                .toList();
+            .filter(message -> message.role() == role)
+            .toList();
     }
+
 
     private ChatMessage onlyMessage(MessageRole role) {
         List<ChatMessage> rows = messagesOf(role);
@@ -422,55 +438,61 @@ class ResultDeliveryRecordTest {
         return rows.getFirst();
     }
 
+
     /** 가장 최근에 만든 실행 줄이다. 완료를 기다리기 직전에는 자동 turn 의 실행 줄이다. */
     private AgentExecution latestExecution() {
         return executions
-                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                .getFirst();
+            .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+            .getFirst();
     }
+
 
     private void finished(AgentExecution execution) {
         publisher.publishEvent(new DelegationFinished(conversation.id(), execution.id()));
     }
 
+
     /** 대화 turn 이 직접 맡긴 위임 실행 줄을 만든다. */
     private AgentExecution delegated(ExecutionStatus status, String output) {
         AgentExecution execution = AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName("worker")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(Instant.now())
-                .build();
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(Instant.now())
+            .build();
         execution.recordOutput(output);
         return executions.save(execution);
     }
 
+
     private static Agent agent(String code, String name, Long ownerId) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId);
     }
+
 
     private static HermesRunResult result(String runId, String status, String output) {
         return HermesRunResult.of(runId, "session", status, output, "model", "provider", TokenUsage.empty());
     }
 
+
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
  * 전에 실행 줄에 루트 session 을 적을 수 있고, MCP {@code agent_*} 호출이 들고 오는 서명한 루트 session 으로
  * 도는 실행을 찾을 수 있다. 근거는 ADR-031 에 있다.
  *
- * <p>흐름의 하위 실행은 {@code RunSession.fresh()} 로 자기 session 을 정하고, Memory 제안은 session 을 적지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,6 +23,7 @@ public class ConversationSessions {
 
     private final ConversationRepository conversations;
     private final ConversationWriter conversationWriter;
+
 
     /**
      * 이 turn 에 보낼 session 을 돌려준다. 대화에 없으면 새로 정해 저장한다.
@@ -42,11 +42,12 @@ public class ConversationSessions {
             return sessionOf(conversation);
         }
         Conversation stored = conversations
-                .findById(conversation.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
+            .findById(conversation.id())
+            .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
         conversation.adoptSessions(stored.hermesSessionId(), stored.hermesRootSessionId());
         return sessionOf(conversation);
     }
+
 
     /**
      * 새 session 을 정해 보낼 session 과 루트 session 을 함께 바꾸고 돌려준다. 그 뒤의 turn 도 새 session 으로 이어진다.
@@ -59,6 +60,7 @@ public class ConversationSessions {
         conversation.assignNewSession(created);
         return sessionOf(conversation);
     }
+
 
     private static RunSession sessionOf(Conversation conversation) {
         return RunSession.ofConversation(conversation.hermesSessionId(), conversation.hermesRootSessionId());

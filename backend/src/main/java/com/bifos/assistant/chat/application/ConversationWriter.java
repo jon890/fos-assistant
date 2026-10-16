@@ -21,55 +21,66 @@ public class ConversationWriter {
 
     private final ConversationRepository repository;
 
+
     @Transactional
     public int touchSession(Long id, String sessionId, Instant now) {
         return repository.touchSession(id, sessionId, now);
     }
+
 
     @Transactional
     public int assignSessionIfAbsent(Long id, String sessionId) {
         return repository.assignSessionIfAbsent(id, sessionId);
     }
 
+
     @Transactional
     public int replaceSessions(Long id, String sessionId) {
         return repository.replaceSessions(id, sessionId);
     }
+
 
     @Transactional
     public int resetAutoTurns(Long id) {
         return repository.resetAutoTurns(id);
     }
 
+
     @Transactional
     public int incrementAutoTurns(Long id) {
         return repository.incrementAutoTurns(id);
     }
+
 
     @Transactional
     public int fillTitleIfBlank(Long id, String title) {
         return repository.fillTitleIfBlank(id, title);
     }
 
+
     @Transactional
     public int renameIfActive(Long id, Long userId, String title, Instant now) {
         return repository.renameIfActive(id, userId, title, now);
     }
+
 
     @Transactional
     public int chooseTierForTask(Long id, ModelTier tier) {
         return repository.chooseTierForTask(id, ModelSelectionMode.TIER, tier);
     }
 
+
     @Transactional
     public int hideFromList(Long id, Instant now) {
         return repository.hideFromList(id, now);
     }
 
+
     @Transactional
     public int showInList(Long id) {
         return repository.showInList(id);
     }
+
 
     @Transactional
     public int deleteIfActive(Long id, Long userId, Instant now) {

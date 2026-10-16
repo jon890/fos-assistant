@@ -69,8 +69,6 @@ class AgentVisibilityLockTest {
         List.of(),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
 
@@ -184,7 +182,7 @@ class AgentVisibilityLockTest {
 
     private CurrentUser member() {
         String email = "visibility-lock-" + UUID.randomUUID() + "@example.com";
-        AppUser saved = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(saved.id(), email, email, 1L, UserRole.MEMBER);
     }
 }

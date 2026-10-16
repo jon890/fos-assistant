@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,7 +9,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,14 +26,13 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "hermes_session_binding",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_hermes_session_binding_session",
-                        columnNames = {"profile_name", "session_id"}))
+    name = "hermes_session_binding",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_hermes_session_binding_session",
+        columnNames = {"profile_name", "session_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class HermesSessionBinding {
+public class HermesSessionBinding extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,33 +63,28 @@ public class HermesSessionBinding {
     @Getter
     private String parentSessionId;
 
-    @Column(name = "created_at", nullable = false)
-    @Getter
-    private Instant createdAt;
 
     private HermesSessionBinding(
-            String profileName,
-            String sessionId,
-            AgentExecution origin,
-            String rootSessionId,
-            String parentSessionId,
-            Instant now) {
+        String profileName,
+        String sessionId,
+        AgentExecution origin,
+        String rootSessionId,
+        String parentSessionId) {
         this.profileName = profileName;
         this.sessionId = sessionId;
         this.userId = origin.userId();
         this.originExecutionId = origin.id();
         this.rootSessionId = rootSessionId;
         this.parentSessionId = parentSessionId;
-        this.createdAt = now;
     }
 
+
     public static HermesSessionBinding of(
-            String profileName,
-            String sessionId,
-            AgentExecution origin,
-            String rootSessionId,
-            String parentSessionId,
-            Instant now) {
-        return new HermesSessionBinding(profileName, sessionId, origin, rootSessionId, parentSessionId, now);
+        String profileName,
+        String sessionId,
+        AgentExecution origin,
+        String rootSessionId,
+        String parentSessionId) {
+        return new HermesSessionBinding(profileName, sessionId, origin, rootSessionId, parentSessionId);
     }
 }

@@ -32,22 +32,24 @@ public class ConnectorPolicyController {
 
     private final ConnectorPolicyService policies;
 
+
     @PostMapping("/internal/hermes/connector-policy")
     public ConnectorPolicyResponse decide(
-            @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
+        @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
         if (!(principal instanceof McpPrincipal mcp)) {
             throw reject("MCP 토큰으로 인증한 요청이 아니다");
         }
         ConnectorPolicyRequest request = ConnectorPolicyRequest.verify(read(body), mcp.tokenHash());
         return ConnectorPolicyResponse.from(policies.decide(
-                mcp.profileName(),
-                request.rootSessionId(),
-                request.sessionId(),
-                request.toolCallId(),
-                request.hermesTool(),
-                request.tool(),
-                request.argsJson()));
+            mcp.profileName(),
+            request.rootSessionId(),
+            request.sessionId(),
+            request.toolCallId(),
+            request.hermesTool(),
+            request.tool(),
+            request.argsJson()));
     }
+
 
     private static JsonNode read(String body) {
         if (body == null || body.isBlank()) {
@@ -59,6 +61,7 @@ public class ConnectorPolicyController {
             throw reject("본문이 JSON 이 아니다");
         }
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String reason) {

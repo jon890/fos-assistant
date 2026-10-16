@@ -18,6 +18,7 @@ public class TurnQuestions {
     private final ExecutionQuestionRepository questions;
     private final ChatMessageRepository messages;
 
+
     /**
      * 그 실행이 사람이 보낸 turn 이면 질문 원문을 낸다.
      *
@@ -27,12 +28,13 @@ public class TurnQuestions {
      */
     public Optional<String> questionOf(Long executionId, Long userId) {
         return questions
-                .findById(executionId)
-                .flatMap(question -> messages.findById(question.messageId()))
-                .filter(message -> message.role() == MessageRole.USER)
-                .filter(message -> Objects.equals(message.senderUserId(), userId))
-                .map(ChatMessage::content);
+            .findById(executionId)
+            .flatMap(question -> messages.findById(question.messageId()))
+            .filter(message -> message.role() == MessageRole.USER)
+            .filter(message -> Objects.equals(message.senderUserId(), userId))
+            .map(ChatMessage::content);
     }
+
 
     /** 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 있는가. 그 실행의 입력은 이력으로 같은 session 에 남는다. */
     public boolean hasRunWithoutQuestion(Long conversationId) {

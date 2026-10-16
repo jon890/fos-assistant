@@ -22,17 +22,18 @@ import org.junit.jupiter.api.Test;
  * V39 까지만 올린 뒤 V40 을 올린다.
  */
 class ConnectorSecretPrefixMigrationTest {
-    private static final String WITH_PREFIX =
-            "{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{\"token\":\"fab_abcd\"}}";
+    private static final String WITH_PREFIX = "{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{\"token\":\"fab_abcd\"}}";
     private static final String ALREADY_EMPTY = "{\"values\":{},\"secretPrefixes\":{}}";
     private static final String UPDATED_AT = "2026-01-02 03:04:05.000000";
     private String url;
+
 
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-prefix-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrate("39");
     }
+
 
     @Test
     @DisplayName("V40은 앞부분이 있는 행의 secretPrefixes 만 비우고 values 와 updated_at 은 그대로 둔다")
@@ -44,6 +45,7 @@ class ConnectorSecretPrefixMigrationTest {
         assertThat(fields(901)).isEqualTo("{\"values\":{\"family\":\"x\"},\"secretPrefixes\":{}}");
         assertThat(updatedAt(901)).isEqualTo(Timestamp.valueOf(UPDATED_AT));
     }
+
 
     @Test
     @DisplayName("V40은 이미 빈 행을 그대로 둔다")
@@ -57,6 +59,7 @@ class ConnectorSecretPrefixMigrationTest {
         assertThat(updatedAt(902)).isEqualTo(Timestamp.valueOf(UPDATED_AT));
     }
 
+
     @Test
     @DisplayName("V40은 secretPrefixes 가 객체가 아닌 값이어도 빈 객체로 바꾼다")
     void v40ReplacesNonObjectSecretPrefixesWithEmptyObject() throws SQLException {
@@ -69,18 +72,20 @@ class ConnectorSecretPrefixMigrationTest {
         assertThat(fields(902)).isEqualTo(ALREADY_EMPTY);
     }
 
+
     @Test
     @DisplayName("V40은 연결이 하나도 없어도 끝난다")
     void v40SucceedsWithNoRows() throws SQLException {
         migrate("40");
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM connector_connection")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM connector_connection")) {
             row.next();
             assertThat(row.getLong(1)).isZero();
         }
     }
+
 
     @Test
     @DisplayName("V40은 JSON 으로 읽지 못하는 행에서 행 번호만 알리고 멈추며 어느 행도 고치지 않는다")
@@ -90,70 +95,73 @@ class ConnectorSecretPrefixMigrationTest {
         long brokenId = id(902);
 
         assertThatThrownBy(() -> migrate("40"))
-                .hasStackTraceContaining("id " + brokenId + " 행")
-                .satisfies(ex -> {
-                    for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
-                        assertThat(String.valueOf(cause.getMessage())).doesNotContain("fab_");
-                    }
-                });
+            .hasStackTraceContaining("id " + brokenId + " 행")
+            .satisfies(ex -> {
+                for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+                    assertThat(String.valueOf(cause.getMessage())).doesNotContain("fab_");
+                }
+            });
 
         assertThat(fields(901)).isEqualTo(WITH_PREFIX);
         assertThat(fields(902)).isEqualTo("fab_broken{");
     }
 
+
     private void migrate(String target) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(target)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(target)
+            .load()
+            .migrate();
     }
+
 
     /** 사용자와 그 사용자의 커넥터 에이전트를 만들고 연결 한 행을 넣는다. */
     private void insert(int id, String fields) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                    + " VALUES (" + id + ", 'u" + id + "@example.com', 'u" + id + "', 1, 'MEMBER',"
-                    + " CURRENT_TIMESTAMP(6))");
+                + " VALUES (" + id + ", 'u" + id + "@example.com', 'u" + id + "', 1, 'MEMBER',"
+                + " CURRENT_TIMESTAMP(6))");
             statement.executeUpdate("INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
-                    + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed)"
-                    + " VALUES (" + id + ", 'c" + id + "', 'n', 'p" + id + "', 'http://localhost',"
-                    + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', " + id + ", FALSE,"
-                    + " CURRENT_TIMESTAMP(6), TRUE)");
+                + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed)"
+                + " VALUES (" + id + ", 'c" + id + "', 'n', 'p" + id + "', 'http://localhost',"
+                + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', " + id + ", FALSE,"
+                + " CURRENT_TIMESTAMP(6), TRUE)");
             statement.executeUpdate("INSERT INTO connector_connection (user_id, connector_id, agent_id, status, fields,"
-                    + " restart_required, desired_enabled, checked_at, created_at, updated_at) VALUES ("
-                    + id + ", 'demo-notes', " + id + ", 'READY', '" + fields + "', FALSE, TRUE, NULL,"
-                    + " TIMESTAMP '" + UPDATED_AT + "', TIMESTAMP '" + UPDATED_AT + "')");
+                + " restart_required, desired_enabled, checked_at, created_at, updated_at) VALUES ("
+                + id + ", 'demo-notes', " + id + ", 'READY', '" + fields + "', FALSE, TRUE, NULL,"
+                + " TIMESTAMP '" + UPDATED_AT + "', TIMESTAMP '" + UPDATED_AT + "')");
         }
     }
 
+
     private String fields(int userId) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row =
-                        statement.executeQuery("SELECT fields FROM connector_connection WHERE user_id = " + userId)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT fields FROM connector_connection WHERE user_id = " + userId)) {
             assertThat(row.next()).as("사용자 %d 의 연결 행", userId).isTrue();
             return row.getString(1);
         }
     }
 
+
     private Timestamp updatedAt(int userId) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery(
-                        "SELECT updated_at FROM connector_connection WHERE user_id = " + userId)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery(
+                "SELECT updated_at FROM connector_connection WHERE user_id = " + userId)) {
             assertThat(row.next()).as("사용자 %d 의 연결 행", userId).isTrue();
             return row.getTimestamp(1);
         }
     }
 
+
     private long id(int userId) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row =
-                        statement.executeQuery("SELECT id FROM connector_connection WHERE user_id = " + userId)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT id FROM connector_connection WHERE user_id = " + userId)) {
             assertThat(row.next()).as("사용자 %d 의 연결 행", userId).isTrue();
             return row.getLong(1);
         }

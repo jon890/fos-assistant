@@ -54,20 +54,20 @@ class ConnectorCallHistoryTest {
     @Autowired
     private AppUserRepository users;
 
+
     @Test
     @DisplayName("자식의 커넥터 호출을 루트에서 찾되 호출 전과 다른 트리에는 적용하지 않는다")
     void findsChildCallWithTimestampAndTreeBoundary() {
-        AppUser user = users.save(AppUser.of("history@example.com", "history", 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of("history@example.com", "history", 1L, UserRole.MEMBER));
         Agent agent = agents.save(Agent.of(
-                "history",
-                "history",
-                "history",
-                "http://agent-runtime.test",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                NOW));
+            "history",
+            "history",
+            "history",
+            "http://agent-runtime.test",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
         AgentExecution root = execution(user, agent, null, null);
         AgentExecution child = execution(user, agent, root.id(), root.id());
         AgentExecution otherRoot = execution(user, agent, null, null);
@@ -75,35 +75,36 @@ class ConnectorCallHistoryTest {
 
         assertThat(history.calledBefore(root.id(), NOW.plusSeconds(1))).isFalse();
         actions.saveAndFlush(ConnectorAction.decided(
-                connection,
-                agent.id(),
-                child,
-                "mcp__mail__read",
-                "read",
-                new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
-                true,
-                "history-child",
-                "synthetic-hash",
-                NOW));
+            connection,
+            agent.id(),
+            child,
+            "mcp__mail__read",
+            "read",
+            new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
+            true,
+            "history-child",
+            "synthetic-hash",
+            NOW));
 
         assertThat(history.calledBefore(root.id(), NOW.minusMillis(1))).isFalse();
         assertThat(history.calledBefore(root.id(), NOW)).isTrue();
         assertThat(history.calledBefore(otherRoot.id(), NOW.plusSeconds(1))).isFalse();
         // 부모가 먼저 읽고 자식에게 위임하는 경우도 같은 루트로 찾는다.
         actions.saveAndFlush(ConnectorAction.decided(
-                connection,
-                agent.id(),
-                otherRoot,
-                "mcp__mail__read",
-                "read",
-                new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
-                true,
-                "history-root",
-                "synthetic-hash",
-                NOW.plusSeconds(2)));
+            connection,
+            agent.id(),
+            otherRoot,
+            "mcp__mail__read",
+            "read",
+            new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
+            true,
+            "history-root",
+            "synthetic-hash",
+            NOW.plusSeconds(2)));
         assertThat(history.calledBefore(otherRoot.id(), NOW.plusSeconds(1))).isFalse();
         assertThat(history.calledBefore(otherRoot.id(), NOW.plusSeconds(2))).isTrue();
     }
+
 
     @Test
     @DisplayName("호출 이력을 읽지 못하면 원문을 남기지 않게 호출 뒤로 판정한다")
@@ -113,16 +114,17 @@ class ConnectorCallHistoryTest {
         assertThat(new ConnectorCallHistory(failed).calledBefore(1L, NOW)).isTrue();
     }
 
+
     private AgentExecution execution(AppUser user, Agent agent, Long parent, Long root) {
         return executions.save(AgentExecution.builder()
-                .userId(user.id())
-                .agentId(agent.id())
-                .parentExecutionId(parent)
-                .rootExecutionId(root)
-                .profileName(agent.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(NOW)
-                .build());
+            .userId(user.id())
+            .agentId(agent.id())
+            .parentExecutionId(parent)
+            .rootExecutionId(root)
+            .profileName(agent.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(NOW)
+            .build());
     }
 }

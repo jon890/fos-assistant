@@ -178,8 +178,7 @@ public final class ConnectorExecutionSnapshot {
             digest.of("execution_args_json", executionArgsJson),
             digest.of("scope_json", scopeJson),
             key,
-            PROTOCOL,
-            now);
+            PROTOCOL);
     }
 
 
@@ -187,6 +186,7 @@ public final class ConnectorExecutionSnapshot {
     public static ConnectorExecutionSnapshot open(
         ConnectorAction action, ConnectorActionExecution row, TextCipher cipher, FinancialDigest digest) {
         require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
+        require(action.bodyErasedAt() == null);
         require(PROTOCOL.equals(row.protocol()));
         String modelArgs = action.executableArgs(plain -> digest.of("args_json", plain)).orElseThrow(ConnectorExecutionSnapshot::invalid);
         String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);

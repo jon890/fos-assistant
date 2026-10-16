@@ -291,7 +291,7 @@ public class ConnectorActionService {
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
         var stored = actions.findByPublicId(actionId);
         // 상한 변경 줄은 금융 주문 승인보다 먼저 가른다(ADR-20261015 / financial-user-limits). 허락을 받지 않는다.
-        if (stored.isPresent() && limitChanges.owns(stored.get())) {
+        if (stored.isPresent() && FinancialLimitChanges.owns(stored.get())) {
             if (!user.id().equals(stored.get().userId())) {
                 throw ConnectorActionDetails.notFound();
             }

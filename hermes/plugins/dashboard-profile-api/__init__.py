@@ -21,10 +21,9 @@ Hermes core 는 고치지 않는다.
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
-| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 profile 에 설치하고 제거한다. 옛 설치는 plugin 의 스킬 본문을 그 profile 의 SOUL.md 에 쓴다. 바인딩 설치(`bind`)는 보관 파일의 값과 plugin 의 스킬을 그 profile 에 복사한다 |
+| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 |
-| `POST /api/connector-vault/import` | 커넥터를 설치한 관리 profile 의 `.env` 에서 그 커넥터의 칸 값을 보관 파일로 옮긴다 |
 | `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
@@ -96,14 +95,11 @@ from .connector_install import (
     POLICY_PLUGIN,
     PROBE_ROUTE_RE,
     PROFILE_SKILLS_DIR,
-    SOUL_FILE,
     _bind_entry_env,
     _bind_entry_shape,
     _bind_skills_installed,
     _check_connector_probe,
-    _connector_allowlist,
     _connector_bind_config,
-    _connector_config,
     _connector_request,
     _connector_server,
     _connector_state,
@@ -112,7 +108,6 @@ from .connector_install import (
     _detached_servers,
     _entry_field_env,
     _entry_matches_manifest,
-    _owned_mode,
     _policy_hook_active,
     _policy_plugin_enabled,
     _remove_backup_env_copies,
@@ -124,13 +119,11 @@ from .connector_manifest import (
     BIND_MODE,
     CONNECTOR_COMMAND_ENV,
     CONNECTOR_ID_RE,
-    CONNECTOR_PERSONA_MAX_CHARS,
     CONNECTOR_ROOTS_ENV,
     CONNECTOR_SKILL_MAX_CHARS,
     CONNECTOR_SKILL_MAX_FILES,
     CONNECTOR_SKILL_PARTS,
     CONNECTOR_STATE,
-    CONNECTOR_TOOLSETS,
     ENV_NAME_RE,
     ERROR_CODE_RE,
     ERROR_DETAILS_MAX,
@@ -139,7 +132,6 @@ from .connector_manifest import (
     FIELD_KEY_RE,
     HERMES_TOOL_NAME_MAX_CHARS,
     HERMES_TOOL_PREFIX_MAX_CHARS,
-    ISOLATED_MODE,
     OUTCOME_UNKNOWN,
     OWNER_ATTACHMENTS_ENV_RE,
     OWNER_ATTACHMENTS_VALUE_RE,
@@ -161,7 +153,6 @@ from .connector_manifest import (
     _connector_errors,
     _connector_fields,
     _connector_manifest,
-    _connector_persona,
     _connector_roots,
     _connector_skills,
     _connector_tools,
@@ -209,7 +200,6 @@ from .connector_run import (
 from .connector_vault import (
     CONNECTOR_VAULT_DIR,
     VAULT_ID_RE,
-    VAULT_IMPORT_PATH,
     VAULT_PATH,
     VAULT_ROUTES,
     _connector_vault_request,

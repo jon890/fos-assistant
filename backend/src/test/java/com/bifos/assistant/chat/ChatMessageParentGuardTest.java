@@ -44,10 +44,12 @@ class ChatMessageParentGuardTest {
     private Long conversationId;
     private final List<Long> createdIds = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         conversationId = taskConversation().id();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -58,6 +60,7 @@ class ChatMessageParentGuardTest {
         createdIds.clear();
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"save", "saveAndFlush", "saveAll", "saveAllAndFlush"})
     @DisplayName("모든 저장 경로가 이미 지운 작업 대화의 늦은 메시지를 거절한다")
@@ -65,12 +68,13 @@ class ChatMessageParentGuardTest {
         assertThat(discard(conversationId)).isEqualTo(1);
 
         assertThatThrownBy(() -> saveWith(method, message(conversationId)))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"save", "saveAndFlush", "saveAll", "saveAllAndFlush"})
@@ -84,6 +88,7 @@ class ChatMessageParentGuardTest {
         assertThat(merged.id()).isEqualTo(saved.id());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"saveAll", "saveAllAndFlush"})
@@ -99,6 +104,7 @@ class ChatMessageParentGuardTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(missing)).isEmpty();
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"saveAll", "saveAllAndFlush"})
     @DisplayName("대화 번호가 역순인 묶음도 입력 순서대로 메시지를 돌려준다")
@@ -112,6 +118,7 @@ class ChatMessageParentGuardTest {
         assertThat(saved).allSatisfy(message -> assertThat(message.id()).isNotNull());
     }
 
+
     @Test
     @DisplayName("목록에서 숨겼지만 물리적으로 남은 대화에는 늦은 실행 결과를 저장한다")
     void savesResultsForSoftDeletedConversation() {
@@ -121,8 +128,9 @@ class ChatMessageParentGuardTest {
 
         assertThat(saved.id()).isNotNull();
         assertThat(conversations.findById(conversationId).orElseThrow().deletedAt())
-                .isNotNull();
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("먼저 읽어 둔 대화가 다른 트랜잭션에서 지워져도 늦은 저장을 거절한다")
@@ -132,7 +140,7 @@ class ChatMessageParentGuardTest {
                 assertThat(conversations.findById(conversationId)).isPresent();
                 try {
                     assertThat(executor.submit(() -> discard(conversationId)).get(10, TimeUnit.SECONDS))
-                            .isEqualTo(1);
+                        .isEqualTo(1);
                 } catch (Exception error) {
                     throw new AssertionError(error);
                 }
@@ -142,6 +150,7 @@ class ChatMessageParentGuardTest {
         }
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
     }
+
 
     @Test
     @DisplayName("메시지가 먼저 잠그면 옛 조회 결과를 가진 삭제도 커밋을 기다리고 대화를 보존한다")
@@ -161,13 +170,13 @@ class ChatMessageParentGuardTest {
                 var cleanup = executor.submit(() -> transaction().execute(status -> {
                     // MySQL REPEATABLE READ 에서 메시지 커밋 전의 조회 시점을 먼저 만든다.
                     assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
-                            .isEmpty();
+                        .isEmpty();
                     deleting.countDown();
                     return discard(conversationId);
                 }));
                 await(deleting);
                 assertThatThrownBy(() -> cleanup.get(200, TimeUnit.MILLISECONDS))
-                        .isInstanceOf(TimeoutException.class);
+                    .isInstanceOf(TimeoutException.class);
                 release.countDown();
 
                 assertThat(writer.get(10, TimeUnit.SECONDS)).isNotNull();
@@ -179,6 +188,7 @@ class ChatMessageParentGuardTest {
         assertThat(conversations.findById(conversationId)).isPresent();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
+
 
     @Test
     @DisplayName("삭제가 먼저 잠그면 메시지 저장은 삭제 커밋 뒤 거절된다")
@@ -198,7 +208,7 @@ class ChatMessageParentGuardTest {
                 var writer = executor.submit(() -> {
                     writing.countDown();
                     assertThatThrownBy(() -> messages.save(message(conversationId)))
-                            .isInstanceOf(ApiException.class);
+                        .isInstanceOf(ApiException.class);
                 });
                 await(writing);
                 assertThatThrownBy(() -> writer.get(200, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
@@ -214,20 +224,23 @@ class ChatMessageParentGuardTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).isEmpty();
     }
 
+
     private int discard(Long id) {
         return transaction().execute(status -> conversations.discardEmptyTaskConversation(id));
     }
 
+
     private Conversation taskConversation() {
-        Conversation conversation =
-                conversations.save(Conversation.startedForTask(1L, "합성 작업 대화", null, 1L, Instant.now()));
+        Conversation conversation = conversations.save(Conversation.startedForTask(1L, "합성 작업 대화", null, 1L, Instant.now()));
         createdIds.add(conversation.id());
         return conversation;
     }
 
+
     private ChatMessage message(Long parentId) {
         return ChatMessage.fromSystem(parentId, "합성 메시지", Instant.now());
     }
+
 
     private ChatMessage saveWith(String method, ChatMessage message) {
         JpaRepository<ChatMessage, Long> repository = messages;
@@ -238,6 +251,7 @@ class ChatMessageParentGuardTest {
         };
     }
 
+
     private List<ChatMessage> saveBatchWith(String method, List<ChatMessage> batch) {
         JpaRepository<ChatMessage, Long> repository = messages;
         return switch (method) {
@@ -247,9 +261,11 @@ class ChatMessageParentGuardTest {
         };
     }
 
+
     private TransactionTemplate transaction() {
         return new TransactionTemplate(transactionManager);
     }
+
 
     private static void await(CountDownLatch latch) {
         try {

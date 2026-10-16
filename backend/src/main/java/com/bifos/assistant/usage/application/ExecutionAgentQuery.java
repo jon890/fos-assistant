@@ -24,10 +24,10 @@ public class ExecutionAgentQuery {
 
     private final AgentExecutionRepository executions;
 
+
     /** 실행 번호별 에이전트 번호다. 행이 없거나 에이전트에 묶이지 않은 실행은 맵에 없다. */
     public Map<Long, Long> agentIdsOf(Collection<Long> executionIds) {
-        List<Long> present =
-                executionIds.stream().filter(Objects::nonNull).distinct().toList();
+        List<Long> present = executionIds.stream().filter(Objects::nonNull).distinct().toList();
         Map<Long, Long> result = new HashMap<>();
         if (present.isEmpty()) {
             return result;

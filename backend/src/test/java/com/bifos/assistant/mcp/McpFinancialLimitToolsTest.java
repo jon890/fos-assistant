@@ -81,7 +81,7 @@ class McpFinancialLimitToolsTest {
     @BeforeEach
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        owner = users.save(AppUser.of("mcp-order-limit-" + UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("mcp-order-limit-" + UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER));
         token = tokens.issue(PROFILE, "order-limit").rawToken();
         Agent agent = McpCallSigner.agentFor(agents, PROFILE);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "상한 검사 대화", agent.id(), Instant.now()));
@@ -94,7 +94,8 @@ class McpFinancialLimitToolsTest {
 
     @AfterEach
     void tearDown() {
-        jdbc.update("DELETE FROM financial_order_limit WHERE user_id = ?", owner.id());
+        jdbc.update("UPDATE app_user SET limit_order_amount_krw = NULL, limit_order_amount_usd = NULL, limit_order_quantity = NULL, "
+            + "limit_daily_amount_krw = NULL, limit_daily_amount_usd = NULL, limit_updated_at = NULL WHERE id = ?", owner.id());
         jdbc.update("DELETE FROM conversation WHERE user_id = ?", owner.id());
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
     }
@@ -119,7 +120,7 @@ class McpFinancialLimitToolsTest {
         JsonNode result = call("order_limit_change", json.createObjectNode().put("name", "order_amount_usd").put("value", "300"));
         assertThat(result.path("isError").asBoolean()).as("결과: %s", result).isFalse();
         assertThat(result.toString()).contains("applied");
-        assertThat(jdbc.queryForObject("select order_amount_usd from financial_order_limit where user_id = ?", BigDecimal.class,
+        assertThat(jdbc.queryForObject("select limit_order_amount_usd from app_user where id = ?", BigDecimal.class,
             owner.id())).isEqualByComparingTo("300");
     }
 
@@ -136,8 +137,7 @@ class McpFinancialLimitToolsTest {
             assertThat(change.path("isError").asBoolean()).as("결과: %s", change).isTrue();
             JsonNode read = call("order_limit_read", json.createObjectNode());
             assertThat(read.path("isError").asBoolean()).as("결과: %s", read).isTrue();
-            assertThat(jdbc.queryForObject("select count(*) from financial_order_limit where user_id = ?", Long.class, owner.id()))
-                .isZero();
+            assertThat(jdbc.queryForObject("select limit_updated_at from app_user where id = ?", Instant.class, owner.id())).isNull();
         } finally {
             checks.delete(saved);
         }

@@ -5,11 +5,15 @@ import java.util.List;
 /** Hermes의 toolset 목록과 API server 설정을 읽고 쓴다. */
 public interface HermesToolsetClient {
 
-    record ToolsetCatalogEntry(String name, String label, String description) {}
+    record ToolsetCatalogEntry(String name, String label, String description) {
+    }
+
 
     List<ToolsetCatalogEntry> readCatalog();
 
+
     List<String> readEnabled(String apiBaseUrl, String profileName);
+
 
     /**
      * API 실행의 toolset 목록을 쓴다.
@@ -21,6 +25,7 @@ public interface HermesToolsetClient {
      *     AGENT_SANDBOX_UNAVAILABLE} 이다. 첨부 디렉터리를 준비하지 못했을 때도 같다. 그때 목록은 바뀌지 않았다
      */
     void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner);
+
 
     /**
      * {@link #writeApiServer} 와 같되, 실행 공간 정책에 없는 profile 의 셸 도구를 local 로 돌리지 않는다.

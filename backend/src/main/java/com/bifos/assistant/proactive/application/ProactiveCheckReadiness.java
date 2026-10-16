@@ -33,8 +33,7 @@ public class ProactiveCheckReadiness {
      * 살펴보기 에이전트에 켜 둘 수 있는 toolset 이다. 쓰기나 외부 연락이 되는 것, 사용자가 없는 실행에서 답을 기다리는 것,
      * Control Plane 이 세거나 멈추지 못하는 위임은 뺐다. 까닭은 문서의 「시작 전 점검」 표에 있다.
      */
-    static final Set<String> ALLOWED_TOOLSETS =
-            Set.of("web", "vision", "todo", AgentToolPolicy.SKILLS, AgentToolPolicy.CONTROL_PLANE_MCP);
+    static final Set<String> ALLOWED_TOOLSETS = Set.of("web", "vision", "todo", AgentToolPolicy.SKILLS, AgentToolPolicy.CONTROL_PLANE_MCP);
 
     /**
      * 쓰기 도구를 허용한 에이전트(ADR-082)에서도 막는 toolset 이다. {@code delegation} 의 자식과 {@code cronjob} 이 건 예약 작업은
@@ -51,15 +50,11 @@ public class ProactiveCheckReadiness {
     private final HermesToolsetClient toolsets;
     private final AgentConnectorBindings connectorBindings;
 
+
     public CheckReadiness check(Agent agent) {
         List<CheckBlocker> blockers = new ArrayList<>();
         if (!properties.current().enabled()) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
-        }
-        // 커넥터 에이전트와 흐름이 붙은 에이전트는 살펴보기를 하지 않으므로 Hermes 를 부를 까닭이 없다.
-        if (agent.connectorManaged() || (agent.flow() != null && !agent.flow().isBlank())) {
-            blockers.add(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED));
-            return new CheckReadiness(blockers);
         }
         if (!skills.enabledNames(agent).contains(SKILL_NAME)) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING));
@@ -67,15 +62,16 @@ public class ProactiveCheckReadiness {
         boolean writesAllowed = agent.proactiveCheckWritesAllowed();
         Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
         List<String> notAllowed = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                .filter(name -> !connectorServers.contains(name) && !allowed(name, writesAllowed))
-                .distinct()
-                .sorted()
-                .toList();
+            .filter(name -> !connectorServers.contains(name) && !allowed(name, writesAllowed))
+            .distinct()
+            .sorted()
+            .toList();
         if (!notAllowed.isEmpty()) {
             blockers.add(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, notAllowed));
         }
         return new CheckReadiness(blockers);
     }
+
 
     /**
      * 살펴보기 에이전트에 켜 둘 수 있는 toolset 인가. 쓰기 도구를 허용한 에이전트는 Control Plane 이 아는 toolset 전부와 Control Plane

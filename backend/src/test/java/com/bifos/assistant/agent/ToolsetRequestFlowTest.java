@@ -102,6 +102,7 @@ class ToolsetRequestFlowTest {
     private Long group;
     private final AtomicReference<List<String>> enabled = new AtomicReference<>(List.of("web"));
 
+
     @BeforeEach
     void setUp() {
         group = Math.abs(UUID.randomUUID().getLeastSignificantBits() / 1000);
@@ -109,28 +110,28 @@ class ToolsetRequestFlowTest {
         owner = user("owner-" + suffix, UserRole.MEMBER, group);
         admin = user("admin-" + suffix, UserRole.ADMIN, group);
         agent = transactions.execute(status -> agents.saveAndFlush(Agent.of(
-                "request-" + suffix,
-                "요청 비서",
-                "request-" + suffix,
-                "http://hermes.test",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now())));
+            "request-" + suffix,
+            "요청 비서",
+            "request-" + suffix,
+            "http://hermes.test",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id())));
         when(hermes.readCatalog())
-                .thenReturn(List.of(
-                        new ToolsetCatalogEntry("web", "검색", "검색"),
-                        new ToolsetCatalogEntry("image_gen", "그림", "그림"),
-                        new ToolsetCatalogEntry("session_search", "대화", "대화")));
+            .thenReturn(List.of(
+                new ToolsetCatalogEntry("web", "검색", "검색"),
+                new ToolsetCatalogEntry("image_gen", "그림", "그림"),
+                new ToolsetCatalogEntry("session_search", "대화", "대화")));
         when(hermes.readEnabled(anyString(), anyString())).thenAnswer(call -> enabled.get());
         doAnswer(call -> {
-                    enabled.set(call.getArgument(1));
-                    return null;
-                })
-                .when(hermes)
-                .writeApiServer(anyString(), anyList(), anyString());
+            enabled.set(call.getArgument(1));
+            return null;
+        })
+            .when(hermes)
+            .writeApiServer(anyString(), anyList(), anyString());
     }
+
 
     @AfterEach
     void cleanUp() {
@@ -144,6 +145,7 @@ class ToolsetRequestFlowTest {
         jdbc.update("delete from app_user where group_id = ?", group);
     }
 
+
     @Test
     @DisplayName("중복 요청은 같은 번호와 한 알림을 남기고 승인은 기존 도구를 보존하며 결과를 한 번 알린다")
     void deduplicatesAndApprovesWithoutLosingExistingTools() {
@@ -154,22 +156,22 @@ class ToolsetRequestFlowTest {
         assertThat(enabled.get()).containsExactly("web", "image_gen", "fos-assistant");
         service.decide(admin, row.id(), true, null);
         assertThat(notifications.page(owner, null, 100).items())
-                .hasSize(1)
-                .allMatch(item -> item.kind() == NotificationKind.TOOLSET_REQUEST_DECIDED);
+            .hasSize(1)
+            .allMatch(item -> item.kind() == NotificationKind.TOOLSET_REQUEST_DECIDED);
     }
+
 
     @Test
     @DisplayName("같은 도구를 동시에 요청해도 에이전트 잠금 뒤 대기 요청과 알림은 하나만 남는다")
     void deduplicatesConcurrentRequests() {
-        CompletableFuture<ToolsetRequestView> first =
-                CompletableFuture.supplyAsync(() -> service.request(owner, agent.code(), "image_gen"));
-        CompletableFuture<ToolsetRequestView> second =
-                CompletableFuture.supplyAsync(() -> service.request(owner, agent.code(), "image_gen"));
+        CompletableFuture<ToolsetRequestView> first = CompletableFuture.supplyAsync(() -> service.request(owner, agent.code(), "image_gen"));
+        CompletableFuture<ToolsetRequestView> second = CompletableFuture.supplyAsync(() -> service.request(owner, agent.code(), "image_gen"));
         assertThat(first.orTimeout(10, TimeUnit.SECONDS).join().id())
-                .isEqualTo(second.orTimeout(10, TimeUnit.SECONDS).join().id());
+            .isEqualTo(second.orTimeout(10, TimeUnit.SECONDS).join().id());
         assertThat(service.list(owner, agent.code(), false)).hasSize(1);
         assertThat(notifications.page(admin, null, 100).items()).hasSize(1);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"reject", "cancel"})
@@ -180,13 +182,13 @@ class ToolsetRequestFlowTest {
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch snapshotRead = new CountDownLatch(1);
         doAnswer(call -> {
-                    applying.countDown();
-                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-                    enabled.set(call.getArgument(1));
-                    return null;
-                })
-                .when(hermes)
-                .writeApiServer(anyString(), anyList(), anyString());
+            applying.countDown();
+            assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            enabled.set(call.getArgument(1));
+            return null;
+        })
+            .when(hermes)
+            .writeApiServer(anyString(), anyList(), anyString());
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<ToolsetRequestView> approval = pool.submit(() -> service.decide(admin, row.id(), true, null));
@@ -196,8 +198,8 @@ class ToolsetRequestFlowTest {
                 assertThat(requests.findAgentIdByPublicId(row.id())).contains(agent.id());
                 snapshotRead.countDown();
                 return action.equals("cancel")
-                        ? service.cancel(owner, row.id())
-                        : service.decide(admin, row.id(), false, "다음에 확인할게요.");
+                    ? service.cancel(owner, row.id())
+                    : service.decide(admin, row.id(), false, "다음에 확인할게요.");
             }));
             assertThat(snapshotRead.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(competing.isDone()).isFalse();
@@ -215,6 +217,7 @@ class ToolsetRequestFlowTest {
         }
     }
 
+
     @Test
     @DisplayName("조건부 갱신은 먼저 결정된 요청의 상태와 결정자를 덮어쓰지 않는다")
     void updatesOnlyPendingRequest() {
@@ -222,13 +225,12 @@ class ToolsetRequestFlowTest {
         Instant decidedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         transactions.executeWithoutResult(status -> {
             assertThat(requests.finishPending(
-                            row.id(), ToolsetRequestStatus.REJECTED, admin.id(), "다음에 확인할게요.", decidedAt))
+                row.id(), ToolsetRequestStatus.REJECTED, admin.id(), "다음에 확인할게요.", decidedAt))
                     .isEqualTo(1);
             assertThat(requests.finishPending(
-                            row.id(), ToolsetRequestStatus.CANCELLED, null, null, decidedAt.plusSeconds(1)))
+                row.id(), ToolsetRequestStatus.CANCELLED, null, null, decidedAt.plusSeconds(1)))
                     .isZero();
-            AgentToolsetRequest stored =
-                    requests.findByPublicIdForUpdate(row.id()).orElseThrow();
+            AgentToolsetRequest stored = requests.findByPublicIdForUpdate(row.id()).orElseThrow();
             assertThat(stored.status()).isEqualTo(ToolsetRequestStatus.REJECTED);
             assertThat(stored.decidedByUserId()).isEqualTo(admin.id());
             assertThat(stored.reason()).isEqualTo("다음에 확인할게요.");
@@ -237,26 +239,28 @@ class ToolsetRequestFlowTest {
         });
     }
 
+
     @Test
     @DisplayName("Hermes 실패와 미반영은 승인을 기록하지 않고 실패가 끝나면 같은 요청을 다시 승인한다")
     void keepsPendingOnHermesFailureAndAllowsRetry() {
         ToolsetRequestView row = service.request(owner, agent.code(), "image_gen");
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "unavailable"))
-                .when(hermes)
-                .writeApiServer(anyString(), anyList(), anyString());
+            .when(hermes)
+            .writeApiServer(anyString(), anyList(), anyString());
         assertError(() -> service.decide(admin, row.id(), true, null), ErrorCode.HERMES_UNAVAILABLE);
         doAnswer(call -> null).when(hermes).writeApiServer(anyString(), anyList(), anyString());
         assertError(() -> service.decide(admin, row.id(), true, null), ErrorCode.AGENT_TOOLS_NOT_APPLIED);
         assertThat(service.read(owner, row.id(), false).status()).isEqualTo(ToolsetRequestStatus.PENDING);
         assertThat(notifications.page(owner, null, 100).items()).isEmpty();
         doAnswer(call -> {
-                    enabled.set(call.getArgument(1));
-                    return null;
-                })
-                .when(hermes)
-                .writeApiServer(anyString(), anyList(), anyString());
+            enabled.set(call.getArgument(1));
+            return null;
+        })
+            .when(hermes)
+            .writeApiServer(anyString(), anyList(), anyString());
         assertThat(service.decide(admin, row.id(), true, null).status()).isEqualTo(ToolsetRequestStatus.APPROVED);
     }
+
 
     @Test
     @DisplayName("Hermes 반영 뒤 DB 저장이 되돌아가도 재승인은 같은 활성 도구를 확인하고 완료한다")
@@ -276,6 +280,7 @@ class ToolsetRequestFlowTest {
         assertThat(notifications.page(owner, null, 100).items()).hasSize(1);
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"hidden", "deleted", "owner", "group", "revoked", "public"})
     @DisplayName("요청 뒤 숨김·삭제·주인·그룹·사용권한·공개 범위가 바뀌면 승인 없이 만료하고 알린다")
@@ -290,7 +295,7 @@ class ToolsetRequestFlowTest {
             case "revoked" ->
                 transactions.executeWithoutResult(status -> {
                     AllowedPerson person = people.save(
-                            AllowedPerson.of(owner.email(), "사용자", "revoked-" + agent.code(), Instant.now()));
+                        AllowedPerson.of(owner.email(), "사용자", "revoked-" + agent.code()));
                     person.disable();
                     people.saveAndFlush(person);
                 });
@@ -306,6 +311,7 @@ class ToolsetRequestFlowTest {
             }
         }
     }
+
 
     @Test
     @DisplayName("다른 주인과 그룹은 읽거나 결정하지 못하고 관리자의 현재 역할도 다시 확인한다")
@@ -325,6 +331,7 @@ class ToolsetRequestFlowTest {
         assertThat(service.read(owner, row.id(), false).status()).isEqualTo(ToolsetRequestStatus.PENDING);
     }
 
+
     @Test
     @DisplayName("거절 사유는 한 줄이어야 하고 취소와 거절 뒤에는 새 요청을 만들 수 있다")
     void requiresOneLineReasonAndReleasesPendingSlot() {
@@ -332,7 +339,7 @@ class ToolsetRequestFlowTest {
         assertError(() -> service.decide(admin, row.id(), false, " "), ErrorCode.VALIDATION_FAILED);
         assertError(() -> service.decide(admin, row.id(), false, "다음\n번"), ErrorCode.VALIDATION_FAILED);
         assertThat(service.decide(admin, row.id(), false, " 다음에 켜 드릴게요. ").reason())
-                .isEqualTo("다음에 켜 드릴게요.");
+            .isEqualTo("다음에 켜 드릴게요.");
         ToolsetRequestView second = service.request(owner, agent.code(), "image_gen");
         assertThat(second.id()).isNotEqualTo(row.id());
         assertThat(service.cancel(owner, second.id()).status()).isEqualTo(ToolsetRequestStatus.CANCELLED);
@@ -341,14 +348,16 @@ class ToolsetRequestFlowTest {
         assertThat(enabled.get()).doesNotContain("image_gen");
     }
 
+
     @Test
     @DisplayName("DB 유일 제약도 대기 요청 중복을 막는다")
     void enforcesPendingUniquenessInDatabase() {
         service.request(owner, agent.code(), "image_gen");
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> requests.saveAndFlush(
-                        AgentToolsetRequest.of(group, agent.id(), owner.id(), "image_gen", Instant.now()))))
+            AgentToolsetRequest.of(group, agent.id(), owner.id(), "image_gen", Instant.now()))))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
 
     @Test
     @DisplayName("숨긴 도구·주인 등급·이미 켜진 도구·그룹 공개 제약은 새 요청에서 거절한다")
@@ -365,6 +374,7 @@ class ToolsetRequestFlowTest {
         assertError(() -> service.request(owner, agent.code(), "image_gen"), ErrorCode.TOOLSET_REQUEST_UNAVAILABLE);
     }
 
+
     @Test
     @DisplayName("요청 뒤 올린 비밀 요청 스킬과 실행 공간 실패도 승인 때 다시 검사한다")
     void rechecksUploadedSecretsAndSandboxOnApproval() {
@@ -379,28 +389,30 @@ class ToolsetRequestFlowTest {
                 검사
                 """;
         String version = skillStore.writeVersion(
-                agent.hermesProfile(), Map.of("secret-test", new SkillBundle("secret-test", content, List.of())));
+            agent.hermesProfile(), Map.of("secret-test", new SkillBundle("secret-test", content, List.of())));
         skillStore.markPublished(agent.hermesProfile(), version);
         enabled.set(List.of("web", "skills"));
         when(hermes.readCatalog())
-                .thenReturn(List.of(
-                        new ToolsetCatalogEntry("web", "검색", "검색"),
-                        new ToolsetCatalogEntry("skills", "스킬", "스킬"),
-                        new ToolsetCatalogEntry("image_gen", "그림", "그림")));
+            .thenReturn(List.of(
+                new ToolsetCatalogEntry("web", "검색", "검색"),
+                new ToolsetCatalogEntry("skills", "스킬", "스킬"),
+                new ToolsetCatalogEntry("image_gen", "그림", "그림")));
         assertError(() -> service.decide(admin, row.id(), true, null), ErrorCode.AGENT_SKILL_REQUESTS_SECRETS);
         skillStore.deleteAll(agent.hermesProfile());
         doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "sandbox unavailable"))
-                .when(hermes)
-                .writeApiServer(anyString(), anyList(), anyString());
+            .when(hermes)
+            .writeApiServer(anyString(), anyList(), anyString());
         assertError(() -> service.decide(admin, row.id(), true, null), ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
         assertThat(service.read(owner, row.id(), false).status()).isEqualTo(ToolsetRequestStatus.PENDING);
         assertThat(notifications.page(owner, null, 100).items()).isEmpty();
     }
 
+
     private CurrentUser user(String local, UserRole role, Long userGroup) {
-        AppUser row = users.saveAndFlush(AppUser.of(local + "@example.com", "검사 사용자", userGroup, role, Instant.now()));
+        AppUser row = users.saveAndFlush(AppUser.of(local + "@example.com", "검사 사용자", userGroup, role));
         return new CurrentUser(row.id(), row.email(), row.displayName(), row.groupId(), row.role());
     }
+
 
     private void changeAgent(boolean deleted, Long ownerId, AgentVisibility scope) {
         transactions.executeWithoutResult(status -> {
@@ -414,9 +426,10 @@ class ToolsetRequestFlowTest {
         });
     }
 
+
     private static void assertError(ThrowingCallable action, ErrorCode code) {
         assertThatThrownBy(action)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(code));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(code));
     }
 }

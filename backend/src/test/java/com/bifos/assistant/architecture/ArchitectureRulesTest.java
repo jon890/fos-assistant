@@ -427,10 +427,9 @@ class ArchitectureRulesTest {
 
 
     @Test
-    @DisplayName("Executors.newVirtualThreadPerTaskExecutor 를 ResearchAndBuildFlow 밖에서 새로 부르지 않는다")
-    void virtualThreadExecutorOnlyInResearchAndBuildFlow() {
-        FreezingArchRule.freeze(ArchitectureRules.VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW)
-            .check(MAIN);
+    @DisplayName("가상 스레드 실행기는 직접 만들지 않는다")
+    void rejectsUnmanagedVirtualThreadExecutors() {
+        ArchitectureRules.NO_UNMANAGED_VIRTUAL_THREAD_EXECUTORS.check(MAIN);
     }
 
 

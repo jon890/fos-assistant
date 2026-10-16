@@ -23,10 +23,11 @@ public class BrowserGatewaySocketConfig implements WebSocketConfigurer {
     private final BrowserGatewaySocket socket;
     private final BrowserGatewayHandshake handshake;
 
+
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(socket, "/internal/browser-gateway/**")
-                .addInterceptors(handshake)
-                .setAllowedOriginPatterns("*");
+            .addInterceptors(handshake)
+            .setAllowedOriginPatterns("*");
     }
 }

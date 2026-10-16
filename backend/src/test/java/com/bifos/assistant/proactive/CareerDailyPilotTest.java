@@ -189,7 +189,7 @@ class CareerDailyPilotTest {
         doReturn(Set.of("career")).when(connectorBindings).connectorServers(any());
         doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
+        AppUser user = users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "career-" + suffix;
         agent = agents.save(Agent.of(
@@ -200,8 +200,7 @@ class CareerDailyPilotTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            ENABLED_AT));
+            owner.id()));
     }
 
 
@@ -234,7 +233,7 @@ class CareerDailyPilotTest {
         assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근에 알린 발견이 없다.");
         assertThat(firstCommand.instructions())
             .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
-            .contains("- 연결한 서비스의 도구는 직접 부른다.")
+            .contains("- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다.")
             .contains("- 이번 실행은 읽기만 한다.");
         ChatMessage discovery = lastMessage(first);
         assertThat(discovery.role()).isEqualTo(MessageRole.ASSISTANT);
@@ -348,16 +347,14 @@ class CareerDailyPilotTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            ENABLED_AT));
+            owner.id()));
         Conversation otherConversation = conversations.save(
             Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 공부", otherAgent.id(), ENABLED_AT));
         AppUser otherUser = users.save(AppUser.of(
             "pilot-other-" + UUID.randomUUID().toString().substring(0, 8) + "@example.com",
             "사용자B",
             1L,
-            UserRole.MEMBER,
-            ENABLED_AT));
+            UserRole.MEMBER));
         Conversation otherUsers = conversations.save(
             Conversation.startedForCheck(otherUser.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
         ProactiveCheck mine = reported(owner.id(), agent.id(), read.id());

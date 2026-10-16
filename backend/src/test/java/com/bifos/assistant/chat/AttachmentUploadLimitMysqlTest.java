@@ -11,6 +11,7 @@ class AttachmentUploadLimitMysqlTest extends AttachmentUploadLimitTest {
 
     private static MysqlTestDatabase database;
 
+
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         database = MysqlTestDatabase.create();

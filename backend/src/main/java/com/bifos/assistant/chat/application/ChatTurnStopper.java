@@ -8,7 +8,6 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -25,12 +24,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 class ChatTurnStopper {
     private final AgentService agents;
-    private final ExecutionRecorder executions;
     private final AgentExecutionRepository executionRepository;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
     private final ChatPendingMessageRepository pendingMessages;
     private final ChatTurnLifecycle chatTurnLifecycle;
+
 
     /**
      * 이 turn 이 중지로 끝났다고 적고 그 대화의 대기 줄을 멈춰 둔다.
@@ -50,6 +49,7 @@ class ChatTurnStopper {
         }
     }
 
+
     /**
      * 중지로 끝난 turn 의 취소 기록을 남긴 뒤 대기 줄을 멈추고 그 turn 을 돌려준다.
      *
@@ -57,13 +57,14 @@ class ChatTurnStopper {
      * 실패해도 대기 줄은 멈춘다. 둘 다 turn 잠금을 풀기 전이다.
      */
     ChatTurn stoppedTurn(
-            TurnHandle handle, PendingTurn pending, HermesRunResult result, ModelChoice choice, Instant startedAt) {
+        TurnHandle handle, PendingTurn pending, HermesRunResult result, ModelChoice choice, Instant startedAt) {
         try {
             return chatTurnLifecycle.recorded(chatTurnLifecycle.cancel(pending, result, choice), startedAt);
         } finally {
             markStoppedTurn(handle, pending);
         }
     }
+
 
     /**
      * 멈춘 turn 을 적는다. 상한으로 멈춘 살펴보기 turn 은 대기 줄을 멈추지 않고, 나머지는 {@link #markStoppedAndHoldPending} 과 같다.
@@ -73,12 +74,13 @@ class ChatTurnStopper {
      */
     void markStoppedTurn(TurnHandle handle, PendingTurn pending) {
         if (pending.intent() instanceof TurnIntent.ProactiveCheck proactive
-                && !proactive.check().holdPendingOnStop()) {
+            && !proactive.check().holdPendingOnStop()) {
             turns.markStopped(handle);
             return;
         }
         markStoppedAndHoldPending(handle, pending.conversation().id());
     }
+
 
     /**
      * 중지가 확정된 turn 이 예외로 끝날 때 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
@@ -96,56 +98,20 @@ class ChatTurnStopper {
             }
         } catch (RuntimeException ex) {
             log.warn(
-                    "중지한 turn 의 취소를 기록하지 못했다 executionId={}",
-                    pending.execution().id(),
-                    ex);
+                "중지한 turn 의 취소를 기록하지 못했다 executionId={}",
+                pending.execution().id(),
+                ex);
         } finally {
             markStoppedTurn(handle, pending);
         }
     }
 
-    /**
-     * 중지로 끝난 흐름 turn 의 결과물을 묶은 뒤 대기 줄을 멈춘다.
-     *
-     * <p>흐름이 취소를 이미 기록했다. 결과물 묶기가 던져도 잠금을 풀기 전에 대기 줄을 멈춘다.
-     */
-    void recordStoppedFlow(TurnHandle handle, ChatTurn turn, Instant startedAt) {
-        try {
-            chatTurnLifecycle.recorded(turn, startedAt);
-        } finally {
-            markStoppedAndHoldPending(handle, turn.conversationId());
-        }
-    }
-
-    /**
-     * 중지가 확정된 흐름 turn 이 예외로 끝날 때 루트 실행 줄을 취소로 남기고 대기 줄을 멈춘다.
-     *
-     * <p>흐름이 루트 실행을 이미 끝난 상태로 적었으면 그대로 둔다. 실행 줄을 다시 읽어 본다. 흐름이 들고 있는 객체의
-     * 상태를 여기서는 알 수 없다. {@code rootExecutionId} 가 null 이면 실행 줄을 만들기 전에 끝난 것이다.
-     */
-    void cancelFlowAndHoldIfStopConfirmed(TurnHandle handle, Long conversationId, Long rootExecutionId) {
-        if (!turns.isStopConfirmed(handle)) {
-            return;
-        }
-        try {
-            if (rootExecutionId != null) {
-                executionRepository
-                        .findById(rootExecutionId)
-                        .filter(execution -> execution.status() == ExecutionStatus.RUNNING)
-                        .ifPresent(executions::cancel);
-            }
-        } catch (RuntimeException ex) {
-            log.warn("중지한 흐름 turn 의 취소를 기록하지 못했다 executionId={}", rootExecutionId, ex);
-        } finally {
-            markStoppedAndHoldPending(handle, conversationId);
-        }
-    }
 
     void stop(CurrentUser user, Long executionId) {
         TurnHandle handle = turns.find(executionId).orElseGet(() -> {
             AgentExecution execution = executionRepository
-                    .findById(executionId)
-                    .orElseThrow(() -> new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found"));
+                .findById(executionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found"));
             if (!execution.userId().equals(user.id())) {
                 throw new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "execution not found");
             }

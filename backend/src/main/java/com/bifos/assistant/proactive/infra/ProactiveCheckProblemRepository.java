@@ -13,13 +13,16 @@ public interface ProactiveCheckProblemRepository extends JpaRepository<Proactive
     /** 가치 평가는 한 살펴보기의 받아들인 후보 집합만 견준다. */
     List<ProactiveCheckProblem> findByCheckIdAndStatusOrderByIdAsc(Long checkId, ProblemStatus status);
 
+
     /** 그 점검 대화에서 그 시각 뒤에 남긴 그 상태의 후보를 최근 것부터 읽는다. 다음 살펴보기의 입력에 싣는다. 개수는 {@code page} 가 정한다. */
     List<ProactiveCheckProblem> findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
-            Long conversationId, ProblemStatus status, Instant after, Pageable page);
+        Long conversationId, ProblemStatus status, Instant after, Pageable page);
+
 
     /** 그 점검 대화에서 그 시각 뒤에 남긴 그 상태의 후보를 모두 읽는다. 중복 판정에 쓴다. */
     List<ProactiveCheckProblem> findByConversationIdAndStatusAndCreatedAtAfter(
-            Long conversationId, ProblemStatus status, Instant after);
+        Long conversationId, ProblemStatus status, Instant after);
+
 
     /** 그 살펴보기들의 후보 전부. 받아들인 것과 버린 것을 함께 읽는다. */
     List<ProactiveCheckProblem> findByCheckIdInOrderByIdAsc(Collection<Long> checkIds);

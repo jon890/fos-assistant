@@ -132,10 +132,10 @@ class ConnectorGuardBindingRoundTripTest {
             new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
         target = new TransactionTemplate(manager).execute(status -> {
             String email = UUID.randomUUID() + "@example.test";
-            var user = users.saveAndFlush(AppUser.of(email, "검사 주인", 1L, UserRole.MEMBER, NOW));
-            people.saveAndFlush(AllowedPerson.of(email, "검사 주인", "alice", NOW));
+            var user = users.saveAndFlush(AppUser.of(email, "검사 주인", 1L, UserRole.MEMBER));
+            people.saveAndFlush(AllowedPerson.of(email, "검사 주인", "alice"));
             var agent = agents.saveAndFlush(Agent.of("guard-" + UUID.randomUUID(), "검사", "alice", "http://localhost",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id(), NOW));
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
             var connection = ConnectorConnection.pending(user.id(), CONNECTOR, NOW);
             connection.connected(new ConnectionFields(Map.of("scope", "000007"), Map.of()), NOW);
             connection.ready(NOW);
@@ -237,7 +237,7 @@ class ConnectorGuardBindingRoundTripTest {
         var entered = new CountDownLatch(1);
         remote.entered.set(entered);
         remote.release.set(new CountDownLatch(1));
-        var result = new ConnectorInstallResult(null, false, failure ? ResyncOutcome.CALL_FAILED : ResyncOutcome.READY, null, false);
+        var result = new ConnectorInstallResult(null, failure ? ResyncOutcome.CALL_FAILED : ResyncOutcome.READY, null);
         var recreated = new ConnectorInstallAttempts(bindings, agents, users, installs, access,
             new TransactionTemplate(manager), new ConnectorExecutionGuard());
         try (var pool = Executors.newSingleThreadExecutor()) {
@@ -313,7 +313,7 @@ class ConnectorGuardBindingRoundTripTest {
         }
         JsonNode node = defect.equals("type") ? ConnectorBindingHttpFixture.JSON.valueToTree(true) : guard;
         var invalid = new ConnectorManifest(declared.id(), declared.title(), declared.description(), declared.fields(),
-            declared.verifyTool(), declared.mcpServer(), declared.toolsets(), declared.attachments(), declared.schema(), declared.tools(),
+            declared.verifyTool(), declared.mcpServer(), declared.schema(), declared.tools(),
             declared.skills(), declared.appearance(), declared.singleBinding(), declared.ownerBrowser(), declared.ownerBrowserLoginUrl(),
             node, defect.equals("missingSha") ? null : defect.equals("badSha") ? "bad" : sha);
         assertThatThrownBy(() -> capture(invalid)).isInstanceOf(IllegalArgumentException.class);
@@ -351,7 +351,7 @@ class ConnectorGuardBindingRoundTripTest {
     private ConnectorBindingAttempt capture(ConnectorManifest manifest) {
         return attempts.start(() -> {
             attempts.lockOwner(target.user().id());
-            return attempts.begin(bindings.findById(target.bindingId()).orElseThrow(), Optional.of(manifest), Map.of(),
+            return attempts.begin(bindings.findById(target.bindingId()).orElseThrow(), Optional.of(manifest),
                 true, true, false, clock.instant());
         });
     }

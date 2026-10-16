@@ -16,27 +16,32 @@ public class ConnectorChangeRecorder {
     private final List<Seen> seen = new CopyOnWriteArrayList<>();
     private volatile boolean recording;
 
+
     /** 적은 것을 비우고 이 뒤의 사건을 적는다. */
     public void start() {
         seen.clear();
         recording = true;
     }
 
+
     /** 적은 것을 비운다. 켜 둔 상태는 그대로다. */
     public void clear() {
         seen.clear();
     }
+
 
     /** 켠 뒤에 받은 사건이다. 받은 순서대로다. */
     public List<Seen> seen() {
         return seen;
     }
 
+
     /** 끄고 적은 것을 비운다. */
     public void reset() {
         recording = false;
         seen.clear();
     }
+
 
     @EventListener
     public void on(ConnectorActionChanged event) {
@@ -45,6 +50,8 @@ public class ConnectorChangeRecorder {
         }
     }
 
+
     /** 받은 사건과 그때 트랜잭션이 열려 있었는지다. */
-    public record Seen(ConnectorActionChanged event, boolean insideTransaction) {}
+    public record Seen(ConnectorActionChanged event, boolean insideTransaction) {
+    }
 }

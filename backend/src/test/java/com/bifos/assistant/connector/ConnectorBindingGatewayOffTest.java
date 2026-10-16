@@ -33,7 +33,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -58,21 +57,19 @@ class ConnectorBindingGatewayOffTest {
     private static final String BROWSER = "demo-browser";
     /** 사용자 브라우저를 쓰는 커넥터다. */
     private static final ConnectorManifest BROWSER_MANIFEST = new ConnectorManifest(
-            BROWSER,
-            "브라우저 메모",
-            "",
-            List.of(),
-            "ping",
-            "browser",
-            List.of(),
-            false,
-            1,
-            List.of(),
-            List.of(),
-            ConnectorAppearance.NONE,
-            false,
-            true,
-            "https://login.example.test/sign-in");
+        BROWSER,
+        "브라우저 메모",
+        "",
+        List.of(),
+        "ping",
+        "browser",
+        1,
+        List.of(),
+        List.of(),
+        ConnectorAppearance.NONE,
+        false,
+        true,
+        "https://login.example.test/sign-in");
 
     @Autowired
     ConnectorBindingService service;
@@ -101,15 +98,17 @@ class ConnectorBindingGatewayOffTest {
     @Autowired
     HermesSkillClient skills;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(BROWSER_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(skills.list(anyString())).thenReturn(List.of());
     }
+
 
     @AfterEach
     void tearDown() {
@@ -120,14 +119,14 @@ class ConnectorBindingGatewayOffTest {
         users.deleteAll();
     }
 
+
     @Test
     @DisplayName("중계가 꺼져 주소가 없으면 사용자 브라우저를 쓰는 커넥터의 붙이기에 null 이 아니라 빈 문자열을 싣는다")
     void bindsBrowserConnectorWithEmptyAddressWhenGatewayIsOff() {
         CurrentUser owner = user();
         Agent agent = agent(owner);
         connectionService.register(owner, BROWSER, Map.of());
-        ConnectorConnection connection =
-                connections.findByUserIdAndConnectorId(owner.id(), BROWSER).orElseThrow();
+        ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), BROWSER).orElseThrow();
 
         assertThat(service.bind(owner, agent.code(), BROWSER).bound()).isTrue();
 
@@ -136,24 +135,25 @@ class ConnectorBindingGatewayOffTest {
         verify(connector).call(eq(BROWSER), eq("ping"), eq(Map.of()), eq(""));
     }
 
+
     private Agent agent(CurrentUser owner) {
         String code = "gw-off-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
     }
+
 
     private CurrentUser user() {
         String suffix = UUID.randomUUID().toString();
         AppUser saved = users.save(
-                AppUser.of("gateway-off-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("gateway-off-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

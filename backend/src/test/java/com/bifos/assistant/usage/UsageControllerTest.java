@@ -83,30 +83,32 @@ class UsageControllerTest {
     private UsageController controller;
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
         agent = agents.findByCode("list-dad")
-                .orElseGet(() -> agents.save(Agent.of(
-                        "list-dad",
-                        "목록 아빠",
-                        "list-dad",
-                        "http://127.0.0.1:1/p/list-dad",
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        USER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                "list-dad",
+                "목록 아빠",
+                "list-dad",
+                "http://127.0.0.1:1/p/list-dad",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID)));
         controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         signInAs(UserRole.ADMIN);
     }
 
+
     /** 같은 사용자를 이 역할로 로그인한 것으로 둔다. 자료는 같고 요청자의 역할만 다르게 하기 위해서다. */
     private void signInAs(UserRole role) {
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, role));
     }
+
 
     @Test
     @DisplayName("MEMBER 역할의 실행 한 줄에는 내부 값이 비고 오류 코드와 걸린 시간은 남는다")
@@ -115,9 +117,9 @@ class UsageControllerTest {
         signInAs(UserRole.MEMBER);
 
         UsageDtos.ExecutionView view = controller.myExecutions(50).stream()
-                .filter(row -> row.id().equals(failed.id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(row -> row.id().equals(failed.id()))
+            .findFirst()
+            .orElseThrow();
 
         assertThat(view.agentCode()).as("agentCode").isNull();
         assertThat(view.provider()).as("provider").isNull();
@@ -143,6 +145,7 @@ class UsageControllerTest {
         assertThat(view.status()).isEqualTo("FAILED");
         assertThat(view.startedAt()).isNotNull();
     }
+
 
     @Test
     @DisplayName("페이지 응답도 MEMBER 역할의 내부 값을 가리고 다음 커서를 준다")
@@ -172,6 +175,7 @@ class UsageControllerTest {
         assertThat(page.nextCursor()).isNotBlank();
     }
 
+
     @Test
     @DisplayName("페이지 limit 은 1보다 작은 요청을 한 줄로 제한한다")
     void executionPageClampsLimitToOne() {
@@ -184,15 +188,16 @@ class UsageControllerTest {
         assertThat(page.nextCursor()).isNotBlank();
     }
 
+
     @Test
     @DisplayName("ADMIN 역할의 실행 한 줄에는 내부 값이 그대로 실린다")
     void adminExecutionRowKeepsInternalValues() {
         AgentExecution failed = detailedExecution();
 
         UsageDtos.ExecutionView view = controller.myExecutions(50).stream()
-                .filter(row -> row.id().equals(failed.id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(row -> row.id().equals(failed.id()))
+            .findFirst()
+            .orElseThrow();
 
         assertThat(view.agentCode()).isEqualTo("list-dad");
         assertThat(view.provider()).isEqualTo("example-provider");
@@ -215,6 +220,7 @@ class UsageControllerTest {
         assertThat(view.latencyMs()).isEqualTo(1_234L);
     }
 
+
     @Test
     @DisplayName("MEMBER 역할의 이번 달 합계에는 실행 건수만 있고 금액과 건수 구분은 빈다")
     void memberMonthlyCostHasOnlyTotalExecutions() {
@@ -235,6 +241,7 @@ class UsageControllerTest {
         assertThat(cost.observationIncompleteExecutions()).isNull();
     }
 
+
     @Test
     @DisplayName("ADMIN 역할의 이번 달 합계에는 금액과 건수 구분이 그대로 있고 실행 건수가 더해진다")
     void adminMonthlyCostKeepsAmountsAndAddsTotalExecutions() {
@@ -252,6 +259,7 @@ class UsageControllerTest {
         assertThat(cost.totalExecutions()).isEqualTo(2L);
     }
 
+
     @Test
     @DisplayName("실행이 하나도 없는 달은 MEMBER 역할에게 실행 건수 0 으로 온다")
     void memberMonthlyCostOfEmptyMonthIsZeroExecutions() {
@@ -263,6 +271,7 @@ class UsageControllerTest {
         assertThat(cost.pricedExecutions()).isNull();
     }
 
+
     @Test
     @DisplayName("MEMBER 역할이 묶음 합계를 부르면 FORBIDDEN 이고 ADMIN 역할은 받는다")
     void memberBreakdownIsForbiddenAndAdminGetsRows() {
@@ -272,13 +281,14 @@ class UsageControllerTest {
         signInAs(UserRole.MEMBER);
 
         assertThat(forAdmin.rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.label()).isEqualTo("example-model-large"));
+            .singleElement()
+            .satisfies(row -> assertThat(row.label()).isEqualTo("example-model-large"));
         assertThatThrownBy(() -> controller.breakdown("model", null))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.FORBIDDEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.FORBIDDEN);
     }
+
 
     @Test
     @DisplayName("MEMBER 역할의 스킬 합계에는 에이전트 코드가 비고 ADMIN 역할에게는 그대로 실린다")
@@ -286,7 +296,7 @@ class UsageControllerTest {
         skillUses.deleteAll();
         AgentExecution used = execution(null, null);
         skillUses.save(ExecutionSkillUse.of(
-                used.id(), "shopping", SkillUseSource.MODEL, Instant.parse("2026-09-01T00:00:00Z")));
+            used.id(), "shopping", SkillUseSource.MODEL, Instant.parse("2026-09-01T00:00:00Z")));
 
         List<UsageDtos.MySkillUsageView> forAdmin = controller.mySkillUsage();
         signInAs(UserRole.MEMBER);
@@ -304,29 +314,31 @@ class UsageControllerTest {
         });
     }
 
+
     /** 내부 값이 모두 채워진 실패 실행이다. 빼는 값과 남기는 값을 한 줄에서 견주려고 쓴다. */
     private AgentExecution detailedExecution() {
         Instant startedAt = Instant.now();
         return executions.save(AgentExecution.builder()
-                .userId(USER_ID)
-                .conversationId(7L)
-                .agentId(agent.id())
-                .profileName("dad")
-                .provider("example-provider")
-                .model("example-model-large")
-                .reasoningEffort("high")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.FAILED)
-                .errorCode("PROVIDER_BLOCKED")
-                .tokens(100L, 40L, 20L, 120L)
-                .timing(startedAt, startedAt.plusMillis(1_234L))
-                .contextChars(3_000L)
-                .contextOmittedItems(2)
-                .runtimeFingerprint("fingerprint-1")
-                .instructionsHash("hash-1")
-                .cost(new ExecutionCost(5_000L, 4_000L, "USD", "2026-09"))
-                .build());
+            .userId(USER_ID)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .profileName("dad")
+            .provider("example-provider")
+            .model("example-model-large")
+            .reasoningEffort("high")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.FAILED)
+            .errorCode("PROVIDER_BLOCKED")
+            .tokens(100L, 40L, 20L, 120L)
+            .timing(startedAt, startedAt.plusMillis(1_234L))
+            .contextChars(3_000L)
+            .contextOmittedItems(2)
+            .runtimeFingerprint("fingerprint-1")
+            .instructionsHash("hash-1")
+            .cost(new ExecutionCost(5_000L, 4_000L, "USD", "2026-09"))
+            .build());
     }
+
 
     @Test
     @DisplayName("자식을 가진 실행만 hasChildren 이 참이다")
@@ -338,16 +350,17 @@ class UsageControllerTest {
         List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
         assertThat(page)
-                .filteredOn(view -> view.id().equals(parent.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::hasChildren)
-                .isEqualTo(true);
+            .filteredOn(view -> view.id().equals(parent.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::hasChildren)
+            .isEqualTo(true);
         assertThat(page)
-                .filteredOn(view -> view.id().equals(alone.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::hasChildren)
-                .isEqualTo(false);
+            .filteredOn(view -> view.id().equals(alone.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::hasChildren)
+            .isEqualTo(false);
     }
+
 
     @Test
     @DisplayName("요청한 effort 를 싣고 고르지 않은 실행은 null 이다")
@@ -358,60 +371,61 @@ class UsageControllerTest {
         List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
         assertThat(page)
-                .filteredOn(view -> view.id().equals(chosen.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::reasoningEffort)
-                .isEqualTo("high");
+            .filteredOn(view -> view.id().equals(chosen.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::reasoningEffort)
+            .isEqualTo("high");
         assertThat(page)
-                .filteredOn(view -> view.id().equals(byDefault.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::reasoningEffort)
-                .isNull();
+            .filteredOn(view -> view.id().equals(byDefault.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::reasoningEffort)
+            .isNull();
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없어도 두 줄이 나오고 없는 쪽의 에이전트 칸만 빈다")
     void twoRowsComeOutWithoutAgentRowAndOnlyMissingSideAgentColumnIsEmpty() {
         Agent gone = agents.save(Agent.of(
-                "list-gone",
-                "지운 아빠",
-                "gone",
-                "http://127.0.0.1:1/p/gone",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now()));
+            "list-gone",
+            "지운 아빠",
+            "gone",
+            "http://127.0.0.1:1/p/gone",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            USER_ID));
         AgentExecution kept = execution(null, null);
         AgentExecution orphaned = executions.save(AgentExecution.builder()
-                .userId(USER_ID)
-                .conversationId(7L)
-                .agentId(gone.id())
-                .profileName("gone")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(USER_ID)
+            .conversationId(7L)
+            .agentId(gone.id())
+            .profileName("gone")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         agents.deleteById(gone.id());
 
         List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
         assertThat(page).hasSize(2);
         assertThat(page)
-                .filteredOn(view -> view.id().equals(orphaned.id()))
-                .singleElement()
-                .satisfies(view -> {
-                    assertThat(view.agentCode()).isNull();
-                    assertThat(view.agentName()).isNull();
-                });
+            .filteredOn(view -> view.id().equals(orphaned.id()))
+            .singleElement()
+            .satisfies(view -> {
+                assertThat(view.agentCode()).isNull();
+                assertThat(view.agentName()).isNull();
+            });
         assertThat(page)
-                .filteredOn(view -> view.id().equals(kept.id()))
-                .singleElement()
-                .satisfies(view -> {
-                    assertThat(view.agentCode()).isEqualTo("list-dad");
-                    assertThat(view.agentName()).isEqualTo("목록 아빠");
-                });
+            .filteredOn(view -> view.id().equals(kept.id()))
+            .singleElement()
+            .satisfies(view -> {
+                assertThat(view.agentCode()).isEqualTo("list-dad");
+                assertThat(view.agentName()).isEqualTo("목록 아빠");
+            });
     }
+
 
     /**
      * 목록 조회가 내는 질의 수다.
@@ -420,6 +434,7 @@ class UsageControllerTest {
      * 에이전트를 한 번에 읽는 것 하나다.
      */
     private static final long QUERIES_PER_LIST = 5;
+
 
     @Test
     @DisplayName("목록이 길어져도 자식을 확인하는 질의는 늘지 않는다")
@@ -430,6 +445,7 @@ class UsageControllerTest {
         assertThat(few).as("실행 2개일 때 %d 번 질의했다", few).isEqualTo(QUERIES_PER_LIST);
         assertThat(many).as("실행 10개일 때 %d 번 질의했다. 2개일 때는 %d 번이었다", many, few).isEqualTo(QUERIES_PER_LIST);
     }
+
 
     /** 실행을 그만큼 넣고 목록을 한 번 부르면서 질의 수를 센다. */
     private long queriesForList(int howMany) {
@@ -446,22 +462,24 @@ class UsageControllerTest {
         return statistics.getQueryExecutionCount();
     }
 
+
     private AgentExecution execution(Long parentId, Long rootId) {
         return execution(parentId, rootId, null);
     }
 
+
     private AgentExecution execution(Long parentId, Long rootId, String reasoningEffort) {
         return executions.save(AgentExecution.builder()
-                .userId(USER_ID)
-                .conversationId(7L)
-                .agentId(agent.id())
-                .parentExecutionId(parentId)
-                .rootExecutionId(rootId)
-                .profileName("dad")
-                .reasoningEffort(reasoningEffort)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(USER_ID)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .parentExecutionId(parentId)
+            .rootExecutionId(rootId)
+            .profileName("dad")
+            .reasoningEffort(reasoningEffort)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
 }

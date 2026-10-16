@@ -1,3 +1,4 @@
+// 코드 규칙: rule-50. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +41,7 @@ class MysqlMigrationTest {
     @Autowired
     private Flyway flyway;
 
+
     @DynamicPropertySource
     static void useMysql(DynamicPropertyRegistry registry) {
         MysqlTestDatabase database = MysqlTestDatabase.create();
@@ -51,12 +53,85 @@ class MysqlMigrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 
+
     @Test
     @DisplayName("모든 마이그레이션이 적용되고 남은 것이 없다")
     void appliesEveryMigration() {
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied()).isNotEmpty();
     }
+
+
+    @Test
+    @DisplayName("모든 애플리케이션 테이블과 컬럼에 COMMENT가 있다")
+    void requiresCommentsOnEveryTableAndColumn() {
+        List<String> tables = jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+                  AND table_name <> 'flyway_schema_history' AND TRIM(table_comment) = ''
+                ORDER BY table_name
+                """, String.class);
+        List<String> columns = jdbc.queryForList("""
+                SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history'
+                  AND TRIM(column_comment) = ''
+                ORDER BY table_name, ordinal_position
+                """, String.class);
+        assertThat(tables).as("테이블 COMMENT 누락: 새 마이그레이션에서 COMMENT 를 달라").isEmpty();
+        assertThat(columns).as("컬럼 COMMENT 누락: 새 마이그레이션에서 COMMENT 를 달라").isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("에이전트 표에서 폐기한 Java Flow 컬럼을 제거한다")
+    void removesRetiredAgentFlowColumn() {
+        // Hibernate validate는 남은 여분 컬럼을 거절하지 않으므로 DROP 결과를 직접 확인한다.
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'agent' AND column_name = 'flow'
+                """, Long.class)).isZero();
+    }
+
+
+    @Test
+    @DisplayName("옛 커넥터 에이전트 컬럼과 연결의 제약을 제거하고 바인딩 제약은 유지한다")
+    void removesLegacyConnectorColumnsAndConstraints() {
+        assertThat(jdbc.queryForList("""
+                SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND ((table_name = 'agent' AND column_name IN ('connector_managed', 'connector_attachments'))
+                    OR (table_name = 'connector_connection' AND column_name IN ('agent_id', 'restart_required', 'desired_enabled')))
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT constraint_name FROM information_schema.table_constraints
+                WHERE constraint_schema = DATABASE() AND table_name = 'connector_connection'
+                  AND constraint_name IN ('fk_connector_connection_agent', 'uk_connector_connection_agent')
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT constraint_name FROM information_schema.table_constraints
+                WHERE constraint_schema = DATABASE() AND table_name = 'agent_connector_binding'
+                  AND constraint_type = 'FOREIGN KEY'
+                """, String.class)).containsExactlyInAnyOrder(
+            "fk_agent_connector_binding_agent", "fk_agent_connector_binding_connection");
+    }
+
+
+    @Test
+    @DisplayName("폐기한 서비스 토큰 표 둘을 제거하고 기억과 에이전트 토큰 표는 보존한다")
+    void removesServiceTokenTablesAndKeepsMemoryAndAgentTokens() {
+        assertThat(jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('service_token', 'service_token_collection')
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('memory', 'memory_collection', 'agent_memory_collection', 'agent_token')
+                """, String.class)).containsExactlyInAnyOrder(
+            "memory", "memory_collection", "agent_memory_collection", "agent_token");
+    }
+
 
     @Test
     @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
@@ -71,11 +146,11 @@ class MysqlMigrationTest {
                     ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
                     """);
             Flyway probe = Flyway.configure()
-                    .configuration(flyway.getConfiguration())
-                    .dataSource(database.url(), database.username(), database.password())
-                    // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
-                    .locations("filesystem:" + directory)
-                    .load();
+                .configuration(flyway.getConfiguration())
+                .dataSource(database.url(), database.username(), database.password())
+                // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
+                .locations("filesystem:" + directory)
+                .load();
             probe.migrate();
             assertThat(probe.info().current().getVersion().getVersion()).isEqualTo("20261007000002");
 
@@ -87,10 +162,9 @@ class MysqlMigrationTest {
             assertThat(probe.migrate().migrationsExecuted).isEqualTo(1);
             probe.validate();
             assertThat(probe.info().pending()).isEmpty();
-            try (var connection =
-                            DriverManager.getConnection(database.url(), database.username(), database.password());
-                    var statement = connection.createStatement();
-                    var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
+            try (var connection = DriverManager.getConnection(database.url(), database.username(), database.password());
+                var statement = connection.createStatement();
+                var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getInt(1)).isZero();
             }
@@ -100,12 +174,13 @@ class MysqlMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("모든 표와 문자열 칸의 정렬 규칙이 하나다")
     void keepsSingleCollation() {
         assertThat(jdbc.queryForObject("SELECT @@collation_server", String.class))
-                .as("서버 기본 정렬 규칙이 운영과 다르면 이 검사가 마이그레이션을 확인하지 못한다")
-                .isEqualTo(SERVER_COLLATION);
+            .as("서버 기본 정렬 규칙이 운영과 다르면 이 검사가 마이그레이션을 확인하지 못한다")
+            .isEqualTo(SERVER_COLLATION);
 
         List<String> columns = jdbc.queryForList("""
                 SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns

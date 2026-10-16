@@ -47,7 +47,7 @@ class ContentDraftIdempotencyMysqlTest extends ContentDraftIdempotencyTest {
                         }
                         creationRequests.saveAndFlush(new ContentDraftCreationRequest(
                             context.creationKey(requestId), context.creationIdentityKey(requestId), owner.id(), conversation.id(),
-                            "profile", 99L, 99L, "root", requestId.toString(), new byte[32], UUID.randomUUID().toString(), NOW));
+                            "profile", 99L, 99L, "root", requestId.toString(), new byte[32], UUID.randomUUID().toString()));
                     });
                     return "accepted";
                 } catch (DataIntegrityViolationException ex) {

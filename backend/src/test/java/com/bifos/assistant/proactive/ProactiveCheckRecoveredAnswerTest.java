@@ -52,7 +52,7 @@ class ProactiveCheckRecoveredAnswerTest {
     private static final String FAILED_NOTICE = "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요";
     private static final String STOPPED_NOTICE = "살펴보기를 멈췄어요";
     private static final String CHECK_ANSWER = "살펴본 글\n<fos-check-result>\n"
-            + "{\"version\":1,\"outcome\":\"NOTHING_NEW\",\"summary\":\"검사하지 않은 요약\"}\n</fos-check-result>";
+        + "{\"version\":1,\"outcome\":\"NOTHING_NEW\",\"summary\":\"검사하지 않은 요약\"}\n</fos-check-result>";
 
     @Autowired
     RecoveredRunRecorder recorder;
@@ -88,29 +88,29 @@ class ProactiveCheckRecoveredAnswerTest {
     private Agent agent;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        user = users.save(AppUser.of("recovered-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER, STARTED));
+        user = users.save(AppUser.of("recovered-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER));
         agent = agents.save(Agent.of(
-                "recovered-" + suffix,
-                "커리어",
-                "recovered-" + suffix,
-                "http://agent-runtime.test/p/recovered-" + suffix,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                STARTED));
-        conversation =
-                conversations.save(Conversation.startedForCheck(user.id(), "먼저 살펴보기 · 커리어", agent.id(), STARTED));
+            "recovered-" + suffix,
+            "커리어",
+            "recovered-" + suffix,
+            "http://agent-runtime.test/p/recovered-" + suffix,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
+        conversation = conversations.save(Conversation.startedForCheck(user.id(), "먼저 살펴보기 · 커리어", agent.id(), STARTED));
     }
+
 
     @AfterEach
     void tearDown() {
         checks.deleteAllById(createdChecks);
         createdExecutions.forEach(id -> executionEvents.deleteAll(
-                executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(id))));
+            executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(id))));
         executions.deleteAllById(createdExecutions);
         transactions.executeWithoutResult(status -> {
             messages.deleteAll(messages.findByConversationIdOrderByIdAsc(conversation.id()));
@@ -119,6 +119,7 @@ class ProactiveCheckRecoveredAnswerTest {
         agents.deleteById(agent.id());
         users.deleteById(user.id());
     }
+
 
     @Test
     @DisplayName("기동 정리가 끝낸 살펴보기 turn 의 답은 남지 않고 실패 알림 줄 하나만 남는다")
@@ -131,12 +132,13 @@ class ProactiveCheckRecoveredAnswerTest {
         assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history)
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.SYSTEM, FAILED_NOTICE));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.SYSTEM, FAILED_NOTICE));
         assertThat(history)
-                .extracting(ChatMessage::content)
-                .noneMatch(content -> content.contains("fos-check-result") || content.contains("검사하지 않은 요약"));
+            .extracting(ChatMessage::content)
+            .noneMatch(content -> content.contains("fos-check-result") || content.contains("검사하지 않은 요약"));
     }
+
 
     @Test
     @DisplayName("기동 정리가 끝낸 자동 실행 살펴보기는 성공이든 취소든 답도 알림 줄도 남기지 않는다")
@@ -145,13 +147,14 @@ class ProactiveCheckRecoveredAnswerTest {
         AgentExecution cancelled = checkRoot(CheckTrigger.AUTONOMY);
 
         assertThat(recorder.settle(completed.id(), ended("completed", CHECK_ANSWER)))
-                .isTrue();
+            .isTrue();
         assertThat(recorder.settle(cancelled.id(), ended("cancelled", CHECK_ANSWER)))
-                .isTrue();
+            .isTrue();
 
         assertThat(executions.findById(completed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("기동 정리가 끝낸 살펴보기 turn 이 취소로 끝났으면 그때까지의 답 대신 멈춤 알림 줄 하나만 남는다")
@@ -163,9 +166,10 @@ class ProactiveCheckRecoveredAnswerTest {
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(executions.findById(root.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
     }
+
 
     @Test
     @DisplayName("취소로 끝난 살펴보기 turn 의 답이 비었어도 멈춤 알림 줄 하나는 남는다")
@@ -175,16 +179,16 @@ class ProactiveCheckRecoveredAnswerTest {
         recorder.settle(root.id(), ended("cancelled", ""));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.SYSTEM, STOPPED_NOTICE));
     }
+
 
     @Test
     @DisplayName("같은 점검 대화에서 사용자가 직접 보낸 보통 turn 의 복구 답은 그대로 남는다")
     void keepsRecoveredAnswerOfOrdinaryTurnInCheckConversation() {
         AgentExecution checkRoot = turn();
-        ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
+        ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, STARTED);
         check.attachRoot(checkRoot.id(), checkRoot.hermesSessionId());
         check.fail("INTERRUPTED", 0, 0, STARTED.plusSeconds(60));
         createdChecks.add(checks.save(check).id());
@@ -195,53 +199,56 @@ class ProactiveCheckRecoveredAnswerTest {
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content, ChatMessage::executionId)
-                .containsExactly(
-                        tuple(MessageRole.USER, "이 공고를 더 알려 줘", null),
-                        tuple(MessageRole.ASSISTANT, "공고의 요구 조건은 이렇다", ordinary.id()));
+            .extracting(ChatMessage::role, ChatMessage::content, ChatMessage::executionId)
+            .containsExactly(
+                tuple(MessageRole.USER, "이 공고를 더 알려 줘", null),
+                tuple(MessageRole.ASSISTANT, "공고의 요구 조건은 이렇다", ordinary.id()));
     }
+
 
     /** 점검 대화에서 돌던 살펴보기 turn 의 실행 줄이다. 살펴보기 줄이 그 실행을 루트로 가리킨다. */
     private AgentExecution checkRoot() {
         return checkRoot(CheckTrigger.MANUAL);
     }
 
+
     private AgentExecution checkRoot(CheckTrigger trigger) {
         AgentExecution root = turn();
-        ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), trigger, false, STARTED);
+        ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), trigger, false, STARTED);
         check.attachRoot(root.id(), root.hermesSessionId());
         createdChecks.add(checks.save(check).id());
         return root;
     }
 
+
     /** 점검 대화에서 돌던 대화 turn 의 실행 줄이다. */
     private AgentExecution turn() {
         AgentExecution saved = executions.save(AgentExecution.builder()
-                .userId(user.id())
-                .agentId(agent.id())
-                .conversationId(conversation.id())
-                .profileName(agent.hermesProfile())
-                .hermesSessionId("fos-" + UUID.randomUUID())
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(STARTED)
-                .build());
+            .userId(user.id())
+            .agentId(agent.id())
+            .conversationId(conversation.id())
+            .profileName(agent.hermesProfile())
+            .hermesSessionId("fos-" + UUID.randomUUID())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(STARTED)
+            .build());
         createdExecutions.add(saved.id());
         return saved;
     }
 
+
     private static HermesRunResult ended(String status, String output) {
         return new HermesRunResult(
-                "run-1",
-                "sess-1",
-                status,
-                output,
-                null,
-                null,
-                null,
-                new TokenUsage(10L, 0L, 5L, 15L),
-                new SessionRuntime("example-model", "example-provider"));
+            "run-1",
+            "sess-1",
+            status,
+            output,
+            null,
+            null,
+            null,
+            new TokenUsage(10L, 0L, 5L, 15L),
+            new SessionRuntime("example-model", "example-provider"));
     }
 }

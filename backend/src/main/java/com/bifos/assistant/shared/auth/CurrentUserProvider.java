@@ -17,6 +17,7 @@ public class CurrentUserProvider {
         return user;
     }
 
+
     public CurrentUser requireAdmin() {
         CurrentUser user = require();
         if (!user.isAdmin()) {

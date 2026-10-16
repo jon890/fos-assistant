@@ -22,7 +22,6 @@ import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import com.bifos.assistant.user.application.UserProvisioningService;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,14 +61,16 @@ class FirstAgentCreatorTest {
     @Autowired
     TrackingBackgroundTasks backgroundTasks;
 
+
     @BeforeEach
     void setUp() {
         reset(toolsets);
         agents.deleteAll();
         users.deleteAll();
         people.deleteAll();
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
     }
+
 
     @Test
     @DisplayName("에이전트 저장이 실패하면 그 예외를 그대로 던지고 사용자도 남기지 않는다")
@@ -80,10 +81,11 @@ class FirstAgentCreatorTest {
         assertThatThrownBy(() -> provisioning.resolve(EMAIL, NAME)).isSameAs(failure);
 
         assertThat(users.findByEmail(EMAIL))
-                .as("에이전트를 저장하지 못했으면 같은 트랜잭션의 사용자 저장도 되돌려져야 한다")
-                .isEmpty();
+            .as("에이전트를 저장하지 못했으면 같은 트랜잭션의 사용자 저장도 되돌려져야 한다")
+            .isEmpty();
         assertThat(agents.count()).as("에이전트 줄도 남지 않아야 한다").isZero();
     }
+
 
     @Test
     @DisplayName("첫 로그인이 커밋되면 그 사용자의 실행 공간 키로 기본 도구를 켠다")
@@ -95,11 +97,12 @@ class FirstAgentCreatorTest {
 
         Long userId = users.findByEmail(EMAIL).orElseThrow().id();
         verify(toolsets)
-                .writeApiServerInSandbox(
-                        PROFILE,
-                        List.of("delegation", "web", "terminal", "file", "code_execution", "fos-assistant"),
-                        "u" + userId);
+            .writeApiServerInSandbox(
+                PROFILE,
+                List.of("delegation", "web", "terminal", "file", "code_execution", "fos-assistant"),
+                "u" + userId);
     }
+
 
     @Test
     @DisplayName("에이전트 저장이 실패해 로그인이 되돌려지면 기본 도구를 켜지 않는다")
@@ -112,6 +115,7 @@ class FirstAgentCreatorTest {
         verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
+
 
     @Test
     @DisplayName("기본 도구를 켜지 못해도 로그인은 끝난다")

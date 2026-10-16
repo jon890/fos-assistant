@@ -24,6 +24,7 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
             """)
     List<ExecutionEvent> findUnscheduledChildren(@Param("since") Instant since, Pageable pageable);
 
+
     /**
      * 한 구간에 시작한 실행에서 session 없이 온 하위 에이전트 시작 사건의 수다.
      *
@@ -38,6 +39,7 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
                 and event.eventType = 'SUBAGENT_STARTED' and event.hermesSessionId is null
             """)
     long countSessionlessChildren(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /**
      * 한 구간에 시작한 실행에서 session 은 있는데 원장 줄이 아직 없는 자식의 수다.
@@ -57,17 +59,20 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
                     where job.profileName = e.profileName and job.childSessionId = event.hermesSessionId)
             """)
     long countUnscheduledChildren(
-            @Param("userId") Long userId,
-            @Param("from") Instant from,
-            @Param("to") Instant to,
-            @Param("finishedFrom") Instant finishedFrom,
-            @Param("finishedBefore") Instant finishedBefore);
+        @Param("userId") Long userId,
+        @Param("from") Instant from,
+        @Param("to") Instant to,
+        @Param("finishedFrom") Instant finishedFrom,
+        @Param("finishedBefore") Instant finishedBefore);
+
 
     boolean existsByExecutionIdAndHermesSessionIdAndEventType(
-            Long executionId, String hermesSessionId, ExecutionEventType eventType);
+        Long executionId, String hermesSessionId, ExecutionEventType eventType);
+
 
     @Query("select coalesce(max(event.sequence), 0) from ExecutionEvent event where event.executionId = :id")
     int lastSequence(@Param("id") Long id);
+
 
     /**
      * 트리에 담긴 실행들의 사건을 일어난 순서대로 한 번에 읽는다. {@code uk_execution_event_seq} 를
@@ -77,6 +82,7 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
      * {@code in} 절은 데이터베이스마다 다르게 동작한다.
      */
     List<ExecutionEvent> findByExecutionIdInOrderByExecutionIdAscSequenceAsc(Collection<Long> executionIds);
+
 
     /**
      * 그 대화의 실행 가운데 바깥 글을 읽었을 수 있는 도구나 하위 에이전트를 시작한 것이 있는가(ADR-20261007 / memory-remember).
@@ -92,7 +98,8 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
                         and (event.toolName is null or event.toolName not in :internalTools)))
             """)
     boolean existsOutsideToolStartInConversation(
-            @Param("conversationId") Long conversationId, @Param("internalTools") Collection<String> internalTools);
+        @Param("conversationId") Long conversationId, @Param("internalTools") Collection<String> internalTools);
+
 
     /**
      * 그 대화의 실행이 낳은 자식 가운데 아직 사용량 작업 줄이 없는 것이 있는가. {@link #findUnscheduledChildren} 과 같은 조건을 그
@@ -108,7 +115,8 @@ public interface ExecutionEventRepository extends JpaRepository<ExecutionEvent, 
                    where job.profileName = parent.profileName and job.childSessionId = event.hermesSessionId)
             """)
     boolean existsUnscheduledChildInConversation(
-            @Param("conversationId") Long conversationId, @Param("since") Instant since);
+        @Param("conversationId") Long conversationId, @Param("since") Instant since);
+
 
     /**
      * 그 대화 실행의 사건에서 {@code detail} 을 비운다. 사건 줄과 토큰은 남긴다.

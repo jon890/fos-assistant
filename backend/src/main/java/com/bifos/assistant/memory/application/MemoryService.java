@@ -6,13 +6,13 @@ import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
-import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -59,7 +60,7 @@ public class MemoryService {
     private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
     private final MemoryRevisionWriter revisionWriter;
-    private final MemoryTitleSearch titleSearch;
+    private final MemoryRelevanceSearch relevanceSearch;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -91,25 +92,6 @@ public class MemoryService {
     /** 번호로 문서 하나를 읽는다. 없는 문서와 남의 문서와 문서가 아닌 항목은 같은 MEMORY_NOT_FOUND 다. */
     public Memory documentFor(CurrentUser user, Long id) {
         return requireOwnDocument(user, memories.findById(id).orElseThrow(MemoryService::notFound));
-    }
-
-
-    /**
-     * 서비스 토큰의 주인이 가진 문서 하나를 읽는다. 요청자는 토큰이 정하고 경로는 사용자를 정하지 못한다.
-     *
-     * <p>없는 문서와 읽을 수 없는 문서를 같은 MEMORY_NOT_FOUND 로 숨긴다. 이름이 없는 줄, 승인 전인 항목, 문서가 아닌
-     * 항목, 토큰이 받지 않는 collection, 민감 허용이 없는 민감 문서가 모두 해당한다. 꺼내는 방식으로는 거르지 않는다.
-     */
-    public Memory documentForService(Long userId, MemoryAccess access, String collection, String documentKey) {
-        Memory memory = memories.findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
-            MemoryScope.USER, userId, collection, documentKey)
-            .orElseThrow(MemoryService::notFound);
-        if (memory.status() != MemoryStatus.ACCEPTED
-            || memory.entryType() != MemoryEntryType.DOCUMENT
-            || !access.allows(memory.collection(), memory.sensitivity())) {
-            throw notFound();
-        }
-        return memory;
     }
 
 
@@ -202,10 +184,10 @@ public class MemoryService {
     }
 
 
-    /** 제목을 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
+    /** 제목과 일반 본문에서 관련도 순으로 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 2)
-    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, Long afterId) {
-        return titleSearch.searchFor(user, access, query, limit, afterId);
+    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, MemorySearchCursor cursor, Optional<float[]> queryVector) {
+        return relevanceSearch.searchFor(user, access, query, limit, cursor, queryVector);
     }
 
 
@@ -348,11 +330,11 @@ public class MemoryService {
     }
 
 
-    /** 항목을 지운다. 마지막 값을 판으로 남긴 뒤 줄을 지운다. */
+    /** 항목을 지운다. 마지막 값을 판으로 남기고 그 벡터를 지운 뒤 줄을 지운다. */
     @Transactional
     public void delete(CurrentUser user, Long id) {
         Memory memory = requireWritableForUpdate(user, id);
-        revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
+        revisionWriter.beforeDelete(user, memory);
         memories.delete(memory);
     }
 

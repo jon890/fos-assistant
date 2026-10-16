@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import jakarta.persistence.Column;
@@ -31,8 +32,7 @@ import lombok.experimental.Accessors;
  *
  * <p>상태를 바꾸는 메서드는 시각을 인자로 받는다. 비밀 칸의 값을 받는 메서드는 두지 않는다.
  *
- * <p>옛 커넥터 에이전트({@code Agent.connectorManaged()})의 바인딩만 에이전트를 켜고 끈다. 그 에이전트는 이 바인딩 하나로
- * 돌기 때문이다. 다른 에이전트의 바인딩은 에이전트를 건드리지 않는다. 그 바인딩의 도구는 판정이 막는다.
+ * <p>바인딩은 에이전트의 사용 여부나 사진 수신 정책을 바꾸지 않는다. 바인딩 도구의 접근은 커넥터 판정이 정한다.
  */
 @Entity
 @Table(
@@ -43,7 +43,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorBinding {
+public class ConnectorBinding extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -100,9 +100,6 @@ public class ConnectorBinding {
     @Column(name = "checked_at")
     private Instant checkedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -112,7 +109,6 @@ public class ConnectorBinding {
         this.connection = connection;
         this.mcpServer = mcpServer;
         this.status = BindingStatus.PENDING;
-        this.createdAt = now;
         this.updatedAt = now;
     }
 
@@ -125,12 +121,6 @@ public class ConnectorBinding {
     /** 설치에 쓴 서버 이름을 적는다. 옛 바인딩은 확인할 때 여기로 채운다. */
     public void recordServer(String mcpServer) {
         this.mcpServer = mcpServer;
-    }
-
-
-    /** 설치를 보내기 전에 끝난 현재 시도만 시작 때의 의도를 되돌린다. PENDING은 유지한다. */
-    public void restoreInstallIntent(boolean desiredEnabled) {
-        this.desiredEnabled = desiredEnabled;
     }
 
 
@@ -183,18 +173,12 @@ public class ConnectorBinding {
         this.applyDueAt = null;
         this.checkedAt = now;
         this.updatedAt = now;
-        if (agent.connectorManaged()) {
-            agent.changeAccess(true, agent.visibility(), agent.ownerUserId());
-        }
     }
 
 
     public void pending(Instant now) {
         this.status = BindingStatus.PENDING;
         this.updatedAt = now;
-        if (agent.connectorManaged()) {
-            disableConnectorAgent();
-        }
     }
 
 
@@ -217,15 +201,4 @@ public class ConnectorBinding {
         this.restartRequired = this.restartRequired || restartRequired;
     }
 
-
-    /**
-     * 옛 커넥터 에이전트를 끄고 사진도 받지 않는 것으로 둔다.
-     *
-     * <p>{@code READY} 가 아닌 바인딩의 옛 에이전트에 사진 받기가 참으로 남지 않게 한다. 참으로 두는 곳은 연결 확인과
-     * 관리자 반영 완료가 선언한 toolset 을 확인한 자리다.
-     */
-    private void disableConnectorAgent() {
-        agent.changeAccess(false, agent.visibility(), agent.ownerUserId());
-        agent.acceptConnectorAttachments(false);
-    }
 }

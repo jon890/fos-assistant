@@ -32,6 +32,7 @@ class AgentImageResizerTest {
         assertThat(result.getHeight()).isEqualTo(1200);
     }
 
+
     @Test
     @DisplayName("긴 변이 1600 보다 작은 사진은 키우지 않는다")
     void keepsSmallImageSize() throws IOException {
@@ -42,6 +43,7 @@ class AgentImageResizerTest {
         assertThat(result.getWidth()).isEqualTo(800);
         assertThat(result.getHeight()).isEqualTo(600);
     }
+
 
     @Test
     @DisplayName("EXIF 방향 6 인 가로 JPEG 는 세로로 세워 줄인다")
@@ -54,6 +56,7 @@ class AgentImageResizerTest {
         assertThat(result.getWidth()).isEqualTo(1200);
         assertThat(result.getHeight()).isEqualTo(1600);
     }
+
 
     @Test
     @DisplayName("투명 PNG 의 투명한 부분은 흰색으로 채운다")
@@ -68,6 +71,7 @@ class AgentImageResizerTest {
         assertThat(center.getBlue()).as("blue").isGreaterThanOrEqualTo(240);
     }
 
+
     @Test
     @DisplayName("3MB 를 넘는 JPEG 의 사본은 긴 변 1600 이고 1MB 이하다")
     void shrinksLargeJpegUnderOneMegabyte() throws IOException {
@@ -81,21 +85,24 @@ class AgentImageResizerTest {
         assertThat(small.length).as("사본 크기").isLessThanOrEqualTo(1024 * 1024);
     }
 
+
     @Test
     @DisplayName("이미지가 아닌 바이트는 빈 값이다")
     void returnsEmptyForNonImageBytes() {
         assertThat(AgentImageResizer.toJpeg(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("화소 수가 상한을 넘는지 int 가 넘치지 않게 판정한다")
     void judgesPixelLimitWithoutIntOverflow() {
         assertThat(AgentImageResizer.withinPixelLimit(50_000, 50_000, AgentImageResizer.MAX_PIXELS))
-                .isFalse();
+            .isFalse();
         assertThat(AgentImageResizer.withinPixelLimit(8_000, 6_000, AgentImageResizer.MAX_PIXELS))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("긴 변이 넘을 때만 비율대로 줄이고 짧은 변은 1 아래로 내리지 않는다")
@@ -106,22 +113,24 @@ class AgentImageResizerTest {
         assertThat(AgentImageResizer.scaledSize(3000, 1, 768)).isEqualTo(new Dimension(768, 1));
     }
 
+
     @Test
     @DisplayName("사본의 가로와 세로를 디코딩 없이 읽고 이미지가 아닌 바이트는 빈 값이다")
     void readsDimensionsFromHeader() throws IOException {
         byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(4000, 3000, BufferedImage.TYPE_INT_RGB)))
-                .orElseThrow();
+            .orElseThrow();
 
         assertThat(AgentImageResizer.dimensions(copy)).contains(new Dimension(1600, 1200));
         assertThat(AgentImageResizer.dimensions(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("1600 사본을 더 작은 긴 변으로 다시 줄인다")
     void shrinksCopyToSmallerLongSide() throws IOException {
         byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(4000, 3000, BufferedImage.TYPE_INT_RGB)))
-                .orElseThrow();
+            .orElseThrow();
 
         BufferedImage result = jpegOf(AgentImageResizer.shrink(copy, 1024).orElseThrow());
 
@@ -129,14 +138,16 @@ class AgentImageResizerTest {
         assertThat(result.getHeight()).isEqualTo(768);
     }
 
+
     @Test
     @DisplayName("긴 변이 이미 원하는 길이 이하인 사본은 받은 바이트를 그대로 돌려준다")
     void returnsSameBytesWhenCopyIsNotLargerThanLongSide() throws IOException {
         byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(768, 576, BufferedImage.TYPE_INT_RGB)))
-                .orElseThrow();
+            .orElseThrow();
 
         assertThat(AgentImageResizer.shrink(copy, 1024).orElseThrow()).containsExactly(copy);
     }
+
 
     @Test
     @DisplayName("긴 변이 이미 원하는 길이인 사본도 품질을 낮추면 같은 크기로 다시 인코딩해 바이트가 준다")
@@ -151,17 +162,19 @@ class AgentImageResizerTest {
         assertThat(result.getHeight()).isEqualTo(576);
         assertThat(lower.length).as("품질 0.4 로 다시 인코딩한 바이트 수").isLessThan(copy.length);
         assertThat(AgentImageResizer.shrink(copy, 768, AgentImageResizer.QUALITY)
-                        .orElseThrow())
+            .orElseThrow())
                 .as("품질이 그대로면 받은 바이트를 그대로 돌려준다")
                 .containsExactly(copy);
     }
+
 
     @Test
     @DisplayName("이미지가 아닌 바이트는 다시 줄이지 못해 빈 값이다")
     void returnsEmptyWhenShrinkingNonImageBytes() {
         assertThat(AgentImageResizer.shrink(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}, 1024))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     private static BufferedImage jpegOf(byte[] bytes) throws IOException {
         assertThat(bytes[0] & 0xff).as("SOI 첫 바이트").isEqualTo(0xff);
@@ -171,11 +184,13 @@ class AgentImageResizerTest {
         return image;
     }
 
+
     private static byte[] png(BufferedImage image) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "png", out);
         return out.toByteArray();
     }
+
 
     private static byte[] jpeg(BufferedImage image, float quality) throws IOException {
         ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
@@ -192,6 +207,7 @@ class AgentImageResizerTest {
         return out.toByteArray();
     }
 
+
     /** 가로세로 그라데이션에 ±8 잡음을 섞는다. 잡음이 있어야 품질 0.95 JPEG 가 3MB 를 넘는다. */
     private static BufferedImage noisyGradient(int width, int height) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -207,17 +223,19 @@ class AgentImageResizerTest {
         return image;
     }
 
+
     private static int clamp(int value) {
         return Math.max(0, Math.min(255, value));
     }
 
+
     /** SOI 바로 뒤에 IFD0 에 방향 태그 하나만 둔 APP1 Exif 구간을 끼운다. 바이트 순서는 big-endian(MM)이다. */
     private static byte[] withExifOrientation(byte[] jpeg, int orientation) {
         ByteBuffer tiff = ByteBuffer.allocate(26).order(ByteOrder.BIG_ENDIAN);
-        tiff.put((byte) 'M').put((byte) 'M').putShort((short) 0x2a).putInt(8); // TIFF 머리. IFD0 은 8 바이트 뒤다
-        tiff.putShort((short) 1); // 항목 수
-        tiff.putShort((short) 0x0112).putShort((short) 3).putInt(1); // 방향 태그, SHORT, 1개
-        tiff.putShort((short) orientation).putShort((short) 0); // 값은 앞 2 바이트에 둔다
+        tiff.put((byte)'M').put((byte)'M').putShort((short)0x2a).putInt(8); // TIFF 머리. IFD0 은 8 바이트 뒤다
+        tiff.putShort((short)1); // 항목 수
+        tiff.putShort((short)0x0112).putShort((short)3).putInt(1); // 방향 태그, SHORT, 1개
+        tiff.putShort((short)orientation).putShort((short)0); // 값은 앞 2 바이트에 둔다
         tiff.putInt(0); // 다음 IFD 없음
         byte[] header = {'E', 'x', 'i', 'f', 0, 0};
         int length = 2 + header.length + tiff.capacity();

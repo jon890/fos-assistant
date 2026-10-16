@@ -32,16 +32,19 @@ class ConversationSessionTest {
     @Autowired
     AppUserRepository users;
 
+
     /** 다른 검사 클래스와 겹치지 않도록 매번 새 사용자로 대화를 만든다. */
     private Conversation newConversation() {
         String email = "session-" + System.nanoTime() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return conversations.save(Conversation.startedBy(user.id(), "제목", null, Instant.now()));
     }
+
 
     private Conversation reload(Conversation conversation) {
         return conversations.findById(conversation.id()).orElseThrow();
     }
+
 
     @Test
     @DisplayName("새 대화는 fos session을 정해 보낼 session과 루트 session에 함께 적는다")
@@ -59,6 +62,7 @@ class ConversationSessionTest {
         assertThat(stored.hermesSessionId()).as("저장된 보낼 session").isEqualTo(sessionId);
         assertThat(stored.hermesRootSessionId()).as("저장된 루트 session").isEqualTo(sessionId);
     }
+
 
     @Test
     @DisplayName("두 turn이 함께 정하려 하면 하나만 저장되고 진 쪽은 저장된 값을 다시 읽어 쓴다")
@@ -81,6 +85,7 @@ class ConversationSessionTest {
         assertThat(stored.hermesRootSessionId()).isEqualTo(first.correlationSessionId());
     }
 
+
     @Test
     @DisplayName("session을 정해도 대화의 updated at은 바뀌지 않는다")
     void fixingSessionLeavesConversationUpdatedAtUnchanged() {
@@ -91,6 +96,7 @@ class ConversationSessionTest {
 
         assertThat(reload(conversation).updatedAt()).isEqualTo(before);
     }
+
 
     @Test
     @DisplayName("Hermes가 정한 session이 있는 옛 대화는 그대로 쓰고 루트를 채우지 않는다")

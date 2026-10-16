@@ -18,11 +18,13 @@ final class KeyCache<K, V> {
     private final Clock clock;
     private final LinkedHashMap<K, Entry<V>> entries = new LinkedHashMap<>(16, 0.75f, true);
 
+
     KeyCache(Duration ttl, int maxEntries, Clock clock) {
         this.ttl = ttl;
         this.maxEntries = maxEntries;
         this.clock = clock;
     }
+
 
     synchronized Optional<V> get(K key) {
         Entry<V> entry = entries.get(key);
@@ -36,6 +38,7 @@ final class KeyCache<K, V> {
         return Optional.of(entry.value());
     }
 
+
     synchronized void put(K key, V value) {
         entries.put(key, new Entry<>(value, clock.instant().plus(ttl)));
         while (entries.size() > maxEntries) {
@@ -44,14 +47,18 @@ final class KeyCache<K, V> {
         }
     }
 
+
     synchronized void clear() {
         entries.clear();
     }
+
 
     synchronized int size() {
         return entries.size();
     }
 
+
     /** 값과 버릴 시각이다. */
-    private record Entry<V>(V value, Instant expiresAt) {}
+    private record Entry<V>(V value, Instant expiresAt) {
+    }
 }

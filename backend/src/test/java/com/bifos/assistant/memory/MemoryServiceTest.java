@@ -4,8 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.embedding.EmbeddingText;
+import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -15,6 +20,7 @@ import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
+import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -63,11 +69,42 @@ class MemoryServiceTest {
     @Autowired
     TransactionTemplate transactions;
 
+    @Autowired
+    MemoryEmbeddingRepository embeddings;
+
+    @Autowired
+    MemoryEmbeddingProperties embeddingProperties;
+
+    @Autowired
+    MemoryVectorCache vectorCache;
+
 
     @BeforeEach
     void setUp() {
         repository.deleteAll();
         revisionRepository.deleteAll();
+    }
+
+
+    @Test
+    @DisplayName("항목을 지우면 그 벡터 줄도 같은 트랜잭션에서 지우고 다른 항목의 줄은 남긴다")
+    void deletesEmbeddingWithMemory() {
+        Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
+        Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
+        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}));
+
+        RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
+        String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
+        embeddings.save(MemoryEmbedding.of(
+            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}));
+        assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
+
+        memories.delete(ADMIN, deleted.id());
+
+        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(kept.id());
+        assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
+        embeddings.deleteAll();
+        vectorCache.clear();
     }
 
 

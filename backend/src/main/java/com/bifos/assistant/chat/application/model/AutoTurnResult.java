@@ -20,13 +20,14 @@ public record AutoTurnResult(String key, String notice, String input, ContextIte
         this(key, notice, input, null);
     }
 
+
     /** 본문과 알림 줄의 글이 로그에 남지 않게 key 와 글자 수와 항목의 출처와 참조만 낸다. */
     @Override
     public String toString() {
         return "AutoTurnResult[key=" + key
-                + ", noticeChars=" + (notice == null ? 0 : notice.length())
-                + ", inputChars=" + (input == null ? 0 : input.length())
-                + ", item=" + (item == null ? "null" : item.source() + ":" + item.ref())
-                + "]";
+            + ", noticeChars=" + (notice == null ? 0 : notice.length())
+            + ", inputChars=" + (input == null ? 0 : input.length())
+            + ", item=" + (item == null ? "null" : item.source() + ":" + item.ref())
+            + "]";
     }
 }

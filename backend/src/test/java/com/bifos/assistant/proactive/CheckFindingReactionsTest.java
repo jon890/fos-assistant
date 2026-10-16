@@ -107,6 +107,7 @@ class CheckFindingReactionsTest {
     private ProactiveCheckFinding reference;
     private ProactiveCheckFinding othersFinding;
 
+
     @BeforeEach
     void setUp() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
@@ -115,15 +116,14 @@ class CheckFindingReactionsTest {
         other = member(now);
         String code = "finding-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = agents.save(Agent.of(
-                code,
-                "합성 분야",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                now));
+            code,
+            "합성 분야",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
         ownerConversation = conversations.save(Conversation.startedForCheck(owner.id(), "합성 살펴보기", agent.id(), now));
         otherConversation = conversations.save(Conversation.startedForCheck(other.id(), "합성 살펴보기", agent.id(), now));
 
@@ -138,6 +138,7 @@ class CheckFindingReactionsTest {
         othersFinding = finding(otherCheck, FindingKind.NEW, null, "career:other", "합성 남의 발견", now);
     }
 
+
     @AfterEach
     void tearDown() {
         deleteRowsOf(owner.id());
@@ -145,6 +146,7 @@ class CheckFindingReactionsTest {
         jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", owner.id());
         jdbc.update("DELETE FROM app_user WHERE id IN (?, ?)", owner.id(), other.id());
     }
+
 
     @Test
     @DisplayName("「관심 없음」 을 누르면 사용자 사건이 점검 대화와 살펴보기 번호와 함께 남고 목록의 반응이 관심 없음이다")
@@ -166,6 +168,7 @@ class CheckFindingReactionsTest {
         assertThat(reactionOf(secondNew)).isNull();
     }
 
+
     @Test
     @DisplayName("같은 단추를 다시 누르면 사건이 늘지 않고, 「나중에」 로 바꾸면 지금 반응이 나중에다")
     void ignoresSameReactionAndKeepsLastChange() {
@@ -177,12 +180,13 @@ class CheckFindingReactionsTest {
         reactions.react(owner, firstNew.id(), FindingReaction.POSTPONED);
 
         assertThat(eventsOf(firstNew))
-                .extracting(FeedbackEvent::eventType)
-                .containsExactly(FeedbackEventType.DISMISSED, FeedbackEventType.POSTPONED);
+            .extracting(FeedbackEvent::eventType)
+            .containsExactly(FeedbackEventType.DISMISSED, FeedbackEventType.POSTPONED);
         assertThat(reactionOf(firstNew)).isEqualTo(FindingReaction.POSTPONED);
         assertThat(reactions.current(owner.id(), List.of(firstNew.id())))
-                .containsExactlyEntriesOf(Map.of(firstNew.id(), FindingReaction.POSTPONED));
+            .containsExactlyEntriesOf(Map.of(firstNew.id(), FindingReaction.POSTPONED));
     }
+
 
     @Test
     @DisplayName("남의 발견과 「참고」 발견, 없는 발견은 살펴보기 없음으로 거절하고 사건을 남기지 않는다")
@@ -195,26 +199,28 @@ class CheckFindingReactionsTest {
         assertThat(eventsOf(reference)).isEmpty();
     }
 
+
     @Test
     @DisplayName("모르는 반응 값과 빈 값은 검증 실패다")
     void rejectsUnknownReactionValue() {
         assertThat(FindingReaction.parse("DISMISSED")).isEqualTo(FindingReaction.DISMISSED);
         for (String value : new String[] {"IGNORED", "dismissed", "", null}) {
             assertThatThrownBy(() -> FindingReaction.parse(value))
-                    .as("reaction=%s", value)
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            error -> assertThat(error.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .as("reaction=%s", value)
+                .isInstanceOfSatisfying(
+                    ApiException.class,
+                    error -> assertThat(error.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         }
     }
+
 
     @Test
     @DisplayName("목록은 남의 대화 공개 식별자를 대화 없음으로 거절하고 「참고」 발견을 싣지 않는다")
     void listsOnlyOwnNewFindings() {
         assertThatThrownBy(() -> reactions.list(owner, otherConversation.publicId()))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
 
         List<CheckFindingView> listed = reactions.list(owner, ownerConversation.publicId());
 
@@ -230,20 +236,22 @@ class CheckFindingReactionsTest {
         assertThat(listed.get(1).topicKey()).isNull();
     }
 
+
     @Test
     @DisplayName("사용자 번호가 127 보다 커도 주인 판정이 값으로 맞는다")
     void matchesOwnerByValueForLargeUserId() {
         assertThat(owner.id()).isGreaterThan(127L);
         // 저장소에서 다시 읽은 번호와 요청자의 번호가 다른 객체여도 같은 주인으로 본다.
         CurrentUser sameOwner = new CurrentUser(
-                Long.valueOf(LARGE_USER_ID), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+            Long.valueOf(LARGE_USER_ID), owner.email(), owner.displayName(), owner.groupId(), owner.role());
 
         reactions.react(sameOwner, secondNew.id(), FindingReaction.ACCEPTED);
 
         assertThat(reactions.list(sameOwner, ownerConversation.publicId()))
-                .extracting(CheckFindingView::id, CheckFindingView::reaction)
-                .containsExactly(tuple(firstNew.id(), null), tuple(secondNew.id(), FindingReaction.ACCEPTED));
+            .extracting(CheckFindingView::id, CheckFindingView::reaction)
+            .containsExactly(tuple(firstNew.id(), null), tuple(secondNew.id(), FindingReaction.ACCEPTED));
     }
+
 
     @Test
     @DisplayName("보고를 보인 살펴보기가 끝나면 「새로 알릴 것」 발견마다 시스템 사건으로 보였다를 남긴다")
@@ -252,19 +260,20 @@ class CheckFindingReactionsTest {
 
         for (ProactiveCheckFinding shown : List.of(firstNew, secondNew)) {
             assertThat(eventsOf(shown))
-                    .as("finding=%s", shown.id())
-                    .singleElement()
-                    .satisfies(event -> {
-                        assertThat(event.eventType()).isEqualTo(FeedbackEventType.SURFACED);
-                        assertThat(event.actor()).isEqualTo(FeedbackActor.SYSTEM);
-                        assertThat(event.conversationId()).isEqualTo(ownerConversation.id());
-                        assertThat(event.originExecutionId()).isEqualTo(ownerRoot.id());
-                        assertThat(event.sourceCheckId()).isEqualTo(ownerCheck.id());
-                    });
+                .as("finding=%s", shown.id())
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.eventType()).isEqualTo(FeedbackEventType.SURFACED);
+                    assertThat(event.actor()).isEqualTo(FeedbackActor.SYSTEM);
+                    assertThat(event.conversationId()).isEqualTo(ownerConversation.id());
+                    assertThat(event.originExecutionId()).isEqualTo(ownerRoot.id());
+                    assertThat(event.sourceCheckId()).isEqualTo(ownerCheck.id());
+                });
         }
         assertThat(eventsOf(reference)).isEmpty();
         assertThat(reactionOf(firstNew)).isNull();
     }
+
 
     @Test
     @DisplayName("「관심 없음」 기간은 digest-window 를 하루 단위로 올림한 값이다")
@@ -272,83 +281,90 @@ class CheckFindingReactionsTest {
         assertThat(reactions.dismissWindowDays()).isEqualTo(2L);
     }
 
+
     private FindingReaction reactionOf(ProactiveCheckFinding target) {
         return reactions.list(owner, ownerConversation.publicId()).stream()
-                .filter(view -> view.id().equals(target.id()))
-                .findFirst()
-                .orElseThrow()
-                .reaction();
+            .filter(view -> view.id().equals(target.id()))
+            .findFirst()
+            .orElseThrow()
+            .reaction();
     }
+
 
     private List<FeedbackEvent> eventsOf(ProactiveCheckFinding target) {
         Long userId = target == othersFinding ? other.id() : owner.id();
         return events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
-                userId, List.of(FeedbackSubjectType.CHECK_FINDING.key(target.id())));
+            userId, List.of(FeedbackSubjectType.CHECK_FINDING.key(target.id())));
     }
+
 
     private static void assertNotFound(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                error -> assertThat(error.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_NOT_FOUND));
     }
 
+
     private ProactiveCheck reportedCheck(
-            CurrentUser user, Conversation conversation, Agent agent, AgentExecution root, Instant now) {
+        CurrentUser user, Conversation conversation, Agent agent, AgentExecution root, Instant now) {
         ProactiveCheck check = ProactiveCheck.started(
-                user.id(), agent.id(), conversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(120));
+            user.id(), agent.id(), conversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(120));
         check.attachRoot(root.id(), "session-fixture");
         check.succeed(
-                CheckOutcome.FINDINGS,
-                2,
-                1,
-                new CheckReport(List.of("합성 변화"), List.of(), List.of(), List.of(), List.of("합성 다음")),
-                0,
-                0,
-                0,
-                0,
-                0,
-                now.minusSeconds(60));
+            CheckOutcome.FINDINGS,
+            2,
+            1,
+            new CheckReport(List.of("합성 변화"), List.of(), List.of(), List.of(), List.of("합성 다음")),
+            0,
+            0,
+            0,
+            0,
+            0,
+            now.minusSeconds(60));
         return checks.save(check);
     }
 
+
     private ProactiveCheckFinding finding(
-            ProactiveCheck check, FindingKind kind, FindingReason reason, String topicKey, String title, Instant now) {
+        ProactiveCheck check, FindingKind kind, FindingReason reason, String topicKey, String title, Instant now) {
         return findings.save(ProactiveCheckFinding.of(
-                check.id(),
-                check.conversationId(),
-                kind,
-                reason,
-                "career",
-                topicKey,
-                title,
-                kind == FindingKind.NEW ? "https://example.com/" + UUID.randomUUID() : null,
-                now,
-                now));
+            check.id(),
+            check.conversationId(),
+            kind,
+            reason,
+            "career",
+            topicKey,
+            title,
+            kind == FindingKind.NEW ? "https://example.com/" + UUID.randomUUID() : null,
+            now));
     }
+
 
     private static AgentExecution execution(CurrentUser user, Conversation conversation, Agent agent, Instant now) {
         return AgentExecution.builder()
-                .userId(user.id())
-                .conversationId(conversation.id())
-                .agentId(agent.id())
-                .profileName(agent.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(now)
-                .build();
+            .userId(user.id())
+            .conversationId(conversation.id())
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(now)
+            .build();
     }
+
 
     /** 그 사용자의 발견 반응 시험 줄을 지운다. 에이전트와 사용자 줄은 부르는 쪽이 지운다. */
     private void deleteRowsOf(Long userId) {
         jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
         jdbc.update(
-                "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                userId);
+            "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+            userId);
         jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
     }
+
 
     /**
      * 앞 실행이 정리 전에 멈춰 남긴 큰 번호 사용자와 그 줄을 지운다. 번호를 직접 정해 넣으므로 남아 있으면 키가 겹친다. 그때의 다른 사용자 줄도
@@ -357,9 +373,9 @@ class CheckFindingReactionsTest {
     private void deleteLeftoverLargeIdMember() {
         String agentsOfUser = "SELECT id FROM agent WHERE owner_user_id = ?";
         jdbc.update(
-                "DELETE FROM proactive_check_finding WHERE check_id IN"
-                        + " (SELECT id FROM proactive_check WHERE agent_id IN (" + agentsOfUser + "))",
-                LARGE_USER_ID);
+            "DELETE FROM proactive_check_finding WHERE check_id IN"
+                + " (SELECT id FROM proactive_check WHERE agent_id IN (" + agentsOfUser + "))",
+            LARGE_USER_ID);
         jdbc.update("DELETE FROM proactive_check WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
         jdbc.update("DELETE FROM agent_execution WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
         jdbc.update("DELETE FROM conversation WHERE agent_id IN (" + agentsOfUser + ")", LARGE_USER_ID);
@@ -368,22 +384,24 @@ class CheckFindingReactionsTest {
         jdbc.update("DELETE FROM app_user WHERE id = ?", LARGE_USER_ID);
     }
 
+
     /** 번호를 직접 정해 넣는다. 저장소의 자동 번호로는 큰 번호를 만들 수 없다. */
     private CurrentUser largeIdMember() {
         String email = "check-finding-" + LARGE_USER_ID + "@example.com";
         jdbc.update(
-                "INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                        + " VALUES (?, ?, ?, 1, 'MEMBER', CURRENT_TIMESTAMP(6))",
-                LARGE_USER_ID,
-                email,
-                email);
+            "INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
+                + " VALUES (?, ?, ?, 1, 'MEMBER', CURRENT_TIMESTAMP(6))",
+            LARGE_USER_ID,
+            email,
+            email);
         AppUser user = users.findById(LARGE_USER_ID).orElseThrow();
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private CurrentUser member(Instant now) {
         String email = "check-finding-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, now));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 }

@@ -37,58 +37,60 @@ public class DelegationCandidates implements AttentionCandidates {
     private final AgentService agents;
     private final AttentionProperties properties;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.DELEGATED);
     }
 
+
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
-        List<AgentExecution> delegations =
-                executions.delegations(user.id(), now.minus(properties.delegatedWindow())).stream()
-                        .filter(execution -> execution.conversationId() != null)
-                        .toList();
+        List<AgentExecution> delegations = executions.delegations(user.id(), now.minus(properties.delegatedWindow())).stream()
+            .filter(execution -> execution.conversationId() != null)
+            .toList();
         if (delegations.isEmpty()) {
             return List.of();
         }
         Map<Long, Conversation> owned = conversations.activeOf(
-                user, delegations.stream().map(AgentExecution::conversationId).toList());
+            user, delegations.stream().map(AgentExecution::conversationId).toList());
         List<AgentExecution> reachable = delegations.stream()
-                .filter(execution -> owned.containsKey(execution.conversationId()))
-                .toList();
+            .filter(execution -> owned.containsKey(execution.conversationId()))
+            .toList();
         Map<Long, Agent> agentById = agents.byIds(reachable.stream()
-                .map(AgentExecution::agentId)
-                .filter(Objects::nonNull)
-                .toList());
+            .map(AgentExecution::agentId)
+            .filter(Objects::nonNull)
+            .toList());
         return reachable.stream()
-                .map(execution -> candidate(execution, owned.get(execution.conversationId()), agentById, now))
-                .toList();
+            .map(execution -> candidate(execution, owned.get(execution.conversationId()), agentById, now))
+            .toList();
     }
 
+
     private AttentionCandidate candidate(
-            AgentExecution execution, Conversation conversation, Map<Long, Agent> agentById, Instant now) {
+        AgentExecution execution, Conversation conversation, Map<Long, Agent> agentById, Instant now) {
         boolean running = execution.status() == ExecutionStatus.RUNNING;
         AttentionTrigger trigger = running ? AttentionTrigger.DELEGATION_RUNNING : AttentionTrigger.DELEGATION_FINISHED;
         boolean longRunning = running
-                && execution.startedAt().plus(properties.longRunningAfter()).isBefore(now);
+            && execution.startedAt().plus(properties.longRunningAfter()).isBefore(now);
         Agent agent = execution.agentId() == null ? null : agentById.get(execution.agentId());
         String itemKey = "execution:" + execution.id();
         return new AttentionCandidate(
-                CardKey.DELEGATED,
-                itemKey,
-                AttentionCandidates.stateKey(trigger, execution.status().name()),
-                trigger,
-                false,
-                longRunning,
-                longRunning ? List.of(AttentionSignal.LONG_RUNNING) : List.of(),
-                AttentionConfidence.CONTROL_PLANE,
-                conversation.title(),
-                conversation.publicId(),
-                agent == null ? null : agent.name(),
-                running ? execution.startedAt() : execution.finishedAt(),
-                List.of(new AttentionSourceRef("EXECUTION_STATE", itemKey, now)),
-                new AttentionExecutionRef(execution.id(), execution.status().name()),
-                null,
-                null);
+            CardKey.DELEGATED,
+            itemKey,
+            AttentionCandidates.stateKey(trigger, execution.status().name()),
+            trigger,
+            false,
+            longRunning,
+            longRunning ? List.of(AttentionSignal.LONG_RUNNING) : List.of(),
+            AttentionConfidence.CONTROL_PLANE,
+            conversation.title(),
+            conversation.publicId(),
+            agent == null ? null : agent.name(),
+            running ? execution.startedAt() : execution.finishedAt(),
+            List.of(new AttentionSourceRef("EXECUTION_STATE", itemKey, now)),
+            new AttentionExecutionRef(execution.id(), execution.status().name()),
+            null,
+            null);
     }
 }

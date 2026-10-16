@@ -55,19 +55,21 @@ class SkillViewStreamTest {
     @Autowired
     ExecutionSkillUseRepository skillUses;
 
+
     @Test
     @DisplayName("32자를 넘는 스킬 이름은 저장된 도구 내용에서 가리고 스킬 사용 기록에는 그 이름으로 남긴다")
     void hidesLongSkillNameInStoredDetailButRecordsSkillUseWithThatName() throws IOException {
         Long executionId = store(streamed(started("skill_view", LONG_NAME), false));
 
         assertThat(storedDetails(executionId))
-                .singleElement()
-                .satisfies(detail -> assertThat(detail).contains(HIDDEN).doesNotContain(LONG_NAME));
+            .singleElement()
+            .satisfies(detail -> assertThat(detail).contains(HIDDEN).doesNotContain(LONG_NAME));
         assertThat(usesOf(executionId)).singleElement().satisfies(use -> {
             assertThat(use.skillName()).isEqualTo(LONG_NAME);
             assertThat(use.source()).isEqualTo(SkillUseSource.MODEL);
         });
     }
+
 
     @Test
     @DisplayName("참고 파일 경로가 붙은 미리보기에서도 긴 스킬 이름을 기록한다")
@@ -75,10 +77,11 @@ class SkillViewStreamTest {
         Long executionId = store(streamed(started("skill_view", LONG_NAME + " → references/list.md"), false));
 
         assertThat(storedDetails(executionId))
-                .singleElement()
-                .satisfies(detail -> assertThat(detail).contains(HIDDEN).doesNotContain(LONG_NAME));
+            .singleElement()
+            .satisfies(detail -> assertThat(detail).contains(HIDDEN).doesNotContain(LONG_NAME));
         assertThat(usesOf(executionId)).extracting(ExecutionSkillUse::skillName).containsExactly(LONG_NAME);
     }
+
 
     @Test
     @DisplayName("길이 상한에서 이름이 잘린 미리보기는 기록하지 않고 경로만 잘린 미리보기는 이름을 기록한다")
@@ -89,24 +92,26 @@ class SkillViewStreamTest {
         assertThat(storedDetails(truncatedName)).hasSize(1);
         assertThat(usesOf(truncatedName)).isEmpty();
         assertThat(usesOf(truncatedPath))
-                .extracting(ExecutionSkillUse::skillName)
-                .containsExactly(LONG_NAME);
+            .extracting(ExecutionSkillUse::skillName)
+            .containsExactly(LONG_NAME);
     }
+
 
     @Test
     @DisplayName("이름 규칙에 맞지 않는 미리보기는 스킬 사용으로 기록하지 않는다")
     void doesNotRecordSkillUseForPreviewBreakingNameRule() throws IOException {
         Long executionId = store(streamed(
-                started("skill_view", "Weekly-Grocery-Shopping-List-Builder-2026")
-                        + started("skill_view", "weekly grocery shopping")
-                        + started("skill_view", "a".repeat(65))
-                        + started("skill_view", "")
-                        + started("skill_view", "../weekly-grocery-shopping-list-builder"),
-                false));
+            started("skill_view", "Weekly-Grocery-Shopping-List-Builder-2026")
+                + started("skill_view", "weekly grocery shopping")
+                + started("skill_view", "a".repeat(65))
+                + started("skill_view", "")
+                + started("skill_view", "../weekly-grocery-shopping-list-builder"),
+            false));
 
         assertThat(storedDetails(executionId)).hasSize(5);
         assertThat(usesOf(executionId)).isEmpty();
     }
+
 
     @Test
     @DisplayName("연결용 에이전트의 실행은 도구 내용 전체를 가리고 스킬 사용을 기록하지 않는다")
@@ -117,23 +122,26 @@ class SkillViewStreamTest {
         assertThat(usesOf(executionId)).isEmpty();
     }
 
+
     @Test
     @DisplayName("skill view 가 아닌 도구와 도구 완료 사건은 스킬 사용을 기록하지 않는다")
     void otherToolAndCompletedEventRecordNoSkillUse() throws IOException {
         Long executionId = store(streamed(
-                started("web_search", LONG_NAME)
-                        + "data: {\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}\n\n",
-                false));
+            started("web_search", LONG_NAME)
+                + "data: {\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}\n\n",
+            false));
 
         assertThat(usesOf(executionId)).isEmpty();
     }
+
 
     private static String started(String tool, String preview) {
         return "data: {\"event\":\"tool.started\",\"tool\":\"" + tool + "\",\"preview\":\"" + preview + "\"}\n\n";
     }
 
+
     /** 이 SSE 본문을 Hermes 가 보낸 것처럼 실제 스트림 읽기로 읽는다. */
-    private static List<RunEvent> streamed(String body, boolean connectorManaged) throws IOException {
+    private static List<RunEvent> streamed(String body, boolean hideAllTools) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/run-one/events", exchange -> {
             byte[] data = body.getBytes(StandardCharsets.UTF_8);
@@ -148,32 +156,34 @@ class SkillViewStreamTest {
             HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
             when(keys.resolve("test-profile")).thenReturn("test-key");
             HermesRunEventStream stream = new HermesRunEventStream(
-                    keys,
-                    new HermesProperties(null, null, null, null, null, null, null, null),
-                    JsonMapper.builder().build());
+                keys,
+                new HermesProperties(null, null, null, null, null, null, null, null),
+                JsonMapper.builder().build());
             List<RunEvent> events = new ArrayList<>();
             stream.open(
-                    "http://127.0.0.1:" + server.getAddress().getPort(),
-                    "test-profile",
-                    "run-one",
-                    events::add,
-                    opened -> {},
-                    connectorManaged ? ToolDetailScope.ALL : ToolDetailScope.NONE);
+                "http://127.0.0.1:" + server.getAddress().getPort(),
+                "test-profile",
+                "run-one",
+                events::add,
+                opened -> {
+                },
+                hideAllTools ? ToolDetailScope.ALL : ToolDetailScope.NONE);
             return events;
         } finally {
             server.stop(0);
         }
     }
 
+
     /** 새 실행 하나를 만들고, 대화 경로가 하듯 사건을 옮겨 적어 저장한다. 그 실행의 번호를 낸다. */
     private Long store(List<RunEvent> events) {
         AgentExecution execution = executions.save(AgentExecution.builder()
-                .userId(1L)
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.parse("2026-09-18T00:00:00Z"))
-                .build());
+            .userId(1L)
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.parse("2026-09-18T00:00:00Z"))
+            .build());
         int sequence = 1;
         for (RunEvent event : events) {
             ExecutionEvent stored = recorder.record(execution, event, sequence);
@@ -185,12 +195,14 @@ class SkillViewStreamTest {
         return execution.id();
     }
 
+
     private List<String> storedDetails(Long executionId) {
         return executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId)).stream()
-                .filter(event -> event.eventType() == ExecutionEventType.TOOL_STARTED)
-                .map(ExecutionEvent::detail)
-                .toList();
+            .filter(event -> event.eventType() == ExecutionEventType.TOOL_STARTED)
+            .map(ExecutionEvent::detail)
+            .toList();
     }
+
 
     private List<ExecutionSkillUse> usesOf(Long executionId) {
         return skillUses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(List.of(executionId));

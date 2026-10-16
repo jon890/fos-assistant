@@ -1,7 +1,6 @@
 package com.bifos.assistant.task.application;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -60,10 +59,10 @@ public class TaskService {
     private final TaskRunRepository runs;
     private final AppUserRepository users;
     private final AgentService agents;
-    private final KnownFlows flows;
     private final ConversationPublicIdLookup conversations;
     private final TaskProperties properties;
     private final Clock clock;
+
 
     /**
      * 작업과 그 시각을 한 트랜잭션에 저장한다.
@@ -74,24 +73,24 @@ public class TaskService {
     public TaskDetail create(CurrentUser user, TaskInput input) {
         Instant now = clock.instant();
         users.findByIdForUpdate(user.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
-        if (tasks.countByOwnerUserIdAndKindAndStateNot(user.id(), TaskKind.TURN, TaskState.ARCHIVED)
-                >= properties.maxPerUser()) {
+            .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
+        if (tasks.countByOwnerUserIdAndKindAndStateNot(user.id(), TaskKind.TURN, TaskState.ARCHIVED) >= properties.maxPerUser()) {
             throw new ApiException(
-                    ErrorCode.TASK_LIMIT_REACHED, "a task limit of " + properties.maxPerUser() + " was reached");
+                ErrorCode.TASK_LIMIT_REACHED, "a task limit of " + properties.maxPerUser() + " was reached");
         }
         Agent agent = requireAgent(user, input.agentCode());
         Schedule schedule = validated(input.schedule(), now);
         Task task = tasks.save(Task.create(
-                user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now));
-        task.chooseModelTier(input.modelTier(), now);
+            user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input)));
+        task.chooseModelTier(input.modelTier());
         MissedPolicy missed = missedOf(input);
         TaskTrigger trigger = triggers.save(
-                schedule.type() == TriggerType.CRON
-                        ? TaskTrigger.cron(task.id(), schedule.cron(), schedule.zone(), missed, schedule.next(), now)
-                        : TaskTrigger.once(task.id(), schedule.fireAt(), schedule.zone(), missed, now));
+            schedule.type() == TriggerType.CRON
+                ? TaskTrigger.cron(task.id(), schedule.cron(), schedule.zone(), missed, schedule.next())
+                : TaskTrigger.once(task.id(), schedule.fireAt(), schedule.zone(), missed));
         return new TaskDetail(task, trigger, agent);
     }
+
 
     /**
      * 작업을 고친다. 작업 수 상한은 보지 않는다.
@@ -105,27 +104,29 @@ public class TaskService {
         Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
         Agent agent = requireAgent(user, input.agentCode());
-        task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now);
-        task.chooseModelTier(input.modelTier(), now);
+        task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
+        task.chooseModelTier(input.modelTier());
         if (!sameSchedule(trigger, input.schedule())) {
             Schedule schedule = validated(input.schedule(), now);
             trigger.reschedule(
-                    schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next(), now);
+                schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next());
         }
         MissedPolicy missed = missedOf(input);
         if (trigger.missedPolicy() != missed) {
-            trigger.changeMissedPolicy(missed, now);
+            trigger.changeMissedPolicy(missed);
         }
         return new TaskDetail(task, trigger, agent);
     }
+
 
     /** 멈춘다. {@code ACTIVE} 가 아니면 그대로 돌려준다. */
     @Transactional
     public TaskDetail pause(CurrentUser user, UUID taskId) {
         Task task = requireTaskForUpdate(user, taskId);
-        task.pause(clock.instant());
+        task.pause();
         return detailOf(task, requireTrigger(task));
     }
+
 
     /**
      * 다시 켠다. {@code PAUSED} 가 아니면 그대로 돌려준다.
@@ -138,11 +139,12 @@ public class TaskService {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
-        if (task.resume(now)) {
-            trigger.moveNext(nextOf(trigger, now), now);
+        if (task.resume()) {
+            trigger.moveNext(nextOf(trigger, now));
         }
         return detailOf(task, trigger);
     }
+
 
     /** 지운다. 줄은 {@code ARCHIVED} 로 남는다. */
     @Transactional
@@ -150,30 +152,31 @@ public class TaskService {
         requireTaskForUpdate(user, taskId).archive(clock.instant());
     }
 
+
     /** 내 보관하지 않은 작업을 만든 순서의 역순으로 읽는다. */
     @Transactional(readOnly = true)
     public List<TaskDetail> list(CurrentUser user) {
-        List<Task> found =
-                tasks.findByOwnerUserIdAndKindAndStateNotOrderByIdDesc(user.id(), TaskKind.TURN, TaskState.ARCHIVED);
+        List<Task> found = tasks.findByOwnerUserIdAndKindAndStateNotOrderByIdDesc(user.id(), TaskKind.TURN, TaskState.ARCHIVED);
         if (found.isEmpty()) {
             return List.of();
         }
         Map<Long, TaskTrigger> byTask = triggers
-                .findByTaskIdIn(found.stream().map(Task::id).toList())
-                .stream()
-                .collect(Collectors.toMap(TaskTrigger::taskId, Function.identity()));
-        Map<Long, Agent> byAgent =
-                agents.byIds(found.stream().map(Task::agentId).distinct().toList());
+            .findByTaskIdIn(found.stream().map(Task::id).toList())
+            .stream()
+            .collect(Collectors.toMap(TaskTrigger::taskId, Function.identity()));
+        Map<Long, Agent> byAgent = agents.byIds(found.stream().map(Task::agentId).distinct().toList());
         return found.stream()
-                .map(task -> new TaskDetail(task, byTask.get(task.id()), byAgent.get(task.agentId())))
-                .toList();
+            .map(task -> new TaskDetail(task, byTask.get(task.id()), byAgent.get(task.agentId())))
+            .toList();
     }
+
 
     @Transactional(readOnly = true)
     public TaskDetail get(CurrentUser user, UUID taskId) {
         Task task = requireTask(user, taskId);
         return detailOf(task, requireTrigger(task));
     }
+
 
     /**
      * 그 작업의 발화를 예정 시각의 역순으로 읽는다.
@@ -188,45 +191,48 @@ public class TaskService {
         Task task = requireTask(user, taskId);
         List<TaskRun> found = runs.findByTaskIdOrderByScheduledForDescIdDesc(task.id(), PageRequest.of(0, limit));
         Map<Long, UUID> publicIds = conversations.publicIdsOf(found.stream()
-                .map(TaskRun::conversationId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList());
+            .map(TaskRun::conversationId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList());
         return found.stream()
-                .map(run -> new TaskRunDetail(
-                        run, run.conversationId() == null ? null : publicIds.get(run.conversationId())))
-                .toList();
+            .map(run -> new TaskRunDetail(
+                run, run.conversationId() == null ? null : publicIds.get(run.conversationId())))
+            .toList();
     }
+
 
     private Task requireTask(CurrentUser user, UUID taskId) {
         return tasks.findByPublicIdAndOwnerUserIdAndKind(taskId, user.id(), TaskKind.TURN)
-                .filter(task -> !task.archived())
-                .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
+            .filter(task -> !task.archived())
+            .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
     }
+
 
     private Task requireTaskForUpdate(CurrentUser user, UUID taskId) {
         return tasks.findByPublicIdAndOwnerUserIdAndKindForUpdate(taskId, user.id(), TaskKind.TURN)
-                .filter(task -> !task.archived())
-                .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
+            .filter(task -> !task.archived())
+            .orElseThrow(() -> new ApiException(ErrorCode.TASK_NOT_FOUND, NOT_FOUND_MESSAGE));
     }
+
 
     private TaskTrigger requireTrigger(Task task) {
         return triggers.findByTaskId(task.id())
-                .orElseThrow(() -> new IllegalStateException("task " + task.id() + " has no trigger"));
+            .orElseThrow(() -> new IllegalStateException("task " + task.id() + " has no trigger"));
     }
+
 
     private TaskDetail detailOf(Task task, TaskTrigger trigger) {
         return new TaskDetail(task, trigger, agents.findById(task.agentId()).orElse(null));
     }
 
-    /** 주인이 대화를 시작할 수 있는 에이전트여야 한다. 흐름이 붙은 에이전트는 받지 않는다. */
+
+    /** 주인이 대화를 시작할 수 있는 에이전트여야 한다. */
     private Agent requireAgent(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
-        if (flows.known(agent.flow())) {
-            throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
-        }
         return agent;
     }
+
 
     /** 시각을 검사하고 다음 예정 시각을 계산한다. */
     private Schedule validated(ScheduleInput input, Instant now) {
@@ -244,20 +250,21 @@ public class TaskService {
         return new Schedule(TriggerType.CRON, schedule.cron(), null, schedule.zone(), next);
     }
 
+
     /** 요청의 시각을 저장하는 모양으로 바꾼다. 지금과 견주는 검사는 하지 않는다. */
     private Schedule parsed(ScheduleInput input) {
         if (input == null || input.type() == null) {
             throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "a schedule type is required");
         }
         ZoneId zone = input.timeZone() == null || input.timeZone().isBlank()
-                ? properties.defaultZone()
-                : TaskSchedule.parseZone(input.timeZone().strip());
+            ? properties.defaultZone()
+            : TaskSchedule.parseZone(input.timeZone().strip());
         if (input.type() == TriggerType.ONCE) {
             if (input.fireAt() == null) {
                 throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "fireAt is required for ONCE");
             }
             return new Schedule(
-                    TriggerType.ONCE, null, input.fireAt().atZone(zone).toInstant(), zone, null);
+                TriggerType.ONCE, null, input.fireAt().atZone(zone).toInstant(), zone, null);
         }
         if (input.cron() == null || input.cron().isBlank()) {
             throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "cron is required for CRON");
@@ -265,11 +272,12 @@ public class TaskService {
         String cron = input.cron().strip();
         if (cron.length() > TaskTrigger.CRON_MAX) {
             throw new ApiException(
-                    ErrorCode.TASK_SCHEDULE_INVALID,
-                    "a cron expression must have at most " + TaskTrigger.CRON_MAX + " characters");
+                ErrorCode.TASK_SCHEDULE_INVALID,
+                "a cron expression must have at most " + TaskTrigger.CRON_MAX + " characters");
         }
         return new Schedule(TriggerType.CRON, cron, null, zone, null);
     }
+
 
     /** 요청의 시각이 저장된 시각과 같은지 본다. 종류, cron, {@code fireAt}, 시간대를 견준다. */
     private boolean sameSchedule(TaskTrigger trigger, ScheduleInput input) {
@@ -283,6 +291,7 @@ public class TaskService {
         return requested.fireAt().truncatedTo(ChronoUnit.MICROS).equals(trigger.fireAt());
     }
 
+
     /** 지금 뒤의 첫 예정 시각이다. 지난 {@code ONCE} 와 다음 시각이 없는 cron 은 null 이다. */
     private static Instant nextOf(TaskTrigger trigger, Instant now) {
         if (trigger.type() == TriggerType.ONCE) {
@@ -291,31 +300,37 @@ public class TaskService {
         return TaskSchedule.nextAfter(TaskSchedule.parseCron(trigger.cronExpr()), trigger.zone(), now);
     }
 
+
     private static String title(String title) {
         String stripped = title == null ? "" : title.strip();
         if (stripped.isEmpty() || stripped.length() > Task.TITLE_MAX) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a task title must have 1 to " + Task.TITLE_MAX + " characters");
+                ErrorCode.VALIDATION_FAILED, "a task title must have 1 to " + Task.TITLE_MAX + " characters");
         }
         return stripped;
     }
+
 
     private static ConversationMode modeOf(TaskInput input) {
         return input.conversationMode() == null ? ConversationMode.NEW_PER_RUN : input.conversationMode();
     }
 
+
     private static MissedPolicy missedOf(TaskInput input) {
         return input.missedPolicy() == null ? MissedPolicy.RUN_ONCE : input.missedPolicy();
     }
 
+
     private static NotifyPolicy notifyOf(TaskInput input) {
         return input.notifyPolicy() == null ? NotifyPolicy.ALWAYS : input.notifyPolicy();
     }
+
 
     /**
      * 검사를 지난 시각이다.
      *
      * @param next 다음 예정 시각. 지금과 견주기 전이면 null
      */
-    private record Schedule(TriggerType type, String cron, Instant fireAt, ZoneId zone, Instant next) {}
+    private record Schedule(TriggerType type, String cron, Instant fireAt, ZoneId zone, Instant next) {
+    }
 }

@@ -33,7 +33,6 @@ public class PendingMessageService {
 
     private final ConversationAccess access;
     private final AgentService agents;
-    private final FlowRegistry flows;
     private final ChatPendingMessageRepository pendingMessages;
     private final ConversationEventHub hub;
     private final NextTurnDispatcher dispatcher;
@@ -49,10 +48,12 @@ public class PendingMessageService {
      */
     private final ConcurrentHashMap<Long, ReentrantLock> addLocks = new ConcurrentHashMap<>();
 
+
     public PendingQueue queue(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
         return queueOf(conversation.id());
     }
+
 
     /**
      * 대기 메시지를 더한다. 도는 turn 이 없으면 곧바로 보낸다.
@@ -73,7 +74,7 @@ public class PendingMessageService {
             // 멈춘 줄에 더한 글만 보내지 않게 새 행도 멈춘 채로 넣는다.
             boolean held = rows.stream().anyMatch(ChatPendingMessage::held);
             pendingMessages.save(
-                    ChatPendingMessage.queued(conversation.id(), user.id(), text, held, Instant.now(clock)));
+                ChatPendingMessage.queued(conversation.id(), user.id(), text, held, Instant.now(clock)));
         } finally {
             lock.unlock();
         }
@@ -81,6 +82,7 @@ public class PendingMessageService {
         dispatcher.tryNext(conversation.id());
         return queueOf(conversation.id());
     }
+
 
     /** 대기 메시지 하나를 취소한다. 이미 보내졌거나 없으면 {@code PENDING_MESSAGE_NOT_FOUND} 다. */
     public void cancel(CurrentUser user, Long conversationId, Long pendingId) {
@@ -92,6 +94,7 @@ public class PendingMessageService {
         hub.publish(conversation.id(), ChatEvent.pending(conversation.publicId()));
     }
 
+
     /** 멈춰 둔 대기 줄을 풀어 보낸다. turn 이 돌고 있으면 그 turn 이 끝난 뒤 간다. */
     public PendingQueue release(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);
@@ -101,7 +104,8 @@ public class PendingMessageService {
         return queueOf(conversation.id());
     }
 
-    /** 보통 보내기와 같은 순서와 메시지로 거절한다. 흐름이 붙은 에이전트는 대기 메시지를 받지 않는다. */
+
+    /** 보통 보내기와 같은 순서와 메시지로 거절한다. */
     private void requireQueueable(Conversation conversation) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
@@ -110,10 +114,9 @@ public class PendingMessageService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        if (flows.find(agent.flow()) != null) {
-            throw new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation does not take queued messages");
-        }
+
     }
+
 
     private PendingQueue queueOf(Long conversationId) {
         List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);

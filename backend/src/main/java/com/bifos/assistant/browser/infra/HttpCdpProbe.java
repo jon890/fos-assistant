@@ -22,8 +22,8 @@ public class HttpCdpProbe implements CdpProbe {
 
     private static final int TIMEOUT_MILLIS = 2_000;
     private static final int DEFAULT_PORT = 80;
-    private static final String REQUEST =
-            "GET /json/version HTTP/1.1\r\nHost: localhost\r\nAccept: application/json\r\nConnection: close\r\n\r\n";
+    private static final String REQUEST = "GET /json/version HTTP/1.1\r\nHost: localhost\r\nAccept: application/json\r\nConnection: close\r\n\r\n";
+
 
     @Override
     public boolean ready(URI address) {
@@ -34,8 +34,7 @@ public class HttpCdpProbe implements CdpProbe {
             OutputStream out = socket.getOutputStream();
             out.write(REQUEST.getBytes(StandardCharsets.US_ASCII));
             out.flush();
-            BufferedReader in =
-                    new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
             String status = in.readLine();
             return status != null && status.matches("^HTTP/1\\.[01] 200( .*)?$");
         } catch (IOException ex) {

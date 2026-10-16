@@ -148,9 +148,11 @@ class UserExecutionLimitChatTest {
     private CurrentUser dad;
     private CurrentUser mom;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -171,18 +173,18 @@ class UserExecutionLimitChatTest {
         mom = member("mom");
         when(currentUser.require()).thenReturn(dad);
         mvc = MockMvcBuilders.standaloneSetup(new ChatController(
-                        chat,
-                        currentUser,
-                        new UserDisplayNameService(users),
-                        agentService,
-                        access,
-                        new ChatEventStreams(Duration.ofSeconds(20)),
-                        null,
-                        mock(ModelTierService.class),
-                        List.of(),
-                        mock(SourceReadSummaries.class)))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            chat,
+            currentUser,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class)))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
         stub().willAnswer(command -> {
             for (Map.Entry<String, CountDownLatch> release : releases.entrySet()) {
                 if (command.input().contains(release.getKey())) {
@@ -195,6 +197,7 @@ class UserExecutionLimitChatTest {
         });
     }
 
+
     @AfterEach
     void tearDown() throws Exception {
         releases.values().forEach(CountDownLatch::countDown);
@@ -204,6 +207,7 @@ class UserExecutionLimitChatTest {
         pool.close();
     }
 
+
     @Test
     @DisplayName("두 대화에서 turn 을 붙잡은 채 셋째 대화로 보내면 409 USER_BUSY 이고 질문도 실행 줄도 남지 않는다")
     void rejectsSendToThirdConversationWithUserBusyAndSavesNothing() throws Exception {
@@ -212,20 +216,21 @@ class UserExecutionLimitChatTest {
         int submittedBefore = stub().received().size();
 
         mvc.perform(post("/api/v1/chat/messages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"conversationId\":\"" + third.publicId() + "\",\"text\":\"셋째 질문\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.USER_BUSY.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"" + third.publicId() + "\",\"text\":\"셋째 질문\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.USER_BUSY.name()));
         List<ChatEvent> streamed = new CopyOnWriteArrayList<>();
         assertUserBusy(() -> chat.stream(dad, third.id(), "셋째 질문", null, streamed::add));
 
         assertThat(streamed).as("스트림은 started 전에 거절된다").isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(third.id()))
-                .as("셋째 대화에 저장된 메시지")
-                .isEmpty();
+            .as("셋째 대화에 저장된 메시지")
+            .isEmpty();
         assertThat(executionsIn(third)).as("셋째 대화의 실행 줄").isEmpty();
         assertThat(stub().received()).as("Hermes 제출 수").hasSize(submittedBefore);
     }
+
 
     @Test
     @DisplayName("한도에 닿은 채 대화 번호 없이 보내면 USER_BUSY 이고 그 사용자의 대화 수가 늘지 않는다")
@@ -234,13 +239,14 @@ class UserExecutionLimitChatTest {
         int conversationsBefore = conversationsOf(dad).size();
 
         mvc.perform(post("/api/v1/chat/messages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"text\":\"새 대화 질문\",\"agentCode\":\"dad\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.USER_BUSY.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"text\":\"새 대화 질문\",\"agentCode\":\"dad\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.USER_BUSY.name()));
 
         assertThat(conversationsOf(dad)).as("dad 의 대화").hasSize(conversationsBefore);
     }
+
 
     @Test
     @DisplayName("미리 본 뒤 그 사이 자리가 차 잠금을 열 때 거절되면 방금 만든 빈 대화를 지운다")
@@ -255,6 +261,7 @@ class UserExecutionLimitChatTest {
         assertThat(conversationsOf(dad)).as("dad 의 대화").hasSize(conversationsBefore);
     }
 
+
     @Test
     @DisplayName("한 사용자가 한도에 닿아도 다른 사용자의 보내기는 성공한다")
     void otherUserCanSendWhileOneUserIsAtLimit() {
@@ -264,6 +271,7 @@ class UserExecutionLimitChatTest {
 
         assertThat(turn.assistantText()).isEqualTo("답");
     }
+
 
     @Test
     @DisplayName("붙잡은 turn 하나가 끝나면 다시 보낼 수 있고 모두 끝나면 쥔 자리가 0 이다")
@@ -282,6 +290,7 @@ class UserExecutionLimitChatTest {
         assertThat(limiter.used(dad.id())).as("모든 turn 이 끝난 뒤 dad 가 쥔 자리").isZero();
     }
 
+
     @Test
     @DisplayName("한도에 닿으면 다시 생성도 USER_BUSY 이고 이전 답을 바꾸지 않는다")
     void regenerateIsRejectedWithUserBusyAndKeepsPreviousAnswer() {
@@ -297,13 +306,14 @@ class UserExecutionLimitChatTest {
         assertThat(contents(third)).as("셋째 대화의 메시지").containsExactlyElementsOf(before);
     }
 
+
     @Test
     @DisplayName("대기 메시지 turn 이 한도에 닿으면 대기 행을 남긴 채 멈추고 그 대화에 USER_BUSY 를 알린다")
     void pendingTurnAtLimitHoldsQueueAndPublishesUserBusy() {
         Conversation waiting = chat.startEmpty(dad, "dad");
         List<AgentExecution> fillers = fillSlotsWithRunningChildren(waiting);
         pendingRows.save(ChatPendingMessage.queued(
-                waiting.id(), dad.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z")));
+            waiting.id(), dad.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z")));
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         Runnable unsubscribe = hub.subscribe(waiting.id(), received::add);
         try {
@@ -314,12 +324,12 @@ class UserExecutionLimitChatTest {
         }
 
         assertThat(pendingRows.findByConversationIdOrderByIdAsc(waiting.id()))
-                .as("대기 행")
-                .singleElement()
-                .satisfies(row -> {
-                    assertThat(row.content()).isEqualTo("대기 글");
-                    assertThat(row.held()).as("멈춤").isTrue();
-                });
+            .as("대기 행")
+            .singleElement()
+            .satisfies(row -> {
+                assertThat(row.content()).isEqualTo("대기 글");
+                assertThat(row.held()).as("멈춤").isTrue();
+            });
         assertThat(received).as("그 대화로 간 사건").anySatisfy(event -> {
             assertThat(event.type()).isEqualTo("error");
             assertThat(event.code()).isEqualTo(ErrorCode.USER_BUSY.name());
@@ -328,6 +338,7 @@ class UserExecutionLimitChatTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(waiting.id())).isEmpty();
         assertThat(stub().received()).as("Hermes 제출").isEmpty();
     }
+
 
     @Test
     @DisplayName("기다리다 시간 초과로 끝난 turn 은 FAILED 로 적고, Hermes 가 끝났다고 답할 때까지 사용자 자리 하나를 쥔다")
@@ -342,17 +353,17 @@ class UserExecutionLimitChatTest {
         });
 
         assertThatThrownBy(() -> chat.send(dad, conversation.id(), "오래 걸리는 질문", null))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT));
 
         assertThat(executionsIn(conversation))
-                .as("시간 초과로 끝난 실행 줄")
-                .singleElement()
-                .satisfies(row -> {
-                    assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
-                    assertThat(row.errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
-                    assertThat(row.hermesRunId()).isEqualTo(runId);
-                });
+            .as("시간 초과로 끝난 실행 줄")
+            .singleElement()
+            .satisfies(row -> {
+                assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
+                assertThat(row.errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
+                assertThat(row.hermesRunId()).isEqualTo(runId);
+            });
         assertThat(limiter.used(dad.id())).as("turn 이 끝난 뒤 원격 종료 확인 자리").isEqualTo(1);
 
         stub().willLookup(runId, HermesRunLookup.finished(completed(runId, "늦게 끝난 답")));
@@ -360,6 +371,7 @@ class UserExecutionLimitChatTest {
         awaitUntil(() -> limiter.used(dad.id()) == 0, "Hermes 가 끝났다고 답한 뒤에도 dad 의 자리가 돌아오지 않았다");
         assertThat(stub().stopped()).as("끝났는지 모르는 run 에 보낸 중지").containsExactly(runId);
     }
+
 
     /** dad 의 두 대화에서 turn 을 하나씩 열어 제출에서 붙잡는다. 돌려주는 것은 붙잡은 표지다. */
     private List<String> holdTwoTurns() {
@@ -377,6 +389,7 @@ class UserExecutionLimitChatTest {
         return marks;
     }
 
+
     /** 대화 turn 의 루트가 아닌 RUNNING 줄 둘로 dad 의 자리를 채운다. */
     private List<AgentExecution> fillSlotsWithRunningChildren(Conversation conversation) {
         AgentExecution root = executions.save(execution(conversation, null, ExecutionStatus.SUCCEEDED));
@@ -388,63 +401,70 @@ class UserExecutionLimitChatTest {
         return fillers;
     }
 
+
     private AgentExecution execution(Conversation conversation, Long parentId, ExecutionStatus status) {
         return AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(conversation.agentId())
-                .parentExecutionId(parentId)
-                .rootExecutionId(parentId)
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(Instant.now())
-                .build();
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(conversation.agentId())
+            .parentExecutionId(parentId)
+            .rootExecutionId(parentId)
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(Instant.now())
+            .build();
     }
 
+
     private CurrentUser member(String name) {
-        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private List<Conversation> conversationsOf(CurrentUser user) {
         return conversations.findAll().stream()
-                .filter(conversation -> user.id().equals(conversation.userId()))
-                .toList();
+            .filter(conversation -> user.id().equals(conversation.userId()))
+            .toList();
     }
+
 
     private List<AgentExecution> executionsIn(Conversation conversation) {
         return executions.findAll().stream()
-                .filter(execution -> conversation.id().equals(execution.conversationId()))
-                .toList();
+            .filter(execution -> conversation.id().equals(execution.conversationId()))
+            .toList();
     }
+
 
     private List<String> contents(Conversation conversation) {
         return messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                .map(message -> message.role() + ":" + message.content())
-                .toList();
+            .map(message -> message.role() + ":" + message.content())
+            .toList();
     }
+
 
     private static void assertUserBusy(Runnable call) {
         assertThatThrownBy(call::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.USER_BUSY);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.USER_BUSY);
     }
+
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(runId, "session", "completed", output, "model", "provider", TokenUsage.empty());
     }
+
 
     private static void awaitUntil(BooleanSupplier condition, String failure) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -460,6 +480,7 @@ class UserExecutionLimitChatTest {
             }
         }
     }
+
 
     private static void await(CountDownLatch latch) {
         try {

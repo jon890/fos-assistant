@@ -71,6 +71,9 @@ public class ConnectorFinancialSummaries {
 
 
     private FinancialActionSummary summary(ConnectorAction action, Usage usage) {
+        if (action.bodyErasedAt() != null) {
+            return FinancialActionSummary.unavailable();
+        }
         try {
             var row = contents.findById(action.id()).orElse(null);
             if (row == null) {

@@ -30,26 +30,30 @@ public class ConnectorConnectionController {
     private final ConnectorConnectionService connections;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/connectors")
     public List<ConnectorView> catalog() {
         return connections.catalog(currentUser.require()).stream()
-                .map(ConnectorView::from)
-                .toList();
+            .map(ConnectorView::from)
+            .toList();
     }
+
 
     @GetMapping("/connections/{id}")
     public ConnectionView read(@PathVariable String id) {
         return ConnectionView.from(connections.read(currentUser.require(), id));
     }
 
+
     @PostMapping("/connections/{id}/options/{fieldKey}")
     public List<OptionView> options(
-            @PathVariable String id, @PathVariable String fieldKey, @RequestBody ValuesRequest request) {
+        @PathVariable String id, @PathVariable String fieldKey, @RequestBody ValuesRequest request) {
         CurrentUser user = currentUser.require();
         return connections.options(user, id, fieldKey, request.values()).stream()
-                .map(OptionView::from)
-                .toList();
+            .map(OptionView::from)
+            .toList();
     }
+
 
     @PostMapping("/connections/{id}")
     public ConnectionView register(@PathVariable String id, @RequestBody ValuesRequest request) {
@@ -57,20 +61,23 @@ public class ConnectorConnectionController {
         return ConnectionView.from(connections.register(user, id, request.values()));
     }
 
+
     @PostMapping("/connections/{id}/check")
     public ConnectionView check(@PathVariable String id) {
         return ConnectionView.from(connections.check(currentUser.require(), id));
     }
+
 
     @DeleteMapping("/connections/{id}")
     public ConnectionView disconnect(@PathVariable String id) {
         return ConnectionView.from(connections.disconnect(currentUser.require(), id));
     }
 
+
     /** 역직렬화 오류에도 비밀값이 포함된 예외 본문을 응답과 로그에 남기지 않는다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> unreadableRequest() {
         return ResponseEntity.badRequest()
-                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "invalid connector request"));
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "invalid connector request"));
     }
 }

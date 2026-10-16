@@ -8,12 +8,13 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.function.Consumer;
 
 record PendingTurn(
-        CurrentUser user,
-        Conversation conversation,
-        Agent agent,
-        HermesRunCommand command,
-        AgentExecution execution,
-        SequenceCounter counter,
-        StringBuilder streamed,
-        TurnIntent intent,
-        Consumer<ChatEvent> onEvent) {}
+    CurrentUser user,
+    Conversation conversation,
+    Agent agent,
+    HermesRunCommand command,
+    AgentExecution execution,
+    SequenceCounter counter,
+    StringBuilder streamed,
+    TurnIntent intent,
+    Consumer<ChatEvent> onEvent) {
+}

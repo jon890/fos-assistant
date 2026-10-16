@@ -23,6 +23,7 @@ public final class AesGcm {
     private static final int TAG_BITS = 128;
     private static final SecureRandom RANDOM = new SecureRandom();
 
+
     public static String seal(SecretKey key, byte[] plain, byte[] aad) {
         try {
             byte[] iv = new byte[IV_BYTES];
@@ -37,6 +38,7 @@ public final class AesGcm {
             throw new IllegalStateException("encryption failed");
         }
     }
+
 
     public static byte[] open(SecretKey key, String sealed, byte[] aad) {
         String[] pieces = sealed.split("\\.", -1);

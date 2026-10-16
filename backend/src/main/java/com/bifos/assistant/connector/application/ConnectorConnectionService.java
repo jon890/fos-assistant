@@ -55,7 +55,6 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class ConnectorConnectionService {
     private static final String STEP_VAULT = "vault";
-    private static final String STEP_VAULT_IMPORT = "vault-import";
     private static final String STEP_DETACH = "detach";
     private static final String STEP_TOOL_CALL = "tool-call";
 
@@ -233,7 +232,7 @@ public class ConnectorConnectionService {
         connection.connected(ConnectorValues.stored(manifest, accepted), now);
         connections.save(connection);
         return bindings.findByConnectionId(connection.id()).stream()
-            .map(binding -> bindingService.reinstall(binding, manifest, accepted)).toList();
+            .map(binding -> bindingService.reinstall(binding, manifest)).toList();
     }
 
 
@@ -242,7 +241,7 @@ public class ConnectorConnectionService {
      *
      * <p>바인딩마다 떼기가 성공하면 그 행을 바로 지운다. 중간에 실패하면 연결을 {@code PENDING} 으로 두고 연결 실패로
      * 끝낸다. 남은 바인딩의 profile 에는 값이 남아 있고 보관 파일도 그대로다. 다시 해제하면 남은 바인딩부터 이어서 뗀다.
-     * 카탈로그에서 빠진 커넥터는 env 이름을 알 수 없어 옛 바인딩의 설치만 끄고 env 는 대시보드가 소유 기록으로 지운다.
+     * 카탈로그에서 빠진 커넥터도 대시보드가 소유 기록으로 서버와 env를 지운다.
      */
     @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public ConnectionSnapshot disconnect(CurrentUser user, String connectorId) {
@@ -254,7 +253,7 @@ public class ConnectorConnectionService {
         String step = STEP_DETACH;
         try {
             for (ConnectorBinding binding : bindings.findByConnectionId(connection.id())) {
-                bindingService.detach(binding, manifest);
+                bindingService.detach(binding);
             }
             step = STEP_VAULT;
             connector.deleteVault(connection.vault());
@@ -272,13 +271,12 @@ public class ConnectorConnectionService {
     /**
      * 보관 파일의 값으로 확인 도구를 부르고, 붙은 바인딩마다 설치와 반영을 맞춘다.
      *
-     * <p>트랜잭션을 셋으로 나눈다. 먼저 잠금 안에서 옛 연결의 값을 그 커넥터 에이전트의 profile 에서 보관 파일로 옮긴다.
+     * <p>트랜잭션을 나눈다. 먼저 잠금 안에서 연결의 보관 파일 상태와 revision을 읽는다.
      * 다음으로 트랜잭션 밖에서 확인 도구를 부른다. 최대 10초가 걸려 그동안 DB 연결과 사용자 잠금을 쥐지 않는다. 끝으로 다시
      * 잠그고 revision을 대조해 설치 시작을 커밋한 뒤 트랜잭션 밖에서 바인딩마다 설치를 맞춘다. 이 메서드에 {@code @Transactional} 을 붙이지 않는다.
      *
-     * <p>확인 도구가 실패하면 연결을 {@code PENDING} 으로 커밋하고 공통 어휘의 오류로 끝낸다. 옛 연결의 값을 옮기지
-     * 못했으면 확인 도구를 부르지 않고 연결의 상태를 그대로 둔다. 그 연결은 다른 에이전트에 붙지 못한다. 보관 파일이 없고 값을
-     * 옮겨 올 옛 바인딩도 없으면 확인할 값이 없다. 카탈로그에 있는 커넥터면 연결을 {@code PENDING} 으로 커밋하고
+     * <p>확인 도구가 실패하면 연결을 {@code PENDING} 으로 커밋하고 공통 어휘의 오류로 끝낸다.
+     * 보관 파일이 없으면 확인할 값이 없다. 카탈로그에 있는 커넥터면 연결을 {@code PENDING} 으로 커밋하고
      * {@code CONNECTOR_NOT_CONNECTED} 로 끝내 값을 다시 등록하게 한다. 바인딩의 외부 호출이 실패하면 그 바인딩만
      * {@code PENDING} 으로 커밋하고 연결 실패로 끝낸다.
      */
@@ -316,29 +314,12 @@ public class ConnectorConnectionService {
     }
 
 
-    /** 연결 확인의 앞 트랜잭션이다. 옛 연결이면 그 커넥터 에이전트의 profile 에 있던 값을 보관 파일로 옮긴다. */
+    /** 연결 확인의 앞 트랜잭션이다. */
     private Prepared prepare(CurrentUser user, String connectorId, boolean known) {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, known);
         if (connection.status() == ConnectionStatus.DISCONNECTED) {
             return new Prepared(null, connection.updatedAt());
-        }
-        if (!connection.vaultStored()) {
-            Optional<ConnectorBinding> legacy = bindings.findByConnectionId(connection.id()).stream()
-                .filter(binding -> binding.agent().connectorManaged())
-                .findFirst();
-            if (legacy.isPresent()) {
-                try {
-                    connector.importVault(
-                        connection.vault(),
-                        connectorId,
-                        legacy.get().agent().hermesProfile());
-                    connection.markVaultStored();
-                    connections.save(connection);
-                } catch (RuntimeException ex) {
-                    warn(STEP_VAULT_IMPORT, connectorId, ex);
-                }
-            }
         }
         return new Prepared(connection.vaultStored() ? connection.vault() : null, connection.updatedAt());
     }
@@ -361,8 +342,8 @@ public class ConnectorConnectionService {
     /**
      * 연결 확인의 뒤 트랜잭션이다. 다시 잠그고 확인 결과를 적은 뒤 바인딩마다 설치를 맞춘다.
      *
-     * <p>그 사이 해제됐으면 아무것도 바꾸지 않는다. 확인 도구가 실패했으면 바인딩은 건드리지 않는다. 보관 파일이 없고 옛
-     * 바인딩도 없으면 {@code PENDING} 으로 두고 {@code CONNECTOR_NOT_CONNECTED} 를 돌려준다. 카탈로그에서 빠진 커넥터는
+     * <p>그 사이 해제됐으면 아무것도 바꾸지 않는다. 확인 도구가 실패했으면 바인딩은 건드리지 않는다. 보관 파일이
+     * 없으면 {@code PENDING} 으로 두고 {@code CONNECTOR_NOT_CONNECTED} 를 돌려준다. 카탈로그에서 빠진 커넥터는
      * 확인할 수도 다시 등록할 수도 없어 보관 파일이 없어도 오류 없이 {@code PENDING} 이다.
      */
     private Checked recordCheck(
@@ -383,10 +364,8 @@ public class ConnectorConnectionService {
             return new Checked(List.of(), verifyFailure);
         }
         List<ConnectorBinding> bound = bindings.findByConnectionId(connection.id());
-        if (manifest.isPresent()
-            && !connection.vaultStored()
-            && bound.stream().noneMatch(binding -> binding.agent().connectorManaged())) {
-            // 값이 보관 파일에도 옛 에이전트의 profile 에도 없다. 확인할 값이 없으니 다시 등록해야 쓸 수 있다.
+        if (manifest.isPresent() && !connection.vaultStored()) {
+            // 보관 파일에 확인할 값이 없으니 다시 등록해야 쓸 수 있다.
             // 카탈로그에서 빠진 커넥터는 다시 등록할 수도 없어 아래의 PENDING 으로 오류 없이 끝낸다.
             connection.pending(now);
             return new Checked(

@@ -15,15 +15,16 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "assistant.autonomy")
 @Validated
 public record AutonomyProperties(
-        @DefaultValue("false") boolean executionEnabled,
-        @DefaultValue("1h") Duration maxEvaluationAge,
-        @DefaultValue("72h") Duration maxEvidenceAge) {
+    @DefaultValue("false") boolean executionEnabled,
+    @DefaultValue("1h") Duration maxEvaluationAge,
+    @DefaultValue("72h") Duration maxEvidenceAge) {
 
     public AutonomyProperties {
         if (!positive(maxEvaluationAge) || !positive(maxEvidenceAge)) {
             throw new IllegalArgumentException("autonomy ages must be positive");
         }
     }
+
 
     private static boolean positive(Duration value) {
         return value != null && !value.isNegative() && !value.isZero();

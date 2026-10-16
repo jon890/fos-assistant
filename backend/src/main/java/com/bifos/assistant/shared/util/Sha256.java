@@ -20,6 +20,7 @@ public final class Sha256 {
     /** 지문으로 남기는 해시 길이. SHA-256 앞부분만 쓴다. */
     private static final int HASH_BYTES = 16;
 
+
     /**
      * SHA-256 의 앞 16바이트를 16진수 32글자로 적는다.
      *
@@ -29,6 +30,7 @@ public final class Sha256 {
     public static String hex16(String value) {
         return HexFormat.of().formatHex(Arrays.copyOf(digest(value), HASH_BYTES));
     }
+
 
     /**
      * SHA-256 전체를 소문자 16진수 64글자로 적는다.
@@ -40,10 +42,12 @@ public final class Sha256 {
         return HexFormat.of().formatHex(digest(value));
     }
 
+
     private static byte[] digest(String value) {
         String source = value == null ? "" : value;
         return newDigest().digest(source.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /** 원본을 나누어 읽는 호출마다 독립적인 SHA-256 digest를 만든다. */
     public static MessageDigest newDigest() {

@@ -11,14 +11,11 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.presentation.AgentController;
-import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
@@ -65,7 +62,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -92,11 +88,13 @@ class ChatAttachmentTurnTest {
     @Autowired
     HermesToolsetClient attachmentTools;
 
+
     @BeforeEach
     void enableOriginalInspectionTool() {
         Mockito.when(attachmentTools.readEnabled(ArgumentMatchers.any(), ArgumentMatchers.any()))
-                .thenReturn(List.of("fos-assistant", "fos-attachments"));
+            .thenReturn(List.of("fos-assistant", "fos-attachments"));
     }
+
 
     private static final String AGENT_ROOT = "/agent-side/attachments";
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
@@ -107,8 +105,6 @@ class ChatAttachmentTurnTest {
     @Autowired
     ChatService chat;
 
-    @Autowired
-    KnownFlows flows;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
     @Autowired
     ArtifactService artifactService;
@@ -158,6 +154,7 @@ class ChatAttachmentTurnTest {
 
     private CurrentUser dad;
 
+
     @BeforeEach
     void setUp() throws IOException {
         stub().reset();
@@ -173,6 +170,7 @@ class ChatAttachmentTurnTest {
         agentOf(dad, "dad");
     }
 
+
     @Test
     @DisplayName("사진 둘을 붙여 보내면 두 행이 그 메시지를 가리킨다")
     void sendingTwoImagesMakesTwoRowsPointToTheMessage() {
@@ -184,9 +182,10 @@ class ChatAttachmentTurnTest {
 
         Long messageId = userMessageOf(conversationId).id();
         assertThat(attachmentRows.findByConversationIdOrderByIdAsc(conversationId))
-                .extracting(ChatAttachment::messageId)
-                .containsExactly(messageId, messageId);
+            .extracting(ChatAttachment::messageId)
+            .containsExactly(messageId, messageId);
     }
+
 
     @Test
     @DisplayName("사진 없이 보내면 Hermes 입력은 결과물 폴더 단락과 사용자가 쓴 것이다")
@@ -197,9 +196,10 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "또 안녕", null);
 
         assertThat(stub().received())
-                .extracting(HermesRunCommand::input)
-                .containsExactly(artifactPreamble(conversationId) + "안녕", artifactPreamble(conversationId) + "또 안녕");
+            .extracting(HermesRunCommand::input)
+            .containsExactly(artifactPreamble(conversationId) + "안녕", artifactPreamble(conversationId) + "또 안녕");
     }
+
 
     @Test
     @DisplayName("사진 서른 장을 붙이면 Hermes와 다시 생성 입력과 말풍선이 선택 순서를 지킨다")
@@ -214,32 +214,32 @@ class ChatAttachmentTurnTest {
         selected.sort(Comparator.comparing(ChatAttachment::id).reversed());
 
         chat.send(
-                dad,
-                conversationId,
-                "이 사진 설명해 줘",
-                null,
-                selected.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "이 사진 설명해 줘",
+            null,
+            selected.stream().map(ChatAttachment::id).toList());
 
         String input = stub().received().getFirst().input();
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
-                .append("[이 대화의 사진 참조]\n")
-                .append(AGENT_ROOT)
-                .append("/users/")
-                .append(AttachmentStore.userDirectoryKey(dad.id()))
-                .append("/")
-                .append(conversationId)
-                .append("\n");
+            .append("[이 대화의 사진 참조]\n")
+            .append(AGENT_ROOT)
+            .append("/users/")
+            .append(AttachmentStore.userDirectoryKey(dad.id()))
+            .append("/")
+            .append(conversationId)
+            .append("\n");
         for (int i = 0; i < selected.size(); i++) {
             ChatAttachment photo = selected.get(i);
             expected.append("- ")
-                    .append(i + 1)
-                    .append("번째 사진: attachment_id=")
-                    .append(photo.id())
-                    .append(", 원본 표시 크기=확인 불가, 파일=")
-                    .append(photo.storedName())
-                    .append(" (올린 이름: ")
-                    .append(photo.originalName())
-                    .append(")\n");
+                .append(i + 1)
+                .append("번째 사진: attachment_id=")
+                .append(photo.id())
+                .append(", 원본 표시 크기=확인 불가, 파일=")
+                .append(photo.storedName())
+                .append(" (올린 이름: ")
+                .append(photo.originalName())
+                .append(")\n");
         }
         // 이미지가 아닌 바이트라 사본이 생기지 않는다. 아무것도 싣지 않고 싣지 못한 사진의 순번을 한 줄로 안내한다.
         List<String> ordinals = new ArrayList<>();
@@ -247,32 +247,34 @@ class ChatAttachmentTurnTest {
             ordinals.add(i + "번째");
         }
         expected.append("\n")
-                .append("사진은 모두 30장이다.\n")
-                .append("입력에 싣지 못한 사진: ")
-                .append(String.join(", ", ordinals))
-                .append(" 사진. ")
-                .append(NOT_EMBEDDED_GUIDANCE);
+            .append("사진은 모두 30장이다.\n")
+            .append("입력에 싣지 못한 사진: ")
+            .append(String.join(", ", ordinals))
+            .append(" 사진. ")
+            .append(NOT_EMBEDDED_GUIDANCE);
         assertThat(input).startsWith(expected.toString());
         assertThat(input)
-                .contains("작은 글자·가격·품번", "attachment_inspect", "region=[x1,y1,x2,y2]", "재업로드나 분할 전송을 요구하지 않는다.");
+            .contains("작은 글자·가격·품번", "attachment_inspect", "region=[x1,y1,x2,y2]", "재업로드나 분할 전송을 요구하지 않는다.");
         expected = new StringBuilder();
         expected.append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
-                .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
-                .append("\n")
-                .append("이 사진 설명해 줘");
+            .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
+            .append("\n")
+            .append("이 사진 설명해 줘");
         assertThat(input).endsWith(expected.toString());
         assertThat(stub().received().getFirst().images()).isEmpty();
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
         assertThat(chat.attachmentsByMessage(dad, conversationId)
-                        .get(userMessageOf(conversationId).id()))
+            .get(userMessageOf(conversationId).id()))
                 .extracting(ChatAttachment::id)
                 .containsExactlyElementsOf(
-                        selected.stream().map(ChatAttachment::id).toList());
+                    selected.stream().map(ChatAttachment::id).toList());
 
-        chat.regenerate(dad, conversationId, event -> {});
+        chat.regenerate(dad, conversationId, event -> {
+        });
 
         assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(input, input);
     }
+
 
     @Test
     @DisplayName("사진 없는 다음 turn에도 과거 사진의 번호와 원본 크기를 복원한다")
@@ -282,10 +284,11 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
         chat.send(dad, conversationId, "첫 사진의 작은 글자는?", null, List.of());
         assertThat(stub().received().getLast().input())
-                .contains("- 1번째 사진: attachment_id=" + photo.id(), "원본 표시 크기=200x100", "attachment_inspect")
-                .doesNotContain("다시 보내 달라고");
+            .contains("- 1번째 사진: attachment_id=" + photo.id(), "원본 표시 크기=200x100", "attachment_inspect")
+            .doesNotContain("다시 보내 달라고");
         assertThat(stub().received().getLast().images()).isEmpty();
     }
+
 
     @Test
     @DisplayName("WebP 사본이 없어도 첫 답변과 다음 질문 전에 원본 도구와 명시적 개요로 안내한다")
@@ -293,24 +296,25 @@ class ChatAttachmentTurnTest {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] raw = Base64.getDecoder().decode("UklGRiAAAABXRUJQVlA4TBQAAAAvB0ABAAcQ/Y/+BwCC8L9tIqL/IQ==");
         ChatAttachment photo = attachments.upload(
-                dad, conversationId, "합성.webp", "image/webp", raw.length, new ByteArrayResource(raw));
+            dad, conversationId, "합성.webp", "image/webp", raw.length, new ByteArrayResource(raw));
         chat.send(dad, conversationId, "사진의 오른쪽을 설명해 줘", null, List.of(photo.id()));
         assertThat(stub().received().getLast().images()).isEmpty();
         assertThat(stub().received().getLast().input())
-                .contains(
-                        "attachment_id=" + photo.id(),
-                        "입력에 싣지 못한 사진",
-                        "attachment_inspect로 원본을 자동 조회",
-                        "overview=true",
-                        "첫 표시 프레임만 본다");
+            .contains(
+                "attachment_id=" + photo.id(),
+                "입력에 싣지 못한 사진",
+                "attachment_inspect로 원본을 자동 조회",
+                "overview=true",
+                "첫 표시 프레임만 본다");
         chat.send(dad, conversationId, "아까 사진의 작은 글자는?", null, List.of());
         assertThat(stub().received().getLast().input())
-                .contains(
-                        "attachment_id=" + photo.id(),
-                        "overview=true",
-                        "원본 region을 고른다",
-                        "사용자에게 재업로드나 분할 전송을 요구하지 않는다");
+            .contains(
+                "attachment_id=" + photo.id(),
+                "overview=true",
+                "원본 region을 고른다",
+                "사용자에게 재업로드나 분할 전송을 요구하지 않는다");
     }
+
 
     @Test
     @DisplayName("사진과 이미지가 아닌 파일을 함께 보내면 사진만 이미지로 싣고 나머지는 싣지 못했다고 안내한다")
@@ -325,13 +329,14 @@ class ChatAttachmentTurnTest {
         assertThat(command.images()).extracting(HermesImage::label).containsExactly("1번째 사진");
         assertThat(command.images().getFirst().dataUrl()).startsWith("data:image/jpeg;base64,");
         assertThat(command.input())
-                .contains(
-                        "사진은 모두 2장이다.\n",
-                        "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
-                        "입력에 싣지 못한 사진: 2번째 사진. " + NOT_EMBEDDED_GUIDANCE,
-                        "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
-                .doesNotContain("싣지 못한 사진은 아래 경로를", "- 1번째 사진: " + agentDirectory(conversationId));
+            .contains(
+                "사진은 모두 2장이다.\n",
+                "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
+                "입력에 싣지 못한 사진: 2번째 사진. " + NOT_EMBEDDED_GUIDANCE,
+                "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
+            .doesNotContain("싣지 못한 사진은 아래 경로를", "- 1번째 사진: " + agentDirectory(conversationId));
     }
+
 
     @Test
     @DisplayName("작은 사진 서른 장을 보내면 서른 장 모두 줄이지 않고 싣는다")
@@ -344,11 +349,11 @@ class ChatAttachmentTurnTest {
         }
 
         chat.send(
-                dad,
-                conversationId,
-                "모두 봐 줘",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "모두 봐 줘",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         HermesRunCommand command = stub().received().getFirst();
         List<String> expectedLabels = new ArrayList<>();
@@ -357,9 +362,10 @@ class ChatAttachmentTurnTest {
         }
         assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.input().lines().filter(line -> line.startsWith("- ") && line.endsWith(".small.jpg")))
-                .isEmpty();
+            .isEmpty();
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
+
 
     @Test
     @DisplayName("바이트 예산에 드는 1600×1200 사진 서른 장은 순서와 사본 바이트를 그대로 유지한다")
@@ -372,63 +378,65 @@ class ChatAttachmentTurnTest {
         }
 
         chat.send(
-                dad,
-                conversationId,
-                "모두 봐 줘",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "모두 봐 줘",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images()).hasSize(30);
         assertThat(command.images().stream()
-                        .mapToLong(image -> image.dataUrl().length())
-                        .sum())
+            .mapToLong(image -> image.dataUrl().length())
+            .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (int i = 0; i < photos.size(); i++) {
             HermesImage image = command.images().get(i);
             assertThat(image.label()).isEqualTo((i + 1) + "번째 사진");
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(1600, 1200));
             assertThat(Base64.getDecoder()
-                            .decode(image.dataUrl().substring(image.dataUrl().indexOf(',') + 1)))
+                .decode(image.dataUrl().substring(image.dataUrl().indexOf(',') + 1)))
                     .as("바이트 여유가 있으면 재인코딩하지 않는다")
                     .isEqualTo(Files.readAllBytes(privateDirectory(conversationId)
-                            .resolve(photos.get(i).id() + ".small.jpg")));
+                        .resolve(photos.get(i).id() + ".small.jpg")));
         }
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
+
 
     @Test
     @DisplayName("사본 합이 7MB 를 넘으면 한 단계 줄여 모든 사진을 싣는다")
     void shrinksOneStepWhenEncodedBytesExceedLimit() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
         byte[] noise = noisePng(1600, 1200);
-        assertThat((long) noise.length).isLessThanOrEqualTo(properties.maxBytes());
+        assertThat((long)noise.length).isLessThanOrEqualTo(properties.maxBytes());
         List<ChatAttachment> photos = new ArrayList<>();
         for (int i = 1; i <= 5; i++) {
             photos.add(uploadPng(dad, conversationId, "잡음-" + i + ".png", noise));
         }
 
         chat.send(
-                dad,
-                conversationId,
-                "다섯 장",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "다섯 장",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         // 잡음 사본 다섯 장은 1600 단계에서 약 9.7MB 라 넘치고, 1280 단계에서 약 4.9MB 라 든다.
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images())
-                .extracting(HermesImage::label)
-                .containsExactly("1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진");
+            .extracting(HermesImage::label)
+            .containsExactly("1번째 사진", "2번째 사진", "3번째 사진", "4번째 사진", "5번째 사진");
         assertThat(command.images().stream()
-                        .mapToLong(image -> image.dataUrl().length())
-                        .sum())
+            .mapToLong(image -> image.dataUrl().length())
+            .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (HermesImage image : command.images()) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(1280);
         }
         assertThat(command.input()).doesNotContain("사진이 많아 긴 변");
     }
+
 
     @Test
     @DisplayName("잡음 사진 서른 장은 768 단계에서 품질을 0.4 까지 낮춰 모두 싣는다")
@@ -441,11 +449,11 @@ class ChatAttachmentTurnTest {
         }
 
         chat.send(
-                dad,
-                conversationId,
-                "서른 장",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "서른 장",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         // 사본이 이미 768×640 이라 1600 부터 768 까지 사본 그대로 넘친다. 768 단계는 품질 0.85 에서 약 14.9MB,
         // 0.6 에서 약 8.3MB 로 넘치고, 0.4 에서 약 6.2MB 로 들어간다.
@@ -456,14 +464,15 @@ class ChatAttachmentTurnTest {
         }
         assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.images().stream()
-                        .mapToLong(image -> image.dataUrl().length())
-                        .sum())
+            .mapToLong(image -> image.dataUrl().length())
+            .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (HermesImage image : command.images()) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
     }
+
 
     @Test
     @DisplayName("정사각형 잡음 사진 서른 장은 768 단계에서 품질을 0.3 까지 낮춰 모두 싣는다")
@@ -476,11 +485,11 @@ class ChatAttachmentTurnTest {
         }
 
         chat.send(
-                dad,
-                conversationId,
-                "서른 장",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "서른 장",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         // 768 단계는 품질 0.85 에서 약 17.9MB, 0.6 에서 약 9.95MB, 0.4 에서 약 7.42MB(7,422,330)로 넘치고,
         // 0.3 에서 약 6.86MB(6,858,570)로 들어간다. 화소 합은 약 1,770만이라 예산 안이다.
@@ -491,14 +500,15 @@ class ChatAttachmentTurnTest {
         }
         assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(command.images().stream()
-                        .mapToLong(image -> image.dataUrl().length())
-                        .sum())
+            .mapToLong(image -> image.dataUrl().length())
+            .sum())
                 .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (HermesImage image : command.images()) {
             assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(768, 768));
         }
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
     }
+
 
     @Test
     @DisplayName("잡음 사진 스물네 장과 작은 사진 한 장은 768 단계의 낮춘 품질로 스물다섯 장 모두 싣는다")
@@ -512,11 +522,11 @@ class ChatAttachmentTurnTest {
         photos.add(uploadPng(dad, conversationId, "작은.png", png(8, 6)));
 
         chat.send(
-                dad,
-                conversationId,
-                "스물다섯 장",
-                null,
-                photos.stream().map(ChatAttachment::id).toList());
+            dad,
+            conversationId,
+            "스물다섯 장",
+            null,
+            photos.stream().map(ChatAttachment::id).toList());
 
         // 잡음 한 장의 768 단계 주소는 품질 0.85 에서 약 342KB 라 스물네 장이 7MB 를 넘고, 품질 0.6 에서 약 200KB 라
         // 스물다섯 장이 모두 든다.
@@ -528,13 +538,14 @@ class ChatAttachmentTurnTest {
         }
         assertThat(images).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
         assertThat(images.stream().mapToLong(image -> image.dataUrl().length()).sum())
-                .isLessThanOrEqualTo(7L * 1024 * 1024);
+            .isLessThanOrEqualTo(7L * 1024 * 1024);
         for (HermesImage image : images.subList(0, 24)) {
             assertThat(longSide(image)).as(image.label()).isEqualTo(768);
         }
         assertThat(imageSize(images.get(24))).as("작은 사진은 키우지 않는다").isEqualTo(new Dimension(8, 6));
         assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
     }
+
 
     @Test
     @DisplayName("다시 생성해도 같은 사진을 다시 싣는다")
@@ -543,7 +554,8 @@ class ChatAttachmentTurnTest {
         ChatAttachment photo = uploadPng(dad, conversationId, "a.png", png(8, 6));
         chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
 
-        chat.regenerate(dad, conversationId, event -> {});
+        chat.regenerate(dad, conversationId, event -> {
+        });
 
         List<HermesRunCommand> received = stub().received();
         assertThat(received).hasSize(2);
@@ -551,6 +563,7 @@ class ChatAttachmentTurnTest {
         assertThat(received.getLast().images()).isEqualTo(received.getFirst().images());
         assertThat(received.getLast().input()).isEqualTo(received.getFirst().input());
     }
+
 
     @Test
     @DisplayName("사본 파일이 없는 사진은 보낼 때 사본을 다시 만들어 싣는다")
@@ -565,9 +578,10 @@ class ChatAttachmentTurnTest {
 
         assertThat(small).isRegularFile();
         assertThat(stub().received().getFirst().images())
-                .extracting(HermesImage::label)
-                .containsExactly("1번째 사진");
+            .extracting(HermesImage::label)
+            .containsExactly("1번째 사진");
     }
+
 
     @Test
     @DisplayName("원본도 사본도 없는 사진을 보내도 실행은 돌고 싣지 못했다고 안내한다")
@@ -582,12 +596,13 @@ class ChatAttachmentTurnTest {
         HermesRunCommand command = stub().received().getFirst();
         assertThat(command.images()).isEmpty();
         assertThat(command.input())
-                .contains(
-                        "- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
-                                + " (올린 이름: a.png)\n",
-                        "입력에 싣지 못한 사진: 1번째 사진. " + NOT_EMBEDDED_GUIDANCE)
-                .doesNotContain("이미지로 함께 실은 사진");
+            .contains(
+                "- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                    + " (올린 이름: a.png)\n",
+                "입력에 싣지 못한 사진: 1번째 사진. " + NOT_EMBEDDED_GUIDANCE)
+            .doesNotContain("이미지로 함께 실은 사진");
     }
+
 
     @Test
     @DisplayName("사진 순번은 이 대화에서 메시지에 묶인 사진을 센 것이다")
@@ -604,11 +619,12 @@ class ChatAttachmentTurnTest {
 
         String input = stub().received().getLast().input();
         assertThat(input)
-                .contains("- 3번째 사진: attachment_id=" + third.id() + ", 원본 표시 크기=확인 불가, 파일=" + third.storedName()
-                        + " (올린 이름: c.png)\n");
+            .contains("- 3번째 사진: attachment_id=" + third.id() + ", 원본 표시 크기=확인 불가, 파일=" + third.storedName()
+                + " (올린 이름: c.png)\n");
         assertThat(stub().received().getFirst().input())
-                .contains("- 1번째 사진: attachment_id=" + first.id(), "- 2번째 사진: attachment_id=" + second.id());
+            .contains("- 1번째 사진: attachment_id=" + first.id(), "- 2번째 사진: attachment_id=" + second.id());
     }
+
 
     @Test
     @DisplayName("먼저 올리고 나중에 보낸 사진은 화면 차례대로 뒤의 순번을 받는다")
@@ -622,9 +638,10 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "나중에 보낸 사진", null, List.of(uploadedFirst.id()));
 
         assertThat(stub().received().getLast().input())
-                .contains("- 2번째 사진: attachment_id=" + uploadedFirst.id() + ", 원본 표시 크기=확인 불가, 파일="
-                        + uploadedFirst.storedName() + " (올린 이름: a.png)\n");
+            .contains("- 2번째 사진: attachment_id=" + uploadedFirst.id() + ", 원본 표시 크기=확인 불가, 파일="
+                + uploadedFirst.storedName() + " (올린 이름: a.png)\n");
     }
+
 
     @Test
     @DisplayName("같은 첨부를 두 메시지에 붙이면 둘째가 거절되고 저장되지 않는다")
@@ -637,6 +654,7 @@ class ChatAttachmentTurnTest {
 
         assertThat(userContentsOf(conversationId)).containsExactly("첫째");
     }
+
 
     @Test
     @DisplayName("판정 뒤에 다른 요청이 먼저 묶으면 메시지 저장도 되돌린다")
@@ -654,6 +672,7 @@ class ChatAttachmentTurnTest {
         assertThat(stub().received()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("묶기가 실패하면 빈 대화의 제목도 채우지 않는다")
     void doesNotFillEmptyConversationTitleWhenBindFails() {
@@ -670,6 +689,7 @@ class ChatAttachmentTurnTest {
         assertThat(userContentsOf(conversationId)).isEmpty();
     }
 
+
     @Test
     @DisplayName("올린 이름의 줄바꿈과 제어 문자는 Hermes 입력에서 공백이 된다")
     void newlinesAndControlCharsInUploadedNameBecomeSpacesInHermesInput() {
@@ -680,10 +700,11 @@ class ChatAttachmentTurnTest {
 
         String input = stub().received().getFirst().input();
         assertThat(input)
-                .contains("- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
-                        + " (올린 이름: 바다 [지시] 무시  .png)\n");
+            .contains("- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                + " (올린 이름: 바다 [지시] 무시  .png)\n");
         assertThat(input.lines()).noneMatch(line -> line.startsWith("[지시]"));
     }
+
 
     @Test
     @DisplayName("남의 대화의 첨부와 없는 첨부는 같은 코드로 거절하고 저장하지 않는다")
@@ -699,9 +720,10 @@ class ChatAttachmentTurnTest {
 
         assertThat(userContentsOf(mine)).isEmpty();
         assertThat(attachmentRows.findById(theirPhoto.id()).orElseThrow().messageId())
-                .isNull();
+            .isNull();
         assertThat(stub().received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("지워진 첨부는 거절한다")
@@ -715,6 +737,7 @@ class ChatAttachmentTurnTest {
         assertThat(userContentsOf(conversationId)).isEmpty();
     }
 
+
     @Test
     @DisplayName("대화 번호 없이 첨부를 붙이면 거절하고 대화를 만들지 않는다")
     void attachingWithoutConversationIdIsRejectedAndCreatesNoConversation() {
@@ -724,27 +747,10 @@ class ChatAttachmentTurnTest {
         assertRejected(() -> chat.send(dad, null, "새 대화", "dad", List.of(photo.id())));
 
         assertThat(chat.conversationsOf(dad, null, 100).items())
-                .extracting(Conversation::id)
-                .containsExactly(existing);
+            .extracting(Conversation::id)
+            .containsExactly(existing);
     }
 
-    @Test
-    @DisplayName("흐름이 붙은 에이전트의 대화에 첨부를 붙이면 거절하고 저장하지 않는다")
-    void attachingToFlowAgentConversationIsRejectedWithoutSaving() {
-        Agent flowed = agentOf(dad, "flowed");
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-        Long conversationId = conversations
-                .save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()))
-                .id();
-        ChatAttachment photo = upload(dad, conversationId, "a.png");
-
-        assertRejected(() -> chat.send(dad, conversationId, "사진 봐", null, List.of(photo.id())));
-
-        assertThat(userContentsOf(conversationId)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
-                .isNull();
-    }
 
     @Test
     @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
@@ -761,8 +767,9 @@ class ChatAttachmentTurnTest {
 
         assertThat(userContentsOf(conversationId)).isEmpty();
         assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("사진을 보낸 뒤 에이전트 주인이 바뀌면 다시 생성도 거절한다")
@@ -775,10 +782,12 @@ class ChatAttachmentTurnTest {
         changed.changeAccess(true, AgentVisibility.PRIVATE, mom.id());
         agents.save(changed);
 
-        assertRejected(() -> chat.regenerate(dad, conversationId, event -> {}));
+        assertRejected(() -> chat.regenerate(dad, conversationId, event -> {
+        }));
 
         assertThat(stub().received()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("대화 이력의 메시지마다 그 첨부가 달리고 없는 메시지는 빈 목록이다")
@@ -791,89 +800,81 @@ class ChatAttachmentTurnTest {
         attachments.deleteByUser(dad, conversationId, second.id());
 
         List<MessageView> history = chatController(dad)
-                .messages(conversations.findById(conversationId).orElseThrow().publicId());
+            .messages(conversations.findById(conversationId).orElseThrow().publicId());
 
         MessageView withPhotos = history.stream()
-                .filter(it -> "사진 둘".equals(it.content()))
-                .findFirst()
-                .orElseThrow();
+            .filter(it -> "사진 둘".equals(it.content()))
+            .findFirst()
+            .orElseThrow();
         assertThat(withPhotos.attachments())
-                .extracting(AttachmentView::id, AttachmentView::originalName, AttachmentView::visible)
-                .containsExactly(tuple(first.id(), "첫째.png", true), tuple(second.id(), "둘째.png", false));
+            .extracting(AttachmentView::id, AttachmentView::originalName, AttachmentView::visible)
+            .containsExactly(tuple(first.id(), "첫째.png", true), tuple(second.id(), "둘째.png", false));
         assertThat(history)
-                .filteredOn(it -> !"사진 둘".equals(it.content()))
-                .hasSize(3)
-                .allSatisfy(it ->
-                        assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
+            .filteredOn(it -> !"사진 둘".equals(it.content()))
+            .hasSize(3)
+            .allSatisfy(it -> assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
     }
 
-    @Test
-    @DisplayName("에이전트 목록에서 흐름이 붙은 에이전트만 사진을 받지 않는다")
-    void onlyFlowAgentsInAgentListDoNotAcceptImages() {
-        Agent flowed = agentOf(dad, "flowed");
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-        CurrentUserProvider provider = mock(CurrentUserProvider.class);
-        when(provider.require()).thenReturn(dad);
-
-        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle, flows).readable();
-
-        assertThat(listed)
-                .extracting(AgentView::code, AgentView::acceptsAttachments)
-                .containsExactlyInAnyOrder(tuple("dad", true), tuple("flowed", false));
-    }
 
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */
     private String artifactPreamble(Long conversationId) {
         return artifactService.agentPreamble(
-                conversations.findById(conversationId).orElseThrow());
+            conversations.findById(conversationId).orElseThrow());
     }
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     private ChatController chatController(CurrentUser user) {
         CurrentUserProvider provider = mock(CurrentUserProvider.class);
         when(provider.require()).thenReturn(user);
         return new ChatController(
-                chat,
-                provider,
-                new UserDisplayNameService(users),
-                agentService,
-                access,
-                new ChatEventStreams(Duration.ofSeconds(20)),
-                null,
-                mock(ModelTierService.class),
-                List.of(),
-                mock(SourceReadSummaries.class));
+            chat,
+            provider,
+            new UserDisplayNameService(users),
+            agentService,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class));
     }
+
 
     private ChatAttachment upload(CurrentUser user, Long conversationId, String name) {
         return attachments.upload(user, conversationId, name, "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
     }
 
+
     private ChatAttachment uploadPng(CurrentUser user, Long conversationId, String name, byte[] png) {
         return attachments.upload(user, conversationId, name, "image/png", png.length, new ByteArrayResource(png));
     }
+
 
     /** 에이전트 쪽에서 보이는 그 대화의 사진 폴더다. */
     private String agentDirectory(Long conversationId) {
         return AGENT_ROOT + "/users/" + AttachmentStore.userDirectoryKey(dad.id()) + "/" + conversationId;
     }
 
+
     /** Control Plane 쪽에서 그 대화의 사진이 놓이는 폴더다. */
     private Path privateDirectory(Long conversationId) {
         return Path.of(properties.root())
-                .toAbsolutePath()
-                .resolve("users")
-                .resolve(AttachmentStore.userDirectoryKey(dad.id()))
-                .resolve(conversationId.toString());
+            .toAbsolutePath()
+            .resolve("users")
+            .resolve(AttachmentStore.userDirectoryKey(dad.id()))
+            .resolve(conversationId.toString());
     }
+
 
     private static byte[] png(int width, int height) throws IOException {
         return pngOf(new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB));
     }
+
 
     /** 압축되지 않는 잡음 PNG 다. 사본도 크게 남아 한 턴의 길이 상한을 확인할 수 있다. 씨앗을 고정해 매번 같다. */
     private static byte[] noisePng(int width, int height) throws IOException {
@@ -887,6 +888,7 @@ class ChatAttachmentTurnTest {
         return pngOf(image);
     }
 
+
     /** 실린 주소를 디코딩한 사진의 가로와 세로다. */
     private static Dimension imageSize(HermesImage image) throws IOException {
         String dataUrl = image.dataUrl();
@@ -895,10 +897,12 @@ class ChatAttachmentTurnTest {
         return new Dimension(decoded.getWidth(), decoded.getHeight());
     }
 
+
     private static int longSide(HermesImage image) throws IOException {
         Dimension size = imageSize(image);
         return Math.max(size.width, size.height);
     }
+
 
     private static byte[] pngOf(BufferedImage image) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -906,44 +910,49 @@ class ChatAttachmentTurnTest {
         return out.toByteArray();
     }
 
+
     private ChatMessage userMessageOf(Long conversationId) {
         return messages.findByConversationIdOrderByIdAsc(conversationId).stream()
-                .filter(it -> it.role() == MessageRole.USER)
-                .findFirst()
-                .orElseThrow();
+            .filter(it -> it.role() == MessageRole.USER)
+            .findFirst()
+            .orElseThrow();
     }
+
 
     private List<String> userContentsOf(Long conversationId) {
         return messages.findByConversationIdOrderByIdAsc(conversationId).stream()
-                .filter(it -> it.role() == MessageRole.USER)
-                .map(ChatMessage::content)
-                .toList();
+            .filter(it -> it.role() == MessageRole.USER)
+            .map(ChatMessage::content)
+            .toList();
     }
+
 
     private static void assertRejected(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 
+
     private CurrentUser member(String email) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private Agent agentOf(CurrentUser owner, String code) {
         Agent saved = agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
         return saved;
     }
+
 
     private static void deleteTree(Path path) throws IOException {
         if (!Files.exists(path)) {

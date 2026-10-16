@@ -101,6 +101,7 @@ class FollowUpAttentionSourceTest {
     private CurrentUser dad;
     private Agent chief;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
@@ -108,6 +109,7 @@ class FollowUpAttentionSourceTest {
         dad = member();
         chief = agentOf(dad);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -118,26 +120,27 @@ class FollowUpAttentionSourceTest {
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", userId);
         }
         createdUsers.clear();
     }
 
+
     @Test
     @DisplayName("제안은 나를 기다리는 카드에 LATER 로 보이고 건수에 들지 않는다")
     void showsProposalAsLaterAndDoesNotCount() {
         FollowUp proposed = followUps.save(FollowUp.proposed(
-                dad.id(),
-                null,
-                7391L,
-                TITLE,
-                FollowUpService.titleKey(TITLE),
-                NOW.plus(Duration.ofHours(1)),
-                false,
-                NOW));
+            dad.id(),
+            null,
+            7391L,
+            TITLE,
+            FollowUpService.titleKey(TITLE),
+            NOW.plus(Duration.ofHours(1)),
+            false,
+            NOW));
 
         AttentionView view = service.view(dad);
 
@@ -160,6 +163,7 @@ class FollowUpAttentionSourceTest {
         assertFollowUpResponse(service.view(dad), false, true);
     }
 
+
     @Test
     @DisplayName("기한이 10시간 뒤인 OPEN 은 DUE_SOON 으로 NOW 이고 followUp 칸을 채운다")
     void showsDueSoonAsNow() {
@@ -176,6 +180,7 @@ class FollowUpAttentionSourceTest {
         assertThat(view.nowCount()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("기한이 지난 OPEN 은 OVERDUE 로 NOW 다")
     void showsOverdueAsNow() {
@@ -186,6 +191,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.level()).isEqualTo(AttentionLevel.NOW);
         assertThat(item.why().signals()).containsExactly(AttentionSignal.OVERDUE);
     }
+
 
     @Test
     @DisplayName("기한이 없고 waiting 이 참인 OPEN 은 WAITING 으로 LATER 다")
@@ -200,14 +206,16 @@ class FollowUpAttentionSourceTest {
         assertThat(view.nowCount()).isZero();
     }
 
+
     @Test
     @DisplayName("기한이 지났고 waiting 이 참이면 신호 순서는 OVERDUE, WAITING 이다")
     void ordersSignalsOverdueBeforeWaiting() {
         open("지나서 기다리는 일", NOW.minusSeconds(60), true, null, NOW.minus(Duration.ofDays(1)));
 
         assertThat(onlyItem(service.view(dad)).why().signals())
-                .containsExactly(AttentionSignal.OVERDUE, AttentionSignal.WAITING);
+            .containsExactly(AttentionSignal.OVERDUE, AttentionSignal.WAITING);
     }
+
 
     @Test
     @DisplayName("연결한 대화의 위임 실행 결과가 받아들인 뒤에 전해졌으면 LINKED_UPDATE 로 NOW 다")
@@ -224,6 +232,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.at()).isEqualTo(NOW.minus(Duration.ofHours(1)));
     }
 
+
     @Test
     @DisplayName("연결한 대화의 승인 줄 결과가 받아들인 뒤에 전해졌으면 LINKED_UPDATE 로 NOW 다")
     void showsLinkedUpdateFromApproval() {
@@ -237,10 +246,11 @@ class FollowUpAttentionSourceTest {
         assertThat(item.why().signals()).containsExactly(AttentionSignal.LINKED_UPDATE);
     }
 
+
     @ParameterizedTest
     @EnumSource(
-            value = ActionStatus.class,
-            names = {"EXPIRED", "REJECTED"})
+        value = ActionStatus.class,
+        names = {"EXPIRED", "REJECTED"})
     @DisplayName("받아들인 뒤 알림 줄을 전한 승인 줄이 실행하지 않고 끝났으면 LINKED_UPDATE 가 아니다")
     void ignoresApprovalClosedWithoutExecution(ActionStatus closed) {
         Conversation conversation = conversationOf(dad);
@@ -251,9 +261,10 @@ class FollowUpAttentionSourceTest {
 
         assertThat(item.level()).as("%s 승인 줄만 전한 할 일의 단계", closed).isEqualTo(AttentionLevel.LATER);
         assertThat(item.why().signals())
-                .as("%s 승인 줄만 전한 할 일의 신호", closed)
-                .doesNotContain(AttentionSignal.LINKED_UPDATE);
+            .as("%s 승인 줄만 전한 할 일의 신호", closed)
+            .doesNotContain(AttentionSignal.LINKED_UPDATE);
     }
+
 
     @Test
     @DisplayName("받아들이기 전에 전해진 결과는 LINKED_UPDATE 가 아니다")
@@ -267,6 +278,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.level()).isEqualTo(AttentionLevel.LATER);
         assertThat(item.why().signals()).isEmpty();
     }
+
 
     @Test
     @DisplayName("받아들인 뒤 사용자와 어시스턴트 메시지와 승인 만료 알림만 있는 대화는 LINKED_UPDATE 가 아니다")
@@ -284,6 +296,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.why().signals()).isEmpty();
     }
 
+
     @Test
     @DisplayName("연결한 대화를 지웠으면 할 일은 남고 conversationId 는 null 이며 결과 도착을 보지 않는다")
     void keepsFollowUpOfDeletedConversationWithoutLinkedUpdate() {
@@ -299,6 +312,7 @@ class FollowUpAttentionSourceTest {
         assertThat(item.why().signals()).isEmpty();
     }
 
+
     @Test
     @DisplayName("숨긴 할 일은 대화에 메시지와 만료 알림 줄이 더 와도 나오지 않고 새 결과가 전해지면 다시 나온다")
     void hiddenFollowUpReturnsOnNewDelivery() {
@@ -313,8 +327,8 @@ class FollowUpAttentionSourceTest {
         actionDelivered(dad, conversation, ActionStatus.EXPIRED, NOW.minus(Duration.ofMinutes(40)));
         messages.save(ChatMessage.fromSystem(conversation.id(), "승인 요청이 만료됐어요", NOW.minus(Duration.ofMinutes(40))));
         assertThat(card(service.view(dad)).items())
-                .as("메시지와 만료한 승인 줄의 알림 줄이 더 와도 상태가 같다")
-                .isEmpty();
+            .as("메시지와 만료한 승인 줄의 알림 줄이 더 와도 상태가 같다")
+            .isEmpty();
 
         delegationDelivered(conversation, NOW.minus(Duration.ofMinutes(30)));
         AttentionItem again = onlyItem(service.view(dad));
@@ -322,6 +336,7 @@ class FollowUpAttentionSourceTest {
         assertThat(again.level()).isEqualTo(AttentionLevel.NOW);
         assertThat(again.why().signals()).containsExactly(AttentionSignal.LINKED_UPDATE);
     }
+
 
     @Test
     @DisplayName("기한이 3일 뒤라 LATER 일 때 숨긴 할 일은 시계가 기한 10시간 전이 되면 DUE_SOON 으로 다시 나온다")
@@ -340,6 +355,7 @@ class FollowUpAttentionSourceTest {
         assertThat(again.why().signals()).containsExactly(AttentionSignal.DUE_SOON);
     }
 
+
     @Test
     @DisplayName("끝낸 할 일은 응답에 없다")
     void hidesDoneFollowUp() {
@@ -351,12 +367,13 @@ class FollowUpAttentionSourceTest {
         assertThat(card(service.view(dad)).items()).isEmpty();
     }
 
+
     @Test
     @DisplayName("다른 사용자의 할 일은 응답에 없다")
     void hidesOtherUsersFollowUp() {
         CurrentUser child = member();
         followUps.save(FollowUp.opened(
-                dad.id(), null, "아빠의 일", FollowUpService.titleKey("아빠의 일"), NOW.minusSeconds(60), false, NOW));
+            dad.id(), null, "아빠의 일", FollowUpService.titleKey("아빠의 일"), NOW.minusSeconds(60), false, NOW));
 
         AttentionView view = service.view(child);
 
@@ -364,100 +381,108 @@ class FollowUpAttentionSourceTest {
         assertThat(view.nowCount()).isZero();
     }
 
+
     /** 받아들인 시각을 {@code acceptedAt} 으로 둔 OPEN 할 일 하나를 저장한다. */
     private FollowUp open(String title, Instant dueAt, boolean waiting, Conversation conversation, Instant acceptedAt) {
         return followUps.save(FollowUp.opened(
-                dad.id(),
-                conversation == null ? null : conversation.id(),
-                title,
-                FollowUpService.titleKey(title),
-                dueAt,
-                waiting,
-                acceptedAt));
+            dad.id(),
+            conversation == null ? null : conversation.id(),
+            title,
+            FollowUpService.titleKey(title),
+            dueAt,
+            waiting,
+            acceptedAt));
     }
+
 
     /** 위임 실행 하나를 저장하고 그 결과를 전한 시각을 적는다. */
     private void delegationDelivered(Conversation conversation, Instant deliveredAt) {
         AgentExecution delegation = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .delegationKey("follow-up-attention-" + UUID.randomUUID())
-                .profileName(chief.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .timing(deliveredAt.minusSeconds(60), deliveredAt)
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .delegationKey("follow-up-attention-" + UUID.randomUUID())
+            .profileName(chief.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .timing(deliveredAt.minusSeconds(60), deliveredAt)
+            .build());
         jdbc.update(
-                "UPDATE agent_execution SET result_delivered_at = ? WHERE id = ?",
-                Timestamp.from(deliveredAt),
-                delegation.id());
+            "UPDATE agent_execution SET result_delivered_at = ? WHERE id = ?",
+            Timestamp.from(deliveredAt),
+            delegation.id());
     }
+
 
     /**
      * 그 상태로 끝나 대화에 전한 시각을 적은 승인 줄 하나를 넣는다. 실행한 줄은 결과를, 거절하거나 만료한 줄은 알림 줄을 전했을 때 이
      * 시각이 적힌다. 승인 줄을 만드는 길은 커넥터 검사가 본다.
      */
     private void actionDelivered(
-            CurrentUser owner, Conversation conversation, ActionStatus status, Instant deliveredAt) {
+        CurrentUser owner, Conversation conversation, ActionStatus status, Instant deliveredAt) {
         jdbc.update(
-                """
+            """
                 INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, tool_name, hermes_tool, risk,
                     approval_mode, decision, passed, status, origin_execution_id, conversation_id, dedupe_key,
                     args_json, args_sha256, expires_at, created_at, result_delivered_at)
                 VALUES (?, ?, ?, 'follow-up-notes', 'write_note', 'mcp__demo__write_note', 'WRITE', 'REQUIRED',
                     'NEEDS_APPROVAL', TRUE, ?, 0, ?, ?, '{"text":"안녕"}', 'sha', ?, ?, ?)
                 """,
-                bytes(UUID.randomUUID()),
-                owner.id(),
-                chief.id(),
-                status.name(),
-                conversation.id(),
-                UUID.randomUUID().toString(),
-                Timestamp.from(NOW.plus(Duration.ofHours(3))),
-                Timestamp.from(NOW.minus(Duration.ofHours(2))),
-                Timestamp.from(deliveredAt));
+            bytes(UUID.randomUUID()),
+            owner.id(),
+            chief.id(),
+            status.name(),
+            conversation.id(),
+            UUID.randomUUID().toString(),
+            Timestamp.from(NOW.plus(Duration.ofHours(3))),
+            Timestamp.from(NOW.minus(Duration.ofHours(2))),
+            Timestamp.from(deliveredAt));
     }
+
 
     private CurrentUser member() {
         String email = "follow-up-attention-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private Agent agentOf(CurrentUser owner) {
         String code = "follow-up-" + UUID.randomUUID().toString().substring(0, 8);
         return agents.save(Agent.of(
-                code,
-                "집안일 도우미",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            "집안일 도우미",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id()));
     }
+
 
     private Conversation conversationOf(CurrentUser owner) {
         return conversations.save(
-                Conversation.startedBy(owner.id(), "할 일에 이어진 대화", chief.id(), NOW.minusSeconds(3_600)));
+            Conversation.startedBy(owner.id(), "할 일에 이어진 대화", chief.id(), NOW.minusSeconds(3_600)));
     }
+
 
     private static byte[] bytes(UUID id) {
         return ByteBuffer.allocate(16)
-                .putLong(id.getMostSignificantBits())
-                .putLong(id.getLeastSignificantBits())
-                .array();
+            .putLong(id.getMostSignificantBits())
+            .putLong(id.getLeastSignificantBits())
+            .array();
     }
+
 
     private static AttentionCard card(AttentionView view) {
         return view.cards().stream()
-                .filter(card -> card.key() == CardKey.NEEDS_ME)
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("나를 기다리는 카드가 응답에 없다: " + view.cards()));
+            .filter(card -> card.key() == CardKey.NEEDS_ME)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("나를 기다리는 카드가 응답에 없다: " + view.cards()));
     }
+
 
     private static AttentionItem onlyItem(AttentionView view) {
         List<AttentionItem> items = card(view).items();
@@ -465,15 +490,16 @@ class FollowUpAttentionSourceTest {
         return items.getFirst();
     }
 
+
     /** API 응답 DTO도 제안 상태와 에이전트 출처를 따로 낸다. */
     private static void assertFollowUpResponse(AttentionView view, boolean proposed, boolean agentProposed) {
         AttentionDtos.FollowUpView followUp = AttentionDtos.ViewResponse.from(view).cards().stream()
-                .filter(card -> card.key().equals("needs_me"))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("나를 기다리는 카드 응답이 없다"))
-                .items()
-                .getFirst()
-                .followUp();
+            .filter(card -> card.key().equals("needs_me"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("나를 기다리는 카드 응답이 없다"))
+            .items()
+            .getFirst()
+            .followUp();
         assertThat(followUp.proposed()).isEqualTo(proposed);
         assertThat(followUp.agentProposed()).isEqualTo(agentProposed);
     }

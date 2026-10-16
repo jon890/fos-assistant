@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -121,20 +119,6 @@ class ConnectorConnectionServiceTest {
                 new ConnectorFieldOptions("list_scopes", "scopes", "id", "name", true))),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
-        1,
-        List.of());
-    /** 이미지 도구와 사진 받기를 선언한 커넥터다. 번호와 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
-    private static final ConnectorManifest VISION_MANIFEST = new ConnectorManifest(
-        DEMO,
-        DEMO_MANIFEST.title(),
-        DEMO_MANIFEST.description(),
-        DEMO_MANIFEST.fields(),
-        "list_scopes",
-        "demo",
-        List.of("vision"),
-        true,
         1,
         List.of());
     /** 형식이 없는 비밀 칸 하나만 가진 커넥터다. 비밀값의 길이 경계를 보는 데 쓴다. */
@@ -145,8 +129,6 @@ class ConnectorConnectionServiceTest {
         List.of(new ConnectorField("pin", "DEMO_PIN", "번호", "", true, true, null, null)),
         "check_pin",
         "pin",
-        List.of(),
-        false,
         1,
         List.of());
     /** 도구마다 정책을 선언한 커넥터다. 번호와 칸과 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
@@ -202,8 +184,6 @@ class ConnectorConnectionServiceTest {
                 "{\"scopes\":[{\"id\":\"a\",\"name\":\"범위 A\"},{\"id\":\"b\",\"name\":\"범위 B\"}]}")));
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(CallResult.success(MAPPER.readTree("{\"scopes\":[]}")));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-            .thenReturn(new InstallResult(false, false));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(false, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
@@ -237,7 +217,7 @@ class ConnectorConnectionServiceTest {
         assertThat(stored(user).vaultStored()).isTrue();
         assertThat(agents.count()).isZero();
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
+
         verify(toolsets, never()).writeApiServer(any(), any(), any());
     }
 
@@ -282,13 +262,11 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         ConnectorConnection connection = stored(user);
-        Agent ordinary = agent(user, false);
+        Agent ordinary = agent(user);
         ConnectorBinding bound = readyBinding(ordinary, connection, "demo");
-        Agent legacy = agent(user, true);
-        ConnectorBinding legacyBound = readyBinding(legacy, connection, null);
+        Agent other = agent(user);
+        ConnectorBinding otherBound = readyBinding(other, connection, null);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-            .thenReturn(new InstallResult(true, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
             .thenReturn(new InstallResult(true, false));
         Map<String, String> replaced = Map.of("token", OTHER_TOKEN);
 
@@ -297,21 +275,18 @@ class ConnectorConnectionServiceTest {
         verify(connector).putVault(connection.vault(), DEMO, replaced);
         verify(connector)
             .bindConnector(ordinary.hermesProfile(), DEMO, connection.vault(), ordinary.sandboxOwner(), null);
-        // 옛 바인딩은 받은 값을 지금처럼 그 profile 의 env 에 쓴다.
-        verify(connector).putEnv(legacy.hermesProfile(), "DEMO_TOKEN", OTHER_TOKEN);
-        verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
-        verify(connector).putConnector(legacy.hermesProfile(), DEMO, true, legacy.sandboxOwner());
+        verify(connector).bindConnector(other.hermesProfile(), DEMO, connection.vault(), other.sandboxOwner(), null);
         assertThat(registered.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(registered.bindings())
             .extracting(BoundAgentSummary::agentCode, BoundAgentSummary::status, BoundAgentSummary::restartRequired)
             .containsExactlyInAnyOrder(
                 tuple(ordinary.code(), BindingStatus.PENDING, true),
-                tuple(legacy.code(), BindingStatus.PENDING, true));
+                tuple(other.code(), BindingStatus.PENDING, true));
         assertThat(bindings.findById(bound.id()).orElseThrow().restartRequiredSince())
             .isNotNull();
         assertThat(agentEnabled(ordinary)).as("일반 에이전트").isTrue();
-        assertThat(agentEnabled(legacy)).as("옛 커넥터 에이전트").isFalse();
-        assertThat(bindings.findById(legacyBound.id()).orElseThrow().desiredEnabled())
+        assertThat(agentEnabled(other)).as("다른 에이전트도 켜진 채로 남는다").isTrue();
+        assertThat(bindings.findById(otherBound.id()).orElseThrow().desiredEnabled())
             .isTrue();
     }
 
@@ -322,8 +297,8 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
         ConnectorConnection connection = stored(user);
-        Agent broken = agent(user, false);
-        Agent fine = agent(user, false);
+        Agent broken = agent(user);
+        Agent fine = agent(user);
         ConnectorBinding brokenBinding = readyBinding(broken, connection, "demo");
         ConnectorBinding fineBinding = readyBinding(fine, connection, "demo");
         doThrow(new IllegalStateException())
@@ -511,7 +486,7 @@ class ConnectorConnectionServiceTest {
         }
         when(connector.readCatalog())
             .thenReturn(List.of(new ConnectorManifest(
-                "demo-wide", "넓은 칸", "", fields, "check", "wide", List.of(), false, 1, List.of())));
+                "demo-wide", "넓은 칸", "", fields, "check", "wide", 1, List.of())));
         // {"values":{"k1":"…",…},"secretPrefixes":{}} 에서 값 말고 드는 글자 수는 33 + 칸마다 7 + 쉼표 7 이다.
         int lastLength = 4000 - (33 + 8 * 7 + 7) - 7 * 500;
         values.put("k8", "v".repeat(lastLength + 1));
@@ -548,7 +523,7 @@ class ConnectorConnectionServiceTest {
         assertThat(before.toString()).doesNotContain("DEMO_TOKEN", "DEMO_SCOPE", "list_scopes");
 
         service.register(user, DEMO, VALUES);
-        Agent agent = agent(user, false);
+        Agent agent = agent(user);
         readyBinding(agent, stored(user), "demo");
 
         assertThat(service.catalog(user).get(0).bindings())
@@ -607,8 +582,6 @@ class ConnectorConnectionServiceTest {
                 PIN_MANIFEST.fields(),
                 PIN_MANIFEST.verifyTool(),
                 PIN_MANIFEST.mcpServer(),
-                List.of(),
-                false,
                 1,
                 List.of(),
                 List.of(),
@@ -731,22 +704,19 @@ class ConnectorConnectionServiceTest {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, Map.of("token", TOKEN, "scope", "a"));
         ConnectorConnection connection = stored(user);
-        Agent ordinary = agent(user, false);
+        Agent ordinary = agent(user);
         readyBinding(ordinary, connection, "demo");
-        Agent legacy = agent(user, true);
-        readyBinding(legacy, connection, null);
+        Agent other = agent(user);
+        readyBinding(other, connection, null);
 
         ConnectionSnapshot disconnected = service.disconnect(user, DEMO);
 
         InOrder ordinaryOrder = inOrder(connector);
         ordinaryOrder.verify(connector).unbindConnector(ordinary.hermesProfile(), DEMO);
         ordinaryOrder.verify(connector).deleteVault(connection.vault());
-        // 옛 바인딩은 지금처럼 env 를 지우고 설치를 끈다.
-        InOrder legacyOrder = inOrder(connector);
-        legacyOrder.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_TOKEN");
-        legacyOrder.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_SCOPE");
-        legacyOrder.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
-        legacyOrder.verify(connector).deleteVault(connection.vault());
+        InOrder otherOrder = inOrder(connector);
+        otherOrder.verify(connector).unbindConnector(other.hermesProfile(), DEMO);
+        otherOrder.verify(connector).deleteVault(connection.vault());
         assertThat(bindings.count()).isZero();
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(disconnected.bindings()).isEmpty();
@@ -756,17 +726,17 @@ class ConnectorConnectionServiceTest {
             .isEqualTo(MAPPER.readTree("{\"values\":{},\"secretPrefixes\":{}}"));
         assertThat(stored(user).vaultStored()).isFalse();
         assertThat(agentEnabled(ordinary)).as("일반 에이전트").isTrue();
-        assertThat(agentEnabled(legacy)).as("옛 커넥터 에이전트").isFalse();
+        assertThat(agentEnabled(other)).as("다른 에이전트도 켜진 채로 남는다").isTrue();
     }
 
 
     @Test
-    @DisplayName("카탈로그에서 빠진 커넥터는 읽기와 해제만 되고 옛 바인딩은 env 를 지우지 않고 설치만 끈다")
+    @DisplayName("카탈로그에서 빠진 커넥터는 읽기와 해제만 되고 붙은 바인딩을 뗀다")
     void removedConnectorCanOnlyBeReadAndDisconnectedWithoutEnvDeletion() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        Agent legacy = agent(user, true);
-        readyBinding(legacy, stored(user), null);
+        Agent other = agent(user);
+        readyBinding(other, stored(user), null);
         when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
 
         assertThat(service.read(user, DEMO).secretPrefixes()).isEqualTo(Map.of("token", "demo"));
@@ -776,7 +746,7 @@ class ConnectorConnectionServiceTest {
         ConnectionSnapshot disconnected = service.disconnect(user, DEMO);
 
         verify(connector, never()).deleteEnv(anyString(), anyString());
-        verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
+        verify(connector).unbindConnector(other.hermesProfile(), DEMO);
         assertThat(disconnected.status()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(service.read(user, DEMO).status()).isEqualTo(ConnectionStatus.DISCONNECTED);
     }
@@ -787,7 +757,7 @@ class ConnectorConnectionServiceTest {
     void vaultDeleteFailureLeavesPendingUntilRetried() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        readyBinding(agent(user, false), stored(user), "demo");
+        readyBinding(agent(user), stored(user), "demo");
         doThrow(new IllegalStateException()).when(connector).deleteVault(anyString());
 
         assertThatThrownBy(() -> service.disconnect(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
@@ -826,7 +796,7 @@ class ConnectorConnectionServiceTest {
     void checkVerifyFailureCommitsPendingAndMapsError() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        readyBinding(agent(user, false), stored(user), "demo");
+        readyBinding(agent(user), stored(user), "demo");
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(CallResult.failure(ConnectorCallError.CREDENTIAL_REJECTED));
 
@@ -845,55 +815,11 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
-    @DisplayName("옛 연결의 확인은 옛 에이전트의 profile 에서 보관 파일로 옮긴 뒤 확인 도구를 부르고 서버 이름을 채운다")
-    void legacyCheckImportsVaultThenVerifies() {
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-        Agent legacy = agent(user, true);
-        ConnectorConnection connection = legacyConnection(user);
-        ConnectorBinding binding = readyBinding(legacy, connection, null);
-        when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
-
-        ConnectionSnapshot checked = service.check(user, DEMO);
-
-        InOrder order = inOrder(connector);
-        order.verify(connector).importVault(connection.vault(), DEMO, legacy.hermesProfile());
-        order.verify(connector).callWithVault(DEMO, "list_scopes", connection.vault(), null);
-        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, true, legacy.sandboxOwner());
-        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
-        assertThat(stored(user).vaultStored()).isTrue();
-        ConnectorBinding resynced = bindings.findById(binding.id()).orElseThrow();
-        assertThat(resynced.mcpServer()).isEqualTo("demo");
-        assertThat(resynced.status()).isEqualTo(BindingStatus.READY);
-        assertThat(agentEnabled(legacy)).isTrue();
-        verify(connector, never())
-            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
-    }
-
-
-    @Test
-    @DisplayName("옛 연결의 값을 옮기지 못하면 확인 도구를 부르지 않고 연결의 상태를 그대로 둔다")
-    void legacyCheckKeepsStateWhenImportFails() {
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-        Agent legacy = agent(user, true);
-        legacyConnection(user);
-        readyBinding(legacy, stored(user), null);
-        when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
-        doThrow(new IllegalStateException()).when(connector).importVault(anyString(), anyString(), anyString());
-
-        ConnectionSnapshot checked = service.check(user, DEMO);
-
-        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
-        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
-        assertThat(stored(user).vaultStored()).isFalse();
-    }
-
-
-    @Test
     @DisplayName("붙은 바인딩은 연결 확인이 설치를 다시 보내 바인딩 방식으로 설치되고 probe 가 도구를 낼 때만 READY 다")
     void checkResyncsBoundBindingByModeAndProbe() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        Agent agent = agent(user, false);
+        Agent agent = agent(user);
         ConnectorBinding binding = pendingBinding(agent, stored(user));
 
         assertThat(service.check(user, DEMO).bindings())
@@ -903,7 +829,7 @@ class ConnectorConnectionServiceTest {
             .bindConnector(agent.hermesProfile(), DEMO, stored(user).vault(), agent.sandboxOwner(), null);
         verify(connector).probe(agent.hermesProfile(), "demo");
 
-        when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
+        when(connector.readConnector(anyString(), anyString())).thenReturn(state("unsupported"));
         assertThat(service.check(user, DEMO).bindings())
             .extracting(BoundAgentSummary::status)
             .containsExactly(BindingStatus.PENDING);
@@ -925,7 +851,7 @@ class ConnectorConnectionServiceTest {
     void checkDoesNotReinstallRestartPendingBinding() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        ConnectorBinding binding = ConnectorBinding.pending(agent(user, false), stored(user), "demo", NOW);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(user), stored(user), "demo", NOW);
         binding.installed(true, NOW);
         bindings.save(binding);
 
@@ -944,7 +870,7 @@ class ConnectorConnectionServiceTest {
     void checkRecordsServerNameOfRestartPendingBinding() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        ConnectorBinding binding = ConnectorBinding.pending(agent(user, false), stored(user), null, NOW);
+        ConnectorBinding binding = ConnectorBinding.pending(agent(user), stored(user), null, NOW);
         binding.installed(true, NOW);
         bindings.save(binding);
 
@@ -960,14 +886,13 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
-    @DisplayName("보관 파일이 없고 옛 바인딩도 없는 연결의 확인은 확인 도구를 부르지 않고 PENDING 을 커밋하며 CONNECTOR_NOT_CONNECTED 다")
-    void checkWithoutVaultOrLegacyBindingAsksToRegisterAgain() {
+    @DisplayName("보관 파일이 없는 연결의 확인은 확인 도구를 부르지 않고 PENDING 을 커밋하며 CONNECTOR_NOT_CONNECTED 다")
+    void checkWithoutVaultAsksToRegisterAgain() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        legacyConnection(user);
+        otherConnection(user);
 
         assertCode(() -> service.check(user, DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
 
-        verify(connector, never()).importVault(anyString(), anyString(), anyString());
         verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(stored(user).status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(stored(user).vaultStored()).isFalse();
@@ -982,8 +907,8 @@ class ConnectorConnectionServiceTest {
     @DisplayName("카탈로그에서 빠진 커넥터는 보관 파일과 옛 바인딩이 없어도 확인이 오류 없이 연결과 바인딩을 PENDING 으로 둔다")
     void checkWithoutVaultOfConnectorRemovedFromCatalogEndsPendingWithoutError() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
-        legacyConnection(user);
-        readyBinding(agent(user, false), stored(user), "demo");
+        otherConnection(user);
+        readyBinding(agent(user), stored(user), "demo");
         when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
@@ -1002,7 +927,7 @@ class ConnectorConnectionServiceTest {
     void checkStartsRestartWaitWhenReinstallChangesSomething() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        ConnectorBinding binding = pendingBinding(agent(user, false), stored(user));
+        ConnectorBinding binding = pendingBinding(agent(user), stored(user));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(true, false));
 
@@ -1022,7 +947,7 @@ class ConnectorConnectionServiceTest {
     void bindingResyncFailureCommitsPendingAndFails() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        ConnectorBinding binding = readyBinding(agent(user, false), stored(user), "demo");
+        ConnectorBinding binding = readyBinding(agent(user), stored(user), "demo");
         doThrow(new IllegalStateException()).when(connector).probe(anyString(), anyString());
 
         assertThatThrownBy(() -> service.check(user, DEMO)).isInstanceOf(ConnectorOperationFailure.class);
@@ -1037,7 +962,7 @@ class ConnectorConnectionServiceTest {
     void checkDoesNotReinstallConnectorRemovedFromCatalog() {
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        readyBinding(agent(user, false), stored(user), "demo");
+        readyBinding(agent(user), stored(user), "demo");
         when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST));
 
         ConnectionSnapshot checked = service.check(user, DEMO);
@@ -1051,39 +976,12 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
-    @DisplayName("옛 바인딩은 선언한 toolset 이 켜졌을 때만 READY 이고 그때만 선언한 사진 받기를 옮긴다")
-    void legacyBindingKeepsToolsetAndAttachmentJudgement() {
-        when(connector.readCatalog()).thenReturn(List.of(VISION_MANIFEST));
-        when(connector.readConnector(anyString(), anyString())).thenReturn(state(HermesConnectorClient.MODE_ISOLATED));
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-        Agent legacy = agent(user, true);
-        legacyConnection(user);
-        ConnectorBinding binding = readyBinding(legacy, stored(user), null);
-
-        assertThat(service.check(user, DEMO).bindings())
-            .extracting(BoundAgentSummary::status)
-            .containsExactly(BindingStatus.PENDING);
-        assertThat(agents.findById(legacy.id()).orElseThrow().acceptsAttachments())
-            .isFalse();
-
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("vision"));
-
-        assertThat(service.check(user, DEMO).bindings())
-            .extracting(BoundAgentSummary::status)
-            .containsExactly(BindingStatus.READY);
-        assertThat(agents.findById(legacy.id()).orElseThrow().acceptsAttachments())
-            .isTrue();
-        assertThat(bindings.findById(binding.id()).orElseThrow().status()).isEqualTo(BindingStatus.READY);
-    }
-
-
-    @Test
     @DisplayName("도구를 선언한 커넥터는 probe 가 낸 선언 밖 도구를 세고, 다시 등록하면 0 으로 되돌린다")
     void countsUndeclaredToolsAndResetsOnReRegistration() {
         when(connector.readCatalog()).thenReturn(List.of(POLICY_MANIFEST));
         CurrentUser user = user(UserRole.MEMBER, 1L);
         service.register(user, DEMO, VALUES);
-        pendingBinding(agent(user, false), stored(user));
+        pendingBinding(agent(user), stored(user));
         when(connector.probe(anyString(), anyString()))
             .thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
 
@@ -1103,11 +1001,11 @@ class ConnectorConnectionServiceTest {
         CurrentUser admin = user(UserRole.ADMIN, 1L);
         service.register(member, DEMO, VALUES);
         service.register(outsider, DEMO, VALUES);
-        Agent agent = agent(member, false);
+        Agent agent = agent(member);
         ConnectorBinding binding = ConnectorBinding.pending(agent, stored(member), "demo", NOW);
         binding.installed(true, NOW);
         bindings.save(binding);
-        readyBinding(agent(outsider, false), stored(outsider), "demo");
+        readyBinding(agent(outsider), stored(outsider), "demo");
 
         List<AdminConnectionSnapshot> listed = service.listForAdmin(admin);
 
@@ -1153,54 +1051,6 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
-    @DisplayName("manifest 로 열 수 없는 toolset 을 선언한 커넥터는 없는 커넥터다")
-    void manifestDeclaringClosedToolsetsIsLeftOut() {
-        for (List<String> declared : List.of(List.of("terminal"), List.of("vision", "file"), List.of("sight"))) {
-            when(connector.readCatalog())
-                .thenReturn(List.of(
-                    new ConnectorManifest(
-                        DEMO,
-                        "검사용 메모",
-                        "",
-                        DEMO_MANIFEST.fields(),
-                        "list_scopes",
-                        "demo",
-                        declared,
-                        false,
-                        1,
-                        List.of()),
-                    PIN_MANIFEST));
-            CurrentUser user = user(UserRole.MEMBER, 1L);
-
-            assertThat(service.catalog(user)).extracting(ConnectorSummary::id).containsExactly(PIN);
-            assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
-        }
-        verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
-    }
-
-
-    @Test
-    @DisplayName("vision 없이 사진 받기를 선언한 커넥터는 없는 커넥터다")
-    void manifestAcceptingAttachmentsWithoutVisionIsLeftOut() {
-        when(connector.readCatalog())
-            .thenReturn(List.of(new ConnectorManifest(
-                DEMO,
-                "검사용 메모",
-                "",
-                DEMO_MANIFEST.fields(),
-                "list_scopes",
-                "demo",
-                List.of(),
-                true,
-                1,
-                List.of())));
-        CurrentUser user = user(UserRole.MEMBER, 1L);
-
-        assertCode(() -> service.register(user, DEMO, VALUES), ErrorCode.CONNECTOR_NOT_FOUND);
-    }
-
-
-    @Test
     @DisplayName("위험도의 하한보다 느슨하게 선언한 커넥터는 카탈로그에 나오지 않는 없는 커넥터다")
     void manifestDeclaringApprovalBelowFloorIsLeftOut() {
         when(connector.readCatalog())
@@ -1227,8 +1077,6 @@ class ConnectorConnectionServiceTest {
             DEMO_MANIFEST.fields(),
             "list_scopes",
             "demo",
-            List.of(),
-            false,
             0,
             List.of());
         when(connector.readCatalog()).thenReturn(List.of(unreadable, PIN_MANIFEST));
@@ -1288,8 +1136,6 @@ class ConnectorConnectionServiceTest {
             DEMO_MANIFEST.fields(),
             "list_scopes",
             "demo",
-            List.of(),
-            false,
             2,
             tools);
     }
@@ -1352,14 +1198,14 @@ class ConnectorConnectionServiceTest {
 
 
     /** 이 변경 전에 만든 연결처럼 보관 파일이 없는 READY 연결을 넣는다. 옛 커넥터 에이전트와는 바인딩으로 잇는다. */
-    private ConnectorConnection legacyConnection(CurrentUser owner) {
+    private ConnectorConnection otherConnection(CurrentUser owner) {
         ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, NOW);
         connection.ready(NOW);
         return connections.save(connection);
     }
 
 
-    private Agent agent(CurrentUser owner, boolean connectorManaged) {
+    private Agent agent(CurrentUser owner) {
         String code = "conn-" + UUID.randomUUID().toString().substring(0, 13);
         Agent agent = Agent.of(
             code,
@@ -1369,11 +1215,7 @@ class ConnectorConnectionServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW);
-        if (connectorManaged) {
-            agent.markConnectorManaged();
-        }
+            owner.id());
         return agents.save(agent);
     }
 
@@ -1399,7 +1241,7 @@ class ConnectorConnectionServiceTest {
 
     private CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

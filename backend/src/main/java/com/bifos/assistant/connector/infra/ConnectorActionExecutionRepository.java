@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 
 /** 승인 이력에 속한 실행 내용이다. 같은 의도 조회는 일반 인덱스를 사용한다. */
 public interface ConnectorActionExecutionRepository extends JpaRepository<ConnectorActionExecution, Long> {
@@ -34,4 +35,14 @@ public interface ConnectorActionExecutionRepository extends JpaRepository<Connec
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from ConnectorActionExecution e where e.actionId = :actionId")
     Optional<ConnectorActionExecution> findByActionIdForUpdate(@Param("actionId") Long actionId);
+
+
+    /** 승인 줄과 같은 purge 트랜잭션에서 실행 본문과 key만 지우고 해시·ticket·연결 참조는 남긴다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ConnectorActionExecution e
+            set e.executionArgsJson = null, e.summaryJson = null, e.scopeJson = null, e.contentKeyId = null
+            where e.actionId in :ids
+            """)
+    int eraseBodiesOf(@Param("ids") Collection<Long> ids);
 }

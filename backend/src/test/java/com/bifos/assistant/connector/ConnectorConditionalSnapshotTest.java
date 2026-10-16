@@ -288,7 +288,7 @@ class ConnectorConditionalSnapshotTest {
 
 
     private Fixture fixture() {
-        AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER));
         Agent agent = agents.saveAndFlush(Agent.of(
             "execution-" + UUID.randomUUID(),
             "검사용 에이전트",
@@ -297,8 +297,7 @@ class ConnectorConditionalSnapshotTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            NOW));
+            user.id()));
         ConnectorConnection connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
         connection.connected(new ConnectionFields(Map.of("account", "1234"), Map.of("secret", "fake")), NOW);
         connection.ready(NOW);

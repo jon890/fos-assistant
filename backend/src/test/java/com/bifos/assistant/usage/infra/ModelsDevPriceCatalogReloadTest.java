@@ -31,6 +31,7 @@ class ModelsDevPriceCatalogReloadTest {
 
     private final AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-09-28T00:00:00Z"));
 
+
     @Test
     @DisplayName("파일이 바뀌면 확인 간격이 지난 뒤 새 가격과 버전을 쓴다")
     void usesNewPriceAndVersionAfterCheckIntervalWhenFileChanges() throws IOException {
@@ -40,13 +41,14 @@ class ModelsDevPriceCatalogReloadTest {
 
         write(catalog("new-model"), SECOND);
         assertThat(catalog.find("openai", "new-model"))
-                .as("간격 안에서는 디스크를 다시 보지 않는다")
-                .isEmpty();
+            .as("간격 안에서는 디스크를 다시 보지 않는다")
+            .isEmpty();
 
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
         assertThat(catalog.find("openai", "new-model")).isPresent();
         assertThat(catalog.version()).isEqualTo("models.dev@2026-09-28");
     }
+
 
     @Test
     @DisplayName("새 파일을 읽지 못하면 이전 가격을 계속 쓴다")
@@ -61,6 +63,7 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.version()).isEqualTo("models.dev@2026-09-17");
     }
 
+
     @Test
     @DisplayName("읽기에 실패한 파일은 수정 시각이 같아도 다음 확인 때 다시 읽는다")
     void rereadsFileThatFailedToReadOnNextCheckEvenWithSameModifiedTime() throws IOException {
@@ -72,17 +75,18 @@ class ModelsDevPriceCatalogReloadTest {
         Files.setLastModifiedTime(file, FileTime.from(SECOND));
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
         assertThat(catalog.find("openai", "old-model"))
-                .as("읽지 못하는 동안에도 이전 가격을 쓴다")
-                .isPresent();
+            .as("읽지 못하는 동안에도 이전 가격을 쓴다")
+            .isPresent();
 
         Files.delete(file);
         write(catalog("new-model"), SECOND);
         now.set(now.get().plus(ModelsDevPriceCatalog.CHECK_INTERVAL));
 
         assertThat(catalog.find("openai", "new-model"))
-                .as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다")
-                .isPresent();
+            .as("수정 시각이 같아도 입출력 오류였으므로 다시 읽는다")
+            .isPresent();
     }
+
 
     @Test
     @DisplayName("사라진 파일이 돌아오면 읽는다")
@@ -99,6 +103,7 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.find("openai", "new-model")).isPresent();
     }
 
+
     @Test
     @DisplayName("내용이 틀린 파일을 고쳐 다시 쓰면 읽는다")
     void readsBrokenFileOnceItIsFixedAndRewritten() throws IOException {
@@ -114,6 +119,7 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.find("openai", "new-model")).isPresent();
     }
 
+
     @Test
     @DisplayName("가격이 하나도 없는 파일은 받아들이지 않는다")
     void doesNotAcceptFileWithoutAnyPrice() throws IOException {
@@ -125,6 +131,7 @@ class ModelsDevPriceCatalogReloadTest {
 
         assertThat(catalog.find("openai", "old-model")).isPresent();
     }
+
 
     @Test
     @DisplayName("기동할 때 없던 파일이 나중에 생기면 읽는다")
@@ -139,6 +146,7 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.isAvailable()).isTrue();
         assertThat(catalog.find("openai", "new-model")).isPresent();
     }
+
 
     @Test
     @DisplayName("설정이 다른 경로를 가리키면 확인 간격을 기다리지 않고 그 파일의 가격을 읽는다")
@@ -156,6 +164,7 @@ class ModelsDevPriceCatalogReloadTest {
         assertThat(catalog.version()).isEqualTo("models.dev@2026-09-28");
     }
 
+
     @Test
     @DisplayName("설정이 같은 record 를 계속 돌려주면 확인 간격 안에서 파일을 다시 읽지 않는다")
     void doesNotRereadFileWithinCheckIntervalWhileSettingsStayTheSame() throws IOException {
@@ -168,14 +177,16 @@ class ModelsDevPriceCatalogReloadTest {
         settings.set(same);
 
         assertThat(catalog.find("openai", "new-model"))
-                .as("같은 record 면 파일과 스냅숏을 다시 정하지 않는다")
-                .isEmpty();
+            .as("같은 record 면 파일과 스냅숏을 다시 정하지 않는다")
+            .isEmpty();
         assertThat(catalog.version()).isEqualTo("models.dev@2026-09-17");
     }
+
 
     private ModelsDevPriceCatalog catalogOf(Path file) {
         return catalogOf(LiveProperties.fixed(PricingProperties.class, new PricingProperties(file.toString())));
     }
+
 
     /** 부를 때마다 {@code settings} 의 지금 값을 돌려준다. */
     private static LiveProperties<PricingProperties> live(AtomicReference<PricingProperties> settings) {
@@ -185,12 +196,14 @@ class ModelsDevPriceCatalogReloadTest {
                 return settings.get();
             }
 
+
             @Override
             public Class<PricingProperties> type() {
                 return PricingProperties.class;
             }
         };
     }
+
 
     private ModelsDevPriceCatalog catalogOf(LiveProperties<PricingProperties> properties) {
         Clock clock = new Clock() {
@@ -199,10 +212,12 @@ class ModelsDevPriceCatalogReloadTest {
                 return ZoneOffset.UTC;
             }
 
+
             @Override
             public Clock withZone(ZoneId zone) {
                 return this;
             }
+
 
             @Override
             public Instant instant() {
@@ -212,9 +227,11 @@ class ModelsDevPriceCatalogReloadTest {
         return new ModelsDevPriceCatalog(properties, clock);
     }
 
+
     private Path write(String body, Instant modifiedAt) throws IOException {
         return write("catalog.json", body, modifiedAt);
     }
+
 
     private Path write(String name, String body, Instant modifiedAt) throws IOException {
         Path file = dir.resolve(name);
@@ -222,6 +239,7 @@ class ModelsDevPriceCatalogReloadTest {
         Files.setLastModifiedTime(file, FileTime.from(modifiedAt));
         return file;
     }
+
 
     private static String catalog(String model) {
         return """

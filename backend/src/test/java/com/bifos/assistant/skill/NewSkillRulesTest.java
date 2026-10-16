@@ -25,8 +25,8 @@ class NewSkillRulesTest {
     private static final String PROFILE = "agent-profile";
 
     private final SkillPublisher publisher = mock(SkillPublisher.class);
-    private final NewSkillRules rules =
-            new NewSkillRules(publisher, new SkillProperties("/skills", "/agent/skills", null, 2));
+    private final NewSkillRules rules = new NewSkillRules(publisher, new SkillProperties("/skills", "/agent/skills", null, 2));
+
 
     @Test
     @DisplayName("올린 스킬 이름은 지금 버전과 표식 없는 버전을 합친다")
@@ -37,16 +37,17 @@ class NewSkillRulesTest {
         assertThat(NewSkillRules.uploadedNames(current, pending)).containsExactlyInAnyOrder("weekly-plan", "shopping");
     }
 
+
     @Test
     @DisplayName("Hermes 목록에 같은 이름이 있으면 SKILL_NAME_TAKEN 이다")
     void rejectsNameHermesAlreadyHas() {
         when(publisher.list(PROFILE)).thenReturn(List.of(new HermesSkill("weekly-plan", "기본 스킬", true)));
 
-        assertThatThrownBy(() ->
-                        rules.requireCreatable(PROFILE, "weekly-plan", frontmatter("가".repeat(10)), Map.of(), Map.of()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SKILL_NAME_TAKEN));
+        assertThatThrownBy(() -> rules.requireCreatable(PROFILE, "weekly-plan", frontmatter("가".repeat(10)), Map.of(), Map.of()))
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SKILL_NAME_TAKEN));
     }
+
 
     @Test
     @DisplayName("올린 스킬 수가 한도와 같으면 VALIDATION_FAILED 이다")
@@ -56,10 +57,11 @@ class NewSkillRulesTest {
         Map<String, SkillBundle> pending = Map.of("second", bundle("second"));
 
         assertThatThrownBy(
-                        () -> rules.requireCreatable(PROFILE, "third", frontmatter("가".repeat(10)), current, pending))
+            () -> rules.requireCreatable(PROFILE, "third", frontmatter("가".repeat(10)), current, pending))
                 .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
+
 
     @Test
     @DisplayName("설명이 61자면 VALIDATION_FAILED 이고 60자면 통과한다")
@@ -67,16 +69,18 @@ class NewSkillRulesTest {
         when(publisher.list(PROFILE)).thenReturn(List.of());
 
         assertThatThrownBy(
-                        () -> rules.requireCreatable(PROFILE, "third", frontmatter("가".repeat(61)), Map.of(), Map.of()))
+            () -> rules.requireCreatable(PROFILE, "third", frontmatter("가".repeat(61)), Map.of(), Map.of()))
                 .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThatCode(() -> rules.requireCreatable(PROFILE, "third", frontmatter("가".repeat(60)), Map.of(), Map.of()))
-                .doesNotThrowAnyException();
+            .doesNotThrowAnyException();
     }
+
 
     private static SkillFrontmatter frontmatter(String description) {
         return SkillFrontmatter.parse("---\nname: third\ndescription: " + description + "\n---\n# 본문\n");
     }
+
 
     private static SkillBundle bundle(String name) {
         return new SkillBundle(name, "---\nname: " + name + "\ndescription: 설명\n---\n# 본문\n", List.of());

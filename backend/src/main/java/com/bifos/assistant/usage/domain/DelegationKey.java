@@ -21,11 +21,13 @@ public record DelegationKey(String value) {
 
     private static final Pattern HEX_64 = Pattern.compile("[0-9a-f]{64}");
 
+
     public DelegationKey {
         if (value == null || !HEX_64.matcher(value).matches()) {
             throw new IllegalArgumentException("delegation key must be 64 lowercase hex characters");
         }
     }
+
 
     /**
      * 다섯 칸을 이 순서로 {@code "\n"} 하나로 이어 SHA-256 을 계산한다.
@@ -35,14 +37,15 @@ public record DelegationKey(String value) {
      */
     public static DelegationKey of(String profileName, String rootSessionId, String sessionId, String toolCallId) {
         String joined = String.join(
-                "\n",
-                "v1",
-                require("profileName", profileName),
-                require("rootSessionId", rootSessionId),
-                require("sessionId", sessionId),
-                require("toolCallId", toolCallId));
+            "\n",
+            "v1",
+            require("profileName", profileName),
+            require("rootSessionId", rootSessionId),
+            require("sessionId", sessionId),
+            require("toolCallId", toolCallId));
         return new DelegationKey(Sha256.hex(joined));
     }
+
 
     private static String require(String name, String part) {
         if (part == null || part.isBlank()) {

@@ -44,6 +44,7 @@ public class TaskFiring {
     private final TaskProperties properties;
     private final TransactionTemplate transactions;
 
+
     /**
      * {@code now} 에 다음 예정 시각이 지났고 작업이 {@code ACTIVE} 인 trigger 를 예정 시각 순으로 처리한다.
      *
@@ -64,6 +65,7 @@ public class TaskFiring {
         return created;
     }
 
+
     /**
      * trigger 하나를 잠그고 다시 읽어 발화한다. 부르는 쪽의 트랜잭션 안에서 돈다.
      *
@@ -72,8 +74,8 @@ public class TaskFiring {
     private boolean fireOne(Long triggerId, Instant now) {
         TaskTrigger trigger = triggers.findByIdForUpdate(triggerId).orElse(null);
         if (trigger == null
-                || trigger.nextFireAt() == null
-                || trigger.nextFireAt().isAfter(now)) {
+            || trigger.nextFireAt() == null
+            || trigger.nextFireAt().isAfter(now)) {
             return false;
         }
         Task task = tasks.findById(trigger.taskId()).orElse(null);
@@ -94,7 +96,7 @@ public class TaskFiring {
             scheduled = latest == null ? scheduled : latest;
         }
         Instant next = cron == null ? null : TaskSchedule.nextAfter(cron, zone, now);
-        trigger.advance(scheduled, next, now);
+        trigger.advance(scheduled, next);
         if (runs.existsByTriggerIdAndScheduledFor(trigger.id(), scheduled)) {
             return false;
         }
@@ -103,17 +105,18 @@ public class TaskFiring {
             reason = TaskRunReason.DAILY_LIMIT;
         }
         TaskRun run = outcome == TaskRunStatus.QUEUED
-                ? TaskRun.queued(task.id(), trigger.id(), task.ownerUserId(), scheduled, now)
-                : TaskRun.skipped(task.id(), trigger.id(), task.ownerUserId(), scheduled, reason, now);
+            ? TaskRun.queued(task.id(), trigger.id(), task.ownerUserId(), scheduled, now)
+            : TaskRun.skipped(task.id(), trigger.id(), task.ownerUserId(), scheduled, reason, now);
         runs.saveAndFlush(run);
         notices.announce(task, run);
         return true;
     }
 
+
     /** 그 주인이 24시간 안에 건너뛰지 않은 발화를 상한만큼 만들었는가. */
     private boolean reachedDailyLimit(Task task, Instant now) {
         long recent = runs.countByOwnerUserIdAndCreatedAtAfterAndStatusNot(
-                task.ownerUserId(), now.minus(DAY), TaskRunStatus.SKIPPED);
+            task.ownerUserId(), now.minus(DAY), TaskRunStatus.SKIPPED);
         return recent >= properties.maxRunsPerDay();
     }
 }

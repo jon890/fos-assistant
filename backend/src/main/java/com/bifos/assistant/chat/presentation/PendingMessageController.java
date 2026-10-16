@@ -29,19 +29,22 @@ public class PendingMessageController {
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
 
+
     @GetMapping
     public PendingQueueView queue(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         return PendingQueueView.from(pending.queue(user, access.requireOwnId(user, conversationId)));
     }
 
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PendingQueueView enqueue(
-            @PathVariable UUID conversationId, @Valid @RequestBody PendingMessageRequest request) {
+        @PathVariable UUID conversationId, @Valid @RequestBody PendingMessageRequest request) {
         CurrentUser user = currentUser.require();
         return PendingQueueView.from(pending.enqueue(user, access.requireOwnId(user, conversationId), request.text()));
     }
+
 
     @DeleteMapping("/{pendingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -49,6 +52,7 @@ public class PendingMessageController {
         CurrentUser user = currentUser.require();
         pending.cancel(user, access.requireOwnId(user, conversationId), pendingId);
     }
+
 
     @PostMapping("/send")
     @ResponseStatus(HttpStatus.ACCEPTED)

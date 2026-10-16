@@ -27,6 +27,8 @@ import tools.jackson.databind.JsonNode;
  */
 @Slf4j
 public record SubagentRegistration(String parentRootSessionId, String parentSessionId, String childSessionId) {
+
+
     private static final String VERSION_LINE = "v1-subagent";
 
     /**
@@ -64,6 +66,7 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
         return new SubagentRegistration(parentRootSessionId, parentSessionId, childSessionId);
     }
 
+
     private static String requireText(JsonNode body, String key) {
         JsonNode value = body.get(key);
         if (value == null || !value.isTextual() || value.asString().isBlank()) {
@@ -72,6 +75,7 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
         return value.asString();
     }
 
+
     /** 없거나 {@code null} 이거나 문자열이면 받는다. */
     private static void requireTextOrNull(JsonNode body, String key) {
         JsonNode value = body.get(key);
@@ -79,6 +83,7 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
             throw reject(key + " 가 문자열이나 null 이 아니다");
         }
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String reason) {

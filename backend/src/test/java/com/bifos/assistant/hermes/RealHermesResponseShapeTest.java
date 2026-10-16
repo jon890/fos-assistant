@@ -31,17 +31,18 @@ class RealHermesResponseShapeTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
+
     @Test
     @DisplayName("reads the token counts a real run reports")
     void readsTheTokenCountsARealRunReports() {
-        TokenUsage usage =
-                HttpHermesRunsClient.readUsage(mapper.readTree(RUN_STATUS).path("usage"));
+        TokenUsage usage = HttpHermesRunsClient.readUsage(mapper.readTree(RUN_STATUS).path("usage"));
 
         assertThat(usage.inputTokens()).isEqualTo(561);
         assertThat(usage.outputTokens()).isEqualTo(15);
         assertThat(usage.totalTokens()).isEqualTo(576);
         assertThat(usage.cachedInputTokens()).isNull();
     }
+
 
     @Test
     @DisplayName("the run reports the profile name where a model would go")

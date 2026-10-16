@@ -43,10 +43,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ProactiveLoopSettingTest {
 
     private static final Instant NOW = Instant.parse("2026-03-02T00:00:00Z");
-    private static final CurrentUser OWNER =
-            new CurrentUser(962_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
-    private static final CurrentUser OTHER =
-            new CurrentUser(962_002L, "other@example.com", "사용자B", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(962_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
+    private static final CurrentUser OTHER = new CurrentUser(962_002L, "other@example.com", "사용자B", 1L, UserRole.MEMBER);
 
     @Autowired
     ProactiveLoopSettingService service;
@@ -74,26 +72,28 @@ class ProactiveLoopSettingTest {
 
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
         agent = agents.save(Agent.of(
-                "loop-" + UUID.randomUUID(),
-                "커리어",
-                "loop-profile-" + UUID.randomUUID(),
-                "http://agent-runtime.test/p/loop",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                OWNER.id(),
-                NOW));
+            "loop-" + UUID.randomUUID(),
+            "커리어",
+            "loop-profile-" + UUID.randomUUID(),
+            "http://agent-runtime.test/p/loop",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            OWNER.id()));
     }
+
 
     @AfterEach
     void tearDown() {
         jdbc.update("DELETE FROM proactive_loop_setting WHERE agent_id = ?", agent.id());
         jdbc.update("DELETE FROM agent WHERE id = ?", agent.id());
     }
+
 
     @Test
     @DisplayName("설정 줄이 없으면 꺼짐이고 설치가 루프를 열었으므로 켤 수 있다")
@@ -103,6 +103,7 @@ class ProactiveLoopSettingTest {
         assertThat(view).isEqualTo(new LoopSettingView(true, false, null));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("켜고 쉬기를 저장하면 다시 읽어도 같은 값이고 쉬기 시각이 지나면 비어 보인다")
@@ -118,46 +119,46 @@ class ProactiveLoopSettingTest {
         assertThat(service.get(OWNER, agent.code())).isEqualTo(new LoopSettingView(true, true, null));
     }
 
+
     @Test
     @DisplayName("이미 있는 줄을 끄면 새 줄을 만들지 않고 그 줄을 바꾼다")
     void changesExistingRow() {
         service.update(OWNER, agent.code(), true, null);
         Long id = settings.findByUserIdAndAgentId(OWNER.id(), agent.id())
-                .orElseThrow()
-                .id();
+            .orElseThrow()
+            .id();
 
         LoopSettingView view = service.update(OWNER, agent.code(), false, null);
 
         assertThat(view).isEqualTo(new LoopSettingView(true, false, null));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
-                .satisfies(row -> {
-                    assertThat(row.id()).isEqualTo(id);
-                    assertThat(row.enabled()).isFalse();
-                });
+            .satisfies(row -> {
+                assertThat(row.id()).isEqualTo(id);
+                assertThat(row.enabled()).isFalse();
+            });
     }
+
 
     @Test
     @DisplayName("처음 저장이 다른 요청과 겹쳐 유일 제약에 걸리면 새 트랜잭션에서 먼저 저장된 줄을 다시 읽어 바꾼다")
     void retriesOnConcurrentFirstSave() {
         Long existingId = settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), false, null, NOW))
-                .id();
+            .id();
         // 첫 읽기만 줄이 없다고 답해, 다른 요청이 그사이 먼저 저장한 상황을 만든다. 저장은 실제 표로 가므로 실제 유일 제약에 걸린다.
         ProactiveLoopSettingRepository racing = mock(ProactiveLoopSettingRepository.class, delegatesTo(settings));
         doAnswer(invocation -> Optional.empty())
-                .doAnswer(invocation ->
-                        settings.findByUserIdAndAgentId(invocation.getArgument(0), invocation.getArgument(1)))
-                .when(racing)
-                .findByUserIdAndAgentId(OWNER.id(), agent.id());
-        ProactiveLoopSettingService racingService =
-                new ProactiveLoopSettingService(agentService, racing, properties, clock, transactions);
+            .doAnswer(invocation -> settings.findByUserIdAndAgentId(invocation.getArgument(0), invocation.getArgument(1)))
+            .when(racing)
+            .findByUserIdAndAgentId(OWNER.id(), agent.id());
+        ProactiveLoopSettingService racingService = new ProactiveLoopSettingService(agentService, racing, properties, clock, transactions);
         Instant snooze = NOW.plus(Duration.ofDays(1));
 
         LoopSettingView view = racingService.update(OWNER, agent.code(), true, snooze);
 
         assertThat(view).isEqualTo(new LoopSettingView(true, true, snooze));
         assertThat(settings.findAll().stream()
-                        .filter(row -> row.agentId().equals(agent.id()))
-                        .toList())
+            .filter(row -> row.agentId().equals(agent.id()))
+            .toList())
                 .as("설정 줄은 하나이고 먼저 저장된 줄이 바뀐다")
                 .singleElement()
                 .satisfies(row -> {
@@ -167,23 +168,25 @@ class ProactiveLoopSettingTest {
                 });
     }
 
+
     @Test
     @DisplayName("쉬기는 지금부터 30일까지 받고 31일 뒤는 VALIDATION_FAILED 로 거절해 저장하지 않는다")
     void limitsSnoozeToThirtyDays() {
         Instant limit = NOW.plus(Duration.ofDays(30));
 
         assertThat(service.update(OWNER, agent.code(), true, limit).snoozedUntil())
-                .isEqualTo(limit);
+            .isEqualTo(limit);
 
         assertThatThrownBy(() -> service.update(OWNER, agent.code(), false, NOW.plus(Duration.ofDays(31))))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
-                .satisfies(row -> {
-                    assertThat(row.enabled()).isTrue();
-                    assertThat(row.snoozedUntil()).isEqualTo(limit);
-                });
+            .satisfies(row -> {
+                assertThat(row.enabled()).isTrue();
+                assertThat(row.snoozedUntil()).isEqualTo(limit);
+            });
     }
+
 
     @Test
     @DisplayName("지난 쉬기 시각은 비운 것으로 저장한다")
@@ -192,23 +195,24 @@ class ProactiveLoopSettingTest {
 
         assertThat(view).isEqualTo(new LoopSettingView(true, true, null));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())
-                        .orElseThrow()
-                        .snoozedUntil())
+            .orElseThrow()
+            .snoozedUntil())
                 .isNull();
     }
+
 
     @Test
     @DisplayName("다른 사용자의 비공개 에이전트는 읽기도 끄기도 켜기도 AGENT_NOT_FOUND 이고 줄을 남기지 않는다")
     void rejectsUnreadableAgent() {
         assertThatThrownBy(() -> service.get(OTHER, agent.code()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThatThrownBy(() -> service.update(OTHER, agent.code(), false, null))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThatThrownBy(() -> service.update(OTHER, agent.code(), true, null))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThat(settings.findByUserIdAndAgentId(OTHER.id(), agent.id())).isEmpty();
     }
 }

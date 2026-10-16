@@ -23,6 +23,7 @@ public record MemoryEncryptionProperties(String activeKeyId, String keys) {
     private static final Pattern KEY_ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
     private static final int KEY_BYTES = 32;
 
+
     public MemoryEncryptionProperties {
         activeKeyId = activeKeyId == null ? "" : activeKeyId.strip();
         keys = keys == null ? "" : keys.strip();
@@ -38,10 +39,12 @@ public record MemoryEncryptionProperties(String activeKeyId, String keys) {
         }
     }
 
+
     /** key id 에서 32바이트 key 로 가는 map 이다. 암호화가 꺼져 있으면 비어 있다. */
     public Map<String, byte[]> parsedKeys() {
         return parse(keys);
     }
+
 
     private static Map<String, byte[]> parse(String keys) {
         Map<String, byte[]> parsed = new LinkedHashMap<>();
@@ -74,6 +77,7 @@ public record MemoryEncryptionProperties(String activeKeyId, String keys) {
         }
         return parsed;
     }
+
 
     @Override
     public String toString() {
