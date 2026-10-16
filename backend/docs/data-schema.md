@@ -12,7 +12,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant`, `financial_order_limit`, `financial_limit_change` |
+| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -243,6 +243,19 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 ### app_user
 
 실제로 들어온 적이 있는 사용자다. 그룹의 첫 사용자가 `ADMIN` 이 되고 그 뒤로는 `MEMBER` 다. `model_default_tier` 가 비면 그룹 기본값을 따른다.
+
+#### 주문 상한 컬럼
+
+`limit_` 로 시작하는 컬럼은 계좌 주인이 운영 최대치 안에서 정한 금융 주문 상한이다. 근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `limit_order_amount_krw`, `limit_order_amount_usd`, `limit_order_quantity`, `limit_daily_amount_krw`, `limit_daily_amount_usd` | DECIMAL(20,6) NULL. 비면 그 상한은 운영 최대치를 따른다. 0 은 그 종류의 주문을 받지 않는다 |
+| `limit_updated_at` | DATETIME(6) NULL. 다섯 컬럼 가운데 하나라도 바꾼 마지막 시각이다. 한 번도 바꾸지 않았으면 비어 있다 |
+
+적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
+**이 컬럼은 전용 `UPDATE` 로만 바꾼다.** `AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼므로, 먼저 읽어 둔 사용자를 나중에 저장해도 상한을 옛 값으로 덮지 않는다. 읽기도 엔티티를 거치지 않는 전용 쿼리로 한다.
+쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 
 ### allowed_person
 
@@ -694,6 +707,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `result_text` 의 `UNKNOWN` 줄은 커넥터가 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
+- `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 
@@ -780,38 +794,6 @@ action을 지우면 실행 내용도 지운다.
 `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
 `revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
 외래 키는 사용자와 대화에 둔다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
-
-### financial_order_limit
-
-계좌 주인이 운영 최대치 안에서 정한 주문 상한이다. 사용자마다 한 줄이다.
-근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `user_id` | BIGINT NOT NULL, PK 및 `app_user` FK |
-| `order_amount_krw`, `order_amount_usd`, `order_quantity`, `daily_amount_krw`, `daily_amount_usd` | DECIMAL(20,6) NULL. 비면 그 상한은 운영 최대치를 따른다 |
-| `updated_at` | DATETIME(6) NOT NULL |
-
-줄이 없으면 다섯 상한이 모두 최대치를 따른다.
-적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
-쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠근다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
-
-### financial_limit_change
-
-대화로 올리기를 요청한 상한 변경의 내용이다. 승인 줄 하나에 한 줄이다.
-`order_limit_change` 가 PENDING `connector_action` 과 함께 만들고, 승인하면 `financial_order_limit` 에 반영한다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
-| `user_id` | BIGINT NOT NULL, `app_user` FK |
-| `limit_kind` | VARCHAR(32) NOT NULL. `ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD` |
-| `requested_value` | DECIMAL(20,6) NOT NULL. 0 이상 |
-| `previous_value` | DECIMAL(20,6) NOT NULL. 요청할 때 적용하던 상한 |
-| `created_at` | DATETIME(6) NOT NULL |
-
-낮추기와 같은 값, 최대치를 넘는 값은 이 줄을 만들지 않는다.
-승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 공개 승인 API 는 이 줄이 있는 승인 줄을 상한 변경 승인으로 보낸다.
 
 ## 사용자 브라우저 표
 

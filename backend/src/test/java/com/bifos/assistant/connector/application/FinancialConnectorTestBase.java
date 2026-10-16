@@ -211,9 +211,9 @@ abstract class FinancialConnectorTestBase {
         } finally {
             // 다음 대화 테스트가 사용자를 지울 수 있도록 이 fixture의 연결과 FK를 먼저 정리한다.
             if (user != null) {
-                jdbc.update("delete from financial_limit_change where user_id = ?", user.id());
                 jdbc.update("delete from connector_action where user_id = ?", user.id());
-                jdbc.update("delete from financial_order_limit where user_id = ?", user.id());
+                jdbc.update("update app_user set limit_order_amount_krw = null, limit_order_amount_usd = null, limit_order_quantity = null, "
+                    + "limit_daily_amount_krw = null, limit_daily_amount_usd = null, limit_updated_at = null where id = ?", user.id());
             }
             if (bindingId != null) {
                 bindings.deleteById(bindingId);
