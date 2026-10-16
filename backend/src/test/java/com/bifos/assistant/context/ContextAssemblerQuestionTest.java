@@ -24,6 +24,7 @@ import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -210,6 +211,38 @@ class ContextAssemblerQuestionTest {
             .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
             .extracting(item -> item.selection().selector())
             .containsOnly(ContextSelection.INDEX_KEYWORD);
+    }
+
+
+    @Test
+    @DisplayName("구역 글자 예산을 넘는 항목은 건너뛰어 색인 앞쪽에 둔다")
+    void skipsItemsOverSectionBudget() {
+        Memory peanut = group("아이 간식 주의", "둘째는 땅콩 알레르기라 땅콩 들어간 음식은 먹으면 안 된다");
+        ContextAssembler tight = TestContextAssemblers.of(
+            memories, properties, clock, new MemorySearchSectionProperties(3, 600, MemorySearchSection.HEADER.length() + 10));
+
+        AssembledContext result = tight.assemble(ADMIN, agentId, PEANUT_QUESTION);
+
+        assertThat(result.instructions()).doesNotContain(SEARCH_HEADER);
+        assertThat(itemOf(result, peanut, ContextSource.MEMORY_INDEX).orElseThrow().selection().selector())
+            .isEqualTo(ContextSelection.INDEX_KEYWORD);
+    }
+
+
+    @Test
+    @DisplayName("앞 층이 자리를 다 써 구역 줄이 들어가지 않으면 그 항목은 색인에 남고 빠진 항목으로 세지 않는다")
+    void leavesItemInIndexWhenNoRoomRemains() {
+        memories.create(ADMIN, MemoryScope.GROUP, "늘 싣는 규칙", "가".repeat(150), true);
+        Memory peanut = group("아이 간식 주의", "둘째는 땅콩 알레르기라 땅콩 들어간 음식은 먹으면 안 된다");
+        ContextAssembler small = TestContextAssemblers.of(
+            memories, new ContextProperties(250, 4, null, null, Map.of(), 0, 200), clock);
+
+        AssembledContext result = small.assemble(ADMIN, agentId, PEANUT_QUESTION);
+
+        assertThat(result.instructions()).doesNotContain(SEARCH_HEADER);
+        assertThat(itemOf(result, peanut, ContextSource.MEMORY_SEARCH)).isEmpty();
+        assertThat(itemOf(result, peanut, ContextSource.MEMORY_INDEX)).isPresent();
+        assertThat(result.omittedMemoryIds()).doesNotContain(peanut.id());
     }
 
 
