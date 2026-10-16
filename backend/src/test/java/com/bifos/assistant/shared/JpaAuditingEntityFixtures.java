@@ -70,9 +70,10 @@ import lombok.NoArgsConstructor;
 final class JpaAuditingEntityFixtures {
     static final Instant BUSINESS = Instant.parse("2020-01-01T00:00:00Z");
 
-    record Fixture(List<CreatedAtEntity> rows, AppUser user, Agent agent, Conversation conversation,
-                   ConnectorConnection connection, ConnectorBinding binding, Memory memory, AgentExecution execution) {}
 
+    record Fixture(List<CreatedAtEntity> rows, AppUser user, Agent agent, Conversation conversation,
+        ConnectorConnection connection, ConnectorBinding binding, Memory memory, AgentExecution execution) {
+    }
 
 
     static Fixture persistAll(EntityManager entityManager) {

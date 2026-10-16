@@ -63,7 +63,6 @@ public class ConnectorConversationGrant extends CreatedAtEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-
     /** 사용자가 거두었거나, 연결을 해제하거나 다시 등록했거나, 에이전트에서 연결을 뗀 시각이다. */
     @Column(name = "revoked_at")
     private Instant revokedAt;

@@ -50,7 +50,6 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private long byteSize;
 
-
     /** 보관 기간이 지나 파일을 지운 시각. 비어 있으면 아직 파일이 있다. */
     @Column(name = "deleted_at")
     @Getter

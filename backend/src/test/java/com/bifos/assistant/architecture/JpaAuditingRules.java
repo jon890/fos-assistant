@@ -41,7 +41,10 @@ final class JpaAuditingRules {
     static final String AUDITED = "com.bifos.assistant.shared.domain.AuditedEntity";
     static final String CONFIG = "com.bifos.assistant.shared.config.JpaAuditingConfig";
 
-    record Contract(String table, String policy) {}
+
+    record Contract(String table, String policy) {
+    }
+
 
     static final Map<String, Contract> ENTITIES = Map.ofEntries(
         Map.entry("com.bifos.assistant.agent.domain.Agent", new Contract("agent", "C+U")),
@@ -88,12 +91,13 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.task.domain.TaskTrigger", new Contract("task_trigger", "C+U")),
         Map.entry("com.bifos.assistant.usage.domain.ExecutionContextSource", new Contract("execution_context_source", "C")),
         Map.entry("com.bifos.assistant.usage.domain.SubagentUsageJob", new Contract("subagent_usage_job", "제외")),
-        Map.entry("com.bifos.assistant.user.domain.AppUser", new Contract("app_user", "C+U"))
-    );
+        Map.entry("com.bifos.assistant.user.domain.AppUser", new Contract("app_user", "C+U")));
+
 
     static ArchRule rule() {
         return classes().should(new ArchCondition<JavaClass>("순수 저장 시각의 base와 업무 시각 제외 및 기존 Clock provider를 지킨다") {
             private final Map<String, Integer> counts = new HashMap<>();
+
 
             @Override
             public void init(Collection<JavaClass> allClasses) {
@@ -101,6 +105,7 @@ final class JpaAuditingRules {
                 ENTITIES.keySet().forEach(name -> counts.put(name, 0));
                 List.of(CREATED, AUDITED, CONFIG, "provider").forEach(name -> counts.put(name, 0));
             }
+
 
             @Override
             public void check(JavaClass type, ConditionEvents events) {
@@ -176,6 +181,7 @@ final class JpaAuditingRules {
                 }
             }
 
+
             @Override
             public void finish(ConditionEvents events) {
                 counts.forEach((name, count) -> {
@@ -187,6 +193,7 @@ final class JpaAuditingRules {
         });
     }
 
+
     private static void checkEntity(JavaClass type, String expected, Contract contract, ConditionEvents events) {
         valid(type, type.getName().equals(expected) && type.isAnnotatedWith(Entity.class), "엔티티 이름·표 선택", events);
         var creation = type.getAllFields().stream().filter(field -> field.isAnnotatedWith(Column.class)
@@ -196,6 +203,7 @@ final class JpaAuditingRules {
         String wanted = contract.policy().equals("C+U") ? AUDITED : CREATED;
         valid(type, contract.policy().equals("제외") ? !type.isAssignableTo(CREATED) : parent.equals(wanted), "전수 판정의 base 상속", events);
     }
+
 
     private static void valid(JavaClass type, boolean condition, String detail, ConditionEvents events) {
         if (!condition) {

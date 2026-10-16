@@ -99,7 +99,6 @@ public class Task extends AuditedEntity {
     @Column(name = "model_tier", length = 16)
     private ModelTier modelTier;
 
-
     /** 지운 시각. {@code state} 가 {@code ARCHIVED} 일 때만 찬다. */
     @Column(name = "archived_at")
     private Instant archivedAt;

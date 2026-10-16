@@ -129,7 +129,6 @@ public class Conversation extends CreatedAtEntity {
     @Getter
     private Long taskId;
 
-
     @Column(name = "updated_at", nullable = false)
     @Getter
     private Instant updatedAt;

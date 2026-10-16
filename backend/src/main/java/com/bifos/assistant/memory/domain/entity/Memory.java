@@ -117,7 +117,6 @@ public class Memory extends CreatedAtEntity {
     @Column(name = "accepted_at")
     private Instant acceptedAt;
 
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 

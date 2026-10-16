@@ -36,7 +36,6 @@ public class ContentDraft extends CreatedAtEntity {
     @Column(name = "current_revision", nullable = false)
     private long currentRevision;
 
-
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

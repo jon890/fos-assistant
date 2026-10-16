@@ -66,7 +66,6 @@ public class ExecutionContextSource extends CreatedAtEntity implements Persistab
     @Column(name = "selection_score")
     private Double selectionScore;
 
-
     /** 데이터베이스에 있는 줄이다. 읽어 왔거나 방금 넣었을 때 참이 된다. */
     @Transient
     private boolean persisted;

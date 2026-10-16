@@ -40,7 +40,6 @@ public class AgentToken extends CreatedAtEntity {
     @Getter
     private String label;
 
-
     @Column(name = "last_used_at")
     @Getter
     private Instant lastUsedAt;

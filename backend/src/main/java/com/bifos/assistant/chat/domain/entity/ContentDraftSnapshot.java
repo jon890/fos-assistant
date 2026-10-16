@@ -77,7 +77,6 @@ public class ContentDraftSnapshot extends CreatedAtEntity {
     @Column(name = "authorization_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
     private String authorizationFingerprint;
 
-
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

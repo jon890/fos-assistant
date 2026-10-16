@@ -100,6 +100,7 @@ public final class ArchitectureRules {
     /** rule-1: 까닭과 예외는 docs/code-rules/rule-1.md를 본다. */
     public static final ArchRule AUDITING_LISTENERS_AND_CLOCK = JpaAuditingRules.rule();
 
+
     private static void require(JavaClass type, boolean valid, String detail, ConditionEvents events) {
         if (!valid) {
             events.add(SimpleConditionEvent.violated(type, type.getName() + ": " + detail));

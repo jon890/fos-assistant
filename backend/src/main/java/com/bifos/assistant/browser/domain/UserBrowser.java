@@ -71,7 +71,6 @@ public class UserBrowser extends CreatedAtEntity {
     @Column(name = "started_at")
     private Instant startedAt;
 
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 

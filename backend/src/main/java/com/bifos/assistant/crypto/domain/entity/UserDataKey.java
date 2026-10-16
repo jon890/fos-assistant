@@ -38,7 +38,6 @@ public class UserDataKey extends CreatedAtEntity {
     @Column(name = "wrapped_key", nullable = false, length = 255)
     private String wrappedKey;
 
-
     /** 마지막으로 다른 KEK 로 다시 감싼 시각. 만든 뒤 한 번도 바꾸지 않았으면 비어 있다 */
     @Column(name = "rewrapped_at")
     private Instant rewrappedAt;

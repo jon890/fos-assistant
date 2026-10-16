@@ -44,7 +44,6 @@ public class ResultDelivery extends CreatedAtEntity {
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
 
-
     /** 상태가 바뀐 시각이다. */
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;

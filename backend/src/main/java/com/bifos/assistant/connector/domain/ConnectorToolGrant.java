@@ -46,7 +46,6 @@ public class ConnectorToolGrant extends CreatedAtEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-
     /** 사용자가 거두었거나 연결을 해제한 시각이다. */
     @Column(name = "revoked_at")
     private Instant revokedAt;

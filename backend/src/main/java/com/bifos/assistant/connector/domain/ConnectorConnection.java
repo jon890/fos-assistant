@@ -68,7 +68,6 @@ public class ConnectorConnection extends CreatedAtEntity {
     @Column(name = "undeclared_tools", nullable = false)
     private int undeclaredTools;
 
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 

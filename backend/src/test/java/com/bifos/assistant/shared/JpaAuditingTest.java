@@ -88,7 +88,7 @@ class JpaAuditingTest {
         clock.set(CREATED);
         var fixture = JpaAuditingEntityFixtures.persistAll(entityManager);
         entityManager.flush();
-        Set<Class<?>> expected = entityManager.getMetamodel().getEntities().stream().map(entity -> (Class<?>) entity.getJavaType())
+        Set<Class<?>> expected = entityManager.getMetamodel().getEntities().stream().map(entity -> (Class<?>)entity.getJavaType())
             .filter(CreatedAtEntity.class::isAssignableFrom).collect(Collectors.toSet());
         assertThat(fixture.rows()).extracting(Object::getClass).containsExactlyInAnyOrderElementsOf(expected);
         for (CreatedAtEntity row : fixture.rows()) {
@@ -130,7 +130,7 @@ class JpaAuditingTest {
             } else if (row instanceof TaskTrigger trigger) {
                 trigger.moveNext(LATER.plusSeconds(10));
             } else if (row instanceof MemoryEmbedding embedding) {
-                embedding.replace("different", new byte[32], new float[]{3, 4});
+                embedding.replace("different", new byte[32], new float[] {3, 4});
             }
         }
         entityManager.flush();

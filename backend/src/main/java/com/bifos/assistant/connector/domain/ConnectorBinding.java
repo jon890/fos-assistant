@@ -100,7 +100,6 @@ public class ConnectorBinding extends CreatedAtEntity {
     @Column(name = "checked_at")
     private Instant checkedAt;
 
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 

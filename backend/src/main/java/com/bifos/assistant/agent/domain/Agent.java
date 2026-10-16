@@ -76,7 +76,6 @@ public class Agent extends AuditedEntity {
     @Getter
     private boolean enabled;
 
-
     /**
      * 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다.
      *

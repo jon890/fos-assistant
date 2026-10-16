@@ -42,7 +42,6 @@ public class AppUser extends AuditedEntity {
     @Getter
     private UserRole role;
 
-
     @Column(name = "model_default_tier", length = 16)
     @Getter
     @Accessors(fluent = true)

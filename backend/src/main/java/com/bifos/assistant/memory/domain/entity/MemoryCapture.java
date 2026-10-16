@@ -63,7 +63,6 @@ public class MemoryCapture extends CreatedAtEntity {
     @Column(name = "previous_status", length = 20)
     private MemoryStatus previousStatus;
 
-
     @Column(name = "undone_at")
     private Instant undoneAt;
 
