@@ -182,7 +182,7 @@ sequenceDiagram
 사용자 질문과 관련도가 높은 몇 건을 본문까지 싣는 구역이다(`MEMORY_SEARCH`). 모델이 `memory_search` 를 부르지 않아도 본문에만 있는 사실이 실린다.
 근거는 [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
 
-- 질문은 사용자가 보낸 turn(`TurnIntent.Fresh`, `TurnIntent.Regenerate`)의 글과 위임받은 실행의 작업 글이다. 예약 작업, 위임 결과 전달, 먼저 살펴보기 turn 은 질문 없이 조립한다
+- 질문은 사용자가 보낸 turn(`TurnIntent.Fresh`, `TurnIntent.Regenerate`)의 글과 위임받은 실행의 작업 글이다. 예약 작업, 위임 결과 전달, 먼저 살펴보기 turn 과 그 트리 아래의 위임 실행은 질문 없이 조립한다
 - 후보는 개인 사실 구역에 실리지 않은 색인 후보다. 지금은 키워드 점수 순으로 고른다. 의미 점수와 RRF 는 ADR 의 「구현 순서」 를 따라 더한다. 어느 규칙으로 골랐는지는 선택 근거의 `selector` 에 남는다
 - 관련 있다는 판정은 질문 토큰 가운데 그 항목에 있는 토큰의 비율이 `assistant.memory.relevance.keyword-min-coverage` 이상인 것이다. 아니면 점수가 없다. 관련 항목이 없는 질문에는 이 구역을 싣지 않는다
 - 민감 항목과 암호화한 항목은 제목으로만 점수를 받고 이 구역에 싣지 않는다. 색인에 제목으로 남는다

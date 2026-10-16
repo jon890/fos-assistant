@@ -95,8 +95,10 @@ public class AgentRunner {
         String instructionAddition,
         DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
-        AssembledContext context = contextAssembler.assemble(user, agent.id(), task);
-        boolean rememberAllowed = rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId);
+        boolean proactiveTree = rootExecutionId != null && proactiveChecks.existsByRootExecutionId(rootExecutionId);
+        // 살펴보기 트리 아래의 실행은 질문 없이 조립한다. 살펴보기에 질문 기반 선별을 잇는 것은 단계 4 다(ADR-20261015 / memory-hybrid-selection)
+        AssembledContext context = contextAssembler.assemble(user, agent.id(), proactiveTree ? null : task);
+        boolean rememberAllowed = !proactiveTree;
         context = contextAssembler.withResponseInstructions(context, rememberAllowed);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
             context.chars(),

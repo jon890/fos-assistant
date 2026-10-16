@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -151,7 +152,7 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("살펴보기 트리의 자식은 Memory 를 읽되 기억을 남기는 지침은 받지 않는다")
+    @DisplayName("살펴보기 트리의 자식은 질문 없이 Memory 를 읽고 기억을 남기는 지침은 받지 않는다")
     void excludesRememberInstructionsFromProactiveChild() {
         when(proactiveChecks.existsByRootExecutionId(10L)).thenReturn(true);
 
@@ -172,6 +173,7 @@ class AgentRunnerConnectorContextTest {
             null);
 
         assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
+        verify(contextAssembler).assemble(eq(user), any(), isNull());
         verify(contextAssembler).withResponseInstructions(any(), eq(false));
     }
 
