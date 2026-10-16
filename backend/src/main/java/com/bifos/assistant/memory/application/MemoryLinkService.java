@@ -276,10 +276,12 @@ public class MemoryLinkService {
     /**
      * 받아들이기와 거절, 되돌리기를 할 수 있는 줄인지 본다. 옛 항목({@code to})을 고칠 수 있는 사람만 한다.
      *
+     * <p>줄은 쓰기 잠금으로 읽는다. 함께 온 두 결정 가운데 나중 것은 바뀐 상태를 보고 409 를 받는다.
+     *
      * <p>없는 줄과 볼 수 없는 줄은 같은 404 다. 볼 수 있지만 그룹의 {@code ADMIN} 이 아니면 기억 수정과 같은 FORBIDDEN 이다.
      */
     private MemoryLink requireDecidable(CurrentUser user, Long linkId) {
-        MemoryLink link = links.findById(linkId).orElseThrow(MemoryLinkService::notFound);
+        MemoryLink link = links.findByIdForUpdate(linkId).orElseThrow(MemoryLinkService::notFound);
         Memory to = memories.findById(link.toMemoryId()).orElseThrow(MemoryLinkService::notFound);
         if (!to.isReadableBy(user.id(), user.groupId())) {
             throw notFound();

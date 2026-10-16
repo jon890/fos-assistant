@@ -3,16 +3,27 @@ package com.bifos.assistant.memory.infra;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 /** 기억 사이의 연결이다. 「대체됨」 판정은 {@code (to_memory_id, type, status)} 색인을 쓴다. */
 public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
+
+    /**
+     * 받아들이기와 거절, 되돌리기가 같은 줄을 함께 바꾸지 않게 쓰기 잠금으로 읽는다. 둘째 요청은 첫째가 바꾼 상태를 읽고 409 를 받는다. 항목을 지우는
+     * 쪽은 이 줄을 지우려다 기다리므로, 받아들이는 중에 줄이 사라져 갱신이 0행이 되는 일이 없다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from MemoryLink l where l.id = :id")
+    Optional<MemoryLink> findByIdForUpdate(@Param("id") Long id);
+
 
     Optional<MemoryLink> findByFromMemoryIdAndToMemoryIdAndType(Long fromMemoryId, Long toMemoryId, MemoryLinkType type);
 

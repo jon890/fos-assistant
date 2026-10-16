@@ -20,7 +20,13 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -225,6 +231,48 @@ class MemoryLinkServiceTest {
 
         assertConflict(() -> linkService.accept(ADMIN, link.id()));
         assertThat(linkService.isSuperseded(old.id())).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("같은 제안에 받아들이기와 거절이 함께 오면 하나만 이기고 다른 하나는 상태 충돌이다")
+    void decidesConcurrentAcceptAndRejectOnce() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            Memory old = memories.create(ADMIN, MemoryScope.USER, "옛 " + round, "1", false);
+            Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새 " + round, "2", false);
+            MemoryLink link = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                List<Future<String>> results = List.of(
+                    pool.submit(() -> decide(start, () -> linkService.accept(ADMIN, link.id()))),
+                    pool.submit(() -> decide(start, () -> linkService.reject(ADMIN, link.id()))));
+                start.countDown();
+                List<String> outcomes = new ArrayList<>();
+                for (Future<String> result : results) {
+                    outcomes.add(result.get(20, TimeUnit.SECONDS));
+                }
+
+                assertThat(outcomes).as("라운드 %s", round).containsExactlyInAnyOrder("ok", "conflict");
+                MemoryLinkStatus stored = links.findById(link.id()).orElseThrow().status();
+                assertThat(linkService.isSuperseded(old.id())).isEqualTo(stored == MemoryLinkStatus.ACTIVE);
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+    }
+
+
+    private static String decide(CountDownLatch start, ThrowingCallable action) throws Exception {
+        start.await();
+        try {
+            action.call();
+            return "ok";
+        } catch (ApiException ex) {
+            return ex.code() == ErrorCode.MEMORY_LINK_STATE_CONFLICT ? "conflict" : ex.code().name();
+        } catch (Throwable ex) {
+            return ex.getClass().getSimpleName();
+        }
     }
 
 
