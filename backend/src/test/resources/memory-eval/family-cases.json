@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
   "users": [
     {
@@ -463,7 +463,8 @@
           "scope": "USER",
           "title": "회사",
           "content": "이직해서 지금 다니는 회사는 나래정보다",
-          "updatedDaysAgo": 6
+          "updatedDaysAgo": 6,
+          "supersedes": "m1"
         }
       ],
       "expect": [
@@ -497,7 +498,8 @@
           "scope": "USER",
           "title": "사는 동네",
           "content": "한빛시 새솔동으로 이사했다",
-          "updatedDaysAgo": 20
+          "updatedDaysAgo": 20,
+          "supersedes": "m1"
         }
       ],
       "expect": [
@@ -531,7 +533,8 @@
           "scope": "USER",
           "title": "지수 학년",
           "content": "지수는 초등학교 3학년으로 올라갔다",
-          "updatedDaysAgo": 30
+          "updatedDaysAgo": 30,
+          "supersedes": "m1"
         }
       ],
       "expect": [
@@ -565,7 +568,8 @@
           "scope": "USER",
           "title": "민준 운동",
           "content": "민준은 수영을 그만두고 축구를 한다",
-          "updatedDaysAgo": 10
+          "updatedDaysAgo": 10,
+          "supersedes": "m1"
         }
       ],
       "expect": [
@@ -643,7 +647,8 @@
           "title": "지수 담임",
           "content": "새 학년 지수 담임은 박도현 선생님이다",
           "retrieval": "ALWAYS",
-          "updatedDaysAgo": 14
+          "updatedDaysAgo": 14,
+          "supersedes": "m1"
         }
       ],
       "expect": [
@@ -1333,6 +1338,477 @@
       "expect": [
         "m1",
         "m2"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "KU-08",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "아이가 요즘 다니는 학원이 어디지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아이 학원",
+          "content": "아이는 피아노 학원에 다닌다",
+          "updatedDaysAgo": 300
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아이 학원",
+          "content": "아이 학원을 태권도로 바꿨다",
+          "updatedDaysAgo": 100,
+          "supersedes": "m1"
+        },
+        {
+          "key": "m3",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아이 학원",
+          "content": "아이 학원을 수영으로 바꿨다",
+          "updatedDaysAgo": 5,
+          "supersedes": "m2"
+        }
+      ],
+      "expect": [
+        "m3"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        },
+        {
+          "memory": "m2",
+          "kind": "SUPERSEDED"
+        }
+      ],
+      "judge": [
+        {
+          "id": "no-old-academy",
+          "question": "답이 아이가 지금 피아노나 태권도 학원에 다닌다고 말하는가?",
+          "expect": false
+        },
+        {
+          "id": "says-swimming",
+          "question": "답이 아이가 수영 학원에 다닌다고 말하는가?",
+          "expect": true
+        }
+      ]
+    },
+    {
+      "id": "KU-09",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "딸 간식으로 땅콩버터 쿠키 괜찮을까?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "딸 땅콩 알레르기",
+          "content": "딸은 땅콩 알레르기가 있다",
+          "updatedDaysAgo": 200
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "딸 땅콩 알레르기",
+          "content": "검사 결과 딸은 이제 땅콩 알레르기가 없다",
+          "updatedDaysAgo": 3,
+          "supersedes": "m1"
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ],
+      "judge": [
+        {
+          "id": "not-allergic-now",
+          "question": "답이 딸에게 지금 땅콩 알레르기가 있다고 말하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "KU-10",
+      "category": "KNOWLEDGE_UPDATE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "가족 여행 언제 떠나지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "가족 여행 날짜",
+          "content": "가족 여행은 5월 3일에 떠난다",
+          "updatedDaysAgo": 40
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "가족 여행 날짜",
+          "content": "가족 여행 출발을 5월 10일로 미뤘다",
+          "updatedDaysAgo": 4,
+          "supersedes": "m1"
+        }
+      ],
+      "expect": [
+        "m2"
+      ],
+      "forbidden": [
+        {
+          "memory": "m1",
+          "kind": "SUPERSEDED"
+        }
+      ],
+      "judge": [
+        {
+          "id": "says-may-10",
+          "question": "답이 출발일을 5월 10일이라고 말하는가?",
+          "expect": true
+        },
+        {
+          "id": "no-may-3",
+          "question": "답이 출발일을 5월 3일이라고 말하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "PF-01",
+      "category": "PREFERENCE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "이번 주말 가족 저녁 메뉴 추천해 줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아이 입맛",
+          "content": "아이는 매운 음식을 못 먹는다",
+          "updatedDaysAgo": 20
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "회사 회식 메뉴",
+          "content": "지난 회식에서 매운 닭갈비를 먹었다",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": [
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ],
+      "judge": [
+        {
+          "id": "no-spicy",
+          "question": "답이 매운 음식을 권하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "PF-02",
+      "category": "PREFERENCE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "밤에 일하면서 마실 음료 추천해 줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "저녁 음료",
+          "content": "저녁에는 카페인이 든 음료를 마시지 않는다",
+          "updatedDaysAgo": 30
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아침 루틴",
+          "content": "아침마다 아메리카노를 두 잔 마신다",
+          "updatedDaysAgo": 15
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": [
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ],
+      "judge": [
+        {
+          "id": "no-caffeine-at-night",
+          "question": "답이 카페인이 든 음료를 권하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "PF-03",
+      "category": "PREFERENCE",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "주말에 할 만한 운동 추천해 줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "운동 제약",
+          "content": "무릎이 안 좋아 달리기는 하지 않는다",
+          "updatedDaysAgo": 45
+        },
+        {
+          "key": "m2",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "아내 운동",
+          "content": "아내는 가을 마라톤을 준비한다",
+          "updatedDaysAgo": 10
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": [
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ],
+      "judge": [
+        {
+          "id": "no-running",
+          "question": "답이 달리기를 권하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "PF-04",
+      "category": "PREFERENCE",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "다음 달 가족 여행 숙소 골라 줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "머무는 곳 취향",
+          "content": "여행 가서 머무는 곳은 늘 조용한 곳을 고른다",
+          "updatedDaysAgo": 60
+        },
+        {
+          "key": "m2",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "출장 숙소",
+          "content": "출장 때는 역 앞 비즈니스호텔에 묵는다",
+          "updatedDaysAgo": 7
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": [
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ],
+      "judge": [
+        {
+          "id": "quiet-stay",
+          "question": "답이 조용한 곳을 고르거나 조용함을 기준으로 드는가?",
+          "expect": true
+        }
+      ]
+    },
+    {
+      "id": "PF-05",
+      "category": "PREFERENCE",
+      "asker": "childA",
+      "agent": "general",
+      "question": "친구들이랑 갈 점심 식당 추천해 줘",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "childA",
+          "scope": "USER",
+          "title": "식단",
+          "content": "고기를 먹지 않는다",
+          "updatedDaysAgo": 90
+        },
+        {
+          "key": "m2",
+          "owner": "childA",
+          "scope": "USER",
+          "title": "급식 메뉴",
+          "content": "학교 급식에 불고기가 자주 나온다",
+          "updatedDaysAgo": 3
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": [
+        {
+          "memory": "m2",
+          "kind": "DISTRACTOR"
+        }
+      ],
+      "judge": [
+        {
+          "id": "no-meat",
+          "question": "답이 고기 요리 중심의 식당을 권하는가?",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "id": "RG-01",
+      "category": "RECALL_GAP",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "아이 담임 선생님 성함이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "아이 학교 생활",
+          "content": "새 학기에 아이 반이 3반으로 정해졌고 교실은 본관 2층 끝에 있다. 담임은 한별 선생님이고 상담 주간은 4월 둘째 주다. 준비물은 매주 금요일 알림장으로 오고 체육복은 화요일과 목요일에 챙긴다. 방과 후 수업은 로봇 과학과 바둑 중에서 고르기로 했고 등하교는 학교 앞 횡단보도까지 같이 걷기로 했다. 반 대표 연락은 학부모 단체 대화방으로 받고 학급 문고는 한 달에 한 권씩 보낸다.",
+          "updatedDaysAgo": 25
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "RG-02",
+      "category": "RECALL_GAP",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "차 타이어 언제 갈았지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentB",
+          "scope": "USER",
+          "title": "자동차 관리",
+          "content": "자동차 정기 점검은 동네 정비소에서 반년마다 한다. 엔진오일은 지난봄에 바꿨고 다음 교체는 주행 거리 만 킬로미터 뒤다. 타이어는 작년 11월에 네 짝을 모두 새로 끼웠다. 와이퍼는 겨울 전에 바꾸고 보험 갱신은 매년 8월이다. 세차는 한 달에 두 번 손세차로 하고 블랙박스 메모리는 석 달마다 비운다. 주차는 아파트 지하 2층을 쓴다. 겨울에는 스노체인을 트렁크에 넣어 둔다.",
+          "updatedDaysAgo": 50
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "RG-03",
+      "category": "RECALL_GAP",
+      "asker": "parentB",
+      "agent": "general",
+      "question": "보일러 점검은 보통 언제 하지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "집 관리",
+          "content": "보일러 점검 업체 연락처는 관리사무소 게시판에 있고 점검은 매년 10월에 한다",
+          "updatedDaysAgo": 80
+        }
+      ],
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "RG-04",
+      "category": "RECALL_GAP",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "차를 어디에 세워 뒀더라?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "오늘 주차",
+          "content": "오늘 백화점에 가서 차를 지하 3층 B구역 기둥 옆에 세웠다. 들어갈 때 엘리베이터 옆 계단으로 내려왔고 주차권은 지갑 안쪽 칸에 넣었다. 나갈 때는 2번 출구가 가깝고 정산은 1층 안내 데스크에서 영수증을 보여 주면 된다. 장 본 짐은 트렁크에 실었고 돌아오는 길에 주유소에 들르기로 했다. 아이 장난감 가방은 뒷좌석에 두었다. 휴대폰 충전기는 조수석 서랍에 있고 우산은 트렁크 왼쪽에 있다.",
+          "updatedDaysAgo": 0
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 600,
+        "contentChars": 300,
+        "updatedDaysAgo": 30
+      },
+      "expect": [
+        "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "RG-05",
+      "category": "RECALL_GAP",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "내 혈액형이 뭐였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "owner": "parentA",
+          "scope": "USER",
+          "title": "혈액형",
+          "content": "혈액형은 O형이다. 예전에 건강검진 결과지에서 확인했고 헌혈할 때도 같은 결과가 나왔다. 가족 가운데 같은 혈액형은 없고 응급 연락처 카드 뒷면에도 적어 두었다. 수술 동의서를 쓸 때도 이 혈액형으로 적었고 여권 지갑에 넣어 둔 메모에도 같은 내용이 있다.",
+          "updatedDaysAgo": 120
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 60,
+        "contentChars": 40,
+        "updatedDaysAgo": 1
+      },
+      "expect": [
+        "m1"
       ],
       "forbidden": []
     }

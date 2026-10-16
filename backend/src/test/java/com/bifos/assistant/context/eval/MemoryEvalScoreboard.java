@@ -52,8 +52,10 @@ final class MemoryEvalScoreboard {
      * @param memory 사례 안의 Memory key
      * @param forbiddenKind 실리면 안 되는 항목이면 그 종류. {@code expect} 항목이면 null
      * @param state 조립 결과에서 읽은 상태
+     * @param rank recall@k 의 순위. {@code INLINE} 항목을 실은 순서대로, 그 뒤에 {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다.
+     * 순위가 없으면 null 이다
      */
-    record ItemVerdict(String memory, ForbiddenKind forbiddenKind, ItemState state) {
+    record ItemVerdict(String memory, ForbiddenKind forbiddenKind, ItemState state, Integer rank) {
 
         boolean expected() {
             return forbiddenKind == null;
@@ -103,6 +105,8 @@ final class MemoryEvalScoreboard {
      * @param cases 센 사례 수
      * @param recallInline {@code expect} 항목 가운데 {@code INLINE} 인 비율
      * @param recallTitleOrBetter {@code expect} 항목 가운데 {@code INLINE} 이나 {@code TITLE_ONLY} 인 비율
+     * @param recallAt5 {@code expect} 항목 가운데 순위가 5 이하인 비율
+     * @param recallAt10 {@code expect} 항목 가운데 순위가 10 이하인 비율
      * @param falseMemoryExposure {@code SUPERSEDED} 와 {@code DISTRACTOR} 항목 가운데 {@code INLINE} 인 비율
      * @param boundaryExposure {@code BOUNDARY} 항목 가운데 {@code ABSENT} 가 아닌 수. {@code OMITTED} 도 센다
      * @param boundaryItems {@code BOUNDARY} 항목 수
@@ -113,6 +117,8 @@ final class MemoryEvalScoreboard {
         int cases,
         Ratio recallInline,
         Ratio recallTitleOrBetter,
+        Ratio recallAt5,
+        Ratio recallAt10,
         Ratio falseMemoryExposure,
         int boundaryExposure,
         int boundaryItems,
@@ -158,6 +164,8 @@ final class MemoryEvalScoreboard {
                     expected,
                     item -> item.state() == ItemState.INLINE || item.state() == ItemState.TITLE_ONLY),
                 expected.size()),
+            Ratio.of(count(expected, item -> rankedWithin(item, 5)), expected.size()),
+            Ratio.of(count(expected, item -> rankedWithin(item, 10)), expected.size()),
             Ratio.of(count(falseMemories, item -> item.state() == ItemState.INLINE), falseMemories.size()),
             count(boundaries, item -> item.state() != ItemState.ABSENT),
             boundaries.size(),
@@ -178,7 +186,7 @@ final class MemoryEvalScoreboard {
 
     String markdown() {
         StringBuilder out = new StringBuilder(HEADLINE).append("\n\n");
-        out.append("시험 세트 판 ").append(datasetVersion).append(", 모드 ");
+        out.append("사례 묶음 버전 ").append(datasetVersion).append(", 모드 ");
         out.append(String.join(", ", modes())).append("\n");
         appendSection(out, ALL, null);
         Arrays.stream(Category.values()).forEach(category -> appendSection(out, category.name(), category));
@@ -220,6 +228,8 @@ final class MemoryEvalScoreboard {
             "회수율(제목 이상)",
             columns,
             metrics -> metrics.recallTitleOrBetter().text());
+        appendRow(out, "recall@5", columns, metrics -> metrics.recallAt5().text());
+        appendRow(out, "recall@10", columns, metrics -> metrics.recallAt10().text());
         appendRow(
             out,
             "오기억 노출률",
@@ -256,6 +266,11 @@ final class MemoryEvalScoreboard {
         out.append("| ").append(label).append(" |");
         columns.forEach(metrics -> out.append(' ').append(cell.apply(metrics)).append(" |"));
         out.append('\n');
+    }
+
+
+    private static boolean rankedWithin(ItemVerdict item, int k) {
+        return item.rank() != null && item.rank() <= k;
     }
 
 

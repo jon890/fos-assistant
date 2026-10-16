@@ -579,6 +579,16 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남기고, 제목과 본문은 남기지 않는다.
 조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 덧붙인다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「본문을 읽으면 남는 기록」).
 `OMITTED` 줄은 자리가 없어 빠진 Memory 항목이거나 결과를 알 수 없어 본문을 싣지 않은 승인 결과다. `source` 가 `MEMORY_` 로 시작하는 `OMITTED` 줄의 수는 `agent_execution.context_omitted_items` 와 같다.
+
+선택 근거 컬럼은 Memory 항목을 어떤 규칙이 몇 번째로 골랐는지 남긴다. 근거는 [ADR-20261015 / memory-eval-gate](adr/ADR-20261015-memory-eval-gate.md) 에 있다. 모두 비어 있을 수 있고, 컬럼을 더하기 전의 줄과 Memory 가 아닌 줄은 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `selector` | 고른 규칙의 이름과 버전. 값의 목록과 뜻은 `ContextSelection` 의 Javadoc 이 갖는다. `MEMORY_READ` 줄은 비어 있다 |
+| `selection_rank` | 같은 실행의 같은 `source` 안에서 고른 순서. 1 부터 센다. `OMITTED` 줄도 순서를 받는다 |
+| `keyword_score`, `semantic_score`, `selection_score` | 키워드 점수, 의미 점수, 합친 점수. 점수 없이 고르는 규칙은 비워 둔다 |
+
+사용 신호(읽혔는가, 고쳐졌는가, 관련 없다고 눌렀는가)는 이 테이블의 컬럼으로 두지 않는다. 이 테이블은 넣기만 하고, 그 신호는 실행 뒤에 온다.
 실행 줄을 지우지 않으므로 이 줄도 지우지 않는다.
 
 ## Memory 표
