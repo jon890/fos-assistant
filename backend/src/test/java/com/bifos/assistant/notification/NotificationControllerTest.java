@@ -22,6 +22,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,6 +66,9 @@ class NotificationControllerTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    TestClock contextClock;
+
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<MvcResult> streams = new ArrayList<>();
@@ -74,6 +78,7 @@ class NotificationControllerTest {
     @BeforeEach
     void setUp() {
         notifications.deleteAll();
+        contextClock.set(CREATED_AT);
         when(currentUser.require())
             .thenReturn(new CurrentUser(USER, "notice@example.com", "알림 받는 사람", 1L, UserRole.MEMBER));
         mvc = MockMvcBuilders.standaloneSetup(new NotificationController(

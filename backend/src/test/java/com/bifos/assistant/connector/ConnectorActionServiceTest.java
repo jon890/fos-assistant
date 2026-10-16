@@ -963,7 +963,8 @@ class ConnectorActionServiceTest {
             .extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
             .containsExactly(tuple(DEMO, WRITE));
         ConnectorToolGrant stored = grants.findAll().get(0);
-        assertThat(Duration.between(stored.createdAt(), stored.expiresAt())).isEqualTo(Duration.ofHours(1));
+        Instant decidedAt = actions.findByPublicId(actionId).orElseThrow().decidedAt();
+        assertThat(stored.expiresAt()).isEqualTo(decidedAt.plus(Duration.ofHours(1)));
     }
 
 
