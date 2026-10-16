@@ -69,8 +69,6 @@ const MESSAGES: Record<string, string> = {
     "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.",
   MEMORY_ENCRYPTION_UNAVAILABLE:
     "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.",
-  SERVICE_TOKEN_NOT_FOUND:
-    "토큰을 찾지 못했어요. 화면을 새로고침해 확인해 주세요.",
   NOTIFICATION_NOT_FOUND: "이미 지워졌거나 없는 알림이에요.",
   PROACTIVE_CHECK_UNAVAILABLE:
     "지금은 이 에이전트로 살펴볼 수 없어요. 에이전트 화면에서 까닭을 확인해 주세요.",

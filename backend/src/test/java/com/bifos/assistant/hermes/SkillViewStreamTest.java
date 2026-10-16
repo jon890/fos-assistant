@@ -141,7 +141,7 @@ class SkillViewStreamTest {
 
 
     /** 이 SSE 본문을 Hermes 가 보낸 것처럼 실제 스트림 읽기로 읽는다. */
-    private static List<RunEvent> streamed(String body, boolean connectorManaged) throws IOException {
+    private static List<RunEvent> streamed(String body, boolean hideAllTools) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/run-one/events", exchange -> {
             byte[] data = body.getBytes(StandardCharsets.UTF_8);
@@ -167,7 +167,7 @@ class SkillViewStreamTest {
                 events::add,
                 opened -> {
                 },
-                connectorManaged ? ToolDetailScope.ALL : ToolDetailScope.NONE);
+                hideAllTools ? ToolDetailScope.ALL : ToolDetailScope.NONE);
             return events;
         } finally {
             server.stop(0);

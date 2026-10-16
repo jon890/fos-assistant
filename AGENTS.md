@@ -11,12 +11,13 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`docs/code-architecture.md`](docs/code-architecture.md) | 모듈의 경계, 사용자와 profile, 에이전트, 대화의 층, 비밀값을 두는 곳 |
 | [`docs/features/`](docs/features/) | 기능마다 요구와 화면, Control Plane, Hermes 를 가로지르는 흐름 |
 | [`docs/adr/INDEX.md`](docs/adr/INDEX.md) | 되돌리기 어려운 결정과 그 근거 |
+| [`docs/code-rules/INDEX.md`](docs/code-rules/INDEX.md) | 코드 규칙의 고정 번호, 까닭과 예외, 연결한 검사 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 커넥터를 고칠 때 |
 
 기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
-새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 커넥터마다 하나인 `docs/features/<id>-connector.md` 다. 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md) 이 갖고, `test/unit/doc-files.test.ts` 가 지킨다.
+새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 커넥터마다 하나인 `docs/features/<id>-connector.md`와 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다. 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
 
 ## 용어
 
@@ -57,7 +58,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 - 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 을 정하지 못한다.
 - Memory 접근 권한은 Control Plane 이 정한다. Hermes 내장 memory 도구는 주지 않는다.
   제목만 주입한 항목은 Control Plane 이 응답을 고르는 MCP 도구로만 읽는다.
-  실행 밖의 서비스는 사용자에 묶인 서비스 토큰으로 문서만 읽는다(ADR-056).
+  실행 밖의 서비스에 Memory 문서를 읽는 경로는 두지 않는다.
 - 실행 기록은 실패해도 남긴다.
 
 ## 공개 저장소

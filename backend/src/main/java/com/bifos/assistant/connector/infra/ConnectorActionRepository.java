@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -162,6 +163,46 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ConnectorAction a set a.agentId = null where a.agentId = :agentId")
     int clearAgentOf(@Param("agentId") Long agentId);
+
+
+    /** 사용자·대화 잠금 안에서 개인 본문과 key 참조만 지운다. 감사와 중복 방지 칸은 바꾸지 않는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ConnectorAction a
+            set a.storedArgsJson = null, a.argsKeyId = null,
+                a.storedResultText = null, a.resultKeyId = null, a.bodyErasedAt = :now
+            where a.id in :ids and a.bodyErasedAt is null
+            """)
+    int eraseBodiesOf(@Param("ids") Collection<Long> ids, @Param("now") Instant now);
+
+
+    /** 열린 승인과 복구용 UNKNOWN, 당일 금융 합계에 필요한 성공 줄은 본문을 남긴다. */
+    @Query("""
+            select a.id from ConnectorAction a
+            where a.conversationId = :conversationId and a.bodyErasedAt is null
+                and (a.status is null or a.status not in :open)
+                and (a.risk is null or a.risk <> :financial or a.status is null or a.status <> :succeeded
+                    or a.decidedAt is null or a.decidedAt < :dayStart)
+            order by a.id
+            """)
+    List<Long> findErasableBodyIds(@Param("conversationId") Long conversationId,
+        @Param("open") Collection<ActionStatus> open, @Param("financial") ToolRisk financial,
+        @Param("succeeded") ActionStatus succeeded, @Param("dayStart") Instant dayStart);
+
+
+    /** 본문 삭제 도입 전에 purge한 대화에서 아직 지우지 않은 승인 본문을 찾는다. */
+    @Query("""
+            select distinct a.conversationId from ConnectorAction a, Conversation c
+            where a.conversationId = c.id and c.deletedAt is not null and c.purgedAt is not null
+                and a.bodyErasedAt is null and a.conversationId not in :skipped
+                and (a.status is null or a.status not in :open)
+                and (a.risk is null or a.risk <> :financial or a.status is null or a.status <> :succeeded
+                    or a.decidedAt is null or a.decidedAt < :dayStart)
+            order by a.conversationId
+            """)
+    List<Long> findPurgedConversationsWithBodies(@Param("skipped") List<Long> skipped,
+        @Param("open") Collection<ActionStatus> open, @Param("financial") ToolRisk financial,
+        @Param("succeeded") ActionStatus succeeded, @Param("dayStart") Instant dayStart, Pageable pageable);
 
 
     /** 그 연결에 그 상태의 승인 줄이 있는가. */

@@ -38,7 +38,7 @@ public class ToolsetCatalogService {
         // Hermes에서 사라진 도구도 숨김을 해제할 수 있도록 설정에 남은 이름을 보인다.
         hidden.stream().sorted().forEach(name -> catalog.putIfAbsent(name, new ToolsetCatalogEntry(name, name, "")));
         Map<Agent, List<String>> enabled = new LinkedHashMap<>();
-        for (Agent agent : agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc()) {
+        for (Agent agent : agents.findByDeletedAtIsNullOrderByCodeAsc()) {
             enabled.put(agent, toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()));
         }
         // 읽지 못한 profile을 0개로 세지 않는다. Hermes 오류는 그대로 전달해 다시 읽게 한다.

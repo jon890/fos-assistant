@@ -3,11 +3,6 @@ package com.bifos.assistant.context.eval;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentMemoryCollection;
-import com.bifos.assistant.agent.domain.type.AgentVisibility;
-import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.context.AssembledContext;
@@ -15,36 +10,33 @@ import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.context.ContextBodyMode;
 import com.bifos.assistant.context.ContextItem;
 import com.bifos.assistant.context.ContextProperties;
+import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
-import com.bifos.assistant.context.eval.MemoryEvalDataset.Filler;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Forbidden;
-import com.bifos.assistant.context.eval.MemoryEvalDataset.MemorySeed;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
-import com.bifos.assistant.memory.domain.type.MemoryEntryType;
-import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,8 +46,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 가상 가족 시험 세트를 {@link ContextAssembler} 로 조립해 Memory 회수를 측정한다. 방법과 지표는 {@code docs/features/memory.md} 의
  * 「합성 측정」 이 갖는다.
  *
- * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출 하나이고, 나머지 지표는
- * 보고서에만 남긴다.
+ * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출, 기준 파일보다 나빠진
+ * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
  */
 @BackendIntegrationTest
 class MemoryRecallEvalTest {
@@ -63,14 +55,11 @@ class MemoryRecallEvalTest {
     private static final MemoryEvalDataset DATASET = MemoryEvalDataset.load();
     private static final Path REPORT_DIR = Path.of("build", "reports", "memory-eval");
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
-    private static final String AGENT_CODE_PREFIX = "memory-eval-";
+    private static final String NONE = "none";
+    private static final String QUESTION_OFF = "questionOff";
     private static final String FACTS_OFF = "factsOff";
     private static final String FACTS_ON = "factsOn";
-
-    /** 사용자 번호와 그룹 번호가 다른 시험이나 운영 줄과 겹치지 않게 큰 수에서 시작한다. */
-    private static final long USER_ID_BASE = 910_000L;
-
-    private static final long GROUP_ID_BASE = 920_000L;
+    private static final String FULL_INJECTION = "fullInjection";
 
     @Autowired
     MemoryService memoryService;
@@ -93,17 +82,18 @@ class MemoryRecallEvalTest {
     @Autowired
     TestClock clock;
 
-    private final List<Long> createdAgentIds = new ArrayList<>();
+    private MemoryEvalFixture fixture;
+
+
+    @BeforeEach
+    void setUp() {
+        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
+    }
 
 
     @AfterEach
     void tearDown() {
-        memories.deleteAll();
-        for (Long agentId : createdAgentIds) {
-            jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
-            agents.deleteById(agentId);
-        }
-        createdAgentIds.clear();
+        fixture.tearDown();
     }
 
 
@@ -111,18 +101,26 @@ class MemoryRecallEvalTest {
     @DisplayName("시험 세트 전체를 조립해 지표를 내고 권한 경계 노출이 0 임을 확인한다")
     void measuresRecallAndKeepsBoundary() {
         clock.set(BASE);
-        Map<String, Long> agentIds = createAgents();
-        Map<String, ContextAssembler> assemblers = new LinkedHashMap<>();
-        assemblers.put(FACTS_OFF, new ContextAssembler(memoryService, withFactsMaxChars(0), clock));
-        assemblers.put(FACTS_ON, new ContextAssembler(memoryService, properties, clock));
+        Map<String, Long> agentIds = fixture.createAgents();
+        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, clock);
+        ContextAssembler factsOff = TestContextAssemblers.of(memoryService, withFactsMaxChars(0), clock);
+        // questionOff 는 질문을 넘기지 않는 지금까지의 조립이다. 질문으로 고른 구역이 놓친 사례를 줄였는지 견준다
+        Map<String, Assembly> assemblies = new LinkedHashMap<>();
+        assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
+        assemblies.put(FACTS_OFF, factsOff::assemble);
+        assemblies.put(FACTS_ON, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
         for (Case each : DATASET.cases()) {
-            assemblers.forEach((mode, modeAssembler) -> {
-                Map<String, Long> ids = seed(each);
-                AssembledContext context = modeAssembler.assemble(userOf(each.asker()), agentIds.get(each.agent()));
+            scoreboard.add(NONE, noneVerdictOf(each));
+            assemblies.forEach((mode, assembly) -> {
+                Map<String, Long> ids = fixture.seed(each);
+                AssembledContext context = assembly.assemble(
+                    fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
                 scoreboard.add(mode, verdictOf(each, ids, context));
             });
+            Map<String, Long> ids = fixture.seed(each);
+            scoreboard.add(FULL_INJECTION, fullInjectionVerdictOf(each, ids, agentIds.get(each.agent())));
         }
 
         String markdown = scoreboard.markdown();
@@ -131,10 +129,30 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
-        assertThat(scoreboard.metrics(FACTS_OFF, null).cases())
-            .isEqualTo(DATASET.cases().size());
-        assertThat(scoreboard.metrics(FACTS_ON, null).cases())
-            .isEqualTo(DATASET.cases().size());
+        for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, FULL_INJECTION)) {
+            assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
+        }
+        Double gapWithQuestion = scoreboard.metrics(FACTS_ON, MemoryEvalDataset.Category.RECALL_GAP).recallAt5().rate();
+        Double gapWithoutQuestion = scoreboard.metrics(QUESTION_OFF, MemoryEvalDataset.Category.RECALL_GAP).recallAt5().rate();
+        assertThat(gapWithQuestion)
+            .as("RECALL_GAP recall@5: factsOn=%s questionOff=%s", gapWithQuestion, gapWithoutQuestion)
+            .isNotNull()
+            .isGreaterThan(gapWithoutQuestion);
+        MemoryEvalScoreboard.Metrics factsOnMetrics = scoreboard.metrics(FACTS_ON, null);
+        if (Boolean.getBoolean(MemoryEvalBaseline.WRITE_PROPERTY)) {
+            MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOnMetrics).write(MemoryEvalBaseline.SOURCE);
+            return;
+        }
+        assertThat(MemoryEvalBaseline.load().violations(DATASET.version(), factsOnMetrics))
+            .as("합성 측정이 기준 파일보다 나빠졌다. 절차는 docs/features/memory.md 의 「기준 파일」")
+            .isEmpty();
+    }
+
+
+    /** 모드 하나의 조립이다. 질문을 쓰지 않는 모드는 받은 질문을 버린다. */
+    @FunctionalInterface
+    private interface Assembly {
+        AssembledContext assemble(CurrentUser user, Long agentId, String question);
     }
 
 
@@ -184,6 +202,33 @@ class MemoryRecallEvalTest {
 
 
     @Test
+    @DisplayName("대체 관계와 판정 질문이 어긋난 사례 묶음은 읽을 때 거절한다")
+    void rejectsBrokenSupersedesAndJudgeWhileLoading() {
+        assertThat(MemoryEvalDataset.parse(SUPERSEDING).cases().getFirst().judge()).hasSize(1);
+
+        assertRejected(SUPERSEDING.replace("\"supersedes\": \"m1\"", "\"supersedes\": \"zz\""), "supersedes");
+        assertRejected(SUPERSEDING.replace("\"supersedes\": \"m1\"", "\"supersedes\": \"m2\""), "supersedes");
+        assertRejected(
+            SUPERSEDING.replace("{ \"key\": \"m1\", \"owner\": \"parentA\"", "{ \"key\": \"m1\", \"owner\": \"parentB\""),
+            "supersedes");
+        assertRejected(SUPERSEDING.replace(", \"supersedes\": \"m1\"", ""), "supersedes");
+        assertRejected(
+            SUPERSEDING.replace(
+                "\"judge\": [ { \"id\": \"j1\", \"question\": \"옛 값을 말하는가?\", \"expect\": false } ]",
+                "\"judge\": [ { \"id\": \"j1\", \"question\": \"가?\", \"expect\": false }, "
+                    + "{ \"id\": \"j1\", \"question\": \"나?\", \"expect\": true } ]"),
+            "judge");
+    }
+
+
+    private static void assertRejected(String json, String message) {
+        assertThatThrownBy(() -> MemoryEvalDataset.parse(json))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining(message);
+    }
+
+
+    @Test
     @DisplayName("분모가 0 인 비율은 해당 없음으로 내고 OMITTED 도 권한 경계 노출로 센다")
     void reportsNotApplicableAndCountsOmittedAsBoundaryExposure() {
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(1);
@@ -193,8 +238,8 @@ class MemoryRecallEvalTest {
                 "X-01",
                 MemoryEvalDataset.Category.BOUNDARY,
                 List.of(
-                    new ItemVerdict("m1", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.OMITTED),
-                    new ItemVerdict("m2", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.ABSENT)),
+                    new ItemVerdict("m1", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.OMITTED, null),
+                    new ItemVerdict("m2", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.ABSENT, null)),
                 0,
                 0));
 
@@ -207,83 +252,168 @@ class MemoryRecallEvalTest {
     }
 
 
-    /** 사례의 Memory 를 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
-    private Map<String, Long> seed(Case each) {
-        memories.deleteAll();
-        Instant now = clock.instant();
-        if (each.filler() != null) {
-            memories.saveAll(fillerOf(each.filler(), now));
-        }
-        Map<String, Long> ids = new HashMap<>();
-        for (MemorySeed seed : each.memories()) {
-            ids.put(seed.key(), memories.save(memoryOf(seed, now)).id());
-        }
-        return ids;
+    @Test
+    @DisplayName("recall@k 는 질문으로 고른 항목, 나머지 본문 항목, 제목 항목의 순위로 세고 순위가 없는 항목은 세지 않는다")
+    void countsRecallAtKByRank() {
+        MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(1);
+        scoreboard.add(
+            FACTS_ON,
+            new CaseVerdict(
+                "X-02",
+                MemoryEvalDataset.Category.INFORMATION_EXTRACTION,
+                List.of(
+                    new ItemVerdict("m1", null, ItemState.INLINE, 1),
+                    new ItemVerdict("m2", null, ItemState.TITLE_ONLY, 6),
+                    new ItemVerdict("m3", null, ItemState.OMITTED, null)),
+                0,
+                1));
+
+        MemoryEvalScoreboard.Metrics metrics = scoreboard.metrics(FACTS_ON, null);
+
+        assertThat(metrics.recallAt5().numerator()).isEqualTo(1);
+        assertThat(metrics.recallAt5().denominator()).isEqualTo(3);
+        assertThat(metrics.recallAt10().numerator()).isEqualTo(2);
+        assertThat(ranksOf(List.of(
+            item("memory:1", ContextBodyMode.TITLE_ONLY),
+            item("memory:2", ContextBodyMode.INLINE),
+            item("memory:3", ContextBodyMode.OMITTED))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("memory:2", 1, "memory:1", 2));
+        assertThat(ranksOf(List.of(
+            item("memory:1", ContextBodyMode.TITLE_ONLY),
+            item("memory:2", ContextBodyMode.INLINE),
+            item(ContextSource.MEMORY_SEARCH, "memory:4", ContextBodyMode.INLINE))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("memory:4", 1, "memory:2", 2, "memory:1", 3));
     }
 
 
-    /** 보조 항목은 사례 항목보다 먼저 넣는다. 번호가 작은 쪽이 먼저 실리므로 사례 항목이 가장 불리한 자리에 선다. */
-    private List<Memory> fillerOf(Filler filler, Instant now) {
-        Instant at = now.minus(Duration.ofDays(filler.updatedDaysAgo()));
-        Long owner = userOf(filler.owner()).id();
-        List<Memory> rows = new ArrayList<>();
-        for (int n = 1; n <= filler.count(); n++) {
-            rows.add(Memory.accepted(
-                MemoryScope.USER,
-                owner,
-                null,
-                "보조 사실 " + n,
-                StoredContent.plain("가".repeat(filler.contentChars())),
-                MemoryPlacement.core(MemoryRetrieval.SEARCH),
-                owner,
-                at));
-        }
-        return rows;
+    @Test
+    @DisplayName("기준 파일보다 recall@5 가 낮거나 오기억 노출률이 높거나 버전이 다르면 어긋남을 낸다")
+    void reportsBaselineViolations() {
+        MemoryEvalBaseline baseline = new MemoryEvalBaseline(2, FACTS_ON, 0.5, 0.25);
+
+        assertThat(baseline.violations(2, metricsOf(2, 4, 1, 4))).isEmpty();
+        assertThat(baseline.violations(2, metricsOf(1, 4, 1, 4))).singleElement().asString().contains("recall@5");
+        assertThat(baseline.violations(2, metricsOf(2, 4, 2, 4))).singleElement().asString().contains("오기억 노출률");
+        assertThat(baseline.violations(3, metricsOf(2, 4, 1, 4)))
+            .singleElement()
+            .asString()
+            .contains(MemoryEvalBaseline.WRITE_PROPERTY);
     }
 
 
-    private Memory memoryOf(MemorySeed seed, Instant now) {
-        Instant at = now.minus(Duration.ofDays(seed.updatedDaysAgo()));
-        StoredContent body = StoredContent.plain(seed.content());
-        MemoryPlacement placement = new MemoryPlacement(seed.collection(), seed.retrieval(), seed.sensitivity());
-        boolean group = seed.scope() == MemoryScope.GROUP;
-        Long ownerId = group ? null : userOf(seed.owner()).id();
-        Long groupId = group ? groupIdOf(seed.group()) : null;
-        if (seed.entryType() == MemoryEntryType.DOCUMENT) {
-            return Memory.document(
-                ownerId, seed.collection(), seed.documentKey(), seed.title(), body, seed.sensitivity(), at);
-        }
-        return switch (seed.status()) {
-            case ACCEPTED ->
-                Memory.accepted(
-                    seed.scope(),
-                    ownerId,
-                    groupId,
-                    seed.title(),
-                    body,
-                    placement,
-                    group ? firstUserIdOfGroup(seed.group()) : ownerId,
-                    at);
-            case PROPOSED -> Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
-            case REJECTED -> {
-                Memory proposed = Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
-                proposed.reject(at);
-                yield proposed;
-            }
-        };
+    /** recall@5 와 오기억 노출률만 채운 지표다. */
+    private static MemoryEvalScoreboard.Metrics metricsOf(int recalled, int expected, int exposed, int falseMemories) {
+        MemoryEvalScoreboard.Ratio none = MemoryEvalScoreboard.Ratio.of(0, 0);
+        return new MemoryEvalScoreboard.Metrics(
+            1,
+            none,
+            none,
+            MemoryEvalScoreboard.Ratio.of(recalled, expected),
+            none,
+            MemoryEvalScoreboard.Ratio.of(exposed, falseMemories),
+            0,
+            0,
+            null,
+            0);
     }
 
 
-    private CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
+    private static ContextItem item(String ref, ContextBodyMode mode) {
+        return item(null, ref, mode);
+    }
+
+
+    private static ContextItem item(ContextSource source, String ref, ContextBodyMode mode) {
+        return new ContextItem(source, ref, null, null, null, null, null, null, mode, List.of(), null, null);
+    }
+
+
+    static CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
+        Map<String, Integer> ranks = ranksOf(context.bundle().items());
         List<ItemVerdict> items = new ArrayList<>();
         for (String key : each.expect()) {
-            items.add(new ItemVerdict(key, null, stateOf(ids.get(key), context)));
+            String ref = ContextItem.memoryRef(ids.get(key));
+            items.add(new ItemVerdict(key, null, stateOf(ids.get(key), context), ranks.get(ref)));
         }
         for (Forbidden forbidden : each.forbidden()) {
+            String ref = ContextItem.memoryRef(ids.get(forbidden.memory()));
             items.add(new ItemVerdict(
-                forbidden.memory(), forbidden.kind(), stateOf(ids.get(forbidden.memory()), context)));
+                forbidden.memory(),
+                forbidden.kind(),
+                stateOf(ids.get(forbidden.memory()), context),
+                ranks.get(ref)));
         }
         return new CaseVerdict(each.id(), each.category(), items, context.chars(), context.omittedItems());
+    }
+
+
+    /** 기억을 싣지 않는 아래쪽 기준선이다. 모든 항목이 없다. */
+    private static CaseVerdict noneVerdictOf(Case each) {
+        List<ItemVerdict> items = new ArrayList<>();
+        each.expect().forEach(key -> items.add(new ItemVerdict(key, null, ItemState.ABSENT, null)));
+        each.forbidden()
+            .forEach(forbidden -> items.add(
+                new ItemVerdict(forbidden.memory(), forbidden.kind(), ItemState.ABSENT, null)));
+        return new CaseVerdict(each.id(), each.category(), items, 0, 0);
+    }
+
+
+    /**
+     * 그 에이전트가 볼 수 있는 항목을 예산 없이 모두 본문으로 싣는 위쪽 기준선이다. 권한 조건은 조립과 같은 {@link MemoryService} 의 조회를
+     * 쓴다. 항상 층 번호 순, 그다음 색인 번호 순으로 늘어놓는다.
+     */
+    private CaseVerdict fullInjectionVerdictOf(Case each, Map<String, Long> ids, Long agentId) {
+        CurrentUser asker = fixture.userOf(each.asker());
+        MemoryAccess access = memoryService.accessOf(agentId);
+        List<Memory> visible = new ArrayList<>();
+        memoryService.alwaysInjectedFor(asker, access).stream()
+            .sorted(Comparator.comparing(Memory::id))
+            .forEach(visible::add);
+        memoryService.indexedFor(asker, access).stream()
+            .sorted(Comparator.comparing(Memory::id))
+            .forEach(visible::add);
+        Map<Long, Integer> ranks = new HashMap<>();
+        long chars = 0;
+        for (Memory memory : visible) {
+            ranks.putIfAbsent(memory.id(), ranks.size() + 1);
+            chars += ("- [" + memory.id() + "] " + memory.title() + ": " + memory.content()).length() + 1;
+        }
+        List<ItemVerdict> items = new ArrayList<>();
+        for (String key : each.expect()) {
+            items.add(fullInjectionItem(key, null, ranks.get(ids.get(key))));
+        }
+        for (Forbidden forbidden : each.forbidden()) {
+            items.add(fullInjectionItem(forbidden.memory(), forbidden.kind(), ranks.get(ids.get(forbidden.memory()))));
+        }
+        return new CaseVerdict(each.id(), each.category(), items, chars, 0);
+    }
+
+
+    private static ItemVerdict fullInjectionItem(String key, MemoryEvalDataset.ForbiddenKind kind, Integer rank) {
+        return new ItemVerdict(key, kind, rank == null ? ItemState.ABSENT : ItemState.INLINE, rank);
+    }
+
+
+    /**
+     * recall@k 의 순위를 매긴다. 질문으로 고른 {@code MEMORY_SEARCH} 항목을 실은 순서대로, 그 뒤에 나머지 {@code INLINE} 항목을, 그 뒤에
+     * {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다. 빠진 항목은 순위가 없다.
+     *
+     * <p>질문으로 고른 항목을 앞에 두는 것은 그 구역이 관련도 순으로 고른 유일한 본문이라서다. 개인 사실 구역은 질문과 무관하게 최근 순으로 고르므로,
+     * 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5 위 밖으로 밀린다.
+     *
+     * @return 항목 참조마다 순위
+     */
+    static Map<String, Integer> ranksOf(List<ContextItem> items) {
+        Map<String, Integer> ranks = new HashMap<>();
+        items.stream()
+            .filter(item -> item.source() == ContextSource.MEMORY_SEARCH && item.bodyMode() == ContextBodyMode.INLINE)
+            .forEach(item -> ranks.putIfAbsent(item.ref(), ranks.size() + 1));
+        for (ContextBodyMode mode : List.of(ContextBodyMode.INLINE, ContextBodyMode.TITLE_ONLY)) {
+            items.stream()
+                .filter(item -> item.bodyMode() == mode)
+                .forEach(item -> ranks.putIfAbsent(item.ref(), ranks.size() + 1));
+        }
+        return ranks;
     }
 
 
@@ -304,59 +434,6 @@ class MemoryRecallEvalTest {
             case TITLE_ONLY -> ItemState.TITLE_ONLY;
             case OMITTED -> ItemState.OMITTED;
         };
-    }
-
-
-    /** 에이전트를 저장하고 시험 세트가 적은 collection 만 받게 한다. 저장하면 딸려 오는 core 줄은 지우고 다시 넣는다. */
-    private Map<String, Long> createAgents() {
-        Map<String, Long> agentIds = new LinkedHashMap<>();
-        for (MemoryEvalDataset.Agent each : DATASET.agents()) {
-            String code = AGENT_CODE_PREFIX + each.key();
-            Long agentId = agents.findByCode(code)
-                .orElseGet(() -> agents.save(Agent.of(
-                    code,
-                    "회수 측정 " + each.key(),
-                    code,
-                    "http://runtime.test/p/" + code,
-                    CostMode.API,
-                    CredentialScope.DEDICATED,
-                    AgentVisibility.GROUP,
-                    null,
-                    BASE)))
-                .id();
-            createdAgentIds.add(agentId);
-            jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
-            each.collections()
-                .forEach(grant -> grants.save(
-                    AgentMemoryCollection.of(agentId, grant.collection(), grant.allowSensitive(), BASE)));
-            agentIds.put(each.key(), agentId);
-        }
-        return agentIds;
-    }
-
-
-    private static CurrentUser userOf(String key) {
-        MemoryEvalDataset.User user = DATASET.user(key);
-        int index = DATASET.users().indexOf(user);
-        return new CurrentUser(USER_ID_BASE + index, key + "@example.com", key, groupIdOf(user.group()), user.role());
-    }
-
-
-    private static Long groupIdOf(String group) {
-        List<String> groups = DATASET.users().stream()
-            .map(MemoryEvalDataset.User::group)
-            .distinct()
-            .toList();
-        return GROUP_ID_BASE + groups.indexOf(group);
-    }
-
-
-    private static Long firstUserIdOfGroup(String group) {
-        return DATASET.users().stream()
-            .filter(user -> user.group().equals(group))
-            .findFirst()
-            .map(user -> userOf(user.key()).id())
-            .orElseThrow();
     }
 
 
@@ -391,7 +468,37 @@ class MemoryRecallEvalTest {
                     { "key": "m1", "owner": "parentA", "scope": "USER", "title": "제목", "content": "내용" }
                   ],
                   "expect": ["m1"],
-                  "forbidden": []
+                  "forbidden": [],
+                  "judge": [ { "id": "j1", "question": "답이 내용을 말하는가?", "expect": true } ]
+                }
+              ]
+            }
+            """;
+
+    /** 대체 관계와 판정 질문의 검사를 확인하는 사례 묶음이다. m2 가 m1 을 대체한다. */
+    private static final String SUPERSEDING = """
+            {
+              "version": 2,
+              "note": "검사용",
+              "users": [
+                { "key": "parentA", "role": "ADMIN", "group": "home" },
+                { "key": "parentB", "role": "ADMIN", "group": "home" }
+              ],
+              "agents": [ { "key": "general", "collections": [ { "collection": "core", "allowSensitive": false } ] } ],
+              "cases": [
+                {
+                  "id": "KU-X",
+                  "category": "KNOWLEDGE_UPDATE",
+                  "asker": "parentA",
+                  "agent": "general",
+                  "question": "질문",
+                  "memories": [
+                    { "key": "m1", "owner": "parentA", "scope": "USER", "title": "제목", "content": "옛 값" },
+                    { "key": "m2", "owner": "parentA", "scope": "USER", "title": "제목", "content": "새 값", "supersedes": "m1" }
+                  ],
+                  "expect": ["m2"],
+                  "forbidden": [ { "memory": "m1", "kind": "SUPERSEDED" } ],
+                  "judge": [ { "id": "j1", "question": "옛 값을 말하는가?", "expect": false } ]
                 }
               ]
             }

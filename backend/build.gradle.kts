@@ -1,3 +1,4 @@
+// 코드 규칙: rule-43. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -66,8 +67,10 @@ tasks.processTestResources {
 
 tasks.test {
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
+    // model-eval 태그는 실제 모델을 부르는 답 판정이고 memoryJudgeEval 이 따로 돌린다.
+    // embedding-eval 태그는 실제 임베딩 서비스를 부르는 회수 측정이고 memoryEmbeddingEval 이 따로 돌린다.
     useJUnitPlatform {
-        excludeTags("mysql")
+        excludeTags("mysql", "model-eval", "embedding-eval")
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
@@ -93,6 +96,8 @@ tasks.withType<Test>().configureEach {
     archunitFreezeProperties.forEach { name ->
         providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
     }
+    // 기억 합성 측정의 기준 파일을 다시 쓰는 속성이다. 절차는 docs/features/memory.md 의 「기준 파일」 이 갖는다.
+    providers.gradleProperty("memoryEval.writeBaseline").orNull?.let { systemProperty("memoryEval.writeBaseline", it) }
     // 기준 파일만 바뀌어도 테스트가 옛 결과로 건너뛰지 않게 입력으로 둔다.
     // inputs.dir 은 디렉터리가 없으면 태스크 검증이 실패해 기준을 처음 만들 수 없다.
     inputs.files(fileTree("config/archunit/store"))
@@ -108,6 +113,36 @@ tasks.register<Test>("archTest") {
     useJUnitPlatform {
         includeTags("architecture")
     }
+}
+
+/**
+ * 합성 사례로 기억이 답에 반영되는지 모델로 판정한다. 설정 환경 변수가 없으면 그 검사를 건너뛰고 성공으로 끝난다.
+ * 방법과 설정 이름은 docs/features/memory.md 의 「답 판정」 이 갖는다. CI 에서 돌리지 않는다.
+ */
+tasks.register<Test>("memoryJudgeEval") {
+    group = "verification"
+    description = "합성 사례로 기억이 답에 반영되는지 모델로 판정한다. 설정이 없으면 건너뛴다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-eval")
+    }
+    maxHeapSize = "1g"
+    // 결과가 밖의 모델에 달려 있어 앞선 결과를 다시 쓰지 않는다.
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("memoryEmbeddingEval") {
+    group = "verification"
+    description = "실제 임베딩 서비스로 사례 묶음을 하이브리드로 조립해 지표를 남긴다. 주소와 모델이 없으면 건너뛴다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("embedding-eval")
+    }
+    maxHeapSize = "1g"
+    // 결과가 밖의 임베딩 서비스에 달려 있어 앞선 결과를 다시 쓰지 않는다.
+    outputs.upToDateWhen { false }
 }
 
 /**

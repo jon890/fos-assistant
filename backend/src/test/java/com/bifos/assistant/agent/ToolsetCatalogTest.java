@@ -51,7 +51,7 @@ class ToolsetCatalogTest {
             .thenReturn(List.of(
                 new ToolsetCatalogEntry("spotify", "Spotify", "음악"),
                 new ToolsetCatalogEntry("memory", "Memory", "기억")));
-        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc())
+        when(agents.findByDeletedAtIsNullOrderByCodeAsc())
             .thenReturn(List.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("spotify"));
         assertThat(catalog.read(admin))
@@ -83,7 +83,7 @@ class ToolsetCatalogTest {
             AgentVisibility.GROUP,
             null,
             Instant.now());
-        when(agents.findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc())
+        when(agents.findByDeletedAtIsNullOrderByCodeAsc())
             .thenReturn(List.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "unavailable"));

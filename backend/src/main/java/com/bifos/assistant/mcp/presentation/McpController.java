@@ -51,6 +51,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class McpController {
     private static final Pattern UUID_TEXT = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final String INVALID_ARGUMENTS = "인자 형식이 올바르지 않습니다.";
+    private static final String SEARCH_RESTART = "검색 순위가 앞 페이지와 달라졌습니다. cursor 없이 다시 검색하세요.";
     private static final String MEMORY_READ = "memory_read";
     private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
@@ -245,23 +246,30 @@ public class McpController {
     /** 검색 범위는 origin 실행에서만 정한다. null과 모르는 키는 인자 오류다. */
     private Map<String, Object> searchMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
         JsonNode limit = arguments.get("limit");
-        JsonNode after = arguments.get("after_id");
-        if (!Set.of("query", "limit", "after_id").containsAll(arguments.propertyNames())
+        JsonNode cursor = arguments.get("cursor");
+        if (!Set.of("query", "limit", "cursor").containsAll(arguments.propertyNames())
             || !text(arguments, "query")
             || (limit != null
                 && (!limit.isIntegralNumber()
                     || !limit.canConvertToInt()
                     || limit.intValue() < 1
                     || limit.intValue() > 50))
-            || (after != null
-                && (!after.isIntegralNumber() || !after.canConvertToLong() || after.longValue() <= 0))) {
+            || (cursor != null && !cursor.isString())) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        MemorySearchArguments value = MemorySearchArguments.from(arguments);
-        if (value.query().isEmpty() || value.query().codePointCount(0, value.query().length()) > 200) {
+        Optional<MemorySearchArguments> parsed = MemorySearchArguments.from(arguments);
+        if (parsed.isEmpty()) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.afterId()));
+        MemorySearchArguments value = parsed.get();
+        try {
+            return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.cursor()));
+        } catch (ApiException ex) {
+            if (ex.code() != ErrorCode.VALIDATION_FAILED) {
+                throw ex;
+            }
+            return invalidParams(id, SEARCH_RESTART);
+        }
     }
 
 

@@ -1,8 +1,8 @@
 -- 삭제 전 모든 테이블에 한 행씩 넣는다. 900000001은 검사마다 고유 번호로 치환한다.
 -- nullable FK는 참조 대상 삽입 뒤 연결한다. FK 검사와 CHECK는 끄지 않는다.
 
-INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at, profile_managed, connector_managed, connector_attachments, proactive_check_writes_allowed)
-VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'http://agent-runtime.test', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 900000001, 1, '2020-01-01 00:00:00', 0, 0, 0, 1);
+INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at, profile_managed, proactive_check_writes_allowed)
+VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'http://agent-runtime.test', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 900000001, 1, '2020-01-01 00:00:00', 0, 1);
 
 INSERT INTO agent_execution (id, user_id, conversation_id, agent_id, profile_name, cost_mode, status, input_tokens, output_tokens, estimated_cost_micros, started_at, output_text, event_observation)
 VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'SUBSCRIPTION', 'SUCCEEDED', 17, 23, 123, '2020-01-01 00:00:00', '지워야 할 실행 본문', 'coverage-900000001');
@@ -13,8 +13,8 @@ VALUES (900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00
 INSERT INTO allowed_person (id, email, display_name, hermes_profile, enabled, created_at)
 VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
-INSERT INTO app_user (id, email, display_name, group_id, role, created_at)
-VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 900000001, 'MEMBER', '2020-01-01 00:00:00');
+INSERT INTO app_user (id, email, display_name, group_id, role, created_at, limit_order_amount_krw, limit_updated_at)
+VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 900000001, 'MEMBER', '2020-01-01 00:00:00', 1, '2020-01-01 00:00:00');
 
 INSERT INTO chat_artifact (id, conversation_id, message_id, path, byte_size, created_at)
 VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, '2020-01-01 00:00:00');
@@ -64,6 +64,9 @@ VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-
 INSERT INTO memory_collection (group_id, collection_key, display_name, sort_order, created_at)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
+INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)
+VALUES (900000001, 'coverage-900000001', 1, X'0000000000000000000000000000000000000000000000000000000000000000', X'0000803F', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
+
 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, sensitivity, changed_at)
 VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
 
@@ -103,11 +106,11 @@ VALUES (900000001, 900000001, 'test', 'coverage-900000001', 'test', '2020-01-01 
 INSERT INTO attention_event (id, user_id, item_key, state_key, trigger_type, attention, event_type, stale, created_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'test', 'test', 1, '2020-01-01 00:00:00');
 
-INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree)
-VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1);
+INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
+VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
-INSERT INTO connector_connection (id, user_id, connector_id, status, fields, restart_required, desired_enabled, created_at, updated_at, undeclared_tools, vault_stored)
-VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', 1, 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
+INSERT INTO connector_connection (id, user_id, connector_id, status, fields, created_at, updated_at, undeclared_tools, vault_stored)
+VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
 
 INSERT INTO connector_conversation_grant (id, user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001, '2099-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -123,9 +126,6 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 64, '0')), UNHEX(LPAD(HEX(90000000
 
 INSERT INTO decision_feedback_event (id, user_id, subject_type, subject_key, event_type, actor, contract_version, occurred_at)
 VALUES (900000001, 900000001, 'FOLLOW_UP', 'coverage-900000001', 'SURFACED', 'USER', 1, '2020-01-01 00:00:00');
-
-INSERT INTO financial_order_limit (user_id, updated_at)
-VALUES (900000001, '2020-01-01 00:00:00');
 
 INSERT INTO follow_up (id, public_id, user_id, conversation_id, proposed_by_execution_id, title, title_key, waiting, status, created_at, updated_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -148,9 +148,6 @@ VALUES (900000001, 900000001, 1, 'coverage-900000001', 900000001, '2020-01-01 00
 INSERT INTO result_delivery_item (id, delivery_id, source, result_key)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');
 
-INSERT INTO service_token (id, user_id, token_hash, label, created_at, expires_at)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2099-01-01 00:00:00');
-
 INSERT INTO task (id, public_id, owner_user_id, agent_id, title, state, conversation_mode, conversation_id, notify, created_at, updated_at, kind)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 'coverage-900000001', 'ACTIVE', 'NEW_PER_RUN', 900000001, 'ALWAYS', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'TURN');
 
@@ -169,9 +166,6 @@ VALUES (900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:0
 INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body, body_key_id)
 VALUES (900000001, 900000001, 1, 'VALID', 1, '2020-01-01 00:00:00', '암호화 본문 대역', 900000001);
 
-INSERT INTO financial_limit_change (action_id, user_id, limit_kind, requested_value, previous_value, created_at)
-VALUES (900000001, 900000001, 'ORDER_AMOUNT_KRW', 1, 1, '2020-01-01 00:00:00');
-
 INSERT INTO media_observation_request (id, attachment_id, request_id, request_hash, observation_id)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001);
 
@@ -187,9 +181,6 @@ VALUES (900000001, 900000001, 900000001, 'test', '2020-01-01 00:00:00');
 INSERT INTO proactive_value_evaluation (id, check_id, user_id, outcome, evidence_json, created_at)
 VALUES (900000001, 900000001, 900000001, 'RUNNING', '{"private":"지울 평가 근거"}', '2020-01-01 00:00:00');
 
-INSERT INTO service_token_collection (token_id, collection, allow_sensitive)
-VALUES (900000001, 'coverage-900000001', 1);
-
 INSERT INTO task_trigger (id, task_id, type, time_zone, missed_policy, created_at, updated_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
 
@@ -202,8 +193,9 @@ VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'test', '{}', '{}
 INSERT INTO task_run (id, public_id, task_id, trigger_id, owner_user_id, scheduled_for, status, conversation_id, execution_id, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, '2020-01-01 00:00:00', 'coverage-900000001', 900000001, 900000001, '2020-01-01 00:00:00');
 
-UPDATE connector_action SET agent_id = 900000001 WHERE id = 900000001;
-UPDATE connector_connection SET agent_id = 900000001 WHERE id = 900000001;
+UPDATE connector_action SET agent_id = 900000001, status = 'SUCCEEDED', risk = 'WRITE' WHERE id = 900000001;
+UPDATE connector_action SET args_key_id = 900000001, result_key_id = 900000001 WHERE id = 900000001;
+UPDATE connector_action_execution SET content_key_id = 900000001 WHERE action_id = 900000001;
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET source_check_id = 900000001 WHERE id = 900000001;

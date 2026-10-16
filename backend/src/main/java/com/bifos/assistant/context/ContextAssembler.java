@@ -13,12 +13,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +30,9 @@ import org.springframework.stereotype.Service;
  * <p>Memory 를 먼저 문맥 묶음의 항목으로 만들고, 그 항목을 지금과 같은 글로 옮긴다(ADR-071). 같은 이름의 개인 문서와 그룹
  * 문서에 붙는 충돌 표시를 빼면 글이 바뀌지 않아 {@code instructions_hash} 도 그대로다.
  *
- * <p>층은 그룹 항상 층, 개인 항상 층, 개인 사실 구역, 색인 층 순서다. 개인 사실 구역은 색인에 오를 짧은 개인 항목을 본문까지 싣는다
- * (ADR-20261008 / memory-facts). 그 구역에 실은 항목은 색인에서 뺀다.
+ * <p>층은 그룹 항상 층, 개인 항상 층, 개인 사실 구역, 질문과 관련된 기억 구역, 색인 층 순서다. 개인 사실 구역은 색인에 오를 짧은 개인 항목을
+ * 본문까지 싣는다(ADR-20261008 / memory-facts). 질문과 관련된 기억 구역은 질문이 있을 때만 관련 있는 항목을 본문까지 싣는다
+ * (ADR-20261015 / memory-hybrid-selection). 두 구역에 실은 항목은 색인에서 뺀다.
  */
 @Service
 @Slf4j
@@ -80,11 +81,16 @@ public class ContextAssembler implements OmittedMemories {
             아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.
             """.stripTrailing();
 
-    private static final Pattern LINE_BREAK = Pattern.compile("\\r\\n|\\n|\\r");
+    /** 지금 조립의 층마다 고르는 규칙이다. 값의 뜻은 {@link ContextSelection} 이 갖는다. */
+    private static final Map<ContextSource, String> SELECTORS = Map.of(
+        ContextSource.MEMORY_ALWAYS, ContextSelection.ALWAYS_BY_ID,
+        ContextSource.MEMORY_FACTS, ContextSelection.FACTS_RECENT,
+        ContextSource.MEMORY_INDEX, ContextSelection.INDEX_BY_ID);
 
     private final MemoryService memories;
     private final ContextProperties properties;
     private final Clock clock;
+    private final MemorySearchSection searchSection;
 
 
     /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. */
@@ -124,7 +130,17 @@ public class ContextAssembler implements OmittedMemories {
      * @param agentId 이 실행을 도는 에이전트의 번호
      */
     public AssembledContext assemble(CurrentUser user, Long agentId) {
-        return assemble(user, memories.accessOf(agentId));
+        return assemble(user, agentId, null);
+    }
+
+
+    /**
+     * 질문과 관련된 기억 구역까지 싣는 조립이다. 질문이 null 이거나 공백뿐이면 {@link #assemble(CurrentUser, Long)} 와 같은 글을 낸다.
+     *
+     * @param question 사용자가 보낸 turn 의 글이나 위임받은 실행의 작업 글
+     */
+    public AssembledContext assemble(CurrentUser user, Long agentId, String question) {
+        return assemble(user, memories.accessOf(agentId), question);
     }
 
 
@@ -134,7 +150,7 @@ public class ContextAssembler implements OmittedMemories {
      * <p>실행에 보내지 않는다. 목록에서 자리가 없어 빠질 항목에 표시를 다는 데만 쓴다.
      */
     public AssembledContext assembleForOwner(CurrentUser user) {
-        return assemble(user, MemoryAccess.owner());
+        return assemble(user, MemoryAccess.owner(), null);
     }
 
 
@@ -144,7 +160,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
 
-    private AssembledContext assemble(CurrentUser user, MemoryAccess access) {
+    private AssembledContext assemble(CurrentUser user, MemoryAccess access, String question) {
         Instant now = clock.instant();
         List<Memory> always = memories.alwaysInjectedFor(user, access);
         List<Memory> indexed = memories.indexedFor(user, access);
@@ -158,10 +174,35 @@ public class ContextAssembler implements OmittedMemories {
         appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
         Set<Long> facts = appendFacts(builder, indexed, now);
-        List<Memory> rest = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
+        List<Memory> afterFacts = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
+        // 다른 범위에 같은 이름의 짝이 있는 문서는 구역에 싣지 않는다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없어 색인에 둔다
+        MemorySearchPlacement search = searchSection.place(
+            question, afterFacts, sameNameDocuments(afterFacts).keySet(), builder, memory -> memoryFreshness(memory, now));
         builder.limit(maxChars);
-        appendIndex(builder, rest, sameNameDocuments(rest), now);
-        return builder.build();
+        appendIndex(builder, search, sameNameDocuments(search.indexOrder()), now);
+        return withSelections(builder.build());
+    }
+
+
+    /**
+     * Memory 항목마다 고른 규칙과 {@code source} 안의 순위를 붙인다(ADR-20261015 / memory-eval-gate). 빠진 항목도 순위를 받는다.
+     *
+     * <p>묶음 항목에만 붙고 글로 옮기지 않으므로 {@code instructions} 와 그 지문은 바뀌지 않는다. 순위는 그 {@code source} 안의 차례이고,
+     * 담을 때 이미 근거를 붙인 항목도 차례를 센다.
+     */
+    private static AssembledContext withSelections(AssembledContext context) {
+        Map<ContextSource, Integer> ranks = new EnumMap<>(ContextSource.class);
+        List<ContextItem> items = context.bundle().items().stream().map(item -> {
+            String selector = SELECTORS.get(item.source());
+            int rank = ranks.merge(item.source(), 1, Integer::sum);
+            // 개인 사실 구역과 질문으로 고른 항목은 고른 규칙과 순위가 항목마다 달라 담을 때 이미 근거를 붙였다
+            if (selector == null || item.selection() != null) {
+                return item;
+            }
+            return item.withSelection(ContextSelection.ranked(selector, rank));
+        }).toList();
+        return new AssembledContext(
+            context.instructions(), context.chars(), context.omittedMemoryIds(), new ContextBundle(items));
     }
 
 
@@ -179,16 +220,20 @@ public class ContextAssembler implements OmittedMemories {
         }
         List<Memory> chosen = chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
         Set<Long> placed = new HashSet<>();
+        Map<Long, Integer> chosenRanks = new HashMap<>();
+        chosen.forEach(memory -> chosenRanks.put(memory.id(), chosenRanks.size() + 1));
         chosen.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
-            ContextItem item = memoryItem(
+            // 순위는 고른 차례(최근에 고친 순)다. 싣는 차례(번호 순)가 아니다
+            ContextItem item = MemoryItems.item(
                 memory,
                 ContextSource.MEMORY_FACTS,
                 ContextBodyMode.INLINE,
                 List.of(),
                 memory.title(),
                 memory.content(),
-                memoryFreshness(memory, now));
-            if (builder.appendIfFits(FACTS_HEADER, factLine(memory), item)) {
+                memoryFreshness(memory, now))
+                .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
+            if (builder.appendIfFits(FACTS_HEADER, MemoryItems.inlineLine(memory), item)) {
                 placed.add(memory.id());
             } else {
                 log.warn("memory facts returned an item to the index memoryId={}", memory.id());
@@ -222,7 +267,7 @@ public class ContextAssembler implements OmittedMemories {
         long used = 0;
         for (Memory memory : candidates.stream().sorted(recentFirst).toList()) {
             boolean first = chosen.isEmpty();
-            long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, factLine(memory))
+            long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, MemoryItems.inlineLine(memory))
                 .length();
             if (used + cost <= budget) {
                 chosen.add(memory);
@@ -230,18 +275,6 @@ public class ContextAssembler implements OmittedMemories {
             }
         }
         return chosen;
-    }
-
-
-    /** 개인 사실 한 줄이다. 제목과 본문의 줄바꿈은 공백 하나로 바꾸고 자르지 않는다. */
-    private static String factLine(Memory memory) {
-        return "- [" + memory.id() + "] " + oneLine(memory.title()) + ": " + oneLine(memory.content());
-    }
-
-
-    /** 줄바꿈을 공백 하나로 바꾼다. 모델이 정한 제목이나 본문이 지시문에 머리 줄을 끼우지 못하게 한다. */
-    private static String oneLine(String text) {
-        return LINE_BREAK.matcher(text).replaceAll(" ");
     }
 
 
@@ -260,7 +293,7 @@ public class ContextAssembler implements OmittedMemories {
 
     /** 항상 층의 줄은 본문까지 싣는다. */
     private ContextItem alwaysItem(Memory memory, Instant now) {
-        return memoryItem(
+        return MemoryItems.item(
             memory,
             ContextSource.MEMORY_ALWAYS,
             ContextBodyMode.INLINE,
@@ -276,7 +309,7 @@ public class ContextAssembler implements OmittedMemories {
         List<String> conflictsWith = sameNames.stream()
             .map(other -> ContextItem.memoryRef(other.id()))
             .toList();
-        return memoryItem(
+        return MemoryItems.item(
             memory,
             ContextSource.MEMORY_INDEX,
             ContextBodyMode.TITLE_ONLY,
@@ -284,30 +317,6 @@ public class ContextAssembler implements OmittedMemories {
             memory.title(),
             null,
             memoryFreshness(memory, now));
-    }
-
-
-    private static ContextItem memoryItem(
-        Memory memory,
-        ContextSource source,
-        ContextBodyMode bodyMode,
-        List<String> conflictsWith,
-        String title,
-        String body,
-        ContextFreshness freshness) {
-        return new ContextItem(
-            source,
-            ContextItem.memoryRef(memory.id()),
-            memory.scope(),
-            memory.ownerUserId(),
-            memory.sensitivity(),
-            ContextTrust.USER_APPROVED,
-            memory.updatedAt(),
-            freshness,
-            bodyMode,
-            conflictsWith,
-            title,
-            body);
     }
 
 
@@ -337,11 +346,16 @@ public class ContextAssembler implements OmittedMemories {
     }
 
 
+    /** 색인 층을 {@code search} 가 정한 차례로 담는다. 질문으로 점수를 받은 항목에는 그 근거를 붙인다. */
     private void appendIndex(
-        ContextBudgetWriter builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
-        memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
+        ContextBudgetWriter builder, MemorySearchPlacement search, Map<Long, List<Memory>> sameNames, Instant now) {
+        search.indexOrder().forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
             ContextItem item = indexItem(memory, others, now);
+            ContextSelection scored = search.indexSelections().get(memory.id());
+            if (scored != null) {
+                item = item.withSelection(scored);
+            }
             builder.append(memory.id(), INDEX_HEADER, indexLine(memory.id(), item.title(), others), item);
         });
     }
@@ -349,7 +363,7 @@ public class ContextAssembler implements OmittedMemories {
 
     /** 색인 한 줄이다. 제목의 줄바꿈은 공백 하나로 바꾼다. 같은 이름의 문서가 다른 범위에 있으면 그 번호를 줄 끝에 적는다. */
     private static String indexLine(Long memoryId, String title, List<Memory> sameNames) {
-        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + oneLine(title));
+        StringBuilder line = new StringBuilder("- [" + memoryId + "] " + MemoryItems.oneLine(title));
         for (Memory other : sameNames) {
             String kind = other.scope() == MemoryScope.GROUP ? "그룹" : "개인";
             line.append(" (같은 이름의 ")

@@ -13,7 +13,6 @@ import re
 
 from .common import (
     CONNECTOR_HOST_MARKER,
-    CONTROL_PLANE_MCP,
     MANAGED_MARKER,
     _json_object,
     _missing_profile,
@@ -24,10 +23,6 @@ from .common import (
 
 from .connector_binding import (
     _connector_bind_config,
-)
-
-from .connector_isolated import (
-    _connector_config,
 )
 
 from .connector_manifest import (
@@ -48,10 +43,8 @@ from .connector_state import (
     CONNECTOR_TOOL_MAP,
     POLICY_PLUGIN,
     PROFILE_SKILLS_DIR,
-    SOUL_FILE,
     _bind_entry_env,
     _bind_entry_shape,
-    _connector_allowlist,
     _connector_server,
     _connector_state,
     _connector_tool_map,
@@ -59,7 +52,6 @@ from .connector_state import (
     _detached_servers,
     _entry_field_env,
     _entry_matches_manifest,
-    _owned_mode,
     _remove_backup_env_copies,
     _skill_tree_files,
     _tool_map_bytes,
@@ -119,8 +111,7 @@ async def _connector_request(request):
         body = await _json_object(request)
         bind = body.get("bind") if isinstance(body, dict) else None
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
-        # `bind` 는 바인딩 설치에서만 뜻이 있다. 떼기는 소유 기록의 설치 방식을 따른다.
-        # `sandbox_owner` 는 사진 도구를 여는 옛 설치와, 사용자 첨부를 읽는 커넥터의 바인딩 설치에서 쓴다(ADR-091, ADR-20261007 connector-owner-attachments).
+        # `sandbox_owner`는 사용자 첨부를 읽는 바인딩의 주인이다(ADR-20261007 connector-owner-attachments).
         # 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 그 값으로 주인의 첨부 디렉터리만 정한다.
         # `owner_browser` 는 그 바인딩의 브라우저 중계 주소다. 선언한 커넥터의 바인딩 설치만 쓴다(ADR-20261008 browser-gateway-token).
         if (body is None
@@ -128,10 +119,10 @@ async def _connector_request(request):
                 <= {"profile", "plugin", "enabled", "bind", "sandbox_owner", "owner_browser"}
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
-                or (body["enabled"] and body["plugin"] not in roots)
+                or (body["enabled"] and (body["plugin"] not in roots or "bind" not in body))
                 or ("bind" in body and (not isinstance(bind, dict) or set(bind) - {"guard"} != {"vault"}
                                         or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
-            return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 그리고 sandbox_owner, owner_browser 만 받는다")
+            return _rejected("profile, 알려진 plugin, enabled와 설치할 bind.vault, sandbox_owner, owner_browser만 받는다")
         if isinstance(bind, dict) and "guard" in bind:
             try:
                 _binding_guard(bind["guard"])
@@ -153,15 +144,7 @@ async def _connector_request(request):
     if missing is not None:
         return missing
     profile_dir = get_profile_dir(body["profile"])
-    # 표식은 대상의 방식으로 판정한다. 커넥터 표식만 있는 사람이 만든 profile 은 바인딩 설치만 받는다.
-    managed = (profile_dir / MANAGED_MARKER).is_file()
-    host = (profile_dir / CONNECTOR_HOST_MARKER).is_file()
-    owned_mode = None if request.method.upper() == "GET" else _owned_mode(profile_dir, body["plugin"])
-    # 커넥터 표식만 있는 profile 의 떼기는 그 항목이 없어도 바인딩 떼기로 다룬다. 다시 보낸 떼기가 바꾸지 않고 성공한다.
-    unbind = (request.method.upper() != "GET" and not body["enabled"]
-              and (owned_mode == BIND_MODE or (owned_mode is None and not managed)))
-    bind_target = request.method.upper() == "GET" or ("bind" in body if body["enabled"] else unbind)
-    if not (managed or (host and bind_target)):
+    if not ((profile_dir / MANAGED_MARKER).is_file() or (profile_dir / CONNECTOR_HOST_MARKER).is_file()):
         return _rejected("관리 표식이 없는 profile 이다", 401)
     stage = "status" if request.method.upper() == "GET" else "manifest"
     try:
@@ -174,15 +157,7 @@ async def _connector_request(request):
             await asyncio.to_thread(_guard_hide_financial, profile_dir, state)
             config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
             servers = config.get("mcp_servers") or {}
-            try:
-                expected = _connector_allowlist(state, servers)
-            except FileExistsError:
-                expected = None
-            # 설치가 쓰는 목록과 같고 Control Plane MCP 등록이 없어야 설치가 끝난 것이다.
-            # 이 값은 profile 단위다. 목록이 profile 하나에 하나뿐이라 서버 이름을 찾지 못하는 기록이 하나라도 있으면
-            # 그 profile 의 커넥터가 모두 `configured: false` 다.
             allowed = (config.get("platform_toolsets") or {}).get("api_server")
-            isolated = (expected is not None and CONTROL_PLANE_MCP not in servers and allowed == expected)
             # 이름 대응에서 `tools` 만 계산한 것과 다른 서버들이다. 모양이 달라 `None` 이면 `policy_hook` 이 거짓이므로
             # 여기서는 항목을 거짓으로 만들지 않는다.
             drift = _tool_map_drift(profile_dir, state)
@@ -190,8 +165,8 @@ async def _connector_request(request):
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
                 entry = state.get(plugin)
-                # 설치하지 않은 커넥터는 소유 기록의 기본값처럼 옛 설치로 답한다. 읽는 쪽은 설치한 항목의 값만 쓴다.
-                mode = _entry_mode(entry)
+                # 설치하지 않은 커넥터도 현재 바인딩 설치 방식으로 답한다.
+                mode = _entry_mode(entry) if entry is not None else BIND_MODE
                 if entry is None or manifest is None or servers.get(manifest["mcp_server"]) != entry["server"]:
                     configured = False
                 else:
@@ -200,16 +175,11 @@ async def _connector_request(request):
                     # 연결의 실행과 probe, 떼기가 끊기지 않게 하고, 상태 조회만 다시 설치할 때까지 거짓으로 답한다.
                     tools_current = (entry["server"].get("tools") == manifest["server"].get("tools")
                                      and (drift is None or manifest["mcp_server"] not in drift))
-                    if mode == BIND_MODE:
-                        # Control Plane MCP 등록이 있어도 된다. 바인딩 설치는 그 등록과 다른 도구 이름을 그대로 둔다.
-                        # 기록이나 `tools` 가 지금 manifest 와 다르면 그 항목만 거짓이다. `policy_hook` 은 보지 않는다.
-                        # 같은 profile 의 다른 항목은 따로 판정한다(ADR-20261009 connector-install-drift).
-                        configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
-                                      and _entry_matches_manifest(plugin, entry)
-                                      and _bind_skills_installed(profile_dir, manifest, entry)
-                                      and tools_current)
-                    else:
-                        configured = isolated and tools_current
+                    # 바인딩은 Control Plane MCP와 다른 내장 도구를 그대로 둔다.
+                    configured = (isinstance(allowed, list) and manifest["mcp_server"] in allowed
+                                  and _entry_matches_manifest(plugin, entry)
+                                  and _bind_skills_installed(profile_dir, manifest, entry)
+                                  and tools_current)
                 support = await asyncio.to_thread(_guard_support, profile, manifest, entry)
                 if support["state"] == "verified" and (not configured or _policy_hook_failure(profile_dir, config, state, drift) is not None):
                     support["state"] = "pending"
@@ -217,7 +187,7 @@ async def _connector_request(request):
                                    "mode": mode, **({"execution_guard": support} if manifest is not None
                                    and manifest.get("execution_guard") is not None else {})})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
-            connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": _entry_mode(entry)}
+            connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": BIND_MODE}
                               for plugin, entry in state.items() if plugin not in roots)
             # 거짓이면 어느 조건인지 이름만 남긴다. profile 이름, 경로, 파일 내용은 남기지 않는다.
             failure = _policy_hook_failure(profile_dir, config, state, drift)
@@ -288,37 +258,10 @@ async def _connector_request(request):
                     support["state"] = "pending"
                 result["execution_guard"] = support
             return JSONResponse({**response, **result}, status_code=200)
-        if unbind:
+        if not body["enabled"]:
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], False)
             return JSONResponse({**response, **result}, status_code=200)
-        # 옛 설치가 사진 도구를 열면 그 에이전트 주인의 격리 실행 공간을 쓴다(ADR-091).
-        sandbox_terminal = None
-        attachment_guard = None
-        local_execution = False
-        manifest = _connector_manifest(body["plugin"])
-        if body["enabled"] and manifest is not None and SANDBOX_TOOLSETS & set(manifest["toolsets"]):
-            sandbox = _sandbox_policy()
-            if sandbox is None:
-                return _sandbox_unavailable()
-            if profile in sandbox["profiles"]:
-                if owner is None:
-                    return _rejected("격리할 사진 도구에는 sandbox_owner 가 필요하다")
-                try:
-                    os.makedirs(_sandbox_workspace(sandbox, owner), exist_ok=True)
-                    _sandbox_prepare_connector_output(sandbox, profile, owner)
-                    prepared = _sandbox_verify_attachment_directories(sandbox, owner)
-                    sandbox_terminal = _sandbox_terminal(sandbox, profile, owner, prepared)
-                    attachment_guard = (sandbox, owner, prepared)
-                except OSError:
-                    return _sandbox_unavailable()
-            else:
-                return _sandbox_unavailable()
-        stage = "isolated"
-        result = await asyncio.to_thread(
-            _connector_config, profile_dir, body["plugin"], body["enabled"], sandbox_terminal, local_execution,
-            attachment_guard)
-        return JSONResponse({**response, **result}, status_code=200)
     except SandboxAttachmentError:
         return _sandbox_unavailable()
     except FileExistsError as error:

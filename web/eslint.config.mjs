@@ -1,14 +1,10 @@
-// web 코드의 lint 규칙이다. 규칙의 까닭은 각 규칙 블록의 주석이 갖고, 기준 파일(eslint-suppressions.json)과 포맷의 판단 규칙은 web/AGENTS.md 의 「lint 와 포맷」 절에 있다.
+// 코드 규칙: rule-42, rule-55, rule-59. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
+// web 코드의 lint 규칙이다. 까닭과 예외는 docs/code-rules가 갖고 실행 조건과 구현 설명은 이 파일이 갖는다.
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-/**
- * `node --test` 가 읽는 파일과 그 파일이 import 하는 파일이다.
- * Node 는 tsconfig 의 `@/` 별칭을 풀지 못하므로, 이 파일들은 상대 경로 import 를 쓴다.
- * 그 파일이 다시 import 하는 파일도 상대 경로를 써야 한다. 타입만 가져오는 `import type` 은 실행할 때 지워지므로 `@/` 를 써도 된다.
- * 새 단위 테스트가 web 파일을 읽으면 그 파일의 `../` import 를 따라가 상대 경로로 import 하는 파일을 이 목록에 더한다.
- */
+// rule-59: Node 테스트의 런타임 의존이 늘면 아래 목록도 함께 늘린다.
 const NODE_TEST_READ_FILES = [
   "src/components/chat/activity/activity-state.ts",
   "src/components/chat/skill-command.ts",
@@ -22,7 +18,7 @@ export default defineConfig([
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 
   {
-    // 오류 응답 모양과 요청 본문 검사를 한곳의 도우미로 모은다. 라우트가 직접 만들면 모양이 라우트마다 달라진다.
+    // rule-55: 라우트의 오류 응답과 본문 파싱을 검사한다.
     files: ["src/app/api/**/*.ts"],
     rules: {
       "no-restricted-syntax": [
@@ -44,7 +40,7 @@ export default defineConfig([
   },
 
   {
-    // 화면은 lib/ 의 호출 함수를 거친다. 화면 코드가 주소와 오류 처리를 각자 다시 쓰지 않게 한다.
+    // rule-55: 화면의 직접 fetch 호출을 검사한다.
     // 화면에서 fetch 를 꼭 써야 하는 파일이 생기면 이 블록의 ignores 에 그 파일과 까닭을 적는다.
     files: ["src/components/**/*.{ts,tsx}", "src/app/**/*.tsx"],
     rules: {
@@ -60,7 +56,7 @@ export default defineConfig([
   },
 
   {
-    // 파일을 옮겨도 import 가 깨지지 않게 상위 경로 대신 `@/` 를 쓴다.
+    // rule-59: 위 Node 런타임 모듈은 별칭 검사에서 제외한다.
     files: ["src/**/*.{ts,tsx}"],
     ignores: NODE_TEST_READ_FILES,
     rules: {
@@ -76,7 +72,7 @@ export default defineConfig([
   },
 
   {
-    // 쪼갤 후보 목록이다. 실패시키지 않는다.
+    // rule-42: 실패시키지 않는 경고다.
     files: ["src/**/*.{ts,tsx}"],
     rules: {
       "max-lines-per-function": [

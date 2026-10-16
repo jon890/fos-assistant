@@ -1,6 +1,5 @@
 package com.bifos.assistant.proactive.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
@@ -54,7 +53,6 @@ public class ProactiveCheckService {
     static final String FAILED_NOTICE = "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요";
 
     private final AgentService agents;
-    private final AgentConnectorBindings connectorBindings;
     private final ProactiveCheckReadiness readiness;
     private final CheckConversations checkConversations;
     private final ProactiveCheckRepository checks;
@@ -177,10 +175,8 @@ public class ProactiveCheckService {
                 agent.proactiveCheckWritesAllowed(),
                 clock.instant());
             check = saveLinked(started, beforeRun);
-            // 붙은 연결이 있는지는 시작할 때 한 번 정한다. 살펴보기 도중에 붙이거나 떼도 지시는 바뀌지 않는다.
-            boolean directConnectors = !connectorBindings.connectorServers(agent.id()).isEmpty();
             ProactiveCheckRun run = new ProactiveCheckRun(
-                user, agent.id(), check, renewsSession(conversation), directConnectors, deps());
+                user, agent.id(), check, renewsSession(conversation), deps());
             backgroundTasks.start(
                 "proactive-check-" + conversation.id(), () -> runCheck(user, conversation.id(), handle, run));
         } catch (RuntimeException | Error ex) {

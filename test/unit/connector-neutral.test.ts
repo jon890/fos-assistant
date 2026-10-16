@@ -1,3 +1,4 @@
+// 코드 규칙: rule-65. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 /**
  * Control Plane 과 웹의 운영 코드, hermes plugin 에 특정 서비스의 이름이 들어오지 않는지 본다.
  *

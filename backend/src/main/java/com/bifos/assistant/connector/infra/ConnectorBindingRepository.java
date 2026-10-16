@@ -55,7 +55,7 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
      * 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
      */
     @Query("select new com.bifos.assistant.connector.domain.ReadyBinding(b.id, b.agent.id, b.connection.userId,"
-        + " b.agent.hermesProfile, b.connection.connectorId, b.agent.connectorManaged)"
+        + " b.agent.hermesProfile, b.connection.connectorId)"
         + " from ConnectorBinding b"
         + " where b.status = :status and b.id > :after"
         + " order by b.id")

@@ -6,7 +6,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 
 ## 요구
 
-- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 남아 있는 옛 커넥터 에이전트도 같다
+- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
 - 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
@@ -172,14 +172,9 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 등록 이름에서 원래 이름을 되찾을 수 없으므로, 설치가 대응을 그 profile 의 `.fos-connector-tools.json` 에 적는다. 형식은 `hermes/plugins/dashboard-profile-api/connector_state.py` 가 갖는다.
 hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알고, 원래 도구 이름은 `tools` 에서만 찾는다. 이 파일이 있는 profile 에서만 hook 이 커넥터 도구 호출을 묻는다.
 
-`isolated` 칸이 그 profile 의 설치 방식을 적는다. 칸이 없으면 참으로 읽으므로 옛 파일은 바꾸지 않아도 된다. 칸이 있는데 boolean 이 아니면 hook 은 파일을 읽지 못한 것으로 본다.
+대시보드 plugin 이 만드는 대응 파일은 항상 `"isolated": false` 를 싣는다. 이는 일반 에이전트의 profile 에 커넥터를 붙인 바인딩 설치를 뜻하며, `servers` 에는 소유 기록의 모든 서버와 뗀 서버 기록의 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다.
 
-| `isolated` | 쓰는 설치 | `servers` 에 싣는 것 |
-| --- | --- | --- |
-| 없음(`true` 와 같다) | 옛 설치. 커넥터마다 만든 전용 profile 이다 | 운영 목록에 있고 manifest 를 읽을 수 있는 커넥터의 서버 |
-| `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버와 뗀 서버 기록의 서버. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다 |
-
-hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루는지는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
+`fos-ctx` 는 `isolated` 가 없으면 호환을 위해 `true` 로 읽고, `true` 또는 누락인 파일에서는 대응에 없는 MCP 도구와 `execute_code` 를 차단한다. 칸이 boolean 이 아니면 대응을 읽지 못한 것으로 처리해 MCP 도구, `execute_code`, 첨부 검사 도구를 차단한다. 이 호환·차단 규칙은 현행 설치 방식이 아니며, plugin 이 만드는 파일의 `false` 와 구별한다. 세 경우의 hook 처리는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
 
 **바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
 그래서 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
@@ -191,7 +186,6 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 같은 커넥터를 같은 서버 이름으로 다시 붙이면 기록에서 지운다. 같은 서버 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽의 도구를 싣는다
 - 기록에는 만료가 없다. gateway 를 재시작한 뒤에는 떼기 전에 시작한 실행이 남지 않으므로 운영자가 지워도 된다
 - 운영자가 뗀 서버와 같은 이름의 MCP 서버를 직접 등록하려면 먼저 기록에서 그 항목을 지운다. 남겨 두면 그 서버의 도구가 모두 판정에서 막힌다
-- 뗀 서버 기록만 남은 profile 도 바인딩 profile 이라 옛 설치를 받지 않는다
 - 실행 공간을 적용하지 않은 profile 에서는 터미널이나 파일 도구가 이 파일을 고칠 수 있다. 실행 공간을 적용한 profile 의 컨테이너에는 이 파일이 없다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 이 위험은 ADR-083 의 「감당할 것」 에 있다
 
 #### 도구 호출 판정
@@ -335,7 +329,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
 - 다른 사용자의 줄은 `CONNECTOR_ACTION_NOT_FOUND` 다. 관리자도 같다
 - 대화의 승인 줄 목록과 그 줄의 승인·거절 응답에서 원고 저장 job 이 연결된 줄은 `contentDraft` 요약을 싣는다. 일반 줄은 null 이다. 화면이 응답으로 자기 줄을 바꿔도 원고 카드로 남게 하기 위해서다. 요약의 칸과 화면 동작은 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) 이 갖는다
-- 공개 승인 API 는 주문 상한 변경 줄(`financial_limit_change` 가 있는 줄)을 금융 주문 승인보다 먼저 상한 변경 승인(`FinancialLimitChanges`)으로 보낸다. 허락 입력은 `VALIDATION_FAILED` 다([ADR-20261015 / financial-user-limits](../adr/ADR-20261015-financial-user-limits.md))
+- 공개 승인 API 는 주문 상한 변경 줄(`limit_kind` 를 적은 줄)을 금융 주문 승인보다 먼저 상한 변경 승인(`FinancialLimitChanges`)으로 보낸다. 허락 입력은 `VALIDATION_FAILED` 다([ADR-20261015 / financial-user-limits](../adr/ADR-20261015-financial-user-limits.md))
 - 공개 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 금융 승인(`ConnectorFinancialApproval`)으로 보낸다. 주인이 아니면 없는 줄과 같은 응답을 먼저 내고, 주인이면 상시 허락이나 대화 허락을 보낸 요청을 `VALIDATION_FAILED` 로 거절한다. 그 뒤 금융 승인이 저장한 snapshot 을 다시 검증한다
 - 금융 줄의 응답은 `financial` 요약(계좌 순번, 동작, 종목, 방향, 수량이나 금액, 가격, 통화, 주문 유형, 정규화)을 싣는다. 계좌 순번은 저장 scope 의 값이다. 저장한 내용을 열지 못하면 `available` 이 거짓이고 화면은 승인 단추를 그리지 않는다. 금융 줄이 아니면 null 이다. 금융 줄은 묶지 않고 「모두 승인」 에 넣지 않는다
 - 부른 쪽은 이미 처리된 요청(409 `CONNECTOR_ACTION_NOT_PENDING`)과 승인했지만 실행하지 않은 요청(200 과 끝난 줄의 `status`)을 구분한다
@@ -715,6 +709,32 @@ request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실
 금융은 암호화가 필수이며 일반 쓰기만 암호화가 꺼져 있을 때 평문 호환을 허용한다.
 인자와 결과 key는 따로 저장하고, 다른 줄이나 사용자로 옮긴 암호문은 풀지 못한다.
 기존 평문 이관과 읽기 실패·실행 차단 규칙은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action」이 갖는다.
+
+### 대화 삭제 뒤 승인 본문 정리
+
+대화 삭제는 지금처럼 목록에서 대화를 숨긴다.
+purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개인 본문도 지운다.
+`connector_action`의 인자·결과와 key 참조, `connector_action_execution`의 실행 인자·요약·범위와 key 참조를 NULL로 비운다.
+상태·시각·도구·위험도·해시·ticket·중복 방지 식별자와 금융 상한 변경의 종류·요청값·이전값은 보존한다.
+
+실행과 복구, 하루 상한 계산에 필요한 줄은 본문 삭제만 미룬다.
+그 대화의 메시지와 첨부 및 지울 수 있는 다른 승인 줄은 함께 정리한다.
+
+| 승인 줄 | 본문을 지우는 때 |
+| --- | --- |
+| `PENDING`, `EXECUTING`, `UNKNOWN` | 그 상태를 벗어난 뒤. `UNKNOWN`이 해소되지 않으면 본문도 계속 남음 |
+| `FINANCIAL`의 `SUCCEEDED`이며 승인 시각이 KST 오늘 이후인 줄 | 하루 상한 합계가 더는 읽지 않는 다음 KST 날짜부터 |
+| 나머지 판정·승인 줄 | 대화 purge 때 |
+
+하루 상한과 같은 `decided_at` 기준을 사용하므로 당일 성공 본문을 먼저 지워 후속 주문을 막거나 상한 합계를 빠뜨리지 않는다.
+승인·claim과 같은 사용자 잠금 안에서 대화 잠금을 잡고 지울 줄을 다시 고른다.
+부모 승인 줄과 실행 원장의 본문 삭제는 같은 트랜잭션으로 커밋한다.
+
+본문을 지우면 승인 줄의 `body_erased_at`을 적고 승인 카드와 결과 조회는 「본문 삭제됨」을 표시한다.
+실행 인자는 제공하지 않으며 금융 snapshot은 열지 않고 카드 요약은 `available=false`로 낸다.
+`conversation.purged_at`은 대화의 정리가 끝난 시각이며 지연한 승인 본문의 삭제 완료를 뜻하지 않는다.
+기존 주기 작업은 이미 purge한 대화도 다시 찾아 지울 수 있게 된 승인 본문만 정리한다.
+이 변경을 적용하기 전에 purge한 대화도 같은 경로로 처리하며 원래 `purged_at`은 바꾸지 않는다.
 
 ## 커넥터 READ 데이터의 흐름
 

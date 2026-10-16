@@ -40,7 +40,7 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
         outer.setTimeout(30);
         long started = System.nanoTime();
-        Throwable failure = catchThrowable(() -> outer.execute(status -> memories.searchFor(USER, CORE, "합성", 10, null)));
+        Throwable failure = catchThrowable(() -> outer.execute(status -> search(USER, CORE, "합성", 10)));
         long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         SQLException sqlFailure = sqlFailure(failure);
         System.out.printf(
@@ -65,7 +65,7 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         save("합성 오류");
         MemorySearchSqlProbe.capture();
         MemorySearchSqlProbe.invalidate();
-        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, null)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> search(USER, CORE, "합성", 10)).isInstanceOf(RuntimeException.class);
         assertProjectionAndTimeout();
     }
 

@@ -70,6 +70,13 @@ assistant:
     facts-max-chars: 2000
     # 개인 사실 구역 후보가 될 수 있는 본문의 최대 글자 수다
     facts-item-max-chars: 200
+    search:
+      # 질문과 관련된 기억 구역에 싣는 항목 수. 0 이면 구역을 끈다
+      max-items: 3
+      # 질문과 관련된 기억 구역 후보가 될 수 있는 본문의 최대 글자 수다
+      item-max-chars: 600
+      # 머리 줄과 구분 줄까지 센 질문과 관련된 기억 구역의 예산이다
+      max-chars: 1500
   data-encryption:
     # 사용자 본문을 저장할 때 암호화하는 KEK 목록 파일과 새로 감쌀 KEK 의 id(ADR-20261008 / data-encryption).
     # 둘 다 비우면 새 대화 본문을 평문으로 저장한다. 값과 파일의 자리는 운영 설정이 정한다
@@ -87,6 +94,28 @@ assistant:
       active-key-id: ${ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID:}
       # <id>:<base64 32바이트> 를 쉼표로 이은 목록. 옛 key 를 남겨 두어야 옛 줄을 읽는다
       keys: ${ASSISTANT_MEMORY_ENCRYPTION_KEYS:}
+    relevance:
+      # 질문 토큰 가운데 항목에 있어야 관련 있다고 보는 비율이다
+      keyword-min-coverage: 0.3
+      # 질문 벡터와 항목 벡터의 코사인이 이 값 이상이면 의미로 관련 있다고 본다. 모델마다 측정으로 정한다
+      semantic-min-similarity: 0.5
+      # 키워드 순위와 의미 순위를 합치는 RRF 의 k
+      rrf-k: 60
+    embedding:
+      # OpenAI 호환 POST /v1/embeddings 를 받는 주소와 모델이다. 주소가 비면 임베딩을 끄고 키워드 점수만 쓴다
+      base-url: ${MEMORY_EMBEDDING_BASE_URL:}
+      # 운영 모델은 BGE-M3 의 int8 ONNX 다(1024차원, 서비스가 1024토큰에서 자른다). 모델을 바꾸면 벡터를 모두 다시 채운다
+      model: ${MEMORY_EMBEDDING_MODEL:onnx-community/bge-m3-ONNX}
+      # 질문 하나를 임베딩할 때 기다리는 상한. 넘으면 키워드 점수만 쓴다
+      query-timeout: 400ms
+      # 채우는 작업이 묶음 하나를 기다리는 상한과 묶음 크기, 한 번에 보내는 묶음 수
+      batch-timeout: 30s
+      batch-size: 16
+      max-batches-per-run: 16
+      # 임베딩할 제목과 본문의 최대 글자 수. 서비스가 1024토큰에서 다시 자르므로 그보다 긴 뒤쪽은 의미 점수에 들지 않는다
+      max-text-chars: 4000
+      # 채우는 작업이 끝나고 다음 작업까지 쉬는 시간
+      refresh-delay: 60s
   delegation:
     # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
     max-depth: 2

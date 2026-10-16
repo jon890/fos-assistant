@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.application;
 
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
@@ -7,6 +8,7 @@ import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -17,13 +19,15 @@ import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 잠가 읽은 기억의 판 저장과 민감 본문의 암호화를 맡는다. 트랜잭션은 호출한 서비스가 정한다. */
+/** 잠가 읽은 기억의 판 저장과 민감 본문의 암호화, 지울 때 딸린 줄의 정리를 맡는다. 트랜잭션은 호출한 서비스가 정한다. */
 @Component
 @RequiredArgsConstructor
 class MemoryRevisionWriter {
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
+    private final MemoryEmbeddingRepository embeddings;
+    private final MemoryVectorCache vectorCache;
     private final MemoryContentCipher cipher;
     private final Clock clock;
 
@@ -43,6 +47,14 @@ class MemoryRevisionWriter {
         }
         memory.revise(body, retrieval, sensitivity, dedupKey, clock.instant());
         return memories.save(memory);
+    }
+
+
+    /** 지우기 전에 마지막 값을 판으로 남기고 그 항목의 벡터를 지운다. 벡터는 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다. */
+    void beforeDelete(CurrentUser user, Memory memory) {
+        revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
+        embeddings.deleteByMemoryId(memory.id());
+        vectorCache.evict(memory.id());
     }
 
 

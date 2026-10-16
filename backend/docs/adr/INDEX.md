@@ -17,7 +17,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md) | Memory 는 사람이 승인한 것만 남는다 | Accepted. 에이전트별 구분을 기각한 부분은 ADR-053 가 대체한다. 사람이 받아들여야 저장된다는 부분은 [ADR-20261007 / memory-remember](../../../docs/adr/ADR-20261007-memory-remember.md) 이 개정한다 |
 | [ADR-013](ADR-013-실행-사건은-우리-모델로-정규화해-저장한다.md) | 실행 사건은 우리 모델로 정규화해 저장한다 | Accepted. 사건을 스트림에서 옮겨 적는 경로에 한 번에 받는 경로를 더하는 부분은 ADR-090 가 정한다 |
 | [ADR-014](ADR-014-실제-청구액과-환산액을-나눠-적는다.md) | 실제 청구액과 환산액을 나눠 적는다 | Accepted |
-| [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) | Memory 는 층을 나눠 싣는다 | Accepted. ADR-003 의 조회 방식을 보완. `always_inject` 칸은 ADR-052 이 `retrieval` 로 넓힌다. 짧은 개인 `SEARCH` 항목의 본문을 싣는 예외는 [ADR-20261008 / memory-facts](../../../docs/adr/ADR-20261008-memory-facts.md) 이 둔다 |
+| [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) | Memory 는 층을 나눠 싣는다 | Accepted. ADR-003 의 조회 방식을 보완. `always_inject` 칸은 ADR-052 이 `retrieval` 로 넓힌다. 짧은 개인 `SEARCH` 항목의 본문을 싣는 예외는 [ADR-20261008 / memory-facts](../../../docs/adr/ADR-20261008-memory-facts.md) 이 둔다. 색인 층을 질문 관련도로 고르는 것은 [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) 이 정한다 |
 | [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) | 사람을 더하는 것을 Control Plane 이 끝낸다 | Accepted. 여는 경로를 둘로 한정한다는 서술은 당시의 맥락이다. 첫 로그인의 모델 읽기는 ADR-030 이 대체한다 |
 | [ADR-019](ADR-019-페르소나는-hermes-가-갖고-control-plane-은-화면만-준다.md) | 페르소나는 Hermes 가 갖고 Control Plane 은 화면만 준다 | Accepted. plugin 소유는 ADR-041 이 대체한다 |
 | [ADR-020](ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md) | 사진은 공유 디렉터리에 두고 에이전트가 파일로 읽는다 | Accepted. 대화 본문에 사진을 싣지 못한다는 맥락은 [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) 이 바꾼다. 저장 경로는 ADR-091 이 사용자별 디렉터리로 바꾼다 |
@@ -45,7 +45,6 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
 | [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다 |
 | [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다 |
-| [ADR-056](ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Accepted. ADR-053 이 미룬 서비스 토큰을 정한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
 | [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다. 자식 provider 를 읽는 길은 ADR-067 이 대체한다 |
 | [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |
@@ -59,7 +58,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) | 문제 찾기는 살펴보기 결과의 문제 후보로 받고 Control Plane 이 근거와 중복을 결정적으로 검사한다 | Accepted. ADR-081 의 결과 블록을 버전 3으로 넓힌다 |
 | [ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | Accepted. `SURFACE` 와 `ASK_APPROVAL` 의 사용자 화면을 만들지 않는다는 부분은 매일 루프 판정에 한해 [ADR-20261008 / daily-loop](../../../docs/adr/ADR-20261008-daily-loop.md) 이 바꾼다 |
 | [ADR-20261007 / background-tasks](ADR-20261007-background-tasks.md) | 운영의 백그라운드 작업은 한 빈으로 띄우고, 검사는 끝날 때 모두 join 한다 | Accepted |
-| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](../../../docs/adr/ADR-20261008-check-finding-reaction.md) 이 둔다. 매일 루프 판정이 화면에 보이고 그 반응이 지금 화면 항목을 빼는 부분은 [ADR-20261008 / daily-loop](../../../docs/adr/ADR-20261008-daily-loop.md) 이 바꾼다 |
+| [ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md) | 판단 피드백은 제안 열쇠에 덧붙이는 사건으로 남기고 반응은 읽을 때 정한다 | Accepted. 살펴보기 발견의 「관심 없음」 이 되풀이 판정을 바꾸는 예외는 [ADR-20261008 / check-finding-reaction](../../../docs/adr/ADR-20261008-check-finding-reaction.md) 이 둔다. 매일 루프 판정이 화면에 보이고 그 반응이 지금 화면 항목을 빼는 부분은 [ADR-20261008 / daily-loop](../../../docs/adr/ADR-20261008-daily-loop.md) 이 바꾼다. 「참고한 기억」 단추의 사건 종류는 [ADR-20261015 / memory-maintenance](../../../docs/adr/ADR-20261015-memory-maintenance.md) 가 더한다 |
 | [ADR-20261007 / live-properties](ADR-20261007-live-properties.md) | 운영 코드는 실행 중에 쓰는 설정을 LiveProperties 로 읽는다 | Accepted |
 | [ADR-20261007 / proactive-eval](ADR-20261007-proactive-eval.md) | 먼저 살펴보기 루프는 결정적 provider 로 실제 서비스를 replay 해 측정하고 안전 경계만 CI 를 막는다 | Accepted. 매일 루프 판정이 화면에 보이게 된 부분은 [ADR-20261008 / daily-loop](../../../docs/adr/ADR-20261008-daily-loop.md) 이 바꾼다 |
 | [ADR-20261007 / test-context-base](ADR-20261007-test-context-base.md) | backend 통합 검사는 Spring 컨텍스트 하나를 함께 쓰고, 설정과 대역은 검사마다 바꿔 끼운다 | Accepted |
@@ -72,6 +71,8 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted |
 | [ADR-20261011 / media-observation-cache](ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Accepted |
 | [ADR-20261013 / financial-digest-key-rotation](ADR-20261013-financial-digest-key-rotation.md) | 금융 해시 key 를 바꾸면 이전 key 의 열린 줄이 끝날 때까지 금융 관문을 닫는다 | Accepted |
+| [ADR-20261015 / memory-eval-gate](ADR-20261015-memory-eval-gate.md) | 기억 선별을 바꾸기 전에 측정을 세 층으로 두고 조립 측정을 악화 금지 게이트로 건다 | Accepted. ADR-071 의 실행마다 남기는 참조에 선택 근거 컬럼을 더한다 |
+| [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 |
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 
 ## 보관
@@ -82,3 +83,4 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | --- | --- | --- |
 | [ADR-006](archive/ADR-006-작업-영역은-읽기-전용-의존이고-공개-범위는-기본값이-없다.md) | 작업 영역은 읽기 전용 의존이고 공개 범위는 기본값이 없다 | Superseded ([ADR-010](ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)) |
 | [ADR-016](archive/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](../../../docs/adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
+| [ADR-056](archive/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Retired. 2026-10-15 사용자 결정으로 발급 2건을 모두 취소했고, 2026-10-05 뒤 사용이 없어 기능 전체를 제거한다 |

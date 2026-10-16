@@ -6,6 +6,7 @@
   `memory_remember` 가 남기는 항목의 `retrieval` 은 그대로 `SEARCH` 다. 그 가운데 짧은 항목은 본문까지 실린다.
   [ADR-015](../../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 의 「`SEARCH` 는 제목만 싣는다」 에 예외를 둔다. 층을 나눠 싣고 나머지는 도구로 읽는다는 결정은 그대로다.
   [ADR-071](../../backend/docs/adr/ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) 의 `source` 목록에 `MEMORY_FACTS` 와 `MEMORY_READ` 를 더한다.
+- 「감당할 것」 의 「같은 사실의 옛 값과 새 값이 함께 실릴 수 있다」 는 [ADR-20261015 / memory-link](ADR-20261015-memory-link.md) 의 「대체함」 링크가 푼다.
 
 ### 결정
 

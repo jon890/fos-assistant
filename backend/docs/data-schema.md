@@ -8,11 +8,11 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token`, `service_token`, `service_token_collection` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant`, `financial_order_limit`, `financial_limit_change` |
+| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding` |
+| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -142,6 +142,31 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 - 정렬 규칙을 바꾸는 마이그레이션은 **표마다 파일을 나눈다.** `CONVERT TO` 는 표를 다시 만드는 DDL 이고 되돌려지지 않는다. 나누면 실패한 표 하나만 옛 정렬 규칙으로 남는다
 - **유일 색인이 걸린 문자열 칸은 새 정렬 규칙에서 같아지는 값이 있는지 운영에서 먼저 센다.** 그런 줄이 있으면 그 표의 문장이 오류 1062 로 실패한다. 세는 방법은 운영 저장소가 갖는다. 다시 만드는 동안 그 표에 쓰기가 막힌다
 
+### 테이블과 컬럼에 한국어 COMMENT를 단다
+
+새 테이블과 컬럼에는 뜻을 설명하는 한국어 `COMMENT`를 함께 단다.
+단위, 암호문과 해시 여부, `NULL`의 뜻, 저장하는 enum 값의 뜻을 먼저 적는다.
+운영 환경의 값과 비밀값을 COMMENT에 넣지 않는다.
+이미 적용된 설명을 고칠 때도 새 마이그레이션을 만든다.
+
+기존 스키마의 설명은 Java 마이그레이션 `V20261016075220__SchemaComments`와
+전용 리소스 `backend/src/main/resources/db/comments/V20261016075220.tsv`가 추가한다.
+리소스의 각 줄은 테이블, 컬럼, 설명을 탭으로 구분하고 컬럼이 `*`이면 테이블 설명이다.
+리소스도 Flyway 체크섬에 포함하므로 적용한 뒤 수정하지 않는다.
+운영 배포 뒤 `test/unit/migration-checksums.json`에 `comments/파일명.tsv`와 SHA-256을 등록한다.
+`migration-immutable.test.ts`가 기존 SQL 파일과 함께 수정과 삭제를 막는다.
+MySQL은 `SHOW CREATE TABLE`의 컬럼 정의를 그대로 사용해 테이블마다 한 번의 `ALTER TABLE`로 묶는다.
+MySQL 8.4에서는 CHECK 제약이 참조하는 컬럼의 COMMENT 변경도 `INPLACE`를 거절할 수 있다.
+알고리즘은 MySQL이 고르며 `COPY`로 처리하는 테이블은 데이터를 복사하는 동안 쓰기가 막힌다.
+운영 반영 전에 테이블별 행 수와 장기 트랜잭션을 확인한다.
+이미 설명이 있는 테이블·컬럼과 뒤의 마이그레이션이 지운 테이블·컬럼은 보존하거나 건너뛴다.
+H2는 같은 목록을 `COMMENT ON`으로 적용한다.
+
+`MysqlMigrationTest`는 Flyway 적용 뒤 `INFORMATION_SCHEMA`에서 설명 누락을 검사한다.
+Flyway가 관리하는 `flyway_schema_history`만 제외하며 새 테이블과 컬럼도 자동으로 검사한다.
+`SchemaCommentsMigrationTest`와 `SchemaCommentsMysqlTest`는 적용 전후 컬럼 정의와 데이터,
+생성 컬럼의 유일 제약을 확인하고 MySQL에서는 COMMENT 이외 DDL 전체도 대조한다.
+
 ### 실제 MySQL 검사를 통과해야 한다
 
 ```bash
@@ -150,7 +175,7 @@ scripts/checks/check-mysql-migration.sh
 ```
 
 Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄우고 `@Tag("mysql")` 이 붙은 검사를 모두 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
-저장소 쿼리 검사는 [`backend/AGENTS.md`](../AGENTS.md) 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」 가 갖는다.
+저장소 쿼리 검사는 [rule-51](../../docs/code-rules/rule-51.md)이 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
 
@@ -169,6 +194,8 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
+승인 줄과 금융 실행 원장의 본문도 지우되 열린 줄과 당일 금융 합계가 읽는 성공 줄은 본문 삭제를 미룬다.
+이미 purge한 대화도 주기적으로 다시 찾아 지울 수 있는 승인 본문을 정리하므로 `purged_at`과 승인 본문 삭제 시각은 다를 수 있다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
@@ -181,13 +208,12 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
+그 항목의 벡터(`memory_embedding`)는 같은 트랜잭션에서 지운다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
 그 변경 기록(`agent_memory_collection_change`)도 그동안 남는다. 누가 언제 민감 허용을 열었는지가 남아야 한다. 에이전트 행을 정리할 때 둘을 함께 지운다.
-서비스 토큰은 폐기해도 줄이 남는다. 언제까지 쓰였는지가 남아야 한다.
-
-허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기하고 브라우저는 멈춘다.
+허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내리며 그 사람의 브라우저는 멈춘다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.
 
@@ -220,12 +246,10 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
 현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
-접근 해제는 서비스 토큰을 폐기하지만 사용자와 개인 데이터는 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+접근 해제는 사용자와 개인 데이터를 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
-| `connector_action` | 도구 인자와 실행 결과 |
-| `connector_action_execution` | 실행 인자와 요약·범위 |
 | `proactive_check` | 점검 보고 |
 | `proactive_check_finding` | 발견 제목과 출처 |
 | `proactive_check_problem` | 문제 본문과 근거 |
@@ -233,6 +257,14 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
 새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
+
+`connector_action`과 `connector_action_execution`은 대화에 묶인 `SCRUB` 대상이다.
+두 줄의 본문과 key 참조만 지우고 상태·시각·도구·위험도·해시·ticket과 중복 방지 식별자는 남긴다.
+검사는 삭제 전 본문과 key가 모두 있었는지 확인하고 나머지 모든 칸과 다른 사용자의 줄을 비교한다.
+`PENDING`, `EXECUTING`, `UNKNOWN`과 KST 당일 승인된 금융 `SUCCEEDED` 줄은 본문을 보존한다.
+지연한 본문과 기존 purge의 남은 본문은 다음 주기에 같은 사용자·대화 잠금과 트랜잭션으로 다시 검사한다.
+상태와 KST 날짜 경계, 롤백도 실제 MySQL 검사가 확인한다.
+자세한 지연 조건은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md#대화-삭제-뒤-승인-본문-정리)이 갖는다.
 
 보관 기간 정리는 `AttachmentCleaner`, `ArtifactCleaner`, `MediaObservationCleaner`, `ContentDraftCleaner`가 파일과 관찰·원고 본문을 다룬다.
 `NotificationCleaner`, `AttentionEventCleaner`, `DecisionFeedbackCleaner`는 기간이 지난 기록을 지운다.
@@ -243,6 +275,19 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 ### app_user
 
 실제로 들어온 적이 있는 사용자다. 그룹의 첫 사용자가 `ADMIN` 이 되고 그 뒤로는 `MEMBER` 다. `model_default_tier` 가 비면 그룹 기본값을 따른다.
+
+#### 주문 상한 컬럼
+
+`limit_` 로 시작하는 컬럼은 계좌 주인이 운영 최대치 안에서 정한 금융 주문 상한이다. 근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `limit_order_amount_krw`, `limit_order_amount_usd`, `limit_order_quantity`, `limit_daily_amount_krw`, `limit_daily_amount_usd` | DECIMAL(20,6) NULL. 비면 그 상한은 운영 최대치를 따른다. 0 은 그 종류의 주문을 받지 않는다 |
+| `limit_updated_at` | DATETIME(6) NULL. 다섯 컬럼 가운데 하나라도 바꾼 마지막 시각이다. 한 번도 바꾸지 않았으면 비어 있다 |
+
+적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
+**이 컬럼은 전용 `UPDATE` 로만 바꾼다.** `AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼므로, 먼저 읽어 둔 사용자를 나중에 저장해도 상한을 옛 값으로 덮지 않는다. 읽기도 엔티티를 거치지 않는 전용 쿼리로 한다.
+쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 
 ### allowed_person
 
@@ -263,8 +308,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
-- `connector_managed` 는 바인딩이 생기기 전의 옛 커넥터 에이전트를 표시하고, 지금은 새로 참이 되지 않는다. 규칙은 [커넥터 연결](../../docs/features/connector.md) 의 「옛 커넥터 에이전트」 가 갖는다
-- `connector_attachments` 는 그 옛 커넥터 에이전트가 사진을 받는지다. 커넥터가 선언한 toolset 이 켜진 것을 확인했을 때만 참이다
 - `default_model_provider` 와 `default_model` 은 함께 채우거나 함께 비운다. `default_reasoning_effort` 는 혼자 둘 수 있다
 
 **모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 기본 모델 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md), [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md)).
@@ -301,17 +344,6 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 **토큰은 어느 profile 이 부르는지만 증명한다. 사용자를 정하지 않는다.** 요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 `user_id` 다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 `profile_name` 이 빈 줄은 profile 을 묶기 전에 폐기된 옛 토큰뿐이고 인증에서 거절한다. 바꿔 끼우는 동안 옛 토큰과 새 토큰이 함께 쓰여 `profile_name` 에 유일 제약을 두지 않는다.
 한 번 묶은 profile 은 바꾸지 않는다. 다른 profile 에 쓰려면 새로 발급한다.
-
-### service_token
-
-다른 서비스가 사용자의 Memory 문서를 읽을 때 쓰는 토큰이다([ADR-056](adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)). 원문은 발급 응답에서 한 번만 내고 해시만 저장한다.
-**`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다. 관리자도 다른 사용자의 토큰을 발급하거나 폐기하지 못한다.
-`expires_at` 은 발급할 때 정하고 고치지 않는다. `last_used_at` 은 거절한 요청에서는 적지 않는다.
-인증할 때도 주인이 지금 허용 목록에 켜져 있는지 본다. 허용 목록에서 끌 때의 폐기가 한 번 실패해도 끈 사용자의 토큰이 통하지 않게 하기 위해서다.
-
-### service_token_collection
-
-서비스 토큰이 받는 collection 하나가 한 줄이다. `agent_memory_collection` 과 같은 뜻이고 같은 세 조건으로 판정한다.
 
 ## 대화 표
 
@@ -524,7 +556,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 것이다. Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 `tool_name` 은 붙은 커넥터 서버의 도구면 Hermes 등록 이름 `mcp__<서버>__<도구>` 다.
-`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 옛 커넥터 에이전트의 도구 내용과, 다른 에이전트에 붙은 커넥터 서버의 도구 내용은 전체를 가린다.
+`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 에이전트에 붙은 커넥터 서버의 도구 내용은 전체를 가린다.
 **`subagent_name`은 이름, `subagent_id`, `goal` 순서로 채운다.** 이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다. 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 **`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.** 어느 칸이 오는지는 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 가 갖는다. 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓰고 사용량 합계에 더하지 않는다.
@@ -566,6 +598,16 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남기고, 제목과 본문은 남기지 않는다.
 조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 덧붙인다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「본문을 읽으면 남는 기록」).
 `OMITTED` 줄은 자리가 없어 빠진 Memory 항목이거나 결과를 알 수 없어 본문을 싣지 않은 승인 결과다. `source` 가 `MEMORY_` 로 시작하는 `OMITTED` 줄의 수는 `agent_execution.context_omitted_items` 와 같다.
+
+선택 근거 컬럼은 Memory 항목을 어떤 규칙이 몇 번째로 골랐는지 남긴다. 근거는 [ADR-20261015 / memory-eval-gate](adr/ADR-20261015-memory-eval-gate.md) 에 있다. 모두 비어 있을 수 있고, 컬럼을 더하기 전의 줄과 Memory 가 아닌 줄은 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `selector` | 고른 규칙의 이름과 버전. 값의 목록과 뜻은 `ContextSelection` 의 Javadoc 이 갖는다. `MEMORY_READ` 줄은 비어 있다 |
+| `selection_rank` | 같은 실행의 같은 `source` 안에서 고른 순서. 1 부터 센다. `OMITTED` 줄도 순서를 받는다 |
+| `keyword_score`, `semantic_score`, `selection_score` | 키워드 점수, 의미 점수, 합친 점수. 점수 없이 고르는 규칙은 비워 둔다 |
+
+사용 신호(읽혔는가, 고쳐졌는가, 관련 없다고 눌렀는가)는 이 테이블의 컬럼으로 두지 않는다. 이 테이블은 넣기만 하고, 그 신호는 실행 뒤에 온다.
 실행 줄을 지우지 않으므로 이 줄도 지우지 않는다.
 
 ## Memory 표
@@ -629,7 +671,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 에이전트가 받는 collection 하나가 한 줄이다([ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)).
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
-에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 옛 커넥터 에이전트에는 넣지 않고, 줄이 있어도 옛 커넥터 에이전트는 받지 않는다.
+에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다.
 그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 빼고 민감 허용을 바꾼다. `created_at` 은 그 collection 을 붙인 시각이고, 민감 허용만 바꾸면 그대로 둔다.
 
 ### agent_memory_collection_change
@@ -654,6 +696,18 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 `previous_status` 가 `PROPOSED` 인 기록을 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다.
 기존 제안의 수락은 중복 후보의 번호만 조회한 뒤 항목을 쓰기 잠금으로 처음 읽는다. 중복 키를 다시 확인하고, 현재 `revision`을 `base_revision`에 남겨 동시에 커밋된 사용자 수정도 보존한다.
 
+### memory_embedding
+
+임베딩 대상 항목 하나의 벡터 한 줄이다. 질문과의 의미 점수를 앱이 전수 계산하는 데 쓴다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
+
+- 기본 키는 `memory_id` 다. 항목 하나에 벡터는 하나다. 모델을 바꾸면 같은 줄을 새 모델의 값으로 덮어쓴다. 모델마다 줄을 두지 않는 것은 한 번에 한 모델만 쓰기 때문이다
+- `model` 은 임베딩 서비스에 보낸 모델 이름, `dimensions` 는 벡터의 차원, `vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 길이는 `dimensions × 4` 바이트다. 운영의 BGE-M3 는 1024차원이라 한 줄이 4KiB 다
+- `text_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 줄은 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
+- 대상은 `ACCEPTED`, `SEARCH`, 민감도 `NORMAL`, 암호화하지 않은 항목이다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 줄은 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)이 다음 주기에 지운다
+- 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지운다. `memory_id` 에 외래 키를 걸지 않고, `MemoryService.delete` 가 같은 트랜잭션에서 그 줄을 지운다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 지운 항목의 줄이 남으면 다음 주기의 정리가 지운다
+
+
+
 ## 커넥터 표
 
 ### connector_connection
@@ -666,8 +720,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
 - 해제해도 행은 남기고 `fields` 를 빈 `values` 와 빈 `secretPrefixes` 로 비운다. 지우는 경로는 없다
 
-`agent_id`, `restart_required`, `desired_enabled` 는 바인딩([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다.
-이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. 엔티티는 두 boolean 칸을 매핑하지 않고 `agent_id` 는 읽기 전용(`legacyAgentId`)으로만 매핑해, 새 행에서 `agent_id` 는 비고 두 boolean 칸은 거짓이다. 옛 값은 지운 에이전트를 정리할 때만 비운다. `agent_id` 의 유일 제약과 FK 는 남아 있고, 비어 있는 값은 유일 제약에 걸리지 않는다.
+옛 전용 에이전트의 이관을 마쳐 `agent_id`, `restart_required`, `desired_enabled`와 관련 FK·유일 색인을 제거했다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 연결 행과 바인딩은 유지한다.
 
 ### agent_connector_binding
 
@@ -678,7 +731,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `install_attempt_id`는 nullable `BINARY(16)` UUID다. 설치 시작을 커밋할 때 새 값으로 바꾸고 현재 시도의 결과만 한 번 적용한 뒤 비운다. 기존 행은 null로 유지하며 상태를 바꾸거나 값을 채우는 마이그레이션은 하지 않는다
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
-- 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 옛 커넥터 에이전트의 바인딩만 그 에이전트를 켜고 끈다
+- 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
 
 ### connector_action
 
@@ -694,8 +747,10 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `result_text` 의 `UNKNOWN` 줄은 커넥터가 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
+- `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+- `body_erased_at`은 대화 purge가 본문을 지운 시각이다. `args_json`, `result_text`와 두 key 참조를 NULL로 비운다. 조회는 「본문 삭제됨」을 표시하고 실행 인자를 제공하지 않는다
 
 인자와 결과는 기존 사용자 데이터 key와 `TextCipher`로 각각 암호화한다.
 AAD는 `connector_action:<id>:column:<칸 이름>:user:<user_id>`다.
@@ -727,7 +782,7 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 | `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
 | `connection_id`, `binding_id` | BIGINT NOT NULL, FK가 없는 이력 번호 |
 | `connection_updated_at`, `binding_updated_at` | DATETIME(6) NOT NULL, 준비 당시 각 행의 `updated_at` |
-| `execution_args_json`, `summary_json`, `scope_json` | MEDIUMTEXT NOT NULL, 원문 또는 암호문 |
+| `execution_args_json`, `summary_json`, `scope_json` | MEDIUMTEXT NULL, 원문 또는 암호문. 대화 purge가 지우면 NULL |
 | `content_key_id` | BIGINT NULL, `user_data_key` 식별자, FK 없음 |
 | `execution_args_sha256`, `scope_sha256` | VARCHAR(64) NOT NULL, 암호화 전 UTF-8 원문의 SHA-256 |
 | `request_key` | VARCHAR(64) NOT NULL, 중복 의도 조회용 일반 인덱스 |
@@ -740,8 +795,10 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 `ConnectorExecutionSnapshot.capture`가 연결의 공개 칸과 실행 args, 표시 값을 검증한 뒤 저장할 내용을 만든다.
 읽을 때 protocol이 `approval-claim-v2`와 다르면 거절한다. 열린 v1 줄(PENDING, EXECUTING, UNKNOWN)이 남아 있으면 금융 관문이 닫힌다.
 연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
-기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
+대화 purge 뒤에도 `connector_action.args_sha256`과 `dedupe_key`는 원래 요청의 중복 판정용으로 남긴다.
 실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.
+예외는 대화 purge의 본문 삭제다. 세 본문과 `content_key_id`를 NULL로 비우고 나머지 칸은 보존한다.
+부모 승인 줄의 `body_erased_at`으로 삭제를 구별하며 금융 snapshot 읽기를 거절하고 카드 요약은 `available=false`로 낸다.
 저장 함수는 ticket 식별자와 발급·소비 시각을 NULL로 둔다.
 발급은 세 권한 칸이 모두 NULL일 때 ticket_id와 ticket_expires_at을 한 번만 채운다.
 소비는 같은 미만료 ticket_id이며 consumed_at이 NULL일 때 그 칸을 한 번만 채운다.
@@ -780,38 +837,6 @@ action을 지우면 실행 내용도 지운다.
 `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
 `revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
 외래 키는 사용자와 대화에 둔다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
-
-### financial_order_limit
-
-계좌 주인이 운영 최대치 안에서 정한 주문 상한이다. 사용자마다 한 줄이다.
-근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `user_id` | BIGINT NOT NULL, PK 및 `app_user` FK |
-| `order_amount_krw`, `order_amount_usd`, `order_quantity`, `daily_amount_krw`, `daily_amount_usd` | DECIMAL(20,6) NULL. 비면 그 상한은 운영 최대치를 따른다 |
-| `updated_at` | DATETIME(6) NOT NULL |
-
-줄이 없으면 다섯 상한이 모두 최대치를 따른다.
-적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
-쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠근다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
-
-### financial_limit_change
-
-대화로 올리기를 요청한 상한 변경의 내용이다. 승인 줄 하나에 한 줄이다.
-`order_limit_change` 가 PENDING `connector_action` 과 함께 만들고, 승인하면 `financial_order_limit` 에 반영한다.
-
-| 컬럼 | 타입과 제약 |
-| --- | --- |
-| `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
-| `user_id` | BIGINT NOT NULL, `app_user` FK |
-| `limit_kind` | VARCHAR(32) NOT NULL. `ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD` |
-| `requested_value` | DECIMAL(20,6) NOT NULL. 0 이상 |
-| `previous_value` | DECIMAL(20,6) NOT NULL. 요청할 때 적용하던 상한 |
-| `created_at` | DATETIME(6) NOT NULL |
-
-낮추기와 같은 값, 최대치를 넘는 값은 이 줄을 만들지 않는다.
-승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 공개 승인 API 는 이 줄이 있는 승인 줄을 상한 변경 승인으로 보낸다.
 
 ## 사용자 브라우저 표
 

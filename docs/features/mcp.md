@@ -51,7 +51,7 @@ sequenceDiagram
     C-->>W: 답
 ```
 
-## 두 방향과 두 토큰
+## 두 방향의 인증
 
 요청이 한 방향으로만 흐르지 않는다.
 Control Plane 이 Hermes 를 부르고, Hermes 가 다시 Control Plane 을 부른다.
@@ -81,14 +81,11 @@ flowchart LR
 | ① | 웹 → Control Plane | 짧은 수명 JWT | 이 사람이 로그인했다 |
 | ② | Control Plane → Hermes | `API_SERVER_KEY` | 이 profile 을 쓸 자격이 있다 |
 | ③ | Hermes → Control Plane | `agent_token` | 이 요청이 어느 profile 에서 왔다 |
-| ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다 |
 
 **①은 사용자를 정하고 ③은 profile 만 정한다.**
 ①은 요청마다 새로 만들어 저장하지 않는다. ③은 한 번 발급해 폐기할 때까지 쓰고 해시만 저장한다.
 ①을 받을 때마다 Control Plane 이 그 사용자가 허용 목록에서 꺼졌는지 확인한다. 흐름은 [`docs/features/users.md`](users.md#사용자를-껐을-때) 의 「사용자를 껐을 때」 가 갖는다.
 ②도 profile 만 정한다. 어느 사용자의 실행인지는 Control Plane 이 알고 Hermes 에게 알리지 않는다.
-④는 사용자 한 사람과 받는 collection 을 정하고, 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다.
-
 **요청 본문에 사용자를 적게 하면 모델이 그것을 바꿀 수 있다.**
 ③도 사용자를 정하지 못한다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰고, MCP 연결과 그 토큰은 profile 에 하나다.
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다. 아래 「MCP 호출의 요청자를 정할 때」 가 그 판정이다.
@@ -176,7 +173,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | 도구 | 계약을 갖는 곳 |
 | --- | --- |
 | `memory_read` | [`docs/features/memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 |
-| `memory_search` | [`docs/features/memory.md`](memory.md) 의 「제목 검색의 구현 계약」. 현재 origin의 권한으로 제목만 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
+| `memory_search` | [`docs/features/memory.md`](memory.md) 의 「기억 검색의 구현 계약」. 현재 origin의 권한으로 제목과 일반 본문을 관련도 순으로 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`docs/features/agent-skill.md`](agent-skill.md) 의 「다른 에이전트에게 맡기기」 |
 | `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |

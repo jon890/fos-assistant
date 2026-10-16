@@ -193,7 +193,7 @@ class McpMemoryToolTest {
         assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
         assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("query");
         JsonNode fields = schema.path("properties");
-        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "after_id");
+        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "cursor");
         assertThat(fields.path("query").path("type").asString()).isEqualTo("string");
         assertThat(fields.path("query").path("minLength").asInt()).isEqualTo(1);
         assertThat(fields.path("query").path("maxLength").asInt()).isEqualTo(200);
@@ -201,8 +201,9 @@ class McpMemoryToolTest {
         assertThat(fields.path("limit").path("minimum").asInt()).isEqualTo(1);
         assertThat(fields.path("limit").path("maximum").asInt()).isEqualTo(50);
         assertThat(fields.path("limit").path("default").asInt()).isEqualTo(10);
-        assertThat(fields.path("after_id").path("type").asString()).isEqualTo("integer");
-        assertThat(fields.path("after_id").path("minimum").asInt()).isEqualTo(1);
+        assertThat(fields.path("cursor").path("type").asString()).isEqualTo("string");
+        assertThat(fields.path("cursor").path("minLength").asInt()).isEqualTo(1);
+        assertThat(fields.path("cursor").path("maxLength").asInt()).isEqualTo(200);
         HttpResponse<String> notification = mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);
         assertThat(notification.body()).isEmpty();

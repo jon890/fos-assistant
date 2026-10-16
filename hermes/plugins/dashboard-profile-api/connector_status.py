@@ -86,7 +86,6 @@ def _tool_map_drift(profile_dir: pathlib.Path, state: dict) -> set[str] | None:
                 for server in servers.values()):
             return None
         # 모양은 `tools` 를 뺀 나머지다. 직렬화해 견주므로 칸이 빠지거나 더해지거나 `true` 와 `1` 처럼 형이 달라도 다르다.
-        # 바인딩 profile 만 `isolated` 를 실으므로 없는 칸을 참으로 읽는 규칙도 양쪽에서 같다.
         if _tool_map_shape(found) != _tool_map_shape(expected):
             return None
         return {name for name, server in servers.items()

@@ -26,7 +26,7 @@ import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import org.springframework.data.domain.Persistable;
 
-/** 승인 줄에 속한 불변 금융 실행 내용이다. 본문은 contentKeyId가 있으면 암호문이다. */
+/** 승인 줄에 속한 금융 실행 내용이다. 저장한 값은 대화 purge의 본문 삭제 외에는 바꾸지 않는다. */
 @Entity
 @Table(
     name = "connector_action_execution",
@@ -66,13 +66,13 @@ public class ConnectorActionExecution implements Persistable<Long> {
     @Column(name = "binding_updated_at", nullable = false, updatable = false)
     private Instant bindingUpdatedAt;
 
-    @Column(name = "execution_args_json", nullable = false, updatable = false, columnDefinition = "MEDIUMTEXT")
+    @Column(name = "execution_args_json", updatable = false, columnDefinition = "MEDIUMTEXT")
     private String executionArgsJson;
 
-    @Column(name = "summary_json", nullable = false, updatable = false, columnDefinition = "MEDIUMTEXT")
+    @Column(name = "summary_json", updatable = false, columnDefinition = "MEDIUMTEXT")
     private String summaryJson;
 
-    @Column(name = "scope_json", nullable = false, updatable = false, columnDefinition = "MEDIUMTEXT")
+    @Column(name = "scope_json", updatable = false, columnDefinition = "MEDIUMTEXT")
     private String scopeJson;
 
     @Column(name = "content_key_id", updatable = false)

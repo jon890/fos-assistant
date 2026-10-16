@@ -19,6 +19,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -358,24 +359,10 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("커넥터 에이전트와 모르는 에이전트와 에이전트가 없는 실행은 Memory 를 하나도 받지 않는다")
-    void connectorAndUnknownAgentsReceiveNoMemory() {
+    @DisplayName("모르는 에이전트와 에이전트가 없는 실행은 Memory 를 하나도 받지 않는다")
+    void unknownAgentsReceiveNoMemory() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
-        Agent connector = Agent.of(
-            "context-connector-" + System.nanoTime(),
-            "연결",
-            "context-connector-" + System.nanoTime(),
-            "http://runtime.test/p/connector",
-            CostMode.API,
-            CredentialScope.DEDICATED,
-            AgentVisibility.PRIVATE,
-            ADMIN.id(),
-            Instant.now());
-        connector.markConnectorManaged();
-        Long connectorId = agents.save(connector).id();
-
-        assertThat(assembler.assemble(ADMIN, connectorId)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, 9_999_999L)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, null)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, agentId).instructions()).contains("그룹 내용", "개인 제목");
@@ -508,6 +495,45 @@ class ContextAssemblerTest {
             assertThat(item.asOf()).isNotNull();
             assertThat(item.conflictsWith()).isEmpty();
         });
+    }
+
+
+    @Test
+    @DisplayName("Memory 항목마다 층의 규칙 이름과 고른 순위를 붙이고 빠진 항목도 순위를 받으며 지시문 글은 바뀌지 않는다")
+    void attachesSelectorAndRankPerSourceWithoutChangingText() {
+        Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
+        Memory personal = memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
+        Memory firstFact = memories.create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
+        Memory secondFact = memories.create(ADMIN, MemoryScope.USER, "운동", "저녁에 걷는다", false);
+        // 개인 사실 구역은 번호 순으로 싣지만 순위는 최근에 고친 순으로 고른 차례다. 나중에 고친 secondFact 가 1 위다
+        touch(firstFact, Instant.now().minusSeconds(60));
+        Memory firstIndexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록 하나", LONG_BODY, false);
+        Memory secondIndexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록 둘", LONG_BODY, false);
+        Memory thirdIndexed = memories.create(ADMIN, MemoryScope.GROUP, "여행 계획", "가을에 바다", false);
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.bundle().items())
+            .extracting(ContextItem::ref, ContextItem::bodyMode, item -> item.selection().selector(), item -> item.selection().rank())
+            .containsExactly(
+                tuple("memory:" + tooLong.id(), ContextBodyMode.OMITTED, ContextSelection.ALWAYS_BY_ID, 1),
+                tuple("memory:" + group.id(), ContextBodyMode.INLINE, ContextSelection.ALWAYS_BY_ID, 2),
+                tuple("memory:" + personal.id(), ContextBodyMode.INLINE, ContextSelection.ALWAYS_BY_ID, 3),
+                tuple("memory:" + firstFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 2),
+                tuple("memory:" + secondFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 1),
+                tuple("memory:" + firstIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 1),
+                tuple("memory:" + secondIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 2),
+                tuple("memory:" + thirdIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 3));
+        assertThat(result.bundle().items()).allSatisfy(item -> {
+            assertThat(item.selection().keywordScore()).isNull();
+            assertThat(item.selection().semanticScore()).isNull();
+            assertThat(item.selection().score()).isNull();
+        });
+        assertThat(result.instructions()).doesNotContain(ContextSelection.ALWAYS_BY_ID, ContextSelection.FACTS_RECENT,
+            ContextSelection.INDEX_BY_ID);
+        assertThat(result.instructionsHash()).isEqualTo(Sha256.hex16(result.instructions()));
+        assertThat(result.omittedMemoryIds()).containsExactly(tooLong.id());
     }
 
 
@@ -823,7 +849,7 @@ class ContextAssemblerTest {
 
     /** 개인 사실 구역 예산만 바꾼 조립기다. 나머지 설정은 운영 바인딩 값을 쓴다. */
     private ContextAssembler assemblerWithFactsBudget(int factsMaxChars) {
-        return new ContextAssembler(
+        return TestContextAssemblers.of(
             memories,
             new ContextProperties(
                 properties.maxChars(),

@@ -12,14 +12,12 @@ import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class FinancialOrderLimitsTest {
-    private static final Instant NOW = Instant.parse("2026-10-15T01:00:00Z");
     private final FinancialOrderLimitRepository rows = mock(FinancialOrderLimitRepository.class);
 
 
@@ -39,11 +37,10 @@ class FinancialOrderLimitsTest {
     @Test
     @DisplayName("사용자 값이 최대치보다 작으면 사용자 값, 크면 최대치이고 0 은 0 이다")
     void takesSmallerOfUserValueAndMaximum() {
-        var row = FinancialOrderLimit.of(9L, NOW);
-        row.set(FinancialLimitKind.ORDER_AMOUNT_USD, new BigDecimal("500"), NOW);
-        row.set(FinancialLimitKind.DAILY_AMOUNT_USD, new BigDecimal("5000"), NOW);
-        row.set(FinancialLimitKind.ORDER_QUANTITY, BigDecimal.ZERO, NOW);
-        when(rows.findById(9L)).thenReturn(Optional.of(row));
+        var row = FinancialOrderLimit.NONE.with(FinancialLimitKind.ORDER_AMOUNT_USD, new BigDecimal("500"))
+            .with(FinancialLimitKind.DAILY_AMOUNT_USD, new BigDecimal("5000"))
+            .with(FinancialLimitKind.ORDER_QUANTITY, BigDecimal.ZERO);
+        when(rows.findByUserId(9L)).thenReturn(Optional.of(row));
         var values = limits().effective(9L);
         assertThat(values.value(FinancialLimitKind.ORDER_AMOUNT_USD)).isEqualByComparingTo("500");
         assertThat(values.value(FinancialLimitKind.DAILY_AMOUNT_USD)).isEqualByComparingTo("1000");

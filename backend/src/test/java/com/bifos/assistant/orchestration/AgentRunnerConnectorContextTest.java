@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -52,10 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * 커넥터 에이전트의 실행이 Memory 문맥을 받지 않는 것을 고정한다(ADR-045).
- *
- * <p>외부 서비스의 글을 읽는 실행에 개인 Memory 를 넣으면 그 글이 모델을 속여 Memory 를 밖으로 내보낼 수 있다.
- * 일반 에이전트의 실행은 그대로 Memory 를 받는다.
+ * 위임 실행의 문맥과 모델, 실행 시각·답 기록 계약을 확인한다.
  */
 class AgentRunnerConnectorContextTest {
 
@@ -78,7 +76,7 @@ class AgentRunnerConnectorContextTest {
 
     @BeforeEach
     void setUp() {
-        when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
+        when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
         when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
@@ -108,7 +106,7 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("Flow와 위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
+    @DisplayName("위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
     void sendsResolvedTierAndRecordsRequestAndSubmission() {
         ModelChoice choice = ModelChoice.of("openai-codex", "example-deep", "high");
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.DEEP));
@@ -142,39 +140,11 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("커넥터 실행은 Memory 없이 공통 지침과 덧붙인 지시를 보낸다")
-    void sendsOnlyInstructionAdditionForConnectorAgent() {
-        run(connectorAgent(), ADDITION, null);
-
-        verify(contextAssembler, never()).assemble(any(), any());
-        String instructions = submitted().instructions();
-        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY).endsWith("\n\n" + ADDITION);
-        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + ADDITION));
-        ExecutionContextSnapshot snapshot = recordedSnapshot();
-        assertThat(snapshot.contextChars()).isEqualTo(commonInstructions.length());
-        assertThat(snapshot.instructionsHash())
-            .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
-    }
-
-
-    @Test
-    @DisplayName("커넥터 실행에 덧붙일 지시가 없어도 공통 표 지침은 보낸다")
-    void sendsNoInstructionsForConnectorAgentWithoutAddition() {
-        run(connectorAgent(), null, null);
-
-        verify(contextAssembler, never()).assemble(any(), any());
-        String instructions = submitted().instructions();
-        assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY);
-        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length());
-    }
-
-
-    @Test
-    @DisplayName("일반 에이전트의 실행은 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
+    @DisplayName("일반 에이전트의 실행은 작업 글을 질문으로 넘겨 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
     void sendsAssembledMemoryForOrdinaryAgent() {
         run(agent(), ADDITION, null);
 
-        verify(contextAssembler).assemble(eq(user), any());
+        verify(contextAssembler).assemble(eq(user), any(), eq("일"));
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
@@ -182,7 +152,7 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("살펴보기 트리의 자식은 Memory 를 읽되 기억을 남기는 지침은 받지 않는다")
+    @DisplayName("살펴보기 트리의 자식은 질문 없이 Memory 를 읽고 기억을 남기는 지침은 받지 않는다")
     void excludesRememberInstructionsFromProactiveChild() {
         when(proactiveChecks.existsByRootExecutionId(10L)).thenReturn(true);
 
@@ -203,20 +173,21 @@ class AgentRunnerConnectorContextTest {
             null);
 
         assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
+        verify(contextAssembler).assemble(eq(user), any(), isNull());
         verify(contextAssembler).withResponseInstructions(any(), eq(false));
     }
 
 
     @Test
-    @DisplayName("위임받은 커넥터 에이전트의 실행이 성공하면 Memory 없이도 답이 output_text 로 넘어간다")
-    void recordsAnswerAsOutputTextForDelegatedConnectorRun() {
-        Agent agent = connectorAgent();
+    @DisplayName("위임 실행이 성공하면 조립한 Memory와 답을 실행 기록에 남긴다")
+    void recordsAnswerAsOutputTextForDelegatedRun() {
+        Agent agent = agent();
         DelegationKey key = DelegationKey.of("parent-profile", "fos-root", "fos-root", "call_1");
 
         AgentRun run = run(agent, null, key);
 
-        verify(contextAssembler, never()).assemble(any(), any());
-        assertThat(submitted().instructions()).contains("GFM", "구분 줄").doesNotContain(MEMORY);
+        verify(contextAssembler).assemble(eq(user), any(), any());
+        assertThat(submitted().instructions()).contains("GFM", MEMORY);
         verify(executions).complete(same(started), same(agent), any(), any(), eq(ANSWER));
         assertThat(run.execution()).isSameAs(completed);
         assertThat(run.result().succeeded()).as("위임 실행의 성공 여부").isTrue();
@@ -236,13 +207,6 @@ class AgentRunnerConnectorContextTest {
         verify(executions)
             .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
-    }
-
-
-    private static Agent connectorAgent() {
-        Agent agent = agent();
-        agent.markConnectorManaged();
-        return agent;
     }
 
 
