@@ -74,24 +74,8 @@ com.bifos.assistant.proactive.application.ProactiveCheckEnded 는 값이다. app
 com.bifos.assistant.proactive.application.ProactiveCheckRun 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveCheckSettled 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 proactive.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.proactive.application.ProblemJudgement 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.skill.application.ActiveConversationPublicIds 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 skill.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.skill.application.CheckedSkillPackage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.ReceivedSkillPackage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillAgentNotice 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.skill.application.SkillDetail 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillFileInfo 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillFileInput 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillFrontmatter 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillList 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillListItem 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillPackageEntry 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillPackageFile 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillPackagePreview 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillPackageProblem 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillSource 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillUsageSummary 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.SkillsChanged 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.skill.application.UserSkillUsage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
+com.bifos.assistant.skill.library.application.SkillInputRules 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.skill.upload.application.SkillAgentNotice 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.task.application.TaskSchedule 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.usage.execution.application.TurnSlot 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.workspace.application.WorkspacePreviewPolicy 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
