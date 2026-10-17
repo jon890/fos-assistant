@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.action.application;
 
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
-import com.bifos.assistant.chat.application.ConversationActionPurge;
+import com.bifos.assistant.chat.purge.application.port.ConversationActionPurge;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;

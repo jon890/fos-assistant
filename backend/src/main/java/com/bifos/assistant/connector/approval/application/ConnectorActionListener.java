@@ -1,10 +1,10 @@
 package com.bifos.assistant.connector.approval.application;
 
-import com.bifos.assistant.chat.application.ChatEvent;
-import com.bifos.assistant.chat.application.ConversationEventHub;
-import com.bifos.assistant.chat.application.ConversationNotices;
-import com.bifos.assistant.chat.application.NextTurnDispatcher;
-import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.turn.application.ConversationEventHub;
+import com.bifos.assistant.chat.turn.application.ConversationNotices;
+import com.bifos.assistant.chat.nextturn.application.NextTurnDispatcher;
+import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionResult;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;

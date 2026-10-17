@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.application.AgentPurgeWriter;
 import com.bifos.assistant.agent.application.dto.AgentPurgeOutcome;
-import com.bifos.assistant.chat.application.ChatService;
-import com.bifos.assistant.chat.application.ConversationPurger;
+import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
-import com.bifos.assistant.chat.application.ConversationActionPurge;
+import com.bifos.assistant.chat.purge.application.port.ConversationActionPurge;
 import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;

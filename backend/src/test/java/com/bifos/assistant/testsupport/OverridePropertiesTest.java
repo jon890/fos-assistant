@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.browser.config.BrowserProperties;
-import com.bifos.assistant.chat.application.DelegationWakeProperties;
+import com.bifos.assistant.chat.nextturn.config.DelegationWakeProperties;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;

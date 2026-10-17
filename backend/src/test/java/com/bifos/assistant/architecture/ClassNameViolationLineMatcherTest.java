@@ -16,7 +16,7 @@ class ClassNameViolationLineMatcherTest {
     @DisplayName("전체 이름의 패키지만 다른 같은 줄은 같다고 본다")
     void ignoresPackageOfClassNames() {
         assertThat(matcher.matches(
-            "com.bifos.assistant.chat.application.ChatService 는 인터페이스다.",
+            "com.bifos.assistant.chat.turn.application.ChatService 는 인터페이스다.",
             "com.bifos.assistant.chat.turn.application.port.ChatService 는 인터페이스다.")).isTrue();
     }
 
@@ -43,7 +43,7 @@ class ClassNameViolationLineMatcherTest {
     @DisplayName("단순 클래스 이름이 다르면 다른 줄이다")
     void differsWhenSimpleNameDiffers() {
         assertThat(matcher.matches(
-            "com.bifos.assistant.chat.application.ChatService 는 인터페이스다.",
+            "com.bifos.assistant.chat.turn.application.ChatService 는 인터페이스다.",
             "com.bifos.assistant.chat.application.ChatServices 는 인터페이스다.")).isFalse();
     }
 

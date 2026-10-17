@@ -9,7 +9,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
-import com.bifos.assistant.chat.application.ConversationPurger;
+import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.attachment.application.MediaObservationService;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;

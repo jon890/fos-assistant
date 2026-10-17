@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bifos.assistant.chat.starter.application.dto.StarterStatus;
 import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
-import com.bifos.assistant.chat.presentation.AgentStarterController;
+import com.bifos.assistant.chat.turn.presentation.AgentStarterController;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

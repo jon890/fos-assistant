@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.feedback.application;
 
-import com.bifos.assistant.chat.application.OwnConversations;
+import com.bifos.assistant.chat.turn.application.OwnConversations;
 import com.bifos.assistant.feedback.application.FeedbackLabeler;
 import com.bifos.assistant.feedback.application.dto.SubjectLabel;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;

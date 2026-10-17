@@ -8,7 +8,7 @@ import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
-import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;

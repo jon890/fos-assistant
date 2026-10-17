@@ -1,9 +1,9 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.chat.application.ChatService;
-import com.bifos.assistant.chat.application.CheckTurn;
-import com.bifos.assistant.chat.application.model.CheckAnswer;
+import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.port.CheckTurn;
+import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.followup.application.FollowUpService;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.check.application;
 
-import com.bifos.assistant.chat.application.CheckReportReads;
+import com.bifos.assistant.chat.turn.application.port.CheckReportReads;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.bifos.assistant.testsupport;
 
 import static org.assertj.core.api.Assertions.fail;
 
-import com.bifos.assistant.chat.application.WakeRetryDue;
+import com.bifos.assistant.chat.nextturn.application.dto.WakeRetryDue;
 import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;

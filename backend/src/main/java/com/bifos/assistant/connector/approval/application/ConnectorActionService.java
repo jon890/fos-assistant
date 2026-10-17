@@ -4,7 +4,7 @@ import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionResult;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
