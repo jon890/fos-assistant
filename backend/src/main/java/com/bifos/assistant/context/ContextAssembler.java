@@ -189,7 +189,7 @@ public class ContextAssembler implements OmittedMemories {
             search,
             conflicting,
             builder,
-            searchSection.itemMaxChars(),
+            searchSection.limits(),
             memory -> memoryFreshness(memory, now)).index();
         builder.limit(maxChars);
         appendIndex(builder, index, sameNameDocuments(index.indexOrder()), now);

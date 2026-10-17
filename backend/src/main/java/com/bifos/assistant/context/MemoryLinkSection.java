@@ -20,7 +20,8 @@ import lombok.NoArgsConstructor;
  * 이어진 한 단계 이웃을 본문으로 싣는다. 두 단계 이상은 따라가지 않는다.
  *
  * <p>이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한, 승인, 대체되지 않음 조건을 지났으므로 이 구역이 볼 수 없는 항목을 싣지 못한다. 민감 항목과
- * 암호화한 항목, 본문이 질문 구역의 항목당 상한보다 긴 항목은 싣지 않고 색인에 둔다. 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다.
+ * 암호화한 항목, 본문이 항목당 상한보다 긴 항목은 싣지 않고 색인에 둔다. 건수와 항목당 글자 수, 구역 글자 예산은 질문 구역의 설정
+ * ({@code assistant.context.search})과 같은 값을 이 구역의 몫으로 따로 쓴다. 예산이나 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class MemoryLinkSection {
@@ -30,9 +31,6 @@ final class MemoryLinkSection {
 
             아래는 위에 실린 기억과 이어진 기억이다. 필요하면 번호로 memory_read 를 불러 다시 읽는다.
             """.stripTrailing();
-
-    /** 한 실행에 싣는 이웃의 상한이다. 질문과 관련된 기억 구역보다 많이 싣지 않게 한다. */
-    static final int MAX_ITEMS = 5;
 
     /** 사람과 에이전트가 맺은 연결(점수 없음)을 먼저, 그다음 점수가 높은 것부터, 같으면 번호 순이다. */
     private static final Comparator<Neighbor> ORDER = Comparator
@@ -53,7 +51,7 @@ final class MemoryLinkSection {
      * @param links 그 번호를 한쪽 끝으로 둔 효력 있는 {@code RELATED}
      * @param search 질문 구역이 정한 색인. 이웃 후보는 이 색인의 항목이다
      * @param indexOnly 색인에만 둘 항목 번호. 다른 범위에 같은 이름의 짝이 있는 문서다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없다
-     * @param itemMaxChars 이웃 하나의 본문 글자 수 상한
+     * @param limits 이웃 건수, 이웃 하나의 본문 글자 수, 구역 글자 예산
      */
     static Placement place(
         Set<Long> anchors,
@@ -61,22 +59,28 @@ final class MemoryLinkSection {
         MemorySearchPlacement search,
         Set<Long> indexOnly,
         ContextBudgetWriter builder,
-        int itemMaxChars,
+        MemorySearchSectionProperties limits,
         Function<Memory, ContextFreshness> freshness) {
-        if (anchors.isEmpty() || links.isEmpty()) {
+        if (anchors.isEmpty() || links.isEmpty() || limits.maxItems() == 0) {
             return new Placement(Set.of(), search);
         }
         Map<Long, Memory> candidates = search.indexOrder().stream()
             .collect(Collectors.toMap(Memory::id, Function.identity(), (left, right) -> left));
         Set<Long> placed = new HashSet<>();
+        long used = 0;
         int rank = 0;
         for (Neighbor neighbor : neighbors(anchors, links, candidates.keySet())) {
-            if (placed.size() >= MAX_ITEMS) {
+            if (placed.size() >= limits.maxItems()) {
                 break;
             }
             Memory memory = candidates.get(neighbor.memoryId());
             rank++;
-            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > itemMaxChars) {
+            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > limits.itemMaxChars()) {
+                continue;
+            }
+            String line = MemoryItems.inlineLine(memory);
+            long cost = ContextBudgetWriter.next(builder.isEmpty(), !placed.isEmpty(), HEADER, line).length();
+            if (used + cost > limits.maxChars()) {
                 continue;
             }
             ContextItem item = MemoryItems.item(
@@ -88,8 +92,9 @@ final class MemoryLinkSection {
                 memory.content(),
                 freshness.apply(memory))
                 .withSelection(new ContextSelection(ContextSelection.LINK_RELATED, rank, null, null, neighbor.score()));
-            if (builder.appendIfFits(HEADER, MemoryItems.inlineLine(memory), item)) {
+            if (builder.appendIfFits(HEADER, line, item)) {
                 placed.add(memory.id());
+                used += cost;
             }
         }
         if (placed.isEmpty()) {

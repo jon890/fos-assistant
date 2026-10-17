@@ -18,6 +18,8 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +55,12 @@ class ContextAssemblerLinkTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    ContextProperties properties;
+
+    @Autowired
+    TestClock clock;
 
     private Long agentId;
 
@@ -169,6 +177,31 @@ class ContextAssemblerLinkTest {
                 """, scope, ownerUserId, groupId, documentKey, title);
         return jdbc.queryForObject(
             "SELECT id FROM memory WHERE scope = ? AND document_key = ?", Long.class, scope, documentKey);
+    }
+
+
+    @Test
+    @DisplayName("이웃은 질문 구역 설정의 건수와 글자 예산을 이 구역의 몫으로 따로 써 넘치는 이웃은 색인에 남긴다")
+    void keepsLinkSectionWithinItsOwnBudget() {
+        Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
+        Memory hotel = memories.create(ADMIN, MemoryScope.USER, "제주 숙소", "숙소는 " + "바닷가 ".repeat(60), false);
+        Memory dinner = memories.create(ADMIN, MemoryScope.USER, "제주 저녁", "저녁은 " + "흑돼지 ".repeat(60), false);
+        relate(trip, hotel, 0.95);
+        relate(trip, dinner, 0.9);
+        ContextAssembler oneItem = TestContextAssemblers.of(
+            memories, properties, clock, new MemorySearchSectionProperties(1, 600, 1_500));
+        ContextAssembler tightChars = TestContextAssemblers.of(
+            memories, properties, clock, new MemorySearchSectionProperties(3, 600, MemoryLinkSection.HEADER.length() + 10));
+        ContextAssembler off = TestContextAssemblers.of(memories, properties, clock, new MemorySearchSectionProperties(0, 600, 1_500));
+
+        AssembledContext one = oneItem.assemble(ADMIN, agentId);
+        AssembledContext tight = tightChars.assemble(ADMIN, agentId);
+
+        assertThat(itemOf(one, hotel, ContextSource.MEMORY_LINK)).isPresent();
+        assertThat(itemOf(one, dinner, ContextSource.MEMORY_INDEX)).isPresent();
+        assertThat(tight.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
+        assertThat(itemOf(tight, hotel, ContextSource.MEMORY_INDEX)).isPresent();
+        assertThat(off.assemble(ADMIN, agentId).bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
     }
 
 

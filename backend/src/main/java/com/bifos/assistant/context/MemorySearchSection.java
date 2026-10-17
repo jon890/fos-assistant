@@ -42,9 +42,9 @@ public class MemorySearchSection {
     private final QueryEmbedder queryEmbedder;
 
 
-    /** 구역에 실을 수 있는 본문의 최대 글자 수다. 연결된 기억 구역도 같은 상한을 쓴다. */
-    int itemMaxChars() {
-        return properties.itemMaxChars();
+    /** 구역의 건수, 항목당 글자 수, 글자 예산이다. 연결된 기억 구역도 같은 값을 자기 몫으로 따로 쓴다. */
+    MemorySearchSectionProperties limits() {
+        return properties;
     }
 
 
