@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.attention.application.AttentionEventCleaner;
 import com.bifos.assistant.attention.application.AttentionMetricsService;
-import com.bifos.assistant.attention.application.model.AttentionMetric;
+import com.bifos.assistant.attention.application.dto.AttentionMetric;
 import com.bifos.assistant.attention.domain.AttentionEvent;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;

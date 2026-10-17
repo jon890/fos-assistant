@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.mcp.application.McpCallContext;
+import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;

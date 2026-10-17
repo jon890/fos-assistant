@@ -1,6 +1,6 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
+import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;

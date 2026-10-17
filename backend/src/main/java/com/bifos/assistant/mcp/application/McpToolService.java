@@ -1,5 +1,7 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCallContext;
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -15,8 +17,8 @@ import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
-import com.bifos.assistant.orchestration.application.DelegationResult;
-import com.bifos.assistant.orchestration.application.DelegationResult.Failure;
+import com.bifos.assistant.orchestration.application.dto.DelegationResult;
+import com.bifos.assistant.orchestration.application.dto.DelegationResult.Failure;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

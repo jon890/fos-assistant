@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import static com.bifos.assistant.mcp.application.McpToolService.result;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.SubagentRegistration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

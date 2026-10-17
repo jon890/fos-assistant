@@ -16,7 +16,7 @@ import com.bifos.assistant.connector.application.FinancialLimitSettings;
 import com.bifos.assistant.connector.application.model.FinancialLimitsView;
 import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.presentation.financial.FinancialLimitController;
-import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

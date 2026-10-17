@@ -1,9 +1,10 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserEndpoint;
-import com.bifos.assistant.browser.application.model.BrowserGrant;
-import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
+import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
+import com.bifos.assistant.browser.application.dto.BrowserEndpoint;
+import com.bifos.assistant.browser.application.dto.BrowserGrant;
+import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

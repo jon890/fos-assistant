@@ -4,8 +4,8 @@ import static com.bifos.assistant.browser.application.RecordingScreenSink.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
-import com.bifos.assistant.browser.application.model.BrowserScreenInput.Kind;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput.Kind;
 import com.bifos.assistant.browser.domain.CdpTarget;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

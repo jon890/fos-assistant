@@ -1,9 +1,10 @@
 package com.bifos.assistant.attention.application;
 
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
-import com.bifos.assistant.attention.application.model.AttentionCard;
-import com.bifos.assistant.attention.application.model.AttentionItem;
-import com.bifos.assistant.attention.application.model.AttentionSnapshot;
+import com.bifos.assistant.attention.config.AttentionProperties;
+import com.bifos.assistant.attention.application.dto.AttentionCandidate;
+import com.bifos.assistant.attention.application.dto.AttentionCard;
+import com.bifos.assistant.attention.application.dto.AttentionItem;
+import com.bifos.assistant.attention.application.dto.AttentionSnapshot;
 import com.bifos.assistant.attention.domain.AttentionControlEntry;
 import com.bifos.assistant.attention.domain.AttentionEvent;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenSink;
+import com.bifos.assistant.browser.application.port.BrowserScreenSink;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

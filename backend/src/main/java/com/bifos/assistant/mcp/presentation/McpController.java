@@ -2,15 +2,15 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
-import com.bifos.assistant.mcp.application.McpCallContext;
-import com.bifos.assistant.mcp.application.McpCaller;
+import com.bifos.assistant.mcp.application.dto.McpCallContext;
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpMemoryLink;
-import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.FollowUpProposeArguments;

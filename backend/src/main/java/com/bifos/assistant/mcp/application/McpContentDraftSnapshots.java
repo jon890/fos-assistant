@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftSaveRequests;

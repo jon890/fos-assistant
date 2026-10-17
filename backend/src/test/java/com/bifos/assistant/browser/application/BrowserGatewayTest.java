@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.application;
 
+import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -8,10 +9,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.browser.application.model.BrowserEndpoint;
-import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.application.dto.BrowserEndpoint;
+import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

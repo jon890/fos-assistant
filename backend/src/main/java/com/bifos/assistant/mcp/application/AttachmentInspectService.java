@@ -1,5 +1,9 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.AttachmentInspectRequest;
+import com.bifos.assistant.mcp.application.dto.McpCallContext;
+import com.bifos.assistant.mcp.application.dto.McpCaller;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.InspectedImage;
 import com.bifos.assistant.shared.error.ApiException;

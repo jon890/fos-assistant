@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.MediaObservationPages;
 import com.bifos.assistant.chat.application.MediaObservationService;

@@ -31,7 +31,7 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

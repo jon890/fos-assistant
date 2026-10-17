@@ -2,7 +2,7 @@ package com.bifos.assistant.browser.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Duration;

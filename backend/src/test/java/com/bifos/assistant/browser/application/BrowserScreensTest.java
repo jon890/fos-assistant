@@ -6,12 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
-import com.bifos.assistant.browser.application.model.BrowserScreenInput.Kind;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput.Kind;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.CdpTarget;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

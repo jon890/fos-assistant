@@ -3,7 +3,7 @@ package com.bifos.assistant.browser.application;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.CdpProbe;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;

@@ -17,7 +17,7 @@ import com.bifos.assistant.browser.application.UserBrowserServiceTestFactory;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.RuntimeContainer;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

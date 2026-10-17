@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.error.ApiException;

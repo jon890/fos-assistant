@@ -5,11 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
+import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import com.bifos.assistant.shared.config.LiveProperties;

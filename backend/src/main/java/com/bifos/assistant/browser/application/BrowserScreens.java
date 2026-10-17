@@ -1,10 +1,10 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
-import com.bifos.assistant.browser.application.model.BrowserScreenSink;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
+import com.bifos.assistant.browser.application.port.BrowserScreenSink;
 import com.bifos.assistant.browser.domain.CdpConnector;
 import com.bifos.assistant.browser.domain.CdpTargets;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

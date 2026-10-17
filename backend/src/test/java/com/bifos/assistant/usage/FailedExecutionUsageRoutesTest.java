@@ -20,7 +20,7 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
-import com.bifos.assistant.orchestration.application.AgentRun;
+import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;

@@ -63,7 +63,7 @@ import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.hermes.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
