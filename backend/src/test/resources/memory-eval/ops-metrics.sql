@@ -99,3 +99,17 @@ SELECT COUNT(*) AS executions,
 FROM agent_execution
 WHERE parent_execution_id IS NULL AND conversation_id IS NOT NULL
   AND started_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP);
+
+-- name: memory_links
+-- 기간 안에 만든 기억 연결을 종류, 만든 쪽, 지금 상태별로 센다. 상태를 CONCAT 으로 문자열로 바꾸는 까닭은 proposal_outcomes 와 같다.
+SELECT CONCAT(type, '') AS link_type, CONCAT(origin, '') AS origin, CONCAT(status, '') AS status, COUNT(*) AS links
+FROM memory_link
+WHERE created_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP)
+GROUP BY CONCAT(type, ''), CONCAT(origin, ''), CONCAT(status, '')
+ORDER BY link_type, origin, status;
+
+-- name: auto_link_revoked
+-- 코드가 만든 연결 가운데 사람이 끊었거나 거절한 줄이다. 자동 연결이 틀린 정도를 표본으로 본다.
+SELECT COUNT(*) AS auto_links, COALESCE(SUM(CASE WHEN status = 'REVOKED' THEN 1 ELSE 0 END), 0) AS revoked
+FROM memory_link
+WHERE origin = 'AUTO' AND created_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP);

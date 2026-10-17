@@ -47,7 +47,9 @@ class MemoryOpsMetricsSqlTest {
         "proposal_outcomes",
         "undo_rate",
         "regenerate_by_memory",
-        "context_size");
+        "context_size",
+        "memory_links",
+        "auto_link_revoked");
 
     /** 이 검사가 넣는 줄의 번호는 여기서 시작한다. 다른 검사가 쓰는 번호와 겹치지 않게 크게 잡는다. */
     private static final long BASE = 880_000_000L;
@@ -81,8 +83,8 @@ class MemoryOpsMetricsSqlTest {
 
 
     @Test
-    @DisplayName("쿼리 파일은 정해진 아홉 지표를 갖고 제목과 본문 컬럼을 읽지 않는다")
-    void declaresNineMetricsWithoutTextColumns() {
+    @DisplayName("쿼리 파일은 정해진 열한 지표를 갖고 제목과 본문 컬럼을 읽지 않는다")
+    void declaresElevenMetricsWithoutTextColumns() {
         String sql = load();
 
         assertThat(queries(sql).keySet()).containsExactlyElementsOf(NAMES);
@@ -129,6 +131,14 @@ class MemoryOpsMetricsSqlTest {
 
         assertThat(delta(before, after, "context_size", "", "executions")).isEqualTo(2);
         assertThat(delta(before, after, "context_size", "", "omitted_items")).isEqualTo(2);
+
+        assertThat(delta(before, after, "memory_links", "SUPERSEDES|AUTO|PROPOSED", "links")).isEqualTo(1);
+        assertThat(delta(before, after, "memory_links", "RELATED|AUTO|ACTIVE", "links")).isEqualTo(1);
+        assertThat(delta(before, after, "memory_links", "RELATED|AUTO|REVOKED", "links")).isEqualTo(1);
+        assertThat(delta(before, after, "memory_links", "RELATED|AGENT|ACTIVE", "links")).isEqualTo(1);
+
+        assertThat(delta(before, after, "auto_link_revoked", "", "auto_links")).isEqualTo(3);
+        assertThat(delta(before, after, "auto_link_revoked", "", "revoked")).isEqualTo(1);
     }
 
 
@@ -194,6 +204,27 @@ class MemoryOpsMetricsSqlTest {
         message(answerWithout, conversation, "ASSISTANT", child, null, in);
         message(regenerated, conversation, "ASSISTANT", child, answerWithMemory, in);
         message(BASE + 53, conversation, "USER", null, null, in);
+
+        // 기간 안의 자동 연결 셋 가운데 사람이 끊은 것은 하나다. 에이전트가 맺은 줄과 기간 밖의 자동 줄은 비율에 들지 않는다
+        link(BASE + 60, readMemory, unreadMemory, "SUPERSEDES", "AUTO", "PROPOSED", in);
+        link(BASE + 61, readMemory, idleMemory, "RELATED", "AUTO", "ACTIVE", in);
+        link(BASE + 62, unreadMemory, idleMemory, "RELATED", "AUTO", "REVOKED", in);
+        link(BASE + 63, readMemory, unreadMemory, "RELATED", "AGENT", "ACTIVE", in);
+        link(BASE + 64, readMemory, correctedMemory, "RELATED", "AUTO", "ACTIVE", out);
+    }
+
+
+    private void link(long id, long from, long to, String type, String origin, String status, Instant createdAt) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("from_memory_id", from);
+        row.put("to_memory_id", to);
+        row.put("type", type);
+        row.put("origin", origin);
+        row.put("status", status);
+        row.put("created_at", at(createdAt));
+        row.put("updated_at", at(createdAt));
+        insert("memory_link", row);
     }
 
 
@@ -383,7 +414,7 @@ class MemoryOpsMetricsSqlTest {
         List<String> keys = new ArrayList<>();
         for (Map.Entry<String, Object> entry : row.entrySet()) {
             String name = entry.getKey().toLowerCase(Locale.ROOT);
-            if (List.of("source", "body_mode", "selector", "status", "with_memory").contains(name)) {
+            if (List.of("source", "body_mode", "selector", "link_type", "origin", "status", "with_memory").contains(name)) {
                 keys.add(String.valueOf(entry.getValue()));
             }
         }

@@ -310,6 +310,7 @@ sequenceDiagram
 - 같은 쌍에 어느 상태든 줄이 이미 있으면 코드는 새로 만들지 않는다. 사람이 거절하거나 끊은 쌍을 다시 묻거나 잇지 않는다
 - 대체 후보는 유사도가 높아도 뜻이 반대일 수 있어(「땅콩 알레르기 있음」 과 「없음」) 늘 제안이다. 사람이 받아들이기 전에는 주입이 바뀌지 않는다
 - 한 항목에서 실패해도 다음 항목을 이어 보고, 채운 벡터는 그대로 둔다. 로그에는 번호와 점수만 남긴다
+- 자동 연결이 맞는지는 운영 집계의 `memory_links` 와 `auto_link_revoked` 로 보고 임계값을 고친다
 
 ### 에이전트가 기억을 남기는 길
 
@@ -603,4 +604,6 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `proposal_outcomes` | 수락률. 제안 기록의 지금 상태별 수. 지운 항목은 따로 센다 | `memory_capture.kind`, `memory.status` | 바로 저장 판정이 너무 좁거나 넓은지 |
 | `undo_rate` | 되돌리기 비율. `CREATED`, `UPDATED` 가운데 `undone_at` 이 있는 비율 | `memory_capture` | 뒤처리 추출을 켤지 |
 | `regenerate_by_memory` | 본문 기억이 실린 답과 아닌 답의 다시 생성 비율 | `chat_message.replaces_message_id`, `execution_context_source` | 기억이 답을 돕는지. 관찰 비교다 |
+| `memory_links` | 기억 연결 수. 기간 안에 만든 줄을 종류, 만든 쪽, 지금 상태별로 센다 | `memory_link` 의 `type`, `origin`, `status` | 자동 연결과 대체 제안이 얼마나 생기는지 |
+| `auto_link_revoked` | 자동 연결을 사람이 끊은 비율. 코드가 만든 줄 가운데 `REVOKED` 인 비율 | `memory_link` 의 `origin`, `status` | 자동 연결의 임계값을 고칠지 |
 | `context_size` | 실행당 문맥 글자 수와 빠진 항목 | 대화 루트 실행의 `context_chars`, `context_omitted_items`. `context_chars` 는 공통 답변 지침을 함께 센다 | 예산과 길이 상한 |
