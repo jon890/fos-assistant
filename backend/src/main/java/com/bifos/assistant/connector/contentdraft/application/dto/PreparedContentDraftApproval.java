@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.contentdraft.application.dto;
 
-import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftBindingStamp;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import java.util.List;
 import java.util.UUID;

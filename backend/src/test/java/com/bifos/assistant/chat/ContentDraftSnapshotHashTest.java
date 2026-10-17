@@ -5,7 +5,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotHash;
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.attachment.application;
 
-import com.bifos.assistant.chat.application.ContentDraftCleaner;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
 import com.bifos.assistant.agent.application.AgentService;

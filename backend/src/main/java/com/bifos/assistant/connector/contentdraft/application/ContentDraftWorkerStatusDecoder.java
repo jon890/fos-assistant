@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.contentdraft.application;
 
-import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftWorkerStatus;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.hermes.application.dto.ContentDraftWorkerStamp;

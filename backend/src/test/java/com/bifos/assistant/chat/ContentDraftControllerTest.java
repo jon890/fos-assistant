@@ -3,7 +3,7 @@ package com.bifos.assistant.chat;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ContentDraftInputReader;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

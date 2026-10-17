@@ -2,8 +2,8 @@ package com.bifos.assistant.connector.contentdraft.application;
 
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftLockedJob;
-import com.bifos.assistant.chat.infra.ContentDraftJobRepository;
-import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

@@ -1,12 +1,12 @@
 package com.bifos.assistant.chat;
 
-import com.bifos.assistant.chat.application.ContentDraftReferences;
-import com.bifos.assistant.chat.application.ContentDraftService;
-import com.bifos.assistant.chat.domain.entity.ContentDraft;
-import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
-import com.bifos.assistant.chat.infra.ContentDraftBodies;
-import com.bifos.assistant.chat.infra.ContentDraftCreationCallRepository;
-import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftReferences;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftService;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraft;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
 import com.bifos.assistant.crypto.domain.SealedText;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentMatchers;
@@ -17,9 +17,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
-import com.bifos.assistant.chat.domain.ContentDraftException;
-import com.bifos.assistant.chat.domain.type.ContentDraftCreationStatus;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftCreationContext;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftCreationStatus;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
