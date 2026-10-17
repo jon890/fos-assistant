@@ -4,7 +4,7 @@ import static com.bifos.assistant.skill.infra.SkillFilePaths.SKILL_MD;
 import static com.bifos.assistant.skill.infra.SkillFilePaths.isScript;
 import static com.bifos.assistant.skill.infra.SkillFilePaths.isValidFilePath;
 
-import com.bifos.assistant.hermes.HermesProfileName;
+import com.bifos.assistant.hermes.application.dto.HermesProfileName;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.domain.SkillBundle;

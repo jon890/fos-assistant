@@ -11,12 +11,12 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.chat.application.ModelVisibilityService;
-import com.bifos.assistant.hermes.DecisionProfileReadinessClient;
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesRunsClient;
-import com.bifos.assistant.hermes.ProfileModelDefaultsClient;
-import com.bifos.assistant.hermes.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.infra.DecisionProfileReadinessClient;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.infra.ProfileModelDefaultsClient;
+import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.proactive.application.HermesDecisionProvider;
 import com.bifos.assistant.proactive.application.ValueEvaluationProperties;
 import com.bifos.assistant.proactive.application.ValueEvaluator;

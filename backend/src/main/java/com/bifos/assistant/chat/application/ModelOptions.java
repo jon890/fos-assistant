@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.hermes.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.model.domain.ModelChoice;
 import java.util.List;
 

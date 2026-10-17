@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
-import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
+import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

@@ -3,8 +3,8 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
-import com.bifos.assistant.hermes.dto.ConnectorRecovery;
+import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
+import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

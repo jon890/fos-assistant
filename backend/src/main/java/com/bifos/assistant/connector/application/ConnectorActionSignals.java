@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.application.ConversationNotices;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;

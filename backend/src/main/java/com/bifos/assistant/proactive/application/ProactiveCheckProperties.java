@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;

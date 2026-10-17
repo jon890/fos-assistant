@@ -38,7 +38,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;

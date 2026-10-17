@@ -1,5 +1,7 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

@@ -1,11 +1,14 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.infra.HttpHermesRunsClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.dto.HermesRunLookup;
+import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

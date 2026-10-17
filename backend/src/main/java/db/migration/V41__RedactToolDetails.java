@@ -1,6 +1,6 @@
 package db.migration;
 
-import com.bifos.assistant.hermes.ToolDetailRedactor;
+import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

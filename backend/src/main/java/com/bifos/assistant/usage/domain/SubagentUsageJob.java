@@ -1,6 +1,6 @@
 package com.bifos.assistant.usage.domain;
 
-import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

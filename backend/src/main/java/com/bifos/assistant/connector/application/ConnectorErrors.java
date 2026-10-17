@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
-import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.AccessLevel;

@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
-import com.bifos.assistant.hermes.HermesProfileKeyStore;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

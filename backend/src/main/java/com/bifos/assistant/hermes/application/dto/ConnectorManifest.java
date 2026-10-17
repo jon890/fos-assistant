@@ -1,0 +1,210 @@
+package com.bifos.assistant.hermes.application.dto;
+
+import java.util.List;
+import tools.jackson.databind.JsonNode;
+
+/**
+ * 대시보드 카탈로그가 내는 커넥터 하나의 선언이다(ADR-043).
+ *
+ * <p>계약은 {@code docs/features/connector.md} 의 「대시보드 plugin 계약」 이 갖는다.
+ *
+ * @param verifyTool 등록 전에 후보 값으로 부르는 확인 도구
+ * @param mcpServer 설치가 그 profile 에 더하는 MCP 서버 이름
+ * @param schema manifest 의 판. 2 부터 도구마다 정책을 선언한다
+ * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
+ * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
+ * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}
+ * @param singleBinding 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다(ADR-20261008 / connector-binding-guards). 옛 대시보드
+ * plugin 은 내지 않고, 없으면 거짓
+ * @param ownerBrowser 참이면 그 커넥터는 사용자 브라우저를 쓴다. 설치와 확인 호출이 중계 주소를 싣는다
+ * (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
+ * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
+ * @param unknownErrors 결과를 모르는 코드와 재시도 식별자 칸의 선언(ADR-20261013 unknown-retry-key). 옛 대시보드 plugin 은 내지 않고,
+ * 없으면 {@link ConnectorUnknownErrors#NONE}
+ */
+public record ConnectorManifest(
+    String id,
+    String title,
+    String description,
+    List<ConnectorField> fields,
+    String verifyTool,
+    String mcpServer,
+    int schema,
+    List<ConnectorTool> tools,
+    List<String> skills,
+    ConnectorAppearance appearance,
+    boolean singleBinding,
+    boolean ownerBrowser,
+    String ownerBrowserLoginUrl,
+    JsonNode executionGuard,
+    String executionGuardManifestSha256,
+    ConnectorSnapshotDeclaration snapshot,
+    ConnectorUnknownErrors unknownErrors) {
+
+    public ConnectorManifest {
+        description = description == null ? "" : description;
+        unknownErrors = unknownErrors == null ? ConnectorUnknownErrors.NONE : unknownErrors;
+        fields = List.copyOf(fields);
+        tools = List.copyOf(tools);
+        skills = List.copyOf(skills);
+        appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** 결과 불명 선언을 모르는 기존 생성자다. 누락은 어느 코드도 받지 않는 것이다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256,
+        ConnectorSnapshotDeclaration snapshot) {
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, snapshot,
+            ConnectorUnknownErrors.NONE);
+    }
+
+
+    /** snapshot 선언을 모르는 기존 생성자다. 누락은 미지원이다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256) {
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, null);
+    }
+
+
+    /** 해시 칸을 모르는 기존 producer 소비 생성자다. */
+    public ConnectorManifest(
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills,
+        ConnectorAppearance appearance,
+        boolean singleBinding,
+        boolean ownerBrowser,
+        String ownerBrowserLoginUrl,
+        JsonNode executionGuard) {
+        this(
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            schema,
+            tools,
+            skills,
+            appearance,
+            singleBinding,
+            ownerBrowser,
+            ownerBrowserLoginUrl,
+            executionGuard,
+            null);
+    }
+
+
+    /** 보호 선언을 모르는 기존 카탈로그 생성자다. 누락은 미지원이다. */
+    public ConnectorManifest(
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills,
+        ConnectorAppearance appearance,
+        boolean singleBinding,
+        boolean ownerBrowser,
+        String ownerBrowserLoginUrl) {
+        this(
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            schema,
+            tools,
+            skills,
+            appearance,
+            singleBinding,
+            ownerBrowser,
+            ownerBrowserLoginUrl,
+            null);
+    }
+
+
+    /** 연결을 에이전트 하나로 제한하지 않고 사용자 브라우저를 쓰지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills,
+        ConnectorAppearance appearance) {
+        this(
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            schema,
+            tools,
+            skills,
+            appearance,
+            false,
+            false,
+            null);
+    }
+
+
+    /** 아이콘과 링크를 내지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills) {
+        this(
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            schema,
+            tools,
+            skills,
+            ConnectorAppearance.NONE);
+    }
+
+
+    /** 스킬을 내지 않는 선언이다. 옛 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
+    public ConnectorManifest(
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        int schema,
+        List<ConnectorTool> tools) {
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, List.of());
+    }
+}

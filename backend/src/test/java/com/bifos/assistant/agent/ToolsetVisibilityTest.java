@@ -6,7 +6,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.agent.infra.ToolsetHiddenRepository;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;

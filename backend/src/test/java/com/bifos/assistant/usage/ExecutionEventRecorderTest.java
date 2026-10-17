@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;

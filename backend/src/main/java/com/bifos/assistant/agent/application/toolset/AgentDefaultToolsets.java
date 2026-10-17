@@ -5,7 +5,7 @@ import com.bifos.assistant.agent.application.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.LinkedHashSet;

@@ -4,7 +4,7 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
+import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

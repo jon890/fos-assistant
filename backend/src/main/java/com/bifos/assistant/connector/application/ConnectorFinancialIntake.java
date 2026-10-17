@@ -7,7 +7,7 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.Optional;

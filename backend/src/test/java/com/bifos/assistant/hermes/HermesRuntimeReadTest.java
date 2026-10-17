@@ -1,13 +1,16 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.infra.HttpHermesRunsClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
-import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;

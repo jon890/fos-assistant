@@ -26,8 +26,8 @@ import com.bifos.assistant.connector.application.model.ContentDraftActionSummary
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
-import com.bifos.assistant.hermes.ContentDraftJobNotFound;
-import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
+import com.bifos.assistant.hermes.application.port.ContentDraftJobNotFound;
+import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.connector.application.model.ContentDraftWorkerStatus;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;

@@ -15,7 +15,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

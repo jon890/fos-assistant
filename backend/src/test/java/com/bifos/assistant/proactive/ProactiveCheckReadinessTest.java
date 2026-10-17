@@ -9,7 +9,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;

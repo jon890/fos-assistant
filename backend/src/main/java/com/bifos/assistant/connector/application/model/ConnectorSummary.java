@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application.model;
 
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.hermes.dto.ConnectorAppearance;
+import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import java.util.List;
 
 /**

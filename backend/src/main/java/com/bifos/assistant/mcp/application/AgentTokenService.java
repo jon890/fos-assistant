@@ -2,7 +2,7 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.IssuedToken;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
-import com.bifos.assistant.hermes.HermesProfileName;
+import com.bifos.assistant.hermes.application.dto.HermesProfileName;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.error.ApiException;

@@ -13,7 +13,7 @@ import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;

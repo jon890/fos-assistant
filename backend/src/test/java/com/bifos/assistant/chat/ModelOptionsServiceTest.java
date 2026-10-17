@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat;
 
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.SUPPORTED;
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNKNOWN;
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPORTED;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.SUPPORTED;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.UNKNOWN;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.UNSUPPORTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -23,10 +23,10 @@ import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelVisibilityService;
-import com.bifos.assistant.hermes.HermesModelClient;
-import com.bifos.assistant.hermes.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.dto.HermesModelCatalog.Provider;
-import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog.Provider;
+import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;

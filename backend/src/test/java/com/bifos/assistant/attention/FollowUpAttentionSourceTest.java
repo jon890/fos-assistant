@@ -27,7 +27,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
-import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;

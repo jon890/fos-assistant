@@ -2,7 +2,7 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;

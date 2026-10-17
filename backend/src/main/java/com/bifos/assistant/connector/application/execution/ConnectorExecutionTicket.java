@@ -7,7 +7,7 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;

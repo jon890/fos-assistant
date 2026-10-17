@@ -2,9 +2,9 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.HermesModelClient;
-import com.bifos.assistant.hermes.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;

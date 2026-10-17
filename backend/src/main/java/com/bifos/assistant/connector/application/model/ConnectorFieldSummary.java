@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application.model;
 
-import com.bifos.assistant.hermes.dto.ConnectorField;
-import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
+import com.bifos.assistant.hermes.application.dto.ConnectorField;
+import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 
 /**
  * 화면이 입력 칸을 그리는 데 쓰는 선언이다.

@@ -2,7 +2,7 @@ package com.bifos.assistant.connector;
 
 import com.bifos.assistant.AssistantApplication;
 import com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder;
-import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.concurrent.ExecutorService;

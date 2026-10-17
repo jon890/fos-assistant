@@ -19,7 +19,7 @@ import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
-import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;

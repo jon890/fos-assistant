@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import java.util.List;
 import java.util.Optional;
 import lombok.AccessLevel;

@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.nio.charset.StandardCharsets;

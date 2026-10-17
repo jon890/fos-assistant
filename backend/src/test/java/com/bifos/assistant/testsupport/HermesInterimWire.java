@@ -3,11 +3,11 @@ package com.bifos.assistant.testsupport;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.HermesProfileKeyStore;
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesRunEventStream;
-import com.bifos.assistant.hermes.ToolDetailScope;
-import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesRunEventStream;
+import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;

@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;

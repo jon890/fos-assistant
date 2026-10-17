@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.crypto.domain.TextCipher;
-import com.bifos.assistant.hermes.dto.CallResult;
-import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.application.dto.CallResult;
+import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;

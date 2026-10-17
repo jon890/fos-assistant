@@ -1,10 +1,11 @@
 package com.bifos.assistant.hermes;
 
-import com.bifos.assistant.hermes.dto.HermesRunCommand;
-import com.bifos.assistant.hermes.dto.HermesRunLookup;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
-import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
 import java.util.ArrayDeque;

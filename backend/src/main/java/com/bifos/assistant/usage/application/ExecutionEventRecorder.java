@@ -1,6 +1,6 @@
 package com.bifos.assistant.usage.application;
 
-import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.skill.application.SkillUseRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;

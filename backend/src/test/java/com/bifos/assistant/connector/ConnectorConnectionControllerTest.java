@@ -33,7 +33,7 @@ import com.bifos.assistant.admin.connector.presentation.AdminAgentConnectionCont
 import com.bifos.assistant.connector.presentation.ConnectionDtos;
 import com.bifos.assistant.admin.connector.presentation.ConnectorConnectionAdminController;
 import com.bifos.assistant.connector.presentation.ConnectorConnectionController;
-import com.bifos.assistant.hermes.dto.ConnectorAppearance;
+import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;

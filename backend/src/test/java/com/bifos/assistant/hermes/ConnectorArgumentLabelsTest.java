@@ -2,7 +2,7 @@ package com.bifos.assistant.hermes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.dto.ConnectorArgumentLabels;
+import com.bifos.assistant.hermes.application.dto.ConnectorArgumentLabels;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

@@ -1,10 +1,10 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.hermes.HermesDashboardClient;
-import com.bifos.assistant.hermes.HermesModelClient;
-import com.bifos.assistant.hermes.HermesRunEventStream;
-import com.bifos.assistant.hermes.HermesSkillClient;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.hermes.infra.HermesRunEventStream;
+import com.bifos.assistant.hermes.application.port.HermesSkillClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;

@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes;
 
-import com.bifos.assistant.hermes.dto.SoulDocument;
+import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
+import com.bifos.assistant.hermes.application.dto.SoulDocument;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

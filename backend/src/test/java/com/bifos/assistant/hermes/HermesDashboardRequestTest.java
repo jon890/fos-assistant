@@ -1,9 +1,11 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HttpHermesDashboardClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.hermes.dto.SoulDocument;
+import com.bifos.assistant.hermes.application.dto.SoulDocument;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

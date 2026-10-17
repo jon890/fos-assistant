@@ -1,7 +1,7 @@
 package com.bifos.assistant.agent.application;
 
-import com.bifos.assistant.hermes.HermesProfileKeyStore;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.extern.slf4j.Slf4j;

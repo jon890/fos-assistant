@@ -2,9 +2,9 @@ package com.bifos.assistant.skill.infra;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
-import com.bifos.assistant.hermes.HermesSkillClient;
-import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesSkillClient;
+import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.util.ArrayList;
 import java.util.List;

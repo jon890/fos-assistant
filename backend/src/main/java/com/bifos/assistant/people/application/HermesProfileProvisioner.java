@@ -1,8 +1,8 @@
 package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.agent.application.ProfileProvisioning;
-import com.bifos.assistant.hermes.HermesDashboardClient;
-import com.bifos.assistant.hermes.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.dto.IssuedToken;
 import com.bifos.assistant.shared.error.ApiException;
