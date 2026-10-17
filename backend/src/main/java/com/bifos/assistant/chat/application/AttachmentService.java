@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
-import com.bifos.assistant.hermes.dto.HermesImage;
+import com.bifos.assistant.hermes.application.dto.HermesImage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

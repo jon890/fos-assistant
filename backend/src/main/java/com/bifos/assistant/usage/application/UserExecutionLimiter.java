@@ -1,8 +1,8 @@
 package com.bifos.assistant.usage.application;
 
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesRunsClient;
-import com.bifos.assistant.hermes.dto.HermesRunLookup;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.application.dto.HermesSkillName;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;

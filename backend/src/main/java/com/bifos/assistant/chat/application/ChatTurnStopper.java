@@ -3,7 +3,7 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;

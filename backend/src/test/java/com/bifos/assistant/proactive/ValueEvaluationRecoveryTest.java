@@ -9,7 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.proactive.application.ValueEvaluationStore;
 import com.bifos.assistant.usage.application.ExecutionRecorder;

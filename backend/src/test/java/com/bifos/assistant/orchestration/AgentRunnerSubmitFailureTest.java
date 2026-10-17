@@ -21,7 +21,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.context.ContextAssembler;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;

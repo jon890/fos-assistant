@@ -3,7 +3,7 @@ package com.bifos.assistant.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.dto.SubagentSessionUsage;
+import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.ExecutionEvent;

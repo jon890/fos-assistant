@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.connector.application.ContentDraftSaveTicket;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.connector.presentation.contentjob.ContentDraftJobAuthorizeDtos.AuthorizeRequest;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.nio.charset.StandardCharsets;

@@ -6,7 +6,7 @@ import com.bifos.assistant.connector.application.model.ConnectorExecutionGuardCo
 import com.bifos.assistant.connector.application.model.ConnectorExecutionGuardContract.ScopeField;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;

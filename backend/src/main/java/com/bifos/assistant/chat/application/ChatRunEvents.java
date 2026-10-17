@@ -2,12 +2,12 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesRunEventStream;
-import com.bifos.assistant.hermes.HermesRunsClient;
-import com.bifos.assistant.hermes.ToolDetailScope;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesRunEventStream;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application.model;
 
-import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
+import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

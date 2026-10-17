@@ -15,5 +15,5 @@ Hermes timeout 설정은 허용된 경로로만 읽는다.
 
 ## 이 저장소의 사례
 
-[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/HttpHermesRunsClient.java)에서 확인한다.
+[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesRunsClient.java)에서 확인한다.
 HttpHermesRunsClient는 HTTP 클라이언트를 구성할 때 timeout을 읽는 허용 경로다.

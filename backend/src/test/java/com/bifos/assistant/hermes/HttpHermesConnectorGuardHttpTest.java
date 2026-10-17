@@ -1,10 +1,14 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.application.port.ConnectorExecutionUnknown;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;
+import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
-import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
+import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;

@@ -1,0 +1,502 @@
+package com.bifos.assistant.hermes.infra;
+
+import com.bifos.assistant.hermes.application.dto.HermesSkillName;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
+import com.bifos.assistant.hermes.domain.ToolDetailScope;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import java.io.BufferedReader;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.List;
+import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+@Component
+@Slf4j
+public class HermesRunEventStream {
+    private static final Pattern THINK_BLOCK = Pattern.compile("(?is)<think>.*?(?:</think>|$)");
+
+    /** 알고 있는 사건만 상태와 소비자에게 넘긴다. 새 사건은 이후 답 조각을 막지 않는다. */
+    private static final Set<String> WIRE_EVENTS = Set.of(
+        "reset", "run.started", "run.steered", "message.delta", "message.interim", "reasoning.available",
+        "tool.started", "tool.completed", "subagent.start", "subagent.complete",
+        "approval.request", "approval.responded", "run.completed", "run.failed", "run.cancelled", "run.interrupted");
+
+    /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
+    private static final String SKILL_VIEW_TOOL = "skill_view";
+
+    private static final String SKILL_VIEW_STARTED = "tool.started";
+
+    /**
+     * Memory 본문을 읽는 Control Plane MCP 도구 이름의 끝이다. Hermes 는 {@code mcp__fos_assistant__memory_read} 처럼
+     * 서버 이름을 앞에 붙여 보낸다.
+     */
+    private static final String MEMORY_READ_TOOL_SUFFIX = "memory_read";
+    /** 결과나 인자에 원고 본문이 실릴 수 있는 도구다. 정확한 이름과 {@code __} 뒤 이름만 가린다. */
+    private static final List<String> CONTENT_DRAFT_TOOLS = List.of(
+        "content_draft_write", "content_draft_read", "content_draft_preview", "content_draft_save");
+    /** 검색어와 제목도 시작과 끝의 실행 사건에서 가린다. */
+    private static final String MEMORY_SEARCH_TOOL_SUFFIX = "memory_search";
+
+    /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
+    private static final String MEMORY_READ_STARTED = "tool.started";
+
+    /** 할 일을 제안하는 Control Plane MCP 도구 이름의 끝이다. 인자에 할 일 제목이 실린다. */
+    private static final String FOLLOW_UP_PROPOSE_TOOL_SUFFIX = "follow_up_propose";
+
+    /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-20261007 / memory-remember). */
+    private static final String MEMORY_REMEMBER_TOOL_SUFFIX = "memory_remember";
+
+    /** 기억을 잇는 Control Plane MCP 도구 이름의 끝이다. 인자와 결과에 기억 번호와 연결의 뜻이 실린다(ADR-20261015 / memory-link). */
+    private static final String MEMORY_LINK_TOOL_SUFFIX = "memory_link";
+
+    private final RestClient restClient;
+    private final HermesProfileKeyStore keyStore;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+
+
+    public HermesRunEventStream(
+        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
+        this(keyStore, properties, objectMapper, Clock.systemUTC());
+    }
+
+
+    @Autowired
+    public HermesRunEventStream(
+        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(properties.connectTimeout());
+        factory.setReadTimeout(properties.runTimeout());
+        this.restClient = RestClient.builder().requestFactory(factory).build();
+        this.keyStore = keyStore;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
+
+
+    public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
+        open(apiBaseUrl, profileName, runId, onEvent, stream -> {
+        });
+    }
+
+
+    public void open(
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        Consumer<RunEvent> onEvent,
+        Consumer<Closeable> onOpened) {
+        open(apiBaseUrl, profileName, runId, onEvent, onOpened, ToolDetailScope.NONE);
+    }
+
+
+    /** @param scope 내용을 통째로 가릴 도구의 범위. 비밀값과 식별자는 범위와 관계없이 가린다 */
+    public void open(
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        Consumer<RunEvent> onEvent,
+        Consumer<Closeable> onOpened,
+        ToolDetailScope scope) {
+        String apiKey = keyStore.resolve(profileName);
+        try (InputStream body = restClient
+            .get()
+            .uri(apiBaseUrl + "/v1/runs/{runId}/events", runId)
+            .header("Authorization", "Bearer " + apiKey)
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .retrieve()
+            .body(InputStream.class)) {
+            if (body == null) {
+                throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
+            }
+            onOpened.accept(body);
+            readEvents(body, onEvent, scope);
+        } catch (RestClientException ex) {
+            throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
+        } catch (IOException ex) {
+            throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not read the Hermes event stream", ex);
+        }
+    }
+
+
+    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope) throws IOException {
+        DetailState state = new DetailState(clock);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
+            StringBuilder data = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty()) {
+                    emit(data, onEvent, scope, state);
+                    continue;
+                }
+                if (line.startsWith(":")) {
+                    continue;
+                }
+                if (line.startsWith("data:")) {
+                    if (!data.isEmpty()) {
+                        data.append('\n');
+                    }
+                    data.append(line.substring(5).stripLeading());
+                }
+            }
+            emit(data, onEvent, scope, state);
+        }
+    }
+
+
+    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state)
+        throws IOException {
+        if (data.isEmpty()) {
+            return;
+        }
+        String raw = data.toString();
+        data.setLength(0);
+        try {
+            JsonNode root = objectMapper.readTree(raw);
+            String type = firstText(root, root.path("data"), "event", "type");
+            if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
+                onEvent.accept(toRunEvent(root, scope, state));
+            } else {
+                // 본문은 로그에도 남기지 않는다. 새 사건 이름만 버전 올리기 때 확인한다.
+                log.debug("알 수 없는 Hermes 사건을 건너뛴다: {}", type);
+            }
+        } catch (JacksonException ex) {
+            throw new IOException("Hermes sent an invalid event");
+        }
+    }
+
+
+    /**
+     * 사건 하나의 JSON 을 {@link RunEvent} 로 옮긴다.
+     *
+     * <p>Hermes 는 사건 이름을 {@code event} 로 보낸다. 실측으로 확인했다. {@code type} 을 함께 보는
+     * 것은 다른 형태로 보내는 구현이 섞일 때를 위한 것이다.
+     */
+    static RunEvent toRunEvent(JsonNode root) {
+        return toRunEvent(root, ToolDetailScope.NONE);
+    }
+
+
+    static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
+        return toRunEvent(root, scope, new DetailState(Clock.systemUTC()));
+    }
+
+
+    private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, DetailState state) {
+        JsonNode payload = root.path("data");
+        String type = firstText(root, payload, "event", "type");
+        String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
+        String detail = firstDetail(root, payload);
+        boolean memorySearch = toolName != null && toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX);
+        String text = firstText(root, payload, "delta", "text", "output");
+        boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
+        boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
+        boolean interimEvent = "message.interim".equalsIgnoreCase(type);
+        Boolean alreadyStreamed = interimEvent ? firstBoolean(root, payload, "already_streamed") : null;
+        JsonNode timestamp = number(root, "timestamp");
+        if (timestamp == null) {
+            timestamp = number(payload, "timestamp");
+        }
+        String interimId = interimEvent ? state.interimIdentity(timestamp, text) : null;
+        Integer streamedPrefixLength = state.classify(type, text, alreadyStreamed, interimId);
+        boolean afterConnector = (toolEvent || subagentEvent || interimEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
+        if (interimEvent) {
+            // 재분류 길이는 가리기 전에 계산한다. 중간 안내도 도구 설명과 같은 민감 출력 경계를 따른다.
+            text = text == null ? null : THINK_BLOCK.matcher(text).replaceAll("").strip();
+            text = ToolDetailRedactor.redact(text, null, scope, state.identifiers, afterConnector);
+            detail = null;
+        } else if (type != null && type.toLowerCase(Locale.ROOT).startsWith("reasoning.")) {
+            text = null;
+            detail = null;
+        }
+        if (toolEvent
+            && toolName != null
+            && (toolName.equals("list_media_observations")
+                || toolName.endsWith("__list_media_observations")
+                || toolName.equals("record_media_observation")
+                || toolName.endsWith("__record_media_observation"))) {
+            // 사진·OCR 본문은 관리자와 커넥터 이력에 관계없이 사건을 만들기 전에 두 경로 모두 버린다.
+            detail = null;
+            text = null;
+        }
+        if (!"USER".equalsIgnoreCase(type) && !"message.delta".equalsIgnoreCase(type) && !"message.interim".equalsIgnoreCase(type)
+            && (contentDraftTool(root) || contentDraftTool(payload))) {
+            // 원고 도구는 별칭 전체를 확인하고 사건 이름과 역할에 관계없이 두 출력 경로를 버린다.
+            detail = null;
+            text = null;
+        }
+        if (memoryReadResult(type, toolName)) {
+            // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
+            detail = null;
+        }
+        if (toolName != null
+            && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
+                || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
+                || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX)
+                || toolName.endsWith(MEMORY_LINK_TOOL_SUFFIX))) {
+            // 시작의 preview 에 할 일 제목이나 기억할 사실, 기억 사이의 연결이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게
+            // 시작과 끝 모두 남기지 않는다
+            detail = null;
+        }
+        String skillName = null;
+        if (toolEvent) {
+            // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
+            if (!scope.hideAll()
+                && !afterConnector
+                && SKILL_VIEW_STARTED.equalsIgnoreCase(type)
+                && SKILL_VIEW_TOOL.equals(toolName)) {
+                skillName = HermesSkillName.fromPreview(detail);
+            }
+            detail = ToolDetailRedactor.redact(detail, toolName, scope, state.identifiers, afterConnector);
+        }
+        String goal = firstText(root, payload, "goal");
+        if (subagentEvent) {
+            // 목표는 모델이 쓴 글이라 읽은 메일 본문이나 비밀값이 실릴 수 있다. 도구 내용과 같은 규칙으로 가린다.
+            // 커넥터 호출 뒤에는 자식에게 넘기는 목표도 길이만 남긴다.
+            goal = ToolDetailRedactor.redact(goal, null, scope, state.identifiers, afterConnector);
+            detail = ToolDetailRedactor.redact(detail, null, scope, state.identifiers, afterConnector);
+        }
+        return new RunEvent(
+            type,
+            memorySearch ? null : text,
+            toolName,
+            detail,
+            durationMs(root, payload),
+            failed(root, payload),
+            firstText(root, payload, "subagent_id"),
+            goal,
+            firstText(root, payload, "model"),
+            firstText(root, payload, "child_session_id"),
+            firstNumber(root, payload, "input_tokens"),
+            firstNumber(root, payload, "output_tokens"),
+            firstText(root, payload, "status"),
+            skillName,
+            alreadyStreamed,
+            streamedPrefixLength,
+            interimId);
+    }
+
+
+    /** 번호표와 커넥터 호출 여부는 스트림마다 따로 둔다. 다른 트리로 이어지지 않는다. */
+    private static final class DetailState {
+        private final Map<String, String> identifiers = new LinkedHashMap<>();
+        private final Clock clock;
+        private boolean connectorCalled;
+        private final StringBuilder deltaSegment = new StringBuilder();
+        private final Set<String> interimKeys = new HashSet<>();
+        private final Map<InterimIdentity, String> interimIds = new LinkedHashMap<>();
+
+
+        /** timestamp는 고유 번호가 아니다. 원문도 대조하되, 바깥에는 실행 안에서 부여한 번호만 보낸다. */
+        String interimIdentity(JsonNode timestamp, String text) {
+            var identity = new InterimIdentity(timestamp == null ? null : timestamp.asText(),
+                normalize(text == null ? "" : text));
+            return interimIds.computeIfAbsent(identity, ignored -> Integer.toString(interimIds.size() + 1));
+        }
+
+
+        private record InterimIdentity(String timestamp, String text) {
+        }
+
+
+        /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */
+        Integer classify(String type, String text, Boolean alreadyStreamed, String interimId) {
+            if ("message.delta".equalsIgnoreCase(type) && text != null) {
+                deltaSegment.append(text);
+                return null;
+            }
+            if ("message.interim".equalsIgnoreCase(type)) {
+                String key = interimId == null ? "text:" + normalize(text == null ? "" : text) : "id:" + interimId;
+                if (!interimKeys.add(key)) {
+                    // 안내 뒤의 최종 답이 같은 접두사여도 재수신이 그 답을 지우지 않는다.
+                    return 0;
+                }
+                String prefix = normalize(deltaSegment.toString());
+                int length = Boolean.TRUE.equals(alreadyStreamed) && !prefix.isEmpty()
+                    && text != null && normalize(text).startsWith(prefix) ? deltaSegment.length() : 0;
+                deltaSegment.setLength(0);
+                return length;
+            }
+            if ("tool.started".equalsIgnoreCase(type) || "run.started".equalsIgnoreCase(type)
+                || "reset".equalsIgnoreCase(type)) {
+                deltaSegment.setLength(0);
+                if (!"tool.started".equalsIgnoreCase(type)) {
+                    interimKeys.clear();
+                    interimIds.clear();
+                }
+            }
+            return null;
+        }
+
+
+        private static String normalize(String text) {
+            return text.replaceAll("(?U)[\\s\\u001c-\\u001f]+", " ").strip();
+        }
+
+
+        private DetailState(Clock clock) {
+            this.clock = clock;
+        }
+
+
+        boolean afterConnector(ToolDetailScope scope, String toolName, JsonNode root, JsonNode payload) {
+            if (scope.hides(toolName)) {
+                connectorCalled = true;
+            }
+            if (!connectorCalled) {
+                JsonNode timestamp = number(root, "timestamp");
+                if (timestamp == null) {
+                    timestamp = number(payload, "timestamp");
+                }
+                Instant at = timestamp == null
+                    ? clock.instant()
+                    : Instant.ofEpochMilli((long)Math.ceil(timestamp.asDouble() * 1000));
+                connectorCalled = scope.connectorCalledInTree().test(at);
+            }
+            return connectorCalled;
+        }
+    }
+
+
+    /** 사건의 별칭에서 원고 저장·읽기·preview·저장 요청 도구 이름을 확인한다. */
+    private static boolean contentDraftTool(JsonNode node) {
+        for (String key : List.of("tool", "tool_name", "toolName", "name")) {
+            JsonNode value = node.get(key);
+            if (value != null && value.isString()) {
+                String name = value.stringValue();
+                for (String tool : CONTENT_DRAFT_TOOLS) {
+                    if (name.equals(tool) || name.endsWith("__" + tool)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+
+    /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */
+    private static boolean memoryReadResult(String type, String toolName) {
+        return toolName != null
+            && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
+            && !MEMORY_READ_STARTED.equalsIgnoreCase(type);
+    }
+
+
+    private static String firstDetail(JsonNode root, JsonNode payload) {
+        for (String name : new String[] {"preview", "detail", "result"}) {
+            JsonNode value = root.get(name);
+            if (value == null || value.isNull()) {
+                value = payload.get(name);
+            }
+            if (value != null && !value.isNull()) {
+                return value.isValueNode() ? value.asText() : value.toString();
+            }
+        }
+        return null;
+    }
+
+
+    /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
+    private static Long durationMs(JsonNode root, JsonNode payload) {
+        JsonNode value = number(root, "duration");
+        if (value == null) {
+            value = number(payload, "duration");
+        }
+        if (value == null) {
+            value = number(root, "duration_seconds");
+        }
+        if (value == null) {
+            value = number(payload, "duration_seconds");
+        }
+        return value == null ? null : Math.round(value.asDouble() * 1000);
+    }
+
+
+    /** {@code error} 를 보내지 않으면 실패인지 아닌지 모른다는 뜻으로 null 을 낸다. */
+    private static Boolean failed(JsonNode root, JsonNode payload) {
+        JsonNode value = bool(root, "error");
+        if (value == null) {
+            value = bool(payload, "error");
+        }
+        if (value != null) {
+            return value.asBoolean();
+        }
+        String status = firstText(root, payload, "status");
+        return status == null ? null : !"completed".equalsIgnoreCase(status);
+    }
+
+
+    private static Long firstNumber(JsonNode root, JsonNode payload, String field) {
+        JsonNode value = number(root, field);
+        if (value == null) {
+            value = number(payload, field);
+        }
+        return value == null ? null : value.asLong();
+    }
+
+
+    private static JsonNode number(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isNumber() ? value : null;
+    }
+
+
+    private static JsonNode bool(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isBoolean() ? value : null;
+    }
+
+
+    private static Boolean firstBoolean(JsonNode root, JsonNode payload, String field) {
+        JsonNode value = bool(root, field);
+        if (value == null && !root.has(field)) {
+            value = bool(payload, field);
+        }
+        return value == null ? null : value.asBoolean();
+    }
+
+
+    private static String firstText(JsonNode root, JsonNode payload, String... names) {
+        for (String name : names) {
+            String value = text(root, name);
+            if (value == null) {
+                value = text(payload, name);
+            }
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+
+    private static String text(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        return value != null && value.isValueNode() ? value.asText() : null;
+    }
+}

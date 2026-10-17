@@ -409,7 +409,7 @@ sequenceDiagram
   실행 입력에는 `agent-root` 를 적는다. 둘 다 기본값이 없어 하나라도 비면 기동을 멈춘다.
 - 저장 경로는 `{root}/users/{사용자 디렉터리 키}/{대화 번호}/{첨부 번호}.{확장자}` 다. 사용자 디렉터리 키는 첨부 행의 올린 사용자에서 만든 해시다. 올릴 때의 이름을 파일 이름으로 쓰지 않는다.
 - 같은 폴더에 긴 변을 줄인 사본 `{첨부 번호}.small.jpg` 를 둔다. 원본을 지울 때 함께 지운다.
-- Control Plane 이 Hermes 를 부르기 전에 사용자 폴더를 만드는 호출과 그 실패 처리는 ADR-091 이 갖는다. 폴더를 만드는 일은 `hermes/SandboxAttachmentDirectory` 가 맡는다.
+- Control Plane 이 Hermes 를 부르기 전에 사용자 폴더를 만드는 호출과 그 실패 처리는 ADR-091 이 갖는다. 폴더를 만드는 일은 `hermes/infra/SandboxAttachmentDirectory` 가 맡는다.
 - **행을 지우지 않는다.** 파일을 지우고 `deleted_at` 을 적는다.
 - HEIC 는 받지 않는다. 새로 올리는 MPO 는 재인코딩 없이 첫 JPEG 만 남기고, 디코딩 검증에 실패하면 원본을 저장한다. 기존 첨부는 바꾸지 않는다.
 - 장수 상한은 아직 메시지에 묶이지 않은 첨부만 센다. multipart 상한과 Tomcat 의 `max-swallow-size` 를 서비스 상한보다 크게 두는 까닭은 `application.yml` 의 주석이 갖는다.

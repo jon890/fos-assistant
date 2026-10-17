@@ -25,7 +25,7 @@ import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;

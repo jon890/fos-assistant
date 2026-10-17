@@ -13,7 +13,7 @@ import com.bifos.assistant.chat.domain.entity.ContentDraftJob;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.hermes.ContentDraftJobNotFound;
+import com.bifos.assistant.hermes.application.port.ContentDraftJobNotFound;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.sql.Timestamp;

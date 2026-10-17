@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.connector.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
-import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Duration;

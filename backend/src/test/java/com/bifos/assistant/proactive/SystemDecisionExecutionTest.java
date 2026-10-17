@@ -3,10 +3,10 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
-import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;

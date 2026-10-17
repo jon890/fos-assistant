@@ -3,7 +3,7 @@ package com.bifos.assistant.testsupport;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.chat.infra.ChatMessageContents;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
 import com.bifos.assistant.shared.config.LiveProperties;

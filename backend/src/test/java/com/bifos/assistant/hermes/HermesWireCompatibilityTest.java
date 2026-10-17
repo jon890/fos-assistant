@@ -1,8 +1,9 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.domain.ToolDetailScope;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.dto.RunEvent;
+import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.testsupport.HermesInterimWire;
 import com.bifos.assistant.testsupport.HermesWire;
 import java.util.ArrayList;

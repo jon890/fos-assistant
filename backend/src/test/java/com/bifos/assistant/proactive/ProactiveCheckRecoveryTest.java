@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.application.RestartReconciler;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.proactive.application.CheckFeedback;
 import com.bifos.assistant.proactive.application.ProactiveCheckRecovery;

@@ -15,7 +15,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Duration;

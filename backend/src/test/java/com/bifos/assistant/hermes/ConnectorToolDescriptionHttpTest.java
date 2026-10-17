@@ -1,10 +1,13 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;
+import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

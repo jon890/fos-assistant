@@ -1,0 +1,64 @@
+package com.bifos.assistant.hermes.application.port;
+
+import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
+
+/**
+ * turn 하나를 Hermes runtime 에 제출하고 끝날 때까지 기다린다.
+ *
+ * <p>인터페이스로 둔 것은 실제 Hermes 없이 Control Plane 을 검사하기 위해서이고, 스트리밍 구현이
+ * 부르는 쪽을 건드리지 않고 polling 구현을 대신하기 위해서다.
+ */
+public interface HermesRunsClient {
+
+    String submit(HermesRunCommand command);
+
+
+    HermesRunResult awaitCompletion(HermesRunCommand command, String runId);
+
+
+    /** 그 실행을 멈추라고 보낸다. */
+    void stop(String apiBaseUrl, String profileName, String runId);
+
+
+    /**
+     * 그 session 과 메시지를 Hermes 에서 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다.
+     *
+     * <p>Hermes 가 그 session 을 모르면(404) 이미 지운 것으로 보고 조용히 끝낸다. 닿지 못했거나 다른 오류면 ApiException 을
+     * 던진다.
+     */
+    void deleteSession(String apiBaseUrl, String profileName, String sessionId);
+
+
+    /**
+     * 실행 하나의 지금 상태를 한 번 읽는다. 기다리지 않는다.
+     *
+     * <p>Hermes 가 그 run 을 모르면(404) NOT_FOUND 다. 닿지 못했거나 다른 오류면 ApiException 을 던진다.
+     */
+    HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId);
+
+
+    /**
+     * 그 세션이 마지막으로 실제로 쓴 provider 와 모델을 읽는다.
+     *
+     * <p>읽지 못하면 null 이다. 모델 이름을 모르는 것이 답을 버릴 이유가 되지 않으므로 부르는 쪽은
+     * null 을 받아도 실행을 성공으로 남긴다.
+     */
+    default SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
+        return null;
+    }
+
+
+    default HermesRunResult runToCompletion(HermesRunCommand command) {
+        return awaitCompletion(command, submit(command));
+    }
+
+
+    /** 읽지 못한 session은 null이며 미완료 사용량을 최종값으로 쓰지 않는다. */
+    default SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
+        return null;
+    }
+}

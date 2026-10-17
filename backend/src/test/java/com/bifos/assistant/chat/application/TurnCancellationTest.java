@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

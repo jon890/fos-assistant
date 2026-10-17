@@ -15,5 +15,5 @@ RestClient.Builder는 자동 구성되지 않으므로 직접 만들고 timeout�
 
 ## 이 저장소의 사례
 
-[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/HttpHermesRunsClient.java)에서 확인한다.
+[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesRunsClient.java)에서 확인한다.
 HttpHermesRunsClient는 직접 만든 HTTP 클라이언트의 timeout을 설정한다.

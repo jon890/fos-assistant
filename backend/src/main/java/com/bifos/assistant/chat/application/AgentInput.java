@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.hermes.dto.HermesImage;
+import com.bifos.assistant.hermes.application.dto.HermesImage;
 import java.util.List;
 
 /**

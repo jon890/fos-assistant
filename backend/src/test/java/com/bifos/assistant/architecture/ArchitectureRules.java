@@ -14,7 +14,7 @@ import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
@@ -671,9 +671,9 @@ public final class ArchitectureRules {
     /** rule-29: 까닭과 예외는 docs/code-rules/rule-29.md를 본다. */
     public static final ArchRule HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
         .that()
-        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HermesRunEventStream")
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.infra.HermesRunEventStream")
         .and()
-        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HttpHermesRunsClient")
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.infra.HttpHermesRunsClient")
         .and()
         .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
         .should(notReadHermesTimeoutsFromInjectedProperties())

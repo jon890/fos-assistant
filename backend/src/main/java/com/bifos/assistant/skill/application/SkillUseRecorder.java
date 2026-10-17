@@ -1,6 +1,6 @@
 package com.bifos.assistant.skill.application;
 
-import com.bifos.assistant.hermes.HermesSkillName;
+import com.bifos.assistant.hermes.application.dto.HermesSkillName;
 import com.bifos.assistant.skill.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;

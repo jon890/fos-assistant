@@ -5,7 +5,7 @@ import com.bifos.assistant.agent.application.toolset.AgentDefaultToolsets;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.user.application.port.FirstSignInListener;

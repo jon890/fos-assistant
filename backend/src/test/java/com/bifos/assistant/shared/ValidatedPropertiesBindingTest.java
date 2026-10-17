@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.infra.ArtifactProperties;
 import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.context.ContextProperties;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.AuthProperties;
 import com.bifos.assistant.skill.infra.SkillProperties;

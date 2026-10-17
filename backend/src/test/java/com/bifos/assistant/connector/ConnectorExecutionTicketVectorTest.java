@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionTicket;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.ConnectorExecutionClaimTestSupport;

@@ -12,8 +12,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.HermesProfileKeyStore;
-import com.bifos.assistant.hermes.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesDashboardClient;
 import com.bifos.assistant.hermes.StubHermesDashboardClient.EnvWrite;
 import com.bifos.assistant.mcp.application.AgentTokenService;

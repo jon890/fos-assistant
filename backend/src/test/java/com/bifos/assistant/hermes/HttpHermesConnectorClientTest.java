@@ -1,5 +1,13 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.application.port.ConnectorExecutionUnknown;
+import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
+import com.bifos.assistant.hermes.application.port.ConnectorProfileRejected;
+import com.bifos.assistant.hermes.application.port.ConnectorSandboxUnavailable;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;
+import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -10,17 +18,17 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
-import com.bifos.assistant.hermes.dto.CallResult;
-import com.bifos.assistant.hermes.dto.ConnectorAppearance;
-import com.bifos.assistant.hermes.dto.ConnectorCallError;
-import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
-import com.bifos.assistant.hermes.dto.ConnectorField;
-import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.hermes.dto.ConnectorRecovery;
-import com.bifos.assistant.hermes.dto.ConnectorTool;
-import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient.InstallResult;
+import com.bifos.assistant.hermes.application.dto.CallResult;
+import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
+import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
+import com.bifos.assistant.hermes.application.dto.ConnectorField;
+import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
+import com.bifos.assistant.hermes.application.dto.ConnectorTool;
+import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -7,10 +7,10 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.HttpHermesConnectorClient;
-import com.bifos.assistant.hermes.SandboxAttachmentDirectory;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
+import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;
+import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedReader;

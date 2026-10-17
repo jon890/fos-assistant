@@ -1,8 +1,10 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.SubagentProviderClient;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.hermes.dto.SubagentProviderLookup;
+import com.bifos.assistant.hermes.application.dto.SubagentProviderLookup;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;

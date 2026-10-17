@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ConversationExecutionPurge;

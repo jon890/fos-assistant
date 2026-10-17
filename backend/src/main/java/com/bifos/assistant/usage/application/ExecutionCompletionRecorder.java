@@ -1,10 +1,10 @@
 package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.HermesRunsClient;
-import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
-import com.bifos.assistant.hermes.dto.TokenUsage;
+import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;

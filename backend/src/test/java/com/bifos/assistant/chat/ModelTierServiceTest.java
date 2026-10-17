@@ -28,7 +28,7 @@ import com.bifos.assistant.chat.domain.ModelTierGroupSetting;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.ModelTierDefinitionRepository;
 import com.bifos.assistant.chat.infra.ModelTierGroupSettingRepository;
-import com.bifos.assistant.hermes.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;

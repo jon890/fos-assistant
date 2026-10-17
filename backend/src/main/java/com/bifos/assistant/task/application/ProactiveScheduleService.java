@@ -4,7 +4,7 @@ import com.bifos.assistant.task.config.ProactiveScheduleProperties;
 import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.hermes.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.proactive.application.ProactiveCheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;

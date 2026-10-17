@@ -1,9 +1,13 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.hermes.application.port.HermesRequestRejected;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HttpHermesSkillClient;
+import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
+import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

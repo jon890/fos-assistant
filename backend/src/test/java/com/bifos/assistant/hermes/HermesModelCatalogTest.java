@@ -1,13 +1,16 @@
 package com.bifos.assistant.hermes;
 
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.SUPPORTED;
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNKNOWN;
-import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPORTED;
+import com.bifos.assistant.hermes.config.HermesProperties;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
+import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.SUPPORTED;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.UNKNOWN;
+import static com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support.UNSUPPORTED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.hermes.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.dto.ReasoningCapability;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
+import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

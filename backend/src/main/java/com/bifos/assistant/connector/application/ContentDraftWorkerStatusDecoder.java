@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.application;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.application.model.ContentDraftWorkerStatus;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
-import com.bifos.assistant.hermes.dto.ContentDraftWorkerStamp;
+import com.bifos.assistant.hermes.application.dto.ContentDraftWorkerStamp;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
