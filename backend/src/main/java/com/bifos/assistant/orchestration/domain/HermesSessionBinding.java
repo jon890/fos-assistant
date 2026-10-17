@@ -1,7 +1,7 @@
 package com.bifos.assistant.orchestration.domain;
 
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

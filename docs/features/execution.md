@@ -306,7 +306,7 @@ Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, 
 
 ### 세는 방법
 
-`usage.application.UserExecutionLimiter` 가 센다.
+`usage.execution.application.UserExecutionLimiter` 가 센다.
 세는 세 자리(turn 자리, 실행 줄, 원격 종료 확인 자리)와, 사용자 잠금 하나 안에서 판정하고 실행 줄을 커밋까지 끝내는 규칙은 [ADR-069](../adr/ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) 의 결정이 갖는다.
 
 실행 줄은 `RUNNING` 이고 대화 turn 의 루트 줄이 아닌 것만 센다. 그 turn 은 turn 자리로 이미 세었다.

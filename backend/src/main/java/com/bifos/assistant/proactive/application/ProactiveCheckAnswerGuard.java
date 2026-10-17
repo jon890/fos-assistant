@@ -3,7 +3,7 @@ package com.bifos.assistant.proactive.application;
 import com.bifos.assistant.chat.application.RecoveredAnswerGuard;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

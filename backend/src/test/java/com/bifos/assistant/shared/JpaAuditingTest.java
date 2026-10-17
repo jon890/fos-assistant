@@ -20,7 +20,7 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
-import com.bifos.assistant.usage.domain.ExecutionContextSource;
+import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
 import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;

@@ -10,7 +10,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.workspace.domain.WorkspaceCursor;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;

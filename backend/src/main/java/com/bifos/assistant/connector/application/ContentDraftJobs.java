@@ -39,7 +39,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;

@@ -1,7 +1,7 @@
 package com.bifos.assistant.mcp.application.dto;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.util.Objects;
 
 /**

@@ -9,7 +9,7 @@ import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
-import com.bifos.assistant.usage.application.UserExecutionProperties;
+import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

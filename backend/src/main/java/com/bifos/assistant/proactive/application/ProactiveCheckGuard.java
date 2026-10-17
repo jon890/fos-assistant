@@ -5,7 +5,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.config.LiveProperties;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

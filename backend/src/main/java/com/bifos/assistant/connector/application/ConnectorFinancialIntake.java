@@ -9,7 +9,7 @@ import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;

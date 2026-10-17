@@ -93,19 +93,5 @@ com.bifos.assistant.skill.application.SkillUsageSummary 는 값이다. applicati
 com.bifos.assistant.skill.application.SkillsChanged 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.skill.application.UserSkillUsage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 skill.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.task.application.TaskSchedule 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.usage.application.BreakdownLine 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ContextSourceRef 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ConversationPublicIds 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 usage.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionConnectorCalls 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 usage.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionContextSnapshot 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionCursor 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionEventView 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionMemoryRef 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionNode 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ExecutionTree 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.InternalValuePolicy 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.usage.application.MonthlyUsageSummary 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.RootExecutionPage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 usage.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.usage.application.ToolDetailPolicy 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.usage.application.TurnSlot 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.usage.execution.application.TurnSlot 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.workspace.application.WorkspacePreviewPolicy 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.

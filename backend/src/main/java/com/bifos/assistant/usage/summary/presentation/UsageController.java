@@ -1,0 +1,153 @@
+package com.bifos.assistant.usage.summary.presentation;
+
+import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.auth.CurrentUserProvider;
+import com.bifos.assistant.skill.application.SkillUsageQuery;
+import com.bifos.assistant.usage.tree.application.dto.ExecutionTree;
+import com.bifos.assistant.usage.tree.application.ExecutionTreeService;
+import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
+import com.bifos.assistant.usage.summary.application.dto.MonthlyUsageSummary;
+import com.bifos.assistant.usage.tree.application.dto.RootExecutionPage;
+import com.bifos.assistant.usage.tree.application.RootExecutionQuery;
+import com.bifos.assistant.usage.summary.application.UsageSummaryService;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.summary.presentation.UsageDtos.ExecutionPageView;
+import com.bifos.assistant.usage.summary.presentation.UsageDtos.ExecutionView;
+import com.bifos.assistant.usage.summary.presentation.UsageDtos.MonthlyCostView;
+import com.bifos.assistant.usage.summary.presentation.UsageDtos.MySkillUsageView;
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/usage")
+@RequiredArgsConstructor
+public class UsageController {
+
+    private static final int MAX_LIMIT = 200;
+
+    /**
+     * 가족이 사는 곳의 달력으로 달을 끊는다. 컨테이너의 {@code TZ} 가 바뀌어도 경계가 흔들리지 않는다.
+     *
+     * <p>같은 시간대를 {@code AgentExecutionRepository.sumByDayBetween} 의 질의와
+     * {@code UsageBreakdownAdminController.HOUSEHOLD_ZONE} 도 갖는다. 그 질의는 표준시와의 차이 9시간을
+     * 식에 직접 적어 날짜를 뽑는다. 가족이 사는 곳이 바뀌면 세 자리를 함께 고친다.
+     */
+    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+
+    private final RootExecutionQuery rootExecutions;
+    private final CurrentUserProvider currentUser;
+    private final AgentService agents;
+    private final ExecutionTreeService executionTrees;
+    private final SkillUsageQuery skillUsage;
+    private final UsageSummaryService summaries;
+
+
+    /**
+     * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
+     *
+     * <p>루트만 낸다. 흐름 하나가 실행 넷을 남기므로 전부 내면 목록이 중간 산출물로 찬다. 자식은 실행
+     * 트리 화면에서 본다.
+     *
+     * <p>{@code MEMBER} 역할에게는 내부 값을 비워 보낸다(ADR-063).
+     */
+    @GetMapping("/executions")
+    public List<ExecutionView> myExecutions(@RequestParam(defaultValue = "50") int limit) {
+        int size = Math.clamp(limit, 1, MAX_LIMIT);
+        CurrentUser user = currentUser.require();
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        RootExecutionPage rootPage = rootExecutions.page(user.id(), size);
+        return executionViews(rootPage, internal);
+    }
+
+
+    /** 로그인한 사용자의 루트 실행을 커서 다음부터 읽는다. 기존 배열 응답은 {@link #myExecutions(int)} 에 남긴다. */
+    @GetMapping("/executions/page")
+    public ExecutionPageView myExecutionPage(
+        @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) String cursor) {
+        int size = Math.clamp(limit, 1, MAX_LIMIT);
+        CurrentUser user = currentUser.require();
+        RootExecutionPage rootPage = rootExecutions.page(user.id(), size, cursor);
+        return new ExecutionPageView(
+            executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
+    }
+
+
+    private List<ExecutionView> executionViews(RootExecutionPage rootPage, boolean internal) {
+        List<AgentExecution> page = rootPage.executions();
+        Set<Long> withChildren = rootPage.idsHavingChildren();
+        Map<Long, UUID> publicIds = rootPage.conversationPublicIds();
+        // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
+        Map<Long, List<String>> skillNames = skillUsage.skillNamesByExecution(
+            page.stream().map(AgentExecution::id).toList());
+        // 에이전트도 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
+        Map<Long, Agent> agentsById = agents.byIds(page.stream().map(AgentExecution::agentId).toList());
+        return page.stream()
+            .map(execution -> ExecutionView.from(
+                execution,
+                agentsById.get(execution.agentId()),
+                execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
+                withChildren.contains(execution.id()),
+                skillNames.getOrDefault(execution.id(), List.of()),
+                internal))
+            .toList();
+    }
+
+
+    /**
+     * 로그인한 사용자 자신이 부른 스킬의 합계다. 에이전트와 스킬 이름으로 묶는다.
+     *
+     * <p>자기 실행만 센다. 관리하는 사람이 보는 에이전트 전체의 합계는 스킬 목록의 {@code usage} 가 맡고,
+     * 거기에는 누가 어느 대화에서 불렀는지가 없다(ADR-034).
+     */
+    @GetMapping("/skills")
+    public List<MySkillUsageView> mySkillUsage() {
+        CurrentUser user = currentUser.require();
+        boolean internal = InternalValuePolicy.visibleTo(user);
+        return skillUsage.byUser(user.id()).stream()
+            .map(usage -> MySkillUsageView.from(usage, internal))
+            .toList();
+    }
+
+
+    /**
+     * 그 실행이 속한 트리를 낸다.
+     *
+     * <p>자식 실행의 번호로 물어도 루트부터 낸다. 없는 실행과 남의 실행은 같은 응답으로 숨긴다.
+     */
+    @GetMapping("/executions/{id}/tree")
+    public ExecutionTree executionTree(@PathVariable Long id) {
+        return executionTrees.of(currentUser.require(), id);
+    }
+
+
+    /**
+     * 이번 달 환산 금액의 합계다.
+     *
+     * <p>구독료와 견줄 숫자라서 화면이 목록과 함께 보여 준다. 저장된 금액을 더하기만 하고 여기서 다시
+     * 환산하지 않는다. native 자식의 금액을 포함하고, 금액을 확인하지 못한 자식 수를 함께 낸다(ADR-062).
+     *
+     * <p>{@code MEMBER} 역할에게는 실행 건수만 싣고 금액과 건수 구분은 비운다(ADR-063).
+     */
+    @GetMapping("/monthly-cost")
+    public MonthlyCostView thisMonthCost() {
+        YearMonth month = YearMonth.now(HOUSEHOLD_ZONE);
+        Instant from = month.atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
+        Instant to = month.plusMonths(1).atDay(1).atStartOfDay(HOUSEHOLD_ZONE).toInstant();
+        CurrentUser user = currentUser.require();
+        MonthlyUsageSummary cost = summaries.monthly(user.id(), from, to);
+        return MonthlyCostView.from(month.toString(), cost, InternalValuePolicy.visibleTo(user));
+    }
+}

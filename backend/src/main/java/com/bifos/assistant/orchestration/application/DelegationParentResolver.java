@@ -2,9 +2,9 @@ package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

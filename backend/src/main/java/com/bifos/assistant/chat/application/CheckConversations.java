@@ -8,7 +8,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Optional;

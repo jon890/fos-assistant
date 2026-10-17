@@ -14,7 +14,7 @@ import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.ProblemStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.ExternalData;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;

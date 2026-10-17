@@ -16,5 +16,5 @@ ModelPrice.ContextTier처럼 바깥 타입 밖에서 쓰지 않는 값은 안에
 
 ## 이 저장소의 사례
 
-[ModelPrice.java](../../backend/src/main/java/com/bifos/assistant/usage/domain/ModelPrice.java)에서 확인한다.
+[ModelPrice.java](../../backend/src/main/java/com/bifos/assistant/usage/pricing/domain/ModelPrice.java)에서 확인한다.
 ModelPrice.ContextTier는 바깥 값의 일부로 두는 중첩 값 사례다.

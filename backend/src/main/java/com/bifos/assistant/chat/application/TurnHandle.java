@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.usage.application.TurnSlot;
+import com.bifos.assistant.usage.execution.application.TurnSlot;
 import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

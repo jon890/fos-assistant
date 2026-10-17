@@ -15,7 +15,7 @@ import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

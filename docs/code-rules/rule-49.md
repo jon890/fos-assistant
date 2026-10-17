@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[ExecutionRecorder.java](../../backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java)에서 확인한다.
+[ExecutionRecorder.java](../../backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionRecorder.java)에서 확인한다.
 ExecutionRecorder는 실행을 시작할 때 만든 기록을 종료 때 갱신한다.

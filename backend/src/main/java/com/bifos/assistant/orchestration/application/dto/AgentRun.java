@@ -1,7 +1,7 @@
 package com.bifos.assistant.orchestration.application.dto;
 
 import com.bifos.assistant.orchestration.domain.ChildResult;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 
 /**
  * 돌린 결과다.

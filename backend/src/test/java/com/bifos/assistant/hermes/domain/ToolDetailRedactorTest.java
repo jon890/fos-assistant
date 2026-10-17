@@ -2,7 +2,7 @@ package com.bifos.assistant.hermes.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.usage.domain.ExecutionEvent;
+import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import java.util.HashMap;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;

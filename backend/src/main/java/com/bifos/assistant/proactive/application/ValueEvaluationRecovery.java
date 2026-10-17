@@ -1,11 +1,11 @@
 package com.bifos.assistant.proactive.application;
 
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.usage.application.ExecutionRecorder;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
-import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;

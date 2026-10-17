@@ -3,7 +3,7 @@ package com.bifos.assistant.orchestration.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Duration;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;

@@ -1,0 +1,460 @@
+package com.bifos.assistant.usage.execution.application;
+
+import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.usage.execution.application.dto.ExecutionAdmission;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.DelegationKey;
+import com.bifos.assistant.usage.execution.domain.ExecutionConversation;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
+ *
+ * <p>완료 기록 서비스는 실행이 끝날 때 비용을 환산하고 쓴 가격표와 함께 저장한다. 조회할 때 다시 계산하면
+ * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class ExecutionRecorder {
+    private final Clock clock;
+
+    private final AgentExecutionRepository executions;
+    private final UserExecutionLimiter limiter;
+    private final ExecutionContextSourceWriter contextSources;
+    private final ExecutionCompletionRecorder completion;
+
+
+    /**
+     * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
+    public AgentExecution start(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        Long contextChars) {
+        return start(
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            ExecutionContextSnapshot.ofChars(contextChars));
+    }
+
+
+    /**
+     * 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
+    public AgentExecution start(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context) {
+        return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, null, null, null);
+    }
+
+
+    /**
+     * 대화가 고른 모델과 effort 까지 적으며 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>{@code requested} 를 시작할 때 적어 두면 실패로 끝난 실행도 어느 provider 로 시도한 것인지
+     * 남는다. 끝나면 세션에서 읽은 실제 값으로 덮인다. 기본값으로 보냈으면 provider 와 모델을 비워 두고
+     * effort 만 적는다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     *
+     * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
+     * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
+     * 넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
+     * @param hermesSessionId 이 실행 줄에 적을 Hermes session. 제출하기 전에 적힌다. 대화 turn 은 그 대화의
+     * 루트 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
+     */
+    public AgentExecution start(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId) {
+        return start(
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            null);
+    }
+
+
+    /**
+     * 다른 에이전트에게 맡긴 실행을 {@code delegation_key} 와 함께 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>키를 처음 만들 때 함께 적어야 유일 제약이 같은 호출의 두 번째 줄을 막는다. 뒤에 붙이면 두 요청이 모두
+     * 줄을 만든 뒤에야 걸린다. 같은 키의 줄이 이미 있으면 저장이 {@code DataIntegrityViolationException} 으로
+     * 실패하고, 부르는 쪽이 그 키로 먼저 저장된 줄을 다시 읽는다.
+     *
+     * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     *
+     * @param delegationKey 위임이 아니면 null 이다
+     */
+    public AgentExecution start(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey) {
+        return start(
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            delegationKey,
+            null,
+            null);
+    }
+
+
+    /**
+     * 보낸 effort 를 누가 정했는지다.
+     *
+     * <p>단계도 대화도 effort 를 정하지 않았는데 보낸 값이 있으면 에이전트 기본값에서 온 것이다(ADR-054).
+     * 단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 {@code REQUESTED} 로 적는다.
+     */
+    private static ReasoningEffortSource effortSource(
+        ExecutionConversation conversation, ModelChoice requested, ModelTier modelTier) {
+        if (requested == null || requested.reasoningEffort() == null) {
+            return ReasoningEffortSource.UNKNOWN;
+        }
+        boolean chosenByConversation = conversation != null && conversation.reasoningEffort() != null;
+        return modelTier == null && !chosenByConversation
+            ? ReasoningEffortSource.AGENT_DEFAULT
+            : ReasoningEffortSource.REQUESTED;
+    }
+
+
+    /**
+     * 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다.
+     *
+     * <p>부모가 있으면 흐름 단계나 위임 자식으로, 대화만 있으면 대화 turn 의 루트로, 둘 다 없으면 백그라운드 실행으로
+     * 사용자 실행 한도를 본다(ADR-069). 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     */
+    public AgentExecution start(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey,
+        ModelTier modelTier,
+        Instant requestReceivedAt) {
+        return record(
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            delegationKey,
+            modelTier,
+            requestReceivedAt,
+            effortSource(conversation, requested, modelTier),
+            admissionOf(conversation, parentExecutionId, rootExecutionId));
+    }
+
+
+    /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
+    private ExecutionAdmission admissionOf(
+        ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
+        if (parentExecutionId != null) {
+            Long rootId = rootExecutionId == null ? parentExecutionId : rootExecutionId;
+            Long rootConversationId = executions
+                .findById(rootId)
+                .map(AgentExecution::conversationId)
+                .orElse(null);
+            if (limiter.isBackgroundConversation(rootConversationId)) {
+                return ExecutionAdmission.BACKGROUND_CHILD;
+            }
+            return ExecutionAdmission.CHILD;
+        }
+        return conversation != null ? ExecutionAdmission.TURN_ROOT : ExecutionAdmission.BACKGROUND;
+    }
+
+
+    private AgentExecution record(
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey,
+        ModelTier modelTier,
+        Instant requestReceivedAt,
+        ReasoningEffortSource effortSource,
+        ExecutionAdmission admission) {
+        AgentExecution execution = limiter.admit(
+            user.id(),
+            admission,
+            () -> executions.save(base(user, conversation, agent)
+                .hermesSessionId(hermesSessionId)
+                .delegationKey(delegationKey == null ? null : delegationKey.value())
+                .parentExecutionId(parentExecutionId)
+                .rootExecutionId(rootExecutionId)
+                .retryOfExecutionId(retryOfExecutionId)
+                .provider(requested == null ? null : requested.provider())
+                .model(requested == null ? null : requested.model())
+                .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                .reasoningEffortSource(effortSource)
+                .modelTier(modelTier)
+                .requestReceivedAt(requestReceivedAt)
+                .contextChars(context.contextChars())
+                .contextOmittedItems(context.contextOmittedItems())
+                .runtimeFingerprint(context.runtimeFingerprint())
+                .instructionsHash(context.instructionsHash())
+                .status(ExecutionStatus.RUNNING)
+                .build()));
+        contextSources.write(execution.id(), context.sources());
+        return execution;
+    }
+
+
+    /**
+     * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
+     *
+     * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 루트, session 을 비우고 문맥 글자
+     * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로 적고, effort 가 있으면 출처는 에이전트
+     * 기본값이다.
+     *
+     * <p>사용자 실행 한도는 백그라운드 실행으로 본다. 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
+     *
+     * @param requested Hermes 에 보낸 provider, 모델, effort
+     */
+    public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice requested) {
+        return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), requested, null, null);
+    }
+
+
+    /** 설치 설정의 시스템 profile 로 판단만 한다. 사용자 에이전트 줄을 만들지 않으며 요청자의 백그라운드 한도로 센다. */
+    public AgentExecution startSystem(CurrentUser user, String profileName, CostMode costMode, ModelChoice requested) {
+        return limiter.admit(
+            user.id(),
+            ExecutionAdmission.BACKGROUND,
+            () -> executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .profileName(profileName)
+                .costMode(costMode)
+                .provider(requested.provider())
+                .model(requested.model())
+                .reasoningEffort(requested.reasoningEffort())
+                .reasoningEffortSource(
+                    requested.reasoningEffort() == null
+                        ? ReasoningEffortSource.UNKNOWN
+                        : ReasoningEffortSource.REQUESTED)
+                .contextChars(0L)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(clock.instant())
+                .build()));
+    }
+
+
+    /** 시스템 판단 실행의 실제 모델과 토큰을 남긴다. 실제 모델을 모르면 요청 모델로 대신하지 않는다. */
+    public AgentExecution completeSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl) {
+        return completion.completeSystem(execution, result, apiBaseUrl);
+    }
+
+
+    /** 실패한 시스템 판단도 실제 모델과 사용량을 보존한다. 실패 응답 본문은 남기지 않는다. */
+    public AgentExecution failSystem(
+        AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
+        return completion.failSystem(execution, result, apiBaseUrl, errorCode);
+    }
+
+
+    /** 제출 직후 run 번호를 붙인다. */
+    public void attachRunId(AgentExecution execution, String hermesRunId) {
+        execution.attachRunId(hermesRunId);
+        executions.save(execution);
+    }
+
+
+    /** Hermes 제출 직전 시각을 실행 줄에 남긴다. */
+    public void markSubmitted(AgentExecution execution) {
+        execution.markSubmitted(clock.instant());
+        executions.save(execution);
+    }
+
+
+    /** 사건 수집을 시작하기 전에 저장한다. 재기동 중 끊기면 수집 완료로 오인하지 않는다. */
+    public void beginEventObservation(AgentExecution execution) {
+        execution.beginEventObservation();
+        saveEventObservation(execution);
+    }
+
+
+    /** 관측 실패가 답과 확인한 사용량의 저장을 막지 않는다. */
+    public void finishEventObservation(AgentExecution execution, boolean complete) {
+        if (execution.finishEventObservation(complete)) {
+            saveEventObservation(execution);
+        }
+    }
+
+
+    private void saveEventObservation(AgentExecution execution) {
+        try {
+            executions.save(execution);
+        } catch (RuntimeException ex) {
+            execution.finishEventObservation(false);
+            log.warn("사건 관측 상태를 저장하지 못했다 executionId={}", execution.id(), ex);
+        }
+    }
+
+
+    /** 최초 assistant delta 수신 시각만 남긴다. */
+    public void markFirstDelta(AgentExecution execution) {
+        if (execution.markFirstDelta(clock.instant())) {
+            executions.save(execution);
+        }
+    }
+
+
+    /**
+     * 끝난 실행을 SUCCEEDED 로 갱신한다.
+     *
+     * <p>기록할 provider 와 모델은 완료 기록 서비스가 고른다. v0.21.5 의 실행 {@code runtime} 이 짝을 주면 그것을,
+     * 아니면 세션 조회와 대화가 고른 값으로 채운다. 모두 읽지 못해도 실행은 성공으로 남긴다. 모델 이름을 모르는
+     * 것이 답을 버릴 이유가 되지 않는다.
+     *
+     * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
+     */
+    public AgentExecution complete(
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        return completion.complete(execution, agent, result, requested);
+    }
+
+
+    /**
+     * 끝난 실행을 SUCCEEDED 로 갱신하며 답을 같은 저장에서 적는다.
+     *
+     * <p>다른 에이전트에게 맡긴 실행이 쓴다. 답을 따로 저장하면 그 사이 {@code agent_status} 가 답 없는 SUCCEEDED 를
+     * 읽는다. 길이를 자르는 것은 부르는 쪽이 한다.
+     *
+     * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
+     */
+    public AgentExecution complete(
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        return completion.complete(execution, agent, result, requested, outputText);
+    }
+
+
+    /**
+     * 이 번호들 중 자식을 가진 것만 낸다.
+     *
+     * <p>대화 이력이 어느 답에 실행 트리로 가는 길을 붙일지 정하는 데 쓴다. 실행마다 세지 않고 한 번에
+     * 읽는다.
+     */
+    public List<Long> idsHavingChildren(Collection<Long> executionIds) {
+        return executions.findParentIdsHavingChildren(executionIds);
+    }
+
+
+    /** 최종 결과를 받지 못한 실행을 FAILED 로 갱신한다. 이미 적힌 사용량은 보존한다. */
+    public AgentExecution fail(AgentExecution execution, String errorCode) {
+        return completion.fail(execution, errorCode);
+    }
+
+
+    /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
+    public AgentExecution fail(
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
+        return completion.fail(execution, agent, result, requested, errorCode);
+    }
+
+
+    /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
+    public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        return completion.cancel(execution, agent, result, requested);
+    }
+
+
+    /**
+     * Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남기고, 멈춘 자리까지의 답을 같은 저장에서 적는다.
+     *
+     * <p>다른 에이전트에게 맡긴 실행이 쓴다. 답을 따로 저장하면 그 사이 {@code agent_status} 가 답 없는 CANCELLED 를
+     * 읽는다. 길이를 자르는 것은 부르는 쪽이 한다.
+     *
+     * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
+     */
+    public AgentExecution cancel(
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        return completion.cancel(execution, agent, result, requested, outputText);
+    }
+
+
+    /** 이미 적은 토큰을 보존하며 실행을 취소로 남긴다. */
+    public AgentExecution cancel(AgentExecution execution) {
+        return completion.cancel(execution);
+    }
+
+
+    private AgentExecution.Builder base(CurrentUser user, ExecutionConversation conversation, Agent agent) {
+        return AgentExecution.builder()
+            .userId(user.id())
+            .conversationId(conversation == null ? null : conversation.id())
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .costMode(agent.costMode())
+            .startedAt(clock.instant());
+    }
+
+}

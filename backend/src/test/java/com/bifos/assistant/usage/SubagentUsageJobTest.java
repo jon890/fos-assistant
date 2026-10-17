@@ -4,12 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
-import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.ExecutionCost;
-import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.SubagentUsageJob;
-import com.bifos.assistant.usage.domain.type.ExecutionEventType;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
+import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
+import com.bifos.assistant.usage.subagent.domain.SubagentUsageJob;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
