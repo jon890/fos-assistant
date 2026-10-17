@@ -3,16 +3,21 @@ package com.bifos.assistant.context;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentMemoryCollection;
+import com.bifos.assistant.agent.domain.AgentMemoryCollectionId;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
+import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -34,6 +39,7 @@ class ContextAssemblerLinkTest {
     private static final CurrentUser ADMIN = new CurrentUser(1L, "user1@example.com", "user1", 10L, UserRole.ADMIN);
     private static final String AGENT_CODE = "context-link-test";
     private static final String LINK_HEADER = "# 연결된 기억";
+    private static final String HEALTH = "health";
 
     @Autowired
     ContextAssembler assembler;
@@ -52,6 +58,9 @@ class ContextAssemblerLinkTest {
 
     @Autowired
     AgentRepository agents;
+
+    @Autowired
+    AgentMemoryCollectionRepository grants;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -202,6 +211,74 @@ class ContextAssemblerLinkTest {
         assertThat(tight.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
         assertThat(itemOf(tight, hotel, ContextSource.MEMORY_INDEX)).isPresent();
         assertThat(off.assemble(ADMIN, agentId).bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
+    }
+
+
+    @Test
+    @DisplayName("에이전트가 받지 않는 collection 과 민감, 암호화한 이웃은 본문으로 싣지 않고 받지 않는 이웃은 색인에도 없다")
+    void keepsNeighborsInsideAgentBoundary() {
+        if (grants.findById(new AgentMemoryCollectionId(agentId, HEALTH)).isEmpty()) {
+            grants.save(AgentMemoryCollection.of(agentId, HEALTH, true));
+        }
+        Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
+        Memory career = memories.create(
+            ADMIN, MemoryScope.USER, "출장", "제주 출장 일정", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        Memory sensitive = memories.create(
+            ADMIN, MemoryScope.USER, "멀미약", "제주 가는 배에서 먹는 약", HEALTH, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+        Long sealed = insertSealed("봉인한 숙소 메모");
+        relate(trip, career, 0.9);
+        relate(trip, sensitive, 0.9);
+        links.save(MemoryLink.related(trip.id(), sealed, null, MemoryLinkOrigin.AUTO, 0.9, null));
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
+        assertThat(result.bundle().items()).noneMatch(item -> item.ref().equals("memory:" + career.id()));
+        assertThat(itemOf(result, sensitive, ContextSource.MEMORY_INDEX)).isPresent();
+        assertThat(result.bundle().items())
+            .anyMatch(item -> item.source() == ContextSource.MEMORY_INDEX && item.ref().equals("memory:" + sealed));
+        assertThat(result.instructions()).doesNotContain("제주 출장 일정", "배에서 먹는 약", "v1.봉인");
+    }
+
+
+    @Test
+    @DisplayName("사용자 목록 경로의 조립도 같은 규칙으로 이웃을 싣는다")
+    void placesNeighborsForOwnerAssembly() {
+        Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
+        Memory hotel = memories.create(ADMIN, MemoryScope.USER, "제주 숙소", "숙소는 " + "바닷가 ".repeat(60), false);
+        relate(trip, hotel, 0.9);
+
+        AssembledContext result = assembler.assembleForOwner(ADMIN);
+
+        assertThat(itemOf(result, hotel, ContextSource.MEMORY_LINK)).isPresent();
+    }
+
+
+    @Test
+    @DisplayName("끊은 연결만 있으면 조립한 글과 지문이 연결이 없을 때와 같다")
+    void keepsSameTextWithOnlyRevokedLinks() {
+        Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
+        Memory hotel = memories.create(ADMIN, MemoryScope.USER, "제주 숙소", "숙소는 " + "바닷가 ".repeat(60), false);
+        AssembledContext before = assembler.assemble(ADMIN, agentId);
+        MemoryLink link = relate(trip, hotel, 0.9);
+        linkService.revoke(ADMIN, link.id());
+
+        AssembledContext after = assembler.assemble(ADMIN, agentId);
+
+        assertThat(after.instructions()).isEqualTo(before.instructions());
+        assertThat(after.bundle()).isEqualTo(before.bundle());
+    }
+
+
+    /** 본문이 암호문이라고 표시한 일반 민감도 줄이다. 데이터가 어긋난 경우를 흉내 낸다. */
+    private Long insertSealed(String title) {
+        jdbc.update("""
+                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, content_key_id,
+                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.봉인-본문', 'test-1', 'SEARCH', FALSE,
+                    'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """, title);
+        return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }
 
 
