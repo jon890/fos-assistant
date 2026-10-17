@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[AgentAdminController.java](../../backend/src/main/java/com/bifos/assistant/agent/admin/presentation/AgentAdminController.java)에서 확인한다.
+[AgentAdminController.java](../../backend/src/main/java/com/bifos/assistant/admin/agent/presentation/AgentAdminController.java)에서 확인한다.
 AgentAdminController의 mapped 메서드들은 관리자 확인 뒤 서비스를 호출한다.
