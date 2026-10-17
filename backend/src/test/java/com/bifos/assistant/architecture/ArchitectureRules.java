@@ -15,7 +15,7 @@ import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
+import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
@@ -36,7 +36,6 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
-import org.springframework.context.annotation.Configuration;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.IdClass;
@@ -162,10 +161,10 @@ public final class ArchitectureRules {
     /** 전체 운영 루트에서 소유 타입을 찾으므로 옛 위치·다른 기능·누락·중복도 실패한다. */
     static ArchRule agentPurgeContractPlacement(String root) {
         Map<String, String> owners = Map.of(
-            "AgentPurger", "agent.purge.application.AgentPurger",
-            "AgentPurgeWriter", "agent.purge.application.AgentPurgeWriter",
-            "AgentPurgeParticipant", "agent.purge.application.AgentPurgeParticipant",
-            "AgentPurgeOutcome", "agent.purge.application.model.AgentPurgeOutcome");
+            "AgentPurger", "agent.application.AgentPurger",
+            "AgentPurgeWriter", "agent.application.AgentPurgeWriter",
+            "AgentPurgeParticipant", "agent.application.port.AgentPurgeParticipant",
+            "AgentPurgeOutcome", "agent.application.dto.AgentPurgeOutcome");
         return classes()
             .that()
             .resideInAPackage(root + "..")
@@ -176,54 +175,27 @@ public final class ArchitectureRules {
 
 
     private static ArchCondition<JavaClass> agentPurgeRoles(String root) {
-        return new ArchCondition<>("purge 의 실행과 공개 결과 역할 및 아래 층의 의존 방향을 지킨다") {
+        return new ArchCondition<>("purge 의 실행과 공개 결과 역할 및 참여 구현을 import 하지 않는 방향을 지킨다") {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
-                String boundary = root + ".agent.purge.";
-                String application = boundary + "application";
-                if (item.getPackageName().startsWith(boundary)) {
-                    boolean config = item.isAnnotatedWith(ConfigurationProperties.class)
-                        || item.isAnnotatedWith(Configuration.class);
-                    if (config) {
-                        require(item, item.getPackageName().equals(boundary + "config"), "설정 선언은 config 에 있다", events);
-                    } else if (item.isAnnotatedWith(Service.class)
-                        || item.isAnnotatedWith(Component.class)) {
-                        require(item, item.getPackageName().equals(application), "Service·Component 는 purge.application 에 있다", events);
-                    }
-                    if (item.getPackageName().startsWith(application)
-                        && item.getModifiers().contains(JavaModifier.PUBLIC)
-                        && (item.isRecord() || item.isEnum()) && !config) {
-                        require(item, item.getPackageName().equals(application + ".model"), "공개 결과는 application.model 에 있다", events);
-                    }
-                    if (Set.of("AgentPurger", "AgentPurgeWriter").contains(item.getSimpleName()) && item.getEnclosingClass().isEmpty()) {
-                        require(item, item.isAnnotatedWith(Component.class), "정리 실행은 Component 다", events);
-                    }
-                    if (item.getSimpleName().equals("AgentPurgeParticipant") && item.getEnclosingClass().isEmpty()) {
-                        require(item, item.isInterface(), "참여 port 는 interface 다", events);
-                    }
-                    if (item.getSimpleName().equals("AgentPurgeOutcome") && item.getEnclosingClass().isEmpty()) {
-                        require(item, item.isEnum(), "정리 결과는 enum 이다", events);
-                    }
+                if (item.getEnclosingClass().isPresent()
+                    || !Set.of("AgentPurger", "AgentPurgeWriter", "AgentPurgeParticipant", "AgentPurgeOutcome")
+                        .contains(item.getSimpleName())) {
+                    return;
+                }
+                if (Set.of("AgentPurger", "AgentPurgeWriter").contains(item.getSimpleName())) {
+                    require(item, item.isAnnotatedWith(Component.class), "정리 실행은 Component 다", events);
+                }
+                if (item.getSimpleName().equals("AgentPurgeParticipant")) {
+                    require(item, item.isInterface(), "참여 port 는 interface 다", events);
+                }
+                if (item.getSimpleName().equals("AgentPurgeOutcome")) {
+                    require(item, item.isEnum(), "정리 결과는 enum 이다", events);
                 }
                 item.getDirectDependenciesFromSelf().forEach(dependency -> {
-                    JavaClass target = dependency.getTargetClass();
-                    String sourcePackage = item.getPackageName();
-                    String targetPackage = target.getPackageName();
-                    boolean inside = sourcePackage.startsWith(boundary);
-                    boolean lower = sourcePackage.contains(".domain") || sourcePackage.contains(".infra");
-                    if (lower && targetPackage.startsWith(application)) {
-                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " domain 과 infra 는 purge.application 을 쓰지 않는다"));
-                    }
-                    if (inside && sourcePackage.contains(".presentation") && targetPackage.contains(".infra")) {
-                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " presentation 은 infra 를 직접 쓰지 않는다"));
-                    }
-                    if (inside && sourcePackage.contains(".domain")
-                        && (targetPackage.contains(".presentation") || targetPackage.startsWith("org.springframework.web")
-                            || targetPackage.startsWith("org.springframework.http") || targetPackage.startsWith("jakarta.servlet"))) {
-                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " domain 은 웹 계층에 의존하지 않는다"));
-                    }
-                    if (inside && (targetPackage.startsWith(root + ".chat.")
-                        || targetPackage.startsWith(root + ".connector.") || targetPackage.startsWith(root + ".proactive."))) {
+                    String targetPackage = dependency.getTargetClass().getPackageName();
+                    if (targetPackage.startsWith(root + ".chat.")
+                        || targetPackage.startsWith(root + ".connector.") || targetPackage.startsWith(root + ".proactive.")) {
                         events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " agent 는 참여 구현의 기능을 import 하지 않는다"));
                     }
                 });

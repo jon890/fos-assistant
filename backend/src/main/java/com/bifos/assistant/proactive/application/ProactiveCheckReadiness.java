@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;

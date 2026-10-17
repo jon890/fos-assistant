@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.presentation;
 
-import com.bifos.assistant.memory.application.model.MemorySource;
-import com.bifos.assistant.memory.application.model.SupersedeProposal;
+import com.bifos.assistant.memory.application.dto.MemorySource;
+import com.bifos.assistant.memory.application.dto.SupersedeProposal;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;

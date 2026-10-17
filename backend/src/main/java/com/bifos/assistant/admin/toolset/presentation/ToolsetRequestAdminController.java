@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.toolset.presentation;
 
-import com.bifos.assistant.agent.application.toolset.ToolsetRequestService;
+import com.bifos.assistant.agent.application.ToolsetRequestService;
 import com.bifos.assistant.admin.toolset.presentation.ToolsetAdminDtos.ToolsetRequestResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;

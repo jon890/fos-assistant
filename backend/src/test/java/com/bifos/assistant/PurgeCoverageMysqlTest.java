@@ -3,8 +3,8 @@ package com.bifos.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.purge.application.AgentPurgeWriter;
-import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.application.AgentPurgeWriter;
+import com.bifos.assistant.agent.application.dto.AgentPurgeOutcome;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;

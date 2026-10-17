@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.application.dto.PersonaSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
 import com.bifos.assistant.hermes.application.dto.SoulDocument;

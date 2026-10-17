@@ -1,6 +1,6 @@
 package com.bifos.assistant.people.application;
 
-import com.bifos.assistant.agent.application.ReservedProfileNames;
+import com.bifos.assistant.agent.application.port.ReservedProfileNames;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

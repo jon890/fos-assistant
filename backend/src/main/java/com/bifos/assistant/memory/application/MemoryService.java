@@ -1,13 +1,13 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
-import com.bifos.assistant.agent.application.AgentMemoryGrants;
+import com.bifos.assistant.agent.application.dto.AgentMemoryGrants;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
-import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.application.model.MemorySearchCursor;
-import com.bifos.assistant.memory.application.model.MemorySearchPage;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
+import com.bifos.assistant.memory.application.dto.MemorySearchPage;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;

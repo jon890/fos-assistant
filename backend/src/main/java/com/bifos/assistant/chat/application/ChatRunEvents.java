@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;

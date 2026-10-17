@@ -1,12 +1,11 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.application.model.MemorySearchCursor;
-import com.bifos.assistant.memory.application.model.MemorySearchItem;
-import com.bifos.assistant.memory.application.model.MemorySearchPage;
-import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
-import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
-import com.bifos.assistant.memory.application.relevance.RelevanceResult;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
+import com.bifos.assistant.memory.application.dto.MemorySearchItem;
+import com.bifos.assistant.memory.application.dto.MemorySearchPage;
+import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
+import com.bifos.assistant.memory.application.dto.RelevanceResult;
 import com.bifos.assistant.memory.domain.MemorySearchCandidate;
 import com.bifos.assistant.memory.infra.MemorySearchCandidates;
 import com.bifos.assistant.shared.auth.CurrentUser;

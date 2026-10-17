@@ -197,10 +197,10 @@ CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치�
 
 ### 에이전트 도구
 
-`agent.application.toolset`은 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
-이 서비스들의 공개 반환값은 `agent.application.model`에 둔다.
+`agent.application`의 도구 서비스(`AgentToolService`, `ToolsetCatalogService`, `ToolsetRequestService`, `ToolsetVisibilityService`, `AgentDefaultToolsets`)는 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
+이 서비스들의 공개 반환값은 `agent.application.dto`에 둔다.
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
-profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
+profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application.port`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
 ### 브라우저 활동 시각
@@ -247,9 +247,9 @@ domain과 infra는 admin을 import하지 않는다.
 
 ### 에이전트 지연 정리
 
-`agent.purge.application`에 `AgentPurger`, `AgentPurgeWriter`, `AgentPurgeParticipant`를 모은다.
-정리 결과 `AgentPurgeOutcome`는 그 아래 `application.model`에 둔다.
-설정 `AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
+`agent.application`에 `AgentPurger`, `AgentPurgeWriter`를 두고 참여 port `AgentPurgeParticipant`는 `application.port`에 둔다.
+정리 결과 `AgentPurgeOutcome`는 `application.dto`에 둔다.
+설정 `AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application.port`에 둔다.
 참여 구현은 `chat`, `connector`, `proactive`가 소유하며 정리 실행은 구현 기능을 import하지 않는다.
 
 먼저 읽기 트랜잭션으로 대기 여부를 확인하고, 관리하는 profile을 회수한 뒤,
@@ -294,7 +294,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
-`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.purge.application`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
+`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.application.port`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 `workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. `admin` 을 뺀 어느 패키지도 `workspace` 를 import 하지 않는다.
 `admin` 은 `workspace` 위, 맨 위다. 관리자 전용 화면과 API 가 기능의 `application` 을 부르고, 어느 패키지도 `admin` 을 import 하지 않는다(`ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN`).

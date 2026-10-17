@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.admin.agent.application.AgentAdminService;
 import com.bifos.assistant.admin.agent.presentation.AgentAdminController;
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;

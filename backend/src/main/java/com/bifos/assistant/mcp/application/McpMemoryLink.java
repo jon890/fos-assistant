@@ -5,7 +5,7 @@ import static com.bifos.assistant.mcp.application.McpToolService.result;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;

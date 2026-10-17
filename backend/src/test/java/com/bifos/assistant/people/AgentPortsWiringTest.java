@@ -2,8 +2,8 @@ package com.bifos.assistant.people;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.agent.application.ProfileProvisioning;
-import com.bifos.assistant.agent.application.ReservedProfileNames;
+import com.bifos.assistant.agent.application.port.ProfileProvisioning;
+import com.bifos.assistant.agent.application.port.ReservedProfileNames;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import java.util.Collections;

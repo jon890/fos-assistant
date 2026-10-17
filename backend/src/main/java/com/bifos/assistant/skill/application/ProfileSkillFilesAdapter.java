@@ -1,6 +1,6 @@
 package com.bifos.assistant.skill.application;
 
-import com.bifos.assistant.agent.application.ProfileSkillFiles;
+import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.skill.domain.SkillBundle;
 import com.bifos.assistant.skill.infra.SkillStore;
 import java.util.List;

@@ -1,10 +1,10 @@
 package com.bifos.assistant.context;
 
-import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
-import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
-import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
-import com.bifos.assistant.memory.application.relevance.RelevanceResult;
-import com.bifos.assistant.memory.application.relevance.RelevanceScore;
+import com.bifos.assistant.memory.application.MemoryRelevance;
+import com.bifos.assistant.memory.application.QueryEmbedder;
+import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
+import com.bifos.assistant.memory.application.dto.RelevanceResult;
+import com.bifos.assistant.memory.application.dto.RelevanceScore;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.ArrayList;

@@ -17,7 +17,7 @@ import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

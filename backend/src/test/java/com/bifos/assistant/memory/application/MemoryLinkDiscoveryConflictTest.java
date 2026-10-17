@@ -7,9 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
-import com.bifos.assistant.memory.application.embedding.EmbeddingText;
-import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.config.MemoryLinkProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
