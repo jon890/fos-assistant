@@ -1,8 +1,8 @@
 package com.bifos.assistant.attention.presentation;
 
 import com.bifos.assistant.attention.application.AttentionMetricsService;
-import com.bifos.assistant.attention.presentation.AttentionDtos.MetricRow;
-import com.bifos.assistant.attention.presentation.AttentionDtos.MetricsResponse;
+import com.bifos.assistant.attention.presentation.AttentionAdminDtos.MetricRow;
+import com.bifos.assistant.attention.presentation.AttentionAdminDtos.MetricsResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

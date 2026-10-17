@@ -2,8 +2,8 @@ package com.bifos.assistant.skill.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.skill.application.SkillService;
-import com.bifos.assistant.skill.presentation.SkillDtos.SkillListView;
-import com.bifos.assistant.skill.presentation.SkillDtos.ToggleSkillRequest;
+import com.bifos.assistant.skill.presentation.SkillAdminDtos.SkillListView;
+import com.bifos.assistant.skill.presentation.SkillAdminDtos.ToggleSkillRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

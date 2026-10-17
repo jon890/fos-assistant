@@ -4,7 +4,6 @@ import com.bifos.assistant.attention.application.model.AttentionCard;
 import com.bifos.assistant.attention.application.model.AttentionExecutionRef;
 import com.bifos.assistant.attention.application.model.AttentionFollowUpRef;
 import com.bifos.assistant.attention.application.model.AttentionItem;
-import com.bifos.assistant.attention.application.model.AttentionMetric;
 import com.bifos.assistant.attention.application.model.AttentionProblem;
 import com.bifos.assistant.attention.application.model.AttentionReport;
 import com.bifos.assistant.attention.application.model.AttentionSignal;
@@ -78,41 +77,6 @@ public final class AttentionDtos {
 
     /** @param type {@code OPENED} 나 {@code ACTED} */
     public record EventRequest(String itemKey, String stateKey, String type) {
-    }
-
-    /**
-     * 관리자 지표다. 제목, 항목 열쇠, 사용자 번호를 싣지 않는다.
-     *
-     * @param days 센 기간의 일 수
-     * @param rows {@code trigger} 선언 순서다. 보인 항목이 없는 {@code trigger} 는 줄이 없다
-     */
-    public record MetricsResponse(int days, List<MetricRow> rows) {
-    }
-
-    /** 뜻은 {@code docs/features/attention.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다. */
-    public record MetricRow(
-        String trigger,
-        long shown,
-        long hidden,
-        long snoozed,
-        long acted,
-        long nowShown,
-        long nowHiddenWithoutAction,
-        long staleShown,
-        Long medianSecondsToFirstAction) {
-
-        public static MetricRow from(AttentionMetric metric) {
-            return new MetricRow(
-                metric.trigger().name(),
-                metric.shown(),
-                metric.hidden(),
-                metric.snoozed(),
-                metric.acted(),
-                metric.nowShown(),
-                metric.nowHiddenWithoutAction(),
-                metric.staleShown(),
-                metric.medianSecondsToFirstAction());
-        }
     }
 
     /**

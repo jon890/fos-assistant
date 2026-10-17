@@ -56,28 +56,6 @@ public final class UserBrowserDtos {
         }
     }
 
-    /** 관리자 목록의 한 줄이다. 컨테이너 번호와 프로필 키는 싣지 않는다. */
-    public record AdminBrowserView(
-        Long id,
-        Long userId,
-        String userName,
-        String status,
-        String lastError,
-        Instant startedAt,
-        Instant lastActiveAt) {
-
-        static AdminBrowserView of(UserBrowserSnapshot browser, String userName) {
-            return new AdminBrowserView(
-                browser.id(),
-                browser.userId(),
-                userName,
-                browser.status().name(),
-                browser.lastError(),
-                browser.startedAt(),
-                browser.lastActiveAt());
-        }
-    }
-
     /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
     public record ScreenInputRequest(
         String type,

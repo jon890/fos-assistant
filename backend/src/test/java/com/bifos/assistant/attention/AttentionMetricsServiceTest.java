@@ -15,7 +15,7 @@ import com.bifos.assistant.attention.domain.type.AttentionLevel;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.infra.AttentionEventRepository;
 import com.bifos.assistant.attention.presentation.AttentionAdminController;
-import com.bifos.assistant.attention.presentation.AttentionDtos.MetricsResponse;
+import com.bifos.assistant.attention.presentation.AttentionAdminDtos.MetricsResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

@@ -1,9 +1,9 @@
 package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.mcp.presentation.AgentTokenDtos.IssueRequest;
-import com.bifos.assistant.mcp.presentation.AgentTokenDtos.IssuedTokenResponse;
-import com.bifos.assistant.mcp.presentation.AgentTokenDtos.TokenResponse;
+import com.bifos.assistant.mcp.presentation.AgentTokenAdminDtos.IssueRequest;
+import com.bifos.assistant.mcp.presentation.AgentTokenAdminDtos.IssuedTokenResponse;
+import com.bifos.assistant.mcp.presentation.AgentTokenAdminDtos.TokenResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
