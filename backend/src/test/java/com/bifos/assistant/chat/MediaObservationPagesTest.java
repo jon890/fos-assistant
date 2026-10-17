@@ -2,9 +2,9 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.MediaObservationPages;
-import com.bifos.assistant.chat.application.model.MediaObservationInput;
-import com.bifos.assistant.chat.application.model.MediaObservationView;
+import com.bifos.assistant.chat.attachment.application.MediaObservationPages;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationInput;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationView;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.ArrayList;
 import java.util.List;

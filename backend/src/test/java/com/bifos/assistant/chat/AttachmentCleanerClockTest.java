@@ -2,15 +2,15 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.attachment.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.ContentDraftCleaner;
-import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
-import com.bifos.assistant.chat.application.MediaObservationCleaner;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.infra.AttachmentProperties;
-import com.bifos.assistant.chat.infra.AttachmentStore;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;

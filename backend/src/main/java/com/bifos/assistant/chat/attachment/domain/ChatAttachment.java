@@ -1,0 +1,137 @@
+package com.bifos.assistant.chat.attachment.domain;
+
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+
+/**
+ * 대화에 올린 사진 한 장이다. 본문은 파일로 두고 이 행은 그 파일을 가리키기만 한다.
+ *
+ * <p>행을 지우지 않는다. 파일을 지우면 {@code deletedAt} 을 적어, 지난 대화에 그 자리에 사진이
+ * 있었다는 것을 남긴다. 근거는 ADR-020 에 있다.
+ */
+@Entity
+@Table(name = "chat_attachment")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
+public class ChatAttachment extends CreatedAtEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
+    private Long id;
+
+    @Column(name = "conversation_id", nullable = false)
+    @Getter
+    private Long conversationId;
+
+    /** 함께 보낸 메시지. 아직 보내지 않았으면 비어 있다. */
+    @Column(name = "message_id")
+    @Getter
+    private Long messageId;
+
+    /** 같은 메시지 안에서 사진이 놓인 자리다. 0부터 시작한다. */
+    @Column(name = "position", nullable = false)
+    @Getter
+    private int position;
+
+    @Column(name = "uploaded_by_user_id", nullable = false)
+    @Getter
+    private Long uploadedByUserId;
+
+    /** 올릴 때의 파일 이름. 화면에 보이기만 하고 디스크 이름으로 쓰지 않는다. */
+    @Column(name = "original_name", nullable = false, length = 255)
+    @Getter
+    private String originalName;
+
+    /** 디스크에 둔 이름. 번호가 생긴 뒤 같은 트랜잭션에서 채운다. */
+    @Column(name = "stored_name", length = 255)
+    @Getter
+    private String storedName;
+
+    @Column(name = "content_type", nullable = false, length = 100)
+    @Getter
+    private String contentType;
+
+    @Column(name = "byte_size", nullable = false)
+    @Getter
+    private long byteSize;
+
+    /** 이 시각이 지나면 파일을 지운다. 볼 수 있는지는 정하지 않는다. */
+    @Column(name = "expires_at", nullable = false)
+    @Getter
+    private Instant expiresAt;
+
+    /** 파일을 실제로 지운 시각. 접근 가능 여부는 삭제 요청과 함께 판정한다. */
+    @Column(name = "deleted_at")
+    @Getter
+    private Instant deletedAt;
+
+    /** 최초 삭제 요청이다. 파일 삭제가 실패해도 접근 차단을 유지한다. */
+    @Column(name = "deletion_requested_at")
+    @Getter
+    private Instant deletionRequestedAt;
+
+
+    private ChatAttachment(
+        Long conversationId,
+        Long uploadedByUserId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        Instant expiresAt) {
+        this.conversationId = conversationId;
+        this.uploadedByUserId = uploadedByUserId;
+        this.originalName = originalName;
+        this.contentType = contentType;
+        this.byteSize = byteSize;
+        this.expiresAt = expiresAt;
+    }
+
+
+    /** 아직 메시지에 묶이지 않은 첨부를 만든다. 디스크 이름은 번호를 받은 뒤 채운다. */
+    public static ChatAttachment of(
+        Long conversationId,
+        Long uploadedByUserId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        Instant expiresAt) {
+        return new ChatAttachment(
+            conversationId, uploadedByUserId, originalName, contentType, byteSize, expiresAt);
+    }
+
+
+    public void nameStoredFile(String storedName) {
+        this.storedName = storedName;
+    }
+
+
+    /** 파일을 지웠다고 적는다. 이미 적혀 있으면 처음 시각을 그대로 둔다. */
+    public void markDeleted(Instant now) {
+        if (this.deletedAt == null) {
+            this.deletedAt = now;
+        }
+    }
+
+
+    public boolean isVisible() {
+        return deletedAt == null && deletionRequestedAt == null;
+    }
+
+
+    public void requestDeletion(Instant now) {
+        if (deletionRequestedAt == null) {
+            deletionRequestedAt = now;
+        }
+    }
+}

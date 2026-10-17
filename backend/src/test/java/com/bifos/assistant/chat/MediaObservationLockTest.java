@@ -2,11 +2,11 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.model.MediaObservationView;
-import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.type.ObservationStatus;
-import com.bifos.assistant.chat.infra.AttachmentStore;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationView;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationStatus;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.FilterInputStream;

@@ -2,11 +2,11 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.MediaObservationAnalysisKey;
-import com.bifos.assistant.chat.application.model.MediaObservationInput.Coverage;
-import com.bifos.assistant.chat.application.model.MediaObservationInput.Region;
-import com.bifos.assistant.chat.application.model.ObservationProvenance;
-import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
+import com.bifos.assistant.chat.attachment.application.MediaObservationAnalysisKey;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationInput.Coverage;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationInput.Region;
+import com.bifos.assistant.chat.attachment.application.dto.ObservationProvenance;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

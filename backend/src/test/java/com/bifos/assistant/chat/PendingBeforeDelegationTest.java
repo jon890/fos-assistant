@@ -24,7 +24,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;

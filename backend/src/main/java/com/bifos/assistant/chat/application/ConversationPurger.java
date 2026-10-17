@@ -1,13 +1,15 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.infra.ArtifactStore;
-import com.bifos.assistant.chat.infra.AttachmentStore;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.shared.error.ApiException;

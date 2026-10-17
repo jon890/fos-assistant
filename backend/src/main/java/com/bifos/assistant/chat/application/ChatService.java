@@ -1,11 +1,12 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.ConversationSessions;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
-import com.bifos.assistant.chat.domain.ChatArtifact;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;

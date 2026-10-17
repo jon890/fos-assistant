@@ -1,12 +1,12 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.McpCaller;
-import com.bifos.assistant.chat.application.MediaObservationInputReader;
-import com.bifos.assistant.chat.application.MediaObservationPages;
-import com.bifos.assistant.chat.application.MediaObservationService;
-import com.bifos.assistant.chat.application.model.MediaObservationView;
-import com.bifos.assistant.chat.application.model.ObservationProvenance;
-import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
+import com.bifos.assistant.chat.attachment.application.MediaObservationInputReader;
+import com.bifos.assistant.chat.attachment.application.MediaObservationPages;
+import com.bifos.assistant.chat.attachment.application.MediaObservationService;
+import com.bifos.assistant.chat.attachment.application.dto.MediaObservationView;
+import com.bifos.assistant.chat.attachment.application.dto.ObservationProvenance;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;

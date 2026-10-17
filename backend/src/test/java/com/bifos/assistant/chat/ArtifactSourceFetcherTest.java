@@ -3,12 +3,12 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.infra.ArtifactSourceDnsResolver;
-import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
-import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
-import com.bifos.assistant.chat.infra.ArtifactSourceResponse;
-import com.bifos.assistant.chat.infra.ArtifactSourceSocketTransport;
-import com.bifos.assistant.chat.infra.ArtifactSourceTransport;
+import com.bifos.assistant.chat.artifact.infra.ArtifactSourceDnsResolver;
+import com.bifos.assistant.chat.artifact.infra.ArtifactSourceFetcher;
+import com.bifos.assistant.chat.artifact.config.ArtifactSourceProperties;
+import com.bifos.assistant.chat.artifact.infra.ArtifactSourceResponse;
+import com.bifos.assistant.chat.artifact.infra.ArtifactSourceSocketTransport;
+import com.bifos.assistant.chat.artifact.infra.ArtifactSourceTransport;
 import com.bifos.assistant.shared.error.ApiException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

@@ -18,7 +18,7 @@ import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;

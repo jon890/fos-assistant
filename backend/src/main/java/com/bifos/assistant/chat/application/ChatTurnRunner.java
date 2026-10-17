@@ -1,11 +1,14 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactService;
+import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.dto.AgentInput;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.agent.application.AgentToolService;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.infra.ArtifactStore;
+import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;

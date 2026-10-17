@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.contentdraft.application;
 
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
-import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftJobQueries;
 import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
 import com.bifos.assistant.chat.application.ContentDraftSnapshotInputs;
 import com.bifos.assistant.chat.application.ContentDraftSnapshots;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.application.model.ContentDraftJobPage;
 import com.bifos.assistant.chat.application.model.ContentDraftJobView;
 import com.bifos.assistant.chat.application.model.ContentDraftSaveRequestView;

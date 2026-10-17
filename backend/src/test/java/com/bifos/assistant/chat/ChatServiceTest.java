@@ -17,7 +17,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ArtifactService;
+import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.application.AskFormat;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
