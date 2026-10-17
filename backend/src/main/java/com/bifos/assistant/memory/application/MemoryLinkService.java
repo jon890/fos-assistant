@@ -226,6 +226,19 @@ public class MemoryLinkService {
     }
 
 
+    /**
+     * 승인을 벗어난 항목의 연결을 모두 끊는다. 거절하거나 바로 저장을 되돌려 제안으로 돌아간 항목은 실리지 않으므로, 그 항목이 대신한 옛 항목까지
+     * 가려지면 두 사실이 모두 에이전트에게 가지 않는다. 부르는 쪽이 항목 줄을 잠근 트랜잭션 안에서 부른다.
+     */
+    @Transactional
+    public void revokeAllOf(Long memoryId) {
+        for (MemoryLink link : links.findOpenByMemoryId(memoryId)) {
+            link.revoke(clock.instant());
+            log.info("memory link revoked with its memory linkId={} memoryId={}", link.id(), memoryId);
+        }
+    }
+
+
     /** 한 실행이 지금까지 맺은 연결 수다. 도구의 실행당 상한이 쓴다. */
     public long countByExecution(Long executionId) {
         return links.countByCreatedByExecutionId(executionId);

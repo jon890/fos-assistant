@@ -63,6 +63,7 @@ public class MemoryCaptureService {
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
     private final MemoryLinkRepository links;
+    private final MemoryLinkService linkService;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -207,6 +208,7 @@ public class MemoryCaptureService {
             }
             memory.restoreProposal(clock.instant());
             Memory restored = memories.save(memory);
+            linkService.revokeAllOf(memory.id());
             // 받아들임을 무른 것이다. 첫 반응은 그대로 두고, 오래 가는 선호로 읽히지 않게 사용자의 마지막 결정을 남긴다.
             feedback.record(MemoryProposalFeedback.of(
                 user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())

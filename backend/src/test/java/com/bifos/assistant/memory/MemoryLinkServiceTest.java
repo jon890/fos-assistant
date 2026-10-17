@@ -204,6 +204,21 @@ class MemoryLinkServiceTest {
 
 
     @Test
+    @DisplayName("받아들인 새 기억을 거절하면 그 기억의 대체도 끊겨 옛 기억이 다시 실린다")
+    void revokesLinksWhenNewMemoryIsRejected() {
+        Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "1", false);
+        Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "2", false);
+        MemoryLink link = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, 1L);
+        linkService.accept(ADMIN, link.id());
+
+        memories.reject(ADMIN, fresh.id());
+
+        assertThat(linkService.isSuperseded(old.id())).isFalse();
+        assertThat(links.findById(link.id()).orElseThrow().status()).isEqualTo(MemoryLinkStatus.REVOKED);
+    }
+
+
+    @Test
     @DisplayName("한 항목을 두 줄이 대신하면 하나를 되돌려도 다른 줄이 있는 동안 대체된 채다")
     void keepsSupersededWhileAnotherActiveLinkRemains() {
         Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "1", false);

@@ -67,6 +67,12 @@ public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
     List<MemoryLink> findProposedSupersedesOfGroup(@Param("groupId") Long groupId);
 
 
+    /** 그 항목을 한쪽 끝으로 둔, 끊지 않은 줄이다. */
+    @Query("select l from MemoryLink l where (l.fromMemoryId = :id or l.toMemoryId = :id)"
+        + " and l.status <> com.bifos.assistant.memory.domain.type.MemoryLinkStatus.REVOKED")
+    List<MemoryLink> findOpenByMemoryId(@Param("id") Long id);
+
+
     /** 항목을 지울 때 같은 트랜잭션에서 그 항목을 한쪽 끝으로 둔 줄을 모두 지운다. */
     @Modifying
     @Query("delete from MemoryLink l where l.fromMemoryId = :id or l.toMemoryId = :id")

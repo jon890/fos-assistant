@@ -60,6 +60,7 @@ public class MemoryService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryLinkRepository links;
+    private final MemoryLinkService linkService;
     private final AgentMemoryCollectionService agentCollections;
     private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
@@ -298,6 +299,8 @@ public class MemoryService {
         Instant now = clock.instant();
         memory.reject(now);
         Memory rejected = memories.save(memory);
+        // 받아들인 항목을 거절했으면 그 항목의 연결도 끊는다. 실리지 않는 새 항목이 옛 항목을 가리지 않게 한다
+        linkService.revokeAllOf(id);
         if (proposal) {
             feedback.record(
                 MemoryProposalFeedback.of(user, rejected, FeedbackEventType.REJECTED, FeedbackActor.USER, now));
