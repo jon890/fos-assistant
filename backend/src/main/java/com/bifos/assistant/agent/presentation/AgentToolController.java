@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 에이전트 toolset을 읽고 바꾸는 사용자와 관리자 경로다. */
+/** 에이전트 toolset을 읽고 바꾸는 사용자 경로다. */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -38,21 +38,6 @@ public class AgentToolController {
     public AgentDtos.ToolsetsView write(@PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.require();
         return view(tools.writeReadable(user, code, request.enabled()));
-    }
-
-
-    @GetMapping("/admin/agents/{code}/tools")
-    public AgentDtos.ToolsetsView readAdmin(@PathVariable String code) {
-        CurrentUser user = currentUser.requireAdmin();
-        return view(tools.readAsAdmin(user, code));
-    }
-
-
-    @PutMapping("/admin/agents/{code}/tools")
-    public AgentDtos.ToolsetsView writeAdmin(
-        @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
-        CurrentUser user = currentUser.requireAdmin();
-        return view(tools.writeAsAdmin(user, code, request.enabled()));
     }
 
 

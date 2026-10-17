@@ -17,8 +17,8 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
-import com.bifos.assistant.agent.presentation.AgentToolController;
+import com.bifos.assistant.agent.presentation.AgentToolAdminController;
+import com.bifos.assistant.agent.presentation.ToolsetAdminDtos.UpdateToolsetsRequest;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -65,7 +65,7 @@ class AgentLifecycleFlagsTest {
     AgentAdminController admin;
 
     @Autowired
-    AgentToolController agentTools;
+    AgentToolAdminController agentTools;
 
     @Autowired
     ChatService chat;
@@ -194,8 +194,8 @@ class AgentLifecycleFlagsTest {
         agents.save(deleted);
         signIn(administrator);
 
-        assertNotFound(() -> agentTools.readAdmin(helper));
-        assertNotFound(() -> agentTools.writeAdmin(helper, new UpdateToolsetsRequest(List.of("web"))));
+        assertNotFound(() -> agentTools.read(helper));
+        assertNotFound(() -> agentTools.write(helper, new UpdateToolsetsRequest(List.of("web"))));
         verifyNoInteractions(hermesToolsets);
     }
 

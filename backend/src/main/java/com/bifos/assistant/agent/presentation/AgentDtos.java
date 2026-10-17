@@ -2,7 +2,6 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.PersonaSnapshot;
 import com.bifos.assistant.agent.application.model.AgentToolView;
-import com.bifos.assistant.agent.application.model.ToolsetCatalogView;
 import com.bifos.assistant.agent.application.model.ToolsetRequestView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -134,14 +133,7 @@ public final class AgentDtos {
         boolean skillsEnabled) {
     }
 
-    public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {
-    }
-
     public record RequestToolset(@NotBlank @Size(max = 64) String toolset) {
-    }
-
-    public record DecideToolsetRequest(
-        @NotNull Boolean approve, @Size(max = 200) String reason) {
     }
 
     public record ToolsetRequestResponse(
@@ -170,24 +162,4 @@ public final class AgentDtos {
         }
     }
 
-    public record EnabledToolsetAgentView(String code, String name) {
-    }
-
-    public record CatalogToolsetView(
-        String name,
-        String label,
-        String description,
-        boolean hidden,
-        List<EnabledToolsetAgentView> enabledAgents) {
-        static CatalogToolsetView from(ToolsetCatalogView source) {
-            return new CatalogToolsetView(
-                source.name(),
-                source.label(),
-                source.description(),
-                source.hidden(),
-                source.enabledAgents().stream()
-                    .map(agent -> new EnabledToolsetAgentView(agent.code(), agent.name()))
-                    .toList());
-        }
-    }
 }
