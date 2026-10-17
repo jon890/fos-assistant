@@ -24,7 +24,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 class AgentPurgerPlacementTest {
 
     private static final String ROOT = "com.bifos.assistant.fixture";
-    private static final String APPLICATION = ROOT + ".agent.purge.application.";
     private static final Set<String> NAMES = Set.of(
         "AgentPurger", "AgentPurgeWriter", "AgentPurgeParticipant", "AgentPurgeOutcome");
 
@@ -51,13 +50,13 @@ class AgentPurgerPlacementTest {
         Map<String, String> sources = sources();
         String store = ROOT + ".agent.infra.Store";
         sources.put(store, source(store, "public class Store {}"));
-        sources.compute(APPLICATION + "AgentPurgeWriter", (name, body) -> body.replace("{}", "{ " + store + " store; }"));
+        sources.compute(fqn("AgentPurgeWriter"), (name, body) -> body.replace("{}", "{ " + store + " store; }"));
         String participant = ROOT + ".connector.application.ConnectorAgentPurge";
         sources.put(participant, source(participant,
-            "class ConnectorAgentPurge implements " + APPLICATION + "AgentPurgeParticipant {}"));
-        String controller = ROOT + ".agent.purge.presentation.Controller";
-        String policy = ROOT + ".agent.purge.domain.Policy";
-        sources.put(controller, source(controller, "public class Controller { " + APPLICATION + "AgentPurger purger; }"));
+            "class ConnectorAgentPurge implements " + fqn("AgentPurgeParticipant") + " {}"));
+        String controller = ROOT + ".agent.presentation.Controller";
+        String policy = ROOT + ".agent.domain.Policy";
+        sources.put(controller, source(controller, "public class Controller { " + fqn("AgentPurger") + " purger; }"));
         sources.put(policy, source(policy, "public class Policy {}"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(8);
@@ -84,8 +83,8 @@ class AgentPurgerPlacementTest {
 
     static Stream<Arguments> wrongPlacements() {
         return names().flatMap(name -> Stream.of(
-            Arguments.of(name, name.equals("AgentPurgeOutcome") ? "agent.application.model" : "agent.application"),
-            Arguments.of(name, "agent.purge.domain"),
+            Arguments.of(name, wrongPackage(name)),
+            Arguments.of(name, "agent.domain"),
             Arguments.of(name, "connector.application")));
     }
 
@@ -134,7 +133,7 @@ class AgentPurgerPlacementTest {
     @DisplayName("동일 이름의 중첩 값은 top-level 소유 선택에 넣지 않는다")
     void ignoresNestedNames() throws IOException {
         Map<String, String> sources = sources();
-        String outer = ROOT + ".agent.purge.application.Internal";
+        String outer = ROOT + ".agent.application.Internal";
         sources.put(outer, source(outer, "class Internal { "
             + "record AgentPurger(int value) {} record AgentPurgeWriter(int value) {} "
             + "record AgentPurgeParticipant(int value) {} record AgentPurgeOutcome(int value) {} }"));
@@ -144,94 +143,27 @@ class AgentPurgerPlacementTest {
     }
 
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("invalidRoles")
-    @DisplayName("중첩 타입의 잘못된 서비스·공개 값·설정 역할도 거절한다")
-    void rejectsNestedInvalidRole(String relative, String declaration, String detail) throws IOException {
+    @Test
+    @DisplayName("정리 실행이 다른 기능의 참여 구현을 import 하면 거절한다")
+    void rejectsParticipantImport() throws IOException {
         Map<String, String> sources = sources();
-        String outer = ROOT + ".agent.purge." + relative.substring(0, relative.lastIndexOf('.') + 1) + "Outer";
-        sources.put(outer, source(outer, "class Outer { "
-            + declaration.replace(relative.substring(relative.lastIndexOf('.') + 1), "Internal")
-                .replace("public class", "public static class")
-            + " }"));
-        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
-        assertThat(fixture).hasSize(6);
-        assertViolation(fixture, outer + "$Internal", detail);
-    }
-
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("wrongDirections")
-    @DisplayName("중첩 타입의 실제 역방향과 웹 의존 및 참여 구현 참조도 거절한다")
-    void rejectsNestedWrongDirection(String relative, String targetRelative, String detail) throws IOException {
-        Map<String, String> sources = sources();
-        String outer = ROOT + ".agent.purge." + relative;
-        String target = targetRelative.startsWith("org.") ? targetRelative : ROOT + "." + targetRelative;
-        if (!targetRelative.startsWith("org.") && !sources.containsKey(target)) {
-            sources.put(target, source(target, "public class " + target.substring(target.lastIndexOf('.') + 1) + " {}"));
-        }
-        sources.put(outer, source(outer, "class " + outer.substring(outer.lastIndexOf('.') + 1)
-            + " { static class Internal { " + target + " dependency; } }"));
-        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
-        assertThat(fixture).hasSize(sources.size() + 1);
-        assertViolation(fixture, outer + "$Internal", detail);
-    }
-
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("invalidRoles")
-    @DisplayName("정리 하위 기능의 잘못된 서비스·공개 값·설정 역할을 거절한다")
-    void rejectsInvalidRole(String relative, String declaration, String detail) throws IOException {
-        Map<String, String> sources = sources();
-        String name = ROOT + ".agent.purge." + relative;
-        sources.put(name, source(name, declaration));
+        String participant = ROOT + ".connector.application.ConnectorAgentPurge";
+        sources.put(participant, source(participant, "public class ConnectorAgentPurge {}"));
+        sources.compute(fqn("AgentPurger"), (name, body) -> body.replace("{}", "{ " + participant + " dependency; }"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(5);
-        assertViolation(fixture, name, detail);
+        assertViolation(fixture, fqn("AgentPurger"), "참여 구현");
     }
 
 
-    static Stream<Arguments> invalidRoles() {
-        return Stream.of(
-            Arguments.of("application.model.BadService", "@org.springframework.stereotype.Service public class BadService {}", "Service·Component"),
-            Arguments.of("domain.BadComponent", "@org.springframework.stereotype.Component public class BadComponent {}", "Service·Component"),
-            Arguments.of("application.BadValue", "public record BadValue(String value) {}", "application.model"),
-            Arguments.of("application.BadResult", "public enum BadResult { WAITING }", "application.model"),
-            Arguments.of("application.BadProperties", "@org.springframework.boot.context.properties.ConfigurationProperties(\"fixture\") public record BadProperties(String value) {}", "config"));
-    }
-
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("wrongDirections")
-    @DisplayName("purge 하위 층의 역방향과 웹 의존 및 참여 구현 import 를 거절한다")
-    void rejectsWrongDirection(String relative, String targetRelative, String detail) throws IOException {
+    @Test
+    @DisplayName("정리 실행이 Component 가 아니면 거절한다")
+    void rejectsMissingComponent() throws IOException {
         Map<String, String> sources = sources();
-        String name = ROOT + ".agent.purge." + relative;
-        String target = targetRelative.startsWith("org.") ? targetRelative : ROOT + "." + targetRelative;
-        if (!targetRelative.startsWith("org.") && !sources.containsKey(target)) {
-            sources.put(target, source(target, "public class " + target.substring(target.lastIndexOf('.') + 1) + " {}"));
-        }
-        sources.put(name, source(name, "public class " + name.substring(name.lastIndexOf('.') + 1) + " { " + target + " dependency; }"));
+        sources.compute(fqn("AgentPurger"), (name, body) -> body.replace("@org.springframework.stereotype.Component ", ""));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
-        assertThat(fixture).hasSize(sources.size());
-        assertViolation(fixture, name, detail);
-        if (!targetRelative.startsWith("connector.")) {
-            ArchRule direction = targetRelative.startsWith("org.")
-                ? ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB : ArchitectureRules.LAYER_DIRECTION;
-            assertThat(direction.evaluate(fixture).getFailureReport().toString()).contains(name, target);
-            assertThatThrownBy(() -> direction.check(fixture)).isInstanceOf(AssertionError.class);
-        }
-    }
-
-
-    static Stream<Arguments> wrongDirections() {
-        return Stream.of(
-            Arguments.of("infra.BadAdapter", "agent.purge.application.AgentPurgeWriter", "domain 과 infra"),
-            Arguments.of("domain.BadPolicy", "agent.purge.application.AgentPurgeWriter", "domain 과 infra"),
-            Arguments.of("presentation.BadController", "agent.purge.infra.Store", "presentation 은 infra"),
-            Arguments.of("domain.WebPolicy", "agent.purge.presentation.Controller", "domain 은 웹"),
-            Arguments.of("domain.HttpPolicy", "org.springframework.http.HttpStatus", "domain 은 웹"),
-            Arguments.of("application.BadUseCase", "connector.application.ConnectorAgentPurge", "참여 구현"));
+        assertThat(fixture).hasSize(4);
+        assertViolation(fixture, fqn("AgentPurger"), "Component");
     }
 
 
@@ -246,7 +178,20 @@ class AgentPurgerPlacementTest {
 
 
     private static String fqn(String name) {
-        return APPLICATION + (name.equals("AgentPurgeOutcome") ? "model." : "") + name;
+        String relative = switch (name) {
+            case "AgentPurgeParticipant" -> "application.port.";
+            case "AgentPurgeOutcome" -> "application.dto.";
+            default -> "application.";
+        };
+        return ROOT + ".agent." + relative + name;
+    }
+
+
+    private static String wrongPackage(String name) {
+        return switch (name) {
+            case "AgentPurgeParticipant", "AgentPurgeOutcome" -> "agent.application";
+            default -> "agent.application.dto";
+        };
     }
 
 
