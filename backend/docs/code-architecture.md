@@ -49,10 +49,62 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 `JpaAuditingTest`, `JpaAuditingMysqlTest`, 기존 `MemoryCollectionAuditingTest`와 MySQL 하위 클래스가 확인한다.
 `JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
 
+## 패키지 배치 규칙
+
+**이동 진행 중이다.** 아래는 목표 구조다. 아직 옮기지 않은 기능은 옛 구조로 남아 있고, 규칙은 그 위반을 기준 파일에 얼려 두었다. 클래스를 옮길 때마다 기준 파일의 줄이 줄고, 이동이 끝나면 이 알림을 지운다.
+결정과 근거는 [ADR-20261015 / package-layout](adr/ADR-20261015-package-layout.md) 이 갖는다.
+
+기능 패키지는 `<기능>[.<하위 기능>].<역할>` 로 나눈다. 하위 기능은 이동 전 `application` 직하가 30개 이상인 기능(`chat`, `connector`, `proactive`, `usage`, `skill`)만 둔다.
+하위 기능의 순서와 책임은 `SubFeatureOrder.ORDER` 와 ADR 의 「하위 기능」 표가 갖는다. 나눈 기능은 루트에 역할 패키지를 두지 않는다.
+
+| 역할 | 패키지 | 두는 것 |
+| --- | --- | --- |
+| presentation | `presentation` | 컨트롤러와 `*Dtos`, 웹 계층의 어댑터 |
+| application | `application` | Spring 빈만. 빈이 소유한 package-private 도우미는 허용한다 |
+| dto | `application.dto` | 서비스가 주고받는 record, enum, 값 클래스 |
+| port | `application.port` | 구현을 바깥에 두는 인터페이스와 그 예외 |
+| config | `config` | `@ConfigurationProperties` 와 그 값 record |
+| domain | `domain` | 엔티티, 영속 ID, 도메인 정책, 저장 enum(`domain.type`) |
+| infra | `infra` | 저장소와 외부 시스템의 어댑터 |
+
+층이 서로 쓸 수 있는 방향이다. `application` 은 빈만 가리키고, 빈을 쓸 수 있는 층은 `presentation` 뿐이다.
+
+| 층 | 쓸 수 있는 층 |
+| --- | --- |
+| presentation | application, port, dto, domain, config |
+| application | port, dto, infra, domain, config |
+| port | dto, domain |
+| dto | port, domain |
+| infra | port, dto, domain, config |
+| domain | domain |
+| config | domain, dto, port, infra |
+
+관리자 전용 화면과 API 는 루트 `admin.<하위 기능>` 으로 모은다. `admin` 은 `application`, `application.dto`, `presentation` 만 갖고, 기능의 `application` 과 `application.dto`(와 `domain.type`)만 부른다. 기능은 `admin` 을 모른다.
+`CurrentUserProvider.requireAdmin` 은 `admin` 안에서만 부른다. 사용자 기능 안에서 권한에 따라 범위만 다른 것은 기능에 남긴다.
+
+| 규칙 | 판정 | 기준 파일 |
+| --- | --- | --- |
+| `LAYER_DIRECTION` | 위 표대로만 층이 서로를 쓴다 | 얼림 |
+| `APPLICATION_ROOT_HOLDS_ONLY_BEANS` | `application` 직하의 인터페이스, record, enum, 빈이 아닌 public 클래스 | 얼림 |
+| `APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT` | `application` 아래 `dto`, `port` 가 아닌 하위 패키지 | 얼림 |
+| `PORT_PACKAGE_HOLDS_ONLY_INTERFACES`, `DTO_PACKAGE_HOLDS_ONLY_VALUES` | `port` 는 인터페이스와 그 예외, `dto` 는 값 | 없음 |
+| `CONFIGURATION_PROPERTIES_IN_CONFIG` | `@ConfigurationProperties` 가 `config` 밖에 있다 | 얼림 |
+| `APPLICATION_PACKAGE_SIZE` | `application` 직하가 25개를 넘는다 | 얼림 |
+| `SUB_FEATURES_FOLLOW_ORDER` | 하위 기능이 위 하위 기능을 쓰거나 순서에 없다 | 얼림 |
+| `SPLIT_FEATURES_HAVE_NO_ROOT_ROLES` | 나눈 기능의 루트에 역할 패키지가 있다 | 얼림 |
+| `SIMPLE_CLASS_NAMES_ARE_UNIQUE` | 운영 클래스의 단순 이름이 겹친다 | 없음 |
+| `ADMIN_PACKAGE_SHAPE`, `FEATURES_DO_NOT_DEPEND_ON_ADMIN` | `admin` 의 패키지 모양, 기능이 `admin` 을 쓴다 | 없음 |
+| `ADMIN_USES_ONLY_FEATURE_APPLICATION` | `admin` 이 기능의 `application`, `application.dto`, `domain.type` 밖을 쓴다 | 얼림 |
+| `ADMIN_ENDPOINTS_REQUIRE_ADMIN` | `admin` 의 엔드포인트가 `requireAdmin` 을 부르지 않는다 | 없음 |
+| `REQUIRE_ADMIN_ONLY_IN_ADMIN` | `admin` 밖에서 `requireAdmin` 을 부른다 | 얼림 |
+
+판정 조건과 실패 메시지는 `PackageLayoutRules` 가 갖는다. 메시지는 어디에 두라고 알린다. 까닭과 예외는 [rule-70](../../docs/code-rules/rule-70.md) 부터 [rule-83](../../docs/code-rules/rule-83.md) 에 있다.
+하위 기능의 경계, 한 서비스의 일이 관리자 전용인지, `dto` 의 타입이 서비스의 입출력인지는 규칙이 판정하지 못하고 리뷰가 본다([rule-84](../../docs/code-rules/rule-84.md)).
+
 ## 패키지와 책임
 
-도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
-`presentation` 은 `infra` 를 바로 쓰지 않는다.
+도메인별로 나누고 각 도메인 안의 층 방향은 위 「패키지 배치 규칙」 이 정한다. `presentation` 은 `infra` 를 바로 쓰지 않는다.
+아래 표는 최상위 패키지의 책임이다. 하위 기능과 `admin` 하위 기능의 책임은 ADR 의 표가 갖는다.
 검사: `ArchitectureRules.LAYER_DIRECTION`
 
 | 패키지 | 책임 |
@@ -244,7 +296,8 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 `agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.purge.application`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
-`workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. 어느 패키지도 `workspace` 를 import 하지 않는다.
+`workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. `admin` 을 뺀 어느 패키지도 `workspace` 를 import 하지 않는다.
+`admin` 은 `workspace` 위, 맨 위다. 관리자 전용 화면과 API 가 기능의 `application` 을 부르고, 어느 패키지도 `admin` 을 import 하지 않는다(`ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN`).
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
 
 ### proactive
@@ -482,7 +535,10 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 설명을 바꾸면 기준이 새 규칙으로 옮겨지지 않으므로, 설명을 바꿀 때는 그 규칙을 다시 얼린다.
 
 위반을 고치면 그 기준 파일도 같은 커밋에서 줄인다.
-지금은 구조 규칙의 위반을 모두 고쳐 기준 파일이 비어 있다. 파일은 새 위반을 받아들여야 할 때를 위해 남긴다.
+위 「패키지 배치 규칙」 이 얼린 위반이 지금의 기준이다. 이동 PR 이 클래스를 옮길 때마다 줄이며, 줄 수가 이동의 진행 표시다.
+
+기준 대조는 위반 줄의 전체 이름에서 패키지를 지우고 단순 클래스 이름으로 한다(`archunit.properties` 의 `freeze.lineMatcher`, 구현은 `ClassNameViolationLineMatcher`). 클래스를 다른 패키지로 옮겨도 기준이 흔들리지 않는다.
+패키지 이름만 있는 줄은 그대로 견준다. 이 대조는 운영 클래스의 단순 이름이 유일하다는 것에 기대고, `SIMPLE_CLASS_NAMES_ARE_UNIQUE` 가 그것을 지킨다.
 
 평소의 테스트는 기준 파일을 쓰지 않고, 기준과 실제가 어긋나면 실패한다.
 쓰기는 Gradle 속성으로만 켠다. 명령은 모두 `backend/` 에서 돈다.

@@ -13,6 +13,7 @@ import java.util.TreeSet;
  * 최상위 패키지 사이의 간선 가운데 층 순서를 거스르는 것을 위반으로 낸다.
  *
  * <p>{@link #ORDER} 는 아래에서 위로 적은 순서다. 위 패키지는 아래 패키지를 쓰고, 아래 패키지가 위 패키지를 쓰면 위반이다.
+ * {@code admin} 은 맨 위다. 관리자 전용 화면과 API 가 기능의 {@code application} 을 부르고, 어느 패키지도 {@code admin} 을 쓰지 않는다.
  * 순서에 없는 최상위 패키지도 위반이다. 새 패키지를 만들면 자리를 정해 {@link #ORDER} 에 넣는다.
  *
  * <p>간선은 {@link TopLevelPackageEdges} 가 모은다. 위반은 패키지 간선 하나에 하나이고,
@@ -43,7 +44,8 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
         "connector",
         "task",
         "attention",
-        "workspace");
+        "workspace",
+        "admin");
 
     private TopLevelPackageEdges edges = TopLevelPackageEdges.of(List.of());
 

@@ -9,7 +9,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
-import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
@@ -135,25 +134,7 @@ public final class ArchitectureRules {
         .as("shared 는 다른 최상위 패키지에 의존하지 않는다");
 
     /** rule-5: 까닭과 예외는 docs/code-rules/rule-5.md를 본다. */
-    public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
-        .consideringOnlyDependenciesInLayers()
-        .layer("presentation")
-        .definedBy("com.bifos.assistant..presentation..")
-        .layer("application")
-        .definedBy("com.bifos.assistant..application..")
-        .layer("infra")
-        .definedBy("com.bifos.assistant..infra..")
-        .layer("domain")
-        .definedBy("com.bifos.assistant..domain..")
-        .whereLayer("presentation")
-        .mayNotBeAccessedByAnyLayer()
-        .whereLayer("application")
-        .mayOnlyBeAccessedByLayers("presentation")
-        .whereLayer("infra")
-        .mayOnlyBeAccessedByLayers("application")
-        .whereLayer("domain")
-        .mayOnlyBeAccessedByLayers("presentation", "application", "infra")
-        .as("층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다");
+    public static final ArchRule LAYER_DIRECTION = PackageLayoutRules.layerDirection(PackageLayoutRules.PRODUCTION_ROOT);
 
     /** rule-6: 까닭과 예외는 docs/code-rules/rule-6.md를 본다. */
     public static final ArchRule DOMAIN_DOES_NOT_DEPEND_ON_WEB = noClasses()
@@ -713,6 +694,48 @@ public final class ArchitectureRules {
 
     /** rule-31: 까닭과 예외는 docs/code-rules/rule-31.md를 본다. */
     public static final ArchRule EMBEDDED_IDS_WITH_ENTITIES = embeddedIdsWithEntities("com.bifos.assistant");
+
+    /** rule-70: 까닭과 예외는 docs/code-rules/rule-70.md를 본다. */
+    public static final ArchRule APPLICATION_ROOT_HOLDS_ONLY_BEANS = PackageLayoutRules.applicationRootHoldsOnlyBeans(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-71: 까닭과 예외는 docs/code-rules/rule-71.md를 본다. */
+    public static final ArchRule APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT = PackageLayoutRules.applicationSubpackagesAreDtoAndPort(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-72: 까닭과 예외는 docs/code-rules/rule-72.md를 본다. */
+    public static final ArchRule PORT_PACKAGE_HOLDS_ONLY_INTERFACES = PackageLayoutRules.portPackageHoldsOnlyInterfaces(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-73: 까닭과 예외는 docs/code-rules/rule-73.md를 본다. */
+    public static final ArchRule DTO_PACKAGE_HOLDS_ONLY_VALUES = PackageLayoutRules.dtoPackageHoldsOnlyValues(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-74: 까닭과 예외는 docs/code-rules/rule-74.md를 본다. */
+    public static final ArchRule CONFIGURATION_PROPERTIES_IN_CONFIG = PackageLayoutRules.configurationPropertiesInConfig(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-75: 까닭과 예외는 docs/code-rules/rule-75.md를 본다. */
+    public static final ArchRule APPLICATION_PACKAGE_SIZE = PackageLayoutRules.applicationPackageSize(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-76: 까닭과 예외는 docs/code-rules/rule-76.md를 본다. */
+    public static final ArchRule SUB_FEATURES_FOLLOW_ORDER = PackageLayoutRules.subFeaturesFollowOrder(PackageLayoutRules.PRODUCTION_ROOT, SubFeatureOrder.ORDER);
+
+    /** rule-77: 까닭과 예외는 docs/code-rules/rule-77.md를 본다. */
+    public static final ArchRule SPLIT_FEATURES_HAVE_NO_ROOT_ROLES = PackageLayoutRules.splitFeaturesHaveNoRootRoles(PackageLayoutRules.PRODUCTION_ROOT, SubFeatureOrder.ORDER);
+
+    /** rule-78: 까닭과 예외는 docs/code-rules/rule-78.md를 본다. */
+    public static final ArchRule SIMPLE_CLASS_NAMES_ARE_UNIQUE = PackageLayoutRules.simpleClassNamesAreUnique(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-79: 까닭과 예외는 docs/code-rules/rule-79.md를 본다. */
+    public static final ArchRule ADMIN_PACKAGE_SHAPE = PackageLayoutRules.adminPackageShape(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-80: 까닭과 예외는 docs/code-rules/rule-80.md를 본다. */
+    public static final ArchRule FEATURES_DO_NOT_DEPEND_ON_ADMIN = PackageLayoutRules.featuresDoNotDependOnAdmin(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-81: 까닭과 예외는 docs/code-rules/rule-81.md를 본다. */
+    public static final ArchRule ADMIN_USES_ONLY_FEATURE_APPLICATION = PackageLayoutRules.adminUsesOnlyFeatureApplication(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-82: 까닭과 예외는 docs/code-rules/rule-82.md를 본다. */
+    public static final ArchRule ADMIN_ENDPOINTS_REQUIRE_ADMIN = PackageLayoutRules.adminEndpointsRequireAdmin(PackageLayoutRules.PRODUCTION_ROOT);
+
+    /** rule-83: 까닭과 예외는 docs/code-rules/rule-83.md를 본다. */
+    public static final ArchRule REQUIRE_ADMIN_ONLY_IN_ADMIN = PackageLayoutRules.requireAdminOnlyInAdmin(PackageLayoutRules.PRODUCTION_ROOT);
 
     private static final Map<String, Map<String, String>> OWNED_PERSISTENT_TYPES = Map.of(
         "crypto", Map.of("UserDataKey", "user_data_key"),
