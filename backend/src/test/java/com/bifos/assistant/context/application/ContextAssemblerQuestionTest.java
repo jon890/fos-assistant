@@ -80,6 +80,9 @@ class ContextAssemblerQuestionTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
+        // 구역 예산이 줄 길이에 맞물려 있어 기억 번호의 자릿수가 결과를 가른다. 다른 테스트가 번호를 올려 둔 채로 오면
+        // 3자리 번호의 줄이 예산에 안 들어가 순서에 따라 결과가 달라지므로, 번호를 처음부터 매기게 고정한다.
+        jdbc.execute("ALTER TABLE memory ALTER COLUMN id RESTART WITH 1");
         agentId = agents.findByCode(AGENT_CODE)
             .orElseGet(() -> agents.save(Agent.of(
                 AGENT_CODE,
