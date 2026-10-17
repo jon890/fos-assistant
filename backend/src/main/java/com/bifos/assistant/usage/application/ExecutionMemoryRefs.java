@@ -33,6 +33,7 @@ public class ExecutionMemoryRefs {
         "MEMORY_ALWAYS", MemoryUseVia.ALWAYS,
         "MEMORY_FACTS", MemoryUseVia.FACTS,
         "MEMORY_SEARCH", MemoryUseVia.SEARCH,
+        "MEMORY_LINK", MemoryUseVia.LINK,
         "MEMORY_READ", MemoryUseVia.READ);
 
     private final ExecutionContextSourceRepository contextSources;

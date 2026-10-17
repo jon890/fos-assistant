@@ -74,6 +74,13 @@ public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
     long countActiveRelatedOf(@Param("id") Long id);
 
 
+    /** 그 번호들 가운데 하나를 한쪽 끝으로 둔 효력 있는 {@code RELATED} 다. 조립이 실린 항목의 이웃을 찾는다. */
+    @Query("select l from MemoryLink l where (l.fromMemoryId in :ids or l.toMemoryId in :ids)"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.RELATED"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE")
+    List<MemoryLink> findActiveRelatedTouching(@Param("ids") Collection<Long> ids);
+
+
     /** 그 항목을 한쪽 끝으로 둔, 끊지 않은 줄이다. */
     @Query("select l from MemoryLink l where (l.fromMemoryId = :id or l.toMemoryId = :id)"
         + " and l.status <> com.bifos.assistant.memory.domain.type.MemoryLinkStatus.REVOKED")

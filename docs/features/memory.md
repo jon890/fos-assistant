@@ -202,6 +202,15 @@ sequenceDiagram
 - 운영 모델은 BGE-M3 의 int8 ONNX(`onnx-community/bge-m3-ONNX`)이고 1024차원이다. 서비스가 글을 1024토큰에서 자르므로 그보다 긴 제목과 본문의 뒤쪽은 의미 점수에 들지 않는다. 앱은 `max-text-chars`(4,000자)까지만 보낸다
 - 벡터는 `memory_embedding` 에 둔다. 채우는 작업이 `refresh-delay` 마다 줄이 없거나 지문이 다른 대상을 `batch-size` 건씩 묶어 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛴다. 늘 실패하는 글이 앞 번호에 있어도 뒤 항목이 채워진다. 한 건씩 보낸 것까지 모두 실패하면 서비스가 내려간 것으로 보고 그 주기를 끝낸다. 조립은 프로세스 안 캐시에서 지문과 모델이 맞는 벡터만 쓴다
 
+#### 연결된 기억 구역
+
+개인 사실 구역과 질문과 관련된 기억 구역에 본문으로 실린 항목과 효력 있는 `RELATED` 로 이어진 한 단계 이웃을 본문까지 싣는다(`MEMORY_LINK`, `link-related-v1`). 계산은 `MemoryLinkSection` 이 갖는다.
+
+- 이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한과 승인, 대체되지 않음 조건을 지났으므로 새 쿼리로 다른 항목을 읽지 않는다. 두 단계 이상은 따라가지 않는다
+- 사람과 에이전트가 맺은 연결을 먼저, 그다음 코드가 맺은 연결을 유사도 순으로 싣는다. 실행마다 5건까지이고 머리 줄은 「연결된 기억」 이다
+- 민감 항목과 암호화한 항목, 본문이 `assistant.context.search.item-max-chars` 보다 긴 항목은 싣지 않고 색인에 둔다. 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다. 실린 이웃은 색인에서 빠진다
+- 연결이 없으면 조립한 글은 이 구역을 두기 전과 같다. 연결이 있으면 질문 없는 조립에서도 개인 사실 구역의 이웃이 실려 지시문 지문이 바뀐다
+
 #### 에이전트의 실행에 보이는 항목
 
 판정은 세 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다.
@@ -271,7 +280,7 @@ sequenceDiagram
 | 종류 | 방향 | 만들 때 상태 | Control Plane 의 동작 |
 | --- | --- | --- | --- |
 | `SUPERSEDES` | 새 항목 → 옛 항목 | 늘 `PROPOSED`. 사람이 받아들이면 `ACTIVE` | `ACTIVE` 면 옛 항목을 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 뺀다 |
-| `RELATED` | 방향 없음. 번호가 작은 쪽이 `from` | 조건을 지나면 바로 `ACTIVE` | 조립이 실린 항목의 한 단계 이웃으로 싣는다(PR 2b) |
+| `RELATED` | 방향 없음. 번호가 작은 쪽이 `from` | 조건을 지나면 바로 `ACTIVE` | 조립이 실린 항목의 한 단계 이웃으로 싣는다(「연결된 기억 구역」) |
 
 - 양 끝은 `ACCEPTED` 이고 같은 범위여야 한다. `USER` 항목끼리는 주인이 같아야 하고 `GROUP` 항목끼리는 그룹이 같아야 한다. `USER` 와 `GROUP` 사이에는 맺지 않는다
 - 자기 자신, 출처 원문(`SOURCE`), 이미 같은 `from`, `to`, 종류의 줄이 있는 쌍은 거절한다. 끊은(`REVOKED`) 줄이 있으면 그 줄을 다시 쓴다
@@ -383,7 +392,7 @@ sequenceDiagram
 대화의 답 아래에 그 답을 만든 실행이 본문을 받은 기억을 모은다. 근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있고, 화면은 위 「참고한 기억」 이 갖는다.
 경로와 응답 칸은 `MemoryUseController` 가, 받은 길의 뜻은 `MemoryUseVia` 가 갖는다.
 
-- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
+- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH`, `MEMORY_LINK` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
 - 읽은 항목은 지금 권한으로 다시 판정해, 그 실행의 에이전트가 지금도 `memory_read` 로 읽을 수 있는 항목(`MemoryService.readableByTool`)만 넣는다
 - 지금 요청자가 읽을 수 있고 `ACCEPTED` 인 항목만 지금 제목으로 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다
 - 본문은 싣지 않는다. 민감 항목도 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다
@@ -413,6 +422,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
+| `MEMORY_LINK` | 「연결된 기억 구역」 에 실린 이웃 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
 | `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | `AGENT` | `INLINE` | 자동 turn 의 `input` |

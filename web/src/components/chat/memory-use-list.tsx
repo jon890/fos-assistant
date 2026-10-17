@@ -9,6 +9,7 @@ const VIA_LABELS: Record<MemoryUse["via"], string> = {
   ALWAYS: "항상",
   FACTS: "기억한 사실",
   SEARCH: "질문으로 찾은 기억",
+  LINK: "연결된 기억",
   READ: "찾아 읽음",
 };
 

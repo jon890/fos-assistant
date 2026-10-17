@@ -44,7 +44,7 @@ SELECT COUNT(*) AS inline_items,
 FROM (
   SELECT source_ref, MIN(created_at) AS first_loaded_at
   FROM execution_context_source
-  WHERE source IN ('MEMORY_ALWAYS', 'MEMORY_FACTS', 'MEMORY_SEARCH', 'MEMORY_READ') AND body_mode = 'INLINE'
+  WHERE source IN ('MEMORY_ALWAYS', 'MEMORY_FACTS', 'MEMORY_SEARCH', 'MEMORY_LINK', 'MEMORY_READ') AND body_mode = 'INLINE'
     AND created_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP)
   GROUP BY source_ref
 ) f;

@@ -12,6 +12,8 @@ public enum ContextSource {
     MEMORY_FACTS,
     /** 본문까지 싣는 Memory 질문과 관련된 기억 구역의 줄. */
     MEMORY_SEARCH,
+    /** 본문까지 싣는 Memory 연결된 기억 구역의 줄. 실린 항목과 {@code RELATED} 로 이어진 한 단계 이웃이다(ADR-20261015 / memory-link). */
+    MEMORY_LINK,
     /** 제목만 싣는 Memory 색인 층의 줄. */
     MEMORY_INDEX,
     /** memory_read 로 본문을 읽은 항목. 조립이 아니라 도구 처리가 실행 기록에 덧붙인다. */

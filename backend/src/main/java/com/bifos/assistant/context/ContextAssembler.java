@@ -179,8 +179,18 @@ public class ContextAssembler implements OmittedMemories {
         // 다른 범위에 같은 이름의 짝이 있는 문서는 구역에 싣지 않는다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없어 색인에 둔다
         MemorySearchPlacement search = searchSection.place(
             question, afterFacts, sameNameDocuments(afterFacts).keySet(), builder, memory -> memoryFreshness(memory, now));
+        // 실린 항목과 RELATED 로 이어진 한 단계 이웃을 남은 자리에 싣고 색인에서 뺀다(ADR-20261015 / memory-link)
+        Set<Long> anchors = new HashSet<>(facts);
+        anchors.addAll(search.placed());
+        MemorySearchPlacement index = MemoryLinkSection.place(
+            anchors,
+            memories.activeRelatedOf(anchors),
+            search,
+            builder,
+            searchSection.itemMaxChars(),
+            memory -> memoryFreshness(memory, now)).index();
         builder.limit(maxChars);
-        appendIndex(builder, search, sameNameDocuments(search.indexOrder()), now);
+        appendIndex(builder, index, sameNameDocuments(index.indexOrder()), now);
         return withSelections(builder.build());
     }
 

@@ -8,6 +8,8 @@ public enum MemoryUseVia {
     FACTS,
     /** 질문과 관련된 기억 구역에 본문까지 실었다. */
     SEARCH,
+    /** 연결된 기억 구역에 본문까지 실었다. 실린 다른 항목과 이어진 이웃이다. */
+    LINK,
     /** {@code memory_read} 로 본문을 읽었다. */
     READ
 }
