@@ -368,7 +368,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 12. 계속 쓰지 않을 거면 아래 「되돌리기」 로 다시 닫는다
 
 상한 거절을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
-준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `ConnectorFinancialProducer.Stage` 가 갖는다.
+준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `FinancialPrepareStage` 가 갖는다.
 `stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유>` 와 대시보드 로그의 `stage=<단계> code=<선언된 오류 코드>` 를 함께 본다. 대시보드 단계는 `connector_prepare.py` 가 정한다. 어느 로그에도 인자, 계좌, 메일, 원격 응답은 남지 않는다.
 승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
 도중에 UNKNOWN 이 나오면 다시 요청하지 않는다. 토스증권 앱에서 주문 상태를 먼저 확인한다.
