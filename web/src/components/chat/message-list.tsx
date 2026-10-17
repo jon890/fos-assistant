@@ -13,7 +13,6 @@ import { OutgoingMessageView } from "./outgoing-message";
 import type { OutgoingMessage } from "./composer-attachment-utils";
 import { MemoryCaptureList } from "./memory-capture-list";
 import type { MemoryCapture } from "@/lib/memory-capture-api";
-import { MemoryUseList } from "./memory-use-list";
 import type { MemoryUse } from "@/lib/memory-use-api";
 import { CheckFindingReactions } from "./check-finding-reactions";
 import type { CheckFinding } from "@/lib/check-finding-api";
@@ -166,7 +165,7 @@ export function MessageList({
   const lastVisible = visible.at(-1)?.turn;
   const hasNoAnswer =
     lastVisible?.role === "USER" && latestView && !sending && !outgoing;
-  // 기억 기록과 참고한 기억은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 펼침 상태는 넣지 않는다.
+  // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 참고한 기억은 작업 과정 안에 있지만, 진행 중 블록을 펼친 채 끝난 답은 펼친 채로 저장되어 높이가 늘 수 있으므로 같이 본다. 펼침 상태는 넣지 않는다.
   const capturesVersion = memoryCaptures
     .map((capture) => `${capture.id}:${capture.status}`)
     .join(",");
@@ -290,6 +289,9 @@ export function MessageList({
                         skillCommandChip={skillCommandChips}
                         onRetryDelivery={onRetryDelivery}
                         deliveryRetrying={deliveryRetrying}
+                        memoryUses={memoryUses.filter(
+                          (use) => use.executionId === turn.executionId,
+                        )}
                         liveActivity={
                           pendingAssistant && hasLiveActivity
                             ? liveActivityBlock
@@ -317,13 +319,6 @@ export function MessageList({
                               capture.executionId === turn.executionId,
                           )}
                           onChanged={onMemoryCapturesChanged}
-                        />
-                      ) : null}
-                      {turn.role === "ASSISTANT" ? (
-                        <MemoryUseList
-                          uses={memoryUses.filter(
-                            (use) => use.executionId === turn.executionId,
-                          )}
                         />
                       ) : null}
                       {isLast && hasNoAnswer ? (

@@ -34,6 +34,25 @@ async function createConversation(page: Page, label: string) {
   return { conversationId, executionId: executionId as number };
 }
 
+/**
+ * 저장된 답에 도구 호출 요약을 붙인다. 참고한 기억은 작업 과정 블록 안에서만 보이므로 블록이 있어야 한다.
+ */
+async function withActivity(page: Page, conversationId: string) {
+  await page.route(
+    `**/api/chat/conversations/${conversationId}/messages`,
+    async (route: Route) => {
+      const response = await route.fetch();
+      const turns = (await response.json()) as Record<string, unknown>[];
+      for (const turn of turns) {
+        if (turn.role === "ASSISTANT") {
+          turn.activity = { toolCount: 1, subagentCount: 0, durationMs: null };
+        }
+      }
+      await route.fulfill({ response, json: turns });
+    },
+  );
+}
+
 /** 대화 단위 SSE 를 사건 없이 붙잡아 둔다. */
 async function holdEvents(page: Page, conversationId: string) {
   await page.route(
@@ -44,7 +63,7 @@ async function holdEvents(page: Page, conversationId: string) {
   );
 }
 
-/** 기억 기록은 비워 둔다. 답 아래에는 참고한 기억만 보인다. */
+/** 기억 기록은 비워 둔다. 작업 과정 블록 밖에는 참고한 기억 말고 볼 것이 없다. */
 async function emptyCaptures(page: Page, conversationId: string) {
   await page.route(
     `**/api/chat/conversations/${conversationId}/memory-captures`,
@@ -109,7 +128,7 @@ test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
-test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처와 링크가 보인다", async ({
+test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치면 제목과 출처와 링크가 보인다", async ({
   page,
 }) => {
   const { conversationId, executionId } = await createConversation(
@@ -117,6 +136,7 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
     "참고 기억 검사 하나",
   );
   await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
   await emptyCaptures(page, conversationId);
   await page.route(
     `**/api/chat/conversations/${conversationId}/memory-uses`,
@@ -124,15 +144,19 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
   );
   await page.goto(`/chat/${conversationId}`);
 
-  const toggle = page.getByTestId("memory-uses-toggle");
-  await expect(toggle).toHaveText("참고한 기억 5개");
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByTestId("memory-use")).toHaveCount(0);
+  const block = page.getByTestId("activity-block");
+  await expect(block).toBeVisible();
+  // 답 아래의 접힌 단추는 없고, 접힌 머리 줄에도 개수가 붙지 않는다
+  await expect(page.getByTestId("memory-uses-toggle")).toHaveCount(0);
+  await expect(block.getByTestId("activity-toggle")).not.toContainText(
+    "참고한 기억",
+  );
+  await expect(page.getByTestId("activity-memory-uses")).not.toBeVisible();
 
-  await toggle.click();
+  await block.getByTestId("activity-toggle").click();
 
-  await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  const items = page.getByTestId("memory-use");
+  await expect(page.getByTestId("activity-memory-uses")).toBeVisible();
+  const items = page.getByTestId("activity-memory-use");
   await expect(items).toHaveCount(5);
   await expect(items.nth(0)).toContainText("딸 이름");
   await expect(items.nth(0)).toContainText("기억한 사실");
@@ -147,12 +171,12 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
   await expect(items.nth(4)).toContainText("연결된 기억");
   await expect(items.nth(0)).not.toContainText("그룹");
   const link = page
-    .getByTestId("memory-uses")
+    .getByTestId("activity-memory-uses")
     .getByRole("link", { name: "기억 화면에서 고치기" });
   await expect(link).toHaveAttribute("href", "/memory");
 });
 
-test("다른 실행의 줄만 있으면 답 아래에 참고한 기억이 없다", async ({
+test("다른 실행의 줄만 있으면 작업 과정 안에 참고한 기억이 없다", async ({
   page,
 }) => {
   const { conversationId, executionId } = await createConversation(
@@ -160,6 +184,7 @@ test("다른 실행의 줄만 있으면 답 아래에 참고한 기억이 없다
     "참고 기억 검사 다른 실행",
   );
   await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
   await emptyCaptures(page, conversationId);
   let served = 0;
   await page.route(
@@ -173,10 +198,10 @@ test("다른 실행의 줄만 있으면 답 아래에 참고한 기억이 없다
 
   await waitForConversation(page, "참고 기억 검사 다른 실행");
   await expect.poll(() => served).toBeGreaterThan(0);
-  await expect(page.getByTestId("memory-uses")).toHaveCount(0);
+  await expect(page.getByTestId("activity-memory-uses")).toHaveCount(0);
 });
 
-test("참고한 기억을 읽지 못해도 대화가 보이고 접힌 줄은 없다", async ({
+test("참고한 기억을 읽지 못해도 대화가 보이고 참고한 기억 절은 없다", async ({
   page,
 }) => {
   const { conversationId } = await createConversation(
@@ -184,6 +209,7 @@ test("참고한 기억을 읽지 못해도 대화가 보이고 접힌 줄은 없
     "참고 기억 검사 실패",
   );
   await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
   await emptyCaptures(page, conversationId);
   let served = 0;
   await page.route(
@@ -200,7 +226,7 @@ test("참고한 기억을 읽지 못해도 대화가 보이고 접힌 줄은 없
 
   await waitForConversation(page, "참고 기억 검사 실패");
   await expect.poll(() => served).toBeGreaterThan(0);
-  await expect(page.getByTestId("memory-uses")).toHaveCount(0);
+  await expect(page.getByTestId("activity-memory-uses")).toHaveCount(0);
 });
 
 test("기억했어요 줄에서 되돌리면 참고한 기억을 다시 읽는다", async ({
@@ -211,6 +237,7 @@ test("기억했어요 줄에서 되돌리면 참고한 기억을 다시 읽는�
     "참고 기억 검사 되돌리기",
   );
   await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
   const state = {
     captures: [
       {
@@ -247,17 +274,14 @@ test("기억했어요 줄에서 되돌리면 참고한 기억을 다시 읽는�
   });
   await page.goto(`/chat/${conversationId}`);
 
-  await expect(page.getByTestId("memory-uses-toggle")).toHaveText(
-    "참고한 기억 3개",
-  );
+  await page.getByTestId("activity-toggle").click();
+  await expect(page.getByTestId("activity-memory-use")).toHaveCount(3);
   const before = usesRequests;
   await page.getByTestId("memory-capture-undo").click();
 
   await expect(page.getByTestId("memory-captures")).toHaveCount(0);
   await expect.poll(() => usesRequests).toBeGreaterThan(before);
-  await expect(page.getByTestId("memory-uses-toggle")).toHaveText(
-    "참고한 기억 2개",
-  );
+  await expect(page.getByTestId("activity-memory-use")).toHaveCount(2);
 });
 
 test("제목은 글자 그대로 보인다", async ({ page }) => {
@@ -266,6 +290,7 @@ test("제목은 글자 그대로 보인다", async ({ page }) => {
     "참고 기억 검사 평문",
   );
   await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
   await emptyCaptures(page, conversationId);
   await page.route(
     `**/api/chat/conversations/${conversationId}/memory-uses`,
@@ -284,9 +309,9 @@ test("제목은 글자 그대로 보인다", async ({ page }) => {
   );
   await page.goto(`/chat/${conversationId}`);
 
-  await page.getByTestId("memory-uses-toggle").click();
+  await page.getByTestId("activity-toggle").click();
 
-  const item = page.getByTestId("memory-use");
+  const item = page.getByTestId("activity-memory-use");
   await expect(item).toContainText("<b>굵게</b>");
   await expect(item.locator("b")).toHaveCount(0);
 });

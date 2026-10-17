@@ -24,7 +24,7 @@ export type {
   Turn,
 } from "./message-types";
 import type { MessageArtifact, MessageAttachment, Turn } from "./message-types";
-import { SourceReadList } from "./source-read-list";
+import type { MemoryUse } from "@/lib/memory-use-api";
 
 function AttachmentGallery({
   conversationId,
@@ -168,6 +168,7 @@ export function MessageBubble({
   onOpenArtifact,
   skillCommandChip = false,
   liveActivity,
+  memoryUses,
   onRetryDelivery,
   deliveryRetrying = false,
 }: {
@@ -192,6 +193,8 @@ export function MessageBubble({
   skillCommandChip?: boolean;
   /** 답이 흘러나오는 동안의 진행 중 작업 과정이다. 저장된 블록과 같은 자리에 그린다 */
   liveActivity?: React.ReactNode;
+  /** 이 답의 실행이 본문을 받은 기억이다. 저장된 작업 과정을 펼쳤을 때만 보인다 */
+  memoryUses?: MemoryUse[];
   /** 실패하거나 중지한 결과 전달의 「결과 다시 전달」 을 누르면 그 묶음 번호로 부른다 */
   onRetryDelivery?(deliveryId: number): void;
   /** 다시 전달을 보내는 중이면 단추를 막는다 */
@@ -321,6 +324,8 @@ export function MessageBubble({
             summary={turn.activity}
             executionId={turn.executionId}
             cancelled={turn.status === "CANCELLED"}
+            sourceReads={turn.sourceReads}
+            memoryUses={memoryUses}
             initialExpanded={initialActivityExpanded}
             onOpenPanel={() => onOpenSaved(turn.executionId!)}
           />
@@ -338,9 +343,6 @@ export function MessageBubble({
           onAnswer={streaming ? undefined : onAnswer}
         />
       </div>
-      {!streaming && !unsaved && turn.sourceReads ? (
-        <SourceReadList sourceReads={turn.sourceReads} />
-      ) : null}
       {turn.status === "CANCELLED" ? (
         <p
           data-testid="stopped-mark"
