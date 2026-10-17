@@ -56,18 +56,21 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
     List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(@Param("ids") Collection<Long> ids);
 
 
-    /** 그 사용자가 주인인 개인 항목의 벡터다. 기억 사이의 연결을 찾을 때 같은 주인의 항목끼리만 견준다. */
-    @Query("select e from MemoryEmbedding e, Memory m where m.id = e.memoryId"
+    /**
+     * 벡터 줄이 있는 그 사용자의 개인 항목 번호다. 기억 사이의 연결을 찾을 때 같은 주인의 항목끼리만 견준다. 벡터는 모델과 지문을 맞춰 보는
+     * {@code MemoryVectorCache} 로 읽는다.
+     */
+    @Query("select e.memoryId from MemoryEmbedding e, Memory m where m.id = e.memoryId"
         + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER"
         + " and m.ownerUserId = :ownerUserId")
-    List<MemoryEmbedding> findOfOwner(@Param("ownerUserId") Long ownerUserId);
+    List<Long> findMemoryIdsOfOwner(@Param("ownerUserId") Long ownerUserId);
 
 
-    /** 그 그룹의 그룹 항목의 벡터다. */
-    @Query("select e from MemoryEmbedding e, Memory m where m.id = e.memoryId"
+    /** 벡터 줄이 있는 그 그룹의 그룹 항목 번호다. */
+    @Query("select e.memoryId from MemoryEmbedding e, Memory m where m.id = e.memoryId"
         + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP"
         + " and m.groupId = :groupId")
-    List<MemoryEmbedding> findOfGroup(@Param("groupId") Long groupId);
+    List<Long> findMemoryIdsOfGroup(@Param("groupId") Long groupId);
 
 
     /** 저장한 줄의 모델과 지문이다. 벡터는 읽지 않는다. */

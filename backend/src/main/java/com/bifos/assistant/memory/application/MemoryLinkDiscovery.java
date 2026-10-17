@@ -3,9 +3,10 @@ package com.bifos.assistant.memory.application;
 import com.bifos.assistant.memory.application.dto.MemoryLinkItem;
 import com.bifos.assistant.memory.application.dto.RelatedPair;
 import com.bifos.assistant.memory.application.dto.SupersedeCandidate;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.config.MemoryLinkProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
@@ -14,8 +15,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -39,6 +38,7 @@ public class MemoryLinkDiscovery {
     private final MemoryLinkService links;
     private final SupersedeCandidates supersedes;
     private final RelatedLinker related;
+    private final MemoryVectorCache vectorCache;
     private final PlatformTransactionManager transactionManager;
 
 
@@ -100,20 +100,23 @@ public class MemoryLinkDiscovery {
         if (target == null || target.status() != MemoryStatus.ACCEPTED || links.isSuperseded(memoryId)) {
             return null;
         }
-        List<MemoryEmbedding> rows = target.scope() == MemoryScope.USER
-            ? embeddings.findOfOwner(target.ownerUserId())
-            : embeddings.findOfGroup(target.groupId());
-        Set<Long> ids = rows.stream().map(MemoryEmbedding::memoryId).collect(Collectors.toSet());
+        Set<Long> ids = Set.copyOf(target.scope() == MemoryScope.USER
+            ? embeddings.findMemoryIdsOfOwner(target.ownerUserId())
+            : embeddings.findMemoryIdsOfGroup(target.groupId()));
         if (!ids.contains(memoryId)) {
             return null;
         }
         Set<Long> superseded = links.supersededBy(ids).keySet();
-        Map<Long, Memory> byId = memories.findAllById(ids).stream()
+        List<Memory> eligible = memories.findAllById(ids).stream()
             .filter(memory -> memory.status() == MemoryStatus.ACCEPTED && !superseded.contains(memory.id()))
-            .collect(Collectors.toMap(Memory::id, Function.identity()));
-        List<MemoryLinkItem> items = rows.stream()
-            .filter(row -> byId.containsKey(row.memoryId()))
-            .map(row -> item(byId.get(row.memoryId()), row))
+            .toList();
+        // 모델이 바뀌는 동안이나 본문을 고친 뒤 다시 임베딩하기 전의 벡터는 지금 글과 맞지 않는다. 조립과 같이 모델과 지문이 맞는 벡터만 쓴다
+        Map<Long, float[]> vectors = vectorCache.vectorsFor(eligible.stream()
+            .map(memory -> new RelevanceCandidate(memory.id(), memory.title(), memory.content()))
+            .toList());
+        List<MemoryLinkItem> items = eligible.stream()
+            .filter(memory -> vectors.containsKey(memory.id()))
+            .map(memory -> item(memory, vectors.get(memory.id())))
             .toList();
         MemoryLinkItem self = items.stream().filter(item -> item.id().equals(memoryId)).findFirst().orElse(null);
         if (self == null) {
@@ -123,7 +126,7 @@ public class MemoryLinkDiscovery {
     }
 
 
-    private static MemoryLinkItem item(Memory memory, MemoryEmbedding row) {
-        return new MemoryLinkItem(memory.id(), memory.updatedAt(), memory.title() + "\n" + memory.content(), row.vector());
+    private static MemoryLinkItem item(Memory memory, float[] vector) {
+        return new MemoryLinkItem(memory.id(), memory.updatedAt(), memory.title() + "\n" + memory.content(), vector);
     }
 }

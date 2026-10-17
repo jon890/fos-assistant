@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.embedding.EmbeddingText;
+import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
@@ -54,9 +57,16 @@ class MemoryLinkDiscoveryTest {
     @Autowired
     MemoryEmbeddingRepository embeddings;
 
+    @Autowired
+    MemoryEmbeddingProperties embeddingProperties;
+
+    @Autowired
+    MemoryVectorCache vectorCache;
+
 
     @BeforeEach
     void setUp() {
+        vectorCache.clear();
         links.deleteAll();
         embeddings.deleteAll();
         repository.deleteAll();
@@ -125,6 +135,20 @@ class MemoryLinkDiscoveryTest {
 
 
     @Test
+    @DisplayName("다른 모델의 벡터와 본문을 고친 뒤 다시 채우기 전의 벡터는 견주지 않는다")
+    void ignoresVectorsOfOtherModelOrOldText() {
+        embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 3층에 세운다", PARKING, "old-model");
+        Memory edited = embedded(ADMIN, MemoryScope.USER, "주차 위치", "차는 4층에 세운다", PARKING);
+        memories.update(ADMIN, edited.id(), "차는 지하 1층에 세운다", false);
+        Memory fresh = embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 5층에 세운다", PARKING);
+
+        discovery.discover(List.of(fresh.id()));
+
+        assertThat(links.count()).isZero();
+    }
+
+
+    @Test
     @DisplayName("자동 RELATED 는 항목마다 상한을 넘지 않는다")
     void keepsRelatedLimitPerItem() {
         Memory hub = memories.create(ADMIN, MemoryScope.USER, "중심", "본문", false);
@@ -137,8 +161,15 @@ class MemoryLinkDiscoveryTest {
 
 
     private Memory embedded(CurrentUser owner, MemoryScope scope, String title, String content, float[] vector) {
+        return embedded(owner, scope, title, content, vector, embeddingProperties.model());
+    }
+
+
+    /** 지금 글의 지문과 주어진 모델 이름으로 벡터 줄을 넣는다. */
+    private Memory embedded(CurrentUser owner, MemoryScope scope, String title, String content, float[] vector, String model) {
         Memory memory = memories.create(owner, scope, title, content, false);
-        embeddings.save(MemoryEmbedding.of(memory.id(), "test-model", new byte[32], vector));
+        String text = EmbeddingText.of(title, content, embeddingProperties.maxTextChars());
+        embeddings.save(MemoryEmbedding.of(memory.id(), model, EmbeddingText.fingerprint(model, text), vector));
         return memory;
     }
 }
