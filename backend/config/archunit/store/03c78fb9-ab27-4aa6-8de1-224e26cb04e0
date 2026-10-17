@@ -6,8 +6,6 @@ com.bifos.assistant.agent.application.ProfileProvisioning 는 인터페이스다
 com.bifos.assistant.agent.application.ProfileSkillFiles 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 agent.application.port 로 옮긴다.
 com.bifos.assistant.agent.application.ReservedProfileNames 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 agent.application.port 로 옮긴다.
 com.bifos.assistant.agent.purge.application.AgentPurgeParticipant 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 agent.application.port 로 옮긴다.
-com.bifos.assistant.attention.application.AttentionCandidates 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 attention.application.port 로 옮긴다.
-com.bifos.assistant.browser.application.BrowserGrantOwners 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 browser.application.port 로 옮긴다.
 com.bifos.assistant.browser.application.BrowserScreenSession 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.browser.application.GatewayRewriter 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.ActivitySummary 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
@@ -73,21 +71,10 @@ com.bifos.assistant.connector.application.FinancialLimitExceeded 는 public 클�
 com.bifos.assistant.feedback.application.FeedbackConversations 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 feedback.application.port 로 옮긴다.
 com.bifos.assistant.feedback.application.FeedbackLabeler 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.followup.application.FollowUpDueAt 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.mcp.application.AttachmentInspectRequest 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
-com.bifos.assistant.mcp.application.FinancialLimitRequests 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 mcp.application.port 로 옮긴다.
-com.bifos.assistant.mcp.application.IssuedToken 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
-com.bifos.assistant.mcp.application.McpCallContext 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
-com.bifos.assistant.mcp.application.McpCaller 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
-com.bifos.assistant.mcp.application.McpPrincipal 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
-com.bifos.assistant.mcp.application.SubagentRegistration 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 mcp.application.dto 로 옮긴다.
 com.bifos.assistant.memory.application.OmittedMemories 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 memory.application.port 로 옮긴다.
 com.bifos.assistant.notification.application.NotificationCursor 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 notification.application.dto 로 옮긴다.
 com.bifos.assistant.notification.application.NotificationEvent 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 notification.application.dto 로 옮긴다.
 com.bifos.assistant.notification.application.NotificationPage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 notification.application.dto 로 옮긴다.
-com.bifos.assistant.orchestration.application.AgentRun 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 orchestration.application.dto 로 옮긴다.
-com.bifos.assistant.orchestration.application.DelegationResult 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 orchestration.application.dto 로 옮긴다.
-com.bifos.assistant.orchestration.application.DelegationStop 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 orchestration.application.dto 로 옮긴다.
-com.bifos.assistant.orchestration.application.SubagentRegistrationResult 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 orchestration.application.dto 로 옮긴다.
 com.bifos.assistant.proactive.application.AutonomyPolicy 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.proactive.application.CheckNotificationPolicy 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 proactive.<하위 기능>.application.port 로 옮긴다.
 com.bifos.assistant.proactive.application.CheckReportApprovalSource 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 proactive.<하위 기능>.application.port 로 옮긴다.
