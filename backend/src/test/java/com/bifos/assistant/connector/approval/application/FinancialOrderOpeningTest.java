@@ -43,11 +43,15 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /** 공개 진입점(정책 판정과 승인 API)이 금융 준비와 금융 승인으로 이어지는지 실제 plugin 왕복으로 본다. */
+@ExtendWith(OutputCaptureExtension.class)
 class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     static final String PREPARE_TOOL = "mcp__tossinvest__prepare_trade";
     static final String EXECUTION_TOOL = "mcp__tossinvest__create_order";
@@ -280,6 +284,35 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(counters().path("prepare").intValue()).isZero();
         assertThatThrownBy(() -> financial(true, List.of("7:" + user.email(), "7:other-" + user.email()), gate.current()))
             .isInstanceOf(IllegalStateException.class);
+    }
+
+
+    /**
+     * 2026-10-17 운영의 첫 주문 준비 거절 후보다. 커넥터의 주문 인자는 계좌를 받지 않고 금액을 10진수 글로만 받는다. 계좌는 연결에서 고른
+     * 값으로만 정해지므로 모델이 넣은 계좌는 같은 값이어도 받지 않는다. 거절 이유는 모델에게 가지 않고 로그에는 단계 코드만 남는다.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"orderAmount-number", "account_seq-text", "account_seq-number"})
+    @DisplayName("금액을 숫자로 넣거나 계좌를 인자로 넣은 준비는 커넥터가 거절해 줄 없이 막고 로그에 prepare_http 단계만 남긴다")
+    void modelArgumentsOutsideOrderSchemaAreRejected(String change, CapturedOutput output) {
+        String args = switch (change) {
+            case "orderAmount-number" -> "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":25}";
+            case "account_seq-text" -> amountOrder("25").replace("}", ",\"account_seq\":\"7\"}");
+            default -> amountOrder("25").replace("}", ",\"account_seq\":7}");
+        };
+        var answer = prepare(UUID.randomUUID().toString(), trade("create_order", args));
+        assertThat(answer.allowed()).isFalse();
+        assertThat(answer.actionId()).isNull();
+        assertThat(answer.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+        assertThat(rows()).isZero();
+        assertThat(counters().path("prepare").intValue()).isEqualTo(1);
+        assertThat(counters().path("financial").intValue()).isZero();
+        assertThat(output.getOut()).contains("금융 준비 HTTP 가 실패했다 status=200 reason=not_ok")
+            .contains("금융 준비를 거절했다 stage=prepare_http kind=Rejected")
+            .doesNotContain(user.email()).doesNotContain("account_seq");
+        // 같은 금액을 글로 넣고 계좌를 빼면 준비된다. 앞의 거절이 인자 모양 때문임을 보이는 대조군이다.
+        var control = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("25")));
+        assertThat(action(control).status()).isEqualTo(ActionStatus.PENDING);
     }
 
 
