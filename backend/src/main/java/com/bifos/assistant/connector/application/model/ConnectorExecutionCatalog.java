@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application.model;
 
-import com.bifos.assistant.connector.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import java.util.Map;
 import java.util.Set;
 

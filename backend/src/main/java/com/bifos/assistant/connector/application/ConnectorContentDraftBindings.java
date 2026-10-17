@@ -1,13 +1,14 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
 import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
-import com.bifos.assistant.connector.domain.ConnectorBinding;
-import com.bifos.assistant.connector.domain.type.BindingStatus;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import java.util.Comparator;

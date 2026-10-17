@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.connector.presentation;
 
-import com.bifos.assistant.connector.application.ConnectorConnectionService;
+import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.admin.connector.presentation.ConnectionAdminDtos.AdminConnectionView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

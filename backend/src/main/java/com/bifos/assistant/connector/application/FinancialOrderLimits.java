@@ -4,7 +4,7 @@ import com.bifos.assistant.connector.application.model.FinancialLimitValues;
 import com.bifos.assistant.connector.domain.FinancialOrderLimit;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;

@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.application.port.AgentPurgeParticipant;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;

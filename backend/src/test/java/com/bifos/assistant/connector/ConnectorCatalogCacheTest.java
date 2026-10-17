@@ -8,8 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.connector.application.ConnectorCatalogCache;
-import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
+import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
+import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;

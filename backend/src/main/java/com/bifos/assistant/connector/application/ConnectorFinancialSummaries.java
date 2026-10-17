@@ -6,7 +6,7 @@ import com.bifos.assistant.connector.application.model.FinancialLimitStatus;
 import com.bifos.assistant.connector.application.model.FinancialLimitValues;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;

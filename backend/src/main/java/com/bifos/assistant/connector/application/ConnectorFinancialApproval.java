@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import static com.bifos.assistant.connector.application.ConnectorFinancialProducer.require;
 
 import com.bifos.assistant.chat.application.ConversationNotices;

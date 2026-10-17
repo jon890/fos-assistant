@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.connector.presentation;
 
-import com.bifos.assistant.connector.application.ConnectorBindingService;
+import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.admin.connector.presentation.ConnectionAdminDtos.AgentConnectionResponse;
 import com.bifos.assistant.admin.connector.presentation.ConnectionAdminDtos.ConfirmRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

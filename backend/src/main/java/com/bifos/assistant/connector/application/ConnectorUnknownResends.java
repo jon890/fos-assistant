@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.application.dto.ConnectorUnknownDetail;
