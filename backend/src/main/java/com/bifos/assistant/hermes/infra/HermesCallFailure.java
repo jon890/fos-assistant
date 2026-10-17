@@ -24,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 사람이 정한다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public final class HermesCallFailure {
+final class HermesCallFailure {
 
     /** 격리 실행 공간이 준비되지 않았을 때 plugin 이 409 응답의 {@code code} 칸에 싣는 값이다. */
     private static final String SANDBOX_UNAVAILABLE_CODE = "sandbox_unavailable";
@@ -35,7 +35,7 @@ public final class HermesCallFailure {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
 
-    public static ApiException of(RestClientException cause, String message) {
+    static ApiException of(RestClientException cause, String message) {
         return new ApiException(codeOf(cause), message, cause);
     }
 
@@ -45,7 +45,7 @@ public final class HermesCallFailure {
      *
      * <p>거절과 닿지 못함을 부르는 쪽이 갈라야 할 때 쓴다. 오류 코드는 어느 쪽이든 같다.
      */
-    public static ApiException ofDistinguishingRejection(RestClientException cause, String message) {
+    static ApiException ofDistinguishingRejection(RestClientException cause, String message) {
         if (cause instanceof RestClientResponseException response
             && response.getStatusCode().is4xxClientError()) {
             return new HermesRequestRejected(codeOf(cause), message, response);
@@ -61,7 +61,7 @@ public final class HermesCallFailure {
      * 글자로 찾지 않는다. {@code detail} 같은 다른 칸에 같은 낱말이 들어 있어도 다른 거절로 본다. 돌려주는 예외는
      * 거절이라는 사실을 지키고 오류 코드만 {@link ErrorCode#AGENT_SANDBOX_UNAVAILABLE} 로 바꾼다.
      */
-    public static Optional<HermesRequestRejected> sandboxRejection(RestClientException cause) {
+    static Optional<HermesRequestRejected> sandboxRejection(RestClientException cause) {
         if (!(cause instanceof RestClientResponseException response)
             || response.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
             return Optional.empty();

@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -287,7 +288,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         } catch (HttpClientErrorException ex) {
             int status = ex.getStatusCode().value();
             if (status == HTTP_CONFLICT) {
-                throw ConnectorSandboxUnavailable.orConflict(ex);
+                throw sandboxOrConflict(ex);
             }
             if (status == HTTP_UNAUTHORIZED) {
                 throw new ConnectorProfileRejected();
@@ -467,5 +468,14 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isString() && !value.asString().isBlank() ? value.asString() : null;
+    }
+
+
+    /** 대시보드의 409 를 본문 {@code code} 로 나눈다. {@code sandbox_unavailable} 이면 실행 공간 거절, 아니면 설치 충돌이다. */
+    private static RuntimeException sandboxOrConflict(HttpClientErrorException ex) {
+        if (HermesCallFailure.sandboxRejection(ex).isPresent()) {
+            return new ConnectorSandboxUnavailable();
+        }
+        return new ConnectorInstallConflict();
     }
 }
