@@ -2,7 +2,7 @@ package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;

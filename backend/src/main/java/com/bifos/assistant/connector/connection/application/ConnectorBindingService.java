@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.connection.application;
 
-import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.agent.application.port.AgentConnectorDetacher;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;

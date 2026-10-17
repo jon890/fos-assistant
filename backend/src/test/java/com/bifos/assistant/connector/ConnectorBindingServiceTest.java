@@ -36,7 +36,7 @@ import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.port.ConnectorInstallConflict;

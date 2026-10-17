@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
 import com.bifos.assistant.chat.application.model.ContentDraftJobPage;
 import com.bifos.assistant.chat.application.model.ContentDraftJobView;
 import com.bifos.assistant.chat.application.model.ContentDraftSaveRequestView;
-import com.bifos.assistant.connector.application.ContentDraftJobs;
+import com.bifos.assistant.connector.contentdraft.application.ContentDraftJobs;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.tngtech.archunit.core.domain.JavaClass;
 import java.util.Arrays;
@@ -28,11 +28,11 @@ class ContentDraftSnapshotArchitectureTest {
         "ContentDraftSaveRequestView", "com.bifos.assistant.chat.application.model",
         "ContentDraftJobView", "com.bifos.assistant.chat.application.model",
         "ContentDraftJobPage", "com.bifos.assistant.chat.application.model",
-        "ContentDraftJobs", "com.bifos.assistant.connector.application",
-        "ContentDraftSaveApproval", "com.bifos.assistant.connector.application",
-        "ContentDraftSaveTicket", "com.bifos.assistant.connector.application",
-        "ContentDraftJobAuthorizer", "com.bifos.assistant.connector.application",
-        "PreparedContentDraftApproval", "com.bifos.assistant.connector.application.model");
+        "ContentDraftJobs", "com.bifos.assistant.connector.contentdraft.application",
+        "ContentDraftSaveApproval", "com.bifos.assistant.connector.contentdraft.application",
+        "ContentDraftSaveTicket", "com.bifos.assistant.connector.contentdraft.application",
+        "ContentDraftJobAuthorizer", "com.bifos.assistant.connector.contentdraft.application",
+        "PreparedContentDraftApproval", "com.bifos.assistant.connector.contentdraft.application.dto");
 
 
     @Test

@@ -7,13 +7,3 @@ chat.infra 에 클래스가 남아 있다. chat 는 하위 기능으로 나뉜 �
 chat.presentation 에 클래스가 남아 있다. chat 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 chat.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
 chat.presentation.contentdraft 에 클래스가 남아 있다. chat 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 chat.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
 chat.presentation.contentsnapshot 에 클래스가 남아 있다. chat 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 chat.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.application 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.application.execution 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.application.model 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.domain 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.domain.type 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.infra 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.presentation 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.presentation.contentjob 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.presentation.execution 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.
-connector.presentation.financial 에 클래스가 남아 있다. connector 는 하위 기능으로 나뉜 기능이라 루트에 역할 패키지를 두지 않는다. 클래스는 connector.<하위 기능>.<역할> 로 옮긴다. 어느 하위 기능인지는 ADR-20261015 의 「하위 기능」 표를 본다.

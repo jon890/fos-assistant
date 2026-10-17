@@ -105,7 +105,7 @@ hermes/
 | tossinvest/src/read-tools.ts, account-tools.ts | 기존 조회 이름과 표시 호환, 공식 result와 계좌 마스킹 |
 | tossinvest/src/market-data-tools.ts, stock-tools.ts, stock-trend-tools.ts, market-info-tools.ts, ranking-tools.ts, indicator-tools.ts, sector-tools.ts | 기능별 READ 도구 등록. server.ts가 연결하고 manifest와 같은 이름을 선언 |
 | tossinvest/src/order-options.ts, prepare-conditional-trade.ts, conditional-trading-tools.ts | 기존 금융 producer와 prepare dispatcher의 확장. execution-guard를 재사용하고 별도 약한 실행 경로를 만들지 않음 |
-| backend connector/application/ConnectorExecutionSnapshot, ConnectorConditionalExecution | 범용 불변 금융 union 검증, 중첩 의도 키. 서비스 이름과 URL은 모름 |
+| backend connector/financial/application/ConnectorExecutionSnapshot, ConnectorConditionalExecution | 범용 불변 금융 union 검증, 중첩 의도 키. 서비스 이름과 URL은 모름 |
 | 기존 승인 DTO와 ApprovalCard | 서버가 저장한 전체 전략과 금액, 고액 명시 확인. 계좌 선택과 모델 문자열 요약은 사용하지 않음 |
 
 현재 client/api-contract/rate-limit과 기존 READ 도구는 구현했다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)이 열었고, 일반 주문 정정과 조건주문 쓰기 producer는 아직 운영에 등록하지 않았다. 저장과 claim, prepare·transport, 바인딩 지원과 일반주문 producer는 각 선행 구현의 책임이며 이 확장에서 중복 작성하지 않는다.

@@ -23,7 +23,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
-import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorCallLimiter;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;

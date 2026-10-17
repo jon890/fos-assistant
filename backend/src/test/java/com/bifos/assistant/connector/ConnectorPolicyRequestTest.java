@@ -3,7 +3,7 @@ package com.bifos.assistant.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.connector.application.ConnectorPolicyRequest;
+import com.bifos.assistant.connector.approval.application.dto.ConnectorPolicyRequest;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;

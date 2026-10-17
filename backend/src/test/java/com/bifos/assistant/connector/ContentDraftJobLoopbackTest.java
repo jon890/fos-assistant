@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector;
 
 import com.bifos.assistant.AssistantApplication;
-import com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder;
+import com.bifos.assistant.connector.contentdraft.application.ContentDraftWorkerStatusDecoder;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import java.time.Clock;
 import java.time.ZoneOffset;
@@ -18,8 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.ContentDraftJobFixture;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
-import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
-import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;

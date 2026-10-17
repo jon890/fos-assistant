@@ -5,8 +5,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder;
-import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.connector.contentdraft.application.ContentDraftWorkerStatusDecoder;
+import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.hermes.application.dto.ContentDraftWorkerStamp;
 import com.bifos.assistant.shared.error.ApiException;

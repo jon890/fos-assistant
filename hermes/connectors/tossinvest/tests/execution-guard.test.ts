@@ -536,7 +536,7 @@ test("운영 SDK·manifest는 주문과 취소만 금융으로 열고 정정은 
     const dtos = await readFile(
       joinRoot(
         root,
-        "backend/src/main/java/com/bifos/assistant/connector/presentation/execution/ConnectorExecutionClaimDtos.java",
+        "backend/src/main/java/com/bifos/assistant/connector/financial/presentation/ConnectorExecutionClaimDtos.java",
       ),
       "utf8",
     );
@@ -556,7 +556,7 @@ test("운영 SDK·manifest는 주문과 취소만 금융으로 열고 정정은 
     const codec = await readFile(
       joinRoot(
         root,
-        "backend/src/main/java/com/bifos/assistant/connector/application/execution/ConnectorExecutionClaimCodec.java",
+        "backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorExecutionClaimCodec.java",
       ),
       "utf8",
     );
@@ -564,7 +564,7 @@ test("운영 SDK·manifest는 주문과 취소만 금융으로 열고 정정은 
     const claimsSource = await readFile(
       joinRoot(
         root,
-        "backend/src/main/java/com/bifos/assistant/connector/application/execution/ConnectorExecutionClaims.java",
+        "backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorExecutionClaims.java",
       ),
       "utf8",
     );

@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.connection.application;
 
-import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;

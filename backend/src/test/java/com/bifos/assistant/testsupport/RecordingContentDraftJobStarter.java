@@ -1,7 +1,7 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.connector.application.ContentDraftJobStarter;
-import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.connector.contentdraft.application.port.ContentDraftJobStarter;
+import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

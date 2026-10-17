@@ -3,9 +3,9 @@ package com.bifos.assistant.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.connector.application.ContentDraftSaveTicket;
-import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
-import com.bifos.assistant.connector.presentation.contentjob.ContentDraftJobAuthorizeDtos.AuthorizeRequest;
+import com.bifos.assistant.connector.contentdraft.application.ContentDraftSaveTicket;
+import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.connector.contentdraft.presentation.ContentDraftJobAuthorizeDtos.AuthorizeRequest;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

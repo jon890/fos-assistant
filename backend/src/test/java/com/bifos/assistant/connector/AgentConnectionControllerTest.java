@@ -22,7 +22,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
 import com.bifos.assistant.connector.connection.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
-import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.connection.presentation.AgentConnectionController;
