@@ -1,7 +1,7 @@
 package com.bifos.assistant.browser.presentation;
 
 import com.bifos.assistant.browser.application.UserBrowserService;
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.BrowserView;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.ScreenInputRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

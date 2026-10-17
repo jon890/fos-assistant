@@ -1,6 +1,6 @@
 package com.bifos.assistant.attention.application;
 
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
+import com.bifos.assistant.attention.application.dto.AttentionCandidate;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;

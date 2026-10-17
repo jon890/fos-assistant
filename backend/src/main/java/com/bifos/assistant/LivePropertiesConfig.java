@@ -1,13 +1,13 @@
 package com.bifos.assistant;
 
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.application.ProactiveLoopProperties;

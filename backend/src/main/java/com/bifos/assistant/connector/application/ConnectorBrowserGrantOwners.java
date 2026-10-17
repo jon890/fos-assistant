@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.browser.application.BrowserGrantOwners;
+import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

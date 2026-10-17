@@ -1,7 +1,7 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.attention.application.AttentionCandidates;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
+import com.bifos.assistant.attention.application.port.AttentionCandidates;
+import com.bifos.assistant.attention.application.dto.AttentionCandidate;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;

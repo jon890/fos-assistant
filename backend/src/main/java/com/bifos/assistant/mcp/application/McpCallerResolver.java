@@ -1,5 +1,8 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCallContext;
+import com.bifos.assistant.mcp.application.dto.McpCaller;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.auth.CurrentUser;

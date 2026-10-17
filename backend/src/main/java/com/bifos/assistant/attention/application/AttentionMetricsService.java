@@ -1,6 +1,6 @@
 package com.bifos.assistant.attention.application;
 
-import com.bifos.assistant.attention.application.model.AttentionMetric;
+import com.bifos.assistant.attention.application.dto.AttentionMetric;
 import com.bifos.assistant.attention.domain.AttentionEvent;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;

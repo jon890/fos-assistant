@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.chat.application.DelegationOutputClip;
 import com.bifos.assistant.shared.config.LiveProperties;
 import lombok.RequiredArgsConstructor;

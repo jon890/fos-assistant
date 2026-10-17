@@ -2,7 +2,7 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.chat.application.InspectedImage;
 import com.bifos.assistant.mcp.application.AttachmentInspectService;
-import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;

@@ -23,7 +23,7 @@ import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.notification.application.NotificationService;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.user.infra.AppUserRepository;

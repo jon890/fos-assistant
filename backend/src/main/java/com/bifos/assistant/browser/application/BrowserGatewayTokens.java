@@ -1,7 +1,7 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserGrant;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.application.dto.BrowserGrant;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;

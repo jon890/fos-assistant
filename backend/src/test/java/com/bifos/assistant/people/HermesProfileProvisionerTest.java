@@ -17,7 +17,7 @@ import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesDashboardClient;
 import com.bifos.assistant.hermes.StubHermesDashboardClient.EnvWrite;
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.mcp.application.IssuedToken;
+import com.bifos.assistant.mcp.application.dto.IssuedToken;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.application.ProfileKeyFactory;

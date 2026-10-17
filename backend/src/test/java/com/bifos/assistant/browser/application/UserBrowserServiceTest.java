@@ -11,12 +11,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.bifos.assistant.browser.application.model.BrowserEndpoint;
-import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
+import com.bifos.assistant.browser.application.dto.BrowserEndpoint;
+import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
-import com.bifos.assistant.browser.infra.BrowserProperties;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

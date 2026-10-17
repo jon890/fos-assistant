@@ -1,7 +1,7 @@
 package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.util.List;
 import java.util.Map;

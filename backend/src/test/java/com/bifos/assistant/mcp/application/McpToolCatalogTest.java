@@ -1,10 +1,11 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.port.FinancialLimitRequests;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Duration;
 import java.util.List;

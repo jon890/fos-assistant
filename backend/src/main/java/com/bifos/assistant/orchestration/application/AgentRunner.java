@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ContextSourceRefs;
 import com.bifos.assistant.chat.application.ModelTierService;

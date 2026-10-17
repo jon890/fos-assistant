@@ -1,6 +1,6 @@
 package com.bifos.assistant.browser.presentation;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenSink;
+import com.bifos.assistant.browser.application.port.BrowserScreenSink;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.browser.application.BrowserGateway;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;

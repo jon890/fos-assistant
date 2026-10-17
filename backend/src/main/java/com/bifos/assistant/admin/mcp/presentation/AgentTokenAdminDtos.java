@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.mcp.presentation;
 
-import com.bifos.assistant.mcp.application.IssuedToken;
+import com.bifos.assistant.mcp.application.dto.IssuedToken;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

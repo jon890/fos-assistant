@@ -1,5 +1,6 @@
 package com.bifos.assistant.attention.application;
 
+import com.bifos.assistant.attention.config.AttentionProperties;
 import com.bifos.assistant.attention.infra.AttentionEventRepository;
 import java.time.Clock;
 import java.time.Instant;

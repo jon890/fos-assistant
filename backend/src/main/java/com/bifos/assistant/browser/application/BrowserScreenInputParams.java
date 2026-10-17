@@ -1,6 +1,6 @@
 package com.bifos.assistant.browser.application;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

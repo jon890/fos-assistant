@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.infra;
 
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.RuntimeContainer;
 import com.bifos.assistant.shared.config.LiveProperties;
