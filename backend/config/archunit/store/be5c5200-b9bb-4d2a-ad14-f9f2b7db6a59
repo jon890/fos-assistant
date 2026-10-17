@@ -4,14 +4,9 @@ com.bifos.assistant.agent.purge.application.model 는 application 의 하위 패
 com.bifos.assistant.chat.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.connector.application.execution 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.connector.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.feedback.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.followup.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.memory.application.embedding 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.memory.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.memory.application.relevance 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.people.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.proactive.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.skill.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.task.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
 com.bifos.assistant.usage.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.workspace.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
