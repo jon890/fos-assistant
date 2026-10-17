@@ -1,8 +1,8 @@
 package com.bifos.assistant.admin.skill.presentation;
 
-import com.bifos.assistant.skill.application.SkillList;
-import com.bifos.assistant.skill.application.SkillListItem;
-import com.bifos.assistant.skill.application.SkillUsageSummary;
+import com.bifos.assistant.skill.library.application.dto.SkillList;
+import com.bifos.assistant.skill.library.application.dto.SkillListItem;
+import com.bifos.assistant.skill.usage.application.dto.SkillUsageSummary;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;

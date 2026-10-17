@@ -31,7 +31,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.skill.application.SkillAgentNotice;
+import com.bifos.assistant.skill.upload.application.SkillAgentNotice;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;

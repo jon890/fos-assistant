@@ -8,7 +8,7 @@ import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckBlockerCode;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.shared.config.LiveProperties;
-import com.bifos.assistant.skill.application.SkillCommandCatalog;
+import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;

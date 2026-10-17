@@ -1,7 +1,7 @@
 package com.bifos.assistant.usage.summary.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.skill.application.UserSkillUsage;
+import com.bifos.assistant.skill.usage.application.dto.UserSkillUsage;
 import com.bifos.assistant.usage.summary.application.dto.MonthlyUsageSummary;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;

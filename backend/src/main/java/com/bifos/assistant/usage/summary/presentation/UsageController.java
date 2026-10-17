@@ -4,7 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.skill.application.SkillUsageQuery;
+import com.bifos.assistant.skill.usage.application.SkillUsageQuery;
 import com.bifos.assistant.usage.tree.application.dto.ExecutionTree;
 import com.bifos.assistant.usage.tree.application.ExecutionTreeService;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;

@@ -3,11 +3,11 @@ package com.bifos.assistant.skill;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import com.bifos.assistant.skill.application.ProfileSkillFilesAdapter;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
-import com.bifos.assistant.skill.infra.SkillProperties;
-import com.bifos.assistant.skill.infra.SkillStore;
+import com.bifos.assistant.skill.library.application.ProfileSkillFilesAdapter;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillFile;
+import com.bifos.assistant.skill.library.config.SkillProperties;
+import com.bifos.assistant.skill.library.infra.SkillStore;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;

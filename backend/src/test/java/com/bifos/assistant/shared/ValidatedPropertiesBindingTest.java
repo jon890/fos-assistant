@@ -13,7 +13,7 @@ import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.AuthProperties;
-import com.bifos.assistant.skill.infra.SkillProperties;
+import com.bifos.assistant.skill.library.config.SkillProperties;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.pricing.config.PricingProperties;
 import java.util.List;

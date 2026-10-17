@@ -6,10 +6,10 @@ import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
-import com.bifos.assistant.skill.application.SkillUseRecorder;
-import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
-import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
+import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

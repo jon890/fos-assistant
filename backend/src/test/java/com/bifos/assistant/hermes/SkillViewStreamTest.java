@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
-import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;

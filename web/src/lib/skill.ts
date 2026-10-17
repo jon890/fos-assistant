@@ -129,13 +129,13 @@ export type SkillUsageRow = {
 
 /**
  * 새 스킬의 description 이 넘을 수 없는 글자 수다. Hermes 가 새 스킬을 만들 때 거는 한도다.
- * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ * backend/src/main/java/com/bifos/assistant/skill/library/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
  */
 export const MAX_NEW_DESCRIPTION_CHARS = 60;
 
 /**
  * description 이 넘을 수 없는 글자 수다. Hermes 가 저장할 때마다 거는 한도다.
- * backend/src/main/java/com/bifos/assistant/skill/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
+ * backend/src/main/java/com/bifos/assistant/skill/library/application/SkillService.java 의 같은 이름 상수와 함께 고친다.
  */
 export const MAX_DESCRIPTION_CHARS = 1024;
 

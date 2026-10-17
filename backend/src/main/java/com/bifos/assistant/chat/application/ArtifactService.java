@@ -7,7 +7,7 @@ import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillAgentNotice;
+import com.bifos.assistant.skill.upload.application.SkillAgentNotice;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;

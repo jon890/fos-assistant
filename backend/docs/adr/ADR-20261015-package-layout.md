@@ -38,7 +38,7 @@
 | `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval` |
 | `proactive` | `check`, `evaluation`, `autonomy`, `loop`, `surface`, `feedback` |
 | `usage` | `pricing`, `execution`, `subagent`, `tree`, `summary` |
-| `skill` | `usage`, `library`, `package` |
+| `skill` | `usage`, `library`, `upload` |
 
 하위 기능이 맡는 일은 아래와 같다.
 
@@ -73,7 +73,7 @@
 | `usage.summary` | 월 합계와 축별 집계 |
 | `skill.usage` | 스킬 호출 이력과 집계 |
 | `skill.library` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시 |
-| `skill.package` | 스킬 zip 묶음의 받기와 검사, 미리보기 |
+| `skill.upload` | 스킬 zip 묶음의 받기와 검사, 미리보기 |
 
 나누지 않은 기능(`agent`, `memory`, `attention`, `task` 등)은 루트에 역할 패키지를 둔다.
 `agent` 의 `application.toolset`, `purge`, `admin` 하위 패키지는 없애고 평평하게 만든다. 관리자 쪽은 `admin.agent` 와 `admin.toolset` 으로 간다.
