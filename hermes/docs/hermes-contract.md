@@ -569,7 +569,7 @@ Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / na
 - 지난 사진 여러 장은 `attachment_inspect`로 한 장씩 조회한다. 큰 사진은 원본 `region`을 조회하고, 위치를 모르면 `overview=true`로 축소 전체 개요를 본 뒤 원본 영역을 고른다
 - 원본 조회가 실패하거나 모델에 native 이미지가 전달되지 않으면 판독 실패를 알린다. 개요만 보고 작은 글자를 읽었다고 하거나 사용자에게 재업로드·분할 전송을 요구하지 않는다
 
-참조 복원과 조회 안내의 정본은 [`AttachmentService.agentInput`](../../backend/src/main/java/com/bifos/assistant/chat/application/AttachmentService.java)이다.
+참조 복원과 조회 안내의 정본은 [`AttachmentService.agentInput`](../../backend/src/main/java/com/bifos/assistant/chat/attachment/application/AttachmentService.java)이다.
 `vision_analyze` 사본 조회 안내는 `embedImages=false` 분기에만 남아 있다. 원본 조회 실패·미지원 때 그 도구로 전환하는 조건은 아니다.
 도구의 native 반환과 실패 처리는 [`attachment_inspect.py`](../plugins/fos-ctx/attachment_inspect.py)가 갖는다.
 실제 provider 수용과 30장 비교 정확도는 위 운영 왕복으로 따로 검증해야 한다.

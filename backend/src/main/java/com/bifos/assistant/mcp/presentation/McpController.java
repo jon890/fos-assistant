@@ -1,7 +1,7 @@
 package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
-import com.bifos.assistant.chat.application.ArtifactWriteRequest;
+import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;

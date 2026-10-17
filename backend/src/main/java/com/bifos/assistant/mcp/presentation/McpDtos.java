@@ -1,6 +1,6 @@
 package com.bifos.assistant.mcp.presentation;
 
-import com.bifos.assistant.chat.application.MediaObservationInputReader;
+import com.bifos.assistant.chat.attachment.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpMemoryLink;

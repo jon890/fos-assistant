@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
 import com.bifos.assistant.agent.application.AgentService;

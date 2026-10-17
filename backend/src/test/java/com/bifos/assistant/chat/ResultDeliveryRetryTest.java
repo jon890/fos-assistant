@@ -27,7 +27,7 @@ import com.bifos.assistant.chat.delivery.domain.ResultDeliveryAttempt;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;

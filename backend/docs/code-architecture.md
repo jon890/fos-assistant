@@ -6,10 +6,10 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ## 관찰 연결의 모듈 배치
 
-REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결)을 따른다.
-chat.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
-공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
-관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
+REST·MCP와 chat.attachment.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결)을 따른다.
+chat.attachment.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
+공개 페이지 타입은 chat.attachment.application.dto.MediaObservationPage에 둔다.
+관찰 REST 요청·응답은 `chat.attachment.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
 일반 대화 DTO는 `ChatDtos`에 두고, 관찰 DTO는 파일 길이 상한 안에서 기존 필드 설명을 보존하도록 관심사별로 나눈다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
 McpToolCatalog는 기존 도구와 관찰 도구의 순서를 유지하고 끝에 memory_search 정의를 더하며 호출 시점의 설정을 읽는다.
@@ -168,7 +168,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 `MediaObservationCleaner`의 참가 메서드는 MANDATORY이며 첨부·대화 삭제의 사전 callback에서 호출한다.
 만료 정리는 대상마다 별도 coordinator 트랜잭션을 연다. [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 서비스 범위를 갖는다.
 
-`chat.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
+`chat.attachment.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
 재사용 판단과 alias 저장은 기존 `MediaObservationService.record`가 맡으며 별도 cache 서비스는 두지 않는다.
 복호화·파싱·검증은 서비스의 조회와 재사용이 같은 함수로 수행한다.
 재사용의 조건과 수명은 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.

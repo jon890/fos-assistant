@@ -1,8 +1,8 @@
 package com.bifos.assistant.connector.contentdraft.application;
 
-import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.application.ContentDraftSnapshots;
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.chat.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;

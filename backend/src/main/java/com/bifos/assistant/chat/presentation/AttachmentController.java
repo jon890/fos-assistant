@@ -1,9 +1,9 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.AttachmentContent;
-import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.dto.AttachmentContent;
+import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

@@ -12,8 +12,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.chat.application.AttachmentService;
-import com.bifos.assistant.chat.application.InspectedImage;
+import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;

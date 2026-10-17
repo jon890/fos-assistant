@@ -1,9 +1,11 @@
 package com.bifos.assistant.chat.infra;
 
+import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayInputStream;

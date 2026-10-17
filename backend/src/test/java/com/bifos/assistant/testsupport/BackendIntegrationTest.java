@@ -4,7 +4,7 @@ import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.chat.application.RecoveredRunRecorder;

@@ -3,8 +3,8 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.domain.MediaObservation;
-import com.bifos.assistant.chat.infra.MediaObservationBodies;
+import com.bifos.assistant.chat.attachment.domain.MediaObservation;
+import com.bifos.assistant.chat.attachment.infra.MediaObservationBodies;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.crypto.application.DataKeyWriter;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;

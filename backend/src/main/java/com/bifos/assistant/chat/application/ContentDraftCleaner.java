@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.domain.type.ContentDraftRevisionStatus;
 import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;

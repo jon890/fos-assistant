@@ -3,10 +3,10 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.application.MediaObservationInputReader;
-import com.bifos.assistant.chat.application.model.ObservationProvenance;
-import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
-import com.bifos.assistant.chat.domain.type.ObservationStatus;
+import com.bifos.assistant.chat.attachment.application.MediaObservationInputReader;
+import com.bifos.assistant.chat.attachment.application.dto.ObservationProvenance;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationStatus;
 import com.bifos.assistant.shared.error.ApiException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;

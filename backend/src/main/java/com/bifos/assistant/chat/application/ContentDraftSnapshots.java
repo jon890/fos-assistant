@@ -1,8 +1,9 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.model.CanonicalDraft;
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotInput;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotView;
@@ -10,7 +11,7 @@ import com.bifos.assistant.chat.domain.entity.ContentDraftSnapshot;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
-import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
+import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;

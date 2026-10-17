@@ -317,7 +317,7 @@ vision 을 지원하지 않는 모델에는 Hermes 가 보조 모델의 설명 �
 
 ### 본문 없는 단계 사건
 
-Control Plane 은 사진이 지난 단계를 `media-pipeline {...}` 로그 한 줄로 남긴다. [`MediaPipelineEvents`](../../backend/src/main/java/com/bifos/assistant/chat/application/MediaPipelineEvents.java) 가 모양을 갖는다.
+Control Plane 은 사진이 지난 단계를 `media-pipeline {...}` 로그 한 줄로 남긴다. [`MediaPipelineEvents`](../../backend/src/main/java/com/bifos/assistant/chat/attachment/application/MediaPipelineEvents.java) 가 모양을 갖는다.
 사건에는 첨부 번호, 자리, 장수, 원고 ID 와 판만 싣는다. 사진 바이트, 캡션, 원고 글, 파일 이름은 싣지 않는다.
 
 | 단계 | 남기는 곳 | 뜻 |
@@ -387,7 +387,7 @@ sequenceDiagram
 **올리는 것만으로 실행이 돌지 않는다.** 보내기를 눌러야 에이전트가 움직인다. 사진만 올라가면 무엇을 하라는지 알 길이 없다.
 
 업로드 응답은 원본 저장 뒤 줄인 사본 준비를 시도하고, 그 호출이 끝난 뒤 반환한다. 사본 준비에 실패해도 업로드 자체는 성공할 수 있다.
-디코딩 슬롯 대기 상한은 [`AttachmentImages.java`](../../backend/src/main/java/com/bifos/assistant/chat/application/AttachmentImages.java)의 `DECODING_WAIT_SECONDS`가 정한다. 이 상한은 전송·저장·변환을 합친 전체 업로드 기한이 아니다.
+디코딩 슬롯 대기 상한은 [`AttachmentImages.java`](../../backend/src/main/java/com/bifos/assistant/chat/attachment/application/AttachmentImages.java)의 `DECODING_WAIT_SECONDS`가 정한다. 이 상한은 전송·저장·변환을 합친 전체 업로드 기한이 아니다.
 화면은 응답 본문을 읽은 뒤 성공 또는 오류 상태로 바꾼다.
 
 사진 하나를 올리지 못하면 그 사진만 다시 시도하거나 빼고 보낼 수 있고, 메시지 전송이 거절되면 입력창으로 되돌리지 않고 내 메시지에 「다시 보내기」 를 보인다.

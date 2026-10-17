@@ -12,7 +12,7 @@ import tools.jackson.databind.node.ArrayNode;
 
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotView;
-import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
+import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import org.springframework.transaction.IllegalTransactionStateException;

@@ -3,14 +3,14 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.attachment.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
-import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.domain.type.ObservationStatus;
-import com.bifos.assistant.chat.infra.AttachmentStore;
+import com.bifos.assistant.chat.attachment.domain.type.ObservationStatus;
+import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.sql.Timestamp;
 import java.time.Duration;
