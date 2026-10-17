@@ -30,7 +30,12 @@ async def call_tool(context, params):
         # 커넥터가 인자를 거절한 것처럼 오류 코드로 답한다. 코드는 테스트가 정한다.
         refused = pathlib.Path(__file__).parent / "prepare-error.json"
         if refused.exists():
-            error = {"error": {"code": json.loads(refused.read_text())["code"], "message": "account 000007 거절"}}
+            code = json.loads(refused.read_text())["code"]
+            if code is None:
+                # TypeScript SDK 가 입력 스키마 검증에서 거절할 때 내는 평문 모양이다.
+                text = "MCP error -32602: Input validation error: account 000007 거절"
+                return CallToolResult(content=[TextContent(type="text", text=text)], is_error=True)
+            error = {"error": {"code": code, "message": "account 000007 거절"}}
             return CallToolResult(content=[TextContent(type="text", text=json.dumps(error))], is_error=True)
         value = {"v": 1, "executionArgs": json.loads(case["executionArgsJson"]), "summary": json.loads(case["summaryJson"])}
     elif name == "place_order":

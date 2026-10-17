@@ -667,6 +667,10 @@ for (const [label, args] of [
             },
           });
           expect(response.isError).toBe(true);
+          // 대시보드는 이 접두어로 SDK 입력 검증 거절을 가려 로그에 고정 코드만 남긴다.
+          expect((response.content as any)[0].text).toStartWith(
+            "MCP error -32602:",
+          );
         },
       );
       expect(fake.requests).toHaveLength(0);

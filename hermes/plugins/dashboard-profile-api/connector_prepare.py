@@ -90,7 +90,7 @@ def _prepare_answer(result, args, manifest, tool, env):
         from .connector_mcp import _UNREADABLE, _tool_error, _tool_payload
         payload = _tool_payload(result)
         _, code = _tool_error(payload) if payload is not _UNREADABLE else ({}, None)
-        raise GuardRejected("prepare_tool", code if code in manifest["errors"] else None)
+        raise GuardRejected("prepare_tool", code if code in manifest["errors"] else _sdk_error_code(result))
     with _stage("prepare_payload"):
         # 텍스트 JSON은 중복 키 검증 전까지 structured_content에 합치지 않는다.
         texts = [item.text for item in result.content if item.type == "text"]
@@ -104,6 +104,16 @@ def _prepare_answer(result, args, manifest, tool, env):
             _require(all(_same_json(payload, value) for value in parsed))
     with _stage("prepare_result"):
         return {"ok": True, "result": _prepare_result(payload, args, manifest, tool, env)}
+
+
+# MCP SDK 가 도구 핸들러 전에 입력 스키마 검증에서 거절하면 JSON-RPC InvalidParams 코드로 시작하는 평문을 낸다.
+SDK_INVALID_PARAMS_PREFIX = "MCP error -32602:"
+
+
+def _sdk_error_code(result):
+    """커넥터가 선언하지 않은 오류 가운데 SDK 의 입력 검증 거절만 고정 코드로 가린다. 글 본문은 남기지 않는다."""
+    text = next((item.text for item in result.content if item.type == "text"), "")
+    return "sdk_invalid_params" if isinstance(text, str) and text.startswith(SDK_INVALID_PARAMS_PREFIX) else None
 
 
 def _guard_result_safe(answer, env):

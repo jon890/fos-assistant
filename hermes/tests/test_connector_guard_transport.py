@@ -217,6 +217,9 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
         # errors 표에 없는 코드는 남기지 않는다.
         refused.write_text(json.dumps({"code": "NOT_DECLARED"}))
         self.assert_stage(self.body(), 200, "prepare_tool", "-")
+        # 핸들러 전에 SDK 입력 검증이 거절하면 고정 코드만 남기고 그 글은 남기지 않는다.
+        refused.write_text(json.dumps({"code": None}))
+        self.assert_stage(self.body(), 200, "prepare_tool", "sdk_invalid_params")
         refused.unlink()
         summary = json.loads(self.case["summaryJson"])
         summary["account"] = "12"
