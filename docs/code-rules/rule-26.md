@@ -10,7 +10,7 @@
 
 ## 예외와 검토 범위
 
-비저장 enum은 application.model에, ErrorCode는 shared.error에 둔다.
+비저장 enum은 application.dto에, ErrorCode는 shared.error에 둔다.
 이 두 조건은 리뷰로 확인한다.
 
 ## 이 저장소의 사례

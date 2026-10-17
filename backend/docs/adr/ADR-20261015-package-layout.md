@@ -177,6 +177,9 @@
   - JPQL 과 로거 이름의 전체 이름 문자열은 컴파일이 잡지 못한다. 이동하는 클래스가 든 열한 개 파일을 이동 PR 이 직접 고친다.
   - 파일 길이 기준 목록, 위험 라벨의 경로, 문서의 경로 표기를 이동 PR 이 함께 고친다.
   - 하위 기능 이름은 업무 용어라 나중에 바뀔 수 있다. 바꿀 때는 한 하위 기능을 통째로 옮기는 PR 하나다.
+  - 이동은 끝났다. 기준 파일에 남은 줄은 `application` 직하의 public 비빈 32개, 하위 기능 순서 위반 13줄(`skill` 5, `connector` 5, `chat` 2, `proactive` 1), `admin` 이 기능의 `domain` 과 `infra` 를 쓰는 24줄, 층 방향 1줄(`CheckedSkillPackage` → `SkillFilePaths`)이다. 나머지 규칙의 기준은 비어 규칙에서 `FreezingArchRule` 을 걷었다. 남은 줄을 줄이는 방법은 후속 작업이다.
+  - `skill` 의 세 번째 하위 기능은 처음 `package` 로 정했으나 Java 예약어라 패키지 이름이 될 수 없어 `upload` 로 바꿨다. 문서가 사용자가 올린 스킬을 `UPLOADED` 로 부르는 말과 맞춘 것이다.
+  - `HermesCallFailure` 는 계획의 `application.port` 가 아니라 `hermes.infra` 에 두었다. port 규칙이 인터페이스와 예외만 허용하고, 쓰는 곳이 `infra` 의 클라이언트뿐이다.
 
 ### 이동 순서
 
