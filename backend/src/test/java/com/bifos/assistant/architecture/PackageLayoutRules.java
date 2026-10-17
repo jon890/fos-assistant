@@ -55,8 +55,6 @@ final class PackageLayoutRules {
     private static final String CURRENT_USER_PROVIDER = ".shared.auth.CurrentUserProvider";
 
 
-    /** 이동이 끝나기 전의 옛 이름이다. admin 이 쓸 수 있는 것으로 임시 허용하고 마지막 이동 PR 이 지운다. */
-
     /** rule-70: 빈이 아닌 타입은 application 직하에 두지 않는다. */
     static ArchRule applicationRootHoldsOnlyBeans(String root) {
         return classes()
