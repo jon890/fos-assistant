@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.attachment.application.AttachmentCleaner;
-import com.bifos.assistant.chat.application.ContentDraftCleaner;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.AttachmentImages;
 import com.bifos.assistant.chat.attachment.application.AttachmentInspection;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
-import com.bifos.assistant.chat.application.ConversationPurger;
+import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
 import com.bifos.assistant.chat.attachment.application.MediaObservationService;

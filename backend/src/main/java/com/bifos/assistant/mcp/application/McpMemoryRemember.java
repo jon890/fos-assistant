@@ -3,7 +3,7 @@ package com.bifos.assistant.mcp.application;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import static com.bifos.assistant.mcp.application.McpToolService.result;
 
-import com.bifos.assistant.chat.application.TurnQuestions;
+import com.bifos.assistant.chat.turn.application.TurnQuestions;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;

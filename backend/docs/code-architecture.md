@@ -382,7 +382,7 @@ provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 �
 | 1 | 공통 답변 지침. 답변 형식과 도구 호출 지침이다(`ContextAssembler.withResponseInstructions`) |
 | 2 | 「# 기억」 지침. `memory_remember` 를 받는 실행에만 붙는다 |
 | 3 | Memory 문맥. 층과 그 순서는 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「범위와 조립」 이 갖는다 |
-| 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
+| 4 | 묻는 형식 안내(`chat/turn/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
 | 5 | 이 turn 에만 붙는 지시(`TurnIntent`). 다시 생성, 결과 전달, 예약 작업, 먼저 살펴보기가 저마다 지시를 붙인다 |
 
 3 만 Memory 의 글자 상한 안에서 고르는 몫이고, 나머지는 상한과 따로 붙는다.

@@ -56,6 +56,7 @@ git grep -nE 'com\.bifos\.assistant\.(chat|connector|proactive|usage|skill)\.(ap
 | `proactive` 의 순서 위반 1줄 | `ProactiveLoopCoordinator` 가 읽는 `SurfacedProblems` 의 결과를 `loop` 쪽 port 로 받게 한다 |
 | `admin` 의 26줄 | `AgentAdminService` 가 쓰는 저장소와 엔티티와 port 는 `agent` 의 `application` 이 dto 로 내놓게 한다. `*AdminDtos` 가 받는 엔티티와 domain 값(`AllowedPerson`, `AgentToken`, `ModelChoice`, `CostBy*`, `ProactiveCheck` 와 판정 domain 값, `AppUser`, `AgentToolPolicy`, `HermesModelCatalog`)은 각 기능의 `application.dto` 로 바꾼다 |
 | `LAYER_DIRECTION` 2줄 | `ConnectorExecutionGuardContract` 를 `ConnectorExecutionSnapshot` 에 기대지 않게 하거나 두 타입의 자리를 맞춘다. `SkillFilePaths` 가 쓰는 `SkillFiles` 의 함수를 `domain` 으로 올려 `SkillFilePaths` 도 `domain` 에 둔다 |
+| `chat` 의 대기 큐 타입 | `PendingQueue`, `PendingQueueView`, `PendingMessageRequest` 는 `nextturn` 만 쓰는데 `turn` 의 `ChatDtos` 와 `turn.application.dto` 에 있다(계획서 표의 자리). `nextturn.application.dto` 와 nextturn 쪽 `*Dtos` 로 옮기면 `ChatDtos.PendingQueueView.from` 의 public 승격이 사라진다 |
 
 ### 4. 알림 문단과 이 계획서를 지운다
 

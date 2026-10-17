@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.contentdraft.application;
 
 import com.bifos.assistant.connector.contentdraft.application.port.ContentDraftJobStarter;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
-import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat;
 
-import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
-import com.bifos.assistant.chat.domain.entity.ContentDraftCreationRequest;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftCreationContext;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationRequest;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;

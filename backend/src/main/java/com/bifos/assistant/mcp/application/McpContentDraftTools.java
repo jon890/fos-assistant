@@ -2,11 +2,11 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import java.util.LinkedHashMap;
-import com.bifos.assistant.chat.application.ContentDraftInputReader;
-import com.bifos.assistant.chat.application.ContentDraftService;
-import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
-import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
-import com.bifos.assistant.chat.domain.ContentDraftException;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftService;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftCreationContext;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftBindingChoiceException;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;

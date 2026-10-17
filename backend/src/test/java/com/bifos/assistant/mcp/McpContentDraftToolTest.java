@@ -1,6 +1,6 @@
 package com.bifos.assistant.mcp;
 
-import com.bifos.assistant.chat.domain.ContentDraftException;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,14 +12,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ContentDraftInputReader;
-import com.bifos.assistant.chat.application.ContentDraftService;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
-import com.bifos.assistant.chat.infra.ContentDraftCreationCallRepository;
-import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
-import com.bifos.assistant.chat.infra.ContentDraftRepository;
-import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
+import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;

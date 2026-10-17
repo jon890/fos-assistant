@@ -6,10 +6,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
-import com.bifos.assistant.chat.presentation.ChatController;
+import com.bifos.assistant.chat.turn.presentation.ChatController;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import java.util.List;
 import java.util.UUID;

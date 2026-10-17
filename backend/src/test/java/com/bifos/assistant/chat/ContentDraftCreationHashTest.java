@@ -3,8 +3,8 @@ package com.bifos.assistant.chat;
 import tools.jackson.databind.node.ObjectNode;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ContentDraftInputReader;
-import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftCreationContext;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;

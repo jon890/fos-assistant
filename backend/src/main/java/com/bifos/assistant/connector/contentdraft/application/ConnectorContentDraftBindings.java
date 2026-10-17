@@ -1,10 +1,10 @@
 package com.bifos.assistant.connector.contentdraft.application;
 
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
-import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
-import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
-import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
-import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
+import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftBindingAccess;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotHash;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftBindingStamp;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftBindingChoiceException;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;

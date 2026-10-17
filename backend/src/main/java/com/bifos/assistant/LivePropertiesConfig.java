@@ -1,7 +1,7 @@
 package com.bifos.assistant;
 
 import com.bifos.assistant.browser.config.BrowserProperties;
-import com.bifos.assistant.chat.application.DelegationWakeProperties;
+import com.bifos.assistant.chat.nextturn.config.DelegationWakeProperties;
 import com.bifos.assistant.chat.starter.config.StarterProperties;
 import com.bifos.assistant.connector.financial.config.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;

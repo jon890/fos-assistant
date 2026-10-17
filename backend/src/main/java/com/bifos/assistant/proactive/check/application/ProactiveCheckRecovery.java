@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckEnded;
-import com.bifos.assistant.chat.application.RestartReconciler;
+import com.bifos.assistant.chat.recovery.application.RestartReconciler;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.check.application;
 
-import com.bifos.assistant.chat.application.RecoveredAnswerGuard;
+import com.bifos.assistant.chat.recovery.application.port.RecoveredAnswerGuard;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;

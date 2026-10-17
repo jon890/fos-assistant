@@ -11,7 +11,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.ArtifactCleaner;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.artifact.application.ChatArtifactWriter;
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;

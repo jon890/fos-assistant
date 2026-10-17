@@ -7,7 +7,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
 import com.bifos.assistant.chat.attachment.application.MediaPipelineEvents;
-import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftAsset;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
