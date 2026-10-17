@@ -200,7 +200,7 @@ CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치�
 `agent.application`의 도구 서비스(`AgentToolService`, `ToolsetCatalogService`, `ToolsetRequestService`, `ToolsetVisibilityService`, `AgentDefaultToolsets`)는 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
 이 서비스들의 공개 반환값은 `agent.application.dto`에 둔다.
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
-profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
+profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application.port`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
 ### 브라우저 활동 시각
