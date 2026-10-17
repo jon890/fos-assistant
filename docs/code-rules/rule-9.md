@@ -15,5 +15,5 @@ profile 회수 port와 설정의 소유 경계는 검사 코드가 별도로 확
 
 ## 이 저장소의 사례
 
-[AgentPurger.java](../../backend/src/main/java/com/bifos/assistant/agent/purge/application/AgentPurger.java)에서 확인한다.
+[AgentPurger.java](../../backend/src/main/java/com/bifos/assistant/agent/application/AgentPurger.java)에서 확인한다.
 AgentPurger는 기능별 정리 참여 port를 통해 정리 순서를 조율한다.
