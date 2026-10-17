@@ -9,11 +9,25 @@ type SourceReads = {
   observationComplete: boolean;
 };
 
+const EVIL_READS: SourceReads = {
+  completedCount: 99,
+  urls: ["https://evil.example"],
+  requestedUrls: ["https://evil.example/requested"],
+  unresolvedCount: 0,
+  observationComplete: true,
+};
+
+/**
+ * 저장된 답에 열람 요약을 끼워 대화를 연다.
+ *
+ * <p>`activity` 는 도구 호출이 있었던 답에만 붙는다. 원문 주소는 그 작업 과정 블록 안에서만 보인다.
+ */
 async function openWithSourceReads(
   page: Page,
   sourceReads: SourceReads,
-  includeStoredAnswer = false,
+  options: { activity?: boolean } = {},
 ) {
+  const withActivity = options.activity ?? true;
   const created = await page.request.post("/api/chat", {
     data: { text: "원문 열람 검사", agentCode: "browser" },
   });
@@ -27,71 +41,54 @@ async function openWithSourceReads(
       const response = await route.fetch();
       const turns = (await response.json()) as Array<Record<string, unknown>>;
       turns.push({
-        id: "temporary-source-read",
-        role: "ASSISTANT",
-        content: "임시 답",
-        senderName: null,
-        sourceReads: {
-          completedCount: 99,
-          urls: ["https://evil.example"],
-          requestedUrls: ["https://evil.example/requested"],
-          unresolvedCount: 0,
-          observationComplete: true,
-        },
-      });
-      turns.push({
         id: 999_999,
         role: "SYSTEM",
         content: "알림 줄",
         senderName: null,
       });
-      if (includeStoredAnswer) {
-        turns.push({
-          id: 999_998,
-          role: "ASSISTANT",
-          content: "저장된 답",
-          senderName: null,
-        });
-      }
       for (const turn of turns) {
         if (turn.role !== "ASSISTANT") {
-          turn.sourceReads = {
-            completedCount: 99,
-            urls: ["https://evil.example"],
-            requestedUrls: ["https://evil.example/requested"],
-            unresolvedCount: 0,
-            observationComplete: true,
-          };
+          turn.sourceReads = EVIL_READS;
+          continue;
         }
-        if (turn.role === "ASSISTANT") {
-          turn.sourceReads = sourceReads;
-        }
+        turn.sourceReads = sourceReads;
+        turn.activity = withActivity
+          ? { toolCount: 1, subagentCount: 0, durationMs: null }
+          : null;
       }
       await route.fulfill({ response, json: turns });
     },
   );
   await page.goto(`/chat/${conversationId}`);
-  return page.getByTestId("source-reads");
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1);
 }
 
-test("저장된 답의 원문 목록은 완료 수와 주소 수를 구분하고 새 탭으로 연다", async ({
+test("원문 주소는 답 아래에 보이지 않고 작업 과정을 펼치면 새 탭 링크로 보인다", async ({
   page,
 }) => {
-  const reads = await openWithSourceReads(page, {
+  await openWithSourceReads(page, {
     completedCount: 2,
     urls: ["https://example.com/path"],
-    requestedUrls: ["https://example.com/requested"],
+    requestedUrls: [
+      "https://example.com/requested",
+      "https://example.com/path",
+    ],
     unresolvedCount: 1,
     observationComplete: false,
   });
 
-  await expect(reads).toContainText("열람 도구 완료 2회 · 확인한 주소 1개");
-  await expect(
-    reads.getByRole("heading", { name: "원문 결과에서 확인한 주소" }),
-  ).toBeVisible();
-  await expect(
-    reads.getByRole("heading", { name: "열람 요청 · 도구 호출 성공" }),
-  ).toBeVisible();
+  const block = page.getByTestId("activity-block");
+  await expect(block).toBeVisible();
+  const reads = page.getByTestId("activity-source-reads");
+  await expect(reads).not.toBeVisible();
+  await expect(page.getByTestId("source-reads")).toHaveCount(0);
+  await expect(block.getByTestId("activity-toggle")).not.toContainText("연 원문");
+
+  await block.getByTestId("activity-toggle").click();
+
+  await expect(reads).toBeVisible();
+  // 같은 주소는 한 번만 보이고 집계 문장과 안내 문장은 없다
+  await expect(reads.getByRole("link")).toHaveCount(2);
   const link = reads.getByRole("link", { name: "https://example.com/path" });
   await expect(link).toHaveAttribute("target", "_blank");
   await expect(link).toHaveAttribute("rel", "noreferrer noopener");
@@ -100,75 +97,53 @@ test("저장된 답의 원문 목록은 완료 수와 주소 수를 구분하고
   });
   await expect(requestedLink).toHaveAttribute("target", "_blank");
   await expect(requestedLink).toHaveAttribute("rel", "noreferrer noopener");
-  await expect(reads).toContainText("페이지별 성공은 확인하지 못했어요.");
-  await expect(reads).toContainText(
-    "일부 열람 결과에서 주소를 확인하지 못했어요.",
-  );
-  await expect(reads).toContainText("열람 기록을 모두 확인하지 못했어요.");
-  await expect(page.getByTestId("user-message")).not.toContainText(
-    "이번에 연 원문",
-  );
-  await expect(page.getByTestId("system-message")).not.toContainText(
-    "이번에 연 원문",
-  );
-  await expect(
-    page.getByTestId("assistant-message").filter({ hasText: "임시 답" }),
-  ).not.toContainText("이번에 연 원문");
-  await expect(page.getByTestId("source-reads")).toHaveCount(1);
-
-  await page.reload();
-  await expect(page.getByTestId("source-reads")).toContainText(
-    "확인한 주소 1개",
-  );
+  await expect(reads).not.toContainText("열람 도구 완료");
+  await expect(reads).not.toContainText("페이지별 성공");
+  await expect(page.getByTestId("user-message")).not.toContainText("연 원문");
+  await expect(page.getByTestId("system-message")).not.toContainText("연 원문");
+  await expect(page.getByTestId("activity-source-reads")).toHaveCount(1);
 });
 
-test("확인한 주소가 없으면 빈 상태를 표시한다", async ({ page }) => {
-  const reads = await openWithSourceReads(page, {
+test("확인한 주소가 없으면 작업 과정에 원문 절을 그리지 않는다", async ({
+  page,
+}) => {
+  await openWithSourceReads(page, {
     completedCount: 2,
     urls: [],
     unresolvedCount: 0,
     observationComplete: true,
   });
 
-  await expect(reads).toContainText("열람 도구 완료 2회 · 확인한 주소 0개");
-  await expect(reads).toContainText("기록에서 확인한 원문 주소가 없어요.");
+  await page.getByTestId("activity-toggle").click();
+  await expect(page.getByTestId("activity-source-reads")).toHaveCount(0);
+  await expect(page.getByTestId("source-reads")).toHaveCount(0);
 });
 
-for (const [observation, observationComplete] of [
-  ["완전한 관측", true],
-  ["불완전한 관측", false],
-] as const) {
-  test(`열람 흔적이 없는 저장된 답은 ${observation}에서도 원문 목록을 숨긴다`, async ({
-    page,
-  }) => {
-    await openWithSourceReads(
-      page,
-      {
-        completedCount: 0,
-        urls: [],
-        unresolvedCount: 0,
-        observationComplete,
-      },
-      true,
-    );
-
-    await expect(
-      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
-    ).toBeVisible();
-    await expect(page.getByTestId("source-reads")).toHaveCount(0);
-
-    await page.reload();
-    await expect(
-      page.getByTestId("assistant-message").filter({ hasText: "저장된 답" }),
-    ).toBeVisible();
-    await expect(page.getByTestId("source-reads")).toHaveCount(0);
-  });
-}
-
-test("요청 주소만 있으면 빈 상태 없이 호출 성공 근거를 보인다", async ({
+test("도구 호출이 없는 답에는 주소가 있어도 아무것도 그리지 않는다", async ({
   page,
 }) => {
-  const reads = await openWithSourceReads(page, {
+  await openWithSourceReads(
+    page,
+    {
+      completedCount: 1,
+      urls: ["https://example.com/path"],
+      unresolvedCount: 0,
+      observationComplete: true,
+    },
+    { activity: false },
+  );
+
+  await expect(page.getByTestId("activity-block")).toHaveCount(0);
+  await expect(page.getByTestId("activity-source-reads")).toHaveCount(0);
+  await expect(page.getByTestId("source-reads")).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  await expect(page.getByTestId("activity-source-reads")).toHaveCount(0);
+});
+
+test("요청 주소만 있어도 작업 과정을 펼치면 보인다", async ({ page }) => {
+  await openWithSourceReads(page, {
     completedCount: 1,
     urls: [],
     requestedUrls: ["https://example.com/requested"],
@@ -176,10 +151,10 @@ test("요청 주소만 있으면 빈 상태 없이 호출 성공 근거를 보�
     observationComplete: true,
   });
 
-  await expect(reads).toContainText("열람 도구 완료 1회 · 확인한 주소 0개");
+  await page.getByTestId("activity-toggle").click();
   await expect(
-    reads.getByRole("heading", { name: "열람 요청 · 도구 호출 성공" }),
+    page
+      .getByTestId("activity-source-reads")
+      .getByRole("link", { name: "https://example.com/requested" }),
   ).toBeVisible();
-  await expect(reads).toContainText("페이지별 성공은 확인하지 못했어요.");
-  await expect(reads).not.toContainText("기록에서 확인한 원문 주소가 없어요.");
 });
