@@ -4,7 +4,7 @@ import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.INVALID_RESULT_NOTICE;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NOTHING_NEW_NOTICE;
 
-import com.bifos.assistant.chat.application.model.CheckAnswer;
+import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
 import com.bifos.assistant.proactive.check.application.dto.AnnouncedKey;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultRead;

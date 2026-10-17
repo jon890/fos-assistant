@@ -31,7 +31,7 @@ lock 파일, 빌드 결과물과 시험 스냅샷은 검토 대상에서 제외�
 FINDING_START
 TYPE: INLINE
 SEVERITY: P1
-PATH: backend/src/main/java/com/bifos/assistant/chat/application/ChatService.java
+PATH: backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatService.java
 LINE: 42
 ISSUE: 문제 설명 (한국어)
 FIX: 수정 제안 (한국어)

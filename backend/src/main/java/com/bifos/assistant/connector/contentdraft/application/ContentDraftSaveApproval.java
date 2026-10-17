@@ -38,7 +38,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
-import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;

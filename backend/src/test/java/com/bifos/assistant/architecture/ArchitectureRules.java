@@ -11,7 +11,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.bifos.assistant.browser.config.BrowserProperties;
-import com.bifos.assistant.chat.application.DelegationWakeProperties;
+import com.bifos.assistant.chat.nextturn.config.DelegationWakeProperties;
 import com.bifos.assistant.chat.starter.config.StarterProperties;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
@@ -414,7 +414,7 @@ public final class ArchitectureRules {
         .resideInAPackage("com.bifos.assistant.orchestration..")
         .should()
         .dependOnClassesThat()
-        .haveFullyQualifiedName("com.bifos.assistant.chat.application.ChatService")
+        .haveFullyQualifiedName("com.bifos.assistant.chat.turn.application.ChatService")
         .as("orchestration 은 ChatService 에 의존하지 않는다");
 
     /** rule-13: 까닭과 예외는 docs/code-rules/rule-13.md를 본다. */
@@ -538,7 +538,7 @@ public final class ArchitectureRules {
         .that()
         .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
         .and()
-        .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.turn.presentation.ChatEventStreams")
         .and()
         .doNotHaveFullyQualifiedName(
             "com.bifos.assistant.notification.presentation.NotificationEventStreams")
@@ -548,7 +548,7 @@ public final class ArchitectureRules {
             .that()
             .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
             .and()
-            .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.turn.presentation.ChatEventStreams")
             .and()
             .doNotHaveFullyQualifiedName(
                 "com.bifos.assistant.notification.presentation.NotificationEventStreams")

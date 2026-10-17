@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.presentation;
 
+import com.bifos.assistant.chat.nextturn.presentation.PendingMessageController;
+import com.bifos.assistant.chat.turn.presentation.ChatDtos;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -12,11 +14,11 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
-import com.bifos.assistant.chat.application.PendingMessageService;
-import com.bifos.assistant.chat.application.TurnCancellation;
-import com.bifos.assistant.chat.application.TurnHandle;
+import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
+import com.bifos.assistant.chat.turn.application.TurnCancellation;
+import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

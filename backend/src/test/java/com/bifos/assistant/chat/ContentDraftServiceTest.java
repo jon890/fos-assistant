@@ -3,7 +3,7 @@ package com.bifos.assistant.chat;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
 import tools.jackson.databind.node.ObjectNode;
-import com.bifos.assistant.chat.application.ConversationPurger;
+import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import org.springframework.dao.DataAccessResourceFailureException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

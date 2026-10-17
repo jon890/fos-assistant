@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.action.application;
 
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
-import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;

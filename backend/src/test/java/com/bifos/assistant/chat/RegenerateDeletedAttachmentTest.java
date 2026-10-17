@@ -8,7 +8,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;

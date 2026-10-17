@@ -19,7 +19,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.admin.toolset.presentation.AgentToolAdminController;
 import com.bifos.assistant.admin.toolset.presentation.ToolsetAdminDtos.UpdateToolsetsRequest;
-import com.bifos.assistant.chat.application.ChatService;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;

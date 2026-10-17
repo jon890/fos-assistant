@@ -3,8 +3,8 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.financial.application.FinancialOrderLimits;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ChatService;
-import com.bifos.assistant.chat.application.ConversationPurger;
+import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import java.math.BigDecimal;
 import java.time.ZoneId;

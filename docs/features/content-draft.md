@@ -638,7 +638,7 @@ tombstone은 두 식별 고정 키와 정확한 범위 대응을 포함한 본�
 
 ### 원고 서비스 배치
 
-신규 엔티티는 `chat.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
+신규 엔티티는 `chat.contentdraft.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
 기존 엔티티를 옮기거나 최상위 기능 패키지를 늘리지 않는다. `domain..`의 기존 층 규칙이 이 하위 패키지도 검사한다.
 상태 enum은 `chat.contentdraft.domain.type`, 공개 서비스 반환 타입은 `chat.contentdraft.application.dto`, 저장소와 암호화는 `chat.contentdraft.infra`에 둔다.
 REST는 `chat.contentdraft.presentation.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
