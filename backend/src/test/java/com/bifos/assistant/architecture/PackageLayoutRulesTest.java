@@ -268,10 +268,9 @@ class PackageLayoutRulesTest {
     void checksAdminUsesOnlyFeatureApplication() throws IOException {
         PackageLayoutRules.adminUsesOnlyFeatureApplication(ROOT).check(compile(
             "admin.agent.application.S", "public class S { $ROOT.a.application.Svc s; $ROOT.a.application.dto.V v; $ROOT.a.domain.type.T t;"
-                + " $ROOT.shared.util.U u; $ROOT.a.application.model.M m; }",
+                + " $ROOT.shared.util.U u; }",
             "a.application.Svc", "public class Svc {}",
             "a.application.dto.V", "public record V() {}",
-            "a.application.model.M", "public record M() {}",
             "a.domain.type.T", "public enum T { A }",
             "shared.util.U", "public class U {}"));
         String report = failure(PackageLayoutRules.adminUsesOnlyFeatureApplication(ROOT), compile(

@@ -29,7 +29,7 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 
 ## 패키지 배치
 
-**이동 진행 중이다.** 기능은 `<기능>[.<하위 기능>].<역할>` 로 나누고 관리자 전용 화면은 `admin` 으로 모으기로 했다. 아직 옮기지 않은 기능은 옛 구조(`application.model` 같은 이름)로 남아 있고, 규칙은 그 위반을 기준 파일에 얼려 두었다. 이동이 끝나면 이 알림을 지운다.
+기능은 `<기능>[.<하위 기능>].<역할>` 로 나누고 관리자 전용 화면은 `admin` 으로 모은다. 이동은 끝났고, 규칙이 얼린 남은 위반은 후속 작업으로 줄여 간다.
 
 - 새 클래스는 목표 구조로 둔다. 인터페이스는 `application.port`, 서비스가 주고받는 값은 `application.dto`, 설정 값은 `config` 다. `application` 직하에는 빈만 둔다.
 - 기능은 `admin` 을 모르고, `admin` 은 기능의 `application` 과 `application.dto` 만 부른다. `CurrentUserProvider.requireAdmin` 은 `admin` 안에서만 부른다.

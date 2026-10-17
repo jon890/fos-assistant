@@ -353,7 +353,7 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("application 아래에 dto 와 port 가 아닌 하위 패키지가 새로 생기지 않는다")
     void applicationSubpackagesAreDtoAndPort() {
-        FreezingArchRule.freeze(ArchitectureRules.APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT).check(MAIN);
+        ArchitectureRules.APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT.check(MAIN);
     }
 
 
@@ -374,14 +374,14 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("ConfigurationProperties 가 config 밖에 새로 생기지 않는다")
     void configurationPropertiesInConfig() {
-        FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_IN_CONFIG).check(MAIN);
+        ArchitectureRules.CONFIGURATION_PROPERTIES_IN_CONFIG.check(MAIN);
     }
 
 
     @Test
     @DisplayName("application 직하의 클래스 수가 상한을 새로 넘지 않는다")
     void applicationPackageSize() {
-        FreezingArchRule.freeze(ArchitectureRules.APPLICATION_PACKAGE_SIZE).check(MAIN);
+        ArchitectureRules.APPLICATION_PACKAGE_SIZE.check(MAIN);
     }
 
 
@@ -395,7 +395,7 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("나눈 기능의 루트에 역할 패키지가 새로 생기지 않는다")
     void splitFeaturesHaveNoRootRoles() {
-        FreezingArchRule.freeze(ArchitectureRules.SPLIT_FEATURES_HAVE_NO_ROOT_ROLES).check(MAIN);
+        ArchitectureRules.SPLIT_FEATURES_HAVE_NO_ROOT_ROLES.check(MAIN);
     }
 
 
@@ -437,7 +437,7 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("requireAdmin 을 admin 밖에서 새로 부르지 않는다")
     void requireAdminOnlyInAdmin() {
-        FreezingArchRule.freeze(ArchitectureRules.REQUIRE_ADMIN_ONLY_IN_ADMIN).check(MAIN);
+        ArchitectureRules.REQUIRE_ADMIN_ONLY_IN_ADMIN.check(MAIN);
     }
 
 
