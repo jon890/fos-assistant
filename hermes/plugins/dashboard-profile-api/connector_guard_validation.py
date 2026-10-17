@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import re
@@ -11,9 +12,42 @@ from .connector_guard import HEX, PROTOCOL, _strict_json
 from .connector_normalization import preserves
 
 
-def _require(condition):
+class GuardRejected(ValueError):
+    """금융 준비나 실행을 거절한 검사의 고정 단계 코드를 담는다.
+
+    `stage` 와 `code` 는 운영 로그에만 남기고 응답에는 싣지 않는다. 인자 값, 계좌, 원격 응답은 담지 않는다.
+    `code` 는 커넥터가 `errors` 표에 선언한 오류 코드이고 선언하지 않은 코드는 담지 않는다.
+    """
+
+    def __init__(self, stage=None, code=None):
+        super().__init__("금융 입력을 검증하지 못했다")
+        self.stage = stage
+        self.code = code
+
+
+def _require(condition, stage=None):
     if not condition:
-        raise ValueError("금융 입력을 검증하지 못했다")
+        raise GuardRejected(stage)
+
+
+@contextlib.contextmanager
+def _stage(name):
+    """이 구간에서 난 실패에 단계 코드를 붙인다. 이미 단계가 붙은 거절은 그대로 둔다."""
+    try:
+        yield
+    except GuardRejected as error:
+        if error.stage is None:
+            error.stage = name
+        raise
+    except Exception as error:
+        raise GuardRejected(name) from error
+
+
+def _guard_stage(error):
+    """로그에 남길 단계 코드와 선언된 오류 코드다. 단계를 붙이지 않은 실패는 `unclassified` 다."""
+    if isinstance(error, GuardRejected):
+        return error.stage or "unclassified", error.code or "-"
+    return "unclassified", "-"
 
 
 def _bounded(value, limit, depth=0):

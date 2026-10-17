@@ -9,6 +9,7 @@ import pathlib
 import re
 from .connector_guard import _guard_request_body, EXECUTION_ENV
 from .connector_prepare import _guard_operation, _run_connector_prepare, _prepare_answer, _guard_result_safe
+from .connector_guard_validation import _guard_stage
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -306,7 +307,10 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     try:
         if prepare or "execution" in body or manifest["schema"] == 2:
             guarded_tool = await _guard_operation(body["profile"], manifest, state[connector_id], body, env, prepare)
-    except Exception:
+    except Exception as error:
+        # 단계 코드만 남긴다. 인자와 profile 의 값은 남기지 않는다.
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 금융 보호 맥락을 확인하지 못했다 stage=%s",
+                       connector_id, _guard_stage(error)[0])
         return _rejected("금융 보호 맥락을 확인하지 못했다", 409)
     problem = _mcp_sdk_problem()
     if problem is not None:
@@ -334,10 +338,11 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
         return _rejected("도구가 시간 제한을 넘겨 실행 결과를 모른다", 504)
     except Exception as error:
-        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s)",
+        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류와 고정 단계 코드만 남긴다.
+        stage, code = _guard_stage(error)
+        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s) stage=%s code=%s",
                        connector_id, hermes_tool, ", ".join(sorted(set(_leaf_error_types(error)))),
-                       _mcp_sdk_version())
+                       _mcp_sdk_version(), stage, code)
         if progress["sent"]:
             # 도구 호출을 보낸 뒤다. 실행됐는지 알 수 없다.
             return _rejected("도구 호출 뒤에 실패해 실행 결과를 모른다", 504)

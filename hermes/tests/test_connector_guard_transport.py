@@ -8,6 +8,7 @@ import hmac
 import http.server
 import importlib
 import json
+import logging
 import os
 import pathlib
 import shutil
@@ -186,6 +187,42 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
         body["profile"] = "missing"
         self.assertEqual(self.request(PREPARE, "POST", body)[0], 404)
         self.assertEqual(self.request("/api/connectors/%s/call" % base.DEMO, "POST", {"tool": "prepare_order", "values": {}})[0], 400)
+
+    def assert_stage(self, body, status, stage, code="-"):
+        # 기반 fixture 가 로그를 꺼 두므로 이 호출 동안만 켠다.
+        logging.disable(logging.NOTSET)
+        try:
+            with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+                self.assertEqual(self.request(PREPARE, "POST", body)[0], status)
+        finally:
+            logging.disable(logging.CRITICAL)
+        text = "\n".join(logs.output)
+        self.assertIn("stage=" + stage, text)
+        if status == 200:
+            self.assertIn("code=" + code, text)
+        # 계좌, 인자, 커넥터 오류 문구, profile 의 값은 남기지 않는다.
+        for value in ("000007", "demo_ok_0123456789", "거절", json.dumps(body["args"])):
+            self.assertNotIn(value, text)
+
+    def test_prepare_rejections_log_fixed_stage_without_values(self):
+        self.mode = "missing"
+        self.assert_stage(self.body(), 409, "support")
+        self.mode = "ok"
+        body = self.body()
+        body["hermes_tool"] = "mcp__demo__list_scopes"
+        self.assert_stage(body, 409, "declaration")
+        refused = self.connector_root / "prepare-error.json"
+        refused.write_text(json.dumps({"code": "DEMO_FORBIDDEN"}))
+        self.assert_stage(self.body(), 200, "prepare_tool", "DEMO_FORBIDDEN")
+        # errors 표에 없는 코드는 남기지 않는다.
+        refused.write_text(json.dumps({"code": "NOT_DECLARED"}))
+        self.assert_stage(self.body(), 200, "prepare_tool", "-")
+        refused.unlink()
+        summary = json.loads(self.case["summaryJson"])
+        summary["account"] = "12"
+        (self.connector_root / "prepare-case.json").write_text(json.dumps(dict(self.case, summaryJson=json.dumps(summary))))
+        self.assert_stage(self.body(), 200, "prepare_result")
+        self.assertEqual(self.claims + self.trades, [])
 
     def test_original_hash_strict_sdk_keys_and_types(self):
         body = self.body(execution=True)
