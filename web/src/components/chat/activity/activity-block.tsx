@@ -7,6 +7,9 @@ import type { ActivitySummary } from "@/lib/chat-event";
 import { formatElapsed, formatSeconds } from "@/lib/format";
 import { fetchExecutionTree } from "@/lib/usage-api";
 import type { ExecutionTreeResponse } from "@/components/execution/execution-tree";
+import type { MemoryUse } from "@/lib/memory-use-api";
+import type { SourceReadSummary } from "@/components/chat/message-types";
+import { ActivityReferences } from "./activity-references";
 import { ActivityTimeline } from "./activity-timeline";
 import {
   activityLabel,
@@ -63,6 +66,10 @@ type Props =
       executionId: number;
       initialExpanded?: boolean;
       cancelled?: boolean;
+      /** 끝난 답이 연 원문. 펼친 안쪽 끝에만 그린다 */
+      sourceReads?: SourceReadSummary | null;
+      /** 끝난 답이 본문을 받은 기억. 펼친 안쪽 끝에만 그린다 */
+      memoryUses?: MemoryUse[];
       onOpenPanel?(): void;
     };
 
@@ -248,6 +255,12 @@ export function ActivityBlock(props: Props) {
                 작업 과정을 읽고 있어요
               </p>
             )}
+            {props.mode === "saved" ? (
+              <ActivityReferences
+                sourceReads={props.sourceReads}
+                memoryUses={props.memoryUses}
+              />
+            ) : null}
             {duration !== null || props.onOpenPanel ? (
               <div className="mt-2 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                 {duration !== null ? (
