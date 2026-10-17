@@ -42,6 +42,12 @@ public class MemorySearchSection {
     private final QueryEmbedder queryEmbedder;
 
 
+    /** 구역의 건수, 항목당 글자 수, 글자 예산이다. 연결된 기억 구역도 같은 값을 자기 몫으로 따로 쓴다. */
+    MemorySearchSectionProperties limits() {
+        return properties;
+    }
+
+
     /**
      * 구역을 싣고 색인에 놓을 항목과 그 순서를 낸다.
      *

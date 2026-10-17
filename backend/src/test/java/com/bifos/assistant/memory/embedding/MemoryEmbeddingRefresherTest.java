@@ -1,6 +1,9 @@
 package com.bifos.assistant.memory.embedding;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -9,6 +12,7 @@ import com.bifos.assistant.memory.application.embedding.EmbeddingRejectedExcepti
 import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingRefresher;
+import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
@@ -45,6 +49,9 @@ class MemoryEmbeddingRefresherTest {
 
     private static final CurrentUser USER = new CurrentUser(1L, "user1@example.com", "user1", 10L, UserRole.ADMIN);
     private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, 2, 16, null, null);
+
+    @Autowired
+    MemoryLinkDiscovery linkDiscovery;
 
     @Autowired
     MemoryService memories;
@@ -114,6 +121,23 @@ class MemoryEmbeddingRefresherTest {
         assertThat(row.dimensions()).isEqualTo(3);
         assertThat(row.vector()).containsExactly(client.vectorOf("타이어\n작년 11월에 갈았다"));
         assertThat(refresher(ENABLED).refreshOnce()).as("바뀐 것이 없는 두 번째 주기").isZero();
+    }
+
+
+    @Test
+    @DisplayName("새로 벡터를 쓴 항목만 연결 탐지에 넘기고 바뀐 것이 없거나 임베딩이 꺼져 있으면 아무것도 넘기지 않는다")
+    void passesOnlyWrittenItemsToLinkDiscovery() {
+        MemoryLinkDiscovery discovery = mock(MemoryLinkDiscovery.class);
+        Memory first = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
+        Memory second = memories.create(USER, MemoryScope.USER, "보일러", "10월에 점검한다", false);
+
+        refresher(ENABLED, discovery).refreshOnce();
+        refresher(ENABLED, discovery).refreshOnce();
+        refresher(MemoryEmbeddingProperties.disabled(), discovery).refreshOnce();
+
+        verify(discovery).discover(List.of(first.id(), second.id()));
+        verify(discovery).discover(List.of());
+        verifyNoMoreInteractions(discovery);
     }
 
 
@@ -275,8 +299,13 @@ class MemoryEmbeddingRefresherTest {
 
 
     private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties) {
+        return refresher(properties, linkDiscovery);
+    }
+
+
+    private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties, MemoryLinkDiscovery discovery) {
         return new MemoryEmbeddingRefresher(
-            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks);
+            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks, discovery);
     }
 
 

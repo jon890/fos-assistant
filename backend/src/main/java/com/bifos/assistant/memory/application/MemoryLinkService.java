@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -94,6 +95,51 @@ public class MemoryLinkService {
             MemoryLinkType.RELATED,
             () -> MemoryLink.related(a, b, trimmed, origin, score, executionId),
             link -> link.reopen(trimmed, origin, score, executionId));
+    }
+
+
+    /**
+     * 코드가 임베딩으로 찾은 대체 제안을 만든다(ADR-20261015 / memory-link). 같은 쌍에 어느 방향, 어느 상태든 대체 줄이나 관련 줄이 이미 있으면
+     * 만들지 않는다. 사람이 거절한 쌍을 다시 묻지 않고, 사람이 「같은 여행」 처럼 관련으로 이은 쌍을 대체로 묻지 않기 위해서다.
+     *
+     * @return 만든 줄. 만들지 않았으면 비어 있다
+     */
+    @Transactional
+    public Optional<MemoryLink> proposeAutoSupersede(Long newId, Long oldId, double score) {
+        if (!systemLinkable(newId, oldId)
+            || links.findByFromMemoryIdAndToMemoryIdAndType(newId, oldId, MemoryLinkType.SUPERSEDES).isPresent()
+            || links.findByFromMemoryIdAndToMemoryIdAndType(oldId, newId, MemoryLinkType.SUPERSEDES).isPresent()
+            || links.findByFromMemoryIdAndToMemoryIdAndType(Math.min(newId, oldId), Math.max(newId, oldId), MemoryLinkType.RELATED)
+                .isPresent()) {
+            return Optional.empty();
+        }
+        MemoryLink created = links.saveAndFlush(MemoryLink.autoSupersede(newId, oldId, score));
+        log.info("memory link created linkId={} type=SUPERSEDES origin=AUTO score={}", created.id(), score);
+        return Optional.of(created);
+    }
+
+
+    /**
+     * 코드가 임베딩으로 찾은 관련 연결을 맺는다. 같은 쌍에 어느 상태든 {@code RELATED} 나 {@code SUPERSEDES} 줄이 있거나, 어느 한쪽이 이미
+     * {@code maxPerItem} 개의 효력 있는 {@code RELATED} 를 가지면 맺지 않는다.
+     *
+     * @return 맺은 줄. 맺지 않았으면 비어 있다
+     */
+    @Transactional
+    public Optional<MemoryLink> relateAuto(Long a, Long b, double score, int maxPerItem) {
+        Long from = Math.min(a, b);
+        Long to = Math.max(a, b);
+        if (!systemLinkable(a, b)
+            || links.findByFromMemoryIdAndToMemoryIdAndType(from, to, MemoryLinkType.RELATED).isPresent()
+            || links.findByFromMemoryIdAndToMemoryIdAndType(a, b, MemoryLinkType.SUPERSEDES).isPresent()
+            || links.findByFromMemoryIdAndToMemoryIdAndType(b, a, MemoryLinkType.SUPERSEDES).isPresent()
+            || links.countActiveRelatedOf(a) >= maxPerItem
+            || links.countActiveRelatedOf(b) >= maxPerItem) {
+            return Optional.empty();
+        }
+        MemoryLink created = links.saveAndFlush(MemoryLink.related(a, b, null, MemoryLinkOrigin.AUTO, score, null));
+        log.info("memory link created linkId={} type=RELATED origin=AUTO score={}", created.id(), score);
+        return Optional.of(created);
     }
 
 
@@ -277,6 +323,28 @@ public class MemoryLinkService {
         if (!linkable(user, first, second)) {
             throw notFound();
         }
+    }
+
+
+    /** 요청자 없이 코드가 잇는 두 항목이 규칙을 지나는가. 같은 범위와 주인의 대체되지 않은 {@code ACCEPTED} 항목이고 출처 원문이 아니다. */
+    private boolean systemLinkable(Long a, Long b) {
+        if (a.equals(b)) {
+            return false;
+        }
+        Memory first = memories.findById(a).orElse(null);
+        Memory second = memories.findById(b).orElse(null);
+        return first != null
+            && second != null
+            && first.status() == MemoryStatus.ACCEPTED
+            && second.status() == MemoryStatus.ACCEPTED
+            && first.entryType() != MemoryEntryType.SOURCE
+            && second.entryType() != MemoryEntryType.SOURCE
+            && first.scope() == second.scope()
+            && (first.scope() == MemoryScope.USER
+                ? Objects.equals(first.ownerUserId(), second.ownerUserId())
+                : Objects.equals(first.groupId(), second.groupId()))
+            && !isSuperseded(a)
+            && !isSuperseded(b);
     }
 
 

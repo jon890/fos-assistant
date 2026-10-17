@@ -90,6 +90,14 @@ public class MemoryLink extends AuditedEntity {
     }
 
 
+    /** 코드가 임베딩으로 찾은 대체 제안이다. 사람이 만든 제안과 같이 받아들이기 전에는 아무것도 바꾸지 않는다. */
+    public static MemoryLink autoSupersede(Long newMemoryId, Long oldMemoryId, double score) {
+        MemoryLink link = proposeSupersede(newMemoryId, oldMemoryId, MemoryLinkOrigin.AUTO, null);
+        link.score = score;
+        return link;
+    }
+
+
     /** 두 항목의 관련 연결이다. 방향이 없으므로 번호가 작은 쪽을 {@code from} 에 둔다. 바로 효력이 있다. */
     public static MemoryLink related(
         Long a, Long b, String label, MemoryLinkOrigin origin, Double score, Long executionId) {
