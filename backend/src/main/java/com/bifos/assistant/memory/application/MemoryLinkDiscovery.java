@@ -7,6 +7,7 @@ import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.config.MemoryLinkProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
@@ -17,9 +18,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -100,17 +104,31 @@ public class MemoryLinkDiscovery {
     private Found discoverOne(MemoryLinkItem target, List<MemoryLinkItem> peers) {
         int proposed = 0;
         for (SupersedeCandidate candidate : supersedes.find(target, peers)) {
-            if (links.proposeAutoSupersede(candidate.newer().id(), candidate.older().id(), candidate.score()).isPresent()) {
+            if (created(() -> links.proposeAutoSupersede(candidate.newer().id(), candidate.older().id(), candidate.score()))) {
                 proposed++;
             }
         }
         int relatedCount = 0;
         for (RelatedPair pair : related.find(target, peers)) {
-            if (links.relateAuto(pair.target().id(), pair.peer().id(), pair.score(), properties.relatedMaxPerItem()).isPresent()) {
+            if (created(() -> links.relateAuto(pair.target().id(), pair.peer().id(), pair.score(), properties.relatedMaxPerItem()))) {
                 relatedCount++;
             }
         }
         return new Found(proposed, relatedCount);
+    }
+
+
+    /**
+     * 연결 하나를 만든다. 에이전트의 {@code memory_link} 가 같은 쌍을 먼저 넣어 유일 제약에 걸리면 그 쌍만 건너뛰고 다음 쌍을 이어 본다. 같은 쌍은 이미
+     * 있으므로 다시 만들 것이 없다.
+     */
+    private boolean created(Supplier<Optional<MemoryLink>> create) {
+        try {
+            return create.get().isPresent();
+        } catch (DataIntegrityViolationException ex) {
+            log.info("memory link discovery skipped an existing pair");
+            return false;
+        }
     }
 
 
