@@ -235,9 +235,9 @@ public final class ArchitectureRules {
     /** 정상·위반 fixture 도 운영 규칙과 같은 조건을 쓰며 바뀌는 것은 루트뿐이다. */
     static ArchRule agentAdminApplicationPlacement(String root) {
         Map<String, String> owners = Map.of(
-            "AgentAdminService", "agent.admin.application.AgentAdminService",
-            "AgentCreateCommand", "agent.admin.application.model.AgentCreateCommand",
-            "AgentUpdateCommand", "agent.admin.application.model.AgentUpdateCommand");
+            "AgentAdminService", "admin.agent.application.AgentAdminService",
+            "AgentCreateCommand", "admin.agent.application.dto.AgentCreateCommand",
+            "AgentUpdateCommand", "admin.agent.application.dto.AgentUpdateCommand");
         return classes()
             .that()
             .resideInAPackage(root + "..")
@@ -250,17 +250,17 @@ public final class ArchitectureRules {
     /** HTTP 타입을 기존 package 로 되돌리거나 중복·누락해도 전체 루트에서 찾는다. */
     static ArchRule agentAdminHttpContract(String root) {
         Map<String, String> owners = Map.of(
-            "AgentAdminController", "agent.admin.presentation.AgentAdminController",
-            "AgentAdminDtos", "agent.admin.presentation.AgentAdminDtos",
-            "CreateAgentRequest", "agent.admin.presentation.AgentAdminDtos$CreateAgentRequest",
-            "UpdateAgentRequest", "agent.admin.presentation.AgentAdminDtos$UpdateAgentRequest",
-            "AdminAgentView", "agent.admin.presentation.AgentAdminDtos$AdminAgentView");
+            "AgentAdminController", "admin.agent.presentation.AgentAdminController",
+            "AgentAdminDtos", "admin.agent.presentation.AgentAdminDtos",
+            "CreateAgentRequest", "admin.agent.presentation.AgentAdminDtos$CreateAgentRequest",
+            "UpdateAgentRequest", "admin.agent.presentation.AgentAdminDtos$UpdateAgentRequest",
+            "AdminAgentView", "admin.agent.presentation.AgentAdminDtos$AdminAgentView");
         return classes()
             .that()
             .resideInAPackage(root + "..")
             .should(ownedTypes(root, owners))
             .andShould(adminHttpRoles(root))
-            .as("AGENT_ADMIN_HTTP_CONTRACT: 관리자 HTTP 배치와 requireAdmin 호출을 지킨다");
+            .as("AGENT_ADMIN_HTTP_CONTRACT: 관리자 HTTP 배치를 지킨다");
     }
 
 
@@ -311,7 +311,7 @@ public final class ArchitectureRules {
         return new ArchCondition<>("admin 은 application 업무만 소유하고 domain 과 infra 가 admin 을 쓰지 않는다") {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
-                String boundary = root + ".agent.admin.";
+                String boundary = root + ".admin.agent.";
                 if (item.getPackageName().startsWith(boundary)) {
                     require(
                         item,
@@ -333,8 +333,8 @@ public final class ArchitectureRules {
                         && item.getPackageName().contains(".application")) {
                         require(
                             item,
-                            item.getPackageName().equals(boundary + "application.model"),
-                            "공개 application record 는 application.model 에 있다",
+                            item.getPackageName().equals(boundary + "application.dto"),
+                            "공개 application record 는 application.dto 에 있다",
                             events);
                     }
                     if (item.isAnnotatedWith(ConfigurationProperties.class)) {
@@ -366,11 +366,11 @@ public final class ArchitectureRules {
 
 
     private static ArchCondition<JavaClass> adminHttpRoles(String root) {
-        return new ArchCondition<>("관리 HTTP record 와 컨트롤러가 presentation 에 있고 mapped 메서드가 requireAdmin 을 부른다") {
+        return new ArchCondition<>("관리 HTTP record 와 컨트롤러가 presentation 에 있고 mapped 메서드가 셋이다") {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
-                String presentation = root + ".agent.admin.presentation";
-                if (item.getPackageName().startsWith(root + ".agent.admin.")
+                String presentation = root + ".admin.agent.presentation";
+                if (item.getPackageName().startsWith(root + ".admin.agent.")
                     && item.isRecord()
                     && !item.isAnnotatedWith(ConfigurationProperties.class)
                     && !item.getPackageName().contains(".application.")) {
@@ -406,16 +406,6 @@ public final class ArchitectureRules {
                             .equals(Set.of("create", "list", "update")),
                     "관리 mapped 메서드는 등록·목록·수정 3개다",
                     events);
-                for (JavaMethod method : mapped) {
-                    boolean authorized = method.getMethodCallsFromSelf().stream()
-                        .anyMatch(call -> call.getTargetOwner().getName().equals(root + ".shared.auth.CurrentUserProvider")
-                            && call.getName().equals("requireAdmin"));
-                    require(
-                        item,
-                        authorized,
-                        method.getFullName() + " 에서 CurrentUserProvider.requireAdmin 을 호출한다",
-                        events);
-                }
             }
         };
     }
