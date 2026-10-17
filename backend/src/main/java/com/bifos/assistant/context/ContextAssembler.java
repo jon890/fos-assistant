@@ -177,8 +177,9 @@ public class ContextAssembler implements OmittedMemories {
         Set<Long> facts = appendFacts(builder, indexed, now);
         List<Memory> afterFacts = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
         // 다른 범위에 같은 이름의 짝이 있는 문서는 구역에 싣지 않는다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없어 색인에 둔다
+        Set<Long> conflicting = sameNameDocuments(afterFacts).keySet();
         MemorySearchPlacement search = searchSection.place(
-            question, afterFacts, sameNameDocuments(afterFacts).keySet(), builder, memory -> memoryFreshness(memory, now));
+            question, afterFacts, conflicting, builder, memory -> memoryFreshness(memory, now));
         // 실린 항목과 RELATED 로 이어진 한 단계 이웃을 남은 자리에 싣고 색인에서 뺀다(ADR-20261015 / memory-link)
         Set<Long> anchors = new HashSet<>(facts);
         anchors.addAll(search.placed());
@@ -186,6 +187,7 @@ public class ContextAssembler implements OmittedMemories {
             anchors,
             memories.activeRelatedOf(anchors),
             search,
+            conflicting,
             builder,
             searchSection.itemMaxChars(),
             memory -> memoryFreshness(memory, now)).index();

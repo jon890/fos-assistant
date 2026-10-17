@@ -52,12 +52,14 @@ final class MemoryLinkSection {
      * @param anchors 개인 사실 구역과 질문 구역에 본문으로 실린 항목 번호
      * @param links 그 번호를 한쪽 끝으로 둔 효력 있는 {@code RELATED}
      * @param search 질문 구역이 정한 색인. 이웃 후보는 이 색인의 항목이다
+     * @param indexOnly 색인에만 둘 항목 번호. 다른 범위에 같은 이름의 짝이 있는 문서다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없다
      * @param itemMaxChars 이웃 하나의 본문 글자 수 상한
      */
     static Placement place(
         Set<Long> anchors,
         List<MemoryLink> links,
         MemorySearchPlacement search,
+        Set<Long> indexOnly,
         ContextBudgetWriter builder,
         int itemMaxChars,
         Function<Memory, ContextFreshness> freshness) {
@@ -74,7 +76,7 @@ final class MemoryLinkSection {
             }
             Memory memory = candidates.get(neighbor.memoryId());
             rank++;
-            if (!plain(memory) || memory.content().length() > itemMaxChars) {
+            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > itemMaxChars) {
                 continue;
             }
             ContextItem item = MemoryItems.item(

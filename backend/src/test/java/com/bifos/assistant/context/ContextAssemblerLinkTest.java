@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 실린 기억과 RELATED 로 이어진 한 단계 이웃을 연결된 기억 구역에 싣는지 확인한다(ADR-20261015 / memory-link). */
 @BackendIntegrationTest
@@ -49,6 +50,9 @@ class ContextAssemblerLinkTest {
 
     @Autowired
     AgentRepository agents;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private Long agentId;
 
@@ -135,6 +139,36 @@ class ContextAssemblerLinkTest {
         assertThat(result.instructions()).doesNotContain(LINK_HEADER);
         assertThat(itemOf(result, longNote, ContextSource.MEMORY_INDEX)).isPresent();
         assertThat(itemOf(result, replaced, ContextSource.MEMORY_INDEX)).as("대체된 항목은 어디에도 없다").isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("다른 범위에 같은 이름의 짝이 있는 문서는 이웃이어도 싣지 않고 두 문서의 충돌 표시를 색인에 남긴다")
+    void keepsSameNameDocumentsInIndex() {
+        Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
+        Long personal = insertDocument("USER", ADMIN.id(), null, "jeju-note", "제주 메모");
+        Long shared = insertDocument("GROUP", null, ADMIN.groupId(), "jeju-note", "제주 메모");
+        links.save(MemoryLink.related(trip.id(), personal, null, MemoryLinkOrigin.HUMAN, null, null));
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId);
+
+        assertThat(result.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
+        assertThat(result.instructions())
+            .contains("- [" + personal + "] 제주 메모 (같은 이름의 그룹 문서 [" + shared + "] 가 있다)")
+            .contains("- [" + shared + "] 제주 메모 (같은 이름의 개인 문서 [" + personal + "] 가 있다)");
+    }
+
+
+    /** 문서를 저장소에 바로 넣는다. 그룹 문서는 서비스로 만들 수 없어 테이블에 직접 쓴다. */
+    private Long insertDocument(String scope, Long ownerUserId, Long groupId, String documentKey, String title) {
+        jdbc.update("""
+                INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, document_key, title,
+                    content, retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '숙소는 바닷가 앞이다', 'SEARCH', FALSE, 'NORMAL', 1, 'ACCEPTED',
+                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """, scope, ownerUserId, groupId, documentKey, title);
+        return jdbc.queryForObject(
+            "SELECT id FROM memory WHERE scope = ? AND document_key = ?", Long.class, scope, documentKey);
     }
 
 
