@@ -248,7 +248,7 @@ domain과 infra는 admin을 import하지 않는다.
 ### 에이전트 지연 정리
 
 `agent.purge.application`에 `AgentPurger`, `AgentPurgeWriter`, `AgentPurgeParticipant`를 모은다.
-정리 결과 `AgentPurgeOutcome`는 그 아래 `application.dto`에 둔다.
+정리 결과 `AgentPurgeOutcome`는 그 아래 `application.model`에 둔다.
 설정 `AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
 참여 구현은 `chat`, `connector`, `proactive`가 소유하며 정리 실행은 구현 기능을 import하지 않는다.
 
