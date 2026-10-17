@@ -24,7 +24,7 @@
   - 저장은 `backend/src/main/java/com/bifos/assistant/chat/application/PendingMessageService.java` 의 `pendingMessages.save(ChatPendingMessage.queued(...))` 한 곳이다
   - 그 밖의 읽기는 `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` 의 대기 줄 응답이다
 - 위임 답
-  - 엔티티 `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` 의 `outputText`(`MEDIUMTEXT NULL`), 주인은 `userId`. 쓰기는 `recordOutput(String)` 하나이고 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionCompletionRecorder.java` 의 두 자리(`execution.recordOutput(outputText)`)가 부른다
+  - 엔티티 `backend/src/main/java/com/bifos/assistant/usage/execution/domain/AgentExecution.java` 의 `outputText`(`MEDIUMTEXT NULL`), 주인은 `userId`. 쓰기는 `recordOutput(String)` 하나이고 `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionCompletionRecorder.java` 의 두 자리(`execution.recordOutput(outputText)`)가 부른다
   - 읽기는 `backend/src/main/java/com/bifos/assistant/chat/application/ChatDeliveryInput.java` 의 `result.outputText()` 와 `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` 의 `execution.outputText()` 두 곳이다
   - 실행 줄은 시작할 때 이미 저장돼 번호가 있다. 그래서 `recordOutput` 때 바로 암호화할 수 있다
   - 지운 대화의 정리(`AgentExecutionRepository.clearOutputsOf`)는 칸을 null 로 비운다. 이때 옆 칸도 null 로 비운다
@@ -99,10 +99,10 @@ scripts/checks/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/chat/infra/ChatPendingMessageWrites.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/PendingMessageService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatDeliveryInput.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionCompletionRecorder.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionOutputs.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/usage/infra/AgentExecutionRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/domain/AgentExecution.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionCompletionRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionOutputs.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/PendingMessageEncryptionTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/usage/ExecutionOutputEncryptionTest.java` | 신규 |

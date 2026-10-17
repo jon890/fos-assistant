@@ -2641,8 +2641,8 @@ provider 를 바꿔도 Control Plane 은 profile 바인딩, 요청한 모델과 
 | credential 쓰기 경계 | 대시보드의 환경 쓰기는 허용한 Control Plane 칸만 받는다. 커넥터 연결 해제로 모델 credential 을 지우지 않는다. `credential_scope` 는 공유 여부의 선언이며 실제 OAuth 격리를 강제하는 값이 아니다 | `test_dashboard_profile_api_env.py`; 선언의 뜻은 [credential 경계](hermes-contract.md#oauth-credential-은-여기서-빠진다) |
 | 루트 usage 읽기 | 입력·출력·cache 칸의 알려진 별칭을 같은 토큰 수로 읽는다. 보고하지 않은 칸은 0 으로 채우지 않는다. total 이 없고 입력·출력이 모두 있으면 합을 구한다. cache 를 입력에 임의로 더하지 않는다 | `hermes/infra/HermesUsageParsingTest` |
 | 가격과 비용 모드 | provider 와 모델의 짝으로 가격을 찾는다. 같은 모델이어도 provider 별 가격을 적용하고 가격 미확인은 금액을 비운다. 입력·출력 토큰 중 하나라도 없으면 금액을 비우고, 명시적인 0 은 누락과 구분해 환산한다. 입력에 포함된 cache 는 한 번만 센다. 구독은 실제 청구액을 비우고 API 는 환산액과 같은 값으로 기록한다 | `usage/CostEstimatorTest`, `usage/UsageCostRecordingTest` |
-| native 자식 provider | session 응답의 provider 를 우선하고 없으면 plugin 을 조회한다. 부모 provider 를 빌리지 않는다. 주 호출이 같은 모델에서 provider 만 바꿔도 복수 경로로 보고 provider 를 비운다. 같은 짝의 반복 호출과 보조 호출은 교체로 세지 않는다. 읽기는 저장소를 바꾸지 않는다 | `hermes/SubagentProviderClientTest`, `usage/application/SubagentUsageReconcilerTest`, `test_dashboard_profile_api_session.py` |
-| native 자식의 미확인과 합계 | session 의 입력에 cache 읽기·쓰기를 더해 run 과 같은 포함 입력으로 환산한다. 필요한 토큰을 모르면 금액을 비운다. 조회 불가 재시도는 종료 뒤 10분까지이며 이후 `PROVIDER_UNKNOWN` 으로 남긴다. usage·가격 미확인을 구분한다. 부모와 자식 사용량을 중복 없이 더하며 재조회가 원장을 다시 더하지 않는다 | `usage/application/SubagentUsageReconcilerTest`, `usage/application/SubagentUsageLedgerTest`, `usage/UsageBreakdownTest` |
+| native 자식 provider | session 응답의 provider 를 우선하고 없으면 plugin 을 조회한다. 부모 provider 를 빌리지 않는다. 주 호출이 같은 모델에서 provider 만 바꿔도 복수 경로로 보고 provider 를 비운다. 같은 짝의 반복 호출과 보조 호출은 교체로 세지 않는다. 읽기는 저장소를 바꾸지 않는다 | `hermes/SubagentProviderClientTest`, `usage/subagent/application/SubagentUsageReconcilerTest`, `test_dashboard_profile_api_session.py` |
+| native 자식의 미확인과 합계 | session 의 입력에 cache 읽기·쓰기를 더해 run 과 같은 포함 입력으로 환산한다. 필요한 토큰을 모르면 금액을 비운다. 조회 불가 재시도는 종료 뒤 10분까지이며 이후 `PROVIDER_UNKNOWN` 으로 남긴다. usage·가격 미확인을 구분한다. 부모와 자식 사용량을 중복 없이 더하며 재조회가 원장을 다시 더하지 않는다 | `usage/subagent/application/SubagentUsageReconcilerTest`, `usage/subagent/application/SubagentUsageLedgerTest`, `usage/UsageBreakdownTest` |
 
 #### 운영 왕복이 필요한 것
 
