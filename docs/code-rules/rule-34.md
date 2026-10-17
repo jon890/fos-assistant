@@ -15,5 +15,5 @@ warning은 실패가 아니며 생성자를 무조건 지우지 않는다.
 
 ## 이 저장소의 사례
 
-[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/HttpHermesRunsClient.java)에서 확인한다.
+[HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesRunsClient.java)에서 확인한다.
 HttpHermesRunsClient처럼 클라이언트를 구성하는 생성자는 계산 없는 단순 주입과 구별한다.
