@@ -29,7 +29,7 @@ import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.proactive.check.application.port.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
-import com.bifos.assistant.proactive.infra.AutonomyDecisionRepository;
+import com.bifos.assistant.proactive.autonomy.infra.AutonomyDecisionRepository;
 import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import com.bifos.assistant.skill.library.application.SkillService;
 import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;

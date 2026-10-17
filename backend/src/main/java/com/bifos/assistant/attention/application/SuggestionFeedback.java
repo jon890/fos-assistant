@@ -12,7 +12,7 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.proactive.application.SurfacedProblems;
+import com.bifos.assistant.proactive.surface.application.SurfacedProblems;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.Optional;
