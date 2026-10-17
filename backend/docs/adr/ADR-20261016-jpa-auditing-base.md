@@ -33,13 +33,13 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 기존 NOT NULL인 변경 시각은 `@AttributeOverride`로 NOT NULL 매핑을 유지한다.
 이번에 추가하는 세 변경 시각만 NULL을 허용한다. 생성 전용 base를 쓰는 불변 기록에는 변경 시각을 추가하지 않는다.
 
-### created_at 45개 엔티티의 전수 판정
+### created_at 46개 엔티티의 전수 판정
 
-기억 단계 1과 사용자 금융 상한 이관을 반영한 운영 엔티티 45개를 생성 시각과 변경 시각으로 나눠 판정한다.
+기억 단계 1과 2, 사용자 금융 상한 이관을 반영한 운영 엔티티 46개를 생성 시각과 변경 시각으로 나눠 판정한다.
 `C`는 순수 저장 생성 시각만 base로 옮기고, `C+U`는 순수 저장 생성·변경 시각을 모두 옮긴다.
 `제외`는 createdAt 자체가 업무 시각이므로 어느 base도 상속하지 않는다.
-판정 결과는 생성 전용 25개, 생성·변경 7개, 제외 13개이며 auditing 대상은 32개다.
-기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다.
+판정 결과는 생성 전용 25개, 생성·변경 8개, 제외 13개이며 auditing 대상은 33개다.
+기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다.
 변경 시각이 없던 엔티티에 새 updated_at을 추가하는 대상은 Agent/AppUser/AllowedPerson 세 개뿐이다.
 「없음」은 UPDATE bulk가 없다는 뜻이며 DELETE bulk는 callback 대상이 아니다.
 
@@ -75,6 +75,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `memory` / `Memory` | C: 문서 본체의 최초 저장만 자동화 | U/acceptedAt은 문서 변경·수락의 업무 시각. revision.changedAt은 별도로 보존 |
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
 | `memory_embedding` / `MemoryEmbedding` | C+U: 벡터 행의 저장·교체 시각. 문서 revision과 지문은 별도 속성 | memoryId 지정 ID. 기존 행을 읽어 replace하고 신규 ID만 save/merge |
+| `memory_link` / `MemoryLink` | C+U: 연결 행의 저장·상태 변경 시각. 대체 판정은 status 가 소유 | revokedAt은 끊거나 거절한 업무 시각으로 명시 전달. UPDATE bulk 없음 |
 | `memory_collection` / `MemoryCollection` | C: collection 행의 최초 저장. 현재 auditing 대상 | 복합 ID saveAll의 merge 반환값 사용 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
 | `proactive_autonomy_decision` / `AutonomyDecision` | 제외: 평가와 판정의 동일 배치 시각. AutonomyPolicyService가 평가 C를 전달 | C 명시 전달. 재설계와 무관하게 현재 업무 계약 보존 |
@@ -164,7 +165,7 @@ bulk 뒤에는 기존 영속성 문맥의 오래된 값을 다시 저장해 덮�
 설정과 provider는 각각 하나만 허용한다. 누락·중복·다른 상속·업무 필드나 getter의 annotation도 실패시킨다.
 `Auditable`, `AbstractAuditable`, `@CreatedBy`, `@LastModifiedBy`는 계속 거절한다.
 기존 MemoryCollection의 callback·merge·rollback 검사를 유지하고 모든 적용 엔티티의 생성 및 C+U 대상의 변경·no-op과 bulk 검사를 더한다.
-전수 표의 45개 createdAt 선택 수를 검사해 누락·추가를 발견하면 표와 판정을 함께 고치게 한다.
+전수 표의 46개 createdAt 선택 수를 검사해 누락·추가를 발견하면 표와 판정을 함께 고치게 한다.
 생성 전용 엔티티가 AuditedEntity를 상속하거나 불필요한 updated_at을 얻으면 구조·스키마 검사에서 실패한다.
 업무 시각 제외 목록은 필드와 getter의 annotation, 상속으로 유입되는 auditing을 모두 거절한다.
 H2와 실제 MySQL에서 ORM 및 JDBC 재조회 값이 MICROS로 같아야 한다.

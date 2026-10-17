@@ -17,9 +17,12 @@ import com.bifos.assistant.context.ContextBodyMode;
 import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
+import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
@@ -100,6 +103,9 @@ class McpMemorySearchToolTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MemoryLinkService linkService;
 
     private MockMvc mvc;
     private CurrentUser user;
@@ -183,7 +189,7 @@ class McpMemorySearchToolTest {
 
 
     @Test
-    @DisplayName("검색 뒤에도 권한 철회 거절 삭제를 검사하고 판이 바뀌면 최신 본문을 읽는다")
+    @DisplayName("검색 뒤에도 권한 철회 거절 대체 삭제를 검사하고 버전이 바뀌면 최신 본문을 읽는다")
     void rechecksReadPermissionsAndReturnsCurrentRevision() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
@@ -203,11 +209,24 @@ class McpMemorySearchToolTest {
         jdbc.update("UPDATE memory SET status = 'REJECTED' WHERE id = ?", memory.id());
         assertUnavailable(memory.id());
         jdbc.update("UPDATE memory SET status = 'ACCEPTED' WHERE id = ?", memory.id());
+        Memory fresh = memories.create(user, MemoryScope.USER, "새로 남긴 항목", "새 본문", false);
+        MemoryLink link = linkService.proposeSupersede(user, fresh.id(), memory.id(), MemoryLinkOrigin.AGENT, null);
+        linkService.accept(user, link.id());
+        assertUnavailable(memory.id());
+        assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
+            .path("items"))
+                .as("대체된 항목은 검색에서도 빠진다")
+                .isEmpty();
+        linkService.revoke(user, link.id());
+        assertThat(text(call("memory_read", arguments().put("id", memory.id()))))
+            .as("대체를 되돌리면 다시 읽힌다")
+            .isEqualTo("바뀐 본문");
+        jdbc.update("DELETE FROM memory_link WHERE id = ?", link.id());
         repository.deleteById(memory.id());
         assertUnavailable(memory.id());
         assertThat(sources.findByIdExecutionIdOrderByIdPositionAsc(run.id()))
             .filteredOn(source -> "MEMORY_READ".equals(source.source()))
-            .hasSize(1);
+            .hasSize(2);
     }
 
 

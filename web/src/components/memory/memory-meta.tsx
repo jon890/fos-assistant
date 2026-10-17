@@ -25,6 +25,11 @@ export function MemoryMeta({
         </span>
       ) : null}
       {memory.sensitive ? <Badge variant="warning">민감</Badge> : null}
+      {memory.supersededBy ? (
+        <Badge variant="outline" data-testid="memory-superseded">
+          대체됨
+        </Badge>
+      ) : null}
       {memory.omittedFromContext ? (
         <Badge variant="destructive" data-testid="memory-omitted">
           길어서 답에 포함되지 않음

@@ -142,6 +142,14 @@ function ProposalCard({
       className="rounded-md border border-border bg-muted p-3 text-sm"
     >
       <p className="text-xs text-muted-foreground">받아들이면 기억해요</p>
+      {capture.externalRead ? (
+        <p
+          data-testid="memory-capture-external-read"
+          className="mt-1 text-xs text-warning"
+        >
+          바깥 글을 읽은 대화에서 나온 제안이에요
+        </p>
+      ) : null}
       <p className="mt-1 font-semibold">{capture.title}</p>
       {capture.sensitive ? (
         <p className="mt-1 text-xs text-muted-foreground">

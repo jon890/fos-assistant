@@ -22,7 +22,7 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 ## JPA 생성 시각
 
 순수 저장 시각은 `shared.domain.CreatedAtEntity`와 `AuditedEntity`의 JPA auditing으로 기록한다.
-생성 전용은 25개, 생성·변경은 7개다. 엔티티별 적용과 업무 시각 제외 판정은
+생성 전용은 25개, 생성·변경은 8개다. 엔티티별 적용과 업무 시각 제외 판정은
 [ADR-20261016 / jpa-auditing-base](adr/ADR-20261016-jpa-auditing-base.md)가 소유한다.
 base는 id·권한·행위자를 갖지 않는다. 생성 전용 엔티티에 변경 시각을 추가하지 않는다.
 
@@ -44,7 +44,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 목록과 각 쓰기 경계는 위 ADR의 bulk 표가 갖는다.
 
 검사는 기준 파일 없는 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`과 `JpaAuditingPlacementTest`가 맡는다.
-두 base, 엔티티별 상속, 45개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
+두 base, 엔티티별 상속, 46개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
 `Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
 `JpaAuditingTest`, `JpaAuditingMysqlTest`, 기존 `MemoryCollectionAuditingTest`와 MySQL 하위 클래스가 확인한다.
 `JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.

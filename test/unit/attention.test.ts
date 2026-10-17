@@ -118,6 +118,10 @@ test("대화가 있는 실패의 제목은 그 대화로 가고, 기억 제안�
   const conversationId = "7b1e0000-0000-4000-8000-000000000000";
   assert.equal(itemHref(item({ why: why("EXECUTION_FAILED", ["NOT_RETRIED"]), conversationId })), `/chat/${conversationId}`);
   assert.equal(itemHref(item({ why: why("MEMORY_PROPOSED", []) })), "/memory");
+  assert.equal(
+    itemHref(item({ why: why("MEMORY_SUPERSEDE_PROPOSED", []) })),
+    "/memory",
+  );
 });
 
 test("할 일의 출처는 상태와 독립적으로 에이전트 제안이면 「대화에서」다", () => {

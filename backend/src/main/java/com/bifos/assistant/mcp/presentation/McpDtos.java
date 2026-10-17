@@ -3,6 +3,8 @@ package com.bifos.assistant.mcp.presentation;
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.mcp.application.McpMemoryLink;
+import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -89,6 +91,51 @@ public final class McpDtos {
                 throw invalidOrderLimit();
             }
             return new OrderLimitChangeArguments(name, value);
+        }
+    }
+
+    /**
+     * {@code memory_link} 의 인자다. 두 번호와 종류, {@code RELATED} 에만 받는 label 이다. 모르는 키, 잘못된 타입, 범위 밖 값은 인자 오류다.
+     * 사용자와 범위는 인자로 받지 않는다.
+     */
+    public record MemoryLinkArguments(long fromId, long toId, String type, String label) {
+
+
+        private static final Set<String> FIELDS = Set.of("from_id", "to_id", "type", "label");
+        private static final Set<String> TYPES = Set.of(McpMemoryLink.SUPERSEDES, McpMemoryLink.RELATED);
+
+        static MemoryLinkArguments from(JsonNode node) {
+            JsonNode type = node.get("type");
+            JsonNode label = node.get("label");
+            if (!FIELDS.containsAll(node.propertyNames())
+                || !positiveId(node.get("from_id"))
+                || !positiveId(node.get("to_id"))
+                || type == null
+                || !type.isString()
+                || !TYPES.contains(type.stringValue())) {
+                throw invalidMemoryLink();
+            }
+            boolean hasLabel = label != null && !label.isNull();
+            if (hasLabel && (!label.isString()
+                || label.stringValue().length() > MemoryLinkService.LABEL_MAX
+                || !McpMemoryLink.RELATED.equals(type.stringValue()))) {
+                throw invalidMemoryLink();
+            }
+            return new MemoryLinkArguments(
+                node.get("from_id").longValue(),
+                node.get("to_id").longValue(),
+                type.stringValue(),
+                hasLabel ? label.stringValue() : null);
+        }
+
+
+        private static boolean positiveId(JsonNode value) {
+            return value != null && value.isIntegralNumber() && value.canConvertToLong() && value.longValue() > 0;
+        }
+
+
+        private static ApiException invalidMemoryLink() {
+            return new ApiException(ErrorCode.VALIDATION_FAILED, "invalid memory link arguments");
         }
     }
 

@@ -145,3 +145,28 @@ test("제안 카드를 거절하면 카드가 사라진다", async ({ page }) =>
 
   await expect(page.getByTestId("memory-captures")).toHaveCount(0);
 });
+
+test("바깥 글을 읽은 대화의 제안 카드는 그 사실을 함께 보인다", async ({
+  page,
+}) => {
+  await open(page, "기억 기록 검사 바깥", [
+    capture(0, { kind: "PROPOSED", status: "PROPOSED", externalRead: true }),
+  ]);
+
+  await expect(page.getByTestId("memory-capture-external-read")).toHaveText(
+    "바깥 글을 읽은 대화에서 나온 제안이에요",
+  );
+});
+
+test("바깥 글을 읽지 않은 대화의 제안 카드는 그 줄을 보이지 않는다", async ({
+  page,
+}) => {
+  await open(page, "기억 기록 검사 안쪽", [
+    capture(0, { kind: "PROPOSED", status: "PROPOSED", externalRead: false }),
+  ]);
+
+  await expect(page.getByTestId("memory-capture")).toContainText(
+    "받아들이면 기억해요",
+  );
+  await expect(page.getByTestId("memory-capture-external-read")).toHaveCount(0);
+});

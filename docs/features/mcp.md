@@ -114,7 +114,7 @@ session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `memory_link`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
@@ -167,6 +167,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 - 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 를 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
 - `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
+- `memory_link` 도 같은 까닭으로 받지 않는다. 바깥 글이 기억 사이의 대체 제안을 시킬 수 있다([ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md))
 
 새 도구를 더하면 살펴보기에서 받을지 함께 정한다([`docs/features/proactive.md`](proactive.md) 의 「읽기 경계」).
 
@@ -180,6 +181,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `content_draft_write`, `content_draft_read` | [원고 저장 계약](content-draft.md#mcp와-배치) |
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
 | `memory_remember` | [`docs/features/memory.md`](memory.md) 의 「에이전트가 기억을 남기는 길」 |
+| `memory_link` | [`docs/features/memory.md`](memory.md) 의 「기억 사이의 연결」 |
 | `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않고, Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.

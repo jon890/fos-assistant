@@ -11,16 +11,19 @@ import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -78,9 +81,13 @@ class MemoryServiceTest {
     @Autowired
     MemoryVectorCache vectorCache;
 
+    @Autowired
+    MemoryLinkRepository links;
+
 
     @BeforeEach
     void setUp() {
+        links.deleteAll();
         repository.deleteAll();
         revisionRepository.deleteAll();
     }
@@ -105,6 +112,37 @@ class MemoryServiceTest {
         assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
         embeddings.deleteAll();
         vectorCache.clear();
+    }
+
+
+    @Test
+    @DisplayName("항목을 지우면 그 항목을 어느 쪽 끝으로 둔 연결도 지우고 다른 연결은 남긴다")
+    void deletesLinksOnBothEndsWithMemory() {
+        Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
+        Memory a = memories.create(ADMIN, MemoryScope.USER, "가", "내용", false);
+        Memory b = memories.create(ADMIN, MemoryScope.USER, "나", "내용", false);
+        links.save(MemoryLink.proposeSupersede(deleted.id(), a.id(), MemoryLinkOrigin.AGENT, null));
+        links.save(MemoryLink.proposeSupersede(b.id(), deleted.id(), MemoryLinkOrigin.AGENT, null));
+        MemoryLink kept = links.save(MemoryLink.related(a.id(), b.id(), null, MemoryLinkOrigin.AGENT, null, null));
+
+        memories.delete(ADMIN, deleted.id());
+
+        assertThat(links.findAll()).extracting(MemoryLink::id).containsExactly(kept.id());
+    }
+
+
+    @Test
+    @DisplayName("대체된 항목은 주입과 본문 읽기에서 빠져도 사람이 보는 목록에는 남는다")
+    void keepsSupersededItemInListButNotInInjection() {
+        Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
+        Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
+        MemoryLink link = MemoryLink.proposeSupersede(fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null);
+        link.accept();
+        links.save(link);
+
+        assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).containsExactly(old.id(), fresh.id());
+        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(fresh.id());
+        assertNotFound(() -> memories.bodyFor(ADMIN, CORE, old.id()));
     }
 
 

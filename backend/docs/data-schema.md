@@ -11,7 +11,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding` |
+| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
@@ -208,7 +208,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
-그 항목의 벡터(`memory_embedding`)는 같은 트랜잭션에서 지운다.
+그 항목의 벡터(`memory_embedding`)와 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)는 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -700,6 +700,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `execution_id` 는 기록을 남긴 origin 실행이고, 한 실행의 상한을 이 칸으로 센다
 - `base_revision` 은 `CREATED` 면 저장한 때의 판 번호, `UPDATED` 면 고치기 전의 판 번호이고 `PROPOSED` 면 비어 있다
 - `previous_status` 는 기존 제안을 받아들인 `CREATED` 만 `PROPOSED` 이고 나머지는 비어 있다
+- `external_read` 는 기록을 남길 때 그 대화의 어느 실행이 바깥 글을 읽었는지다(「바로 저장 판정」 의 조건 4). 승인 카드가 이 값을 보인다. 이 컬럼이 생기기 전의 줄은 거짓이다
 
 같은 사실을 같은 실행에서 두 번 남겨도 중복 키가 같은 항목을 하나로 둔다. 기록은 저장하거나 고친 경우에만 남는다.
 `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이라 되돌리지 않는다.
@@ -717,6 +718,17 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지운다. `memory_id` 에 외래 키를 걸지 않고, `MemoryService.delete` 가 같은 트랜잭션에서 그 줄을 지운다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 지운 항목의 줄이 남으면 다음 주기의 정리가 지운다
 
 
+
+### memory_link
+
+기억 두 개 사이의 연결 한 줄이다. 동작과 화면은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억 사이의 연결」 이, 근거는 [ADR-20261015 / memory-link](../../docs/adr/ADR-20261015-memory-link.md) 가 갖는다.
+
+- `type` 은 `SUPERSEDES`(새 항목 `from` 이 옛 항목 `to` 를 대신한다)와 `RELATED`(방향 없음, 번호가 작은 쪽이 `from`) 둘이다. 연결의 뜻은 자유 글 `label` 에 두고 Control Plane 은 그 글로 판정하지 않는다
+- `origin` 은 `AUTO`(코드가 찾음), `AGENT`, `HUMAN` 이고 `status` 는 `PROPOSED`, `ACTIVE`, `REVOKED` 다. 끊거나 거절하면 지우지 않고 `REVOKED` 와 `revoked_at` 을 적는다
+- `(from_memory_id, to_memory_id, type)` 이 유일하다. 같은 쌍을 다시 맺으면 `REVOKED` 줄을 다시 쓴다
+- `to_memory_id` 와 `type`, `status` 로 「이 항목을 대신한 `ACTIVE` 줄이 있는가」 를 찾는 색인을 둔다. 조립과 검색의 권한 조건이 이 조회를 쓴다
+- `score` 는 코드가 찾은 줄의 유사도이고 사람과 에이전트가 맺은 줄은 비어 있다. `created_by_execution_id` 는 에이전트가 맺은 줄의 origin 실행이다
+- 양 끝에 외래 키를 걸지 않는다. 항목을 지우면 `MemoryService.delete` 가 같은 트랜잭션에서 그 항목을 한쪽 끝으로 둔 줄을 지운다
 
 ## 커넥터 표
 

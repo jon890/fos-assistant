@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -14,11 +15,14 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
+import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -114,6 +118,9 @@ class McpMemoryRememberToolTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    MemoryLinkService linkService;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -141,6 +148,11 @@ class McpMemoryRememberToolTest {
         jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_capture WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_revision WHERE owner_user_id = ?", dad.id());
+        jdbc.update(
+            "DELETE FROM memory_link WHERE from_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)"
+                + " OR to_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
+            dad.id(),
+            dad.id());
         jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", dad.id());
         jdbc.update("DELETE FROM chat_message WHERE conversation_id = ?", conversation.id());
         jdbc.update("DELETE FROM conversation WHERE user_id = ?", dad.id());
@@ -175,7 +187,7 @@ class McpMemoryRememberToolTest {
 
         JsonNode result = call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
 
-        assertThat(text(result)).isEqualTo(REMEMBERED);
+        assertThat(text(result)).startsWith(REMEMBERED);
         assertThat(result.path("isError").asBoolean()).isFalse();
         Memory memory = onlyMemory();
         assertThat(memory.status()).isEqualTo(MemoryStatus.ACCEPTED);
@@ -195,8 +207,8 @@ class McpMemoryRememberToolTest {
     void remembersRefinedContentRegardlessOfEvidence() throws Exception {
         askedInThisTurn();
 
-        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).isEqualTo(REMEMBERED);
-        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).startsWith(REMEMBERED);
+        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).startsWith(REMEMBERED);
 
         assertThat(memoriesOfDad())
             .extracting(Memory::status)
@@ -235,7 +247,7 @@ class McpMemoryRememberToolTest {
     void remembersWhenNegationKept() throws Exception {
         askedInThisTurn("나는 오이를 안 먹어.");
 
-        assertThat(text(call(remember("오이", "오이를 먹지 않는다", null)))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("오이", "오이를 먹지 않는다", null)))).startsWith(REMEMBERED);
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
@@ -276,7 +288,7 @@ class McpMemoryRememberToolTest {
     void remembersWhenOnlyQuestionLooksSensitive() throws Exception {
         askedInThisTurn("어제 병원에 다녀왔어. 다른 사람은 홍길동이야.");
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이야", null)))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이야", null)))).startsWith(REMEMBERED);
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
@@ -310,10 +322,16 @@ class McpMemoryRememberToolTest {
         toolStarted("mcp__fos_assistant__memory_read");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-            .isEqualTo(REMEMBERED);
+            .startsWith(REMEMBERED);
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(capturesOfDad())
+            .as("바깥 글을 읽은 뒤의 제안 기록만 externalRead 가 참이다")
+            .extracting(MemoryCapture::kind, MemoryCapture::externalRead)
+            .containsExactlyInAnyOrder(
+                tuple(MemoryCaptureKind.CREATED, false),
+                tuple(MemoryCaptureKind.PROPOSED, true));
     }
 
 
@@ -337,7 +355,7 @@ class McpMemoryRememberToolTest {
         toolStarted("tool_describe");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-            .isEqualTo(REMEMBERED);
+            .startsWith(REMEMBERED);
 
         toolStarted("tool_call");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
@@ -408,7 +426,7 @@ class McpMemoryRememberToolTest {
     void remembersInNewRootRunWithoutLegacyRun() throws Exception {
         String root = askedInNewRootRun();
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).startsWith(REMEMBERED);
     }
 
 
@@ -498,6 +516,29 @@ class McpMemoryRememberToolTest {
 
 
     @Test
+    @DisplayName("대체를 받아들인 새 기억이 되돌리기로 제안에 돌아가면 그 대체도 끊겨 옛 기억이 다시 실린다")
+    void revokesSupersedeWhenUndoingAcceptance() throws Exception {
+        Memory old = memoryService.create(currentDad(), MemoryScope.USER, "사는 곳", "서울에 산다", false);
+        call(remember("이사한 곳", "부산에 산다", null));
+        Long fresh = memoriesOfDad().stream().filter(memory -> !memory.id().equals(old.id())).findFirst().orElseThrow().id();
+        askedInThisTurn("나 부산에 살아");
+        call(remember("이사한 곳", "부산에 산다", "나 부산에 살아"));
+        MemoryLink link = linkService.proposeSupersede(currentDad(), fresh, old.id(), MemoryLinkOrigin.AGENT, null);
+        linkService.accept(currentDad(), link.id());
+        assertThat(linkService.isSuperseded(old.id())).isTrue();
+        MemoryCapture accepted = capturesOfDad().stream()
+            .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
+            .findFirst()
+            .orElseThrow();
+
+        captureService.undo(currentDad(), accepted.id());
+
+        assertThat(memories.findById(fresh).orElseThrow().status()).isEqualTo(MemoryStatus.PROPOSED);
+        assertThat(linkService.isSuperseded(old.id())).as("되돌린 새 기억이 옛 기억을 가리지 않는다").isFalse();
+    }
+
+
+    @Test
     @DisplayName("같은 제목과 본문은 한 줄만 남기고 이미 기억하고 있다고 답한다")
     void keepsOneRowForSameFact() throws Exception {
         askedInThisTurn();
@@ -509,6 +550,29 @@ class McpMemoryRememberToolTest {
         assertThat(text(second)).isEqualTo("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.");
         assertThat(memoriesOfDad()).hasSize(1);
         assertThat(capturesOfDad()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("다른 기억이 대체한 항목과 같은 내용이면 이미 안다고 답하지 않고 되돌릴지 물으라고 답하며 memory_id 로도 고치지 않는다")
+    void doesNotTreatSupersededFactAsKnown() throws Exception {
+        askedInThisTurn();
+        ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야");
+        call(arguments.deepCopy());
+        Long old = onlyMemory().id();
+        Memory fresh = memoryService.create(currentDad(), MemoryScope.USER, "다른 사람 변경", "다른 사람은 김철수다", false);
+        MemoryLink link = linkService.proposeSupersede(currentDad(), fresh.id(), old, MemoryLinkOrigin.AGENT, null);
+        linkService.accept(currentDad(), link.id());
+
+        JsonNode again = call(arguments.deepCopy());
+        ObjectNode update = remember("다른 사람", "다른 사람은 박영희다", "다른 사람은 홍길동이야");
+        update.put("memory_id", old);
+        JsonNode updated = call(update);
+
+        assertThat(again.path("isError").asBoolean()).isTrue();
+        assertThat(text(again)).startsWith("같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다.");
+        assertThat(text(updated)).isEqualTo("고칠 기억을 찾지 못했다. memory_id 없이 새로 남긴다.");
+        assertThat(memories.findById(old).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
     }
 
 

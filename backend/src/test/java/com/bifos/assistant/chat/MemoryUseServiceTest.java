@@ -11,8 +11,11 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
+import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -71,6 +74,9 @@ class MemoryUseServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    MemoryLinkService links;
+
     private CurrentUser dad;
     private CurrentUser kid;
     private Conversation conversation;
@@ -100,6 +106,7 @@ class MemoryUseServiceTest {
         }
         for (Long memoryId : createdMemoryIds) {
             jdbc.update("DELETE FROM memory_revision WHERE memory_id = ?", memoryId);
+            jdbc.update("DELETE FROM memory_link WHERE from_memory_id = ? OR to_memory_id = ?", memoryId, memoryId);
         }
         memories.deleteAllById(createdMemoryIds);
     }
@@ -157,6 +164,27 @@ class MemoryUseServiceTest {
         assertThat(service.usesOf(dad, conversation.id()))
             .extracting(MemoryUse::memoryId, MemoryUse::via)
             .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
+    }
+
+
+    @Test
+    @DisplayName("대체된 항목은 빠지고 대체를 되돌리면 다시 나온다")
+    void dropsSupersededItemsUntilRevoked() {
+        Memory old = memory(dad, MemoryScope.USER, "옛 주소", "서울", MemoryRetrieval.SEARCH);
+        Memory fresh = memory(dad, MemoryScope.USER, "새 주소", "부산", MemoryRetrieval.SEARCH);
+        AgentExecution run = answeredRun(conversation, true);
+        source(run, 0, "MEMORY_FACTS", old, "INLINE");
+        source(run, 1, "MEMORY_READ", fresh, "INLINE");
+        MemoryLink link = links.proposeSupersede(dad, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
+        links.accept(dad, link.id());
+
+        assertThat(service.usesOf(dad, conversation.id())).extracting(MemoryUse::memoryId).containsExactly(fresh.id());
+
+        links.revoke(dad, link.id());
+
+        assertThat(service.usesOf(dad, conversation.id()))
+            .extracting(MemoryUse::memoryId)
+            .containsExactly(old.id(), fresh.id());
     }
 
 

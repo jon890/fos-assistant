@@ -239,7 +239,7 @@ class HookTest(PluginFixture):
     def test_memory_and_artifact_tools_block_without_signature(self):
         """서명이 없으면 memory, artifact, 할 일 제안 도구 호출을 막는다."""
         for tool in ("memory_read", "memory_search", "artifact_write", "follow_up_propose", "memory_remember",
-                     "list_media_observations", "record_media_observation", "content_draft_write", "content_draft_read",
+                     "memory_link", "list_media_observations", "record_media_observation", "content_draft_write", "content_draft_read",
                      "content_draft_preview", "content_draft_save", "order_limit_read", "order_limit_change"):
             name = "mcp__fos_assistant__" + tool
             with self.subTest(tool=tool, state="signed"):

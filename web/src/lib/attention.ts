@@ -106,6 +106,9 @@ const REASONS: Record<
   MEMORY_PROPOSED: [
     { signal: null, text: "에이전트가 기억할 것을 제안했어요" },
   ],
+  MEMORY_SUPERSEDE_PROPOSED: [
+    { signal: null, text: "새 기억이 옛 기억을 대신하자는 제안이 왔어요" },
+  ],
   FOLLOW_UP_PROPOSED: [{ signal: null, text: "에이전트가 할 일로 제안했어요" }],
   FOLLOW_UP_OPEN: [
     { signal: "DUE_SOON", text: "기한이 다가왔어요" },
@@ -190,6 +193,7 @@ export function itemHref(item: AttentionItem): string | null {
         ? null
         : `/chat/${item.conversationId}`;
     case "MEMORY_PROPOSED":
+    case "MEMORY_SUPERSEDE_PROPOSED":
       return "/memory";
     case "DELEGATION_RUNNING":
     case "DELEGATION_FINISHED":
@@ -356,6 +360,7 @@ export function itemActions(item: AttentionItem): ItemAction[] {
     case "APPROVAL_PENDING":
       return link("대화에서 보기");
     case "MEMORY_PROPOSED":
+    case "MEMORY_SUPERSEDE_PROPOSED":
       return link("기억에서 보기");
     case "FOLLOW_UP_PROPOSED":
       if (item.followUp === null) return [];

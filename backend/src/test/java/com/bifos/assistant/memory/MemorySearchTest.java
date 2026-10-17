@@ -14,12 +14,15 @@ import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
 import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -71,12 +74,16 @@ public class MemorySearchTest {
     @Autowired
     MemoryVectorCache vectorCache;
 
+    @Autowired
+    MemoryLinkRepository links;
+
 
     @BeforeEach
     void setUp() {
         MemorySearchSqlProbe.reset();
         embeddings.deleteAll();
         vectorCache.clear();
+        links.deleteAll();
         repository.deleteAll();
     }
 
@@ -151,7 +158,18 @@ public class MemorySearchTest {
                 null,
                 "core",
                 MemoryRetrieval.ALWAYS,
+                MemorySensitivity.NORMAL),
+            save(
+                "대체됨 경계",
+                MemoryScope.USER,
+                USER.id(),
+                null,
+                "core",
+                MemoryRetrieval.SEARCH,
                 MemorySensitivity.NORMAL));
+        MemoryLink superseding = MemoryLink.proposeSupersede(own.id(), hidden.get(9).id(), MemoryLinkOrigin.HUMAN, null);
+        superseding.accept();
+        links.save(superseding);
         jdbc.update(
             "UPDATE memory SET status = 'REJECTED' WHERE id = ?",
             hidden.get(5).id());
