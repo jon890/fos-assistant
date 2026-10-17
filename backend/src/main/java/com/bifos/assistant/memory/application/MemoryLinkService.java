@@ -2,6 +2,7 @@ package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.application.model.SupersedeProposal;
+import com.bifos.assistant.memory.domain.MemoryLinkEnds;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
@@ -99,13 +100,18 @@ public class MemoryLinkService {
     /**
      * 대체 제안을 받아들인다. 옛 항목이 이미 다른 줄로 대체됐어도 두 줄을 함께 둔다. 「대체됨」 은 하나라도 있으면 참이다.
      *
-     * <p>새 항목이 이미 대체됐으면 받아들이지 않는다. 서로를 대체하는 두 제안을 모두 받아들이면 두 항목이 함께 주입에서 사라진다.
+     * <p>새 항목이 이미 대체됐으면 받아들이지 않는다. 서로를 대체하는 두 제안을 모두 받아들이면 두 항목이 함께 주입에서 사라진다. 두 제안이
+     * 함께 와도 하나만 이기도록 양 끝 항목 줄을 번호 순서로 먼저 잠그고 연결 줄을 잠근다. 항목을 지우는 쪽도 항목 줄을 잠근 뒤 연결 줄을 지우므로 잠금
+     * 순서가 같아 서로 기다리다 멈추지 않는다.
      *
      * @throws ApiException 없는 줄과 볼 수 없는 줄은 MEMORY_NOT_FOUND, 그룹 항목을 {@code MEMBER} 가 받아들이면 FORBIDDEN, 제안이
      * 아니거나 양 끝이 더는 연결할 수 없는 항목이면 MEMORY_LINK_STATE_CONFLICT
      */
     @Transactional
     public MemoryLink accept(CurrentUser user, Long linkId) {
+        MemoryLinkEnds ends = links.findEndsById(linkId).orElseThrow(MemoryLinkService::notFound);
+        memories.findByIdForUpdate(Math.min(ends.fromMemoryId(), ends.toMemoryId()));
+        memories.findByIdForUpdate(Math.max(ends.fromMemoryId(), ends.toMemoryId()));
         MemoryLink link = requireDecidable(user, linkId);
         if (link.type() != MemoryLinkType.SUPERSEDES || link.status() != MemoryLinkStatus.PROPOSED) {
             throw stateConflict();

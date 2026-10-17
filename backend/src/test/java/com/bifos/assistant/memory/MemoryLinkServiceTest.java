@@ -280,6 +280,37 @@ class MemoryLinkServiceTest {
     }
 
 
+    @Test
+    @DisplayName("서로를 대체하는 두 제안을 함께 받아들여도 하나만 이기고 두 항목이 함께 대체되지 않는다")
+    void acceptsOnlyOneOfConcurrentCycle() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            Memory a = memories.create(ADMIN, MemoryScope.USER, "순환 가 " + round, "1", false);
+            Memory b = memories.create(ADMIN, MemoryScope.USER, "순환 나 " + round, "2", false);
+            MemoryLink aOverB = linkService.proposeSupersede(ADMIN, a.id(), b.id(), MemoryLinkOrigin.AGENT, null);
+            MemoryLink bOverA = linkService.proposeSupersede(ADMIN, b.id(), a.id(), MemoryLinkOrigin.AGENT, null);
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                List<Future<String>> results = List.of(
+                    pool.submit(() -> decide(start, () -> linkService.accept(ADMIN, aOverB.id()))),
+                    pool.submit(() -> decide(start, () -> linkService.accept(ADMIN, bOverA.id()))));
+                start.countDown();
+                List<String> outcomes = new ArrayList<>();
+                for (Future<String> result : results) {
+                    outcomes.add(result.get(20, TimeUnit.SECONDS));
+                }
+
+                assertThat(outcomes).as("라운드 %s", round).containsExactlyInAnyOrder("ok", "conflict");
+                assertThat(linkService.isSuperseded(a.id()) && linkService.isSuperseded(b.id()))
+                    .as("라운드 %s 에 두 항목이 함께 대체됐다", round)
+                    .isFalse();
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+    }
+
+
     private static String decide(CountDownLatch start, ThrowingCallable action) throws Exception {
         start.await();
         try {

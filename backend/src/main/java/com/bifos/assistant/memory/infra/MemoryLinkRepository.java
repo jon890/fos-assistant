@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.infra;
 
+import com.bifos.assistant.memory.domain.MemoryLinkEnds;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
@@ -23,6 +24,12 @@ public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from MemoryLink l where l.id = :id")
     Optional<MemoryLink> findByIdForUpdate(@Param("id") Long id);
+
+
+    /** 연결의 양 끝 번호만 읽는다. 엔티티를 영속 문맥에 올리지 않아 뒤의 잠금 조회가 최신 상태를 읽는다. */
+    @Query("select new com.bifos.assistant.memory.domain.MemoryLinkEnds(l.fromMemoryId, l.toMemoryId)"
+        + " from MemoryLink l where l.id = :id")
+    Optional<MemoryLinkEnds> findEndsById(@Param("id") Long id);
 
 
     Optional<MemoryLink> findByFromMemoryIdAndToMemoryIdAndType(Long fromMemoryId, Long toMemoryId, MemoryLinkType type);
