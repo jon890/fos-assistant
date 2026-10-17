@@ -30,10 +30,10 @@
 | `skill.library.domain` | `skill.domain` | SkillBundle, SkillFile |
 | `skill.library.infra` | `skill.infra` | PreviousSkill, PreviousSkillStore, SkillFilePaths, SkillFiles, SkillPublisher, SkillStore |
 | `skill.library.presentation` | `skill.presentation` | SkillController, SkillDtos |
-| `skill.package.application` | `skill.application` | SkillAgentNotice†, SkillPackageCheck, SkillPackageDiff, SkillPackageService, SkillPackageZip |
-| `skill.package.application.dto` | `skill.application` | CheckedSkillPackage, ReceivedSkillPackage, SkillPackageEntry, SkillPackageFile |
-| `skill.package.application.dto` | `skill.application.model` | SkillPackageChange, SkillPackageReason |
-| `skill.package.presentation` | `skill.presentation` | SkillPackageController |
+| `skill.upload.application` | `skill.application` | SkillAgentNotice†, SkillPackageCheck, SkillPackageDiff, SkillPackageService, SkillPackageZip |
+| `skill.upload.application.dto` | `skill.application` | CheckedSkillPackage, ReceivedSkillPackage, SkillPackageEntry, SkillPackageFile |
+| `skill.upload.application.dto` | `skill.application.model` | SkillPackageChange, SkillPackageReason |
+| `skill.upload.presentation` | `skill.presentation` | SkillPackageController |
 | `skill.usage.application` | `skill.application` | SkillUsageQuery, SkillUseRecorder |
 | `skill.usage.application.dto` | `skill.application` | SkillUsageSummary, UserSkillUsage |
 | `skill.usage.application.port` | `skill.application` | ActiveConversationPublicIds |
@@ -64,8 +64,8 @@
 
 | 기능 | 아래 하위 기능 | 쓰는 클래스 | 위 하위 기능 | 쓰이는 클래스 |
 | --- | --- | --- | --- | --- |
-| `skill` | `library` | `SkillPackagePreview` | `package` | `SkillPackageFile` |
-| `skill` | `library` | `SkillPackageProblem` | `package` | `SkillPackageReason` |
+| `skill` | `library` | `SkillPackagePreview` | `upload` | `SkillPackageFile` |
+| `skill` | `library` | `SkillPackageProblem` | `upload` | `SkillPackageReason` |
 
 `LAYER_DIRECTION` 에 더한다. 짝이 되는 클래스가 아직 옛 위치에 있어서 생기는 줄이다.
 

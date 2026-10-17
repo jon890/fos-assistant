@@ -221,7 +221,7 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 
 ### 스킬
 
-`skill.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
+`skill.library.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
 같은 패키지 안의 `PreviousSkillVersions`는 기존 `PreviousSkillStore`를 사용해 게시 뒤 이전 버전을 쓰고 지우며 보관 시각을 읽는다.
 이 세 작업의 실패는 기존 경고를 남기고 저장·삭제·원문 읽기를 계속한다. 시각이 없거나 읽지 못하면 `previousSavedAt`은 `null`이다.
 되돌리기의 엄격한 이전 본문 읽기는 `SkillService`에 남는다. 이전 버전이 없으면 `SKILL_NOT_FOUND`이며 읽기 실패를 무시하지 않는다.
