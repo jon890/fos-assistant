@@ -96,3 +96,6 @@
 | [rule-82](rule-82.md) | admin의 엔드포인트는 requireAdmin을 부른다. | [ADMIN_ENDPOINTS_REQUIRE_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-83](rule-83.md) | requireAdmin은 admin 안에서만 부른다. | [REQUIRE_ADMIN_ONLY_IN_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-84](rule-84.md) | 하위 기능과 admin의 경계, dto와 도우미의 소속은 리뷰가 판단한다. | [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-85](rule-85.md) | DB 테이블과 컬럼 이름은 lower_snake_case로 쓴다. | [스키마 이름 검사](../../backend/src/test/java/com/bifos/assistant/SchemaIdentifiersMysqlTest.java) |
+| [rule-86](rule-86.md) | 운영 코드에 필드 주입을 두지 않는다. | [소스 선언 검사](../../backend/src/test/java/com/bifos/assistant/architecture/SourceCodeRules.java) |
+| [rule-87](rule-87.md) | 엔티티에 Lombok @Data·@Setter·@EqualsAndHashCode·@ToString을 붙이지 않는다. | [소스 선언 검사](../../backend/src/test/java/com/bifos/assistant/architecture/SourceCodeRules.java) |
