@@ -11,7 +11,10 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,20 +45,39 @@ public class MemoryLinkDiscovery {
     private final PlatformTransactionManager transactionManager;
 
 
-    /** 그 번호들의 항목마다 연결을 찾는다. */
+    /**
+     * 그 번호들의 항목마다 연결을 찾는다. 같은 주인의 항목은 한 번만 읽는다. 모델을 바꾼 직후처럼 한 주기에 많은 항목을 다시 채워도 주인마다 이웃 목록을 한
+     * 번 읽고 그 안에서 견준다.
+     */
     public void discover(Collection<Long> memoryIds) {
         if (memoryIds.isEmpty()) {
             return;
         }
+        Map<Owner, List<Long>> byOwner = readOnly().execute(status -> targetsByOwner(memoryIds));
         int proposed = 0;
         int relatedCount = 0;
-        for (Long memoryId : memoryIds) {
+        for (Map.Entry<Owner, List<Long>> entry : byOwner == null ? Map.<Owner, List<Long>>of().entrySet() : byOwner.entrySet()) {
+            List<MemoryLinkItem> items;
             try {
-                Found found = discoverOne(memoryId);
-                proposed += found.proposed();
-                relatedCount += found.related();
+                items = readOnly().execute(status -> itemsOf(entry.getKey()));
             } catch (RuntimeException ex) {
-                log.warn("memory link discovery failed memoryId={} exceptionClass={}", memoryId, ex.getClass().getSimpleName());
+                log.warn("memory link discovery failed to read scope={} exceptionClass={}", entry.getKey().scope(), ex.getClass().getSimpleName());
+                continue;
+            }
+            Map<Long, MemoryLinkItem> byId = new HashMap<>();
+            items.forEach(item -> byId.put(item.id(), item));
+            for (Long memoryId : entry.getValue()) {
+                MemoryLinkItem target = byId.get(memoryId);
+                if (target == null) {
+                    continue;
+                }
+                try {
+                    Found found = discoverOne(target, items.stream().filter(item -> !item.id().equals(memoryId)).toList());
+                    proposed += found.proposed();
+                    relatedCount += found.related();
+                } catch (RuntimeException ex) {
+                    log.warn("memory link discovery failed memoryId={} exceptionClass={}", memoryId, ex.getClass().getSimpleName());
+                }
             }
         }
         if (proposed > 0 || relatedCount > 0) {
@@ -67,25 +89,23 @@ public class MemoryLinkDiscovery {
     private record Found(int proposed, int related) {
     }
 
-    private record Neighborhood(MemoryLinkItem target, List<MemoryLinkItem> peers) {
+    /** 같은 항목끼리만 견주는 주인이다. {@code USER} 는 주인 사용자, {@code GROUP} 은 그룹 번호다. */
+    private record Owner(MemoryScope scope, Long id) {
+        static Owner of(Memory memory) {
+            return new Owner(memory.scope(), memory.scope() == MemoryScope.USER ? memory.ownerUserId() : memory.groupId());
+        }
     }
 
 
-    private Found discoverOne(Long memoryId) {
-        TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
-        readOnly.setReadOnly(true);
-        Neighborhood around = readOnly.execute(status -> neighborhood(memoryId));
-        if (around == null) {
-            return new Found(0, 0);
-        }
+    private Found discoverOne(MemoryLinkItem target, List<MemoryLinkItem> peers) {
         int proposed = 0;
-        for (SupersedeCandidate candidate : supersedes.find(around.target(), around.peers())) {
+        for (SupersedeCandidate candidate : supersedes.find(target, peers)) {
             if (links.proposeAutoSupersede(candidate.newer().id(), candidate.older().id(), candidate.score()).isPresent()) {
                 proposed++;
             }
         }
         int relatedCount = 0;
-        for (RelatedPair pair : related.find(around.target(), around.peers())) {
+        for (RelatedPair pair : related.find(target, peers)) {
             if (links.relateAuto(pair.target().id(), pair.peer().id(), pair.score(), properties.relatedMaxPerItem()).isPresent()) {
                 relatedCount++;
             }
@@ -94,17 +114,24 @@ public class MemoryLinkDiscovery {
     }
 
 
-    /** 그 항목과 같은 주인의, 대체되지 않은 승인 항목 가운데 벡터가 있는 것이다. 그 항목이 대상이 아니면 null 이다. */
-    private Neighborhood neighborhood(Long memoryId) {
-        Memory target = memories.findById(memoryId).orElse(null);
-        if (target == null || target.status() != MemoryStatus.ACCEPTED || links.isSuperseded(memoryId)) {
-            return null;
-        }
-        Set<Long> ids = Set.copyOf(target.scope() == MemoryScope.USER
-            ? embeddings.findMemoryIdsOfOwner(target.ownerUserId())
-            : embeddings.findMemoryIdsOfGroup(target.groupId()));
-        if (!ids.contains(memoryId)) {
-            return null;
+    /** 그 번호 가운데 승인되고 대체되지 않은 항목을 주인마다 묶는다. */
+    private Map<Owner, List<Long>> targetsByOwner(Collection<Long> memoryIds) {
+        Set<Long> superseded = links.supersededBy(memoryIds).keySet();
+        Map<Owner, List<Long>> byOwner = new LinkedHashMap<>();
+        memories.findAllById(memoryIds).stream()
+            .filter(memory -> memory.status() == MemoryStatus.ACCEPTED && !superseded.contains(memory.id()))
+            .forEach(memory -> byOwner.computeIfAbsent(Owner.of(memory), owner -> new ArrayList<>()).add(memory.id()));
+        return byOwner;
+    }
+
+
+    /** 그 주인의, 대체되지 않은 승인 항목 가운데 지금 모델과 지금 글에 맞는 벡터가 있는 것이다. */
+    private List<MemoryLinkItem> itemsOf(Owner owner) {
+        Set<Long> ids = Set.copyOf(owner.scope() == MemoryScope.USER
+            ? embeddings.findMemoryIdsOfOwner(owner.id())
+            : embeddings.findMemoryIdsOfGroup(owner.id()));
+        if (ids.isEmpty()) {
+            return List.of();
         }
         Set<Long> superseded = links.supersededBy(ids).keySet();
         List<Memory> eligible = memories.findAllById(ids).stream()
@@ -114,15 +141,17 @@ public class MemoryLinkDiscovery {
         Map<Long, float[]> vectors = vectorCache.vectorsFor(eligible.stream()
             .map(memory -> new RelevanceCandidate(memory.id(), memory.title(), memory.content()))
             .toList());
-        List<MemoryLinkItem> items = eligible.stream()
+        return eligible.stream()
             .filter(memory -> vectors.containsKey(memory.id()))
             .map(memory -> item(memory, vectors.get(memory.id())))
             .toList();
-        MemoryLinkItem self = items.stream().filter(item -> item.id().equals(memoryId)).findFirst().orElse(null);
-        if (self == null) {
-            return null;
-        }
-        return new Neighborhood(self, items.stream().filter(item -> !item.id().equals(memoryId)).toList());
+    }
+
+
+    private TransactionTemplate readOnly() {
+        TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
+        readOnly.setReadOnly(true);
+        return readOnly;
     }
 
 

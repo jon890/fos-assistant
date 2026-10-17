@@ -135,6 +135,27 @@ class MemoryLinkDiscoveryTest {
 
 
     @Test
+    @DisplayName("한 주기에 같은 주인의 여러 항목을 넘겨도 항목마다 연결을 찾고 주인이 다른 항목은 따로 견준다")
+    void discoversSeveralItemsGroupedByOwner() {
+        Memory oldParking = embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 3층에 세운다", PARKING);
+        Memory newParking = embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 5층에 세운다", PARKING);
+        Memory trip = embedded(ADMIN, MemoryScope.USER, "여름 여행", "제주에 간다", TRIP);
+        Memory hotel = embedded(ADMIN, MemoryScope.USER, "숙소", "제주 숙소를 잡았다", HOTEL);
+        Memory otherOld = embedded(OTHER, MemoryScope.USER, "주차 자리", "차는 7층에 세운다", PARKING);
+        Memory otherNew = embedded(OTHER, MemoryScope.USER, "주차 자리", "차는 8층에 세운다", PARKING);
+
+        discovery.discover(List.of(newParking.id(), hotel.id(), otherNew.id()));
+
+        assertThat(links.findAll())
+            .extracting(MemoryLink::fromMemoryId, MemoryLink::toMemoryId, MemoryLink::type)
+            .containsExactlyInAnyOrder(
+                tuple(newParking.id(), oldParking.id(), MemoryLinkType.SUPERSEDES),
+                tuple(trip.id(), hotel.id(), MemoryLinkType.RELATED),
+                tuple(otherNew.id(), otherOld.id(), MemoryLinkType.SUPERSEDES));
+    }
+
+
+    @Test
     @DisplayName("다른 모델의 벡터와 본문을 고친 뒤 다시 채우기 전의 벡터는 견주지 않는다")
     void ignoresVectorsOfOtherModelOrOldText() {
         embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 3층에 세운다", PARKING, "old-model");
