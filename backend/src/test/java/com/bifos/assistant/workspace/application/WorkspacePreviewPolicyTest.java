@@ -2,7 +2,7 @@ package com.bifos.assistant.workspace.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.workspace.application.model.WorkspacePreview;
+import com.bifos.assistant.workspace.application.dto.WorkspacePreview;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

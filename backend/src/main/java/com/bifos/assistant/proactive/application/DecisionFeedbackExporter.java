@@ -2,7 +2,7 @@ package com.bifos.assistant.proactive.application;
 
 import com.bifos.assistant.chat.application.OwnConversations;
 import com.bifos.assistant.feedback.application.FeedbackLabeler;
-import com.bifos.assistant.feedback.application.model.SubjectLabel;
+import com.bifos.assistant.feedback.application.dto.SubjectLabel;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;

@@ -30,7 +30,7 @@ import com.bifos.assistant.workspace.domain.WorkspaceCursor;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;
 import com.bifos.assistant.workspace.domain.WorkspacePath;
-import com.bifos.assistant.workspace.infra.WorkspaceProperties;
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

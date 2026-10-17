@@ -44,7 +44,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
-import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.sql.Timestamp;
 import java.nio.ByteBuffer;

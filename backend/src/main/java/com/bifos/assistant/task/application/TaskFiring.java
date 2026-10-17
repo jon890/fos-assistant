@@ -1,5 +1,6 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.TaskTrigger;

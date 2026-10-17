@@ -16,7 +16,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.feedback.application.model.FeedbackLabel;
+import com.bifos.assistant.feedback.application.dto.FeedbackLabel;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;

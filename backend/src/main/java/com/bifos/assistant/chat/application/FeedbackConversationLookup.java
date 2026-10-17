@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.feedback.application.FeedbackConversations;
+import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

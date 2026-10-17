@@ -2,8 +2,8 @@ package com.bifos.assistant.followup.presentation;
 
 import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.followup.application.model.FollowUpPatch;
-import com.bifos.assistant.followup.application.model.NewFollowUp;
+import com.bifos.assistant.followup.application.dto.FollowUpPatch;
+import com.bifos.assistant.followup.application.dto.NewFollowUp;
 import com.bifos.assistant.followup.presentation.FollowUpDtos.CreateFollowUpRequest;
 import com.bifos.assistant.followup.presentation.FollowUpDtos.FollowUpView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

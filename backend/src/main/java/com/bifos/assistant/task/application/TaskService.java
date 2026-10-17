@@ -1,15 +1,16 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.task.application.model.ScheduleInput;
-import com.bifos.assistant.task.application.model.TaskDetail;
-import com.bifos.assistant.task.application.model.TaskInput;
-import com.bifos.assistant.task.application.model.TaskRunDetail;
+import com.bifos.assistant.task.application.dto.ScheduleInput;
+import com.bifos.assistant.task.application.dto.TaskDetail;
+import com.bifos.assistant.task.application.dto.TaskInput;
+import com.bifos.assistant.task.application.dto.TaskRunDetail;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.TaskTrigger;

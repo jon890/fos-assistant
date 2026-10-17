@@ -7,7 +7,7 @@ import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.crypto.domain.AesGcm;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
-import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
+import com.bifos.assistant.crypto.config.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;

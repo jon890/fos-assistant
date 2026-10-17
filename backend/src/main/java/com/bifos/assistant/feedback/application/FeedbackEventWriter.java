@@ -1,6 +1,7 @@
 package com.bifos.assistant.feedback.application;
 
-import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.application.port.FeedbackConversations;
+import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.usage.domain.AgentExecution;

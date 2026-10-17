@@ -1,5 +1,6 @@
 package com.bifos.assistant.feedback.application;
 
+import com.bifos.assistant.feedback.config.DecisionFeedbackProperties;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import java.time.Clock;
 import java.time.Instant;

@@ -1,5 +1,7 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.task.config.ProactiveScheduleProperties;
+import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.HermesToolsetClient;
@@ -13,7 +15,7 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.task.application.model.ProactiveSchedule;
+import com.bifos.assistant.task.application.dto.ProactiveSchedule;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.MissedPolicy;

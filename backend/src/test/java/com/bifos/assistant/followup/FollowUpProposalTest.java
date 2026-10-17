@@ -10,7 +10,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
+import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;

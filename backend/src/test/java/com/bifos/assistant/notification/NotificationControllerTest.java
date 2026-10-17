@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 
 import com.bifos.assistant.notification.application.NotificationEventHub;
-import com.bifos.assistant.notification.application.NotificationProperties;
+import com.bifos.assistant.notification.config.NotificationProperties;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.NotificationTarget;

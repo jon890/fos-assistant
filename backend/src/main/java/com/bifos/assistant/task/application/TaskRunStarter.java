@@ -1,5 +1,6 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
@@ -26,7 +27,7 @@ import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;

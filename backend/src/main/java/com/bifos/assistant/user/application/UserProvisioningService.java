@@ -1,5 +1,6 @@
 package com.bifos.assistant.user.application;
 
+import com.bifos.assistant.user.application.port.FirstSignInListener;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;

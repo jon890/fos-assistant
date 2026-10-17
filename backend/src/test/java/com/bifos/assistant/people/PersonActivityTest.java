@@ -11,7 +11,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.SignInPolicy;
-import com.bifos.assistant.people.application.model.PersonAccess;
+import com.bifos.assistant.people.application.dto.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;

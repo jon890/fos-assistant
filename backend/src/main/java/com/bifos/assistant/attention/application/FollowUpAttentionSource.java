@@ -11,7 +11,7 @@ import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
+import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ConversationResultDeliveries;

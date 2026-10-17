@@ -1,5 +1,6 @@
 package com.bifos.assistant.workspace.infra;
 
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

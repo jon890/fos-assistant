@@ -1,7 +1,7 @@
 package com.bifos.assistant.admin.workspace.presentation;
 
-import com.bifos.assistant.workspace.application.model.WorkspaceSpaceUsage;
-import com.bifos.assistant.workspace.application.model.WorkspaceUsageReport;
+import com.bifos.assistant.workspace.application.dto.WorkspaceSpaceUsage;
+import com.bifos.assistant.workspace.application.dto.WorkspaceUsageReport;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

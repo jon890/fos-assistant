@@ -15,7 +15,7 @@ import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;

@@ -49,7 +49,7 @@ import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
-import com.bifos.assistant.feedback.application.FeedbackConversations;
+import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;

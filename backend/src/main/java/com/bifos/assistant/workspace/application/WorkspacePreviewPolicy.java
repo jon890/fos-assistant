@@ -1,6 +1,6 @@
 package com.bifos.assistant.workspace.application;
 
-import com.bifos.assistant.workspace.application.model.WorkspacePreview;
+import com.bifos.assistant.workspace.application.dto.WorkspacePreview;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;

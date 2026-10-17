@@ -1,6 +1,6 @@
 package com.bifos.assistant.followup.presentation;
 
-import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
+import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;

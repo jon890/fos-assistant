@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteResult;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
+import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;

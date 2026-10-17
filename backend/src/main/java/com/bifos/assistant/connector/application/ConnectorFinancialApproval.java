@@ -14,7 +14,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
-import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
