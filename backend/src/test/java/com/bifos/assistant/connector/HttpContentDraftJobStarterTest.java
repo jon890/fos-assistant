@@ -9,9 +9,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder;
-import com.bifos.assistant.connector.application.HttpContentDraftJobStarter;
-import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.connector.contentdraft.application.ContentDraftWorkerStatusDecoder;
+import com.bifos.assistant.connector.contentdraft.application.HttpContentDraftJobStarter;
+import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.hermes.application.dto.ContentDraftWorkerStamp;
 import com.bifos.assistant.shared.error.ApiException;

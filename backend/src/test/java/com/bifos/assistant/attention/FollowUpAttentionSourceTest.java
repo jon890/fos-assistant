@@ -23,7 +23,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;

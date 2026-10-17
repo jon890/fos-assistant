@@ -12,10 +12,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.connector.application.FinancialLimitSettings;
-import com.bifos.assistant.connector.application.model.FinancialLimitsView;
-import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
-import com.bifos.assistant.connector.presentation.financial.FinancialLimitController;
+import com.bifos.assistant.connector.financial.application.FinancialLimitSettings;
+import com.bifos.assistant.connector.financial.application.dto.FinancialLimitsView;
+import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
+import com.bifos.assistant.connector.financial.presentation.FinancialLimitController;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

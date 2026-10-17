@@ -9,7 +9,7 @@ import com.bifos.assistant.attention.application.dto.AttentionSignal;
 import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
-import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;

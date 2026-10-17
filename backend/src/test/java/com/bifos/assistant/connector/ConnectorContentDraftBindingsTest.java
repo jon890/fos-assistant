@@ -9,7 +9,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
 import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
-import com.bifos.assistant.connector.application.ConnectorContentDraftBindings;
+import com.bifos.assistant.connector.contentdraft.application.ConnectorContentDraftBindings;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;

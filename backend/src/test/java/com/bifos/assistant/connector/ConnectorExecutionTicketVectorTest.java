@@ -3,8 +3,8 @@ package com.bifos.assistant.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
-import com.bifos.assistant.connector.application.execution.ConnectorExecutionTicket;
+import com.bifos.assistant.connector.financial.application.ConnectorExecutionClaimCodec;
+import com.bifos.assistant.connector.financial.application.ConnectorExecutionTicket;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

@@ -4,7 +4,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorBindingAttempt;
-import com.bifos.assistant.connector.application.execution.ConnectorExecutionGuard;
+import com.bifos.assistant.connector.financial.application.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorInstallResult;
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;

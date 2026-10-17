@@ -21,7 +21,7 @@ import com.bifos.assistant.connector.connection.application.dto.AdminConnectionS
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
-import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;

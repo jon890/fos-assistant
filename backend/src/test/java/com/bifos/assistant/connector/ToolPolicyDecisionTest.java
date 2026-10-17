@@ -1,14 +1,14 @@
 package com.bifos.assistant.connector;
 
-import static com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary.APPROVAL_ONLY;
-import static com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary.NOT_CHECK;
-import static com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary.READ_ONLY;
+import static com.bifos.assistant.connector.action.domain.ToolPolicyDecision.CheckBoundary.APPROVAL_ONLY;
+import static com.bifos.assistant.connector.action.domain.ToolPolicyDecision.CheckBoundary.NOT_CHECK;
+import static com.bifos.assistant.connector.action.domain.ToolPolicyDecision.CheckBoundary.READ_ONLY;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
-import com.bifos.assistant.connector.domain.ToolPolicyDecision;
-import com.bifos.assistant.connector.domain.type.ActionDecision;
-import com.bifos.assistant.connector.domain.type.ActionDenyReason;
+import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
+import com.bifos.assistant.connector.action.domain.type.ActionDecision;
+import com.bifos.assistant.connector.action.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;

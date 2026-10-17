@@ -1,6 +1,6 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.context.event.EventListener;
