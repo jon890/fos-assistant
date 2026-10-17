@@ -224,7 +224,7 @@ worker 시작 전송과 private 상태 조회, MCP 도구와 REST·화면 연결
 
 ### 승인 요청과 조회 port
 
-`TopLevelPackageOrder.ORDER`에서 chat은 connector보다 아래다. port는 chat에 두고 `connector.application.ContentDraftJobs`가 구현한다.
+`TopLevelPackageOrder.ORDER`에서 chat은 connector보다 아래다. port는 chat에 두고 `connector.contentdraft.application.ContentDraftJobs`가 구현한다.
 반환 record는 `chat.application.model`에 둔다. connector 엔티티·enum·catalog·ticket은 반환하지 않는다.
 
 | 계약 | 시그니처와 반환 |

@@ -320,7 +320,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
-`connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
+`connector.connection.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 `agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 셋으로 부른다. `connector` 가 `agent` 보다 위라서다.
 
 | port | 하는 일 | 구현 | 부르는 곳 |
@@ -338,10 +338,10 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | 클래스 | 하는 일 |
 | --- | --- |
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
-| `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
-| `connector.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
-| `connector.application.ConnectorFinancialIntake` | 커넥터의 금융 준비 도구 호출을 금융 준비로 넘긴다. 살펴보기 트리와 지금 열지 않는 동작은 줄 없이 막는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)) |
-| `connector.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
+| `connector.approval.application.dto.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
+| `connector.approval.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
+| `connector.approval.application.ConnectorFinancialIntake` | 커넥터의 금융 준비 도구 호출을 금융 준비로 넘긴다. 살펴보기 트리와 지금 열지 않는 동작은 줄 없이 막는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)) |
+| `connector.approval.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
 | `connector.connection.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
@@ -812,7 +812,7 @@ compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메�
 ### 원고 저장 승인과 worker 허가
 
 승인 요청·job 조회 port `ContentDraftSaveRequests`·`ContentDraftJobQueries`와 반환 record는 chat에 두고 connector의 `ContentDraftJobs`가 구현한다.
-승인 분기 `ContentDraftSaveApproval`, 허가 `ContentDraftJobAuthorizer`, 서명 `ContentDraftSaveTicket`, 공유 잠금 `ContentDraftJobLocks`는 `connector.application`에 둔다.
+승인 분기 `ContentDraftSaveApproval`, 허가 `ContentDraftJobAuthorizer`, 서명 `ContentDraftSaveTicket`, 공유 잠금 `ContentDraftJobLocks`는 `connector.contentdraft.application`에 둔다.
 worker 시작 전송은 `ContentDraftJobStarter` port이며 구현 빈이 없으면 시작을 지원하지 않는 것으로 본다.
 chat의 원고 타입은 connector와 mcp를 import하지 않는다. 검사: `ContentDraftSnapshotArchitectureTest`가 기준 파일 없이 새 타입의 층 순서·순환과 반환 타입을 본다.
 흐름과 잠금 순서는 [원고 기능](../../docs/features/content-draft.md#승인-snapshot과-저장-job)이 갖는다.
