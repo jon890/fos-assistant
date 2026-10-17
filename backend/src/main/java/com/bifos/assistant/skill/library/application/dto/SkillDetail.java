@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
 import java.time.Instant;
 import java.util.List;

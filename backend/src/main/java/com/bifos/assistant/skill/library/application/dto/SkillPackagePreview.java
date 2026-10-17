@@ -1,5 +1,6 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageFile;
 import java.util.List;
 
 /**

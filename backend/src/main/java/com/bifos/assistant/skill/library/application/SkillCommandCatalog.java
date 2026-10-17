@@ -1,5 +1,8 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application;
 
+import com.bifos.assistant.skill.library.application.dto.SkillList;
+import com.bifos.assistant.skill.library.application.dto.SkillListItem;
+import com.bifos.assistant.skill.library.application.dto.SkillsChanged;
 import com.bifos.assistant.agent.domain.Agent;
 import java.time.Clock;
 import java.time.Duration;

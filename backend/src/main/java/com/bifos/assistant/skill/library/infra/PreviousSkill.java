@@ -1,6 +1,6 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.infra;
 
-import com.bifos.assistant.skill.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
 import java.time.Instant;
 
 /**

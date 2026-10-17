@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.domain;
+package com.bifos.assistant.skill.library.domain;
 
 import com.bifos.assistant.shared.util.Sha256;
 import java.util.ArrayList;

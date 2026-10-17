@@ -1,10 +1,12 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application;
 
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.NOT_ZIP;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.TOO_MANY_ENTRIES;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.UNPACKED_TOO_LARGE;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.UNSAFE_ENTRY;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.ZIP_TOO_LARGE;
+import com.bifos.assistant.skill.upload.application.dto.ReceivedSkillPackage;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageEntry;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.NOT_ZIP;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.TOO_MANY_ENTRIES;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.UNPACKED_TOO_LARGE;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.UNSAFE_ENTRY;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.ZIP_TOO_LARGE;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

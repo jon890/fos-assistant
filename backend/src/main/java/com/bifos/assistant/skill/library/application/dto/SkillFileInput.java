@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
 /**
  * 스킬을 저장할 때 받는 참고 파일 하나다.

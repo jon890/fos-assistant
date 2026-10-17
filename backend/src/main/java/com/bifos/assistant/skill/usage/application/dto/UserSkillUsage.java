@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.usage.application.dto;
 
 import java.time.Instant;
 import java.util.UUID;

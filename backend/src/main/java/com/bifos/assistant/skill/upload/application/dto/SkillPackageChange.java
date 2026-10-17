@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application.model;
+package com.bifos.assistant.skill.upload.application.dto;
 
 /** 스킬 묶음 미리보기에서 파일 하나가 지금 스킬과 견줘 어떻게 바뀌는가다. 저장하지 않는다. */
 public enum SkillPackageChange {

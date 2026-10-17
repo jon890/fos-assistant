@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.domain.type;
+package com.bifos.assistant.skill.usage.domain.type;
 
 /** 스킬이 어떻게 쓰였는지다. */
 public enum SkillUseSource {

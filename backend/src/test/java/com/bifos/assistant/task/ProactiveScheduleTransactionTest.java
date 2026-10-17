@@ -22,7 +22,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillCommandCatalog;
+import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import com.bifos.assistant.task.application.ProactiveScheduleService;
 import com.bifos.assistant.task.application.TaskFiring;
 import com.bifos.assistant.task.application.TaskRunStarter;

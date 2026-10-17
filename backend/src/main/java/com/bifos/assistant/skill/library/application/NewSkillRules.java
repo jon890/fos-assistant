@@ -1,10 +1,11 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application;
 
+import com.bifos.assistant.skill.library.application.dto.SkillFrontmatter;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.infra.SkillProperties;
-import com.bifos.assistant.skill.infra.SkillPublisher;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.config.SkillProperties;
+import com.bifos.assistant.skill.library.infra.SkillPublisher;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;

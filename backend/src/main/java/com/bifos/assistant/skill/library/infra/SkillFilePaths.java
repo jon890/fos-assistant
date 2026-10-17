@@ -1,10 +1,10 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.infra;
 
-import static com.bifos.assistant.skill.infra.SkillFiles.validation;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.validation;
 
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillFile;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;

@@ -1,4 +1,6 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
+
+import com.bifos.assistant.skill.usage.application.dto.SkillUsageSummary;
 
 /**
  * 스킬 목록의 한 줄이다.

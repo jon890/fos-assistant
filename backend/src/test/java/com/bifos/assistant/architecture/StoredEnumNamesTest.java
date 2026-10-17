@@ -21,7 +21,7 @@ import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.FindingKind;
 import com.bifos.assistant.proactive.domain.type.FindingReason;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import java.util.Arrays;

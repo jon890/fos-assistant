@@ -2,7 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.skill.application.ActiveConversationPublicIds;
+import com.bifos.assistant.skill.usage.application.port.ActiveConversationPublicIds;
 import com.bifos.assistant.usage.execution.application.port.ConversationPublicIds;
 import java.util.Collection;
 import java.util.Map;

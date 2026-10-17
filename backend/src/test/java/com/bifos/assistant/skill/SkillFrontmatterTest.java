@@ -2,8 +2,8 @@ package com.bifos.assistant.skill;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.skill.application.SkillFrontmatter;
-import com.bifos.assistant.skill.application.SkillService;
+import com.bifos.assistant.skill.library.application.dto.SkillFrontmatter;
+import com.bifos.assistant.skill.library.application.SkillService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

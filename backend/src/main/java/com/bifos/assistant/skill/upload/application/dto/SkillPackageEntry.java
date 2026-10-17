@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application.dto;
 
 /**
  * 받은 스킬 묶음의 파일 하나다.

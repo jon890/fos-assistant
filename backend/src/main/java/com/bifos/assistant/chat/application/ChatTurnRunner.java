@@ -11,7 +11,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillUseRecorder;
+import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.application.dto.ContextSourceRef;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;

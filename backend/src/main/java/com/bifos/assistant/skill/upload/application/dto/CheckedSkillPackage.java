@@ -1,7 +1,8 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application.dto;
 
-import com.bifos.assistant.skill.domain.SkillFile;
-import com.bifos.assistant.skill.infra.SkillFilePaths;
+import com.bifos.assistant.skill.library.application.dto.SkillPackageProblem;
+import com.bifos.assistant.skill.library.domain.SkillFile;
+import com.bifos.assistant.skill.library.infra.SkillFilePaths;
 import java.util.List;
 
 /**

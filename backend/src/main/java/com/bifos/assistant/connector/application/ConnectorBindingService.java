@@ -25,7 +25,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.infra.SkillPublisher;
+import com.bifos.assistant.skill.library.infra.SkillPublisher;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;

@@ -1,11 +1,11 @@
-package com.bifos.assistant.skill.presentation;
+package com.bifos.assistant.skill.library.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.skill.application.SkillService;
-import com.bifos.assistant.skill.presentation.SkillDtos.SkillDetailView;
-import com.bifos.assistant.skill.presentation.SkillDtos.SkillListView;
-import com.bifos.assistant.skill.presentation.SkillDtos.ToggleSkillRequest;
-import com.bifos.assistant.skill.presentation.SkillDtos.WriteSkillRequest;
+import com.bifos.assistant.skill.library.application.SkillService;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.SkillDetailView;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.SkillListView;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.ToggleSkillRequest;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.WriteSkillRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

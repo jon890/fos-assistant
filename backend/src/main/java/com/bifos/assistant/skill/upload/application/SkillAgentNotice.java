@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

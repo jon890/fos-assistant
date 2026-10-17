@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.domain;
+package com.bifos.assistant.skill.usage.domain;
 
 import java.time.Instant;
 

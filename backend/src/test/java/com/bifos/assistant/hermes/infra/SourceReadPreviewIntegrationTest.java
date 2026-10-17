@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.application.SourceReadSummaries;
 import com.bifos.assistant.chat.application.SourceReadSummary;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.hermes.application.dto.RunEvent;
-import com.bifos.assistant.skill.application.SkillUseRecorder;
+import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;

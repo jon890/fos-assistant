@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
 /**
  * 스킬이 어디서 왔는가.

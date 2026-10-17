@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
 /**
  * 참고 파일의 경로와 크기와 편집할 원문이다.

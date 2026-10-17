@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.infra;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;

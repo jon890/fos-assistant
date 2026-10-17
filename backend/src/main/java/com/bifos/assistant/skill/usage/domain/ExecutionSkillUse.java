@@ -1,6 +1,6 @@
-package com.bifos.assistant.skill.domain;
+package com.bifos.assistant.skill.usage.domain;
 
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

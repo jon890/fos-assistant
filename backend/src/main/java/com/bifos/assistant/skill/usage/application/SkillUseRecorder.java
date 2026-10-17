@@ -1,9 +1,9 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.usage.application;
 
 import com.bifos.assistant.hermes.application.dto.HermesSkillName;
-import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
-import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
 import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;

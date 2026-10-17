@@ -1,7 +1,7 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application;
 
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.infra.PreviousSkillStore;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.infra.PreviousSkillStore;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 /** 이전 버전의 보관과 시각 조회가 실패해도 이미 끝난 게시와 원문 읽기를 유지한다. */
 @Component
 @RequiredArgsConstructor
-@Slf4j(topic = "com.bifos.assistant.skill.application.SkillService")
+@Slf4j(topic = "com.bifos.assistant.skill.library.application.SkillService")
 class PreviousSkillVersions {
 
     private final PreviousSkillStore store;

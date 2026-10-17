@@ -1,14 +1,14 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.infra;
 
-import static com.bifos.assistant.skill.infra.SkillFilePaths.SKILL_MD;
-import static com.bifos.assistant.skill.infra.SkillFilePaths.isScript;
-import static com.bifos.assistant.skill.infra.SkillFilePaths.isValidFilePath;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.SKILL_MD;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.isScript;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.isValidFilePath;
 
 import com.bifos.assistant.hermes.application.dto.HermesProfileName;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;

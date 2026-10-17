@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;

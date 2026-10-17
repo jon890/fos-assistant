@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
 /**
  * 그 에이전트의 스킬 저장, 지우기, 켜고 끄기가 Hermes 에 반영됐다는 사건이다.

@@ -1,15 +1,17 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application;
 
-import static com.bifos.assistant.skill.application.SkillService.MAX_CHARS_PER_FILE;
-import static com.bifos.assistant.skill.application.SkillService.MAX_DESCRIPTION_CHARS;
-import static com.bifos.assistant.skill.application.SkillService.MAX_FILES;
-import static com.bifos.assistant.skill.application.SkillService.MAX_TOTAL_BYTES;
+import com.bifos.assistant.skill.library.application.dto.SkillFileInput;
+import com.bifos.assistant.skill.library.application.dto.SkillFrontmatter;
+import static com.bifos.assistant.skill.library.application.SkillService.MAX_CHARS_PER_FILE;
+import static com.bifos.assistant.skill.library.application.SkillService.MAX_DESCRIPTION_CHARS;
+import static com.bifos.assistant.skill.library.application.SkillService.MAX_FILES;
+import static com.bifos.assistant.skill.library.application.SkillService.MAX_TOTAL_BYTES;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
-import com.bifos.assistant.skill.infra.SkillFilePaths;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillFile;
+import com.bifos.assistant.skill.library.infra.SkillFilePaths;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,7 +22,7 @@ import lombok.NoArgsConstructor;
 
 /** 스킬 저장 요청의 {@code SKILL.md}, 파일 목록, 크기와 함께 실리는 스킬의 비밀 요청 칸을 검사한다. 한도 값은 {@link SkillService} 가 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-final class SkillInputRules {
+public final class SkillInputRules {
 
     static SkillFrontmatter requireSkillMd(String name, String skillMd) {
         if (skillMd == null || skillMd.isBlank()) {
@@ -126,7 +128,7 @@ final class SkillInputRules {
     }
 
 
-    static long utf8Bytes(String value) {
+    public static long utf8Bytes(String value) {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
     }
 }

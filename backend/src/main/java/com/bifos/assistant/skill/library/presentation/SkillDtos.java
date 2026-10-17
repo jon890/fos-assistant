@@ -1,11 +1,11 @@
-package com.bifos.assistant.skill.presentation;
+package com.bifos.assistant.skill.library.presentation;
 
-import com.bifos.assistant.skill.application.SkillDetail;
-import com.bifos.assistant.skill.application.SkillFileInput;
-import com.bifos.assistant.skill.application.SkillList;
-import com.bifos.assistant.skill.application.SkillListItem;
-import com.bifos.assistant.skill.application.SkillPackagePreview;
-import com.bifos.assistant.skill.application.SkillUsageSummary;
+import com.bifos.assistant.skill.library.application.dto.SkillDetail;
+import com.bifos.assistant.skill.library.application.dto.SkillFileInput;
+import com.bifos.assistant.skill.library.application.dto.SkillList;
+import com.bifos.assistant.skill.library.application.dto.SkillListItem;
+import com.bifos.assistant.skill.library.application.dto.SkillPackagePreview;
+import com.bifos.assistant.skill.usage.application.dto.SkillUsageSummary;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -80,7 +80,7 @@ public final class SkillDtos {
      */
     public record SkillDetailView(
         String name, String description, String body, List<SkillFileView> files, Instant previousSavedAt) {
-        static SkillDetailView from(SkillDetail detail) {
+        public static SkillDetailView from(SkillDetail detail) {
             return new SkillDetailView(
                 detail.name(),
                 detail.description(),
@@ -111,7 +111,7 @@ public final class SkillDtos {
         List<SkillPackageFileView> files,
         List<String> ignored,
         List<SkillPackageProblemView> problems) {
-        static SkillPackagePreviewView from(SkillPackagePreview preview) {
+        public static SkillPackagePreviewView from(SkillPackagePreview preview) {
             return new SkillPackagePreviewView(
                 preview.name(),
                 preview.description(),

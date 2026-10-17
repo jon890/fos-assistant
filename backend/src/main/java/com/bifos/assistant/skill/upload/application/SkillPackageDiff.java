@@ -1,11 +1,12 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application;
 
-import static com.bifos.assistant.skill.application.SkillInputRules.utf8Bytes;
-import static com.bifos.assistant.skill.infra.SkillFilePaths.SKILL_MD;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageFile;
+import static com.bifos.assistant.skill.library.application.SkillInputRules.utf8Bytes;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.SKILL_MD;
 
-import com.bifos.assistant.skill.application.model.SkillPackageChange;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.domain.SkillFile;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageChange;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillFile;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

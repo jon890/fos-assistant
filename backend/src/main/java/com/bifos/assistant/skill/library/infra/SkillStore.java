@@ -1,19 +1,20 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.library.infra;
 
-import static com.bifos.assistant.skill.infra.SkillFilePaths.requireBundle;
-import static com.bifos.assistant.skill.infra.SkillFiles.TEMP_PREFIX;
-import static com.bifos.assistant.skill.infra.SkillFiles.createDirectory;
-import static com.bifos.assistant.skill.infra.SkillFiles.deleteQuietly;
-import static com.bifos.assistant.skill.infra.SkillFiles.deleteRecursively;
-import static com.bifos.assistant.skill.infra.SkillFiles.randomSuffix;
-import static com.bifos.assistant.skill.infra.SkillFiles.readBundle;
-import static com.bifos.assistant.skill.infra.SkillFiles.requireDirectory;
-import static com.bifos.assistant.skill.infra.SkillFiles.requireProfile;
-import static com.bifos.assistant.skill.infra.SkillFiles.storeFailure;
-import static com.bifos.assistant.skill.infra.SkillFiles.validation;
-import static com.bifos.assistant.skill.infra.SkillFiles.writeFile;
+import com.bifos.assistant.skill.library.config.SkillProperties;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.requireBundle;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.TEMP_PREFIX;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.createDirectory;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.deleteQuietly;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.deleteRecursively;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.randomSuffix;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.readBundle;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.requireDirectory;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.requireProfile;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.storeFailure;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.validation;
+import static com.bifos.assistant.skill.library.infra.SkillFiles.writeFile;
 
-import com.bifos.assistant.skill.domain.SkillBundle;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;

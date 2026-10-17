@@ -1,9 +1,9 @@
-package com.bifos.assistant.skill.infra;
+package com.bifos.assistant.skill.usage.infra;
 
-import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.SkillUseCount;
-import com.bifos.assistant.skill.domain.SkillUseOccurrence;
-import com.bifos.assistant.skill.domain.type.SkillUseSource;
+import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
+import com.bifos.assistant.skill.usage.domain.SkillUseCount;
+import com.bifos.assistant.skill.usage.domain.SkillUseOccurrence;
+import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,7 +30,7 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
      * 걸쳐 쌓인다.
      */
     @Query("""
-            select new com.bifos.assistant.skill.domain.SkillUseCount(
+            select new com.bifos.assistant.skill.usage.domain.SkillUseCount(
                 u.skillName, count(distinct u.executionId), max(u.occurredAt))
             from ExecutionSkillUse u
                 join AgentExecution e on e.id = u.executionId
@@ -42,7 +42,7 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
 
     /** 그 사용자의 실행에서 쓰인 것을 실행과 에이전트와 대화 번호를 붙여 읽는다. */
     @Query("""
-            select new com.bifos.assistant.skill.domain.SkillUseOccurrence(
+            select new com.bifos.assistant.skill.usage.domain.SkillUseOccurrence(
                 u.executionId, e.agentId, e.conversationId, u.skillName, u.occurredAt)
             from ExecutionSkillUse u
                 join AgentExecution e on e.id = u.executionId

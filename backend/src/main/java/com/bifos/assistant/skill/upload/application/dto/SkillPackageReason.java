@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application.model;
+package com.bifos.assistant.skill.upload.application.dto;
 
 /**
  * 스킬 묶음을 받거나 검사할 때 난 문제의 까닭이다. 미리보기 응답의 {@code reason} 값이고 저장하지 않는다.

@@ -1,10 +1,10 @@
-package com.bifos.assistant.skill.presentation;
+package com.bifos.assistant.skill.upload.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.skill.application.SkillPackageService;
-import com.bifos.assistant.skill.application.SkillPackageZip;
-import com.bifos.assistant.skill.presentation.SkillDtos.SkillDetailView;
-import com.bifos.assistant.skill.presentation.SkillDtos.SkillPackagePreviewView;
+import com.bifos.assistant.skill.upload.application.SkillPackageService;
+import com.bifos.assistant.skill.upload.application.SkillPackageZip;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.SkillDetailView;
+import com.bifos.assistant.skill.library.presentation.SkillDtos.SkillPackagePreviewView;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import lombok.RequiredArgsConstructor;

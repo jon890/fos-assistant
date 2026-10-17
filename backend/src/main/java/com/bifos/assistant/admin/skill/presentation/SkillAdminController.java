@@ -1,7 +1,7 @@
 package com.bifos.assistant.admin.skill.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
-import com.bifos.assistant.skill.application.SkillService;
+import com.bifos.assistant.skill.library.application.SkillService;
 import com.bifos.assistant.admin.skill.presentation.SkillAdminDtos.SkillListView;
 import com.bifos.assistant.admin.skill.presentation.SkillAdminDtos.ToggleSkillRequest;
 import jakarta.validation.Valid;

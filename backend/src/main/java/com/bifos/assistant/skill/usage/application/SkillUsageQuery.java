@@ -1,11 +1,14 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.usage.application;
 
+import com.bifos.assistant.skill.usage.application.dto.SkillUsageSummary;
+import com.bifos.assistant.skill.usage.application.dto.UserSkillUsage;
+import com.bifos.assistant.skill.usage.application.port.ActiveConversationPublicIds;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.skill.domain.ExecutionSkillUse;
-import com.bifos.assistant.skill.domain.SkillUseCount;
-import com.bifos.assistant.skill.domain.SkillUseOccurrence;
-import com.bifos.assistant.skill.infra.ExecutionSkillUseRepository;
+import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
+import com.bifos.assistant.skill.usage.domain.SkillUseCount;
+import com.bifos.assistant.skill.usage.domain.SkillUseOccurrence;
+import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;

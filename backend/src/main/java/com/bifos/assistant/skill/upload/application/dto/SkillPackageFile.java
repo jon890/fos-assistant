@@ -1,6 +1,4 @@
-package com.bifos.assistant.skill.application;
-
-import com.bifos.assistant.skill.application.model.SkillPackageChange;
+package com.bifos.assistant.skill.upload.application.dto;
 
 /**
  * 스킬 묶음 미리보기의 파일 한 줄이다.

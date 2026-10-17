@@ -1,16 +1,16 @@
 package com.bifos.assistant.skill;
 
-import static com.bifos.assistant.skill.application.SkillPackageZip.MAX_ENTRIES;
-import static com.bifos.assistant.skill.application.SkillPackageZip.MAX_UNPACKED_BYTES;
-import static com.bifos.assistant.skill.application.SkillPackageZip.MAX_ZIP_BYTES;
+import static com.bifos.assistant.skill.upload.application.SkillPackageZip.MAX_ENTRIES;
+import static com.bifos.assistant.skill.upload.application.SkillPackageZip.MAX_UNPACKED_BYTES;
+import static com.bifos.assistant.skill.upload.application.SkillPackageZip.MAX_ZIP_BYTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import com.bifos.assistant.skill.application.ReceivedSkillPackage;
-import com.bifos.assistant.skill.application.SkillPackageEntry;
-import com.bifos.assistant.skill.application.SkillPackageProblem;
-import com.bifos.assistant.skill.application.SkillPackageZip;
-import com.bifos.assistant.skill.application.model.SkillPackageReason;
+import com.bifos.assistant.skill.upload.application.dto.ReceivedSkillPackage;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageEntry;
+import com.bifos.assistant.skill.library.application.dto.SkillPackageProblem;
+import com.bifos.assistant.skill.upload.application.SkillPackageZip;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageReason;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

@@ -1,6 +1,6 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.library.application.dto;
 
-import com.bifos.assistant.skill.application.model.SkillPackageReason;
+import com.bifos.assistant.skill.upload.application.dto.SkillPackageReason;
 
 /**
  * 스킬 묶음의 문제 하나다.

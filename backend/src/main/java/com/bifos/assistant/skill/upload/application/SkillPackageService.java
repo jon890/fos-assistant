@@ -1,20 +1,27 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.upload.application;
 
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.DESCRIPTION_TOO_LONG;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.LIMIT_REACHED;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.NAME_TAKEN;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.SCRIPTS_NEED_SANDBOX;
-import static com.bifos.assistant.skill.application.model.SkillPackageReason.ZIP_TOO_LARGE;
-import static com.bifos.assistant.skill.infra.SkillFilePaths.SKILL_MD;
+import com.bifos.assistant.skill.library.application.NewSkillRules;
+import com.bifos.assistant.skill.library.application.SkillService;
+import com.bifos.assistant.skill.library.application.dto.SkillDetail;
+import com.bifos.assistant.skill.library.application.dto.SkillFrontmatter;
+import com.bifos.assistant.skill.library.application.dto.SkillPackagePreview;
+import com.bifos.assistant.skill.library.application.dto.SkillPackageProblem;
+import com.bifos.assistant.skill.upload.application.dto.CheckedSkillPackage;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.DESCRIPTION_TOO_LONG;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.LIMIT_REACHED;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.NAME_TAKEN;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.SCRIPTS_NEED_SANDBOX;
+import static com.bifos.assistant.skill.upload.application.dto.SkillPackageReason.ZIP_TOO_LARGE;
+import static com.bifos.assistant.skill.library.infra.SkillFilePaths.SKILL_MD;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.domain.SkillBundle;
-import com.bifos.assistant.skill.infra.SkillFilePaths;
-import com.bifos.assistant.skill.infra.SkillPublisher;
-import com.bifos.assistant.skill.infra.SkillStore;
+import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.infra.SkillFilePaths;
+import com.bifos.assistant.skill.library.infra.SkillPublisher;
+import com.bifos.assistant.skill.library.infra.SkillStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

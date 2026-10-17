@@ -1,4 +1,4 @@
-package com.bifos.assistant.skill.application;
+package com.bifos.assistant.skill.usage.application.port;
 
 import java.util.Collection;
 import java.util.Map;
