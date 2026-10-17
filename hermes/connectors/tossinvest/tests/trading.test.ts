@@ -658,7 +658,12 @@ for (const [label, args] of [
             arguments: {
               v: 1,
               tool: "create_order",
-              args: { symbol: "ABC", side: "BUY", orderType: "MARKET", ...args },
+              args: {
+                symbol: "ABC",
+                side: "BUY",
+                orderType: "MARKET",
+                ...args,
+              },
             },
           });
           expect(response.isError).toBe(true);
