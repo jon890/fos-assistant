@@ -6,7 +6,6 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -17,17 +16,14 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.application.SkillUsageQuery;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.usage.application.ExecutionTreeService;
-import com.bifos.assistant.usage.application.RootExecutionQuery;
 import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import com.bifos.assistant.usage.presentation.UsageController;
-import com.bifos.assistant.usage.presentation.UsageDtos.BreakdownRow;
+import com.bifos.assistant.usage.presentation.UsageBreakdownAdminController;
+import com.bifos.assistant.usage.presentation.UsageBreakdownAdminDtos.BreakdownRow;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,22 +62,10 @@ class UsageBreakdownTest {
     AgentRepository agents;
 
     @Autowired
-    AgentService agentService;
-
-    @Autowired
-    ExecutionTreeService trees;
-
-    @Autowired
     UsageSummaryService summaries;
 
-    @Autowired
-    RootExecutionQuery rootExecutions;
-
-    @Autowired
-    SkillUsageQuery skillUsage;
-
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
-    private UsageController controller;
+    private UsageBreakdownAdminController controller;
     private Agent career;
     private Agent chore;
 
@@ -91,7 +75,7 @@ class UsageBreakdownTest {
         executions.deleteAll();
         career = agent(CAREER_CODE, "진로 비서");
         chore = agent(CHORE_CODE, "집안일 비서");
-        controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
+        controller = new UsageBreakdownAdminController(currentUser, summaries);
         when(currentUser.require()).thenReturn(new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN));
         // 묶음 합계는 관리자만 받는다. 대역이어도 관리자 확인은 실제 판정을 타게 한다.
         doCallRealMethod().when(currentUser).requireAdmin();

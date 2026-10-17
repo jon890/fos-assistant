@@ -25,16 +25,16 @@ public class ToolsetAdminController {
 
 
     @GetMapping
-    public List<AgentDtos.CatalogToolsetView> read() {
+    public List<ToolsetAdminDtos.CatalogToolsetView> read() {
         return catalog.read(currentUser.requireAdmin()).stream()
-            .map(AgentDtos.CatalogToolsetView::from)
+            .map(ToolsetAdminDtos.CatalogToolsetView::from)
             .toList();
     }
 
 
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void save(@Valid @RequestBody AgentDtos.HiddenToolsetsRequest request) {
+    public void save(@Valid @RequestBody ToolsetAdminDtos.HiddenToolsetsRequest request) {
         visibility.save(currentUser.requireAdmin(), request.hidden());
     }
 }

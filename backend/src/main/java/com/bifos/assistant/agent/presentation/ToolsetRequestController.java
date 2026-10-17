@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 요청자는 자기 요청을, 관리자는 같은 그룹의 요청을 읽고 결정한다. */
+/** 요청자가 자기 toolset 요청을 읽고 낸다. */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -38,31 +38,9 @@ public class ToolsetRequestController {
     }
 
 
-    @GetMapping("/admin/agents/{code}/tool-requests")
-    public List<ToolsetRequestResponse> listAdmin(@PathVariable String code) {
-        return requests.list(currentUser.requireAdmin(), code, true).stream()
-            .map(ToolsetRequestResponse::from)
-            .toList();
-    }
-
-
     @GetMapping("/tool-requests/{id}")
     public ToolsetRequestResponse read(@PathVariable UUID id) {
         return ToolsetRequestResponse.from(requests.read(currentUser.require(), id, false));
-    }
-
-
-    @GetMapping("/admin/tool-requests/{id}")
-    public ToolsetRequestResponse readAdmin(@PathVariable UUID id) {
-        return ToolsetRequestResponse.from(requests.read(currentUser.requireAdmin(), id, true));
-    }
-
-
-    @PostMapping("/admin/tool-requests/{id}")
-    public ToolsetRequestResponse decide(
-        @PathVariable UUID id, @Valid @RequestBody AgentDtos.DecideToolsetRequest body) {
-        return ToolsetRequestResponse.from(
-            requests.decide(currentUser.requireAdmin(), id, body.approve(), body.reason()));
     }
 
 

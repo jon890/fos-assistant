@@ -29,6 +29,8 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionCost;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.presentation.UsageBreakdownAdminController;
+import com.bifos.assistant.usage.presentation.UsageBreakdownAdminDtos;
 import com.bifos.assistant.usage.presentation.UsageController;
 import com.bifos.assistant.usage.presentation.UsageDtos;
 import jakarta.persistence.EntityManagerFactory;
@@ -81,6 +83,7 @@ class UsageControllerTest {
 
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private UsageController controller;
+    private UsageBreakdownAdminController breakdownController;
     private Agent agent;
 
 
@@ -98,6 +101,7 @@ class UsageControllerTest {
                 AgentVisibility.PRIVATE,
                 USER_ID)));
         controller = new UsageController(rootExecutions, currentUser, agentService, trees, skillUsage, summaries);
+        breakdownController = new UsageBreakdownAdminController(currentUser, summaries);
         // 대역이어도 관리자 확인은 실제 판정을 탄다. 그래야 MEMBER 역할의 거절을 볼 수 있다.
         doCallRealMethod().when(currentUser).requireAdmin();
         signInAs(UserRole.ADMIN);
@@ -277,13 +281,13 @@ class UsageControllerTest {
     void memberBreakdownIsForbiddenAndAdminGetsRows() {
         detailedExecution();
 
-        UsageDtos.BreakdownView forAdmin = controller.breakdown("model", null);
+        UsageBreakdownAdminDtos.BreakdownView forAdmin = breakdownController.breakdown("model", null);
         signInAs(UserRole.MEMBER);
 
         assertThat(forAdmin.rows())
             .singleElement()
             .satisfies(row -> assertThat(row.label()).isEqualTo("example-model-large"));
-        assertThatThrownBy(() -> controller.breakdown("model", null))
+        assertThatThrownBy(() -> breakdownController.breakdown("model", null))
             .isInstanceOf(ApiException.class)
             .extracting(failure -> ((ApiException)failure).code())
             .isEqualTo(ErrorCode.FORBIDDEN);
