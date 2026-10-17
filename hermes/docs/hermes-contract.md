@@ -1682,6 +1682,16 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 [`_maybe_wrap_untrusted`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L515),
 [감싸는 도구와 32자 하한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L436)
 
+### MCP 서버의 tools/call 결과 모양
+
+Hermes 는 MCP 서버의 `tools/call` 결과를 `mcp` 패키지의 `CallToolResult` 로 검증한다.
+`content` 가 없는 결과는 `1 validation error for CallToolResult content Field required` 로 호출 실패가 되고 모델은 도구 실패만 받는다.
+2026-10-17 운영 로그에서 `order_limit_read` 가 값 객체를 그대로 냈을 때 확인했다. 소스로는 읽지 않았다.
+
+Control Plane MCP 도구는 모두 `{content: [{type: "text", text}], isError}` 로 답한다.
+판정의 기준은 [`test/fixtures/mcp-call-tool-result-v1.json`](../../test/fixtures/mcp-call-tool-result-v1.json) 이다.
+[`test_control_plane_tool_result.py`](../tests/test_control_plane_tool_result.py) 가 실제 `mcp` 패키지로, `McpToolResultShapeTest` 가 backend 의 모양 검사로 그 fixture 를 같은 쪽으로 가르는지 본다.
+
 ### 도구를 모델에게서 빼는 설정
 
 `mcp_servers.<서버>.tools.include` 와 `tools.exclude` 가 있다. 접두사가 붙기 전의 원래 도구 이름과 glob 을 받는다.
