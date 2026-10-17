@@ -67,7 +67,6 @@ public class MemoryLinkDiscovery {
     private record Found(int proposed, int related) {
     }
 
-
     private record Neighborhood(MemoryLinkItem target, List<MemoryLinkItem> peers) {
     }
 
