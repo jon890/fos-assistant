@@ -17,6 +17,8 @@ const CATEGORY_BUTTON = 'button[data-click-area="tpb*i.category"]';
 const TAG_INPUT = "#tag-input";
 export const SAVE_BUTTON = "저장";
 const CATEGORIES_MAX = 50;
+/** `list_categories` 가 읽는 목록의 상한. 넘으면 잘린 목록으로 막지 않게 오류로 처리한다. */
+export const CATEGORY_LIST_MAX = 200;
 export const SAVE_TRIES = 25;
 const OPEN_TRIES = 3;
 const DIAGNOSIS_LAYERS = 8;
@@ -127,15 +129,12 @@ function categoryOptionFinder(category: string) {
 }
 
 /** 열린 카테고리 목록의 이름. 찾는 카테고리가 없을 때 사용자에게 고르게 돌려준다. */
-async function categoryNames(page: EditorPage) {
+async function categoryNames(page: EditorPage, max = CATEGORIES_MAX) {
   const raw = await page.js<string>(
     "JSON.stringify([...document.querySelectorAll('[data-testid^=categoryItemText_]')]" +
       ".map(name => name.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean))",
   );
-  return [...new Set(JSON.parse(raw || "[]") as string[])].slice(
-    0,
-    CATEGORIES_MAX,
-  );
+  return [...new Set(JSON.parse(raw || "[]") as string[])].slice(0, max);
 }
 
 /** 움직이는 화면이 멈추고 단추가 드러난 뒤 누른다. */
@@ -257,4 +256,32 @@ export async function readSettings(page: EditorPage) {
   if (!(await closeSettings(page)))
     throw page.fail("editor_failed", "상태를 읽은 뒤 발행 설정을 닫지 못했다");
   return current;
+}
+
+/**
+ * 발행 설정의 카테고리 목록을 열어 이름을 차례대로 읽는다. 항목은 누르지 않고 설정을 닫으려고 한다.
+ * 목록을 열지 못하면 `editor_failed`, 상한(`CATEGORY_LIST_MAX`)을 넘으면 잘린 목록을 주지 않고 `editor_failed` 다.
+ */
+export async function readCategories(page: EditorPage) {
+  if (!(await openSettings(page)))
+    throw page.fail("editor_failed", "카테고리 목록을 읽을 수 없다");
+  if (!(await clickStableControl(page, CATEGORY_BUTTON)))
+    throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다");
+  const shown = await page.waitUntil(async () =>
+    Boolean(
+      await page.js(
+        "!!document.querySelector('[data-testid^=categoryItemText_]')",
+      ),
+    ),
+  );
+  if (!shown) throw page.fail("editor_failed", "카테고리 목록이 보이지 않는다");
+  const names = await categoryNames(page, CATEGORY_LIST_MAX + 1);
+  if (names.length > CATEGORY_LIST_MAX)
+    throw page.fail(
+      "editor_failed",
+      "카테고리가 너무 많아 목록을 다 읽지 못한다",
+    );
+  // 이름은 이미 읽었고 읽기 탭은 곧 닫히므로 설정을 닫지 못해도 실패로 보지 않는다.
+  await closeSettings(page).catch(() => false);
+  return names;
 }

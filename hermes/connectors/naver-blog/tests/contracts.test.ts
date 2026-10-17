@@ -75,11 +75,12 @@ test("manifest 도구 선언은 MCP 서버 도구와 정확히 같다", async ()
   );
 });
 
-test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기는 계정 안 쓰기다", async () => {
+test("도구 여덟을 선언하고 불러오기와 임시저장과 덮어쓰기는 계정 안 쓰기다", async () => {
   const tools = await listTools();
 
   expect(tools.map((tool) => tool.name).sort()).toEqual([
     "draft_job",
+    "list_categories",
     "list_drafts",
     "overwrite_draft",
     "read_draft",
@@ -88,6 +89,7 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
     "session_status",
   ]);
   expect(manifest.tools.list_drafts).toMatchObject({ risk: "READ" });
+  expect(manifest.tools.list_categories).toMatchObject({ risk: "READ" });
   expect(manifest.tools.read_draft).toMatchObject({
     risk: "WRITE",
     approval: "required",
