@@ -81,7 +81,7 @@ export async function assertIdle(dir: string, blogId: string) {
  * 「작성 중인 글이 있습니다」 알림은 닫지 않고 `notice` 로 알린다. 닫으면 사용자가 쓰던 자동저장본이 버려질 수 있다.
  * 읽기는 잠금을 잡지 않는다. 읽는 동안 시작한 저장 작업은 자기 탭의 화면을 따로 대조한다.
  */
-async function withWriteTab<T>(
+export async function withWriteTab<T>(
   env: Env,
   options: ReadOptions,
   work: (page: EditorPage, blogId: string, notice: boolean) => Promise<T>,

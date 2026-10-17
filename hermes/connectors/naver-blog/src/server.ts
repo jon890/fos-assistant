@@ -12,6 +12,7 @@ import {
   type DraftInput,
   validateDraft,
 } from "./draft.ts";
+import { categoryProblem, listCategories } from "./categories.ts";
 import { listDrafts, readDraft } from "./drafts.ts";
 import { DRAFT_ID_PATTERN } from "./editor/drafts.ts";
 import type { OverwriteInput } from "./editor/overwrite.ts";
@@ -208,6 +209,24 @@ async function draftJob(env: Env, jobId: string, waitSeconds: number) {
   }
 }
 
+/**
+ * 미리보기를 만들되 새 글의 카테고리가 최근에 읽은 블로그 카테고리에 없으면 `problems` 로 알린다.
+ * 덮어쓰기(`base`)는 카테고리를 바꾼 경우에만 대조한다. 그대로 두는 기존 글의 이름은 목록에 없어도 막지 않는다.
+ */
+async function renderChecked(env: Env, input: RenderInput) {
+  const rendered = await renderDraft(input, env[ATTACHMENT_DIR_ENV]);
+  const problem =
+    input.base === undefined || input.base.category !== input.category
+      ? await categoryProblem(env, input.category)
+      : null;
+  if (problem === null) return rendered;
+  return {
+    problems: [...rendered.problems, problem],
+    html: null,
+    assets: [] as [],
+  };
+}
+
 /** 도구를 등록한 서버. 시험은 이 서버를 InMemoryTransport 로 부른다. */
 export function createServer(
   env: Env = process.env,
@@ -234,6 +253,15 @@ export function createServer(
     () => guard(() => listDrafts(env)),
   );
   server.registerTool(
+    "list_categories",
+    {
+      description: manifest.tools.list_categories.description,
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => guard(() => listCategories(env)),
+  );
+  server.registerTool(
     "read_draft",
     {
       description: manifest.tools.read_draft.description,
@@ -254,8 +282,7 @@ export function createServer(
       inputSchema: renderShape,
       annotations: { readOnlyHint: true },
     },
-    (input) =>
-      guard(() => renderDraft(input as RenderInput, env[ATTACHMENT_DIR_ENV])),
+    (input) => guard(() => renderChecked(env, input as RenderInput)),
   );
   server.registerTool(
     "save_draft",

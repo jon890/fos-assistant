@@ -369,6 +369,18 @@
         "summary": "네이버 블로그의 임시저장 글 제목과 고친 시각을 앞쪽 200개까지 읽어요. 읽는 동안 내 브라우저에 글쓰기 탭이 잠깐 열려요.",
         "arg_labels": {}
       },
+      "list_categories": {
+        "risk": "READ",
+        "approval": "none",
+        "title": "블로그 카테고리 보기",
+        "grant": false,
+        "outbound": false,
+        "conversation_grant": false,
+        "identifiers": [],
+        "description": "네이버 블로그의 카테고리 이름을 차례대로 읽어 count와 categories로 돌려줍니다. 입력 인자는 없습니다. 글쓰기 탭을 열어 발행 설정의 카테고리 목록을 펼쳐 읽고 탭을 닫으며, 항목을 고르지 않고 글을 저장하지도 않습니다. 새 글 초안의 category는 이 목록의 이름 가운데 하나여야 하며, 최근에 읽은 목록에 없는 이름은 render_draft가 problems로 알리고 원고 미리보기도 만들지 않습니다. 작성 중인 글 알림이 떠 있거나 같은 블로그에서 저장 작업이 진행 중이면 거절합니다.",
+        "summary": "내 블로그에 있는 카테고리 이름을 읽어요. 읽는 동안 내 브라우저에 글쓰기 탭이 잠깐 열려요. 글을 저장하거나 카테고리를 바꾸지 않아요.",
+        "arg_labels": {}
+      },
       "read_draft": {
         "risk": "WRITE",
         "approval": "required",
