@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult.Failure;
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;

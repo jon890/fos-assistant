@@ -1,7 +1,7 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.task.domain.TaskRun;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;

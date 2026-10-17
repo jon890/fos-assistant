@@ -2,13 +2,13 @@ package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.proactive.application.FindingJudgement;
-import com.bifos.assistant.proactive.application.model.AnnouncedKey;
-import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
-import com.bifos.assistant.proactive.application.model.CheckResultBlock.Next;
-import com.bifos.assistant.proactive.application.model.JudgedFinding;
-import com.bifos.assistant.proactive.domain.type.FindingKind;
-import com.bifos.assistant.proactive.domain.type.FindingReason;
+import com.bifos.assistant.proactive.check.application.FindingJudgement;
+import com.bifos.assistant.proactive.check.application.dto.AnnouncedKey;
+import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock.Finding;
+import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock.Next;
+import com.bifos.assistant.proactive.check.application.dto.JudgedFinding;
+import com.bifos.assistant.proactive.check.domain.type.FindingKind;
+import com.bifos.assistant.proactive.check.domain.type.FindingReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;

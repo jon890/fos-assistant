@@ -9,7 +9,7 @@ import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
-import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;

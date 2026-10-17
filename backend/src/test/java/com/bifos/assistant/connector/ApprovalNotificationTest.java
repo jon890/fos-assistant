@@ -38,7 +38,7 @@ import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
-import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
+import com.bifos.assistant.proactive.check.application.port.CheckNotificationPolicy;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;

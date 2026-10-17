@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.presentation;
 
-import com.bifos.assistant.proactive.application.ProactiveCheckService;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.StartedResponse;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.StatusResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

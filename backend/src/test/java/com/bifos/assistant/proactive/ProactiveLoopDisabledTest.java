@@ -3,7 +3,7 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;

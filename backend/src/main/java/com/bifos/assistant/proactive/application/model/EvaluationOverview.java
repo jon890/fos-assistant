@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.application.model;
 
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import java.util.List;
 

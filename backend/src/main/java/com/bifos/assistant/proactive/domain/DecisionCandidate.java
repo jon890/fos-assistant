@@ -1,5 +1,7 @@
 package com.bifos.assistant.proactive.domain;
 
+import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
+import com.bifos.assistant.proactive.check.domain.ProblemEvidence;
 import java.time.Instant;
 import java.util.List;
 

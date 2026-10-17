@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.domain;
 
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.DecisionAxis;
 import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
 import com.bifos.assistant.proactive.domain.type.DecisionLevel;

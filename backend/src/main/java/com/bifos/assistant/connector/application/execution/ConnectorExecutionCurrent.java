@@ -20,7 +20,7 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

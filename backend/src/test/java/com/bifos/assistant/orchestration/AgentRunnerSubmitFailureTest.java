@@ -27,7 +27,7 @@ import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;

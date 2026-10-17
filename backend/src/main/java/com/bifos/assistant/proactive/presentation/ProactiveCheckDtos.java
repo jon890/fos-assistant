@@ -1,13 +1,13 @@
 package com.bifos.assistant.proactive.presentation;
 
-import com.bifos.assistant.proactive.application.model.CheckBlocker;
-import com.bifos.assistant.proactive.application.model.CheckFindingView;
-import com.bifos.assistant.proactive.application.model.CheckStatusView;
+import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
+import com.bifos.assistant.proactive.check.application.dto.CheckFindingView;
+import com.bifos.assistant.proactive.check.application.dto.CheckStatusView;
 import com.bifos.assistant.proactive.application.model.LoopSettingView;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.DecisionCandidate;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
 import com.bifos.assistant.proactive.domain.type.AutonomyLevel;

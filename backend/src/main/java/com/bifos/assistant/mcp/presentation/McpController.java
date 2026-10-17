@@ -19,8 +19,8 @@ import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationRecordArgume
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryRememberArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemorySearchArguments;
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Duration;

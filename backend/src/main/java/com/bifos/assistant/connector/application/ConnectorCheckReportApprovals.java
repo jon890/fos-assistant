@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.proactive.application.CheckReportApprovalSource;
+import com.bifos.assistant.proactive.check.application.port.CheckReportApprovalSource;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

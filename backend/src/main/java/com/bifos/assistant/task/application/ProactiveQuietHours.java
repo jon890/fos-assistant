@@ -1,8 +1,8 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.application.port.CheckNotificationPolicy;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskKind;
