@@ -8,6 +8,3 @@ com.bifos.assistant.connector.application.ConnectorBindingProperties 는 @Config
 com.bifos.assistant.connector.application.ConnectorFinancialProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.connector.application.ConnectorPolicyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.connector.application.ConnectorProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.proactive.application.AutonomyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.proactive.application.ProactiveLoopProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.proactive.application.ValueEvaluationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
