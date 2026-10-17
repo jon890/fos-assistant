@@ -514,7 +514,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
 | `questionOff` | 질문을 넘기지 않은 운영 기본값의 조립. 질문 기반 선별이 무엇을 더했는지 견주는 기준선이다 |
 | `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 기준 파일 게이트는 이 모드에만 건다 |
-| `linksOff` | `factsOn` 과 같은 조립에 대체 연결만 넣지 않는다. 연결이 옛 사실의 노출을 얼마나 줄였는지 견주는 기준선이다 |
+| `linksOff` | `factsOn` 과 같은 조립에 대체 연결과 관련 연결을 넣지 않는다. 연결이 옛 사실의 노출과 여러 대화에 걸친 사실의 회수에 미친 효과를 견주는 기준선이다 |
 
 `linksOff` 를 뺀 모든 모드는 사례의 `supersedes` 마다 사람이 받아들인 대체 연결을, `related` 마다 효력 있는 관련 연결을 넣고 조립한다. 대체된 항목은 에이전트가 볼 수 없는 항목이라 `fullInjection` 에도 실리지 않는다.
 | `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
