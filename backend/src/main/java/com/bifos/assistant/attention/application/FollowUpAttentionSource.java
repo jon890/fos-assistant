@@ -14,7 +14,7 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.application.ConversationResultDeliveries;
+import com.bifos.assistant.usage.execution.application.ConversationResultDeliveries;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;

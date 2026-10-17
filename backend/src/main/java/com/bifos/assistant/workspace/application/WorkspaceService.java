@@ -6,7 +6,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.workspace.application.dto.WorkspaceAgent;
 import com.bifos.assistant.workspace.application.dto.WorkspaceFile;
 import com.bifos.assistant.workspace.application.dto.WorkspacePreview;

@@ -1,10 +1,10 @@
 package com.bifos.assistant.admin.usage.presentation;
 
-import com.bifos.assistant.usage.application.BreakdownLine;
-import com.bifos.assistant.usage.domain.CostByAgent;
-import com.bifos.assistant.usage.domain.CostByDay;
-import com.bifos.assistant.usage.domain.CostByFingerprint;
-import com.bifos.assistant.usage.domain.CostByModel;
+import com.bifos.assistant.usage.summary.application.dto.BreakdownLine;
+import com.bifos.assistant.usage.execution.domain.CostByAgent;
+import com.bifos.assistant.usage.execution.domain.CostByDay;
+import com.bifos.assistant.usage.execution.domain.CostByFingerprint;
+import com.bifos.assistant.usage.execution.domain.CostByModel;
 import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;

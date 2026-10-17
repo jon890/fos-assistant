@@ -15,7 +15,7 @@ import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.HexFormat;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.orchestration.application.dto;
 
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 
 /**
  * {@code agent_stop} 한 번의 결과다.

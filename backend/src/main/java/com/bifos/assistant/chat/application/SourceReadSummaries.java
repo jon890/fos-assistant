@@ -2,12 +2,12 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.type.MessageRole;
-import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.ExecutionEvent;
-import com.bifos.assistant.usage.domain.type.EventObservation;
-import com.bifos.assistant.usage.domain.type.ExecutionEventType;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import com.bifos.assistant.usage.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
+import com.bifos.assistant.usage.execution.domain.type.EventObservation;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;

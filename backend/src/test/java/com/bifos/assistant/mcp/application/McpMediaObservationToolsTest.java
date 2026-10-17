@@ -30,7 +30,7 @@ import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

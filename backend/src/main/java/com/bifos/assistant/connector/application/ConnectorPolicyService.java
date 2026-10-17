@@ -34,7 +34,7 @@ import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;

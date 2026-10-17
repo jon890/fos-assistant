@@ -15,7 +15,7 @@ import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.AuthProperties;
 import com.bifos.assistant.skill.infra.SkillProperties;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.usage.infra.PricingProperties;
+import com.bifos.assistant.usage.pricing.config.PricingProperties;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.application.RestartReconciler;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
-import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;

@@ -3,7 +3,7 @@ package com.bifos.assistant.admin.usage.presentation;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.application.UsageSummaryService;
+import com.bifos.assistant.usage.summary.application.UsageSummaryService;
 import com.bifos.assistant.admin.usage.presentation.UsageBreakdownAdminDtos.BreakdownRow;
 import com.bifos.assistant.admin.usage.presentation.UsageBreakdownAdminDtos.BreakdownView;
 import java.time.Instant;

@@ -5,7 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.memory.application.dto.MemorySource;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.application.ExecutionAgentQuery;
+import com.bifos.assistant.usage.execution.application.ExecutionAgentQuery;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;

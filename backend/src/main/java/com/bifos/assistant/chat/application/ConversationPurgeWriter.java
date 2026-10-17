@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
-import com.bifos.assistant.usage.application.ConversationExecutionPurge;
+import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

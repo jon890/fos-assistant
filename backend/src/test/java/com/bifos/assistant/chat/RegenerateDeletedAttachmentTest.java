@@ -22,7 +22,7 @@ import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;

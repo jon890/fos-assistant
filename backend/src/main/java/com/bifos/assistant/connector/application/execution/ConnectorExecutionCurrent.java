@@ -24,7 +24,7 @@ import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.UUID;

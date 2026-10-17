@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.usage.application.ExecutionConnectorCalls;
+import com.bifos.assistant.usage.execution.application.port.ExecutionConnectorCalls;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

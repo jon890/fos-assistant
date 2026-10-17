@@ -15,7 +15,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.domain.WorkspaceDeleter;
 import com.bifos.assistant.workspace.domain.WorkspaceDeletion;

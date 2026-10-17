@@ -10,7 +10,7 @@ import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;

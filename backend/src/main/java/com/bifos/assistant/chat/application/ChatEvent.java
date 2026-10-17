@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.usage.application.InternalValuePolicy;
-import com.bifos.assistant.usage.application.ToolDetailPolicy;
+import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
+import com.bifos.assistant.usage.execution.domain.ToolDetailPolicy;
 import java.util.Optional;
 import java.util.UUID;
 

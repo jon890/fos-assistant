@@ -14,7 +14,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.application.SkillCommandCatalog;
-import com.bifos.assistant.usage.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;

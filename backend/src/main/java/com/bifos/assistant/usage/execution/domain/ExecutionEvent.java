@@ -1,0 +1,231 @@
+package com.bifos.assistant.usage.execution.domain;
+
+import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+
+/**
+ * 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 한 줄이다.
+ *
+ * <p>Hermes 가 보낸 payload 를 통째로 넣지 않고 필요한 칸만 고른다. 도구가 읽어 온 문서 전체가 사건에
+ * 실려 오는 것을 그대로 저장하지 않기 위해서다. 근거는 ADR-013 에 있다.
+ *
+ * <p>문자열 칸의 길이를 마이그레이션과 글자까지 맞춘다. 테스트는 이 엔티티로 스키마를 만들고 운영은
+ * Flyway 가 만든 스키마를 검증하므로, 둘이 어긋나면 테스트는 통과하고 배포에서 기동이 실패한다.
+ */
+@Entity
+@Table(
+    name = "execution_event",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_execution_completed_child",
+            columnNames = {"execution_id", "completed_child_session_id"})
+    })
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Accessors(fluent = true)
+public class ExecutionEvent {
+
+    /** 화면에 한 줄로 보일 만큼만 담는다. 넘으면 자른다. 값은 {@code hermes} 의 {@code ToolDetailRedactor} 가 갖는다. */
+    public static final int DETAIL_LIMIT = ToolDetailRedactor.DETAIL_LIMIT;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Getter
+    private Long id;
+
+    @Column(name = "execution_id", nullable = false)
+    @Getter
+    private Long executionId;
+
+    /** 그 실행 안에서의 순서다. 1부터 센다. */
+    @Column(name = "sequence", nullable = false)
+    @Getter
+    private int sequence;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_type", nullable = false, length = 40)
+    @Getter
+    private ExecutionEventType eventType;
+
+    @Column(name = "tool_name", length = 128)
+    @Getter
+    private String toolName;
+
+    @Column(name = "subagent_name", length = 128)
+    @Getter
+    private String subagentName;
+
+    /** 하위 에이전트가 따로 session 을 가지면 적는다. 그 경로가 없으면 비운다. */
+    @Column(name = "hermes_session_id", length = 128)
+    @Getter
+    private String hermesSessionId;
+
+    /** 같은 자식 완료가 SSE와 재조회에서 겹쳐도 한 번만 기록하는 자연키다. */
+    @Column(name = "completed_child_session_id", length = 128)
+    private String completedChildSessionId;
+
+    @Column(name = "duration_ms")
+    @Getter
+    private Long durationMs;
+
+    @Column(name = "failed")
+    @Getter
+    private Boolean failed;
+
+    @Column(name = "detail", length = DETAIL_LIMIT)
+    @Getter
+    private String detail;
+
+    @Column(name = "model", length = 128)
+    @Getter
+    private String model;
+
+    @Column(name = "input_tokens")
+    @Getter
+    private Long inputTokens;
+
+    @Column(name = "output_tokens")
+    @Getter
+    private Long outputTokens;
+
+    @Column(name = "occurred_at", nullable = false)
+    @Getter
+    private Instant occurredAt;
+
+
+    private ExecutionEvent(Builder builder) {
+        this.executionId = builder.executionId;
+        this.sequence = builder.sequence;
+        this.eventType = builder.eventType;
+        this.toolName = builder.toolName;
+        this.subagentName = builder.subagentName;
+        this.hermesSessionId = builder.hermesSessionId;
+        this.completedChildSessionId = builder.eventType == ExecutionEventType.SUBAGENT_COMPLETED ? builder.hermesSessionId : null;
+        this.durationMs = builder.durationMs;
+        this.failed = builder.failed;
+        this.detail = builder.detail;
+        this.model = builder.model;
+        this.inputTokens = builder.inputTokens;
+        this.outputTokens = builder.outputTokens;
+        this.occurredAt = builder.occurredAt;
+    }
+
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+
+    public static final class Builder {
+        private Long executionId;
+        private int sequence;
+        private ExecutionEventType eventType;
+        private String toolName;
+        private String subagentName;
+        private String hermesSessionId;
+        private Long durationMs;
+        private Boolean failed;
+        private String detail;
+        private String model;
+        private Long inputTokens;
+        private Long outputTokens;
+        private Instant occurredAt;
+
+
+        public Builder executionId(Long executionId) {
+            this.executionId = executionId;
+            return this;
+        }
+
+
+        public Builder sequence(int sequence) {
+            this.sequence = sequence;
+            return this;
+        }
+
+
+        public Builder eventType(ExecutionEventType eventType) {
+            this.eventType = eventType;
+            return this;
+        }
+
+
+        public Builder toolName(String toolName) {
+            this.toolName = toolName;
+            return this;
+        }
+
+
+        public Builder subagentName(String subagentName) {
+            this.subagentName = subagentName;
+            return this;
+        }
+
+
+        public Builder hermesSessionId(String hermesSessionId) {
+            this.hermesSessionId = hermesSessionId;
+            return this;
+        }
+
+
+        public Builder durationMs(Long durationMs) {
+            this.durationMs = durationMs;
+            return this;
+        }
+
+
+        public Builder failed(Boolean failed) {
+            this.failed = failed;
+            return this;
+        }
+
+
+        /** 길이가 넘으면 자른다. 잘랐다는 표시는 남기지 않는다. */
+        public Builder detail(String detail) {
+            this.detail = detail == null || detail.length() <= DETAIL_LIMIT ? detail : detail.substring(0, DETAIL_LIMIT);
+            return this;
+        }
+
+
+        public Builder model(String model) {
+            this.model = model;
+            return this;
+        }
+
+
+        public Builder inputTokens(Long inputTokens) {
+            this.inputTokens = inputTokens;
+            return this;
+        }
+
+
+        public Builder outputTokens(Long outputTokens) {
+            this.outputTokens = outputTokens;
+            return this;
+        }
+
+
+        public Builder occurredAt(Instant occurredAt) {
+            this.occurredAt = occurredAt;
+            return this;
+        }
+
+
+        public ExecutionEvent build() {
+            return new ExecutionEvent(this);
+        }
+    }
+}
