@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.attention.presentation;
 
-import com.bifos.assistant.attention.application.model.AttentionMetric;
+import com.bifos.assistant.attention.application.dto.AttentionMetric;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

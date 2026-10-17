@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.DelegationOutputClip;
 import com.bifos.assistant.orchestration.application.DelegationOutput;
-import com.bifos.assistant.orchestration.application.DelegationProperties;
+import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;

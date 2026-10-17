@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.attention.application.MemoryProposalCandidates;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
+import com.bifos.assistant.attention.application.dto.AttentionCandidate;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.memory.application.MemoryLinkService;

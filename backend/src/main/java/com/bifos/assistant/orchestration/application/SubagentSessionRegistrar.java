@@ -1,5 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;

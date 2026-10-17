@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
-import com.bifos.assistant.orchestration.application.SubagentRegistrationResult;
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;

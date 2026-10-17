@@ -1,7 +1,7 @@
 package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.mcp.application.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.auth.AgentTokenFilter;
 import com.bifos.assistant.shared.error.ApiException;
 import jakarta.servlet.FilterChain;

@@ -1,5 +1,3 @@
-com.bifos.assistant.attention.application.AttentionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. attention.config 로 옮긴다.
-com.bifos.assistant.browser.infra.BrowserProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. browser.config 로 옮긴다.
 com.bifos.assistant.chat.application.DelegationWakeProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.application.RestartReconcileProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.application.StarterProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
@@ -19,7 +17,6 @@ com.bifos.assistant.memory.application.MemoryEncryptionProperties 는 @Configura
 com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
 com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
 com.bifos.assistant.notification.application.NotificationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. notification.config 로 옮긴다.
-com.bifos.assistant.orchestration.application.DelegationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. orchestration.config 로 옮긴다.
 com.bifos.assistant.proactive.application.AutonomyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveCheckProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveLoopProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.

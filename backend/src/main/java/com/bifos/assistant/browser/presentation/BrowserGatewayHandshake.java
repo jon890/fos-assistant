@@ -1,7 +1,7 @@
 package com.bifos.assistant.browser.presentation;
 
 import com.bifos.assistant.browser.application.BrowserGateway;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.shared.error.ApiException;
 import java.util.Map;
 import java.util.regex.Matcher;

@@ -1,15 +1,15 @@
 package com.bifos.assistant.attention.presentation;
 
-import com.bifos.assistant.attention.application.model.AttentionCard;
-import com.bifos.assistant.attention.application.model.AttentionExecutionRef;
-import com.bifos.assistant.attention.application.model.AttentionFollowUpRef;
-import com.bifos.assistant.attention.application.model.AttentionItem;
-import com.bifos.assistant.attention.application.model.AttentionProblem;
-import com.bifos.assistant.attention.application.model.AttentionReport;
-import com.bifos.assistant.attention.application.model.AttentionSignal;
-import com.bifos.assistant.attention.application.model.AttentionSourceRef;
-import com.bifos.assistant.attention.application.model.AttentionView;
-import com.bifos.assistant.attention.application.model.AttentionWhy;
+import com.bifos.assistant.attention.application.dto.AttentionCard;
+import com.bifos.assistant.attention.application.dto.AttentionExecutionRef;
+import com.bifos.assistant.attention.application.dto.AttentionFollowUpRef;
+import com.bifos.assistant.attention.application.dto.AttentionItem;
+import com.bifos.assistant.attention.application.dto.AttentionProblem;
+import com.bifos.assistant.attention.application.dto.AttentionReport;
+import com.bifos.assistant.attention.application.dto.AttentionSignal;
+import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
+import com.bifos.assistant.attention.application.dto.AttentionView;
+import com.bifos.assistant.attention.application.dto.AttentionWhy;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import java.time.Instant;

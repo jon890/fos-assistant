@@ -1,9 +1,9 @@
 package com.bifos.assistant.mcp.presentation;
 
-import com.bifos.assistant.mcp.application.McpPrincipal;
-import com.bifos.assistant.mcp.application.SubagentRegistration;
+import com.bifos.assistant.mcp.application.dto.McpPrincipal;
+import com.bifos.assistant.mcp.application.dto.SubagentRegistration;
 import com.bifos.assistant.mcp.presentation.McpDtos.SubagentRegistrationResponse;
-import com.bifos.assistant.orchestration.application.SubagentRegistrationResult;
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

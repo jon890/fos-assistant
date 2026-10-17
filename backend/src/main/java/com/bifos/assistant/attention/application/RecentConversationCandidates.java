@@ -1,10 +1,12 @@
 package com.bifos.assistant.attention.application;
 
+import com.bifos.assistant.attention.application.port.AttentionCandidates;
+import com.bifos.assistant.attention.config.AttentionProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.attention.application.model.AttentionCandidate;
-import com.bifos.assistant.attention.application.model.AttentionConfidence;
-import com.bifos.assistant.attention.application.model.AttentionSourceRef;
+import com.bifos.assistant.attention.application.dto.AttentionCandidate;
+import com.bifos.assistant.attention.application.dto.AttentionConfidence;
+import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.ChatService;

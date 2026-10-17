@@ -1,8 +1,8 @@
 package com.bifos.assistant.browser.presentation;
 
-import com.bifos.assistant.browser.application.model.BrowserScreenInput;
-import com.bifos.assistant.browser.application.model.BrowserScreenInput.Kind;
-import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
+import com.bifos.assistant.browser.application.dto.BrowserScreenInput.Kind;
+import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;

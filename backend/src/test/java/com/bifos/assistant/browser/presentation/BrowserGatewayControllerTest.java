@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bifos.assistant.browser.application.BrowserGateway;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.browser.domain.CdpGatewayHttp;
 import com.bifos.assistant.browser.domain.CdpReply;
 import com.bifos.assistant.shared.error.ApiException;

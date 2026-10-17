@@ -4,7 +4,7 @@ import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesProfileKeyStore;
 import com.bifos.assistant.mcp.application.AgentTokenService;
-import com.bifos.assistant.mcp.application.IssuedToken;
+import com.bifos.assistant.mcp.application.dto.IssuedToken;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import lombok.RequiredArgsConstructor;

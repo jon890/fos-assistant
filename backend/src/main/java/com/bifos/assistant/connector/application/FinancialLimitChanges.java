@@ -18,7 +18,7 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.mcp.application.FinancialLimitRequests;
+import com.bifos.assistant.mcp.application.port.FinancialLimitRequests;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;

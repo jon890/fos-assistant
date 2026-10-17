@@ -1,8 +1,8 @@
 package com.bifos.assistant.browser.presentation;
 
 import com.bifos.assistant.browser.application.BrowserGateway;
-import com.bifos.assistant.browser.application.model.BrowserUsageHandle;
-import com.bifos.assistant.browser.application.model.GatewayTarget;
+import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
+import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.browser.domain.CdpRelay;
 import com.bifos.assistant.browser.domain.CdpRelayConnector;
 import com.bifos.assistant.browser.domain.CdpRelayListener;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.browser.presentation;
 
-import com.bifos.assistant.browser.application.model.UserBrowserSnapshot;
+import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

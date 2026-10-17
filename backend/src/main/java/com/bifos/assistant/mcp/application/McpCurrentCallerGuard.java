@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
