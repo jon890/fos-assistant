@@ -120,7 +120,7 @@ class ConnectorFinancialIntake {
             String operation = tool == null ? null : contract.operations().get(tool);
             if (operation == null || !OPEN_OPERATIONS.contains(operation)
                 || !ConnectorExecutionSnapshot.ORDER.equals(contract.kind(tool))) {
-                log.warn("금융 준비 도구의 인자가 지금 여는 주문이 아니다");
+                log.warn("금융 준비를 거절했다 stage=input kind=-");
                 return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
             }
             return producer.request(profileName, rootSessionId, sessionId, toolCallId,
@@ -129,10 +129,16 @@ class ConnectorFinancialIntake {
             log.info("금융 준비가 상한에 걸렸다 limit={}", ex.kind());
             return new ConnectorPolicyAnswer(false, limitMessage(ex), null);
         } catch (RuntimeException ex) {
-            // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 종류만 남긴다.
-            log.warn("금융 준비를 거절했다 kind={}", ex.getClass().getSimpleName());
+            // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 단계 코드와 종류만 남긴다.
+            log.warn("금융 준비를 거절했다 stage={} kind={}", stageOf(ex), ex.getClass().getSimpleName());
             return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
         }
+    }
+
+
+    /** 준비가 붙인 단계 코드다. 단계 밖에서 던진 예외는 {@code unclassified} 다. */
+    static String stageOf(RuntimeException ex) {
+        return ex instanceof ConnectorFinancialProducer.Rejected rejected ? rejected.stage().code() : "unclassified";
     }
 
 

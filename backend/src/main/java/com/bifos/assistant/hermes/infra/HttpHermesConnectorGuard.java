@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -26,6 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /** 금융 소비 경로의 strict 입력과 읽기 전용 준비 전송이다. 운영 승인 경로는 아직 호출하지 않는다. */
+@Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class HttpHermesConnectorGuard {
     private static final JsonMapper MAPPER = JsonMapper.builder(JsonFactory.builder()
@@ -117,8 +119,12 @@ final class HttpHermesConnectorGuard {
 
     static CallResult prepare(RestClient client, String base, String token, String connector, ObjectNode body) {
         if (body == null) {
+            log.warn("금융 준비 HTTP 를 보내지 않았다 reason=body");
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
         }
+        // 실패 로그에는 HTTP 상태와 고정 이유만 남긴다. 대시보드의 본문과 cause 는 남기지 않는다.
+        int status = 0;
+        String reason;
         try {
             var response = client.post()
                 .uri(base + "/api/connectors/{id}/prepare", connector)
@@ -130,13 +136,14 @@ final class HttpHermesConnectorGuard {
                 })
                 .toEntity(String.class);
             String raw = response.getBody();
-            if (response.getStatusCode().value() != 200
-                || raw == null
-                || raw.getBytes(StandardCharsets.UTF_8).length > 32768) {
+            status = response.getStatusCode().value();
+            if (status != 200 || raw == null || raw.getBytes(StandardCharsets.UTF_8).length > 32768) {
+                log.warn("금융 준비 HTTP 가 실패했다 status={} reason={}", status, status != 200 ? "status" : "size");
                 return CallResult.failure(ConnectorCallError.UNAVAILABLE);
             }
             JsonNode answer = MAPPER.readTree(raw);
             JsonNode result = answer.get("result");
+            reason = answer.path("ok").isBoolean() && !answer.path("ok").booleanValue() ? "not_ok" : "shape";
             if (answer.path("ok").isBoolean()
                 && answer.path("ok").booleanValue()
                 && result != null
@@ -150,7 +157,9 @@ final class HttpHermesConnectorGuard {
             }
         } catch (RuntimeException ignored) {
             // 읽기 전용 준비는 재시도 없이 미지원으로 끝낸다. 원문과 cause는 남기지 않는다.
+            reason = status == 0 ? "transport" : "unreadable";
         }
+        log.warn("금융 준비 HTTP 가 실패했다 status={} reason={}", status, reason);
         return CallResult.failure(ConnectorCallError.UNAVAILABLE);
     }
 
