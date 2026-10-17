@@ -67,6 +67,13 @@ public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
     List<MemoryLink> findProposedSupersedesOfGroup(@Param("groupId") Long groupId);
 
 
+    /** 그 항목을 한쪽 끝으로 둔 효력 있는 {@code RELATED} 수다. 자동 연결의 항목당 상한이 쓴다. */
+    @Query("select count(l) from MemoryLink l where (l.fromMemoryId = :id or l.toMemoryId = :id)"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.RELATED"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE")
+    long countActiveRelatedOf(@Param("id") Long id);
+
+
     /** 그 항목을 한쪽 끝으로 둔, 끊지 않은 줄이다. */
     @Query("select l from MemoryLink l where (l.fromMemoryId = :id or l.toMemoryId = :id)"
         + " and l.status <> com.bifos.assistant.memory.domain.type.MemoryLinkStatus.REVOKED")

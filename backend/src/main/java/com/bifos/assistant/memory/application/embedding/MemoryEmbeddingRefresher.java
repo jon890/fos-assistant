@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.application.embedding;
 
+import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingSource;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingStamp;
@@ -27,6 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>한 번에 대상이 아닌 줄과 항목이 없어진 줄을 지우고, 줄이 없거나 지문이 다른 대상을 번호 순으로 {@code batchSize} 씩
  * {@code maxBatchesPerRun} 묶음까지 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛰고, 그것도 모두 실패하면 그 주기를 끝내고 다음 주기에 다시 한다. 임베딩 호출 동안 트랜잭션을 열어 두지
  * 않는다. 로그에는 건수와 예외 클래스 이름만 남긴다.
+ *
+ * <p>주기마다 새로 쓴 항목은 {@link MemoryLinkDiscovery} 에 넘겨 대체 후보와 관련 기억을 찾는다(ADR-20261015 / memory-link).
  */
 @Slf4j
 @Component
@@ -39,6 +42,7 @@ public class MemoryEmbeddingRefresher {
     private final PlatformTransactionManager transactionManager;
     private final MemoryVectorCache vectorCache;
     private final BackgroundTasks backgroundTasks;
+    private final MemoryLinkDiscovery linkDiscovery;
     private final AtomicBoolean running = new AtomicBoolean();
 
 
@@ -83,7 +87,7 @@ public class MemoryEmbeddingRefresher {
             return stale.size();
         });
         List<MemoryEmbeddingSource> pending = pending();
-        int written = 0;
+        List<Long> writtenIds = new ArrayList<>();
         int batches = 0;
         for (int start = 0; start < pending.size() && batches < properties.maxBatchesPerRun(); start += properties.batchSize()) {
             List<Long> ids = pending.subList(start, Math.min(start + properties.batchSize(), pending.size())).stream()
@@ -97,13 +101,19 @@ public class MemoryEmbeddingRefresher {
             }
             Embedded embedded = embedBatch(batch);
             if (embedded == null) {
-                log.warn("memory embedding refresh stopped written={} pending={}", written, Math.max(0, pending.size() - written));
+                log.warn(
+                    "memory embedding refresh stopped written={} pending={}",
+                    writtenIds.size(),
+                    Math.max(0, pending.size() - writtenIds.size()));
                 break;
             }
-            Integer stored = transaction.execute(status -> write(embedded.sources(), embedded.vectors()));
+            List<Long> stored = transaction.execute(status -> write(embedded.sources(), embedded.vectors()));
             embedded.sources().forEach(source -> vectorCache.evict(source.memoryId()));
-            written += stored == null ? 0 : stored;
+            writtenIds.addAll(stored == null ? List.of() : stored);
         }
+        int written = writtenIds.size();
+        // 새로 쓴 벡터로 대체 후보와 관련 기억을 찾는다. 연결을 찾지 못해도 채운 벡터는 그대로 둔다
+        linkDiscovery.discover(writtenIds);
         if (removed > 0 || written > 0) {
             log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, Math.max(0, pending.size() - written));
         }
@@ -183,9 +193,9 @@ public class MemoryEmbeddingRefresher {
      * 임베딩한 벡터를 넣거나 바꾼다. 임베딩을 기다리는 동안 지워졌거나 대상에서 빠진 항목은 쓰지 않는다. 그 확인 뒤에 지운 항목의 줄이 남으면 다음 주기의 정리가
      * 지운다.
      *
-     * @return 넣거나 바꾼 줄 수
+     * @return 넣거나 바꾼 줄의 항목 번호
      */
-    private int write(List<MemoryEmbeddingSource> batch, List<float[]> vectors) {
+    private List<Long> write(List<MemoryEmbeddingSource> batch, List<float[]> vectors) {
         List<Long> ids = batch.stream().map(MemoryEmbeddingSource::memoryId).toList();
         Set<Long> stillEligible = embeddings.findEmbeddableSourcesByIds(ids).stream()
             .map(MemoryEmbeddingSource::memoryId)
@@ -193,13 +203,13 @@ public class MemoryEmbeddingRefresher {
         Map<Long, MemoryEmbedding> existing = embeddings.findByMemoryIdIn(ids)
             .stream()
             .collect(Collectors.toMap(MemoryEmbedding::memoryId, Function.identity()));
-        int count = 0;
+        List<Long> written = new ArrayList<>();
         for (int i = 0; i < batch.size(); i++) {
             MemoryEmbeddingSource source = batch.get(i);
             if (!stillEligible.contains(source.memoryId())) {
                 continue;
             }
-            count++;
+            written.add(source.memoryId());
             byte[] fingerprint = EmbeddingText.fingerprint(properties.model(), textOf(source));
             MemoryEmbedding row = existing.get(source.memoryId());
             if (row == null) {
@@ -208,7 +218,7 @@ public class MemoryEmbeddingRefresher {
                 row.replace(properties.model(), fingerprint, vectors.get(i));
             }
         }
-        return count;
+        return written;
     }
 
 

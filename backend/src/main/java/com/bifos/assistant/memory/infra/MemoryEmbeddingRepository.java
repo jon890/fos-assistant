@@ -56,6 +56,20 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
     List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(@Param("ids") Collection<Long> ids);
 
 
+    /** 그 사용자가 주인인 개인 항목의 벡터다. 기억 사이의 연결을 찾을 때 같은 주인의 항목끼리만 견준다. */
+    @Query("select e from MemoryEmbedding e, Memory m where m.id = e.memoryId"
+        + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER"
+        + " and m.ownerUserId = :ownerUserId")
+    List<MemoryEmbedding> findOfOwner(@Param("ownerUserId") Long ownerUserId);
+
+
+    /** 그 그룹의 그룹 항목의 벡터다. */
+    @Query("select e from MemoryEmbedding e, Memory m where m.id = e.memoryId"
+        + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP"
+        + " and m.groupId = :groupId")
+    List<MemoryEmbedding> findOfGroup(@Param("groupId") Long groupId);
+
+
     /** 저장한 줄의 모델과 지문이다. 벡터는 읽지 않는다. */
     @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingStamp(e.memoryId, e.model, e.textFingerprint)"
         + " from MemoryEmbedding e")
