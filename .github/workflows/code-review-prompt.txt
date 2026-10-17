@@ -75,6 +75,7 @@ FINDING_END
 | Node import와 브라우저 테스트 | rule-59 (`docs/code-rules/rule-59.md`), rule-60 (`docs/code-rules/rule-60.md`), rule-61 (`docs/code-rules/rule-61.md`), rule-62 (`docs/code-rules/rule-62.md`) |
 | Hermes 변경과 호환성 | rule-63 (`docs/code-rules/rule-63.md`), rule-64 (`docs/code-rules/rule-64.md`), rule-65 (`docs/code-rules/rule-65.md`), rule-66 (`docs/code-rules/rule-66.md`), rule-67 (`docs/code-rules/rule-67.md`) |
 | 동시 갱신과 입력 수명 | rule-68 (`docs/code-rules/rule-68.md`), rule-69 (`docs/code-rules/rule-69.md`) |
+| 하위 기능과 admin의 경계, dto와 도우미의 소속 | rule-84 (`docs/code-rules/rule-84.md`) |
 
 ### 테이블과 판단 구조
 

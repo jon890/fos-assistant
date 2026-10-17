@@ -344,6 +344,104 @@ class ArchitectureRulesTest {
 
 
     @Test
+    @DisplayName("application 직하에 빈이 아닌 타입이 새로 생기지 않는다")
+    void applicationRootHoldsOnlyBeans() {
+        FreezingArchRule.freeze(ArchitectureRules.APPLICATION_ROOT_HOLDS_ONLY_BEANS).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("application 아래에 dto 와 port 가 아닌 하위 패키지가 새로 생기지 않는다")
+    void applicationSubpackagesAreDtoAndPort() {
+        FreezingArchRule.freeze(ArchitectureRules.APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("port 패키지에는 인터페이스와 그 예외만 있다")
+    void portPackageHoldsOnlyInterfaces() {
+        ArchitectureRules.PORT_PACKAGE_HOLDS_ONLY_INTERFACES.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("dto 패키지에는 값만 있다")
+    void dtoPackageHoldsOnlyValues() {
+        ArchitectureRules.DTO_PACKAGE_HOLDS_ONLY_VALUES.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("ConfigurationProperties 가 config 밖에 새로 생기지 않는다")
+    void configurationPropertiesInConfig() {
+        FreezingArchRule.freeze(ArchitectureRules.CONFIGURATION_PROPERTIES_IN_CONFIG).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("application 직하의 클래스 수가 상한을 새로 넘지 않는다")
+    void applicationPackageSize() {
+        FreezingArchRule.freeze(ArchitectureRules.APPLICATION_PACKAGE_SIZE).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("하위 기능이 위 하위 기능을 새로 쓰지 않는다")
+    void subFeaturesFollowOrder() {
+        FreezingArchRule.freeze(ArchitectureRules.SUB_FEATURES_FOLLOW_ORDER).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("나눈 기능의 루트에 역할 패키지가 새로 생기지 않는다")
+    void splitFeaturesHaveNoRootRoles() {
+        FreezingArchRule.freeze(ArchitectureRules.SPLIT_FEATURES_HAVE_NO_ROOT_ROLES).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("운영 클래스의 단순 이름이 겹치지 않는다")
+    void simpleClassNamesAreUnique() {
+        ArchitectureRules.SIMPLE_CLASS_NAMES_ARE_UNIQUE.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("admin 이 허용된 패키지만 갖는다")
+    void adminPackageShape() {
+        ArchitectureRules.ADMIN_PACKAGE_SHAPE.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("기능이 admin 을 쓰지 않는다")
+    void featuresDoNotDependOnAdmin() {
+        ArchitectureRules.FEATURES_DO_NOT_DEPEND_ON_ADMIN.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("admin 이 기능의 application 밖을 새로 쓰지 않는다")
+    void adminUsesOnlyFeatureApplication() {
+        FreezingArchRule.freeze(ArchitectureRules.ADMIN_USES_ONLY_FEATURE_APPLICATION).check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("admin 의 엔드포인트가 requireAdmin 을 부른다")
+    void adminEndpointsRequireAdmin() {
+        ArchitectureRules.ADMIN_ENDPOINTS_REQUIRE_ADMIN.check(MAIN);
+    }
+
+
+    @Test
+    @DisplayName("requireAdmin 을 admin 밖에서 새로 부르지 않는다")
+    void requireAdminOnlyInAdmin() {
+        FreezingArchRule.freeze(ArchitectureRules.REQUIRE_ADMIN_ONLY_IN_ADMIN).check(MAIN);
+    }
+
+
+    @Test
     @DisplayName("domain 이 웹 계층을 쓰지 않는다")
     void domainDoesNotDependOnWeb() {
         FreezingArchRule.freeze(ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB).check(MAIN);

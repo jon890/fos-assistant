@@ -12,6 +12,7 @@
 
 정확한 순서와 미등록 패키지 판정은 TopLevelPackageOrder가 갖는다.
 순서 표는 backend 아키텍처 문서에서 찾는다.
+admin은 순서의 맨 위다. 어느 패키지도 admin을 쓰지 않는다(rule-80).
 
 ## 이 저장소의 사례
 
