@@ -19,7 +19,7 @@ test("한 번에 올리는 사진 장수 상한은 화면 상수와 서버 기�
     /export const MAX_ATTACHMENTS = (\d+);/,
   );
   const serverDefault = readLimit(
-    "backend/src/main/java/com/bifos/assistant/chat/infra/AttachmentProperties.java",
+    "backend/src/main/java/com/bifos/assistant/chat/attachment/config/AttachmentProperties.java",
     /DEFAULT_MAX_FILES = (\d+);/,
   );
   const serverSetting = readLimit(

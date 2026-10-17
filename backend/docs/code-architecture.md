@@ -168,7 +168,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 `MediaObservationCleaner`의 참가 메서드는 MANDATORY이며 첨부·대화 삭제의 사전 callback에서 호출한다.
 만료 정리는 대상마다 별도 coordinator 트랜잭션을 연다. [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 서비스 범위를 갖는다.
 
-`chat.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
+`chat.attachment.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
 재사용 판단과 alias 저장은 기존 `MediaObservationService.record`가 맡으며 별도 cache 서비스는 두지 않는다.
 복호화·파싱·검증은 서비스의 조회와 재사용이 같은 함수로 수행한다.
 재사용의 조건과 수명은 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.
