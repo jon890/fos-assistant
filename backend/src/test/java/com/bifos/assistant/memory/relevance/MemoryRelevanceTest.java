@@ -3,7 +3,7 @@ package com.bifos.assistant.memory.relevance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
-import com.bifos.assistant.context.ContextSelection;
+import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.KeywordScorer;

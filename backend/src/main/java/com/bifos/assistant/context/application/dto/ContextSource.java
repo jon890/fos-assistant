@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 /**
  * 문맥 묶음의 항목이 어느 기록에서 왔는지다(ADR-071).

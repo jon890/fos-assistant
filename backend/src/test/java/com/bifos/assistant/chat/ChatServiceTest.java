@@ -38,7 +38,7 @@ import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;

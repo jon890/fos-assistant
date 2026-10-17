@@ -3,11 +3,11 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.model.AutoTurnResult;
-import com.bifos.assistant.context.ContextBodyMode;
-import com.bifos.assistant.context.ContextFreshness;
-import com.bifos.assistant.context.ContextItem;
-import com.bifos.assistant.context.ContextSource;
-import com.bifos.assistant.context.ContextTrust;
+import com.bifos.assistant.context.application.dto.ContextBodyMode;
+import com.bifos.assistant.context.application.dto.ContextFreshness;
+import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextSource;
+import com.bifos.assistant.context.application.dto.ContextTrust;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.time.Instant;

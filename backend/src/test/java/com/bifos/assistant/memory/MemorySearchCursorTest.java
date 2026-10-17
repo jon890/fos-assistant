@@ -2,7 +2,7 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.context.ContextSelection;
+import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.memory.application.MemoryRelevance;
 import java.nio.charset.StandardCharsets;

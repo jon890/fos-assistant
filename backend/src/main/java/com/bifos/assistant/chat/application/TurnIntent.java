@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.List;
 
 /** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */

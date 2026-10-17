@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.config;
 
 import java.time.Duration;
 import java.util.Map;

@@ -1,5 +1,9 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application;
 
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.ContextBodyMode;
+import com.bifos.assistant.context.application.dto.ContextBundle;
+import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

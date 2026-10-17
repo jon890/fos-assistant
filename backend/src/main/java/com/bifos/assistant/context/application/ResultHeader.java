@@ -1,5 +1,6 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application;
 
+import com.bifos.assistant.context.application.dto.ContextFreshness;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;

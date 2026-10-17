@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application.model;
 
-import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.List;
 
 /**

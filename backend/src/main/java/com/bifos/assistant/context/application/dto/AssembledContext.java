@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 import com.bifos.assistant.shared.util.Sha256;
 import java.util.List;

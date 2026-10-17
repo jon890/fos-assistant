@@ -13,7 +13,7 @@ import com.bifos.assistant.chat.application.TurnCancellation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.infra.HttpContentDraftSnapshotClient;

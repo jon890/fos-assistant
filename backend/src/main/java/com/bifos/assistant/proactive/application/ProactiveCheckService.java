@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.application.TurnHandle;
 import com.bifos.assistant.chat.application.model.OpenedCheck;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.application.model.CheckReadiness;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;

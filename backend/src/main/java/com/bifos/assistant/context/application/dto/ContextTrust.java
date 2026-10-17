@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 /** 문맥 항목의 글을 누가 썼는지다(ADR-071). 값의 순서가 우선순위이고, 어긋나도 어느 쪽을 지우지 않는다. */
 public enum ContextTrust {

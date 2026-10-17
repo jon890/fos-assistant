@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application.model;
 
-import com.bifos.assistant.context.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextItem;
 
 /**
  * 자동 turn 으로 전할 결과 하나다.

@@ -8,7 +8,7 @@ import com.bifos.assistant.chat.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.domain.RunSession;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
-import com.bifos.assistant.context.AssembledContext;
+import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.application.dto.HermesImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;

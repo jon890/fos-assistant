@@ -1,5 +1,6 @@
 package com.bifos.assistant.context;
 
+import com.bifos.assistant.context.config.ContextProperties;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
