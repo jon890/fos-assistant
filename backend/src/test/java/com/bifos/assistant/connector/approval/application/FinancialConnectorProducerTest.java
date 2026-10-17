@@ -9,8 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
-import com.bifos.assistant.connector.approval.application.ConnectorFinancialProducer.Rejected;
-import com.bifos.assistant.connector.approval.application.ConnectorFinancialProducer.Stage;
+import com.bifos.assistant.connector.approval.application.dto.FinancialPrepareStage;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
@@ -84,7 +83,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
         long count = actions.count();
         long snapshots = contents.count();
         doReturn(CallResult.failure(ConnectorCallError.UNAVAILABLE)).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
-        assertRejectedAt(Stage.PREPARE_HTTP);
+        assertRejectedAt(FinancialPrepareStage.PREPARE_HTTP);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(contents.count()).isEqualTo(snapshots);
         assertThat(counters().path("financial").intValue()).isZero();
@@ -107,7 +106,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     void missingDigestKeyRejectsBeforePrepare() {
         long count = actions.count();
         OverridableLiveProperties.during(gate, financial(false, owned("7"), "1000000"));
-        assertRejectedAt(Stage.GATE);
+        assertRejectedAt(FinancialPrepareStage.GATE);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("prepare").intValue()).isZero();
         assertThat(counters().path("financial").intValue()).isZero();
@@ -119,7 +118,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     void accountOutsideAllowListRejectsBeforePrepare() {
         long count = actions.count();
         OverridableLiveProperties.during(gate, financial(true, owned("9"), "1000000"));
-        assertRejectedAt(Stage.ACCOUNTS);
+        assertRejectedAt(FinancialPrepareStage.ACCOUNTS);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("prepare").intValue()).isZero();
     }
@@ -181,7 +180,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
         }).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
         long count = actions.count();
         // 바인딩이 READY 가 아니게 되면 Hermes 의 지원 확인도 verified 가 아니어서 준비 뒤 다시 확인에서 걸린다.
-        assertRejectedAt(Stage.GUARD_STATE);
+        assertRejectedAt(FinancialPrepareStage.GUARD_STATE);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("financial").intValue()).isZero();
     }
@@ -192,11 +191,11 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     @ValueSource(strings = {"cipher-disabled", "user-not-allowed", "read-only-check", "agent-disabled", "agent-owner",
         "connection-owner", "undeclared-tool"})
     void rejectsBeforePreparationWhenAuthorityOrDeclarationDiffers(String change) {
-        Stage expected = switch (change) {
-            case "cipher-disabled" -> Stage.CIPHER;
-            case "read-only-check" -> Stage.CHECK;
-            case "undeclared-tool" -> Stage.MANIFEST;
-            default -> Stage.OWNER;
+        FinancialPrepareStage expected = switch (change) {
+            case "cipher-disabled" -> FinancialPrepareStage.CIPHER;
+            case "read-only-check" -> FinancialPrepareStage.CHECK;
+            case "undeclared-tool" -> FinancialPrepareStage.MANIFEST;
+            default -> FinancialPrepareStage.OWNER;
         };
         long count = actions.count();
         long snapshots = contents.count();
@@ -217,7 +216,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
             String name = toolName;
             assertThatThrownBy(() -> producer.request(profile, session, session, UUID.randomUUID().toString(),
                 "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class)
-                    .isInstanceOfSatisfying(Rejected.class, rejected -> assertThat(rejected.stage()).isEqualTo(expected));
+                    .isInstanceOfSatisfying(FinancialPrepareRejected.class, rejected -> assertThat(rejected.stage()).isEqualTo(expected));
         } finally {
             ReflectionTestUtils.setField(producer, "cipher", original);
             // 다른 테스트가 RUNNING 살펴보기 줄을 보지 않도록 지운다.
@@ -241,11 +240,11 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     @ValueSource(strings = {"not-configured", "no-policy-hook", "guard-pending", "guard-revision", "guard-connection", "guard-manifest"})
     void rejectsSupportMismatchWithStage(String change) {
         long count = actions.count();
-        Stage expected = switch (change) {
-            case "not-configured", "no-policy-hook" -> Stage.CONNECTOR_STATE;
-            case "guard-pending" -> Stage.GUARD_STATE;
-            case "guard-revision", "guard-connection" -> Stage.GUARD_REVISION;
-            default -> Stage.GUARD_MANIFEST;
+        FinancialPrepareStage expected = switch (change) {
+            case "not-configured", "no-policy-hook" -> FinancialPrepareStage.CONNECTOR_STATE;
+            case "guard-pending" -> FinancialPrepareStage.GUARD_STATE;
+            case "guard-revision", "guard-connection" -> FinancialPrepareStage.GUARD_REVISION;
+            default -> FinancialPrepareStage.GUARD_MANIFEST;
         };
         stateWith(state -> switch (change) {
             case "not-configured" -> new ConnectorState(state.profile(), state.enabled(), false, state.restartRequired(),
@@ -272,7 +271,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
                 invocation.getArgument(3));
             return CallResult.success(((ObjectNode)prepared.result()).put("extra", true));
         }).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
-        assertRejectedAt(Stage.PREPARE_SHAPE);
+        assertRejectedAt(FinancialPrepareStage.PREPARE_SHAPE);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("financial").intValue()).isZero();
     }
@@ -281,15 +280,15 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     @Test
     @DisplayName("단계 코드는 소문자 낱말이고 계좌, 메일, 인자 값을 담지 않는다")
     void stageCodesAreFixedWords() {
-        for (Stage stage : Stage.values()) {
+        for (FinancialPrepareStage stage : FinancialPrepareStage.values()) {
             assertThat(stage.code()).matches("[a-z_]+");
         }
-        assertThat(new Rejected(Stage.ACCOUNTS).getMessage()).isEqualTo(ConnectorFinancialProducer.rejected().getMessage());
+        assertThat(new FinancialPrepareRejected(FinancialPrepareStage.ACCOUNTS).getMessage()).isEqualTo(ConnectorFinancialProducer.rejected().getMessage());
     }
 
 
-    private void assertRejectedAt(Stage stage) {
-        assertThatThrownBy(this::request).isInstanceOfSatisfying(Rejected.class,
+    private void assertRejectedAt(FinancialPrepareStage stage) {
+        assertThatThrownBy(this::request).isInstanceOfSatisfying(FinancialPrepareRejected.class,
             rejected -> assertThat(rejected.stage()).isEqualTo(stage));
     }
 

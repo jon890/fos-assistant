@@ -138,7 +138,7 @@ class ConnectorFinancialIntake {
 
     /** 준비가 붙인 단계 코드다. 단계 밖에서 던진 예외는 {@code unclassified} 다. */
     static String stageOf(RuntimeException ex) {
-        return ex instanceof ConnectorFinancialProducer.Rejected rejected ? rejected.stage().code() : "unclassified";
+        return ex instanceof FinancialPrepareRejected rejected ? rejected.stage().code() : "unclassified";
     }
 
 

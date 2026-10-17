@@ -308,7 +308,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(counters().path("prepare").intValue()).isEqualTo(1);
         assertThat(counters().path("financial").intValue()).isZero();
         assertThat(output.getOut()).contains("금융 준비 HTTP 가 실패했다 status=200 reason=not_ok")
-            .contains("금융 준비를 거절했다 stage=prepare_http kind=Rejected")
+            .contains("금융 준비를 거절했다 stage=prepare_http kind=FinancialPrepareRejected")
             .doesNotContain(user.email()).doesNotContain("account_seq");
         // 같은 금액을 글로 넣고 계좌를 빼면 준비된다. 앞의 거절이 인자 모양 때문임을 보이는 대조군이다.
         var control = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("25")));
