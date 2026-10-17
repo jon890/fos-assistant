@@ -1,15 +1,15 @@
 package com.bifos.assistant.proactive;
 
-import com.bifos.assistant.proactive.domain.AxisJudgement;
-import com.bifos.assistant.proactive.domain.CandidateJudgement;
-import com.bifos.assistant.proactive.domain.DecisionCandidate;
-import com.bifos.assistant.proactive.domain.DecisionResult;
-import com.bifos.assistant.proactive.domain.DecisionState;
+import com.bifos.assistant.proactive.evaluation.domain.AxisJudgement;
+import com.bifos.assistant.proactive.evaluation.domain.CandidateJudgement;
+import com.bifos.assistant.proactive.evaluation.domain.DecisionCandidate;
+import com.bifos.assistant.proactive.evaluation.domain.DecisionResult;
+import com.bifos.assistant.proactive.evaluation.domain.DecisionState;
 import com.bifos.assistant.proactive.check.domain.ProblemEvidence;
-import com.bifos.assistant.proactive.domain.type.DecisionAxis;
-import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
-import com.bifos.assistant.proactive.domain.type.DecisionLevel;
-import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionAxis;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionConfidence;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionLevel;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionOutcome;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;

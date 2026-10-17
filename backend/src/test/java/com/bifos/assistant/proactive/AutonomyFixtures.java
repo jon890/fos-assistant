@@ -1,11 +1,11 @@
 package com.bifos.assistant.proactive;
 
-import com.bifos.assistant.proactive.domain.AutonomyInputs;
+import com.bifos.assistant.proactive.autonomy.domain.AutonomyInputs;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.domain.type.DecisionAxis;
-import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
-import com.bifos.assistant.proactive.domain.type.DecisionLevel;
-import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionAxis;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionConfidence;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionLevel;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionOutcome;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumMap;

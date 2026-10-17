@@ -7,7 +7,7 @@ import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
 import com.bifos.assistant.connector.application.ConnectorActionSweeper;
 import com.bifos.assistant.connector.application.ConnectorActionBodyBackfill;
-import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
+import com.bifos.assistant.proactive.evaluation.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
 import java.sql.SQLException;

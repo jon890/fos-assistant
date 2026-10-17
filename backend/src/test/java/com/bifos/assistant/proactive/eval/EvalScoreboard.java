@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.eval;
 
-import com.bifos.assistant.proactive.domain.type.AutonomyReason;
-import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyReason;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionOutcome;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

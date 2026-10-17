@@ -1,17 +1,17 @@
 package com.bifos.assistant.admin.proactive.presentation;
 
-import com.bifos.assistant.proactive.application.model.EvaluationOverview;
-import com.bifos.assistant.proactive.domain.AutonomyDecision;
-import com.bifos.assistant.proactive.domain.CandidateJudgement;
-import com.bifos.assistant.proactive.domain.DecisionCandidate;
+import com.bifos.assistant.proactive.autonomy.application.dto.EvaluationOverview;
+import com.bifos.assistant.proactive.autonomy.domain.AutonomyDecision;
+import com.bifos.assistant.proactive.evaluation.domain.CandidateJudgement;
+import com.bifos.assistant.proactive.evaluation.domain.DecisionCandidate;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.domain.ValueEvaluation;
-import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
-import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
-import com.bifos.assistant.proactive.domain.type.AutonomyReason;
+import com.bifos.assistant.proactive.evaluation.domain.ValueEvaluation;
+import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyExecutionStatus;
+import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyLevel;
+import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.domain.type.DecisionFailure;
-import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionFailure;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionOutcome;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;

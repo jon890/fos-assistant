@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.proactive.presentation;
 
-import com.bifos.assistant.proactive.application.ValueEvaluationOverviews;
+import com.bifos.assistant.proactive.autonomy.application.ValueEvaluationOverviews;
 import com.bifos.assistant.admin.proactive.presentation.ProactiveAdminDtos.EvaluationOverviewResponse;
 import com.bifos.assistant.admin.proactive.presentation.ProactiveAdminDtos.EvaluationRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;

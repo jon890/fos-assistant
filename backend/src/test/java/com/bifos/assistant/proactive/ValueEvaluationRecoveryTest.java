@@ -10,8 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
-import com.bifos.assistant.proactive.application.ValueEvaluationStore;
+import com.bifos.assistant.proactive.evaluation.application.ValueEvaluationRecovery;
+import com.bifos.assistant.proactive.evaluation.application.ValueEvaluationStore;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;

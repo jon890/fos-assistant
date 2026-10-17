@@ -1,8 +1,8 @@
 package com.bifos.assistant.proactive.eval;
 
-import com.bifos.assistant.proactive.domain.type.DecisionAxis;
-import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
-import com.bifos.assistant.proactive.domain.type.DecisionLevel;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionAxis;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionConfidence;
+import com.bifos.assistant.proactive.evaluation.domain.type.DecisionLevel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
