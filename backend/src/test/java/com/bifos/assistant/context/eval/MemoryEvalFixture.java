@@ -19,6 +19,7 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.TestClock;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,8 +70,9 @@ final class MemoryEvalFixture {
     }
 
 
-    /** 넣은 Memory 와 만든 에이전트를 지운다. */
+    /** 넣은 Memory 와 연결, 만든 에이전트를 지운다. */
     void tearDown() {
+        jdbc.update("DELETE FROM memory_link");
         memories.deleteAll();
         for (Long agentId : createdAgentIds) {
             jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
@@ -80,8 +82,18 @@ final class MemoryEvalFixture {
     }
 
 
-    /** 사례의 Memory 를 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
+    /** 사례의 Memory 와 대체 연결을 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
     Map<String, Long> seed(Case each) {
+        return seed(each, true);
+    }
+
+
+    /**
+     * 사례의 Memory 를 새로 넣는다. {@code links} 가 참이면 {@code supersedes} 마다 사람이 받아들인 대체 연결을 함께 넣는다. 거짓이면 연결이
+     * 없는 단계 1 의 구조다(ADR-20261015 / memory-link).
+     */
+    Map<String, Long> seed(Case each, boolean links) {
+        jdbc.update("DELETE FROM memory_link");
         memories.deleteAll();
         Instant now = clock.instant();
         if (each.filler() != null) {
@@ -90,6 +102,19 @@ final class MemoryEvalFixture {
         Map<String, Long> ids = new HashMap<>();
         for (MemorySeed seed : each.memories()) {
             ids.put(seed.key(), memories.save(memoryOf(seed, now)).id());
+        }
+        if (links) {
+            for (MemorySeed seed : each.memories()) {
+                if (seed.supersedes() != null) {
+                    jdbc.update(
+                        "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
+                            + " VALUES (?, ?, 'SUPERSEDES', 'HUMAN', 'ACTIVE', ?, ?)",
+                        ids.get(seed.key()),
+                        ids.get(seed.supersedes()),
+                        Timestamp.from(now),
+                        Timestamp.from(now));
+                }
+            }
         }
         return ids;
     }

@@ -94,6 +94,13 @@ class ToolDetailEventStreamTest {
 
             """;
 
+    private static final String MEMORY_LINK_RAW = """
+            data: {"event":"tool.started","tool":"mcp__fos_assistant__memory_link","preview":"{\\"from_id\\": 3, \\"to_id\\": 2, \\"type\\": \\"RELATED\\", \\"label\\": \\"연결-표식-6620\\"}"}
+
+            data: {"event":"tool.completed","tool":"mcp__fos_assistant__memory_link","result":"연결-표식-6620 연결했습니다."}
+
+            """;
+
     /** 붙은 커넥터 서버의 도구와 다른 도구가 한 실행에서 함께 돈다. */
     private static final String MIXED_RAW = """
             data: {"event":"tool.started","tool":"web_search","preview":"호출-전-1180 Bearer short-secret"}
@@ -288,6 +295,21 @@ class ToolDetailEventStreamTest {
 
             assertThat(events).extracting(RunEvent::detail).containsExactly(null, null);
             assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__follow_up_propose");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+
+    @Test
+    @DisplayName("memory_link 사건은 시작과 완료 모두 내용을 남기지 않는다")
+    void keepsNoDetailOfMemoryLinkEvents() throws IOException {
+        HttpServer server = startServer(MEMORY_LINK_RAW);
+        try {
+            List<RunEvent> events = read(server, ToolDetailScope.NONE);
+
+            assertThat(events).extracting(RunEvent::detail).containsExactly(null, null);
+            assertThat(events).extracting(RunEvent::toolName).containsOnly("mcp__fos_assistant__memory_link");
         } finally {
             server.stop(0);
         }

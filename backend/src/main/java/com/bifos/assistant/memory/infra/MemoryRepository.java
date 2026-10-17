@@ -56,7 +56,7 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     /**
      * 한 사용자와 그 그룹의 실릴 수 있는 항목을 collection 과 민감도마다 센다.
      *
-     * <p>실릴 수 있는 항목은 {@code ACCEPTED} 이고 {@code SOURCE} 도 {@code ARCHIVE} 도 아닌 줄이다. collection 과
+     * <p>실릴 수 있는 항목은 {@code ACCEPTED} 이고 {@code SOURCE} 도 {@code ARCHIVE} 도 아니며 대체되지 않은 줄이다. collection 과
      * 민감도는 거르지 않는다. 범위는 그 사용자의 {@code USER} 항목과 그 그룹의 {@code GROUP} 항목이다.
      *
      * @param userId 항목 주인이다. null 이면 {@code USER} 조건이 참이 되지 않아 그룹 항목만 센다
@@ -67,6 +67,9 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
         + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.retrieval <> com.bifos.assistant.memory.domain.type.MemoryRetrieval.ARCHIVE"
+        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
         + " and ((m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER and m.ownerUserId = :userId)"
         + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
         + " group by m.collection, m.sensitivity")

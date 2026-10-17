@@ -63,6 +63,10 @@ public class MemoryCapture extends CreatedAtEntity {
     @Column(name = "previous_status", length = 20)
     private MemoryStatus previousStatus;
 
+    /** 기록을 남긴 대화가 그 전에 바깥 글을 읽는 도구를 불렀는가. 승인 카드가 「바깥 글을 읽은 대화에서 나온 제안」 이라고 보인다. */
+    @Column(name = "external_read", nullable = false)
+    private boolean externalRead;
+
     @Column(name = "undone_at")
     private Instant undoneAt;
 
@@ -74,7 +78,8 @@ public class MemoryCapture extends CreatedAtEntity {
         Long executionId,
         MemoryCaptureKind kind,
         Integer baseRevision,
-        MemoryStatus previousStatus) {
+        MemoryStatus previousStatus,
+        boolean externalRead) {
         MemoryCapture capture = new MemoryCapture();
         capture.memoryId = memoryId;
         capture.userId = userId;
@@ -83,6 +88,7 @@ public class MemoryCapture extends CreatedAtEntity {
         capture.kind = kind;
         capture.baseRevision = baseRevision;
         capture.previousStatus = previousStatus;
+        capture.externalRead = externalRead;
         return capture;
     }
 

@@ -32,6 +32,11 @@ const LABELS: Record<string, Label> = {
     running: "기억해 두고 있어요",
     done: "기억해 뒀어요",
   },
+  // 대체는 제안만 남긴다. 바꾼 것처럼 읽히지 않게 쓴다.
+  memory_link: {
+    running: "기억을 서로 잇고 있어요",
+    done: "기억을 서로 이었어요",
+  },
   follow_up_propose: {
     running: "할 일을 제안하고 있어요",
     done: "할 일을 제안했어요",

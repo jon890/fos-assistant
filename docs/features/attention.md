@@ -63,6 +63,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 | `APPROVAL_PENDING` | 없음 | 승인을 기다리고 있어요 |
 | `APPROVAL_PENDING` | `EXPIRES_SOON` | 승인을 기다리고 있어요. 곧 만료돼요 |
 | `MEMORY_PROPOSED` | 없음 | 에이전트가 기억할 것을 제안했어요 |
+| `MEMORY_SUPERSEDE_PROPOSED` | 없음 | 새 기억이 옛 기억을 대신하자는 제안이 왔어요 |
 | `FOLLOW_UP_PROPOSED` | 없음 | 에이전트가 할 일로 제안했어요 |
 | `FOLLOW_UP_OPEN` | `DUE_SOON` | 기한이 다가왔어요 |
 | `FOLLOW_UP_OPEN` | `OVERDUE` | 기한이 지났어요 |
@@ -161,6 +162,7 @@ sequenceDiagram
 | `DELIVERY_FAILED` | `failures` | 결과 전달 묶음 `result_delivery`([ADR-075](../adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md)) | `FAILED` 이고 `updated_at` 이 `failure-window` 안. `DELIVERING` 은 시도가 도는 중이라 후보가 아니다 | 늘 | `DELIVERED`, `STOPPED`. 대화를 지웠다 | 묶음 번호와 `attempt_count`. 실패한 turn 과 합치면 그 실행 번호도 함께 | `CONTROL_PLANE` |
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전. 요청자의 지우지 않은 대화에 속한다 | 늘 | 승인, 거절, 만료 | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `revision` | `MODEL_INFERRED` |
+| `MEMORY_SUPERSEDE_PROPOSED` | `needs_me` | 요청자가 옛 항목을 고칠 수 있는 `memory_link` 의 `SUPERSEDES` 줄 | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
 | `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
 | `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각 | `USER_CONFIRMED` |
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `status` | `CONTROL_PLANE` |
@@ -188,6 +190,7 @@ sequenceDiagram
 연결한 대화를 지웠으면 그 할 일은 남고 `conversationId` 는 `null` 이며 결과 도착을 보지 않는다.
 
 `MEMORY_PROPOSED` 는 기억 메뉴의 제안 건수에 이미 센다. 지금 화면의 건수에는 세지 않는다.
+`MEMORY_SUPERSEDE_PROPOSED` 는 기억 화면의 「검토할 기억」 카드로 가는 줄이고 지금 화면에서 받아들이지 않는다([`docs/features/memory.md`](memory.md) 의 「기억 사이의 연결」).
 `DELIVERY_FAILED` 는 결과 전달 묶음의 상태를 읽기만 한다. 그 상태를 저장하고 다시 전달하는 일은 `chat` 의 `ResultDeliveryRecorder` 가 갖는다.
 
 ### 억제 신호
@@ -228,6 +231,7 @@ sequenceDiagram
 | `EXECUTION_STATE` | 판정 시각(`readAt`) | `EXECUTION_FAILED`, `DELEGATION_RUNNING`, `DELEGATION_FINISHED` |
 | `APPROVAL_REQUEST` | 승인 줄의 `created_at` | `APPROVAL_PENDING` |
 | `MEMORY_PROPOSAL` | Memory 의 `updated_at` | `MEMORY_PROPOSED` |
+| `MEMORY_LINK` | 연결의 `updated_at` | `MEMORY_SUPERSEDE_PROPOSED` |
 | `CONVERSATION` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
 | `FOLLOW_UP` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
 | `RESULT_DELIVERY` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
