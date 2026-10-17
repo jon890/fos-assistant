@@ -66,6 +66,9 @@
 | --- | --- | --- | --- | --- |
 | `skill` | `library` | `SkillPackagePreview` | `upload` | `SkillPackageFile` |
 | `skill` | `library` | `SkillPackageProblem` | `upload` | `SkillPackageReason` |
+| `skill` | `library` | `SkillDtos` | `upload` | `SkillPackageFile` |
+| `skill` | `library` | `SkillDtos` | `upload` | `SkillPackageReason` |
+| `skill` | `library` | `SkillDtos` | `upload` | `SkillPackageChange` |
 
 `LAYER_DIRECTION` 에 더한다. 짝이 되는 클래스가 아직 옛 위치에 있어서 생기는 줄이다.
 
