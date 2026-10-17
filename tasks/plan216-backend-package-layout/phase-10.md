@@ -26,7 +26,7 @@
 | `APPLICATION_ROOT_HOLDS_ONLY_BEANS` | 32 | public 이면서 빈이 아닌 클래스. 아래 표 |
 | `LAYER_DIRECTION` | 2 | `ConnectorExecutionGuardContract`(dto)가 `ConnectorExecutionSnapshot`(application)을, `CheckedSkillPackage`(dto)가 `SkillFilePaths`(infra)를 쓴다 |
 | `SUB_FEATURES_FOLLOW_ORDER` | 9 | `skill` 2, `chat` 2, `connector` 4, `proactive` 1 |
-| `ADMIN_USES_ONLY_FEATURE_APPLICATION` | 14 | phase 03 의 표 13줄과 `AgentAdminService` 가 port 를 쓰는 1줄 |
+| `ADMIN_USES_ONLY_FEATURE_APPLICATION` | 26 | phase 03 의 표 25줄과 `AgentAdminService` 가 port 를 쓰는 1줄 |
 | 나머지 규칙 | 0 | 기준 파일에 항목이 없다 |
 
 나머지 규칙의 기준 파일 항목이 비면 `stored.rules` 에서 그 규칙의 줄도 지운다.
@@ -54,7 +54,7 @@ git grep -nE 'com\.bifos\.assistant\.(chat|connector|proactive|usage|skill)\.(ap
 | `chat` 의 순서 위반 2줄 | `AttachmentCleaner` 가 부르는 `ContentDraftCleaner` 는 `attachment.application.port` 에 정리 참여 인터페이스를 두고 `contentdraft` 가 구현한다(`AgentPurgeParticipant` 와 같은 모양). `MediaPipelineEvents.draftReferenced` 는 `ContentDraftAsset` 대신 첨부 번호와 자리를 받게 한다 |
 | `skill` 의 순서 위반 2줄 | `SkillPackagePreview`, `SkillPackageProblem` 이 `package` 의 타입을 쓴다. 두 값을 `package.application.dto` 로 옮기고 `SkillDtos` 가 그것을 쓰게 한다 |
 | `proactive` 의 순서 위반 1줄 | `ProactiveLoopCoordinator` 가 읽는 `SurfacedProblems` 의 결과를 `loop` 쪽 port 로 받게 한다 |
-| `admin` 의 14줄 | `AgentAdminService` 가 쓰는 저장소와 엔티티와 port 는 `agent` 의 `application` 이 dto 로 내놓게 한다. `*AdminDtos` 가 받는 엔티티와 domain 값(`AllowedPerson`, `AgentToken`, `ModelChoice`, `CostBy*`, `ProactiveCheck`)은 각 기능의 `application.dto` 로 바꾼다 |
+| `admin` 의 26줄 | `AgentAdminService` 가 쓰는 저장소와 엔티티와 port 는 `agent` 의 `application` 이 dto 로 내놓게 한다. `*AdminDtos` 가 받는 엔티티와 domain 값(`AllowedPerson`, `AgentToken`, `ModelChoice`, `CostBy*`, `ProactiveCheck` 와 판정 domain 값, `AppUser`, `AgentToolPolicy`, `HermesModelCatalog`)은 각 기능의 `application.dto` 로 바꾼다 |
 | `LAYER_DIRECTION` 2줄 | `ConnectorExecutionGuardContract` 를 `ConnectorExecutionSnapshot` 에 기대지 않게 하거나 두 타입의 자리를 맞춘다. `SkillFilePaths` 가 쓰는 `SkillFiles` 의 함수를 `domain` 으로 올려 `SkillFilePaths` 도 `domain` 에 둔다 |
 
 ### 4. 알림 문단과 이 계획서를 지운다

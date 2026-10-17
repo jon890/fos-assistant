@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[AgentAdminService.java](../../backend/src/main/java/com/bifos/assistant/agent/admin/application/AgentAdminService.java)에서 확인한다.
+[AgentAdminService.java](../../backend/src/main/java/com/bifos/assistant/admin/agent/application/AgentAdminService.java)에서 확인한다.
 AgentAdminService는 관리자 등록 업무를 별도 application 경계에서 처리한다.

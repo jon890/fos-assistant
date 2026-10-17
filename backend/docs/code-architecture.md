@@ -228,9 +228,9 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 
 ### 에이전트 관리자 등록
 
-수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡고,
-`AgentCreateCommand`와 `AgentUpdateCommand`는 그 아래 `application.model`에 둔다.
-관리 등록·목록·수정의 HTTP 경로는 `agent.admin.presentation.AgentAdminController`가,
+수동 profile 등록과 변경은 `admin.agent.application.AgentAdminService`가 맡고,
+`AgentCreateCommand`와 `AgentUpdateCommand`는 그 아래 `application.dto`에 둔다.
+관리 등록·목록·수정의 HTTP 경로는 `admin.agent.presentation.AgentAdminController`가,
 두 요청 record와 `AdminAgentView`는 같은 패키지의 `AgentAdminDtos`가 갖는다.
 변환기는 package-private이며 컨트롤러와 함께 둔다.
 

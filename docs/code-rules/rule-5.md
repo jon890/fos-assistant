@@ -17,7 +17,7 @@ infra는 port와 dto를 쓸 수 있고 application의 빈은 쓰지 않는다. �
 
 ## 이 저장소의 사례
 
-[AgentAdminService.java](../../backend/src/main/java/com/bifos/assistant/agent/admin/application/AgentAdminService.java)에서 확인한다.
+[AgentAdminService.java](../../backend/src/main/java/com/bifos/assistant/admin/agent/application/AgentAdminService.java)에서 확인한다.
 AgentAdminService가 관리자 업무의 서비스 경계를 맡고 컨트롤러가 이를 호출한다.
 
 책임과 실행 절차는 [code-architecture.md](../../backend/docs/code-architecture.md)에서 이어 읽는다.

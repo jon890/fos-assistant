@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.admin.browser.presentation.UserBrowserAdminController;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;

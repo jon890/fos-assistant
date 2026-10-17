@@ -15,5 +15,5 @@ presentation 패키지의 요청과 응답은 *Dtos.java 하나에 모은다.
 
 ## 이 저장소의 사례
 
-[AgentAdminDtos.java](../../backend/src/main/java/com/bifos/assistant/agent/admin/presentation/AgentAdminDtos.java)에서 확인한다.
+[AgentAdminDtos.java](../../backend/src/main/java/com/bifos/assistant/admin/agent/presentation/AgentAdminDtos.java)에서 확인한다.
 AgentAdminDtos는 관리자 컨트롤러 밖에서 HTTP 요청과 응답 record를 모은다.

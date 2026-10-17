@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.agent.admin.application.AgentAdminService;
-import com.bifos.assistant.agent.admin.presentation.AgentAdminController;
+import com.bifos.assistant.admin.agent.application.AgentAdminService;
+import com.bifos.assistant.admin.agent.presentation.AgentAdminController;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
