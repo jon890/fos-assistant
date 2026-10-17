@@ -8,7 +8,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
-import com.bifos.assistant.user.application.FirstSignInListener;
+import com.bifos.assistant.user.application.port.FirstSignInListener;
 import com.bifos.assistant.user.domain.AppUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

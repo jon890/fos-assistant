@@ -14,7 +14,7 @@ import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.application.UserExecutionProperties;
 import com.bifos.assistant.usage.infra.PricingProperties;
-import com.bifos.assistant.workspace.infra.WorkspaceProperties;
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

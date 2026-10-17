@@ -10,20 +10,14 @@ com.bifos.assistant.connector.application.ConnectorPolicyProperties 는 @Configu
 com.bifos.assistant.connector.application.ConnectorProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.context.ContextProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. context.config 로 옮긴다.
 com.bifos.assistant.context.MemorySearchSectionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. context.config 로 옮긴다.
-com.bifos.assistant.crypto.infra.DataEncryptionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. crypto.config 로 옮긴다.
-com.bifos.assistant.feedback.application.DecisionFeedbackProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. feedback.config 로 옮긴다.
 com.bifos.assistant.hermes.HermesProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. hermes.config 로 옮긴다.
 com.bifos.assistant.memory.application.MemoryEncryptionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
 com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
 com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
-com.bifos.assistant.notification.application.NotificationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. notification.config 로 옮긴다.
 com.bifos.assistant.proactive.application.AutonomyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveCheckProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveLoopProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ValueEvaluationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.skill.infra.SkillProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. skill.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.task.application.ProactiveScheduleProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. task.config 로 옮긴다.
-com.bifos.assistant.task.application.TaskProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. task.config 로 옮긴다.
 com.bifos.assistant.usage.application.UserExecutionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. usage.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.usage.infra.PricingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. usage.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.workspace.infra.WorkspaceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. workspace.config 로 옮긴다.

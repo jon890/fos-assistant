@@ -1,7 +1,7 @@
 package com.bifos.assistant.feedback.application;
 
-import com.bifos.assistant.feedback.application.model.FeedbackLabel;
-import com.bifos.assistant.feedback.application.model.SubjectLabel;
+import com.bifos.assistant.feedback.application.dto.FeedbackLabel;
+import com.bifos.assistant.feedback.application.dto.SubjectLabel;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;

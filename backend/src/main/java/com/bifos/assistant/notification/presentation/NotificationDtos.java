@@ -1,6 +1,6 @@
 package com.bifos.assistant.notification.presentation;
 
-import com.bifos.assistant.notification.application.NotificationPage;
+import com.bifos.assistant.notification.application.dto.NotificationPage;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;

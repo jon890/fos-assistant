@@ -1,7 +1,7 @@
 package com.bifos.assistant.workspace.presentation;
 
-import com.bifos.assistant.workspace.application.model.WorkspaceAgent;
-import com.bifos.assistant.workspace.application.model.WorkspaceStatus;
+import com.bifos.assistant.workspace.application.dto.WorkspaceAgent;
+import com.bifos.assistant.workspace.application.dto.WorkspaceStatus;
 import com.bifos.assistant.workspace.domain.WorkspaceDeletion;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceListing;

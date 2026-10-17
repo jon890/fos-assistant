@@ -3,7 +3,7 @@ package com.bifos.assistant.workspace.presentation;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;
 import com.bifos.assistant.workspace.application.WorkspaceService;
-import com.bifos.assistant.workspace.application.model.WorkspaceFile;
+import com.bifos.assistant.workspace.application.dto.WorkspaceFile;
 import com.bifos.assistant.workspace.presentation.WorkspaceDtos.DeletionView;
 import com.bifos.assistant.workspace.presentation.WorkspaceDtos.ListingView;
 import com.bifos.assistant.workspace.presentation.WorkspaceDtos.StatusView;

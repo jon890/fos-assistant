@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.application.model;
 
-import com.bifos.assistant.feedback.application.model.FeedbackLabel;
+import com.bifos.assistant.feedback.application.dto.FeedbackLabel;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;

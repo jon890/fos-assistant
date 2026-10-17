@@ -1,5 +1,6 @@
 package com.bifos.assistant.workspace.infra;
 
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

@@ -18,7 +18,7 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.workspace.application.WorkspaceUsageService;
-import com.bifos.assistant.workspace.infra.WorkspaceProperties;
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;

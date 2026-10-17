@@ -3,9 +3,9 @@ package com.bifos.assistant.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.notification.application.NotificationEvent;
+import com.bifos.assistant.notification.application.dto.NotificationEvent;
 import com.bifos.assistant.notification.application.NotificationEventHub;
-import com.bifos.assistant.notification.application.NotificationPage;
+import com.bifos.assistant.notification.application.dto.NotificationPage;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.NotificationTarget;

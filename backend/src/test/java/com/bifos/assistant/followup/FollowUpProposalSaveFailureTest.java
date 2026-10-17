@@ -13,7 +13,7 @@ import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.followup.application.FollowUpService;
-import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
+import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

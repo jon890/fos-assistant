@@ -20,7 +20,7 @@ import com.bifos.assistant.workspace.application.WorkspaceService;
 import com.bifos.assistant.workspace.domain.WorkspaceDeleter;
 import com.bifos.assistant.workspace.domain.WorkspaceDeletion;
 import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;
-import com.bifos.assistant.workspace.infra.WorkspaceProperties;
+import com.bifos.assistant.workspace.config.WorkspaceProperties;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;

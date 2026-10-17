@@ -32,7 +32,7 @@ import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
-import com.bifos.assistant.notification.application.NotificationEvent;
+import com.bifos.assistant.notification.application.dto.NotificationEvent;
 import com.bifos.assistant.notification.application.NotificationEventHub;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;

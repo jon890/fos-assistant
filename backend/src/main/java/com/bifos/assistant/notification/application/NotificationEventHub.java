@@ -1,5 +1,6 @@
 package com.bifos.assistant.notification.application;
 
+import com.bifos.assistant.notification.application.dto.NotificationEvent;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;

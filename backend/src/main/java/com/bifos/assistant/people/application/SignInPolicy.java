@@ -2,7 +2,7 @@ package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
-import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.user.application.port.SignInRevocation;
 import java.time.Clock;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

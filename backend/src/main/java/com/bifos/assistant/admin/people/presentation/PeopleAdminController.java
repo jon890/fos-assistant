@@ -2,7 +2,7 @@ package com.bifos.assistant.admin.people.presentation;
 
 import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.application.PersonRegistrar;
-import com.bifos.assistant.people.application.model.PersonAccess;
+import com.bifos.assistant.people.application.dto.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.admin.people.presentation.PeopleAdminDtos.CreatePersonRequest;
 import com.bifos.assistant.admin.people.presentation.PeopleAdminDtos.PersonView;

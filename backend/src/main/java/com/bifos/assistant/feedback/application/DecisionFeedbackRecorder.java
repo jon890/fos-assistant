@@ -1,6 +1,6 @@
 package com.bifos.assistant.feedback.application;
 
-import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package com.bifos.assistant.notification.presentation;
 
-import com.bifos.assistant.notification.application.NotificationEvent;
-import com.bifos.assistant.notification.application.NotificationProperties;
+import com.bifos.assistant.notification.application.dto.NotificationEvent;
+import com.bifos.assistant.notification.config.NotificationProperties;
 import java.time.Duration;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;

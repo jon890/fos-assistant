@@ -3,7 +3,7 @@ package com.bifos.assistant.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.notification.application.NotificationCleaner;
-import com.bifos.assistant.notification.application.NotificationProperties;
+import com.bifos.assistant.notification.config.NotificationProperties;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.infra.NotificationRepository;

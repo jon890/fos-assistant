@@ -1,5 +1,6 @@
 package com.bifos.assistant.notification.application;
 
+import com.bifos.assistant.notification.config.NotificationProperties;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import java.time.Clock;
 import java.time.Instant;

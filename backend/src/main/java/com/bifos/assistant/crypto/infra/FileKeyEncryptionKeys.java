@@ -1,5 +1,6 @@
 package com.bifos.assistant.crypto.infra;
 
+import com.bifos.assistant.crypto.config.DataEncryptionProperties;
 import com.bifos.assistant.crypto.domain.AesGcm;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import java.io.IOException;

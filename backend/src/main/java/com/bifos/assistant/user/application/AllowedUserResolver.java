@@ -1,5 +1,6 @@
 package com.bifos.assistant.user.application;
 
+import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.TokenUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
