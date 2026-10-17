@@ -225,7 +225,7 @@ worker 시작 전송과 private 상태 조회, MCP 도구와 REST·화면 연결
 ### 승인 요청과 조회 port
 
 `TopLevelPackageOrder.ORDER`에서 chat은 connector보다 아래다. port는 chat에 두고 `connector.contentdraft.application.ContentDraftJobs`가 구현한다.
-반환 record는 `chat.application.model`에 둔다. connector 엔티티·enum·catalog·ticket은 반환하지 않는다.
+반환 record는 `chat.contentdraft.application.dto`에 둔다. connector 엔티티·enum·catalog·ticket은 반환하지 않는다.
 
 | 계약 | 시그니처와 반환 |
 | --- | --- |
@@ -640,8 +640,8 @@ tombstone은 두 식별 고정 키와 정확한 범위 대응을 포함한 본�
 
 신규 엔티티는 `chat.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
 기존 엔티티를 옮기거나 최상위 기능 패키지를 늘리지 않는다. `domain..`의 기존 층 규칙이 이 하위 패키지도 검사한다.
-상태 enum은 `chat.domain.type`, 공개 서비스 반환 타입은 `chat.application.model`, 저장소와 암호화는 `chat.infra`에 둔다.
-REST는 `chat.presentation.contentdraft.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
+상태 enum은 `chat.contentdraft.domain.type`, 공개 서비스 반환 타입은 `chat.contentdraft.application.dto`, 저장소와 암호화는 `chat.contentdraft.infra`에 둔다.
+REST는 `chat.contentdraft.presentation.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
 기존 chat.presentation의 DTO 파일을 더 늘리지 않는다.
 
 ### 권한·원본·관찰 검사

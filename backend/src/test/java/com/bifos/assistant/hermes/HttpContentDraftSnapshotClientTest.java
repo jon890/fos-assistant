@@ -16,7 +16,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotHash;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.sun.net.httpserver.HttpServer;

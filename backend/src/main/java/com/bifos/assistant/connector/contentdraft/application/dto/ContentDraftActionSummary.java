@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.contentdraft.application.dto;
 
-import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import java.util.UUID;
 
 /**

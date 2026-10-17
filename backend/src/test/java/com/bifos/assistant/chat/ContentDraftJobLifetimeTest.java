@@ -8,9 +8,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.chat.application.model.ContentDraftJobView;
-import com.bifos.assistant.chat.domain.entity.ContentDraftJob;
-import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftJobView;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftJob;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.contentdraft.application.ContentDraftJobs;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.application.port.ContentDraftJobNotFound;

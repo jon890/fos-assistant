@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.attachment.application;
 
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
-import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftAsset;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;

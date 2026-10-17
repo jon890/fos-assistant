@@ -6,8 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
-import com.bifos.assistant.chat.domain.ContentDraftException;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftBindingChoiceException;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.contentdraft.application.ConnectorContentDraftBindings;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;

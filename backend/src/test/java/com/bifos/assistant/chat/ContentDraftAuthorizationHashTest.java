@@ -2,9 +2,9 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ContentDraftAuthorizationHash;
-import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
-import com.bifos.assistant.chat.application.model.ContentDraftSnapshotInput;
+import com.bifos.assistant.chat.contentdraft.application.ContentDraftAuthorizationHash;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftBindingStamp;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftSnapshotInput;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

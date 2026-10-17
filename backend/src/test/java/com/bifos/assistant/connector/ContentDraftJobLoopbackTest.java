@@ -13,11 +13,11 @@ import org.springframework.context.support.GenericApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.bifos.assistant.chat.domain.ContentDraftException;
+import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import com.bifos.assistant.chat.ContentDraftJobFixture;
-import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import java.io.BufferedReader;

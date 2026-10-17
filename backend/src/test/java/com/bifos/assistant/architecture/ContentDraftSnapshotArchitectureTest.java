@@ -4,11 +4,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ContentDraftJobQueries;
-import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
-import com.bifos.assistant.chat.application.model.ContentDraftJobPage;
-import com.bifos.assistant.chat.application.model.ContentDraftJobView;
-import com.bifos.assistant.chat.application.model.ContentDraftSaveRequestView;
+import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftJobQueries;
+import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftSaveRequests;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftJobPage;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftJobView;
+import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftSaveRequestView;
 import com.bifos.assistant.connector.contentdraft.application.ContentDraftJobs;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -23,11 +23,11 @@ import org.junit.jupiter.api.Test;
 @Tag("architecture")
 class ContentDraftSnapshotArchitectureTest {
     private static final Map<String, String> OWNED = Map.of(
-        "ContentDraftSaveRequests", "com.bifos.assistant.chat.application",
-        "ContentDraftJobQueries", "com.bifos.assistant.chat.application",
-        "ContentDraftSaveRequestView", "com.bifos.assistant.chat.application.model",
-        "ContentDraftJobView", "com.bifos.assistant.chat.application.model",
-        "ContentDraftJobPage", "com.bifos.assistant.chat.application.model",
+        "ContentDraftSaveRequests", "com.bifos.assistant.chat.contentdraft.application.port",
+        "ContentDraftJobQueries", "com.bifos.assistant.chat.contentdraft.application.port",
+        "ContentDraftSaveRequestView", "com.bifos.assistant.chat.contentdraft.application.dto",
+        "ContentDraftJobView", "com.bifos.assistant.chat.contentdraft.application.dto",
+        "ContentDraftJobPage", "com.bifos.assistant.chat.contentdraft.application.dto",
         "ContentDraftJobs", "com.bifos.assistant.connector.contentdraft.application",
         "ContentDraftSaveApproval", "com.bifos.assistant.connector.contentdraft.application",
         "ContentDraftSaveTicket", "com.bifos.assistant.connector.contentdraft.application",
