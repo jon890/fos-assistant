@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * 에이전트가 주문 상한을 읽고 바꾸는 길이다(ADR-20261015 / financial-user-limits). 구현은 커넥터가 갖고 mcp 는 커넥터를 import 하지 않는다.
  *
- * <p>올리기는 승인 카드만 만들고 반영하지 않는다. 결과는 MCP 도구 결과로 그대로 낸다.
+ * <p>올리기는 승인 카드만 만들고 반영하지 않는다. 결과 값은 MCP 도구가 JSON 글로 감싸 낸다.
  */
 public interface FinancialLimitRequests {
 

@@ -1,0 +1,58 @@
+{
+  "version": "mcp-call-tool-result-v1",
+  "note": "Control Plane MCP 도구 결과의 모양이다. accepted 는 Hermes 의 CallToolResult 검증을 지나고 rejected 는 거절된다. hermes/tests/test_control_plane_tool_result.py 가 실제 mcp 패키지로, McpToolResultShapeTest 가 backend 의 모양 검사로 같은 판정을 확인한다.",
+  "accepted": [
+    {
+      "name": "json-text",
+      "result": {
+        "content": [{"type": "text", "text": "{\"available\":true,\"limits\":[]}"}],
+        "isError": false
+      }
+    },
+    {
+      "name": "error-text",
+      "result": {
+        "content": [{"type": "text", "text": "호출 맥락을 확인할 수 없습니다."}],
+        "isError": true
+      }
+    },
+    {
+      "name": "without-is-error",
+      "result": {
+        "content": [{"type": "text", "text": "{}"}]
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "name": "bare-value-object",
+      "result": {
+        "available": true,
+        "limits": [],
+        "spentToday": {"KRW": "0", "USD": "0"},
+        "remainingToday": {"KRW": "300000", "USD": "1000"}
+      }
+    },
+    {
+      "name": "bare-status-object",
+      "result": {
+        "status": "applied",
+        "name": "order_amount_usd"
+      }
+    },
+    {
+      "name": "content-not-list",
+      "result": {
+        "content": "{}",
+        "isError": false
+      }
+    },
+    {
+      "name": "text-item-without-text",
+      "result": {
+        "content": [{"type": "text"}],
+        "isError": false
+      }
+    }
+  ]
+}

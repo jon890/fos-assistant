@@ -123,6 +123,7 @@ class McpCallerInvariantTest {
                 .as("%s 의 HTTP 상태, 본문: %s", tool.getKey(), response.body())
                 .isEqualTo(200);
             JsonNode result = json.readTree(response.body()).path("result");
+            McpToolResultShape.assertCallToolResult(tool.getKey(), result);
             assertThat(result.path("isError").asBoolean())
                 .as("%s 의 결과: %s", tool.getKey(), result)
                 .isTrue();
