@@ -13,5 +13,3 @@ com.bifos.assistant.proactive.application.ProactiveCheckProperties 는 @Configur
 com.bifos.assistant.proactive.application.ProactiveLoopProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ValueEvaluationProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.skill.infra.SkillProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. skill.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.usage.application.UserExecutionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. usage.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.usage.infra.PricingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. usage.<하위 기능>.config 로 옮긴다.
