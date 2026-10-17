@@ -1,3 +1,4 @@
+com.bifos.assistant.admin.agent.application.AgentAdminService 가 agent 의 com.bifos.assistant.agent.application.port.AgentConnectorBindings 를 쓴다. admin 은 기능의 application 과 application.dto 만 부른다. 필요한 값은 그 기능의 application 이 dto 로 내놓게 한다. 응답 모양은 admin 의 *Dtos 에 둔다.
 com.bifos.assistant.admin.agent.application.AgentAdminService 가 agent 의 com.bifos.assistant.agent.domain.Agent 를 쓴다. admin 은 기능의 application 과 application.dto 만 부른다. 필요한 값은 그 기능의 application 이 dto 로 내놓게 한다. 응답 모양은 admin 의 *Dtos 에 둔다.
 com.bifos.assistant.admin.agent.application.AgentAdminService 가 agent 의 com.bifos.assistant.agent.infra.AgentRepository 를 쓴다. admin 은 기능의 application 과 application.dto 만 부른다. 필요한 값은 그 기능의 application 이 dto 로 내놓게 한다. 응답 모양은 admin 의 *Dtos 에 둔다.
 com.bifos.assistant.admin.agent.application.AgentAdminService 가 user 의 com.bifos.assistant.user.domain.AppUser 를 쓴다. admin 은 기능의 application 과 application.dto 만 부른다. 필요한 값은 그 기능의 application 이 dto 로 내놓게 한다. 응답 모양은 admin 의 *Dtos 에 둔다.

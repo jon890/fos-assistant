@@ -10,9 +10,6 @@ com.bifos.assistant.connector.application.ConnectorPolicyProperties 는 @Configu
 com.bifos.assistant.connector.application.ConnectorProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.context.ContextProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. context.config 로 옮긴다.
 com.bifos.assistant.context.MemorySearchSectionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. context.config 로 옮긴다.
-com.bifos.assistant.memory.application.MemoryEncryptionProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
-com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
-com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. memory.config 로 옮긴다.
 com.bifos.assistant.proactive.application.AutonomyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveCheckProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.proactive.application.ProactiveLoopProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. proactive.<하위 기능>.config 로 옮긴다.
