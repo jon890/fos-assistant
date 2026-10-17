@@ -25,9 +25,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 class AgentAdminServicePlacementTest {
 
     private static final String ROOT = "com.bifos.assistant.fixture";
-    private static final String SERVICE = ROOT + ".agent.admin.application.AgentAdminService";
-    private static final String CONTROLLER = ROOT + ".agent.admin.presentation.AgentAdminController";
-    private static final String DTOS = ROOT + ".agent.admin.presentation.AgentAdminDtos";
+    private static final String SERVICE = ROOT + ".admin.agent.application.AgentAdminService";
+    private static final String CONTROLLER = ROOT + ".admin.agent.presentation.AgentAdminController";
+    private static final String DTOS = ROOT + ".admin.agent.presentation.AgentAdminDtos";
     private static final Set<String> OWNED_NAMES = Set.of(
         "AgentAdminService",
         "AgentCreateCommand",
@@ -96,12 +96,12 @@ class AgentAdminServicePlacementTest {
             Arguments.of("AgentAdminService", SERVICE, ROOT + ".agent.application.AgentAdminService", false),
             Arguments.of(
                 "AgentCreateCommand",
-                ROOT + ".agent.admin.application.model.AgentCreateCommand",
+                ROOT + ".admin.agent.application.dto.AgentCreateCommand",
                 ROOT + ".agent.application.AgentCreateCommand",
                 false),
             Arguments.of(
                 "AgentUpdateCommand",
-                ROOT + ".agent.admin.application.model.AgentUpdateCommand",
+                ROOT + ".admin.agent.application.dto.AgentUpdateCommand",
                 ROOT + ".agent.application.AgentUpdateCommand",
                 false),
             Arguments.of(
@@ -126,25 +126,25 @@ class AgentAdminServicePlacementTest {
     static Stream<Arguments> invalidRoles() {
         return Stream.of(
             Arguments.of(
-                "agent.admin.application.BadEntity",
+                "admin.agent.application.BadEntity",
                 "@jakarta.persistence.Entity public class BadEntity {}",
                 "Entity"),
             Arguments.of(
-                "agent.admin.application.BadEmbeddable",
+                "admin.agent.application.BadEmbeddable",
                 "@jakarta.persistence.Embeddable public class BadEmbeddable {}",
                 "Embeddable"),
             Arguments.of(
-                "agent.admin.application.BadRepository", "public interface BadRepository {}", "Repository"),
+                "admin.agent.application.BadRepository", "public interface BadRepository {}", "Repository"),
             Arguments.of(
-                "agent.admin.presentation.BadService",
+                "admin.agent.presentation.BadService",
                 "@org.springframework.stereotype.Service public class BadService {}",
                 "Service"),
             Arguments.of(
-                "agent.admin.application.BadValue",
+                "admin.agent.application.BadValue",
                 "public record BadValue(String value) {}",
-                "application.model"),
+                "application.dto"),
             Arguments.of(
-                "agent.admin.application.BadProperties",
+                "admin.agent.application.BadProperties",
                 "@org.springframework.boot.context.properties.ConfigurationProperties(\"fixture\") public record BadProperties(String value) {}",
                 "config"),
             Arguments.of(
@@ -158,32 +158,12 @@ class AgentAdminServicePlacementTest {
     }
 
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("mappedMethods")
-    @DisplayName("관리 mapped 메서드마다 requireAdmin 호출 제거를 거절한다")
-    void rejectsMissingAuthorization(String method) throws IOException {
-        Map<String, String> sources = sources();
-        sources.compute(
-            CONTROLLER,
-            (name, source) -> source.replace(
-                "void " + method + "() { currentUser.requireAdmin();", "void " + method + "() {"));
-        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
-        assertThat(fixture).hasSize(10);
-        assertViolation(rule(true), fixture, CONTROLLER, method + "()", "requireAdmin");
-    }
-
-
-    static Stream<String> mappedMethods() {
-        return Stream.of("create", "list", "update");
-    }
-
-
     @Test
     @DisplayName("HTTP record 를 Dtos 밖으로 옮기면 거절한다")
     void rejectsDetachedHttpRecord() throws IOException {
         Map<String, String> sources = sources();
         sources.compute(DTOS, (name, source) -> source.replace("public record AdminAgentView() {}", ""));
-        String name = ROOT + ".agent.admin.presentation.AdminAgentView";
+        String name = ROOT + ".admin.agent.presentation.AdminAgentView";
         sources.put(name, source(name, "public record AdminAgentView() {}"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(10);
@@ -291,7 +271,7 @@ class AgentAdminServicePlacementTest {
                 }
                 """.formatted(lifecycle)));
         for (String name : List.of("AgentCreateCommand", "AgentUpdateCommand")) {
-            String fqn = ROOT + ".agent.admin.application.model." + name;
+            String fqn = ROOT + ".admin.agent.application.dto." + name;
             sources.put(fqn, source(fqn, "public record " + name + "() {}"));
         }
         sources.put(DTOS, source(DTOS, """

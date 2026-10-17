@@ -41,11 +41,11 @@ public class UsageController {
     /**
      * 가족이 사는 곳의 달력으로 달을 끊는다. 컨테이너의 {@code TZ} 가 바뀌어도 경계가 흔들리지 않는다.
      *
-     * <p>같은 시간대를 {@code AgentExecutionRepository.sumByDayBetween} 의 질의도 갖는다. 그 질의는
-     * 표준시와의 차이 9시간을 식에 직접 적어 날짜를 뽑는다. 가족이 사는 곳이 바뀌면 두 자리를 함께
-     * 고친다.
+     * <p>같은 시간대를 {@code AgentExecutionRepository.sumByDayBetween} 의 질의와
+     * {@code UsageBreakdownAdminController.HOUSEHOLD_ZONE} 도 갖는다. 그 질의는 표준시와의 차이 9시간을
+     * 식에 직접 적어 날짜를 뽑는다. 가족이 사는 곳이 바뀌면 세 자리를 함께 고친다.
      */
-    static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RootExecutionQuery rootExecutions;
     private final CurrentUserProvider currentUser;

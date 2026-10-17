@@ -29,6 +29,7 @@ while IFS= read -r path; do
     backend/src/main/java/com/bifos/assistant/shared/auth/* | \
     backend/src/main/java/com/bifos/assistant/shared/config/SecurityConfig.java | \
     backend/src/main/java/com/bifos/assistant/mcp/* | \
+    backend/src/main/java/com/bifos/assistant/admin/mcp/* | \
     backend/src/main/java/com/bifos/assistant/people/application/SignInPolicy.java | \
     web/src/auth.ts | \
     web/src/lib/control-plane.ts | \

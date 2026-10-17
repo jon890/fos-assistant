@@ -1,5 +1,6 @@
 package com.bifos.assistant.workspace.presentation;
 
+import com.bifos.assistant.admin.workspace.presentation.WorkspaceAdminController;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.not;

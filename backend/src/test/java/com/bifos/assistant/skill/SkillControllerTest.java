@@ -31,7 +31,7 @@ import com.bifos.assistant.skill.application.SkillList;
 import com.bifos.assistant.skill.application.SkillListItem;
 import com.bifos.assistant.skill.application.SkillService;
 import com.bifos.assistant.skill.application.SkillSource;
-import com.bifos.assistant.skill.presentation.SkillAdminController;
+import com.bifos.assistant.admin.skill.presentation.SkillAdminController;
 import com.bifos.assistant.skill.presentation.SkillController;
 import java.time.Instant;
 import java.util.List;

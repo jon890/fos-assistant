@@ -69,27 +69,24 @@ phase 02 가 만든 클래스는 다음처럼 옮긴다.
 
 ### 3. 기준 파일
 
-- 줄어든다: `REQUIRE_ADMIN_ONLY_IN_ADMIN` 은 0이 되어 기준 파일 항목이 비면 지운다.
-- **더한다(이 목록만)**: `ADMIN_USES_ONLY_FEATURE_APPLICATION` 13줄이다. 모두 끝까지 남는다. 코드 대조로 확인한 줄이고, phase 02 가 만든 `*AdminDtos` 의 변환 메서드가 쓰는 타입(아래 표의 `*AdminDtos` 줄)은 phase 02 PR 이 실제 모양을 확정한 뒤 이 표를 고친다.
+- 줄어든다: `REQUIRE_ADMIN_ONLY_IN_ADMIN` 은 `AgentMemorySettingController` 두 줄만 남는다(memory 몫의 이동 PR 이 지운다). `APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT` 의 `agent.admin.application.model` 한 줄이 사라진다.
+- **더한다(이 목록만)**: `ADMIN_USES_ONLY_FEATURE_APPLICATION` 25줄이다. 모두 끝까지 남는다. 처음 표(13줄)는 phase 02 가 `*AdminDtos` 의 모양을 확정하기 전의 추정이었고, 실제로는 변환 메서드가 쓰는 domain 값이 더 있었다.
 - 옛 이름 `application.model` 과 `application.toolset` 의 타입을 쓰는 줄은 규칙이 허용하므로 없다. 기능이 옮겨지면 새 이름이 되어 그대로 허용이다.
 
 | `admin` 클래스 | 쓰는 것 | 있는 곳 |
 | --- | --- | --- |
-| `AgentAdminService` | `AgentRepository` | `agent.infra` |
-| `AgentAdminService` | `AppUserRepository` | `user.infra` |
-| `AgentAdminService` | `Agent` | `agent.domain` |
+| `AgentAdminService` | `AgentRepository`, `Agent` | `agent.infra`, `agent.domain` |
+| `AgentAdminService` | `AppUserRepository`, `AppUser` | `user.infra`, `user.domain` |
 | `AgentAdminDtos` | `Agent` | `agent.domain` |
-| `PeopleAdminController` | `AllowedPerson` | `people.domain` |
+| `AgentTokenAdminDtos` | `AgentToken`(두 줄) | `mcp.domain` |
+| `ModelAdminDtos` | `ModelChoice`(두 줄) | `model.domain` |
+| `ModelAdminDtos` | `HermesModelCatalog`, `ReasoningCapability` | `hermes.dto` |
 | `PeopleAdminDtos` | `AllowedPerson` | `people.domain` |
-| `AgentTokenAdminDtos` | `AgentToken` | `mcp.domain` |
-| `ModelAdminDtos` | `ModelChoice` | `model.domain` |
-| `UsageBreakdownAdminDtos` | `CostByAgent` | `usage.domain`(옮긴 뒤 `usage.execution.domain`) |
-| `UsageBreakdownAdminDtos` | `CostByDay` | 위와 같다 |
-| `UsageBreakdownAdminDtos` | `CostByFingerprint` | 위와 같다 |
-| `UsageBreakdownAdminDtos` | `CostByModel` | 위와 같다 |
-| `ProactiveAdminDtos` | `ProactiveCheck` | `proactive.domain`(옮긴 뒤 `proactive.check.domain`) |
+| `ProactiveAdminDtos` | `ProactiveCheck`, `ValueEvaluation`, `AutonomyDecision`, `CandidateJudgement`, `DecisionCandidate`, `DecisionEvidence`, `DecisionResult`, `DecisionState` | `proactive.domain`(옮긴 뒤 `proactive.check.domain` 등) |
+| `ToolsetAdminDtos` | `AgentToolPolicy` | `agent.domain` |
+| `UsageBreakdownAdminDtos` | `CostByAgent`, `CostByDay`, `CostByFingerprint`, `CostByModel` | `usage.domain`(옮긴 뒤 `usage.execution.domain`) |
 
-PR 5-1 이 `AgentAdminService` 가 `AgentConnectorBindings`(`agent.application.port`)를 쓰는 한 줄을 더한다. port 는 `application` 이 아니기 때문이다. 합쳐 14줄이 이동이 끝난 뒤에도 남는다.
+PR 5-1 이 `AgentAdminService` 가 `AgentConnectorBindings`(`agent.application.port`)를 쓰는 한 줄을 더한다. port 는 `application` 이 아니기 때문이다.
 
 ### 4. 이 phase 를 검증하는 테스트
 

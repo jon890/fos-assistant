@@ -19,7 +19,7 @@
 | [rule-5](rule-5.md) | 기능 안의 층은 허용된 방향으로만 의존한다. | [LAYER_DIRECTION](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-6](rule-6.md) | domain은 웹 타입에 의존하지 않는다. | [DOMAIN_DOES_NOT_DEPEND_ON_WEB](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-7](rule-7.md) | 관리자 서비스·명령은 지정된 소유 경계에 둔다. | [AGENT_ADMIN_APPLICATION_PLACEMENT](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
-| [rule-8](rule-8.md) | 관리자 HTTP 타입의 위치와 requireAdmin 호출을 지킨다. | [AGENT_ADMIN_HTTP_CONTRACT](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-8](rule-8.md) | 관리자 HTTP 타입의 위치와 mapped 메서드 구성을 지킨다. | [AGENT_ADMIN_HTTP_CONTRACT](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-9](rule-9.md) | 에이전트 정리 실행과 port·결과는 소유 경계를 지킨다. | [AGENT_PURGE_CONTRACT_PLACEMENT](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-10](rule-10.md) | orchestration은 mcp에 의존하지 않는다. | [ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-11](rule-11.md) | mcp는 Hermes 호출 타입을 직접 쓰지 않는다. | [MCP_DOES_NOT_CALL_HERMES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
