@@ -7,11 +7,15 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 에이전트가 주문 상한을 읽고 바꾸는 MCP 도구다(ADR-20261015 / financial-user-limits).
  *
  * <p>올리기는 승인 카드만 만들고 반영하지 않는다. 살펴보기 트리에서는 부르지 못한다.
+ *
+ * <p>결과는 다른 도구처럼 {@code content} 의 글 하나로 감싼다. Hermes 는 MCP {@code CallToolResult} 모양이 아닌 결과를 검증 오류로
+ * 버리므로 값 객체를 그대로 내면 모델은 도구 실패만 받는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,16 +27,18 @@ public class McpFinancialLimitTools {
         "daily_amount_usd");
     /** 0 이상, 소수 6자리까지의 십진 글이다. */
     public static final String DECIMAL = "^[0-9]{1,14}(\\.[0-9]{1,6})?$";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     private final FinancialLimitRequests requests;
 
 
     public Map<String, Object> read(McpCaller caller) {
-        return requests.read(caller.user());
+        return McpToolService.result(JSON.writeValueAsString(requests.read(caller.user())), false);
     }
 
 
     public Map<String, Object> change(McpCaller caller, String name, String value) {
-        return requests.change(caller.user(), caller.originExecution().id(), name, value);
+        return McpToolService.result(JSON.writeValueAsString(requests.change(caller.user(), caller.originExecution().id(), name, value)),
+            false);
     }
 
 

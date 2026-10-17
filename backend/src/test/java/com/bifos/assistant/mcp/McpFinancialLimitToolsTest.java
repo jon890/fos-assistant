@@ -115,11 +115,29 @@ class McpFinancialLimitToolsTest {
 
 
     @Test
-    @DisplayName("대화의 실행이 부른 낮추기는 바로 반영된다")
+    @DisplayName("읽기 결과는 CallToolResult 모양이고 글 하나에 상한과 오늘 남은 한도를 JSON 으로 싣는다")
+    void readReturnsCallToolResult() throws Exception {
+        JsonNode result = call("order_limit_read", json.createObjectNode());
+        McpToolResultShape.assertCallToolResult("order_limit_read", result);
+        assertThat(result.path("isError").asBoolean()).as("결과: %s", result).isFalse();
+        assertThat(result.path("content").size()).isEqualTo(1);
+        JsonNode body = json.readTree(result.path("content").get(0).path("text").asString());
+        assertThat(body.path("available").isBoolean()).as("본문: %s", body).isTrue();
+        var names = StreamSupport.stream(body.path("limits").spliterator(), false).map(item -> item.path("name").asString()).toList();
+        assertThat(names).containsExactlyInAnyOrder("order_amount_krw", "order_amount_usd", "order_quantity", "daily_amount_krw",
+            "daily_amount_usd");
+        assertThat(body.path("remainingToday").isObject()).as("본문: %s", body).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("대화의 실행이 부른 낮추기는 바로 반영되고 결과는 CallToolResult 모양이다")
     void conversationRunLowersLimit() throws Exception {
         JsonNode result = call("order_limit_change", json.createObjectNode().put("name", "order_amount_usd").put("value", "300"));
+        McpToolResultShape.assertCallToolResult("order_limit_change", result);
         assertThat(result.path("isError").asBoolean()).as("결과: %s", result).isFalse();
-        assertThat(result.toString()).contains("applied");
+        JsonNode body = json.readTree(result.path("content").get(0).path("text").asString());
+        assertThat(body.path("status").asString()).as("본문: %s", body).isEqualTo("applied");
         assertThat(jdbc.queryForObject("select limit_order_amount_usd from app_user where id = ?", BigDecimal.class,
             owner.id())).isEqualByComparingTo("300");
     }
@@ -134,8 +152,10 @@ class McpFinancialLimitToolsTest {
         ProactiveCheck saved = checks.save(check);
         try {
             JsonNode change = call("order_limit_change", json.createObjectNode().put("name", "order_amount_usd").put("value", "300"));
+            McpToolResultShape.assertCallToolResult("order_limit_change", change);
             assertThat(change.path("isError").asBoolean()).as("결과: %s", change).isTrue();
             JsonNode read = call("order_limit_read", json.createObjectNode());
+            McpToolResultShape.assertCallToolResult("order_limit_read", read);
             assertThat(read.path("isError").asBoolean()).as("결과: %s", read).isTrue();
             assertThat(jdbc.queryForObject("select limit_updated_at from app_user where id = ?", Instant.class, owner.id())).isNull();
         } finally {

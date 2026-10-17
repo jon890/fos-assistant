@@ -9,18 +9,22 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
+import com.bifos.assistant.connector.approval.application.dto.FinancialPrepareStage;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.node.ObjectNode;
 
 /** 테스트의 호출부만 실제 내부 업무 규칙에 연결한다. 공개 진입점은 {@link FinancialOrderOpeningTest} 가 본다. */
 class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
@@ -79,7 +83,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
         long count = actions.count();
         long snapshots = contents.count();
         doReturn(CallResult.failure(ConnectorCallError.UNAVAILABLE)).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
-        assertThatThrownBy(this::request).isInstanceOf(RuntimeException.class);
+        assertRejectedAt(FinancialPrepareStage.PREPARE_HTTP);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(contents.count()).isEqualTo(snapshots);
         assertThat(counters().path("financial").intValue()).isZero();
@@ -102,7 +106,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     void missingDigestKeyRejectsBeforePrepare() {
         long count = actions.count();
         OverridableLiveProperties.during(gate, financial(false, owned("7"), "1000000"));
-        assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        assertRejectedAt(FinancialPrepareStage.GATE);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("prepare").intValue()).isZero();
         assertThat(counters().path("financial").intValue()).isZero();
@@ -114,7 +118,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     void accountOutsideAllowListRejectsBeforePrepare() {
         long count = actions.count();
         OverridableLiveProperties.during(gate, financial(true, owned("9"), "1000000"));
-        assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        assertRejectedAt(FinancialPrepareStage.ACCOUNTS);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("prepare").intValue()).isZero();
     }
@@ -175,7 +179,8 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
             return prepared;
         }).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
         long count = actions.count();
-        assertThatThrownBy(this::request).isInstanceOf(RuntimeException.class);
+        // 바인딩이 READY 가 아니게 되면 Hermes 의 지원 확인도 verified 가 아니어서 준비 뒤 다시 확인에서 걸린다.
+        assertRejectedAt(FinancialPrepareStage.GUARD_STATE);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("financial").intValue()).isZero();
     }
@@ -186,6 +191,12 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
     @ValueSource(strings = {"cipher-disabled", "user-not-allowed", "read-only-check", "agent-disabled", "agent-owner",
         "connection-owner", "undeclared-tool"})
     void rejectsBeforePreparationWhenAuthorityOrDeclarationDiffers(String change) {
+        FinancialPrepareStage expected = switch (change) {
+            case "cipher-disabled" -> FinancialPrepareStage.CIPHER;
+            case "read-only-check" -> FinancialPrepareStage.CHECK;
+            case "undeclared-tool" -> FinancialPrepareStage.MANIFEST;
+            default -> FinancialPrepareStage.OWNER;
+        };
         long count = actions.count();
         long snapshots = contents.count();
         String toolName = "create_order";
@@ -204,7 +215,8 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
             }
             String name = toolName;
             assertThatThrownBy(() -> producer.request(profile, session, session, UUID.randomUUID().toString(),
-                "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class);
+                "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class)
+                    .isInstanceOfSatisfying(FinancialPrepareRejected.class, rejected -> assertThat(rejected.stage()).isEqualTo(expected));
         } finally {
             ReflectionTestUtils.setField(producer, "cipher", original);
             // 다른 테스트가 RUNNING 살펴보기 줄을 보지 않도록 지운다.
@@ -220,5 +232,77 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
         assertThat(contents.count()).isEqualTo(snapshots);
         assertThat(counters().path("prepare").intValue()).isZero();
         assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @DisplayName("Hermes 의 커넥터 상태나 지원 확인이 맞지 않으면 준비 HTTP 전에 그 검사의 단계 코드로 거절한다")
+    @ValueSource(strings = {"not-configured", "no-policy-hook", "guard-pending", "guard-revision", "guard-connection", "guard-manifest"})
+    void rejectsSupportMismatchWithStage(String change) {
+        long count = actions.count();
+        FinancialPrepareStage expected = switch (change) {
+            case "not-configured", "no-policy-hook" -> FinancialPrepareStage.CONNECTOR_STATE;
+            case "guard-pending" -> FinancialPrepareStage.GUARD_STATE;
+            case "guard-revision", "guard-connection" -> FinancialPrepareStage.GUARD_REVISION;
+            default -> FinancialPrepareStage.GUARD_MANIFEST;
+        };
+        stateWith(state -> switch (change) {
+            case "not-configured" -> new ConnectorState(state.profile(), state.enabled(), false, state.restartRequired(),
+                state.policyHook(), state.mode(), state.executionGuard());
+            case "no-policy-hook" -> new ConnectorState(state.profile(), state.enabled(), state.configured(), state.restartRequired(),
+                false, state.mode(), state.executionGuard());
+            case "guard-pending" -> guard(state, "state", "pending");
+            case "guard-revision" -> guard(state, "connectionUpdatedAt", connectionRevision.plusSeconds(1).toString());
+            case "guard-connection" -> guard(state, "connectionId", Long.toString(connectionId + 1));
+            default -> guard(state, "manifestSha256", "0".repeat(64));
+        });
+        assertRejectedAt(expected);
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(counters().path("prepare").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("준비 결과가 v, executionArgs, summary 셋이 아니면 prepare_shape 로 거절하고 아무것도 저장하지 않는다")
+    void rejectsPreparedResultShapeWithStage() {
+        long count = actions.count();
+        doAnswer(invocation -> {
+            var prepared = client.prepare(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2),
+                invocation.getArgument(3));
+            return CallResult.success(((ObjectNode)prepared.result()).put("extra", true));
+        }).when(hermes).prepare(anyString(), anyString(), anyString(), anyString());
+        assertRejectedAt(FinancialPrepareStage.PREPARE_SHAPE);
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("단계 코드는 소문자 낱말이고 계좌, 메일, 인자 값을 담지 않는다")
+    void stageCodesAreFixedWords() {
+        for (FinancialPrepareStage stage : FinancialPrepareStage.values()) {
+            assertThat(stage.code()).matches("[a-z_]+");
+        }
+        assertThat(new FinancialPrepareRejected(FinancialPrepareStage.ACCOUNTS).getMessage()).isEqualTo(ConnectorFinancialProducer.rejected().getMessage());
+    }
+
+
+    private void assertRejectedAt(FinancialPrepareStage stage) {
+        assertThatThrownBy(this::request).isInstanceOfSatisfying(FinancialPrepareRejected.class,
+            rejected -> assertThat(rejected.stage()).isEqualTo(stage));
+    }
+
+
+    /** 실제 plugin 이 답한 커넥터 상태를 바꿔 돌려준다. */
+    private void stateWith(UnaryOperator<ConnectorState> change) {
+        doAnswer(invocation -> change.apply(client.readConnector(invocation.getArgument(0), invocation.getArgument(1))))
+            .when(hermes).readConnector(anyString(), anyString());
+    }
+
+
+    private static ConnectorState guard(ConnectorState state, String field, String value) {
+        ObjectNode node = ((ObjectNode)state.executionGuard()).deepCopy().put(field, value);
+        return new ConnectorState(state.profile(), state.enabled(), state.configured(), state.restartRequired(), state.policyHook(),
+            state.mode(), node);
     }
 }

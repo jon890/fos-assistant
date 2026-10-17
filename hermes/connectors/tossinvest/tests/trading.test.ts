@@ -617,6 +617,69 @@ for (const [label, region, args] of [
   });
 }
 
+test("운영 서버의 prepare_trade 스키마는 주문 인자의 글 금액을 싣고 계좌 칸을 두지 않는다", async () => {
+  const { fake, env } = setup("US");
+  try {
+    await withMcp(
+      createTossinvestServer({ apiBase: fake.url, env: { ...env } }),
+      async (client) => {
+        const listed = (await client.listTools()).tools.find(
+          (item) => item.name === "prepare_trade",
+        )!;
+        const options = (listed.inputSchema.properties as any).args.anyOf;
+        const create = options.find((item: any) => "symbol" in item.properties);
+        expect(create.additionalProperties).toBe(false);
+        expect(create.properties.orderAmount.type).toBe("string");
+        expect(create.properties.quantity.type).toBe("string");
+        expect(create.required).toEqual(["symbol", "side", "orderType"]);
+        for (const item of options)
+          expect(Object.keys(item.properties)).not.toContain("account_seq");
+      },
+    );
+    expect(fake.requests).toHaveLength(0);
+  } finally {
+    fake.stop();
+  }
+});
+
+for (const [label, args] of [
+  ["금액을 숫자로", { orderAmount: 25 }],
+  ["계좌를 글로", { orderAmount: "25", account_seq: account }],
+  ["계좌를 숫자로", { orderAmount: "25", account_seq: 7 }],
+] as const) {
+  test(`prepare_trade는 ${label} 넣은 주문을 거절하고 토스 HTTP 0회다`, async () => {
+    const { fake, env } = setup("US");
+    try {
+      await withMcp(
+        createTossinvestServer({ apiBase: fake.url, env: { ...env } }),
+        async (client) => {
+          const response = await client.callTool({
+            name: "prepare_trade",
+            arguments: {
+              v: 1,
+              tool: "create_order",
+              args: {
+                symbol: "ABC",
+                side: "BUY",
+                orderType: "MARKET",
+                ...args,
+              },
+            },
+          });
+          expect(response.isError).toBe(true);
+          // 대시보드는 이 접두어로 SDK 입력 검증 거절을 가려 로그에 고정 코드만 남긴다.
+          expect((response.content as any)[0].text).toStartWith(
+            "MCP error -32602:",
+          );
+        },
+      );
+      expect(fake.requests).toHaveLength(0);
+    } finally {
+      fake.stop();
+    }
+  });
+}
+
 test("운영 서버의 prepare_trade는 정정을 받지 않고 HTTP 0회다", async () => {
   const { fake, env } = setup("US");
   try {
