@@ -6,7 +6,7 @@ import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
+import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;

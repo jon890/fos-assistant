@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.agent.purge.application.AgentPurgeParticipant;
+import com.bifos.assistant.agent.application.port.AgentPurgeParticipant;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import lombok.RequiredArgsConstructor;

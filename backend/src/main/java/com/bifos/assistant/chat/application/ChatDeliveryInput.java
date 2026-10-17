@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.AutoTurnResult;

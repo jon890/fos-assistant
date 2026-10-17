@@ -17,7 +17,7 @@ import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.model.CapturedMemory;
+import com.bifos.assistant.memory.application.dto.CapturedMemory;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;

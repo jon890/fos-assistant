@@ -1,9 +1,9 @@
 package com.bifos.assistant.admin.memory.presentation;
 
-import com.bifos.assistant.memory.application.model.AgentMemoryGrantInput;
-import com.bifos.assistant.memory.application.model.AgentMemorySetting;
-import com.bifos.assistant.memory.application.model.AgentMemorySettingChange;
-import com.bifos.assistant.memory.application.model.AgentMemorySettingCollection;
+import com.bifos.assistant.memory.application.dto.AgentMemoryGrantInput;
+import com.bifos.assistant.memory.application.dto.AgentMemorySetting;
+import com.bifos.assistant.memory.application.dto.AgentMemorySettingChange;
+import com.bifos.assistant.memory.application.dto.AgentMemorySettingCollection;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

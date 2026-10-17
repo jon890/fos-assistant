@@ -5,7 +5,7 @@ import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpMemoryLink;
 import com.bifos.assistant.memory.application.MemoryLinkService;
-import com.bifos.assistant.memory.application.model.MemorySearchCursor;
+import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Optional;

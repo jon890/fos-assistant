@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.embedding.EmbeddingText;
-import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
-import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
+import com.bifos.assistant.memory.application.EmbeddingText;
+import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.application.MemoryVectorCache;
+import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;

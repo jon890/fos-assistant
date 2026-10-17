@@ -14,7 +14,7 @@ import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
-import com.bifos.assistant.memory.application.model.CapturedMemory;
+import com.bifos.assistant.memory.application.dto.CapturedMemory;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;

@@ -2,7 +2,7 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.application.dto.AgentPurgeOutcome;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;

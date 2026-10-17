@@ -19,7 +19,7 @@ import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.model.MemorySearchCursor;
+import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;

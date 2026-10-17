@@ -7,10 +7,10 @@ import static org.mockito.Mockito.mockingDetails;
 
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.application.model.MemoryRememberOutcome;
-import com.bifos.assistant.memory.application.model.MemoryRememberRequest;
-import com.bifos.assistant.memory.application.model.MemoryRememberResult;
+import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemoryRememberOutcome;
+import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
+import com.bifos.assistant.memory.application.dto.MemoryRememberResult;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;

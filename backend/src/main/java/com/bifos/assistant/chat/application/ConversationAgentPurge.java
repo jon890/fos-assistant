@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.agent.purge.application.AgentPurgeParticipant;
+import com.bifos.assistant.agent.application.port.AgentPurgeParticipant;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

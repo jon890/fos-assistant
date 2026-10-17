@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.application;
 
+import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

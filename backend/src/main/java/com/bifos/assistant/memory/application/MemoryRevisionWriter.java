@@ -1,6 +1,5 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;

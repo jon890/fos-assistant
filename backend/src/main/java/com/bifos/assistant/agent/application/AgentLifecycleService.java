@@ -1,5 +1,10 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorDetacher;
+import com.bifos.assistant.agent.application.port.ProfileProvisioning;
+import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
+import com.bifos.assistant.agent.application.port.ReservedProfileNames;
 import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.domain.Agent;

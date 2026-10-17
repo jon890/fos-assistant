@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.presentation;
 
-import com.bifos.assistant.agent.application.PersonaSnapshot;
-import com.bifos.assistant.agent.application.model.AgentToolView;
-import com.bifos.assistant.agent.application.model.ToolsetRequestView;
+import com.bifos.assistant.agent.application.dto.PersonaSnapshot;
+import com.bifos.assistant.agent.application.dto.AgentToolView;
+import com.bifos.assistant.agent.application.dto.ToolsetRequestView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import jakarta.validation.constraints.NotBlank;

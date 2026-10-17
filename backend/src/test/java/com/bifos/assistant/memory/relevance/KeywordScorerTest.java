@@ -3,11 +3,11 @@ package com.bifos.assistant.memory.relevance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.memory.application.relevance.KeywordScore;
-import com.bifos.assistant.memory.application.relevance.KeywordScorer;
-import com.bifos.assistant.memory.application.relevance.KoreanBigramTokenizer;
-import com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties;
-import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
+import com.bifos.assistant.memory.application.dto.KeywordScore;
+import com.bifos.assistant.memory.application.KeywordScorer;
+import com.bifos.assistant.memory.application.KoreanBigramTokenizer;
+import com.bifos.assistant.memory.config.MemoryRelevanceProperties;
+import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

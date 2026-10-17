@@ -3,10 +3,10 @@ package com.bifos.assistant.memory.embedding;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.memory.application.embedding.EmbeddingRejectedException;
-import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
-import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.application.embedding.OpenAiCompatibleEmbeddingClient;
+import com.bifos.assistant.memory.application.port.EmbeddingRejectedException;
+import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
+import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.OpenAiCompatibleEmbeddingClient;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;

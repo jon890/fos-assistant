@@ -1,8 +1,8 @@
 package com.bifos.assistant.admin.toolset.presentation;
 
-import com.bifos.assistant.agent.application.model.AgentToolView;
-import com.bifos.assistant.agent.application.model.ToolsetCatalogView;
-import com.bifos.assistant.agent.application.model.ToolsetRequestView;
+import com.bifos.assistant.agent.application.dto.AgentToolView;
+import com.bifos.assistant.agent.application.dto.ToolsetCatalogView;
+import com.bifos.assistant.agent.application.dto.ToolsetRequestView;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

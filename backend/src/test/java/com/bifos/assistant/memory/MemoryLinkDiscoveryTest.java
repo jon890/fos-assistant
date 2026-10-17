@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.application.embedding.EmbeddingText;
-import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.application.EmbeddingText;
+import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;

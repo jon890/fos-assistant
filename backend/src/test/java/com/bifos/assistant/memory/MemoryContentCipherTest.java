@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryContentCipher;
-import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
+import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;

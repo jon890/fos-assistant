@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.admin.agent.application.AgentAdminService;
 import com.bifos.assistant.admin.agent.application.dto.AgentCreateCommand;
 import com.bifos.assistant.admin.agent.application.dto.AgentUpdateCommand;
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.domain.Agent;

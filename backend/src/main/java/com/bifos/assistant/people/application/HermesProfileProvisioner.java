@@ -1,6 +1,6 @@
 package com.bifos.assistant.people.application;
 
-import com.bifos.assistant.agent.application.ProfileProvisioning;
+import com.bifos.assistant.agent.application.port.ProfileProvisioning;
 import com.bifos.assistant.hermes.application.port.HermesDashboardClient;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
 import com.bifos.assistant.mcp.application.AgentTokenService;

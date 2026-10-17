@@ -1,6 +1,6 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.infra.AgentRepository;

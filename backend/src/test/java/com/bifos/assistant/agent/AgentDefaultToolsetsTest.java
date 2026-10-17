@@ -11,9 +11,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
-import com.bifos.assistant.agent.application.ProfileSkillFiles;
-import com.bifos.assistant.agent.application.toolset.AgentDefaultToolsets;
+import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
+import com.bifos.assistant.agent.application.AgentDefaultToolsets;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
