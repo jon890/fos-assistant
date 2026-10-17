@@ -4,7 +4,4 @@ com.bifos.assistant.chat.application.StarterProperties 는 @ConfigurationPropert
 com.bifos.assistant.chat.infra.ArtifactProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.infra.ArtifactSourceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.infra.AttachmentProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorBindingProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.connector.application.ConnectorFinancialProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorPolicyProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. connector.<하위 기능>.config 로 옮긴다.
