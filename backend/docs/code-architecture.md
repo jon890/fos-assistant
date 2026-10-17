@@ -51,7 +51,6 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 
 ## 패키지 배치 규칙
 
-**이동 진행 중이다.** 아래는 목표 구조다. 아직 옮기지 않은 기능은 옛 구조로 남아 있고, 규칙은 그 위반을 기준 파일에 얼려 두었다. 클래스를 옮길 때마다 기준 파일의 줄이 줄고, 이동이 끝나면 이 알림을 지운다.
 결정과 근거는 [ADR-20261015 / package-layout](adr/ADR-20261015-package-layout.md) 이 갖는다.
 
 기능 패키지는 `<기능>[.<하위 기능>].<역할>` 로 나눈다. 하위 기능은 이동 전 `application` 직하가 30개 이상인 기능(`chat`, `connector`, `proactive`, `usage`, `skill`)만 둔다.
