@@ -115,6 +115,19 @@ class MemoryLinkDiscoveryTest {
 
 
     @Test
+    @DisplayName("사람이 관련으로 이은 쌍은 값이 달라도 대체 제안을 만들지 않는다")
+    void doesNotProposeSupersedeForHumanRelatedPair() {
+        Memory first = embedded(ADMIN, MemoryScope.USER, "제주 여행 1일차", "1일차는 성산에 간다", PARKING);
+        Memory second = embedded(ADMIN, MemoryScope.USER, "제주 여행 2일차", "2일차는 애월에 간다", PARKING);
+        links.save(MemoryLink.related(first.id(), second.id(), "같은 여행", MemoryLinkOrigin.HUMAN, null, null));
+
+        discovery.discover(List.of(second.id()));
+
+        assertThat(links.findAll()).extracting(MemoryLink::type).containsExactly(MemoryLinkType.RELATED);
+    }
+
+
+    @Test
     @DisplayName("서로 가장 가까운 같은 범위의 항목은 바로 효력 있는 RELATED 로 잇고 끊은 쌍은 다시 잇지 않는다")
     void relatesMutualNeighbors() {
         Memory trip = embedded(ADMIN, MemoryScope.USER, "여름 여행", "제주에 간다", TRIP);

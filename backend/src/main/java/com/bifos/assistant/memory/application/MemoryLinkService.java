@@ -99,8 +99,8 @@ public class MemoryLinkService {
 
 
     /**
-     * 코드가 임베딩으로 찾은 대체 제안을 만든다(ADR-20261015 / memory-link). 같은 쌍에 어느 방향, 어느 상태든 대체 줄이 이미 있으면 만들지
-     * 않는다. 사람이 거절한 쌍을 다시 묻지 않기 위해서다.
+     * 코드가 임베딩으로 찾은 대체 제안을 만든다(ADR-20261015 / memory-link). 같은 쌍에 어느 방향, 어느 상태든 대체 줄이나 관련 줄이 이미 있으면
+     * 만들지 않는다. 사람이 거절한 쌍을 다시 묻지 않고, 사람이 「같은 여행」 처럼 관련으로 이은 쌍을 대체로 묻지 않기 위해서다.
      *
      * @return 만든 줄. 만들지 않았으면 비어 있다
      */
@@ -108,7 +108,9 @@ public class MemoryLinkService {
     public Optional<MemoryLink> proposeAutoSupersede(Long newId, Long oldId, double score) {
         if (!systemLinkable(newId, oldId)
             || links.findByFromMemoryIdAndToMemoryIdAndType(newId, oldId, MemoryLinkType.SUPERSEDES).isPresent()
-            || links.findByFromMemoryIdAndToMemoryIdAndType(oldId, newId, MemoryLinkType.SUPERSEDES).isPresent()) {
+            || links.findByFromMemoryIdAndToMemoryIdAndType(oldId, newId, MemoryLinkType.SUPERSEDES).isPresent()
+            || links.findByFromMemoryIdAndToMemoryIdAndType(Math.min(newId, oldId), Math.max(newId, oldId), MemoryLinkType.RELATED)
+                .isPresent()) {
             return Optional.empty();
         }
         MemoryLink created = links.saveAndFlush(MemoryLink.autoSupersede(newId, oldId, score));
