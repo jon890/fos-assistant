@@ -512,7 +512,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 기준 파일 게이트는 이 모드에만 건다 |
 | `linksOff` | `factsOn` 과 같은 조립에 대체 연결만 넣지 않는다. 연결이 옛 사실의 노출을 얼마나 줄였는지 견주는 기준선이다 |
 
-`linksOff` 를 뺀 모든 모드는 사례의 `supersedes` 마다 사람이 받아들인 대체 연결을 넣고 조립한다. 대체된 항목은 에이전트가 볼 수 없는 항목이라 `fullInjection` 에도 실리지 않는다.
+`linksOff` 를 뺀 모든 모드는 사례의 `supersedes` 마다 사람이 받아들인 대체 연결을, `related` 마다 효력 있는 관련 연결을 넣고 조립한다. 대체된 항목은 에이전트가 볼 수 없는 항목이라 `fullInjection` 에도 실리지 않는다.
 | `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
 
 #### 사례 묶음
@@ -552,12 +552,13 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 `MEMORY_SEARCH` 항목을 앞에 세는 것은 그 구역만 관련도 순으로 고른 본문이라서다. 개인 사실 구역은 최근 순으로 고르므로, 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5위 밖에 놓인다.
 임베딩을 켠 조립은 CI 에서 재지 않는다. 임베딩 서비스를 띄운 개발 머신에서 `./gradlew memoryEmbeddingEval` 이 같은 사례 묶음으로 `hybrid` 모드를 재고 `factsOn` 과 나란히 보고서만 남긴다(`MEMORY_EMBEDDING_BASE_URL` 이 없으면 건너뛰고, `MEMORY_EMBEDDING_MODEL` 이 없으면 운영 기본 모델 이름을 쓴다). 질문 임베딩 지연의 p50 과 p95 도 쓴다. 모델 후보를 견주고 `semantic-min-similarity` 를 정할 때 쓴다.
 
-**실패 조건은 넷이다.**
+**실패 조건은 다섯이다.**
 
 - 어느 모드에서든 권한 경계 노출이 0 이 아니다
 - `factsOn` 모드의 전체 recall@5 가 기준 파일보다 낮거나, 전체 오기억 노출률이 기준 파일보다 높다
 - `factsOn` 모드의 `RECALL_GAP` recall@5 가 `questionOff` 보다 높지 않다
 - `factsOn` 모드의 `KNOWLEDGE_UPDATE` 오기억 노출률이 `linksOff` 보다 낮지 않다
+- `factsOn` 모드의 `MULTI_SESSION` recall@5 가 `linksOff` 보다 높지 않다
 
 #### 기준 파일
 

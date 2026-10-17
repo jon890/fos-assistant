@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
   "users": [
     {
@@ -1809,6 +1809,84 @@
       },
       "expect": [
         "m1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-07",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "다음 달 가족 캠핑 준비 어떻게 하기로 했지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "가족 캠핑",
+          "content": "다음 달 가족 캠핑은 강원도 홍천 계곡으로 간다",
+          "updatedDaysAgo": 10,
+          "related": [
+            "m2"
+          ]
+        },
+        {
+          "key": "m2",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "텐트 대여",
+          "content": "텐트는 동네 대여점에서 빌리고 반납은 일요일 저녁이다",
+          "updatedDaysAgo": 9
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 6,
+        "contentChars": 300,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1",
+        "m2"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "MS-08",
+      "category": "MULTI_SESSION",
+      "asker": "parentA",
+      "agent": "general",
+      "question": "할머니 생신 모임 몇 시였지?",
+      "memories": [
+        {
+          "key": "m1",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "할머니 생신",
+          "content": "할머니 생신 모임은 토요일 점심 12시 한식당이다",
+          "updatedDaysAgo": 7,
+          "related": [
+            "m2"
+          ]
+        },
+        {
+          "key": "m2",
+          "scope": "GROUP",
+          "group": "home",
+          "title": "예약 담당",
+          "content": "예약은 큰고모가 맡았고 인원은 열두 명으로 잡았다",
+          "updatedDaysAgo": 6
+        }
+      ],
+      "filler": {
+        "owner": "parentA",
+        "count": 6,
+        "contentChars": 300,
+        "updatedDaysAgo": 60
+      },
+      "expect": [
+        "m1",
+        "m2"
       ],
       "forbidden": []
     }
