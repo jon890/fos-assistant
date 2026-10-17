@@ -2,11 +2,11 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
-import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.util.Sha256;

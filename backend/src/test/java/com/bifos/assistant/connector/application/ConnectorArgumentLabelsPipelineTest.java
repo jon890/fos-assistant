@@ -8,7 +8,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;

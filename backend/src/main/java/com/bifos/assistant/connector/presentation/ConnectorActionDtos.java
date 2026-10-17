@@ -8,7 +8,7 @@ import com.bifos.assistant.connector.application.model.FinancialActionSummary;
 import com.bifos.assistant.connector.application.model.FinancialLimitChangeSummary;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Map;

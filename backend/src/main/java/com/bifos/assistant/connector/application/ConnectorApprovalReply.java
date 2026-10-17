@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;

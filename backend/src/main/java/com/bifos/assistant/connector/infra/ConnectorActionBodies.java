@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.infra;
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionBodyOpener;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import java.time.Instant;

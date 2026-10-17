@@ -2,11 +2,11 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionGuardContract;
-import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ConnectorBinding;
-import com.bifos.assistant.connector.domain.HermesToolName;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.HermesToolName;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;

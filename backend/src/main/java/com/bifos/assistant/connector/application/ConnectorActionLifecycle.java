@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -7,10 +8,10 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
-import com.bifos.assistant.connector.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;

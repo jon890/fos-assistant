@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.infra;
 import com.bifos.assistant.connector.domain.ActionDelivery;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;

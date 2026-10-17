@@ -1,7 +1,7 @@
 package com.bifos.assistant.admin.connector.presentation;
 
-import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
-import com.bifos.assistant.connector.application.model.AgentConnectionView;
+import com.bifos.assistant.connector.connection.application.dto.AdminConnectionSnapshot;
+import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;

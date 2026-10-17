@@ -1,13 +1,15 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ActionDelivery;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.domain.ToolDetailRedactor;

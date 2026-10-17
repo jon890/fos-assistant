@@ -1,9 +1,9 @@
 package com.bifos.assistant.connector.application.execution;
 
-import com.bifos.assistant.connector.application.ConnectorManifests;
-import com.bifos.assistant.connector.domain.type.BindingStatus;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.connection.application.ConnectorManifests;
+import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;

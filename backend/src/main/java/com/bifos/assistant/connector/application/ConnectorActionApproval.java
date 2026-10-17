@@ -1,12 +1,13 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import static com.bifos.assistant.connector.application.ConnectorActionDetails.conversationGrantable;
 import static com.bifos.assistant.connector.application.ConnectorActionDetails.grantable;
 import static com.bifos.assistant.connector.application.ConnectorActionDetails.hiddenArgs;
 
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
@@ -14,11 +15,11 @@ import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;

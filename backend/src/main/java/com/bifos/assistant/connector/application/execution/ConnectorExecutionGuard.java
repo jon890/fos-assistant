@@ -1,11 +1,11 @@
 package com.bifos.assistant.connector.application.execution;
 
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
-import com.bifos.assistant.connector.application.ConnectorToolPolicies;
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionGuardContract;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionGuardContract.ScopeField;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import java.util.ArrayList;
 import java.util.HashSet;

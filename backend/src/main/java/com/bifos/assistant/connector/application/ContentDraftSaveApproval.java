@@ -1,5 +1,7 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
@@ -12,13 +14,13 @@ import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.connector.application.model.PreparedContentDraftApproval;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;

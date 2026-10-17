@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ConversationNotices;
 import com.bifos.assistant.chat.infra.ConversationRepository;
@@ -8,14 +9,14 @@ import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
-import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;

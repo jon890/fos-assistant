@@ -2,10 +2,10 @@ package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.connector.application.ConnectorToolPolicies;
-import com.bifos.assistant.connector.domain.ToolPolicy;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;

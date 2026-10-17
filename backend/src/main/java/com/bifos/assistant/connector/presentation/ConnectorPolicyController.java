@@ -2,7 +2,7 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.ConnectorPolicyRequest;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
-import com.bifos.assistant.connector.presentation.ConnectionDtos.ConnectorPolicyResponse;
+import com.bifos.assistant.connector.connection.presentation.ConnectionDtos.ConnectorPolicyResponse;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

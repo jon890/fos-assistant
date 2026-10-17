@@ -1,10 +1,11 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import java.util.Optional;
 
 /**

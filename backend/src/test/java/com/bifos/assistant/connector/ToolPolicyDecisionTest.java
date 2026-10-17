@@ -5,13 +5,13 @@ import static com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBound
 import static com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary.READ_ONLY;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.connector.domain.ToolPolicy;
+import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
-import com.bifos.assistant.connector.domain.type.ConnectionStatus;
-import com.bifos.assistant.connector.domain.type.ToolApproval;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
+import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;

@@ -7,7 +7,7 @@ import com.bifos.assistant.connector.application.FinancialLimitChanges;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ConversationGrantView;
