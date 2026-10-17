@@ -3,7 +3,7 @@ package com.bifos.assistant.chat.presentation.contentsnapshot;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftJobQueries;
 import com.bifos.assistant.chat.application.ContentDraftSnapshots;
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.model.ContentDraftJobView;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotView;
 import com.bifos.assistant.chat.domain.ContentDraftException;

@@ -10,7 +10,7 @@ import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.OwnConversations;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.proactive.loop.config.ProactiveLoopProperties;
 import com.bifos.assistant.proactive.surface.application.SurfacedProblems;
 import com.bifos.assistant.proactive.surface.application.dto.SurfacedProblem;

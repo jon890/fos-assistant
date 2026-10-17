@@ -2,10 +2,10 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
-import com.bifos.assistant.chat.application.ConversationWriter;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.conversation.application.ConversationWriter;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;

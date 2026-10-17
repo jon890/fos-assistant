@@ -1,6 +1,6 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;

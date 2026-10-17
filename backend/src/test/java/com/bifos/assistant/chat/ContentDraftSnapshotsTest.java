@@ -10,7 +10,7 @@ import java.lang.reflect.InvocationTargetException;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.ArrayNode;
 
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotView;
 import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import java.io.IOException;

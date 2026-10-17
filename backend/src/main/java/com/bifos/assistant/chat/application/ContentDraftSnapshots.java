@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.model.CanonicalDraft;
 import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;

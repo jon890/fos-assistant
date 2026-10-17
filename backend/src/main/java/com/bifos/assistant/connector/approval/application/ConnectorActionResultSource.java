@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.approval.application;
 
-import com.bifos.assistant.chat.application.AutoTurnResultSource;
-import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
+import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionResult;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.context.application.dto.ContextBodyMode;

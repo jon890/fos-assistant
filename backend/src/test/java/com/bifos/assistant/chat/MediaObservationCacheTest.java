@@ -8,7 +8,7 @@ import com.bifos.assistant.chat.application.model.MediaObservationInput.Coverage
 import com.bifos.assistant.chat.application.model.MediaObservationInput.Evidence;
 import com.bifos.assistant.chat.application.model.MediaObservationInput.Region;
 import com.bifos.assistant.chat.application.model.ObservationProvenance;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
 import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;

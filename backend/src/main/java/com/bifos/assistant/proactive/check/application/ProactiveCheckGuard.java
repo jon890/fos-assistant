@@ -1,8 +1,8 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.config.LiveProperties;

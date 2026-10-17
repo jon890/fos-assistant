@@ -9,11 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.application.ChatService;
-import com.bifos.assistant.chat.application.ConversationAccess;
-import com.bifos.assistant.chat.application.ModelTierService;
-import com.bifos.assistant.chat.application.SourceReadSummaries;
-import com.bifos.assistant.chat.application.SourceReadSummary;
-import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
+import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
+import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;

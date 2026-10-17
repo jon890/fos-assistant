@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import java.util.Map;
 import java.util.Locale;
 import java.util.List;

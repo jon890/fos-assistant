@@ -10,7 +10,7 @@ import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.ChatService;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.List;

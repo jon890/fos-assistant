@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.PendingMessageService;
 import com.bifos.assistant.chat.presentation.ChatDtos.PendingMessageRequest;
 import com.bifos.assistant.chat.presentation.ChatDtos.PendingQueueView;

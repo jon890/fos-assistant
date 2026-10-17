@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationEventHub;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

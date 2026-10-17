@@ -3,9 +3,9 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.type.ConversationPurpose;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;

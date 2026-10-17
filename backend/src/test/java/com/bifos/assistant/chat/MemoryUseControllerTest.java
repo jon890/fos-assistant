@@ -11,12 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ConversationAccess;
-import com.bifos.assistant.chat.application.MemoryUseService;
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.MemoryUseService;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.MemoryUseController;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.memory.application.MemoryService;

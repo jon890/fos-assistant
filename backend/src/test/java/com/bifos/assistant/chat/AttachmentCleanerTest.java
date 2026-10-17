@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.AttachmentService;
-import com.bifos.assistant.chat.application.ConversationWriter;
+import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import java.io.ByteArrayInputStream;

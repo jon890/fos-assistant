@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.chat.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
 import com.bifos.assistant.hermes.infra.DecisionProfileReadinessClient;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;

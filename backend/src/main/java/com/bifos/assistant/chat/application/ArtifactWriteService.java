@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactSourceFetcher;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.shared.auth.CurrentUser;

@@ -7,7 +7,7 @@ import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
 import com.bifos.assistant.chat.domain.entity.ContentDraftCreationRequest;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;

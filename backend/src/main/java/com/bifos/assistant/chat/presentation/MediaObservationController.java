@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.MediaObservationPages;
 import com.bifos.assistant.chat.application.MediaObservationService;

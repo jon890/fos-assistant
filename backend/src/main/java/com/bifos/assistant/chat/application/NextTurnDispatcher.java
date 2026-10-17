@@ -1,9 +1,9 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ChatPendingMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;

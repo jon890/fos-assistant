@@ -105,7 +105,7 @@ flowchart LR
 
 ### 실행 줄에 적는 session
 
-Hermes 에 보낼 session(`runtimeSessionId`)과 실행 줄에 적을 session(`correlationSessionId`)은 뜻이 다르다. 둘을 `chat.domain.RunSession` 하나로 넘긴다.
+Hermes 에 보낼 session(`runtimeSessionId`)과 실행 줄에 적을 session(`correlationSessionId`)은 뜻이 다르다. 둘을 `chat.conversation.domain.RunSession` 하나로 넘긴다.
 문자열 둘을 나란히 받으면 순서를 바꿔도 컴파일되기 때문이다.
 대화 turn 은 대화의 session 을 보내고 대화의 루트 session 을 적는다. 흐름의 하위 실행과 위임 자식은 `RunSession.fresh()` 로 새 session 을 정해 부모의 session 을 잇지 않는다.
 

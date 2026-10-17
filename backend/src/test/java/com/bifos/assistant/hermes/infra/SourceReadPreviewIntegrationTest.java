@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.chat.application.SourceReadSummaries;
-import com.bifos.assistant.chat.application.SourceReadSummary;
-import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
+import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.skill.usage.application.SkillUseRecorder;
 import com.bifos.assistant.usage.execution.application.ExecutionEventRecorder;

@@ -1,9 +1,9 @@
 package com.bifos.assistant.admin.model.presentation;
 
-import com.bifos.assistant.chat.application.AgentModelDefaultService;
-import com.bifos.assistant.chat.application.GroupModelTiers;
-import com.bifos.assistant.chat.application.ModelTierService;
-import com.bifos.assistant.chat.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.AgentModelDefaultService;
+import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelTiers;
+import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
 import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.AgentModelDefaultView;
 import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.AgentModelSettingsView;
 import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.ChooseModelRequest;

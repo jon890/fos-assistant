@@ -3,9 +3,9 @@ package com.bifos.assistant.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.memory.application.MemoryService;

@@ -1,8 +1,8 @@
 package com.bifos.assistant.admin.model.presentation;
 
-import com.bifos.assistant.chat.application.AgentModelSettings;
-import com.bifos.assistant.chat.application.HiddenModels;
-import com.bifos.assistant.chat.application.ModelOptions;
+import com.bifos.assistant.chat.modelchoice.application.dto.AgentModelSettings;
+import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
+import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.model.domain.ModelChoice;

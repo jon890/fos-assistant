@@ -2,14 +2,12 @@ com.bifos.assistant.browser.application.BrowserScreenSession 는 public 클래�
 com.bifos.assistant.browser.application.GatewayRewriter 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.ActivitySummary 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.AgentInput 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.AgentModelSettings 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.AgentPhoto 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.ArtifactFile 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.ArtifactWriteRequest 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.ArtifactWriteResult 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.AskFormat 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.AttachmentContent 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.AutoTurnResultSource 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
 com.bifos.assistant.chat.application.ChatEvent 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.ChatTurn 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.CheckReportReads 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
@@ -21,31 +19,18 @@ com.bifos.assistant.chat.application.ContentDraftSaveRequests 는 인터페이�
 com.bifos.assistant.chat.application.ContentDraftSnapshotHash 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.ContextSourceRefs 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.ConversationActionPurge 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.chat.application.ConversationCursor 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.ConversationPage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.ConversationTaskLabels 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
 com.bifos.assistant.chat.application.DelegationFinished 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.DelegationOutputClip 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.chat.application.GroupModelTiers 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.HiddenModels 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.InspectedImage 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.MediaObservationAnalysisKey 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.MediaPipelineEvents 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.chat.application.MemoryUse 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.ModelOptions 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.ModelTierOptions 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.MpoJpegNormalizer 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.PendingQueue 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.PendingTurn 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.RecoveredAnswerGuard 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.chat.application.ResolvedModelTier 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.Routed 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.RunningTurn 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.ScheduledTurnExecutions 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.
 com.bifos.assistant.chat.application.SkillCommand 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.SourceReadSummary 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.StarterStatus 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.chat.application.StarterSuggestions 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.TurnClosed 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.TurnHandle 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.TurnIntent 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 chat.<하위 기능>.application.port 로 옮긴다.

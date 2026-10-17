@@ -2,7 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import com.bifos.assistant.context.application.dto.ContextBodyMode;
 import com.bifos.assistant.context.application.dto.ContextFreshness;
 import com.bifos.assistant.context.application.dto.ContextItem;

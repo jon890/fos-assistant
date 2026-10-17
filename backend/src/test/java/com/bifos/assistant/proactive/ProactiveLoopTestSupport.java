@@ -11,7 +11,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.CheckConversations;
+import com.bifos.assistant.chat.conversation.application.CheckConversations;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill;

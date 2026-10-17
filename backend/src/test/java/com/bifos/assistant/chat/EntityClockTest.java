@@ -2,7 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;

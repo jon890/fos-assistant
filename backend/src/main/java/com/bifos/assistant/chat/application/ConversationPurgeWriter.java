@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
@@ -8,10 +8,10 @@ import com.bifos.assistant.chat.domain.entity.ContentDraftCreationRequest;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;

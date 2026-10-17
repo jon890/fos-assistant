@@ -2,8 +2,8 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.chat.domain.ChatPendingMessage;
-import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
 import java.util.List;

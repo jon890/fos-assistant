@@ -1,7 +1,7 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.chat.application.AutoTurnResultSource;
-import com.bifos.assistant.chat.application.model.AutoTurnResult;
+import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
+import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

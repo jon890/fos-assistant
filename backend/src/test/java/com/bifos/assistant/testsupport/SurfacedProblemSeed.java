@@ -1,7 +1,7 @@
 package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.CheckConversations;
+import com.bifos.assistant.chat.conversation.application.CheckConversations;
 import com.bifos.assistant.proactive.autonomy.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.autonomy.domain.AutonomyInputs;
 import com.bifos.assistant.proactive.evaluation.domain.DecisionEvidence;

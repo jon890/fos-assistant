@@ -1,15 +1,17 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.type.MessageRole;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
