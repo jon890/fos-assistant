@@ -115,6 +115,27 @@ class MemoryLinkDiscoveryTest {
 
 
     @Test
+    @DisplayName("항목당 대체 제안 상한은 만든 제안 수로 세어 거절한 쌍이 상한을 채우지 않는다")
+    void countsSupersedeLimitByCreatedProposals() {
+        Memory first = embedded(ADMIN, MemoryScope.USER, "학원", "월요일 4시", PARKING);
+        Memory second = embedded(ADMIN, MemoryScope.USER, "학원", "화요일 4시", PARKING);
+        Memory third = embedded(ADMIN, MemoryScope.USER, "학원", "수요일 4시", PARKING);
+        Memory fresh = embedded(ADMIN, MemoryScope.USER, "학원", "목요일 4시", PARKING);
+        for (Memory old : List.of(first, second)) {
+            MemoryLink rejected = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null);
+            linkService.reject(ADMIN, rejected.id());
+        }
+
+        discovery.discover(List.of(fresh.id()));
+
+        assertThat(links.findAll())
+            .filteredOn(link -> link.status() == MemoryLinkStatus.PROPOSED)
+            .extracting(MemoryLink::fromMemoryId, MemoryLink::toMemoryId)
+            .containsExactly(tuple(fresh.id(), third.id()));
+    }
+
+
+    @Test
     @DisplayName("사람이 관련으로 이은 쌍은 값이 달라도 대체 제안을 만들지 않는다")
     void doesNotProposeSupersedeForHumanRelatedPair() {
         Memory first = embedded(ADMIN, MemoryScope.USER, "제주 여행 1일차", "1일차는 성산에 간다", PARKING);

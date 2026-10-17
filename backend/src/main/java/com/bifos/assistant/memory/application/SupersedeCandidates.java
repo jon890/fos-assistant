@@ -30,14 +30,16 @@ class SupersedeCandidates {
     private final MemoryLinkProperties properties;
 
 
-    /** {@code target} 과 견준 대체 후보를 유사도가 높은 것부터 상한까지 낸다. */
+    /**
+     * {@code target} 과 견준 대체 후보를 유사도가 높은 것부터 모두 낸다. 항목당 상한은 실제로 만든 제안 수로 세야 하므로 부르는 쪽이 센다. 이미 줄이
+     * 있는 쌍은 만들지 않으므로, 여기서 자르면 사람이 거절한 쌍이 상한을 채워 그다음의 새 후보가 묻히기 때문이다.
+     */
     List<SupersedeCandidate> find(MemoryLinkItem target, List<MemoryLinkItem> peers) {
         return peers.stream()
             .filter(peer -> !peer.id().equals(target.id()))
             .map(peer -> candidate(target, peer, target.similarity(peer)))
             .filter(candidate -> candidate != null)
             .sorted(Comparator.comparingDouble(SupersedeCandidate::score).reversed())
-            .limit(properties.supersedeMaxPerItem())
             .toList();
     }
 

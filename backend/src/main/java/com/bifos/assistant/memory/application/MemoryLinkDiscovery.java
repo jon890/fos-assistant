@@ -104,6 +104,10 @@ public class MemoryLinkDiscovery {
     private Found discoverOne(MemoryLinkItem target, List<MemoryLinkItem> peers) {
         int proposed = 0;
         for (SupersedeCandidate candidate : supersedes.find(target, peers)) {
+            // 상한은 만든 제안 수로 센다. 이미 줄이 있어 건너뛴 쌍은 세지 않는다
+            if (proposed >= properties.supersedeMaxPerItem()) {
+                break;
+            }
             if (created(() -> links.proposeAutoSupersede(candidate.newer().id(), candidate.older().id(), candidate.score()))) {
                 proposed++;
             }

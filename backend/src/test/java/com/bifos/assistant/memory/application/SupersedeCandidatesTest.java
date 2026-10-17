@@ -52,15 +52,15 @@ class SupersedeCandidatesTest {
 
 
     @Test
-    @DisplayName("후보는 유사도가 높은 것부터 항목마다 두 건까지다")
-    void keepsTopTwoCandidates() {
+    @DisplayName("후보는 유사도가 높은 것부터 모두 낸다. 항목당 상한은 만든 제안 수로 부르는 쪽이 센다")
+    void listsAllCandidatesBySimilarity() {
         MemoryLinkItem target = item(1L, LATER, "학원\n월요일 4시", SAME);
         List<MemoryLinkItem> peers = List.of(
             item(2L, EARLIER, "학원\n화요일 4시", CLOSE),
             item(3L, EARLIER, "학원\n수요일 4시", SAME),
             item(4L, EARLIER, "학원\n목요일 4시", SAME));
 
-        assertThat(candidates.find(target, peers)).extracting(c -> c.older().id()).containsExactly(3L, 4L);
+        assertThat(candidates.find(target, peers)).extracting(c -> c.older().id()).containsExactly(3L, 4L, 2L);
     }
 
 

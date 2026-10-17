@@ -316,7 +316,7 @@ sequenceDiagram
 
 | 무엇 | 조건 | 만드는 줄 |
 | --- | --- | --- |
-| 대체 후보(`SupersedeCandidates`) | 유사도가 `supersede-min-similarity`(0.85) 이상이고 두 글의 숫자, 날짜 낱말, 부정 표지 가운데 하나라도 다르다. 유사도 순으로 항목마다 `supersede-max-per-item`(2)건 | 나중에 고친 항목을 `from` 으로 둔 `PROPOSED` `SUPERSEDES`, `origin=AUTO`, 유사도를 `score` 에 |
+| 대체 후보(`SupersedeCandidates`) | 유사도가 `supersede-min-similarity`(0.85) 이상이고 두 글의 숫자, 날짜 낱말, 부정 표지 가운데 하나라도 다르다. 유사도 순으로 보며 만든 제안이 항목마다 `supersede-max-per-item`(2)건에 닿으면 멈춘다. 이미 줄이 있어 건너뛴 쌍은 세지 않는다 | 나중에 고친 항목을 `from` 으로 둔 `PROPOSED` `SUPERSEDES`, `origin=AUTO`, 유사도를 `score` 에 |
 | 자동 관련(`RelatedLinker`) | 유사도가 `related-min-similarity`(0.7) 이상이고 서로의 상위 `related-top-k`(3) 안에 들며 대체 후보가 아니다. 항목마다 효력 있는 `RELATED` 는 `related-max-per-item`(5)개까지 | `ACTIVE` `RELATED`, `origin=AUTO` |
 
 - 같은 쌍에 어느 상태든 줄이 이미 있으면 코드는 새로 만들지 않는다. 사람이 거절하거나 끊은 쌍을 다시 묻거나 잇지 않는다
