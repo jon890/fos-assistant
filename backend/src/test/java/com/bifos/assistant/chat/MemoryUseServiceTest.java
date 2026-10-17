@@ -153,6 +153,19 @@ class MemoryUseServiceTest {
 
 
     @Test
+    @DisplayName("연결된 기억 구역에 본문까지 실린 항목은 연결로 찾은 길로 나온다")
+    void listsLinkSectionItemsAsLinkVia() {
+        Memory neighbor = memory(dad, MemoryScope.USER, "제주 숙소", "숙소는 바닷가 앞이다", MemoryRetrieval.SEARCH);
+        AgentExecution run = answeredRun(conversation, true);
+        source(run, 0, "MEMORY_LINK", neighbor, "INLINE");
+
+        assertThat(service.usesOf(dad, conversation.id()))
+            .extracting(MemoryUse::memoryId, MemoryUse::via)
+            .containsExactly(tuple(neighbor.id(), MemoryUseVia.LINK));
+    }
+
+
+    @Test
     @DisplayName("같은 항목이 실렸고 읽히기도 했으면 앞의 실린 것 하나만 나온다")
     void keepsOnlyTheFirstWhenLoadedAndReadBoth() {
         Memory fact = memory(dad, MemoryScope.USER, "딸 이름", "딸 이름은 하나다", MemoryRetrieval.SEARCH);

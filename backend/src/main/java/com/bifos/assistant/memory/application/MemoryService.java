@@ -10,6 +10,7 @@ import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -29,6 +30,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -221,6 +223,12 @@ public class MemoryService {
             && memory.entryType() != MemoryEntryType.SOURCE
             && access.allows(memory.collection(), memory.sensitivity())
             && !links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
+    }
+
+
+    /** 그 번호들 가운데 하나를 한쪽 끝으로 둔 효력 있는 {@code RELATED} 다. 조립이 실린 항목의 이웃을 찾는다. */
+    public List<MemoryLink> activeRelatedOf(Collection<Long> memoryIds) {
+        return memoryIds.isEmpty() ? List.of() : links.findActiveRelatedTouching(memoryIds);
     }
 
 

@@ -70,6 +70,7 @@ const CONTEXT_SOURCE_LABELS: Record<string, string> = {
   MEMORY_ALWAYS: "기억(항상)",
   MEMORY_FACTS: "기억(개인 사실)",
   MEMORY_SEARCH: "기억(질문 관련)",
+  MEMORY_LINK: "기억(연결됨)",
   MEMORY_INDEX: "기억(제목만)",
   MEMORY_READ: "기억(찾아 읽음)",
   DELEGATION_RESULT: "맡긴 일 결과",

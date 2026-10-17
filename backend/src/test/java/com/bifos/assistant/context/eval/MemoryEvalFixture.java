@@ -24,9 +24,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -89,8 +91,8 @@ final class MemoryEvalFixture {
 
 
     /**
-     * 사례의 Memory 를 새로 넣는다. {@code links} 가 참이면 {@code supersedes} 마다 사람이 받아들인 대체 연결을 함께 넣는다. 거짓이면 연결이
-     * 없는 단계 1 의 구조다(ADR-20261015 / memory-link).
+     * 사례의 Memory 를 새로 넣는다. {@code links} 가 참이면 {@code supersedes} 마다 사람이 받아들인 대체 연결을, {@code related} 마다 효력
+     * 있는 관련 연결을 함께 넣는다. 거짓이면 연결이 없는 단계 1 의 구조다(ADR-20261015 / memory-link).
      */
     Map<String, Long> seed(Case each, boolean links) {
         jdbc.update("DELETE FROM memory_link");
@@ -115,8 +117,31 @@ final class MemoryEvalFixture {
                         Timestamp.from(now));
                 }
             }
+            insertRelated(each, ids, now);
         }
         return ids;
+    }
+
+
+    /** 사례의 {@code related} 마다 번호가 작은 쪽을 {@code from} 으로 둔 효력 있는 관련 연결을 한 번씩 넣는다. */
+    private void insertRelated(Case each, Map<String, Long> ids, Instant now) {
+        Set<List<Long>> pairs = new HashSet<>();
+        for (MemorySeed seed : each.memories()) {
+            for (String key : seed.related()) {
+                Long a = ids.get(seed.key());
+                Long b = ids.get(key);
+                pairs.add(List.of(Math.min(a, b), Math.max(a, b)));
+            }
+        }
+        for (List<Long> pair : pairs) {
+            jdbc.update(
+                "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
+                    + " VALUES (?, ?, 'RELATED', 'HUMAN', 'ACTIVE', ?, ?)",
+                pair.get(0),
+                pair.get(1),
+                Timestamp.from(now),
+                Timestamp.from(now));
+        }
     }
 
 

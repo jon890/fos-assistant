@@ -116,6 +116,15 @@ assistant:
       max-text-chars: 4000
       # 채우는 작업이 끝나고 다음 작업까지 쉬는 시간
       refresh-delay: 60s
+    link:
+      # 새로 임베딩한 항목과 같은 주인의 항목을 견주어 연결을 찾는다. 임베딩이 꺼져 있으면 돌지 않는다
+      # 대체 후보: 코사인이 이 값 이상이고 숫자, 날짜 낱말, 부정 표지 가운데 하나가 다른 쌍. 늘 사람이 받아들일 제안으로 만든다
+      supersede-min-similarity: 0.85
+      supersede-max-per-item: 2
+      # 자동 RELATED: 코사인이 이 값 이상이고 서로의 상위 k 안에 드는 쌍. 항목마다 효력 있는 RELATED 의 상한을 둔다
+      related-min-similarity: 0.7
+      related-top-k: 3
+      related-max-per-item: 5
   delegation:
     # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
     max-depth: 2

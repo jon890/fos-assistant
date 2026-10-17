@@ -14,6 +14,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.embedding.EmbeddingClient;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingRefresher;
+import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.embedding.OpenAiCompatibleEmbeddingClient;
 import com.bifos.assistant.memory.application.relevance.KeywordScorer;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
@@ -63,6 +64,9 @@ class MemoryEmbeddingEvalTest {
     private static final String HYBRID = "hybrid";
     /** {@code application.yml} 의 {@code assistant.memory.embedding.model} 기본값과 같다. */
     private static final String DEFAULT_MODEL = "onnx-community/bge-m3-ONNX";
+
+    @Autowired
+    MemoryLinkDiscovery linkDiscovery;
 
     @Autowired
     MemoryService memoryService;
@@ -126,7 +130,8 @@ class MemoryEmbeddingEvalTest {
             return vectors;
         };
         MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings);
-        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(settings, timed, embeddings, transactionManager, cache, backgroundTasks);
+        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(
+            settings, timed, embeddings, transactionManager, cache, backgroundTasks, linkDiscovery);
         MemorySearchSection hybridSection = new MemorySearchSection(
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),

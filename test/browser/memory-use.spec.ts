@@ -9,7 +9,7 @@ type Use = {
   memoryId: number;
   title: string;
   scope: "USER" | "GROUP";
-  via: "ALWAYS" | "FACTS" | "SEARCH" | "READ";
+  via: "ALWAYS" | "FACTS" | "SEARCH" | "LINK" | "READ";
 };
 
 /**
@@ -97,8 +97,8 @@ function threeUses(executionId: number): Use[] {
   ];
 }
 
-/** 세 줄 뒤에 질문으로 찾은 기억 한 줄을 더한다. */
-function fourUses(executionId: number): Use[] {
+/** 세 줄 뒤에 질문으로 찾은 기억과 연결된 기억 한 줄씩을 더한다. */
+function fiveUses(executionId: number): Use[] {
   return [
     ...threeUses(executionId),
     {
@@ -107,6 +107,13 @@ function fourUses(executionId: number): Use[] {
       title: "자동차 관리",
       scope: "USER",
       via: "SEARCH",
+    },
+    {
+      executionId,
+      memoryId: 92,
+      title: "타이어 교체",
+      scope: "USER",
+      via: "LINK",
     },
   ];
 }
@@ -133,7 +140,7 @@ test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치
   await emptyCaptures(page, conversationId);
   await page.route(
     `**/api/chat/conversations/${conversationId}/memory-uses`,
-    (route: Route) => route.fulfill({ json: fourUses(executionId) }),
+    (route: Route) => route.fulfill({ json: fiveUses(executionId) }),
   );
   await page.goto(`/chat/${conversationId}`);
 
@@ -150,7 +157,7 @@ test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치
 
   await expect(page.getByTestId("activity-memory-uses")).toBeVisible();
   const items = page.getByTestId("activity-memory-use");
-  await expect(items).toHaveCount(4);
+  await expect(items).toHaveCount(5);
   await expect(items.nth(0)).toContainText("딸 이름");
   await expect(items.nth(0)).toContainText("기억한 사실");
   await expect(items.nth(1)).toContainText("우리 집 규칙");
@@ -160,6 +167,8 @@ test("참고한 기억은 답 아래에 보이지 않고 작업 과정을 펼치
   await expect(items.nth(2)).toContainText("찾아 읽음");
   await expect(items.nth(3)).toContainText("자동차 관리");
   await expect(items.nth(3)).toContainText("질문으로 찾은 기억");
+  await expect(items.nth(4)).toContainText("타이어 교체");
+  await expect(items.nth(4)).toContainText("연결된 기억");
   await expect(items.nth(0)).not.toContainText("그룹");
   const link = page
     .getByTestId("activity-memory-uses")

@@ -12,6 +12,7 @@ import com.bifos.assistant.memory.application.embedding.EmbeddingClient;
 import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingRefresher;
+import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.relevance.KeywordScorer;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties;
@@ -44,6 +45,9 @@ class ContextAssemblerHybridTest {
     private static final String AGENT_CODE = "context-hybrid-test";
     private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
     private static final String QUESTION = "바퀴 언제 바꿨지";
+
+    @Autowired
+    MemoryLinkDiscovery linkDiscovery;
 
     @Autowired
     MemoryService memories;
@@ -168,7 +172,7 @@ class ContextAssemblerHybridTest {
 
     private void refresh() {
         new MemoryEmbeddingRefresher(
-            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks)
+            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks, linkDiscovery)
                 .refreshOnce();
     }
 
