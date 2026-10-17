@@ -7,6 +7,7 @@ import { claimApproval, takeApproval } from "./execution-guard.ts";
 import { prepareTrade, readExpectedOrder, orderPath } from "./prepare-trade.ts";
 import {
   EXECUTION_SCHEMAS,
+  MODEL_SCHEMAS,
   OPEN_TRADE_TOOLS,
   tradingBody,
   UNKNOWN,
@@ -29,7 +30,14 @@ export function registerTradingTools(
     {
       v: z.literal(1),
       tool: z.enum(tools),
-      args: z.record(z.string(), z.unknown()),
+      // 모델이 보는 스키마에 실제 주문 인자를 싣는다. 금액은 10진수 글이고 계좌 칸은 없다(연결에서 고른 계좌로만 나간다).
+      // 어느 도구의 인자인지 대조하는 일은 prepareTrade 가 tool 로 다시 한다.
+      args: z.union(
+        tools.map((tool) => MODEL_SCHEMAS[tool]) as unknown as [
+          z.ZodType,
+          ...z.ZodType[],
+        ],
+      ),
     },
     { readOnlyHint: true },
     async ({ tool, args }) => prepareTrade(client, tool, args),
