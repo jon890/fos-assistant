@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.CheckTurn;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckOutcome;

@@ -1,5 +1,13 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application;
 
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.ContextBodyMode;
+import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextSelection;
+import com.bifos.assistant.context.application.dto.ContextSource;
+import com.bifos.assistant.context.application.dto.ContextTrust;
+import com.bifos.assistant.context.config.ContextProperties;
+import com.bifos.assistant.context.config.MemorySearchSectionProperties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 

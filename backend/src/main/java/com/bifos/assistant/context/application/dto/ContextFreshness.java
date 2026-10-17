@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 /** 문맥 항목의 내용이 지금도 참이라고 볼 수 있는지다(ADR-071). */
 public enum ContextFreshness {

@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 import java.util.List;
 import java.util.stream.Collectors;

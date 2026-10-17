@@ -3,7 +3,7 @@ package com.bifos.assistant.memory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryContentBackfill;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;

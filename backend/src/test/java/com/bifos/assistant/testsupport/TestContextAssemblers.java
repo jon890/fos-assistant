@@ -1,9 +1,9 @@
 package com.bifos.assistant.testsupport;
 
-import com.bifos.assistant.context.ContextAssembler;
-import com.bifos.assistant.context.ContextProperties;
-import com.bifos.assistant.context.MemorySearchSection;
-import com.bifos.assistant.context.MemorySearchSectionProperties;
+import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.config.ContextProperties;
+import com.bifos.assistant.context.application.MemorySearchSection;
+import com.bifos.assistant.context.config.MemorySearchSectionProperties;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.config.MemoryRelevanceProperties;

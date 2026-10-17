@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.context.ContextProperties;
+import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

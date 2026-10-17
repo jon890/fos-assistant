@@ -1,5 +1,8 @@
 package com.bifos.assistant.context;
 
+import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.ContextItem;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;

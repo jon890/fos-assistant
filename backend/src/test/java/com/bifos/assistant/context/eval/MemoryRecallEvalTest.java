@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.context.AssembledContext;
-import com.bifos.assistant.context.ContextAssembler;
-import com.bifos.assistant.context.ContextBodyMode;
-import com.bifos.assistant.context.ContextItem;
-import com.bifos.assistant.context.ContextProperties;
-import com.bifos.assistant.context.ContextSource;
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.dto.ContextBodyMode;
+import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.config.ContextProperties;
+import com.bifos.assistant.context.application.dto.ContextSource;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Forbidden;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;

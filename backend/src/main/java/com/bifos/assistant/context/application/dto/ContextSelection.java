@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 /**
  * 문맥 항목 하나를 어떤 규칙이 몇 번째로 골랐는지다(ADR-20261015 / memory-eval-gate). 실행 기록의 선택 근거 칸에 그대로 옮긴다.
@@ -44,7 +44,7 @@ public record ContextSelection(String selector, int rank, Double keywordScore, D
     public static final String LINK_RELATED = "link-related-v1";
 
     /** 질문과 관련된 기억 구역의 규칙에 짝지은 색인의 규칙이다. */
-    static String indexSelectorOf(String searchSelector) {
+    public static String indexSelectorOf(String searchSelector) {
         if (SEARCH_KEYWORD.equals(searchSelector)) {
             return INDEX_KEYWORD;
         }

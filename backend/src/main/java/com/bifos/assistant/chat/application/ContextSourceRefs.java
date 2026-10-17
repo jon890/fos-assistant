@@ -1,8 +1,8 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.context.AssembledContext;
-import com.bifos.assistant.context.ContextItem;
-import com.bifos.assistant.context.ContextSelection;
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.usage.application.ContextSourceRef;
 import java.util.List;
 import lombok.AccessLevel;

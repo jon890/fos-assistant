@@ -33,7 +33,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.infra.ResultDeliveryRepository;
-import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;

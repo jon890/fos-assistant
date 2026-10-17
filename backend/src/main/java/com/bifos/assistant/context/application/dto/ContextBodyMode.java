@@ -1,4 +1,4 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application.dto;
 
 /** 문맥 항목의 본문을 싣는 방식이다(ADR-071). */
 public enum ContextBodyMode {

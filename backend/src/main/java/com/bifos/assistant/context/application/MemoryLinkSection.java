@@ -1,5 +1,12 @@
-package com.bifos.assistant.context;
+package com.bifos.assistant.context.application;
 
+import com.bifos.assistant.context.application.dto.ContextBodyMode;
+import com.bifos.assistant.context.application.dto.ContextFreshness;
+import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.application.dto.ContextSelection;
+import com.bifos.assistant.context.application.dto.ContextSource;
+import com.bifos.assistant.context.application.dto.MemorySearchPlacement;
+import com.bifos.assistant.context.config.MemorySearchSectionProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
