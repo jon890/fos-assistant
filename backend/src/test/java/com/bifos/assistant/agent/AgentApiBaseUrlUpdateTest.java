@@ -11,11 +11,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.admin.application.AgentAdminService;
-import com.bifos.assistant.agent.admin.presentation.AgentAdminController;
-import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.AdminAgentView;
-import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.CreateAgentRequest;
-import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.UpdateAgentRequest;
+import com.bifos.assistant.admin.agent.application.AgentAdminService;
+import com.bifos.assistant.admin.agent.presentation.AgentAdminController;
+import com.bifos.assistant.admin.agent.presentation.AgentAdminDtos.AdminAgentView;
+import com.bifos.assistant.admin.agent.presentation.AgentAdminDtos.CreateAgentRequest;
+import com.bifos.assistant.admin.agent.presentation.AgentAdminDtos.UpdateAgentRequest;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentConnectorDetacher;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;

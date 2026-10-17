@@ -372,8 +372,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 이다. 그 값을 파라미터로 넘기면 H2 가 {@code group by} 의 식을 {@code select} 의 식과 같은
      * 것으로 보지 않아 질의가 거절된다.
      *
-     * <p>같은 시간대를 {@code UsageController.HOUSEHOLD_ZONE} 도 갖는다. 그쪽은 달의 경계를 끊는 데
-     * 쓰고 여기는 날짜를 뽑는 데 쓴다. 가족이 사는 곳이 바뀌면 두 자리를 함께 고친다.
+     * <p>같은 시간대를 {@code UsageController.HOUSEHOLD_ZONE} 과
+     * {@code UsageBreakdownAdminController.HOUSEHOLD_ZONE} 도 갖는다. 그쪽은 달의 경계를 끊는 데 쓰고 여기는
+     * 날짜를 뽑는 데 쓴다. 가족이 사는 곳이 바뀌면 세 자리를 함께 고친다.
      */
     @Query("""
             select new com.bifos.assistant.usage.domain.CostByDay(

@@ -10,7 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
+import com.bifos.assistant.admin.agent.application.dto.AgentUpdateCommand;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.util.Date;

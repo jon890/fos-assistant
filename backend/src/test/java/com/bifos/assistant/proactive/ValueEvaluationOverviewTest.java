@@ -32,7 +32,7 @@ import com.bifos.assistant.proactive.infra.AutonomyDecisionRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
-import com.bifos.assistant.proactive.presentation.ValueEvaluationAdminController;
+import com.bifos.assistant.admin.proactive.presentation.ValueEvaluationAdminController;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;

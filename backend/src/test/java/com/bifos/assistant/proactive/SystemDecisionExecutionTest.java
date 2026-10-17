@@ -16,7 +16,7 @@ import com.bifos.assistant.usage.application.UsageSummaryService;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
-import com.bifos.assistant.usage.presentation.UsageBreakdownAdminController;
+import com.bifos.assistant.admin.usage.presentation.UsageBreakdownAdminController;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.YearMonth;

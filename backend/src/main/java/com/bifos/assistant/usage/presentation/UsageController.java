@@ -45,7 +45,7 @@ public class UsageController {
      * 표준시와의 차이 9시간을 식에 직접 적어 날짜를 뽑는다. 가족이 사는 곳이 바뀌면 두 자리를 함께
      * 고친다.
      */
-    static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
     private final RootExecutionQuery rootExecutions;
     private final CurrentUserProvider currentUser;
