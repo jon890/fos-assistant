@@ -2,7 +2,7 @@ package com.bifos.assistant.workspace.presentation;
 
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.workspace.application.WorkspaceUsageService;
-import com.bifos.assistant.workspace.presentation.WorkspaceDtos.AdminUsageView;
+import com.bifos.assistant.workspace.presentation.WorkspaceAdminDtos.AdminUsageView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

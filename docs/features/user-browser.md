@@ -94,7 +94,7 @@ Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작
 ### API(사용자 브라우저)
 
 모두 웹의 서버 라우트를 거치고 요청자는 토큰의 사용자다.
-경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 가, 오류 코드는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
+경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 와 `UserBrowserAdminDtos` 가, 오류 코드는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
 응답에는 컨테이너 번호와 프로필 키를 싣지 않는다.
 
 웹에서 브라우저 상태를 바꾸는 라우트(`/api/browser` 아래의 만들기, 지우기, 켜기, 끄기, 화면 열기, 입력과 관리자의 끄기, 지우기)는 Control Plane 을 부르기 전에 출처를 본다.

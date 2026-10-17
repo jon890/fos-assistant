@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
-import com.bifos.assistant.connector.presentation.ConnectionDtos.AdminConnectionView;
+import com.bifos.assistant.connector.presentation.ConnectionAdminDtos.AdminConnectionView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import java.util.List;
