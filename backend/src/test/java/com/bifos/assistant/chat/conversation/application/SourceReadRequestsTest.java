@@ -1,6 +1,5 @@
-package com.bifos.assistant.chat.application;
+package com.bifos.assistant.chat.conversation.application;
 
-import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
