@@ -400,7 +400,7 @@ writer는 머리 줄과 구분 줄을 포함한 길이를 계산한다. 항상 �
 
 ## 가격표
 
-`usage/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
+`usage/pricing/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
 파일이 바뀌면 재기동 없이 다시 읽는다. 새 파일이 읽히지 않거나 가격이 하나도 없으면 이전 가격을 계속 쓴다.
 
 Hermes profile 디렉터리를 그대로 붙이지 않는다.
