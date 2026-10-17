@@ -5,7 +5,7 @@ import com.bifos.assistant.proactive.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.domain.DecisionCandidate;
 import com.bifos.assistant.proactive.domain.DecisionResult;
 import com.bifos.assistant.proactive.domain.DecisionState;
-import com.bifos.assistant.proactive.domain.ProblemEvidence;
+import com.bifos.assistant.proactive.check.domain.ProblemEvidence;
 import com.bifos.assistant.proactive.domain.type.DecisionAxis;
 import com.bifos.assistant.proactive.domain.type.DecisionConfidence;
 import com.bifos.assistant.proactive.domain.type.DecisionLevel;

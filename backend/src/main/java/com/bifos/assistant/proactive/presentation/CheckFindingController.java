@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.presentation;
 
-import com.bifos.assistant.proactive.application.CheckFindingReactions;
-import com.bifos.assistant.proactive.application.model.FindingReaction;
+import com.bifos.assistant.proactive.check.application.CheckFindingReactions;
+import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.CheckFindingsResponse;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.FindingReactionRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

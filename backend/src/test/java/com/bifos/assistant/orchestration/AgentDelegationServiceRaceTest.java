@@ -22,7 +22,7 @@ import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.orchestration.application.dto.DelegationResult;
 import com.bifos.assistant.orchestration.domain.ChildResult;
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;

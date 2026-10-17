@@ -18,7 +18,7 @@ import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
-import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.application.ProactiveLoopProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import com.bifos.assistant.usage.pricing.config.PricingProperties;
@@ -611,7 +611,7 @@ public final class ArchitectureRules {
     private static final String LIVE_PROPERTIES_CONFIG = "com.bifos.assistant.LivePropertiesConfig";
 
     /** 기동 때 살펴보기 {@code max-duration} 과 {@code hermes.run-timeout} 을 견주는 설정 클래스다. */
-    private static final String RUN_TIMEOUT_CHECK = "com.bifos.assistant.proactive.application.ProactiveCheckProperties$RunTimeoutCheck";
+    private static final String RUN_TIMEOUT_CHECK = "com.bifos.assistant.proactive.check.config.ProactiveCheckProperties$RunTimeoutCheck";
 
     /** 실행 중에 쓰는 설정 record 다. {@code HermesProperties} 는 두 칸만 해당하므로 따로 본다. */
     private static final List<Class<?>> LIVE_SETTINGS = List.of(

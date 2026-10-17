@@ -1,10 +1,10 @@
 package com.bifos.assistant.task.application.dto;
 
-import com.bifos.assistant.proactive.application.model.CheckBlocker;
-import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
-import com.bifos.assistant.proactive.domain.type.CheckOutcome;
-import com.bifos.assistant.proactive.domain.type.CheckSkippedReason;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
+import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
+import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
+import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import java.time.Instant;
 import java.util.List;
 

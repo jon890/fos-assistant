@@ -2,7 +2,7 @@ package com.bifos.assistant.task.presentation;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import com.bifos.assistant.proactive.application.model.CheckBlocker;
+import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
 import com.bifos.assistant.task.application.dto.ProactiveSchedule;
 import com.bifos.assistant.task.application.dto.ProactiveSchedule.LastCheck;
 import com.bifos.assistant.task.application.dto.ScheduleInput;

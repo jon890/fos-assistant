@@ -1,17 +1,18 @@
 package com.bifos.assistant.proactive.application;
 
+import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckSettled;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.ProactiveLoopRun;
 import com.bifos.assistant.proactive.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.domain.ValueEvaluation;
-import com.bifos.assistant.proactive.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.LoopRunStatus;
 import com.bifos.assistant.proactive.domain.type.LoopSkippedReason;
-import com.bifos.assistant.proactive.domain.type.ProblemStatus;
-import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckProblemRepository;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopRunRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;

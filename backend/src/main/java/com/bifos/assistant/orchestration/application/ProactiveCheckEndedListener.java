@@ -1,6 +1,6 @@
 package com.bifos.assistant.orchestration.application;
 
-import com.bifos.assistant.proactive.application.ProactiveCheckEnded;
+import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckEnded;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

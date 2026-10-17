@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.application;
 
 import com.bifos.assistant.agent.application.port.AgentPurgeParticipant;
-import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

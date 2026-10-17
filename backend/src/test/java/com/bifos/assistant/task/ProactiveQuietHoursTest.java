@@ -5,9 +5,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
-import com.bifos.assistant.proactive.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
+import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.task.application.ProactiveQuietHours;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskTrigger;

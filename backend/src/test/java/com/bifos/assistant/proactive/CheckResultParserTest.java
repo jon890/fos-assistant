@@ -2,12 +2,12 @@ package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.proactive.application.CheckResultParser;
-import com.bifos.assistant.proactive.application.model.CheckResultBlock;
-import com.bifos.assistant.proactive.application.model.CheckResultBlock.Finding;
-import com.bifos.assistant.proactive.application.model.CheckResultRead;
-import com.bifos.assistant.proactive.domain.type.CheckInvalidReason;
-import com.bifos.assistant.proactive.domain.type.CheckOutcome;
+import com.bifos.assistant.proactive.check.application.CheckResultParser;
+import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
+import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock.Finding;
+import com.bifos.assistant.proactive.check.application.dto.CheckResultRead;
+import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
+import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

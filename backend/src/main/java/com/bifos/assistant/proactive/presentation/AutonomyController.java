@@ -2,7 +2,7 @@ package com.bifos.assistant.proactive.presentation;
 
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
 import com.bifos.assistant.proactive.application.SurfacedProblems;
-import com.bifos.assistant.proactive.application.model.DecisionReaction;
+import com.bifos.assistant.proactive.check.application.dto.DecisionReaction;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.AutonomyDecisionResponse;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.AutonomyPreferenceBody;
 import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.DecisionReactionRequest;
