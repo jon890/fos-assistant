@@ -52,14 +52,13 @@ com.bifos.assistant.chat.application.TurnIntent 는 인터페이스다. applicat
 com.bifos.assistant.chat.application.TurnMark 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
 com.bifos.assistant.chat.application.TurnRunRef 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.chat.application.WakeRetryDue 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 chat.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorExecutionSnapshot 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorManifests 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorPolicyRequest 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 connector.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.connector.application.ConnectorToolPolicies 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.connector.application.ContentDraftJobStarter 는 인터페이스다. application 직하에는 빈만 둔다. 구현을 바깥(infra 나 위 기능의 application)에 두는 인터페이스는 connector.<하위 기능>.application.port 로 옮긴다.
-com.bifos.assistant.connector.application.ContentDraftLockedJob 는 값이다. application 직하에는 빈만 둔다. 서비스가 주고받는 값은 connector.<하위 기능>.application.dto 로 옮긴다.
-com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
-com.bifos.assistant.connector.application.FinancialLimitExceeded 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.action.application.ConnectorActionDetails 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.action.application.ConnectorActionSignals 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.connection.application.ConnectorManifests 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.connection.application.ConnectorToolPolicies 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.contentdraft.application.ContentDraftWorkerStatusDecoder 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
+com.bifos.assistant.connector.financial.application.FinancialLimitExceeded 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.context.application.ResultHeader 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.feedback.application.FeedbackLabeler 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.
 com.bifos.assistant.followup.application.FollowUpDueAt 는 public 클래스인데 Spring 빈이 아니다. 빈으로 만들거나, 같은 패키지에서만 쓰면 package-private 으로 낮추거나, 정책이나 값 함수면 domain 으로 옮긴다.

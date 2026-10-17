@@ -1,3 +1,1 @@
 com.bifos.assistant.chat.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.connector.application.execution 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
-com.bifos.assistant.connector.application.model 는 application 의 하위 패키지로 허용되지 않는다. application 아래에는 dto 와 port 만 둔다. model 은 dto 로, 서비스는 application 으로, 인터페이스는 port 로 옮긴다.
