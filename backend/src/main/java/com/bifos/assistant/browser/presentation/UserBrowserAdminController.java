@@ -1,7 +1,7 @@
 package com.bifos.assistant.browser.presentation;
 
 import com.bifos.assistant.browser.application.UserBrowserService;
-import com.bifos.assistant.browser.presentation.UserBrowserDtos.AdminBrowserView;
+import com.bifos.assistant.browser.presentation.UserBrowserAdminDtos.AdminBrowserView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import java.util.List;

@@ -482,7 +482,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 
 ## 커넥터 연결 API
 
-경로와 요청, 응답 칸은 `ConnectorConnectionController`, `AgentConnectionController`, `ConnectorConnectionAdminController`, `AdminAgentConnectionController` 와 `ConnectionDtos` 가 갖는다.
+경로와 요청, 응답 칸은 `ConnectorConnectionController`, `AgentConnectionController`, `ConnectorConnectionAdminController`, `AdminAgentConnectionController` 와 `ConnectionDtos`, `ConnectionAdminDtos` 가 갖는다.
 아래는 화면이 기대는 약속이다.
 
 - 응답에는 env 이름, 보관 파일 이름, 서버 이름을 담지 않는다. 비밀 칸은 앞부분만 담는다. 관리자 목록에는 다른 사용자의 칸 값과 비밀 앞부분을 넣지 않는다

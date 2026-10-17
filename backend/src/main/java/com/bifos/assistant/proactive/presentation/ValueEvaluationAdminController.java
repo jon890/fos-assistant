@@ -1,8 +1,8 @@
 package com.bifos.assistant.proactive.presentation;
 
 import com.bifos.assistant.proactive.application.ValueEvaluationOverviews;
-import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.EvaluationOverviewResponse;
-import com.bifos.assistant.proactive.presentation.ProactiveCheckDtos.EvaluationRequest;
+import com.bifos.assistant.proactive.presentation.ProactiveAdminDtos.EvaluationOverviewResponse;
+import com.bifos.assistant.proactive.presentation.ProactiveAdminDtos.EvaluationRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;

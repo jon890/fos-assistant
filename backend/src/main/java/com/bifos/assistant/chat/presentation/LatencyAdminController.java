@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.FirstResponseLatencyService;
-import com.bifos.assistant.chat.presentation.ChatDtos.LatencySummaryView;
+import com.bifos.assistant.chat.presentation.LatencyAdminDtos.LatencySummaryView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

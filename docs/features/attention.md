@@ -246,7 +246,7 @@ sequenceDiagram
 
 ### API(먼저 알리기와 지금 화면의 판정)
 
-경로와 본문, 응답 칸은 `AttentionController`, `AttentionAdminController`, `AttentionDtos` 가 갖는다.
+경로와 본문, 응답 칸은 `AttentionController`, `AttentionAdminController`, `AttentionDtos`, `AttentionAdminDtos` 가 갖는다.
 모두 웹 JWT 로 부르고 요청자 자기 것만 읽고 쓴다. `GET /api/v1/attention` 만 응답에 실린 `NOW` 와 `LATER` 항목마다 `SHOWN` 사건을 한 번 남기고, `summary` 는 사건을 남기지 않는다.
 
 `itemKey` 에 `:` 와 UUID 가 들어 있어 경로 대신 본문으로 받는다.

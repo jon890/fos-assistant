@@ -3,7 +3,6 @@ package com.bifos.assistant.proactive.presentation;
 import com.bifos.assistant.proactive.application.model.CheckBlocker;
 import com.bifos.assistant.proactive.application.model.CheckFindingView;
 import com.bifos.assistant.proactive.application.model.CheckStatusView;
-import com.bifos.assistant.proactive.application.model.EvaluationOverview;
 import com.bifos.assistant.proactive.application.model.LoopSettingView;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.CandidateJudgement;
@@ -13,7 +12,6 @@ import com.bifos.assistant.proactive.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.domain.type.AutonomyExecutionStatus;
 import com.bifos.assistant.proactive.domain.type.AutonomyLevel;
 import com.bifos.assistant.proactive.domain.type.AutonomyReason;
-import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.domain.type.DecisionFailure;
 import com.bifos.assistant.proactive.domain.type.DecisionOutcome;
 import jakarta.validation.constraints.NotBlank;
@@ -82,34 +80,6 @@ public final class ProactiveCheckDtos {
                 candidate.problem(),
                 candidate.actionType(),
                 candidate.sideEffect());
-        }
-    }
-
-    /** 관리자 화면이 고른 살펴보기다. 루트 실행과 점검 대화 식별자는 싣지 않는다. */
-    public record CheckSummaryView(Long id, CheckTrigger trigger, Instant finishedAt, int acceptedCandidates) {
-    }
-
-    /**
-     * 관리자 화면이 읽는 가치 평가 묶음이다.
-     *
-     * @param check 고를 살펴보기가 없으면 null
-     * @param evaluation 아직 평가하지 않았으면 null
-     * @param decisions 판정하지 않았거나 후보가 없었으면 빈 목록
-     */
-    public record EvaluationOverviewResponse(
-        CheckSummaryView check, EvaluationResponse evaluation, List<AutonomyDecisionResponse> decisions) {
-
-        static EvaluationOverviewResponse from(EvaluationOverview overview) {
-            ProactiveCheck check = overview.check();
-            return new EvaluationOverviewResponse(
-                check == null
-                    ? null
-                    : new CheckSummaryView(
-                        check.id(), check.trigger(), check.finishedAt(), overview.acceptedCandidates()),
-                overview.evaluation() == null ? null : EvaluationResponse.from(overview.evaluation()),
-                overview.decisions().stream()
-                    .map(AutonomyDecisionResponse::from)
-                    .toList());
         }
     }
 

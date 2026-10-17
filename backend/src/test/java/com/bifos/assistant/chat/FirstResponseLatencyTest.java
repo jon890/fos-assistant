@@ -13,7 +13,7 @@ import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.chat.presentation.ChatDtos.LatencyRowView;
+import com.bifos.assistant.chat.presentation.LatencyAdminDtos.LatencyRowView;
 import com.bifos.assistant.chat.presentation.LatencyAdminController;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;

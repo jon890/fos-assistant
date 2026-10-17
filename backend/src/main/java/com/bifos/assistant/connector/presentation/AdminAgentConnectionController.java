@@ -1,8 +1,8 @@
 package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.ConnectorBindingService;
-import com.bifos.assistant.connector.presentation.ConnectionDtos.AgentConnectionResponse;
-import com.bifos.assistant.connector.presentation.ConnectionDtos.ConfirmRequest;
+import com.bifos.assistant.connector.presentation.ConnectionAdminDtos.AgentConnectionResponse;
+import com.bifos.assistant.connector.presentation.ConnectionAdminDtos.ConfirmRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PathVariable;
