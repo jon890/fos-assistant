@@ -165,14 +165,17 @@ export function MessageList({
   const lastVisible = visible.at(-1)?.turn;
   const hasNoAnswer =
     lastVisible?.role === "USER" && latestView && !sending && !outgoing;
-  // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 참고한 기억은 접힌 작업 과정 안에 있어 높이가 변하지 않는다. 펼침 상태는 넣지 않는다.
+  // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 참고한 기억은 작업 과정 안에 있지만, 진행 중 블록을 펼친 채 끝난 답은 펼친 채로 저장되어 높이가 늘 수 있으므로 같이 본다. 펼침 상태는 넣지 않는다.
   const capturesVersion = memoryCaptures
     .map((capture) => `${capture.id}:${capture.status}`)
+    .join(",");
+  const usesVersion = memoryUses
+    .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
   const findingsVersion = checkFindings
     .map((finding) => `${finding.id}:${finding.reaction}`)
     .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${findingsVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${findingsVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
