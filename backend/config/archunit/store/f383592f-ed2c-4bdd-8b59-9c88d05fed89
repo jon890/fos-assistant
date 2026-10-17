@@ -1,6 +1,5 @@
 com.bifos.assistant.chat.application.DelegationWakeProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.application.RestartReconcileProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
-com.bifos.assistant.chat.application.StarterProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.infra.ArtifactProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.infra.ArtifactSourceProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
 com.bifos.assistant.chat.infra.AttachmentProperties 는 @ConfigurationProperties 인데 config 패키지 밖에 있다. chat.<하위 기능>.config 로 옮긴다.
