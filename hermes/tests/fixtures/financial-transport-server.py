@@ -27,7 +27,7 @@ async def call_tool(context, params):
     elif name == "prepare_order":
         if set(arguments) != {"v", "tool", "args"} or arguments["v"] != 1 or arguments["tool"] != "place_order":
             raise ValueError("잘못된 준비 호출이다")
-        # 커넥터가 인자를 거절한 것처럼 오류 코드로 답한다. 값은 시험이 정한다.
+        # 커넥터가 인자를 거절한 것처럼 오류 코드로 답한다. 코드는 테스트가 정한다.
         refused = pathlib.Path(__file__).parent / "prepare-error.json"
         if refused.exists():
             error = {"error": {"code": json.loads(refused.read_text())["code"], "message": "account 000007 거절"}}
