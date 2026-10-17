@@ -1,13 +1,16 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.dto.ConversationCursor;
+import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.type.ConversationPurpose;
-import com.bifos.assistant.chat.domain.type.MessageRole;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
+import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;

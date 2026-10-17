@@ -1,6 +1,6 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.chat.application.ScheduledTurnExecutions;
+import com.bifos.assistant.chat.conversation.application.port.ScheduledTurnExecutions;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import java.util.Collection;
 import java.util.HashSet;

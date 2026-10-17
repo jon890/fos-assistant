@@ -4,7 +4,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftService;
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.model.ContentDraftView;
 import com.bifos.assistant.chat.presentation.contentdraft.ContentDraftDtos.DraftError;
 import com.bifos.assistant.chat.presentation.contentdraft.ContentDraftDtos.ListResponse;

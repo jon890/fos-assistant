@@ -1,17 +1,17 @@
 package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ActivitySummary;
-import com.bifos.assistant.chat.application.MemoryUse;
-import com.bifos.assistant.chat.application.ModelOptions;
+import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
+import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
 import com.bifos.assistant.chat.application.RunningTurn;
-import com.bifos.assistant.chat.application.SourceReadSummary;
-import com.bifos.assistant.chat.application.StarterSuggestions;
+import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
+import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.ChatPendingMessage;
-import com.bifos.assistant.chat.domain.type.ConversationPurpose;
-import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
+import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;

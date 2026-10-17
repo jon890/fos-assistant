@@ -1,7 +1,7 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;

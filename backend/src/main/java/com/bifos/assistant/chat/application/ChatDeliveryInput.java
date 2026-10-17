@@ -1,11 +1,13 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
+import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.model.AutoTurnResult;
-import com.bifos.assistant.chat.application.model.DeliveryInput;
-import com.bifos.assistant.chat.application.model.DeliveryItemRef;
+import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryInput;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryItemRef;
 import com.bifos.assistant.context.application.dto.ContextBodyMode;
 import com.bifos.assistant.context.application.dto.ContextFreshness;
 import com.bifos.assistant.context.application.dto.ContextItem;

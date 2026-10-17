@@ -1,6 +1,6 @@
 package com.bifos.assistant.admin.usage.presentation;
 
-import com.bifos.assistant.chat.application.FirstResponseLatencyService;
+import com.bifos.assistant.chat.conversation.application.FirstResponseLatencyService;
 import com.bifos.assistant.admin.usage.presentation.LatencyAdminDtos.LatencySummaryView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;

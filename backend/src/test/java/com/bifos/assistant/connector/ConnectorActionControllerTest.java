@@ -14,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.approval.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.approval.application.FinancialLimitChanges;

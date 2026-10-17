@@ -1,7 +1,7 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.chat.application.ConversationTaskLabels;
-import com.bifos.assistant.chat.application.model.TaskLabel;
+import com.bifos.assistant.chat.conversation.application.port.ConversationTaskLabels;
+import com.bifos.assistant.chat.conversation.application.dto.TaskLabel;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.infra.TaskRepository;
 import java.util.Collection;

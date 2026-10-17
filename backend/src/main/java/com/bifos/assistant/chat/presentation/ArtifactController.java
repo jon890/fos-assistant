@@ -2,7 +2,7 @@ package com.bifos.assistant.chat.presentation;
 
 import com.bifos.assistant.chat.application.ArtifactFile;
 import com.bifos.assistant.chat.application.ArtifactService;
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;

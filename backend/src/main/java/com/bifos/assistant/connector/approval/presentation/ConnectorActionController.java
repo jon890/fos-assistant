@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.approval.presentation;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.approval.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.approval.application.FinancialLimitChanges;

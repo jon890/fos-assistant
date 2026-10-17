@@ -1,6 +1,6 @@
 package com.bifos.assistant.people.application;
 
-import com.bifos.assistant.chat.application.UserConversationActivity;
+import com.bifos.assistant.chat.conversation.application.UserConversationActivity;
 import com.bifos.assistant.people.application.dto.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;

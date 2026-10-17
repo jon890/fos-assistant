@@ -21,10 +21,10 @@ import com.bifos.assistant.chat.application.model.MediaObservationInput.Coverage
 import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ContentDraftRevisionStatus;
 import com.bifos.assistant.chat.infra.AttachmentStore;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;

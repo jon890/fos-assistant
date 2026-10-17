@@ -1,6 +1,6 @@
 package com.bifos.assistant.task.application;
 
-import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.notification.domain.NotificationTarget;
 import com.bifos.assistant.notification.domain.type.NotificationKind;

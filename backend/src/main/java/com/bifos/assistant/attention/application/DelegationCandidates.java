@@ -12,7 +12,7 @@ import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.OwnConversations;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.execution.application.AttentionExecutionQuery;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;

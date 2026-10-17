@@ -1,8 +1,8 @@
 package com.bifos.assistant.admin.usage.presentation;
 
-import com.bifos.assistant.chat.application.model.LatencyRow;
-import com.bifos.assistant.chat.application.model.LatencyStat;
-import com.bifos.assistant.chat.application.model.LatencySummary;
+import com.bifos.assistant.chat.conversation.application.dto.LatencyRow;
+import com.bifos.assistant.chat.conversation.application.dto.LatencyStat;
+import com.bifos.assistant.chat.conversation.application.dto.LatencySummary;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.LocalDate;
 import java.util.List;

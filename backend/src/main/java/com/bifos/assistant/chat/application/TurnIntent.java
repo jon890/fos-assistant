@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.List;
 

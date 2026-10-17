@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.CheckConversations;
+import com.bifos.assistant.chat.conversation.application.CheckConversations;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.FeedbackLabeler;
 import com.bifos.assistant.feedback.application.dto.FeedbackEntry;

@@ -1,13 +1,17 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationSessions;
+import com.bifos.assistant.chat.conversation.application.ConversationWriter;
+import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
+import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.model.CheckAnswer;
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.domain.ExecutionQuestion;
-import com.bifos.assistant.chat.domain.RunSession;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.ExecutionQuestion;
+import com.bifos.assistant.chat.conversation.domain.RunSession;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.application.dto.HermesImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;

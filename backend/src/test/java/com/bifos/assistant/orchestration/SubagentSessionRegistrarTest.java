@@ -3,8 +3,8 @@ package com.bifos.assistant.orchestration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;

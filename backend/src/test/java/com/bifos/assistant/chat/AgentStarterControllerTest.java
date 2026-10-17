@@ -7,9 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.chat.application.StarterStatus;
-import com.bifos.assistant.chat.application.StarterSuggestionService;
-import com.bifos.assistant.chat.application.StarterSuggestions;
+import com.bifos.assistant.chat.starter.application.dto.StarterStatus;
+import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
+import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
 import com.bifos.assistant.chat.presentation.AgentStarterController;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

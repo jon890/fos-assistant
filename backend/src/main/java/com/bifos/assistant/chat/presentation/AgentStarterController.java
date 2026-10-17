@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.StarterSuggestionService;
+import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
 import com.bifos.assistant.chat.presentation.ChatDtos.StartersView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;

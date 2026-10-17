@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.evaluation.application;
 
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.proactive.evaluation.domain.DecisionCandidate;
 import com.bifos.assistant.proactive.evaluation.domain.DecisionEvidence;
 import com.bifos.assistant.proactive.evaluation.domain.DecisionProviderInfo;

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.application;
 
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
 import com.bifos.assistant.chat.domain.entity.ContentDraftCreationRequest;
 import com.bifos.assistant.chat.domain.entity.ContentDraftCreationCall;
@@ -15,9 +16,9 @@ import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.domain.entity.ContentDraft;
 import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
 import com.bifos.assistant.chat.domain.entity.ContentDraftRevision;
-import com.bifos.assistant.chat.domain.type.ConversationPurpose;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ContentDraftRevisionStatus;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;

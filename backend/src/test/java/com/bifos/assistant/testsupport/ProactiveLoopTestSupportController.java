@@ -2,7 +2,7 @@ package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.CheckConversations;
+import com.bifos.assistant.chat.conversation.application.CheckConversations;
 import com.bifos.assistant.proactive.surface.application.SurfacedProblems;
 import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyLevel;
 import com.bifos.assistant.proactive.autonomy.infra.AutonomyDecisionRepository;

@@ -10,7 +10,7 @@ import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.chat.application.OwnConversations;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.proactive.check.application.ProactiveReportSource;
 import com.bifos.assistant.proactive.check.application.dto.UnreadCheckReport;
 import com.bifos.assistant.shared.auth.CurrentUser;

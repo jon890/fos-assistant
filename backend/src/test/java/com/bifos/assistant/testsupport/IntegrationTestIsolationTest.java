@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.infra.ChatMessageContents;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageContents;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.hermes.StubHermesRunsClient;

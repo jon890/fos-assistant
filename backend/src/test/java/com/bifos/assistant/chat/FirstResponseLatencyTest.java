@@ -7,12 +7,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.chat.application.FirstResponseLatencyService;
-import com.bifos.assistant.chat.application.ScheduledTurnExecutions;
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.Conversation;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.application.FirstResponseLatencyService;
+import com.bifos.assistant.chat.conversation.application.port.ScheduledTurnExecutions;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.admin.usage.presentation.LatencyAdminDtos.LatencyRowView;
 import com.bifos.assistant.admin.usage.presentation.LatencyAdminController;
 import com.bifos.assistant.model.domain.type.ModelTier;

@@ -2,7 +2,7 @@ package com.bifos.assistant.proactive.evaluation.application;
 
 import com.bifos.assistant.proactive.evaluation.application.port.DecisionProvider;
 import com.bifos.assistant.proactive.evaluation.config.ValueEvaluationProperties;
-import com.bifos.assistant.chat.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
 import com.bifos.assistant.hermes.infra.DecisionProfileReadinessClient;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;

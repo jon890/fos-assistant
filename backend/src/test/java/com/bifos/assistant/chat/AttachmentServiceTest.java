@@ -6,13 +6,13 @@ import static org.assertj.core.groups.Tuple.tuple;
 
 import com.bifos.assistant.chat.application.AttachmentContent;
 import com.bifos.assistant.chat.application.AttachmentService;
-import com.bifos.assistant.chat.application.ConversationWriter;
+import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
-import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;

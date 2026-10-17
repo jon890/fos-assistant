@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.presentation;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.presentation.ChatDtos.MemoryCaptureView;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.shared.auth.CurrentUser;

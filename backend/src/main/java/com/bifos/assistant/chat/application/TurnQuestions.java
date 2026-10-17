@@ -1,9 +1,9 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.chat.domain.ChatMessage;
-import com.bifos.assistant.chat.domain.type.MessageRole;
-import com.bifos.assistant.chat.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
+import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;

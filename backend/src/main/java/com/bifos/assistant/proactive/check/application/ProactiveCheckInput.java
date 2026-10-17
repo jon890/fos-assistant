@@ -4,7 +4,7 @@ import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_PROBLEMS;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.OPENING;
 
-import com.bifos.assistant.chat.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;

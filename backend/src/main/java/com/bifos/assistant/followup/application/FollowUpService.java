@@ -1,8 +1,8 @@
 package com.bifos.assistant.followup.application;
 
-import com.bifos.assistant.chat.application.ConversationAccess;
-import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
-import com.bifos.assistant.chat.domain.type.ConversationPurpose;
+import com.bifos.assistant.chat.conversation.application.ConversationAccess;
+import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLookup;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
