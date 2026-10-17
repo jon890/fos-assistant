@@ -1,9 +1,9 @@
-package com.bifos.assistant.memory.presentation;
+package com.bifos.assistant.admin.memory.presentation;
 
 import com.bifos.assistant.memory.application.AgentMemorySettingService;
-import com.bifos.assistant.memory.presentation.MemoryDtos.AgentMemoryGrantBody;
-import com.bifos.assistant.memory.presentation.MemoryDtos.AgentMemorySettingView;
-import com.bifos.assistant.memory.presentation.MemoryDtos.ReplaceAgentMemoryRequest;
+import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.AgentMemoryGrantBody;
+import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.AgentMemorySettingView;
+import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.ReplaceAgentMemoryRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

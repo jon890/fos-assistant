@@ -69,7 +69,7 @@ phase 02 가 만든 클래스는 다음처럼 옮긴다.
 
 ### 3. 기준 파일
 
-- 줄어든다: `REQUIRE_ADMIN_ONLY_IN_ADMIN` 은 `AgentMemorySettingController` 두 줄만 남는다(memory 몫의 이동 PR 이 지운다). `APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT` 의 `agent.admin.application.model` 한 줄이 사라진다.
+- 줄어든다: `REQUIRE_ADMIN_ONLY_IN_ADMIN` 은 0줄이 된다(memory 몫의 `AgentMemorySettingController` 두 줄은 memory 이동 PR 이 지운다). `APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT` 의 `agent.admin.application.model` 한 줄이 사라진다.
 - **더한다(이 목록만)**: `ADMIN_USES_ONLY_FEATURE_APPLICATION` 25줄이다. 모두 끝까지 남는다. 처음 표(13줄)는 phase 02 가 `*AdminDtos` 의 모양을 확정하기 전의 추정이었고, 실제로는 변환 메서드가 쓰는 domain 값이 더 있었다.
 - 옛 이름 `application.model` 과 `application.toolset` 의 타입을 쓰는 줄은 규칙이 허용하므로 없다. 기능이 옮겨지면 새 이름이 되어 그대로 허용이다.
 

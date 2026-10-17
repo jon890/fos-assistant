@@ -1,2 +1,0 @@
-com.bifos.assistant.memory.presentation.AgentMemorySettingController.get 가 CurrentUserProvider.requireAdmin 을 부른다. 관리자 전용 API 는 admin.<하위 기능>.presentation 에 두고 requireAdmin 은 거기서만 부른다. 사용자 기능 안에서 권한에 따라 범위만 다르면 CurrentUser 의 역할로 판정한다.
-com.bifos.assistant.memory.presentation.AgentMemorySettingController.replace 가 CurrentUserProvider.requireAdmin 을 부른다. 관리자 전용 API 는 admin.<하위 기능>.presentation 에 두고 requireAdmin 은 거기서만 부른다. 사용자 기능 안에서 권한에 따라 범위만 다르면 CurrentUser 의 역할로 판정한다.
