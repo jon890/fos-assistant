@@ -43,7 +43,7 @@ Control Plane 이 실행 입력에 지난 사진 참조를 실을 때 `reference
 
 `backend/src/main/java/com/bifos/assistant/chat/attachment/application/AttachmentService.java`
 
-- `sent` 마다 `inspectable(it)` 을 한 번만 불러 결과를 `Set<Long>`(보관 중인 첨부 번호)으로 모은다. 사진 참조 줄(`files`)의 `inspectable(it)` 호출은 이 집합을 읽게 바꾼다
+- `sent` 마다 `inspectable(it)` 을 한 번만 불러 결과를 `Set<Long>`(보관 중인 첨부 번호)으로 모은다. `agentInput` 안의 `inspectable(it)` 호출은 `attached` 쪽(298, 301줄 근처)을 포함해 모두 이 집합을 읽게 바꾼다. `attached` 는 `sent` 에 들어 있어 동작은 같다
 - 지난 사진은 `sent` 가운데 `attached` 의 번호에 없고 보관 중인 첨부다. `sent` 의 순서대로 번호를 모아 `MediaPipelineEvents.referenced(conversationId, 그 번호들)` 을 `return` 직전에 부른다
 - `sent` 가 비어 일찍 돌아가는 경로는 바꾸지 않는다
 
@@ -60,7 +60,7 @@ Control Plane 이 실행 입력에 지난 사진 참조를 실을 때 `reference
 
 `test/support/media-pipeline-log.ts`
 
-- `BackendPipelineEvent` 의 `stage` 에 `"referenced"` 와 `"inspected"` 를 더하고, `executionId?: number`, `assetId?: string`, `mode?: "ORIGINAL" | "REGION" | "OVERVIEW"`, `outcome?: string` 필드를 더한다. `inspected` 에는 `count` 와 `assets` 가 없으므로 그 두 필드를 선택으로 바꾼다
+- `BackendPipelineEvent` 의 `stage` 에 `"referenced"` 와 `"inspected"` 를 더하고, `executionId?: number`, `assetId?: string`, `mode?: "ORIGINAL" | "REGION" | "OVERVIEW"`, `outcome?: string` 필드를 더한다. `BackendPipelineEvent` 는 `stage` 로 가르는 판별 유니온으로 바꾼다. `embedded`, `draftReferenced`, `referenced` 는 `count` 와 `assets` 가 필수이고 `inspected` 는 `executionId`, `assetId`, `mode`, `outcome` 을 갖는다. `test/e2e/scenarios/media-pipeline-draft.ts` 와 `backendEvidence` 가 `event.assets` 를 읽는 곳은 `stage` 를 좁힌 뒤 읽도록 고쳐 strict 타입 검사를 통과시킨다. 그래서 e2e 시나리오 파일도 이 phase 의 변경 파일이다
 - `KEYS` 에 `referenced: ["schemaVersion", "stage", "conversationId", "count", "assets"]`, `inspected: ["schemaVersion", "stage", "conversationId", "executionId", "assetId", "mode", "outcome"]` 를 더한다
 - `validateBackendPipelineEvent` 는 단계별로 허용 칸이 정확히 같은지 본다. `referenced` 는 `count` 와 `assets` 검사를 기존과 같이 하고 자리가 0부터 하나씩 늘어야 한다. `inspected` 는 `executionId` 가 1 이상의 안전한 정수, `assetId` 가 `ID` 정규식, `mode` 가 세 값 가운데 하나, `outcome` 이 `^[A-Z][A-Z_]{0,63}$` 이어야 한다. 어긋나면 `BACKEND_EVENT_INVALID` 다
 - `backendEvidence` 는 `embedded` 와 `draftReferenced` 만 받는다. 다른 단계가 오면 `BACKEND_EVENT_STAGE_UNSUPPORTED` 를 던진다
@@ -69,7 +69,7 @@ Control Plane 이 실행 입력에 지난 사진 참조를 실을 때 `reference
 
 - `backend/src/test/java/com/bifos/assistant/chat/MediaPipelineEventsTest.java`: 기존 `ListAppender` 방식으로 세 사례를 더한다. 지난 사진 두 장의 `referenced` 줄이 `count` 2 와 자리 0, 1 을 싣는다. 빈 목록은 줄을 남기지 않는다. `inspected` 가 `overview`·`region` 조합마다 방식을 맞게 적고, `failure` 가 있으면 그 이름을, 없으면 `OK` 를 적는다
 - `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java`: `nextTextTurnRestoresPastReferences` 옆에 사례를 하나 더한다. 사진을 붙인 메시지 뒤에 사진 없는 메시지를 보내면 두 번째 실행 입력을 만들 때 그 사진의 `referenced` 줄이 남고, 사진을 붙인 첫 메시지에서는 `referenced` 줄이 남지 않는다. 로그는 `MediaPipelineEvents` 로거에 `ListAppender` 를 붙여 읽는다
-- `backend/src/test/java/com/bifos/assistant/mcp/application/AttachmentInspectServiceTest.java`: 성공한 조회가 `OK` 줄을, `limitsRepeatedCallAndRejectsCancellationDuringRead` 와 같은 세 번째 반복 조회가 한도 오류 코드의 줄을 남기는지 본다. 서명이 바뀐 요청(`tamperedTopLevelProofCannotSelectCurrentExecution` 의 입력)은 줄을 남기지 않는다
+- `backend/src/test/java/com/bifos/assistant/mcp/application/AttachmentInspectServiceTest.java`: 성공한 조회가 `OK` 줄을, `limitsRepeatedCallAndRejectsCancellationDuringRead` 와 같은 세 번째 반복 조회가 `MCP_CALL_CONTEXT_INVALID`(한도 전용 코드는 없고 `consume` 이 `invalid()` 로 던진다)의 줄을 남기는지 본다. 서명이 바뀐 요청(`tamperedTopLevelProofCannotSelectCurrentExecution` 의 입력)은 줄을 남기지 않는다
 - `test/unit/media-pipeline-log.test.ts`: 두 단계의 정상 줄을 받는다. `inspected` 에 좌표 칸이나 파일 이름 칸이 섞이면, `mode` 가 목록 밖이면, `outcome` 에 소문자나 공백이 있으면 거절한다. `backendEvidence` 가 `inspected` 를 받으면 `BACKEND_EVENT_STAGE_UNSUPPORTED` 를 던진다
 
 ## 검증
@@ -80,9 +80,12 @@ cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 node --test test/unit/media-pipeline-log.test.ts
 node --test 'test/unit/**/*.test.ts'
 cd backend && ./gradlew archTest
+cd test && ../web/node_modules/.bin/tsc -p tsconfig.json
 ```
 
-모두 종료 코드 0 이다.
+`web/node_modules` 가 없으면 먼저 `pnpm --dir web install` 을 돌린다. 모두 종료 코드 0 이다.
+
+`node --test 'test/unit/**/*.test.ts'` 는 `test/unit/doc-code-references.test.ts` 가 포함하며, 앞 docs 커밋이 아직 없는 파일을 가리키는 세 줄에 `ref-ignore` 표기를 달아 두었으므로 통과해야 한다. 그 표기는 phase 03 에서 뗀다.
 
 ## 변경 파일
 
@@ -96,3 +99,4 @@ cd backend && ./gradlew archTest
 | `backend/src/test/java/com/bifos/assistant/mcp/application/AttachmentInspectServiceTest.java` | 수정 |
 | `test/support/media-pipeline-log.ts` | 수정 |
 | `test/unit/media-pipeline-log.test.ts` | 수정 |
+| `test/e2e/scenarios/media-pipeline-draft.ts` | 수정 |

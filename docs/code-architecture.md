@@ -53,7 +53,7 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 | `test/e2e/` | Control Plane 의 응답과 권한과 기록 | 가짜 Hermes, 백엔드, 데이터베이스 |
 | `test/browser/` | 화면의 배치와 동작 | 위에 더해 웹과 Chromium |
 | `test/unit/` | 화면이 쓰는 순수 함수 | 없음 |
-| `test/model-eval/` | 실제 모델이 운영 흐름에서 지시와 도구를 따르는가. CI 에서 돌지 않는다 | 운영 Control Plane, Hermes, 모델. 판정 규칙은 `test/unit/` 이 따로 검사한다 |
+| `test/model-eval/` | 실제 모델이 운영 흐름에서 지시와 도구를 따르는가. CI 에서 돌지 않는다 | 운영 Control Plane, Hermes, 모델. 판정 규칙은 `test/unit/` 이 따로 검사한다 | <!-- ref-ignore: phase 03 에서 파일이 생기면 뗀다 -->
 
 브라우저 테스트는 `mobile` 과 `desktop` 두 폭에서 돈다. 폭의 값은 `test/browser/playwright.config.ts` 가 갖는다.
 
