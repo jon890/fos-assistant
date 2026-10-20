@@ -15,7 +15,7 @@
 - 안내는 `backend/src/main/java/com/bifos/assistant/chat/attachment/application/AttachmentService.java` 의 `private static String photoGuidance(List<AgentPhoto> photos)` 가 만든다. `photos` 는 이번 메시지의 첨부(`attached`)에서 만든 것이라, 이번 메시지에 사진이 없으면 빈 목록이다
 - `agentInput` 안의 `sent` 는 이 대화에서 메시지에 묶인 모든 첨부다. 이번 메시지의 첨부도 이미 묶여 들어 있다. 지난 사진은 `sent` 가운데 `attached` 의 번호에 없는 첨부다. 보관 중인지는 `inspectable(ChatAttachment)` 가 판정한다
 - `agentInput` 은 지난 사진 가운데 보관 중인 것의 번호 목록을 만들어 `MediaPipelineEvents.referenced(conversationId, 번호 목록)` 에 넘긴다. 지난 사진 수는 그 목록의 크기를 쓴다. 같은 첨부에 `inspectable` 을 다시 부르지 않는다
-- 지금 문구를 단언하는 테스트: `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` 의 250줄(「사진은 모두 30장이다.」)과 333줄(「사진은 모두 2장이다.」), `backend/src/test/java/com/bifos/assistant/chat/AttachmentDeletionBarrierTest.java` 의 471줄(「사진은 모두 1장」)이다. `test/e2e/scenarios/chat-attachment.ts` 는 「이 메시지에 이미지로 함께 실은 사진: 1번째 사진.」 을 단언하므로 그 문장은 바꾸지 않는다
+- 지금 문구를 단언하는 테스트: `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentTurnTest.java` 의 255줄(「사진은 모두 30장이다.」)과 371줄(「사진은 모두 2장이다.」), `backend/src/test/java/com/bifos/assistant/chat/AttachmentDeletionBarrierTest.java` 의 471줄(「사진은 모두 1장」)이다. `test/e2e/scenarios/chat-attachment.ts` 는 「이 메시지에 이미지로 함께 실은 사진: 1번째 사진.」 을 단언하므로 그 문장은 바꾸지 않는다
 
 **근거 문서**: `docs/features/attachment.md` 의 「실행 입력에 사진을 싣는 법」
 
@@ -46,7 +46,7 @@
 
 ### 2. 이 phase 를 검증하는 테스트
 
-- `ChatAttachmentTurnTest` 250줄과 333줄의 기대 문장을 `이번 메시지의 사진은 30장이다.`, `이번 메시지의 사진은 2장이다.` 로 바꾼다
+- `ChatAttachmentTurnTest` 255줄과 371줄의 기대 문장을 `이번 메시지의 사진은 30장이다.`, `이번 메시지의 사진은 2장이다.` 로 바꾼다
 - `AttachmentDeletionBarrierTest` 471줄의 기대 문장을 `이번 메시지의 사진은 1장` 으로 바꾼다
 - `ChatAttachmentTurnTest` 의 `nextTextTurnRestoresPastReferences` 에 단언을 더한다. 두 번째 입력이 `이번 메시지에 새로 붙인 사진은 없다. 이 대화에는 앞서 보낸 사진 1장이 있다.` 와 `보지 않은 사진의 내용을 사용자에게 설명해 달라고 하지 않는다.` 를 담고, `사진은 모두` 와 `0장` 을 담지 않는다
 - 같은 테스트 파일에 사례 둘을 더한다
