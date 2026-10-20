@@ -1,0 +1,13 @@
+{
+  "name": "plan220-blog-photo-eval",
+  "description": "블로그 사진 평가 — 지난 사진을 조회하는지 단계 사건으로 남기고, 합성 사진과 운영 왕복 평가 스크립트로 판정한다",
+  "status": "pending",
+  "created_at": "2026-10-20",
+  "total_phases": 3,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+  ]
+}
