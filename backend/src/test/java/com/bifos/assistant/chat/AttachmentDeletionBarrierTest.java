@@ -468,7 +468,7 @@ public class AttachmentDeletionBarrierTest {
                 .isEmpty();
         assertThat(service.agentInput(conversation.id(), List.of(photo), "본문")
             .text())
-                .contains("사진은 모두 1장")
+                .contains("이번 메시지의 사진은 1장")
                 .doesNotContain("파일=" + photo.storedName());
     }
 
