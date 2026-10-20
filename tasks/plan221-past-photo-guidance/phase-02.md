@@ -51,7 +51,7 @@
 ## 검증
 
 ```bash
-python3 -m unittest discover -s hermes/tests -p 'test_connectors_contract.py'
+python3 -m unittest discover -s hermes/tests -p 'test_connectors_contract.py' -k skills -k front_matter
 grep -q "쓸 사진을 모두 본 뒤에도 알 수 없을 때만" hermes/connectors/naver-blog/skills/naver-blog/SKILL.md
 grep -q "쓸 사진을 모두 보기 전에는 초안을 만들지 않고" hermes/connectors/naver-blog/skills/naver-blog/SKILL.md
 ! grep -q "사진을 모두 보고, 위" hermes/connectors/naver-blog/skills/naver-blog/SKILL.md

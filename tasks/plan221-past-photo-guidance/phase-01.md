@@ -41,7 +41,7 @@
   - `이번 메시지에 새로 붙인 사진은 없다. 이 대화에는 앞서 보낸 사진 P장이 있다.`
   - `사진을 근거로 답하거나 글을 써야 하면 위 참조의 attachment_id로 attachment_inspect를 불러 필요한 사진을 직접 본다.`
   - `보지 않은 사진의 내용을 사용자에게 설명해 달라고 하지 않는다.`
-- `photos` 가 비고 `pastCount` 가 0 이면(보낸 사진이 모두 보관 종료) `이번 메시지에 새로 붙인 사진은 없다. 앞서 보낸 사진은 모두 보관이 끝나 볼 수 없다.` 한 줄을 쓴다
+- `photos` 가 비고 `pastCount` 가 0 이면(보낸 사진이 모두 보관 종료) `이번 메시지에 새로 붙인 사진은 없다. 앞서 보낸 사진은 보관이 끝나 하나도 볼 수 없다.` 한 줄을 쓴다
 - 메서드 Javadoc 에 이번 메시지와 지난 사진을 나눠 적는 까닭을 한 문장으로 적는다
 
 ### 2. 이 phase 를 검증하는 테스트
@@ -51,13 +51,13 @@
 - `ChatAttachmentTurnTest` 의 `nextTextTurnRestoresPastReferences` 에 단언을 더한다. 두 번째 입력이 `이번 메시지에 새로 붙인 사진은 없다. 이 대화에는 앞서 보낸 사진 1장이 있다.` 와 `보지 않은 사진의 내용을 사용자에게 설명해 달라고 하지 않는다.` 를 담고, `사진은 모두` 와 `0장` 을 담지 않는다
 - 같은 테스트 파일에 사례 둘을 더한다
   - 앞 메시지에 사진 한 장, 이번 메시지에 사진 한 장을 보내면 입력이 `이번 메시지의 사진은 1장이다.` 와 `이 대화에는 앞서 보낸 사진 1장도 있다.` 를 담는다
-  - 앞 메시지의 사진을 지운 뒤 사진 없이 보내면 입력이 `앞서 보낸 사진은 모두 보관이 끝나 볼 수 없다.` 를 담는다. 첨부를 지우는 방법은 같은 파일의 기존 삭제 사례를 따른다
+  - 앞 메시지의 사진을 지운 뒤 사진 없이 보내면 입력이 `앞서 보낸 사진은 보관이 끝나 하나도 볼 수 없다.` 를 담는다. 첨부를 지우는 방법은 같은 파일의 기존 삭제 사례를 따른다
 
 ## 검증
 
 ```bash
 cd backend && ./gradlew test --tests '*ChatAttachmentTurnTest' --tests '*AttachmentDeletionBarrierTest'
-cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+git fetch origin && cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
 ! git grep -n "사진은 모두" -- backend/src/main
 ```
 
