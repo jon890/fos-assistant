@@ -16,5 +16,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["e2e/**/*.ts"]
+  "include": ["e2e/**/*.ts", "model-eval/**/*.ts"]
 }
