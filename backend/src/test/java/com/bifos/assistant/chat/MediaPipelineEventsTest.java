@@ -8,6 +8,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
 import com.bifos.assistant.chat.attachment.application.MediaPipelineEvents;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftAsset;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -106,6 +107,60 @@ class MediaPipelineEventsTest {
             .forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
 
         assertThat(logs.list).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("지난 사진 참조 사건은 첨부 번호와 자리만 싣는다")
+    void referencedRecordsPastPhotoPositions() {
+        MediaPipelineEvents.referenced(7L, List.of(11L, 13L));
+
+        JsonNode event = onlyEvent();
+        assertThat(event.path("stage").asString()).isEqualTo("referenced");
+        assertThat(event.path("count").asInt()).isEqualTo(2);
+        assertThat(event.path("assets").get(0).path("assetId").asString()).isEqualTo("11");
+        assertThat(event.path("assets").get(0).path("position").asInt()).isEqualTo(0);
+        assertThat(event.path("assets").get(1).path("assetId").asString()).isEqualTo("13");
+        assertThat(event.path("assets").get(1).path("position").asInt()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("지난 사진이 없으면 참조 사건을 남기지 않는다")
+    void referencedSkipsEmptyList() {
+        MediaPipelineEvents.referenced(7L, List.of());
+
+        assertThat(logs.list).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("원본 조회 사건은 방식을 개요, 영역, 원본 순으로 가르고 실패하지 않았으면 OK 를 적는다")
+    void inspectedRecordsModeAndOutcome() {
+        MediaPipelineEvents.inspected(7L, 21L, 11L, true, false, null);
+        MediaPipelineEvents.inspected(7L, 21L, 11L, false, true, null);
+        MediaPipelineEvents.inspected(7L, 21L, 11L, false, false, null);
+
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage)
+            .anySatisfy(message -> assertThat(message).contains("\"mode\":\"OVERVIEW\"", "\"outcome\":\"OK\""))
+            .anySatisfy(message -> assertThat(message).contains("\"mode\":\"REGION\""))
+            .anySatisfy(message -> assertThat(message).contains("\"mode\":\"ORIGINAL\""));
+        assertThat(logs.list).hasSize(3);
+    }
+
+
+    @Test
+    @DisplayName("원본 조회가 실패하면 오류 코드 이름을 적고 좌표나 파일 이름은 싣지 않는다")
+    void inspectedRecordsFailureCodeName() {
+        MediaPipelineEvents.inspected(7L, 21L, 11L, false, true, ErrorCode.MCP_CALL_CONTEXT_INVALID);
+
+        JsonNode event = onlyEvent();
+        assertThat(event.path("stage").asString()).isEqualTo("inspected");
+        assertThat(event.path("executionId").asLong()).isEqualTo(21L);
+        assertThat(event.path("assetId").asString()).isEqualTo("11");
+        assertThat(event.path("mode").asString()).isEqualTo("REGION");
+        assertThat(event.path("outcome").asString()).isEqualTo("MCP_CALL_CONTEXT_INVALID");
+        assertThat(event.propertyNames()).hasSize(7);
     }
 
 

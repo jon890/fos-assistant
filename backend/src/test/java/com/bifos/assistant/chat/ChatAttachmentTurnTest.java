@@ -9,6 +9,9 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -18,6 +21,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.MediaPipelineEvents;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
@@ -74,6 +78,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 
@@ -287,6 +292,39 @@ class ChatAttachmentTurnTest {
             .contains("- 1번째 사진: attachment_id=" + photo.id(), "원본 표시 크기=200x100", "attachment_inspect")
             .doesNotContain("다시 보내 달라고");
         assertThat(stub().received().getLast().images()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("사진 없는 다음 turn은 지난 사진의 참조 사건을 남기고 사진을 붙인 첫 turn은 남기지 않는다")
+    void recordsReferencedEventOnlyForPastPhotos() throws IOException {
+        Logger logger = (Logger)LoggerFactory.getLogger(MediaPipelineEvents.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            Long conversationId = chat.startEmpty(dad, "dad").id();
+            ChatAttachment photo = uploadPng(dad, conversationId, "원본.png", png(200, 100));
+            chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+            assertThat(referencedLines(logs)).isEmpty();
+
+            chat.send(dad, conversationId, "첫 사진의 작은 글자는?", null, List.of());
+            assertThat(referencedLines(logs)).hasSize(1);
+            assertThat(referencedLines(logs).getFirst()).contains(
+                "\"conversationId\":" + conversationId,
+                "\"count\":1",
+                "{\"assetId\":\"" + photo.id() + "\",\"position\":0}");
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
+
+
+    private static List<String> referencedLines(ListAppender<ILoggingEvent> logs) {
+        return logs.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(message -> message.contains("\"stage\":\"referenced\""))
+            .toList();
     }
 
 

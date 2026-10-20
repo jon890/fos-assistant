@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -295,16 +296,20 @@ public class AttachmentService {
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
             + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
-        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(this::inspectable).toList(), order).stream()
+        Set<Long> retained = sent.stream()
+            .filter(this::inspectable)
+            .map(ChatAttachment::id)
+            .collect(Collectors.toSet());
+        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(it -> retained.contains(it.id())).toList(), order).stream()
             .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
         List<AgentPhoto> photos = attached.stream()
-            .map(attachment -> inspectable(attachment) && prepared.containsKey(attachment.id())
+            .map(attachment -> retained.contains(attachment.id()) && prepared.containsKey(attachment.id())
                 ? prepared.get(attachment.id())
                 : new AgentPhoto(attachment.id(), order.get(attachment.id()), null))
             .toList();
         String files = sent.stream()
             .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
-                + (inspectable(it)
+                + (retained.contains(it.id())
                     ? ", 원본 표시 크기=" + inspection.displaySize(it) + ", 파일=" + it.storedName() + " (올린 이름: "
                         + it.originalName() + ")"
                     : " [보관 종료]"))
@@ -331,6 +336,10 @@ public class AttachmentService {
             .filter(AgentPhoto::embedded)
             .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
             .toList();
+        Set<Long> attachedIds = attached.stream().map(ChatAttachment::id).collect(Collectors.toSet());
+        MediaPipelineEvents.referenced(
+            conversationId,
+            sent.stream().map(ChatAttachment::id).filter(id -> !attachedIds.contains(id) && retained.contains(id)).toList());
         return new AgentInput(input, hermesImages);
     }
 

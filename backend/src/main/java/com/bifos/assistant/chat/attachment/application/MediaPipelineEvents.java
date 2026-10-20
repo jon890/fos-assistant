@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.attachment.application;
 
 import com.bifos.assistant.chat.attachment.application.dto.AgentPhoto;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftAsset;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
@@ -48,6 +49,34 @@ public final class MediaPipelineEvents {
             + ",\"draftId\":\"" + draftId + "\",\"revision\":" + revision + ",\"count\":" + assets.size()
             + ",\"assets\":" + assetList + "}";
         afterCommit(() -> log.info("media-pipeline {}", message));
+    }
+
+
+    /**
+     * 실행 입력에 지난 사진 참조를 실은 사실을 남긴다. 이번 메시지의 사진은 {@code embedded} 가 다루므로 뺀 지난 사진만 싣는다.
+     * 자리는 목록 안의 순서다. 참조 줄을 만든 사실만 뜻하며 모델이 그 사진을 읽었다는 증거가 아니다.
+     */
+    public static void referenced(Long conversationId, List<Long> attachmentIds) {
+        if (attachmentIds.isEmpty()) {
+            return;
+        }
+        log.info("media-pipeline {}", "{\"schemaVersion\":1,\"stage\":\"referenced\",\"conversationId\":" + conversationId
+            + ",\"count\":" + attachmentIds.size() + ",\"assets\":" + positions(attachmentIds) + "}");
+    }
+
+
+    /**
+     * 원본 조회 요청 하나를 처리한 결과를 남긴다. 영역 좌표와 파일 이름, 사진 바이트는 싣지 않는다.
+     * {@code failure} 가 없으면 결과는 {@code OK} 이고 있으면 그 이름이다. 조회 요청을 처리한 사실만 뜻하며
+     * 모델이 사진을 읽었다는 증거가 아니다.
+     */
+    public static void inspected(
+        Long conversationId, Long executionId, long attachmentId, boolean overview, boolean region, ErrorCode failure) {
+        String mode = overview ? "OVERVIEW" : region ? "REGION" : "ORIGINAL";
+        String outcome = failure == null ? "OK" : failure.name();
+        log.info("media-pipeline {}", "{\"schemaVersion\":1,\"stage\":\"inspected\",\"conversationId\":" + conversationId
+            + ",\"executionId\":" + executionId + ",\"assetId\":\"" + attachmentId + "\",\"mode\":\"" + mode
+            + "\",\"outcome\":\"" + outcome + "\"}");
     }
 
 
