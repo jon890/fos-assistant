@@ -143,7 +143,7 @@ function nodesOf(root: ExecutionNode): ExecutionNode[] {
 type RunReport = RunRecord & RunScore & { kept: boolean; deleteError?: string };
 
 async function judge(api: ControlPlane, run: RunRecord, answers: Map<string, PhotoAnswer> | null, log: ReturnType<typeof parseBackendPipelineEvents>): Promise<RunScore> {
-  const blank = { events: log, answers, executionIds: [], status: null, toolFailed: false, truncated: false, preview: null };
+  const blank = { events: log, answers, executionIds: [], status: null, failedTools: [], truncated: false, preview: null };
   const last = run.messages.at(-1);
   if (run.error || !run.conversationId || !last || last.executionId === null)
     return scoreRun({ ...blank, run: run.error ? run : { ...run, error: "보낸 기록 없음" } });
@@ -162,9 +162,11 @@ async function judge(api: ControlPlane, run: RunRecord, answers: Map<string, Pho
       events: log,
       executionIds: nodes.map((node) => node.executionId),
       status: tree.root.status,
-      toolFailed: nodes.some((node) =>
-        (node.events ?? []).some((event) => event.toolName?.includes(BLOG_TOOL) && event.failed === true),
-      ),
+      failedTools: [...new Set(nodes.flatMap((node) =>
+        (node.events ?? []).flatMap((event) =>
+          event.toolName?.includes(BLOG_TOOL) && event.failed === true ? [event.toolName] : [],
+        ),
+      ))],
       truncated: tree.truncated,
       preview: previewOf(htmls, run.messages.flatMap((message) => message.attachmentIds)),
     });
@@ -186,6 +188,13 @@ function markdown(runs: RunReport[], scenarios: { scenarioId: string; outcome: R
         lines.push(`- ${photo.photoId} (첨부 ${photo.attachmentId}): ${photo.issues.join(", ")}`);
       lines.push("");
     }
+  }
+  const noted = runs.filter((run) => run.notes.length > 0);
+  if (noted.length > 0) {
+    lines.push("", "## 실행 참고", "");
+    for (const run of noted)
+      lines.push(`- \`${run.scenarioId}\` #${run.repeat} ${run.outcome}: 참고: ${run.notes.join(", ")}`);
+    lines.push("");
   }
   const kept = runs.filter((run) => run.kept && run.conversationId);
   lines.push("## 남긴 대화", "");

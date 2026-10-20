@@ -82,7 +82,7 @@ function input(overrides: Partial<ScoreInput> = {}): ScoreInput {
     events: [embedded(IDS), referenced(IDS), ...IDS.map((id) => inspected(id))],
     executionIds: [ROOT, CHILD],
     status: "SUCCEEDED",
-    toolFailed: false,
+    failedTools: [],
     truncated: false,
     preview: html(IDS),
     ...overrides,
@@ -132,19 +132,45 @@ test("정답이 없으면 판독 실패, 부르지 않으면 원고 누락, 참�
 
 test("미리보기가 없으면 미리보기 없음 하나만 적은 FAIL 이다", () => {
   const result = scoreRun(input({ preview: null }));
-  assert.deepEqual(result, { outcome: "FAIL", reasons: ["미리보기 없음"], photos: [] });
+  assert.deepEqual(result, { outcome: "FAIL", reasons: ["미리보기 없음"], notes: [], photos: [] });
 });
 
-test("실행이 SUCCEEDED 가 아니거나 블로그 도구가 실패하거나 트리가 잘리면 INCONCLUSIVE 다", () => {
+test("미리보기가 있으면 list_categories 실패를 참고에 남기고 사진 기준으로 PASS 다", () => {
+  const result = scoreRun(input({ failedTools: ["list_categories", "list_categories"] }));
+  assert.equal(result.outcome, "PASS");
+  assert.deepEqual(result.reasons, []);
+  assert.deepEqual(result.notes, ["list_categories 실패"]);
+  assert.deepEqual(issuesOf(result), {});
+  assert.equal(result.photos.length, 6);
+});
+
+test("미리보기와 도구 실패가 함께 있어도 사진 하나의 정답 글자가 없으면 FAIL 이다", () => {
+  const result = scoreRun(input({ failedTools: ["list_categories"], preview: html(IDS, [], [101]) }));
+  assert.equal(result.outcome, "FAIL");
+  assert.deepEqual(issuesOf(result), { p01: ["판독 실패"] });
+  assert.deepEqual(result.notes, ["list_categories 실패"]);
+});
+
+test("미리보기가 없고 네이버 블로그 도구가 실패하면 INCONCLUSIVE 다", () => {
+  assert.deepEqual(scoreRun(input({ failedTools: ["list_categories", "render_draft"], preview: null })), {
+    outcome: "INCONCLUSIVE",
+    reasons: ["네이버 블로그 도구 실패"],
+    notes: ["list_categories 실패", "render_draft 실패"],
+    photos: [],
+  });
+});
+
+test("미리보기가 있어도 실행이 SUCCEEDED 가 아니거나 트리가 잘리면 INCONCLUSIVE 다", () => {
   assert.deepEqual(scoreRun(input({ status: "FAILED" })), {
     outcome: "INCONCLUSIVE",
     reasons: ["실행 상태 FAILED"],
+    notes: [],
     photos: [],
   });
-  assert.deepEqual(scoreRun(input({ toolFailed: true })).reasons, ["네이버 블로그 도구 실패"]);
   assert.deepEqual(scoreRun(input({ truncated: true })), {
     outcome: "INCONCLUSIVE",
     reasons: ["실행 트리 잘림"],
+    notes: [],
     photos: [],
   });
   assert.equal(scoreRun(input({ run: { ...pastOnly(), error: "TimeoutError: 시간 초과" } })).outcome, "INCONCLUSIVE");
@@ -214,7 +240,7 @@ test("앞 메시지의 referenced 가 아니라 마지막 메시지의 reference
 
 test("로그에 이 대화의 사건이 하나도 없으면 INCONCLUSIVE 다", () => {
   const result = scoreRun(input({ events: [embedded([901, 902], [], 99)], preview: null }));
-  assert.deepEqual(result, { outcome: "INCONCLUSIVE", reasons: ["로그에 대화 사건 없음"], photos: [] });
+  assert.deepEqual(result, { outcome: "INCONCLUSIVE", reasons: ["로그에 대화 사건 없음"], notes: [], photos: [] });
 });
 
 test("normalize 는 띄어쓰기, 태그, 엔티티를 지운다", () => {
