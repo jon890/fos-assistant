@@ -5,6 +5,7 @@ import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.MediaPipelineEvents;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -37,19 +38,34 @@ public class AttachmentInspectService {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
         McpCaller caller = authorize(principal, body, request);
         AgentExecution execution = caller.originExecution();
-        consume(caller, request.attachmentId());
-        InspectedImage result = request.overview()
-            ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
-            : attachments.inspect(
-                caller.user(),
-                execution.conversationId(),
-                request.attachmentId(),
-                request.region(),
-                () -> active(execution.id()));
-        if (!active(execution.id())) {
-            throw invalid();
+        try {
+            consume(caller, request.attachmentId());
+            InspectedImage result = request.overview()
+                ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
+                : attachments.inspect(
+                    caller.user(),
+                    execution.conversationId(),
+                    request.attachmentId(),
+                    request.region(),
+                    () -> active(execution.id()));
+            if (!active(execution.id())) {
+                throw invalid();
+            }
+            record(execution, request, null);
+            return result;
+        } catch (ApiException ex) {
+            record(execution, request, ex.code());
+            throw ex;
+        } catch (RuntimeException ex) {
+            record(execution, request, ErrorCode.INTERNAL_ERROR);
+            throw ex;
         }
-        return result;
+    }
+
+
+    private static void record(AgentExecution execution, AttachmentInspectRequest request, ErrorCode failure) {
+        MediaPipelineEvents.inspected(
+            execution.conversationId(), execution.id(), request.attachmentId(), request.overview(), request.region() != null, failure);
     }
 
 

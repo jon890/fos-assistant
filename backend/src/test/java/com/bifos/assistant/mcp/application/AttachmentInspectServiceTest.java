@@ -1,5 +1,8 @@
 package com.bifos.assistant.mcp.application;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.mcp.application.dto.AttachmentInspectRequest;
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
@@ -13,6 +16,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.application.MediaPipelineEvents;
 import com.bifos.assistant.chat.attachment.application.dto.InspectedImage;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -24,10 +28,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -184,5 +190,44 @@ class AttachmentInspectServiceTest {
             .thenReturn(new McpCaller(user, execution, context));
         assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
         verifyNoInteractions(attachments);
+    }
+
+
+    @Test
+    @DisplayName("조회 사건은 성공에 OK, 한도 거절에 오류 코드 이름을 남기고 서명이 어긋난 요청은 남기지 않는다")
+    void recordsInspectedEventForOutcomesAfterAuthorization() {
+        Logger logger = (Logger)LoggerFactory.getLogger(MediaPipelineEvents.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            ObjectNode body = request(NOW);
+            service.inspect(principal, body);
+            assertThat(inspectedLines(logs)).hasSize(1);
+            assertThat(inspectedLines(logs).getFirst()).contains(
+                "\"conversationId\":2", "\"executionId\":1", "\"assetId\":\"7\"", "\"mode\":\"ORIGINAL\"", "\"outcome\":\"OK\"");
+
+            service.inspect(principal, body);
+            assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
+            assertThat(inspectedLines(logs)).hasSize(3);
+            assertThat(inspectedLines(logs).getLast()).contains("\"outcome\":\"MCP_CALL_CONTEXT_INVALID\"");
+
+            ObjectNode tampered = request(NOW);
+            ((ObjectNode)tampered.get("_fos_inspect")).put("top_level", false);
+            when(callers.resolveAttachmentInspection(eq(principal), any(), eq(false)))
+                .thenReturn(new McpCaller(user, execution, context));
+            assertThatThrownBy(() -> service.inspect(principal, tampered)).isInstanceOf(ApiException.class);
+            assertThat(inspectedLines(logs)).hasSize(3);
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
+
+
+    private static List<String> inspectedLines(ListAppender<ILoggingEvent> logs) {
+        return logs.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(message -> message.contains("\"stage\":\"inspected\""))
+            .toList();
     }
 }

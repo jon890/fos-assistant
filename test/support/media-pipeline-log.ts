@@ -3,17 +3,45 @@ import type {
   PipelineEvidenceV1,
 } from "./media-pipeline-evidence.ts";
 
-/** Control Plane 의 `MediaPipelineEvents` 가 남기는 본문 없는 단계 사건이다. */
-export type BackendPipelineEvent = {
-  schemaVersion: 1;
-  stage: "embedded" | "draftReferenced";
-  conversationId: number;
-  draftId?: string;
-  revision?: number;
+type PipelineAsset = { assetId: string; position: number };
+type EventBase = { schemaVersion: 1; conversationId: number };
+
+/** 실은 사진 사건이다. 싣지 못한 첨부 번호는 `missing` 에 있다. */
+export type EmbeddedEvent = EventBase & {
+  stage: "embedded";
   count: number;
-  assets: { assetId: string; position: number }[];
-  missing?: string[];
+  assets: PipelineAsset[];
+  missing: string[];
 };
+/** 원고 revision 이 참조한 사진 사건이다. */
+export type DraftReferencedEvent = EventBase & {
+  stage: "draftReferenced";
+  draftId: string;
+  revision: number;
+  count: number;
+  assets: PipelineAsset[];
+};
+/** 실행 입력에 실은 지난 사진 참조 사건이다. */
+export type ReferencedEvent = EventBase & {
+  stage: "referenced";
+  count: number;
+  assets: PipelineAsset[];
+};
+/** 원본 조회 요청 하나의 처리 결과 사건이다. */
+export type InspectedEvent = EventBase & {
+  stage: "inspected";
+  executionId: number;
+  assetId: string;
+  mode: "ORIGINAL" | "REGION" | "OVERVIEW";
+  outcome: string;
+};
+
+/** Control Plane 의 `MediaPipelineEvents` 가 남기는 본문 없는 단계 사건이다. */
+export type BackendPipelineEvent =
+  | EmbeddedEvent
+  | DraftReferencedEvent
+  | ReferencedEvent
+  | InspectedEvent;
 
 const PREFIX = "media-pipeline ";
 const ID = /^[1-9][0-9]{0,18}$/;
@@ -29,7 +57,19 @@ const KEYS = {
     "count",
     "assets",
   ],
+  referenced: ["schemaVersion", "stage", "conversationId", "count", "assets"],
+  inspected: [
+    "schemaVersion",
+    "stage",
+    "conversationId",
+    "executionId",
+    "assetId",
+    "mode",
+    "outcome",
+  ],
 } as const;
+const MODES: readonly string[] = ["ORIGINAL", "REGION", "OVERVIEW"];
+const OUTCOME = /^[A-Z][A-Z_]{0,63}$/;
 
 /**
  * 사건의 칸을 허용 목록으로만 받는다. 번호와 자리, 장수 밖의 칸이나 글이 섞이면 거절한다.
@@ -38,19 +78,41 @@ const KEYS = {
 export function validateBackendPipelineEvent(value: unknown): BackendPipelineEvent {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("BACKEND_EVENT_INVALID");
-  const event = value as BackendPipelineEvent;
+  const raw = value as Record<string, unknown>;
+  const stage = raw.stage;
   const allowed: readonly string[] | undefined =
-    event.stage === "embedded" || event.stage === "draftReferenced"
-      ? KEYS[event.stage]
+    stage === "embedded" ||
+    stage === "draftReferenced" ||
+    stage === "referenced" ||
+    stage === "inspected"
+      ? KEYS[stage]
       : undefined;
-  const keys = Object.keys(event);
+  const keys = Object.keys(raw);
   if (
     !allowed ||
     keys.length !== allowed.length ||
     keys.some((key) => !allowed.includes(key)) ||
-    event.schemaVersion !== 1 ||
-    !Number.isSafeInteger(event.conversationId) ||
-    event.conversationId < 1 ||
+    raw.schemaVersion !== 1 ||
+    !Number.isSafeInteger(raw.conversationId) ||
+    (raw.conversationId as number) < 1
+  )
+    throw new Error("BACKEND_EVENT_INVALID");
+  if (stage === "inspected") {
+    if (
+      !Number.isSafeInteger(raw.executionId) ||
+      (raw.executionId as number) < 1 ||
+      typeof raw.assetId !== "string" ||
+      !ID.test(raw.assetId) ||
+      typeof raw.mode !== "string" ||
+      !MODES.includes(raw.mode) ||
+      typeof raw.outcome !== "string" ||
+      !OUTCOME.test(raw.outcome)
+    )
+      throw new Error("BACKEND_EVENT_INVALID");
+    return raw as InspectedEvent;
+  }
+  const event = raw as EmbeddedEvent | DraftReferencedEvent | ReferencedEvent;
+  if (
     !Number.isSafeInteger(event.count) ||
     !Array.isArray(event.assets) ||
     event.count !== event.assets.length
@@ -79,11 +141,14 @@ export function validateBackendPipelineEvent(value: unknown): BackendPipelineEve
     )
       throw new Error("BACKEND_EVENT_INVALID");
     ids.push(...event.missing);
+  } else if (event.stage === "referenced") {
+    if (event.assets.some((asset, index) => asset.position !== index))
+      throw new Error("BACKEND_EVENT_INVALID");
   } else if (
     typeof event.draftId !== "string" ||
     !UUID.test(event.draftId) ||
     !Number.isSafeInteger(event.revision) ||
-    event.revision! < 1
+    event.revision < 1
   )
     throw new Error("BACKEND_EVENT_INVALID");
   if (new Set(ids).size !== ids.length) throw new Error("BACKEND_EVENT_DUPLICATE_ID");
@@ -117,6 +182,8 @@ export function backendEvidence(
   assetKeys: ReadonlyMap<string, string>,
   scope: EvidenceScope,
 ): PipelineEvidenceV1[] {
+  if (event.stage !== "embedded" && event.stage !== "draftReferenced")
+    throw new Error("BACKEND_EVENT_STAGE_UNSUPPORTED");
   const keyOf = (assetId: string) => {
     const assetKey = assetKeys.get(assetId);
     if (!assetKey) throw new Error("BACKEND_EVENT_FOREIGN_ID");
@@ -132,7 +199,7 @@ export function backendEvidence(
       scope,
     }),
   );
-  const failed = (event.missing ?? []).map(
+  const failed = (event.stage === "embedded" ? event.missing : []).map(
     (assetId): PipelineEvidenceV1 => ({
       schemaVersion: 1,
       runId,
