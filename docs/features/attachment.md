@@ -2,7 +2,7 @@
 
 대화에 사진을 올려 에이전트에게 보내고, 에이전트가 만든 HTML 결과물을 보관하고 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPipeline*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+covers: `backend/src/main/java/com/bifos/assistant/mcp/application/AttachmentInspectService.java`, `test/support/media-pipeline-log.ts`, `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPipeline*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
 
 ## 삭제 요청과 접근 차단
 

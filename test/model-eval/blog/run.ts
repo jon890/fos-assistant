@@ -97,6 +97,8 @@ async function send(values: Record<string, unknown>): Promise<number> {
     private: Boolean(scenarioFile),
     runs: [],
   };
+  // 중간에 멈춰도 앞 기록이 남도록 대화 번호를 받은 직후와 메시지를 보낼 때마다 다시 쓴다
+  const save = () => writeFileSync(join(out, "runs.json"), `${JSON.stringify(file, null, 2)}\n`);
   for (const scenario of scenarios) {
     for (let n = 1; n <= repeat; n++) {
       const run: RunRecord = { scenarioId: scenario.id, repeat: n, conversationId: null, messages: [] };
@@ -104,6 +106,7 @@ async function send(values: Record<string, unknown>): Promise<number> {
       try {
         const conversationId = await api.startConversation(env.FOS_EVAL_AGENT_CODE);
         run.conversationId = conversationId;
+        save();
         if (tier) await api.chooseTier(conversationId, tier);
         for (const message of scenario.messages) {
           const sent = { executionId: null as number | null, attachmentIds: [] as number[], photoIds: [] as string[] };
@@ -116,17 +119,19 @@ async function send(values: Record<string, unknown>): Promise<number> {
           const text = message.text.replaceAll("{category}", env.FOS_EVAL_BLOG_CATEGORY);
           const reply = await api.send(conversationId, text, env.FOS_EVAL_AGENT_CODE, sent.attachmentIds);
           sent.executionId = reply.executionId;
+          save();
         }
       } catch (error) {
         if (error instanceof UsageError) throw error;
         run.error = errorText(error);
       }
-      // 중간에 멈춰도 앞 실행의 기록이 남도록 실행마다 다시 쓴다
-      writeFileSync(join(out, "runs.json"), `${JSON.stringify(file, null, 2)}\n`);
+      save();
       const executions = run.messages.map((message) => message.executionId ?? "-").join(",");
       console.log(`${scenario.id} #${n} 대화 ${run.conversationId ?? "-"} 실행 ${executions}${run.error ? ` 오류 ${run.error}` : ""}`);
     }
   }
+  const failed = file.runs.filter((run) => run.error).length;
+  if (failed > 0) console.log(`오류로 멈춘 실행 ${failed}개. score 가 INCONCLUSIVE 로 판정한다`);
   return 0;
 }
 

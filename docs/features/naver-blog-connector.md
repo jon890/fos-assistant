@@ -2,7 +2,7 @@
 
 사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고 고치며, 블로그 글을 임시저장하는 범용 커넥터의 개발 문서다.
 
-covers: `hermes/connectors/naver-blog/`
+covers: `hermes/connectors/naver-blog/`, `test/model-eval/blog/`, `test/unit/blog-photo-eval-*.test.ts`
 
 코드는 [`hermes/connectors/naver-blog/`](../../hermes/connectors/naver-blog) 에 있다.
 이 문서는 도구와 정책, 초안의 모양, 임시저장 글 읽기와 덮어쓰기, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [네이버 블로그 커넥터 README](../../hermes/connectors/naver-blog/README.md) 가 갖는다.
