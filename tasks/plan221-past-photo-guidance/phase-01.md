@@ -56,8 +56,9 @@
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ChatAttachmentTurnTest' --tests '*AttachmentDeletionBarrierTest'
-git fetch origin && cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck
+# cwd: 저장소 root
+(cd backend && ./gradlew test --tests '*ChatAttachmentTurnTest' --tests '*AttachmentDeletionBarrierTest')
+git fetch origin && (cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck)
 ! git grep -n "사진은 모두" -- backend/src/main
 ```
 
