@@ -9,6 +9,8 @@ import {
   backendEvidence,
   parseBackendPipelineEvents,
   type BackendPipelineEvent,
+  type DraftReferencedEvent,
+  type EmbeddedEvent,
 } from "../../support/media-pipeline-log.ts";
 import { expect, fail, step, type Context } from "../harness.ts";
 import { callTool, contextFor, type ToolResult } from "../delegation-support.ts";
@@ -28,11 +30,11 @@ function draft(result: ToolResult): DraftView {
 }
 
 /** 로그는 프로세스 출력을 파일로 옮겨 쓰므로 응답보다 늦게 닿을 수 있다. 조건을 만족할 때까지 짧게 다시 읽는다. */
-async function waitForEvent(
+async function waitForEvent<T extends BackendPipelineEvent>(
   context: Context,
-  match: (event: BackendPipelineEvent) => boolean,
+  match: (event: BackendPipelineEvent) => event is T,
   what: string,
-): Promise<BackendPipelineEvent> {
+): Promise<T> {
   for (let attempt = 0; attempt < 100; attempt++) {
     const found = parseBackendPipelineEvents(await context.readBackendLog()).filter(match);
     if (found.length > 1) fail(`${what} 사건이 중복됐다`);
@@ -58,18 +60,18 @@ export async function checkPipelineEvidence(
   const assetKeys = new Map(
     sent.map((fixture, position) => [String(sentIds[position]), fixture.assetKey]),
   );
-  const ours = (event: BackendPipelineEvent) =>
-    [...event.assets.map((asset) => asset.assetId), ...(event.missing ?? [])].some((id) =>
+  const ours = (event: EmbeddedEvent) =>
+    [...event.assets.map((asset) => asset.assetId), ...event.missing].some((id) =>
       assetKeys.has(id),
     );
   const embedded = await waitForEvent(
     context,
-    (event) => event.stage === "embedded" && ours(event),
+    (event): event is EmbeddedEvent => event.stage === "embedded" && ours(event),
     "실은 사진",
   );
   expect(
     embedded.count === 30 &&
-      embedded.missing!.length === 0 &&
+      embedded.missing.length === 0 &&
       embedded.assets.every((asset, position) => asset.assetId === String(sentIds[position])),
     "실은 사진 사건의 첨부 순서가 보낸 순서와 다르다",
   );
@@ -112,7 +114,7 @@ export async function checkPipelineEvidence(
   const referenced = async (revision: number) =>
     waitForEvent(
       context,
-      (event) =>
+      (event): event is DraftReferencedEvent =>
         event.stage === "draftReferenced" &&
         event.draftId === first.draftId &&
         event.revision === revision,
@@ -127,7 +129,7 @@ export async function checkPipelineEvidence(
     ),
     "원고 참조 사건의 첨부·블록 자리가 원고와 다르다",
   );
-  const judge = (runId: string, draftEvent: BackendPipelineEvent) => {
+  const judge = (runId: string, draftEvent: DraftReferencedEvent) => {
     const uploaded = sent.map(
       (fixture): PipelineEvidenceV1 => ({
         schemaVersion: 1,

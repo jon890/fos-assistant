@@ -2,7 +2,7 @@
 
 대화에 사진을 올려 에이전트에게 보내고, 에이전트가 만든 HTML 결과물을 보관하고 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPipeline*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+covers: `backend/src/main/java/com/bifos/assistant/mcp/application/AttachmentInspectService.java`, `test/support/media-pipeline-log.ts`, `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPipeline*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
 
 ## 삭제 요청과 접근 차단
 
@@ -318,12 +318,18 @@ vision 을 지원하지 않는 모델에는 Hermes 가 보조 모델의 설명 �
 ### 본문 없는 단계 사건
 
 Control Plane 은 사진이 지난 단계를 `media-pipeline {...}` 로그 한 줄로 남긴다. [`MediaPipelineEvents`](../../backend/src/main/java/com/bifos/assistant/chat/attachment/application/MediaPipelineEvents.java) 가 모양을 갖는다.
-사건에는 첨부 번호, 자리, 장수, 원고 ID 와 판만 싣는다. 사진 바이트, 캡션, 원고 글, 파일 이름은 싣지 않는다.
+사건에는 첨부 번호, 자리, 장수, 원고 ID 와 판, 실행 번호, 조회 방식과 결과 코드만 싣는다. 사진 바이트, 캡션, 원고 글, 파일 이름, 조회 영역의 좌표는 싣지 않는다.
 
 | 단계 | 남기는 곳 | 뜻 |
 | --- | --- | --- |
 | `embedded` | 실행 입력을 만들 때 | 이번 메시지의 사진 가운데 이미지로 실은 것의 순서와 싣지 못한 첨부 번호다. Hermes 나 provider 가 받았다는 뜻이 아니다 |
+| `referenced` | 실행 입력을 만들 때. 이번 메시지 밖에 보관 중인 보낸 사진이 있을 때만 | 사진 참조 목록에 실은 지난 사진의 첨부 번호와 그 목록 안의 순서다. 모델이 그 사진을 보았다는 뜻이 아니다 |
+| `inspected` | `attachment_inspect` 요청을 서명과 실행 확인까지 통과시킨 뒤, 처리가 끝날 때마다 | 실행 번호, 첨부 번호, 조회 방식(`ORIGINAL`, `REGION`, `OVERVIEW`), 결과(`OK` 나 오류 코드)다. `OK` 는 Control Plane 이 바이트를 돌려줬다는 뜻이다. plugin 의 변환이나 모델의 수신을 뜻하지 않는다 |
 | `draftReferenced` | 원고 revision 커밋 뒤 | 그 판의 블록이 참조한 첨부 번호와 블록 자리다. 롤백한 저장은 남기지 않는다 |
+
+서명이나 실행 확인에서 거절한 조회 요청은 누가 불렀는지 확정하지 못해 `inspected` 를 남기지 않는다.
+조회 한도를 넘은 요청은 실행을 확인한 뒤에 거절하므로 오류 코드와 함께 남는다.
+[블로그 사진 평가](naver-blog-connector.md#블로그-사진-평가)가 `referenced` 와 `inspected` 로 지난 사진을 조회했는지 판정한다.
 
 MCP 통합 검사는 30장 흐름에서 이 사건을 로그에서 모아 [단계별 증거](content-draft.md#단계별-증거)의 판정기에 넣는다.
 허용 목록 밖의 칸이 섞인 사건은 [로그 판독기](../../test/support/media-pipeline-log.ts)가 거절한다.

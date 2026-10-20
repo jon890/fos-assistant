@@ -29,6 +29,25 @@ const referenced = {
     { assetId: "13", position: 3 },
   ],
 };
+const pastReferenced = {
+  schemaVersion: 1,
+  stage: "referenced",
+  conversationId: 7,
+  count: 2,
+  assets: [
+    { assetId: "11", position: 0 },
+    { assetId: "13", position: 1 },
+  ],
+};
+const inspected = {
+  schemaVersion: 1,
+  stage: "inspected",
+  conversationId: 7,
+  executionId: 21,
+  assetId: "11",
+  mode: "REGION",
+  outcome: "MCP_CALL_CONTEXT_INVALID",
+};
 const line = (value: unknown) =>
   `2026-10-12T00:00:00 INFO 1 --- [x] c.b.a.c.a.MediaPipelineEvents : media-pipeline ${JSON.stringify(value)}`;
 
@@ -82,5 +101,41 @@ test("첨부 번호를 manifest 키로 잇고 싣지 못한 사진은 실패로 
   assert.throws(
     () => backendEvidence(event!, "run-1", new Map([["11", "synthetic-1"]]), "FAKE_HERMES"),
     /BACKEND_EVENT_FOREIGN_ID/,
+  );
+});
+
+test("지난 사진 참조와 원본 조회 사건의 정상 줄을 받는다", () => {
+  const events = parseBackendPipelineEvents(
+    [line(pastReferenced), line(inspected), line({ ...inspected, mode: "OVERVIEW", outcome: "OK" })].join("\n"),
+  );
+  assert.deepEqual(events, [
+    pastReferenced,
+    inspected,
+    { ...inspected, mode: "OVERVIEW", outcome: "OK" },
+  ]);
+});
+
+test("지난 사진 참조와 원본 조회 사건의 허용 밖 칸과 값은 거절한다", () => {
+  const broken: unknown[] = [
+    { ...inspected, region: [0, 0, 10, 10] },
+    { ...inspected, fileName: "a.jpg" },
+    { ...inspected, mode: "FULL" },
+    { ...inspected, outcome: "ok" },
+    { ...inspected, outcome: "NOT FOUND" },
+    { ...inspected, assetId: "abc" },
+    { ...inspected, executionId: 0 },
+    { ...pastReferenced, missing: [] },
+    { ...pastReferenced, assets: [{ assetId: "11", position: 1 }], count: 1 },
+  ];
+  for (const value of broken) {
+    assert.throws(() => parseBackendPipelineEvents(line(value)), /BACKEND_EVENT_INVALID/);
+  }
+});
+
+test("원본 조회 사건은 단계 증거로 바꾸지 않는다", () => {
+  const [event] = parseBackendPipelineEvents(line(inspected));
+  assert.throws(
+    () => backendEvidence(event!, "run-1", new Map([["11", "synthetic-1"]]), "FAKE_HERMES"),
+    /BACKEND_EVENT_STAGE_UNSUPPORTED/,
   );
 });
