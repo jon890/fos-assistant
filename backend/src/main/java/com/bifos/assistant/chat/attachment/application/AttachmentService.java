@@ -349,6 +349,7 @@ public class AttachmentService {
     /**
      * 이번 메시지의 사진과 지난 사진을 나눠 적는다. 「모두」 라고 쓰면 대화 전체로 읽혀, 이번 메시지에 사진이 없을 때 지난 사진이 없는 것으로 오해하기 때문이다.
      * 싣지 못한 사진의 순번은 한 줄에 적고 원본 도구로 조회하게 한다.
+     * 설명을 부탁하지 말라는 문장은 이번 메시지에 사진이 없을 때만 붙인다. 사진이 있으면 에이전트가 이미 사진을 보고 있어 지난 사진도 같은 도구로 보라는 안내로 충분하다.
      */
     private static String photoGuidance(List<AgentPhoto> photos, int pastCount) {
         if (photos.isEmpty()) {
