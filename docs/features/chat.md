@@ -55,6 +55,10 @@ sequenceDiagram
     C->>C: turn 잠금을 풀고 다음 turn 을 정한다
 ```
 
+**스트림 안의 거절도 서버 로그에 남긴다.**
+스트림 경로는 `GlobalExceptionHandler` 를 거치지 않는다. 그래서 스트림 안에서 난 `ApiException` 을 `ChatEventStreams` 가 직접 `error` 사건으로 보내고, 같은 코드와 문구를 `chat stream api error code=<코드> message=<문구>` warn 로그로 남긴다.
+2026-10-15 에 사진을 붙인 메시지가 모델 단계 판정에서 `VALIDATION_FAILED` 로 네 번 거절됐다. 그때 문구가 화면에만 떴고 서버에는 남지 않아, 사유를 코드 이력으로 거꾸로 찾아야 했다.
+
 ## 대화 목록
 
 예약 작업이 만든 대화는 날짜 묶음에서 빼고 맨 위의 「예약 작업」 묶음에 모은다([`docs/features/schedule.md`](schedule.md)).
