@@ -39,6 +39,7 @@ public class ChatEventStreams {
             try {
                 work.accept(channel::send);
             } catch (ApiException ex) {
+                log.warn("chat stream api error code={} message={}", ex.code(), ex.getMessage());
                 channel.send(ChatEvent.error(ex.code().name(), ex.getMessage()));
             } catch (Exception ex) {
                 log.error("chat stream failed", ex);
