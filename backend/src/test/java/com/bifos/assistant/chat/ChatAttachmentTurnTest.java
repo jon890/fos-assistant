@@ -252,7 +252,7 @@ class ChatAttachmentTurnTest {
             ordinals.add(i + "번째");
         }
         expected.append("\n")
-            .append("사진은 모두 30장이다.\n")
+            .append("이번 메시지의 사진은 30장이다.\n")
             .append("입력에 싣지 못한 사진: ")
             .append(String.join(", ", ordinals))
             .append(" 사진. ")
@@ -290,8 +290,37 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "첫 사진의 작은 글자는?", null, List.of());
         assertThat(stub().received().getLast().input())
             .contains("- 1번째 사진: attachment_id=" + photo.id(), "원본 표시 크기=200x100", "attachment_inspect")
-            .doesNotContain("다시 보내 달라고");
+            .contains(
+                "이번 메시지에 새로 붙인 사진은 없다. 이 대화에는 앞서 보낸 사진 1장이 있다.",
+                "보지 않은 사진의 내용을 사용자에게 설명해 달라고 하지 않는다.")
+            .doesNotContain("다시 보내 달라고", "사진은 모두", "0장");
         assertThat(stub().received().getLast().images()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("이번 메시지에 사진이 있고 지난 사진도 있으면 둘을 나눠 적는다")
+    void guidanceSplitsCurrentAndPastPhotos() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment first = uploadPng(dad, conversationId, "첫.png", png(200, 100));
+        chat.send(dad, conversationId, "봐 줘", null, List.of(first.id()));
+        ChatAttachment second = uploadPng(dad, conversationId, "둘.png", png(200, 100));
+        chat.send(dad, conversationId, "이것도 봐 줘", null, List.of(second.id()));
+        assertThat(stub().received().getLast().input())
+            .contains("이번 메시지의 사진은 1장이다.", "이 대화에는 앞서 보낸 사진 1장도 있다.");
+    }
+
+
+    @Test
+    @DisplayName("지난 사진이 모두 지워졌으면 볼 수 없다고 적는다")
+    void guidanceSaysNothingViewableWhenPastPhotosAreRemoved() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = uploadPng(dad, conversationId, "원본.png", png(200, 100));
+        chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+        attachments.deleteByUser(dad, conversationId, photo.id());
+        chat.send(dad, conversationId, "다시 봐 줘", null, List.of());
+        assertThat(stub().received().getLast().input())
+            .contains("앞서 보낸 사진은 보관이 끝나 하나도 볼 수 없다.");
     }
 
 
@@ -368,7 +397,7 @@ class ChatAttachmentTurnTest {
         assertThat(command.images().getFirst().dataUrl()).startsWith("data:image/jpeg;base64,");
         assertThat(command.input())
             .contains(
-                "사진은 모두 2장이다.\n",
+                "이번 메시지의 사진은 2장이다.\n",
                 "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
                 "입력에 싣지 못한 사진: 2번째 사진. " + NOT_EMBEDDED_GUIDANCE,
                 "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")

@@ -314,11 +314,16 @@ public class AttachmentService {
                         + it.originalName() + ")"
                     : " [보관 종료]"))
             .collect(Collectors.joining("\n"));
+        Set<Long> attachedIds = attached.stream().map(ChatAttachment::id).collect(Collectors.toSet());
+        List<Long> pastIds = sent.stream()
+            .map(ChatAttachment::id)
+            .filter(id -> !attachedIds.contains(id) && retained.contains(id))
+            .toList();
         String input = "[이 대화의 사진 참조]\n"
             + directory + "\n"
             + files + "\n"
             + "\n"
-            + photoGuidance(photos)
+            + photoGuidance(photos, pastIds.size())
             + "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
             + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
             + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
@@ -336,19 +341,30 @@ public class AttachmentService {
             .filter(AgentPhoto::embedded)
             .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
             .toList();
-        Set<Long> attachedIds = attached.stream().map(ChatAttachment::id).collect(Collectors.toSet());
-        MediaPipelineEvents.referenced(
-            conversationId,
-            sent.stream().map(ChatAttachment::id).filter(id -> !attachedIds.contains(id) && retained.contains(id)).toList());
+        MediaPipelineEvents.referenced(conversationId, pastIds);
         return new AgentInput(input, hermesImages);
     }
 
 
     /**
-     * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. 싣지 못한 사진의 순번을 한 줄에 적고 원본 도구로 조회하게 한다.
+     * 이번 메시지의 사진과 지난 사진을 나눠 적는다. 「모두」 라고 쓰면 대화 전체로 읽혀, 이번 메시지에 사진이 없을 때 지난 사진이 없는 것으로 오해하기 때문이다.
+     * 싣지 못한 사진의 순번은 한 줄에 적고 원본 도구로 조회하게 한다.
+     * 설명을 부탁하지 말라는 문장은 이번 메시지에 사진이 없을 때만 붙인다. 사진이 있으면 에이전트가 이미 사진을 보고 있어 지난 사진도 같은 도구로 보라는 안내로 충분하다.
      */
-    private static String photoGuidance(List<AgentPhoto> photos) {
-        StringBuilder guidance = new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
+    private static String photoGuidance(List<AgentPhoto> photos, int pastCount) {
+        if (photos.isEmpty()) {
+            if (pastCount == 0) {
+                return "이번 메시지에 새로 붙인 사진은 없다. 앞서 보낸 사진은 보관이 끝나 하나도 볼 수 없다.\n";
+            }
+            return "이번 메시지에 새로 붙인 사진은 없다. 이 대화에는 앞서 보낸 사진 " + pastCount + "장이 있다.\n"
+                + "사진을 근거로 답하거나 글을 써야 하면 위 참조의 attachment_id로 attachment_inspect를 불러 필요한 사진을 직접 본다.\n"
+                + "보지 않은 사진의 내용을 사용자에게 설명해 달라고 하지 않는다.\n";
+        }
+        StringBuilder guidance = new StringBuilder("이번 메시지의 사진은 ").append(photos.size()).append("장이다.\n");
+        if (pastCount > 0) {
+            guidance.append("이 대화에는 앞서 보낸 사진 ").append(pastCount)
+                .append("장도 있다. 지난 사진이 필요하면 위 참조의 attachment_id로 attachment_inspect를 불러 본다.\n");
+        }
         List<AgentPhoto> embedded = photos.stream().filter(AgentPhoto::embedded).toList();
         if (!embedded.isEmpty()) {
             guidance.append("이 메시지에 이미지로 함께 실은 사진: ")
