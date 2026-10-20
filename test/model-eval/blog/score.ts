@@ -19,7 +19,7 @@ export type RunRecord = {
 export type RunOutcome = "PASS" | "FAIL" | "INCONCLUSIVE";
 export type PhotoIssue = "참조 누락" | "조회 누락" | "판독 실패" | "원고 누락";
 export type PhotoResult = { photoId: string; attachmentId: number; issues: PhotoIssue[] };
-export type RunScore = { outcome: RunOutcome; reasons: string[]; photos: PhotoResult[] };
+export type RunScore = { outcome: RunOutcome; reasons: string[]; notes: string[]; photos: PhotoResult[] };
 
 export type ScoreInput = {
   run: RunRecord;
@@ -30,8 +30,8 @@ export type ScoreInput = {
   executionIds: number[];
   /** 마지막 실행의 트리 `root.status` 다. */
   status: string | null;
-  /** 트리 어느 노드에서든 네이버 블로그 도구 사건이 실패했다. */
-  toolFailed: boolean;
+  /** 실행 트리에서 실패한 네이버 블로그 도구 이름이다. */
+  failedTools: string[];
   /** 실행 트리를 어딘가 잘라 자손 실행을 모두 보지 못했다. */
   truncated: boolean;
   preview: string | null;
@@ -109,13 +109,14 @@ function lastMessageEvents(
 
 /** 마지막 메시지의 실행 하나를 사진 조회, 되묻지 않음, 원고의 사진 반영으로 판정한다. */
 export function scoreRun(input: ScoreInput): RunScore {
-  const { run, answers, events, status, toolFailed, truncated, preview } = input;
+  const { run, answers, events, status, failedTools, truncated, preview } = input;
+  const notes = [...new Set(failedTools)].map((name) => `${name} 실패`);
   const environment: string[] = [];
   if (run.error) environment.push(`실행 오류: ${run.error}`);
   if (status !== "SUCCEEDED") environment.push(`실행 상태 ${status ?? "없음"}`);
-  if (toolFailed) environment.push("네이버 블로그 도구 실패");
+  if (preview === null && failedTools.length > 0) environment.push("네이버 블로그 도구 실패");
   if (truncated) environment.push("실행 트리 잘림");
-  if (environment.length > 0) return { outcome: "INCONCLUSIVE", reasons: environment, photos: [] };
+  if (environment.length > 0) return { outcome: "INCONCLUSIVE", reasons: environment, notes, photos: [] };
 
   const messageOf = new Map<string, number>();
   run.messages.forEach((message, index) => {
@@ -128,8 +129,8 @@ export function scoreRun(input: ScoreInput): RunScore {
       .map((event) => event.conversationId),
   );
   if (conversations.size === 0)
-    return { outcome: "INCONCLUSIVE", reasons: ["로그에 대화 사건 없음"], photos: [] };
-  if (preview === null) return { outcome: "FAIL", reasons: ["미리보기 없음"], photos: [] };
+    return { outcome: "INCONCLUSIVE", reasons: ["로그에 대화 사건 없음"], notes, photos: [] };
+  if (preview === null) return { outcome: "FAIL", reasons: ["미리보기 없음"], notes, photos: [] };
 
   const own = events.filter((event) => conversations.has(event.conversationId));
   const lastIndex = run.messages.length - 1;
@@ -167,7 +168,7 @@ export function scoreRun(input: ScoreInput): RunScore {
   });
   const reasons = answers === null ? ["정답 없음"] : [];
   const outcome: RunOutcome = photos.some((photo) => photo.issues.length > 0) ? "FAIL" : "PASS";
-  return { outcome, reasons, photos };
+  return { outcome, reasons, notes, photos };
 }
 
 /** 정한 횟수만큼 돌았고 모두 통과해야 시나리오가 통과다. */
