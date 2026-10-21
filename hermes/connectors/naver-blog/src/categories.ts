@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { withWriteTab, type ReadOptions } from "./drafts.ts";
+import { settleBeforeRead, withWriteTab, type ReadOptions } from "./drafts.ts";
 import { readCategories } from "./editor/settings.ts";
 import { ToolError } from "./errors.ts";
 import { checkJobDir, DEFAULT_JOB_DIR, openJobDir } from "./jobs.ts";
@@ -21,7 +21,8 @@ function cacheFile(dir: string, blogId: string) {
 /**
  * 블로그의 실제 카테고리 이름을 차례대로 돌려준다. 항목은 누르지 않고 글도 저장하지 않는다.
  * 읽은 목록은 작업 디렉터리에 남겨, 목록에 없는 이름의 초안을 승인 카드 전에 막는 데 쓴다.
- * 「작성 중인 글」 알림이 떠 있으면 설정을 열 수 없어 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 「작성 중인 글」 알림이 떠 있으면 설정을 열 수 없어 어떤 단추도 누르지 않고 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 글쓰기 화면을 연 뒤 늦게 뜬 도움말 알림은 닫고 읽는다. 모르는 알림은 누르지 않고 `NAVER_BLOG_EDITOR_CHANGED` 다.
  */
 export function listCategories(env: Env, options: ReadOptions = {}) {
   return withWriteTab(
@@ -29,7 +30,8 @@ export function listCategories(env: Env, options: ReadOptions = {}) {
     "list_categories",
     options,
     async (page, blogId, notice) => {
-      if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
+      if (await settleBeforeRead(page, notice))
+        throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
       const categories = await readCategories(page);
       let temporary: string | null = null;
       try {

@@ -281,6 +281,18 @@ export class FakeEditor {
   host = "blog.naver.com";
   /** 화면을 덮은 알림의 글. 비면 알림이 없다. */
   popup = "";
+  /** 알림 상자의 단추 이름. */
+  popupButtons = ["취소", "확인"];
+  /** 참이면 알림 상자가 도움말 알림의 클래스를 가진다. */
+  popupHelp = false;
+  /** 알림이 누르면 사라지는 단추 이름. 비면 어떤 단추도 알림을 닫지 못한다. */
+  popupClosedBy: string[] = ["취소"];
+  /** 알림 상자의 단추를 누른 이름을 차례대로 적는다. 누르지 않아야 하는 검사가 쓴다. */
+  readonly popupClicks: string[] = [];
+  /** 알림을 닫은 뒤 같은 알림이 이만큼 더 이어서 뜬다. */
+  chainedPopups = 0;
+  /** 글쓰기 화면이 준비된 뒤 늦게 띄울 알림의 글. 준비를 마치는 순간 `popup` 이 된다. */
+  latePopup = "";
   /** 붙자마자 alert 를 띄운다. */
   alertOnEnable = false;
   /** 사진 단추를 누르면 파일 선택 창 이벤트를 보낸다. */
@@ -506,9 +518,24 @@ export class FakeEditor {
     if (finder.includes(".se-popup button")) {
       if (!this.popup || quoted(finder, "===") !== "취소") return null;
       return () => {
+        this.popupClicks.push("취소");
         this.popup = "";
         this.document = null;
         this.documentId = "";
+      };
+    }
+    if (finder.includes('?.querySelectorAll("button")')) {
+      const label = quoted(finder, "===");
+      if (!this.popup || !this.popupButtons.includes(label)) return null;
+      return () => {
+        this.popupClicks.push(label);
+        if (!this.popupClosedBy.includes(label)) return;
+        const text = this.popup;
+        this.popup = "";
+        if (this.chainedPopups > 0) {
+          this.chainedPopups -= 1;
+          this.popup = text;
+        }
       };
     }
     if (finder.includes("button.se-image-toolbar-button"))
@@ -710,7 +737,14 @@ export class FakeEditor {
         getItem: (key: string) => this.storage.get(key) ?? null,
         setItem: (key: string, value: string) =>
           void this.storage.set(key, value),
-        removeItem: (key: string) => void this.storage.delete(key),
+        removeItem: (key: string) => {
+          this.storage.delete(key);
+          // 글쓰기 화면이 준비된 뒤 늦게 뜨는 알림을 만든다.
+          if (this.latePopup) {
+            this.popup = this.latePopup;
+            this.latePopup = "";
+          }
+        },
       };
       return new Function("sessionStorage", `return (${expression});`)(storage);
     }
@@ -821,6 +855,22 @@ export class FakeEditor {
         x: this.spot(action),
         y: 1,
         uncovered: true,
+      });
+    }
+    if (expression.includes("risky:") && expression.includes("popup-dim")) {
+      if (!this.popup) return null;
+      return JSON.stringify({
+        box: this.popupHelp
+          ? "div.se-popup-container.se-popup-help"
+          : "div.se-popup-container.__se-pop-layer",
+        buttons: this.popupButtons,
+        risky: this.popupButtons.some((label) =>
+          /발행|저장|등록|게시|공개|삭제|전송|업로드|완료/.test(label),
+        ),
+        draft:
+          this.popup.includes("작성 중인 글이 있습니다") &&
+          this.popup.includes("이어서 작성하시겠습니까"),
+        help: this.popupHelp,
       });
     }
     if (expression.includes("popup-dim")) return this.popup;

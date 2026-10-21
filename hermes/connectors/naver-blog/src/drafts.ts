@@ -21,6 +21,7 @@ import {
   type EditorPage,
   openWriteTab,
 } from "./editor/page.ts";
+import { settleReadPopup } from "./editor/read-popup.ts";
 import { readSettings } from "./editor/settings.ts";
 import { logToolDiagnostic, ToolError } from "./errors.ts";
 import {
@@ -145,25 +146,45 @@ export async function withWriteTab<T>(
   }
 }
 
+/**
+ * 글쓰기 화면을 연 뒤 늦게 뜬 알림을 읽기 전에 처리하고, 「작성 중인 글」 알림이 떠 있는지 돌려준다.
+ * 열 때 이미 그 알림을 봤으면(`notice`) 더 누르지 않고 그대로 알린다.
+ */
+export async function settleBeforeRead(
+  page: EditorPage,
+  notice: boolean,
+  { screenNeeded = true } = {},
+) {
+  if (notice) return true;
+  return (await settleReadPopup(page, { screenNeeded })) === "draft_notice";
+}
+
 /** 목록에 싣는 제목의 최대 글자 수. */
 const TITLE_MAX = 200;
 
 /**
  * 임시저장 글의 번호와 제목, 고친 시각을 목록 차례대로 돌려준다. 편집기에 글을 불러오지 않는다.
- * 「작성 중인 글」 알림이 떠 있어도 목록 응답은 받을 수 있어 그대로 읽는다.
+ * 「작성 중인 글」 알림이 떠 있어도 목록 응답은 받을 수 있어 그대로 읽는다. 늦게 뜬 도움말 알림은 닫고, 닫을 수 없는 알림이 남아도 읽는다.
  */
 export function listDrafts(env: Env, options: ReadOptions = {}) {
-  return withWriteTab(env, "list_drafts", options, async (page, blogId) => {
-    const drafts = (await tempDrafts(page, blogId)).map((draft) => ({
-      ...draft,
-      title: [...draft.title].slice(0, TITLE_MAX).join(""),
-    }));
-    return {
-      count: drafts.length,
-      drafts,
-      autosave_requests: page.autosaveRequests,
-    };
-  });
+  return withWriteTab(
+    env,
+    "list_drafts",
+    options,
+    async (page, blogId, notice) => {
+      // 목록은 화면이 아니라 응답으로 읽어서 닫을 수 없는 알림이 떠 있어도 읽는다.
+      await settleBeforeRead(page, notice, { screenNeeded: false });
+      const drafts = (await tempDrafts(page, blogId)).map((draft) => ({
+        ...draft,
+        title: [...draft.title].slice(0, TITLE_MAX).join(""),
+      }));
+      return {
+        count: drafts.length,
+        drafts,
+        autosave_requests: page.autosaveRequests,
+      };
+    },
+  );
 }
 
 /**
@@ -216,7 +237,8 @@ export function readDraft(
     "read_draft",
     options,
     async (page, blogId, notice) => {
-      if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
+      if (await settleBeforeRead(page, notice))
+        throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
       const before = await tempList(page, blogId);
       if (!before.drafts.some((draft) => draft.draft_id === draftId))
         throw new ToolError("NAVER_BLOG_DRAFT_NOT_FOUND");

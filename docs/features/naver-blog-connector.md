@@ -338,6 +338,14 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 멈춘 `editor_failed` 에는 `error.popup_diagnostics` 가 붙는다: `kind`(`draft_notice`, `help`, `unknown`), 상자 요소 `box`(태그와 앞 클래스 둘), 단추 이름 `buttons`(알려진 `취소`, `확인`, `닫기`, `계속`, `나중에`, `다음에` 만 그대로이고 나머지는 `other`, 여덟 개까지), 닫아 보았는지 `dismissed`. 알림의 본문 글은 읽어도 싣지 않는다. 화면이 깨끗해지면 이 진단을 비워, 알림과 상관없는 뒤의 실패에는 붙이지 않는다. 눌렀는데도 알림이 남아 멈추면 `dismissed` 가 참이다.
 이 진단은 실패 시점의 상태이며 과거 실패 원인을 확정하는 자료가 아니다.
 
+#### 읽기 도구의 처리
+
+읽기 도구(`list_categories`, `list_drafts`, `read_draft`)는 글쓰기 화면을 연 직후의 「작성 중인 글」 알림만 보던 데다, 그 뒤에 늦게 뜬 알림은 처리하지 않았다. 흐린 배경이 발행 단추를 덮으면 발행 설정을 열지 못하고 `NAVER_BLOG_EDITOR_CHANGED` 로 끝났다.
+그래서 카테고리 목록을 읽기 전과 임시저장 글을 읽기 전에 저장 흐름이 쓰는 같은 판별과 누르기(`dismissKnownPopup`)를 읽기용 정책으로 부른다.
+- 도움말류는 저장 흐름처럼 `닫기`(없으면 `확인`)로 닫고 읽기를 이어 간다. 세 번까지 이어서 닫고, 마지막으로 닫은 뒤의 화면도 한 번 더 본다.
+- 「작성 중인 글」 알림은 어떤 단추도 누르지 않고 `NAVER_BLOG_EDITOR_IN_USE` 로 멈춘다. 저장 흐름은 취소를 눌러 새 글을 쓰지만, 읽기는 사용자의 자동저장 글을 잃게 하면 안 되기 때문이다. `list_drafts` 는 화면이 아니라 목록 응답을 읽으므로 도움말만 닫고, 이 알림이나 모르는 알림이 남아 있어도 누르지 않고 목록을 읽는다.
+- 모르는 알림이나 위험한 단추가 든 알림은 누르지 않고 `NAVER_BLOG_EDITOR_CHANGED` 로 멈춘다(`list_drafts` 제외). 이 실패는 `diagnosis` 도 함께 실어, 모델에게 가는 코드가 `UNAVAILABLE` 이 아니라 `EDITOR_CHANGED` 가 되게 한다.
+
 준비 실패의 `error.open_diagnostics`는 시도 수(40까지)와 마지막 관측만 담는다.
 관측은 페이지 제목·호스트·문서 로딩 상태의 분류, 페이지 초점·표시 여부,
 제목 후보·준비 후보·프레임·프레임 안 제목·editor·입력 프레임 수(각 100까지)와 실패 사유다.
@@ -434,9 +442,10 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `editor_code` | `EditorError` 의 코드. 로그인이 풀린 경우를 뺀 편집기 실패는 대개 `editor_failed` 다 |
 | `stage` | 실패한 단계 이름 |
 | `message` | 코드가 정한 고정 문구. `list_categories` 는 「카테고리 목록을 읽을 수 없다」(발행 설정을 열지 못함), 「카테고리 선택기를 열지 못했다」, 「카테고리 목록이 보이지 않는다」 셋으로 단계가 갈린다 |
+| `popup_diagnostics` | 화면을 덮은 알림을 보고 멈췄을 때만 있다. 저장 흐름의 `error.popup_diagnostics` 와 같은 칸(`kind`, `box`, `buttons`, `dismissed`)이고 같은 제한을 지킨다. 알림의 본문 글은 싣지 않고, 단추 이름은 알려진 것만 그대로 적는다 |
 | `diagnosis` | 발행 설정이나 카테고리 목록을 열지 못했을 때만 있다. 발행 단추와 카테고리 단추의 상태(`missing`, `hidden`, `disabled`, `shown`), 단추 가운데를 차지한 요소, 보이는 레이어를 클래스 이름으로만 적는다 |
 
-주소, 블로그 아이디, 글, 브라우저가 준 원문, CDP 주소, 파일 경로는 싣지 않는다. 클래스 이름 모양(`[A-Za-z0-9_.-]`, 80자까지)이 아닌 진단 값은 버리고, 고정 문구에 `/`, `@`, `\` 가 있으면 문구를 버린다. `hermes/connectors/naver-blog/tests/category-diagnostics.test.ts` 가 세 단계 실패와 이 제한을 지킨다.
+주소, 블로그 아이디, 글, 브라우저가 준 원문, CDP 주소, 파일 경로는 싣지 않는다. 클래스 이름 모양(`[A-Za-z0-9_.-]`, 80자까지)이 아닌 진단 값은 버리고, 고정 문구에 `/`, `@`, `\` 가 있으면 문구를 버린다. `hermes/connectors/naver-blog/tests/category-diagnostics.test.ts` 가 세 단계 실패와 이 제한을, `read-popup.test.ts` 가 늦게 뜬 알림 세 가지의 처리를 지킨다.
 
 이 줄은 Hermes 가 커넥터 MCP 서버(Hermes 프로세스의 자식)의 표준 오류를 모아 두는 그 profile 의 `logs/mcp-stderr.log` 에 남는다. Hermes 의 이 동작은 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「MCP 자식의 표준 오류」 가 갖는다. 대시보드의 연결 확인(`session_status`)은 자식의 표준 오류를 버리므로 그 경로에서는 남지 않는다.
 

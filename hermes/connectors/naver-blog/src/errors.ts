@@ -1,3 +1,5 @@
+import { filterPopupDiagnostics } from "./editor/popup.ts";
+
 /** 도구가 내는 오류 코드. connector.json 의 `errors` 표와 같은 이름이다. */
 export type ErrorCode =
   | "NAVER_BLOG_INVALID_INPUT"
@@ -79,7 +81,7 @@ function safeDiagnosis(raw: unknown) {
 
 /**
  * 편집기 단계의 실패를 표준 오류에 한 줄 JSON 으로 남긴다. 모델에게 가는 오류에는 코드만 실려, 어느 단계에서 막혔는지는 이 줄로만 알 수 있다.
- * 도구 이름, 편집기 오류 코드, 단계, 고정 문구, 화면 진단(클래스 이름)만 싣는다.
+ * 도구 이름, 편집기 오류 코드, 단계, 고정 문구, 화면 진단(클래스 이름), 알림 진단(종류, 상자 클래스, 알려진 단추 이름, 닫아 보았는지)만 싣는다.
  * 주소, 블로그 아이디, 글, 브라우저가 준 원문, 파일 경로는 싣지 않는다. 문구에 `/`, `@`, `\` 가 있거나 100자를 넘으면 문구를 버린다.
  * 편집기 오류가 아닌 예외는 클래스 이름만 남긴다.
  */
@@ -103,6 +105,9 @@ export function logToolDiagnostic(
       message.length <= MESSAGE_MAX && !/[/@\\]/.test(message) ? message : null;
     const diagnosis = safeDiagnosis(error.extra?.diagnosis);
     if (diagnosis) entry.diagnosis = diagnosis;
+    // 화면을 덮은 알림의 종류와 단추 이름. 알려진 이름만 싣고 알림의 글은 싣지 않는다.
+    const popup = filterPopupDiagnostics(error.extra?.popup_diagnostics);
+    if (popup) entry.popup_diagnostics = popup;
   } else {
     entry.error_class = classOnly(error.name);
   }
