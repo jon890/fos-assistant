@@ -289,6 +289,8 @@ export class FakeEditor {
   popupClosedBy: string[] = ["취소"];
   /** 알림 상자의 단추를 누른 이름을 차례대로 적는다. 누르지 않아야 하는 검사가 쓴다. */
   readonly popupClicks: string[] = [];
+  /** 알림을 닫은 뒤 같은 알림이 이만큼 더 이어서 뜬다. */
+  chainedPopups = 0;
   /** 글쓰기 화면이 준비된 뒤 늦게 띄울 알림의 글. 준비를 마치는 순간 `popup` 이 된다. */
   latePopup = "";
   /** 붙자마자 alert 를 띄운다. */
@@ -527,7 +529,13 @@ export class FakeEditor {
       if (!this.popup || !this.popupButtons.includes(label)) return null;
       return () => {
         this.popupClicks.push(label);
-        if (this.popupClosedBy.includes(label)) this.popup = "";
+        if (!this.popupClosedBy.includes(label)) return;
+        const text = this.popup;
+        this.popup = "";
+        if (this.chainedPopups > 0) {
+          this.chainedPopups -= 1;
+          this.popup = text;
+        }
       };
     }
     if (finder.includes("button.se-image-toolbar-button"))

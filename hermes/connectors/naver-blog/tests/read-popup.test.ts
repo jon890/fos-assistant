@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listCategories } from "../src/categories.ts";
-import { listDrafts } from "../src/drafts.ts";
+import { listDrafts, readDraft } from "../src/drafts.ts";
 import { ToolError } from "../src/errors.ts";
 import { EDITOR_METHODS, FakeCdp, FakeEditor } from "./fake-cdp.ts";
 
@@ -163,4 +163,39 @@ test("임시저장 목록도 늦게 뜬 도움말 알림은 닫고, 작성 중�
   expect((await listDrafts(notice.env, TIMES)).count).toBe(1);
   expect(notice.editor.popupClicks).toEqual([]);
   expect(notice.editor.popup).toBe(DRAFT_NOTICE);
+});
+
+test("임시저장 목록은 늦게 뜬 모르는 알림이 남아도 누르지 않고 목록을 읽는다", async () => {
+  const { editor, env } = await setup();
+  editor.latePopup = "가상 안내";
+  editor.popupButtons = ["닫기", "가상 단추"];
+
+  expect((await listDrafts(env, TIMES)).count).toBe(1);
+  expect(editor.popupClicks).toEqual([]);
+});
+
+test("글 읽기는 늦게 뜬 작성 중인 글 알림의 단추를 누르지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { editor, env } = await setup();
+  editor.latePopup = DRAFT_NOTICE;
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.popupClicks).toEqual([]);
+});
+
+test("도움말이 세 번 이어서 떠도 모두 닫았으면 읽기를 이어 간다", async () => {
+  const { editor, env } = await setup();
+  editor.latePopup = "가상 도움말 안내";
+  editor.popupHelp = true;
+  editor.popupButtons = ["닫기"];
+  editor.popupClosedBy = ["닫기"];
+  editor.chainedPopups = 2;
+
+  const result = await listCategories(env, TIMES);
+
+  expect(result.count).toBe(2);
+  expect(editor.popupClicks).toEqual(["닫기", "닫기", "닫기"]);
 });
