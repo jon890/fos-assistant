@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteResult;
 import com.bifos.assistant.chat.artifact.application.ArtifactWriteService;
+import com.bifos.assistant.chat.artifact.domain.ArtifactSourceRejectedException;
 import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
@@ -155,6 +156,12 @@ public class McpToolService {
             return result(toJson(written), false);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
+                if (ex instanceof ArtifactSourceRejectedException) {
+                    return result(
+                        "source_url이 거절됐습니다. render_draft가 준 source_url 값을 글자 그대로 넣으세요. "
+                            + "스티커 하나가 실패하면 나머지는 건너뛰고 저장한 미리보기를 유지하세요.",
+                        true);
+                }
                 throw ex;
             }
             log.warn(

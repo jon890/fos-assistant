@@ -10,6 +10,12 @@ import com.bifos.assistant.chat.artifact.infra.ArtifactSourceResponse;
 import com.bifos.assistant.chat.artifact.infra.ArtifactSourceSocketTransport;
 import com.bifos.assistant.chat.artifact.infra.ArtifactSourceTransport;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -27,6 +33,50 @@ import org.junit.jupiter.api.Test;
 
 /** 주소 결과물은 외부 DNS나 네트워크 없이 대역으로 경계를 검사한다. */
 class ArtifactSourceFetcherTest {
+
+    @Test
+    @DisplayName("URL 거절은 검사 이름과 호스트만 기록하고 DNS 전에 입력 오류로 돌린다")
+    void rejectsInvalidUrlWithSafeReasonAndHostBeforeDns() {
+        Logger logger = (Logger)LoggerFactory.getLogger(ArtifactSourceFetcher.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        ArtifactSourceFetcher source = fetcher(
+            host -> {
+                throw new AssertionError("DNS must not run");
+            },
+            (address, host, uri, connect, read, cancellation) -> {
+                throw new AssertionError();
+            });
+        Map<String, String> cases = Map.of(
+            "http://images.example.com/private.png?secret=value", "scheme",
+            "https://secret@images.example.com/private.png?secret=value", "userinfo",
+            "https://images.example.com/private.png?secret=value#secret", "fragment",
+            "https://images.example.com:444/private.png?secret=value", "port",
+            "https://Images.example.com/private.png?secret=value", "host_format",
+            "https://other.example.com/private.png?secret=value", "allowed_host",
+            "https://images.example.com/private.png?secret=value%0a", "control_character");
+        try {
+            for (var entry : cases.entrySet()) {
+                appender.list.clear();
+                URI uri = URI.create(entry.getKey());
+                assertThatThrownBy(() -> source.fetch(uri, "image/png"))
+                    .isInstanceOfSatisfying(ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                assertThat(appender.list).hasSize(1);
+                ILoggingEvent event = appender.list.getFirst();
+                assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                assertThat(event.getFormattedMessage())
+                    .isEqualTo("artifact source rejected reason=" + entry.getValue() + " host=" + uri.getHost())
+                    .doesNotContain("private.png", "secret", "https://", "http://");
+                assertThat(event.getThrowableProxy()).isNull();
+            }
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
 
     @Test
     @DisplayName("주소 공급자 설정은 안전한 기본값과 형식만 받는다")

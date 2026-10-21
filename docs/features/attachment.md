@@ -663,10 +663,21 @@ skill_manage 로 스킬을 만들거나 고치지 않는다. 스킬 안내에 sk
 | origin 실행으로 요청자를 정하지 못한다 | `isError` 참, 호출 맥락 오류 |
 | 도구 인자, 확장자, 본문 크기, 경로 형식, URL 문법 | JSON-RPC `-32602` |
 | 없는 대화, 지운 대화, 남의 대화 | `isError` 참 |
-| `source_url` 의 HTTPS, 허용 호스트, DNS 검사 | `isError` 참. 다운로드로 넘어가지 않는다 |
+| `source_url` 의 HTTPS, 사용자 정보, 조각, 포트, 호스트 형식, 허용 호스트, 제어 문자 검사 | `VALIDATION_FAILED`, `isError` 참. DNS 조회 전에 거절하고 원본 `source_url` 사용을 안내한다 |
+| `source_url` 의 DNS 검사 | `INTERNAL_ERROR`, `isError` 참. 다운로드로 넘어가지 않는다 |
 | redirect, 잘못된 상태나 MIME, 크기 초과, 연결 실패와 제한 시간 초과, 저장 실패 | `isError` 참 |
 
 모델은 도구 오류를 받고 요청을 고치거나 만들지 못한 이유를 답한다. 도구 실패 자체가 이미 돌고 있는 Hermes 실행을 중단하지는 않는다.
+
+URL 형식과 허용 호스트 거절은 warn 로그의 `reason` 과 `host` 로 구분한다.
+`reason` 은 `scheme`, `userinfo`, `fragment`, `port`, `host_format`, `allowed_host`, `control_character` 중 하나다.
+호스트를 읽을 수 없으면 `host` 는 `null` 이고, 경로와 쿼리, 사용자 정보, 전체 URL 은 기록하지 않는다.
+내려받기 실패는 기존처럼 `INTERNAL_ERROR` 로 남긴다.
+
+네이버 블로그 스킬은 미리보기 HTML 을 먼저 저장하고 스티커를 한 번에 하나씩 받는다.
+`source_url` 은 `render_draft` 의 값을 바꾸지 않고 전달한다.
+스티커 하나가 실패하면 나머지는 건너뛰고 저장한 HTML 을 유지한다. 받지 못한 스티커는 빈 그림으로 보인다.
+연속 실패로 Hermes 가 MCP 서버를 일시 정지해도 미리보기 HTML 저장이 함께 막히지 않게 하기 위해서다.
 
 **쓰기는 답에 결과물을 연결하지 않는다.**
 현재 대화에 쓴 HTML 은 turn 끝에 `ArtifactService.recordTurn` 이 찾아 그 답에 묶는다.
