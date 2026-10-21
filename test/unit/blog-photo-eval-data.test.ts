@@ -13,6 +13,21 @@ const scenarios: Scenario[] = JSON.parse(readFileSync(new URL("scenarios.json", 
 
 const squash = (text: string) => text.replace(/\s+/g, "");
 
+function assertQuotedCategories(list: Scenario[]): void {
+  for (const scenario of list) {
+    for (const [index, message] of scenario.messages.entries()) {
+      for (const match of message.text.matchAll(/\{category\}/g)) {
+        const start = match.index;
+        assert.equal(
+          message.text.slice(start - 1, start + match[0].length + 1),
+          "「{category}」",
+          `${scenario.id} 메시지 ${index + 1} 의 {category} 가 「」 안에 없다`,
+        );
+      }
+    }
+  }
+}
+
 /** 지시문에 허용 표기가 들어 있는 곳을 돌려준다. 들어 있으면 정답이 지시문으로 새는 것이다. */
 function findLeaks(list: Scenario[], data: Photo[]): string[] {
   const leaks: string[] = [];
@@ -94,6 +109,16 @@ test("마지막 메시지에만 {category} 가 한 번 있고 지난 사진 시�
 
 test("어느 메시지에도 정답 표기가 들어 있지 않다", () => {
   assert.deepEqual(findLeaks(scenarios, photos), []);
+});
+
+test("지시문의 {category} 는 문장 부호와 구별되도록 「」 로 감싼다", () => {
+  assertQuotedCategories(scenarios);
+});
+
+test("{category} 를 감싸지 않은 사본은 거절한다", () => {
+  const unquoted = structuredClone(scenarios);
+  unquoted[0].messages[1].text = unquoted[0].messages[1].text.replace("「{category}」", "{category}");
+  assert.throws(() => assertQuotedCategories(unquoted), /past-only 메시지 2.*「」 안에 없다/);
 });
 
 test("지시문에 정답을 넣은 사본은 새는 것으로 거절한다", () => {
