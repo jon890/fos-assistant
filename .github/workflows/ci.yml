@@ -75,7 +75,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 2026-10-21 기준 성공 실행도 10~14분 걸리고 15분 상한에서 취소가 반복돼 여유를 둔다.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
