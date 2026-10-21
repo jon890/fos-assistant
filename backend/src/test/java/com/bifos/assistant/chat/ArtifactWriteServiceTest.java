@@ -133,8 +133,8 @@ class ArtifactWriteServiceTest {
 
 
     @Test
-    @DisplayName("본인 대화의 이미지 URL은 내려받은 바이트를 같은 저장소에 쓴다")
-    void writesDownloadedBytesOfOwnImageUrlToSameStore() throws Exception {
+    @DisplayName("render draft의 스티커 URL을 그대로 내려받아 본인 대화에 저장한다")
+    void writesUnmodifiedRenderDraftStickerUrlToOwnConversation() throws Exception {
         ConversationAccess access = mock(ConversationAccess.class);
         ArtifactStore store = mock(ArtifactStore.class);
         Conversation conversation = mock(Conversation.class);
@@ -144,18 +144,24 @@ class ArtifactWriteServiceTest {
         byte[] image = {1, 2, 3};
         when(store.write(42L, "a.png", image)).thenReturn(3L);
         ArtifactSourceFetcher source = new ArtifactSourceFetcher(
-            new ArtifactSourceProperties(List.of("images.example.com"), null, null, null),
+            new ArtifactSourceProperties(List.of("storep-phinf.pstatic.net"), null, null, null),
             host -> new InetAddress[] {InetAddress.getByName("8.8.8.8")},
-            (address, host, uri, connect, read, cancellation) -> new ArtifactSourceResponse(
-                200,
-                Map.of("content-type", "image/png", "content-length", "3"),
-                new ByteArrayInputStream(image)));
+            (address, host, uri, connect, read, cancellation) -> {
+                assertThat(host).isEqualTo("storep-phinf.pstatic.net");
+                assertThat(uri.toString()).isEqualTo(
+                    "https://storep-phinf.pstatic.net/ogq_abc123/original_4.png?type=p100_100");
+                return new ArtifactSourceResponse(
+                    200,
+                    Map.of("content-type", "image/png", "content-length", "3"),
+                    new ByteArrayInputStream(image));
+            });
 
         assertThat(new ArtifactWriteService(access, store, source)
             .write(
                 USER,
-                new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
-                    .isEqualTo(new ArtifactWriteResult("a.png", 3L));
+                new ArtifactWriteRequest(publicId, "a.png", null,
+                    "https://storep-phinf.pstatic.net/ogq_abc123/original_4.png?type=p100_100")))
+                        .isEqualTo(new ArtifactWriteResult("a.png", 3L));
     }
 
 
@@ -241,7 +247,8 @@ class ArtifactWriteServiceTest {
             .write(
                 USER,
                 new ArtifactWriteRequest(publicId, "a.png", null, "https://images.example.com/a.png")))
-                    .isInstanceOf(ApiException.class);
+                    .isInstanceOfSatisfying(ApiException.class,
+                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
         assertThat(Files.readAllBytes(root.resolve("42/a.png"))).containsExactly(1, 2, 3);
         try (var files = Files.list(root.resolve("42"))) {
             assertThat(files.map(path -> path.getFileName().toString())).containsExactly("a.png");
