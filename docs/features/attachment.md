@@ -678,7 +678,7 @@ MCP 는 `userId`, `executionId`, `errorCode`, 같은 `reason` 을 별도 warn �
 네이버 블로그 스킬은 미리보기 HTML 을 먼저 저장하고 스티커를 한 번에 하나씩 받는다.
 `source_url` 은 `render_draft` 의 값을 바꾸지 않고 전달한다.
 스티커 하나가 실패하면 나머지는 건너뛰고 저장한 HTML 을 유지한다. 받지 못한 스티커는 빈 그림으로 보인다.
-연속 실패로 Hermes 가 MCP 서버를 일시 정지해도 미리보기 HTML 저장이 함께 막히지 않게 하기 위해서다.
+[MCP 서버 일시 정지](../../hermes/docs/hermes-contract.md#mcp-서버-일시-정지)로 미리보기 HTML 저장이 함께 막히지 않게 하기 위해서다.
 
 **쓰기는 답에 결과물을 연결하지 않는다.**
 현재 대화에 쓴 HTML 은 turn 끝에 `ArtifactService.recordTurn` 이 찾아 그 답에 묶는다.
