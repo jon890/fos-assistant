@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.infra;
 
 import com.bifos.assistant.chat.artifact.config.ArtifactSourceProperties;
+import com.bifos.assistant.chat.artifact.domain.ArtifactSourceRejectedException;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayOutputStream;
@@ -22,9 +23,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 
 /** 허용한 호스트를 검사한 공개 IP로만 HTTPS 이미지 하나를 가져온다. */
 @Component
+@Slf4j
 public class ArtifactSourceFetcher {
 
     public static final int MAX_BYTES = 5 * 1024 * 1024;
@@ -172,29 +175,42 @@ public class ArtifactSourceFetcher {
 
 
     private ValidSource validate(URI source) {
-        if (source == null
-            || !"https".equals(source.getScheme())
-            || source.getRawUserInfo() != null
-            || source.getRawFragment() != null
-            || source.getHost() == null
-            || source.getHost().endsWith(".")
-            || source.getPort() != -1 && source.getPort() != 443
-            || source.getHost().indexOf(':') >= 0
-            || source.getHost().matches("[0-9.]+")
-            || !source.getHost()
-                .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
-            throw failed("artifact source URL is invalid", null);
+        String host = source == null ? null : source.getHost();
+        if (source == null || !"https".equals(source.getScheme())) {
+            throw rejected("scheme", host);
         }
-        String host = source.getHost();
+        if (source.getRawUserInfo() != null) {
+            throw rejected("userinfo", host);
+        }
+        if (source.getRawFragment() != null) {
+            throw rejected("fragment", host);
+        }
+        if (source.getPort() != -1 && source.getPort() != 443) {
+            throw rejected("port", host);
+        }
+        if (host == null
+            || host.endsWith(".")
+            || host.indexOf(':') >= 0
+            || host.matches("[0-9.]+")
+            || !host
+                .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
+            throw rejected("host_format", host);
+        }
         if (!properties.allowedHosts().contains(host)) {
-            throw failed("artifact source host is not allowed", null);
+            throw rejected("allowed_host", host);
         }
         String raw = source.getRawPath() + (source.getRawQuery() == null ? "" : "?" + source.getRawQuery());
         String decoded = source.getPath() + (source.getQuery() == null ? "" : "?" + source.getQuery());
         if (hasControlCharacter(raw) || hasControlCharacter(decoded)) {
-            throw failed("artifact source URL is invalid", null);
+            throw rejected("control_character", host);
         }
         return new ValidSource(source, host);
+    }
+
+
+    private static ApiException rejected(String reason, String host) {
+        log.warn("artifact source rejected reason={} host={}", reason, host);
+        return new ArtifactSourceRejectedException(reason);
     }
 
 
