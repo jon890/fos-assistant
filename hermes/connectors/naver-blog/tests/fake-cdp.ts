@@ -920,7 +920,11 @@ export class FakeEditor {
         this.categoryListOpen &&
         this.categories.includes(quoted(expression, "==="))
       );
-    if (expression.includes("!!document.querySelector('[data-testid^=categoryItemText_]')"))
+    if (
+      expression.includes(
+        "!!document.querySelector('[data-testid^=categoryItemText_]')",
+      )
+    )
       return this.categoryListOpen;
     if (expression.includes("categoryItemText_"))
       return JSON.stringify(this.categoryListOpen ? this.categories : []);

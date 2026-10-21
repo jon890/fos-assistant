@@ -100,16 +100,16 @@ export function logToolDiagnostic(
     entry.stage = classOnly(error.stage);
     const message = String(error.message ?? "");
     entry.message =
-      message.length <= MESSAGE_MAX && !/[/@\\]/.test(message)
-        ? message
-        : null;
+      message.length <= MESSAGE_MAX && !/[/@\\]/.test(message) ? message : null;
     const diagnosis = safeDiagnosis(error.extra?.diagnosis);
     if (diagnosis) entry.diagnosis = diagnosis;
   } else {
     entry.error_class = classOnly(error.name);
   }
   try {
-    process.stderr.write(`${JSON.stringify({ naver_blog_diagnostic: entry })}\n`);
+    process.stderr.write(
+      `${JSON.stringify({ naver_blog_diagnostic: entry })}\n`,
+    );
   } catch {
     // 진단을 남기지 못해도 도구 결과는 그대로 돌려준다.
   }

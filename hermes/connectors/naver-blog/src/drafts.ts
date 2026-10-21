@@ -202,34 +202,44 @@ export function readDraft(
   draftId: string,
   options: ReadOptions = {},
 ) {
-  return withWriteTab(env, "read_draft", options, async (page, blogId, notice) => {
-    if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
-    const before = await tempList(page, blogId);
-    if (!before.drafts.some((draft) => draft.draft_id === draftId))
-      throw new ToolError("NAVER_BLOG_DRAFT_NOT_FOUND");
-    await assertEmptyEditor(page, before.drafts);
-    await loadDraft(page, blogId, draftId, before.drafts);
-    let content;
-    let photos;
-    try {
-      const document = await editorDocument(page);
-      content = documentToDraft(document);
-      photos = documentPhotos(document);
-    } catch (error) {
-      if (error instanceof DocumentShapeError)
-        throw page.fail("editor_failed", error.message);
-      throw error;
-    }
-    const { category, tags } = await readSettings(page);
-    const draft = { title: content.title, category, tags, body: content.body };
-    const after = await tempList(page, blogId).catch(() => null);
-    return {
-      draft_id: draftId,
-      revision: draftRevision(draft),
-      ...draft,
-      ...photos,
-      autosave_check: autosaveCheck(before, after, draftId),
-      autosave_requests: page.autosaveRequests,
-    };
-  });
+  return withWriteTab(
+    env,
+    "read_draft",
+    options,
+    async (page, blogId, notice) => {
+      if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
+      const before = await tempList(page, blogId);
+      if (!before.drafts.some((draft) => draft.draft_id === draftId))
+        throw new ToolError("NAVER_BLOG_DRAFT_NOT_FOUND");
+      await assertEmptyEditor(page, before.drafts);
+      await loadDraft(page, blogId, draftId, before.drafts);
+      let content;
+      let photos;
+      try {
+        const document = await editorDocument(page);
+        content = documentToDraft(document);
+        photos = documentPhotos(document);
+      } catch (error) {
+        if (error instanceof DocumentShapeError)
+          throw page.fail("editor_failed", error.message);
+        throw error;
+      }
+      const { category, tags } = await readSettings(page);
+      const draft = {
+        title: content.title,
+        category,
+        tags,
+        body: content.body,
+      };
+      const after = await tempList(page, blogId).catch(() => null);
+      return {
+        draft_id: draftId,
+        revision: draftRevision(draft),
+        ...draft,
+        ...photos,
+        autosave_check: autosaveCheck(before, after, draftId),
+        autosave_requests: page.autosaveRequests,
+      };
+    },
+  );
 }
