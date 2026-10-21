@@ -14,6 +14,7 @@ import {
 } from "./editor/drafts.ts";
 import { open } from "./editor/open.ts";
 import {
+  ABORTED,
   closeTab,
   EditorError,
   type EditorOptions,
@@ -21,7 +22,7 @@ import {
   openWriteTab,
 } from "./editor/page.ts";
 import { readSettings } from "./editor/settings.ts";
-import { ToolError } from "./errors.ts";
+import { logToolDiagnostic, ToolError } from "./errors.ts";
 import {
   JOB_ID_PATTERN,
   jobAlive,
@@ -44,11 +45,25 @@ const LOGIN_CHECK_MS = 5_000;
  * 편집기 단계의 실패를 도구 오류로 바꾼다. 화면에서 읽은 글과 문장은 싣지 않는다.
  * 까닭을 모르는 실패는 로그인 쿠키를 한 번 더 보고, 쿠키가 없으면 로그인이 풀린 것으로 알린다.
  * 읽는 도중 세션이 끝나면 목록 응답이 로그인 화면으로 넘어가 모양 오류로만 보이기 때문이다.
+ * 쿠키가 있는데 화면 진단(`extra.diagnosis`)을 실은 편집기 실패는 `NAVER_BLOG_EDITOR_CHANGED` 다. 진단을 읽는 자리는 발행 설정과 카테고리 목록을 여는 단계다.
+ * 그 밖의 실패(시간 초과, 중단, 목록 응답 오류, 문서 모양 오류)는 `NAVER_BLOG_UNAVAILABLE` 로 둔다.
+ * 모델에게는 코드만 가므로, 단계와 화면 진단은 표준 오류에 한 줄로 남긴다.
  */
-async function toolErrorOf(env: Env, error: unknown): Promise<ToolError> {
+async function toolErrorOf(
+  env: Env,
+  tool: string,
+  error: unknown,
+): Promise<ToolError> {
   if (error instanceof ToolError) return error;
   if (error instanceof EditorError && error.code === "login_required")
     return new ToolError("NAVER_BLOG_LOGIN_REQUIRED");
+  logToolDiagnostic(
+    tool,
+    error instanceof EditorError
+      ? error
+      : { name: error instanceof Error ? error.constructor.name : undefined },
+    error instanceof EditorError,
+  );
   try {
     await sessionStatus(env, { timeoutMs: LOGIN_CHECK_MS });
   } catch (checked) {
@@ -58,6 +73,13 @@ async function toolErrorOf(env: Env, error: unknown): Promise<ToolError> {
     )
       return checked;
   }
+  if (
+    error instanceof EditorError &&
+    error.code === "editor_failed" &&
+    error.message !== ABORTED &&
+    error.extra.diagnosis !== undefined
+  )
+    return new ToolError("NAVER_BLOG_EDITOR_CHANGED");
   return new ToolError("NAVER_BLOG_UNAVAILABLE");
 }
 
@@ -76,13 +98,14 @@ export async function assertIdle(dir: string, blogId: string) {
 }
 
 /**
- * 그 블로그의 글쓰기 화면을 새 탭에 열고 `work` 를 돌린 뒤 탭을 닫는다.
+ * 그 블로그의 글쓰기 화면을 새 탭에 열고 `work` 를 돌린 뒤 탭을 닫는다. `tool` 은 실패 진단 줄에 싣는 도구 이름이다.
  * 같은 블로그에 돌고 있는 저장 작업이 있으면 탭을 열지 않고 `NAVER_BLOG_BUSY` 다.
  * 「작성 중인 글이 있습니다」 알림은 닫지 않고 `notice` 로 알린다. 닫으면 사용자가 쓰던 자동저장본이 버려질 수 있다.
  * 읽기는 잠금을 잡지 않는다. 읽는 동안 시작한 저장 작업은 자기 탭의 화면을 따로 대조한다.
  */
 export async function withWriteTab<T>(
   env: Env,
+  tool: string,
   options: ReadOptions,
   work: (page: EditorPage, blogId: string, notice: boolean) => Promise<T>,
 ): Promise<T> {
@@ -109,7 +132,7 @@ export async function withWriteTab<T>(
       }
     }
   } catch (error) {
-    throw await toolErrorOf(env, error);
+    throw await toolErrorOf(env, tool, error);
   }
 }
 
@@ -121,7 +144,7 @@ const TITLE_MAX = 200;
  * 「작성 중인 글」 알림이 떠 있어도 목록 응답은 받을 수 있어 그대로 읽는다.
  */
 export function listDrafts(env: Env, options: ReadOptions = {}) {
-  return withWriteTab(env, options, async (page, blogId) => {
+  return withWriteTab(env, "list_drafts", options, async (page, blogId) => {
     const drafts = (await tempDrafts(page, blogId)).map((draft) => ({
       ...draft,
       title: [...draft.title].slice(0, TITLE_MAX).join(""),
@@ -179,7 +202,7 @@ export function readDraft(
   draftId: string,
   options: ReadOptions = {},
 ) {
-  return withWriteTab(env, options, async (page, blogId, notice) => {
+  return withWriteTab(env, "read_draft", options, async (page, blogId, notice) => {
     if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
     const before = await tempList(page, blogId);
     if (!before.drafts.some((draft) => draft.draft_id === draftId))

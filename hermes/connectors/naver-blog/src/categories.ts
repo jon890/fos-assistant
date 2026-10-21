@@ -24,7 +24,7 @@ function cacheFile(dir: string, blogId: string) {
  * 「작성 중인 글」 알림이 떠 있으면 설정을 열 수 없어 `NAVER_BLOG_EDITOR_IN_USE` 다.
  */
 export function listCategories(env: Env, options: ReadOptions = {}) {
-  return withWriteTab(env, options, async (page, blogId, notice) => {
+  return withWriteTab(env, "list_categories", options, async (page, blogId, notice) => {
     if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
     const categories = await readCategories(page);
     let temporary: string | null = null;

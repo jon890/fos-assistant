@@ -309,13 +309,17 @@ export class FakeEditor {
   intercept = false;
   /** 발행 단추를 이만큼 눌러도 레이어가 열리지 않는다. 바쁜 편집기를 흉내 낸다. */
   publishIgnored = 0;
+  /** 참이면 카테고리 선택기 단추가 화면에 없다. 선택기를 누를 수 없는 편집기를 만든다. */
+  categoryButtonMissing = false;
+  /** 참이면 카테고리 선택기를 눌러도 목록이 펼쳐지지 않는다. 목록이 보이지 않는 편집기를 만든다. */
+  categoryListStaysClosed = false;
   /** 끝이 있는 애니메이션이 돈다고 이만큼 답한다. */
   animatingPolls = 0;
   /** 발행 단추 진단 식의 답. */
-  publishDiagnosis = {
+  publishDiagnosis: Record<string, unknown> = {
     publish_button: "shown",
-    covered_by: null as string | null,
-    layers: [] as string[],
+    covered_by: null,
+    layers: [],
   };
   /** 발행 단추를 누른 수. */
   publishClicks = 0;
@@ -801,8 +805,14 @@ export class FakeEditor {
       const selector = quoted(expression, "querySelector(");
       let action: (() => void) | null = null;
       if (selector.includes("tpb.publish")) action = this.publishAction;
-      if (selector.includes("tpb*i.category") && this.settingsOpen)
-        action = () => (this.categoryListOpen = true);
+      if (
+        selector.includes("tpb*i.category") &&
+        this.settingsOpen &&
+        !this.categoryButtonMissing
+      )
+        action = () => {
+          if (!this.categoryListStaysClosed) this.categoryListOpen = true;
+        };
       if (selector === "#tag-input" && this.settingsOpen)
         action = () => (this.focused = "tag");
       if (!action) return null;
@@ -910,6 +920,8 @@ export class FakeEditor {
         this.categoryListOpen &&
         this.categories.includes(quoted(expression, "==="))
       );
+    if (expression.includes("!!document.querySelector('[data-testid^=categoryItemText_]')"))
+      return this.categoryListOpen;
     if (expression.includes("categoryItemText_"))
       return JSON.stringify(this.categoryListOpen ? this.categories : []);
     if (expression.includes("#tag-input")) return this.tagInput;
