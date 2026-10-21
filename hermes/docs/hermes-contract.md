@@ -1692,6 +1692,12 @@ Control Plane MCP 도구는 모두 `{content: [{type: "text", text}], isError}` 
 판정의 기준은 [`test/fixtures/mcp-call-tool-result-v1.json`](../../test/fixtures/mcp-call-tool-result-v1.json) 이다.
 [`test_control_plane_tool_result.py`](../tests/test_control_plane_tool_result.py) 가 실제 `mcp` 패키지로, `McpToolResultShapeTest` 가 backend 의 모양 검사로 그 fixture 를 같은 쪽으로 가르는지 본다.
 
+### MCP 자식의 표준 오류
+
+Hermes 는 stdio MCP 서버(커넥터)의 표준 오류를 그 profile 의 `logs/mcp-stderr.log`(순환본 `.1`)에 모은다. 운영의 기동 확인이 이 파일의 `starting MCP server '<이름>'` 줄을 읽는 것으로 확인했다. 소스로는 읽지 않았다.
+커넥터가 진단을 남기는 자리가 이 파일이다. 줄에는 주소, 블로그 아이디, 글을 싣지 않는다. 대시보드 plugin 의 연결 확인과 선택지 호출은 자식의 표준 오류를 버리므로 그 경로의 진단은 남지 않는다.
+네이버 블로그 커넥터의 진단 줄 모양은 [네이버 블로그 커넥터](../../docs/features/naver-blog-connector.md) 의 「진단 줄」 이 갖는다.
+
 ### 도구를 모델에게서 빼는 설정
 
 `mcp_servers.<서버>.tools.include` 와 `tools.exclude` 가 있다. 접두사가 붙기 전의 원래 도구 이름과 glob 을 받는다.

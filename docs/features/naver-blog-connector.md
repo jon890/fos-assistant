@@ -114,7 +114,7 @@ MCP 서버 이름은 `naver-blog` 다.
 6. 목록 응답을 다시 받아 `autosave_check` 를 만든다
 
 까닭을 구분하지 못한 실패 뒤에는 브라우저의 네이버 로그인 쿠키를 한 번 더 본다. 쿠키가 없으면 `NAVER_BLOG_UNAVAILABLE` 대신 `NAVER_BLOG_LOGIN_REQUIRED` 다. 읽는 도중 세션이 끝나면 목록 응답이 로그인 화면으로 넘어가 모양 오류로만 보이기 때문이다.
-쿠키는 남았는데 서버 쪽 세션만 끝난 경우는 구분하지 못하고 `NAVER_BLOG_UNAVAILABLE` 이다.
+쿠키는 남았는데 서버 쪽 세션만 끝난 경우는 구분하지 못한다. 발행 설정이나 카테고리 목록을 열지 못해 화면 진단을 읽은 실패는 `NAVER_BLOG_EDITOR_CHANGED` 고, 그 밖의 실패는 `NAVER_BLOG_UNAVAILABLE` 이다.
 
 `autosave_check` 는 읽기 앞뒤 목록을 견준 관측값이다. 뒤 목록을 읽지 못하면 `null` 이다.
 
@@ -405,6 +405,7 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `NAVER_BLOG_JOB_NOT_FOUND` | `invalid_input` | 그 번호의 작업이 없거나 지워졌다 |
 | `NAVER_BLOG_DRAFT_NOT_FOUND` | `invalid_input` | 그 `draft_id` 의 글이 임시저장 목록에 없다 |
 | `NAVER_BLOG_EDITOR_IN_USE` | `unavailable` | 글쓰기 화면에 「작성 중인 글이 있습니다」 알림이 떠 있거나 새 탭의 편집기에 쓰던 글이 남아 있어 글을 불러오지 않았다 |
+| `NAVER_BLOG_EDITOR_CHANGED` | `unavailable` | 쿠키는 있는데 `list_categories` 가 발행 설정 열기, 카테고리 선택기 누르기, 목록 표시 기다리기 가운데 한 단계에서 실패했다. 네이버 화면이 바뀌었거나 다른 것이 덮고 있을 수 있다. 시간 초과와 중단은 제외한다. 사용자가 카테고리 이름을 말했으면 그 이름으로 `render_draft` 를 이어 가도 된다 |
 | `NAVER_BLOG_LOGIN_REQUIRED` | `credential_rejected` | 브라우저에 네이버 로그인 쿠키가 없다. 읽기 도구가 로그인 화면을 만났거나, 까닭을 모르게 실패한 뒤 쿠키가 없을 때도 이 코드다 |
 | `NAVER_BLOG_BUSY` | `unavailable` | 그 블로그에 돌고 있는 작업이 있다. 새 글 저장, 덮어쓰기, 읽기 도구 모두 이 코드로 거절한다 |
 | `NAVER_BLOG_BROWSER_UNREACHABLE` | `unavailable` | 중계에 닿지 않거나, 브라우저를 켜지 못했다(동시 수가 찼다). 중계가 404, 502, 503 을 주거나 중계 주소가 비었을 때도 이 코드다 |
@@ -417,6 +418,27 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 `save_draft` 와 `overwrite_draft` 는 브라우저를 확인할 때 45초까지 기다린다.
 
 오류 글에 중계 주소, 파일 경로, 브라우저가 준 오류 원문을 싣지 않는다.
+
+### 진단 줄
+
+모델에게 가는 오류는 코드만 싣는다. 그래서 `NAVER_BLOG_EDITOR_CHANGED` 만으로는 편집기 화면의 어느 단계에서 막혔는지 알 수 없다.
+읽기 도구(`list_categories`, `list_drafts`, `read_draft`)가 편집기 단계에서 실패하면 서버가 표준 오류에 한 줄 JSON 을 남긴다. 다른 예외는 클래스 이름만 남긴다. 모델에게 가는 코드를 `NAVER_BLOG_EDITOR_CHANGED` 로 바꾸는 것은 `diagnosis` 가 있는 실패뿐이다.
+
+```json
+{"naver_blog_diagnostic":{"tool":"list_categories","editor_code":"editor_failed","stage":"open","message":"카테고리 선택기를 열지 못했다","diagnosis":{"publish_button":"shown","covered_by":null,"category_button":"hidden","category_covered_by":null,"layers":["div.layer_popup__x1"]}}}
+```
+
+| 칸 | 뜻 |
+| --- | --- |
+| `tool` | 실패한 도구 이름 |
+| `editor_code` | `EditorError` 의 코드. 로그인이 풀린 경우를 뺀 편집기 실패는 대개 `editor_failed` 다 |
+| `stage` | 실패한 단계 이름 |
+| `message` | 코드가 정한 고정 문구. `list_categories` 는 「카테고리 목록을 읽을 수 없다」(발행 설정을 열지 못함), 「카테고리 선택기를 열지 못했다」, 「카테고리 목록이 보이지 않는다」 셋으로 단계가 갈린다 |
+| `diagnosis` | 발행 설정이나 카테고리 목록을 열지 못했을 때만 있다. 발행 단추와 카테고리 단추의 상태(`missing`, `hidden`, `disabled`, `shown`), 단추 가운데를 차지한 요소, 보이는 레이어를 클래스 이름으로만 적는다 |
+
+주소, 블로그 아이디, 글, 브라우저가 준 원문, CDP 주소, 파일 경로는 싣지 않는다. 클래스 이름 모양(`[A-Za-z0-9_.-]`, 80자까지)이 아닌 진단 값은 버리고, 고정 문구에 `/`, `@`, `\` 가 있으면 문구를 버린다. `hermes/connectors/naver-blog/tests/category-diagnostics.test.ts` 가 세 단계 실패와 이 제한을 지킨다.
+
+이 줄은 Hermes 가 커넥터 MCP 서버(Hermes 프로세스의 자식)의 표준 오류를 모아 두는 그 profile 의 `logs/mcp-stderr.log` 에 남는다. Hermes 의 이 동작은 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「MCP 자식의 표준 오류」 가 갖는다. 대시보드의 연결 확인(`session_status`)은 자식의 표준 오류를 버리므로 그 경로에서는 남지 않는다.
 
 ## 서버와 검사
 
