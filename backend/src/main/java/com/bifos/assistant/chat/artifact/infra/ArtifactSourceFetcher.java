@@ -210,10 +210,7 @@ public class ArtifactSourceFetcher {
 
     private static ApiException rejected(String reason, String host) {
         log.warn("artifact source rejected reason={} host={}", reason, host);
-        String message = "allowed_host".equals(reason)
-            ? "artifact source host is not allowed"
-            : "artifact source URL is invalid";
-        return new ArtifactSourceRejectedException(message);
+        return new ArtifactSourceRejectedException(reason);
     }
 
 

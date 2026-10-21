@@ -672,6 +672,7 @@ skill_manage 로 스킬을 만들거나 고치지 않는다. 스킬 안내에 sk
 URL 형식과 허용 호스트 거절은 warn 로그의 `reason` 과 `host` 로 구분한다.
 `reason` 은 `scheme`, `userinfo`, `fragment`, `port`, `host_format`, `allowed_host`, `control_character` 중 하나다.
 호스트를 읽을 수 없으면 `host` 는 `null` 이고, 경로와 쿼리, 사용자 정보, 전체 URL 은 기록하지 않는다.
+MCP 는 `userId`, `executionId`, `errorCode`, 같은 `reason` 을 별도 warn 로그에 남겨 거절을 해당 실행과 연결한다.
 내려받기 실패는 기존처럼 `INTERNAL_ERROR` 로 남긴다.
 
 네이버 블로그 스킬은 미리보기 HTML 을 먼저 저장하고 스티커를 한 번에 하나씩 받는다.

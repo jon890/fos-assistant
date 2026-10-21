@@ -156,12 +156,15 @@ public class McpToolService {
             return result(toJson(written), false);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
-                if (ex instanceof ArtifactSourceRejectedException) {
-                    String reason = "artifact source host is not allowed".equals(ex.getMessage())
+                if (ex instanceof ArtifactSourceRejectedException rejected) {
+                    log.warn(
+                        "artifact source rejected userId={} executionId={} errorCode={} reason={}",
+                        user.id(), caller.executionId(), ex.code(), rejected.reason());
+                    String message = "allowed_host".equals(rejected.reason())
                         ? "source_url의 호스트가 허용되지 않았습니다. 허용된 이미지 호스트의 주소를 사용하세요. "
                         : "source_url 주소 형식이 올바르지 않습니다. HTTPS 이미지 주소인지 확인하세요. ";
                     return result(
-                        reason + "제공받은 주소는 글자 그대로 전달하세요.",
+                        message + "제공받은 주소는 글자 그대로 전달하세요.",
                         true);
                 }
                 throw ex;
