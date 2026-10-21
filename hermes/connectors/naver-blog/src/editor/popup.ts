@@ -129,13 +129,18 @@ export function filterPopupDiagnostics(
 /**
  * 알려진 알림을 안전한 쪽으로 한 번 닫는다. 닫았으면 `true` 이고, 모르는 알림이거나 위험한 단추가 있으면 누르지 않고 `false` 다.
  * 「작성 중인 글」 알림은 이어 쓰지 않는 단추(취소)를, 도움말 알림은 닫기 단추를 누른다.
+ * `keepDraftNotice` 이면 「작성 중인 글」 알림을 누르지 않고 `false` 다. 사용자의 자동저장 글을 잃게 하면 안 되는 읽기 도구가 쓴다.
  */
-export async function dismissKnownPopup(page: EditorPage) {
+export async function dismissKnownPopup(
+  page: EditorPage,
+  { keepDraftNotice = false } = {},
+) {
   const found = await probePopup(page);
   if (!found) return false;
   page.popup = found.diagnostics;
   const { kind } = found.diagnostics;
   if (kind === "unknown" || found.risky) return false;
+  if (kind === "draft_notice" && keepDraftNotice) return false;
   const label =
     kind === "draft_notice"
       ? "취소"

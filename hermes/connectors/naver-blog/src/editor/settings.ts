@@ -83,7 +83,7 @@ export async function openSettings(page: EditorPage) {
  * 설정이나 카테고리 목록을 열지 못한 까닭을 클래스 이름으로만 읽는다. 글과 주소는 싣지 않는다.
  * `publish_button`, `category_button` 은 단추의 상태, `covered_by`, `category_covered_by` 는 단추 가운데를 차지한 요소, `layers` 는 보이는 레이어다.
  */
-async function publishDiagnosis(page: EditorPage) {
+export async function publishDiagnosis(page: EditorPage) {
   try {
     const raw = await page.js<string>(PUBLISH_DIAGNOSIS);
     return JSON.parse(raw || "{}") as Record<string, unknown>;
