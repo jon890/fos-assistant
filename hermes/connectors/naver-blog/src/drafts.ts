@@ -163,19 +163,24 @@ const TITLE_MAX = 200;
  * 「작성 중인 글」 알림이 떠 있어도 목록 응답은 받을 수 있어 그대로 읽는다. 늦게 뜬 도움말 알림은 닫는다.
  */
 export function listDrafts(env: Env, options: ReadOptions = {}) {
-  return withWriteTab(env, "list_drafts", options, async (page, blogId, notice) => {
-    // 목록은 화면이 아니라 응답으로 읽어서 「작성 중인 글」 알림이 떠 있어도 읽는다.
-    await settleBeforeRead(page, notice);
-    const drafts = (await tempDrafts(page, blogId)).map((draft) => ({
-      ...draft,
-      title: [...draft.title].slice(0, TITLE_MAX).join(""),
-    }));
-    return {
-      count: drafts.length,
-      drafts,
-      autosave_requests: page.autosaveRequests,
-    };
-  });
+  return withWriteTab(
+    env,
+    "list_drafts",
+    options,
+    async (page, blogId, notice) => {
+      // 목록은 화면이 아니라 응답으로 읽어서 「작성 중인 글」 알림이 떠 있어도 읽는다.
+      await settleBeforeRead(page, notice);
+      const drafts = (await tempDrafts(page, blogId)).map((draft) => ({
+        ...draft,
+        title: [...draft.title].slice(0, TITLE_MAX).join(""),
+      }));
+      return {
+        count: drafts.length,
+        drafts,
+        autosave_requests: page.autosaveRequests,
+      };
+    },
+  );
 }
 
 /**
