@@ -172,6 +172,7 @@ test("작업 오류 코드는 공통 어휘에 이어진다", () => {
       recovery: "recheck",
     },
     NAVER_BLOG_EDITOR_IN_USE: "unavailable",
+    NAVER_BLOG_EDITOR_CHANGED: "unavailable",
     NAVER_BLOG_UNAVAILABLE: {
       category: "unavailable",
       recovery: "retry_later",

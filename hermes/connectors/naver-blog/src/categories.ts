@@ -24,25 +24,30 @@ function cacheFile(dir: string, blogId: string) {
  * 「작성 중인 글」 알림이 떠 있으면 설정을 열 수 없어 `NAVER_BLOG_EDITOR_IN_USE` 다.
  */
 export function listCategories(env: Env, options: ReadOptions = {}) {
-  return withWriteTab(env, options, async (page, blogId, notice) => {
-    if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
-    const categories = await readCategories(page);
-    let temporary: string | null = null;
-    try {
-      const file = cacheFile(await openJobDir(env), blogId);
-      temporary = `${file}.${randomUUID()}.tmp`;
-      await writeFile(
-        temporary,
-        JSON.stringify({ read_at: Date.now(), categories }),
-        { mode: 0o600 },
-      );
-      await rename(temporary, file);
-    } catch {
-      // 목록을 남기지 못해도 읽은 결과는 돌려준다. 막는 검사만 건너뛴다.
-      if (temporary) await unlink(temporary).catch(() => {});
-    }
-    return { count: categories.length, categories };
-  });
+  return withWriteTab(
+    env,
+    "list_categories",
+    options,
+    async (page, blogId, notice) => {
+      if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
+      const categories = await readCategories(page);
+      let temporary: string | null = null;
+      try {
+        const file = cacheFile(await openJobDir(env), blogId);
+        temporary = `${file}.${randomUUID()}.tmp`;
+        await writeFile(
+          temporary,
+          JSON.stringify({ read_at: Date.now(), categories }),
+          { mode: 0o600 },
+        );
+        await rename(temporary, file);
+      } catch {
+        // 목록을 남기지 못해도 읽은 결과는 돌려준다. 막는 검사만 건너뛴다.
+        if (temporary) await unlink(temporary).catch(() => {});
+      }
+      return { count: categories.length, categories };
+    },
+  );
 }
 
 /** 최근에 읽은 목록. 없거나 오래됐거나 모양이 다르면 `null` 이다. */

@@ -30,22 +30,23 @@ const ANIMATING =
 
 // 요소를 태그와 앞 클래스 둘로만 적는다. 바뀌는 해시가 붙어도 어느 레이어인지는 알아볼 수 있다.
 // 편집기 도구 막대 안의 layer 클래스는 늘 보이므로 레이어 목록에서 뺀다.
+// 발행 단추와 카테고리 단추의 상태(missing, hidden, disabled, shown)와 가운데를 차지한 요소를 함께 읽는다.
 const PUBLISH_DIAGNOSIS = `(() => {
   ${LAYER_DIAGNOSIS_JS}
-  const button = document.querySelector(${JSON.stringify(PUBLISH_SETTINGS_BUTTON)});
-  let state = "missing", covered = null;
-  if (button) {
+  const probe = selector => {
+    const button = document.querySelector(selector);
+    if (!button) return ["missing", null];
     const r = button.getBoundingClientRect();
-    if (!r.width || !r.height) state = "hidden";
-    else {
-      state = button.disabled ? "disabled" : "shown";
-      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      if (!hit || !(hit === button || button.contains(hit))) covered = name(hit);
-    }
-  }
+    if (!r.width || !r.height) return ["hidden", null];
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const covered = hit && !(hit === button || button.contains(hit)) ? name(hit) : null;
+    return [button.disabled ? "disabled" : "shown", covered];
+  };
+  const [state, covered] = probe(${JSON.stringify(PUBLISH_SETTINGS_BUTTON)});
+  const [category, categoryCovered] = probe(${JSON.stringify(CATEGORY_BUTTON)});
   const layers = visibleLayers(${DIAGNOSIS_LAYERS});
   return JSON.stringify({ publish_button: state, covered_by: covered,
-    layers });
+    category_button: category, category_covered_by: categoryCovered, layers });
 })()`;
 
 const q = (value: unknown) => JSON.stringify(value);
@@ -79,8 +80,8 @@ export async function openSettings(page: EditorPage) {
 }
 
 /**
- * 발행 단추를 열지 못한 까닭을 클래스 이름으로만 읽는다. 글과 주소는 싣지 않는다.
- * `publish_button` 은 단추의 상태, `covered_by` 는 단추 가운데를 차지한 요소, `layers` 는 보이는 레이어다.
+ * 설정이나 카테고리 목록을 열지 못한 까닭을 클래스 이름으로만 읽는다. 글과 주소는 싣지 않는다.
+ * `publish_button`, `category_button` 은 단추의 상태, `covered_by`, `category_covered_by` 는 단추 가운데를 차지한 요소, `layers` 는 보이는 레이어다.
  */
 async function publishDiagnosis(page: EditorPage) {
   try {
@@ -260,13 +261,17 @@ export async function readSettings(page: EditorPage) {
 
 /**
  * 발행 설정의 카테고리 목록을 열어 이름을 차례대로 읽는다. 항목은 누르지 않고 설정을 닫으려고 한다.
- * 목록을 열지 못하면 `editor_failed`, 상한(`CATEGORY_LIST_MAX`)을 넘으면 잘린 목록을 주지 않고 `editor_failed` 다.
+ * 목록을 열지 못하면 화면 진단(`diagnosis`)을 실은 `editor_failed`, 상한(`CATEGORY_LIST_MAX`)을 넘으면 잘린 목록을 주지 않고 `editor_failed` 다.
  */
 export async function readCategories(page: EditorPage) {
   if (!(await openSettings(page)))
-    throw page.fail("editor_failed", "카테고리 목록을 읽을 수 없다");
+    throw page.fail("editor_failed", "카테고리 목록을 읽을 수 없다", {
+      diagnosis: await publishDiagnosis(page),
+    });
   if (!(await clickStableControl(page, CATEGORY_BUTTON)))
-    throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다");
+    throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다", {
+      diagnosis: await publishDiagnosis(page),
+    });
   const shown = await page.waitUntil(async () =>
     Boolean(
       await page.js(
@@ -274,7 +279,10 @@ export async function readCategories(page: EditorPage) {
       ),
     ),
   );
-  if (!shown) throw page.fail("editor_failed", "카테고리 목록이 보이지 않는다");
+  if (!shown)
+    throw page.fail("editor_failed", "카테고리 목록이 보이지 않는다", {
+      diagnosis: await publishDiagnosis(page),
+    });
   const names = await categoryNames(page, CATEGORY_LIST_MAX + 1);
   if (names.length > CATEGORY_LIST_MAX)
     throw page.fail(
