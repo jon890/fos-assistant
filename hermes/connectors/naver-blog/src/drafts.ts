@@ -41,6 +41,15 @@ export type ReadOptions = Omit<EditorOptions, "signal"> & { limitMs?: number };
 /** 실패 뒤 로그인 쿠키를 다시 볼 때의 시간 상한. */
 const LOGIN_CHECK_MS = 5_000;
 
+/** 진단 스크립트가 실패하면 빈 객체가 오므로, 칸이 하나라도 있어야 화면 진단을 읽은 것으로 본다. */
+function hasDiagnosis(diagnosis: unknown) {
+  return (
+    typeof diagnosis === "object" &&
+    diagnosis !== null &&
+    Object.keys(diagnosis).length > 0
+  );
+}
+
 /**
  * 편집기 단계의 실패를 도구 오류로 바꾼다. 화면에서 읽은 글과 문장은 싣지 않는다.
  * 까닭을 모르는 실패는 로그인 쿠키를 한 번 더 보고, 쿠키가 없으면 로그인이 풀린 것으로 알린다.
@@ -77,7 +86,7 @@ async function toolErrorOf(
     error instanceof EditorError &&
     error.code === "editor_failed" &&
     error.message !== ABORTED &&
-    error.extra.diagnosis !== undefined
+    hasDiagnosis(error.extra.diagnosis)
   )
     return new ToolError("NAVER_BLOG_EDITOR_CHANGED");
   return new ToolError("NAVER_BLOG_UNAVAILABLE");

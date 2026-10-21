@@ -209,3 +209,15 @@ test("편집기 오류가 아닌 예외는 클래스 이름만 남긴다", async
     error_class: "RangeError",
   });
 });
+
+test("진단 스크립트가 빈 값을 주면 EDITOR_CHANGED 가 아니라 UNAVAILABLE 이다", async () => {
+  const { editor, env } = await setup();
+  editor.categoryButtonMissing = true;
+  editor.publishDiagnosis = {};
+
+  const { result } = await captureStderr(() =>
+    listCategories(env, TIMES).catch((caught) => caught),
+  );
+
+  expect((result as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+});

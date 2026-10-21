@@ -384,7 +384,7 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `category_not_found` | 그 이름의 카테고리가 없다 | `categories`: 있는 카테고리 이름 |
 | `place_not_unique` | 상호명과 주소가 모두 맞는 결과가 하나가 아니다 | `place`: 찾던 상호명과 주소, `candidates`: 검색 결과의 상호명과 주소 |
 | `photo_upload_failed` | 사진을 넣거나 전송을 끝내지 못했다 | `photo`: 몇 번째 사진 자리인지 |
-| `editor_failed` | 그 밖에 화면이 기대한 상태가 아니었다 | `stage` 와 `message`: 무엇을 찾지 못했는지. `message` 는 커넥터가 정한 문장이다. 발행 설정을 열지 못했으면 `diagnosis` 가 붙는다: `publish_button`(`shown`, `disabled`, `hidden`, `missing`), 단추 가운데를 차지한 요소 `covered_by`, 보이는 레이어 `layers`. 요소는 태그와 앞 클래스 둘로만 적고 화면의 글은 싣지 않는다 |
+| `editor_failed` | 그 밖에 화면이 기대한 상태가 아니었다 | `stage` 와 `message`: 무엇을 찾지 못했는지. `message` 는 커넥터가 정한 문장이다. 발행 설정을 열지 못했으면 `diagnosis` 가 붙는다: `publish_button`(`shown`, `disabled`, `hidden`, `missing`), 단추 가운데를 차지한 요소 `covered_by`, 카테고리 단추의 `category_button`(같은 네 값)과 `category_covered_by`, 보이는 레이어 `layers`. 요소는 태그와 앞 클래스 둘로만 적고 화면의 글은 싣지 않는다 |
 | `timeout` | 작업이 10분 안에 끝나지 않았다 | |
 
 승인한 원고 snapshot 으로 띄운 작업은 `draft_job` 이 없는 작업(`NAVER_BLOG_JOB_NOT_FOUND`)으로 다룬다. 그 작업은 Control Plane 만 private 조회로 읽는다. 계약은 [원고 기능](content-draft.md#커넥터의-예약-job-시작과-조회)이 갖는다.
@@ -422,7 +422,7 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 ### 진단 줄
 
 모델에게 가는 오류는 코드만 싣는다. 그래서 `NAVER_BLOG_EDITOR_CHANGED` 만으로는 편집기 화면의 어느 단계에서 막혔는지 알 수 없다.
-읽기 도구(`list_categories`, `list_drafts`, `read_draft`)가 편집기 단계에서 실패하면 서버가 표준 오류에 한 줄 JSON 을 남긴다. 다른 예외는 클래스 이름만 남긴다. 모델에게 가는 코드를 `NAVER_BLOG_EDITOR_CHANGED` 로 바꾸는 것은 `diagnosis` 가 있는 실패뿐이다.
+읽기 도구(`list_categories`, `list_drafts`, `read_draft`)가 편집기 단계에서 실패하면 서버가 표준 오류에 한 줄 JSON 을 남긴다. 다른 예외는 클래스 이름만 남긴다. 모델에게 가는 코드를 `NAVER_BLOG_EDITOR_CHANGED` 로 바꾸는 것은 `diagnosis` 칸이 하나라도 있는 실패뿐이다.
 
 ```json
 {"naver_blog_diagnostic":{"tool":"list_categories","editor_code":"editor_failed","stage":"open","message":"카테고리 선택기를 열지 못했다","diagnosis":{"publish_button":"shown","covered_by":null,"category_button":"hidden","category_covered_by":null,"layers":["div.layer_popup__x1"]}}}
