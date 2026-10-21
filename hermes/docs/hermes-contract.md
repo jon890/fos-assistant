@@ -1692,6 +1692,38 @@ Control Plane MCP 도구는 모두 `{content: [{type: "text", text}], isError}` 
 판정의 기준은 [`test/fixtures/mcp-call-tool-result-v1.json`](../../test/fixtures/mcp-call-tool-result-v1.json) 이다.
 [`test_control_plane_tool_result.py`](../tests/test_control_plane_tool_result.py) 가 실제 `mcp` 패키지로, `McpToolResultShapeTest` 가 backend 의 모양 검사로 그 fixture 를 같은 쪽으로 가르는지 본다.
 
+### MCP 서버 일시 정지
+
+2026-10-21에 `v0.21.6` 소스에서 확인했다. 실제 MCP 서버를 연속 실패시키는 실행은 확인하지 않음.
+
+| 항목 | 소스에서 확인한 동작 |
+| --- | --- |
+| 정지 조건 | 같은 서버 연결의 도구 호출이 연속 3회 실패하면 그 뒤 호출을 막는다. 도구 하나의 실패 횟수가 아니다 |
+| 도구가 반환한 오류 | `isError: true`를 Hermes가 JSON `error` 결과로 바꾸며, `_record_call_outcome`이 이를 `application=True`인 실패 1회로 센다. `source_url` 검사의 `VALIDATION_FAILED`와 없는 대화 등의 오류가 이 경로를 따른다 |
+| JSON-RPC 인자 오류 | Control Plane의 도구 인자·확장자·본문 크기·경로 형식·URL 문법 오류는 `-32602`로 돌아온다. 이는 `_dispatch`의 예외 경로와 `_on_failure`를 거쳐 `application=False`인 실패로 세어지므로, 연속되면 `is unreachable after …` 문구가 나온다 |
+| 전송 오류와 시간 초과 | 연결을 얻지 못한 호출과 복구하지 못한 호출 예외도 실패로 센다. timeout도 예외 경로를 따른다. 복구 후 재시도 결과는 성공·오류에 따라 다시 집계한다. 사용자 새 메시지로 생긴 `InterruptedError`는 이 집계에서 제외한다 |
+| 기간과 설정 | 임계값 `3`, 정지 시간 `60.0`초는 모듈 상수다. 이 판정 경로는 설정을 읽지 않는다. 임계값 이상인 실패 때마다 `time.monotonic()` 시각을 기록한다 |
+| 범위 | 실행·session별이 아닌 Hermes 프로세스 안의 서버 연결 키별 상태다. multiplexer에서는 `(소유 scope, 서버 이름)`을 쓴다. 별도 연결인 profile은 분리되지만 다른 profile의 연결을 채택했다면 같은 키와 정지 상태를 공유한다 |
+| 정지 중 결과 | 서버에 `tools/call`을 보내지 않고 JSON `error`를 돌려준다. 모두 도구 반환 오류였으면 `rejected the last … calls`, `Paused for ~…s`와 인자 수정 안내가 나온다. JSON-RPC 오류나 전송 실패처럼 `application=False`인 실패가 섞였으면 `is unreachable after … consecutive failures`와 남은 대기 시간이 나온다. 거절 자체는 횟수나 정지 시각을 늘리지 않는다 |
+| 시간 경과 뒤 | 마지막 정지 시각부터 60초가 지나면 다음 호출을 허용한다. 성공하면 횟수와 정지 시각을 초기화하고, 다시 실패하면 정지 시각을 갱신한다. 시간이 지났다고 오류 횟수를 먼저 지우지는 않는다 |
+| 복구 시 초기화 | 연결 초기화와 도구 발견을 마쳐 session이 준비되면 정지 상태를 지운다. OAuth 복구 뒤 재연결 성공, 쓰기 호출의 session 만료 뒤 재연결 성공도 `_reset_server_error`를 부른다. 이들 복구 분기를 실제 서버로 실행하는 검증은 확인하지 않음 |
+
+근거는 [`mcp_tool.py`의 상수와 집계·초기화](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool.py#L461-L512),
+[`_check_circuit_breaker`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L88-L107),
+[연결 실패와 결과 집계](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L110-L165),
+[예외와 복구 분기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L192-L255),
+[`_dispatch`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L327-L350),
+[`isError` 변환](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L525-L538),
+[호출 전 정지 판정과 실패 기록](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_handlers.py#L566-L608),
+[서버 연결 키와 공유 연결 선택](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_scope.py#L1-L67),
+[session 준비 시 초기화](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_transport.py#L248-L262)다.
+
+Control Plane이 반환한 `isError` 결과와 JSON-RPC `-32602` 인자 오류는 서로 다른 경로로 이 횟수에 들어간다.
+각 오류의 응답 모양은 [결과물을 MCP로 쓸 때](../../docs/features/attachment.md#결과물을-mcp-로-쓸-때)의 표가 갖는다.
+따라서 스킬은 같은 서버의 도구를 연달아 실패시키지 않게 해야 한다.
+`artifact_write`가 반복 실패하면 같은 `fos-assistant` 연결의 미리보기 HTML 저장도 막히므로,
+필수 결과물을 먼저 저장하고 선택 항목이 실패하면 나머지 호출을 멈춘다.
+
 ### MCP 자식의 표준 오류
 
 Hermes 는 stdio MCP 서버(커넥터)의 표준 오류를 그 profile 의 `logs/mcp-stderr.log`(순환본 `.1`)에 모은다. 운영의 기동 확인이 이 파일의 `starting MCP server '<이름>'` 줄을 읽는 것으로 확인했다. 소스로는 읽지 않았다.
