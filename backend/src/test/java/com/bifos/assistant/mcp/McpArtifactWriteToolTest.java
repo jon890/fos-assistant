@@ -117,6 +117,7 @@ class McpArtifactWriteToolTest {
     @DisplayName("본인 대화에 HTML을 쓰고 공개 결과만 돌려준다")
     void writesHtmlToOwnConversationAndReturnsOnlyPublicResult() throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
+        long artifactCountBefore = artifacts.count();
 
         JsonNode result = body(call(dadToken, conversation.publicId().toString(), "test/index.html", "<h1>안녕</h1>"));
 
@@ -126,7 +127,7 @@ class McpArtifactWriteToolTest {
         assertThat(output.path("path").asString()).isEqualTo("test/index.html");
         assertThat(output.path("byteSize").asLong()).isEqualTo("<h1>안녕</h1>".getBytes(StandardCharsets.UTF_8).length);
         assertThat(store.resolveInside(conversation.id(), "test/index.html")).isPresent();
-        assertThat(artifacts.count()).isZero();
+        assertThat(artifacts.count()).isEqualTo(artifactCountBefore);
     }
 
 
