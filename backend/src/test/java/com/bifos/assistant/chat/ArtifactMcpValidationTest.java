@@ -38,8 +38,9 @@ class ArtifactMcpValidationTest {
             doThrow(new ArtifactSourceRejectedException(reason)).when(artifacts).write(user, request);
             Map<String, Object> result = service.writeArtifact(caller, request);
             assertThat(result.get("isError")).isEqualTo(true);
-            assertThat(result.toString()).contains("render_draft", "source_url", "글자 그대로", "건너뛰고")
-                .doesNotContain("private.example", "secret.png", "token=secret");
+            assertThat(result.toString()).contains("source_url", "글자 그대로")
+                .contains(reason.contains("host") ? "호스트가 허용되지 않았습니다" : "주소 형식이 올바르지 않습니다")
+                .doesNotContain("render_draft", "스티커", "private.example", "secret.png", "token=secret");
         }
         ApiException syntax = new ApiException(ErrorCode.VALIDATION_FAILED, "artifact source URL is invalid");
         doThrow(syntax).when(artifacts).write(user, request);

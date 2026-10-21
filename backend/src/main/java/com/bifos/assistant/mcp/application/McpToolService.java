@@ -157,9 +157,11 @@ public class McpToolService {
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
                 if (ex instanceof ArtifactSourceRejectedException) {
+                    String reason = "artifact source host is not allowed".equals(ex.getMessage())
+                        ? "source_url의 호스트가 허용되지 않았습니다. 허용된 이미지 호스트의 주소를 사용하세요. "
+                        : "source_url 주소 형식이 올바르지 않습니다. HTTPS 이미지 주소인지 확인하세요. ";
                     return result(
-                        "source_url이 거절됐습니다. render_draft가 준 source_url 값을 글자 그대로 넣으세요. "
-                            + "스티커 하나가 실패하면 나머지는 건너뛰고 저장한 미리보기를 유지하세요.",
+                        reason + "제공받은 주소는 글자 그대로 전달하세요.",
                         true);
                 }
                 throw ex;
