@@ -63,7 +63,8 @@ export function registerTools(register: RegisterTool, workbench: Workbench) {
     async ({ q, types, page, size }) => {
       const query = new URLSearchParams();
       const text = q.trim();
-      if (Array.from(text).length > QUERY_MAX_CHARS) throw invalid();
+      // 워크벤치가 UTF-16 단위로 셀 수 있어 더 엄격한 쪽으로 센다.
+      if (text.length > QUERY_MAX_CHARS) throw invalid();
       if (text) query.set("q", text);
       const typeKeys = list(types, (item) => TYPE_KEY.test(item));
       if (typeKeys) query.set("types", typeKeys);
