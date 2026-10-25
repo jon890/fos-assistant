@@ -309,6 +309,62 @@ describe("오류", () => {
     });
   });
 
+  test("본문이 시간 안에 다 오지 않으면 서비스를 쓸 수 없다고 끝난다", async () => {
+    fake.routes.set(
+      "GET /api/v1/me",
+      () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(new TextEncoder().encode('{"user":'));
+              // 닫지 않는다. 남은 본문이 오지 않는다.
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+    );
+    await withMcp(server(), async (client) => {
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_UNAVAILABLE" },
+        "get_connection",
+      );
+    });
+  });
+
+  test("응답이 4 MiB 를 넘으면 읽지 않고 끝난다", async () => {
+    const big = JSON.stringify({ text: "a".repeat(4 * 1024 * 1024) });
+    fake.routes.set(
+      "GET /api/v1/ontology",
+      new Response(big, { headers: { "content-type": "application/json" } }),
+    );
+    fake.routes.set(
+      "GET /api/v1/me",
+      () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              const chunk = new TextEncoder().encode("a".repeat(1024 * 1024));
+              for (let i = 0; i < 5; i++) controller.enqueue(chunk);
+              controller.close();
+            },
+          }),
+        ),
+    );
+    await withMcp(server(), async (client) => {
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_UNAVAILABLE" },
+        "get_ontology",
+      );
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_UNAVAILABLE" },
+        "get_connection",
+      );
+    });
+  });
+
   test("계약 밖의 인자는 부르기 전에 거절한다", async () => {
     const cases: Array<[string, Record<string, unknown>]> = [
       ["get_node", { id: "../me" }],

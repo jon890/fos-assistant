@@ -8,6 +8,8 @@ export const token = `fwb_${"A".repeat(39)}test`;
 export const credentials = { FINANCIAL_WORKBENCH_TOKEN: token };
 export const upstreamText = "upstream-error-text-for-tests";
 export const nodeId = "0b8f3c2e-5d1a-4c7b-9e2f-1a2b3c4d5e6f";
+// 지금 떠 있는 대역의 주소다. 기준 주소가 결과에 새지 않는지 `tool()` 이 본다.
+const liveUrls = new Set<string>();
 
 export type RecordedRequest = {
   method: string;
@@ -46,6 +48,7 @@ export class FakeWorkbench {
         return route instanceof Response ? route.clone() : route(recorded);
       },
     });
+    liveUrls.add(this.url);
   }
 
   get url() {
@@ -61,6 +64,7 @@ export class FakeWorkbench {
   }
 
   stop() {
+    liveUrls.delete(this.url);
     this.server.stop(true);
     expect(this.allowed).toBe(true);
   }
@@ -116,6 +120,10 @@ export async function tool(
   const text = (result.content as Array<{ text: string }>)[0]?.text ?? "";
   expect(text).not.toContain(token);
   expect(text).not.toContain(upstreamText);
+  for (const url of liveUrls) {
+    expect(text).not.toContain(url);
+    expect(text).not.toContain(new URL(url).host);
+  }
   return { result, body: JSON.parse(text) as Record<string, any> };
 }
 
