@@ -25,10 +25,20 @@ SERVER_TIMEOUT_SECONDS = 30
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 # 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
 TOOL_SUMMARY_MAX_CHARS = 200
+# 운영자가 띄운 공개 오픈소스 서비스의 기준 주소 하나만 `operator_env` 로 받는 커넥터다(ADR-20261025 / connector-operator-base-url).
+# 커넥터 id 와 env 이름을 함께 고정한다. 다른 커넥터나 다른 이름의 운영 값은 위반이다.
+OPERATOR_BASE_URL_ENV = {"financial-workbench": "FINANCIAL_WORKBENCH_BASE_URL"}
+# 검사에서 운영 목록 대신 넣는 자리표시 주소다. 실제 서비스 주소가 아니다.
+PLACEHOLDER_BASE_URL = "https://workbench.example"
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
     return sorted(p for p in connectors.iterdir() if p.is_dir() and not p.name.startswith("."))
+
+
+def operator_values(name: str) -> dict[str, str]:
+    """운영 목록이 그 커넥터에 줄 `env` 를 자리표시 값으로 만든다. 허용 목록 밖이면 비어 있다."""
+    return {OPERATOR_BASE_URL_ENV[name]: PLACEHOLDER_BASE_URL} if name in OPERATOR_BASE_URL_ENV else {}
 
 
 def read_json(path: pathlib.Path):
@@ -125,7 +135,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     loaded = None
     served_args: set[str] = set()
     try:
-        loaded = load_connector(name, {"root": root, "command": sys.executable, "env": {}})
+        loaded = load_connector(name, {"root": root, "command": sys.executable, "env": operator_values(name)})
     except Exception as error:
         problems.append("manifest 검증 실패: %s" % error)
 
@@ -173,9 +183,11 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         if any(word in env_name for word in SECRET_WORDS) and field.get("secret") is not True:
             problems.append("비밀 칸의 secret 이 참이 아니다: %s" % field.get("env"))
 
-    for key in ("operator_env", "operator_secrets"):
-        if declared.get(key):
-            problems.append("%s 가 비어 있지 않다" % key)
+    if declared.get("operator_secrets"):
+        problems.append("operator_secrets 가 비어 있지 않다")
+    operator_env = declared.get("operator_env")
+    if operator_env and operator_env != list(operator_values(name)):
+        problems.append("operator_env 가 허용 목록의 기준 주소 하나가 아니다: %r" % operator_env)
 
     servers = mcp_config.get("mcpServers", {})
     server = next(iter(servers.values()), None) if servers else None
@@ -366,13 +378,28 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                     self.assertEqual(read_json(root / ".mcp.json"), original)
                     server = original["mcpServers"][source.name]
                     command = shutil.which(server["command"])
-                    loaded = self.plugin._load_connector(source.name, {"root": root, "command": command, "env": {}})
+                    loaded = self.plugin._load_connector(source.name, {"root": root, "command": command,
+                                                                        "env": operator_values(source.name)})
                     self.assertEqual(loaded["server"]["command"], command)
                     self.assertEqual(loaded["server"]["args"], [
                         arg.replace("${CLAUDE_PLUGIN_ROOT}", str(root)) for arg in server["args"]])
                     entry = "dist/%s-mcp.js" % source.name
                     self.assertEqual((root / entry).read_bytes(), (source / entry).read_bytes())
                 self.assertEqual(self.broken_copy(check_copy, source), [])
+
+    def test_operator_env_outside_the_base_url_allowlist_is_reported(self):
+        """허용 목록 밖의 커넥터가 운영 값을 두거나, 허용한 커넥터가 다른 이름을 더하면 위반이다."""
+        def add_operator_env(names):
+            def change(root):
+                self.edit_declaration(lambda v: v.update(operator_env=names))(root)
+                self.edit_server(lambda server: server["env"].update({n: "${%s}" % n for n in names}))(root)
+            return change
+        self.assert_reported(self.broken_copy(add_operator_env(["GMAIL_API_BASE_URL"])), "operator_env")
+        workbench = CONNECTORS / "financial-workbench"
+        self.assert_reported(self.broken_copy(add_operator_env(
+            ["FINANCIAL_WORKBENCH_BASE_URL", "FINANCIAL_WORKBENCH_OTHER"]), workbench), "operator_env")
+        self.assert_reported(self.broken_copy(self.edit_declaration(
+            lambda v: v.update(operator_secrets=["FINANCIAL_WORKBENCH_SECRET"])), workbench), "operator_secrets")
 
     def test_naver_blog_without_dotenv_blocking_option_is_reported(self):
         self.assert_reported(self.broken_copy(self.edit_server(lambda server: server.update(

@@ -7,7 +7,7 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 
 | 식별자 | 제목 | 상태 |
 | --- | --- | --- |
-| [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다 |
+| [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) | 범용 커넥터는 이 저장소의 `hermes/connectors/` 에 두고 저장소가 유지보수한다 | Accepted. ADR-043 의 plugin 가운데 누구나 쓸 수 있는 것의 자리를 정한다. 운영 값의 예외 하나는 ADR-20261025 / connector-operator-base-url 이 더한다 |
 | [ADR-066](ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md) | Gmail 커넥터는 직접 만든 MCP 서버와 `gmail.modify` scope 하나로 돌고 휴지통은 서버가 막는다 | Accepted. 서버와 scope 는 ADR-084 로 부분 대체했다 |
 | [ADR-084](ADR-084-gmail-typescript-filters.md) | Gmail 커넥터는 TypeScript 묶음 파일로 실행하고 필터 권한을 따로 받는다 | Accepted. ADR-066 의 서버와 단일 scope 를 대체한다. 실행 파일 커밋과 대조 검사는 ADR-20261011 / connector-source-build 가 대체한다 |
 | [ADR-088](ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) | 대시보드 plugin 은 감싸는 경로의 바꿔 끼우기를 두고, 기대는 Hermes 내부 지점을 계약 시험으로 확인한다 | Accepted. ADR-041 의 plugin 을 기능 모듈로 나누는 경계를 정한다 |
@@ -19,3 +19,4 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 | [ADR-20261011 / connector-source-build](ADR-20261011-connector-source-build.md) | 커넥터 실행 파일은 소스로 빌드하고 Git 으로 추적하지 않는다 | Accepted. ADR-084 의 실행 파일 커밋과 대조 검사를 부분 대체한다 |
 | [ADR-20261011 / content-snapshot-compiler](ADR-20261011-content-snapshot-compiler.md) | 원고 compiler는 별도 private process로 호출한다 | Accepted |
 | [ADR-20261012 / bodyless-request-diagnostics](ADR-20261012-bodyless-request-diagnostics.md) | 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다 | Accepted, 운영 미연결(2026-10-13). ADR-001의 관리 entrypoint 내부 교체 예외와 일반 writer 계약을 정하고, 운영 연결은 upstream 공식 설정이 생길 때까지 보류한다 |
+| [ADR-20261025 / connector-operator-base-url](ADR-20261025-connector-operator-base-url.md) | 공개 오픈소스 서비스의 커넥터는 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다 | Accepted. ADR-064 의 「운영 값이 있어야 도는 커넥터」 에 예외 하나를 더한다 |
