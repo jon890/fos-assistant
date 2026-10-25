@@ -68,6 +68,7 @@ General-purpose connectors live in this repository under `hermes/connectors/` an
 The first one is Gmail: it searches and reads your mail and filters without asking, and creates drafts, sends, replies, manages labels and changes filters only after you approve. It never moves mail to the trash or deletes it.
 The second is Naver Blog: it uses the Naver account you signed in to in "My browser" and, after you approve, saves a post with your chat photos as a Naver Blog draft. It never publishes.
 The third is Toss Securities: it reads your own holdings, quotes, buying power and order history. It places or cancels only regular orders you approve, one at a time, and never modifies orders or creates conditional orders. One connection attaches to a single agent that has an execution space.
+The fourth is Financial Workbench: it reads investment decisions, valuations, evidence chains and your study list from a financial ontology workbench you host yourself, and never writes to it. Attach it to the same agent as Toss Securities to see your holdings next to the reasons you bought them. Because the workbench is open source, the only operator value it takes is the address where the operator runs it ([ADR-20261025 / connector-operator-base-url](hermes/docs/adr/ADR-20261025-connector-operator-base-url.md)).
 A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
 Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
 

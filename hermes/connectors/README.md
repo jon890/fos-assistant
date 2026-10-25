@@ -17,6 +17,8 @@
 
 여기 두지 않는 커넥터도 같은 `connector.json` 으로 붙는다. 그 서비스의 저장소에 두고 운영 목록에 올리면 된다.
 
+예외는 서비스 자체가 공개 오픈소스라 누구나 띄울 수 있는 커넥터다. 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md)). 「비밀값과 권한」 의 `operator_env` 줄이 범위를 갖는다.
+
 ## 디렉터리
 
 ```
@@ -85,7 +87,8 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - 토큰, secret, 비밀번호, key 를 받는 칸은 `"secret": true` 다
 - 결과와 로그와 오류 글에 자격 증명과 서비스가 준 오류 원문을 싣지 않는다. 오류는 코드만 내고 `errors` 표로 공통 어휘에 잇는다
 - 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 커넥터 문서에 적는다
-- `operator_env` 와 `operator_secrets` 를 두지 않는다
+- `operator_secrets` 를 두지 않는다
+- `operator_env` 를 두지 않는다. 예외는 공개 오픈소스 서비스의 기준 주소 하나다. 그 서비스를 운영자가 띄우고, 값은 비밀이 아닌 `https://` 주소이고, 커넥터가 그 모양이 아니면 부르지 않는다. 허용하는 커넥터와 env 이름은 `hermes/tests/test_connectors_contract.py` 의 `OPERATOR_BASE_URL_ENV` 가 갖는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md))
 - **서비스가 권한 범위를 나누지 못해, 쓰는 도구가 없어도 키 하나로 돈이 움직이거나 되돌리기 어려운 일을 할 수 있으면 `"sandbox_required": true` 를 선언한다.** 실행 공간이 없는 profile 의 셸은 `.env` 를 읽기 때문이다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md))
 - **서비스가 계정이나 클라이언트마다 유효한 토큰을 하나만 두면 `"single_binding": true` 를 선언한다.** 여러 에이전트의 MCP 프로세스가 번갈아 토큰을 받아 서로의 호출을 깨기 때문이다. 한 프로세스 안에서도 토큰을 다시 받는 일은 한 번에 하나만 한다
 
@@ -188,7 +191,7 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 `Dockerfile`과 `package.ts`는 소스 checkout과 같은 SHA의 커넥터 설치 묶음을 만든다.
 운영 저장소는 이 빌드 정의를 재사용하고, Hermes runtime에는 검증한 파일만 설치한다.
-생성 entry 세 개는 Git 추적에서 제외하고 루트 `.gitignore`에 정확한 경로를 적는다. 설치 경로와 manifest 계약은 유지한다. 토스증권의 생성 API 계약 소스와 공식 fixture는 빌드 산출물이 아니므로 계속 추적한다.
+커넥터마다 하나인 생성 entry는 Git 추적에서 제외하고 루트 `.gitignore`에 정확한 경로를 적는다. 설치 경로와 manifest 계약은 유지한다. 토스증권의 생성 API 계약 소스와 공식 fixture는 빌드 산출물이 아니므로 계속 추적한다.
 
 소스 변경 뒤 생성 entry를 수정한 다른 브랜치와 병합할 때 생기는 modify/delete 충돌은 생성 파일의 삭제를 유지해 해결한다. 병합한 소스에서 다시 빌드하며 생성 entry를 Git에 다시 넣지 않는다.
 
@@ -215,7 +218,7 @@ plugin manifest, `.mcp.json`, 아이콘, 스킬, 전체 source와 테스트도 �
 커넥터 밖의 root `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`, `README.md`는 포함하지 않는다.
 `node_modules`는 설치 파일이 아니며 추적하면 실패한다.
 
-`.dockerignore`는 `node_modules`와 현재 세 커넥터의 생성 entry만 제외한다.
+`.dockerignore`는 `node_modules`와 각 커넥터의 생성 entry만 제외한다.
 `dist` 전체를 제외하지 않으므로 그 아래 다른 추적 파일도 보존한다.
 커넥터를 추가할 때 Dockerfile의 의존성 COPY와 `.dockerignore`의 정확한 entry를 함께 추가한다.
 context에 커넥터가 있는데 의존성 설치 층이 빠졌으면 묶음 생산이 실패한다.
@@ -278,7 +281,7 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를
 | `identifiers` 에 적은 이름이 모두 서버의 그 도구 입력 스키마에 있다 | 없는 인자의 선언은 아무것도 가림에서 빼지 않는 죽은 글이다 |
 | `arg_labels`를 선언한 도구의 표시 이름이 검증을 통과하고 키가 실제 입력 스키마와 정확히 같다 | 승인 카드의 이름이 빠지거나 실행 인자와 다른 칸을 가리킨다 |
 | env 이름에 `TOKEN`, `SECRET`, `PASSWORD`, `KEY` 가 든 칸이 `secret: true` 다 | 비밀값이 화면과 응답에 보인다 |
-| `operator_env` 와 `operator_secrets` 가 비었다 | 운영 값 없이 돌지 않는다 |
+| `operator_secrets` 가 비었고, `operator_env` 는 비었거나 허용 목록의 그 커넥터 기준 주소 env 하나뿐이다 | 운영 값 없이 돌지 않는다 |
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 붙인 에이전트에 지침이 없다 |
 | `icon` 과 `link` 를 선언했고, `.svg` 아이콘이 `xmlns="http://www.w3.org/2000/svg"` 를 선언했다 | 카드가 기본 아이콘이나 빈 아이콘으로 보이고 서비스로 가는 길이 없다 |
