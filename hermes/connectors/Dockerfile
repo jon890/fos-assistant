@@ -2,6 +2,7 @@ FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b4
 ARG SOURCE_COMMIT
 WORKDIR /src
 # 소스보다 의존성 층을 먼저 두어 lockfile이 같으면 설치를 재사용한다.
+COPY financial-workbench/package.json financial-workbench/bun.lock financial-workbench/
 COPY gmail/package.json gmail/bun.lock gmail/
 COPY naver-blog/package.json naver-blog/bun.lock naver-blog/
 COPY tossinvest/package.json tossinvest/bun.lock tossinvest/

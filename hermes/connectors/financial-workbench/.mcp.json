@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "financial-workbench": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/financial-workbench-mcp.js"],
+      "env": {
+        "FINANCIAL_WORKBENCH_TOKEN": "${FINANCIAL_WORKBENCH_TOKEN}",
+        "FINANCIAL_WORKBENCH_BASE_URL": "${FINANCIAL_WORKBENCH_BASE_URL}"
+      }
+    }
+  }
+}

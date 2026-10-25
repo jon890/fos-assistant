@@ -1,0 +1,101 @@
+{
+  "schema": 2,
+  "id": "financial-workbench",
+  "title": "금융 워크벤치",
+  "description": "금융 온톨로지 워크벤치에 쌓은 투자 결정과 밸류에이션, 근거 문서와 주장, 내 공부 목록을 읽습니다. 워크벤치에 쓰지 않습니다.",
+  "icon": "icon.svg",
+  "link": "https://github.com/jon890/fos-graphrag",
+  "link_kind": "project",
+  "readme_url": "https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/financial-workbench/README.md",
+  "fields": [
+    {
+      "key": "token",
+      "env": "FINANCIAL_WORKBENCH_TOKEN",
+      "label": "연동 토큰",
+      "description": "워크벤치의 「더보기 → 연동 토큰」 에서 발급한 fwb_ 로 시작하는 값입니다.",
+      "secret": true,
+      "required": true,
+      "pattern": "^fwb_[A-Za-z0-9_-]{43}$"
+    }
+  ],
+  "verify": {
+    "tool": "get_connection"
+  },
+  "operator_env": ["FINANCIAL_WORKBENCH_BASE_URL"],
+  "default_tool_policy": "deny",
+  "tools": {
+    "get_connection": {
+      "risk": "READ",
+      "title": "연결 확인하기",
+      "summary": "연동 토큰이 맞는지 보고 워크벤치의 내 표시 이름과 토큰 이름을 읽어요.",
+      "description": "연동 토큰으로 워크벤치에 연결되는지 확인합니다. 입력 인자는 없으며 user(id, displayName, role), token(id, name, last4), rateLimitPerMinute를 돌려줍니다. 토큰 원문은 돌려주지 않습니다."
+    },
+    "get_ontology": {
+      "risk": "READ",
+      "title": "온톨로지 요약 보기",
+      "summary": "워크벤치에 어떤 종류의 항목과 관계가 있는지 읽어요.",
+      "description": "워크벤치 온톨로지의 노드 타입(key, label, 속성), 관계 종류(from, to, 문장 틀), 주장 predicate를 읽습니다. 입력 인자는 없습니다. search_nodes의 types에 넣을 타입 키나 관계의 뜻을 모를 때 먼저 부릅니다. 대화마다 한 번이면 충분합니다."
+    },
+    "search_nodes": {
+      "risk": "READ",
+      "title": "항목 찾기",
+      "summary": "이름이나 종목 코드로 워크벤치의 기업, 산업, 투자 결정, 근거 문서 같은 항목을 찾아요.",
+      "description": "q(100자까지)로 이름, 종목 코드, 검색 속성을 대소문자 무시 부분 일치로 찾습니다. types에 쉼표로 이은 타입 키(예: Company,Decision,Valuation)를 넣어 좁힙니다. page는 0부터, size는 기본 20, 1~50입니다. 결과는 id, type, typeLabel, label, reviewStatus(주장일 때만), revision, updatedAt이며 속성은 없으니 get_node로 읽습니다. 보유 종목은 search_nodes보다 lookup_security가 맞습니다."
+    },
+    "get_node": {
+      "risk": "READ",
+      "title": "항목 자세히 보기",
+      "summary": "항목 하나의 속성과 이어진 관계, 주장, 근거 문서, 개념을 읽어요.",
+      "description": "id(UUID)로 노드 하나의 상세를 읽습니다. properties, relations(100개까지), claims(20개까지, 글 500자에서 자름), documents, concepts(각 20개까지)를 돌려줍니다. relationsTruncated, claimsTruncated가 참이면 일부만 읽은 것이니 그렇다고 말합니다. 주장의 reviewStatus가 REVIEWED인 것을 근거로 앞에 두고 DRAFT는 검토 전이라고 밝힙니다."
+    },
+    "trace_node": {
+      "risk": "READ",
+      "title": "근거 따라가기",
+      "summary": "투자 결정이나 밸류에이션에서 시작해 병목, 산업, 세상의 변화까지 근거를 거슬러 올라가요.",
+      "description": "id(UUID)의 항목에서 근거 관계를 따라 위로 올라간 단계(steps)와 이 항목에 기대는 항목(dependents)을 읽습니다. 단계마다 status가 SUPPORTED(근거 문서나 검토 완료 주장이 있다), PARTIAL(검토 전 주장만 있다), MISSING(둘 다 없다)이고 missing에 아직 잇지 않은 관계와 후보가 있습니다. myKnowledge는 내 이해 표시입니다. 「왜 샀는지」, 「근거가 충분한지」를 물을 때 씁니다. truncated, dependentsTruncated가 참이면 일부만 읽은 것입니다."
+    },
+    "get_neighborhood": {
+      "risk": "READ",
+      "title": "주변 그래프 보기",
+      "summary": "한 항목에서 한두 단계 안에 이어진 항목과 관계를 읽어요.",
+      "description": "id(UUID)를 중심으로 hops(1이나 2, 기본 1) 안의 nodes와 edges를 읽습니다. 노드 150개, 관계 300개까지이며 truncated가 참이면 일부만 읽은 것입니다. 같은 산업의 다른 기업이나 한 병목에 걸린 기업들처럼 옆으로 넓혀 볼 때 씁니다. 근거의 위아래 사슬은 trace_node가 맞습니다."
+    },
+    "lookup_security": {
+      "risk": "READ",
+      "title": "종목의 투자 근거 찾기",
+      "summary": "종목 코드로 워크벤치의 종목과 내 투자 결정, 밸류에이션 시나리오를 함께 읽어요.",
+      "description": "ticker(국내 6자리 코드나 미국 티커, 32자까지)와 선택 market으로 종목을 찾고, 그 종목의 투자 결정(decisions: action, decidedAt, reason, basedOn)과 발행 기업의 밸류에이션(valuations: asOf, currentPrice, method, scenarios의 BEAR/BASE/BULL valuePerShare)을 함께 읽습니다. 토스증권 도구가 준 종목 코드와 시장 코드(KR, US, KOSPI, KOSDAQ, NASDAQ, NYSE, AMEX 등)를 바꾸지 않고 그대로 넣습니다. 맞는 종목이 없으면 matches가 빈 배열입니다. ...Truncated 칸이 참이면 일부만 읽은 것입니다."
+    },
+    "list_my_knowledge": {
+      "risk": "READ",
+      "title": "내 공부 목록 보기",
+      "summary": "내가 안다, 헷갈린다, 공부 중이라고 표시한 항목과 메모를 읽어요.",
+      "description": "토큰 주인의 이해 표시 목록을 읽습니다. level에 KNOWN, UNSURE, LEARNING을 쉼표로 이어 좁히고 비우면 전체입니다. page는 0부터, size는 기본 20, 1~50입니다. 항목마다 node, level, note, updatedAt, 그 항목이 걸린 투자 결정(contexts), 근거 문서와 개념이 있습니다. 「무엇을 더 공부해야 하나」를 물을 때 씁니다."
+    }
+  },
+  "errors": {
+    "WORKBENCH_UNAUTHORIZED": {
+      "category": "credential_rejected",
+      "recovery": "reconnect"
+    },
+    "WORKBENCH_FORBIDDEN": "forbidden",
+    "WORKBENCH_INVALID_INPUT": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "WORKBENCH_NOT_FOUND": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "WORKBENCH_RATE_LIMITED": {
+      "category": "unavailable",
+      "recovery": "retry_later",
+      "details": ["retry_after_seconds"]
+    },
+    "WORKBENCH_NOT_CONFIGURED": "unavailable",
+    "WORKBENCH_UNAVAILABLE": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    }
+  }
+}
