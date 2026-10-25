@@ -2,17 +2,14 @@ import { z } from "zod";
 import {
   LEVELS,
   MARKETS,
-  PAGE_SIZE_MAX,
   QUERY_MAX_CHARS,
   TICKER,
   TYPE_KEY,
   UUID,
 } from "./constants.ts";
-import { WorkbenchError } from "./errors.ts";
+import { invalid, pageSchema, paging } from "./inputs.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 import type { Workbench } from "./workbench-client.ts";
-
-const invalid = () => new WorkbenchError("WORKBENCH_INVALID_INPUT");
 
 /** 경로에 넣는 값이므로 UUID 모양만 받는다. 다른 경로로 새지 않게 한다. */
 function nodeId(value: string) {
@@ -31,17 +28,6 @@ function list(value: string, accept: (item: string) => boolean) {
   return items.join(",");
 }
 
-function paging(query: URLSearchParams, page: number, size: number) {
-  if (page < 0 || size < 1 || size > PAGE_SIZE_MAX) throw invalid();
-  query.set("page", String(page));
-  query.set("size", String(size));
-}
-
-const pageSchema = {
-  page: z.number().int().default(0),
-  size: z.number().int().default(20),
-};
-
 export function registerTools(register: RegisterTool, workbench: Workbench) {
   const read = { readOnlyHint: true };
 
@@ -51,6 +37,7 @@ export function registerTools(register: RegisterTool, workbench: Workbench) {
       user: value.user,
       token: value.token,
       rateLimitPerMinute: value.rateLimitPerMinute,
+      writeRateLimitPerMinute: value.writeRateLimitPerMinute,
     };
   });
 

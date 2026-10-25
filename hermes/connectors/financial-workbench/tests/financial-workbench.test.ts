@@ -24,19 +24,27 @@ const server = (env: Record<string, string> = credentials) =>
 
 const me = {
   user: { id: nodeId, displayName: "Alice", role: "EDITOR" },
-  token: { id: nodeId, name: "Hermes", last4: "test" },
+  token: { id: nodeId, name: "Hermes", last4: "test", scope: "READ_WRITE" },
   rateLimitPerMinute: 60,
+  writeRateLimitPerMinute: 10,
 };
 
 describe("도구 목록", () => {
-  test("서버의 도구와 manifest 의 선언이 같고 모두 읽기 전용이다", async () => {
+  test("서버의 도구와 manifest 의 선언이 같고 READ 도구만 읽기 전용이다", async () => {
+    const declared: Record<string, { risk: string }> = manifest.tools;
     await withMcp(server(), async (client) => {
       const tools = (await client.listTools()).tools;
       expect(tools.map((item) => item.name).sort()).toEqual(
-        Object.keys(manifest.tools).sort(),
+        Object.keys(declared).sort(),
       );
-      for (const item of tools)
-        expect(item.annotations?.readOnlyHint).toBe(true);
+      for (const item of tools) {
+        const read = declared[item.name]!.risk === "READ";
+        expect(item.annotations?.readOnlyHint).toBe(read);
+        if (read) continue;
+        // 쓰는 도구는 지우지 않고, 같은 체결과 같은 dedupeKey 는 다시 보내도 새로 생기지 않는다.
+        expect(item.annotations?.destructiveHint).toBe(false);
+        expect(item.annotations?.idempotentHint).toBe(true);
+      }
     });
   });
 });

@@ -2,7 +2,7 @@
   "schema": 2,
   "id": "financial-workbench",
   "title": "금융 워크벤치",
-  "description": "금융 온톨로지 워크벤치에 쌓은 투자 결정과 밸류에이션, 근거 문서와 주장, 내 공부 목록을 읽습니다. 워크벤치에 쓰지 않습니다.",
+  "description": "금융 온톨로지 워크벤치에 쌓은 투자 결정과 밸류에이션, 근거 문서와 주장, 내 공부 목록을 읽고, 토스증권 체결을 기록하며 해석은 제안으로 올립니다.",
   "icon": "icon.svg",
   "link": "https://github.com/jon890/fos-graphrag",
   "link_kind": "project",
@@ -21,14 +21,16 @@
   "verify": {
     "tool": "get_connection"
   },
-  "operator_env": ["FINANCIAL_WORKBENCH_BASE_URL"],
+  "operator_env": [
+    "FINANCIAL_WORKBENCH_BASE_URL"
+  ],
   "default_tool_policy": "deny",
   "tools": {
     "get_connection": {
       "risk": "READ",
       "title": "연결 확인하기",
-      "summary": "연동 토큰이 맞는지 보고 워크벤치의 내 표시 이름과 토큰 이름을 읽어요.",
-      "description": "연동 토큰으로 워크벤치에 연결되는지 확인합니다. 입력 인자는 없으며 user(id, displayName, role), token(id, name, last4), rateLimitPerMinute를 돌려줍니다. 토큰 원문은 돌려주지 않습니다."
+      "summary": "연동 토큰이 맞는지 보고 워크벤치의 내 표시 이름과 토큰 이름, 기록 권한을 읽어요.",
+      "description": "연동 토큰으로 워크벤치에 연결되는지 확인합니다. 입력 인자는 없으며 user(id, displayName, role), token(id, name, last4, scope), rateLimitPerMinute, writeRateLimitPerMinute를 돌려줍니다. token.scope가 READ(조회만)면 record_trades와 submit_proposals가 INSUFFICIENT_SCOPE로 실패하니 부르지 않습니다. READ_WRITE(조회와 기록)여야 씁니다. 토큰 원문은 돌려주지 않습니다."
     },
     "get_ontology": {
       "risk": "READ",
@@ -71,6 +73,42 @@
       "title": "내 공부 목록 보기",
       "summary": "내가 안다, 헷갈린다, 공부 중이라고 표시한 항목과 메모를 읽어요.",
       "description": "토큰 주인의 이해 표시 목록을 읽습니다. level에 KNOWN, UNSURE, LEARNING을 쉼표로 이어 좁히고 비우면 전체입니다. page는 0부터, size는 기본 20, 1~50입니다. 항목마다 node, level, note, updatedAt, 그 항목이 걸린 투자 결정(contexts), 근거 문서와 개념이 있습니다. 「무엇을 더 공부해야 하나」를 물을 때 씁니다."
+    },
+    "record_trades": {
+      "risk": "WRITE",
+      "approval": "required",
+      "outbound": false,
+      "conversation_grant": true,
+      "title": "체결 기록하기",
+      "summary": "토스증권에서 읽은 체결을 금액과 수량까지 워크벤치의 내 체결 기록에 남겨요. 나만 봐요.",
+      "description": "토스증권 체결을 워크벤치의 내 체결 기록에 저장합니다. trades에 1~50건을 넣습니다. 토스증권 list_orders(status CLOSED)나 get_order의 주문 하나가 체결 하나이며 체결이 끝난 상태(FILLED, CANCELED, REJECTED, REPLACED) 가운데 execution.filledQuantity가 0보다 큰 주문만 넣습니다. PARTIAL_FILLED처럼 체결이 끝나지 않은 주문은 넣지 않습니다. 이미 있는 체결은 고쳐지지 않기 때문입니다. 칸 대응: externalId=orderId, side=side(BUY, SELL), ticker=symbol, quantity=execution.filledQuantity, price=execution.averageFilledPrice, amount=execution.filledAmount, commission=execution.commission, tax=execution.tax, executedAt=execution.filledAt(+09:00이 붙은 시각 그대로), currency=currency. market은 get_stocks의 market(KOSPI, NASDAQ 등)을 넣고, 모르면 currency가 KRW면 KR, USD면 US입니다. name은 종목 이름이며 선택입니다. broker는 기본 TOSS입니다. 수와 금액은 토스증권의 decimal 글을 바꾸지 않고 넣습니다. commission과 tax는 서버가 더해 fee로 보내므로 직접 더하지 않습니다. null인 값은 칸을 빼거나 null로 넣습니다. 계좌 번호, 계좌 순번 같은 계좌 정보는 넣지 않습니다. 넣으면 거절됩니다. 같은 체결을 다시 보내도 새로 생기지 않으므로 다시 보내도 됩니다. 결과 results는 항목마다 index, status(created 새로 저장, existing 이미 있음), trade(security는 이어진 워크벤치 종목, decisions는 이어진 투자 결정)입니다. 한 건이라도 틀리면 아무것도 저장되지 않습니다.",
+      "arg_labels": {
+        "trades": "체결"
+      }
+    },
+    "list_my_trades": {
+      "risk": "READ",
+      "title": "내 체결 보기",
+      "summary": "워크벤치에 기록한 내 체결과 이어진 투자 결정을 읽어요.",
+      "description": "토큰 주인의 체결 기록을 체결 시각이 늦은 순서로 읽습니다. ticker(32자까지)로 좁히고, from, to에 오프셋이 붙은 ISO-8601 시각(예: 2026-10-01T00:00:00+09:00)을 넣으면 from 이상 to 미만입니다. page는 0부터, size는 기본 20, 1~50입니다. 항목마다 체결 칸과 security, decisions가 있습니다. decisions가 비어 있으면 아직 투자 결정과 잇지 않은 체결입니다. 어떤 체결을 이미 기록했는지 확인할 때도 씁니다."
+    },
+    "submit_proposals": {
+      "risk": "WRITE",
+      "approval": "required",
+      "outbound": false,
+      "conversation_grant": true,
+      "title": "워크벤치에 제안 올리기",
+      "summary": "투자 결정 만들기, 체결과 결정 잇기, 근거 잇기, 공부 메모를 제안으로 올려요. 워크벤치에서 내가 승인해야 반영돼요.",
+      "description": "모델이 해석한 것을 워크벤치에 제안으로 올립니다. 올리기만 하고 바꾸지 않습니다. 사용자가 워크벤치의 「더보기 → 제안」에서 승인해야 반영됩니다. proposals에 1~20건을 넣습니다. 항목은 kind, payload, rationale(사람이 승인할지 판단할 까닭, 2000자까지), evidence(선택. nodeIds 20개, tradeIds 50개, urls 10개까지), dedupeKey(필수, 100자까지)입니다. kind별 payload: LINK_TRADE_DECISION은 {tradeIds: [체결 id 1~50개], decisionId: 투자 결정 id}로 체결을 그 결정의 실행으로 잇습니다. 예: {kind: LINK_TRADE_DECISION, payload: {tradeIds: [id], decisionId: id}, rationale: 10월 24일 FLNC 매수는 같은 날의 FLNC 추가 매수 결정을 실행한 것이다, dedupeKey: link:<externalId>:<decisionId>}. CREATE_NODE는 {type, properties, links, tradeIds}로 노드를 만듭니다. 예: 투자 결정이 없는 체결이면 {type: Decision, properties: {title, action, decidedAt}, links: [{type: HAS_DECISION, fromId: 종목 id}], tradeIds: [체결 id]}. links는 10개까지이고 항목마다 fromId나 toId 하나만 줍니다. tradeIds는 type이 Decision일 때만 받습니다. CREATE_RELATIONSHIP은 {type, fromId, toId}로 근거 관계를 잇습니다. STUDY_NOTE는 {nodeId, level(KNOWN, UNSURE, LEARNING), note(1000자까지)}로 공부 메모를 남깁니다. type과 관계 종류, 속성 키는 get_ontology로 확인합니다. dedupeKey는 같은 해석이면 늘 같은 값이 되게 kind와 대상 id로 만듭니다. 같은 키로 다시 올리면 새로 생기지 않고 있던 제안을 돌려줍니다. 결과 results는 항목마다 index, status(created, existing), proposal(id, status PENDING, ACCEPTED, REJECTED)입니다. 한 건이라도 틀리면 아무것도 올라가지 않습니다.",
+      "arg_labels": {
+        "proposals": "제안"
+      }
+    },
+    "list_my_proposals": {
+      "risk": "READ",
+      "title": "내 제안 보기",
+      "summary": "워크벤치에 올린 제안이 대기 중인지, 승인됐는지, 거절됐다면 왜인지 읽어요.",
+      "description": "토큰 주인의 제안을 읽습니다. status에 PENDING, ACCEPTED, REJECTED 가운데 하나를 넣어 좁히고 비우면 전체입니다. page는 0부터, size는 기본 20, 1~50입니다. 항목마다 kind, status, payload, rationale, dedupeKey, decidedAt, decisionNote(거절 까닭), result(승인으로 생긴 nodeIds, relationshipIds, tradeIds), lastError가 있습니다. 같은 제안을 다시 올리기 전에 이미 승인했거나 거절했는지 봅니다. 거절된 제안은 같은 내용으로 다시 올리지 않습니다."
     }
   },
   "errors": {
@@ -79,23 +117,54 @@
       "recovery": "reconnect"
     },
     "WORKBENCH_FORBIDDEN": "forbidden",
+    "WORKBENCH_INSUFFICIENT_SCOPE": {
+      "category": "forbidden",
+      "recovery": "reconnect"
+    },
     "WORKBENCH_INVALID_INPUT": {
       "category": "invalid_input",
-      "recovery": "fix_input"
+      "recovery": "fix_input",
+      "details": [
+        "item_index"
+      ]
     },
     "WORKBENCH_NOT_FOUND": {
       "category": "invalid_input",
+      "recovery": "fix_input",
+      "details": [
+        "item_index"
+      ]
+    },
+    "WORKBENCH_CONFLICT": {
+      "category": "invalid_input",
+      "recovery": "fix_input",
+      "details": [
+        "item_index"
+      ]
+    },
+    "WORKBENCH_PAYLOAD_TOO_LARGE": {
+      "category": "invalid_input",
       "recovery": "fix_input"
+    },
+    "WORKBENCH_PROPOSAL_LIMIT": {
+      "category": "unavailable",
+      "details": [
+        "max_pending",
+        "pending"
+      ]
     },
     "WORKBENCH_RATE_LIMITED": {
       "category": "unavailable",
       "recovery": "retry_later",
-      "details": ["retry_after_seconds"]
+      "details": [
+        "retry_after_seconds"
+      ]
     },
     "WORKBENCH_NOT_CONFIGURED": "unavailable",
     "WORKBENCH_UNAVAILABLE": {
       "category": "unavailable",
       "recovery": "retry_later"
-    }
+    },
+    "WORKBENCH_WRITE_UNKNOWN": "outcome_unknown"
   }
 }

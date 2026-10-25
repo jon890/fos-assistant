@@ -16,6 +16,7 @@ export type RecordedRequest = {
   path: string;
   query: URLSearchParams;
   headers: Headers;
+  body: string;
 };
 
 export type Route =
@@ -39,6 +40,7 @@ export class FakeWorkbench {
           path: url.pathname,
           query: url.searchParams,
           headers: request.headers,
+          body: await request.text(),
         };
         this.requests.push(recorded);
         if (!isAllowed(recorded.method, recorded.path)) this.allowed = false;
@@ -59,6 +61,10 @@ export class FakeWorkbench {
     this.routes.set(`GET ${path}`, json(body, status, headers));
   }
 
+  onPost(path: string, body: unknown, status = 200, headers?: HeadersInit) {
+    this.routes.set(`POST ${path}`, json(body, status, headers));
+  }
+
   seen(path?: string) {
     return this.requests.filter((request) => !path || request.path === path);
   }
@@ -70,11 +76,14 @@ export class FakeWorkbench {
   }
 }
 
-/** 계약의 `/api/v1` 조회 경로만 허용한다. 목록 밖의 메서드나 경로를 부르면 그 테스트가 실패한다. */
+/** 계약의 `/api/v1` 경로만 허용한다. 목록 밖의 메서드나 경로를 부르면 그 테스트가 실패한다. */
 function isAllowed(method: string, requested: string) {
-  if (method !== "GET") return false;
   // 기준 주소에 경로가 붙은 경우를 보는 테스트는 `/prefix` 를 쓴다.
   const path = requested.replace(/^\/prefix(?=\/api\/v1\/)/, "");
+  const writes = new Set(["/api/v1/trades", "/api/v1/proposals"]);
+  if (method === "POST") return writes.has(path);
+  if (method !== "GET") return false;
+  if (writes.has(path)) return true;
   const exact = new Set([
     "/api/v1/me",
     "/api/v1/ontology",
