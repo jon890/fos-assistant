@@ -348,13 +348,18 @@ def secret_requests(path: pathlib.Path) -> list[str]:
 class ContractCatchesViolationsTest(base.ConnectorGateCase):
     """실제 커넥터를 복사해 하나씩 망가뜨리면 같은 검사가 위반을 내는지 본다."""
 
-    def broken_copy(self, change, source: pathlib.Path = CONNECTORS / "gmail") -> list[str]:
+    def broken_copy(self, change, source: pathlib.Path = CONNECTORS / "gmail", operator_env=None) -> list[str]:
+        """`operator_env` 를 주면 운영 목록이 그 값을 준 것처럼 로더에 넘긴다. 로더를 통과한 뒤의 검사를 보려는 것이다."""
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = pathlib.Path(tmp.name).resolve() / source.name
         shutil.copytree(source, root, ignore=shutil.ignore_patterns("__pycache__", "node_modules"))
         change(root)
-        return check_connector(root, REPO, self.plugin._load_connector)
+        load = self.plugin._load_connector
+        if operator_env is not None:
+            def load(name, entry, real=self.plugin._load_connector):
+                return real(name, {**entry, "env": {**entry["env"], **operator_env}})
+        return check_connector(root, REPO, load)
 
     def edit_declaration(self, mutate):
         def change(root):
@@ -394,10 +399,18 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                 self.edit_declaration(lambda v: v.update(operator_env=names))(root)
                 self.edit_server(lambda server: server["env"].update({n: "${%s}" % n for n in names}))(root)
             return change
-        self.assert_reported(self.broken_copy(add_operator_env(["GMAIL_API_BASE_URL"])), "operator_env")
+        # 운영 목록이 값을 주어 로더는 통과한다. 막는 것은 허용 목록 검사 하나다.
+        outside = "허용 목록의 기준 주소 하나가 아니다"
+        gmail = self.broken_copy(add_operator_env(["GMAIL_API_BASE_URL"]),
+                                 operator_env={"GMAIL_API_BASE_URL": PLACEHOLDER_BASE_URL})
+        self.assertEqual([p for p in gmail if "manifest 검증 실패" in p], [])
+        self.assert_reported(gmail, outside)
         workbench = CONNECTORS / "financial-workbench"
-        self.assert_reported(self.broken_copy(add_operator_env(
-            ["FINANCIAL_WORKBENCH_BASE_URL", "FINANCIAL_WORKBENCH_OTHER"]), workbench), "operator_env")
+        names = ["FINANCIAL_WORKBENCH_BASE_URL", "FINANCIAL_WORKBENCH_OTHER"]
+        extra = self.broken_copy(add_operator_env(names), workbench,
+                                 operator_env={name: PLACEHOLDER_BASE_URL for name in names})
+        self.assertEqual([p for p in extra if "manifest 검증 실패" in p], [])
+        self.assert_reported(extra, outside)
         self.assert_reported(self.broken_copy(self.edit_declaration(
             lambda v: v.update(operator_secrets=["FINANCIAL_WORKBENCH_SECRET"])), workbench), "operator_secrets")
 
