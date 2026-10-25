@@ -37,10 +37,14 @@ describe("도구 목록", () => {
       expect(tools.map((item) => item.name).sort()).toEqual(
         Object.keys(declared).sort(),
       );
-      for (const item of tools)
-        expect(item.annotations?.readOnlyHint).toBe(
-          declared[item.name]!.risk === "READ",
-        );
+      for (const item of tools) {
+        const read = declared[item.name]!.risk === "READ";
+        expect(item.annotations?.readOnlyHint).toBe(read);
+        if (read) continue;
+        // 쓰는 도구는 지우지 않고, 같은 체결과 같은 dedupeKey 는 다시 보내도 새로 생기지 않는다.
+        expect(item.annotations?.destructiveHint).toBe(false);
+        expect(item.annotations?.idempotentHint).toBe(true);
+      }
     });
   });
 });

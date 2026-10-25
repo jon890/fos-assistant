@@ -116,6 +116,24 @@ describe("체결 기록", () => {
     expect("fee" in sent[2]).toBe(false);
   });
 
+  test("선택 칸의 null 과 빈 글은 없는 값으로 본다", async () => {
+    fake.onPost("/api/v1/trades", { results: [] });
+    await withMcp(server(), async (client) => {
+      const { result } = await tool(client, "record_trades", {
+        trades: [
+          { ...tossTrade, commission: null, name: "  ", broker: null },
+          { ...tossTrade, commission: null, tax: null, fee: null },
+        ],
+      });
+      expect(result.isError).toBeFalsy();
+    });
+    const sent = JSON.parse(fake.seen("/api/v1/trades")[0]!.body).trades;
+    expect(sent[0].fee).toBe(0.02);
+    expect(sent[0].broker).toBe("TOSS");
+    expect("name" in sent[0]).toBe(false);
+    expect("fee" in sent[1]).toBe(false);
+  });
+
   test("계약 밖의 칸이나 틀린 값은 부르지 않고 거절한다", async () => {
     const wrong: Array<Record<string, unknown>> = [
       { ...tossTrade, accountNumber: "123-45" },
@@ -486,7 +504,34 @@ describe("쓰기 오류", () => {
     expect(fake.seen("/api/v1/trades")).toHaveLength(1);
   });
 
-  test("잠금 충돌과 서버 오류는 저장하지 않은 실패로 끝난다", async () => {
+  test("워크벤치가 되돌렸다고 밝히지 않은 5xx 는 결과 모름으로 끝난다", async () => {
+    fake.routes.set(
+      "POST /api/v1/trades",
+      new Response(`<html>${upstreamText}</html>`, { status: 502 }),
+    );
+    fake.onPost(
+      "/api/v1/proposals",
+      { code: "INTERNAL_ERROR", message: upstreamText },
+      500,
+    );
+    await withMcp(server(), async (client) => {
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_WRITE_UNKNOWN" },
+        "record_trades",
+        { trades: [tossTrade] },
+      );
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_WRITE_UNKNOWN" },
+        "submit_proposals",
+        { proposals: [proposal] },
+      );
+    });
+    expect(fake.seen("/api/v1/trades")).toHaveLength(1);
+  });
+
+  test("잠금 충돌과 워크벤치가 되돌린 5xx 는 저장하지 않은 실패로 끝난다", async () => {
     fake.onPost(
       "/api/v1/trades",
       { code: "TRANSIENT_CONFLICT", message: upstreamText },

@@ -105,6 +105,8 @@ const FIELD_PATH =
   /^[A-Za-z][A-Za-z0-9]{0,39}(?:\[\d{1,3}\])?(?:\.[A-Za-z][A-Za-z0-9]{0,39}(?:\[\d{1,3}\])?){0,5}$/;
 const RULE = /^[a-z][a-z0-9-]{0,63}$/;
 const FIELD_MAX = 20;
+// 워크벤치가 트랜잭션을 되돌린 뒤 내는 5xx 코드다. 그 밖의 5xx 는 프록시가 낸 것일 수 있어 저장 여부를 모른다.
+const ROLLED_BACK = new Set(["QUERY_TIMEOUT", "DATABASE_UNAVAILABLE"]);
 
 /** 몇 번째 항목이 틀렸는지 `details.index` 나 첫 필드 경로의 번호로 읽는다. */
 function itemIndex(details: any, fields: string[]): Record<string, number> {
@@ -122,9 +124,15 @@ function itemIndex(details: any, fields: string[]): Record<string, number> {
 
 /**
  * 실패한 응답을 오류 코드로 바꾼다. 서비스의 오류 글은 싣지 않는다.
- * 쓰기의 400, 404, 409 는 몇 번째 항목인지와 필드 경로, 규칙 이름만 옮긴다.
+ * 400, 404, 409 는 몇 번째 항목인지와 필드 경로, 규칙 이름만 옮긴다.
+ * 쓰기의 5xx 는 워크벤치가 되돌렸다고 밝힌 것만 저장 안 된 실패이고 나머지는 `lost` 다.
  */
-function failure(response: Response, data: any, notFound: string) {
+function failure(
+  response: Response,
+  data: any,
+  notFound: string,
+  lost: string,
+) {
   const code = typeof data?.code === "string" ? data.code : "";
   const details = data?.details;
   const fields = Object.keys(
@@ -177,7 +185,11 @@ function failure(response: Response, data: any, notFound: string) {
         retryAfter(response, data),
       );
     default:
-      return new WorkbenchError("WORKBENCH_UNAVAILABLE");
+      return new WorkbenchError(
+        response.status >= 500 && !ROLLED_BACK.has(code)
+          ? lost
+          : "WORKBENCH_UNAVAILABLE",
+      );
   }
 }
 
@@ -263,7 +275,9 @@ export class Workbench {
     try {
       raw = await bounded(response);
     } catch {
-      throw new WorkbenchError(response.ok ? lost : "WORKBENCH_UNAVAILABLE");
+      throw new WorkbenchError(
+        response.ok || response.status >= 500 ? lost : "WORKBENCH_UNAVAILABLE",
+      );
     }
     let data: any = undefined;
     try {
@@ -276,6 +290,7 @@ export class Workbench {
         response,
         data,
         options.notFound ?? "WORKBENCH_NOT_CONFIGURED",
+        lost,
       );
     if (!data || typeof data !== "object" || Array.isArray(data))
       throw new WorkbenchError(lost);

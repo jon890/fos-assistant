@@ -53,6 +53,8 @@ function text(value: unknown, max: number, required = true) {
   }
   if (typeof value !== "string") throw invalid();
   const trimmed = value.trim();
+  // 선택 칸의 빈 글은 워크벤치처럼 없는 값으로 본다.
+  if (!trimmed && !required) return undefined;
   if (!trimmed || trimmed.length > max) throw invalid();
   return trimmed;
 }
@@ -151,7 +153,7 @@ function tradeInput(value: unknown) {
   const total = fee(item);
   return {
     broker:
-      item.broker === undefined
+      item.broker === undefined || item.broker === null
         ? "TOSS"
         : oneOf(item.broker, new Set(["TOSS", "OTHER"])),
     externalId: text(item.externalId, 100)!,
@@ -224,19 +226,19 @@ function proposalInput(value: unknown) {
 }
 
 const tradeSchema = z.looseObject({
-  broker: z.string().optional(),
+  broker: z.string().nullable().optional(),
   externalId: z.string(),
   side: z.string(),
   market: z.string(),
   ticker: z.string(),
-  name: z.string().optional(),
+  name: z.string().nullable().optional(),
   quantity: z.union([z.string(), z.number()]),
   price: z.union([z.string(), z.number()]),
   currency: z.string(),
   amount: z.union([z.string(), z.number()]),
-  commission: z.union([z.string(), z.number()]).optional(),
-  tax: z.union([z.string(), z.number()]).optional(),
-  fee: z.union([z.string(), z.number()]).optional(),
+  commission: z.union([z.string(), z.number()]).nullable().optional(),
+  tax: z.union([z.string(), z.number()]).nullable().optional(),
+  fee: z.union([z.string(), z.number()]).nullable().optional(),
   executedAt: z.string(),
 });
 
