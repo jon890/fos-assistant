@@ -108,7 +108,8 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 | `fee` | `commission`, `tax`(선택) 또는 `fee`(선택) | `execution.commission`, `execution.tax` |
 | `executedAt` | `executedAt` | `execution.filledAt` |
 
-- `status` 가 `FILLED` 이거나, `CANCELED` 인데 `filledQuantity` 가 0 보다 큰 주문만 넣게 도구 설명에 적었다. 이미 있는 체결은 워크벤치가 고치지 않으므로, 체결이 끝나지 않은 주문을 넣으면 그 뒤의 체결이 반영되지 않는다
+- 체결이 끝난 상태(`FILLED`, `CANCELED`, `REJECTED`, `REPLACED`) 가운데 `filledQuantity` 가 0 보다 큰 주문만 넣게 도구 설명에 적었다. 토스증권 계약이 앞의 셋 밖의 셋도 `filledQuantity` 로 부분 체결을 보라고 한다. 이미 있는 체결은 워크벤치가 고치지 않으므로, 체결이 끝나지 않은 주문을 넣으면 그 뒤의 체결이 반영되지 않는다
+- 선택 칸(`broker`, `name`, `commission`, `tax`, `fee`)은 `null` 이나 빈 글이면 없는 값으로 본다. 토스증권의 `commission`, `tax` 는 `null` 일 수 있다
 - 수와 금액은 토스증권의 decimal 글이나 JSON 수를 받는다. JSON 수로 보냈을 때 자리가 바뀌지 않는 값만 받고, 지수 표기와 음수를 거절한다. `quantity` 는 0 보다 커야 한다
 - `commission` 과 `tax` 는 서버가 소수 자리까지 정확히 더해 `fee` 로 보낸다. 모델이 더하지 않게 한다. `fee` 를 직접 주면 둘과 함께 줄 수 없다
 - 표 밖의 칸(계좌 번호, 계좌 순번 등)이 있으면 보내지 않고 `WORKBENCH_INVALID_INPUT` 으로 끝낸다
@@ -129,8 +130,8 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 ### 쓰기 공통
 
 - 요청 본문이 64KiB 를 넘으면 부르지 않고 `WORKBENCH_PAYLOAD_TOO_LARGE` 로 끝낸다
-- 쓰기는 다시 부르지 않는다. 보낸 뒤 시간 초과나 연결 끊김으로 답을 받지 못했거나, `200` 인데 본문을 읽지 못하면 `WORKBENCH_WRITE_UNKNOWN`(`outcome_unknown`)으로 끝낸다. 스킬은 조회 도구로 저장됐는지 본 뒤에만 같은 값으로 다시 보내게 한다
-- 워크벤치는 한 요청을 전부 저장하거나 전부 거절한다. 실패하면 아무것도 저장되지 않았다
+- 쓰기는 다시 부르지 않는다. 보낸 뒤 시간 초과나 연결 끊김으로 답을 받지 못했거나, `200` 인데 본문을 읽지 못했거나, 워크벤치가 되돌렸다고 밝히지 않은 `5xx`(`code` 가 `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE` 이 아닌 것)를 받으면 `WORKBENCH_WRITE_UNKNOWN`(`outcome_unknown`)으로 끝낸다. 앞단 프록시가 낸 `502`, `504` 나 커밋 뒤의 `500` 은 저장됐을 수 있다. 스킬은 조회 도구로 저장됐는지 본 뒤에만 같은 값으로 다시 보내게 한다
+- 워크벤치는 한 요청을 전부 저장하거나 전부 거절한다. 결과 모름이 아닌 실패면 아무것도 저장되지 않았다
 
 결과는 워크벤치 응답의 JSON 을 그대로 돌려준다. `get_connection` 만 `user`, `token`, `rateLimitPerMinute`, `writeRateLimitPerMinute` 네 칸으로 줄인다. `token` 에 `scope` 가 있다.
 워크벤치가 둔 잘림 표시(`relationsTruncated`, `claimsTruncated`, `matchesTruncated`, `decisionsTruncated`, `valuationsTruncated`, `scenariosTruncated`, `truncated`, `dependentsTruncated`)는 바꾸지 않는다.
@@ -146,15 +147,15 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 | `WORKBENCH_UNAUTHORIZED` | `401`. 토큰이 없거나 형식이 틀렸으면 부르지 않고 같은 코드로 끝낸다 | `credential_rejected` | `reconnect` |
 | `WORKBENCH_FORBIDDEN` | `403` 가운데 아래 범위 부족이 아닌 것 | `forbidden` | |
 | `WORKBENCH_INSUFFICIENT_SCOPE` | `403 INSUFFICIENT_SCOPE`. 「조회만」 토큰으로 쓰는 도구를 불렀다 | `forbidden` | `reconnect` |
-| `WORKBENCH_INVALID_INPUT` | `400`, 또는 서버가 부르기 전에 인자를 거절했다. 쓰기의 `400` 은 `item_index`(몇 번째 항목), `fields`(필드 경로), `rule`(온톨로지 규칙 이름)을 싣는다 | `invalid_input` | `fix_input` |
+| `WORKBENCH_INVALID_INPUT` | `400`, 또는 서버가 부르기 전에 인자를 거절했다. `400` 은 `item_index`(몇 번째 항목), `fields`(필드 경로), `rule`(온톨로지 규칙 이름)을 싣는다 | `invalid_input` | `fix_input` |
 | `WORKBENCH_NOT_FOUND` | `id` 를 받는 도구(`get_node`, `trace_node`, `get_neighborhood`)의 `404`. 없거나 보관한 항목이다. 쓰기의 `404` 는 `details.index` 가 있을 때 이 코드이고 `item_index` 를 싣는다 | `invalid_input` | `fix_input` |
 | `WORKBENCH_CONFLICT` | 쓰기의 `409` 가운데 아래 둘이 아닌 것(`ARCHIVED`, `DUPLICATE` 등). `item_index` 를 싣는다 | `invalid_input` | `fix_input` |
 | `WORKBENCH_PROPOSAL_LIMIT` | `409 PROPOSAL_LIMIT`. `details.max` 를 `max_pending`, `details.pending` 을 `pending` 정수로 싣는다 | `unavailable` | |
 | `WORKBENCH_PAYLOAD_TOO_LARGE` | `413`, 또는 보내기 전에 본문이 64KiB 를 넘었다 | `invalid_input` | `fix_input` |
 | `WORKBENCH_RATE_LIMITED` | `429`. 1분 60번이나 쓰기 1분 10번을 넘겼다. `Retry-After` 초를, 없으면 `details.retryAfterSeconds` 를 `retry_after_seconds` 정수로 싣는다 | `unavailable` | `retry_later` |
-| `WORKBENCH_WRITE_UNKNOWN` | 쓰기를 보냈지만 답을 받지 못했다 | `outcome_unknown` | |
+| `WORKBENCH_WRITE_UNKNOWN` | 쓰기를 보냈지만 답을 받지 못했거나, 되돌렸다고 밝히지 않은 `5xx` 를 받았다 | `outcome_unknown` | |
 | `WORKBENCH_NOT_CONFIGURED` | 운영 값이 없거나 `https://` 주소가 아니다. `id` 가 없는 경로의 `404` 도 기준 주소가 틀린 것이라 이 코드다 | `unavailable` | |
-| `WORKBENCH_UNAVAILABLE` | 그 밖의 상태(`409 TRANSIENT_CONFLICT`, `5xx` 포함), 다른 곳으로 넘기는 응답, 조회의 시간 초과와 연결 실패, JSON 객체가 아닌 응답 | `unavailable` | `retry_later` |
+| `WORKBENCH_UNAVAILABLE` | 그 밖의 상태(`409 TRANSIENT_CONFLICT`, 조회의 `5xx`, 쓰기의 `503 QUERY_TIMEOUT`, `503 DATABASE_UNAVAILABLE` 포함), 다른 곳으로 넘기는 응답, 조회의 시간 초과와 연결 실패, JSON 객체가 아닌 응답 | `unavailable` | `retry_later` |
 
 `item_index`, `max_pending`, `pending`, `retry_after_seconds` 는 `connector.json` 의 `errors` 항목에 `details` 로 선언해 승인한 실행의 실패에서도 에이전트에 닿는다.
 `fields` 와 `rule` 은 글이라 대화 허락이나 상시 허락으로 바로 실행한 호출의 결과에만 남는다([ADR-092](../adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)).
@@ -198,4 +199,5 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 6. 워크벤치의 토큰 목록에서 그 토큰의 마지막 사용 시각이 바뀌었는지
 7. 「조회와 기록」 토큰으로 토스증권 체결 하나를 기록하면 워크벤치의 내 체결에 금액과 수량이 보이고, 같은 체결을 다시 시키면 `existing` 으로 끝나는지
 8. 체결과 결정을 잇는 제안이 워크벤치의 「더보기 → 제안」 에 대기로 보이고, 승인하면 그 체결의 `decisions` 에 결정이 보이는지
-9. 「조회만」 토큰으로 바꾸면 기록이 범위 부족으로 끝나고 새 토큰을 발급하라는 안내가 나오는지
+9. 정정된 주문(`REPLACED`)의 체결분이 정정으로 생긴 새 주문의 `execution` 에 다시 담기지 않는지. 다시 담기면 두 번 기록되므로 도구 설명에서 `REPLACED` 를 뺀다
+10. 「조회만」 토큰으로 바꾸면 기록이 범위 부족으로 끝나고 새 토큰을 발급하라는 안내가 나오는지

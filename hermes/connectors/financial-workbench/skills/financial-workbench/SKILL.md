@@ -27,7 +27,7 @@ description: 사용자의 금융 온톨로지 워크벤치에서 투자 결정�
 
 사용자가 체결을 말하거나 기록해 달라고 하면 토스증권에서 읽은 체결을 `record_trades` 로 워크벤치에 남긴다.
 
-1. 토스증권 `list_orders`(`status: CLOSED`)나 `get_order` 로 체결을 읽는다. `status` 가 `FILLED` 이거나, `CANCELED` 인데 `execution.filledQuantity` 가 0 보다 큰 주문만 넣는다. 체결이 끝나지 않은 주문은 넣지 않는다
+1. 토스증권 `list_orders`(`status: CLOSED`)나 `get_order` 로 체결을 읽는다. 체결이 끝난 상태(`FILLED`, `CANCELED`, `REJECTED`, `REPLACED`) 가운데 `execution.filledQuantity` 가 0 보다 큰 주문만 넣는다. 취소, 거부, 정정된 주문도 그 전에 체결된 몫이 있으면 넣는다. 체결이 끝나지 않은 주문은 넣지 않는다
 2. 칸은 `record_trades` 도구 설명의 대응대로 옮긴다. 수와 금액은 토스증권의 decimal 글을 그대로 넣고, 수수료(`commission`)와 세금(`tax`)은 더하지 않고 따로 넣는다
 3. 계좌 번호와 계좌 순번은 넣지 않는다
 4. 같은 체결을 다시 보내도 새로 생기지 않는다. 이미 기록했는지 모르면 그냥 보내도 된다. 결과의 `status` 가 `created` 면 새로 남긴 것이고 `existing` 이면 이미 있던 것이다
@@ -77,13 +77,13 @@ description: 사용자의 금융 온톨로지 워크벤치에서 투자 결정�
 
 읽지 못했으면 읽지 못했다고 말한다. 값을 지어내지 않는다.
 
-**`record_trades` 와 `submit_proposals` 는 한 건이라도 틀리면 아무것도 저장하지 않는다.** 실패하면 「아무것도 저장되지 않았다」 고 알린다.
+**`record_trades` 와 `submit_proposals` 는 한 건이라도 틀리면 아무것도 저장하지 않는다.** `WORKBENCH_WRITE_UNKNOWN` 이 아닌 실패면 「아무것도 저장되지 않았다」 고 알린다.
 
 - `WORKBENCH_INSUFFICIENT_SCOPE`: 「조회만」 토큰이다. 「워크벤치의 더보기 → 연동 토큰에서 『조회와 기록』 토큰을 새로 발급해, 외부 서비스 연결에서 이 연결을 고쳐 달라」 고 안내한다. 같은 대화에서 쓰는 도구를 다시 부르지 않는다
 - `WORKBENCH_PROPOSAL_LIMIT`: 대기 중인 제안이 상한(`max_pending`)을 넘는다. `pending` 이 지금 대기 수다. 워크벤치의 더보기 → 제안에서 정리해 달라고 안내한다
 - `WORKBENCH_PAYLOAD_TOO_LARGE`: 한 번에 보낸 것이 너무 크다. 나눠서 보낸다
 - `WORKBENCH_CONFLICT`: `item_index` 번째 항목이 보관된 결정처럼 지금 쓸 수 없는 대상을 가리킨다. 그 항목을 빼거나 대상을 다시 찾는다
-- `WORKBENCH_WRITE_UNKNOWN`: 보냈지만 저장됐는지 모른다. 곧바로 다시 보내지 않고 `list_my_trades` 나 `list_my_proposals` 로 저장됐는지 본 뒤, 없을 때만 같은 값으로 한 번 보낸다. 같은 체결과 같은 `dedupeKey` 는 두 번 생기지 않는다
+- `WORKBENCH_WRITE_UNKNOWN`: 보냈지만 저장됐는지 모른다. 이때는 「저장되지 않았다」 고 하지 않는다. 곧바로 다시 보내지 않고 `list_my_trades` 나 `list_my_proposals` 로 저장됐는지 본 뒤, 없을 때만 같은 값으로 한 번 보낸다. 같은 체결과 같은 `dedupeKey` 는 두 번 생기지 않는다
 - `WORKBENCH_UNAUTHORIZED`: 연동 토큰이 없거나 폐기됐다. 「워크벤치의 더보기 → 연동 토큰에서 토큰을 다시 발급해, 외부 서비스 연결에서 이 연결을 고쳐 달라」 고 안내한다
 - `WORKBENCH_RATE_LIMITED`: 1분에 60번을 넘겼거나 기록과 제안을 1분에 10번 넘게 불렀다. `retry_after_seconds` 가 있으면 그 초를 알린다. 같은 대화에서 곧바로 다시 부르지 않는다
 - `WORKBENCH_NOT_FOUND`: 그 `id` 의 항목이 없거나 보관됐다. `item_index` 가 있으면 그 번째 항목이 가리킨 노드나 체결이 없다. 검색으로 다시 찾는다
