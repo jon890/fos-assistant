@@ -73,11 +73,15 @@ export function registerTools(register: RegisterTool, workbench: Workbench) {
   );
 
   register("get_node", { id: z.string() }, read, ({ id }) =>
-    workbench.get(`/nodes/${nodeId(id)}`),
+    workbench.get(`/nodes/${nodeId(id)}`, undefined, "WORKBENCH_NOT_FOUND"),
   );
 
   register("trace_node", { id: z.string() }, read, ({ id }) =>
-    workbench.get(`/nodes/${nodeId(id)}/trace`),
+    workbench.get(
+      `/nodes/${nodeId(id)}/trace`,
+      undefined,
+      "WORKBENCH_NOT_FOUND",
+    ),
   );
 
   register(
@@ -89,6 +93,7 @@ export function registerTools(register: RegisterTool, workbench: Workbench) {
       return workbench.get(
         "/graph/neighborhood",
         new URLSearchParams({ id: nodeId(id), hops: String(hops) }),
+        "WORKBENCH_NOT_FOUND",
       );
     },
   );

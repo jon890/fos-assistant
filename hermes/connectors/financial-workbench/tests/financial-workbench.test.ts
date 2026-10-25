@@ -237,6 +237,34 @@ describe("오류", () => {
     });
   });
 
+  test("id 가 없는 경로의 404 는 기준 주소가 틀렸다는 코드로 끝난다", async () => {
+    await withMcp(server(), async (client) => {
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_NOT_CONFIGURED" },
+        "get_connection",
+      );
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_NOT_CONFIGURED" },
+        "lookup_security",
+        { ticker: "FLNC" },
+      );
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_NOT_FOUND" },
+        "trace_node",
+        { id: nodeId },
+      );
+      await expectFailure(
+        client,
+        { code: "WORKBENCH_NOT_FOUND" },
+        "get_neighborhood",
+        { id: nodeId },
+      );
+    });
+  });
+
   test("다른 곳으로 넘기는 응답을 따라가지 않는다", async () => {
     fake.routes.set(
       "GET /api/v1/me",

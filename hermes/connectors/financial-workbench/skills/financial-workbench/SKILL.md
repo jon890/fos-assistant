@@ -56,5 +56,5 @@ description: 사용자의 금융 온톨로지 워크벤치에서 투자 결정�
 - `WORKBENCH_RATE_LIMITED`: 1분에 60번을 넘겼다. `retry_after_seconds` 가 있으면 그 초를 알린다. 같은 대화에서 곧바로 다시 부르지 않는다
 - `WORKBENCH_NOT_FOUND`: 그 `id` 의 항목이 없거나 보관됐다. 검색으로 다시 찾는다
 - `WORKBENCH_INVALID_INPUT`: 인자를 확인한다. `id` 는 UUID, `size` 는 1~50, `hops` 는 1이나 2다
-- `WORKBENCH_NOT_CONFIGURED`: 관리자가 워크벤치 주소를 넣지 않았다. 관리자에게 알려 달라고 안내한다
+- `WORKBENCH_NOT_CONFIGURED`: 관리자가 워크벤치 주소를 넣지 않았거나 틀리게 넣었다. 관리자에게 알려 달라고 안내한다
 - `WORKBENCH_FORBIDDEN`, `WORKBENCH_UNAVAILABLE`: 워크벤치를 지금 쓸 수 없다. 잠시 뒤 다시 하자고 한다

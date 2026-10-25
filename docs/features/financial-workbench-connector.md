@@ -84,9 +84,9 @@ MCP 서버 이름은 `financial-workbench` 다. 모든 도구가 `READ` 이고 �
 | `WORKBENCH_UNAUTHORIZED` | `401`. 토큰이 없거나 형식이 틀렸으면 부르지 않고 같은 코드로 끝낸다 | `credential_rejected` | `reconnect` |
 | `WORKBENCH_FORBIDDEN` | `403` | `forbidden` | |
 | `WORKBENCH_INVALID_INPUT` | `400`, 또는 서버가 부르기 전에 인자를 거절했다 | `invalid_input` | `fix_input` |
-| `WORKBENCH_NOT_FOUND` | `404`. 없거나 보관한 항목이다 | `invalid_input` | `fix_input` |
+| `WORKBENCH_NOT_FOUND` | `id` 를 받는 도구(`get_node`, `trace_node`, `get_neighborhood`)의 `404`. 없거나 보관한 항목이다 | `invalid_input` | `fix_input` |
 | `WORKBENCH_RATE_LIMITED` | `429`. `Retry-After` 초를, 없으면 `details.retryAfterSeconds` 를 `retry_after_seconds` 정수로 싣는다 | `unavailable` | `retry_later` |
-| `WORKBENCH_NOT_CONFIGURED` | 운영 값이 없거나 `https://` 주소가 아니다 | `unavailable` | |
+| `WORKBENCH_NOT_CONFIGURED` | 운영 값이 없거나 `https://` 주소가 아니다. `id` 가 없는 경로의 `404` 도 기준 주소가 틀린 것이라 이 코드다 | `unavailable` | |
 | `WORKBENCH_UNAVAILABLE` | 그 밖의 상태, 다른 곳으로 넘기는 응답, 시간 초과, 연결 실패, JSON 객체가 아닌 응답 | `unavailable` | `retry_later` |
 
 `401` 을 받으면 스킬이 「워크벤치의 더보기 → 연동 토큰에서 다시 발급해 외부 서비스 연결에서 이 연결을 고치라」 고 안내한다.

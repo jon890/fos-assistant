@@ -116,8 +116,15 @@ export class Workbench {
     return token;
   }
 
-  /** `/api/v1` 아래 경로 하나를 GET 으로 부른다. 429 에도 다시 부르지 않는다. */
-  async get(path: string, query?: URLSearchParams): Promise<any> {
+  /**
+   * `/api/v1` 아래 경로 하나를 GET 으로 부른다. 429 에도 다시 부르지 않는다.
+   * id 가 없는 경로의 404 는 항목이 아니라 기준 주소가 틀린 것이라 `notFound` 를 따로 받는다.
+   */
+  async get(
+    path: string,
+    query?: URLSearchParams,
+    notFound = "WORKBENCH_NOT_CONFIGURED",
+  ): Promise<any> {
     const base = this.baseUrl ?? baseUrlOf(this.env[BASE_URL_ENV]);
     const token = this.token();
     const search = query && [...query].length ? `?${query}` : "";
@@ -157,8 +164,7 @@ export class Workbench {
         throw new WorkbenchError("WORKBENCH_FORBIDDEN");
       if (response.status === 400)
         throw new WorkbenchError("WORKBENCH_INVALID_INPUT");
-      if (response.status === 404)
-        throw new WorkbenchError("WORKBENCH_NOT_FOUND");
+      if (response.status === 404) throw new WorkbenchError(notFound);
       if (response.status === 429)
         throw new WorkbenchError(
           "WORKBENCH_RATE_LIMITED",
