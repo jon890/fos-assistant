@@ -24,19 +24,23 @@ const server = (env: Record<string, string> = credentials) =>
 
 const me = {
   user: { id: nodeId, displayName: "Alice", role: "EDITOR" },
-  token: { id: nodeId, name: "Hermes", last4: "test" },
+  token: { id: nodeId, name: "Hermes", last4: "test", scope: "READ_WRITE" },
   rateLimitPerMinute: 60,
+  writeRateLimitPerMinute: 10,
 };
 
 describe("도구 목록", () => {
-  test("서버의 도구와 manifest 의 선언이 같고 모두 읽기 전용이다", async () => {
+  test("서버의 도구와 manifest 의 선언이 같고 READ 도구만 읽기 전용이다", async () => {
+    const declared: Record<string, { risk: string }> = manifest.tools;
     await withMcp(server(), async (client) => {
       const tools = (await client.listTools()).tools;
       expect(tools.map((item) => item.name).sort()).toEqual(
-        Object.keys(manifest.tools).sort(),
+        Object.keys(declared).sort(),
       );
       for (const item of tools)
-        expect(item.annotations?.readOnlyHint).toBe(true);
+        expect(item.annotations?.readOnlyHint).toBe(
+          declared[item.name]!.risk === "READ",
+        );
     });
   });
 });

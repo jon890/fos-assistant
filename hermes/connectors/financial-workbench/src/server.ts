@@ -8,6 +8,7 @@ import {
 } from "./runtime.ts";
 import { createToolRegistration } from "./tool-registration.ts";
 import { registerTools } from "./tools.ts";
+import { registerWriteTools } from "./write-tools.ts";
 
 export { baseUrlOf } from "./workbench-client.ts";
 export { isSupportedBunVersion } from "./runtime.ts";
@@ -19,7 +20,9 @@ export function createWorkbenchServer(options: WorkbenchOptions = {}) {
     name: "fos-financial-workbench",
     version: "1.0.0",
   });
-  registerTools(createToolRegistration(server), workbench);
+  const register = createToolRegistration(server);
+  registerTools(register, workbench);
+  registerWriteTools(register, workbench);
   return server;
 }
 
