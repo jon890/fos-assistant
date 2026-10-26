@@ -3,6 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-10-25
 - [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 의 「운영 값이 있어야 도는 커넥터는 여기 두지 않는다」 에 예외 하나를 더한다. 나머지는 그대로다.
+- 금융 워크벤치를 원격 MCP 플러그인으로 옮기면 [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) 이 이 결정을 대체한다.
 
 ### 결정
 
