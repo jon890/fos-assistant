@@ -7,6 +7,7 @@ from .connector_guard import _guard_manifest
 from .connector_description import _tool_descriptions, _tool_summaries
 from .connector_appearance import _tool_arg_labels
 from .connector_snapshot_manifest import _snapshot_manifest
+from .connector_remote import _is_remote, _remote_server, _remote_server_matches
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -159,19 +160,28 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("MCP 서버 이름이 올바르지 않다")
     if len(_hermes_tool_name(mcp_server, "")) > HERMES_TOOL_PREFIX_MAX_CHARS:
         raise ValueError("MCP 서버 이름이 길어 등록 이름의 앞부분이 %d자를 넘는다" % HERMES_TOOL_PREFIX_MAX_CHARS)
-    if (not isinstance(server, dict) or set(server) - {"command", "args", "env"}
+    # `type` 이 없거나 `stdio` 면 자식 프로세스로 띄우는 로컬 서버이고, `http` 면 원격 MCP 다(ADR-20261026 remote-mcp-plugin).
+    transport = server.get("type", "stdio") if isinstance(server, dict) else None
+    if transport not in ("stdio", "http"):
+        raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
+    remote = transport == "http"
+    if remote:
+        definition = _remote_server(entry, server, declared, fields)
+    elif entry.get("url") is not None or "headers" in declared:
+        raise ValueError("로컬 MCP 서버는 운영 목록의 url 과 headers 선언을 받지 않는다")
+    elif (set(server) - {"type", "command", "args", "env"}
             or not isinstance(server.get("args"), list) or not isinstance(server.get("env"), dict)):
         raise ValueError("MCP 서버 정의 모양이 올바르지 않다")
     optional_env = frozenset(field["env"] for field in fields if field.get("required", True) is False)
-    if set(server["env"]) != field_env | set(operator_env) | owner_env:
+    if not remote and set(server["env"]) != field_env | set(operator_env) | owner_env:
         raise ValueError("MCP 서버 env 가 fields 와 operator_env, owner_attachments_env, owner_output_env, "
                          "owner_browser_env 의 합과 다르다")
-    for name, value in server["env"].items():
+    for name, value in ({} if remote else server["env"]).items():
         # 비밀값 원문이나 다른 변수의 참조를 받지 않는다. 선택 칸만 빈 기본값 참조를 쓸 수 있다.
         if value != "${%s}" % name and not (name in optional_env and value == "${%s:-}" % name):
             raise ValueError("MCP 서버 env 는 자기 이름의 참조만 허용한다")
     args = []
-    for arg in server["args"]:
+    for arg in ([] if remote else server["args"]):
         if not isinstance(arg, str):
             raise ValueError("MCP 서버 인자는 문자열이다")
         if arg.startswith(PLUGIN_ROOT_REF + "/"):
@@ -182,9 +192,9 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         elif "$" in arg:
             raise ValueError("MCP 서버 인자에 plugin root 밖의 치환이 있다")
         args.append(arg)
-    # 실행 파일은 manifest 가 정하지 못한다. 운영 목록의 값이나 기본 실행 파일만 쓴다.
-    command = entry["command"] or _connector_command()
-    if command is None or not os.access(command, os.X_OK):
+    # 실행 파일은 manifest 가 정하지 못한다. 운영 목록의 값이나 기본 실행 파일만 쓴다. 원격 서버에는 실행 파일이 없다.
+    command = None if remote else entry["command"] or _connector_command()
+    if not remote and (command is None or not os.access(command, os.X_OK)):
         raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
 
     # 옛 설치는 스킬 본문을 `SOUL.md` 에 써 지침으로 넣고 skills toolset 은 열지 않는다.
@@ -202,17 +212,20 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         skill_dirs.append(path.resolve())
     installed_skills = _connector_skills(skill_dirs)
 
-    env = {name: "${%s}" % name for name in server["env"]}
-    # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
-    env.update({name: entry["env"][name] for name in operator_env})
-    # 주인의 첨부 디렉터리와 커넥터 출력 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 디렉터리로 바꾼다.
-    # 주인을 모르는 설치는 빈 값 그대로 두어 커넥터가 사용자 첨부를 읽지 않고 파일을 쓰지 않는다.
-    # 브라우저 중계 주소도 같다. 바인딩 설치가 이 빈 값을 그 바인딩의 중계 주소로 바꾼다.
-    env.update({name: "" for name in owner_env})
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
-    snapshot = _snapshot_manifest(declared, server, tools, set(server["env"]) | set(entry["env"]))
-    definition = {"command": command, "args": args, "env": env, "enabled": True}
+    # 원격 서버는 자식 프로세스의 env 로 건네는 선언을 받지 않았다. snapshot 은 자식 프로세스의 인자로 켜므로 없다.
+    snapshot = None
+    if not remote:
+        env = {name: "${%s}" % name for name in server["env"]}
+        # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
+        env.update({name: entry["env"][name] for name in operator_env})
+        # 주인의 첨부 디렉터리와 커넥터 출력 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 디렉터리로 바꾼다.
+        # 주인을 모르는 설치는 빈 값 그대로 두어 커넥터가 사용자 첨부를 읽지 않고 파일을 쓰지 않는다.
+        # 브라우저 중계 주소도 같다. 바인딩 설치가 이 빈 값을 그 바인딩의 중계 주소로 바꾼다.
+        env.update({name: "" for name in owner_env})
+        snapshot = _snapshot_manifest(declared, server, tools, set(server["env"]) | set(entry["env"]))
+        definition = {"command": command, "args": args, "env": env, "enabled": True}
     # 늘 승인이 필요한 도구는 모델에 등록하지 않는다. 도구 이름에는 glob 글자가 없어 그 이름만 빠진다.
     excluded = sorted(name for name, policy in tools.items() if policy["approval"] == "always")
     if excluded:
@@ -229,6 +242,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "fields": fields,
         "verify": {"tool": verify["tool"]},
         "mcp_server": mcp_server,
+        # 대시보드 plugin 이 그 서버에 붙는 방식이다. 카탈로그 응답에는 싣지 않는다.
+        "transport": transport,
         "operator_env": frozenset(operator_env),
         "owner_attachments_env": owner_attachments_env,
         "owner_output_env": owner_output_env,
@@ -298,6 +313,9 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     브라우저 중계 주소 env 도 같다. 빈 값이거나 `<gateway-base-url>/<접근 표식>` 모양인지만 본다(ADR-20261008 browser-gateway-token).
     """
     expected = manifest["server"]
+    if manifest["transport"] == "http" or _is_remote(server):
+        # 원격 정의는 칸 값이 profile `.env` 를 거치는 헤더뿐이라 주소와 헤더만 견준다.
+        return manifest["transport"] == "http" and _remote_server_matches(expected, server)
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
             or set(server["env"]) != set(expected["env"])):
         return False

@@ -16,6 +16,7 @@ import unittest
 from unittest import mock
 
 from plugin_loading import load_plugin
+from dashboard_profile_api_support import REMOTE, REMOTE_URL, remote_connector
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -1427,6 +1428,176 @@ class PluginStandardFormatTest(ConnectorGateCase):
         """두 플러그인 manifest 가 모두 없으면 빠진다."""
         shutil.rmtree(self.connector_root / ".claude-plugin")
         self.rejected_with("플러그인 manifest 가 없다")
+
+
+class RemoteMcpServerTest(ConnectorGateCase):
+    """MCP 정의의 서버가 `type: http` 인 플러그인을 읽는 규칙을 검사한다(ADR-20261026 remote-mcp-plugin)."""
+
+    # 운영 목록이 주는 내부망 주소다. 운영자가 믿은 구간이라 `http://` 도 받는다.
+    OPERATOR_URL = "http://mcp.internal.test/mcp"
+
+    def setUp(self):
+        super().setUp()
+        self.remote_root = remote_connector(self.base / "remote-connector")
+        self.remote_entry({})
+
+    def remote_entry(self, extra, url=None):
+        """운영 목록을 원격 플러그인 하나로 바꾼다. `extra` 는 그 항목에 더할 키다."""
+        entry = {"root": str(self.remote_root), **extra}
+        if url is not None:
+            entry["url"] = url
+        self.operator_list({REMOTE: entry})
+
+    def rewrite_remote(self, name, change):
+        path = self.remote_root / name
+        value = json.loads(path.read_text(encoding="utf-8"))
+        change(value)
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    def rewrite_server(self, change):
+        self.rewrite_remote(".mcp.json", lambda value: change(value["mcpServers"]["remote"]))
+
+    def rejected_with(self, text, hidden=()):
+        """카탈로그에서 빠지고 그 까닭이 경고 로그에 있는지 본다. `hidden` 의 글은 로그에 없어야 한다."""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.catalog(), [])
+        logging.disable(logging.CRITICAL)
+        output = "\n".join(logs.output)
+        self.assertIn(text, output)
+        for value in hidden:
+            self.assertNotIn(value, output)
+
+    def test_remote_server_installs_the_url_and_headers_of_the_mcp_definition(self):
+        """정의의 주소와 헤더를 설치할 서버 정의로 내고, 자식 프로세스에 쓰는 칸은 비어 있다."""
+        manifest = self.plugin._connector_manifest(REMOTE)
+        self.assertEqual(manifest["server"], {"url": REMOTE_URL, "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"},
+                                              "enabled": True, "tools": {"exclude": ["purge"]}})
+        self.assertEqual(manifest["transport"], "http")
+        self.assertEqual((manifest["operator_env"], manifest["optional_env"]), (frozenset(), frozenset()))
+        for key in ("owner_attachments_env", "owner_output_env", "owner_browser_env", "owner_browser_login_url",
+                    "snapshot", "execution_guard"):
+            self.assertIsNone(manifest[key], key)
+        entry = self.catalog()[0]
+        self.assertEqual(entry["id"], REMOTE)
+        self.assertNotIn("transport", entry)
+        self.assertNotIn(REMOTE_URL, json.dumps(entry))
+
+    def test_operator_url_replaces_the_definition_url(self):
+        """운영 목록에 `url` 이 있으면 그 주소를 쓴다. 정의의 주소는 모양만 본다."""
+        self.remote_entry({}, url=self.OPERATOR_URL)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["url"], self.OPERATOR_URL)
+
+    def test_operator_url_alone_is_enough(self):
+        """정의에 주소가 없어도 운영 목록의 `url` 이 있으면 오른다."""
+        self.rewrite_server(lambda server: server.pop("url"))
+        self.remote_entry({}, url=self.OPERATOR_URL)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["url"], self.OPERATOR_URL)
+
+    def test_assistant_headers_join_the_definition_headers(self):
+        """`assistant.json` 의 `headers` 를 정의의 헤더와 합친다. 칸은 두 헤더가 참조하는 이름과 같다."""
+        def declare(value):
+            value["headers"] = {"X-Api-Key": "${REMOTE_KEY}"}
+            value["fields"].append({"key": "key", "env": "REMOTE_KEY", "label": "키", "required": True})
+        self.rewrite_remote("assistant.json", declare)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["headers"],
+                         {"Authorization": "Bearer ${REMOTE_TOKEN}", "X-Api-Key": "${REMOTE_KEY}"})
+
+    def test_url_with_a_forbidden_part_is_dropped(self):
+        """정의의 주소는 `https://` 만 받고 계정 정보, 쿼리, fragment, `$` 치환이 있으면 빠진다. 로그에 주소가 없다."""
+        for label, url, operator in (
+            ("http without operator url", "http://mcp.remote.test/mcp", None),
+            ("http with operator url", "http://mcp.remote.test/mcp", self.OPERATOR_URL),
+            ("credentials", "https://user:pass@mcp.remote.test/mcp", None),
+            ("query", "https://mcp.remote.test/mcp?key=1", None),
+            ("fragment", "https://mcp.remote.test/mcp#top", None),
+            ("substitution", "https://${REMOTE_HOST}/mcp", None),
+        ):
+            with self.subTest(label):
+                self.rewrite_server(lambda server, url=url: server.update(url=url))
+                self.remote_entry({}, url=operator)
+                self.rejected_with("원격 MCP 서버 정의의 url", hidden=(url,))
+
+    def test_operator_url_with_a_forbidden_part_is_dropped(self):
+        """운영 목록의 주소도 같은 부분을 받지 않는다. 로그에 주소가 없다."""
+        for url in ("http://user:pass@mcp.internal.test/mcp", "http://mcp.internal.test/mcp?a=1",
+                    "ftp://mcp.internal.test/mcp", "http://${HOST}/mcp"):
+            with self.subTest(url):
+                self.remote_entry({}, url=url)
+                self.rejected_with("운영 목록의 url", hidden=(url,))
+
+    def test_remote_server_without_any_url_is_dropped(self):
+        self.rewrite_server(lambda server: server.pop("url"))
+        self.rejected_with("url 이 없다")
+
+    def test_header_value_other_than_a_required_field_reference_is_dropped(self):
+        """리터럴 값과 선택 칸 참조는 받지 않는다. 로그에 헤더 값이 없다."""
+        for value in ("Bearer remote_literal_secret", "${REMOTE_TOKEN:-}", "Token ${REMOTE_TOKEN}"):
+            with self.subTest(value):
+                self.rewrite_server(lambda server, value=value: server.update(headers={"Authorization": value}))
+                self.rejected_with("headers 는", hidden=(value,))
+
+    def test_header_declared_twice_is_dropped(self):
+        """같은 헤더 이름이 정의와 `assistant.json` 에 함께 있으면 대소문자가 달라도 빠진다."""
+        self.rewrite_remote("assistant.json",
+                            lambda value: value.update(headers={"authorization": "Bearer ${REMOTE_TOKEN}"}))
+        self.rejected_with("같은 헤더 이름")
+
+    def test_fields_must_match_the_header_references(self):
+        """칸은 모두 필수 칸이고, 그 env 이름이 헤더가 참조하는 이름과 같아야 한다."""
+        for label, field, text in (
+            ("unreferenced field", {"key": "extra", "env": "REMOTE_EXTRA", "label": "추가", "required": True},
+             "참조하는 이름이 다르다"),
+            ("optional field", {"key": "extra", "env": "REMOTE_EXTRA", "label": "추가", "required": False},
+             "모두 필수 칸"),
+        ):
+            with self.subTest(label):
+                self.rewrite_remote("assistant.json", lambda value, field=field: value.update(
+                    fields=[value["fields"][0], field]))
+                self.rejected_with(text)
+        self.rewrite_remote("assistant.json", lambda value: value.update(fields=[]))
+        self.rejected_with("참조하는 이름이 다르다")
+
+    def test_declarations_that_pass_values_to_a_child_process_are_dropped(self):
+        """자식 프로세스의 env 로 값을 건네는 선언은 하나만 있어도 빠진다."""
+        forbidden = sys.modules[self.plugin.__name__ + ".connector_schema"].REMOTE_FORBIDDEN_KEYS
+        original = (self.remote_root / "assistant.json").read_bytes()
+        for key in forbidden:
+            # 앞선 검사를 통과하는 값이다. `operator_env` 는 목록이고 나머지는 env 이름 모양의 문자열로 둔다.
+            value = [] if key == "operator_env" else "REMOTE_DECLARED"
+            with self.subTest(key):
+                (self.remote_root / "assistant.json").write_bytes(original)
+                self.rewrite_remote("assistant.json", lambda declared, key=key, value=value: declared.update({key: value}))
+                self.rejected_with("원격 MCP 서버는 %s 를 선언하지 않는다" % key)
+
+    def test_operator_entry_with_command_or_env_is_dropped(self):
+        for extra in ({"command": sys.executable}, {"env": {"REMOTE_BASE": "value"}}):
+            with self.subTest(extra):
+                self.remote_entry(extra)
+                self.rejected_with("command 나 env")
+
+    def test_unsupported_transport_is_dropped(self):
+        self.rewrite_server(lambda server: server.update(type="sse"))
+        self.rejected_with("MCP 서버 정의 모양이 올바르지 않다")
+
+    def test_local_server_rejects_the_remote_declarations(self):
+        """로컬 서버는 운영 목록의 `url` 과 `headers` 선언을 받지 않는다. 명시한 `type: stdio` 는 받는다."""
+        local = {"root": str(self.connector_root), "command": sys.executable, "env": {"DEMO_BASE": DEMO_BASE}}
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(type="stdio"))
+        self.operator_list({DEMO: local})
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["transport"], "stdio")
+
+        self.operator_list({DEMO: {**local, "url": self.OPERATOR_URL}})
+        self.rejected_with("로컬 MCP 서버는", hidden=(self.OPERATOR_URL,))
+        self.operator_list({DEMO: local})
+        self.rewrite("connector.json", lambda value: value.update(headers={"Authorization": "Bearer ${DEMO_TOKEN}"}))
+        self.rejected_with("로컬 MCP 서버는")
+        self.rewrite("connector.json", lambda value: value.pop("headers"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(
+            headers={"Authorization": "Bearer ${DEMO_TOKEN}"}))
+        self.rejected_with("MCP 서버 정의 모양이 올바르지 않다")
 
 
 class HermesToolNameTest(ConnectorGateCase):

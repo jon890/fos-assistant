@@ -37,9 +37,38 @@ OTHER_BASE = "http://other.test/base"
 DEMO_VALUE = "demo_ok_0123456789"
 OTHER_VALUE = "other_1234"
 VAULT = "/api/connector-vault"
+# 원격 MCP 시험 플러그인이다. MCP 정의의 서버가 `type: http` 이고 칸 값은 헤더로만 간다.
+REMOTE = "remote-notes"
+REMOTE_URL = "https://mcp.remote.test/mcp"
+REMOTE_VALUE = "remote_0123"
 
 # 설정이 없을 때 API 경로가 떨어지는 복합 toolset 을 줄여 흉내 낸다.
 WIDE_TOOLSETS = {"code_execution", "delegation", "file", "memory", "terminal", "web"}
+
+
+def remote_connector(root: pathlib.Path, url: str | None = REMOTE_URL) -> pathlib.Path:
+    """원격 MCP 플러그인 디렉터리를 만든다. 서버 이름은 `remote` 이고 필수 칸 하나가 `Authorization` 헤더를 채운다.
+
+    `url` 이 None 이면 MCP 정의에 주소를 두지 않는다. 늘 승인을 받는 도구 `purge` 는 `tools.exclude` 로 빠진다.
+    """
+    (root / ".claude-plugin").mkdir(parents=True)
+    (root / ".claude-plugin/plugin.json").write_text(json.dumps({"name": REMOTE, "skills": "./skills"}),
+                                                     encoding="utf-8")
+    (root / "assistant.json").write_text(json.dumps({
+        "schema": 2, "id": REMOTE, "title": "원격 메모",
+        "fields": [{"key": "token", "env": "REMOTE_TOKEN", "label": "토큰", "secret": True, "required": True,
+                    "pattern": "^remote_[0-9]{4}$"}],
+        "verify": {"tool": "list_items"},
+        "tools": {"list_items": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"}},
+    }), encoding="utf-8")
+    server = {"type": "http", "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"}}
+    if url is not None:
+        server["url"] = url
+    (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"remote": server}}), encoding="utf-8")
+    (root / "skills/remote").mkdir(parents=True)
+    (root / "skills/remote/SKILL.md").write_text(
+        "---\nname: remote\ndescription: 원격 메모 커넥터의 스킬이다.\n---\n\n# 원격 메모\n", encoding="utf-8")
+    return root
 
 
 def fake_platform_tools(config, platform):

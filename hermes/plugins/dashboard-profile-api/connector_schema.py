@@ -42,6 +42,20 @@ FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 
 
+# 원격 MCP 서버의 헤더 값 모양이다. 필수 칸 하나의 참조나 그 앞에 `Bearer ` 를 붙인 것만 받는다(ADR-20261026 remote-mcp-plugin).
+# 리터럴 비밀값을 플러그인 파일에 두는 길을 막는다. 이름 글자는 `ENV_NAME_RE` 와 같다.
+REMOTE_HEADER_VALUE_RE = re.compile(r"^(Bearer )?\$\{([A-Za-z_][A-Za-z0-9_]{0,127})\}$")
+
+
+# 원격 MCP 서버의 헤더 이름이다. HTTP 토큰 글자만 받는다.
+REMOTE_HEADER_NAME_RE = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$")
+
+
+# 원격 MCP 서버에서 받지 않는 `assistant.json` 선언이다. 모두 자식 프로세스의 env 로 값을 건네는 선언이다.
+REMOTE_FORBIDDEN_KEYS = ("operator_env", "owner_attachments_env", "owner_output_env", "owner_browser_env",
+                         "snapshot", "execution_guard")
+
+
 # 바인딩 주인의 첨부 디렉터리를 받을 env 이름이다(ADR-20261007 connector-owner-attachments).
 OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 

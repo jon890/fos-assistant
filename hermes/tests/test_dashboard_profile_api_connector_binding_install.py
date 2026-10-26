@@ -5,7 +5,8 @@ import os
 import yaml
 from unittest import mock
 from plugin_loading import patch_plugin
-from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE, OTHER, OTHER_BASE, OTHER_VALUE
+from dashboard_profile_api_support import (DEMO, DEMO_BASE, DEMO_VALUE, OTHER, OTHER_BASE, OTHER_VALUE, REMOTE,
+                                           REMOTE_URL, REMOTE_VALUE, remote_connector)
 import dashboard_profile_api_support as support
 
 
@@ -521,3 +522,77 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertNotIn("old-value", env)
         written = self.vault("PUT", vault="c4", connector=DEMO, values={"token": DEMO_VALUE, "retired": "old-value"})
         self.assertEqual(written.status_code, 400)
+
+    def remote_fixture(self):
+        """시험 커넥터 하나와 원격 MCP 플러그인을 운영 목록에 올리고 원격 플러그인의 보관 파일 `c3` 을 둔다."""
+        self.connector_fixture()
+        remote = remote_connector(self.root.parent / "remote-connector")
+        roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])
+        roots[REMOTE] = {"root": str(remote)}
+        patch = mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(roots)})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.assertEqual(self.vault("PUT", vault="c3", connector=REMOTE,
+                                    values={"token": REMOTE_VALUE}).status_code, 200)
+
+    def test_binding_a_remote_plugin_writes_the_url_and_header_definition(self):
+        """원격 플러그인을 붙이면 서버 정의가 주소와 헤더이고 칸 값은 `.env` 로만 간다. 다시 붙이면 그대로이고 떼면 지운다."""
+        self.remote_fixture()
+
+        response = self.bind(REMOTE, "c3")
+
+        self.assertEqual(response.status_code, 200, response.body)
+        self.assertIs(response.body["changed"], True)
+        server = self.alice_config()["mcp_servers"]["remote"]
+        self.assertEqual(server, {"url": REMOTE_URL, "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"},
+                                  "enabled": True, "tools": {"exclude": ["purge"]}})
+        self.assertIn("remote", self.alice_config()["platform_toolsets"]["api_server"])
+        env = self.root / "alice/.env"
+        self.assertEqual(env.read_text(encoding="utf-8").splitlines(), ["REMOTE_TOKEN=" + REMOTE_VALUE])
+        record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
+        self.assertEqual(record[REMOTE]["server"], server)
+        self.assertEqual(self.tool_map()["servers"]["remote"], {
+            "connector": REMOTE, "prefix": "mcp__remote__",
+            "tools": {"mcp__remote__list_items": "list_items", "mcp__remote__purge": "purge"}})
+        self.assertIs(self.bind(REMOTE, "c3").body["changed"], False)
+
+        removed = self.bind(REMOTE, enabled=False)
+
+        self.assertEqual(removed.status_code, 200, removed.body)
+        self.assertNotIn("REMOTE_TOKEN", env.read_text(encoding="utf-8"))
+        self.assertNotIn("remote", self.alice_config()["mcp_servers"])
+        self.assertNotIn(REMOTE, json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8")))
+
+    def test_remote_record_leaves_the_local_binding_of_the_profile_usable(self):
+        """원격과 로컬을 한 profile 에 붙여도 조회, probe, 로컬 다시 붙이기가 된다. 원격 호출은 자식을 띄우지 않는다."""
+        self.remote_fixture()
+        self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
+        self.assertEqual(self.bind(REMOTE, "c3").status_code, 200)
+
+        self.assertEqual(self.status_of()["connectors"], [
+            {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
+            {"plugin": REMOTE, "enabled": True, "configured": True, "mode": "bind"}])
+        self.assertEqual(self.connector_probe("remote"), 204)
+        self.assertEqual(self.connector_probe("demo"), 204)
+        self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
+                                    values={"token": "demo_new_0123456789"}).status_code, 200)
+        rebound = self.bind(DEMO, "c1")
+        self.assertEqual(rebound.status_code, 200, rebound.body)
+        self.assertIs(rebound.body["changed"], True)
+
+        ran = []
+
+        async def runner(*args):
+            ran.append(args[0]["id"])
+            return None
+
+        with patch_plugin(self.plugin, "_mcp_sdk_problem", return_value=None), \
+                patch_plugin(self.plugin, "_run_connector_execute", side_effect=runner), \
+                patch_plugin(self.plugin, "_run_connector_tool", side_effect=runner):
+            executed = self.request("/api/connectors/%s/execute" % REMOTE, "POST", token="valid", full_response=True,
+                                    body={"profile": "alice", "hermes_tool": "mcp__remote__list_items", "args": {}})
+            called = self.request("/api/connectors/%s/call" % REMOTE, "POST", token="valid", full_response=True,
+                                  body={"tool": "list_items", "vault": "c3"})
+        for response in (executed, called):
+            self.assertEqual((response.status_code, response.body), (200, {"ok": False, "error": "unavailable"}))
+        self.assertEqual(ran, [])

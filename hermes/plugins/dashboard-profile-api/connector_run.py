@@ -100,6 +100,9 @@ async def _connector_call_request(request, connector_id: str):
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
         return _rejected("없는 connector 다", 404)
+    if manifest["transport"] == "http":
+        # 원격 MCP 커넥터에는 띄울 자식 프로세스가 없다. 대시보드가 원격 서버에 직접 붙는 경로는 아직 열지 않았다.
+        return failed("unavailable")
     body = await _json_object(request)
     if (body is None or set(body) - {"owner_browser"} not in ({"tool", "values"}, {"tool", "vault"})
             or ("values" in body and not isinstance(body["values"], dict))
@@ -249,6 +252,9 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
         return _rejected("없는 connector 다", 404)
+    if manifest["transport"] == "http":
+        # 원격 MCP 커넥터에는 띄울 자식 프로세스가 없다. 대시보드가 원격 서버에 직접 붙는 경로는 아직 열지 않았다.
+        return failed("unavailable")
     body = await _guard_request_body(request)
     if (body is None or set(body) - ({"execution"} if not prepare else set()) != {"profile", "hermes_tool", "args"} or not isinstance(body["args"], dict)
             or not isinstance(body["hermes_tool"], str) or not 1 <= len(body["hermes_tool"]) <= 128):
