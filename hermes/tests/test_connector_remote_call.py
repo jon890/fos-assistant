@@ -129,6 +129,31 @@ class RemoteCallTest(base.ConnectorGateCase):
         """헤더가 참조하는 칸 값이 없으면 부르지 않고 `unavailable` 이다."""
         self.assertEqual(self.call(values={}), UNAVAILABLE)
 
+    def test_vault_call_keeps_the_operator_url_after_plugin_url_changes(self):
+        """보관 토큰으로 확인해도 플러그인 갱신이 토큰의 목적지를 바꾸지 않는다."""
+        self.rewrite_remote(".mcp.json", lambda value: value["mcpServers"]["remote"].update(
+            url=self.server_base + "/landing"))
+        stored = {"v": 1, "connector": REMOTE, "values": {"token": REMOTE_VALUE}}
+        with patch_plugin(self.plugin, "_read_vault", return_value=stored):
+            answer = self.request(CALL, "POST", {"tool": "list_items", "vault": "c1"})
+        self.assertEqual(answer, (200, {"ok": True, "result": {"authorization": SENT_HEADER}}))
+        self.assertEqual(self.received()["landing"], 0)
+
+    def test_vault_call_without_operator_url_never_reads_the_token(self):
+        self.operator_list({REMOTE: {"root": str(self.remote_root)}})
+        with patch_plugin(self.plugin, "_read_vault") as read:
+            status, _ = self.request(CALL, "POST", {"tool": "list_items", "vault": "c1"})
+        self.assertEqual(status, 404)
+        read.assert_not_called()
+
+    def test_oversized_json_and_sse_fail_without_leaking_logs(self):
+        for path in ("/oversized-json", "/oversized-sse"):
+            with self.subTest(path=path):
+                self.point_to(path)
+                with call_base.collected_logs() as logs:
+                    self.assertEqual(self.call(), UNAVAILABLE)
+                self.assert_nothing_leaked(logs)
+
     def test_call_does_not_run_a_tool_that_is_not_read_only(self):
         """확인 도구가 서버의 `tools/list` 에서 읽기 전용이 아니면 부르지 않는다."""
         # 플러그인은 읽기 도구로 선언했지만 서버는 읽기 전용이라고 알리지 않는다.

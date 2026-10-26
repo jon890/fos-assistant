@@ -528,7 +528,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.connector_fixture()
         remote = remote_connector(self.root.parent / "remote-connector")
         roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])
-        roots[REMOTE] = {"root": str(remote)}
+        roots[REMOTE] = {"root": str(remote), "url": REMOTE_URL}
         patch = mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(roots)})
         patch.start()
         self.addCleanup(patch.stop)

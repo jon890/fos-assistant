@@ -7,21 +7,25 @@
 
 ### 결정
 
-**`.mcp.json` 의 서버가 `type: http` 이면 대시보드 plugin 은 자식 프로세스 대신 Streamable HTTP 로 붙는다. 주소는 플러그인 파일이나 운영 목록에서만 오고, 사용자의 입력 칸 값은 `assistant.json` 이 선언한 헤더에만 들어간다.**
+**`.mcp.json` 의 서버가 `type: http` 이면 대시보드 plugin 은 자식 프로세스 대신 Streamable HTTP 로 붙는다. 주소는 운영 목록에서만 오고, 사용자의 입력 칸 값은 `assistant.json` 이 선언한 헤더에만 들어간다.**
 
 | 항목 | 정한 것 |
 | --- | --- |
 | 전송 | MCP Streamable HTTP. `sse` 는 받지 않는다 |
-| 주소의 출처 | `.mcp.json` 의 `url`(`https://`) 이거나, 운영 목록 항목의 `url`(`http://` 나 `https://`)이다. 운영 목록 값이 있으면 그것을 쓴다. 둘 다 계정 정보, 쿼리, fragment, `$` 치환이 없다 |
-| 사용자 입력 | `fields` 의 값은 헤더 값의 `${이름}` 자리에만 들어간다. 주소, 경로, 헤더 이름에는 들어가지 않는다 |
+| 주소의 출처 | 운영 목록 항목의 `url`(`http://` 나 `https://`)이 필수다. `.mcp.json` 의 `url` 은 무시한다. 플러그인 갱신만으로 토큰의 목적지가 바뀌지 않는다. 운영 목록 주소에는 계정 정보, 쿼리, fragment, `$` 치환이 없다 |
+| 사용자 입력 | `fields` 의 값은 헤더 값의 `${이름}` 자리에만 들어간다. 주소, 경로, 헤더 이름에는 들어가지 않는다. env 이름은 `^[A-Z][A-Z0-9_]{0,127}$` 이고 Hermes 전역 이름은 받지 않는다 |
 | 헤더 선언 | `.mcp.json` 서버의 `headers` 와 `assistant.json` 의 `headers` 를 합친다. 같은 이름이 둘에 있으면 카탈로그에서 뺀다. 값은 `${이름}` 이나 `Bearer ${이름}` 이고 `${이름}` 은 필수 칸 하나다. 리터럴 값과 선택 칸(`${이름:-}`)은 받지 않는다 |
 | 인증 | 이번에는 사용자가 넣는 토큰만 받는다. 원격 MCP 의 OAuth 로그인은 Hermes 와 대시보드 plugin 에 넣지 않는다 |
 | 원격에서 받지 않는 선언 | `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `snapshot`, `execution_guard`. 모두 자식 프로세스의 env 로 값을 건네는 선언이다 |
-| 운영 목록 항목 | `{"root": "<플러그인 디렉터리>", "url": "<선택>"}`. `command` 와 `env` 가 있으면 그 항목을 버린다 |
+| 운영 목록 항목 | `{"root": "<플러그인 디렉터리>", "url": "<필수 원격 MCP 주소>"}`. `command` 와 `env` 가 있으면 그 항목을 버린다 |
 | 설치하는 서버 정의 | `{"url": ..., "headers": {...}, "strict_redirect_headers": true, "enabled": true}` 와 지금처럼 `tools.exclude`. 헤더 값의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다 |
 | 대시보드의 호출 | 확인 도구, 선택지, 승인 실행은 대시보드 plugin 이 직접 같은 원격 서버에 붙고 redirect 를 따라가지 않는다. MCP probe 는 Hermes 가 붙으므로 Hermes 의 redirect 규칙(아래 「감당할 것」)을 따른다 |
 | 도구 이름과 승인 | Hermes 등록 이름은 `mcp__<서버>__<도구>` 그대로이고 전송과 무관하다. `fos-ctx` 의 판정과 이름 대응 파일은 바뀌지 않는다 |
 | 다른 저장소의 플러그인 | 운영자가 홈서버에 받아 둔 그 저장소의 checkout 을 운영 목록의 `root` 로 가리킨다. 실행 중에 marketplace 나 원격 저장소에서 내려받지 않는다. 경로와 갱신 절차는 `fos-home-infra` 가 갖는다 |
+
+원격 칸 env 검사는 [Hermes v0.21.6 `agent/secret_scope.py`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`가 근거다. OS·Python 이름은 정확히 일치할 때 거절하고, `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_`는 접두 전체를 거절한다. 소문자 context 변수도 이름 형식에서 빠진다.
+
+대시보드 응답은 SDK가 본문을 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB로 제한한다. Hermes의 [`_make_mcp_body_cap_transport`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)와 같은 상한이다. 긴 SSE 연결은 누적 크기로 끊지 않는다.
 
 ### 옮기는 순서
 
@@ -54,6 +58,7 @@ Hermes 는 이미 `mcp_servers` 에 `url` 과 `${이름}` 을 참조하는 헤�
 - 감당할 것:
   - 원격 서버가 바뀌면 이 저장소의 검사는 모른다. 선언하지 않은 도구는 지금처럼 거절하고 연결 상태에 센다. 실제 서버로 붙는지는 그 플러그인의 소유자가 확인한다.
   - 토큰이 HTTP 헤더로 나간다. 운영 목록의 `url` 이 `http://` 이면 그 구간은 운영자가 믿은 내부망이어야 한다. 그 판단은 `fos-home-infra` 가 갖는다.
-  - Hermes 는 다른 호스트로 가는 redirect 를 따라간다. 설치하는 서버 정의의 `strict_redirect_headers: true` 로 그때 `Authorization` 과 함께 선언한 헤더를 모두 지우게 한다([Hermes 계약의 「원격 MCP 서버」](../hermes-contract.md#원격-mcp-서버)). 요청은 다른 호스트로 가지만 토큰은 가지 않는다. 이 키가 있으면 Hermes 는 SSE 로 다시 붙어 보지 않는다. 대시보드 plugin 의 호출은 redirect 를 따라가지 않는다.
+  - Hermes 는 다른 호스트로 가는 redirect 를 따라간다. 설치하는 서버 정의의 `strict_redirect_headers: true` 로 그때 `Authorization` 과 함께 선언한 헤더를 모두 지우게 한다([Hermes 계약의 「원격 MCP 서버」](../hermes-contract.md#원격-mcp-서버)). 이 설정은 헤더만 지우고 목적지와 POST 본문을 막지 않는다. 이 키가 있으면 Hermes 는 SSE 로 다시 붙어 보지 않는다. 대시보드 plugin 의 호출은 redirect 를 따라가지 않는다.
+  - 원격 서버의 redirect 로 Hermes 요청이 내부망에 닿을 수 있다. 운영 목록 `url` 고정과 홈서버 egress 제한으로 막는다. egress 제한은 `fos-home-infra` 후속이다.
   - 원격 서버의 응답 시간은 자식 프로세스보다 흔들린다. 시간 제한과 동시 한도는 지금 값을 그대로 쓴다.
   - Codex 와 Claude Code 처럼 OAuth 로 붙고 싶은 요구가 생기면 이 ADR 의 「인증」 을 다시 판단한다.

@@ -1911,6 +1911,9 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 [설정 읽기와 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_config.py)와
 [연결 직전의 다시 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_discovery.py)가 근거다.
 
+다만 context 변수는 `_CONTEXT_VAR_RESOLVERS`가 먼저 풀고, `agent/secret_scope.py`의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`에 속한 이름은 프로세스 env를 읽는다. 원격 플러그인의 칸은 대문자 env 이름만 받고, OS·Python 전역 이름과 `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_` 접두를 거절한다. 대시보드와 Hermes가 서로 다른 출처의 값을 보내는 일을 막는다.
+[전역 이름의 근거](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)는 해당 버전의 상수다.
+
 ### 헤더는 연결할 때 한 번 정해진다
 
 펼친 헤더는 연결을 만들 때 HTTP 클라이언트의 기본 헤더가 되고, 그 연결이 사는 동안 바뀌지 않는다.
@@ -1925,6 +1928,7 @@ Hermes 의 Streamable HTTP 클라이언트와 연결 전 content-type 확인 요
 scheme, host, port 가운데 하나라도 다른 곳으로 가면 `Authorization` 헤더만 지운다.
 그 밖의 설정 헤더는 서버 정의의 `strict_redirect_headers` 가 참일 때만 지운다. 우리가 설치하는 원격 서버 정의는 이 키를 참으로 둔다.
 이 키가 참이면 Streamable HTTP 연결이 거절돼도 SSE 로 다시 붙어 보지 않고, SSE 전송과 `mcp<1.24.0` 에서는 연결하지 않는다.
+헤더를 지워도 307/308 redirect의 POST 본문과 내부망 목적지는 막지 않는다. plugin은 운영 목록 `url`만 쓰며, 홈서버 egress 제한은 `fos-home-infra` 후속이다.
 [redirect 헤더 처리](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)가 근거다.
 
 대시보드 plugin 의 `call` 과 `execute` 는 Hermes 를 거치지 않고 같은 주소에 직접 붙는다. 이 경로는 redirect 를 따라가지 않고 호출 실패로 답한다.

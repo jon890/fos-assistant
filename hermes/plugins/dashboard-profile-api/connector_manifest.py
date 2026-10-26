@@ -128,7 +128,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     field_env = {field["env"] for field in fields}
     operator_env = declared.get("operator_env", [])
     if (not isinstance(operator_env, list)
-            or any(not isinstance(name, str) or not ENV_NAME_RE.match(name) or name in BASE_ENV_KEYS
+            or any(not isinstance(name, str) or not ENV_NAME_RE.fullmatch(name) or name in BASE_ENV_KEYS
                    for name in operator_env)
             or len(set(operator_env)) != len(operator_env) or set(operator_env) & field_env):
         raise ValueError("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")

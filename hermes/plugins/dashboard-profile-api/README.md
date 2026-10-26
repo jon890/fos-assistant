@@ -114,7 +114,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
   },
   "<원격 MCP 커넥터 이름>": {
     "root": "<plugin 디렉터리>",
-    "url": "<선택. 원격 MCP 주소>"
+    "url": "<원격 MCP 일 때 필수 주소>"
   },
   "<다른 커넥터 이름>": "<plugin 디렉터리>"
 }
@@ -139,11 +139,13 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **원격 MCP 커넥터는 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
 
-- 주소는 운영 목록의 `url` 이 있으면 그것, 없으면 MCP 정의의 `url`(`https://`)이다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 커넥터를 카탈로그에서 뺀다
+- 주소는 운영 목록의 `url` 이 필수이고 MCP 정의의 `url` 은 무시한다. 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 커넥터를 카탈로그에서 뺀다
 - 헤더는 MCP 정의의 `headers` 와 `assistant.json` 의 `headers` 를 합친 것이다. 값은 `${이름}` 이나 `Bearer ${이름}` 이고 `${이름}` 은 필수 칸 하나다. 같은 헤더 이름이 둘에 있으면 카탈로그에서 뺀다
 - `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `snapshot`, `execution_guard` 를 선언하면 카탈로그에서 뺀다
 - 설치하는 서버 정의는 `{"url", "headers", "strict_redirect_headers", "enabled"}` 와 `tools.exclude` 다. 헤더의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 참이고, Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다
 - 아래 `call` 과 `execute` 는 같은 주소에 직접 붙고, 칸 값은 헤더에만 넣는다. redirect 는 같은 호스트로 가는 것도 따라가지 않는다. 주소와 헤더 값, 인자를 로그에 싣지 않는다
+- 칸 env 이름은 `^[A-Z][A-Z0-9_]{0,127}$` 이고 Hermes 전역 이름과 접두는 거절한다. 목록과 근거는 원격 MCP ADR 이 갖는다
+- 원격 응답은 SDK 가 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB 로 제한한다. SSE 연결의 누적 크기는 제한하지 않는다
 - 원격 호출 동안 SDK 와 HTTP 라이브러리의 로그는 수준과 상관없이 남기지 않는다. 주소와 인자가 WARNING 이상의 예외 문구에도 실리기 때문이다
 - probe 는 Hermes 가 붙는다. redirect 처리는 [Hermes 계약](../../docs/hermes-contract.md) 의 「원격 MCP 서버」 를 따른다
 

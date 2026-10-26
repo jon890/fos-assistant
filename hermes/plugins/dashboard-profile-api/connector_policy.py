@@ -40,7 +40,7 @@ def _connector_fields(declared) -> list:
     for field in declared:
         if (not isinstance(field, dict)
                 or not isinstance(field.get("key"), str) or not FIELD_KEY_RE.match(field["key"])
-                or not isinstance(field.get("env"), str) or not ENV_NAME_RE.match(field["env"])
+                or not isinstance(field.get("env"), str) or not ENV_NAME_RE.fullmatch(field["env"])
                 or field["env"] in BASE_ENV_KEYS
                 or not isinstance(field.get("label"), str)
                 or not isinstance(field.get("description", ""), str)

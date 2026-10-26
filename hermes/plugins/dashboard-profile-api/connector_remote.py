@@ -1,7 +1,7 @@
 """원격 MCP 서버 정의를 검증하고 소유 기록의 원격 정의를 읽는다(ADR-20261026 remote-mcp-plugin).
 
 MCP 정의의 서버가 `type: http` 인 커넥터는 자식 프로세스 대신 Streamable HTTP 로 붙는다.
-주소는 플러그인 파일이나 운영 목록에서만 오고, 사용자의 칸 값은 헤더 값의 `${이름}` 자리에만 들어간다.
+주소는 운영 목록에서만 오고, 사용자의 칸 값은 헤더 값의 `${이름}` 자리에만 들어간다.
 예외 사유와 로그에 주소와 헤더 값을 싣지 않는다.
 """
 
@@ -10,9 +10,19 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import logging
+import re
 from urllib.parse import urlsplit
 
 from .connector_schema import REMOTE_FORBIDDEN_KEYS, REMOTE_HEADER_NAME_RE, REMOTE_HEADER_VALUE_RE
+from .connector_remote_body import _cap_remote_response
+
+
+# Hermes v0.21.6 agent/secret_scope.py 의 _GLOBAL_ENV_EXACT, _GLOBAL_ENV_PREFIXES 가 근거다.
+# 배포·중계 관련 이름은 같은 계열의 비밀값도 칸으로 받지 않도록 접두 전체를 막는다.
+REMOTE_ENV_NAME_RE = re.compile(r"[A-Z][A-Z0-9_]{0,127}")
+REMOTE_GLOBAL_ENV = frozenset({"PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "PWD", "SHELL", "TMPDIR",
+                               "VIRTUAL_ENV", "PYTHONPATH", "SSL_CERT_FILE"})
+REMOTE_GLOBAL_PREFIXES = ("HERMES_", "TERMINAL_", "GATEWAY_RELAY_", "API_SERVER_")
 
 
 # 대시보드 plugin 이나 MCP 전송이 직접 정하는 헤더다. 플러그인이 선언하면 요청 모양이 바뀌므로 받지 않는다.
@@ -81,15 +91,15 @@ def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> d
     # 실행 파일과 운영자 env 는 자식 프로세스에 쓰는 값이다. 원격 커넥터의 항목에 있으면 운영 목록이 틀린 것이다.
     if entry.get("command") is not None or entry.get("env"):
         raise ValueError("원격 MCP 서버의 운영 목록 항목에 command 나 env 가 있다")
-    # 플러그인 파일의 주소는 https 만 받는다. 운영 목록의 http 는 운영자가 믿은 내부망 구간이다.
-    if "url" in server and not _remote_url_ok(server["url"], ("https",)):
-        raise ValueError("원격 MCP 서버 정의의 url 이 https 주소가 아니거나 받지 않는 부분이 있다")
+    # 플러그인 갱신으로 토큰의 목적지가 바뀌지 않게 파일의 url 은 무시한다.
     operator_url = entry.get("url")
-    if operator_url is not None and not _remote_url_ok(operator_url, ("http", "https")):
+    if operator_url is None:
+        raise ValueError("원격 MCP 서버의 운영 목록에 url 이 없다")
+    if not _remote_url_ok(operator_url, ("http", "https")):
         raise ValueError("운영 목록의 url 이 http 나 https 주소가 아니거나 받지 않는 부분이 있다")
-    url = operator_url if operator_url is not None else server.get("url")
-    if url is None:
-        raise ValueError("원격 MCP 서버의 url 이 없다")
+    if any(not REMOTE_ENV_NAME_RE.fullmatch(field["env"]) or field["env"] in REMOTE_GLOBAL_ENV
+           or field["env"].startswith(REMOTE_GLOBAL_PREFIXES) for field in fields):
+        raise ValueError("원격 MCP 서버의 칸 env 이름이 올바르지 않거나 Hermes 전역 이름이다")
     headers = _remote_headers(server.get("headers"), "MCP 서버 정의")
     declared_headers = _remote_headers(declared.get("headers"), "assistant.json")
     names = [name.lower() for name in (*headers, *declared_headers)]
@@ -102,7 +112,7 @@ def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> d
     if {field["env"] for field in fields} != _remote_header_env({"headers": headers}):
         raise ValueError("원격 MCP 서버의 칸과 헤더가 참조하는 이름이 다르다")
     # Hermes 는 redirect 를 따라간다. 이 키가 참이면 다른 origin 으로 갈 때 `Authorization` 밖의 설정 헤더도 지운다.
-    return {"url": url, "headers": headers, "strict_redirect_headers": True, "enabled": True}
+    return {"url": operator_url, "headers": headers, "strict_redirect_headers": True, "enabled": True}
 
 
 def _remote_server_matches(expected: dict, recorded: dict) -> bool:
@@ -165,7 +175,8 @@ async def _remote_streams(server: dict, values: dict, timeout: float):
         logging.getLogger(name).addFilter(_REMOTE_CALL_FILTER)
     token = _remote_call.set(True)
     try:
-        async with httpx2.AsyncClient(headers=headers, follow_redirects=False, timeout=timeout) as client:
+        async with httpx2.AsyncClient(headers=headers, follow_redirects=False, timeout=timeout,
+                                     event_hooks={"response": [_cap_remote_response]}) as client:
             async with streamable_http_client(server["url"], http_client=client) as streams:
                 yield streams
     finally:

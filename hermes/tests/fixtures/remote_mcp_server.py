@@ -20,7 +20,7 @@ def build_server():
     """도구와 경로를 단 MCP 서버다. 모든 도구는 받은 `Authorization` 헤더를 결과에 싣는다."""
     from mcp.server.mcpserver import Context, MCPServer
     from mcp_types import ToolAnnotations
-    from starlette.responses import JSONResponse, RedirectResponse
+    from starlette.responses import JSONResponse, RedirectResponse, StreamingResponse
 
     server = MCPServer("remote")
     # 서버가 받은 요청 수다. 부르지 않아야 하는 도구와 redirect 대상이 요청을 받았는지 검사가 읽는다.
@@ -61,6 +61,20 @@ def build_server():
     async def hits(request):
         """지금까지 받은 요청 수다."""
         return JSONResponse(counts)
+
+    @server.custom_route("/oversized-json", methods=["POST"])
+    @server.custom_route("/oversized-sse", methods=["POST"])
+    async def oversized(request):
+        """Content-Length 없이 상한보다 큰 본문이나 SSE 이벤트 하나를 흘린다."""
+        is_sse = request.url.path.endswith("sse")
+
+        async def chunks():
+            yield b"data: " if is_sse else b'{"value":"'
+            for _ in range(11 * 1024):
+                yield b"x" * 1024
+            yield b"\n\n" if is_sse else b'"}'
+
+        return StreamingResponse(chunks(), media_type="text/event-stream" if is_sse else "application/json")
 
     return server
 
