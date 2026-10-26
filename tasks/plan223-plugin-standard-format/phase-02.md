@@ -56,9 +56,9 @@
 
 ### 3. `hermes/plugins/dashboard-profile-api/connector_remote.py`(신규)
 
-- `_remote_server(entry, server, declared, fields) -> dict`: 위 「의도 메모」 의 주소, 헤더, 칸, 운영 목록, 금지 선언 규칙을 검사하고 `{"url", "headers", "enabled": True}` 를 돌려준다. 틀리면 `ValueError` 와 직접 쓴 사유다. 사유에 주소와 헤더 값을 넣지 않는다
+- `_remote_server(entry, server, declared, fields) -> dict`: 위 「의도 메모」 의 주소, 헤더, 칸, 운영 목록, 금지 선언 규칙을 검사하고 `{"url", "headers", "strict_redirect_headers": True, "enabled": True}` 를 돌려준다. 틀리면 `ValueError` 와 직접 쓴 사유다. 사유에 주소와 헤더 값을 넣지 않는다
 - `_remote_server_matches(expected, recorded) -> bool`: `url` 과 `headers` 가 같은지 본다(`tools` 는 비교하지 않는다)
-- `_remote_record_ok(server) -> bool`: 소유 기록의 원격 정의 모양 검사. 키가 `{"url", "headers", "enabled"}`(와 `tools`)이고, `headers` 가 문자열 dict 이고, `enabled` 가 참이다
+- `_remote_record_ok(server) -> bool`: 소유 기록의 원격 정의 모양 검사. 키가 `{"url", "headers", "strict_redirect_headers", "enabled"}`(와 `tools`)이고 `strict_redirect_headers` 가 참이고, `headers` 가 문자열 dict 이고, `enabled` 가 참이다
 - `_remote_header_env(server) -> set`: 기록의 `headers` 값에서 `REMOTE_HEADER_VALUE_RE` 로 `${이름}` 을 모은다
 - `_is_remote(server) -> bool`: 기록이나 manifest 의 서버 정의가 `url` 을 가지면 참
 
@@ -89,7 +89,7 @@
 - `hermes/tests/test_connector_roots.py`: `url` 이 든 항목이 읽히고, `url` 이 문자열이 아니면 그 항목만 버려진다
 - `hermes/tests/test_connector_manifest.py`(`ConnectorGateCase` 사본을 원격 정의로 고친다): 정상(`.mcp.json` `url`, 운영 목록 `url` 이 있으면 그것, 운영 목록 `url` 만 있고 `.mcp.json` 에 `url` 이 없음). 거절(운영 목록 `url` 없이 `http://` 정의 주소, 운영 목록 `url` 이 있어도 `.mcp.json` 쪽이 `http://`, 계정 정보, 쿼리, `$`, 리터럴 헤더 값, 선택 칸 참조, 헤더 겹침, 칸과 참조 불일치, `REMOTE_FORBIDDEN_KEYS` 선언 하나씩, 원격인데 운영 목록 `command` 나 비지 않은 `env`, 로컬인데 운영 목록 `url`, 로컬인데 `headers`, `type: sse`)
 - `hermes/tests/test_dashboard_profile_api_connector_binding_install.py`:
-  - 원격 플러그인을 붙이면 `config.yaml` 의 서버가 `{"url", "headers", "enabled"}` 와 `tools.exclude` 이고, `.env` 에 칸 값이 쓰이고, 이름 대응 파일에 그 서버가 실린다
+  - 원격 플러그인을 붙이면 `config.yaml` 의 서버가 `{"url", "headers", "strict_redirect_headers", "enabled"}` 와 `tools.exclude` 이고, `.env` 에 칸 값이 쓰이고, 이름 대응 파일에 그 서버가 실린다
   - 같은 manifest 로 다시 붙이면 `changed` 가 거짓이다. 떼면 그 `.env` key 가 지워진다
   - 원격과 로컬을 같은 profile 에 붙인 뒤 상태 조회가 200 이고 두 항목이 `configured`, 원격 서버의 probe 가 통과하고, 로컬을 다시 붙이기가 성공한다
 - 도우미 `hermes/tests/dashboard_profile_api_support.py` 에 원격 플러그인 디렉터리를 만드는 함수를 더한다

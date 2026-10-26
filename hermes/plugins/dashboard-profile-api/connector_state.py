@@ -214,7 +214,7 @@ def _entry_manifest_mismatches(plugin: str, entry: dict) -> tuple[str, ...]:
     recorded = entry["server"]
     expected = manifest["server"]
     if manifest["transport"] == "http" or _is_remote(recorded):
-        mismatches = [name for name in ("url", "headers") if recorded.get(name) != expected.get(name)]
+        mismatches = [name for name in ("url", "headers", "strict_redirect_headers") if recorded.get(name) != expected.get(name)]
     else:
         mismatches = [name for name in ("command", "args") if recorded.get(name) != expected.get(name)]
         # `_server_matches` 가 선택 칸의 빈 값, 옛 운영자 env 참조, 주인별 디렉터리 값을 호환으로 인정한다.
