@@ -4,12 +4,12 @@
   "pr_scope": "대시보드 plugin 이 두 플러그인 manifest 와 assistant.json(옛 connector.json)을 읽고 원격 MCP 플러그인을 운영 목록에서 받아 설치, 확인, 승인 실행까지 하게 한다.",
   "deferred": [
     {
-      "what": "금융 워크벤치를 워크벤치 저장소의 원격 MCP 플러그인으로 바꾸고 hermes/connectors/financial-workbench/ 와 ADR-20261025 / connector-operator-base-url 을 걷어 낸다",
+      "what": "금융 워크벤치를 워크벤치 저장소의 원격 MCP 플러그인(valuation-ontology)으로 바꾸고 hermes/connectors/financial-workbench/ 와 ADR-20261025 / connector-operator-base-url 을 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다",
       "why": "워크벤치 서버의 /mcp 와 그 플러그인의 assistant.json 이 아직 없고, 운영 목록을 fos-home-infra 에서 함께 바꿔야 한다",
       "after": "이 plan 의 PR 과 워크벤치 저장소의 원격 MCP 플러그인 PR 이 모두 머지되고 배포된 뒤"
     },
     {
-      "what": "화면과 문서, 용어표의 「커넥터」 를 「플러그인」 으로 바꾸고 이 저장소 커넥터의 connector.json 을 assistant.json 으로 옮긴다",
+      "what": "문서와 용어표, 화면 안 목록과 카드의 「커넥터」 를 「플러그인」 으로 바꾸고 이 저장소 커넥터의 connector.json 을 assistant.json 으로 옮긴다. 「외부 서비스 연결」 화면과 메뉴 이름은 그대로 둔다",
       "why": "이 plan 이 고치는 문서와 커넥터 디렉터리를 같이 건드려 한 PR 에 넣으면 이동과 동작 변경이 섞인다",
       "after": "이 plan 의 PR 이 머지된 뒤. 금융 워크벤치 전환과는 순서가 없다"
     },
@@ -34,8 +34,20 @@
   "total_phases": 3,
   "current_phase": 1,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    }
   ]
 }

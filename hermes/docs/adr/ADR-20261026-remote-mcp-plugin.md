@@ -30,7 +30,7 @@ PR 하나가 한 단계다. 앞 단계가 머지된 뒤 다음 단계를 계획�
 | 순서 | 단계 | 담는 것 |
 | --- | --- | --- |
 | 1 | 형식 수용과 원격 MCP | 대시보드 plugin 의 manifest 읽기, `assistant.json` 과 옛 `connector.json`, `type: http` 서버의 설치와 호출, 문서. 이 저장소의 커넥터는 그대로 돈다 |
-| 2 | 금융 워크벤치 전환 | 워크벤치 저장소의 플러그인에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 ADR-20261025 를 걷어 낸다 |
+| 2 | 금융 워크벤치 전환 | 워크벤치 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다(사용자 결정 2026-10-26) |
 | 3 | 이름 변경 | 화면과 문서, 용어표의 「커넥터」 를 「플러그인」 으로 바꾸고 이 저장소 커넥터의 `connector.json` 을 `assistant.json` 으로 옮긴다([ADR-20261026 / plugin-naming](../../../docs/adr/ADR-20261026-plugin-naming.md)) |
 | 4 | `assistant.json` 없는 플러그인 | 선언하지 않은 도구를 「묻는다」 로 판정하고 입력 칸을 MCP 정의에서 추론한다. Control Plane 과 화면이 바뀐다 |
 

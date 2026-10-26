@@ -9,7 +9,7 @@ covers: `hermes/connectors/financial-workbench/`
 운영 값을 받는 근거는 [ADR-20261025 / connector-operator-base-url](../../hermes/docs/adr/ADR-20261025-connector-operator-base-url.md) 에 있다.
 커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
 
-**이 로컬 커넥터는 워크벤치 저장소의 원격 MCP 플러그인으로 바뀐다.** 워크벤치 서버가 `/mcp` 를 열고 그 저장소의 플러그인에 `assistant.json` 이 생기면, 운영 목록을 그 플러그인으로 바꾸고 이 디렉터리와 ADR-20261025 를 걷어 낸다. 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다.
+**이 로컬 커넥터는 워크벤치 저장소의 원격 MCP 플러그인으로 바뀐다.** 워크벤치 서버가 `/mcp` 를 열고 그 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생기면, 운영 목록을 그 플러그인으로 바꾸고 이 디렉터리와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다. 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다.
 
 워크벤치는 공개 저장소 [`jon890/fos-graphrag`](https://github.com/jon890/fos-graphrag) 의 `financial-workbench` 다.
 투자 판단을 「세상의 변화 → 병목 → 산업 → 기업 → 밸류에이션(시나리오) → 투자 결정」 으로 잇는 그래프이고, 근거 문서와 검토 상태가 있는 주장, 개념, 사용자별 공부 목록을 갖는다.
