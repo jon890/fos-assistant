@@ -19,7 +19,8 @@
   - 스킬 경로는 `plugin.get("skills", "./skills")` 다
 - `_connector_manifest(connector_id)` 가 `_guard_manifest(_load_connector(...), _read_connector_json(entry["root"], "connector.json"))` 로 선언 원문을 한 번 더 읽는다. 같은 파일을 두 번 고르지 않게 고른 원문을 넘긴다
 - `_read_connector_json(root, relative)` 는 `hermes/plugins/dashboard-profile-api/connector_manifest_io.py` 에 있고, 없거나 링크면 `ValueError("<경로> 가 없거나 링크다")` 다
-- 테스트 도우미는 `hermes/tests/dashboard_profile_api_support.py` 다. 거기서 플러그인 디렉터리를 만들고(`.claude-plugin/plugin.json`, `connector.json`, `.mcp.json`), `hermes/tests/test_connector_manifest.py` 가 파일마다 틀린 값을 넣는 표 테스트을 둔다
+- `hermes/tests/test_connector_manifest.py` 의 표 테스트는 `dashboard_profile_api_support.py` 를 쓰지 않는다. `ConnectorGateCase.setUp` 이 `hermes/tests/fixtures/demo-connector`(`.claude-plugin/plugin.json`, `.mcp.json`, `connector.json`, `server.py`, `skills/`)를 임시 디렉터리로 복사하고, `rewrite(<파일>, <고칠 함수>)` 로 사본의 JSON 을 고친다. 파일을 옮기거나 지우는 경우는 사본에서 직접 한다
+- `ConnectorGateCase` 는 클래스 단위로 `logging.disable(logging.CRITICAL)` 을 켠다. 경고 문구를 확인하는 테스트는 같은 파일의 `operator_secrets` 테스트처럼 그 동안만 `logging.disable(logging.NOTSET)` 으로 켜고 `assertLogs(self.plugin.logger, level="WARNING")` 로 읽는다
 - 이 저장소 커넥터의 공통 검사 `hermes/tests/test_connectors_contract.py` 는 `.claude-plugin/plugin.json` 과 `connector.json` 을 직접 읽는다. 이 phase 는 그 검사를 바꾸지 않는다
 
 ## 의도 메모
@@ -47,15 +48,15 @@
 - `_load_connector` 가 고른 선언 원문을 반환 dict 의 내부 칸으로 넘기지 말고, `_connector_manifest` 가 `_read_assistant_json(entry["root"])` 로 같은 규칙으로 다시 읽어 `_guard_manifest` 에 넘긴다
 - docstring 의 「`connector.json`, `.mcp.json`, `plugin.json` 을 읽어」 를 새 이름으로 고친다
 
-### 3. 이 phase 를 검증하는 `hermes/tests/test_connector_manifest.py` 와 `hermes/tests/dashboard_profile_api_support.py`
+### 3. 이 phase 를 검증하는 `hermes/tests/test_connector_manifest.py`
 
-도우미에 manifest 종류(`claude`, `codex`, `both`)와 선언 파일 이름(`assistant.json`, `connector.json`)을 고르는 인자를 더한다. 기본값은 지금 모양(`claude`, `connector.json`)이라 다른 테스트은 그대로다.
+`ConnectorGateCase` 의 사본을 고쳐 아래를 확인한다. 기존 테스트는 사본 모양(`.claude-plugin`, `connector.json`)을 그대로 쓰므로 바뀌지 않는다.
 
-- `.codex-plugin/plugin.json` 만 있고 `skills` 가 목록인 플러그인이 카탈로그에 오르고 그 스킬이 `skills` 에 있다
-- 두 manifest 가 있고 이름이 같으면 `.claude-plugin` 의 스킬 경로를 쓴다. 이름이 다르면 카탈로그에서 빠지고 경고에 「이름이 다르다」 가 있다
-- `assistant.json` 만 있으면 오르고, `connector.json` 만 있어도 오른다. 둘 다 있으면 빠진다
-- manifest 의 `mcpServers` 가 `./mcp/servers.json` 이면 그 파일을 읽는다. 객체면 빠진다. `../x.json` 이면 빠진다
-- manifest 가 하나도 없으면 빠진다
+- 사본의 `.claude-plugin/` 을 `.codex-plugin/` 으로 옮기고 `skills` 를 `["./skills"]` 목록으로 쓰면 카탈로그에 오르고 그 스킬이 `skills` 에 있다
+- `.codex-plugin/plugin.json` 을 하나 더 두고 이름이 같으면 오른다. 이름이 다르면 빠지고 경고에 「이름이 다르다」 가 있다
+- 사본의 `connector.json` 을 `assistant.json` 으로 옮기면 오른다. 두 파일이 다 있으면 빠지고 경고에 「함께 있다」 가 있다
+- manifest 의 `mcpServers` 를 `./mcp/servers.json` 으로 두고 `.mcp.json` 을 그 자리로 옮기면 오른다. 객체면 빠진다. `../x.json` 이면 빠진다
+- 두 manifest 를 모두 지우면 빠진다
 
 ## 검증
 
@@ -72,5 +73,4 @@ node scripts/checks/check-file-length.mjs
 |---|---|
 | `hermes/plugins/dashboard-profile-api/connector_manifest_io.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_manifest.py` | 수정 |
-| `hermes/tests/dashboard_profile_api_support.py` | 수정 |
 | `hermes/tests/test_connector_manifest.py` | 수정 |
