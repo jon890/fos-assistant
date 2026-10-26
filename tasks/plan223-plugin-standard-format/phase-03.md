@@ -92,3 +92,6 @@ node scripts/checks/check-file-length.mjs
 | `hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md` | 수정 |
 | `hermes/tests/fixtures/remote_mcp_server.py` | 신규 |
 | `hermes/tests/test_connector_remote_call.py` | 신규 |
+| `hermes/tests/hermes_contract.py` | 수정 (plugin 이 새로 import 하는 `httpx2` 를 `THIRD_PARTY_PACKAGES` 에 더한다) |
+| `hermes/tests/test_connector_manifest.py` | 수정 (예약 헤더 이름 거절) |
+| `hermes/tests/test_dashboard_profile_api_connector_binding_install.py` | 수정 (phase 02 의 `unavailable` 갈래 단언을 원격 호출 단언으로 바꾼다) |
