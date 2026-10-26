@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.metadata
+import inspect
 import json
 import os
 
@@ -12,6 +14,10 @@ from typing import (
 
 from .connector_policy import (
     _hermes_tool_name,
+)
+
+from .connector_remote import (
+    _remote_streams,
 )
 
 from .connector_schema import (
@@ -30,27 +36,49 @@ MCP_SDK_MAJOR = 2
 _mcp_sdk_version_cache: Optional[str] = None
 
 
-async def _run_connector_tool(manifest: dict, tool: str, env: dict):
-    """커넥터 MCP 서버를 자식 프로세스로 한 번 띄워 도구 하나를 부르고 닫는다.
+@contextlib.asynccontextmanager
+async def _open_connector_session(manifest: dict, values: dict, timeout: float):
+    """커넥터 MCP 서버에 붙어 `initialize` 를 마친 `ClientSession` 을 내준다.
 
-    도구가 `tools/list` 에서 읽기 전용이 아니면 부르지 않고 None 을 돌려준다.
+    로컬 서버(`stdio`)는 자식 프로세스로 띄우고 `values` 를 그 env 로 준다.
+    원격 서버(`http`)는 Streamable HTTP 로 붙고 `values` 는 선언한 헤더의 `${이름}` 자리에만 들어간다.
+    `timeout` 은 원격 요청 하나의 시간 제한이다. 호출 전체의 제한은 부르는 쪽이 건다.
     `mcp` 는 여기서 import 한다. SDK 가 없는 환경에서도 plugin 이 올라오고 이 경로만 실패한다.
     """
-    from mcp import ClientSession, StdioServerParameters
+    from mcp import ClientSession
+
+    if manifest["transport"] == "http":
+        async with _remote_streams(manifest["server"], values, timeout) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                yield session
+        return
+    from mcp import StdioServerParameters
     from mcp.client.stdio import stdio_client
 
     server = manifest["server"]
-    params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=env)
-    # 자식의 stderr 에 무엇이 찍힐지 모른다. 후보 값이 대시보드 로그로 가지 않게 버린다.
+    params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=values)
+    # 자식의 stderr 에 무엇이 찍힐지 모른다. 칸 값과 인자가 대시보드 로그로 가지 않게 버린다.
     with open(os.devnull, "w", encoding="utf-8") as sink:
         async with stdio_client(params, errlog=sink) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                listed = await session.list_tools()
-                annotations = next((item.annotations for item in listed.tools if item.name == tool), None)
-                if annotations is None or annotations.read_only_hint is not True:
-                    return None
-                return await session.call_tool(tool, {})
+                yield session
+
+
+async def _run_connector_tool(manifest: dict, tool: str, values: dict):
+    """커넥터 MCP 서버에 한 번 붙어 도구 하나를 부르고 닫는다.
+
+    도구가 `tools/list` 에서 읽기 전용이 아니면 부르지 않고 None 을 돌려준다.
+    """
+    from . import connector_run
+
+    async with _open_connector_session(manifest, values, connector_run.CONNECTOR_CALL_TIMEOUT_SECONDS) as session:
+        listed = await session.list_tools()
+        annotations = next((item.annotations for item in listed.tools if item.name == tool), None)
+        if annotations is None or annotations.read_only_hint is not True:
+            return None
+        return await session.call_tool(tool, {})
 
 
 def _mcp_sdk_version() -> str:
@@ -71,9 +99,14 @@ def _mcp_sdk_problem() -> Optional[str]:
     try:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
+        from mcp.client.streamable_http import streamable_http_client
+        import httpx2
         import mcp.types as mcp_types
     except ImportError:
         return "mcp SDK 를 읽어 오지 못했다"
+    # 원격 커넥터는 redirect 를 따라가지 않는 클라이언트를 직접 만들어 넘긴다. 받지 못하는 SDK 로는 부르지 않는다.
+    if "http_client" not in inspect.signature(streamable_http_client).parameters:
+        return "Streamable HTTP 클라이언트가 http_client 인자를 받지 않는다"
     if "read_only_hint" not in mcp_types.ToolAnnotations.model_fields:
         return "필요한 속성 read_only_hint 가 없다"
     for name in ("structured_content", "is_error", "content"):
@@ -170,29 +203,22 @@ def _retry_value(payload, error: dict, key: str):
     return None
 
 
-async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, env: dict, progress: dict):
-    """커넥터 MCP 서버를 자식 프로세스로 한 번 띄워 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
+async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, values: dict, progress: dict):
+    """커넥터 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
 
     등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
     도구를 부르기 직전에 `progress["sent"]` 를 참으로 둔다. 그 뒤의 실패는 도구가 실행됐는지 알 수 없다.
     """
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
+    from . import connector_run
 
-    server = manifest["server"]
-    params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=env)
-    # 자식의 stderr 에 무엇이 찍힐지 모른다. profile 의 값과 인자가 대시보드 로그로 가지 않게 버린다.
-    with open(os.devnull, "w", encoding="utf-8") as sink:
-        async with stdio_client(params, errlog=sink) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                listed = await session.list_tools()
-                names = [item.name for item in listed.tools
-                         if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]
-                if len(names) != 1 or (manifest["schema"] == 2 and names[0] not in manifest["tools"]):
-                    return None
-                progress["sent"] = True
-                return await session.call_tool(names[0], args)
+    async with _open_connector_session(manifest, values, connector_run.CONNECTOR_EXECUTE_TIMEOUT_SECONDS) as session:
+        listed = await session.list_tools()
+        names = [item.name for item in listed.tools
+                 if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]
+        if len(names) != 1 or (manifest["schema"] == 2 and names[0] not in manifest["tools"]):
+            return None
+        progress["sent"] = True
+        return await session.call_tool(names[0], args)
 
 
 def _connector_execute_answer(manifest: dict, result) -> dict:

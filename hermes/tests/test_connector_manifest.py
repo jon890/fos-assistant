@@ -1544,6 +1544,12 @@ class RemoteMcpServerTest(ConnectorGateCase):
                             lambda value: value.update(headers={"authorization": "Bearer ${REMOTE_TOKEN}"}))
         self.rejected_with("같은 헤더 이름")
 
+    def test_header_set_by_the_transport_is_dropped(self):
+        """대시보드나 MCP 전송이 정하는 헤더 이름은 대소문자와 상관없이 받지 않는다."""
+        self.rewrite_remote("assistant.json", lambda value: value.update(headers={"host": "${REMOTE_TOKEN}"}))
+        self.rewrite_server(lambda server: server.pop("headers"))
+        self.rejected_with("전송이 정하는 헤더 이름")
+
     def test_fields_must_match_the_header_references(self):
         """칸은 모두 필수 칸이고, 그 env 이름이 헤더가 참조하는 이름과 같아야 한다."""
         for label, field, text in (

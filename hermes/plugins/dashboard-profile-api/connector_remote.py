@@ -7,9 +7,38 @@ MCP 정의의 서버가 `type: http` 인 커넥터는 자식 프로세스 대신
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
+import logging
 from urllib.parse import urlsplit
 
 from .connector_schema import REMOTE_FORBIDDEN_KEYS, REMOTE_HEADER_NAME_RE, REMOTE_HEADER_VALUE_RE
+
+
+# 대시보드 plugin 이나 MCP 전송이 직접 정하는 헤더다. 플러그인이 선언하면 요청 모양이 바뀌므로 받지 않는다.
+REMOTE_RESERVED_HEADERS = frozenset({"host", "content-length", "content-type", "transfer-encoding", "connection",
+                                     "accept", "mcp-session-id", "mcp-protocol-version", "last-event-id"})
+
+
+# 원격 호출 동안 기록을 버리는 logger 다. 요청 주소, 보낸 메시지, 예외 문자열에 주소와 헤더 값과 인자가 섞인다.
+# 기록은 그 기록을 남긴 logger 의 필터만 거치므로 하위 logger 이름까지 적는다.
+REMOTE_QUIET_LOGGERS = ("httpx2", "httpcore2.connection", "httpcore2.http11", "httpcore2.http2", "httpcore2.proxy",
+                        "httpcore2.socks", "mcp.client.streamable_http", "mcp.shared.jsonrpc_dispatcher",
+                        "mcp.shared.dispatcher", "client")
+
+
+# 지금 실행 문맥이 원격 호출 안인가. 같은 logger 를 쓰는 로컬 커넥터 호출의 기록은 그대로 남긴다.
+_remote_call = contextvars.ContextVar("connector_remote_call", default=False)
+
+
+class _RemoteCallFilter(logging.Filter):
+    """원격 호출 문맥에서 남은 기록을 수준과 상관없이 버린다."""
+
+    def filter(self, record):
+        return not _remote_call.get()
+
+
+_REMOTE_CALL_FILTER = _RemoteCallFilter()
 
 
 def _remote_url_ok(url, schemes: tuple) -> bool:
@@ -34,6 +63,8 @@ def _remote_headers(value, where: str) -> dict:
             not isinstance(name, str) or not REMOTE_HEADER_NAME_RE.fullmatch(name)
             or not isinstance(item, str) or not REMOTE_HEADER_VALUE_RE.fullmatch(item) for name, item in value.items()):
         raise ValueError("%s 의 headers 는 이름과 `${이름}` 이나 `Bearer ${이름}` 값의 object 다" % where)
+    if any(name.lower() in REMOTE_RESERVED_HEADERS for name in value):
+        raise ValueError("%s 의 headers 에 대시보드나 MCP 전송이 정하는 헤더 이름이 있다" % where)
     return dict(value)
 
 
@@ -94,3 +125,41 @@ def _remote_header_env(server) -> set:
 def _is_remote(server) -> bool:
     """서버 정의가 원격 MCP 의 것인지 본다. 소유 기록과 manifest 의 정의 모두 `url` 을 가지면 원격이다."""
     return isinstance(server, dict) and "url" in server
+
+
+def _remote_request_headers(server: dict, values: dict) -> dict:
+    """서버 정의의 헤더 값에서 `${이름}` 을 칸 값으로 바꾼 요청 헤더다.
+
+    참조한 칸 값이 없거나 비었거나 CR, LF, NUL 이 있으면 ValueError 다. 사유에 값을 싣지 않는다.
+    """
+    headers = {}
+    for name, template in server["headers"].items():
+        match = REMOTE_HEADER_VALUE_RE.fullmatch(template)
+        value = values.get(match.group(2)) if match else None
+        if not isinstance(value, str) or not value or any(ch in value for ch in "\r\n\0"):
+            raise ValueError("원격 MCP 서버의 헤더에 넣을 칸 값이 없거나 받지 않는 글자가 있다")
+        headers[name] = (match.group(1) or "") + value
+    return headers
+
+
+@contextlib.asynccontextmanager
+async def _remote_streams(server: dict, values: dict, timeout: float):
+    """원격 MCP 서버에 Streamable HTTP 로 붙어 읽기와 쓰기 스트림을 내준다(ADR-20261026 remote-mcp-plugin).
+
+    redirect 는 따라가지 않는다. 토큰 헤더가 다른 호스트로 가지 않고, redirect 응답은 호출 실패가 된다.
+    SDK 의 기본 클라이언트는 redirect 를 따라가므로 클라이언트를 직접 만들어 넘긴다. 넘긴 클라이언트는 SDK 가 닫지 않는다.
+    """
+    import httpx2
+    from mcp.client.streamable_http import streamable_http_client
+
+    headers = _remote_request_headers(server, values)
+    for name in REMOTE_QUIET_LOGGERS:
+        # 같은 필터 객체는 한 번만 달린다. 원격 호출 문맥 밖의 기록은 그대로 지난다.
+        logging.getLogger(name).addFilter(_REMOTE_CALL_FILTER)
+    token = _remote_call.set(True)
+    try:
+        async with httpx2.AsyncClient(headers=headers, follow_redirects=False, timeout=timeout) as client:
+            async with streamable_http_client(server["url"], http_client=client) as streams:
+                yield streams
+    finally:
+        _remote_call.reset(token)

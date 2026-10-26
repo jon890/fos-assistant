@@ -100,9 +100,6 @@ async def _connector_call_request(request, connector_id: str):
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
         return _rejected("없는 connector 다", 404)
-    if manifest["transport"] == "http":
-        # 원격 MCP 커넥터에는 띄울 자식 프로세스가 없다. 대시보드가 원격 서버에 직접 붙는 경로는 아직 열지 않았다.
-        return failed("unavailable")
     body = await _json_object(request)
     if (body is None or set(body) - {"owner_browser"} not in ({"tool", "values"}, {"tool", "vault"})
             or ("values" in body and not isinstance(body["values"], dict))
@@ -147,8 +144,9 @@ async def _connector_call_request(request, connector_id: str):
         owner_browser = body.get("owner_browser")
         env[manifest["owner_browser_env"]] = (
             owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser) else "")
-    # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
-    env["PATH"] = os.path.dirname(server["command"])
+    if manifest["transport"] == "stdio":
+        # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
+        env["PATH"] = os.path.dirname(server["command"])
 
     problem = _mcp_sdk_problem()
     if problem is not None:
@@ -162,7 +160,7 @@ async def _connector_call_request(request, connector_id: str):
         return failed("unavailable")
     _connector_calls += 1
     try:
-        # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
+        # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스나 원격 연결을 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env), CONNECTOR_CALL_TIMEOUT_SECONDS)
         answer = None if result is None else _connector_call_answer(manifest, result)
         if answer is not None and answer.get("error") == OUTCOME_UNKNOWN:
@@ -175,7 +173,7 @@ async def _connector_call_request(request, connector_id: str):
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
         return failed("unavailable")
     except Exception as error:
-        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
+        # 예외 본문에는 자식의 출력이나 원격 주소가 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
                        connector_id, tool, ", ".join(sorted(set(_leaf_error_types(error)))), _mcp_sdk_version())
         return failed("unavailable")
@@ -252,9 +250,6 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
         return _rejected("없는 connector 다", 404)
-    if manifest["transport"] == "http":
-        # 원격 MCP 커넥터에는 띄울 자식 프로세스가 없다. 대시보드가 원격 서버에 직접 붙는 경로는 아직 열지 않았다.
-        return failed("unavailable")
     body = await _guard_request_body(request)
     if (body is None or set(body) - ({"execution"} if not prepare else set()) != {"profile", "hermes_tool", "args"} or not isinstance(body["args"], dict)
             or not isinstance(body["hermes_tool"], str) or not 1 <= len(body["hermes_tool"]) <= 128):
@@ -307,8 +302,14 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         env[manifest["owner_output_env"]] = ""
     if owner_browser is not None:
         env[manifest["owner_browser_env"]] = owner_browser
-    # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
-    env["PATH"] = os.path.dirname(server["command"])
+    if manifest["transport"] == "http":
+        # 원격 서버에는 칸 값이 헤더로 간다. 헤더를 끊는 글자가 있으면 부르지 않는다. 실행되지 않았다.
+        if any(ch in value for value in env.values() for ch in "\r\n\0"):
+            logger.warning("dashboard-profile-api: 커넥터 %s 의 칸 값에 헤더로 보낼 수 없는 글자가 있다", connector_id)
+            return failed("unavailable")
+    else:
+        # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
+        env["PATH"] = os.path.dirname(server["command"])
     guarded_tool = None
     try:
         if prepare or "execution" in body or manifest["schema"] == 2:
@@ -344,7 +345,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
         return _rejected("도구가 시간 제한을 넘겨 실행 결과를 모른다", 504)
     except Exception as error:
-        # 예외 본문에는 자식의 출력이 섞일 수 있다. 가장 안쪽 예외의 종류와 고정 단계 코드만 남긴다.
+        # 예외 본문에는 자식의 출력이나 원격 주소가 섞일 수 있다. 가장 안쪽 예외의 종류와 고정 단계 코드만 남긴다.
         stage, code = _guard_stage(error)
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s) stage=%s code=%s",
                        connector_id, hermes_tool, ", ".join(sorted(set(_leaf_error_types(error)))),

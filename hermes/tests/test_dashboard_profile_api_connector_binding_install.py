@@ -564,7 +564,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertNotIn(REMOTE, json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8")))
 
     def test_remote_record_leaves_the_local_binding_of_the_profile_usable(self):
-        """원격과 로컬을 한 profile 에 붙여도 조회, probe, 로컬 다시 붙이기가 된다. 원격 호출은 자식을 띄우지 않는다."""
+        """원격과 로컬을 한 profile 에 붙여도 조회, probe, 로컬 다시 붙이기가 된다. 원격 호출은 칸 값만 들고 같은 흐름으로 간다."""
         self.remote_fixture()
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
         self.assertEqual(self.bind(REMOTE, "c3").status_code, 200)
@@ -582,17 +582,22 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
 
         ran = []
 
-        async def runner(*args):
-            ran.append(args[0]["id"])
+        async def execute_runner(manifest, hermes_tool, args, values, progress):
+            ran.append((manifest["id"], sorted(values)))
+            return None
+
+        async def call_runner(manifest, tool, values):
+            ran.append((manifest["id"], sorted(values)))
             return None
 
         with patch_plugin(self.plugin, "_mcp_sdk_problem", return_value=None), \
-                patch_plugin(self.plugin, "_run_connector_execute", side_effect=runner), \
-                patch_plugin(self.plugin, "_run_connector_tool", side_effect=runner):
+                patch_plugin(self.plugin, "_run_connector_execute", side_effect=execute_runner), \
+                patch_plugin(self.plugin, "_run_connector_tool", side_effect=call_runner):
             executed = self.request("/api/connectors/%s/execute" % REMOTE, "POST", token="valid", full_response=True,
                                     body={"profile": "alice", "hermes_tool": "mcp__remote__list_items", "args": {}})
             called = self.request("/api/connectors/%s/call" % REMOTE, "POST", token="valid", full_response=True,
                                   body={"tool": "list_items", "vault": "c3"})
-        for response in (executed, called):
-            self.assertEqual((response.status_code, response.body), (200, {"ok": False, "error": "unavailable"}))
-        self.assertEqual(ran, [])
+        # 대역은 도구를 찾지 못한 것처럼 None 을 돌려준다. 원격에는 실행 파일이 없어 `PATH` 를 주지 않는다.
+        self.assertEqual(executed.status_code, 400, executed.body)
+        self.assertEqual(called.status_code, 400, called.body)
+        self.assertEqual(ran, [(REMOTE, ["REMOTE_TOKEN"]), (REMOTE, ["REMOTE_TOKEN"])])

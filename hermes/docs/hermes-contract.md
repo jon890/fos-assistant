@@ -1896,6 +1896,38 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 [요청 모델](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_models.py)이 근거다.
 기계용 인증에서 이 메서드와 커넥터 칸 key를 허용하는 정책은 `fos-home-infra`가 소유한다.
 
+## 원격 MCP 서버
+
+2026-10-26에 Hermes `v0.21.6`의 소스를 읽어 판정했다.
+`mcp_servers` 의 정의에 `url` 이 있으면 Hermes 는 자식 프로세스 대신 그 주소에 Streamable HTTP 로 붙는다.
+원격 플러그인을 설치한 서버 정의가 이 모양이다([ADR-20261026 / remote-mcp-plugin](adr/ADR-20261026-remote-mcp-plugin.md)).
+
+### 헤더의 `${이름}` 풀이
+
+`config.yaml` 을 읽을 때 `_interpolate_env_vars` 가 `url` 과 `headers` 를 포함한 정의 전체의 `${이름}` 을 그 profile 의 secret scope 로 펼친다.
+연결 직전에 주인 profile 의 scope 로 한 번 더 펼치고, `_require_rendered_remote` 가 `url` 이나 `headers` 에 펼쳐지지 않은 `${이름}` 이 남았으면 연결하지 않는다.
+로컬 서버의 `env` 는 펼치지 못한 참조를 원문으로 남기지만, 원격 서버는 그 상태로 요청을 보내지 않고 연결 실패가 된다.
+그래서 원격 플러그인의 칸 값도 profile `.env` 에 있어야 하고, 헤더 값에는 그 이름의 `${이름}` 참조만 둔다.
+[설정 읽기와 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_config.py)와
+[연결 직전의 다시 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_discovery.py)가 근거다.
+
+### 헤더는 연결할 때 한 번 정해진다
+
+펼친 헤더는 연결을 만들 때 HTTP 클라이언트의 기본 헤더가 되고, 그 연결이 사는 동안 바뀌지 않는다.
+Hermes 는 헤더에 `mcp-protocol-version` 이 없으면 더한다.
+위 「설정 저장과 gateway 연결 확인」 의 연결 재사용이 원격 서버에도 같다. profile `.env` 의 토큰을 바꿔도 이미 붙은 연결은 옛 헤더를 보낸다.
+토큰 교체는 그 연결을 다시 만들어야 반영된다.
+[Streamable HTTP 연결](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_transport.py)이 근거다.
+
+### redirect
+
+Hermes 의 Streamable HTTP 클라이언트와 연결 전 content-type 확인 요청은 redirect 를 따라간다(`follow_redirects=True`).
+scheme, host, port 가운데 하나라도 다른 곳으로 가면 `Authorization` 헤더만 지운다.
+그 밖의 설정 헤더는 서버 정의의 `strict_redirect_headers` 가 참일 때만 지운다. 우리가 설치하는 서버 정의는 그 칸을 쓰지 않는다.
+[redirect 헤더 처리](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)가 근거다.
+
+대시보드 plugin 의 `call` 과 `execute` 는 Hermes 를 거치지 않고 같은 주소에 직접 붙는다. 이 경로는 redirect 를 따라가지 않고 호출 실패로 답한다.
+
 ## 실행 공간
 
 2026-10-05 에 운영과 같은 이미지(v0.21.5, `v2026.9.24`)를 격리 환경에 띄워 측정했다.
