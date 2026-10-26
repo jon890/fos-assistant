@@ -430,6 +430,12 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길을 남기지 않는다.
 그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청은 이 검사를 하지 않는다.
 
+### 플러그인 형식과 원격 MCP
+
+대시보드 plugin 은 운영 목록의 디렉터리를 Claude Code 플러그인이나 Codex 플러그인으로 읽고, assistant 쪽 정보는 `assistant.json`(옛 이름 `connector.json`)에서 읽는다([ADR-20261026 / plugin-standard-format](../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md)).
+MCP 서버가 `type: http` 이면 자식 프로세스 대신 그 원격 서버에 붙고, 연결의 칸 값은 헤더로만 간다([ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md)).
+Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 전송과 무관하게 같다. 읽기 규칙과 운영 목록 항목은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+
 ### 바인딩 설치
 
 `PUT /api/connectors` 의 `enabled: true` 요청은 `bind: {vault}` 의 보관 파일 값으로 그 profile 에 커넥터를 붙인다.
