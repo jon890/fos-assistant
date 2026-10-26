@@ -27,7 +27,7 @@ REMOTE_GLOBAL_PREFIXES = ("HERMES_", "TERMINAL_", "GATEWAY_RELAY_", "API_SERVER_
 
 # 대시보드 plugin 이나 MCP 전송이 직접 정하는 헤더다. 플러그인이 선언하면 요청 모양이 바뀌므로 받지 않는다.
 REMOTE_RESERVED_HEADERS = frozenset({"host", "content-length", "content-type", "transfer-encoding", "connection",
-                                     "accept", "mcp-session-id", "mcp-protocol-version", "last-event-id"})
+                                     "accept", "accept-encoding", "mcp-session-id", "mcp-protocol-version", "last-event-id"})
 
 
 # 원격 호출 동안 기록을 버리는 logger 다. 요청 주소, 보낸 메시지, 예외 문자열에 주소와 헤더 값과 인자가 섞인다.
@@ -170,6 +170,7 @@ async def _remote_streams(server: dict, values: dict, timeout: float):
     from mcp.client.streamable_http import streamable_http_client
 
     headers = _remote_request_headers(server, values)
+    headers["Accept-Encoding"] = "identity"
     for name in REMOTE_QUIET_LOGGERS:
         # 같은 필터 객체는 한 번만 달린다. 원격 호출 문맥 밖의 기록은 그대로 지난다.
         logging.getLogger(name).addFilter(_REMOTE_CALL_FILTER)

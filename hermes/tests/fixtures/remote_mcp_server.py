@@ -5,6 +5,7 @@
 """
 
 import contextlib
+import gzip
 import json
 import os
 import socket
@@ -20,7 +21,7 @@ def build_server():
     """도구와 경로를 단 MCP 서버다. 모든 도구는 받은 `Authorization` 헤더를 결과에 싣는다."""
     from mcp.server.mcpserver import Context, MCPServer
     from mcp_types import ToolAnnotations
-    from starlette.responses import JSONResponse, RedirectResponse, StreamingResponse
+    from starlette.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 
     server = MCPServer("remote")
     # 서버가 받은 요청 수다. 부르지 않아야 하는 도구와 redirect 대상이 요청을 받았는지 검사가 읽는다.
@@ -28,6 +29,7 @@ def build_server():
 
     def authorization(ctx: Context) -> str:
         headers = ctx.headers or {}
+        counts["accept_encoding"] = headers.get("accept-encoding", "")
         return headers.get("authorization", "")
 
     @server.tool(annotations=ToolAnnotations(read_only_hint=True))
@@ -75,6 +77,12 @@ def build_server():
             yield b"\n\n" if is_sse else b'"}'
 
         return StreamingResponse(chunks(), media_type="text/event-stream" if is_sse else "application/json")
+
+    @server.custom_route("/compressed", methods=["POST"])
+    async def compressed(request):
+        """raw 본문은 작지만 압축을 풀면 상한을 넘는 응답이다."""
+        body = gzip.compress(b"x" * (11 * 1024 * 1024))
+        return Response(body, media_type="application/json", headers={"content-encoding": "gzip"})
 
     return server
 

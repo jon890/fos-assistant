@@ -2863,6 +2863,7 @@ Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v
 - `mcp_types.ToolAnnotations` 에 `read_only_hint` 가, `mcp_types.CallToolResult` 에 `structured_content` 와 `is_error` 가 있다
 - `from mcp import ClientSession, StdioServerParameters` 와 `from mcp.client.stdio import stdio_client` 가 된다
 - `from mcp.client.streamable_http import streamable_http_client` 가 되고 그 함수가 `http_client` 인자를 받으며, `import httpx2` 가 된다. 하나라도 어긋나면 로컬 커넥터의 호출까지 `unavailable` 이다
+- 새 Hermes 버전의 `agent/secret_scope.py`에 있는 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`를 대시보드 `connector_remote.py`의 원격 칸 env 거절 목록과 대조한다. 전역 이름이 늘거나 접두가 바뀌면 거절 목록과 테스트도 갱신한다
 
 대시보드의 MCP probe 는 Hermes 자신의 코드로 돌아 SDK 판과 무관하게 도구 수를 낸다. probe 가 통과해도 plugin 의 `call` 경로가 맞다는 증거가 아니다.
 판이 어긋나면 plugin 이 올라올 때 판과 까닭을 로그 한 줄로 남긴다. 확인 절차와 live 검사는 `fos-home-infra` 가 갖는다.

@@ -1,6 +1,7 @@
 """원격 MCP 본문을 SDK 가 모으기 전에 끊고 SSE 는 이벤트마다 세는지 검사한다."""
 
 import asyncio
+import gzip
 import itertools
 import sys
 from unittest import mock
@@ -11,6 +12,34 @@ from test_connector_manifest import ConnectorGateCase
 
 
 class RemoteBodyLimitTest(ConnectorGateCase):
+    def test_compressed_response_is_closed_before_decoding(self):
+        module = sys.modules[self.plugin.__name__ + ".connector_remote_body"]
+        compressed = gzip.compress(b"x" * (11 * 1024 * 1024))
+        self.assertLess(len(compressed), module.REMOTE_MAX_BODY_BYTES)
+
+        async def run(encoding):
+            consumed, closed = [], []
+
+            class Stream(httpx2.AsyncByteStream):
+                async def __aiter__(self):
+                    consumed.append(True)
+                    yield compressed
+
+                async def aclose(self):
+                    closed.append(True)
+
+            response = httpx2.Response(200, headers={"content-encoding": encoding}, stream=Stream())
+            async with httpx2.AsyncClient(transport=httpx2.MockTransport(lambda request: response),
+                                         event_hooks={"response": [module._cap_remote_response]}) as client:
+                with self.assertRaisesRegex(httpx2.ReadError, "압축 형식"):
+                    await client.get("https://remote.test/mcp")
+            self.assertEqual(consumed, [])
+            self.assertTrue(closed)
+
+        for encoding in ("gzip", "GZIP", "br", "identity, gzip"):
+            with self.subTest(encoding=encoding):
+                asyncio.run(run(encoding))
+
     def test_response_limit_before_buffering_and_stream_cleanup(self):
         module = sys.modules[self.plugin.__name__ + ".connector_remote_body"]
         self.assertEqual(module.REMOTE_MAX_BODY_BYTES, 10 * 1024 * 1024)
@@ -45,7 +74,7 @@ class RemoteBodyLimitTest(ConnectorGateCase):
             return consumed
 
         with mock.patch.object(module, "REMOTE_MAX_BODY_BYTES", 16):
-            for headers in ({}, {"content-length": "invalid"}):
+            for headers in ({}, {"content-length": "invalid"}, {"content-encoding": "identity"}):
                 asyncio.run(run([b"x" * 8, b"x" * 8], headers, False))
                 asyncio.run(run([b"x" * 8, b"x" * 9], headers, True))
             self.assertEqual(asyncio.run(run([b"x"], {"content-length": "17"}, True)), [])

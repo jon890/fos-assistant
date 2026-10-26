@@ -25,7 +25,7 @@
 
 원격 칸 env 검사는 [Hermes v0.21.6 `agent/secret_scope.py`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`가 근거다. OS·Python 이름은 정확히 일치할 때 거절하고, `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_`는 접두 전체를 거절한다. 소문자 context 변수도 이름 형식에서 빠진다.
 
-대시보드 응답은 SDK가 본문을 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB로 제한한다. Hermes의 [`_make_mcp_body_cap_transport`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)와 같은 상한이다. 긴 SSE 연결은 누적 크기로 끊지 않는다.
+대시보드는 `Accept-Encoding: identity`를 보내고 `accept-encoding`을 플러그인이 덮어쓰지 못하게 한다. 응답의 `content-encoding`이 없거나 `identity`인 경우만 받고 다른 압축 응답은 읽기 전에 닫는다. 허용한 응답은 SDK가 본문을 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB로 제한한다. 압축을 풀면서 상한을 우회하는 일을 막는다. Hermes의 [`_make_mcp_body_cap_transport`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)와 같은 크기 상한이고, 긴 SSE 연결은 누적 크기로 끊지 않는다.
 
 ### 옮기는 순서
 

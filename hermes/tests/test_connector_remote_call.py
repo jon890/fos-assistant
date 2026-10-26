@@ -123,6 +123,7 @@ class RemoteCallTest(base.ConnectorGateCase):
         with call_base.collected_logs() as logs:
             answer = self.call()
         self.assertEqual(answer, (200, {"ok": True, "result": {"authorization": SENT_HEADER}}))
+        self.assertEqual(self.received()["accept_encoding"], "identity")
         self.assert_nothing_leaked(logs)
 
     def test_call_without_the_header_value_does_not_reach_the_server(self):
@@ -147,7 +148,7 @@ class RemoteCallTest(base.ConnectorGateCase):
         read.assert_not_called()
 
     def test_oversized_json_and_sse_fail_without_leaking_logs(self):
-        for path in ("/oversized-json", "/oversized-sse"):
+        for path in ("/oversized-json", "/oversized-sse", "/compressed"):
             with self.subTest(path=path):
                 self.point_to(path)
                 with call_base.collected_logs() as logs:

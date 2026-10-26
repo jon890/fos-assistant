@@ -1450,6 +1450,15 @@ class PluginStandardFormatTest(ConnectorGateCase):
         self.rewrite("connector.json", lambda value: value.update(operator_env=["DEMO_BASE\n"]))
         self.rejected_with("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
 
+    def test_owner_env_names_reject_a_trailing_newline(self):
+        """첨부·출력·브라우저 env 를 읽는 경계에서 끝 줄바꿈을 거절한다."""
+        owner = sys.modules[self.plugin.__name__ + ".connector_owner_env"]
+        for key in ("owner_attachments_env", "owner_output_env", "owner_browser_env"):
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, key):
+                    owner._connector_owner_env({key: "DEMO_OWNER_ENV\n"}, set(), [])
+                self.assertIn("DEMO_OWNER_ENV", owner._connector_owner_env({key: "DEMO_OWNER_ENV"}, set(), [])[-1])
+
     def test_connector_without_any_manifest_is_dropped(self):
         """두 플러그인 manifest 가 모두 없으면 빠진다."""
         shutil.rmtree(self.connector_root / ".claude-plugin")
@@ -1569,7 +1578,7 @@ class RemoteMcpServerTest(ConnectorGateCase):
     def test_header_set_by_the_transport_is_dropped(self):
         """대시보드나 MCP 전송이 정하는 헤더 이름은 대소문자와 상관없이 받지 않는다."""
         self.rewrite_server(lambda server: server.pop("headers"))
-        for name in ("host", "HOST", "Content-Type", "cOnTeNt-TyPe"):
+        for name in ("host", "HOST", "Content-Type", "cOnTeNt-TyPe", "Accept-Encoding", "aCcEpT-EnCoDiNg"):
             with self.subTest(name=name):
                 self.rewrite_remote("assistant.json", lambda value: value.update(headers={name: "${REMOTE_TOKEN}"}))
                 self.rejected_with("전송이 정하는 헤더 이름")

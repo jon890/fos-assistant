@@ -145,7 +145,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 설치하는 서버 정의는 `{"url", "headers", "strict_redirect_headers", "enabled"}` 와 `tools.exclude` 다. 헤더의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 참이고, Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다
 - 아래 `call` 과 `execute` 는 같은 주소에 직접 붙고, 칸 값은 헤더에만 넣는다. redirect 는 같은 호스트로 가는 것도 따라가지 않는다. 주소와 헤더 값, 인자를 로그에 싣지 않는다
 - 칸 env 이름은 `^[A-Z][A-Z0-9_]{0,127}$` 이고 Hermes 전역 이름과 접두는 거절한다. 목록과 근거는 원격 MCP ADR 이 갖는다
-- 원격 응답은 SDK 가 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB 로 제한한다. SSE 연결의 누적 크기는 제한하지 않는다
+- `Accept-Encoding: identity` 를 보내고 이 헤더를 플러그인이 덮어쓰지 못하게 한다. `content-encoding` 이 없거나 `identity` 인 응답만 받고 다른 압축 응답은 읽기 전에 닫는다
+- 허용한 응답은 SDK 가 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB 로 제한한다. SSE 연결의 누적 크기는 제한하지 않는다
 - 원격 호출 동안 SDK 와 HTTP 라이브러리의 로그는 수준과 상관없이 남기지 않는다. 주소와 인자가 WARNING 이상의 예외 문구에도 실리기 때문이다
 - probe 는 Hermes 가 붙는다. redirect 처리는 [Hermes 계약](../../docs/hermes-contract.md) 의 「원격 MCP 서버」 를 따른다
 

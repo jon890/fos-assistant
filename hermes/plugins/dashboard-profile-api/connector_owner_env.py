@@ -23,7 +23,7 @@ def _connector_owner_env(declared: dict, field_env: set, operator_env: list):
     # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-20261007 connector-owner-attachments).
     owner_attachments_env = declared.get("owner_attachments_env")
     if owner_attachments_env is not None and (
-            not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_attachments_env)
+            not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.fullmatch(owner_attachments_env)
             or owner_attachments_env in BASE_ENV_KEYS or owner_attachments_env in field_env
             or owner_attachments_env in operator_env):
         raise ValueError("owner_attachments_env 는 칸과 운영자 env 와 겹치지 않는 env 이름 하나다")
@@ -31,7 +31,7 @@ def _connector_owner_env(declared: dict, field_env: set, operator_env: list):
     # 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받는 env 이름이다. 값은 바인딩 설치가 넣는다(ADR-20261008 connector-output-files).
     owner_output_env = declared.get("owner_output_env")
     if owner_output_env is not None and (
-            not isinstance(owner_output_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_output_env)
+            not isinstance(owner_output_env, str) or not OWNER_ATTACHMENTS_ENV_RE.fullmatch(owner_output_env)
             or owner_output_env in BASE_ENV_KEYS or owner_output_env in field_env
             or owner_output_env in operator_env or owner_output_env in owner_env):
         raise ValueError("owner_output_env 는 칸과 운영자 env, owner_attachments_env 와 겹치지 않는 env 이름 하나다")
@@ -40,7 +40,7 @@ def _connector_owner_env(declared: dict, field_env: set, operator_env: list):
     # 사용자 브라우저 중계 주소를 받는 env 이름이다. 값은 바인딩 설치와 확인 호출이 넣는다(ADR-20261008 browser-gateway-token).
     owner_browser_env = declared.get("owner_browser_env")
     if owner_browser_env is not None and (
-            not isinstance(owner_browser_env, str) or not OWNER_ATTACHMENTS_ENV_RE.match(owner_browser_env)
+            not isinstance(owner_browser_env, str) or not OWNER_ATTACHMENTS_ENV_RE.fullmatch(owner_browser_env)
             or owner_browser_env in BASE_ENV_KEYS or owner_browser_env in field_env
             or owner_browser_env in operator_env or owner_browser_env in owner_env):
         raise ValueError("owner_browser_env 는 칸과 운영자 env, owner_attachments_env, owner_output_env 와 "

@@ -17,6 +17,10 @@ async def _cap_remote_response(response):
     """유한 본문과 SSE 이벤트 하나마다 10 MiB 를 넘으면 주소 없는 ReadError 로 끊는다."""
     import httpx2
 
+    # 압축을 푼 뒤 커지는 본문으로 raw 바이트 상한을 우회하지 못하게 한다.
+    if response.headers.get("content-encoding", "").strip().lower() not in ("", "identity"):
+        await response.aclose()
+        raise httpx2.ReadError("원격 MCP 응답의 압축 형식은 받지 않는다")
     limit = REMOTE_MAX_BODY_BYTES
     declared = response.headers.get("content-length")
     with contextlib.suppress(ValueError):
