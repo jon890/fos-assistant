@@ -72,7 +72,7 @@ class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
         self.assertEqual(self.vault("PUT", vault="c7", connector=DEMO, values={}).status_code, 200)
         seen = []
 
-        async def verify(manifest, tool, env):
+        async def verify(manifest, tool, env, timeout):
             seen.append((tool, env))
             return types.SimpleNamespace(structured_content={"scopes": []}, is_error=False, content=[])
 

@@ -157,7 +157,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
 
         ran = []
 
-        async def runner(manifest, hermes_tool, args, env, progress):
+        async def runner(manifest, hermes_tool, args, env, progress, timeout):
             ran.append(manifest["id"])
             return None
 
@@ -545,7 +545,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertIs(response.body["changed"], True)
         server = self.alice_config()["mcp_servers"]["remote"]
         self.assertEqual(server, {"url": REMOTE_URL, "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"},
-                                  "enabled": True, "tools": {"exclude": ["purge"]}})
+                                  "strict_redirect_headers": True, "enabled": True, "tools": {"exclude": ["purge"]}})
         self.assertIn("remote", self.alice_config()["platform_toolsets"]["api_server"])
         env = self.root / "alice/.env"
         self.assertEqual(env.read_text(encoding="utf-8").splitlines(), ["REMOTE_TOKEN=" + REMOTE_VALUE])
@@ -582,11 +582,11 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
 
         ran = []
 
-        async def execute_runner(manifest, hermes_tool, args, values, progress):
+        async def execute_runner(manifest, hermes_tool, args, values, progress, timeout):
             ran.append((manifest["id"], sorted(values)))
             return None
 
-        async def call_runner(manifest, tool, values):
+        async def call_runner(manifest, tool, values, timeout):
             ran.append((manifest["id"], sorted(values)))
             return None
 

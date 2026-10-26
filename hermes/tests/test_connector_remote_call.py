@@ -156,9 +156,12 @@ class RemoteCallTest(base.ConnectorGateCase):
         self.assert_nothing_leaked(logs)
 
     def test_execute_with_a_header_breaking_value_does_not_run(self):
-        """profile `.env` 의 칸 값에 NUL 이 있으면 부르지 않고 `{ok: false}` 다."""
+        """profile `.env` 의 칸 값에 NUL 이 있으면 부르기 전에 까닭을 로그로 남기고 `{ok: false}` 다."""
         self.install(token="remote_\x000123")
-        self.assertEqual(self.execute(args={"text": "a"}), UNAVAILABLE)
+        with patch_plugin(self.plugin, "_run_connector_execute") as runner, call_base.collected_logs() as logs:
+            self.assertEqual(self.execute(args={"text": "a"}), UNAVAILABLE)
+        runner.assert_not_called()
+        self.assertTrue(any("헤더로 보낼 수 없는 글자" in line for line in logs), logs)
         self.assertEqual(self.received()["write_item"], 0)
 
     def test_redirect_is_not_followed(self):

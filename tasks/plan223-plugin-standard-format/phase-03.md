@@ -32,7 +32,7 @@
 - 세션 여는 부분만 전송별로 나누고 `initialize` 뒤의 흐름은 한 벌로 둔다. `_open_connector_session(manifest, values)` 비동기 context manager 를 두고 두 함수가 그것을 쓴다
 - 원격 요청의 헤더는 manifest 의 `headers` 원문에서 `${이름}` 을 칸 값으로 바꿔 만든다. 칸 값에 CR, LF, NUL 이 있으면 부르지 않는다(`call` 은 이미 `invalid_input` 으로 거절한다. `execute` 도 같은 검사를 한다)
 - 클라이언트는 `httpx2.AsyncClient(headers=<만든 헤더>, follow_redirects=False, timeout=<지금 호출 시간 제한>)` 로 만들어 `streamable_http_client(url, http_client=...)` 에 넘긴다. redirect 응답은 따라가지 않으므로 호출 실패가 된다. 토큰 헤더가 다른 호스트로 가는 것을 막는다
-- 주소, 헤더 값, 응답 본문을 로그에 싣지 않는다. 대시보드 logger 의 예외는 지금처럼 종류 이름만 남긴다(`_leaf_error_types`). `httpx2` 와 `mcp.client.streamable_http` logger 가 요청 URL 을 남기지 않게, 원격 호출 동안 두 logger 의 INFO 이하를 제외하는 필터를 단다
+- 주소, 헤더 값, 응답 본문을 로그에 싣지 않는다. 대시보드 logger 의 예외는 지금처럼 종류 이름만 남긴다(`_leaf_error_types`). SDK 와 HTTP 라이브러리는 DEBUG 와 INFO 에 요청 URL 과 보낸 메시지를, WARNING 이상에도 예외 문구를 남긴다. 원격 호출 동안 그 logger 들(`httpx2`, `httpcore2.*`, `mcp.client.streamable_http`, `mcp.shared.*`, `ClientSession` 의 logger)의 기록을 수준과 상관없이 제외하는 필터를 단다
 - `execute` 에서 요청을 보낸 뒤의 연결 끊김과 시간 초과는 지금처럼 504(실행됐는지 모름)다. 원격은 요청이 서버에 닿았는지 알 수 없는 구간이 자식 프로세스보다 넓다. `progress["sent"]` 를 `call_tool` 직전에 두는 규칙을 그대로 지킨다
 - 원격 서버의 Hermes 쪽 동작(헤더의 `${이름}` 풀이, 연결할 때 한 번 정해지는 헤더, redirect)을 `hermes/docs/hermes-contract.md` 에 적는다. 근거는 `hermes/tests/hermes_contract.py` 의 `HERMES_VERSION` tag 의 상류 소스 `tools/mcp_tool_config.py`, `tools/mcp_tool_transport.py` 다. 상류 소스는 공개 저장소에서 읽는다
 - Hermes 가 다른 호스트로 가는 redirect 를 따라간다면 Hermes 를 고치지 않고 `hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md` 의 「감당할 것」 에 한 줄 더한다. 따라갈 때 `Authorization` 을 지우는지도 함께 적는다

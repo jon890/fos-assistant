@@ -69,7 +69,10 @@ def _remote_headers(value, where: str) -> dict:
 
 
 def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> dict:
-    """원격 MCP 서버 정의를 검증하고 설치할 서버 정의 `{"url", "headers", "enabled"}` 를 낸다. 틀리면 ValueError 다."""
+    """원격 MCP 서버 정의를 검증하고 설치할 서버 정의 `{"url", "headers", "strict_redirect_headers", "enabled"}` 를 낸다.
+
+    틀리면 ValueError 다.
+    """
     if set(server) - {"type", "url", "headers"}:
         raise ValueError("원격 MCP 서버 정의 모양이 올바르지 않다")
     for key in REMOTE_FORBIDDEN_KEYS:
@@ -98,18 +101,21 @@ def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> d
         raise ValueError("원격 MCP 서버의 칸은 모두 필수 칸이다")
     if {field["env"] for field in fields} != _remote_header_env({"headers": headers}):
         raise ValueError("원격 MCP 서버의 칸과 헤더가 참조하는 이름이 다르다")
-    return {"url": url, "headers": headers, "enabled": True}
+    # Hermes 는 redirect 를 따라간다. 이 키가 참이면 다른 origin 으로 갈 때 `Authorization` 밖의 설정 헤더도 지운다.
+    return {"url": url, "headers": headers, "strict_redirect_headers": True, "enabled": True}
 
 
 def _remote_server_matches(expected: dict, recorded: dict) -> bool:
     """소유 기록의 원격 서버 정의가 지금 manifest 의 정의와 같은지 본다. `tools` 는 견주지 않는다."""
-    return recorded.get("url") == expected["url"] and recorded.get("headers") == expected["headers"]
+    return (recorded.get("url") == expected["url"] and recorded.get("headers") == expected["headers"]
+            and recorded.get("strict_redirect_headers") is expected["strict_redirect_headers"])
 
 
 def _remote_record_ok(server) -> bool:
     """소유 기록의 원격 서버 정의 모양을 본다. `tools` 의 모양은 부르는 쪽이 본다."""
-    return (isinstance(server, dict) and set(server) - {"tools"} == {"url", "headers", "enabled"}
-            and isinstance(server["url"], str) and server["enabled"] is True and isinstance(server["headers"], dict)
+    return (isinstance(server, dict) and set(server) - {"tools"} == {"url", "headers", "strict_redirect_headers", "enabled"}
+            and isinstance(server["url"], str) and server["enabled"] is True and server["strict_redirect_headers"] is True
+            and isinstance(server["headers"], dict)
             and all(isinstance(name, str) and isinstance(value, str) for name, value in server["headers"].items()))
 
 
@@ -131,6 +137,7 @@ def _remote_request_headers(server: dict, values: dict) -> dict:
     """서버 정의의 헤더 값에서 `${이름}` 을 칸 값으로 바꾼 요청 헤더다.
 
     참조한 칸 값이 없거나 비었거나 CR, LF, NUL 이 있으면 ValueError 다. 사유에 값을 싣지 않는다.
+    부르는 쪽(`connector_run`)도 부르기 전에 같은 글자를 보고 까닭을 로그로 남긴다. 여기 검사는 헤더를 만드는 쪽의 마지막 방어다.
     """
     headers = {}
     for name, template in server["headers"].items():
@@ -162,4 +169,8 @@ async def _remote_streams(server: dict, values: dict, timeout: float):
             async with streamable_http_client(server["url"], http_client=client) as streams:
                 yield streams
     finally:
-        _remote_call.reset(token)
+        try:
+            _remote_call.reset(token)
+        except ValueError:
+            # 정리가 다른 문맥에서 돌면 token 을 되돌리지 못한다. 그 문맥은 곧 버려지므로 그대로 둔다.
+            pass

@@ -113,7 +113,6 @@ node scripts/checks/check-file-length.mjs
 | `hermes/plugins/dashboard-profile-api/connector_remote.py` | 신규 |
 | `hermes/plugins/dashboard-profile-api/connector_manifest.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_state.py` | 수정 |
-| `hermes/plugins/dashboard-profile-api/connector_binding.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_guard.py` | 수정 |
 | `hermes/plugins/dashboard-profile-api/connector_run.py` | 수정 |
 | `hermes/tests/dashboard_profile_api_support.py` | 수정 |

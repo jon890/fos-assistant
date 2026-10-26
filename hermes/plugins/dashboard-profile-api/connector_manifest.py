@@ -314,7 +314,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     """
     expected = manifest["server"]
     if manifest["transport"] == "http" or _is_remote(server):
-        # 원격 정의는 칸 값이 profile `.env` 를 거치는 헤더뿐이라 주소와 헤더만 견준다.
+        # 원격 정의는 칸 값이 profile `.env` 를 거치는 헤더뿐이라 주소와 헤더, redirect 헤더 처리만 비교한다.
         return manifest["transport"] == "http" and _remote_server_matches(expected, server)
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
             or set(server["env"]) != set(expected["env"])):

@@ -1470,10 +1470,14 @@ class RemoteMcpServerTest(ConnectorGateCase):
             self.assertNotIn(value, output)
 
     def test_remote_server_installs_the_url_and_headers_of_the_mcp_definition(self):
-        """정의의 주소와 헤더를 설치할 서버 정의로 내고, 자식 프로세스에 쓰는 칸은 비어 있다."""
+        """정의의 주소와 헤더를 설치할 서버 정의로 내고, 자식 프로세스에 쓰는 칸은 비어 있다.
+
+        Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 `strict_redirect_headers` 를 켠다.
+        """
         manifest = self.plugin._connector_manifest(REMOTE)
         self.assertEqual(manifest["server"], {"url": REMOTE_URL, "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"},
-                                              "enabled": True, "tools": {"exclude": ["purge"]}})
+                                              "strict_redirect_headers": True, "enabled": True,
+                                              "tools": {"exclude": ["purge"]}})
         self.assertEqual(manifest["transport"], "http")
         self.assertEqual((manifest["operator_env"], manifest["optional_env"]), (frozenset(), frozenset()))
         for key in ("owner_attachments_env", "owner_output_env", "owner_browser_env", "owner_browser_login_url",

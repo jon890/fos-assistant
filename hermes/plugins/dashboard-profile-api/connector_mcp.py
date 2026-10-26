@@ -66,14 +66,12 @@ async def _open_connector_session(manifest: dict, values: dict, timeout: float):
                 yield session
 
 
-async def _run_connector_tool(manifest: dict, tool: str, values: dict):
-    """커넥터 MCP 서버에 한 번 붙어 도구 하나를 부르고 닫는다.
+async def _run_connector_tool(manifest: dict, tool: str, values: dict, timeout: float):
+    """커넥터 MCP 서버에 한 번 붙어 도구 하나를 부르고 닫는다. `timeout` 은 원격 요청 하나의 시간 제한이다.
 
     도구가 `tools/list` 에서 읽기 전용이 아니면 부르지 않고 None 을 돌려준다.
     """
-    from . import connector_run
-
-    async with _open_connector_session(manifest, values, connector_run.CONNECTOR_CALL_TIMEOUT_SECONDS) as session:
+    async with _open_connector_session(manifest, values, timeout) as session:
         listed = await session.list_tools()
         annotations = next((item.annotations for item in listed.tools if item.name == tool), None)
         if annotations is None or annotations.read_only_hint is not True:
@@ -203,15 +201,15 @@ def _retry_value(payload, error: dict, key: str):
     return None
 
 
-async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, values: dict, progress: dict):
+async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, values: dict, progress: dict,
+                                 timeout: float):
     """커넥터 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
 
     등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
     도구를 부르기 직전에 `progress["sent"]` 를 참으로 둔다. 그 뒤의 실패는 도구가 실행됐는지 알 수 없다.
+    `timeout` 은 원격 요청 하나의 시간 제한이다.
     """
-    from . import connector_run
-
-    async with _open_connector_session(manifest, values, connector_run.CONNECTOR_EXECUTE_TIMEOUT_SECONDS) as session:
+    async with _open_connector_session(manifest, values, timeout) as session:
         listed = await session.list_tools()
         names = [item.name for item in listed.tools
                  if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]

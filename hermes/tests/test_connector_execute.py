@@ -389,7 +389,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
              UNAVAILABLE),
         ):
             with self.subTest(label):
-                async def fixed(manifest, hermes_tool, args, env, progress, result=result):
+                async def fixed(manifest, hermes_tool, args, env, progress, timeout, result=result):
                     return result
 
                 with patch_plugin(self.plugin, "_run_connector_execute", fixed):
@@ -460,7 +460,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             release = asyncio.Event()
             started = 0
 
-            async def held(manifest, tool, env):
+            async def held(manifest, tool, env, timeout):
                 nonlocal started
                 started += 1
                 await release.wait()
@@ -485,7 +485,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         """도구가 `payload` 를 오류 결과로 돌려준 것처럼 실행 경로를 한 번 지난다."""
         result = call_base.tool_result(is_error=True, content=[call_base.text_content(json.dumps(payload))])
 
-        async def fixed(manifest, hermes_tool, args, env, progress):
+        async def fixed(manifest, hermes_tool, args, env, progress, timeout):
             progress["sent"] = True
             return result
 

@@ -293,7 +293,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
             release = asyncio.Event()
             started = 0
 
-            async def held(manifest, tool, env):
+            async def held(manifest, tool, env, timeout):
                 nonlocal started
                 started += 1
                 await release.wait()
@@ -320,7 +320,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_slot_is_released_after_failures(self):
         """실패로 끝난 호출도 자리를 돌려준다. 다섯 번 넘게 실패한 뒤에도 다음 호출을 받는다."""
-        async def broken(manifest, tool, env):
+        async def broken(manifest, tool, env, timeout):
             raise RuntimeError("injected")
 
         with patch_plugin(self.plugin, "_run_connector_tool", broken):
@@ -373,7 +373,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
             ("input required", object(), UNAVAILABLE),
         ):
             with self.subTest(label):
-                async def fixed(manifest, tool, env, result=result):
+                async def fixed(manifest, tool, env, timeout, result=result):
                     return result
 
                 with patch_plugin(self.plugin, "_run_connector_tool", fixed), collected_logs() as records:
@@ -406,7 +406,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
 
     def test_failure_log_names_innermost_error_and_sdk_version(self):
         """묶인 예외는 가장 안쪽 종류와 SDK 판을 로그에 남기고, 예외 본문은 남기지 않는다."""
-        async def broken(manifest, tool, env):
+        async def broken(manifest, tool, env, timeout):
             raise ExceptionGroup("outer", [AttributeError("secret-text")])
 
         with patch_plugin(self.plugin, "_run_connector_tool", broken), collected_logs() as records:
