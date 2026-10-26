@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # web 이미지의 Node 는 24 LTS 에 머문다. 24.x 패치만 받고 메이저 올리기는 사람이 정한다.
+  - package-ecosystem: "docker"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

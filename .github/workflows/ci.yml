@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 2
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 바뀐 파일로 실행할 검사 선택
         id: paths
@@ -136,7 +136,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 변경 판정과 검사 결과 확인
         env:
@@ -157,7 +157,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 통합한 quality job 결과 확인
         env:
@@ -207,7 +207,7 @@ jobs:
           package_json_file: web/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
@@ -267,7 +267,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 변경 판정과 검사 결과 확인
         env:
@@ -303,7 +303,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
@@ -332,7 +332,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - run: node test/e2e/run.ts
       - name: 실패한 E2E의 합성 백엔드 로그
@@ -356,7 +356,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 변경 판정과 검사 결과 확인
         env:
@@ -376,7 +376,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - run: node --test 'test/unit/**/*.test.ts'
       - name: 마이그레이션 버전 검사
@@ -429,7 +429,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           package-manager-cache: false
       - name: 변경 판정과 검사 결과 확인
         env:
@@ -480,7 +480,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
         with:
-          node-version: '22.18.0'
+          node-version: '24'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile

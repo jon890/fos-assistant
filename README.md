@@ -212,7 +212,7 @@ One family actually uses it, and that is the only deployment so far.
 | Tool | Version |
 | --- | --- |
 | Java | 21 |
-| Node.js | 22.18 or later |
+| Node.js | 24 or later |
 | pnpm | 10 |
 | Python | 3.13 (for the Hermes plugin tests) |
 | Hermes Agent | checked against v2026.9.24 |

@@ -7,7 +7,7 @@
  *
  *     node test/e2e/run.ts
  *
- * <p>Node 의 TypeScript 실행을 쓰므로 빌드 단계가 없다. Node 22.18 이상이 필요하다.
+ * <p>Node 의 TypeScript 실행을 쓰므로 빌드 단계가 없다. Node 24 이상이 필요하다.
  */
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdtemp, rm, writeFile, chmod, mkdir } from "node:fs/promises";

@@ -213,7 +213,7 @@ flowchart LR
 | 도구 | 버전 |
 | --- | --- |
 | Java | 21 |
-| Node.js | 22.18 이상 |
+| Node.js | 24 이상 |
 | pnpm | 10 |
 | Python | 3.13 (Hermes plugin 검사에 쓴다) |
 | Hermes Agent | v2026.9.24 에서 확인했다 |

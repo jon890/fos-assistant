@@ -39,8 +39,8 @@ fi
 
 # test/e2e 와 test/unit 은 Node 의 TypeScript 실행을 쓴다.
 node_version="$(node -p 'process.versions.node')"
-if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)'; then
-  echo "Node 22.18 이상이 필요하다. 지금은 ${node_version} 이다." >&2
+if ! node -e 'const [a]=process.versions.node.split(".").map(Number); process.exit(a>=24?0:1)'; then
+  echo "Node 24 이상이 필요하다. 지금은 ${node_version} 이다." >&2
   exit 2
 fi
 
