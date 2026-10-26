@@ -30,7 +30,8 @@ from .connector_policy import (
     _tool_identifiers,
 )
 
-from .connector_manifest_io import _connector_roots, _connector_command, _read_connector_json
+from .connector_manifest_io import (_connector_roots, _connector_command, _read_assistant_json, _read_connector_json,
+                                    _read_mcp_definition, _read_plugin_manifest)
 
 from .connector_schema import (
     BIND_MODE,
@@ -93,7 +94,7 @@ def _appearance_or_none(connector_id: str, name: str, read):
 
 
 def _load_connector(connector_id: str, entry: dict) -> dict:
-    """plugin 디렉터리의 `connector.json`, `.mcp.json`, `plugin.json` 을 읽어 검증한다. 틀리면 예외다.
+    """plugin 디렉터리의 플러그인 manifest 와 `assistant.json`(옛 이름 `connector.json`), MCP 정의를 읽어 검증한다. 틀리면 예외다.
 
     형식 규칙은 `hermes/connectors/README.md` 의 「connector.json」 이 소유한다(ADR-043).
     """
@@ -102,11 +103,11 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("커넥터 이름이 올바르지 않다")
     if root.resolve() != root:
         raise ValueError("connector 경로에 심볼릭 링크가 있다")
-    plugin = _read_connector_json(root, ".claude-plugin/plugin.json")
-    if not isinstance(plugin, dict) or plugin.get("name") != connector_id:
-        raise ValueError("plugin.json 의 이름이 운영 목록과 다르다")
+    plugin = _read_plugin_manifest(root)
+    if plugin.get("name") != connector_id:
+        raise ValueError("플러그인 manifest 의 이름이 운영 목록과 다르다")
 
-    declared = _read_connector_json(root, "connector.json")
+    declared = _read_assistant_json(root)
     if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] not in (1, 2):
         raise ValueError("schema 는 1 이나 2 만 받는다")
     if declared.get("id") != connector_id:
@@ -141,7 +142,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors, error_contracts = _connector_errors(declared.get("errors", {}))
-    mcp = _read_connector_json(root, ".mcp.json")
+    mcp = _read_mcp_definition(root, plugin)
     if not isinstance(mcp, dict):
         raise ValueError("MCP manifest 는 객체여야 한다")
     if "mcpServers" in mcp:
@@ -256,7 +257,7 @@ def _connector_manifest(connector_id: str) -> dict | None:
         logger.warning("dashboard-profile-api: 커넥터 %r 가 운영 목록에 없다", connector_id)
         return None
     try:
-        return _guard_manifest(_load_connector(connector_id, entry), _read_connector_json(entry["root"], "connector.json"))
+        return _guard_manifest(_load_connector(connector_id, entry), _read_assistant_json(entry["root"]))
     except Exception as error:
         # 파일 내용과 운영 경로를 로그에 싣지 않는다. 직접 낸 사유만 그대로 적는다.
         reason = str(error) if type(error) is ValueError else type(error).__name__

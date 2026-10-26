@@ -1362,6 +1362,73 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         self.assertLess(rejected, 1.0, "주석 뒤 X 판정이 %.3f 초 걸렸다" % rejected)
 
 
+class PluginStandardFormatTest(ConnectorGateCase):
+    """Claude Code 와 Codex 플러그인 형식의 manifest, `assistant.json`, MCP 정의 경로를 읽는 규칙을 검사한다."""
+
+    def ids(self):
+        return [entry["id"] for entry in self.catalog()]
+
+    def rejected_with(self, text):
+        """카탈로그에서 빠지고 그 까닭이 경고 로그에 있는지 본다. 준비가 꺼 둔 로그를 읽는 동안만 켠다."""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.catalog(), [])
+        logging.disable(logging.CRITICAL)
+        self.assertIn(text, "\n".join(logs.output))
+
+    def write_json(self, name, value):
+        path = self.connector_root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    def test_codex_manifest_alone_is_read_with_its_skill_list(self):
+        """`.codex-plugin/plugin.json` 만 있어도 오르고, 목록으로 쓴 스킬 경로의 스킬이 `skills` 에 있다."""
+        (self.connector_root / ".claude-plugin").rename(self.connector_root / ".codex-plugin")
+        self.rewrite(".codex-plugin/plugin.json", lambda value: value.update(skills=["./skills"]))
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+
+    def test_both_manifests_need_the_same_name_and_claude_comes_first(self):
+        """두 manifest 가 다 있으면 이름이 같아야 오르고 `.claude-plugin` 쪽을 읽는다. 이름이 다르면 빠진다."""
+        # Codex 쪽 스킬 경로는 없는 디렉터리다. 이쪽을 읽었다면 커넥터가 빠진다.
+        self.write_json(".codex-plugin/plugin.json", {"name": DEMO, "skills": ["./codex-skills"]})
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+        self.write_json(".codex-plugin/plugin.json", {"name": "other-notes"})
+        self.rejected_with("이름이 다르다")
+
+    def test_assistant_json_replaces_the_old_name_but_not_both(self):
+        """`connector.json` 을 `assistant.json` 으로 옮기면 오르고, 두 파일이 함께 있으면 빠진다."""
+        original = (self.connector_root / "connector.json").read_bytes()
+        (self.connector_root / "connector.json").rename(self.connector_root / "assistant.json")
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertIsNotNone(self.plugin._connector_manifest(DEMO))
+        (self.connector_root / "connector.json").write_bytes(original)
+        self.rejected_with("함께 있다")
+
+    def test_mcp_definition_path_comes_from_the_manifest(self):
+        """`mcpServers` 가 플러그인 안의 경로면 그 파일을 읽는다. 객체이거나 플러그인 밖이면 빠진다."""
+        (self.connector_root / "mcp").mkdir()
+        (self.connector_root / ".mcp.json").rename(self.connector_root / "mcp/servers.json")
+        self.rewrite(".claude-plugin/plugin.json", lambda value: value.update(mcpServers="./mcp/servers.json"))
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["mcp_server"], "demo")
+        inline = json.loads((self.connector_root / "mcp/servers.json").read_text(encoding="utf-8"))
+        for label, wrong in (("inline object", inline), ("outside the plugin", "../x.json")):
+            with self.subTest(label):
+                if label == "outside the plugin":
+                    # 플러그인 밖에 실제 파일을 두어, 경로 검사가 없으면 읽히는 상황을 만든다.
+                    (self.base / "x.json").write_text(json.dumps(inline), encoding="utf-8")
+                self.rewrite(".claude-plugin/plugin.json", lambda value, wrong=wrong: value.update(mcpServers=wrong))
+                self.rejected_with("MCP 정의 경로가 올바르지 않다")
+
+    def test_connector_without_any_manifest_is_dropped(self):
+        """두 플러그인 manifest 가 모두 없으면 빠진다."""
+        shutil.rmtree(self.connector_root / ".claude-plugin")
+        self.rejected_with("플러그인 manifest 가 없다")
+
+
 class HermesToolNameTest(ConnectorGateCase):
     """원래 도구 이름에서 Hermes 의 등록 이름을 계산하는 규칙을 검사한다."""
 
