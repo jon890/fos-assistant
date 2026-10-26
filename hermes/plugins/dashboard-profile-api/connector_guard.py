@@ -50,7 +50,7 @@ async def _guard_request_body(request):
 
 
 def _guard_manifest(manifest, declared):
-    if set(manifest["server"]["env"]) & EXECUTION_ENV:
+    if set(manifest["server"].get("env", {})) & EXECUTION_ENV:
         raise ValueError("실행 전용 env 는 설치에 선언하지 않는다")
     guard = declared.get("execution_guard")
     manifest["execution_guard"] = None

@@ -1896,6 +1896,43 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 [요청 모델](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_models.py)이 근거다.
 기계용 인증에서 이 메서드와 커넥터 칸 key를 허용하는 정책은 `fos-home-infra`가 소유한다.
 
+## 원격 MCP 서버
+
+2026-10-26에 Hermes `v0.21.6`의 소스를 읽어 판정했다.
+`mcp_servers` 의 정의에 `url` 이 있으면 Hermes 는 자식 프로세스 대신 그 주소에 Streamable HTTP 로 붙는다.
+원격 플러그인을 설치한 서버 정의가 이 모양이다([ADR-20261026 / remote-mcp-plugin](adr/ADR-20261026-remote-mcp-plugin.md)).
+
+### 헤더의 `${이름}` 풀이
+
+`config.yaml` 을 읽을 때 `_interpolate_env_vars` 가 `url` 과 `headers` 를 포함한 정의 전체의 `${이름}` 을 그 profile 의 secret scope 로 펼친다.
+연결 직전에 주인 profile 의 scope 로 한 번 더 펼치고, `_require_rendered_remote` 가 `url` 이나 `headers` 에 펼쳐지지 않은 `${이름}` 이 남았으면 연결하지 않는다.
+로컬 서버의 `env` 는 펼치지 못한 참조를 원문으로 남기지만, 원격 서버는 그 상태로 요청을 보내지 않고 연결 실패가 된다.
+그래서 원격 플러그인의 칸 값도 profile `.env` 에 있어야 하고, 헤더 값에는 그 이름의 `${이름}` 참조만 둔다.
+[설정 읽기와 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_config.py)와
+[연결 직전의 다시 펼치기](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_discovery.py)가 근거다.
+
+다만 context 변수는 `_CONTEXT_VAR_RESOLVERS`가 먼저 풀고, `agent/secret_scope.py`의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`에 속한 이름은 프로세스 env를 읽는다. 원격 플러그인의 칸은 대문자 env 이름만 받고, OS·Python 전역 이름과 `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_` 접두를 거절한다. 대시보드와 Hermes가 서로 다른 출처의 값을 보내는 일을 막는다.
+[전역 이름의 근거](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)는 해당 버전의 상수다.
+
+### 헤더는 연결할 때 한 번 정해진다
+
+펼친 헤더는 연결을 만들 때 HTTP 클라이언트의 기본 헤더가 되고, 그 연결이 사는 동안 바뀌지 않는다.
+Hermes 는 헤더에 `mcp-protocol-version` 이 없으면 더한다.
+위 「설정 저장과 gateway 연결 확인」 의 연결 재사용이 원격 서버에도 같다. profile `.env` 의 토큰을 바꿔도 이미 붙은 연결은 옛 헤더를 보낸다.
+토큰 교체는 그 연결을 다시 만들어야 반영된다.
+[Streamable HTTP 연결](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_transport.py)이 근거다.
+
+### redirect
+
+Hermes 의 Streamable HTTP 클라이언트와 연결 전 content-type 확인 요청은 redirect 를 따라간다(`follow_redirects=True`).
+scheme, host, port 가운데 하나라도 다른 곳으로 가면 `Authorization` 헤더만 지운다.
+그 밖의 설정 헤더는 서버 정의의 `strict_redirect_headers` 가 참일 때만 지운다. 우리가 설치하는 원격 서버 정의는 이 키를 참으로 둔다.
+이 키가 참이면 Streamable HTTP 연결이 거절돼도 SSE 로 다시 붙어 보지 않고, SSE 전송과 `mcp<1.24.0` 에서는 연결하지 않는다.
+헤더를 지워도 307/308 redirect의 POST 본문과 내부망 목적지는 막지 않는다. plugin은 운영 목록 `url`만 쓰며, 홈서버 egress 제한은 `fos-home-infra` 후속이다.
+[redirect 헤더 처리](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/tools/mcp_tool_errors.py)가 근거다.
+
+대시보드 plugin 의 `call` 과 `execute` 는 Hermes 를 거치지 않고 같은 주소에 직접 붙는다. 이 경로는 redirect 를 따라가지 않고 호출 실패로 답한다.
+
 ## 실행 공간
 
 2026-10-05 에 운영과 같은 이미지(v0.21.5, `v2026.9.24`)를 격리 환경에 띄워 측정했다.
@@ -2820,11 +2857,13 @@ Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profil
 대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../../docs/features/connector.md) 의 「MCP SDK 계약」).
 Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v0.20.0 부터 v0.20.2 까지는 1.28.1, v0.20.3 부터 v0.21.5 까지는 2.0.0 이다. 그래서 판은 이미지를 올릴 때만 바뀐다.
 1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 커넥터 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
-올릴 때 확인할 것은 셋이다.
+올릴 때 확인할 것은 아래와 같다.
 
 - 새 이미지의 `mcp` 판이 `2.` 으로 시작한다
 - `mcp_types.ToolAnnotations` 에 `read_only_hint` 가, `mcp_types.CallToolResult` 에 `structured_content` 와 `is_error` 가 있다
 - `from mcp import ClientSession, StdioServerParameters` 와 `from mcp.client.stdio import stdio_client` 가 된다
+- `from mcp.client.streamable_http import streamable_http_client` 가 되고 그 함수가 `http_client` 인자를 받으며, `import httpx2` 가 된다. 하나라도 어긋나면 로컬 커넥터의 호출까지 `unavailable` 이다
+- 새 Hermes 버전의 `agent/secret_scope.py`에 있는 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`를 대시보드 `connector_remote.py`의 원격 칸 env 거절 목록과 대조한다. 전역 이름이 늘거나 접두가 바뀌면 거절 목록과 테스트도 갱신한다
 
 대시보드의 MCP probe 는 Hermes 자신의 코드로 돌아 SDK 판과 무관하게 도구 수를 낸다. probe 가 통과해도 plugin 의 `call` 경로가 맞다는 증거가 아니다.
 판이 어긋나면 plugin 이 올라올 때 판과 까닭을 로그 한 줄로 남긴다. 확인 절차와 live 검사는 `fos-home-infra` 가 갖는다.

@@ -57,9 +57,9 @@ class ConnectorEnvironmentTest(unittest.TestCase):
             if name not in values:
                 os.environ.pop(name, None)
 
-    def entry(self, root, command=None, env=None):
+    def entry(self, root, command=None, env=None, url=None):
         """읽은 운영 목록 항목 하나의 모양이다."""
-        return {"root": pathlib.Path(root), "command": command, "env": env or {}}
+        return {"root": pathlib.Path(root), "command": command, "env": env or {}, "url": url}
 
     def test_roots_reads_string_entries_as_plugin_directories(self):
         """문자열 값은 plugin 디렉터리로 읽는다. 실행 파일과 운영자 env 는 없다."""
@@ -116,6 +116,24 @@ class ConnectorEnvironmentTest(unittest.TestCase):
         ):
             with self.subTest(label):
                 self.environment(**{ROOTS_ENV: json.dumps({"x": entry, "y": "/abs/y"})})
+                self.assertEqual(self.plugin._connector_roots(), {"y": self.entry("/abs/y")})
+
+    def test_roots_reads_the_remote_url(self):
+        """원격 MCP 커넥터의 항목은 `url` 을 갖는다. 실행 파일과 운영자 env 는 없다."""
+        self.environment(**{ROOTS_ENV: json.dumps({
+            "remote-notes": {"root": "/abs/remote", "url": "http://mcp.internal.test/mcp"},
+            "plain": "/abs/plain",
+        })})
+        self.assertEqual(self.plugin._connector_roots(), {
+            "remote-notes": self.entry("/abs/remote", url="http://mcp.internal.test/mcp"),
+            "plain": self.entry("/abs/plain"),
+        })
+
+    def test_roots_drops_only_the_entry_whose_url_is_not_a_string(self):
+        """`url` 이 문자열이 아니면 그 항목만 버린다. 주소의 모양은 원격 서버 정의를 읽을 때 본다."""
+        for url in (1, ["https://mcp.test/mcp"], {"href": "https://mcp.test/mcp"}, True):
+            with self.subTest(url=url):
+                self.environment(**{ROOTS_ENV: json.dumps({"x": {"root": "/abs/x", "url": url}, "y": "/abs/y"})})
                 self.assertEqual(self.plugin._connector_roots(), {"y": self.entry("/abs/y")})
 
     def test_command_reads_absolute_path(self):

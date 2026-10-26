@@ -25,6 +25,8 @@ from .connector_policy import (
     _hermes_tool_name,
 )
 
+from .connector_remote import _is_remote, _remote_header_env, _remote_record_ok
+
 from .connector_schema import (
     BIND_MODE,
     CONNECTOR_ID_RE,
@@ -81,7 +83,8 @@ def _restore_binding_files(written: list, originals: dict, targets: dict, shared
 def _connector_server(manifest: dict) -> dict:
     """profile 설정에 쓸 서버 정의의 사본이다."""
     server = manifest["server"]
-    copied = {**server, "args": list(server["args"]), "env": dict(server["env"])}
+    copied = ({**server, "headers": dict(server["headers"])} if _is_remote(server)
+              else {**server, "args": list(server["args"]), "env": dict(server["env"])})
     if "tools" in server:
         copied["tools"] = {"exclude": list(server["tools"]["exclude"])}
     return copied
@@ -176,15 +179,18 @@ def _connector_state(value, target: str | None = None) -> dict:
             raise ValueError("connector 소유 기록의 바인딩 필드가 올바르지 않다")
         server = entry["server"]
         tools = server.get("tools") if isinstance(server, dict) else None
-        if (not isinstance(server, dict) or set(server) - {"tools"} != {"command", "args", "env", "enabled"}
+        # 원격 MCP 의 기록은 원격 정의의 모양으로 본다. 한 항목의 모양 때문에 같은 profile 의 다른 바인딩이 막히지 않게 한다.
+        if (not isinstance(server, dict)
                 or ("tools" in server and (
                     not isinstance(tools, dict) or set(tools) != {"exclude"} or not isinstance(tools["exclude"], list)
                     or any(not isinstance(item, str) for item in tools["exclude"])))
-                or not isinstance(server["command"], str) or server["enabled"] is not True
-                or not isinstance(server["args"], list) or any(not isinstance(arg, str) for arg in server["args"])
-                or not isinstance(server["env"], dict)
-                or any(not isinstance(name, str) or not isinstance(item, str)
-                       for name, item in server["env"].items())):
+                or (not _remote_record_ok(server) if _is_remote(server) else (
+                    set(server) - {"tools"} != {"command", "args", "env", "enabled"}
+                    or not isinstance(server["command"], str) or server["enabled"] is not True
+                    or not isinstance(server["args"], list) or any(not isinstance(arg, str) for arg in server["args"])
+                    or not isinstance(server["env"], dict)
+                    or any(not isinstance(name, str) or not isinstance(item, str)
+                           for name, item in server["env"].items())))):
             raise ValueError("소유 기록의 실행 정의 모양이 올바르지 않다")
         if plugin not in roots or plugin != target:
             continue
@@ -207,12 +213,15 @@ def _entry_manifest_mismatches(plugin: str, entry: dict) -> tuple[str, ...]:
         return ()
     recorded = entry["server"]
     expected = manifest["server"]
-    mismatches = [name for name in ("command", "args") if recorded.get(name) != expected.get(name)]
-    # `_server_matches` 가 선택 칸의 빈 값, 옛 운영자 env 참조, 주인별 디렉터리 값을 호환으로 인정한다.
-    # command 와 args 를 현재 값으로 맞춘 뒤에도 다르면 env 정의가 실제로 다르다.
-    comparable = {**recorded, "command": expected["command"], "args": expected["args"]}
-    if not _server_matches(manifest, comparable):
-        mismatches.append("env")
+    if manifest["transport"] == "http" or _is_remote(recorded):
+        mismatches = [name for name in ("url", "headers", "strict_redirect_headers") if recorded.get(name) != expected.get(name)]
+    else:
+        mismatches = [name for name in ("command", "args") if recorded.get(name) != expected.get(name)]
+        # `_server_matches` 가 선택 칸의 빈 값, 옛 운영자 env 참조, 주인별 디렉터리 값을 호환으로 인정한다.
+        # command 와 args 를 현재 값으로 맞춘 뒤에도 다르면 env 정의가 실제로 다르다.
+        comparable = {**recorded, "command": expected["command"], "args": expected["args"]}
+        if not _server_matches(manifest, comparable):
+            mismatches.append("env")
     if entry.get("mcp_server", manifest["mcp_server"]) != manifest["mcp_server"]:
         mismatches.append("mcp_server")
     return tuple(mismatches)
@@ -234,10 +243,13 @@ def _entry_field_env(plugin: str, entry: dict) -> set:
     """소유 기록 항목의 커넥터가 profile `.env` 에 두는 이름이다.
 
     manifest 가 있으면 칸의 env 이름이고, 운영 목록에서 빠졌으면 기록의 서버 정의가 `${이름}` 으로 참조하던 이름이다.
+    원격 MCP 의 기록이면 헤더 값이 참조하던 이름이다.
     """
     manifest = _connector_manifest(plugin) if plugin in _connector_roots() else None
     if manifest is not None:
         return {field["env"] for field in manifest["fields"]}
+    if _is_remote(entry["server"]):
+        return _remote_header_env(entry["server"])
     return {key for key, value in entry["server"]["env"].items() if value == "${%s}" % key}
 
 
@@ -258,7 +270,7 @@ def _bind_entry_shape(entry) -> None:
 def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
     """떼기가 profile `.env` 에서 지울 이름이다.
 
-    기록의 서버 정의가 `${이름}` 으로 참조하는 이름은 늘 지운다. 운영 목록에서 빠졌거나 실행 정의가 바뀌어도 설치할 때 쓴
+    기록의 서버 정의가 `${이름}` 으로 참조하는 이름은 늘 지운다. 원격 MCP 의 기록이면 헤더 값이 참조하는 이름이다. 운영 목록에서 빠졌거나 실행 정의가 바뀌어도 설치할 때 쓴
     이름이 거기 남아 있다. manifest 가 있고 기록의 실행 정의가 지금과 같으면 칸의 env 이름도 지운다.
     Control Plane 이 쓰는 이름은 지우지 않는다.
     """
@@ -266,6 +278,8 @@ def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
     env = server.get("env") if isinstance(server, dict) else None
     names = {key for key, value in env.items() if isinstance(key, str) and value == "${%s}" % key} \
         if isinstance(env, dict) else set()
+    if _is_remote(server):
+        names |= _remote_header_env(server)
     if manifest is not None:
         try:
             matches = _server_matches(manifest, server)

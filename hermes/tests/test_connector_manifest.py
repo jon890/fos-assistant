@@ -16,6 +16,7 @@ import unittest
 from unittest import mock
 
 from plugin_loading import load_plugin
+from dashboard_profile_api_support import REMOTE, REMOTE_URL, remote_connector
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -1360,6 +1361,301 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         rejected = time.monotonic() - started
         self.assertLess(accepted, 1.0, "주석 뒤 <svg/> 판정이 %.3f 초 걸렸다" % accepted)
         self.assertLess(rejected, 1.0, "주석 뒤 X 판정이 %.3f 초 걸렸다" % rejected)
+
+
+class PluginStandardFormatTest(ConnectorGateCase):
+    """Claude Code 와 Codex 플러그인 형식의 manifest, `assistant.json`, MCP 정의 경로를 읽는 규칙을 검사한다."""
+
+    def ids(self):
+        return [entry["id"] for entry in self.catalog()]
+
+    def rejected_with(self, text):
+        """카탈로그에서 빠지고 그 까닭이 경고 로그에 있는지 본다. 준비가 꺼 둔 로그를 읽는 동안만 켠다."""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.catalog(), [])
+        logging.disable(logging.CRITICAL)
+        self.assertIn(text, "\n".join(logs.output))
+
+    def write_json(self, name, value):
+        path = self.connector_root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    def test_codex_manifest_alone_is_read_with_its_skill_list(self):
+        """`.codex-plugin/plugin.json` 만 있어도 오르고, 목록으로 쓴 스킬 경로의 스킬이 `skills` 에 있다."""
+        (self.connector_root / ".claude-plugin").rename(self.connector_root / ".codex-plugin")
+        self.rewrite(".codex-plugin/plugin.json", lambda value: value.update(skills=["./skills"]))
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+
+    def test_both_manifests_need_the_same_name_and_claude_comes_first(self):
+        """두 manifest 가 다 있으면 이름이 같아야 오르고 `.claude-plugin` 쪽을 읽는다. 이름이 다르면 빠진다."""
+        # Codex 쪽 스킬 경로는 없는 디렉터리다. 이쪽을 읽었다면 커넥터가 빠진다.
+        self.write_json(".codex-plugin/plugin.json", {"name": DEMO, "skills": ["./codex-skills"]})
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.catalog()[0]["skills"], ["demo"])
+        self.write_json(".codex-plugin/plugin.json", {"name": "other-notes"})
+        self.rejected_with("이름이 다르다")
+
+    def test_assistant_json_replaces_the_old_name_but_not_both(self):
+        """`connector.json` 을 `assistant.json` 으로 옮기면 오르고, 두 파일이 함께 있으면 빠진다."""
+        original = (self.connector_root / "connector.json").read_bytes()
+        (self.connector_root / "connector.json").rename(self.connector_root / "assistant.json")
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertIsNotNone(self.plugin._connector_manifest(DEMO))
+        (self.connector_root / "connector.json").write_bytes(original)
+        self.rejected_with("함께 있다")
+
+    def test_mcp_definition_path_comes_from_the_manifest(self):
+        """`mcpServers` 가 플러그인 안의 경로면 그 파일을 읽는다. 객체이거나 플러그인 밖이면 빠진다."""
+        (self.connector_root / "mcp").mkdir()
+        (self.connector_root / ".mcp.json").rename(self.connector_root / "mcp/servers.json")
+        self.rewrite(".claude-plugin/plugin.json", lambda value: value.update(mcpServers="./mcp/servers.json"))
+        self.assertEqual(self.ids(), [DEMO])
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["mcp_server"], "demo")
+        inline = json.loads((self.connector_root / "mcp/servers.json").read_text(encoding="utf-8"))
+        for label, wrong in (("inline object", inline), ("outside the plugin", "../x.json")):
+            with self.subTest(label):
+                if label == "outside the plugin":
+                    # 플러그인 밖에 실제 파일을 두어, 경로 검사가 없으면 읽히는 상황을 만든다.
+                    (self.base / "x.json").write_text(json.dumps(inline), encoding="utf-8")
+                self.rewrite(".claude-plugin/plugin.json", lambda value, wrong=wrong: value.update(mcpServers=wrong))
+                self.rejected_with("MCP 정의 경로가 올바르지 않다")
+
+    def test_plugin_json_assistant_and_custom_mcp_paths_reject_links(self):
+        """새 형식의 선언 파일과 사용자 지정 MCP 경로도 링크면 거절한다."""
+        (self.connector_root / ".claude-plugin").rename(self.connector_root / ".codex-plugin")
+        (self.connector_root / "connector.json").rename(self.connector_root / "assistant.json")
+        (self.connector_root / "mcp").mkdir()
+        (self.connector_root / ".mcp.json").rename(self.connector_root / "mcp/servers.json")
+        self.rewrite(".codex-plugin/plugin.json", lambda value: value.update(mcpServers="./mcp/servers.json"))
+        for name in (".codex-plugin/plugin.json", "assistant.json", "mcp/servers.json"):
+            with self.subTest(name=name):
+                target = self.connector_root / name
+                original = target.read_bytes()
+                outside = self.base / "outside.json"
+                outside.write_bytes(original)
+                target.unlink()
+                target.symlink_to(outside)
+                self.rejected_with("링크다")
+                target.unlink()
+                target.write_bytes(original)
+
+    def test_field_and_operator_env_reject_a_trailing_newline(self):
+        self.rewrite("connector.json", lambda value: value["fields"][0].update(env="DEMO_TOKEN\n"))
+        self.rejected_with("fields 의 칸 모양이 올바르지 않다")
+        self.rewrite("connector.json", lambda value: value["fields"][0].update(env="DEMO_TOKEN"))
+        self.rewrite("connector.json", lambda value: value.update(operator_env=["DEMO_BASE\n"]))
+        self.rejected_with("operator_env 는 칸과 겹치지 않는 env 이름 목록이다")
+
+    def test_owner_env_names_reject_a_trailing_newline(self):
+        """첨부·출력·브라우저 env 를 읽는 경계에서 끝 줄바꿈을 거절한다."""
+        owner = sys.modules[self.plugin.__name__ + ".connector_owner_env"]
+        for key in ("owner_attachments_env", "owner_output_env", "owner_browser_env"):
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, key):
+                    owner._connector_owner_env({key: "DEMO_OWNER_ENV\n"}, set(), [])
+                self.assertIn("DEMO_OWNER_ENV", owner._connector_owner_env({key: "DEMO_OWNER_ENV"}, set(), [])[-1])
+
+    def test_connector_without_any_manifest_is_dropped(self):
+        """두 플러그인 manifest 가 모두 없으면 빠진다."""
+        shutil.rmtree(self.connector_root / ".claude-plugin")
+        self.rejected_with("플러그인 manifest 가 없다")
+
+
+class RemoteMcpServerTest(ConnectorGateCase):
+    """MCP 정의의 서버가 `type: http` 인 플러그인을 읽는 규칙을 검사한다(ADR-20261026 remote-mcp-plugin)."""
+
+    # 운영 목록이 주는 내부망 주소다. 운영자가 믿은 구간이라 `http://` 도 받는다.
+    OPERATOR_URL = "http://mcp.internal.test/mcp"
+
+    def setUp(self):
+        super().setUp()
+        self.remote_root = remote_connector(self.base / "remote-connector")
+        self.remote_entry({})
+
+    def remote_entry(self, extra, url=REMOTE_URL):
+        """운영 목록을 원격 플러그인 하나로 바꾼다. `extra` 는 그 항목에 더할 키다."""
+        entry = {"root": str(self.remote_root), **extra}
+        if url is not None:
+            entry["url"] = url
+        self.operator_list({REMOTE: entry})
+
+    def rewrite_remote(self, name, change):
+        path = self.remote_root / name
+        value = json.loads(path.read_text(encoding="utf-8"))
+        change(value)
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    def rewrite_server(self, change):
+        self.rewrite_remote(".mcp.json", lambda value: change(value["mcpServers"]["remote"]))
+
+    def rejected_with(self, text, hidden=()):
+        """카탈로그에서 빠지고 그 까닭이 경고 로그에 있는지 본다. `hidden` 의 글은 로그에 없어야 한다."""
+        logging.disable(logging.NOTSET)
+        self.addCleanup(logging.disable, logging.CRITICAL)
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.catalog(), [])
+        logging.disable(logging.CRITICAL)
+        output = "\n".join(logs.output)
+        self.assertIn(text, output)
+        for value in hidden:
+            self.assertNotIn(value, output)
+
+    def test_remote_server_installs_the_operator_url_and_declared_headers(self):
+        """운영 목록 주소와 선언한 헤더를 설치할 서버 정의로 내고, 자식 프로세스에 쓰는 칸은 비어 있다.
+
+        Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 `strict_redirect_headers` 를 켠다.
+        """
+        manifest = self.plugin._connector_manifest(REMOTE)
+        self.assertEqual(manifest["server"], {"url": REMOTE_URL, "headers": {"Authorization": "Bearer ${REMOTE_TOKEN}"},
+                                              "strict_redirect_headers": True, "enabled": True,
+                                              "tools": {"exclude": ["purge"]}})
+        self.assertEqual(manifest["transport"], "http")
+        self.assertEqual((manifest["operator_env"], manifest["optional_env"]), (frozenset(), frozenset()))
+        for key in ("owner_attachments_env", "owner_output_env", "owner_browser_env", "owner_browser_login_url",
+                    "snapshot", "execution_guard"):
+            self.assertIsNone(manifest[key], key)
+        entry = self.catalog()[0]
+        self.assertEqual(entry["id"], REMOTE)
+        self.assertNotIn("transport", entry)
+        self.assertNotIn(REMOTE_URL, json.dumps(entry))
+
+    def test_operator_url_replaces_the_definition_url(self):
+        """운영 목록에 `url` 이 있으면 그 주소를 쓴다. 정의의 주소는 무시한다."""
+        self.remote_entry({}, url=self.OPERATOR_URL)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["url"], self.OPERATOR_URL)
+
+    def test_operator_url_alone_is_enough(self):
+        """정의에 주소가 없어도 운영 목록의 `url` 이 있으면 오른다."""
+        self.rewrite_server(lambda server: server.pop("url"))
+        self.remote_entry({}, url=self.OPERATOR_URL)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["url"], self.OPERATOR_URL)
+
+    def test_assistant_headers_join_the_definition_headers(self):
+        """`assistant.json` 의 `headers` 를 정의의 헤더와 합친다. 칸은 두 헤더가 참조하는 이름과 같다."""
+        def declare(value):
+            value["headers"] = {"X-Api-Key": "${REMOTE_KEY}"}
+            value["fields"].append({"key": "key", "env": "REMOTE_KEY", "label": "키", "required": True})
+        self.rewrite_remote("assistant.json", declare)
+        self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["headers"],
+                         {"Authorization": "Bearer ${REMOTE_TOKEN}", "X-Api-Key": "${REMOTE_KEY}"})
+
+    def test_definition_url_is_ignored_even_when_changed_or_invalid(self):
+        """플러그인 갱신이 주소를 바꾸어도 운영 목록의 목적지만 설치한다."""
+        for url in ("https://changed.remote.test/mcp", "http://other.test/mcp", "${REMOTE_HOST}", None, 123):
+            with self.subTest(url=url):
+                self.rewrite_server(lambda server: server.update(url=url))
+                self.assertEqual(self.plugin._connector_manifest(REMOTE)["server"]["url"], REMOTE_URL)
+
+    def test_operator_url_with_a_forbidden_part_is_dropped(self):
+        """운영 목록의 주소도 같은 부분을 받지 않는다. 로그에 주소가 없다."""
+        for url in ("http://user:pass@mcp.internal.test/mcp", "http://mcp.internal.test/mcp?a=1",
+                    "ftp://mcp.internal.test/mcp", "http://${HOST}/mcp"):
+            with self.subTest(url):
+                self.remote_entry({}, url=url)
+                self.rejected_with("운영 목록의 url", hidden=(url,))
+
+    def test_remote_server_without_operator_url_is_dropped_even_with_plugin_url(self):
+        self.remote_entry({}, url=None)
+        self.rejected_with("운영 목록에 url 이 없다")
+
+    def test_header_value_other_than_a_required_field_reference_is_dropped(self):
+        """리터럴 값과 선택 칸 참조는 받지 않는다. 로그에 헤더 값이 없다."""
+        for value in ("Bearer remote_literal_secret", "${REMOTE_TOKEN:-}", "Token ${REMOTE_TOKEN}"):
+            with self.subTest(value):
+                self.rewrite_server(lambda server, value=value: server.update(headers={"Authorization": value}))
+                self.rejected_with("headers 는", hidden=(value,))
+
+    def test_header_declared_twice_is_dropped(self):
+        """같은 헤더 이름이 정의와 `assistant.json` 에 함께 있으면 대소문자가 달라도 빠진다."""
+        self.rewrite_remote("assistant.json",
+                            lambda value: value.update(headers={"authorization": "Bearer ${REMOTE_TOKEN}"}))
+        self.rejected_with("같은 헤더 이름")
+
+    def test_header_set_by_the_transport_is_dropped(self):
+        """대시보드나 MCP 전송이 정하는 헤더 이름은 대소문자와 상관없이 받지 않는다."""
+        self.rewrite_server(lambda server: server.pop("headers"))
+        for name in ("host", "HOST", "Content-Type", "cOnTeNt-TyPe", "Accept-Encoding", "aCcEpT-EnCoDiNg"):
+            with self.subTest(name=name):
+                self.rewrite_remote("assistant.json", lambda value: value.update(headers={name: "${REMOTE_TOKEN}"}))
+                self.rejected_with("전송이 정하는 헤더 이름")
+
+    def test_remote_env_rejects_context_and_global_names(self):
+        """전역 env 와 context 변수가 profile 칸 값 대신 헤더로 풀리지 않게 한다."""
+        names = ("userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "_TOKEN", "token",
+                 "HOME", "PATH", "USER", "LANG", "LC_ALL", "TZ", "PWD", "SHELL", "TMPDIR", "VIRTUAL_ENV",
+                 "PYTHONPATH", "SSL_CERT_FILE", "HERMES_HOME", "HERMES_TOKEN", "HERMES_KANBAN_DB",
+                 "TERMINAL_CWD", "GATEWAY_RELAY_SECRET", "API_SERVER_KEY", "A" * 129)
+        for name in names:
+            with self.subTest(name=name):
+                self.rewrite_remote("assistant.json", lambda value: value["fields"][0].update(env=name))
+                self.rewrite_server(lambda server: server.update(headers={"Authorization": "Bearer ${%s}" % name}))
+                self.assertEqual(self.catalog(), [])
+
+    def test_remote_env_accepts_uppercase_names_at_the_length_limit(self):
+        for name in ("TOKEN", "A" + "_0" * 63 + "Z"):
+            with self.subTest(name=name):
+                self.rewrite_remote("assistant.json", lambda value: value["fields"][0].update(env=name))
+                self.rewrite_server(lambda server: server.update(headers={"Authorization": "Bearer ${%s}" % name}))
+                self.assertEqual(len(self.catalog()), 1)
+
+    def test_fields_must_match_the_header_references(self):
+        """칸은 모두 필수 칸이고, 그 env 이름이 헤더가 참조하는 이름과 같아야 한다."""
+        for label, field, text in (
+            ("unreferenced field", {"key": "extra", "env": "REMOTE_EXTRA", "label": "추가", "required": True},
+             "참조하는 이름이 다르다"),
+            ("optional field", {"key": "extra", "env": "REMOTE_EXTRA", "label": "추가", "required": False},
+             "모두 필수 칸"),
+        ):
+            with self.subTest(label):
+                self.rewrite_remote("assistant.json", lambda value, field=field: value.update(
+                    fields=[value["fields"][0], field]))
+                self.rejected_with(text)
+        self.rewrite_remote("assistant.json", lambda value: value.update(fields=[]))
+        self.rejected_with("참조하는 이름이 다르다")
+
+    def test_declarations_that_pass_values_to_a_child_process_are_dropped(self):
+        """자식 프로세스의 env 로 값을 건네는 선언은 하나만 있어도 빠진다."""
+        forbidden = sys.modules[self.plugin.__name__ + ".connector_schema"].REMOTE_FORBIDDEN_KEYS
+        original = (self.remote_root / "assistant.json").read_bytes()
+        for key in forbidden:
+            # 앞선 검사를 통과하는 값이다. `operator_env` 는 목록이고 나머지는 env 이름 모양의 문자열로 둔다.
+            value = [] if key == "operator_env" else "REMOTE_DECLARED"
+            with self.subTest(key):
+                (self.remote_root / "assistant.json").write_bytes(original)
+                self.rewrite_remote("assistant.json", lambda declared, key=key, value=value: declared.update({key: value}))
+                self.rejected_with("원격 MCP 서버는 %s 를 선언하지 않는다" % key)
+
+    def test_operator_entry_with_command_or_env_is_dropped(self):
+        for extra in ({"command": sys.executable}, {"env": {"REMOTE_BASE": "value"}}):
+            with self.subTest(extra):
+                self.remote_entry(extra)
+                self.rejected_with("command 나 env")
+
+    def test_unsupported_transport_is_dropped(self):
+        self.rewrite_server(lambda server: server.update(type="sse"))
+        self.rejected_with("MCP 서버 정의 모양이 올바르지 않다")
+
+    def test_local_server_rejects_the_remote_declarations(self):
+        """로컬 서버는 운영 목록의 `url` 과 `headers` 선언을 받지 않는다. 명시한 `type: stdio` 는 받는다."""
+        local = {"root": str(self.connector_root), "command": sys.executable, "env": {"DEMO_BASE": DEMO_BASE}}
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(type="stdio"))
+        self.operator_list({DEMO: local})
+        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+        self.assertEqual(self.plugin._connector_manifest(DEMO)["transport"], "stdio")
+
+        self.operator_list({DEMO: {**local, "url": self.OPERATOR_URL}})
+        self.rejected_with("로컬 MCP 서버는", hidden=(self.OPERATOR_URL,))
+        self.operator_list({DEMO: local})
+        self.rewrite("connector.json", lambda value: value.update(headers={"Authorization": "Bearer ${DEMO_TOKEN}"}))
+        self.rejected_with("로컬 MCP 서버는")
+        self.rewrite("connector.json", lambda value: value.pop("headers"))
+        self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(
+            headers={"Authorization": "Bearer ${DEMO_TOKEN}"}))
+        self.rejected_with("MCP 서버 정의 모양이 올바르지 않다")
 
 
 class HermesToolNameTest(ConnectorGateCase):

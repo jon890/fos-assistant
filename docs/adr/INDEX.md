@@ -116,6 +116,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261015 / memory-maintenance](ADR-20261015-memory-maintenance.md) | 기억 정비는 신호를 쌓아 규칙으로 처리하고, 처음 4주는 제안만 기록한 뒤 정밀도를 보고 자동으로 바꾼다 | backend, frontend | Accepted. 아직 구현하지 않았다. ADR-20261007 / decision-feedback 에 「참고한 기억」 단추 사건을 더한다 |
 | [ADR-20261016 / code-rules](ADR-20261016-code-rules.md) | 규칙의 까닭과 예외는 번호 문서가, 실행 조건은 검사 코드가 갖는다 | 공통 | Accepted. ADR-042의 설명 소유권과 ADR-20261009 / docs-per-module의 문서 배치 예외를 보완한다 |
 | [ADR-20261020 / blog-photo-eval](ADR-20261020-blog-photo-eval.md) | 블로그 사진 이해는 운영 왕복으로 평가하고 규칙으로 판정한다 | backend, hermes | Accepted. 본문 없는 단계 사건에 `referenced` 와 `inspected` 를 더한다 |
+| [ADR-20261026 / plugin-naming](ADR-20261026-plugin-naming.md) | 「커넥터」 는 화면과 문서에서 「플러그인」 이고, 코드 식별자는 `connector` 를 그대로 쓴다 | backend, frontend, hermes | Accepted. 아직 구현하지 않았다. ADR-20261026 / remote-mcp-plugin 의 옮기는 순서 셋째 단계에서 바꾼다 |
 
 ## 보관
 

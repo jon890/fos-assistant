@@ -33,7 +33,8 @@ NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
 # profile별 적재와 reload가 공유 FIFO의 module 이름을 지우지 않는다는 경계다.
 NATIVE_IMAGE_PLUGIN_LOADER = ("hermes_cli/plugins_loader.py", "_directory_module_name", "_evict_modules")
 
-THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "starlette", "PIL"})
+# `httpx2` 는 `mcp` SDK 2 가 함께 설치하는 HTTP 클라이언트다. 원격 MCP 커넥터의 클라이언트를 redirect 없이 직접 만든다.
+THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "httpx2", "starlette", "PIL"})
 
 
 @dataclass(frozen=True)

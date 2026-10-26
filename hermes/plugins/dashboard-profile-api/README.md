@@ -100,8 +100,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 ### 커넥터
 
 **plugin 은 커넥터의 이름을 코드에 두지 않는다.**
-운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다.
-`connector.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
+운영 목록의 plugin 디렉터리마다 `assistant.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다. `assistant.json` 이 없으면 옛 이름 `connector.json` 을 같은 규칙으로 읽고, 둘 다 있으면 그 커넥터를 카탈로그에서 뺀다([ADR-20261026 / plugin-standard-format](../../docs/adr/ADR-20261026-plugin-standard-format.md)).
+`assistant.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
 
 **운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
 
@@ -112,6 +112,10 @@ provider credential 은 이 토큰으로 쓰지 못한다.
     "command": "<MCP 서버를 실행할 파일>",
     "env": { "<operator_env 이름>": "<값>" }
   },
+  "<원격 MCP 커넥터 이름>": {
+    "root": "<plugin 디렉터리>",
+    "url": "<원격 MCP 일 때 필수 주소>"
+  },
   "<다른 커넥터 이름>": "<plugin 디렉터리>"
 }
 ```
@@ -120,17 +124,33 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 둘 다 없거나 실행 권한이 없으면 그 커넥터는 쓸 수 없다
 - `connector.json` 이 `operator_env` 로 적은 이름은 모두 `env` 에 값이 있어야 한다. 그 값은 설치할 때 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다
 - 경로는 절대 경로다. 모양이 틀린 항목은 그 항목만 버린다
+- `url` 은 `.mcp.json` 의 서버가 `type: http` 인 커넥터만 받는다. 그 커넥터의 항목에 `command` 나 `env` 가 있으면 그 항목을 버린다. 규칙은 [ADR-20261026 / remote-mcp-plugin](../../docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖는다
 
-**plugin 디렉터리에서 읽는 것은 넷이다.** `.claude-plugin/plugin.json`, `.mcp.json`, `connector.json`, 스킬 디렉터리다.
+**plugin 디렉터리에서 읽는 것은 넷이다.** 플러그인 manifest(`.claude-plugin/plugin.json` 이나 `.codex-plugin/plugin.json`), MCP 정의(manifest 의 `mcpServers` 경로나 `.mcp.json`), `assistant.json`, 스킬 디렉터리다.
 하나라도 검증에 실패하면 그 커넥터는 카탈로그에서 빠지고 경고 로그 한 줄이 남는다. 대시보드와 다른 커넥터는 그대로 돈다.
 
-- `.mcp.json` 은 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다
+- manifest 가 둘 다 있으면 `name` 이 같아야 하고, 스킬과 MCP 정의의 경로는 `.claude-plugin` 쪽을 쓴다. `hooks`, `commands`, `agents` 같은 다른 칸은 읽지 않는다
+- MCP 정의는 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다
+- 서버의 `type` 이 `http` 이면 원격 MCP 다. 아래 로컬 실행형의 `command`, `args`, `env` 규칙 대신 「원격 MCP 커넥터」 의 규칙을 따른다
 - 서버의 `command` 는 쓰지 않고 운영 목록의 실행 파일로 바꾼다
 - 서버의 `args` 가운데 `${CLAUDE_PLUGIN_ROOT}/` 로 시작하는 것은 plugin 디렉터리 안의 링크 없는 파일이어야 하고 실제 경로로 바꾼다. 그 밖의 `$` 치환은 받지 않는다
 - 서버의 `env` 는 자기 이름의 `${이름}` 참조만 둔다. 선택 칸은 `${이름:-}` 도 된다
 - 값이 없는 선택 칸은 설치할 때 서버 정의에 빈 값을 명시한다. Hermes 는 빈 변수의 참조를 그대로 남기기 때문이다
 
-**`POST /api/connectors/<id>/call` 은 자식 프로세스를 띄운다.**
+**원격 MCP 커넥터는 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
+
+- 주소는 운영 목록의 `url` 이 필수이고 MCP 정의의 `url` 은 무시한다. 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 커넥터를 카탈로그에서 뺀다
+- 헤더는 MCP 정의의 `headers` 와 `assistant.json` 의 `headers` 를 합친 것이다. 값은 `${이름}` 이나 `Bearer ${이름}` 이고 `${이름}` 은 필수 칸 하나다. 같은 헤더 이름이 둘에 있으면 카탈로그에서 뺀다
+- `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `snapshot`, `execution_guard` 를 선언하면 카탈로그에서 뺀다
+- 설치하는 서버 정의는 `{"url", "headers", "strict_redirect_headers", "enabled"}` 와 `tools.exclude` 다. 헤더의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 참이고, Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다
+- 아래 `call` 과 `execute` 는 같은 주소에 직접 붙고, 칸 값은 헤더에만 넣는다. redirect 는 같은 호스트로 가는 것도 따라가지 않는다. 주소와 헤더 값, 인자를 로그에 싣지 않는다
+- 칸 env 이름은 `^[A-Z][A-Z0-9_]{0,127}$` 이고 Hermes 전역 이름과 접두는 거절한다. 목록과 근거는 원격 MCP ADR 이 갖는다
+- `Accept-Encoding: identity` 를 보내고 이 헤더를 플러그인이 덮어쓰지 못하게 한다. `content-encoding` 이 없거나 `identity` 인 응답만 받고 다른 압축 응답은 읽기 전에 닫는다
+- 허용한 응답은 SDK 가 모으기 전에 일반 본문과 SSE 이벤트 하나마다 10 MiB 로 제한한다. SSE 연결의 누적 크기는 제한하지 않는다
+- 원격 호출 동안 SDK 와 HTTP 라이브러리의 로그는 수준과 상관없이 남기지 않는다. 주소와 인자가 WARNING 이상의 예외 문구에도 실리기 때문이다
+- probe 는 Hermes 가 붙는다. redirect 처리는 [Hermes 계약](../../docs/hermes-contract.md) 의 「원격 MCP 서버」 를 따른다
+
+**`POST /api/connectors/<id>/call` 은 자식 프로세스를 띄운다.** 원격 MCP 커넥터는 위 규칙대로 그 주소에 붙는다.
 
 - 자식이 받는 환경 변수는 요청의 칸 값, 운영 목록의 `env`, MCP SDK 가 늘 더하는 기본 env(`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`)뿐이다. `owner_attachments_env` 와 `owner_output_env` 를 선언한 커넥터에는 그 이름을 빈 값으로 준다. 이 경로에는 바인딩 주인이 없기 때문이다.
   `owner_browser_env` 를 선언한 커넥터에는 요청의 `owner_browser`(요청자의 호출 표식을 실은 중계 주소)를 준다. 없거나 중계 주소 모양이 아니면 빈 값이다. 선언하지 않은 커넥터는 그 값을 받아도 넘기지 않는다.

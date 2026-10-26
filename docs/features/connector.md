@@ -258,7 +258,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 연결 확인, 반영 예정 확인, 정의 어긋남 점검, 관리자 반영 완료가 바인딩마다 한다. 결과는 `READY` 거나 `ResyncOutcome` 의 까닭 하나와 함께 `PENDING` 이다.
 
 다시 보내는 설치는 소유 기록의 실행 정의가 지금 manifest 와 다르다는 이유로 거절하지 않는다.
-설정의 서버 정의가 소유 기록과 같을 때만 그 커넥터를 새 manifest 의 command, args, env 로 다시 설치하고, 보관 파일과 연결 값, 같은 profile 의 다른 커넥터는 유지한다.
+설정의 서버 정의가 소유 기록과 같을 때만 그 커넥터를 새 manifest 의 실행 정의(로컬은 command, args, env, 원격은 url, headers)로 다시 설치하고, 보관 파일과 연결 값, 같은 profile 의 다른 커넥터는 유지한다.
 입력 칸의 env 이름이 바뀌면 옛 env 줄을 지우고 같은 값을 새 이름에 쓴다. 새 이름이 이 바인딩이 소유하지 않은 설정과 겹치면 409 다.
 운영자가 서버를 바꾸거나 지웠으면 409 다. MCP 서버 이름을 바꾸는 것은 이 재설치로 옮기지 않는다.
 조회와 실행, probe 는 늘 지금 manifest 와 맞는지 보므로 재설치 전의 낡은 정의로 실행하지 않는다.
@@ -430,6 +430,12 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길을 남기지 않는다.
 그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청은 이 검사를 하지 않는다.
 
+### 플러그인 형식과 원격 MCP
+
+대시보드 plugin 은 운영 목록의 디렉터리를 Claude Code 플러그인이나 Codex 플러그인으로 읽고, assistant 쪽 정보는 `assistant.json`(옛 이름 `connector.json`)에서 읽는다([ADR-20261026 / plugin-standard-format](../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md)).
+MCP 서버가 `type: http` 이면 자식 프로세스 대신 그 원격 서버에 붙고, 연결의 칸 값은 헤더로만 간다([ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md)).
+Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 전송과 무관하게 같다. 읽기 규칙과 운영 목록 항목은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+
 ### 바인딩 설치
 
 `PUT /api/connectors` 의 `enabled: true` 요청은 `bind: {vault}` 의 보관 파일 값으로 그 profile 에 커넥터를 붙인다.
@@ -474,7 +480,7 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 대시보드 plugin 의 `call` 은 공식 `mcp` Python SDK 로 커넥터 서버를 부른다. plugin 은 SDK 를 스스로 설치하지 않고 Hermes 가 설치한 버전을 쓴다.
 
 - **지원 범위는 `mcp>=2.0,<3` 이다.** 검사는 `mcp==2.0.0` 으로 돈다
-- plugin 이 기대는 이름은 `mcp.ClientSession`, `mcp.StdioServerParameters`, `mcp.client.stdio.stdio_client`, `ToolAnnotations.read_only_hint`, `CallToolResult.structured_content`, `CallToolResult.is_error`, `CallToolResult.content` 다
+- plugin 이 기대는 이름은 `mcp.ClientSession`, `mcp.StdioServerParameters`, `mcp.client.stdio.stdio_client`, `ToolAnnotations.read_only_hint`, `CallToolResult.structured_content`, `CallToolResult.is_error`, `CallToolResult.content` 다. 원격 MCP 커넥터를 위해 `mcp.client.streamable_http.streamable_http_client`(`http_client` 인자를 받는다)와 `httpx2.AsyncClient` 도 기댄다
 - 1.x 는 이 속성을 `readOnlyHint`, `structuredContent`, `isError` 로 둔다. 1.x 에서 `is_error` 를 기본값으로 읽으면 도구 오류가 성공으로 읽힌다. 그래서 plugin 은 속성을 직접 읽고, 이름이 없으면 실패한다
 - plugin 은 올라올 때와 `call` 마다 SDK 버전과 위 속성을 확인한다. 범위 밖이거나 속성이 없으면 자식을 띄우지 않고 `unavailable` 로 답하며, 버전과 까닭을 운영 로그 한 줄로 남긴다
 - `call` 이 예외로 실패하면 묶음 예외(`ExceptionGroup`)를 풀어 가장 안쪽 예외의 종류와 SDK 버전을 로그에 남긴다. 예외 본문과 칸 값은 남기지 않는다

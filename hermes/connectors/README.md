@@ -306,6 +306,11 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를
 
 ## connector.json
 
+새 이름은 `assistant.json` 이다. 대시보드 plugin 은 `assistant.json` 을 먼저 읽고, 없으면 `connector.json` 을 같은 규칙으로 읽는다. 둘 다 두면 카탈로그에서 빠진다.
+이 저장소의 커넥터는 이름 변경 단계에서 함께 옮긴다([ADR-20261026 / plugin-standard-format](../docs/adr/ADR-20261026-plugin-standard-format.md)).
+플러그인 manifest 는 `.claude-plugin/plugin.json` 과 `.codex-plugin/plugin.json` 가운데 하나 이상이면 된다.
+원격 MCP(`type: http`) 서버를 둔 플러그인은 아래 칸에 더해 `headers` 를 선언할 수 있다. 규칙은 [`dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+
 plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같은 디렉터리의 `.mcp.json` 이 MCP 서버 하나를 정의하고, `connector.json` 은 그 서버를 사람에게 어떻게 연결하는지를 정한다.
 
 ```json
