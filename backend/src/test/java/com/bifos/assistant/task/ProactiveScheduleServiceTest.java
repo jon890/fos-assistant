@@ -25,7 +25,6 @@ import com.bifos.assistant.task.config.ProactiveScheduleProperties;
 import com.bifos.assistant.task.application.ProactiveScheduleService;
 import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.task.infra.TaskRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,7 +39,6 @@ class ProactiveScheduleServiceTest {
     private final ProactiveCheckReadiness readiness = mock(ProactiveCheckReadiness.class);
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final TaskRepository tasks = mock(TaskRepository.class);
-    private final TaskTriggerRepository triggers = mock(TaskTriggerRepository.class);
     private final ProactiveCheckRepository checks = mock(ProactiveCheckRepository.class);
     private final Agent agent = mock(Agent.class);
     private final CurrentUser user = new CurrentUser(10L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
@@ -86,7 +84,7 @@ class ProactiveScheduleServiceTest {
             .isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE);
 
         verify(tasks, never()).save(any());
-        verifyNoInteractions(triggers, checks);
+        verifyNoInteractions(checks);
     }
 
 
@@ -138,7 +136,6 @@ class ProactiveScheduleServiceTest {
             toolsets,
             new ProactiveScheduleProperties(isolatedExecutionEnabled),
             tasks,
-            triggers,
             checks,
             new TaskProperties(
                 "-",

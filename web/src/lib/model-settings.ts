@@ -83,6 +83,23 @@ export async function getAgentModelSettings(
   };
 }
 
+/** 그룹 하나의 모델 목록이다. 켜진 모든 에이전트에서 도는 provider 와 모델만 담는다 */
+export type GroupModelCatalog = Pick<
+  ModelCatalog,
+  "providers" | "reasoningEfforts"
+>;
+
+/**
+ * `GET /api/admin/model-catalog` 를 읽는다. Hermes 가 목록을 답하지 못했으면 `catalog` 가 null 이고,
+ * 요청 자체가 실패해도 null 로 돌려준다. 두 경우 모두 화면은 저장된 값만 보인다.
+ */
+export async function getGroupModelCatalog(): Promise<GroupModelCatalog | null> {
+  const result = await request<{ catalog: GroupModelCatalog | null }>(
+    "/api/admin/model-catalog",
+  );
+  return result.ok ? (result.data?.catalog ?? null) : null;
+}
+
 export function saveAgentModelDefault(
   code: string,
   choice: AgentModelDefault,

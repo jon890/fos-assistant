@@ -3,6 +3,7 @@ package com.bifos.assistant.context.eval;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -34,6 +35,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 번호를 쓰고 끝나면 지운다.
  */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.QUERY_OUTSIDE_REPOSITORY)
 class MemoryOpsMetricsSqlTest {
 
     static final String RESOURCE = "/memory-eval/ops-metrics.sql";

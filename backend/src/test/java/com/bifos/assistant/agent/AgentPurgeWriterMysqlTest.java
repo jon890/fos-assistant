@@ -3,28 +3,13 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.application.dto.AgentPurgeOutcome;
-import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-/** Flyway 가 만든 실제 MySQL 의 FK 아래에서 지운 에이전트를 지운다. 상위 클래스의 검사가 모두 여기서도 돈다. */
-@Tag("mysql")
+/** Flyway 가 만든 실제 MySQL 의 FK 아래에서 지운 에이전트를 지운다. 상위 클래스에서는 FK 가 걸린 검사만 여기서도 돈다. */
+@MysqlIntegrationTest
 class AgentPurgeWriterMysqlTest extends AgentPurgeWriterTest {
-
-    @DynamicPropertySource
-    static void mysqlProperties(DynamicPropertyRegistry registry) {
-        MysqlTestDatabase database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    }
-
 
     @Test
     @DisplayName("살펴보기의 자식 줄은 FK 가 함께 지우거나 비운다")

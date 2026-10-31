@@ -36,6 +36,7 @@ import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
@@ -138,6 +139,7 @@ class AgentPurgeWriterTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @Test
     @DisplayName("딸린 줄이 모두 있는 지운 에이전트를 지우고 대화와 실행은 남긴다")
     void purgesAgentWithAttachedRowsAndKeepsConversationAndExecution() {

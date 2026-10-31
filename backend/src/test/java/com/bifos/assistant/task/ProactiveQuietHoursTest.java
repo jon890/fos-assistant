@@ -10,10 +10,8 @@ import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.task.application.ProactiveQuietHours;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.infra.TaskRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -25,11 +23,9 @@ class ProactiveQuietHoursTest {
 
     private final ProactiveCheckGuard checks = mock(ProactiveCheckGuard.class);
     private final TaskRepository tasks = mock(TaskRepository.class);
-    private final TaskTriggerRepository triggers = mock(TaskTriggerRepository.class);
     private final AgentExecution origin = mock(AgentExecution.class);
     private final ProactiveCheck scheduled = mock(ProactiveCheck.class);
     private final Task schedule = mock(Task.class);
-    private final TaskTrigger trigger = mock(TaskTrigger.class);
 
 
     @Test
@@ -95,13 +91,11 @@ class ProactiveQuietHoursTest {
         when(tasks.findByOwnerUserIdAndAgentIdAndKind(101L, 201L, TaskKind.CHECK))
             .thenReturn(Optional.of(schedule));
         when(schedule.archived()).thenReturn(false);
-        when(schedule.id()).thenReturn(301L);
-        when(triggers.findByTaskId(301L)).thenReturn(Optional.of(trigger));
-        when(trigger.zone()).thenReturn(zone);
+        when(schedule.zone()).thenReturn(zone);
     }
 
 
     private ProactiveQuietHours policy() {
-        return new ProactiveQuietHours(checks, tasks, triggers);
+        return new ProactiveQuietHours(checks, tasks);
     }
 }

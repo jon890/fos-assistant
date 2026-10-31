@@ -2,7 +2,7 @@
 
 대화마다 모델과 단계를 고르고, 실행이 쓴 토큰과 사용량을 기록해 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
+covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/admin/group-tier-settings.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
 
 ## 요구
 
@@ -92,7 +92,7 @@ sequenceDiagram
 ## 모델을 고를 때
 
 화면은 provider id 원문을 그리지 않는다. Hermes 목록이 준 표시 이름을 쓰고, 목록이 없는 화면은 `web/src/lib/provider-label.ts` 의 `providerLabel()` 이 준 이름을 쓴다.
-관리자가 단계별 모델과 숨김을 편집하는 칸만 id 를 그대로 받는다. 저장 형식과 API 는 id 를 그대로 쓴다.
+관리자가 숨김을 편집하는 칸만 id 를 그대로 받는다. 저장 형식과 API 는 id 를 그대로 쓴다.
 
 모델 목록은 저장하지 않는다. Hermes 가 답한 것을 Control Plane 메모리에 profile 마다 `assistant.chat.model-options-ttl` 동안 들고 있고, Control Plane 이 다시 뜨면 비어서 시작한다.
 다시 읽기가 실패하면 옛 목록을 쓰고 잠시 뒤 다시 읽는다(`ModelOptionsService`).
@@ -128,6 +128,24 @@ sequenceDiagram
 「단계별 모델」 은 빠르게, 균형, 깊게를 골랐을 때 실제로 도는 모델과 강도다. 비워 둔 단계는 에이전트 기본 모델로 돈다.
 그룹 관리자만 그룹 단계 정의와 그룹 기본값을 저장하고, 사용자는 자기 기본 단계만 바꿀 수 있다.
 
+### 그룹 모델 목록
+
+**관리자는 단계별 모델을 그룹 목록에서 고른다. 문자열로 받지 않는다.**
+그룹 목록은 켜진 모든 에이전트 profile 목록의 교집합이다. 모두에게 있는 provider 와 모델만 남아, 고른 모델은 어느 에이전트에서도 돈다.
+그룹이 숨긴 모델은 빠진다. 계산은 `GroupModelCatalogService` 가 하고 `GET /api/v1/admin/model-catalog` 가 돌려준다.
+각 profile 의 목록은 「모델을 고를 때」 의 캐시를 그대로 쓴다. profile 마다 밝힌 reasoning 지원이 다르면 그 칸은 `UNKNOWN` 이다.
+
+| 경우 | 관리자 화면 |
+| --- | --- |
+| 한 profile 이라도 목록을 한 번도 읽지 못했다 | 응답의 `catalog` 가 null 이다. 저장된 값만 선택지로 남고 비우기만 할 수 있다. 강도는 Control Plane 이 받는 값에서 고른다 |
+| 저장된 모델이 그룹 목록에 없다 | 그 값을 「목록에 없음」 을 붙인 선택지로 남겨 보이고 안내한다. 그대로 저장하거나 목록의 모델로 바꾼다 |
+| provider 를 비운 옛 정의다 | 목록과 비교할 수 없어 「목록에 없음」 으로 보인다. 모델을 고르면 provider 가 함께 채워진다 |
+
+저장은 지금처럼 형식과 숨김만 검사한다. 목록에 있는지는 화면이 고르는 칸으로만 지킨다.
+목록이 좁으면 홈서버에서 profile 의 provider 인증을 맞추는 것을 후속으로 검토한다. 맞추면 교집합이 저절로 넓어진다.
+
+모델 설정은 그룹 하나로 모으는 중이다. 슬라이더 칸, 에이전트 기본 모델과 사용자 직접 선택의 정리, 기존 값의 이관은 [ADR-20261101 / model-setting](../adr/ADR-20261101-model-setting.md) 이 갖는다.
+
 ### 모델 선택
 
 대화 선택은 `DEFAULT`, `TIER`, `CUSTOM` 세 모드다. 해석은 `ModelTierService` 가 한다.
@@ -154,7 +172,7 @@ sequenceDiagram
 
 **실행은 단계 모델이 Hermes 목록에 없다는 이유만으로 막지 않는다.**
 Hermes 는 Codex 의 실제 목록을 읽지 못하면 고정된 대체 목록을 같은 모양으로 준다. 그 목록에는 최근 추가된 모델이 빠져 있고, 응답만으로는 대체 목록인지 알 수 없다.
-Control Plane 은 목록을 profile 마다 10분 들고 있어서, 대체 목록을 한 번 받으면 그 10분 동안 같은 단계의 실행이 모두 실패했다. 에이전트 기본 모델이 목록과 견주지 않는 것과 같은 방향으로 맞춘다.
+Control Plane 은 목록을 profile 마다 10분 들고 있어서, 대체 목록을 한 번 받으면 그 10분 동안 같은 단계의 실행이 모두 실패했다. 에이전트 기본 모델이 목록과 비교하지 않는 것과 같은 방향으로 맞춘다.
 
 | 경로 | 목록에 없을 때 |
 | --- | --- |
@@ -178,10 +196,10 @@ Hermes 가 실제로 쓴 provider 와 모델은 실행 완료 시 결과로 갱�
 
 ### 에이전트 기본 모델
 
-`agent` 표가 기본 provider, 모델, effort 를 갖는다. 세 값이 모두 비면 profile 의 값으로 돈다. 모델 없이 effort 만 둘 수 있다.
+`agent` 테이블가 기본 provider, 모델, effort 를 갖는다. 세 값이 모두 비면 profile 의 값으로 돈다. 모델 없이 effort 만 둘 수 있다.
 관리자가 에이전트 상세 화면의 「모델」 절에서 정한다. 코드는 `AgentModelDefaultService` 가 갖는다.
 
-- **저장할 때 그 에이전트의 목록에 있고 숨기지 않은 모델인지 검사하고(없으면 목록을 한 번 다시 읽어 본다), 실행할 때는 목록을 읽지 않고 저장된 값을 그대로 보낸다.** 목록 조회가 실패한 날에도 그 대화가 돈다. 이미 저장된 모델을 두고 effort 만 바꾸는 저장은 목록과 견주지 않는다
+- **저장할 때 그 에이전트의 목록에 있고 숨기지 않은 모델인지 검사하고(없으면 목록을 한 번 다시 읽어 본다), 실행할 때는 목록을 읽지 않고 저장된 값을 그대로 보낸다.** 목록 조회가 실패한 날에도 그 대화가 돈다. 이미 저장된 모델을 두고 effort 만 바꾸는 저장은 목록과 비교하지 않는다
 - effort 의 `none` 은 그 모델(비웠으면 profile 의 기본 모델)의 `disable` 이 `SUPPORTED` 이고 `support` 가 `UNSUPPORTED` 가 아닐 때만 저장한다. 그 판정에는 목록이 필요해 Hermes 가 답하지 못하면 `HERMES_UNAVAILABLE` 이다. 그룹의 단계 정의는 모델을 가리키는 profile 이 하나가 아니라 `none` 을 받지 않는다([ADR-060](../adr/ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md))
 - Hermes 가 목록을 답하지 못해도 관리 화면은 저장된 기본값과 숨김 목록을 보인다. 그때는 기본 모델을 비우거나 숨김을 푸는 것만 할 수 있다
 - 대화가 모델을 직접 고르고 effort 를 비웠으면 에이전트 기본 effort 를 얹지 않는다. 그 effort 는 에이전트 기본 모델에 맞춘 값이다
@@ -193,7 +211,7 @@ Hermes 가 실제로 쓴 provider 와 모델은 실행 완료 시 결과로 갱�
 
 ### 모델 숨김
 
-그룹이 숨긴 provider 와 모델은 `model_hidden` 표에 있다. 숨긴 것만 적고, provider 전체나 provider 의 모델 하나를 숨긴다.
+그룹이 숨긴 provider 와 모델은 `model_hidden` 테이블에 있다. 숨긴 것만 적고, provider 전체나 provider 의 모델 하나를 숨긴다.
 적히지 않은 provider 와 모델은 새로 생긴 것까지 모두 보인다. 판정 규칙은 `HiddenModels` 와 `ModelVisibilityService` 가 갖는다.
 
 같은 규칙이 고를 수 있는 모델 목록, 대화의 직접 선택과 단계 선택 저장, 그룹 단계 정의 저장, 에이전트 기본 모델 저장, 실행 직전에 걸린다.
@@ -207,7 +225,7 @@ mapping 이 빈 단계를 고를 때도 profile 의 기본 모델로 판정한�
 
 **숨김은 실제로 도는 모델까지 강제한다.**
 에이전트 기본값을 정하지 않은 에이전트는 요청에 모델을 싣지 않고, Hermes 가 profile 의 기본 모델로 돌린다.
-그룹에 숨김이 하나라도 있으면 실행 직전에 그 profile 의 기본 provider 와 모델을 숨김과 견준다.
+그룹에 숨김이 하나라도 있으면 실행 직전에 그 profile 의 기본 provider 와 모델을 숨김과 비교한다.
 
 | 경우 | 결과 |
 | --- | --- |
