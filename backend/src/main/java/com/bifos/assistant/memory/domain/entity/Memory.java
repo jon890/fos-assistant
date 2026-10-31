@@ -23,6 +23,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * Memory 한 줄이다. 칸의 뜻은 {@code backend/docs/data-schema.md} 의 「memory」 가 갖는다(ADR-052).
@@ -125,6 +126,7 @@ public class Memory extends CreatedAtEntity {
      * 것으로 보고 자동 보관하지 않는다. 항목의 종류를 나누는 칸이 아니다.
      */
     @Column(nullable = false)
+    @ColumnDefault("false")
     private boolean archivable;
 
 
