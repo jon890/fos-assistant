@@ -83,7 +83,7 @@ class MemoryCaptureConcurrencyTest {
         captureService.undo(USER, capture.id());
         assertCurrent(proposal.id(), ORIGINAL, MemoryStatus.PROPOSED, 2);
         assertThat(captures.findById(capture.id()).orElseThrow().undone()).isTrue();
-        service.update(USER, proposal.id(), CHANGED, true);
+        service.update(USER, proposal.id(), CHANGED, true, null);
         assertCurrent(proposal.id(), CHANGED, MemoryStatus.PROPOSED, 3);
         assertHistory(proposal.id(), ORIGINAL, ORIGINAL);
     }
@@ -108,7 +108,7 @@ class MemoryCaptureConcurrencyTest {
         captureService.undo(USER, capture.id());
         assertThat(memories.findById(result.memoryId())).isEmpty();
         assertCurrent(proposal.id(), CHANGED, MemoryStatus.PROPOSED, 2);
-        service.update(USER, proposal.id(), "산책은 점심에 한다", true);
+        service.update(USER, proposal.id(), "산책은 점심에 한다", true, null);
         assertCurrent(proposal.id(), "산책은 점심에 한다", MemoryStatus.PROPOSED, 3);
         assertHistory(proposal.id(), ORIGINAL, CHANGED);
     }
@@ -137,7 +137,7 @@ class MemoryCaptureConcurrencyTest {
                 throw new AssertionError("중복 후보 조회에 도달하지 않았다");
             }
             // 이 서비스 호출이 반환하면 별도 트랜잭션의 수정이 커밋된 상태다.
-            service.update(USER, proposal.id(), editedContent, true);
+            service.update(USER, proposal.id(), editedContent, true, null);
             committed.countDown();
             return remembering.get(20, TimeUnit.SECONDS);
         } finally {
