@@ -19,7 +19,7 @@
 | 자동 전환 | 두지 않는다. ChatGPT 는 2026-09-14 에 Instant 에서 Thinking 으로의 자동 전환을 없앴다 |
 | 에이전트 기본 모델 | 없앤다. 모든 에이전트가 그룹 설정을 따른다(사용자 결정 2026-11-01) |
 | 사용자의 개별 선택 | 없앤다. `CUSTOM` 모드와 사용자 화면의 provider, 모델, effort 고르기를 지운다(사용자 결정 2026-11-01) |
-| 새 테이블 | 만들지 않는다. 칸 정의는 `model_tier_definition`, 기본 칸은 `model_tier_group_setting` 과 `app_user.model_default_tier` 를 그대로 쓴다 |
+| 데이터 모델 | 그룹의 모델 설정 셋(`model_tier_definition`, `model_tier_group_setting`, `model_hidden`)을 설정 테이블 하나의 JSON 한 칸으로 합친다. 아래 「데이터 모델」 이 갖는다(사용자 결정 2026-11-01). 새 테이블은 만들지 않는다 |
 
 기존 값은 이렇게 옮긴다.
 
@@ -31,6 +31,26 @@
 | 대화의 `DEFAULT` 와 `CUSTOM` 선택 | 선택 없음. 사용자와 그룹 기본 칸으로 돈다. 직접 고른 모델과 effort 의 짝은 칸 하나에 맞춰지지 않아 가장 가까운 칸을 고를 근거가 없다 |
 | 에이전트 기본 모델 | 옮기지 않는다. 관리자가 그룹 설정에서 다시 정한다 |
 | 실행 기록의 단계 이름 | 바꾸지 않는다. 그때 고른 값의 기록이다. 화면이 옛 이름도 그린다 |
+
+### 데이터 모델
+
+**설정 성격의 테이블은 하나로 합친다(사용자 결정 2026-11-01).** `model_tier_group_setting` 을 `group_setting` 으로 이름을 바꿔 그룹 설정 테이블로 넓히고, 나머지 둘의 행을 그 JSON 으로 옮긴 뒤 지운다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `group_id` | 그룹 |
+| `setting_key` | 설정의 종류. 모델 설정은 `MODEL` 이다. 다른 기능의 그룹 설정(예: `toolset_hidden`)도 같은 테이블에 새 키로 옮길 수 있다 |
+| `value` | 설정 JSON 의 문자열. MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라서다(`connector_connection.fields` 와 같은 까닭) |
+| `updated_at` | 마지막으로 바꾼 시각 |
+
+기본 키는 (`group_id`, `setting_key`) 다. `MODEL` 의 JSON 은 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 담고 버전 번호를 함께 둔다.
+JSON 의 형식은 Control Plane 이 저장할 때 검사하고, 읽을 때 모르는 버전이면 설정이 없는 것으로 보지 않고 오류로 올린다.
+사용자 기본 칸(`app_user.model_default_tier`)과 대화의 칸(`conversation.model_tier`)은 사용자와 대화의 값이라 옮기지 않는다.
+
+| | 테이블 | `agent` 테이블의 모델 컬럼 |
+| --- | --- | --- |
+| 지금 | `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 의 셋 | 기본 provider, 모델, effort 의 셋 |
+| 합친 뒤 | `group_setting` 하나. 둘이 줄어든다 | 없다. 셋이 줄어든다 |
 
 ### ChatGPT 모델 선택 조사
 
