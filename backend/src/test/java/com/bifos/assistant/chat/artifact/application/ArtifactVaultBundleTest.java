@@ -34,6 +34,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -231,10 +232,10 @@ class ArtifactVaultBundleTest {
         write(dadConversation, "limit/b.png", new byte[8]);
         write(dadConversation, "limit/c.png", new byte[8]);
 
-        ArtifactVaultService fileLimit = service(new ArtifactVaultProperties(null, 32L, null, null));
-        ArtifactVaultService bundleLimit = service(new ArtifactVaultProperties(null, null, 60L, null));
-        ArtifactVaultService countLimit = service(new ArtifactVaultProperties(null, null, null, 3));
-        ArtifactVaultService quota = service(new ArtifactVaultProperties(60L, null, null, null));
+        ArtifactVaultService fileLimit = service(new ArtifactVaultProperties(null, 32L, null, null, null));
+        ArtifactVaultService bundleLimit = service(new ArtifactVaultProperties(null, null, 60L, null, null));
+        ArtifactVaultService countLimit = service(new ArtifactVaultProperties(null, null, null, 3, null));
+        ArtifactVaultService quota = service(new ArtifactVaultProperties(60L, null, null, null, null));
 
         assertRejected(() -> fileLimit.vault(dad.id(), dadConversation.id(), "limit/one.html"),
             ErrorCode.ARTIFACT_VAULT_UNSUPPORTED);
@@ -411,7 +412,7 @@ class ArtifactVaultBundleTest {
 
 
     private ArtifactVaultService service(ArtifactVaultProperties limits) {
-        return new ArtifactVaultService(reader, rows, writer, bodies, limits, transactions);
+        return new ArtifactVaultService(reader, rows, writer, bodies, limits, transactions, Clock.systemUTC());
     }
 
 
@@ -426,7 +427,7 @@ class ArtifactVaultBundleTest {
                 return bundle;
             }
         };
-        return new ArtifactVaultService(hooked, rows, writer, bodies, limits, transactions);
+        return new ArtifactVaultService(hooked, rows, writer, bodies, limits, transactions, Clock.systemUTC());
     }
 
 
@@ -437,7 +438,10 @@ class ArtifactVaultBundleTest {
 
 
     private int vaultedRowCount(AppUser user) {
-        return jdbc.queryForObject("select count(*) from chat_artifact where vault_user_id = ?", Integer.class, user.id());
+        // 지운 보관본은 본문이 빈 지우기 이력으로 남는다. 본문을 가진 줄만 센다.
+        return jdbc.queryForObject(
+            "select count(*) from chat_artifact where vault_user_id = ? and vault_body is not null", Integer.class,
+            user.id());
     }
 
 

@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.infra;
 
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -64,8 +65,8 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     int deleteAllOf(@Param("conversationId") Long conversationId);
 
 
-    /** 그 사용자가 보관한 사본의 평문 바이트 수 합이다. 용량을 넘는지 볼 때 쓴다. */
-    @Query("select coalesce(sum(a.byteSize), 0) from ChatArtifact a where a.vaultUserId = :userId")
+    /** 그 사용자가 보관한 사본의 평문 바이트 수 합이다. 용량을 넘는지 볼 때 쓴다. 지운 보관본의 이력은 세지 않는다. */
+    @Query("select coalesce(sum(a.byteSize), 0) from ChatArtifact a where a.vaultUserId = :userId and a.deletedAt is null")
     long sumVaultBytes(@Param("userId") Long userId);
 
 
@@ -81,6 +82,7 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
               from ChatArtifact a
              where a.vaultUserId = :userId
                and a.vaultBundleId is null
+               and a.deletedAt is null
              order by a.id desc
             """)
     List<ArtifactVaultRow> listVaulted(@Param("userId") Long userId);
@@ -89,8 +91,8 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     Optional<ChatArtifact> findByIdAndVaultUserId(Long id, Long vaultUserId);
 
 
-    /** 주인의 보관본 가운데 뿌리 행이다. 묶음 안 파일의 번호로는 찾지 못한다. */
-    Optional<ChatArtifact> findByIdAndVaultUserIdAndVaultBundleIdIsNull(Long id, Long vaultUserId);
+    /** 주인의 보관본 가운데 지우지 않은 뿌리 행이다. 묶음 안 파일의 번호와 지운 보관본의 이력으로는 찾지 못한다. */
+    Optional<ChatArtifact> findByIdAndVaultUserIdAndVaultBundleIdIsNullAndDeletedAtIsNull(Long id, Long vaultUserId);
 
 
     /** 주인의 묶음 안에서 그 경로의 파일이다. 주인을 다시 확인한다. */
@@ -112,15 +114,107 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
 
     /**
-     * 주인의 보관본 하나를 지운다. 묶음이면 안의 파일도 함께 지운다. 묶음 안 파일의 번호로는 지우지 못한다.
+     * 주인의 묶음 안 파일을 모두 지운다. 뿌리 행은 {@link #forgetVaulted} 가 이력으로 남긴다.
      *
-     * <p>지운 줄 수가 0 이면 없거나 남의 것이다.
+     * <p>트랜잭션은 {@code ArtifactVaultService} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatArtifact a where a.vaultUserId = :userId and a.vaultBundleId = :id")
+    int deleteVaultParts(@Param("id") Long id, @Param("userId") Long userId);
+
+
+    /**
+     * 주인의 보관본 뿌리 행을 지우기 이력으로 바꾼다. 본문과 key 번호, 경로, 크기를 비우고 지운 시각을 적는다.
+     *
+     * <p>지문은 남겨 자동 보관이 같은 대화·경로·본문을 다시 보관하지 못하게 한다. 지문은 해시라 본문을 되살리지 못한다.
+     * 묶음 안 파일의 번호와 이미 지운 것은 바꾸지 않는다. 바꾼 줄 수가 0 이면 없거나 남의 것이다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            delete from ChatArtifact a
-             where a.vaultUserId = :userId
-               and ((a.id = :id and a.vaultBundleId is null) or a.vaultBundleId = :id)
+            update ChatArtifact a
+               set a.vaultBody = null, a.vaultKeyId = null, a.path = '', a.byteSize = 0, a.deletedAt = :now
+             where a.id = :id
+               and a.vaultUserId = :userId
+               and a.vaultBundleId is null
+               and a.deletedAt is null
             """)
-    int deleteVaulted(@Param("id") Long id, @Param("userId") Long userId);
+    int forgetVaulted(@Param("id") Long id, @Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /** 사용자가 지운 보관본을 그 사용자가 다시 보관할 때 이력 행을 지운다. 새 보관본이 같은 지문을 쓴다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatArtifact a where a.id = :id and a.vaultUserId = :userId and a.deletedAt is not null")
+    int deleteForgotten(@Param("id") Long id, @Param("userId") Long userId);
+
+
+    /**
+     * 그 답에 묶인 결과물 행 가운데 아직 자동 보관 대상이 아닌 것을 {@code PENDING} 으로 둔다.
+     *
+     * <p>같은 turn 의 완료가 두 번 와도 둘째는 0 줄이다. 파일을 지운 행은 두지 않는다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.autoVaultState = :pending
+             where a.messageId = :messageId
+               and a.autoVaultState is null
+               and a.vaultUserId is null
+               and a.deletedAt is null
+            """)
+    int markAutoVaultPending(@Param("messageId") Long messageId, @Param("pending") AutoVaultState pending);
+
+
+    /** 그 상태의 결과물 행 가운데 번호가 {@code afterId} 보다 큰 것을 오래된 것부터 준다. */
+    List<ChatArtifact> findTop100ByAutoVaultStateAndIdGreaterThanOrderByIdAsc(AutoVaultState state, Long afterId);
+
+
+    List<ChatArtifact> findByMessageIdAndAutoVaultState(Long messageId, AutoVaultState state);
+
+
+    Optional<ChatArtifact> findByMessageIdAndPathAndVaultUserIdIsNull(Long messageId, String path);
+
+
+    /** {@code PENDING} 인 줄을 {@code RUNNING} 으로 맡고 시도 횟수를 하나 더한다. 바꾼 줄 수가 1 이면 이 호출이 맡았다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.autoVaultState = :running, a.autoVaultAttempts = a.autoVaultAttempts + 1
+             where a.id = :id
+               and a.autoVaultState = :pending
+            """)
+    int claimAutoVault(
+        @Param("id") Long id, @Param("pending") AutoVaultState pending, @Param("running") AutoVaultState running);
+
+
+    /** 상태가 {@code from} 인 줄만 {@code to} 로 바꾸고 오류 코드를 적는다. 오류 코드는 {@code FAILED} 일 때만 채운다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.autoVaultState = :to, a.autoVaultError = :error
+             where a.id = :id
+               and a.autoVaultState = :from
+            """)
+    int moveAutoVault(
+        @Param("id") Long id,
+        @Param("from") AutoVaultState from,
+        @Param("to") AutoVaultState to,
+        @Param("error") String error);
+
+
+    /** 사용자가 다시 보관을 누른 실패 줄을 처음 상태로 되돌린다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.autoVaultState = :pending, a.autoVaultError = null, a.autoVaultAttempts = 0
+             where a.id = :id
+               and a.autoVaultState = :failed
+            """)
+    int reopenAutoVault(
+        @Param("id") Long id, @Param("failed") AutoVaultState failed, @Param("pending") AutoVaultState pending);
+
+
+    /** 재시작 뒤 맡은 작업이 없는 {@code RUNNING} 줄을 다시 차례에 둔다. Control Plane 은 한 인스턴스로 돈다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ChatArtifact a set a.autoVaultState = :pending where a.autoVaultState = :running")
+    int requeueRunning(@Param("running") AutoVaultState running, @Param("pending") AutoVaultState pending);
 }

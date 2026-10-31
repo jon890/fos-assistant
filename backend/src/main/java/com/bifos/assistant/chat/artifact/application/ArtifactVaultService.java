@@ -17,7 +17,9 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.ZipEntry;
@@ -54,6 +56,7 @@ public class ArtifactVaultService {
     private final ArtifactVaultBodies bodies;
     private final ArtifactVaultProperties properties;
     private final PlatformTransactionManager transactionManager;
+    private final Clock clock;
     private final ReentrantLock[] userLocks = newLocks();
 
     /** 동시에 도는 보관의 자리다. 보관 하나는 파일 하나씩만 메모리에 올리므로 메모리 상한은 이 수에 비례한다. */
@@ -67,6 +70,22 @@ public class ArtifactVaultService {
      * 대화 주인 확인은 호출하는 쪽이 한다.
      */
     public ArtifactVaultItem vault(Long ownerUserId, Long conversationId, String relativePath) {
+        return vault(ownerUserId, conversationId, relativePath, true).orElseThrow();
+    }
+
+
+    /**
+     * turn 이 끝날 때 결과물을 자동으로 보관한다. 사용자가 같은 대화·경로·본문의 보관본을 지운 적이 있으면 다시 만들지 않고
+     * 빈 값을 준다. 나머지는 {@link #vault(Long, Long, String)} 와 같다.
+     */
+    public Optional<ArtifactVaultItem> vaultAutomatically(Long ownerUserId, Long conversationId, String relativePath) {
+        return vault(ownerUserId, conversationId, relativePath, false);
+    }
+
+
+    /** @param revive 사용자가 지운 같은 보관본이 있을 때 다시 만든다. 사용자가 직접 보관할 때만 참이다 */
+    private Optional<ArtifactVaultItem> vault(
+        Long ownerUserId, Long conversationId, String relativePath, boolean revive) {
         String rootPath = ArtifactReferences.normalize(relativePath);
         ArtifactBundleReader.requireVaultable(rootPath);
         if (!running.tryAcquire()) {
@@ -78,11 +97,20 @@ public class ArtifactVaultService {
             lock.lock();
             try {
                 ChatArtifact existing = rows.findByVaultUserIdAndVaultFingerprint(ownerUserId, bundle.fingerprint()).orElse(null);
-                if (existing != null) {
-                    return new ArtifactVaultItem(
-                        existing.id(), existing.path(), bundle.totalBytes(), bundle.fileCount(), existing.createdAt());
+                if (existing != null && !existing.isDeleted()) {
+                    return Optional.of(new ArtifactVaultItem(
+                        existing.id(), existing.path(), bundle.totalBytes(), bundle.fileCount(), existing.createdAt()));
                 }
-                return new TransactionTemplate(transactionManager).execute(status -> save(ownerUserId, bundle));
+                if (existing != null && !revive) {
+                    return Optional.empty();
+                }
+                return Optional.of(new TransactionTemplate(transactionManager).execute(status -> {
+                    if (existing != null) {
+                        // 지우기 이력을 지우고 같은 지문으로 새로 넣는다. 같은 트랜잭션이라 중간에 실패하면 이력이 되살아난다.
+                        rows.deleteForgotten(existing.id(), ownerUserId);
+                    }
+                    return save(ownerUserId, bundle);
+                }));
             } finally {
                 lock.unlock();
             }
@@ -154,13 +182,20 @@ public class ArtifactVaultService {
 
 
     /**
-     * 보관본 하나를 지운다. 묶음이면 안의 파일도 함께 지운다. 행이 곧 본문이라 지우는 순간 읽을 수 없고 재시작으로
+     * 보관본 하나를 지운다. 묶음이면 안의 파일을 함께 지운다. 본문이 행에만 있어 지우는 순간 읽을 수 없고 재시작으로
      * 되살아나지 않는다.
      *
-     * <p>이미 없는 것을 지우려 해도 같은 응답이다. 묶음 안 파일의 번호로는 지우지 못한다.
+     * <p>뿌리 행은 본문과 경로를 비운 지우기 이력으로 남는다. 자동 보관은 이 이력이 있으면 같은 보관본을 다시 만들지 않는다.
+     * 이미 없는 것을 지우려 해도 같은 응답이다. 묶음 안 파일의 번호로는 지우지 못한다.
      */
     public void delete(Long ownerUserId, Long id) {
-        int deleted = new TransactionTemplate(transactionManager).execute(status -> rows.deleteVaulted(id, ownerUserId));
+        int deleted = new TransactionTemplate(transactionManager).execute(status -> {
+            int forgotten = rows.forgetVaulted(id, ownerUserId, clock.instant());
+            if (forgotten == 1) {
+                rows.deleteVaultParts(id, ownerUserId);
+            }
+            return forgotten;
+        });
         if (deleted == 0) {
             throw missing();
         }
@@ -200,7 +235,7 @@ public class ArtifactVaultService {
 
 
     private ChatArtifact root(Long ownerUserId, Long id) {
-        return rows.findByIdAndVaultUserIdAndVaultBundleIdIsNull(id, ownerUserId)
+        return rows.findByIdAndVaultUserIdAndVaultBundleIdIsNullAndDeletedAtIsNull(id, ownerUserId)
             .orElseThrow(ArtifactVaultService::missing);
     }
 

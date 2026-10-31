@@ -68,6 +68,11 @@ public class AppUser extends AuditedEntity {
     @Column(name = "limit_updated_at", insertable = false, updatable = false)
     private Instant limitUpdatedAt;
 
+    // 결과물 자동 보관을 켰는지다(#530). 비어 있으면 고른 적이 없어 ArtifactAutoVaultSetting 의 기본값을 따른다.
+    // 상한처럼 일반 저장이 옛 값으로 덮지 않도록 넣기와 고치기에서 빼고 AppUserRepository 의 전용 쿼리로만 읽고 쓴다.
+    @Column(name = "artifact_auto_vault", insertable = false, updatable = false)
+    private Boolean artifactAutoVault;
+
 
     protected AppUser() {}
 
