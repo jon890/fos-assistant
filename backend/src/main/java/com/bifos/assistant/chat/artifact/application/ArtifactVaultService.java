@@ -24,7 +24,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,7 +51,7 @@ public class ArtifactVaultService {
      * 두지 않으려는 보수적인 판정이다. 묶음 보관은 PR 2 가 맡는다.
      */
     private static final Pattern DEPENDENCY = Pattern.compile(
-        "<\\s*(img|picture|source|video|audio|link|iframe|embed|object|image|use)\\b|srcset\\s*=|url\\s*\\(|@import",
+        "<\\s*(img|picture|source|video|audio|link|iframe|embed|object|image|use)\\b|srcset\\s*=|background\\s*=|feImage|url\\s*\\(|@import",
         Pattern.CASE_INSENSITIVE);
 
     private final ArtifactService artifacts;
@@ -134,17 +133,11 @@ public class ArtifactVaultService {
             throw new ApiException(ErrorCode.ARTIFACT_VAULT_FULL, "the vault of this user is full");
         }
         SealedText sealed = bodies.seal(ownerUserId, conversationId, path, fingerprint, text);
-        try {
-            ChatArtifact saved = rows.saveAndFlush(ChatArtifact.vaulted(
-                conversationId, path, size, ownerUserId, sealed.keyId(), sealed.content(), fingerprint));
-            log.info("artifact vaulted id={} contentType={}", saved.id(), contentType);
-            return item(saved);
-        } catch (DataIntegrityViolationException ex) {
-            // 다른 요청이 같은 지문을 먼저 저장했다. 중복을 만들지 않고 그 줄을 돌려준다.
-            return rows.findByVaultUserIdAndVaultFingerprint(ownerUserId, fingerprint)
-                .map(ArtifactVaultService::item)
-                .orElseThrow(() -> ex);
-        }
+        // 같은 지문의 동시 요청은 사용자별 잠금이 막고, 남는 경쟁은 유일 인덱스가 거절한다. 같은 트랜잭션에서 다시 찾지 않는다.
+        ChatArtifact saved = rows.saveAndFlush(ChatArtifact.vaulted(
+            conversationId, path, size, ownerUserId, sealed.keyId(), sealed.content(), fingerprint));
+        log.info("artifact vaulted id={} contentType={}", saved.id(), contentType);
+        return item(saved);
     }
 
 

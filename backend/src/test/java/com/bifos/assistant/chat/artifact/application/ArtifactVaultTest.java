@@ -246,10 +246,12 @@ class ArtifactVaultTest {
     void rejectsUnsupportedFiles() {
         write(dadConversation, "photo.png", "png");
         write(dadConversation, "withimg.html", "<p><img src=\"a.png\"></p>");
+        write(dadConversation, "withfe.html", "<svg><feImage href=\"a.png\"/></svg>");
+        write(dadConversation, "withbg.html", "<body background=\"a.jpg\">");
         write(dadConversation, "withurl.css", "p{background:url(a.png)}");
         write(dadConversation, "big.css", "x".repeat(6 * 1024 * 1024));
 
-        for (String path : new String[] {"photo.png", "withimg.html", "withurl.css", "big.css"}) {
+        for (String path : new String[] {"photo.png", "withimg.html", "withfe.html", "withbg.html", "withurl.css", "big.css"}) {
             assertThatThrownBy(() -> vault.vault(dad.id(), dadConversation.id(), path))
                 .as(path)
                 .isInstanceOfSatisfying(
