@@ -67,6 +67,9 @@ public class CheckResultParser {
     private static final int ITEMS_MAX = 6;
     private static final int NEXT_TEXT_MAX = 300;
     private static final int CHANGE_SINCE_LAST_MAX = 300;
+    private static final int SUGGESTIONS_MAX = 5;
+    private static final int SUGGESTION_ID_MAX = 120;
+    private static final int SUGGESTION_TITLE_MAX = 200;
     private static final int PROBLEMS_MAX = 3;
     private static final int PROBLEM_KEY_MAX = 120;
     private static final int PROBLEM_MAX = 300;
@@ -154,7 +157,8 @@ public class CheckResultParser {
             texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
             texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX),
             version.asInt() >= 2 ? report(root.get("report")) : null,
-            version.asInt() == 3 ? problems(root.get("problemCandidates")) : List.of()));
+            version.asInt() == 3 ? problems(root.get("problemCandidates")) : List.of(),
+            suggestions(root.get("suggestions"))));
     }
 
 
@@ -245,6 +249,33 @@ public class CheckResultParser {
             if (element.isObject()) {
                 found.add(problem(element));
             }
+        }
+        return List.copyOf(found);
+    }
+
+
+    /**
+     * 제안 항목을 읽는다. 객체가 아닌 원소와 제목이 없는 원소는 건너뛰고 상한을 넘는 원소는 버린다. {@code detail} 은 구조를 보지 않고 JSON
+     * 글로만 옮긴다. 크기 검사는 저장하는 쪽이 한다.
+     */
+    private static List<CheckResultBlock.Suggestion> suggestions(JsonNode array) {
+        List<CheckResultBlock.Suggestion> found = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return found;
+        }
+        for (JsonNode element : array) {
+            if (found.size() >= SUGGESTIONS_MAX) {
+                break;
+            }
+            String title = element.isObject() ? text(element.get("title"), SUGGESTION_TITLE_MAX) : null;
+            if (title == null) {
+                continue;
+            }
+            JsonNode detail = element.get("detail");
+            found.add(new CheckResultBlock.Suggestion(
+                text(element.get("id"), SUGGESTION_ID_MAX),
+                title,
+                detail == null || detail.isNull() ? null : detail.toString()));
         }
         return List.copyOf(found);
     }

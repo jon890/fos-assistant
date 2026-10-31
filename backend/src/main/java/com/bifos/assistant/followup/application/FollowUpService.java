@@ -12,6 +12,8 @@ import com.bifos.assistant.followup.application.dto.FollowUpPatch;
 import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.followup.application.dto.NewFollowUp;
+import com.bifos.assistant.followup.application.dto.SuggestedItem;
+import com.bifos.assistant.followup.application.dto.SuggestionOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
@@ -68,12 +70,16 @@ public class FollowUpService {
     /** 한 실행이 제안할 수 있는 줄의 상한이다. */
     static final int MAX_PROPOSALS_PER_EXECUTION = 2;
 
+    /** 제안 본문(JSON 글)의 글자 수 상한이다. 값은 {@link FollowUpSuggestions} 가 갖는다. */
+    public static final int SUGGESTION_DETAIL_MAX = FollowUpSuggestions.DETAIL_MAX;
+
     private static final Set<FollowUpStatus> LISTED = Set.of(FollowUpStatus.PROPOSED, FollowUpStatus.OPEN);
 
     private final FollowUpRepository followUps;
     private final ConversationAccess conversations;
     private final ConversationPublicIdLookup conversationIds;
     private final DecisionFeedbackRecorder feedback;
+    private final FollowUpSuggestions suggestions;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -84,12 +90,14 @@ public class FollowUpService {
         ConversationAccess conversations,
         ConversationPublicIdLookup conversationIds,
         DecisionFeedbackRecorder feedback,
+        FollowUpSuggestions suggestions,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.followUps = followUps;
         this.conversations = conversations;
         this.conversationIds = conversationIds;
         this.feedback = feedback;
+        this.suggestions = suggestions;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -136,7 +144,10 @@ public class FollowUpService {
      */
     @Transactional(readOnly = true)
     public List<FollowUpSnapshot> openAndProposedOf(Long userId) {
-        return snapshots(followUps.findByUserIdAndStatusInOrderByIdAsc(userId, LISTED));
+        Instant now = clock.instant();
+        return snapshots(followUps.findByUserIdAndStatusInOrderByIdAsc(userId, LISTED).stream()
+            .filter(row -> !row.expiredAt(now))
+            .toList());
     }
 
 
@@ -228,6 +239,17 @@ public class FollowUpService {
     }
 
 
+    /**
+     * 먼저 살펴보기의 결과 블록이 낸 제안 항목을 할 일의 {@code PROPOSED} 줄로 저장한다. 규칙은 {@link FollowUpSuggestions} 가 갖는다.
+     *
+     * @param executionId 제안을 낸 살펴보기 실행의 번호
+     * @return 항목 순서대로의 결과
+     */
+    public List<SuggestionOutcome> proposeSuggestion(Long executionId, List<SuggestedItem> items) {
+        return suggestions.propose(executionId, items);
+    }
+
+
     /** 보통 대화는 모든 열린 제안, 점검 대화는 최근 7일의 제안만 센다. */
     private long openProposalCount(CurrentUser owner, Long conversationId, Instant now) {
         if (conversations.requireOwn(owner, conversationId).purpose() == ConversationPurpose.CHECK) {
@@ -248,7 +270,7 @@ public class FollowUpService {
         try {
             saved = transactions.execute(status -> {
                 FollowUp followUp = requireOwn(user, id);
-                if (!followUp.status().open()) {
+                if (!followUp.status().open() || followUp.expiredAt(now)) {
                     throw notInState();
                 }
                 String title = newTitle == null ? followUp.title() : newTitle;
@@ -316,7 +338,7 @@ public class FollowUpService {
         Instant now = clock.instant();
         FollowUp saved = transactions.execute(status -> {
             FollowUp followUp = requireOwn(user, id);
-            if (followUp.status() != from) {
+            if (followUp.status() != from || followUp.expiredAt(now)) {
                 throw notInState();
             }
             move.accept(followUp, now);
@@ -367,7 +389,7 @@ public class FollowUpService {
      * 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 제목 열쇠다. 제목은 담지 않는다. 트랜잭션 안에서 부르면 커밋한
      * 뒤에 남는다.
      */
-    private static FeedbackEntry feedbackOf(
+    static FeedbackEntry feedbackOf(
         FollowUp followUp, FeedbackEventType type, FeedbackActor actor, Instant now) {
         return FeedbackEntry.of(followUp.userId(), FeedbackSubjectType.FOLLOW_UP, followUp.publicId(), type, actor, now)
             .conversation(followUp.conversationId())

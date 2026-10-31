@@ -22,13 +22,12 @@ import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.loop.domain.ProactiveLoopRun;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.loop.domain.type.LoopSkippedReason;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.loop.infra.ProactiveLoopRunRepository;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
+import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.TestClock;
@@ -46,6 +45,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 매일 루프 통합 검사가 함께 쓰는 준비와 정리다. 설치 설정은 검사 클래스 단위로만 바꿀 수 있어, 설정 조합마다 검사 클래스를 나누고 이 클래스를
@@ -89,7 +89,10 @@ abstract class ProactiveLoopTestSupport {
     ProactiveLoopRunRepository loopRuns;
 
     @Autowired
-    ProactiveLoopSettingRepository loopSettings;
+    LoopScheduleSettings loopSettings;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -120,7 +123,7 @@ abstract class ProactiveLoopTestSupport {
     void tearDown() {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM proactive_loop_run WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM proactive_loop_setting WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_autonomy_decision WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM user_autonomy_preference WHERE user_id = ?", userId);
@@ -169,9 +172,10 @@ abstract class ProactiveLoopTestSupport {
     }
 
 
-    /** 설정 줄을 서비스를 거치지 않고 저장한다. 설치 설정이 꺼져 있어도 켜진 줄을 둘 수 있다. */
+    /** 설정(CHECK 작업)을 서비스를 거치지 않고 저장한다. 설치 설정이 꺼져 있어도 켜진 줄을 둘 수 있다. */
     void saveSetting(CurrentUser user, Agent agent, boolean enabled, Instant snoozedUntil) {
-        loopSettings.save(ProactiveLoopSetting.of(user.id(), agent.id(), enabled, snoozedUntil, clock.instant()));
+        transactions.executeWithoutResult(
+            status -> loopSettings.save(user.id(), agent.id(), enabled, snoozedUntil, clock.instant()));
     }
 
 
