@@ -62,7 +62,11 @@ export function createMemory(input: {
 
 export function updateMemory(
   id: number,
-  input: { content: FormDataEntryValue | null; alwaysInject: boolean },
+  input: {
+    content: FormDataEntryValue | null;
+    alwaysInject: boolean;
+    archivable?: boolean;
+  },
 ): Promise<Response> {
   return fetch(`/api/memories/${id}`, {
     method: "PATCH",

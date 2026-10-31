@@ -8,18 +8,28 @@ import {
 import { MemoryList, type Memory } from "@/components/memory/memory-list";
 import type { SupersedeProposal } from "@/lib/memory-link-api";
 import { callControlPlane } from "@/lib/control-plane";
+import type { MaintenanceCandidate } from "@/lib/memory-maintenance-api";
 import { readMe } from "@/lib/me";
 
-export default async function MemoryPage() {
+export default async function MemoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ memory?: string | string[] }>;
+}) {
   const session = await auth();
   if (!session?.user?.email) redirect("/signin");
-  const [result, documents, collections, me, supersedes] = await Promise.all([
-    callControlPlane<Memory[]>("/api/v1/memories"),
-    callControlPlane<MemoryDocument[]>("/api/v1/memory-documents"),
-    callControlPlane<MemoryCollectionOption[]>("/api/v1/memory-collections"),
-    readMe(),
-    callControlPlane<SupersedeProposal[]>("/api/v1/memory-links/pending"),
-  ]);
+  const { memory } = await searchParams;
+  const [result, documents, collections, me, supersedes, candidates] =
+    await Promise.all([
+      callControlPlane<Memory[]>("/api/v1/memories"),
+      callControlPlane<MemoryDocument[]>("/api/v1/memory-documents"),
+      callControlPlane<MemoryCollectionOption[]>("/api/v1/memory-collections"),
+      readMe(),
+      callControlPlane<SupersedeProposal[]>("/api/v1/memory-links/pending"),
+      callControlPlane<MaintenanceCandidate[]>(
+        "/api/v1/memory/maintenance-candidates",
+      ),
+    ]);
   if (!result.ok) return <p className="text-sm">{result.message}</p>;
   const readAt = new Date().toISOString();
   // 문서 탭을 읽지 못해도 기억 목록은 그대로 그린다.
@@ -28,6 +38,12 @@ export default async function MemoryPage() {
     <MemoryList
       initialMemories={result.data}
       initialSupersedes={supersedes.ok ? supersedes.data : []}
+      initialCandidates={candidates.ok ? candidates.data : []}
+      focusMemoryId={
+        typeof memory === "string" && /^\d+$/.test(memory)
+          ? Number(memory)
+          : undefined
+      }
       isAdmin={me?.role === "ADMIN"}
       currentUserId={me?.id}
       readAt={readAt}
