@@ -8,7 +8,8 @@ import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckSettled
 import com.bifos.assistant.proactive.autonomy.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.loop.domain.ProactiveLoopRun;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
+import com.bifos.assistant.proactive.loop.application.dto.LoopScheduleState;
+import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
 import com.bifos.assistant.proactive.evaluation.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
@@ -18,7 +19,6 @@ import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.loop.infra.ProactiveLoopRunRepository;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -57,7 +57,7 @@ public class ProactiveLoopCoordinator {
 
     private final ProactiveCheckRepository checks;
     private final ProactiveCheckProblemRepository problems;
-    private final ProactiveLoopSettingRepository settings;
+    private final LoopScheduleSettings schedules;
     private final ProactiveLoopRunRepository runs;
     private final ValueEvaluationService evaluations;
     private final AutonomyPolicyService autonomy;
@@ -115,23 +115,21 @@ public class ProactiveLoopCoordinator {
 
     /** 잠그기 전 읽기다. 동의하지 않은 사용자의 살펴보기마다 잠금을 잡지 않게 먼저 거른다. */
     private boolean consented(ProactiveCheck check) {
-        return settings.findByUserIdAndAgentId(check.userId(), check.agentId())
-            .map(ProactiveLoopSetting::enabled)
+        return schedules.find(check.userId(), check.agentId())
+            .map(LoopScheduleState::enabled)
             .orElse(false);
     }
 
 
     /**
-     * 그 사용자의 설정 줄을 모두 쓰기 잠금으로 잡고 시도 줄을 저장한다. 같은 사용자의 두 깨우기가 하루 상한을 함께 넘지 않게 같은 트랜잭션에서 센다.
+     * 그 사용자의 CHECK 작업 줄을 모두 쓰기 잠금으로 잡고 시도 줄을 저장한다. 같은 사용자의 두 깨우기가 하루 상한을 함께 넘지 않게 같은
+     * 트랜잭션에서 센다.
      *
      * @return 저장한 시도 줄. 잠근 뒤 설정이 꺼졌거나 지워졌으면 null
      */
     private ProactiveLoopRun begin(ProactiveCheck check, int maxRunsPerDay) {
         Long userId = check.userId();
-        ProactiveLoopSetting setting = settings.findByUserIdOrderByIdAsc(userId).stream()
-            .filter(each -> each.agentId().equals(check.agentId()))
-            .findFirst()
-            .orElse(null);
+        LoopScheduleState setting = schedules.findLockingUser(userId, check.agentId()).orElse(null);
         if (setting == null || !setting.enabled()) {
             return null;
         }

@@ -12,6 +12,7 @@ import java.util.List;
  *
  * @param outcome {@link CheckOutcome#FINDINGS} 나 {@link CheckOutcome#NOTHING_NEW} 만 온다
  * @param problemCandidates 버전 3의 문제 후보다. 버전 1과 2는 비어 있다
+ * @param suggestions 제안 항목이다. 기능 스위치가 켜졌을 때만 저장 경로가 읽는다. 버전과 상관없이 없으면 비어 있다
  */
 public record CheckResultBlock(
     int version,
@@ -22,7 +23,33 @@ public record CheckResultBlock(
     List<String> followUpCandidates,
     List<String> sourceFailures,
     ReportDraft report,
-    List<ProblemCandidate> problemCandidates) {
+    List<ProblemCandidate> problemCandidates,
+    List<Suggestion> suggestions) {
+
+    /** 제안 항목이 없는 블록이다. */
+    public CheckResultBlock(
+        int version,
+        CheckOutcome outcome,
+        String summary,
+        List<Finding> findings,
+        List<String> questions,
+        List<String> followUpCandidates,
+        List<String> sourceFailures,
+        ReportDraft report,
+        List<ProblemCandidate> problemCandidates) {
+        this(
+            version,
+            outcome,
+            summary,
+            findings,
+            questions,
+            followUpCandidates,
+            sourceFailures,
+            report,
+            problemCandidates,
+            List.of());
+    }
+
 
     /** 발견 하나다. */
     public record Finding(
@@ -61,6 +88,15 @@ public record CheckResultBlock(
         String sideEffect,
         String risk,
         String changeSinceLast) {
+    }
+
+    /**
+     * 모델이 낸 제안 항목 하나다. 서버는 소유와 크기만 검사하고 {@code detailJson} 의 구조를 보지 않는다.
+     *
+     * @param id 모델이 준 항목 식별자. 없으면 비어 있고 저장할 때 블록 안의 순번을 쓴다
+     * @param detailJson 모델이 낸 자유 JSON 을 글로 옮긴 것. 없으면 비어 있다
+     */
+    public record Suggestion(String id, String title, String detailJson) {
     }
 
     /** 결과 블록 v2에서 모델이 제안한 보고 글이다. 근거와 승인 항목은 Control Plane 이 채운다. */

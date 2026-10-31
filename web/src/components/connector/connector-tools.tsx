@@ -58,18 +58,57 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
   );
 }
 
+/** 표준 플러그인 카드와 연결 화면이 함께 보이는 안내다. */
+export const STANDARD_PLUGIN_NOTICE = "모든 도구를 쓸 때마다 확인해요.";
+
+/**
+ * `assistant.json` 이 없는 표준 플러그인의 「할 수 있는 일」 이다. 선언한 도구가 없어 마지막 연결 확인에서 받은 도구 수만 보인다.
+ * 읽기 표시가 있는 도구는 한 번 승인한 뒤 계속 허락할 수 있다.
+ */
+export function StandardPluginTools({
+  listedTools,
+  readOnlyTools,
+}: {
+  listedTools: number | null;
+  readOnlyTools: number | null;
+}) {
+  return (
+    <div className="space-y-1 text-sm" data-testid="standard-plugin-tools">
+      <p>{STANDARD_PLUGIN_NOTICE}</p>
+      {listedTools !== null ? (
+        <p
+          className="text-muted-foreground"
+          data-testid="standard-plugin-tool-count"
+        >
+          마지막 확인에서 도구 {listedTools}개를 받았어요.
+          {readOnlyTools
+            ? ` 그 가운데 읽기만 하는 도구 ${readOnlyTools}개는 한 번 승인한 뒤 계속 허락할 수 있어요.`
+            : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** 연결 화면의 「할 수 있는 일」 절이다. 서비스가 알려 주지 않은 도구는 쓰지 않는다고 알린다. */
 export function ConnectorToolsSection({
   tools,
   undeclaredTools,
+  standard,
 }: {
   tools: ConnectorTool[];
   undeclaredTools: number;
+  /** 표준 플러그인이면 마지막 확인에서 받은 도구 수다. 아니면 없다. */
+  standard?: { listedTools: number | null; readOnlyTools: number | null };
 }) {
   return (
     <section className="space-y-2">
       <h2 className="text-sm font-semibold">할 수 있는 일</h2>
-      <ConnectorTools tools={tools} />
+      {standard ? (
+        <StandardPluginTools {...standard} />
+      ) : (
+        <ConnectorTools tools={tools} />
+      )}
       {undeclaredTools > 0 ? (
         <Notice
           variant="info"

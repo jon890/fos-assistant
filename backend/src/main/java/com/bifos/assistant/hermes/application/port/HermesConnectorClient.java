@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
@@ -85,6 +86,23 @@ public interface HermesConnectorClient {
      * @param ownerBrowser {@link #call} 과 같다
      */
     CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser);
+
+
+    /**
+     * 후보 값으로 표준 플러그인({@code schema: 3})의 MCP 서버에 붙어 {@code tools/list} 만 받는다. 도구를 부르지 않는다.
+     *
+     * <p>확인 도구가 없는 커넥터의 연결 확인이다(ADR-20261101 / plugin-without-assistant-json). 이 경로를 모르는 옛 대시보드 plugin 이면
+     * {@code unavailable} 이다.
+     */
+    default ConnectorToolListing listTools(String connectorId, Map<String, String> values) {
+        return ConnectorToolListing.failure(ConnectorCallError.UNAVAILABLE);
+    }
+
+
+    /** 보관 파일의 값으로 {@link #listTools} 와 같은 것을 받는다. 값은 Control Plane 을 거치지 않는다. */
+    default ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
+        return ConnectorToolListing.failure(ConnectorCallError.UNAVAILABLE);
+    }
 
 
     /**

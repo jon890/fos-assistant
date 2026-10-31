@@ -51,4 +51,12 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
     /** 그 실행이 제안한 줄의 수다. 끝난 줄도 센다. */
     long countByProposedByExecutionId(Long executionId);
+
+
+    /** 같은 실행의 같은 결과 항목으로 이미 만든 제안이다. 키는 서버가 계산한 SHA-256 16진수다. */
+    Optional<FollowUp> findByUserIdAndDedupeKey(Long userId, String dedupeKey);
+
+
+    /** 그 대화에서 먼저 살펴보기가 낸 제안 줄이다(중복 열쇠가 있는 줄). 대화를 지울 때 제안의 줄과 본문을 지우려고 읽는다. */
+    List<FollowUp> findByConversationIdAndDedupeKeyIsNotNull(Long conversationId);
 }
