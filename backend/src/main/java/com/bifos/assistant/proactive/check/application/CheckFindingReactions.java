@@ -8,6 +8,7 @@ import com.bifos.assistant.feedback.domain.FeedbackEvent;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
+import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.proactive.check.application.dto.CheckFindingView;
 import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
@@ -38,6 +39,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>사건 열쇠는 {@code check_finding:<발견 번호>} 다. 발견의 지금 반응은 그 발견의 마지막 사용자 사건이다. 남의 발견과 「참고」 발견은
  * 없는 발견과 같은 응답으로 숨긴다.
+ *
+ * <p>발견을 할 일의 제안 줄로 옮겼으면({@link LegacySuggestionBackfill}) 반응은 그 줄의 열쇠 {@code follow_up:<공개 식별자>} 로 읽고
+ * 쓴다. 옛 번호로 들어오는 요청과 응답의 모양은 그대로다. 옮긴 줄이 없는 발견은 옛 열쇠를 쓴다.
  */
 @Component
 @RequiredArgsConstructor
@@ -50,6 +54,7 @@ public class CheckFindingReactions {
     private final FeedbackEventRepository events;
     private final DecisionFeedbackRecorder feedback;
     private final ConversationAccess conversations;
+    private final FollowUpService followUps;
     private final LiveProperties<ProactiveCheckProperties> properties;
     private final Clock clock;
 
@@ -117,11 +122,14 @@ public class CheckFindingReactions {
         if (current(user.id(), List.of(findingId)).get(findingId) == reaction) {
             return;
         }
-        feedback.record(entry(check, findingId, reaction.eventType(), FeedbackActor.USER));
+        feedback.record(entry(check, subjectOf(user.id(), findingId), reaction.eventType(), FeedbackActor.USER));
     }
 
 
-    /** 발견마다 마지막 사용자 반응이다. 반응이 없는 발견은 맵에 없다. */
+    /**
+     * 발견마다 마지막 사용자 반응이다. 반응이 없는 발견은 맵에 없다. 제안 줄로 옮긴 발견은 옛 열쇠와 새 열쇠의 사건을 시간 순서로 함께 읽는다.
+     * 옛 열쇠에 남은 사건이 있을 수 있기 때문이다.
+     */
     public Map<Long, FindingReaction> current(Long userId, Collection<Long> findingIds) {
         if (findingIds.isEmpty()) {
             return Map.of();
@@ -130,6 +138,7 @@ public class CheckFindingReactions {
         for (Long id : findingIds) {
             idsByKey.put(FeedbackSubjectType.CHECK_FINDING.key(id), id);
         }
+        movedTo(userId, findingIds).forEach((id, followUpId) -> idsByKey.put(FeedbackSubjectType.FOLLOW_UP.key(followUpId), id));
         Map<Long, FindingReaction> reactions = new HashMap<>();
         for (FeedbackEvent event : events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(userId, idsByKey.keySet())) {
             FindingReaction reaction = FindingReaction.of(event.eventType());
@@ -143,15 +152,48 @@ public class CheckFindingReactions {
 
     /** 보고를 보인 살펴보기의 「새로 알릴 것」 발견마다 {@code SURFACED} 를 남긴다. */
     public void surfaced(ProactiveCheck check) {
-        for (ProactiveCheckFinding finding : findings.findByCheckIdAndKind(check.id(), FindingKind.NEW)) {
-            feedback.record(entry(check, finding.id(), FeedbackEventType.SURFACED, FeedbackActor.SYSTEM));
+        List<ProactiveCheckFinding> shown = findings.findByCheckIdAndKind(check.id(), FindingKind.NEW);
+        Map<Long, UUID> moved = movedTo(check.userId(), shown.stream().map(ProactiveCheckFinding::id).toList());
+        for (ProactiveCheckFinding finding : shown) {
+            feedback.record(entry(check, subjectOf(finding.id(), moved.get(finding.id())), FeedbackEventType.SURFACED, FeedbackActor.SYSTEM));
         }
     }
 
 
-    private FeedbackEntry entry(ProactiveCheck check, Long findingId, FeedbackEventType type, FeedbackActor actor) {
-        return FeedbackEntry.of(
-            check.userId(), FeedbackSubjectType.CHECK_FINDING, findingId, type, actor, clock.instant())
+    /** 발견 가운데 제안 줄로 옮긴 것의 줄 공개 식별자다. 옮기지 않은 발견은 맵에 없다. */
+    private Map<Long, UUID> movedTo(Long userId, Collection<Long> findingIds) {
+        Map<String, UUID> byKey = followUps.suggestionPublicIds(
+            userId, findingIds.stream().map(LegacySuggestionKeys::finding).toList());
+        Map<Long, UUID> moved = new HashMap<>();
+        for (Long id : findingIds) {
+            UUID followUpId = byKey.get(LegacySuggestionKeys.finding(id));
+            if (followUpId != null) {
+                moved.put(id, followUpId);
+            }
+        }
+        return moved;
+    }
+
+
+    private Subject subjectOf(Long userId, Long findingId) {
+        return subjectOf(findingId, movedTo(userId, List.of(findingId)).get(findingId));
+    }
+
+
+    private static Subject subjectOf(Long findingId, UUID followUpId) {
+        return followUpId == null
+            ? new Subject(FeedbackSubjectType.CHECK_FINDING, FeedbackSubjectType.CHECK_FINDING.key(findingId))
+            : new Subject(FeedbackSubjectType.FOLLOW_UP, FeedbackSubjectType.FOLLOW_UP.key(followUpId));
+    }
+
+
+    /** 사건이 가리키는 제안의 종류와 열쇠다. */
+    private record Subject(FeedbackSubjectType type, String key) {
+    }
+
+
+    private FeedbackEntry entry(ProactiveCheck check, Subject subject, FeedbackEventType type, FeedbackActor actor) {
+        return FeedbackEntry.ofKey(check.userId(), subject.type(), subject.key(), type, actor, clock.instant())
             .conversation(check.conversationId())
             .originExecution(check.rootExecutionId())
             .sourceCheck(check.id());

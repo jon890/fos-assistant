@@ -2,6 +2,7 @@ package com.bifos.assistant.feedback.infra;
 
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -53,6 +54,20 @@ public interface FeedbackEventRepository extends JpaRepository<FeedbackEvent, Lo
         + " com.bifos.assistant.feedback.domain.type.FeedbackEventType.MAINTENANCE_DENIED)")
     int deleteOfSubjectsKeepingMaintenance(
         @Param("userId") Long userId, @Param("subjectKeys") Collection<String> subjectKeys);
+
+
+    /**
+     * 그 사용자의 한 제안 열쇠에 남은 사건을 다른 제안 열쇠로 옮긴다. 옛 제안의 줄을 새 제안 줄로 옮긴 뒤 반응이 새 줄을 가리키게 하려고
+     * 한 번 쓴다. 사건의 나머지 칸은 그대로 둔다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update FeedbackEvent e set e.subjectType = :toType, e.subjectKey = :toKey"
+        + " where e.userId = :userId and e.subjectKey = :fromKey")
+    int repointSubject(
+        @Param("userId") Long userId,
+        @Param("fromKey") String fromKey,
+        @Param("toType") FeedbackSubjectType toType,
+        @Param("toKey") String toKey);
 
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)

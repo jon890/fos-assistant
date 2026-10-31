@@ -4,6 +4,7 @@ import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.followup.application.dto.LegacySuggestion;
 import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.followup.application.dto.SuggestionOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -17,7 +18,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -110,6 +115,104 @@ public class FollowUpSuggestions {
             }
             return SuggestionOutcome.DUPLICATE;
         }
+    }
+
+
+    /**
+     * 옛 발견이나 문제 후보 하나를 제안 줄로 옮긴다. 이미 옮긴 줄이면 새 줄을 만들지 않는다.
+     *
+     * <p>옛 줄이 생긴 시각부터 {@link #TTL} 이 지났으면 만료된 제안으로 옮긴다. 화면에는 보이지 않고 열린 줄에서도 빠져, 같은 제목의 새
+     * 제안을 막지 않는다. 그 밖에는 같은 제목의 열린 줄이 있으면 새 줄을 만들지 않고, 같은 대화에서 30일 안에 거절한 제목도 옮기지
+     * 않는다. 한 실행의 제안 상한({@link #MAX_PER_EXECUTION})은 걸지 않는다. 옛 경로는 한 번에 그보다 많이 낼 수 있었다.
+     *
+     * @return {@code CREATED} 새 줄, {@code DUPLICATE} 이미 옮겼거나 같은 제목의 열린 줄이 있음, {@code DECLINED_BEFORE} 거절한 제목,
+     * {@code INVALID} 제목이 비었음
+     */
+    public SuggestionOutcome migrateLegacy(LegacySuggestion item) {
+        String title = item.title() == null ? "" : item.title().strip();
+        if (title.codePointCount(0, title.length()) > FollowUpService.TITLE_MAX) {
+            title = title.substring(0, title.offsetByCodePoints(0, FollowUpService.TITLE_MAX)).strip();
+        }
+        if (title.isEmpty()) {
+            return SuggestionOutcome.INVALID;
+        }
+        Draft draft = new Draft(
+            item.userId(),
+            item.conversationId(),
+            item.executionId(),
+            title,
+            FollowUpService.titleKey(title),
+            item.dedupeKey(),
+            item.detailJson() == null || item.detailJson().isBlank() ? null : item.detailJson());
+        try {
+            return transactions.execute(status -> insertLegacy(draft, item.createdAt()));
+        } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
+            if (!Boolean.TRUE.equals(transactions.execute(status -> duplicateOf(draft)))) {
+                throw ex;
+            }
+            return SuggestionOutcome.DUPLICATE;
+        }
+    }
+
+
+    /** 그 사용자의 옮긴 제안 줄의 공개 식별자를 중복 열쇠로 찾는다. 없는 열쇠는 맵에 없다. */
+    public Map<String, UUID> publicIdsOf(Long userId, Collection<String> dedupeKeys) {
+        Map<String, UUID> found = new HashMap<>();
+        if (dedupeKeys.isEmpty()) {
+            return found;
+        }
+        for (FollowUp row : followUps.findByUserIdAndDedupeKeyIn(userId, dedupeKeys)) {
+            found.put(row.dedupeKey(), row.publicId());
+        }
+        return found;
+    }
+
+
+    private SuggestionOutcome insertLegacy(Draft draft, Instant createdAt) {
+        Instant now = clock.instant();
+        if (followUps.findByUserIdAndDedupeKey(draft.userId(), draft.dedupeKey()).isPresent()) {
+            return SuggestionOutcome.DUPLICATE;
+        }
+        Instant expiresAt = createdAt.plus(TTL);
+        boolean expired = !expiresAt.isAfter(now);
+        if (!expired) {
+            FollowUp sameTitle = followUps
+                .findByUserIdAndTitleKeyAndOpenMarker(draft.userId(), draft.titleKey(), FollowUp.OPEN_MARKER)
+                .orElse(null);
+            if (sameTitle != null) {
+                if (!sameTitle.expiredAt(now)) {
+                    return SuggestionOutcome.DUPLICATE;
+                }
+                sameTitle.releaseExpired(now);
+                followUps.saveAndFlush(sameTitle);
+            }
+            if (followUps.existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
+                draft.conversationId(),
+                draft.titleKey(),
+                FollowUpStatus.REJECTED,
+                now.minus(FollowUpService.REJECTED_COOLDOWN))) {
+                return SuggestionOutcome.DECLINED_BEFORE;
+            }
+        }
+        SealedText sealed = draft.detailJson() == null
+            ? null
+            : bodies.seal(draft.userId(), draft.dedupeKey(), draft.detailJson());
+        FollowUp row = FollowUp.suggested(
+            draft.userId(),
+            draft.conversationId(),
+            draft.executionId(),
+            draft.title(),
+            draft.titleKey(),
+            draft.dedupeKey(),
+            sealed == null ? null : sealed.content(),
+            sealed == null ? null : sealed.keyId(),
+            expiresAt,
+            createdAt);
+        if (expired) {
+            row.releaseExpired(now);
+        }
+        followUps.saveAndFlush(row);
+        return SuggestionOutcome.CREATED;
     }
 
 
