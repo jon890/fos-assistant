@@ -26,7 +26,7 @@ export function recordedTierLabel(tier: string): string {
     MODEL_TIER_LABELS[tier as ModelTierCode] ?? LEGACY_TIER_LABELS[tier] ?? tier
   );
 }
-export type ModelSelectionMode = "DEFAULT" | "TIER" | "CUSTOM";
+export type ModelSelectionMode = "TIER" | "CUSTOM";
 
 export type ModelTier = {
   tier: ModelTierCode;
@@ -115,8 +115,8 @@ export async function saveGroupTiers(
 
 export function saveConversationTier<T>(
   conversationId: string,
-  mode: "DEFAULT" | "TIER",
-  tier: ModelTierCode | null,
+  mode: "TIER",
+  tier: ModelTierCode,
 ): Promise<RequestResult<T>> {
   return request<T>(`/api/chat/conversations/${conversationId}/model-tier`, {
     method: "PUT",

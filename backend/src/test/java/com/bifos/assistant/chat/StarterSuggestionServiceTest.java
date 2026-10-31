@@ -17,6 +17,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
+import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.chat.starter.config.StarterProperties;
 import com.bifos.assistant.chat.starter.application.dto.StarterStatus;
 import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
@@ -32,6 +33,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -202,10 +204,24 @@ class StarterSuggestionServiceTest {
 
 
     @Test
-    @DisplayName("에이전트 기본값이 있으면 Hermes 에 보낸 세 값이 실행 줄에 적히고 출처는 AGENT DEFAULT 다")
-    void recordsSentAgentDefaultsOnRunRowWithAgentDefaultSource() {
-        family.changeDefaultModel("example-provider", "example-agent", "medium");
-        agents.save(family);
+    @DisplayName("사용자나 그룹 기본 칸이 정한 값을 Hermes 에 보내고 실행 줄에 칸과 세 값이 적히며 출처는 REQUESTED 다")
+    void recordsTierValuesOnRunRowWithRequestedSource() {
+        ModelTierService tiers = mock(ModelTierService.class);
+        when(tiers.detachedChoice(any(), any()))
+            .thenReturn(new ResolvedModelTier(
+                ModelChoice.of("example-provider", "example-tier-model", "medium"), ModelTier.MEDIUM));
+        service = new StarterSuggestionService(
+            properties,
+            agentService,
+            conversations,
+            messages,
+            hermes,
+            executions,
+            tiers,
+            objectMapper,
+            limiter,
+            clock,
+            executor);
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
@@ -213,21 +229,22 @@ class StarterSuggestionServiceTest {
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.provider()).isEqualTo("example-provider");
-            assertThat(command.model()).isEqualTo("example-agent");
+            assertThat(command.model()).isEqualTo("example-tier-model");
             assertThat(command.reasoningEffort()).isEqualTo("medium");
         });
         assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
             assertThat(row.provider()).isEqualTo("example-provider");
-            assertThat(row.model()).isEqualTo("example-agent");
+            assertThat(row.model()).isEqualTo("example-tier-model");
             assertThat(row.reasoningEffort()).isEqualTo("medium");
-            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+            assertThat(row.modelTier()).isEqualTo(ModelTier.MEDIUM.name());
+            assertThat(row.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
         });
     }
 
 
     @Test
-    @DisplayName("에이전트 기본값이 비면 Hermes 에 세 값을 보내지 않고 실행 줄의 세 값은 null 이며 출처는 UNKNOWN 이다")
-    void sendsNothingAndRecordsUnknownSourceWhenAgentHasNoDefaults() {
+    @DisplayName("사용자와 그룹 기본 칸이 없으면 Hermes 에 세 값을 보내지 않고 실행 줄의 세 값은 null 이며 출처는 UNKNOWN 이다")
+    void sendsNothingAndRecordsUnknownSourceWhenNoDefaultTierIsSet() {
         answerWith(json(FOUR));
 
         service.read(DAD, "starter-family");
@@ -252,7 +269,7 @@ class StarterSuggestionServiceTest {
     @DisplayName("숨김 판정이 거절하면 Hermes 에 제출하지 않고 실행 줄이 FAILED 와 MODEL HIDDEN 으로 남는다")
     void leavesFailedRunRowWithoutSubmittingWhenHiddenCheckRejects() {
         ModelTierService rejecting = mock(ModelTierService.class);
-        when(rejecting.detachedChoice(any())).thenReturn(ModelChoice.defaults());
+        when(rejecting.detachedChoice(any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
         doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
             .when(rejecting)
             .requireRunnable(any(), any(), any());

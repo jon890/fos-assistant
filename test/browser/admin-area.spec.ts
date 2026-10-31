@@ -137,7 +137,7 @@ test("관리자 영역의 에이전트 목록은 등록 양식을 갖고 상세 
   await card.getByRole("link", { name: "상세 보기" }).click();
   await expect(page).toHaveURL(/\/admin\/agents\/browser$/);
   await expect(page.getByRole("region", { name: "관리" })).toBeVisible();
-  await expect(page.getByTestId("agent-model-section")).toBeVisible();
+  await expect(page.getByTestId("agent-model-section")).toHaveCount(0);
 });
 
 test("관리 절에서 먼저 살펴보기 쓰기 허용을 켜면 위험 문구가 보이고 새로 고쳐도 남으며 끄면 사라진다", async ({ page }) => {
@@ -333,23 +333,15 @@ test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하�
   }
 });
 
-test("모델 화면에서 숨길 모델의 목록을 읽을 에이전트를 바꿔도 저장하지 않은 그룹 기본 단계가 남는다", async ({ page }) => {
+test("모델 화면에는 숨길 모델의 목록을 읽을 에이전트를 고르는 칸이 없고 후보를 그룹 전체로 보인다", async ({ page }) => {
+  const candidates = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/admin/model-hidden/candidates");
   await page.goto("/admin/models");
-  const section = page.getByRole("region", { name: "그룹 모델 설정" });
-  const defaultTier = section.getByLabel("그룹 기본 단계");
-  await expect(defaultTier).toHaveValue("");
-  await defaultTier.selectOption("MEDIUM");
+  expect((await candidates).ok()).toBeTruthy();
 
   const hidden = page.getByRole("region", { name: "모델 숨김" });
-  const agent = hidden.getByLabel("숨길 모델의 목록을 읽을 에이전트");
-  const codes = await agent.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
-  expect(codes.length, "에이전트가 둘은 있어야 선택을 바꿀 수 있다").toBeGreaterThan(1);
-  await agent.selectOption(codes[1]);
-  await expect(agent).toHaveValue(codes[1]);
-  await expect(hidden.getByRole("button", { name: "저장" })).toBeVisible();
-
-  // 저장하지 않았으므로 다른 검사가 보는 그룹 기본 단계는 그대로다.
-  await expect(defaultTier).toHaveValue("MEDIUM");
+  await expect(hidden.getByRole("button", { name: "숨김 저장" })).toBeVisible();
+  await expect(hidden.getByLabel("숨길 모델의 목록을 읽을 에이전트")).toHaveCount(0);
+  await expect(hidden.getByRole("combobox")).toHaveCount(0);
 });
 
 test("MEMBER 역할이 관리자 영역의 모델 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {

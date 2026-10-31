@@ -38,7 +38,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 그룹 목록이 켜진 에이전트 profile 목록의 교집합인지 본다.
+ * 그룹 목록이 켜진 에이전트 profile 목록의 교집합이고 숨길 모델의 후보가 합집합인지 본다.
  *
  * <p>에이전트 판정과 profile 목록 캐시는 실제 서비스가 하게 하고 저장소와 Hermes 만 대역으로 둔다.
  */
@@ -162,6 +162,70 @@ class GroupModelCatalogServiceTest {
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
         assertThatThrownBy(() -> service.catalogFor(GROUP_ID))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+    }
+
+
+    @Test
+    @DisplayName("숨길 모델의 후보는 어느 profile 에든 있는 provider 와 모델을 첫 profile 의 차례 뒤에 붙여 모두 담는다")
+    void hideCandidatesAreTheUnionOfEveryProfile() {
+        agentOf("dad", "dad-profile");
+        agentOf("kid", "kid-profile");
+        catalogOf("dad-profile", provider("openai-codex", "b", "a"), provider("anthropic", "x"));
+        catalogOf("kid-profile", provider("openai-codex", "a", "c"), provider("openrouter", "y"));
+
+        GroupModelCatalog candidates = service.hideCandidates();
+
+        assertThat(candidates.providers()).extracting(Provider::slug).containsExactly("openai-codex", "anthropic", "openrouter");
+        assertThat(candidates.providers().getFirst().models()).containsExactly("b", "a", "c");
+        assertThat(candidates.reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);
+        // 같은 profile 들의 교집합이면 한 profile 에만 있는 모델은 숨길 방법이 없다
+        assertThat(service.catalogFor(GROUP_ID).providers().getFirst().models()).containsExactly("a");
+    }
+
+
+    @Test
+    @DisplayName("숨길 모델의 후보에는 이미 숨긴 모델도 남아 풀 수 있다")
+    void hideCandidatesKeepAlreadyHiddenModels() {
+        when(visibility.hiddenFor(GROUP_ID)).thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "a"))));
+        agentOf("dad", "dad-profile");
+        catalogOf("dad-profile", provider("openai-codex", "a", "b"), provider("anthropic", "x"));
+
+        GroupModelCatalog candidates = service.hideCandidates();
+
+        assertThat(candidates.providers().getFirst().models()).containsExactly("a", "b");
+        assertThat(service.catalogFor(GROUP_ID).providers().getFirst().models()).containsExactly("b");
+    }
+
+
+    @Test
+    @DisplayName("profile 마다 밝힌 reasoning 지원이 다르면 후보의 그 칸은 모름이고 한 profile 에만 있는 모델은 그 profile 의 값이다")
+    void hideCandidatesMergeReasoningSupport() {
+        agentOf("dad", "dad-profile");
+        agentOf("kid", "kid-profile");
+        catalogOf("dad-profile", new Provider("openai-codex", "ChatGPT", List.of("a", "only-dad"), Map.of(
+            "a", new ReasoningCapability(SUPPORTED, SUPPORTED),
+            "only-dad", new ReasoningCapability(SUPPORTED, SUPPORTED))));
+        catalogOf("kid-profile", new Provider("openai-codex", "ChatGPT", List.of("a"), Map.of(
+            "a", new ReasoningCapability(SUPPORTED, UNSUPPORTED))));
+
+        Provider merged = service.hideCandidates().providers().getFirst();
+
+        assertThat(merged.reasoning().get("a")).isEqualTo(new ReasoningCapability(SUPPORTED, UNKNOWN));
+        assertThat(merged.reasoning().get("only-dad")).isEqualTo(new ReasoningCapability(SUPPORTED, SUPPORTED));
+    }
+
+
+    @Test
+    @DisplayName("숨길 모델의 후보도 한 profile 이라도 목록을 한 번도 읽지 못했으면 읽기 실패를 그대로 올린다")
+    void hideCandidatesPropagateFailureWhenAnyProfileWasNeverRead() {
+        agentOf("dad", "dad-profile");
+        agentOf("kid", "kid-profile");
+        catalogOf("dad-profile", provider("openai-codex", "a"));
+        when(hermes.readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile"))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        assertThatThrownBy(() -> service.hideCandidates())
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
 }

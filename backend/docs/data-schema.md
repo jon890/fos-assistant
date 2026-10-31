@@ -320,9 +320,9 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
-- `default_model_provider` 와 `default_model` 은 함께 채우거나 함께 비운다. `default_reasoning_effort` 는 혼자 둘 수 있다
+- 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
-**모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 기본 모델 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md), [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md)).
+**에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).
 **주인과 공개 범위는 따로다.** 그룹에 공개해도 만든 사람(`owner_user_id`)이 계속 관리하고, `PRIVATE` 에서는 주인이 꼭 있어야 한다. 이 결정 전에 운영에서 등록한 `GROUP` 에이전트는 주인이 비어 있어 `ADMIN` 만 관리한다([ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md)).
 추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다([ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md)).
 
@@ -334,7 +334,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `MODEL` 은 그룹의 모델 설정이다. 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 버전 번호와 함께 담는다. 읽고 쓰는 일은 `ModelSettingStore` 가 한다.
 
 - 줄이 없는 그룹은 다섯 칸이 모두 비었고 숨김도 없다
-- 칸의 provider 가 비면 요청한 에이전트의 기본 provider 로, 세 값이 모두 비면 에이전트 기본 모델로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
+- 칸의 provider 가 비면 요청한 에이전트 profile 의 provider 로, 세 값이 모두 비면 요청에 모델을 싣지 않아 profile 의 값으로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
 - 숨김 항목의 `model` 이 null 이면 그 provider 전체를 숨긴 것이다
 - 모르는 버전이거나 형식이 깨진 JSON 은 설정이 없는 것으로 보지 않고 오류로 올린다. 없는 것으로 보면 숨김이 풀린 채 실행된다
 - 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
@@ -367,7 +367,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
-- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다
+- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 와 `CUSTOM` 이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가 선택 없음으로 바꿨다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
