@@ -32,3 +32,8 @@ backend 아키텍처 문서는 freeze·Checkstyle 기준과 파일 길이 기준
 | 규칙을 새로 더했다 | `pnpm exec eslint --suppress-all` 로 기존 위반을 기준에 둔다. 그 규칙의 위반 수를 커밋 메시지에 적는다 |
 
 책임과 실행 절차는 [code-architecture.md](../../backend/docs/code-architecture.md)에서 이어 읽는다.
+
+## 리뷰가 보는 것
+
+도구는 기준 파일에 줄이 있는지만 본다.
+리뷰는 기준에 든 위반을 고치고도 기준을 줄이지 않았는지, 새 위반을 기준으로 덮었다면 까닭이 커밋과 PR 에 있는지, 설계상 suppression 과 기존 부채가 섞이지 않았는지 본다.

@@ -18,3 +18,8 @@ fake Hermes도 실제 응답 칸과 모양을 따른다.
 
 [hermes_contract.py](../../hermes/tests/hermes_contract.py)에서 확인한다.
 hermes_contract.py는 plugin이 기대는 Hermes 내부 계약을 확인한다.
+
+## 리뷰가 보는 것
+
+계약 테스트는 선언된 의존만 확인한다.
+리뷰는 새 Hermes 내부 의존이 같은 변경에 선언됐는지, fake Hermes 가 실제 응답의 칸과 모양보다 너그럽게 답하도록 바뀌지 않았는지 `hermes-contract` 와 대조한다.
