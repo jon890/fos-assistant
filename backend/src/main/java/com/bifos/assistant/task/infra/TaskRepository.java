@@ -16,6 +16,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
+    /** 발화할 작업 번호를 예정 시각 순으로 읽는다. 실제 발화 전에는 작업을 잠그고 다시 읽는다. */
+    @Query("select t.id from Task t where t.state = :state and t.nextFireAt <= :now order by t.nextFireAt, t.id")
+    List<Long> findDueIds(@Param("now") Instant now, @Param("state") TaskState state);
+
+
     /** 그 사용자의 해당 종류 작업 가운데 그 상태가 아닌 것의 수다. */
     long countByOwnerUserIdAndKindAndStateNot(Long ownerUserId, TaskKind kind, TaskState state);
 

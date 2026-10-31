@@ -50,8 +50,8 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.TaskRunStarter;
 import com.bifos.assistant.task.application.TaskService;
 import com.bifos.assistant.task.domain.Task;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
@@ -60,7 +60,6 @@ import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
@@ -145,9 +144,6 @@ class TaskRunStarterTest {
 
     @Autowired
     TaskRepository tasks;
-
-    @Autowired
-    TaskTriggerRepository triggers;
 
     @Autowired
     TaskRunRepository runs;
@@ -690,10 +686,12 @@ class TaskRunStarterTest {
     @DisplayName("CHECK 발화는 점검 대화에서 SCHEDULED 살펴보기를 열고 task_run에 점검과 루트 실행을 연결한다")
     void startsScheduledCheckAndRecoversItsResult() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
-        Task checkTask = tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기"));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
+        Task checkTask = Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기");
+        checkTask.reschedule(TriggerType.CRON, "0 9 * * *", null, SEOUL, SCHEDULED);
+        checkTask.changeMissedPolicy(MissedPolicy.SKIP);
+        tasks.save(checkTask);
         TaskRun run = runs.save(TaskRun.queued(
-            checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
+            checkTask.id(), fixture.owner().id(), SCHEDULED, NOW));
         stub().willReturn(HermesRunResult.of(
             "run-check",
             "check-session",
@@ -1008,7 +1006,7 @@ class TaskRunStarterTest {
 
     private TaskRun queued(Fixture fixture, Instant scheduledFor, Instant createdAt) {
         return runs.save(TaskRun.queued(
-            fixture.task().id(), fixture.trigger().id(), fixture.owner().id(), scheduledFor, createdAt));
+            fixture.task().id(), fixture.owner().id(), scheduledFor, createdAt));
     }
 
 
@@ -1026,10 +1024,11 @@ class TaskRunStarterTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             owner.id()));
-        Task task = tasks.save(Task.create(owner.id(), agent.id(), TITLE, INSTRUCTION, mode, notify));
-        TaskTrigger trigger = triggers.save(TaskTrigger.cron(
-            task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, Instant.parse("2026-12-01T00:00:00Z")));
-        return new Fixture(owner, task, trigger);
+        Task task = Task.create(owner.id(), agent.id(), TITLE, INSTRUCTION, mode, notify);
+        task.reschedule(TriggerType.CRON, "0 9 1 * *", null, SEOUL, Instant.parse("2026-12-01T00:00:00Z"));
+        task.changeMissedPolicy(MissedPolicy.RUN_ONCE);
+        tasks.save(task);
+        return new Fixture(owner, task);
     }
 
 
@@ -1049,11 +1048,10 @@ class TaskRunStarterTest {
         checks.deleteAllById(createdChecks);
         createdChecks.clear();
         runs.deleteAll();
-        triggers.deleteAll();
         tasks.deleteAll();
     }
 
 
-    private record Fixture(AppUser owner, Task task, TaskTrigger trigger) {
+    private record Fixture(AppUser owner, Task task) {
     }
 }

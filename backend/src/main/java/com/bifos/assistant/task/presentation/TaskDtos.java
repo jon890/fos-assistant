@@ -11,7 +11,6 @@ import com.bifos.assistant.task.application.dto.TaskInput;
 import com.bifos.assistant.task.application.dto.TaskRunDetail;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
@@ -141,12 +140,12 @@ public final class TaskDtos {
      */
     public record ScheduleView(TriggerType type, String cron, LocalDateTime fireAt, String timeZone) {
 
-        static ScheduleView from(TaskTrigger trigger) {
+        static ScheduleView from(Task task) {
             return new ScheduleView(
-                trigger.type(),
-                trigger.cronExpr(),
-                trigger.fireAt() == null ? null : LocalDateTime.ofInstant(trigger.fireAt(), trigger.zone()),
-                trigger.timeZone());
+                task.type(),
+                task.cronExpr(),
+                task.fireAt() == null ? null : LocalDateTime.ofInstant(task.fireAt(), task.zone()),
+                task.timeZone());
         }
     }
 
@@ -179,7 +178,6 @@ public final class TaskDtos {
 
         public static TaskView from(TaskDetail detail) {
             Task task = detail.task();
-            TaskTrigger trigger = detail.trigger();
             Agent agent = detail.agent();
             return new TaskView(
                 task.publicId(),
@@ -188,11 +186,11 @@ public final class TaskDtos {
                 agent == null ? null : agent.name(),
                 task.instruction(),
                 task.state(),
-                ScheduleView.from(trigger),
-                trigger.nextFireAt(),
-                trigger.lastFiredAt(),
+                ScheduleView.from(task),
+                task.nextFireAt(),
+                task.lastFiredAt(),
                 task.conversationMode(),
-                trigger.missedPolicy(),
+                task.missedPolicy(),
                 task.notifyPolicy(),
                 task.modelTier(),
                 task.createdAt());

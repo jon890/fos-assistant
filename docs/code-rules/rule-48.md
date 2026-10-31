@@ -19,3 +19,8 @@ key 원문을 DB에 넣는 것과 사용자 본문의 암호화 저장은 다르
 
 [memory-secrecy.test.ts](../../test/unit/memory-secrecy.test.ts)에서 확인한다.
 memory-secrecy 테스트가 비밀 본문이 응답에 남는 경로를 확인한다.
+
+## 리뷰가 보는 것
+
+회귀 테스트는 알려진 비밀 경로만 막는다.
+리뷰는 새 코드가 Hermes 내장 memory 도구를 주거나, 실행 밖 서비스에 Memory 문서를 읽는 경로를 만들거나, key 원문을 DB 에 넣는지 본다.

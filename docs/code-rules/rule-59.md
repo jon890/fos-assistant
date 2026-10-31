@@ -17,3 +17,8 @@ NODE_TEST_READ_FILES와 그 런타임 의존은 상대 import를 쓴다.
 
 [eslint.config.mjs](../../web/eslint.config.mjs)에서 확인한다.
 NODE_TEST_READ_FILES가 Node 테스트가 런타임에 읽는 모듈을 별도로 지정한다.
+
+## 리뷰가 보는 것
+
+lint 는 별칭 import 를 금지한 파일 목록만 지킨다.
+리뷰는 Node 테스트가 런타임에 읽는 새 모듈이 `NODE_TEST_READ_FILES` 에 올랐는지, 그 의존이 상대 import 인지 본다.

@@ -17,3 +17,8 @@
 
 [conversation-requests.spec.ts](../../test/browser/conversation-requests.spec.ts)에서 확인한다.
 conversation-requests spec은 대화가 많은 사이드바의 미리 읽기 요청을 센다.
+
+## 리뷰가 보는 것
+
+브라우저 테스트는 정해진 화면의 요청 수만 센다.
+리뷰는 새로 생긴 줄 수가 정해지지 않은 목록과 비용 큰 탭이 자동 prefetch 를 끄는지, 선택 주소와 표시가 함께 바뀌는지 본다.
