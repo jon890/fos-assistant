@@ -128,6 +128,22 @@ class DataKeyServiceTest {
 
 
     @Test
+    @DisplayName("바이트 본문도 같은 key 와 AAD 로 풀리고 글로 암호화한 본문은 그 UTF-8 바이트로 풀린다")
+    void sealsBytesAndOpensTextAsBytes() {
+        Long userId = anyUserId();
+        byte[] image = {(byte)0x89, 'P', 'N', 'G', 0, (byte)0xff};
+
+        SealedText sealed = cipher.sealBytes(userId, "row:b", image).orElseThrow();
+        SealedText text = cipher.seal(userId, "row:t", PLAIN).orElseThrow();
+
+        assertThat(cipher.openBytes(sealed.keyId(), userId, "row:b", sealed.content())).hasValue(image);
+        assertThat(cipher.openBytes(sealed.keyId(), userId, "row:other", sealed.content())).isEmpty();
+        assertThat(cipher.openBytes(text.keyId(), userId, "row:t", text.content()))
+            .hasValue(PLAIN.getBytes(StandardCharsets.UTF_8));
+    }
+
+
+    @Test
     @DisplayName("다른 사용자의 데이터 key 로 쓴 본문은 주인을 바꿔 불러도 풀리지 않는다")
     void refusesToOpenWithAnotherOwner() {
         Long owner = anyUserId();

@@ -496,8 +496,10 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `vault_key_id` | 본문을 암호화한 `user_data_key.id` |
 | `vault_body` | 암호화한 본문(`v1.<IV>.<암호문과 태그>`). 평문은 두지 않는다 |
 | `vault_fingerprint` | 대화 번호, 경로, 본문 바이트의 SHA-256 16진수. `(vault_user_id, vault_fingerprint)` 에 유일 제약이 있어 같은 보관 요청은 한 건이다 |
+| `vault_bundle_id` | 이 행이 든 묶음의 뿌리 행 `id`. 뿌리 행과 묶음이 아닌 보관 사본, 대화 결과물 행은 비어 있다. `(vault_bundle_id, path)` 에 색인이 있다 |
 
 보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
+묶음 안 파일 행도 `vault_user_id` 가 채워져 있어 같이 남는다. 묶음 안 파일의 `vault_fingerprint` 는 묶음 지문과 경로로 만든다. 묶음은 뿌리 번호로만 지우고 안의 행을 같은 문장에서 지운다.
 외래 키를 두지 않는다. 대화와 메시지가 지워져도 보관 사본 행은 남는다.
 
 ### result_delivery

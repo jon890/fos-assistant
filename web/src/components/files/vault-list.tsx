@@ -9,8 +9,11 @@ import { FRAME_SANDBOX } from "@/components/chat/artifact/artifact-panel";
 import {
   deleteVaultItem,
   fetchVaultItems,
+  isVaultImage,
   VAULT_ERRORS,
+  vaultArchiveUrl,
   vaultContentUrl,
+  vaultFileUrl,
   type VaultItem,
   type VaultList,
 } from "@/lib/artifact-vault-api";
@@ -19,9 +22,11 @@ import { formatFullTime } from "@/lib/format";
 import { formatSize } from "@/lib/workspace-file";
 
 /**
- * 「보관한 결과물」 목록이다. 대화에서 골라 보관한 HTML·CSS 를 읽고 지운다.
+ * 「보관한 결과물」 목록이다. 대화에서 골라 보관한 HTML·CSS 와 사진을 읽고 지운다.
  *
- * <p>HTML 은 스크립트가 돌지 않는 iframe 으로 미리 보고 CSS 는 내려받는다. 지우기는 두 번 눌러야 한다.
+ * <p>HTML 은 스크립트가 돌지 않는 iframe 으로 미리 본다. 사진과 스타일을 부르는 HTML 은 묶음으로 보관돼 있고, iframe 이
+ * 보관본 안의 파일 주소로 열려 상대 주소의 사진도 보관본에서 읽는다. 묶음은 zip 으로 내려받는다.
+ * 사진은 그대로 보이고 CSS 는 내려받는다. 지우기는 두 번 눌러야 한다.
  */
 export function VaultListView() {
   const [items, setItems] = useState<VaultItem[] | null>(null);
@@ -81,12 +86,14 @@ export function VaultListView() {
       {items !== null && items.length === 0 ? (
         <EmptyState
           title="보관한 결과물이 없어요"
-          description="대화에서 결과물을 열고 「보관」을 누르면 여기에 암호화해 둬요. 대화를 지워도 남아요."
+          description="대화에서 결과물을 열고 「보관」을 누르면 HTML 이 부르는 사진과 스타일까지 여기에 암호화해 둬요. 대화를 지워도 남아요."
         />
       ) : null}
       {items?.map((item) => {
         const name = artifactName(item.path);
         const isHtml = item.path.toLowerCase().endsWith(".html");
+        const isImage = isVaultImage(item.path);
+        const isBundle = item.fileCount > 1;
         return (
           <div
             key={item.id}
@@ -101,9 +108,10 @@ export function VaultListView() {
                 {name}
               </p>
               <span className="text-xs text-muted-foreground">
+                {isBundle ? `파일 ${item.fileCount}개 · ` : ""}
                 {formatSize(item.byteSize)} · {formatFullTime(item.vaultedAt)}
               </span>
-              {isHtml ? (
+              {isHtml || isImage ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -115,7 +123,15 @@ export function VaultListView() {
                 </Button>
               ) : null}
               <Button variant="outline" size="sm" asChild>
-                <a href={vaultContentUrl(item.id, true)}>내려받기</a>
+                <a
+                  href={
+                    isBundle
+                      ? vaultArchiveUrl(item.id)
+                      : vaultContentUrl(item.id, true)
+                  }
+                >
+                  {isBundle ? "묶음 내려받기" : "내려받기"}
+                </a>
               </Button>
               {confirmId === item.id ? (
                 <>
@@ -148,18 +164,39 @@ export function VaultListView() {
               )}
             </div>
             {previewId === item.id ? (
-              // 에이전트가 만든 HTML 은 흰 바탕을 전제로 하므로 bg-white 를 그대로 둔다.
-              <iframe
-                title={name}
-                sandbox={FRAME_SANDBOX}
-                src={vaultContentUrl(item.id)}
-                data-testid="vault-frame"
-                className="mt-3 h-96 w-full rounded border border-border bg-white"
-              />
+              <VaultPreview item={item} name={name} />
             ) : null}
           </div>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * 보관본 하나의 미리보기다. 사진은 그대로 보이고 HTML 은 스크립트가 돌지 않는 iframe 으로 연다.
+ *
+ * <p>iframe 은 보관본 안의 파일 주소로 열어 HTML 이 상대 주소로 부르는 사진과 스타일도 같은 보관본에서 읽는다.
+ */
+function VaultPreview({ item, name }: { item: VaultItem; name: string }) {
+  if (isVaultImage(item.path))
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 보관본 주소는 next/image 최적화를 거치지 않는다
+      <img
+        src={vaultContentUrl(item.id)}
+        alt={name}
+        data-testid="vault-image"
+        className="mt-3 max-h-96 rounded border border-border"
+      />
+    );
+  return (
+    // 에이전트가 만든 HTML 은 흰 바탕을 전제로 하므로 bg-white 를 그대로 둔다.
+    <iframe
+      title={name}
+      sandbox={FRAME_SANDBOX}
+      src={vaultFileUrl(item.id, item.path)}
+      data-testid="vault-frame"
+      className="mt-3 h-96 w-full rounded border border-border bg-white"
+    />
   );
 }
