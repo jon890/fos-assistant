@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +34,7 @@ import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** MySQL도 이 회귀와 요청 재시도/USER 회귀를 그대로 실행한다. */
+@MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class MediaObservationLockTest extends MediaObservationCacheTest {
     @Test
     @DisplayName("같은 CAS로 경쟁하는 새 요청은 revision 하나만 만든다")
