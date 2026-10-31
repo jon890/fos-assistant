@@ -9,11 +9,19 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.attention.application.AttentionEventCleaner;
 import com.bifos.assistant.attention.application.AttentionMetricsService;
 import com.bifos.assistant.attention.application.dto.AttentionMetric;
-import com.bifos.assistant.attention.domain.AttentionEvent;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
-import com.bifos.assistant.attention.domain.type.AttentionLevel;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
-import com.bifos.assistant.attention.infra.AttentionEventRepository;
+import com.bifos.assistant.feedback.application.FeedbackLabeler;
+import com.bifos.assistant.feedback.application.ReactionLedger;
+import com.bifos.assistant.feedback.application.dto.ControlEntry;
+import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.UUID;
 import com.bifos.assistant.admin.attention.presentation.AttentionAdminController;
 import com.bifos.assistant.admin.attention.presentation.AttentionAdminDtos.MetricsResponse;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -37,13 +45,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * 지표 사건을 {@code trigger} 별로 세는 것과 보관 기간 정리를 본다. 셈은 {@code docs/features/attention.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 다.
  *
- * <p>지표는 모든 사용자의 사건을 세므로 검사마다 사건 표를 비운다. 사건은 저장소로 바로 넣는다. 시각은 이 검사의 시계가 정한다.
+ * <p>지표는 모든 사용자의 사건을 세므로 검사마다 반응 기록의 지금 화면 사건을 비운다. 사건은 반응 기록으로 바로 넣는다. 시각은 이 검사의 시계가 정한다.
  */
 @BackendIntegrationTest
 class AttentionMetricsServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");
-    private static final Long USER = 7_001L;
+    private Long user;
 
     @Autowired
     TestClock clock;
@@ -55,19 +63,33 @@ class AttentionMetricsServiceTest {
     AttentionEventCleaner cleaner;
 
     @Autowired
-    AttentionEventRepository events;
+    ReactionLedger ledger;
+
+    @Autowired
+    AppUserRepository users;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
 
     @BeforeEach
     void setUp() {
         clock.set(NOW);
-        events.deleteAll();
+        clearEvents();
+        String email = "attention-metrics-" + UUID.randomUUID() + "@example.com";
+        user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER)).id();
     }
 
 
     @AfterEach
     void tearDown() {
-        events.deleteAll();
+        clearEvents();
+        jdbc.update("DELETE FROM app_user WHERE id = ?", user);
+    }
+
+
+    private void clearEvents() {
+        jdbc.update("DELETE FROM decision_feedback_event WHERE subject_type = 'ATTENTION_ITEM' OR card_key IS NOT NULL");
     }
 
 
@@ -107,7 +129,9 @@ class AttentionMetricsServiceTest {
 
         assertThat(row.shown()).as("30일 안에 보인 항목 수").isEqualTo(1);
         assertThat(deleted).isEqualTo(1);
-        assertThat(events.findAll()).extracting(AttentionEvent::itemKey).containsExactly("conversation:new");
+        assertThat(jdbc.queryForList(
+            "SELECT subject_key FROM decision_feedback_event WHERE user_id = ?", String.class, user))
+                .containsExactly("conversation:new");
     }
 
 
@@ -130,13 +154,13 @@ class AttentionMetricsServiceTest {
         doCallRealMethod().when(currentUser).requireAdmin();
         AttentionAdminController controller = new AttentionAdminController(metrics, currentUser);
 
-        when(currentUser.require()).thenReturn(new CurrentUser(USER, "member@example.com", "아빠", 1L, UserRole.MEMBER));
+        when(currentUser.require()).thenReturn(new CurrentUser(user, "member@example.com", "아빠", 1L, UserRole.MEMBER));
         assertThatThrownBy(() -> controller.metrics(30))
             .isInstanceOf(ApiException.class)
             .extracting(failure -> ((ApiException)failure).code())
             .isEqualTo(ErrorCode.FORBIDDEN);
 
-        when(currentUser.require()).thenReturn(new CurrentUser(USER, "admin@example.com", "엄마", 1L, UserRole.ADMIN));
+        when(currentUser.require()).thenReturn(new CurrentUser(user, "admin@example.com", "엄마", 1L, UserRole.ADMIN));
         MetricsResponse response = controller.metrics(30);
         assertThat(response.days()).isEqualTo(30);
         assertThat(response.rows()).singleElement().satisfies(row -> {
@@ -146,17 +170,51 @@ class AttentionMetricsServiceTest {
     }
 
 
-    /** 실패 trigger 의 {@code NOW} 사건 한 줄을 넣는다. 상태는 항목마다 하나로 둔다. */
+    @Test
+    @DisplayName("판정을 옮기지 않은 이관 사건은 센 항목이지만 NOW 로 보인 항목에는 들지 않는다")
+    void countsLegacyShownWithoutLevelButNotAsNow() {
+        saveLegacyShown("conversation:legacy", NOW.minus(Duration.ofHours(3)));
+
+        AttentionMetric row = onlyRow(metrics.metrics(30));
+
+        assertThat(row.shown()).isEqualTo(1);
+        assertThat(row.nowShown()).isZero();
+    }
+
+
+    /**
+     * 실패 trigger 의 {@code NOW} 사건 한 줄을 반응 기록에 넣는다. 상태는 항목마다 하나로 둔다. 숨김은 카드가 있는 제어 사건으로 넣는다.
+     */
     private void save(String itemKey, AttentionEventType type, Instant at) {
-        events.save(AttentionEvent.of(
-            USER,
+        String state = "state-" + itemKey;
+        if (type == AttentionEventType.HIDDEN) {
+            FeedbackEntry hide = FeedbackEntry.ofKey(
+                user, FeedbackSubjectType.ATTENTION_ITEM, itemKey, FeedbackEventType.DISMISSED, FeedbackActor.USER, at)
+                .version(state)
+                .reason(FeedbackLabeler.ATTENTION_HIDE);
+            ledger.append(new ControlEntry(hide, "FAILURES", null, null));
+            return;
+        }
+        FeedbackEntry view = FeedbackEntry.ofKey(
+            user,
+            FeedbackSubjectType.ATTENTION_ITEM,
             itemKey,
-            "state-" + itemKey,
-            AttentionTrigger.EXECUTION_FAILED,
-            AttentionLevel.NOW,
-            type,
-            false,
-            at));
+            FeedbackEventType.valueOf(type.name()),
+            type == AttentionEventType.SHOWN ? FeedbackActor.SYSTEM : FeedbackActor.USER,
+            at)
+            .version(state)
+            .reason(AttentionTrigger.EXECUTION_FAILED + "@NOW");
+        ledger.append(new ControlEntry(view, null, null, null));
+    }
+
+
+    /** 옛 {@code attention_event} 에서 이관한 노출처럼 판정이 없는 사건 한 줄을 넣는다. */
+    private void saveLegacyShown(String itemKey, Instant at) {
+        FeedbackEntry view = FeedbackEntry.ofKey(
+            user, FeedbackSubjectType.ATTENTION_ITEM, itemKey, FeedbackEventType.SHOWN, FeedbackActor.SYSTEM, at)
+            .version("state-" + itemKey)
+            .reason(AttentionTrigger.EXECUTION_FAILED.name());
+        ledger.append(new ControlEntry(view, null, null, "legacy:attention_event:" + itemKey));
     }
 
 

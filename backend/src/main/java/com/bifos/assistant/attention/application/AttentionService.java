@@ -4,15 +4,15 @@ import com.bifos.assistant.attention.application.port.AttentionCandidates;
 import com.bifos.assistant.attention.config.AttentionProperties;
 import com.bifos.assistant.attention.application.dto.AttentionCandidate;
 import com.bifos.assistant.attention.application.dto.AttentionCard;
+import com.bifos.assistant.attention.application.dto.AttentionReaction;
 import com.bifos.assistant.attention.application.dto.AttentionControl;
 import com.bifos.assistant.attention.application.dto.AttentionSnapshot;
 import com.bifos.assistant.attention.application.dto.AttentionView;
-import com.bifos.assistant.attention.domain.AttentionControlEntry;
-import com.bifos.assistant.attention.domain.AttentionEvent;
-import com.bifos.assistant.attention.domain.type.AttentionAction;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.CardKey;
-import com.bifos.assistant.attention.infra.AttentionControlRepository;
+import com.bifos.assistant.feedback.application.ReactionLedger;
+import com.bifos.assistant.feedback.application.dto.ReactionRecord;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.time.Instant;
@@ -21,6 +21,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,7 @@ public class AttentionService {
     private final List<AttentionCandidates> sources;
     private final AttentionJudge judge;
     private final AttentionProperties properties;
-    private final AttentionControlRepository controls;
+    private final ReactionLedger ledger;
     private final AttentionEventWriter events;
     private final Clock clock;
 
@@ -96,33 +97,46 @@ public class AttentionService {
     }
 
 
-    /** 저장한 제어를 판정에 넘기는 값으로 바꾼다. 숨기기는 상태 지문을, 미루기는 기한을 채운다. */
+    /**
+     * 반응 기록의 마지막 제어 사건을 판정에 넘기는 값으로 바꾼다. 숨김은 상태 지문을, 미루기는 기한을 채우고 복원은 제어가 없다.
+     * 읽지 못하면 던진다. 읽지 못한 채 판정하면 숨긴 항목이 다시 보이기 때문이다.
+     */
     private List<AttentionControl> controlsOf(CurrentUser user) {
-        return controls.findByUserId(user.id()).stream()
+        return ledger.currentControls(user.id()).stream()
             .map(AttentionService::control)
+            .flatMap(Optional::stream)
             .toList();
     }
 
 
-    private static AttentionControl control(AttentionControlEntry entry) {
-        return entry.action() == AttentionAction.HIDE
-            ? new AttentionControl(entry.cardKey(), entry.itemKey(), entry.stateKey(), null)
-            : new AttentionControl(entry.cardKey(), entry.itemKey(), null, entry.untilAt());
+    private static Optional<AttentionControl> control(ReactionRecord record) {
+        CardKey card;
+        try {
+            card = CardKey.valueOf(record.cardKey());
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+        if (record.type() == FeedbackEventType.DISMISSED) {
+            return Optional.of(new AttentionControl(card, record.subjectKey(), record.stateKey(), null));
+        }
+        if (record.type() == FeedbackEventType.POSTPONED) {
+            return Optional.of(new AttentionControl(card, record.subjectKey(), null, record.untilAt()));
+        }
+        return Optional.empty();
     }
 
 
     /** 응답에 실린 항목마다 {@code SHOWN} 사건 하나다. 지금의 출처는 모두 판정할 때 읽은 기록이라 오래되지 않았다. */
-    private static List<AttentionEvent> shown(CurrentUser user, AttentionSnapshot snapshot) {
+    private static List<AttentionReaction> shown(CurrentUser user, AttentionSnapshot snapshot) {
         return snapshot.cards().stream()
             .flatMap(card -> card.items().stream())
-            .map(item -> AttentionEvent.of(
+            .map(item -> new AttentionReaction(
                 user.id(),
                 item.itemKey(),
                 item.stateKey(),
                 item.trigger(),
                 item.level(),
                 AttentionEventType.SHOWN,
-                false,
                 snapshot.now()))
             .toList();
     }

@@ -18,11 +18,12 @@ import com.bifos.assistant.attention.application.dto.AttentionView;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;
 import com.bifos.assistant.attention.domain.type.CardKey;
-import com.bifos.assistant.attention.infra.AttentionControlRepository;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.feedback.application.ReactionLedger;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
@@ -118,7 +119,7 @@ class AttentionControlServiceTest {
     AttentionTestCandidates.ReadCountingCandidates readCounting;
 
     @Autowired
-    AttentionControlRepository controlEntries;
+    ReactionLedger ledger;
 
     @Autowired
     MemoryService memories;
@@ -174,13 +175,12 @@ class AttentionControlServiceTest {
             .extracting(AttentionItem::conversationId)
             .containsExactly(conversation.publicId());
         assertThat(attention.summary(dad)).isEqualTo(before - 1);
-        assertThat(events(AttentionEventType.HIDDEN))
-            .containsExactly(tuple(failure.itemKey(), failure.stateKey(), "EXECUTION_FAILED", "NOW"));
+        assertThat(events(AttentionEventType.HIDDEN)).containsExactly(tuple(failure.itemKey(), failure.stateKey(), null, null));
     }
 
 
     @Test
-    @DisplayName("같은 숨기기를 두 번 보내도 제어 줄과 HIDDEN 사건은 한 줄이다")
+    @DisplayName("같은 숨기기를 두 번 보내도 현재 제어와 HIDDEN 사건은 한 줄이다")
     void keepsOneRowForRepeatedHide() {
         failedConversation("주간 장보기 목록 정리");
         AttentionItem failure = onlyItem(attention.view(dad), CardKey.FAILURES);
@@ -247,7 +247,7 @@ class AttentionControlServiceTest {
 
 
     @Test
-    @DisplayName("다른 기한으로 두 번 미루면 제어 줄의 기한은 두 번째 값이고 SNOOZED 사건은 한 줄이다")
+    @DisplayName("다른 기한으로 두 번 미루면 현재 제어의 기한은 두 번째 값이고 SNOOZED 사건은 조작마다 한 줄이다")
     void keepsLatestUntilAndOneEventForRepeatedSnooze() {
         failedConversation("주간 장보기 목록 정리");
         AttentionItem failure = onlyItem(attention.view(dad), CardKey.FAILURES);
@@ -258,8 +258,11 @@ class AttentionControlServiceTest {
         controls.snooze(dad, CardKey.FAILURES, failure.itemKey(), second);
 
         assertThat(controlRows()).containsExactly(tuple("FAILURES", "SNOOZE", null, second));
+        // 기한이 다른 미루기는 서로 다른 조작이라 사건이 모두 남고, 현재 제어는 마지막 것이다.
         assertThat(events(AttentionEventType.SNOOZED))
-            .containsExactly(tuple(failure.itemKey(), failure.stateKey(), "EXECUTION_FAILED", "NOW"));
+            .containsExactly(
+                tuple(failure.itemKey(), failure.stateKey(), null, null),
+                tuple(failure.itemKey(), failure.stateKey(), null, null));
     }
 
 
@@ -306,13 +309,14 @@ class AttentionControlServiceTest {
         assertThat(feedbackRows())
             .containsExactly(
                 tuple("connector_action:" + actionId, "POSTPONED", "USER", "ATTENTION_SNOOZE"),
+                tuple("connector_action:" + actionId, "RESTORED", "USER", "ATTENTION_RESTORE"),
                 tuple("connector_action:" + actionId, "DISMISSED", "USER", "ATTENTION_HIDE"));
     }
 
 
     @Test
-    @DisplayName("Memory 제안을 숨기면 제안한 실행의 대화를 채워 남기고, 그 대화를 지운 뒤 숨기면 남기지 않는다")
-    void fillsOriginAndSkipsDeletedConversationForMemoryProposal() {
+    @DisplayName("Memory 제안을 숨기면 제안한 실행의 대화를 채워 남기고, 그 대화를 지운 뒤 숨겨도 사건은 대화 없이 남는다")
+    void fillsOriginAndDetachesDeletedConversationForMemoryProposal() {
         Conversation kept = conversationOf(dad, "취미 이야기");
         AgentExecution keptRun = executions.save(root(dad, kept, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(60), NOW));
         Memory keptProposal = memories.proposeUser(dad, "합성 취미", "합성 취미를 즐긴다", keptRun.id());
@@ -327,27 +331,38 @@ class AttentionControlServiceTest {
 
         assertThat(jdbc.queryForList(
             "SELECT subject_key, conversation_id FROM decision_feedback_event"
-                + " WHERE user_id = ? AND event_type = 'DISMISSED'",
+                + " WHERE user_id = ? AND event_type = 'DISMISSED' ORDER BY subject_key",
             dad.id()))
-                .singleElement()
-                .satisfies(row -> {
-                    assertThat(row.get("SUBJECT_KEY")).isEqualTo("memory:" + keptProposal.id());
-                    assertThat(row.get("CONVERSATION_ID")).isEqualTo(kept.id());
-                });
+                .satisfiesExactly(
+                    row -> {
+                        assertThat(row.get("SUBJECT_KEY")).isEqualTo("memory:" + keptProposal.id());
+                        assertThat(row.get("CONVERSATION_ID")).isEqualTo(kept.id());
+                    },
+                    row -> {
+                        // 숨김은 현재값이라 지운 대화의 제안이어도 남긴다. 대화에서는 뗀다.
+                        assertThat(row.get("SUBJECT_KEY")).isEqualTo("memory:" + deletedProposal.id());
+                        assertThat(row.get("CONVERSATION_ID")).isNull();
+                    });
         assertThat(deletedProposal.id()).isNotNull();
     }
 
 
     @Test
-    @DisplayName("제안이 아닌 실패 항목을 숨기면 판단 피드백을 남기지 않는다")
-    void skipsDecisionFeedbackForNonSuggestions() {
+    @DisplayName("제안이 아닌 실패 항목을 숨기면 제안 흐름이 아닌 ATTENTION_ITEM 제어 사건을 남긴다")
+    void recordsAttentionItemControlForNonSuggestions() {
         Conversation conversation = failedConversation("목록 정리");
         AttentionItem failure = onlyItem(attention.view(dad), CardKey.FAILURES);
 
         controls.hide(dad, CardKey.FAILURES, failure.itemKey(), failure.stateKey());
 
         assertThat(conversation.id()).isNotNull();
-        assertThat(feedbackRows()).isEmpty();
+        assertThat(feedbackRows())
+            .containsExactly(tuple(failure.itemKey(), "DISMISSED", "USER", "ATTENTION_HIDE"));
+        assertThat(jdbc.queryForObject(
+            "SELECT subject_type FROM decision_feedback_event WHERE user_id = ? AND event_type = 'DISMISSED'",
+            String.class,
+            dad.id()))
+                .isEqualTo("ATTENTION_ITEM");
     }
 
 
@@ -543,12 +558,12 @@ class AttentionControlServiceTest {
     }
 
 
-    /** 요청자의 판단 피드백을 {@code (subjectKey, eventType, actor, reasonCode)} 로 일어난 순서대로 읽는다. */
+    /** 요청자의 제어 사건(숨김, 미루기, 복원)을 {@code (subjectKey, eventType, actor, reasonCode)} 로 일어난 순서대로 읽는다. */
     private List<Tuple> feedbackRows() {
         return jdbc
             .queryForList(
                 "SELECT subject_key, event_type, actor, reason_code FROM decision_feedback_event"
-                    + " WHERE user_id = ? ORDER BY id",
+                    + " WHERE user_id = ? AND event_type IN ('DISMISSED', 'POSTPONED', 'RESTORED') ORDER BY id",
                 dad.id())
             .stream()
             .map(row -> tuple(row.get("SUBJECT_KEY"), row.get("EVENT_TYPE"), row.get("ACTOR"), row.get("REASON_CODE")))
@@ -556,24 +571,44 @@ class AttentionControlServiceTest {
     }
 
 
-    /** 요청자의 사건을 {@code (itemKey, stateKey, trigger, attention)} 로 읽는다. */
+    /**
+     * 요청자의 지표 사건을 {@code (itemKey, stateKey, trigger, attention)} 로 읽는다. 숨김과 미루기는 제어 사건이라 계기와 판정을 담지 않아
+     * 뒤 둘이 null 이다.
+     */
     private List<Tuple> events(AttentionEventType type) {
+        String eventType = switch (type) {
+            case HIDDEN -> "DISMISSED";
+            case SNOOZED -> "POSTPONED";
+            default -> type.name();
+        };
         return jdbc
             .queryForList(
-                "SELECT item_key, state_key, trigger_type, attention FROM attention_event"
-                    + " WHERE user_id = ? AND event_type = ?",
+                "SELECT subject_key, subject_version, reason_code FROM decision_feedback_event"
+                    + " WHERE user_id = ? AND event_type = ? AND (card_key IS NOT NULL OR subject_type = 'ATTENTION_ITEM')"
+                    + " AND (event_type IN ('SHOWN', 'OPENED', 'ACTED') OR card_key IS NOT NULL) ORDER BY id",
                 dad.id(),
-                type.name())
+                eventType)
             .stream()
-            .map(row -> tuple(row.get("ITEM_KEY"), row.get("STATE_KEY"), row.get("TRIGGER_TYPE"), row.get("ATTENTION")))
+            .map(row -> {
+                String reason = (String)row.get("REASON_CODE");
+                boolean view = type == AttentionEventType.SHOWN || type == AttentionEventType.OPENED || type == AttentionEventType.ACTED;
+                String trigger = view ? reason.substring(0, reason.indexOf('@')) : null;
+                String level = view ? reason.substring(reason.indexOf('@') + 1) : null;
+                return tuple(row.get("SUBJECT_KEY"), row.get("SUBJECT_VERSION"), trigger, level);
+            })
             .toList();
     }
 
 
-    /** 요청자의 제어 줄을 {@code (card, action, stateKey, until)} 로 읽는다. */
+    /** 요청자의 현재 제어를 {@code (card, action, stateKey, until)} 로 읽는다. 복원이 마지막인 항목은 뺀다. */
     private List<Tuple> controlRows() {
-        return controlEntries.findByUserId(dad.id()).stream()
-            .map(entry -> tuple(entry.cardKey().name(), entry.action().name(), entry.stateKey(), entry.untilAt()))
+        return ledger.currentControls(dad.id()).stream()
+            .filter(record -> record.type() != FeedbackEventType.RESTORED)
+            .map(record -> tuple(
+                record.cardKey(),
+                record.type() == FeedbackEventType.DISMISSED ? "HIDE" : "SNOOZE",
+                record.type() == FeedbackEventType.DISMISSED ? record.stateKey() : null,
+                record.untilAt()))
             .toList();
     }
 
