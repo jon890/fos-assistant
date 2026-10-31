@@ -238,9 +238,20 @@ public class StarterSuggestionService {
         boolean awaited = false;
         try {
             String input = prompt(firstQuestions(user, agent));
-            ResolvedModelTier resolved = modelTiers.detachedChoice(user, agent);
+            // 칸을 해석하다 실패해도 실행 줄은 남긴다. 모델을 싣지 않은 줄을 먼저 만들고 그 오류 코드로 실패시킨다.
+            ResolvedModelTier resolved;
+            RuntimeException resolveFailure = null;
+            try {
+                resolved = modelTiers.detachedChoice(user, agent);
+            } catch (RuntimeException ex) {
+                resolveFailure = ex;
+                resolved = new ResolvedModelTier(ModelChoice.defaults(), null);
+            }
             ModelChoice choice = resolved.choice();
             execution = executions.startDetached(user, agent, choice, resolved.tier());
+            if (resolveFailure != null) {
+                throw resolveFailure;
+            }
             // 실행 줄을 먼저 만들고 숨김을 판정한다. 거절해도 그 오류 코드로 실패한 줄이 남는다.
             modelTiers.requireRunnable(user, agent, choice);
             // 대화가 없는 실행이라 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 모델을 싣지 않아 profile 의 값이다.

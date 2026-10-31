@@ -302,6 +302,42 @@ class StarterSuggestionServiceTest {
 
 
     @Test
+    @DisplayName("칸을 해석하다 목록을 읽지 못해 실패해도 Hermes 에 제출하지 않고 실행 줄이 FAILED 와 그 오류 코드로 남는다")
+    void leavesFailedRunRowWhenResolvingTierFails() {
+        ModelTierService failing = mock(ModelTierService.class);
+        when(failing.detachedChoice(any(), any()))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        service = new StarterSuggestionService(
+            properties,
+            agentService,
+            conversations,
+            messages,
+            hermes,
+            executions,
+            failing,
+            objectMapper,
+            limiter,
+            clock,
+            executor);
+        answerWith(json(FOUR));
+
+        service.read(DAD, "starter-family");
+        executor.awaitAll();
+
+        assertThat(stub().received()).as("Hermes 에 제출한 수").isEmpty();
+        assertThat(executionRows.findAll()).singleElement().satisfies(row -> {
+            assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
+            assertThat(row.errorCode()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE.name());
+            assertThat(row.provider()).isNull();
+            assertThat(row.model()).isNull();
+        });
+        assertThat(service.read(DAD, "starter-family"))
+            .as("재시도 간격 안의 추천")
+            .isEqualTo(new StarterSuggestions(List.of(), StarterStatus.NONE));
+    }
+
+
+    @Test
     @DisplayName("이력이 있으면 그 사용자의 지우지 않은 대화마다 첫 질문을 입력에 싣는다")
     void putsFirstQuestionOfEachLiveConversationIntoInput() {
         conversationOf(DAD, family, "이번 주 일정 알려 줘", "다음 질문은 싣지 않는다");
