@@ -1,5 +1,7 @@
 package com.bifos.assistant.proactive.check.application;
 
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.FollowUpService;
@@ -17,6 +19,7 @@ import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -59,6 +62,7 @@ public class LegacySuggestionBackfill implements ApplicationRunner {
     private final ProactiveCheckFindingRepository findings;
     private final ProactiveCheckProblemRepository problems;
     private final ProactiveCheckRepository checks;
+    private final ConversationRepository conversations;
     private final FollowUpService followUps;
     private final DecisionFeedbackRecorder feedback;
 
@@ -99,9 +103,10 @@ public class LegacySuggestionBackfill implements ApplicationRunner {
                 return total;
             }
             Map<Long, ProactiveCheck> owners = ownersOf(batch.stream().map(ProactiveCheckFinding::checkId).toList());
+            Set<Long> active = activeConversations(batch.stream().map(ProactiveCheckFinding::conversationId).toList());
             for (ProactiveCheckFinding finding : batch) {
                 ProactiveCheck check = owners.get(finding.checkId());
-                total = total.plus(check == null ? new BackfillReport(0, 0, 1, 0, 0) : migrateFinding(finding, check));
+                total = total.plus(check == null || !active.contains(finding.conversationId()) ? new BackfillReport(0, 0, 1, 0, 0) : migrateFinding(finding, check));
             }
             after = batch.getLast().id();
         }
@@ -153,9 +158,10 @@ public class LegacySuggestionBackfill implements ApplicationRunner {
                 return total;
             }
             Map<Long, ProactiveCheck> owners = ownersOf(batch.stream().map(ProactiveCheckProblem::checkId).toList());
+            Set<Long> active = activeConversations(batch.stream().map(ProactiveCheckProblem::conversationId).toList());
             for (ProactiveCheckProblem problem : batch) {
                 ProactiveCheck check = owners.get(problem.checkId());
-                total = total.plus(check == null ? new BackfillReport(0, 0, 1, 0, 0) : migrateProblem(problem, check));
+                total = total.plus(check == null || !active.contains(problem.conversationId()) ? new BackfillReport(0, 0, 1, 0, 0) : migrateProblem(problem, check));
             }
             after = batch.getLast().id();
         }
@@ -216,6 +222,18 @@ public class LegacySuggestionBackfill implements ApplicationRunner {
         boolean moved = outcome == SuggestionOutcome.DUPLICATE
             && followUps.suggestionPublicIds(item.userId(), List.of(item.dedupeKey())).containsKey(item.dedupeKey());
         return moved ? new BackfillReport(0, 1, 0, 0, 0) : new BackfillReport(0, 0, 1, 0, 0);
+    }
+
+
+    /**
+     * 지우지 않은 대화의 번호다. 지웠거나 정리한 대화의 옛 줄은 옮기지 않는다. 정리 작업은 옮긴 제안 줄만 지우고 옛 줄은 남기므로, 건너뛰지
+     * 않으면 다음 기동이 지운 대화의 제목과 본문을 다시 저장한다.
+     */
+    private Set<Long> activeConversations(List<Long> conversationIds) {
+        return conversations.findAllById(conversationIds.stream().distinct().toList()).stream()
+            .filter(conversation -> conversation.deletedAt() == null && conversation.purgedAt() == null)
+            .map(Conversation::id)
+            .collect(Collectors.toSet());
     }
 
 

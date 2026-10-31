@@ -445,6 +445,12 @@ class LegacySuggestionBackfillTest {
             Long.class,
             owner.id(),
             conversation.id())).isZero();
+
+        // 정리 작업은 옛 발견과 문제 후보를 남긴다. 재기동해도 지운 대화의 제안이 되살아나면 안 된다.
+        BackfillReport restarted = backfill.backfill();
+
+        assertThat(restarted.created()).isZero();
+        assertThat(rowsOf(owner)).singleElement().satisfies(row -> assertThat(row.publicId()).isEqualTo(toAccept.publicId()));
     }
 
 
