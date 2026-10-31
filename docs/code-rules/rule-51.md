@@ -20,3 +20,8 @@ Specification·EntityManager·JdbcTemplate 등 동적 쿼리는 RepositoryQueryM
 RepositoryQuerySweep는 저장소 메서드를 실행할 인자를 준비한다.
 
 책임과 실행 절차는 [data-schema.md](../../backend/docs/data-schema.md)에서 이어 읽는다.
+
+## 리뷰가 보는 것
+
+자동 수집은 지원하는 인자의 저장소 메서드만 실행한다.
+리뷰는 새 쿼리가 Specification, EntityManager, JdbcTemplate 처럼 수집되지 않는 방식인데 `RepositoryQueryMysqlTest` 에 더해지지 않았는지 본다.

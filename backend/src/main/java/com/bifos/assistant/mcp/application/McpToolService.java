@@ -314,8 +314,9 @@ public class McpToolService {
         String evidence,
         Long memoryId,
         String collection,
-        boolean sensitive) {
-        return memoryRemember.remember(caller, title, content, evidence, memoryId, collection, sensitive);
+        boolean sensitive,
+        boolean archivable) {
+        return memoryRemember.remember(caller, title, content, evidence, memoryId, collection, sensitive, archivable);
     }
 
 

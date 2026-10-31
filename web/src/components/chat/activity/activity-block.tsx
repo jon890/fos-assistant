@@ -10,6 +10,7 @@ import type { ExecutionTreeResponse } from "@/components/execution/execution-tre
 import type { MemoryUse } from "@/lib/memory-use-api";
 import type { SourceReadSummary } from "@/components/chat/message-types";
 import { ActivityReferences } from "./activity-references";
+import { MemoryUseFeedback } from "@/components/chat/memory-use-feedback";
 import { ActivityTimeline } from "./activity-timeline";
 import {
   activityLabel,
@@ -70,8 +71,18 @@ type Props =
       sourceReads?: SourceReadSummary | null;
       /** 끝난 답이 본문을 받은 기억. 펼친 안쪽 끝에만 그린다 */
       memoryUses?: MemoryUse[];
+      /** 참고한 기억의 단추가 반응을 남길 대화. 없으면 단추를 그리지 않는다 */
+      conversationId?: string | null;
       onOpenPanel?(): void;
     };
+
+/** 대화 번호가 있을 때만 참고한 기억마다 「관련 없음」, 「틀림」 단추를 붙인다. */
+function memoryUseFeedback(conversationId: string | null | undefined) {
+  if (!conversationId) return undefined;
+  return function MemoryUseActions(use: MemoryUse) {
+    return <MemoryUseFeedback conversationId={conversationId} use={use} />;
+  };
+}
 
 export function ActivityBlock(props: Props) {
   const [savedExpanded, setSavedExpanded] = useState(
@@ -259,6 +270,7 @@ export function ActivityBlock(props: Props) {
               <ActivityReferences
                 sourceReads={props.sourceReads}
                 memoryUses={props.memoryUses}
+                memoryUseActions={memoryUseFeedback(props.conversationId)}
               />
             ) : null}
             {duration !== null || props.onOpenPanel ? (

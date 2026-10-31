@@ -61,6 +61,9 @@ public class ConnectorExecutionClaims {
                 // 승인 뒤 재기동으로 key 파일 설정을 비웠거나 계좌를 목록에서 뺐으면 ticket 을 소비하지 않는다.
                 gate.requireOpen();
                 gate.requireScope(payload.userId(), snapshot.scopeJson());
+                // 승인 뒤 계좌 주인이 상한을 낮췄으면 소비 전에 막는다. 상한 변경도 위에서 잠근 사용자 행을 잠그므로 그 순간에 커밋된 값을 본다.
+                // 자기 EXECUTING 줄은 하루 합계에서 빼고, 하루는 합계가 주문을 묶는 승인 시각의 KST 날짜로 센다.
+                gate.requireWithinLimits(payload.userId(), action.id(), snapshot.executionArgsJson(), action.decidedAt());
                 row.consumeTicket(payload.ticketId(), now.truncatedTo(ChronoUnit.MICROS));
                 tickets.beforeCommit(action, payload);
                 return new ConnectorExecutionClaimResult(1, true, payload.ticketId(), payload.expiresAt());
