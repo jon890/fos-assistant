@@ -185,7 +185,8 @@ public class ArtifactVaultService {
      * 보관본 하나를 지운다. 묶음이면 안의 파일을 함께 지운다. 본문이 행에만 있어 지우는 순간 읽을 수 없고 재시작으로
      * 되살아나지 않는다.
      *
-     * <p>뿌리 행은 본문과 경로를 비운 지우기 이력으로 남는다. 자동 보관은 이 이력이 있으면 같은 보관본을 다시 만들지 않는다.
+     * <p>뿌리 행은 본문과 key 번호, 경로, 크기를 비운 지우기 이력으로 남는다. 자동 보관은 이 이력이 있으면 같은 보관본을 다시
+     * 만들지 않는다. 대화가 이미 지워졌으면 다시 보관될 일이 없어 이력도 남기지 않는다. 대화를 정리할 때 이력도 함께 지운다.
      * 이미 없는 것을 지우려 해도 같은 응답이다. 묶음 안 파일의 번호로는 지우지 못한다.
      */
     public void delete(Long ownerUserId, Long id) {
@@ -193,6 +194,7 @@ public class ArtifactVaultService {
             int forgotten = rows.forgetVaulted(id, ownerUserId, clock.instant());
             if (forgotten == 1) {
                 rows.deleteVaultParts(id, ownerUserId);
+                rows.deleteForgottenOfGoneConversation(id, ownerUserId);
             }
             return forgotten;
         });

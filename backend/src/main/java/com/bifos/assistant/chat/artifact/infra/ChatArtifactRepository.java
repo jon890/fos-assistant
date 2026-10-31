@@ -59,9 +59,14 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
      * 그 대화의 결과물 행을 모두 지운다. 파일은 부르는 쪽이 먼저 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다.
      *
      * <p>사용자가 보관한 사본({@code vault_user_id} 가 채워진 행)은 남긴다. 보관본은 대화와 독립된 수명을 가진다.
+     * 그 대화의 지우기 이력({@code deleted_at} 이 채워진 보관 뿌리 행)은 함께 지운다. 지운 대화에서는 자동 보관이 다시 돌지 않는다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from ChatArtifact a where a.conversationId = :conversationId and a.vaultUserId is null")
+    @Query("""
+            delete from ChatArtifact a
+             where a.conversationId = :conversationId
+               and (a.vaultUserId is null or a.deletedAt is not null)
+            """)
     int deleteAllOf(@Param("conversationId") Long conversationId);
 
 
@@ -139,6 +144,23 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
                and a.deletedAt is null
             """)
     int forgetVaulted(@Param("id") Long id, @Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /**
+     * 대화가 이미 지워졌거나 지울 차례인 보관본의 지우기 이력을 지운다. 그 대화에서는 자동 보관이 다시 돌지 않아 이력이 필요 없다.
+     *
+     * <p>트랜잭션은 {@code ArtifactVaultService} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            delete from ChatArtifact a
+             where a.id = :id
+               and a.vaultUserId = :userId
+               and a.deletedAt is not null
+               and not exists (
+                   select c.id from Conversation c where c.id = a.conversationId and c.deletedAt is null)
+            """)
+    int deleteForgottenOfGoneConversation(@Param("id") Long id, @Param("userId") Long userId);
 
 
     /** 사용자가 지운 보관본을 그 사용자가 다시 보관할 때 이력 행을 지운다. 새 보관본이 같은 지문을 쓴다. */
