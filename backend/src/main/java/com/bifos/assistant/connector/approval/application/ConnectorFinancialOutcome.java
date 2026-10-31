@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
  * <p>부르는 쪽은 사용자, 승인 줄, 실행 줄 순서로 이미 잠갔어야 한다. 실행 줄의 {@code consumed_at} 이 비어 있으면 claim 이
  * 성공한 적이 없고, 이 전이로 줄이 {@code EXECUTING} 밖으로 나가면 앞으로의 claim 도 거절되므로 금융 POST 는 나가지 않는다.
  * 실행 줄이 없는 줄(금융이 아닌 쓰기)은 지금처럼 결과를 모르는 것으로 끝낸다.
+ * claim 없이 온 성공 응답은 부르는 쪽이 {@code UNKNOWN} 으로 끝낸다. 실행기가 계약을 어겼으니 미전송의 증명으로 쓰지 않는다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorFinancialOutcome {
