@@ -1,0 +1,11 @@
+{
+  "name": "plan311-artifact-vault-images",
+  "description": "결과물 보관 PR 2. 이미지가 포함된 완성 HTML 묶음과 독립 이미지를 보관한다 (#530)",
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}
