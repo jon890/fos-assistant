@@ -1,10 +1,15 @@
 /** 보관한 결과물의 서버 라우트를 부른다. 실패를 문구로 바꾸는 일은 부르는 쪽이 한다. */
 
-/** 보관한 결과물 하나다. `vaultedAt` 은 ISO-8601 문자열이다. */
+/**
+ * 보관한 결과물 하나다. `vaultedAt` 은 ISO-8601 문자열이다.
+ *
+ * 묶음이면 `path` 는 고른 HTML 이고 `byteSize` 는 묶음 전체, `fileCount` 는 그 HTML 을 센 파일 수다.
+ */
 export type VaultItem = {
   id: number;
   path: string;
   byteSize: number;
+  fileCount: number;
   vaultedAt: string;
 };
 
@@ -14,7 +19,7 @@ export type VaultList = { items: VaultItem[] };
 /** 이 화면에서만 뜻이 정해지는 오류 코드의 문구다. */
 export const VAULT_ERRORS: Record<string, string> = {
   ARTIFACT_VAULT_UNSUPPORTED:
-    "HTML 이나 CSS 만 보관할 수 있어요. 사진이나 다른 파일을 부르는 결과물은 아직 보관하지 못해요.",
+    "보관할 수 없는 결과물이에요. 외부 주소나 data 주소를 부르거나, 부르는 파일이 없거나, 크기 한도(파일 하나 5MB, 묶음 100MB, 1,000개)를 넘었어요.",
   ARTIFACT_VAULT_FULL:
     "보관 공간이 가득 찼어요. 보관한 결과물을 지운 뒤 다시 보관해 주세요.",
   ARTIFACT_VAULT_UNAVAILABLE:
@@ -43,7 +48,27 @@ export function deleteVaultItem(id: number): Promise<Response> {
   return fetch(`/api/artifact-vault/${id}`, { method: "DELETE" });
 }
 
-/** 보관본 본문 주소다. `download` 면 내려받기다. */
+/** 보관본 뿌리 파일의 본문 주소다. `download` 면 내려받기다. */
 export function vaultContentUrl(id: number, download = false): string {
   return `/api/artifact-vault/${id}/content${download ? "?download=1" : ""}`;
+}
+
+/**
+ * 보관본 안의 파일 주소다. 묶음 HTML 을 이 주소로 열면 HTML 이 상대 주소로 부르는 사진과 스타일도 같은 보관본 안에서 열린다.
+ */
+export function vaultFileUrl(id: number, path: string): string {
+  return `/api/artifact-vault/${id}/files/${path
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+}
+
+/** 묶음 전체를 zip 으로 내려받는 주소다. */
+export function vaultArchiveUrl(id: number): string {
+  return `/api/artifact-vault/${id}/archive`;
+}
+
+/** 사진 보관본인지 경로의 확장자로 가린다. */
+export function isVaultImage(path: string): boolean {
+  return /\.(png|jpe?g|gif|webp)$/i.test(path);
 }
