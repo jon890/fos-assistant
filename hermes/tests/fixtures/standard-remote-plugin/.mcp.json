@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "std-remote": {
+      "type": "http",
+      "url": "https://plugin-file.invalid/mcp",
+      "headers": {"Authorization": "Bearer ${STD_REMOTE_TOKEN}"}
+    }
+  }
+}
