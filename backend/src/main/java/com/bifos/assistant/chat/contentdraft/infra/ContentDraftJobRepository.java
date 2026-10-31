@@ -33,6 +33,22 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
     List<ContentDraftJob> findByStatusInAndApprovedAtBefore(Collection<ContentDraftJobStatus> statuses, Instant before);
 
 
+    /**
+     * 같은 사용자·대화·원고·연결에서 저장 결과가 UNKNOWN 으로 남은 다른 snapshot 의 job 이 있는지 본다.
+     * UNKNOWN 이면 네이버에 임시저장 글이 이미 생겼을 수 있어 새 snapshot 저장을 막는 근거가 된다.
+     */
+    @Query("""
+        select count(j) > 0 from ContentDraftJob j, ContentDraftSnapshot s, ContentDraftRevision r
+        where j.snapshotId = s.id and s.revisionId = r.id
+          and j.ownerUserId = :ownerId and j.conversationId = :conversationId
+          and s.connectionId = :connectionId and r.draftId = :draftId
+          and j.status = com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus.UNKNOWN
+          and j.snapshotId <> :snapshotRowId
+        """)
+    boolean existsUnknownForOtherSnapshot(@Param("ownerId") Long ownerId, @Param("conversationId") Long conversationId,
+        @Param("connectionId") Long connectionId, @Param("draftId") Long draftId, @Param("snapshotRowId") Long snapshotRowId);
+
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from ContentDraftJob j where j.id = :id")
     Optional<ContentDraftJob> lockById(@Param("id") Long id);

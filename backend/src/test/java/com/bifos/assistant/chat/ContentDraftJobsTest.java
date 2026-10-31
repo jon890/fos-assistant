@@ -63,6 +63,45 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
 
 
     @Test
+    @DisplayName("저장 결과가 UNKNOWN 으로 남은 원고의 새 snapshot 저장은 막고 같은 snapshot 재요청은 기존 job 을 돌려준다")
+    void blocksNewSnapshotWhileUnknownRemains() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID first = preview();
+        var request = saves.requestSave(owner, origin.id(), first);
+        contentApproval.approve(owner, request.actionId(), null);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
+        UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
+        code(() -> saves.requestSave(owner, origin.id(), second), ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN);
+        assertThat(jobRows.count()).isEqualTo(1);
+        assertThat(actionRows.count()).isEqualTo(1);
+        assertThat(saves.requestSave(owner, origin.id(), first).actionId()).isEqualTo(request.actionId());
+    }
+
+
+    @Test
+    @DisplayName("결과 조회로 UNKNOWN 이 풀리면 새 snapshot 저장을 다시 받는다")
+    void allowsNewSnapshotAfterUnknownResolved() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID first = preview();
+        var request = saves.requestSave(owner, origin.id(), first);
+        contentApproval.approve(owner, request.actionId(), null);
+        drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
+        UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
+        code(() -> saves.requestSave(owner, origin.id(), second), ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, first).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        var next = saves.requestSave(owner, origin.id(), second);
+        assertThat(next.snapshotId()).isEqualTo(second);
+        assertThat(jobRows.count()).isEqualTo(2);
+    }
+
+
+    @Test
     @DisplayName("정상 접수 뒤 조회가 succeeded를 읽으면 job과 EXECUTING 승인 줄이 SUCCEEDED가 된다")
     void succeedsActionAfterAcceptedStartAndSucceededStatus() {
         UUID snapshotId = preview();
