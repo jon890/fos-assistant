@@ -368,7 +368,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     void summaryCarriesLimitStatus() {
         OverridableLiveProperties.during(gate, limits("30", "100"));
         jdbc.update("update app_user set limit_daily_amount_usd = 50, limit_updated_at = current_timestamp where id = ?", user.id());
-        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
+        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20.0000001")));
         assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         var pending = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("10")));
         var limits = summaries.summaryOf(user, pending.actionId()).orElseThrow().limits();
@@ -376,8 +376,8 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(limits.orderLimit()).isEqualTo("30");
         assertThat(limits.quantityLimit()).isEqualTo("1000");
         assertThat(limits.dailyLimit()).isEqualTo("50");
-        assertThat(limits.spentToday()).isEqualTo("20");
-        assertThat(limits.remainingToday()).isEqualTo("30");
+        assertThat(limits.spentToday()).isEqualTo("20.0000001");
+        assertThat(limits.remainingToday()).isEqualTo("29.9999999");
     }
 
 

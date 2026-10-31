@@ -44,7 +44,7 @@ class ConnectorArgumentLabelsPipelineTest {
             new HermesProperties("unused", base, "test-dashboard-token", base, null, null, null, null),
             new SandboxAttachmentDirectory(attachments.toString()));
         ReflectionTestUtils.setField(client, "client", builder.build());
-        server.expect(requestTo(base + "/api/connectors/catalog")).andRespond(withSuccess(
+        server.expect(requestTo(base + "/api/connectors/catalog?include=standard")).andRespond(withSuccess(
             Files.readString(Path.of("../test/resources/connector-argument-masked-catalog.json")),
             MediaType.APPLICATION_JSON));
         ConnectorManifest manifest = client.readCatalog().getFirst();
@@ -88,7 +88,7 @@ class ConnectorArgumentLabelsPipelineTest {
             new HermesProperties("unused", base, "test-dashboard-token", base, null, null, null, null),
             new SandboxAttachmentDirectory(attachments.toString()));
         ReflectionTestUtils.setField(client, "client", builder.build());
-        server.expect(requestTo(base + "/api/connectors/catalog")).andRespond(withSuccess(
+        server.expect(requestTo(base + "/api/connectors/catalog?include=standard")).andRespond(withSuccess(
             Files.readString(Path.of("../test/resources/connector-argument-catalog.json")), MediaType.APPLICATION_JSON));
         for (ConnectorManifest manifest : client.readCatalog()) {
             ConnectorAction action = mock(ConnectorAction.class);

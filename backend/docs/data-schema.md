@@ -488,6 +488,18 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 `(message_id, path)` 에 유일 제약이 있다. 같은 파일을 다음 turn 이 다시 고치면 그 turn 의 답에 새 행이 생긴다. 파일은 하나이므로 옛 답에서 열어도 지금 내용이 보인다.
 보관 기간과 대화 삭제의 규칙은 첨부와 같다. 지운 표시를 다시 맞추는 규칙은 [`docs/features/attachment.md`](../../docs/features/attachment.md) 의 「지운 표시를 다시 맞추기」 가 갖는다.
 
+**사용자가 보관한 사본도 이 표의 행이다**([ADR-20261101 / artifact-vault](../../docs/adr/ADR-20261101-artifact-vault.md)). `vault_user_id` 가 채워진 행이고 `message_id` 는 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `vault_user_id` | 보관 주인(대화 요청자). 비어 있으면 대화 결과물 행이다 |
+| `vault_key_id` | 본문을 암호화한 `user_data_key.id` |
+| `vault_body` | 암호화한 본문(`v1.<IV>.<암호문과 태그>`). 평문은 두지 않는다 |
+| `vault_fingerprint` | 대화 번호, 경로, 본문 바이트의 SHA-256 16진수. `(vault_user_id, vault_fingerprint)` 에 유일 제약이 있어 같은 보관 요청은 한 건이다 |
+
+보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
+외래 키를 두지 않는다. 대화와 메시지가 지워져도 보관 사본 행은 남는다.
+
 ### result_delivery
 
 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다. 그 turn 이 알림 줄을 저장할 때 생긴다.

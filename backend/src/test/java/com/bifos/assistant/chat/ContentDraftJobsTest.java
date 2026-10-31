@@ -20,6 +20,7 @@ import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.dao.TransientDataAccessException;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftSaveRequestView;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftJob;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
@@ -60,6 +61,68 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
         assertThat(starter.started()).hasSize(1);
         assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
         Mockito.verify(compiler, Mockito.times(1)).status(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("저장 결과가 UNKNOWN 으로 남은 원고의 새 snapshot 저장은 막고 같은 snapshot 재요청은 기존 job 을 돌려준다")
+    void blocksNewSnapshotWhileUnknownRemains() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID first = preview();
+        var request = saves.requestSave(owner, origin.id(), first);
+        contentApproval.approve(owner, request.actionId(), null);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
+        UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
+        code(() -> saves.requestSave(owner, origin.id(), second), ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN);
+        assertThat(jobRows.count()).isEqualTo(1);
+        assertThat(actionRows.count()).isEqualTo(1);
+        assertThat(saves.requestSave(owner, origin.id(), first).actionId()).isEqualTo(request.actionId());
+    }
+
+
+    @Test
+    @DisplayName("결과 조회로 UNKNOWN 이 풀리면 새 snapshot 저장을 다시 받는다")
+    void allowsNewSnapshotAfterUnknownResolved() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID first = preview();
+        var request = saves.requestSave(owner, origin.id(), first);
+        contentApproval.approve(owner, request.actionId(), null);
+        drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
+        UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
+        code(() -> saves.requestSave(owner, origin.id(), second), ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, first).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        var next = saves.requestSave(owner, origin.id(), second);
+        assertThat(next.snapshotId()).isEqualTo(second);
+        assertThat(jobRows.count()).isEqualTo(2);
+    }
+
+
+    @Test
+    @DisplayName("다른 원고의 UNKNOWN 과 닫힌 UNKNOWN 은 새 snapshot 저장을 막지 않는다")
+    void doesNotBlockForOtherDraftOrClosedUnknown() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID first = preview();
+        var request = saves.requestSave(owner, origin.id(), first);
+        contentApproval.approve(owner, request.actionId(), null);
+        drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
+        UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
+        // 다른 원고는 같은 대화·연결이어도 막히지 않는다.
+        UUID otherDraft = drafts.create(owner, conversation.id(), inputDraft("다른 원고", true)).draft().draftId();
+        UUID other = snapshots.preview(owner, conversation.id(), otherDraft, 1, binding.id(), origin.id()).snapshotId();
+        assertThat(saves.requestSave(owner, origin.id(), other).snapshotId()).isEqualTo(other);
+        // 기한이 지나 닫힌 UNKNOWN 은 다시 조회하지 않으므로 막지 않는다.
+        var closed = jobRows.findAll().stream().filter(j -> j.status() == ContentDraftJobStatus.UNKNOWN).findFirst().orElseThrow();
+        closed.close(ContentDraftJob.EXPIRED, Instant.now());
+        jobRows.saveAndFlush(closed);
+        assertThat(saves.requestSave(owner, origin.id(), second).snapshotId()).isEqualTo(second);
     }
 
 

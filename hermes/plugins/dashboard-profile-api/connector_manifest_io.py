@@ -87,12 +87,13 @@ def _read_assistant_json(root: pathlib.Path):
     """assistant 전용 선언을 읽는다. `assistant.json` 이 있으면 그것, 없으면 옛 이름 `connector.json` 이다.
 
     둘 다 있으면 거절한다. 하나를 골라 읽으면 작성자가 옛 파일을 지우지 않은 채 다른 값을 읽는 일을 모른다.
+    둘 다 없으면 None 이다. 표준 플러그인으로 읽는다(ADR-20261101 plugin-without-assistant-json).
     """
     present = [relative for relative in ("assistant.json", "connector.json") if os.path.lexists(root / relative)]
     if len(present) == 2:
         raise ValueError("assistant.json 과 connector.json 이 함께 있다")
     if not present:
-        raise ValueError("assistant.json 이 없다")
+        return None
     return _read_connector_json(root, present[0])
 
 

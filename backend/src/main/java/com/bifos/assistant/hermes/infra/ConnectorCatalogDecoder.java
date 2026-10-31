@@ -17,6 +17,8 @@ final class ConnectorCatalogDecoder {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
     /** 읽을 수 없는 선언에 주는 판이다. 받는 쪽이 아는 판이 아니라 그 커넥터만 카탈로그에서 빠진다. */
     private static final int SCHEMA_UNREADABLE = 0;
+    /** {@code assistant.json} 이 없는 표준 플러그인의 schema 값이다. 확인 도구가 없다(ADR-20261101 / plugin-without-assistant-json). */
+    private static final int SCHEMA_STANDARD = 3;
 
 
     static ConnectorManifest read(JsonNode item) {
@@ -32,12 +34,14 @@ final class ConnectorCatalogDecoder {
         JsonNode tools = item.get("tools");
         // 판이나 도구 선언의 모양이 틀리면 둘을 함께 버린다. 도구만 비우면 도구를 선언하지 않는 판으로 읽혀 통과한다.
         boolean readable = readableSchema(schema) && ConnectorCatalogTools.readable(tools);
+        // 표준 플러그인만 확인 도구가 없다. 다른 schema 에서 빠지면 지금처럼 카탈로그 읽기를 실패로 다룬다.
+        boolean standard = readable && schema(schema) == SCHEMA_STANDARD;
         return new ConnectorManifest(
             requiredText(item, "id"),
             requiredText(item, "title"),
             text(item, "description"),
             fields,
-            requiredText(item.get("verify"), "tool"),
+            standard ? null : requiredText(item.get("verify"), "tool"),
             requiredText(item, "mcp_server"),
             readable ? schema(schema) : SCHEMA_UNREADABLE,
             readable ? ConnectorCatalogTools.read(tools) : List.of(),
