@@ -84,7 +84,7 @@ sequenceDiagram
 | 0 | 측정 세 층과 악화 금지 게이트, 실행 기록의 선택 근거 컬럼(아래 「Memory 회수 측정」). 서버의 임베딩 지연은 운영 저장소가 재고 결과 수치만 여기 적는다 | [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) |
 | 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 개인 사실 구역은 그대로다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
 | 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록 | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) |
-| 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드. 단추와 표시는 만들었고(아래 「참고한 기억의 단추」, 「도구 계약(Memory)」), 정비 루프의 제안 모드와 후보 확인 화면, `/memory` 에서 표시를 보이고 고치는 것은 아직 만들지 않았다 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
+| 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드. 모두 만들었다(아래 「참고한 기억의 단추」, 「도구 계약(Memory)」, 「정비 루프」, 「기억 화면」). 제안 모드는 후보와 근거만 기록하고 기억을 바꾸지 않는다 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
 | 4 | 정비의 자동 전환과 먼저 살펴보기 연결 | 같은 ADR |
 
 단계 1 의 운영 임베딩 실측(2026-10-16, BGE-M3 int8 ONNX, 1024토큰 상한)이다. 결과 수치만 적고 재는 방법은 운영 저장소가 갖는다.
@@ -105,6 +105,9 @@ sequenceDiagram
 - 「고치기」 와 「지우기」 는 고칠 수 있는 사람(개인 기억은 주인, 그룹 기억은 `ADMIN`)에게만 보인다
 - 민감한 기억은 목록이 본문을 싣지 않으므로 펼쳐도 안내만 보이고 「고치기」 가 없다
 - 에이전트가 남긴 줄은 남긴 에이전트를 보인다. 이름을 보일지는 서버가 정한다(아래 「범위와 조립」)
+- 줄에 「자동 보관 허락」 표시(`archivable`)를 보이고, 고칠 수 있는 사람이 「고치기」 에서 켜고 끈다. 목록에서 `PATCH /api/v1/memories/{id}` 의 선택 칸 `archivable` 로 보낸다. 없으면 지금 값을 그대로 둔다
+- `/memory?memory=<번호>` 로 열면 그 줄을 펼치고 스크롤한다. 「참고한 기억」 의 「틀림」 뒤 링크가 이 주소를 쓴다
+- 「기억」 탭 위에 「정비 후보」 절을 보인다. 후보가 없으면 그리지 않는다(아래 「정비 루프」)
 - 사람이 손으로 기억과 문서를 만드는 양식은 `web/src/lib/memory-features.ts` 의 `MEMORY_MANUAL_CREATE` 로 숨겨 두었다. 양식과 API 는 지우지 않았다
 
 관리자 에이전트 상세의 「기억 영역」 절(`components/agent/agent-memory-section.tsx`)은 collection 마다 「받음」 과 「민감 항목까지」, 실릴 수 있는 항목 수, 최근 변경을 보인다.
@@ -116,7 +119,7 @@ sequenceDiagram
 
 - 「기억했어요」 줄과 같은 때에 다시 읽는다. 읽지 못하면 앞 목록을 그대로 두고 대화를 막지 않는다
 - 저장된 작업 과정(`ActivityBlock` 의 저장 모드)을 펼치면 끝에 항목마다 제목과 받은 길(`MemoryUseVia`)을 보이고, 「기억 화면에서 고치기」 링크를 둔다. 제목은 평문으로만 그린다(ADR-009). 코드는 `components/chat/activity/activity-references.tsx` 가 갖는다
-- 항목마다 「관련 없음」, 「틀림」 단추를 둔다. 누른 뒤에는 그 항목에 「…으로 남겼어요」 만 보이고, 「틀림」 이면 「기억 화면에서 고치기」 링크를 함께 보인다. 남긴 표시는 그 화면에만 있고 다시 열면 단추가 다시 보인다. 무엇이 남는지는 아래 「참고한 기억의 단추」 가 갖는다. 코드는 `components/chat/memory-use-feedback.tsx` 가 갖는다
+- 항목마다 「관련 없음」, 「틀림」 단추를 둔다. 누른 뒤에는 그 항목에 「…으로 남겼어요」 만 보이고, 「틀림」 이면 그 항목을 바로 여는 「기억 화면에서 고치기」 링크를 함께 보인다. 남긴 표시는 그 화면에만 있고 다시 열면 단추가 다시 보인다. 무엇이 남는지는 아래 「참고한 기억의 단추」 가 갖는다. 코드는 `components/chat/memory-use-feedback.tsx` 가 갖는다
 - 도구 호출이 없어 작업 과정 블록이 없는 답에는 아무것도 그리지 않는다
 - 새로 읽힌 기억 목록은 맨 아래 따라가기가 보는 글의 변화에 든다. 블록은 접혀 있으면 높이가 변하지 않지만, 진행 중 블록을 펼친 채 끝난 답은 펼친 채로 저장되어 절이 들어오면 높이가 늘기 때문이다
 - 화면에서 빠져도 자료는 그대로 쌓인다. 이 화면은 `memory-uses` 응답만 읽고, 기억 평가와 운영 지표는 `execution_context_source` 와 `memory_revision` 등 표를 직접 센다
@@ -419,6 +422,54 @@ sequenceDiagram
 - 같은 단추를 다시 누르면 사건이 하나 더 남는다. 반응 읽기(`FeedbackLabeler`)는 이 두 사건을 받아들임이나 거절로 읽지 않고, replay 읽기 모델(`DecisionFeedbackExporter`)도 싣지 않는다. 정비 규칙의 입력 신호로만 읽는다
 - 단추를 누른 대화를 지우면 그 단추 사건은 지우지만, 같은 기억의 다른 대화 사건(제안과 받아들임)까지 넓혀 지우지 않는다. 단추 사건은 그 답에 대한 반응이지 기억을 제안한 흐름이 아니다
 
+## 정비 루프
+
+하루에 한 번 도는 정비 작업(`MemoryMaintenanceJob`)이 정해진 규칙으로 정비 후보를 만든다. 처음 4주는 **제안 모드**라 후보와 근거만 `decision_feedback_event` 의 정비 사건으로 남기고, 기억의 제목, 본문, 판, 상태, `retrieval`, `archivable` 과 `memory_link` 를 바꾸지 않는다. LLM 이 기억을 고쳐 쓰지 않는다. 근거는 [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) 에 있다.
+
+### 사건
+
+새 테이블은 없다. `decision_feedback_event` 에 사건 종류 셋과 JSON 칸 `detail` 하나를 더했다.
+
+| 사건 종류 | 주체 | 뜻 |
+| --- | --- | --- |
+| `MAINTENANCE_PROPOSED` | `SYSTEM` | 정비 작업이 후보를 만들었다 |
+| `MAINTENANCE_CONFIRMED` | `USER` | 사람이 후보를 「맞음」 으로 확인했다 |
+| `MAINTENANCE_DENIED` | `USER` | 사람이 후보를 「아님」 으로 확인했다 |
+
+- 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다. 제목과 본문은 남기지 않고 화면이 지금 제목을 `memory` 에서 읽는다
+- `detail` 은 후보 사건이면 규칙 버전(`ruleVersion`), 모드(`mode`, 제안 모드는 `PROPOSE`), 그때의 신호 값(`evidence`)이고, 확인 사건이면 확인한 후보 사건의 번호(`candidateId`)다. 신호 값의 이름은 규칙이 정해 규칙이 바뀌어도 스키마는 그대로다
+- 반응 읽기(`FeedbackLabeler`)와 replay 읽기 모델(`DecisionFeedbackExporter`)은 정비 사건을 싣지 않는다(`FeedbackEventType.marksMemoryUse`). 단계 4 가 `MAINTENANCE_APPLIED`, `MAINTENANCE_REVERTED` 를 더한다
+- 개인 항목의 후보는 주인에게, 그룹 항목의 후보는 그 그룹의 `ADMIN` 마다 하나씩 남긴다. 사건이 사용자의 것이라 `user_id` 가 비지 않게 하려는 배치다. 한 사람이 확인하면 같은 열쇠와 동작의 다른 관리자 후보도 닫힌 것으로 본다
+- 열린 후보는 같은 열쇠와 동작의 `MAINTENANCE_PROPOSED` 뒤에 확인 사건이 없는 것이다. 같은 항목, 같은 동작, 같은 revision 번호의 후보가 열려 있거나 이미 확인됐으면 다음 실행이 새 후보를 만들지 않는다. 항목을 고쳐 revision 번호가 오르면 다시 후보가 될 수 있다
+- 사건은 마지막 사건 뒤 365일이 지나면 보관 기간 정리가 지운다
+
+### 규칙
+
+규칙 버전은 `MemoryMaintenanceRules.RULE_VERSION`(지금 1)이 갖는다. 숫자는 첫 값이고 4주 동안 확인 결과를 보고 고친다. 값은 설정 `assistant.memory.maintenance.*` 가 갖는다.
+
+| 동작 | 후보가 되는 항목 | 근거에 적는 값 |
+| --- | --- | --- |
+| `ARCHIVE` | `ACCEPTED` 인 `MEMORY` 이고 `retrieval` 이 `ARCHIVE` 가 아니며, `archive-idle-days`(90일) 전에 만들었고, 그 기간 동안 `execution_context_source` 에 한 번도 실리거나 읽히지 않았고, 「관련 없음」 이나 「틀림」 단추 사건이 1건 이상 | `idleDays`, `unwantedMarks`, `archivable`, `retrieval` |
+| `DEDUP` | 같은 주인과 같은 지문(범위, 주인, 제목, 본문의 해시)을 가진 `ACCEPTED` 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽. 민감 항목과 암호문 항목은 보지 않는다 | `keepMemoryId`, `sameCount`, `archivable` |
+
+- **`archivable` 이 거짓인 항목도 `ARCHIVE` 후보는 만들고 근거에 그 값을 적는다.** 제안 모드는 동작을 적용하지 않으므로 안전하고, 후보로만 보이게 한다. 거짓인 항목은 단계 4 의 자동 보관에서도 제외한다
+- `SUPERSEDES` 후보는 이 작업이 다시 만들지 않는다. 「기억 사이의 연결」 의 제안이 그대로 `/memory` 에 보인다
+
+### 후보 확인
+
+| 경로 | 뜻 |
+| --- | --- |
+| `GET /api/v1/memory/maintenance-candidates` | 요청자가 고칠 수 있는 항목의 확인 전 후보. 후보 번호(사건 번호), 항목 번호, 범위, 지금 제목, 동작, 근거 요약, 지금 `archivable`, 후보를 만든 때 |
+| `PUT /api/v1/memory/maintenance-candidates/{id}/review` | 본문 `{ "review": "CORRECT" \| "INCORRECT" }`. 확인 사건을 남기고 204 |
+
+- 고칠 수 있는 사람은 개인 항목의 주인, 그룹 항목의 `ADMIN` 이다. 남의 후보, 없는 후보, 지운 항목의 후보는 모두 404 `MEMORY_NOT_FOUND` 이고 목록에도 나오지 않는다
+- **「맞음」 을 눌러도 이 단계에서는 동작을 적용하지 않는다.** 확인 결과만 남는다. 적용은 사람이 `/memory` 의 「고치기」 로 한다
+- 화면은 「기억」 탭의 「정비 후보」 절이다. 줄마다 제목, 동작, 근거 요약, 「맞음」, 「아님」, 그 항목을 여는 링크를 둔다
+
+### 정밀도 기준
+
+동작마다 확인한 후보가 30건 이상이고 「맞음」 비율이 0.9 이상이면 그 동작을 자동 전환 후보로 본다(설정 `min-reviewed`, `min-precision`). 전환은 단계 4 가 하고, 이 단계는 아래 「운영 집계」 의 `maintenance_precision` 만 만든다.
+
 ## 문맥 묶음
 
 Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마다의 판정, Hermes 에 넘기는 형식, 로그와 저장 규칙을 갖는다.
@@ -637,4 +688,5 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `regenerate_by_memory` | 본문 기억이 실린 답과 아닌 답의 다시 생성 비율 | `chat_message.replaces_message_id`, `execution_context_source` | 기억이 답을 돕는지. 관찰 비교다 |
 | `memory_links` | 기억 연결 수. 기간 안에 만든 줄을 종류, 만든 쪽, 지금 상태별로 센다 | `memory_link` 의 `type`, `origin`, `status` | 자동 연결과 대체 제안이 얼마나 생기는지 |
 | `auto_link_revoked` | 자동 연결을 사람이 끊은 비율. 코드가 만든 줄 가운데 `REVOKED` 인 비율 | `memory_link` 의 `origin`, `status` | 자동 연결의 임계값을 고칠지 |
+| `maintenance_precision` | 정비 후보의 확인 결과. 동작별 확인 수, 「맞음」 수, 기준(30건, 0.9)을 넘었는지 | `decision_feedback_event` 의 `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED` 와 `reason_code` | 동작을 자동으로 바꿀지(단계 4) |
 | `context_size` | 실행당 문맥 글자 수와 빠진 항목 | 대화 루트 실행의 `context_chars`, `context_omitted_items`. `context_chars` 는 공통 답변 지침을 함께 센다 | 예산과 길이 상한 |
