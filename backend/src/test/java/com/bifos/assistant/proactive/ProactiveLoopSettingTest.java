@@ -12,7 +12,11 @@ import com.bifos.assistant.proactive.loop.application.ProactiveLoopSettingServic
 import com.bifos.assistant.proactive.loop.application.dto.LoopScheduleState;
 import com.bifos.assistant.proactive.loop.application.dto.LoopSettingView;
 import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
+import com.bifos.assistant.task.domain.Task;
+import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.TaskState;
+import com.bifos.assistant.task.domain.type.TriggerType;
+import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -22,6 +26,7 @@ import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.TestClock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +50,9 @@ class ProactiveLoopSettingTest {
 
     @Autowired
     LoopScheduleSettings schedules;
+
+    @Autowired
+    TaskRepository tasks;
 
     @Autowired
     AgentRepository agents;
@@ -113,7 +121,7 @@ class ProactiveLoopSettingTest {
 
 
     @Test
-    @DisplayName("같은 사용자와 에이전트의 설정은 하나이고, 끄면 같은 CHECK 작업을 멈춘다")
+    @DisplayName("같은 사용자와 에이전트의 설정은 하나이고 켜고 꺼도 같은 CHECK 작업의 동의만 바꾸며 일정은 켜지지 않는다")
     void keepsOneSettingPerUserAndAgent() {
         service.update(OWNER, agent.code(), true, null);
         service.update(OWNER, agent.code(), true, NOW.plus(Duration.ofDays(1)));
@@ -123,10 +131,27 @@ class ProactiveLoopSettingTest {
 
         assertThat(view).isEqualTo(new LoopSettingView(true, false, null));
         assertThat(checkTaskIds(OWNER)).as("CHECK 작업은 하나이고 같은 줄이 바뀐다").containsExactly(taskId);
-        assertThat(taskState(taskId)).isEqualTo(TaskState.PAUSED);
+        assertThat(taskState(taskId)).as("루프 동의는 일정을 켜지 않는다").isEqualTo(TaskState.PAUSED);
         assertThat(service.update(OWNER, agent.code(), true, null))
             .isEqualTo(new LoopSettingView(true, true, null));
-        assertThat(taskState(taskId)).as("다시 켜면 같은 작업이 켜진다").isEqualTo(TaskState.ACTIVE);
+        assertThat(taskState(taskId)).isEqualTo(TaskState.PAUSED);
+    }
+
+
+    @Test
+    @DisplayName("옛 동의 꺼짐과 일정 켜짐은 꺼짐이고 옛 동의 켜짐과 일정 켜짐은 켜짐이며 어느 쪽도 일정 상태를 바꾸지 않는다")
+    void loopConsentIsSeparateFromSchedule() {
+        Long taskId = activeCheckTask(OWNER, agent);
+
+        assertThat(service.get(OWNER, agent.code()))
+            .as("일정이 켜져 있어도 동의가 없으면 꺼짐")
+            .isEqualTo(new LoopSettingView(true, false, null));
+
+        assertThat(service.update(OWNER, agent.code(), true, null)).isEqualTo(new LoopSettingView(true, true, null));
+        assertThat(taskState(taskId)).isEqualTo(TaskState.ACTIVE);
+
+        assertThat(service.update(OWNER, agent.code(), false, null)).isEqualTo(new LoopSettingView(true, false, null));
+        assertThat(taskState(taskId)).as("동의를 꺼도 일정은 그대로").isEqualTo(TaskState.ACTIVE);
     }
 
 
@@ -156,23 +181,6 @@ class ProactiveLoopSettingTest {
 
         assertThat(service.get(OTHER, shared.code())).isEqualTo(new LoopSettingView(true, true, null));
         assertThat(service.get(OWNER, shared.code())).isEqualTo(new LoopSettingView(true, false, null));
-    }
-
-
-    @Test
-    @DisplayName("옛 루프 동의만 있고 CHECK 작업이 꺼진 사용자는 설정이 꺼져 있다")
-    void legacyConsentAloneDoesNotEnable() {
-        jdbc.update(
-            "INSERT INTO proactive_loop_setting (user_id, agent_id, enabled, snoozed_until, updated_at)"
-                + " VALUES (?, ?, TRUE, NULL, CURRENT_TIMESTAMP(6))",
-            OWNER.id(),
-            agent.id());
-
-        assertThat(service.get(OWNER, agent.code())).isEqualTo(new LoopSettingView(true, false, null));
-
-        service.update(OWNER, agent.code(), false, null);
-
-        assertThat(service.get(OWNER, agent.code())).isEqualTo(new LoopSettingView(true, false, null));
     }
 
 
@@ -215,6 +223,15 @@ class ProactiveLoopSettingTest {
             .isInstanceOfSatisfying(
                 ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThat(schedules.find(OTHER.id(), agent.id())).isEmpty();
+    }
+
+
+    /** 일정이 켜진 CHECK 작업을 루프 동의 없이 만든다. */
+    private Long activeCheckTask(CurrentUser user, Agent target) {
+        Task task = Task.check(user.id(), target.id(), "매일 먼저 살펴보기");
+        task.reschedule(TriggerType.CRON, "0 9 * * *", null, ZoneId.of("Asia/Seoul"), NOW.plus(Duration.ofHours(9)));
+        task.changeMissedPolicy(MissedPolicy.SKIP);
+        return tasks.save(task).id();
     }
 
 

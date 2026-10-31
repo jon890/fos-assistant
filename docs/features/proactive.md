@@ -340,9 +340,9 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### 사용자 설정
 
-사용자와 에이전트마다 하나다. 켜짐과 쉬기는 그 사용자와 에이전트의 `CHECK` 예약 작업(`task`)이 갖는다. 켜짐은 작업의 상태가 `ACTIVE` 인 것이고 쉬기는 `task.snoozed_until` 이다. 작업이 없거나 꺼져 있으면 꺼짐이다. 공유 에이전트도 사용자마다 작업이 따로라 설정이 서로 바뀌지 않는다.
-켜면 그 작업을 켜고(작업이 없으면 기본 시각 09:00 의 작업을 만들고), 끄면 멈춘다. 켜기 직전 준비 상태 검사는 하지 않는다. 발화 직전에 권한과 준비 상태를 다시 검사한다.
-이전에 `proactive_loop_setting` 이 갖던 값은 옮겼다. 옛 동의만 있고 작업이 꺼져 있던 사용자는 꺼진 채다. 경로는 `ProactiveLoopController` 가 갖는다.
+사용자와 에이전트마다 하나다. 동의(켜짐)와 쉬기는 그 사용자와 에이전트의 `CHECK` 예약 작업(`task`)이 갖는다. 동의는 `task.loop_enabled`, 쉬기는 `task.snoozed_until` 이고, 작업이 없으면 꺼짐이다. 공유 에이전트도 사용자마다 작업이 따로라 설정이 서로 바뀌지 않는다.
+**루프 동의는 매일 깨우기 일정의 켜짐(`task.state`)과 다른 동의다.** 루프를 켜고 꺼도 일정은 바뀌지 않고, 일정을 켜고 꺼도 동의는 바뀌지 않는다. 작업이 없을 때 루프 설정을 저장하면 일정이 꺼진 작업을 만들어 동의를 담는다.
+이전에 `proactive_loop_setting` 이 갖던 값은 옮겼다. 옛 동의가 꺼져 있었으면 일정이 켜져 있어도 꺼진 채이고, 옛 동의가 켜져 있었으면 켜진 채다. 경로는 `ProactiveLoopController` 가 갖는다.
 조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
 설치 설정이 꺼져 있으면 꺼진 줄을 켜는 요청만 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 늘 받는다.
 `snoozedUntil` 이 `ProactiveLoopSettingService.MAX_SNOOZE` 를 넘으면 400 `VALIDATION_FAILED`, 지난 시각이면 비운 것과 같다.

@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * 매일 루프의 켜기와 쉬기를 사용자와 에이전트마다 하나인 CHECK 예약 작업이 갖게 하는 경계다(ADR-20261101 / proactive-suggestion).
+ * 매일 루프의 동의와 쉬기를 사용자와 에이전트마다 하나인 CHECK 예약 작업이 갖게 하는 경계다(ADR-20261101 / proactive-suggestion).
  * 공유 에이전트도 사용자마다 작업이 따로라 사용자별 설정이 서로 바뀌지 않는다.
  */
 public interface LoopScheduleSettings {
@@ -22,7 +22,8 @@ public interface LoopScheduleSettings {
 
 
     /**
-     * 설정을 저장한다. 작업이 없으면 만들고 있으면 바꾼다. 켜면 작업을 켜고 끄면 멈춘다. 부르는 쪽의 트랜잭션 안에서 부른다.
+     * 설정을 저장한다. 작업이 없으면 일정이 꺼진 작업을 만들어 동의를 담고 있으면 바꾼다. 일정의 켜짐은 바꾸지 않는다. 부르는 쪽의 트랜잭션
+     * 안에서 부른다.
      *
      * @param snoozedUntil 비어 있으면 쉬지 않는다
      */

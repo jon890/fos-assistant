@@ -6,7 +6,6 @@ import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
-import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import java.time.Instant;
@@ -20,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 매일 루프의 켜짐과 쉬기를 사용자와 에이전트마다 하나인 CHECK 작업에서 읽고 쓴다(ADR-20261101 / proactive-suggestion).
  *
- * <p>켜짐은 작업이 {@code ACTIVE} 인 것이다. 옛 루프 동의만으로 꺼진 작업을 켜지 않으며, 작업이 없는 사용자가 처음 켜면 기본 시각의
- * 작업을 만든다. 발화 직전에 권한과 준비 상태를 다시 검사하므로 여기서는 검사하지 않는다.
+ * <p>루프 동의({@code loop_enabled})는 일정의 켜짐({@code state})과 다른 동의다. 이 클래스는 동의와 쉬기만 바꾸고 일정의 켜짐은 바꾸지
+ * 않는다. 작업이 없는 사용자가 처음 저장하면 일정이 꺼진 작업을 만들어 동의를 담는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -67,22 +66,18 @@ class TaskLoopSettings implements LoopScheduleSettings {
             Instant next = TaskSchedule.nextAfter(TaskSchedule.parseCron(DEFAULT_CRON), zone, now);
             task.reschedule(TriggerType.CRON, DEFAULT_CRON, null, zone, next);
             task.changeMissedPolicy(MissedPolicy.SKIP);
+            // 동의만 담는 줄이다. 일정은 사용자가 따로 켠다.
+            task.changeCheckEnabled(false);
         }
         if (task.archived()) {
             return new LoopScheduleState(false, null);
         }
-        if (enabled && task.state() == TaskState.PAUSED) {
-            task.resume();
-            task.moveNext(TaskSchedule.nextAfter(TaskSchedule.parseCron(task.cronExpr()), task.zone(), now));
-        } else if (!enabled) {
-            task.changeCheckEnabled(false);
-        }
-        task.snoozeUntil(snoozedUntil);
+        task.changeLoop(enabled, snoozedUntil);
         return stateOf(tasks.saveAndFlush(task));
     }
 
 
     private static LoopScheduleState stateOf(Task task) {
-        return new LoopScheduleState(task.state() == TaskState.ACTIVE, task.snoozedUntil());
+        return new LoopScheduleState(task.loopEnabled(), task.snoozedUntil());
     }
 }

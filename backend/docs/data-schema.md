@@ -934,7 +934,7 @@ action을 지우면 실행 내용도 지운다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
-- `snoozed_until` 은 `CHECK` 줄만 쓰는 매일 루프의 쉬기 끝 시각(UTC)이다. 비어 있으면 쉬지 않는다. 매일 루프의 켜짐은 이 줄의 `state` 가 `ACTIVE` 인 것이다
+- `loop_enabled` 와 `snoozed_until` 은 `CHECK` 줄만 쓰는 매일 루프의 동의와 쉬기 끝 시각(UTC)이다. 동의는 일정의 켜짐(`state`)과 다른 동의라 따로 둔다. 기본은 동의 없음이고 쉬기는 비어 있으면 쉬지 않는다
 - `conversation_id` 는 `SINGLE` 일 때 결과를 쌓는 대화다. 첫 발화가 만들기 전에는 비어 있고, `NEW_PER_RUN` 은 늘 비어 있다
 - `model_tier` 가 비면 발화가 대화의 모델 선택을 건드리지 않는다
 - 외래 키는 `owner_user_id` 에만 둔다. 에이전트와 대화는 지워도 행이 남는 표라 걸지 않는다
@@ -1002,7 +1002,7 @@ action을 지우면 실행 내용도 지운다.
 ### `proactive_loop_setting`
 
 사용자가 에이전트마다 매일 루프를 켠 옛 설정이다. **읽는 곳이 없다.** 켜짐과 쉬기는 사용자와 에이전트마다 하나인 `CHECK` `task` 가 갖는다([매일 루프](../../docs/features/proactive.md)의 「사용자 설정」).
-`task.snoozed_until` 을 더하는 마이그레이션이 켜진 줄의 쉬기 시각만 같은 사용자·에이전트의 `CHECK` 작업으로 복사했고, 옛 동의만으로 꺼진 작업을 켜지 않았다.
+`task.loop_enabled` 와 `task.snoozed_until` 을 더하는 마이그레이션이 켜진 줄의 동의와 쉬기 시각을 같은 사용자·에이전트의 `CHECK` 작업으로 복사했다. 꺼진 줄은 복사하지 않아 일정이 켜져 있어도 동의 없음으로 남고, 작업의 `state` 는 건드리지 않았다. 짝지을 `CHECK` 작업이 없는 켜진 줄은 옮길 곳이 없어 동의 없음이 된다.
 에이전트를 지울 때 이 표의 줄만 함께 지운다. 표 자체는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
 
 ### `proactive_loop_run`
