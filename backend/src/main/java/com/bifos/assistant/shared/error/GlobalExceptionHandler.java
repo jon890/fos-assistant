@@ -51,6 +51,13 @@ public class GlobalExceptionHandler {
      *
      * <p>대화의 공개 식별자 자리에 UUID 가 아닌 값이 오면 여기 걸린다. 그대로 두면 500 으로 끝난다.
      */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
+    }
+
+
     /**
      * 읽을 수 없는 요청 본문을 입력 오류로 돌려준다.
      *
@@ -61,13 +68,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
             .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "the request body is not readable"));
-    }
-
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
-            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
     }
 
 
