@@ -91,7 +91,7 @@ public class MemoryController {
 
     @PatchMapping("/{id}")
     public MemoryView update(@PathVariable Long id, @Valid @RequestBody UpdateMemoryRequest request) {
-        return MemoryView.from(memories.update(currentUser.require(), id, request.content(), request.alwaysInject()));
+        return MemoryView.from(memories.update(currentUser.require(), id, request.content(), request.alwaysInject(), request.archivable()));
     }
 
 

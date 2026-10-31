@@ -487,7 +487,7 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
         MemoryCapture capture = onlyCapture();
-        memoryService.update(currentDad(), capture.memoryId(), "다른 사람은 홍길동이고 열 살이다", false);
+        memoryService.update(currentDad(), capture.memoryId(), "다른 사람은 홍길동이고 열 살이다", false, null);
 
         assertThatThrownBy(() -> captureService.undo(currentDad(), capture.id()))
             .isInstanceOfSatisfying(

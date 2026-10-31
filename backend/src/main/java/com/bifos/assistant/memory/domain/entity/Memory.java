@@ -277,6 +277,15 @@ public class Memory extends CreatedAtEntity {
     }
 
 
+    /** 사람이 화면에서 정한 자동 보관 허락 표시를 적는다. null 이면 지금 값을 그대로 둔다. */
+    public Memory withArchivable(Boolean value) {
+        if (value != null) {
+            archivable = value;
+        }
+        return this;
+    }
+
+
     /** 사람이 받아들인다. 이때부터 주입 대상이 된다. */
     public void accept(Long userId, Instant at) {
         status = MemoryStatus.ACCEPTED;

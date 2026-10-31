@@ -2,6 +2,7 @@ package com.bifos.assistant.usage.execution.infra;
 
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSourceId;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,6 +33,15 @@ public interface ExecutionContextSourceRepository
      */
     List<ExecutionContextSource> findByIdExecutionIdInAndSourceInAndBodyModeOrderByIdExecutionIdAscIdPositionAsc(
         Collection<Long> executionIds, Collection<String> sources, String bodyMode);
+
+
+    /**
+     * 그때 뒤에 실린 줄의 원래 기록 참조를 중복 없이 낸다. 출처와 방식은 가리지 않는다. 정비 규칙이 기간 안에 한 번이라도 실린 기억을
+     * 가려내려고 읽는다.
+     */
+    @Query("select distinct source.sourceRef from ExecutionContextSource source"
+        + " where source.createdAt >= :since and source.sourceRef like 'memory:%'")
+    List<String> findMemoryRefsLoadedSince(@Param("since") Instant since);
 
 
     /** 실행 하나의 마지막 순서다. 줄이 없으면 null 이다. */
