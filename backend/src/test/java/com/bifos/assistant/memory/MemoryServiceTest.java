@@ -31,6 +31,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -233,6 +234,7 @@ class MemoryServiceTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("저장소도 동시에 들어온 중복 제안을 막는다")
     void repositoryAlsoBlocksConcurrentDuplicateProposals() {
@@ -288,6 +290,7 @@ class MemoryServiceTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("수정이 커밋되는 사이에 들어온 승인은 그 수정의 본문과 판 번호를 되돌리지 않는다")
     void acceptingWhileAnUpdateCommitsDoesNotRevertTheUpdate() throws Exception {

@@ -10,6 +10,7 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -132,6 +133,7 @@ class ChatMessageParentGuardTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("먼저 읽어 둔 대화가 다른 트랜잭션에서 지워져도 늦은 저장을 거절한다")
     void rejectsCachedParentAfterConcurrentDeletion() throws Exception {
@@ -152,6 +154,7 @@ class ChatMessageParentGuardTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("메시지가 먼저 잠그면 옛 조회 결과를 가진 삭제도 커밋을 기다리고 대화를 보존한다")
     void preservesParentWhenMessageWriteWins() throws Exception {
@@ -190,6 +193,7 @@ class ChatMessageParentGuardTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("삭제가 먼저 잠그면 메시지 저장은 삭제 커밋 뒤 거절된다")
     void rejectsMessageWhenDeletionWins() throws Exception {

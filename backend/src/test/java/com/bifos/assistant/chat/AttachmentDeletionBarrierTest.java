@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -64,6 +65,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** 요청 커밋과 파일 작업의 장벽을 H2와 실제 MySQL에서 같은 회귀로 확인한다. */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.ROW_LOCK)
 public class AttachmentDeletionBarrierTest {
     @Autowired
     ContentDraftCleaner drafts;

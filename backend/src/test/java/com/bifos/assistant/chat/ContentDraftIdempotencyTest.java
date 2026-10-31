@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
 import com.bifos.assistant.crypto.domain.SealedText;
+import com.bifos.assistant.testsupport.MysqlCase;
 import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
@@ -117,6 +118,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("별도 연결의 동시 같은 생성은 한 원고 한 revision 한 대응만 커밋한다")
     void acceptsOneDraftAcrossConcurrentTransactions() throws Exception {
@@ -217,6 +219,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("동시 같은 키의 다른 본문은 성공 하나와 충돌 하나이고 최초 본문을 보존한다")
     void rejectsConcurrentDifferentBodiesWithoutOverwriting() throws Exception {
