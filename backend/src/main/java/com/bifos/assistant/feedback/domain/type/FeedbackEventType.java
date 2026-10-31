@@ -31,5 +31,11 @@ public enum FeedbackEventType {
      */
     MARKED_IRRELEVANT,
     /** 사용자가 답의 「참고한 기억」 에서 그 기억이 틀렸다고 눌렀다. 고치는 것은 사람이 기억 화면에서 한다. 기억 내용은 바뀌지 않는다. */
-    MARKED_WRONG
+    MARKED_WRONG;
+
+
+    /** 「참고한 기억」 단추 사건인가. 제안의 흐름이 아니라 답에 대한 반응이라 replay 읽기 모델과 대화 삭제의 열쇠 확장에서 뺀다. */
+    public boolean marksMemoryUse() {
+        return this == MARKED_IRRELEVANT || this == MARKED_WRONG;
+    }
 }
