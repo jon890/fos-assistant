@@ -156,19 +156,13 @@ public class ExecutionRecorder {
 
 
     /**
-     * 보낸 effort 를 누가 정했는지다.
+     * 보낸 effort 의 출처다. 보낸 값이 있으면 {@code REQUESTED} 다.
      *
-     * <p>단계도 대화도 effort 를 정하지 않았는데 보낸 값이 있으면 에이전트 기본값에서 온 것이다(ADR-054).
-     * 단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 {@code REQUESTED} 로 적는다.
+     * <p>에이전트 기본 effort 는 없어졌으므로 새 실행에 {@code AGENT_DEFAULT} 를 적지 않는다. 옛 기록의 값은 그대로 둔다.
      */
-    private static ReasoningEffortSource effortSource(
-        ExecutionConversation conversation, ModelChoice requested, ModelTier modelTier) {
-        if (requested == null || requested.reasoningEffort() == null) {
-            return ReasoningEffortSource.UNKNOWN;
-        }
-        boolean chosenByConversation = conversation != null && conversation.reasoningEffort() != null;
-        return modelTier == null && !chosenByConversation
-            ? ReasoningEffortSource.AGENT_DEFAULT
+    private static ReasoningEffortSource effortSource(ModelChoice requested) {
+        return requested == null || requested.reasoningEffort() == null
+            ? ReasoningEffortSource.UNKNOWN
             : ReasoningEffortSource.REQUESTED;
     }
 
@@ -205,7 +199,7 @@ public class ExecutionRecorder {
             delegationKey,
             modelTier,
             requestReceivedAt,
-            effortSource(conversation, requested, modelTier),
+            effortSource(requested),
             admissionOf(conversation, parentExecutionId, rootExecutionId));
     }
 
@@ -273,15 +267,27 @@ public class ExecutionRecorder {
      * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
      *
      * <p>추천 질문을 만드는 실행처럼 turn 이 아닌 실행이 쓴다. 대화, 부모, 루트, session 을 비우고 문맥 글자
-     * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로 적고, effort 가 있으면 출처는 에이전트
-     * 기본값이다.
+     * 수는 0 으로 적는다. 보낸 모델 선택은 {@code requested} 로, 고른 칸은 {@code modelTier} 로 적는다.
      *
      * <p>사용자 실행 한도는 백그라운드 실행으로 본다. 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      *
      * @param requested Hermes 에 보낸 provider, 모델, effort
+     * @param modelTier 사용자 기본 칸이나 그룹 기본 칸으로 정했으면 그 칸이고, 모델을 싣지 않았으면 null
      */
-    public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice requested) {
-        return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), requested, null, null);
+    public AgentExecution startDetached(CurrentUser user, Agent agent, ModelChoice requested, ModelTier modelTier) {
+        return start(
+            user,
+            null,
+            agent,
+            null,
+            null,
+            ExecutionContextSnapshot.ofChars(0L),
+            requested,
+            null,
+            null,
+            null,
+            modelTier,
+            null);
     }
 
 

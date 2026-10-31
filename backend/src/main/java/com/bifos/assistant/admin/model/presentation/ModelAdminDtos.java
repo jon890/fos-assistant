@@ -1,12 +1,9 @@
 package com.bifos.assistant.admin.model.presentation;
 
-import com.bifos.assistant.chat.modelchoice.application.dto.AgentModelSettings;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
-import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
-import com.bifos.assistant.model.domain.ModelChoice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.Collections;
@@ -20,36 +17,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ModelAdminDtos {
 
-    /** 에이전트에 저장된 기본 모델이다. 세 값이 모두 null 이면 profile 의 값으로 돈다. */
-    public record AgentModelDefaultView(String provider, String model, String reasoningEffort) {
-
-        static AgentModelDefaultView from(ModelChoice choice) {
-            return new AgentModelDefaultView(choice.provider(), choice.model(), choice.reasoningEffort());
-        }
-    }
-
     /**
-     * 관리자가 에이전트 기본 모델과 숨김을 정할 때 보는 값이다.
-     * @param agentDefault 에이전트에 저장된 기본값
-     * @param catalog 숨김을 적용하지 않은 목록. 기본 provider 와 기본 모델은 profile 의 값이다. Hermes 가 목록을
-     * 답하지 못했으면 null 이다
-     * @param hidden 그룹의 숨김 목록
-     */
-    public record AgentModelSettingsView(
-        AgentModelDefaultView agentDefault, ModelOptionsView catalog, HiddenModelsView hidden) {
-
-        static AgentModelSettingsView from(AgentModelSettings settings) {
-            return new AgentModelSettingsView(
-                AgentModelDefaultView.from(settings.agentDefault()),
-                settings.catalog() == null ? null : ModelOptionsView.from(settings.catalog()),
-                HiddenModelsView.from(settings.hidden()));
-        }
-    }
-
-    /**
-     * 그룹 하나의 모델 목록이다.
+     * 그룹 하나의 모델 목록이다. 단계별 모델을 고르는 목록과 숨길 모델을 고르는 후보가 같은 모양을 쓴다.
      *
-     * @param catalog 켜진 모든 에이전트에서 도는 provider 와 모델. 목록을 읽지 못했으면 null 이다
+     * @param catalog 단계별 모델이면 켜진 모든 에이전트에서 도는 provider 와 모델이고, 숨길 후보면 어느 profile 에든 있는
+     * provider 와 모델이다. 목록을 읽지 못했으면 null 이다
      */
     public record GroupModelCatalogView(CatalogView catalog) {
 
@@ -91,43 +63,6 @@ public final class ModelAdminDtos {
      * @param model null 이면 그 provider 전체다
      */
     public record HiddenModelEntry(@NotNull String provider, String model) {
-    }
-
-    /** 대화에서 쓸 모델과 effort 다. 모두 비워 보내면 그 profile 의 기본값으로 돌아간다. */
-    public record ChooseModelRequest(String provider, String model, String reasoningEffort) {
-
-        /** 요청 값을 검증해 선택으로 바꾼다. 맞지 않으면 {@code VALIDATION_FAILED} 다. */
-        public ModelChoice toChoice() {
-            return ModelChoice.of(provider, model, reasoningEffort);
-        }
-    }
-
-    /**
-     * 그 에이전트의 profile 로 고를 수 있는 모델이다. 그룹이 숨긴 것은 빠져 있다.
-     * @param defaultModel 고르지 않았을 때 도는 모델. 에이전트 기본값이 있으면 그 값이고 없으면 profile 의 값이다
-     * @param defaultReasoningEffort 에이전트 기본 effort. 정하지 않았으면 null
-     * @param defaultFromAgent 기본 모델을 에이전트 기본값이 정했는가
-     * @param defaultAvailable 기본 모델이 {@code providers} 에 있는가. 숨겼거나 목록에서 빠졌으면 거짓이다
-     */
-    public record ModelOptionsView(
-        String defaultProvider,
-        String defaultModel,
-        String defaultReasoningEffort,
-        boolean defaultFromAgent,
-        boolean defaultAvailable,
-        List<ProviderView> providers,
-        List<String> reasoningEfforts) {
-
-        static ModelOptionsView from(ModelOptions options) {
-            return new ModelOptionsView(
-                options.defaultProvider(),
-                options.defaultModel(),
-                options.defaultReasoningEffort(),
-                options.defaultFromAgent(),
-                options.defaultAvailable(),
-                options.providers().stream().map(ProviderView::from).toList(),
-                options.reasoningEfforts());
-        }
     }
 
     /**

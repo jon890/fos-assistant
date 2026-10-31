@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.starter.application;
 
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
+import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.chat.starter.application.dto.StarterStatus;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
 import com.bifos.assistant.chat.starter.config.StarterProperties;
@@ -237,11 +238,12 @@ public class StarterSuggestionService {
         boolean awaited = false;
         try {
             String input = prompt(firstQuestions(user, agent));
-            ModelChoice choice = modelTiers.detachedChoice(agent);
-            execution = executions.startDetached(user, agent, choice);
+            ResolvedModelTier resolved = modelTiers.detachedChoice(user, agent);
+            ModelChoice choice = resolved.choice();
+            execution = executions.startDetached(user, agent, choice, resolved.tier());
             // 실행 줄을 먼저 만들고 숨김을 판정한다. 거절해도 그 오류 코드로 실패한 줄이 남는다.
             modelTiers.requireRunnable(user, agent, choice);
-            // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
+            // 대화가 없는 실행이라 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 모델을 싣지 않아 profile 의 값이다.
             HermesRunCommand command = new HermesRunCommand(
                 agent.hermesProfile(),
                 agent.apiBaseUrl(),

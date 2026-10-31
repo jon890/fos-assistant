@@ -105,10 +105,10 @@ public class ModelOptionsService {
     /**
      * 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다.
      *
-     * <p>그 그룹이 숨긴 provider 와 모델은 뺀다. 기본 모델은 에이전트 기본값이 있으면 그 값이다(ADR-054).
+     * <p>그 그룹이 숨긴 provider 와 모델은 뺀다. 기본 모델은 profile 의 값이다.
      */
     public ModelOptions optionsForAgent(Long groupId, Agent agent) {
-        return optionsOf(catalogFor(agent), agent, visibility.hiddenFor(groupId));
+        return optionsOf(catalogFor(agent), visibility.hiddenFor(groupId));
     }
 
 
@@ -139,11 +139,9 @@ public class ModelOptionsService {
 
     /**
      * 숨김을 적용하지 않은 목록을 읽는다. 관리자가 무엇을 숨길지 고르는 화면이 쓴다.
-     *
-     * <p>기본 모델도 에이전트 기본값을 얹지 않은 profile 의 값이다.
      */
     public ModelOptions unfilteredForAgent(Agent agent) {
-        return optionsOf(catalogFor(agent), null, HiddenModels.none());
+        return optionsOf(catalogFor(agent), HiddenModels.none());
     }
 
 
@@ -177,10 +175,7 @@ public class ModelOptionsService {
     }
 
 
-    /**
-     * @param agent 기본값을 얹을 에이전트. null 이면 profile 의 값만 쓴다
-     */
-    private static ModelOptions optionsOf(HermesModelCatalog catalog, Agent agent, HiddenModels hidden) {
+    private static ModelOptions optionsOf(HermesModelCatalog catalog, HiddenModels hidden) {
         List<HermesModelCatalog.Provider> providers = new ArrayList<>();
         for (HermesModelCatalog.Provider provider : catalog.providers()) {
             HermesModelCatalog.Provider visible = withoutHidden(provider, hidden);
@@ -188,9 +183,8 @@ public class ModelOptionsService {
                 providers.add(visible);
             }
         }
-        boolean fromAgent = agent != null && agent.defaultModel() != null;
-        String defaultProvider = fromAgent ? agent.defaultModelProvider() : catalog.defaultProvider();
-        String defaultModel = fromAgent ? agent.defaultModel() : catalog.defaultModel();
+        String defaultProvider = catalog.defaultProvider();
+        String defaultModel = catalog.defaultModel();
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
             !Objects.equals(left.slug(), defaultProvider), !Objects.equals(right.slug(), defaultProvider)));
@@ -202,8 +196,6 @@ public class ModelOptionsService {
         return new ModelOptions(
             defaultProvider,
             defaultModel,
-            agent == null ? null : agent.defaultReasoningEffort(),
-            fromAgent,
             available,
             List.copyOf(providers),
             ModelChoice.REASONING_EFFORTS);

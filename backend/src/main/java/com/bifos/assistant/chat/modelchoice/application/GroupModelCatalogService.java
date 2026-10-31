@@ -78,6 +78,55 @@ public class GroupModelCatalogService {
     }
 
 
+    /**
+     * 관리자가 숨길 모델을 고르는 후보다. 켜진 에이전트 profile 의 숨기지 않은 목록과 숨긴 것까지 모두 담은 합집합이다.
+     *
+     * <p>고르는 목록(교집합)과 달리 합집합인 까닭은 숨김이 어느 profile 에서든 걸려야 해서다. 교집합으로 두면 한
+     * profile 에만 있는 모델은 숨길 방법이 없고, 그 profile 의 에이전트는 숨길 모델로 계속 돈다. 숨김을 적용하지 않은
+     * 목록으로 만들어, 이미 숨긴 모델도 후보에 남아 풀 수 있다.
+     *
+     * @throws ApiException 한 profile 이라도 목록을 한 번도 읽지 못했을 때. 읽은 것만으로 만들면 읽지 못한 profile 에만
+     * 있는 모델이 빠진다
+     */
+    public GroupModelCatalog hideCandidates() {
+        List<List<HermesModelCatalog.Provider>> lists = new ArrayList<>();
+        Set<String> profiles = new LinkedHashSet<>();
+        for (Agent agent : agents.enabledAgents()) {
+            if (profiles.add(agent.hermesProfile())) {
+                lists.add(modelOptions.unfilteredForAgent(agent).providers());
+            }
+        }
+        return new GroupModelCatalog(union(lists), ModelChoice.REASONING_EFFORTS);
+    }
+
+
+    /** 첫 목록의 차례를 지키며 나머지 목록에만 있는 provider 와 모델을 뒤에 붙인다. */
+    static List<HermesModelCatalog.Provider> union(List<List<HermesModelCatalog.Provider>> lists) {
+        Map<String, List<HermesModelCatalog.Provider>> bySlug = new LinkedHashMap<>();
+        for (List<HermesModelCatalog.Provider> list : lists) {
+            for (HermesModelCatalog.Provider provider : list) {
+                bySlug.computeIfAbsent(provider.slug(), slug -> new ArrayList<>()).add(provider);
+            }
+        }
+        List<HermesModelCatalog.Provider> result = new ArrayList<>();
+        for (List<HermesModelCatalog.Provider> same : bySlug.values()) {
+            LinkedHashSet<String> models = new LinkedHashSet<>();
+            same.forEach(provider -> models.addAll(provider.models()));
+            Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
+            for (String model : models) {
+                reasoning.put(model, agreed(same.stream()
+                    .filter(provider -> provider.models().contains(model))
+                    .map(provider -> provider.reasoning().getOrDefault(model, ReasoningCapability.UNKNOWN_ALL))
+                    .toList()));
+            }
+            HermesModelCatalog.Provider first = same.getFirst();
+            result.add(new HermesModelCatalog.Provider(
+                first.slug(), first.name(), List.copyOf(models), Collections.unmodifiableMap(reasoning)));
+        }
+        return List.copyOf(result);
+    }
+
+
     /** 첫 목록의 차례를 지키며 모든 목록에 있는 provider 와 모델만 남긴다. */
     static List<HermesModelCatalog.Provider> intersect(List<List<HermesModelCatalog.Provider>> lists) {
         if (lists.isEmpty()) {
