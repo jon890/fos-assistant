@@ -24,7 +24,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다.
+ * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 제안 줄로 옮길 때 한 번 하는 제안 열쇠 이관뿐이다
+ * ({@code DecisionFeedbackRecorder.repointSubject}).
  *
  * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖는다. 제목, 본문, 인자, 원문을 담는 칸이 없다. 연결은 번호와 열쇠, 판은
  * 해시와 판 번호로만 둔다.
