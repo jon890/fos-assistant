@@ -27,6 +27,7 @@ function summary(change: Record<string, unknown> = {}) {
     ownerBrowserLoginUrl: null,
     readmeUrl: null,
     linkKind: "service",
+    standardPlugin: false,
     ...change,
   };
 }
@@ -283,4 +284,19 @@ test("실제 GET은 공통 경계마다 정책을 보존하고 요약만 정제�
       vector.name,
     );
   }
+});
+
+test("웹 카탈로그 라우트는 표준 플러그인 표시를 참일 때만 옮기고 다른 값은 거짓으로 읽는다", async () => {
+  const response = await getCatalog([
+    summary({ standardPlugin: true }),
+    summary({ standardPlugin: "true" }),
+    summary({ standardPlugin: undefined }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    (await response.json()).map(
+      (item: { standardPlugin: boolean }) => item.standardPlugin,
+    ),
+    [true, false, false],
+  );
 });

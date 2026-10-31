@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
+import { actionDisplayTitle } from "@/lib/connector-action-title";
 import {
   readConnectorGrants,
   revokeConnectorGrant,
@@ -106,7 +107,7 @@ export function ConnectorGrants({
           >
             <span className="min-w-0">
               <span className="block break-all">
-                {grant.title ?? "이름 없는 동작"}
+                {actionDisplayTitle(grant.title, grant.toolName)}
               </span>
               <span className="block text-xs text-muted-foreground">
                 {formatExpires(grant.expiresAt)}까지

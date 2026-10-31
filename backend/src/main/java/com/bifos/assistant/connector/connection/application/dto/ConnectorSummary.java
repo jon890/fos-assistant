@@ -13,6 +13,8 @@ import java.util.List;
  * @param available 지금 카탈로그에 있는가. 거짓이면 읽기와 해제만 되고 {@code fields} 와 {@code description} 이 비어 있다
  * @param bindings 내 연결이 붙은 에이전트들. 연결이 없으면 빈 목록
  * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 곳. 선언하지 않았거나 카탈로그에서 빠진 커넥터는 null
+ * @param standardPlugin {@code assistant.json} 이 없는 표준 플러그인({@code schema: 3})인가. 그 도구는 모두 첫 호출에 승인을 받는다
+ * (ADR-20261101 / plugin-without-assistant-json). 카탈로그에서 빠진 커넥터는 거짓
  */
 public record ConnectorSummary(
     String id,
@@ -24,10 +26,27 @@ public record ConnectorSummary(
     ConnectionStatus myStatus,
     boolean available,
     List<BoundAgentSummary> bindings,
-    String ownerBrowserLoginUrl) {
+    String ownerBrowserLoginUrl,
+    boolean standardPlugin) {
 
     public ConnectorSummary {
         bindings = List.copyOf(bindings);
+    }
+
+
+    /** 도구를 선언하는 커넥터의 항목이다. */
+    public ConnectorSummary(
+        String id,
+        String title,
+        String description,
+        ConnectorAppearance appearance,
+        List<ConnectorFieldSummary> fields,
+        List<ConnectorToolSummary> tools,
+        ConnectionStatus myStatus,
+        boolean available,
+        List<BoundAgentSummary> bindings,
+        String ownerBrowserLoginUrl) {
+        this(id, title, description, appearance, fields, tools, myStatus, available, bindings, ownerBrowserLoginUrl, false);
     }
 
 

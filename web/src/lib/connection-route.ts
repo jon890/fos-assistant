@@ -212,6 +212,7 @@ function safeSummary(value: unknown) {
     myStatus: status(item.myStatus),
     available: bool(item.available),
     bindings: safeBindings(item.bindings),
+    standardPlugin: item.standardPlugin === true,
   };
 }
 
@@ -243,6 +244,13 @@ function safeTools(value: unknown): ConnectorTool[] {
       },
     ];
   });
+}
+
+/** 받은 도구 수다. 없거나 모양이 틀리면 null 로 두고 화면은 수를 보이지 않는다. */
+function listedCount(value: unknown): number | null {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+    ? (value as number)
+    : null;
 }
 
 function undeclaredCount(value: unknown): number {
@@ -288,6 +296,8 @@ function safeConnection(value: unknown) {
     checkedAt,
     bindings: safeBindings(item.bindings),
     undeclaredTools: undeclaredCount(item.undeclaredTools),
+    listedTools: listedCount(item.listedTools),
+    readOnlyTools: listedCount(item.readOnlyTools),
   };
 }
 

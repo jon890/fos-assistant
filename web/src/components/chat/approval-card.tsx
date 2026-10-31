@@ -18,6 +18,7 @@ import {
   FinancialLineView,
 } from "@/components/chat/financial-summary";
 import { toolRiskLabel } from "@/lib/connection";
+import { actionDisplayTitle } from "@/lib/connector-action-title";
 import {
   approvalArgs,
   approvalArgLabel,
@@ -293,7 +294,7 @@ export function ApprovalCard({
         <>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="min-w-0 break-words text-sm font-medium">
-              {action.title}
+              {actionDisplayTitle(action.title, action.toolName)}
             </h3>
             <Badge variant="outline">
               {action.risk ? toolRiskLabel(action.risk) : "쓰기"}

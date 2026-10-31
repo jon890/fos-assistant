@@ -458,6 +458,28 @@ test("허락을 줄 수 없는 동작에는 묻지 않기 단추가 없다", asy
   await expect(page.getByTestId("approval-grant")).toHaveCount(0);
 });
 
+test("표준 플러그인처럼 제목을 선언하지 않은 줄은 원래 도구 이름을 보이고, 읽기 표시가 없는 도구에는 묻지 않기 단추가 없다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "표준 플러그인 도구 이름",
+    action({
+      title: "이름 없는 동작",
+      toolName: "delete_note",
+      grantAllowed: false,
+    }),
+  );
+  const card = page.getByTestId("approval-card");
+
+  await expect(
+    card.getByRole("heading", { name: "delete_note" }),
+  ).toBeVisible();
+  await expect(card.getByText("이름 없는 동작")).toHaveCount(0);
+  await expect(card.getByTestId("approval-approve")).toBeVisible();
+  await expect(card.getByTestId("approval-grant")).toHaveCount(0);
+});
+
 test("가려진 내용이 있는 줄은 가려진 칸과 할 일을 보이고 승인 단추 없이 거절만 남긴다", async ({
   page,
 }) => {
