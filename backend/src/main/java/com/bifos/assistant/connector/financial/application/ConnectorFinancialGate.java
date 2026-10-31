@@ -112,6 +112,8 @@ public class ConnectorFinancialGate {
      * 상한을 바꾸는 쪽도 같은 행을 잠그므로 주문은 그 순간에 커밋된 상한으로 판정된다. 자기 승인 줄은 하루 합계에서 뺀다.
      *
      * <p>모양이 틀린 주문은 지금처럼 이유 없이 닫고, 상한에 걸린 주문만 {@link FinancialLimitExceeded} 로 걸린 상한을 밝힌다.
+     *
+     * @param now 하루 합계를 셀 KST 날짜의 시각. 준비와 승인은 지금 시각을, claim 은 그 주문의 승인 시각을 준다
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireWithinLimits(Long userId, Long ownActionId, String executionArgsJson, Instant now) {
