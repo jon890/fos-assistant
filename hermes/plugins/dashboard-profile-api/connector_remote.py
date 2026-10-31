@@ -79,6 +79,37 @@ def _remote_headers(value, where: str) -> dict:
     return dict(value)
 
 
+def _portable_remote_server(name: str, server: dict) -> dict:
+    """이식형 전송과 API key 인증을 기존 원격 정의로 바꾼다. UI 메타데이터는 실행하지 않는다."""
+    result = {key: value for key, value in server.items() if key not in ("extensions", "_meta")}
+    result["type"] = "http"
+    extensions = server.get("extensions", {})
+    if not isinstance(extensions, dict) or not isinstance(extensions.get("com.openai", {}), dict):
+        raise ValueError("MCP 서버의 extensions 모양이 올바르지 않다")
+    openai = extensions.get("com.openai", {})
+    if "auth" not in openai:
+        return result
+    auth = openai["auth"]
+    if not isinstance(auth, dict):
+        raise ValueError("MCP 서버의 auth 는 객체다")
+    if auth == {"type": "none"}:
+        return result
+    scheme = auth.get("headerScheme")
+    allowed = {"type", "headerScheme"} | ({"headerName"} if scheme == "custom_header" else set())
+    if (auth.get("type") != "api_key" or scheme not in ("bearer", "custom_header")
+            or set(auth) - allowed):
+        raise ValueError("MCP 서버의 인증 방식을 받지 않는다")
+    env = re.sub(r"[^A-Z0-9_]", "_", name.upper()) + "_API_KEY"
+    header = "Authorization" if scheme == "bearer" else auth.get("headerName")
+    template = ("Bearer " if scheme == "bearer" else "") + "${%s}" % env
+    inferred = _remote_headers({header: template}, "MCP 서버 인증")
+    headers = _remote_headers(result.get("headers"), "MCP 서버 정의")
+    if any(key.lower() == header.lower() for key in headers):
+        raise ValueError("같은 헤더 이름이 두 번 선언됐다")
+    result["headers"] = {**headers, **inferred}
+    return result
+
+
 def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> dict:
     """원격 MCP 서버 정의를 검증하고 설치할 서버 정의 `{"url", "headers", "strict_redirect_headers", "enabled"}` 를 낸다.
 
