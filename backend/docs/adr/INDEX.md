@@ -24,7 +24,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-021](ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) | 중지한 답은 멈춘 자리까지 남긴다 | Accepted. ADR-008 에 예외를 둔다 |
 | [ADR-028](ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md) | 결과물은 사용자의 대화 폴더에 MCP 도구로 쓴다 | Accepted. MCP 토큰이 정한 사용자는 ADR-032 가 대체한다 |
 | [ADR-029](ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) | 에이전트 도구는 Control Plane 이 등급으로 판정하고 Hermes 설정 API 로 쓴다 | Accepted. ADR-007 에 더한다. 연결용 에이전트의 도구 목록은 ADR-044 와 ADR-045 가 대체했고, 그 예외 부분은 ADR-083 이 대체한다 |
-| [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다. 기본값을 profile 에 두는 부분은 ADR-054 가 대체한다 |
+| [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) | 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다 | Accepted. ADR-007 의 모델 부분을 대체한다. 기본값을 profile 에 두는 부분은 ADR-054 가 대체한다. 대화가 모델과 effort 를 직접 고르는 부분은 model-unify 계획이 머지되면 [ADR-20261101 / model-setting](../../../docs/adr/ADR-20261101-model-setting.md) 이 대체한다(아직 적용 전) |
 | [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) | MCP 호출의 부모 실행은 profile 플러그인이 서명한 루트 session 으로 잇는다 | Accepted. ADR-017 의 부모 잇기를 정한다. 일부는 ADR-032 가 대체한다. 하위 에이전트 session 의 주인은 ADR-037 이 정한다 |
 | [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) | MCP 토큰은 profile 을 증명하고 실제 사용자는 부모 실행에서 정한다 | Accepted. ADR-003, ADR-017, ADR-028 의 요청자 판정과 ADR-031 의 일부를 대체한다. 하위 에이전트 session 의 요청자는 ADR-037 이 대체한다 |
 | [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | Accepted. 연결용 에이전트의 일반 편집 권한은 ADR-039 가 대체한다. 지운 에이전트의 행을 남긴다는 부분은 [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) 가 7일 뒤에 한해 대체한다 |
@@ -43,7 +43,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다. 승인한 실행이 실패했을 때 저장하고 전하는 결과는 ADR-092 가 정한다 |
 | [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다. 민감 본문은 평문이라는 부분은 ADR-055 가 대체한다 |
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
-| [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다 |
+| [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다. 에이전트 기본 모델은 model-unify 계획이 머지되면 [ADR-20261101 / model-setting](../../../docs/adr/ADR-20261101-model-setting.md) 이 대체한다(아직 적용 전) |
 | [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
 | [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다. 자식 provider 를 읽는 길은 ADR-067 이 대체한다 |
