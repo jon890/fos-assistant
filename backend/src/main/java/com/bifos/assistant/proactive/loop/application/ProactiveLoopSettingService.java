@@ -4,8 +4,8 @@ import com.bifos.assistant.proactive.loop.config.ProactiveLoopProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.proactive.loop.application.dto.LoopSettingView;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
+import com.bifos.assistant.proactive.loop.application.dto.LoopScheduleState;
+import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -21,7 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 사용자가 에이전트마다 매일 루프를 켜고 끄고 쉬게 하는 설정을 관리한다. 뜻은 {@code docs/features/proactive.md} 의 「사용자 설정」 이
- * 갖는다.
+ * 갖는다. 켜짐과 쉬기는 사용자와 에이전트마다 하나인 CHECK 예약 작업이 갖는다({@link LoopScheduleSettings}).
  *
  * <p>설치 설정이 꺼져 있어도 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 받는다. 꺼진 줄을 켜는 요청만 막는다.
  */
@@ -33,7 +33,7 @@ public class ProactiveLoopSettingService {
     static final Duration MAX_SNOOZE = Duration.ofDays(30);
 
     private final AgentService agents;
-    private final ProactiveLoopSettingRepository settings;
+    private final LoopScheduleSettings schedules;
     private final LiveProperties<ProactiveLoopProperties> properties;
     private final Clock clock;
     private final TransactionTemplate transactions;
@@ -42,14 +42,14 @@ public class ProactiveLoopSettingService {
     @Transactional(readOnly = true)
     public LoopSettingView get(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
-        ProactiveLoopSetting row = settings.findByUserIdAndAgentId(user.id(), agent.id()).orElse(null);
-        return view(row, clock.instant());
+        LoopScheduleState state = schedules.find(user.id(), agent.id()).orElse(null);
+        return view(state, clock.instant());
     }
 
 
     /**
-     * 설정을 저장한다. 같은 사용자와 에이전트의 처음 저장이 동시에 오면 늦은 쪽이 유일 제약에 걸린다. 그 트랜잭션은 롤백되므로 새 트랜잭션에서 먼저
-     * 저장된 줄을 다시 읽어 바꾼다.
+     * 설정을 저장한다. 켜면 그 사용자와 에이전트의 CHECK 작업을 켜고(없으면 기본 시각으로 만들고) 끄면 멈춘다. 같은 줄을 동시에 저장하는
+     * 요청이 제약에 걸리면 그 트랜잭션은 롤백되므로 새 트랜잭션에서 한 번 더 저장한다.
      */
     public LoopSettingView update(CurrentUser user, String agentCode, boolean enabled, Instant snoozedUntil) {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
@@ -73,29 +73,21 @@ public class ProactiveLoopSettingService {
 
     /** 이미 켠 줄을 켠 채 두는 요청은 설치 설정이 꺼져 있어도 받는다. 꺼진 줄을 켜는 요청만 막는다. */
     private boolean alreadyEnabled(Long userId, Long agentId) {
-        return settings.findByUserIdAndAgentId(userId, agentId)
-            .map(ProactiveLoopSetting::enabled)
-            .orElse(false);
+        return schedules.find(userId, agentId).map(LoopScheduleState::enabled).orElse(false);
     }
 
 
-    /** 있으면 바꾸고 없으면 만든다. 유일 제약 위반이 이 트랜잭션 안에서 드러나도록 곧바로 flush 한다. */
+    /** 작업을 잠그고 바꾼다. 제약 위반이 이 트랜잭션 안에서 드러나도록 저장소가 곧바로 flush 한다. */
     private LoopSettingView save(Long userId, Long agentId, boolean enabled, Instant snooze, Instant now) {
-        ProactiveLoopSetting row = settings.findByUserIdAndAgentId(userId, agentId)
-            .map(existing -> {
-                existing.change(enabled, snooze, now);
-                return existing;
-            })
-            .orElseGet(() -> ProactiveLoopSetting.of(userId, agentId, enabled, snooze, now));
-        return view(settings.saveAndFlush(row), now);
+        return view(schedules.save(userId, agentId, enabled, snooze, now), now);
     }
 
 
-    private LoopSettingView view(ProactiveLoopSetting row, Instant now) {
+    private LoopSettingView view(LoopScheduleState state, Instant now) {
         boolean available = properties.current().enabled();
-        if (row == null) {
+        if (state == null) {
             return new LoopSettingView(available, false, null);
         }
-        return new LoopSettingView(available, row.enabled(), row.snoozedAt(now) ? row.snoozedUntil() : null);
+        return new LoopSettingView(available, state.enabled(), state.snoozedAt(now) ? state.snoozedUntil() : null);
     }
 }

@@ -137,6 +137,10 @@ public class Task extends AuditedEntity {
     @Column(name = "last_fired_at")
     private Instant lastFiredAt;
 
+    /** {@code CHECK} 작업의 매일 루프 쉬기 끝 시각이다. 이 시각 전의 깨우기는 루프로 잇지 않는다. 비어 있으면 쉬지 않는다. */
+    @Column(name = "snoozed_until")
+    private Instant snoozedUntil;
+
 
     /**
      * 시각을 바꾼다. 종류에 맞지 않는 칸은 비운다.
@@ -223,6 +227,15 @@ public class Task extends AuditedEntity {
             throw new IllegalStateException("only CHECK tasks can change the proactive schedule");
         }
         state = enabled ? TaskState.ACTIVE : TaskState.PAUSED;
+    }
+
+
+    /** 매일 루프의 쉬기 끝 시각을 정한다. null 이면 쉬지 않는다. {@code CHECK} 작업만 쓴다. */
+    public void snoozeUntil(Instant until) {
+        if (kind != TaskKind.CHECK) {
+            throw new IllegalStateException("only CHECK tasks can snooze the proactive loop");
+        }
+        this.snoozedUntil = micros(until);
     }
 
 
