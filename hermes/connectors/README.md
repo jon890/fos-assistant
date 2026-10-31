@@ -46,9 +46,8 @@ hermes/connectors/<id>/
 
 ### 도구 정책
 
-- `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. 선언과 서버의 도구 목록이 정확히 같아야 한다
+- `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. `default_tool_policy: ask` 가 아니면 선언과 서버의 도구 목록이 정확히 같아야 한다
 - 도구마다 위험도를 고르고 그 까닭을 커넥터 개발 문서의 표에 적는다
-
 - 남이 만든 MCP 서버처럼 도구를 빠짐없이 선언하기 어려우면 `"default_tool_policy": "ask"` 를 선언해 일부만 선언할 수 있다. `tools` 에 없는 도구는 `assistant.json` 이 없는 플러그인과 같이 호출마다 승인을 받는다. 받는 값은 `deny`(기본값)와 `ask` 뿐이다([도구 정책](../../docs/features/connector-policy.md) 의 「일부 도구만 선언하기」)
 
 | 도구가 하는 일 | 선언 |
