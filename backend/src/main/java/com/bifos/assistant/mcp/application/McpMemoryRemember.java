@@ -62,7 +62,9 @@ public class McpMemoryRemember {
         + "「못」, 「안」, 「않」, 「없」, 「아니」 같은 부정은 content 에 그대로 살린다. "
         + "조건이 맞으면 바로 저장되고, 아니면 제안으로 남아 사용자가 받아들여야 한다. 결과 글대로 사용자에게 알린다. "
         + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고친다. "
-        + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. 한 번의 답에서 3개까지 남긴다.";
+        + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. "
+        + "기간이 있는 상태나 이미 지난 일이면 archivable 을 true 로 준다(예: 「이번 주 출장 중이다」). "
+        + "생일, 알레르기처럼 변하지 않는 사실이나 판단이 서지 않으면 주지 않는다. 한 번의 답에서 3개까지 남긴다.";
 
     private final MemoryService memories;
     private final MemoryCaptureService memoryCaptures;
@@ -96,6 +98,8 @@ public class McpMemoryRemember {
                     "collection",
                     Map.of("type", "string"),
                     "sensitive",
+                    Map.of("type", "boolean"),
+                    "archivable",
                     Map.of("type", "boolean")),
                 "required",
                 List.of("title", "content")));
@@ -113,6 +117,7 @@ public class McpMemoryRemember {
      * @param evidence 판정에 쓰지 않는 옛 인자. 없으면 null
      * @param memoryId 고칠 기존 항목 번호. 없으면 null
      * @param collection 둘 collection. 없으면 null
+     * @param archivable 모델이 자동 보관을 허락했는가. 새 항목에만 적고 기존 항목을 고칠 때는 쓰지 않는다
      */
     Map<String, Object> remember(
         McpCaller caller,
@@ -121,7 +126,8 @@ public class McpMemoryRemember {
         String evidence,
         Long memoryId,
         String collection,
-        boolean sensitive) {
+        boolean sensitive,
+        boolean archivable) {
         AgentExecution origin = caller.originExecution();
         MemoryAccess access = memories.accessOf(origin.agentId());
         if (access.isEmpty()) {
@@ -157,7 +163,8 @@ public class McpMemoryRemember {
                 origin.id(),
                 origin.conversationId(),
                 direct,
-                externalRead));
+                externalRead,
+                archivable));
         log.info(
             "memory remember userId={} executionId={} direct={} outcome={}",
             caller.user().id(),
