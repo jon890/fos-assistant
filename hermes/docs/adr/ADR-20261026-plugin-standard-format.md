@@ -21,9 +21,8 @@
 | 옛 이름 | `assistant.json` 이 없으면 `connector.json` 을 같은 규칙으로 읽는다. 둘 다 있으면 카탈로그에서 뺀다 |
 | manifest 의 나머지 | `hooks`, `commands`, `agents`, Codex 의 `interface` 같은 칸과 디렉터리는 읽지 않고 설치하지 않는다. Hermes 에 옮겨 갈 자리가 없다 |
 
-`assistant.json` 이 없을 때의 기본값(도구는 모두 호출마다 승인, 입력 칸은 MCP 정의에서 추론, 확인 도구 없음)은 이 결정의 방향이지만 첫 구현에 넣지 않는다.
-선언하지 않은 도구를 거절하는 지금의 판정(`default_tool_policy: deny`)을 「묻는다」 로 바꾸는 일이 Control Plane 과 화면에 걸쳐서다.
-그때까지는 `assistant.json` 이나 `connector.json` 이 없으면 카탈로그에서 뺀다.
+`assistant.json` 이 없을 때의 기본값(도구는 모두 호출마다 승인, 입력 칸은 MCP 정의에서 추론, 확인 도구 없음)은 [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) 이 정한다.
+그 플러그인은 카탈로그에 `schema: 3` 으로 오른다. `assistant.json` 은 있으면 그 기본값을 덮어쓰는 선택 파일이다.
 
 ### 맥락
 

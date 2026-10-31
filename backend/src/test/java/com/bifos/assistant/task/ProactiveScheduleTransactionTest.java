@@ -28,14 +28,12 @@ import com.bifos.assistant.task.application.TaskFiring;
 import com.bifos.assistant.task.application.TaskRunStarter;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -81,9 +79,6 @@ class ProactiveScheduleTransactionTest {
     TaskRepository tasks;
 
     @Autowired
-    TaskTriggerRepository triggers;
-
-    @Autowired
     TaskRunRepository runs;
 
     @Autowired
@@ -96,7 +91,6 @@ class ProactiveScheduleTransactionTest {
     AgentRepository agents;
 
     private final List<Long> createdRuns = new ArrayList<>();
-    private final List<Long> createdTriggers = new ArrayList<>();
     private final List<Long> createdTasks = new ArrayList<>();
     private final List<Long> createdAgents = new ArrayList<>();
     private final List<Long> createdUsers = new ArrayList<>();
@@ -112,7 +106,6 @@ class ProactiveScheduleTransactionTest {
     @AfterEach
     void tearDown() {
         runs.deleteAllById(createdRuns);
-        triggers.deleteAllById(createdTriggers);
         tasks.deleteAllById(createdTasks);
         agents.deleteAllById(createdAgents);
         users.deleteAllById(createdUsers);
@@ -124,11 +117,11 @@ class ProactiveScheduleTransactionTest {
     @DisplayName("Hermes 장애 중에도 ACTIVE 매일 깨우기를 끄면 DB에 PAUSED로 커밋되고 복구 뒤 새 CHECK를 시작하지 않는다")
     void disablesScheduleAndPreventsFutureChecksAfterRuntimeRecovers(String band, ErrorCode errorCode) {
         Fixture fixture = activeSchedule();
-        TaskTrigger trigger = triggers.findByTaskId(fixture.task().id()).orElseThrow();
+        Task trigger = tasks.findById(fixture.task().id()).orElseThrow();
         trigger.moveNext(DUE);
-        triggers.saveAndFlush(trigger);
+        tasks.saveAndFlush(trigger);
         TaskRun queued = runs.saveAndFlush(TaskRun.queued(
-            fixture.task().id(), trigger.id(), fixture.owner().id(), DUE, NOW));
+            fixture.task().id(), fixture.owner().id(), DUE, NOW));
         createdRuns.add(queued.id());
 
         reset(toolsets, skills);
@@ -202,7 +195,6 @@ class ProactiveScheduleTransactionTest {
         Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(owner.id(), agent.id(), TaskKind.CHECK)
             .orElseThrow();
         createdTasks.add(task.id());
-        createdTriggers.add(triggers.findByTaskId(task.id()).orElseThrow().id());
         return new Fixture(owner, agent, currentUser, task);
     }
 

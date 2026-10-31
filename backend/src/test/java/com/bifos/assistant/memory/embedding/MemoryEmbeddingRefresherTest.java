@@ -150,7 +150,7 @@ class MemoryEmbeddingRefresherTest {
         refresher(ENABLED).refreshOnce();
         byte[] before = embeddings.findById(edited.id()).orElseThrow().textFingerprint();
 
-        memories.update(USER, edited.id(), "올해 3월에 다시 갈았다", false);
+        memories.update(USER, edited.id(), "올해 3월에 다시 갈았다", false, null);
         memories.update(USER, hidden.id(), "O형이다", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
         jdbc.update("DELETE FROM memory WHERE id = ?", gone.id());
         int written = refresher(ENABLED).refreshOnce();

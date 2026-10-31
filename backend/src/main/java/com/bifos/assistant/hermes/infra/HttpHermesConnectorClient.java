@@ -79,7 +79,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     @Override
     public List<ConnectorManifest> readCatalog() {
         JsonNode body = request(() -> ConnectorCatalogTools.parseCatalog(client.get()
-            .uri(baseUrl + "/api/connectors/catalog")
+            // 표준 플러그인(`schema: 3`)은 청한 쪽에만 실린다. 옛 Control Plane 은 확인 도구가 없는 항목을 읽지 못한다(rule-66).
+            .uri(baseUrl + "/api/connectors/catalog?include=standard")
             .header(AUTHORIZATION, bearer())
             .retrieve()
             .body(String.class)));

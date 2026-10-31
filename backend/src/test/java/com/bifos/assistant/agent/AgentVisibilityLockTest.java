@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -54,6 +55,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * 트랜잭션과 행 잠금이 실제로 돌아야 동시 요청의 차례를 볼 수 있다. Hermes 대시보드와 커넥터, 도구 목록 경로만 대역이다.
  */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class AgentVisibilityLockTest {
 
     /** plugin 틀이 붙이는 안전한 기본 도구다. 셸과 파일 등급이 없다. */

@@ -8,9 +8,9 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>계약은 {@code docs/features/connector.md} 의 「대시보드 plugin 계약」 이 갖는다.
  *
- * @param verifyTool 등록 전에 후보 값으로 부르는 확인 도구
+ * @param verifyTool 등록 전에 후보 값으로 부르는 확인 도구. 표준 플러그인(`schema: 3`)은 확인 도구가 없어 null
  * @param mcpServer 설치가 그 profile 에 더하는 MCP 서버 이름
- * @param schema manifest 의 판. 2 부터 도구마다 정책을 선언한다
+ * @param schema manifest 의 schema. 2 는 도구마다 정책을 선언하고, 3 은 {@code assistant.json} 이 없어 도구를 선언하지 않는다
  * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
  * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
  * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}

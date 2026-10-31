@@ -166,7 +166,7 @@ public class ArtifactService {
 
     private ApiException missing(Long conversationId, String relativePath) {
         if (relativePath != null
-            && artifacts.existsByConversationIdAndPathAndDeletedAtIsNotNull(conversationId, relativePath)) {
+            && artifacts.existsByConversationIdAndPathAndDeletedAtIsNotNullAndVaultUserIdIsNull(conversationId, relativePath)) {
             return new ApiException(ErrorCode.ARTIFACT_GONE, "this file is no longer kept");
         }
         return new ApiException(ErrorCode.ARTIFACT_NOT_FOUND, "this file does not exist");

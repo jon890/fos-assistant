@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,7 +20,7 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
 
     /** 없는 파일이 보관 기간이 지나 지워진 것인지 가릴 때만 쓴다. */
-    boolean existsByConversationIdAndPathAndDeletedAtIsNotNull(Long conversationId, String path);
+    boolean existsByConversationIdAndPathAndDeletedAtIsNotNullAndVaultUserIdIsNull(Long conversationId, String path);
 
 
     /**
@@ -39,6 +40,7 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
              where a.conversationId = :conversationId
                and a.path = :path
                and a.deletedAt is null
+               and a.vaultUserId is null
                and a.createdAt < :createdBefore
             """)
     int markDeleted(
@@ -49,11 +51,42 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
 
     /** 지운 표시가 없고 {@code createdBefore} 보다 앞서 만든 행이다. 파일이 없는데 행이 살아 있는 것을 찾을 때 쓴다. */
-    List<ChatArtifact> findByDeletedAtIsNullAndCreatedAtBefore(Instant createdBefore);
+    List<ChatArtifact> findByDeletedAtIsNullAndVaultUserIdIsNullAndCreatedAtBefore(Instant createdBefore);
 
 
-    /** 그 대화의 결과물 행을 모두 지운다. 파일은 부르는 쪽이 먼저 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
+    /**
+     * 그 대화의 결과물 행을 모두 지운다. 파일은 부르는 쪽이 먼저 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다.
+     *
+     * <p>사용자가 보관한 사본({@code vault_user_id} 가 채워진 행)은 남긴다. 보관본은 대화와 독립된 수명을 가진다.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from ChatArtifact a where a.conversationId = :conversationId")
+    @Query("delete from ChatArtifact a where a.conversationId = :conversationId and a.vaultUserId is null")
     int deleteAllOf(@Param("conversationId") Long conversationId);
+
+
+    /** 그 사용자가 보관한 사본의 평문 바이트 수 합이다. 용량을 넘는지 볼 때 쓴다. */
+    @Query("select coalesce(sum(a.byteSize), 0) from ChatArtifact a where a.vaultUserId = :userId")
+    long sumVaultBytes(@Param("userId") Long userId);
+
+
+    /** 그 사용자의 보관 사본을 새로 만든 것부터 준다. 암호화한 본문은 목록에 필요 없어 읽지 않는다. */
+    @Query("""
+            select a.id as id, a.path as path, a.byteSize as byteSize, a.createdAt as createdAt
+              from ChatArtifact a
+             where a.vaultUserId = :userId
+             order by a.id desc
+            """)
+    List<ArtifactVaultRow> listVaulted(@Param("userId") Long userId);
+
+
+    Optional<ChatArtifact> findByIdAndVaultUserId(Long id, Long vaultUserId);
+
+
+    Optional<ChatArtifact> findByVaultUserIdAndVaultFingerprint(Long vaultUserId, String vaultFingerprint);
+
+
+    /** 주인의 보관 사본 하나를 지운다. 지운 줄 수가 0 이면 없거나 남의 것이다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatArtifact a where a.id = :id and a.vaultUserId = :userId")
+    int deleteVaulted(@Param("id") Long id, @Param("userId") Long userId);
 }

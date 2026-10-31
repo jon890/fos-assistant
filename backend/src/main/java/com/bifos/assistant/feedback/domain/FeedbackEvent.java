@@ -4,6 +4,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -19,6 +20,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다.
@@ -84,6 +87,12 @@ public class FeedbackEvent {
     @Column(name = "changed_fields", length = SHORT_MAX_LENGTH, updatable = false)
     private String changedFields;
 
+    /** 정비 사건의 근거다. 다른 사건은 비어 있다. 제목과 본문은 담지 않는다. */
+    @Convert(converter = MaintenanceDetailConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "detail", columnDefinition = "JSON", updatable = false)
+    private MaintenanceDetail detail;
+
     @Column(name = "contract_version", nullable = false, updatable = false)
     private int contractVersion;
 
@@ -123,6 +132,38 @@ public class FeedbackEvent {
         event.contractVersion = CONTRACT_VERSION;
         // 칸이 DATETIME(6) 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다.
         event.occurredAt = occurredAt.truncatedTo(ChronoUnit.MICROS);
+        return event;
+    }
+
+
+    /**
+     * 정비 사건 한 줄이다. 열쇠는 {@code memory:<번호>}, 동작 종류는 {@code reasonCode}, 그때의 revision 번호는 {@code
+     * subjectVersion} 이다. 대화와 실행에는 묶이지 않는다.
+     */
+    public static FeedbackEvent maintenance(
+        Long userId,
+        Long memoryId,
+        FeedbackEventType eventType,
+        FeedbackActor actor,
+        int revision,
+        String action,
+        MaintenanceDetail detail,
+        Instant occurredAt) {
+        FeedbackEvent event = of(
+            userId,
+            FeedbackSubjectType.MEMORY,
+            FeedbackSubjectType.MEMORY.key(memoryId),
+            eventType,
+            actor,
+            null,
+            null,
+            null,
+            null,
+            Integer.toString(revision),
+            action,
+            null,
+            occurredAt);
+        event.detail = detail;
         return event;
     }
 

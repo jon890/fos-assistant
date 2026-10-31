@@ -19,6 +19,23 @@ public record MysqlTestDatabase(String url, String username, String password) {
     private static final String USERNAME = "MIGRATION_MYSQL_USERNAME";
     private static final String PASSWORD = "MIGRATION_MYSQL_PASSWORD";
 
+    private static MysqlTestDatabase shared;
+
+    /**
+     * JVM 하나가 함께 쓰는 데이터베이스다. 처음 부를 때 한 번만 만든다.
+     *
+     * <p>{@code @MysqlIntegrationTest} 가 이 데이터베이스로 Spring 컨텍스트 하나를 띄워 함께 쓴다. 검사끼리 데이터를 공유하므로
+     * 앞 검사가 남긴 줄에 기대지 않는다(ADR-20261007 / test-context-base 의 격리 규칙을 MySQL 에도 적용한다).
+     * 스키마 전체를 새로 만들어야 하는 마이그레이션 검사는 {@link #create()} 로 따로 받는다.
+     */
+    public static synchronized MysqlTestDatabase shared() {
+        if (shared == null) {
+            shared = create();
+        }
+        return shared;
+    }
+
+
     public static MysqlTestDatabase create() {
         String serverUrl = required(SERVER_URL);
         String username = required(USERNAME);

@@ -30,6 +30,6 @@ public class ChatArtifactWriter {
     /** 지운 표시가 없고 {@code createdBefore} 보다 앞서 만든 행이다. */
     @Transactional(readOnly = true)
     public List<ChatArtifact> activeCreatedBefore(Instant createdBefore) {
-        return repository.findByDeletedAtIsNullAndCreatedAtBefore(createdBefore);
+        return repository.findByDeletedAtIsNullAndVaultUserIdIsNullAndCreatedAtBefore(createdBefore);
     }
 }

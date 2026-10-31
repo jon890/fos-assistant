@@ -26,6 +26,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.domain.Task;
+import com.bifos.assistant.task.domain.type.TriggerType;
+import com.bifos.assistant.task.domain.type.MissedPolicy;
+import java.time.ZoneOffset;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.infra.TaskRepository;
@@ -157,8 +160,11 @@ class ConversationTaskLabelTest {
 
 
     private Task task(String title) {
-        return tasks.save(Task.create(
-            owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS));
+        Task task = Task.create(
+            owner.id(), agent.id(), title, "정리해 줘", ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
+        task.reschedule(TriggerType.ONCE, null, Instant.EPOCH, ZoneOffset.UTC, null);
+        task.changeMissedPolicy(MissedPolicy.SKIP);
+        return tasks.save(task);
     }
 
 

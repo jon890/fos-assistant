@@ -6,11 +6,14 @@ import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionContextSourceRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -66,6 +69,16 @@ public class ExecutionMemoryRefs {
         List<ExecutionMemoryRef> refs = new ArrayList<>();
         viaByExecution.forEach((executionId, vias) -> vias.forEach((memoryId, via) -> refs.add(new ExecutionMemoryRef(executionId, agentIds.get(executionId), memoryId, via))));
         return refs;
+    }
+
+
+    /** 그때 뒤에 한 번이라도 실리거나 읽힌 기억의 번호다. 제목만 실린 줄도 센다. */
+    @Transactional(readOnly = true)
+    public Set<Long> loadedSince(Instant since) {
+        return contextSources.findMemoryRefsLoadedSince(since).stream()
+            .map(ExecutionMemoryRefs::memoryIdOf)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
     }
 
 

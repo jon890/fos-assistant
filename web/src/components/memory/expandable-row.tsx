@@ -17,6 +17,7 @@ export function ExpandableRow({
   leaving = false,
   entering = false,
   tone = "plain",
+  anchorId,
   children,
 }: {
   title: string;
@@ -29,16 +30,19 @@ export function ExpandableRow({
   entering?: boolean;
   /** 검토할 줄은 바탕을 달리해 일반 줄과 구분한다. */
   tone?: "plain" | "review";
+  /** 다른 화면에서 이 줄로 스크롤할 때 찾는 id 다. */
+  anchorId?: string;
   children: React.ReactNode;
 }) {
   const id = useId();
   const panelId = `${id}-panel`;
   return (
     <li
+      id={anchorId}
       data-leaving={leaving || undefined}
       data-open={open || undefined}
       className={cn(
-        "list-none overflow-hidden rounded-md border border-border",
+        "list-none scroll-mt-4 overflow-hidden rounded-md border border-border",
         tone === "review" && "bg-muted",
         entering && "animate-message-assistant",
       )}

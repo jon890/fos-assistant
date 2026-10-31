@@ -27,8 +27,8 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
     List<TaskRun> findByStatusAndProactiveCheckIdIsNotNull(TaskRunStatus status);
 
 
-    /** 그 trigger 의 그 예정 시각 줄이 이미 있는가. 유일 제약에 닿기 전에 본다. */
-    boolean existsByTriggerIdAndScheduledFor(Long triggerId, Instant scheduledFor);
+    /** 그 작업의 그 예정 시각 줄이 이미 있는가. 유일 제약에 닿기 전에 본다. */
+    boolean existsByTaskIdAndScheduledFor(Long taskId, Instant scheduledFor);
 
 
     /**

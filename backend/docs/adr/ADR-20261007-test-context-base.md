@@ -8,7 +8,7 @@
     검사는 선언형 주석 `@OverrideProperties` 로 값을 정하고, 공통 확장이 검사 전에 적용하고 검사 뒤에 기동 값으로 되돌린다.
   - Hermes 대역, 시험 시계, 백그라운드 작업 실행기, Hermes 클라이언트 mock, 검사가 동작을 바꾸는 운영 빈의 spy 는 기반 한곳에 둔다.
   - 검사 하나만 쓰던 mock 은 기반의 spy 로 올린다. 검사 하나만 쓰던 대역 설정은 꺼 두면 아무것도 하지 않는 대역으로 기반에 올리고, 그 검사가 켠다.
-  - 검사 클래스에 컨텍스트 키를 바꾸는 선언(`@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, 중첩 `@TestConfiguration` 등)을 두지 않는다. 구조 규칙으로 확인하고, 막는 목록은 그 규칙이 갖는다. `@Tag("mysql")` 검사는 예외다.
+  - 검사 클래스에 컨텍스트 키를 바꾸는 선언(`@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, 중첩 `@TestConfiguration` 등)을 두지 않는다. 구조 규칙으로 확인하고, 막는 목록은 그 규칙이 갖는다. `@Tag("mysql")` 을 직접 단 검사는 예외다. 다만 H2 검사를 상속하는 MySQL 검사는 예외가 아니다(아래 「MySQL 검사」).
   - 컨텍스트를 함께 쓰는 검사 사이의 격리는 JUnit 확장 하나가 맡는다.
 - **맥락**:
   - 2026-10-07 측정에서 `@SpringBootTest` 검사 141개(MySQL 태그 제외)가 컨텍스트를 77번 띄웠다(그날 origin/main 을 두 번 합치기 전. 합친 뒤 main 기준선은 79번).
@@ -39,4 +39,33 @@
     - **운영 빈이 JVM 메모리에 두는 캐시는 다음 검사에 남는다.** 보관 시간을 test profile 에서 짧게 두거나 시험 시계로 지나가게 한다.
     - **기반의 spy 는 모든 통합 검사에서 spy 다.** 그 빈의 메서드를 `verify(...)` 의 matcher 사이에서 부르면 Mockito 가 matcher 수를 잘못 센다. mock 에서 spy 로 올린 빈은 정하지 않은 메서드가 실제로 돈다.
     - **기반에 대역을 더하면 모든 검사가 바뀐다.** 꺼 둔 상태에서 아무것도 하지 않아야 하고, 더할 때는 전체 검사로 확인한다.
-- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. MySQL 태그 검사의 기준 클래스는 이 결정 밖이다. 쓰는 방법은 [`backend/docs/code-architecture.md`](../code-architecture.md) 가 갖는다.
+- **적용 범위**: `backend/src/test` 의 Spring 통합 검사. 직접 `@Tag("mysql")` 을 달고 DB 를 직접 만드는 검사의 기준 클래스는 이 결정 밖이다. 쓰는 방법은 [`backend/docs/code-architecture.md`](../code-architecture.md) 가 갖는다.
+
+## MySQL 검사
+
+2026-11-01 에 개정했다.
+
+**개정 전.** MySQL 검사는 이 결정의 예외였다. H2 검사 클래스 37개를 상속해 클래스마다 `@DynamicPropertySource` 로 DB 를 새로 만들었다.
+클래스마다 컨텍스트가 갈라져 한 실행이 컨텍스트를 33번 띄웠다(기동 합계 약 229초, 컨텍스트 하나가 Flyway 마이그레이션 120개를 적용해 6.3-7.1초).
+상속한 H2 검사가 모두 MySQL 에서 다시 돌아, MySQL job 의 89%가 H2 에서 이미 본 것을 되풀이했다.
+
+**원칙(사용자 결정 2026-11-01).**
+
+1. 도메인 로직은 최대한 Spring 과 DB 없이 자바 함수와 객체 단위 테스트로 본다. DB 가 필요하면 H2 같은 메모리 DB 로 빠르게 본다.
+2. 실제 DB 동작에 기대는 테스트(행 잠금, 정렬 규칙, 마이그레이션 DDL, FULLTEXT)만 MySQL 컨테이너로 본다. 지금은 `scripts/checks/check-mysql-migration.sh` 가 컨테이너를 띄우며, Testcontainers 로 옮기는 일은 별도로 정한다.
+3. Spring 통합 테스트 가운데 도메인 로직만 보는 것은 단위 테스트로 내린다(후속 계획이 표본 패키지로 시작한다).
+
+**결정.** H2 를 기본으로 두고, MySQL 은 H2 와 실제로 다르게 동작하는 것에 기대는 검사만 DB 하나와 컨텍스트 하나로 돌린다.
+
+- **돌리는 이유는 넷이다.** 행 잠금과 유일 제약 경합(`ROW_LOCK`), 한글·대소문자 정렬 규칙(`COLLATION`), 마이그레이션이 만든 DDL(`MIGRATION_DDL`), 저장소 밖 쿼리의 MySQL 문법(`QUERY_OUTSIDE_REPOSITORY`, [rule-51](../../../docs/code-rules/rule-51.md) 이 이 검사에 맡긴 몫)이다.
+  ngram FULLTEXT 도 이유가 되지만 기억 검색이 쓰지 않는다([ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) 이 기각했다). 쓰는 날 이유를 더한다.
+- **`@MysqlIntegrationTest` 가 컨텍스트를 모은다.** `mysql` 태그, `MysqlTestDatabase.shared()` 의 DB 하나에 붙는 `SharedMysqlContext`, 상속한 검사를 걸러 내는 `MysqlCasesOnly` 를 한 주석이 갖는다. 검사 클래스에 `@DynamicPropertySource` 를 두지 않으므로 컨텍스트 키가 같다.
+- **H2 검사를 통째로 상속해 되풀이하지 않는다.** 하위 MySQL 클래스는 직접 선언한 메서드와 상위 클래스에서 `@MysqlCase(이유)` 를 단 메서드만 돌린다. 이유 없는 상위 메서드는 건너뛰어 보고서에 건너뜀으로 남는다.
+- **마이그레이션 검사는 그대로 둔다.** 스키마를 처음부터 적용해 보는 것이 목적이라 메서드마다 DB 를 새로 만든다. 줄이는 방법은 별도 결정이다.
+
+**감당할 것.**
+
+- 컨텍스트와 DB 를 함께 쓰므로 MySQL 검사도 앞 검사가 남긴 데이터에 기대지 않는다(위 「검사는 앞 검사가 남긴 데이터에 기대지 않는다」 와 같다).
+- H2 에서만 돌게 된 검사는 MySQL 고유의 실패를 보지 못한다. 저장소 쿼리는 `RepositoryQueryMysqlTest` 가, 스키마와 엔티티의 대조는 `MysqlMigrationTest` 가 계속 본다. 그 밖에 저장 callback 의 시각 정밀도처럼 H2 와 달라질 수 있는 동작은 H2 로만 본다.
+- 새 H2 검사를 MySQL 에서도 돌리려면 `@MysqlCase` 의 이유를 단다. 이유가 넷에 들지 않으면 H2 에서만 돈다.
+

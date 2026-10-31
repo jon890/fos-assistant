@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import com.bifos.assistant.chat.contentdraft.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.mockito.Mockito;
@@ -175,6 +176,7 @@ class McpContentDraftToolTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("동시 HTTP 같은 서명 전송은 한 원고와 한 생성 및 전송 대응만 저장한다")
     void serializesTwoHttpRequestsAtDatabaseBoundary() throws Exception {

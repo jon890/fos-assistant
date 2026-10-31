@@ -31,11 +31,29 @@ public enum FeedbackEventType {
      */
     MARKED_IRRELEVANT,
     /** 사용자가 답의 「참고한 기억」 에서 그 기억이 틀렸다고 눌렀다. 고치는 것은 사람이 기억 화면에서 한다. 기억 내용은 바뀌지 않는다. */
-    MARKED_WRONG;
+    MARKED_WRONG,
+    /**
+     * 정비 작업이 기억 항목의 정비 후보를 만들었다. 주체는 시스템이다. 열쇠는 {@code memory:<번호>}, 동작 종류는 {@code reason_code}, 그때의
+     * 판 번호는 {@code subject_version}, 규칙 버전과 신호 값은 {@code detail} 이다. 제안 모드에서는 기억을 바꾸지 않는다.
+     */
+    MAINTENANCE_PROPOSED,
+    /** 사람이 정비 후보를 「맞음」 으로 확인했다. 이 단계에서는 동작을 적용하지 않고 확인 결과만 남긴다. */
+    MAINTENANCE_CONFIRMED,
+    /** 사람이 정비 후보를 「아님」 으로 확인했다. */
+    MAINTENANCE_DENIED;
 
 
-    /** 「참고한 기억」 단추 사건인가. 제안의 흐름이 아니라 답에 대한 반응이라 replay 읽기 모델과 대화 삭제의 열쇠 확장에서 뺀다. */
+    /**
+     * 「참고한 기억」 단추 사건과 정비 사건인가. 제안의 흐름이 아니라 답에 대한 반응이거나 정비 규칙의 기록이라 반응 읽기, replay 읽기
+     * 모델, 대화 삭제의 열쇠 확장에서 뺀다.
+     */
     public boolean marksMemoryUse() {
-        return this == MARKED_IRRELEVANT || this == MARKED_WRONG;
+        return this == MARKED_IRRELEVANT || this == MARKED_WRONG || marksMaintenance();
+    }
+
+
+    /** 정비 사건(후보, 확인)인가. */
+    public boolean marksMaintenance() {
+        return this == MAINTENANCE_PROPOSED || this == MAINTENANCE_CONFIRMED || this == MAINTENANCE_DENIED;
     }
 }

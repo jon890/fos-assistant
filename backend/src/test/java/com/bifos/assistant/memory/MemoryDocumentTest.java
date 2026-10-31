@@ -258,7 +258,7 @@ class MemoryDocumentTest {
             .id();
 
         for (Long id : List.of(sensitiveId, plainId)) {
-            assertCode(() -> memories.update(DAD, id, "x", true), ErrorCode.MEMORY_NOT_FOUND);
+            assertCode(() -> memories.update(DAD, id, "x", true, null), ErrorCode.MEMORY_NOT_FOUND);
             assertCode(() -> memories.reject(DAD, id), ErrorCode.MEMORY_NOT_FOUND);
             assertCode(() -> memories.accept(DAD, id), ErrorCode.MEMORY_NOT_FOUND);
             Map<String, Object> stored = row(id);

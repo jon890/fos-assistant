@@ -13,7 +13,6 @@ import com.bifos.assistant.task.application.dto.TaskInput;
 import com.bifos.assistant.task.application.dto.TaskRunDetail;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
@@ -22,7 +21,6 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -32,8 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.support.CronExpression;
@@ -56,7 +52,6 @@ public class TaskService {
     private static final String NOT_FOUND_MESSAGE = "this task does not exist";
 
     private final TaskRepository tasks;
-    private final TaskTriggerRepository triggers;
     private final TaskRunRepository runs;
     private final AppUserRepository users;
     private final AgentService agents;
@@ -81,15 +76,13 @@ public class TaskService {
         }
         Agent agent = requireAgent(user, input.agentCode());
         Schedule schedule = validated(input.schedule(), now);
-        Task task = tasks.save(Task.create(
-            user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input)));
+        Task task = Task.create(
+            user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
         task.chooseModelTier(input.modelTier());
         MissedPolicy missed = missedOf(input);
-        TaskTrigger trigger = triggers.save(
-            schedule.type() == TriggerType.CRON
-                ? TaskTrigger.cron(task.id(), schedule.cron(), schedule.zone(), missed, schedule.next())
-                : TaskTrigger.once(task.id(), schedule.fireAt(), schedule.zone(), missed));
-        return new TaskDetail(task, trigger, agent);
+        task.reschedule(schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next());
+        task.changeMissedPolicy(missed);
+        return new TaskDetail(tasks.save(task), agent);
     }
 
 
@@ -103,20 +96,19 @@ public class TaskService {
     public TaskDetail update(CurrentUser user, UUID taskId, TaskInput input) {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
-        TaskTrigger trigger = requireTrigger(task);
         Agent agent = requireAgent(user, input.agentCode());
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
         task.chooseModelTier(input.modelTier());
-        if (!sameSchedule(trigger, input.schedule())) {
+        if (!sameSchedule(task, input.schedule())) {
             Schedule schedule = validated(input.schedule(), now);
-            trigger.reschedule(
+            task.reschedule(
                 schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next());
         }
         MissedPolicy missed = missedOf(input);
-        if (trigger.missedPolicy() != missed) {
-            trigger.changeMissedPolicy(missed);
+        if (task.missedPolicy() != missed) {
+            task.changeMissedPolicy(missed);
         }
-        return new TaskDetail(task, trigger, agent);
+        return new TaskDetail(task, agent);
     }
 
 
@@ -125,7 +117,7 @@ public class TaskService {
     public TaskDetail pause(CurrentUser user, UUID taskId) {
         Task task = requireTaskForUpdate(user, taskId);
         task.pause();
-        return detailOf(task, requireTrigger(task));
+        return detailOf(task);
     }
 
 
@@ -139,11 +131,10 @@ public class TaskService {
     public TaskDetail resume(CurrentUser user, UUID taskId) {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
-        TaskTrigger trigger = requireTrigger(task);
         if (task.resume()) {
-            trigger.moveNext(nextOf(trigger, now));
+            task.moveNext(nextOf(task, now));
         }
-        return detailOf(task, trigger);
+        return detailOf(task);
     }
 
 
@@ -161,13 +152,9 @@ public class TaskService {
         if (found.isEmpty()) {
             return List.of();
         }
-        Map<Long, TaskTrigger> byTask = triggers
-            .findByTaskIdIn(found.stream().map(Task::id).toList())
-            .stream()
-            .collect(Collectors.toMap(TaskTrigger::taskId, Function.identity()));
         Map<Long, Agent> byAgent = agents.byIds(found.stream().map(Task::agentId).distinct().toList());
         return found.stream()
-            .map(task -> new TaskDetail(task, byTask.get(task.id()), byAgent.get(task.agentId())))
+            .map(task -> new TaskDetail(task, byAgent.get(task.agentId())))
             .toList();
     }
 
@@ -175,7 +162,7 @@ public class TaskService {
     @Transactional(readOnly = true)
     public TaskDetail get(CurrentUser user, UUID taskId) {
         Task task = requireTask(user, taskId);
-        return detailOf(task, requireTrigger(task));
+        return detailOf(task);
     }
 
 
@@ -217,14 +204,8 @@ public class TaskService {
     }
 
 
-    private TaskTrigger requireTrigger(Task task) {
-        return triggers.findByTaskId(task.id())
-            .orElseThrow(() -> new IllegalStateException("task " + task.id() + " has no trigger"));
-    }
-
-
-    private TaskDetail detailOf(Task task, TaskTrigger trigger) {
-        return new TaskDetail(task, trigger, agents.findById(task.agentId()).orElse(null));
+    private TaskDetail detailOf(Task task) {
+        return new TaskDetail(task, agents.findById(task.agentId()).orElse(null));
     }
 
 
@@ -271,34 +252,34 @@ public class TaskService {
             throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "cron is required for CRON");
         }
         String cron = input.cron().strip();
-        if (cron.length() > TaskTrigger.CRON_MAX) {
+        if (cron.length() > Task.CRON_MAX) {
             throw new ApiException(
                 ErrorCode.TASK_SCHEDULE_INVALID,
-                "a cron expression must have at most " + TaskTrigger.CRON_MAX + " characters");
+                "a cron expression must have at most " + Task.CRON_MAX + " characters");
         }
         return new Schedule(TriggerType.CRON, cron, null, zone, null);
     }
 
 
     /** 요청의 시각이 저장된 시각과 같은지 본다. 종류, cron, {@code fireAt}, 시간대를 견준다. */
-    private boolean sameSchedule(TaskTrigger trigger, ScheduleInput input) {
+    private boolean sameSchedule(Task task, ScheduleInput input) {
         Schedule requested = parsed(input);
-        if (requested.type() != trigger.type() || !requested.zone().getId().equals(trigger.timeZone())) {
+        if (requested.type() != task.type() || !requested.zone().getId().equals(task.timeZone())) {
             return false;
         }
         if (requested.type() == TriggerType.CRON) {
-            return requested.cron().equals(trigger.cronExpr());
+            return requested.cron().equals(task.cronExpr());
         }
-        return requested.fireAt().truncatedTo(ChronoUnit.MICROS).equals(trigger.fireAt());
+        return requested.fireAt().truncatedTo(ChronoUnit.MICROS).equals(task.fireAt());
     }
 
 
     /** 지금 뒤의 첫 예정 시각이다. 지난 {@code ONCE} 와 다음 시각이 없는 cron 은 null 이다. */
-    private static Instant nextOf(TaskTrigger trigger, Instant now) {
-        if (trigger.type() == TriggerType.ONCE) {
-            return trigger.fireAt().isAfter(now) ? trigger.fireAt() : null;
+    private static Instant nextOf(Task task, Instant now) {
+        if (task.type() == TriggerType.ONCE) {
+            return task.fireAt().isAfter(now) ? task.fireAt() : null;
         }
-        return TaskSchedule.nextAfter(TaskSchedule.parseCron(trigger.cronExpr()), trigger.zone(), now);
+        return TaskSchedule.nextAfter(TaskSchedule.parseCron(task.cronExpr()), task.zone(), now);
     }
 
 
