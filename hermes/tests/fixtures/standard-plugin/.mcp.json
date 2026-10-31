@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "std-notes": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server.py"],
+      "env": {
+        "STD_TOKEN": "${STD_TOKEN}",
+        "STD_REGION": "${STD_REGION:-}"
+      }
+    }
+  }
+}

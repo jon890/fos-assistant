@@ -28,9 +28,18 @@ public final class ConnectorToolPolicies {
 
     private static final int LEGACY_SCHEMA = 1;
 
+    /** {@code assistant.json} 이 없는 표준 플러그인의 schema 값이다. 도구를 선언하지 않고 확인 도구가 없다. */
+    public static final int STANDARD_SCHEMA = 3;
+
 
     /** 이 manifest 의 도구 정책으로 판정해도 되는가. 거짓이면 그 커넥터를 없는 것으로 다룬다. */
     public static boolean valid(ConnectorManifest manifest) {
+        if (manifest.schema() == STANDARD_SCHEMA) {
+            // 선언이 없는 schema 다. 도구 선언이나 확인 도구, 선택지 도구가 실려 오면 대시보드가 다른 schema 로 읽은 것이다.
+            return manifest.tools().isEmpty()
+                && manifest.verifyTool() == null
+                && manifest.fields().stream().allMatch(field -> field.options() == null);
+        }
         if (manifest.schema() != LEGACY_SCHEMA && manifest.schema() != DECLARING_SCHEMA) {
             return false;
         }

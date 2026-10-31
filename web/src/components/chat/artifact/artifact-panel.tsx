@@ -9,7 +9,10 @@ import {
 } from "@/components/ui/tooltip-button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useMediaQuery } from "@/components/ui/use-media-query";
+import { Button } from "@/components/ui/button";
+import { describeFailure } from "@/components/error-message";
 import { artifactName } from "@/lib/artifact-name";
+import { VAULT_ERRORS, vaultArtifact } from "@/lib/artifact-vault-api";
 
 /**
  * iframe 에 주는 권한이다. 스크립트 실행 권한은 주지 않는다(ADR-027).
@@ -54,11 +57,49 @@ export function ArtifactPanel({
     () => `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   const name = givenName ?? artifactName(path);
+  const [vault, setVault] = useState<
+    { state: "idle" | "busy" | "done" } | { state: "error"; message: string }
+  >({ state: "idle" });
+
+  /** 이 결과물을 내 보관함에 암호화해 둔다. 대화를 지워도 남고, `/files` 의 「보관한 결과물」 에서 본다. */
+  async function keep() {
+    setVault({ state: "busy" });
+    try {
+      const response = await vaultArtifact(conversationId, path);
+      setVault(
+        response.ok
+          ? { state: "done" }
+          : {
+              state: "error",
+              message: await describeFailure(response, VAULT_ERRORS),
+            },
+      );
+    } catch {
+      setVault({
+        state: "error",
+        message: "보관하지 못했어요. 다시 시도해 주세요.",
+      });
+    }
+  }
   const src = `${artifactUrl(conversationId, path)}?open=${cacheKey}`;
 
   const header = (title: React.ReactNode) => (
     <header className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-3">
       {title}
+      <Button
+        variant="outline"
+        size="sm"
+        data-testid="artifact-vault"
+        disabled={vault.state === "busy" || vault.state === "done"}
+        onClick={() => void keep()}
+      >
+        {vault.state === "done" ? "보관함에 둠" : "보관"}
+      </Button>
+      {vault.state === "error" ? (
+        <span role="alert" className="max-w-48 text-xs text-destructive">
+          {vault.message}
+        </span>
+      ) : null}
       <a
         href={src}
         target="_blank"
