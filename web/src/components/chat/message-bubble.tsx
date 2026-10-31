@@ -326,6 +326,7 @@ export function MessageBubble({
             cancelled={turn.status === "CANCELLED"}
             sourceReads={turn.sourceReads}
             memoryUses={memoryUses}
+            conversationId={conversationId}
             initialExpanded={initialActivityExpanded}
             onOpenPanel={() => onOpenSaved(turn.executionId!)}
           />

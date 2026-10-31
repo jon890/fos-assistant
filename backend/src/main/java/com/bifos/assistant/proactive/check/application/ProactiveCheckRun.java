@@ -96,6 +96,7 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param chat 상한에 닿은 turn 을 멈춘다
      * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
      * @param reactions 최근에 알린 발견의 지금 반응을 읽어 입력에 싣고 「관심 없음」 주제를 되풀이로 내린다
+     * @param wakeMemory 그 에이전트가 받는 기억에서 지난 살펴보기 뒤에 바뀐 항목과 이어진 항목을 꺼내 입력에 싣는다
      */
     record Deps(
         LiveProperties<ProactiveCheckProperties> properties,
@@ -104,6 +105,7 @@ public class ProactiveCheckRun implements CheckTurn {
         ProactiveCheckProblemRepository problems,
         FollowUpService followUps,
         CheckFindingReactions reactions,
+        WakeMemoryRead wakeMemory,
         ChatMessageRepository messages,
         AgentExecutionRepository executions,
         ContextAssembler contextAssembler,

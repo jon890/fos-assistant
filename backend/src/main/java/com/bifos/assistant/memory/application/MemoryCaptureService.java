@@ -108,24 +108,12 @@ public class MemoryCaptureService {
             }
             throw ex;
         }
-        Memory saved = memories.save(
-            direct
-                ? Memory.remembered(
-                    user.id(),
-                    request.title(),
-                    body,
-                    placement,
-                    request.executionId(),
-                    dedupKey,
-                    clock.instant())
-                : Memory.proposed(
-                    user.id(),
-                    request.title(),
-                    body,
-                    placement,
-                    request.executionId(),
-                    dedupKey,
-                    clock.instant()));
+        Memory created = direct
+            ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
+            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
+        // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
+        created.allowArchive(request.archivable());
+        Memory saved = memories.save(created);
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
         record(saved.id(), user, request, kind, direct ? saved.revision() : null);
         if (!direct) {

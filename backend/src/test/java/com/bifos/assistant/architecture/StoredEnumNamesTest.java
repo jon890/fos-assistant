@@ -91,7 +91,9 @@ class StoredEnumNamesTest {
                 "APPROVED",
                 "REJECTED",
                 "EXECUTION_SUCCEEDED",
-                "EXECUTION_FAILED")),
+                "EXECUTION_FAILED",
+                "MARKED_IRRELEVANT",
+                "MARKED_WRONG")),
         Map.entry(
             FeedbackSubjectType.class,
             List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "CHECK_FINDING", "AUTONOMY_DECISION")),

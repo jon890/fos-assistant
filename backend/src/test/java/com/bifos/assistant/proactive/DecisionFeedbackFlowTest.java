@@ -285,6 +285,21 @@ class DecisionFeedbackFlowTest {
 
 
     @Test
+    @DisplayName("참고한 기억 단추 사건만 있는 기억은 replay 읽기 모델에 제안으로 나오지 않는다")
+    void memoryUseMarksAreNotExportedAsProposals() {
+        recorder.record(FeedbackEntry.of(
+            owner.id(), FeedbackSubjectType.MEMORY, 987_654L, FeedbackEventType.MARKED_WRONG, FeedbackActor.USER, Instant.now()));
+        recorder.record(FeedbackEntry.of(
+            owner.id(), FeedbackSubjectType.MEMORY, 987_654L, FeedbackEventType.MARKED_IRRELEVANT, FeedbackActor.USER, Instant.now()));
+
+        assertThat(subjectEvents("memory:987654")).hasSize(2);
+        assertThat(exporter.export(owner, Duration.ofDays(30)).records())
+            .extracting(DecisionRecord::decisionKey)
+            .doesNotContain("memory:987654");
+    }
+
+
+    @Test
     @DisplayName("대화를 지운 뒤 그 대화에서 나온 Memory 제안을 받아들여도 지운 대화에 사건을 남기지 않는다")
     void skipsEventsAfterConversationIsDeleted() {
         Memory proposed = memories.proposeUser(owner, "합성 관심 범위", "합성 분야의 공고만 본다", root.id());
