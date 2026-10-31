@@ -484,7 +484,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 **사용자가 보관한 사본도 이 표의 행이다**([ADR-20261101 / artifact-vault](../../docs/adr/ADR-20261101-artifact-vault.md)). `vault_user_id` 가 채워진 행이고 `message_id` 는 비어 있다.
 
-| 칸 | 뜻 |
+| 컬럼 | 뜻 |
 | --- | --- |
 | `vault_user_id` | 보관 주인(대화 요청자). 비어 있으면 대화 결과물 행이다 |
 | `vault_key_id` | 본문을 암호화한 `user_data_key.id` |

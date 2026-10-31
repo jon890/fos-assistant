@@ -159,7 +159,7 @@ sequenceDiagram
     C-->>W: 풀어 낸 본문(스크립트 없는 머리글, no-store)
 ```
 
-보관본은 `chat_artifact` 의 `vault_user_id` 가 채워진 행이다. 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `chat_artifact` 절이 갖는다.
+보관본은 `chat_artifact` 의 `vault_user_id` 가 채워진 행이다. 컬럼은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `chat_artifact` 절이 갖는다.
 `ArtifactVaultTest` 가 암호문 저장, 남의 보관본 차단, 대화 정리 뒤의 보존, 용량 초과, 중복, 위변조를 확인한다.
 
 이 기능이 아직 하지 않는 것은 아래와 같다.
