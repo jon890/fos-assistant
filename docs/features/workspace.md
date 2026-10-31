@@ -2,7 +2,7 @@
 
 사용자가 에이전트의 실행 공간에 있는 파일을 화면에서 열어 보는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`
+covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`, `backend/src/main/java/com/bifos/assistant/chat/artifact/`, `web/src/components/files/`, `web/src/app/api/artifact-vault/`, `web/src/lib/artifact-vault-api.ts`
 
 ## 목록 페이지
 
@@ -132,3 +132,38 @@ CSV 와 TSV 의 줄 상한과 따옴표 처리는 `web/src/components/workspace/
 | 목록을 연 사이 에이전트가 파일을 바꾼다 | 페이지는 snapshot이 아니다. 지난 정렬 키 앞에 생긴 항목은 다시 읽기로 보이며 이름이나 종류가 바뀐 항목은 다시 보일 수 있다. 화면은 스스로 다시 읽지 않는다 |
 
 지우면 Control Plane 은 INFO 로그 한 줄을 남기고, 도우미는 지운 경로만 감사 기록에 남긴다.
+
+## 보관한 결과물
+
+대화에서 사용자가 고른 HTML·CSS 를 대화와 따로 암호화해 두고, `/files` 의 「보관한 결과물」 탭에서 읽고 지우는 기능이다(#530 PR 1). 결정은 [ADR-20261101 / artifact-vault](../adr/ADR-20261101-artifact-vault.md) 가 갖는다.
+기존 「실행 공간」 은 에이전트 주인의 공간이고 이 탭은 대화 요청자의 보관함이다. 둘은 저장소도 권한도 다르다.
+
+- 대화의 결과물 패널 머리에 「보관」 단추가 있다. 누르면 그 파일을 지금 내용으로 보관한다
+- 보관 주인은 대화 요청자다. 그룹 공개 에이전트를 썼어도 에이전트 주인에게 자동으로 보이지 않는다
+- 대화를 지워도 보관본은 남는다
+- 사용자당 5GiB 를 넘으면 새 보관만 거절하고 이미 보관한 것은 그대로 둔다. 자동 삭제는 없다
+- 본문은 사용자별 데이터 key 로 암호화해 둔다. 암호화를 쓸 수 없으면 평문으로 두지 않고 보관을 거절한다
+- HTML·CSS 만 보관한다. 사진, 스타일, 프레임을 부르는 HTML 은 아직 보관하지 못하고 안내만 보인다(PR 2 가 맡는다)
+- 같은 대화·경로·본문을 다시 보관해도 한 건이다. 파일을 고친 뒤 보관하면 새 보관본이 생긴다
+
+```mermaid
+sequenceDiagram
+    participant W as 화면
+    participant C as Control Plane
+    W->>C: POST /api/v1/artifact-vault 대화와 경로
+    C->>C: 대화 주인 확인, 형식·의존 파일·크기 검사
+    C->>C: 용량 확인, 주인의 key 로 암호화해 chat_artifact 의 보관 사본 행으로 저장
+    C-->>W: 보관한 항목
+    W->>C: GET 목록, 본문, DELETE 항목
+    C->>C: 보관 주인인지 확인. 남의 번호는 없는 번호와 같은 404
+    C-->>W: 풀어 낸 본문(스크립트 없는 머리글, no-store)
+```
+
+보관본은 `chat_artifact` 의 `vault_user_id` 가 채워진 행이다. 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `chat_artifact` 절이 갖는다.
+`ArtifactVaultTest` 가 암호문 저장, 남의 보관본 차단, 대화 정리 뒤의 보존, 용량 초과, 중복, 위변조를 확인한다.
+
+이 기능이 아직 하지 않는 것은 아래와 같다.
+
+- 대화를 지울 때 「보관본도 함께 지우기」 선택지
+- 이미지가 든 결과물 묶음과 독립 이미지(PR 2)
+- turn 이 끝날 때 완성 결과물을 자동 보관(PR 3)
