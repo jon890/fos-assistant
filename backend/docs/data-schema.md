@@ -916,6 +916,7 @@ action을 지우면 실행 내용도 지운다.
 ### task
 
 예약 작업 하나다. 언제 발화하고 어떻게 시작하는지는 [`docs/features/schedule.md`](../../docs/features/schedule.md) 가 갖는다([ADR-076](adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md)).
+일정을 본체에 두고 작업 기준으로 발화하는 근거는 [ADR-20261016 / task-schedule-columns](adr/ADR-20261016-task-schedule-columns.md)가 갖는다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
