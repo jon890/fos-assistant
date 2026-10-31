@@ -46,7 +46,7 @@
 | --- | --- |
 | `chat.conversation` | 대화와 메시지의 저장, 대화 접근 확인, 목록 읽기, 실행 질문, 메모리 사용 표시, 첫 응답 지연 집계 |
 | `chat.delivery` | 위임과 예약이 낸 결과를 대화에 전하는 기록과 재시도 상태 |
-| `chat.modelchoice` | 모델과 effort 선택, 모델 단계, 숨김, 에이전트 기본 모델 |
+| `chat.modelchoice` | 모델과 effort 선택, 모델 단계, 숨김 |
 | `chat.attachment` | 사진 첨부의 저장과 검사, 원본 조회, 첨부 관찰 |
 | `chat.artifact` | 에이전트가 만든 결과물 파일 |
 | `chat.contentdraft` | 원고 초안과 snapshot |
