@@ -165,12 +165,7 @@ class ConnectorActionApproval {
         ConnectorAction finished = transactions.execute(status -> record(actionId, executed, unknownDetail));
         signals.publish(finished);
         if (executed != null && Boolean.FALSE.equals(executed.readOnly())) {
-            // 실행 결과는 이미 기록하고 알렸다. 표시 회수가 실패해도 결과 전달을 막지 않는다. 판정은 다음 연결 확인이 다시 거둔다.
-            try {
-                transactions.executeWithoutResult(status -> dropReadOnly(finished));
-            } catch (RuntimeException ex) {
-                log.warn("승인 실행 뒤 읽기 표시를 거두지 못했다 actionId={} kind={}", actionId, ex.getClass().getSimpleName());
-            }
+            dropReadOnlyClosed(finished);
         }
         return details.view(finished);
     }
@@ -290,6 +285,38 @@ class ConnectorActionApproval {
 
 
     /**
+     * 승인 실행이 읽기 표시를 거둔 도구의 표시와 상시 허락을 거둔다. 실행 결과는 이미 기록하고 알렸으므로 실패해도 결과 전달을 막지 않는다.
+     *
+     * <p>닫히는 쪽으로 두 번 본다. 먼저 사용자 행을 잠그고 표시와 허락을 함께 거둔다. 그것이 실패하면 사용자 행을 잠그지 않는 새
+     * 트랜잭션에서 그 도구의 상시 허락만 거둔다. 판정은 허락과 표시가 함께 있어야 묻지 않고 지나므로, 허락만 거둬도 다음 호출은 승인을
+     * 받는다. 둘 다 실패하면 다음 연결 확인이 거둘 때까지 허락이 남는다. 그 위험은 경고 로그로 남긴다.
+     */
+    private void dropReadOnlyClosed(ConnectorAction finished) {
+        try {
+            transactions.executeWithoutResult(status -> dropReadOnly(finished));
+            return;
+        } catch (RuntimeException ex) {
+            log.warn("승인 실행 뒤 읽기 표시를 거두지 못해 상시 허락만 다시 거둔다 actionId={} kind={}",
+                finished.publicId(), ex.getClass().getSimpleName());
+        }
+        try {
+            transactions.executeWithoutResult(status -> revokeToolGrants(finished, now()));
+        } catch (RuntimeException ex) {
+            log.error("승인 실행 뒤 상시 허락을 거두지 못했다. 다음 연결 확인까지 남는다 actionId={} kind={}",
+                finished.publicId(), ex.getClass().getSimpleName());
+        }
+    }
+
+
+    /** 그 줄의 사용자와 커넥터, 도구의 유효한 상시 허락을 거둔다. 트랜잭션 안에서만 부른다. */
+    private void revokeToolGrants(ConnectorAction action, Instant now) {
+        grants.findActiveByUserIdAndConnectorId(action.userId(), action.connectorId(), now).stream()
+            .filter(grant -> grant.toolName().equals(action.toolName()))
+            .forEach(grant -> grant.revoke(now));
+    }
+
+
+    /**
      * 승인 실행이 받은 표시가 거짓인 도구의 읽기 표시와 상시 허락을 한 트랜잭션에서 거둔다(ADR-20261101 / plugin-without-assistant-json).
      * 트랜잭션 안에서만 부른다.
      *
@@ -303,9 +330,7 @@ class ConnectorActionApproval {
             .filter(connection -> connection.unmarkReadOnly(action.toolName()))
             .ifPresent(connection -> {
                 connections.save(connection);
-                grants.findActiveByUserIdAndConnectorId(action.userId(), action.connectorId(), now).stream()
-                    .filter(grant -> grant.toolName().equals(action.toolName()))
-                    .forEach(grant -> grant.revoke(now));
+                revokeToolGrants(action, now);
             });
     }
 

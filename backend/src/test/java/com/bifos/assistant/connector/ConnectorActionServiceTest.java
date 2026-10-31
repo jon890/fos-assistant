@@ -1498,6 +1498,34 @@ class ConnectorActionServiceTest {
 
 
     @Test
+    @DisplayName("표준 플러그인의 표시 회수가 사용자 잠금에서 실패해도 그 도구의 상시 허락은 따로 거둬 다음 호출이 승인을 받는다")
+    void standardPluginGrantIsRevokedEvenWhenDroppingTheMarkFails() {
+        catalogBecomes(standardManifest());
+        markListedTools(Map.of(STANDARD_READ, true));
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(false));
+        UUID actionId = ask(STANDARD_READ, "{}").actionId();
+        // 승인의 첫 잠금은 지나고, 실행 뒤 표시를 거두는 두 번째 잠금만 실패한다.
+        int[] calls = {0};
+        doAnswer(invocation -> {
+            if (++calls[0] == 2) {
+                throw new IllegalStateException("lock timeout");
+            }
+            jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
+            return users.findById(owner.id());
+        }).when(users).findByIdForUpdate(owner.id());
+
+        assertThat(service.approve(me, actionId, GrantPeriod.HOUR).status()).isEqualTo(ActionStatus.SUCCEEDED);
+
+        // 표시는 남았지만 허락이 없어 판정은 승인으로 돌아간다. 다음 연결 확인이 표시를 바꾼다.
+        assertThat(connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow().readOnlyMarked(STANDARD_READ))
+            .isTrue();
+        assertThat(grants.findAll()).extracting(grant -> grant.revokedAt() != null).containsExactly(true);
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isFalse();
+    }
+
+
+    @Test
     @DisplayName("카탈로그를 읽지 못하면 승인 줄의 grantAllowed 가 거짓이고 기간을 실은 승인은 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
     void grantIsRefusedWhenCatalogIsUnreadable() {
         catalogBecomes(legacyManifest());
