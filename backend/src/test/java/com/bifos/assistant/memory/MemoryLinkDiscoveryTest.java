@@ -194,7 +194,7 @@ class MemoryLinkDiscoveryTest {
     void ignoresVectorsOfOtherModelOrOldText() {
         embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 3층에 세운다", PARKING, "old-model");
         Memory edited = embedded(ADMIN, MemoryScope.USER, "주차 위치", "차는 4층에 세운다", PARKING);
-        memories.update(ADMIN, edited.id(), "차는 지하 1층에 세운다", false);
+        memories.update(ADMIN, edited.id(), "차는 지하 1층에 세운다", false, null);
         Memory fresh = embedded(ADMIN, MemoryScope.USER, "주차 자리", "차는 5층에 세운다", PARKING);
 
         discovery.discover(List.of(fresh.id()));

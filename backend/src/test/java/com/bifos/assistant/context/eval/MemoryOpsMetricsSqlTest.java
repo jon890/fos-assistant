@@ -51,7 +51,8 @@ class MemoryOpsMetricsSqlTest {
         "regenerate_by_memory",
         "context_size",
         "memory_links",
-        "auto_link_revoked");
+        "auto_link_revoked",
+        "maintenance_precision");
 
     /** 이 검사가 넣는 줄의 번호는 여기서 시작한다. 다른 검사가 쓰는 번호와 겹치지 않게 크게 잡는다. */
     private static final long BASE = 880_000_000L;
@@ -85,8 +86,8 @@ class MemoryOpsMetricsSqlTest {
 
 
     @Test
-    @DisplayName("쿼리 파일은 정해진 열한 지표를 갖고 제목과 본문 컬럼을 읽지 않는다")
-    void declaresElevenMetricsWithoutTextColumns() {
+    @DisplayName("쿼리 파일은 정해진 지표를 갖고 제목과 본문 컬럼을 읽지 않는다")
+    void declaresMetricsWithoutTextColumns() {
         String sql = load();
 
         assertThat(queries(sql).keySet()).containsExactlyElementsOf(NAMES);
@@ -141,6 +142,13 @@ class MemoryOpsMetricsSqlTest {
 
         assertThat(delta(before, after, "auto_link_revoked", "", "auto_links")).isEqualTo(3);
         assertThat(delta(before, after, "auto_link_revoked", "", "revoked")).isEqualTo(1);
+
+        // 기간 안에 ARCHIVE 확인이 셋(맞음 둘, 아님 하나), DEDUP 확인이 서른(모두 맞음)이다. 기간 밖과 후보 사건은 세지 않는다
+        assertThat(delta(before, after, "maintenance_precision", "ARCHIVE", "reviewed")).isEqualTo(3);
+        assertThat(delta(before, after, "maintenance_precision", "ARCHIVE", "correct")).isEqualTo(2);
+        assertThat(delta(before, after, "maintenance_precision", "DEDUP", "reviewed")).isEqualTo(30);
+        assertThat(delta(before, after, "maintenance_precision", "DEDUP", "correct")).isEqualTo(30);
+        assertThat(valueOf(after.get("maintenance_precision"), "ARCHIVE", "meets_threshold")).isZero();
     }
 
 
@@ -213,6 +221,44 @@ class MemoryOpsMetricsSqlTest {
         link(BASE + 62, unreadMemory, idleMemory, "RELATED", "AUTO", "REVOKED", in);
         link(BASE + 63, readMemory, unreadMemory, "RELATED", "AGENT", "ACTIVE", in);
         link(BASE + 64, readMemory, correctedMemory, "RELATED", "AUTO", "ACTIVE", out);
+        maintenanceEvents();
+    }
+
+
+    private void maintenanceEvents() {
+        Instant in = Instant.now().minus(Duration.ofDays(1));
+        Instant out = Instant.now().minus(Duration.ofDays(40));
+        Map<String, Object> user = new HashMap<>();
+        user.put("id", BASE + 70);
+        user.put("email", "ops-metrics-" + BASE + "@example.com");
+        user.put("display_name", "ops");
+        user.put("role", "MEMBER");
+        user.put("created_at", at(in));
+        insert("app_user", user);
+        long id = BASE + 71;
+        feedback(id++, "MAINTENANCE_PROPOSED", "ARCHIVE", in);
+        feedback(id++, "MAINTENANCE_CONFIRMED", "ARCHIVE", in);
+        feedback(id++, "MAINTENANCE_CONFIRMED", "ARCHIVE", in);
+        feedback(id++, "MAINTENANCE_DENIED", "ARCHIVE", in);
+        feedback(id++, "MAINTENANCE_CONFIRMED", "ARCHIVE", out);
+        for (int i = 0; i < 30; i++) {
+            feedback(id++, "MAINTENANCE_CONFIRMED", "DEDUP", in);
+        }
+    }
+
+
+    private void feedback(long id, String eventType, String action, Instant occurredAt) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("id", id);
+        row.put("user_id", BASE + 70);
+        row.put("subject_type", "MEMORY");
+        row.put("subject_key", "memory:" + id);
+        row.put("event_type", eventType);
+        row.put("actor", "USER");
+        row.put("reason_code", action);
+        row.put("contract_version", 1);
+        row.put("occurred_at", at(occurredAt));
+        insert("decision_feedback_event", row);
     }
 
 
@@ -416,7 +462,7 @@ class MemoryOpsMetricsSqlTest {
         List<String> keys = new ArrayList<>();
         for (Map.Entry<String, Object> entry : row.entrySet()) {
             String name = entry.getKey().toLowerCase(Locale.ROOT);
-            if (List.of("source", "body_mode", "selector", "link_type", "origin", "status", "with_memory").contains(name)) {
+            if (List.of("source", "body_mode", "selector", "link_type", "origin", "status", "with_memory", "action").contains(name)) {
                 keys.add(String.valueOf(entry.getValue()));
             }
         }

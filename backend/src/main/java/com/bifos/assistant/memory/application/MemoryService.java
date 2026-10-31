@@ -318,7 +318,7 @@ public class MemoryService {
 
 
     /**
-     * 지금 화면의 수정이다. 민감도는 그대로 두고 본문과 항상 실을지만 바꾼다.
+     * 지금 화면의 수정이다. 민감도는 그대로 두고 본문과 항상 실을지만 바꾼다. {@code archivable} 이 null 이 아니면 자동 보관 허락 표시도 정한다.
      *
      * <p>항상 싣지 않게 바꾸면 색인으로 간다. 이미 보관(ARCHIVE)한 항목은 보관한 채로 둔다. 이 화면이 보관을 모르므로
      * 본문만 고친 것이 그 항목을 색인으로 되살리지 않게 한다.
@@ -328,7 +328,7 @@ public class MemoryService {
      * @throws ApiException 민감 항목일 때. MEMORY_SENSITIVE_NOT_EDITABLE
      */
     @Transactional
-    public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject) {
+    public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject, Boolean archivable) {
         Memory memory = requireMemoryForUpdate(user, id);
         if (memory.sensitivity() == MemorySensitivity.SENSITIVE) {
             throw new ApiException(
@@ -337,7 +337,7 @@ public class MemoryService {
         MemoryRetrieval retrieval = alwaysInject
             ? MemoryRetrieval.ALWAYS
             : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
-        return revise(user, memory, content, retrieval, memory.sensitivity());
+        return revise(user, memory, content, retrieval, memory.sensitivity()).withArchivable(archivable);
     }
 
 

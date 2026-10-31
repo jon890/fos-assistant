@@ -113,3 +113,19 @@ ORDER BY link_type, origin, status;
 SELECT COUNT(*) AS auto_links, COALESCE(SUM(CASE WHEN status = 'REVOKED' THEN 1 ELSE 0 END), 0) AS revoked
 FROM memory_link
 WHERE origin = 'AUTO' AND created_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP);
+
+-- name: maintenance_precision
+-- 정비 후보를 사람이 확인한 결과를 동작(reason_code)별로 센다. 확인 사건 하나가 후보 하나다. 그룹 항목도 한 사람이 확인한 사건 하나만 남는다.
+-- 자동 전환 후보의 기준은 확인한 후보 30건 이상, 「맞음」 비율 0.9 이상이다. 설정 assistant.memory.maintenance.min-reviewed, min-precision 의 기본값과 같다.
+-- 사건 종류를 CONCAT 으로 문자열로 바꾸는 까닭은 proposal_outcomes 와 같다.
+SELECT reason_code AS action,
+       COUNT(*) AS reviewed,
+       COALESCE(SUM(CASE WHEN CONCAT(event_type, '') = 'MAINTENANCE_CONFIRMED' THEN 1 ELSE 0 END), 0) AS correct,
+       CASE WHEN COUNT(*) >= 30
+                 AND SUM(CASE WHEN CONCAT(event_type, '') = 'MAINTENANCE_CONFIRMED' THEN 1 ELSE 0 END) >= 0.9 * COUNT(*)
+            THEN 1 ELSE 0 END AS meets_threshold
+FROM decision_feedback_event
+WHERE CONCAT(event_type, '') IN ('MAINTENANCE_CONFIRMED', 'MAINTENANCE_DENIED')
+  AND occurred_at >= TIMESTAMPADD(DAY, -28, CURRENT_TIMESTAMP)
+GROUP BY reason_code
+ORDER BY reason_code;

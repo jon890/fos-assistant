@@ -51,7 +51,7 @@ public class DecisionFeedbackRecorder {
         List<String> subjects = events.findSubjectKeysOfConversation(userId, conversationId);
         int count = events.deleteOfConversation(userId, conversationId);
         if (!subjects.isEmpty()) {
-            count += events.deleteOfSubjects(userId, subjects);
+            count += events.deleteOfSubjectsKeepingMaintenance(userId, subjects);
         }
         return count;
     }

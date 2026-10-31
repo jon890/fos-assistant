@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { fetchMemories } from "@/lib/memory-api";
 import {
   fetchPendingSupersedes,
   type SupersedeProposal,
 } from "@/lib/memory-link-api";
+import {
+  fetchMaintenanceCandidates,
+  type MaintenanceCandidate,
+} from "@/lib/memory-maintenance-api";
 import { MEMORY_MANUAL_CREATE } from "@/lib/memory-features";
 import type { MemorySourceFields } from "@/lib/memory-source";
 import {
@@ -17,9 +20,10 @@ import {
 } from "./memory-filter";
 import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
-import { MemoryProposal } from "./memory-proposal";
-import { MemorySupersedeProposal } from "./memory-supersede-proposal";
+import { MemoryMaintenanceSection } from "./memory-maintenance-section";
+import { MemoryReviewSection } from "./memory-review-section";
 import { MemoryTabs, type MemoryTab } from "./memory-tabs";
+import { useMemoryFocus } from "./use-memory-focus";
 
 export type Memory = MemorySourceFields & {
   id: number;
@@ -29,6 +33,8 @@ export type Memory = MemorySourceFields & {
   /** 민감한 기억은 빈 글이다. */
   content: string;
   alwaysInject: boolean;
+  /** 정비가 자동으로 보관해도 된다고 허락한 기억이다. 서버가 보내지 않으면 허락하지 않은 것으로 본다. */
+  archivable?: boolean;
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
   sensitive?: boolean;
   omittedFromContext?: boolean;
@@ -53,6 +59,8 @@ function byRecent(left: Memory, right: Memory): number {
 export function MemoryList({
   initialMemories,
   initialSupersedes = [],
+  initialCandidates = [],
+  focusMemoryId,
   isAdmin,
   currentUserId,
   readAt,
@@ -61,6 +69,10 @@ export function MemoryList({
   initialMemories: Memory[];
   /** 받아들이거나 거절할 대체 제안이다. 읽지 못했으면 빈 목록이다. */
   initialSupersedes?: SupersedeProposal[];
+  /** 확인할 정비 후보다. 읽지 못했으면 빈 목록이다. */
+  initialCandidates?: MaintenanceCandidate[];
+  /** 주소의 `memory` 값이다. 그 줄을 펼치고 스크롤한다. */
+  focusMemoryId?: number;
   isAdmin: boolean;
   currentUserId?: number;
   /** 서버가 목록을 읽은 시각이다. 서버와 브라우저가 같은 상대 시각을 그리도록 지금 시각 대신 쓴다 */
@@ -70,6 +82,7 @@ export function MemoryList({
 }) {
   const [memories, setMemories] = useState(initialMemories);
   const [supersedes, setSupersedes] = useState(initialSupersedes);
+  const [candidates, setCandidates] = useState(initialCandidates);
   const [tab, setTab] = useState<MemoryTab>("memory");
   const [filter, setFilter] = useState<MemoryFilter>("ALL");
   /** 펼친 줄이다. 한 번에 하나만 펼친다. */
@@ -78,11 +91,15 @@ export function MemoryList({
   const [initialIds] = useState(
     () => new Set(initialMemories.map((memory) => memory.id)),
   );
+  useMemoryFocus(focusMemoryId, { setOpenId, setTab, setFilter });
   async function reload() {
-    const [response, pending] = await Promise.all([
+    const [response, pending, candidateResponse] = await Promise.all([
       fetchMemories(),
       fetchPendingSupersedes().catch(() => null),
+      fetchMaintenanceCandidates().catch(() => null),
     ]);
+    if (candidateResponse?.ok)
+      setCandidates((await candidateResponse.json()) as MaintenanceCandidate[]);
     if (pending?.ok)
       setSupersedes((await pending.json()) as SupersedeProposal[]);
     if (response.ok) {
@@ -112,39 +129,20 @@ export function MemoryList({
       {MEMORY_MANUAL_CREATE ? (
         <MemoryForm isAdmin={isAdmin} onCreated={reload} />
       ) : null}
-      {proposals.length + supersedes.length > 0 ? (
-        <section className="mb-8" aria-labelledby="memory-review-heading">
-          <div className="mb-1 flex items-center gap-2">
-            <h2 id="memory-review-heading" className="text-lg font-semibold">
-              검토할 기억
-            </h2>
-            <Badge variant="info">{proposals.length + supersedes.length}</Badge>
-          </div>
-          <p className="mb-3 text-sm text-muted-foreground">
-            에이전트가 기억해도 될지 물어본 것이에요. 눌러서 내용을 보고
-            받아들이거나 거절해 주세요.
-          </p>
-          <ul className="grid gap-2">
-            {supersedes.map((proposal) => (
-              <MemorySupersedeProposal
-                key={`link-${proposal.id}`}
-                proposal={proposal}
-                onChanged={reload}
-              />
-            ))}
-            {proposals.map((memory) => (
-              <MemoryProposal
-                key={memory.id}
-                memory={memory}
-                open={openId === memory.id}
-                readAt={readAt}
-                onToggle={() => toggle(memory.id)}
-                onChanged={reload}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <MemoryReviewSection
+        proposals={proposals}
+        supersedes={supersedes}
+        openId={openId}
+        readAt={readAt}
+        onToggle={toggle}
+        onChanged={reload}
+      />
+      <MemoryMaintenanceSection
+        candidates={candidates}
+        onReviewed={(id) =>
+          setCandidates((rows) => rows.filter((row) => row.id !== id))
+        }
+      />
       <section aria-labelledby="memory-accepted-heading">
         <h2 id="memory-accepted-heading" className="mb-3 text-lg font-semibold">
           알고 있는 것
