@@ -36,13 +36,12 @@ export function ArtifactVaultStatus({
   conversationId,
   messageId,
   path,
-  state: initialState,
-  error: initialError,
+  state,
+  error,
 }: Props) {
-  const [status, setStatus] = useState<AutoVaultStatus>({
-    state: initialState,
-    error: initialError,
-  });
+  // 다시 보관한 응답만 지역 상태로 둔다. 그 밖에는 이력을 다시 읽어 온 값을 그대로 보인다.
+  const [retried, setRetried] = useState<AutoVaultStatus | null>(null);
+  const status = retried ?? { state, error };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -55,7 +54,7 @@ export function ArtifactVaultStatus({
         setMessage(await describeFailure(response, VAULT_ERRORS));
         return;
       }
-      setStatus((await response.json()) as AutoVaultStatus);
+      setRetried((await response.json()) as AutoVaultStatus);
     } catch {
       setMessage("보관하지 못했어요. 다시 시도해 주세요.");
     } finally {
