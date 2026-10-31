@@ -34,7 +34,8 @@ test("답 아래 결과물을 누르면 스크립트가 막힌 iframe 에 사진
     Object.defineProperty(window.crypto, "randomUUID", { value: undefined });
   });
   const rows = await sendProbe(page);
-  await expect(rows.first()).toHaveText("초안");
+  // 자동 보관을 켠 다른 테스트와 겹치면 줄 끝에 보관 상태가 붙으므로 이름 단추만 본다.
+  await expect(rows.first().getByRole("button")).toHaveText("초안");
 
   await rows.first().getByRole("button").click();
   const panel = page.getByTestId("artifact-panel");
@@ -148,5 +149,35 @@ test("폴더 이름이 같은 결과물은 답 아래 줄과 패널 머리가 �
     await expect(panel.getByRole("heading")).toHaveText(name);
     await panel.getByRole("button", { name: "결과물 닫기" }).click();
     await expect(panel).toHaveCount(0);
+  }
+});
+
+test("자동 보관을 켜면 답이 끝날 때 결과물 옆에 보관 완료가 보이고 보관함에 들어간다", async ({ page }) => {
+  await page.goto("/files?tab=vault");
+  const toggle = page.getByRole("switch", { name: "결과물 자동 보관" });
+  await expect(toggle).toHaveAttribute("aria-checked", /true|false/);
+  try {
+    if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    await sendProbe(page);
+    const conversationUrl = page.url();
+    // 보관은 답이 끝난 뒤 요청 밖에서 돈다. 다시 읽으면 끝난 상태가 보인다.
+    await expect(async () => {
+      await page.goto(conversationUrl);
+      const status = page
+        .getByTestId("assistant-message")
+        .last()
+        .getByTestId("message-artifact")
+        .first()
+        .getByTestId("artifact-auto-vault");
+      await expect(status).toHaveText("보관 완료", { timeout: 2_000 });
+    }).toPass({ timeout: 30_000 });
+
+    await page.goto("/files?tab=vault");
+    await expect(page.getByTestId("vault-item").first()).toBeVisible();
+  } finally {
+    // 기본값으로 되돌려 다른 테스트가 보관 상태를 보지 않게 한다.
+    await page.request.put("/api/artifact-vault/auto", { data: { enabled: false } });
   }
 });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { auth } from "@/auth";
+import { AutoVaultSetting } from "@/components/files/auto-vault-setting";
 import { VaultListView } from "@/components/files/vault-list";
 import { WorkspaceExplorer } from "@/components/workspace/workspace-explorer";
 
@@ -43,7 +44,10 @@ export default async function FilesPage({
         </Link>
       </nav>
       {vault ? (
-        <VaultListView />
+        <div className="space-y-3">
+          <AutoVaultSetting />
+          <VaultListView />
+        </div>
       ) : (
         // 주소의 `path`, `file` 을 useSearchParams 로 읽으므로 Suspense 로 감싼다.
         <Suspense

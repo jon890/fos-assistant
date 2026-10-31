@@ -254,6 +254,9 @@ assistant:
       connect-timeout: 5s
       read-timeout: 10s
       total-timeout: 30s
+  artifact-vault:
+    # 자동 보관을 기다리는 결과물을 다시 훑는 간격. 재시작 뒤와 일시 장애 뒤에 이어서 보관한다
+    auto-retry-delay: 60s
   skill:
     # 에이전트에 올린 스킬을 profile 별 버전 디렉터리로 두는 공유 디렉터리. Control Plane 이 쓰고 Hermes 는
     # 읽기 전용으로 본다. 기본값을 두지 않아 없으면 기동에 실패한다
