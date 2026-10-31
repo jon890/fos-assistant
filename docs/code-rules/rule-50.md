@@ -21,3 +21,8 @@ Lob 문자열의 길이는 columnDefinition으로 정한다.
 MysqlMigrationTest가 Flyway 스키마와 엔티티를 실제 MySQL에서 대조한다.
 
 책임과 실행 절차는 [data-schema.md](../../backend/docs/data-schema.md)에서 이어 읽는다.
+
+## 리뷰가 보는 것
+
+도구는 스키마와 엔티티의 일치, 적용 파일의 불변, 버전 형식을 확인한다.
+리뷰는 기존 행에 새 칸이 NOT NULL 로 들어가 운영 기동이 실패하지 않는지, H2 에만 있는 함수에 기대지 않는지, DDL 과 DML 분리가 data-schema 와 맞는지 본다.

@@ -10,6 +10,15 @@
 새 규칙은 문서와 검사를 같은 PR에 넣고, 리뷰 전용 조건이면 그 한계를 밝힌다.
 목록 자체는 `test/unit/rule-index.test.ts`가 파일, 번호, 문장, 검사 연결과 코드의 역참조를 확인한다.
 
+## 채택 기준
+
+- 규칙은 코드가 갖출 상태로 쓴다. 하지 말아야 할 행동의 나열로 쓰지 않는다.
+- 겪은 것만 올린다. 일어날 법한 일을 미리 규칙으로 만들지 않는다.
+- 검사 방법을 적을 수 없으면 규칙으로 만들지 않는다.
+- 검사를 고치면 일부러 위반을 만들어 잡히는지 본다.
+
+검사 칸에 도구와 `리뷰`가 함께 있는 규칙 파일은 `## 리뷰가 보는 것` 절에 도구가 보지 못하는 부분만 적는다.
+
 | 번호 | 규칙 한 문장 | 검사 |
 | --- | --- | --- |
 | [rule-1](rule-1.md) | auditing은 허용된 필드와 기존 Clock provider만 쓴다. | [AUDITING_LISTENERS_AND_CLOCK](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |

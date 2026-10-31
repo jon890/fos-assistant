@@ -19,3 +19,8 @@
 
 [check-public-safe.sh](../../scripts/checks/check-public-safe.sh)에서 확인한다.
 check-public-safe.sh가 push 전 공개 정보 검사의 진입점이다.
+
+## 리뷰가 보는 것
+
+공개 정보 검사는 추적 파일의 지금 내용만 본다.
+리뷰는 커밋 메시지와 앞 커밋에 넣었다 지운 값, 값 목록에 없는 새 종류의 운영 정보, 홈서버에서 무언가를 돌리는 명령이 문서에 들어갔는지 본다.

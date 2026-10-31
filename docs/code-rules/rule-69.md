@@ -16,3 +16,8 @@
 
 [composer-send-flow.spec.ts](../../test/browser/composer-send-flow.spec.ts)에서 확인한다.
 composer-send-flow spec은 메시지 전송 중 입력과 첨부 상태의 흐름을 확인한다.
+
+## 리뷰가 보는 것
+
+브라우저 테스트는 전송 흐름의 입력 상태만 확인한다.
+리뷰는 새 갱신이 부모 교체로 입력창을 unmount 해 첨부를 지우지 않는지, 요소가 늦게 생겨 레이아웃이 밀리지 않는지 본다.
