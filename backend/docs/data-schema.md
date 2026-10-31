@@ -909,6 +909,8 @@ action을 지우면 실행 내용도 지운다.
 | `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
 | `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
 
+옛 발견과 문제 후보를 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>`(예: `legacy:proactive_check_finding:<번호>`)이고, 옛 분류 원문은 `detail_json` 의 `legacy` 필드에 있다. 옮기는 방법과 반응 사건의 열쇠 이관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「옛 발견과 문제 후보 옮기기」 가 갖는다. 이 작업은 마이그레이션이 아니라 기동 뒤 한 번 도는 backfill 이라 칸을 더하지 않는다.
+
 **`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
 같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
 
