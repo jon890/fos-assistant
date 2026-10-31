@@ -2,6 +2,7 @@ package com.bifos.assistant.hermes.infra;
 
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.AccessLevel;
@@ -10,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * 대시보드 plugin 의 {@code POST /api/connectors/<id>/tools} 를 부르고 응답을 읽는다(ADR-20261101 / plugin-without-assistant-json).
@@ -18,11 +21,19 @@ import tools.jackson.databind.JsonNode;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class HttpHermesConnectorToolList {
-    /** 받는 도구 수의 상한이다. 넘는 서버는 확인하지 못한 것으로 둔다. 저장 칸({@code listed_tools})의 크기가 이 상한에 맞춰져 있다. */
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+
+    /** 받는 도구 수의 상한이다. 넘는 서버는 확인하지 못한 것으로 둔다. */
     static final int MAX_TOOLS = 256;
 
-    /** 도구 이름 길이의 상한이다. 승인 줄의 {@code tool_name} 칸과 같다. */
+    /** 도구 이름 길이의 상한이다. 승인 줄의 {@code tool_name} 컬럼과 같다. */
     static final int MAX_NAME_LENGTH = 128;
+
+    /**
+     * 받은 목록을 저장할 때의 JSON UTF-8 바이트 상한이다. {@code listed_tools} 의 {@code TEXT}(65,535바이트)보다 작게 둔다. 이름 길이는
+     * 글자 수로 재므로 비ASCII 이름이 많으면 도구 수와 길이 상한 안에서도 넘칠 수 있어 따로 본다.
+     */
+    static final int MAX_STORED_BYTES = 60_000;
 
 
     static ConnectorToolListing post(
@@ -69,6 +80,17 @@ final class HttpHermesConnectorToolList {
                 throw new IllegalStateException();
             }
         }
+        if (storedBytes(listed) > MAX_STORED_BYTES) {
+            throw new IllegalStateException();
+        }
         return ConnectorToolListing.success(listed);
+    }
+
+
+    /** {@code ListedToolsConverter} 가 저장할 JSON 객체와 같은 모양의 UTF-8 바이트 수다. */
+    private static int storedBytes(Map<String, Boolean> listed) {
+        ObjectNode root = MAPPER.createObjectNode();
+        listed.forEach(root::put);
+        return MAPPER.writeValueAsString(root).getBytes(StandardCharsets.UTF_8).length;
     }
 }

@@ -163,10 +163,15 @@ class ConnectorActionApproval {
         CallResult executed = result;
         ConnectorUnknownDetail unknownDetail = unknown;
         ConnectorAction finished = transactions.execute(status -> record(actionId, executed, unknownDetail));
-        if (executed != null && Boolean.FALSE.equals(executed.readOnly())) {
-            transactions.executeWithoutResult(status -> dropReadOnly(finished));
-        }
         signals.publish(finished);
+        if (executed != null && Boolean.FALSE.equals(executed.readOnly())) {
+            // 실행 결과는 이미 기록하고 알렸다. 표시 회수가 실패해도 결과 전달을 막지 않는다. 판정은 다음 연결 확인이 다시 거둔다.
+            try {
+                transactions.executeWithoutResult(status -> dropReadOnly(finished));
+            } catch (RuntimeException ex) {
+                log.warn("승인 실행 뒤 읽기 표시를 거두지 못했다 actionId={} kind={}", actionId, ex.getClass().getSimpleName());
+            }
+        }
         return details.view(finished);
     }
 

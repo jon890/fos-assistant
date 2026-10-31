@@ -179,6 +179,25 @@ class StandardPluginPolicyTest {
 
 
     @Test
+    @DisplayName("도구 수와 이름 길이 상한 안이어도 저장할 JSON 이 컬럼 크기를 넘는 목록은 틀린 응답으로 다룬다")
+    void toolListingThatOverflowsTheColumnIsRejected() {
+        StringBuilder tools = new StringBuilder();
+        for (int index = 0; index < 256; index++) {
+            // 한 글자가 UTF-8 3바이트인 120자 이름이다. 글자 수 상한은 지나지만 합치면 60,000바이트를 넘는다.
+            tools.append(index == 0 ? "" : ",")
+                .append("{\"name\":\"").append(String.format("%03d", index)).append("가".repeat(117))
+                .append("\",\"read_only\":false}");
+        }
+        server.expect(requestTo(BASE + "/api/connectors/standard-notes/tools"))
+            .andRespond(withSuccess("{\"ok\":true,\"tools\":[" + tools + "]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.listToolsWithVault("standard-notes", "c1"))
+            .isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+
+    @Test
     @DisplayName("schema 3 이 아닌 항목에서 확인 도구가 빠지면 지금처럼 카탈로그 읽기가 실패한다")
     void verifyToolIsStillRequiredForDeclaredSchemas() {
         server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
