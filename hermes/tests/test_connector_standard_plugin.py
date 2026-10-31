@@ -151,6 +151,121 @@ class StandardPluginCatalogTest(StandardPluginCase):
         self.assertEqual(self.standard_catalog()[LOCAL]["fields"], [])
 
 
+class PortablePluginCatalogTest(StandardPluginCase):
+    """OpenAI 이식형 묶음도 기존 카탈로그·원격 검증을 거친다."""
+
+    def setUp(self):
+        super().setUp()
+        self.portable_root = self.base / "portable-plugin"
+        shutil.copytree(FIXTURES / "portable-plugin", self.portable_root)
+        self.operator_list({"portable-notes": {"root": str(self.portable_root), "url": OPERATOR_URL}})
+
+    def write_server(self, server):
+        (self.portable_root / "mcp.json").write_text(json.dumps({"mcpServers": {"portable-notes": server}}),
+                                                      encoding="utf-8")
+
+    def server(self):
+        return json.loads((FIXTURES / "portable-plugin/mcp.json").read_text())["mcpServers"]["portable-notes"]
+
+    def test_portable_bundle_infers_bearer_and_ignores_ui_and_hooks(self):
+        entry = self.standard_catalog()["portable-notes"]
+        self.assertEqual((entry["schema"], entry["skills"], entry["verify"], entry["tools"]),
+                         (3, ["portable-notes"], None, {}))
+        self.assertEqual(entry["fields"], [{"key": "portable_notes_api_key", "env": "PORTABLE_NOTES_API_KEY",
+                                          "label": "PORTABLE_NOTES_API_KEY", "secret": True, "required": True}])
+        manifest = self.plugin._connector_manifest("portable-notes")
+        self.assertEqual(manifest["transport"], "http")
+        self.assertEqual(manifest["server"], {"url": OPERATOR_URL,
+                         "headers": {"Authorization": "Bearer ${PORTABLE_NOTES_API_KEY}"},
+                         "strict_redirect_headers": True, "enabled": True})
+        self.assertNotIn("unused", json.dumps(entry))
+        self.assertNotIn("plugin-file.invalid", json.dumps(manifest["server"]))
+        self.assertEqual(self.catalog(), [])
+
+    def test_custom_header_and_no_auth(self):
+        for auth, headers in (({"type": "api_key", "headerScheme": "custom_header", "headerName": "X-Api-Key"},
+                               {"X-Api-Key": "${PORTABLE_NOTES_API_KEY}"}), ({"type": "none"}, {}), (None, {})):
+            with self.subTest(auth=auth):
+                server = self.server()
+                server["extensions"] = {"com.openai": {"auth": auth}} if auth else {}
+                self.write_server(server)
+                manifest = self.plugin._connector_manifest("portable-notes")
+                self.assertEqual(manifest["server"]["headers"], headers)
+                self.assertEqual(len(self.standard_catalog()["portable-notes"]["fields"]), len(headers))
+
+    def test_unsupported_or_malformed_auth_is_left_out(self):
+        for auth in ({"type": "oauth"}, {"type": "mixed"}, {"type": "api_key", "headerScheme": "basic"},
+                     {"type": "api_key", "headerScheme": "unknown"}, {"type": "api_key"},
+                     {"type": "api_key", "headerScheme": "custom_header"},
+                     {"type": "api_key", "headerScheme": "custom_header", "headerName": "Host"},
+                     {"type": "api_key", "headerScheme": "custom_header", "headerName": "bad\r\nheader"},
+                     {"type": "api_key", "headerScheme": "bearer", "headerName": "X-Api-Key"},
+                     {"type": "none", "clientSecret": "not-a-credential"}, None, [], "none"):
+            with self.subTest(auth=auth):
+                server = self.server()
+                server["extensions"]["com.openai"]["auth"] = auth
+                self.write_server(server)
+                self.assertEqual(self.standard_catalog(), {})
+
+    def test_duplicate_auth_header_and_global_env_are_left_out(self):
+        server = self.server()
+        server["headers"] = {"authorization": "Bearer ${OTHER_TOKEN}"}
+        self.write_server(server)
+        self.assertEqual(self.standard_catalog(), {})
+        server = self.server()
+        (self.portable_root / "mcp.json").write_text(json.dumps({"mcpServers": {"HERMES_TOKEN": server}}))
+        self.assertEqual(self.standard_catalog(), {})
+
+    def test_two_mcp_files_are_left_out_even_with_explicit_path(self):
+        shutil.copyfile(self.portable_root / "mcp.json", self.portable_root / ".mcp.json")
+        self.assertEqual(self.standard_catalog(), {})
+        manifest = self.portable_root / "plugin.json"
+        manifest.write_text(json.dumps({"name": "portable-notes", "mcpServers": "./mcp.json"}))
+        self.assertEqual(self.standard_catalog(), {})
+
+    def test_assistant_declaration_uses_normalized_auth_without_inference(self):
+        declared = {"schema": 2, "id": "portable-notes", "title": "선언한 제목",
+                    "fields": [{"key": "token", "env": "PORTABLE_NOTES_API_KEY", "label": "토큰", "secret": True}],
+                    "verify": {"tool": "list_notes"}, "tools": {"list_notes": {"risk": "READ"}}}
+        (self.portable_root / "assistant.json").write_text(json.dumps(declared), encoding="utf-8")
+        entry = self.standard_catalog()["portable-notes"]
+        self.assertEqual((entry["schema"], entry["title"], entry["fields"][0]["key"]), (2, "선언한 제목", "token"))
+        server = self.server()
+        server["extensions"]["com.openai"]["auth"] = {"type": "oauth"}
+        self.write_server(server)
+        self.assertEqual(self.standard_catalog(), {})
+
+    def test_malformed_extensions_and_linked_files_are_left_out(self):
+        for extensions in (None, [], {"com.openai": []}):
+            with self.subTest(extensions=extensions):
+                server = self.server()
+                server["extensions"] = extensions
+                self.write_server(server)
+                self.assertEqual(self.standard_catalog(), {})
+        for filename in ("mcp.json", "plugin.json"):
+            with self.subTest(filename=filename):
+                target = self.portable_root / filename
+                original = (FIXTURES / "portable-plugin" / filename).read_text()
+                outside = self.base / (filename + ".outside")
+                outside.write_text(original)
+                target.unlink()
+                target.symlink_to(outside)
+                self.assertEqual(self.standard_catalog(), {})
+                target.unlink()
+                target.write_text(original)
+
+    def test_manifest_names_and_precedence(self):
+        for dirname in (".codex-plugin", ".claude-plugin"):
+            folder = self.portable_root / dirname
+            folder.mkdir()
+            manifest = folder / "plugin.json"
+            manifest.write_text(json.dumps({"name": "other"}))
+            self.assertEqual(self.standard_catalog(), {})
+            manifest.write_text(json.dumps({"name": "portable-notes", "displayName": dirname}))
+            expected = "portable-notes" if dirname == ".codex-plugin" else dirname
+            self.assertEqual(self.standard_catalog()["portable-notes"]["title"], expected)
+
+
 class StandardPluginToolListTest(StandardPluginCase):
     """`POST /api/connectors/<id>/tools` 는 `tools/list` 만 받아 도구 이름과 읽기 표시를 낸다."""
 

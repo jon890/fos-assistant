@@ -440,6 +440,7 @@ Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 �
 **`assistant.json` 이 없는 표준 플러그인도 카탈로그에 `schema: 3` 으로 오른다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
 입력 칸은 MCP 정의의 env 와 헤더 참조에서 추론하고, 확인 도구(`verify`)는 null 이고 `tools` 는 비어 있다.
 Claude Code, Codex, ChatGPT 플러그인 형식의 비교와 받지 않는 것은 그 ADR 이 갖는다.
+ChatGPT 이식형 묶음의 root `plugin.json`, `mcp.json`, `skills/` 도 읽는다. `streamable-http` 는 기존 원격 전송으로 바꾸고 `auth.api_key` 의 bearer·custom header 는 입력 칸으로 만든다. 파일의 주소 대신 운영 목록의 `url` 만 쓰며, 지원하지 않는 인증이나 manifest 이름 불일치, MCP 정의 파일 중복은 항목 전체를 카탈로그에서 뺀다.
 
 - 카탈로그는 `GET /api/connectors/catalog?include=standard` 로 청할 때만 `schema: 3` 항목을 싣는다. Control Plane 은 늘 이 query 를 붙인다. 이 query 를 모르는 옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하기 때문이다
 - Control Plane 은 `schema: 3` 이면 확인 도구와 `tools` 가 비어 있고 선택지 칸이 없을 때만 읽을 수 있는 커넥터로 다룬다
