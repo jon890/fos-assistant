@@ -134,7 +134,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 if (again.isPresent()) {
                     return requestView(snapshot, again.get());
                 }
-                // 앞 저장의 결과가 UNKNOWN 으로 남은 원고는 새 snapshot 을 저장하지 않는다. 네이버에 글이 이미 생겼을 수 있다.
+                // 앞 저장의 결과가 UNKNOWN 으로 남은 원고는 새 snapshot 을 저장하지 않는다. 외부 서비스에 글이 이미 생겼을 수 있다.
                 var revision = revisions.findById(snapshot.revisionId()).orElseThrow(ContentDraftJobs::notFound);
                 if (jobs.existsUnknownForOtherSnapshot(user.id(), conversationId, snapshot.connectionId(), revision.draftId(), snapshot.id())) {
                     throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN, null);

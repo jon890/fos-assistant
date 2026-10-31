@@ -35,7 +35,7 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
 
     /**
      * 같은 사용자·대화·원고·연결에서 저장 결과가 UNKNOWN 으로 남은 다른 snapshot 의 job 이 있는지 본다.
-     * UNKNOWN 이면 네이버에 임시저장 글이 이미 생겼을 수 있어 새 snapshot 저장을 막는 근거가 된다.
+     * UNKNOWN 이면 외부 서비스에 임시저장 글이 이미 생겼을 수 있어 새 snapshot 저장을 막는 근거가 된다.
      */
     @Query("""
         select count(j) > 0 from ContentDraftJob j, ContentDraftSnapshot s, ContentDraftRevision r
