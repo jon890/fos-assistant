@@ -42,11 +42,17 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
         where j.snapshotId = s.id and s.revisionId = r.id
           and j.ownerUserId = :ownerId and j.conversationId = :conversationId
           and s.connectionId = :connectionId and r.draftId = :draftId
-          and j.status = com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus.UNKNOWN
+          and j.status = :unknown
           and j.snapshotId <> :snapshotRowId
         """)
-    boolean existsUnknownForOtherSnapshot(@Param("ownerId") Long ownerId, @Param("conversationId") Long conversationId,
-        @Param("connectionId") Long connectionId, @Param("draftId") Long draftId, @Param("snapshotRowId") Long snapshotRowId);
+    boolean existsByStatusForOtherSnapshot(@Param("ownerId") Long ownerId, @Param("conversationId") Long conversationId,
+        @Param("connectionId") Long connectionId, @Param("draftId") Long draftId, @Param("snapshotRowId") Long snapshotRowId,
+        @Param("unknown") ContentDraftJobStatus unknown);
+
+
+    default boolean existsUnknownForOtherSnapshot(Long ownerId, Long conversationId, Long connectionId, Long draftId, Long snapshotRowId) {
+        return existsByStatusForOtherSnapshot(ownerId, conversationId, connectionId, draftId, snapshotRowId, ContentDraftJobStatus.UNKNOWN);
+    }
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
