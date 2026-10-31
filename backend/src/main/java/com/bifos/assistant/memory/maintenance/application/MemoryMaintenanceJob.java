@@ -2,6 +2,7 @@ package com.bifos.assistant.memory.maintenance.application;
 
 import com.bifos.assistant.feedback.application.MaintenanceEventLog;
 import com.bifos.assistant.feedback.domain.MaintenanceDetail;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.memory.maintenance.application.MemoryMaintenanceRules.Proposal;
 import com.bifos.assistant.memory.config.MemoryMaintenanceProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
@@ -17,9 +18,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -69,9 +73,12 @@ public class MemoryMaintenanceJob {
         created.put(MemoryMaintenanceRules.ARCHIVE, 0);
         created.put(MemoryMaintenanceRules.DEDUP, 0);
         Map<Long, List<Long>> adminsByGroup = new LinkedHashMap<>();
+        Map<Long, Set<String>> openByUser = new HashMap<>();
         for (Proposal proposal : proposals) {
-            for (Long recipient : recipientsOf(proposal.memory(), adminsByGroup)) {
-                if (events.alreadyProposed(recipient, proposal.memory().id(), proposal.action(), proposal.memory().revision())) {
+            List<Long> recipients = recipientsOf(proposal.memory(), adminsByGroup);
+            for (Long recipient : recipients) {
+                if (events.alreadyProposed(recipient, proposal.memory().id(), proposal.action(), proposal.memory().revision())
+                    || isOpen(openByUser, recipient, recipients, proposal)) {
                     continue;
                 }
                 events.propose(
@@ -90,6 +97,20 @@ public class MemoryMaintenanceJob {
             created.get(MemoryMaintenanceRules.ARCHIVE),
             created.get(MemoryMaintenanceRules.DEDUP));
         return created;
+    }
+
+
+    /**
+     * 같은 항목과 동작의 후보가 이미 열려 있는가. 열린 채로 항목을 고쳐 revision 이 올라도 같은 후보를 한 줄 더 만들지 않는다. 사용자마다 한 번만
+     * 읽는다.
+     */
+    private boolean isOpen(Map<Long, Set<String>> openByUser, Long recipient, List<Long> peers, Proposal proposal) {
+        Set<String> open = openByUser.computeIfAbsent(
+            recipient,
+            userId -> events.openCandidates(userId, peers).stream()
+                .map(event -> event.subjectKey() + "|" + event.reasonCode())
+                .collect(Collectors.toSet()));
+        return open.contains(FeedbackSubjectType.MEMORY.key(proposal.memory().id()) + "|" + proposal.action());
     }
 
 

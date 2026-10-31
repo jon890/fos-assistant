@@ -440,8 +440,8 @@ sequenceDiagram
 - `detail` 은 후보 사건이면 규칙 버전(`ruleVersion`), 모드(`mode`, 제안 모드는 `PROPOSE`), 그때의 신호 값(`evidence`)이고, 확인 사건이면 확인한 후보 사건의 번호(`candidateId`)다. 신호 값의 이름은 규칙이 정해 규칙이 바뀌어도 스키마는 그대로다
 - 반응 읽기(`FeedbackLabeler`)와 replay 읽기 모델(`DecisionFeedbackExporter`)은 정비 사건을 싣지 않는다(`FeedbackEventType.marksMemoryUse`). 단계 4 가 `MAINTENANCE_APPLIED`, `MAINTENANCE_REVERTED` 를 더한다
 - 개인 항목의 후보는 주인에게, 그룹 항목의 후보는 그 그룹의 `ADMIN` 마다 하나씩 남긴다. 사건이 사용자의 것이라 `user_id` 가 비지 않게 하려는 배치다. 한 사람이 확인하면 같은 열쇠와 동작의 다른 관리자 후보도 닫힌 것으로 본다
-- 열린 후보는 같은 열쇠와 동작의 `MAINTENANCE_PROPOSED` 뒤에 확인 사건이 없는 것이다. 같은 항목, 같은 동작, 같은 revision 번호의 후보가 열려 있거나 이미 확인됐으면 다음 실행이 새 후보를 만들지 않는다. 항목을 고쳐 revision 번호가 오르면 다시 후보가 될 수 있다
-- 사건은 마지막 사건 뒤 365일이 지나면 보관 기간 정리가 지운다
+- 열린 후보는 같은 열쇠와 동작의 `MAINTENANCE_PROPOSED` 뒤에 확인 사건이 없는 것이다. 같은 항목과 동작의 후보가 열려 있으면 항목을 고쳐 revision 번호가 올라도 새 후보를 만들지 않는다. 이미 확인한 후보는 같은 revision 번호로 다시 열리지 않고, 항목을 고쳐 revision 번호가 오르면 다시 후보가 될 수 있다. 두 관리자가 같은 후보를 동시에 확인해도 항목을 잠가 확인 사건이 하나만 남는다
+- 사건은 마지막 사건 뒤 365일이 지나면 보관 기간 정리가 지운다. 기억을 제안한 대화를 지울 때는 같은 열쇠의 정비 사건을 남긴다. 지우면 확인한 후보가 다시 열리고 정밀도 표본이 사라진다
 
 ### 규칙
 

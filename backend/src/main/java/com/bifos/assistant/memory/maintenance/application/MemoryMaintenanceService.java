@@ -76,15 +76,22 @@ public class MemoryMaintenanceService {
      */
     @Transactional
     public void review(CurrentUser user, Long candidateId, MaintenanceReview review) {
-        FeedbackEvent candidate = events.openCandidates(user.id(), peersOf(user)).stream()
-            .filter(event -> event.id().equals(candidateId))
-            .findFirst()
-            .orElseThrow(MemoryMaintenanceService::notFound);
-        Memory memory = memories.findById(MaintenanceEventLog.memoryIdOf(candidate)).orElse(null);
+        FeedbackEvent seen = openCandidate(user, candidateId);
+        // 같은 그룹 후보를 두 관리자가 동시에 확인해도 확인 사건이 하나만 남게, 항목을 잠근 뒤 다시 읽는다
+        Memory memory = memories.findByIdForUpdate(MaintenanceEventLog.memoryIdOf(seen)).orElse(null);
+        FeedbackEvent candidate = openCandidate(user, candidateId);
         if (!editable(user, memory)) {
             throw notFound();
         }
         events.review(user.id(), candidate, review == MaintenanceReview.CORRECT, clock.instant());
+    }
+
+
+    private FeedbackEvent openCandidate(CurrentUser user, Long candidateId) {
+        return events.openCandidates(user.id(), peersOf(user)).stream()
+            .filter(event -> event.id().equals(candidateId))
+            .findFirst()
+            .orElseThrow(MemoryMaintenanceService::notFound);
     }
 
 

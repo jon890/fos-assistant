@@ -42,6 +42,19 @@ public interface FeedbackEventRepository extends JpaRepository<FeedbackEvent, Lo
     int deleteOfConversation(@Param("userId") Long userId, @Param("conversationId") Long conversationId);
 
 
+    /**
+     * 대화를 지울 때 그 대화의 제안과 같은 열쇠의 다른 사건을 지우되 정비 사건은 남긴다. 정비 사건은 대화에 묶이지 않은 규칙의 기록이라,
+     * 지우면 확인한 후보가 같은 revision 으로 다시 열리고 정밀도 표본이 사라진다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from FeedbackEvent e where e.userId = :userId and e.subjectKey in :subjectKeys"
+        + " and e.eventType not in (com.bifos.assistant.feedback.domain.type.FeedbackEventType.MAINTENANCE_PROPOSED,"
+        + " com.bifos.assistant.feedback.domain.type.FeedbackEventType.MAINTENANCE_CONFIRMED,"
+        + " com.bifos.assistant.feedback.domain.type.FeedbackEventType.MAINTENANCE_DENIED)")
+    int deleteOfSubjectsKeepingMaintenance(
+        @Param("userId") Long userId, @Param("subjectKeys") Collection<String> subjectKeys);
+
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from FeedbackEvent e where e.userId = :userId and e.subjectKey in :subjectKeys")
     int deleteOfSubjects(@Param("userId") Long userId, @Param("subjectKeys") Collection<String> subjectKeys);

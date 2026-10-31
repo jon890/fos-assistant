@@ -270,6 +270,46 @@ class MemoryMaintenanceTest {
 
 
     @Test
+    @DisplayName("열린 채로 항목을 고쳐 revision 이 올라도 같은 항목과 동작의 후보를 한 줄 더 만들지 않는다")
+    void editedMemoryDoesNotGetSecondOpenCandidate() {
+        Memory stale = oldMemory(dad, "정비 테스트 고침", "오래된 상태", 100);
+        marked(dad, stale, FeedbackEventType.MARKED_WRONG);
+        job.run(now);
+
+        memoryService.update(dad, stale.id(), "고친 글", false, true);
+        job.run(now.plusSeconds(60));
+
+        assertThat(proposedOf(dad, stale)).hasSize(1);
+        assertThat(maintenance.candidatesFor(dad)).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("기억을 제안한 대화를 지워도 같은 열쇠의 정비 사건은 남는다")
+    void forgettingConversationKeepsMaintenanceEvents() {
+        Memory stale = oldMemory(dad, "정비 테스트 대화 삭제", "오래된 상태", 100);
+        marked(dad, stale, FeedbackEventType.MARKED_WRONG);
+        job.run(now);
+        maintenance.review(dad, maintenance.candidatesFor(dad).get(0).id(), MaintenanceReview.INCORRECT);
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "정비 테스트 제안 대화", null, Instant.now()));
+        recorder.record(FeedbackEntry.of(
+            dad.id(), FeedbackSubjectType.MEMORY, stale.id(), FeedbackEventType.ACCEPTED, FeedbackActor.USER, now)
+            .conversation(conversation.id()));
+
+        recorder.forgetConversation(dad.id(), conversation.id());
+
+        assertThat(events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(dad.id(), List.of("memory:" + stale.id())))
+            .extracting(FeedbackEvent::eventType)
+            .as("제안 사건은 지우고 정비 사건은 남긴다")
+            .contains(FeedbackEventType.MAINTENANCE_PROPOSED, FeedbackEventType.MAINTENANCE_DENIED)
+            .doesNotContain(FeedbackEventType.ACCEPTED);
+        job.run(now.plusSeconds(60));
+        assertThat(maintenance.candidatesFor(dad)).as("아님 으로 닫은 후보가 다시 열리지 않는다").isEmpty();
+        jdbc.update("DELETE FROM conversation WHERE id = ?", conversation.id());
+    }
+
+
+    @Test
     @DisplayName("화면의 수정은 자동 보관 허락을 켜고 끄며, 값을 보내지 않으면 지금 값을 그대로 둔다")
     void updateTogglesArchivableOnlyWhenGiven() {
         Memory memory = oldMemory(dad, "정비 테스트 허락", "기간이 있는 상태", 1);
