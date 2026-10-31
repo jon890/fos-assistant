@@ -436,6 +436,14 @@ Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길�
 MCP 서버가 `type: http` 이면 자식 프로세스 대신 그 원격 서버에 붙고, 연결의 칸 값은 헤더로만 간다([ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md)).
 Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 전송과 무관하게 같다. 읽기 규칙과 운영 목록 항목은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
 
+**`assistant.json` 이 없는 표준 플러그인도 카탈로그에 `schema: 3` 으로 오른다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
+입력 칸은 MCP 정의의 env 와 헤더 참조에서 추론하고, 확인 도구(`verify`)는 null 이고 `tools` 는 비어 있다.
+Claude Code, Codex, ChatGPT 플러그인 형식의 비교와 받지 않는 것은 그 ADR 이 갖는다.
+
+- 카탈로그는 `GET /api/connectors/catalog?include=standard` 로 청할 때만 `schema: 3` 항목을 싣는다. Control Plane 은 늘 이 query 를 붙인다. 이 query 를 모르는 옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하기 때문이다
+- Control Plane 은 `schema: 3` 이면 확인 도구와 `tools` 가 비어 있고 선택지 칸이 없을 때만 읽을 수 있는 커넥터로 다룬다
+- `schema: 3` 연결의 등록과 확인은 아직 `CONNECTOR_UNAVAILABLE` 로 거절한다. 확인 도구 대신 MCP 도구 목록으로 확인하는 길은 그 ADR 의 「남은 단계」 2단계가 연다. 그때까지 운영 목록에 `schema: 3` 플러그인을 올리지 않는다
+
 ### 바인딩 설치
 
 `PUT /api/connectors` 의 `enabled: true` 요청은 `bind: {vault}` 의 보관 파일 값으로 그 profile 에 커넥터를 붙인다.
