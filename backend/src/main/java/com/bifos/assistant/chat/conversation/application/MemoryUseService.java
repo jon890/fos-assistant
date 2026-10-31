@@ -1,15 +1,23 @@
 package com.bifos.assistant.chat.conversation.application;
 
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
+import com.bifos.assistant.chat.conversation.application.dto.MemoryUseReaction;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.memory.application.AcceptedMemoryLookup;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionMemoryRef;
 import com.bifos.assistant.usage.execution.application.ExecutionMemoryRefs;
 import com.bifos.assistant.usage.execution.application.dto.MemoryUseVia;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +42,8 @@ public class MemoryUseService {
     private final ExecutionMemoryRefs refs;
     private final AcceptedMemoryLookup accepted;
     private final MemoryService memoryService;
+    private final DecisionFeedbackRecorder feedback;
+    private final Clock clock;
 
 
     /** 답 실행 번호 오름차순으로, 한 실행 안에서는 실은 순서 뒤에 읽은 순서로 낸다. */
@@ -55,6 +65,29 @@ public class MemoryUseService {
             }
         }
         return uses;
+    }
+
+
+    /**
+     * 「참고한 기억」 의 항목 단추 하나를 판단 피드백 사건으로 남긴다(ADR-20261015 / memory-maintenance). 기억 내용과 주입은 바꾸지 않는다.
+     *
+     * <p>그 대화의 그 답이 지금 보이는 목록에 그 기억을 실었을 때만 받는다. 남의 기억이나 그 답이 쓰지 않은 기억을 가리키면 없는 것과 같은
+     * 응답이다. 열쇠는 {@code memory:<번호>}, {@code subject_version} 은 누른 때의 revision 번호, 실행은 그 답의 실행이다.
+     */
+    @Transactional(readOnly = true)
+    public void react(
+        CurrentUser user, Long conversationId, Long executionId, Long memoryId, MemoryUseReaction reaction) {
+        boolean used = usesOf(user, conversationId).stream()
+            .anyMatch(use -> use.executionId().equals(executionId) && use.memoryId().equals(memoryId));
+        Memory memory = used ? accepted.acceptedReadableAmong(user, Set.of(memoryId)).get(memoryId) : null;
+        if (memory == null) {
+            throw new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory use");
+        }
+        feedback.record(
+            FeedbackEntry.of(user.id(), FeedbackSubjectType.MEMORY, memoryId, reaction.eventType(), FeedbackActor.USER, clock.instant())
+                .conversation(conversationId)
+                .originExecution(executionId)
+                .version(Integer.toString(memory.revision())));
     }
 
 

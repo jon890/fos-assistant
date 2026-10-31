@@ -24,5 +24,12 @@ public enum FeedbackEventType {
     /** 실행이 성공했다. 제안에서 온 할 일을 끝낸 것도 여기다. 주체는 사용자나 시스템이다. */
     EXECUTION_SUCCEEDED,
     /** 실행이 실패했거나 시작하지 못했다. 주체는 시스템이다. */
-    EXECUTION_FAILED
+    EXECUTION_FAILED,
+    /**
+     * 사용자가 답의 「참고한 기억」 에서 그 기억이 이 답과 관련 없다고 눌렀다. 열쇠는 {@code memory:<번호>} 이고 기억 내용은 바뀌지 않는다.
+     * 정비 규칙의 입력 신호로만 읽는다(ADR-20261015 / memory-maintenance).
+     */
+    MARKED_IRRELEVANT,
+    /** 사용자가 답의 「참고한 기억」 에서 그 기억이 틀렸다고 눌렀다. 고치는 것은 사람이 기억 화면에서 한다. 기억 내용은 바뀌지 않는다. */
+    MARKED_WRONG
 }
