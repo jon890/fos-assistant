@@ -33,7 +33,7 @@ TYPE: INLINE
 SEVERITY: P1
 PATH: backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatService.java
 LINE: 42
-ISSUE: [rule-34] 문제 설명 (한국어)
+ISSUE: [rule-N] 문제 설명 (걸린 규칙이 있을 때만 태그를 단다) (한국어)
 FIX: 수정 제안 (한국어)
 FINDING_END
 ```
@@ -233,7 +233,7 @@ rm -f "$REVIEW_JSON" "$BODY_MD"
 
 ### 판정 줄
 
-요약 `body` 의 둘째 줄(제목 다음 빈 줄 뒤)에 아래 두 문자열 가운데 **정확히 하나**를 한 줄로 둔다. 다른 표현, 꾸밈, 앞뒤 문자를 붙이지 않는다. 자동 도구가 정규식으로 읽는다.
+요약 `body` 의 제목 다음 빈 줄 뒤 첫 줄에 아래 두 문자열 가운데 **정확히 하나**를 한 줄로 둔다. 다른 표현, 꾸밈, 앞뒤 문자를 붙이지 않는다. 자동 도구가 정규식으로 읽는다.
 
 - `판정: 머지 가능` — 게시할 지적에 P1 과 P2 가 없다
 - `판정: 반영 필요` — 게시할 지적에 P1 이나 P2 가 하나라도 있다
