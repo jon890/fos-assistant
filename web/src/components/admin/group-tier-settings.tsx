@@ -92,7 +92,9 @@ function TierFields({ item, catalog, onChange }: TierFieldsProps) {
           모델
           <NativeSelect
             value={storedKey}
-            aria-describedby={storedMissing ? missingHelpId : undefined}
+            aria-describedby={
+              storedMissing && catalog !== null ? missingHelpId : undefined
+            }
             onChange={(event) => pickModel(event.target.value)}
           >
             <option value="">비워 두기 (에이전트 기본 모델로 돌아요)</option>
