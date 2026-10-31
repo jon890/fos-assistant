@@ -20,12 +20,10 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.task.application.TaskService;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.task.presentation.TaskController;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
@@ -60,9 +58,6 @@ class TaskControllerTest {
 
     @Autowired
     TaskRepository tasks;
-
-    @Autowired
-    TaskTriggerRepository triggers;
 
     @Autowired
     TaskRunRepository runs;
@@ -210,12 +205,11 @@ class TaskControllerTest {
         Task task = tasks.findByPublicIdAndOwnerUserIdAndKind(
             UUID.fromString(id), currentUser.require().id(), TaskKind.TURN)
             .orElseThrow();
-        TaskTrigger trigger = triggers.findByTaskId(task.id()).orElseThrow();
         Instant older = Instant.parse("2026-10-02T00:00:00Z");
         Instant newer = Instant.parse("2026-10-03T00:00:00Z");
         TaskRun skipped = runs.save(
-            TaskRun.skipped(task.id(), trigger.id(), task.ownerUserId(), older, TaskRunReason.MISSED, older));
-        TaskRun queued = runs.save(TaskRun.queued(task.id(), trigger.id(), task.ownerUserId(), newer, newer));
+            TaskRun.skipped(task.id(), task.ownerUserId(), older, TaskRunReason.MISSED, older));
+        TaskRun queued = runs.save(TaskRun.queued(task.id(), task.ownerUserId(), newer, newer));
 
         JsonNode list = body(mvc.perform(get("/api/v1/tasks/{id}/runs", id)).andReturn().getResponse(), 200);
 
@@ -276,7 +270,6 @@ class TaskControllerTest {
 
         assertThat(error.path("code").asString()).isEqualTo("TASK_SCHEDULE_INVALID");
         assertThat(tasks.count()).isZero();
-        assertThat(triggers.count()).isZero();
     }
 
 
@@ -292,9 +285,9 @@ class TaskControllerTest {
         JsonNode error = body(send(put("/api/v1/tasks/{id}", id), request("고친 이름", cronSchedule(cron))), 400);
 
         assertThat(error.path("code").asString()).isEqualTo("TASK_SCHEDULE_INVALID");
-        assertThat(triggers.findAll())
+        assertThat(tasks.findAll())
             .singleElement()
-            .extracting(TaskTrigger::cronExpr)
+            .extracting(Task::cronExpr)
             .isEqualTo(original);
         assertThat(tasks.findAll()).singleElement().extracting(Task::title).isEqualTo("이름");
     }
@@ -304,14 +297,14 @@ class TaskControllerTest {
     @DisplayName("앞뒤 공백을 뗀 100자 cron 은 길이로 거절하지 않는다")
     void acceptMaximumCronAfterStrippingWhitespace() throws Exception {
         String cron = "00 9 1 * " + "1,".repeat(45) + "1";
-        assertThat(cron).hasSize(TaskTrigger.CRON_MAX);
+        assertThat(cron).hasSize(Task.CRON_MAX);
 
         JsonNode view = body(send(post("/api/v1/tasks"), request("이름", cronSchedule("  " + cron + "  "))), 200);
 
         assertThat(view.path("schedule").path("cron").asString()).isEqualTo(cron);
-        assertThat(triggers.findAll())
+        assertThat(tasks.findAll())
             .singleElement()
-            .extracting(TaskTrigger::cronExpr)
+            .extracting(Task::cronExpr)
             .isEqualTo(cron);
     }
 
@@ -358,7 +351,6 @@ class TaskControllerTest {
 
     private void clean() {
         runs.deleteAll();
-        triggers.deleteAll();
         tasks.deleteAll();
     }
 }

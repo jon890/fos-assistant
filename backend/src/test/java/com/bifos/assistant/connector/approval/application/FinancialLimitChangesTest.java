@@ -13,13 +13,12 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -45,8 +44,6 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
     ConnectorActionService publicApproval;
     @Autowired
     TaskRepository tasks;
-    @Autowired
-    TaskTriggerRepository triggers;
     @Autowired
     TaskRunRepository taskRuns;
     Long origin;
@@ -154,15 +151,15 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
         try {
             tx().executeWithoutResult(status -> {
                 var run = runs.findById(origin).orElseThrow();
-                var task = tasks.save(Task.create(user.id(), run.agentId(), "매일 상한", "상한 올려 줘", ConversationMode.NEW_PER_RUN,
-                    NotifyPolicy.NEVER));
-                var trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", ZoneId.of("Asia/Seoul"), MissedPolicy.RUN_ONCE,
-                    now));
-                var taskRun = TaskRun.queued(task.id(), trigger.id(), user.id(), now, now);
+                var task = Task.create(user.id(), run.agentId(), "매일 상한", "상한 올려 줘", ConversationMode.NEW_PER_RUN,
+                    NotifyPolicy.NEVER);
+                task.reschedule(TriggerType.CRON, "0 9 * * *", null, ZoneId.of("Asia/Seoul"), now);
+                task.changeMissedPolicy(MissedPolicy.RUN_ONCE);
+                tasks.save(task);
+                var taskRun = TaskRun.queued(task.id(), user.id(), now, now);
                 taskRun.useConversation(run.conversationId());
                 taskRun.start(now);
                 created[0] = taskRuns.save(taskRun).id();
-                created[1] = trigger.id();
                 created[2] = task.id();
             });
             assertThat(jdbc.update("update task_run set execution_id = ? where id = ?", origin, created[0])).isEqualTo(1);
@@ -176,7 +173,6 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
         } finally {
             if (created[0] != null) {
                 taskRuns.deleteById(created[0]);
-                triggers.deleteById(created[1]);
                 tasks.deleteById(created[2]);
             }
         }

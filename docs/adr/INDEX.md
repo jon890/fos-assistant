@@ -118,6 +118,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261020 / blog-photo-eval](ADR-20261020-blog-photo-eval.md) | 블로그 사진 이해는 운영 왕복으로 평가하고 규칙으로 판정한다 | backend, hermes | Accepted. 본문 없는 단계 사건에 `referenced` 와 `inspected` 를 더한다 |
 | [ADR-20261026 / plugin-naming](ADR-20261026-plugin-naming.md) | 「커넥터」 는 화면과 문서에서 「플러그인」 이고, 코드 식별자는 `connector` 를 그대로 쓴다 | backend, frontend, hermes | Accepted. 아직 구현하지 않았다. ADR-20261026 / remote-mcp-plugin 의 옮기는 순서 셋째 단계에서 바꾼다 |
 | [ADR-20261101 / artifact-vault](ADR-20261101-artifact-vault.md) | 사용자가 보관한 결과물은 chat_artifact 의 보관 사본 행에 암호화해 두고 대화와 따로 남긴다 | backend, frontend | Accepted. PR 1(HTML·CSS 선택 보관)만 구현했다. 이미지 묶음과 자동 보관은 아직이다 |
+| [ADR-20261101 / model-setting](ADR-20261101-model-setting.md) | 그룹에 모델 설정 하나를 두어 모든 에이전트가 따르고, 사용자는 ChatGPT 의 Thinking 슬라이더 칸으로만 고른다 | backend, frontend | Accepted. 관리자가 그룹 목록에서 고르는 칸만 구현했다. ADR-030 의 대화 직접 선택과 ADR-054 의 에이전트 기본 모델을 대체한다 |
 | [ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md) | 먼저 살펴보기는 기억 위의 읽기 전용 깨우기와 제안 카드로 줄이고, 저장은 새 테이블 없이 할 일의 제안 상태와 기존 반응 기록으로 한다 | backend, frontend | Accepted. 새 읽기 경로만 구현했다. 옮기는 순서의 마지막 단계에서 ADR-20261007 / value-evaluation, ADR-20261008 / daily-loop 와 backend 의 autonomy-policy 를 대체한다 |
 
 ## 보관
