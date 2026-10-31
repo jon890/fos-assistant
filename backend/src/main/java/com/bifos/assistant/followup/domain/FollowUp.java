@@ -252,6 +252,19 @@ public class FollowUp {
     }
 
 
+    /**
+     * 만료된 제안을 열린 줄에서 뺀다. 상태는 그대로 {@code PROPOSED} 이고 {@code open_marker} 만 비워, 같은 제목의 새 제안이 유일 제약에
+     * 막히지 않게 한다. 화면에는 만료로 이미 보이지 않는다.
+     */
+    public void releaseExpired(Instant now) {
+        if (!expiredAt(now)) {
+            throw new IllegalStateException("only an expired proposal can be released");
+        }
+        this.openMarker = null;
+        this.updatedAt = now;
+    }
+
+
     /** 본문을 지운다. 대화를 지울 때 받아들인 줄의 제안 본문을 비우려고 쓴다. 줄은 남는다. */
     public void clearDetail() {
         this.detailJson = null;

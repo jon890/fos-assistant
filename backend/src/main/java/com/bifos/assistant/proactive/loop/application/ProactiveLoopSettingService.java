@@ -48,8 +48,8 @@ public class ProactiveLoopSettingService {
 
 
     /**
-     * 설정을 저장한다. 켜면 그 사용자와 에이전트의 CHECK 작업을 켜고(없으면 기본 시각으로 만들고) 끄면 멈춘다. 같은 줄을 동시에 저장하는
-     * 요청이 제약에 걸리면 그 트랜잭션은 롤백되므로 새 트랜잭션에서 한 번 더 저장한다.
+     * 설정을 저장한다. 그 사용자와 에이전트의 CHECK 작업의 루프 동의와 쉬기만 바꾸고 일정의 켜짐은 바꾸지 않는다. 작업이 없으면 일정이
+     * 꺼진 작업을 만든다. 같은 줄을 동시에 저장하는 요청이 제약에 걸리면 그 트랜잭션은 롤백되므로 새 트랜잭션에서 한 번 더 저장한다.
      */
     public LoopSettingView update(CurrentUser user, String agentCode, boolean enabled, Instant snoozedUntil) {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);

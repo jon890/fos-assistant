@@ -116,8 +116,19 @@ public class FollowUpSuggestions {
     /** 트랜잭션 안에서 제안 줄 하나를 저장한다. 억제 규칙에 걸리면 저장하지 않고 그 까닭을 돌려준다. */
     private SuggestionOutcome insert(Draft draft) {
         Instant now = clock.instant();
-        if (duplicateOf(draft)) {
+        if (followUps.findByUserIdAndDedupeKey(draft.userId(), draft.dedupeKey()).isPresent()) {
             return SuggestionOutcome.DUPLICATE;
+        }
+        FollowUp sameTitle = followUps
+            .findByUserIdAndTitleKeyAndOpenMarker(draft.userId(), draft.titleKey(), FollowUp.OPEN_MARKER)
+            .orElse(null);
+        if (sameTitle != null) {
+            if (!sameTitle.expiredAt(now)) {
+                return SuggestionOutcome.DUPLICATE;
+            }
+            // 만료된 제안은 화면에서 이미 빠졌다. 같은 제목의 새 제안이 막히지 않게 열린 줄에서 뺀다.
+            sameTitle.releaseExpired(now);
+            followUps.saveAndFlush(sameTitle);
         }
         if (followUps.existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
             draft.conversationId(),

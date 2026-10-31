@@ -1,6 +1,7 @@
 package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
@@ -15,6 +16,7 @@ import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.followup.infra.FollowUpSuggestionBodies;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Duration;
@@ -182,6 +184,28 @@ class ProactiveSuggestionStoreTest extends ProactiveLoopTestSupport {
         clock.set(clock.instant().plus(Duration.ofDays(8)));
 
         assertThat(followUps.list(user)).extracting(FollowUpSnapshot::publicId).containsExactly(toAccept.publicId());
+    }
+
+
+    @Test
+    @DisplayName("만료된 제안이 같은 제목의 새 제안을 막지 않고 만료된 줄은 받아들이지 못한다")
+    void expiredSuggestionDoesNotBlockSameTitle() throws InterruptedException {
+        CurrentUser user = owner();
+        Agent agent = newAgent(user);
+        wake(user, agent, singleSuggestionOutput("매달 돌아오는 제안"));
+        FollowUp old = rowsOf(user).getFirst();
+        clock.set(clock.instant().plus(Duration.ofDays(8)));
+
+        assertThatThrownBy(() -> followUps.accept(user, old.publicId())).isInstanceOf(ApiException.class);
+        List<SuggestionOutcome> again = followUps.proposeSuggestion(
+            old.proposedByExecutionId(), List.of(new SuggestedItem("next-month", "매달 돌아오는 제안", null)));
+
+        assertThat(again).containsExactly(SuggestionOutcome.CREATED);
+        assertThat(rowsOf(user)).hasSize(2);
+        assertThat(rowsOf(user).stream().filter(row -> row.id().equals(old.id())).findFirst().orElseThrow().openMarker())
+            .as("만료된 줄은 열린 줄에서 빠진다")
+            .isNull();
+        assertThat(followUps.list(user)).singleElement().satisfies(each -> assertThat(each.title()).isEqualTo("매달 돌아오는 제안"));
     }
 
 

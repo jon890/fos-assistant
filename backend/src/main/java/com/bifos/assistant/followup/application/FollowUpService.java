@@ -270,7 +270,7 @@ public class FollowUpService {
         try {
             saved = transactions.execute(status -> {
                 FollowUp followUp = requireOwn(user, id);
-                if (!followUp.status().open()) {
+                if (!followUp.status().open() || followUp.expiredAt(now)) {
                     throw notInState();
                 }
                 String title = newTitle == null ? followUp.title() : newTitle;
@@ -338,7 +338,7 @@ public class FollowUpService {
         Instant now = clock.instant();
         FollowUp saved = transactions.execute(status -> {
             FollowUp followUp = requireOwn(user, id);
-            if (followUp.status() != from) {
+            if (followUp.status() != from || followUp.expiredAt(now)) {
                 throw notInState();
             }
             move.accept(followUp, now);
