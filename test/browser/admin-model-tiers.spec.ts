@@ -9,7 +9,7 @@ import type { Page } from "../../web/node_modules/@playwright/test/index.js";
  */
 
 type Tier = {
-  tier: "FAST" | "BALANCED" | "DEEP";
+  tier: "INSTANT" | "MEDIUM" | "HIGH" | "EXTRA_HIGH" | "PRO";
   label: string;
   provider: string | null;
   model: string | null;
@@ -17,9 +17,11 @@ type Tier = {
 };
 
 const TIERS: Tier[] = [
-  { tier: "FAST", label: "빠르게", provider: "openai-codex", model: "listed-fast", reasoningEffort: "low" },
-  { tier: "BALANCED", label: "균형", provider: "openai-codex", model: "retired-model", reasoningEffort: "medium" },
-  { tier: "DEEP", label: "깊게", provider: null, model: null, reasoningEffort: null },
+  { tier: "INSTANT", label: "Instant", provider: "openai-codex", model: "listed-fast", reasoningEffort: "low" },
+  { tier: "MEDIUM", label: "Medium", provider: "openai-codex", model: "retired-model", reasoningEffort: "medium" },
+  { tier: "HIGH", label: "High", provider: null, model: null, reasoningEffort: null },
+  { tier: "EXTRA_HIGH", label: "Extra High", provider: null, model: null, reasoningEffort: null },
+  { tier: "PRO", label: "Pro", provider: null, model: null, reasoningEffort: null },
 ];
 
 const CATALOG = {
@@ -55,11 +57,20 @@ function tierFieldset(page: Page, label: string) {
   return page.getByRole("region", { name: "그룹 모델 설정" }).getByRole("group", { name: label });
 }
 
+test("관리자 화면은 ChatGPT 슬라이더의 다섯 칸을 차례대로 그린다", async ({ page }) => {
+  await stub(page, CATALOG);
+  await page.goto("/admin/models");
+  const region = page.getByRole("region", { name: "그룹 모델 설정" });
+  for (const label of ["Instant", "Medium", "High", "Extra High", "Pro"]) {
+    await expect(region.getByRole("group", { name: label, exact: true })).toBeVisible();
+  }
+});
+
 test("단계별 모델은 그룹 목록에서 고르고 고른 provider 와 모델을 함께 저장한다", async ({ page }) => {
   const saved = await stub(page, CATALOG);
   await page.goto("/admin/models");
 
-  const deep = tierFieldset(page, "깊게");
+  const deep = tierFieldset(page, "High");
   const model = deep.getByLabel("모델");
   await expect(model).toHaveValue("");
   await expect(deep.getByLabel("강도")).toBeDisabled();
@@ -73,7 +84,7 @@ test("단계별 모델은 그룹 목록에서 고르고 고른 provider 와 모�
 
   await expect.poll(() => saved.length).toBe(1);
   const body = saved[0] as { tiers: Tier[] };
-  expect(body.tiers.find((item) => item.tier === "DEEP")).toMatchObject({
+  expect(body.tiers.find((item) => item.tier === "HIGH")).toMatchObject({
     provider: "anthropic",
     model: "other-model",
     reasoningEffort: "high",
@@ -84,16 +95,16 @@ test("저장된 모델이 목록에 없으면 그 값을 남겨 보이고 그대
   const saved = await stub(page, CATALOG);
   await page.goto("/admin/models");
 
-  const balanced = tierFieldset(page, "균형");
+  const balanced = tierFieldset(page, "Medium");
   const model = balanced.getByLabel("모델");
   await expect(model.locator("option:checked")).toHaveText("ChatGPT 구독 · retired-model (목록에 없음)");
   await expect(balanced.getByText("저장된 모델이 지금 목록에 없어요.", { exact: false })).toBeVisible();
   // 목록에 있는 단계에는 안내가 없다.
-  await expect(tierFieldset(page, "빠르게").getByText("목록에 없어요", { exact: false })).toHaveCount(0);
+  await expect(tierFieldset(page, "Instant").getByText("목록에 없어요", { exact: false })).toHaveCount(0);
 
   await page.getByRole("region", { name: "그룹 모델 설정" }).getByRole("button", { name: "저장" }).click();
   await expect.poll(() => saved.length).toBe(1);
-  expect((saved[0] as { tiers: Tier[] }).tiers.find((item) => item.tier === "BALANCED")).toMatchObject({
+  expect((saved[0] as { tiers: Tier[] }).tiers.find((item) => item.tier === "MEDIUM")).toMatchObject({
     provider: "openai-codex",
     model: "retired-model",
   });
@@ -110,18 +121,18 @@ test("목록을 읽지 못하면 저장된 값만 보이고 비울 수는 있다
   const section = page.getByRole("region", { name: "그룹 모델 설정" });
   await expect(section.getByRole("alert")).toContainText("모델 목록을 불러오지 못했어요.");
 
-  const fast = tierFieldset(page, "빠르게");
+  const fast = tierFieldset(page, "Instant");
   const model = fast.getByLabel("모델");
   await expect(model.locator("option:checked")).toHaveText("ChatGPT 구독 · listed-fast (목록에 없음)");
   // 비우기와 저장된 값 말고는 고를 것이 없다.
   await expect(model.locator("option")).toHaveCount(2);
-  await expect(tierFieldset(page, "깊게").getByLabel("모델").locator("option")).toHaveCount(1);
+  await expect(tierFieldset(page, "High").getByLabel("모델").locator("option")).toHaveCount(1);
 
   await model.selectOption("");
   await expect(fast.getByLabel("강도")).toBeDisabled();
   await section.getByRole("button", { name: "저장" }).click();
   await expect.poll(() => saved.length).toBe(1);
-  expect((saved[0] as { tiers: Tier[] }).tiers.find((item) => item.tier === "FAST")).toMatchObject({
+  expect((saved[0] as { tiers: Tier[] }).tiers.find((item) => item.tier === "INSTANT")).toMatchObject({
     provider: null,
     model: null,
     reasoningEffort: null,

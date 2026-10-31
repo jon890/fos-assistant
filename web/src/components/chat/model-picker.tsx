@@ -23,6 +23,7 @@ import {
 import { NativeSelect } from "@/components/ui/native-select";
 import {
   getModelTiers,
+  MODEL_TIER_LABELS,
   saveDefaultTier,
   type ModelSelectionMode,
   type ModelTier,
@@ -444,31 +445,18 @@ type TierPickerProps = {
   advancedPicker: ReactNode;
 };
 
-const FALLBACK_TIERS: ModelTier[] = [
-  {
-    tier: "FAST",
-    label: "빠르게",
-    provider: null,
-    model: null,
-    reasoningEffort: null,
-  },
-  {
-    tier: "BALANCED",
-    label: "균형",
-    provider: null,
-    model: null,
-    reasoningEffort: null,
-  },
-  {
-    tier: "DEEP",
-    label: "깊게",
-    provider: null,
-    model: null,
-    reasoningEffort: null,
-  },
-];
+/** 단계를 읽기 전과 읽지 못했을 때 자리를 잡는 칸이다. 누를 수 없다. 읽은 뒤에는 관리자가 채운 칸만 보인다. */
+const FALLBACK_TIERS: ModelTier[] = (
+  Object.keys(MODEL_TIER_LABELS) as ModelTierCode[]
+).map((tier) => ({
+  tier,
+  label: MODEL_TIER_LABELS[tier],
+  provider: null,
+  model: null,
+  reasoningEffort: null,
+}));
 
-/** 입력창 가까이에서 세 단계와 기본값을 고른다. 고급 직접 선택은 설정 안에 둔다. */
+/** 입력창 가까이에서 칸과 기본값을 고른다. 고급 직접 선택은 설정 안에 둔다. */
 export function ModelTierPicker({
   agentCode,
   mode,

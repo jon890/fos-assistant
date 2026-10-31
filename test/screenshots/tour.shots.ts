@@ -207,7 +207,7 @@ test("데모 데이터를 넣는다", async ({ page }) => {
 async function send(page: Page, text: string): Promise<void> {
   await page.goto("/");
   await page.getByRole("radio", { name: "생활 비서" }).click();
-  await page.getByTestId("model-tier-balanced").click();
+  await page.getByTestId("model-tier-medium").click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
@@ -215,7 +215,7 @@ async function send(page: Page, text: string): Promise<void> {
 test("새 대화", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("radio", { name: "생활 비서" }).click();
-  await page.getByTestId("model-tier-balanced").click();
+  await page.getByTestId("model-tier-medium").click();
   await expect(
     page.getByRole("button", { name: PLAN_QUESTION, exact: true }),
   ).toBeVisible({ timeout: 20_000 });

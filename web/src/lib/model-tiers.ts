@@ -1,6 +1,31 @@
 import { describeFailure } from "@/components/error-message";
 
-export type ModelTierCode = "FAST" | "BALANCED" | "DEEP";
+/** ChatGPT 의 Thinking 슬라이더 칸이다. 이 차례로 그린다(ADR-20261101 / model-setting). */
+export type ModelTierCode =
+  "INSTANT" | "MEDIUM" | "HIGH" | "EXTRA_HIGH" | "PRO";
+
+/** 칸 이름은 옮기지 않고 ChatGPT 의 이름을 그대로 쓴다. */
+export const MODEL_TIER_LABELS: Record<ModelTierCode, string> = {
+  INSTANT: "Instant",
+  MEDIUM: "Medium",
+  HIGH: "High",
+  EXTRA_HIGH: "Extra High",
+  PRO: "Pro",
+};
+
+/** 지난 단계 이름이다. 실행 기록과 사용량은 그때 고른 이름을 그대로 갖는다. */
+const LEGACY_TIER_LABELS: Record<string, string> = {
+  FAST: "빠르게",
+  BALANCED: "균형",
+  DEEP: "깊게",
+};
+
+/** 실행 기록에 남은 단계 이름을 화면 이름으로 바꾼다. 모르는 이름은 그대로 보인다. */
+export function recordedTierLabel(tier: string): string {
+  return (
+    MODEL_TIER_LABELS[tier as ModelTierCode] ?? LEGACY_TIER_LABELS[tier] ?? tier
+  );
+}
 export type ModelSelectionMode = "DEFAULT" | "TIER" | "CUSTOM";
 
 export type ModelTier = {

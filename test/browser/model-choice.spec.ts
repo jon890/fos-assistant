@@ -42,9 +42,11 @@ test("에이전트가 없는 새 대화는 모델 조회 없이 기본 단계 �
 
   await page.goto("/");
   for (const [tier, label] of [
-    ["fast", "빠르게"],
-    ["balanced", "균형"],
-    ["deep", "깊게"],
+    ["instant", "Instant"],
+    ["medium", "Medium"],
+    ["high", "High"],
+    ["extra_high", "Extra High"],
+    ["pro", "Pro"],
   ]) {
     const button = page.getByTestId(`model-tier-${tier}`);
     await expect(button).toHaveText(label);
@@ -91,22 +93,22 @@ function effortSelect(page: Page): Locator {
 const TIERS = {
   tiers: [
     {
-      tier: "FAST",
-      label: "빠르게",
+      tier: "INSTANT",
+      label: "Instant",
       provider: null,
       model: "example-fast",
       reasoningEffort: "low",
     },
     {
-      tier: "BALANCED",
-      label: "균형",
+      tier: "MEDIUM",
+      label: "Medium",
       provider: null,
       model: "example-balanced",
       reasoningEffort: "medium",
     },
     {
-      tier: "DEEP",
-      label: "깊게",
+      tier: "HIGH",
+      label: "High",
       provider: null,
       model: "example-deep",
       reasoningEffort: "high",
@@ -435,31 +437,31 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
         model: null,
         reasoningEffort: null,
         modelSelectionMode: savedBodies.length === 1 ? "TIER" : "DEFAULT",
-        modelTier: savedBodies.length === 1 ? "DEEP" : null,
+        modelTier: savedBodies.length === 1 ? "HIGH" : null,
       };
       await route.fulfill({ json: savedConversation });
     },
   );
 
   await page.goto("/");
-  await expect(page.getByTestId("model-tier-picker")).toContainText("빠르게");
-  await expect(page.getByTestId("model-tier-picker")).toContainText("균형");
-  await expect(page.getByTestId("model-tier-picker")).toContainText("깊게");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("Instant");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("Medium");
+  await expect(page.getByTestId("model-tier-picker")).toContainText("High");
   await tierSettings(page).click();
   await expect(
     page.getByRole("button", { name: "그룹 모델 설정" }),
   ).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  await page.getByTestId("model-tier-deep").click();
-  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+  await page.getByTestId("model-tier-high").click();
+  await expect(page.getByTestId("model-tier-high")).toHaveAttribute(
     "data-variant",
     "secondary",
   );
-  await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-high")).toBeEnabled();
   await tierSettings(page).click();
   await page.getByTestId("model-tier-profile-default").click();
-  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+  await expect(page.getByTestId("model-tier-high")).toHaveAttribute(
     "data-variant",
     "ghost",
   );
@@ -467,7 +469,7 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
 
   await expect.poll(() => savedBodies.length).toBe(2);
   expect(savedBodies).toEqual([
-    { mode: "TIER", tier: "DEEP" },
+    { mode: "TIER", tier: "HIGH" },
     { mode: "DEFAULT", tier: null },
   ]);
 });
@@ -522,7 +524,7 @@ test("그룹 모델 설정은 그룹 기본 단계를 단계별 모델보다 위
 test("내 기본값 창은 정하지 않았을 때 도는 기준을 알린다", async ({ page }) => {
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
-    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "DEEP" } }),
+    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "HIGH" } }),
   );
 
   await page.goto("/");
@@ -566,14 +568,14 @@ test("내 기본값 저장이 실패하면 창을 유지하고 다시 저장할 
   await page.getByRole("button", { name: "내 기본값" }).click();
 
   const defaultsDialog = page.getByRole("dialog", { name: "내 기본값" });
-  await defaultsDialog.getByRole("button", { name: "빠르게" }).click();
+  await defaultsDialog.getByRole("button", { name: "Instant" }).click();
   const failedAlert = defaultsDialog.getByRole("alert");
   await expect(failedAlert).toHaveText(
     "내 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
   await expect(defaultsDialog).toBeVisible();
 
-  await defaultsDialog.getByRole("button", { name: "빠르게" }).click();
+  await defaultsDialog.getByRole("button", { name: "Instant" }).click();
   await expect(defaultsDialog).toHaveCount(0);
   await expect(failedAlert).toHaveCount(0);
 });
@@ -583,7 +585,7 @@ test("내 기본값을 저장하면 고르지 않은 대화의 단계 단추에 
 }) => {
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers",
-    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "DEEP" } }),
+    (route) => route.fulfill({ json: { ...TIERS, groupDefaultTier: "HIGH" } }),
   );
   await page.route(
     (url) => url.pathname === "/api/chat/model-tiers/default",
@@ -592,12 +594,12 @@ test("내 기본값을 저장하면 고르지 않은 대화의 단계 단추에 
 
   await page.goto("/");
   // 내 기본값이 없으면 그룹 기본 단계가 적용된다.
-  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+  await expect(page.getByTestId("model-tier-high")).toHaveAttribute(
     "data-inherited",
     "true",
   );
-  await expect(page.getByTestId("model-tier-deep")).toContainText("기본");
-  await expect(page.getByTestId("model-tier-deep")).toHaveAttribute(
+  await expect(page.getByTestId("model-tier-high")).toContainText("기본");
+  await expect(page.getByTestId("model-tier-high")).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -606,15 +608,15 @@ test("내 기본값을 저장하면 고르지 않은 대화의 단계 단추에 
   await page.getByRole("button", { name: "내 기본값" }).click();
   await page
     .getByRole("dialog", { name: "내 기본값" })
-    .getByRole("button", { name: "빠르게" })
+    .getByRole("button", { name: "Instant" })
     .click();
   await page.keyboard.press("Escape");
 
-  await expect(page.getByTestId("model-tier-fast")).toHaveAttribute(
+  await expect(page.getByTestId("model-tier-instant")).toHaveAttribute(
     "data-inherited",
     "true",
   );
-  await expect(page.getByTestId("model-tier-deep")).not.toHaveAttribute(
+  await expect(page.getByTestId("model-tier-high")).not.toHaveAttribute(
     "data-inherited",
   );
 });
@@ -669,7 +671,7 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
         json: {
           ...TIERS,
           admin: true,
-          groupDefaultTier: "BALANCED",
+          groupDefaultTier: "MEDIUM",
           tiers: TIERS.tiers.map((item) => ({
             ...item,
             provider: null,
@@ -688,9 +690,9 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
   );
 
   await page.goto("/");
-  await expect(page.getByTestId("model-tier-fast")).toBeEnabled();
-  await expect(page.getByTestId("model-tier-balanced")).toBeEnabled();
-  await expect(page.getByTestId("model-tier-deep")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-instant")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-medium")).toBeEnabled();
+  await expect(page.getByTestId("model-tier-high")).toBeEnabled();
 
   await tierSettings(page).click();
   const settingsDialog = page.getByRole("dialog", { name: "모델 단계 설정" });
@@ -710,9 +712,7 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
   await expect(
     groupSection.getByLabel("강도", { exact: true }).first(),
   ).toHaveValue("");
-  await expect(groupSection.getByLabel("그룹 기본 단계")).toHaveValue(
-    "BALANCED",
-  );
+  await expect(groupSection.getByLabel("그룹 기본 단계")).toHaveValue("MEDIUM");
   await groupSection.getByRole("button", { name: "저장" }).click();
 
   await expect
@@ -721,28 +721,28 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
       {
         tiers: [
           {
-            tier: "FAST",
-            label: "빠르게",
+            tier: "INSTANT",
+            label: "Instant",
             provider: null,
             model: null,
             reasoningEffort: null,
           },
           {
-            tier: "BALANCED",
-            label: "균형",
+            tier: "MEDIUM",
+            label: "Medium",
             provider: null,
             model: null,
             reasoningEffort: null,
           },
           {
-            tier: "DEEP",
-            label: "깊게",
+            tier: "HIGH",
+            label: "High",
             provider: null,
             model: null,
             reasoningEffort: null,
           },
         ],
-        defaultTier: "BALANCED",
+        defaultTier: "MEDIUM",
       },
     ]);
 });
@@ -892,7 +892,9 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   await expectSaved(page);
   await expect(picker(page)).toHaveText("기본 · medium");
   await closeSettings(page);
-  await expect(page.getByRole("radio", { name: "성격 비서", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("radio", { name: "성격 비서", exact: true }),
+  ).toBeDisabled();
 
   const uploaded = page.waitForResponse(
     (response) =>
