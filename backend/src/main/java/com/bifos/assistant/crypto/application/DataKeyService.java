@@ -1,6 +1,7 @@
 package com.bifos.assistant.crypto.application;
 
 import com.bifos.assistant.crypto.domain.AesGcm;
+import com.bifos.assistant.crypto.domain.BinaryCipher;
 import com.bifos.assistant.crypto.domain.DataKey;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.SealedText;
@@ -23,11 +24,13 @@ import org.springframework.stereotype.Component;
  * <p>데이터 key 는 사용자마다 하나이고 KEK 로 감싸 {@code user_data_key} 에 둔다. 푼 key 는 정한 수명과 개수 안에서 메모리에
  * 둔다. 그래서 같은 사용자의 본문을 여러 개 풀 때 KEK 풀기는 처음 한 번만 돈다.
  *
+ * <p>글({@link TextCipher})과 바이트({@link BinaryCipher})는 같은 key 와 같은 모양을 쓴다. 글은 UTF-8 바이트로 바꿔 암호화한다.
+ *
  * <p>풀지 못한 까닭은 데이터 key 번호와 사용자 번호만 경고 로그에 남긴다. 본문과 key 와 AAD 는 남기지 않는다.
  */
 @Component
 @Slf4j
-public class DataKeyService implements TextCipher {
+public class DataKeyService implements TextCipher, BinaryCipher {
 
     private static final Duration UNAVAILABLE_TTL = Duration.ofMinutes(1);
 
@@ -67,17 +70,29 @@ public class DataKeyService implements TextCipher {
 
     @Override
     public Optional<SealedText> seal(Long ownerUserId, String aad, String plain) {
-        if (!enabled()) {
-            return Optional.empty();
-        }
-        DataKey key = forWriting(ownerUserId);
-        String content = AesGcm.seal(key.secret(), plain.getBytes(StandardCharsets.UTF_8), bytes(aad));
-        return Optional.of(new SealedText(content, key.id()));
+        return sealBytes(ownerUserId, aad, plain.getBytes(StandardCharsets.UTF_8));
     }
 
 
     @Override
     public Optional<String> open(Long keyId, Long ownerUserId, String aad, String sealed) {
+        return openBytes(keyId, ownerUserId, aad, sealed).map(plain -> new String(plain, StandardCharsets.UTF_8));
+    }
+
+
+    @Override
+    public Optional<SealedText> sealBytes(Long ownerUserId, String aad, byte[] plain) {
+        if (!enabled()) {
+            return Optional.empty();
+        }
+        DataKey key = forWriting(ownerUserId);
+        String content = AesGcm.seal(key.secret(), plain, bytes(aad));
+        return Optional.of(new SealedText(content, key.id()));
+    }
+
+
+    @Override
+    public Optional<byte[]> openBytes(Long keyId, Long ownerUserId, String aad, String sealed) {
         if (unavailable.get(keyId).isPresent()) {
             return Optional.empty();
         }
@@ -94,7 +109,7 @@ public class DataKeyService implements TextCipher {
                 log.warn("데이터 key 의 주인이 본문의 주인과 다르다 keyId={} ownerUserId={}", keyId, ownerUserId);
                 return Optional.empty();
             }
-            return Optional.of(new String(AesGcm.open(key.secret(), sealed, bytes(aad)), StandardCharsets.UTF_8));
+            return Optional.of(AesGcm.open(key.secret(), sealed, bytes(aad)));
         } catch (IllegalStateException e) {
             log.warn("본문을 풀지 못했다 keyId={} ownerUserId={} reason={}", keyId, ownerUserId, e.getMessage());
             return Optional.empty();

@@ -75,6 +75,11 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private String vaultFingerprint;
 
+    /** 이 보관 사본이 든 묶음의 뿌리 행 번호. 뿌리 행과 묶음이 아닌 보관 사본, 대화 결과물 행은 비어 있다. */
+    @Column(name = "vault_bundle_id")
+    @Getter
+    private Long vaultBundleId;
+
 
     private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
         this.conversationId = conversationId;
@@ -102,6 +107,20 @@ public class ChatArtifact extends CreatedAtEntity {
         Long conversationId, String path, long byteSize, Long ownerUserId, Long keyId, String sealedBody,
         String fingerprint) {
         return new ChatArtifact(conversationId, path, byteSize, ownerUserId, keyId, sealedBody, fingerprint);
+    }
+
+
+    /**
+     * 묶음 뿌리가 부르는 파일의 보관 사본이다. 뿌리 행과 같은 주인, 같은 대화이고 뿌리를 지우면 함께 지운다.
+     *
+     * @param bundleId 뿌리 행의 번호
+     */
+    public static ChatArtifact vaultedPart(
+        Long conversationId, String path, long byteSize, Long ownerUserId, Long keyId, String sealedBody,
+        String fingerprint, Long bundleId) {
+        ChatArtifact part = new ChatArtifact(conversationId, path, byteSize, ownerUserId, keyId, sealedBody, fingerprint);
+        part.vaultBundleId = bundleId;
+        return part;
     }
 
 

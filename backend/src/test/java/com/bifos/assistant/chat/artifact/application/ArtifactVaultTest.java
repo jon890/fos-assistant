@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultBodies;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultWriter;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -45,6 +46,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 /**
  * 고른 HTML·CSS 를 사용자별 보관함에 암호화해 두고 주인에게만 읽고 지우게 하는지 확인한다(#530 PR 1).
  *
+ * <p>묶음 보관은 {@code ArtifactVaultBundleTest} 가 본다.
+ *
  * <p>남의 보관본, 대화 삭제 뒤의 보관본, 용량 초과, 위변조, 같은 요청의 중복을 본다.
  */
 @BackendIntegrationTest
@@ -62,7 +65,10 @@ class ArtifactVaultTest {
     ArtifactVaultService vault;
 
     @Autowired
-    ArtifactService artifacts;
+    ArtifactBundleReader reader;
+
+    @Autowired
+    ArtifactVaultWriter writer;
 
     @Autowired
     ArtifactStore store;
@@ -204,7 +210,7 @@ class ArtifactVaultTest {
     @DisplayName("용량을 넘으면 새 보관만 거절하고 이미 보관한 것은 그대로이며 지우면 다시 보관할 수 있다")
     void rejectsOnlyNewVaultOverQuota() {
         ArtifactVaultService small = new ArtifactVaultService(
-            artifacts, rows, bodies, new ArtifactVaultProperties(100L, null), transactions);
+            reader, rows, writer, bodies, new ArtifactVaultProperties(100L, null, null, null), transactions);
         write(dadConversation, "a.css", "a".repeat(60));
         write(dadConversation, "b.css", "b".repeat(60));
 
@@ -242,16 +248,15 @@ class ArtifactVaultTest {
 
 
     @Test
-    @DisplayName("HTML·CSS 가 아니거나 다른 파일을 부르거나 상한을 넘으면 보관하지 않는다")
+    @DisplayName("받지 않는 형식이거나 부르는 파일이 없거나 상한을 넘으면 보관하지 않는다")
     void rejectsUnsupportedFiles() {
-        write(dadConversation, "photo.png", "png");
         write(dadConversation, "withimg.html", "<p><img src=\"a.png\"></p>");
         write(dadConversation, "withfe.html", "<svg><feImage href=\"a.png\"/></svg>");
         write(dadConversation, "withbg.html", "<body background=\"a.jpg\">");
         write(dadConversation, "withurl.css", "p{background:url(a.png)}");
         write(dadConversation, "big.css", "x".repeat(6 * 1024 * 1024));
 
-        for (String path : new String[] {"photo.png", "withimg.html", "withfe.html", "withbg.html", "withurl.css", "big.css"}) {
+        for (String path : new String[] {"notes.txt", "withimg.html", "withfe.html", "withbg.html", "withurl.css", "big.css"}) {
             assertThatThrownBy(() -> vault.vault(dad.id(), dadConversation.id(), path))
                 .as(path)
                 .isInstanceOfSatisfying(
