@@ -1,0 +1,23 @@
+{
+  "name": "plan225-proactive-legacy-migration",
+  "description": "옛 발견과 문제 후보를 할 일의 PROPOSED 줄로 옮기고 기존 카드 링크와 반응을 잇는다",
+  "pr_scope": "proactive_check_finding 과 proactive_check_problem 의 줄을 follow_up 의 PROPOSED 줄로 옮기는 작업과 공개 ID 호환 읽기를 한 PR 로 끝낸다.",
+  "deferred": [
+    {
+      "what": "노출과 반응을 한 테이블로 쓰고 숨김·미루기 경로 옮기기",
+      "why": "옮긴 제안이 있어야 그 제안의 제어 사건을 옮길 수 있다",
+      "after": "이 plan 의 PR 이 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
+  ]
+}

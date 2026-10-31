@@ -20,8 +20,15 @@ public interface FeedbackEventRepository extends JpaRepository<FeedbackEvent, Lo
         Long userId, Collection<String> subjectKeys);
 
 
-    /** 그 대화에 묶인 사건의 제안 열쇠다. 대화를 지울 때 그 제안의 사건을 함께 지우려고 읽는다. */
-    @Query("select distinct e.subjectKey from FeedbackEvent e where e.userId = :userId and e.conversationId = :conversationId")
+    /**
+     * 그 대화에 묶인 사건의 제안 열쇠다. 대화를 지울 때 그 제안의 사건을 함께 지우려고 읽는다.
+     *
+     * <p>「참고한 기억」 단추 사건은 그 대화의 답에 대한 반응이지 기억을 제안한 흐름이 아니다. 그 사건은 대화와 함께 지우되, 그 기억의 다른
+     * 대화 사건까지 지우지 않게 열쇠를 넓히는 데서 뺀다.
+     */
+    @Query("select distinct e.subjectKey from FeedbackEvent e where e.userId = :userId and e.conversationId = :conversationId"
+        + " and e.eventType not in (com.bifos.assistant.feedback.domain.type.FeedbackEventType.MARKED_IRRELEVANT,"
+        + " com.bifos.assistant.feedback.domain.type.FeedbackEventType.MARKED_WRONG)")
     List<String> findSubjectKeysOfConversation(
         @Param("userId") Long userId, @Param("conversationId") Long conversationId);
 

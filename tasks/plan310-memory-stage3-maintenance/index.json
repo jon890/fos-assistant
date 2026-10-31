@@ -1,0 +1,11 @@
+{
+  "name": "plan310-memory-stage3-maintenance",
+  "description": "기억 단계 3 의 두 번째 PR. 정비 루프를 제안 모드로 돌려 후보와 근거만 decision_feedback_event 의 사건으로 남기고, 사람이 후보를 확인하는 화면과 /memory 의 자동 보관 허락 표시를 만든다",
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}

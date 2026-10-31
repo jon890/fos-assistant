@@ -23,6 +23,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * Memory 한 줄이다. 칸의 뜻은 {@code backend/docs/data-schema.md} 의 「memory」 가 갖는다(ADR-052).
@@ -119,6 +120,14 @@ public class Memory extends CreatedAtEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * 정비 루프가 이 항목을 자동 보관해도 되는가(ADR-20261015 / memory-maintenance). 기본은 거짓이다. 거짓이면 변하지 않는 사실이거나 모르는
+     * 것으로 보고 자동 보관하지 않는다. 항목의 종류를 나누는 칸이 아니다.
+     */
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean archivable;
 
 
     private Memory(
@@ -259,6 +268,12 @@ public class Memory extends CreatedAtEntity {
         memory.proposedByExecutionId = proposedByExecutionId;
         memory.proposalDedupKey = proposalDedupKey;
         return memory;
+    }
+
+
+    /** 자동 보관 허락 표시를 정한다. {@code memory_remember} 가 새 항목을 만들 때 모델의 인자로 부른다. */
+    public void allowArchive(boolean value) {
+        archivable = value;
     }
 
 

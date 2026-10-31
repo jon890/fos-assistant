@@ -74,6 +74,10 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
         Long conversationId, CheckStatus status);
 
 
+    /** 그 점검 대화에서 그 상태로 끝난 마지막 살펴보기. 기억에서 꺼낸 최근 일의 시작 경계를 읽는다. */
+    Optional<ProactiveCheck> findFirstByConversationIdAndStatusOrderByIdDesc(Long conversationId, CheckStatus status);
+
+
     /** 그 사용자가 그 시각 뒤에 연 살펴보기. 판단 피드백의 replay 읽기 모델이 상황으로 읽는다. */
     List<ProactiveCheck> findByUserIdAndStartedAtGreaterThanEqualOrderByIdAsc(Long userId, Instant since);
 

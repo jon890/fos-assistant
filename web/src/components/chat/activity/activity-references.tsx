@@ -23,13 +23,16 @@ function sourceUrls(sourceReads: SourceReadSummary | null | undefined) {
  *
  * <p>사용자가 확인할 내용이 아니라 작업 과정의 일부라 접힌 줄에는 개수를 더하지 않는다.
  * 기억 제목은 사용자나 모델이 쓴 글이라 평문으로만 그린다(ADR-009).
+ * 기억마다 붙일 단추(「관련 없음」, 「틀림」)는 부르는 쪽이 `memoryUseActions` 로 준다. 없으면 그리지 않는다.
  */
 export function ActivityReferences({
   sourceReads,
   memoryUses,
+  memoryUseActions,
 }: {
   sourceReads?: SourceReadSummary | null;
   memoryUses?: MemoryUse[];
+  memoryUseActions?: (use: MemoryUse) => React.ReactNode;
 }) {
   const urls = sourceUrls(sourceReads);
   const uses = memoryUses ?? [];
@@ -70,6 +73,7 @@ export function ActivityReferences({
                 </span>
                 <span>{VIA_LABELS[use.via]}</span>
                 {use.scope === "GROUP" ? <span>그룹</span> : null}
+                {memoryUseActions?.(use)}
               </li>
             ))}
           </ul>
