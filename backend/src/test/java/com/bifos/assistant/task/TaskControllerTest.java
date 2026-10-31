@@ -135,12 +135,12 @@ class TaskControllerTest {
     @DisplayName("만들기에 modelTier 를 보내면 응답에 그 단계가 실리고, 보내지 않으면 null 이다")
     void returnsModelTierInTaskView() throws Exception {
         Map<String, Object> withTier = request("단계 작업", cronSchedule("0 9 1 * *"));
-        withTier.put("modelTier", "BALANCED");
+        withTier.put("modelTier", "MEDIUM");
 
         JsonNode chosen = body(send(post("/api/v1/tasks"), withTier), 200);
         JsonNode empty = body(send(post("/api/v1/tasks"), request("단계 없는 작업", cronSchedule("0 9 1 * *"))), 200);
 
-        assertThat(chosen.path("modelTier").asString()).as("고른 단계: %s", chosen).isEqualTo("BALANCED");
+        assertThat(chosen.path("modelTier").asString()).as("고른 단계: %s", chosen).isEqualTo("MEDIUM");
         assertThat(empty.path("modelTier").isNull()).as("고르지 않은 단계: %s", empty).isTrue();
     }
 

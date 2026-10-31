@@ -1,17 +1,15 @@
 package com.bifos.assistant.chat.modelchoice.application;
 
+import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelTiers;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
+import com.bifos.assistant.chat.modelchoice.application.dto.ModelSetting;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelTierOptions;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierDefinition;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierGroupSetting;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierDefinitionRepository;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierGroupSettingRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -21,11 +19,10 @@ import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 그룹 단계와 사용자 기본값, 에이전트 기본 모델을 해석한다.
  *
- * <p>단계 정의는 DB 의 행만 읽는다. 행이 없는 그룹의 세 단계는 모두 빈 mapping 이고 에이전트 기본값으로 돈다.
+ * <p>칸은 ChatGPT 의 Thinking 슬라이더 다섯 칸이다(ADR-20261101 / model-setting). 칸 정의는 그룹 설정 줄
+ * ({@link ModelSettingStore})에서 읽는다. 줄이 없는 그룹의 다섯 칸은 모두 빈 칸이고, 빈 칸은 에이전트 기본값으로 돈다.
  * 에이전트 기본값도 없으면 요청에 모델을 싣지 않아 Hermes profile 의 값으로 돈다(ADR-054).
  *
  * <p>실행할 때는 단계가 가리키는 모델이 Hermes 목록에 없다는 이유만으로 막지 않는다. Hermes 가 돌려준 목록이
@@ -50,11 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ModelTierService {
 
-    private final ModelTierDefinitionRepository definitions;
-    private final ModelTierGroupSettingRepository groupSettings;
+    private final ModelSettingStore settings;
     private final AppUserRepository users;
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
+    private final GroupModelCatalogService groupCatalog;
     private final Clock clock;
 
 
@@ -62,26 +60,27 @@ public class ModelTierService {
      * 요청자가 고를 수 있는 단계와 기본값이다.
      *
      * <p>단계가 가리키는 provider 와 모델과 effort 는 내부 값이라 {@code ADMIN} 역할에게만 싣는다(ADR-063).
-     * 그 밖의 요청자는 단계와 이름만 받는다.
+     * 그 밖의 요청자는 단계와 이름만 받는다. 빈 칸은 고를 수 없어 싣지 않는다. ChatGPT 가 요금제마다 칸 수를 달리
+     * 보이는 것과 같다.
      */
     @Transactional(readOnly = true)
     public ModelTierOptions optionsFor(CurrentUser user, Agent agent) {
-        List<ModelTierDefinition> definitions = definitionsFor(user.groupId());
+        ModelSetting setting = settings.read(user.groupId());
+        List<ModelSetting.Stop> filled = setting.tiers().stream()
+            .filter(stop -> !stop.isEmpty())
+            .toList();
         boolean internal = InternalValuePolicy.visibleTo(user);
-        String defaultProvider = internal && needsDefaultProvider(definitions)
+        String defaultProvider = internal && filled.stream().anyMatch(stop -> stop.provider() == null)
             ? modelOptions.optionsForAgent(user.groupId(), agent).defaultProvider()
             : null;
         return new ModelTierOptions(
-            definitions.stream()
-                .map(definition -> internal ? view(definition, defaultProvider) : nameOnly(definition))
+            filled.stream()
+                .map(stop -> internal ? view(stop, defaultProvider) : nameOnly(stop))
                 .toList(),
             users.findById(user.id())
                 .map(it -> tierOf(it.modelDefaultTier()))
                 .orElse(null),
-            groupSettings
-                .findById(user.groupId())
-                .map(it -> it.defaultTier())
-                .orElse(null),
+            setting.defaultTier(),
             user.isAdmin());
     }
 
@@ -98,14 +97,12 @@ public class ModelTierService {
         if (!admin.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
+        ModelSetting setting = settings.read(admin.groupId());
         return new GroupModelTiers(
-            definitionsFor(admin.groupId()).stream()
+            setting.tiers().stream()
                 .map(ModelTierService::stored)
                 .toList(),
-            groupSettings
-                .findById(admin.groupId())
-                .map(it -> it.defaultTier())
-                .orElse(null));
+            setting.defaultTier());
     }
 
 
@@ -118,10 +115,26 @@ public class ModelTierService {
     }
 
 
-    @Transactional
+    /**
+     * 그룹의 칸 다섯과 그룹 기본 칸을 저장한다.
+     *
+     * <p>저장된 값과 provider 나 모델이 다른 칸만 그룹 목록({@link GroupModelCatalogService})과 견준다. 들고 있던
+     * 목록에 없으면 다시 읽어 보고, 그래도 없으면 {@code VALIDATION_FAILED} 다. 바뀌지 않은 칸은 견주지 않아, 목록을
+     * 읽지 못해도 effort 만 고치거나 칸을 비우는 저장은 된다. 바뀐 칸은 provider 를 비울 수 없다. 옮겨 온 정의의 빈
+     * provider 는 바꾸지 않으면 그대로 둔다.
+     *
+     * <p>검증은 트랜잭션 밖에서 끝낸다. 목록 조회가 Hermes 를 부를 수 있어 DB 연결을 쥔 채 기다리지 않게 한다
+     * ({@code AgentModelDefaultService.save} 와 같은 까닭).
+     *
+     * @throws ApiException {@code VALIDATION_FAILED}. 칸이 다섯 개가 아니거나 값이 맞지 않거나 목록에 없을 때.
+     * {@code MODEL_HIDDEN}. 바뀐 칸이 그룹이 숨긴 모델일 때. 바뀐 칸이 있는데 목록을 읽지 못하면 그 오류가 그대로 나간다
+     */
     public void saveGroup(CurrentUser user, List<ModelTierOptions.Tier> tiers, ModelTier defaultTier) {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
+        }
+        if (tiers == null || tiers.stream().anyMatch(tier -> tier == null || tier.tier() == null)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
         List<ModelTierOptions.Tier> normalizedTiers = tiers.stream().map(ModelTierService::normalize).toList();
         if (normalizedTiers.size() != ModelTier.values().length
@@ -136,22 +149,62 @@ public class ModelTierService {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid model tier definition");
             }
         }
-        if (defaultTier != null && normalizedTiers.stream().noneMatch(tier -> tier.tier() == defaultTier)) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "group default tier must be defined");
+        ModelSetting stored = settings.read(user.groupId());
+        List<ModelTierOptions.Tier> changed = normalizedTiers.stream()
+            .filter(tier -> !isFallback(tier))
+            .filter(tier -> {
+                ModelSetting.Stop before = stored.stop(tier.tier());
+                return !Objects.equals(tier.provider(), before.provider()) || !Objects.equals(tier.model(), before.model());
+            })
+            .toList();
+        for (ModelTierOptions.Tier tier : changed) {
+            if (tier.provider() == null) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "a changed model tier must name its provider");
+            }
+            visibility.requireVisible(user.groupId(), ModelChoice.stored(tier.provider(), tier.model(), null));
         }
-        // provider 를 비운 정의는 에이전트마다 provider 가 달라 여기서 판정하지 못한다. 실행할 때 그 에이전트의 목록으로 본다.
-        for (ModelTierOptions.Tier tier : normalizedTiers) {
-            if (tier.provider() != null) {
-                visibility.requireVisible(user.groupId(), ModelChoice.stored(tier.provider(), tier.model(), null));
+        requireOffered(user.groupId(), changed);
+        settings.saveTiers(
+            user.groupId(),
+            normalizedTiers.stream()
+                .sorted(Comparator.comparing(ModelTierOptions.Tier::tier))
+                .map(tier -> new ModelSetting.Stop(tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
+                .toList(),
+            defaultTier);
+    }
+
+
+    /** 바뀐 칸이 모두 그룹 목록에 있는지 본다. 들고 있던 목록에 없으면 한 번 다시 읽는다. */
+    private void requireOffered(Long groupId, List<ModelTierOptions.Tier> changed) {
+        if (changed.isEmpty()) {
+            return;
+        }
+        List<ModelTierOptions.Tier> missing = missingFrom(groupCatalog.catalogFor(groupId), changed);
+        if (missing.isEmpty()) {
+            return;
+        }
+        log.warn("바뀐 칸의 모델이 그룹 목록에 없어 다시 읽는다 tiers={}", tierNames(missing));
+        missing = missingFrom(groupCatalog.refreshedCatalogFor(groupId), missing);
+        if (!missing.isEmpty()) {
+            log.warn("다시 읽어도 바뀐 칸의 모델이 그룹 목록에 없어 저장을 거절한다 tiers={}", tierNames(missing));
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is not in the group model catalog");
+        }
+    }
+
+
+    private static List<ModelTierOptions.Tier> missingFrom(GroupModelCatalog catalog, List<ModelTierOptions.Tier> tiers) {
+        List<ModelTierOptions.Tier> missing = new ArrayList<>();
+        for (ModelTierOptions.Tier tier : tiers) {
+            if (!catalog.offers(tier.provider(), tier.model())) {
+                missing.add(tier);
             }
         }
-        definitions.deleteByGroupId(user.groupId());
-        definitions.flush();
-        definitions.saveAll(normalizedTiers.stream()
-            .map(tier -> ModelTierDefinition.of(
-                user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
-            .toList());
-        groupSettings.save(ModelTierGroupSetting.of(user.groupId(), defaultTier));
+        return missing;
+    }
+
+
+    private static List<ModelTier> tierNames(List<ModelTierOptions.Tier> tiers) {
+        return tiers.stream().map(ModelTierOptions.Tier::tier).toList();
     }
 
 
@@ -247,10 +300,7 @@ public class ModelTierService {
                 .map(it -> tierOf(it.modelDefaultTier()))
                 .orElse(null);
         if (selected == null) {
-            selected = groupSettings
-                .findById(user.groupId())
-                .map(it -> it.defaultTier())
-                .orElse(null);
+            selected = settings.read(user.groupId()).defaultTier();
         }
         if (selected == null) {
             return new ResolvedModelTier(agentDefault(agent), null);
@@ -277,11 +327,8 @@ public class ModelTierService {
         if (tier == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier");
         }
-        ModelTierDefinition definition = definitionsFor(user.groupId()).stream()
-            .filter(candidate -> candidate.tier() == tier)
-            .findFirst()
-            .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier"));
-        if (isFallback(definition)) {
+        ModelSetting.Stop definition = settings.read(user.groupId()).stop(tier);
+        if (definition.isEmpty()) {
             ModelChoice fallback = agentDefault(agent);
             requireRunnable(user.groupId(), agent, fallback);
             return new ResolvedModelTier(fallback, tier);
@@ -354,8 +401,8 @@ public class ModelTierService {
     }
 
 
-    private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
-        if (isFallback(definition)) {
+    private static ModelTierOptions.Tier view(ModelSetting.Stop definition, String defaultProvider) {
+        if (definition.isEmpty()) {
             return nameOnly(definition);
         }
         return new ModelTierOptions.Tier(
@@ -368,7 +415,7 @@ public class ModelTierService {
 
 
     /** 저장된 값 그대로 담는다. 빈 칸을 채우지 않는다. */
-    private static ModelTierOptions.Tier stored(ModelTierDefinition definition) {
+    private static ModelTierOptions.Tier stored(ModelSetting.Stop definition) {
         return new ModelTierOptions.Tier(
             definition.tier(),
             labelOf(definition.tier()),
@@ -379,7 +426,7 @@ public class ModelTierService {
 
 
     /** 단계와 이름만 담는다. 가리키는 모델을 싣지 않는 요청자와 mapping 이 빈 단계가 함께 쓴다. */
-    private static ModelTierOptions.Tier nameOnly(ModelTierDefinition definition) {
+    private static ModelTierOptions.Tier nameOnly(ModelSetting.Stop definition) {
         return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
     }
 
@@ -414,11 +461,6 @@ public class ModelTierService {
     }
 
 
-    private static boolean isFallback(ModelTierDefinition definition) {
-        return definition.provider() == null && definition.model() == null && definition.reasoningEffort() == null;
-    }
-
-
     private static String blankToNull(String value) {
         if (value == null) {
             return null;
@@ -428,37 +470,13 @@ public class ModelTierService {
     }
 
 
-    /**
-     * 정의 행이 없는 그룹은 세 단계를 빈 mapping 으로 보인다. 조회에서 저장하지 않는다.
-     * 일부 행만 있으면 관리자가 저장한 정의가 깨진 것이므로 임의의 기본값과 섞지 않는다.
-     */
-    private List<ModelTierDefinition> definitionsFor(Long groupId) {
-        List<ModelTierDefinition> stored = definitions.findByGroupIdOrderByTier(groupId);
-        if (stored.isEmpty()) {
-            return Arrays.stream(ModelTier.values())
-                .map(tier -> ModelTierDefinition.of(groupId, tier, null, null, null))
-                .toList();
-        }
-        Map<ModelTier, ModelTierDefinition> byTier = stored.stream()
-            .collect(Collectors.toMap(ModelTierDefinition::tier, Function.identity(), (left, right) -> left));
-        if (byTier.size() != ModelTier.values().length
-            || Arrays.stream(ModelTier.values()).anyMatch(tier -> !byTier.containsKey(tier))) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "stored model tier definitions are incomplete");
-        }
-        return Arrays.stream(ModelTier.values()).map(byTier::get).toList();
-    }
-
-
-    private static boolean needsDefaultProvider(List<ModelTierDefinition> definitions) {
-        return definitions.stream().anyMatch(definition -> !isFallback(definition) && definition.provider() == null);
-    }
-
-
     private static String labelOf(ModelTier tier) {
         return switch (tier) {
-            case FAST -> "빠르게";
-            case BALANCED -> "균형";
-            case DEEP -> "깊게";
+            case INSTANT -> "Instant";
+            case MEDIUM -> "Medium";
+            case HIGH -> "High";
+            case EXTRA_HIGH -> "Extra High";
+            case PRO -> "Pro";
         };
     }
 

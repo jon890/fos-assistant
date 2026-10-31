@@ -767,7 +767,7 @@ class TaskRunStarterTest {
     @DisplayName("FAST 를 고른 NEW_PER_RUN 작업의 발화 대화와 루트 실행은 FAST 단계다")
     void usesTaskTierForNewPerRunConversation() {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
-        chooseTier(fixture, ModelTier.FAST);
+        chooseTier(fixture, ModelTier.INSTANT);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
 
         starter.startQueued(NOW);
@@ -776,10 +776,10 @@ class TaskRunStarterTest {
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
-        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.FAST);
+        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.INSTANT);
         assertThat(executions.findById(finished.executionId()).orElseThrow().modelTier())
             .as("루트 실행의 단계")
-            .isEqualTo(ModelTier.FAST.name());
+            .isEqualTo(ModelTier.INSTANT.name());
     }
 
 
@@ -787,7 +787,7 @@ class TaskRunStarterTest {
     @DisplayName("DEEP 을 고른 SINGLE 작업은 사용자가 그 대화에서 모델을 골라도 다음 발화가 DEEP 단계로 되돌린다")
     void returnsSingleConversationToTaskTier() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
-        chooseTier(fixture, ModelTier.DEEP);
+        chooseTier(fixture, ModelTier.HIGH);
         TaskRun first = queued(fixture, SCHEDULED, NOW);
         starter.startQueued(NOW);
         Long conversationId = awaitFinished(first).conversationId();
@@ -814,7 +814,7 @@ class TaskRunStarterTest {
         assertThat(finished.conversationId()).as("두 번째 발화의 대화").isEqualTo(conversationId);
         Conversation conversation = conversations.findById(conversationId).orElseThrow();
         assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
-        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.DEEP);
+        assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.HIGH);
         assertThat(conversation.modelChoice().provider()).as("고른 provider").isNull();
         assertThat(conversation.modelChoice().model()).as("고른 모델").isNull();
     }

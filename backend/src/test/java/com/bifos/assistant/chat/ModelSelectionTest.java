@@ -14,10 +14,10 @@ import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.modelchoice.domain.ModelHidden;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.modelchoice.infra.ModelHiddenRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -127,7 +127,7 @@ class ModelSelectionTest {
     HermesRunsClient hermes;
 
     @Autowired
-    ModelHiddenRepository hiddenModels;
+    ModelVisibilityService visibility;
 
     @Autowired
     HermesRunEventStream eventStream;
@@ -376,7 +376,7 @@ class ModelSelectionTest {
     void rejectsDefaultRunWhileProfileDefaultModelIsHiddenAndRunsAgainAfterUnhiding() {
         Long conversationId = chat.startEmpty(user, AGENT_CODE).id();
         stub().willReturn(succeeded("run-1", "sess-1"));
-        hiddenModels.save(ModelHidden.of(user.groupId(), "example-provider", "example-model"));
+        visibility.save(admin(), List.of(new HiddenModels.Entry("example-provider", "example-model")));
         try {
             assertThatThrownBy(() -> chat.send(user, conversationId, "안녕", null))
                 .isInstanceOf(ApiException.class)
@@ -392,7 +392,7 @@ class ModelSelectionTest {
                 });
         } finally {
             // 이 그룹은 다른 검사도 쓴다. 숨김이 남으면 그 검사들의 기본값 실행이 막힌다.
-            hiddenModels.deleteAll(hiddenModels.findByGroupIdOrderByProviderAscModelAsc(user.groupId()));
+            visibility.save(admin(), List.of());
         }
 
         ChatTurn turn = chat.send(user, conversationId, "안녕", null);
@@ -493,5 +493,11 @@ class ModelSelectionTest {
     private static HermesRunResult blocked(String runId, String sessionId) {
         return new HermesRunResult(
             runId, sessionId, "failed", null, "example-model", null, BLOCKED_ERROR, TokenUsage.empty());
+    }
+
+
+    /** 숨김을 바꾸는 관리자다. 숨김은 그룹 설정이라 같은 그룹이면 된다. */
+    private CurrentUser admin() {
+        return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), UserRole.ADMIN);
     }
 }

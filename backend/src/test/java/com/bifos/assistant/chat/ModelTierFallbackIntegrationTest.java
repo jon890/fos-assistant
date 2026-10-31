@@ -11,15 +11,17 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierDefinition;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierDefinitionRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
+import com.bifos.assistant.chat.modelchoice.application.dto.ModelSetting;
+import com.bifos.assistant.chat.modelchoice.domain.GroupSetting;
+import com.bifos.assistant.chat.modelchoice.domain.GroupSettingId;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +49,10 @@ class ModelTierFallbackIntegrationTest {
     ModelTierService tiers;
 
     @Autowired
-    ModelTierDefinitionRepository definitions;
+    ModelSettingStore store;
+
+    @Autowired
+    GroupSettingRepository settings;
 
     @Autowired
     TransactionTemplate transactions;
@@ -55,18 +60,18 @@ class ModelTierFallbackIntegrationTest {
 
     @BeforeEach
     void clearLeftovers() {
-        transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
+        transactions.executeWithoutResult(status -> settings.deleteById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL)));
     }
 
 
     @AfterEach
     void cleanUp() {
-        transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
+        transactions.executeWithoutResult(status -> settings.deleteById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL)));
     }
 
 
     @Test
-    @DisplayName("정의가 없는 신규 그룹은 세 단계 모두 에이전트 기본 모델로 해석하고 정의를 만들지 않는다")
+    @DisplayName("정의가 없는 신규 그룹은 다섯 칸 모두 에이전트 기본 모델로 해석하고 정의를 만들지 않는다")
     void newGroupUsesAgentDefaultsWithoutPersistingDefinitions() {
         Agent configuredAgent = mock(Agent.class);
         ModelChoice defaults = new ModelChoice("example-provider", "example-model", "medium");
@@ -80,17 +85,14 @@ class ModelTierFallbackIntegrationTest {
             assertThat(resolved.tier()).isEqualTo(tier);
             assertThat(resolved.choice()).isEqualTo(defaults);
         }
-        assertThat(definitions.findByGroupIdOrderByTier(GROUP_ID)).isEmpty();
+        assertThat(settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL))).isEmpty();
     }
 
 
     @Test
     @DisplayName("비어 있는 기존 seed 단계는 선택 대화에서도 tier 기록을 남기고 profile 기본값으로 해석한다")
     void nullSeedUsesProfileDefaultWhileKeepingTier() {
-        definitions.saveAll(List.of(
-            ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
-            ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),
-            ModelTierDefinition.of(GROUP_ID, ModelTier.DEEP, null, null, null)));
+        store.saveTiers(GROUP_ID, ModelSetting.empty().tiers(), null);
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
 
         for (ModelTier tier : ModelTier.values()) {

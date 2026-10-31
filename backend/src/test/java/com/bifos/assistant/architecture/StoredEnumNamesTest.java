@@ -48,7 +48,7 @@ class StoredEnumNamesTest {
         Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
         Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
         Map.entry(ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")),
-        Map.entry(ModelTier.class, List.of("FAST", "BALANCED", "DEEP")),
+        Map.entry(ModelTier.class, List.of("INSTANT", "MEDIUM", "HIGH", "EXTRA_HIGH", "PRO")),
         Map.entry(
             ExecutionEventType.class,
             List.of(
