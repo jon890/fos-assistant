@@ -35,23 +35,25 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
 
     /**
      * 같은 사용자·대화·원고·연결에서 저장 결과가 UNKNOWN 으로 남은 다른 snapshot 의 job 이 있는지 본다.
-     * UNKNOWN 이면 외부 서비스에 임시저장 글이 이미 생겼을 수 있어 새 snapshot 저장을 막는 근거가 된다.
+     * 결과를 기다리는 UNKNOWN 만 센다. Control Plane 이 닫은 UNKNOWN(기한 만료·worker 가 모름·연결 변경)은 다시 조회하지 않아
+     * 영영 풀리지 않으므로 세지 않는다. UNKNOWN 이면 외부 서비스에 임시저장 글이 이미 생겼을 수 있어 새 snapshot 저장을 막는 근거가 된다.
      */
     @Query("""
         select count(j) > 0 from ContentDraftJob j, ContentDraftSnapshot s, ContentDraftRevision r
         where j.snapshotId = s.id and s.revisionId = r.id
           and j.ownerUserId = :ownerId and j.conversationId = :conversationId
           and s.connectionId = :connectionId and r.draftId = :draftId
-          and j.status = :unknown
+          and j.status = :unknown and (j.errorCode is null or j.errorCode not in :closed)
           and j.snapshotId <> :snapshotRowId
         """)
     boolean existsByStatusForOtherSnapshot(@Param("ownerId") Long ownerId, @Param("conversationId") Long conversationId,
         @Param("connectionId") Long connectionId, @Param("draftId") Long draftId, @Param("snapshotRowId") Long snapshotRowId,
-        @Param("unknown") ContentDraftJobStatus unknown);
+        @Param("unknown") ContentDraftJobStatus unknown, @Param("closed") Collection<String> closed);
 
 
     default boolean existsUnknownForOtherSnapshot(Long ownerId, Long conversationId, Long connectionId, Long draftId, Long snapshotRowId) {
-        return existsByStatusForOtherSnapshot(ownerId, conversationId, connectionId, draftId, snapshotRowId, ContentDraftJobStatus.UNKNOWN);
+        return existsByStatusForOtherSnapshot(ownerId, conversationId, connectionId, draftId, snapshotRowId, ContentDraftJobStatus.UNKNOWN,
+            List.of(ContentDraftJob.EXPIRED, ContentDraftJob.NOT_FOUND, ContentDraftJob.BINDING_CHANGED));
     }
 
 

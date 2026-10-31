@@ -240,7 +240,7 @@ requestSave는 호출한 origin이 같은 사용자·대화의 취소되지 않�
 승인 줄은 기존 `save_draft` 선언의 위험도로 판정하되 승인 방식은 `always`로 저장한다. 상시 허락을 보지 않고 승인 카드에 허락 선택을 내지 않는다.
 인자는 `{"snapshotId":"<UUID>"}` 하나이고 dedupe key는 `v1-content-save`와 owner·snapshotId의 SHA-256이다. 최초 MCP 생성의 중복 방지 키와 섞지 않는다.
 같은 snapshot의 두 번째 요청은 상태와 상관없이 앞의 승인 줄과 job을 돌려준다. 동시 요청은 사용자 잠금과 snapshot 유일 색인으로 하나가 된다.
-같은 사용자·대화·원고·연결에서 앞 snapshot 의 job 이 UNKNOWN 으로 남아 있으면 다른 snapshot 의 새 요청은 `CONTENT_DRAFT_RESULT_UNKNOWN`(409)으로 거절한다. 네이버에 임시저장 글이 이미 생겼을 수 있어서다. 앞 job 의 결과 조회가 UNKNOWN 을 풀면(SUCCEEDED·FAILED) 다시 받는다. 사용자 확인으로 넘기는 경로는 두지 않는다. 승인 줄과 job 은 이 검사를 통과한 뒤에만 만든다.
+같은 사용자·대화·원고·연결에서 앞 snapshot 의 job 이 UNKNOWN 으로 남아 있으면 다른 snapshot 의 새 요청은 `CONTENT_DRAFT_RESULT_UNKNOWN`(409)으로 거절한다. 네이버에 임시저장 글이 이미 생겼을 수 있어서다. 결과를 기다리는 UNKNOWN 만 센다. 앞 job 의 결과 조회가 UNKNOWN 을 풀면(SUCCEEDED·FAILED) 다시 받고, Control Plane 이 닫은 UNKNOWN(기한 만료, worker 가 모름, 연결 변경)은 다시 조회하지 않아 막지 않는다. 사용자 확인으로 넘기는 경로는 두지 않는다. 승인 줄과 job 은 이 검사를 통과한 뒤에만 만든다.
 
 refresh와 list는 원래 대화 주인에게 Control Plane이 보관한 상태만 돌려주고 외부를 부르지 않는다. 남의 것과 없는 것은 같은 404다.
 list는 1~20개를 job 내부 번호 역순으로 읽고 21번째 행으로 다음 페이지를 판정한다. cursor는 snapshot 공개 UUID이며 같은 owner·대화 밖이면 404다.
