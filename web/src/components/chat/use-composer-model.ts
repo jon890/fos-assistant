@@ -83,10 +83,10 @@ export function useComposerModel({
     }
   }
 
-  /** 고른 단계를 대화에 저장한다. 기본값으로 돌아가기도 같은 경로에서 명시적으로 적는다. */
+  /** 고른 단계를 대화에 저장한다. */
   async function saveModelTier(
-    mode: "DEFAULT" | "TIER",
-    tier: ModelTierCode | null,
+    mode: "TIER",
+    tier: ModelTierCode,
   ): Promise<ModelTierSaveResult> {
     setSavingModel(true);
     try {
