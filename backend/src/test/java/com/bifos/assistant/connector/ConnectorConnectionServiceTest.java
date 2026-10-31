@@ -1076,6 +1076,26 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
+    @DisplayName("default_tool_policy: ask 커넥터는 선언하지 않은 도구를 거절하지 않으므로 선언 밖 도구 수에 넣지 않는다")
+    void askConnectorDoesNotCountUndeclaredTools() {
+        ConnectorManifest ask = new ConnectorManifest(
+            DEMO, POLICY_MANIFEST.title(), POLICY_MANIFEST.description(), POLICY_MANIFEST.fields(), "list_scopes", "demo", 2,
+            POLICY_MANIFEST.tools(), List.of(), null, false, false, null, null, null, null, null, "ask");
+        when(connector.readCatalog()).thenReturn(List.of(ask));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        pendingBinding(agent(user), stored(user));
+        when(connector.probe(anyString(), anyString()))
+            .thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        assertThat(checked.undeclaredTools()).isZero();
+        assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.READY);
+    }
+
+
+    @Test
     @DisplayName("관리자 목록은 같은 그룹 사용자의 바인딩마다 에이전트와 재시작 대기 시각을 준다")
     void adminListShowsSameGroupBindings() {
         CurrentUser member = user(UserRole.MEMBER, 1L);

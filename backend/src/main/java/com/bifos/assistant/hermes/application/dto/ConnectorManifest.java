@@ -21,6 +21,8 @@ import tools.jackson.databind.JsonNode;
  * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
  * @param unknownErrors 결과를 모르는 코드와 재시도 식별자 칸의 선언(ADR-20261013 unknown-retry-key). 옛 대시보드 plugin 은 내지 않고,
  * 없으면 {@link ConnectorUnknownErrors#NONE}
+ * @param defaultToolPolicy {@code tools} 에 없는 도구의 처리. {@code "ask"} 만 있고 선언하지 않았거나 {@code deny} 이거나 옛 대시보드
+ * plugin 이 이 칸을 내지 않으면 null 이며, 그때는 선언하지 않은 도구를 거절한다. {@code schema: 2} 에서만 뜻이 있다
  */
 public record ConnectorManifest(
     String id,
@@ -39,7 +41,12 @@ public record ConnectorManifest(
     JsonNode executionGuard,
     String executionGuardManifestSha256,
     ConnectorSnapshotDeclaration snapshot,
-    ConnectorUnknownErrors unknownErrors) {
+    ConnectorUnknownErrors unknownErrors,
+    String defaultToolPolicy) {
+
+
+    /** 선언하지 않은 도구를 호출마다 묻는 {@link #defaultToolPolicy} 값이다. */
+    public static final String DEFAULT_TOOL_POLICY_ASK = "ask";
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -48,6 +55,18 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** 기본 도구 정책을 모르는 기존 생성자다. 누락은 선언하지 않은 도구를 거절하는 것이다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256,
+        ConnectorSnapshotDeclaration snapshot, ConnectorUnknownErrors unknownErrors) {
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, snapshot,
+            unknownErrors, null);
     }
 
 
