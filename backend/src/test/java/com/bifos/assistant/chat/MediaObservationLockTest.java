@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** MySQL도 이 회귀와 요청 재시도/USER 회귀를 그대로 실행한다. */
+/** 이 클래스가 선언한 잠금 회귀는 MySQL 에서도 다시 돈다. 상위 클래스의 요청 재시도와 USER 회귀는 H2 에서만 돈다. */
 @MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class MediaObservationLockTest extends MediaObservationCacheTest {
     @Test

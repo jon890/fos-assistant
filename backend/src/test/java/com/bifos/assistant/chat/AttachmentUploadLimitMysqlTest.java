@@ -2,7 +2,7 @@ package com.bifos.assistant.chat;
 
 import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 
-/** {@link AttachmentUploadLimitTest} 의 실제 HTTP 동시 upload 검사를 MySQL에서 함께 돌린다. */
+/** {@link AttachmentUploadLimitTest} 가운데 `@MysqlCase` 를 단 동시 upload 검사만 MySQL 에서 다시 돈다. */
 @MysqlIntegrationTest
 class AttachmentUploadLimitMysqlTest extends AttachmentUploadLimitTest {
 

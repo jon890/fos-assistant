@@ -16,7 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** H2와 같은 실제 서비스 회귀를 Flyway MySQL 스키마에서도 실행한다. */
+/** H2 회귀 가운데 `@MysqlCase` 를 단 동시 생성 검사와 이 클래스가 선언한 유일 제약 검사만 MySQL 에서 돈다. */
 @MysqlIntegrationTest
 class ContentDraftIdempotencyMysqlTest extends ContentDraftIdempotencyTest {
     @Test
