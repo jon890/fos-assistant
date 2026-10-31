@@ -20,3 +20,23 @@ export const readMemoryUses = (conversationId: string) =>
     `/api/chat/conversations/${conversationId}/memory-uses`,
     READ_FAILED,
   );
+
+/** 「참고한 기억」 항목의 단추다. `IRRELEVANT` 는 「관련 없음」, `WRONG` 은 「틀림」 이다. 기억 내용은 바뀌지 않는다. */
+export type MemoryUseReaction = "IRRELEVANT" | "WRONG";
+
+const REACT_FAILED = "반응을 남기지 못했어요. 잠시 뒤 다시 눌러 주세요.";
+
+/** 답 하나가 참고한 기억 하나에 반응을 남긴다. 성공하면 본문 없이 끝난다. */
+export const reactToMemoryUse = (
+  conversationId: string,
+  use: Pick<MemoryUse, "executionId" | "memoryId">,
+  reaction: MemoryUseReaction,
+) =>
+  memoryRequest<null>(
+    `/api/chat/conversations/${conversationId}/memory-uses/reactions`,
+    REACT_FAILED,
+    {
+      method: "POST",
+      body: { executionId: use.executionId, memoryId: use.memoryId, reaction },
+    },
+  );

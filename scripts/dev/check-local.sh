@@ -9,7 +9,7 @@
 #
 # 사용법: scripts/dev/check-local.sh [--fast | --skip-browser] [브라우저 spec ...]
 # --fast 는 Draft PR 을 열기 전에 쓴다. 몇 분 안에 끝나는 단계만 돈다.
-#   공개 정보, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, test/unit, 품질(컴파일과 구조 규칙, 포맷) 검사다.
+#   공개 정보, PR 크기, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, test/unit, 품질(컴파일과 구조 규칙, 포맷) 검사다.
 #   공개 정보 검사는 push 하면 되돌릴 수 없으므로 빼지 않고 맨 앞에 둔다.
 #   이 검사는 추적 파일의 지금 내용만 본다. 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
 #   backend 테스트, MySQL, 웹 빌드, 브라우저, e2e, 커넥터, Hermes 는 Draft CI 가 확인한다.
@@ -52,13 +52,26 @@ step() {
   if "$@" >"${log}" 2>&1; then
     echo "통과 ($((SECONDS - started))초)"
     # 통과해도 검사 범위가 줄었다는 알림은 보인다. check-public-safe.sh 는 값 목록이 없으면 형태만 검사하고 통과한다.
-    grep -A3 '^알림:' "${log}" || true
+    if [ "${name}" = pr-size ]; then
+      cat "${log}"
+    else
+      grep -A3 '^알림:' "${log}" || true
+    fi
   else
     echo "실패 ($((SECONDS - started))초)"
     echo "--- ${log} 의 끝 ---" >&2
     tail -n 40 "${log}" >&2
     exit 1
   fi
+}
+
+check_pr_size() {
+  if [ "$(git -C "${ROOT}" branch --show-current)" = main ] ||
+     ! git -C "${ROOT}" merge-base origin/main HEAD >/dev/null 2>&1; then
+    echo "알림: main 브랜치이거나 공통 조상을 구할 수 없어 PR 크기를 건너뛴다."
+    return 0
+  fi
+  (cd "${ROOT}" && node scripts/pr/pr-size.mjs origin/main HEAD)
 }
 
 build_web() {
@@ -97,6 +110,7 @@ PY
 echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
 if [ "${fast}" = true ]; then
   step public-safe     "${ROOT}/scripts/checks/check-public-safe.sh"
+  step pr-size         check_pr_size
   step file-length     node "${ROOT}/scripts/checks/check-file-length.mjs"
   step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
   step migration-versions bash -c "cd '${ROOT}' && node scripts/checks/check-migration-versions.mjs"

@@ -76,6 +76,8 @@ jobs:
           path: .review-tools
           fetch-depth: 1
           sparse-checkout: |
+            scripts/pr/pr-size.mjs
+            scripts/pr/pr-size-review.mjs
             scripts/pr/review-execution-summary.mjs
             scripts/pr/submitted-claude-reviews.jq
             scripts/review-execution-summary.mjs
@@ -232,6 +234,36 @@ jobs:
           # allowedTools 는 허용 목록이라 여기 없으면 위임 절이 조용히 자가검토로 떨어진다.
           # 서브 에이전트는 부모 권한을 상속하므로 disallowedTools 의 read-only 도 함께 적용된다.
           claude_args: '--model opus --allowedTools "Bash,Read,Grep,Glob,Agent,Task" --disallowedTools "Write,Edit"'
+
+      # 모델의 판단과 별개로 크기 지적을 게시한다. 도구는 기본 브랜치의 것을 쓴다.
+      - name: 크기 지적용 Node 준비
+        if: steps.review.outcome == 'success'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: 큰 PR 에 P3 크기 리뷰 게시
+        if: steps.review.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          REVIEW_HEAD: ${{ steps.review-target.outputs.head_sha }}
+        run: |
+          # 이 변경을 처음 배포하는 PR 에는 main 의 도구가 아직 없다.
+          SIZE_SCRIPT=.review-tools/scripts/pr/pr-size.mjs
+          REVIEW_SCRIPT=.review-tools/scripts/pr/pr-size-review.mjs
+          if [ ! -f "$SIZE_SCRIPT" ] || [ ! -f "$REVIEW_SCRIPT" ]; then exit 0; fi
+          BASE_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefOid -q .baseRefOid) || exit 0
+          if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+            git fetch --no-tags --unshallow origin || exit 0
+          fi
+          git fetch --no-tags origin "$BASE_SHA" || exit 0
+          SIZE_JSON=$(mktemp "$RUNNER_TEMP/pr-size.XXXXXX")
+          trap 'rm -f "$SIZE_JSON"' EXIT
+          # 상한 초과의 실패는 기존 크기 검사가 담당한다. JSON 은 그대로 읽는다.
+          node "$SIZE_SCRIPT" "$BASE_SHA" "$REVIEW_HEAD" --json > "$SIZE_JSON" || true
+          node "$REVIEW_SCRIPT" "$SIZE_JSON" "$REPO" "$PR_NUMBER" "$REVIEW_HEAD"
 
       # 실행 기록의 init 메시지에서 실제 모델 ID 를 읽어 notice 와 Job Summary 에 남긴다.
       # 리뷰가 실패해도 어떤 모델이었는지 남도록 always 로 돈다. 읽지 못해도 워크플로를 실패시키지 않는다.

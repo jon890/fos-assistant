@@ -25,6 +25,7 @@ type MemoryUse = {
 type ActivityReferences = (input: {
   sourceReads?: SourceReadSummary | null;
   memoryUses?: MemoryUse[];
+  memoryUseActions?: (use: MemoryUse) => React.ReactNode;
 }) => React.ReactNode;
 
 const FILE = new URL(
@@ -114,4 +115,31 @@ test("기억 제목은 평문으로만 그리고 고치는 링크를 둔다", as
   assert.match(html, /그룹/);
   assert.match(html, /href="\/memory"/);
   assert.doesNotMatch(html, /activity-source-reads/);
+});
+
+test("기억마다 부르는 쪽이 준 단추를 붙이고, 주지 않으면 단추가 없다", async () => {
+  const memoryUses: MemoryUse[] = [
+    {
+      executionId: 1,
+      memoryId: 5,
+      title: "딸 이름",
+      scope: "USER",
+      via: "FACTS",
+    },
+    {
+      executionId: 1,
+      memoryId: 6,
+      title: "취미",
+      scope: "USER",
+      via: "SEARCH",
+    },
+  ];
+  const withActions = await render({
+    memoryUses,
+    memoryUseActions: (use) => `[단추 ${use.memoryId}]`,
+  });
+  assert.match(withActions, /\[단추 5\]/);
+  assert.match(withActions, /\[단추 6\]/);
+  const without = await render({ memoryUses });
+  assert.doesNotMatch(without, /단추/);
 });
