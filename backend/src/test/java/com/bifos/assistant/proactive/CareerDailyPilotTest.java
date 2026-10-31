@@ -50,7 +50,6 @@ import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.TestClock;
@@ -135,9 +134,6 @@ class CareerDailyPilotTest {
 
     @Autowired
     TaskRepository tasks;
-
-    @Autowired
-    TaskTriggerRepository triggers;
 
     @Autowired
     TaskRunRepository runs;
@@ -534,7 +530,6 @@ class CareerDailyPilotTest {
 
     private void cleanTasks() {
         runs.deleteAll();
-        triggers.deleteAll();
         tasks.deleteAll();
         checks.deleteAllById(createdChecks);
         createdChecks.clear();

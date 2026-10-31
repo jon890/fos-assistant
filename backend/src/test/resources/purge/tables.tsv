@@ -60,8 +60,7 @@ result_delivery_attempt|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달�
 result_delivery_item|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 출처와 결과 식별자만 남긴다.
 subagent_usage_job|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|GAP|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
-task_run|USER|id|GAP|KEEP|KEEP|task_id와 trigger_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.
-task_trigger|USER|id|GAP|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 대화와 에이전트 하나의 삭제로 지우지 않는다.
+task_run|USER|id|GAP|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.
 toolset_hidden|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 toolset 설정이다.
 user_autonomy_preference|USER|user_id|GAP|KEEP|KEEP|user_id FK에 속한다. 사용자별 자동 실행 동의다.
 user_browser|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 브라우저 제거와 유휴 정리는 별도 경로가 맡는다.

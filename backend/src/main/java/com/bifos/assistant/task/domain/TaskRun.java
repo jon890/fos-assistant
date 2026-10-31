@@ -26,7 +26,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 발화 한 번이다(ADR-077).
  *
- * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「task_run」 이 갖는다. 같은 trigger 의 같은 예정 시각은 한 줄뿐이다.
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「task_run」 이 갖는다. 같은 작업의 같은 예정 시각은 한 줄뿐이다.
  *
  * <p>시각 칸은 {@code DATETIME(6)} 이라 마이크로초까지만 둔다.
  */
@@ -36,8 +36,8 @@ import org.hibernate.type.SqlTypes;
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_task_run_public_id", columnNames = "public_id"),
         @UniqueConstraint(
-            name = "uk_task_run_trigger_scheduled",
-            columnNames = {"trigger_id", "scheduled_for"})
+            name = "uk_task_run_task_scheduled",
+            columnNames = {"task_id", "scheduled_for"})
     })
 @Getter
 @Accessors(fluent = true)
@@ -56,9 +56,6 @@ public class TaskRun {
 
     @Column(name = "task_id", nullable = false, updatable = false)
     private Long taskId;
-
-    @Column(name = "trigger_id", nullable = false, updatable = false)
-    private Long triggerId;
 
     /** 그 발화 때의 작업 주인이다. 하루 발화 수를 조인 없이 센다. */
     @Column(name = "owner_user_id", nullable = false, updatable = false)
@@ -99,17 +96,16 @@ public class TaskRun {
 
 
     /** 열기를 기다리는 발화다. */
-    public static TaskRun queued(Long taskId, Long triggerId, Long ownerUserId, Instant scheduledFor, Instant now) {
-        return created(taskId, triggerId, ownerUserId, scheduledFor, TaskRunStatus.QUEUED, null, now);
+    public static TaskRun queued(Long taskId, Long ownerUserId, Instant scheduledFor, Instant now) {
+        return created(taskId, ownerUserId, scheduledFor, TaskRunStatus.QUEUED, null, now);
     }
 
 
     /** 열지 않고 건너뛴 발화다. 만든 때가 끝난 때다. */
     public static TaskRun skipped(
-        Long taskId, Long triggerId, Long ownerUserId, Instant scheduledFor, TaskRunReason reason, Instant now) {
+        Long taskId, Long ownerUserId, Instant scheduledFor, TaskRunReason reason, Instant now) {
         TaskRun run = created(
             taskId,
-            triggerId,
             ownerUserId,
             scheduledFor,
             TaskRunStatus.SKIPPED,
@@ -190,7 +186,6 @@ public class TaskRun {
 
     private static TaskRun created(
         Long taskId,
-        Long triggerId,
         Long ownerUserId,
         Instant scheduledFor,
         TaskRunStatus status,
@@ -198,7 +193,6 @@ public class TaskRun {
         Instant now) {
         TaskRun run = new TaskRun();
         run.taskId = Objects.requireNonNull(taskId, "taskId");
-        run.triggerId = Objects.requireNonNull(triggerId, "triggerId");
         run.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
         run.scheduledFor = Objects.requireNonNull(scheduledFor, "scheduledFor").truncatedTo(ChronoUnit.MICROS);
         run.status = status;

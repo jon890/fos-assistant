@@ -89,7 +89,6 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.proactive.evaluation.domain.ValueEvaluation", new Contract("proactive_value_evaluation", "제외")),
         Map.entry("com.bifos.assistant.task.domain.Task", new Contract("task", "C+U")),
         Map.entry("com.bifos.assistant.task.domain.TaskRun", new Contract("task_run", "제외")),
-        Map.entry("com.bifos.assistant.task.domain.TaskTrigger", new Contract("task_trigger", "C+U")),
         Map.entry("com.bifos.assistant.usage.execution.domain.ExecutionContextSource", new Contract("execution_context_source", "C")),
         Map.entry("com.bifos.assistant.usage.subagent.domain.SubagentUsageJob", new Contract("subagent_usage_job", "제외")),
         Map.entry("com.bifos.assistant.user.domain.AppUser", new Contract("app_user", "C+U")));

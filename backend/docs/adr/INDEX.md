@@ -51,7 +51,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-068](ADR-068-최상위-패키지는-한-방향-층-순서를-따르고-거꾸로-가는-의존은-port-나-이동으로-끊는다.md) | 최상위 패키지는 한 방향 층 순서를 따르고 거꾸로 가는 의존은 port 나 이동으로 끊는다 | Accepted |
 | [ADR-071](ADR-071-여러-출처의-문맥은-항목마다-출처와-권한과-신선도를-지닌-묶음으로-조립한다.md) | 여러 출처의 문맥은 항목마다 출처와 권한과 신선도를 지닌 묶음으로 조립한다 | Accepted |
 | [ADR-076](ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md) | 예약 작업은 Control Plane 이 갖고 발화한 실행은 대화 turn 경로로 돈다 | Accepted. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
-| [ADR-077](ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md) | 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다 | Accepted |
+| [ADR-077](ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md) | 발화는 trigger 와 예정 시각의 유일 제약으로 한 번만 만들고 놓친 발화는 작업마다 정한다 | Accepted. 일정 저장과 유일 제약 키, 행 잠금은 [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md)가 대체한다 |
 | [ADR-079](ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md) | 예약 작업은 사용자당 10개, 최소 간격 15분, 하루 48번으로 제한한다 | Accepted. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-081](ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) | 살펴보기 결과는 답 끝의 구조화 블록으로 받고 Control Plane 이 검사해 그린다 | Accepted. ADR-009 의 신뢰하지 않는 글 원칙을 살펴보기 결과에 적용한다. 「관심 없음」 주제를 digest 기간 동안 원문과 changeSinceLast 에 관계없이 내리는 예외는 [ADR-20261008 / check-finding-reaction](../../../docs/adr/ADR-20261008-check-finding-reaction.md) 이 둔다. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-090](ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md) | 한 번에 받는 경로도 Hermes 사건 스트림을 열어 도구 사건을 남긴다 | Accepted. ADR-013 이 사건을 옮겨 적는 경로에 한 번에 받는 경로를 더한다 |
@@ -75,6 +75,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 |
 | [ADR-20261015 / package-layout](ADR-20261015-package-layout.md) | 기능은 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면은 admin 으로 모은다 | Accepted. ADR-068 의 최상위 층 순서를 보완한다 |
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
+| [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |
 
 ## 보관
 

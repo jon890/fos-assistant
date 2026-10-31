@@ -4,10 +4,8 @@ import com.bifos.assistant.proactive.check.application.port.CheckNotificationPol
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.infra.TaskRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -25,7 +23,6 @@ public class ProactiveQuietHours implements CheckNotificationPolicy {
 
     private final ProactiveCheckGuard checks;
     private final TaskRepository tasks;
-    private final TaskTriggerRepository triggers;
 
 
     @Override
@@ -36,9 +33,7 @@ public class ProactiveQuietHours implements CheckNotificationPolicy {
                     return true;
                 }
                 return scheduleOf(check.userId(), check.agentId())
-                    .map(Task::id)
-                    .flatMap(triggers::findByTaskId)
-                    .map(trigger -> outsideQuietHours(trigger, now))
+                    .map(task -> outsideQuietHours(task, now))
                     .orElse(false);
             })
             .orElse(true);
@@ -51,8 +46,8 @@ public class ProactiveQuietHours implements CheckNotificationPolicy {
     }
 
 
-    private static boolean outsideQuietHours(TaskTrigger trigger, Instant now) {
-        LocalTime localTime = now.atZone(trigger.zone()).toLocalTime();
+    private static boolean outsideQuietHours(Task task, Instant now) {
+        LocalTime localTime = now.atZone(task.zone()).toLocalTime();
         return !localTime.isBefore(QUIET_END) && localTime.isBefore(QUIET_START);
     }
 }
