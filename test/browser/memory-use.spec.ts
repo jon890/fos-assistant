@@ -315,3 +315,50 @@ test("제목은 글자 그대로 보인다", async ({ page }) => {
   await expect(item).toContainText("<b>굵게</b>");
   await expect(item.locator("b")).toHaveCount(0);
 });
+
+test("참고한 기억의 틀림 단추는 그 답과 기억을 보내고 고치는 길을 보인다", async ({
+  page,
+}) => {
+  const { conversationId, executionId } = await createConversation(
+    page,
+    "참고 기억 검사 단추",
+  );
+  await holdEvents(page, conversationId);
+  await withActivity(page, conversationId);
+  await emptyCaptures(page, conversationId);
+  await page.route(
+    `**/api/chat/conversations/${conversationId}/memory-uses`,
+    (route: Route) => route.fulfill({ json: threeUses(executionId) }),
+  );
+  const sent: unknown[] = [];
+  await page.route(
+    `**/api/chat/conversations/${conversationId}/memory-uses/reactions`,
+    (route: Route) => {
+      sent.push(route.request().postDataJSON());
+      return route.fulfill({ status: 204, body: "" });
+    },
+  );
+  await page.goto(`/chat/${conversationId}`);
+  await page
+    .getByTestId("activity-block")
+    .getByTestId("activity-toggle")
+    .click();
+
+  const first = page.getByTestId("activity-memory-use").nth(0);
+  await first.getByRole("button", { name: "딸 이름 기억: 틀림" }).click();
+
+  await expect(first.getByTestId("memory-use-feedback-sent")).toContainText(
+    "틀림으로 남겼어요",
+  );
+  await expect(
+    first.getByRole("link", { name: "기억 화면에서 고치기" }),
+  ).toHaveAttribute("href", "/memory");
+  expect(sent).toEqual([{ executionId, memoryId: 12, reaction: "WRONG" }]);
+  // 다른 항목의 단추는 그대로 남는다
+  await expect(
+    page
+      .getByTestId("activity-memory-use")
+      .nth(1)
+      .getByRole("button", { name: "우리 집 규칙 기억: 관련 없음" }),
+  ).toBeVisible();
+});

@@ -191,7 +191,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 같은 트랜잭션에서 두 가지를 함께 지운다.
 아직 보내지 않은 대기 메시지(`chat_pending_message`)는 지운 대화에 보낼 곳이 없어 지운다.
-판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다.
+판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다. 「참고한 기억」 단추 사건은 그 대화의 것만 지우고 넓히지 않는다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
 승인 줄과 금융 실행 원장의 본문도 지우되 열린 줄과 당일 금융 합계가 읽는 성공 줄은 본문 삭제를 미룬다.
@@ -632,6 +632,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
 - `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문의 해시다. 직접 등록한 항목과 민감 항목은 비어 있다
+- `archivable` 은 정비 루프가 자동 보관해도 되는지의 표시이고 기본은 거짓이다. `memory_remember` 가 새 항목을 만들 때만 모델의 인자로 적는다. 항목의 종류를 나누는 칸이 아니다([ADR-20261015 / memory-maintenance](../../docs/adr/ADR-20261015-memory-maintenance.md))
 
 **`ACCEPTED` 인 항목만 주입한다.** `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
 주입할 때 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목 가운데, 그 실행의 에이전트가 받는 `collection` 의 항목만 고른다.

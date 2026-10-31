@@ -221,6 +221,46 @@ class McpMemoryRememberToolTest {
 
 
     @Test
+    @DisplayName("archivable 을 주지 않은 새 기억은 자동 보관 허락이 거짓이고 true 로 준 새 기억만 참이다")
+    void archivableDefaultsToFalse() throws Exception {
+        askedInThisTurn();
+
+        assertThat(text(call(remember("생일", "생일은 3월 2일이다", null)))).startsWith(REMEMBERED);
+        assertThat(text(call(remember("출장", "이번 주 부산 출장 중이다", null).put("archivable", true))))
+            .startsWith(REMEMBERED);
+
+        assertThat(memoriesOfDad())
+            .extracting(Memory::title, Memory::archivable)
+            .containsExactly(tuple("생일", false), tuple("출장", true));
+    }
+
+
+    @Test
+    @DisplayName("기존 기억을 고칠 때 준 archivable 은 그 항목의 자동 보관 허락을 바꾸지 않는다")
+    void archivableIsIgnoredOnUpdate() throws Exception {
+        askedInThisTurn();
+        assertThat(text(call(remember("직업", "교사다", null)))).startsWith(REMEMBERED);
+        Memory created = onlyMemory();
+
+        call(remember("직업", "교감이다", null).put("memory_id", created.id()).put("archivable", true));
+
+        assertThat(memories.findById(created.id()).orElseThrow().archivable()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("archivable 이 참거짓이 아니면 인자 오류다")
+    void rejectsNonBooleanArchivable() throws Exception {
+        askedInThisTurn();
+
+        JsonNode response = body(send(signed(remember("취미", "등산을 좋아한다", null).put("archivable", "yes"))));
+
+        assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
+        assertThat(memoriesOfDad()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("질문의 부정이 본문에서 사라지면 제안으로 내린다")
     void proposesWhenContentDropsNegation() throws Exception {
         askedInThisTurn("매운 음식을 못 먹는다.");
