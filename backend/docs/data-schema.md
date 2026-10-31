@@ -8,7 +8,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
@@ -326,18 +326,22 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 **주인과 공개 범위는 따로다.** 그룹에 공개해도 만든 사람(`owner_user_id`)이 계속 관리하고, `PRIVATE` 에서는 주인이 꼭 있어야 한다. 이 결정 전에 운영에서 등록한 `GROUP` 에이전트는 주인이 비어 있어 `ADMIN` 만 관리한다([ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md)).
 추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다([ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md)).
 
-### model_tier_definition
+### group_setting
 
-그룹이 정한 모델 단계의 mapping 이다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다.
-`provider` 가 비면 요청한 에이전트의 기본 provider 로, `model` 이 비면 에이전트 기본 모델로 돈다.
+그룹 설정이다. 그룹과 설정 종류(`setting_key`)마다 줄 하나를 두고 값은 JSON 문자열(`setting_value`)이다. 기본 키는 (`group_id`, `setting_key`) 다.
+설정 성격의 그룹 데이터는 새 테이블 대신 여기에 새 키로 둔다. 결정과 컬럼의 뜻은 [ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md) 의 「데이터 모델」 이 갖는다.
 
-### model_tier_group_setting
+`MODEL` 은 그룹의 모델 설정이다. 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 버전 번호와 함께 담는다. 읽고 쓰는 일은 `ModelSettingStore` 가 한다.
 
-그룹의 기본 모델 단계다. `default_tier` 가 비면 그룹 기본 단계가 없다.
+- 줄이 없는 그룹은 다섯 칸이 모두 비었고 숨김도 없다
+- 칸의 provider 가 비면 요청한 에이전트의 기본 provider 로, 세 값이 모두 비면 에이전트 기본 모델로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
+- 숨김 항목의 `model` 이 null 이면 그 provider 전체를 숨긴 것이다
+- 모르는 버전이거나 형식이 깨진 JSON 은 설정이 없는 것으로 보지 않고 오류로 올린다. 없는 것으로 보면 숨김이 풀린 채 실행된다
+- 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
+- `updated_at` 은 옮겨 온 줄에서 비어 있다. 바꾼 시각을 모른다
 
-### model_hidden
-
-그룹이 숨긴 provider 와 모델만 적는다. `model` 이 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다.
+옛 표 `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 은 `V20261031171501` 부터 `V20261031171503` 이 이 표로 옮기고 지웠다. 기본 단계 표의 이름을 바꿔 넓혔으므로 표 수는 둘 줄었다.
+옛 단계 코드 `FAST`, `BALANCED`, `DEEP` 은 같은 이관에서 `INSTANT`, `MEDIUM`, `HIGH` 로 바뀌었다. `app_user.model_default_tier`, `conversation.model_tier`, `task.model_tier` 가 대상이고, `agent_execution.model_tier` 는 그때 고른 값의 기록이라 옛 이름 그대로다.
 
 ### toolset_hidden
 
@@ -492,8 +496,10 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `vault_key_id` | 본문을 암호화한 `user_data_key.id` |
 | `vault_body` | 암호화한 본문(`v1.<IV>.<암호문과 태그>`). 평문은 두지 않는다 |
 | `vault_fingerprint` | 대화 번호, 경로, 본문 바이트의 SHA-256 16진수. `(vault_user_id, vault_fingerprint)` 에 유일 제약이 있어 같은 보관 요청은 한 건이다 |
+| `vault_bundle_id` | 이 행이 든 묶음의 뿌리 행 `id`. 뿌리 행과 묶음이 아닌 보관 사본, 대화 결과물 행은 비어 있다. `(vault_bundle_id, path)` 에 색인이 있다 |
 
 보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
+묶음 안 파일 행도 `vault_user_id` 가 채워져 있어 같이 남는다. 묶음 안 파일의 `vault_fingerprint` 는 묶음 지문과 경로로 만든다. 묶음은 뿌리 번호로만 지우고 안의 행을 같은 문장에서 지운다.
 외래 키를 두지 않는다. 대화와 메시지가 지워져도 보관 사본 행은 남는다.
 
 ### result_delivery
@@ -896,6 +902,17 @@ action을 지우면 실행 내용도 지운다.
 `open_marker` 는 `PROPOSED` 와 `OPEN` 이면 1 이고 끝난 상태면 비어 있다. 유일 제약은 비어 있는 값을 서로 다르다고 보므로 끝난 줄은 걸리지 않는다. 이 칸은 유일 제약에만 쓴다.
 외래 키는 사용자에만 둔다. 대화와 실행이 지워져도 줄은 남는다. 대화는 숨기기만 하기 때문이다.
 
+먼저 살펴보기의 제안도 이 표의 `PROPOSED` 줄이다([ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md)). 새 테이블을 만들지 않고 아래 칸을 더했다. 사람이 직접 더한 할 일과 대화 중 제안한 할 일은 네 칸이 모두 비어 있다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `detail_json`, `detail_key_id` | 제안의 글, 근거, 모델이 낸 자유 JSON 을 사용자 데이터 key 로 암호화한 본문과 key 식별자. 암호화가 꺼져 있으면 평문이고 key 식별자는 비어 있다. AAD 는 사용자와 `dedupe_key` 로 정한다. 크기만 검사하고 구조를 보지 않는다 |
+| `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
+| `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
+
+**`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
+같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
+
 ### attention_control
 
 한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고친다.
@@ -936,6 +953,7 @@ action을 지우면 실행 내용도 지운다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
+- `loop_enabled` 와 `snoozed_until` 은 `CHECK` 줄만 쓰는 매일 루프의 동의와 쉬기 끝 시각(UTC)이다. 동의는 일정의 켜짐(`state`)과 다른 동의라 따로 둔다. 기본은 동의 없음이고 쉬기는 비어 있으면 쉬지 않는다
 - `conversation_id` 는 `SINGLE` 일 때 결과를 쌓는 대화다. 첫 발화가 만들기 전에는 비어 있고, `NEW_PER_RUN` 은 늘 비어 있다
 - `model_tier` 가 비면 발화가 대화의 모델 선택을 건드리지 않는다
 - 외래 키는 `owner_user_id` 에만 둔다. 에이전트와 대화는 지워도 행이 남는 표라 걸지 않는다
@@ -1002,9 +1020,9 @@ action을 지우면 실행 내용도 지운다.
 
 ### `proactive_loop_setting`
 
-사용자가 에이전트마다 매일 루프를 켠 설정이다. [매일 루프](../../docs/features/proactive.md)의 「사용자 설정」 이 뜻을 갖는다.
-줄이 없으면 꺼짐이다. 사용자나 에이전트를 지우면 함께 지운다.
-`(user_id, agent_id)` 는 유일하다. 하루 상한을 셀 때 그 사용자의 줄을 모두 쓰기 잠금으로 읽는다.
+사용자가 에이전트마다 매일 루프를 켠 옛 설정이다. **읽는 곳이 없다.** 켜짐과 쉬기는 사용자와 에이전트마다 하나인 `CHECK` `task` 가 갖는다([매일 루프](../../docs/features/proactive.md)의 「사용자 설정」).
+`task.loop_enabled` 와 `task.snoozed_until` 을 더하는 마이그레이션이 켜진 줄의 동의와 쉬기 시각을 같은 사용자·에이전트의 `CHECK` 작업으로 복사했다. 꺼진 줄은 복사하지 않아 일정이 켜져 있어도 동의 없음으로 남고, 작업의 `state` 는 건드리지 않았다. 짝지을 `CHECK` 작업이 없는 켜진 줄은 옮길 곳이 없어 동의 없음이 된다.
+에이전트를 지울 때 이 표의 줄만 함께 지운다. 표 자체는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
 
 ### `proactive_loop_run`
 
@@ -1022,6 +1040,14 @@ action을 지우면 실행 내용도 지운다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
+
+카드 범위와 미루기, 재전송 합치기를 위한 칸이 있다. 아직 쓰는 곳이 없고 기본은 모두 비어 있다(ADR-20261101 의 순서 5 가 쓴다).
+
+| 칸 | 뜻 |
+| --- | --- |
+| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다 |
+| `until_at` | 미루기가 끝나는 시각 |
+| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일해 같은 키의 재전송이 한 줄이 된다 |
 
 정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
 `detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.

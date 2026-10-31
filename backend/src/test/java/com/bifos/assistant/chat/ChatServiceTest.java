@@ -27,12 +27,12 @@ import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierDefinition;
+import com.bifos.assistant.chat.modelchoice.domain.GroupSetting;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierDefinitionRepository;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.chat.turn.presentation.ChatController;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
@@ -137,7 +137,7 @@ class ChatServiceTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ModelTierDefinitionRepository tierDefinitions;
+    GroupSettingRepository groupSettings;
 
     @Autowired
     TransactionTemplate transactions;
@@ -266,29 +266,28 @@ class ChatServiceTest {
 
 
     @Test
-    @DisplayName("깨진 단계 정의로 모델 해석이 실패해도 질문과 FAILED 실행을 남기고 Hermes에는 제출하지 않는다")
+    @DisplayName("깨진 그룹 모델 설정으로 모델 해석이 실패해도 질문과 FAILED 실행을 남기고 Hermes에는 제출하지 않는다")
     void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
         Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         transactions.executeWithoutResult(status -> conversations.chooseModelTierIfActive(
-            conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.FAST));
-        tierDefinitions.save(ModelTierDefinition.of(dad.groupId(), ModelTier.FAST, null, "example-fast", "low"));
+            conversation.id(), dad.id(), ModelSelectionMode.TIER, ModelTier.INSTANT));
+        groupSettings.save(GroupSetting.of(
+            dad.groupId(), GroupSetting.MODEL, "{\"version\":99}", Instant.parse("2026-11-01T00:00:00Z")));
 
         assertThatThrownBy(() -> chat.send(dad, conversation.id(), "질문", null))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(IllegalStateException.class);
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).singleElement();
         assertThat(executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 10)))
             .singleElement()
             .satisfies(execution -> {
                 assertThat(execution.status()).isEqualTo(ExecutionStatus.FAILED);
-                assertThat(execution.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                assertThat(execution.errorCode()).isEqualTo("MODEL_TIER_RESOLVE_FAILED");
                 assertThat(eventsOf(execution.id())).singleElement().satisfies(event -> {
                     assertThat(event.eventType()).isEqualTo(ExecutionEventType.RUN_FAILED);
-                    assertThat(event.detail()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+                    assertThat(event.detail()).isEqualTo("MODEL_TIER_RESOLVE_FAILED");
                 });
             });
         assertThat(stub().received()).isEmpty();
@@ -1362,7 +1361,7 @@ class ChatServiceTest {
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
-        tierDefinitions.deleteAll();
+        groupSettings.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();
         agents.deleteAll();

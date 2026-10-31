@@ -17,10 +17,16 @@ public final class ArtifactVaultDtos {
     public record VaultRequest(@NotNull UUID conversationId, @NotBlank String path) {
     }
 
-    public record VaultItemView(Long id, String path, long byteSize, Instant vaultedAt) {
+    /**
+     * 보관본 하나다.
+     *
+     * @param byteSize 묶음 전체의 평문 바이트 수
+     * @param fileCount 묶음의 파일 수. 뿌리를 센다
+     */
+    public record VaultItemView(Long id, String path, long byteSize, int fileCount, Instant vaultedAt) {
 
         static VaultItemView of(ArtifactVaultItem item) {
-            return new VaultItemView(item.id(), item.path(), item.byteSize(), item.vaultedAt());
+            return new VaultItemView(item.id(), item.path(), item.byteSize(), item.fileCount(), item.vaultedAt());
         }
     }
 

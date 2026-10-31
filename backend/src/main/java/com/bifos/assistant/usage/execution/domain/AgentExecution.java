@@ -4,7 +4,6 @@ import com.bifos.assistant.usage.pricing.domain.EstimatedCost;
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.domain.TokenUsage;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.usage.execution.domain.type.EventObservation;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;
@@ -104,9 +103,9 @@ public class AgentExecution {
     @Column(name = "reasoning_effort_source", length = 20)
     private ReasoningEffortSource reasoningEffortSource;
 
-    @Enumerated(EnumType.STRING)
+    /** 그때 고른 단계의 이름이다. 지난 단계 이름(FAST 등)도 그대로 남아 있어 enum 으로 읽지 않는다. */
     @Column(name = "model_tier", length = 16)
-    private ModelTier modelTier;
+    private String modelTier;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
@@ -447,7 +446,7 @@ public class AgentExecution {
         private String model;
         private String reasoningEffort;
         private ReasoningEffortSource reasoningEffortSource;
-        private ModelTier modelTier;
+        private String modelTier;
         private CostMode costMode;
         private ExecutionStatus status;
         private String errorCode;
@@ -555,7 +554,7 @@ public class AgentExecution {
         }
 
 
-        public Builder modelTier(ModelTier modelTier) {
+        public Builder modelTier(String modelTier) {
             this.modelTier = modelTier;
             return this;
         }

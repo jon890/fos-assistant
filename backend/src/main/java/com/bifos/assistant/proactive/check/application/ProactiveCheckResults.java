@@ -5,6 +5,7 @@ import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NOTHING_NEW_NOTICE;
 
 import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
+import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.proactive.check.application.dto.AnnouncedKey;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultRead;
@@ -49,6 +50,10 @@ class ProactiveCheckResults {
     private volatile List<ProactiveCheckProblem> pendingProblems = List.of();
     /** 결과 블록 v2를 검사해 만든 보고다. */
     private volatile CheckReport pendingReport;
+    /** 결과 블록의 제안 항목. 스위치가 켜져 있을 때만 {@link #saveFindings} 가 할 일 줄로 저장한다. */
+    private volatile List<SuggestedItem> pendingSuggestions = List.of();
+    /** 제안 항목을 낸 turn 의 실행 번호다. */
+    private volatile Long suggestionExecutionId;
 
 
     ProactiveCheckResults(CurrentUser owner, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
@@ -84,6 +89,10 @@ class ProactiveCheckResults {
         }
         CheckResultBlock block = read.block();
         outcome = block.outcome();
+        suggestionExecutionId = executionId;
+        pendingSuggestions = block.suggestions().stream()
+            .map(each -> new SuggestedItem(each.id(), each.title(), each.detailJson()))
+            .toList();
         if (block.outcome() == CheckOutcome.NOTHING_NEW
             && block.findings().isEmpty()
             && block.questions().isEmpty()
@@ -156,6 +165,28 @@ class ProactiveCheckResults {
         List<ProactiveCheckProblem> problems = pendingProblems;
         if (!problems.isEmpty()) {
             deps.problems().saveAll(problems);
+        }
+        saveSuggestions();
+    }
+
+
+    /**
+     * 기능 스위치가 켜져 있을 때만 제안 항목을 할 일 줄로 저장한다. 꺼져 있으면 지금 동작 그대로 아무것도 하지 않는다. 알리지 않는
+     * 살펴보기(자동 실행)는 저장하지 않는다. 저장 실패가 발견 저장과 살펴보기의 끝을 막지 않게 로그만 남긴다.
+     */
+    private void saveSuggestions() {
+        List<SuggestedItem> items = pendingSuggestions;
+        if (items.isEmpty() || silent() || !deps.suggestionProperties().current().enabled()) {
+            return;
+        }
+        try {
+            deps.followUps().proposeSuggestion(suggestionExecutionId, items);
+        } catch (RuntimeException ex) {
+            log.warn(
+                "살펴보기 제안을 저장하지 못했다 checkId={} executionId={} error={}",
+                check.id(),
+                suggestionExecutionId,
+                ex.getClass().getSimpleName());
         }
     }
 

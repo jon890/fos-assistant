@@ -110,11 +110,26 @@ public class FirstResponseLatencyService {
 
 
     /** 날짜와 모델 단계가 같은 turn 의 묶음 키다. 단계가 없는 묶음은 null 이다. */
-    private record Group(LocalDate date, ModelTier modelTier) {
+    private record Group(LocalDate date, String modelTier) {
     }
 
 
-    /** 날짜 오름차순이고, 같은 날짜 안에서는 단계 선언 순서, 단계 없음이 마지막이다. */
+    /** 지금 단계 다음에 둘 지난 단계 이름이다. 실행 기록은 그때 고른 이름을 그대로 갖는다. */
+    private static final List<String> LEGACY_TIERS = List.of("FAST", "BALANCED", "DEEP");
+
+    /** 날짜 오름차순이고, 같은 날짜 안에서는 단계 선언 순서, 지난 단계, 모르는 이름, 단계 없음 차례다. */
     private static final Comparator<Group> GROUP_ORDER = Comparator.comparing(Group::date)
-        .thenComparing(Group::modelTier, Comparator.nullsLast(Comparator.naturalOrder()));
+        .thenComparing(Group::modelTier, Comparator.nullsLast(
+            Comparator.comparingInt(FirstResponseLatencyService::tierRank).thenComparing(Comparator.naturalOrder())));
+
+
+    private static int tierRank(String tier) {
+        for (ModelTier current : ModelTier.values()) {
+            if (current.name().equals(tier)) {
+                return current.ordinal();
+            }
+        }
+        int legacy = LEGACY_TIERS.indexOf(tier);
+        return ModelTier.values().length + (legacy < 0 ? LEGACY_TIERS.size() : legacy);
+    }
 }

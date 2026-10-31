@@ -1,6 +1,5 @@
 package com.bifos.assistant.chat.conversation.domain;
 
-import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
 
 /**
@@ -12,8 +11,8 @@ import java.time.Instant;
  * @param requestReceivedAt 요청을 받은 시각
  * @param submittedAt Hermes 에 제출하기 직전 시각
  * @param firstDeltaAt 첫 assistant delta 를 받은 시각
- * @param modelTier 그 실행의 모델 단계. 단계를 고르지 않은 실행은 null
+ * @param modelTier 그 실행의 모델 단계 이름. 지난 단계 이름일 수 있다. 단계를 고르지 않은 실행은 null
  */
 public record TurnTiming(
-    Long executionId, Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, ModelTier modelTier) {
+    Long executionId, Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, String modelTier) {
 }

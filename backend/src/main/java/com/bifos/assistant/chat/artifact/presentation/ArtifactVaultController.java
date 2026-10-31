@@ -24,9 +24,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
- * 사용자가 보관한 결과물의 목록과 읽기, 지우기다. 주인은 웹 토큰의 사용자다.
+ * 사용자가 보관한 결과물의 목록과 읽기, 지우기다. 주인은 웹 토큰의 사용자다. 묶음은 뿌리 파일의 번호 하나로 읽고 지운다.
  *
  * <p>보관은 대화 주인만 할 수 있다. 읽기와 지우기는 보관 주인만 한다. 남의 번호는 없는 번호와 같은 응답이다.
  */
@@ -57,18 +58,54 @@ public class ArtifactVaultController {
 
 
     /**
-     * 보관본 본문이다. 스크립트가 돌지 않는 머리글을 붙이고 캐시하지 않는다. {@code download=1} 이면 내려받기다.
+     * 보관본 뿌리 파일의 본문이다. 스크립트가 돌지 않는 머리글을 붙이고 캐시하지 않는다. {@code download=1} 이면 내려받기다.
      */
     @GetMapping("/{id}/content")
     public ResponseEntity<byte[]> content(@PathVariable Long id, @RequestParam(required = false) String download) {
-        ArtifactVaultContent content = vault.read(currentUser.require().id(), id);
-        ContentDisposition disposition = ("1".equals(download)
+        return body(vault.read(currentUser.require().id(), id), "1".equals(download));
+    }
+
+
+    /**
+     * 보관본 안의 파일 하나다. 묶음 미리보기의 HTML 이 상대 주소로 부르는 사진과 스타일이 이 길로 온다.
+     *
+     * <p>{@code {*path}} 는 디코딩한 상대 경로를 앞의 {@code /} 와 함께 준다. 파일마다 보관 주인을 다시 확인한다.
+     */
+    @GetMapping("/{id}/files/{*path}")
+    public ResponseEntity<byte[]> file(@PathVariable Long id, @PathVariable("path") String path) {
+        String relativePath = path.startsWith("/") ? path.substring(1) : path;
+        return body(vault.readFile(currentUser.require().id(), id, relativePath), false);
+    }
+
+
+    /** 묶음 전체를 zip 으로 내려받는다. 풀리지 않는 파일이 있으면 쓰기 전에 거절한다. */
+    @GetMapping("/{id}/archive")
+    public ResponseEntity<StreamingResponseBody> archive(@PathVariable Long id) {
+        Long owner = currentUser.require().id();
+        String name = vault.prepareArchive(owner, id);
+        ContentDisposition disposition = ContentDisposition.attachment().filename(name, StandardCharsets.UTF_8).build();
+        StreamingResponseBody stream = out -> vault.writeArchive(owner, id, out);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("application/zip"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .header("Content-Security-Policy", SandboxedContentPolicy.NONE)
+            .header("X-Content-Type-Options", "nosniff")
+            .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+            .body(stream);
+    }
+
+
+    private static ResponseEntity<byte[]> body(ArtifactVaultContent content, boolean download) {
+        ContentDisposition disposition = (download
             ? ContentDisposition.attachment()
             : ContentDisposition.inline())
                 .filename(content.name(), StandardCharsets.UTF_8)
                 .build();
+        String type = content.contentType().startsWith("text/")
+            ? content.contentType() + ";charset=UTF-8"
+            : content.contentType();
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(content.contentType() + ";charset=UTF-8"))
+            .contentType(MediaType.parseMediaType(type))
             .contentLength(content.body().length)
             .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
             .header("Content-Security-Policy", SandboxedContentPolicy.HTML)

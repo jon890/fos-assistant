@@ -404,6 +404,38 @@ class CheckResultParserTest {
     }
 
 
+    @Test
+    @DisplayName("제안 항목은 제목이 있는 객체만 읽고 5개까지 받으며 본문은 구조를 보지 않고 JSON 글로 옮긴다")
+    void readsSuggestionsWithoutInspectingDetail() {
+        CheckResultBlock result = parser.read(block("""
+                {"version":3,"outcome":"NOTHING_NEW","suggestions":[
+                  {"id":"s1","title":"첫 제안","detail":{"why":"근거","refs":[1,2]}},
+                  {"title":"식별자 없는 제안"},
+                  {"id":"x"},
+                  "문자열 원소",
+                  {"id":"s4","title":"넷째 제안","detail":null},
+                  {"id":"s5","title":"다섯째 제안"},
+                  {"id":"s6","title":"여섯째 제안"},
+                  {"id":"s7","title":"일곱째 제안"}]}
+                """)).block();
+
+        assertThat(result.suggestions())
+            .extracting(CheckResultBlock.Suggestion::title)
+            .containsExactly("첫 제안", "식별자 없는 제안", "넷째 제안", "다섯째 제안", "여섯째 제안");
+        assertThat(result.suggestions().getFirst().id()).isEqualTo("s1");
+        assertThat(result.suggestions().getFirst().detailJson()).isEqualTo("{\"why\":\"근거\",\"refs\":[1,2]}");
+        assertThat(result.suggestions().get(1).id()).isNull();
+        assertThat(result.suggestions().get(2).detailJson()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("제안 항목이 없는 블록은 빈 목록을 낸다")
+    void blockWithoutSuggestionsHasEmptyList() {
+        assertThat(parser.read(block(VALID_JSON)).block().suggestions()).isEmpty();
+    }
+
+
     private static String longFinding() {
         String longItem = "\"" + "다".repeat(301) + "\"";
         String items = String.join(",", longItem, longItem, longItem, longItem, longItem, longItem, longItem);

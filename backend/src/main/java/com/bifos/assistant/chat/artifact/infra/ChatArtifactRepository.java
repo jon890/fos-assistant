@@ -69,11 +69,18 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     long sumVaultBytes(@Param("userId") Long userId);
 
 
-    /** 그 사용자의 보관 사본을 새로 만든 것부터 준다. 암호화한 본문은 목록에 필요 없어 읽지 않는다. */
+    /**
+     * 그 사용자의 보관본을 새로 만든 것부터 준다. 묶음은 뿌리 행 하나로 보이고 안의 파일 수와 바이트를 더한다.
+     *
+     * <p>암호화한 본문은 목록에 필요 없어 읽지 않는다.
+     */
     @Query("""
-            select a.id as id, a.path as path, a.byteSize as byteSize, a.createdAt as createdAt
+            select a.id as id, a.path as path, a.byteSize as byteSize, a.createdAt as createdAt,
+                   (select count(p.id) from ChatArtifact p where p.vaultBundleId = a.id) as partCount,
+                   (select coalesce(sum(p.byteSize), 0) from ChatArtifact p where p.vaultBundleId = a.id) as partBytes
               from ChatArtifact a
              where a.vaultUserId = :userId
+               and a.vaultBundleId is null
              order by a.id desc
             """)
     List<ArtifactVaultRow> listVaulted(@Param("userId") Long userId);
@@ -82,11 +89,38 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     Optional<ChatArtifact> findByIdAndVaultUserId(Long id, Long vaultUserId);
 
 
+    /** 주인의 보관본 가운데 뿌리 행이다. 묶음 안 파일의 번호로는 찾지 못한다. */
+    Optional<ChatArtifact> findByIdAndVaultUserIdAndVaultBundleIdIsNull(Long id, Long vaultUserId);
+
+
+    /** 주인의 묶음 안에서 그 경로의 파일이다. 주인을 다시 확인한다. */
+    Optional<ChatArtifact> findByVaultBundleIdAndPathAndVaultUserId(Long vaultBundleId, String path, Long vaultUserId);
+
+
+    /** 주인의 묶음 안 파일의 번호와 경로를 경로 순으로 준다. 본문은 읽지 않는다. */
+    @Query("""
+            select p.id as id, p.path as path
+              from ChatArtifact p
+             where p.vaultBundleId = :bundleId
+               and p.vaultUserId = :userId
+             order by p.path asc
+            """)
+    List<ArtifactVaultPart> listParts(@Param("bundleId") Long bundleId, @Param("userId") Long userId);
+
+
     Optional<ChatArtifact> findByVaultUserIdAndVaultFingerprint(Long vaultUserId, String vaultFingerprint);
 
 
-    /** 주인의 보관 사본 하나를 지운다. 지운 줄 수가 0 이면 없거나 남의 것이다. */
+    /**
+     * 주인의 보관본 하나를 지운다. 묶음이면 안의 파일도 함께 지운다. 묶음 안 파일의 번호로는 지우지 못한다.
+     *
+     * <p>지운 줄 수가 0 이면 없거나 남의 것이다.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("delete from ChatArtifact a where a.id = :id and a.vaultUserId = :userId")
+    @Query("""
+            delete from ChatArtifact a
+             where a.vaultUserId = :userId
+               and ((a.id = :id and a.vaultBundleId is null) or a.vaultBundleId = :id)
+            """)
     int deleteVaulted(@Param("id") Long id, @Param("userId") Long userId);
 }

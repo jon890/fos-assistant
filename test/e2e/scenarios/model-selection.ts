@@ -148,35 +148,37 @@ export const modelSelectionScenario: Scenario = {
       `실제로 돈 모델을 적지 않았다: ${JSON.stringify(probed)}`,
     );
 
-    step("단계 정의는 DB 만 갖는다. 저장 전에는 세 단계가 비어 있고 관리자가 저장한 뒤 그 값을 쓴다");
+    step("칸 정의는 DB 만 갖는다. 저장 전에는 다섯 칸이 비어 고를 칸이 없고 관리자가 저장한 뒤 그 값을 쓴다");
     const emptyTiers = expectStatus(
       await call(context, "/chat/model-tiers?agentCode=dad", { token: context.tokens.dad }),
       200,
       "저장 전 단계 조회",
     ).json<{ tiers: { model: string | null }[] }>();
     expect(
-      emptyTiers.tiers.length === 3 && emptyTiers.tiers.every((tier) => tier.model === null),
-      `저장 전인데 단계에 모델이 있다: ${JSON.stringify(emptyTiers)}`,
+      emptyTiers.tiers.length === 0,
+      `저장 전인데 고를 칸이 있다: ${JSON.stringify(emptyTiers)}`,
     );
     expectStatus(await call(context, "/chat/model-tiers/group", {
       method: "PUT",
       token: context.tokens.dad,
       body: {
         tiers: [
-          { tier: "FAST", provider: null, model: "example-fast", reasoningEffort: "low" },
-          { tier: "BALANCED", provider: null, model: "example-balanced", reasoningEffort: "medium" },
-          { tier: "DEEP", provider: null, model: "example-deep", reasoningEffort: "high" },
+          { tier: "INSTANT", provider: "openai-codex", model: "example-fast", reasoningEffort: "low" },
+          { tier: "MEDIUM", provider: "openai-codex", model: "example-balanced", reasoningEffort: "medium" },
+          { tier: "HIGH", provider: "openai-codex", model: "example-deep", reasoningEffort: "high" },
+          { tier: "EXTRA_HIGH", provider: null, model: null, reasoningEffort: null },
+          { tier: "PRO", provider: null, model: null, reasoningEffort: null },
         ],
         defaultTier: null,
       },
     }), 204, "그룹 단계 저장");
 
-    step("세 단계는 저장한 정의와 profile catalog로 해석하고 기본값 복귀는 요청 값을 비운다");
+    step("세 칸은 저장한 정의와 profile catalog로 해석하고 기본값 복귀는 요청 값을 비운다");
     const tierConversationId = await emptyConversation(context);
     const tierCases = [
-      { tier: "FAST", model: "example-fast", effort: "low" },
-      { tier: "BALANCED", model: "example-balanced", effort: "medium" },
-      { tier: "DEEP", model: "example-deep", effort: "high" },
+      { tier: "INSTANT", model: "example-fast", effort: "low" },
+      { tier: "MEDIUM", model: "example-balanced", effort: "medium" },
+      { tier: "HIGH", model: "example-deep", effort: "high" },
     ];
     for (const selected of tierCases) {
       expectStatus(await call(context, `/chat/conversations/${tierConversationId}/model-tier`, {

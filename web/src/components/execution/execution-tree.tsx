@@ -61,7 +61,8 @@ export type ExecutionTreeNode = {
   reasoningEffort?: string | null;
   reasoningEffortSource?:
     "REQUESTED" | "AGENT_DEFAULT" | "PROFILE_DEFAULT" | "UNKNOWN" | null;
-  modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  /** 그때 고른 단계 이름이다. 지난 이름(FAST 등)도 그대로 온다. */
+  modelTier?: string | null;
   requestReceivedAt?: string | null;
   submittedAt?: string | null;
   firstDeltaAt?: string | null;

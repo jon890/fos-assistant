@@ -73,14 +73,8 @@ VALUES (900000001, 900000001, 900000001, 'RELATED', 'HUMAN', 'ACTIVE', '2020-01-
 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, sensitivity, changed_at)
 VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
 
-INSERT INTO model_hidden (id, group_id, provider, model)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');
-
-INSERT INTO model_tier_definition (id, group_id, tier)
-VALUES (900000001, 900000001, 'FAST');
-
-INSERT INTO model_tier_group_setting (group_id)
-VALUES (900000001);
+INSERT INTO group_setting (group_id, setting_key, setting_value)
+VALUES (900000001, 'coverage-900000001', '{}');
 
 INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
 VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00');

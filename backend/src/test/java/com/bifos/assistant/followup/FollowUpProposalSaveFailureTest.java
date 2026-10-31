@@ -13,6 +13,7 @@ import com.bifos.assistant.chat.conversation.application.ConversationPublicIdLoo
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.followup.application.FollowUpService;
+import com.bifos.assistant.followup.application.FollowUpSuggestions;
 import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
@@ -52,6 +53,7 @@ class FollowUpProposalSaveFailureTest {
             conversations,
             mock(ConversationPublicIdLookup.class),
             mock(DecisionFeedbackRecorder.class),
+            mock(FollowUpSuggestions.class),
             mock(PlatformTransactionManager.class),
             Clock.fixed(NOW, ZoneOffset.UTC));
     }
