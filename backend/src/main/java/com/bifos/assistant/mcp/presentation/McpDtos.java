@@ -273,20 +273,35 @@ public final class McpDtos {
      * @param memoryId 고칠 항목 번호. 없거나 {@code null} 이면 null
      * @param collection 둘 collection. 없거나 {@code null} 이면 null
      * @param sensitive 민감한 내용인가. 없거나 {@code null} 이면 null
+     * @param archivable 자동 보관을 허락하는가. 없거나 {@code null} 이면 null
      */
     public record MemoryRememberArguments(
-        String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
+        String title,
+        String content,
+        String evidence,
+        Long memoryId,
+        String collection,
+        Boolean sensitive,
+        Boolean archivable) {
+
+
+        /** 받는 인자 이름이다. 사용자와 범위, 바로 저장할지를 정하는 인자는 없다. */
+        static final Set<String> FIELDS = Set.of(
+            "title", "content", "evidence", "memory_id", "collection", "sensitive", "archivable");
+
         /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
         static MemoryRememberArguments from(JsonNode arguments) {
             JsonNode memoryId = arguments.get("memory_id");
             JsonNode sensitive = arguments.get("sensitive");
+            JsonNode archivable = arguments.get("archivable");
             return new MemoryRememberArguments(
                 arguments.get("title").asString(),
                 arguments.get("content").asString(),
                 optionalText(arguments, "evidence"),
                 memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
                 optionalText(arguments, "collection"),
-                sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
+                sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue(),
+                archivable == null || archivable.isNull() ? null : archivable.booleanValue());
         }
 
 
@@ -300,7 +315,7 @@ public final class McpDtos {
         @Override
         public String toString() {
             return "MemoryRememberArguments[memoryId=" + memoryId + ", collection=" + collection + ", sensitive="
-                + sensitive + "]";
+                + sensitive + ", archivable=" + archivable + "]";
         }
     }
 
