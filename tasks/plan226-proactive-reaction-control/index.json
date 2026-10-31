@@ -1,0 +1,28 @@
+{
+  "name": "plan226-proactive-reaction-control",
+  "description": "지금 화면의 노출, 숨김, 미루기, 복원을 decision_feedback_event 하나로 기록하고 attention_control 의 현재값을 처음 제어 사건으로 옮긴다",
+  "pr_scope": "숨김·미루기·복원의 필수 기록 경로와 현재 제어 조회를 반응 기록으로 바꾸고 옛 현재값을 사건으로 옮기는 일을 한 PR 로 끝낸다.",
+  "deferred": [
+    {
+      "what": "가치 평가, 네 수준, 자동 실행 동의, 다시 살펴보기 루프 제거",
+      "why": "화면과 기록 경로가 새 경로로 바뀐 뒤에야 옛 경로를 지울 수 있다",
+      "after": "이 plan 의 PR 이 머지된 뒤"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    }
+  ]
+}
