@@ -62,4 +62,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Modifying
     @Query("update Task t set t.conversationId = :conversationId, t.updatedAt = :at where t.id = :id")
     int useConversation(@Param("id") Long id, @Param("conversationId") Long conversationId, @Param("at") Instant at);
+
+
+    /**
+     * 그 사용자의 해당 종류 작업을 모두 쓰기 잠금으로 읽는다. 같은 사용자의 매일 루프 시도가 하루 상한을 함께 넘지 않게 한다. 잠그는
+     * 순서는 번호 순이다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from Task t where t.ownerUserId = :ownerUserId and t.kind = :kind order by t.id")
+    List<Task> findByOwnerUserIdAndKindOrderByIdAscForUpdate(
+        @Param("ownerUserId") Long ownerUserId, @Param("kind") TaskKind kind);
 }

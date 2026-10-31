@@ -10,8 +10,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.proactive.loop.application.ProactiveLoopSettingService;
 import com.bifos.assistant.proactive.loop.application.dto.LoopSettingView;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
+import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -27,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 설치 설정 기본값(꺼짐)에서 꺼진 줄을 켜는 요청만 막고 끄기, 쉬기, 이미 켠 줄을 켠 채 두는 요청은 받는지 본다. */
 @BackendIntegrationTest
@@ -39,7 +39,10 @@ class ProactiveLoopSettingDisabledTest {
     ProactiveLoopSettingService service;
 
     @Autowired
-    ProactiveLoopSettingRepository settings;
+    LoopScheduleSettings schedules;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     @Autowired
     AgentRepository agents;
@@ -70,7 +73,7 @@ class ProactiveLoopSettingDisabledTest {
 
     @AfterEach
     void tearDown() {
-        jdbc.update("DELETE FROM proactive_loop_setting WHERE agent_id = ?", agent.id());
+        jdbc.update("DELETE FROM task WHERE agent_id = ?", agent.id());
         jdbc.update("DELETE FROM agent WHERE id = ?", agent.id());
     }
 
@@ -83,13 +86,13 @@ class ProactiveLoopSettingDisabledTest {
 
 
     @Test
-    @DisplayName("켜기는 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 줄을 남기지 않는다")
+    @DisplayName("켜기는 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 작업을 만들지 않는다")
     void rejectsEnabling() {
         assertThatThrownBy(() -> service.update(OWNER, agent.code(), true, null))
             .isInstanceOfSatisfying(
                 ApiException.class,
                 ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
-        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())).isEmpty();
+        assertThat(schedules.find(OWNER.id(), agent.id())).isEmpty();
     }
 
 
@@ -101,7 +104,7 @@ class ProactiveLoopSettingDisabledTest {
         LoopSettingView view = service.update(OWNER, agent.code(), false, snooze);
 
         assertThat(view).isEqualTo(new LoopSettingView(false, false, snooze));
-        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
+        assertThat(schedules.find(OWNER.id(), agent.id()).orElseThrow())
             .satisfies(row -> {
                 assertThat(row.enabled()).isFalse();
                 assertThat(row.snoozedUntil()).isEqualTo(snooze);
@@ -112,13 +115,14 @@ class ProactiveLoopSettingDisabledTest {
     @Test
     @DisplayName("이미 켠 줄을 켠 채 두는 요청은 설치가 루프를 열지 않아도 받고 쉬기를 저장한다")
     void acceptsKeepingEnabledLineEnabled() {
-        settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), true, null, NOW));
+        transactions.executeWithoutResult(
+            status -> schedules.save(OWNER.id(), agent.id(), true, null, NOW));
         Instant snooze = NOW.plus(Duration.ofDays(2));
 
         LoopSettingView view = service.update(OWNER, agent.code(), true, snooze);
 
         assertThat(view).isEqualTo(new LoopSettingView(false, true, snooze));
-        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
+        assertThat(schedules.find(OWNER.id(), agent.id()).orElseThrow())
             .satisfies(row -> {
                 assertThat(row.enabled()).isTrue();
                 assertThat(row.snoozedUntil()).isEqualTo(snooze);
@@ -129,13 +133,14 @@ class ProactiveLoopSettingDisabledTest {
     @Test
     @DisplayName("꺼진 줄을 켜는 요청은 줄이 있어도 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 줄을 그대로 둔다")
     void rejectsEnablingDisabledLine() {
-        settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), false, null, NOW));
+        transactions.executeWithoutResult(
+            status -> schedules.save(OWNER.id(), agent.id(), false, NOW.plus(Duration.ofDays(1)), NOW));
 
         assertThatThrownBy(() -> service.update(OWNER, agent.code(), true, null))
             .isInstanceOfSatisfying(
                 ApiException.class,
                 ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
-        assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())
+        assertThat(schedules.find(OWNER.id(), agent.id())
             .orElseThrow()
             .enabled())
                 .isFalse();

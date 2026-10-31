@@ -1,24 +1,14 @@
 package com.bifos.assistant.proactive.loop.infra;
 
 import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
-import jakarta.persistence.LockModeType;
-import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ProactiveLoopSettingRepository extends JpaRepository<ProactiveLoopSetting, Long> {
 
-    Optional<ProactiveLoopSetting> findByUserIdAndAgentId(Long userId, Long agentId);
-
-
-    /** 하루 상한을 세기 전에 그 사용자의 설정 줄을 모두 쓰기 잠금으로 읽는다. 같은 사용자의 시도가 상한을 함께 넘지 않게 한다. */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<ProactiveLoopSetting> findByUserIdOrderByIdAsc(Long userId);
-
+    // 읽는 메서드는 없다. 켜짐과 쉬기는 CHECK 작업이 갖는다(LoopScheduleSettings). 이 표는 순서 7 에서 지울 때까지 에이전트 정리만 쓴다.
 
     /** 지운 에이전트를 정리할 때 그 에이전트의 설정 줄을 모두 지운다. 지운 행 수를 돌려준다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
