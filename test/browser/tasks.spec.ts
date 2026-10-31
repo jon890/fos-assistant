@@ -86,15 +86,15 @@ test("모델 단계를 골라 저장하면 상세와 API 에 그 단계가 남�
   await page.getByLabel("에이전트", { exact: true }).selectOption("browser");
   await page.getByLabel("지시", { exact: true }).fill("이번 주 할 일을 정리해 줘");
   await page.getByLabel("시각(시:분)").fill("09:00");
-  await page.getByLabel("모델 단계", { exact: true }).selectOption({ label: "균형" });
+  await page.getByLabel("모델 단계", { exact: true }).selectOption({ label: "Medium" });
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]{36}$/);
 
-  await expect(page.getByLabel("모델 단계", { exact: true })).toHaveValue("BALANCED");
+  await expect(page.getByLabel("모델 단계", { exact: true })).toHaveValue("MEDIUM");
   const id = page.url().split("/").pop();
   const fetched = await page.request.get(`/api/tasks/${id}`);
   expect(fetched.ok()).toBeTruthy();
-  expect(((await fetched.json()) as { modelTier: string | null }).modelTier).toBe("BALANCED");
+  expect(((await fetched.json()) as { modelTier: string | null }).modelTier).toBe("MEDIUM");
 });
 
 test("멈추기와 다시 켜기가 배지를 바꾼다", async ({ page }) => {

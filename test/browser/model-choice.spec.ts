@@ -531,7 +531,7 @@ test("내 기본값 창은 정하지 않았을 때 도는 기준을 알린다", 
   await tierSettings(page).click();
   await page.getByRole("button", { name: "내 기본값" }).click();
   await expect(page.getByRole("dialog", { name: "내 기본값" })).toContainText(
-    "정하지 않으면 그룹 기본 단계(깊게)로 돌아요.",
+    "정하지 않으면 그룹 기본 단계(High)로 돌아요.",
   );
 });
 
