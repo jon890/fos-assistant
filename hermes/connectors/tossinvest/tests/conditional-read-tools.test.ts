@@ -1,8 +1,9 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import canonical from "./fixtures/openapi-1.2.24.json";
 import { Tossinvest } from "../src/client.ts";
+import { clock } from "../src/rate-limit.ts";
 import { registerConditionalReadTools } from "../src/conditional-read-tools.ts";
 import { createToolRegistration } from "../src/tool-registration.ts";
 import {
@@ -472,19 +473,61 @@ test.each([
   },
 );
 
-test("목록과 상세가 조회 큐와 deadline을 공유해 대기 중인 상세 HTTP를 보내지 않는다", async () => {
-  const context = setup(100);
-  context.fake.on("GET", path, page);
-  context.fake.on("GET", `${path}/${officialId}`, detail);
-  await run(context, async (client) => {
-    expect(
-      (await tool(client, "list_conditional_orders", { status: "OPEN" })).result
-        .isError,
-    ).toBeUndefined();
-    await expectFailure(client, "TOSSINVEST_NETWORK", "get_conditional_order", {
-      conditionalOrderId: officialId,
+test.each([
+  { timeoutMs: 50, detailCalls: 0 },
+  { timeoutMs: 500, detailCalls: 1 },
+])(
+  "목록과 상세가 조회 큐와 deadline을 공유한다: %j",
+  async ({ timeoutMs, detailCalls }) => {
+    let now = 1_800_000_000_000;
+    const waits: number[] = [];
+    const current = spyOn(clock, "now").mockImplementation(() => now);
+    const sleep = spyOn(clock, "sleep").mockImplementation(async (ms) => {
+      waits.push(ms);
+      now += ms;
     });
-  });
-  expect(context.fake.seen("GET", path)).toHaveLength(1);
-  expect(context.fake.seen("GET", `${path}/${officialId}`)).toHaveLength(0);
-});
+    // HTTP의 실제 시간 abort도 막아 큐의 가상 deadline만 검증한다.
+    const abort = spyOn(AbortSignal, "timeout").mockImplementation(
+      () => new AbortController().signal,
+    );
+    try {
+      const context = setup(timeoutMs);
+      context.fake.on("GET", path, page);
+      context.fake.on("GET", `${path}/${officialId}`, detail);
+      await run(context, async (client) => {
+        expect(
+          (await tool(client, "list_conditional_orders", { status: "OPEN" }))
+            .result.isError,
+        ).toBeUndefined();
+        if (detailCalls === 0) {
+          await expectFailure(
+            client,
+            "TOSSINVEST_NETWORK",
+            "get_conditional_order",
+            {
+              conditionalOrderId: officialId,
+            },
+          );
+        } else {
+          expect(
+            (
+              await tool(client, "get_conditional_order", {
+                conditionalOrderId: officialId,
+              })
+            ).result.isError,
+          ).toBeUndefined();
+        }
+      });
+      expect(context.fake.seen("GET", path)).toHaveLength(1);
+      expect(context.fake.seen("GET", `${path}/${officialId}`)).toHaveLength(
+        detailCalls,
+      );
+      // 목록이 쓴 그룹 예산 때문에 상세가 기다린다. deadline을 넘으면 sleep 전 거절한다.
+      expect(waits).toEqual(detailCalls === 0 ? [] : [100]);
+    } finally {
+      abort.mockRestore();
+      current.mockRestore();
+      sleep.mockRestore();
+    }
+  },
+);
