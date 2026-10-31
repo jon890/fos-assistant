@@ -28,13 +28,12 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import java.math.BigDecimal;
 import java.time.ZoneId;
@@ -68,8 +67,6 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     TextCipher cipher;
     @Autowired
     TaskRepository tasks;
-    @Autowired
-    TaskTriggerRepository triggers;
     @Autowired
     TaskRunRepository taskRuns;
 
@@ -193,15 +190,15 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         try {
             tx().executeWithoutResult(status -> {
                 var run = runs.findAll().stream().filter(row -> session.equals(row.hermesSessionId())).findFirst().orElseThrow();
-                var task = tasks.save(Task.create(user.id(), run.agentId(), "매일 주문", "주문해 줘", ConversationMode.NEW_PER_RUN,
-                    NotifyPolicy.NEVER));
-                var trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", ZoneId.of("Asia/Seoul"), MissedPolicy.RUN_ONCE,
-                    now));
-                var taskRun = TaskRun.queued(task.id(), trigger.id(), user.id(), now, now);
+                var task = Task.create(user.id(), run.agentId(), "매일 주문", "주문해 줘", ConversationMode.NEW_PER_RUN,
+                    NotifyPolicy.NEVER);
+                task.reschedule(TriggerType.CRON, "0 9 * * *", null, ZoneId.of("Asia/Seoul"), now);
+                task.changeMissedPolicy(MissedPolicy.RUN_ONCE);
+                tasks.save(task);
+                var taskRun = TaskRun.queued(task.id(), user.id(), now, now);
                 taskRun.useConversation(run.conversationId());
                 taskRun.start(now);
                 created[0] = taskRuns.save(taskRun).id();
-                created[1] = trigger.id();
                 created[2] = task.id();
             });
             // 도는 발화는 끝날 때 루트 실행 번호를 적는다. 이 fixture 의 실행이 그 발화의 루트임을 미리 잇는다.
@@ -220,7 +217,6 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         } finally {
             if (created[0] != null) {
                 taskRuns.deleteById(created[0]);
-                triggers.deleteById(created[1]);
                 tasks.deleteById(created[2]);
             }
         }
@@ -372,7 +368,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     void summaryCarriesLimitStatus() {
         OverridableLiveProperties.during(gate, limits("30", "100"));
         jdbc.update("update app_user set limit_daily_amount_usd = 50, limit_updated_at = current_timestamp where id = ?", user.id());
-        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
+        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20.0000001")));
         assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         var pending = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("10")));
         var limits = summaries.summaryOf(user, pending.actionId()).orElseThrow().limits();
@@ -380,8 +376,8 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(limits.orderLimit()).isEqualTo("30");
         assertThat(limits.quantityLimit()).isEqualTo("1000");
         assertThat(limits.dailyLimit()).isEqualTo("50");
-        assertThat(limits.spentToday()).isEqualTo("20");
-        assertThat(limits.remainingToday()).isEqualTo("30");
+        assertThat(limits.spentToday()).isEqualTo("20.0000001");
+        assertThat(limits.remainingToday()).isEqualTo("29.9999999");
     }
 
 

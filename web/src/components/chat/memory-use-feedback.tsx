@@ -48,7 +48,7 @@ export function MemoryUseFeedback({
         <span>{LABELS[sent]}으로 남겼어요</span>
         {sent === "WRONG" ? (
           <Link
-            href="/memory"
+            href={`/memory?memory=${use.memoryId}`}
             prefetch={false}
             className="underline underline-offset-2"
           >

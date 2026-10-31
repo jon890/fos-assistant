@@ -133,7 +133,7 @@ class MemoryEncryptionDisabledTest {
     void normalToSensitiveIsRejected() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", "처음 글", false);
         // 평문 판 1 을 먼저 둔다. 거절된 수정이 앞선 판도 건드리지 않는지 본다
-        memories.update(ADMIN, memory.id(), PLAIN, false);
+        memories.update(ADMIN, memory.id(), PLAIN, false, null);
 
         assertUnavailable(
             () -> memories.update(ADMIN, memory.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
@@ -170,7 +170,7 @@ class MemoryEncryptionDisabledTest {
     void normalWorksWithoutKey() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", PLAIN, false);
 
-        memories.update(ADMIN, memory.id(), "고친 글", true);
+        memories.update(ADMIN, memory.id(), "고친 글", true, null);
         memories.delete(ADMIN, memory.id());
 
         assertThat(count("memory")).isZero();

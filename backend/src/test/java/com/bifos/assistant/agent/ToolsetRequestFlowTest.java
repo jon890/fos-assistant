@@ -34,6 +34,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.library.domain.SkillBundle;
 import com.bifos.assistant.skill.library.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
@@ -161,6 +162,7 @@ class ToolsetRequestFlowTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("같은 도구를 동시에 요청해도 에이전트 잠금 뒤 대기 요청과 알림은 하나만 남는다")
     void deduplicatesConcurrentRequests() {
@@ -173,6 +175,7 @@ class ToolsetRequestFlowTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(strings = {"reject", "cancel"})
     @DisplayName("승인 중 시작된 거절과 취소는 이전 읽기 시점에서도 승인 결과를 보고 도구와 알림을 반복하지 않는다")
@@ -218,6 +221,7 @@ class ToolsetRequestFlowTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("조건부 갱신은 먼저 결정된 요청의 상태와 결정자를 덮어쓰지 않는다")
     void updatesOnlyPendingRequest() {
@@ -349,6 +353,7 @@ class ToolsetRequestFlowTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("DB 유일 제약도 대기 요청 중복을 막는다")
     void enforcesPendingUniquenessInDatabase() {

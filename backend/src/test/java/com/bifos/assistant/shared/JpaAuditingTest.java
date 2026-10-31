@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
@@ -131,8 +130,7 @@ class JpaAuditingTest {
                 entry.rehide("changed");
             } else if (row instanceof Task task) {
                 task.changeCheckEnabled(false);
-            } else if (row instanceof TaskTrigger trigger) {
-                trigger.moveNext(LATER.plusSeconds(10));
+                task.moveNext(LATER.plusSeconds(10));
             } else if (row instanceof MemoryEmbedding embedding) {
                 embedding.replace("different", new byte[32], new float[] {3, 4});
             } else if (row instanceof MemoryLink link) {
@@ -142,7 +140,7 @@ class JpaAuditingTest {
         }
         entityManager.flush();
         List<AuditedEntity> changed = fixture.rows().stream().filter(AuditedEntity.class::isInstance).map(AuditedEntity.class::cast).toList();
-        assertThat(changed).hasSize(8).allSatisfy(row -> {
+        assertThat(changed).hasSize(7).allSatisfy(row -> {
             assertThat(row.createdAt()).isEqualTo(micros(CREATED));
             assertThat(row.updatedAt()).isEqualTo(micros(LATER));
         });

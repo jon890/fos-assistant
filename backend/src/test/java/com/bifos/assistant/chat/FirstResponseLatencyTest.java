@@ -207,7 +207,7 @@ class FirstResponseLatencyTest {
         message(ChatMessage.fromSystem(conversationId, "예약 작업이 시작됐어요", YESTERDAY_NOON));
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "화요일 회의 일정을 알려 줘", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "회의는 화요일 10시예요", scheduled.id(), YESTERDAY_NOON));
-        TaskRun run = TaskRun.queued(7_001L, 7_002L, ADMIN_ID, YESTERDAY_NOON, YESTERDAY_NOON);
+        TaskRun run = TaskRun.queued(7_001L, ADMIN_ID, YESTERDAY_NOON, YESTERDAY_NOON);
         run.succeed(scheduled.id(), YESTERDAY_NOON.plusSeconds(5));
         savedRuns.add(taskRuns.save(run));
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);

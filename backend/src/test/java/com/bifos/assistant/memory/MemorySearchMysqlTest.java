@@ -5,31 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.bifos.assistant.testsupport.MemorySearchSqlProbe;
-import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** H2에서 확인한 검색 동작과 SQL 투영을 Flyway로 만든 실제 MySQL 스키마에서도 확인한다. */
-@Tag("mysql")
+@MysqlIntegrationTest
 class MemorySearchMysqlTest extends MemorySearchTest {
-    @DynamicPropertySource
-    static void useMysql(DynamicPropertyRegistry registry) {
-        MysqlTestDatabase database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    }
-
 
     @Test
     @DisplayName("검색 statement는 바깥 트랜잭션의 30초 제한과 분리해 2초에 지연을 중단하고 실패를 돌려준다")

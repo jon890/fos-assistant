@@ -20,7 +20,6 @@ import com.bifos.assistant.task.application.dto.ScheduleInput;
 import com.bifos.assistant.task.application.dto.TaskDetail;
 import com.bifos.assistant.task.application.dto.TaskInput;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
@@ -29,7 +28,6 @@ import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
@@ -80,9 +78,6 @@ class TaskServiceTest {
     TaskRepository tasks;
 
     @Autowired
-    TaskTriggerRepository triggers;
-
-    @Autowired
     TaskRunRepository runs;
 
     @Autowired
@@ -114,7 +109,7 @@ class TaskServiceTest {
         TaskDetail created = service.create(owner, monthly("  지난달 기록 정리  ", owner));
 
         Task stored = tasks.findById(created.task().id()).orElseThrow();
-        TaskTrigger trigger = triggers.findByTaskId(stored.id()).orElseThrow();
+        Task trigger = tasks.findById(stored.id()).orElseThrow();
         assertThat(stored.title()).isEqualTo("지난달 기록 정리");
         assertThat(stored.ownerUserId()).isEqualTo(owner.id());
         assertThat(stored.state()).isEqualTo(TaskState.ACTIVE);
@@ -126,7 +121,7 @@ class TaskServiceTest {
         assertThat(trigger.timeZone()).isEqualTo("Asia/Seoul");
         assertThat(trigger.missedPolicy()).isEqualTo(MissedPolicy.RUN_ONCE);
         assertThat(trigger.nextFireAt()).isEqualTo(Instant.parse("2026-11-01T00:00:00Z"));
-        assertThat(trigger.createdAt()).isEqualTo(created.trigger().createdAt());
+        assertThat(trigger.createdAt()).isEqualTo(created.task().createdAt());
     }
 
 
@@ -138,8 +133,8 @@ class TaskServiceTest {
 
         TaskDetail created = service.create(owner, once("내일 알림", agent, LocalDateTime.parse("2026-10-05T09:00")));
 
-        assertThat(created.trigger().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
-        assertThat(created.trigger().fireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
+        assertThat(created.task().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
+        assertThat(created.task().fireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
         assertCode(
             () -> service.create(owner, once("지난 알림", agent, LocalDateTime.parse("2026-10-04T08:59"))),
             ErrorCode.TASK_SCHEDULE_INVALID);
@@ -257,7 +252,7 @@ class TaskServiceTest {
         CurrentUser owner = member();
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
         UUID taskId = service.create(owner, cron("매일 9시", agent, "0 9 * * *")).task().publicId();
-        assertThat(service.get(owner, taskId).trigger().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
+        assertThat(service.get(owner, taskId).task().nextFireAt()).isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail paused = service.pause(owner, taskId);
         assertThat(paused.task().state()).isEqualTo(TaskState.PAUSED);
@@ -267,7 +262,7 @@ class TaskServiceTest {
         TaskDetail resumed = service.resume(owner, taskId);
 
         assertThat(resumed.task().state()).isEqualTo(TaskState.ACTIVE);
-        assertThat(triggers.findByTaskId(resumed.task().id()).orElseThrow().nextFireAt())
+        assertThat(tasks.findById(resumed.task().id()).orElseThrow().nextFireAt())
             .isEqualTo(Instant.parse("2026-10-08T00:00:00Z"));
         assertThat(service.resume(owner, taskId).task().state()).isEqualTo(TaskState.ACTIVE);
     }
@@ -284,12 +279,12 @@ class TaskServiceTest {
         TaskDetail renamed = service.update(owner, taskId, cron("새 이름", agent, "0 9 * * *"));
 
         assertThat(renamed.task().title()).isEqualTo("새 이름");
-        assertThat(triggers.findByTaskId(renamed.task().id()).orElseThrow().nextFireAt())
+        assertThat(tasks.findById(renamed.task().id()).orElseThrow().nextFireAt())
             .isEqualTo(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail moved = service.update(owner, taskId, cron("새 이름", agent, "0 10 * * *"));
 
-        assertThat(triggers.findByTaskId(moved.task().id()).orElseThrow().nextFireAt())
+        assertThat(tasks.findById(moved.task().id()).orElseThrow().nextFireAt())
             .isEqualTo(Instant.parse("2026-10-07T01:00:00Z"));
     }
 
@@ -301,14 +296,14 @@ class TaskServiceTest {
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
         LocalDateTime fireAt = LocalDateTime.parse("2026-10-04T12:00");
         TaskDetail created = service.create(owner, once("한 번", agent, fireAt));
-        TaskTrigger trigger = triggers.findByTaskId(created.task().id()).orElseThrow();
+        Task trigger = tasks.findById(created.task().id()).orElseThrow();
         trigger.advance(trigger.fireAt(), null);
-        triggers.save(trigger);
+        tasks.save(trigger);
         clock.set(Instant.parse("2026-10-05T00:00:00Z"));
 
         TaskDetail renamed = service.update(owner, created.task().publicId(), once("고친 이름", agent, fireAt));
 
-        TaskTrigger stored = triggers.findByTaskId(renamed.task().id()).orElseThrow();
+        Task stored = tasks.findById(renamed.task().id()).orElseThrow();
         assertThat(renamed.task().title()).isEqualTo("고친 이름");
         assertThat(stored.nextFireAt()).isNull();
         assertThat(stored.lastFiredAt()).isEqualTo(Instant.parse("2026-10-04T03:00:00Z"));
@@ -490,7 +485,6 @@ class TaskServiceTest {
 
     private void clean() {
         runs.deleteAll();
-        triggers.deleteAll();
         tasks.deleteAll();
     }
 

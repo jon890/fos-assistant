@@ -17,7 +17,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
 | 「먼저 살펴보기 표」 | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
-| 「예약 작업 표」 | `task`, `task_trigger`, `task_run` |
+| 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
 | 「암호화 key 표」 | `user_data_key` |
 
@@ -174,8 +174,10 @@ Flyway가 관리하는 `flyway_schema_history`만 제외하며 새 테이블과 
 scripts/checks/check-mysql-migration.sh
 ```
 
-Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄우고 `@Tag("mysql")` 이 붙은 검사를 모두 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
+Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄우고 `@Tag("mysql")` 이 붙은 검사를 모두 돌린다. CI 의 `backend-tests` 의 `mysql` 갈래도 이 스크립트를 돌린다.
 저장소 쿼리 검사는 [rule-51](../../docs/code-rules/rule-51.md)이 갖는다.
+**H2 에서 도는 검사를 MySQL 에서 되풀이하지 않는다.** MySQL 은 행 잠금, 정렬 규칙, 마이그레이션 DDL 처럼 H2 와 다르게 동작하는 것만 본다.
+그런 H2 검사만 `@MysqlCase` 로 표시하고, 근거와 이유 목록은 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
 
@@ -481,6 +483,18 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 에이전트가 turn 안에 대화의 결과물 폴더에 만들거나 고친 HTML 파일 하나가 한 행이다([ADR-027](../../docs/adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md)).
 `(message_id, path)` 에 유일 제약이 있다. 같은 파일을 다음 turn 이 다시 고치면 그 turn 의 답에 새 행이 생긴다. 파일은 하나이므로 옛 답에서 열어도 지금 내용이 보인다.
 보관 기간과 대화 삭제의 규칙은 첨부와 같다. 지운 표시를 다시 맞추는 규칙은 [`docs/features/attachment.md`](../../docs/features/attachment.md) 의 「지운 표시를 다시 맞추기」 가 갖는다.
+
+**사용자가 보관한 사본도 이 표의 행이다**([ADR-20261101 / artifact-vault](../../docs/adr/ADR-20261101-artifact-vault.md)). `vault_user_id` 가 채워진 행이고 `message_id` 는 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `vault_user_id` | 보관 주인(대화 요청자). 비어 있으면 대화 결과물 행이다 |
+| `vault_key_id` | 본문을 암호화한 `user_data_key.id` |
+| `vault_body` | 암호화한 본문(`v1.<IV>.<암호문과 태그>`). 평문은 두지 않는다 |
+| `vault_fingerprint` | 대화 번호, 경로, 본문 바이트의 SHA-256 16진수. `(vault_user_id, vault_fingerprint)` 에 유일 제약이 있어 같은 보관 요청은 한 건이다 |
+
+보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
+외래 키를 두지 않는다. 대화와 메시지가 지워져도 보관 사본 행은 남는다.
 
 ### result_delivery
 
@@ -917,6 +931,7 @@ action을 지우면 실행 내용도 지운다.
 ### task
 
 예약 작업 하나다. 언제 발화하고 어떻게 시작하는지는 [`docs/features/schedule.md`](../../docs/features/schedule.md) 가 갖는다([ADR-076](adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md)).
+일정을 본체에 두고 작업 기준으로 발화하는 근거는 [ADR-20261016 / task-schedule-columns](adr/ADR-20261016-task-schedule-columns.md)가 갖는다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
@@ -927,22 +942,22 @@ action을 지우면 실행 내용도 지운다.
 **`check_owner_user_id`, `check_agent_id` 생성 열은 `CHECK` 일 때만 주인과 에이전트 번호를 채운다.** 두 칸의 유일 제약으로 깨우기 설정 하나를 강제한다. `TURN` 줄은 두 칸이 비어 있어 걸리지 않는다.
 `CHECK` 는 같은 설정 줄을 다시 쓰고, 점검 대화를 쓰므로 `conversation_mode`, `conversation_id` 로 대화를 만들지 않는다.
 
-### task_trigger
-
-작업의 시각이다([ADR-077](adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md)).
-`fire_at` 과 `next_fire_at` 은 UTC 이고, 한 번 발화한 `ONCE` 는 `next_fire_at` 이 비어 있다. `last_fired_at` 은 마지막으로 처리한 예정 시각이다.
-`task_id` 의 유일 제약은 작업 하나에 시각 하나라는 지금의 규칙이다. 다른 종류의 trigger 를 더하는 단계가 이 제약을 바꾼다.
-시각을 고치면 같은 줄을 고친다. 발화 기록의 유일 제약이 이 줄의 번호를 쓰므로 줄을 새로 만들지 않는다.
+일정은 작업 하나의 현재값이므로 같은 `task` 줄에 둔다. `trigger_type`은 `CRON` 또는 `ONCE`다.
+`cron_expr`은 반복 일정에서만 채우고, `fire_at`은 한 번 실행하는 일정에서만 채운다.
+`time_zone`은 IANA 시간대 이름이며 `missed_policy`는 놓친 발화 처리 방식이다.
+`fire_at`과 `next_fire_at`은 UTC이고, 한 번 발화한 `ONCE`는 `next_fire_at`이 비어 있다.
+`last_fired_at`은 마지막으로 처리한 예정 시각이다. 일정 수정과 발화는 같은 작업 줄을 잠그고 처리한다.
+`(state, next_fire_at, id)` 색인으로 발화할 작업을 찾는다.
 
 ### task_run
 
-발화 한 번이다. `(trigger_id, scheduled_for)` 가 유일해, 같은 예정 시각의 발화는 서버를 다시 띄워도 하나다.
+발화 한 번이다. `(task_id, scheduled_for)` 가 유일해, 같은 예정 시각의 발화는 서버를 다시 띄워도 하나다.
 
 - `owner_user_id` 는 그 발화 때의 작업 주인이다. 하루 발화 수를 조인 없이 세려고 따로 둔다
 - `reason` 은 `SUCCEEDED` 면 비어 있거나, 답이 `[SILENT]` 뿐이면 `NOTHING_TO_REPORT` 다
 - `execution_id` 는 turn 이 끝난 모양을 받았을 때만 찬다
 - `proactive_check_id` 는 `CHECK` 발화가 연 점검 줄이다. 저장과 발화 연결을 한 트랜잭션으로 끝낸다
-- 외래 키는 `task_id` 와 `trigger_id` 에 둔다. 작업과 시각은 지우지 않으므로 걸어도 된다
+- 외래 키는 `task_id`에 둔다. 작업은 지워도 행이 남으므로 참조를 유지한다
 
 ## 먼저 살펴보기 표
 
@@ -1006,6 +1021,9 @@ action을 지우면 실행 내용도 지운다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
+
+정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
+`detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.
 
 ## 암호화 key 표
 

@@ -30,6 +30,7 @@ export function MemoryEditForm({
       response = await updateMemory(memory.id, {
         content: form.get("content"),
         alwaysInject: form.get("alwaysInject") === "on",
+        archivable: form.get("archivable") === "on",
       });
     } catch {
       setError("기억을 고치지 못했어요.");
@@ -71,6 +72,15 @@ export function MemoryEditForm({
           className="accent-primary"
         />
         답을 만들 때 항상 함께 넣기
+      </Label>
+      <Label className="mt-2 font-normal">
+        <input
+          name="archivable"
+          type="checkbox"
+          defaultChecked={memory.archivable ?? false}
+          className="accent-primary"
+        />
+        자동 보관 허락
       </Label>
       <div className="mt-3 flex gap-2">
         <Button

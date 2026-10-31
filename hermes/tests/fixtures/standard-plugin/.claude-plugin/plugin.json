@@ -1,0 +1,9 @@
+{
+  "name": "standard-notes",
+  "displayName": "표준 메모",
+  "version": "0.1.0",
+  "description": "assistant.json 없이 Claude Code 형식만 갖춘 검사용 플러그인",
+  "author": {"name": "검사"},
+  "commands": "./commands",
+  "hooks": "./hooks/hooks.json"
+}

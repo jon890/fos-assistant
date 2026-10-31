@@ -163,6 +163,16 @@ public enum ErrorCode {
     /** 그 결과물이 있었지만 보관 기간이 지나 파일을 지웠다. 행에 지운 시각이 적힌 경로에만 쓴다. */
     ARTIFACT_GONE(HttpStatus.GONE),
     /**
+     * 보관할 수 없는 결과물이다. HTML·CSS 가 아니거나, 사진·스타일 같은 다른 파일을 부르거나, 한 파일 상한을 넘었다.
+     *
+     * <p>이미지가 든 묶음은 아직 보관하지 않는다. 사진이 빠진 HTML 을 완성본으로 보관하지 않으려는 것이다.
+     */
+    ARTIFACT_VAULT_UNSUPPORTED(HttpStatus.UNPROCESSABLE_ENTITY),
+    /** 사용자의 보관 용량이 찼다. 새 보관만 거절하고 이미 보관한 것은 건드리지 않는다. */
+    ARTIFACT_VAULT_FULL(HttpStatus.CONFLICT),
+    /** 암호화가 꺼져 있거나 key 를 쓸 수 없어 보관하거나 열 수 없다. 평문으로 대신 두지 않는다. */
+    ARTIFACT_VAULT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    /**
      * MCP 호출의 {@code _fos_ctx} 를 믿을 수 없거나, 그것이 가리키는 origin 실행을 하나로 정하지 못했다.
      *
      * <p>서명 없음, 서명 틀림, origin 없음, origin 둘 이상을 가르지 않는다. 가르면 모델이 어느 값을 흉내 내야

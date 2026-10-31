@@ -35,8 +35,8 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private Long conversationId;
 
-    /** 이 파일을 만든 turn 의 답 메시지. */
-    @Column(name = "message_id", nullable = false)
+    /** 이 파일을 만든 turn 의 답 메시지. 보관 사본 행은 비어 있다. */
+    @Column(name = "message_id")
     @Getter
     private Long messageId;
 
@@ -55,6 +55,26 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private Instant deletedAt;
 
+    /** 보관 사본의 주인(대화 요청자). 비어 있으면 대화 결과물 행이다. */
+    @Column(name = "vault_user_id")
+    @Getter
+    private Long vaultUserId;
+
+    /** 보관 본문을 암호화한 데이터 key 의 번호. */
+    @Column(name = "vault_key_id")
+    @Getter
+    private Long vaultKeyId;
+
+    /** 암호화한 보관 본문. 평문은 어디에도 두지 않는다. */
+    @Column(name = "vault_body", columnDefinition = "LONGTEXT")
+    @Getter
+    private String vaultBody;
+
+    /** 같은 사용자의 같은 보관 요청을 한 건으로 만드는 지문. */
+    @Column(name = "vault_fingerprint", length = 64)
+    @Getter
+    private String vaultFingerprint;
+
 
     private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
         this.conversationId = conversationId;
@@ -64,8 +84,34 @@ public class ChatArtifact extends CreatedAtEntity {
     }
 
 
+    private ChatArtifact(
+        Long conversationId, String path, long byteSize, Long vaultUserId, Long vaultKeyId, String vaultBody,
+        String vaultFingerprint) {
+        this.conversationId = conversationId;
+        this.path = path;
+        this.byteSize = byteSize;
+        this.vaultUserId = vaultUserId;
+        this.vaultKeyId = vaultKeyId;
+        this.vaultBody = vaultBody;
+        this.vaultFingerprint = vaultFingerprint;
+    }
+
+
+    /** 사용자가 골라 보관한 사본이다. 답에 묶이지 않고 대화를 지워도 남는다. */
+    public static ChatArtifact vaulted(
+        Long conversationId, String path, long byteSize, Long ownerUserId, Long keyId, String sealedBody,
+        String fingerprint) {
+        return new ChatArtifact(conversationId, path, byteSize, ownerUserId, keyId, sealedBody, fingerprint);
+    }
+
+
     public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize) {
         return new ChatArtifact(conversationId, messageId, path, byteSize);
+    }
+
+
+    public boolean isVaulted() {
+        return vaultUserId != null;
     }
 
 

@@ -162,13 +162,13 @@ class MemoryEncryptionTest {
     @DisplayName("여러 번 고친 일반 항목을 민감으로 고치면 앞선 판이 모두 암호문이고 다른 항목의 판은 평문 그대로다")
     void normalToSensitiveSealsEveryEarlierRevisionOfThatItemOnly() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
-        memories.update(ADMIN, memory.id(), SECOND, false);
-        memories.update(ADMIN, memory.id(), THIRD, false);
+        memories.update(ADMIN, memory.id(), SECOND, false, null);
+        memories.update(ADMIN, memory.id(), THIRD, false, null);
         List<Map<String, Object>> before = jdbc.queryForList(
             "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? ORDER BY revision",
             memory.id());
         Memory other = memories.create(ADMIN, MemoryScope.USER, "다른 항목", OTHER, false);
-        memories.update(ADMIN, other.id(), "고친 글", false);
+        memories.update(ADMIN, other.id(), "고친 글", false, null);
 
         memories.update(ADMIN, memory.id(), THIRD, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
 
@@ -203,7 +203,7 @@ class MemoryEncryptionTest {
         Memory memory = sensitive(MemoryScope.USER, FIRST);
         String before = (String)memoryRow(memory.id()).get("CONTENT");
 
-        assertThatThrownBy(() -> memories.update(ADMIN, memory.id(), "x", false))
+        assertThatThrownBy(() -> memories.update(ADMIN, memory.id(), "x", false, null))
             .isInstanceOfSatisfying(
                 ApiException.class,
                 e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
@@ -221,7 +221,7 @@ class MemoryEncryptionTest {
     void normalItemIsEditableFromList() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
 
-        memories.update(ADMIN, memory.id(), "x", false);
+        memories.update(ADMIN, memory.id(), "x", false, null);
 
         assertThat(memoryRow(memory.id()).get("CONTENT")).isEqualTo("x");
         assertThat(repository.findById(memory.id()).orElseThrow().revision()).isEqualTo(2);
@@ -320,7 +320,7 @@ class MemoryEncryptionTest {
     @DisplayName("암호화 중 실패하면 현재 본문과 이전 판이 그대로 남는다")
     void preservesCurrentAndEarlierRevisionWhenEncryptionFails() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
-        memories.update(ADMIN, memory.id(), SECOND, false);
+        memories.update(ADMIN, memory.id(), SECOND, false, null);
 
         assertThatThrownBy(() -> memories.update(
             ADMIN, memory.id(), null, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE))

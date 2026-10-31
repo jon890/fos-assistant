@@ -23,8 +23,9 @@ public final class MemoryDtos {
         Boolean alwaysInject) {
     }
 
+    /** {@code archivable} 은 자동 보관 허락 표시다. 없으면 지금 값을 그대로 둔다. */
     public record UpdateMemoryRequest(
-        @NotBlank String content, @NotNull Boolean alwaysInject) {
+        @NotBlank String content, @NotNull Boolean alwaysInject, Boolean archivable) {
     }
 
     /**
@@ -58,7 +59,8 @@ public final class MemoryDtos {
         boolean omittedFromContext,
         String sourceAgentName,
         boolean sourceAgentDeleted,
-        SupersededByView supersededBy) {
+        SupersededByView supersededBy,
+        boolean archivable) {
         static MemoryView from(Memory memory) {
             return from(memory, false, null, null);
         }
@@ -85,7 +87,8 @@ public final class MemoryDtos {
                 omittedFromContext,
                 source == null ? null : source.agentName(),
                 source != null && source.agentDeleted(),
-                supersededBy);
+                supersededBy,
+                memory.archivable());
         }
     }
 

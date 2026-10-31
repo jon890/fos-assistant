@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftCreationContext;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationRequest;
+import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,13 +15,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import com.bifos.assistant.testsupport.MysqlTestDatabase;
-import org.junit.jupiter.api.Tag;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
-/** H2와 같은 실제 서비스 회귀를 Flyway MySQL 스키마에서도 실행한다. */
-@Tag("mysql")
+/** H2 회귀 가운데 `@MysqlCase` 를 단 동시 생성 검사와 이 클래스가 선언한 유일 제약 검사만 MySQL 에서 돈다. */
+@MysqlIntegrationTest
 class ContentDraftIdempotencyMysqlTest extends ContentDraftIdempotencyTest {
     @Test
     @DisplayName("사용자 잠금을 우회한 사전 조회 두 개는 둘 다 부재를 보고 DB UNIQUE만 중복 저장을 차단한다")
@@ -64,15 +61,4 @@ class ContentDraftIdempotencyMysqlTest extends ContentDraftIdempotencyTest {
         Assertions.assertThat(draftRows.count()).isZero();
     }
 
-
-    @DynamicPropertySource
-    static void mysql(DynamicPropertyRegistry registry) {
-        var database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    }
 }

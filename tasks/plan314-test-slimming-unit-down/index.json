@@ -1,0 +1,15 @@
+{
+  "name": "plan314-test-slimming-unit-down",
+  "description": "도메인 로직만 보는 Spring 통합 테스트를 Spring 과 DB 없는 단위 테스트로 내린다",
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    }
+  ]
+}

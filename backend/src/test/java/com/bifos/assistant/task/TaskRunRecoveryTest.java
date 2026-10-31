@@ -26,8 +26,8 @@ import com.bifos.assistant.task.application.TaskNotices;
 import com.bifos.assistant.task.application.TaskRunRecovery;
 import com.bifos.assistant.task.application.TaskRunStarter;
 import com.bifos.assistant.task.domain.Task;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.TaskRun;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
@@ -35,7 +35,6 @@ import com.bifos.assistant.task.domain.type.TaskRunReason;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -87,9 +86,6 @@ class TaskRunRecoveryTest {
     TaskRepository tasks;
 
     @Autowired
-    TaskTriggerRepository triggers;
-
-    @Autowired
     TaskRunRepository runs;
 
     @Autowired
@@ -126,11 +122,11 @@ class TaskRunRecoveryTest {
     @DisplayName("기동 정리는 RUNNING 줄을 INTERRUPTED 로 닫고 알림 하나를 남기며 QUEUED 줄은 그대로 둔다")
     void closesRunningRunsAndLeavesQueued() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
-        TaskRun running = TaskRun.queued(fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED, NOW);
+        TaskRun running = TaskRun.queued(fixture.task().id(), fixture.ownerId(), SCHEDULED, NOW);
         running.start(NOW);
         running = runs.save(running);
         TaskRun queued = runs.save(TaskRun.queued(
-            fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED.minusSeconds(60), NOW));
+            fixture.task().id(), fixture.ownerId(), SCHEDULED.minusSeconds(60), NOW));
 
         recovery.onReady();
 
@@ -163,7 +159,7 @@ class TaskRunRecoveryTest {
         Task pausedTask = tasks.findById(paused.task().id()).orElseThrow();
         pausedTask.pause();
         tasks.save(pausedTask);
-        TaskRun waiting = runs.save(TaskRun.queued(paused.task().id(), paused.trigger().id(), paused.ownerId(), SCHEDULED, NOW));
+        TaskRun waiting = runs.save(TaskRun.queued(paused.task().id(), paused.ownerId(), SCHEDULED, NOW));
         TaskRunRecovery fresh = new TaskRunRecovery(runs, tasks, notices, checks, transactions, fixedClock());
         TaskDispatcher dispatcher = new TaskDispatcher(firing, starter, fresh, fixedClock());
 
@@ -204,14 +200,16 @@ class TaskRunRecoveryTest {
     @DisplayName("기동 정리는 읽지 않은 보고로 끝난 CHECK 발화를 INTERRUPTED 대신 건너뜀으로 회복하고 알리지 않는다")
     void recoversUnreadScheduledCheckWithoutCountingItAsInterrupted() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
-        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기"));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
+        Task checkTask = Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기");
+        checkTask.reschedule(TriggerType.CRON, "0 9 * * *", null, SEOUL, SCHEDULED);
+        checkTask.changeMissedPolicy(MissedPolicy.SKIP);
+        tasks.save(checkTask);
         ProactiveCheck check = ProactiveCheck.started(
             fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
         check.skip(CheckSkippedReason.UNREAD_REPORT, NOW);
         check = checks.save(check);
         createdChecks.add(check.id());
-        TaskRun running = TaskRun.queued(checkTask.id(), checkTrigger.id(), fixture.ownerId(), SCHEDULED, NOW);
+        TaskRun running = TaskRun.queued(checkTask.id(), fixture.ownerId(), SCHEDULED, NOW);
         running.useProactiveCheck(check.id());
         running.start(NOW);
         running = runs.save(running);
@@ -232,15 +230,17 @@ class TaskRunRecoveryTest {
     @DisplayName("기동 정리는 끝난 CHECK의 루트 실행 번호를 연결한 발화에 회복한다")
     void recoversCompletedCheckWithItsRootExecution() {
         Fixture fixture = fixture(NotifyPolicy.NEVER);
-        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기"));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
+        Task checkTask = Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기");
+        checkTask.reschedule(TriggerType.CRON, "0 9 * * *", null, SEOUL, SCHEDULED);
+        checkTask.changeMissedPolicy(MissedPolicy.SKIP);
+        tasks.save(checkTask);
         ProactiveCheck check = ProactiveCheck.started(
             fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
         check.attachRoot(7_777L, "scheduled-session");
         check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW);
         check = checks.save(check);
         createdChecks.add(check.id());
-        TaskRun running = TaskRun.queued(checkTask.id(), checkTrigger.id(), fixture.ownerId(), SCHEDULED, NOW);
+        TaskRun running = TaskRun.queued(checkTask.id(), fixture.ownerId(), SCHEDULED, NOW);
         running.useProactiveCheck(check.id());
         running.start(NOW);
         running = runs.save(running);
@@ -272,10 +272,11 @@ class TaskRunRecoveryTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             owner.id()));
-        Task task = tasks.save(
-            Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify));
-        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, SCHEDULED));
-        return new Fixture(owner.id(), task, trigger);
+        Task task = Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify);
+        task.reschedule(TriggerType.CRON, "0 9 1 * *", null, SEOUL, SCHEDULED);
+        task.changeMissedPolicy(MissedPolicy.RUN_ONCE);
+        tasks.save(task);
+        return new Fixture(owner.id(), task);
     }
 
 
@@ -295,11 +296,10 @@ class TaskRunRecoveryTest {
         checks.deleteAllById(createdChecks);
         createdChecks.clear();
         runs.deleteAll();
-        triggers.deleteAll();
         tasks.deleteAll();
     }
 
 
-    private record Fixture(Long ownerId, Task task, TaskTrigger trigger) {
+    private record Fixture(Long ownerId, Task task) {
     }
 }

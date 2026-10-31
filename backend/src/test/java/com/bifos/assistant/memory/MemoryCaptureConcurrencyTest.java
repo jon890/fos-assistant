@@ -23,6 +23,7 @@ import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** 중복 후보 조회와 잠금 사이에 커밋된 사용자 수정을 H2와 MySQL에서 보존한다. */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class MemoryCaptureConcurrencyTest {
     private static final CurrentUser USER = new CurrentUser(1L, "memory@example.com", "사용자", 10L, UserRole.ADMIN);
     private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
@@ -83,7 +85,7 @@ class MemoryCaptureConcurrencyTest {
         captureService.undo(USER, capture.id());
         assertCurrent(proposal.id(), ORIGINAL, MemoryStatus.PROPOSED, 2);
         assertThat(captures.findById(capture.id()).orElseThrow().undone()).isTrue();
-        service.update(USER, proposal.id(), CHANGED, true);
+        service.update(USER, proposal.id(), CHANGED, true, null);
         assertCurrent(proposal.id(), CHANGED, MemoryStatus.PROPOSED, 3);
         assertHistory(proposal.id(), ORIGINAL, ORIGINAL);
     }
@@ -108,7 +110,7 @@ class MemoryCaptureConcurrencyTest {
         captureService.undo(USER, capture.id());
         assertThat(memories.findById(result.memoryId())).isEmpty();
         assertCurrent(proposal.id(), CHANGED, MemoryStatus.PROPOSED, 2);
-        service.update(USER, proposal.id(), "산책은 점심에 한다", true);
+        service.update(USER, proposal.id(), "산책은 점심에 한다", true, null);
         assertCurrent(proposal.id(), "산책은 점심에 한다", MemoryStatus.PROPOSED, 3);
         assertHistory(proposal.id(), ORIGINAL, CHANGED);
     }
@@ -137,7 +139,7 @@ class MemoryCaptureConcurrencyTest {
                 throw new AssertionError("중복 후보 조회에 도달하지 않았다");
             }
             // 이 서비스 호출이 반환하면 별도 트랜잭션의 수정이 커밋된 상태다.
-            service.update(USER, proposal.id(), editedContent, true);
+            service.update(USER, proposal.id(), editedContent, true, null);
             committed.countDown();
             return remembering.get(20, TimeUnit.SECONDS);
         } finally {

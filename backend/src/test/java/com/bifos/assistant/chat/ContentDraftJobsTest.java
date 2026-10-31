@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.MysqlCase;
 import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -325,6 +326,7 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("동시 승인은 jobId 하나를 예약하고 시작을 한 번만 보내며 재요청은 같은 job을 돌려준다")
     void reservesOneJobAndStartsOnceUnderConcurrentApproval() throws Exception {
@@ -443,6 +445,7 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("사용자 끄기·에이전트 비활성·origin 취소가 먼저 커밋되면 저장 허가는 거절되고 claim은 비어 있다")
     void rejectsSaveAfterRevocationCommittedFirst() {
@@ -460,6 +463,7 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("관리자 비활성이 에이전트 잠금을 쥐면 저장 허가는 커밋을 기다린 뒤 거절한다")
     void waitsForAgentAdminRevocation() throws Exception {
@@ -495,6 +499,7 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("실행 취소가 행 잠금을 쥔 동안 저장 허가는 기다렸다가 커밋을 보고 거절하고 rollback이면 허가한다")
     void waitsForHeldCancelThenFollowsItsOutcome() throws Exception {
@@ -507,6 +512,7 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("사용자 끄기가 허용 목록 행을 쥔 동안 저장 허가는 기다렸다가 끄기 커밋을 보고 거절한다")
     void waitsForHeldDisableThenRejects() throws Exception {

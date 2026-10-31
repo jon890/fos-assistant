@@ -144,11 +144,63 @@ test("모르는 이름과 십진 글이 아닌 값은 Control Plane 을 부르�
     ["weekly_amount", { value: "1" }],
     ["order_amount_usd", { value: "1e3" }],
     ["order_amount_usd", { value: -1 }],
+    ["order_amount_usd", { value: "-1" }],
+    ["order_amount_usd", { value: 1 }],
+    ["order_amount_usd", { value: "100000000000000" }],
     ["order_amount_usd", { value: "1.1234567" }],
   ] as const) {
     const { response, calls } = await callRoute("put", LIMITS, name, body);
     assert.equal(response.status, 400);
     assert.equal(calls.length, 0);
+  }
+});
+
+test("GET과 PUT은 소수 7자리 사용액과 잔액을 원문대로 전달한다", async () => {
+  for (const kind of ["get", "put"] as const) {
+    const { response } = await callRoute(kind, {
+      ...LIMITS,
+      spentToday: { KRW: "0", USD: "1.0000001" },
+      remainingToday: { KRW: "300000", USD: "998.9999999" },
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.spentToday.USD, "1.0000001");
+    assert.equal(body.remainingToday.USD, "998.9999999");
+  }
+});
+
+test("사용액과 잔액은 긴 정밀도를 보존하고 비정상 decimal 응답은 거절한다", async () => {
+  const longest = `1.${"2".repeat(98)}`;
+  for (const field of ["spentToday", "remainingToday"] as const) {
+    const accepted = await callRoute("get", {
+      ...LIMITS,
+      [field]: { KRW: "123456789012345", USD: longest },
+    });
+    assert.equal(accepted.response.status, 200);
+    assert.deepEqual((await accepted.response.json())[field], {
+      KRW: "123456789012345",
+      USD: longest,
+    });
+    for (const value of [
+      "1e3",
+      "-1",
+      1,
+      null,
+      "",
+      "1.",
+      ".1",
+      "1\n",
+      `${longest}2`,
+    ]) {
+      for (const kind of ["get", "put"] as const) {
+        const { response } = await callRoute(kind, {
+          ...LIMITS,
+          [field]: { KRW: "0", USD: value },
+        });
+        assert.equal(response.status, 502);
+        assert.equal((await response.json()).code, "INTERNAL_ERROR");
+      }
+    }
   }
 });
 

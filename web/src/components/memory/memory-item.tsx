@@ -66,6 +66,7 @@ export function MemoryItem({
   return (
     <ExpandableRow
       title={memory.title}
+      anchorId={`memory-${memory.id}`}
       meta={<MemoryMeta memory={memory} readAt={readAt} />}
       open={open}
       onToggle={() => {

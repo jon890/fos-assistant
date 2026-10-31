@@ -17,3 +17,8 @@ warning은 실패가 아니며 생성자를 무조건 지우지 않는다.
 
 [HttpHermesRunsClient.java](../../backend/src/main/java/com/bifos/assistant/hermes/infra/HttpHermesRunsClient.java)에서 확인한다.
 HttpHermesRunsClient처럼 클라이언트를 구성하는 생성자는 계산 없는 단순 주입과 구별한다.
+
+## 리뷰가 보는 것
+
+checkstyle 은 단순 주입 생성자를 경고로 알릴 뿐 계산이 있는지는 모른다.
+리뷰는 생성자에 계산, HTTP 클라이언트 구성, 테스트 전용 용도가 있어 `RequiredArgsConstructor` 로 바꾸면 안 되는 경우를 가려 본다.
