@@ -639,17 +639,40 @@ test("그룹 단계 저장이 실패하면 입력값을 유지하고 다시 저�
     },
   );
 
+  // 목록을 바꿔 끼워 Hermes 응답과 상관없이 같은 화면을 만든다.
+  await page.route(
+    (url) => url.pathname === "/api/admin/model-catalog",
+    (route) =>
+      route.fulfill({
+        json: {
+          catalog: {
+            providers: [
+              {
+                provider: "openai-codex",
+                name: "OpenAI Codex",
+                models: ["example-fast"],
+                reasoning: {},
+              },
+            ],
+            reasoningEfforts: ["low", "medium", "high"],
+          },
+        },
+      }),
+  );
+
   await page.goto("/admin/models");
 
   const groupSection = page.getByRole("region", { name: "그룹 모델 설정" });
-  const model = groupSection.getByLabel("모델", { exact: true }).first();
-  await model.fill("example-retry");
+  const effort = groupSection
+    .getByRole("group", { name: "Instant", exact: true })
+    .getByLabel("강도");
+  await effort.selectOption("high");
   await groupSection.getByRole("button", { name: "저장" }).click();
   const failedAlert = groupSection.getByRole("alert");
   await expect(failedAlert).toHaveText(
     "그룹 모델 설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
   );
-  await expect(model).toHaveValue("example-retry");
+  await expect(effort).toHaveValue("high");
 
   await groupSection.getByRole("button", { name: "저장" }).click();
   await expect(
@@ -706,12 +729,12 @@ test("단계 매핑이 비어 있으면 관리자 설정에서 기본값 실행�
   await expect(
     groupSection.getByText("단계별 모델을 아직 정하지 않았어요."),
   ).toBeVisible();
-  await expect(
-    groupSection.getByLabel("모델", { exact: true }).first(),
-  ).toHaveValue("");
-  await expect(
-    groupSection.getByLabel("강도", { exact: true }).first(),
-  ).toHaveValue("");
+  const instant = groupSection.getByRole("group", {
+    name: "Instant",
+    exact: true,
+  });
+  await expect(instant.getByLabel("모델")).toHaveValue("");
+  await expect(instant.getByLabel("강도")).toHaveValue("");
   await expect(groupSection.getByLabel("그룹 기본 단계")).toHaveValue("MEDIUM");
   await groupSection.getByRole("button", { name: "저장" }).click();
 

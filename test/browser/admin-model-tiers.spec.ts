@@ -54,7 +54,7 @@ async function stub(page: Page, catalog: typeof CATALOG | null): Promise<unknown
 }
 
 function tierFieldset(page: Page, label: string) {
-  return page.getByRole("region", { name: "그룹 모델 설정" }).getByRole("group", { name: label });
+  return page.getByRole("region", { name: "그룹 모델 설정" }).getByRole("group", { name: label, exact: true });
 }
 
 test("관리자 화면은 ChatGPT 슬라이더의 다섯 칸을 차례대로 그린다", async ({ page }) => {
