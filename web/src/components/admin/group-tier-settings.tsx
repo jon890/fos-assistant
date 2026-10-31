@@ -262,8 +262,8 @@ export function GroupTierSettings() {
       <section className="grid gap-2">
         <h3 className="text-sm font-medium">단계별 모델</h3>
         <p className="text-xs text-muted-foreground">
-          빠르게, 균형, 깊게를 골랐을 때 실제로 도는 모델과 강도예요. 비워 둔
-          단계는 에이전트 기본 모델로 돌아요.
+          Instant, Medium, High, Extra High, Pro 를 골랐을 때 실제로 도는 모델과
+          강도예요. 비워 둔 칸은 사용자에게 보이지 않아요.
         </p>
         {load.catalog === null ? (
           <Notice variant="warning" role="alert">

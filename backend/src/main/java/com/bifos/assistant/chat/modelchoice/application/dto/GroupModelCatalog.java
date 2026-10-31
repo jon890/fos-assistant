@@ -11,4 +11,10 @@ import java.util.List;
  * @param reasoningEfforts 고를 수 있는 effort. 낮은 것부터 적는다
  */
 public record GroupModelCatalog(List<HermesModelCatalog.Provider> providers, List<String> reasoningEfforts) {
+
+    /** 그 provider 의 그 모델이 목록에 있는가. */
+    public boolean offers(String provider, String model) {
+        return providers.stream()
+            .anyMatch(row -> row.slug().equals(provider) && row.models().contains(model));
+    }
 }

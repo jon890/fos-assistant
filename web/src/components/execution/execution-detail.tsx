@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { recordedTierLabel } from "@/lib/model-tiers";
 import { useAdminView } from "@/components/shell/app-shell";
 import {
   agentLabel,
@@ -49,10 +50,7 @@ function statusLabel(status: string): string {
 }
 
 function tierLabel(tier: ExecutionTreeNode["modelTier"]): string {
-  if (tier === "FAST") return "빠르게";
-  if (tier === "BALANCED") return "균형";
-  if (tier === "DEEP") return "깊게";
-  return "-";
+  return tier ? recordedTierLabel(tier) : "-";
 }
 
 function effortSourceLabel(node: ExecutionTreeNode): string {

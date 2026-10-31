@@ -23,7 +23,7 @@ type Scenario = { id: string; messages: Message[] };
 type RunsFile = { version: 1; startedAt: string; repeat: number; private: boolean; runs: RunRecord[] };
 
 const DIR = dirname(fileURLToPath(import.meta.url));
-const TIERS = ["FAST", "BALANCED", "DEEP"];
+const TIERS = ["INSTANT", "MEDIUM", "HIGH"];
 const DEFAULT_TURN_TIMEOUT_MS = 900000;
 const BLOG_TOOL = "naver_blog";
 

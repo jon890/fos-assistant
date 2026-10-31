@@ -318,12 +318,12 @@ test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하�
   const defaultTier = section.getByLabel("그룹 기본 단계");
   await expect(defaultTier).toHaveValue("");
   try {
-    await defaultTier.selectOption("BALANCED");
+    await defaultTier.selectOption("MEDIUM");
     await section.getByRole("button", { name: "저장" }).click();
     await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
 
     await page.reload();
-    await expect(defaultTier).toHaveValue("BALANCED");
+    await expect(defaultTier).toHaveValue("MEDIUM");
   } finally {
     // 다른 검사가 그룹 기본 단계가 없다고 보고 돌므로 원래대로 되돌린다.
     await page.goto("/admin/models");
@@ -338,7 +338,7 @@ test("모델 화면에서 숨길 모델의 목록을 읽을 에이전트를 바�
   const section = page.getByRole("region", { name: "그룹 모델 설정" });
   const defaultTier = section.getByLabel("그룹 기본 단계");
   await expect(defaultTier).toHaveValue("");
-  await defaultTier.selectOption("BALANCED");
+  await defaultTier.selectOption("MEDIUM");
 
   const hidden = page.getByRole("region", { name: "모델 숨김" });
   const agent = hidden.getByLabel("숨길 모델의 목록을 읽을 에이전트");
@@ -349,7 +349,7 @@ test("모델 화면에서 숨길 모델의 목록을 읽을 에이전트를 바�
   await expect(hidden.getByRole("button", { name: "저장" })).toBeVisible();
 
   // 저장하지 않았으므로 다른 검사가 보는 그룹 기본 단계는 그대로다.
-  await expect(defaultTier).toHaveValue("BALANCED");
+  await expect(defaultTier).toHaveValue("MEDIUM");
 });
 
 test("MEMBER 역할이 관리자 영역의 모델 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
@@ -396,11 +396,11 @@ test("에이전트로 읽는 단계 조회가 실패해도 관리자 영역의 �
   await expect(defaultTier).toHaveValue("");
   await expect(section.getByRole("alert")).toHaveCount(0);
   try {
-    await defaultTier.selectOption("DEEP");
+    await defaultTier.selectOption("HIGH");
     await section.getByRole("button", { name: "저장" }).click();
     await expect(section.getByText("저장했어요", { exact: true })).toBeVisible();
     await page.reload();
-    await expect(defaultTier).toHaveValue("DEEP");
+    await expect(defaultTier).toHaveValue("HIGH");
   } finally {
     // 다른 검사가 그룹 기본 단계가 없다고 보고 돌므로 원래대로 되돌린다.
     await page.goto("/admin/models");

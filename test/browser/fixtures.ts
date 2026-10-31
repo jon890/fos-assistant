@@ -500,7 +500,7 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
   await seedModelTiers(token);
 }
 
-/** 단계 정의는 DB 만 갖는다. 관리자 경로로 대역 catalog 의 중립 모델을 저장한다. */
+/** 칸 정의는 DB 만 갖는다. 관리자 경로로 대역 catalog 의 중립 모델을 저장한다. 바꾼 칸은 provider 를 비울 수 없다. */
 async function seedModelTiers(token: string): Promise<void> {
   const response = await fetch(
     `${CONTROL_PLANE_BASE_URL}/api/v1/chat/model-tiers/group`,
@@ -513,23 +513,30 @@ async function seedModelTiers(token: string): Promise<void> {
       body: JSON.stringify({
         tiers: [
           {
-            tier: "FAST",
-            provider: null,
+            tier: "INSTANT",
+            provider: "openai-codex",
             model: "example-fast",
             reasoningEffort: "low",
           },
           {
-            tier: "BALANCED",
-            provider: null,
+            tier: "MEDIUM",
+            provider: "openai-codex",
             model: "example-balanced",
             reasoningEffort: "medium",
           },
           {
-            tier: "DEEP",
-            provider: null,
+            tier: "HIGH",
+            provider: "openai-codex",
             model: "example-deep",
             reasoningEffort: "high",
           },
+          {
+            tier: "EXTRA_HIGH",
+            provider: null,
+            model: null,
+            reasoningEffort: null,
+          },
+          { tier: "PRO", provider: null, model: null, reasoningEffort: null },
         ],
         defaultTier: null,
       }),

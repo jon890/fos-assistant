@@ -15,7 +15,6 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.admin.usage.presentation.LatencyAdminDtos.LatencyRowView;
 import com.bifos.assistant.admin.usage.presentation.LatencyAdminController;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -100,15 +99,15 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("사용자 질문 뒤 답이 있는 실행 셋은 첫 반응 시간의 건수와 중앙값과 90번째 백분위로 집계된다")
     void aggregatesCountMedianAndNinetiethPercentileOfUserTurns() {
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 200L, 2_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(120), 300L, 9_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(60), 200L, 2_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(120), 300L, 9_000L);
 
         LatencyRowView row = controller.latency(30).rows().getFirst();
 
         assertThat(controller.latency(30).rows()).hasSize(1);
         assertThat(row.date()).isEqualTo(YESTERDAY);
-        assertThat(row.modelTier()).isEqualTo(ModelTier.FAST);
+        assertThat(row.modelTier()).isEqualTo("FAST");
         assertThat(row.turns()).isEqualTo(3L);
         assertThat(row.firstResponse()).satisfies(stat -> {
             assertThat(stat.count()).isEqualTo(3L);
@@ -132,10 +131,10 @@ class FirstResponseLatencyTest {
     @DisplayName("SYSTEM 알림 줄 뒤에 답한 자동 turn 은 세지 않는다")
     void doesNotCountAutoTurnAnsweredAfterSystemNotice() {
         long conversationId = conversation(ADMIN_ID).id();
-        AgentExecution auto = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution auto = execution(conversationId, ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "위임 결과가 도착했어요", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "결과를 전해요", auto.id(), YESTERDAY_NOON));
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -150,8 +149,8 @@ class FirstResponseLatencyTest {
     @DisplayName("다시 생성한 두 번째 답의 실행도 사용자 turn 으로 센다")
     void countsExecutionOfRegeneratedAnswerAsUserTurn() {
         long conversationId = conversation(ADMIN_ID).id();
-        AgentExecution first = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
-        AgentExecution second = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
+        AgentExecution first = execution(conversationId, ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution second = execution(conversationId, ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "질문이에요", YESTERDAY_NOON));
         ChatMessage firstAnswer = message(ChatMessage.fromAssistant(conversationId, "첫 답", first.id(), YESTERDAY_NOON.plusSeconds(2)));
         message(ChatMessage.regeneratedAnswer(
@@ -170,7 +169,7 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("첫 조각 시각이 빈 turn 은 제출까지에만 들고 첫 반응 시간과 첫 조각까지에는 들지 않는다")
     void turnWithoutFirstDeltaCountsOnlyToSubmit() {
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, null);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, null);
 
         LatencyRowView row = rowsOf(30).getFirst();
 
@@ -188,8 +187,8 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("자식 실행은 세지 않는다")
     void doesNotCountChildExecution() {
-        AgentExecution root = userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(10), 100L, 5_000L, root.id());
+        AgentExecution root = userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(10), 100L, 5_000L, root.id());
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -203,14 +202,14 @@ class FirstResponseLatencyTest {
     @DisplayName("예약 작업 발화가 연 turn 은 지시가 USER 메시지로 남아도 세지 않는다")
     void doesNotCountScheduledTaskTurnEvenThoughInstructionIsUserMessage() {
         long conversationId = conversation(ADMIN_ID).id();
-        AgentExecution scheduled = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution scheduled = execution(conversationId, ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "예약 작업이 시작됐어요", YESTERDAY_NOON));
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "화요일 회의 일정을 알려 줘", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "회의는 화요일 10시예요", scheduled.id(), YESTERDAY_NOON));
         TaskRun run = TaskRun.queued(7_001L, ADMIN_ID, YESTERDAY_NOON, YESTERDAY_NOON);
         run.succeed(scheduled.id(), YESTERDAY_NOON.plusSeconds(5));
         savedRuns.add(taskRuns.save(run));
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(60), 100L, 2_000L);
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -224,8 +223,8 @@ class FirstResponseLatencyTest {
     @Test
     @DisplayName("다른 사용자의 실행은 세지 않는다")
     void doesNotCountOtherUsersExecution() {
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L);
-        userTurn(OTHER_USER_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(10), 100L, 8_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 1_000L);
+        userTurn(OTHER_USER_ID, "FAST", YESTERDAY_NOON.plusSeconds(10), 100L, 8_000L);
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -239,8 +238,8 @@ class FirstResponseLatencyTest {
     @DisplayName("한국 시각 자정을 넘는 실행은 다음 날짜 줄로 묶인다")
     void groupsExecutionPastKoreanMidnightIntoNextDate() {
         // 세계 표준시 10월 4일 14:30 은 한국 시각 10월 4일 23:30 이고, 15:30 은 10월 5일 00:30 이다.
-        userTurn(ADMIN_ID, ModelTier.FAST, Instant.parse("2026-10-04T14:30:00Z"), 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, Instant.parse("2026-10-04T15:30:00Z"), 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", Instant.parse("2026-10-04T14:30:00Z"), 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", Instant.parse("2026-10-04T15:30:00Z"), 100L, 1_000L);
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -252,23 +251,23 @@ class FirstResponseLatencyTest {
     @DisplayName("같은 날짜 안에서는 FAST, BALANCED, DEEP, 단계 없음 순서로 준다")
     void ordersTiersWithinDateAsFastBalancedDeepThenNone() {
         userTurn(ADMIN_ID, null, YESTERDAY_NOON, 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.DEEP, YESTERDAY_NOON.plusSeconds(1), 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(2), 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.BALANCED, YESTERDAY_NOON.plusSeconds(3), 100L, 1_000L);
+        userTurn(ADMIN_ID, "DEEP", YESTERDAY_NOON.plusSeconds(1), 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON.plusSeconds(2), 100L, 1_000L);
+        userTurn(ADMIN_ID, "BALANCED", YESTERDAY_NOON.plusSeconds(3), 100L, 1_000L);
 
         List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
             .extracting(LatencyRowView::modelTier)
-            .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP, null);
+            .containsExactly("FAST", "BALANCED", "DEEP", null);
     }
 
 
     @Test
     @DisplayName("집계 기간보다 오래된 실행은 세지 않는다")
     void doesNotCountExecutionOlderThanPeriod() {
-        userTurn(ADMIN_ID, ModelTier.FAST, NOW.minus(Duration.ofDays(40)), 100L, 1_000L);
-        userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 2_000L);
+        userTurn(ADMIN_ID, "FAST", NOW.minus(Duration.ofDays(40)), 100L, 1_000L);
+        userTurn(ADMIN_ID, "FAST", YESTERDAY_NOON, 100L, 2_000L);
 
         assertThat(rowsOf(30))
             .singleElement()
@@ -309,14 +308,14 @@ class FirstResponseLatencyTest {
     }
 
 
-    private AgentExecution userTurn(Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs) {
+    private AgentExecution userTurn(Long userId, String tier, Instant received, Long submitMs, Long firstDeltaMs) {
         return userTurn(userId, tier, received, submitMs, firstDeltaMs, null);
     }
 
 
     /** 새 대화에 {@code USER} 질문과 그 실행이 낸 {@code ASSISTANT} 답을 심는다. */
     private AgentExecution userTurn(
-        Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
+        Long userId, String tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
         long conversationId = conversation(userId).id();
         AgentExecution execution = execution(conversationId, userId, tier, received, submitMs, firstDeltaMs, parentId);
         message(ChatMessage.fromUser(conversationId, userId, "이번 주 일정이 어떻게 돼?", received));
@@ -329,7 +328,7 @@ class FirstResponseLatencyTest {
     private AgentExecution execution(
         long conversationId,
         Long userId,
-        ModelTier tier,
+        String tier,
         Instant received,
         Long submitMs,
         Long firstDeltaMs,

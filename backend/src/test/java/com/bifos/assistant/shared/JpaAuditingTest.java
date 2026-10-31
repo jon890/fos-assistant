@@ -167,9 +167,9 @@ class JpaAuditingTest {
     void recordsBulkChangesAndPreservesNoOp() {
         clock.set(CREATED);
         AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@audit.test", "감사", 1L, UserRole.MEMBER));
-        assertThat(users.updateModelDefaultTier(user.id(), "FAST", micros(LATER))).isEqualTo(1);
+        assertThat(users.updateModelDefaultTier(user.id(), "INSTANT", micros(LATER))).isEqualTo(1);
         assertThat(users.findById(user.id()).orElseThrow().updatedAt()).isEqualTo(micros(LATER));
-        assertThat(users.updateModelDefaultTier(user.id(), "FAST", micros(LATER.plusSeconds(60)))).isZero();
+        assertThat(users.updateModelDefaultTier(user.id(), "INSTANT", micros(LATER.plusSeconds(60)))).isZero();
         assertThat(users.findById(user.id()).orElseThrow().updatedAt()).isEqualTo(micros(LATER));
         assertThat(users.updateModelDefaultTier(user.id(), null, micros(LATER.plusSeconds(120)))).isEqualTo(1);
         Instant limitTime = micros(LATER.plusSeconds(180));

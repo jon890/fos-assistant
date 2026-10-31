@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { describeError } from "@/components/error-message";
+import type { ModelTierCode } from "@/lib/model-tiers";
 import { coalesce } from "@/lib/coalesce";
 import { deleteConversation, renameConversation } from "@/lib/chat-api";
 import {
@@ -30,7 +31,7 @@ export type Conversation = {
   reasoningEffort: string | null;
   /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
   modelSelectionMode?: "DEFAULT" | "TIER" | "CUSTOM" | null;
-  modelTier?: "FAST" | "BALANCED" | "DEEP" | null;
+  modelTier?: ModelTierCode | null;
   /**
    * 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 이 provider 가 서버 응답을 읽을 때 없으면 `CHAT` 으로 채운다.
    * `replace` 로 받은 줄은 부른 쪽이 준 그대로라 비어 있을 수 있다.

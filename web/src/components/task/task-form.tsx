@@ -10,7 +10,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchChatAgents } from "@/lib/chat-api";
-import type { ModelTierCode } from "@/lib/model-tiers";
+import { MODEL_TIER_LABELS, type ModelTierCode } from "@/lib/model-tiers";
 import { createTask, updateTask } from "@/lib/task-api";
 import {
   choiceOf,
@@ -351,9 +351,11 @@ export function TaskForm({
           }
         >
           <option value="">기본값</option>
-          <option value="FAST">빠르게</option>
-          <option value="BALANCED">균형</option>
-          <option value="DEEP">깊게</option>
+          {(Object.keys(MODEL_TIER_LABELS) as ModelTierCode[]).map((code) => (
+            <option key={code} value={code}>
+              {MODEL_TIER_LABELS[code]}
+            </option>
+          ))}
         </NativeSelect>
       </Field>
       <div>
