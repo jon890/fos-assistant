@@ -198,6 +198,7 @@ public class ConnectorConnectionService {
         return limiter.call(user.id(), () -> {
             ConnectorManifest manifest = requireManifest(connectorId);
             Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
+            requireVerifyTool(manifest);
             call(user.id(), manifest, manifest.verifyTool(), accepted);
             List<ConnectorBindingAttempt> started = bindingService.start(() -> apply(user, manifest, accepted));
             if (started == null) {
@@ -328,6 +329,9 @@ public class ConnectorConnectionService {
 
     /** 보관 파일의 값으로 확인 도구를 부른다. 실패는 공통 어휘의 오류로 돌려준다. */
     private ApiException verify(long userId, ConnectorManifest manifest, String vault) {
+        if (manifest.verifyTool() == null) {
+            return ConnectorErrors.unavailable();
+        }
         final CallResult result;
         try {
             result = connector.callWithVault(
@@ -401,6 +405,17 @@ public class ConnectorConnectionService {
 
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
+    /**
+     * 확인 도구가 없는 표준 플러그인(`schema: 3`)은 아직 등록하지 않는다. 확인 도구 대신 MCP 도구 목록으로 확인하는 길은 다음 단계가
+     * 연다(ADR-20261101 / plugin-without-assistant-json). 그때까지 외부를 부르지 않고 쓸 수 없는 커넥터로 답한다.
+     */
+    private static void requireVerifyTool(ConnectorManifest manifest) {
+        if (manifest.verifyTool() == null) {
+            throw ConnectorErrors.unavailable();
+        }
+    }
+
+
     private JsonNode call(long userId, ConnectorManifest manifest, String tool, Map<String, String> values) {
         final CallResult result;
         try {

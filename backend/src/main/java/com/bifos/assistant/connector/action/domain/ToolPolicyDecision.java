@@ -28,6 +28,9 @@ public record ToolPolicyDecision(
     /** 도구를 선언하지 않는 manifest 판이다. */
     private static final int LEGACY_SCHEMA = 1;
 
+    /** {@code assistant.json} 이 없어 도구를 선언하지 않는 표준 플러그인의 schema 값이다(ADR-20261101 / plugin-without-assistant-json). */
+    private static final int STANDARD_SCHEMA = 3;
+
     /** 호출이 먼저 살펴보기 트리 안에 있는지와 그 살펴보기가 쓰기 도구를 허용했는지다. 저장하지 않는다. */
     public enum CheckBoundary {
         /** 살펴보기 트리 밖의 호출이다. 보통 판정을 그대로 한다. */
@@ -83,12 +86,14 @@ public record ToolPolicyDecision(
             return denied(ActionDenyReason.NOT_READY, null);
         }
         // 도구를 선언하지 않는 판이 쓰기로 읽어 주는 것은 그 커넥터의 MCP 서버가 낸 도구뿐이다.
-        if (!ownServerTool || (declared.isEmpty() && schema != LEGACY_SCHEMA)) {
+        if (!ownServerTool || (declared.isEmpty() && schema != LEGACY_SCHEMA && schema != STANDARD_SCHEMA)) {
             return denied(ActionDenyReason.UNDECLARED, null);
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.
-        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 대화 허락은 여는 선언이 없어 닫는다.
-        ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
+        // `schema: 1` 은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 표준 플러그인은 운영자가 읽어 본 선언이
+        // 없어 상시 허락도 닫고 호출마다 사람이 본다. 대화 허락은 여는 선언이 없어 둘 다 닫는다.
+        ToolPolicy policy = declared.orElseGet(
+            () -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, schema == LEGACY_SCHEMA));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
         }
