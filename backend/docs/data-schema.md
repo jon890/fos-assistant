@@ -883,6 +883,17 @@ action을 지우면 실행 내용도 지운다.
 `open_marker` 는 `PROPOSED` 와 `OPEN` 이면 1 이고 끝난 상태면 비어 있다. 유일 제약은 비어 있는 값을 서로 다르다고 보므로 끝난 줄은 걸리지 않는다. 이 칸은 유일 제약에만 쓴다.
 외래 키는 사용자에만 둔다. 대화와 실행이 지워져도 줄은 남는다. 대화는 숨기기만 하기 때문이다.
 
+먼저 살펴보기의 제안도 이 표의 `PROPOSED` 줄이다([ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md)). 새 테이블을 만들지 않고 아래 칸을 더했다. 사람이 직접 더한 할 일과 대화 중 제안한 할 일은 네 칸이 모두 비어 있다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `detail_json`, `detail_key_id` | 제안의 글, 근거, 모델이 낸 자유 JSON 을 사용자 데이터 key 로 암호화한 본문과 key 식별자. 암호화가 꺼져 있으면 평문이고 key 식별자는 비어 있다. AAD 는 사용자와 `dedupe_key` 로 정한다. 크기만 검사하고 구조를 보지 않는다 |
+| `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
+| `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
+
+**`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
+같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
+
 ### attention_control
 
 한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고친다.
@@ -1009,6 +1020,14 @@ action을 지우면 실행 내용도 지운다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
+
+카드 범위와 미루기, 재전송 합치기를 위한 칸이 있다. 아직 쓰는 곳이 없고 기본은 모두 비어 있다(ADR-20261101 의 순서 5 가 쓴다).
+
+| 칸 | 뜻 |
+| --- | --- |
+| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다 |
+| `until_at` | 미루기가 끝나는 시각 |
+| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일해 같은 키의 재전송이 한 줄이 된다 |
 
 정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
 `detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.

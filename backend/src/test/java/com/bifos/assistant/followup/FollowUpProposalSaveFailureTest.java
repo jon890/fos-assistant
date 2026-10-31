@@ -16,6 +16,8 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
+import com.bifos.assistant.followup.infra.FollowUpSuggestionBodies;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import java.time.Clock;
@@ -52,6 +54,8 @@ class FollowUpProposalSaveFailureTest {
             conversations,
             mock(ConversationPublicIdLookup.class),
             mock(DecisionFeedbackRecorder.class),
+            mock(AgentExecutionRepository.class),
+            mock(FollowUpSuggestionBodies.class),
             mock(PlatformTransactionManager.class),
             Clock.fixed(NOW, ZoneOffset.UTC));
     }

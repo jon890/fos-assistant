@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -25,7 +26,8 @@ import org.hibernate.type.SqlTypes;
  * 사용자 한 사람의 할 일 한 줄이다(ADR-073).
  *
  * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「follow_up」 이 갖고, 상태 전이는 {@code docs/features/attention.md} 의
- * 「상태」 가 갖는다. 대화와 실행은 지워져도 이 줄을 남기므로 번호로만 둔다.
+ * 「상태」 가 갖는다. 대화와 실행은 지워져도 이 줄을 남기므로 번호로만 둔다. 먼저 살펴보기의 제안({@link #suggested})은 예외다. 그 줄과
+ * 본문({@code detailJson})은 대화를 지울 때 함께 지운다. 제안 줄은 중복 열쇠({@code dedupeKey})가 있는 줄이다(ADR-20261101 / proactive-suggestion).
  *
  * <p>유일 제약을 엔티티에도 선언한다. 테스트는 엔티티로 스키마를 만들므로, 선언하지 않으면 같은 제목이 동시에 열릴 때의 처리가
  * 테스트에서 돌지 않는다.
@@ -37,7 +39,8 @@ import org.hibernate.type.SqlTypes;
         @UniqueConstraint(name = "uk_follow_up_public_id", columnNames = "public_id"),
         @UniqueConstraint(
             name = "uk_follow_up_open_title",
-            columnNames = {"user_id", "title_key", "open_marker"})
+            columnNames = {"user_id", "title_key", "open_marker"}),
+        @UniqueConstraint(name = "uk_follow_up_user_dedupe", columnNames = {"user_id", "dedupe_key"})
     })
 @Getter
 @Accessors(fluent = true)
@@ -102,6 +105,24 @@ public class FollowUp {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    /**
+     * 먼저 살펴보기가 낸 제안의 글과 근거, 모델의 자유 출력이다. 사용자 데이터 key 로 암호화한 JSON 이고 {@code detailKeyId} 가 비면
+     * 평문이다. 사람이 직접 더했거나 대화 중 제안한 줄은 비어 있다.
+     */
+    @Column(name = "detail_json", columnDefinition = "LONGTEXT")
+    private String detailJson;
+
+    @Column(name = "detail_key_id")
+    private Long detailKeyId;
+
+    /** 같은 실행의 같은 결과 항목을 다시 받아도 제안이 하나이게 하는 서버 계산 열쇠다. 비어 있으면 열쇠가 없다. */
+    @Column(name = "dedupe_key", length = 64, columnDefinition = "CHAR(64)")
+    private String dedupeKey;
+
+    /** 받아들이지 않은 제안이 지금 화면에서 빠지는 시각이다. 받아들이면 비운다. */
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
 
     /** 에이전트가 제안한 할 일이다. 사람이 받아들이기 전까지 {@code PROPOSED} 다. */
     public static FollowUp proposed(
@@ -116,6 +137,31 @@ public class FollowUp {
         FollowUp followUp = started(userId, conversationId, title, titleKey, dueAt, waiting, now);
         followUp.proposedByExecutionId = executionId;
         followUp.status = FollowUpStatus.PROPOSED;
+        return followUp;
+    }
+
+
+    /**
+     * 먼저 살펴보기가 낸 제안이다. {@link #proposed} 와 같은 {@code PROPOSED} 줄에 본문과 중복 열쇠, 만료 시각을 더한다.
+     *
+     * @param detailJson 암호화한 본문. 암호화가 꺼져 있으면 평문이고 {@code detailKeyId} 가 비어 있다
+     */
+    public static FollowUp suggested(
+        Long userId,
+        Long conversationId,
+        Long executionId,
+        String title,
+        String titleKey,
+        String dedupeKey,
+        String detailJson,
+        Long detailKeyId,
+        Instant expiresAt,
+        Instant now) {
+        FollowUp followUp = proposed(userId, conversationId, executionId, title, titleKey, null, false, now);
+        followUp.dedupeKey = dedupeKey;
+        followUp.detailJson = detailJson;
+        followUp.detailKeyId = detailKeyId;
+        followUp.expiresAt = expiresAt == null ? null : expiresAt.truncatedTo(ChronoUnit.MICROS);
         return followUp;
     }
 
@@ -162,6 +208,7 @@ public class FollowUp {
     public void accept(Instant now) {
         require(FollowUpStatus.PROPOSED);
         this.status = FollowUpStatus.OPEN;
+        this.expiresAt = null;
         this.acceptedAt = now;
         this.updatedAt = now;
     }
@@ -196,6 +243,19 @@ public class FollowUp {
         this.dueAt = dueAt;
         this.waiting = waiting;
         this.updatedAt = now;
+    }
+
+
+    /** 받아들이지 않은 제안이 화면에서 빠질 시각을 지났는가. 받아들인 줄과 끝난 줄은 만료되지 않는다. */
+    public boolean expiredAt(Instant now) {
+        return status == FollowUpStatus.PROPOSED && expiresAt != null && !expiresAt.isAfter(now);
+    }
+
+
+    /** 본문을 지운다. 대화를 지울 때 받아들인 줄의 제안 본문을 비우려고 쓴다. 줄은 남는다. */
+    public void clearDetail() {
+        this.detailJson = null;
+        this.detailKeyId = null;
     }
 
 

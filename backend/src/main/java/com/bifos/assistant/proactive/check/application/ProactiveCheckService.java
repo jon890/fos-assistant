@@ -3,6 +3,7 @@ package com.bifos.assistant.proactive.check.application;
 import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckEnded;
 import com.bifos.assistant.proactive.check.application.dto.ProactiveCheckSettled;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
@@ -62,6 +63,7 @@ public class ProactiveCheckService {
     private final ProactiveCheckFindingRepository findings;
     private final ProactiveCheckProblemRepository problems;
     private final FollowUpService followUps;
+    private final LiveProperties<ProactiveSuggestionProperties> suggestionProperties;
     private final LiveProperties<ProactiveCheckProperties> properties;
     private final TurnCancellation turns;
     private final ChatService chat;
@@ -394,6 +396,7 @@ public class ProactiveCheckService {
             findings,
             problems,
             followUps,
+            suggestionProperties,
             reactions,
             wakeMemory,
             messages,

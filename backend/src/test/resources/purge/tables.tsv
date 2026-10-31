@@ -34,7 +34,7 @@ execution_context_source|CONVERSATION|execution_id|GAP|KEEP|KEEP|execution_id로
 execution_event|CONVERSATION|id|GAP|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
 execution_question|CONVERSATION|execution_id|GAP|DELETE|KEEP|execution_id와 message_id로 대화에 속한다. 대화 purge가 지운다.
 execution_skill_use|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
-follow_up|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다.
+follow_up|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다. 먼저 살펴보기가 낸 제안 줄(dedupe_key가 있는 줄)은 대화 purge가 본문과 함께 지우고, 받아들인 줄은 제안 본문만 비운다.
 hermes_session_binding|CONVERSATION|id|GAP|KEEP|KEEP|user_id와 origin_execution_id에 속한다. session 소유권 참조는 실행 기록과 함께 남기는 계약이다.
 media_observation|CONVERSATION|id|GAP|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
 media_observation_request|CONVERSATION|id|GAP|DELETE|KEEP|observation_id FK로 관찰에 속한다. 관찰 삭제 때 ON DELETE CASCADE로 지운다.

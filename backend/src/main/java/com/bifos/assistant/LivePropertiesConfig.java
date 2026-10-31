@@ -10,6 +10,7 @@ import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.autonomy.config.AutonomyProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.proactive.loop.config.ProactiveLoopProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
@@ -63,6 +64,13 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<AutonomyProperties> autonomyPropertiesLive(AutonomyProperties value) {
         return LiveProperties.fixed(AutonomyProperties.class, value);
+    }
+
+
+    @Bean
+    public LiveProperties<ProactiveSuggestionProperties> proactiveSuggestionPropertiesLive(
+        ProactiveSuggestionProperties value) {
+        return LiveProperties.fixed(ProactiveSuggestionProperties.class, value);
     }
 
 

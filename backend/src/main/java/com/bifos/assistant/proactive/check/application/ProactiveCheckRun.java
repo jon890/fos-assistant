@@ -1,6 +1,7 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.port.CheckTurn;
 import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
@@ -95,6 +96,7 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param executions 지난 살펴보기의 루트 실행 줄을 읽어 Memory 문맥 지문을 견준다
      * @param chat 상한에 닿은 turn 을 멈춘다
      * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
+     * @param suggestionProperties 제안 저장 경로의 기능 스위치다. 꺼져 있으면 결과 블록의 제안 항목을 저장하지 않는다
      * @param reactions 최근에 알린 발견의 지금 반응을 읽어 입력에 싣고 「관심 없음」 주제를 되풀이로 내린다
      * @param wakeMemory 그 에이전트가 받는 기억에서 지난 살펴보기 뒤에 바뀐 항목과 이어진 항목을 꺼내 입력에 싣는다
      */
@@ -104,6 +106,7 @@ public class ProactiveCheckRun implements CheckTurn {
         ProactiveCheckFindingRepository findings,
         ProactiveCheckProblemRepository problems,
         FollowUpService followUps,
+        LiveProperties<ProactiveSuggestionProperties> suggestionProperties,
         CheckFindingReactions reactions,
         WakeMemoryRead wakeMemory,
         ChatMessageRepository messages,

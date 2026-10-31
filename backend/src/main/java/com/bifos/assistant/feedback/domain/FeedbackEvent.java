@@ -41,6 +41,8 @@ public class FeedbackEvent {
 
     static final int SUBJECT_KEY_MAX_LENGTH = 80;
     static final int SHORT_MAX_LENGTH = 64;
+    static final int CARD_KEY_MAX_LENGTH = 40;
+    static final int EVENT_KEY_MAX_LENGTH = 120;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -92,6 +94,21 @@ public class FeedbackEvent {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "detail", columnDefinition = "JSON", updatable = false)
     private MaintenanceDetail detail;
+
+    /** 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나누는 카드 열쇠다. 카드와 무관한 사건은 비어 있다. */
+    @Column(name = "card_key", length = CARD_KEY_MAX_LENGTH, updatable = false)
+    private String cardKey;
+
+    /** 미루기가 끝나는 시각이다. 미루기 사건이 아니면 비어 있다. */
+    @Column(name = "until_at", updatable = false)
+    private Instant untilAt;
+
+    /**
+     * 서버가 검증한 요청 키나 노출 키다. {@code (user_id, event_key)} 가 유일해 같은 키의 재전송을 한 줄로 합친다. 비어 있으면 합치지
+     * 않는다.
+     */
+    @Column(name = "event_key", length = EVENT_KEY_MAX_LENGTH, updatable = false)
+    private String eventKey;
 
     @Column(name = "contract_version", nullable = false, updatable = false)
     private int contractVersion;
@@ -165,6 +182,24 @@ public class FeedbackEvent {
             occurredAt);
         event.detail = detail;
         return event;
+    }
+
+
+    /**
+     * 카드 범위, 미루기 끝, 재전송 합치기 열쇠를 채운다. 저장하기 전에만 부른다. 열쇠는 칸 길이에서 자르지 않고 넘으면 거절한다. 잘린
+     * 열쇠가 다른 사건과 같아져 사건이 합쳐지는 일을 막기 위해서다.
+     */
+    public FeedbackEvent control(String cardKey, Instant untilAt, String eventKey) {
+        if (cardKey != null && cardKey.length() > CARD_KEY_MAX_LENGTH) {
+            throw new IllegalArgumentException("card key is longer than " + CARD_KEY_MAX_LENGTH);
+        }
+        if (eventKey != null && eventKey.length() > EVENT_KEY_MAX_LENGTH) {
+            throw new IllegalArgumentException("event key is longer than " + EVENT_KEY_MAX_LENGTH);
+        }
+        this.cardKey = cardKey;
+        this.untilAt = untilAt == null ? null : untilAt.truncatedTo(ChronoUnit.MICROS);
+        this.eventKey = eventKey;
+        return this;
     }
 
 
