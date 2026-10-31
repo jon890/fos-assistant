@@ -755,6 +755,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
+- `listed_tools` 는 표준 플러그인(`schema: 3`) 연결의 마지막 확인에서 MCP 서버가 낸 도구의 JSON 텍스트 `{"<도구 이름>": <readOnlyHint 가 참인가>}` 다. 표준 플러그인이 아니거나 확인하기 전, 해제한 연결은 null 이다. 값을 다시 등록하면 새로 받은 목록으로 바꾼다. 참인 도구만 상시 허락을 줄 수 있고, 뜻은 [커넥터 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 갖는다([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md))
 - 해제해도 행은 남기고 `fields` 를 빈 `values` 와 빈 `secretPrefixes` 로 비운다. 지우는 경로는 없다
 
 옛 전용 에이전트의 이관을 마쳐 `agent_id`, `restart_required`, `desired_enabled`와 관련 FK·유일 색인을 제거했다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 연결 행과 바인딩은 유지한다.

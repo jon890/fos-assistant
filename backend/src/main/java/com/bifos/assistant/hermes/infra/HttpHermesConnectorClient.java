@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -113,6 +114,18 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             .retrieve()
             .body(JsonNode.class));
         return callResult(body);
+    }
+
+
+    @Override
+    public ConnectorToolListing listTools(String connectorId, Map<String, String> values) {
+        return HttpHermesConnectorToolList.post(client, baseUrl, token, connectorId, Map.of("values", values));
+    }
+
+
+    @Override
+    public ConnectorToolListing listToolsWithVault(String connectorId, String vault) {
+        return HttpHermesConnectorToolList.post(client, baseUrl, token, connectorId, Map.of(VAULT, vault));
     }
 
 

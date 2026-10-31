@@ -164,6 +164,16 @@ final class HttpHermesConnectorGuard {
     }
 
 
+    /**
+     * 실행 응답의 {@code read_only} 칸이다. 옛 대시보드 plugin 은 내지 않고, 없거나 boolean 이 아니면 null 이다. null 은 표시를 거두지
+     * 않는다.
+     */
+    private static Boolean readOnly(JsonNode answer) {
+        JsonNode value = answer.get("read_only");
+        return value != null && value.isBoolean() ? value.booleanValue() : null;
+    }
+
+
     static CallResult execute(RestClient client, String base, String token, String connector, ObjectNode body) {
         if (body == null) {
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
@@ -199,12 +209,12 @@ final class HttpHermesConnectorGuard {
                 if (result == null || result.isNull()) {
                     throw new ConnectorExecutionUnknown();
                 }
-                return CallResult.success(result);
+                return CallResult.success(result).withReadOnly(readOnly(answer));
             }
             return CallResult.failure(
                 ConnectorCallError.fromWord(answer.path("error").asString())
                     .orElseThrow(ConnectorExecutionUnknown::new),
-                ConnectorErrorDetail.fromAnswer(answer).orElse(null));
+                ConnectorErrorDetail.fromAnswer(answer).orElse(null)).withReadOnly(readOnly(answer));
         } catch (ConnectorExecutionUnknown unknown) {
             throw unknown;
         } catch (RuntimeException ignored) {

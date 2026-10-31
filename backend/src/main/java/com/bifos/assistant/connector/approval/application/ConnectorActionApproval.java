@@ -163,6 +163,9 @@ class ConnectorActionApproval {
         CallResult executed = result;
         ConnectorUnknownDetail unknownDetail = unknown;
         ConnectorAction finished = transactions.execute(status -> record(actionId, executed, unknownDetail));
+        if (executed != null && Boolean.FALSE.equals(executed.readOnly())) {
+            transactions.executeWithoutResult(status -> dropReadOnly(finished));
+        }
         signals.publish(finished);
         return details.view(finished);
     }
@@ -201,6 +204,8 @@ class ConnectorActionApproval {
             return Approval.refused(saved);
         }
         Optional<ConnectorManifest> manifest = details.readManifest(action.connectorId());
+        // 표준 플러그인 연결의 읽기 표시다. 사용자 행을 잠근 뒤에 읽어 연결 확인이 바꾸는 표시와 엇갈리지 않는다.
+        boolean readOnlyMarked = details.readOnlyMarked(action, manifest);
         if (action.executableArgs().isEmpty()) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
@@ -212,7 +217,7 @@ class ConnectorActionApproval {
             return Approval.refused(actions.save(action));
         }
         // 승인 줄이 `grantAllowed` 로 낸 것과 같은 조건이다. 카탈로그를 읽지 못했으면 허락을 줄 수 없다.
-        if (grant != null && !(action.grantAllowed() && grantable(manifest, action))) {
+        if (grant != null && !(action.grantAllowed() && grantable(manifest, action, readOnlyMarked))) {
             throw grantNotAllowed();
         }
         // 승인 줄이 `conversationGrantAllowed` 로 낸 것과 같은 조건이다. 밖으로 나가는 도구는 대화 허락도 받지 않는다.
@@ -223,7 +228,8 @@ class ConnectorActionApproval {
         Optional<ConnectorBinding> binding = connections
             .findByUserIdAndConnectorId(action.userId(), action.connectorId())
             .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
-        Optional<ToolPolicyDecision> decision = binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
+        Optional<ToolPolicyDecision> decision = binding.flatMap(
+            found -> manifest.map(declared -> redecide(found, declared, action, readOnlyMarked)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
@@ -231,7 +237,7 @@ class ConnectorActionApproval {
         if (grant != null) {
             // 지금 정책으로 다시 본다. 요청을 만든 뒤 늘 승인을 받는 도구로 바뀌었거나 선언이 상시 허락을 닫았으면
             // 허락을 주지 않는다.
-            if (decision.get().approval() != ToolApproval.REQUIRED || !grantable(manifest, action)) {
+            if (decision.get().approval() != ToolApproval.REQUIRED || !grantable(manifest, action, readOnlyMarked)) {
                 throw grantNotAllowed();
             }
             grants.save(ConnectorToolGrant.of(
@@ -264,15 +270,38 @@ class ConnectorActionApproval {
      * 줄은 사람이 승인한 것이라 보통 실행의 줄과 같게 판정한다.
      */
     private static ToolPolicyDecision redecide(
-        ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
+        ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action, boolean readOnlyMarked) {
         return ToolPolicyDecision.decide(
             ConnectorPolicyService.usableStatus(binding.connection(), binding),
             ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
             manifest.schema(),
             ConnectorToolPolicies.find(manifest, action.toolName()),
             false,
+            false,
+            readOnlyMarked,
             action.executableArgs().orElseThrow().getBytes(StandardCharsets.UTF_8).length,
             CheckBoundary.NOT_CHECK);
+    }
+
+
+    /**
+     * 승인 실행이 받은 표시가 거짓인 도구의 읽기 표시와 상시 허락을 한 트랜잭션에서 거둔다(ADR-20261101 / plugin-without-assistant-json).
+     * 트랜잭션 안에서만 부른다.
+     *
+     * <p>서버가 표시를 거두면 그 뒤 호출은 다시 매번 승인이다. 받은 도구 목록이 없는 연결(표준 플러그인이 아닌 연결)은 선언이 허락을
+     * 정하므로 건드리지 않는다. 연결 확인과 같은 순서로 사용자 행을 먼저 잠근다.
+     */
+    private void dropReadOnly(ConnectorAction action) {
+        Instant now = now();
+        users.findByIdForUpdate(action.userId()).orElseThrow(ConnectorActionDetails::notFound);
+        connections.findByUserIdAndConnectorId(action.userId(), action.connectorId())
+            .filter(connection -> connection.unmarkReadOnly(action.toolName()))
+            .ifPresent(connection -> {
+                connections.save(connection);
+                grants.findActiveByUserIdAndConnectorId(action.userId(), action.connectorId(), now).stream()
+                    .filter(grant -> grant.toolName().equals(action.toolName()))
+                    .forEach(grant -> grant.revoke(now));
+            });
     }
 
 

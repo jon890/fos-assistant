@@ -130,7 +130,12 @@ public final class ConnectionDtos {
         }
     }
 
-    /** 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다. */
+    /**
+     * 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다.
+     *
+     * <p>{@code listedTools} 와 {@code readOnlyTools} 는 표준 플러그인 연결의 마지막 확인에서 받은 도구 수와 그 가운데 읽기 표시가 있는
+     * 수다. 표준 플러그인이 아니거나 확인하기 전이면 null 이다.
+     */
     public record ConnectionView(
         String connectorId,
         String status,
@@ -138,7 +143,9 @@ public final class ConnectionDtos {
         Map<String, String> values,
         Instant checkedAt,
         List<BoundAgentView> bindings,
-        int undeclaredTools) {
+        int undeclaredTools,
+        Integer listedTools,
+        Integer readOnlyTools) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -147,7 +154,9 @@ public final class ConnectionDtos {
                 value.values(),
                 value.checkedAt(),
                 value.bindings().stream().map(BoundAgentView::from).toList(),
-                value.undeclaredTools());
+                value.undeclaredTools(),
+                value.listedTools(),
+                value.readOnlyTools());
         }
     }
 

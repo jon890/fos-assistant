@@ -416,7 +416,7 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 `PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
-- `call` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
+- `call` 과 `tools` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [커넥터 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
 - Control Plane은 웹에 `readmeUrl`, `linkKind`를 전달한다. 옛 응답의 README 주소는 null이고, `link_kind`가 없거나 `project`가 아니면 `service`로 읽는다. 목록 카드와 상세 머리는 `link`를 「공식 사이트」 또는 「프로젝트 GitHub」로, `readmeUrl`을 「커넥터 README」로 표시하고 각각 새 탭으로 연다
 - 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 카탈로그 읽기를 실패로 다룬다
@@ -442,7 +442,8 @@ Claude Code, Codex, ChatGPT 플러그인 형식의 비교와 받지 않는 것�
 
 - 카탈로그는 `GET /api/connectors/catalog?include=standard` 로 청할 때만 `schema: 3` 항목을 싣는다. Control Plane 은 늘 이 query 를 붙인다. 이 query 를 모르는 옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하기 때문이다
 - Control Plane 은 `schema: 3` 이면 확인 도구와 `tools` 가 비어 있고 선택지 칸이 없을 때만 읽을 수 있는 커넥터로 다룬다
-- `schema: 3` 연결의 등록과 확인은 아직 `CONNECTOR_UNAVAILABLE` 로 거절한다. 확인 도구 대신 MCP 도구 목록으로 확인하는 길은 그 ADR 의 「남은 단계」 2단계가 연다. 그때까지 운영 목록에 `schema: 3` 플러그인을 올리지 않는다
+- `schema: 3` 연결의 등록과 확인은 확인 도구 대신 대시보드의 `POST /api/connectors/<id>/tools` 로 그 MCP 서버의 `tools/list` 가 성공하는지 본다. 도구는 부르지 않고, 원격 서버의 401 과 403 은 `credential_rejected` 다
+- 받은 도구 이름과 읽기 표시(`readOnlyHint`)는 연결의 `listed_tools` 에 적고 확인할 때마다 덮어쓴다. 연결 응답의 `listedTools` 와 `readOnlyTools` 가 그 수다. 받는 도구는 256개까지이고, 넘으면 확인하지 못한 것(`unavailable`)으로 둔다
 
 ### 바인딩 설치
 

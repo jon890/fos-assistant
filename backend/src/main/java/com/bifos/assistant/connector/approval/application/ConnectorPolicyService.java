@@ -264,6 +264,8 @@ public class ConnectorPolicyService {
             declared,
             !resend && grants.standing(connection, confirmedTool, now),
             !resend && grants.inConversation(origin, connection, confirmedTool, now),
+            // 표준 플러그인은 연결의 마지막 확인에서 읽기 표시를 받은 도구만 상시 허락을 본다(ADR-20261101 / plugin-without-assistant-json).
+            connection.readOnlyMarked(confirmedTool),
             argsJson.getBytes(StandardCharsets.UTF_8).length,
             boundary))
             .orElseGet(ToolPolicyDecision::policyUnavailable);

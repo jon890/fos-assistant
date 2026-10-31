@@ -12,6 +12,7 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary
 import com.bifos.assistant.connector.connection.application.dto.ResyncOutcome;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
@@ -67,7 +68,7 @@ public class ConnectorConnectionService {
     private final TransactionTemplate transactions;
     private final ConnectorCallLimiter limiter;
     private final ConnectorActionService approvals;
-    private final BrowserGatewayTokens tokens;
+    private final ConnectorVerifier verifier;
     private final Clock clock;
 
 
@@ -77,6 +78,15 @@ public class ConnectorConnectionService {
      * @param vault 확인 도구가 값을 읽을 보관 파일. 값이 보관 파일에 없거나 해제된 연결이면 null
      */
     private record Prepared(String vault, Instant revision) {
+    }
+
+    /**
+     * 트랜잭션 밖에서 확인한 결과다.
+     *
+     * @param failure 확인하지 못한 까닭. 확인했거나 확인할 값이 없었으면 null
+     * @param listed 표준 플러그인이 받은 도구 목록. 아니면 null
+     */
+    private record CheckResult(boolean verified, ApiException failure, ListedTools listed) {
     }
 
     /** 커밋한 설치 입력과, 커밋한 뒤에 알릴 실패를 담은 연결 확인의 결과다. */
@@ -105,7 +115,7 @@ public class ConnectorConnectionService {
         this.transactions = new TransactionTemplate(transactionManager);
         this.limiter = limiter;
         this.approvals = approvals;
-        this.tokens = tokens;
+        this.verifier = new ConnectorVerifier(connector, tokens);
         this.clock = clock;
     }
 
@@ -186,7 +196,8 @@ public class ConnectorConnectionService {
     /**
      * 값을 등록하거나 교체한다. 입력 칸이 없는 커넥터는 빈 값을 받는다.
      *
-     * <p>확인 도구는 DB 트랜잭션 밖에서 먼저 부른다. 최대 10초가 걸려 그동안 DB 연결을 쥐지 않기 위해서다. 통과한
+     * <p>확인 도구는 DB 트랜잭션 밖에서 먼저 부른다. 확인 도구가 없는 표준 플러그인은 그 자리에서 MCP 도구 목록을 받고, 저장할 때 받은
+     * 도구와 읽기 표시를 함께 적는다(ADR-20261101 / plugin-without-assistant-json). 최대 10초가 걸려 그동안 DB 연결을 쥐지 않기 위해서다. 통과한
      * 뒤에만 트랜잭션을 열어 사용자 행을 잠그고 저장한다. 그 사이에 같은 사용자의 다른 요청이 끼어도 잠금 안에서
      * 행을 다시 읽으므로 상태 전이는 순서대로 적용된다.
      *
@@ -198,9 +209,8 @@ public class ConnectorConnectionService {
         return limiter.call(user.id(), () -> {
             ConnectorManifest manifest = requireManifest(connectorId);
             Map<String, String> accepted = ConnectorValues.validated(manifest, values, true);
-            requireVerifyTool(manifest);
-            call(user.id(), manifest, manifest.verifyTool(), accepted);
-            List<ConnectorBindingAttempt> started = bindingService.start(() -> apply(user, manifest, accepted));
+            ListedTools listed = verifier.values(user.id(), manifest, accepted);
+            List<ConnectorBindingAttempt> started = bindingService.start(() -> apply(user, manifest, accepted, listed));
             if (started == null) {
                 throw new ConnectorOperationFailure();
             }
@@ -213,9 +223,11 @@ public class ConnectorConnectionService {
     /**
      * 잠금 안에서 보관 파일과 붙은 바인딩을 반영하고 저장한다. 트랜잭션 안에서만 부른다.
      *
+     * @param listed 표준 플러그인이 받은 도구 목록. 표준 플러그인이 아니면 null
      * @return 커밋할 설치 입력. 보관 파일을 쓰지 못해 {@code PENDING} 만 남겼으면 null. 예외로 알리면 그 커밋이 되돌려진다
      */
-    private List<ConnectorBindingAttempt> apply(CurrentUser user, ConnectorManifest manifest, Map<String, String> accepted) {
+    private List<ConnectorBindingAttempt> apply(
+        CurrentUser user, ConnectorManifest manifest, Map<String, String> accepted, ListedTools listed) {
         AppUser owner = lock(user.id());
         Instant now = now();
         ConnectorConnection connection = connections
@@ -232,6 +244,8 @@ public class ConnectorConnectionService {
             return null;
         }
         connection.connected(ConnectorValues.stored(manifest, accepted), now);
+        // 앞선 상시 허락은 위에서 모두 거뒀다. 새 값으로 받은 읽기 표시만 남는다.
+        connection.recordListedTools(listed);
         connections.save(connection);
         return bindings.findByConnectionId(connection.id()).stream()
             .map(binding -> bindingService.reinstall(binding, manifest)).toList();
@@ -291,13 +305,18 @@ public class ConnectorConnectionService {
             }
             ApiException verifyFailure = null;
             boolean verified = false;
+            ListedTools listedTools = null;
             if (prepared.vault() != null && manifest.isPresent()) {
-                verifyFailure = verify(user.id(), manifest.get(), prepared.vault());
+                ConnectorVerifier.Verified result = verifier.vault(user.id(), manifest.get(), prepared.vault());
+                verifyFailure = result.failure();
+                listedTools = result.listed();
                 verified = verifyFailure == null;
             }
             ApiException failure = verifyFailure;
             boolean ready = verified;
-            Checked checked = bindingService.start(() -> recordCheck(user, connectorId, manifest, prepared.revision(), ready, failure));
+            ListedTools listed = listedTools;
+            Checked checked = bindingService.start(
+                () -> recordCheck(user, connectorId, manifest, prepared.revision(), new CheckResult(ready, failure, listed)));
             if (checked == null) {
                 throw new ConnectorOperationFailure();
             }
@@ -327,37 +346,19 @@ public class ConnectorConnectionService {
     }
 
 
-    /** 보관 파일의 값으로 확인 도구를 부른다. 실패는 공통 어휘의 오류로 돌려준다. */
-    private ApiException verify(long userId, ConnectorManifest manifest, String vault) {
-        if (manifest.verifyTool() == null) {
-            return ConnectorErrors.unavailable();
-        }
-        final CallResult result;
-        try {
-            result = connector.callWithVault(
-                manifest.id(), manifest.verifyTool(), vault, ownerBrowser(userId, manifest));
-        } catch (RuntimeException ex) {
-            warn(STEP_TOOL_CALL, manifest.id(), ex);
-            return ConnectorErrors.unavailable();
-        }
-        return result.ok() ? null : ConnectorErrors.of(result.error());
-    }
-
-
     /**
      * 연결 확인의 뒤 트랜잭션이다. 다시 잠그고 확인 결과를 적은 뒤 바인딩마다 설치를 맞춘다.
      *
      * <p>그 사이 해제됐으면 아무것도 바꾸지 않는다. 확인 도구가 실패했으면 바인딩은 건드리지 않는다. 보관 파일이
      * 없으면 {@code PENDING} 으로 두고 {@code CONNECTOR_NOT_CONNECTED} 를 돌려준다. 카탈로그에서 빠진 커넥터는
      * 확인할 수도 다시 등록할 수도 없어 보관 파일이 없어도 오류 없이 {@code PENDING} 이다.
+     *
+     * <p>표준 플러그인이 도구 목록을 받았으면 그 목록으로 바꾸고, 읽기 표시가 없거나 빠진 도구의 상시 허락을 같은 트랜잭션에서 거둔다.
      */
     private Checked recordCheck(
-        CurrentUser user,
-        String connectorId,
-        Optional<ConnectorManifest> manifest,
-        Instant revision,
-        boolean verified,
-        ApiException verifyFailure) {
+        CurrentUser user, String connectorId, Optional<ConnectorManifest> manifest, Instant revision, CheckResult result) {
+        boolean verified = result.verified();
+        ApiException verifyFailure = result.failure();
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
         if (connection.status() == ConnectionStatus.DISCONNECTED || !connection.updatedAt().equals(revision)) {
@@ -380,6 +381,10 @@ public class ConnectorConnectionService {
         }
         if (verified) {
             connection.ready(now);
+            if (result.listed() != null) {
+                connection.recordListedTools(result.listed());
+                approvals.revokeUnmarkedGrants(connection, result.listed(), now);
+            }
         } else if (manifest.isEmpty()) {
             connection.pending(now);
         }
@@ -404,22 +409,11 @@ public class ConnectorConnectionService {
     }
 
 
-    /**
-     * 확인 도구가 없는 표준 플러그인({@code schema: 3})은 아직 등록하지 않는다. 확인 도구 대신 MCP 도구 목록으로 확인하는 길은 다음 단계가
-     * 연다(ADR-20261101 / plugin-without-assistant-json). 그때까지 외부를 부르지 않고 쓸 수 없는 커넥터로 답한다.
-     */
-    private static void requireVerifyTool(ConnectorManifest manifest) {
-        if (manifest.verifyTool() == null) {
-            throw ConnectorErrors.unavailable();
-        }
-    }
-
-
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
     private JsonNode call(long userId, ConnectorManifest manifest, String tool, Map<String, String> values) {
         final CallResult result;
         try {
-            result = connector.call(manifest.id(), tool, values, ownerBrowser(userId, manifest));
+            result = connector.call(manifest.id(), tool, values, verifier.ownerBrowser(userId, manifest));
         } catch (RuntimeException ex) {
             warn(STEP_TOOL_CALL, manifest.id(), ex);
             throw ConnectorErrors.unavailable();
@@ -428,16 +422,6 @@ public class ConnectorConnectionService {
             throw ConnectorErrors.of(result.error());
         }
         return result.result();
-    }
-
-
-    /**
-     * 확인 도구와 선택지 호출에 실을 브라우저 중계 주소다. 사용자 브라우저를 쓰지 않는 커넥터는 null 이라 본문에 키가 없다.
-     *
-     * <p>바인딩이 없는 호출이라 요청자의 호출 표식을 싣는다. 중계가 꺼졌으면 빈 값이다(ADR-20261008 / browser-gateway-token).
-     */
-    private String ownerBrowser(long userId, ConnectorManifest manifest) {
-        return manifest.ownerBrowser() ? tokens.callAddress(userId).orElse("") : null;
     }
 
 

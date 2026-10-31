@@ -7,7 +7,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 ## 요구
 
 - 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
-- 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
+- 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자는 판정에 들어가지 않는다. 서버의 `readOnlyHint` 는 표준 플러그인의 상시 허락을 여는 데만 쓰고 승인을 건너뛰게 하지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
 - 사용자는 승인하면서 그 도구를 그 대화에서만 계속 허용할 수 있다. 밖으로 나가는 도구와 `always` 도구는 열지 않는다. 아래 「대화 허락」 이 정한다
@@ -166,9 +166,10 @@ sequenceDiagram
 **`schema: 1` 커넥터에서 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인 줄이 된다.** 조회 도구도 마찬가지다.
 `schema: 1` 은 `tools` 를 선언하지 않으므로 그 밖의 도구를 모두 `WRITE` 와 `required` 로 읽는다. 승인 없이 조회를 쓰려면 그 plugin 이 `schema: 2` 로 올려 조회 도구를 `READ` 로 선언해야 한다.
 
-**`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 호출마다 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
-`schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 상시 허락과 대화 허락을 모두 닫는다.
-MCP 서버의 `readOnlyHint` 는 승인을 건너뛰게 하지 않는다. 그 표시로 상시 허락만 여는 일은 그 ADR 의 「남은 단계」 가 갖는다.
+**`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 첫 호출에 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
+`schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 대화 허락은 닫는다.
+상시 허락은 연결의 마지막 확인에서 `readOnlyHint` 가 참이었던 도구(`connector_connection.listed_tools`)에만 열고, 나머지는 호출마다 승인이다. 판정과 승인 카드의 `grantAllowed`, 허락을 만드는 승인이 같은 조건을 본다.
+연결 확인이 받은 목록에서 표시가 거짓이거나 빠진 도구, 승인 실행의 응답이 `read_only: false` 인 도구는 그 트랜잭션에서 표시와 상시 허락을 함께 거둔다. 그 뒤 호출은 다시 승인을 받는다. `destructiveHint` 와 `openWorldHint` 는 판정에 쓰지 않는다.
 
 #### 이름 대응
 

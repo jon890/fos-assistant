@@ -11,6 +11,7 @@ import com.bifos.assistant.connector.approval.application.dto.ConnectorConversat
 import com.bifos.assistant.connector.approval.application.dto.ConnectorGrantView;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.action.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
@@ -358,6 +359,23 @@ class ConnectorActionLifecycle {
         grants.saveAll(active);
         conversationGrants.revokeAllOfConnector(connection.userId(), connection.connectorId(), now);
         signals.publishAfterCommit(rejected);
+    }
+
+
+    /**
+     * 표준 플러그인 연결 확인이 받은 도구 목록에서 읽기 표시가 없거나 빠진 도구의 유효한 상시 허락을 거둔다. 연결 확인의 트랜잭션 안에서
+     * 부른다(ADR-20261101 / plugin-without-assistant-json).
+     *
+     * <p>판정이 읽기 표시 없는 도구의 허락을 보지 않아 효력은 이미 없다. 그래도 거둬 두어 서버가 표시를 다시 달 때 앞선 허락이 조용히
+     * 되살아나지 않게 한다. 답을 기다리는 줄은 건드리지 않는다. 그 줄은 승인할 때 지금 표시로 다시 본다.
+     */
+    void revokeUnmarkedGrants(ConnectorConnection connection, ListedTools listed, Instant now) {
+        List<ConnectorToolGrant> unmarked = grants
+            .findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now).stream()
+            .filter(grant -> !listed.readOnly(grant.toolName()))
+            .toList();
+        unmarked.forEach(grant -> grant.revoke(now));
+        grants.saveAll(unmarked);
     }
 
 
