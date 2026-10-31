@@ -65,6 +65,8 @@ export type ConnectorSummary = {
   bindings: BoundAgent[];
   /** 「내 브라우저」 에서 먼저 로그인할 `https://` 주소다. 선언하지 않았으면 null 이다. 옛 Control Plane 은 내지 않는다. */
   ownerBrowserLoginUrl: string | null;
+  /** `assistant.json` 이 없는 표준 플러그인인가. 그 도구는 모두 쓸 때마다 확인한다. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
+  standardPlugin: boolean;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -80,6 +82,10 @@ export type ConnectorConnection = {
   bindings: BoundAgent[];
   /** 커넥터가 선언하지 않아 쓰지 않는 도구의 수다. */
   undeclaredTools: number;
+  /** 표준 플러그인 연결의 마지막 확인에서 받은 도구 수다. 표준 플러그인이 아니거나 확인 전이면 null 이다. */
+  listedTools: number | null;
+  /** 그 가운데 서버가 읽기만 한다고 표시한 도구 수다. 한 번 승인한 뒤 계속 허락할 수 있다. */
+  readOnlyTools: number | null;
 };
 
 /**

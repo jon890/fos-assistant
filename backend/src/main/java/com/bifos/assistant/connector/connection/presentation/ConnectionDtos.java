@@ -91,6 +91,7 @@ public final class ConnectionDtos {
      * @param icon 검증을 통과한 아이콘의 data URL. 없거나 틀렸으면 null
      * @param link 검증을 통과한 {@code https://} 링크. 없거나 틀렸으면 null
      * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 {@code https://} 주소. 선언하지 않았으면 null
+     * @param standardPlugin {@code assistant.json} 이 없는 표준 플러그인인가. 화면이 「모든 도구를 쓸 때마다 확인」 안내를 보인다
      */
     public record ConnectorView(
         String id,
@@ -105,7 +106,8 @@ public final class ConnectionDtos {
         List<BoundAgentView> bindings,
         String ownerBrowserLoginUrl,
         String readmeUrl,
-        String linkKind) {
+        String linkKind,
+        boolean standardPlugin) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -120,7 +122,8 @@ public final class ConnectionDtos {
                 value.bindings().stream().map(BoundAgentView::from).toList(),
                 value.ownerBrowserLoginUrl(),
                 value.appearance().readmeUrl(),
-                value.appearance().linkKind());
+                value.appearance().linkKind(),
+                value.standardPlugin());
         }
     }
 
