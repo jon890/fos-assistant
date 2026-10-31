@@ -3,7 +3,6 @@ package com.bifos.assistant.admin.usage.presentation;
 import com.bifos.assistant.chat.conversation.application.dto.LatencyRow;
 import com.bifos.assistant.chat.conversation.application.dto.LatencyStat;
 import com.bifos.assistant.chat.conversation.application.dto.LatencySummary;
-import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.AccessLevel;
@@ -29,7 +28,7 @@ public final class LatencyAdminDtos {
 
     /**
      * @param date {@code Asia/Seoul} 의 날짜
-     * @param modelTier 모델 단계. 단계를 고르지 않은 실행은 null
+     * @param modelTier 모델 단계 이름. 지난 단계 이름일 수 있다. 단계를 고르지 않은 실행은 null
      * @param turns 답 메시지가 있는 사용자 turn 수
      * @param firstResponse 요청을 받은 때부터 첫 조각까지
      * @param toSubmit 요청을 받은 때부터 제출까지
@@ -37,7 +36,7 @@ public final class LatencyAdminDtos {
      */
     public record LatencyRowView(
         LocalDate date,
-        ModelTier modelTier,
+        String modelTier,
         long turns,
         LatencyStatView firstResponse,
         LatencyStatView toSubmit,

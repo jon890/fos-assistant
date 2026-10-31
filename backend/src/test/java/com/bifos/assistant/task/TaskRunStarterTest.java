@@ -779,7 +779,7 @@ class TaskRunStarterTest {
         assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.FAST);
         assertThat(executions.findById(finished.executionId()).orElseThrow().modelTier())
             .as("루트 실행의 단계")
-            .isEqualTo(ModelTier.FAST);
+            .isEqualTo(ModelTier.FAST.name());
     }
 
 
