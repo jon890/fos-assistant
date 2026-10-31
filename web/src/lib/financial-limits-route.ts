@@ -27,6 +27,17 @@ function decimal(value: unknown): string {
   return value;
 }
 
+/** 합계는 설정 입력보다 정밀할 수 있으므로 자릿수를 줄이지 않고 길이만 제한한다. */
+function usageDecimal(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    value.length > 100 ||
+    !/^[0-9]+(\.[0-9]+)?$/.test(value)
+  )
+    throw new Error();
+  return value;
+}
+
 function text(value: unknown, max = 40): string {
   if (typeof value !== "string" || value.length > max) throw new Error();
   return value;
@@ -47,7 +58,7 @@ function name(value: unknown): FinancialLimitItem["name"] {
 
 function byCurrency(value: unknown): Record<string, string> {
   const item = record(value);
-  return { KRW: decimal(item.KRW), USD: decimal(item.USD) };
+  return { KRW: usageDecimal(item.KRW), USD: usageDecimal(item.USD) };
 }
 
 export function safeFinancialLimits(value: unknown): FinancialLimits {
@@ -84,8 +95,8 @@ export function safeLimitStatus(value: unknown): FinancialLimitStatus | null {
     orderLimit: decimal(item.orderLimit),
     quantityLimit: decimal(item.quantityLimit),
     dailyLimit: decimal(item.dailyLimit),
-    spentToday: decimal(item.spentToday),
-    remainingToday: decimal(item.remainingToday),
+    spentToday: usageDecimal(item.spentToday),
+    remainingToday: usageDecimal(item.remainingToday),
   };
 }
 

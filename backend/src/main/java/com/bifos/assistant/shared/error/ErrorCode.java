@@ -142,6 +142,8 @@ public enum ErrorCode {
     CONTENT_DRAFT_CONFLICT(HttpStatus.CONFLICT),
     /** 원고가 고정한 원본이나 관찰을 더 이상 쓸 수 없다. */
     CONTENT_DRAFT_STALE(HttpStatus.CONFLICT),
+    /** 같은 원고의 앞 저장 결과가 UNKNOWN 으로 남아 있어 새 snapshot 저장을 받지 않는다. 결과 조회로 풀리면 다시 받는다. */
+    CONTENT_DRAFT_RESULT_UNKNOWN(HttpStatus.CONFLICT),
     /** 원고의 보관 기간이 끝났다. */
     CONTENT_DRAFT_GONE(HttpStatus.GONE),
     /** 일시 장애로 원고 본문을 사용할 수 없다. */
