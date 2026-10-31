@@ -409,6 +409,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 ### 사건
 
 사건 종류는 `FeedbackEventType` 이 갖는다. 실제 화면과 API 흐름에 있는 것만 두는 까닭은 ADR 이 갖는다.
+「참고한 기억」 의 단추 사건은 [`docs/features/memory.md`](memory.md) 의 「참고한 기억의 단추」 가 갖는다. 기억 내용을 바꾸지 않고 반응 읽기에도 들지 않는다.
 각 도메인 서비스가 동작을 마친 자리에서 `DecisionFeedbackRecorder.record` 를 부른다. `feedback` 은 부르는 쪽을 모른다.
 무응답은 사건이 아니라 `SURFACED` 뒤에 사용자 사건이 없다는 사실로 읽는다. 승인 줄의 만료, 결과를 모르는 실행, 보고 열기도 사건이 아니다.
 사용자가 직접 더한 할 일과 사람이 고르는 지금 화면의 `FOLLOW_UP_OPEN` 항목은 제안이 아니라 사건을 남기지 않는다.
@@ -446,7 +447,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 | 일 | 처리 |
 | --- | --- |
 | 사용자 줄을 지움 | FK `ON DELETE CASCADE` 로 함께 지운다 |
-| 대화를 지움 | `ChatConversationManagement.delete` 가 같은 트랜잭션에서 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건을 지운다 |
+| 대화를 지움 | `ChatConversationManagement.delete` 가 같은 트랜잭션에서 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건을 지운다. 「참고한 기억」 단추 사건(`MARKED_IRRELEVANT`, `MARKED_WRONG`)은 그 대화의 사건으로만 지우고 같은 기억의 다른 사건으로 넓히지 않는다 |
 | 보관 기간이 지남 | 마지막 사건이 `assistant.decision-feedback.retention` 보다 오래된 제안의 사건을 모두 지운다. 사건 단위로 지우면 나중 사건만 남아 첫 반응을 잘못 읽는다 |
 | 살펴보기, 판정, 실행 줄을 지움 | 그 번호 칸만 비운다(`ON DELETE SET NULL`) |
 
