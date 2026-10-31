@@ -42,6 +42,9 @@ assistant:
       model: ""
       # 채우는 작업이 검사 도중 스스로 돌지 않게 한다. 검사는 refreshOnce 를 직접 부른다
       refresh-delay: 1h
+    maintenance:
+      # 검사가 뜰 때마다 정비 작업이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+      cron: "-"
   starters:
     # 추천 실행이 대역 Hermes 의 받은 명령과 응답 큐를 함께 써 다른 검사의 단언을 흔든다.
     # 추천을 보는 검사만 켠다
