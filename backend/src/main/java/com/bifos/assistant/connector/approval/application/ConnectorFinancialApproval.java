@@ -125,10 +125,13 @@ class ConnectorFinancialApproval {
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             if (action.status() == ActionStatus.EXECUTING) {
                 var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorFinancialProducer::rejected);
-                if (executed != null && executed.ok()) {
-                    if (row.consumedAt() == null) {
-                        log.warn("claim 없이 금융 성공을 받았다 actionId={}", actionId);
-                    }
+                if (executed != null && executed.ok() && row.consumedAt() == null) {
+                    // claim 없이 온 성공은 「claim 성공 없이 금융 POST 를 보내지 않는다」 는 계약과 어긋난다. 보냈는지 가릴 수 없으므로
+                    // 성공과 실패 어느 쪽으로도 확정하지 않고 UNKNOWN 으로 남긴다(ADR-20261012 / financial-unsent-proof 개정).
+                    // 응답 본문은 주문의 증거가 아니라 저장하지 않고, 진단에는 승인 번호만 남긴다.
+                    log.warn("금융 실행 프로토콜 불일치: claim 없이 성공 응답을 받았다 actionId={}", actionId);
+                    action.unknown(clock.instant());
+                } else if (executed != null && executed.ok()) {
                     bodies.succeed(action, clip(executed.result().toString()), clock.instant());
                     feedback.record(entry(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
                 } else {
