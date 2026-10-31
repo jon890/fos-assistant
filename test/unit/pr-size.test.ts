@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, renameSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, renameSync, rmSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded } from "../../scripts/pr/pr-size.mjs";
+import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded, report } from "../../scripts/pr/pr-size.mjs";
 
 const SCRIPT = new URL("../../scripts/pr/pr-size.mjs", import.meta.url).pathname;
 // 시험 자식이 CI 작업의 출력과 요약을 바꾸거나 예외 라벨을 물려받지 않게 한다.
@@ -102,5 +102,75 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: { ...CLI_ENV, PR_LABELS: '["규모:예외"]' } }).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+
+test("커넥터 스킬만 문서 분류보다 먼저 운영 코드로 센다", () => {
+  const skill = "hermes/connectors/sample/skills/search/SKILL.md";
+  assert.equal(category(skill), "production");
+  for (const file of ["hermes/skills/search/SKILL.md", join("hermes/connectors/sample", "README.md"), "hermes/connectors/sample/skills/search/guide.md"]) {
+    assert.equal(category(file), "docs", file);
+  }
+  assert.deepEqual(countChanges(`4\t5\t${skill}\0`), { production: 9, tests: 0, docs: 0, ignored: 0 });
+});
+
+test("JSON 계약과 phase·순수 이동·기능 영역 후보를 실제 git diff로 확인한다", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "pr-size-boundaries-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  const put = (file: string, content: string) => {
+    mkdirSync(join(cwd, file, ".."), { recursive: true });
+    writeFileSync(join(cwd, file), content);
+  };
+  try {
+    git("init", "-q"); git("config", "user.name", "Test"); git("config", "user.email", "test@example.com");
+    put("web/src/features/chat/old.ts", "unchanged\n");
+    put("tasks/plan-test/phase-01.md", "## 변경 파일\n| 파일 | 변경 |\n| `backend/src/main/java/com/bifos/assistant/chat/*.java` | 신규 |\n## 확인\n`web/src/app/page.tsx`\n");
+    git("add", "."); git("commit", "-qm", "initial");
+    const base = git("rev-parse", "HEAD");
+    renameSync(join(cwd, "web/src/features/chat/old.ts"), join(cwd, "web/src/features/chat/new.ts"));
+    put("backend/src/main/java/com/bifos/assistant/chat/App.java", "code\n".repeat(MAX_LINES + 1));
+    put("web/src/app/page.tsx", "page\n");
+    put("tasks/plan-test/phase-02.md", "## 변경 파일\n- `web/src/app/page.tsx`\n");
+    rmSync(join(cwd, "tasks/plan-test/phase-01.md"));
+    git("add", "."); git("commit", "-qm", "changes");
+    const result = spawnSync("node", [SCRIPT, "--json", base], { cwd, encoding: "utf8", env: CLI_ENV });
+    assert.equal(result.status, 1);
+    const json = JSON.parse(result.stdout);
+    assert.deepEqual(json, report(base, "HEAD", cwd));
+    assert.deepEqual(Object.keys(json).sort(), ["schema_version", "total_lines", "counts", "large_threshold", "max_lines", "large", "pass", "split_candidates"].sort());
+    assert.equal(json.schema_version, 1);
+    assert.equal(json.max_lines, MAX_LINES);
+    assert.equal(json.large_threshold, LARGE_THRESHOLD);
+    assert.equal(json.total_lines, Object.values(json.counts).reduce((sum: number, value: any) => sum + value, 0));
+    assert.equal(json.large, true); assert.equal(json.pass, false);
+    const phase = json.split_candidates.find((c: any) => c.name === "tasks/plan-test/phase-01.md");
+    assert.deepEqual(phase, { kind: "phase", name: "tasks/plan-test/phase-01.md", files: ["backend/src/main/java/com/bifos/assistant/chat/App.java"], counts: { production: MAX_LINES + 1, tests: 0, docs: 0, ignored: 0 } });
+    assert.equal(json.split_candidates.find((c: any) => c.name === "tasks/plan-test/phase-02.md").counts.production, 1);
+    const move = json.split_candidates.find((c: any) => c.kind === "move");
+    assert.deepEqual(move.files, ["web/src/features/chat/new.ts", "web/src/features/chat/old.ts"]);
+    assert.deepEqual(move.counts, { production: 0, tests: 0, docs: 0, ignored: 0 });
+    assert.ok(json.split_candidates.some((c: any) => c.kind === "area" && c.name === "backend/src/main/java/com/bifos/assistant/chat"));
+    const text = spawnSync("node", [SCRIPT, base], { cwd, encoding: "utf8", env: CLI_ENV });
+    for (const kind of ["phase", "move", "area"]) assert.ok(text.stdout.includes(`- ${kind}:`));
+    const exempt = spawnSync("node", [SCRIPT, base, "--json"], { cwd, encoding: "utf8", env: { ...CLI_ENV, PR_LABELS: '["규모:예외"]' } });
+    assert.equal(exempt.status, 0); assert.equal(JSON.parse(exempt.stdout).pass, true);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
+});
+
+test("로컬 크기 단계는 main·공통 조상 없음만 건너뛰고 상한 초과를 전파한다", () => {
+  const script = readFileSync(new URL("../../scripts/dev/check-local.sh", import.meta.url), "utf8");
+  assert.match(script, /step pr-size\s+check_pr_size/);
+  const fn = script.slice(script.indexOf("check_pr_size()"), script.indexOf("build_web()"));
+  for (const [branch, ancestor, expected] of [["main", 0, 0], ["topic", 1, 0], ["topic", 0, 1]] as const) {
+    const result = spawnSync("bash", ["-c", `
+      ROOT="$PWD"
+      git() { if [[ "$*" == *branch* ]]; then echo "$BRANCH"; else return "$ANCESTOR"; fi; }
+      node() { echo "나눌 경계 후보"; return 1; }
+      ${fn}
+      check_pr_size
+    `], { encoding: "utf8", env: { ...process.env, BRANCH: branch, ANCESTOR: String(ancestor) } });
+    assert.equal(result.status, expected, result.stderr);
+    assert.match(result.stdout, expected ? /경계 후보/ : /건너뛴다/);
   }
 });
