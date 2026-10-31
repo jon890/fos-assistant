@@ -51,6 +51,10 @@ function problemsOf(index: string, files: Map<string, string>, readSource: (file
     if (links.length === 0 || row.checks.replace(/\[[^\]]+\]\(\.\.\/\.\.\/[^)]+\)/g, "").replace(/[,\s]/g, "") !== "") {
       problems.push(`${id}: 검사 이름과 소스 링크가 필요하다`);
     }
+    // 도구와 리뷰가 함께 검사하는 규칙은 도구가 보지 못하는 부분을 따로 적는다.
+    if (links.length > 1 && links.some(([, name]) => name === "리뷰") && !/^## 리뷰가 보는 것\n\n\S/m.test(body)) {
+      problems.push(`${id}: 리뷰가 보는 것이 비어 있다`);
+    }
     for (const [, name, source] of links) {
       if (normalize(source) !== source || source.startsWith("..") || source.startsWith("/")) {
         problems.push(`${id}: 검사 경로가 저장소 밖이다`);
@@ -150,4 +154,14 @@ test("검사 링크의 이름·경로와 본문의 끊어진 사례 링크를 �
   }
   const body = BODY + "\n[사례](../../missing.java)\n";
   assert.match(problemsOf(HEADER + ROW, new Map([["rule-1.md", body]]), (file) => file === "review.txt" ? "rule-1" : undefined).join("\n"), /본문 링크가 없다/);
+});
+
+test("도구와 리뷰를 함께 연결한 규칙은 리뷰가 보는 것 절이 있어야 한다", () => {
+  const checks = "[검사](../../tool.txt), [리뷰](../../review.txt)";
+  const row = ROW.replace("[리뷰](../../review.txt)", checks);
+  const body = BODY.replace("[리뷰](../../review.txt)", checks);
+  const read = () => "rule-1";
+  assert.match(problemsOf(HEADER + row, new Map([["rule-1.md", body]]), read).join("\n"), /리뷰가 보는 것/);
+  const withSection = body + "\n## 리뷰가 보는 것\n\n도구가 보지 못하는 부분이다.\n";
+  assert.deepEqual(problemsOf(HEADER + row, new Map([["rule-1.md", withSection]]), read), []);
 });
