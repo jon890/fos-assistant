@@ -109,7 +109,7 @@ class AgentRunnerConnectorContextTest {
     @DisplayName("위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
     void sendsResolvedTierAndRecordsRequestAndSubmission() {
         ModelChoice choice = ModelChoice.of("openai-codex", "example-deep", "high");
-        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.DEEP));
+        when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(choice, ModelTier.HIGH));
 
         run(agent(), null, null);
 
@@ -129,7 +129,7 @@ class AgentRunnerConnectorContextTest {
                 any(),
                 any(),
                 any(),
-                eq(ModelTier.DEEP),
+                eq(ModelTier.HIGH),
                 eq(REQUEST_RECEIVED_AT));
         verify(executions).markSubmitted(started);
         verify(executions, never()).markFirstDelta(any());

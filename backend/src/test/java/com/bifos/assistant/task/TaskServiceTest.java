@@ -319,11 +319,11 @@ class TaskServiceTest {
         CurrentUser owner = member();
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
 
-        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.BALANCED));
+        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.MEDIUM));
 
-        assertThat(created.task().modelTier()).isEqualTo(ModelTier.BALANCED);
+        assertThat(created.task().modelTier()).isEqualTo(ModelTier.MEDIUM);
         assertThat(tasks.findById(created.task().id()).orElseThrow().modelTier())
-            .isEqualTo(ModelTier.BALANCED);
+            .isEqualTo(ModelTier.MEDIUM);
     }
 
 
@@ -332,7 +332,7 @@ class TaskServiceTest {
     void clearsModelTierOnUpdateWithoutIt() {
         CurrentUser owner = member();
         Agent agent = agentOf(owner, AgentVisibility.PRIVATE);
-        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.BALANCED));
+        TaskDetail created = service.create(owner, withTier(cron("단계 작업", agent, "0 9 1 * *"), ModelTier.MEDIUM));
 
         TaskDetail updated = service.update(owner, created.task().publicId(), cron("단계 작업", agent, "0 9 1 * *"));
 
@@ -347,7 +347,7 @@ class TaskServiceTest {
     void rejectsModelTierForCheckTask() {
         Task check = Task.check(1L, 1L, "매일 깨우기");
 
-        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.INSTANT)).isInstanceOf(IllegalStateException.class);
         assertThat(check.modelTier()).isNull();
     }
 

@@ -256,7 +256,7 @@ public class ExecutionRecorder {
                 .model(requested == null ? null : requested.model())
                 .reasoningEffort(requested == null ? null : requested.reasoningEffort())
                 .reasoningEffortSource(effortSource)
-                .modelTier(modelTier)
+                .modelTier(modelTier == null ? null : modelTier.name())
                 .requestReceivedAt(requestReceivedAt)
                 .contextChars(context.contextChars())
                 .contextOmittedItems(context.contextOmittedItems())

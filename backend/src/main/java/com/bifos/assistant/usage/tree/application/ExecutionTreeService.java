@@ -251,7 +251,7 @@ public class ExecutionTreeService {
             !internal || execution.reasoningEffortSource() == null
                 ? null
                 : execution.reasoningEffortSource().name(),
-            execution.modelTier() == null ? null : execution.modelTier().name(),
+            execution.modelTier(),
             internal ? execution.inputTokens() : null,
             internal ? execution.cachedInputTokens() : null,
             internal ? execution.outputTokens() : null,
