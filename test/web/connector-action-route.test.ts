@@ -319,6 +319,26 @@ const FINANCIAL = {
   limits: null,
 };
 
+test("승인 목록은 소수 7자리 사용액과 잔액이 있는 상한 표시를 유지한다", async () => {
+  const limits = {
+    currency: "USD",
+    orderLimit: "1000",
+    quantityLimit: "1000",
+    dailyLimit: "1000",
+    spentToday: "1.0000001",
+    remainingToday: "998.9999999",
+  };
+  const { response } = await callRoute("list", [
+    {
+      ...item({}),
+      risk: "FINANCIAL",
+      financial: { ...FINANCIAL, limits },
+    },
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json())[0].financial.limits, limits);
+});
+
 test("금융 요약은 계약의 칸만 옮기고 금융 줄이 아니면 null 이다", async () => {
   const { response } = await callRoute("list", [
     {
