@@ -57,6 +57,10 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
     Optional<FollowUp> findByUserIdAndDedupeKey(Long userId, String dedupeKey);
 
 
+    /** 그 사용자의 줄 가운데 중복 열쇠가 그 목록에 든 것이다. 옛 줄을 옮긴 제안 줄을 한 번에 찾으려고 읽는다. */
+    List<FollowUp> findByUserIdAndDedupeKeyIn(Long userId, Collection<String> dedupeKeys);
+
+
     /** 그 대화에서 먼저 살펴보기가 낸 제안 줄이다(중복 열쇠가 있는 줄). 대화를 지울 때 제안의 줄과 본문을 지우려고 읽는다. */
     List<FollowUp> findByConversationIdAndDedupeKeyIsNotNull(Long conversationId);
 }

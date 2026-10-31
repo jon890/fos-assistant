@@ -11,6 +11,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.dto.FollowUpPatch;
 import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
+import com.bifos.assistant.followup.application.dto.LegacySuggestion;
 import com.bifos.assistant.followup.application.dto.NewFollowUp;
 import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.followup.application.dto.SuggestionOutcome;
@@ -26,6 +27,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -247,6 +249,21 @@ public class FollowUpService {
      */
     public List<SuggestionOutcome> proposeSuggestion(Long executionId, List<SuggestedItem> items) {
         return suggestions.propose(executionId, items);
+    }
+
+
+    /**
+     * 옛 발견이나 문제 후보를 제안 줄로 옮긴다. 규칙은 {@link FollowUpSuggestions#migrateLegacy} 가 갖는다. 이미 있는 할 일 줄은 건드리지
+     * 않는다.
+     */
+    public SuggestionOutcome migrateLegacySuggestion(LegacySuggestion item) {
+        return suggestions.migrateLegacy(item);
+    }
+
+
+    /** 옮긴 제안 줄의 공개 식별자를 {@code dedupe_key} 로 찾는다. 옮기지 않은 열쇠는 맵에 없다. */
+    public Map<String, UUID> suggestionPublicIds(Long userId, Collection<String> dedupeKeys) {
+        return suggestions.publicIdsOf(userId, dedupeKeys);
     }
 
 
