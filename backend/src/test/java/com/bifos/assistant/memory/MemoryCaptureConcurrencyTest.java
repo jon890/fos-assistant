@@ -23,6 +23,7 @@ import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +39,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** 중복 후보 조회와 잠금 사이에 커밋된 사용자 수정을 H2와 MySQL에서 보존한다. */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class MemoryCaptureConcurrencyTest {
     private static final CurrentUser USER = new CurrentUser(1L, "memory@example.com", "사용자", 10L, UserRole.ADMIN);
     private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
