@@ -11,6 +11,7 @@ import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
+import com.bifos.assistant.connector.approval.application.dto.FinancialPrepareStage;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionTicket;
@@ -23,6 +24,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -199,7 +201,10 @@ class FinancialClaimGuardTest extends FinancialConnectorTestBase {
         assertThat(counters().path("financial").intValue()).isZero();
         // 남은 ticket 으로 claim 해도 줄이 EXECUTING 이 아니라 거절된다. 같은 의도의 새 준비도 UNKNOWN 이 막는다.
         assertThat(client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent).ok()).isFalse();
-        assertThatThrownBy(this::request).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(this::request).isInstanceOfSatisfying(FinancialPrepareRejected.class, rejected -> {
+            assertThat(rejected.stage()).isEqualTo(FinancialPrepareStage.CONFLICT);
+            assertThat(rejected.code()).isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        });
         assertThat(counters().path("financial").intValue()).isZero();
         // 진단 줄은 승인 번호만 싣는다. 원문 인자, ticket, 위조 결과를 남기지 않는다.
         assertThat(output.getAll()).contains("금융 실행 프로토콜 불일치").contains(requested.actionId().toString())
