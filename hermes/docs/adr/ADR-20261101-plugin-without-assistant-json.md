@@ -23,7 +23,7 @@
 | 살펴보기 | 읽기 경계의 살펴보기는 승인 줄 없이 거절하고, 쓰기를 허용한 살펴보기는 승인 줄로 보낸다. `schema: 1` 의 선언 없는 도구와 같다 |
 | 승인한 실행 | 대시보드의 `execute` 는 `schema: 2` 가 아니면 선언을 보지 않고 등록 이름이 맞는 도구 하나를 부른다. `schema: 3` 도 같다 |
 | 옛 Control Plane | `schema: 3` 항목은 `GET /api/connectors/catalog?include=standard` 로 청한 쪽에만 싣는다. 옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못한다([rule-66](../../../docs/code-rules/rule-66.md)) |
-| 덮어쓰기 | `assistant.json` 이 있으면 지금처럼 그 선언만 읽는다. `schema: 3` 의 추론과 섞지 않는다. 일부 도구만 선언하고 나머지를 「묻는다」 로 두는 일은 아래 「남은 단계」 가 정한다 |
+| 덮어쓰기 | `assistant.json` 이 있으면 지금처럼 그 선언만 읽는다. `schema: 3` 의 추론과 섞지 않는다. 일부 도구만 선언하고 나머지를 「묻는다」 로 두는 일은 아래 「남은 단계」 의 4단계가 `default_tool_policy: ask` 로 정했다 |
 
 **MCP tool annotations 는 판정을 느슨하게 하지 않는다. `readOnlyHint: true` 인 도구도 첫 호출은 사람이 승인하고, 그 뒤 사용자가 그 도구에 상시 허락을 줄 수 있다(사용자 결정 2026-11-01).**
 
@@ -99,6 +99,6 @@ PR 하나가 한 단계다. 1단계가 이 ADR 과 함께 머지된 뒤 다음 �
 | 1 | 카탈로그와 판정 | `schema: 3` 의 카탈로그 항목, 칸 추론, `include=standard`, Control Plane 의 판정(상시 허락 닫힘), `schema: 3` 연결 등록 거절. 이 ADR 과 형식 비교 |
 | 2 | 연결과 읽기 표시 | 확인 도구 대신 MCP 도구 목록으로 연결을 확인한다. `readOnlyHint` 로 상시 허락을 열고 표시가 바뀌면 거둔다. 승인 카드에 도구 이름을 보인다. 화면이 `schema: 3` 연결을 보인다. #627 로 끝났다. 서버 설명 표시는 하지 않았고 남은 일이다 |
 | 3 | ChatGPT 이식형 묶음 | root `plugin.json` 과 `mcp.json`, `streamable-http`, `auth.api_key` 를 위 표대로 읽는다. #631 로 끝났다 |
-| 4 | 부분 선언 | `assistant.json` 이 일부 도구만 선언하고 나머지를 `schema: 3` 처럼 묻게 하는 선언(`default_tool_policy: ask`) |
+| 4 | 부분 선언 | `assistant.json` 이 일부 도구만 선언하고 나머지를 `schema: 3` 처럼 묻게 하는 선언(`default_tool_policy: ask`). `schema: 2` 에서만 받고, 카탈로그에 칸이 없으면 거절한다. 규칙은 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다. 끝났다 |
 
 화면과 문서의 「커넥터」 를 「플러그인」 으로 바꾸는 일은 원격 MCP ADR 「옮기는 순서」 의 3단계가 갖는다.

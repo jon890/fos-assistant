@@ -1007,9 +1007,22 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
                 (self.connector_root / "connector.json").write_bytes(original)
 
     def test_explicit_deny_default_policy_is_accepted(self):
-        """`default_tool_policy` 는 `deny` 만 받는다."""
+        """`default_tool_policy` 는 `deny` 와 `ask` 만 받는다. `deny` 는 카탈로그에 싣지 않는다."""
         self.declare(default_tool_policy="deny")
-        self.assertEqual([entry["id"] for entry in self.catalog()], [DEMO])
+        entries = self.catalog()
+        self.assertEqual([entry["id"] for entry in entries], [DEMO])
+        self.assertNotIn("default_tool_policy", entries[0])
+
+    def test_ask_default_policy_is_listed_in_the_catalog(self):
+        """`ask` 는 카탈로그에 실리고, 칸이 없는 항목에는 그 칸이 없어 옛 Control Plane 처럼 거절로 읽힌다."""
+        self.declare(default_tool_policy="ask")
+        entries = self.catalog()
+        self.assertEqual([entry["id"] for entry in entries], [DEMO])
+        self.assertEqual(entries[0]["default_tool_policy"], "ask")
+        # 선언한 도구의 정책은 그대로다.
+        self.assertEqual(entries[0]["tools"]["list_scopes"]["approval"], "none")
+        self.declare(default_tool_policy="deny")
+        self.assertNotIn("default_tool_policy", self.catalog()[0])
 
     def test_invalid_tool_policy_leaves_the_connector_out(self):
         """도구 정책이 하나라도 틀리면 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다."""
@@ -1030,6 +1043,8 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             ("tools is a list", lambda: self.rewrite(
                 "connector.json", lambda value: value.update(schema=2, tools=["list_scopes"]))),
             ("default policy allow", lambda: self.declare(default_tool_policy="allow")),
+            ("default policy upper case", lambda: self.declare(default_tool_policy="ASK")),
+            ("default policy list", lambda: self.declare(default_tool_policy=["ask"])),
             ("default policy null", lambda: self.declare(default_tool_policy=None)),
             ("unknown risk", lambda: self.declare(lambda tools: tools.update(write_note={"risk": "DANGEROUS"}))),
             ("lowercase risk", lambda: self.declare(lambda tools: tools.update(write_note={"risk": "write"}))),

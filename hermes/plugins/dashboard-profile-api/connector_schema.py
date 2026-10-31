@@ -126,6 +126,11 @@ TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 TOOL_APPROVALS = ("none", "required", "always")
 
 
+# `assistant.json` 의 `default_tool_policy` 가 받는 값이다. `tools` 에 없는 도구를 거절(`deny`)하거나 호출마다 묻는다(`ask`).
+# 선언하지 않은 도구를 승인 없이 열어 주는 값은 두지 않는다.
+DEFAULT_TOOL_POLICIES = ("deny", "ask")
+
+
 # 위험도마다 (`approval` 이 없을 때의 기본값, 선언이 내려갈 수 없는 하한) 이다.
 TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "required"),
                       "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),

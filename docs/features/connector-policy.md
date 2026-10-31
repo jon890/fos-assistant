@@ -141,7 +141,7 @@ sequenceDiagram
 | `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. `READ` 가 아니고 `approval` 이 `required` 인 도구가 빠뜨리면 manifest 를 거절한다. 그 밖의 도구는 거짓으로 채운다 |
 | `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
-| `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다 |
+| `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny`(없을 때의 기본값)나 `ask` 만 받는다. 아래 「일부 도구만 선언하기」 |
 
 | 위험도 | 뜻 | 기본 `approval` | 하한 |
 | --- | --- | --- | --- |
@@ -171,6 +171,18 @@ sequenceDiagram
 `schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 대화 허락은 닫는다.
 상시 허락은 연결의 마지막 확인에서 `readOnlyHint` 가 참이었던 도구(`connector_connection.listed_tools`)에만 열고, 나머지는 호출마다 승인이다. 판정과 승인 카드의 `grantAllowed`, 허락을 만드는 승인이 같은 조건을 본다.
 연결 확인이 받은 목록에서 표시가 거짓이거나 빠진 도구, 승인 실행의 응답이 `read_only: false` 인 도구는 그 트랜잭션에서 표시와 상시 허락을 함께 거둔다. 그 뒤 호출은 다시 승인을 받는다. `destructiveHint` 와 `openWorldHint` 는 판정에 쓰지 않는다.
+
+#### 일부 도구만 선언하기
+
+**`default_tool_policy: ask` 는 일부 도구만 선언하고 나머지를 `schema: 3` 의 도구처럼 호출마다 묻는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md) 「남은 단계」 4).
+`schema: 2` 에서만 선언할 수 있다. 선언한 도구는 지금처럼 그 선언으로 판정하고, `tools` 에 없는 그 서버의 도구는 `schema: 3` 의 선언 없는 도구와 같은 규칙을 쓴다.
+대시보드 plugin 이 `ask` 일 때만 카탈로그 항목에 `default_tool_policy: "ask"` 를 싣는다. `deny` 와 칸이 없는 항목은 이 칸이 없다.
+
+- **받는 값은 `deny` 와 `ask` 뿐이다.** 선언하지 않은 도구를 읽기로 보는 것처럼 사람이 보지 않고 열리는 기본값은 받지 않는다
+- 선언하지 않은 도구는 `WRITE` 와 `required` 로 읽고 대화 허락은 닫는다. 읽기 표시(`readOnlyHint`)가 있는 도구만 첫 승인 뒤 상시 허락을 열고, 표시를 거두면 상시 허락도 닫는다. 규칙은 `ToolPolicyDecision.decide` 의 `schema: 3` 규칙을 그대로 쓴다
+- 카탈로그에 칸이 없으면 선언하지 않은 도구를 거절한다. 옛 Control Plane 은 이 칸을 모르므로 거절하고, 새 Control Plane 이 옛 대시보드 plugin 의 카탈로그를 읽어도 칸이 없어 거절한다. 어느 쪽이든 느슨해지지 않는다
+- `ask` 커넥터의 선언하지 않은 도구는 거절되지 않으므로 위 「선언하지 않은 도구」 의 수에 넣지 않는다
+- 연결 확인이 `tools/list` 대신 확인 도구를 부르므로(`schema: 2`), `listed_tools` 는 기록되지 않고 읽기 표시도 없다. 지금은 `ask` 커넥터의 선언하지 않은 도구가 상시 허락 없이 호출마다 승인이다
 
 #### 이름 대응
 
@@ -256,7 +268,7 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 #### 선언하지 않은 도구
 
 연결 확인과 관리자 반영 완료는 MCP probe 가 낸 도구 가운데 `schema: 2` manifest 의 `tools` 에 없는 것을 세어 연결에 적고 연결 상태와 관리자 목록에 낸다.
-선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 과 `schema: 3` 은 세지 않는다. 두 schema 의 선언 없는 도구는 거절되지 않고 승인 줄이 된다.
+선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 과 `schema: 3` 은 세지 않는다. 두 schema 의 선언 없는 도구는 거절되지 않고 승인 줄이 된다. `default_tool_policy: ask` 인 `schema: 2` 도 세지 않는다.
 
 ### 사용자별 호출 제한
 

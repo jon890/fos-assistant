@@ -60,6 +60,16 @@ class StandardPluginPolicyTest {
           "verify":null,"mcp_server":"std-remote","owner_browser":false,"owner_browser_login_url":null,
           "single_binding":false,"skills":["remote-notes"],"unknown_errors":{},"tools":{}}]
         """;
+    /** 일부 도구만 선언하고 나머지를 호출마다 묻는 커넥터다. `default_tool_policy` 칸이 있는 항목과 없는 항목이다. */
+    private static final String PARTIAL_ITEM = """
+        [{"id":"partial-notes","schema":2,"title":"일부 선언","description":"","icon":null,"link":null,
+          "readme_url":null,"link_kind":"service",
+          "fields":[{"key":"token","env":"PARTIAL_TOKEN","label":"토큰","secret":true,"required":true}],
+          "verify":{"tool":"list_notes"},"mcp_server":"partial-notes","owner_browser":false,
+          "owner_browser_login_url":null,"single_binding":false,"skills":[],"unknown_errors":{},
+          "DEFAULT_POLICY":
+          "tools":{"list_notes":{"risk":"READ","approval":"none"}}}]
+        """;
     private static final ToolPolicyDecision EVERY_CALL = new ToolPolicyDecision(
         ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
 
@@ -215,6 +225,81 @@ class StandardPluginPolicyTest {
             manifest.fields(), "list_notes", manifest.mcpServer(), manifest.schema(), manifest.tools());
 
         assertThat(ConnectorToolPolicies.valid(withVerify)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy: ask 커넥터는 선언한 READ 도구는 승인 없이, 선언하지 않은 도구는 승인 필요로 판정한다")
+    void askDefaultPolicyAsksForUndeclaredToolsOnly() {
+        ConnectorManifest manifest = readPartial("\"default_tool_policy\":\"ask\",");
+        assertThat(manifest.defaultToolPolicy()).isEqualTo("ask");
+        assertThat(ConnectorToolPolicies.valid(manifest)).isTrue();
+        assertThat(ConnectorToolPolicies.partialAsk(manifest)).isTrue();
+        int schema = ConnectorToolPolicies.decisionSchema(manifest);
+
+        ToolPolicyDecision declaredRead = ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, ConnectorToolPolicies.find(manifest, "list_notes"),
+            false, false, false, 2, NOT_CHECK);
+        assertThat(declaredRead.decision()).isEqualTo(ActionDecision.ALLOWED);
+
+        // 선언하지 않은 도구는 schema 3 의 도구와 같다. 읽기 표시가 없으면 허락이 있어도 승인이고, 표시가 있으면 허락으로 지난다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), true, true, false, 2, NOT_CHECK))
+                .isEqualTo(EVERY_CALL);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), false, false, true, 2, NOT_CHECK))
+                .isEqualTo(EVERY_CALL);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), true, false, true, 2, NOT_CHECK).decision())
+                .isEqualTo(ActionDecision.ALLOWED);
+        // 읽기 경계의 살펴보기는 승인 줄 없이 거절하고, 다른 서버의 등록 이름은 거절한다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), false, 2, READ_ONLY).denyReason())
+                .isEqualTo(ActionDenyReason.READ_ONLY_RUN);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, false, schema, Optional.empty(), false, 2, NOT_CHECK).denyReason())
+                .isEqualTo(ActionDenyReason.UNDECLARED);
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 칸이 없거나 deny 거나 모르는 값인 schema 2 는 선언하지 않은 도구를 지금처럼 거절한다")
+    void missingDefaultPolicyStillRefusesUndeclaredTools() {
+        for (String declared : List.of("", "\"default_tool_policy\":\"deny\",", "\"default_tool_policy\":\"allow\",",
+            "\"default_tool_policy\":null,", "\"default_tool_policy\":[\"ask\"],")) {
+            ConnectorManifest manifest = readPartial(declared);
+            assertThat(manifest.defaultToolPolicy()).as(declared).isNull();
+            assertThat(ConnectorToolPolicies.partialAsk(manifest)).as(declared).isFalse();
+            int schema = ConnectorToolPolicies.decisionSchema(manifest);
+            assertThat(schema).as(declared).isEqualTo(2);
+            assertThat(ToolPolicyDecision.decide(
+                ConnectionStatus.READY, true, schema, Optional.empty(), true, false, true, 2, NOT_CHECK).denyReason())
+                    .as(declared)
+                    .isEqualTo(ActionDenyReason.UNDECLARED);
+        }
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 는 schema 2 에서만 읽고, 표준 플러그인의 판정 schema 는 그대로 3 이다")
+    void askIsReadOnlyForDeclaringSchema() {
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(CATALOG.replace("\"tools\":{}}", "\"default_tool_policy\":\"ask\",\"tools\":{}}"),
+                MediaType.APPLICATION_JSON));
+        ConnectorManifest standard = client.readCatalog().getFirst();
+
+        assertThat(standard.defaultToolPolicy()).isNull();
+        assertThat(ConnectorToolPolicies.partialAsk(standard)).isFalse();
+        assertThat(ConnectorToolPolicies.undeclaredAsk(standard)).isTrue();
+        assertThat(ConnectorToolPolicies.decisionSchema(standard)).isEqualTo(ConnectorToolPolicies.STANDARD_SCHEMA);
+    }
+
+
+    private ConnectorManifest readPartial(String defaultPolicy) {
+        server.reset();
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(PARTIAL_ITEM.replace("\"DEFAULT_POLICY\":", defaultPolicy), MediaType.APPLICATION_JSON));
+        return client.readCatalog().getFirst();
     }
 
 

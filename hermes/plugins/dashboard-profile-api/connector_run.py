@@ -390,7 +390,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         if "retry" in answer:
             unknown["retry"] = answer["retry"]
         return JSONResponse(unknown, status_code=504)
-    if manifest["schema"] == TOOL_LIST_SCHEMA and "read_only" in progress:
-        # 표준 플러그인만 부르기 직전 `tools/list` 의 읽기 표시를 더한다. 옛 Control Plane 은 이 칸을 읽지 않는다(rule-66).
+    if (manifest["schema"] == TOOL_LIST_SCHEMA or manifest["default_tool_policy"] == "ask") and "read_only" in progress:
+        # 표준 플러그인과 `default_tool_policy: ask` 커넥터만 부르기 직전 `tools/list` 의 읽기 표시를 더한다. 옛 Control Plane 은 이 칸을 읽지 않는다(rule-66).
         answer = {**answer, "read_only": progress["read_only"]}
     return JSONResponse(answer, status_code=200)
