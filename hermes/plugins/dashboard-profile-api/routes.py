@@ -126,6 +126,8 @@ CONNECTORS_PATH = "/api/connectors"
 CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
+# 표준 플러그인의 연결 확인이 쓰는 `tools/list` 경로다(ADR-20261101 plugin-without-assistant-json).
+TOOLS_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/tools$")
 PREPARE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/prepare$")
 SNAPSHOT_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/snapshot$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
@@ -323,8 +325,10 @@ def _install_gate() -> bool:
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
         prepare = PREPARE_ROUTE_RE.match(path) if method == "POST" else None
+        tools = TOOLS_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
-                or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None or prepare is not None):
+                or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None
+                or prepare is not None or tools is not None):
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
@@ -335,6 +339,9 @@ def _install_gate() -> bool:
             if call is not None:
                 # profile 쓰기 잠금 밖에서 돈다. 안에서 돌면 도구를 기다리는 동안 모든 profile 요청이 멈춘다.
                 return await _connector_call_request(request, call.group(1))
+            if tools is not None:
+                # `call` 과 같은 까닭으로 profile 쓰기 잠금 밖에서 돈다.
+                return await _connector_call_request(request, tools.group(1), listing=True)
             if execute is not None:
                 # `call` 과 같은 까닭으로 profile 쓰기 잠금 밖에서 돈다.
                 return await _connector_execute_request(request, execute.group(1))

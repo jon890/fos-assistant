@@ -8,7 +8,22 @@ import * as connection from "../../web/src/lib/connection.ts";
 import { toolText } from "../../web/src/lib/connector-tool-text.ts";
 import ts from "../../web/node_modules/typescript/lib/typescript.js";
 
+type ToolsModule = {
+  ConnectorTools: (props: {
+    tools: connection.ConnectorTool[];
+  }) => React.ReactNode;
+  StandardPluginTools: (props: {
+    listedTools: number | null;
+    readOnlyTools: number | null;
+  }) => React.ReactNode;
+};
+
 async function render(tools: connection.ConnectorTool[]) {
+  const loaded = await load();
+  return renderToStaticMarkup(loaded.ConnectorTools({ tools }));
+}
+
+async function load(): Promise<ToolsModule> {
   const source = await readFile(
     new URL(
       "../../web/src/components/connector/connector-tools.tsx",
@@ -26,13 +41,7 @@ async function render(tools: connection.ConnectorTool[]) {
   const webRequire = createRequire(
     new URL("../../web/package.json", import.meta.url),
   );
-  const module = {
-    exports: {} as {
-      ConnectorTools: (props: {
-        tools: connection.ConnectorTool[];
-      }) => React.ReactNode;
-    },
-  };
+  const module = { exports: {} as ToolsModule };
   const dependencies: Record<string, unknown> = {
     "@/lib/connection": connection,
     "@/lib/connector-tool-text": { toolText },
@@ -48,7 +57,7 @@ async function render(tools: connection.ConnectorTool[]) {
     exports: module.exports,
     require: (name: string) => dependencies[name] ?? webRequire(name),
   });
-  return renderToStaticMarkup(module.exports.ConnectorTools({ tools }));
+  return module.exports;
 }
 
 test("실제 도구 컴포넌트는 요약을 HTML로 실행하지 않고 제목과 정책 밑에 평문으로 그린다", async () => {
@@ -93,4 +102,29 @@ test("제목이 없거나 빈 도구는 실제 이름 대신 대체 이름을 �
     }
   }
   assert.ok((await render([])).includes("connector-tools-empty"));
+});
+
+test("표준 플러그인은 모든 도구를 쓸 때마다 확인한다고 알리고 마지막 확인에서 받은 도구 수와 읽기 도구 수를 보인다", async () => {
+  const loaded = await load();
+  const counted = renderToStaticMarkup(
+    loaded.StandardPluginTools({ listedTools: 3, readOnlyTools: 1 }),
+  );
+  assert.match(counted, /모든 도구를 쓸 때마다 확인해요/);
+  assert.match(counted, /도구 3개를 받았어요/);
+  assert.match(
+    counted,
+    /읽기만 하는 도구 1개는 한 번 승인한 뒤 계속 허락할 수 있어요/,
+  );
+
+  const noReadOnly = renderToStaticMarkup(
+    loaded.StandardPluginTools({ listedTools: 2, readOnlyTools: 0 }),
+  );
+  assert.match(noReadOnly, /도구 2개를 받았어요/);
+  assert.doesNotMatch(noReadOnly, /계속 허락/);
+
+  const unchecked = renderToStaticMarkup(
+    loaded.StandardPluginTools({ listedTools: null, readOnlyTools: null }),
+  );
+  assert.match(unchecked, /모든 도구를 쓸 때마다 확인해요/);
+  assert.doesNotMatch(unchecked, /받았어요/);
 });

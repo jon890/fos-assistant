@@ -407,6 +407,7 @@ export function ConnectorConnectionPanel({
           <ConnectorToolsSection
             tools={connector?.tools ?? []}
             undeclaredTools={connection.undeclaredTools}
+            standard={connector?.standardPlugin ? connection : undefined}
           />
           <ConnectorGrants connectorId={id} refreshKey={connection} />
           {connector?.tools?.some((tool) => tool.risk === "FINANCIAL") ? (

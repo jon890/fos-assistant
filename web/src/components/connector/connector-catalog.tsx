@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConnectionBadge } from "@/components/connector/connection-badge";
+import { STANDARD_PLUGIN_NOTICE } from "@/components/connector/connector-tools";
 import { LoginLink } from "@/components/connector/browser-login";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -35,6 +36,7 @@ function hasCardContent(
   return (
     !connector.available ||
     connector.tools.length > 0 ||
+    connector.standardPlugin ||
     connector.myStatus !== "DISCONNECTED" ||
     connectorAppearanceLinkHref(connector.link) !== null ||
     connectorAppearanceLinkHref(connector.readmeUrl) !== null ||
@@ -114,6 +116,13 @@ function ConnectorCard({
                 data-testid="connector-tool-summary"
               >
                 {toolSummary(connector.tools)}
+              </p>
+            ) : connector.standardPlugin ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="connector-standard-notice"
+              >
+                {STANDARD_PLUGIN_NOTICE}
               </p>
             ) : null
           ) : (
