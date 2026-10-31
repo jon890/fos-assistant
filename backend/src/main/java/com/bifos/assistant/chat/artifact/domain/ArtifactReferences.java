@@ -47,8 +47,12 @@ public final class ArtifactReferences {
     private static final Pattern CSS_SKIP = Pattern.compile(
         "(?i)(url\\(\\s*|@import\\s+)?(\"[^\"\\n]*\"|'[^'\\n]*')");
 
-    /** 원문 그대로 읽고 태그를 찾지 않는 요소다. {@code <style>} 은 CSS 로 읽는다. */
-    private static final Set<String> RAW_TEXT = Set.of("script", "style", "textarea", "title", "xmp", "noscript");
+    /**
+     * 원문 그대로 읽고 태그를 찾지 않는 요소다. {@code <style>} 은 CSS 로 읽는다.
+     *
+     * <p>{@code <noscript>} 는 넣지 않는다. 미리보기는 스크립트가 꺼져 있어 그 안이 보통 마크업으로 그려진다.
+     */
+    private static final Set<String> RAW_TEXT = Set.of("script", "style", "textarea", "title", "xmp");
 
     /** 요소마다 불러오는 주소를 담는 속성이다. 모든 요소의 {@code style} 속성은 따로 본다. */
     private static final Map<String, Set<String>> LOADING_ATTRIBUTES = Map.ofEntries(
@@ -70,9 +74,11 @@ public final class ArtifactReferences {
         Map.entry("feimage", Set.of("href", "xlink:href")),
         Map.entry("use", Set.of("href", "xlink:href")));
 
-    /** {@code <link>} 가운데 다른 파일을 불러오는 {@code rel} 값이다. {@code canonical} 같은 것은 불러오지 않는다. */
-    private static final Set<String> LOADING_LINK_RELS = Set.of(
-        "stylesheet", "icon", "apple-touch-icon", "preload", "prefetch", "modulepreload", "manifest", "mask-icon");
+    /**
+     * {@code <link>} 가운데 미리보기가 실제로 불러 그리는 {@code rel} 값이다. {@code preload} 는 {@code as} 가 스타일이나
+     * 사진일 때만 따라간다. 스크립트나 manifest 를 가리키는 것은 미리보기에 쓰이지 않아 따라가지 않는다.
+     */
+    private static final Set<String> LOADING_LINK_RELS = Set.of("stylesheet", "icon", "apple-touch-icon", "mask-icon");
 
     /** 태그 하나다. 이름과 속성 부분을 나눈다. 따옴표 안의 {@code >} 는 태그 끝이 아니다. */
     private static final Pattern TAG = Pattern.compile(
@@ -228,10 +234,7 @@ public final class ArtifactReferences {
 
     private static void onTag(String from, String name, List<String[]> attributes, Set<String> found) {
         Set<String> loading = LOADING_ATTRIBUTES.getOrDefault(name, Set.of());
-        boolean loadingLink = name.equals("link") && attributes.stream()
-            .filter(attribute -> attribute[0].equals("rel"))
-            .flatMap(attribute -> List.of(attribute[1].toLowerCase(Locale.ROOT).split("\\s+")).stream())
-            .anyMatch(LOADING_LINK_RELS::contains);
+        boolean loadingLink = name.equals("link") && isLoadingLink(attributes);
         for (String[] attribute : attributes) {
             String attributeName = attribute[0];
             if (attributeName.equals("style")) {
@@ -244,6 +247,20 @@ public final class ArtifactReferences {
                 addResolved(from, attribute[1], found);
             }
         }
+    }
+
+
+    private static boolean isLoadingLink(List<String[]> attributes) {
+        List<String> rels = List.of(valueOf(attributes, "rel").toLowerCase(Locale.ROOT).split("\\s+"));
+        String as = valueOf(attributes, "as").toLowerCase(Locale.ROOT).strip();
+        return rels.stream().anyMatch(LOADING_LINK_RELS::contains)
+            || (rels.contains("preload") && (as.equals("style") || as.equals("image")));
+    }
+
+
+    private static String valueOf(List<String[]> attributes, String name) {
+        return attributes.stream().filter(attribute -> attribute[0].equals(name)).map(attribute -> attribute[1])
+            .findFirst().orElse("");
     }
 
 

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ArtifactReferencesTest {
 
     @Test
-    @DisplayName("불러오는 자리만 보고 링크와 스크립트, 주석, 문서 안 주소는 보지 않는다")
+    @DisplayName("미리보기가 불러오는 자리만 보고 링크와 스크립트, 주석, 문서 안 주소, 미리보기에 쓰이지 않는 link 는 보지 않는다")
     void findsOnlyLoadingReferences() {
         String html = """
             <!-- <img src="commented.png"> -->
@@ -22,10 +22,14 @@ class ArtifactReferencesTest {
             <video poster="e.gif"></video><use xlink:href="#x"/>
             <title><img src="in-title.png"></title>
             <img src="a.png?x=1#frag">
+            <noscript><img src="f.png"></noscript>
+            <link rel="modulepreload" href="app.js"><link rel="manifest" href="site.webmanifest">
+            <link rel="preload" href="font.woff2" as="font"><link rel="preload" as="image" href="g.webp">
             """;
 
         assertThat(ArtifactReferences.ofHtml("site/index.html", html)).containsExactly(
-            "site/a.png", "site/b.png", "site/c.png", "site/icon.png", "site/d.png", "site/e.gif");
+            "site/a.png", "site/b.png", "site/c.png", "site/icon.png", "site/d.png", "site/e.gif", "site/f.png",
+            "site/g.webp");
     }
 
 
