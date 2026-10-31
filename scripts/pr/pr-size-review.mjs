@@ -39,13 +39,23 @@ function gh(args, input) {
 // 권한이 없거나 리뷰 도중 head가 바뀌면 모델 리뷰의 성공에는 영향을 주지 않는다.
 export function publishSizeReview(size, repo, number, head, api = gh) {
   const body = sizeFinding(size);
-  if (!body) return false;
   try {
     const pr = api(["pr", "view", number, "--repo", repo, "--json", "isCrossRepository,headRefOid"]);
     if (pr.isCrossRepository || pr.headRefOid !== head) return false;
     const endpoint = `repos/${repo}/pulls/${number}/reviews`;
     const reviews = api(["api", "--paginate", "--slurp", `${endpoint}?per_page=100`]).flat();
-    if (reviews.some(review => review.user?.login === "github-actions[bot]" && review.commit_id === head && review.body?.includes(MARKER))) return false;
+    const previous = reviews.filter(review => review.user?.login === "github-actions[bot]" && review.body?.includes(MARKER));
+    const current = body && previous.find(review => review.commit_id === head && review.body === body);
+    // 작은 PR로 줄였을 때도 이전 P3 지적이 현재 지적으로 남지 않게 한다.
+    for (const review of previous) {
+      if (review === current) continue;
+      api(["api", "graphql", "-f", `query=mutation($id: ID!) {
+        minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
+          minimizedComment { isMinimized }
+        }
+      }`, "-f", `id=${review.node_id}`]);
+    }
+    if (!body || current) return false;
     api(["api", endpoint, "--method", "POST", "--input", "-"], JSON.stringify({ event: "COMMENT", commit_id: head, body, comments: [] }));
     return true;
   } catch {

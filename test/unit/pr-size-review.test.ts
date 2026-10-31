@@ -53,9 +53,6 @@ test("현재 head에 COMMENT 리뷰를 게시하고 같은 head의 기존 크기
 
 test("작은 PR·상한 초과·fork·head 변경·권한 부족은 조용히 건너뛴다", () => {
   const fail = () => { throw new Error("403"); };
-  for (const lines of [LARGE_THRESHOLD, MAX_LINES + 1]) {
-    assert.equal(publishSizeReview(size(lines), "owner/repo", "1", "head", () => assert.fail("API를 호출하지 않아야 함")), false);
-  }
   for (const pr of [{ isCrossRepository: true, headRefOid: "head" }, { headRefOid: "new-head" }]) {
     assert.equal(publishSizeReview(size(LARGE_THRESHOLD + 1), "owner/repo", "1", "head", () => pr), false);
   }
@@ -64,6 +61,30 @@ test("작은 PR·상한 초과·fork·head 변경·권한 부족은 조용히 �
     let calls = 0;
     const api = () => { if (++calls === failAt) return fail(); return calls === 1 ? { headRefOid: "head" } : [[]]; };
     assert.equal(publishSizeReview(size(LARGE_THRESHOLD + 1), "owner/repo", "1", "head", api), false);
+  }
+});
+
+
+test("새 head에서는 이전 크기 리뷰만 접고 현재 head에 새 지적을 게시한다", () => {
+  for (const lines of [LARGE_THRESHOLD + 1, LARGE_THRESHOLD, MAX_LINES + 1]) {
+    const calls = [];
+    const api = (args, input) => {
+      calls.push({ args, input });
+      if (args[0] === "pr") return { headRefOid: "new-head" };
+      if (args.includes("--slurp")) return [[
+        { node_id: "old-size", user: { login: "github-actions[bot]" }, commit_id: "old-head", body: sizeFinding(size(LARGE_THRESHOLD + 1)) },
+        { node_id: "human", user: { login: "human" }, body: "<!-- pr-size-finding -->" },
+        { node_id: "other", user: { login: "github-actions[bot]" }, body: "다른 리뷰" },
+      ]];
+      return {};
+    };
+    assert.equal(publishSizeReview(size(lines), "owner/repo", "1", "new-head", api), lines > LARGE_THRESHOLD && lines <= MAX_LINES);
+    const minimize = calls.filter(call => call.args.includes("graphql"));
+    assert.equal(minimize.length, 1);
+    assert.ok(minimize[0].args.includes("id=old-size"));
+    const posts = calls.filter(call => call.args.includes("POST"));
+    assert.equal(posts.length, lines > LARGE_THRESHOLD && lines <= MAX_LINES ? 1 : 0);
+    if (posts.length) assert.equal(JSON.parse(posts[0].input).commit_id, "new-head");
   }
 });
 
