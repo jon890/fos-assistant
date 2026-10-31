@@ -8,6 +8,7 @@ from .connector_description import _tool_descriptions, _tool_summaries
 from .connector_appearance import _tool_arg_labels
 from .connector_snapshot_manifest import _snapshot_manifest
 from .connector_remote import _is_remote, _remote_server, _remote_server_matches
+from .connector_standard import STANDARD_SCHEMA, _standard_declaration
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -109,7 +110,15 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("플러그인 manifest 의 이름이 운영 목록과 다르다")
 
     declared = _read_assistant_json(root)
-    if not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] not in (1, 2):
+    # `assistant.json` 이 없으면 표준 플러그인이다. 선언을 manifest 와 MCP 정의에서 만들고 같은 검증을 거친다.
+    standard = declared is None
+    mcp = _read_mcp_definition(root, plugin)
+    if standard:
+        # 운영자 env 는 `assistant.json` 의 `operator_env` 로만 선언한다. 표준 플러그인의 env 는 모두 사용자 칸이다.
+        if entry["env"]:
+            raise ValueError("assistant.json 이 없는 플러그인의 운영 목록 항목에 env 가 있다")
+        declared = _standard_declaration(connector_id, plugin, mcp)
+    elif not isinstance(declared, dict) or type(declared.get("schema")) is not int or declared["schema"] not in (1, 2):
         raise ValueError("schema 는 1 이나 2 만 받는다")
     if declared.get("id") != connector_id:
         raise ValueError("id 가 운영 목록의 이름과 다르다")
@@ -121,9 +130,10 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     readme_url = _appearance_or_none(connector_id, "readme_url", lambda: _connector_link(declared.get("readme_url")))
     link_kind = "project" if declared.get("link_kind") == "project" else "service"
     fields = _connector_fields(declared.get("fields"))
-    verify = declared.get("verify")
-    if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
-            or not TOOL_NAME_RE.match(verify["tool"])):
+    # 표준 플러그인에는 확인 도구가 없다. 연결 확인은 그 서버가 낸 도구 목록으로 한다.
+    verify = None if standard else declared.get("verify")
+    if not standard and (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
+                         or not TOOL_NAME_RE.match(verify["tool"])):
         raise ValueError("verify.tool 은 도구 이름이다")
     field_env = {field["env"] for field in fields}
     operator_env = declared.get("operator_env", [])
@@ -143,7 +153,6 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors, error_contracts = _connector_errors(declared.get("errors", {}))
-    mcp = _read_mcp_definition(root, plugin)
     if not isinstance(mcp, dict):
         raise ValueError("MCP manifest 는 객체여야 한다")
     if "mcpServers" in mcp:
@@ -213,7 +222,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     installed_skills = _connector_skills(skill_dirs)
 
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
-    tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
+    # 표준 플러그인은 도구 정책을 선언하지 않는다. Control Plane 이 그 서버의 도구를 모두 호출마다 승인으로 판정한다.
+    tools = {} if standard else _connector_tools(declared, verify["tool"], option_tools, mcp_server)
     # 원격 서버는 자식 프로세스의 env 로 건네는 선언을 받지 않았다. snapshot 은 자식 프로세스의 인자로 켜므로 없다.
     snapshot = None
     if not remote:
@@ -240,7 +250,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "readme_url": readme_url,
         "link_kind": link_kind,
         "fields": fields,
-        "verify": {"tool": verify["tool"]},
+        "verify": None if standard else {"tool": verify["tool"]},
         "mcp_server": mcp_server,
         # 대시보드 plugin 이 그 서버에 붙는 방식이다. 카탈로그 응답에는 싣지 않는다.
         "transport": transport,
@@ -255,7 +265,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         **_connector_binding_flags(declared),
         "skills": installed_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
-        "call_tools": frozenset({verify["tool"]} | option_tools),
+        "call_tools": frozenset(option_tools if standard else {verify["tool"]} | option_tools),
         "tools": tools,
         "snapshot": snapshot,
         "tool_descriptions": _tool_descriptions(declared),
@@ -272,7 +282,7 @@ def _connector_manifest(connector_id: str) -> dict | None:
         logger.warning("dashboard-profile-api: 커넥터 %r 가 운영 목록에 없다", connector_id)
         return None
     try:
-        return _guard_manifest(_load_connector(connector_id, entry), _read_assistant_json(entry["root"]))
+        return _guard_manifest(_load_connector(connector_id, entry), _read_assistant_json(entry["root"]) or {})
     except Exception as error:
         # 파일 내용과 운영 경로를 로그에 싣지 않는다. 직접 낸 사유만 그대로 적는다.
         reason = str(error) if type(error) is ValueError else type(error).__name__
@@ -338,8 +348,12 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     return True
 
 
-def _connector_catalog_response():
+def _connector_catalog_response(include_standard: bool = False):
     """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
+
+    `assistant.json` 이 없는 표준 플러그인(`schema: 3`, `verify: null`)은 `include_standard` 가 참일 때만 싣는다.
+    옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하므로, schema 3 을 아는 쪽이 query 로 청한다
+    (rule-66).
 
     `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
     `owner_browser` 는 사용자 브라우저를 쓰는 커넥터인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
@@ -366,6 +380,7 @@ def _connector_catalog_response():
                                                        "arg_labels": manifest["tool_arg_labels"].get(name, {})}.items()
                            if value is not None}
                     for name, policy in manifest["tools"].items()}}
-         for manifest in _connector_catalog().values()],
+         for manifest in _connector_catalog().values()
+         if include_standard or manifest["schema"] != STANDARD_SCHEMA],
         status_code=200,
     )

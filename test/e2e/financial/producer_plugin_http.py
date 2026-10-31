@@ -14,6 +14,7 @@ import tempfile
 import signal
 import threading
 import types
+import urllib.parse
 from unittest import mock
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -73,8 +74,12 @@ class Fixture(ConnectorExecuteTest):
         return {"ok": True}
 
     async def send(self, path, method, body=None, token="valid"):
+        # 카탈로그는 `?include=standard` 를 싣고 온다. starlette 처럼 경로와 query 를 나눠 넘긴다.
+        path, _, raw_query = path.partition("?")
+        query = urllib.parse.parse_qs(raw_query)
         request = types.SimpleNamespace(url=types.SimpleNamespace(path=path), method=method, token=token,
-            state=types.SimpleNamespace(), query_params=types.SimpleNamespace(getlist=lambda key: [], keys=lambda: []))
+            state=types.SimpleNamespace(), query_params=types.SimpleNamespace(getlist=lambda key: query.get(key, []),
+                                                                              keys=lambda: list(query)))
         async def tree():
             return body
         async def raw():

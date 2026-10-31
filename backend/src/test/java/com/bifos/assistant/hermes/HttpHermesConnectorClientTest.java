@@ -88,7 +88,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("실제 Python producer의 Gmail과 네이버 카탈로그 인자 이름을 읽는다")
     void readsArgumentLabelsFromPythonCatalog() throws Exception {
         String raw = Files.readString(Path.of("../test/resources/connector-argument-catalog.json"));
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
         List<ConnectorManifest> catalog = client.readCatalog();
         assertThat(catalog).hasSize(2);
@@ -109,7 +109,7 @@ class HttpHermesConnectorClientTest {
             + "\"nested\":{\"risk\":\"WRITE\",\"arg_labels\":{\"to\":{}}},"
             + "\"array\":{\"risk\":\"WRITE\",\"arg_labels\":[]},"
             + "\"old\":{\"risk\":\"WRITE\"}}";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(CATALOG.replace(tail, tail + policies), MediaType.APPLICATION_JSON));
         List<ConnectorTool> tools = client.readCatalog().getFirst().tools();
         assertThat(tools).extracting(ConnectorTool::argLabels)
@@ -126,14 +126,14 @@ class HttpHermesConnectorClientTest {
             + "\"start_tool\":\"start_snapshot\",\"status_tool\":\"status_snapshot\","
             + "\"capabilities\":{\"compile\":true,\"start\":false,\"status\":false}}";
         String tail = "\"mcp_server\":\"demo\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog")).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard")).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(CATALOG.replace(tail, tail + "," + declaration), MediaType.APPLICATION_JSON));
         for (String broken : List.of(declaration.replace("\"compile\":true", "\"compile\":false"),
             declaration.replace("\"status\":false", "\"status\":true"),
             declaration.replace("\"compile_snapshot\"", "\"start_snapshot\""),
             declaration.replace(",\"status\":false", ""))) {
-            server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
                 .andRespond(withSuccess(CATALOG.replace(tail, tail + "," + broken), MediaType.APPLICATION_JSON));
         }
         assertThat(client.readCatalog().getFirst().snapshot()).isNull();
@@ -189,7 +189,7 @@ class HttpHermesConnectorClientTest {
             "\"mcp_server\":\"demo\"",
             "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7},"
                 + "\"execution_guard_manifest_sha256\":\"" + manifestSha256 + "\"");
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
         ConnectorManifest manifest = client.readCatalog().getFirst();
         var guard = manifest.executionGuard();
@@ -211,7 +211,7 @@ class HttpHermesConnectorClientTest {
                 "\"mcp_server\":\"demo\",\"execution_guard\":{\"protocol\":1,\"protocol\":2}")
         }) {
             server.reset();
-            server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
                 .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
             assertThatThrownBy(client::readCatalog)
                 .isInstanceOf(IllegalStateException.class)
@@ -223,7 +223,7 @@ class HttpHermesConnectorClientTest {
     @Test
     @DisplayName("옛 카탈로그의 보호 선언 누락은 null로 남는다")
     void preservesMissingExecutionGuardAsUnsupported() {
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
         ConnectorManifest manifest = client.readCatalog().getFirst();
         assertThat(manifest.executionGuard()).isNull();
@@ -234,7 +234,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("카탈로그에서 칸의 env, 선택지, 확인 도구, MCP 서버 이름을 읽는다")
     @Test
     void readsCatalogWithEnvOptionsVerifyToolAndMcpServer() {
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andExpect(method(HttpMethod.GET))
             .andExpect(header("Authorization", "Bearer test-dashboard-token"))
             .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
@@ -276,7 +276,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("카탈로그의 아이콘과 링크를 읽고, 칸이 없는 옛 응답은 둘 다 비우고, 틀린 아이콘은 그 칸만 버린다")
     @Test
     void readsIconAndLinkAndDropsOnlyTheBrokenField() {
-        String url = BASE + "/api/connectors/catalog";
+        String url = BASE + "/api/connectors/catalog?include=standard";
         String tail = "\"mcp_server\":\"demo\"";
         String svg = Base64.getEncoder()
             .encodeToString("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".getBytes(StandardCharsets.UTF_8));
@@ -320,9 +320,9 @@ class HttpHermesConnectorClientTest {
         String metadata = ",\"link\":\"http://invalid.example.test/\",\"readme_url\":\"https://example.com/README.md\",\"link_kind\":\"project\"";
         String guard = ",\"execution_guard\":{\"protocol\":false,\"extra\":7},"
             + "\"execution_guard_manifest_sha256\":\"" + "a".repeat(64) + "\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(catalog.replace(tail, tail + metadata + guard), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(catalog, MediaType.APPLICATION_JSON));
         ConnectorManifest read = client.readCatalog().get(0);
         ConnectorManifest legacy = client.readCatalog().get(0);
@@ -346,7 +346,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("카탈로그의 owner_browser 와 로그인 주소를 읽고, 칸이 없는 옛 카탈로그는 거짓과 null 이며 https 가 아닌 주소는 버린다")
     @Test
     void readsOwnerBrowserAndLoginUrl() {
-        String url = BASE + "/api/connectors/catalog";
+        String url = BASE + "/api/connectors/catalog?include=standard";
         String tail = "\"mcp_server\":\"demo\"";
         server.expect(requestTo(url))
             .andRespond(withSuccess(
@@ -385,7 +385,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("카탈로그의 single_binding 을 읽고, 칸이 없으면 거짓이며 boolean 이 아니면 거절한다")
     @Test
     void readsDeclaredSingleBinding() {
-        String url = BASE + "/api/connectors/catalog";
+        String url = BASE + "/api/connectors/catalog?include=standard";
         String tail = "\"mcp_server\":\"demo\"";
         server.expect(requestTo(url))
             .andRespond(withSuccess(
@@ -406,7 +406,7 @@ class HttpHermesConnectorClientTest {
     @Test
     void readsSchemaAndToolPolicies() {
         String tail = "\"mcp_server\":\"demo\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(
                     tail,
@@ -435,7 +435,7 @@ class HttpHermesConnectorClientTest {
     void readsGrantOfToolPolicies() {
         String tail = "\"mcp_server\":\"demo\"";
         String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(
                     tail,
@@ -469,7 +469,7 @@ class HttpHermesConnectorClientTest {
     void readsOutboundOfToolPolicies() {
         String tail = "\"mcp_server\":\"demo\"";
         String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(
                     tail,
@@ -501,7 +501,7 @@ class HttpHermesConnectorClientTest {
     void readsConversationGrantOfToolPolicies() {
         String tail = "\"mcp_server\":\"demo\"";
         String required = "{\"risk\":\"WRITE\",\"approval\":\"required\",\"outbound\":false";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(
                     tail,
@@ -533,7 +533,7 @@ class HttpHermesConnectorClientTest {
     void readsIdentifiersOfToolPolicies() {
         String tail = "\"mcp_server\":\"demo\"";
         String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(
                     tail,
@@ -561,7 +561,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("schema 가 정수가 아니거나 tools 가 객체가 아닌 커넥터는 받는 쪽이 거르는 값으로 읽고 다른 커넥터는 그대로 읽는다")
     @Test
     void readsMalformedSchemaOrToolsAsUnjudgeableWithoutFailingCatalog() {
-        String url = BASE + "/api/connectors/catalog";
+        String url = BASE + "/api/connectors/catalog?include=standard";
         String tail = "\"mcp_server\":\"demo\"";
         String other = ",{\"id\":\"other-notes\",\"title\":\"다른 메모\",\"fields\":[],"
             + "\"verify\":{\"tool\":\"list_scopes\"},\"mcp_server\":\"other\",\"schema\":2,"
@@ -646,7 +646,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("커넥터가 하나도 없는 카탈로그는 빈 목록이다")
     @Test
     void readsEmptyCatalog() {
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThat(client.readCatalog()).isEmpty();
@@ -657,7 +657,7 @@ class HttpHermesConnectorClientTest {
     @DisplayName("모양이 틀린 카탈로그를 거절한다")
     @Test
     void rejectsMalformedCatalog() {
-        String url = BASE + "/api/connectors/catalog";
+        String url = BASE + "/api/connectors/catalog?include=standard";
         server.expect(requestTo(url)).andRespond(withSuccess("{\"connectors\":[]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(url))
             .andRespond(withSuccess(
@@ -1033,11 +1033,11 @@ class HttpHermesConnectorClientTest {
     @Test
     void readsSkillNamesAndDefaultsToEmpty() {
         String tail = "\"mcp_server\":\"demo\"";
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(
                 CATALOG.replace(tail, tail + ",\"skills\":[\"demo-notes-guide\"]"),
                 MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
             .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
 
         assertThat(client.readCatalog().get(0).skills()).containsExactly("demo-notes-guide");

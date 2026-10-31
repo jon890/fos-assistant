@@ -37,7 +37,7 @@ class ConnectorToolDescriptionHttpTest {
                 + "\"tools\":{\"read_note\":{\"risk\":\"READ\",\"approval\":\"none\",\"title\":\"읽기\",\"description\":"
                 + asciiJson(mapper.writeValueAsString(vector.get("value"))) + ",\"summary\":"
                 + asciiJson(mapper.writeValueAsString(vector.get("value"))) + "}}}]";
-            server.expect(requestTo("https://example.test/api/connectors/catalog"))
+            server.expect(requestTo("https://example.test/api/connectors/catalog?include=standard"))
                 .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
             var tool = client.readCatalog().getFirst().tools().getFirst();
             assertThat(tool.risk()).isEqualTo("READ");

@@ -1,0 +1,7 @@
+{
+  "name": "standard-remote",
+  "version": "0.1.0",
+  "description": "assistant.json 없이 Codex 형식과 원격 MCP 만 갖춘 검사용 플러그인",
+  "skills": "./skills/",
+  "interface": {"displayName": "읽지 않는 표시 이름"}
+}

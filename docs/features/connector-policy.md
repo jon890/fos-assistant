@@ -166,6 +166,10 @@ sequenceDiagram
 **`schema: 1` 커넥터에서 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인 줄이 된다.** 조회 도구도 마찬가지다.
 `schema: 1` 은 `tools` 를 선언하지 않으므로 그 밖의 도구를 모두 `WRITE` 와 `required` 로 읽는다. 승인 없이 조회를 쓰려면 그 plugin 이 `schema: 2` 로 올려 조회 도구를 `READ` 로 선언해야 한다.
 
+**`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 호출마다 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
+`schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 상시 허락과 대화 허락을 모두 닫는다.
+MCP 서버의 `readOnlyHint` 는 승인을 건너뛰게 하지 않는다. 그 표시로 상시 허락만 여는 일은 그 ADR 의 「남은 단계」 가 갖는다.
+
 #### 이름 대응
 
 Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를 바꾸고 긴 이름을 줄인다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「MCP 도구의 등록 이름」).
@@ -250,7 +254,7 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 #### 선언하지 않은 도구
 
 연결 확인과 관리자 반영 완료는 MCP probe 가 낸 도구 가운데 `schema: 2` manifest 의 `tools` 에 없는 것을 세어 연결에 적고 연결 상태와 관리자 목록에 낸다.
-선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 은 세지 않는다.
+선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 과 `schema: 3` 은 세지 않는다. 두 schema 의 선언 없는 도구는 거절되지 않고 승인 줄이 된다.
 
 ### 사용자별 호출 제한
 

@@ -329,7 +329,9 @@ def _install_gate() -> bool:
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
             if path == CATALOG_PATH:
-                return _connector_catalog_response()
+                query = getattr(request, "query_params", None)
+                include = query.getlist("include") if query is not None else []
+                return _connector_catalog_response(include_standard="standard" in include)
             if call is not None:
                 # profile 쓰기 잠금 밖에서 돈다. 안에서 돌면 도구를 기다리는 동안 모든 profile 요청이 멈춘다.
                 return await _connector_call_request(request, call.group(1))

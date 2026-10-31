@@ -15,7 +15,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
@@ -60,7 +60,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 
 **Hermes 버전을 올리면 표 이름과 칸 이름을 다시 확인한다.** 이름이 바뀌면 이 경로가 503 으로 답하고 Control Plane 은 그 자식을 가격 미확인으로 남긴다.
 
-**카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `owner_browser` 는 `owner_browser_env` 를 선언했는지이고 env 이름은 내지 않는다. `owner_browser_login_url` 은 선언한 `https` 주소나 null 이다. 옛 대시보드 plugin 은 두 칸을 내지 않고 Control Plane 은 거짓과 null 로 읽는다. `unknown_errors` 는 `outcome_unknown` 코드마다 선언한 `retry_key` 이름이나 null 이다. 옛 대시보드 plugin 은 내지 않고 Control Plane 은 어느 코드도 받지 않는 것으로 읽는다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)).
+**카탈로그 응답.** `fields[]` 는 manifest 의 칸 그대로(`env`, `options` 포함)이고 `verify` 는 `{tool}` 이다. `schema: 3` 은 `verify` 가 null 이다. `owner_browser` 는 `owner_browser_env` 를 선언했는지이고 env 이름은 내지 않는다. `owner_browser_login_url` 은 선언한 `https` 주소나 null 이다. 옛 대시보드 plugin 은 두 칸을 내지 않고 Control Plane 은 거짓과 null 로 읽는다. `unknown_errors` 는 `outcome_unknown` 코드마다 선언한 `retry_key` 이름이나 null 이다. 옛 대시보드 plugin 은 내지 않고 Control Plane 은 어느 코드도 받지 않는 것으로 읽는다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)).
 `toolsets` 와 `attachments` 는 manifest 에 없으면 빈 목록과 거짓이다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 같은 기본값으로 읽는다.
 `single_binding` 은 boolean 이고 선언이 없으면 거짓이다. 옛 대시보드 plugin 은 이 칸을 내지 않고, Control Plane 은 없는 칸을 거짓으로 읽는다. `sandbox_required` 는 싣지 않는다. 대시보드가 바인딩 설치에서 직접 판정한다([ADR-20261008 / connector-binding-guards](../../../docs/adr/ADR-20261008-connector-binding-guards.md)).
 `tools` 는 `{<이름>: {risk, approval, title, grant, outbound, conversation_grant, identifiers, description, arg_labels}}` 이고 `approval`, `grant`, `outbound`, `conversation_grant`, `identifiers` 는 기본값을 채운 값이다. 옛 대시보드 plugin 은 `conversation_grant` 를 내지 않고, Control Plane 은 없는 칸을 거짓으로 읽는다. `schema: 1` 은 `verify.tool` 과 `options.tool` 만 `READ` 로 담는다.
@@ -101,6 +101,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **plugin 은 커넥터의 이름을 코드에 두지 않는다.**
 운영 목록의 plugin 디렉터리마다 `assistant.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다. `assistant.json` 이 없으면 옛 이름 `connector.json` 을 같은 규칙으로 읽고, 둘 다 있으면 그 커넥터를 카탈로그에서 뺀다([ADR-20261026 / plugin-standard-format](../../docs/adr/ADR-20261026-plugin-standard-format.md)).
+둘 다 없으면 표준 플러그인으로 읽는다. 아래 「`assistant.json` 이 없는 플러그인」 이 규칙을 갖는다.
 `assistant.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
 
 **운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
@@ -136,6 +137,15 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 서버의 `args` 가운데 `${CLAUDE_PLUGIN_ROOT}/` 로 시작하는 것은 plugin 디렉터리 안의 링크 없는 파일이어야 하고 실제 경로로 바꾼다. 그 밖의 `$` 치환은 받지 않는다
 - 서버의 `env` 는 자기 이름의 `${이름}` 참조만 둔다. 선택 칸은 `${이름:-}` 도 된다
 - 값이 없는 선택 칸은 설치할 때 서버 정의에 빈 값을 명시한다. Hermes 는 빈 변수의 참조를 그대로 남기기 때문이다
+
+**`assistant.json` 이 없는 플러그인은 카탈로그에 `schema: 3` 으로 낸다**([ADR-20261101 / plugin-without-assistant-json](../../docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
+선언은 `connector_standard.py` 가 manifest 와 MCP 정의에서 만들고, 그 뒤 검증은 `assistant.json` 과 같다.
+
+- 제목은 manifest 의 `displayName`, 없으면 `name` 이다. 설명은 `description` 이다
+- 로컬 서버의 `env` 는 `${이름}` 이면 필수 칸, `${이름:-}` 이면 선택 칸이 된다. 다른 값이 하나라도 있으면 카탈로그에서 뺀다. 원격 서버는 헤더 값의 `${이름}` 마다 필수 칸이다
+- 칸은 모두 `secret: true` 이고 key 는 env 이름의 소문자, 표시 이름은 env 이름이다. env 이름은 원격 칸과 같은 규칙으로 Hermes 전역 이름을 거절한다
+- 운영 목록 항목에 `env` 가 있으면 뺀다. 확인 도구와 선택지 도구가 없어 `call` 이 부를 도구가 없다. `tools` 는 비고 `tools.exclude` 도 없다
+- 카탈로그 응답은 query `include=standard` 가 있을 때만 이 항목을 싣고, `verify` 는 null 이다
 
 **원격 MCP 커넥터는 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
 
