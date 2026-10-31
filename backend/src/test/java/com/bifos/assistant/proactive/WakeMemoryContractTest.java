@@ -16,6 +16,8 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -127,7 +129,7 @@ class WakeMemoryContractTest extends ProactiveLoopTestSupport {
 
 
     @Test
-    @DisplayName("두 번째 깨우기는 앞 깨우기가 끝난 뒤에 바뀐 기억만 바뀐 항목으로 싣는다")
+    @DisplayName("두 번째 깨우기는 앞 깨우기가 시작한 뒤에 바뀐 기억만 바뀐 항목으로 싣는다")
     void secondWakeCarriesOnlyMemoryChangedAfterPreviousWake() throws InterruptedException {
         CurrentUser user = user();
         Agent agent = agent(user);
@@ -147,6 +149,47 @@ class WakeMemoryContractTest extends ProactiveLoopTestSupport {
         assertThat(received.get(1).input())
             .contains("[" + later.id() + "] 뒤표식")
             .doesNotContain("앞표식");
+    }
+
+
+    @Test
+    @DisplayName("실패한 깨우기는 경계를 옮기지 않아 그 전에 바뀐 기억을 다음 깨우기가 싣고, 앞 깨우기가 도는 동안 바뀐 기억도 싣는다")
+    void failedWakeDoesNotMoveWindow() throws InterruptedException {
+        CurrentUser user = user();
+        Agent agent = agent(user);
+        clock.set(BASE.minus(Duration.ofDays(1)));
+        create(user, "앞표식 실패 전에 바뀐 기억", GRANTED);
+        clock.set(BASE);
+        StubHermesRunsClient stub = (StubHermesRunsClient)hermes;
+        stub.willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "합성 장애"));
+        checkService.startScheduled(user, agent.code(), saved -> {
+        });
+        awaitIdle();
+
+        clock.set(BASE.plus(Duration.ofDays(1)));
+        wake(user, agent, nothingNewOutput());
+
+        List<HermesRunCommand> received = stub.received();
+        assertThat(received.getLast().input()).contains("앞표식");
+    }
+
+
+    @Test
+    @DisplayName("항상 싣는 기억은 본문이 이미 문맥에 있다고 표시하고 색인 기억은 표시하지 않는다")
+    void alwaysMemoryIsMarkedInContext() throws InterruptedException {
+        CurrentUser user = user();
+        Agent agent = agent(user);
+        clock.set(BASE.minus(Duration.ofDays(1)));
+        Memory always = memories.create(
+            user, MemoryScope.USER, "항상표식 매일 아침 운동", "본문표식", GRANTED, MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+        Memory indexed = create(user, "색인표식 주말 계획", GRANTED);
+        clock.set(BASE);
+
+        wake(user, agent, nothingNewOutput());
+
+        assertThat(onlyInput())
+            .contains("[" + always.id() + "] 항상표식 매일 아침 운동 · 바뀜 2026-11-01 · 본문은 문맥에 있음")
+            .contains("[" + indexed.id() + "] 색인표식 주말 계획 · 바뀜 2026-11-01\n");
     }
 
 

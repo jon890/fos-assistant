@@ -66,7 +66,10 @@ class ProactiveCheckInput {
                 .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
                 .append(memorySignal(previous));
         }
-        Instant since = last.map(previous -> previous.finishedAt() == null ? previous.startedAt() : previous.finishedAt())
+        // 앞 살펴보기는 시작할 때 입력을 만들었으므로 그 시작 시각부터 본다. 실패하거나 멈춘 살펴보기는 모델이 결과를 내지 못해 경계를 옮기지 않는다
+        Instant since = deps.checks()
+            .findFirstByConversationIdAndStatusOrderByIdDesc(conversationId, CheckStatus.SUCCEEDED)
+            .map(ProactiveCheck::startedAt)
             .orElse(null);
         text.append("\n\n").append(deps.wakeMemory().section(owner, agentId, since, now));
         text.append("\n\n최근에 알린 발견\n").append(recentFindings(now));
