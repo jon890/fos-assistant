@@ -1007,6 +1007,9 @@ action을 지우면 실행 내용도 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
+정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
+`detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.
+
 ## 암호화 key 표
 
 ### user_data_key
