@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import db.migration.V20261016224030__TaskTriggerIntoTask;
+import db.migration.V20261016224032__TaskScheduleConstraints;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -125,7 +127,9 @@ class TaskScheduleMigrationTest {
         Path migrations = Path.of("src/main/resources/db/migration");
         Files.copy(migrations.resolve("V68__task.sql"), directory.resolve("V68__task.sql"));
         flyway = Flyway.configure().dataSource(database.url(), database.username(), database.password())
-            .locations("filesystem:" + directory).load();
+            .locations("filesystem:" + directory)
+            .javaMigrations(new V20261016224030__TaskTriggerIntoTask(), new V20261016224032__TaskScheduleConstraints())
+            .target("68").load();
         flyway.migrate();
         return new JdbcTemplate(new DriverManagerDataSource(database.url(), database.username(), database.password()));
     }
@@ -135,12 +139,12 @@ class TaskScheduleMigrationTest {
         Path migrations = Path.of("src/main/resources/db/migration");
         try (var files = Files.list(migrations)) {
             for (Path migration : files.filter(file -> List.of(
-                "task_trigger_into_task.sql", "task_schedule_backfill.sql", "task_schedule_constraints.sql")
+                "task_schedule_backfill.sql")
                 .stream().anyMatch(suffix -> file.getFileName().toString().endsWith("__" + suffix))).toList()) {
                 Files.copy(migration, directory.resolve(migration.getFileName()));
             }
         }
-        flyway.migrate();
+        Flyway.configure().configuration(flyway.getConfiguration()).target("latest").load().migrate();
     }
 
 
