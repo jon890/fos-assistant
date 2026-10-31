@@ -28,7 +28,7 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
 
 
     /** 그 trigger 의 그 예정 시각 줄이 이미 있는가. 유일 제약에 닿기 전에 본다. */
-    boolean existsByTriggerIdAndScheduledFor(Long triggerId, Instant scheduledFor);
+    boolean existsByTaskIdAndScheduledFor(Long taskId, Instant scheduledFor);
 
 
     /**

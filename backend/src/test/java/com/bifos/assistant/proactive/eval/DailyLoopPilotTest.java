@@ -801,7 +801,6 @@ class DailyLoopPilotTest {
     /** 예약 작업 줄은 모든 시험이 공유하므로 지난 줄이 이번 발화에 섞이지 않게 비운다. */
     private void cleanTasks() {
         jdbc.update("DELETE FROM task_run");
-        jdbc.update("DELETE FROM task_trigger");
         jdbc.update("DELETE FROM task");
     }
 

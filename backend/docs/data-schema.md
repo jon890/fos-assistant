@@ -17,7 +17,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
 | 「먼저 살펴보기 표」 | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
-| 「예약 작업 표」 | `task`, `task_trigger`, `task_run` |
+| 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
 | 「암호화 key 표」 | `user_data_key` |
 
@@ -926,22 +926,22 @@ action을 지우면 실행 내용도 지운다.
 **`check_owner_user_id`, `check_agent_id` 생성 열은 `CHECK` 일 때만 주인과 에이전트 번호를 채운다.** 두 칸의 유일 제약으로 깨우기 설정 하나를 강제한다. `TURN` 줄은 두 칸이 비어 있어 걸리지 않는다.
 `CHECK` 는 같은 설정 줄을 다시 쓰고, 점검 대화를 쓰므로 `conversation_mode`, `conversation_id` 로 대화를 만들지 않는다.
 
-### task_trigger
-
-작업의 시각이다([ADR-077](adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md)).
-`fire_at` 과 `next_fire_at` 은 UTC 이고, 한 번 발화한 `ONCE` 는 `next_fire_at` 이 비어 있다. `last_fired_at` 은 마지막으로 처리한 예정 시각이다.
-`task_id` 의 유일 제약은 작업 하나에 시각 하나라는 지금의 규칙이다. 다른 종류의 trigger 를 더하는 단계가 이 제약을 바꾼다.
-시각을 고치면 같은 줄을 고친다. 발화 기록의 유일 제약이 이 줄의 번호를 쓰므로 줄을 새로 만들지 않는다.
+일정은 작업 하나의 현재값이므로 같은 `task` 줄에 둔다. `trigger_type`은 `CRON` 또는 `ONCE`다.
+`cron_expr`은 반복 일정에서만 채우고, `fire_at`은 한 번 실행하는 일정에서만 채운다.
+`time_zone`은 IANA 시간대 이름이며 `missed_policy`는 놓친 발화 처리 방식이다.
+`fire_at`과 `next_fire_at`은 UTC이고, 한 번 발화한 `ONCE`는 `next_fire_at`이 비어 있다.
+`last_fired_at`은 마지막으로 처리한 예정 시각이다. 일정 수정과 발화는 같은 작업 줄을 잠그고 처리한다.
+`(state, next_fire_at, id)` 색인으로 발화할 작업을 찾는다.
 
 ### task_run
 
-발화 한 번이다. `(trigger_id, scheduled_for)` 가 유일해, 같은 예정 시각의 발화는 서버를 다시 띄워도 하나다.
+발화 한 번이다. `(task_id, scheduled_for)` 가 유일해, 같은 예정 시각의 발화는 서버를 다시 띄워도 하나다.
 
 - `owner_user_id` 는 그 발화 때의 작업 주인이다. 하루 발화 수를 조인 없이 세려고 따로 둔다
 - `reason` 은 `SUCCEEDED` 면 비어 있거나, 답이 `[SILENT]` 뿐이면 `NOTHING_TO_REPORT` 다
 - `execution_id` 는 turn 이 끝난 모양을 받았을 때만 찬다
 - `proactive_check_id` 는 `CHECK` 발화가 연 점검 줄이다. 저장과 발화 연결을 한 트랜잭션으로 끝낸다
-- 외래 키는 `task_id` 와 `trigger_id` 에 둔다. 작업과 시각은 지우지 않으므로 걸어도 된다
+- 외래 키는 `task_id`에 둔다. 작업은 지워도 행이 남으므로 참조를 유지한다
 
 ## 먼저 살펴보기 표
 

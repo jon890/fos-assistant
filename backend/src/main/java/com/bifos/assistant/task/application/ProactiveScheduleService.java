@@ -17,13 +17,11 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.dto.ProactiveSchedule;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.infra.TaskRepository;
-import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -49,7 +47,6 @@ public class ProactiveScheduleService {
     private final HermesToolsetClient toolsets;
     private final ProactiveScheduleProperties properties;
     private final TaskRepository tasks;
-    private final TaskTriggerRepository triggers;
     private final ProactiveCheckRepository checks;
     private final TaskProperties taskProperties;
     private final Clock clock;
@@ -60,8 +57,7 @@ public class ProactiveScheduleService {
         Agent agent = agents.requireReadable(user, agentCode);
         Task task = tasks.findByOwnerUserIdAndAgentIdAndKind(user.id(), agent.id(), TaskKind.CHECK)
             .orElse(null);
-        TaskTrigger trigger = task == null ? null : triggers.findByTaskId(task.id()).orElse(null);
-        return view(user, agent, task, trigger, displayBlockers(agent));
+        return view(user, agent, task, displayBlockers(agent));
     }
 
 
@@ -88,33 +84,29 @@ public class ProactiveScheduleService {
                 ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
         }
         if (task == null) {
-            task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE));
-            triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next));
-        } else {
-            TaskTrigger trigger = requireTrigger(task);
-            trigger.reschedule(TriggerType.CRON, cron, null, zone, next);
-            trigger.changeMissedPolicy(MissedPolicy.SKIP);
+            task = Task.check(user.id(), agent.id(), CHECK_TITLE);
         }
+        task.reschedule(TriggerType.CRON, cron, null, zone, next);
+        task.changeMissedPolicy(MissedPolicy.SKIP);
         if (enabled) {
             task.changeCheckEnabled(true);
         } else {
             task.changeCheckEnabled(false);
         }
-        TaskTrigger trigger = task == null ? null : requireTrigger(task);
-        return view(user, agent, task, trigger, checkedBlockers);
+        return view(user, agent, tasks.save(task), checkedBlockers);
     }
 
 
     private ProactiveSchedule view(
-        CurrentUser user, Agent agent, Task task, TaskTrigger trigger, List<CheckBlocker> blockers) {
+        CurrentUser user, Agent agent, Task task, List<CheckBlocker> blockers) {
         ProactiveCheck last = checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
             user.id(), agent.id(), CheckTrigger.AUTONOMY)
             .orElse(null);
         return new ProactiveSchedule(
             task != null && task.state() == TaskState.ACTIVE,
-            trigger == null ? DEFAULT_TIME : timeOf(trigger),
-            trigger == null ? taskProperties.defaultZone().getId() : trigger.timeZone(),
-            task == null || task.state() != TaskState.ACTIVE || trigger == null ? null : trigger.nextFireAt(),
+            task == null ? DEFAULT_TIME : timeOf(task),
+            task == null ? taskProperties.defaultZone().getId() : task.timeZone(),
+            task == null || task.state() != TaskState.ACTIVE ? null : task.nextFireAt(),
             last == null
                 ? null
                 : new ProactiveSchedule.LastCheck(
@@ -166,12 +158,6 @@ public class ProactiveScheduleService {
     }
 
 
-    private TaskTrigger requireTrigger(Task task) {
-        return triggers.findByTaskId(task.id())
-            .orElseThrow(() -> new IllegalStateException("proactive schedule task has no trigger"));
-    }
-
-
     private static String requiredTimeZone(String timeZone) {
         if (timeZone == null || timeZone.isBlank()) {
             throw new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, "a time zone is required");
@@ -193,8 +179,8 @@ public class ProactiveScheduleService {
     }
 
 
-    private static String timeOf(TaskTrigger trigger) {
-        String[] fields = trigger.cronExpr().split("\\s+");
+    private static String timeOf(Task task) {
+        String[] fields = task.cronExpr().split("\\s+");
         return String.format("%02d:%02d", Integer.parseInt(fields[1]), Integer.parseInt(fields[0]));
     }
 }
