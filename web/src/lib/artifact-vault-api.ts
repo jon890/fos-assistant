@@ -44,6 +44,43 @@ export function vaultArtifact(
   });
 }
 
+/** 결과물 하나의 자동 보관 상태다. `ChatDtos.ArtifactView.autoVault` 와 같은 값이다. 대상이 아니면 null 이다. */
+export type AutoVaultState =
+  "PENDING" | "RUNNING" | "DONE" | "SKIPPED" | "FAILED";
+
+/** `POST /api/artifact-vault/auto/retry` 의 응답이다. `error` 는 실패일 때의 오류 코드다. */
+export type AutoVaultStatus = {
+  state: AutoVaultState | null;
+  error: string | null;
+};
+
+/** 자동 보관을 켰는지 읽는다. 본문은 `{ enabled: boolean }` 이다. */
+export function fetchAutoVaultSetting(): Promise<Response> {
+  return fetch("/api/artifact-vault/auto", { cache: "no-store" });
+}
+
+/** 자동 보관을 켜거나 끈다. 성공하면 본문이 바뀐 `{ enabled: boolean }` 이다. */
+export function changeAutoVaultSetting(enabled: boolean): Promise<Response> {
+  return fetch("/api/artifact-vault/auto", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+/** 자동 보관이 실패한 결과물을 다시 보관한다. 성공하면 본문이 {@link AutoVaultStatus} 다. */
+export function retryAutoVault(
+  conversationId: string,
+  messageId: number,
+  path: string,
+): Promise<Response> {
+  return fetch("/api/artifact-vault/auto/retry", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, messageId, path }),
+  });
+}
+
 export function deleteVaultItem(id: number): Promise<Response> {
   return fetch(`/api/artifact-vault/${id}`, { method: "DELETE" });
 }
