@@ -101,20 +101,20 @@ class StandardPluginPolicyTest {
                 assertThat(ToolPolicyDecision.decide(
                     ConnectionStatus.READY, hermesTool.startsWith("mcp__std_"), manifest.schema(), Optional.empty(),
                     granted, granted, 2, NOT_CHECK))
-                    .as("%s granted=%s", manifest.id(), granted)
-                    .isEqualTo(EVERY_CALL);
+                        .as("%s granted=%s", manifest.id(), granted)
+                        .isEqualTo(EVERY_CALL);
             }
             // 쓰기를 허용한 살펴보기도 승인 줄로 보낸다. 읽기 경계의 살펴보기는 승인 줄 없이 거절한다.
             assertThat(ToolPolicyDecision.decide(
                 ConnectionStatus.READY, true, manifest.schema(), Optional.empty(), false, 2, APPROVAL_ONLY))
-                .isEqualTo(EVERY_CALL);
+                    .isEqualTo(EVERY_CALL);
             assertThat(ToolPolicyDecision.decide(
                 ConnectionStatus.READY, true, manifest.schema(), Optional.empty(), false, 2, READ_ONLY).denyReason())
-                .isEqualTo(ActionDenyReason.READ_ONLY_RUN);
+                    .isEqualTo(ActionDenyReason.READ_ONLY_RUN);
             // 다른 서버의 등록 이름은 schema 와 상관없이 거절한다.
             assertThat(ToolPolicyDecision.decide(
                 ConnectionStatus.READY, false, manifest.schema(), Optional.empty(), true, 2, NOT_CHECK).denyReason())
-                .isEqualTo(ActionDenyReason.UNDECLARED);
+                    .isEqualTo(ActionDenyReason.UNDECLARED);
         }
     }
 
