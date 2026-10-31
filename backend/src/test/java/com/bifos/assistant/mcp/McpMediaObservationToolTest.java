@@ -40,6 +40,7 @@ import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
@@ -502,6 +503,7 @@ class McpMediaObservationToolTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("실제 HTTP에서 권한 snapshot 뒤 철회와 쓰기가 경합하면 저장은 남고 응답 본문은 차단한다")
     void keepsCommittedRevisionButWithholdsBodyDuringRevocationRace() throws Exception {

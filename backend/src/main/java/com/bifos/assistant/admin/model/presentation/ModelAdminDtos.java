@@ -1,6 +1,7 @@
 package com.bifos.assistant.admin.model.presentation;
 
 import com.bifos.assistant.chat.modelchoice.application.dto.AgentModelSettings;
+import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
@@ -43,6 +44,28 @@ public final class ModelAdminDtos {
                 settings.catalog() == null ? null : ModelOptionsView.from(settings.catalog()),
                 HiddenModelsView.from(settings.hidden()));
         }
+    }
+
+    /**
+     * 그룹 하나의 모델 목록이다.
+     *
+     * @param catalog 켜진 모든 에이전트에서 도는 provider 와 모델. 목록을 읽지 못했으면 null 이다
+     */
+    public record GroupModelCatalogView(CatalogView catalog) {
+
+        static GroupModelCatalogView from(GroupModelCatalog catalog) {
+            return new GroupModelCatalogView(new CatalogView(
+                catalog.providers().stream().map(ProviderView::from).toList(), catalog.reasoningEfforts()));
+        }
+
+
+        static GroupModelCatalogView missing() {
+            return new GroupModelCatalogView(null);
+        }
+    }
+
+    /** 그룹 목록의 provider 와 effort 선택지다. */
+    public record CatalogView(List<ProviderView> providers, List<String> reasoningEfforts) {
     }
 
     /** 그룹의 숨김 목록 전체다. 저장할 때는 이 목록으로 통째로 바꾼다. */

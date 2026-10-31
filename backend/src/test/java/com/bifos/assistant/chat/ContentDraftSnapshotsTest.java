@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.lang.reflect.Proxy;
 import java.util.Optional;
@@ -237,6 +238,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("두 동시 preview가 같은 owner snapshot을 반환한다")
     void deduplicatesConcurrentPreviews() throws Exception {
@@ -286,6 +288,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("실제 UNIQUE 실패 트랜잭션 뒤 새 owner 범위 읽기로 동일 snapshot을 찾는다")
     void retriesOwnerReadAfterRolledBackUniqueFailure() {

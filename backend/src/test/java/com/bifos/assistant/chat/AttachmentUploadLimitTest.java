@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import io.jsonwebtoken.Jwts;
@@ -110,6 +111,7 @@ class AttachmentUploadLimitTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("같은 대화에 동시에 올린 서른두 요청은 서른 개만 성공한다")
     void concurrentUploadsKeepTheUnboundAttachmentLimit() throws Exception {

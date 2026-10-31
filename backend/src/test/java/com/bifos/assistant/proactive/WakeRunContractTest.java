@@ -114,7 +114,6 @@ class WakeRunContractTest extends ProactiveLoopTestSupport {
         for (Long userId : scheduledUsers) {
             jdbc.update("DELETE FROM notification WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM task_run WHERE owner_user_id = ?", userId);
-            jdbc.update("DELETE FROM task_trigger WHERE task_id IN (SELECT id FROM task WHERE owner_user_id = ?)", userId);
             jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
         }
         scheduledUsers.clear();

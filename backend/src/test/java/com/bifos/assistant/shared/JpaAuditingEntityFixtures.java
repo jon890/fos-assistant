@@ -52,7 +52,7 @@ import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.domain.Task;
-import com.bifos.assistant.task.domain.TaskTrigger;
+import com.bifos.assistant.task.domain.type.TriggerType;
 import com.bifos.assistant.task.domain.type.MissedPolicy;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
@@ -125,8 +125,10 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, MemoryEmbedding.of(memory.id(), "audit", new byte[32], new float[] {1, 2}));
         add(entityManager, rows, MemoryCapture.of(memory.id(), user.id(), conversation.id(), execution.id(), MemoryCaptureKind.CREATED, 1, null, false));
         add(entityManager, rows, MemoryLink.related(memory.id(), memory.id() + 1, "audit", MemoryLinkOrigin.HUMAN, null, null));
-        Task task = add(entityManager, rows, Task.check(user.id(), agent.id(), "예약"));
-        add(entityManager, rows, TaskTrigger.once(task.id(), BUSINESS.plusSeconds(60), ZoneOffset.UTC, MissedPolicy.SKIP));
+        Task task = Task.check(user.id(), agent.id(), "예약");
+        task.reschedule(TriggerType.ONCE, null, BUSINESS.plusSeconds(60), ZoneOffset.UTC, BUSINESS.plusSeconds(60));
+        task.changeMissedPolicy(MissedPolicy.SKIP);
+        add(entityManager, rows, task);
         add(entityManager, rows, ProactiveCheckFinding.of(check.id(), conversation.id(), FindingKind.NEW, null, "검사", unique, "발견", "https://example.test", BUSINESS));
         add(entityManager, rows, ProactiveCheckProblem.of(check.id(), conversation.id(), ProblemStatus.ACCEPTED, null, unique,
             "문제", null, null, null, null, null, null, null, null, List.of(), BUSINESS));

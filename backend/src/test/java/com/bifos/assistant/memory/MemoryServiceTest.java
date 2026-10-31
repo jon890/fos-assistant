@@ -31,6 +31,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -196,14 +197,14 @@ class MemoryServiceTest {
         assertThat(memories.indexedFor(ADMIN, CORE)).isEmpty();
         assertNotFound(() -> memories.bodyFor(ADMIN, CORE, proposed.id()));
 
-        memories.update(ADMIN, proposed.id(), "내용", true);
+        memories.update(ADMIN, proposed.id(), "내용", true, null);
         memories.accept(ADMIN, proposed.id());
         assertThat(memories.alwaysInjectedFor(ADMIN, CORE))
             .extracting(Memory::id)
             .contains(proposed.id());
         assertThat(memories.indexedFor(ADMIN, CORE)).isEmpty();
 
-        memories.update(ADMIN, proposed.id(), "내용", false);
+        memories.update(ADMIN, proposed.id(), "내용", false, null);
         assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).contains(proposed.id());
         assertThat(memories.bodyFor(ADMIN, CORE, proposed.id()).content()).isEqualTo("내용");
     }
@@ -215,7 +216,7 @@ class MemoryServiceTest {
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
 
         assertForbidden(() -> memories.create(MEMBER, MemoryScope.GROUP, "새 그룹", "내용", false));
-        assertForbidden(() -> memories.update(MEMBER, group.id(), "수정", true));
+        assertForbidden(() -> memories.update(MEMBER, group.id(), "수정", true, null));
         assertForbidden(() -> memories.delete(MEMBER, group.id()));
     }
 
@@ -225,7 +226,7 @@ class MemoryServiceTest {
     void sameTitleAndBodyProposalLeavesOneRow() {
         Memory first = memories.proposeUser(ADMIN, "제안", "내용", 99L);
         memories.accept(ADMIN, first.id());
-        memories.update(ADMIN, first.id(), "수정한 내용", false);
+        memories.update(ADMIN, first.id(), "수정한 내용", false, null);
         Memory duplicate = memories.proposeUser(ADMIN, "제안", "수정한 내용", 100L);
 
         assertThat(duplicate.id()).isEqualTo(first.id());
@@ -233,6 +234,7 @@ class MemoryServiceTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("저장소도 동시에 들어온 중복 제안을 막는다")
     void repositoryAlsoBlocksConcurrentDuplicateProposals() {
@@ -250,8 +252,8 @@ class MemoryServiceTest {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "제목", "처음 내용", false);
         assertThat(memory.revision()).isOne();
 
-        memories.update(ADMIN, memory.id(), "둘째 내용", true);
-        Memory current = memories.update(ADMIN, memory.id(), "셋째 내용", false);
+        memories.update(ADMIN, memory.id(), "둘째 내용", true, null);
+        Memory current = memories.update(ADMIN, memory.id(), "셋째 내용", false, null);
 
         assertThat(current.revision()).isEqualTo(3);
         assertThat(current.content()).isEqualTo("셋째 내용");
@@ -272,7 +274,7 @@ class MemoryServiceTest {
     @DisplayName("지워도 판이 남고 마지막 값이 지운 판으로 더해진다")
     void deletingKeepsHistoryAndAddsATombstone() {
         Memory memory = memories.create(ADMIN, MemoryScope.GROUP, "제목", "처음 내용", false);
-        memories.update(ADMIN, memory.id(), "고친 내용", false);
+        memories.update(ADMIN, memory.id(), "고친 내용", false, null);
 
         memories.delete(ADMIN, memory.id());
 
@@ -288,6 +290,7 @@ class MemoryServiceTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("수정이 커밋되는 사이에 들어온 승인은 그 수정의 본문과 판 번호를 되돌리지 않는다")
     void acceptingWhileAnUpdateCommitsDoesNotRevertTheUpdate() throws Exception {
@@ -368,7 +371,7 @@ class MemoryServiceTest {
 
         assertThat(memories.readableBy(noGroup)).isEmpty();
         assertNotFound(() -> memories.bodyFor(noGroup, CORE, orphan.id()));
-        assertNotFound(() -> memories.update(noGroup, orphan.id(), "고침", false));
+        assertNotFound(() -> memories.update(noGroup, orphan.id(), "고침", false, null));
         assertNotFound(() -> memories.delete(noGroup, orphan.id()));
     }
 
@@ -378,7 +381,7 @@ class MemoryServiceTest {
     void revisionsOfOthersItemsLookLikeMissingItems() {
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "개인", "처음", false);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "처음", false);
-        memories.update(ADMIN, personal.id(), "고침", false);
+        memories.update(ADMIN, personal.id(), "고침", false, null);
         memories.delete(ADMIN, group.id());
 
         assertThat(memories.revisionsOf(MEMBER, personal.id())).isEmpty();
@@ -396,7 +399,7 @@ class MemoryServiceTest {
 
         Memory sensitive = memories.create(
             ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        assertThatThrownBy(() -> memories.update(ADMIN, sensitive.id(), "내용", true))
+        assertThatThrownBy(() -> memories.update(ADMIN, sensitive.id(), "내용", true, null))
             .isInstanceOfSatisfying(
                 ApiException.class,
                 ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
@@ -493,7 +496,7 @@ class MemoryServiceTest {
         assertNotFound(() -> memories.bodyFor(ADMIN, CORE, memory.id()));
         assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).containsExactly(memory.id());
 
-        Memory edited = memories.update(ADMIN, memory.id(), "고친 본문", false);
+        Memory edited = memories.update(ADMIN, memory.id(), "고친 본문", false, null);
         assertThat(edited.retrieval()).isEqualTo(MemoryRetrieval.ARCHIVE);
         assertThat(edited.alwaysInject()).isFalse();
     }
@@ -508,7 +511,7 @@ class MemoryServiceTest {
         assertThat(memory.collection()).isEqualTo("core");
         assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
 
-        Memory changed = memories.update(ADMIN, memory.id(), "내용", false);
+        Memory changed = memories.update(ADMIN, memory.id(), "내용", false, null);
         assertThat(changed.retrieval()).isEqualTo(MemoryRetrieval.SEARCH);
         assertThat(changed.alwaysInject()).isFalse();
     }

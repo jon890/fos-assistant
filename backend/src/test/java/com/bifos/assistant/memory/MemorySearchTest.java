@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MemorySearchSqlProbe;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,6 +49,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 실제 repository의 관련도 검색, 권한 경계, 커서와 SQL 투영을 확인한다. 원문은 출력하지 않는다. */
 @BackendIntegrationTest
+@MysqlCase(MysqlCase.Reason.COLLATION)
 public class MemorySearchTest {
     static final CurrentUser USER = new CurrentUser(811L, "search@example.test", "검색 검사", 10L, UserRole.ADMIN);
     static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());

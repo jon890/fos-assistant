@@ -46,7 +46,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 검사는 기준 파일 없는 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`과 `JpaAuditingPlacementTest`가 맡는다.
 두 base, 엔티티별 상속, 46개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
 `Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
-`JpaAuditingTest`, `JpaAuditingMysqlTest`, 기존 `MemoryCollectionAuditingTest`와 MySQL 하위 클래스가 확인한다.
+`JpaAuditingTest`와 기존 `MemoryCollectionAuditingTest`가 H2 에서 확인한다. 칸의 정밀도는 `MysqlMigrationTest`가 실제 스키마로 대조한다.
 `JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
 
 ## 패키지 배치 규칙
@@ -435,9 +435,11 @@ class ConversationPagingTest {
 ```
 
 기반이 주는 대역과 mock, spy 는 `BackendIntegrationTest` 의 주석 선언과 `IntegrationTestDoubles` 가 갖는다.
-MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
+MySQL 에서 돌릴 이유가 있는 검사는 `@MysqlIntegrationTest` 를 더한다. 그 검사는 JVM 하나가 쓰는 MySQL 데이터베이스와 컨텍스트 하나를 함께 쓴다.
+스키마를 처음부터 적용해 보는 마이그레이션 검사처럼 DB 를 직접 만들어야 하는 검사만 `@Tag("mysql")` 에 `MysqlTestDatabase.create()` 를 쓴다.
+H2 검사 클래스를 상속한 MySQL 검사는 `@MysqlCase` 를 단 메서드만 돈다. 이유는 `MysqlCase.Reason` 이 갖고, 근거는 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 
-**검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@Tag("mysql")` 검사는 예외다.
+**검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@MysqlIntegrationTest` 검사도 이 규칙을 지킨다. 직접 `@Tag("mysql")` 을 단 검사만 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
 
 `ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.

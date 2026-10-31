@@ -33,6 +33,14 @@ public class AgentService {
     }
 
 
+    /** 켜져 있고 지우지 않은 에이전트 전체다. 그룹 하나의 설정이 모든 에이전트에 걸리는지 볼 때 쓴다. */
+    public List<Agent> enabledAgents() {
+        return agents.findByEnabledTrueOrderByCodeAsc().stream()
+            .filter(agent -> !agent.isDeleted())
+            .toList();
+    }
+
+
     /** 요청자가 읽을 수 있는 에이전트다. 지운 에이전트는 없는 에이전트와 같게 {@code AGENT_NOT_FOUND} 다. */
     public Agent requireReadable(CurrentUser user, String code) {
         Agent agent = agents.findByCode(code).orElseThrow(() -> notFound());

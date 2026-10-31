@@ -1,0 +1,20 @@
+{
+  "name": "plan312-test-slimming-migration-setup",
+  "description": "데이터 마이그레이션 검사의 setup 을 클래스마다 한 번으로 줄이고, 운영에 적용된 옛 마이그레이션의 데이터 검사를 정리한다",
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    }
+  ]
+}
