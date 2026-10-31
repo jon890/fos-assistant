@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,20 +13,19 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.modelchoice.application.GroupModelCatalogService;
+import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
+import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelTiers;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
-import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
+import com.bifos.assistant.chat.modelchoice.application.dto.ModelSetting;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelTierOptions;
-import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
-import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
-import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierDefinition;
-import com.bifos.assistant.chat.modelchoice.domain.ModelTierGroupSetting;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierDefinitionRepository;
-import com.bifos.assistant.chat.modelchoice.infra.ModelTierGroupSettingRepository;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -38,82 +36,81 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 단계 정의 저장의 관리자 경계와 실행 단계 우선순위를 확인한다. */
+/** 칸 정의 저장의 관리자 경계와 실행 칸 우선순위를 확인한다. */
 class ModelTierServiceTest {
+
+    private static final CurrentUser MEMBER = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+
+    private static final CurrentUser ADMIN = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+
 
     @Test
     @DisplayName("DEFAULT 대화는 사용자와 그룹 기본 단계가 있어도 profile 기본값만 쓴다")
     void explicitDefaultBypassesUserAndGroupDefaults() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        FakeModelSettingStore store = new FakeModelSettingStore();
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        ModelTierService service = service(store, users, options, nothingHidden(), mock(GroupModelCatalogService.class));
         Conversation conversation = mock(Conversation.class);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
 
-        ResolvedModelTier resolved = service.resolve(user, conversation, mock(Agent.class));
+        ResolvedModelTier resolved = service.resolve(MEMBER, conversation, mock(Agent.class));
 
         assertThat(resolved.choice().usesDefaultModel()).isTrue();
         assertThat(resolved.tier()).isNull();
-        verifyNoInteractions(definitions, settings, users, options);
+        assertThat(store.reads()).isZero();
+        verifyNoInteractions(users, options);
     }
 
 
     @Test
-    @DisplayName("DB 정의가 없는 새 그룹은 저장하지 않고 빈 세 단계를 순서대로 돌려준다")
-    void newGroupGetsReadOnlyEmptyDefinitionsInOrder() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+    @DisplayName("설정 줄이 없는 새 그룹은 저장하지 않고 고를 칸을 싣지 않는다")
+    void newGroupGetsNoTiersWithoutSaving() {
+        FakeModelSettingStore store = new FakeModelSettingStore();
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
+        ModelTierService service = service(store, users, options, nothingHidden(), mock(GroupModelCatalogService.class));
         when(users.findById(1L)).thenReturn(Optional.empty());
-        when(settings.findById(10L)).thenReturn(Optional.empty());
 
-        ModelTierOptions result = service.optionsFor(user, mock(Agent.class));
+        ModelTierOptions result = service.optionsFor(MEMBER, mock(Agent.class));
 
-        assertThat(result.tiers())
-            .extracting(ModelTierOptions.Tier::tier)
-            .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP);
-        assertThat(result.tiers()).allSatisfy(tier -> {
-            assertThat(tier.model()).isNull();
-            assertThat(tier.reasoningEffort()).isNull();
-        });
-        verify(definitions, never()).save(any());
+        assertThat(result.tiers()).isEmpty();
+        assertThat(result.groupDefaultTier()).isNull();
+        assertThat(store.saves()).isZero();
         verifyNoInteractions(options);
     }
 
 
     @Test
-    @DisplayName("MEMBER 역할이 받는 단계에는 provider 와 모델과 effort 가 비고 단계와 이름과 기본값은 남는다")
+    @DisplayName("MEMBER 역할이 받는 칸에는 provider 와 모델과 effort 가 비고 칸과 이름과 기본값은 남는다")
     void memberGetsTiersWithoutProviderModelOrEffort() {
         TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.MEDIUM);
         when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
-        when(fixtures.settings().findById(10L))
-            .thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.BALANCED)));
 
         ModelTierOptions result = fixtures.service().optionsFor(fixtures.user(), fixtures.agent());
 
         assertThat(result.tiers())
             .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::label)
             .containsExactly(
-                tuple(ModelTier.FAST, "빠르게"), tuple(ModelTier.BALANCED, "균형"), tuple(ModelTier.DEEP, "깊게"));
+                tuple(ModelTier.INSTANT, "Instant"),
+                tuple(ModelTier.MEDIUM, "Medium"),
+                tuple(ModelTier.HIGH, "High"),
+                tuple(ModelTier.EXTRA_HIGH, "Extra High"),
+                tuple(ModelTier.PRO, "Pro"));
         assertThat(result.tiers()).allSatisfy(tier -> {
             assertThat(tier.provider()).as("provider").isNull();
             assertThat(tier.model()).as("model").isNull();
             assertThat(tier.reasoningEffort()).as("reasoningEffort").isNull();
         });
-        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.BALANCED);
+        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.MEDIUM);
         assertThat(result.admin()).isFalse();
         // 싣지 않을 provider 를 알아내려고 Hermes 목록을 읽지 않는다.
         verifyNoInteractions(fixtures.options());
@@ -121,14 +118,12 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("ADMIN 역할이 받는 단계에는 provider 와 모델과 effort 가 그대로 실린다")
+    @DisplayName("ADMIN 역할이 받는 칸에는 provider 와 모델과 effort 가 그대로 실린다")
     void adminGetsTiersWithProviderModelAndEffort() {
         TierFixtures fixtures = tierFixtures();
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
         when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
-        when(fixtures.settings().findById(10L)).thenReturn(Optional.empty());
 
-        ModelTierOptions result = fixtures.service().optionsFor(admin, fixtures.agent());
+        ModelTierOptions result = fixtures.service().optionsFor(ADMIN, fixtures.agent());
 
         assertThat(result.tiers())
             .extracting(
@@ -137,22 +132,48 @@ class ModelTierServiceTest {
                 ModelTierOptions.Tier::model,
                 ModelTierOptions.Tier::reasoningEffort)
             .containsExactly(
-                tuple(ModelTier.FAST, "openai-codex", "example-fast", "low"),
-                tuple(ModelTier.BALANCED, "openai-codex", "example-balanced", "medium"),
-                tuple(ModelTier.DEEP, "openai-codex", "example-deep", "high"));
+                tuple(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+                tuple(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+                tuple(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+                tuple(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+                tuple(ModelTier.PRO, "openai-codex", "example-pro", "max"));
         assertThat(result.admin()).isTrue();
     }
 
 
     @Test
-    @DisplayName("관리자는 에이전트 없이 그룹 단계를 읽고 provider 를 비운 단계는 비운 채 받는다")
+    @DisplayName("optionsFor 는 빈 칸을 싣지 않고 채운 칸만 차례대로 싣는다")
+    void optionsForSkipsEmptyStops() {
+        FakeModelSettingStore store = new FakeModelSettingStore()
+            .tiers(
+                new ModelSetting.Stop(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+                new ModelSetting.Stop(ModelTier.HIGH, "openai-codex", "example-deep", "high"));
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = service(store, users, options, nothingHidden(), mock(GroupModelCatalogService.class));
+        when(users.findById(1L)).thenReturn(Optional.empty());
+
+        ModelTierOptions member = service.optionsFor(MEMBER, mock(Agent.class));
+        ModelTierOptions admin = service.optionsFor(ADMIN, mock(Agent.class));
+
+        assertThat(member.tiers())
+            .extracting(ModelTierOptions.Tier::tier)
+            .containsExactly(ModelTier.INSTANT, ModelTier.HIGH);
+        assertThat(admin.tiers())
+            .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::model)
+            .containsExactly(tuple(ModelTier.INSTANT, "example-fast"), tuple(ModelTier.HIGH, "example-deep"));
+        // provider 를 비운 칸이 없으니 에이전트의 기본 provider 를 읽지 않는다.
+        verifyNoInteractions(options);
+    }
+
+
+    @Test
+    @DisplayName("관리자는 에이전트 없이 그룹 칸을 읽고 provider 를 비운 칸은 비운 채 받는다")
     void adminReadsGroupTiersWithoutAgentAndBlankProviderStaysBlank() {
         TierFixtures fixtures = tierFixtures();
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
-        when(fixtures.settings().findById(10L))
-            .thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.BALANCED)));
+        fixtures.store().defaultTier(ModelTier.MEDIUM);
 
-        GroupModelTiers result = fixtures.service().groupTiers(admin);
+        GroupModelTiers result = fixtures.service().groupTiers(ADMIN);
 
         assertThat(result.tiers())
             .extracting(
@@ -161,17 +182,19 @@ class ModelTierServiceTest {
                 ModelTierOptions.Tier::model,
                 ModelTierOptions.Tier::reasoningEffort)
             .containsExactly(
-                tuple(ModelTier.FAST, null, "example-fast", "low"),
-                tuple(ModelTier.BALANCED, null, "example-balanced", "medium"),
-                tuple(ModelTier.DEEP, null, "example-deep", "high"));
-        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.BALANCED);
-        // 에이전트의 목록을 읽지 않는다. 관리자가 시작할 수 없는 에이전트만 있어도 그룹 단계를 읽는다.
+                tuple(ModelTier.INSTANT, null, "example-fast", "low"),
+                tuple(ModelTier.MEDIUM, null, "example-balanced", "medium"),
+                tuple(ModelTier.HIGH, null, "example-deep", "high"),
+                tuple(ModelTier.EXTRA_HIGH, null, "example-deep", "xhigh"),
+                tuple(ModelTier.PRO, null, "example-pro", "max"));
+        assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.MEDIUM);
+        // 에이전트의 목록을 읽지 않는다. 관리자가 시작할 수 없는 에이전트만 있어도 그룹 칸을 읽는다.
         verifyNoInteractions(fixtures.options());
     }
 
 
     @Test
-    @DisplayName("MEMBER 역할은 그룹 단계의 관리자 조회를 받지 못한다")
+    @DisplayName("MEMBER 역할은 그룹 칸의 관리자 조회를 받지 못한다")
     void memberCannotReadGroupTiers() {
         TierFixtures fixtures = tierFixtures();
 
@@ -183,192 +206,333 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("관리자가 아니면 그룹 단계 정의를 바꾸지 못한다")
+    @DisplayName("관리자가 아니면 그룹 칸 정의를 바꾸지 못한다")
     void memberCannotSaveGroupModelTiers() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        FakeModelSettingStore store = new FakeModelSettingStore();
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser member = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        ModelTierService service = service(store, users, options, nothingHidden(), catalog);
 
-        assertThatThrownBy(() -> service.saveGroup(member, List.of(), null))
+        assertThatThrownBy(() -> service.saveGroup(MEMBER, List.of(), null))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.FORBIDDEN);
 
-        verifyNoInteractions(definitions, settings, users, options);
+        assertThat(store.reads()).isZero();
+        assertThat(store.saves()).isZero();
+        verifyNoInteractions(users, options, catalog);
     }
 
 
     @Test
-    @DisplayName("세 단계가 모두 없으면 관리자도 그룹 단계를 저장하지 못한다")
+    @DisplayName("다섯 칸이 모두 없으면 관리자도 그룹 칸을 저장하지 못한다")
     void rejectsIncompleteDefinitions() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
-        List<ModelTierOptions.Tier> incomplete = List.of(new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", "low"));
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+        List<ModelTierOptions.Tier> one = List.of(tier(ModelTier.INSTANT, null, "example-fast", "low"));
+        List<ModelTierOptions.Tier> three = List.of(
+            tier(ModelTier.INSTANT, null, null, null),
+            tier(ModelTier.MEDIUM, null, null, null),
+            tier(ModelTier.HIGH, null, null, null));
 
-        assertThatThrownBy(() -> service.saveGroup(admin, incomplete, ModelTier.FAST))
+        assertThatThrownBy(() -> service.saveGroup(ADMIN, one, ModelTier.INSTANT))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThatThrownBy(() -> service.saveGroup(ADMIN, three, ModelTier.INSTANT))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
-        verifyNoInteractions(definitions, settings, users, options);
+        assertThat(store.saves()).isZero();
+        verifyNoInteractions(catalog);
     }
 
 
     @Test
-    @DisplayName("그룹 단계 저장은 provider와 model의 앞뒤 공백을 없애고 빈 provider는 null로 둔다")
-    void saveGroupNormalizesProviderAndModelBeforePersisting() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
-        doAnswer(invocation -> {
-            List<ModelTierDefinition> saved = invocation.getArgument(0);
-            assertThat(saved)
-                .satisfiesExactly(
-                    fast -> {
-                        assertThat(fast.provider()).isNull();
-                        assertThat(fast.model()).isEqualTo("example-fast");
-                    },
-                    balanced -> {
-                        assertThat(balanced.provider()).isEqualTo("openai-codex");
-                        assertThat(balanced.model()).isEqualTo("example-balanced");
-                    },
-                    deep -> {
-                        assertThat(deep.provider()).isEqualTo("openai-codex");
-                        assertThat(deep.model()).isEqualTo("example-deep");
-                    });
-            return saved;
-        })
-            .when(definitions)
-            .saveAll(any());
+    @DisplayName("다섯 칸을 모두 받으면 저장하고 그룹 기본 칸도 저장된다")
+    void savesAllFiveStopsAndGroupDefault() {
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        when(catalog.catalogFor(10L)).thenReturn(groupCatalog(
+            "openai-codex", "example-fast", "example-balanced", "example-deep", "example-pro"));
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
 
         service.saveGroup(
-            admin,
+            ADMIN,
             List.of(
-                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "   ", " example-fast ", "low"),
-                new ModelTierOptions.Tier(
-                    ModelTier.BALANCED, "균형", " openai-codex ", " example-balanced ", "medium"),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", " openai-codex ", " example-deep ", "high")),
-            ModelTier.FAST);
+                tier(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+                tier(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+                tier(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+                tier(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+                tier(ModelTier.PRO, "openai-codex", "example-pro", "max")),
+            ModelTier.HIGH);
+
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().tiers())
+            .extracting(
+                ModelSetting.Stop::tier,
+                ModelSetting.Stop::provider,
+                ModelSetting.Stop::model,
+                ModelSetting.Stop::reasoningEffort)
+            .containsExactly(
+                tuple(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+                tuple(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+                tuple(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+                tuple(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+                tuple(ModelTier.PRO, "openai-codex", "example-pro", "max"));
+        assertThat(store.current().defaultTier()).isEqualTo(ModelTier.HIGH);
     }
 
 
     @Test
-    @DisplayName("관리자는 provider만 또는 effort만 있는 부분 단계 mapping을 저장하지 못한다")
+    @DisplayName("바뀐 칸만 그룹 목록과 견주고 provider 와 모델이 그대로인 칸은 effort 가 바뀌어도 견주지 않는다")
+    void comparesOnlyChangedStopsWithGroupCatalog() {
+        FakeModelSettingStore store = new FakeModelSettingStore().tiers(explicitStops());
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        // 바뀐 칸의 모델만 있는 목록이다. 바뀌지 않은 칸까지 견주면 다시 읽어도 없어 거절된다.
+        when(catalog.catalogFor(10L)).thenReturn(groupCatalog("openai-codex", "example-other"));
+        when(catalog.refreshedCatalogFor(10L)).thenReturn(groupCatalog("openai-codex", "example-other"));
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+
+        service.saveGroup(
+            ADMIN,
+            List.of(
+                tier(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+                tier(ModelTier.MEDIUM, "openai-codex", "example-balanced", "high"),
+                tier(ModelTier.HIGH, "openai-codex", "example-other", "high"),
+                tier(ModelTier.EXTRA_HIGH, null, null, null),
+                tier(ModelTier.PRO, "openai-codex", "example-pro", "max")),
+            null);
+
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().stop(ModelTier.MEDIUM).reasoningEffort()).isEqualTo("high");
+        assertThat(store.current().stop(ModelTier.HIGH).model()).isEqualTo("example-other");
+        assertThat(store.current().stop(ModelTier.EXTRA_HIGH).isEmpty()).isTrue();
+        verify(catalog).catalogFor(10L);
+        verify(catalog, never()).refreshedCatalogFor(any());
+    }
+
+
+    @Test
+    @DisplayName("그룹 목록을 읽지 못해도 바뀐 칸이 없으면 저장되고 바뀐 칸이 있으면 그 오류가 그대로 나간다")
+    void savesWithoutCatalogWhenNothingChanged() {
+        FakeModelSettingStore store = new FakeModelSettingStore().tiers(explicitStops());
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        when(catalog.catalogFor(10L)).thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+
+        // effort 만 고치고 칸 하나를 비운다.
+        service.saveGroup(
+            ADMIN,
+            List.of(
+                tier(ModelTier.INSTANT, "openai-codex", "example-fast", "medium"),
+                tier(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+                tier(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+                tier(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+                tier(ModelTier.PRO, null, null, null)),
+            ModelTier.INSTANT);
+
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().stop(ModelTier.INSTANT).reasoningEffort()).isEqualTo("medium");
+        assertThat(store.current().stop(ModelTier.PRO).isEmpty()).isTrue();
+        verifyNoInteractions(catalog);
+
+        assertThatThrownBy(() -> service.saveGroup(
+            ADMIN,
+            List.of(
+                tier(ModelTier.INSTANT, "openai-codex", "example-other", "medium"),
+                tier(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+                tier(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+                tier(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+                tier(ModelTier.PRO, null, null, null)),
+            ModelTier.INSTANT))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException)error).code())
+                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+        assertThat(store.saves()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("들고 있던 그룹 목록에 없으면 다시 읽어 있으면 저장하고 다시 읽어도 없으면 VALIDATION_FAILED 로 거절한다")
+    void rereadsGroupCatalogBeforeRejecting() {
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        when(catalog.catalogFor(10L)).thenReturn(groupCatalog("openai-codex", "another-model"));
+        when(catalog.refreshedCatalogFor(10L))
+            .thenReturn(groupCatalog("openai-codex", "example-new"))
+            .thenReturn(groupCatalog("openai-codex", "another-model"));
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+
+        service.saveGroup(ADMIN, fiveTiers(tier(ModelTier.INSTANT, "openai-codex", "example-new", "low")), null);
+
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().stop(ModelTier.INSTANT).model()).isEqualTo("example-new");
+
+        assertThatThrownBy(() -> service.saveGroup(
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, "openai-codex", "example-missing", "low")), null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException)error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().stop(ModelTier.INSTANT).model()).isEqualTo("example-new");
+    }
+
+
+    @Test
+    @DisplayName("바뀐 칸이 provider 를 비우면 VALIDATION_FAILED 이고 옮겨 온 정의의 빈 provider 를 그대로 두는 저장은 된다")
+    void changedStopMustNameProviderButMigratedBlankProviderStays() {
+        FakeModelSettingStore store = new FakeModelSettingStore()
+            .tiers(new ModelSetting.Stop(ModelTier.INSTANT, null, "example-fast", "low"));
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+
+        assertThatThrownBy(() -> service.saveGroup(
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, null, "example-other", "low")), null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException)error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThat(store.saves()).isZero();
+
+        service.saveGroup(ADMIN, fiveTiers(tier(ModelTier.INSTANT, null, "example-fast", "high")), null);
+
+        assertThat(store.saves()).isEqualTo(1);
+        assertThat(store.current().stop(ModelTier.INSTANT))
+            .isEqualTo(new ModelSetting.Stop(ModelTier.INSTANT, null, "example-fast", "high"));
+        verifyNoInteractions(catalog);
+    }
+
+
+    @Test
+    @DisplayName("그룹 칸 저장은 provider와 model의 앞뒤 공백을 없애고 빈 provider는 null로 둔다")
+    void saveGroupNormalizesProviderAndModelBeforePersisting() {
+        // 옮겨 온 정의처럼 provider 를 비운 INSTANT 칸이 이미 있다. 공백 provider 는 그 칸을 바꾸지 않는다.
+        FakeModelSettingStore store = new FakeModelSettingStore()
+            .tiers(new ModelSetting.Stop(ModelTier.INSTANT, null, "example-fast", "low"));
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        when(catalog.catalogFor(10L)).thenReturn(groupCatalog("openai-codex", "example-balanced", "example-deep"));
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), nothingHidden(), catalog);
+
+        service.saveGroup(
+            ADMIN,
+            List.of(
+                tier(ModelTier.INSTANT, "   ", " example-fast ", "low"),
+                tier(ModelTier.MEDIUM, " openai-codex ", " example-balanced ", "medium"),
+                tier(ModelTier.HIGH, " openai-codex ", " example-deep ", "high"),
+                tier(ModelTier.EXTRA_HIGH, null, null, null),
+                tier(ModelTier.PRO, null, null, null)),
+            ModelTier.INSTANT);
+
+        assertThat(store.current().tiers())
+            .extracting(ModelSetting.Stop::provider, ModelSetting.Stop::model)
+            .containsExactly(
+                tuple(null, "example-fast"),
+                tuple("openai-codex", "example-balanced"),
+                tuple("openai-codex", "example-deep"),
+                tuple(null, null),
+                tuple(null, null));
+    }
+
+
+    @Test
+    @DisplayName("관리자는 provider만 또는 effort만 있는 부분 칸 mapping을 저장하지 못한다")
     void rejectsPartialTierMappings() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        ModelTierService service = service(
+            store,
+            mock(AppUserRepository.class),
+            mock(ModelOptionsService.class),
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
 
         assertThatThrownBy(() -> service.saveGroup(
-            admin,
-            List.of(
-                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", "openai-codex", null, null),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
-            null))
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, "openai-codex", null, null)), null))
                 .isInstanceOf(ApiException.class)
                 .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> service.saveGroup(
-            admin,
-            List.of(
-                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, "example-fast", null),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
-            null))
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, null, "example-fast", null)), null))
                 .isInstanceOf(ApiException.class)
                 .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> service.saveGroup(
-            admin,
-            List.of(
-                new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, null, "low"),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
-            null))
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, null, null, "low")), null))
                 .isInstanceOf(ApiException.class)
                 .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
+        assertThat(store.saves()).isZero();
     }
 
 
     @Test
-    @DisplayName("그룹 단계 정의는 effort none 을 받지 않는다")
+    @DisplayName("그룹 칸 정의는 effort none 을 받지 않는다")
     void rejectsNoneEffortInGroupTierDefinition() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        ModelTierService service = service(
+            store,
+            mock(AppUserRepository.class),
+            mock(ModelOptionsService.class),
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
 
         assertThatThrownBy(() -> service.saveGroup(
-            admin,
-            List.of(
-                new ModelTierOptions.Tier(
-                    ModelTier.FAST, "빠르게", "openai-codex", "example-fast", "none"),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
-            null))
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, "openai-codex", "example-fast", "none")), null))
                 .isInstanceOf(ApiException.class)
                 .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
-        verify(definitions, never()).saveAll(any());
+        assertThat(store.saves()).isZero();
     }
 
 
     @Test
-    @DisplayName("저장 단계와 에이전트 기본값이 모두 비어 있으면 단계 기록을 남기고 profile 기본값으로 돈다")
+    @DisplayName("저장 칸과 에이전트 기본값이 모두 비어 있으면 칸 기록을 남기고 profile 기본값으로 돈다")
     void emptyTierMappingFallsBackToProfileDefault() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(List.of());
+        ModelTierService service = service(
+            new FakeModelSettingStore(),
+            mock(AppUserRepository.class),
+            options,
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
 
-        ResolvedModelTier resolved = service.resolveTier(user, ModelTier.FAST, mock(Agent.class));
+        ResolvedModelTier resolved = service.resolveTier(MEMBER, ModelTier.INSTANT, mock(Agent.class));
 
-        assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
+        assertThat(resolved.tier()).isEqualTo(ModelTier.INSTANT);
         assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
         verifyNoInteractions(options);
     }
 
 
     @Test
-    @DisplayName("provider를 비운 단계는 요청 profile의 catalog에서 따로 검증하고 그 profile의 provider를 쓴다")
+    @DisplayName("provider를 비운 칸은 요청 profile의 catalog에서 따로 검증하고 그 profile의 provider를 쓴다")
     void storedTiersUseEachProfilesCatalog() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        ModelTierService service = service(
+            new FakeModelSettingStore().tiers(storedStops()),
+            mock(AppUserRepository.class),
+            options,
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
         Agent fastAgent = mock(Agent.class);
         Agent balancedAgent = mock(Agent.class);
         Agent deepAgent = mock(Agent.class);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(storedDefinitions());
         when(options.optionsForAgent(10L, fastAgent)).thenReturn(catalog("fast-provider", "example-fast"));
         when(options.optionsForAgent(10L, balancedAgent)).thenReturn(catalog("balanced-provider", "example-balanced"));
         when(options.optionsForAgent(10L, deepAgent)).thenReturn(catalog("deep-provider", "example-deep"));
 
-        ResolvedModelTier fast = service.resolveTier(user, ModelTier.FAST, fastAgent);
-        ResolvedModelTier balanced = service.resolveTier(user, ModelTier.BALANCED, balancedAgent);
-        ResolvedModelTier deep = service.resolveTier(user, ModelTier.DEEP, deepAgent);
+        ResolvedModelTier fast = service.resolveTier(MEMBER, ModelTier.INSTANT, fastAgent);
+        ResolvedModelTier balanced = service.resolveTier(MEMBER, ModelTier.MEDIUM, balancedAgent);
+        ResolvedModelTier deep = service.resolveTier(MEMBER, ModelTier.HIGH, deepAgent);
 
         assertThat(fast.choice()).isEqualTo(ModelChoice.of("fast-provider", "example-fast", "low"));
         assertThat(balanced.choice()).isEqualTo(ModelChoice.of("balanced-provider", "example-balanced", "medium"));
@@ -377,20 +541,20 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("단계 모델이 요청 profile의 catalog에 없으면 실행 전에 거절한다")
+    @DisplayName("칸 모델이 요청 profile의 catalog에 없으면 실행 전에 거절한다")
     void rejectsStoredTierMissingFromAgentCatalog() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
+        ModelTierService service = service(
+            new FakeModelSettingStore().tiers(storedStops()),
+            mock(AppUserRepository.class),
+            options,
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
         Agent agent = mock(Agent.class);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(storedDefinitions());
         when(options.optionsForAgent(10L, agent)).thenReturn(catalog("fast-provider", "another-model"));
         when(options.refreshedOptionsForAgent(10L, agent)).thenReturn(catalog("fast-provider", "another-model"));
 
-        assertThatThrownBy(() -> service.resolveTier(user, ModelTier.FAST, agent))
+        assertThatThrownBy(() -> service.resolveTier(MEMBER, ModelTier.INSTANT, agent))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.VALIDATION_FAILED);
@@ -399,13 +563,13 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("단계를 고를 때 들고 있던 목록에 모델이 없어도 다시 읽은 목록에 있으면 받는다")
+    @DisplayName("칸을 고를 때 들고 있던 목록에 모델이 없어도 다시 읽은 목록에 있으면 받는다")
     void acceptsTierWhenRereadCatalogOffersModel() {
         TierFixtures fixtures = tierFixtures();
         when(fixtures.options().optionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
         when(fixtures.options().refreshedOptionsForAgent(10L, fixtures.agent())).thenReturn(fullCatalog());
 
-        ResolvedModelTier deep = fixtures.service().resolveTier(fixtures.user(), ModelTier.DEEP, fixtures.agent());
+        ResolvedModelTier deep = fixtures.service().resolveTier(fixtures.user(), ModelTier.HIGH, fixtures.agent());
 
         assertThat(deep.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
         verify(fixtures.options()).refreshedOptionsForAgent(10L, fixtures.agent());
@@ -413,16 +577,16 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("실행할 때 들고 있던 목록이 대체 목록이어도 다시 읽은 목록으로 단계를 해석한다")
+    @DisplayName("실행할 때 들고 있던 목록이 대체 목록이어도 다시 읽은 목록으로 칸을 해석한다")
     void runResolvesTierWithRereadCatalogAfterSubstituteCatalog() {
         TierFixtures fixtures = tierFixtures();
         when(fixtures.options().optionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
         when(fixtures.options().refreshedOptionsForAgent(10L, fixtures.agent())).thenReturn(fullCatalog());
 
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.DEEP), fixtures.agent());
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.HIGH), fixtures.agent());
 
         assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
-        assertThat(resolved.tier()).isEqualTo(ModelTier.DEEP);
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
     }
 
 
@@ -433,7 +597,7 @@ class ModelTierServiceTest {
         when(fixtures.options().optionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
         when(fixtures.options().refreshedOptionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
 
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.DEEP), fixtures.agent());
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.HIGH), fixtures.agent());
 
         assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
         verify(fixtures.options()).refreshedOptionsForAgent(10L, fixtures.agent());
@@ -445,14 +609,14 @@ class ModelTierServiceTest {
     void runDoesNotRereadWhenCatalogOffersModel() {
         TierFixtures fixtures = tierFixtures();
 
-        fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.DEEP), fixtures.agent());
+        fixtures.service().resolve(fixtures.user(), tierConversation(ModelTier.HIGH), fixtures.agent());
 
         verify(fixtures.options(), never()).refreshedOptionsForAgent(any(), any());
     }
 
 
     @Test
-    @DisplayName("숨긴 단계 모델은 목록을 다시 읽지 않고 실행과 단계 고르기 모두 MODEL_HIDDEN 으로 거절한다")
+    @DisplayName("숨긴 칸 모델은 목록을 다시 읽지 않고 실행과 칸 고르기 모두 MODEL_HIDDEN 으로 거절한다")
     void hiddenTierModelIsRejectedWithoutRereadingOnRunAndOnChoice() {
         TierFixtures fixtures = tierFixtures();
         ModelVisibilityService visibility = mock(ModelVisibilityService.class);
@@ -460,19 +624,407 @@ class ModelTierServiceTest {
         doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
             .when(visibility)
             .requireVisible(any(), any());
-        ModelTierService service = new ModelTierService(
-            fixtures.definitions(), fixtures.settings(), fixtures.users(), fixtures.options(), visibility, Clock.systemUTC());
+        ModelTierService service = service(
+            fixtures.store(), fixtures.users(), fixtures.options(), visibility, mock(GroupModelCatalogService.class));
         when(fixtures.options().optionsForAgent(10L, fixtures.agent())).thenReturn(substituteCatalog());
 
-        assertThatThrownBy(() -> service.resolveTier(fixtures.user(), ModelTier.DEEP, fixtures.agent()))
+        assertThatThrownBy(() -> service.resolveTier(fixtures.user(), ModelTier.HIGH, fixtures.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
-        assertThatThrownBy(() -> service.resolve(fixtures.user(), tierConversation(ModelTier.DEEP), fixtures.agent()))
+        assertThatThrownBy(() -> service.resolve(fixtures.user(), tierConversation(ModelTier.HIGH), fixtures.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
         verify(fixtures.options(), never()).refreshedOptionsForAgent(any(), any());
+    }
+
+
+    @Test
+    @DisplayName("모든 칸이 빈 그룹은 관리자에게도 catalog 조회 없이 고를 칸을 싣지 않는다")
+    void storedFallbackTiersDoNotReadCatalogForOptions() {
+        AppUserRepository users = mock(AppUserRepository.class);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        ModelTierService service = service(
+            new FakeModelSettingStore().tiers(fallbackStops()),
+            users,
+            options,
+            nothingHidden(),
+            mock(GroupModelCatalogService.class));
+        when(users.findById(1L)).thenReturn(Optional.empty());
+
+        ModelTierOptions result = service.optionsFor(ADMIN, mock(Agent.class));
+
+        assertThat(result.tiers()).isEmpty();
+        verifyNoInteractions(options);
+    }
+
+
+    @Test
+    @DisplayName("상속 대화는 사용자 기본 칸을 그룹 기본 칸보다 먼저 쓴다")
+    void inheritedConversationPrefersUserDefaultTier() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.HIGH);
+        AppUser appUser = mock(AppUser.class);
+        when(appUser.modelDefaultTier()).thenReturn("INSTANT");
+        when(fixtures.users().findById(1L)).thenReturn(Optional.of(appUser));
+        Conversation conversation = mock(Conversation.class);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.INSTANT);
+        assertThat(resolved.choice().model()).isEqualTo("example-fast");
+        assertThat(resolved.choice().reasoningEffort()).isEqualTo("low");
+    }
+
+
+    @Test
+    @DisplayName("사용자 기본 칸이 없으면 상속 대화는 그룹 기본 칸을 쓴다")
+    void inheritedConversationFallsBackToGroupDefaultTier() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.HIGH);
+        AppUser appUser = mock(AppUser.class);
+        when(appUser.modelDefaultTier()).thenReturn(null);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.of(appUser));
+        Conversation conversation = mock(Conversation.class);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
+        assertThat(resolved.choice().model()).isEqualTo("example-deep");
+        assertThat(resolved.choice().reasoningEffort()).isEqualTo("high");
+    }
+
+
+    @Test
+    @DisplayName("명시 칸은 사용자와 그룹 기본 칸보다 먼저 쓴다")
+    void tierConversationOverridesUserAndGroupDefaults() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.HIGH);
+        Conversation conversation = mock(Conversation.class);
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.TIER);
+        when(conversation.modelTier()).thenReturn(ModelTier.MEDIUM);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.MEDIUM);
+        assertThat(resolved.choice().reasoningEffort()).isEqualTo("medium");
+        // 설정은 고른 칸의 정의를 읽을 때 한 번만 읽는다. 그룹 기본 칸을 찾으려 다시 읽지 않는다.
+        assertThat(fixtures.store().reads()).isEqualTo(1);
+        verifyNoInteractions(fixtures.users());
+    }
+
+
+    @Test
+    @DisplayName("CUSTOM 대화는 저장한 모델 선택을 칸 정의와 무관하게 보존한다")
+    void customConversationPreservesStoredChoice() {
+        TierFixtures fixtures = tierFixtures();
+        Conversation conversation = mock(Conversation.class);
+        ModelChoice choice = ModelChoice.stored("openai-codex", "custom-model", "max");
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
+        when(conversation.modelChoice()).thenReturn(choice);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(choice);
+        assertThat(resolved.tier()).isNull();
+        assertThat(fixtures.store().reads()).isZero();
+        verifyNoInteractions(fixtures.users(), fixtures.options());
+    }
+
+
+    @Test
+    @DisplayName("실행에 넘길 칸 선택은 뒤의 칸 정의 변경에 영향받지 않는다")
+    void resolvedTierChoiceIsImmutableSnapshot() {
+        TierFixtures fixtures = tierFixtures();
+
+        ResolvedModelTier resolved = fixtures.service().resolveTier(fixtures.user(), ModelTier.INSTANT, fixtures.agent());
+        fixtures.store().tiers(new ModelSetting.Stop(ModelTier.INSTANT, "openai-codex", "example-deep", "high"));
+
+        ResolvedModelTier updated = fixtures.service().resolveTier(fixtures.user(), ModelTier.INSTANT, fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-fast", "low"));
+        assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
+    }
+
+
+    @Test
+    @DisplayName("DEFAULT 대화는 에이전트 기본 모델이 있으면 그 값을 명시해 보낸다")
+    void explicitDefaultUsesAgentDefaultModel() {
+        TierFixtures fixtures = tierFixtures();
+        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "high");
+        Conversation conversation = mock(Conversation.class);
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "high"));
+        assertThat(resolved.tier()).isNull();
+        verifyNoInteractions(fixtures.options());
+    }
+
+
+    @Test
+    @DisplayName("선택 없는 대화는 사용자와 그룹 기본 칸이 없으면 에이전트 기본 모델로 돈다")
+    void inheritedConversationFallsBackToAgentDefaultModel() {
+        TierFixtures fixtures = tierFixtures();
+        agentDefault(fixtures.agent(), "openai-codex", "example-agent", null);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", null));
+        assertThat(resolved.tier()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("mapping이 빈 칸은 칸 기록을 남기고 에이전트 기본 모델로 돈다")
+    void emptyTierMappingUsesAgentDefaultModel() {
+        TierFixtures fixtures = tierFixtures();
+        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "medium");
+        fixtures.store().tiers(fallbackStops());
+
+        ResolvedModelTier resolved = fixtures.service().resolveTier(fixtures.user(), ModelTier.HIGH, fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "medium"));
+    }
+
+
+    @Test
+    @DisplayName("모델을 비운 CUSTOM 대화는 에이전트 기본 모델로 돌고 effort는 대화가 고른 값이 먼저다")
+    void customConversationWithoutModelUsesAgentDefaultModel() {
+        TierFixtures fixtures = tierFixtures();
+        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "low");
+        Conversation conversation = mock(Conversation.class);
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
+        when(conversation.modelChoice()).thenReturn(ModelChoice.stored(null, null, "max"));
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "max"));
+    }
+
+
+    @Test
+    @DisplayName("해석한 모델이 숨긴 모델이면 다른 모델로 바꾸지 않고 MODEL_HIDDEN 으로 거절한다")
+    void hiddenModelIsRejectedInsteadOfReplaced() {
+        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        ModelTierService service = service(
+            new FakeModelSettingStore(),
+            mock(AppUserRepository.class),
+            mock(ModelOptionsService.class),
+            visibility,
+            mock(GroupModelCatalogService.class));
+        Conversation conversation = mock(Conversation.class);
+        ModelChoice choice = ModelChoice.stored("openai-codex", "hidden-model", null);
+        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
+        when(conversation.modelChoice()).thenReturn(choice);
+        when(visibility.hiddenFor(10L))
+            .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "hidden-model"))));
+
+        assertThatThrownBy(() -> service.resolve(MEMBER, conversation, mock(Agent.class)))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+
+    @Test
+    @DisplayName("숨긴 provider를 명시한 칸 정의는 저장하지 못한다")
+    void hiddenProviderCannotBeSavedAsTierDefinition() {
+        FakeModelSettingStore store = new FakeModelSettingStore();
+        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        GroupModelCatalogService catalog = mock(GroupModelCatalogService.class);
+        ModelTierService service = service(
+            store, mock(AppUserRepository.class), mock(ModelOptionsService.class), visibility, catalog);
+        doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
+            .when(visibility)
+            .requireVisible(10L, ModelChoice.stored("hidden-provider", "example-fast", null));
+
+        assertThatThrownBy(() -> service.saveGroup(
+            ADMIN, fiveTiers(tier(ModelTier.INSTANT, "hidden-provider", "example-fast", "low")), null))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException)error).code())
+                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+        assertThat(store.saves()).isZero();
+        verifyNoInteractions(catalog);
+    }
+
+
+    @Test
+    @DisplayName("숨김이 없으면 모델을 싣지 않는 해석은 목록을 읽지 않고 통과한다")
+    void resolvesDefaultWithoutReadingCatalogWhenNothingIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(HiddenModels.none());
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+        verifyNoInteractions(fixtures.options());
+    }
+
+
+    @Test
+    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsDefaultRunWhenProfileDefaultModelIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+
+    @Test
+    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 provider 전체를 숨겼으면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsDefaultRunWhenProfileDefaultProviderIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+
+    @Test
+    @DisplayName("숨김이 있어도 profile 의 기본 모델이 숨기지 않은 모델이면 세 값을 비운 채 통과한다")
+    void passesDefaultRunWhenProfileDefaultModelIsNotHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-other"));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+    }
+
+
+    @Test
+    @DisplayName("숨김이 있는데 목록을 한 번도 읽지 못했으면 통과시키지 않고 HERMES_UNAVAILABLE 로 거절한다")
+    void rejectsDefaultRunWhenCatalogWasNeverRead() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+    }
+
+
+    @Test
+    @DisplayName("숨김이 있어도 에이전트 기본 모델이 있으면 목록을 읽지 않고 그 모델로 판정한다")
+    void judgesAgentDefaultModelWithoutReadingCatalog() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        agentDefault(fixtures.agent(), "example-provider", "example-agent", null);
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("example-provider", "example-agent", null));
+        verifyNoInteractions(fixtures.options());
+    }
+
+
+    @Test
+    @DisplayName("숨김이 있고 에이전트 기본 모델이 숨긴 모델이면 목록을 읽지 않고 MODEL_HIDDEN 으로 거절한다")
+    void rejectsHiddenAgentDefaultModelWithoutReadingCatalog() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-agent"));
+        agentDefault(fixtures.agent(), "example-provider", "example-agent", null);
+
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+        verifyNoInteractions(fixtures.options());
+    }
+
+
+    @Test
+    @DisplayName("Hermes 가 profile 의 기본 모델을 주지 않으면 판정할 값이 없어 통과한다")
+    void passesDefaultRunWhenHermesGivesNoDefaultModel() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", null, null));
+
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+    }
+
+
+    @Test
+    @DisplayName("Hermes 가 기본 provider 만 주지 않으면 모델 이름으로 판정하고 provider 전체 숨김은 견주지 않는다")
+    void judgesByModelNameWhenHermesGivesNoDefaultProvider() {
+        HiddenFixtures sameModel = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(sameModel.options().profileDefaultOf(sameModel.agent()))
+            .thenReturn(ModelChoice.stored(null, "example-model", null));
+        HiddenFixtures wholeProvider = hiddenFixtures(hiding("example-provider", null));
+        when(wholeProvider.options().profileDefaultOf(wholeProvider.agent()))
+            .thenReturn(ModelChoice.stored(null, "example-model", null));
+
+        assertThatThrownBy(() -> sameModel.service().resolve(sameModel.user(), defaultConversation(), sameModel.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+        assertThat(wholeProvider.service()
+            .resolve(wholeProvider.user(), defaultConversation(), wholeProvider.agent())
+            .choice())
+                .isEqualTo(ModelChoice.defaults());
+    }
+
+
+    @Test
+    @DisplayName("mapping이 빈 칸도 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
+    void rejectsEmptyTierMappingWhenProfileDefaultModelIsHidden() {
+        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(fixtures.options().profileDefaultOf(fixtures.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        assertThatThrownBy(() -> fixtures.service().resolveTier(fixtures.user(), ModelTier.INSTANT, fixtures.agent()))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+
+    @Test
+    @DisplayName("대화 없는 실행이 보낼 값은 에이전트 기본값이고 그 값이 같은 숨김 판정을 지난다")
+    void detachedChoiceIsAgentDefaultAndPassesSameHiddenCheck() {
+        HiddenFixtures visible = hiddenFixtures(hiding("example-provider", "example-other"));
+        agentDefault(visible.agent(), "example-provider", "example-agent", "medium");
+        HiddenFixtures hiddenDefault = hiddenFixtures(hiding("example-provider", "example-model"));
+        when(hiddenDefault.options().profileDefaultOf(hiddenDefault.agent()))
+            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+
+        ModelChoice sent = visible.service().detachedChoice(visible.agent());
+        ModelChoice empty = hiddenDefault.service().detachedChoice(hiddenDefault.agent());
+
+        assertThat(sent).isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
+        assertThatCode(() -> visible.service().requireRunnable(visible.user(), visible.agent(), sent))
+            .doesNotThrowAnyException();
+        assertThat(empty.usesDefaultModel()).as("기본값이 빈 에이전트는 모델을 싣지 않는다").isTrue();
+        assertThatThrownBy(() -> hiddenDefault.service().requireRunnable(hiddenDefault.user(), hiddenDefault.agent(), empty))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
+    }
+
+
+    private static ModelTierService service(
+        FakeModelSettingStore store,
+        AppUserRepository users,
+        ModelOptionsService options,
+        ModelVisibilityService visibility,
+        GroupModelCatalogService catalog) {
+        return new ModelTierService(store, users, options, visibility, catalog, Clock.systemUTC());
     }
 
 
@@ -484,7 +1036,7 @@ class ModelTierServiceTest {
     }
 
 
-    /** Hermes 가 Codex 목록을 읽지 못해 돌려주는 대체 목록처럼 단계 모델이 빠진 목록이다. */
+    /** Hermes 가 Codex 목록을 읽지 못해 돌려주는 대체 목록처럼 칸 모델이 빠진 목록이다. */
     private static ModelOptions substituteCatalog() {
         return catalog("openai-codex", "another-model");
     }
@@ -497,404 +1049,9 @@ class ModelTierServiceTest {
             List.of(new HermesModelCatalog.Provider(
                 "openai-codex",
                 "OpenAI",
-                List.of("example-fast", "example-balanced", "example-deep", "another-model"),
+                List.of("example-fast", "example-balanced", "example-deep", "example-pro", "another-model"),
                 Map.of())),
             List.of());
-    }
-
-
-    @Test
-    @DisplayName("관리자가 비어 있는 세 단계를 저장하면 catalog 조회 없이 profile 기본값 안내를 돌려준다")
-    void storedFallbackTiersDoNotReadCatalogForOptions() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
-        AppUserRepository users = mock(AppUserRepository.class);
-        ModelOptionsService options = mock(ModelOptionsService.class);
-        ModelTierService service = new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.ADMIN);
-        when(definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
-        when(users.findById(1L)).thenReturn(Optional.empty());
-        when(settings.findById(10L)).thenReturn(Optional.empty());
-
-        ModelTierOptions result = service.optionsFor(user, mock(Agent.class));
-
-        assertThat(result.tiers()).allSatisfy(tier -> {
-            assertThat(tier.provider()).isNull();
-            assertThat(tier.model()).isNull();
-            assertThat(tier.reasoningEffort()).isNull();
-        });
-        verifyNoInteractions(options);
-    }
-
-
-    @Test
-    @DisplayName("상속 대화는 사용자 기본 단계를 그룹 기본 단계보다 먼저 쓴다")
-    void inheritedConversationPrefersUserDefaultTier() {
-        TierFixtures fixtures = tierFixtures();
-        AppUser appUser = mock(AppUser.class);
-        when(appUser.modelDefaultTier()).thenReturn("FAST");
-        when(fixtures.users.findById(1L)).thenReturn(Optional.of(appUser));
-        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
-        Conversation conversation = mock(Conversation.class);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.tier()).isEqualTo(ModelTier.FAST);
-        assertThat(resolved.choice().model()).isEqualTo("example-fast");
-        assertThat(resolved.choice().reasoningEffort()).isEqualTo("low");
-    }
-
-
-    @Test
-    @DisplayName("사용자 기본 단계가 없으면 상속 대화는 그룹 기본 단계를 쓴다")
-    void inheritedConversationFallsBackToGroupDefaultTier() {
-        TierFixtures fixtures = tierFixtures();
-        AppUser appUser = mock(AppUser.class);
-        when(appUser.modelDefaultTier()).thenReturn(null);
-        when(fixtures.users.findById(1L)).thenReturn(Optional.of(appUser));
-        when(fixtures.settings.findById(10L)).thenReturn(Optional.of(ModelTierGroupSetting.of(10L, ModelTier.DEEP)));
-        Conversation conversation = mock(Conversation.class);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.tier()).isEqualTo(ModelTier.DEEP);
-        assertThat(resolved.choice().model()).isEqualTo("example-deep");
-        assertThat(resolved.choice().reasoningEffort()).isEqualTo("high");
-    }
-
-
-    @Test
-    @DisplayName("명시 단계는 사용자와 그룹 기본 단계보다 먼저 쓴다")
-    void tierConversationOverridesUserAndGroupDefaults() {
-        TierFixtures fixtures = tierFixtures();
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.TIER);
-        when(conversation.modelTier()).thenReturn(ModelTier.BALANCED);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.tier()).isEqualTo(ModelTier.BALANCED);
-        assertThat(resolved.choice().reasoningEffort()).isEqualTo("medium");
-        verifyNoInteractions(fixtures.users, fixtures.settings);
-    }
-
-
-    @Test
-    @DisplayName("CUSTOM 대화는 저장한 모델 선택을 단계 정의와 무관하게 보존한다")
-    void customConversationPreservesStoredChoice() {
-        TierFixtures fixtures = tierFixtures();
-        Conversation conversation = mock(Conversation.class);
-        ModelChoice choice = ModelChoice.stored("openai-codex", "custom-model", "max");
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(choice);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(choice);
-        assertThat(resolved.tier()).isNull();
-        verifyNoInteractions(fixtures.definitions, fixtures.settings, fixtures.users, fixtures.options);
-    }
-
-
-    @Test
-    @DisplayName("실행에 넘길 단계 선택은 뒤의 단계 정의 변경에 영향받지 않는다")
-    void resolvedTierChoiceIsImmutableSnapshot() {
-        TierFixtures fixtures = tierFixtures();
-
-        ResolvedModelTier resolved = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
-        ModelTierDefinition changed = ModelTierDefinition.of(10L, ModelTier.FAST, "openai-codex", "example-deep", "high");
-        when(fixtures.definitions.findByGroupIdOrderByTier(10L))
-            .thenReturn(List.of(
-                changed,
-                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "example-balanced", "medium"),
-                ModelTierDefinition.of(10L, ModelTier.DEEP, null, "example-deep", "high")));
-
-        ResolvedModelTier updated = fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-fast", "low"));
-        assertThat(updated.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
-    }
-
-
-    @Test
-    @DisplayName("DEFAULT 대화는 에이전트 기본 모델이 있으면 그 값을 명시해 보낸다")
-    void explicitDefaultUsesAgentDefaultModel() {
-        TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent, "openai-codex", "example-agent", "high");
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "high"));
-        assertThat(resolved.tier()).isNull();
-        verifyNoInteractions(fixtures.options);
-    }
-
-
-    @Test
-    @DisplayName("선택 없는 대화는 사용자와 그룹 기본 단계가 없으면 에이전트 기본 모델로 돈다")
-    void inheritedConversationFallsBackToAgentDefaultModel() {
-        TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent, "openai-codex", "example-agent", null);
-        when(fixtures.users.findById(1L)).thenReturn(Optional.empty());
-        when(fixtures.settings.findById(10L)).thenReturn(Optional.empty());
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, mock(Conversation.class), fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", null));
-        assertThat(resolved.tier()).isNull();
-    }
-
-
-    @Test
-    @DisplayName("mapping이 빈 단계는 단계 기록을 남기고 에이전트 기본 모델로 돈다")
-    void emptyTierMappingUsesAgentDefaultModel() {
-        TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent, "openai-codex", "example-agent", "medium");
-        when(fixtures.definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
-
-        ResolvedModelTier resolved = fixtures.service.resolveTier(fixtures.user, ModelTier.DEEP, fixtures.agent);
-
-        assertThat(resolved.tier()).isEqualTo(ModelTier.DEEP);
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "medium"));
-    }
-
-
-    @Test
-    @DisplayName("모델을 비운 CUSTOM 대화는 에이전트 기본 모델로 돌고 effort는 대화가 고른 값이 먼저다")
-    void customConversationWithoutModelUsesAgentDefaultModel() {
-        TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent, "openai-codex", "example-agent", "low");
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(ModelChoice.stored(null, null, "max"));
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, conversation, fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "max"));
-    }
-
-
-    @Test
-    @DisplayName("해석한 모델이 숨긴 모델이면 다른 모델로 바꾸지 않고 MODEL_HIDDEN 으로 거절한다")
-    void hiddenModelIsRejectedInsteadOfReplaced() {
-        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
-        ModelTierService service = new ModelTierService(
-            mock(ModelTierDefinitionRepository.class),
-            mock(ModelTierGroupSettingRepository.class),
-            mock(AppUserRepository.class),
-            mock(ModelOptionsService.class),
-            visibility, Clock.systemUTC());
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        Conversation conversation = mock(Conversation.class);
-        ModelChoice choice = ModelChoice.stored("openai-codex", "hidden-model", null);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(choice);
-        when(visibility.hiddenFor(10L))
-            .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "hidden-model"))));
-
-        assertThatThrownBy(() -> service.resolve(user, conversation, mock(Agent.class)))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-    }
-
-
-    @Test
-    @DisplayName("숨긴 provider를 명시한 단계 정의는 저장하지 못한다")
-    void hiddenProviderCannotBeSavedAsTierDefinition() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
-        ModelTierService service = new ModelTierService(
-            definitions,
-            mock(ModelTierGroupSettingRepository.class),
-            mock(AppUserRepository.class),
-            mock(ModelOptionsService.class),
-            visibility, Clock.systemUTC());
-        CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", 10L, UserRole.ADMIN);
-        doThrow(new ApiException(ErrorCode.MODEL_HIDDEN, "hidden"))
-            .when(visibility)
-            .requireVisible(10L, ModelChoice.stored("hidden-provider", "example-fast", null));
-
-        assertThatThrownBy(() -> service.saveGroup(
-            admin,
-            List.of(
-                new ModelTierOptions.Tier(
-                    ModelTier.FAST, "빠르게", "hidden-provider", "example-fast", "low"),
-                new ModelTierOptions.Tier(ModelTier.BALANCED, "균형", null, null, null),
-                new ModelTierOptions.Tier(ModelTier.DEEP, "깊게", null, null, null)),
-            null))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException)error).code())
-                .isEqualTo(ErrorCode.MODEL_HIDDEN);
-        verifyNoInteractions(definitions);
-    }
-
-
-    @Test
-    @DisplayName("숨김이 없으면 모델을 싣지 않는 해석은 목록을 읽지 않고 통과한다")
-    void resolvesDefaultWithoutReadingCatalogWhenNothingIsHidden() {
-        HiddenFixtures fixtures = hiddenFixtures(HiddenModels.none());
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
-        verifyNoInteractions(fixtures.options);
-    }
-
-
-    @Test
-    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
-    void rejectsDefaultRunWhenProfileDefaultModelIsHidden() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
-
-        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-    }
-
-
-    @Test
-    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 provider 전체를 숨겼으면 MODEL_HIDDEN 으로 거절한다")
-    void rejectsDefaultRunWhenProfileDefaultProviderIsHidden() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
-
-        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있어도 profile 의 기본 모델이 숨기지 않은 모델이면 세 값을 비운 채 통과한다")
-    void passesDefaultRunWhenProfileDefaultModelIsNotHidden() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-other"));
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있는데 목록을 한 번도 읽지 못했으면 통과시키지 않고 HERMES_UNAVAILABLE 로 거절한다")
-    void rejectsDefaultRunWhenCatalogWasNeverRead() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
-
-        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있어도 에이전트 기본 모델이 있으면 목록을 읽지 않고 그 모델로 판정한다")
-    void judgesAgentDefaultModelWithoutReadingCatalog() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
-        agentDefault(fixtures.agent, "example-provider", "example-agent", null);
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("example-provider", "example-agent", null));
-        verifyNoInteractions(fixtures.options);
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있고 에이전트 기본 모델이 숨긴 모델이면 목록을 읽지 않고 MODEL_HIDDEN 으로 거절한다")
-    void rejectsHiddenAgentDefaultModelWithoutReadingCatalog() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-agent"));
-        agentDefault(fixtures.agent, "example-provider", "example-agent", null);
-
-        assertThatThrownBy(() -> fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-        verifyNoInteractions(fixtures.options);
-    }
-
-
-    @Test
-    @DisplayName("Hermes 가 profile 의 기본 모델을 주지 않으면 판정할 값이 없어 통과한다")
-    void passesDefaultRunWhenHermesGivesNoDefaultModel() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenReturn(ModelChoice.stored("example-provider", null, null));
-
-        ResolvedModelTier resolved = fixtures.service.resolve(fixtures.user, defaultConversation(), fixtures.agent);
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
-    }
-
-
-    @Test
-    @DisplayName("Hermes 가 기본 provider 만 주지 않으면 모델 이름으로 판정하고 provider 전체 숨김은 견주지 않는다")
-    void judgesByModelNameWhenHermesGivesNoDefaultProvider() {
-        HiddenFixtures sameModel = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(sameModel.options.profileDefaultOf(sameModel.agent))
-            .thenReturn(ModelChoice.stored(null, "example-model", null));
-        HiddenFixtures wholeProvider = hiddenFixtures(hiding("example-provider", null));
-        when(wholeProvider.options.profileDefaultOf(wholeProvider.agent))
-            .thenReturn(ModelChoice.stored(null, "example-model", null));
-
-        assertThatThrownBy(() -> sameModel.service.resolve(sameModel.user, defaultConversation(), sameModel.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-        assertThat(wholeProvider.service
-            .resolve(wholeProvider.user, defaultConversation(), wholeProvider.agent)
-            .choice())
-                .isEqualTo(ModelChoice.defaults());
-    }
-
-
-    @Test
-    @DisplayName("mapping이 빈 단계도 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
-    void rejectsEmptyTierMappingWhenProfileDefaultModelIsHidden() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(fixtures.definitions.findByGroupIdOrderByTier(10L)).thenReturn(fallbackDefinitions());
-        when(fixtures.options.profileDefaultOf(fixtures.agent))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
-
-        assertThatThrownBy(() -> fixtures.service.resolveTier(fixtures.user, ModelTier.FAST, fixtures.agent))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-    }
-
-
-    @Test
-    @DisplayName("대화 없는 실행이 보낼 값은 에이전트 기본값이고 그 값이 같은 숨김 판정을 지난다")
-    void detachedChoiceIsAgentDefaultAndPassesSameHiddenCheck() {
-        HiddenFixtures visible = hiddenFixtures(hiding("example-provider", "example-other"));
-        agentDefault(visible.agent, "example-provider", "example-agent", "medium");
-        HiddenFixtures hiddenDefault = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(hiddenDefault.options.profileDefaultOf(hiddenDefault.agent))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
-
-        ModelChoice sent = visible.service.detachedChoice(visible.agent);
-        ModelChoice empty = hiddenDefault.service.detachedChoice(hiddenDefault.agent);
-
-        assertThat(sent).isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
-        assertThatCode(() -> visible.service.requireRunnable(visible.user, visible.agent, sent))
-            .doesNotThrowAnyException();
-        assertThat(empty.usesDefaultModel()).as("기본값이 빈 에이전트는 모델을 싣지 않는다").isTrue();
-        assertThatThrownBy(() -> hiddenDefault.service.requireRunnable(hiddenDefault.user, hiddenDefault.agent, empty))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
     }
 
 
@@ -918,32 +1075,25 @@ class ModelTierServiceTest {
     }
 
 
-    /** 그룹 10 이 {@code hidden} 을 숨긴 상태의 서비스와 대역이다. 에이전트 기본 모델은 비어 있다. */
+    /** 그룹 10 이 {@code hidden} 을 숨긴 상태의 서비스와 대역이다. 칸은 모두 비었고 에이전트 기본 모델도 비어 있다. */
     private static HiddenFixtures hiddenFixtures(HiddenModels hidden) {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelVisibilityService visibility = mock(ModelVisibilityService.class);
         when(visibility.hiddenFor(10L)).thenReturn(hidden);
         return new HiddenFixtures(
-            new ModelTierService(
-                definitions,
-                mock(ModelTierGroupSettingRepository.class),
+            service(
+                new FakeModelSettingStore(),
                 mock(AppUserRepository.class),
                 options,
-                visibility, Clock.systemUTC()),
-            definitions,
+                visibility,
+                mock(GroupModelCatalogService.class)),
             options,
-            new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER),
+            MEMBER,
             mock(Agent.class));
     }
 
 
-    private record HiddenFixtures(
-        ModelTierService service,
-        ModelTierDefinitionRepository definitions,
-        ModelOptionsService options,
-        CurrentUser user,
-        Agent agent) {
+    private record HiddenFixtures(ModelTierService service, ModelOptionsService options, CurrentUser user, Agent agent) {
     }
 
 
@@ -954,18 +1104,12 @@ class ModelTierServiceTest {
     }
 
 
+    /** 다섯 칸이 모두 provider 를 비운 정의로 찬 그룹이다. 에이전트의 목록은 openai-codex 하나다. */
     private static TierFixtures tierFixtures() {
-        ModelTierDefinitionRepository definitions = mock(ModelTierDefinitionRepository.class);
-        ModelTierGroupSettingRepository settings = mock(ModelTierGroupSettingRepository.class);
+        FakeModelSettingStore store = new FakeModelSettingStore().tiers(storedStops());
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
         Agent agent = mock(Agent.class);
-        CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", 10L, UserRole.MEMBER);
-        when(definitions.findByGroupIdOrderByTier(10L))
-            .thenReturn(List.of(
-                ModelTierDefinition.of(10L, ModelTier.FAST, null, "example-fast", "low"),
-                ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "example-balanced", "medium"),
-                ModelTierDefinition.of(10L, ModelTier.DEEP, null, "example-deep", "high")));
         when(options.optionsForAgent(10L, agent))
             .thenReturn(new ModelOptions(
                 "openai-codex",
@@ -973,24 +1117,22 @@ class ModelTierServiceTest {
                 List.of(new HermesModelCatalog.Provider(
                     "openai-codex",
                     "OpenAI",
-                    List.of("example-fast", "example-balanced", "example-deep"),
+                    List.of("example-fast", "example-balanced", "example-deep", "example-pro"),
                     Map.of())),
                 List.of()));
         return new TierFixtures(
-            new ModelTierService(definitions, settings, users, options, nothingHidden(), Clock.systemUTC()),
-            definitions,
-            settings,
+            service(store, users, options, nothingHidden(), mock(GroupModelCatalogService.class)),
+            store,
             users,
             options,
-            user,
+            MEMBER,
             agent);
     }
 
 
     private record TierFixtures(
         ModelTierService service,
-        ModelTierDefinitionRepository definitions,
-        ModelTierGroupSettingRepository settings,
+        FakeModelSettingStore store,
         AppUserRepository users,
         ModelOptionsService options,
         CurrentUser user,
@@ -998,11 +1140,30 @@ class ModelTierServiceTest {
     }
 
 
-    private static List<ModelTierDefinition> storedDefinitions() {
-        return List.of(
-            ModelTierDefinition.of(10L, ModelTier.FAST, null, "example-fast", "low"),
-            ModelTierDefinition.of(10L, ModelTier.BALANCED, null, "example-balanced", "medium"),
-            ModelTierDefinition.of(10L, ModelTier.DEEP, null, "example-deep", "high"));
+    /** 옮겨 온 정의처럼 provider 를 비운 다섯 칸이다. */
+    private static ModelSetting.Stop[] storedStops() {
+        return new ModelSetting.Stop[] {
+            new ModelSetting.Stop(ModelTier.INSTANT, null, "example-fast", "low"),
+            new ModelSetting.Stop(ModelTier.MEDIUM, null, "example-balanced", "medium"),
+            new ModelSetting.Stop(ModelTier.HIGH, null, "example-deep", "high"),
+            new ModelSetting.Stop(ModelTier.EXTRA_HIGH, null, "example-deep", "xhigh"),
+            new ModelSetting.Stop(ModelTier.PRO, null, "example-pro", "max")};
+    }
+
+
+    /** provider 를 밝힌 다섯 칸이다. */
+    private static ModelSetting.Stop[] explicitStops() {
+        return new ModelSetting.Stop[] {
+            new ModelSetting.Stop(ModelTier.INSTANT, "openai-codex", "example-fast", "low"),
+            new ModelSetting.Stop(ModelTier.MEDIUM, "openai-codex", "example-balanced", "medium"),
+            new ModelSetting.Stop(ModelTier.HIGH, "openai-codex", "example-deep", "high"),
+            new ModelSetting.Stop(ModelTier.EXTRA_HIGH, "openai-codex", "example-deep", "xhigh"),
+            new ModelSetting.Stop(ModelTier.PRO, "openai-codex", "example-pro", "max")};
+    }
+
+
+    private static ModelSetting.Stop[] fallbackStops() {
+        return ModelSetting.empty().tiers().toArray(ModelSetting.Stop[]::new);
     }
 
 
@@ -1015,10 +1176,39 @@ class ModelTierServiceTest {
     }
 
 
-    private static List<ModelTierDefinition> fallbackDefinitions() {
-        return List.of(
-            ModelTierDefinition.of(10L, ModelTier.FAST, null, null, null),
-            ModelTierDefinition.of(10L, ModelTier.BALANCED, null, null, null),
-            ModelTierDefinition.of(10L, ModelTier.DEEP, null, null, null));
+    private static GroupModelCatalog groupCatalog(String provider, String... models) {
+        return new GroupModelCatalog(
+            List.of(new HermesModelCatalog.Provider(provider, provider, List.of(models), Map.of())),
+            ModelChoice.REASONING_EFFORTS);
+    }
+
+
+    /** 칸 하나를 담는다. 이름은 서비스가 쓰지 않지만 화면이 보내는 값과 같게 둔다. */
+    private static ModelTierOptions.Tier tier(ModelTier tier, String provider, String model, String effort) {
+        return new ModelTierOptions.Tier(tier, labelOf(tier), provider, model, effort);
+    }
+
+
+    /** 주어진 칸만 채우고 나머지는 빈 칸으로 둔 다섯 칸이다. */
+    private static List<ModelTierOptions.Tier> fiveTiers(ModelTierOptions.Tier... filled) {
+        List<ModelTierOptions.Tier> tiers = new ArrayList<>();
+        for (ModelTier each : ModelTier.values()) {
+            tiers.add(tier(each, null, null, null));
+        }
+        for (ModelTierOptions.Tier one : filled) {
+            tiers.set(one.tier().ordinal(), one);
+        }
+        return tiers;
+    }
+
+
+    private static String labelOf(ModelTier tier) {
+        return switch (tier) {
+            case INSTANT -> "Instant";
+            case MEDIUM -> "Medium";
+            case HIGH -> "High";
+            case EXTRA_HIGH -> "Extra High";
+            case PRO -> "Pro";
+        };
     }
 }

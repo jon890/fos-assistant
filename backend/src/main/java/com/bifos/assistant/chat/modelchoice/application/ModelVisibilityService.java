@@ -1,12 +1,11 @@
 package com.bifos.assistant.chat.modelchoice.application;
 
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
-import com.bifos.assistant.chat.modelchoice.domain.ModelHidden;
-import com.bifos.assistant.chat.modelchoice.infra.ModelHiddenRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -25,14 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ModelVisibilityService {
 
-    private final ModelHiddenRepository hidden;
+    private final ModelSettingStore store;
 
 
+    /** 숨긴 항목은 provider 이름, 모델 이름 차례다. 모델이 null 인 항목이 그 provider 의 맨 앞이다. */
     @Transactional(readOnly = true)
     public HiddenModels hiddenFor(Long groupId) {
-        return new HiddenModels(hidden.findByGroupIdOrderByProviderAscModelAsc(groupId).stream()
-            .map(row -> new HiddenModels.Entry(row.provider(), row.wholeProvider() ? null : row.model()))
-            .toList());
+        return store.read(groupId).hidden();
     }
 
 
@@ -52,26 +50,29 @@ public class ModelVisibilityService {
      * 숨김 목록 전체를 바꾼다.
      *
      * <p>형식만 본다. 아직 목록에 나오지 않은 provider 와 모델도 미리 숨길 수 있어야 하므로 catalog 와
-     * 견주지 않는다. 같은 항목이 두 번 오면 하나로 합친다. 판정은 대소문자를 구분한다.
+     * 견주지 않는다. 같은 항목이 두 번 오면 하나로 합친다. 판정은 대소문자를 구분한다. 칸 설정은 그대로 둔다.
      */
-    @Transactional
     public void save(CurrentUser user, List<HiddenModels.Entry> entries) {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
-        // 유일 제약은 DB 의 비교 규칙을 따라 대소문자를 가리지 않을 수 있다. 대소문자만 다른 항목은 먼저 온 것만 남긴다.
+        // 옛 표의 유일 제약과 같게 대소문자만 다른 항목은 먼저 온 것만 남긴다.
         Map<String, HiddenModels.Entry> normalized = new LinkedHashMap<>();
         for (HiddenModels.Entry entry : entries) {
             HiddenModels.Entry clean = normalize(entry);
             String key = (clean.provider() + "\n" + (clean.model() == null ? "" : clean.model())).toLowerCase(Locale.ROOT);
             normalized.putIfAbsent(key, clean);
         }
-        hidden.deleteByGroupId(user.groupId());
-        hidden.flush();
-        hidden.saveAll(normalized.values().stream()
-            .map(entry -> ModelHidden.of(user.groupId(), entry.provider(), entry.model()))
-            .toList());
+        store.saveHidden(user.groupId(), new HiddenModels(normalized.values().stream()
+            .sorted(HIDDEN_ORDER)
+            .toList()));
     }
+
+
+    /** provider 이름, 모델 이름 차례다. provider 전체를 숨긴 항목이 그 provider 의 맨 앞이다. */
+    private static final Comparator<HiddenModels.Entry> HIDDEN_ORDER = Comparator
+        .comparing(HiddenModels.Entry::provider)
+        .thenComparing(HiddenModels.Entry::model, Comparator.nullsFirst(Comparator.naturalOrder()));
 
 
     private static HiddenModels.Entry normalize(HiddenModels.Entry entry) {

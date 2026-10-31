@@ -6,6 +6,7 @@ import {
   formatDurationFor,
   formatTokens,
 } from "@/lib/format";
+import { recordedTierLabel } from "@/lib/model-tiers";
 import { providerLabel } from "@/lib/provider-label";
 
 /**
@@ -192,9 +193,7 @@ export function ExecutionNode({
 }
 
 function tierLabel(tier: NonNullable<ExecutionTreeNode["modelTier"]>): string {
-  if (tier === "FAST") return "빠르게";
-  if (tier === "BALANCED") return "균형";
-  return "깊게";
+  return recordedTierLabel(tier);
 }
 
 function effortLabel(

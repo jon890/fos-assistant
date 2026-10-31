@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-11-01
-- 아직 일부만 구현했다. 관리자가 단계별 모델을 그룹 목록에서 고르는 칸만 들어갔고, 나머지는 `tasks/` 의 `model-unify` 계획이 단계별로 옮긴다.
+- 아직 일부만 구현했다. 관리자가 단계별 모델을 그룹 목록에서 고르는 칸, 슬라이더 다섯 칸과 기존 값의 이관, `group_setting` 으로의 합치기가 들어갔다. 에이전트 기본 모델과 사용자 직접 선택의 정리는 `tasks/` 의 `model-unify` 계획이 옮긴다.
 - ADR-030 의 「대화가 provider 와 모델, effort 를 직접 고른다」 와 ADR-054 의 「에이전트 기본 모델」 을 대체한다. 대체는 그 부분을 지우는 계획이 머지될 때 적용되고, ADR-054 의 모델 숨김은 그대로다.
 
 ### 결정
@@ -40,8 +40,8 @@
 | --- | --- |
 | `group_id` | 그룹 |
 | `setting_key` | 설정의 종류. 모델 설정은 `MODEL` 이다. 다른 기능의 그룹 설정(예: `toolset_hidden`)도 같은 테이블에 새 키로 옮길 수 있다 |
-| `value` | 설정 JSON 의 문자열. MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라서다(`connector_connection.fields` 와 같은 까닭) |
-| `updated_at` | 마지막으로 바꾼 시각 |
+| `setting_value` | 설정 JSON 의 문자열. `value` 는 검사가 쓰는 H2 의 예약어라 `setting_key` 와 짝을 맞춘 이름으로 둔다. MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라서다(`connector_connection.fields` 와 같은 까닭) |
+| `updated_at` | 마지막으로 바꾼 시각. 옮겨 온 줄은 바꾼 시각을 몰라 비어 있다 |
 
 기본 키는 (`group_id`, `setting_key`) 다. `MODEL` 의 JSON 은 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 담고 버전 번호를 함께 둔다.
 JSON 의 형식은 Control Plane 이 저장할 때 검사하고, 읽을 때 모르는 버전이면 설정이 없는 것으로 보지 않고 오류로 올린다.

@@ -8,7 +8,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
@@ -326,18 +326,22 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 **주인과 공개 범위는 따로다.** 그룹에 공개해도 만든 사람(`owner_user_id`)이 계속 관리하고, `PRIVATE` 에서는 주인이 꼭 있어야 한다. 이 결정 전에 운영에서 등록한 `GROUP` 에이전트는 주인이 비어 있어 `ADMIN` 만 관리한다([ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md)).
 추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다([ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md)).
 
-### model_tier_definition
+### group_setting
 
-그룹이 정한 모델 단계의 mapping 이다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다.
-`provider` 가 비면 요청한 에이전트의 기본 provider 로, `model` 이 비면 에이전트 기본 모델로 돈다.
+그룹 설정이다. 그룹과 설정 종류(`setting_key`)마다 줄 하나를 두고 값은 JSON 문자열(`setting_value`)이다. 기본 키는 (`group_id`, `setting_key`) 다.
+설정 성격의 그룹 데이터는 새 테이블 대신 여기에 새 키로 둔다. 결정과 컬럼의 뜻은 [ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md) 의 「데이터 모델」 이 갖는다.
 
-### model_tier_group_setting
+`MODEL` 은 그룹의 모델 설정이다. 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 버전 번호와 함께 담는다. 읽고 쓰는 일은 `ModelSettingStore` 가 한다.
 
-그룹의 기본 모델 단계다. `default_tier` 가 비면 그룹 기본 단계가 없다.
+- 줄이 없는 그룹은 다섯 칸이 모두 비었고 숨김도 없다
+- 칸의 provider 가 비면 요청한 에이전트의 기본 provider 로, 세 값이 모두 비면 에이전트 기본 모델로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
+- 숨김 항목의 `model` 이 null 이면 그 provider 전체를 숨긴 것이다
+- 모르는 버전이거나 형식이 깨진 JSON 은 설정이 없는 것으로 보지 않고 오류로 올린다. 없는 것으로 보면 숨김이 풀린 채 실행된다
+- 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
+- `updated_at` 은 옮겨 온 줄에서 비어 있다. 바꾼 시각을 모른다
 
-### model_hidden
-
-그룹이 숨긴 provider 와 모델만 적는다. `model` 이 빈 문자열이면 그 provider 전체를 숨긴 것이다. NULL 은 유일 제약이 겹침을 막지 못해 쓰지 않는다.
+옛 표 `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 은 `V20261031171501` 부터 `V20261031171503` 이 이 표로 옮기고 지웠다. 기본 단계 표의 이름을 바꿔 넓혔으므로 표 수는 둘 줄었다.
+옛 단계 코드 `FAST`, `BALANCED`, `DEEP` 은 같은 이관에서 `INSTANT`, `MEDIUM`, `HIGH` 로 바뀌었다. `app_user.model_default_tier`, `conversation.model_tier`, `task.model_tier` 가 대상이고, `agent_execution.model_tier` 는 그때 고른 값의 기록이라 옛 이름 그대로다.
 
 ### toolset_hidden
 

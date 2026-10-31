@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { recordedTierLabel } from "@/lib/model-tiers";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -17,7 +18,8 @@ export type LatencyStat = {
 
 export type LatencyRow = {
   date: string;
-  modelTier: "FAST" | "BALANCED" | "DEEP" | null;
+  /** 그때 고른 단계 이름이다. 지난 이름(FAST 등)도 그대로 온다. */
+  modelTier: string | null;
   turns: number;
   firstResponse: LatencyStat;
   toSubmit: LatencyStat;
@@ -56,7 +58,7 @@ function dayLabel(date: string): string {
 }
 
 function tierLabel(tier: LatencyRow["modelTier"]): string {
-  return tier ?? "단계 없음";
+  return tier ? recordedTierLabel(tier) : "단계 없음";
 }
 
 function rowKey(row: LatencyRow): string {

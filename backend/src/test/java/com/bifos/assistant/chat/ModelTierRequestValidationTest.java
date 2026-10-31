@@ -49,9 +49,33 @@ class ModelTierRequestValidationTest {
     void rejectsMissingSelectionMode() throws Exception {
         mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"tier\":\"FAST\"}"))
+            .content("{\"tier\":\"INSTANT\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        verifyNoInteractions(chat, tiers);
+    }
+
+
+    @Test
+    @DisplayName("지난 단계 이름(FAST, BALANCED, DEEP)으로 온 요청은 새 칸으로 바꾸지 않고 400 으로 거절한다")
+    void rejectsLegacyTierNames() throws Exception {
+        for (String legacy : new String[] {"FAST", "BALANCED", "DEEP"}) {
+            mvc.perform(put("/api/v1/chat/model-tiers/default")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tier\":\"" + legacy + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"mode\":\"TIER\",\"tier\":\"" + legacy + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            mvc.perform(put("/api/v1/chat/model-tiers/group")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tiers\":[{\"tier\":\"" + legacy + "\"}],\"defaultTier\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
         verifyNoInteractions(chat, tiers);
     }
 }

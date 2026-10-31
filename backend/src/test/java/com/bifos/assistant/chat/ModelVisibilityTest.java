@@ -17,7 +17,9 @@ import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
 import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
-import com.bifos.assistant.chat.modelchoice.infra.ModelHiddenRepository;
+import com.bifos.assistant.chat.modelchoice.domain.GroupSetting;
+import com.bifos.assistant.chat.modelchoice.domain.GroupSettingId;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog.Provider;
@@ -54,7 +56,7 @@ class ModelVisibilityTest {
     ModelVisibilityService visibility;
 
     @Autowired
-    ModelHiddenRepository hidden;
+    GroupSettingRepository groupSettings;
 
     @Autowired
     TransactionTemplate transactions;
@@ -63,8 +65,8 @@ class ModelVisibilityTest {
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> {
-            hidden.deleteByGroupId(GROUP_ID);
-            hidden.deleteByGroupId(OTHER_GROUP_ID);
+            groupSettings.deleteById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL));
+            groupSettings.deleteById(new GroupSettingId(OTHER_GROUP_ID, GroupSetting.MODEL));
         });
     }
 

@@ -47,12 +47,30 @@ public class GroupModelCatalogService {
      * Hermes 가 답하지 않으면 {@code HERMES_UNAVAILABLE} 이다
      */
     public GroupModelCatalog catalogFor(Long groupId) {
+        return catalogFor(groupId, false);
+    }
+
+
+    /**
+     * 들고 있던 목록을 건너뛰고 각 profile 의 목록을 다시 읽어 만든다. 들고 있던 목록에 없는 모델을 저장하려 할 때
+     * 쓴다. Hermes 의 대체 목록에는 최근 모델이 빠진다.
+     *
+     * @throws ApiException {@link #catalogFor(Long)} 와 같다
+     */
+    public GroupModelCatalog refreshedCatalogFor(Long groupId) {
+        return catalogFor(groupId, true);
+    }
+
+
+    private GroupModelCatalog catalogFor(Long groupId, boolean refresh) {
         List<List<HermesModelCatalog.Provider>> lists = new ArrayList<>();
         Set<String> profiles = new LinkedHashSet<>();
         for (Agent agent : agents.enabledAgents()) {
             // 같은 profile 을 가리키는 에이전트는 같은 목록이다. 한 번만 센다.
             if (profiles.add(agent.hermesProfile())) {
-                ModelOptions options = modelOptions.optionsForAgent(groupId, agent);
+                ModelOptions options = refresh
+                    ? modelOptions.refreshedOptionsForAgent(groupId, agent)
+                    : modelOptions.optionsForAgent(groupId, agent);
                 lists.add(options.providers());
             }
         }

@@ -87,7 +87,7 @@ sequenceDiagram
 
 #### 모델 단계
 
-작업마다 어느 단계로 돌지 정한다. 단계의 뜻은 [모델 단계와 실행 기록](model-usage.md) 이 갖는다.
+작업마다 어느 칸(`INSTANT`, `MEDIUM`, `HIGH`, `EXTRA_HIGH`, `PRO`)으로 돌지 정한다. 칸의 뜻은 [모델 단계와 실행 기록](model-usage.md) 이 갖는다.
 
 | 작업의 `model_tier` | 발화가 대화에 하는 일 |
 | --- | --- |

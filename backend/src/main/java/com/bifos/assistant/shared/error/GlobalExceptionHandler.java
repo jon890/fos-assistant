@@ -5,6 +5,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -54,6 +55,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
             .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
+    }
+
+
+    /**
+     * 읽을 수 없는 요청 본문을 입력 오류로 돌려준다.
+     *
+     * <p>enum 칸에 모르는 값이 오면 여기 걸린다. 지난 모델 단계 이름(FAST 등)으로 온 요청이 그 예다. 그대로 두면
+     * 500 으로 끝난다. 본문에 비밀값이 있을 수 있어 예외 메시지를 응답에 싣지 않는다.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "the request body is not readable"));
     }
 
 
