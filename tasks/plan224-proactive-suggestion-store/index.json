@@ -1,7 +1,7 @@
 {
   "name": "plan224-proactive-suggestion-store",
-  "description": "제안 테이블과 반응 기록의 새 컬럼을 만들고, 새 제안 경로를 기능 스위치 뒤에 두고, 매일 루프의 사용자별 설정을 task 로 옮긴다",
-  "pr_scope": "proactive_suggestion 테이블과 decision_feedback_event 의 새 컬럼, 꺼진 기능 스위치 뒤의 제안 저장 경로, proactive_loop_setting 의 사용자별 설정을 CHECK task 로 옮기는 일을 한 PR 로 끝낸다.",
+  "description": "할 일에 제안 컬럼을 더하고 반응 기록의 새 컬럼을 만들고, 새 제안 경로를 기능 스위치 뒤에 두고, 매일 루프의 사용자별 설정을 task 로 옮긴다",
+  "pr_scope": "follow_up 의 제안 컬럼과 decision_feedback_event 의 새 컬럼, 꺼진 기능 스위치 뒤의 제안 저장 경로, proactive_loop_setting 의 사용자별 설정을 CHECK task 로 옮기는 일을 한 PR 로 끝낸다.",
   "deferred": [
     {
       "what": "옛 발견, 문제 후보, follow_up PROPOSED 를 제안으로 옮기기",

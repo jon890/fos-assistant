@@ -17,18 +17,18 @@
 
 ## 의도 메모
 
-- 제안을 받아들이면 할 일을 만들거나 대화를 연다. 받아들임은 쓰기 승인이 아니다. 외부 쓰기는 승인 카드로만 간다
+- 제안은 할 일의 `PROPOSED` 줄이다. 받아들이면 같은 줄이 `OPEN` 이 된다. 받아들임은 쓰기 승인이 아니다. 외부 쓰기는 승인 카드로만 간다
 - 화면 문구와 카드 모양을 바꾸므로 시작 전에 코디네이터에게 화면 계약 변경을 묻는다
 
 ## 작업 항목
 
 ### 1. 제안 후보
 
-`backend/src/main/java/com/bifos/assistant/attention/application/SuggestionCandidates.java` 를 두고 `SurfacedProblemCandidates` 대신 쓴다.
+`backend/src/main/java/com/bifos/assistant/attention/application/SuggestionCandidates.java` 를 두고 `SurfacedProblemCandidates` 대신 쓴다. 기존 `FollowUpAttentionSource` 가 읽는 `PROPOSED` 와 겹치지 않게 한쪽으로 모은다.
 
 ### 2. 이 phase 를 검증하는 테스트
 
-`backend/src/test/java/com/bifos/assistant/attention/SuggestionCandidatesTest.java` 에서 확인한다. 만료된 제안은 보이지 않고, 숨긴 제안은 반응 기록대로 빠지며, 받아들인 제안은 할 일 하나만 만든다.
+`backend/src/test/java/com/bifos/assistant/attention/SuggestionCandidatesTest.java` 에서 확인한다. 만료된 제안은 보이지 않고, 숨긴 제안은 반응 기록대로 빠지며, 받아들인 제안은 같은 줄이 `OPEN` 이 될 뿐 할 일을 더 만들지 않는다.
 
 ## 검증
 
