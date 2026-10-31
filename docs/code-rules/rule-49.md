@@ -17,3 +17,8 @@
 
 [ExecutionRecorder.java](../../backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionRecorder.java)에서 확인한다.
 ExecutionRecorder는 실행을 시작할 때 만든 기록을 종료 때 갱신한다.
+
+## 리뷰가 보는 것
+
+시나리오는 확인한 응답만 본다.
+리뷰는 새 경로가 남의 자료에 없는 것과 다른 응답을 주지 않는지, 실패한 실행에도 시작 기록과 종료 상태가 남는지 본다.
