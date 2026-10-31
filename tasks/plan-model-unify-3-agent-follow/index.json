@@ -1,0 +1,11 @@
+{
+  "name": "plan-model-unify-3-agent-follow",
+  "description": "에이전트 기본 모델과 DEFAULT 모드를 없애 모든 에이전트가 그룹 모델 설정을 따르게 한다",
+  "status": "pending",
+  "created_at": "2026-11-01",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}

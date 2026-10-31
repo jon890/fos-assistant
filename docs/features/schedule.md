@@ -14,6 +14,7 @@ covers: `backend/src/main/java/com/bifos/assistant/task/`, `backend/src/main/jav
 
 근거는 [ADR-076](../../backend/docs/adr/ADR-076-예약-작업은-control-plane-이-갖고-발화한-실행은-대화-turn-경로로-돈다.md), [ADR-077](../../backend/docs/adr/ADR-077-발화는-trigger-와-예정-시각의-유일-제약으로-한-번만-만들고-놓친-발화는-작업마다-정한다.md), [ADR-078](../adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md), [ADR-079](../../backend/docs/adr/ADR-079-예약-작업은-사용자당-10개-최소-간격-15분-하루-48번으로-제한한다.md) 이다.
 Hermes cron 을 대신하며 모델 단계와 「보고할 것 없음」 을 더한 근거는 [ADR-20261008 / cron-to-task](../adr/ADR-20261008-cron-to-task.md) 다.
+일정의 본체 컬럼 저장과 작업 기준 발화 잠금은 [ADR-20261016 / task-schedule-columns](../../backend/docs/adr/ADR-20261016-task-schedule-columns.md)가 정한다.
 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
 
 **이 문서의 일반 예약 작업은 `task.kind = TURN` 이다.**
@@ -45,7 +46,7 @@ sequenceDiagram
     W->>C: POST /api/v1/tasks
     C->>C: 시각을 검사하고 next_fire_at 을 계산한다
     Note over C: 발화기와 시작 단계가 정해 둔 간격마다 차례로 돈다
-    C->>C: 발화기가 시각이 지난 trigger 를 행 잠금으로 읽고 QUEUED 발화와 다음 시각을 한 트랜잭션에 쓴다
+    C->>C: 발화기가 시각이 지난 작업을 행 잠금으로 읽고 QUEUED 발화와 다음 시각을 한 트랜잭션에 쓴다
     C->>C: 시작 단계가 작업, 주인, 에이전트를 다시 보고 대화를 준비한다
     C->>C: turn 잠금을 얻으면 RUNNING 을 적는다
     C->>C: 알림 줄과 지시를 대화에 저장한다
@@ -101,7 +102,7 @@ sequenceDiagram
 
 #### 발화
 
-trigger 마다 트랜잭션 하나에서 그 줄을 행 잠금으로 다시 읽고 처리한다. 한 trigger 의 실패는 그 trigger 만 되돌리고 다른 trigger 의 발화를 막지 않는다.
+작업마다 트랜잭션 하나에서 그 작업 줄을 행 잠금으로 다시 읽고 처리한다. 한 작업의 실패는 그 작업만 되돌리고 다른 작업의 발화를 막지 않는다.
 
 | 상황 | 처리 |
 | --- | --- |
@@ -109,7 +110,7 @@ trigger 마다 트랜잭션 하나에서 그 줄을 행 잠금으로 다시 읽�
 | 그보다 늦었고 놓친 발화가 `RUN_ONCE` 다 | 지금 앞의 예정 시각 가운데 가장 늦은 것 하나로 `QUEUED` 를 만든다 |
 | 그보다 늦었고 `SKIP` 이다 | 그 시각으로 `SKIPPED`(`MISSED`)를 하나 남긴다. 알리지 않는다 |
 | 그 사용자의 24시간 안 발화가 `assistant.task.max-runs-per-day` 에 닿았다 | `SKIPPED`(`DAILY_LIMIT`)로 남기고 알린다 |
-| 같은 `(trigger_id, scheduled_for)` 줄이 이미 있다 | 새로 만들지 않는다. `next_fire_at` 만 옮긴다 |
+| 같은 `(task_id, scheduled_for)` 줄이 이미 있다 | 새로 만들지 않는다. `next_fire_at` 만 옮긴다 |
 
 어느 경우든 같은 트랜잭션에서 `next_fire_at` 을 지금 뒤의 첫 예정 시각으로 옮긴다. `ONCE` 는 비운다.
 
