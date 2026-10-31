@@ -77,6 +77,7 @@ public class ProactiveCheckService {
     private final ApplicationEventPublisher events;
     private final CheckFeedback feedback;
     private final CheckFindingReactions reactions;
+    private final WakeMemoryRead wakeMemory;
     private final Clock clock;
     private final TransactionTemplate transactions;
     private final BackgroundTasks backgroundTasks;
@@ -394,6 +395,7 @@ public class ProactiveCheckService {
             problems,
             followUps,
             reactions,
+            wakeMemory,
             messages,
             executions,
             contextAssembler,

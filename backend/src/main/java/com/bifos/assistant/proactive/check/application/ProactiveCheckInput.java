@@ -26,7 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 
-/** 변화 신호와 최근 발견·문제 후보를 살펴보기 입력으로 조립한다. */
+/** 변화 신호와 기억에서 꺼낸 최근 일, 최근 발견·문제 후보를 살펴보기 입력으로 조립한다. */
 class ProactiveCheckInput {
     private static final String UNKNOWN = "모름";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
@@ -66,6 +66,12 @@ class ProactiveCheckInput {
                 .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
                 .append(memorySignal(previous));
         }
+        // 앞 살펴보기는 시작할 때 입력을 만들었으므로 그 시작 시각부터 본다. 실패하거나 멈춘 살펴보기는 모델이 결과를 내지 못해 경계를 옮기지 않는다
+        Instant since = deps.checks()
+            .findFirstByConversationIdAndStatusOrderByIdDesc(conversationId, CheckStatus.SUCCEEDED)
+            .map(ProactiveCheck::startedAt)
+            .orElse(null);
+        text.append("\n\n").append(deps.wakeMemory().section(owner, agentId, since, now));
         text.append("\n\n최근에 알린 발견\n").append(recentFindings(now));
         text.append("\n\n최근에 받아들인 문제 후보\n").append(recentProblems(now));
         return text.toString();
