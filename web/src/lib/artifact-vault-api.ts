@@ -19,7 +19,7 @@ export type VaultList = { items: VaultItem[] };
 /** 이 화면에서만 뜻이 정해지는 오류 코드의 문구다. */
 export const VAULT_ERRORS: Record<string, string> = {
   ARTIFACT_VAULT_UNSUPPORTED:
-    "보관할 수 없는 결과물이에요. 외부 주소나 data 주소를 부르거나, 부르는 파일이 없거나, 크기 한도(파일 하나 5MB, 묶음 100MB, 1,000개)를 넘었어요.",
+    "보관할 수 없는 결과물이에요. 받지 않는 형식(글꼴 등)이나 외부 주소, data 주소를 부르거나, 부르는 파일이 없거나, 크기 한도(파일 하나 5MB, 묶음 100MB, 1,000개)를 넘었어요. 보관하는 사이 원본이 바뀌었다면 다시 눌러 주세요.",
   ARTIFACT_VAULT_FULL:
     "보관 공간이 가득 찼어요. 보관한 결과물을 지운 뒤 다시 보관해 주세요.",
   ARTIFACT_VAULT_UNAVAILABLE:
