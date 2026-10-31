@@ -32,7 +32,10 @@ export const GRANT_PERIODS: readonly GrantPeriod[] = [
   "DAYS_30",
 ];
 
-/** 승인 줄 한 개다. 카드는 이 응답으로만 그린다. `toolName` 과 `errorCode` 는 내부 값이라 화면에 그리지 않는다. */
+/**
+ * 승인 줄 한 개다. 카드는 이 응답으로만 그린다. `errorCode` 는 내부 값이라 화면에 그리지 않는다.
+ * `toolName` 은 선언한 제목이 없는 줄에서만 이름 대신 보인다(`actionDisplayTitle`).
+ */
 export type ConnectorAction = {
   actionId: string;
   connectorId: string;

@@ -91,6 +91,7 @@ public final class ConnectionDtos {
      * @param icon 검증을 통과한 아이콘의 data URL. 없거나 틀렸으면 null
      * @param link 검증을 통과한 {@code https://} 링크. 없거나 틀렸으면 null
      * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 {@code https://} 주소. 선언하지 않았으면 null
+     * @param standardPlugin {@code assistant.json} 이 없는 표준 플러그인인가. 화면이 「모든 도구를 쓸 때마다 확인」 안내를 보인다
      */
     public record ConnectorView(
         String id,
@@ -105,7 +106,8 @@ public final class ConnectionDtos {
         List<BoundAgentView> bindings,
         String ownerBrowserLoginUrl,
         String readmeUrl,
-        String linkKind) {
+        String linkKind,
+        boolean standardPlugin) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -120,7 +122,8 @@ public final class ConnectionDtos {
                 value.bindings().stream().map(BoundAgentView::from).toList(),
                 value.ownerBrowserLoginUrl(),
                 value.appearance().readmeUrl(),
-                value.appearance().linkKind());
+                value.appearance().linkKind(),
+                value.standardPlugin());
         }
     }
 
@@ -130,7 +133,12 @@ public final class ConnectionDtos {
         }
     }
 
-    /** 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다. */
+    /**
+     * 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다.
+     *
+     * <p>{@code listedTools} 와 {@code readOnlyTools} 는 표준 플러그인 연결의 마지막 확인에서 받은 도구 수와 그 가운데 읽기 표시가 있는
+     * 수다. 표준 플러그인이 아니거나 확인하기 전이면 null 이다.
+     */
     public record ConnectionView(
         String connectorId,
         String status,
@@ -138,7 +146,9 @@ public final class ConnectionDtos {
         Map<String, String> values,
         Instant checkedAt,
         List<BoundAgentView> bindings,
-        int undeclaredTools) {
+        int undeclaredTools,
+        Integer listedTools,
+        Integer readOnlyTools) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
                 value.connectorId(),
@@ -147,7 +157,9 @@ public final class ConnectionDtos {
                 value.values(),
                 value.checkedAt(),
                 value.bindings().stream().map(BoundAgentView::from).toList(),
-                value.undeclaredTools());
+                value.undeclaredTools(),
+                value.listedTools(),
+                value.readOnlyTools());
         }
     }
 

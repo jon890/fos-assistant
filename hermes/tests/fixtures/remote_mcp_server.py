@@ -59,6 +59,11 @@ def build_server():
         counts["landing"] += 1
         return JSONResponse({"jsonrpc": "2.0", "id": 1, "result": {}})
 
+    @server.custom_route("/denied", methods=["GET", "POST", "DELETE"])
+    async def denied(request):
+        """칸 값을 받지 않는 서버다. 모든 요청에 401 로 답한다."""
+        return JSONResponse({"error": "invalid_token"}, status_code=401)
+
     @server.custom_route("/hits", methods=["GET"])
     async def hits(request):
         """지금까지 받은 요청 수다."""

@@ -68,6 +68,13 @@ public class ConnectorConnection extends CreatedAtEntity {
     @Column(name = "undeclared_tools", nullable = false)
     private int undeclaredTools;
 
+    /**
+     * 표준 플러그인 연결의 마지막 확인에서 MCP 서버가 낸 도구와 읽기 표시다. 표준 플러그인이 아니거나 확인하기 전이면 null 이다.
+     * {@code ListedToolsConverter} 가 JSON 텍스트로 읽고 쓴다(ADR-20261101 / plugin-without-assistant-json).
+     */
+    @Column(name = "listed_tools", columnDefinition = "TEXT")
+    private ListedTools listedTools;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -100,13 +107,15 @@ public class ConnectorConnection extends CreatedAtEntity {
     /**
      * 확인 도구가 통과한 값을 보관 파일에 썼다. 비밀이 아닌 칸 값과 비밀 앞부분을 적고 쓸 수 있는 연결로 둔다.
      *
-     * <p>세어 둔 선언 밖 도구 수는 값이 바뀌었으므로 비운다. 다음 연결 확인이 다시 센다.
+     * <p>세어 둔 선언 밖 도구 수와 받은 도구 목록은 값이 바뀌었으므로 비운다. 다음 연결 확인이 다시 센다. 표준 플러그인은 부르는 쪽이
+     * 이 값으로 받은 도구 목록을 바로 {@link #recordListedTools} 로 적는다.
      */
     public void connected(ConnectionFields fields, Instant now) {
         now = nextRevision(now);
         this.fields = fields;
         this.vaultStored = true;
         this.undeclaredTools = 0;
+        this.listedTools = null;
         this.status = ConnectionStatus.READY;
         this.checkedAt = now;
         this.updatedAt = now;
@@ -134,6 +143,32 @@ public class ConnectorConnection extends CreatedAtEntity {
     }
 
 
+    /** 표준 플러그인의 연결 확인이 받은 도구 목록으로 바꾼다. 빠진 도구의 상시 허락은 부르는 쪽이 같은 트랜잭션에서 거둔다. */
+    public void recordListedTools(ListedTools tools) {
+        this.listedTools = tools;
+    }
+
+
+    /** 그 도구가 마지막 확인에서 읽기 표시를 받았는가. 표준 플러그인이 아니거나 확인하기 전이면 거짓이다. */
+    public boolean readOnlyMarked(String toolName) {
+        return listedTools != null && listedTools.readOnly(toolName);
+    }
+
+
+    /**
+     * 승인 실행이 받은 표시가 거짓인 도구의 읽기 표시를 거둔다. 받은 도구 목록이 없는 연결이면 아무것도 하지 않는다.
+     *
+     * @return 받은 도구 목록이 있는 연결인가. 참이면 부르는 쪽이 그 도구의 상시 허락을 같은 트랜잭션에서 거둔다
+     */
+    public boolean unmarkReadOnly(String toolName) {
+        if (listedTools == null) {
+            return false;
+        }
+        this.listedTools = listedTools.withoutReadOnly(toolName);
+        return true;
+    }
+
+
     /**
      * 바인딩을 모두 떼고 보관 파일을 지웠다. 행은 이력을 위해 남기고 칸 값과 비밀 앞부분을 비운다.
      *
@@ -145,6 +180,7 @@ public class ConnectorConnection extends CreatedAtEntity {
         this.fields = ConnectionFields.empty();
         this.vaultStored = false;
         this.undeclaredTools = 0;
+        this.listedTools = null;
         this.checkedAt = now;
         this.updatedAt = now;
     }
