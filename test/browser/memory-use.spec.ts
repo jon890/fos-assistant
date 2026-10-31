@@ -352,7 +352,7 @@ test("참고한 기억의 틀림 단추는 그 답과 기억을 보내고 고치
   );
   await expect(
     first.getByRole("link", { name: "기억 화면에서 고치기" }),
-  ).toHaveAttribute("href", "/memory");
+  ).toHaveAttribute("href", "/memory?memory=12");
   expect(sent).toEqual([{ executionId, memoryId: 12, reaction: "WRONG" }]);
   // 다른 항목의 단추는 그대로 남는다
   await expect(

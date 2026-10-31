@@ -30,6 +30,11 @@ export function MemoryMeta({
           대체됨
         </Badge>
       ) : null}
+      {memory.archivable ? (
+        <Badge variant="outline" data-testid="memory-archivable">
+          자동 보관 허락
+        </Badge>
+      ) : null}
       {memory.omittedFromContext ? (
         <Badge variant="destructive" data-testid="memory-omitted">
           길어서 답에 포함되지 않음

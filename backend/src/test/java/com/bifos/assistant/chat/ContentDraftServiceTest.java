@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import tools.jackson.databind.node.ObjectNode;
 import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -70,6 +71,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("실제 트랜잭션의 동시 CAS는 한 판만 수락한다")
     void acceptsExactlyOneConcurrentCas() throws Exception {
@@ -325,6 +327,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("업로더 변경과 대화 purge는 잠금 안에서 본문과 자식을 정리한다")
     void cleansOwnerMismatchAndPurgesDraftChildrenBeforeAttachments() {
@@ -393,6 +396,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("커밋 뒤 경쟁 수정이 끝나도 생성과 수정은 이번 수락 판을 응답한다")
     void returnsAcceptedRevisionWhenAnotherCasCommitsBeforeResponseRead() {

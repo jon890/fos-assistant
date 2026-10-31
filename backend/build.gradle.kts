@@ -160,8 +160,9 @@ tasks.register<Test>("mysqlMigrationTest") {
     }
     // 전체 MySQL 검사도 Spring 문맥을 보존하므로 일반 test와 같은 힙을 사용한다.
     maxHeapSize = "1g"
-    // 검사별 컨텍스트에 남은 연결 풀이 누적되지 않도록, 일반 test 와 같은 상한을 두고 축출할 때 닫는다.
-    systemProperty("spring.test.context.cache.maxSize", "2")
+    // `@MysqlIntegrationTest` 가 데이터베이스와 컨텍스트 하나를 함께 쓴다. 남은 컨텍스트는 DB 를 직접 만들거나
+    // 설정이 다른 검사 몇 개뿐이다(HikariPool-N 의 최댓값으로 센다). 공유 컨텍스트가 클래스 순서 때문에 밀려나 다시 뜨지 않게 한다.
+    systemProperty("spring.test.context.cache.maxSize", "6")
     // 결과가 밖의 MySQL 서버에 달려 있어 앞선 결과를 다시 쓰지 않는다.
     outputs.upToDateWhen { false }
 }

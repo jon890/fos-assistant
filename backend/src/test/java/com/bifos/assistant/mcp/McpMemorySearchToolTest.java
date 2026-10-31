@@ -195,7 +195,7 @@ class McpMemorySearchToolTest {
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
             .path("items"))
                 .hasSize(1);
-        memories.update(user, memory.id(), "바뀐 본문", false);
+        memories.update(user, memory.id(), "바뀐 본문", false, null);
         JsonNode latest = searchData(call("memory_search", arguments().put("query", QUERY)));
         assertThat(latest.path("items").get(0).path("revision").asInt()).isEqualTo(2);
         assertThat(text(call("memory_read", arguments().put("id", memory.id()))))
