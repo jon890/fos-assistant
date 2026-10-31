@@ -486,6 +486,10 @@ test.each([
       waits.push(ms);
       now += ms;
     });
+    // HTTP의 실제 시간 abort도 막아 큐의 가상 deadline만 검증한다.
+    const abort = spyOn(AbortSignal, "timeout").mockImplementation(
+      () => new AbortController().signal,
+    );
     try {
       const context = setup(timeoutMs);
       context.fake.on("GET", path, page);
@@ -521,6 +525,7 @@ test.each([
       // 목록이 쓴 그룹 예산 때문에 상세가 기다린다. deadline을 넘으면 sleep 전 거절한다.
       expect(waits).toEqual(detailCalls === 0 ? [] : [100]);
     } finally {
+      abort.mockRestore();
       current.mockRestore();
       sleep.mockRestore();
     }
