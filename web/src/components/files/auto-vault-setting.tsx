@@ -18,7 +18,7 @@ const SAVE_FAILED = "자동 보관 설정을 바꾸지 못했어요. 다시 시�
  * 「보관한 결과물」 위에 두는 자동 보관 켜고 끄기다(#530 PR 3).
  *
  * <p>켜면 에이전트가 답과 함께 만든 결과물을 그 답이 끝날 때 이 보관함에 둔다. 끄면 다음 답부터 두지 않고 이미 보관한 것은
- * 그대로다. 기본값은 Control Plane 이 정한다.
+ * 그대로다. 기본값은 켜짐이고 Control Plane 이 정한다.
  */
 export function AutoVaultSetting() {
   const [enabled, setEnabled] = useState<boolean | null>(null);

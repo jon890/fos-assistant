@@ -5,4 +5,4 @@ ALTER TABLE chat_artifact ADD COLUMN auto_vault_state VARCHAR(16) NULL COMMENT '
 ALTER TABLE chat_artifact ADD COLUMN auto_vault_error VARCHAR(64) NULL COMMENT '자동 보관이 FAILED 로 끝난 까닭의 오류 코드. 다시 보관하면 비운다';
 ALTER TABLE chat_artifact ADD COLUMN auto_vault_attempts INT NOT NULL DEFAULT 0 COMMENT '자동 보관을 시도한 횟수. 일시 장애로 다시 시도할 때 상한을 센다';
 CREATE INDEX ix_chat_artifact_auto_vault ON chat_artifact (auto_vault_state, id);
-ALTER TABLE app_user ADD COLUMN artifact_auto_vault BOOLEAN NULL COMMENT '결과물 자동 보관을 켰는지. 비어 있으면 사용자가 고른 적이 없어 코드의 기본값을 따른다';
+ALTER TABLE app_user ADD COLUMN artifact_auto_vault BOOLEAN NULL DEFAULT TRUE COMMENT '결과물 자동 보관을 켰는지. 기본은 켜짐이고 있는 사용자도 켜짐으로 채운다. 비어 있으면 코드의 기본값을 따른다';

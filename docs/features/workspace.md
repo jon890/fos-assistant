@@ -172,7 +172,7 @@ sequenceDiagram
 
 「보관한 결과물」 탭 위의 「결과물 자동 보관」 을 켜면 turn 이 끝날 때 그 답에 묶인 결과물을 요청자의 보관함에 둔다(#530 PR 3).
 
-- **기본값은 꺼짐이다.** 사용자가 켜지 않으면 보관 공간을 쓰지 않는다. 기본값은 `ArtifactAutoVaultSetting.DEFAULT_ENABLED` 한 곳이 정한다
+- **기본값은 켜짐이다**(2026-11-01 사용자 결정). 이미 있는 사용자도 켜짐으로 시작한다. 끄면 다음 답부터 보관하지 않고 보관한 것은 그대로다. 기본값은 `app_user.artifact_auto_vault` 의 DB 기본값과 `ArtifactAutoVaultSetting.DEFAULT_ENABLED` 가 같은 값으로 정한다
 - 대상은 그 turn 이 결과물로 묶은 HTML 이다. HTML 이 부르는 사진과 스타일은 수동 보관과 같이 묶음으로 들어간다. 로그나 중간 파일처럼 답에 묶이지 않은 파일은 넣지 않는다
 - 완료한 turn 만 보관한다. 중지했거나 답이 없는 turn 의 파일은 완성본이라고 볼 수 없다. 재시작 뒤 복구로 끝난 turn 도 완료면 보관한다
 - 보관 주인은 대화 요청자다. 그룹 공개 에이전트를 써도 에이전트 주인의 보관함에는 넣지 않는다
@@ -195,7 +195,7 @@ sequenceDiagram
 ```
 
 작업 기록과 지우기 이력은 새 표 없이 `chat_artifact` 에 둔다. 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 `chat_artifact` 절이 갖고, 설정 칸은 `app_user` 절이 갖는다.
-`ArtifactAutoVaultTest` 가 기본값 꺼짐, 같은 완료가 두 번 와도 한 건, 재시작 뒤 이어서 끝내기, 지운 보관본을 다시 만들지 않기, 그룹 공개 에이전트에서 요청자에게만 보관, 실패 뒤 답과 원본 유지와 다시 보관을 확인한다. 복구로 끝난 turn 은 `RecoveredRunRecorderTest` 가 본다.
+`ArtifactAutoVaultTest` 가 기본값 켜짐과 끈 사용자의 제외, 같은 완료가 두 번 와도 한 건, 재시작 뒤 이어서 끝내기, 지운 보관본을 다시 만들지 않기, 그룹 공개 에이전트에서 요청자에게만 보관, 실패 뒤 답과 원본 유지와 다시 보관을 확인한다. 복구로 끝난 turn 은 `RecoveredRunRecorderTest` 가 본다.
 
 이 기능이 아직 하지 않는 것은 아래와 같다.
 

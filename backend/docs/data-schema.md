@@ -303,7 +303,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 #### 결과물 자동 보관 컬럼
 
-`artifact_auto_vault` 는 BOOLEAN NULL 이다. 비어 있으면 사용자가 고른 적이 없어 `ArtifactAutoVaultSetting.DEFAULT_ENABLED` 를 따른다. 기본값을 바꿀 때 칸을 채우지 않아도 이미 있는 사용자에게 함께 적용된다.
+`artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다. 비어 있으면 `ArtifactAutoVaultSetting.DEFAULT_ENABLED`(켜짐)를 따른다. 두 값은 같아야 한다.
 주문 상한처럼 엔티티의 넣기와 고치기에서 빼고 전용 쿼리로만 읽고 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
 
 ### allowed_person

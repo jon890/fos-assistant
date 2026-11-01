@@ -9,15 +9,15 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자가 결과물 자동 보관을 켰는지 읽고 바꾼다(#530 PR 3).
  *
- * <p>고른 적이 없는 사용자는 {@link #DEFAULT_ENABLED} 를 따른다. 기본값은 이 상수 한 곳만 바꾸면 된다. 칸은 비어 있는
- * 채로 두므로 이미 있는 사용자도 함께 바뀐다.
+ * <p>칸이 비어 있으면 {@link #DEFAULT_ENABLED} 를 따른다. 칸의 DB 기본값({@code DEFAULT TRUE})이 새 사용자와 이미 있는 사용자를
+ * 켜짐으로 채우고, 이 상수는 칸이 비어 있을 때의 값이다. 둘은 같은 값이어야 한다.
  */
 @Service
 @RequiredArgsConstructor
 public class ArtifactAutoVaultSetting {
 
-    /** 고른 적이 없는 사용자의 값이다. 꺼 두면 사용자가 켜기 전까지 보관 공간을 쓰지 않는다. */
-    public static final boolean DEFAULT_ENABLED = false;
+    /** 고른 적이 없는 사용자의 값이다. 켜 두어 완성 결과물이 대화와 따로 남는다(2026-11-01 사용자 결정). */
+    public static final boolean DEFAULT_ENABLED = true;
 
     private final AppUserRepository users;
     private final Clock clock;

@@ -116,17 +116,25 @@ class ArtifactAutoVaultTest {
 
 
     @Test
-    @DisplayName("고른 적이 없는 사용자는 자동 보관이 꺼져 있어 결과물을 보관하지 않는다")
-    void offByDefault() throws Exception {
-        assertThat(setting.isEnabled(dad.id())).isEqualTo(ArtifactAutoVaultSetting.DEFAULT_ENABLED).isFalse();
+    @DisplayName("고른 적이 없는 사용자도 자동 보관이 켜져 있고 끈 사용자의 결과물은 보관하지 않는다")
+    void onByDefaultAndSkipsWhenTurnedOff() throws Exception {
+        assertThat(setting.isEnabled(dad.id())).isEqualTo(ArtifactAutoVaultSetting.DEFAULT_ENABLED).isTrue();
+        assertThat(jdbc.queryForObject("select artifact_auto_vault from app_user where id = ?", Boolean.class, dad.id()))
+            .as("새 사용자의 칸은 DB 기본값으로 켜짐이다")
+            .isTrue();
         Conversation dadConversation = conversation(dad, null);
-        ChatArtifact row = answerWithFile(dadConversation, "page.html");
+        ChatArtifact kept = answerWithFile(dadConversation, "kept.html");
+        autoVault.afterCompletedTurn(dadConversation.id(), kept.messageId());
+        awaitBackground();
+        assertThat(state(kept)).isEqualTo(AutoVaultState.DONE);
 
-        autoVault.afterCompletedTurn(dadConversation.id(), row.messageId());
+        setting.change(dad.id(), false);
+        ChatArtifact skipped = answerWithFile(dadConversation, "skipped.html");
+        autoVault.afterCompletedTurn(dadConversation.id(), skipped.messageId());
         awaitBackground();
 
-        assertThat(state(row)).isNull();
-        assertThat(vault.list(dad.id())).isEmpty();
+        assertThat(state(skipped)).isNull();
+        assertThat(vault.list(dad.id())).extracting(ArtifactVaultItem::path).containsExactly("kept.html");
     }
 
 
