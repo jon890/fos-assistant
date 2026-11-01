@@ -309,6 +309,18 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             self.assertEqual(self.execute(args={"text": "a"})[0], 200)
             self.assertEqual(called, ["write_note"])
 
+    def test_schema_two_ask_runs_undeclared_tools(self):
+        """`default_tool_policy: ask` 이면 선언에 없는 도구도 실행하고 읽기 표시를 더해 답한다."""
+        self.declare_schema_two()
+        self.rewrite("connector.json", lambda value: value.update(default_tool_policy="ask"))
+        status, body = self.execute("mcp__demo__env_view")
+        self.assertEqual(status, 200, body)
+        self.assertTrue(body["ok"], body)
+        self.assertIn("read_only", body)
+        # 서버에 없는 이름은 `ask` 여도 부르지 않는다.
+        self.assertEqual(self.execute("mcp__demo__nope")[0], 400)
+        self.assertEqual(self.execute("mcp__other__write_note")[0], 400)
+
     def test_profile_and_connector_are_checked_before_the_child_starts(self):
         """설치하지 않았거나 관리 표식이 없는 profile, 모르는 커넥터, 틀린 본문은 4xx 이고 자식을 띄우지 않는다."""
         self.install("plain", installed=False)

@@ -249,7 +249,7 @@ public class ConnectorActionDetails {
      */
     public boolean readOnlyMarked(ConnectorAction action, Optional<ConnectorManifest> manifest) {
         if (connections == null || action.toolName() == null
-            || manifest.filter(found -> found.schema() == ConnectorToolPolicies.STANDARD_SCHEMA).isEmpty()) {
+            || manifest.filter(ConnectorToolPolicies::undeclaredAsk).isEmpty()) {
             return false;
         }
         return connections.findByUserIdAndConnectorId(action.userId(), action.connectorId())
@@ -321,7 +321,7 @@ public class ConnectorActionDetails {
         return ConnectorToolPolicies.find(manifest.get(), action.toolName())
             .map(ToolPolicy::grantable)
             .orElse(schema == SCHEMA_WITHOUT_TOOLS
-                || (schema == ConnectorToolPolicies.STANDARD_SCHEMA && readOnlyMarked && action.toolName() != null));
+                || (ConnectorToolPolicies.undeclaredAsk(manifest.get()) && readOnlyMarked && action.toolName() != null));
     }
 
 

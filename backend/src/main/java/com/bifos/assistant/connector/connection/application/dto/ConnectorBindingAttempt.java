@@ -10,6 +10,8 @@ import java.util.UUID;
  * 시작 트랜잭션이 커밋한 설치 입력이다. 엔티티와 lazy 참조, 가변 JSON을 외부 호출로 넘기지 않는다.
  *
  * <p>시도 UUID는 DB 결과 대조용이며 Hermes에 보내지 않는다.
+ *
+ * @param undeclaredAsk 선언하지 않은 도구를 호출마다 묻는 커넥터({@code default_tool_policy: ask})인가. 참이면 선언하지 않은 도구 수를 세지 않는다
  */
 public record ConnectorBindingAttempt(
     Long bindingId,
@@ -35,7 +37,8 @@ public record ConnectorBindingAttempt(
     boolean checkInstallation,
     boolean replaceValues,
     ResyncOutcome waiting,
-    List<String> declaredTools) {
+    List<String> declaredTools,
+    boolean undeclaredAsk) {
 
     public ConnectorBindingAttempt {
         declaredTools = List.copyOf(declaredTools);

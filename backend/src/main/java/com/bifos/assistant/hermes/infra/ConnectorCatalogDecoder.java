@@ -19,6 +19,8 @@ final class ConnectorCatalogDecoder {
     private static final int SCHEMA_UNREADABLE = 0;
     /** {@code assistant.json} 이 없는 표준 플러그인의 schema 값이다. 확인 도구가 없다(ADR-20261101 / plugin-without-assistant-json). */
     private static final int SCHEMA_STANDARD = 3;
+    /** 도구마다 정책을 선언하는 schema 값이다. {@code default_tool_policy} 는 이 schema 에서만 뜻이 있다. */
+    private static final int SCHEMA_DECLARING = 2;
 
 
     static ConnectorManifest read(JsonNode item) {
@@ -53,7 +55,21 @@ final class ConnectorCatalogDecoder {
             item.get("execution_guard"),
             text(item, "execution_guard_manifest_sha256"),
             ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()),
-            ConnectorUnknownErrors.read(item.get("unknown_errors")));
+            ConnectorUnknownErrors.read(item.get("unknown_errors")),
+            readable && schema(schema) == SCHEMA_DECLARING ? defaultToolPolicy(item) : null);
+    }
+
+
+    /**
+     * 선언하지 않은 도구를 호출마다 묻는 {@code ask} 만 읽는다. 칸이 없거나 다른 값이면 null 이라 지금처럼 거절한다.
+     *
+     * <p>이 칸을 모르는 옛 대시보드 plugin 은 내지 않으므로 느슨해지지 않는다. 모르는 값이나 글이 아닌 값도 카탈로그를 버리지
+     * 않고 거절로 읽는다.
+     */
+    private static String defaultToolPolicy(JsonNode item) {
+        return ConnectorManifest.DEFAULT_TOOL_POLICY_ASK.equals(text(item, "default_tool_policy"))
+            ? ConnectorManifest.DEFAULT_TOOL_POLICY_ASK
+            : null;
     }
 
 

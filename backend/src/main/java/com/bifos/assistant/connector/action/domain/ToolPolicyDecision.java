@@ -81,7 +81,8 @@ public record ToolPolicyDecision(
 
     /**
      * @param ownServerTool 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 아니면 판과 상관없이 선언 없는 도구다
-     * @param schema manifest 의 판
+     * @param schema manifest 의 판. 선언하지 않은 도구를 호출마다 묻는 {@code schema: 2}({@code default_tool_policy: ask})는 부르는 쪽이
+     * 표준 플러그인의 값(3)으로 바꿔 넘긴다. 선언한 도구는 값과 상관없이 선언으로 판정한다
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
      * @param conversationGranted 그 대화의 그 에이전트 실행에 그 도구의 유효한 대화 허락이 있는가

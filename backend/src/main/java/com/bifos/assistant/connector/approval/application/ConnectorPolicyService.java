@@ -260,7 +260,7 @@ public class ConnectorPolicyService {
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
             usable,
             ownServerTool(value, hermesTool),
-            value.schema(),
+            ConnectorToolPolicies.decisionSchema(value),
             declared,
             !resend && grants.standing(connection, confirmedTool, now),
             !resend && grants.inConversation(origin, connection, confirmedTool, now),

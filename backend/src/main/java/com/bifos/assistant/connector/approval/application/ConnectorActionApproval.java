@@ -274,7 +274,7 @@ class ConnectorActionApproval {
         return ToolPolicyDecision.decide(
             ConnectorPolicyService.usableStatus(binding.connection(), binding),
             ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
-            manifest.schema(),
+            ConnectorToolPolicies.decisionSchema(manifest),
             ConnectorToolPolicies.find(manifest, action.toolName()),
             false,
             false,
