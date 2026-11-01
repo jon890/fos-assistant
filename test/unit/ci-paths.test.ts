@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -194,6 +194,33 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     assert.deepEqual(selected(), {
       backend: "true", web: "false", browser: "true", e2e: "true", hermes: "false", quality: "true",
     });
+    // 컨트롤러를 지운 PR 은 라벨이 없어도 브라우저와 E2E 를 돌린다. 이름만 바꿔도 옛 경로가 지워진 것이고, 수정만 하면 건너뛴다.
+    const dirName = "backend/src/main/java/a/presentation";
+    const controller = `${dirName}/FooController.java`;
+    git("checkout", "-b", "ctrl-base", "main");
+    mkdirSync(join(dir, dirName), { recursive: true });
+    writeFileSync(join(dir, controller), "synthetic\n");
+    commit("controller added");
+    const scenario = (name: string, change: () => void) => {
+      git("checkout", "-b", `${name}-pr`, "ctrl-base");
+      change();
+      commit(name);
+      git("checkout", "-b", `${name}-merge`, "ctrl-base");
+      writeFileSync(join(dir, `${name}.txt`), "synthetic\n");
+      commit(`${name} base advances`);
+      git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "merge", "--no-ff", `${name}-pr`, "-m", `merge ${name}`);
+      assert.equal(run("pull_request").status, 0, name);
+      return selected();
+    };
+    const deleted = scenario("delete", () => git("rm", controller));
+    assert.equal(deleted.browser, "true");
+    assert.equal(deleted.e2e, "true");
+    const renamed = scenario("rename", () => git("mv", controller, `${dirName}/BarController.java`));
+    assert.equal(renamed.browser, "true");
+    assert.equal(renamed.e2e, "true");
+    const edited = scenario("edit", () => writeFileSync(join(dir, controller), "edited\n"));
+    assert.equal(edited.browser, "false");
+    assert.equal(edited.e2e, "false");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -211,6 +238,20 @@ test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 
   assert.deepEqual(withoutSlow(judged, true), judged);
   // 원래 판정 결과는 바꾸지 않는다.
   assert.equal(judged.browser.run, true);
+});
+
+test("API 컨트롤러와 웹 경로 파일을 지우면 경로 삭제로 본다", () => {
+  for (const file of [
+    "backend/src/main/java/com/bifos/assistant/admin/agent/presentation/AgentAdminController.java",
+    "backend/src/main/java/com/bifos/assistant/x/presentation/sub/FooController.java",
+    "web/src/app/api/chat/route.ts", "web/src/app/now/page.tsx", "web/src/app/page.tsx", "web/src/components/Card.tsx",
+  ]) assert.equal(removesRoute([file]), true, file);
+  for (const file of [
+    "backend/src/main/java/com/bifos/assistant/x/application/FooService.java",
+    "backend/src/test/java/com/bifos/assistant/x/presentation/FooController.java",
+    "web/src/lib/a.ts", "web/src/app/layout.tsx", "docs/prd.md",
+  ]) assert.equal(removesRoute([file]), false, file);
+  assert.equal(removesRoute([]), false);
 });
 
 test("workflow 는 전체 검사 라벨을 판정에 넘기고, 다른 라벨이 CI 를 다시 돌리지 않게 labeled 를 받지 않는다", () => {
