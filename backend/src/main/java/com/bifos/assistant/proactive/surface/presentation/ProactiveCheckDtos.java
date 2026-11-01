@@ -1,13 +1,8 @@
 package com.bifos.assistant.proactive.surface.presentation;
 
-import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
-import com.bifos.assistant.proactive.check.application.dto.CheckFindingView;
-import com.bifos.assistant.proactive.check.application.dto.CheckStatusView;
-import com.bifos.assistant.proactive.loop.application.dto.LoopSettingView;
 import com.bifos.assistant.proactive.autonomy.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.evaluation.domain.CandidateJudgement;
 import com.bifos.assistant.proactive.evaluation.domain.DecisionCandidate;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.evaluation.domain.ValueEvaluation;
 import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyExecutionStatus;
 import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyLevel;
@@ -17,9 +12,7 @@ import com.bifos.assistant.proactive.evaluation.domain.type.DecisionOutcome;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -103,113 +96,6 @@ public final class ProactiveCheckDtos {
 
     /** 사용자의 자동 실행 동의다. */
     public record AutonomyPreferenceBody(@NotNull Boolean readOnlyExecution) {
-    }
-
-    /**
-     * 에이전트 하나의 매일 루프 설정을 바꾼다.
-     *
-     * @param snoozedUntil 비우거나 지금부터 30일 안의 시각. 지난 시각은 비운 것과 같다
-     */
-    public record LoopSettingBody(@NotNull Boolean enabled, Instant snoozedUntil) {
-    }
-
-    /**
-     * 에이전트 하나의 매일 루프 설정이다.
-     *
-     * @param available 설치가 매일 루프를 연다. 거짓이면 켤 수 없다
-     * @param snoozedUntil 쉬는 끝 시각. 지금보다 뒤일 때만 싣는다
-     */
-    public record LoopSettingResponse(boolean available, boolean enabled, Instant snoozedUntil) {
-
-        static LoopSettingResponse from(LoopSettingView view) {
-            return new LoopSettingResponse(view.available(), view.enabled(), view.snoozedUntil());
-        }
-    }
-
-    /**
-     * 살펴보기 상태다.
-     *
-     * @param available 지금 살펴보기를 시작할 수 있다. {@code blockers} 가 비었을 때만 참이다
-     * @param blockers 막는 까닭. 화면이 까닭마다 안내를 그린다
-     * @param conversationId 요청자의 점검 대화의 공개 식별자. 없으면 null
-     * @param lastCheck 요청자가 그 에이전트로 연 마지막 살펴보기. 없으면 null
-     */
-    public record StatusResponse(
-        boolean available, List<BlockerView> blockers, UUID conversationId, LastCheckView lastCheck) {
-
-        static StatusResponse from(CheckStatusView view) {
-            return new StatusResponse(
-                view.readiness().available(),
-                view.readiness().blockers().stream().map(BlockerView::from).toList(),
-                view.conversationId(),
-                view.lastCheck() == null ? null : LastCheckView.from(view.lastCheck()));
-        }
-    }
-
-    /**
-     * 살펴보기를 시작했다.
-     *
-     * @param conversationId 결과가 남는 점검 대화의 공개 식별자
-     */
-    public record StartedResponse(UUID conversationId) {
-    }
-
-    /**
-     * 막는 까닭 하나다.
-     *
-     * @param code {@code CheckBlockerCode} 의 이름
-     * @param toolsets {@code TOOLSETS_NOT_ALLOWED} 일 때 끌 toolset 이름. 다른 까닭이면 빈 목록
-     */
-    public record BlockerView(String code, List<String> toolsets) {
-
-        static BlockerView from(CheckBlocker blocker) {
-            return new BlockerView(blocker.code().name(), blocker.toolsets());
-        }
-    }
-
-    /**
-     * 마지막 살펴보기다.
-     *
-     * @param status {@code CheckStatus} 의 이름
-     * @param outcome {@code CheckOutcome} 의 이름. 성공했을 때만 있고 아니면 null
-     * @param invalidReason {@code CheckInvalidReason} 의 이름. {@code outcome} 이 {@code INVALID_RESULT} 일 때만 있고 아니면
-     * null. 그 칸을 더하기 전에 끝난 살펴보기도 null 이다
-     * @param finishedAt 끝난 시각. 돌고 있으면 null
-     */
-    public record LastCheckView(
-        String status,
-        String outcome,
-        String invalidReason,
-        String skippedReason,
-        Instant startedAt,
-        Instant finishedAt) {
-
-        static LastCheckView from(ProactiveCheck check) {
-            return new LastCheckView(
-                check.status().name(),
-                check.outcome() == null ? null : check.outcome().name(),
-                check.invalidReason() == null ? null : check.invalidReason().name(),
-                check.skippedReason() == null ? null : check.skippedReason().name(),
-                check.startedAt(),
-                check.finishedAt());
-        }
-    }
-
-    /**
-     * 점검 대화의 「새로 알릴 것」 발견과 지금 반응이다.
-     *
-     * @param dismissWindowDays 「관심 없음」 이 같은 주제를 내리는 기간. {@code digest-window} 를 하루 단위로 올림한 값이다
-     * @param findings 오래된 것부터
-     */
-    public record CheckFindingsResponse(long dismissWindowDays, List<CheckFindingView> findings) {
-    }
-
-    /**
-     * 발견 하나에 누른 단추다. 모르는 값은 서비스가 {@code VALIDATION_FAILED} 로 거절한다.
-     *
-     * @param reaction {@code ACCEPTED}, {@code POSTPONED}, {@code DISMISSED} 가운데 하나
-     */
-    public record FindingReactionRequest(@NotBlank String reaction) {
     }
 
     /** @param reaction {@code ACCEPTED} 나 {@code DISMISSED}. 모르는 값은 서비스가 400 으로 거절한다 */
