@@ -1,7 +1,7 @@
 {
   "name": "plan227-proactive-old-removal",
   "description": "새 제안 화면과 기록 경로로 바꾼 뒤 가치 평가, 행동 정책의 네 수준, 자동 실행 동의, 매일 루프를 코드에서 지운다",
-  "pr_scope": "제안 기능 스위치를 기본으로 켜고 proactive 의 evaluation, autonomy, loop, surface 하위 기능과 그 API, 화면, 테스트를 지우는 일을 한 PR 로 끝낸다.",
+  "pr_scope": "phase 01(제안 스위치 기본 켜기, 깨우기 지시의 suggestions, 제안 카드 후보)은 앞 PR 에서 끝났다. 남은 phase 02 는 크기 상한(운영 코드 1500줄) 때문에 하위 기능 경계로 PR 둘(B, C)로 나눈다. 경계는 phase-02.md 의 「PR 나누기」 가 갖는다.",
   "deferred": [
     {
       "what": "옛 테이블 열 개를 DROP",
@@ -9,16 +9,11 @@
       "after": "이 plan 의 PR 이 머지되고 한 번 배포된 뒤"
     }
   ],
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-11-01",
   "total_phases": 2,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
-    {
-      "number": 1,
-      "file": "phase-01.md",
-      "execution_profile": "deep"
-    },
     {
       "number": 2,
       "file": "phase-02.md",

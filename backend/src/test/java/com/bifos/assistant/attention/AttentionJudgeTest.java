@@ -52,6 +52,20 @@ class AttentionJudgeTest {
 
 
     @Test
+    @DisplayName("같은 카드에 같은 열쇠의 후보가 둘 오면 먼저 온 후보 하나만 남는다")
+    void keepsFirstOfSameKeyWithinCard() {
+        AttentionCandidate first = candidate(CardKey.NEEDS_ME, "follow_up:a", "s1", false, AttentionConfidence.MODEL_INFERRED);
+        AttentionCandidate second = candidate(CardKey.NEEDS_ME, "follow_up:a", "s2", true, AttentionConfidence.USER_CONFIRMED);
+
+        List<AttentionCard> cards = judge(Map.of(CardKey.NEEDS_ME, List.of(first, second)));
+
+        assertThat(card(cards, CardKey.NEEDS_ME).items())
+            .extracting(AttentionItem::itemKey, AttentionItem::stateKey)
+            .containsExactly(tuple("follow_up:a", "s1"));
+    }
+
+
+    @Test
     @DisplayName("모델이 낸 후보는 NOW 조건을 채워도 LATER 다")
     void keepsModelInferredCandidateLater() {
         AttentionCandidate proposal = candidate(CardKey.NEEDS_ME, "memory:1", "s", true, AttentionConfidence.MODEL_INFERRED);
