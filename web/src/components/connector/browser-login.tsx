@@ -21,7 +21,7 @@ export function LoginLink({
   );
 }
 
-/** 「내 브라우저」 에 로그인한 계정을 쓰는 커넥터면 칸 위에 먼저 로그인하라고 안내한다. */
+/** 「내 브라우저」 에 로그인한 계정을 쓰는 플러그인이면 칸 위에 먼저 로그인하라고 안내한다. */
 export function LoginNotice({ url }: { url: string | null | undefined }) {
   const href = browserLoginHref(url);
   if (!href) return null;
@@ -29,7 +29,7 @@ export function LoginNotice({ url }: { url: string | null | undefined }) {
     <Notice variant="info" data-testid="browser-login-notice">
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span>
-          이 커넥터는 「내 브라우저」에 로그인한 계정을 써요. 먼저 내
+          이 플러그인은 「내 브라우저」에 로그인한 계정을 써요. 먼저 내
           브라우저에서 로그인한 뒤 연결해 주세요.
         </span>
         <LoginLink href={href} />

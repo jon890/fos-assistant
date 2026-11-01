@@ -6,7 +6,7 @@ import {
 
 /**
  * 에이전트 상세의 「이 에이전트가 쓰는 연결」 한 줄이다.
- * `status` 는 붙어 있지 않으면 null 이다. `toolCount` 는 커넥터가 선언한 도구 수이고 `skills` 는 붙이면 설치되는 스킬 이름이다.
+ * `status` 는 붙어 있지 않으면 null 이다. `toolCount` 는 플러그인이 선언한 도구 수이고 `skills` 는 붙이면 설치되는 스킬 이름이다.
  */
 export type AgentConnectionView = {
   connectorId: string;

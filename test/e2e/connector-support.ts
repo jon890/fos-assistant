@@ -1,5 +1,5 @@
 /**
- * 연결을 에이전트에 붙여 커넥터 도구를 부르는 시나리오들이 함께 쓰는 준비다.
+ * 연결을 에이전트에 붙여 플러그인 도구를 부르는 시나리오들이 함께 쓰는 준비다.
  *
  * <p>연결 등록, 비공개 에이전트 만들기, 붙이기, 반영 확인을 차례로 한다(ADR-083). 새 서버를 더한 붙이기는 재시작이 필요 없어
  * Control Plane 이 반영 지연 뒤 스스로 확인해 `READY` 로 만든다(ADR-20261007 / connector-live-reload). 값 교체처럼 재시작 대기가 된
@@ -42,7 +42,7 @@ export type AdminConnectionView = {
 export type AgentRef = { code: string; profile: string };
 export type ToolProbe = { answer: string; conversationId: string };
 
-/** 시험 커넥터에 넣는 값이다. 칸이 없는 커넥터는 빈 값을 받는다. */
+/** 시험 플러그인에 넣는 값이다. 칸이 없는 플러그인은 빈 값을 받는다. */
 export const DEMO_VALUES = { token: DEMO_TOKEN_OK, scope: "a" };
 
 export function connectionPath(connectorId: string): string {
@@ -146,7 +146,7 @@ export async function awaitReady(context: Context, token: string, agentCode: str
 }
 
 /**
- * 에이전트에게 커넥터 도구 호출 한 줄을 시켜 대역이 답한 판정 줄과 그 대화를 돌려준다.
+ * 에이전트에게 플러그인 도구 호출 한 줄을 시켜 대역이 답한 판정 줄과 그 대화를 돌려준다.
  *
  * <p>답은 `allow` 나 `block <글>` 이다. 대역이 그 에이전트 profile 의 hook 처럼 Control Plane 에 판정을 묻는다.
  */

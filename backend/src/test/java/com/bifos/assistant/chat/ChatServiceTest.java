@@ -76,6 +76,7 @@ import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -138,6 +139,9 @@ class ChatServiceTest {
 
     @Autowired
     GroupSettingRepository groupSettings;
+
+    @Autowired
+    ModelTierService modelTiers;
 
     @Autowired
     TransactionTemplate transactions;
@@ -266,7 +270,7 @@ class ChatServiceTest {
 
 
     @Test
-    @DisplayName("대화 단계 저장은 TIER 와 단계가 함께 올 때만 받고 CUSTOM 이나 단계 없는 TIER 는 거절한다")
+    @DisplayName("대화 단계 저장은 TIER 와 단계가 함께 올 때만 받고 모드나 단계가 빠지면 거절한다")
     void chooseModelTierAcceptsOnlyTierModeWithTier() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent agent = agents.findByCode("dad").orElseThrow();
@@ -274,8 +278,6 @@ class ChatServiceTest {
 
         for (var invalid : List.of(
             new ModelTierSelection(null, ModelTier.INSTANT),
-            new ModelTierSelection(ModelSelectionMode.CUSTOM, null),
-            new ModelTierSelection(ModelSelectionMode.CUSTOM, ModelTier.INSTANT),
             new ModelTierSelection(ModelSelectionMode.TIER, null))) {
             assertThatThrownBy(() -> chat.chooseModelTier(dad, conversation.id(), invalid.mode(), invalid.tier()))
                 .as("%s", invalid)
@@ -283,6 +285,27 @@ class ChatServiceTest {
                     ApiException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         }
         assertThat(conversations.findById(conversation.id()).orElseThrow().modelSelectionMode()).isNull();
+        assertThat(users.findById(dad.id()).orElseThrow().modelDefaultTier()).as("거절한 뒤의 사용자 기본 칸").isNull();
+    }
+
+
+    @Test
+    @DisplayName("대화에 칸을 고르면 그 칸이 사용자 기본 칸이 되어 다음 새 대화가 그 칸으로 돈다")
+    void choosingTierAlsoBecomesUserDefaultForNextNewConversation() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        Conversation first = conversations.save(Conversation.startedBy(dad.id(), "첫 대화", agent.id(), Instant.now()));
+        Conversation second = conversations.save(Conversation.startedBy(dad.id(), "다음 대화", agent.id(), Instant.now()));
+
+        chat.chooseModelTier(dad, first.id(), ModelSelectionMode.TIER, ModelTier.HIGH);
+
+        assertThat(users.findById(dad.id()).orElseThrow().modelDefaultTier()).isEqualTo(ModelTier.HIGH.name());
+        assertThat(conversations.findById(second.id()).orElseThrow().modelSelectionMode())
+            .as("고르지 않은 대화는 선택 없음 그대로")
+            .isNull();
+        assertThat(modelTiers.resolve(dad, conversations.findById(second.id()).orElseThrow(), agent).tier())
+            .as("고르지 않은 다음 대화가 도는 칸")
+            .isEqualTo(ModelTier.HIGH);
     }
 
 

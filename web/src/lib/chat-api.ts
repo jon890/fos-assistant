@@ -25,14 +25,6 @@ export function fetchAgentStarters(agentCode: string): Promise<Response> {
   return fetch(`/api/agents/${agentCode}/starters`, { cache: "no-store" });
 }
 
-/** 그 에이전트로 고를 수 있는 모델 목록을 읽는다. */
-export function fetchModelOptions(agentCode: string): Promise<Response> {
-  return fetch(
-    `/api/chat/model-options?agentCode=${encodeURIComponent(agentCode)}`,
-    { cache: "no-store" },
-  );
-}
-
 /** 빈 대화를 만든다. */
 export function createConversation(agentCode: string): Promise<Response> {
   return fetch("/api/chat/conversations", {
@@ -145,16 +137,4 @@ export function deleteConversationAttachment(
     `${conversationPath(conversationId)}/attachments/${attachmentId}`,
     { method: "DELETE" },
   );
-}
-
-/** 그 대화에서 쓸 모델 선택을 저장한다. */
-export function saveConversationModel(
-  conversationId: string,
-  choice: unknown,
-): Promise<Response> {
-  return fetch(`${conversationPath(conversationId)}/model`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify(choice),
-  });
 }

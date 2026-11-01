@@ -290,7 +290,7 @@ function grantId(value: unknown): number {
 }
 
 /**
- * 대화 허락은 이름과 끝나는 시각, 다른 에이전트에 준 허락이면 그 에이전트 이름만 옮긴다. 커넥터와 도구의 원래 이름은 화면이
+ * 대화 허락은 이름과 끝나는 시각, 다른 에이전트에 준 허락이면 그 에이전트 이름만 옮긴다. 플러그인과 도구의 원래 이름은 화면이
  * 쓰지 않는다.
  */
 function safeConversationGrant(value: unknown): ConversationGrant {

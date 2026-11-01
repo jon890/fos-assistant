@@ -258,7 +258,7 @@ test("실행 트리 패널", async ({ page }) => {
   await shot(page, "tour-03-run-tree");
 });
 
-test("커넥터 쓰기 승인 카드", async ({ page }) => {
+test("플러그인 쓰기 승인 카드", async ({ page }) => {
   const created = await page.request.post("/api/chat", {
     data: { text: SHOPPING_QUESTION, agentCode: lifeAgent },
   });
@@ -266,7 +266,7 @@ test("커넥터 쓰기 승인 카드", async ({ page }) => {
   const { conversationId } = (await created.json()) as {
     conversationId: string;
   };
-  // 승인 줄은 실제 커넥터 호출이 만든다. 가짜 Hermes 로는 그 호출을 만들 수 없어 브라우저 검사와 같이 응답을 정해 준다.
+  // 승인 줄은 실제 플러그인 호출이 만든다. 가짜 Hermes 로는 그 호출을 만들 수 없어 브라우저 검사와 같이 응답을 정해 준다.
   await page.route(
     `**/api/chat/conversations/${conversationId}/events`,
     async () => {

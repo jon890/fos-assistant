@@ -12,7 +12,7 @@ import {
   MCP_SERVER_TEST_PATH,
 } from "./runtime-fixtures.ts";
 import { send, readBody } from "./lifecycle.ts";
-/** 커넥터 카탈로그, 도구 호출, 설치와 보관 파일 경로를 처리한다. */
+/** 플러그인 카탈로그, 도구 호출, 설치와 보관 파일 경로를 처리한다. */
 export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, vaultValuesValid }: ReturnType<typeof createBindings>) {
   const snapshotRoutes = createContentSnapshotRoutes(state);
   return async (request: IncomingMessage, response: ServerResponse, path: string, queryProfile: string | null): Promise<boolean> => {
@@ -77,7 +77,7 @@ export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, 
     }
 
     if (request.method === "GET" && path === CONNECTORS_PATH) {
-      // 대시보드로 만든 profile 은 관리 표식이, 미리 심어 둔 profile 은 운영자가 둔 커넥터 표식이 있는 것으로 친다.
+      // 대시보드로 만든 profile 은 관리 표식이, 미리 심어 둔 profile 은 운영자가 둔 플러그인 표식이 있는 것으로 친다.
       if (queryProfile === null || (!state.profiles.has(queryProfile) && state.keys[queryProfile] === undefined)) {
         send(response, 404, { error: "no such profile" });
         return true;
@@ -147,7 +147,7 @@ export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, 
 
     const probeMatch = MCP_SERVER_TEST_PATH.exec(path);
     if (request.method === "POST" && probeMatch !== null) {
-      // 그 profile 에 붙인 커넥터의 서버만 시험한다.
+      // 그 profile 에 붙인 플러그인의 서버만 시험한다.
       const connector = catalogOf(state).find((candidate) => candidate.mcp_server === probeMatch[1]);
       if (connector === undefined || queryProfile === null
           || !state.boundConnectors.get(queryProfile)?.has(connector.id)) {

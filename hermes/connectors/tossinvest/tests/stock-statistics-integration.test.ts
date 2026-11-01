@@ -42,7 +42,7 @@ const canonical = JSON.parse(
   readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`, "utf8"),
 );
 const manifest = JSON.parse(
-  readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
+  readFileSync(`${import.meta.dir}/../assistant.json`, "utf8"),
 );
 
 async function checkProduction(client: Client, fake: FakeToss) {

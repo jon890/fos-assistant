@@ -1,4 +1,4 @@
-"""운영 목록의 커넥터를 읽고 검증해 카탈로그로 낸다."""
+"""운영 목록의 플러그인을 읽고 검증해 카탈로그로 낸다."""
 
 from __future__ import annotations
 
@@ -85,25 +85,25 @@ from .connector_skills import (
 def _appearance_or_none(connector_id: str, name: str, read):
     """카드 칸 하나를 읽는다. 틀리면 그 칸만 None 으로 두고 경고를 남긴다(ADR-20261008 connector-card).
 
-    카탈로그는 도구 정책 판정과 바인딩 설치도 먹이므로, 장식 칸 하나 때문에 커넥터를 빼지 않는다.
+    카탈로그는 도구 정책 판정과 바인딩 설치도 먹이므로, 장식 칸 하나 때문에 플러그인을 빼지 않는다.
     로그에는 경로와 값을 싣지 않고 직접 낸 사유만 적는다.
     """
     try:
         return read()
     except Exception as error:
         reason = str(error) if type(error) is ValueError else type(error).__name__
-        logger.warning("dashboard-profile-api: 커넥터 %r 의 %s 칸을 버렸다: %s", connector_id, name, reason)
+        logger.warning("dashboard-profile-api: 플러그인 %r 의 %s 칸을 버렸다: %s", connector_id, name, reason)
         return None
 
 
 def _load_connector(connector_id: str, entry: dict) -> dict:
     """plugin 디렉터리의 플러그인 manifest 와 `assistant.json`(옛 이름 `connector.json`), MCP 정의를 읽어 검증한다. 틀리면 예외다.
 
-    형식 규칙은 `hermes/connectors/README.md` 의 「connector.json」 이 소유한다(ADR-043).
+    형식 규칙은 `hermes/connectors/README.md` 의 「assistant.json」 이 소유한다(ADR-043).
     """
     root = entry["root"]
     if not CONNECTOR_ID_RE.match(connector_id):
-        raise ValueError("커넥터 이름이 올바르지 않다")
+        raise ValueError("플러그인 이름이 올바르지 않다")
     if root.resolve() != root:
         raise ValueError("connector 경로에 심볼릭 링크가 있다")
     plugin = _read_plugin_manifest(root)
@@ -151,7 +151,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     if not isinstance(operator_secrets, list) or any(not isinstance(name, str) for name in operator_secrets):
         raise ValueError("operator_secrets 는 env 이름 목록이다")
     if operator_secrets:
-        # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
+        # 조용히 무시하면 비밀이 필요한 플러그인의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors, error_contracts = _connector_errors(declared.get("errors", {}))
     if not isinstance(mcp, dict):
@@ -164,7 +164,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("MCP 서버 하나만 허용한다")
     mcp_server, server = next(iter(mcp.items()))
     # 맞춘 이름으로 견준다. `fos_assistant` 나 `FOS-Assistant` 처럼 글자만 다른 이름도 Control Plane MCP 의 이름으로 읽힐 수 있어
-    # 그 커넥터의 도구가 Control Plane 도구와 같은 이름 공간에 놓인다.
+    # 그 플러그인의 도구가 Control Plane 도구와 같은 이름 공간에 놓인다.
     if (not SERVER_NAME_RE.match(mcp_server)
             or _canonical_server_name(mcp_server) == _canonical_server_name(CONTROL_PLANE_MCP)):
         raise ValueError("MCP 서버 이름이 올바르지 않다")
@@ -205,7 +205,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     # 실행 파일은 manifest 가 정하지 못한다. 운영 목록의 값이나 기본 실행 파일만 쓴다. 원격 서버에는 실행 파일이 없다.
     command = None if remote else entry["command"] or _connector_command()
     if not remote and (command is None or not os.access(command, os.X_OK)):
-        raise ValueError("커넥터 실행 파일이 없거나 실행할 수 없다")
+        raise ValueError("플러그인 실행 파일이 없거나 실행할 수 없다")
 
     # 옛 설치는 스킬 본문을 `SOUL.md` 에 써 지침으로 넣고 skills toolset 은 열지 않는다.
     # 바인딩 설치는 스킬 디렉터리를 그 profile 의 스킬로 복사한다. 둘 다 같은 디렉터리를 읽는다.
@@ -233,8 +233,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         env = {name: "${%s}" % name for name in server["env"]}
         # 운영자 env 는 profile `.env` 를 거치지 않는다. 운영 목록의 값을 서버 정의에 직접 넣는다.
         env.update({name: entry["env"][name] for name in operator_env})
-        # 주인의 첨부 디렉터리와 커넥터 출력 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 디렉터리로 바꾼다.
-        # 주인을 모르는 설치는 빈 값 그대로 두어 커넥터가 사용자 첨부를 읽지 않고 파일을 쓰지 않는다.
+        # 주인의 첨부 디렉터리와 플러그인 출력 디렉터리도 profile `.env` 를 거치지 않는다. 바인딩 설치가 이 빈 값을 그 디렉터리로 바꾼다.
+        # 주인을 모르는 설치는 빈 값 그대로 두어 플러그인이 사용자 첨부를 읽지 않고 파일을 쓰지 않는다.
         # 브라우저 중계 주소도 같다. 바인딩 설치가 이 빈 값을 그 바인딩의 중계 주소로 바꾼다.
         env.update({name: "" for name in owner_env})
         snapshot = _snapshot_manifest(declared, server, tools, set(server["env"]) | set(entry["env"]))
@@ -280,22 +280,22 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
 
 
 def _connector_manifest(connector_id: str) -> dict | None:
-    """운영 목록에 있고 검증을 통과한 커넥터의 manifest 다. 아니면 경고 한 줄을 남기고 None 이다."""
+    """운영 목록에 있고 검증을 통과한 플러그인의 manifest 다. 아니면 경고 한 줄을 남기고 None 이다."""
     entry = _connector_roots().get(connector_id)
     if entry is None:
-        logger.warning("dashboard-profile-api: 커넥터 %r 가 운영 목록에 없다", connector_id)
+        logger.warning("dashboard-profile-api: 플러그인 %r 가 운영 목록에 없다", connector_id)
         return None
     try:
         return _guard_manifest(_load_connector(connector_id, entry), _read_assistant_json(entry["root"]) or {})
     except Exception as error:
         # 파일 내용과 운영 경로를 로그에 싣지 않는다. 직접 낸 사유만 그대로 적는다.
         reason = str(error) if type(error) is ValueError else type(error).__name__
-        logger.warning("dashboard-profile-api: 커넥터 %r 를 쓸 수 없다: %s", connector_id, reason)
+        logger.warning("dashboard-profile-api: 플러그인 %r 를 쓸 수 없다: %s", connector_id, reason)
         return None
 
 
 def _connector_catalog() -> dict[str, dict]:
-    """운영 목록의 커넥터 가운데 검증을 통과한 manifest 다."""
+    """운영 목록의 플러그인 가운데 검증을 통과한 manifest 다."""
     manifests = {name: _connector_manifest(name) for name in _connector_roots()}
     return {name: manifest for name, manifest in manifests.items() if manifest is not None}
 
@@ -323,7 +323,7 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     `tools` 는 견주지 않는다. 옛 기록에는 그 키가 없고, 다시 보낸 설치가 지금 manifest 의 값으로 덮어쓴다.
     주인의 첨부 디렉터리 env 는 설치마다 그 주인의 값이라 manifest 와 견주지 않는다. 빈 값이거나
     `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-20261007 connector-owner-attachments).
-    커넥터 출력 디렉터리 env 도 같다. `<루트>/users/<64자리 16진수>/<profile>/<id>` 모양인지만 본다(ADR-20261008 connector-output-files).
+    플러그인 출력 디렉터리 env 도 같다. `<루트>/users/<64자리 16진수>/<profile>/<id>` 모양인지만 본다(ADR-20261008 connector-output-files).
     브라우저 중계 주소 env 도 같다. 빈 값이거나 `<gateway-base-url>/<접근 표식>` 모양인지만 본다(ADR-20261008 browser-gateway-token).
     """
     expected = manifest["server"]
@@ -353,14 +353,14 @@ def _server_matches(manifest: dict, server: dict) -> bool:
 
 
 def _connector_catalog_response(include_standard: bool = False):
-    """검증을 통과한 커넥터의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
+    """검증을 통과한 플러그인의 카탈로그다. 운영자 env 의 이름과 값, 오류 대응 표, 스킬 본문은 담지 않는다.
 
     `assistant.json` 이 없는 표준 플러그인(`schema: 3`, `verify: null`)은 `include_standard` 가 참일 때만 싣는다.
     옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하므로, schema 3 을 아는 쪽이 query 로 청한다
     (rule-66).
 
     `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
-    `owner_browser` 는 사용자 브라우저를 쓰는 커넥터인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
+    `owner_browser` 는 사용자 브라우저를 쓰는 플러그인인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
     """
     from starlette.responses import JSONResponse
 

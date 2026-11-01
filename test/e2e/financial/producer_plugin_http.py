@@ -24,6 +24,9 @@ from test_connector_execute import ConnectorExecuteTest
 
 class Fixture(ConnectorExecuteTest):
     def setUp(self):
+        if not (REPO / "hermes/connectors/tossinvest/node_modules").is_dir():
+            raise RuntimeError("tossinvest 의존성이 없다. "
+                               "bun install --frozen-lockfile --cwd hermes/connectors/tossinvest 를 먼저 돌린다.")
         self.temporary = tempfile.TemporaryDirectory(prefix="fos-producer-")
         self.base = pathlib.Path(self.temporary.name).resolve()
         self.addCleanup(self.temporary.cleanup)
@@ -121,7 +124,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/fixture/counters":
             answer = {**fixture.counter(), "prepare": fixture.prepares, "execute": fixture.executes}
         elif self.path == "/fixture/manifest-change":
-            fixture.rewrite("connector.json", lambda value: value.update(title="변경한 선언"))
+            fixture.rewrite("assistant.json", lambda value: value.update(title="변경한 선언"))
             answer = {"ok": True}
         elif self.path.startswith("/api/connectors?"):
             answer = fixture.state()

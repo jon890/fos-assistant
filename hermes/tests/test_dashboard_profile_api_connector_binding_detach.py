@@ -73,7 +73,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertIs(self.bind(OTHER, enabled=False).body["changed"], False)
 
     def test_detaching_after_the_operator_changes_the_run_definition_removes_server_env_and_skills(self):
-        """운영자가 커넥터의 실행 정의를 바꾸거나 운영 목록에서 빼도 떼기는 그 서버와 이름과 env 와 스킬을 지운다."""
+        """운영자가 플러그인의 실행 정의를 바꾸거나 운영 목록에서 빼도 떼기는 그 서버와 이름과 env 와 스킬을 지운다."""
         demo, _ = self.bind_fixture()
         alice = self.root / "alice"
         for label in ("run definition changed", "removed from operator list"):
@@ -122,7 +122,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
                 (alice / ".env").write_text("", encoding="utf-8")
 
     def test_detaching_keeps_another_binding_under_its_recorded_name_when_its_manifest_changed(self):
-        """다른 바인딩 항목의 서버 이름이나 실행 정의를 manifest 에서 바꾼 뒤 이 커넥터를 떼면 대응 파일에 기록의 이름이 빈 tools 로 남는다."""
+        """다른 바인딩 항목의 서버 이름이나 실행 정의를 manifest 에서 바꾼 뒤 이 플러그인을 떼면 대응 파일에 기록의 이름이 빈 tools 로 남는다."""
         _, other = self.bind_fixture()
         alice = self.root / "alice"
         original = (other / ".mcp.json").read_text(encoding="utf-8")
@@ -184,7 +184,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
             "demo": {"connector": DEMO, "prefix": "mcp__demo__", "tools": {}}}})
         self.assertEqual(json.loads(detached.read_text(encoding="utf-8")), {DEMO: "demo"})
 
-        # 다른 커넥터의 새 이름은 재시작 없이 반영을 기다리고, 뗀 DEMO 기록은 보존한다.
+        # 다른 플러그인의 새 이름은 재시작 없이 반영을 기다리고, 뗀 DEMO 기록은 보존한다.
         other = self.bind(OTHER, "c2")
         self.assertEqual(other.status_code, 200, other.body)
         self.assertEqual({key: other.body[key] for key in ("changed", "restart_required", "reload_pending")},
@@ -230,7 +230,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
                          {"changed": False, "restart_required": False, "plugin_updated": False, "reload_pending": False})
 
     def test_detaching_again_on_a_profile_with_only_the_connector_marker_succeeds(self):
-        """커넥터 표식만 있는 profile 에서 떼기를 다시 보내거나 붙인 적 없는 커넥터를 떼면 바꾸지 않고 200 이다."""
+        """플러그인 표식만 있는 profile 에서 떼기를 다시 보내거나 붙인 적 없는 플러그인을 떼면 바꾸지 않고 200 이다."""
         self.bind_fixture()
         self.host_profile()
         self.assertEqual(self.bind(profile="human").status_code, 200)

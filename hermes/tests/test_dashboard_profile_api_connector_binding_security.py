@@ -35,7 +35,7 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
         refused(self.bind(vault="c9"), 400)
         refused(self.bind(vault="../c1"), 400)
 
-        # 다른 바인딩 커넥터가 같은 env 이름을 쓰면 붙이지 않는다.
+        # 다른 바인딩 플러그인이 같은 env 이름을 쓰면 붙이지 않는다.
         self.assertEqual(self.bind().status_code, 200)
         declared = json.loads((other / "connector.json").read_text(encoding="utf-8"))
         declared["fields"][1]["env"] = "DEMO_SCOPE"
@@ -55,7 +55,7 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
         refused(self.bind(profile="owner"), 401, "owner")
 
     def test_binding_refuses_a_connector_skill_that_requests_secrets(self):
-        """커넥터 스킬의 앞머리가 환경 값이나 자격 증명 파일을 요청하면 붙이지 않고 아무 파일도 바꾸지 않는다(ADR-086)."""
+        """플러그인 스킬의 앞머리가 환경 값이나 자격 증명 파일을 요청하면 붙이지 않고 아무 파일도 바꾸지 않는다(ADR-086)."""
         self.bind_fixture()
         skill = self.root.parent / "demo-connector/skills/demo/SKILL.md"
         original = skill.read_text(encoding="utf-8")
@@ -125,7 +125,7 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
                 self.assertEqual(self.tree("alice"), before)
 
     def test_config_update_must_keep_bound_server_names(self):
-        """도구 저장이 붙은 커넥터의 서버 이름을 빠뜨리면 409 이고 설정이 그대로다. 함께 보내면 지금처럼 쓴다."""
+        """도구 저장이 붙은 플러그인의 서버 이름을 빠뜨리면 409 이고 설정이 그대로다. 함께 보내면 지금처럼 쓴다."""
         self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
         path = self.root / "alice/config.yaml"
@@ -141,13 +141,13 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
                                       body={"profile": "alice", "config": {"skills": {"external_dirs": []}}}), 200)
 
     def test_tool_map_keeps_a_bound_server_whose_connector_left_the_operator_list(self):
-        """운영 목록에서 빠진 바인딩 커넥터의 서버도 빈 `tools` 로 대응에 남고, 떼면 기록이 참조하던 env 를 지운다."""
+        """운영 목록에서 빠진 바인딩 플러그인의 서버도 빈 `tools` 로 대응에 남고, 떼면 기록이 참조하던 env 를 지운다."""
         demo, _ = self.bind_fixture()
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
         self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
         listed = {DEMO: {"root": str(demo), "env": {"DEMO_BASE": DEMO_BASE}}}
         with mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(listed)}):
-            # 다른 값으로 다시 붙이면 대응 파일을 다시 쓴다. 빠진 커넥터의 서버는 도구 없이 남는다.
+            # 다른 값으로 다시 붙이면 대응 파일을 다시 쓴다. 빠진 플러그인의 서버는 도구 없이 남는다.
             self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
                                         values={"token": "demo_new_0123456789"}).status_code, 200)
             self.assertIs(self.bind(DEMO, "c1").body["changed"], True)

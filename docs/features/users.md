@@ -54,7 +54,7 @@ sequenceDiagram
 | 모델 | `/admin/models` | 그룹 모델 설정(단계별 모델, 그룹 기본 단계), 모델 숨김 | 대화 입력창 모델 선택기 안의 「그룹 모델 설정」 |
 | 도구 | `/admin/tools` | 그룹의 화면에 보일 도구, 켜진 에이전트 수와 관리 화면 링크 | 없음 |
 | 사용량과 비용 | `/admin/usage`, `/admin/executions/{id}` | 금액과 모델과 토큰, 「사용량 내역」, 「설정별 사용량」 탭, 실행 상세의 내부 값 | `/usage` 와 `/executions/{id}` 가 `ADMIN` 에게 더 그리던 것 |
-| 커넥터 | `/admin/connections` | 반영을 기다리는 바인딩의 「반영 완료」. 재시작 대기 바인딩은 공유 gateway 를 재시작한 뒤 누른다 | `/connections` 아래의 관리자 패널 |
+| 플러그인 | `/admin/connections` | 반영을 기다리는 바인딩의 「반영 완료」. 재시작 대기 바인딩은 공유 gateway 를 재시작한 뒤 누른다 | `/connections` 아래의 관리자 패널 |
 | 브라우저 | `/admin/browsers` | 모든 사용자 브라우저의 상태와 오류 코드, 끄기와 지우기 | 없음. `/browser` 는 내 브라우저만 보이고 오류 코드를 그리지 않는다 |
 | 파일 공간 | `/admin/workspaces` | 실행 공간마다 용량과 항목 수 | 없음. `/files` 는 내 공간만 보이고 관리자도 남의 공간을 열지 못한다 |
 

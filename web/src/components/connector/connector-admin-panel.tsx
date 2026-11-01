@@ -18,7 +18,7 @@ import {
   type ConnectorSummary,
 } from "@/lib/connection";
 
-/** 바인딩 한 줄의 열쇠다. 한 에이전트에 같은 커넥터는 하나만 붙는다. */
+/** 바인딩 한 줄의 열쇠다. 한 에이전트에 같은 플러그인은 하나만 붙는다. */
 const key = (connection: AdminConnection) =>
   `${connection.agentCode}/${connection.connectorId}`;
 

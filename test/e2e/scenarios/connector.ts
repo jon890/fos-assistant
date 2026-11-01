@@ -1,7 +1,7 @@
 /**
- * 두 번째 커넥터가 코드 변경 없이 붙는지 전체 흐름으로 본다.
+ * 두 번째 플러그인이 코드 변경 없이 붙는지 전체 흐름으로 본다.
  *
- * <p>대역의 카탈로그에는 시험 커넥터만 있다. Control Plane 은 그 선언만 읽고 등록, 확인, 해제까지 돈다. 시험 커넥터는
+ * <p>대역의 카탈로그에는 시험 플러그인만 있다. Control Plane 은 그 선언만 읽고 등록, 확인, 해제까지 돈다. 시험 플러그인은
  * 칸 이름과 env 이름이 다른 서비스와 겹치지 않는다. 연결은 계정 하나이고 에이전트를 만들지 않는다(ADR-083). 값은 대역의
  * 보관 파일에만 가고, 에이전트에 붙이는 흐름은 연결 붙이기 시나리오가 본다.
  */
@@ -19,17 +19,17 @@ type ConnectorView = {
 const CONNECTION = `/connections/${DEMO_CONNECTOR.id}`;
 
 export const connectorScenario: Scenario = {
-  name: "커넥터 연결",
+  name: "플러그인 연결",
 
   async run(context) {
-    step("카탈로그에 시험 커넥터가 보이고 대시보드 내부 이름은 응답에 없다");
-    const catalogResponse = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "커넥터 목록");
+    step("카탈로그에 시험 플러그인이 보이고 대시보드 내부 이름은 응답에 없다");
+    const catalogResponse = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "플러그인 목록");
     const demo = catalogResponse.json<ConnectorView[]>().find((connector) => connector.id === DEMO_CONNECTOR.id);
-    expect(demo !== undefined, `커넥터 목록에 ${DEMO_CONNECTOR.id} 가 없다\n${catalogResponse.body}`);
+    expect(demo !== undefined, `플러그인 목록에 ${DEMO_CONNECTOR.id} 가 없다\n${catalogResponse.body}`);
     expect(
       demo!.title === DEMO_CONNECTOR.title && demo!.available && demo!.myStatus === "DISCONNECTED"
         && demo!.bindings.length === 0,
-      `시험 커넥터 항목이 다르다\n${catalogResponse.body}`,
+      `시험 플러그인 항목이 다르다\n${catalogResponse.body}`,
     );
     expect(demo!.fields.map((field) => field.key).join() === "token,scope", `칸 순서가 다르다\n${catalogResponse.body}`);
     expect(demo!.fields[0]!.secret && demo!.fields[0]!.required && demo!.fields[1]!.hasOptions,
@@ -140,11 +140,11 @@ export const connectorScenario: Scenario = {
     expect(DEMO_TOKEN_OK.length >= 16, "검사용 토큰이 앞부분을 저장하는 길이보다 짧다");
     expect(ready.secretPrefixes.token === DEMO_TOKEN_OK.slice(0, 4), `비밀 앞부분이 다르다\n${checked.body}`);
     expect(ready.values.scope === "a" && ready.values.token === undefined, `칸 값이 다르다\n${checked.body}`);
-    const catalogAfter = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "등록 뒤 커넥터 목록");
+    const catalogAfter = expectStatus(await call(context, "/connectors", { token: context.tokens.dad }), 200, "등록 뒤 플러그인 목록");
     const listed = catalogAfter.json<ConnectorView[]>().find((connector) => connector.id === DEMO_CONNECTOR.id);
     expect(
       listed?.myStatus === "READY" && listed.bindings.length === 0,
-      `등록 뒤 목록의 시험 커넥터가 붙은 에이전트 없는 READY 가 아니다\n${catalogAfter.body}`,
+      `등록 뒤 목록의 시험 플러그인이 붙은 에이전트 없는 READY 가 아니다\n${catalogAfter.body}`,
     );
     const reads = [
       registered.body,

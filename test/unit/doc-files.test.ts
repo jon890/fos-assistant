@@ -16,7 +16,7 @@ const MODULE_NAMES = new Set(["code-architecture.md", "data-schema.md"]);
 /** 루트 `docs/features/` 아래 기능 문서의 이름이다. 규칙은 ADR-20261009 / feature-docs 가 정한다. */
 const FEATURE_DOC = /^[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 
-/** 커넥터 하나의 개발 내용을 갖는 기능 파일이다. 「절로 더한다」 의 예외이고 ADR-20261009 / feature-docs 가 정한다. */
+/** 플러그인 하나의 개발 내용을 갖는 기능 파일이다. 「절로 더한다」 의 예외이고 ADR-20261009 / feature-docs 가 정한다. */
 const CONNECTOR_DOC = /^([a-z0-9]+(?:-[a-z0-9]+)*)-connector\.md$/;
 
 /** 정해진 이름 밖에 두는 문서와 그 까닭이다. 까닭이 없으면 더하지 않는다. */
@@ -26,7 +26,7 @@ export const EXCEPTIONS: Record<string, string> = {
   "docs/self-hosting.md": "구현 전인 계획서가 이 파일의 환경 변수 표를 고친다. 그 계획이 끝나면 README 와 설정 파일 주석으로 옮긴다",
 };
 
-/** `docs/` 밖에서 둘 수 있는 Markdown 이다. 입구와 규칙, 코드 옆 README, 스킬과 커넥터가 읽는 파일이다. */
+/** `docs/` 밖에서 둘 수 있는 Markdown 이다. 입구와 규칙, 코드 옆 README, 스킬과 플러그인이 읽는 파일이다. */
 const OUTSIDE_DOCS = [
   /^(?:.+\/)?README\.md$/,
   /^README\.ko\.md$/,
@@ -50,7 +50,7 @@ export function problemOf(file: string): string | undefined {
       if (!FEATURE_DOC.test(name)) return "docs/features/ 아래에는 소문자 영문과 숫자, 하이픈 이름의 .md 만 둔다";
       const connector = CONNECTOR_DOC.exec(name)?.[1];
       if (connector && !existsSync(join(REPO_ROOT, "hermes/connectors", connector))) {
-        return "커넥터별 기능 파일은 같은 이름의 hermes/connectors/<id>/ 가 있어야 한다";
+        return "플러그인별 기능 파일은 같은 이름의 hermes/connectors/<id>/ 가 있어야 한다";
       }
       return undefined;
     }

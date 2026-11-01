@@ -7,7 +7,7 @@ const SCOPE_ID = "scope-a";
 const demoConnector = {
   id: DEMO_ID,
   title: "검사용 메모",
-  description: "검사에서만 쓰는 커넥터입니다.",
+  description: "검사에서만 쓰는 플러그인입니다.",
   myStatus: "DISCONNECTED",
   available: true,
   bindings: [],
@@ -894,7 +894,7 @@ test("허락한 동작이 없으면 그 제목을 보이지 않는다", async ({
   await expect(page.getByText("묻지 않고 실행하는 동작")).toHaveCount(0);
 });
 
-test("도구를 선언하지 않은 커넥터는 안내 한 줄을 보인다", async ({ page }) => {
+test("도구를 선언하지 않은 플러그인은 안내 한 줄을 보인다", async ({ page }) => {
   await page.route("**/api/connectors", (route) =>
     route.fulfill({ json: [{ ...demoConnector, tools: [] }] }),
   );
@@ -1043,7 +1043,7 @@ test("해제가 중간에 멈춰 연결이 준비 중이면 다시 해제하라�
   await expect(page.getByRole("button", { name: "연결 해제" })).toBeVisible();
 });
 
-test("입력 칸이 없는 커넥터는 입력 없이 연결하기 단추만 보인다", async ({
+test("입력 칸이 없는 플러그인은 입력 없이 연결하기 단추만 보인다", async ({
   page,
 }) => {
   let submitted: unknown;
@@ -1074,7 +1074,7 @@ const browserConnector = {
   ownerBrowserLoginUrl: LOGIN_URL,
 };
 
-test("내 브라우저 로그인을 쓰는 커넥터는 칸 위에 안내와 로그인 링크를 보인다", async ({
+test("내 브라우저 로그인을 쓰는 플러그인은 칸 위에 안내와 로그인 링크를 보인다", async ({
   page,
 }) => {
   await page.route("**/api/connectors", (route) =>
@@ -1086,7 +1086,7 @@ test("내 브라우저 로그인을 쓰는 커넥터는 칸 위에 안내와 로
   await page.goto(`/connections/${DEMO_ID}`);
   const notice = page.getByTestId("browser-login-notice");
   await expect(notice).toContainText(
-    "이 커넥터는 「내 브라우저」에 로그인한 계정을 써요.",
+    "이 플러그인은 「내 브라우저」에 로그인한 계정을 써요.",
   );
   await expect(
     notice.getByRole("link", { name: "내 브라우저에서 로그인" }),

@@ -284,7 +284,7 @@ class StandardPluginToolListTest(StandardPluginCase):
         self.assertNotIn(LOCAL_TOKEN, "\n".join(logs))
 
     def test_tool_list_refuses_declared_connectors_and_bad_bodies(self):
-        """`assistant.json` 을 둔 커넥터(`schema: 2`)와 `tool` 을 실은 본문은 거절한다. 서버에 붙지 않는다."""
+        """`assistant.json` 을 둔 플러그인(`schema: 2`)와 `tool` 을 실은 본문은 거절한다. 서버에 붙지 않는다."""
         declared = {"schema": 2, "id": LOCAL, "title": "덮어쓴 제목",
                     "fields": [{"key": "token", "env": "STD_TOKEN", "label": "토큰", "secret": True},
                                {"key": "region", "env": "STD_REGION", "label": "지역", "required": False}],

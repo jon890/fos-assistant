@@ -12,7 +12,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
+| 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -187,7 +187,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 `profile_managed` 가 참이면 그 Hermes profile 과 올린 스킬 디렉터리를 지우고 그 profile 의 MCP 토큰을 폐기한다.
 거짓이면 운영에서 만든 profile 이라 profile 은 남긴다.
 `profile_managed` 와 상관없이 그 에이전트에 붙은 바인딩은 뗀다.
-지운 지 `assistant.agents.purge-after` 가 지나면 정리 작업이 에이전트 행과 그 에이전트의 설정, 권한, 살펴보기 기록을 지우고 커넥터 줄의 `agent_id` 는 비운다.
+지운 지 `assistant.agents.purge-after` 가 지나면 정리 작업이 에이전트 행과 그 에이전트의 설정, 권한, 살펴보기 기록을 지우고 플러그인 줄의 `agent_id` 는 비운다.
 대화와 실행 기록과 스킬 호출 이력, 예약 작업은 남고 「지운 에이전트」 로 보인다. 무엇을 지우고 무엇을 기다리는지는 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
@@ -266,7 +266,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `PENDING`, `EXECUTING`, `UNKNOWN`과 KST 당일 승인된 금융 `SUCCEEDED` 줄은 본문을 보존한다.
 지연한 본문과 기존 purge의 남은 본문은 다음 주기에 같은 사용자·대화 잠금과 트랜잭션으로 다시 검사한다.
 상태와 KST 날짜 경계, 롤백도 실제 MySQL 검사가 확인한다.
-자세한 지연 조건은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md#대화-삭제-뒤-승인-본문-정리)이 갖는다.
+자세한 지연 조건은 [플러그인 도구 정책과 승인](../../docs/features/connector-policy.md#대화-삭제-뒤-승인-본문-정리)이 갖는다.
 
 보관 기간 정리는 `AttachmentCleaner`, `ArtifactCleaner`, `MediaObservationCleaner`, `ContentDraftCleaner`가 파일과 관찰·원고 본문을 다룬다.
 `NotificationCleaner`, `AttentionEventCleaner`, `DecisionFeedbackCleaner`는 기간이 지난 기록을 지운다.
@@ -372,7 +372,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
-- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 와 `CUSTOM` 이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가 선택 없음으로 바꿨다
+- `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `model_provider`, `model`, `reasoning_effort` 는 `CUSTOM` 이 쓰던 칸이라 그 뒤로는 늘 비어 있고, 실행 줄이 대화의 effort 를 읽는 경로(`Conversation.executionConversation`)를 정리할 때 함께 지운다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
@@ -531,7 +531,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 ### result_delivery_item
 
 묶음에 든 결과 하나가 한 행이다. 다시 전달할 때 `id` 순서로 입력을 만든다.
-`result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 커넥터 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
+`result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 플러그인 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
 `(source, result_key)` 에 유일 제약이 있어 한 결과는 한 묶음에만 든다. 같은 결과를 두 자동 turn 이 함께 넘기려 하면 뒤의 트랜잭션이 알림 줄까지 함께 되돌아간다.
 결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
 
@@ -602,8 +602,8 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 ### execution_event
 
 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 것이다. Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
-`tool_name` 은 붙은 커넥터 서버의 도구면 Hermes 등록 이름 `mcp__<서버>__<도구>` 다.
-`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 에이전트에 붙은 커넥터 서버의 도구 내용은 전체를 가린다.
+`tool_name` 은 붙은 플러그인 서버의 도구면 Hermes 등록 이름 `mcp__<서버>__<도구>` 다.
+`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 에이전트에 붙은 플러그인 서버의 도구 내용은 전체를 가린다.
 **`subagent_name`은 이름, `subagent_id`, `goal` 순서로 채운다.** 이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다. 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 **`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.** 어느 칸이 오는지는 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 가 갖는다. 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓰고 사용량 합계에 더하지 않는다.
@@ -689,7 +689,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 
 V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 전에 맞춘다.
 `always_inject` 와 `retrieval` 이 어긋난 줄은 `always_inject` 를 따라 `retrieval` 을 `ALWAYS` 나 `SEARCH` 로 고친다.
-`agent_memory_collection` 에 줄이 없는 에이전트에는 `core` 를 넣는다. 옛 커넥터 에이전트는 뺀다.
+`agent_memory_collection` 에 줄이 없는 에이전트에는 `core` 를 넣는다. 옛 플러그인 에이전트는 뺀다.
 되돌린 동안 고치거나 지운 Memory 는 `memory_revision` 에 판이 남지 않는다.
 
 근거는 [ADR-003](adr/ADR-003-memory-권한은-주입으로-강제한다.md), [ADR-012](adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md),
@@ -768,17 +768,17 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `score` 는 코드가 찾은 줄의 유사도이고 사람과 에이전트가 맺은 줄은 비어 있다. `created_by_execution_id` 는 에이전트가 맺은 줄의 origin 실행이다
 - 양 끝에 외래 키를 걸지 않는다. 항목을 지우면 `MemoryService.delete` 가 같은 트랜잭션에서 그 항목을 한쪽 끝으로 둔 줄을 지운다
 
-## 커넥터 표
+## 플러그인 표
 
 ### connector_connection
 
-사용자마다 커넥터 하나에 연결 하나를 둔다. 상태가 바뀌는 조건과 API 는 [커넥터 연결](../../docs/features/connector.md) 이 갖는다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). `(user_id, connector_id)` 가 유일하다.
+사용자마다 플러그인 하나에 연결 하나를 둔다. 상태가 바뀌는 조건과 API 는 [플러그인 연결](../../docs/features/connector.md) 이 갖는다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). `(user_id, connector_id)` 가 유일하다.
 
 - `fields` 는 JSON 텍스트 `{"values": {key: 값}, "secretPrefixes": {key: 앞 4자}}` 다. 비밀 칸의 원문과 해시는 넣지 않는다. 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
-- `listed_tools` 는 표준 플러그인(`schema: 3`) 연결의 마지막 확인에서 MCP 서버가 낸 도구의 JSON 텍스트 `{"<도구 이름>": <readOnlyHint 가 참인가>}` 다. 표준 플러그인이 아니거나 확인하기 전, 해제한 연결은 null 이다. 값을 다시 등록하면 새로 받은 목록으로 바꾼다. 참인 도구만 상시 허락을 줄 수 있고, 뜻은 [커넥터 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 갖는다([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md))
+- `listed_tools` 는 표준 플러그인(`schema: 3`) 연결의 마지막 확인에서 MCP 서버가 낸 도구의 JSON 텍스트 `{"<도구 이름>": <readOnlyHint 가 참인가>}` 다. 표준 플러그인이 아니거나 확인하기 전, 해제한 연결은 null 이다. 값을 다시 등록하면 새로 받은 목록으로 바꾼다. 참인 도구만 상시 허락을 줄 수 있고, 뜻은 [플러그인 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 갖는다([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md))
 - 해제해도 행은 남기고 `fields` 를 빈 `values` 와 빈 `secretPrefixes` 로 비운다. 지우는 경로는 없다
 
 옛 전용 에이전트의 이관을 마쳐 `agent_id`, `restart_required`, `desired_enabled`와 관련 FK·유일 색인을 제거했다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 연결 행과 바인딩은 유지한다.
@@ -788,7 +788,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 에이전트에 연결을 붙인 것이고, 에이전트와 연결은 다대다다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). `(agent_id, connection_id)` 가 유일하다.
 연결의 `status` 는 「값이 확인돼 쓸 수 있는가」 이고, 바인딩의 `status` 는 「그 에이전트의 profile 에 설치되고 반영됐는가」 다. 바인딩의 `desired_enabled` 가 참이어도 반영 확인 전에는 `PENDING` 이다.
 
-- `mcp_server` 는 붙일 때 manifest 가 선언한 MCP 서버 이름이다. 운영자가 카탈로그에서 커넥터를 빼도 그 profile 에 설치된 서버 이름을 잃지 않게 둔다. 마이그레이션이 만든 옛 바인딩은 비어 있고 연결 확인과 관리자 반영 완료가 채운다
+- `mcp_server` 는 붙일 때 manifest 가 선언한 MCP 서버 이름이다. 운영자가 카탈로그에서 플러그인을 빼도 그 profile 에 설치된 서버 이름을 잃지 않게 둔다. 마이그레이션이 만든 옛 바인딩은 비어 있고 연결 확인과 관리자 반영 완료가 채운다
 - `install_attempt_id`는 nullable `BINARY(16)` UUID다. 설치 시작을 커밋할 때 새 값으로 바꾸고 현재 시도의 결과만 한 번 적용한 뒤 비운다. 기존 행은 null로 유지하며 상태를 바꾸거나 값을 채우는 마이그레이션은 하지 않는다
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
@@ -796,16 +796,16 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 ### connector_action
 
-커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md), [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
+플러그인 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md), [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다.
 
-- `agent_id` 는 판정한 실행의 에이전트이고, 승인하면 그 에이전트의 profile 에서 실행한다. 바인딩 전에 남은 옛 줄은 옛 커넥터 에이전트를 가리킨다. 지운 에이전트를 정리하면 비우고, 비어 있는 줄은 승인해도 실행하지 않는다
+- `agent_id` 는 판정한 실행의 에이전트이고, 승인하면 그 에이전트의 profile 에서 실행한다. 바인딩 전에 남은 옛 줄은 옛 플러그인 에이전트를 가리킨다. 지운 에이전트를 정리하면 비우고, 비어 있는 줄은 승인해도 실행하지 않는다
 - `tool_name` 은 MCP 서버의 원래 도구 이름이고 `hermes_tool` 은 hook 이 받은 등록 이름이다. 등록 이름과 맞는 것을 확인하지 못한 호출은 `tool_name` 을 비운다
 - `risk` 와 `approval_mode` 는 판정 당시의 값이다. 정책을 읽지 못했거나, 선언이 없었거나, 연결이 준비되지 않아 거절한 호출은 비어 있다
 - `args_sha256` 은 원문을 두지 않는 줄에서도 무엇을 불렀는지 맞춰 보려고 둔다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
 - `dedupe_key` 는 `v1-connector`, profile, 루트 session, session, `tool_call_id` 를 줄바꿈으로 이어 SHA-256 한 값이고 유일하다. 같은 호출이 다시 와도 줄이 하나다
-- `result_text` 의 `FAILED` 줄은 커넥터가 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
-- `result_text` 의 `UNKNOWN` 줄은 커넥터가 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
+- `result_text` 의 `FAILED` 줄은 플러그인이 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
+- `result_text` 의 `UNKNOWN` 줄은 플러그인이 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
@@ -836,7 +836,7 @@ key 교체와 이전 key 줄의 처리는 [ADR-20261013 / financial-digest-key-r
 승인 줄 하나에 속한 금융 실행 내용이다.
 정책 판정이 받은 준비 도구 호출이 이 줄을 만들고, 공개 승인 API 가 이 줄을 금융 승인으로 실행한다. 실행 도구의 직접 호출은 계속 거절한다.
 근거는 [ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)이 갖는다.
-JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md)의 「금융 실행 내용의 저장과 검증」이 갖는다.
+JSON 검증 계약은 [플러그인 도구 정책과 승인](../../docs/features/connector-policy.md)의 「금융 실행 내용의 저장과 검증」이 갖는다.
 
 | 컬럼 | 타입과 제약 |
 | --- | --- |
@@ -1021,7 +1021,7 @@ action을 지우면 실행 내용도 지운다.
 ### proactive_check_problem
 
 결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)). 받아들인 것과 버린 것을 모두 남긴다.
-칸의 뜻과 검사는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「문제 후보」 가 갖는다. 살펴보기 줄을 지우면 함께 지운다. 원문 본문과 커넥터 응답은 남기지 않는다.
+칸의 뜻과 검사는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「문제 후보」 가 갖는다. 살펴보기 줄을 지우면 함께 지운다. 원문 본문과 플러그인 응답은 남기지 않는다.
 
 ### `proactive_value_evaluation`
 

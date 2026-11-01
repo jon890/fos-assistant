@@ -28,7 +28,7 @@ async function fixture(args = ["${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js"]) {
   const root = join(work, "source");
   const connector = join(root, "sample");
   const files = {
-    "connector.json": '{"id":"sample"}\n',
+    "assistant.json": '{"id":"sample"}\n',
     ".mcp.json":
       JSON.stringify({ mcpServers: { sample: { command: "bun", args } } }) +
       "\n",

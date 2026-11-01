@@ -84,7 +84,7 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
 
   const menu = page.getByRole("navigation", { name: "관리자 메뉴" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("link")).toHaveText(["사용자", "에이전트", "모델", "도구", "사용량과 비용", "커넥터", "브라우저", "파일 공간"]);
+  await expect(menu.getByRole("link")).toHaveText(["사용자", "에이전트", "모델", "도구", "사용량과 비용", "외부 서비스 연결", "브라우저", "파일 공간"]);
   await expect(menu.getByRole("link", { name: "사용자", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
   await expect(page.getByRole("banner").getByText("관리자", { exact: true })).toBeVisible();
@@ -179,7 +179,7 @@ test("일반 화면의 에이전트 상세에는 관리 절과 모델 절이 없
 
 test("연결 반영 확인은 관리자 영역에 있고 일반 외부 서비스 연결 화면에는 없다", async ({ page }) => {
   await page.goto("/admin/connections");
-  await expect(page.getByRole("heading", { name: "커넥터", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "외부 서비스 연결", exact: true })).toBeVisible();
   await expect(page.getByTestId("connector-admin-panel")).toBeVisible();
 
   await page.goto("/connections");
@@ -300,11 +300,32 @@ test("MEMBER 역할이 관리자 영역의 사용량 주소를 열면 홈으로 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("ADMIN 역할의 대화 화면 설정 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
+test("ADMIN 역할의 대화 화면 모델 단계 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
+  // 그룹에 채운 칸이 없으면 단추 자체를 그리지 않는다. 실제 응답에 칸만 덮어써 창을 열 수 있게 한다.
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          tiers: [
+            { tier: "INSTANT", label: "Instant", provider: "openai-codex", model: "example-fast", reasoningEffort: "low" },
+            { tier: "HIGH", label: "High", provider: "openai-codex", model: "example-deep", reasoningEffort: "high" },
+          ],
+        },
+      });
+    },
+  );
   await page.goto("/");
-  await page.getByTestId("model-tier-settings").click();
-  await expect(page.getByRole("dialog", { name: "모델 단계 설정" })).toBeVisible();
+  await page.getByTestId("model-tier-picker").click();
+  const slider = page.getByTestId("model-tier-slider");
+  await expect(slider.getByRole("radio", { name: "High" })).toBeVisible();
   await expect(page.getByRole("button", { name: "그룹 모델 설정" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "그룹 모델 설정" })).toHaveCount(0);
 });
 
 test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하면 새로 고쳐도 남고 모델 숨김 양식이 보인다", async ({ page }) => {

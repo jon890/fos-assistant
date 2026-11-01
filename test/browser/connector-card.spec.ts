@@ -11,7 +11,7 @@ function connector(id: string, change: Record<string, unknown> = {}) {
   return {
     id,
     title: `검사용 ${id}`,
-    description: `${id} 커넥터의 설명이에요.`,
+    description: `${id} 플러그인의 설명이에요.`,
     icon: null,
     link: null,
     myStatus: "DISCONNECTED",
@@ -71,7 +71,7 @@ test("아이콘과 링크가 있는 카드가 도구 요약과 함께 보인다"
   await expect(readme).toHaveAttribute("target", "_blank");
   await expect(readme).toHaveAttribute("rel", "noopener noreferrer");
   await expect(readme).toHaveAccessibleName(
-    /커넥터 README.*검사용 rich-card.*새 탭/,
+    /플러그인 README.*검사용 rich-card.*새 탭/,
   );
   await expect(card.getByTestId("connector-tool-summary")).toHaveText(
     "도구 3개 · 조회 1 · 쓰기 1 · 되돌리기 어려운 쓰기 1",
@@ -236,7 +236,7 @@ test("카드의 설명 글을 눌러도 상세 화면으로 간다", async ({ pa
   await page.goto("/connections");
   // 설명은 이름 링크의 덧씌움 아래에 있어 locator.click() 은 포인터 가로채기로 실패한다.
   const box = await page
-    .getByText("rich-card 커넥터의 설명이에요.")
+    .getByText("rich-card 플러그인의 설명이에요.")
     .boundingBox();
   if (!box) throw new Error("설명 요소의 상자를 찾지 못했어요");
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);

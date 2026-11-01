@@ -1,5 +1,4 @@
 import type { AgentView } from "@/lib/agent";
-import { type ModelChoice } from "./model-picker";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { type ModelTierCode } from "@/lib/model-tiers";
 import type { MessageAttachment } from "./message-types";
@@ -44,14 +43,12 @@ export type Props = {
    * 입력창을 거치지 않고 보내는 추천 질문도 이 동안은 막아야 대화가 둘 생기지 않는다.
    */
   onBlockingChange?(blocking: boolean): void;
-  /** 이 대화에 적힌 모델 선택이다. 대화가 아직 없으면 null */
-  modelChoice: ModelChoice | null;
   /**
    * 대화는 있는데 그 대화에 적힌 모델 선택을 아직 모른다. 대화 목록이 오기 전이 그렇다.
-   * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
+   * 이때 고르게 하면 적힌 칸을 모르는 채 처음 위치를 잡는다. 그래서 단추를 막는다.
    */
   modelChoiceUnknown: boolean;
-  modelSelectionMode: "TIER" | "CUSTOM" | null;
+  modelSelectionMode: "TIER" | null;
   modelTier: ModelTierCode | null;
   /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
   onModelChoiceSaved(conversation: Conversation): void;

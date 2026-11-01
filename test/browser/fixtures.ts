@@ -254,10 +254,10 @@ function connectorCall(
 }
 
 /**
- * 그 사용자로 시험 커넥터를 등록하고 확인해 `READY` 로 만든다. 연결의 상태를 돌려준다.
+ * 그 사용자로 시험 플러그인을 등록하고 확인해 `READY` 로 만든다. 연결의 상태를 돌려준다.
  *
  * <p>연결 등록은 에이전트를 만들지 않는다. 에이전트에 붙이는 것은 `bindDemoConnector` 가 한다.
- * 커넥터 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
+ * 플러그인 호출에는 사용자별 동시 1개 제한이 있어 등록과 확인을 차례로 보낸다.
  */
 export async function connectDemoConnector(email: string): Promise<string> {
   const registered = await connectorCall(email, "POST", "", {
@@ -265,30 +265,30 @@ export async function connectDemoConnector(email: string): Promise<string> {
   });
   if (!registered.ok)
     throw new Error(
-      `시험 커넥터를 등록하지 못했다: ${registered.status} ${await registered.text()}`,
+      `시험 플러그인을 등록하지 못했다: ${registered.status} ${await registered.text()}`,
     );
   const checked = await connectorCall(email, "POST", "/check");
   if (!checked.ok)
     throw new Error(
-      `시험 커넥터를 확인하지 못했다: ${checked.status} ${await checked.text()}`,
+      `시험 플러그인을 확인하지 못했다: ${checked.status} ${await checked.text()}`,
     );
   const view = (await checked.json()) as { status: string };
   if (view.status !== "READY") {
-    throw new Error(`시험 커넥터가 READY 가 아니다: ${view.status}`);
+    throw new Error(`시험 플러그인이 READY 가 아니다: ${view.status}`);
   }
   return view.status;
 }
 
-/** 그 사용자의 시험 커넥터 연결을 해제한다. 붙은 에이전트에서도 모두 뗀다. */
+/** 그 사용자의 시험 플러그인 연결을 해제한다. 붙은 에이전트에서도 모두 뗀다. */
 export async function disconnectDemoConnector(email: string): Promise<void> {
   const response = await connectorCall(email, "DELETE", "");
   if (!response.ok)
     throw new Error(
-      `시험 커넥터를 해제하지 못했다: ${response.status} ${await response.text()}`,
+      `시험 플러그인을 해제하지 못했다: ${response.status} ${await response.text()}`,
     );
 }
 
-/** 그 사용자의 시험 커넥터 연결을 그 사용자의 에이전트에 붙인다. 붙인 줄의 상태를 돌려준다. */
+/** 그 사용자의 시험 플러그인 연결을 그 사용자의 에이전트에 붙인다. 붙인 줄의 상태를 돌려준다. */
 export async function bindDemoConnector(
   email: string,
   agentCode: string,
@@ -304,7 +304,7 @@ export async function bindDemoConnector(
   );
   if (!response.ok)
     throw new Error(
-      `시험 커넥터를 붙이지 못했다: ${agentCode} ${response.status} ${await response.text()}`,
+      `시험 플러그인을 붙이지 못했다: ${agentCode} ${response.status} ${await response.text()}`,
     );
   return (await response.json()) as {
     bound: boolean;
@@ -594,7 +594,7 @@ function startControlPlane(
       ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
       ASSISTANT_MEMORY_ENCRYPTION_KEYS:
         "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
-      // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
+      // 검사는 같은 사용자로 짧은 시간에 플러그인을 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       HERMES_PROFILE_KEY_DIR: keyDir,
       // 기본값이 없어 주지 않으면 기동하지 못한다. 실행마다 만든 임시 디렉터리 아래에 둔다.

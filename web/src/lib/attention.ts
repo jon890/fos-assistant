@@ -43,12 +43,6 @@ export type AttentionItem = {
   } | null;
   /** 「보고」 카드의 다섯 칸 요약이다. 그 밖의 카드에서는 null 이다. */
   report: AttentionReport | null;
-  /** 먼저 다룰 문제 항목의 판정과 제안한 다음 행동이다. 모델이 쓴 글이라 평문으로만 그린다. 그 밖의 항목에서는 null 이다. */
-  problem: {
-    decisionId: number;
-    level: string;
-    action: string | null;
-  } | null;
 };
 
 export type AttentionReport = {
@@ -334,15 +328,7 @@ export function isoToSeoulInput(iso: string | null): string {
 }
 
 export type ItemAction = {
-  kind:
-    | "link"
-    | "accept"
-    | "reject"
-    | "edit"
-    | "done"
-    | "drop"
-    | "react-accept"
-    | "react-dismiss";
+  kind: "link" | "accept" | "reject" | "edit" | "done" | "drop";
   label: string;
 };
 
@@ -381,13 +367,6 @@ export function itemActions(item: AttentionItem): ItemAction[] {
     case "DELEGATION_RUNNING":
     case "DELEGATION_FINISHED":
       return link("작업 과정 보기");
-    case "PROBLEM_SURFACED":
-      if (item.problem === null) return [];
-      return [
-        ...link("점검 대화에서 보기"),
-        { kind: "react-accept", label: "받아들임" },
-        { kind: "react-dismiss", label: "관심 없음" },
-      ];
     default:
       return [];
   }

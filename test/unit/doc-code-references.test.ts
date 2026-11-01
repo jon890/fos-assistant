@@ -190,8 +190,8 @@ export function stringRoutes(source: string): Route[] {
 }
 
 /**
- * `hermes/connectors/<id>/` 아래 파일이면 그 커넥터 디렉터리를 낸다.
- * 커넥터별 기능 파일 `docs/features/<id>-connector.md` 도 그 커넥터의 문서로 본다.
+ * `hermes/connectors/<id>/` 아래 파일이면 그 플러그인 디렉터리를 낸다.
+ * 플러그인별 기능 파일 `docs/features/<id>-connector.md` 도 그 플러그인의 문서로 본다.
  */
 export function connectorOf(file: string): string | undefined {
   const feature = /^docs\/features\/([a-z0-9-]+)-connector\.md$/.exec(file);
@@ -257,7 +257,7 @@ function canonical(key: string): string {
 interface CodeIndex {
   paths: PathIndex;
   routes: Route[];
-  /** 커넥터 디렉터리마다 그 소스가 문자열로 부르는 `/api/v1/` 경로다. */
+  /** 플러그인 디렉터리마다 그 소스가 문자열로 부르는 `/api/v1/` 경로다. */
   connectorRoutes: Map<string, Route[]>;
   configKeys: Set<string>;
   propertyFiles: Map<string, string[]>;
@@ -422,7 +422,7 @@ export function resolveToken(text: string, docFile: string): { category: Categor
   let resolved: boolean | undefined;
   if (category === "path") resolved = resolvePath(text, docFile, index.paths);
   else if (category === "api") {
-    // 커넥터 문서의 API 경로는 그 커넥터가 부르는 바깥 서비스의 경로다. 그 커넥터 소스의 문자열과 맞춘다
+    // 플러그인 문서의 API 경로는 그 플러그인이 부르는 바깥 서비스의 경로다. 그 플러그인 소스의 문자열과 맞춘다
     const connector = connectorOf(docFile);
     resolved = matchesRoute(text, connector ? (index.connectorRoutes.get(connector) ?? []) : index.routes);
   } else if (category === "config") resolved = resolveConfig(text, index);
@@ -561,7 +561,7 @@ test("멤버는 선언과 클래스 안 호출로 찾고 다른 객체의 멤버
   for (const member of ["stream", "wrap", "map"]) assert.equal(declaresMember(java, member), false, member);
 });
 
-test("커넥터 문서의 API 경로는 그 커넥터 소스의 문자열과 맞춘다", () => {
+test("플러그인 문서의 API 경로는 그 플러그인 소스의 문자열과 맞춘다", () => {
   assert.equal(connectorOf("hermes/connectors/guide/src/client.ts"), "hermes/connectors/guide");
   assert.equal(connectorOf("hermes/connectors/README.md"), undefined);
   assert.equal(connectorOf("docs/features/guide-connector.md"), "hermes/connectors/guide");

@@ -169,7 +169,7 @@ reset과 완료·중지·오류에서 지우고, 대화 선택·새 실행·재�
 맞지 않는 구간과 Hermes가 돌려준 최종 `output`은 그대로 둔다. 최종 답에서 안내 문장을 찾아 지우지 않는다.
 중지 결과의 `output`이 비었을 때 저장하는 부분 답에도 같은 재분류를 적용한다.
 
-중간 안내는 신뢰하지 않는 모델 텍스트다. 비밀값과 커넥터 호출 뒤의 민감 출력은 기존 도구 설명 정책으로 가린다.
+중간 안내는 신뢰하지 않는 모델 텍스트다. 비밀값과 플러그인 호출 뒤의 민감 출력은 기존 도구 설명 정책으로 가린다.
 think 블록과 reasoning 사건의 원문은 전달하지 않는다. 이 정책이 모든 민감한 문장을 판별한다는 보장은 없다.
 이미 흘린 delta는 뒤의 안내 사건으로 재분류되기 전까지 답 영역에 잠시 보일 수 있다.
 Hermes wire의 상세 계약과 확인 범위는 [Hermes 계약](../../hermes/docs/hermes-contract.md)의 「Runs 응답과 사건의 버전 차이」가 갖는다.
@@ -384,7 +384,6 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 | 실행 한 줄의 `errorCode`, `RUN_FAILED` 사건의 `detail`, SSE `error` 사건의 `code` | 화면이 코드를 사람 말 문구로 바꾸는 데 쓴다. 빼면 모든 실패가 같은 문구가 되고 화면의 분기가 깨진다. 코드 원문은 화면이 `MEMBER` 역할에게 그리지 않는다 |
 | `latencyMs`, `modelTier`, `skillNames` | `MEMBER` 역할에게 보이는 값이다 |
 | `subagentName` | 목표가 비었을 때 도우미 줄의 이름으로 쓴다 |
-| `GET /api/v1/chat/model-options` 와 대화 응답의 `provider`, `model`, `reasoningEffort` | `MEMBER` 역할도 쓰는 모델 선택의 입력이다. 숨김 목록을 적용한 것만 간다 |
 | 에이전트 목록의 `code`, 대화의 `agentCode` | 주소와 요청 본문에 쓰는 열쇠다 |
 
 ## 대기열과 중지

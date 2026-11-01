@@ -40,8 +40,6 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 모델이 좋아지면 판단이 더 세분화될 수 있어, 분류를 고정하면 모델을 바꿀 때마다 스키마와 코드를 함께 고쳐야 한다.
 Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지는 모델 출력의 자유 칸이나 JSON으로 받는다.
 예를 들어 자율성 정책의 네 수준을 enum으로 굳혀 모델의 판단 전체를 그중 하나에 맞추는 설계는 이 규칙의 반례다.
-현재 `AutonomyLevel`은 Control Plane이 결정적으로 정하는 안전 판정이므로 허용한다([ADR-20261007 / autonomy-policy](../backend/docs/adr/ADR-20261007-autonomy-policy.md)).
-이 enum을 모델 판단의 분류로 확장하지 않는다.
 판단 개선은 판단 단계를 늘리는 대신 실행 성공률, 사용자 수정률 같은 결과 지표로 평가한다.
 
 ## 화면을 검증하는 방법
@@ -76,9 +74,9 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 `agent` 는 profile 이름과 주소만 적는다.
 profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
-## 커넥터 비밀값을 두는 곳
+## 플러그인 비밀값을 두는 곳
 
-`connector_connection` 은 사용자, 커넥터, 상태, 칸 값, 마지막 확인 시각, 값을 보관 파일에 두었는지, 선언하지 않은 도구 수를 저장한다.
+`connector_connection` 은 사용자, 플러그인, 상태, 칸 값, 마지막 확인 시각, 값을 보관 파일에 두었는지, 선언하지 않은 도구 수를 저장한다.
 에이전트에 붙인 것은 `agent_connector_binding` 이 바인딩마다 상태와 재시작 대기를 저장한다([`backend/docs/data-schema.md`](../backend/docs/data-schema.md)).
 비밀 칸은 원문과 해시를 저장하지 않고, 값이 충분히 길 때만 앞부분을 남긴다. 길이 기준과 저장 칸은 [`backend/docs/data-schema.md`](../backend/docs/data-schema.md) 의 「connector_connection」 이 갖는다.
 화면은 연결된 상태에서 앞부분이 없는 필수 비밀 칸을 「입력됨」 으로만 보인다. 앞부분이 없는 선택 비밀 칸은 입력 여부를 응답으로 알 수 없어 보이지 않는다.

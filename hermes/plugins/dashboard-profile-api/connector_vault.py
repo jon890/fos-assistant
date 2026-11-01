@@ -61,13 +61,13 @@ def _read_vault(vault: str) -> dict | None:
 
 
 def _write_vault(vault: str, connector: str, values: dict) -> None:
-    """보관 파일을 쓴다. 같은 이름의 파일이 다른 커넥터의 것이면 `FileExistsError` 다."""
+    """보관 파일을 쓴다. 같은 이름의 파일이 다른 플러그인의 것이면 `FileExistsError` 다."""
     path = _vault_path(vault)
     path.parent.mkdir(mode=0o700, exist_ok=True)
     os.chmod(path.parent, 0o700)
     stored = _read_vault(vault)
     if stored is not None and stored["connector"] != connector:
-        raise FileExistsError("다른 커넥터의 보관 파일이다")
+        raise FileExistsError("다른 플러그인의 보관 파일이다")
     _atomic_private_write(path, (json.dumps({"v": 1, "connector": connector, "values": values},
                                             sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8"))
     os.chmod(path, 0o600)

@@ -24,8 +24,8 @@
 | `/agents/{code}` | 에이전트 하나의 설정. 성격, 도구, 스킬, 먼저 살펴보기와 매일 깨우기. 주인과 `ADMIN` 에게 공개와 삭제 |
 | `/agents/{code}/skills/new` | 새 스킬. 주인과 `ADMIN` |
 | `/agents/{code}/skills/{name}` | 올린 스킬 편집. 주인과 `ADMIN` |
-| `/connections` | 「외부 서비스 연결」. 커넥터 카드 목록. [`docs/features/connector.md`](../../docs/features/connector.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
-| `/connections/{id}` | 커넥터 하나의 외부 서비스 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
+| `/connections` | 「외부 서비스 연결」. 플러그인 카드 목록. [`docs/features/connector.md`](../../docs/features/connector.md) 의 「연결 뒤 에이전트 고르기」 를 따른다. 카드마다 아이콘, 이름, 연결 상태, 설명, 링크, 도구 수와 위험도별 수, 붙인 에이전트 수를 보인다([ADR-20261008 / connector-card](../../docs/adr/ADR-20261008-connector-card.md)) |
+| `/connections/{id}` | 플러그인 하나의 외부 서비스 연결 화면. 머리에 아이콘, 이름, 설명, 링크를 보이고, 계정을 연결하고, 이 연결을 붙인 에이전트를 보인다 |
 | `/connections/accountbook` | 옛 주소. `/connections/{id}` 로 넘긴다 |
 | `/browser` | 내 브라우저. 만들기, 켜기, 끄기, 지우기와 자동 중지 안내, 켜져 있거나 꺼져 있을 때 로그인 화면(「화면 열기」). `?url=` 은 화면을 열 때 갈 시작 주소이고 `http`, `https` 가 아니면 무시한다. 사이드바 「고급」 의 「내 브라우저」 와 `/connections` 위쪽의 「내 브라우저」 링크로 간다([`docs/features/user-browser.md`](../../docs/features/user-browser.md)) |
 | `/files` | 파일 공간. 내 에이전트들이 함께 쓰는 실행 공간의 목록, 미리보기, 내려받기, 지우기. `?path=` 는 연 디렉터리이고 `?file=` 은 미리 보는 파일이다. 사이드바 「고급」 의 「파일 공간」 으로 간다. [`docs/features/workspace.md`](../../docs/features/workspace.md) 의 「파일 공간」 |
@@ -97,7 +97,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 | 새 대화 | `SquarePen`. 좁은 화면 머리의 「새 대화」 와 같다 |
 | 지금 볼 것 | `Inbox` |
 | 에이전트 | `Bot` |
-| 외부 서비스 연결 | `Plug`. 커넥터 아이콘이 없는 서비스의 카드도 같은 아이콘이다 |
+| 외부 서비스 연결 | `Plug`. 플러그인 아이콘이 없는 서비스의 카드도 같은 아이콘이다 |
 | 예약 작업 | `CalendarClock` |
 | 기억 | `Brain` |
 | 사용량 | `ChartColumn` |
@@ -153,7 +153,7 @@ ChatGPT 의 배치를 따른다. 위쪽 가로 메뉴를 두지 않고 왼쪽 �
 메뉴와 순서는 [`docs/features/users.md`](../../docs/features/users.md) 「관리자 영역」 의 표와 같고, 목록은 `components/shell/admin-shell.tsx` 가 갖는다.
 
 머리의 「관리자」 는 배지다. 색과 부품은 일반 화면과 같은 토큰을 쓴다.
-관리자 메뉴도 항목마다 아이콘을 둔다. 사용자 `Users`, 에이전트 `Bot`, 모델 `Cpu`, 사용량과 비용 `Receipt`, 커넥터 `Plug`, 브라우저 `Globe`, 파일 공간 `HardDrive` 다.
+관리자 메뉴도 항목마다 아이콘을 둔다. 사용자 `Users`, 에이전트 `Bot`, 모델 `Cpu`, 사용량과 비용 `Receipt`, 플러그인 `Plug`, 브라우저 `Globe`, 파일 공간 `HardDrive` 다.
 머리에 특정 그룹을 뜻하는 이름을 적지 않는다.
 
 **「사용 화면으로 돌아가기」 는 마지막으로 보던 대화로 간다.**

@@ -2,7 +2,7 @@
 /**
  * Control Plane 과 웹의 운영 코드, hermes plugin 에 특정 서비스의 이름이 들어오지 않는지 본다.
  *
- * 커넥터는 manifest 가 정하므로 코드는 어느 서비스도 알면 안 된다. 금지 낱말은 이 파일 안에만 둔다.
+ * 플러그인은 manifest 가 정하므로 코드는 어느 서비스도 알면 안 된다. 금지 낱말은 이 파일 안에만 둔다.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

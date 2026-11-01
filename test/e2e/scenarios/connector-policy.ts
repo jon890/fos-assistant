@@ -1,7 +1,7 @@
 /**
- * 연결을 붙인 일반 에이전트의 커넥터 도구 호출이 Control Plane 의 판정을 거치는지 전체 흐름으로 본다.
+ * 연결을 붙인 일반 에이전트의 플러그인 도구 호출이 Control Plane 의 판정을 거치는지 전체 흐름으로 본다.
  *
- * <p>대역이 그 에이전트 profile 의 hook 처럼 도구 호출마다 판정을 묻고, 허용된 호출만 커넥터 서버에 닿은 것으로 친다.
+ * <p>대역이 그 에이전트 profile 의 hook 처럼 도구 호출마다 판정을 묻고, 허용된 호출만 플러그인 서버에 닿은 것으로 친다.
  * 시작에서 연결을 등록하고 비공개 에이전트에 붙여 반영 완료까지 한 뒤, 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
@@ -89,14 +89,14 @@ function requestNumber(answer: string): string | undefined {
 }
 
 export const connectorPolicyScenario: Scenario = {
-  name: "커넥터 도구 정책",
+  name: "플러그인 도구 정책",
 
   async run(context) {
     useConnectorPolicy(context);
     const setup = new ConnectorSetup(context, context.tokens.dad);
     let failed = false;
     try {
-      step("시험 커넥터를 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
+      step("시험 플러그인을 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
       const agent = await setup.attachedAgent("메모 정책 비서");
       const agentCode = agent.code;
       const profile = agent.profile;
@@ -106,9 +106,9 @@ export const connectorPolicyScenario: Scenario = {
       );
       const mine = (): ConnectorToolCall[] =>
         context.hermes.connectorToolCalls().filter((entry) => entry.profile === profile);
-      expect(mine().length === 0, `호출하기 전인데 커넥터 서버에 닿은 호출이 있다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 0, `호출하기 전인데 플러그인 서버에 닿은 호출이 있다: ${JSON.stringify(mine())}`);
 
-      step("승인이 없는 읽기 도구는 허용되어 커넥터 서버에 닿는다");
+      step("승인이 없는 읽기 도구는 허용되어 플러그인 서버에 닿는다");
       const listed = await probe(context, agentCode, `${PREFIX}list_scopes`, "{}");
       expect(listed === "allow", `list_scopes 가 허용되지 않았다: ${listed}`);
       expect(
@@ -117,13 +117,13 @@ export const connectorPolicyScenario: Scenario = {
         `list_scopes 호출 하나만 닿아야 한다: ${JSON.stringify(mine())}`,
       );
 
-      step("승인이 필요한 쓰기 도구는 승인 요청 번호와 함께 막히고 커넥터 서버에 닿지 않는다");
+      step("승인이 필요한 쓰기 도구는 승인 요청 번호와 함께 막히고 플러그인 서버에 닿지 않는다");
       const noteArgs = JSON.stringify({ text: "안녕", tags: ["가", "나"] });
       const asked = await probeIn(context, agentCode, `${PREFIX}write_note`, noteArgs);
       const written = asked.answer;
       const actionId = requestNumber(written);
       expect(written.startsWith("block ") && actionId !== undefined, `write_note 가 승인 요청 번호와 함께 막히지 않았다: ${written}`);
-      expect(mine().length === 1, `승인하기 전인데 write_note 가 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `승인하기 전인데 write_note 가 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("다른 사용자는 그 승인 요청을 승인하지 못한다");
       const foreignApproval = expectStatus(
@@ -137,7 +137,7 @@ export const connectorPolicyScenario: Scenario = {
         foreignApproval.json<{ code: string }>().code === "CONNECTOR_ACTION_NOT_FOUND",
         `오류 코드가 다르다\n${foreignApproval.body}`,
       );
-      expect(mine().length === 1, `남이 승인한 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `남이 승인한 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("주인이 승인하면 저장한 인자로 실행 경로를 한 번 부르고 결과를 줄에 남긴다");
       const approved = expectStatus(
@@ -227,7 +227,7 @@ export const connectorPolicyScenario: Scenario = {
         (await messagesOf(context, refusedAsk.conversationId)).at(-1)!.role === "SYSTEM",
         "거절 알림 줄 뒤에 답이 붙었다",
       );
-      expect(mine().length === 2, `거절한 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 2, `거절한 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("답이 없는 승인 요청은 기다리는 시간이 지나면 만료 알림 줄만 남기고 그 뒤 승인은 409 다");
       const expiringAsk = await probeIn(context, agentCode, `${PREFIX}write_note`, JSON.stringify({ text: "기다릴 글" }));
@@ -259,21 +259,21 @@ export const connectorPolicyScenario: Scenario = {
         lateApproval.json<{ code: string }>().code === "CONNECTOR_ACTION_NOT_PENDING",
         `오류 코드가 다르다\n${lateApproval.body}`,
       );
-      expect(mine().length === 2, `만료된 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 2, `만료된 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
-      step("선언하지 않은 도구와 파괴적인 도구는 글과 함께 막히고 커넥터 서버에 닿지 않는다");
+      step("선언하지 않은 도구와 파괴적인 도구는 글과 함께 막히고 플러그인 서버에 닿지 않는다");
       for (const tool of ["hidden_tool", "purge_notes"]) {
         const answer = await probe(context, agentCode, `${PREFIX}${tool}`, "{}");
         expect(answer.startsWith("block "), `${tool} 이 막히지 않았다: ${answer}`);
         expect(answer.slice("block ".length).trim() !== "", `${tool} 을 막은 글이 비었다`);
         expect(!answer.includes("정책을 확인하지 못했다"), `${tool} 을 Control Plane 의 판정이 아닌 까닭으로 막았다: ${answer}`);
       }
-      expect(mine().length === 2, `막힌 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 2, `막힌 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("다른 서버의 등록 이름은 선언한 도구와 이름이 같아도 막힌다");
       const foreign = await probe(context, agentCode, "mcp__other__list_scopes", "{}");
       expect(foreign.startsWith("block "), `다른 서버의 도구가 막히지 않았다: ${foreign}`);
-      expect(mine().length === 2, `다른 서버의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 2, `다른 서버의 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("상시 허락을 닫은 도구가 식별자로 선언한 칸의 긴 id 는 승인 줄에 그대로 보이고 승인하면 실행한다");
       const reachedBeforeDelete = mine().length;
@@ -337,7 +337,7 @@ export const connectorPolicyScenario: Scenario = {
         refusedHidden.status === "REJECTED" && refusedHidden.errorCode === "hidden_args",
         `가려진 칸이 있는 줄이 hidden_args 로 끝나지 않았다: ${JSON.stringify(refusedHidden)}`,
       );
-      expect(mine().length === reachedBeforeHidden, `가려진 칸이 있는 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === reachedBeforeHidden, `가려진 칸이 있는 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
       await awaitMessages(
         context,
         hiddenAsk.conversationId,
@@ -368,7 +368,7 @@ export const connectorPolicyScenario: Scenario = {
       ).json<ActionView>();
       expect(
         agendaApproved.status === "SUCCEEDED" && agendaApproved.connectorId === AGENDA_CONNECTOR.id,
-        `둘째 연결의 승인 줄이 그 커넥터의 SUCCEEDED 가 아니다: ${JSON.stringify(agendaApproved)}`,
+        `둘째 연결의 승인 줄이 그 플러그인의 SUCCEEDED 가 아니다: ${JSON.stringify(agendaApproved)}`,
       );
       expect(
         JSON.stringify(mine().slice(reachedBeforeAgenda).map((entry) => [entry.hermesTool, entry.via]))
@@ -404,7 +404,7 @@ export const connectorPolicyScenario: Scenario = {
       expect(
         JSON.stringify(mine().slice(reachedAfterAgenda).map((entry) => entry.hermesTool))
           === JSON.stringify([`${PREFIX}list_scopes`]),
-        `해제한 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine().slice(reachedAfterAgenda))}`,
+        `해제한 연결의 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine().slice(reachedAfterAgenda))}`,
       );
     } catch (error) {
       failed = true;

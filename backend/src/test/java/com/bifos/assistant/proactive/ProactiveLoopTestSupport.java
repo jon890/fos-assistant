@@ -125,8 +125,6 @@ abstract class ProactiveLoopTestSupport {
             jdbc.update("DELETE FROM proactive_loop_run WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM proactive_autonomy_decision WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM user_autonomy_preference WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
             jdbc.update(
                 "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
@@ -253,20 +251,8 @@ abstract class ProactiveLoopTestSupport {
     }
 
 
-    List<ProactiveLoopRun> runsOf(CurrentUser user) {
-        return loopRuns.findAll().stream()
-            .filter(run -> run.userId().equals(user.id()))
-            .toList();
-    }
-
-
     long evaluationCount(CurrentUser user) {
         return count("SELECT COUNT(*) FROM proactive_value_evaluation WHERE user_id = ?", user.id());
-    }
-
-
-    long decisionCount(CurrentUser user) {
-        return count("SELECT COUNT(*) FROM proactive_autonomy_decision WHERE user_id = ?", user.id());
     }
 
 

@@ -29,8 +29,6 @@ public enum ErrorCode {
     PROACTIVE_LOOP_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 없는 보고와 다른 사용자의 보고를 같은 응답으로 숨긴다. */
     PROACTIVE_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND),
-    /** 반응할 판정이 없다. 남의 판정이거나 매일 루프가 보인 판정이 아니다. */
-    AUTONOMY_DECISION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 대기 메시지가 상한에 닿았다. 개수가 찼거나, 더하면 합친 글이 메시지 길이 상한을 넘는다. */
     PENDING_QUEUE_FULL(HttpStatus.CONFLICT),
     /** 취소하려는 대기 메시지가 이미 보내졌거나 없다. 남의 대화의 대기 메시지도 같은 응답으로 숨긴다. */
@@ -297,6 +295,8 @@ public enum ErrorCode {
     TASK_SCHEDULE_INVALID(HttpStatus.BAD_REQUEST),
     /** 그 경로가 받지 않는 메서드로 왔다. 받는 메서드는 {@code Allow} 헤더가 적는다. */
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
+    /** 없는 경로다. 지운 경로를 옛 화면이 부를 때도 여기 온다. */
+    ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 없는 평가와 남의 평가, 지운 대화의 평가를 같은 응답으로 숨긴다. */
     VALUE_EVALUATION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 끝나지 않았거나 실패한 살펴보기와 아직 평가 중인 시도는 replay 할 수 없다. */

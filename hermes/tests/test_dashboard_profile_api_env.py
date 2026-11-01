@@ -68,7 +68,7 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
                          ["delegation", "fos-assistant", "terminal", "demo"])
 
     def test_connector_env_delete_preserves_other_credentials(self):
-        """커넥터 칸의 환경 변수 삭제는 AI credential 과 Control Plane 토큰을 지우지 않는다."""
+        """플러그인 칸의 환경 변수 삭제는 AI credential 과 Control Plane 토큰을 지우지 않는다."""
         self.connector_fixture()
         for key in ("DEMO_TOKEN", "DEMO_SCOPE"):
             response = self.request("/api/env", "DELETE", token="valid", body={"profile": "alice", "key": key})
@@ -80,7 +80,7 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
                                       body={"profile": "owner", "key": "DEMO_TOKEN"}), 401)
 
     def test_connector_env_keys_follow_the_catalog(self):
-        """커넥터 key 는 카탈로그에 있는 동안만 쓸 수 있다. 목록에서 빠지면 400 이다."""
+        """플러그인 key 는 카탈로그에 있는 동안만 쓸 수 있다. 목록에서 빠지면 400 이다."""
         self.connector_fixture()
         body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
         self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 200)

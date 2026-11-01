@@ -590,8 +590,8 @@ class HermesSourceTest(unittest.TestCase):
                         "%s 의 %s 에 %s 가 없다. %s" % (builder, key, result, revisit))
 
     def test_unattended_approval_points(self):
-        """unattended_mode 가 execute_code 만 열고 셸과 커넥터 승인은 승인 카드로 남는 데 기대는 지점이 그대로인지 본다."""
-        revisit = ("plugin 의 approve 가 셸 위험 명령과 커넥터 승인까지 사람 없이 열 수 있다. "
+        """unattended_mode 가 execute_code 만 열고 셸과 플러그인 승인은 승인 카드로 남는 데 기대는 지점이 그대로인지 본다."""
+        revisit = ("plugin 의 approve 가 셸 위험 명령과 플러그인 승인까지 사람 없이 열 수 있다. "
                    "ADR-20261008 execute-code-unattended 를 다시 본다")
 
         def function(tree, name):

@@ -16,7 +16,7 @@ class GuardRejected(ValueError):
     """금융 준비나 실행을 거절한 검사의 고정 단계 코드를 담는다.
 
     `stage` 와 `code` 는 운영 로그에만 남기고 응답에는 싣지 않는다. 인자 값, 계좌, 원격 응답은 담지 않는다.
-    `code` 는 커넥터가 `errors` 표에 선언한 오류 코드이고 선언하지 않은 코드는 담지 않는다.
+    `code` 는 플러그인이 `errors` 표에 선언한 오류 코드이고 선언하지 않은 코드는 담지 않는다.
     """
 
     def __init__(self, stage=None, code=None):

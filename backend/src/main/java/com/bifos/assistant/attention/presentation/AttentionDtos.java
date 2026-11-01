@@ -4,7 +4,6 @@ import com.bifos.assistant.attention.application.dto.AttentionCard;
 import com.bifos.assistant.attention.application.dto.AttentionExecutionRef;
 import com.bifos.assistant.attention.application.dto.AttentionFollowUpRef;
 import com.bifos.assistant.attention.application.dto.AttentionItem;
-import com.bifos.assistant.attention.application.dto.AttentionProblem;
 import com.bifos.assistant.attention.application.dto.AttentionReport;
 import com.bifos.assistant.attention.application.dto.AttentionSignal;
 import com.bifos.assistant.attention.application.dto.AttentionSourceRef;
@@ -150,8 +149,7 @@ public final class AttentionDtos {
         ExecutionView execution,
         UUID actionId,
         FollowUpView followUp,
-        ReportView report,
-        ProblemView problem) {
+        ReportView report) {
 
         static ItemView from(AttentionItem item) {
             return new ItemView(
@@ -167,19 +165,7 @@ public final class AttentionDtos {
                 ExecutionView.from(item.execution()),
                 item.actionId(),
                 FollowUpView.from(item.followUp()),
-                ReportView.from(item.report()),
-                ProblemView.from(item.problem()));
-        }
-    }
-
-    /**
-     * @param level {@code SURFACE} 나 {@code ASK_APPROVAL}
-     * @param action 제안한 다음 행동 글. 모델이 쓴 글이라 평문으로 그린다. 비었을 수 있다
-     */
-    public record ProblemView(Long decisionId, String level, String action) {
-
-        static ProblemView from(AttentionProblem problem) {
-            return problem == null ? null : new ProblemView(problem.decisionId(), problem.level(), problem.action());
+                ReportView.from(item.report()));
         }
     }
 

@@ -36,6 +36,10 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 - 결정과 근거는 [ADR-20261015 / package-layout](docs/adr/ADR-20261015-package-layout.md), 층 방향과 하위 기능의 순서는 [`code-architecture.md`](docs/code-architecture.md) 의 「패키지 배치 규칙」 이 갖는다.
 - 하위 기능의 경계와 한 서비스의 일이 관리자 전용인지는 규칙이 판정하지 못한다. 리뷰가 본다([rule-84](../docs/code-rules/rule-84.md)).
 
+## 로컬 검사
+
+로컬 검사에서 무엇을 언제 실행하고 어떤 의존성을 준비하는지는 [`scripts/dev/check-local.sh`](../scripts/dev/check-local.sh)의 머리말이 갖는다.
+
 ## 품질 검사
 
 구조 규칙, 코드 규칙, 포맷은 `./gradlew qualityCheck` 하나가 묶어 검사한다. 파일을 바꾸지 않는다.

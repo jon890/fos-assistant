@@ -9,7 +9,7 @@ for (const theme of ["light", "dark"] as const) {
       ["gmail", "naver-blog"].map(async (id) => {
         const root = new URL(`../../hermes/connectors/${id}/`, import.meta.url);
         const manifest = JSON.parse(
-          await readFile(new URL("connector.json", root), "utf8"),
+          await readFile(new URL("assistant.json", root), "utf8"),
         );
         const icon = await readFile(new URL(manifest.icon, root));
         return {
@@ -54,7 +54,7 @@ for (const theme of ["light", "dark"] as const) {
       await expect(
         card.getByTestId("connector-readme-link"),
       ).toHaveAccessibleName(
-        new RegExp(`커넥터 README.*${connector.title}.*새 탭`),
+        new RegExp(`플러그인 README.*${connector.title}.*새 탭`),
       );
       const icon = icons.nth(index);
       await expect(icon).toBeVisible();

@@ -13,7 +13,7 @@ fos-ctx는 기존 pre_tool_call로 두 관찰 도구의 _fos_ctx를 덮어쓰고
 기존 attachment_inspect, 최초 native 이미지 입력과 delegate_task의 이미지 전달을 유지한다.
 새 도구는 모델 선언을 저장하며 실제 provider·model이나 이미지 판독 품질을 증명하지 않는다.
 Control Plane은 두 도구의 bare/prefixed 이름에 대해 start/complete/fail detail과 text를 수집 전에 null로 만든다.
-root/data에 담긴 preview/detail/result와 delta/text/output도 가리며 ADMIN/MEMBER와 커넥터 호출 전후에 같은 규칙을 적용한다.
+root/data에 담긴 preview/detail/result와 delta/text/output도 가리며 ADMIN/MEMBER와 플러그인 호출 전후에 같은 규칙을 적용한다.
 Memory 검색이 추가된 기준에서는 그 가림과 REQUIRED_TOOLS 등록도 유지한다.
 native 이미지·coverage의 선언 의미는 바꾸지 않는다.
 
@@ -433,7 +433,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 플러그인 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 플러그인 경로를 Control Plane 이 쓰는 방법은 [플러그인 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
@@ -764,7 +764,7 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 | --- | --- |
 | `message.delta` | `delta` 에 답의 조각 |
 | `message.interim` | `text`, `already_streamed`. 중간 안내이며 실행은 이어 간다 |
-| `tool.started` | `tool` 에 도구 이름, `preview` 에 주요 인자 하나의 값. 아래 「붙은 커넥터 서버의 도구 사건」 을 본다 |
+| `tool.started` | `tool` 에 도구 이름, `preview` 에 주요 인자 하나의 값. 아래 「붙은 플러그인 서버의 도구 사건」 을 본다 |
 | `tool.completed` | `tool`, `duration` 초, `error` 참거짓, `preview` 에 결과 |
 | `subagent.start`, `subagent.complete` | [「자식 토큰을 SSE 로 받을 수 있다」](hermes-contract.md#자식-토큰을-sse-로-받을-수-있다) 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
@@ -815,9 +815,9 @@ Java HTTP parser 검사는 이 공유 표본부터 쓴다.
 이 검사는 `seq`, `: open`, `replay.truncated`가 끼어도 다음 답 조각을 읽는다는 뜻이며,
 `Last-Event-ID` 재연결이나 실제 재생 기능을 구현하지 않는다.
 
-#### 붙은 커넥터 서버의 도구 사건
+#### 붙은 플러그인 서버의 도구 사건
 
-붙은 커넥터 서버의 MCP 도구도 내장 도구와 같은 길로 사건을 보낸다.
+붙은 플러그인 서버의 MCP 도구도 내장 도구와 같은 길로 사건을 보낸다.
 v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `tool.started`, 끝난 뒤에 `tool.completed` 를 `tool_progress_callback` 으로 부르고,
 `gateway/platforms/api_server_runs.py` 가 그것을 위 표의 사건으로 바꿔 보낸다.
 도구 종류에 따라 다르게 보내는 곳은 없다.
@@ -837,7 +837,7 @@ v0.21.5 의 `agent/tool_executor.py` 가 도구 하나를 실행하기 전에 `t
 Hermes 는 도구를 실행했다는 로그를 남기지만 사건 스트림은 구독자가 있을 때만 읽힌다.
 Control Plane 은 한 번에 받는 경로에서도 스트림을 연다([ADR-090](../../backend/docs/adr/ADR-090-한-번에-받는-경로도-hermes-사건-스트림을-열어-도구-사건을-남긴다.md)).
 
-가짜 Hermes 는 허용된 커넥터 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.
+가짜 Hermes 는 허용된 플러그인 도구 호출을 위 모양(`run_id`, `timestamp`, 시작의 인자 `preview`, 완료의 결과 `preview`)으로 흘린다.
 
 ### session 을 지우는 경로
 
@@ -1658,7 +1658,7 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 
 `transform_tool_result` hook 은 도구 결과가 모델의 문맥에 들어가기 전에 그 글을 바꾼다.
 2026-10-05 에 같은 판의 소스로 확인했다. 실행으로는 확인하지 않았다.
-바인딩 profile 의 `fos-ctx` 가 이 hook 으로 커넥터 도구 결과를 `<external-data>` 로 감싼다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+바인딩 profile 의 `fos-ctx` 가 이 hook 으로 플러그인 도구 결과를 `<external-data>` 로 감싼다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 
 | 확인한 것 | 내용 |
 | --- | --- |
@@ -1673,7 +1673,7 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 **MCP 결과에는 Hermes 가 따로 `<untrusted_tool_result>` 감싸기를 한다.**
 이 hook 이 돌고 난 뒤, 결과를 대화 메시지로 만들 때 이름이 `mcp_` 로 시작하는 도구의 글에 건다.
 32자보다 짧은 글은 감싸지 않는다. 본문 안의 `untrusted_tool_result` 표시는 대소문자에 상관없이 `untrusted-tool-result` 로 바꾼다.
-그래서 바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 가 안쪽, `<untrusted_tool_result>` 가 바깥쪽이다. hook 이 실패해도 바깥쪽은 남는다.
+그래서 바인딩 profile 의 플러그인 도구 결과는 `<external-data>` 가 안쪽, `<untrusted_tool_result>` 가 바깥쪽이다. hook 이 실패해도 바깥쪽은 남는다.
 
 근거: [`_apply_transform_tool_result_hook`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L848),
 [dispatcher 가 막은 호출을 돌려주는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L940),
@@ -1726,9 +1726,9 @@ Control Plane이 반환한 `isError` 결과와 JSON-RPC `-32602` 인자 오류�
 
 ### MCP 자식의 표준 오류
 
-Hermes 는 stdio MCP 서버(커넥터)의 표준 오류를 그 profile 의 `logs/mcp-stderr.log`(순환본 `.1`)에 모은다. 운영의 기동 확인이 이 파일의 `starting MCP server '<이름>'` 줄을 읽는 것으로 확인했다. 소스로는 읽지 않았다.
-커넥터가 진단을 남기는 자리가 이 파일이다. 줄에는 주소, 블로그 아이디, 글을 싣지 않는다. 대시보드 plugin 의 연결 확인과 선택지 호출은 자식의 표준 오류를 버리므로 그 경로의 진단은 남지 않는다.
-네이버 블로그 커넥터의 진단 줄 모양은 [네이버 블로그 커넥터](../../docs/features/naver-blog-connector.md) 의 「진단 줄」 이 갖는다.
+Hermes 는 stdio MCP 서버(플러그인)의 표준 오류를 그 profile 의 `logs/mcp-stderr.log`(순환본 `.1`)에 모은다. 운영의 기동 확인이 이 파일의 `starting MCP server '<이름>'` 줄을 읽는 것으로 확인했다. 소스로는 읽지 않았다.
+플러그인이 진단을 남기는 자리가 이 파일이다. 줄에는 주소, 블로그 아이디, 글을 싣지 않는다. 대시보드 plugin 의 연결 확인과 선택지 호출은 자식의 표준 오류를 버리므로 그 경로의 진단은 남지 않는다.
+네이버 블로그 플러그인의 진단 줄 모양은 [네이버 블로그 플러그인](../../docs/features/naver-blog-connector.md) 의 「진단 줄」 이 갖는다.
 
 ### 도구를 모델에게서 빼는 설정
 
@@ -1771,10 +1771,10 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 아직 확인하지 못했다. 실행 방법은 운영 저장소가 갖는다.
 
 - 떠 있는 공유 gateway 가 profile 의 `fos-ctx` 를 새 판으로 바꾼 뒤 재시작 없이 새 코드를 읽는지. `__init__.py`뿐 아니라 `connector_policy`와 `hooks` 등 하위 모듈도 새 판인지 확인한다. 파일 비교로 답하는 `policy_hook`만으로는 실행 중인 모듈의 판을 증명하지 못한다
-- native 자식과 공유 gateway 에서 실제 커넥터 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
-- Control Plane 이 내려가 있을 때 연결을 붙인 에이전트의 커넥터 도구가 막히는지
-- 바인딩 profile 에서 커넥터 도구의 결과가 `<external-data>` 안에 있고 그 바깥을 `<untrusted_tool_result>` 가 감싸는지. 실행 기록의 도구 내용으로 본다
-- 대시보드 plugin 을 올린 뒤 카탈로그에 커넥터가 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 커넥터가 빠질 수 있다
+- native 자식과 공유 gateway 에서 실제 플러그인 호출이 hook 을 거치는지. 대역 서버의 호출 기록과 `connector_action` 을 견준다
+- Control Plane 이 내려가 있을 때 연결을 붙인 에이전트의 플러그인 도구가 막히는지
+- 바인딩 profile 에서 플러그인 도구의 결과가 `<external-data>` 안에 있고 그 바깥을 `<untrusted_tool_result>` 가 감싸는지. 실행 기록의 도구 내용으로 본다
+- 대시보드 plugin 을 올린 뒤 카탈로그에 플러그인이 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 플러그인이 빠질 수 있다
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
 - `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
@@ -1837,11 +1837,11 @@ MCP 서버 설정의 `env`에 명시한 값이 자식 프로세스에 전달된�
 [환경 값 처리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/mcp_tool_config.py)와
 [`StdioServerParameters` 생성](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tools/mcp_tool_transport.py)이 근거다.
 
-따라서 커넥터의 토큰을 profile `.env`에 저장하는 것과 함께,
+따라서 플러그인의 토큰을 profile `.env`에 저장하는 것과 함께,
 MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가계부라면 `env.ACCOUNTBOOK_API_TOKEN`에 `${ACCOUNTBOOK_API_TOKEN}` 이다.
 토큰 원문을 `.mcp.json`이나 `config.yaml`에 쓰지 않는다.
-사용자가 넣는 다른 칸(`connector.json` 의 `fields[].env`)도 같은 방식으로 전달한다.
-운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([커넥터 설치](../../docs/features/connector.md)).
+사용자가 넣는 다른 칸(`assistant.json` 의 `fields[].env`)도 같은 방식으로 전달한다.
+운영자가 주는 값(`operator_env`)은 profile `.env` 를 거치지 않는다. 대시보드 plugin 이 설치할 때 운영 목록의 값을 서버 정의의 `env` 에 직접 넣는다([플러그인 설치](../../docs/features/connector.md)).
 운영자가 주는 비밀은 이 방식으로 넘기지 못한다. `${이름}` 은 그 profile 의 secret scope 에서만 풀리고, 공유 gateway 는 scope 에 없는 이름을 프로세스 env 에서 찾지 않는다(v0.21.5 의 `agent/secret_scope.py` `get_secret`). 그래서 `operator_secrets` 는 지원하지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)).
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.
@@ -1894,7 +1894,7 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 `PUT /api/env`에 빈 값을 넣는 것과 항목 제거를 구분한다.
 [환경 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/config_env.py)와
 [요청 모델](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_models.py)이 근거다.
-기계용 인증에서 이 메서드와 커넥터 칸 key를 허용하는 정책은 `fos-home-infra`가 소유한다.
+기계용 인증에서 이 메서드와 플러그인 칸 key를 허용하는 정책은 `fos-home-infra`가 소유한다.
 
 ## 원격 MCP 서버
 
@@ -1982,12 +1982,12 @@ Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile �
 `execute_code` 의 RPC 로 다시 Hermes 에서 도는 도구는 `web_search`, `web_extract`, `read_file`, `write_file`, `search_files`, `patch`, `terminal` 이다.
 웹 도구는 Hermes 쪽에서 주소 검사를 거치고, 나머지는 다시 컨테이너로 간다.
 
-**스크립트는 커넥터 MCP 도구를 부르지 못한다.** RPC 로 부를 수 있는 도구는 위 일곱 개(`SANDBOX_ALLOWED_TOOLS`)와 그 profile 에 켜진 도구의 교집합이고, 교집합이 비면 일곱 개 전부다.
+**스크립트는 플러그인 MCP 도구를 부르지 못한다.** RPC 로 부를 수 있는 도구는 위 일곱 개(`SANDBOX_ALLOWED_TOOLS`)와 그 profile 에 켜진 도구의 교집합이고, 교집합이 비면 일곱 개 전부다.
 스텁 모듈(`hermes_tools.py`)이 그 교집합만 만들고, RPC 처리기(`tools/code_execution_rpc.py` 의 `_handle_rpc_request`)가 목록 밖 이름을 거절한다. docker 실행 공간의 원격 커널(`tools/code_kernel_remote.py`)도 같은 목록이다.
-목록은 모듈 상수라 core 를 고치지 않고는 늘지 않는다. 커넥터 데이터를 계산하는 길은 [ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md) 가 정한다.
+목록은 모듈 상수라 core 를 고치지 않고는 늘지 않는다. 플러그인 데이터를 계산하는 길은 [ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md) 가 정한다.
 
-커넥터 MCP 서버가 컨테이너 밖에서 도는 것이 비밀 격리의 근거다.
-커넥터 토큰은 MCP 프로세스의 환경에만 있고, 셸은 그 프로세스와 profile 파일을 보지 못한다.
+플러그인 MCP 서버가 컨테이너 밖에서 도는 것이 비밀 격리의 근거다.
+플러그인 토큰은 MCP 프로세스의 환경에만 있고, 셸은 그 프로세스와 profile 파일을 보지 못한다.
 
 ### profile 마다 다른 설정을 읽는다
 
@@ -2072,7 +2072,7 @@ proxy 검사와 유휴 정리, 복구는 이 label 로 정책의 profile 을 식
 | `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>`(Hermes 와 같은 경로) | 정책에 `skill_root` 가 있고 그 profile 의 스킬 디렉터리가 있을 때 plugin 이 붙인다. 그 profile 의 모든 스킬 버전이다. scripts 가 있는지는 보지 않으므로, `skill_root` 를 넣은 뒤에는 스킬 디렉터리가 있는 profile 마다 다음 셸 설정 쓰기에서 컨테이너 키가 한 번 바뀐다 | 읽기 전용 |
 | `/root/.hermes/cache/*`, `images`, `attachments` | 그 profile 의 media cache | 읽기 전용 |
 | `/root/.hermes/<상대 경로>` | `terminal.credential_files` 와 스킬이 선언한 `required_credential_files` | 읽기 전용 |
-| `<connector_output_root>/users/<sha256(주인)>/<profile>`(같은 경로) | 정책에 그 키가 있을 때 plugin 이 붙인다. 커넥터가 계산할 목록을 쓴다 | 읽기 전용 |
+| `<connector_output_root>/users/<sha256(주인)>/<profile>`(같은 경로) | 정책에 그 키가 있을 때 plugin 이 붙인다. 플러그인이 계산할 목록을 쓴다 | 읽기 전용 |
 | `docker_volumes` 의 나머지 | 운영자가 정한 것 | 적힌 대로 |
 
 `/workspace` 와 `/root` 밖의 파일 시스템은 이미지의 것이고 컨테이너를 지우면 사라진다.
@@ -2159,7 +2159,7 @@ gateway 의 `start_gateway()` 가 `HERMES_EXEC_ASK=1` 을 프로세스 환경에
 ### 측정 결과
 
 profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하나다.
-모든 profile 의 `.env`, 커넥터 값 파일, 커넥터 코드 디렉터리, 루트 설정과 OAuth 파일에 서로 다른 합성 값을 두었다.
+모든 profile 의 `.env`, 플러그인 값 파일, 플러그인 코드 디렉터리, 루트 설정과 OAuth 파일에 서로 다른 합성 값을 두었다.
 
 | 시험 | 결과 |
 | --- | --- |
@@ -2167,7 +2167,7 @@ profile 셋을 썼다. 사용자 A 의 profile 둘, 사용자 B 의 profile 하�
 | `ls`, `cat` 로 Hermes 데이터 경로 | 없는 경로 |
 | 컨테이너 환경 변수의 합성 값 | 없음 |
 | `read_file` 로 다른 profile 의 `.env`, 루트 `.env`, OAuth 파일 | 이름 검사로 거절 |
-| `read_file` 로 커넥터 값 파일, 커넥터 코드, 루트 설정 | 「File not found」 |
+| `read_file` 로 플러그인 값 파일, 플러그인 코드, 루트 설정 | 「File not found」 |
 | `patch` 로 Hermes 루트 설정 | 읽지 못함 |
 | `search_files` 로 `/workspace`, `/root` 의 합성 값 | 0건 |
 | `execute_code` 로 다른 profile 의 `.env` 열기 | `FileNotFoundError` |
@@ -2186,8 +2186,8 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 
 | 도구나 경로 | 남는 것 | 지금 상태 |
 | --- | --- | --- |
-| 스킬 앞머리의 `required_environment_variables`(`setup.collect_secrets`, `prerequisites.env_vars` 포함) | 스킬을 읽으면 그 이름의 값을 profile `.env` 에서 꺼내 컨테이너 환경에 넣는다. **측정에서 Control Plane MCP 토큰과 커넥터 토큰이 컨테이너 환경에 들어왔다.** `API_SERVER_KEY` 같은 provider 차단 목록만 막힌다 | 올린 스킬은 Control Plane 이, 커넥터 스킬은 대시보드 plugin 의 manifest 검증이 이 칸을 거절한다 |
-| 스킬 앞머리의 `required_credential_files` | profile 디렉터리 안의 파일을 컨테이너 `/root/.hermes/` 아래에 붙인다. `.env` 와 `auth.json` 은 거절하지만 **커넥터 값 파일(`.fos-connectors.json`)은 붙었다** | 위와 같다 |
+| 스킬 앞머리의 `required_environment_variables`(`setup.collect_secrets`, `prerequisites.env_vars` 포함) | 스킬을 읽으면 그 이름의 값을 profile `.env` 에서 꺼내 컨테이너 환경에 넣는다. **측정에서 Control Plane MCP 토큰과 플러그인 토큰이 컨테이너 환경에 들어왔다.** `API_SERVER_KEY` 같은 provider 차단 목록만 막힌다 | 올린 스킬은 Control Plane 이, 플러그인 스킬은 대시보드 plugin 의 manifest 검증이 이 칸을 거절한다 |
+| 스킬 앞머리의 `required_credential_files` | profile 디렉터리 안의 파일을 컨테이너 `/root/.hermes/` 아래에 붙인다. `.env` 와 `auth.json` 은 거절하지만 **플러그인 값 파일(`.fos-connectors.json`)은 붙었다** | 위와 같다 |
 | `skill_manage` | profile 의 스킬 디렉터리에 쓴다 | `fos-ctx` 의 `pre_tool_call` 이 막는다(ADR-034) |
 | `skill_view` 의 `` !`cmd` `` 전처리 | Hermes 호스트에서 명령을 돌린다 | `skills.inline_shell` 기본값 false 로 꺼져 있다 |
 | `browser_*` | Hermes 컨테이너의 브라우저가 돈다 | `file://` 은 막혔다(측정). toolset 은 profile 틀에서 꺼져 있다 |
@@ -2252,7 +2252,7 @@ Hermes 가 쓰는 Docker API 는 `version`, `info`, `ps`, `inspect`, `image insp
 
 | 길 | 측정 | 판정 |
 | --- | --- | --- |
-| socket 을 Hermes 에 직접 붙인다 | 동작한다 | Hermes 프로세스나 그 자식(커넥터 MCP 서버 포함)이 뚫리면 호스트 root 와 같다 |
+| socket 을 Hermes 에 직접 붙인다 | 동작한다 | Hermes 프로세스나 그 자식(플러그인 MCP 서버 포함)이 뚫리면 호스트 root 와 같다 |
 | 경로와 메서드만 거르는 socket proxy(containers, exec, images, info, version 만 연다) | 실행 공간이 동작한다. volume 과 network 목록은 403 | **`--privileged -v /:/host` 컨테이너 생성이 통과했다.** 호스트 파일 시스템이 보였다 |
 | 컨테이너 생성 요청 본문을 검사하는 proxy | 이 저장소에서 측정하지 않았다 | 채택했다. 아래 조건을 본문에서 강제한다 |
 
@@ -2598,8 +2598,8 @@ Control Plane이 주인을 검사해 정확한 profile만 보낼 수는 있지�
 `GET /api/config`는 환경 변수 참조를 펼친 설정을 돌려줄 수 있으므로 도구 화면의 조회 경로로 열지 않는다.
 
 도구 선택값을 저장할 때는 제품이 허용한 이름만 받아 목록 전체를 계산하고, `memory`를 항상 제거해야 한다.
-Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다. 연결을 붙인 에이전트의 profile 도 같고, 그 목록에는 붙인 커넥터의 서버 이름이 함께 있다. 도구 저장은 그 이름을 함께 보내고, 대시보드 plugin 은 그 이름이 빠진 목록을 거절한다([`docs/features/connector.md`](../../docs/features/connector.md) 의 「바인딩 설치」).
-남아 있는 옛 커넥터 에이전트의 profile 은 예외다. 그 목록은 설치한 커넥터의 MCP 서버 이름과 그 커넥터의 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 갖고 대시보드 plugin 의 설치가 쓴다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
+Control Plane MCP(`fos-assistant`)의 서버 이름은 API 허용 목록에 계속 남겨야 한다. 연결을 붙인 에이전트의 profile 도 같고, 그 목록에는 붙인 플러그인의 서버 이름이 함께 있다. 도구 저장은 그 이름을 함께 보내고, 대시보드 plugin 은 그 이름이 빠진 목록을 거절한다([`docs/features/connector.md`](../../docs/features/connector.md) 의 「바인딩 설치」).
+남아 있는 옛 플러그인 에이전트의 profile 은 예외다. 그 목록은 설치한 플러그인의 MCP 서버 이름과 그 플러그인의 manifest 가 선언한 읽기 전용 이미지 도구(`vision`)만 갖고 대시보드 plugin 의 설치가 쓴다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)).
 등록된 MCP 서버 이름이 하나도 없는 목록은 모든 활성 MCP 서버를 통과시킬 수 있으므로, 알 수 없는 이름만 남은 목록을 허용해서는 안 된다.
 `_get_platform_tools`로 저장 뒤 실제 목록을 계산해 허용 목록과 대조한다.
 새 plugin toolset은 저장 목록에 없어도 자동으로 켜질 수 있고, `agent.disabled_toolsets`는 마지막에 적용되므로 둘 다 확인해야 한다.
@@ -2723,7 +2723,7 @@ provider 를 바꿔도 Control Plane 은 profile 바인딩, 요청한 모델과 
 | 단계와 profile 기본값 | 모델 단계의 provider 가 비면 요청 profile 의 카탈로그로 정한다. 단계의 모델이 그 카탈로그에 없거나 선택한 모델이 숨겨졌으면 다른 provider 로 대체하지 않고 거절한다. 대화 선택, 사용자 기본 칸, 그룹 기본 칸, profile 기본값의 우선순위를 유지한다. 에이전트 기본 모델은 없다 | `chat/ModelTierServiceTest`, `chat/ModelVisibilityTest`; 선택 규칙은 [모델 단계](../../docs/features/schedule.md) |
 | 요청 경로와 실제 경로 | 실행 조회의 요청 모델과 실제 `runtime` 을 구분한다. Hermes 가 알려 준 실제 provider 와 모델로 실행을 기록한다. 기본값과 요청값으로 실제 경로를 추정하지 않는다 | `hermes/HermesRuntimeReadTest`, `chat/ModelSelectionTest` |
 | profile 인증 경계 | provider 교체로 API 인증 key 를 바꾸지 않는다. 요청자의 바인딩에서 profile 을 정하고 key 가 없으면 다른 profile 의 key 를 빌리지 않는다. 모델 목록 cache 도 profile 별로 나눈다 | `hermes/HermesRunRequestTest`, `hermes/HermesProfileKeyStoreTest`, `chat/ChatServiceTest`, `chat/ModelOptionsServiceTest` |
-| credential 쓰기 경계 | 대시보드의 환경 쓰기는 허용한 Control Plane 칸만 받는다. 커넥터 연결 해제로 모델 credential 을 지우지 않는다. `credential_scope` 는 공유 여부의 선언이며 실제 OAuth 격리를 강제하는 값이 아니다 | `test_dashboard_profile_api_env.py`; 선언의 뜻은 [credential 경계](hermes-contract.md#oauth-credential-은-여기서-빠진다) |
+| credential 쓰기 경계 | 대시보드의 환경 쓰기는 허용한 Control Plane 칸만 받는다. 플러그인 연결 해제로 모델 credential 을 지우지 않는다. `credential_scope` 는 공유 여부의 선언이며 실제 OAuth 격리를 강제하는 값이 아니다 | `test_dashboard_profile_api_env.py`; 선언의 뜻은 [credential 경계](hermes-contract.md#oauth-credential-은-여기서-빠진다) |
 | 루트 usage 읽기 | 입력·출력·cache 칸의 알려진 별칭을 같은 토큰 수로 읽는다. 보고하지 않은 칸은 0 으로 채우지 않는다. total 이 없고 입력·출력이 모두 있으면 합을 구한다. cache 를 입력에 임의로 더하지 않는다 | `hermes/infra/HermesUsageParsingTest` |
 | 가격과 비용 모드 | provider 와 모델의 짝으로 가격을 찾는다. 같은 모델이어도 provider 별 가격을 적용하고 가격 미확인은 금액을 비운다. 입력·출력 토큰 중 하나라도 없으면 금액을 비우고, 명시적인 0 은 누락과 구분해 환산한다. 입력에 포함된 cache 는 한 번만 센다. 구독은 실제 청구액을 비우고 API 는 환산액과 같은 값으로 기록한다 | `usage/CostEstimatorTest`, `usage/UsageCostRecordingTest` |
 | native 자식 provider | session 응답의 provider 를 우선하고 없으면 plugin 을 조회한다. 부모 provider 를 빌리지 않는다. 주 호출이 같은 모델에서 provider 만 바꿔도 복수 경로로 보고 provider 를 비운다. 같은 짝의 반복 호출과 보조 호출은 교체로 세지 않는다. 읽기는 저장소를 바꾸지 않는다 | `hermes/SubagentProviderClientTest`, `usage/subagent/application/SubagentUsageReconcilerTest`, `test_dashboard_profile_api_session.py` |
@@ -2842,7 +2842,7 @@ token provider 등록, profile 생성의 `name`, 환경 쓰기의 `profile/key/v
 - 공유 listener 가 turn 마다 profile 의 `terminal.*` 를 scope 로 묶는다(`_profile_runtime_scope`, `install_and_reset_profile_terminal_scope`)
 - `_get_file_ops` 와 `execute_code` 가 terminal 과 같은 환경을 쓴다
 - `docker_volumes`, `docker_extra_args`, `env_passthrough`, `credential_files` 의 이름과 뜻
-- 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사(`SkillFrontmatter`)와 대시보드 plugin 의 커넥터 스킬 검사(`_skill_name`)에 함께 더한다
+- 스킬 앞머리에서 환경 값과 파일을 실행 공간에 넣는 칸의 이름(`tools/skills_tool_setup.py` 의 `_get_required_environment_variables`, `required_credential_files`). 칸이 늘면 올린 스킬 저장 검사(`SkillFrontmatter`)와 대시보드 plugin 의 플러그인 스킬 검사(`_skill_name`)에 함께 더한다
 - `HERMES_WRITE_SAFE_ROOT` 를 docker backend 의 파일 쓰기에도 경로 문자열로 적용한다
 - `execute_code` 가 RPC 로 부를 수 있는 도구(`SANDBOX_ALLOWED_TOOLS`)에 MCP 도구가 없다. 생기면 [ADR-20261008 / connector-output-files](adr/ADR-20261008-connector-output-files.md) 를 다시 검토한다
 - gateway 가 `HERMES_EXEC_ASK` 를 켜고, 셸 위험 명령과 plugin 승인 요청이 ask 문맥에서 `approvals.unattended_mode` 를 보지 않는다. 계약 시험이 확인한다. 바뀌면 docker profile 의 `unattended_mode: approve` 가 그 둘까지 승인 없이 열므로 [ADR-20261008 / execute-code-unattended](adr/ADR-20261008-execute-code-unattended.md) 를 다시 본다
@@ -2854,15 +2854,15 @@ Hermes 를 올리면 번들 스킬이 늘 수 있다. 같은 이름이면 profil
 그 검사의 절차는 `fos-home-infra` 가 갖는다. 까닭은 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 의 「Hermes 를 올릴 때 이름 충돌을 본다」 에 있다.
 
 **올린 Hermes 이미지의 `mcp` SDK 버전을 본다.**
-대시보드 plugin 의 커넥터 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([커넥터 설치](../../docs/features/connector.md) 의 「MCP SDK 계약」).
+대시보드 plugin 의 플러그인 도구 호출은 Hermes 가 설치한 `mcp` Python SDK 를 쓰고, 지원 범위는 `mcp>=2.0,<3` 이다([플러그인 설치](../../docs/features/connector.md) 의 「MCP SDK 계약」).
 Hermes 는 `mcp` 를 정확한 판 하나로 고정한다. v0.19.0 은 1.26.0, v0.20.0 부터 v0.20.2 까지는 1.28.1, v0.20.3 부터 v0.21.5 까지는 2.0.0 이다. 그래서 판은 이미지를 올릴 때만 바뀐다.
-1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 커넥터 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
+1.x 는 속성 이름이 camelCase(`readOnlyHint`, `structuredContent`, `isError`)라 plugin 의 모든 플러그인 도구 호출이 `unavailable` 이 된다. 2.0.0, 2.0.1, 2.1.1, 2.2.0 에서는 plugin 의 호출 순서가 같게 동작함을 2026-10-01 에 확인했다.
 올릴 때 확인할 것은 아래와 같다.
 
 - 새 이미지의 `mcp` 판이 `2.` 으로 시작한다
 - `mcp_types.ToolAnnotations` 에 `read_only_hint` 가, `mcp_types.CallToolResult` 에 `structured_content` 와 `is_error` 가 있다
 - `from mcp import ClientSession, StdioServerParameters` 와 `from mcp.client.stdio import stdio_client` 가 된다
-- `from mcp.client.streamable_http import streamable_http_client` 가 되고 그 함수가 `http_client` 인자를 받으며, `import httpx2` 가 된다. 하나라도 어긋나면 로컬 커넥터의 호출까지 `unavailable` 이다
+- `from mcp.client.streamable_http import streamable_http_client` 가 되고 그 함수가 `http_client` 인자를 받으며, `import httpx2` 가 된다. 하나라도 어긋나면 로컬 플러그인의 호출까지 `unavailable` 이다
 - 새 Hermes 버전의 `agent/secret_scope.py`에 있는 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`를 대시보드 `connector_remote.py`의 원격 칸 env 거절 목록과 대조한다. 전역 이름이 늘거나 접두가 바뀌면 거절 목록과 테스트도 갱신한다
 
 대시보드의 MCP probe 는 Hermes 자신의 코드로 돌아 SDK 판과 무관하게 도구 수를 낸다. probe 가 통과해도 plugin 의 `call` 경로가 맞다는 증거가 아니다.
@@ -2961,7 +2961,7 @@ Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-cont
 - 스킬 색인 캐시 키에 `skills.disabled` 에서 읽은 이름이 들어 있다. plugin 이 바꾼 색인 표식이 그 profile 의 색인을 새로 만들게 한다
 
 [`hermes/tests/hermes_contract.py`](../tests/hermes_contract.py) 의 `LIVE_RELOAD` 가 이 지점을 선언하고, `HermesSourceTest.test_live_reload_points` 가 소스에서 확인한다.
-실패하면 붙인 커넥터가 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정할 수 있다. ADR 의 판정을 다시 본다.
+실패하면 붙인 플러그인이 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정할 수 있다. ADR 의 판정을 다시 본다.
 
 ### 금융 prepare와 실행 전용 전달
 
@@ -2970,7 +2970,7 @@ Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-cont
 MCP 입력은 `{v:1,tool,args}`이며 tool은 접두사를 뺀 금융 도구 이름이다.
 실제 목록에 같은 등록 이름이 하나이고 준비 도구의 `read_only_hint`가 참이어야 한다.
 준비 결과는 `{v:1,executionArgs,summary}`이며 크기·strict 타입·표시 값은
-[커넥터 정책](../../docs/features/connector-policy.md)의 저장 검증 계약을 따른다.
+[플러그인 정책](../../docs/features/connector-policy.md)의 저장 검증 계약을 따른다.
 일반 verify/options는 빈 args를 유지한다.
 
 금융 execute 본문은 기존 세 칸에 `execution`을 추가한다.
@@ -3047,24 +3047,24 @@ source logger Filter이므로 direct·ancestor handler에 모두 적용되며 �
 Filter 전에 본문을 저장하는 record factory, logging 자체의 실패를 출력하는 custom handler와 framework 예외는 별도 정책이 필요하다.
 이미 열린 gateway task, trajectory·session 저장과 공개 A1 request_dump writer도 보호 완료로 판정하지 않는다.
 
-### 커넥터 정책이 기대는 계약
+### 플러그인 정책이 기대는 계약
 
-Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.
+Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 플러그인 도구의 판정이 비켜 갈 수 있다.
 계약의 내용은 [도구 hook 과 승인](hermes-contract.md) 에 있다.
 
 | 계약 | 달라지면 |
 | --- | --- |
 | MCP 도구의 등록 이름 규칙(`mcp_prefixed_tool_name`) | 대시보드 plugin 의 `_hermes_tool_name` 을 같은 규칙으로 고친다. 다르면 hook 이 도구를 대응 파일에서 찾지 못해 모두 막는다 |
 | 글이 있는 `block` 이 MCP 요청을 막는다 | hook 으로 강제할 수 없다. wrapper 가 필요하다 |
-| 중계 도구 `tool_call` 이 hook 에 안쪽 등록 이름을 준다 | 중계 도구를 커넥터를 설치한 profile 에서 막는다 |
+| 중계 도구 `tool_call` 이 hook 에 안쪽 등록 이름을 준다 | 중계 도구를 플러그인을 설치한 profile 에서 막는다 |
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
-| `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 커넥터 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
+| `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 플러그인 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
 
 ## 토스증권 REST 전체 지원의 호출 한도
 
-서비스별 계약은 [토스증권 커넥터](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
-Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
+서비스별 계약은 [토스증권 플러그인](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
+Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 플러그인의 기존 client와 범용 승인 plugin 경계를 사용한다.
 Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. READ 도구 33개는 GET 34개와 내부 인증 1개를 사용한다. 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 6개 금융 producer는 구현·등록하지 않았다. 새 조회 도구의 운영 반영은 배포 뒤 확인해야 한다.
 
 ### 그룹별 예산
@@ -3095,7 +3095,7 @@ credential identity는 실제 발급에 쓴 trim한 secret이 같은 동안만 �
 만료·실패 시 token과 완료된 issuing 참조를 제거한다. identity 저장소는 요청 acquire/release로 사용 수를 관리하고 진행 중 발급·요청이 없는 만료 entry를 다음 acquire/release 때 제거한다. 프로세스 종료와 시험 teardown에서 전체 참조를 정리한다.
 동일 identity 단일 발급, 다른 origin/secret 분리, 교체 중 발급 결과의 identity 격리, stale 401의 새 token 보존, 만료·실패·teardown 정리와 반복 revoke의 유한 실패를 직접 단언한다.
 현재 single_binding은 연결 하나의 바인딩 중복만 막는다. probe, verify/options, prepare, 승인 실행은 별도 stdio 프로세스일 수 있으므로 프로세스 메모리 큐만으로 전역 예산을 보장하지 않는다.
-별도 token broker나 비밀 디스크 캐시를 추가하지 않는다. 커넥터 전용 client를 사용하고 각 프로세스는 응답 헤더와 유한 재시도로 경쟁을 처리한다.
+별도 token broker나 비밀 디스크 캐시를 추가하지 않는다. 플러그인 전용 client를 사용하고 각 프로세스는 응답 헤더와 유한 재시도로 경쟁을 처리한다.
 두 프로세스가 동시에 발급하면 이전 토큰이 철회될 수 있음을 로컬 시험으로 검증한다. 반복 token-revoked는 명확한 UNAVAILABLE이며 영구 재발급 반복을 하지 않는다.
 GET은 429 재시도 최대 1회, expired-token/token-revoked 재발급 최대 1회와 전체 전송 최대 3회를 적용한다. 5xx와 일반 401/403은 자동 재전송하지 않는다.
 큐 대기도 전체 호출 deadline 안에 포함하며 준비 RPC 2초와 실행 권한 60초를 넘겨 쓰기를 시작하지 않는다.
@@ -3106,6 +3106,6 @@ Authorization, secret, ticket, 계좌번호 원문과 upstream 오류 본문은 
 
 ## 카탈로그의 도구 상세 설명과 요약
 
-`/api/connectors/catalog`의 schema 2 `tools.<이름>.description`과 `tools.<이름>.summary`는 선택 평문이다. 원문 선언에서 별도 `tool_descriptions`와 `tool_summaries`로 정규화한 뒤 응답에만 합친다. 정책 dict에는 넣지 않으며, 누락하거나 표시 계약을 어긴 값은 응답에서 생략한다. 표시 문자·길이 계약과 SDK 정본 연결은 [커넥터 연결](../../docs/features/connector.md)의 「도구 이름과 요약」이 갖는다.
+`/api/connectors/catalog`의 schema 2 `tools.<이름>.description`과 `tools.<이름>.summary`는 선택 평문이다. 원문 선언에서 별도 `tool_descriptions`와 `tool_summaries`로 정규화한 뒤 응답에만 합친다. 정책 dict에는 넣지 않으며, 누락하거나 표시 계약을 어긴 값은 응답에서 생략한다. 표시 문자·길이 계약과 SDK 정본 연결은 [플러그인 연결](../../docs/features/connector.md)의 「도구 이름과 요약」이 갖는다.
 
-원문 전체 canonical SHA와 호환 순서는 [커넥터 도구 정책](../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」가 갖는다. 카탈로그 읽기는 MCP 프로세스나 서비스 API를 시작하지 않는다.
+원문 전체 canonical SHA와 호환 순서는 [플러그인 도구 정책](../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」가 갖는다. 카탈로그 읽기는 MCP 프로세스나 서비스 API를 시작하지 않는다.

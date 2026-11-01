@@ -1,13 +1,10 @@
-import { expect, PERSONA_EMPTY_AGENT_CODE, setSession, test } from "./fixtures.ts";
+import { expect, setSession, test } from "./fixtures.ts";
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /**
  * 관리자 「모델」 화면의 숨김 절을 본다. 에이전트는 모델을 갖지 않으므로 에이전트를 고르지 않고 그룹 전체의 후보를
  * 읽는다(ADR-20261101 / model-setting).
  */
-
-/** 다른 검사가 대화를 보내지 않는 에이전트다. 고를 수 있는 모델 목록을 읽는 데만 쓴다. */
-const AGENT_CODE = PERSONA_EMPTY_AGENT_CODE;
 
 /** 대역 catalog 에 있는 모델이다. 다른 검사가 실제 실행에 쓰지 않는 것을 숨긴다. */
 const HIDDEN_MODEL = "example-deep";
@@ -20,12 +17,13 @@ async function clearHidden(page: Page): Promise<void> {
   expect(hidden.ok(), `숨김을 비우지 못했다: ${hidden.status()}`).toBeTruthy();
 }
 
-type Options = { providers: { models: string[] }[] };
+type Catalog = { catalog: { providers: { models: string[] }[] } | null };
 
-async function modelOptions(page: Page): Promise<Options> {
-  const response = await page.request.get(`/api/chat/model-options?agentCode=${AGENT_CODE}`);
+/** 관리자가 칸에 고를 수 있는 그룹 모델 목록이다. 숨김이 적용된 목록이라 숨긴 모델이 빠진다. */
+async function groupCatalog(page: Page): Promise<Catalog> {
+  const response = await page.request.get("/api/admin/model-catalog");
   expect(response.ok()).toBeTruthy();
-  return (await response.json()) as Options;
+  return (await response.json()) as Catalog;
 }
 
 test("관리자가 모델을 숨기면 고를 수 있는 목록에서 빠지고 새로 고쳐도 숨김이 남는다", async ({ page }) => {
@@ -39,9 +37,9 @@ test("관리자가 모델을 숨기면 고를 수 있는 목록에서 빠지고 
     await save.click();
     await expect(section.getByRole("status")).toHaveText("숨김 설정을 저장했어요.");
 
-    const options = await modelOptions(page);
-    expect(options.providers[0]?.models).not.toContain(HIDDEN_MODEL);
-    expect(options.providers[0]?.models).toContain(KEPT_MODEL);
+    const { catalog } = await groupCatalog(page);
+    expect(catalog?.providers[0]?.models).not.toContain(HIDDEN_MODEL);
+    expect(catalog?.providers[0]?.models).toContain(KEPT_MODEL);
 
     await page.reload();
     await expect(section.getByRole("checkbox", { name: `${HIDDEN_MODEL} 숨기기` })).toBeChecked();

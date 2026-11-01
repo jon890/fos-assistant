@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -171,7 +170,7 @@ class ModelVisibilityTest {
             .thenReturn(new HermesModelCatalog(
                 null, "model-old", List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))));
         ModelOptionsService options = new ModelOptionsService(
-            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
 
         assertThat(options.optionsForAgent(GROUP_ID, agent).defaultAvailable()).isTrue();
     }
@@ -188,7 +187,7 @@ class ModelVisibilityTest {
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(catalog);
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile(), true)).thenReturn(catalog);
         return new ModelOptionsService(
-            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
     }
 
 

@@ -30,7 +30,7 @@ afterEach(async () => {
 });
 
 async function setup(body: string) {
-  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 플러그인이 링크를 거절하므로 실제 경로를 쓴다.
   const photoDir = await realpath(
     await mkdtemp(join(tmpdir(), "naver-blog-photos-")),
   );

@@ -19,7 +19,7 @@ test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", (
   assert.deepEqual(running(docs), []);
 });
 
-test("커넥터 README 는 존재 여부를 확인하는 hermes 검사만 돌린다", () => {
+test("플러그인 README 는 존재 여부를 확인하는 hermes 검사만 돌린다", () => {
   assert.deepEqual(running(["hermes/connectors/naver-blog/README.md"]), ["hermes"]);
   assert.deepEqual(running([".github/CODEOWNERS"]), ["hermes"]);
 });
@@ -35,7 +35,7 @@ test("모듈 코드는 그 모듈과 그것을 띄우는 job 을 돌린다", () 
   assert.deepEqual(running(["test/e2e/run.ts"]), ["backend", "browser", "e2e", "hermes"]);
 });
 
-test("브라우저는 backend 테스트와 커넥터 catalog 만 바꾸면 건너뛴다", () => {
+test("브라우저는 backend 테스트와 플러그인 catalog 만 바꾸면 건너뛴다", () => {
   assert.deepEqual(running(["backend/src/test/java/A.java"]), ["backend", "e2e", "hermes", "quality"]);
   assert.deepEqual(running(["test/resources/connector-argument-catalog.json"]), ["backend", "hermes"]);
   assert.deepEqual(running(["test/resources/connector-argument-masked-catalog.json"]), ["backend", "hermes"]);
@@ -48,8 +48,8 @@ test("브라우저 서버가 쓰는 테스트 지원 API 와 리소스는 브라
   ]) assert.deepEqual(running([file]), ["backend", "browser", "e2e", "hermes", "quality"], file);
 });
 
-test("커넥터 카드가 읽는 manifest 와 아이콘 변경도 브라우저 검사를 돌린다", () => {
-  for (const file of ["hermes/connectors/gmail/connector.json", "hermes/connectors/naver-blog/icon.svg"]) {
+test("플러그인 카드가 읽는 manifest 와 아이콘 변경도 브라우저 검사를 돌린다", () => {
+  for (const file of ["hermes/connectors/gmail/assistant.json", "hermes/connectors/naver-blog/icon.svg"]) {
     assert.deepEqual(running([file]), ["backend", "browser", "e2e", "hermes", "quality"], file);
   }
 });

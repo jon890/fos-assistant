@@ -7,7 +7,7 @@ import {
 } from "@/lib/connection";
 import { cn } from "cn";
 
-/** 커넥터 아이콘이다. 값이 없거나 모양이 틀리면 기본 아이콘을 그린다. `<img>` 로만 그려 SVG 안의 스크립트가 돌지 않게 한다. */
+/** 플러그인 아이콘이다. 값이 없거나 모양이 틀리면 기본 아이콘을 그린다. `<img>` 로만 그려 SVG 안의 스크립트가 돌지 않게 한다. */
 export function ConnectorIcon({
   icon,
   className,
@@ -76,7 +76,7 @@ export function ConnectorLink({
   );
 }
 
-/** 공식 서비스나 프로젝트와 커넥터 설명서를 서로 다른 이름으로 연다. */
+/** 공식 서비스나 프로젝트와 플러그인 설명서를 서로 다른 이름으로 연다. */
 export function ConnectorLinks({
   connector,
   title,
@@ -103,7 +103,7 @@ export function ConnectorLinks({
       <ConnectorLink
         link={connector?.readmeUrl}
         title={title}
-        label="커넥터 README"
+        label="플러그인 README"
         readme
       />
     </div>

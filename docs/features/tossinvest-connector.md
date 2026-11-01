@@ -1,17 +1,17 @@
-# 토스증권 커넥터
+# 토스증권 플러그인
 
-사용자의 토스증권 계좌를 읽고 승인한 일반 주문을 넣는 커넥터의 개발 문서다.
+사용자의 토스증권 계좌를 읽고 승인한 일반 주문을 넣는 플러그인의 개발 문서다.
 
 covers: `hermes/connectors/tossinvest/`
 
 코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
-이 문서는 도구와 정책, 보안, 연결 유지, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [토스증권 커넥터 README](../../hermes/connectors/tossinvest/README.md) 가 갖는다.
+이 문서는 도구와 정책, 보안, 연결 유지, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [토스증권 플러그인 README](../../hermes/connectors/tossinvest/README.md) 가 갖는다.
 결정은 [ADR-20261008 / tossinvest-connector](../../hermes/docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
+플러그인 공통 계약은 [플러그인 연결](connector.md) 과 [플러그인 도구 정책](connector-policy.md) 이 갖는다.
 
 서비스는 [토스증권 공식 사이트](https://www.tossinvest.com/) 에 있다. API 설정 근거는 [토스증권 개발자 문서](https://developers.tossinvest.com/)다.
 
-**이 커넥터는 사용자가 승인한 일반 주문을 한 건씩 넣거나 취소한다.** 정정과 조건주문은 하지 않는다. 그 둘은 사용자가 토스증권 앱이나 웹에서 한다.
+**이 플러그인은 사용자가 승인한 일반 주문을 한 건씩 넣거나 취소한다.** 정정과 조건주문은 하지 않는다. 그 둘은 사용자가 토스증권 앱이나 웹에서 한다.
 
 ## 등록 칸
 
@@ -33,7 +33,7 @@ covers: `hermes/connectors/tossinvest/`
 
 ## 도구와 정책
 
-MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 준비 도구 `prepare_trade` 는 `READ` 이고 승인 없이 돈다. 실행 도구 `create_order` 와 `cancel_order` 는 `FINANCIAL` 이고 호출마다 승인을 받는다. SDK 설명은 connector.json의 본문을 그대로 쓴다. 조회 도구와 준비 도구의 `readOnlyHint` 는 참이고 실행 도구 둘은 거짓이다.
+MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 준비 도구 `prepare_trade` 는 `READ` 이고 승인 없이 돈다. 실행 도구 `create_order` 와 `cancel_order` 는 `FINANCIAL` 이고 호출마다 승인을 받는다. SDK 설명은 assistant.json의 본문을 그대로 쓴다. 조회 도구와 준비 도구의 `readOnlyHint` 는 참이고 실행 도구 둘은 거짓이다.
 
 | 도구 | 부르는 API | 하는 일 |
 | --- | --- | --- |
@@ -74,7 +74,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 �
 | `create_order` | `POST /api/v1/orders` | 승인한 일반 주문 한 건을 넣는다. FINANCIAL/always 다 |
 | `cancel_order` | `POST /api/v1/orders/{orderId}/cancel` | 승인한 대로 주문 한 건을 취소한다. FINANCIAL/always 다 |
 
-계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
+계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 플러그인과 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
 모델은 준비 도구 `prepare_trade` 만 부른다. 인자는 `{v: 1, tool, args}` 이고 `tool` 은 `create_order` 나 `cancel_order` 다.
 `args` 의 스키마는 그 두 도구의 strict 인자 스키마(`MODEL_SCHEMAS`)의 union 이다. 금액, 수량, 가격은 10진수 글이고 계좌 칸이 없다.
@@ -136,7 +136,7 @@ get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다
 네 시세 도구의 `symbol`은 국내 종목 코드(`005930`, `0101N0`)나 미국 티커(`AAPL`, `BRK.B`) 한 개다. 계좌 헤더를 보내지 않는다. 조회 시점의 REST 응답을 읽으며 실시간 구독이나 자동 폴링은 하지 않는다.
 호가와 잔량, 체결가와 수량, 캔들의 OHLCV는 공식 필드의 decimal 문자열 그대로다. 미국 가격제한의 null과 빈 배열, 데이터 미제공 시 호가 시각의 null도 보존한다. 필드 정본은 [공식 fixture](../../hermes/connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)와 생성된 계약이다.
 
-캔들의 `adjusted`는 기본 true이고 false도 query로 전달한다. `before`는 타임존이 있는 ISO 8601 시각이며 그 시각과 같거나 이전인 봉을 읽는다. 예를 들어 `2026-03-25T09:00:00+09:00`을 인자로 넣으면 커넥터가 `+`를 인코딩한다.
+캔들의 `adjusted`는 기본 true이고 false도 query로 전달한다. `before`는 타임존이 있는 ISO 8601 시각이며 그 시각과 같거나 이전인 봉을 읽는다. 예를 들어 `2026-03-25T09:00:00+09:00`을 인자로 넣으면 플러그인이 `+`를 인코딩한다.
 다음 페이지는 `result.nextBefore`를 다음 호출의 `before`로 그대로 넣는다. 마지막 페이지는 null이다. 한 호출에서 다음 페이지를 자동으로 모으지 않는다.
 
 ### 환율과 시장 일정
@@ -145,7 +145,7 @@ get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다
 시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
 세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 초를 생략하거나 시간대가 없는 시각과 추가 인자를 거절한다.
 
-`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 `execution_guard`(`protocol` 은 `approval-claim-v2`, `prepare_tool` 은 `prepare_trade`, `operations` 는 `create_order`=`CREATE` 와 `cancel_order`=`CANCEL`, `scope_fields` 는 `account_seq`=`account`)를 선언하므로 해시 값이 있다. 도구 목록이나 선언을 바꾸면 이전 해시에 묶인 승인 ticket 이 무효가 된다. 조회 도구 33개와 준비 도구의 승인 정책은 `none`, 실행 도구 둘은 `always` 다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 다시 동기화하지 않으면 바인딩이 새 manifest 의 보호 선언을 받지 못해 준비가 모두 거절된다.
+`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 플러그인에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 플러그인은 `execution_guard`(`protocol` 은 `approval-claim-v2`, `prepare_tool` 은 `prepare_trade`, `operations` 는 `create_order`=`CREATE` 와 `cancel_order`=`CANCEL`, `scope_fields` 는 `account_seq`=`account`)를 선언하므로 해시 값이 있다. 도구 목록이나 선언을 바꾸면 이전 해시에 묶인 승인 ticket 이 무효가 된다. 조회 도구 33개와 준비 도구의 승인 정책은 `none`, 실행 도구 둘은 `always` 다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 다시 동기화하지 않으면 바인딩이 새 manifest 의 보호 선언을 받지 못해 준비가 모두 거절된다.
 
 ### 섹터 조회
 
@@ -200,7 +200,7 @@ symbol은 영문·숫자·점·하이픈을 받지만 통계는 KR 전용이다.
 
 공식 [OpenAPI 스펙](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)은 계좌 관련 조회를 아래 API 그룹으로 나눈다.
 
-| 엔드포인트 | 공식 호출 한도 그룹 | 공식 초당 한도 | 커넥터의 최소 간격 |
+| 엔드포인트 | 공식 호출 한도 그룹 | 공식 초당 한도 | 플러그인의 최소 간격 |
 | --- | --- | --- | --- |
 | `GET /api/v1/accounts` | `ACCOUNT` | 1회 | 1,000ms |
 | `GET /api/v1/holdings` | `ASSET` | 5회 | 200ms |
@@ -208,7 +208,7 @@ symbol은 영문·숫자·점·하이픈을 받지만 통계는 KR 전용이다.
 | `GET /api/v1/orders`, `GET /api/v1/orders/{orderId}` | `ORDER_HISTORY` | 5회 | 200ms |
 
 한도 수치는 공식 [연동 가이드의 Rate Limits](https://openapi.tossinvest.com/openapi-docs/overview.md#rate-limits)에서 확인했다. 공식 한도는 사전 공지 없이 바뀔 수 있다.
-커넥터는 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 KST 09:00~09:10에 피크 한도를 적용한다. 공식 19그룹과 AUTH도 같은 큐 경계를 사용한다. 예산은 origin/client ID별로 공유하며 secret 변경으로 한도를 우회하지 못한다.
+플러그인은 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 KST 09:00~09:10에 피크 한도를 적용한다. 공식 19그룹과 AUTH도 같은 큐 경계를 사용한다. 예산은 origin/client ID별로 공유하며 secret 변경으로 한도를 우회하지 못한다.
 `get_buying_power`의 두 조회와 서로 다른 호출의 같은 그룹 요청, 토큰 재발급 뒤 재송도 이 큐를 거친다. 다른 그룹은 서로의 큐를 기다리지 않는다. X-RateLimit의 낮은 한도와 Remaining/상대 Reset, Retry-After를 우선 적용한다. 큐 대기도 4초 호출 deadline 안에 포함한다.
 
 간격, 상대 헤더 대기, 호출 deadline과 토큰 TTL은 `performance.timeOrigin + performance.now()`의 소수 밀리초 시각을 함께 쓴다. 실행 중 벽시계가 보정되어도 경과 시간은 바뀌지 않는다. KST 피크 여부는 현재 벽시계로 판단한다. 타이머에 넘기는 남은 시간은 밀리초 단위로 올림하고, 깬 뒤 간격과 deadline을 다시 검사한다. `Date.now()`의 정수 눈금만 비교하면 실제로 1초가 지나기 전에 다음 요청을 보낼 수 있기 때문이다.
@@ -283,14 +283,14 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 상한을 둔다. 운영 설정의 값은 최대치이고, 실제 상한은 계좌 주인이 그 안에서 정한다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. 최대치는 `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd`. USD 금액 주문은 환율로 바꾸지 않고 USD 상한과만 견준다. 사용자 상한은 아래 「주문 상한」 이 갖는다 |
 | 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
 | UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
-| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 있음. `fos-financial-intent-v2`. 저장 줄의 protocol 을 `approval-claim-v2` 로 올렸고, 열린 v1 줄이 남으면 관문이 닫힌다 |
+| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 플러그인, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 있음. `fos-financial-intent-v2`. 저장 줄의 protocol 을 `approval-claim-v2` 로 올렸고, 열린 v1 줄이 남으면 관문이 닫힌다 |
 | 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 있음. `FinancialDigest`, key 파일은 `digest-key-file`. 없으면 관문이 닫힌다 |
 | 공개 진입점 연결 | 정책 판정이 준비 도구 호출을 producer 로, 승인 API 가 FINANCIAL 줄을 금융 승인으로 보낸다. 토스 서버와 manifest 가 준비 도구와 실행 도구 둘을 등록한다 | 있음. 준비 호출은 판정 전에 금융 준비로 넘기고, 공개 승인은 주인 확인 뒤 허락 입력을 거절하고 금융 승인으로 보낸다 |
 | 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보고 승인하게 두지 않는다 | 있음. 카드가 계좌 순번과 저장 요약을 보이고, 요약을 열지 못하면 승인 단추를 그리지 않는다 |
 
 카드의 계좌 순번은 사용자에게 익숙한 값이 아니다. 허용 목록에 그 순번을 적은 운영자와 연결 화면의 계좌 선택지로 대조한다. 근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
 
-지금 있는 준비, 승인, 실행, 확인의 경로와 네이버, Gmail 과의 차이, 개방 Go/No-Go 는 [커넥터별 준비, 승인, 실행, 확인](connector-policy.md#커넥터별-준비-승인-실행-확인)이 갖는다.
+지금 있는 준비, 승인, 실행, 확인의 경로와 네이버, Gmail 과의 차이, 개방 Go/No-Go 는 [플러그인별 준비, 승인, 실행, 확인](connector-policy.md#플러그인별-준비-승인-실행-확인)이 갖는다.
 
 ### 주문 상한
 
@@ -373,7 +373,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 상한 거절을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
 준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `FinancialPrepareStage` 가 갖는다.
 `stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유>` 와 대시보드 로그의 `stage=<단계> code=<선언된 오류 코드>` 를 함께 본다. 대시보드 단계는 `connector_prepare.py` 가 정한다. 어느 로그에도 인자, 계좌, 메일, 원격 응답은 남지 않는다.
-`args` 가 스키마에 맞지 않으면(금액을 숫자로, 계좌를 인자로 넣는 경우) 커넥터 핸들러 전에 MCP SDK 가 거절하므로 `stage=prepare_tool code=sdk_invalid_params` 가 남는다. 스키마는 지났지만 커넥터가 거절한 주문은 `code=TOSSINVEST_INVALID_INPUT` 처럼 선언된 코드가 남는다.
+`args` 가 스키마에 맞지 않으면(금액을 숫자로, 계좌를 인자로 넣는 경우) 플러그인 핸들러 전에 MCP SDK 가 거절하므로 `stage=prepare_tool code=sdk_invalid_params` 가 남는다. 스키마는 지났지만 플러그인이 거절한 주문은 `code=TOSSINVEST_INVALID_INPUT` 처럼 선언된 코드가 남는다.
 승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
 도중에 UNKNOWN 이 나오면 다시 요청하지 않는다. 토스증권 앱에서 주문 상태를 먼저 확인한다.
 
@@ -385,7 +385,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | 실행기 응답 | claim 미소비 | claim 소비 |
 | --- | --- | --- |
 | 성공 | `UNKNOWN`. 프로토콜 불일치라 성공으로 적지 않고 실행 성공 피드백도 남기지 않는다. 로그에 `금융 실행 프로토콜 불일치` 와 승인 번호만 남는다 | `SUCCEEDED` |
-| 커넥터가 선언한 오류 | `FAILED` | `FAILED` |
+| 플러그인이 선언한 오류 | `FAILED` | `FAILED` |
 | 상세 없는 `unavailable` | `FAILED` | `UNKNOWN` |
 | 응답을 잃음 | `FAILED` | `UNKNOWN` |
 

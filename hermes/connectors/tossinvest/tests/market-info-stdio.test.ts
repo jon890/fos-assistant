@@ -27,7 +27,7 @@ const cases = [
   ["/api/v1/candles", "get_candles", { symbol: "005930", interval: "1d" }],
 ] as const;
 const manifest = JSON.parse(
-  readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
+  readFileSync(`${import.meta.dir}/../assistant.json`, "utf8"),
 );
 
 test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 시세·시장 7 operation을 계좌 없이 실제 HTTP로 보낸다", async () => {

@@ -2,7 +2,7 @@
  * 예약 작업이 정한 시각에 발화해 작업 주인의 대화 turn 을 열고, 그 turn 의 쓰기 도구가 사람이 보낸 turn 과 같은 승인을
  * 거치는지 전체 흐름으로 본다.
  *
- * <p>승인이 필요한 커넥터 도구는 커넥터 도구 정책 시나리오와 같은 방법으로 부른다. 시작에서 연결을 등록해 비공개 에이전트에
+ * <p>승인이 필요한 플러그인 도구는 플러그인 도구 정책 시나리오와 같은 방법으로 부른다. 시작에서 연결을 등록해 비공개 에이전트에
  * 붙이고 반영 완료까지 한 뒤, 끝에서 작업과 그 에이전트를 지우고 연결을 해제한다. 발화기는 `run.ts` 가 1초마다 돌게 해 두었다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
@@ -53,7 +53,7 @@ export const scheduledTaskScenario: Scenario = {
     let taskId: string | undefined;
     let failed = false;
     try {
-      step("시험 커넥터를 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
+      step("시험 플러그인을 등록하고 비공개 에이전트에 붙여 반영 완료까지 한다");
       const agentCode = (await setup.attachedAgent("예약 시험 비서")).code;
 
       step("연결을 붙인 그 에이전트로 쓰기 도구를 부르는 한 번 도는 작업을 3초 뒤로 만든다");

@@ -1,6 +1,6 @@
 """원격 MCP 서버 정의를 검증하고 소유 기록의 원격 정의를 읽는다(ADR-20261026 remote-mcp-plugin).
 
-MCP 정의의 서버가 `type: http` 인 커넥터는 자식 프로세스 대신 Streamable HTTP 로 붙는다.
+MCP 정의의 서버가 `type: http` 인 플러그인은 자식 프로세스 대신 Streamable HTTP 로 붙는다.
 주소는 운영 목록에서만 오고, 사용자의 칸 값은 헤더 값의 `${이름}` 자리에만 들어간다.
 예외 사유와 로그에 주소와 헤더 값을 싣지 않는다.
 """
@@ -38,7 +38,7 @@ REMOTE_QUIET_LOGGERS = ("httpx2", "httpcore2.connection", "httpcore2.http11", "h
                         "mcp.shared.dispatcher", "client")
 
 
-# 지금 실행 문맥이 원격 호출 안인가. 같은 logger 를 쓰는 로컬 커넥터 호출의 기록은 그대로 남긴다.
+# 지금 실행 문맥이 원격 호출 안인가. 같은 logger 를 쓰는 로컬 플러그인 호출의 기록은 그대로 남긴다.
 _remote_call = contextvars.ContextVar("connector_remote_call", default=False)
 
 
@@ -120,7 +120,7 @@ def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> d
     for key in REMOTE_FORBIDDEN_KEYS:
         if key in declared:
             raise ValueError("원격 MCP 서버는 %s 를 선언하지 않는다" % key)
-    # 실행 파일과 운영자 env 는 자식 프로세스에 쓰는 값이다. 원격 커넥터의 항목에 있으면 운영 목록이 틀린 것이다.
+    # 실행 파일과 운영자 env 는 자식 프로세스에 쓰는 값이다. 원격 플러그인의 항목에 있으면 운영 목록이 틀린 것이다.
     if entry.get("command") is not None or entry.get("env"):
         raise ValueError("원격 MCP 서버의 운영 목록 항목에 command 나 env 가 있다")
     # 플러그인 갱신으로 토큰의 목적지가 바뀌지 않게 파일의 url 은 무시한다.
