@@ -21,6 +21,29 @@
 - `AUTONOMY` 계기의 옛 살펴보기 줄과 실패 이력은 지우지 않는다. 읽는 곳만 없앤다
 - 대체되는 ADR(value-evaluation, autonomy-policy, daily-loop)은 이 PR 에서 `superseded` 로 바꾸고 `archive/` 로 옮긴다
 
+## PR 나누기
+
+삭제만으로 운영 코드가 4000줄 안팎이라 크기 상한(`scripts/pr/pr-size.mjs`)을 넘는다. `규모:예외` 라벨은 쓰지 않고 아래 두 PR 로 나눈다. PR 마다 그 단계의 문서와 테스트를 함께 담는다. 계획서는 마지막 PR(C)에서 지운다.
+
+| PR | 지우는 것 |
+| --- | --- |
+| B | `proactive/evaluation/**`, `proactive/autonomy/**`, `proactive/surface/**`, `proactive/feedback/` 의 export, 그 API 와 화면(가치 평가 절, 판정 반응, 「먼저 다룰 문제」 의 `problem` 칸과 반응 단추) |
+| C | `proactive/loop/**`, 자동 실행 동의와 `ProactiveCheckService.startAutonomous`, 매일 루프 설정 화면, 대체되는 ADR 의 `superseded` 표시와 `archive/` 이동 |
+
+B 와 C 의 경계에서 서로 부르는 코드가 남으면(예: `loop` 가 `autonomy` 를 부른다) B 에서 그 호출만 함께 걷어 낸다.
+
+### 지시서 담당 밖이지만 고쳐야 하는 파일
+
+phase 01 을 조사하며 찾은 참조다. 지시서의 담당 목록에 넣는다.
+
+- backend: `admin/proactive/**`(`ValueEvaluationAdminController`, `ProactiveAdminDtos`), `task/application/TaskLoopSettings.java`, `task/application/ProactiveScheduleService.java`, `LivePropertiesConfig.java`, 에이전트 정리(`ProactiveAgentPurge` 를 쓰는 곳)
+- backend 테스트: `testsupport/**`(`SurfacedProblemSeed`, `ProactiveLoopTestSupportController`, `BackendIntegrationTest`), `architecture/**`(`ArchitectureRules`, `StoredEnumNamesTest`, `JpaAuditingRules`, `SubFeatureOrder`), `CollationMixQueryMysqlTest`, `agent/AgentPurgeWriterTest`, `proactive/eval/**`, `attention/AttentionJudgeTest`(`AttentionProblem`)
+- web: `components/agent/**`, `lib/value-evaluation.ts`, `lib/decision-reaction-api.ts`, `lib/attention.ts`, `app/api/admin/proactive-checks/**`, `app/api/autonomy-decisions/**`, `test/unit/attention.test.ts`, `test/browser/admin-value-evaluation.spec.ts`
+- hermes: `plugins/dashboard-profile-api/profiles.py` 의 `decision-readiness`
+- 문서: `backend/docs/code-architecture.md`, `docs/adr/` 와 `backend/docs/adr/` 의 대체 ADR(value-evaluation, autonomy-policy, daily-loop)
+
+저장된 enum 값(`CheckTrigger.AUTONOMY`, `AttentionTrigger.PROBLEM_SURFACED`, `FeedbackSubjectType.AUTONOMY_DECISION`)은 옛 줄이 있어 테이블 DROP(plan228) 전까지 지우지 않는다.
+
 ## 작업 항목
 
 ### 1. 코드 삭제
