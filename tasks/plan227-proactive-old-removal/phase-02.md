@@ -33,7 +33,7 @@
 | B4 | `proactive/evaluation/**`, 구조 규칙과 기준 파일의 마무리 |
 | C | `proactive/loop/**`, 자동 실행 동의와 `ProactiveCheckService.startAutonomous`, 매일 루프 설정 화면, 대체되는 ADR 의 `superseded` 표시와 `archive/` 이동, hermes 의 `decision-readiness` 와 `decision-profile` |
 
-C 가 이어받는 정리: hermes 는 `plugins/dashboard-profile-api/profiles.py` 의 `_decision_readiness_response`, 같은 플러그인 `routes.py`·`__init__.py` 의 연결, `decision-profile/`, `bundle.sh` 의 복사 줄, 그것을 읽는 `tests/test_dashboard_profile_api_profiles.py`·`tests/test_hermes_contract.py` 의 검사, `docs/hermes-contract.md` 의 절이다. 이 밖에 `ErrorCode` 의 `AUTONOMY_DECISION_NOT_FOUND`, `VALUE_EVALUATION_NOT_FOUND`, `VALUE_EVALUATION_STATE_CONFLICT` 와 화면의 `error-message.ts`, `feedback` 의 `FeedbackLabeler.label`(호출하는 곳이 테스트뿐이다), `docs/features/memory.md` 가 가리키는 `DecisionFeedbackExporter` 도 정리한다.
+C 가 이어받는 정리: hermes 는 `plugins/dashboard-profile-api/profiles.py` 의 `_decision_readiness_response`, 같은 플러그인 `routes.py`·`__init__.py` 의 연결, `decision-profile/`, `bundle.sh` 의 복사 줄, 그것을 읽는 `tests/test_dashboard_profile_api_profiles.py`·`tests/test_hermes_contract.py` 의 검사, `docs/hermes-contract.md` 의 절이다. 이 밖에 `ErrorCode` 의 `AUTONOMY_DECISION_NOT_FOUND`, `VALUE_EVALUATION_NOT_FOUND`, `VALUE_EVALUATION_STATE_CONFLICT` 와 화면의 `error-message.ts`, `feedback` 의 `FeedbackLabeler.label`(호출하는 곳이 테스트뿐이다)도 정리한다.
 
 경계에서 서로 부르는 코드가 남으면(예: `loop` 가 `autonomy` 를 부른다) 앞 PR 에서 그 호출만 함께 걷어 낸다.
 
