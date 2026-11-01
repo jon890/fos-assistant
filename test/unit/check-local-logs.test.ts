@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import test from "node:test";
 
-function runCheck(fail: boolean) {
+function runCheck(fail: boolean, failPublicSafe = false) {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "check-local-logs-")));
   const checks = join(directory, "scripts/checks");
   const dev = join(directory, "scripts/dev");
@@ -16,8 +16,9 @@ function runCheck(fail: boolean) {
   const stdout = Array.from({ length: 65 }, (_, index) => `output-${index + 1}\n`).join("");
   const output = stdout + "stderr-output\n";
   writeFileSync(join(checks, "check-public-safe.sh"),
+    `#!/bin/bash\necho synthetic-private-marker\nexit ${failPublicSafe ? 1 : 0}\n`, { mode: 0o755 });
+  writeFileSync(join(checks, "quality.sh"),
     `#!/bin/bash\nprintf '%s' '${stdout}'\necho stderr-output >&2\nexit ${fail ? 1 : 0}\n`, { mode: 0o755 });
-  writeFileSync(join(checks, "quality.sh"), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
   for (const command of ["node", "git", "pnpm"]) {
     writeFileSync(join(bin, command), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
   }
@@ -58,12 +59,27 @@ test("실패 단계의 마지막 줄에 절대 경로를 보이고 원본 전체
       assert.ok(isAbsolute(log));
       assert.ok(log.startsWith(join(fixture.directory, "temporary logs") + "/"));
       assert.equal(readFileSync(log, "utf8"), fixture.output);
+      assert.ok(!existsSync(join(log, "../public-safe.log")));
       assert.ok(!result.stderr.includes("output-1\n"));
       assert.ok(result.stderr.includes("output-65\nstderr-output\n"));
       paths.push(log);
     }
     assert.notEqual(paths[0], paths[1]);
     assert.ok(paths.every((log) => existsSync(log)));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("공개 정보 검사가 실패하면 출력은 보이되 원본 로그를 남기지 않는다", () => {
+  const fixture = runCheck(false, true);
+  try {
+    const result = fixture.run();
+    assert.equal(result.status, 1, result.stderr);
+    assert.ok(result.stderr.includes("synthetic-private-marker"));
+    assert.ok(result.stderr.includes("공개 정보 검사 로그는 비공개 값이 남지 않도록 보존하지 않는다."));
+    assert.ok(!result.stderr.includes("원본 로그:"));
+    assert.deepEqual(readdirSync(fixture.logs), []);
   } finally {
     rmSync(fixture.directory, { recursive: true, force: true });
   }
