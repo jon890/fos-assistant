@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import test from "node:test";
@@ -21,14 +21,29 @@ function runCheck(fail: boolean) {
   for (const command of ["node", "git", "pnpm"]) {
     writeFileSync(join(bin, command), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
   }
-  const run = () => spawnSync("bash", [join(dev, "check-local.sh"), "--fast"], {
+  const run = (args = ["--fast"]) => spawnSync("bash", [join(dev, "check-local.sh"), ...args], {
     cwd: directory,
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TMPDIR: "temporary logs" },
     encoding: "utf8",
     timeout: 30_000,
   });
-  return { directory, output, run };
+  return { directory, output, run, bin, logs };
 }
+
+test("사용법이나 Node 버전 오류에서는 로그 폴더를 만들지 않는다", () => {
+  const fixture = runCheck(false);
+  try {
+    for (const args of [["--bogus"], ["--fast", "browser.spec.ts"]]) {
+      assert.equal(fixture.run(args).status, 2);
+      assert.deepEqual(readdirSync(fixture.logs), []);
+    }
+    writeFileSync(join(fixture.bin, "node"), "#!/bin/bash\nexit 1\n", { mode: 0o755 });
+    assert.equal(fixture.run().status, 2);
+    assert.deepEqual(readdirSync(fixture.logs), []);
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
 
 test("실패 단계의 마지막 줄에 절대 경로를 보이고 원본 전체를 실행별로 보존한다", () => {
   const fixture = runCheck(true);

@@ -25,10 +25,6 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-tmp_root="${TMPDIR:-/tmp}"
-tmp_root="$(cd "${tmp_root}" && pwd)"
-LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
-trap 'if [ "$?" -eq 0 ]; then rm -rf "${LOG_DIR}"; fi' EXIT
 
 fast=false
 skip_browser=false
@@ -50,6 +46,11 @@ if ! node -e 'const [a]=process.versions.node.split(".").map(Number); process.ex
   echo "Node 24 이상이 필요하다. 지금은 ${node_version} 이다." >&2
   exit 2
 fi
+
+tmp_root="${TMPDIR:-/tmp}"
+tmp_root="$(cd "${tmp_root}" && pwd)"
+LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
+trap 'if [ "$?" -eq 0 ]; then rm -rf "${LOG_DIR}"; fi' EXIT
 
 step() {
   local name="$1"; shift
