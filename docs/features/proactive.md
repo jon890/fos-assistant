@@ -5,7 +5,7 @@
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
 옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 가치 평가, 행동 정책, 매일 루프의 절은 옮기는 순서 6 에서 지운다.
 
-covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/components/agent/agent-value-evaluation-section.tsx`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `web/src/lib/value-evaluation.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
+covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
 
 ## 요구
 
@@ -97,14 +97,6 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 결과를 읽지 못한 마지막 살펴보기는 `lastCheck.invalidReason` 이 `EMPTY_ANSWER` 면 답을 받지 못했다고, 그 밖이거나 비었으면 형식이 맞지 않았다고 보인다.
 매일 루프 설정(`agent-proactive-loop-setting.tsx`)은 매일 깨우기 설정의 `form` 밖에 두고 스위치와 쉬기 단추가 바로 저장한다. 설치가 매일 루프를 열지 않았으면 꺼진 스위치만 막는다.
 관리자 영역 상세(`/admin/agents/{code}`)는 상태 조회가 성공했을 때만 이 절을 그린다. 관리자가 대화를 시작할 수 없는 남의 비공개 에이전트는 404 라 그리지 않는다.
-
-### 가치 평가 절
-
-관리자 영역 상세에서만 먼저 살펴보기 절 바로 뒤에 그린다(`components/agent/agent-value-evaluation-section.tsx`). 먼저 살펴보기 절을 그리지 않는 에이전트에는 이 절도 그리지 않는다.
-가치 평가와 행동 정책은 요청자의 자료만 다루므로 관리자 본인이 연 살펴보기만 보인다. 고를 살펴보기가 없으면 안내만 보이고 단추를 그리지 않는다.
-마지막 평가가 `RUNNING` 이면 단추를 끈다. 거절되면 단추 아래에 오류 문구를 보이고 절은 그대로 둔다.
-결과 상태와 코드는 관리자 영역이므로 코드 그대로 보이고, 모델이 쓴 설명은 평문으로 그린다. 결과를 고치거나 승인하는 동작, 자동 실행 동의를 바꾸는 칸은 없다.
-단추는 판정까지 부른다. 그래서 `assistant.autonomy.execution-enabled` 와 관리자 본인의 동의가 모두 켜져 있으면 `EXECUTE` 판정이 읽기 전용 살펴보기를 한 번 시작할 수 있고, 절의 안내 문구가 이것을 알린다.
 
 ### 에이전트 상세의 읽기와 주소 확인
 
@@ -394,7 +386,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 받아들인 문제 후보 가운데 지금 무엇을 먼저 다룰지 판단한다. 권한, 승인, 실행 여부는 아래 「행동 정책」 이 정한다.
 결정은 [ADR-20261007 / value-evaluation](../adr/ADR-20261007-value-evaluation.md)에, 설정은 `ValueEvaluationProperties` 에 있다.
-결과를 대화에 올리지 않는다. 부르는 자리는 매일 루프와 관리자 영역의 「가치 평가 절」 둘이다.
+결과를 대화에 올리지 않는다. 부르는 자리는 매일 루프 하나다.
 
 ### 입력과 판단 축
 
@@ -422,22 +414,15 @@ timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 �
 판단 중 대화를 지워도 평가 기록은 완료로 닫고, 이후 조회와 replay 에는 대화의 조회 권한을 다시 확인한다.
 기동할 때 남은 `RUNNING` 은 `FALLBACK / INTERRUPTED` 로 닫고 다시 부르지 않는다. 한 줄의 복구가 실패해도 다른 줄과 서버 기동을 이어 간다.
 replay 는 저장된 `state` 와 `questions` 로 새 시도를 만든다. 같은 답의 재현을 보장하지 않고, 같은 입력에서 판단 차이를 비교하는 기능이다.
-경로는 `ValueEvaluationController` 와 `ValueEvaluationAdminController` 가 갖는다. 다른 사용자의 자료는 관리자에게도 `VALUE_EVALUATION_NOT_FOUND` 다.
+경로는 `ValueEvaluationController` 가 갖는다. 관리자 영역의 가치 평가 경로와 화면은 지웠다.
 행동 정책은 `ValueEvaluationService.read` 의 `DecisionEvidence` 를 읽는다. `EVALUATED` 도 추천일 뿐 실행 허락이 아니므로 정책은 후보와 근거의 유효성, 사용자 권한을 다시 확인한다.
 축의 `UNKNOWN`, 낮은 확신, 부작용 힌트를 판단에서 빠뜨리지 않는다. replay 결과를 현재 상황의 실행 근거로 바로 쓰지 않는다.
-
-### 관리자 화면이 읽는 묶음
-
-관리자 본인의 자료만 다루며 `ADMIN` 이 아니면 `FORBIDDEN` 이다. 판단 profile 을 부르는 비용이 드는 동작을 관리자 화면 밖으로 넓히지 않기 위해서다. 응답 모양은 `EvaluationOverview` 가 갖는다.
-고르는 살펴보기는 `SUCCEEDED` 이고, 계기가 `AUTONOMY` 가 아니고, `ACCEPTED` 문제 후보가 있고, 점검 대화를 지우지 않은 가장 최근 줄이다.
-자동 실행이 연 살펴보기는 사람에게 바로 보이지 않으므로 고르지 않는다. 후보 조건이 없으면 평가해도 `EMPTY` 뿐인 줄(건너뛴 예약 실행, 결과를 읽지 못한 줄)이 평가할 줄을 가린다.
-`POST .../value-evaluation-runs` 는 평가와 판정을 따로 부를 때와 같은 검사를 거친다. 판정이 실패하면 평가 줄은 남고 오류를 주며, 다시 누르면 새 평가를 만든다.
 
 ## 행동 정책
 
 가치 평가를 받은 문제 후보마다 무엇까지 해도 되는지 정한다.
 결정은 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md)에 있다. 입력은 `AutonomyInputs`, 키와 기본값은 `AutonomyProperties`, 경로는 `AutonomyController` 가 갖는다.
-매일 루프와 관리자 영역의 「가치 평가 절」 이 부른다. 사용자 동의를 바꾸는 화면은 없다. `RUNNING` 평가는 `VALUE_EVALUATION_STATE_CONFLICT` 다.
+매일 루프가 부른다. 사용자 동의를 바꾸는 화면은 없다.
 
 ### 행동 수준
 
@@ -474,7 +459,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 
 ## 판단 피드백
 
-사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남기고, 상황부터 결과까지 다시 읽는 읽기 모델을 낸다.
+사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남긴다.
 결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
 예외는 둘이다. 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내리고, 매일 루프가 보인 문제는 반응이 있으면 지금 화면에서 빠진다.
@@ -483,12 +468,12 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 ### 사건
 
 사건 종류는 `FeedbackEventType` 이 갖는다. 실제 화면과 API 흐름에 있는 것만 두는 까닭은 ADR 이 갖는다.
-「참고한 기억」 의 단추 사건은 [`docs/features/memory.md`](memory.md) 의 「참고한 기억의 단추」 가 갖는다. 기억 내용을 바꾸지 않고 반응 읽기와 replay 읽기 모델에도 들지 않는다.
+「참고한 기억」 의 단추 사건은 [`docs/features/memory.md`](memory.md) 의 「참고한 기억의 단추」 가 갖는다. 기억 내용을 바꾸지 않고 반응 읽기에도 들지 않는다.
 각 도메인 서비스가 동작을 마친 자리에서 `DecisionFeedbackRecorder.record` 를 부른다. `feedback` 은 부르는 쪽을 모른다.
 무응답은 사건이 아니라 `SURFACED` 뒤에 사용자 사건이 없다는 사실로 읽는다. 승인 줄의 만료, 결과를 모르는 실행, 보고 열기도 사건이 아니다.
 사용자가 직접 더한 할 일과 사람이 고르는 지금 화면의 `FOLLOW_UP_OPEN` 항목은 제안이 아니라 사건을 남기지 않는다.
 보고를 남기지 않은 살펴보기는 침묵이다. 사건이 아니라 상황의 `reportSurfaced = false` 로 읽는다.
-관리자 화면이나 판정 API 로 낸 판정과 관리자 영역의 가치 평가 절은 보이는 제안이 아니므로 `SURFACED` 를 남기지 않는다.
+판정 API 로 낸 판정은 보이는 제안이 아니므로 `SURFACED` 를 남기지 않는다.
 
 `DecisionFeedbackRecorder.record` 는 부르는 쪽이 커밋한 뒤 새 트랜잭션으로 넣으므로 되돌려진 동작의 사건은 남지 않는다. 실패해도 부르는 쪽으로 던지지 않는다.
 살펴보기의 끝은 저장된 줄을 다시 읽어 판정한다. 끝난 상태를 저장하지 못했으면 기동 정리가 닫을 때 남긴다.
@@ -496,25 +481,9 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 
 ### 반응 읽기
 
-반응은 저장하지 않는다. replay 읽기 모델이 제안 하나의 사건을 그때마다 읽는다.
+반응은 저장하지 않고 제안 하나의 사건을 읽을 때마다 정한다.
 읽기 규칙과 규칙 버전은 `FeedbackLabeler` 가, 잘못된 학습을 막는 규칙은 ADR 이 갖는다.
 규칙 버전 2 에서 `persistentPreference` 를 마지막 결정 기준으로 바꿨다. 버전 1 은 받아들인 사건이 하나라도 있으면 참이었다.
-
-### replay 읽기 모델
-
-경로와 `days` 범위는 `DecisionFeedbackController` 가, 모양은 `DecisionFeedbackExport` 가 갖는다. 관리자도 남의 기록을 읽지 못한다.
-이 모양이 그대로 API 계약이다. offline replay 도구와 모양을 맞추려고 별도 응답 DTO 를 두지 않고 `version` 으로 바뀜을 알린다.
-
-결정에 묶는 순서는 다음과 같다.
-
-1. 사건의 `source_check_id`
-2. 사건의 `origin_execution_id` 를 루트 실행으로 가진 살펴보기
-3. 자동 실행한 살펴보기에 묶인 제안은 그 실행을 허락한 판정의 원천 살펴보기로 옮긴다
-
-자동 실행한 살펴보기 자신은 그 문제 후보와 판단, 정책을 가진 상황 하나로 따로 남고, 사용자 반응은 모두 원천 결정에 모인다.
-기간 안에 사건이 있는 제안은 기간 앞의 사건도 함께 읽어 첫 반응을 잃지 않는다.
-지운 대화에 묶인 사건이 있는 제안과, 점검 대화를 지운 살펴보기의 결정은 싣지 않는다.
-모델과 사용자가 쓴 글(문제와 행동 글, 설명, 할 일 제목, Memory 본문, 커넥터 인자와 결과)은 싣지 않는다. 문제 키, 행동 종류, 부작용 힌트, 확신은 정규화한 짧은 열쇠라 싣는다.
 
 ### 보관과 삭제
 
