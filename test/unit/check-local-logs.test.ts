@@ -38,7 +38,8 @@ test("사용법이나 Node 버전 오류에서는 로그 폴더를 만들지 않
       assert.equal(fixture.run(args).status, 2);
       assert.deepEqual(readdirSync(fixture.logs), []);
     }
-    writeFileSync(join(fixture.bin, "node"), "#!/bin/bash\nexit 1\n", { mode: 0o755 });
+    writeFileSync(join(fixture.bin, "node"),
+      '#!/bin/bash\nif [ "$1" = -p ]; then echo 20.0.0; else exit 1; fi\n', { mode: 0o755 });
     assert.equal(fixture.run().status, 2);
     assert.deepEqual(readdirSync(fixture.logs), []);
   } finally {
