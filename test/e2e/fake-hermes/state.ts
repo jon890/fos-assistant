@@ -42,9 +42,9 @@ export function createFakeHermesState(
   /** 설치해도 정책 hook 이 고쳐지지 않게 둔 profile 이다. */
   const policyHookOff = new Set<string>();
   const connectorEnvNames = new Set(FAKE_CONNECTORS.flatMap((connector) => connector.fields.map((field) => field.env)));
-  /** 보관 파일 이름과 그 커넥터와 칸 값이다. 값은 메모리에만 두고 어느 응답에도 싣지 않는다. */
+  /** 보관 파일 이름과 그 플러그인과 칸 값이다. 값은 메모리에만 두고 어느 응답에도 싣지 않는다. */
   const vaults = new Map<string, { connector: string; values: Record<string, string> }>();
-  /** profile 이름과 그 profile 에 바인딩 설치한 커넥터 id 와 보관 파일 이름이다. */
+  /** profile 이름과 그 profile 에 바인딩 설치한 플러그인 id 와 보관 파일 이름이다. */
   const boundConnectors = new Map<string, Map<string, string>>();
   /** 대시보드로 만들지 않은 profile 의 `.env` 다. 바인딩 설치가 칸 값을 여기 쓴다. */
   const hostEnv = new Map<string, Record<string, string>>();
@@ -193,7 +193,7 @@ export type SnapshotRequest = {
  */
 function createContentSnapshotState() {
   return {
-    /** 참이면 카탈로그에 snapshot 커넥터를 낸다. */
+    /** 참이면 카탈로그에 snapshot 플러그인을 낸다. */
     on: false,
     requests: [] as SnapshotRequest[],
     starts: new Map<string, number>(),
@@ -210,7 +210,7 @@ function createContentSnapshotState() {
 }
 export type FakeHermesState = ReturnType<typeof createFakeHermesState>;
 
-/** 대역이 흉내 내는 커넥터 칸이다. 두 시험 커넥터의 선언이 함께 맞는 모양이다. */
+/** 대역이 흉내 내는 플러그인 칸이다. 두 시험 플러그인의 선언이 함께 맞는 모양이다. */
 export type FakeConnectorField = {
   key: string;
   env: string;
@@ -219,7 +219,7 @@ export type FakeConnectorField = {
   pattern?: string;
 };
 
-/** 대역이 흉내 내는 커넥터 선언이다. 칸, 확인 도구, 서버 이름, 도구 이름만 본다. */
+/** 대역이 흉내 내는 플러그인 선언이다. 칸, 확인 도구, 서버 이름, 도구 이름만 본다. */
 export type FakeConnector = {
   id: string;
   fields: readonly FakeConnectorField[];
@@ -244,13 +244,13 @@ export type Run = {
   runtime?: { provider: string; model: string; route_source: string };
   /** 살펴보기 실행이면 사건 스트림이 흘릴 도구 사건과 기다릴 자리다. */
   proactive?: { tools: string[]; gate?: Promise<void> };
-  /** 정책이 허용해 커넥터 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
+  /** 정책이 허용해 플러그인 서버에 닿은 호출이다. 사건 스트림이 호출마다 시작과 완료 사건을 실제 Hermes 의 모양으로 흘린다. */
   connectorCalls?: ConnectorCall[];
   /** 바깥 도구를 쓰는 run 이다. 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝난다. */
   outsideTool?: boolean;
 };
 
-/** 허용된 커넥터 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
+/** 허용된 플러그인 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
 export type ConnectorCall = { hermesTool: string; argsJson: string };
 
 /**
@@ -341,7 +341,7 @@ export type FakeHermes = {
   /** 그 profile 에 마지막으로 기록된 API 도구 목록이다. 기록한 적이 없으면 `undefined` 다. */
   apiServerToolsetsOf(name: string): string[] | undefined;
   /**
-   * 커넥터 경로로 받은 요청을 받은 순서대로 적은 줄이다. `call <도구>`, `env put <profile> <key>`,
+   * 플러그인 경로로 받은 요청을 받은 순서대로 적은 줄이다. `call <도구>`, `env put <profile> <key>`,
    * `env delete <profile> <key>`, `toolsets <profile>`, `probe <profile>`, `bind <profile>`, `unbind <profile>`,
    * `vault put`, `vault delete` 이다.
    * 비밀 값과 보관 파일 이름은 적지 않는다.
@@ -352,21 +352,21 @@ export type FakeHermes = {
    * 상태가 되고, `true` 로 풀 때까지 설치 목록이 `policy_hook: false` 로 답한다.
    */
   setPolicyHook(profile: string, active: boolean): void;
-  /** 커넥터 도구 호출의 판정을 물을 Control Plane 주소를 준다. 주지 않으면 `CONNECTOR_TOOL_PROBE` 의 호출은 모두 막힌다. */
+  /** 플러그인 도구 호출의 판정을 물을 Control Plane 주소를 준다. 주지 않으면 `CONNECTOR_TOOL_PROBE` 의 호출은 모두 막힌다. */
   setConnectorPolicy(endpoint: string): void;
   /**
-   * 커넥터 서버에 닿은 도구 호출이다. 막힌 호출은 없다. `via` 가 `hook` 이면 판정이 `allow` 여서 지나간 호출이고,
+   * 플러그인 서버에 닿은 도구 호출이다. 막힌 호출은 없다. `via` 가 `hook` 이면 판정이 `allow` 여서 지나간 호출이고,
    * `execute` 이면 Control Plane 이 승인한 뒤 대시보드의 실행 경로로 보낸 호출이다. 실행 경로의 `argsJson` 은 받은
    * `args` 를 다시 직렬화한 글이다.
    */
   connectorToolCalls(): readonly ConnectorToolCall[];
   /**
-   * 그 profile 의 실행이 커넥터 도구를 직접 부른 것처럼 줄마다 Control Plane 에 판정을 묻고 답 줄을 돌려준다. 줄과 답의 모양은
+   * 그 profile 의 실행이 플러그인 도구를 직접 부른 것처럼 줄마다 Control Plane 에 판정을 묻고 답 줄을 돌려준다. 줄과 답의 모양은
    * `CONNECTOR_TOOL_PROBE` 와 같다. 살펴보기처럼 입력을 정할 수 없는 실행을 붙잡아 둔 동안 시나리오가 그 실행의 모델 역할을
    * 할 때 쓴다. 사람이 만든 profile 의 `.env` 에는 대역이 아는 MCP 토큰이 없으므로 운영자가 넣었을 토큰을 받는다.
    */
   callConnectorTools(profile: string, sessionId: string, lines: readonly string[], token: string): Promise<string>;
-  /** 그 profile 에 바인딩 설치로 붙은 커넥터 id 들이다. 옛 설치는 담지 않는다. */
+  /** 그 profile 에 바인딩 설치로 붙은 플러그인 id 들이다. 옛 설치는 담지 않는다. */
   boundConnectorsOf(profile: string): string[];
   holdNextRun(): void;
   /**
@@ -427,7 +427,7 @@ export type FakeHermes = {
   releaseProactiveEvents(): void;
   /** 받은 살펴보기 실행의 profile 과 입력 원문을 받은 순서대로 돌려준다. */
   proactiveInputs(): readonly { profile: string; input: string }[];
-  /** snapshot 커넥터를 카탈로그에 내거나 뺀다. Control Plane 은 카탈로그를 잠시 메모리에 두므로 기동 전에 켜 두는 것이 안전하다. */
+  /** snapshot 플러그인을 카탈로그에 내거나 뺀다. Control Plane 은 카탈로그를 잠시 메모리에 두므로 기동 전에 켜 두는 것이 안전하다. */
   setSnapshotConnector(on: boolean): void;
   /** private snapshot 경로가 받은 요청을 받은 순서대로 복사해 돌려준다. */
   snapshotRequests(): readonly SnapshotRequest[];

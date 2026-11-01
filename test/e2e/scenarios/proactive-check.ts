@@ -1,10 +1,10 @@
 /**
- * 먼저 살펴보기가 웹 도구 사건, 붙은 커넥터 도구의 직접 호출, 결과 블록을 거쳐 점검 대화에 검사한 결과를 남기는지 전체 흐름으로 본다.
+ * 먼저 살펴보기가 웹 도구 사건, 붙은 플러그인 도구의 직접 호출, 결과 블록을 거쳐 점검 대화에 검사한 결과를 남기는지 전체 흐름으로 본다.
  *
  * <p>대역은 모델이 아니다. 무엇을 조사할지 고르는 것은 분야 지침과 실제 모델의 몫이고, 여기서는 Control Plane 이 맥락을 싣고,
  * 읽기 경계를 지키고, 결과를 검사해 남기는지를 본다. 대역이 살펴보기 실행을 붙잡은 동안 시나리오가 그 실행의 모델과 profile
- * 플러그인 역할을 한다. `_fos_ctx` 를 서명해 MCP 를 부르고, 커넥터 도구는 대역의 hook 으로 판정을 물어 직접 부른다(ADR-083).
- * 시험 커넥터의 읽기 도구가 분야 커넥터의 후보 읽기 자리를 맡는다.
+ * 플러그인 역할을 한다. `_fos_ctx` 를 서명해 MCP 를 부르고, 플러그인 도구는 대역의 hook 으로 판정을 물어 직접 부른다(ADR-083).
+ * 시험 플러그인의 읽기 도구가 분야 플러그인의 후보 읽기 자리를 맡는다.
  *
  * <p>앞 시나리오가 남긴 연결 상태에 기대지 않게 시작에서 연결을 등록해 살펴볼 에이전트에 붙이고 끝에서 해제한다. 바꾼 toolset 과
  * 스킬도 끝에서 되돌린다. 모든 글과 주소는 합성 값이다.
@@ -45,7 +45,7 @@ const START_NOTICE = "먼저 살펴보기를 시작했어요";
 const NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
 const TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
 const READ_ONLY_RUN = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
-/** 승인 줄을 만든 커넥터 호출에 Control Plane 이 답하는 글의 앞부분이다. 뒤에 승인 요청 번호가 온다. */
+/** 승인 줄을 만든 플러그인 호출에 Control Plane 이 답하는 글의 앞부분이다. 뒤에 승인 요청 번호가 온다. */
 const APPROVAL_PREFIX = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
 const NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
@@ -71,8 +71,8 @@ const PROBLEM = {
   expectedBenefit: "면접에서 설계 근거를 말한다",
   sideEffect: "NONE",
 };
-const SOURCE_FAILURE = "시험 커넥터 연결이 해제돼 읽지 못했어요";
-/** 살펴볼 에이전트의 profile 이다. 대역이 그 profile 의 hook 처럼 커넥터 도구 판정을 묻는다. */
+const SOURCE_FAILURE = "시험 플러그인 연결이 해제돼 읽지 못했어요";
+/** 살펴볼 에이전트의 profile 이다. 대역이 그 profile 의 hook 처럼 플러그인 도구 판정을 묻는다. */
 const PROFILE = DAD_BINDING.profileName;
 
 /** 「새로 알릴 것」 의 조건을 모두 갖춘 발견 하나다. */
@@ -212,7 +212,7 @@ export const proactiveCheckScenario: Scenario = {
     let writesAgent: AdminAgentView | undefined;
     let failed = false;
     try {
-      step("준비: 시험 커넥터를 등록한다");
+      step("준비: 시험 플러그인을 등록한다");
       await setup.connect();
       const reached = () => context.hermes.connectorToolCalls().filter((entry) => entry.profile === PROFILE);
 
@@ -236,7 +236,7 @@ export const proactiveCheckScenario: Scenario = {
         "허용 목록 toolset 켜기",
       );
 
-      step("준비: 살펴볼 에이전트에 그 연결을 붙이고 관리자가 반영 완료를 누른다. 붙은 커넥터 서버는 허용 목록과 상관없이 받는다");
+      step("준비: 살펴볼 에이전트에 그 연결을 붙이고 관리자가 반영 완료를 누른다. 붙은 플러그인 서버는 허용 목록과 상관없이 받는다");
       await attach(context, context.tokens.dad, AGENT, DEMO_CONNECTOR.id);
       const prepared = await statusOf(context);
       expect(
@@ -292,7 +292,7 @@ export const proactiveCheckScenario: Scenario = {
       const delegate = async (agentCode: string, task: string): Promise<ToolResult> =>
         callTool(context, token, "agent_delegate", { agent_code: agentCode, task },
           contextFor(token, "agent_delegate", heldSession()));
-      /** 붙잡은 살펴보기 turn 의 모델이 커넥터 도구 하나를 직접 부른 것처럼 판정을 묻고 답 줄을 돌려준다. */
+      /** 붙잡은 살펴보기 turn 의 모델이 플러그인 도구 하나를 직접 부른 것처럼 판정을 묻고 답 줄을 돌려준다. */
       const direct = async (hermesTool: string, argsJson = "{}"): Promise<string> =>
         context.hermes.callConnectorTools(PROFILE, heldSession(), [`${hermesTool} ${argsJson}`], token);
       const rejectedCode = (result: ToolResult, what: string): string => {
@@ -347,17 +347,17 @@ export const proactiveCheckScenario: Scenario = {
           `붙은 연결이 있는 살펴보기의 지시가 직접 호출을 말하지 않는다:\n${instructions}`,
         );
 
-        step("직접 호출: 살펴보기 turn 이 붙은 커넥터의 읽기 도구를 부르면 허용되어 커넥터 서버에 닿는다");
+        step("직접 호출: 살펴보기 turn 이 붙은 플러그인의 읽기 도구를 부르면 허용되어 플러그인 서버에 닿는다");
         const reachedBefore = reached().length;
         const read = await direct(`${PREFIX}list_scopes`);
         expect(read === `${PREFIX}list_scopes: allow`, `읽기 도구가 허용되지 않았다: ${read}`);
         expect(
           JSON.stringify(reached().slice(reachedBefore))
             === JSON.stringify([{ profile: PROFILE, hermesTool: `${PREFIX}list_scopes`, argsJson: "{}", via: "hook" }]),
-          `list_scopes 호출 하나만 커넥터 서버에 닿아야 한다: ${JSON.stringify(reached())}`,
+          `list_scopes 호출 하나만 플러그인 서버에 닿아야 한다: ${JSON.stringify(reached())}`,
         );
 
-        step("읽기 경계: 커넥터 쓰기 도구는 READ_ONLY_RUN 으로 막히고 승인 줄이 생기지 않는다");
+        step("읽기 경계: 플러그인 쓰기 도구는 READ_ONLY_RUN 으로 막히고 승인 줄이 생기지 않는다");
         const write = await direct(`${PREFIX}write_note`, JSON.stringify({ text: "합성 메모" }));
         expect(
           write === `${PREFIX}write_note: block ${READ_ONLY_RUN}`,
@@ -380,7 +380,7 @@ export const proactiveCheckScenario: Scenario = {
           injected === `${PREFIX}write_note: block ${READ_ONLY_RUN}`,
           `지시가 든 쓰기 도구가 READ_ONLY_RUN 글로 막히지 않았다: ${injected}`,
         );
-        expect(reached().length === reachedBefore + 1, `막힌 쓰기 호출이 커넥터 서버에 닿았다: ${JSON.stringify(reached())}`);
+        expect(reached().length === reachedBefore + 1, `막힌 쓰기 호출이 플러그인 서버에 닿았다: ${JSON.stringify(reached())}`);
         const actions = expectStatus(
           await call(context, `/chat/conversations/${conversationId}/connector-actions`, { token: context.tokens.dad }),
           200,
@@ -613,7 +613,7 @@ export const proactiveCheckScenario: Scenario = {
         expect(!kidInput.includes(leaked), `다른 사용자의 입력에 이 사용자의 발견 「${leaked}」 가 있다`);
       }
 
-      step("쓰기 허용: 관리자가 켜면 terminal 이 켜져 있어도 202 로 시작하고 커넥터 쓰기는 PENDING 승인 줄과 action_id 로 막힌다");
+      step("쓰기 허용: 관리자가 켜면 terminal 이 켜져 있어도 202 로 시작하고 플러그인 쓰기는 PENDING 승인 줄과 action_id 로 막힌다");
       const admin = expectStatus(
         await call(context, "/admin/agents", { token: context.tokens.dad }), 200, "관리자 에이전트 목록",
       ).json<AdminAgentView[]>().find((agent) => agent.code === AGENT);
@@ -654,7 +654,7 @@ export const proactiveCheckScenario: Scenario = {
         approved.startsWith(answerLine) && actionId !== undefined,
         `쓰기 도구가 승인 요청 번호와 함께 막히지 않았다: ${approved}`,
       );
-      expect(reached().length === reachedBeforeWrite, `승인 전 쓰기 호출이 커넥터 서버에 닿았다: ${JSON.stringify(reached())}`);
+      expect(reached().length === reachedBeforeWrite, `승인 전 쓰기 호출이 플러그인 서버에 닿았다: ${JSON.stringify(reached())}`);
       const pending = expectStatus(
         await call(context, `/chat/conversations/${conversationId}/connector-actions`, { token: context.tokens.dad }),
         200,
@@ -668,7 +668,7 @@ export const proactiveCheckScenario: Scenario = {
       held = false;
       await awaitFinished(context, beforeWrites, "쓰기 허용 살펴보기");
 
-      step("쓰기 허용: 사람이 그 승인 줄을 승인하면 커넥터 서버에 한 번 닿고 결과가 점검 대화의 다음 turn 으로 온다");
+      step("쓰기 허용: 사람이 그 승인 줄을 승인하면 플러그인 서버에 한 번 닿고 결과가 점검 대화의 다음 turn 으로 온다");
       const messagesBeforeApproval = (await messagesOf(context, conversationId)).length;
       const executedBefore = reached().filter((entry) => entry.via === "execute").length;
       const approval = expectStatus(
@@ -682,7 +682,7 @@ export const proactiveCheckScenario: Scenario = {
       const executedAfter = reached().filter((entry) => entry.via === "execute");
       expect(
         executedAfter.length === executedBefore + 1 && executedAfter.at(-1)!.hermesTool === `${PREFIX}write_note`,
-        `승인한 쓰기가 커넥터 서버에 한 번 닿지 않았다: ${JSON.stringify(reached())}`,
+        `승인한 쓰기가 플러그인 서버에 한 번 닿지 않았다: ${JSON.stringify(reached())}`,
       );
       // 자동 turn 이 끝나야 다음 단계의 살펴보기가 점검 대화를 쓸 수 있다.
       const deadline = Date.now() + 10_000;
@@ -728,7 +728,7 @@ export const proactiveCheckScenario: Scenario = {
       const reachedBeforeGone = reached().length;
       const unavailable = await direct(`${PREFIX}list_scopes`);
       expect(unavailable === `${PREFIX}list_scopes: block ${NO_CONTEXT}`, `해제한 연결의 도구가 줄 없이 막히지 않았다: ${unavailable}`);
-      expect(reached().length === reachedBeforeGone, `해제한 연결의 호출이 커넥터 서버에 닿았다: ${JSON.stringify(reached())}`);
+      expect(reached().length === reachedBeforeGone, `해제한 연결의 호출이 플러그인 서버에 닿았다: ${JSON.stringify(reached())}`);
       context.hermes.releaseHeldRun();
       held = false;
       await awaitFinished(context, beforeDisconnected, "해제 뒤 살펴보기");

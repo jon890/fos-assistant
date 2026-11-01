@@ -27,7 +27,7 @@ const LINKS = [
   { href: "/admin/models", label: "모델", icon: Cpu },
   { href: "/admin/tools", label: "도구", icon: Wrench },
   { href: "/admin/usage", label: "사용량과 비용", icon: Receipt },
-  { href: "/admin/connections", label: "커넥터", icon: Plug },
+  { href: "/admin/connections", label: "플러그인", icon: Plug },
   { href: "/admin/browsers", label: "브라우저", icon: Globe },
   { href: "/admin/workspaces", label: "파일 공간", icon: HardDrive },
 ] as const;

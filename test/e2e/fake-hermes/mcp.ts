@@ -7,12 +7,12 @@ import { randomUUID } from "node:crypto";
 export function createMcp(state: FakeHermesState) {
 
   /**
-   * profile 플러그인의 `pre_tool_call` hook 처럼 커넥터 도구 호출마다 Control Plane 에 판정을 묻는다.
+   * profile 플러그인의 `pre_tool_call` hook 처럼 플러그인 도구 호출마다 Control Plane 에 판정을 묻는다.
    *
    * <p>토큰은 그 profile 의 `.env` 에 든 MCP 토큰이고, 제출받은 run 의 session 이 곧 루트 session 이다.
    * 실제 hook 과 같이 주소나 토큰이 없거나 답이 200 의 `allow` 가 아니면 막는다. `block` 에 글이 없어도 막는다.
    * 인자는 입력의 글을 그대로 보낸다. 실제 hook 은 키를 정렬해 직렬화하지만 서버는 받은 글을 그대로 해시한다.
-   * 원래 도구 이름은 등록 이름의 서버 앞부분으로 고른 커넥터가 선언한 도구일 때만 싣는다.
+   * 원래 도구 이름은 등록 이름의 서버 앞부분으로 고른 플러그인이 선언한 도구일 때만 싣는다.
    *
    * @param callIdPrefix 도구 호출 id 의 앞부분. 한 session 에서 같은 id 를 다시 쓰면 앞선 판정이 되풀이되므로 부를 때마다 다르게 준다
    * @param allowed 주면 허용된 호출을 여기에 더한다. 실행의 사건 스트림이 그 호출을 도구 사건으로 흘린다

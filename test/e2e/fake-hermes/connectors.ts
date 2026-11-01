@@ -4,14 +4,14 @@ import { send } from "./lifecycle.ts";
 import { SANDBOX_OWNER_PATTERN, CONTROL_PLANE_MCP } from "./runtime-fixtures.ts";
 
 /**
- * 대역이 카탈로그로 내는 시험 커넥터다. 선언 모양은 plugin 이 읽는 `connector.json` 과 같고, 카탈로그 응답에는
+ * 대역이 카탈로그로 내는 시험 플러그인다. 선언 모양은 plugin 이 읽는 `assistant.json` 과 같고, 카탈로그 응답에는
  * 거기에 `mcp_server` 가 더해진다. 칸의 이름과 env 이름을 어느 서비스의 것과도 다르게 둔다.
  */
 export const DEMO_CONNECTOR = {
   id: "demo-notes",
   schema: 2,
   title: "검사용 메모",
-  description: "검사에서만 쓰는 커넥터입니다.",
+  description: "검사에서만 쓰는 플러그인입니다.",
   fields: [
     {
       key: "token", env: "DEMO_TOKEN", label: "토큰", description: "검사용 토큰입니다.",
@@ -52,15 +52,15 @@ export const DEMO_TOKEN_OK = "demo_ok_0123456789";
 export const DEMO_TOKEN_BAD = "demo_bad_0123456789";
 
 /**
- * 대역이 카탈로그로 내는 둘째 시험 커넥터다. 입력 칸이 없어 연결에 값을 받지 않고 확인 도구는 늘 통과한다.
+ * 대역이 카탈로그로 내는 둘째 시험 플러그인다. 입력 칸이 없어 연결에 값을 받지 않고 확인 도구는 늘 통과한다.
  *
- * <p>한 에이전트에 연결 둘을 붙였을 때 도구마다 제 연결로 판정하는지 보는 데 쓴다. 서버 이름이 첫째 커넥터와 다르다.
+ * <p>한 에이전트에 연결 둘을 붙였을 때 도구마다 제 연결로 판정하는지 보는 데 쓴다. 서버 이름이 첫째 플러그인과 다르다.
  */
 export const AGENDA_CONNECTOR = {
   id: "demo-agenda",
   schema: 2,
   title: "검사용 일정",
-  description: "검사에서만 쓰는 입력 칸 없는 커넥터입니다.",
+  description: "검사에서만 쓰는 입력 칸 없는 플러그인입니다.",
   fields: [] as FakeConnectorField[],
   verify: { tool: "list_events" },
   mcp_server: "agenda",
@@ -71,7 +71,7 @@ export const AGENDA_CONNECTOR = {
 };
 
 /**
- * private snapshot 선언을 가진 합성 커넥터다. 시나리오가 `setSnapshotConnector(true)` 로 켤 때만 카탈로그에 보인다.
+ * private snapshot 선언을 가진 합성 플러그인다. 시나리오가 `setSnapshotConnector(true)` 로 켤 때만 카탈로그에 보인다.
  *
  * <p>원고 저장 승인 줄은 `save_draft` 의 정책을 빌려 판정하므로 그 이름의 도구를 선언한다. 선언 모양은 `docs/features/content-draft.md`
  * 의 「private snapshot 내부 transport」 를 따르며, 운영 선언과 달리 시작과 상태 조회를 켠다. 실제 서비스 이름과 겹치지 않는다.
@@ -80,7 +80,7 @@ export const SNAPSHOT_CONNECTOR = {
   id: "demo-snapshot",
   schema: 2,
   title: "검사용 원고 저장",
-  description: "검사에서만 쓰는 원고 저장 커넥터입니다.",
+  description: "검사에서만 쓰는 원고 저장 플러그인입니다.",
   fields: [] as FakeConnectorField[],
   verify: { tool: "list_drafts" },
   mcp_server: "snapshot",
@@ -97,10 +97,10 @@ export const SNAPSHOT_CONNECTOR = {
   },
 };
 
-/** 카탈로그에 내는 커넥터들이다. */
+/** 카탈로그에 내는 플러그인들이다. */
 export const FAKE_CONNECTORS: readonly FakeConnector[] = [DEMO_CONNECTOR, AGENDA_CONNECTOR];
 
-/** 지금 카탈로그에 보이는 커넥터들이다. snapshot 커넥터는 켠 동안만 더한다. */
+/** 지금 카탈로그에 보이는 플러그인들이다. snapshot 플러그인은 켠 동안만 더한다. */
 export function catalogOf(state: FakeHermesState): readonly FakeConnector[] {
   return state.contentSnapshot.on ? [...FAKE_CONNECTORS, SNAPSHOT_CONNECTOR] : FAKE_CONNECTORS;
 }
@@ -112,12 +112,12 @@ export const SERVER_TOOLS: Record<string, string[]> = {
   [SNAPSHOT_CONNECTOR.mcp_server]: ["list_drafts", "save_draft"],
 };
 
-/** 꺼진 snapshot 커넥터도 찾는다. 카탈로그에 없을 때는 그 id 로 들어오는 요청이 없다. */
+/** 꺼진 snapshot 플러그인도 찾는다. 카탈로그에 없을 때는 그 id 로 들어오는 요청이 없다. */
 export function fakeConnector(id: string | undefined): FakeConnector | undefined {
   return [...FAKE_CONNECTORS, SNAPSHOT_CONNECTOR].find((connector) => connector.id === id);
 }
 
-/** 확인 도구의 답이다. 첫째 커넥터는 토큰을 보고, 칸이 없는 나머지 커넥터는 늘 통과한다. */
+/** 확인 도구의 답이다. 첫째 플러그인은 토큰을 보고, 칸이 없는 나머지 플러그인은 늘 통과한다. */
 export function verifyAnswer(connector: FakeConnector, values: Record<string, string> | undefined): unknown {
   if (connector.id === AGENDA_CONNECTOR.id) return { ok: true, result: { events: [] } };
   if (connector.id === SNAPSHOT_CONNECTOR.id) return { ok: true, result: { drafts: [] } };
@@ -126,7 +126,7 @@ export function verifyAnswer(connector: FakeConnector, values: Record<string, st
     : { ok: false, error: "credential_rejected" };
 }
 
-/** 커넥터의 보관 값과 바인딩 설치를 흉내 낸다. */
+/** 플러그인의 보관 값과 바인딩 설치를 흉내 낸다. */
 export function createBindings(state: FakeHermesState) {
   /** 그 profile 의 `.env` 다. 대시보드로 만든 profile 은 `profiles` 의 것을 쓴다. */
   const envOf = (profile: string): Record<string, string> => {
@@ -136,10 +136,10 @@ export function createBindings(state: FakeHermesState) {
     state.hostEnv.set(profile, host);
     return host;
   };
-  /** 그 profile 에 바인딩 설치한 커넥터의 MCP 서버 이름이다. 도구 목록을 쓰는 요청이 이 이름을 모두 실어야 한다. */
+  /** 그 profile 에 바인딩 설치한 플러그인의 MCP 서버 이름이다. 도구 목록을 쓰는 요청이 이 이름을 모두 실어야 한다. */
   const boundServers = (profile: string): string[] =>
     [...(state.boundConnectors.get(profile)?.keys() ?? [])].flatMap((id) => fakeConnector(id)?.mcp_server ?? []);
-  /** 그 커넥터의 칸 선언과 맞는 값인가. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 받지 않는다. */
+  /** 그 플러그인의 칸 선언과 맞는 값인가. 모르는 키, 필수 칸 누락, `pattern` 위반, 두 줄 이상인 값은 받지 않는다. */
   const vaultValuesValid = (connector: FakeConnector, values: unknown): values is Record<string, string> => {
     if (typeof values !== "object" || values === null || Array.isArray(values)) return false;
     const given = values as Record<string, unknown>;
@@ -160,9 +160,9 @@ export function createBindings(state: FakeHermesState) {
    * 「바인딩 설치」 를 따른다.
    *
    * <p>붙이기는 보관 파일의 값을 그 profile 의 `.env` 에 쓰고 서버 이름을 API 도구 목록에 더한다. 있던 이름은 그대로 둔다.
-   * 붙기 전이던 커넥터에서 바뀐 것이 있으면 `reload_pending` 이 참이고 재시작은 필요 없다. 새 MCP 서버는 공유 gateway 가 설정
-   * 맞추기 주기에 연결한다. 이미 붙어 있던 커넥터의 값이 바뀌면 `restart_required` 가 참이다. 떠 있는 서버의 env 는 재시작해야
-   * 바뀌기 때문이다. 떼기는 그 이름만 빼고 env 를 지우며 `reload_pending` 이 참이고 재시작은 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 커넥터에 스킬이 없다.
+   * 붙기 전이던 플러그인에서 바뀐 것이 있으면 `reload_pending` 이 참이고 재시작은 필요 없다. 새 MCP 서버는 공유 gateway 가 설정
+   * 맞추기 주기에 연결한다. 이미 붙어 있던 플러그인의 값이 바뀌면 `restart_required` 가 참이다. 떠 있는 서버의 env 는 재시작해야
+   * 바뀌기 때문이다. 떼기는 그 이름만 빼고 env 를 지우며 `reload_pending` 이 참이고 재시작은 요구하지 않는다. 스킬 복사는 흉내 내지 않는다. 시험 플러그인에 스킬이 없다.
    */
   const bindingInstall = (
     response: ServerResponse,
@@ -189,13 +189,13 @@ export function createBindings(state: FakeHermesState) {
         return;
       }
       state.connectorRequests.push(`unbind ${profile}`);
-      // 카탈로그에 없는 커넥터도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
+      // 카탈로그에 없는 플러그인도 실제 대시보드는 소유 기록만 보고 뗀다. 이 대역은 그 기록만 지운다.
       if (connector === undefined) {
         const removed = bound.delete(plugin);
         answer(removed, false, removed);
         return;
       }
-      // 그 profile 에 붙지 않은 커넥터는 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
+      // 그 profile 에 붙지 않은 플러그인은 뗄 것이 없다. 실제 대시보드처럼 아무것도 바꾸지 않고 바뀐 것 없이 답한다.
       if (!bound.delete(plugin)) {
         answer(false, false, false);
         return;
@@ -227,7 +227,7 @@ export function createBindings(state: FakeHermesState) {
       send(response, 409, { error: "the profile conflicts with this connector" });
       return;
     }
-    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 커넥터를 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
+    // 정책 hook 이 꺼진 profile 에는 새로 붙이지 않는다. 이미 붙은 플러그인을 다시 설치하는 것은 받고 hook 상태로 PENDING 에 남는다.
     if (!bound.has(plugin) && state.policyHookOff.has(profile)) {
       send(response, 409, { error: "the policy hook plugin is not enabled" });
       return;

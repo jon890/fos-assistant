@@ -146,7 +146,7 @@ test("아이콘과 링크, 로그인 안내 주소가 없는 옛 카탈로그도
   ]);
 });
 
-test("장식 칸이 틀려도 커넥터는 유지하고 해당 칸만 비운다", async () => {
+test("장식 칸이 틀려도 플러그인은 유지하고 해당 칸만 비운다", async () => {
   const response = await getCatalog([
     summary({
       icon: "https://example.com/icon.png",

@@ -17,7 +17,7 @@ function policyVariant(tool: ConnectorTool) {
 /** 제목을 선언하지 않은 도구에 보이는 이름이다. 실제 도구 이름은 화면에 보이지 않는다. */
 const UNNAMED_TOOL_TITLE = "이름 없는 도구";
 
-/** 커넥터가 선언한 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보인다. */
+/** 플러그인이 선언한 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보인다. */
 export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
   if (!Array.isArray(tools) || tools.length === 0) {
     return (

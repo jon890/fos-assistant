@@ -3,7 +3,7 @@
     "id": "demo-notes",
     "schema": 2,
     "title": "검사용 메모",
-    "description": "검사에서만 쓰는 커넥터입니다.",
+    "description": "검사에서만 쓰는 플러그인입니다.",
     "icon": null,
     "link": null,
     "readme_url": null,

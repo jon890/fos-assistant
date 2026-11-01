@@ -10,9 +10,9 @@ const script = resolve(import.meta.dirname, "../../scripts/ci/check-feature-cove
 
 test("parseCovers 는 제목과 첫 절 사이의 covers 줄에서 경로를 순서대로 낸다", () => {
   const markdown = [
-    "# 커넥터 연결",
+    "# 플러그인 연결",
     "",
-    "사용자가 커넥터에 계정을 연결하는 기능이다.",
+    "사용자가 플러그인에 계정을 연결하는 기능이다.",
     "",
     "covers: `backend/connector/`, `web/src/components/connector/`, `hermes/connectors/**/Art*`",
     "",
@@ -102,7 +102,7 @@ function repository(t: test.TestContext) {
     mkdirSync(join(root, dirname(file)), { recursive: true });
     writeFileSync(join(root, file), text);
   };
-  put("docs/features/connector.md", "# 커넥터\n\n한 문장이다.\n\ncovers: `src/연결/`, `src/a.ts`\n\n## 요구\n");
+  put("docs/features/connector.md", "# 플러그인\n\n한 문장이다.\n\ncovers: `src/연결/`, `src/a.ts`\n\n## 요구\n");
   put("docs/features/chat.md", "# 대화\n\n한 문장이다.\n\n## 요구\n");
   for (const name of ["one", "two", "three", "four", "five"]) put(`src/연결/${name}.ts`, "export {};\n");
   put("src/a.ts", "export {};\n");
@@ -136,7 +136,7 @@ test("스크립트는 covers 경로를 바꾸고 기능 파일을 그대로 둔 
 test("스크립트는 기능 파일도 함께 바꾼 PR 에는 경고를 내지 않는다", (t) => {
   const repo = repository(t);
   repo.put("src/a.ts", "export const a = 1;\n");
-  repo.put("docs/features/connector.md", "# 커넥터\n\n바꾼 문장이다.\n\ncovers: `src/연결/`, `src/a.ts`\n\n## 요구\n");
+  repo.put("docs/features/connector.md", "# 플러그인\n\n바꾼 문장이다.\n\ncovers: `src/연결/`, `src/a.ts`\n\n## 요구\n");
   repo.git("commit", "--quiet", "-am", "change");
   const result = repo.run(repo.base, "HEAD");
   assert.equal(result.status, 0, result.stderr);

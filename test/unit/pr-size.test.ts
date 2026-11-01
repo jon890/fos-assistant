@@ -106,7 +106,7 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
 });
 
 
-test("커넥터 스킬만 문서 분류보다 먼저 운영 코드로 센다", () => {
+test("플러그인 스킬만 문서 분류보다 먼저 운영 코드로 센다", () => {
   const skill = "hermes/connectors/sample/skills/search/SKILL.md";
   assert.equal(category(skill), "production");
   for (const file of ["hermes/skills/search/SKILL.md", join("hermes/connectors/sample", "README.md"), "hermes/connectors/sample/skills/search/guide.md"]) {
