@@ -107,6 +107,9 @@ assistant:
     root: build/test-artifacts
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
     agent-root: /agent-side/artifacts
+  artifact-vault:
+    # 검사가 뜰 때마다 자동 보관 훑기가 함께 돌지 않게 늦춘다. 검사는 그 메서드를 직접 부른다
+    auto-retry-delay: 1h
   skill:
     root: build/test-skills
     # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 루트를 같게 둔다

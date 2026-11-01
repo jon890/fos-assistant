@@ -1,3 +1,4 @@
+import type { AutoVaultState } from "@/lib/artifact-vault-api";
 import type { ActivitySummary } from "@/lib/chat-event";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
@@ -16,6 +17,10 @@ export type MessageArtifact = {
   byteSize: number;
   /** 보관 기간이 지나 파일이 지워졌다 */
   deleted: boolean;
+  /** 자동 보관 상태다. 자동 보관 대상이 아니면 null 이다. 옛 서버 응답에는 없다 */
+  autoVault?: AutoVaultState | null;
+  /** 자동 보관이 실패한 까닭의 오류 코드다 */
+  autoVaultError?: string | null;
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */

@@ -139,10 +139,19 @@ public final class ChatDtos {
      * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
      * @param byteSize 답에 묶을 때의 크기
      * @param deleted 보관 기간이 지나 파일을 지웠다
+     * @param autoVault 자동 보관 상태({@code PENDING}, {@code RUNNING}, {@code DONE}, {@code SKIPPED}, {@code FAILED}).
+     * 자동 보관 대상이 아니면 null
+     * @param autoVaultError {@code FAILED} 일 때 그 까닭의 오류 코드. 아니면 null
      */
-    public record ArtifactView(String path, long byteSize, boolean deleted) {
+    public record ArtifactView(
+        String path, long byteSize, boolean deleted, String autoVault, String autoVaultError) {
         static ArtifactView from(ChatArtifact artifact) {
-            return new ArtifactView(artifact.path(), artifact.byteSize(), artifact.isDeleted());
+            return new ArtifactView(
+                artifact.path(),
+                artifact.byteSize(),
+                artifact.isDeleted(),
+                artifact.autoVaultState() == null ? null : artifact.autoVaultState().name(),
+                artifact.autoVaultError());
         }
     }
 

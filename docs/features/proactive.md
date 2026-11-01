@@ -15,7 +15,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 - 사용자는 에이전트 상세나 점검 대화의 단추로 살펴보기를 시작하거나, 매일 깨우기를 켜서 정한 시각에 돌린다. 매일 깨우기는 기본 꺼짐이다.
 - 결과는 그 사용자와 에이전트의 점검 대화 하나에만 남는다. 같은 에이전트를 쓰는 다른 사용자의 점검 대화와 살펴보기는 따로다.
 - 관리자가 쓰기 도구를 허용하지 않은 에이전트의 살펴보기는 읽기만 하고, 그 경계는 Control Plane 이 강제한다.
-- 매일 깨우기 뒤에는 사용자가 켠 에이전트에서만 문제 후보를 가치 평가와 행동 정책에 한 번 잇고, 먼저 다룰 문제를 지금 화면에 보인다.
+- 매일 깨우기 뒤에는 사용자가 켠 에이전트에서만 문제 후보를 가치 평가와 행동 정책에 한 번 잇는다. 그 판정은 지금 화면에 더 보이지 않고, 지금 화면에는 결과 블록의 제안이 제안 카드로 보인다.
 - 사용자에게 스킬을 부르라고 안내하지 않는다. 스킬은 에이전트를 준비하는 사람이 설치한다.
 
 ### 새 설계
@@ -31,8 +31,8 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 | --- | --- |
 | 기억에서 꺼내기 | 구현했다. 모든 살펴보기의 입력에 싣는다 |
 | 읽기만 하며 살펴보기 | 지금의 읽기 경계를 쓴다. 쓰기 허용을 켠 에이전트도 쓰기는 승인 카드로만 간다 |
-| 제안 저장 | 구현했다. 기능 스위치 `assistant.proactive-suggestion.enabled`(기본 꺼짐) 뒤에서 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 아래 「제안 저장」 이다 |
-| 제안 카드 | 아직 만들지 않았다. 지금은 발견, 문제 후보, 「내 차례」 의 「먼저 다룰 문제」 가 그 자리다. 제안 줄은 할 일 목록과 「내 차례」 의 할 일 후보로만 보인다 |
+| 제안 저장 | 구현했다. 기능 스위치 `assistant.proactive-suggestion.enabled`(기본 켜짐)가 켜져 있으면 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 깨우기 지시(`ProactiveCheckInstructions.COMMON_RULES`)가 이 배열을 알린다. 아래 「제안 저장」 이다 |
+| 제안 카드 | 구현했다. 「내 차례」 의 「먼저 다룰 문제」 자리를 제안 카드가 대신한다. `SuggestionCandidates` 가 만료되지 않은 `PROPOSED` 줄을 낸다([attention.md](attention.md) 의 「후보와 trigger」) |
 | 반응을 신호로 | 아직 만들지 않았다. 지금은 판단 피드백 사건이다. 지금 화면의 노출, 열기, 숨김, 미루기, 복원은 이 반응 기록에 남는다([attention.md](attention.md) 의 「저장」). 반응을 기억 정비의 신호로 읽는 일은 아직 없다 |
 
 바뀌지 않아야 하는 경계는 판단 로직이 아니라 계약 테스트가 지킨다.
@@ -61,7 +61,8 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 제안 저장
 
-스위치가 켜져 있을 때만, 살펴보기가 답을 저장한 뒤 발견과 같은 자리에서 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 꺼져 있거나 알리지 않는 자동 실행이면 아무것도 하지 않아 지금 동작 그대로다.
+스위치가 켜져 있으면(기본), 살펴보기가 답을 저장한 뒤 발견과 같은 자리에서 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 끄거나 알리지 않는 자동 실행이면 제안을 저장하지 않는다.
+칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultParser` 가 갖는다. 지시는 제안을 받아들여도 쓰기 승인이 아니고 외부 쓰기는 승인 카드로만 간다고 함께 알린다.
 
 - 사용자와 대화는 넘긴 실행의 실행 줄에서 정한다. 요청 본문이 사용자를 정하지 못한다
 - 제목은 1자부터 200자까지, `detail`(모델의 자유 JSON)은 4000자까지다. 서버는 이 크기와 소유만 검사하고 `detail` 의 구조나 근거의 가치를 보지 않는다. 어긋난 항목은 건너뛰고 나머지를 저장한다
@@ -367,7 +368,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### 사용자에게 보이는 것
 
-매일 루프가 낸 `SURFACE` 와 `ASK_APPROVAL` 판정만 지금 화면 「내 차례」 카드의 「먼저 다룰 문제」 로 보인다. 화면은 [`docs/features/attention.md`](attention.md)가 갖는다.
+**판정은 지금 화면에 더 보이지 않는다.** 「내 차례」 의 「먼저 다룰 문제」 자리는 제안 카드가 대신한다([`docs/features/attention.md`](attention.md) 의 「후보와 trigger」).
+아래는 아직 남은 판정 목록과 반응 API(`SurfacedProblems`, `AutonomyController`)의 동작이다. 지금 화면은 이 목록을 읽지 않고, 반응 API 와 화면 코드는 판단 층을 지우는 뒤 PR 에서 함께 지운다.
 관리자 화면이나 판정 API 로 낸 판정은 사용자가 켠 루프가 아니므로 보이지 않는다.
 반응 경로는 `AutonomyController` 가 갖는다. 남의 판정, 없는 판정, 다른 수준의 판정, 루프 밖의 판정은 404 `AUTONOMY_DECISION_NOT_FOUND` 다.
 지금 반응은 그 판정의 마지막 사용자 `ACCEPTED`, `DISMISSED` 다. 지금 화면의 숨기기와 미루기는 지금 반응이 아니다. 같은 단추를 다시 누르면 사건을 더 남기지 않는다.

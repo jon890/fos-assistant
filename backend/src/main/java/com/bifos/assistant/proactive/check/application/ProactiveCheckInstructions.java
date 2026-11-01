@@ -42,6 +42,7 @@ class ProactiveCheckInstructions {
             - sourceFailures: 문자열 배열, 5개까지, 각 200자까지. 읽지 못한 출처와 까닭
             - report: 객체. changed와 done은 각각 문자열 배열 3개까지, next는 문자열 배열 2개까지. evidence와 needsApproval은 적지 않는다
             - problemCandidates: 배열, 3개까지. 이번 발견을 근거로 이 사용자가 풀 가치가 있는 문제. 없으면 비운다. 우선순위는 적지 않는다
+            - suggestions: 배열, 5개까지. 사용자가 챙길 것을 지금 화면의 제안 카드로 낸다. 없으면 비운다. outcome 이 NOTHING_NEW 여도 낼 수 있다
 
             findings 의 한 칸:
             - area: 문자열, 40자까지. 분야 지침이 정한 영역
@@ -68,7 +69,13 @@ class ProactiveCheckInstructions {
             - expectedBenefit: 문자열, 300자까지. 해결하면 사용자가 얻을 것의 가설
             - sideEffect: NONE, INTERNAL, EXTERNAL 가운데 하나. 앱 밖에 쓰거나 연락하면 EXTERNAL
             - risk: 문자열, 선택, 200자까지
-            - changeSinceLast: 문자열, 선택, 300자까지. 같은 문제 키를 다시 낼 때 지난번과 달라진 점""";
+            - changeSinceLast: 문자열, 선택, 300자까지. 같은 문제 키를 다시 낼 때 지난번과 달라진 점
+
+            suggestions 의 한 칸:
+            - id: 문자열, 120자까지. 이 블록 안에서 제안을 가리는 키
+            - title: 문자열, 200자까지. 카드에 보일 한 줄
+            - detail: JSON 객체, 선택, 4000자까지. 근거, 목표와 출처 참조, 왜 지금인지 같은 자유 내용
+            - 제안을 받아들여도 쓰기 승인이 아니다. 외부에 쓰는 일은 승인 카드로만 간다""";
 
 
     /** 경계 줄을 골라 지시를 만든다. 나머지 규칙은 모든 살펴보기에 같다. */

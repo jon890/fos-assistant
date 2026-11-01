@@ -30,6 +30,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -210,7 +211,7 @@ class ArtifactVaultTest {
     @DisplayName("용량을 넘으면 새 보관만 거절하고 이미 보관한 것은 그대로이며 지우면 다시 보관할 수 있다")
     void rejectsOnlyNewVaultOverQuota() {
         ArtifactVaultService small = new ArtifactVaultService(
-            reader, rows, writer, bodies, new ArtifactVaultProperties(100L, null, null, null), transactions);
+            reader, rows, writer, bodies, new ArtifactVaultProperties(100L, null, null, null, null), transactions, Clock.systemUTC());
         write(dadConversation, "a.css", "a".repeat(60));
         write(dadConversation, "b.css", "b".repeat(60));
 

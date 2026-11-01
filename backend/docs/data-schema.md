@@ -301,6 +301,11 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 전용 금융 UPDATE는 `limit_updated_at`과 일반 감사 `updated_at`을 함께 적는다. 두 칸의 의미를 합치지 않는다.
 
+#### 결과물 자동 보관 컬럼
+
+`artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다. 비어 있으면 `ArtifactAutoVaultSetting.DEFAULT_ENABLED`(켜짐)를 따른다. 두 값은 같아야 한다.
+주문 상한처럼 엔티티의 넣기와 고치기에서 빼고 전용 쿼리로만 읽고 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
+
 ### allowed_person
 
 로그인할 수 있는 사람의 목록이다. **여기 없는 주소는 토큰을 받지 못한다.**
@@ -499,8 +504,20 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `vault_bundle_id` | 이 행이 든 묶음의 뿌리 행 `id`. 뿌리 행과 묶음이 아닌 보관 사본, 대화 결과물 행은 비어 있다. `(vault_bundle_id, path)` 에 색인이 있다 |
 
 보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
-묶음 안 파일 행도 `vault_user_id` 가 채워져 있어 같이 남는다. 묶음 안 파일의 `vault_fingerprint` 는 묶음 지문과 경로로 만든다. 묶음은 뿌리 번호로만 지우고 안의 행을 같은 문장에서 지운다.
+묶음 안 파일 행도 `vault_user_id` 가 채워져 있어 같이 남는다. 묶음 안 파일의 `vault_fingerprint` 는 묶음 지문과 경로로 만든다.
+**사용자가 보관본을 지우면 뿌리 행은 지우기 이력으로 남는다.** 같은 트랜잭션에서 묶음 안 행을 지우고, 뿌리 행은 `vault_body`, `vault_key_id` 를 비우고 `path` 를 빈 문자열로, `byte_size` 를 0 으로 바꾼 뒤 `deleted_at` 에 지운 시각을 적는다. `vault_fingerprint` 는 남아 자동 보관이 같은 보관본을 다시 만들지 못한다. 사용자가 직접 다시 보관하면 이 이력 행을 지우고 새로 넣는다. 목록과 읽기, 용량은 `deleted_at` 이 빈 행만 본다.
+그 대화를 정리할 때 이력 행도 함께 지운다. 대화가 이미 지워진 뒤에 보관본을 지우면 이력을 남기지 않고 행을 지운다. 지운 대화에서는 자동 보관이 다시 돌지 않는다. 사용자 접근 해제는 보관 사본과 이력을 지우지 않는다.
 외래 키를 두지 않는다. 대화와 메시지가 지워져도 보관 사본 행은 남는다.
+
+**자동 보관의 작업 기록은 결과물 행 자신의 칸이다**(#530 PR 3). 새 표를 두지 않는다. 보관 사본 행은 이 칸이 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `auto_vault_state` | `PENDING`, `RUNNING`, `DONE`, `SKIPPED`, `FAILED`. 비어 있으면 자동 보관 대상이 아니다. `(auto_vault_state, id)` 에 색인이 있다 |
+| `auto_vault_error` | `FAILED` 의 까닭인 오류 코드 |
+| `auto_vault_attempts` | 맡을 때마다 하나 더한다. 일시 장애로 다시 차례에 둘 때 상한을 센다 |
+
+상태는 조건부 update 로만 옮긴다. 비어 있는 행만 `PENDING` 으로, `PENDING` 인 행만 `RUNNING` 으로 바꾸므로 같은 turn 의 완료가 두 번 와도 한 번만 돈다. 재시작하면 `RUNNING` 을 `PENDING` 으로 되돌리고 `PENDING` 을 주기마다 훑는다. Control Plane 이 한 인스턴스라는 전제다.
 
 ### result_delivery
 

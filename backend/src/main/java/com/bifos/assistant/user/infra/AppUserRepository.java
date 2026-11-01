@@ -51,4 +51,17 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
                 or (u.modelDefaultTier is not null and :tier is null))
             """)
     int updateModelDefaultTier(@Param("userId") Long userId, @Param("tier") String tier, @Param("at") Instant at);
+
+
+    /** 결과물 자동 보관 설정이다. 고른 적이 없거나 없는 사용자면 null 이다. */
+    @Query("select u.artifactAutoVault from AppUser u where u.id = :userId")
+    Boolean findArtifactAutoVault(@Param("userId") Long userId);
+
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "update app_user set artifact_auto_vault = :enabled, updated_at = :at where id = :userId",
+        nativeQuery = true)
+    int updateArtifactAutoVault(
+        @Param("userId") Long userId, @Param("enabled") boolean enabled, @Param("at") Instant at);
 }

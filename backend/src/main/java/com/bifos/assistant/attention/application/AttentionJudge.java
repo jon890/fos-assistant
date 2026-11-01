@@ -78,8 +78,10 @@ public class AttentionJudge {
         int limit,
         Set<String> keptKeys) {
         List<AttentionItem> items = new ArrayList<>();
+        // 같은 카드의 두 소스가 따로 읽는 사이에 상태가 바뀌면 같은 열쇠가 두 번 올 수 있다. 먼저 온 후보만 남긴다.
+        Set<String> cardKeys = new HashSet<>();
         for (AttentionCandidate candidate : candidates) {
-            if (suppressed(card, candidate, controls, now, keptKeys)) {
+            if (suppressed(card, candidate, controls, now, keptKeys) || !cardKeys.add(candidate.itemKey())) {
                 continue;
             }
             items.add(item(candidate));

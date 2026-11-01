@@ -1,7 +1,11 @@
 package com.bifos.assistant.chat.artifact.presentation;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactAutoVault;
 import com.bifos.assistant.chat.artifact.application.ArtifactVaultService;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultContent;
+import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultRetryRequest;
+import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultSettingView;
+import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.AutoVaultStatusView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.VaultItemView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.VaultListView;
 import com.bifos.assistant.chat.artifact.presentation.ArtifactVaultDtos.VaultRequest;
@@ -9,6 +13,7 @@ import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.util.SandboxedContentPolicy;
+import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -39,6 +45,8 @@ public class ArtifactVaultController {
     private final ArtifactVaultService vault;
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
+    private final ArtifactAutoVault autoVault;
+    private final ArtifactAutoVaultSetting autoVaultSetting;
 
 
     @GetMapping
@@ -54,6 +62,30 @@ public class ArtifactVaultController {
         CurrentUser user = currentUser.require();
         Long conversation = access.requireOwnId(user, request.conversationId());
         return VaultItemView.of(vault.vault(user.id(), conversation, request.path()));
+    }
+
+
+    /** 내가 결과물 자동 보관을 켰는지다. */
+    @GetMapping("/auto")
+    public AutoVaultSettingView autoVaultSetting() {
+        return new AutoVaultSettingView(autoVaultSetting.isEnabled(currentUser.require().id()));
+    }
+
+
+    /** 결과물 자동 보관을 켜거나 끈다. 끄면 다음 turn 부터 보관하지 않고 이미 보관한 것은 그대로다. */
+    @PutMapping("/auto")
+    public AutoVaultSettingView changeAutoVault(@Valid @RequestBody AutoVaultSettingView request) {
+        Long user = currentUser.require().id();
+        autoVaultSetting.change(user, request.enabled());
+        return new AutoVaultSettingView(autoVaultSetting.isEnabled(user));
+    }
+
+
+    /** 자동 보관이 실패한 결과물을 지금 다시 보관한다. 대화가 내 것이 아니면 없는 대화와 같은 응답이다. */
+    @PostMapping("/auto/retry")
+    public AutoVaultStatusView retryAutoVault(@Valid @RequestBody AutoVaultRetryRequest request) {
+        Long conversation = access.requireOwnId(currentUser.require(), request.conversationId());
+        return AutoVaultStatusView.of(autoVault.retry(conversation, request.messageId(), request.path()));
     }
 
 

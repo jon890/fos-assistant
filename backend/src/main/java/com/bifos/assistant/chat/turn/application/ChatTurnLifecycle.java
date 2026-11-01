@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SequenceCounter;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.chat.turn.application.port.CheckTurn;
+import com.bifos.assistant.chat.artifact.application.ArtifactAutoVault;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.conversation.application.ConversationSessions;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
@@ -53,6 +54,7 @@ class ChatTurnLifecycle {
     private final ExecutionRecorder executions;
     private final StarterSuggestionService starterSuggestions;
     private final ArtifactService artifacts;
+    private final ArtifactAutoVault autoVault;
     private final Clock clock;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ChatRunEvents chatRunEvents;
@@ -274,9 +276,15 @@ class ChatTurnLifecycle {
      *
      * <p>turn 을 돌려주는 자리마다 부른다. 끝 사건을 보내는 자리에 두면 스트림이 아닌 경로가 빠진다. 묶기가
      * 실패해도 turn 은 성공으로 끝난다. 근거는 ADR-027 에 있다.
+     *
+     * <p>완료한 turn 이면 묶은 결과물을 요청자의 보관함에 자동으로 보관하기 시작한다. 중지한 turn 의 파일은 완성본이라고 볼 수
+     * 없어 보관하지 않는다. 보관은 요청 밖에서 돌아 turn 을 기다리게 하지 않는다.
      */
     ChatTurn recorded(ChatTurn turn, Instant startedAt) {
         artifacts.recordTurn(turn.conversationId(), turn.messageId(), startedAt);
+        if (!turn.cancelled()) {
+            autoVault.afterCompletedTurn(turn.conversationId(), turn.messageId());
+        }
         return turn;
     }
 }

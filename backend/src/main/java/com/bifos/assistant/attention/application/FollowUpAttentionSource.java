@@ -26,9 +26,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 요청자의 {@code PROPOSED} 와 {@code OPEN} 할 일을 나를 기다리는 카드의 후보로 낸다(ADR-073).
+ * 요청자의 {@code OPEN} 할 일을 나를 기다리는 카드의 후보로 낸다(ADR-073). 받아들이기 전의 {@code PROPOSED} 줄은 제안 카드로
+ * {@link SuggestionCandidates} 가 낸다.
  *
- * <p>제안은 늘 {@code LATER} 다. 에이전트가 짐작한 것이라 건수에 들지 않는다. 받아들인 할 일은 기한이 다가오거나 지났을 때, 연결한
+ * <p>받아들인 할 일은 기한이 다가오거나 지났을 때, 연결한
  * 대화에 받아들인 뒤의 결과가 전해졌을 때 {@code NOW} 가 된다. 결과 도착은 맡긴 일과 승인 줄의 {@code result_delivered_at} 으로
  * 판정한다. {@code SYSTEM} 메시지는 자동 turn 한도 안내와 승인 거절 알림도 섞여 구분하지 못하므로 보지 않는다. 사용자가 그 대화에서
  * 주고받는 메시지도 세지 않는다.
@@ -63,7 +64,9 @@ public class FollowUpAttentionSource implements AttentionCandidates {
 
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
-        List<FollowUpSnapshot> rows = followUps.openAndProposedOf(user.id());
+        List<FollowUpSnapshot> rows = followUps.openAndProposedOf(user.id()).stream()
+            .filter(row -> row.status() == FollowUpStatus.OPEN)
+            .toList();
         if (rows.isEmpty()) {
             return List.of();
         }
@@ -87,30 +90,9 @@ public class FollowUpAttentionSource implements AttentionCandidates {
 
 
     private AttentionCandidate candidate(FollowUpSnapshot row, Map<Long, Instant> lastDelivered, Instant now) {
-        boolean proposed = row.status() == FollowUpStatus.PROPOSED;
         String itemKey = "follow_up:" + row.publicId();
         List<AttentionSourceRef> sources = List.of(new AttentionSourceRef(SOURCE, itemKey, row.updatedAt()));
-        AttentionFollowUpRef ref = new AttentionFollowUpRef(row.publicId(), row.dueAt(), row.waiting(), proposed, row.proposed());
-        if (proposed) {
-            return new AttentionCandidate(
-                CardKey.NEEDS_ME,
-                itemKey,
-                AttentionCandidates.stateKey(
-                    AttentionTrigger.FOLLOW_UP_PROPOSED, row.updatedAt().toString()),
-                AttentionTrigger.FOLLOW_UP_PROPOSED,
-                false,
-                false,
-                row.waiting() ? List.of(AttentionSignal.WAITING) : List.of(),
-                AttentionConfidence.MODEL_INFERRED,
-                row.title(),
-                row.conversationPublicId(),
-                null,
-                row.createdAt(),
-                sources,
-                null,
-                null,
-                ref);
-        }
+        AttentionFollowUpRef ref = new AttentionFollowUpRef(row.publicId(), row.dueAt(), row.waiting(), false, row.proposed());
         DueBand band = dueBand(row.dueAt(), now);
         Instant delivered = row.conversationPublicId() == null ? null : lastDelivered.get(row.conversationId());
         boolean linkedUpdate = delivered != null && delivered.isAfter(row.acceptedAt());

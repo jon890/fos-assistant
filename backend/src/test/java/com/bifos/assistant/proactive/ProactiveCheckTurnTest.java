@@ -392,7 +392,12 @@ class ProactiveCheckTurnTest {
             .contains("<fos-check-result>")
             .contains("changeSinceLast")
             .contains("problemCandidates")
-            .contains("relatedGoal");
+            .contains("relatedGoal")
+            .as("제안 배열과 한 칸의 이름, 받아들임이 쓰기 승인이 아니라는 줄")
+            .contains("- suggestions: 배열, 5개까지")
+            .contains("suggestions 의 한 칸:")
+            .contains("- detail: JSON 객체")
+            .contains("외부에 쓰는 일은 승인 카드로만 간다");
         assertThat(second.input())
             .contains("skill_view(name=\"proactive-check\")")
             .contains("<external-data>")
