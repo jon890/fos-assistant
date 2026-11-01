@@ -323,7 +323,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 매일 깨우기로 돈 살펴보기가 끝나도 가치 평가와 행동 정책에 잇지 않는다.
 둘을 잇던 조정자와 살펴보기의 끝을 알리던 사건은 지웠다.
-이 절에는 설정과 기동 복구가 남아 있고, 키는 `ProactiveLoopProperties` 가 갖는다. 남은 코드는 plan227 의 마지막 PR 이 지운다.
+이 절에는 설정과 기동 복구가 남아 있고, 키는 `ProactiveLoopProperties` 가 갖는다.
 결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
 
 ### 사용자 설정
