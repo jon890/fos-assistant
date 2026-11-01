@@ -3,7 +3,6 @@ package com.bifos.assistant.chat.turn.presentation;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUseReaction;
-import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.chat.turn.application.dto.PendingQueue;
 import com.bifos.assistant.chat.turn.application.dto.RunningTurn;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
@@ -13,20 +12,14 @@ import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
-import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -158,9 +151,6 @@ public final class ChatDtos {
      * @param id 대화의 공개 식별자
      * @param agentCode 대화의 에이전트 코드. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
      * @param agentName 대화의 에이전트 이름. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
-     * @param provider 이 대화에서 고른 provider. 고르지 않았으면 null
-     * @param model 이 대화에서 고른 모델. 고르지 않았으면 null 이고 그 profile 의 기본 모델로 돈다
-     * @param reasoningEffort 이 대화에서 고른 effort. 고르지 않았으면 null
      * @param purpose 보통 대화인지 먼저 살펴보기의 점검 대화인지. 화면이 점검 대화를 알아보는 데 쓴다
      * @param taskId 이 대화를 만든 예약 작업의 공개 식별자. 작업이 만든 대화가 아니면 null
      * @param taskTitle 그 작업의 이름. 지운 작업도 이름을 싣는다. 작업이 만든 대화가 아니면 null
@@ -171,9 +161,6 @@ public final class ChatDtos {
         String agentCode,
         String agentName,
         Instant updatedAt,
-        String provider,
-        String model,
-        String reasoningEffort,
         ModelSelectionMode modelSelectionMode,
         ModelTier modelTier,
         ConversationPurpose purpose,
@@ -196,19 +183,7 @@ public final class ChatDtos {
     public record RenameConversationRequest(@NotNull String title) {
     }
 
-    /** 대화에서 쓸 모델과 effort 다. 모두 비워 보내면 그 profile 의 기본값으로 돌아간다. */
-    public record ChooseModelRequest(String provider, String model, String reasoningEffort) {
-
-        /** 요청 값을 검증해 선택으로 바꾼다. 맞지 않으면 {@code VALIDATION_FAILED} 다. */
-        public ModelChoice toChoice() {
-            return ModelChoice.of(provider, model, reasoningEffort);
-        }
-    }
-
     public record ChooseModelTierRequest(@NotNull ModelSelectionMode mode, ModelTier tier) {
-    }
-
-    public record UpdateDefaultModelTierRequest(ModelTier tier) {
     }
 
     public record ModelTierDefinitionRequest(ModelTier tier, String provider, String model, String reasoningEffort) {
@@ -216,61 +191,6 @@ public final class ChatDtos {
 
     public record UpdateGroupModelTiersRequest(
         @NotNull List<@NotNull ModelTierDefinitionRequest> tiers, ModelTier defaultTier) {
-    }
-
-    /**
-     * 그 에이전트의 profile 로 고를 수 있는 모델이다. 그룹이 숨긴 것은 빠져 있다.
-     * @param defaultModel 요청에 모델을 싣지 않을 때 도는 모델. profile 의 값이다
-     * @param defaultAvailable 기본 모델이 {@code providers} 에 있는가. 숨겼거나 목록에서 빠졌으면 거짓이다
-     */
-    public record ModelOptionsView(
-        String defaultProvider,
-        String defaultModel,
-        boolean defaultAvailable,
-        List<ProviderView> providers,
-        List<String> reasoningEfforts) {
-
-        static ModelOptionsView from(ModelOptions options) {
-            return new ModelOptionsView(
-                options.defaultProvider(),
-                options.defaultModel(),
-                options.defaultAvailable(),
-                options.providers().stream().map(ProviderView::from).toList(),
-                options.reasoningEfforts());
-        }
-    }
-
-    /**
-     * @param provider Hermes 가 부르는 provider 이름
-     * @param name 화면에 보일 이름
-     * @param models 그 provider 의 모델 이름
-     * @param reasoning 모델 이름을 열쇠로 한 reasoning 지원과 끄기 지원. 모든 모델이 표에 있고, Hermes 가 밝히지 않은
-     * 칸은 {@code UNKNOWN} 이다
-     * @param reasoningCapable 옛 web 호환용이고 다음 배포에서 지운다. 각 모델의 {@code support} 가
-     * {@code UNSUPPORTED} 가 아니면 참이다
-     */
-    public record ProviderView(
-        String provider,
-        String name,
-        List<String> models,
-        Map<String, ReasoningCapability> reasoning,
-        Map<String, Boolean> reasoningCapable) {
-
-        static ProviderView from(HermesModelCatalog.Provider provider) {
-            Map<String, ReasoningCapability> reasoning = new LinkedHashMap<>();
-            Map<String, Boolean> reasoningCapable = new LinkedHashMap<>();
-            for (String model : provider.models()) {
-                ReasoningCapability capability = provider.reasoning().getOrDefault(model, ReasoningCapability.UNKNOWN_ALL);
-                reasoning.put(model, capability);
-                reasoningCapable.put(model, capability.support() != ReasoningCapability.Support.UNSUPPORTED);
-            }
-            return new ProviderView(
-                provider.slug(),
-                provider.name(),
-                provider.models(),
-                Collections.unmodifiableMap(reasoning),
-                Collections.unmodifiableMap(reasoningCapable));
-        }
     }
 
     /**

@@ -210,24 +210,6 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
         @Param("now") Instant now);
 
 
-    /** 고른 모델과 effort 만 바꾼다. 대화 목록의 순서를 흔들지 않도록 {@code updatedAt} 은 건드리지 않는다. */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
-            update Conversation c
-               set c.modelProvider = :provider, c.model = :model, c.reasoningEffort = :reasoningEffort,
-                   c.modelSelectionMode = :customMode,
-                   c.modelTier = null
-             where c.id = :id and c.userId = :userId and c.deletedAt is null
-            """)
-    int chooseModelIfActive(
-        @Param("id") Long id,
-        @Param("userId") Long userId,
-        @Param("provider") String provider,
-        @Param("model") String model,
-        @Param("reasoningEffort") String reasoningEffort,
-        @Param("customMode") ModelSelectionMode customMode);
-
-
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Conversation c set c.modelSelectionMode = :mode, c.modelTier = :tier,

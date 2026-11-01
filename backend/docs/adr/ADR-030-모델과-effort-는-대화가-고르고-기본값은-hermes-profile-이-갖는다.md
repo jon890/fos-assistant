@@ -1,6 +1,7 @@
 ## ADR-030: 모델과 effort 는 대화가 고르고 기본값은 Hermes profile 이 갖는다
 
 - **status**: `accepted`
+- 대화가 provider 와 모델, effort 를 직접 고르는 부분은 [ADR-20261101 / model-setting](../../../docs/adr/ADR-20261101-model-setting.md) 이 대체했다. 대화는 그룹이 정한 슬라이더 칸만 고른다. 기본값을 profile 에 두는 부분은 ADR-054 가 대체했다.
 - **결정**: 에이전트는 모델을 갖지 않는다. 사용자가 대화마다 모델과 reasoning effort 를 고르고, 고른 값은 그 대화에 남는다.
   고르지 않은 대화는 `/v1/runs` 에 `provider`, `model`, `model_options` 를 보내지 않아 그 profile 의 기본값으로 돈다.
   고를 수 있는 모델은 그 대화 에이전트의 profile 에 Hermes 가 답하는 목록이며, Control Plane 은 그것을 저장하지 않는다.

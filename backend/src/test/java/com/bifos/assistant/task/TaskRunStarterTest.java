@@ -784,7 +784,7 @@ class TaskRunStarterTest {
 
 
     @Test
-    @DisplayName("DEEP 을 고른 SINGLE 작업은 사용자가 그 대화에서 모델을 골라도 다음 발화가 DEEP 단계로 되돌린다")
+    @DisplayName("HIGH 를 고른 SINGLE 작업은 사용자가 그 대화에서 다른 칸을 골라도 다음 발화가 HIGH 칸으로 되돌린다")
     void returnsSingleConversationToTaskTier() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
         chooseTier(fixture, ModelTier.HIGH);
@@ -792,18 +792,16 @@ class TaskRunStarterTest {
         starter.startQueued(NOW);
         Long conversationId = awaitFinished(first).conversationId();
         new TransactionTemplate(transactionManager)
-            .executeWithoutResult(status -> assertThat(conversations.chooseModelIfActive(
+            .executeWithoutResult(status -> assertThat(conversations.chooseModelTierIfActive(
                 conversationId,
                 fixture.owner().id(),
-                "custom-provider",
-                "custom-model",
-                null,
-                ModelSelectionMode.CUSTOM))
-                    .as("사용자가 고른 모델")
+                ModelSelectionMode.TIER,
+                ModelTier.INSTANT))
+                    .as("사용자가 고른 칸")
                     .isEqualTo(1));
-        assertThat(conversations.findById(conversationId).orElseThrow().modelSelectionMode())
-            .as("사용자가 고른 뒤의 선택 방식")
-            .isEqualTo(ModelSelectionMode.CUSTOM);
+        assertThat(conversations.findById(conversationId).orElseThrow().modelTier())
+            .as("사용자가 고른 뒤의 칸")
+            .isEqualTo(ModelTier.INSTANT);
 
         Instant nextMonth = Instant.parse("2026-12-01T00:00:00Z");
         TaskRun second = queued(fixture, nextMonth, nextMonth);

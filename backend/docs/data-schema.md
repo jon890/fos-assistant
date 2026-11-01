@@ -367,7 +367,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
-- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 와 `CUSTOM` 이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가 선택 없음으로 바꿨다
+- `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `model_provider`, `model`, `reasoning_effort` 는 `CUSTOM` 이 쓰던 칸이라 그 뒤로는 늘 비어 있고, 실행 줄이 대화의 effort 를 읽는 경로(`Conversation.executionConversation`)를 정리할 때 함께 지운다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다

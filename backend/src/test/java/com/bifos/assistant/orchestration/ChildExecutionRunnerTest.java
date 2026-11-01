@@ -2,6 +2,9 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -10,16 +13,21 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.AskFormat;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
 import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -27,6 +35,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConversationTierChoice;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
@@ -38,6 +47,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -84,6 +94,16 @@ class ChildExecutionRunnerTest {
     @Autowired
     HermesRunsClient hermes;
 
+    @Autowired
+    ModelSettingStore settings;
+
+    @Autowired
+    GroupSettingRepository groupSettings;
+
+    /** 칸 모델을 찾는 목록이다. 목록에 없어도 실행은 그 값으로 보내므로 빈 목록만 준다. */
+    @Autowired
+    HermesModelClient modelClient;
+
     /** 이 검사가 쓰는 에이전트와 사용자다. 다른 검사 클래스와 겹치지 않는 이름으로 둔다. */
     private static final List<String> MY_AGENTS = List.of("child-dad", "child-mom");
 
@@ -111,6 +131,16 @@ class ChildExecutionRunnerTest {
         memoryRepository.deleteAll();
         MY_AGENTS.forEach(code -> agents.findByCode(code).ifPresent(agents::delete));
         MY_EMAILS.forEach(email -> users.findByEmail(email).ifPresent(users::delete));
+        HermesModelCatalog empty = new HermesModelCatalog(null, null, List.of());
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(empty);
+        when(modelClient.readCatalog(anyString(), anyString(), anyBoolean())).thenReturn(empty);
+    }
+
+
+    @AfterEach
+    void clearModelSetting() {
+        // 칸 정의는 그룹 설정 줄이라 같은 그룹을 쓰는 다른 검사에 남는다.
+        ConversationTierChoice.clear(groupSettings, transaction, 1L);
     }
 
 
@@ -213,12 +243,12 @@ class ChildExecutionRunnerTest {
 
 
     /**
-     * 자식 에이전트가 달라도 그 대화에서 고른 모델과 effort 로 돈다.
+     * 자식 에이전트가 달라도 그 대화에서 고른 칸의 모델과 effort 로 돈다.
      *
-     * <p>사용자가 이 대화에서 고른 모델이 그 대화의 모든 실행에 적용된다는 규칙을 하나로 둔다.
+     * <p>사용자가 이 대화에서 고른 칸이 그 대화의 모든 실행에 적용된다는 규칙을 하나로 둔다.
      */
     @Test
-    @DisplayName("모델을 고른 대화의 자식 실행은 그 선택으로 Hermes를 부른다")
+    @DisplayName("칸을 고른 대화의 자식 실행은 그 칸의 선택으로 Hermes를 부른다")
     void childRunOfConversationWithChosenModelCallsHermesWithThatChoice() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
         member("child-mom@example.com", "child-mom");
@@ -226,8 +256,9 @@ class ChildExecutionRunnerTest {
         shared.changeAccess(true, AgentVisibility.GROUP, null);
         agents.save(shared);
         Conversation started = conversationOf(dad, "child-dad");
-        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-            started.id(), dad.id(), "nvidia", "nemotron", "high", ModelSelectionMode.CUSTOM));
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transaction, dad.groupId(), dad.id(), started.id(),
+            ModelTier.HIGH, ModelChoice.stored("nvidia", "nemotron", "high"));
         Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "조사 결과"));
@@ -246,12 +277,13 @@ class ChildExecutionRunnerTest {
 
 
     @Test
-    @DisplayName("모델을 고른 대화에서 자식 실행이 막히면 PROVIDER BLOCKED로 남는다")
+    @DisplayName("칸을 고른 대화에서 자식 실행이 막히면 PROVIDER BLOCKED로 남는다")
     void childRunLeavesProviderBlockedWhenBlockedWithChosenModel() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
         Conversation started = conversationOf(dad, "child-dad");
-        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-            started.id(), dad.id(), "nvidia", "nemotron", null, ModelSelectionMode.CUSTOM));
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transaction, dad.groupId(), dad.id(), started.id(),
+            ModelTier.HIGH, ModelChoice.stored("nvidia", "nemotron", null));
         Conversation conversation = conversations.findById(started.id()).orElseThrow();
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(new HermesRunResult(
