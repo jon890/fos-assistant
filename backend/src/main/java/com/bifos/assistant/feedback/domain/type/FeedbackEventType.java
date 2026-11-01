@@ -40,7 +40,18 @@ public enum FeedbackEventType {
     /** 사람이 정비 후보를 「맞음」 으로 확인했다. 이 단계에서는 동작을 적용하지 않고 확인 결과만 남긴다. */
     MAINTENANCE_CONFIRMED,
     /** 사람이 정비 후보를 「아님」 으로 확인했다. */
-    MAINTENANCE_DENIED;
+    MAINTENANCE_DENIED,
+    /** 지금 화면 응답에 항목이 실렸다. 주체는 시스템이다. */
+    SHOWN,
+    /** 사용자가 지금 화면의 항목을 열었다. */
+    OPENED,
+    /** 사용자가 지금 화면의 항목 단추로 동작했다. */
+    ACTED,
+    /**
+     * 사용자가 지금 화면에서 한 카드의 숨김이나 미루기를 되돌렸다. 그 카드의 그 항목은 이 사건 뒤로 제어가 없다.
+     * 숨김({@code DISMISSED})과 미루기({@code POSTPONED})는 {@code card_key} 가 있으면 제어 사건이다.
+     */
+    RESTORED;
 
 
     /**
@@ -55,5 +66,13 @@ public enum FeedbackEventType {
     /** 정비 사건(후보, 확인)인가. */
     public boolean marksMaintenance() {
         return this == MAINTENANCE_PROPOSED || this == MAINTENANCE_CONFIRMED || this == MAINTENANCE_DENIED;
+    }
+
+
+    /**
+     * 지금 화면의 노출, 열기, 동작, 복원 사건인가. 제안의 흐름이 아니라 화면을 쓴 기록이라 replay 읽기 모델에서 뺀다.
+     */
+    public boolean marksAttentionView() {
+        return this == SHOWN || this == OPENED || this == ACTED || this == RESTORED;
     }
 }

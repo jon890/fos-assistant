@@ -64,15 +64,34 @@ public final class AttentionDtos {
     }
 
 
-    /** @param card 카드 열쇠의 소문자 글 */
-    public record HideRequest(String card, String itemKey, String stateKey) {
+    /**
+     * @param card 카드 열쇠의 소문자 글
+     * @param requestKey 같은 요청의 재전송을 한 사건으로 합치는 열쇠. 선택이고 없으면 합치지 않는다
+     */
+    public record HideRequest(String card, String itemKey, String stateKey, String requestKey) {
+
+        public HideRequest(String card, String itemKey, String stateKey) {
+            this(card, itemKey, stateKey, null);
+        }
     }
 
-    /** @param until 지금보다 뒤이고 {@code snooze-max} 안이어야 한다 */
-    public record SnoozeRequest(String card, String itemKey, Instant until) {
+    /**
+     * @param until 지금보다 뒤이고 {@code snooze-max} 안이어야 한다
+     * @param requestKey 같은 요청의 재전송을 한 사건으로 합치는 열쇠. 선택이고 없으면 합치지 않는다
+     */
+    public record SnoozeRequest(String card, String itemKey, Instant until, String requestKey) {
+
+        public SnoozeRequest(String card, String itemKey, Instant until) {
+            this(card, itemKey, until, null);
+        }
     }
 
-    public record RestoreRequest(String card, String itemKey) {
+    /** @param requestKey 같은 요청의 재전송을 한 사건으로 합치는 열쇠. 선택이고 없으면 합치지 않는다 */
+    public record RestoreRequest(String card, String itemKey, String requestKey) {
+
+        public RestoreRequest(String card, String itemKey) {
+            this(card, itemKey, null);
+        }
     }
 
     /** @param type {@code OPENED} 나 {@code ACTED} */

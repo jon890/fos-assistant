@@ -28,7 +28,7 @@ class FeedbackEventWriter {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void insert(FeedbackEntry entry) {
-        FeedbackEvent event = toEvent(entry);
+        FeedbackEvent event = toEvent(entry, false);
         if (event.conversationId() != null && !conversations.isActive(event.conversationId())) {
             return;
         }
@@ -36,14 +36,21 @@ class FeedbackEventWriter {
     }
 
 
-    /** 실행 번호가 있으면 트리 루트로 바꾸고, 대화를 모르면 그 실행의 대화를 쓴다. */
-    private FeedbackEvent toEvent(FeedbackEntry entry) {
+    /**
+     * 실행 번호가 있으면 트리 루트로 바꾸고, 대화를 모르면 그 실행의 대화를 쓴다.
+     *
+     * @param detachDeletedConversation 묶인 대화를 이미 지웠으면 대화에서 떼고 만든다. 사건을 버리지 못하는 필수 쓰기가 쓴다
+     */
+    FeedbackEvent toEvent(FeedbackEntry entry, boolean detachDeletedConversation) {
         Optional<AgentExecution> origin = entry.originExecutionId() == null ? Optional.empty() : executions.findById(entry.originExecutionId());
         // 실행 줄이 없으면 비운다. 없는 번호를 넣으면 FK 에 걸려 사건을 잃는다.
         Long rootExecutionId = origin.map(AgentExecution::treeRootId).orElse(null);
         Long conversationId = entry.conversationId() != null
             ? entry.conversationId()
             : origin.map(AgentExecution::conversationId).orElse(null);
+        if (detachDeletedConversation && conversationId != null && !conversations.isActive(conversationId)) {
+            conversationId = null;
+        }
         return FeedbackEvent.of(
             entry.userId(),
             entry.subjectType(),

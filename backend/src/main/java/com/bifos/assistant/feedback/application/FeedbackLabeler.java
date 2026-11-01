@@ -30,6 +30,9 @@ public final class FeedbackLabeler {
     /** 지금 화면의 미루기다. */
     public static final String ATTENTION_SNOOZE = "ATTENTION_SNOOZE";
 
+    /** 지금 화면의 숨기기와 미루기를 되돌렸다. */
+    public static final String ATTENTION_RESTORE = "ATTENTION_RESTORE";
+
     /** 사용자가 {@code memory_remember} 의 기록을 되돌려 받아들인 제안을 다시 제안으로 돌렸다. 받아들임을 무른 것이다. */
     public static final String MEMORY_UNDO = "MEMORY_UNDO";
 
