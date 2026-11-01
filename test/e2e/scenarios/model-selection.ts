@@ -49,6 +49,9 @@ const GROUP_TIERS = [
   { tier: "PRO", provider: null, model: null, reasoningEffort: null },
 ];
 
+/** 다섯 칸을 모두 비운 정의다. 이 시나리오가 끝날 때 되돌리는 값이다. */
+const EMPTY_TIERS = GROUP_TIERS.map(({ tier }) => ({ tier, provider: null, model: null, reasoningEffort: null }));
+
 export const modelSelectionScenario: Scenario = {
   name: "대화의 모델 선택",
 
@@ -424,6 +427,14 @@ export const modelSelectionScenario: Scenario = {
     } finally {
       context.hermes.clearBlockedProviders();
     }
+
+    // 칸을 고르면 dad 의 기본 칸이 HIGH 로 남고, 그 사용자 기본 칸을 비우는 경로는 없다. 칸 정의를 비워 뒤에 도는
+    // 시나리오가 이 시나리오의 칸 모델로 돌지 않게 한다. 빈 칸은 요청에 모델을 싣지 않아 profile 의 기본값으로 돈다.
+    expectStatus(await call(context, "/chat/model-tiers/group", {
+      method: "PUT",
+      token: context.tokens.dad,
+      body: { tiers: EMPTY_TIERS, defaultTier: null },
+    }), 204, "그룹 칸 정의 비우기");
   },
 };
 
