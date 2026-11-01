@@ -360,7 +360,8 @@ test("저장이 실패하면 단추가 이전 칸으로 돌아가고 알린다",
   await page.goto(`/chat/${conversationId}`);
 
   await openSlider(page);
-  await stop(page, "High").check();
+  // 저장이 실패하면 고른 칸이 곧바로 이전 칸으로 돌아간다. check() 는 바뀐 상태까지 확인하므로 누르기만 한다.
+  await stop(page, "High").click();
 
   await expect(page.getByTestId("model-picker-error")).toHaveText(
     "모델 단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.",
@@ -393,7 +394,8 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
   await page.goto("/");
 
   await openSlider(page);
-  await stop(page, "High").check();
+  // 저장이 실패하면 고른 칸이 곧바로 이전 칸으로 돌아간다. check() 는 바뀐 상태까지 확인하므로 누르기만 한다.
+  await stop(page, "High").click();
 
   await expect(page.getByTestId("attachment-notice")).toHaveText(
     "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
