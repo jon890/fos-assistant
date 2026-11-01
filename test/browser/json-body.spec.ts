@@ -13,7 +13,7 @@ const ROUTES: ReadonlyArray<{ method: "POST" | "PUT" | "PATCH"; path: string }> 
   { method: "POST", path: "/api/chat/stream" },
   { method: "POST", path: "/api/chat/conversations" },
   { method: "PATCH", path: `/api/chat/conversations/${CONVERSATION}` },
-  { method: "PUT", path: `/api/chat/conversations/${CONVERSATION}/model` },
+  { method: "PUT", path: `/api/chat/conversations/${CONVERSATION}/model-tier` },
   { method: "POST", path: "/api/agents" },
   { method: "PATCH", path: "/api/agents/browser/visibility" },
   { method: "PUT", path: "/api/agents/browser/persona" },

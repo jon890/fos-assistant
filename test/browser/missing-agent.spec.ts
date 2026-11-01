@@ -81,6 +81,6 @@ test("에이전트 행이 없는 대화는 지운 에이전트로 보이고 다�
   );
 
   await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
-  await expect(page.getByTestId("model-tier-settings")).toBeDisabled();
+  await expect(page.getByTestId("model-tier-picker")).toBeDisabled();
   await expect(page.getByRole("button", { name: "사진 첨부" })).toHaveCount(0);
 });
