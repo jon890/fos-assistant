@@ -432,7 +432,7 @@ test.describe("지금 화면", () => {
     const row = needsMe.getByTestId("now-item").filter({ hasText: title });
     await expect(row).toHaveCount(1);
     await expect(row).toHaveAttribute("data-attention", "LATER");
-    await expect(row).toContainText("에이전트가 할 일로 제안했어요");
+    await expect(row).toContainText("에이전트가 챙길 것을 제안했어요");
     await expect(row).toContainText("대화에서");
 
     const due = isoToSeoulInput(new Date(Date.now() + 72 * HOUR_MS).toISOString());
