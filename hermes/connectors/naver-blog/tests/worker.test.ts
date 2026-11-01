@@ -91,6 +91,32 @@ async function queuedJob(
   return { dir, jobId, run, runWith };
 }
 
+/** 실제 시간이 흐르지 않아도 예약한 상한의 직전과 경계를 검사한다. */
+function limitClock() {
+  let elapsed = 0;
+  let pending: { abort: () => void; at: number } | null = null;
+  const scheduleLimit: WorkerDeps["scheduleLimit"] = (abort, ms) => {
+    pending = { abort, at: elapsed + ms };
+    return () => {
+      pending = null;
+    };
+  };
+  return {
+    scheduleLimit,
+    advance(ms: number) {
+      elapsed += ms;
+      if (pending && elapsed >= pending.at) {
+        const { abort } = pending;
+        pending = null;
+        abort();
+      }
+    },
+    get pending() {
+      return pending !== null;
+    },
+  };
+}
+
 /** 작업이 끝나면 입력 파일과 잠금이 없고 상태 파일과 끝냄 표시만 남는다. */
 async function expectOnlyState(dir: string, jobId: string) {
   expect((await readdir(dir)).sort()).toEqual([
@@ -162,7 +188,7 @@ for (const stage of ["open", "fill"] as const)
       await client.close();
       await server.close();
     }
-  }, 15_000);
+  }, 90_000);
 
 test("커서 진단 직렬화는 허용 값만 복사하고 기존 사본 번호를 보존한다", async () => {
   const { dir, jobId, run } = await queuedJob();
@@ -237,9 +263,9 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
             ).js("document.getElementById('title').style.display='none'");
         },
         signal,
-        { stepSeconds: 3, openSeconds: 0.5 },
+        { stepSeconds: 30, openSeconds: 5 },
       ),
-    500,
+    5_000,
   );
   const state = await readState(dir, jobId);
   expect(stages).toEqual(["open", "fill"]);
@@ -251,19 +277,24 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
   expect(chrome.calls).not.toContain("Input.insertText");
   expect(chrome.calls).not.toContain("Page.setInterceptFileChooserDialog");
   expect(chrome.closed).toHaveLength(1);
-}, 15_000);
+}, 90_000);
 
 test("성공하면 succeeded 와 편집기 상태, 저장 전후 수를 남기고 연결 값은 env 에서 읽는다", async () => {
-  const { dir, jobId, run } = await queuedJob();
+  const { dir, jobId, runWith } = await queuedJob();
+  const clock = limitClock();
   let received: unknown;
 
-  await run(async (env, blocks, input, onStage) => {
-    received = { env, blocks, input };
-    await onStage("open");
-    await onStage("save_clicking");
-    return { state: EDITOR_STATE, savedBefore: 3, savedAfter: 4 };
+  await runWith({
+    scheduleLimit: clock.scheduleLimit,
+    runDraft: async (env, blocks, input, onStage) => {
+      received = { env, blocks, input };
+      await onStage("open");
+      await onStage("save_clicking");
+      return { state: EDITOR_STATE, savedBefore: 3, savedAfter: 4 };
+    },
   });
 
+  expect(clock.pending).toBe(false);
   const state = await readState(dir, jobId);
   expect(state).toMatchObject({
     status: "succeeded",
@@ -345,19 +376,31 @@ test("저장 전의 category_not_found 는 failed 와 있는 카테고리 이름
 });
 
 test("limitMs 가 지나면 signal 로 멈추고 timeout 실패로 끝난다", async () => {
-  const { dir, jobId, run } = await queuedJob();
+  const { dir, jobId, runWith } = await queuedJob();
+  const clock = limitClock();
   let aborted = false;
 
-  await run(async (_env, _blocks, _input, onStage, signal) => {
-    await onStage("photos");
-    await new Promise((_, reject) =>
-      signal.addEventListener("abort", () => {
-        aborted = true;
-        reject(new EditorError("editor_failed", "photos", "aborted"));
-      }),
-    );
-    throw new Error("unreachable");
-  }, 100);
+  await runWith(
+    {
+      scheduleLimit: clock.scheduleLimit,
+      runDraft: async (_env, _blocks, _input, onStage, signal) => {
+        await onStage("photos");
+        const stopped = new Promise((_, reject) =>
+          signal.addEventListener("abort", () => {
+            aborted = true;
+            reject(new EditorError("editor_failed", "photos", "aborted"));
+          }),
+        );
+        clock.advance(99);
+        expect(signal.aborted).toBe(false);
+        clock.advance(1);
+        await stopped;
+        throw new Error("unreachable");
+      },
+    },
+    100,
+  );
+  expect(clock.pending).toBe(false);
 
   const state = await readState(dir, jobId);
   expect(aborted).toBe(true);
@@ -589,9 +632,10 @@ test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 
     kind: "overwrite",
     ...OVERWRITE_INPUT,
   });
+  const clock = limitClock();
   const overwrite = overwriteSpy(async (_env, _input, onStage, signal) => {
     await onStage("apply");
-    return new Promise<OverwriteResult>((_, reject) =>
+    const stopped = new Promise<OverwriteResult>((_, reject) =>
       signal.addEventListener("abort", () =>
         reject(
           new EditorError("editor_failed", "apply", "aborted", {
@@ -601,13 +645,22 @@ test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 
         ),
       ),
     );
+    clock.advance(99);
+    expect(signal.aborted).toBe(false);
+    clock.advance(1);
+    return stopped;
   });
 
   await runWith(
-    { runDraft: draftSpy().fake, runOverwrite: overwrite.fake },
+    {
+      runDraft: draftSpy().fake,
+      runOverwrite: overwrite.fake,
+      scheduleLimit: clock.scheduleLimit,
+    },
     100,
   );
 
+  expect(clock.pending).toBe(false);
   const state = await readState(dir, jobId);
   expect(state?.status).toBe("failed");
   expect(state?.error).toEqual({

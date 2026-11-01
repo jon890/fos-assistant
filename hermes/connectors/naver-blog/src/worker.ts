@@ -39,6 +39,8 @@ export type WorkerDeps = {
   runOverwrite: typeof runOverwrite;
   /** 작업 하나의 시간 상한. 지나면 `runDraft` 나 `runOverwrite` 를 멈추고 `timeout` 으로 끝낸다. */
   limitMs: number;
+  /** 시간 상한을 예약하고 취소 함수를 돌려준다. 테스트는 수동 시계로 바꾼다. */
+  scheduleLimit: (abort: () => void, ms: number) => () => void;
   /** 연결 칸 값을 읽는 env. 작업 프로세스는 자기 env 를 쓴다. */
   env: Env;
   /** 원고 snapshot job 의 CP authorize 호출. 테스트는 대역 CP 로 바꾼다. */
@@ -49,6 +51,10 @@ const DEFAULT_DEPS: WorkerDeps = {
   runDraft,
   runOverwrite,
   limitMs: 600_000,
+  scheduleLimit: (abort, ms) => {
+    const timer = setTimeout(abort, ms);
+    return () => clearTimeout(timer);
+  },
   env: process.env,
   fetch: (url, init) => fetch(url, init),
 };
@@ -252,7 +258,10 @@ export async function runWorker(
       HEARTBEAT_MS,
     );
     const controller = new AbortController();
-    const limit = setTimeout(() => controller.abort(), deps.limitMs);
+    const cancelLimit = deps.scheduleLimit(
+      () => controller.abort(),
+      deps.limitMs,
+    );
     stage = started.stage;
     let outcome: Parameters<typeof finishState>[2];
     try {
@@ -338,7 +347,7 @@ export async function runWorker(
         }
       }
     } finally {
-      clearTimeout(limit);
+      cancelLimit();
       clearInterval(timer);
     }
     try {

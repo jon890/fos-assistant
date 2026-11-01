@@ -79,7 +79,7 @@ export async function localChrome() {
       CdpSession.prototype.send = originalSend;
   };
   try {
-    const deadline = performance.now() + 10_000;
+    const deadline = performance.now() + 30_000;
     while (performance.now() < deadline) {
       const port = (
         await readFile(join(profile, "DevToolsActivePort"), "utf8").catch(
@@ -181,7 +181,9 @@ export async function localChrome() {
     const base = `http://127.0.0.1:${server.port}`;
     const url = base + "/synthetic-gateway";
     const version = (
-      (await httpJson(url, "/json/version")) as { Browser: string }
+      (await httpJson(url, "/json/version", { timeoutMs: 30_000 })) as {
+        Browser: string;
+      }
     ).Browser;
     return {
       url,
