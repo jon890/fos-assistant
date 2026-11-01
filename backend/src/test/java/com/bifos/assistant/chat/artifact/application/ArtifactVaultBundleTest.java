@@ -34,11 +34,13 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -231,10 +233,10 @@ class ArtifactVaultBundleTest {
         write(dadConversation, "limit/b.png", new byte[8]);
         write(dadConversation, "limit/c.png", new byte[8]);
 
-        ArtifactVaultService fileLimit = service(new ArtifactVaultProperties(null, 32L, null, null));
-        ArtifactVaultService bundleLimit = service(new ArtifactVaultProperties(null, null, 60L, null));
-        ArtifactVaultService countLimit = service(new ArtifactVaultProperties(null, null, null, 3));
-        ArtifactVaultService quota = service(new ArtifactVaultProperties(60L, null, null, null));
+        ArtifactVaultService fileLimit = service(new ArtifactVaultProperties(null, 32L, null, null, null));
+        ArtifactVaultService bundleLimit = service(new ArtifactVaultProperties(null, null, 60L, null, null));
+        ArtifactVaultService countLimit = service(new ArtifactVaultProperties(null, null, null, 3, null));
+        ArtifactVaultService quota = service(new ArtifactVaultProperties(60L, null, null, null, null));
 
         assertRejected(() -> fileLimit.vault(dad.id(), dadConversation.id(), "limit/one.html"),
             ErrorCode.ARTIFACT_VAULT_UNSUPPORTED);
@@ -339,6 +341,52 @@ class ArtifactVaultBundleTest {
         vault.delete(dad.id(), item.id());
         assertThat(vaultedRowCount(dad)).isZero();
         assertThat(rows.sumVaultBytes(dad.id())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from chat_artifact where vault_user_id = ?", Integer.class, dad.id()))
+            .as("지운 대화에서는 자동 보관이 돌지 않아 지우기 이력도 남기지 않는다")
+            .isZero();
+    }
+
+
+    @Test
+    @DisplayName("지운 묶음은 본문과 key 와 경로와 묶음 안 파일 없이 지문만 남고 목록과 읽기와 용량에 나오지 않으며 대화를 정리하면 함께 지워진다")
+    void deletedBundleLeavesOnlyFingerprint() throws Exception {
+        ArtifactVaultItem item = vault.vault(dad.id(), dadConversation.id(), "page/index.html");
+        String fingerprint = jdbc.queryForObject(
+            "select vault_fingerprint from chat_artifact where id = ?", String.class, item.id());
+
+        vault.delete(dad.id(), item.id());
+
+        Map<String, Object> left = jdbc.queryForMap(
+            "select path, byte_size, vault_body, vault_key_id, vault_fingerprint, deleted_at from chat_artifact"
+                + " where vault_user_id = ?",
+            dad.id());
+        assertThat(left.get("path")).isEqualTo("");
+        assertThat(((Number)left.get("byte_size")).longValue()).isZero();
+        assertThat(left.get("vault_body")).isNull();
+        assertThat(left.get("vault_key_id")).isNull();
+        assertThat(left.get("vault_fingerprint")).isEqualTo(fingerprint);
+        assertThat(left.get("deleted_at")).isNotNull();
+        assertThat(jdbc.queryForObject(
+            "select count(*) from chat_artifact where vault_bundle_id = ?", Integer.class, item.id()))
+                .as("묶음 안 파일 행은 남지 않는다")
+                .isZero();
+        assertThat(rows.sumVaultBytes(dad.id())).isZero();
+        assertThat(vault.list(dad.id())).isEmpty();
+        assertRejected(() -> vault.read(dad.id(), item.id()), ErrorCode.ARTIFACT_NOT_FOUND);
+        assertRejected(() -> vault.readFile(dad.id(), item.id(), "page/img/back.webp"), ErrorCode.ARTIFACT_NOT_FOUND);
+        assertRejected(() -> vault.prepareArchive(dad.id(), item.id()), ErrorCode.ARTIFACT_NOT_FOUND);
+        assertRejected(() -> vault.delete(dad.id(), item.id()), ErrorCode.ARTIFACT_NOT_FOUND);
+        assertThat(new String(http("/api/v1/artifact-vault", dad).body(), StandardCharsets.UTF_8))
+            .as("/files 목록에 나오지 않는다")
+            .contains("\"items\":[]");
+        assertThat(http("/api/v1/artifact-vault/" + item.id() + "/content", dad).statusCode()).isEqualTo(404);
+
+        conversationWriter.deleteIfActive(dadConversation.id(), dad.id(), NOW.minusSeconds(60));
+        purger.purgeDue(NOW);
+
+        assertThat(jdbc.queryForObject("select count(*) from chat_artifact where vault_user_id = ?", Integer.class, dad.id()))
+            .as("대화를 정리하면 지우기 이력도 함께 지운다")
+            .isZero();
     }
 
 
@@ -411,7 +459,7 @@ class ArtifactVaultBundleTest {
 
 
     private ArtifactVaultService service(ArtifactVaultProperties limits) {
-        return new ArtifactVaultService(reader, rows, writer, bodies, limits, transactions);
+        return new ArtifactVaultService(reader, rows, writer, bodies, limits, transactions, Clock.systemUTC());
     }
 
 
@@ -426,7 +474,7 @@ class ArtifactVaultBundleTest {
                 return bundle;
             }
         };
-        return new ArtifactVaultService(hooked, rows, writer, bodies, limits, transactions);
+        return new ArtifactVaultService(hooked, rows, writer, bodies, limits, transactions, Clock.systemUTC());
     }
 
 
@@ -437,7 +485,10 @@ class ArtifactVaultBundleTest {
 
 
     private int vaultedRowCount(AppUser user) {
-        return jdbc.queryForObject("select count(*) from chat_artifact where vault_user_id = ?", Integer.class, user.id());
+        // 지운 보관본은 본문이 빈 지우기 이력으로 남는다. 본문을 가진 줄만 센다.
+        return jdbc.queryForObject(
+            "select count(*) from chat_artifact where vault_user_id = ? and vault_body is not null", Integer.class,
+            user.id());
     }
 
 

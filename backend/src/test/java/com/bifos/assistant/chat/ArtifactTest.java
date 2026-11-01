@@ -294,7 +294,7 @@ class ArtifactTest {
 
         artifactService.recordTurn(conversation.id(), null, Instant.now().minus(Duration.ofMinutes(1)));
 
-        assertThat(artifactRows.findAll()).isEmpty();
+        assertThat(resultRows()).isEmpty();
     }
 
 
@@ -611,7 +611,7 @@ class ArtifactTest {
 
         assertThat(removed).isEqualTo(1);
         assertThat(Files.exists(html)).isFalse();
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .singleElement()
             .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
         HttpResponse<String> response = file(conversation, "a/index.html");
@@ -636,7 +636,7 @@ class ArtifactTest {
 
         assertThat(removed).isEqualTo(1);
         assertThat(Files.exists(html)).isFalse();
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .singleElement()
             .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
         HttpResponse<String> response = file(conversation, "a/index.html");
@@ -660,7 +660,7 @@ class ArtifactTest {
 
         cleaner.cleanExpired(futureNow());
 
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .singleElement()
             .satisfies(row -> assertThat(row.deletedAt()).isNull());
     }
@@ -676,7 +676,7 @@ class ArtifactTest {
 
         cleaner.cleanExpired(futureNow());
 
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .singleElement()
             .satisfies(row -> assertThat(row.deletedAt()).isNotNull());
         HttpResponse<String> response = file(conversation, "a/index.html");
@@ -743,7 +743,7 @@ class ArtifactTest {
 
         failingOnce.cleanExpired(futureNow());
 
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .hasSize(2)
             .filteredOn(row -> row.deletedAt() != null)
             .as("실패하지 않은 한 행만 적혔다")
@@ -751,9 +751,15 @@ class ArtifactTest {
 
         failingOnce.cleanExpired(futureNow());
 
-        assertThat(artifactRows.findAll())
+        assertThat(resultRows())
             .hasSize(2)
             .allSatisfy(row -> assertThat(row.deletedAt()).isNotNull());
+    }
+
+
+    /** 대화 결과물 행이다. 자동 보관이 만든 보관 사본 행은 정리의 대상이 아니라 뺀다. */
+    private List<ChatArtifact> resultRows() {
+        return artifactRows.findAll().stream().filter(row -> !row.isVaulted()).toList();
     }
 
 

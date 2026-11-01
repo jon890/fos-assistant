@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.nextturn.application.port.DelegationOutputClip;
 import com.bifos.assistant.chat.recovery.application.port.RecoveredAnswerGuard;
 import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.artifact.application.ArtifactAutoVault;
 import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
@@ -79,6 +80,7 @@ public class RecoveredRunRecorder {
     private final ChatMessageRepository messages;
     private final DelegationOutputClip delegationOutput;
     private final ArtifactService artifacts;
+    private final ArtifactAutoVault autoVault;
     private final ConversationEventHub hub;
     private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
@@ -162,6 +164,10 @@ public class RecoveredRunRecorder {
                 written.row().conversationId(),
                 written.messageId(),
                 written.row().startedAt());
+            // 완료한 turn 만 자동 보관한다. 중지한 turn 의 파일은 완성본이라고 볼 수 없다.
+            if (written.endEvent() == ExecutionEventType.RUN_COMPLETED) {
+                autoVault.afterCompletedTurn(written.row().conversationId(), written.messageId());
+            }
         }
         announce(written);
         return true;

@@ -11,6 +11,7 @@ import { AnswerBody } from "./answer-body";
 import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
 import { artifactNames } from "@/lib/artifact-name";
+import { ArtifactVaultStatus } from "./artifact/artifact-vault-status";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
@@ -68,9 +69,14 @@ function AttachmentGallery({
 
 function ArtifactList({
   artifacts,
+  conversationId,
+  messageId,
   onOpen,
 }: {
   artifacts: MessageArtifact[];
+  conversationId: string | null;
+  /** 저장한 답의 번호다. 아직 저장하지 않은 답이면 자동 보관 상태를 그리지 않는다 */
+  messageId: Turn["id"];
   onOpen?(path: string, name: string): void;
 }) {
   if (artifacts.length === 0) return null;
@@ -111,6 +117,15 @@ function ArtifactList({
               <span className="shrink-0 text-xs text-muted-foreground">
                 보관 기간이 지나 볼 수 없어요.
               </span>
+            ) : null}
+            {conversationId !== null && typeof messageId === "number" ? (
+              <ArtifactVaultStatus
+                conversationId={conversationId}
+                messageId={messageId}
+                path={artifact.path}
+                state={artifact.autoVault ?? null}
+                error={artifact.autoVaultError ?? null}
+              />
             ) : null}
           </li>
         );
@@ -370,6 +385,8 @@ export function MessageBubble({
       />
       <ArtifactList
         artifacts={turn.artifacts ?? []}
+        conversationId={conversationId}
+        messageId={turn.id}
         onOpen={
           onOpenArtifact
             ? (path, name) => onOpenArtifact(turn.id, path, name)

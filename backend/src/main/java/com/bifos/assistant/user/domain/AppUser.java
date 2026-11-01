@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(name = "app_user")
@@ -67,6 +68,13 @@ public class AppUser extends AuditedEntity {
 
     @Column(name = "limit_updated_at", insertable = false, updatable = false)
     private Instant limitUpdatedAt;
+
+    // 결과물 자동 보관을 켰는지다(#530). DB 기본값이 켜짐이고, 비어 있으면 ArtifactAutoVaultSetting 의 기본값을 따른다.
+    // 상한처럼 일반 저장이 옛 값으로 덮지 않도록 넣기와 고치기에서 빼고 AppUserRepository 의 전용 쿼리로만 읽고 쓴다.
+    // 검사의 create-drop 스키마도 마이그레이션처럼 켜짐을 기본값으로 두도록 적는다.
+    @ColumnDefault("true")
+    @Column(name = "artifact_auto_vault", insertable = false, updatable = false)
+    private Boolean artifactAutoVault;
 
 
     protected AppUser() {}
