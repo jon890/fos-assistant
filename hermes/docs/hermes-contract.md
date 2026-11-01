@@ -179,7 +179,7 @@ multiplex 를 켜면 listener 주인의 gateway 만 이 값에 따라 시작하�
 
 ## profile 생성
 
-도구 없는 시스템 판단 profile은 [가치 평가](../../docs/features/proactive.md)의 준비 상태 계약을 따른다.
+도구 없는 시스템 판단 profile 의 준비 상태를 읽는 경로다. 부르는 가치 평가 코드는 지웠고, 이 경로와 profile 은 매일 루프를 지우는 PR 이 함께 지운다.
 `GET /api/profiles/{name}/decision-readiness`는 Control Plane 관리 토큰으로 그 profile의 준비 여부만 읽는다.
 
 ### profile 을 HTTP 로 만드는 길

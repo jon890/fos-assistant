@@ -37,7 +37,9 @@
 
 **B3 완료.** `proactive/autonomy/**` 와 그 테스트, 설정 등록, 저장 enum 검사 항목, `AUTONOMY_DECISION_NOT_FOUND` 를 지웠다. 화면과 API 경로는 B1, B2 에서 이미 사라졌다. 테이블과 옛 이력, `CheckTrigger.AUTONOMY`, `FeedbackSubjectType.AUTONOMY_DECISION` 은 그대로 둔다. `startAutonomous` 는 부르는 곳이 없지만 C 가 지운다.
 
-C 가 이어받는 정리: hermes 는 `plugins/dashboard-profile-api/profiles.py` 의 `_decision_readiness_response`, 같은 플러그인 `routes.py`·`__init__.py` 의 연결, `decision-profile/`, `bundle.sh` 의 복사 줄, 그것을 읽는 `tests/test_dashboard_profile_api_profiles.py`·`tests/test_hermes_contract.py` 의 검사, `docs/hermes-contract.md` 의 절이다. 이 밖에 `ErrorCode` 의 `AUTONOMY_DECISION_NOT_FOUND`, `VALUE_EVALUATION_NOT_FOUND`, `VALUE_EVALUATION_STATE_CONFLICT` 와 화면의 `error-message.ts`, `feedback` 의 `FeedbackLabeler.label`(호출하는 곳이 테스트뿐이다)도 정리한다.
+**B4 완료.** `proactive/evaluation/**` 와 그 테스트(판단 provider 흉내 포함), 평가 시나리오 fixture, `ErrorCode` 의 `VALUE_EVALUATION_NOT_FOUND`·`VALUE_EVALUATION_STATE_CONFLICT` 와 화면 `error-message.ts` 의 그 줄을 지웠다. 구조 규칙의 `SubFeatureOrder`·`JpaAuditingRules` 에서 사라진 패키지와 엔티티 줄을 걷어 냈고, `ArchitectureRules`와 `archunit` 기준 파일에는 걷어 낼 줄이 없었다. 테이블 `proactive_value_evaluation` 과 옛 줄은 그대로 둔다.
+
+C 가 이어받는 정리: hermes 는 `plugins/dashboard-profile-api/profiles.py` 의 `_decision_readiness_response`, 같은 플러그인 `routes.py`·`__init__.py` 의 연결, `decision-profile/`, `bundle.sh` 의 복사 줄, 그것을 읽는 `tests/test_dashboard_profile_api_profiles.py`·`tests/test_hermes_contract.py` 의 검사, `docs/hermes-contract.md` 의 절이다. 백엔드의 `hermes.infra.DecisionProfileReadinessClient` 는 B4 가 부르는 곳을 지워 호출자가 없으니 함께 지운다. 이 밖에 `feedback` 의 `FeedbackLabeler.label`(호출하는 곳이 테스트뿐이다)도 정리한다.
 
 경계에서 서로 부르는 코드가 남으면(예: `loop` 가 `autonomy` 를 부른다) 앞 PR 에서 그 호출만 함께 걷어 낸다.
 

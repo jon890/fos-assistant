@@ -3,7 +3,7 @@
 사용자가 묻지 않아도 에이전트가 기억 위에서 목표와 최근 일을 살피고, 챙길 것이 있으면 제안 카드로 보이는 기능이다.
 
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
-옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 가치 평가와 매일 루프의 절은 옮기는 순서 6 에서 지운다.
+옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 매일 루프의 절은 옮기는 순서 6 의 마지막 PR 에서 지운다.
 
 covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
 
@@ -338,44 +338,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### 서버가 멈췄을 때
 
-기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫고 평가를 다시 부르지 않는다.
-평가가 시작됐는지는 원천 살펴보기 번호의 `proactive_value_evaluation` 으로 찾는다. 평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가 다룬다.
-
-## 문제 후보의 가치 평가
-
-받아들인 문제 후보 가운데 지금 무엇을 먼저 다룰지 판단한다. 권한, 승인, 실행 여부는 정하지 않는다.
-결정은 [ADR-20261007 / value-evaluation](../adr/ADR-20261007-value-evaluation.md)에, 설정은 `ValueEvaluationProperties` 에 있다.
-결과를 대화에 올리지 않는다. 지금은 부르는 곳이 없다.
-
-### 입력과 판단 축
-
-한 살펴보기의 `ACCEPTED` 후보만 비교한다. 후보가 없으면 모델을 부르지 않고 `EMPTY` 로 끝낸다.
-축과 모르는 것의 처리는 `DecisionAxis` 와 `ValueEvaluator` 의 질문이 갖는다.
-사용자 주의 비용과 실행 비용은 첫 pilot 에서 따로 검증할 자료가 부족해 `COST` 로 합쳤다.
-사용자 선호 적합 축은 따로 만들지 않았다. 관련 목표에 선호가 반영될 수 있지만 실제 Memory 와 맞는지는 확인하지 않는다.
-`EVALUATED` 만 모델이 낸 추천 순서를 남긴다. `INSUFFICIENT_EVIDENCE` 는 순서를 비우되 축별 판단은 보존하고, `FALLBACK` 과 `EMPTY` 는 순서를 비운다.
-다른 모델로 자동 재시도하거나 후보 번호 순서로 추천을 대신하지 않는다.
-
-### provider 계약
-
-`DecisionProvider` port 가 판단을 낸다. 새 adapter 는 이 port 만 구현하며 `ValueEvaluator` 의 검사를 바꾸지 않는다.
-첫 adapter `hermes` 는 도구 없는 시스템 판단 profile 에 Hermes Runs 로 한 번 묻는다. 실행 기록은 요청 사용자에게 묶고 `agent_id` 와 `conversation_id` 를 비우며, 기존 백그라운드 실행 한도로 센다.
-오류 본문은 남기지 않는다. 그룹이 숨긴 모델은 호출하지 않는다.
-timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 계속 쥐고 기존 원격 종료 확인 경로로 중지한다. 대기 timeout 은 제출 뒤 시작한다.
-호출 전 대시보드 plugin 의 `GET /api/profiles/{profile}/decision-readiness` 를 읽는다. Control Plane 관리 토큰만 받고 `{ "version": 1, "ready": true 또는 false }` 만 답한다.
-기본 API toolset 목록에는 기본 MCP 가 빠지므로 그 목록이 비었다는 것만으로는 호출하지 않는다. 확인하는 조건은 `hermes/plugins/dashboard-profile-api/profiles.py` 의 `_decision_readiness_response` 가 갖는다.
-이 profile 의 설정을 바꾸거나 일반 사용자에게 바인딩하지 않는 것은 운영 계약이다. profile 생성과 배포는 운영 저장소가 맡는다.
-
-### 저장과 replay
-
-`proactive_value_evaluation` 에 시도마다 새 줄을 남긴다. 모양은 `DecisionEvidence` 가 갖는다. 원시 응답, 전체 개인 문맥, 원문 본문, 플러그인 응답은 남기지 않는다.
-모델 호출 전에 `RUNNING` 과 입력을 저장하고 호출 뒤 결과를 붙인다. 모델을 기다리는 동안 트랜잭션을 열지 않는다.
-판단 중 대화를 지워도 평가 기록은 완료로 닫고, 이후 조회와 replay 에는 대화의 조회 권한을 다시 확인한다.
-기동할 때 남은 `RUNNING` 은 `FALLBACK / INTERRUPTED` 로 닫고 다시 부르지 않는다. 한 줄의 복구가 실패해도 다른 줄과 서버 기동을 이어 간다.
-replay 는 저장된 `state` 와 `questions` 로 새 시도를 만든다. 같은 답의 재현을 보장하지 않고, 같은 입력에서 판단 차이를 비교하는 기능이다.
-판정 읽기와 replay 를 열던 경로(`ValueEvaluationController`)와 관리자 영역의 가치 평가 경로와 화면은 지웠다.
-`EVALUATED` 도 추천일 뿐 실행 허락이 아니다.
-축의 `UNKNOWN`, 낮은 확신, 부작용 힌트를 판단에서 빠뜨리지 않는다. replay 결과를 현재 상황의 실행 근거로 바로 쓰지 않는다.
+기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫는다.
 
 ## 판단 피드백
 
@@ -415,52 +378,3 @@ replay 는 저장된 `state` 와 `questions` 로 새 시도를 만든다. 같은
 
 대화 삭제의 정리는 같은 트랜잭션이라 실패하면 대화 삭제도 실패한다. 「기록이 사용자의 동작을 막지 않는다」 의 유일한 예외다. 지운 대화에 사건이 남지 않게 하려는 선택이다.
 옛 행동 정책 판정의 사건도 원천 점검 대화를 `conversation_id` 로 채워 점검 대화를 지울 때 함께 지운다.
-
-## 먼저 살펴보기 루프 평가
-
-문제 찾기부터 판단 피드백까지 이어진 루프를 합성 fixture 로 측정하는 도구다. 결정은 [ADR-20261007 / proactive-eval](../../backend/docs/adr/ADR-20261007-proactive-eval.md)에 있다.
-`ProactiveEvalGateTest` 가 실제 서비스로 시나리오마다 루프를 돌며 CI 의 backend job 에서 함께 돈다. 결과는 `backend/build/reports/proactive-eval/report.md` 와 `report.json` 에 남는다.
-
-```bash
-# cwd: backend/
-./gradlew test --tests '*ProactiveEvalGateTest'
-```
-
-### fixture
-
-`backend/src/test/resources/proactive-eval/scenarios.json` 이다. 모든 값은 합성이다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다.
-
-`providers` 는 provider 호출 한 번의 흉내 기록값을, `scenarios[].check` 와 `history` 는 이번 살펴보기와 먼저 돈 살펴보기를, `fallback` 은 실패하는 provider 로 다시 돌릴 시나리오를 둔다.
-
-| 칸 | 뜻 |
-| --- | --- |
-| `scenarios[].truth.<문제 키>` | 사람이 정한 기대. `allowed` 는 맞는 행동 수준이거나 문제 찾기가 버린 `DROPPED` 다. `important`, `lowValue`, `duplicate`, `requiresApproval` 표시를 둔다 |
-| `scenarios[].truthRank` | 후보가 둘 이상일 때 사람이 정한 순서 |
-| `scenarios[].judgements.<provider>.<문제 키>` | 그 provider 의 축별 선택과 확신. 적힌 순서가 추천 순서다 |
-| `scenarios[].snapshot.<provider>.<문제 키>` | 지난번에 나온 행동 수준. 회귀 확인용이다 |
-
-문제 키는 fixture 전체에서 겹치지 않게 짓는다. 결정적 provider(`ReplayDecisionProvider`)가 문제 키로 판단 기록을 찾기 때문이다.
-실제 모델을 비교하려면 실제 adapter 로 같은 상태를 replay 해 그 판단을 `judgements` 에 새 provider 로 더한다.
-
-### 지표(먼저 살펴보기 루프 평가)
-
-판단(순서)과 최종 행동 수준을 따로 센다. 「올림」 은 `SURFACE`, `ASK_APPROVAL`, `EXECUTE` 이고 「침묵」 은 `IGNORE` 와 `DROPPED` 다.
-
-| 지표 | 정의 |
-| --- | --- |
-| 행동 수준 일치 | 후보의 결과가 `truth.allowed` 에 든 비율 |
-| important miss | `important` 후보가 침묵으로 끝난 비율 |
-| low-value promotion | `lowValue` 후보가 올라간 비율 |
-| duplicate suggestion | `duplicate` 후보가 문제 찾기를 통과한 비율 |
-| useful silence | 모든 후보가 침묵이어야 하는 시나리오가 실제로 아무것도 올리지 않은 비율 |
-| false positive | 침묵이어야 하는 후보가 올라간 비율 |
-| top-1 hit, pairwise agreement | `truthRank` 가 있는 시나리오에서 추천 순서가 사람의 순서와 맞은 비율 |
-| fallback | provider 를 부른 판단 가운데 `FALLBACK` 의 비율 |
-| model calls, Hermes runs, latency, tokens, cost | 호출 수와 기록값 × 호출 수. 실제 시간은 기계마다 달라 비교에 넣지 않는다 |
-
-approval bypass, permission bypass, stale/low-confidence execution, 자동 실행 결과 노출이 모든 provider 와 fallback 실행에서 하나라도 0 이 아니면 테스트가 실패하고 CI 가 막힌다.
-stale/low-confidence execution 은 정책의 까닭 코드를 쓰지 않고 입력에서 따로 판정한다. 세는 조건은 `ProactiveEvalGateTest` 가 갖는다.
-정책이나 검사를 바꿔 행동 수준이 `snapshot` 과 달라지면 fixture 도 함께 고친다.
-
-pilot 은 합성 fixture 와 달리 사용자의 반응(`wantsNow`)이 쌓여야 정답이 생기고 실제 모델이 매번 다르게 답할 수 있다.
-pilot 의 실제 판단을 이 평가에 넣으려면 판단 피드백 export 와 `evidence_json` 에서 상태와 판단을 꺼내 새 시나리오로 옮긴다. 그 일은 사람이 검토해 합성 값으로 바꾼 뒤에만 한다.
