@@ -37,6 +37,8 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary
 import com.bifos.assistant.connector.connection.application.dto.ConnectorToolSummary;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
+import com.bifos.assistant.connector.action.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
@@ -52,6 +54,7 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
+import com.bifos.assistant.hermes.application.dto.ConnectorToolListing;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
@@ -63,6 +66,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -131,6 +135,18 @@ class ConnectorConnectionServiceTest {
         "pin",
         1,
         List.of());
+    /** 확인 도구와 도구 선언이 없는 표준 플러그인이다(ADR-20261101 / plugin-without-assistant-json). */
+    private static final String STANDARD = "standard-notes";
+    private static final Map<String, String> STANDARD_VALUES = Map.of("std_token", TOKEN);
+    private static final ConnectorManifest STANDARD_MANIFEST = new ConnectorManifest(
+        STANDARD,
+        "표준 메모",
+        "",
+        List.of(new ConnectorField("std_token", "STD_TOKEN", "STD_TOKEN", "", true, true, null, null)),
+        null,
+        "std-notes",
+        3,
+        List.of());
     /** 도구마다 정책을 선언한 커넥터다. 번호와 칸과 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
     private static final ConnectorManifest POLICY_MANIFEST = policyManifest(List.of(
         new ConnectorTool("list_scopes", "READ", "none", null, null),
@@ -174,6 +190,9 @@ class ConnectorConnectionServiceTest {
     @Autowired
     BrowserGatewayTokens tokens;
 
+    @Autowired
+    ConnectorToolGrantRepository grants;
+
 
     @BeforeEach
     void setUp() {
@@ -194,6 +213,7 @@ class ConnectorConnectionServiceTest {
 
     @AfterEach
     void tearDown() {
+        jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();
         connections.deleteAll();
         agents.deleteAll();
@@ -219,6 +239,68 @@ class ConnectorConnectionServiceTest {
         verify(connector, never()).putEnv(anyString(), anyString(), anyString());
 
         verify(toolsets, never()).writeApiServer(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("표준 플러그인의 등록은 확인 도구 대신 MCP 도구 목록으로 확인하고 받은 도구 수와 읽기 표시 수를 적는다")
+    void standardPluginRegistrationListsToolsInsteadOfCallingVerifyTool() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        when(connector.readCatalog()).thenReturn(List.of(STANDARD_MANIFEST));
+        when(connector.listTools(STANDARD, STANDARD_VALUES))
+            .thenReturn(ConnectorToolListing.success(Map.of("list_notes", true, "delete_note", false)));
+
+        ConnectionSnapshot registered = service.register(user, STANDARD, STANDARD_VALUES);
+
+        verify(connector, never()).call(anyString(), anyString(), anyMap(), nullable(String.class));
+        assertThat(registered.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(registered.undeclaredTools()).isZero();
+        assertThat(registered.listedTools()).isEqualTo(2);
+        assertThat(registered.readOnlyTools()).isEqualTo(1);
+        assertThat(stored(user, STANDARD).readOnlyMarked("list_notes")).isTrue();
+        assertThat(stored(user, STANDARD).readOnlyMarked("delete_note")).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("표준 플러그인의 도구 목록이 실패하면 그 어휘의 오류로 끝내고 연결을 만들지 않는다")
+    void standardPluginRegistrationFailsWithTheListingError() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        when(connector.readCatalog()).thenReturn(List.of(STANDARD_MANIFEST));
+        when(connector.listTools(STANDARD, STANDARD_VALUES))
+            .thenReturn(ConnectorToolListing.failure(ConnectorCallError.CREDENTIAL_REJECTED));
+
+        assertCode(() -> service.register(user, STANDARD, STANDARD_VALUES), ErrorCode.CONNECTOR_CREDENTIAL_REJECTED);
+
+        assertThat(connections.findAll()).isEmpty();
+        verify(connector, never()).putVault(anyString(), anyString(), anyMap());
+    }
+
+
+    @Test
+    @DisplayName("표준 플러그인의 연결 확인이 받은 목록에서 읽기 표시가 빠진 도구의 상시 허락을 같은 트랜잭션에서 거둔다")
+    void standardPluginCheckRevokesGrantsOfToolsThatLostTheMark() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        when(connector.readCatalog()).thenReturn(List.of(STANDARD_MANIFEST));
+        when(connector.listTools(STANDARD, STANDARD_VALUES))
+            .thenReturn(ConnectorToolListing.success(Map.of("list_notes", true, "find_note", true)));
+        service.register(user, STANDARD, STANDARD_VALUES);
+        Instant later = Instant.now().plus(Duration.ofDays(1));
+        grants.save(ConnectorToolGrant.of(user.id(), STANDARD, "list_notes", later));
+        grants.save(ConnectorToolGrant.of(user.id(), STANDARD, "find_note", later));
+        // 서버가 `list_notes` 의 표시를 거두고 `find_note` 를 목록에서 뺐다.
+        when(connector.listToolsWithVault(STANDARD, stored(user, STANDARD).vault()))
+            .thenReturn(ConnectorToolListing.success(Map.of("list_notes", false, "delete_note", false)));
+
+        ConnectionSnapshot checked = service.check(user, STANDARD);
+
+        verify(connector, never()).callWithVault(anyString(), anyString(), anyString(), nullable(String.class));
+        assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
+        assertThat(checked.listedTools()).isEqualTo(2);
+        assertThat(checked.readOnlyTools()).isZero();
+        assertThat(grants.findAll())
+            .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+            .containsExactlyInAnyOrder(tuple("list_notes", true), tuple("find_note", true));
     }
 
 
@@ -994,6 +1076,26 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
+    @DisplayName("default_tool_policy: ask 커넥터는 선언하지 않은 도구를 거절하지 않으므로 선언 밖 도구 수에 넣지 않는다")
+    void askConnectorDoesNotCountUndeclaredTools() {
+        ConnectorManifest ask = new ConnectorManifest(
+            DEMO, POLICY_MANIFEST.title(), POLICY_MANIFEST.description(), POLICY_MANIFEST.fields(), "list_scopes", "demo", 2,
+            POLICY_MANIFEST.tools(), List.of(), null, false, false, null, null, null, null, null, "ask");
+        when(connector.readCatalog()).thenReturn(List.of(ask));
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        service.register(user, DEMO, VALUES);
+        pendingBinding(agent(user), stored(user));
+        when(connector.probe(anyString(), anyString()))
+            .thenReturn(new ProbeResult(true, List.of("list_scopes", "hidden_tool")));
+
+        ConnectionSnapshot checked = service.check(user, DEMO);
+
+        assertThat(checked.undeclaredTools()).isZero();
+        assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.READY);
+    }
+
+
+    @Test
     @DisplayName("관리자 목록은 같은 그룹 사용자의 바인딩마다 에이전트와 재시작 대기 시각을 준다")
     void adminListShowsSameGroupBindings() {
         CurrentUser member = user(UserRole.MEMBER, 1L);
@@ -1221,7 +1323,12 @@ class ConnectorConnectionServiceTest {
 
 
     private ConnectorConnection stored(CurrentUser user) {
-        return connections.findByUserIdAndConnectorId(user.id(), DEMO).orElseThrow();
+        return stored(user, DEMO);
+    }
+
+
+    private ConnectorConnection stored(CurrentUser user, String connectorId) {
+        return connections.findByUserIdAndConnectorId(user.id(), connectorId).orElseThrow();
     }
 
 

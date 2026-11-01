@@ -29,11 +29,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 그룹 단계와 사용자 기본값, 에이전트 기본 모델을 해석한다.
+ * 그룹 단계와 사용자 기본값을 해석한다.
  *
  * <p>칸은 ChatGPT 의 Thinking 슬라이더 다섯 칸이다(ADR-20261101 / model-setting). 칸 정의는 그룹 설정 줄
- * ({@link ModelSettingStore})에서 읽는다. 줄이 없는 그룹의 다섯 칸은 모두 빈 칸이고, 빈 칸은 에이전트 기본값으로 돈다.
- * 에이전트 기본값도 없으면 요청에 모델을 싣지 않아 Hermes profile 의 값으로 돈다(ADR-054).
+ * ({@link ModelSettingStore})에서 읽는다. 에이전트는 모델을 갖지 않으므로 모든 에이전트가 같은 칸을 따른다. 고르지 않은
+ * 대화는 사용자 기본 칸, 그룹 기본 칸 차례로 정하고, 둘 다 없거나 고른 칸이 비었으면 요청에 모델을 싣지 않아 Hermes
+ * profile 의 값으로 돈다. 대화 없이 도는 실행({@link #detachedChoice})도 같은 차례다.
  *
  * <p>실행할 때는 단계가 가리키는 모델이 Hermes 목록에 없다는 이유만으로 막지 않는다. Hermes 가 돌려준 목록이
  * 대체 목록일 수 있고(최근 모델이 빠진다), 정말 못 쓰는 모델이면 Hermes 가 그 실행을 거절해 실행 기록에 남는다.
@@ -123,8 +124,7 @@ public class ModelTierService {
      * 읽지 못해도 effort 만 고치거나 칸을 비우는 저장은 된다. 바뀐 칸은 provider 를 비울 수 없다. 옮겨 온 정의의 빈
      * provider 는 바꾸지 않으면 그대로 둔다.
      *
-     * <p>검증은 트랜잭션 밖에서 끝낸다. 목록 조회가 Hermes 를 부를 수 있어 DB 연결을 쥔 채 기다리지 않게 한다
-     * ({@code AgentModelDefaultService.save} 와 같은 까닭).
+     * <p>검증은 트랜잭션 밖에서 끝낸다. 목록 조회가 Hermes 를 부를 수 있어 DB 연결을 쥔 채 기다리지 않게 한다.
      *
      * @throws ApiException {@code VALIDATION_FAILED}. 칸이 다섯 개가 아니거나 값이 맞지 않거나 목록에 없을 때.
      * {@code MODEL_HIDDEN}. 바뀐 칸이 그룹이 숨긴 모델일 때. 바뀐 칸이 있는데 목록을 읽지 못하면 그 오류가 그대로 나간다
@@ -249,9 +249,20 @@ public class ModelTierService {
     }
 
 
-    /** 대화 없이 도는 실행이 보낼 에이전트 기본값이다. 숨김은 판정하지 않는다. */
-    public ModelChoice detachedChoice(Agent agent) {
-        return agentDefault(agent);
+    /**
+     * 대화 없이 도는 실행(추천 질문)이 보낼 값이다. 사용자 기본 칸, 그룹 기본 칸 차례로 정하고 둘 다 없으면 요청에
+     * 모델을 싣지 않는다.
+     *
+     * <p>숨김은 판정하지 않는다. 실행 줄을 먼저 만든 뒤 {@link #requireRunnable(CurrentUser, Agent, ModelChoice)} 로
+     * 판정해야 거절해도 그 오류 코드로 실패한 줄이 남는다. 숨긴 모델을 가리키는 칸이면 그 값을 그대로 돌려준다.
+     */
+    @Transactional(readOnly = true)
+    public ResolvedModelTier detachedChoice(CurrentUser user, Agent agent) {
+        ModelTier selected = defaultTierOf(user);
+        if (selected == null) {
+            return new ResolvedModelTier(ModelChoice.defaults(), null);
+        }
+        return resolveTier(user, selected, agent, false, true);
     }
 
 
@@ -289,48 +300,53 @@ public class ModelTierService {
 
     private ResolvedModelTier resolveUnchecked(CurrentUser user, Conversation conversation, Agent agent) {
         if (conversation.modelSelectionMode() == ModelSelectionMode.CUSTOM) {
-            return new ResolvedModelTier(customChoice(conversation.modelChoice(), agent), null);
-        }
-        if (conversation.modelSelectionMode() == ModelSelectionMode.DEFAULT) {
-            return new ResolvedModelTier(agentDefault(agent), null);
+            return new ResolvedModelTier(conversation.modelChoice(), null);
         }
         ModelTier selected = conversation.modelSelectionMode() == ModelSelectionMode.TIER
             ? conversation.modelTier()
-            : users.findById(user.id())
-                .map(it -> tierOf(it.modelDefaultTier()))
-                .orElse(null);
+            : defaultTierOf(user);
         if (selected == null) {
-            selected = settings.read(user.groupId()).defaultTier();
+            return new ResolvedModelTier(ModelChoice.defaults(), null);
         }
-        if (selected == null) {
-            return new ResolvedModelTier(agentDefault(agent), null);
-        }
-        return resolveTier(user, selected, agent, false);
+        return resolveTier(user, selected, agent, false, false);
+    }
+
+
+    /** 고르지 않은 실행의 칸이다. 사용자 기본 칸이 먼저고 없으면 그룹 기본 칸이다. 둘 다 없으면 null 이다. */
+    private ModelTier defaultTierOf(CurrentUser user) {
+        ModelTier own = users.findById(user.id())
+            .map(it -> tierOf(it.modelDefaultTier()))
+            .orElse(null);
+        return own != null ? own : settings.read(user.groupId()).defaultTier();
     }
 
 
     /**
-     * 단계를 고르는 입력을 검증하며 실제 요청 값을 만든다. mapping 이 빈 단계는 에이전트 기본값으로 돈다.
+     * 단계를 고르는 입력을 검증하며 실제 요청 값을 만든다. mapping 이 빈 단계는 요청에 모델을 싣지 않아 profile 의 값으로 돈다.
      *
      * <p>단계가 가리키는 모델이 목록에 없으면 목록을 다시 읽고, 그래도 없으면 {@code VALIDATION_FAILED} 이다.
      */
     @Transactional(readOnly = true)
     public ResolvedModelTier resolveTier(CurrentUser user, ModelTier tier, Agent agent) {
-        return resolveTier(user, tier, agent, true);
+        return resolveTier(user, tier, agent, true, false);
     }
 
 
     /**
      * @param strict 참이면 다시 읽은 뒤에도 목록에 없는 모델을 거절한다. 거짓이면(실행) 경고만 남기고 보낸다
+     * @param deferHidden 참이면 숨긴 모델을 거절하지 않고 그 값을 돌려준다. 호출한 쪽이 실행 줄을 만든 뒤 판정한다
      */
-    private ResolvedModelTier resolveTier(CurrentUser user, ModelTier tier, Agent agent, boolean strict) {
+    private ResolvedModelTier resolveTier(
+        CurrentUser user, ModelTier tier, Agent agent, boolean strict, boolean deferHidden) {
         if (tier == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier");
         }
         ModelSetting.Stop definition = settings.read(user.groupId()).stop(tier);
         if (definition.isEmpty()) {
-            ModelChoice fallback = agentDefault(agent);
-            requireRunnable(user.groupId(), agent, fallback);
+            ModelChoice fallback = ModelChoice.defaults();
+            if (!deferHidden) {
+                requireRunnable(user.groupId(), agent, fallback);
+            }
             return new ResolvedModelTier(fallback, tier);
         }
         ModelOptions options = modelOptions.optionsForAgent(user.groupId(), agent);
@@ -339,7 +355,13 @@ public class ModelTierService {
             provider = options.defaultProvider();
         }
         ModelChoice choice = ModelChoice.of(provider, definition.model(), definition.reasoningEffort());
-        visibility.requireVisible(user.groupId(), choice);
+        if (deferHidden) {
+            if (visibility.hiddenFor(user.groupId()).hides(choice.provider(), choice.model())) {
+                return new ResolvedModelTier(choice, tier);
+            }
+        } else {
+            visibility.requireVisible(user.groupId(), choice);
+        }
         if (!options.offers(choice.provider(), choice.model())) {
             log.warn(
                 "단계 모델이 들고 있던 목록에 없어 다시 읽는다 profile={} tier={} provider={} model={} providerModels={}",
@@ -374,30 +396,6 @@ public class ModelTierService {
             .filter(row -> row.slug().equals(provider))
             .mapToInt(row -> row.models().size())
             .sum();
-    }
-
-
-    /**
-     * 에이전트에 저장된 기본 모델과 effort 다. 비어 있으면 요청에 싣지 않아 profile 의 값으로 돈다.
-     *
-     * <p>실행할 때는 Hermes 목록과 견주지 않는다. 목록 조회가 실패해도 기본값 대화가 돌게 하려는 것이다.
-     * 목록에서 빠진 모델이면 Hermes 가 그 실행을 거절한다.
-     */
-    private static ModelChoice agentDefault(Agent agent) {
-        return ModelChoice.stored(agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
-    }
-
-
-    /** 대화가 모델을 비워 둔 직접 선택은 에이전트 기본 모델로 돌고, effort 는 대화가 고른 값이 먼저다. */
-    private static ModelChoice customChoice(ModelChoice own, Agent agent) {
-        if (!own.usesDefaultModel()) {
-            return own;
-        }
-        ModelChoice base = agentDefault(agent);
-        return ModelChoice.stored(
-            base.provider(),
-            base.model(),
-            own.reasoningEffort() != null ? own.reasoningEffort() : base.reasoningEffort());
     }
 
 

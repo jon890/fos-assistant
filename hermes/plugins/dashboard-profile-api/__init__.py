@@ -21,6 +21,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
+| `POST /api/connectors/<id>/tools` | 후보 값이나 보관 파일의 값으로 표준 플러그인(`schema: 3`)의 MCP 서버에 붙어 도구 이름과 읽기 표시만 받는다 |
 | `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 |
@@ -192,6 +193,7 @@ from .connector_run import (
     _mcp_sdk_version,
     _run_connector_execute,
     _run_connector_tool,
+    _run_connector_tool_list,
     _safe_error_detail,
     _tool_error,
     _tool_payload,
@@ -253,6 +255,7 @@ from .routes import (
     SESSION_PROVIDER_RE,
     SOUL_METHODS,
     SOUL_SUFFIX,
+    TOOLS_ROUTE_RE,
     _install_gate,
     _profile_segment,
 )
@@ -377,7 +380,8 @@ def register(ctx) -> None:
         ", ".join(
             ["%s %s" % (" ".join(sorted(methods)), path) for path, methods in sorted(opened.items())]
             + ["GET PUT /api/profiles/<이름>/soul", "DELETE /api/profiles/<관리 표식 profile>",
-               "POST /api/connectors/<id>/call", "POST /api/mcp/servers/<설치한 커넥터의 서버>/test"]
+               "POST /api/connectors/<id>/call", "POST /api/connectors/<id>/tools",
+               "POST /api/mcp/servers/<설치한 커넥터의 서버>/test"]
         ),
         _skill_root() or "설정되지 않음",
     )

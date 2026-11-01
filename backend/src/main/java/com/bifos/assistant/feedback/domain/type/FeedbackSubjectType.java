@@ -16,7 +16,12 @@ public enum FeedbackSubjectType {
     /** 살펴보기의 「새로 알릴 것」 발견 하나. 열쇠는 {@code check_finding:<번호>} 다. */
     CHECK_FINDING("check_finding"),
     /** 행동 정책 판정. 자동 실행을 시작하지 못한 것과 매일 루프가 보인 판정의 반응이다. 열쇠는 {@code autonomy_decision:<번호>} 다. */
-    AUTONOMY_DECISION("autonomy_decision");
+    AUTONOMY_DECISION("autonomy_decision"),
+    /**
+     * 지금 화면의 항목 가운데 제안이 아닌 것(실패한 대화, 맡긴 일, 보고, 최근 대화)과, 어떤 항목이든 지금 화면에서 보이고 열린 기록이다.
+     * 열쇠는 지금 화면의 {@code itemKey} 를 그대로 쓴다. 제안의 흐름이 아니라 replay 읽기 모델에서 뺀다.
+     */
+    ATTENTION_ITEM("attention_item");
 
 
     private final String prefix;

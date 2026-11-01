@@ -118,7 +118,8 @@ public class ConnectorInstallAttempts {
             connection.connectorId(), protocol, manifestSha, connection.vault(),
             declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
             binding.restartRequired(), checkInstallation, replaceValues, waiting,
-            declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList());
+            declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
+            declared != null && ConnectorToolPolicies.partialAsk(declared));
     }
 
 

@@ -325,9 +325,9 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
-- `default_model_provider` 와 `default_model` 은 함께 채우거나 함께 비운다. `default_reasoning_effort` 는 혼자 둘 수 있다
+- 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
-**모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 기본 모델 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md), [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md)).
+**에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).
 **주인과 공개 범위는 따로다.** 그룹에 공개해도 만든 사람(`owner_user_id`)이 계속 관리하고, `PRIVATE` 에서는 주인이 꼭 있어야 한다. 이 결정 전에 운영에서 등록한 `GROUP` 에이전트는 주인이 비어 있어 `ADMIN` 만 관리한다([ADR-033](adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md)).
 추천 질문은 데이터베이스에 두지 않고 backend 메모리에만 둔다([ADR-036](adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md)).
 
@@ -339,7 +339,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `MODEL` 은 그룹의 모델 설정이다. 칸 다섯의 provider, 모델, effort 와 그룹 기본 칸, 숨김 목록을 버전 번호와 함께 담는다. 읽고 쓰는 일은 `ModelSettingStore` 가 한다.
 
 - 줄이 없는 그룹은 다섯 칸이 모두 비었고 숨김도 없다
-- 칸의 provider 가 비면 요청한 에이전트의 기본 provider 로, 세 값이 모두 비면 에이전트 기본 모델로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
+- 칸의 provider 가 비면 요청한 에이전트 profile 의 provider 로, 세 값이 모두 비면 요청에 모델을 싣지 않아 profile 의 값으로 돈다. 선택 순서는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 이 정한다
 - 숨김 항목의 `model` 이 null 이면 그 provider 전체를 숨긴 것이다
 - 모르는 버전이거나 형식이 깨진 JSON 은 설정이 없는 것으로 보지 않고 오류로 올린다. 없는 것으로 보면 숨김이 풀린 채 실행된다
 - 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
@@ -372,7 +372,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
-- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다
+- `model_provider` 와 `model` 은 함께 채우거나 함께 비운다. `reasoning_effort` 의 `none` 은 reasoning 끄기이고 비어 있음(미지정)과 다르다. `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 와 `CUSTOM` 이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가 선택 없음으로 바꿨다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
@@ -778,6 +778,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 앞부분은 값이 16자 이상일 때만 넣는다. 16자 미만인 값은 앞 4자가 원문의 큰 부분이기 때문이다. V40 이전에 저장한 행은 원래 길이를 알 수 없어 `secretPrefixes` 가 비어 있다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
+- `listed_tools` 는 표준 플러그인(`schema: 3`) 연결의 마지막 확인에서 MCP 서버가 낸 도구의 JSON 텍스트 `{"<도구 이름>": <readOnlyHint 가 참인가>}` 다. 표준 플러그인이 아니거나 확인하기 전, 해제한 연결은 null 이다. 값을 다시 등록하면 새로 받은 목록으로 바꾼다. 참인 도구만 상시 허락을 줄 수 있고, 뜻은 [커넥터 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 갖는다([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md))
 - 해제해도 행은 남기고 `fields` 를 빈 `values` 와 빈 `secretPrefixes` 로 비운다. 지우는 경로는 없다
 
 옛 전용 에이전트의 이관을 마쳐 `agent_id`, `restart_required`, `desired_enabled`와 관련 FK·유일 색인을 제거했다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 연결 행과 바인딩은 유지한다.
@@ -926,16 +927,22 @@ action을 지우면 실행 내용도 지운다.
 | `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
 | `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
 
+옛 발견과 문제 후보를 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>`(예: `legacy:proactive_check_finding:<번호>`)이고, 옛 분류 원문은 `detail_json` 의 `legacy` 필드에 있다. 옮기는 방법과 반응 사건의 열쇠 이관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「옛 발견과 문제 후보 옮기기」 가 갖는다. 이 작업은 마이그레이션이 아니라 기동 뒤 한 번 도는 backfill 이라 칸을 더하지 않는다.
+
 **`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
 같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
 
 ### attention_control
 
-한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고친다.
+**읽고 쓰는 곳이 없다.** 지금 화면의 숨김과 미루기는 `decision_feedback_event` 의 제어 사건으로 옮겼고, 이 표의 살아 있는 줄은 마이그레이션이 처음 제어 사건으로 복사했다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
+
+한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고쳤다.
 **유일 제약 `uk_attention_control_item` 에 `card_key` 를 넣어 카드마다 제어를 나눈다.** 같은 대화가 두 카드에 나와도 제어가 서로 덮어쓰지 않는다.
 `card_key` 는 API 의 소문자 카드 열쇠를 대문자로 쓴 값이다. `state_key` 는 `HIDE` 일 때 숨긴 상태이고, 판정의 `stateKey` 가 이것과 다르면 다시 보인다.
 
 ### attention_event
+
+**읽고 쓰는 곳이 없다.** 노출, 열기, 동작은 `decision_feedback_event` 의 사건으로 옮겼고 옛 줄 가운데 이 셋은 마이그레이션이 복사했다. `AttentionEventCleaner` 가 남은 줄을 보관 기간이 지나며 비운다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
 
 **유일 제약 `uk_attention_event_once`(`user_id`, `item_key`, `state_key`, `event_type`, `attention`)는 화면을 열 때마다 같은 사건이 쌓이는 것을 막는다.**
 판정 칸이 제약에 들어 있어, 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다.
@@ -1051,19 +1058,29 @@ action을 지우면 실행 내용도 지운다.
 
 ### decision_feedback_event
 
-제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
+제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 할 일의 제안 줄로 옮길 때 그 줄이 생긴 발견의 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 한 번 바꾸는 이관뿐이다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
 사용자를 지우면 함께 지운다. 다른 사용자는 관리자여도 읽지 못한다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
-카드 범위와 미루기, 재전송 합치기를 위한 칸이 있다. 아직 쓰는 곳이 없고 기본은 모두 비어 있다(ADR-20261101 의 순서 5 가 쓴다).
+지금 화면의 숨김, 미루기, 복원과 노출, 열기, 동작도 이 표의 사건이다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「저장」). 아래 칸이 쓰인다.
 
 | 칸 | 뜻 |
 | --- | --- |
-| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다 |
+| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다. 값은 카드 열쇠를 대문자로 쓴 것이다. 제어 사건(`DISMISSED`, `POSTPONED`, `RESTORED`)만 갖고 노출, 열기, 동작은 비어 있다 |
 | `until_at` | 미루기가 끝나는 시각 |
-| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일해 같은 키의 재전송이 한 줄이 된다 |
+| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일(`uk_decision_feedback_event_user_event_key`)해 같은 키의 재전송이 한 줄이 된다 |
+| `subject_version` | 제어 사건에서는 그때 항목의 상태 지문이다. 숨김은 숨긴 상태이고, 이 값이 바뀌면 다시 보인다. 노출, 열기, 동작도 그때의 상태 지문이다 |
+| `reason_code` | 제어 사건은 `ATTENTION_HIDE`, `ATTENTION_SNOOZE`, `ATTENTION_RESTORE` 다. 노출, 열기, 동작은 `<계기>@<판정>`(예: `EXECUTION_FAILED@NOW`)이고 이관한 옛 사건은 `<계기>` 뿐이다 |
+
+- 지금 화면의 항목 가운데 제안이 아닌 것과 노출, 열기, 복원은 `subject_type` 이 `ATTENTION_ITEM` 이고 `subject_key` 는 지금 화면의 `itemKey` 다. 제안 항목의 숨김과 미루기는 그 제안의 종류와 열쇠로 남기고 제안한 대화와 실행을 채운다
+- 새 사건 종류는 `SHOWN`(노출, 주체 `SYSTEM`), `OPENED`, `ACTED`, `RESTORED` 다
+- **색인 `idx_decision_feedback_event_control`(`user_id`, `card_key`, `subject_key`, `id`)이 현재 제어를 읽는다.** 카드와 항목마다 `id` 가 가장 큰 제어 사건이 현재값이다
+- 숨김, 미루기, 복원은 부르는 쪽 트랜잭션에서 필수로 저장하고 실패하면 요청도 실패한다. 노출, 열기, 동작은 관측용이라 실패해도 응답을 낸다
+- 보관 기간 정리(`DecisionFeedbackCleaner`)는 카드마다 항목마다 마지막 숨김과 기한이 안 지난 미루기를 남긴다
+- 옛 `attention_control`, `attention_event` 의 값은 `event_key` 가 `legacy:attention_control:<번호>`, `legacy:attention_event:<번호>` 인 줄로 복사했다. 이관한 줄은 `subject_type` 이 `ATTENTION_ITEM` 이고 판정(`attention`)과 신선도는 옮기지 않았다
+- 지금 화면의 사건은 reaction replay 읽기 모델에 싣지 않는다
 
 정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
 `detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.

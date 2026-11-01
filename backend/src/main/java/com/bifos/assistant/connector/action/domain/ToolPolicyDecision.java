@@ -12,7 +12,8 @@ import java.util.Optional;
  * 커넥터 도구 호출 하나의 판정이다(ADR-049).
  *
  * <p>판정은 DB 와 Hermes 를 모르는 {@link #decide} 하나가 한다. 조건을 위에서부터 차례로 보고 처음 맞는 것으로 정하며, 조건과
- * 그 순서는 {@link #decide} 의 코드가 갖는다. 모델이 준 인자의 내용과 서버의 {@code readOnlyHint} 는 판정에 들어가지 않는다.
+ * 그 순서는 {@link #decide} 의 코드가 갖는다. 모델이 준 인자의 내용은 판정에 들어가지 않는다. 서버의 {@code readOnlyHint} 는 표준
+ * 플러그인의 선언 없는 도구에 상시 허락을 열지만 승인 필요를 풀지 않는다(ADR-20261101 / plugin-without-assistant-json).
  *
  * @param denyReason {@code DENIED} 일 때만 있다
  * @param risk 판정에 쓴 위험도. 정책을 읽지 못했거나 연결이 준비되지 않았거나 선언이 없어 거절한 호출은 null
@@ -64,12 +65,29 @@ public record ToolPolicyDecision(
     }
 
 
+    /** 읽기 표시를 보지 않는 호출이다. 뜻은 {@link #decide(ConnectionStatus, boolean, int, Optional, boolean, boolean, boolean, int, CheckBoundary)} 와 같다. */
+    public static ToolPolicyDecision decide(
+        ConnectionStatus connectionStatus,
+        boolean ownServerTool,
+        int schema,
+        Optional<ToolPolicy> declared,
+        boolean granted,
+        boolean conversationGranted,
+        int argsBytes,
+        CheckBoundary boundary) {
+        return decide(connectionStatus, ownServerTool, schema, declared, granted, conversationGranted, false, argsBytes, boundary);
+    }
+
+
     /**
      * @param ownServerTool 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 아니면 판과 상관없이 선언 없는 도구다
-     * @param schema manifest 의 판
+     * @param schema manifest 의 판. 선언하지 않은 도구를 호출마다 묻는 {@code schema: 2}({@code default_tool_policy: ask})는 부르는 쪽이
+     * 표준 플러그인의 값(3)으로 바꿔 넘긴다. 선언한 도구는 값과 상관없이 선언으로 판정한다
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
      * @param conversationGranted 그 대화의 그 에이전트 실행에 그 도구의 유효한 대화 허락이 있는가
+     * @param readOnlyMarked 표준 플러그인 연결의 마지막 확인에서 그 도구가 읽기 표시({@code readOnlyHint})를 받았는가. 표준 플러그인의
+     * 선언 없는 도구에만 쓴다
      * @param argsBytes 인자 글의 UTF-8 바이트 수
      * @param boundary 먼저 살펴보기 트리 안의 호출인지와 그 살펴보기의 경계. 뜻은 {@link CheckBoundary} 가 갖는다
      */
@@ -80,6 +98,7 @@ public record ToolPolicyDecision(
         Optional<ToolPolicy> declared,
         boolean granted,
         boolean conversationGranted,
+        boolean readOnlyMarked,
         int argsBytes,
         CheckBoundary boundary) {
         if (connectionStatus != ConnectionStatus.READY) {
@@ -91,9 +110,11 @@ public record ToolPolicyDecision(
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.
         // `schema: 1` 은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 표준 플러그인은 운영자가 읽어 본 선언이
-        // 없어 상시 허락도 닫고 호출마다 사람이 본다. 대화 허락은 여는 선언이 없어 둘 다 닫는다.
+        // 없어 서버가 읽기 표시를 단 도구만 상시 허락을 열고, 나머지는 호출마다 사람이 본다. 읽기 표시가 있어도 첫 호출은 승인이다.
+        // 대화 허락은 여는 선언이 없어 둘 다 닫는다.
+        boolean grantable = schema == LEGACY_SCHEMA || (schema == STANDARD_SCHEMA && readOnlyMarked);
         ToolPolicy policy = declared.orElseGet(
-            () -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, schema == LEGACY_SCHEMA));
+            () -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, grantable));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
         }

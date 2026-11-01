@@ -37,18 +37,19 @@ _mcp_sdk_version_cache: Optional[str] = None
 
 
 @contextlib.asynccontextmanager
-async def _open_connector_session(manifest: dict, values: dict, timeout: float):
+async def _open_connector_session(manifest: dict, values: dict, timeout: float, seen: Optional[dict] = None):
     """커넥터 MCP 서버에 붙어 `initialize` 를 마친 `ClientSession` 을 내준다.
 
     로컬 서버(`stdio`)는 자식 프로세스로 띄우고 `values` 를 그 env 로 준다.
     원격 서버(`http`)는 Streamable HTTP 로 붙고 `values` 는 선언한 헤더의 `${이름}` 자리에만 들어간다.
     `timeout` 은 원격 요청 하나의 시간 제한이다. 호출 전체의 제한은 부르는 쪽이 건다.
+    `seen` 은 원격 서버가 칸 값을 거절했는지 적을 자리다(`_remote_streams`). 로컬 서버에는 쓰지 않는다.
     `mcp` 는 여기서 import 한다. SDK 가 없는 환경에서도 plugin 이 올라오고 이 경로만 실패한다.
     """
     from mcp import ClientSession
 
     if manifest["transport"] == "http":
-        async with _remote_streams(manifest["server"], values, timeout) as (read, write):
+        async with _remote_streams(manifest["server"], values, timeout, seen) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 yield session
@@ -77,6 +78,21 @@ async def _run_connector_tool(manifest: dict, tool: str, values: dict, timeout: 
         if annotations is None or annotations.read_only_hint is not True:
             return None
         return await session.call_tool(tool, {})
+
+
+def _read_only(item) -> bool:
+    """`tools/list` 의 도구 하나가 `readOnlyHint` 를 참으로 표시했는가. 표시가 없으면 거짓이다(MCP 명세의 기본값)."""
+    return item.annotations is not None and item.annotations.read_only_hint is True
+
+
+async def _run_connector_tool_list(manifest: dict, values: dict, timeout: float, seen: dict) -> list:
+    """커넥터 MCP 서버에 한 번 붙어 `tools/list` 만 받고 닫는다. 도구를 부르지 않는다.
+
+    도구마다 `{"name", "read_only"}` 다. 이름이 글이 아닌 항목은 뺀다. 설명과 입력 schema 는 싣지 않는다.
+    """
+    async with _open_connector_session(manifest, values, timeout, seen) as session:
+        listed = await session.list_tools()
+    return [{"name": item.name, "read_only": _read_only(item)} for item in listed.tools if isinstance(item.name, str)]
 
 
 def _mcp_sdk_version() -> str:
@@ -206,15 +222,20 @@ async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, v
     """커넥터 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
 
     등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
-    도구를 부르기 직전에 `progress["sent"]` 를 참으로 둔다. 그 뒤의 실패는 도구가 실행됐는지 알 수 없다.
+    선언에 없어도 `default_tool_policy: ask` 이면 부른다. Control Plane 이 승인 필요로 판정한 호출만 여기 온다.
+    도구를 부르기 직전에 `progress["read_only"]` 에 그 도구의 읽기 표시를 두고 `progress["sent"]` 를 참으로 둔다.
+    `sent` 뒤의 실패는 도구가 실행됐는지 알 수 없다.
     `timeout` 은 원격 요청 하나의 시간 제한이다.
     """
     async with _open_connector_session(manifest, values, timeout) as session:
         listed = await session.list_tools()
         names = [item.name for item in listed.tools
                  if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]
-        if len(names) != 1 or (manifest["schema"] == 2 and names[0] not in manifest["tools"]):
+        if len(names) != 1 or (
+                manifest["schema"] == 2 and manifest["default_tool_policy"] != "ask" and names[0] not in manifest["tools"]):
             return None
+        # 부르기 직전에 받은 읽기 표시다. Control Plane 이 표시를 거둔 도구의 상시 허락을 거둔다(ADR-20261101 plugin-without-assistant-json).
+        progress["read_only"] = next(_read_only(item) for item in listed.tools if item.name == names[0])
         progress["sent"] = True
         return await session.call_tool(names[0], args)
 

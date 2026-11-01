@@ -46,8 +46,9 @@ hermes/connectors/<id>/
 
 ### 도구 정책
 
-- `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. 선언과 서버의 도구 목록이 정확히 같아야 한다
+- `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. `default_tool_policy: ask` 가 아니면 선언과 서버의 도구 목록이 정확히 같아야 한다
 - 도구마다 위험도를 고르고 그 까닭을 커넥터 개발 문서의 표에 적는다
+- 남이 만든 MCP 서버처럼 도구를 빠짐없이 선언하기 어려우면 `"default_tool_policy": "ask"` 를 선언해 일부만 선언할 수 있다. `tools` 에 없는 도구는 `assistant.json` 이 없는 플러그인과 같이 호출마다 승인을 받는다. 받는 값은 `deny`(기본값)와 `ask` 뿐이다([도구 정책](../../docs/features/connector-policy.md) 의 「일부 도구만 선언하기」)
 
 | 도구가 하는 일 | 선언 |
 | --- | --- |
@@ -342,6 +343,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 칸 | 뜻 |
 | --- | --- |
+| `default_tool_policy` | 선택. `deny`(기본값)나 `ask`. `schema: 2` 에서만 선언한다 |
 | `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
 | `tools.<이름>.arg_labels` | 선택. 도구별 승인 인자의 표시 이름 객체다. 누락·불량 metadata는 빈 객체로 읽고 원래 키로 표시한다 |
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |

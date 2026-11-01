@@ -1,11 +1,12 @@
 package com.bifos.assistant.attention.application;
 
 import com.bifos.assistant.attention.application.dto.AttentionMetric;
-import com.bifos.assistant.attention.domain.AttentionEvent;
 import com.bifos.assistant.attention.domain.type.AttentionEventType;
 import com.bifos.assistant.attention.domain.type.AttentionLevel;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
-import com.bifos.assistant.attention.infra.AttentionEventRepository;
+import com.bifos.assistant.feedback.application.FeedbackLabeler;
+import com.bifos.assistant.feedback.application.ReactionLedger;
+import com.bifos.assistant.feedback.application.dto.ReactionRecord;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
@@ -34,7 +35,7 @@ public class AttentionMetricsService {
     private static final int MIN_DAYS = 1;
     private static final int MAX_DAYS = 90;
 
-    private final AttentionEventRepository events;
+    private final ReactionLedger ledger;
     private final Clock clock;
 
 
@@ -48,12 +49,13 @@ public class AttentionMetricsService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "days must be 1 to 90");
         }
         Instant since = clock.instant().minus(Duration.ofDays(days));
-        Map<String, List<AttentionEvent>> byItem = new LinkedHashMap<>();
-        for (AttentionEvent event : events.findByCreatedAtGreaterThanEqual(since)) {
-            byItem.computeIfAbsent(identity(event), key -> new ArrayList<>()).add(event);
+        Map<String, List<Row>> byItem = new LinkedHashMap<>();
+        for (ReactionRecord record : ledger.attentionMetricEventsSince(
+            since, List.of(FeedbackLabeler.ATTENTION_HIDE, FeedbackLabeler.ATTENTION_SNOOZE))) {
+            row(record).ifPresent(row -> byItem.computeIfAbsent(identity(row), key -> new ArrayList<>()).add(row));
         }
         Map<AttentionTrigger, Tally> tallies = new EnumMap<>(AttentionTrigger.class);
-        for (List<AttentionEvent> itemEvents : byItem.values()) {
+        for (List<Row> itemEvents : byItem.values()) {
             firstOf(itemEvents, AttentionEventType.SHOWN)
                 .ifPresent(shown -> tallies.computeIfAbsent(shown.trigger(), trigger -> new Tally())
                     .add(itemEvents, shown));
@@ -64,22 +66,68 @@ public class AttentionMetricsService {
     }
 
 
-    private static String identity(AttentionEvent event) {
-        return event.userId() + "|" + event.itemKey() + "|" + event.stateKey();
+    /**
+     * 반응 기록의 줄을 지표 사건으로 읽는다. 노출, 열기, 동작은 {@code reason_code} 에서 계기와 판정을 읽고, 숨김과 미루기는 계기를 모르므로
+     * 계기가 필요 없는 칸만 쓴다. 계기를 읽지 못하는 노출 줄은 센 항목이 아니라 건너뛴다.
+     */
+    private static Optional<Row> row(ReactionRecord record) {
+        AttentionEventType type = switch (record.type()) {
+            case SHOWN -> AttentionEventType.SHOWN;
+            case OPENED -> AttentionEventType.OPENED;
+            case ACTED -> AttentionEventType.ACTED;
+            case DISMISSED -> AttentionEventType.HIDDEN;
+            case POSTPONED -> AttentionEventType.SNOOZED;
+            default -> null;
+        };
+        if (type == null || record.stateKey() == null) {
+            return Optional.empty();
+        }
+        if (type == AttentionEventType.HIDDEN || type == AttentionEventType.SNOOZED) {
+            return Optional.of(new Row(record.id(), record.userId(), record.subjectKey(), record.stateKey(), type, null, null, record.occurredAt()));
+        }
+        return AttentionReactionCodec.triggerOf(record.reasonCode())
+            .map(trigger -> new Row(
+                record.id(),
+                record.userId(),
+                record.subjectKey(),
+                record.stateKey(),
+                type,
+                trigger,
+                AttentionReactionCodec.levelOf(record.reasonCode()).orElse(null),
+                record.occurredAt()));
     }
 
 
-    private static Optional<AttentionEvent> firstOf(List<AttentionEvent> events, AttentionEventType... types) {
+    private static String identity(Row row) {
+        return row.userId() + "|" + row.itemKey() + "|" + row.stateKey();
+    }
+
+
+    private static Optional<Row> firstOf(List<Row> events, AttentionEventType... types) {
         return events.stream()
-            .filter(event -> List.of(types).contains(event.eventType()))
-            .min(Comparator.comparing(AttentionEvent::createdAt).thenComparing(AttentionEvent::id));
+            .filter(event -> List.of(types).contains(event.type()))
+            .min(Comparator.comparing(Row::at).thenComparing(Row::id));
     }
 
 
-    private static boolean has(List<AttentionEvent> events, AttentionEventType type) {
-        return events.stream().anyMatch(event -> event.eventType() == type);
+    private static boolean has(List<Row> events, AttentionEventType type) {
+        return events.stream().anyMatch(event -> event.type() == type);
     }
 
+
+    /**
+     * 지표가 세는 사건 하나다. {@code trigger} 와 {@code level} 은 노출, 열기, 동작에만 있고, 이관한 옛 사건은 {@code level} 이 비어 있다.
+     */
+    private record Row(
+        Long id,
+        Long userId,
+        String itemKey,
+        String stateKey,
+        AttentionEventType type,
+        AttentionTrigger trigger,
+        AttentionLevel level,
+        Instant at) {
+    }
 
     /** 한 {@code trigger} 의 항목을 세는 그릇이다. 이 클래스 밖에서 쓰이지 않는다. */
     private static final class Tally {
@@ -89,15 +137,14 @@ public class AttentionMetricsService {
         private long acted;
         private long nowShown;
         private long nowHiddenWithoutAction;
-        private long staleShown;
         private final List<Long> secondsToFirstAction = new ArrayList<>();
 
 
         /** 한 항목의 사건을 더한다. {@code firstShown} 은 그 항목의 첫 {@code SHOWN} 이다. */
-        void add(List<AttentionEvent> itemEvents, AttentionEvent firstShown) {
+        void add(List<Row> itemEvents, Row firstShown) {
             shown++;
             boolean wasHidden = has(itemEvents, AttentionEventType.HIDDEN);
-            Optional<AttentionEvent> firstAction = firstOf(itemEvents, AttentionEventType.OPENED, AttentionEventType.ACTED);
+            Optional<Row> firstAction = firstOf(itemEvents, AttentionEventType.OPENED, AttentionEventType.ACTED);
             if (wasHidden) {
                 hidden++;
             }
@@ -107,20 +154,18 @@ public class AttentionMetricsService {
             firstAction.ifPresent(action -> {
                 acted++;
                 secondsToFirstAction.add(Math.max(
+                    // 지금의 후보는 모두 판정할 때 읽은 기록이라 신선도가 늘 FRESH 다. 반응 기록은 신선도를 담지 않는다.
                     0,
-                    Duration.between(firstShown.createdAt(), action.createdAt())
+                    Duration.between(firstShown.at(), action.at())
                         .toSeconds()));
             });
             boolean shownAsNow = itemEvents.stream()
-                .anyMatch(event -> event.eventType() == AttentionEventType.SHOWN && event.level() == AttentionLevel.NOW);
+                .anyMatch(event -> event.type() == AttentionEventType.SHOWN && event.level() == AttentionLevel.NOW);
             if (shownAsNow) {
                 nowShown++;
                 if (wasHidden && firstAction.isEmpty()) {
                     nowHiddenWithoutAction++;
                 }
-            }
-            if (itemEvents.stream().anyMatch(event -> event.eventType() == AttentionEventType.SHOWN && event.stale())) {
-                staleShown++;
             }
         }
 
@@ -134,7 +179,8 @@ public class AttentionMetricsService {
                 acted,
                 nowShown,
                 nowHiddenWithoutAction,
-                staleShown,
+                // 지금의 후보는 모두 판정할 때 읽은 기록이라 신선도가 늘 FRESH 다. 반응 기록은 신선도를 담지 않는다.
+                0,
                 median(secondsToFirstAction));
         }
 

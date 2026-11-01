@@ -13,6 +13,7 @@ import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorConversationGrantRepository;
+import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
@@ -52,17 +53,31 @@ public class ConnectorActionDetails {
     private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorCatalogCache catalog;
     private final Clock clock;
+    /** 표준 플러그인 연결의 읽기 표시를 읽는다. null 이면 읽기 표시를 보지 않고 모든 선언 없는 도구의 상시 허락을 닫는다. */
+    private final ConnectorConnectionRepository connections;
+
+
+    /** 읽기 표시를 보지 않는 조회다. 표준 플러그인을 다루지 않는 원고 저장 승인이 쓴다. */
+    public ConnectorActionDetails(
+        ConnectorActionRepository actions,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConnectorCatalogCache catalog,
+        Clock clock) {
+        this(actions, conversationGrants, catalog, clock, null);
+    }
 
 
     public ConnectorActionDetails(
         ConnectorActionRepository actions,
         ConnectorConversationGrantRepository conversationGrants,
         ConnectorCatalogCache catalog,
-        Clock clock) {
+        Clock clock,
+        ConnectorConnectionRepository connections) {
         this.actions = actions;
         this.conversationGrants = conversationGrants;
         this.catalog = catalog;
         this.clock = clock;
+        this.connections = connections;
     }
 
 
@@ -79,7 +94,7 @@ public class ConnectorActionDetails {
         found.sort(Comparator.comparing(ConnectorAction::id));
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return found.stream()
-            .map(action -> view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
+            .map(action -> markedView(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
             .toList();
     }
 
@@ -199,7 +214,7 @@ public class ConnectorActionDetails {
 
     /** @param manifests 커넥터마다 한 번만 읽으려고 부르는 쪽이 들고 있는 manifest 들 */
     private ConnectorActionResult resultOf(ConnectorAction action, Map<String, Optional<ConnectorManifest>> manifests) {
-        ConnectorActionView view = view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
+        ConnectorActionView view = markedView(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
         return new ConnectorActionResult(
             action.publicId(),
             view.title(),
@@ -215,19 +230,53 @@ public class ConnectorActionDetails {
 
     /** 카탈로그에서 그 도구의 이름을 찾아 붙인다. 카탈로그를 읽지 못해도 줄은 돌려준다. */
     public ConnectorActionView view(ConnectorAction action) {
-        return view(action, readManifest(action.connectorId()));
+        return markedView(action, readManifest(action.connectorId()));
     }
 
 
-    /** @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값 */
+    /** 표준 플러그인 연결의 읽기 표시까지 보고 상시 허락을 줄 수 있는지 붙인다. */
+    private ConnectorActionView markedView(ConnectorAction action, Optional<ConnectorManifest> manifest) {
+        return view(action, manifest, readOnlyMarked(action, manifest));
+    }
+
+
+    /**
+     * 그 줄의 도구가 표준 플러그인 연결의 마지막 확인에서 읽기 표시를 받았는가(ADR-20261101 / plugin-without-assistant-json).
+     *
+     * <p>표준 플러그인이 아니거나, 카탈로그를 읽지 못했거나, 원래 도구 이름을 확인하지 못한 줄은 거짓이다. 저장하지 않고 읽을 때마다 본다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    public boolean readOnlyMarked(ConnectorAction action, Optional<ConnectorManifest> manifest) {
+        if (connections == null || action.toolName() == null
+            || manifest.filter(ConnectorToolPolicies::undeclaredAsk).isEmpty()) {
+            return false;
+        }
+        return connections.findByUserIdAndConnectorId(action.userId(), action.connectorId())
+            .map(connection -> connection.readOnlyMarked(action.toolName()))
+            .orElse(false);
+    }
+
+
+    /** 읽기 표시를 보지 않는 표시 값이다. 표준 플러그인의 줄이면 상시 허락을 줄 수 없는 것으로 낸다. */
     public static ConnectorActionView view(ConnectorAction action, Optional<ConnectorManifest> manifest) {
+        return view(action, manifest, false);
+    }
+
+
+    /**
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     * @param readOnlyMarked {@link #readOnlyMarked} 의 값
+     */
+    public static ConnectorActionView view(
+        ConnectorAction action, Optional<ConnectorManifest> manifest, boolean readOnlyMarked) {
         // 상한 변경 줄은 커넥터 도구가 아니라 선언이 없다. 제목과 식별자는 Control Plane 이 정한 정책에서 받는다.
         boolean limitChange = FinancialLimitChanges.owns(action);
         return ConnectorActionView.from(
             action,
             limitChange ? Optional.of(FinancialLimitChanges.POLICY)
                 : manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
-            grantable(manifest, action),
+            grantable(manifest, action, readOnlyMarked),
             hiddenArgs(manifest, action),
             manifest.flatMap(found -> found.tools().stream()
                 .filter(tool -> Objects.equals(tool.name(), action.toolName()))
@@ -257,17 +306,22 @@ public class ConnectorActionDetails {
      *
      * <p>승인 줄에 저장하지 않고 읽을 때마다 본다. 선언이 바뀌면 바로 따른다. 카탈로그를 읽지 못했으면 줄 수 없는
      * 것으로 낸다. 도구를 선언하지 않는 판은 상시 허락을 닫는 선언을 둘 수 없으므로 선언 없는 도구에도 줄 수 있다.
+     * 표준 플러그인({@code schema: 3})은 연결의 마지막 확인에서 읽기 표시를 받은 도구만 줄 수 있다. 판정의
+     * {@link com.bifos.assistant.connector.action.domain.ToolPolicyDecision#decide} 와 같은 조건이다.
      * 도구를 선언하는 판에서 선언이 없는 도구는 호출이 거절되므로 줄 수 없다.
      *
      * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     * @param readOnlyMarked {@link #readOnlyMarked} 의 값
      */
-    public static boolean grantable(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+    public static boolean grantable(Optional<ConnectorManifest> manifest, ConnectorAction action, boolean readOnlyMarked) {
         if (manifest.isEmpty()) {
             return false;
         }
+        int schema = manifest.get().schema();
         return ConnectorToolPolicies.find(manifest.get(), action.toolName())
             .map(ToolPolicy::grantable)
-            .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
+            .orElse(schema == SCHEMA_WITHOUT_TOOLS
+                || (ConnectorToolPolicies.undeclaredAsk(manifest.get()) && readOnlyMarked && action.toolName() != null));
     }
 
 

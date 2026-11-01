@@ -7,8 +7,9 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 ## 도구 이름과 요약
 
 상세 화면은 도구마다 사람 말 이름(`title`)과 한두 문장의 요약(`summary`)을 위험도·승인 배지와 함께 보인다.
-**실제 도구 이름(`search_messages` 같은 것)과 모델이 읽는 설명은 화면에 보이지 않는다.**
+**도구 목록에는 실제 도구 이름(`search_messages` 같은 것)과 모델이 읽는 설명이 보이지 않는다.** 승인 카드만 제목이 없는 도구에 원래 이름을 보인다.
 이름이 없거나 공백이면 「이름 없는 도구」 를 보이고, 요약이 없거나 불량이면 요약 줄을 그리지 않는다. 요약은 접거나 줄 수로 자르지 않고 개행을 유지한다. 목록 카드는 기존 도구 요약(도구 수)을 유지한다.
+`assistant.json` 이 없는 표준 플러그인(`standardPlugin`)은 선언한 도구가 없어, 목록 카드와 상세 화면이 「모든 도구를 쓸 때마다 확인해요.」 를 보이고 상세 화면은 마지막 연결 확인에서 받은 도구 수와 읽기 표시가 있는 도구 수(`listedTools`, `readOnlyTools`)를 더한다. 칸의 표시 이름은 env 이름이고 모든 칸을 가리는 입력으로 받는다.
 
 제목이 없을 때의 대체 문구는 그 자리가 다루는 말을 따른다.
 도구 목록은 도구를 나열하므로 「이름 없는 도구」 다.
@@ -17,7 +18,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 
 | 칸 | 읽는 쪽 | 쓰는 법 |
 | --- | --- | --- |
-| `tools.<이름>.title` | 화면, 승인 카드, 알림 | 한글 도구 이름. 1자에서 80자. 승인 카드는 같은 칸을 제목으로 쓰고, 없으면 「이름 없는 동작」 이다 |
+| `tools.<이름>.title` | 화면, 승인 카드, 알림 | 한글 도구 이름. 1자에서 80자. 승인 카드는 같은 칸을 제목으로 쓰고, 없으면 확인된 원래 도구 이름을, 그것도 없으면 「이름 없는 동작」 을 보인다. 알림은 「이름 없는 동작」 이다 |
 | `tools.<이름>.summary` | 화면, 커넥터 README | 「~해요」체 한두 문장, 200자 안. 무엇을 하는지와 사용자가 알아야 할 한 가지(본문을 열지 않는다, 보내지 않는다, 승인을 받는다)만 적는다. 인자 이름, 반환 칸, ID, scope 같은 내부 말을 쓰지 않는다 |
 | `tools.<이름>.description` | 모델 | 기능, 중요한 입력, 결과의 제한과 부작용. Gmail 과 네이버 블로그는 이 JSON 을 정적으로 import 하여 SDK 등록에도 같은 설명을 쓴다. 화면에 닿지 않는다 |
 
@@ -416,7 +417,7 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 `PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
-- `call` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
+- `call` 과 `tools` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [커넥터 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
 - Control Plane은 웹에 `readmeUrl`, `linkKind`를 전달한다. 옛 응답의 README 주소는 null이고, `link_kind`가 없거나 `project`가 아니면 `service`로 읽는다. 목록 카드와 상세 머리는 `link`를 「공식 사이트」 또는 「프로젝트 GitHub」로, `readmeUrl`을 「커넥터 README」로 표시하고 각각 새 탭으로 연다
 - 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 카탈로그 읽기를 실패로 다룬다
@@ -439,10 +440,12 @@ Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 �
 **`assistant.json` 이 없는 표준 플러그인도 카탈로그에 `schema: 3` 으로 오른다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
 입력 칸은 MCP 정의의 env 와 헤더 참조에서 추론하고, 확인 도구(`verify`)는 null 이고 `tools` 는 비어 있다.
 Claude Code, Codex, ChatGPT 플러그인 형식의 비교와 받지 않는 것은 그 ADR 이 갖는다.
+ChatGPT 이식형 묶음의 root `plugin.json`, `mcp.json`, `skills/` 도 읽는다. `streamable-http` 는 기존 원격 전송으로 바꾸고 `auth.api_key` 의 bearer·custom header 는 입력 칸으로 만든다. 파일의 주소 대신 운영 목록의 `url` 만 쓰며, 지원하지 않는 인증이나 manifest 이름 불일치, MCP 정의 파일 중복은 항목 전체를 카탈로그에서 뺀다.
 
 - 카탈로그는 `GET /api/connectors/catalog?include=standard` 로 청할 때만 `schema: 3` 항목을 싣는다. Control Plane 은 늘 이 query 를 붙인다. 이 query 를 모르는 옛 Control Plane 은 `verify.tool` 이 없는 항목 하나로 카탈로그 전체를 읽지 못하기 때문이다
 - Control Plane 은 `schema: 3` 이면 확인 도구와 `tools` 가 비어 있고 선택지 칸이 없을 때만 읽을 수 있는 커넥터로 다룬다
-- `schema: 3` 연결의 등록과 확인은 아직 `CONNECTOR_UNAVAILABLE` 로 거절한다. 확인 도구 대신 MCP 도구 목록으로 확인하는 길은 그 ADR 의 「남은 단계」 2단계가 연다. 그때까지 운영 목록에 `schema: 3` 플러그인을 올리지 않는다
+- `schema: 3` 연결의 등록과 확인은 확인 도구 대신 대시보드의 `POST /api/connectors/<id>/tools` 로 그 MCP 서버의 `tools/list` 가 성공하는지 본다. 도구는 부르지 않고, 원격 서버의 401 과 403 은 `credential_rejected` 다
+- 받은 도구 이름과 읽기 표시(`readOnlyHint`)는 연결의 `listed_tools` 에 적고 확인할 때마다 덮어쓴다. 연결 응답의 `listedTools` 와 `readOnlyTools` 가 그 수다. 받는 도구는 256개까지이고, 넘으면 확인하지 못한 것(`unavailable`)으로 둔다
 
 ### 바인딩 설치
 

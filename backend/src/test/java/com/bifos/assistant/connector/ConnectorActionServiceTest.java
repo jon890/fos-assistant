@@ -35,6 +35,7 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyA
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
@@ -138,6 +139,8 @@ class ConnectorActionServiceTest {
     private static final String DEMO = "demo-notes";
     private static final String WRITE = "write_note";
     private static final String MAIL = "mail_note";
+    /** 표준 플러그인 검사에서 서버가 읽기 표시를 단 도구다. */
+    private static final String STANDARD_READ = "list_notes";
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
     private static final String UNKNOWN_CODE = "CAREER_OUTCOME_UNKNOWN";
     private static final String ATTEMPT_ID = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f";
@@ -1451,6 +1454,116 @@ class ConnectorActionServiceTest {
 
 
     @Test
+    @DisplayName("표준 플러그인은 읽기 표시가 있는 도구만 첫 승인 때 상시 허락을 주고, 그 뒤 그 도구의 호출은 묻지 않고 지난다")
+    void standardPluginGrantOpensOnlyForReadOnlyMarkedTools() {
+        catalogBecomes(standardManifest());
+        markListedTools(Map.of(STANDARD_READ, true, WRITE, false));
+        UUID read = ask(STANDARD_READ, "{}").actionId();
+        UUID write = ask(WRITE, ARGS).actionId();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+            .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed, ConnectorActionView::conversationGrantAllowed)
+            .containsExactly(tuple(read, true, false), tuple(write, false, false));
+        assertCode(() -> service.approve(me, write, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(true));
+        assertThat(service.approve(me, read, GrantPeriod.HOUR).status()).isEqualTo(ActionStatus.SUCCEEDED);
+
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isTrue();
+        assertThat(ask(WRITE, "{\"text\":\"다른 글\"}").allowed()).isFalse();
+        assertThat(grants.findAll()).extracting(ConnectorToolGrant::toolName).containsExactly(STANDARD_READ);
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy: ask 커넥터의 선언하지 않은 도구는 승인 줄이 되고, 읽기 표시가 있는 도구만 첫 승인 때 상시 허락을 준다")
+    void askConnectorUndeclaredToolsFollowTheStandardRules() {
+        catalogBecomes(askManifest());
+        markListedTools(Map.of(STANDARD_READ, true, WRITE, false));
+        UUID read = ask(STANDARD_READ, "{}").actionId();
+        UUID write = ask(WRITE, ARGS).actionId();
+
+        assertThat(read).isNotNull();
+        assertThat(write).isNotNull();
+        assertThat(service.listForConversation(me, CONVERSATION))
+            .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed, ConnectorActionView::conversationGrantAllowed)
+            .containsExactly(tuple(read, true, false), tuple(write, false, false));
+        assertCode(() -> service.approve(me, write, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(true));
+        assertThat(service.approve(me, read, GrantPeriod.HOUR).status()).isEqualTo(ActionStatus.SUCCEEDED);
+
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isTrue();
+        assertThat(ask(WRITE, "{\"text\":\"다른 글\"}").allowed()).isFalse();
+        // 선언한 도구는 선언대로 승인 없이 지난다.
+        assertThat(ask("list_scopes", "{}").allowed()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 칸이 없는 schema 2 커넥터의 선언하지 않은 도구는 승인 줄 없이 거절된다")
+    void declaringConnectorWithoutAskRefusesUndeclaredTools() {
+        catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null, null))));
+        markListedTools(Map.of(STANDARD_READ, true));
+
+        ConnectorPolicyAnswer answer = ask(STANDARD_READ, "{}");
+
+        assertThat(answer.allowed()).isFalse();
+        assertThat(answer.actionId()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("표준 플러그인의 승인 실행이 읽기 표시가 거짓이라고 답하면 그 도구의 표시와 상시 허락을 거두고 다음 호출은 다시 승인을 받는다")
+    void standardPluginExecutionThatDropsTheMarkRevokesTheGrant() {
+        catalogBecomes(standardManifest());
+        markListedTools(Map.of(STANDARD_READ, true, "other_read", true));
+        Instant now = Instant.now();
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_read", now.plus(Duration.ofDays(1))));
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(false));
+
+        service.approve(me, ask(STANDARD_READ, "{}").actionId(), GrantPeriod.HOUR);
+
+        ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow();
+        assertThat(connection.readOnlyMarked(STANDARD_READ)).isFalse();
+        assertThat(connection.readOnlyMarked("other_read")).isTrue();
+        assertThat(grants.findAll())
+            .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+            .containsExactlyInAnyOrder(tuple(STANDARD_READ, true), tuple("other_read", false));
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("표준 플러그인의 표시 회수가 사용자 잠금에서 실패해도 그 도구의 상시 허락은 따로 거둬 다음 호출이 승인을 받는다")
+    void standardPluginGrantIsRevokedEvenWhenDroppingTheMarkFails() {
+        catalogBecomes(standardManifest());
+        markListedTools(Map.of(STANDARD_READ, true));
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(false));
+        UUID actionId = ask(STANDARD_READ, "{}").actionId();
+        // 승인의 첫 잠금은 지나고, 실행 뒤 표시를 거두는 두 번째 잠금만 실패한다.
+        int[] calls = {0};
+        doAnswer(invocation -> {
+            if (++calls[0] == 2) {
+                throw new IllegalStateException("lock timeout");
+            }
+            jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
+            return users.findById(owner.id());
+        }).when(users).findByIdForUpdate(owner.id());
+
+        assertThat(service.approve(me, actionId, GrantPeriod.HOUR).status()).isEqualTo(ActionStatus.SUCCEEDED);
+
+        // 표시는 남았지만 허락이 없어 판정은 승인으로 돌아간다. 다음 연결 확인이 표시를 바꾼다.
+        assertThat(connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow().readOnlyMarked(STANDARD_READ))
+            .isTrue();
+        assertThat(grants.findAll()).extracting(grant -> grant.revokedAt() != null).containsExactly(true);
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isFalse();
+    }
+
+
+    @Test
     @DisplayName("카탈로그를 읽지 못하면 승인 줄의 grantAllowed 가 거짓이고 기간을 실은 승인은 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
     void grantIsRefusedWhenCatalogIsUnreadable() {
         catalogBecomes(legacyManifest());
@@ -1969,6 +2082,29 @@ class ConnectorActionServiceTest {
             new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
             new ConnectorTool("send_note", "WRITE", "always", null, null),
             new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", Boolean.FALSE, identifiers)));
+    }
+
+
+    /** 확인 도구와 도구 선언이 없는 표준 플러그인이다(ADR-20261101 / plugin-without-assistant-json). 서버 이름은 {@link #DECLARING} 와 같다. */
+    private static ConnectorManifest standardManifest() {
+        return new ConnectorManifest(DEMO, "검사용 메모", "", List.of(), null, "demo", 3, List.of());
+    }
+
+
+    /** 도구 하나만 선언하고 나머지를 호출마다 묻는 {@code default_tool_policy: ask} 커넥터다. 서버 이름은 {@link #DECLARING} 와 같다. */
+    private static ConnectorManifest askManifest() {
+        return new ConnectorManifest(
+            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", 2,
+            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
+            List.of(), null, false, false, null, null, null, null, null, ConnectorManifest.DEFAULT_TOOL_POLICY_ASK);
+    }
+
+
+    /** 연결 확인이 받은 도구 목록을 연결에 적는다. */
+    private void markListedTools(Map<String, Boolean> tools) {
+        ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow();
+        connection.recordListedTools(new ListedTools(tools));
+        connections.save(connection);
     }
 
 

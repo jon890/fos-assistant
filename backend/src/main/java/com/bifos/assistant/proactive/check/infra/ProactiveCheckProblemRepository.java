@@ -26,4 +26,8 @@ public interface ProactiveCheckProblemRepository extends JpaRepository<Proactive
 
     /** 그 살펴보기들의 후보 전부. 받아들인 것과 버린 것을 함께 읽는다. */
     List<ProactiveCheckProblem> findByCheckIdInOrderByIdAsc(Collection<Long> checkIds);
+
+
+    /** 그 번호 뒤의 그 상태 후보를 번호 순서로 읽는다. 옛 줄을 제안 줄로 옮기는 작업이 번호를 따라 나누어 읽는다. */
+    List<ProactiveCheckProblem> findByStatusAndIdGreaterThanOrderByIdAsc(ProblemStatus status, Long afterId, Pageable page);
 }

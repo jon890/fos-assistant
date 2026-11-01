@@ -96,10 +96,21 @@ class StoredEnumNamesTest {
                 "MARKED_WRONG",
                 "MAINTENANCE_PROPOSED",
                 "MAINTENANCE_CONFIRMED",
-                "MAINTENANCE_DENIED")),
+                "MAINTENANCE_DENIED",
+                "SHOWN",
+                "OPENED",
+                "ACTED",
+                "RESTORED")),
         Map.entry(
             FeedbackSubjectType.class,
-            List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "CHECK_FINDING", "AUTONOMY_DECISION")),
+            List.of(
+                "FOLLOW_UP",
+                "MEMORY",
+                "CONNECTOR_ACTION",
+                "CHECK",
+                "CHECK_FINDING",
+                "AUTONOMY_DECISION",
+                "ATTENTION_ITEM")),
         Map.entry(FeedbackActor.class, List.of("USER", "AGENT", "SYSTEM")));
 
 

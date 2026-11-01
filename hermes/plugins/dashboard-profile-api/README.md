@@ -17,7 +17,8 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
-| `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
+| `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}`. 도구를 찾아 부른 응답에는 부르기 직전 `tools/list` 의 `read_only`(그 도구의 `readOnlyHint` 가 참인가)를 더한다 | 504 실행됐는지 모른다 |
+| `POST /api/connectors/<id>/tools` | 표준 플러그인(`schema: 3`)의 연결 확인. 후보 값이나 보관 파일의 값으로 MCP 서버에 붙어 `tools/list` 만 받는다. 도구는 부르지 않는다 | `{values}` 또는 `{vault}`. 둘 가운데 정확히 하나다. 시간 제한과 동시 한도는 `call` 과 같다 | `{ok: true, tools: [{name, read_only}]}`. `read_only` 는 `readOnlyHint` 가 참일 때만 참이다. 붙지 못하면 `{ok: false, error: "unavailable"}`, 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다 | 400 `schema: 3` 이 아닌 커넥터, 본문 모양 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
 | `PUT /api/connectors` | profile 에 커넥터를 붙이고 뗀다 | `enabled: true` 는 `{profile, plugin, enabled: true, bind: {vault}, sandbox_owner?, owner_browser?}` 이며 `bind.vault` 가 필수다. Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 커넥터에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 커넥터는 이 값을 쓰지 않는다. `enabled: false` 는 `{profile, plugin, enabled: false}` 로 바인딩을 뗀다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다, `enabled: true` 인데 `bind.vault` 가 없거나 `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 커넥터를 붙이는데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
@@ -125,14 +126,14 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 둘 다 없거나 실행 권한이 없으면 그 커넥터는 쓸 수 없다
 - `connector.json` 이 `operator_env` 로 적은 이름은 모두 `env` 에 값이 있어야 한다. 그 값은 설치할 때 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다
 - 경로는 절대 경로다. 모양이 틀린 항목은 그 항목만 버린다
-- `url` 은 `.mcp.json` 의 서버가 `type: http` 인 커넥터만 받는다. 그 커넥터의 항목에 `command` 나 `env` 가 있으면 그 항목을 버린다. 규칙은 [ADR-20261026 / remote-mcp-plugin](../../docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖는다
+- `url` 은 MCP 정의의 서버가 `type: http` 나 `streamable-http` 인 커넥터만 받는다. 그 커넥터의 항목에 `command` 나 `env` 가 있으면 그 항목을 버린다. 규칙은 [ADR-20261026 / remote-mcp-plugin](../../docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖는다
 
-**plugin 디렉터리에서 읽는 것은 넷이다.** 플러그인 manifest(`.claude-plugin/plugin.json` 이나 `.codex-plugin/plugin.json`), MCP 정의(manifest 의 `mcpServers` 경로나 `.mcp.json`), `assistant.json`, 스킬 디렉터리다.
+**plugin 디렉터리에서 manifest, MCP 정의, assistant 선언, 스킬을 읽는다.** 플러그인 manifest 는 `.claude-plugin/plugin.json`, root `plugin.json`, `.codex-plugin/plugin.json` 이다. MCP 정의는 manifest 의 `mcpServers` 경로나 root `.mcp.json`, `mcp.json` 이다. assistant 선언은 `assistant.json` 이다.
 하나라도 검증에 실패하면 그 커넥터는 카탈로그에서 빠지고 경고 로그 한 줄이 남는다. 대시보드와 다른 커넥터는 그대로 돈다.
 
-- manifest 가 둘 다 있으면 `name` 이 같아야 하고, 스킬과 MCP 정의의 경로는 `.claude-plugin` 쪽을 쓴다. `hooks`, `commands`, `agents` 같은 다른 칸은 읽지 않는다
-- MCP 정의는 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다
-- 서버의 `type` 이 `http` 이면 원격 MCP 다. 아래 로컬 실행형의 `command`, `args`, `env` 규칙 대신 「원격 MCP 커넥터」 의 규칙을 따른다
+- manifest 가 여럿이면 `name` 이 모두 같아야 한다. 위 목록의 순서로 앞선 manifest 의 스킬과 MCP 정의 경로를 쓴다. `hooks`, `commands`, `agents` 같은 다른 칸은 읽지 않는다
+- MCP 정의는 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다. `.mcp.json` 과 `mcp.json` 이 함께 있으면 명시한 경로와 상관없이 카탈로그에서 뺀다. 이식형 MCP 정의의 `$schema` 는 실행 설정에 쓰지 않는다
+- 서버의 `type` 이 `http` 나 `streamable-http` 이면 원격 MCP 다. 아래 로컬 실행형의 `command`, `args`, `env` 규칙 대신 「원격 MCP 커넥터」 의 규칙을 따른다
 - 서버의 `command` 는 쓰지 않고 운영 목록의 실행 파일로 바꾼다
 - 서버의 `args` 가운데 `${CLAUDE_PLUGIN_ROOT}/` 로 시작하는 것은 plugin 디렉터리 안의 링크 없는 파일이어야 하고 실제 경로로 바꾼다. 그 밖의 `$` 치환은 받지 않는다
 - 서버의 `env` 는 자기 이름의 `${이름}` 참조만 둔다. 선택 칸은 `${이름:-}` 도 된다
@@ -149,6 +150,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **원격 MCP 커넥터는 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
 
+- 이식형 서버의 `extensions["com.openai"].auth` 는 생략하거나 `type: none`, `api_key` 를 쓴다. `api_key` 의 `headerScheme: bearer` 는 `Authorization: Bearer ${<이름>}`, `custom_header` 는 `headerName` 의 `${<이름>}` 헤더로 바꾼다. 칸 env 이름은 서버 이름을 대문자로 바꾸고 하이픈을 `_` 로 바꾼 뒤 `_API_KEY` 를 붙인다. 기존 원격 칸·헤더 검증을 그대로 거친다
+- `oauth`, `mixed`, `basic` 과 알 수 없는 인증 방식, 잘못된 인증 선언은 항목 전체를 카탈로그에서 뺀다. `.app.json`, `interface`, `onboardingSkill`, `hooks` 와 위젯 UI 는 읽거나 실행하지 않는다. 서버의 `_meta` 와 인증 이외의 `extensions` 설정도 설치할 서버 정의에 싣지 않는다
 - 주소는 운영 목록의 `url` 이 필수이고 MCP 정의의 `url` 은 무시한다. 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 커넥터를 카탈로그에서 뺀다
 - 헤더는 MCP 정의의 `headers` 와 `assistant.json` 의 `headers` 를 합친 것이다. 값은 `${이름}` 이나 `Bearer ${이름}` 이고 `${이름}` 은 필수 칸 하나다. 같은 헤더 이름이 둘에 있으면 카탈로그에서 뺀다
 - `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `snapshot`, `execution_guard` 를 선언하면 카탈로그에서 뺀다

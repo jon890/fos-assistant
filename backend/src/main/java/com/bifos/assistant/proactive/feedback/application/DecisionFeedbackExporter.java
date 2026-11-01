@@ -162,19 +162,19 @@ public class DecisionFeedbackExporter {
     /**
      * 그 기간에 사건이 있는 제안의 사건 전부를 제안별로 묶는다. 사건 하나라도 지운 대화나 남의 대화에 묶였으면 그 제안을 뺀다.
      *
-     * <p>기간 앞의 사건도 함께 읽어 첫 반응을 잃지 않게 한다. 「참고한 기억」 단추 사건은 제안의 흐름이 아니라 싣지 않는다. 그 사건만
+     * <p>기간 앞의 사건도 함께 읽어 첫 반응을 잃지 않게 한다. 「참고한 기억」 단추 사건과 지금 화면의 노출, 열기, 복원 사건은 제안의 흐름이 아니라 싣지 않는다. 그 사건만
      * 있는 기억이 보이지 않은 제안으로 나오지 않게 하고, 단추를 누른 대화를 지워도 그 기억의 제안이 빠지지 않게 한다.
      */
     private Map<String, List<FeedbackEvent>> visibleSubjects(CurrentUser user, Instant from) {
         Set<String> keys = events.findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(user.id(), from).stream()
-            .filter(event -> !event.eventType().marksMemoryUse())
+            .filter(event -> !event.eventType().marksMemoryUse() && !event.marksAttentionOnly())
             .map(FeedbackEvent::subjectKey)
             .collect(Collectors.toCollection(HashSet::new));
         if (keys.isEmpty()) {
             return Map.of();
         }
         List<FeedbackEvent> history = events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(user.id(), keys).stream()
-            .filter(event -> !event.eventType().marksMemoryUse())
+            .filter(event -> !event.eventType().marksMemoryUse() && !event.marksAttentionOnly())
             .toList();
         Set<Long> conversationIds = history.stream()
             .map(FeedbackEvent::conversationId)

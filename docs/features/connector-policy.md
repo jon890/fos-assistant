@@ -7,7 +7,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 ## 요구
 
 - 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
-- 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
+- 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자는 판정에 들어가지 않는다. 서버의 `readOnlyHint` 는 표준 플러그인의 상시 허락을 여는 데만 쓰고 승인을 건너뛰게 하지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
 - 사용자는 승인하면서 그 도구를 그 대화에서만 계속 허용할 수 있다. 밖으로 나가는 도구와 `always` 도구는 열지 않는다. 아래 「대화 허락」 이 정한다
@@ -30,6 +30,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 | 같은 커넥터의 같은 도구로 기다리는 줄이 둘 이상이다 | 한 묶음으로 접어 보인다. 펼치면 건마다 단추가 있고, 한 건만 남으면 한 장의 카드가 된다 |
 | 펼친 묶음의 모든 건을 한 번에 승인할 수 있다 | 「N건 모두 승인」. 조건은 [ADR-087](../../web/docs/adr/ADR-087-같은-도구의-승인-줄은-묶음으로-보이고-상시-허락을-줄-수-있는-줄만-한꺼번에-승인한다.md) 이 갖는다 |
 | 실행 중이거나 실행했는지 모르는 줄, `toolName` 이 없는 줄 | 묶지 않는다. 이름이 없는 줄을 제목으로 묶으면 다른 도구가 섞일 수 있다 |
+| 도구가 제목을 선언하지 않았고 원래 이름(`toolName`)이 확인됐다 | 「이름 없는 동작」 대신 원래 도구 이름을 제목으로 보인다. 표준 플러그인의 도구가 여기에 든다. 상시 허락 목록도 같다. 규칙은 `web/src/lib/connector-action-title.ts` 가 갖는다 |
 | 줄이 `EXECUTING` 이다 | 단추 없이 실행하는 중이라고 보인다 |
 | `PENDING` 인 줄의 `hiddenArgs` 가 참이다 | 승인 단추 없이 가려진 내용 때문에 승인할 수 없다는 안내. 「거절」 은 남긴다 |
 | 줄이 `UNKNOWN` 이다 | 단추 없이 실행했는지 모른다고 보인다. 「닫기」 는 그 화면에서만 숨기고 줄의 상태를 바꾸지 않는다 |
@@ -140,7 +141,7 @@ sequenceDiagram
 | `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. `READ` 가 아니고 `approval` 이 `required` 인 도구가 빠뜨리면 manifest 를 거절한다. 그 밖의 도구는 거짓으로 채운다 |
 | `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
-| `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다 |
+| `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny`(없을 때의 기본값)나 `ask` 만 받는다. 아래 「일부 도구만 선언하기」 |
 
 | 위험도 | 뜻 | 기본 `approval` | 하한 |
 | --- | --- | --- | --- |
@@ -166,9 +167,22 @@ sequenceDiagram
 **`schema: 1` 커넥터에서 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인 줄이 된다.** 조회 도구도 마찬가지다.
 `schema: 1` 은 `tools` 를 선언하지 않으므로 그 밖의 도구를 모두 `WRITE` 와 `required` 로 읽는다. 승인 없이 조회를 쓰려면 그 plugin 이 `schema: 2` 로 올려 조회 도구를 `READ` 로 선언해야 한다.
 
-**`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 호출마다 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
-`schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 상시 허락과 대화 허락을 모두 닫는다.
-MCP 서버의 `readOnlyHint` 는 승인을 건너뛰게 하지 않는다. 그 표시로 상시 허락만 여는 일은 그 ADR 의 「남은 단계」 가 갖는다.
+**`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 첫 호출에 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
+`schema: 1` 처럼 `WRITE` 와 `required` 로 읽되, 운영자가 읽어 본 선언이 없으므로 대화 허락은 닫는다.
+상시 허락은 연결의 마지막 확인에서 `readOnlyHint` 가 참이었던 도구(`connector_connection.listed_tools`)에만 열고, 나머지는 호출마다 승인이다. 판정과 승인 카드의 `grantAllowed`, 허락을 만드는 승인이 같은 조건을 본다.
+연결 확인이 받은 목록에서 표시가 거짓이거나 빠진 도구, 승인 실행의 응답이 `read_only: false` 인 도구는 그 트랜잭션에서 표시와 상시 허락을 함께 거둔다. 그 뒤 호출은 다시 승인을 받는다. `destructiveHint` 와 `openWorldHint` 는 판정에 쓰지 않는다.
+
+#### 일부 도구만 선언하기
+
+**`default_tool_policy: ask` 는 일부 도구만 선언하고 나머지를 `schema: 3` 의 도구처럼 호출마다 묻는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md) 「남은 단계」 4).
+`schema: 2` 에서만 선언할 수 있다. 선언한 도구는 지금처럼 그 선언으로 판정하고, `tools` 에 없는 그 서버의 도구는 `schema: 3` 의 선언 없는 도구와 같은 규칙을 쓴다.
+대시보드 plugin 이 `ask` 일 때만 카탈로그 항목에 `default_tool_policy: "ask"` 를 싣는다. `deny` 와 칸이 없는 항목은 이 칸이 없다.
+
+- **받는 값은 `deny` 와 `ask` 뿐이다.** 선언하지 않은 도구를 읽기로 보는 것처럼 사람이 보지 않고 열리는 기본값은 받지 않는다
+- 선언하지 않은 도구는 `WRITE` 와 `required` 로 읽고 대화 허락은 닫는다. 읽기 표시(`readOnlyHint`)가 있는 도구만 첫 승인 뒤 상시 허락을 열고, 표시를 거두면 상시 허락도 닫는다. 규칙은 `ToolPolicyDecision.decide` 의 `schema: 3` 규칙을 그대로 쓴다
+- 카탈로그에 칸이 없으면 선언하지 않은 도구를 거절한다. 옛 Control Plane 은 이 칸을 모르므로 거절하고, 새 Control Plane 이 옛 대시보드 plugin 의 카탈로그를 읽어도 칸이 없어 거절한다. 어느 쪽이든 느슨해지지 않는다
+- `ask` 커넥터의 선언하지 않은 도구는 거절되지 않으므로 위 「선언하지 않은 도구」 의 수에 넣지 않는다
+- 연결 확인이 `tools/list` 대신 확인 도구를 부르므로(`schema: 2`), `listed_tools` 는 기록되지 않고 읽기 표시도 없다. 지금은 `ask` 커넥터의 선언하지 않은 도구가 상시 허락 없이 호출마다 승인이다
 
 #### 이름 대응
 
@@ -254,7 +268,7 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 #### 선언하지 않은 도구
 
 연결 확인과 관리자 반영 완료는 MCP probe 가 낸 도구 가운데 `schema: 2` manifest 의 `tools` 에 없는 것을 세어 연결에 적고 연결 상태와 관리자 목록에 낸다.
-선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 과 `schema: 3` 은 세지 않는다. 두 schema 의 선언 없는 도구는 거절되지 않고 승인 줄이 된다.
+선언하지 않은 도구가 있어도 바인딩은 `READY` 가 된다. 그 도구의 호출만 거절된다. `schema: 1` 과 `schema: 3` 은 세지 않는다. 두 schema 의 선언 없는 도구는 거절되지 않고 승인 줄이 된다. `default_tool_policy: ask` 인 `schema: 2` 도 세지 않는다.
 
 ### 사용자별 호출 제한
 

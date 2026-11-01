@@ -12,6 +12,7 @@ import com.bifos.assistant.connector.approval.application.dto.ConnectorConversat
 import com.bifos.assistant.connector.approval.application.dto.ConnectorGrantView;
 import com.bifos.assistant.connector.action.application.dto.PendingApproval;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
+import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;
@@ -142,7 +143,7 @@ public class ConnectorActionService {
         this.financialApproval = financialApproval;
         this.limitChanges = limitChanges;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
-        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
+        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock, connections);
         this.signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
             actions,
@@ -438,6 +439,15 @@ public class ConnectorActionService {
      */
     public void rejectPendingFor(ConnectorConnection connection, Instant now) {
         lifecycle.rejectPendingFor(connection, now);
+    }
+
+
+    /**
+     * 표준 플러그인 연결 확인이 받은 도구 목록에서 읽기 표시가 없는 도구의 상시 허락을 거둔다. 연결 확인의 트랜잭션 안에서 부른다.
+     * 거두는 조건은 {@link ConnectorActionLifecycle#revokeUnmarkedGrants} 가 갖는다.
+     */
+    public void revokeUnmarkedGrants(ConnectorConnection connection, ListedTools listed, Instant now) {
+        lifecycle.revokeUnmarkedGrants(connection, listed, now);
     }
 
 

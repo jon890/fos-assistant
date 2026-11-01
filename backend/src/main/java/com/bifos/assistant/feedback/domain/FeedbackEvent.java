@@ -11,7 +11,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -24,13 +26,19 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다.
+ * 판단 피드백 기록의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 제안 줄로 옮길 때 한 번 하는 제안 열쇠 이관뿐이다
+ * ({@code DecisionFeedbackRecorder.repointSubject}).
  *
  * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖는다. 제목, 본문, 인자, 원문을 담는 칸이 없다. 연결은 번호와 열쇠, 판은
  * 해시와 판 번호로만 둔다.
  */
 @Entity
-@Table(name = "decision_feedback_event")
+@Table(
+    name = "decision_feedback_event",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_decision_feedback_event_user_event_key",
+        columnNames = {"user_id", "event_key"}),
+    indexes = @Index(name = "idx_decision_feedback_event_control", columnList = "user_id, card_key, subject_key, id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -200,6 +208,15 @@ public class FeedbackEvent {
         this.untilAt = untilAt == null ? null : untilAt.truncatedTo(ChronoUnit.MICROS);
         this.eventKey = eventKey;
         return this;
+    }
+
+
+    /**
+     * 지금 화면을 쓴 기록인가. 항목이 보이고 열린 사건과 복원이거나, 제안이 아닌 항목({@code ATTENTION_ITEM})의 사건이다. 제안의 흐름이
+     * 아니라 reaction replay 읽기 모델에서 뺀다.
+     */
+    public boolean marksAttentionOnly() {
+        return subjectType == FeedbackSubjectType.ATTENTION_ITEM || eventType.marksAttentionView();
     }
 
 

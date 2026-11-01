@@ -81,20 +81,15 @@ class ChatConversationManagement {
     }
 
 
-    /** 대화가 고른 단계를 저장한다. DEFAULT 는 에이전트 기본 모델만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
+    /** 대화가 고른 단계를 저장한다. 단계를 고르는 모드만 받는다. */
     Conversation chooseModelTier(CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
         Conversation conversation = access.requireOwn(user, conversationId);
-        if (mode == null
-            || mode == ModelSelectionMode.CUSTOM
-            || (mode == ModelSelectionMode.TIER && tier == null)
-            || (mode == ModelSelectionMode.DEFAULT && tier != null)) {
+        if (mode != ModelSelectionMode.TIER || tier == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid model tier selection");
         }
-        if (mode == ModelSelectionMode.TIER) {
-            Agent agent = agents.requireStartable(
-                user, agents.requireById(conversation.agentId()).code());
-            modelTiers.resolveTier(user, tier, agent);
-        }
+        Agent agent = agents.requireStartable(
+            user, agents.requireById(conversation.agentId()).code());
+        modelTiers.resolveTier(user, tier, agent);
         if (conversations.chooseModelTierIfActive(conversationId, user.id(), mode, tier) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }

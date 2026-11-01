@@ -39,7 +39,7 @@ class ExecutionConversationTest {
     /** 대화가 고른 effort 다. Hermes 에 보낸 effort 와 다른 값으로 두어 어느 쪽을 읽었는지 구분한다. */
     private static final String CHOSEN_EFFORT = "high";
 
-    /** Hermes 에 보낸 값이다. 단계 없이 보내므로 출처는 대화가 effort 를 골랐는지로만 정해진다. */
+    /** Hermes 에 보낸 값이다. 에이전트 기본 effort 가 없어, 보낸 effort 가 있으면 출처는 언제나 REQUESTED 다. */
     private static final ModelChoice SENT = ModelChoice.stored(PROVIDER, MODEL, "medium");
 
     @Autowired
@@ -82,30 +82,45 @@ class ExecutionConversationTest {
 
 
     @Test
-    @DisplayName("대화가 effort 를 고르지 않았으면 null 을 담아 내고 실행 줄의 출처는 AGENT DEFAULT 다")
-    void carriesNullEffortWhenConversationChoseNoneAndRecordsAgentDefaultSource() {
+    @DisplayName("대화가 effort 를 고르지 않았으면 null 을 담아 내고 보낸 effort 가 있으면 실행 줄의 출처는 REQUESTED 다")
+    void carriesNullEffortWhenConversationChoseNoneAndRecordsRequestedSource() {
         ExecutionConversation value = conversation.executionConversation();
         AgentExecution execution = start(value);
 
         assertThat(value.id()).isEqualTo(conversation.id());
         assertThat(value.reasoningEffort()).isNull();
         assertThat(saved(execution).conversationId()).isEqualTo(conversation.id());
-        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
     }
 
 
     @Test
-    @DisplayName("대화 없이 시작한 실행 줄은 대화 번호가 비고 출처는 AGENT DEFAULT 다")
+    @DisplayName("대화 없이 시작한 실행 줄은 대화 번호가 비고 보낸 effort 가 있으면 출처는 REQUESTED 다")
     void leavesConversationIdEmptyWhenStartedWithoutConversation() {
         AgentExecution execution = start(null);
 
         assertThat(saved(execution).conversationId()).isNull();
-        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.AGENT_DEFAULT);
+        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
+    }
+
+
+    @Test
+    @DisplayName("보낸 effort 가 없으면 실행 줄의 출처는 UNKNOWN 이다")
+    void recordsUnknownSourceWhenNoEffortWasSent() {
+        AgentExecution execution = start(conversation.executionConversation(), ModelChoice.defaults());
+
+        assertThat(saved(execution).reasoningEffort()).isNull();
+        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.UNKNOWN);
     }
 
 
     /** 단계 없이 effort 를 실어 보낸 실행을 시작한다. 인자 열둘을 받는 판이라야 보낸 값과 단계를 함께 정한다. */
     private AgentExecution start(ExecutionConversation value) {
+        return start(value, SENT);
+    }
+
+
+    private AgentExecution start(ExecutionConversation value, ModelChoice sent) {
         return recorder.start(
             user(),
             value,
@@ -113,7 +128,7 @@ class ExecutionConversationTest {
             null,
             null,
             ExecutionContextSnapshot.ofChars(0L),
-            SENT,
+            sent,
             null,
             null,
             null,

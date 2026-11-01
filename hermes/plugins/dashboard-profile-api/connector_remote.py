@@ -11,6 +11,7 @@ import contextlib
 import contextvars
 import logging
 import re
+from typing import Optional
 from urllib.parse import urlsplit
 
 from .connector_schema import REMOTE_FORBIDDEN_KEYS, REMOTE_HEADER_NAME_RE, REMOTE_HEADER_VALUE_RE
@@ -76,6 +77,37 @@ def _remote_headers(value, where: str) -> dict:
     if any(name.lower() in REMOTE_RESERVED_HEADERS for name in value):
         raise ValueError("%s 의 headers 에 대시보드나 MCP 전송이 정하는 헤더 이름이 있다" % where)
     return dict(value)
+
+
+def _portable_remote_server(name: str, server: dict) -> dict:
+    """이식형 전송과 API key 인증을 기존 원격 정의로 바꾼다. UI 메타데이터는 실행하지 않는다."""
+    result = {key: value for key, value in server.items() if key not in ("extensions", "_meta")}
+    result["type"] = "http"
+    extensions = server.get("extensions", {})
+    if not isinstance(extensions, dict) or not isinstance(extensions.get("com.openai", {}), dict):
+        raise ValueError("MCP 서버의 extensions 모양이 올바르지 않다")
+    openai = extensions.get("com.openai", {})
+    if "auth" not in openai:
+        return result
+    auth = openai["auth"]
+    if not isinstance(auth, dict):
+        raise ValueError("MCP 서버의 auth 는 객체다")
+    if auth == {"type": "none"}:
+        return result
+    scheme = auth.get("headerScheme")
+    allowed = {"type", "headerScheme"} | ({"headerName"} if scheme == "custom_header" else set())
+    if (auth.get("type") != "api_key" or scheme not in ("bearer", "custom_header")
+            or set(auth) - allowed):
+        raise ValueError("MCP 서버의 인증 방식을 받지 않는다")
+    env = re.sub(r"[^A-Z0-9_]", "_", name.upper()) + "_API_KEY"
+    header = "Authorization" if scheme == "bearer" else auth.get("headerName")
+    template = ("Bearer " if scheme == "bearer" else "") + "${%s}" % env
+    inferred = _remote_headers({header: template}, "MCP 서버 인증")
+    headers = _remote_headers(result.get("headers"), "MCP 서버 정의")
+    if any(key.lower() == header.lower() for key in headers):
+        raise ValueError("같은 헤더 이름이 두 번 선언됐다")
+    result["headers"] = {**headers, **inferred}
+    return result
 
 
 def _remote_server(entry: dict, server: dict, declared: dict, fields: list) -> dict:
@@ -159,12 +191,17 @@ def _remote_request_headers(server: dict, values: dict) -> dict:
     return headers
 
 
+# 원격 서버가 칸 값을 받지 않았다는 응답 상태다. 도구 목록 경로가 `credential_rejected` 로 옮긴다.
+REMOTE_REJECTED_STATUSES = frozenset({401, 403})
+
+
 @contextlib.asynccontextmanager
-async def _remote_streams(server: dict, values: dict, timeout: float):
+async def _remote_streams(server: dict, values: dict, timeout: float, seen: Optional[dict] = None):
     """원격 MCP 서버에 Streamable HTTP 로 붙어 읽기와 쓰기 스트림을 내준다(ADR-20261026 remote-mcp-plugin).
 
     redirect 는 따라가지 않는다. 토큰 헤더가 다른 호스트로 가지 않고, redirect 응답은 호출 실패가 된다.
     SDK 의 기본 클라이언트는 redirect 를 따라가므로 클라이언트를 직접 만들어 넘긴다. 넘긴 클라이언트는 SDK 가 닫지 않는다.
+    `seen` 을 주면 서버가 401 이나 403 으로 답했을 때 `seen["rejected"]` 를 참으로 둔다. 응답 본문과 주소는 담지 않는다.
     """
     import httpx2
     from mcp.client.streamable_http import streamable_http_client
@@ -176,8 +213,15 @@ async def _remote_streams(server: dict, values: dict, timeout: float):
         logging.getLogger(name).addFilter(_REMOTE_CALL_FILTER)
     token = _remote_call.set(True)
     try:
+        hooks = [_cap_remote_response]
+        if seen is not None:
+            async def note_rejected(response):
+                if response.status_code in REMOTE_REJECTED_STATUSES:
+                    seen["rejected"] = True
+            # 크기 제한보다 먼저 본다. 거절 응답의 본문이 커도 상태는 남는다.
+            hooks.insert(0, note_rejected)
         async with httpx2.AsyncClient(headers=headers, follow_redirects=False, timeout=timeout,
-                                     event_hooks={"response": [_cap_remote_response]}) as client:
+                                     event_hooks={"response": hooks}) as client:
             async with streamable_http_client(server["url"], http_client=client) as streams:
                 yield streams
     finally:

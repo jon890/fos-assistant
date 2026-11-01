@@ -229,16 +229,12 @@ public final class ChatDtos {
 
     /**
      * 그 에이전트의 profile 로 고를 수 있는 모델이다. 그룹이 숨긴 것은 빠져 있다.
-     * @param defaultModel 고르지 않았을 때 도는 모델. 에이전트 기본값이 있으면 그 값이고 없으면 profile 의 값이다
-     * @param defaultReasoningEffort 에이전트 기본 effort. 정하지 않았으면 null
-     * @param defaultFromAgent 기본 모델을 에이전트 기본값이 정했는가
+     * @param defaultModel 요청에 모델을 싣지 않을 때 도는 모델. profile 의 값이다
      * @param defaultAvailable 기본 모델이 {@code providers} 에 있는가. 숨겼거나 목록에서 빠졌으면 거짓이다
      */
     public record ModelOptionsView(
         String defaultProvider,
         String defaultModel,
-        String defaultReasoningEffort,
-        boolean defaultFromAgent,
         boolean defaultAvailable,
         List<ProviderView> providers,
         List<String> reasoningEfforts) {
@@ -247,8 +243,6 @@ public final class ChatDtos {
             return new ModelOptionsView(
                 options.defaultProvider(),
                 options.defaultModel(),
-                options.defaultReasoningEffort(),
-                options.defaultFromAgent(),
                 options.defaultAvailable(),
                 options.providers().stream().map(ProviderView::from).toList(),
                 options.reasoningEfforts());

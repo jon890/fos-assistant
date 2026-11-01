@@ -5,6 +5,8 @@ import static com.bifos.assistant.connector.action.domain.ToolPolicyDecision.Che
 import static com.bifos.assistant.connector.action.domain.ToolPolicyDecision.CheckBoundary.READ_ONLY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -15,25 +17,29 @@ import com.bifos.assistant.connector.connection.application.ConnectorToolPolicie
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
+import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HttpHermesConnectorClient;
 import com.bifos.assistant.hermes.infra.SandboxAttachmentDirectory;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 /**
- * {@code assistant.json} 이 없는 표준 플러그인(`schema: 3`)을 카탈로그에서 읽고 그 도구를 호출마다 승인으로 판정한다
- * (ADR-20261101 / plugin-without-assistant-json).
+ * {@code assistant.json} 이 없는 표준 플러그인(`schema: 3`)을 카탈로그에서 읽고 그 도구를 호출마다 승인으로 판정한다. 읽기 표시가 있는
+ * 도구만 첫 승인 뒤 상시 허락으로 지난다(ADR-20261101 / plugin-without-assistant-json).
  *
  * <p>카탈로그 항목은 대시보드 plugin 이 {@code hermes/tests/fixtures/standard-plugin} 과
  * {@code standard-remote-plugin} 으로 내는 모양과 같다. 그 모양은 {@code hermes/tests/test_connector_standard_plugin.py} 가 검사한다.
@@ -53,6 +59,16 @@ class StandardPluginPolicyTest {
                      "required":true}],
           "verify":null,"mcp_server":"std-remote","owner_browser":false,"owner_browser_login_url":null,
           "single_binding":false,"skills":["remote-notes"],"unknown_errors":{},"tools":{}}]
+        """;
+    /** 일부 도구만 선언하고 나머지를 호출마다 묻는 커넥터다. `default_tool_policy` 칸이 있는 항목과 없는 항목이다. */
+    private static final String PARTIAL_ITEM = """
+        [{"id":"partial-notes","schema":2,"title":"일부 선언","description":"","icon":null,"link":null,
+          "readme_url":null,"link_kind":"service",
+          "fields":[{"key":"token","env":"PARTIAL_TOKEN","label":"토큰","secret":true,"required":true}],
+          "verify":{"tool":"list_notes"},"mcp_server":"partial-notes","owner_browser":false,
+          "owner_browser_login_url":null,"single_binding":false,"skills":[],"unknown_errors":{},
+          "DEFAULT_POLICY":
+          "tools":{"list_notes":{"risk":"READ","approval":"none"}}}]
         """;
     private static final ToolPolicyDecision EVERY_CALL = new ToolPolicyDecision(
         ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
@@ -92,7 +108,7 @@ class StandardPluginPolicyTest {
 
 
     @Test
-    @DisplayName("표준 플러그인의 도구는 상시 허락과 대화 허락이 있어도 호출마다 승인 필요로 판정한다")
+    @DisplayName("표준 플러그인의 읽기 표시 없는 도구는 상시 허락과 대화 허락이 있어도 호출마다 승인 필요로 판정한다")
     void everyToolOfStandardPluginNeedsApprovalEachCall() {
         for (ConnectorManifest manifest : readCatalog()) {
             String hermesTool = "mcp__" + manifest.mcpServer().replace('-', '_') + "__delete_note";
@@ -120,6 +136,78 @@ class StandardPluginPolicyTest {
 
 
     @Test
+    @DisplayName("표준 플러그인은 읽기 표시가 있는 도구만 상시 허락으로 허용하고, 표시를 거두면 허락이 남아도 승인 필요로 돌아간다")
+    void onlyReadOnlyMarkedToolsPassWithStandingGrant() {
+        ConnectorManifest manifest = readCatalog().getFirst();
+        ToolPolicyDecision allowed = new ToolPolicyDecision(
+            ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
+
+        // 읽기 표시가 있어도 첫 호출은 승인이다. 허락이 생긴 뒤에만 지난다.
+        assertThat(decide(manifest, true, false)).isEqualTo(EVERY_CALL);
+        assertThat(decide(manifest, true, true)).isEqualTo(allowed);
+        // 표시가 없거나 거둔 도구는 남은 허락을 보지 않는다.
+        assertThat(decide(manifest, false, true)).isEqualTo(EVERY_CALL);
+        // 대화 허락은 읽기 표시와 상관없이 닫혀 있다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, manifest.schema(), Optional.empty(), false, true, true, 2, NOT_CHECK))
+                .isEqualTo(EVERY_CALL);
+        // 읽기 표시는 표준 플러그인에만 쓴다. 도구를 선언하는 판의 선언 없는 도구는 지금처럼 거절한다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, 2, Optional.empty(), true, false, true, 2, NOT_CHECK).denyReason())
+                .isEqualTo(ActionDenyReason.UNDECLARED);
+        // 쓰기를 허용한 살펴보기는 허락과 표시를 보지 않고 승인 줄로 보낸다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, manifest.schema(), Optional.empty(), true, false, true, 2, APPROVAL_ONLY))
+                .isEqualTo(EVERY_CALL);
+    }
+
+
+    @Test
+    @DisplayName("도구 목록은 /tools 에 보관 파일 이름만 보내 이름과 읽기 표시를 읽고, 거절 어휘와 틀린 모양을 가른다")
+    void toolListingReadsNamesAndReadOnlyMarks() {
+        server.expect(requestTo(BASE + "/api/connectors/standard-notes/tools"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json("{\"vault\":\"c1\"}", JsonCompareMode.STRICT))
+            .andRespond(withSuccess("""
+                {"ok":true,"tools":[{"name":"list_notes","read_only":true},{"name":"delete_note","read_only":false}]}
+                """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/standard-notes/tools"))
+            .andRespond(withSuccess("{\"ok\":false,\"error\":\"credential_rejected\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/standard-notes/tools"))
+            .andRespond(withSuccess("""
+                {"ok":true,"tools":[{"name":"list_notes","read_only":true},{"name":"list_notes","read_only":false}]}
+                """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.listToolsWithVault("standard-notes", "c1").tools())
+            .containsExactly(Map.entry("list_notes", true), Map.entry("delete_note", false));
+        assertThat(client.listTools("standard-notes", Map.of("std_token", "x")).error())
+            .isEqualTo(ConnectorCallError.CREDENTIAL_REJECTED);
+        assertThatThrownBy(() -> client.listToolsWithVault("standard-notes", "c1"))
+            .isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("도구 수와 이름 길이 상한 안이어도 저장할 JSON 이 컬럼 크기를 넘는 목록은 틀린 응답으로 다룬다")
+    void toolListingThatOverflowsTheColumnIsRejected() {
+        StringBuilder tools = new StringBuilder();
+        for (int index = 0; index < 256; index++) {
+            // 한 글자가 UTF-8 3바이트인 120자 이름이다. 글자 수 상한은 지나지만 합치면 60,000바이트를 넘는다.
+            tools.append(index == 0 ? "" : ",")
+                .append("{\"name\":\"").append(String.format("%03d", index)).append("가".repeat(117))
+                .append("\",\"read_only\":false}");
+        }
+        server.expect(requestTo(BASE + "/api/connectors/standard-notes/tools"))
+            .andRespond(withSuccess("{\"ok\":true,\"tools\":[" + tools + "]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.listToolsWithVault("standard-notes", "c1"))
+            .isInstanceOf(IllegalStateException.class);
+        server.verify();
+    }
+
+
+    @Test
     @DisplayName("schema 3 이 아닌 항목에서 확인 도구가 빠지면 지금처럼 카탈로그 읽기가 실패한다")
     void verifyToolIsStillRequiredForDeclaredSchemas() {
         server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
@@ -137,6 +225,87 @@ class StandardPluginPolicyTest {
             manifest.fields(), "list_notes", manifest.mcpServer(), manifest.schema(), manifest.tools());
 
         assertThat(ConnectorToolPolicies.valid(withVerify)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy: ask 커넥터는 선언한 READ 도구는 승인 없이, 선언하지 않은 도구는 승인 필요로 판정한다")
+    void askDefaultPolicyAsksForUndeclaredToolsOnly() {
+        ConnectorManifest manifest = readPartial("\"default_tool_policy\":\"ask\",");
+        assertThat(manifest.defaultToolPolicy()).isEqualTo("ask");
+        assertThat(ConnectorToolPolicies.valid(manifest)).isTrue();
+        assertThat(ConnectorToolPolicies.partialAsk(manifest)).isTrue();
+        int schema = ConnectorToolPolicies.decisionSchema(manifest);
+
+        ToolPolicyDecision declaredRead = ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, ConnectorToolPolicies.find(manifest, "list_notes"),
+            false, false, false, 2, NOT_CHECK);
+        assertThat(declaredRead.decision()).isEqualTo(ActionDecision.ALLOWED);
+
+        // 선언하지 않은 도구는 schema 3 의 도구와 같다. 읽기 표시가 없으면 허락이 있어도 승인이고, 표시가 있으면 허락으로 지난다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), true, true, false, 2, NOT_CHECK))
+                .isEqualTo(EVERY_CALL);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), false, false, true, 2, NOT_CHECK))
+                .isEqualTo(EVERY_CALL);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), true, false, true, 2, NOT_CHECK).decision())
+                .isEqualTo(ActionDecision.ALLOWED);
+        // 읽기 경계의 살펴보기는 승인 줄 없이 거절하고, 다른 서버의 등록 이름은 거절한다.
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, schema, Optional.empty(), false, 2, READ_ONLY).denyReason())
+                .isEqualTo(ActionDenyReason.READ_ONLY_RUN);
+        assertThat(ToolPolicyDecision.decide(
+            ConnectionStatus.READY, false, schema, Optional.empty(), false, 2, NOT_CHECK).denyReason())
+                .isEqualTo(ActionDenyReason.UNDECLARED);
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 칸이 없거나 deny 거나 모르는 값인 schema 2 는 선언하지 않은 도구를 지금처럼 거절한다")
+    void missingDefaultPolicyStillRefusesUndeclaredTools() {
+        for (String declared : List.of("", "\"default_tool_policy\":\"deny\",", "\"default_tool_policy\":\"allow\",",
+            "\"default_tool_policy\":null,", "\"default_tool_policy\":[\"ask\"],")) {
+            ConnectorManifest manifest = readPartial(declared);
+            assertThat(manifest.defaultToolPolicy()).as(declared).isNull();
+            assertThat(ConnectorToolPolicies.partialAsk(manifest)).as(declared).isFalse();
+            int schema = ConnectorToolPolicies.decisionSchema(manifest);
+            assertThat(schema).as(declared).isEqualTo(2);
+            assertThat(ToolPolicyDecision.decide(
+                ConnectionStatus.READY, true, schema, Optional.empty(), true, false, true, 2, NOT_CHECK).denyReason())
+                    .as(declared)
+                    .isEqualTo(ActionDenyReason.UNDECLARED);
+        }
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 는 schema 2 에서만 읽고, 표준 플러그인의 판정 schema 는 그대로 3 이다")
+    void askIsReadOnlyForDeclaringSchema() {
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(CATALOG.replace("\"tools\":{}}", "\"default_tool_policy\":\"ask\",\"tools\":{}}"),
+                MediaType.APPLICATION_JSON));
+        ConnectorManifest standard = client.readCatalog().getFirst();
+
+        assertThat(standard.defaultToolPolicy()).isNull();
+        assertThat(ConnectorToolPolicies.partialAsk(standard)).isFalse();
+        assertThat(ConnectorToolPolicies.undeclaredAsk(standard)).isTrue();
+        assertThat(ConnectorToolPolicies.decisionSchema(standard)).isEqualTo(ConnectorToolPolicies.STANDARD_SCHEMA);
+    }
+
+
+    private ConnectorManifest readPartial(String defaultPolicy) {
+        server.reset();
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(PARTIAL_ITEM.replace("\"DEFAULT_POLICY\":", defaultPolicy), MediaType.APPLICATION_JSON));
+        return client.readCatalog().getFirst();
+    }
+
+
+    private static ToolPolicyDecision decide(ConnectorManifest manifest, boolean readOnlyMarked, boolean granted) {
+        return ToolPolicyDecision.decide(
+            ConnectionStatus.READY, true, manifest.schema(), Optional.empty(), granted, false, readOnlyMarked, 2, NOT_CHECK);
     }
 
 

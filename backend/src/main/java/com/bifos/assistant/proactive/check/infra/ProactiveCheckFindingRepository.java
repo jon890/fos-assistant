@@ -25,4 +25,8 @@ public interface ProactiveCheckFindingRepository extends JpaRepository<Proactive
 
     /** 그 살펴보기가 낸 그 종류의 발견이다. */
     List<ProactiveCheckFinding> findByCheckIdAndKind(Long checkId, FindingKind kind);
+
+
+    /** 그 번호 뒤의 그 종류 발견을 번호 순서로 읽는다. 옛 줄을 제안 줄로 옮기는 작업이 번호를 따라 나누어 읽는다. */
+    List<ProactiveCheckFinding> findByKindAndIdGreaterThanOrderByIdAsc(FindingKind kind, Long afterId, Pageable page);
 }

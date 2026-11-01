@@ -41,6 +41,7 @@ from .connector_mcp import (
     _mcp_sdk_version,
     _run_connector_execute,
     _run_connector_tool,
+    _run_connector_tool_list,
     _safe_error_detail,
     _tool_error,
     _tool_payload,
@@ -84,10 +85,16 @@ CONNECTOR_EXECUTE_TIMEOUT_SECONDS = 60
 _connector_calls = 0
 
 
-async def _connector_call_request(request, connector_id: str):
+# 도구 목록 경로(`/tools`)가 받는 표준 플러그인의 schema 다(ADR-20261101 plugin-without-assistant-json).
+TOOL_LIST_SCHEMA = 3
+
+
+async def _connector_call_request(request, connector_id: str, listing=False):
     """후보 값이나 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다.
 
-    본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `vault` 는 그 커넥터의 보관 파일이어야 한다.
+    `listing` 이 참이면 도구를 부르지 않고 `tools/list` 만 받아 `{"ok": true, "tools": [{"name", "read_only"}]}` 로 답한다.
+    `schema: 3` 커넥터만 받는다. 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다. 시간 제한과 동시 한도는 같다.
+    본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `listing` 이면 `tool` 이 없다. `vault` 는 그 커넥터의 보관 파일이어야 한다.
     보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 확인된다.
     `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 커넥터만 쓴다.
     """
@@ -101,12 +108,16 @@ async def _connector_call_request(request, connector_id: str):
     if manifest is None:
         return _rejected("없는 connector 다", 404)
     body = await _json_object(request)
-    if (body is None or set(body) - {"owner_browser"} not in ({"tool", "values"}, {"tool", "vault"})
+    shapes = ({"values"}, {"vault"}) if listing else ({"tool", "values"}, {"tool", "vault"})
+    if (body is None or set(body) - {"owner_browser"} not in shapes
             or ("values" in body and not isinstance(body["values"], dict))
             or ("vault" in body and (not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])))):
         return _rejected("tool 과, values 나 vault 가운데 하나만 필요하다")
-    tool = body["tool"]
-    if not isinstance(tool, str) or tool not in manifest["call_tools"]:
+    if listing and manifest["schema"] != TOOL_LIST_SCHEMA:
+        return _rejected("도구 목록은 assistant.json 이 없는 표준 플러그인에서만 받는다")
+    # 도구 목록은 도구를 부르지 않는다. 로그에 남길 이름만 둔다.
+    tool = "tools/list" if listing else body["tool"]
+    if not listing and (not isinstance(tool, str) or tool not in manifest["call_tools"]):
         return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
     if "vault" in body:
         try:
@@ -159,8 +170,16 @@ async def _connector_call_request(request, connector_id: str):
         logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
         return failed("unavailable")
     _connector_calls += 1
+    seen = {"rejected": False}
+    # 원격 서버가 칸 값을 받지 않았으면 도구 목록 경로만 따로 알린다. 확인 도구는 도구의 오류 코드로 알린다.
+    rejected_or = lambda word: "credential_rejected" if listing and seen["rejected"] else word
     try:
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스나 원격 연결을 끝낸 뒤에 돌아온다.
+        if listing:
+            tools = await asyncio.wait_for(
+                _run_connector_tool_list(manifest, env, CONNECTOR_CALL_TIMEOUT_SECONDS, seen),
+                CONNECTOR_CALL_TIMEOUT_SECONDS)
+            return JSONResponse({"ok": True, "tools": tools}, status_code=200)
         result = await asyncio.wait_for(_run_connector_tool(manifest, tool, env, CONNECTOR_CALL_TIMEOUT_SECONDS),
                                         CONNECTOR_CALL_TIMEOUT_SECONDS)
         answer = None if result is None else _connector_call_answer(manifest, result)
@@ -172,12 +191,12 @@ async def _connector_call_request(request, connector_id: str):
         return failed("unavailable")
     except asyncio.TimeoutError:
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
-        return failed("unavailable")
+        return failed(rejected_or("unavailable"))
     except Exception as error:
         # 예외 본문에는 자식의 출력이나 원격 주소가 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
                        connector_id, tool, ", ".join(sorted(set(_leaf_error_types(error)))), _mcp_sdk_version())
-        return failed("unavailable")
+        return failed(rejected_or("unavailable"))
     finally:
         _connector_calls -= 1
     if answer is None:
@@ -371,4 +390,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         if "retry" in answer:
             unknown["retry"] = answer["retry"]
         return JSONResponse(unknown, status_code=504)
+    if (manifest["schema"] == TOOL_LIST_SCHEMA or manifest["default_tool_policy"] == "ask") and "read_only" in progress:
+        # 표준 플러그인과 `default_tool_policy: ask` 커넥터만 부르기 직전 `tools/list` 의 읽기 표시를 더한다. 옛 Control Plane 은 이 칸을 읽지 않는다(rule-66).
+        answer = {**answer, "read_only": progress["read_only"]}
     return JSONResponse(answer, status_code=200)
