@@ -3,7 +3,7 @@
 사용자가 묻지 않아도 에이전트가 기억 위에서 목표와 최근 일을 살피고, 챙길 것이 있으면 제안 카드로 보이는 기능이다.
 
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
-옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 가치 평가, 행동 정책, 매일 루프의 절은 옮기는 순서 6 에서 지운다.
+옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 가치 평가와 매일 루프의 절은 옮기는 순서 6 에서 지운다.
 
 covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
 
@@ -15,7 +15,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 - 사용자는 에이전트 상세나 점검 대화의 단추로 살펴보기를 시작하거나, 매일 깨우기를 켜서 정한 시각에 돌린다. 매일 깨우기는 기본 꺼짐이다.
 - 결과는 그 사용자와 에이전트의 점검 대화 하나에만 남는다. 같은 에이전트를 쓰는 다른 사용자의 점검 대화와 살펴보기는 따로다.
 - 관리자가 쓰기 도구를 허용하지 않은 에이전트의 살펴보기는 읽기만 하고, 그 경계는 Control Plane 이 강제한다.
-- 매일 깨우기 뒤에는 사용자가 켠 에이전트에서만 문제 후보를 가치 평가와 행동 정책에 한 번 잇는다. 그 판정은 지금 화면에 더 보이지 않고, 지금 화면에는 결과 블록의 제안이 제안 카드로 보인다.
+- 살펴보기가 끝나도 문제 후보를 가치 평가에 잇지 않는다. 지금 화면에는 결과 블록의 제안이 제안 카드로 보인다.
 - 사용자에게 스킬을 부르라고 안내하지 않는다. 스킬은 에이전트를 준비하는 사람이 설치한다.
 
 ### 새 설계
@@ -304,7 +304,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 결정은 [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다. 칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultBlock` 이 갖는다.
 `problemKey` 는 앞뒤 공백을 지우고 소문자로 맞춰 비교한다. 검사 순서와 버린 까닭은 ADR-093 의 까닭 표와 `ProblemJudgement` 가 갖는다.
-단추로 연 살펴보기와 매일 깨우기는 가치 평가와 행동 정책을 부르지 않는다.
+단추로 연 살펴보기와 매일 깨우기는 가치 평가를 부르지 않는다.
 
 ### 분야 지침이 지킬 것
 
@@ -321,8 +321,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ## 매일 루프
 
-매일 깨우기로 돈 살펴보기가 끝나도 가치 평가와 행동 정책에 잇지 않는다.
-둘을 잇던 조정자와 살펴보기의 끝을 알리던 사건은 지웠다.
+매일 깨우기로 돈 살펴보기가 끝나도 가치 평가에 잇지 않는다.
+가치 평가를 잇던 조정자와 살펴보기의 끝을 알리던 사건, 행동 정책은 지웠다.
 이 절에는 설정과 기동 복구가 남아 있고, 키는 `ProactiveLoopProperties` 가 갖는다.
 결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
 
@@ -334,16 +334,16 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
 설치 설정이 꺼져 있으면 꺼진 줄을 켜는 요청만 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 늘 받는다.
 `snoozedUntil` 이 `ProactiveLoopSettingService.MAX_SNOOZE` 를 넘으면 400 `VALIDATION_FAILED`, 지난 시각이면 비운 것과 같다.
-쉬기가 끝난 뒤 쉬는 동안의 깨우기를 몰아 잇지 않는다. 읽기 전용 자동 실행은 이 설정과 따로 행동 정책의 설치 설정과 사용자 동의가 연다.
+쉬기가 끝난 뒤 쉬는 동안의 깨우기를 몰아 잇지 않는다.
 
 ### 서버가 멈췄을 때
 
-기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫고 평가와 판정을 다시 부르지 않는다.
-평가가 시작됐는지는 원천 살펴보기 번호의 `proactive_value_evaluation` 으로 찾는다. 평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가, 판정 줄의 `PENDING` 은 행동 정책이 다룬다.
+기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫고 평가를 다시 부르지 않는다.
+평가가 시작됐는지는 원천 살펴보기 번호의 `proactive_value_evaluation` 으로 찾는다. 평가 줄의 `RUNNING` 은 가치 평가의 기동 복구가 다룬다.
 
 ## 문제 후보의 가치 평가
 
-받아들인 문제 후보 가운데 지금 무엇을 먼저 다룰지 판단한다. 권한, 승인, 실행 여부는 아래 「행동 정책」 이 정한다.
+받아들인 문제 후보 가운데 지금 무엇을 먼저 다룰지 판단한다. 권한, 승인, 실행 여부는 정하지 않는다.
 결정은 [ADR-20261007 / value-evaluation](../adr/ADR-20261007-value-evaluation.md)에, 설정은 `ValueEvaluationProperties` 에 있다.
 결과를 대화에 올리지 않는다. 지금은 부르는 곳이 없다.
 
@@ -358,7 +358,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ### provider 계약
 
-`DecisionProvider` port 가 판단을 낸다. 새 adapter 는 이 port 만 구현하며 `ValueEvaluator` 의 검사와 행동 정책을 바꾸지 않는다.
+`DecisionProvider` port 가 판단을 낸다. 새 adapter 는 이 port 만 구현하며 `ValueEvaluator` 의 검사를 바꾸지 않는다.
 첫 adapter `hermes` 는 도구 없는 시스템 판단 profile 에 Hermes Runs 로 한 번 묻는다. 실행 기록은 요청 사용자에게 묶고 `agent_id` 와 `conversation_id` 를 비우며, 기존 백그라운드 실행 한도로 센다.
 오류 본문은 남기지 않는다. 그룹이 숨긴 모델은 호출하지 않는다.
 timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 계속 쥐고 기존 원격 종료 확인 경로로 중지한다. 대기 timeout 은 제출 뒤 시작한다.
@@ -374,47 +374,8 @@ timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 �
 기동할 때 남은 `RUNNING` 은 `FALLBACK / INTERRUPTED` 로 닫고 다시 부르지 않는다. 한 줄의 복구가 실패해도 다른 줄과 서버 기동을 이어 간다.
 replay 는 저장된 `state` 와 `questions` 로 새 시도를 만든다. 같은 답의 재현을 보장하지 않고, 같은 입력에서 판단 차이를 비교하는 기능이다.
 판정 읽기와 replay 를 열던 경로(`ValueEvaluationController`)와 관리자 영역의 가치 평가 경로와 화면은 지웠다.
-행동 정책은 `ValueEvaluationService.read` 의 `DecisionEvidence` 를 읽는다. `EVALUATED` 도 추천일 뿐 실행 허락이 아니므로 정책은 후보와 근거의 유효성, 사용자 권한을 다시 확인한다.
+`EVALUATED` 도 추천일 뿐 실행 허락이 아니다.
 축의 `UNKNOWN`, 낮은 확신, 부작용 힌트를 판단에서 빠뜨리지 않는다. replay 결과를 현재 상황의 실행 근거로 바로 쓰지 않는다.
-
-## 행동 정책
-
-가치 평가를 받은 문제 후보마다 무엇까지 해도 되는지 정한다.
-결정은 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md)에 있다. 입력은 `AutonomyInputs`, 키와 기본값은 `AutonomyProperties` 가 갖는다.
-지금은 부르는 곳이 없다. 판정을 열던 경로와 사용자 동의를 바꾸던 경로(`AutonomyController`)는 지웠다.
-
-### 행동 수준
-
-| 수준 | 뜻 | 이번에 하는 일 |
-| --- | --- | --- |
-| `IGNORE` | 다루지 않는다 | 판정만 남긴다 |
-| `SURFACE` | 보일 가치가 있지만 실행 근거나 허락이 없다 | 판정만 남긴다. 지금 화면은 이 판정을 읽지 않는다 |
-| `ASK_APPROVAL` | 쓰기나 위험이 있어 사람의 승인 없이는 하지 않는다 | 새 승인 줄을 만들지 않는다. 지금 화면은 이 판정을 읽지 않는다 |
-| `EXECUTE` | 읽기 전용 살펴보기를 한 번 시작한다 | 실행 키를 저장한 뒤 시작한다 |
-
-### 까닭 코드와 수준
-
-까닭과 그 묶음은 `AutonomyReason` 이, 조건과 보는 순서는 `AutonomyPolicy` 가 갖는다. 규칙을 바꾸면 `AutonomyPolicy.VERSION` 을 올리고 판정 줄에 남긴다.
-묶음은 다루지 않음, 근거 부족, 승인, 실행 막힘, 실행이고 이 차례로 본다. 모든 까닭을 모은 뒤 앞 묶음에 하나라도 있으면 뒤를 보지 않는다.
-근거가 약한 후보에는 승인을 묻지 않는다. 승인 묶음은 실행 막힘보다 앞서므로 사용자 동의가 꺼져 있어도 쓰기 후보는 `ASK_APPROVAL` 이다.
-replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아니다(`REPLAY_INPUT`). 행동 종류가 `QUESTION` 이면 사용자가 답해야 하므로 근거 부족으로 본다.
-한 판정에서 `EXECUTE` 는 추천 순서로 처음 받은 후보 하나에만 남고, 나머지는 `EXECUTION_TAKEN` 으로 내려간다.
-
-### 자동 실행
-
-`EXECUTE` 판정은 같은 트랜잭션에서 `execution_key = check:<원천 살펴보기 식별자>` 와 `PENDING` 을 저장한다. 유일 제약에 걸리면 판정을 한 번 다시 하고 `ALREADY_EXECUTED` 가 붙는다.
-커밋한 뒤 `ProactiveCheckService.startAutonomous` 로 시작한다. 시작하면 `STARTED` 와 새 살펴보기 식별자를 남긴다.
-시작 직전에 사용자의 읽기 전용 실행 동의와 설치의 `executionEnabled` 를 다시 읽는다. 하나라도 꺼져 있으면 시작 경로를 부르지 않고 `PROACTIVE_CHECK_UNAVAILABLE` 로 `FAILED` 를 남긴다.
-그래서 동의는 두 번 본다. 판정할 때 읽은 값은 `EXECUTE` 가 될 수 있는지를 정하고, 시작 직전에 읽은 값은 실제로 시작하는지를 정한다. 판정 저장 뒤 시작 전에 철회하면 판정은 `EXECUTE` 로 남지만 시작하지 않는다.
-이 확인은 잠금 없는 조회이고 시작 경로 안쪽이 아니다. 확인을 통과한 뒤 `startAutonomous` 가 에이전트를 조회하고 turn 을 여는 동안 들어온 철회는 막지 못하며, 이미 시작한 살펴보기도 멈추지 않는다.
-사용자가 스스로 끈 결과라 이 `FAILED` 는 판단 피드백(`EXECUTION_FAILED`)을 남기지 않는다.
-시작 경로가 거절하면 `FAILED` 와 오류 코드를 남기고 다시 시작하지 않는다. 저장 뒤 시작 전에 서버가 멈추면 `PENDING` 그대로 두고 다시 시작하지 않는다.
-시작은 기존 경로의 검사(시작 권한, 시작 전 점검, 사용자 자리, 대화 잠금)를 모두 다시 거치고, 매일 깨우기처럼 백그라운드 자리를 쓴다.
-그 에이전트에 쓰기 허용이 켜져 있으면 `PROACTIVE_CHECK_UNAVAILABLE` 로 거절한다. 판정 뒤 관리자가 켠 경우도 여기서 막힌다.
-자동 실행한 살펴보기가 답과 보고, 발견을 남기지 않고 문제 후보만 저장하는 것은 ADR 이 갖는다.
-시작, 멈춤, 실패 알림 줄도 남기지 않는다. 살펴보기 줄의 상태와 오류 코드는 남긴다. 상태 조회와 매일 깨우기 조회는 이 줄을 마지막 살펴보기로 보이지 않는다.
-자동 실행은 점검 대화의 Hermes session 을 그대로 쓰므로 그 문답이 다음 살펴보기의 맥락에 들어간다.
-자동 실행이 받아들인 문제 키도 다음 살펴보기의 중복 판정에 들어간다. 같은 문제가 바뀐 점 없이 다시 나오면 버려지지만, 그 후보는 이미 행동 정책을 거칠 수 있다.
 
 ## 판단 피드백
 
@@ -453,7 +414,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 | 살펴보기, 판정, 실행 줄을 지움 | 그 번호 칸만 비운다(`ON DELETE SET NULL`) |
 
 대화 삭제의 정리는 같은 트랜잭션이라 실패하면 대화 삭제도 실패한다. 「기록이 사용자의 동작을 막지 않는다」 의 유일한 예외다. 지운 대화에 사건이 남지 않게 하려는 선택이다.
-행동 정책 판정의 사건은 원천 점검 대화를 `conversation_id` 로 채워 점검 대화를 지울 때 함께 지운다.
+옛 행동 정책 판정의 사건도 원천 점검 대화를 `conversation_id` 로 채워 점검 대화를 지울 때 함께 지운다.
 
 ## 먼저 살펴보기 루프 평가
 
