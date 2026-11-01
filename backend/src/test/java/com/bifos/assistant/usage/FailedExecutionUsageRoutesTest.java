@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
@@ -50,6 +51,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 대화와 위임 경로가 Hermes 실패 결과의 사용량을 실제 실행 기록과 비용으로 보존하는지 본다. */
 @BackendIntegrationTest
@@ -96,6 +98,9 @@ class FailedExecutionUsageRoutesTest {
     @Autowired
     PriceCatalog prices;
 
+    @Autowired
+    TransactionTemplate transaction;
+
     private CurrentUser user;
     private Agent agent;
     private Conversation conversation;
@@ -116,9 +121,12 @@ class FailedExecutionUsageRoutesTest {
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
             user.id());
-        agent.changeDefaultModel("requested-provider", "requested-model", null);
         agent = agents.save(agent);
-        conversation = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
+        Conversation started = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
+        // 요청한 모델과 실제로 돈 모델이 달라야 사용량과 비용이 실제 모델 기준임을 확인할 수 있다
+        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
+            started.id(), user.id(), "requested-provider", "requested-model", null, ModelSelectionMode.CUSTOM));
+        conversation = conversations.findById(started.id()).orElseThrow();
         doReturn(Optional.of(new CatalogPrice(
             new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
             PRICING_VERSION)))

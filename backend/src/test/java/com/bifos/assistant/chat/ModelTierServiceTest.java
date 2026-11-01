@@ -1,7 +1,6 @@
 package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,21 +51,19 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("DEFAULT 대화는 사용자와 그룹 기본 단계가 있어도 profile 기본값만 쓴다")
-    void explicitDefaultBypassesUserAndGroupDefaults() {
+    @DisplayName("선택 없는 대화는 사용자와 그룹 기본 칸이 모두 없으면 요청에 모델을 싣지 않는다")
+    void inheritedConversationWithoutAnyDefaultTierSendsNoModel() {
         FakeModelSettingStore store = new FakeModelSettingStore();
         AppUserRepository users = mock(AppUserRepository.class);
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelTierService service = service(store, users, options, nothingHidden(), mock(GroupModelCatalogService.class));
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
+        when(users.findById(1L)).thenReturn(Optional.empty());
 
-        ResolvedModelTier resolved = service.resolve(MEMBER, conversation, mock(Agent.class));
+        ResolvedModelTier resolved = service.resolve(MEMBER, mock(Conversation.class), mock(Agent.class));
 
-        assertThat(resolved.choice().usesDefaultModel()).isTrue();
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
         assertThat(resolved.tier()).isNull();
-        assertThat(store.reads()).isZero();
-        verifyNoInteractions(users, options);
+        verifyNoInteractions(options);
     }
 
 
@@ -495,7 +492,7 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("저장 칸과 에이전트 기본값이 모두 비어 있으면 칸 기록을 남기고 profile 기본값으로 돈다")
+    @DisplayName("고른 칸이 비어 있으면 칸 기록을 남기고 요청에 모델을 싣지 않는다")
     void emptyTierMappingFallsBackToProfileDefault() {
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelTierService service = service(
@@ -749,61 +746,43 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("DEFAULT 대화는 에이전트 기본 모델이 있으면 그 값을 명시해 보낸다")
-    void explicitDefaultUsesAgentDefaultModel() {
+    @DisplayName("선택 없는 대화는 그룹 기본 칸이 비어 있으면 칸 기록을 남기고 모델을 싣지 않는다")
+    void inheritedConversationWithEmptyGroupDefaultTierSendsNoModel() {
         TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "high");
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
-
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "high"));
-        assertThat(resolved.tier()).isNull();
-        verifyNoInteractions(fixtures.options());
-    }
-
-
-    @Test
-    @DisplayName("선택 없는 대화는 사용자와 그룹 기본 칸이 없으면 에이전트 기본 모델로 돈다")
-    void inheritedConversationFallsBackToAgentDefaultModel() {
-        TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent(), "openai-codex", "example-agent", null);
+        fixtures.store().tiers(fallbackStops()).defaultTier(ModelTier.HIGH);
         when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
 
         ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent());
 
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", null));
-        assertThat(resolved.tier()).isNull();
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
     }
 
 
     @Test
-    @DisplayName("mapping이 빈 칸은 칸 기록을 남기고 에이전트 기본 모델로 돈다")
-    void emptyTierMappingUsesAgentDefaultModel() {
+    @DisplayName("mapping이 빈 칸은 칸 기록을 남기고 모델을 싣지 않는다")
+    void emptyTierMappingSendsNoModel() {
         TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "medium");
         fixtures.store().tiers(fallbackStops());
 
         ResolvedModelTier resolved = fixtures.service().resolveTier(fixtures.user(), ModelTier.HIGH, fixtures.agent());
 
         assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "medium"));
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
     }
 
 
     @Test
-    @DisplayName("모델을 비운 CUSTOM 대화는 에이전트 기본 모델로 돌고 effort는 대화가 고른 값이 먼저다")
-    void customConversationWithoutModelUsesAgentDefaultModel() {
+    @DisplayName("모델을 비운 CUSTOM 대화는 모델을 싣지 않고 effort는 대화가 고른 값을 보낸다")
+    void customConversationWithoutModelKeepsOnlyChosenEffort() {
         TierFixtures fixtures = tierFixtures();
-        agentDefault(fixtures.agent(), "openai-codex", "example-agent", "low");
         Conversation conversation = mock(Conversation.class);
         when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
         when(conversation.modelChoice()).thenReturn(ModelChoice.stored(null, null, "max"));
 
         ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
 
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("openai-codex", "example-agent", "max"));
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored(null, null, "max"));
     }
 
 
@@ -858,7 +837,7 @@ class ModelTierServiceTest {
     void resolvesDefaultWithoutReadingCatalogWhenNothingIsHidden() {
         HiddenFixtures fixtures = hiddenFixtures(HiddenModels.none());
 
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent());
 
         assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
         verifyNoInteractions(fixtures.options());
@@ -866,13 +845,13 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
+    @DisplayName("선택 없는 실행은 profile 의 기본 모델이 숨긴 모델이면 MODEL_HIDDEN 으로 거절한다")
     void rejectsDefaultRunWhenProfileDefaultModelIsHidden() {
         HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
         when(fixtures.options().profileDefaultOf(fixtures.agent()))
             .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
 
-        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
@@ -880,13 +859,13 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("에이전트 기본 모델이 없고 profile 의 기본 provider 전체를 숨겼으면 MODEL_HIDDEN 으로 거절한다")
+    @DisplayName("선택 없는 실행은 profile 의 기본 provider 전체를 숨겼으면 MODEL_HIDDEN 으로 거절한다")
     void rejectsDefaultRunWhenProfileDefaultProviderIsHidden() {
         HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", null));
         when(fixtures.options().profileDefaultOf(fixtures.agent()))
             .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
 
-        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
@@ -900,7 +879,7 @@ class ModelTierServiceTest {
         when(fixtures.options().profileDefaultOf(fixtures.agent()))
             .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
 
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent());
 
         assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
     }
@@ -913,37 +892,10 @@ class ModelTierServiceTest {
         when(fixtures.options().profileDefaultOf(fixtures.agent()))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
-        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
+        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있어도 에이전트 기본 모델이 있으면 목록을 읽지 않고 그 모델로 판정한다")
-    void judgesAgentDefaultModelWithoutReadingCatalog() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-model"));
-        agentDefault(fixtures.agent(), "example-provider", "example-agent", null);
-
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored("example-provider", "example-agent", null));
-        verifyNoInteractions(fixtures.options());
-    }
-
-
-    @Test
-    @DisplayName("숨김이 있고 에이전트 기본 모델이 숨긴 모델이면 목록을 읽지 않고 MODEL_HIDDEN 으로 거절한다")
-    void rejectsHiddenAgentDefaultModelWithoutReadingCatalog() {
-        HiddenFixtures fixtures = hiddenFixtures(hiding("example-provider", "example-agent"));
-        agentDefault(fixtures.agent(), "example-provider", "example-agent", null);
-
-        assertThatThrownBy(() -> fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent()))
-            .isInstanceOf(ApiException.class)
-            .extracting(error -> ((ApiException)error).code())
-            .isEqualTo(ErrorCode.MODEL_HIDDEN);
-        verifyNoInteractions(fixtures.options());
     }
 
 
@@ -954,7 +906,7 @@ class ModelTierServiceTest {
         when(fixtures.options().profileDefaultOf(fixtures.agent()))
             .thenReturn(ModelChoice.stored("example-provider", null, null));
 
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), defaultConversation(), fixtures.agent());
+        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), mock(Conversation.class), fixtures.agent());
 
         assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
     }
@@ -970,12 +922,12 @@ class ModelTierServiceTest {
         when(wholeProvider.options().profileDefaultOf(wholeProvider.agent()))
             .thenReturn(ModelChoice.stored(null, "example-model", null));
 
-        assertThatThrownBy(() -> sameModel.service().resolve(sameModel.user(), defaultConversation(), sameModel.agent()))
+        assertThatThrownBy(() -> sameModel.service().resolve(sameModel.user(), mock(Conversation.class), sameModel.agent()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
         assertThat(wholeProvider.service()
-            .resolve(wholeProvider.user(), defaultConversation(), wholeProvider.agent())
+            .resolve(wholeProvider.user(), mock(Conversation.class), wholeProvider.agent())
             .choice())
                 .isEqualTo(ModelChoice.defaults());
     }
@@ -996,22 +948,82 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("대화 없는 실행이 보낼 값은 에이전트 기본값이고 그 값이 같은 숨김 판정을 지난다")
-    void detachedChoiceIsAgentDefaultAndPassesSameHiddenCheck() {
-        HiddenFixtures visible = hiddenFixtures(hiding("example-provider", "example-other"));
-        agentDefault(visible.agent(), "example-provider", "example-agent", "medium");
-        HiddenFixtures hiddenDefault = hiddenFixtures(hiding("example-provider", "example-model"));
-        when(hiddenDefault.options().profileDefaultOf(hiddenDefault.agent()))
-            .thenReturn(ModelChoice.stored("example-provider", "example-model", null));
+    @DisplayName("대화 없는 실행은 사용자 기본 칸을 그룹 기본 칸보다 먼저 쓴다")
+    void detachedChoicePrefersUserDefaultTier() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.HIGH);
+        AppUser appUser = mock(AppUser.class);
+        when(appUser.modelDefaultTier()).thenReturn("INSTANT");
+        when(fixtures.users().findById(1L)).thenReturn(Optional.of(appUser));
 
-        ModelChoice sent = visible.service().detachedChoice(visible.agent());
-        ModelChoice empty = hiddenDefault.service().detachedChoice(hiddenDefault.agent());
+        ResolvedModelTier resolved = fixtures.service().detachedChoice(fixtures.user(), fixtures.agent());
 
-        assertThat(sent).isEqualTo(ModelChoice.stored("example-provider", "example-agent", "medium"));
-        assertThatCode(() -> visible.service().requireRunnable(visible.user(), visible.agent(), sent))
-            .doesNotThrowAnyException();
-        assertThat(empty.usesDefaultModel()).as("기본값이 빈 에이전트는 모델을 싣지 않는다").isTrue();
-        assertThatThrownBy(() -> hiddenDefault.service().requireRunnable(hiddenDefault.user(), hiddenDefault.agent(), empty))
+        assertThat(resolved.tier()).isEqualTo(ModelTier.INSTANT);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-fast", "low"));
+    }
+
+
+    @Test
+    @DisplayName("대화 없는 실행은 사용자 기본 칸이 없으면 그룹 기본 칸을 쓴다")
+    void detachedChoiceFallsBackToGroupDefaultTier() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().defaultTier(ModelTier.HIGH);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+
+        ResolvedModelTier resolved = fixtures.service().detachedChoice(fixtures.user(), fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.of("openai-codex", "example-deep", "high"));
+    }
+
+
+    @Test
+    @DisplayName("대화 없는 실행은 사용자와 그룹 기본 칸이 모두 없으면 요청에 모델을 싣지 않는다")
+    void detachedChoiceSendsNoModelWithoutAnyDefaultTier() {
+        TierFixtures fixtures = tierFixtures();
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+
+        ResolvedModelTier resolved = fixtures.service().detachedChoice(fixtures.user(), fixtures.agent());
+
+        assertThat(resolved.tier()).isNull();
+        assertThat(resolved.choice().usesDefaultModel()).isTrue();
+        assertThat(resolved.choice().reasoningEffort()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("대화 없는 실행은 고른 칸이 비어 있으면 칸 기록을 남기고 모델을 싣지 않는다")
+    void detachedChoiceSendsNoModelWhenDefaultTierIsEmpty() {
+        TierFixtures fixtures = tierFixtures();
+        fixtures.store().tiers(fallbackStops()).defaultTier(ModelTier.HIGH);
+        when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
+
+        ResolvedModelTier resolved = fixtures.service().detachedChoice(fixtures.user(), fixtures.agent());
+
+        assertThat(resolved.tier()).isEqualTo(ModelTier.HIGH);
+        assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
+    }
+
+
+    @Test
+    @DisplayName("대화 없는 실행의 값은 숨긴 모델이어도 해석에서 거절하지 않고 requireRunnable 이 MODEL_HIDDEN 으로 거절한다")
+    void detachedChoiceDefersHiddenCheckToRequireRunnable() {
+        FakeModelSettingStore store = new FakeModelSettingStore().tiers(storedStops());
+        store.defaultTier(ModelTier.INSTANT);
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        Agent agent = mock(Agent.class);
+        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        when(visibility.hiddenFor(10L)).thenReturn(hiding("openai-codex", "example-fast"));
+        AppUserRepository users = mock(AppUserRepository.class);
+        when(users.findById(1L)).thenReturn(Optional.empty());
+        ModelTierService service = service(store, users, options, visibility, mock(GroupModelCatalogService.class));
+        when(options.optionsForAgent(10L, agent)).thenReturn(fullCatalog());
+
+        ResolvedModelTier resolved = service.detachedChoice(MEMBER, agent);
+
+        assertThat(resolved.choice().model()).isEqualTo("example-fast");
+        verify(options, never()).refreshedOptionsForAgent(any(), any());
+        assertThatThrownBy(() -> service.requireRunnable(MEMBER, agent, resolved.choice()))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);
@@ -1068,14 +1080,7 @@ class ModelTierServiceTest {
     }
 
 
-    private static Conversation defaultConversation() {
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.DEFAULT);
-        return conversation;
-    }
-
-
-    /** 그룹 10 이 {@code hidden} 을 숨긴 상태의 서비스와 대역이다. 칸은 모두 비었고 에이전트 기본 모델도 비어 있다. */
+    /** 그룹 10 이 {@code hidden} 을 숨긴 상태의 서비스와 대역이다. 칸은 모두 비었다. */
     private static HiddenFixtures hiddenFixtures(HiddenModels hidden) {
         ModelOptionsService options = mock(ModelOptionsService.class);
         ModelVisibilityService visibility = mock(ModelVisibilityService.class);
@@ -1094,13 +1099,6 @@ class ModelTierServiceTest {
 
 
     private record HiddenFixtures(ModelTierService service, ModelOptionsService options, CurrentUser user, Agent agent) {
-    }
-
-
-    private static void agentDefault(Agent agent, String provider, String model, String effort) {
-        when(agent.defaultModelProvider()).thenReturn(provider);
-        when(agent.defaultModel()).thenReturn(model);
-        when(agent.defaultReasoningEffort()).thenReturn(effort);
     }
 
 

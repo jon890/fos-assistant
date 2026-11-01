@@ -3,17 +3,8 @@ import { describeFailure } from "@/components/error-message";
 /** 숨긴 provider 또는 모델 하나다. `model` 이 null 이면 그 provider 전체다 */
 export type HiddenModelEntry = { provider: string; model: string | null };
 
-/** 에이전트에 저장된 기본 모델이다. 세 값이 모두 null 이면 profile 의 값으로 돈다 */
-export type AgentModelDefault = {
-  provider: string | null;
-  model: string | null;
-  reasoningEffort: string | null;
-};
-
-/** 숨김을 적용하지 않은 목록이다. 기본 provider 와 기본 모델은 profile 의 값이다 */
-export type ModelCatalog = {
-  defaultProvider: string | null;
-  defaultModel: string | null;
+/** 그룹 하나의 모델 목록이다. 단계별 모델을 고르는 목록과 숨길 모델을 고르는 후보가 같은 모양을 쓴다 */
+export type GroupModelCatalog = {
   providers: {
     provider: string;
     name: string;
@@ -24,25 +15,15 @@ export type ModelCatalog = {
   reasoningEfforts: string[];
 };
 
-/** `GET /api/admin/agents/{code}/model-settings` 의 응답이다. 목록을 읽지 못했으면 `catalog` 가 null 이다 */
-export type AgentModelSettingsResponse = {
-  agentDefault: AgentModelDefault;
-  catalog: ModelCatalog | null;
-  hidden: { entries: HiddenModelEntry[] };
-};
-
-/** 화면이 쓰는 모양이다. 목록을 읽지 못했으면 빈 목록을 두고 `catalogMissing` 으로 알린다 */
-export type AgentModelSettings = {
-  agentDefault: AgentModelDefault;
-  catalog: ModelCatalog;
+/** 화면이 쓰는 숨김 설정이다. 후보를 읽지 못했으면 빈 목록을 두고 `catalogMissing` 으로 알린다 */
+export type HiddenModelSettings = {
+  catalog: GroupModelCatalog;
   catalogMissing: boolean;
   hidden: { entries: HiddenModelEntry[] };
 };
 
-/** 목록을 읽지 못했을 때 쓴다. 강도는 Control Plane 이 받는 값이라 목록 없이도 고를 수 있다 */
-const EMPTY_CATALOG: ModelCatalog = {
-  defaultProvider: null,
-  defaultModel: null,
+/** 목록을 읽지 못했을 때 쓴다 */
+const EMPTY_CATALOG: GroupModelCatalog = {
   providers: [],
   reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
 };
@@ -66,29 +47,6 @@ async function request<T>(
   }
 }
 
-export async function getAgentModelSettings(
-  code: string,
-): Promise<Result<AgentModelSettings>> {
-  const result = await request<AgentModelSettingsResponse>(
-    `/api/admin/agents/${code}/model-settings`,
-  );
-  if (!result.ok) return result;
-  return {
-    ok: true,
-    data: {
-      ...result.data,
-      catalog: result.data.catalog ?? EMPTY_CATALOG,
-      catalogMissing: result.data.catalog === null,
-    },
-  };
-}
-
-/** 그룹 하나의 모델 목록이다. 켜진 모든 에이전트에서 도는 provider 와 모델만 담는다 */
-export type GroupModelCatalog = Pick<
-  ModelCatalog,
-  "providers" | "reasoningEfforts"
->;
-
 /**
  * `GET /api/admin/model-catalog` 를 읽는다. Hermes 가 목록을 답하지 못했으면 `catalog` 가 null 이고,
  * 요청 자체가 실패해도 null 로 돌려준다. 두 경우 모두 화면은 저장된 값만 보인다.
@@ -100,15 +58,29 @@ export async function getGroupModelCatalog(): Promise<GroupModelCatalog | null> 
   return result.ok ? (result.data?.catalog ?? null) : null;
 }
 
-export function saveAgentModelDefault(
-  code: string,
-  choice: AgentModelDefault,
-): Promise<Result<AgentModelDefault>> {
-  return request(`/api/admin/agents/${code}/model-default`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(choice),
-  });
+/**
+ * 숨김 설정과 숨길 모델의 후보를 함께 읽는다. 후보를 읽지 못했으면 `catalogMissing` 이 참이고, 그때도 저장된
+ * 숨김을 풀 수 있다. 숨김 목록을 읽지 못하면 실패다.
+ */
+export async function getHiddenModelSettings(): Promise<
+  Result<HiddenModelSettings>
+> {
+  const [hidden, candidates] = await Promise.all([
+    request<{ entries: HiddenModelEntry[] }>("/api/admin/model-hidden"),
+    request<{ catalog: GroupModelCatalog | null }>(
+      "/api/admin/model-hidden/candidates",
+    ),
+  ]);
+  if (!hidden.ok) return hidden;
+  const catalog = candidates.ok ? (candidates.data?.catalog ?? null) : null;
+  return {
+    ok: true,
+    data: {
+      catalog: catalog ?? EMPTY_CATALOG,
+      catalogMissing: catalog === null,
+      hidden: { entries: hidden.data.entries },
+    },
+  };
 }
 
 export function saveHiddenModels(
@@ -144,23 +116,4 @@ export function hidesModel(
       entry.provider === provider &&
       (entry.model === null || entry.model === model),
   );
-}
-
-/**
- * 에이전트 기본 모델이 없어 profile 의 기본 모델로 도는데 그 모델이 숨겨졌는가.
- *
- * Control Plane 이 실행 직전에 하는 판정과 같다. profile 의 기본 provider 를 모르면 모델 이름만 견주고,
- * 그때 provider 전체를 숨긴 항목은 견주지 않는다.
- */
-export function hidesProfileDefault(settings: AgentModelSettings): boolean {
-  const { defaultProvider, defaultModel } = settings.catalog;
-  if (
-    settings.catalogMissing ||
-    settings.agentDefault.model !== null ||
-    defaultModel === null
-  )
-    return false;
-  if (defaultProvider !== null)
-    return hidesModel(settings.hidden.entries, defaultProvider, defaultModel);
-  return settings.hidden.entries.some((entry) => entry.model === defaultModel);
 }

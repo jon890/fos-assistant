@@ -324,7 +324,7 @@ turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 
 그 profile 의 목록을 한 번도 읽지 못했으면 `HERMES_UNAVAILABLE` 이다.
 
 **effort `none` 은 저장할 때만 판정한다**([ADR-060](../adr/ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md)).
-모델을 비웠으면 에이전트 기본 모델로 판정하므로, `none` 의 저장만 목록 읽기 실패(`HERMES_UNAVAILABLE`)와 쓸 수 없는 에이전트의 오류를 받는다.
+모델을 비웠으면 그 에이전트 profile 의 기본 모델로 판정하므로, `none` 의 저장만 목록 읽기 실패(`HERMES_UNAVAILABLE`)와 쓸 수 없는 에이전트의 오류를 받는다.
 저장한 뒤 지원 값이 바뀌어도 실행은 저장된 `none` 을 그대로 보낸다.
 Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼고, `none` 은 `model_options.reasoning.effort` 에 싣는다.
 정한 모델이 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패시킨다. 모델이 비어 있으면 `ModelOptionsService.profileDefaultOf` 로 같은 판정을 한다.

@@ -51,7 +51,7 @@ export type Props = {
    * 이때 고르게 하면 모르는 값을 「기본」 으로 보고 저장해 적힌 모델을 지운다. 그래서 단추를 막는다.
    */
   modelChoiceUnknown: boolean;
-  modelSelectionMode: "DEFAULT" | "TIER" | "CUSTOM" | null;
+  modelSelectionMode: "TIER" | "CUSTOM" | null;
   modelTier: ModelTierCode | null;
   /** 모델 선택을 저장한 뒤 서버가 돌려준 대화 한 줄을 알린다 */
   onModelChoiceSaved(conversation: Conversation): void;
