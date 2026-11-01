@@ -254,6 +254,17 @@ test.describe("지금 화면", () => {
     )) as { decisionId: number; conversationId: string };
   }
 
+  /** 지금 화면의 실패 카드에서 대화 하나를 고른다. 없으면 실패를 만든다. */
+  async function failedConversationId(page: Page, hermes: Parameters<typeof failTurn>[1]): Promise<string> {
+    await openNow(page);
+    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
+    if ((await failed.count()) === 0) {
+      await failTurn(page, hermes, "주간 장보기 영수증 정리");
+      await openNow(page);
+    }
+    return conversationIdOf(await failed.first().getAttribute("href"));
+  }
+
   async function summaryCount(page: Page): Promise<number> {
     const response = await page.request.get("/api/attention/summary");
     expect(response.ok(), `지금 볼 것의 수를 읽지 못했다: ${response.status()}`).toBeTruthy();
@@ -414,13 +425,7 @@ test.describe("지금 화면", () => {
     isolatedMember,
   }, testInfo) => {
     const email = isolatedMember.email;
-    await openNow(page);
-    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
-    if ((await failed.count()) === 0) {
-      await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await openNow(page);
-    }
-    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+    const conversationId = await failedConversationId(page, hermes);
 
     const title = "학교 상담 신청서 내기";
     const before = await summaryCount(page);
@@ -498,13 +503,7 @@ test.describe("지금 화면", () => {
     isolatedMember,
   }) => {
     const email = isolatedMember.email;
-    await openNow(page);
-    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
-    if ((await failed.count()) === 0) {
-      await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await openNow(page);
-    }
-    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+    const conversationId = await failedConversationId(page, hermes);
 
     const oldProblem = "장보기 예약이 내일 마감이에요";
     const title = "예약 사이트에서 시간 확인하기";
@@ -532,13 +531,7 @@ test.describe("지금 화면", () => {
     hermes,
     isolatedMember,
   }) => {
-    await openNow(page);
-    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
-    if ((await failed.count()) === 0) {
-      await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await openNow(page);
-    }
-    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+    const conversationId = await failedConversationId(page, hermes);
     const title = "주간 식단 재료 적어 보기";
     await proposeFollowUp(isolatedMember.email, conversationId, title);
     await page.route("**/api/follow-ups/*/reject", (route: Route) =>
@@ -556,13 +549,7 @@ test.describe("지금 화면", () => {
   });
 
   test("이미 없는 제안에 반응하면 그 코드의 문구를 항목 아래에 보인다", async ({ page, hermes, isolatedMember }) => {
-    await openNow(page);
-    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
-    if ((await failed.count()) === 0) {
-      await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await openNow(page);
-    }
-    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+    const conversationId = await failedConversationId(page, hermes);
     const title = "주말 장보기 지출 내역 훑어 보기";
     await proposeFollowUp(isolatedMember.email, conversationId, title);
     await page.route("**/api/follow-ups/*/accept", (route: Route) =>
