@@ -8,7 +8,6 @@ import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
 import com.bifos.assistant.chat.conversation.application.port.ConversationTaskLabels;
-import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelTierOptions;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
@@ -22,14 +21,12 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ArtifactView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.AttachmentView;
-import com.bifos.assistant.chat.turn.presentation.ChatDtos.ChooseModelRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ChooseModelTierRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ConversationPageView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ConversationRefView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.DeliveryView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.MessageView;
-import com.bifos.assistant.chat.turn.presentation.ChatDtos.ModelOptionsView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.RunningTurnView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.SendMessageRequest;
@@ -37,9 +34,7 @@ import com.bifos.assistant.chat.turn.presentation.ChatDtos.SendMessageResponse;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.StartConversationRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.StartConversationResponse;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.StopResponse;
-import com.bifos.assistant.chat.turn.presentation.ChatDtos.UpdateDefaultModelTierRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.UpdateGroupModelTiersRequest;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
@@ -79,7 +74,6 @@ public class ChatController {
     private final AgentService agents;
     private final ConversationAccess access;
     private final ChatEventStreams streams;
-    private final ModelOptionsService modelOptions;
     private final ModelTierService modelTiers;
     private final List<ConversationTaskLabels> taskLabels;
     private final SourceReadSummaries sourceReads;
@@ -93,7 +87,6 @@ public class ChatController {
         AgentService agents,
         ConversationAccess access,
         ChatEventStreams streams,
-        ModelOptionsService modelOptions,
         ModelTierService modelTiers,
         List<ConversationTaskLabels> taskLabels,
         SourceReadSummaries sourceReads) {
@@ -103,7 +96,6 @@ public class ChatController {
         this.agents = agents;
         this.access = access;
         this.streams = streams;
-        this.modelOptions = modelOptions;
         this.modelTiers = modelTiers;
         this.taskLabels = taskLabels;
         this.sourceReads = sourceReads;
@@ -224,38 +216,10 @@ public class ChatController {
     }
 
 
-    /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
-    @PutMapping("/conversations/{conversationId}/model")
-    public ConversationView chooseModel(@PathVariable UUID conversationId, @RequestBody ChooseModelRequest request) {
-        CurrentUser user = currentUser.require();
-        Conversation chosen = chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice());
-        return viewOf(chosen);
-    }
-
-
-    /**
-     * 그 에이전트의 profile 로 고를 수 있는 모델과 기본값을 돌려준다.
-     *
-     * <p>{@code agentCode} 를 필수 인자로 두지 않는다. 빠지면 필수 인자 예외가 받는 곳 없이 500 이 되므로,
-     * 서비스의 에이전트 확인이 {@code AGENT_NOT_FOUND} 로 거절하게 둔다.
-     */
-    @GetMapping("/model-options")
-    public ModelOptionsView modelOptions(@RequestParam(required = false) String agentCode) {
-        return ModelOptionsView.from(modelOptions.optionsFor(currentUser.require(), agentCode));
-    }
-
-
     @GetMapping("/model-tiers")
     public ModelTierOptions modelTiers(@RequestParam String agentCode) {
         CurrentUser user = currentUser.require();
         return modelTiers.optionsFor(user, agents.requireStartable(user, agentCode));
-    }
-
-
-    @PutMapping("/model-tiers/default")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateModelTierDefault(@RequestBody UpdateDefaultModelTierRequest request) {
-        modelTiers.saveUserDefault(currentUser.require(), request.tier());
     }
 
 
@@ -273,6 +237,7 @@ public class ChatController {
     }
 
 
+    /** 대화가 고른 칸을 저장하고, 그 칸을 요청자의 다음 새 대화에도 남긴다. 바뀐 대화 한 줄을 돌려준다. */
     @PutMapping("/conversations/{conversationId}/model-tier")
     public ConversationView chooseModelTier(
         @PathVariable UUID conversationId, @Valid @RequestBody ChooseModelTierRequest request) {
@@ -326,16 +291,12 @@ public class ChatController {
      * 없으면({@code label} 이 null) 작업 칸을 비운다.
      */
     private ConversationView viewOf(Conversation conversation, Agent agent, TaskLabel label) {
-        ModelChoice choice = conversation.modelChoice();
         return new ConversationView(
             conversation.publicId(),
             conversation.title(),
             agent == null ? null : agent.code(),
             agent == null ? null : agent.name(),
             conversation.updatedAt(),
-            choice.provider(),
-            choice.model(),
-            choice.reasoningEffort(),
             conversation.modelSelectionMode(),
             conversation.modelTier(),
             conversation.purpose(),

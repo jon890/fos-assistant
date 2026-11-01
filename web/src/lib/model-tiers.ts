@@ -26,7 +26,7 @@ export function recordedTierLabel(tier: string): string {
     MODEL_TIER_LABELS[tier as ModelTierCode] ?? LEGACY_TIER_LABELS[tier] ?? tier
   );
 }
-export type ModelSelectionMode = "TIER" | "CUSTOM";
+export type ModelSelectionMode = "TIER";
 
 export type ModelTier = {
   tier: ModelTierCode;
@@ -90,16 +90,6 @@ export async function getGroupModelTiers(): Promise<
         ok: false,
         message: result.ok ? "단계를 읽지 못했어요." : result.message,
       };
-}
-
-export async function saveDefaultTier(
-  tier: ModelTierCode | null,
-): Promise<RequestResult<null>> {
-  return request("/api/chat/model-tiers/default", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tier }),
-  });
 }
 
 export async function saveGroupTiers(

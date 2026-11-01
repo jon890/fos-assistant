@@ -2,13 +2,11 @@ package com.bifos.assistant.chat.modelchoice.application;
 
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
-import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import com.bifos.assistant.model.domain.ModelChoice;
-import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Clock;
 import java.time.Duration;
@@ -57,7 +55,6 @@ public class ModelOptionsService {
      */
     public static final Duration MIN_REFRESH_INTERVAL = Duration.ofSeconds(30);
 
-    private final AgentService agents;
     private final HermesModelClient hermes;
     private final ModelVisibilityService visibility;
     private final Duration ttl;
@@ -73,32 +70,22 @@ public class ModelOptionsService {
 
     @Autowired
     public ModelOptionsService(
-        AgentService agents,
         HermesModelClient hermes,
         ModelVisibilityService visibility,
         @Value("${assistant.chat.model-options-ttl:10m}") Duration ttl) {
-        this(agents, hermes, visibility, ttl, Clock.systemUTC());
+        this(hermes, visibility, ttl, Clock.systemUTC());
     }
 
 
     public ModelOptionsService(
-        AgentService agents,
         HermesModelClient hermes,
         ModelVisibilityService visibility,
         Duration ttl,
         Clock clock) {
-        this.agents = agents;
         this.hermes = hermes;
         this.visibility = visibility;
         this.ttl = ttl;
         this.clock = clock;
-    }
-
-
-    /** 요청자가 쓸 수 있는 에이전트의 profile 로 고를 수 있는 모델을 돌려준다. */
-    public ModelOptions optionsFor(CurrentUser user, String agentCode) {
-        Agent agent = agents.requireStartable(user, agentCode);
-        return optionsForAgent(user.groupId(), agent);
     }
 
 

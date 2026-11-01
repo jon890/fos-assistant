@@ -2,7 +2,10 @@ package com.bifos.assistant.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -11,16 +14,21 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
 import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.orchestration.application.dto.AgentRun;
 import com.bifos.assistant.orchestration.application.AgentRunner;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -28,6 +36,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConversationTierChoice;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.pricing.domain.CatalogPrice;
@@ -45,6 +54,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -101,6 +111,15 @@ class FailedExecutionUsageRoutesTest {
     @Autowired
     TransactionTemplate transaction;
 
+    @Autowired
+    ModelSettingStore settings;
+
+    @Autowired
+    GroupSettingRepository groupSettings;
+
+    @Autowired
+    HermesModelClient modelClient;
+
     private CurrentUser user;
     private Agent agent;
     private Conversation conversation;
@@ -123,15 +142,26 @@ class FailedExecutionUsageRoutesTest {
             user.id());
         agent = agents.save(agent);
         Conversation started = conversations.save(Conversation.startedBy(user.id(), "실패 사용량", agent.id(), Instant.now()));
-        // 요청한 모델과 실제로 돈 모델이 달라야 사용량과 비용이 실제 모델 기준임을 확인할 수 있다
-        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-            started.id(), user.id(), "requested-provider", "requested-model", null, ModelSelectionMode.CUSTOM));
+        // 요청한 모델과 실제로 돈 모델이 달라야 사용량과 비용이 실제 모델 기준임을 확인할 수 있다.
+        // 요청 모델은 대화가 고른 칸이 정한다. 목록에 없어도 실행은 그 값으로 보낸다.
+        HermesModelCatalog empty = new HermesModelCatalog(null, null, List.of());
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(empty);
+        when(modelClient.readCatalog(anyString(), anyString(), anyBoolean())).thenReturn(empty);
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transaction, user.groupId(), user.id(), started.id(),
+            ModelTier.HIGH, ModelChoice.stored("requested-provider", "requested-model", null));
         conversation = conversations.findById(started.id()).orElseThrow();
         doReturn(Optional.of(new CatalogPrice(
             new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), new BigDecimal("0.5"), List.of()),
             PRICING_VERSION)))
                 .when(prices)
                 .find(PROVIDER, MODEL);
+    }
+
+
+    @AfterEach
+    void clearModelSetting() {
+        ConversationTierChoice.clear(groupSettings, transaction, user.groupId());
     }
 
 

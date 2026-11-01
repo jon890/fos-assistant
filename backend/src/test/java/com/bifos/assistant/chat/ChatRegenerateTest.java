@@ -2,6 +2,9 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -20,18 +23,24 @@ import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConversationTierChoice;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -42,16 +51,19 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @BackendIntegrationTest
 class ChatRegenerateTest {
@@ -95,6 +107,18 @@ class ChatRegenerateTest {
     @Autowired
     AttachmentStore store;
 
+    @Autowired
+    ModelSettingStore settings;
+
+    @Autowired
+    GroupSettingRepository groupSettings;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
+    HermesModelClient modelClient;
+
 
     private StubHermesRunsClient stub() {
         return (StubHermesRunsClient)hermes;
@@ -111,6 +135,13 @@ class ChatRegenerateTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
+    }
+
+
+    @AfterEach
+    void clearModelSetting() {
+        // 칸 정의는 그룹 설정 줄이라 같은 그룹을 쓰는 다른 검사에 남는다.
+        ConversationTierChoice.clear(groupSettings, transactions, 1L);
     }
 
 
@@ -241,12 +272,20 @@ class ChatRegenerateTest {
 
 
     @Test
-    @DisplayName("모델을 고른 대화에서 다시 생성하면 요청에 그 선택이 실린다")
-    void regeneratingInConversationWithChosenModelCarriesChoiceInRequest() {
+    @DisplayName("칸을 고른 대화에서 다시 생성하면 요청에 그 칸의 선택이 실린다")
+    void regeneratingInConversationWithChosenTierCarriesChoiceInRequest() {
         CurrentUser dad = member("dad@example.com", "dad");
+        HermesModelCatalog catalog = new HermesModelCatalog(
+            "nvidia",
+            "example-model-small",
+            List.of(new HermesModelCatalog.Provider("nvidia", "nvidia", List.of("example-model-small"), Map.of())));
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(catalog);
+        when(modelClient.readCatalog(anyString(), anyString(), anyBoolean())).thenReturn(catalog);
         stub().willReturnInOrder(result("first", "첫 답"), result("second", "새 답"));
         Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        chat.chooseModel(dad, conversationId, new ModelChoice("nvidia", "example-model-small", "high"));
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transactions, dad.groupId(), dad.id(), conversationId,
+            ModelTier.HIGH, new ModelChoice("nvidia", "example-model-small", "high"));
 
         chat.regenerate(dad, conversationId, event -> {
         });

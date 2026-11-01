@@ -571,6 +571,7 @@ export const proactiveCheckScenario: Scenario = {
         dismissedAnswer.includes(`- ${WEB_ONLY.title}: 이미 알린 것이에요`),
         `관심 없음 주제가 이미 알린 것으로 내려가지 않았다:\n${dismissedAnswer}`,
       );
+
       step("다른 사용자: 이 에이전트의 상태 조회와 시작이 404 이고 대화 목록에 이 점검 대화가 없다");
       for (const [method, path] of [["GET", CHECK_PATH], ["POST", `${CHECK_PATH}/runs`]] as const) {
         const foreign = expectStatus(await call(context, path, { method, token: context.tokens.kid }), 404, `다른 사용자의 ${method}`);

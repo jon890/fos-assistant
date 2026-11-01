@@ -60,7 +60,7 @@ class GroupModelCatalogServiceTest {
         when(agentRepository.findByEnabledTrueOrderByCodeAsc()).thenReturn(agents);
         AgentService agentService = new AgentService(agentRepository);
         ModelOptionsService options = new ModelOptionsService(
-            agentService, hermes, visibility, Duration.ofMinutes(10));
+            hermes, visibility, Duration.ofMinutes(10));
         service = new GroupModelCatalogService(agentService, options);
     }
 

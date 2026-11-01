@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
@@ -99,6 +101,20 @@ public class GlobalExceptionHandler {
             .allow(supported == null ? new HttpMethod[0] : supported.toArray(HttpMethod[]::new))
             .body(new ErrorResponse(
                 ErrorCode.METHOD_NOT_ALLOWED.name(), "method " + ex.getMethod() + " is not supported"));
+    }
+
+
+    /**
+     * 없는 경로에 온 요청이다. 서버 결함이 아니므로 ERROR 로 남기지 않고 404 로 답한다.
+     *
+     * <p>지운 경로(예: 대화의 provider, 모델, effort 를 직접 저장하던 경로)를 배포 전의 화면이 부를 때 500 으로 답하면 서버가
+     * 고장 난 것처럼 보인다.
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNoRoute(Exception ex) {
+        log.warn("no route: {}", ex.getMessage());
+        return ResponseEntity.status(ErrorCode.ROUTE_NOT_FOUND.status())
+            .body(new ErrorResponse(ErrorCode.ROUTE_NOT_FOUND.name(), "no such route"));
     }
 
 

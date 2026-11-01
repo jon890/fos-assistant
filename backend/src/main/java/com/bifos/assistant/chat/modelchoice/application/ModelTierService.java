@@ -107,6 +107,9 @@ public class ModelTierService {
     }
 
 
+    /**
+     * 요청자의 기본 칸을 바꾼다. 대화에서 칸을 고를 때 같은 트랜잭션에서 불린다. 따로 정하는 설정 창은 없다.
+     */
     @Transactional
     public void saveUserDefault(CurrentUser user, ModelTier tier) {
         if (users.updateModelDefaultTier(user.id(), tier == null ? null : tier.name(), clock.instant().truncatedTo(ChronoUnit.MICROS)) == 0
@@ -208,34 +211,6 @@ public class ModelTierService {
     }
 
 
-    /** 대화에 직접 고른 모델을 저장하기 전에 그룹이 숨긴 모델인지 본다. */
-    @Transactional(readOnly = true)
-    public void requireVisible(CurrentUser user, ModelChoice choice) {
-        visibility.requireVisible(user.groupId(), choice);
-    }
-
-
-    /**
-     * 대화에 저장하려는 effort 가 그 모델에서 고를 수 있는 값인지 본다.
-     *
-     * <p>{@code none} 만 판정한다. 그 에이전트의 목록(숨김 적용)에서 모델의 끄기 지원이 확인되지 않으면 거절한다.
-     * 모델을 비웠으면 목록의 기본 모델로 본다. 목록 조회 실패({@code HERMES_UNAVAILABLE})는 그대로 올린다.
-     *
-     * @throws ApiException {@code VALIDATION_FAILED}. 그 모델에서 reasoning 을 끌 수 있는지 확인되지 않을 때
-     */
-    @Transactional(readOnly = true)
-    public void requireEffortAllowed(CurrentUser user, Agent agent, ModelChoice choice) {
-        if (!ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())) {
-            return;
-        }
-        if (!modelOptions
-            .optionsForAgent(user.groupId(), agent)
-            .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
-        }
-    }
-
-
     /**
      * 이번 실행이 Hermes 에 보낼 값을 정한다.
      *
@@ -299,9 +274,6 @@ public class ModelTierService {
 
 
     private ResolvedModelTier resolveUnchecked(CurrentUser user, Conversation conversation, Agent agent) {
-        if (conversation.modelSelectionMode() == ModelSelectionMode.CUSTOM) {
-            return new ResolvedModelTier(conversation.modelChoice(), null);
-        }
         ModelTier selected = conversation.modelSelectionMode() == ModelSelectionMode.TIER
             ? conversation.modelTier()
             : defaultTierOf(user);

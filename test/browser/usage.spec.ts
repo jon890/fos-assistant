@@ -2,7 +2,8 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import { encode } from "../../web/node_modules/next-auth/jwt.js";
 import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import { expect, setSession, test, SWITCH_AGENT_CODE } from "./fixtures.ts";
+import { expect, setSession, test } from "./fixtures.ts";
+import { filledTierProvider, readGroupModelTiers, saveGroupModelTiers } from "./helpers.ts";
 import { AUTH_SECRET, CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL, WEB_BASE_URL } from "./settings.ts";
 
 const SESSION_COOKIE = "authjs.session-token";
@@ -161,34 +162,47 @@ test("실행 기록이 없으면 빈 상태를 보인다", async ({ context, pag
   await expect(page.getByText("아직 실행 기록이 없어요", { exact: true })).toBeVisible();
 });
 
-test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다", async ({ page, hermes }, testInfo) => {
-  const blockedProvider = `usage-blocked-${testInfo.project.name}`;
-  const created = await page.request.post("/api/chat/conversations", {
-    data: { agentCode: SWITCH_AGENT_CODE },
-  });
-  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
-  const { conversationId } = (await created.json()) as { conversationId: string };
-  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
-    data: { provider: blockedProvider, model: "blocked-model", reasoningEffort: null },
-  });
-  expect(chosen.ok(), `모델을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
-
-  await hermes.blockProvider(blockedProvider);
+test("막힌 모델로 실패한 실행은 모델을 쓸 수 없다고 보인다", async ({
+  page,
+  context,
+  hermes,
+  isolatedMember,
+}, testInfo) => {
+  // 칸을 고르면 그 사용자의 기본 칸도 바뀐다. 관리자 세션의 기본 칸을 남기지 않도록 따로 만든 사용자로 고른다.
+  const blockedProvider = await filledTierProvider(page, "HIGH");
+  await setSession(context, isolatedMember);
+  const agent = await page.request.post("/api/agents", { data: { name: "사용량 막힘 비서" } });
+  expect(agent.status()).toBe(201);
+  const { code: agentCode } = (await agent.json()) as { code: string };
   try {
-    const response = await page.request.post("/api/chat", {
-      data: { conversationId, text: "사용량 막힘 검사" },
+    const created = await page.request.post("/api/chat/conversations", { data: { agentCode } });
+    expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
+    const { conversationId } = (await created.json()) as { conversationId: string };
+    const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model-tier`, {
+      data: { mode: "TIER", tier: "HIGH" },
     });
-    expect(response.ok()).toBeFalsy();
-    expect(((await response.json()) as { code: string }).code).toBe("PROVIDER_BLOCKED");
-  } finally {
-    await hermes.clearBlockedProviders();
-  }
+    expect(chosen.ok(), `칸을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
 
-  await page.goto("/usage?tab=executions");
-  const records = page.getByTestId(
-    testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
-  );
-  await expect(records.getByText("모델을 쓸 수 없음").first()).toBeVisible();
+    await hermes.blockProvider(blockedProvider);
+    try {
+      const response = await page.request.post("/api/chat", {
+        data: { conversationId, text: "사용량 막힘 검사" },
+      });
+      expect(response.ok()).toBeFalsy();
+      expect(((await response.json()) as { code: string }).code).toBe("PROVIDER_BLOCKED");
+    } finally {
+      await hermes.clearBlockedProviders();
+    }
+
+    await page.goto("/usage?tab=executions");
+    const records = page.getByTestId(
+      testInfo.project.name === "mobile" ? "execution-cards" : "execution-table",
+    );
+    await expect(records.getByText("모델을 쓸 수 없음").first()).toBeVisible();
+  } finally {
+    const removed = await page.request.delete(`/api/agents/${agentCode}`);
+    expect(removed.status()).toBe(204);
+  }
 });
 
 /**
@@ -221,27 +235,28 @@ test("붐벼서 거절된 실행은 다른 실패와 다르게 보인다", async
  */
 test("실행 기록에 요청한 effort와 보완된 profile 기본 강도가 보인다", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  const created = await page.request.post("/api/chat/conversations", {
-    data: { agentCode: SWITCH_AGENT_CODE },
-  });
-  expect(created.ok(), `빈 대화를 만들지 못했다: ${created.status()}`).toBeTruthy();
-  const { conversationId } = (await created.json()) as { conversationId: string };
-  const chosen = await page.request.put(`/api/chat/conversations/${conversationId}/model`, {
-    data: { provider: null, model: null, reasoningEffort: "high" },
-  });
-  expect(chosen.ok(), `effort 를 고르지 못했다: ${chosen.status()}`).toBeTruthy();
-
-  const withEffort = await page.request.post("/api/chat", {
-    data: { conversationId, text: `effort 표시 검사 ${testInfo.project.name}` },
-  });
-  expect(withEffort.ok(), `effort 를 고른 대화의 보내기가 실패했다: ${withEffort.status()}`).toBeTruthy();
-  const withEffortId = ((await withEffort.json()) as { executionId: number }).executionId;
-
+  // 기본값 실행을 먼저 보낸다. 그룹 기본 칸을 바꾸는 동안 보내면 그 칸의 effort 로 돈다.
   const byDefault = await page.request.post("/api/chat", {
     data: { text: `기본 effort 표시 검사 ${testInfo.project.name}`, agentCode: "browser" },
   });
   expect(byDefault.ok(), `기본값 보내기가 실패했다: ${byDefault.status()}`).toBeTruthy();
   const byDefaultId = ((await byDefault.json()) as { executionId: number }).executionId;
+
+  // 칸을 직접 고르면 관리자 세션의 기본 칸이 남는다. 되돌릴 수 있는 그룹 기본 칸으로 effort 를 정한다.
+  const original = await readGroupModelTiers(page);
+  const effortTier = original.tiers.find((it) => it.reasoningEffort === "high");
+  expect(effortTier, "effort 가 high 인 칸이 없다").toBeTruthy();
+  let withEffortId: number;
+  await saveGroupModelTiers(page, original.tiers, effortTier!.tier);
+  try {
+    const withEffort = await page.request.post("/api/chat", {
+      data: { text: `effort 표시 검사 ${testInfo.project.name}`, agentCode: "browser" },
+    });
+    expect(withEffort.ok(), `effort 를 정한 보내기가 실패했다: ${withEffort.status()}`).toBeTruthy();
+    withEffortId = ((await withEffort.json()) as { executionId: number }).executionId;
+  } finally {
+    await saveGroupModelTiers(page, original.tiers, original.groupDefaultTier);
+  }
 
   // 완료 직후에는 비어 있을 수 있다. 비동기 조회가 profile 기본 강도를 보완한 뒤 화면을 읽는다.
   await expect.poll(async () => {
