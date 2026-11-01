@@ -379,6 +379,8 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - run: node --test 'test/unit/**/*.test.ts'
+      - name: 로컬 검사 스크립트 회귀 테스트
+        run: python3 -I test/e2e/financial/test_local_check.py
       - name: 마이그레이션 버전 검사
         env:
           # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
