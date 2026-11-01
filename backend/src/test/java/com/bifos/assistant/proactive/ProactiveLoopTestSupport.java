@@ -253,20 +253,8 @@ abstract class ProactiveLoopTestSupport {
     }
 
 
-    List<ProactiveLoopRun> runsOf(CurrentUser user) {
-        return loopRuns.findAll().stream()
-            .filter(run -> run.userId().equals(user.id()))
-            .toList();
-    }
-
-
     long evaluationCount(CurrentUser user) {
         return count("SELECT COUNT(*) FROM proactive_value_evaluation WHERE user_id = ?", user.id());
-    }
-
-
-    long decisionCount(CurrentUser user) {
-        return count("SELECT COUNT(*) FROM proactive_autonomy_decision WHERE user_id = ?", user.id());
     }
 
 

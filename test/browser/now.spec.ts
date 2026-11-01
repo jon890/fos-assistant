@@ -236,24 +236,6 @@ test.describe("지금 화면", () => {
     return id as string;
   }
 
-  /**
-   * 매일 루프가 먼저 다룰 문제를 골라 둔 상태를 만든다. 브라우저 환경에는 판단 profile 이 없어 루프가 직접 만들지 못한다.
-   */
-  async function surfaceProblem(
-    email: string,
-    agentCode: string,
-    problem: string,
-    action: string,
-    level: "SURFACE" | "ASK_APPROVAL",
-  ): Promise<{ decisionId: number; conversationId: string }> {
-    return (await seedViaTestSupport(
-      email,
-      "proactive-loop/surfaced",
-      { agentCode, problem, action, level },
-      "먼저 다룰 문제를 심지 못했다",
-    )) as { decisionId: number; conversationId: string };
-  }
-
   /** 지금 화면의 실패 카드에서 대화 하나를 고른다. 없으면 실패를 만든다. */
   async function failedConversationId(page: Page, hermes: Parameters<typeof failTurn>[1]): Promise<string> {
     await openNow(page);
@@ -497,7 +479,7 @@ test.describe("지금 화면", () => {
     await expect(rejected).toHaveCount(0, REFRESHED);
   });
 
-  test("먼저 다룰 문제 자리는 제안 카드가 맡고 서버가 더 내지 않는 옛 판정은 보이지 않는다", async ({
+  test("먼저 다룰 문제 자리는 제안 카드가 맡는다", async ({
     page,
     hermes,
     isolatedMember,
@@ -505,10 +487,8 @@ test.describe("지금 화면", () => {
     const email = isolatedMember.email;
     const conversationId = await failedConversationId(page, hermes);
 
-    const oldProblem = "장보기 예약이 내일 마감이에요";
     const title = "예약 사이트에서 시간 확인하기";
     const before = await summaryCount(page);
-    await surfaceProblem(email, await ownAgent(page), oldProblem, "예약 사이트에서 시간을 확인해 보기", "SURFACE");
     await proposeFollowUp(email, conversationId, title);
     expect(await summaryCount(page), "제안 카드가 지금 볼 것의 수에 들어갔다").toBe(before);
 
@@ -521,7 +501,6 @@ test.describe("지금 화면", () => {
     for (const name of ["받아들이기", "거절", "고치기"]) {
       await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
     }
-    await expect(needsMe.getByText(oldProblem)).toHaveCount(0);
     await expect(page.getByText("에이전트가 먼저 다룰 문제로 골랐어요")).toHaveCount(0);
     await expect(needsMe.getByTestId("card-now-count")).toHaveCount(0);
   });

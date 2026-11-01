@@ -36,7 +36,7 @@
 | --- | --- |
 | `chat` | `conversation`, `delivery`, `modelchoice`, `attachment`, `artifact`, `contentdraft`, `starter`, `turn`, `nextturn`, `recovery`, `purge` |
 | `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval` |
-| `proactive` | `check`, `evaluation`, `autonomy`, `loop`, `surface` |
+| `proactive` | `check`, `evaluation`, `autonomy`, `loop` |
 | `usage` | `pricing`, `execution`, `subagent`, `tree`, `summary` |
 | `skill` | `usage`, `library`, `upload` |
 
@@ -64,7 +64,6 @@
 | `proactive.evaluation` | 문제 후보의 가치 평가와 판단 provider |
 | `proactive.autonomy` | 행동 수준의 판정과 자동 실행 |
 | `proactive.loop` | 매일 깨우기와 루프 설정, 지운 에이전트의 정리 참여 |
-| `proactive.surface` | 사용자에게 보이는 문제 후보의 읽기 모델과 그 API |
 | `usage.pricing` | 가격표와 비용 환산 |
 | `usage.execution` | 실행 기록, 실행 사건, 사용자 실행 한도 |
 | `usage.subagent` | native 하위 에이전트 사용량의 재조회와 원장 |
