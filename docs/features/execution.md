@@ -123,7 +123,7 @@ Control Plane 이 응답에서 빼고, 화면도 받은 것을 그대로 그리�
 | `MESSAGE_NOT_LATEST`, `DELIVERY_NOT_FOUND`, `DELIVERY_NOT_RETRYABLE` | 이력을 다시 읽는다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 사용량 목록으로 되돌린다 |
-| `AUTONOMY_DECISION_NOT_FOUND` | 서버 문구를 항목 아래에 보이고 지금 화면을 다시 읽는다([`docs/features/proactive.md`](proactive.md) 의 「사용자에게 보이는 것」) |
+| `AUTONOMY_DECISION_NOT_FOUND` | 판정 반응 API 를 지워 더는 나오지 않는다. 코드는 plan227 의 마지막 PR 이 지운다 |
 | `PROACTIVE_LOOP_UNAVAILABLE` | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다([`docs/features/proactive.md`](proactive.md) 의 「사용자 설정」) |
 | `PROACTIVE_CHECK_UNAVAILABLE` | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다([`docs/features/proactive.md`](proactive.md) 의 「시작 전 점검」) |
 

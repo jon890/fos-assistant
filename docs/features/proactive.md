@@ -251,7 +251,6 @@ sequenceDiagram
 
 turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가 줄을 적고, 그 트리의 위임 결과를 모두 전했다고 적고(`ExecutionDeliveryWriter.markTreeDelivered`), `ProactiveCheckEnded` 를 내 도는 위임 자식을 멈춘다.
 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정하므로, 그 전에 전달을 적어야 점검 대화에 자동 turn 이 열리지 않는다.
-잠금을 푼 뒤 `ProactiveCheckSettled` 를 내고 아래 「매일 루프」 가 받는다. 그 처리의 실패는 살펴보기의 끝을 바꾸지 않는다.
 실패하면 끝내지 못했다는 알림 줄과 SSE `error` 를, 멈춘 뒤 예외로 끝나면 멈췄다는 알림 줄과 `stopped` 를 보낸다. 알림 줄은 한 살펴보기에 하나다.
 
 **발견은 대화에 답을 남긴 뒤 저장한다.** 답 저장이 실패하면 발견도 남기지 않는다. 사용자가 보지 못한 발견이 다음 살펴보기에서 「이미 알린 것」 으로 내려가지 않게 하기 위해서다.
@@ -305,7 +304,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 결정은 [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다. 칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultBlock` 이 갖는다.
 `problemKey` 는 앞뒤 공백을 지우고 소문자로 맞춰 비교한다. 검사 순서와 버린 까닭은 ADR-093 의 까닭 표와 `ProblemJudgement` 가 갖는다.
-단추로 연 살펴보기는 가치 평가와 행동 정책을 부르지 않는다. 매일 깨우기는 사용자가 켠 에이전트에서만 「매일 루프」 가 잇는다.
+단추로 연 살펴보기와 매일 깨우기는 가치 평가와 행동 정책을 부르지 않는다.
 
 ### 분야 지침이 지킬 것
 
@@ -322,31 +321,10 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 ## 매일 루프
 
-매일 깨우기로 돈 살펴보기가 끝나면, 그 살펴보기가 받아들인 문제 후보를 가치 평가와 행동 정책에 한 번 잇는다.
-결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다. 잇는 것은 `ProactiveLoopCoordinator`, 키와 기본값은 `ProactiveLoopProperties` 가 갖는다.
-결정적 provider 로 7일을 이어 돌리는 합성 반복은 `DailyLoopPilotTest` 가 맡는다.
-
-### 언제 부르는가
-
-`ProactiveCheckSettled` 를 같은 백그라운드 스레드에서 받는다. 잠금을 푼 뒤라 자동 실행이 같은 점검 대화의 잠금을 잡을 수 있다.
-계기가 `SCHEDULED` 가 아니거나, 상태가 `SUCCEEDED` 가 아니거나, `assistant.proactive-loop.enabled` 가 거짓이거나, 그 에이전트의 설정 줄이 없거나 꺼져 있으면 시도 줄 없이 돌아간다. 동의하지 않은 사용자의 살펴보기마다 줄이 쌓이지 않게 하기 위해서다.
-
-그 밖이면 그 사용자의 설정 줄을 모두 쓰기 잠금으로 읽은 트랜잭션에서 아래 순서로 정한다.
-
-| 순서 | 조건 | 시도 줄 |
-| --- | --- | --- |
-| 1 | 설정의 `snoozed_until` 이 지금보다 뒤다 | `SKIPPED`, `SNOOZED` |
-| 2 | 그 살펴보기의 `ACCEPTED` 문제 후보가 없다 | `SKIPPED`, `NO_CANDIDATE` |
-| 3 | `SKIPPED` 가 아닌 시도 줄이 `ProactiveLoopCoordinator.DAILY_WINDOW` 안에 `max-runs-per-day` 개 이상이다 | `SKIPPED`, `DAILY_LIMIT` |
-| 4 | 위가 모두 아니다 | `RUNNING` |
-
-`NO_CANDIDATE` 는 모델을 부르지 않으므로 하루 상한에 세지 않지만, 동의한 사용자의 침묵을 조회할 수 있게 줄은 남긴다.
-잠근 목록에서 그 에이전트의 줄이 그사이 꺼졌거나 지워졌으면 줄 없이 돌아간다. 원천 살펴보기의 유일 제약에 걸리면 다른 처리가 맡은 것이므로 아무것도 하지 않는다.
-
-`RUNNING` 을 커밋한 뒤 트랜잭션 밖에서 평가와 판정을 부른다. 모델을 기다리는 동안 잠금을 쥐지 않는다.
-판단 profile 이 없거나 꺼져 있으면 평가는 `FALLBACK / PROVIDER_UNAVAILABLE`, 판정은 모두 `IGNORE` 이고 시도는 `DECIDED` 다.
-평가나 판정이 `ApiException` 으로 거절되면(점검 대화를 지운 경우 포함) 그 오류 코드로, 그 밖의 예외는 `INTERNAL_ERROR` 로 `FAILED` 다. 평가 도중 끝났으면 평가 번호가 비고, 평가 줄은 원천 살펴보기 번호로 찾는다.
-판정을 남긴 뒤 `SURFACE`, `ASK_APPROVAL` 판정마다 판단 피드백 `SURFACED` 를 남긴다.
+매일 깨우기로 돈 살펴보기가 끝나도 가치 평가와 행동 정책에 잇지 않는다.
+둘을 잇던 조정자와 살펴보기의 끝을 알리던 사건은 지웠다.
+이 절에는 설정과 기동 복구가 남아 있고, 키는 `ProactiveLoopProperties` 가 갖는다. 남은 코드는 plan227 의 마지막 PR 이 지운다.
+결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
 
 ### 사용자 설정
 
@@ -358,25 +336,6 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 `snoozedUntil` 이 `ProactiveLoopSettingService.MAX_SNOOZE` 를 넘으면 400 `VALIDATION_FAILED`, 지난 시각이면 비운 것과 같다.
 쉬기가 끝난 뒤 쉬는 동안의 깨우기를 몰아 잇지 않는다. 읽기 전용 자동 실행은 이 설정과 따로 행동 정책의 설치 설정과 사용자 동의가 연다.
 
-### 사용자에게 보이는 것
-
-**판정은 지금 화면에 더 보이지 않는다.** 「내 차례」 의 「먼저 다룰 문제」 자리는 제안 카드가 대신한다([`docs/features/attention.md`](attention.md) 의 「후보와 trigger」).
-아래는 아직 남은 판정 목록과 반응 API(`SurfacedProblems`, `AutonomyController`)의 동작이다. 지금 화면은 이 목록을 읽지 않고, 반응 API 와 화면 코드는 판단 층을 지우는 뒤 PR 에서 함께 지운다.
-관리자 화면이나 판정 API 로 낸 판정은 사용자가 켠 루프가 아니므로 보이지 않는다.
-반응 경로는 `AutonomyController` 가 갖는다. 남의 판정, 없는 판정, 다른 수준의 판정, 루프 밖의 판정은 404 `AUTONOMY_DECISION_NOT_FOUND` 다.
-지금 반응은 그 판정의 마지막 사용자 `ACCEPTED`, `DISMISSED` 다. 지금 화면의 숨기기와 미루기는 지금 반응이 아니다. 같은 단추를 다시 누르면 사건을 더 남기지 않는다.
-
-**보일 판정은 아래 순서로 고른다.**
-
-1. 요청자의 `DECIDED` 시도 가운데 `surface-window` 안의 줄이 가리키는 평가를 모은다
-2. 평가와 후보마다 가장 먼저 남긴 판정 하나만 루프의 판정으로 본다. 판정 API 로 다시 판정한 줄은 루프의 판정이 아니고, 반응해도 404 다
-3. `SURFACE`, `ASK_APPROVAL` 만 남기고, 같은 문제 키는 가장 늦은 판정 하나만 남긴다
-4. 지금 반응이 있는 판정은 뺀다. 그래서 새 판정에 「관심 없음」 을 누르면 같은 키의 옛 판정이 대신 나오지 않는다
-5. 지운 점검 대화와 찾지 못한 에이전트의 판정을 빼고 가장 늦은 것부터 `surface-max-items` 개만 보인다. 같은 카드의 할 일과 Memory 제안이 카드 상한 밖으로 밀리지 않게 하기 위해서다. 숨기거나 미룬 항목도 이 자리를 쓰므로 최근 문제를 모두 숨기면 오래된 문제는 창이 지날 때까지 보이지 않는다
-
-원천 살펴보기나 후보 줄이 없거나 문제 글이 빈 판정은 그 줄만 뺀다.
-목록을 읽다 예외가 나면 이 항목만 비우고 로그를 남긴다. 같은 카드의 승인 대기, 할 일, Memory 제안을 가리지 않기 위해서다.
-
 ### 서버가 멈췄을 때
 
 기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫고 평가와 판정을 다시 부르지 않는다.
@@ -386,7 +345,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 받아들인 문제 후보 가운데 지금 무엇을 먼저 다룰지 판단한다. 권한, 승인, 실행 여부는 아래 「행동 정책」 이 정한다.
 결정은 [ADR-20261007 / value-evaluation](../adr/ADR-20261007-value-evaluation.md)에, 설정은 `ValueEvaluationProperties` 에 있다.
-결과를 대화에 올리지 않는다. 부르는 자리는 매일 루프 하나다.
+결과를 대화에 올리지 않는다. 지금은 부르는 곳이 없다.
 
 ### 입력과 판단 축
 
@@ -414,23 +373,23 @@ timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 �
 판단 중 대화를 지워도 평가 기록은 완료로 닫고, 이후 조회와 replay 에는 대화의 조회 권한을 다시 확인한다.
 기동할 때 남은 `RUNNING` 은 `FALLBACK / INTERRUPTED` 로 닫고 다시 부르지 않는다. 한 줄의 복구가 실패해도 다른 줄과 서버 기동을 이어 간다.
 replay 는 저장된 `state` 와 `questions` 로 새 시도를 만든다. 같은 답의 재현을 보장하지 않고, 같은 입력에서 판단 차이를 비교하는 기능이다.
-경로는 `ValueEvaluationController` 가 갖는다. 관리자 영역의 가치 평가 경로와 화면은 지웠다.
+판정 읽기와 replay 를 열던 경로(`ValueEvaluationController`)와 관리자 영역의 가치 평가 경로와 화면은 지웠다.
 행동 정책은 `ValueEvaluationService.read` 의 `DecisionEvidence` 를 읽는다. `EVALUATED` 도 추천일 뿐 실행 허락이 아니므로 정책은 후보와 근거의 유효성, 사용자 권한을 다시 확인한다.
 축의 `UNKNOWN`, 낮은 확신, 부작용 힌트를 판단에서 빠뜨리지 않는다. replay 결과를 현재 상황의 실행 근거로 바로 쓰지 않는다.
 
 ## 행동 정책
 
 가치 평가를 받은 문제 후보마다 무엇까지 해도 되는지 정한다.
-결정은 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md)에 있다. 입력은 `AutonomyInputs`, 키와 기본값은 `AutonomyProperties`, 경로는 `AutonomyController` 가 갖는다.
-매일 루프가 부른다. 사용자 동의를 바꾸는 화면은 없다.
+결정은 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md)에 있다. 입력은 `AutonomyInputs`, 키와 기본값은 `AutonomyProperties` 가 갖는다.
+지금은 부르는 곳이 없다. 판정을 열던 경로와 사용자 동의를 바꾸던 경로(`AutonomyController`)는 지웠다.
 
 ### 행동 수준
 
 | 수준 | 뜻 | 이번에 하는 일 |
 | --- | --- | --- |
 | `IGNORE` | 다루지 않는다 | 판정만 남긴다 |
-| `SURFACE` | 보일 가치가 있지만 실행 근거나 허락이 없다 | 매일 루프가 낸 판정이면 지금 화면 「내 차례」 에 보인다 |
-| `ASK_APPROVAL` | 쓰기나 위험이 있어 사람의 승인 없이는 하지 않는다 | 새 승인 줄을 만들지 않는다. 매일 루프가 낸 판정이면 지금 화면에 보인다 |
+| `SURFACE` | 보일 가치가 있지만 실행 근거나 허락이 없다 | 판정만 남긴다. 지금 화면은 이 판정을 읽지 않는다 |
+| `ASK_APPROVAL` | 쓰기나 위험이 있어 사람의 승인 없이는 하지 않는다 | 새 승인 줄을 만들지 않는다. 지금 화면은 이 판정을 읽지 않는다 |
 | `EXECUTE` | 읽기 전용 살펴보기를 한 번 시작한다 | 실행 키를 저장한 뒤 시작한다 |
 
 ### 까닭 코드와 수준
@@ -462,7 +421,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남긴다.
 결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
-예외는 둘이다. 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내리고, 매일 루프가 보인 문제는 반응이 있으면 지금 화면에서 빠진다.
+예외는 하나다. 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다.
 사건은 `source_check_id` 로, 또는 `origin_execution_id` 가 살펴보기의 `root_execution_id` 와 같은지로 상황에 이어진다.
 
 ### 사건
@@ -473,7 +432,6 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 무응답은 사건이 아니라 `SURFACED` 뒤에 사용자 사건이 없다는 사실로 읽는다. 승인 줄의 만료, 결과를 모르는 실행, 보고 열기도 사건이 아니다.
 사용자가 직접 더한 할 일과 사람이 고르는 지금 화면의 `FOLLOW_UP_OPEN` 항목은 제안이 아니라 사건을 남기지 않는다.
 보고를 남기지 않은 살펴보기는 침묵이다. 사건이 아니라 상황의 `reportSurfaced = false` 로 읽는다.
-판정 API 로 낸 판정은 보이는 제안이 아니므로 `SURFACED` 를 남기지 않는다.
 
 `DecisionFeedbackRecorder.record` 는 부르는 쪽이 커밋한 뒤 새 트랜잭션으로 넣으므로 되돌려진 동작의 사건은 남지 않는다. 실패해도 부르는 쪽으로 던지지 않는다.
 살펴보기의 끝은 저장된 줄을 다시 읽어 판정한다. 끝난 상태를 저장하지 못했으면 기동 정리가 닫을 때 남긴다.
