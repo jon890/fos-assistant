@@ -112,13 +112,10 @@ export class CdpSession {
         reject(unreachable());
         return;
       }
-      const timer = setTimeout(
-        () => {
-          socket.close();
-          reject(unreachable());
-        },
-        Math.max(1, timeoutMs),
-      );
+      const timer = setTimeout(() => {
+        socket.close();
+        reject(unreachable());
+      }, Math.max(1, timeoutMs));
       const fail = () => {
         clearTimeout(timer);
         reject(unreachable());
@@ -147,13 +144,10 @@ export class CdpSession {
     if (this.closed) return Promise.reject(unreachable());
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => {
-          this.pending.delete(id);
-          reject(unreachable());
-        },
-        Math.max(1, timeoutMs),
-      );
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(unreachable());
+      }, Math.max(1, timeoutMs));
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.socket.send(JSON.stringify({ id, method, params }));
@@ -166,10 +160,7 @@ export class CdpSession {
   }
 
   /** 이름이 같은 이벤트 하나를 기다려 그 `params` 를 돌려준다. */
-  waitEvent<T = any>(
-    method: string,
-    timeoutMs = COMMAND_TIMEOUT_MS,
-  ): Promise<T> {
+  waitEvent<T = any>(method: string, timeoutMs = COMMAND_TIMEOUT_MS): Promise<T> {
     if (this.closed) return Promise.reject(unreachable());
     return new Promise<T>((resolve, reject) => {
       const waiters = this.waiters.get(method) ?? new Set<Pending>();
@@ -177,13 +168,10 @@ export class CdpSession {
       const waiter: Pending = {
         resolve,
         reject,
-        timer: setTimeout(
-          () => {
-            waiters.delete(waiter);
-            reject(unreachable());
-          },
-          Math.max(1, timeoutMs),
-        ),
+        timer: setTimeout(() => {
+          waiters.delete(waiter);
+          reject(unreachable());
+        }, Math.max(1, timeoutMs)),
       };
       waiters.add(waiter);
     });
@@ -221,8 +209,7 @@ export class CdpSession {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error)
-        pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
+      if (message.error) pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
       else pending.resolve(message.result ?? {});
       return;
     }
