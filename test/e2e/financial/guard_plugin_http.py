@@ -30,7 +30,7 @@ class Fixture(ProfileApiRouteTest):
         for vault in ("c1", "c2"):
             self.assertEqual(self.vault("DELETE", vault=vault).status_code, 200)
         os.environ["FOS_ASSISTANT_CONNECTOR_COMMAND"] = sys.executable
-        declared = json.loads((self.connector / "assistant.json").read_text())
+        declared = json.loads((self.connector / "connector.json").read_text())
         declared.update(schema=2, tools={
             "list_scopes": {"risk": "READ"},
             "write_note": {"risk": "WRITE", "outbound": False},
@@ -78,7 +78,7 @@ class Fixture(ProfileApiRouteTest):
         urllib.request.OpenerDirector.open = observed
 
     def write_manifest(self, declared):
-        (self.connector / "assistant.json").write_text(json.dumps(declared, ensure_ascii=False))
+        (self.connector / "connector.json").write_text(json.dumps(declared, ensure_ascii=False))
 
     def inspect(self):
         directory = self.root / "alice"
