@@ -19,7 +19,7 @@ catalog = {}
 for name in ("gmail", "naver-blog"):
     loaded = manifest._load_connector(name, {
         "root": REPO / "hermes/connectors" / name, "command": sys.executable, "env": {}})
-    declared = json.loads((REPO / "hermes/connectors" / name / "connector.json").read_text())
+    declared = json.loads((REPO / "hermes/connectors" / name / "assistant.json").read_text())
     catalog[name] = manifest._guard_manifest(loaded, declared)
 with mock.patch.object(manifest, "_connector_catalog", return_value=catalog):
     produced = json.loads(manifest._connector_catalog_response().body)

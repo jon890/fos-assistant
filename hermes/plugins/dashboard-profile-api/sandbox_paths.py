@@ -71,13 +71,13 @@ def _sandbox_attachment_roots_ok(attachment_root: str, attachment_agent_root: st
 
 def _sandbox_connector_output_root_ok(root: str, workspace_root: str, attachment_root: str,
                                       attachment_agent_root: str) -> bool:
-    """커넥터 출력 루트가 사용자 workspace, 첨부 경로, 예약 경로와 겹치지 않는지 본다(ADR-20261008 connector-output-files)."""
+    """플러그인 출력 루트가 사용자 workspace, 첨부 경로, 예약 경로와 겹치지 않는지 본다(ADR-20261008 connector-output-files)."""
     return not any(_sandbox_paths_overlap(root, other)
                    for other in (workspace_root, attachment_root, attachment_agent_root, *SANDBOX_RESERVED_PATHS))
 
 
 def _sandbox_connector_output_mount_overlaps(mount: str, connector_output_root: Optional[str]) -> bool:
-    """운영 마운트가 커넥터 출력 루트를 원본이나 대상으로 덮는지 본다. 덮으면 다른 profile 의 출력이 보인다."""
+    """운영 마운트가 플러그인 출력 루트를 원본이나 대상으로 덮는지 본다. 덮으면 다른 profile 의 출력이 보인다."""
     if connector_output_root is None:
         return False
     source, target = mount.split(":")
@@ -87,7 +87,7 @@ def _sandbox_connector_output_mount_overlaps(mount: str, connector_output_root: 
 
 def _sandbox_skill_root_ok(skill_root: str, skill_agent_root: str, workspace_root: str, attachment_root: str,
                            attachment_agent_root: str, connector_output_root: Optional[str]) -> bool:
-    """스킬 루트의 원본과 Hermes 쪽 대상이 사용자 workspace, 첨부, 커넥터 출력, 예약 경로와 겹치지 않는지 본다.
+    """스킬 루트의 원본과 Hermes 쪽 대상이 사용자 workspace, 첨부, 플러그인 출력, 예약 경로와 겹치지 않는지 본다.
 
     원본이 겹치면 스킬 마운트가 다른 사용자의 파일을 보이게 하고, 대상이 겹치면 다른 마운트의 자리를 가린다.
     """

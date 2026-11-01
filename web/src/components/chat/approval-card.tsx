@@ -74,7 +74,7 @@ function HiddenArgsNotice({ action }: { action: ConnectorAction }) {
       </p>
       <p data-testid="approval-hidden-args-next" className="mt-1">
         거절한 뒤 에이전트에게 그 부분을 빼거나 풀어 쓰게 해 주세요. 가려진 것이
-        지우거나 바꿀 대상의 id 라면 커넥터가 그 칸을 식별자로 선언해야 하니
+        지우거나 바꿀 대상의 id 라면 플러그인이 그 칸을 식별자로 선언해야 하니
         관리자에게 알려 주세요.
       </p>
     </Notice>

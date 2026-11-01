@@ -43,7 +43,7 @@ class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
                 self.assertEqual(response.status_code, 400)
                 self.assertNotIn(secret, json.dumps(response.body))
                 self.assertEqual(stored.read_bytes(), written)
-        # 같은 이름의 보관 파일이 다른 커넥터의 것이면 409 다.
+        # 같은 이름의 보관 파일이 다른 플러그인의 것이면 409 다.
         self.assertEqual(self.vault("PUT", vault="c1", connector=OTHER,
                                     values={"token": OTHER_VALUE}).status_code, 409)
         self.assertEqual(stored.read_bytes(), written)
@@ -57,7 +57,7 @@ class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
         self.assertEqual(self.vault("DELETE", vault="c3", connector=DEMO).status_code, 400)
 
     def test_connector_without_fields_is_bound_with_an_empty_vault(self):
-        """칸이 없는 커넥터는 카탈로그에 오르고, 빈 `values` 의 보관 파일로 확인 도구를 부르고 바인딩 설치가 된다."""
+        """칸이 없는 플러그인은 카탈로그에 오르고, 빈 `values` 의 보관 파일로 확인 도구를 부르고 바인딩 설치가 된다."""
         demo, _ = self.bind_fixture()
         declared = json.loads((demo / "connector.json").read_text(encoding="utf-8"))
         declared["fields"] = []

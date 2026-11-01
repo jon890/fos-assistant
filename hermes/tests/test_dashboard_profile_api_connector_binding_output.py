@@ -1,4 +1,4 @@
-"""dashboard-profile-api 의 커넥터 출력 디렉터리 바인딩을 검사한다(ADR-20261008 connector-output-files)."""
+"""dashboard-profile-api 의 플러그인 출력 디렉터리 바인딩을 검사한다(ADR-20261008 connector-output-files)."""
 
 import json
 import pathlib
@@ -11,7 +11,7 @@ class ProfileApiConnectorBindingOutputTest(support.ProfileApiRouteTest):
         self.set_sandbox_policy(self.sandbox_policy(connector_output_root=self.connector_output_root))
 
     def test_binding_writes_the_profile_output_directory_into_the_server_definition(self):
-        """정책에 출력 루트가 있으면 그 profile 과 커넥터의 디렉터리를 만들고 서버 정의 env 에 넣는다. `.env` 에는 쓰지 않는다."""
+        """정책에 출력 루트가 있으면 그 profile 과 플러그인의 디렉터리를 만들고 서버 정의 env 에 넣는다. `.env` 에는 쓰지 않는다."""
         demo, _ = self.bind_fixture()
         self.declare_owner_output(demo)
         self.with_output_root()

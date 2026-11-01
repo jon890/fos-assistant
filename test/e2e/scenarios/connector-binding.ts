@@ -1,5 +1,5 @@
 /**
- * 사용자가 한 번 연결한 계정을 자기 비공개 에이전트에 붙여, 그 에이전트가 커넥터 도구를 직접 부르는 흐름을 본다(ADR-083).
+ * 사용자가 한 번 연결한 계정을 자기 비공개 에이전트에 붙여, 그 에이전트가 플러그인 도구를 직접 부르는 흐름을 본다(ADR-083).
  *
  * <p>붙이기는 대역의 보관 파일 값을 그 에이전트 profile 에 바인딩 설치로 옮긴다. 새 서버를 더한 붙이기는 재시작이 필요 없어
  * Control Plane 이 반영 지연 뒤 스스로 확인해 쓸 수 있게 하고, 값 교체처럼 재시작 대기가 된 바인딩만 관리자가 공유 gateway 를
@@ -137,10 +137,10 @@ export const connectorBindingScenario: Scenario = {
         bindRequests.join(" | ") === `bind ${agent.profile}`,
         `붙이기 동안 그 profile 의 바인딩 설치 하나만 받아야 한다: ${bindRequests.join(" | ")}`,
       );
-      // 대역은 보관 파일이 없거나 다른 커넥터의 것인 바인딩 설치를 400 으로 거절한다. 붙은 것으로 남았으면 `bind.vault` 를 받은 것이다.
+      // 대역은 보관 파일이 없거나 다른 플러그인의 것인 바인딩 설치를 400 으로 거절한다. 붙은 것으로 남았으면 `bind.vault` 를 받은 것이다.
       expect(
         context.hermes.boundConnectorsOf(agent.profile).join() === DEMO_CONNECTOR.id,
-        `대역에 붙은 커넥터가 시험 커넥터 하나가 아니다: ${context.hermes.boundConnectorsOf(agent.profile).join()}`,
+        `대역에 붙은 플러그인이 시험 플러그인 하나가 아니다: ${context.hermes.boundConnectorsOf(agent.profile).join()}`,
       );
       const boundToolsets = context.hermes.apiServerToolsetsOf(agent.profile) ?? [];
       expect(
@@ -171,10 +171,10 @@ export const connectorBindingScenario: Scenario = {
         "대역의 요청 기록에 토큰 원문이 있다",
       );
 
-      step("반영 전에 그 에이전트의 실행이 커넥터 도구를 부르면 반영 대기로 막히고 커넥터 서버에 닿지 않는다");
+      step("반영 전에 그 에이전트의 실행이 플러그인 도구를 부르면 반영 대기로 막히고 플러그인 서버에 닿지 않는다");
       const early = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
       expect(early.answer === `block ${BINDING_PENDING}`, `반영 전 호출이 반영 대기 글로 막히지 않았다: ${early.answer}`);
-      expect(mine().length === 0, `반영 전 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 0, `반영 전 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("관리자 반영 완료 없이 Control Plane 이 스스로 확인해 READY 가 된다");
       const readyRow = await awaitReady(context, owner, agent.code, DEMO_CONNECTOR.id);
@@ -197,11 +197,11 @@ export const connectorBindingScenario: Scenario = {
       );
       const waiting = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
       expect(waiting.answer === `block ${BINDING_RESTART}`, `재시작 대기 바인딩의 호출이 관리자 반영 글로 막히지 않았다: ${waiting.answer}`);
-      expect(mine().length === 0, `재시작 대기 중 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 0, `재시작 대기 중 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
       const confirmedRow = await confirm(context, agent.code, DEMO_CONNECTOR.id);
       expect(confirmedRow.status === "READY", `관리자 반영 완료 뒤 READY 가 아니다: ${JSON.stringify(confirmedRow)}`);
 
-      step("같은 에이전트의 실행이 읽기 도구를 부르면 허용되어 커넥터 서버에 닿는다");
+      step("같은 에이전트의 실행이 읽기 도구를 부르면 허용되어 플러그인 서버에 닿는다");
       const read = await probeTool(context, owner, agent.code, `${PREFIX}list_scopes`);
       expect(read.answer === "allow", `읽기 도구가 허용되지 않았다: ${read.answer}`);
       expect(
@@ -218,7 +218,7 @@ export const connectorBindingScenario: Scenario = {
         asked.answer.startsWith(`block ${APPROVAL_PREFIX}`) && actionId !== undefined,
         `write_note 가 승인 요청 번호와 함께 막히지 않았다: ${asked.answer}`,
       );
-      expect(mine().length === 1, `승인하기 전인데 write_note 가 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === 1, `승인하기 전인데 write_note 가 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
       const approved = expectStatus(
         await call(context, `/connector-actions/${actionId}/approve`, { method: "POST", token: owner, body: { grant: null } }),
         200,
@@ -226,7 +226,7 @@ export const connectorBindingScenario: Scenario = {
       ).json<ActionView>();
       expect(
         approved.status === "SUCCEEDED" && approved.connectorId === DEMO_CONNECTOR.id,
-        `승인한 줄이 시험 커넥터의 SUCCEEDED 가 아니다: ${JSON.stringify(approved)}`,
+        `승인한 줄이 시험 플러그인의 SUCCEEDED 가 아니다: ${JSON.stringify(approved)}`,
       );
       const executed = mine().filter((entry) => entry.via === "execute");
       expect(
@@ -345,7 +345,7 @@ export const connectorBindingScenario: Scenario = {
         context.hermes.boundConnectorsOf(agent.profile).length === 0
           && !unboundToolsets.includes(DEMO_CONNECTOR.mcp_server) && unboundToolsets.includes(CONTROL_PLANE_MCP)
           && context.hermes.profileEnv(agent.profile).DEMO_TOKEN === undefined,
-        `뗀 profile 에 커넥터가 남았거나 Control Plane MCP 가 빠졌다: ${unboundToolsets.join()}`,
+        `뗀 profile 에 플러그인이 남았거나 Control Plane MCP 가 빠졌다: ${unboundToolsets.join()}`,
       );
       const unboundRow = (await connectionsOf(context, owner, agent.code)).connections
         .find((row) => row.connectorId === DEMO_CONNECTOR.id);
@@ -363,7 +363,7 @@ export const connectorBindingScenario: Scenario = {
         "뗀 뒤 대화의 승인 줄",
       ).json<unknown[]>();
       expect(afterActions.length === 0, `뗀 뒤 쓰기 호출이 승인 줄을 남겼다: ${JSON.stringify(afterActions)}`);
-      expect(mine().length === reachedBeforeUnbind, `뗀 뒤 호출이 커넥터 서버에 닿았다: ${JSON.stringify(mine())}`);
+      expect(mine().length === reachedBeforeUnbind, `뗀 뒤 호출이 플러그인 서버에 닿았다: ${JSON.stringify(mine())}`);
 
       step("다시 두 에이전트에 붙인 뒤 연결을 해제하면 붙은 바인딩이 모두 떼어지고 보관 파일이 지워진다");
       const second = await setup.createAgent("일정 비서");
@@ -386,7 +386,7 @@ export const connectorBindingScenario: Scenario = {
       for (const target of [agent, second]) {
         expect(
           context.hermes.boundConnectorsOf(target.profile).length === 0,
-          `해제 뒤 ${target.code} 의 profile 에 커넥터가 남았다`,
+          `해제 뒤 ${target.code} 의 profile 에 플러그인이 남았다`,
         );
         const rows = (await connectionsOf(context, owner, target.code)).connections;
         expect(rows.length === 0, `해제 뒤 ${target.code} 의 연결 목록에 연결이 남았다: ${JSON.stringify(rows)}`);

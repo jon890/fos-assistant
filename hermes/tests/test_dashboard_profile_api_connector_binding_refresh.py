@@ -150,7 +150,7 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
         self.assertIn("OTHER_TOKEN=other_1234", after)
 
     def test_rebinding_rejects_renamed_field_env_that_an_operator_already_uses(self):
-        """새 field env 이름이 profile의 비커넥터 값과 겹치면 그 값을 덮어쓰지 않는다."""
+        """새 field env 이름이 profile의 비플러그인 값과 겹치면 그 값을 덮어쓰지 않는다."""
         connector, _ = self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
         vault_before = {path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}

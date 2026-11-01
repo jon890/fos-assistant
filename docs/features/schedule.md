@@ -143,7 +143,7 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 | 사용자가 중지했다 | `CANCELLED`, 루트 실행 번호 | 없음 |
 | 예외로 끝났다 | `FAILED`(`FAILED`) | `NEVER` 가 아니면 `TASK_FAILED` |
 
-쓰기 도구를 불러 승인을 기다리는 turn 도 답을 마치면 `SUCCEEDED` 다. 승인은 [커넥터 도구 정책](connector-policy.md) 의 「승인이 필요한 호출」 그대로 따로 살고, [알림](attention.md) 의 `APPROVAL_REQUESTED` 가 사람을 부른다.
+쓰기 도구를 불러 승인을 기다리는 turn 도 답을 마치면 `SUCCEEDED` 다. 승인은 [플러그인 도구 정책](connector-policy.md) 의 「승인이 필요한 호출」 그대로 따로 살고, [알림](attention.md) 의 `APPROVAL_REQUESTED` 가 사람을 부른다.
 
 #### 보고할 것 없음
 
@@ -190,4 +190,4 @@ turn 은 위임 결과를 전하는 자동 turn 과 같은 모양으로 돈다(`
 - 작업 범위로 기간을 정해 `required` 도구를 미리 허락하는 것
 - 에이전트가 작업을 제안하고 사람이 받아들이는 것. 받아들이기 전에는 발화하지 않는다
 - 웹 푸시
-- webhook 과 커넥터 사건 trigger. 넣지 않기로 했다. Control Plane 을 바깥에 여는 결정이 먼저다
+- webhook 과 플러그인 사건 trigger. 넣지 않기로 했다. Control Plane 을 바깥에 여는 결정이 먼저다

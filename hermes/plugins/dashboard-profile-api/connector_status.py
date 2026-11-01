@@ -1,4 +1,4 @@
-"""profile 의 커넥터 스킬과 정책 hook 이 설치한 판인지 확인한다."""
+"""profile 의 플러그인 스킬과 정책 hook 이 설치한 판인지 확인한다."""
 
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def _tool_map_drift(profile_dir: pathlib.Path, state: dict) -> set[str] | None:
 
 
 def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict, drift=_UNSET) -> str | None:
-    """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치지 않는 첫 조건의 이름이다. 모두 통과하면 `None` 이다.
+    """그 profile 에서 플러그인 도구 호출이 정책 hook 을 거치지 않는 첫 조건의 이름이다. 모두 통과하면 `None` 이다.
 
     조건은 `docs/features/connector-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
     `drift` 는 같은 요청에서 이미 계산한 `_tool_map_drift` 의 값이다. 주지 않으면 여기서 계산한다.
@@ -127,5 +127,5 @@ def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict, d
 
 
 def _policy_hook_active(profile_dir: pathlib.Path, config: dict, state: dict) -> bool:
-    """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치는지 본다. 조건은 `_policy_hook_failure` 가 갖는다."""
+    """그 profile 에서 플러그인 도구 호출이 정책 hook 을 거치는지 본다. 조건은 `_policy_hook_failure` 가 갖는다."""
     return _policy_hook_failure(profile_dir, config, state) is None

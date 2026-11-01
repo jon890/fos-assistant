@@ -84,7 +84,7 @@ test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열�
 
   const menu = page.getByRole("navigation", { name: "관리자 메뉴" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("link")).toHaveText(["사용자", "에이전트", "모델", "도구", "사용량과 비용", "커넥터", "브라우저", "파일 공간"]);
+  await expect(menu.getByRole("link")).toHaveText(["사용자", "에이전트", "모델", "도구", "사용량과 비용", "외부 서비스 연결", "브라우저", "파일 공간"]);
   await expect(menu.getByRole("link", { name: "사용자", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(menu.locator('[aria-current="page"]')).toHaveCount(1);
   await expect(page.getByRole("banner").getByText("관리자", { exact: true })).toBeVisible();
@@ -179,7 +179,7 @@ test("일반 화면의 에이전트 상세에는 관리 절과 모델 절이 없
 
 test("연결 반영 확인은 관리자 영역에 있고 일반 외부 서비스 연결 화면에는 없다", async ({ page }) => {
   await page.goto("/admin/connections");
-  await expect(page.getByRole("heading", { name: "커넥터", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "외부 서비스 연결", exact: true })).toBeVisible();
   await expect(page.getByTestId("connector-admin-panel")).toBeVisible();
 
   await page.goto("/connections");

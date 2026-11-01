@@ -127,7 +127,7 @@ export const TOOLSET_CATALOG_PATH = "/api/tools/toolsets";
 
 export const CONFIG_PATH = "/api/config";
 
-/** 커넥터 plugin 의 경로다. 카탈로그, 도구 호출, 설치 상태, MCP 서버 확인이 있다. */
+/** 플러그인 plugin 의 경로다. 카탈로그, 도구 호출, 설치 상태, MCP 서버 확인이 있다. */
 export const CONNECTOR_CATALOG_PATH = "/api/connectors/catalog";
 
 export const CONNECTOR_CALL_PATH = /^\/api\/connectors\/([a-z0-9-]+)\/call$/;

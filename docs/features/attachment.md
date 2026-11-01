@@ -251,7 +251,7 @@ caller.originExecution().conversationId()만 쓰며 모델 본문을 서명된 �
 두 MCP 성공 응답 JSON은 ExternalData.wrap으로 감싼다.
 사진·OCR의 지시와 닫는 표시는 데이터로 취급한다.
 두 도구의 bare 이름과 MCP 접두사가 붙은 이름 모두 start/complete/fail의 detail과 text를 수집 전에 null로 만든다.
-root/data의 preview/detail/result와 delta/text/output 모두 이 규칙을 적용하며 역할과 커넥터 사용 여부는 영향을 주지 않는다.
+root/data의 preview/detail/result와 delta/text/output 모두 이 규칙을 적용하며 역할과 플러그인 사용 여부는 영향을 주지 않는다.
 로그에는 본문·OCR·암호문·외부 오류 원문·서명·토큰을 넣지 않는다.
 도구 로그를 남기면 도구 이름·실행 ID·공개 오류 코드만 남긴다.
 새 도구는 memory_remember의 INTERNAL_TOOLS에 추가하지 않아 개인 기억의 바로 저장 조건을 완화하지 않는다.
@@ -470,7 +470,7 @@ sequenceDiagram
 ### 원본과 영역을 자동 조회할 때
 
 새 profile에는 원본 조회 도구를 제공한다. 기존 개인 에이전트도 사진이 있는 일반 turn을 제출하기 전에
-자동으로 제공하므로 사용자가 설정을 켤 필요가 없다. 공유 profile과 커넥터의 도구 격리는 유지한다.
+자동으로 제공하므로 사용자가 설정을 켤 필요가 없다. 공유 profile과 플러그인의 도구 격리는 유지한다.
 
 [ADR-20261010 / attachment-inspect](../adr/ADR-20261010-attachment-inspect.md)가 권한과 실패 계약을 정한다.
 모델은 첨부 참조와 선택 `region=[x1,y1,x2,y2]` 또는 `overview=true`를 고른다. 좌표는 회전된 원본 표시 방향이며 오른쪽·아래 끝은 제외한다.
@@ -728,7 +728,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 - 같은 출처의 주소라 결과물의 `img-src 'self'` 가 허용하고, iframe 의 `allow-same-origin` 으로 로그인 쿠키가 함께 간다. 첨부는 그 대화의 주인만 받으므로 결과물을 여는 사람과 같은 권한이다
 - 첨부는 `Cache-Control: private` 이다. 대화 화면에서 이미 받은 사진은 브라우저가 다시 받지 않는다
 - 첨부를 지웠거나 보관 기간이 지났으면 410 이라 그 자리는 깨진 그림이다. HTML 은 `alt` 에 몇 번째 사진인지 적는다
-- 이 모양에 기대는 쪽은 네이버 블로그 커넥터의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
+- 이 모양에 기대는 쪽은 네이버 블로그 플러그인의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
 
 ### 결과물 파일을 볼 때
 

@@ -164,7 +164,7 @@ def _sandbox_policy() -> Optional[dict]:
     attachment_agent_root = value["attachment_agent_root"]
     if not _sandbox_attachment_roots_ok(attachment_root, attachment_agent_root, workspace_root):
         return invalid("attachment_root 또는 attachment_agent_root")
-    # 선택 키다. 없으면 커넥터 출력 디렉터리를 붙이지 않고 셸 설정과 지문이 그대로다.
+    # 선택 키다. 없으면 플러그인 출력 디렉터리를 붙이지 않고 셸 설정과 지문이 그대로다.
     connector_output_root = value.get("connector_output_root")
     if connector_output_root is not None and (
             not _sandbox_path_ok(connector_output_root)
@@ -225,7 +225,7 @@ def _sandbox_attachment_agent_directory(policy: dict, owner: str) -> str:
 
 
 def _sandbox_connector_output_profile_directory(policy: dict, profile: str, owner: str) -> Optional[str]:
-    """그 profile 의 커넥터 출력 디렉터리다. 실행 공간에 같은 경로로 읽기 전용으로 붙는다. 정책에 키가 없으면 None 이다."""
+    """그 profile 의 플러그인 출력 디렉터리다. 실행 공간에 같은 경로로 읽기 전용으로 붙는다. 정책에 키가 없으면 None 이다."""
     root = policy.get("connector_output_root")
     if root is None:
         return None
@@ -315,8 +315,8 @@ def _sandbox_terminal(policy: dict, profile: str, owner: str, attachment_snapsho
     _sandbox_validate_attachment_snapshot(policy, owner, attachment_snapshot)
     settings = policy["profiles"][profile]
     mounts = policy["read_only_mounts"] + settings["read_only_mounts"]
-    # 커넥터가 Hermes 쪽에서 쓴 경로를 스크립트가 그대로 열도록 같은 경로에 읽기 전용으로 붙인다.
-    # 실행 공간이 쓰지 못하므로 링크를 바꿔 끼워 커넥터의 쓰기를 다른 곳으로 돌릴 수 없다(ADR-20261008 connector-output-files).
+    # 플러그인이 Hermes 쪽에서 쓴 경로를 스크립트가 그대로 열도록 같은 경로에 읽기 전용으로 붙인다.
+    # 실행 공간이 쓰지 못하므로 링크를 바꿔 끼워 플러그인의 쓰기를 다른 곳으로 돌릴 수 없다(ADR-20261008 connector-output-files).
     output = _sandbox_connector_output_profile_directory(policy, profile, owner)
     output_mounts = ["%s:%s:ro" % (output, output)] if output is not None else []
     skill_mounts = _sandbox_skill_mounts(policy, profile)

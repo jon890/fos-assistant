@@ -1,29 +1,29 @@
 # dashboard-profile-api plugin
 
-Hermes 대시보드에 설치하는 plugin 이다. Control Plane 이 profile 과 도구, 스킬, 커넥터를 HTTP 로 다루는 경로를 연다.
+Hermes 대시보드에 설치하는 plugin 이다. Control Plane 이 profile 과 도구, 스킬, 플러그인을 HTTP 로 다루는 경로를 연다.
 설치와 운영 값은 [`hermes/README.md`](../../README.md), Hermes 쪽 동작은 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 가 갖는다.
 
 ## dashboard-profile-api 가 여는 것
 
 인증은 모두 `Authorization: Bearer <대시보드 서비스 토큰>` 이고 없거나 틀리면 401 이다.
-Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문서가 갖는다. 커넥터 경로는 [커넥터 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이, 에이전트 만들기는 [에이전트](../../../docs/features/agent-skill.md) 가 갖는다.
+Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문서가 갖는다. 플러그인 경로는 [플러그인 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이, 에이전트 만들기는 [에이전트](../../../docs/features/agent-skill.md) 가 갖는다.
 
 | 요청 | 쓰임 | 본문이나 query | 성공 | 실패 |
 | --- | --- | --- | --- | --- |
 | `GET /api/profiles` | 이름이 이미 있는지 본다 | 없음 | 200 | |
 | `POST /api/profiles` | profile 을 만들고 같은 요청 안에서 설정 틀과 서명 plugin 과 관리 표식을 둔다 | `name`, `no_skills`, `description` 셋을 받고 다른 키는 거절한다. Control Plane 은 `{name, no_skills: true}` 를 보낸다 | 200. 이때 안전한 도구 목록, Control Plane MCP 등록(토큰 값 없음), 서명 plugin 켜짐, 관리 표식이 모두 있다 | 400 이름 규칙, 이미 있는 이름(Hermes 는 409 가 아니라 400), 허용하지 않는 키. 500 틀 적용 실패(만든 것은 지웠다) |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
-| `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
-| `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
-| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
+| `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 플러그인의 `fields[].env` 뿐 | 200. 플러그인 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
+| `DELETE /api/env` | 관리 profile 의 플러그인 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 플러그인이면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 플러그인의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}`. 도구를 찾아 부른 응답에는 부르기 직전 `tools/list` 의 `read_only`(그 도구의 `readOnlyHint` 가 참인가)를 더한다 | 504 실행됐는지 모른다 |
-| `POST /api/connectors/<id>/tools` | 표준 플러그인(`schema: 3`)의 연결 확인. 후보 값이나 보관 파일의 값으로 MCP 서버에 붙어 `tools/list` 만 받는다. 도구는 부르지 않는다 | `{values}` 또는 `{vault}`. 둘 가운데 정확히 하나다. 시간 제한과 동시 한도는 `call` 과 같다 | `{ok: true, tools: [{name, read_only}]}`. `read_only` 는 `readOnlyHint` 가 참일 때만 참이다. 붙지 못하면 `{ok: false, error: "unavailable"}`, 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다 | 400 `schema: 3` 이 아닌 커넥터, 본문 모양 |
-| `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
-| `PUT /api/connectors` | profile 에 커넥터를 붙이고 뗀다 | `enabled: true` 는 `{profile, plugin, enabled: true, bind: {vault}, sandbox_owner?, owner_browser?}` 이며 `bind.vault` 가 필수다. Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 커넥터에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 커넥터는 이 값을 쓰지 않는다. `enabled: false` 는 `{profile, plugin, enabled: false}` 로 바인딩을 뗀다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다, `enabled: true` 인데 `bind.vault` 가 없거나 `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 커넥터를 붙이는데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
-| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
+| `POST /api/connectors/<id>/tools` | 표준 플러그인(`schema: 3`)의 연결 확인. 후보 값이나 보관 파일의 값으로 MCP 서버에 붙어 `tools/list` 만 받는다. 도구는 부르지 않는다 | `{values}` 또는 `{vault}`. 둘 가운데 정확히 하나다. 시간 제한과 동시 한도는 `call` 과 같다 | `{ok: true, tools: [{name, read_only}]}`. `read_only` 는 `readOnlyHint` 가 참일 때만 참이다. 붙지 못하면 `{ok: false, error: "unavailable"}`, 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다 | 400 `schema: 3` 이 아닌 플러그인, 본문 모양 |
+| `GET /api/connectors?profile=<p>` | 플러그인의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 플러그인 표식이 모두 없다 |
+| `PUT /api/connectors` | profile 에 플러그인을 붙이고 뗀다 | `enabled: true` 는 `{profile, plugin, enabled: true, bind: {vault}, sandbox_owner?, owner_browser?}` 이며 `bind.vault` 가 필수다. Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 플러그인은 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 플러그인은 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 플러그인에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 플러그인은 이 값을 쓰지 않는다. `enabled: false` 는 `{profile, plugin, enabled: false}` 로 바인딩을 뗀다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 플러그인의 것이다, `enabled: true` 인데 `bind.vault` 가 없거나 `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 플러그인에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 플러그인을 붙이는데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 플러그인에 `sandbox_owner` 가 없다 |
+| `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 플러그인, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 플러그인의 것이다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
-| `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
+| `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 플러그인의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
 | `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
 | `PUT /api/config` (스킬 게시) | 지정한 profile 의 올린 스킬 경로를 쓴다 | `{profile, config: {skills: {external_dirs: [<Hermes 쪽 스킬 루트>/<profile>/<버전>]}}, sandbox_owner?, require_sandbox?}`. 버전 이름은 `v[0-9]{13}-[a-z0-9]{4}` 다(`v` 뒤에 UTC 밀리초 13자리와 소문자 영숫자 4자). 목록은 0개나 1개. 0개는 게시 해제. 도구 목록을 같은 본문에 둘 수 있다. `scripts/` 가 든 스킬을 게시할 때 Control Plane 은 지금 도구 목록과 `require_sandbox: true` 를 함께 보낸다. 그때 plugin 은 목록에 실행 공간 도구가 있고, profile 이 정책에 등록돼 있고, 정책에 `skill_root` 가 있어야 받는다. 이 판정이 없는 옛 plugin 은 `require_sandbox` 를 셸 도구에만 적용해 그대로 받으므로, 이 판정을 가진 plugin 을 Control Plane 보다 먼저 배포한다 | 200 | 400 경로 형식, 다른 profile 의 prefix, 둘 이상, 심볼릭 링크, 없는 디렉터리, `skills` 도구가 꺼진 채 게시. 409 운영자가 넣은 다른 외부 경로가 있다. 409 `sandbox_unavailable` 은 `require_sandbox` 인데 위 셋 가운데 하나가 없다. 404 없는 profile |
@@ -70,8 +70,8 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 검증과 원래 키 호환은 [승인 인자 표시 이름](../../../docs/features/connector-policy.md#승인-인자-표시-이름)이 갖는다.
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
 `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름 목록이고 이름 순이다. 이름은 `SKILL.md` 앞머리의 `name` 이고, 없으면 디렉터리 이름이다. 본문은 담지 않는다.
-`fields` 가 빈 목록인 커넥터도 받는다. 값을 받지 않는 일반 MCP 서버다.
-`icon`은 `{media_type, data}`이거나 null이다. `link`와 `readme_url`은 각각 500자 이하의 HTTPS·ASCII 주소나 null이다. 주소 하나가 틀려도 그 칸만 비우고 커넥터와 다른 칸은 유지한다. `link_kind`는 `project`거나 `service`이며 없거나 모르는 값은 `service`다. Control Plane은 옛 응답의 주소를 null로 읽고 웹에 `readmeUrl`, `linkKind`로 낸다. 두 링크의 검사와 화면 계약은 [커넥터 카드 ADR](../../../docs/adr/ADR-20261008-connector-card.md)의 「두 링크로 확장한 계약」이 갖는다.
+`fields` 가 빈 목록인 플러그인도 받는다. 값을 받지 않는 일반 MCP 서버다.
+`icon`은 `{media_type, data}`이거나 null이다. `link`와 `readme_url`은 각각 500자 이하의 HTTPS·ASCII 주소나 null이다. 주소 하나가 틀려도 그 칸만 비우고 플러그인과 다른 칸은 유지한다. `link_kind`는 `project`거나 `service`이며 없거나 모르는 값은 `service`다. Control Plane은 옛 응답의 주소를 null로 읽고 웹에 `readmeUrl`, `linkKind`로 낸다. 두 링크의 검사와 화면 계약은 [플러그인 카드 ADR](../../../docs/adr/ADR-20261008-connector-card.md)의 「두 링크로 확장한 계약」이 갖는다.
 
 **`POST /api/profiles` 는 틀을 쓰지 못하면 만든 것을 지운다.**
 본문은 `name`, `no_skills`, `description` 만 받는다. `clone_from` 은 다른 profile 의 `.env` 를 끌어오므로 400 이다.
@@ -94,46 +94,46 @@ MCP 도구는 만든 뒤 1~2분 안에 붙는다. 이유는 운영 저장소의 
 사람이 만든 profile 과 기본 profile 은 401 이다. 파일이라 대시보드를 다시 띄워도 남는다.
 
 **`PUT /api/env` 는 [plugin 의 허용 목록](common.py) 에 있는 key 만 받는다.**
-기본 key 는 plugin 이 갖고, 커넥터 key 는 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
+기본 key 는 plugin 이 갖고, 플러그인 key 는 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
 본문은 `{profile, key, value}` 이고 값은 한 줄이어야 한다.
 provider credential 은 이 토큰으로 쓰지 못한다.
 
-### 커넥터
+### 플러그인
 
-**plugin 은 커넥터의 이름을 코드에 두지 않는다.**
-운영 목록의 plugin 디렉터리마다 `assistant.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다. `assistant.json` 이 없으면 옛 이름 `connector.json` 을 같은 규칙으로 읽고, 둘 다 있으면 그 커넥터를 카탈로그에서 뺀다([ADR-20261026 / plugin-standard-format](../../docs/adr/ADR-20261026-plugin-standard-format.md)).
+**plugin 은 플러그인의 이름을 코드에 두지 않는다.**
+운영 목록의 plugin 디렉터리마다 `assistant.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다. `assistant.json` 이 없으면 옛 이름 `connector.json` 을 같은 규칙으로 읽고, 둘 다 있으면 그 플러그인을 카탈로그에서 뺀다([ADR-20261026 / plugin-standard-format](../../docs/adr/ADR-20261026-plugin-standard-format.md)).
 둘 다 없으면 표준 플러그인으로 읽는다. 아래 「`assistant.json` 이 없는 플러그인」 이 규칙을 갖는다.
-`assistant.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
+`assistant.json` 의 형식은 [플러그인 연결](../../connectors/README.md) 의 「assistant.json」 이 소유한다. 플러그인 경로가 설치와 확인에서 뜻하는 것은 [플러그인 설치](../../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
 
-**운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
+**운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 플러그인 이름마다 값 하나를 둔 JSON object 다.
 
 ```json
 {
-  "<커넥터 이름>": {
+  "<플러그인 이름>": {
     "root": "<plugin 디렉터리>",
     "command": "<MCP 서버를 실행할 파일>",
     "env": { "<operator_env 이름>": "<값>" }
   },
-  "<원격 MCP 커넥터 이름>": {
+  "<원격 MCP 플러그인 이름>": {
     "root": "<plugin 디렉터리>",
     "url": "<원격 MCP 일 때 필수 주소>"
   },
-  "<다른 커넥터 이름>": "<plugin 디렉터리>"
+  "<다른 플러그인 이름>": "<plugin 디렉터리>"
 }
 ```
 
 - 값이 문자열이면 `{"root": 그 값}` 으로 읽는다
-- `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 둘 다 없거나 실행 권한이 없으면 그 커넥터는 쓸 수 없다
-- `connector.json` 이 `operator_env` 로 적은 이름은 모두 `env` 에 값이 있어야 한다. 그 값은 설치할 때 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다
+- `command` 가 없으면 `FOS_ASSISTANT_CONNECTOR_COMMAND` 를 쓴다. 둘 다 없거나 실행 권한이 없으면 그 플러그인은 쓸 수 없다
+- `assistant.json` 이 `operator_env` 로 적은 이름은 모두 `env` 에 값이 있어야 한다. 그 값은 설치할 때 서버 정의에 직접 들어가고 profile `.env` 를 거치지 않는다
 - 경로는 절대 경로다. 모양이 틀린 항목은 그 항목만 버린다
-- `url` 은 MCP 정의의 서버가 `type: http` 나 `streamable-http` 인 커넥터만 받는다. 그 커넥터의 항목에 `command` 나 `env` 가 있으면 그 항목을 버린다. 규칙은 [ADR-20261026 / remote-mcp-plugin](../../docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖는다
+- `url` 은 MCP 정의의 서버가 `type: http` 나 `streamable-http` 인 플러그인만 받는다. 그 플러그인의 항목에 `command` 나 `env` 가 있으면 그 항목을 버린다. 규칙은 [ADR-20261026 / remote-mcp-plugin](../../docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖는다
 
 **plugin 디렉터리에서 manifest, MCP 정의, assistant 선언, 스킬을 읽는다.** 플러그인 manifest 는 `.claude-plugin/plugin.json`, root `plugin.json`, `.codex-plugin/plugin.json` 이다. MCP 정의는 manifest 의 `mcpServers` 경로나 root `.mcp.json`, `mcp.json` 이다. assistant 선언은 `assistant.json` 이다.
-하나라도 검증에 실패하면 그 커넥터는 카탈로그에서 빠지고 경고 로그 한 줄이 남는다. 대시보드와 다른 커넥터는 그대로 돈다.
+하나라도 검증에 실패하면 그 플러그인은 카탈로그에서 빠지고 경고 로그 한 줄이 남는다. 대시보드와 다른 플러그인은 그대로 돈다.
 
 - manifest 가 여럿이면 `name` 이 모두 같아야 한다. 위 목록의 순서로 앞선 manifest 의 스킬과 MCP 정의 경로를 쓴다. `hooks`, `commands`, `agents` 같은 다른 칸은 읽지 않는다
-- MCP 정의는 서버 하나만 둔다. 그 이름이 커넥터의 MCP 서버 이름이다. `.mcp.json` 과 `mcp.json` 이 함께 있으면 명시한 경로와 상관없이 카탈로그에서 뺀다. 이식형 MCP 정의의 `$schema` 는 실행 설정에 쓰지 않는다
-- 서버의 `type` 이 `http` 나 `streamable-http` 이면 원격 MCP 다. 아래 로컬 실행형의 `command`, `args`, `env` 규칙 대신 「원격 MCP 커넥터」 의 규칙을 따른다
+- MCP 정의는 서버 하나만 둔다. 그 이름이 플러그인의 MCP 서버 이름이다. `.mcp.json` 과 `mcp.json` 이 함께 있으면 명시한 경로와 상관없이 카탈로그에서 뺀다. 이식형 MCP 정의의 `$schema` 는 실행 설정에 쓰지 않는다
+- 서버의 `type` 이 `http` 나 `streamable-http` 이면 원격 MCP 다. 아래 로컬 실행형의 `command`, `args`, `env` 규칙 대신 「원격 MCP 플러그인」 의 규칙을 따른다
 - 서버의 `command` 는 쓰지 않고 운영 목록의 실행 파일로 바꾼다
 - 서버의 `args` 가운데 `${CLAUDE_PLUGIN_ROOT}/` 로 시작하는 것은 plugin 디렉터리 안의 링크 없는 파일이어야 하고 실제 경로로 바꾼다. 그 밖의 `$` 치환은 받지 않는다
 - 서버의 `env` 는 자기 이름의 `${이름}` 참조만 둔다. 선택 칸은 `${이름:-}` 도 된다
@@ -148,11 +148,11 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 운영 목록 항목에 `env` 가 있으면 뺀다. 확인 도구와 선택지 도구가 없어 `call` 이 부를 도구가 없다. `tools` 는 비고 `tools.exclude` 도 없다
 - 카탈로그 응답은 query `include=standard` 가 있을 때만 이 항목을 싣고, `verify` 는 null 이다
 
-**원격 MCP 커넥터는 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
+**원격 MCP 플러그인은 자식 프로세스를 띄우지 않고 Streamable HTTP 로 붙는다.**
 
 - 이식형 서버의 `extensions["com.openai"].auth` 는 생략하거나 `type: none`, `api_key` 를 쓴다. `api_key` 의 `headerScheme: bearer` 는 `Authorization: Bearer ${<이름>}`, `custom_header` 는 `headerName` 의 `${<이름>}` 헤더로 바꾼다. 칸 env 이름은 서버 이름을 대문자로 바꾸고 하이픈을 `_` 로 바꾼 뒤 `_API_KEY` 를 붙인다. 기존 원격 칸·헤더 검증을 그대로 거친다
 - `oauth`, `mixed`, `basic` 과 알 수 없는 인증 방식, 잘못된 인증 선언은 항목 전체를 카탈로그에서 뺀다. `.app.json`, `interface`, `onboardingSkill`, `hooks` 와 위젯 UI 는 읽거나 실행하지 않는다. 서버의 `_meta` 와 인증 이외의 `extensions` 설정도 설치할 서버 정의에 싣지 않는다
-- 주소는 운영 목록의 `url` 이 필수이고 MCP 정의의 `url` 은 무시한다. 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 커넥터를 카탈로그에서 뺀다
+- 주소는 운영 목록의 `url` 이 필수이고 MCP 정의의 `url` 은 무시한다. 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다. 계정 정보, 쿼리, fragment, `$` 치환이 있으면 그 플러그인을 카탈로그에서 뺀다
 - 헤더는 MCP 정의의 `headers` 와 `assistant.json` 의 `headers` 를 합친 것이다. 값은 `${이름}` 이나 `Bearer ${이름}` 이고 `${이름}` 은 필수 칸 하나다. 같은 헤더 이름이 둘에 있으면 카탈로그에서 뺀다
 - `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env`, `snapshot`, `execution_guard` 를 선언하면 카탈로그에서 뺀다
 - 설치하는 서버 정의는 `{"url", "headers", "strict_redirect_headers", "enabled"}` 와 `tools.exclude` 다. 헤더의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 참이고, Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다
@@ -163,12 +163,12 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 원격 호출 동안 SDK 와 HTTP 라이브러리의 로그는 수준과 상관없이 남기지 않는다. 주소와 인자가 WARNING 이상의 예외 문구에도 실리기 때문이다
 - probe 는 Hermes 가 붙는다. redirect 처리는 [Hermes 계약](../../docs/hermes-contract.md) 의 「원격 MCP 서버」 를 따른다
 
-**`POST /api/connectors/<id>/call` 은 자식 프로세스를 띄운다.** 원격 MCP 커넥터는 위 규칙대로 그 주소에 붙는다.
+**`POST /api/connectors/<id>/call` 은 자식 프로세스를 띄운다.** 원격 MCP 플러그인은 위 규칙대로 그 주소에 붙는다.
 
-- 자식이 받는 환경 변수는 요청의 칸 값, 운영 목록의 `env`, MCP SDK 가 늘 더하는 기본 env(`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`)뿐이다. `owner_attachments_env` 와 `owner_output_env` 를 선언한 커넥터에는 그 이름을 빈 값으로 준다. 이 경로에는 바인딩 주인이 없기 때문이다.
-  `owner_browser_env` 를 선언한 커넥터에는 요청의 `owner_browser`(요청자의 호출 표식을 실은 중계 주소)를 준다. 없거나 중계 주소 모양이 아니면 빈 값이다. 선언하지 않은 커넥터는 그 값을 받아도 넘기지 않는다.
-  `vault` 로 부르면 보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 확인되게 하려는 것이다. `values` 의 모르는 칸은 그대로 `invalid_input` 이다.
-  대시보드 프로세스의 다른 env(서비스 토큰, 다른 커넥터의 값)는 넘어가지 않는다. `PATH` 는 대시보드의 값 대신 실행 파일이 있는 디렉터리만 준다
+- 자식이 받는 환경 변수는 요청의 칸 값, 운영 목록의 `env`, MCP SDK 가 늘 더하는 기본 env(`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`)뿐이다. `owner_attachments_env` 와 `owner_output_env` 를 선언한 플러그인에는 그 이름을 빈 값으로 준다. 이 경로에는 바인딩 주인이 없기 때문이다.
+  `owner_browser_env` 를 선언한 플러그인에는 요청의 `owner_browser`(요청자의 호출 표식을 실은 중계 주소)를 준다. 없거나 중계 주소 모양이 아니면 빈 값이다. 선언하지 않은 플러그인은 그 값을 받아도 넘기지 않는다.
+  `vault` 로 부르면 보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 플러그인의 옛 연결도 확인되게 하려는 것이다. `values` 의 모르는 칸은 그대로 `invalid_input` 이다.
+  대시보드 프로세스의 다른 env(서비스 토큰, 다른 플러그인의 값)는 넘어가지 않는다. `PATH` 는 대시보드의 값 대신 실행 파일이 있는 디렉터리만 준다
 - 후보 값은 디스크, 응답, 로그에 남기지 않는다. 자식의 stderr 도 대시보드 로그로 보내지 않는다
 - 도구는 인자 없이 부른다. 값은 환경 변수로만 간다
 - profile 쓰기 잠금 밖에서 돈다. 도구를 기다리는 동안 다른 profile 요청이 멈추지 않는다
@@ -177,11 +177,11 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **`POST /api/connectors/<id>/execute` 는 Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다.**
 
-- 그 profile 에 관리 표식이나 커넥터 표식과 그 커넥터의 소유 기록이 있어야 한다. 커넥터 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다. `owner_attachments_env` 를 선언한 커넥터는 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. `owner_browser_env` 를 선언한 커넥터는 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다
+- 그 profile 에 관리 표식이나 플러그인 표식과 그 플러그인의 소유 기록이 있어야 한다. 플러그인 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다. `owner_attachments_env` 를 선언한 플러그인은 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. `owner_browser_env` 를 선언한 플러그인은 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. 본문은 `{detail, code}` 이고, 그 코드가 `retry_key` 를 선언했으면 `retry: {<retry_key>: <값>}` 을 더한다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)). `call` 에서는 그 코드를 `unavailable` 로 돌려준다
-- 요청과 응답은 [커넥터 연결](../../../docs/features/connector-policy.md) 의 「커넥터 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
+- 요청과 응답은 [플러그인 연결](../../../docs/features/connector-policy.md) 의 「플러그인 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 바인딩할 때의 서버 정의를 갖는다.**
 
@@ -191,9 +191,9 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 | 실행 파일을 받지 못했다 | 설치가 503 이다 | 상태 조회, 제거, probe 가 모두 503 이다 |
 | 설치한 뒤 실행 파일, plugin 경로, 실행 정의의 command·args, 운영자 env 값이 바뀌었다 | 해당 없음 | 상태 조회, 제거, probe 가 모두 503 이다 |
 
-운영 목록에서 빠진 커넥터를 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
+운영 목록에서 빠진 플러그인을 제거하면 plugin 이 그 기록의 서버 env 가 `${이름}` 으로 참조하던 key 를 profile `.env` 에서 함께 지운다. Control Plane 이 그 이름을 더는 알 수 없기 때문이다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
-바인딩의 실행과 probe 는 요청이 가리키는 커넥터의 항목만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 커넥터는 probe 와 실행과 붙이기가 그대로 된다.
+바인딩의 실행과 probe 는 요청이 가리키는 플러그인의 항목만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 플러그인은 probe 와 실행과 붙이기가 그대로 된다.
 바인딩 설치는 기록의 형식과 실제 설정의 소유권을 확인한 뒤, command, args, env 가 바뀌었어도 새 manifest 로 다시 설치한다. 보관 파일과 연결 값은 유지한다. 떼기는 바인딩 항목을 지금 manifest 와 견주지 않는다.
 
 바인딩 설치는 `config.yaml`, `.fos-connectors.json`, `.env`, 뗀 서버 기록, 도구 이름 대응, 스킬, 정책 plugin 파일을 차례로 교체한다.
@@ -205,10 +205,10 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 기존 바인딩 소유 기록이 있고, 현재 서버 설정이 이번 요청으로 만들 새 정의와 정확히 같으며, 기록과의 차이가 plugin이 관리하는 `tools.exclude`뿐인 경우다.
 이때 `restart_required: true`로 답한다. gateway가 옛 서버를 쥐고 있을 수 있기 때문이다.
 소유 기록 부재나 command, args, env, enabled, 다른 tools 설정의 차이는 계속 409다.
-연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [커넥터 설치](../../../docs/features/connector.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
+연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [플러그인 설치](../../../docs/features/connector.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.**
 
-**커넥터는 바인딩으로만 붙인다.** 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile 이 받는다. `enabled: true` 요청은 보관 파일의 값을 profile `.env` 에 복사하고 서버 이름만 더한다. 다른 API 도구와 Control Plane MCP 등록은 그대로 두며, 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다.
+**플러그인은 바인딩으로만 붙인다.** 관리 표식이나 플러그인 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile 이 받는다. `enabled: true` 요청은 보관 파일의 값을 profile `.env` 에 복사하고 서버 이름만 더한다. 다른 API 도구와 Control Plane MCP 등록은 그대로 두며, 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다.
 
 대응 파일은 `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다.
 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 붙이기의 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 붙이기는 `restart_required` 가 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)).
@@ -219,14 +219,14 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
 대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.
 `vault` 는 `^c[1-9][0-9]{0,18}$` 이다. Control Plane 의 연결 번호 앞에 `c` 를 붙인 것이다.
-본문은 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 이고, 빈 선택 칸은 넣지 않는다. 칸이 없는 커넥터는 빈 `values` 다.
+본문은 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 이고, 빈 선택 칸은 넣지 않는다. 칸이 없는 플러그인은 빈 `values` 다.
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
 
-**커넥터 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
-운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
+**플러그인 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
+운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 플러그인의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 플러그인 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
-`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일의 모양(서버 목록, `connector`, `prefix`)이 지금 manifest 로 계산한 것과 맞을 때만 참이다. 서버 정의의 `tools.exclude` 와 대응 파일의 서버별 `tools` 가 어긋나면 그 커넥터 항목만 `configured` 가 거짓이며, 조건은 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
+`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일의 모양(서버 목록, `connector`, `prefix`)이 지금 manifest 로 계산한 것과 맞을 때만 참이다. 서버 정의의 `tools.exclude` 와 대응 파일의 서버별 `tools` 가 어긋나면 그 플러그인 항목만 `configured` 가 거짓이며, 조건은 [플러그인 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
 **한 배포 동안 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 바인딩은 위 재설치 경로로 새 정의를 적용한다.
 
@@ -313,8 +313,8 @@ plugin 스킬은 `plugin:이름` 으로만 불려 겹치지 않는다.
 
 **여기 없는 것은 맞는 토큰으로도 열리지 않는다.**
 `GET /api/config` 와 이름을 바꾸는 `PATCH`, 스킬을 만들고 고치는 `POST /api/skills`, `PUT /api/skills/content` 가 여기 해당한다.
-`DELETE /api/env` 는 관리 profile 의 커넥터 칸 key 만 받는다.
+`DELETE /api/env` 는 관리 profile 의 플러그인 칸 key 만 받는다.
 
 ## 도구 상세 설명과 요약
 
-schema 2 `tools.<이름>.description`과 `tools.<이름>.summary`를 선택 평문으로 받는다. 설명은 `tool_descriptions`, 요약은 `tool_summaries`에 정책 dict와 분리하여 보관하고 카탈로그 응답에만 합친다. 불량 설명의 fallback과 전체 manifest SHA, 옛 엄격 reader와의 호환 순서는 [커넥터 도구 정책](../../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」를 따른다. 표시 계약은 [커넥터 연결](../../../docs/features/connector.md)의 「도구 이름과 요약」이 갖는다.
+schema 2 `tools.<이름>.description`과 `tools.<이름>.summary`를 선택 평문으로 받는다. 설명은 `tool_descriptions`, 요약은 `tool_summaries`에 정책 dict와 분리하여 보관하고 카탈로그 응답에만 합친다. 불량 설명의 fallback과 전체 manifest SHA, 옛 엄격 reader와의 호환 순서는 [플러그인 도구 정책](../../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」를 따른다. 표시 계약은 [플러그인 연결](../../../docs/features/connector.md)의 「도구 이름과 요약」이 갖는다.

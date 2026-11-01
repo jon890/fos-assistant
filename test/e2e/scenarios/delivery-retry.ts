@@ -1,8 +1,8 @@
 /**
- * 승인한 커넥터 호출의 결과 전달이 실패한 뒤 다시 전달하면 저장된 결과만으로 답이 생기는지 전체 흐름으로 본다.
+ * 승인한 플러그인 호출의 결과 전달이 실패한 뒤 다시 전달하면 저장된 결과만으로 답이 생기는지 전체 흐름으로 본다.
  *
  * <p>대역 Hermes 가 run 제출을 거절하는 동안 승인하면 결과 전달 묶음이 FAILED 로 남는다. 거절을 푼 뒤 다시 전달하면
- * 커넥터 서버에 닿는 호출 없이 그 에이전트의 답이 이어진다. 앞의 시나리오처럼 연결을 등록해 비공개 에이전트에 붙이고,
+ * 플러그인 서버에 닿는 호출 없이 그 에이전트의 답이 이어진다. 앞의 시나리오처럼 연결을 등록해 비공개 에이전트에 붙이고,
  * 끝에서 그 에이전트를 지우고 연결을 해제한다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Response, type Scenario } from "../harness.ts";
@@ -172,7 +172,7 @@ export const deliveryRetryScenario: Scenario = {
       const resolved = await failureOf(context, conversationId);
       expect(resolved === undefined, `다시 전달이 끝났는데 실패 카드에 남았다: ${JSON.stringify(resolved)}`);
 
-      step("마지막 입력에 저장된 결과가 실리고 커넥터 호출은 늘지 않는다");
+      step("마지막 입력에 저장된 결과가 실리고 플러그인 호출은 늘지 않는다");
       const input = context.hermes.lastSubmittedInput() ?? "";
       expect(
         input.includes("승인한 동작의 결과가 도착했다.") && input.includes("<external-data>"),
@@ -180,7 +180,7 @@ export const deliveryRetryScenario: Scenario = {
       );
       expect(
         mine().length === callsAfterApproval,
-        `다시 전달이 커넥터 호출을 늘렸다: ${JSON.stringify(mine())}`,
+        `다시 전달이 플러그인 호출을 늘렸다: ${JSON.stringify(mine())}`,
       );
 
       step("전달이 끝난 묶음은 다시 전달할 수 없고 다른 사용자는 부르지 못한다");

@@ -21,7 +21,7 @@ export const VALUE_MAX_CHARS = 64;
 export const SYMBOL = /^[A-Za-z0-9.-]+$/;
 export const NAME_MAX_CHARS = 100;
 export const QUOTE_SYMBOLS_MAX = 200;
-/** connector.json 의 `account` 칸 형식과 같다. */
+/** assistant.json 의 `account` 칸 형식과 같다. */
 export const ACCOUNT_SEQ = /^[1-9][0-9]{0,18}$/;
 export const validAccountSeq = (seq: string) =>
   seq.trim() === seq &&

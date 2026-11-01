@@ -33,7 +33,7 @@ NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
 # profile별 적재와 reload가 공유 FIFO의 module 이름을 지우지 않는다는 경계다.
 NATIVE_IMAGE_PLUGIN_LOADER = ("hermes_cli/plugins_loader.py", "_directory_module_name", "_evict_modules")
 
-# `httpx2` 는 `mcp` SDK 2 가 함께 설치하는 HTTP 클라이언트다. 원격 MCP 커넥터의 클라이언트를 redirect 없이 직접 만든다.
+# `httpx2` 는 `mcp` SDK 2 가 함께 설치하는 HTTP 클라이언트다. 원격 MCP 플러그인의 클라이언트를 redirect 없이 직접 만든다.
 THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "httpx2", "starlette", "PIL"})
 
 
@@ -371,7 +371,7 @@ OWN_ROUTES = frozenset({
 # 바인딩 설치가 재시작 없이 반영되는 데 기대는 지점이다(ADR-20261007 connector-live-reload).
 # 공유 gateway 의 housekeeping 이 profile 마다 `mcp_servers` 와 살아 있는 연결을 맞추고,
 # 스킬 색인 캐시 키에 `skills.disabled` 가 들어 있어 plugin 이 바꾼 색인 표식이 그 profile 의 색인을 새로 만들게 한다.
-# 이 지점이 바뀌면 붙인 커넥터가 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정한다.
+# 이 지점이 바뀌면 붙인 플러그인이 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정한다.
 LIVE_RELOAD = {
     # housekeeping 작업 목록에 MCP 설정 맞추기 작업이 있다. 그 이름 문자열이 있는 파일이다.
     "reconcile_chore": ("gateway/run.py", "MCP config reconcile"),
@@ -383,7 +383,7 @@ LIVE_RELOAD = {
 }
 
 # docker profile 의 `approvals.unattended_mode: approve` 가 `execute_code` 만 열고 셸 위험 명령과 plugin 승인 요청은 승인 카드로 남는 데 기대는 지점이다.
-# 이 지점이 바뀌면 같은 설정이 셸과 커넥터 승인까지 사람 없이 여는데 Control Plane 은 알지 못한다.
+# 이 지점이 바뀌면 같은 설정이 셸과 플러그인 승인까지 사람 없이 여는데 Control Plane 은 알지 못한다.
 # 실패하면 ADR-20261008 execute-code-unattended 를 다시 본다.
 UNATTENDED_APPROVAL = {
     # gateway 가 프로세스 환경에 켜는 ask 표식이다

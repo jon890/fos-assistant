@@ -1,6 +1,6 @@
 # fos-ctx plugin
 
-profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해 붙이고, 하위 에이전트 session 을 Control Plane 에 등록하고, 커넥터 도구 호출을 Control Plane 에 묻는다.
+profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해 붙이고, 하위 에이전트 session 을 Control Plane 에 등록하고, 플러그인 도구 호출을 Control Plane 에 묻는다.
 설치와 운영 값은 [`hermes/README.md`](../../README.md), Hermes 쪽 동작은 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 가 갖는다.
 
 ## 원본 사진 조회 계약
@@ -17,7 +17,7 @@ profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해
 region은 EXIF를 반영한 원본 표시 좌표이고 오른쪽·아래 끝은 제외한다.
 모델이 임의 경로, URL, 사용자, profile을 정하지 못한다.
 hook은 실제 session과 tool call id로 `_fos_ctx`와 `_fos_inspect`를 덮어쓴다.
-커넥터 격리 profile과 서명 재료 누락은 hook에서 막으며 서버도 같은 요청을 거절한다.
+플러그인 격리 profile과 서명 재료 누락은 hook에서 막으며 서버도 같은 요청을 거절한다.
 
 `_fos_inspect`는 `issued_at_ms`, boolean `top_level`, `sig`다.
 요청 digest는 첨부 번호의 십진 표현, 개행, region의 쉼표 구분 정수 표현(없으면 빈 문자열)을
@@ -81,7 +81,7 @@ native 지원이 없어 요약만 모델에 남으면 판독 실패를 알리도
 `delegate_task` 의 `images` 와 `tasks[].images` 는 HTTP(S) 주소와 이미지 data URL 만 받는다.
 로컬 파일 경로는 Docker 밖에서 읽히므로 hook 이 파일 읽기 전에 막는다. 이미지 없는 자식 실행은 유지한다.
 이 제한은 `fos-ctx` 1.4.0 이 켜진 profile 에 적용한다. 기존 일반 profile 은 파일 갱신과 gateway reload 를,
-커넥터는 재설치를 끝낸 뒤 로컬 이미지 거절을 확인해야 한다. hook 이 꺼진 profile 은 막지 못한다.
+플러그인은 재설치를 끝낸 뒤 로컬 이미지 거절을 확인해야 한다. hook 이 꺼진 profile 은 막지 못한다.
 
 Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서명이 없거나 틀리면 거절한다.
 키와 서명 규칙은 [`hermes/plugins/fos-ctx/README.md`](README.md) 의 「`_fos_ctx` 계약」 이 소유한다.
@@ -125,9 +125,9 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 일회용 컨테이너에서 부모 run 이 0.25초에 끝나고 등록이 0.12초에 도착했다.
 등록 로그는 `fos-ctx: 자식 session 을 등록했다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다.
 
-### 커넥터 도구 호출을 묻는다
+### 플러그인 도구 호출을 묻는다
 
-profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 커넥터 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
+profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 플러그인 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
 경로와 인증, 서명할 글, Control Plane 이 판정하는 단계는 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「도구 호출 판정」 이 소유한다.
 요청 칸은 Control Plane 의 `ConnectorPolicyRequest` 가, 응답 칸은 `ConnectionDtos.ConnectorPolicyResponse` 가, 판정 조건과 순서는 `ToolPolicyDecision` 이 갖는다.
 대응 파일이 없는 profile 에서는 아래 처리를 하지 않는다.
@@ -136,8 +136,8 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 
 | 방식 | `isolated` | 어떤 profile 인가 |
 | --- | --- | --- |
-| 옛 설치 profile | 없거나 `true` | 커넥터마다 만든 전용 profile. Control Plane MCP 가 없고 커넥터 서버만 있다 |
-| 바인딩 profile | `false` | 일반 에이전트의 profile 에 커넥터를 붙인 것. Control Plane MCP, 내장 도구, 운영자가 넣은 다른 MCP 서버가 함께 있다 |
+| 옛 설치 profile | 없거나 `true` | 플러그인마다 만든 전용 profile. Control Plane MCP 가 없고 플러그인 서버만 있다 |
+| 바인딩 profile | `false` | 일반 에이전트의 profile 에 플러그인을 붙인 것. Control Plane MCP, 내장 도구, 운영자가 넣은 다른 MCP 서버가 함께 있다 |
 
 | hook 이 본 것 | 옛 설치 profile | 바인딩 profile |
 | --- | --- | --- |
@@ -145,7 +145,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | 대응 파일을 읽지 못한다. `isolated` 가 boolean 이 아닌 것도 같다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 옛 설치 profile 일 수 있고, 그 profile 에는 Control Plane MCP 가 없기 때문이다. 그 밖의 도구는 건드리지 않는다 | 같다 |
 | 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 | 같다 |
 | 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 | 같다 |
-| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 커넥터 도구는 session 이 없어 아래 규칙으로 막힌다 |
+| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 플러그인 도구는 session 이 없어 아래 규칙으로 막힌다 |
 | `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 | 같다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 | 건드리지 않는다. 운영자가 넣은 다른 MCP 서버의 도구다 |
 | `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
@@ -155,15 +155,15 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 | 같다 |
 | 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 | 같다 |
 
-**바인딩 profile 은 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있다는 데 기댄다.**
-대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 커넥터 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
+**바인딩 profile 은 대응 파일에 그 profile 의 모든 플러그인 서버가 실려 있다는 데 기댄다.**
+대응에 없는 `mcp__` 도구를 통과시키므로, 실리지 않은 플러그인 서버가 있으면 그 서버의 도구가 판정 없이 나간다.
 대시보드 plugin 의 바인딩 설치와 떼기가 소유 기록의 모든 서버를 싣고, manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버는 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
 뗀 서버도 빈 `tools` 로 남긴다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 묻는다.
 
-**바인딩 profile 의 커넥터 도구 결과는 `<external-data>` 로 감싼다.**
+**바인딩 profile 의 플러그인 도구 결과는 `<external-data>` 로 감싼다.**
 fos-ctx 의 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과가 글이면 Control Plane 의 `ExternalData` 와 같은 모양으로 바꾼다.
 안내 문장 한 줄, `<external-data>` 줄, 본문, `</external-data>` 줄이다. 본문 안의 닫는 표시는 대소문자와 안쪽 공백에 상관없이 `<\/external-data>` 로 바꾼다.
-오류 글도 감싼다. 판정이 막은 호출은 이 hook 에 닿지 않으므로 여기 닿은 오류 글은 커넥터 서버가 낸 것이다.
+오류 글도 감싼다. 판정이 막은 호출은 이 hook 에 닿지 않으므로 여기 닿은 오류 글은 플러그인 서버가 낸 것이다.
 글이 아닌 결과, 다른 도구, 옛 설치 profile 은 바꾸지 않는다. 대응 파일을 읽지 못하거나 예외가 나면 바꾸지 않고, Hermes 의 `<untrusted_tool_result>` 감싸기만 남는다.
 Hermes 가 이 hook 을 언제 부르는지는 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.
 
@@ -172,7 +172,7 @@ hook 은 등록 이름이 대응 파일의 `tools` 에 있는 서버를 먼저 �
 
 | 항목 | 값 |
 | --- | --- |
-| 주소 | 위 「운영 값」 의 커넥터 정책 주소. 운영이 준다 |
+| 주소 | 위 「운영 값」 의 플러그인 정책 주소. 운영이 준다 |
 | 인증 | 그 profile 의 MCP 토큰 |
 | 제한 시간 | 3초. 한 번만 부르고 다시 부르지 않는다. 기다리는 동안 run 의 스레드가 묶인다 |
 | 로그 | 상태 코드나 예외 종류만 남긴다. 토큰, 서명, 인자, 응답 본문은 남기지 않는다 |
@@ -184,7 +184,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
-key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../../docs/hermes-contract.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 커넥터 스킬은 그 칸을 거절한다.
+key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../../docs/hermes-contract.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 플러그인 스킬은 그 칸을 거절한다.
 셸을 여는 profile 의 목록은 운영 저장소의 live 검사가 소유한다.
 그 목록에 Control Plane MCP 를 등록한 profile 을 더할 때는 이 제약을 함께 판단한다.
 
@@ -202,7 +202,7 @@ Control Plane 이 그 값으로 요청자를 정하는 순서는 [`docs/features
 직접 읽기 때문에 사용자별 첨부 mount 만으로는 막을 수 없다. 결정은 [ADR-091](../../../docs/adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
 
 이 제한은 새 판 `fos-ctx` 가 켜진 profile 에만 적용된다. 기존 일반 profile 도 파일을 갱신하고 gateway 에서
-다시 읽어야 하며, 커넥터는 재설치 때 갱신된다. hook 이 꺼진 profile 은 막지 못한다.
+다시 읽어야 하며, 플러그인은 재설치 때 갱신된다. hook 이 꺼진 profile 은 막지 못한다.
 
 ### Control Plane 의 MCP 도구로 다른 실행을 부를 때
 
@@ -437,8 +437,8 @@ Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사�
 
 ### 바인딩 profile 의 판정
 
-일반 에이전트의 profile 에 커넥터를 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
-Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 MCP 도구 호출은 Control Plane 에 판정을 묻는다.
+일반 에이전트의 profile 에 플러그인을 붙이면 그 profile 에서 `fos-ctx` 가 두 가지 일을 함께 한다([ADR-083](../../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 플러그인 MCP 도구 호출은 Control Plane 에 판정을 묻는다.
 이름 대응 파일의 `isolated` 가 `false` 인 profile 이 바인딩 profile 이다. 칸의 뜻은 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「이름 대응」 이 갖는다.
 
 | 도구 | 바인딩 profile 에서 하는 것 |
@@ -446,12 +446,12 @@ Control Plane MCP 호출에는 지금처럼 `_fos_ctx` 를 붙이고, 커넥터 
 | 대응 파일의 서버와 맞는 도구 | Control Plane 에 묻는다. 등록 이름이 Control Plane MCP 의 접두사로 시작해도 묻고 `_fos_ctx` 를 붙이지 않는다 |
 | 그 밖의 Control Plane MCP 도구 | 대응 파일이 없는 profile 과 같이 `_fos_ctx` 를 붙인다 |
 | `execute_code`, 다른 MCP 서버의 도구, 내장 도구 | 건드리지 않는다. `skill_manage` 만 지금처럼 막는다 |
-| `execute_code` 안에서 부른 커넥터 도구 | hook 에 `session_id` 가 오지 않아 묻지 않고 막는다 |
+| `execute_code` 안에서 부른 플러그인 도구 | hook 에 `session_id` 가 오지 않아 묻지 않고 막는다 |
 
 판정을 물을 때와 `_fos_ctx` 를 서명할 때 같은 profile 토큰을 쓴다. 그래서 바인딩 profile 에는 Control Plane MCP 의 토큰이 있어야 한다.
 옛 설치 profile 과 다른 점은 대응에 없는 도구를 통과시키는 것이다. 그 profile 에는 Control Plane MCP 와 운영자가 넣은 MCP 서버가 함께 있어 막으면 그 서버들이 모두 막힌다.
-그 대신 대응 파일에 그 profile 의 모든 커넥터 서버가 실려 있어야 한다. 바인딩 설치와 떼기가 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
+그 대신 대응 파일에 그 profile 의 모든 플러그인 서버가 실려 있어야 한다. 바인딩 설치와 떼기가 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다.
 뗀 서버도 빈 `tools` 로 남는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있기 때문이다.
 
-커넥터 도구의 결과는 `transform_tool_result` hook 이 Control Plane 의 `ExternalData` 와 같은 `<external-data>` 로 감싼다.
-hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/plugins/fos-ctx/README.md`](README.md) 의 「커넥터 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](../../docs/hermes-contract.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.
+플러그인 도구의 결과는 `transform_tool_result` hook 이 Control Plane 의 `ExternalData` 와 같은 `<external-data>` 로 감싼다.
+hook 이 무엇을 묻고 막고 감싸는지 전체 표는 [`hermes/plugins/fos-ctx/README.md`](README.md) 의 「플러그인 도구 호출을 묻는다」 가, Hermes 가 그 hook 을 언제 부르는지는 [도구 hook 과 승인](../../docs/hermes-contract.md) 의 「도구 결과를 바꾸는 hook」 이 갖는다.

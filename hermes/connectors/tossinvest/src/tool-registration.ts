@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { guard } from "./errors.ts";
 import { z } from "zod";
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 
 export type RegisterTool = (
   name: string,

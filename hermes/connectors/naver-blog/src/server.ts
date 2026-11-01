@@ -1,4 +1,4 @@
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { randomUUID } from "node:crypto";

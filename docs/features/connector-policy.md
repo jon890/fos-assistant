@@ -1,18 +1,18 @@
-# 커넥터 도구 정책과 승인
+# 플러그인 도구 정책과 승인
 
-커넥터 도구 호출을 위험도와 정책으로 판정하고, 승인이 필요한 호출을 사용자가 승인하는 기능이다.
+플러그인 도구 호출을 위험도와 정책으로 판정하고, 승인이 필요한 호출을 사용자가 승인하는 기능이다.
 
 covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/chat/approval-*`, `web/src/components/chat/conversation-grant-list.tsx`, `web/src/components/connector/connector-tools.tsx`, `web/src/lib/connector-action.ts`, `hermes/plugins/dashboard-profile-api/connector_policy.py`, `hermes/plugins/fos-ctx/connector_policy.py`
 
 ## 요구
 
-- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
+- 연결을 붙인 에이전트의 플러그인 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
 - 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자는 판정에 들어가지 않는다. 서버의 `readOnlyHint` 는 표준 플러그인의 상시 허락을 여는 데만 쓰고 승인을 건너뛰게 하지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
 - 사용자는 승인하면서 그 도구를 그 대화에서만 계속 허용할 수 있다. 밖으로 나가는 도구와 `always` 도구는 열지 않는다. 아래 「대화 허락」 이 정한다
 - `DESTRUCTIVE` 와 `FINANCIAL` 은 선언할 수 있지만 호출은 늘 거절한다
-- 커넥터에서 읽은 글이 어디로 갈 수 있는지는 아래 「커넥터 READ 데이터의 흐름」 이 정한다
+- 플러그인에서 읽은 글이 어디로 갈 수 있는지는 아래 「플러그인 READ 데이터의 흐름」 이 정한다
 - 위험도는 plugin 을 만든 사람의 판단이다. Control Plane 은 그 판단이 맞는지 확인하지 못하고, 운영자가 고른 plugin 만 목록에 오른다는 전제에 기댄다
 
 ### 화면
@@ -27,7 +27,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 | `approval` 사건을 받거나 대화를 연다 | 승인 줄을 다시 읽어 `PENDING` 인 줄마다 카드를 보인다. 상시 허락을 줄 수 있는 줄(`grantAllowed`)에는 「승인하고 묻지 않기」 가, 대화 허락을 줄 수 있는 줄(`conversationGrantAllowed`)에는 기간을 함께 적은 「이 대화에서 계속 허용 (24시간)」 이 더 있다. 대화 허락 목록도 다시 읽는다 |
 | 그 대화에 유효한 대화 허락이 있다 | 입력창 위에 「이 대화에서 묻지 않고 실행해요: 「제목」」 과 「다시 묻기」 를 한 줄씩 보인다. 코드는 `components/chat/conversation-grant-list.tsx` 가 갖는다 |
 | 승인 줄이 하나도 없다 | 카드 자리를 그리지 않는다 |
-| 같은 커넥터의 같은 도구로 기다리는 줄이 둘 이상이다 | 한 묶음으로 접어 보인다. 펼치면 건마다 단추가 있고, 한 건만 남으면 한 장의 카드가 된다 |
+| 같은 플러그인의 같은 도구로 기다리는 줄이 둘 이상이다 | 한 묶음으로 접어 보인다. 펼치면 건마다 단추가 있고, 한 건만 남으면 한 장의 카드가 된다 |
 | 펼친 묶음의 모든 건을 한 번에 승인할 수 있다 | 「N건 모두 승인」. 조건은 [ADR-087](../../web/docs/adr/ADR-087-같은-도구의-승인-줄은-묶음으로-보이고-상시-허락을-줄-수-있는-줄만-한꺼번에-승인한다.md) 이 갖는다 |
 | 실행 중이거나 실행했는지 모르는 줄, `toolName` 이 없는 줄 | 묶지 않는다. 이름이 없는 줄을 제목으로 묶으면 다른 도구가 섞일 수 있다 |
 | 도구가 제목을 선언하지 않았고 원래 이름(`toolName`)이 확인됐다 | 「이름 없는 동작」 대신 원래 도구 이름을 제목으로 보인다. 표준 플러그인의 도구가 여기에 든다. 상시 허락 목록도 같다. 규칙은 `web/src/lib/connector-action-title.ts` 가 갖는다 |
@@ -76,8 +76,8 @@ Python producer, Java 카탈로그 소비자와 웹 정제는 같은 규칙을 �
 `ToolPolicy`나 `ConnectorToolPolicies`에 표시 이름을 섞지 않는다.
 기존 경로의 요청은 그대로고 GET 목록과 POST 승인·거절의 응답에만 metadata를 더한다.
 metadata 없는 선언을 읽는 옛 plugin과 옛 Control Plane 응답은 원래 키로 표시하는 호환 경로다.
-옛 plugin은 arg_labels가 있는 도구 선언을 거절해 해당 커넥터를 카탈로그에서 뺄 수 있다.
-활성 plugin이 새 metadata를 받는지 먼저 확인하고 커넥터 선언을 반영한 뒤 두 서비스 카드 노출을 확인한다.
+옛 plugin은 arg_labels가 있는 도구 선언을 거절해 해당 플러그인을 카탈로그에서 뺄 수 있다.
+활성 plugin이 새 metadata를 받는지 먼저 확인하고 플러그인 선언을 반영한 뒤 두 서비스 카드 노출을 확인한다.
 실제 배포와 rollback은 운영 저장소 절차를 따른다.
 `_guard_manifest`는 선언 전체의 canonical JSON을 해시하므로 표시 이름 변경도 manifest SHA를 바꾼다.
 그 보호 계약은 유지한다. 도구 정책과 인자 원문 해시는 같지만 옛 금융 ticket/승인은 fail-closed로 무효화되어 재승인이 필요하다.
@@ -89,7 +89,7 @@ metadata 없는 선언을 읽는 옛 plugin과 옛 Control Plane 응답은 원�
 
 ## 흐름
 
-모델이 커넥터 도구를 부르고, 승인이 필요하면 사용자가 승인해 실행되기까지다.
+모델이 플러그인 도구를 부르고, 승인이 필요하면 사용자가 승인해 실행되기까지다.
 
 ```mermaid
 sequenceDiagram
@@ -97,9 +97,9 @@ sequenceDiagram
     participant C as Control Plane
     participant H as Hermes
     participant D as 대시보드 plugin
-    participant S as 커넥터 MCP 서버
+    participant S as 플러그인 MCP 서버
 
-    H->>H: 모델이 커넥터 도구를 부른다. fos-ctx hook 이 대응 파일에서 원래 이름을 찾는다
+    H->>H: 모델이 플러그인 도구를 부른다. fos-ctx hook 이 대응 파일에서 원래 이름을 찾는다
     H->>C: POST /internal/hermes/connector-policy, profile 토큰과 서명
     C->>C: session 으로 실행을 찾고 그 에이전트의 바인딩과 카탈로그로 판정
     C->>C: connector_action 한 줄
@@ -124,12 +124,12 @@ sequenceDiagram
     end
 ```
 
-## 커넥터 도구 정책
+## 플러그인 도구 정책
 
 ### 도구 정책
 
 `schema: 2` 는 그 MCP 서버의 도구마다 위험도와 승인 방식을 `tools` 에 선언한다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
-도구를 고르는 방법과 예시는 [커넥터 만들기](../../hermes/connectors/README.md) 의 「도구 정책」 이, 칸의 모양 검사는 `hermes/plugins/dashboard-profile-api/connector_schema.py` 가 갖는다.
+도구를 고르는 방법과 예시는 [플러그인 만들기](../../hermes/connectors/README.md) 의 「도구 정책」 이, 칸의 모양 검사는 `hermes/plugins/dashboard-profile-api/connector_schema.py` 가 갖는다.
 
 | 칸 | 뜻 |
 | --- | --- |
@@ -157,14 +157,14 @@ sequenceDiagram
 | `required` | 호출마다 승인을 받는다. 사용자가 상시 허락을 주면 그 기간에는 바로 실행한다 |
 | `always` | 호출마다 승인을 받는다. 상시 허락을 만들 수 없다. 설치가 서버 정의의 `tools.exclude` 에 넣어 모델에게 보이지 않는다 |
 
-- 선언이 하한보다 느슨하거나 모양이 틀리면 그 커넥터를 카탈로그에 내지 않는다. Control Plane 도 카탈로그를 읽을 때 하한을 한 번 더 보고, 느슨한 커넥터는 없는 커넥터로 다룬다
+- 선언이 하한보다 느슨하거나 모양이 틀리면 그 플러그인을 카탈로그에 내지 않는다. Control Plane 도 카탈로그를 읽을 때 하한을 한 번 더 보고, 느슨한 플러그인은 없는 플러그인으로 다룬다
 - `verify.tool` 과 `options.tool` 은 `READ` 와 `none` 이어야 한다
 - `"grant": false` 인 도구는 모델에게 보인다. 모델에게서 빼는 것은 `approval: always` 인 도구뿐이다
 - 카탈로그 응답의 `grant` 와 `identifiers` 는 기본값을 채운 값이다. 이 칸을 내지 않는 옛 대시보드 plugin 이면 Control Plane 은 `grant` 를 `approval` 이 `required` 인 도구에서 참으로, `identifiers` 를 빈 목록으로 읽는다
-- MCP 서버 이름을 등록 규칙으로 바꾸고 소문자로 맞춘 값이 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. 그 커넥터의 도구가 Control Plane 도구와 같은 이름으로 읽힐 수 있기 때문이다
+- MCP 서버 이름을 등록 규칙으로 바꾸고 소문자로 맞춘 값이 Control Plane MCP 의 것과 같으면 카탈로그에 내지 않는다. 그 플러그인의 도구가 Control Plane 도구와 같은 이름으로 읽힐 수 있기 때문이다
 - 등록 이름의 앞부분(`mcp__<서버>__`)이 너무 길면 카탈로그에 내지 않는다. 등록 이름을 줄일 때 Control Plane 의 접두사 검사가 그 서버의 긴 도구를 선언 없는 도구로 읽기 때문이다
 
-**`schema: 1` 커넥터에서 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인 줄이 된다.** 조회 도구도 마찬가지다.
+**`schema: 1` 플러그인에서 확인 도구와 선택지 도구 밖의 도구는 모두 막히고 승인 줄이 된다.** 조회 도구도 마찬가지다.
 `schema: 1` 은 `tools` 를 선언하지 않으므로 그 밖의 도구를 모두 `WRITE` 와 `required` 로 읽는다. 승인 없이 조회를 쓰려면 그 plugin 이 `schema: 2` 로 올려 조회 도구를 `READ` 로 선언해야 한다.
 
 **`assistant.json` 이 없는 표준 플러그인(`schema: 3`)의 도구는 모두 첫 호출에 승인을 받는다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
@@ -181,27 +181,27 @@ sequenceDiagram
 - **받는 값은 `deny` 와 `ask` 뿐이다.** 선언하지 않은 도구를 읽기로 보는 것처럼 사람이 보지 않고 열리는 기본값은 받지 않는다
 - 선언하지 않은 도구는 `WRITE` 와 `required` 로 읽고 대화 허락은 닫는다. 읽기 표시(`readOnlyHint`)가 있는 도구만 첫 승인 뒤 상시 허락을 열고, 표시를 거두면 상시 허락도 닫는다. 규칙은 `ToolPolicyDecision.decide` 의 `schema: 3` 규칙을 그대로 쓴다
 - 카탈로그에 칸이 없으면 선언하지 않은 도구를 거절한다. 옛 Control Plane 은 이 칸을 모르므로 거절하고, 새 Control Plane 이 옛 대시보드 plugin 의 카탈로그를 읽어도 칸이 없어 거절한다. 어느 쪽이든 느슨해지지 않는다
-- `ask` 커넥터의 선언하지 않은 도구는 거절되지 않으므로 위 「선언하지 않은 도구」 의 수에 넣지 않는다
-- 연결 확인이 `tools/list` 대신 확인 도구를 부르므로(`schema: 2`), `listed_tools` 는 기록되지 않고 읽기 표시도 없다. 지금은 `ask` 커넥터의 선언하지 않은 도구가 상시 허락 없이 호출마다 승인이다
+- `ask` 플러그인의 선언하지 않은 도구는 거절되지 않으므로 위 「선언하지 않은 도구」 의 수에 넣지 않는다
+- 연결 확인이 `tools/list` 대신 확인 도구를 부르므로(`schema: 2`), `listed_tools` 는 기록되지 않고 읽기 표시도 없다. 지금은 `ask` 플러그인의 선언하지 않은 도구가 상시 허락 없이 호출마다 승인이다
 
 #### 이름 대응
 
 Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를 바꾸고 긴 이름을 줄인다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「MCP 도구의 등록 이름」).
 등록 이름에서 원래 이름을 되찾을 수 없으므로, 설치가 대응을 그 profile 의 `.fos-connector-tools.json` 에 적는다. 형식은 `hermes/plugins/dashboard-profile-api/connector_state.py` 가 갖는다.
-hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알고, 원래 도구 이름은 `tools` 에서만 찾는다. 이 파일이 있는 profile 에서만 hook 이 커넥터 도구 호출을 묻는다.
+hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 알고, 원래 도구 이름은 `tools` 에서만 찾는다. 이 파일이 있는 profile 에서만 hook 이 플러그인 도구 호출을 묻는다.
 
-대시보드 plugin 이 만드는 대응 파일은 항상 `"isolated": false` 를 싣는다. 이는 일반 에이전트의 profile 에 커넥터를 붙인 바인딩 설치를 뜻하며, `servers` 에는 소유 기록의 모든 서버와 뗀 서버 기록의 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다.
+대시보드 plugin 이 만드는 대응 파일은 항상 `"isolated": false` 를 싣는다. 이는 일반 에이전트의 profile 에 플러그인을 붙인 바인딩 설치를 뜻하며, `servers` 에는 소유 기록의 모든 서버와 뗀 서버 기록의 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다.
 
-`fos-ctx` 는 `isolated` 가 없으면 호환을 위해 `true` 로 읽고, `true` 또는 누락인 파일에서는 대응에 없는 MCP 도구와 `execute_code` 를 차단한다. 칸이 boolean 이 아니면 대응을 읽지 못한 것으로 처리해 MCP 도구, `execute_code`, 첨부 검사 도구를 차단한다. 이 호환·차단 규칙은 현행 설치 방식이 아니며, plugin 이 만드는 파일의 `false` 와 구별한다. 세 경우의 hook 처리는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
+`fos-ctx` 는 `isolated` 가 없으면 호환을 위해 `true` 로 읽고, `true` 또는 누락인 파일에서는 대응에 없는 MCP 도구와 `execute_code` 를 차단한다. 칸이 boolean 이 아니면 대응을 읽지 못한 것으로 처리해 MCP 도구, `execute_code`, 첨부 검사 도구를 차단한다. 이 호환·차단 규칙은 현행 설치 방식이 아니며, plugin 이 만드는 파일의 `false` 와 구별한다. 세 경우의 hook 처리는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「플러그인 도구 호출을 묻는다」 가 갖는다.
 
-**바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
+**바인딩 profile 에서 대응에 실리지 않은 플러그인 서버는 판정 없이 나간다.**
 그래서 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
 
 **떼기는 뗀 서버를 대응에서 빼지 않는다.**
 떼기 전에 시작한 실행은 그 서버를 쥔 채 돌고, 대응에서 서버가 빠지면 그 실행의 호출이 판정 없이 나가기 때문이다.
 떼기는 서버 이름을 뗀 서버 기록 `.fos-connector-detached.json` 에 남기고 대응에 그 서버를 빈 `tools` 로 싣는다. Control Plane 은 그 에이전트에 그 서버를 붙인 연결이 없어 막는다.
 
-- 같은 커넥터를 같은 서버 이름으로 다시 붙이면 기록에서 지운다. 같은 서버 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽의 도구를 싣는다
+- 같은 플러그인을 같은 서버 이름으로 다시 붙이면 기록에서 지운다. 같은 서버 이름을 지금 붙은 플러그인이 쓰면 붙은 쪽의 도구를 싣는다
 - 기록에는 만료가 없다. gateway 를 재시작한 뒤에는 떼기 전에 시작한 실행이 남지 않으므로 운영자가 지워도 된다
 - 운영자가 뗀 서버와 같은 이름의 MCP 서버를 직접 등록하려면 먼저 기록에서 그 항목을 지운다. 남겨 두면 그 서버의 도구가 모두 판정에서 막힌다
 - 실행 공간을 적용하지 않은 profile 에서는 터미널이나 파일 도구가 이 파일을 고칠 수 있다. 실행 공간을 적용한 profile 의 컨테이너에는 이 파일이 없다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 이 위험은 ADR-083 의 「감당할 것」 에 있다
@@ -231,9 +231,9 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 서버 이름과 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다
 - `schema: 1` 에서 `tool` 이 없는 호출은 승인 필요로 막는다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절한다
-- 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
+- 상시 허락은 그 사용자가 그 플러그인의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
-- 커넥터의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
+- 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -258,7 +258,7 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. 그 조건은 `hermes/plugins/dashboard-profile-api/connector_status.py` 가 갖고, 대응 파일은 서버 목록과 `connector`, `prefix` 까지만 견주고 서버마다의 `tools` 는 보지 않는다.
 
 - 설치는 그 profile 의 `fos-ctx` 를 묶음의 버전으로 바꾸고, 파일이 바뀌었으면 `plugin_updated: true` 로 답한다. 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있어 Control Plane 은 그 바인딩을 재시작 대기로 둔다
-- 서버 정의의 `tools.exclude` 나 대응의 서버별 `tools` 가 어긋나면 그 커넥터 항목만 `configured` 가 거짓이고 `policy_hook` 은 그대로다([ADR-20261009 / connector-install-drift](../adr/ADR-20261009-connector-install-drift.md)). 그래서 커넥터 하나의 manifest 가 바뀌어도 같은 profile 의 다른 커넥터는 판정을 통과한다
+- 서버 정의의 `tools.exclude` 나 대응의 서버별 `tools` 가 어긋나면 그 플러그인 항목만 `configured` 가 거짓이고 `policy_hook` 은 그대로다([ADR-20261009 / connector-install-drift](../adr/ADR-20261009-connector-install-drift.md)). 그래서 플러그인 하나의 manifest 가 바뀌어도 같은 profile 의 다른 플러그인은 판정을 통과한다
 - 어긋난 서버의 `approval: always` 도구는 공유 gateway 를 재시작하기 전까지 모델에 등록된 채일 수 있다. 그 호출도 hook 이 묻고, 그 바인딩은 `READY` 가 아니어서 Control Plane 이 막는다
 - 대응에서 서버가 빠지면 판정 없이 나가므로 서버 목록과 접두사가 다르면 계속 `policy_hook` 이 거짓이다. 거짓이면 대시보드가 조건 이름만 경고 로그에 남긴다
 - 연결 확인과 관리자 반영 완료는 설치를 다시 보낸 뒤에 `policy_hook` 을 읽는다. 옛 버전의 `fos-ctx` 를 가진 바인딩은 연결 확인 한 번으로 새 버전이 되고 재시작 대기가 된다
@@ -306,7 +306,7 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 | 대화가 없는 실행이 만든 요청 | 승인 카드가 뜰 곳이 없어 만료된다. 모델에게도 실행되지 않는다고 말한다 |
 | 끝난 요청의 알림 줄을 저장하는 순간 사용자가 그 대화에 보낸다 | 알림 줄을 저장하는 트랜잭션 동안 turn 잠금을 잡는다. 그 사이의 보내기는 `CONVERSATION_BUSY` 를 받고, 글만 보낸 것이면 화면이 대기 메시지로 다시 넣는다. 실행은 열리지 않으므로 도는 turn 표시에 실행 번호가 없다 |
 
-## 커넥터 승인
+## 플러그인 승인
 
 결정은 [ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다.
 승인과 거절은 그 요청이 나온 대화의 승인 카드에서 한다. 실행 결과는 그 대화의 알림 줄과 자동 turn 으로 온다.
@@ -338,13 +338,13 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 
 - 응답의 `argsJson` 은 비밀처럼 보이는 키의 값과 토큰 모양의 글을 `[가림]` 으로 바꿔 낸다([ADR-047](../../backend/docs/adr/ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) 의 비밀값 부분). 길이로 자르지 않고, 실행은 저장한 원문으로 한다
 - UUID 는 가리지 않는다. 무엇을 고치는지 가리키는 값이라 가리면 서로 다른 대상의 요청이 같게 보이고, 이 응답은 주인만 읽는다
-- 커넥터가 `identifiers` 로 선언한 맨 위 인자는 긴 덩어리를 가리는 규칙에서 빠진다. 알려진 비밀 접두사로 시작하는 값과 비밀 키 이름의 칸은 그래도 가린다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md))
+- 플러그인이 `identifiers` 로 선언한 맨 위 인자는 긴 덩어리를 가리는 규칙에서 빠진다. 알려진 비밀 접두사로 시작하는 값과 비밀 키 이름의 칸은 그래도 가린다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md))
 - **상시 허락을 닫은 도구의 승인 줄은 인자가 하나도 가려지지 않아야 승인된다**([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). 그 도구는 밖으로 나가는 호출이라 사람이 원문을 다 읽어야 한다. 가린 글이 원문과 다르면 `hiddenArgs` 가 참이고, 그 줄에 승인 요청이 오면 실행하지 않고 `REJECTED`(`hidden_args`)로 끝낸 줄을 200 으로 돌려준다
 - `grantAllowed`, `hiddenArgs`, `identifiers` 의 선언은 줄을 읽을 때와 승인할 때의 카탈로그로 본다. 카탈로그를 읽지 못했으면 거짓이거나 선언이 없는 것으로 보고, 그 줄의 승인은 정책을 판정하지 못해 `not_executable` 로 끝난다
 - `conversationGrant` 는 대화 허락을 함께 주는 승인이다. 받는 조건과 거절은 「대화 허락」 이 갖는다
 - `grant` 는 `required` 이고 선언이 상시 허락을 닫지 않은 도구에만 받는다. 그 밖의 도구나 원래 도구 이름을 모르는 줄이면 `VALIDATION_FAILED` 다. `TODAY` 는 서버의 시간대와 상관없이 `Asia/Seoul` 의 그날 끝까지다. 사용량 화면의 달 경계와 같은 고정 시간대다
 - `title` 은 선언에 이름이 없거나 카탈로그를 읽지 못했으면 `이름 없는 동작` 이다. 도구의 원래 이름은 내부 값이라 `title` 과 알림 줄과 모델 입력에 싣지 않는다
-- 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
+- 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 플러그인의 줄은 두고 본다
 - 다른 사용자의 줄은 `CONNECTOR_ACTION_NOT_FOUND` 다. 관리자도 같다
 - 대화의 승인 줄 목록과 그 줄의 승인·거절 응답에서 원고 저장 job 이 연결된 줄은 `contentDraft` 요약을 싣는다. 일반 줄은 null 이다. 화면이 응답으로 자기 줄을 바꿔도 원고 카드로 남게 하기 위해서다. 요약의 칸과 화면 동작은 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) 이 갖는다
 - 공개 승인 API 는 주문 상한 변경 줄(`limit_kind` 를 적은 줄)을 금융 주문 승인보다 먼저 상한 변경 승인(`FinancialLimitChanges`)으로 보낸다. 허락 입력은 `VALIDATION_FAILED` 다([ADR-20261015 / financial-user-limits](../adr/ADR-20261015-financial-user-limits.md))
@@ -358,18 +358,18 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 
 - `SUCCEEDED`, `FAILED`, `UNKNOWN` 이면 그 대화에 알림 줄을 남기고 자동 turn 을 열어 결과를 전한다. 위임 결과와 같은 잠금과 같은 연속 상한을 쓰고, 위임 결과가 함께 있으면 한 turn 에 모은다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 보낼 대기 메시지가 있으면 그것이 먼저 간다([대기열과 중지](chat.md) 의 「응답 중 대기열」)
 - 알림 줄은 이름과 상태만 쓴다. 결과 본문은 모델 입력에만 넣고 `<external-data>` 로 감싼다. 입력의 형식은 [`docs/features/memory.md`](memory.md) 의 「Hermes 에 넘기는 형식」 이 갖는다. 요청 번호와 도구의 원래 이름은 모델이 답에 옮겨 화면에 나오지 않게 싣지 않는다
-- `FAILED` 는 본문을 싣지 않고, 저장한 오류 계약이 있으면 오류 코드와 세부, 복구 안내를 더한다([커넥터 만들기](../../hermes/connectors/README.md) 의 「오류 복구 계약」). `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다. 저장한 코드와 재시도 식별자가 있으면 머리줄에 더하고, 커넥터 스킬이 안내할 때만 그 식별자로 한 번 다시 부를 수 있다는 줄을 잇는다
+- `FAILED` 는 본문을 싣지 않고, 저장한 오류 계약이 있으면 오류 코드와 세부, 복구 안내를 더한다([플러그인 만들기](../../hermes/connectors/README.md) 의 「오류 복구 계약」). `UNKNOWN` 은 본문 대신 다시 실행하지 말고 사용자에게 확인을 부탁하라는 글을 넣는다. 저장한 코드와 재시도 식별자가 있으면 머리줄에 더하고, 플러그인 스킬이 안내할 때만 그 식별자로 한 번 다시 부를 수 있다는 줄을 잇는다
 - 알림 줄 저장, 전했다는 표시, 자동 turn 수 증가는 한 트랜잭션이다. 연속 상한에 닿아 turn 을 열지 못한 결과는 남고, 사용자가 메시지를 보낸 뒤의 turn 이 닫힐 때 전해진다
 - 거절과 만료는 알림 줄만 남기고 자동 turn 을 열지 않는다. 시스템이 실행하지 않고 끝낸 줄은 거절이 아니라 취소했다고 알린다
 - 그 대화의 turn 이 도는 동안에는 알림 줄을 남기지 않고 turn 이 닫힐 때 남긴다. 잠금을 잡은 채 저장하고 못 잡으면 미룬다. 답보다 먼저 알림 줄이 끼면 그 답이 알림 줄에 이어진 자동 turn 의 답으로 읽히기 때문이다. 표시를 먼저 적으므로 같은 줄의 사건이 겹쳐도 알림 줄은 하나다
 
-**`POST /api/connectors/{id}/execute`** 는 대시보드 plugin 의 실행 경로다. 자식의 env 와 응답 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+**`POST /api/connectors/{id}/execute`** 는 대시보드 plugin 의 실행 경로다. 자식의 env 와 응답 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
 
 - Control Plane 은 승인 줄의 에이전트에 붙은 바인딩의 profile 로 보낸다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 대시보드는 승인 여부를 다시 확인하지 않는다
-- 커넥터 MCP 서버를 자식으로 한 번 띄워 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 부른다. 시간 제한은 `CONNECTOR_EXECUTE_TIMEOUT_SECONDS` 이고 동시 실행은 `call` 과 같은 한도를 함께 쓴다
+- 플러그인 MCP 서버를 자식으로 한 번 띄워 등록 이름이 `hermes_tool` 과 같은 도구가 정확히 하나일 때 부른다. 시간 제한은 `CONNECTOR_EXECUTE_TIMEOUT_SECONDS` 이고 동시 실행은 `call` 과 같은 한도를 함께 쓴다
 - 도구가 `errors` 표에 있는 코드로 실패하면 그 코드와 복구 계약을 싣고, Control Plane 은 같은 규칙으로 다시 검증해 `FAILED` 줄에 저장한다. `outcome_unknown` 인 코드는 504 로 답해 `UNKNOWN` 이 된다. 504 본문에는 그 코드와 선언한 재시도 식별자만 싣고, Control Plane 은 같은 형식으로 다시 검증해 `UNKNOWN` 줄에 저장한다
 - 도구가 오류 없이 끝났는데 구조화 결과도 JSON 텍스트도 없으면 첫 텍스트 칸의 글로 성공을 답한다. 실행된 쓰기를 실패로 기록하지 않기 위해서다
-- 커넥터의 도구 하나는 프로세스 안의 상태에 기대지 않아야 한다. 이 경로는 Hermes 가 쥔 MCP 연결이 아니라 새 프로세스에서 돈다
+- 플러그인의 도구 하나는 프로세스 안의 상태에 기대지 않아야 한다. 이 경로는 Hermes 가 쥔 MCP 연결이 아니라 새 프로세스에서 돈다
 
 ### 대화 허락
 
@@ -386,17 +386,17 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 | 다른 대화, 새 대화, 같은 대화의 다른 에이전트 위임 실행 | 허락이 없는 것으로 판정한다 |
 | 사용자가 「다시 묻기」 를 누른다 | `DELETE /api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}`. 그 줄과 같은 대화, 에이전트, 도구의 허락을 모두 거둔다. 남의 허락이나 다른 대화의 번호는 `CONNECTOR_ACTION_NOT_FOUND` 다 |
 | 대화를 지운다 | 판정이 지운 대화의 허락을 보지 않는다 |
-| 그 에이전트에서 연결을 뗀다 | 그 에이전트의 그 커넥터 대화 허락을 거둔다. 다시 붙여도 돌아오지 않는다 |
-| 연결을 해제하거나 값을 다시 등록한다 | 그 커넥터의 대화 허락을 모두 거둔다 |
+| 그 에이전트에서 연결을 뗀다 | 그 에이전트의 그 플러그인 대화 허락을 거둔다. 다시 붙여도 돌아오지 않는다 |
+| 연결을 해제하거나 값을 다시 등록한다 | 그 플러그인의 대화 허락을 모두 거둔다 |
 | 함께 승인한 실행이 실패했거나 결과를 모른다 | 그 승인 줄과 함께 준 허락을 거둔다. 기동 정리와 오래 남은 실행 정리가 결과를 모르는 것으로 바꿀 때도 같다 |
-| 선언이 그 도구의 대화 허락을 닫는다 | 승인 줄 정리가 1분마다 유효한 허락을 거둔다. 선언이 다시 열어도 앞선 허락은 돌아오지 않는다. 카탈로그를 읽지 못한 커넥터는 건드리지 않는다 |
+| 선언이 그 도구의 대화 허락을 닫는다 | 승인 줄 정리가 1분마다 유효한 허락을 거둔다. 선언이 다시 열어도 앞선 허락은 돌아오지 않는다. 카탈로그를 읽지 못한 플러그인은 건드리지 않는다 |
 | 같은 줄을 동시에 승인한다 | 승인 줄의 행 잠금이 하나만 통과시켜 허락도 한 줄이다 |
 | 결과를 대화에 전한다 | 그 승인과 함께 준 허락이 아직 유효하면 알림 줄에 「이 대화에서는 10월 13일 14:00까지 같은 동작을 다시 묻지 않고 실행해요. 다른 대화에서는 다시 물어요」 처럼 끝나는 시각을 넣어 더한다. 모델 입력에는 그 시각까지 이 대화에서 이 에이전트가 부르는 같은 동작이 승인 없이 실행되고 다른 에이전트는 다시 승인을 받는다는 줄을 더한다. 시각은 가족이 사는 곳의 시각이다 |
 
 - 대화 허락 목록(`GET /api/v1/chat/conversations/{id}/connector-conversation-grants`)은 번호, 제목, 끝나는 시각과, 대화의 에이전트와 다른 에이전트에 준 허락이면 그 에이전트 이름(`agentName`)만 낸다. 화면은 줄마다 끝나는 시각을 보이고 다른 에이전트의 허락이면 그 이름을 함께 보인다. 지금 선언이 대화 허락을 닫은 도구의 줄은 효력이 없어 내지 않는다
 - 승인할 때와 떼거나 해제할 때 모두 사용자 행을 먼저 잠그므로, 뗀 뒤에 승인이 허락을 남기지 못한다. 그 승인은 `not_executable` 로 끝난다
 
-## 커넥터별 준비, 승인, 실행, 확인
+## 플러그인별 준비, 승인, 실행, 확인
 
 외부 상태를 바꾸는 세 경로가 준비부터 확인까지 무엇으로 중복과 결과 불명을 다루는지 한 표에 둔다.
 네이버 블로그 실사용과 토스 매매 개방의 Go/No-Go 는 이 표와 아래 체크리스트로 판단한다.
@@ -407,27 +407,27 @@ hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알�
 
 | 단계 | 네이버 블로그 원고 임시저장 | 토스 주문 | Gmail 보내기와 답장 |
 | --- | --- | --- | --- |
-| 지금 운영 | 열려 있다. connector.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 열림. 관문의 운영 값(key 파일, 허용 목록, 0 이 아닌 상한)이 채워졌을 때 열린다. 모델이 부른 준비 도구는 금융 준비로 넘어가고, 실행 도구를 직접 부른 호출은 `RISK_NOT_OPEN` 이다 | 열려 있다 |
+| 지금 운영 | 열려 있다. assistant.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 열림. 관문의 운영 값(key 파일, 허용 목록, 0 이 아닌 상한)이 채워졌을 때 열린다. 모델이 부른 준비 도구는 금융 준비로 넘어가고, 실행 도구를 직접 부른 호출은 `RISK_NOT_OPEN` 이다 | 열려 있다 |
 | 준비 | `content_draft_preview` 가 원고 revision, 사진 원본 바이트, 바인딩 버전을 고정한 불변 snapshot 을 만든다. 같은 revision 과 권한 지문이면 같은 snapshot 이다. [불변 preview snapshot](content-draft.md#불변-preview-snapshot) | 준비 도구(`READ`, `none`)를 `POST /api/connectors/{id}/prepare` 로 한 번 부르고 원래 인자, 실행 인자, summary, scope 를 암호화한 snapshot 으로 저장한다. [금융 실행 내용의 저장과 검증](#금융-실행-내용의-저장과-검증) | 따로 없다. 모델이 보낸 인자 원문(`args_json`)과 그 해시(`args_sha256`)를 승인 줄에 저장한다. [승인의 불변식](#승인의-불변식) |
 | 승인하는 사람 | 연결 주인이 그 대화의 원고 카드에서 canonical 미리보기와 포함·빠진 사진을 보고 승인한다 | 연결 주인이 그 대화의 승인 카드에서 계좌 순번과 저장 요약을 보고 승인한다. 요약을 열지 못하면 승인하지 못한다 | 연결 주인이 그 대화의 승인 카드에서 받는 사람, 제목, 본문 원문을 보고 승인한다. 가려지는 글이 하나라도 있으면 승인하지 못한다(`hidden_args`) |
 | 상시 허락, 대화 허락 | 둘 다 받지 않는다. 승인 줄을 `always` 로 저장하고 「N건 모두 승인」 에도 넣지 않는다 | 둘 다 받지 않는다. `FINANCIAL` 은 `always` 다 | 둘 다 받지 않는다. `grant: false` 이고 `conversation_grant` 를 선언하지 않는다 |
 | `outbound` | 거짓. 계정 안의 임시저장이다 | 해당 없다. 돈이 움직이는 도구는 `FINANCIAL` 위험도로 따로 닫는다 | 참 |
-| 실행 | 승인이 jobId 를 예약하고 저장 ticket 을 발급해 worker 시작을 최대 한 번 보낸다. worker 는 authorize 의 `start`, 사진마다 `photo`, 저장 클릭 직전 `save` 허가를 받아야 진행한다. [승인과 jobId 예약](content-draft.md#승인과-jobid-예약) | 승인이 실행 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 커넥터는 주문을 보내기 직전에 claim 으로 ticket 을 한 번 소비한다 | 승인이 줄을 `EXECUTING` 으로 커밋한 뒤 대시보드 `execute` 로 저장한 인자를 한 번 보낸다. ticket 은 없다 |
+| 실행 | 승인이 jobId 를 예약하고 저장 ticket 을 발급해 worker 시작을 최대 한 번 보낸다. worker 는 authorize 의 `start`, 사진마다 `photo`, 저장 클릭 직전 `save` 허가를 받아야 진행한다. [승인과 jobId 예약](content-draft.md#승인과-jobid-예약) | 승인이 실행 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 플러그인은 주문을 보내기 직전에 claim 으로 ticket 을 한 번 소비한다 | 승인이 줄을 `EXECUTING` 으로 커밋한 뒤 대시보드 `execute` 로 저장한 인자를 한 번 보낸다. ticket 은 없다 |
 | 중복을 막는 키 | 승인 줄의 dedupe key(`v1-content-save`, 주인, snapshotId), job 의 snapshot 유일 색인, worker 상태 파일의 `O_EXCL`, Control Plane 의 `start_claimed_at`, `save_claimed_at` 단일 claim | 준비가 만든 `clientOrderId`, 같은 의도의 `request_key`(같은 키의 `PENDING`, `EXECUTING`, `UNKNOWN` 이 있으면 준비, 승인, claim 을 막는다), ticket 단일 소비 | 정책 판정의 `dedupe_key`(profile, 루트 session, session, `tool_call_id`)와 승인 줄의 행 잠금이다. Gmail 에 보내는 멱등 키는 없다 |
 | 결과 조회 | job GET 이 같은 jobId 만 private status 로 조회한다. 승인 뒤 15분이 지나면 `ContentDraftJobExpirer` 가 한 번 조회하고 닫는다. 사용자는 네이버 임시저장 목록에서 확인한다 | 실행 응답으로 끝난다. 사용자는 `list_orders`, `get_order` 와 토스증권 앱에서 확인한다 | 실행 응답으로 끝난다. 사용자는 Gmail 보낸편지함에서 확인한다 |
 | `UNKNOWN` 이 되는 때 | 시작 응답을 잃었다. save claim 이나 저장 클릭 뒤에 실패했다. 바인딩 버전이 바뀌었거나 15분 정리에 걸렸는데 start claim 이 있었다. [job 상태와 재접속](content-draft.md#job-상태와-재접속) | 응답을 잃었거나 결과가 불확실한데 claim 을 소비했다. 소비하지 않았음을 잠금 안에서 증명하면 `FAILED` 다 | `GMAIL_SEND_UNKNOWN`(보낸 뒤 시간 초과, 연결 끊김, 5xx), execute 시간 초과, 실행 중 서버 재시작(`ConnectorActionSweeper`), 오래 남은 `EXECUTING`(`ConnectorActionExpirer`) |
-| 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다. 새 snapshot 의 재저장은 감수한다(아래 「남은 공백」) | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 커넥터도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다. 같은 메일의 새 호출은 감수한다(아래 「남은 공백」) |
+| 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다. 새 snapshot 의 재저장은 감수한다(아래 「남은 공백」) | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 플러그인도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다. 같은 메일의 새 호출은 감수한다(아래 「남은 공백」) |
 | owner 코드 | [`ContentDraftSnapshots`](../../backend/src/main/java/com/bifos/assistant/chat/contentdraft/application/ContentDraftSnapshots.java), [`ContentDraftJobs`](../../backend/src/main/java/com/bifos/assistant/connector/contentdraft/application/ContentDraftJobs.java), [`ContentDraftSaveApproval`](../../backend/src/main/java/com/bifos/assistant/connector/contentdraft/application/ContentDraftSaveApproval.java), [`ContentDraftJobAuthorizer`](../../backend/src/main/java/com/bifos/assistant/connector/contentdraft/application/ContentDraftJobAuthorizer.java), [`ContentDraftJobExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/contentdraft/application/ContentDraftJobExpirer.java), [`connector_snapshot_job.py`](../../hermes/plugins/dashboard-profile-api/connector_snapshot_job.py), [`content-snapshot-job.ts`](../../hermes/connectors/naver-blog/src/content-snapshot-job.ts) | [`ConnectorFinancialProducer`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorFinancialProducer.java), [`ConnectorFinancialApproval`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorFinancialApproval.java), [`ConnectorFinancialConflicts`](../../backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorFinancialConflicts.java), [`ConnectorExecutionSnapshot`](../../backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorExecutionSnapshot.java), [`ConnectorExecutionClaims`](../../backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorExecutionClaims.java), [`connector_prepare.py`](../../hermes/plugins/dashboard-profile-api/connector_prepare.py), [`trading-tools.ts`](../../hermes/connectors/tossinvest/src/trading-tools.ts) | [`ToolPolicyDecision`](../../backend/src/main/java/com/bifos/assistant/connector/action/domain/ToolPolicyDecision.java), [`ConnectorActionApproval`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorActionApproval.java), [`ConnectorActionLifecycle`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorActionLifecycle.java), [`ConnectorActionSweeper`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorActionSweeper.java), [`ConnectorActionExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/approval/application/ConnectorActionExpirer.java), [`connector_run.py`](../../hermes/plugins/dashboard-profile-api/connector_run.py), [`mail-tools.ts`](../../hermes/connectors/gmail/src/mail-tools.ts) |
 
 이 표 밖의 쓰기는 Gmail 열과 같은 일반 승인 줄 경로를 탄다.
 네이버의 자유 형식 `save_draft`, `overwrite_draft`, `read_draft` 와 Gmail 의 초안, 라벨, 필터 도구가 그렇다.
-상시 허락과 대화 허락을 받는지는 도구마다 다르고 [네이버 블로그 커넥터](naver-blog-connector.md#도구와-정책) 와 [Gmail 커넥터](gmail-connector.md#도구와-정책) 가 갖는다.
+상시 허락과 대화 허락을 받는지는 도구마다 다르고 [네이버 블로그 플러그인](naver-blog-connector.md#도구와-정책) 와 [Gmail 플러그인](gmail-connector.md#도구와-정책) 가 갖는다.
 
 ### Go/No-Go 체크리스트
 
 네이버 블로그 실사용은 아래가 모두 채워지면 Go 다.
 
-- [ ] snapshot capability 의 `start`, `status` 를 켠 connector.json 이 배포됐다. 저장소의 선언은 둘 다 참이다
+- [ ] snapshot capability 의 `start`, `status` 를 켠 assistant.json 이 배포됐다. 저장소의 선언은 둘 다 참이다
 - [ ] 사용자가 실제 계정으로 지정 테스트 글을 저장하는 것과 쓸 사진 수를 명시적으로 승인했다
 - [ ] [배포 뒤 원격 확인](content-draft.md#배포-뒤-원격-확인) 표를 그 테스트 글로 돌았다. start 는 1회, 재접속과 재시작 뒤 추가 start 와 저장 클릭은 0회, claim 뒤의 불확실한 결과는 `UNKNOWN` 이다
 - [ ] [읽기 부작용 확인](naver-blog-connector.md#읽기-부작용-확인) 을 같은 자리에서 돌아 `read_draft` 를 `WRITE` 로 둘지 정했다
@@ -483,7 +483,7 @@ arg는 주문과 내부 메타데이터의 예약 이름을 쓸 수 없다.
 저장 전과 읽기 검증에서 같은 경계를 적용하며 공개 연결 칸의 field 이름에는 이 제한을 적용하지 않는다.
 scope에는 선언한 arg만 있고 값은 비어 있지 않은 UTF-8 128바이트 이하 문자열이다.
 각 값은 연결의 공개 칸 및 실행 args의 같은 arg 값과 문자열 그대로 같아야 한다.
-실제 자식 env 대조와 서비스별 시장·통화 조합은 커넥터 구현이 맡는다.
+실제 자식 env 대조와 서비스별 시장·통화 조합은 플러그인 구현이 맡는다.
 
 ### 표시 값과 실행 인자
 
@@ -523,7 +523,7 @@ normalization.field는 symbol, quantity, orderAmount, price, timeInForce 중 하
 숫자를 다른 값으로 바꾸거나 추가·제거하는 변환과 가격 절삭은 거절한다.
 timeInForce는 CREATE에서 생략한 값을 DAY로 보충하는 기존 기본값만 허용한다.
 변경되지 않은 값은 기존 strict 입력 계약을 적용하며 canonical 표기를 새로 강제하지 않는다.
-정규화 계산과 조회 값의 출처 확인은 커넥터가 맡는다.
+정규화 계산과 조회 값의 출처 확인은 플러그인이 맡는다.
 
 | 동작 | 실행 args의 정확한 키 |
 | --- | --- |
@@ -545,7 +545,7 @@ keyed hash는 운영 비밀 key 파일과 칸 이름으로 만든 HMAC-SHA256이
 DB만 읽은 사람이 인자 후보를 대입해 맞혀 보지 못하게 하려는 것이다. key 파일이 없거나, keyed hash 이전 protocol(`approval-claim-v1`)이나 이전 key로 만든 PENDING·EXECUTING·UNKNOWN 줄이 남았으면 금융 관문이 닫힌다. 지금 protocol(`approval-claim-v2`)과 지금 key로 만든 줄, 끝난 줄은 보지 않으므로 첫 실제 호출 뒤 재기동해도 관문이 다시 열린다.
 하루 상한 합계는 같은 날의 이전 protocol 줄과 이전 key 줄도 센다. 이전 protocol 줄은 평문 SHA-256으로 대조하고, 이전 key 줄은 AAD로 묶은 암호문을 열어 금액을 읽는다.
 key를 바꾸면 같은 의도도 request_key가 달라지므로 이전 key의 열린 줄이 끝날 때까지 닫는다. 근거는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md)이 갖는다.
-request_key의 원재료는 사용자, 커넥터, 도구와 실행 args의 정규화한 문자열 필드로 만든다. 연결 번호는 넣지 않는다.
+request_key의 원재료는 사용자, 플러그인, 도구와 실행 args의 정규화한 문자열 필드로 만든다. 연결 번호는 넣지 않는다.
 scope arg, market, currency와 원래 orderId는 포함하고 clientOrderId와 expected_order는 제외한다.
 decimal은 앞의 0과 불필요한 소수점 끝 0을 제거한 정확한 문자열로 맞춘다.
 필드 이름을 ASCII 순으로 정렬하고 각 이름·값을 `UTF-8 바이트수:값`으로 붙인다.
@@ -694,7 +694,7 @@ ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTT
 금융 실행 전체를 켜고 끄는 설정은 따로 두지 않는다. 허용 목록이 비었거나 상한이 0이면 주문이 거절되고, keyed hash key 파일(`digest-key-file`)을 읽지 못하면 관문 전체가 닫힌다.
 key 파일이 운영에서 금융을 여는 마지막 잠금이다. key를 쓰는 request_key와 해시 단계 없이 금융이 열리지 않게 코드로 막는다.
 준비는 prepare 전에 key 파일과 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
-허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
+허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 플러그인](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
 승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌와 그 주인을 본다.
 하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 key 파일과 계좌 허용 목록만 본다. 하루 합계에도 금액이 있는 생성만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
 
@@ -719,9 +719,9 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 이 규칙은 execute의 `400`·`401`·`404`·`409`에도 적용한다.
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
-request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실행 원문의 scope 칸으로 들어가므로 같은 사용자가 같은 계좌에 내는 같은 주문은 연결을 다시 등록해도 같은 키다.
+request_key는 연결 번호 대신 플러그인 이름을 넣는다. 계좌는 실행 원문의 scope 칸으로 들어가므로 같은 사용자가 같은 계좌에 내는 같은 주문은 연결을 다시 등록해도 같은 키다.
 옛 v1 키와는 호환하지 않는다. v2 로 올릴 때는 운영에 금융 caller가 없어 옛 v1 줄이 없었다. 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
-개방 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 운영 값이 채워지기 전에는 관문이 주문을 거절한다.
+개방 조건은 [토스증권 플러그인](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 운영 값이 채워지기 전에는 관문이 주문을 거절한다.
 
 모든 승인 줄의 `args_json`과 `result_text`는 기존 사용자 데이터 key로 암호화한다.
 금융은 암호화가 필수이며 일반 쓰기만 암호화가 꺼져 있을 때 평문 호환을 허용한다.
@@ -731,7 +731,7 @@ request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실
 ### 대화 삭제 뒤 승인 본문 정리
 
 대화 삭제는 지금처럼 목록에서 대화를 숨긴다.
-purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개인 본문도 지운다.
+purge는 메시지와 첨부를 정리하면서 두 플러그인 테이블의 개인 본문도 지운다.
 `connector_action`의 인자·결과와 key 참조, `connector_action_execution`의 실행 인자·요약·범위와 key 참조를 NULL로 비운다.
 상태·시각·도구·위험도·해시·ticket·중복 방지 식별자와 금융 상한 변경의 종류·요청값·이전값은 보존한다.
 
@@ -754,9 +754,9 @@ purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개�
 기존 주기 작업은 이미 purge한 대화도 다시 찾아 지울 수 있게 된 승인 본문만 정리한다.
 이 변경을 적용하기 전에 purge한 대화도 같은 경로로 처리하며 원래 `purged_at`은 바꾸지 않는다.
 
-## 커넥터 READ 데이터의 흐름
+## 플러그인 READ 데이터의 흐름
 
-연결을 붙인 에이전트가 커넥터에서 읽은 글이 모델, 셸, 웹, 다른 커넥터, Memory, 결과물, 기록으로 가는 길을 갖는다.
+연결을 붙인 에이전트가 플러그인에서 읽은 글이 모델, 셸, 웹, 다른 플러그인, Memory, 결과물, 기록으로 가는 길을 갖는다.
 길마다 지금 무엇이 막고 무엇이 막지 않는지, 제품 정책상 허용인지 승인인지 거절인지를 흐름 판정 코드와 함께 적는다.
 원칙과 기본값을 지금 바꾸지 않은 까닭은 [ADR-20261008 / read-data-flow](../adr/ADR-20261008-read-data-flow.md) 가 갖는다.
 이 절은 실제 유출 사고를 다루지 않고, 지원하는 도구로 생길 수 있는 흐름의 범위를 정한다. 실행 공간은 [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) 과 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
@@ -775,7 +775,7 @@ purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개�
 | 경계 | 넘을 때 판정하는 곳 | 판정하지 않는 것 |
 | --- | --- | --- |
 | 외부 서비스에서 모델로 | `fos-ctx` 의 `transform_tool_result` 가 감싼다. 판정은 아니다 | 글의 내용 |
-| 모델에서 커넥터 도구로 | `fos-ctx` 의 `pre_tool_call` 이 묻고 Control Plane 이 판정한다 | 인자의 내용과 그 글이 어디서 왔는지 |
+| 모델에서 플러그인 도구로 | `fos-ctx` 의 `pre_tool_call` 이 묻고 Control Plane 이 판정한다 | 인자의 내용과 그 글이 어디서 왔는지 |
 | 모델에서 Control Plane 도구로 | Control Plane 이 도구마다 판정한다 | 도구마다 다르다. 아래 「흐름 판정 표」 를 본다 |
 | 모델에서 셸, 웹, 브라우저로 | 없다. 도구를 켤 수 있는 등급만 있다 | 명령, 주소, 보낼 글 |
 | 셸에서 비밀값으로 | 실행 공간을 적용한 profile 에서는 비밀이 컨테이너에 없다 | 실행 공간을 적용하지 않은 profile |
@@ -785,18 +785,18 @@ purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개�
 
 | 수단 | 보장하는 것 | 보장하지 않는 것 |
 | --- | --- | --- |
-| `<external-data>` 감싸기 | 바인딩 profile 의 커넥터 도구 결과에 출처 안내와 닫는 표시 바꾸기를 붙인다. Hermes 의 `<untrusted_tool_result>` 가 그 바깥에 한 번 더 있다 | 모델이 그 글을 지시로 따르지 않는 것. hook 이 실패하면 감싸기 없이 원래 결과가 간다. 셸, 웹, 파일 도구의 결과와 커넥터 출력 파일은 감싸지 않는다 |
-| 커넥터 도구 판정 | 바인딩한 커넥터 서버의 도구만 지나간다. 선언 없는 도구와 열지 않은 위험도는 거절하고, 쓰기는 승인이나 상시 허락이 있어야 나간다. Control Plane 이 답하지 않거나 틀린 답을 주면 막는다 | 인자에 무엇이 실렸는지, 그 글이 다른 커넥터에서 왔는지. `fos-ctx` 가 꺼지거나 옛 버전이면 판정 없이 나간다. 그때 연결 확인이 바인딩을 `PENDING` 으로 둔다 |
+| `<external-data>` 감싸기 | 바인딩 profile 의 플러그인 도구 결과에 출처 안내와 닫는 표시 바꾸기를 붙인다. Hermes 의 `<untrusted_tool_result>` 가 그 바깥에 한 번 더 있다 | 모델이 그 글을 지시로 따르지 않는 것. hook 이 실패하면 감싸기 없이 원래 결과가 간다. 셸, 웹, 파일 도구의 결과와 플러그인 출력 파일은 감싸지 않는다 |
+| 플러그인 도구 판정 | 바인딩한 플러그인 서버의 도구만 지나간다. 선언 없는 도구와 열지 않은 위험도는 거절하고, 쓰기는 승인이나 상시 허락이 있어야 나간다. Control Plane 이 답하지 않거나 틀린 답을 주면 막는다 | 인자에 무엇이 실렸는지, 그 글이 다른 플러그인에서 왔는지. `fos-ctx` 가 꺼지거나 옛 버전이면 판정 없이 나간다. 그때 연결 확인이 바인딩을 `PENDING` 으로 둔다 |
 | 승인 카드 | 사람이 그 호출의 인자를 보고 정한다. 상시 허락을 닫은 도구는 가려지는 글이 있으면 승인하지 못한다 | 상시 허락이 있는 기간의 호출. 사람이 본문을 읽지 않고 누르는 것 |
 | 실행 공간 | 등록한 profile 의 셸, 파일 도구, `execute_code` 가 profile `.env`, 연결 보관 파일, 대응 파일, 다른 사용자의 파일에 닿지 않는다 | 밖으로 나가는 요청. 실행 공간을 적용하지 않은 profile. 컨테이너 밖에서 도는 web, browser 도구 |
 | 바인딩의 주인과 공개 범위 | 연결이 붙은 에이전트는 `PRIVATE` 이고 주인이 자기 연결만 붙인다. 남이 주인의 계정으로 외부 서비스를 부르지 못한다 | 주인 자신의 실행 안에서 글이 어디로 가는지 |
-| `memory_remember` 의 바깥 도구 확인 | 그 대화의 도구가 모두 안쪽 목록(`McpMemoryRemember.INTERNAL_TOOLS`)에 들 때만 바로 저장할 수 있다. 커넥터 도구, 웹, 하위 에이전트, `agent_status` 가 하나라도 있으면 제안으로 둔다. 나머지 조건은 [`docs/features/memory.md`](memory.md) 의 「바로 저장 판정」 이 갖는다 | 사건 저장이 실패해 도구 시작 줄이 빠진 대화 |
-| 도구 내용 가림 | 커넥터 도구의 입력과 결과는 실행 기록에 `[연결 도구 내용 가림]`만 남는다. 실행 트리에서 커넥터 호출 뒤에는 일반 도구 내용과 하위 에이전트 목표도 길이만 남긴다. 호출 전에는 비밀 모양을 가리고 길이를 자른다 | 이미 저장된 사건. 이전 turn에서 읽은 본문. Hermes가 보내기 전에 자른 원문 길이 |
+| `memory_remember` 의 바깥 도구 확인 | 그 대화의 도구가 모두 안쪽 목록(`McpMemoryRemember.INTERNAL_TOOLS`)에 들 때만 바로 저장할 수 있다. 플러그인 도구, 웹, 하위 에이전트, `agent_status` 가 하나라도 있으면 제안으로 둔다. 나머지 조건은 [`docs/features/memory.md`](memory.md) 의 「바로 저장 판정」 이 갖는다 | 사건 저장이 실패해 도구 시작 줄이 빠진 대화 |
+| 도구 내용 가림 | 플러그인 도구의 입력과 결과는 실행 기록에 `[연결 도구 내용 가림]`만 남는다. 실행 트리에서 플러그인 호출 뒤에는 일반 도구 내용과 하위 에이전트 목표도 길이만 남긴다. 호출 전에는 비밀 모양을 가리고 길이를 자른다 | 이미 저장된 사건. 이전 turn에서 읽은 본문. Hermes가 보내기 전에 자른 원문 길이 |
 
 ### 흐름 판정 코드
 
 코드는 이 문서의 표에서만 쓰는 이름이다. API 응답이나 DB 값이 아니다.
-`RISK_NOT_OPEN` 과 `READ_ONLY_RUN` 은 커넥터 판정의 `deny_reason` 과 같은 뜻이다.
+`RISK_NOT_OPEN` 과 `READ_ONLY_RUN` 은 플러그인 판정의 `deny_reason` 과 같은 뜻이다.
 
 | 코드 | 판정 | 뜻 |
 | --- | --- | --- |
@@ -808,39 +808,39 @@ purge는 메시지와 첨부를 정리하면서 두 커넥터 테이블의 개�
 | `PROPOSAL_ONLY` | 사용자 승인 | 제안으로만 남고 사람이 받아들여야 효력이 생긴다 |
 | `RISK_NOT_OPEN` | 거절 | 위험도가 `DESTRUCTIVE` 나 `FINANCIAL` 이라 늘 거절한다 |
 | `READ_ONLY_RUN` | 거절 | 사람이 보지 않는 먼저 살펴보기 트리라 승인 없는 READ 만 받는다 |
-| `NO_SESSION` | 거절 | 실행 맥락이 없는 커넥터 호출이다. `execute_code` 안의 호출이 여기 온다 |
+| `NO_SESSION` | 거절 | 실행 맥락이 없는 플러그인 호출이다. `execute_code` 안의 호출이 여기 온다 |
 | `CREDENTIAL_ABSENT` | 거절 | 실행 공간에 비밀값이 없어 닿을 것이 없다 |
 | `HIDDEN_ARGS` | 거절 | 상시 허락을 닫은 도구의 인자에 가려지는 글이 있어 승인해도 실행하지 않는다 |
 | `UNMEDIATED_EGRESS` | 통제 없음 | 호출마다 판정하는 곳이 없다. 도구를 켜는 등급과 사후 기록만 있다. 결정으로 감수한다 |
 
 ### 흐름 판정 표
 
-출처는 커넥터 READ 도구의 결과다. 예시는 Gmail 메일 본문이지만 가계부나 건강 기록처럼 민감한 READ 도 같다.
-판정은 출처를 보지 않으므로 어느 커넥터에서 읽었는지에 따라 달라지지 않는다.
+출처는 플러그인 READ 도구의 결과다. 예시는 Gmail 메일 본문이지만 가계부나 건강 기록처럼 민감한 READ 도 같다.
+판정은 출처를 보지 않으므로 어느 플러그인에서 읽었는지에 따라 달라지지 않는다.
 합성 테스트는 지어낸 메일 본문과 `example` 주소만 쓴다. 테스트 칸이 없다고 적힌 줄은 판정하는 곳이 이 저장소의 코드 밖에 있거나 운영 측정으로 확인한 줄이다.
 
 | 번호 | 흐름 | 판정 | 코드 | 판정하는 곳 | 합성 시험 |
 | --- | --- | --- | --- | --- | --- |
 | RF-01 | READ 결과가 모델 문맥으로 | 허용 | `WRAPPED_CONTEXT` | `fos-ctx` `transform_tool_result` | `test_read_data_flow` `test_read_result_reaches_model_inside_external_data`, `test_fos_ctx` `TransformToolResultTest` |
 | RF-02 | 최종 답과 대화 기록으로 | 허용 | `SAME_OWNER_SINK` | 대화 주인 확인 | 별도 시험 없음. 대화 읽기 권한 시험이 본다 |
-| RF-03 | 같은 커넥터의 밖으로 나가는 쓰기로 (메일 보내기, 답장) | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정. `outbound` 와 `"grant": false` | `ToolPolicyDecisionTest` 의 상시 허락을 닫은 도구 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
-| RF-04 | 다른 커넥터의 쓰기로, 상시 허락이나 그 대화의 대화 허락이 있을 때 (블로그 임시저장, 메일 초안) | 허용 | `STANDING_GRANT` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 상시 허락 허용 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
-| RF-05 | 다른 커넥터의 쓰기로, 상시 허락이 없거나 닫혔을 때 | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정 | `ToolPolicyDecisionTest` |
+| RF-03 | 같은 플러그인의 밖으로 나가는 쓰기로 (메일 보내기, 답장) | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정. `outbound` 와 `"grant": false` | `ToolPolicyDecisionTest` 의 상시 허락을 닫은 도구 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
+| RF-04 | 다른 플러그인의 쓰기로, 상시 허락이나 그 대화의 대화 허락이 있을 때 (블로그 임시저장, 메일 초안) | 허용 | `STANDING_GRANT` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 상시 허락 허용 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
+| RF-05 | 다른 플러그인의 쓰기로, 상시 허락이 없거나 닫혔을 때 | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정 | `ToolPolicyDecisionTest` |
 | RF-06 | `DESTRUCTIVE`, `FINANCIAL` 도구로 | 거절 | `RISK_NOT_OPEN` | Control Plane 판정. 설치가 모델에게서 뺀다 | `ToolPolicyDecisionTest` |
 | RF-07 | 먼저 살펴보기 트리 안에서 쓰기로 | 거절. 쓰기를 허용한 살펴보기는 사용자 승인 | `READ_ONLY_RUN`, `PER_CALL_APPROVAL` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 살펴보기 시험 |
 | RF-08 | 셸과 `execute_code` 를 거쳐 인터넷으로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 셸 계열은 관리자 등급이다 | `test_read_data_flow` `test_shell_web_and_browser_calls_are_not_inspected` |
-| RF-08a | `execute_code` 스크립트 안에서 커넥터 도구로 | 거절 | `NO_SESSION` | `fos-ctx` `pre_tool_call` | `test_read_data_flow` `test_connector_call_from_code_has_no_session_and_is_blocked` |
+| RF-08a | `execute_code` 스크립트 안에서 플러그인 도구로 | 거절 | `NO_SESSION` | `fos-ctx` `pre_tool_call` | `test_read_data_flow` `test_connector_call_from_code_has_no_session_and_is_blocked` |
 | RF-09 | `web` 도구의 검색어나 주소로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 연결이 붙은 에이전트에서도 `web`은 주인 등급으로 둔다. 숨은 지시로 본문이 검색어나 주소에 실려 나갈 수 있는 위험을 감당한다(2026-10-08 사용자 결정(#320)) | `test_read_data_flow` `test_shell_web_and_browser_calls_are_not_inspected` |
 | RF-10 | 내장 `browser` 도구의 주소로 | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 관리자 등급이고 profile 틀은 꺼 둔다 | `test_read_data_flow` `test_shell_web_and_browser_calls_are_not_inspected` |
 | RF-11 | 사용자 `/workspace` 의 파일로 | 허용 | `SAME_OWNER_SINK` | 실행 공간의 사용자 디렉터리 | 별도 시험 없음. 실행 공간 측정은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다 |
 | RF-12 | `artifact_write` 결과물로 | 허용 | `SAME_OWNER_SINK` | Control Plane. 대화 주인만 읽고 스크립트와 외부 이미지를 막는 머리글을 붙인다. 결과물 안의 링크는 사용자가 누르면 새 창으로 열린다 | `ArtifactTest` 의 머리글 시험과 남의 대화 시험, `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
-| RF-13 | `memory_remember` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 대화에 바깥 도구가 있으면 제안이다 | `McpMemoryRememberToolTest` 의 커넥터 READ 시험과 바깥 도구 시험 |
+| RF-13 | `memory_remember` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 대화에 바깥 도구가 있으면 제안이다 | `McpMemoryRememberToolTest` 의 플러그인 READ 시험과 바깥 도구 시험 |
 | RF-14 | `follow_up_propose` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 사람이 받아들여야 할 일이 된다 | `McpFollowUpToolTest` |
 | RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 연결이 붙은 에이전트의 결과는 돌아올 때 `ExternalData` 로 감싼다(`McpToolService`, `ChatDeliveryInput`) | `SAME_OWNER_SINK` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의이고 대상 에이전트의 도구로 돈다. 그 도구로 가는 흐름은 이 표의 다른 줄이 정한다. 결과는 다음 turn 전달과 `agent_status` 두 길로 돌아온다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
-| RF-16 | 실행 기록의 도구 내용으로 | 허용(가림). 트리에서 커넥터 호출 뒤에는 일반 도구도 이름과 받은 내용의 길이만 남긴다(#319) | `REDACTED_RECORD` | `ToolDetailRedactor`, `HermesRunEventStream`. 커넥터 정책 기록으로 루트와 자식, 형제를 함께 확인한다. 이력 조회 실패도 가린다 | `ToolDetailRedactorTest`의 다른 도구 인자 시험, `ToolDetailEventStreamTest`의 호출 전후와 트리 이력 시험, `ConnectorCallHistoryTest` |
+| RF-16 | 실행 기록의 도구 내용으로 | 허용(가림). 트리에서 플러그인 호출 뒤에는 일반 도구도 이름과 받은 내용의 길이만 남긴다(#319) | `REDACTED_RECORD` | `ToolDetailRedactor`, `HermesRunEventStream`. 플러그인 정책 기록으로 루트와 자식, 형제를 함께 확인한다. 이력 조회 실패도 가린다 | `ToolDetailRedactorTest`의 다른 도구 인자 시험, `ToolDetailEventStreamTest`의 호출 전후와 트리 이력 시험, `ConnectorCallHistoryTest` |
 | RF-17 | 승인 줄로 | 허용 | `SAME_OWNER_SINK` | 승인 줄에 인자 원문이 `ToolPolicyDecision.MAX_ARGS_BYTES` 까지, 결과 글이 남는다. 주인 화면은 가린 인자를 받는다 | `ConnectorActionServiceTest` |
 | RF-18 | `fos-ctx` 와 backend 로그로 | 허용(가림) | `REDACTED_RECORD` | hook 은 인자와 결과 본문을 로그에 남기지 않는다. backend 는 도구 인자와 결과를 로그에 남기는 줄이 없다(코드 확인, 시험 없음). Hermes core 의 로그는 확인하지 않았다 | `test_fos_ctx` 의 `test_logs_hide_token_signature_and_args`, `test_unreadable_tool_map_returns_none_without_leaking` |
-| RF-19 | 커넥터 출력 파일로 | 허용 | `SAME_OWNER_SINK` | 그 profile 의 실행 공간에만 읽기 전용으로 붙는다. 셸이 읽은 뒤는 RF-08 과 같다 | `test_dashboard_profile_api_connector_binding_output`, `test_dashboard_profile_api_sandbox_terminal` 의 출력 디렉터리 읽기 전용 시험 |
+| RF-19 | 플러그인 출력 파일로 | 허용 | `SAME_OWNER_SINK` | 그 profile 의 실행 공간에만 읽기 전용으로 붙는다. 셸이 읽은 뒤는 RF-08 과 같다 | `test_dashboard_profile_api_connector_binding_output`, `test_dashboard_profile_api_sandbox_terminal` 의 출력 디렉터리 읽기 전용 시험 |
 | RF-20 | 모델 공급자로 | 허용 | `WRAPPED_CONTEXT` | 없다. 대화에 쓰인 글은 요청의 일부다([`privacy.md`](../privacy.md)) | 해당 없음 |
 | RF-21 | 그 밖의 주인 등급 도구로 (`vision`, `tts`) | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. `vision_analyze`는 모델이 준 HTTP(S) 주소를 Hermes에서 내려받는다. 주소 안전성과 사이트 정책 검사는 READ 본문 반출을 판정하지 않으므로 RF-09와 같은 길이다 | Hermes v0.21.5 소스 확인(2026-10-08). 아래 근거를 본다 |
 | RF-22 | 그 밖의 관리자 등급 도구로 (`image_gen`, `video_gen`, `discord`, `homeassistant`, `spotify`, `computer_use`, `cronjob`, `session_search`) | 통제 없음 | `UNMEDIATED_EGRESS` | 없다. 관리자가 켠다. `cronjob` 은 글을 Hermes 예약 작업에 오래 남기고 그 작업은 local 로 돈다(RC-02) | 해당 없음 |
@@ -864,13 +864,13 @@ RF-21의 근거는 Hermes v0.21.5(태그 `v2026.9.24`)의 소스다.
 
 정한 계약과 달라 고칠 것이다.
 이전 turn 의 본문은 판정 표의 줄로 두지 않는다. 한 실행 안의 흐름이 아니라 이전 turn 에 걸린 틈이기 때문이다.
-커넥터 호출 뒤 일반 도구와 하위 에이전트 목표는 가리지만, 새 실행 트리는 이전 turn에서 읽은 본문까지 추적하지 않고 이미 저장된 사건도 다시 가리지 않는다. 대화 이력을 포함한 가림 범위는 별도 결정이 필요하다.
+플러그인 호출 뒤 일반 도구와 하위 에이전트 목표는 가리지만, 새 실행 트리는 이전 turn에서 읽은 본문까지 추적하지 않고 이미 저장된 사건도 다시 가리지 않는다. 대화 이력을 포함한 가림 범위는 별도 결정이 필요하다.
 
 | 실행 공간이 해결한 것 | 남은 것 |
 | --- | --- |
 | 등록한 profile 의 셸, 파일 도구, `execute_code` 가 profile `.env`, 연결 보관 파일, 대응 파일, `fos-ctx` 설정에 닿지 않는다. 셸로 승인을 비켜 가는 세 길(토큰 직접 사용, 대응 파일 고치기, hook 끄기)이 막힌다 | 밖으로 나가는 요청을 막지 않는다. 승인 없이 부른 READ 결과를 셸이 인터넷으로 보낼 수 있다(RF-08) |
 | 다른 사용자의 `/workspace` 와 첨부가 보이지 않는다 | 같은 사용자의 에이전트끼리는 `/workspace` 를 함께 쓴다. 웹 도구가 없는 에이전트가 쓴 파일을 셸이 있는 다른 에이전트가 읽어 보낼 수 있다 |
-| `execute_code` 안에서 커넥터 도구를 부르지 못한다(RF-08a) | web 과 browser 도구는 컨테이너 밖 Hermes 프로세스에서 돈다. 실행 공간과 상관없이 RF-09, RF-10 이 남는다 |
+| `execute_code` 안에서 플러그인 도구를 부르지 못한다(RF-08a) | web 과 browser 도구는 컨테이너 밖 Hermes 프로세스에서 돈다. 실행 공간과 상관없이 RF-09, RF-10 이 남는다 |
 | 스킬 앞머리로 값을 넣는 길을 저장 때 막는다(RC-03) | 정책에 등록하지 않은 profile 과 기존 Hermes 예약 작업은 local 로 돈다. 그곳에서는 RC-02 가 남는다 |
 | | 운영자가 읽기 전용으로 붙인 token 파일은 그 실행 공간에서 셸이 읽는다 |
 

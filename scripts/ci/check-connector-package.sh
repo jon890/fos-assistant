@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT
 mkdir "$work/original"
 for connector in hermes/connectors/*/; do
-  [ -f "$connector/connector.json" ] || continue
+  [ -f "$connector/assistant.json" ] || continue
   id="$(basename "$connector")"
   connectors+=("$id")
   entry="$connector/dist/$id-mcp.js"

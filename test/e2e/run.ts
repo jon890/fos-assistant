@@ -136,7 +136,7 @@ const SCENARIOS: readonly Scenario[] = [
   // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
   delegationScenario,
   agentLifecycleScenario,
-  // 커넥터 시나리오들은 저마다 연결을 등록하고 붙일 에이전트를 만들며, 그 에이전트를 지우고 연결을 해제하는 것으로 끝난다.
+  // 플러그인 시나리오들은 저마다 연결을 등록하고 붙일 에이전트를 만들며, 그 에이전트를 지우고 연결을 해제하는 것으로 끝난다.
   // 지운 에이전트가 목록에서 빠지지만 에이전트 수를 세는 시나리오 뒤에 둔다.
   connectorScenario,
   connectorBindingScenario,
@@ -146,7 +146,7 @@ const SCENARIOS: readonly Scenario[] = [
   deliveryRetryScenario,
   // 승인이 필요한 도구를 예약 turn 에서 부르므로 알림 시나리오와 같은 준비를 쓴다.
   scheduledTaskScenario,
-  // 시험 커넥터를 다시 등록해 쓰고 해제로 끝나므로 커넥터 시나리오들 뒤에 둔다. 도구 호출 상한을 바꿔 Control Plane 을 다시 띄웠다가
+  // 시험 플러그인을 다시 등록해 쓰고 해제로 끝나므로 플러그인 시나리오들 뒤에 둔다. 도구 호출 상한을 바꿔 Control Plane 을 다시 띄웠다가
   // 기본값으로 되돌려 다시 띄운다.
   proactiveCheckScenario,
   // 에이전트를 하나 만들고 끄므로 에이전트 수를 세는 시나리오 뒤에 둔다.
@@ -155,7 +155,7 @@ const SCENARIOS: readonly Scenario[] = [
   busyScenario,
   // 실패한 turn 을 하나 더 남기므로 사용량 합계를 세는 시나리오 뒤에 둔다.
   attentionScenario,
-  // snapshot 커넥터를 붙인 에이전트를 만들고 지우며 끝에 Control Plane 을 다시 띄운다. turn 을 돌리므로 막힌 provider 보다 앞에 둔다.
+  // snapshot 플러그인을 붙인 에이전트를 만들고 지우며 끝에 Control Plane 을 다시 띄운다. turn 을 돌리므로 막힌 provider 보다 앞에 둔다.
   contentSnapshotSaveScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 turn 을 돌리는 시나리오 가운데 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
   modelSelectionScenario,
@@ -256,7 +256,7 @@ function startControlPlane(
       // 민감 Memory 문서를 만드는 시나리오가 쓴다. 운영 값이 아니라 글자 0123456789abcdef0123456789abcdef 의 base64 다.
       ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
       ASSISTANT_MEMORY_ENCRYPTION_KEYS: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
-      // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
+      // 검사는 같은 사용자로 짧은 시간에 플러그인을 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       // 답이 없는 승인 요청이 만료되는 것을 기본값 24시간을 기다리지 않고 본다. 승인과 거절을 보는 단계는
       // 요청을 만든 직후에 답하므로 이 시간 안에 끝난다. 만료 정리도 1분이 아니라 1초마다 돌린다.

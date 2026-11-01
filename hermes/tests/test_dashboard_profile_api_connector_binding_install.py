@@ -12,7 +12,7 @@ import dashboard_profile_api_support as support
 
 class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
     def test_binding_two_connectors_adds_their_names_and_keeps_the_profile(self):
-        """두 커넥터를 차례로 붙이면 도구 목록에 서버 이름만 더해지고 Control Plane MCP 와 SOUL.md 는 그대로이며 스킬이 생긴다."""
+        """두 플러그인을 차례로 붙이면 도구 목록에 서버 이름만 더해지고 Control Plane MCP 와 SOUL.md 는 그대로이며 스킬이 생긴다."""
         demo, other = self.bind_fixture()
         before = self.alice_config()
         catalog = {entry["id"]: entry["skills"] for entry in
@@ -141,7 +141,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
                 self.assertTrue(disabled[-1].startswith("fos-skill-index-"), disabled)
 
     def test_changing_one_connector_leaves_the_other_binding_of_the_profile_usable(self):
-        """한 커넥터의 실행 정의가 바뀌어도 같은 profile 의 다른 바인딩은 조회, probe, 실행, 다시 붙이기가 되고 바뀐 항목만 쓸 수 없다."""
+        """한 플러그인의 실행 정의가 바뀌어도 같은 profile 의 다른 바인딩은 조회, probe, 실행, 다시 붙이기가 되고 바뀐 항목만 쓸 수 없다."""
         _, other = self.bind_fixture()
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
         self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
@@ -166,7 +166,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
             for plugin, tool in ((DEMO, "mcp__demo__write_note"), (OTHER, "mcp__other__write_note")):
                 self.request("/api/connectors/%s/execute" % plugin, "POST", token="valid", full_response=True,
                              body={"profile": "alice", "hermes_tool": tool, "args": {}})
-        # 바뀐 커넥터는 자식을 띄우기 전에 멈춘다.
+        # 바뀐 플러그인은 자식을 띄우기 전에 멈춘다.
         self.assertEqual(ran, [DEMO])
 
         self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
@@ -187,7 +187,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         return status, [call.args[0] % call.args[1:] for call in warning.call_args_list]
 
     def test_stale_tools_exclude_marks_only_that_connector_unconfigured(self):
-        """승인 방식만 올라 서버 정의의 `tools.exclude` 만 어긋나면 그 커넥터 항목만 거짓이고 같은 profile 의 다른 바인딩과 hook 은 참이다."""
+        """승인 방식만 올라 서버 정의의 `tools.exclude` 만 어긋나면 그 플러그인 항목만 거짓이고 같은 profile 의 다른 바인딩과 hook 은 참이다."""
         demo, _ = self.bind_fixture()
         self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE", "outbound": False}})
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
@@ -215,7 +215,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertIs(status["policy_hook"], True)
 
     def test_added_tool_marks_only_that_connector_unconfigured(self):
-        """도구가 더해져 이름 대응의 그 서버 `tools` 만 계산한 것과 다르면 그 커넥터 항목만 거짓이고 hook 은 참이다."""
+        """도구가 더해져 이름 대응의 그 서버 `tools` 만 계산한 것과 다르면 그 플러그인 항목만 거짓이고 hook 은 참이다."""
         demo, _ = self.bind_fixture()
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
         self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
@@ -293,7 +293,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(self.bind().status_code, 200)
 
     def test_binding_a_vision_connector_leaves_builtin_tools_and_terminal_to_the_agent(self):
-        """사진 도구를 선언한 커넥터도 바인딩은 실행 공간 정책 없이 붙고 내장 도구와 `terminal:` 을 바꾸지 않는다."""
+        """사진 도구를 선언한 플러그인도 바인딩은 실행 공간 정책 없이 붙고 내장 도구와 `terminal:` 을 바꾸지 않는다."""
         self.bind_fixture()
         manifest = self.root.parent / "demo-connector/connector.json"
         declared = json.loads(manifest.read_text(encoding="utf-8"))
@@ -310,7 +310,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(config.get("terminal"), before.get("terminal"))
 
     def test_sandbox_required_connector_is_rejected_without_a_policy(self):
-        """실행 공간 정책이 없으면 `sandbox_required` 커넥터의 바인딩 설치는 409 `sandbox_unavailable` 이고 profile 파일이 그대로다."""
+        """실행 공간 정책이 없으면 `sandbox_required` 플러그인의 바인딩 설치는 409 `sandbox_unavailable` 이고 profile 파일이 그대로다."""
         demo, _ = self.bind_fixture()
         self.declare_sandbox_required(demo)
         before = self.tree("alice")
@@ -356,7 +356,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertIs(self.status_of()["connectors"][0]["configured"], True)
 
     def test_connector_without_the_declaration_binds_without_a_policy(self):
-        """`sandbox_required` 를 선언하지 않은 커넥터는 정책이 없어도 지금처럼 붙는다."""
+        """`sandbox_required` 를 선언하지 않은 플러그인은 정책이 없어도 지금처럼 붙는다."""
         self.bind_fixture()
 
         with self.without_environment("FOS_ASSISTANT_SANDBOX"):
@@ -368,7 +368,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
                          {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
 
     def test_rebinding_an_owned_connector_is_accepted_while_the_policy_hook_is_off(self):
-        """이미 붙은 커넥터를 다시 설치하는 것은 fos-ctx 가 꺼져 있어도 받고, hook 상태는 거짓으로 남는다."""
+        """이미 붙은 플러그인을 다시 설치하는 것은 fos-ctx 가 꺼져 있어도 받고, hook 상태는 거짓으로 남는다."""
         self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
         config = self.alice_config()
@@ -378,7 +378,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertIs(self.status_of()["policy_hook"], False)
 
     def test_profile_with_only_the_connector_marker_takes_bindings_only(self):
-        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치와 떼기만 받는다."""
+        """플러그인 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치와 떼기만 받는다."""
         self.bind_fixture()
         self.host_profile()
 
@@ -414,7 +414,7 @@ BROWSER_ADDRESS = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 
 
 
 class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
-    """`owner_browser_env` 를 선언한 커넥터의 바인딩 설치를 검사한다(ADR-20261008 browser-gateway-token)."""
+    """`owner_browser_env` 를 선언한 플러그인의 바인딩 설치를 검사한다(ADR-20261008 browser-gateway-token)."""
 
     def test_binding_writes_the_relay_address_into_the_server_definition(self):
         """받은 중계 주소를 서버 정의 env 에 넣고 `.env` 에는 쓰지 않는다. 같은 주소로 다시 설치하면 재시작이 필요 없다."""
@@ -454,7 +454,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
                 self.assertIs(self.status_of()["connectors"][0]["configured"], True)
 
     def test_connector_without_the_declaration_ignores_the_address(self):
-        """선언하지 않은 커넥터는 주소를 받아도 서버 정의 env 에 이름을 더하지 않는다."""
+        """선언하지 않은 플러그인은 주소를 받아도 서버 정의 env 에 이름을 더하지 않는다."""
         self.bind_fixture()
 
         response = self.bind(browser=BROWSER_ADDRESS)
@@ -481,7 +481,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
     def test_rebinding_removes_the_env_line_of_a_field_no_longer_declared(self):
         """옛 소유 기록이 참조하던 칸이 지금 manifest 에 없으면 다시 붙일 때 그 `.env` 줄을 지운다.
 
-        브라우저 주소를 연결 칸으로 받던 커넥터가 중계 주소를 받도록 바뀐 profile 이다. 옛 주소 줄이 남지 않는다.
+        브라우저 주소를 연결 칸으로 받던 플러그인이 중계 주소를 받도록 바뀐 profile 이다. 옛 주소 줄이 남지 않는다.
         """
         demo, _ = self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
@@ -524,7 +524,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertEqual(written.status_code, 400)
 
     def remote_fixture(self):
-        """시험 커넥터 하나와 원격 MCP 플러그인을 운영 목록에 올리고 원격 플러그인의 보관 파일 `c3` 을 둔다."""
+        """시험 플러그인 하나와 원격 MCP 플러그인을 운영 목록에 올리고 원격 플러그인의 보관 파일 `c3` 을 둔다."""
         self.connector_fixture()
         remote = remote_connector(self.root.parent / "remote-connector")
         roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])

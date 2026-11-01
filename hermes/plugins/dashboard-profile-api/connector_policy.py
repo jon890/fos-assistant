@@ -1,4 +1,4 @@
-"""커넥터 입력 칸, 도구 정책, 오류 계약을 검증한다."""
+"""플러그인 입력 칸, 도구 정책, 오류 계약을 검증한다."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from .connector_schema import (
 
 
 def _connector_fields(declared) -> list:
-    """`connector.json` 의 `fields` 를 검증한다. 틀리면 예외다.
+    """`assistant.json` 의 `fields` 를 검증한다. 틀리면 예외다.
 
     빈 목록도 받는다. 값을 받지 않는 일반 MCP 서버가 입력 칸 없이 카탈로그에 오르는 길이다(ADR-083).
     """
@@ -125,7 +125,7 @@ def _default_tool_policy(declared: dict) -> str:
 
 
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers"}}` 로 낸다.
+    """`assistant.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers"}}` 로 낸다.
 
     틀리면 예외다.
 

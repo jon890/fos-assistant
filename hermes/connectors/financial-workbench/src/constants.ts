@@ -36,7 +36,7 @@ export const PAGE_SIZE_MAX = 50;
 // 워크벤치가 받는 요청 본문의 상한(64KiB)이다. 넘으면 부르지 않는다.
 export const REQUEST_MAX_BYTES = 64 * 1024;
 export const RESPONSE_MAX_BYTES = 4 * 1024 * 1024;
-// 워크벤치는 상세의 속성 글을 자르지 않는다. 한 칸이 모델 입력을 다 차지하지 않게 커넥터가 자른다.
+// 워크벤치는 상세의 속성 글을 자르지 않는다. 한 칸이 모델 입력을 다 차지하지 않게 플러그인이 자른다.
 export const TEXT_MAX_CHARS = 20_000;
 // 대시보드가 확인 도구를 기다리는 시간(10초)보다 짧게 둔다.
 export const TIMEOUT_MS = 8_000;

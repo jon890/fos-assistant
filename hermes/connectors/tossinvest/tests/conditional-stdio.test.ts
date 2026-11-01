@@ -11,7 +11,7 @@ import {
   sensitiveMarker,
 } from "./conditional-boundary-fixture.ts";
 import { buildBundle } from "../scripts/build.ts";
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import canonical from "./fixtures/openapi-1.2.24.json";
 import { FakeToss, accountNo, credentials, tool } from "./support.ts";
 

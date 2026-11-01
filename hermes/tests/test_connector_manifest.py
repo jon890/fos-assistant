@@ -31,7 +31,7 @@ CATALOG = "/api/connectors/catalog"
 
 
 class ConnectorGateCase(unittest.TestCase):
-    """가짜 Hermes 모듈로 plugin 을 불러와 토큰 미들웨어를 거쳐 커넥터 경로를 부른다.
+    """가짜 Hermes 모듈로 plugin 을 불러와 토큰 미들웨어를 거쳐 플러그인 경로를 부른다.
 
     검사 메서드는 없다. 카탈로그 검사와 도구 호출 검사가 이 준비를 함께 쓴다.
     응답은 실제 starlette 의 것이다. `mcp` SDK 가 starlette 를 함께 설치한다.
@@ -98,7 +98,7 @@ class ConnectorGateCase(unittest.TestCase):
             os.environ[COMMAND_ENV] = command
 
     def rewrite(self, name, change):
-        """시험 커넥터 사본의 JSON 파일 하나를 고쳐 쓴다."""
+        """시험 플러그인 사본의 JSON 파일 하나를 고쳐 쓴다."""
         path = self.connector_root / name
         value = json.loads(path.read_text(encoding="utf-8"))
         change(value)
@@ -164,7 +164,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(self.catalog(), [])
 
     def test_catalog_lists_the_validated_connector_without_operator_values(self):
-        """시험 커넥터가 카탈로그에 나오고, 칸의 env 와 확인 도구가 있고, 운영자 env 의 이름과 값이 없다."""
+        """시험 플러그인이 카탈로그에 나오고, 칸의 env 와 확인 도구가 있고, 운영자 env 의 이름과 값이 없다."""
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
@@ -173,7 +173,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
                                       "owner_browser_login_url", "tools", "skills", "unknown_errors"})
         # 글로 선언한 `outcome_unknown` 코드는 재시도 식별자 칸이 없다.
         self.assertEqual(entry["unknown_errors"], {"DEMO_UNKNOWN": None})
-        # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
+        # `icon` 과 `link` 를 선언하지 않은 플러그인은 두 칸이 null 이다.
         self.assertIsNone(entry["icon"])
         self.assertIsNone(entry["link"])
         self.assertIsNone(entry["readme_url"])
@@ -198,7 +198,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(self.request(CATALOG, "POST")[0], 401)
 
     def test_catalog_is_empty_without_operator_list(self):
-        """운영 목록이 없으면 커넥터가 하나도 없다."""
+        """운영 목록이 없으면 플러그인이 하나도 없다."""
         self.operator_list({})
         self.assertEqual(self.catalog(), [])
         self.assertIsNone(self.plugin._connector_manifest(DEMO))
@@ -210,7 +210,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(self.catalog()[0]["unknown_errors"], {"DEMO_UNKNOWN": "attemptId"})
 
     def test_invalid_manifest_is_left_out_without_raising(self):
-        """manifest 검증이 하나라도 실패하면 그 커넥터는 카탈로그에서 빠지고 예외가 나지 않는다."""
+        """manifest 검증이 하나라도 실패하면 그 플러그인은 카탈로그에서 빠지고 예외가 나지 않는다."""
         def field(index):
             return lambda value: value["fields"][index]
 
@@ -327,7 +327,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
                 (self.connector_root / ".mcp.json").write_bytes(original)
 
     def test_operator_secrets_are_rejected_as_unsupported(self):
-        """`operator_secrets` 를 선언한 커넥터는 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""
+        """`operator_secrets` 를 선언한 플러그인은 카탈로그에서 빠지고 까닭이 경고 로그에 남는다. 빈 목록은 통과한다."""
         original = (self.connector_root / "connector.json").read_bytes()
         self.rewrite("connector.json", lambda value: value.update(operator_secrets=["DEMO_SERVICE_KEY"]))
         # 준비가 로그를 꺼 둔다. 경고를 읽는 동안만 켠다.
@@ -365,7 +365,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertIs(manifest["sandbox_required"], True)
 
     def test_binding_guard_declaration_that_is_not_a_boolean_leaves_the_connector_out(self):
-        """두 칸 가운데 하나라도 boolean 이 아니면 그 커넥터는 카탈로그에서 빠지고 예외가 나지 않는다."""
+        """두 칸 가운데 하나라도 boolean 이 아니면 그 플러그인은 카탈로그에서 빠지고 예외가 나지 않는다."""
         original = (self.connector_root / "connector.json").read_bytes()
         for label, change in (
             ("single_binding is a string", lambda value: value.update(single_binding="true")),
@@ -432,7 +432,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.assertEqual(self.catalog(), [])
 
     def test_command_must_be_executable(self):
-        """실행 파일을 받지 못했거나 실행 권한이 없으면 그 커넥터는 쓸 수 없다."""
+        """실행 파일을 받지 못했거나 실행 권한이 없으면 그 플러그인은 쓸 수 없다."""
         entry = {"root": str(self.connector_root), "env": {"DEMO_BASE": DEMO_BASE}}
         self.operator_list({DEMO: entry})
         self.assertEqual(self.catalog(), [])
@@ -448,7 +448,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
 
     def test_operator_list_accepts_string_and_object_entries(self):
         """운영 목록의 문자열 모양과 object 모양을 둘 다 읽어 카탈로그로 낸다."""
-        # 문자열 모양은 운영자 env 를 줄 자리가 없다. 운영자 env 가 없는 커넥터를 하나 더 만든다.
+        # 문자열 모양은 운영자 env 를 줄 자리가 없다. 운영자 env 가 없는 플러그인을 하나 더 만든다.
         plain_root = self.base / "plain-connector"
         shutil.copytree(DEMO_CONNECTOR, plain_root)
         for name, change in (
@@ -473,7 +473,7 @@ class ConnectorCatalogTest(ConnectorGateCase):
 
 
 class ConnectorOwnerAttachmentsTest(ConnectorGateCase):
-    """사용자 첨부를 읽는 커넥터가 `owner_attachments_env` 를 선언하는 규칙을 검사한다(ADR-20261007 connector-owner-attachments)."""
+    """사용자 첨부를 읽는 플러그인이 `owner_attachments_env` 를 선언하는 규칙을 검사한다(ADR-20261007 connector-owner-attachments)."""
 
     NAME = "DEMO_ATTACHMENT_DIR"
 
@@ -489,7 +489,7 @@ class ConnectorOwnerAttachmentsTest(ConnectorGateCase):
         self.declare()
         manifest = self.plugin._connector_manifest(DEMO)
         self.assertEqual(manifest["owner_attachments_env"], self.NAME)
-        # 주인을 모르는 설치는 빈 값 그대로라 커넥터가 사용자 첨부를 읽지 않는다. profile `.env` 참조가 아니다.
+        # 주인을 모르는 설치는 빈 값 그대로라 플러그인이 사용자 첨부를 읽지 않는다. profile `.env` 참조가 아니다.
         self.assertEqual(manifest["server"]["env"][self.NAME], "")
         body = self.catalog()
         self.assertEqual([entry["id"] for entry in body], [DEMO])
@@ -528,7 +528,7 @@ class ConnectorOwnerAttachmentsTest(ConnectorGateCase):
 
 
 class ConnectorOwnerOutputTest(ConnectorGateCase):
-    """목록을 파일로 내는 커넥터가 `owner_output_env` 를 선언하는 규칙을 검사한다(ADR-20261008 connector-output-files)."""
+    """목록을 파일로 내는 플러그인이 `owner_output_env` 를 선언하는 규칙을 검사한다(ADR-20261008 connector-output-files)."""
 
     NAME = "DEMO_OUTPUT_DIR"
 
@@ -579,7 +579,7 @@ class ConnectorOwnerOutputTest(ConnectorGateCase):
 
 
 class ConnectorOwnerBrowserTest(ConnectorGateCase):
-    """사용자 브라우저를 쓰는 커넥터가 `owner_browser_env` 와 로그인 안내 주소를 선언하는 규칙을 검사한다(ADR-20261008 browser-gateway-token)."""
+    """사용자 브라우저를 쓰는 플러그인이 `owner_browser_env` 와 로그인 안내 주소를 선언하는 규칙을 검사한다(ADR-20261008 browser-gateway-token)."""
 
     NAME = "DEMO_BROWSER_URL"
     LOGIN = "https://login.example.test/sign-in"
@@ -683,10 +683,10 @@ class ConnectorOwnerBrowserTest(ConnectorGateCase):
 
 
 class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
-    """입력 칸이 없는 커넥터와, 바인딩 설치가 복사할 스킬을 카탈로그로 내는 규칙을 검사한다(ADR-083)."""
+    """입력 칸이 없는 플러그인과, 바인딩 설치가 복사할 스킬을 카탈로그로 내는 규칙을 검사한다(ADR-083)."""
 
     def without_fields(self):
-        """시험 커넥터의 칸을 모두 뺀다. `.mcp.json` 의 env 에는 운영자 env 만 남는다."""
+        """시험 플러그인의 칸을 모두 뺀다. `.mcp.json` 의 env 에는 운영자 env 만 남는다."""
         self.rewrite("connector.json", lambda value: value.update(fields=[]))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(env={"DEMO_BASE": "${DEMO_BASE}"}))
 
@@ -747,7 +747,7 @@ class ConnectorFieldlessAndSkillTest(ConnectorGateCase):
             (skill / "references/link.md").symlink_to(outside)
 
         def link_outside_copied_parts():
-            # 복사하지 않는 자리의 링크도 거절한다. 그 아래 어느 항목이든 링크이면 그 커넥터를 내지 않는다.
+            # 복사하지 않는 자리의 링크도 거절한다. 그 아래 어느 항목이든 링크이면 그 플러그인을 내지 않는다.
             (skill / "notes.md").symlink_to(outside)
 
         def name(value):
@@ -800,7 +800,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
     """`schema: 2` 의 도구 정책을 검증해 카탈로그로 내는 규칙을 검사한다(ADR-049)."""
 
     def declare(self, change=lambda tools: None, **extra):
-        """시험 커넥터를 `schema: 2` 로 바꾼다. 기준 선언에 `change` 를 입히고 `extra` 를 manifest 에 더한다."""
+        """시험 플러그인을 `schema: 2` 로 바꾼다. 기준 선언에 `change` 를 입히고 `extra` 를 manifest 에 더한다."""
         tools = {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "READ"}, "write_note": {"risk": "WRITE", "outbound": False}}
         change(tools)
         self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools, **extra))
@@ -825,7 +825,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
 
     def test_toss_stock_tools_are_read_without_approval_or_grant(self):
         """실제 종목 참조 선언을 카탈로그 reader로 읽어 READ/none을 확인한다."""
-        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        declared = json.loads((ROOT / "connectors/tossinvest/assistant.json").read_text())
         names = {"get_stocks", "list_stocks", "get_stock_warnings"}
         tools = {"list_scopes": {"risk": "READ"}, **{name: declared["tools"][name] for name in names}}
         self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
@@ -838,7 +838,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
 
     def test_toss_read_union_preserves_descriptions_and_read_policy(self):
         """조회 합집합 33개를 실제 reader로 읽어 설명을 보존하고, 금융 셋은 주문 준비와 주문, 취소만 둔다."""
-        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        declared = json.loads((ROOT / "connectors/tossinvest/assistant.json").read_text())
         trading = {"prepare_trade": "READ", "create_order": "FINANCIAL", "cancel_order": "FINANCIAL"}
         names = {
             "list_accounts", "get_quotes", "get_holdings", "get_buying_power", "list_orders",
@@ -979,7 +979,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertEqual(tools["env_view"]["identifiers"], [])
 
     def test_invalid_identifiers_leave_the_connector_out(self):
-        """틀린 `identifiers` 는 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다(ADR-089)."""
+        """틀린 `identifiers` 는 고쳐 읽지 않고 그 플러그인을 카탈로그에서 뺀다(ADR-089)."""
         cases = (
             ("not a list", "note_id"),
             ("not a string item", [1]),
@@ -1025,7 +1025,7 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertNotIn("default_tool_policy", self.catalog()[0])
 
     def test_invalid_tool_policy_leaves_the_connector_out(self):
-        """도구 정책이 하나라도 틀리면 고쳐 읽지 않고 그 커넥터를 카탈로그에서 뺀다."""
+        """도구 정책이 하나라도 틀리면 고쳐 읽지 않고 그 플러그인을 카탈로그에서 뺀다."""
         cases = (
             ("write below the floor", lambda: self.declare(
                 lambda tools: tools.update(write_note={"risk": "WRITE", "approval": "none", "outbound": False}))),
@@ -1177,9 +1177,9 @@ REJECTED_LINKS = (
 
 
 class ConnectorAppearanceTest(ConnectorGateCase):
-    """커넥터 카드의 `icon` 과 `link` 를 검증해 카탈로그에 싣는 규칙을 검사한다(ADR-20261008 connector-card).
+    """플러그인 카드의 `icon` 과 `link` 를 검증해 카탈로그에 싣는 규칙을 검사한다(ADR-20261008 connector-card).
 
-    `icon` 이나 `link` 가 규칙을 하나라도 어기면 그 칸만 null 이고 커넥터는 카탈로그에 그대로 나온다.
+    `icon` 이나 `link` 가 규칙을 하나라도 어기면 그 칸만 null 이고 플러그인은 카탈로그에 그대로 나온다.
     """
 
     def declare(self, **values):
@@ -1199,7 +1199,7 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         return body[0]["icon"]
 
     def catalog_entry(self):
-        """카탈로그에 시험 커넥터 하나만 있음을 확인하고 그 항목을 돌려준다."""
+        """카탈로그에 시험 플러그인 하나만 있음을 확인하고 그 항목을 돌려준다."""
         body = self.catalog()
         self.assertEqual([entry["id"] for entry in body], [DEMO])
         return body[0]
@@ -1280,7 +1280,7 @@ class ConnectorAppearanceTest(ConnectorGateCase):
                 self.assertEqual(self.catalog_entry()["link"], link)
 
     def test_links_outside_the_link_shape_are_dropped(self):
-        """링크 모양을 벗어난 링크는 그 칸만 null 이고 아이콘과 커넥터는 남는다."""
+        """링크 모양을 벗어난 링크는 그 칸만 null 이고 아이콘과 플러그인은 남는다."""
         icon = (DEMO_CONNECTOR / "icon.svg").read_bytes()
         expected_icon = {"media_type": "image/svg+xml", "data": base64.b64encode(icon).decode("ascii")}
         for link in REJECTED_LINKS:
@@ -1293,7 +1293,7 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         self.assertIsNone(self.catalog_entry()["link"])
 
     def test_invalid_icon_drops_only_the_icon(self):
-        """아이콘의 경로, 크기, 형식이 하나라도 틀리면 아이콘 칸만 null 이고 링크와 커넥터는 남는다."""
+        """아이콘의 경로, 크기, 형식이 하나라도 틀리면 아이콘 칸만 null 이고 링크와 플러그인은 남는다."""
         outside = self.base / "outside.svg"
         outside.write_bytes(svg())
         link = "https://example.com/notes"
@@ -1345,12 +1345,12 @@ class ConnectorAppearanceTest(ConnectorGateCase):
                 (self.connector_root / "icon.svg").write_bytes(original)
 
     def test_dropped_field_is_logged_without_path_or_value(self):
-        """버린 칸은 커넥터 번호, 칸 이름, 직접 낸 사유만 경고 로그에 남는다. 경로와 링크 값은 없다."""
+        """버린 칸은 플러그인 번호, 칸 이름, 직접 낸 사유만 경고 로그에 남는다. 경로와 링크 값은 없다."""
         secret_link = "https://example.com/a|private"
         self.declare(icon="missing-private.svg", link=secret_link)
         output = self.warnings_while(self.catalog_entry)
-        self.assertIn("커넥터 %r 의 icon 칸을 버렸다" % DEMO, output)
-        self.assertIn("커넥터 %r 의 link 칸을 버렸다" % DEMO, output)
+        self.assertIn("플러그인 %r 의 icon 칸을 버렸다" % DEMO, output)
+        self.assertIn("플러그인 %r 의 link 칸을 버렸다" % DEMO, output)
         for leaked in ("missing-private", "private", str(self.base)):
             self.assertNotIn(leaked, output)
 
@@ -1407,7 +1407,7 @@ class PluginStandardFormatTest(ConnectorGateCase):
 
     def test_both_manifests_need_the_same_name_and_claude_comes_first(self):
         """두 manifest 가 다 있으면 이름이 같아야 오르고 `.claude-plugin` 쪽을 읽는다. 이름이 다르면 빠진다."""
-        # Codex 쪽 스킬 경로는 없는 디렉터리다. 이쪽을 읽었다면 커넥터가 빠진다.
+        # Codex 쪽 스킬 경로는 없는 디렉터리다. 이쪽을 읽었다면 플러그인이 빠진다.
         self.write_json(".codex-plugin/plugin.json", {"name": DEMO, "skills": ["./codex-skills"]})
         self.assertEqual(self.ids(), [DEMO])
         self.assertEqual(self.catalog()[0]["skills"], ["demo"])

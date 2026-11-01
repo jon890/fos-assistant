@@ -32,19 +32,19 @@ hook 이 예외를 던지면 호출이 막힌다.
 - 실패하면 로그만 남긴다. 예외를 내지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다
 - 토큰, 서명, 본문은 로그에 남기지 않는다
 
-## 커넥터 정책
+## 플러그인 정책
 
-profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 그 profile 에서는 커넥터 MCP 도구 호출마다
+profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 그 profile 에서는 플러그인 MCP 도구 호출마다
 Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
 계약의 정본은 fos-assistant `docs/features/connector-policy.md` 의 「도구 호출 판정」 이고, 이 파일은 그 계약을 그대로 따른다.
 
 대응 파일의 `isolated` 칸이 profile 의 방식을 정한다. 칸이 없으면 참으로 읽는다.
 
-- 옛 설치 profile(`isolated` 가 참): 커넥터마다 만든 전용 profile 이다. Control Plane MCP 가 없고 커넥터 서버만 있다.
+- 옛 설치 profile(`isolated` 가 참): 플러그인마다 만든 전용 profile 이다. Control Plane MCP 가 없고 플러그인 서버만 있다.
   그래서 대응에 없는 `mcp__` 도구와 `execute_code` 를 막는다
-- 바인딩 profile(`isolated` 가 거짓): 일반 에이전트의 profile 에 커넥터를 붙인 것이다.
+- 바인딩 profile(`isolated` 가 거짓): 일반 에이전트의 profile 에 플러그인을 붙인 것이다.
   Control Plane MCP 와 운영자가 넣은 다른 MCP 서버가 함께 있으므로 대응의 서버와 맞는 도구만 묻는다.
-  나머지 도구는 대응 파일이 없는 profile 과 같게 둔다. 대응에 그 profile 의 모든 커넥터 서버가 실려 있다는
+  나머지 도구는 대응 파일이 없는 profile 과 같게 둔다. 대응에 그 profile 의 모든 플러그인 서버가 실려 있다는
   대시보드 plugin 의 약속에 기댄다
 
 두 방식에 같이 걸리는 것이다.
@@ -75,10 +75,10 @@ Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
 
 바인딩 profile 에만 걸리는 것이다.
 
-- `execute_code`, 다른 MCP 서버의 도구, 내장 도구는 건드리지 않는다. 관리자가 켠 코드 실행을 커넥터 때문에 끄지 않는다.
-  `execute_code` 안에서 부른 커넥터 도구는 hook 에 session 이 오지 않아 위의 규칙으로 막힌다
-- 커넥터 도구의 결과가 글이면 `transform_tool_result` hook 이 `<external-data>` 로 감싼다. 모양은 Control Plane 의
-  `ExternalData.wrap` 과 같다. 판정이 막은 호출은 이 hook 에 닿지 않으므로, 여기 닿은 오류 글은 커넥터 서버가 낸 외부 데이터다.
+- `execute_code`, 다른 MCP 서버의 도구, 내장 도구는 건드리지 않는다. 관리자가 켠 코드 실행을 플러그인 때문에 끄지 않는다.
+  `execute_code` 안에서 부른 플러그인 도구는 hook 에 session 이 오지 않아 위의 규칙으로 막힌다
+- 플러그인 도구의 결과가 글이면 `transform_tool_result` hook 이 `<external-data>` 로 감싼다. 모양은 Control Plane 의
+  `ExternalData.wrap` 과 같다. 판정이 막은 호출은 이 hook 에 닿지 않으므로, 여기 닿은 오류 글은 플러그인 서버가 낸 외부 데이터다.
   글이 아닌 결과는 그대로 둔다. 예외는 잡아 None 을 돌려준다. Hermes 는 그때 원래 결과를 그대로 넘기고,
   MCP 결과에 거는 `<untrusted_tool_result>` 감싸기는 남는다
 
@@ -168,4 +168,4 @@ def register(ctx):
     ctx.register_hook("subagent_start", subagent_start)
     ctx.register_hook("transform_tool_result", transform_tool_result)
     logger.info("fos-ctx: Control Plane MCP 호출에 _fos_ctx 를 서명해 붙이고 skill_manage 를 막고 자식 session 을 등록하고 "
-                "커넥터 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 커넥터 도구 결과를 감싼다")
+                "플러그인 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싼다")

@@ -1,19 +1,19 @@
-# 금융 워크벤치 커넥터
+# 금융 워크벤치 플러그인
 
-사용자의 금융 온톨로지 워크벤치를 조회하고, 체결을 기록하고, 해석을 제안으로 올리는 커넥터의 개발 문서다.
+사용자의 금융 온톨로지 워크벤치를 조회하고, 체결을 기록하고, 해석을 제안으로 올리는 플러그인의 개발 문서다.
 
 covers: `hermes/connectors/financial-workbench/`
 
 코드는 [`hermes/connectors/financial-workbench/`](../../hermes/connectors/financial-workbench) 에 있다.
-이 문서는 등록 칸과 운영 값, 도구와 정책, 보안, 실제 계정으로 확인할 것을 갖는다. 사용자 안내는 [금융 워크벤치 커넥터 README](../../hermes/connectors/financial-workbench/README.md) 가 갖는다.
+이 문서는 등록 칸과 운영 값, 도구와 정책, 보안, 실제 계정으로 확인할 것을 갖는다. 사용자 안내는 [금융 워크벤치 플러그인 README](../../hermes/connectors/financial-workbench/README.md) 가 갖는다.
 운영 값을 받는 근거는 [ADR-20261025 / connector-operator-base-url](../../hermes/docs/adr/ADR-20261025-connector-operator-base-url.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
+플러그인 공통 계약은 [플러그인 연결](connector.md) 과 [플러그인 도구 정책](connector-policy.md) 이 갖는다.
 
-**이 로컬 커넥터는 워크벤치 저장소의 원격 MCP 플러그인으로 바뀐다.** 워크벤치 서버가 `/mcp` 를 열고 그 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생기면, 운영 목록을 그 플러그인으로 바꾸고 이 디렉터리와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다. 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다.
+**이 로컬 플러그인은 워크벤치 저장소의 원격 MCP 플러그인으로 바뀐다.** 워크벤치 서버가 `/mcp` 를 열고 그 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생기면, 운영 목록을 그 플러그인으로 바꾸고 이 디렉터리와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다. 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다.
 
 워크벤치는 공개 저장소 [`jon890/fos-graphrag`](https://github.com/jon890/fos-graphrag) 의 `financial-workbench` 다.
 투자 판단을 「세상의 변화 → 병목 → 산업 → 기업 → 밸류에이션(시나리오) → 투자 결정」 으로 잇는 그래프이고, 근거 문서와 검토 상태가 있는 주장, 개념, 사용자별 공부 목록을 갖는다.
-이 커넥터가 따르는 API 는 그 저장소의 `financial-workbench/docs/api-contract.md` 가운데 「연동 토큰」 과 「에이전트 API(`/api/v1`)」 절이다.
+이 플러그인이 따르는 API 는 그 저장소의 `financial-workbench/docs/api-contract.md` 가운데 「연동 토큰」 과 「에이전트 API(`/api/v1`)」 절이다.
 
 **체결 사실은 바로 저장하고, 모델이 해석한 것은 제안으로 올린다.** 사용자 결정(2026-10-25)이다.
 토스증권 체결은 금액과 수량까지 워크벤치에 들어가고 워크벤치에서 주인만 본다.
@@ -35,14 +35,14 @@ covers: `hermes/connectors/financial-workbench/`
 | `FINANCIAL_WORKBENCH_BASE_URL` | 아니다 | 운영자가 띄운 워크벤치의 공개 기준 주소. 이 주소 뒤에 `/api/v1/...` 를 붙인다 |
 
 값은 운영 목록이 갖고 이 저장소에는 적지 않는다. 운영 목록에 값이 없으면 대시보드가 카탈로그에서 뺀다.
-커넥터는 값이 `https://` 주소이고 계정 정보와 쿼리, fragment 가 없을 때만 부른다. 아니면 부르지 않고 `WORKBENCH_NOT_CONFIGURED` 로 끝낸다. 끝의 `/` 는 지운다.
+플러그인은 값이 `https://` 주소이고 계정 정보와 쿼리, fragment 가 없을 때만 부른다. 아니면 부르지 않고 `WORKBENCH_NOT_CONFIGURED` 로 끝낸다. 끝의 `/` 는 지운다.
 
 | 선언 | 값 | 까닭 |
 | --- | --- | --- |
 | `single_binding` | 선언하지 않는다 | 토큰은 사람마다 5개까지 따로 발급되고, 서로를 무효로 만들지 않는다. 같은 연결을 여러 에이전트에 붙여도 된다 |
-| `sandbox_required` | 선언하지 않는다 | 셸이 `.env` 의 토큰을 읽어도 할 수 있는 것은 이 커넥터의 도구와 같다. 돈이 움직이지 않고, 체결 기록은 주인이 워크벤치에서 지울 수 있으며, 제안은 사람이 승인해야 반영된다 |
+| `sandbox_required` | 선언하지 않는다 | 셸이 `.env` 의 토큰을 읽어도 할 수 있는 것은 이 플러그인의 도구와 같다. 돈이 움직이지 않고, 체결 기록은 주인이 워크벤치에서 지울 수 있으며, 제안은 사람이 승인해야 반영된다 |
 
-토스증권 커넥터는 두 선언을 모두 참으로 둔다. 두 선언은 토스증권 연결에만 걸리므로, 실행 공간이 있는 에이전트 하나에 토스증권과 워크벤치를 함께 붙일 수 있다.
+토스증권 플러그인은 두 선언을 모두 참으로 둔다. 두 선언은 토스증권 연결에만 걸리므로, 실행 공간이 있는 에이전트 하나에 토스증권과 워크벤치를 함께 붙일 수 있다.
 스킬 이름은 `financial-workbench` 라 토스증권의 `tossinvest` 와 겹치지 않는다.
 
 ## 도구와 정책
@@ -137,7 +137,7 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 
 결과는 워크벤치 응답의 JSON 을 그대로 돌려준다. `get_connection` 만 `user`, `token`, `rateLimitPerMinute`, `writeRateLimitPerMinute` 네 칸으로 줄인다. `token` 에 `scope` 가 있다.
 워크벤치가 둔 잘림 표시(`relationsTruncated`, `claimsTruncated`, `matchesTruncated`, `decisionsTruncated`, `valuationsTruncated`, `scenariosTruncated`, `truncated`, `dependentsTruncated`)는 바꾸지 않는다.
-워크벤치는 상세의 속성 글을 자르지 않는다. 커넥터는 글 하나가 20,000자를 넘으면 잘라 끝에 `…` 를 붙이고 결과 맨 위에 `textTruncated: true` 를 둔다.
+워크벤치는 상세의 속성 글을 자르지 않는다. 플러그인은 글 하나가 20,000자를 넘으면 잘라 끝에 `…` 를 붙이고 결과 맨 위에 `textTruncated: true` 를 둔다.
 응답 본문이 4 MiB 를 넘으면 읽지 않고 `WORKBENCH_UNAVAILABLE` 로 끝낸다.
 
 ### 오류
@@ -159,7 +159,7 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 | `WORKBENCH_NOT_CONFIGURED` | 운영 값이 없거나 `https://` 주소가 아니다. `id` 가 없는 경로의 `404` 도 기준 주소가 틀린 것이라 이 코드다 | `unavailable` | |
 | `WORKBENCH_UNAVAILABLE` | 그 밖의 상태(`409 TRANSIENT_CONFLICT`, 조회의 `5xx`, 쓰기의 `503 QUERY_TIMEOUT`, `503 DATABASE_UNAVAILABLE` 포함), 다른 곳으로 넘기는 응답, 조회의 시간 초과와 연결 실패, JSON 객체가 아닌 응답 | `unavailable` | `retry_later` |
 
-`item_index`, `max_pending`, `pending`, `retry_after_seconds` 는 `connector.json` 의 `errors` 항목에 `details` 로 선언해 승인한 실행의 실패에서도 에이전트에 닿는다.
+`item_index`, `max_pending`, `pending`, `retry_after_seconds` 는 `assistant.json` 의 `errors` 항목에 `details` 로 선언해 승인한 실행의 실패에서도 에이전트에 닿는다.
 `fields` 와 `rule` 은 글이라 대화 허락이나 상시 허락으로 바로 실행한 호출의 결과에만 남는다([ADR-092](../adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)).
 `fields` 는 `fieldErrors` 의 키 가운데 필드 경로 모양(`trades[2].quantity`)만 20개까지 옮기고 사유 글은 버린다. `rule` 은 영문 소문자와 하이픈 모양만 옮긴다.
 
@@ -193,7 +193,7 @@ MCP 서버 이름은 `financial-workbench` 다. `READ` 도구는 서버에서 `r
 
 배포 뒤 소유자가 자기 워크벤치 계정으로 한 번 확인한다. 실행 방법과 운영 값은 운영 저장소가 갖는다.
 
-1. 운영 목록에 기준 주소를 넣은 뒤 카탈로그에 커넥터가 보이는지
+1. 운영 목록에 기준 주소를 넣은 뒤 카탈로그에 플러그인이 보이는지
 2. 워크벤치에서 발급한 토큰으로 등록하면 확인 도구가 표시 이름과 토큰 이름을 읽는지, 폐기한 토큰은 거절되는지
 3. 토스증권을 붙인 에이전트에 함께 붙는지
 4. 대화에서 보유 종목 하나를 물으면 토스증권의 보유와 워크벤치의 결정, 시나리오가 함께 나오는지

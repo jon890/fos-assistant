@@ -258,7 +258,7 @@ sequenceDiagram
 
 `memory_read` 가 본문을 내 주면 그 호출의 origin 실행의 `execution_context_source` 마지막 줄 뒤에 `source=MEMORY_READ` 줄을 하나 덧붙인다(`ExecutionContextSourceWriter.append`). 읽지 못한 호출은 남기지 않는다. 답마다 참고한 기억이 이 줄을 읽는다.
 
-- 실행 사건에서 번호를 읽지 않는 까닭은 Hermes 의 `tool.started` 사건이 이 도구의 `id` 인자를 싣지 않기 때문이다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「붙은 커넥터 서버의 도구 사건」)
+- 실행 사건에서 번호를 읽지 않는 까닭은 Hermes 의 `tool.started` 사건이 이 도구의 `id` 인자를 싣지 않기 때문이다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「붙은 플러그인 서버의 도구 사건」)
 - 저장은 새 트랜잭션에서 하고 실패해도 도구 결과를 바꾸지 않는다. 순서 번호가 부딪치면 한 번 다시 시도하고, 그래도 실패하면 실행 번호만 경고 로그로 남긴다. 관측용 기록이기 때문이다
 - 이 줄은 조립 결과가 아니라 실행 뒤의 기록이다. `context_chars` 와 `instructions_hash`, `context_omitted_items` 에 들지 않는다
 
@@ -506,9 +506,9 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 
 **`EXECUTION_STATE` 와 `FOLLOW_UP` 은 대화 turn 에 싣지 않는다.** 지금 화면이 「왜 보였는가」 의 `sources` 에 이 `source` 이름과 `ref` 형식을 쓸 뿐이다. 대화마다 실으면 할 일이 지식처럼 쓰여 새 Memory 층이 된다([ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)).
 
-**커넥터의 실시간 데이터는 source 가 아니다.** Control Plane 은 커넥터를 직접 부르지 않는다.
-일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어오고, 묶음을 거치지 않고 `fos-ctx` 가 `<external-data>` 로 감싼다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)).
-일정 커넥터가 생기면 그 결과를 읽는 source 를 이 표에 더한다.
+**플러그인의 실시간 데이터는 source 가 아니다.** Control Plane 은 플러그인을 직접 부르지 않는다.
+일정 같은 플러그인 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어오고, 묶음을 거치지 않고 `fos-ctx` 가 `<external-data>` 로 감싼다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)).
+일정 플러그인이 생기면 그 결과를 읽는 source 를 이 표에 더한다.
 
 연결을 붙인 에이전트도 보통 에이전트와 같은 묶음을 받는다.
 

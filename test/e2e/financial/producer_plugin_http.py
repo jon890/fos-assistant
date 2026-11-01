@@ -124,7 +124,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/fixture/counters":
             answer = {**fixture.counter(), "prepare": fixture.prepares, "execute": fixture.executes}
         elif self.path == "/fixture/manifest-change":
-            fixture.rewrite("connector.json", lambda value: value.update(title="변경한 선언"))
+            fixture.rewrite("assistant.json", lambda value: value.update(title="변경한 선언"))
             answer = {"ok": True}
         elif self.path.startswith("/api/connectors?"):
             answer = fixture.state()

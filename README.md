@@ -3,7 +3,7 @@
 English | [한국어](README.ko.md)
 
 A personal AI assistant that belongs to the person using it, not to a model vendor or to any one product.
-It is a self-hosted Control Plane and web app on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research, where you connect general-purpose connectors and your own agents into an agentic workflow of your own, backed by a memory that only keeps what you said, wrote, or accepted yourself.
+It is a self-hosted Control Plane and web app on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research, where you connect general-purpose plugins and your own agents into an agentic workflow of your own, backed by a memory that only keeps what you said, wrote, or accepted yourself.
 Agents can look ahead and make suggestions before you ask, but how far they may act is decided by Control Plane rules, not by the model.
 People who share a purpose, a family for example, use it together as a group, each with their own agents.
 
@@ -22,9 +22,9 @@ Everything shown is made-up demo data: the pictures are taken by a script agains
 
 ![A running answer with one line per step: memory read, web search, two helper agents, and a web page being read](docs/images/tour-02-working.png)
 
-**Approve before anything is written.** A connector call that writes to an outside service waits on a card that shows exactly what will be sent.
+**Approve before anything is written.** A plugin call that writes to an outside service waits on a card that shows exactly what will be sent.
 
-![Approval card for a connector write, showing the title and body of the note with approve and reject buttons](docs/images/tour-04-approval.png)
+![Approval card for a plugin write, showing the title and body of the note with approve and reject buttons](docs/images/tour-04-approval.png)
 
 **Decide what is remembered.** A fact you state yourself in a conversation that has not read outside text is remembered right away, and you can edit or undo it under the answer. Any other memory an agent leaves stays a proposal and is used in later conversations only after you accept it.
 
@@ -57,20 +57,20 @@ The Now screen (`/now`), the external service connections screen, and the schedu
 ## Why this exists
 
 We want any individual to be free to have an assistant of their own, without depending on a particular model or product.
-To get there, the goal is to let you connect general-purpose connectors into an agentic workflow that is yours.
+To get there, the goal is to let you connect general-purpose plugins into an agentic workflow that is yours.
 
 - **Independent of the model.** A conversation picks a tier (fast, balanced, or deep), and the Control Plane database holds the policy that maps a tier to an actual model. The runtime is separate too: Hermes Agent runs the agents, and this repository decides who may use what, provides the web UI, and records what was used.
-- **Independent of any product.** A connector is declared by a plugin's `connector.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a connector, so adding one means writing a plugin with a `connector.json` and listing it in the Hermes dashboard's connector list, not changing the Control Plane or the web app ([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
+- **Independent of any product.** A plugin is declared by its `assistant.json`, and the Control Plane only has the generic flow. It does not know the name or the address of the service behind a plugin, so adding one means writing a plugin with an `assistant.json` and listing it in the Hermes dashboard's plugin list, not changing the Control Plane or the web app ([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 - **Yours.** You decide which tools and memory an agent has and which model a conversation uses.
 - **It is the source of truth for long-term knowledge about you.** Agents read only the part they are allowed to, and the body of a sensitive entry is encrypted at rest.
 
-General-purpose connectors live in this repository under `hermes/connectors/` and are maintained here ([ADR-064](hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+General-purpose plugins live in this repository under `hermes/connectors/` and are maintained here ([ADR-064](hermes/docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 The first one is Gmail: it searches and reads your mail and filters without asking, and creates drafts, sends, replies, manages labels and changes filters only after you approve. It never moves mail to the trash or deletes it.
 The second is Naver Blog: it uses the Naver account you signed in to in "My browser" and, after you approve, saves a post with your chat photos as a Naver Blog draft. It never publishes.
 The third is Toss Securities: it reads your own holdings, quotes, buying power and order history. It places or cancels only regular orders you approve, one at a time, and never modifies orders or creates conditional orders. One connection attaches to a single agent that has an execution space.
 The fourth is Financial Workbench: it reads investment decisions, valuations, evidence chains and your study list from a financial ontology workbench you host yourself, and never writes to it. Attach it to the same agent as Toss Securities to see your holdings next to the reasons you bought them. Because the workbench is open source, the only operator value it takes is the address where the operator runs it ([ADR-20261025 / connector-operator-base-url](hermes/docs/adr/ADR-20261025-connector-operator-base-url.md)).
-A connector for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
-Growing the set of general-purpose connectors is where the work is headed. It is not done yet.
+A plugin for a service that only one household or organization uses, such as the household account book attached today, stays in its own repository.
+Growing the set of general-purpose plugins is where the work is headed. It is not done yet.
 
 ## How it compares
 
@@ -80,8 +80,8 @@ The table says what each one is, in its own documentation's words where possible
 | Option | What it is | What is different here |
 | --- | --- | --- |
 | Hosted assistant apps, such as ChatGPT or Claude | Run by the model vendor, with nothing to install. Claude, for example, [saves memory as you chat](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>) and lets you read, edit, and delete it in settings. | It runs on your own server. Which model a tier means is a policy row in your database. The only memory an agent keeps right away is a fact you stated yourself in a conversation. Everything else is used only after a person accepts it. |
-| Self-hosted chat UIs, such as [Open WebUI](https://docs.openwebui.com/) or [LibreChat](https://www.librechat.ai/docs) | Open WebUI calls itself "a self-hosted AI platform" with "support for Ollama and OpenAI-compatible APIs". LibreChat is "a self-hosted web application" with agents, MCP, and custom endpoints. | This project does not call model APIs itself. It sits on an agent runtime and adds one isolated Hermes profile per person, collections that decide which agent receives which memory, an approval step for connector writes, delegation between agents with a run tree, and a ledger that converts usage to API prices. |
-| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) on its own | An autonomous agent you reach from the CLI or a messaging gateway, with its own persistent memory, skills, and subagents. | It adds a web app for a group of people. The profile a run uses comes from the requester's binding. Memory goes through the Control Plane only, and Hermes' built-in memory tool is not given to agents. Sensitive entries are encrypted. Connectors follow one generic structure ([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
+| Self-hosted chat UIs, such as [Open WebUI](https://docs.openwebui.com/) or [LibreChat](https://www.librechat.ai/docs) | Open WebUI calls itself "a self-hosted AI platform" with "support for Ollama and OpenAI-compatible APIs". LibreChat is "a self-hosted web application" with agents, MCP, and custom endpoints. | This project does not call model APIs itself. It sits on an agent runtime and adds one isolated Hermes profile per person, collections that decide which agent receives which memory, an approval step for plugin writes, delegation between agents with a run tree, and a ledger that converts usage to API prices. |
+| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) on its own | An autonomous agent you reach from the CLI or a messaging gateway, with its own persistent memory, skills, and subagents. | It adds a web app for a group of people. The profile a run uses comes from the requester's binding. Memory goes through the Control Plane only, and Hermes' built-in memory tool is not given to agents. Sensitive entries are encrypted. Plugins follow one generic structure ([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
 
 ### Who it is for
 
@@ -89,7 +89,7 @@ It fits you if:
 
 - you run your own server and want a family or another small group to share one assistant, each person with their own agents and memory,
 - you want to change the model behind a conversation without changing the product you use,
-- you want agents and connectors to do recurring work, with a person approving what gets written outside and memory keeping only what a person said or accepted.
+- you want agents and plugins to do recurring work, with a person approving what gets written outside and memory keeping only what a person said or accepted.
 
 It does not fit you yet if:
 
@@ -118,17 +118,17 @@ Adding a user is a single decision by an administrator, and it must not slow any
 - **Photos and HTML results.** Attach photos for an agent to read, and open the HTML pages an agent produces in a side panel. Scripts in those pages do not run. Photos are stored per user ([`docs/features/attachment.md`](docs/features/attachment.md), [`docs/features/attachment.md`](docs/features/attachment.md)).
 - **Run tree and cost.** Every run is recorded, including the ones that fail. Open a run to see its tool calls and child runs as a tree. Runs made on a subscription are also shown converted to API prices, so an administrator can compare settings ([`docs/features/execution.md`](docs/features/execution.md), [ADR-004](backend/docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 
-### Connectors and approval
+### Plugins and approval
 
-- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the external service connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
-- **Attaching needs no restart.** A newly attached connector is picked up by runs shortly afterwards, without restarting the shared gateway, so nobody else's conversation is cut off in the meantime ([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
-- **Connector cards.** The external service connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
+- **Connect once, attach to several agents.** A plugin hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the external service connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **Attaching needs no restart.** A newly attached plugin is picked up by runs shortly afterwards, without restarting the shared gateway, so nobody else's conversation is cut off in the meantime ([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
+- **Plugin cards.** The external service connections screen shows each plugin as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
 - **Writes wait on an approval card.** A call that writes to an outside service waits on a card that shows exactly what will be sent, and runs only after you approve it, once, with exactly the arguments you approved. A tool that allows a standing grant runs without a card while the grant you gave lasts, and tools that send data out have standing grants closed. Approvals for the same tool are grouped, and approval requests and expiries reach you as notifications on any screen ([`docs/features/connector-policy.md`](docs/features/connector-policy.md), [`docs/features/attention.md`](docs/features/attention.md)).
 
 ### Proactive checks and the Now screen
 
 - **Proactive checks.** Without being asked, an agent looks at your context and makes a suggestion, asks a question, or stays silent. You start a check with a button, or turn on a daily wake-up that runs it at a time you choose. The daily wake-up is off by default. Unless an administrator allows write tools for the agent, a check only reads, and the Control Plane enforces that boundary ([`docs/features/proactive.md`](docs/features/proactive.md)).
-- **Context assembly.** Context gathered from Memory, delegated results, results of approved connector calls, run state, and follow-ups is assembled into a bundle where every item carries its source, permissions, and freshness ([`docs/features/memory.md`](docs/features/memory.md)).
+- **Context assembly.** Context gathered from Memory, delegated results, results of approved plugin calls, run state, and follow-ups is assembled into a bundle where every item carries its source, permissions, and freshness ([`docs/features/memory.md`](docs/features/memory.md)).
 - **Problem candidates.** A check's result can name problems worth solving for this user as candidates, and the Control Plane checks their evidence and duplicates deterministically ([ADR-093](backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)).
 - **The Now screen (`/now`).** Failed runs, things waiting for your approval or acceptance and follow-ups coming due, delegated work, conversations to continue, and check reports are collected into a fixed set of cards. For proactive notices, things shown without being asked, the default is not to notify, and only signals defined from Control Plane records reach the screen. Each item can be hidden or snoozed ([`docs/features/attention.md`](docs/features/attention.md), [`docs/features/attention.md`](docs/features/attention.md)).
 - **Follow-ups.** An agent proposes things you need to do or are waiting on, and only the ones a person accepts are tracked ([`docs/features/attention.md`](docs/features/attention.md)).
@@ -150,8 +150,8 @@ Some Memory screens, such as editing the collection list and viewing earlier rev
 ### Execution spaces
 
 - **An execution space per user, in docker.** For profiles registered in the operator's policy, the shell, file, and code execution tools run in an execution space in docker. There is one container per profile, and each user gets a separate working directory. Inside it, other users' files, other profiles' secrets, and the Hermes settings are out of reach. The only exception is paths the operator mounts read-only. Profiles not registered in the policy do not get this isolation, and coverage is extended one profile at a time ([ADR-086](docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md)).
-- **Scripts do the arithmetic.** When a connector writes the full list for a period as a read-only file in that agent's execution space and returns only the path, totals and statistics are computed by a script instead of being estimated by the model. This needs a connector that declares file output, a profile registered in an execution space policy that sets an output path, and an agent with the code execution tool on. The Gmail and Naver Blog connectors in this repository do not declare file output ([ADR-20261008 / connector-output-files](hermes/docs/adr/ADR-20261008-connector-output-files.md)).
-- **A browser per user (in progress).** The Control Plane manages one browser per user, and the user signs in to services directly on the web app's "My browser" screen. Connectors reach that browser only through the Control Plane's relay. The code is in, but it is off by default and still in progress ([ADR-20261007 / user-browser](docs/adr/ADR-20261007-user-browser.md), [`docs/features/user-browser.md`](docs/features/user-browser.md)).
+- **Scripts do the arithmetic.** When a plugin writes the full list for a period as a read-only file in that agent's execution space and returns only the path, totals and statistics are computed by a script instead of being estimated by the model. This needs a plugin that declares file output, a profile registered in an execution space policy that sets an output path, and an agent with the code execution tool on. The Gmail and Naver Blog plugins in this repository do not declare file output ([ADR-20261008 / connector-output-files](hermes/docs/adr/ADR-20261008-connector-output-files.md)).
+- **A browser per user (in progress).** The Control Plane manages one browser per user, and the user signs in to services directly on the web app's "My browser" screen. Plugins reach that browser only through the Control Plane's relay. The code is in, but it is off by default and still in progress ([ADR-20261007 / user-browser](docs/adr/ADR-20261007-user-browser.md), [`docs/features/user-browser.md`](docs/features/user-browser.md)).
 
 The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.md).
 
@@ -159,8 +159,8 @@ The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.m
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember right away what you did not say.** The only thing stored at once is a fact you stated yourself in a conversation a person sent. Everything else is used only after a person accepts it. Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not widen what it does on a model's judgment alone.** Deterministic Control Plane rules decide how far to go, and the only thing those rules start on their own is a read-only check. A connector write call goes through an approval card or a standing grant you gave ([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
-- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
+- **It does not widen what it does on a model's judgment alone.** Deterministic Control Plane rules decide how far to go, and the only thing those rules start on their own is a read-only check. A plugin write call goes through an approval card or a standing grant you gave ([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
+- **It does not store secrets in the database.** AI credentials and plugin tokens stay on the Hermes side. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
@@ -177,7 +177,7 @@ flowchart LR
     subgraph H[Hermes Agent]
         A[API server]
         P[Profile per user]
-        G["Plugins and connectors (hermes/)"]
+        G["Plugins and plugins (hermes/)"]
     end
     P -. "MCP calls, signed by a plugin" .-> C
     P --> S["Execution space per user (docker)"]
@@ -186,9 +186,9 @@ flowchart LR
 | Layer | Responsibility |
 | --- | --- |
 | Hermes Agent | Agent execution, tool calls, subagents, sessions |
-| Control Plane (`backend/`) | Users, agent access, Memory access, model routing, connector approvals, scheduled tasks and proactive checks, notifications, usage accounting |
+| Control Plane (`backend/`) | Users, agent access, Memory access, model routing, plugin approvals, scheduled tasks and proactive checks, notifications, usage accounting |
 | Web (`web/`) | Conversations, run status, approval cards, connections, the Now screen, Memory review, usage |
-| Hermes add-ons (`hermes/`) | The plugins and profile template installed into your Hermes, and the general-purpose connectors |
+| Hermes add-ons (`hermes/`) | The plugins and profile template installed into your Hermes, and the general-purpose plugins |
 | Execution space per user | Runs the shell, file, and code execution tools. Applies only to profiles registered in the operator's policy |
 
 The profile a run uses is always taken from the requester's binding.
@@ -251,17 +251,17 @@ How this project uses Hermes is described in [`hermes/docs/hermes-contract.md`](
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
 - Run `scripts/dev/check-local.sh --fast` before pushing. It runs only the quick checks, including the public-safety check, and leaves the heavy checks to the Draft PR CI. Without `--fast` it runs everything; pass browser specs to limit the browser suite. Merge decisions use the required PR CI checks run against the current main merged with the PR. If CI cannot run, run the full local checks. See the 「확인」 and 「머지는 PR 로 한다」 sections of [`AGENTS.md`](AGENTS.md); `scripts/pr/merge-ready.sh <PR>` makes the merge call.
 
-### Contributing a connector
+### Contributing a plugin
 
-A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull request that adds one needs the following.
+A general-purpose plugin is one directory, `hermes/connectors/<id>/`. A pull request that adds one needs the following.
 
-- A `connector.json` with `schema: 2` that declares every tool the MCP server exposes, each with a risk and a reason for it in the connector's document.
+- An `assistant.json` with `schema: 2` that declares every tool the MCP server exposes, each with a risk and a reason for it in the plugin's document.
 - Calls that write require approval. Tools that send data to people outside the account also declare `"grant": false`, so each call is approved by a person. Tools that delete are not exposed.
 - Secrets come in only through environment variables declared in `fields`, and the smallest OAuth scope or permission that works.
-- An MCP server in TypeScript, bundled with its dependencies into one JavaScript file for Bun during checks and packaging. Generated entry files are not committed. Connector tests live alongside the source and use a local fake of the service.
+- An MCP server in TypeScript, bundled with its dependencies into one JavaScript file for Bun during checks and packaging. Generated entry files are not committed. Plugin tests live alongside the source and use a local fake of the service.
 - A setup guide in `hermes/connectors/<id>/README.md` and an owner line in `.github/CODEOWNERS`.
 
-`hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.
+`hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new plugin is checked as soon as it is added.
 The full guide is [`hermes/connectors/README.md`](hermes/connectors/README.md) (Korean), and [`hermes/connectors/gmail/`](hermes/connectors/gmail) is the reference to copy from.
 
 ## License

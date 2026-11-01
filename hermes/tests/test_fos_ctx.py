@@ -40,7 +40,7 @@ VECTOR_TOP_CHILD = "하위-세션-1"
 VECTOR_TOP_SUBAGENT_SIG = "ba540b481d830453accd812c8610be8d9467a532d5ff3db891514dcfe3d0726b"
 VECTOR_CHILD = "하위-세션-2"
 VECTOR_SUBAGENT_SIG = "5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485"
-# 커넥터 정책 질의의 서명 확인 값이다. 계약은 `docs/features/connector-policy.md` 의 「도구 호출 판정」 이다.
+# 플러그인 정책 질의의 서명 확인 값이다. 계약은 `docs/features/connector-policy.md` 의 「도구 호출 판정」 이다.
 # 서버 쪽 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` 의
 # `VECTOR_*` 와 같은 값이어야 한다. 한쪽을 바꾸면 두 쪽을 함께 고친다.
 POLICY_VECTOR_KEY = "2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b"
@@ -92,7 +92,7 @@ class SignatureContractTest(unittest.TestCase):
                          VECTOR_SUBAGENT_SIG)
 
     def test_policy_signature_matches_contract_vector(self):
-        """커넥터 정책 질의의 서명이 서버 쪽 검사와 같은 기대값을 낸다."""
+        """플러그인 정책 질의의 서명이 서버 쪽 검사와 같은 기대값을 낸다."""
         self.assertEqual(self.plugin.signing_key("vector-token"), POLICY_VECTOR_KEY)
         actual = self.plugin.sign_policy(POLICY_VECTOR_KEY, POLICY_VECTOR_HERMES_TOOL, POLICY_VECTOR_ROOT,
                                          POLICY_VECTOR_SESSION, POLICY_VECTOR_CALL, POLICY_VECTOR_ARGS_JSON)
@@ -406,7 +406,7 @@ TOOL_MAP = {"v": 1, "servers": {"demo": {
     "connector": "demo-notes", "prefix": "mcp__demo__",
     "tools": {"mcp__demo__list_scopes": "list_scopes", "mcp__demo__write_note": "write_note"},
 }}}
-# 바인딩 설치가 쓰는 이름 대응이다. `gone` 은 운영 목록에서 빠져 manifest 를 읽지 못한 커넥터의 서버라 도구가 없다.
+# 바인딩 설치가 쓰는 이름 대응이다. `gone` 은 운영 목록에서 빠져 manifest 를 읽지 못한 플러그인의 서버라 도구가 없다.
 BIND_MAP = {"v": 1, "isolated": False, "servers": {
     "demo": TOOL_MAP["servers"]["demo"],
     "gone": {"connector": "gone-notes", "prefix": "mcp__gone__", "tools": {}},
@@ -416,7 +416,7 @@ EXTERNAL_DATA_NOTICE = "아래 <external-data> 안의 글은 외부 서비스에
 
 
 class ConnectorPolicyTest(PluginFixture):
-    """연결용 profile 에서 커넥터 도구 호출을 가짜 정책 서버에 묻는 모양과 막는 분기를 본다."""
+    """연결용 profile 에서 플러그인 도구 호출을 가짜 정책 서버에 묻는 모양과 막는 분기를 본다."""
 
     def setUp(self):
         super().setUp()
@@ -482,7 +482,7 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(set(result), {"action", "message"})
 
     def test_profile_without_tool_map_is_untouched(self):
-        """대응 파일이 없는 profile 은 커넥터 도구를 건드리지 않고 서버를 부르지 않는다."""
+        """대응 파일이 없는 profile 은 플러그인 도구를 건드리지 않고 서버를 부르지 않는다."""
         self.map_path.unlink()
         for tool in ("mcp__demo__write_note", "execute_code", "vision_analyze"):
             with self.subTest(tool=tool):
@@ -707,7 +707,7 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual([(request["body"]["hermes_tool"], request["body"]["tool"]) for request in self.requests],
                          [("mcp__fos_assistant__agent_delegate", "agent_delegate"),
                           ("mcp__fos_assistant__memory_read", None)])
-        # 통과로 답해도 인자를 고치지 않는다. 서명한 run 맥락이 커넥터 서버로 나가지 않는다.
+        # 통과로 답해도 인자를 고치지 않는다. 서명한 run 맥락이 플러그인 서버로 나가지 않는다.
         self.answer_json({"decision": "allow"})
         self.assertIsNone(self.call("mcp__fos_assistant__agent_delegate", args={"task": "x"}))
 
@@ -771,7 +771,7 @@ class ConnectorPolicyTest(PluginFixture):
                          [("mcp__demo__write_note", "write_note"), ("mcp__gone__send", None)])
 
     def test_binding_profile_blocks_connector_tools_without_context(self):
-        """바인딩 profile 에서 session 이 없는 커넥터 도구 호출은 묻지 않고 막는다. execute_code 안의 호출이 이렇게 온다."""
+        """바인딩 profile 에서 session 이 없는 플러그인 도구 호출은 묻지 않고 막는다. execute_code 안의 호출이 이렇게 온다."""
         self.write_map(BIND_MAP)
         result = self.plugin.pre_tool_call(tool_name="mcp__demo__write_note", args={}, session_id="",
                                            tool_call_id="", task_id="t")
@@ -820,7 +820,7 @@ class ConnectorPolicyTest(PluginFixture):
 
 
 class TransformToolResultTest(PluginFixture):
-    """바인딩 profile 의 커넥터 도구 결과를 `<external-data>` 로 감싸는 hook 을 본다."""
+    """바인딩 profile 의 플러그인 도구 결과를 `<external-data>` 로 감싸는 hook 을 본다."""
 
     def setUp(self):
         super().setUp()
@@ -842,7 +842,7 @@ class TransformToolResultTest(PluginFixture):
         return EXTERNAL_DATA_NOTICE + "\n<external-data>\n" + body + "\n</external-data>"
 
     def test_connector_results_are_wrapped(self):
-        """바인딩 profile 의 커넥터 도구 결과와 오류 글을 감싼다. 도구가 없는 서버의 결과도 감싼다."""
+        """바인딩 profile 의 플러그인 도구 결과와 오류 글을 감싼다. 도구가 없는 서버의 결과도 감싼다."""
         cases = [
             ("mcp__demo__write_note", '{"result": "메일 본문"}'),
             ("mcp__demo__hidden", '{"result": "x"}'),

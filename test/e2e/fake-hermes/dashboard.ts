@@ -146,7 +146,7 @@ export function createProfileRoutes(state: FakeHermesState) {
       }
       env[body.key] = body.value;
       if (state.connectorEnvNames.has(body.key)) {
-        // 커넥터 칸은 응답이 재시작 필요 여부도 담는다. 값은 적지 않는다.
+        // 플러그인 칸은 응답이 재시작 필요 여부도 담는다. 값은 적지 않는다.
         state.connectorRequests.push(`env put ${body.profile} ${body.key}`);
         send(response, 200, { profile: body.profile, key: body.key, restart_required: false });
         return true;
@@ -178,7 +178,7 @@ export function createProfileRoutes(state: FakeHermesState) {
         return true;
       }
       delete state.keys[name];
-      // 붙인 커넥터의 소유 기록과 `.env` 는 profile 디렉터리에 있어 함께 사라진다.
+      // 붙인 플러그인의 소유 기록과 `.env` 는 profile 디렉터리에 있어 함께 사라진다.
       state.boundConnectors.delete(name);
       state.hostEnv.delete(name);
       send(response, 200, { name });
@@ -298,10 +298,10 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
             return true;
           }
         }
-        // 처리기가 목록을 통째로 바꾸므로 붙은 커넥터의 서버 이름이 빠진 목록은 조용히 지우지 않고 거절한다.
+        // 처리기가 목록을 통째로 바꾸므로 붙은 플러그인의 서버 이름이 빠진 목록은 조용히 지우지 않고 거절한다.
         // plugin 처럼 실행 공간 검사 뒤에 본다. 둘 다 409 라 순서가 다르면 Control Plane 이 다른 오류로 읽는다.
         if (!bound.every((name) => toolsets.includes(name))) {
-          send(response, 409, { error: "연결된 커넥터의 도구 이름이 빠졌다" });
+          send(response, 409, { error: "연결된 플러그인의 도구 이름이 빠졌다" });
           return true;
         }
       }

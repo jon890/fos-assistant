@@ -36,7 +36,7 @@ def sign_subagent(key: str, parent_root_session_id: str, parent_session_id: str,
 
 def sign_policy(key: str, hermes_tool: str, root_session_id: str, session_id: str, tool_call_id: str,
                 args_json: str) -> str:
-    """커넥터 정책 질의의 서명을 소문자 16진수로 돌려준다. key 는 `sign` 과 같다.
+    """플러그인 정책 질의의 서명을 소문자 16진수로 돌려준다. key 는 `sign` 과 같다.
 
     인자는 글 그대로가 아니라 그 글의 SHA-256 을 넣는다. 받는 쪽도 받은 글을 그대로 해시한다.
     """

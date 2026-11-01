@@ -14,7 +14,7 @@ export type BoundAgent = {
   restartRequired: boolean;
 };
 
-/** 커넥터 manifest 의 칸 한 개다. 입력 칸은 이 목록으로 그린다. */
+/** 플러그인 manifest 의 칸 한 개다. 입력 칸은 이 목록으로 그린다. */
 export type ConnectorField = {
   key: string;
   label: string;
@@ -31,7 +31,7 @@ export type ToolRisk =
 export type ToolApproval = "NONE" | "REQUIRED" | "ALWAYS";
 
 /**
- * 커넥터가 선언한 도구 한 개다. 화면은 `name` 을 보이지 않고 `title` 과 `summary` 만 보인다.
+ * 플러그인이 선언한 도구 한 개다. 화면은 `name` 을 보이지 않고 `title` 과 `summary` 만 보인다.
  * `grant` 는 승인하면서 그 도구에 상시 허락을 줄 수 있는지다.
  */
 export type ConnectorTool = {
@@ -44,7 +44,7 @@ export type ConnectorTool = {
   summary?: string | null;
 };
 
-/** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 커넥터다. */
+/** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 플러그인다. */
 export type ConnectorSummary = {
   id: string;
   title: string;
@@ -53,7 +53,7 @@ export type ConnectorSummary = {
   icon: string | null;
   /** 서비스 소개 주소(`https://`)다. 옛 Control Plane 은 내지 않는다. */
   link: string | null;
-  /** 커넥터 README 주소다. 옛 Control Plane은 내지 않는다. */
+  /** 플러그인 README 주소다. 옛 Control Plane은 내지 않는다. */
   readmeUrl?: string | null;
   /** 첫 링크의 종류다. 옛 응답은 service로 읽는다. */
   linkKind?: "service" | "project";
@@ -80,7 +80,7 @@ export type ConnectorConnection = {
   checkedAt: string | null;
   /** 이 연결을 붙인 에이전트들이다. 재시작 대기는 연결이 아니라 붙은 에이전트마다 있다. */
   bindings: BoundAgent[];
-  /** 커넥터가 선언하지 않아 쓰지 않는 도구의 수다. */
+  /** 플러그인이 선언하지 않아 쓰지 않는 도구의 수다. */
   undeclaredTools: number;
   /** 표준 플러그인 연결의 마지막 확인에서 받은 도구 수다. 표준 플러그인이 아니거나 확인 전이면 null 이다. */
   listedTools: number | null;

@@ -145,7 +145,7 @@ def _bound_servers(profile_dir: pathlib.Path) -> list:
     """소유 기록의 바인딩 항목이 설치한 서버 이름이다. 기록이 없으면 빈 목록이다.
 
     기록은 JSON 모양만 본다. `_connector_state` 는 manifest 의 실행 정의가 바뀌면 예외를 내어,
-    운영자가 커넥터를 바꾸면 그 커넥터가 붙은 모든 에이전트의 도구 저장이 실패하기 때문이다.
+    운영자가 플러그인을 바꾸면 그 플러그인이 붙은 모든 에이전트의 도구 저장이 실패하기 때문이다.
     """
     path = profile_dir / CONNECTOR_STATE
     if not path.is_file():
@@ -160,9 +160,9 @@ def _bound_servers(profile_dir: pathlib.Path) -> list:
 async def _check_config_update(request):
     """공유 토큰의 설정 쓰기를 profile 별 API 도구 목록과 올린 스킬 경로로 제한한다.
 
-    처리기는 API 도구 목록을 통째로 바꾼다. 그래서 바인딩 설치가 더한 커넥터 서버 이름은
+    처리기는 API 도구 목록을 통째로 바꾼다. 그래서 바인딩 설치가 더한 플러그인 서버 이름은
     Control Plane 이 목록에 함께 보낸다는 계약이다. 그 이름이 하나라도 빠진 요청은 409 로 거절한다(ADR-083).
-    조용히 지워지면 붙은 커넥터의 도구가 말없이 사라진다.
+    조용히 지워지면 붙은 플러그인의 도구가 말없이 사라진다.
     """
     body = await _json_object(request)
     if body is None or set(body) - {"sandbox_owner", "require_sandbox"} != {"profile", "config"}:
@@ -253,7 +253,7 @@ async def _check_config_update(request):
             if set(allowed) - known:
                 return _rejected("모르는 도구 이름이 있다")
             if set(_bound_servers(get_profile_dir(profile))) - set(allowed):
-                return _rejected("연결된 커넥터의 도구 이름이 빠졌다", 409)
+                return _rejected("연결된 플러그인의 도구 이름이 빠졌다", 409)
             if CONTROL_PLANE_MCP not in mcp_names and not (set(allowed) & builtins):
                 return _rejected("내장 도구가 하나 이상 필요하다")
             updated["platform_toolsets"] = {**(saved.get("platform_toolsets") or {}), **platform}
