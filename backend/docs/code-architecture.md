@@ -303,9 +303,8 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 문제 후보의 가치 평가는 `ValueEvaluationService`와 `ValueEvaluator`가 맡는다.
 `DecisionProvider`는 모델과 무관한 판단 port이며 첫 adapter는 도구 없는 시스템 profile에 Hermes Runs로 묻는다.
-권한과 행동 정책을 결정하지 않는다([가치 평가](../../docs/features/proactive.md)).
-행동 수준은 모델을 모르는 `AutonomyPolicy` 가 정하고 `AutonomyPolicyService` 가 판정을 남긴다. `EXECUTE` 는 `ProactiveCheckService.startAutonomous` 로 읽기 전용 살펴보기를 시작한다([행동 정책](../../docs/features/proactive.md)).
-살펴보기가 끝난 뒤 두 서비스를 잇던 조정자와 사건은 지웠고, 지금은 두 서비스를 부르는 곳이 없다([매일 루프](../../docs/features/proactive.md)).
+권한과 실행 여부를 결정하지 않는다([가치 평가](../../docs/features/proactive.md)).
+살펴보기가 끝난 뒤 가치 평가를 잇던 조정자와 사건, 행동 정책은 지웠고, 지금은 `ValueEvaluationService` 를 부르는 곳이 없다([매일 루프](../../docs/features/proactive.md)).
 
 `proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
 `chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다. 사용자가 점검 대화를 읽으면 그 대화의 보고를 연 것으로 적도록 `chat` 의 port `CheckReportReads` 도 `proactive` 가 구현한다.

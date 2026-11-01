@@ -21,7 +21,7 @@ final class SubFeatureOrder {
             "conversation", "delivery", "modelchoice", "attachment", "artifact", "contentdraft",
             "starter", "turn", "nextturn", "recovery", "purge"),
         "connector", List.of("connection", "action", "financial", "contentdraft", "approval"),
-        "proactive", List.of("check", "evaluation", "autonomy", "loop"),
+        "proactive", List.of("check", "evaluation", "loop"),
         "usage", List.of("pricing", "execution", "subagent", "tree", "summary"),
         "skill", List.of("usage", "library", "upload"));
 }
