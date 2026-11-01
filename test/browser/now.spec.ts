@@ -236,6 +236,35 @@ test.describe("지금 화면", () => {
     return id as string;
   }
 
+  /**
+   * 매일 루프가 먼저 다룰 문제를 골라 둔 상태를 만든다. 브라우저 환경에는 판단 profile 이 없어 루프가 직접 만들지 못한다.
+   */
+  async function surfaceProblem(
+    email: string,
+    agentCode: string,
+    problem: string,
+    action: string,
+    level: "SURFACE" | "ASK_APPROVAL",
+  ): Promise<{ decisionId: number; conversationId: string }> {
+    return (await seedViaTestSupport(
+      email,
+      "proactive-loop/surfaced",
+      { agentCode, problem, action, level },
+      "먼저 다룰 문제를 심지 못했다",
+    )) as { decisionId: number; conversationId: string };
+  }
+
+  /** 지금 화면의 실패 카드에서 대화 하나를 고른다. 없으면 실패를 만든다. */
+  async function failedConversationId(page: Page, hermes: Parameters<typeof failTurn>[1]): Promise<string> {
+    await openNow(page);
+    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
+    if ((await failed.count()) === 0) {
+      await failTurn(page, hermes, "주간 장보기 영수증 정리");
+      await openNow(page);
+    }
+    return conversationIdOf(await failed.first().getAttribute("href"));
+  }
+
   async function summaryCount(page: Page): Promise<number> {
     const response = await page.request.get("/api/attention/summary");
     expect(response.ok(), `지금 볼 것의 수를 읽지 못했다: ${response.status()}`).toBeTruthy();
@@ -396,13 +425,7 @@ test.describe("지금 화면", () => {
     isolatedMember,
   }, testInfo) => {
     const email = isolatedMember.email;
-    await openNow(page);
-    const failed = page.getByTestId("now-card-failures").getByTestId("now-item").getByRole("link");
-    if ((await failed.count()) === 0) {
-      await failTurn(page, hermes, "주간 장보기 영수증 정리");
-      await openNow(page);
-    }
-    const conversationId = conversationIdOf(await failed.first().getAttribute("href"));
+    const conversationId = await failedConversationId(page, hermes);
 
     const title = "학교 상담 신청서 내기";
     const before = await summaryCount(page);
@@ -472,6 +495,74 @@ test.describe("지금 화면", () => {
       /^\/api\/follow-ups\/[^/]+\/reject$/,
     );
     await expect(rejected).toHaveCount(0, REFRESHED);
+  });
+
+  test("먼저 다룰 문제 자리는 제안 카드가 맡고 서버가 더 내지 않는 옛 판정은 보이지 않는다", async ({
+    page,
+    hermes,
+    isolatedMember,
+  }) => {
+    const email = isolatedMember.email;
+    const conversationId = await failedConversationId(page, hermes);
+
+    const oldProblem = "장보기 예약이 내일 마감이에요";
+    const title = "예약 사이트에서 시간 확인하기";
+    const before = await summaryCount(page);
+    await surfaceProblem(email, await ownAgent(page), oldProblem, "예약 사이트에서 시간을 확인해 보기", "SURFACE");
+    await proposeFollowUp(email, conversationId, title);
+    expect(await summaryCount(page), "제안 카드가 지금 볼 것의 수에 들어갔다").toBe(before);
+
+    await openNow(page);
+    const needsMe = page.getByTestId("now-card-needs_me");
+    const row = needsMe.getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute("data-attention", "LATER");
+    await expect(row).toContainText("에이전트가 챙길 것을 제안했어요");
+    for (const name of ["받아들이기", "거절", "고치기"]) {
+      await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
+    }
+    await expect(needsMe.getByText(oldProblem)).toHaveCount(0);
+    await expect(page.getByText("에이전트가 먼저 다룰 문제로 골랐어요")).toHaveCount(0);
+    await expect(needsMe.getByTestId("card-now-count")).toHaveCount(0);
+  });
+
+  test("제안 카드에 반응을 남기지 못하면 항목 아래에 안내를 보이고 항목은 남는다", async ({
+    page,
+    hermes,
+    isolatedMember,
+  }) => {
+    const conversationId = await failedConversationId(page, hermes);
+    const title = "주간 식단 재료 적어 보기";
+    await proposeFollowUp(isolatedMember.email, conversationId, title);
+    await page.route("**/api/follow-ups/*/reject", (route: Route) =>
+      route.fulfill({ status: 502, json: { code: "INTERNAL_ERROR", message: "unavailable" } }),
+    );
+
+    await openNow(page);
+    const row = page.getByTestId("now-card-needs_me").getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "거절", exact: true }).click();
+    await expect(row.getByText("unavailable")).toBeVisible();
+    await expect(row).toHaveCount(1);
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
+  test("이미 없는 제안에 반응하면 그 코드의 문구를 항목 아래에 보인다", async ({ page, hermes, isolatedMember }) => {
+    const conversationId = await failedConversationId(page, hermes);
+    const title = "주말 장보기 지출 내역 훑어 보기";
+    await proposeFollowUp(isolatedMember.email, conversationId, title);
+    await page.route("**/api/follow-ups/*/accept", (route: Route) =>
+      route.fulfill({ status: 404, json: { code: "FOLLOW_UP_NOT_FOUND", message: "no such follow-up" } }),
+    );
+
+    await openNow(page);
+    const row = page.getByTestId("now-card-needs_me").getByTestId("now-item").filter({ hasText: title });
+    await expect(row).toHaveCount(1);
+    await row.getByRole("button", { name: "받아들이기", exact: true }).click();
+    await expect(row).toContainText("이미 지워졌거나 없는 할 일이에요.");
+
+    await page.unrouteAll({ behavior: "ignoreErrors" });
   });
 
   test("새 대화 화면의 「확인할 것 N건」 은 늦게 도착해도 입력창을 밀지 않고 읽지 못하면 그리지 않는다", async ({
