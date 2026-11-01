@@ -165,7 +165,7 @@ push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 D
 scripts/dev/check-local.sh --fast
 ```
 
-PR CI 에서 브라우저 shard 와 E2E 는 기본으로 건너뛴다. 그 둘은 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
+PR CI 에서 브라우저 shard 와 E2E 는 기본으로 건너뛴다. 그 둘은 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. API 컨트롤러나 웹 `api`·`page.tsx`·`components` 파일을 지우거나 이름을 바꾼 PR 은 라벨 없이도 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
