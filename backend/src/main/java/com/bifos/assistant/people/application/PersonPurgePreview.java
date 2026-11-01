@@ -19,32 +19,44 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자를 정리하면 무엇이 얼마나 지워지는지 읽기만 해서 보인다(ADR-20261101 / user-purge).
  *
- * <p>아무것도 쓰지 않는다. 실제로 지우는 진입점은 뒤 단계에서 연다. 지울 범위의 표와 칸이 이 목록과 어긋나지
- * 않도록 질의는 실제 표에 대해 돈다.
+ * <p>아무것도 쓰지 않는다. 실제로 지우는 진입점은 뒤 단계에서 연다. 질의는 실제 표에 대해 돌아 칸 이름이 틀리면
+ * 테스트가 잡는다. 세는 대상은 ADR 의 지울 범위 중 사용자 번호로 찾을 수 있는 표다. 대화는 아직 지우지 않은 줄만 센다.
+ * 참조를 비우거나 줄을 지우는 `app_user` 외래 키 표(ADR 의 「app_user 를 가리키는 다른 표」)는 세지 않는다.
  */
 @Service
 @RequiredArgsConstructor
 public class PersonPurgePreview {
 
-    /** 표, 사용자 칸, 추가 조건, 정리 때 하는 일이다. 추가 조건은 구현이 정한 고정 문자열이다. */
-    private record Target(String table, String userColumn, String extraWhere, Action action) {
+    /** 표, 그 사용자의 줄을 고르는 조건(`:userId` 바인딩), 정리 때 하는 일이다. 조건은 구현이 정한 고정 문자열이다. */
+    private record Target(String table, String where, Action action) {
     }
 
 
+    /** 그 사용자의 개인 기억 번호를 고르는 부분 질의다. 임베딩과 링크는 사용자 칸이 없어 이것으로 찾는다. */
+    private static final String USER_MEMORY_IDS = "(select id from memory where owner_user_id = :userId and scope = 'USER')";
+
     private static final List<Target> TARGETS = List.of(
-        new Target("conversation", "user_id", "", Action.DELETE),
-        new Target("chat_attachment", "uploaded_by_user_id", "", Action.DELETE),
-        new Target("chat_artifact", "vault_user_id", "", Action.DELETE),
-        new Target("memory", "owner_user_id", " and scope = 'USER'", Action.DELETE),
-        new Target("memory", "owner_user_id", " and scope = 'GROUP'", Action.TRANSFER),
-        new Target("follow_up", "user_id", "", Action.DELETE),
-        new Target("task", "owner_user_id", "", Action.DELETE),
-        new Target("notification", "user_id", "", Action.DELETE),
-        new Target("connector_connection", "user_id", "", Action.DELETE),
-        new Target("user_browser", "user_id", "", Action.DELETE),
-        new Target("user_data_key", "user_id", "", Action.DELETE),
-        new Target("agent", "owner_user_id", " and deleted_at is null and visibility = 'PRIVATE'", Action.DELETE),
-        new Target("agent", "owner_user_id", " and deleted_at is null and visibility = 'GROUP'", Action.TRANSFER));
+        new Target("conversation", "user_id = :userId and deleted_at is null", Action.DELETE),
+        new Target("chat_attachment", "uploaded_by_user_id = :userId", Action.DELETE),
+        new Target("chat_artifact", "vault_user_id = :userId", Action.DELETE),
+        new Target("memory", "owner_user_id = :userId and scope = 'USER'", Action.DELETE),
+        new Target("memory_embedding", "memory_id in " + USER_MEMORY_IDS, Action.DELETE),
+        new Target("memory_link", "from_memory_id in " + USER_MEMORY_IDS + " or to_memory_id in " + USER_MEMORY_IDS,
+            Action.DELETE),
+        new Target("memory_revision", "owner_user_id = :userId", Action.DELETE),
+        new Target("follow_up", "user_id = :userId", Action.DELETE),
+        new Target("task", "owner_user_id = :userId", Action.DELETE),
+        new Target("task_run", "owner_user_id = :userId", Action.DELETE),
+        new Target("notification", "user_id = :userId", Action.DELETE),
+        new Target("attention_event", "user_id = :userId", Action.DELETE),
+        new Target("attention_control", "user_id = :userId", Action.DELETE),
+        new Target("user_autonomy_preference", "user_id = :userId", Action.DELETE),
+        new Target("connector_connection", "user_id = :userId", Action.DELETE),
+        new Target("connector_tool_grant", "user_id = :userId", Action.DELETE),
+        new Target("user_browser", "user_id = :userId", Action.DELETE),
+        new Target("user_data_key", "user_id = :userId", Action.DELETE),
+        new Target("agent", "owner_user_id = :userId and deleted_at is null and visibility = 'PRIVATE'", Action.DELETE),
+        new Target("agent", "owner_user_id = :userId and deleted_at is null and visibility = 'GROUP'", Action.TRANSFER));
 
     private final AllowedPersonRepository people;
     private final AppUserRepository users;
@@ -77,7 +89,7 @@ public class PersonPurgePreview {
 
 
     private long count(Target target, Long userId) {
-        String sql = "select count(*) from " + target.table() + " where " + target.userColumn() + " = :userId" + target.extraWhere();
+        String sql = "select count(*) from " + target.table() + " where " + target.where();
         Number n = (Number)entityManager.createNativeQuery(sql).setParameter("userId", userId).getSingleResult();
         return n.longValue();
     }

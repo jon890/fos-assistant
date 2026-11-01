@@ -21,9 +21,10 @@
 | 보관본(`chat_artifact` 의 `vault_user_id` 행) | 묶음 자식 행과 본문 없는 지우기 이력 행까지 지운다. 다른 사용자의 행은 건드리지 않는다. 본문을 푸는 key 를 지우기 전에 먼저 지운다 |
 | 비공개 에이전트 | 지운 것으로 표시해 기존 에이전트 정리(ADR-20261009 / agent-purge)가 7일 뒤 지운다 |
 | 그룹에 공개한 에이전트 | 지우지 않고 `owner_user_id` 를 그룹의 관리자에게 넘긴다. 관리자가 여럿이면 `app_user.id` 가 가장 작은 관리자에게 넘긴다 |
-| 그룹 공용 기억 항목(`memory` 의 `scope = 'GROUP'`) | 지우지 않고 소유 칸을 같은 관리자에게 넘긴다 |
+| 그룹 공용 기억 항목(`memory` 의 `scope = 'GROUP'`) | 지우지 않고 넘기지도 않는다. 이 줄은 `owner_user_id` 가 비어 있고 `group_id` 가 소유한다. 사용자 번호는 `accepted_by_user_id` 에 외래 키 없이 남을 뿐이라 사용자 줄을 지워도 막지 않는다 |
 | 개인 기억(`scope = 'USER'`)과 그 임베딩, 링크, 변경 이력 | 지운다 |
 | 할 일, 예약 작업과 실행 이력, 알림, 주의 이벤트, 자동 실행 동의, 커넥터 연결과 도구 권한, 브라우저 | 지운다. 커넥터 연결의 비밀값과 브라우저 profile 은 외부 정리까지 한다 |
+| `app_user` 를 가리키는 다른 표(`connector_action`, `connector_conversation_grant`, `connector_tool_grant`, `service_token`, `accountbook_connection`, `financial_order_limit`, `financial_limit_change`, `proactive_check`, `attention_control`, `attention_event`, `agent_toolset_request`) | 외래 키가 `ON DELETE CASCADE` 가 아니라 사용자 줄을 지우면 막힌다. 그 사용자 소유 줄(`user_id`, `requester_user_id`)은 지운다. 다른 사용자의 요청을 처리한 기록(`decided_by_user_id`)은 줄을 남기고 칸을 비운다. 금융 한도와 그 변경 이력은 사용자의 것이라 같이 지운다. 승인 줄(`connector_action`)의 사용량 참조처럼 남겨야 하는 줄이 있으면 구현 단계에서 근거와 함께 이 표에 더한다 |
 | 데이터 key(`user_data_key`) | 위가 모두 끝난 마지막에 지운다. 지운 뒤에는 남은 암호문을 풀 수 없다 |
 | 사용자 줄(`app_user`) | 마지막에 지운다 |
 | `allowed_person` | 줄은 남기고 꺼진 채 둔다. 같은 주소가 다시 들어오려면 관리자가 켜야 한다. 켜면 새 사용자가 새로 만들어진다 |
@@ -41,7 +42,7 @@
 
 1. 지울 범위 미리보기(읽기 전용). 지우는 코드는 없다.
 2. 예약 칸, 예약과 취소 API, 다시 켜면 취소. 정리 작업은 아직 지우지 않는다.
-3. 보관본과 개인 데이터 삭제, 그룹 공유 데이터 이관, 데이터 key 와 사용자 줄 삭제, 정리 작업을 연다. 이 단계에서 `tables.tsv` 의 USER 칸을 DELETE, TRANSFER 로 바꾼다.
+3. 보관본과 개인 데이터 삭제, 그룹 공개 에이전트 이관, 데이터 key 와 사용자 줄 삭제, 정리 작업을 연다. 이 단계에서 `tables.tsv` 의 USER 칸을 DELETE, TRANSFER 로 바꾼다.
 
 ### 대안 기각
 
@@ -56,5 +57,5 @@
 - 얻는 것: 정리 뒤 주인이 없는 암호화 본문이나 개인 기억이 남지 않는다. 다른 사용자의 사용은 끊기지 않는다.
 - 감당할 것:
   - 정리가 시작되면 되돌릴 수 없다.
-  - 관리자는 넘겨받은 에이전트와 기억을 떠맡는다.
+  - 관리자는 넘겨받은 에이전트를 떠맡는다.
   - 사용량 원장에 사라진 사용자의 번호가 남는다. 이름과 주소는 `app_user` 와 함께 사라진다.
