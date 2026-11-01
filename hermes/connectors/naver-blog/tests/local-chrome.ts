@@ -81,7 +81,7 @@ export async function localChrome({ now = () => performance.now() } = {}) {
       CdpSession.prototype.send = originalSend;
   };
   try {
-    const deadline = now() + CHROME_STARTUP_MS;
+    const deadline = startedAt + CHROME_STARTUP_MS;
     while (now() < deadline) {
       const port = (
         await readFile(join(profile, "DevToolsActivePort"), "utf8").catch(
