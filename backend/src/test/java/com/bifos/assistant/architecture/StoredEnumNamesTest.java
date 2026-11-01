@@ -12,8 +12,6 @@ import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyExecutionStatus;
-import com.bifos.assistant.proactive.autonomy.domain.type.AutonomyLevel;
 import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
@@ -62,8 +60,6 @@ class StoredEnumNamesTest {
                 "SUBAGENT_COMPLETED",
                 "PROVIDER_SWITCHED")),
         Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED", "AUTONOMY")),
-        Map.entry(AutonomyLevel.class, List.of("IGNORE", "SURFACE", "ASK_APPROVAL", "EXECUTE")),
-        Map.entry(AutonomyExecutionStatus.class, List.of("PENDING", "STARTED", "FAILED")),
         Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
         Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
         Map.entry(
