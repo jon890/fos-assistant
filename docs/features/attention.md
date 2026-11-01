@@ -64,7 +64,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 | `APPROVAL_PENDING` | `EXPIRES_SOON` | 승인을 기다리고 있어요. 곧 만료돼요 |
 | `MEMORY_PROPOSED` | 없음 | 에이전트가 기억할 것을 제안했어요 |
 | `MEMORY_SUPERSEDE_PROPOSED` | 없음 | 새 기억이 옛 기억을 대신하자는 제안이 왔어요 |
-| `FOLLOW_UP_PROPOSED` | 없음 | 에이전트가 할 일로 제안했어요 |
+| `FOLLOW_UP_PROPOSED` | 없음 | 에이전트가 챙길 것을 제안했어요 |
 | `FOLLOW_UP_OPEN` | `DUE_SOON` | 기한이 다가왔어요 |
 | `FOLLOW_UP_OPEN` | `OVERDUE` | 기한이 지났어요 |
 | `FOLLOW_UP_OPEN` | `LINKED_UPDATE` | 연결한 대화에 결과가 도착했어요 |
