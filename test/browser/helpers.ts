@@ -67,3 +67,49 @@ export async function waitForViewTransition(page: Page) {
       ),
   );
 }
+
+/** `GET /api/admin/model-tiers` 가 내는 그룹 칸 정의다. */
+export type GroupModelTiers = {
+  tiers: {
+    tier: string;
+    provider: string | null;
+    model: string | null;
+    reasoningEffort: string | null;
+  }[];
+  groupDefaultTier: string | null;
+};
+
+/** 관리자 세션으로 그룹 칸 정의를 읽는다. 바꾸는 검사는 이 값을 들고 있다가 끝에 되돌린다. */
+export async function readGroupModelTiers(page: Page): Promise<GroupModelTiers> {
+  const response = await page.request.get("/api/admin/model-tiers");
+  expect(response.ok(), `칸 정의를 읽지 못했다: ${response.status()}`).toBeTruthy();
+  return (await response.json()) as GroupModelTiers;
+}
+
+/** 관리자 세션으로 그룹 칸 정의와 그룹 기본 칸을 저장한다. 칸 정의는 그대로 두고 기본 칸만 바꿀 때도 쓴다. */
+export async function saveGroupModelTiers(
+  page: Page,
+  tiers: GroupModelTiers["tiers"],
+  defaultTier: string | null,
+): Promise<void> {
+  const response = await page.request.put("/api/chat/model-tiers/group", {
+    data: {
+      tiers: tiers.map(({ tier, provider, model, reasoningEffort }) => ({
+        tier,
+        provider,
+        model,
+        reasoningEffort,
+      })),
+      defaultTier,
+    },
+  });
+  expect(response.ok(), `칸 정의를 저장하지 못했다: ${response.status()} ${await response.text()}`).toBeTruthy();
+}
+
+/** 관리자 세션으로 그룹 칸 정의를 읽어 그 칸이 가리키는 provider 를 돌려준다. 빈 칸이면 실패한다. */
+export async function filledTierProvider(page: Page, tier: string): Promise<string> {
+  const { tiers } = await readGroupModelTiers(page);
+  const provider = tiers.find((it) => it.tier === tier)?.provider;
+  expect(provider, `${tier} 칸이 비어 있다`).toBeTruthy();
+  return provider!;
+}

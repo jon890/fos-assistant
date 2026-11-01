@@ -8,12 +8,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -47,8 +45,7 @@ import org.junit.jupiter.api.Test;
 /**
  * 모델 목록을 profile 마다 들고 있는 것과, 들고 있던 목록으로 Hermes 실패를 넘기는 것을 본다.
  *
- * <p>에이전트 확인은 실제 {@link AgentService} 가 판정하게 하고 저장소만 대역으로 둔다. 대역으로 바꾸면
- * 대화를 보낼 때와 같은 판정을 쓰는지 볼 수 없다.
+ * <p>에이전트는 저장소 대역에서 code 로 꺼내 넘긴다. 권한 확인은 부르는 쪽이 끝낸 뒤다.
  */
 class ModelOptionsServiceTest {
 
@@ -66,7 +63,7 @@ class ModelOptionsServiceTest {
     @BeforeEach
     void setUp() {
         when(visibility.hiddenFor(1L)).thenReturn(HiddenModels.none());
-        service = new ModelOptionsService(new AgentService(agentRepository), hermes, visibility, TTL, clock);
+        service = new ModelOptionsService(hermes, visibility, TTL, clock);
         agentOf("dad", "dad-profile", true);
         agentOf("kid", "kid-profile", true);
     }
@@ -79,6 +76,11 @@ class ModelOptionsServiceTest {
 
     private static Provider provider(String slug, String... models) {
         return new Provider(slug, slug, List.of(models), Map.of());
+    }
+
+
+    private ModelOptions options(String code) {
+        return service.optionsForAgent(dad.groupId(), agentRepository.findByCode(code).orElseThrow());
     }
 
 
@@ -103,8 +105,8 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
-        ModelOptions first = service.optionsFor(dad, "dad");
-        ModelOptions second = service.optionsFor(dad, "dad");
+        ModelOptions first = options("dad");
+        ModelOptions second = options("dad");
 
         assertThat(second).isEqualTo(first);
         assertThat(first.defaultProvider()).isEqualTo("openai-codex");
@@ -121,13 +123,13 @@ class ModelOptionsServiceTest {
             .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
 
-        service.optionsFor(dad, "dad");
+        options("dad");
         clock.advance(TTL.minusSeconds(1));
-        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("old");
+        assertThat(options("dad").providers().get(0).models()).containsExactly("old");
         verify(hermes, times(1)).readCatalog(anyString(), anyString());
 
         clock.advance(Duration.ofSeconds(1));
-        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("new");
+        assertThat(options("dad").providers().get(0).models()).containsExactly("new");
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
     }
 
@@ -139,19 +141,19 @@ class ModelOptionsServiceTest {
             .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         clock.advance(TTL);
-        ModelOptions stale = service.optionsFor(dad, "dad");
+        ModelOptions stale = options("dad");
         clock.advance(Duration.ofSeconds(59));
-        ModelOptions withinDelay = service.optionsFor(dad, "dad");
+        ModelOptions withinDelay = options("dad");
 
         assertThat(stale.providers().get(0).models()).containsExactly("old");
         assertThat(withinDelay.providers().get(0).models()).containsExactly("old");
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
 
         clock.advance(Duration.ofSeconds(1));
-        ModelOptions recovered = service.optionsFor(dad, "dad");
+        ModelOptions recovered = options("dad");
 
         assertThat(recovered.providers().get(0).models()).containsExactly("new");
         verify(hermes, times(3)).readCatalog(anyString(), anyString());
@@ -166,12 +168,12 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute", "real")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         ModelOptions refreshed = service.refreshedOptionsForAgent(1L, agent);
 
         assertThat(refreshed.providers().get(0).models()).containsExactly("substitute", "real");
-        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("substitute", "real");
+        assertThat(options("dad").providers().get(0).models()).containsExactly("substitute", "real");
         verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
         verify(hermes, times(1)).readCatalog(anyString(), anyString());
     }
@@ -185,7 +187,7 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         service.refreshedOptionsForAgent(1L, agent);
         clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL.minusSeconds(1));
@@ -222,7 +224,7 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         ModelOptions refreshed = service.refreshedOptionsForAgent(1L, agent);
 
@@ -236,7 +238,7 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         ModelChoice profileDefault = service.profileDefaultOf(agent);
 
@@ -282,10 +284,10 @@ class ModelOptionsServiceTest {
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
-        assertThatThrownBy(() -> service.optionsFor(dad, "dad"))
+        assertThatThrownBy(() -> options("dad"))
             .isInstanceOfSatisfying(
                 ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
-        assertThat(service.optionsFor(dad, "dad").providers()).hasSize(1);
+        assertThat(options("dad").providers()).hasSize(1);
     }
 
 
@@ -295,11 +297,11 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
             .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
-        service.optionsFor(dad, "dad");
+        options("dad");
 
         clock.advance(TTL);
 
-        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("a");
+        assertThat(options("dad").providers().get(0).models()).containsExactly("a");
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
     }
 
@@ -310,7 +312,7 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
 
-        assertThatThrownBy(() -> service.optionsFor(dad, "dad"))
+        assertThatThrownBy(() -> options("dad"))
             .isInstanceOfSatisfying(
                 ApiException.class,
                 ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_PROFILE_KEY_MISSING));
@@ -323,38 +325,11 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
-        service.optionsFor(dad, "dad");
-        service.optionsFor(dad, "kid");
+        options("dad");
+        options("kid");
 
         verify(hermes).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile");
         verify(hermes).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile");
-    }
-
-
-    @Test
-    @DisplayName("agentCode 가 비었거나 없는 에이전트는 AGENT NOT FOUND 이고 Hermes 를 부르지 않는다")
-    void blankAgentCodeOrMissingAgentIsAgentNotFoundWithoutCallingHermes() {
-        when(agentRepository.findByCode("ghost")).thenReturn(Optional.empty());
-
-        for (String code : new String[] {null, "", "  ", "ghost"}) {
-            assertThatThrownBy(() -> service.optionsFor(dad, code))
-                .as("agentCode=%s", code)
-                .isInstanceOfSatisfying(
-                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
-        }
-        verify(hermes, never()).readCatalog(anyString(), anyString());
-    }
-
-
-    @Test
-    @DisplayName("꺼진 에이전트는 AGENT DISABLED 이고 Hermes 를 부르지 않는다")
-    void disabledAgentIsAgentDisabledWithoutCallingHermes() {
-        agentOf("off", "off-profile", false);
-
-        assertThatThrownBy(() -> service.optionsFor(dad, "off"))
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_DISABLED));
-        verify(hermes, never()).readCatalog(anyString(), anyString());
     }
 
 
@@ -365,7 +340,7 @@ class ModelOptionsServiceTest {
             .thenReturn(catalog(
                 "openai-codex", provider("alpha", "a"), provider("openai-codex", "b"), provider("beta", "c")));
 
-        ModelOptions options = service.optionsFor(dad, "dad");
+        ModelOptions options = options("dad");
 
         assertThat(options.providers()).extracting(Provider::slug).containsExactly("openai-codex", "alpha", "beta");
     }
@@ -377,7 +352,7 @@ class ModelOptionsServiceTest {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog(null, provider("alpha", "a"), provider("beta", "b")));
 
-        assertThat(service.optionsFor(dad, "dad").providers())
+        assertThat(options("dad").providers())
             .extracting(Provider::slug)
             .containsExactly("alpha", "beta");
     }
@@ -397,7 +372,7 @@ class ModelOptionsServiceTest {
                         "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
                         "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
 
-        Provider provider = service.optionsFor(dad, "dad").providers().get(0);
+        Provider provider = options("dad").providers().get(0);
 
         assertThat(provider.reasoning())
             .isEqualTo(Map.of(
@@ -424,7 +399,7 @@ class ModelOptionsServiceTest {
                         "example-model", new ReasoningCapability(SUPPORTED, SUPPORTED),
                         "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
 
-        Provider provider = service.optionsFor(dad, "dad").providers().get(0);
+        Provider provider = options("dad").providers().get(0);
 
         assertThat(provider.models()).containsExactly("example-model");
         assertThat(provider.reasoning()).containsOnlyKeys("example-model");
@@ -449,7 +424,7 @@ class ModelOptionsServiceTest {
                         "no-reasoning", new ReasoningCapability(UNSUPPORTED, SUPPORTED),
                         "unknown-reasoning", new ReasoningCapability(UNKNOWN, SUPPORTED))))));
 
-        ModelOptions options = service.optionsFor(dad, "dad");
+        ModelOptions options = options("dad");
 
         assertThat(options.allowsEffort("p", "can-off", "none"))
             .as("disable SUPPORTED")
@@ -502,7 +477,7 @@ class ModelOptionsServiceTest {
     void reasoningEffortsEqualEffortsConversationCanChoose() {
         when(hermes.readCatalog(anyString(), anyString())).thenReturn(catalog("openai-codex"));
 
-        assertThat(service.optionsFor(dad, "dad").reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);
+        assertThat(options("dad").reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);
     }
 
 

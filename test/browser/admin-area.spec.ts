@@ -300,11 +300,32 @@ test("MEMBER 역할이 관리자 영역의 사용량 주소를 열면 홈으로 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("ADMIN 역할의 대화 화면 설정 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
+test("ADMIN 역할의 대화 화면 모델 단계 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
+  // 그룹에 채운 칸이 없으면 단추 자체를 그리지 않는다. 실제 응답에 칸만 덮어써 창을 열 수 있게 한다.
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const body = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          tiers: [
+            { tier: "INSTANT", label: "Instant", provider: "openai-codex", model: "example-fast", reasoningEffort: "low" },
+            { tier: "HIGH", label: "High", provider: "openai-codex", model: "example-deep", reasoningEffort: "high" },
+          ],
+        },
+      });
+    },
+  );
   await page.goto("/");
-  await page.getByTestId("model-tier-settings").click();
-  await expect(page.getByRole("dialog", { name: "모델 단계 설정" })).toBeVisible();
+  await page.getByTestId("model-tier-picker").click();
+  const slider = page.getByTestId("model-tier-slider");
+  await expect(slider.getByRole("radio", { name: "High" })).toBeVisible();
   await expect(page.getByRole("button", { name: "그룹 모델 설정" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "그룹 모델 설정" })).toHaveCount(0);
 });
 
 test("관리자 영역의 모델 화면에서 그룹 기본 단계를 저장하면 새로 고쳐도 남고 모델 숨김 양식이 보인다", async ({ page }) => {

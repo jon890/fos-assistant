@@ -46,7 +46,6 @@ class SourceReadMessagesTest {
         null,
         access,
         new ChatEventStreams(Duration.ofSeconds(1)),
-        null,
         mock(ModelTierService.class),
         List.of(),
         sourceReads);

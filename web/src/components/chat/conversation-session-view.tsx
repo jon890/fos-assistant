@@ -310,15 +310,6 @@ export function ConversationSessionView({
             }
             skillNames={skillNames}
             onBlockingChange={setComposerBlocking}
-            modelChoice={
-              currentConversation
-                ? {
-                    provider: currentConversation.provider,
-                    model: currentConversation.model,
-                    reasoningEffort: currentConversation.reasoningEffort,
-                  }
-                : null
-            }
             modelChoiceUnknown={
               conversationId !== null && currentConversation === undefined
             }

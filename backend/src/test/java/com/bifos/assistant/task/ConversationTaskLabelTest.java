@@ -16,9 +16,11 @@ import com.bifos.assistant.chat.conversation.application.port.ConversationTaskLa
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.turn.presentation.ChatController;
-import com.bifos.assistant.chat.turn.presentation.ChatDtos.ChooseModelRequest;
+import com.bifos.assistant.chat.turn.presentation.ChatDtos.ChooseModelTierRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.RenameConversationRequest;
 import com.bifos.assistant.chat.turn.presentation.ChatEventStreams;
@@ -112,7 +114,6 @@ class ConversationTaskLabelTest {
             agentService,
             access,
             new ChatEventStreams(Duration.ofSeconds(20)),
-            null,
             mock(ModelTierService.class),
             taskLabels,
             mock(SourceReadSummaries.class));
@@ -142,7 +143,8 @@ class ConversationTaskLabelTest {
         assertNoLabel(controller.conversation(plain.publicId()));
         assertLabel(controller.rename(fromTask.publicId(), new RenameConversationRequest("새 제목")), task);
         assertNoLabel(controller.rename(plain.publicId(), new RenameConversationRequest("새 보통 제목")));
-        assertLabel(controller.chooseModel(fromTask.publicId(), new ChooseModelRequest(null, null, null)), task);
+        assertLabel(controller.chooseModelTier(
+            fromTask.publicId(), new ChooseModelTierRequest(ModelSelectionMode.TIER, ModelTier.MEDIUM)), task);
     }
 
 

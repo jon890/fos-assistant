@@ -713,24 +713,6 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("CUSTOM 대화는 저장한 모델 선택을 칸 정의와 무관하게 보존한다")
-    void customConversationPreservesStoredChoice() {
-        TierFixtures fixtures = tierFixtures();
-        Conversation conversation = mock(Conversation.class);
-        ModelChoice choice = ModelChoice.stored("openai-codex", "custom-model", "max");
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(choice);
-
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
-
-        assertThat(resolved.choice()).isEqualTo(choice);
-        assertThat(resolved.tier()).isNull();
-        assertThat(fixtures.store().reads()).isZero();
-        verifyNoInteractions(fixtures.users(), fixtures.options());
-    }
-
-
-    @Test
     @DisplayName("실행에 넘길 칸 선택은 뒤의 칸 정의 변경에 영향받지 않는다")
     void resolvedTierChoiceIsImmutableSnapshot() {
         TierFixtures fixtures = tierFixtures();
@@ -773,37 +755,22 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("모델을 비운 CUSTOM 대화는 모델을 싣지 않고 effort는 대화가 고른 값을 보낸다")
-    void customConversationWithoutModelKeepsOnlyChosenEffort() {
-        TierFixtures fixtures = tierFixtures();
-        Conversation conversation = mock(Conversation.class);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(ModelChoice.stored(null, null, "max"));
-
-        ResolvedModelTier resolved = fixtures.service().resolve(fixtures.user(), conversation, fixtures.agent());
-
-        assertThat(resolved.choice()).isEqualTo(ModelChoice.stored(null, null, "max"));
-    }
-
-
-    @Test
     @DisplayName("해석한 모델이 숨긴 모델이면 다른 모델로 바꾸지 않고 MODEL_HIDDEN 으로 거절한다")
     void hiddenModelIsRejectedInsteadOfReplaced() {
-        ModelVisibilityService visibility = mock(ModelVisibilityService.class);
+        FakeModelSettingStore store = new FakeModelSettingStore()
+            .tiers(new ModelSetting.Stop(ModelTier.HIGH, "openai-codex", "hidden-model", "high"))
+            .hidden(hiding("openai-codex", "hidden-model"));
+        ModelOptionsService options = mock(ModelOptionsService.class);
+        Agent agent = mock(Agent.class);
+        when(options.optionsForAgent(10L, agent)).thenReturn(catalog("openai-codex", "hidden-model"));
         ModelTierService service = service(
-            new FakeModelSettingStore(),
+            store,
             mock(AppUserRepository.class),
-            mock(ModelOptionsService.class),
-            visibility,
+            options,
+            new ModelVisibilityService(store),
             mock(GroupModelCatalogService.class));
-        Conversation conversation = mock(Conversation.class);
-        ModelChoice choice = ModelChoice.stored("openai-codex", "hidden-model", null);
-        when(conversation.modelSelectionMode()).thenReturn(ModelSelectionMode.CUSTOM);
-        when(conversation.modelChoice()).thenReturn(choice);
-        when(visibility.hiddenFor(10L))
-            .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "hidden-model"))));
 
-        assertThatThrownBy(() -> service.resolve(MEMBER, conversation, mock(Agent.class)))
+        assertThatThrownBy(() -> service.resolve(MEMBER, tierConversation(ModelTier.HIGH), agent))
             .isInstanceOf(ApiException.class)
             .extracting(error -> ((ApiException)error).code())
             .isEqualTo(ErrorCode.MODEL_HIDDEN);

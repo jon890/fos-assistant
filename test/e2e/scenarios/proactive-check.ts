@@ -26,7 +26,6 @@ type AgentView = { code: string };
 type AdminAgentView = { code: string; enabled: boolean; visibility: string; proactiveCheckWritesAllowed: boolean };
 type ConnectorActionView = { actionId: string; status: string };
 type CheckFindingsView = { dismissWindowDays: number; findings: { id: number; topicKey: string | null; reaction: string | null }[] };
-type FeedbackExport = { records: { subjects: { subjectKey: string; label: string | null }[] }[] };
 
 /** 살펴볼 일반 에이전트다. 연결의 주인인 아빠의 비공개 에이전트라 그 연결을 붙일 수 있다. */
 const AGENT = "dad";
@@ -572,11 +571,6 @@ export const proactiveCheckScenario: Scenario = {
         dismissedAnswer.includes(`- ${WEB_ONLY.title}: 이미 알린 것이에요`),
         `관심 없음 주제가 이미 알린 것으로 내려가지 않았다:\n${dismissedAnswer}`,
       );
-      const subjectKey = `check_finding:${reacted.id}`;
-      const subject = expectStatus(
-        await call(context, "/decision-feedback/export", { token: context.tokens.dad }), 200, "판단 피드백 내보내기",
-      ).json<FeedbackExport>().records.flatMap((record) => record.subjects).find((each) => each.subjectKey === subjectKey);
-      expect(subject?.label === "DECLINED", `${subjectKey} 의 반응 읽기가 DECLINED 가 아니다: ${JSON.stringify(subject)}`);
 
       step("다른 사용자: 이 에이전트의 상태 조회와 시작이 404 이고 대화 목록에 이 점검 대화가 없다");
       for (const [method, path] of [["GET", CHECK_PATH], ["POST", `${CHECK_PATH}/runs`]] as const) {

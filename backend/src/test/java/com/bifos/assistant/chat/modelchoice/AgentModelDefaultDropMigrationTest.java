@@ -17,10 +17,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 에이전트 기본 모델을 없애는 두 마이그레이션을 본다(ADR-20261101 / model-setting).
+ * 에이전트 기본 모델과 대화의 직접 고른 모델을 없애는 세 마이그레이션을 본다(ADR-20261101 / model-setting).
  *
  * <p>대화의 {@code DEFAULT} 선택을 선택 없음으로 바꾸는 파일과 {@code agent} 의 세 컬럼을 지우는 파일은 따로다. 삭제만
- * 미룰 수 있어야 해서, 앞 파일까지만 적용했을 때 컬럼이 남는지도 함께 본다.
+ * 미룰 수 있어야 해서, 앞 파일까지만 적용했을 때 컬럼이 남는지도 함께 본다. 세 번째 파일은 대화의 {@code CUSTOM}
+ * 선택을 선택 없음으로 옮기고 그 대화의 칸, provider, 모델, effort 를 비운다.
  */
 class AgentModelDefaultDropMigrationTest {
 
@@ -28,6 +29,9 @@ class AgentModelDefaultDropMigrationTest {
     private static final String BEFORE = "20261031171503";
 
     private static final String CLEAR_MODE = "20261031171509";
+
+    /** {@code CUSTOM} 선택을 비우는 파일 바로 앞 버전이다. */
+    private static final String BEFORE_CUSTOM_CLEAR = "20261031171513";
 
     private Database database;
 
@@ -48,9 +52,9 @@ class AgentModelDefaultDropMigrationTest {
 
 
     @Test
-    @DisplayName("DEFAULT 대화는 선택 없음으로 바뀌고 TIER 와 CUSTOM 대화와 선택 없는 대화는 그대로다")
+    @DisplayName("CUSTOM 을 비우는 파일 앞까지는 DEFAULT 대화만 선택 없음으로 바뀌고 TIER 와 CUSTOM 대화와 선택 없는 대화는 그대로다")
     void clearsOnlyDefaultSelection() throws SQLException {
-        migrate(null);
+        migrate(BEFORE_CUSTOM_CLEAR);
 
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT model_selection_mode FROM conversation WHERE id = 31"))
@@ -68,6 +72,30 @@ class AgentModelDefaultDropMigrationTest {
             assertThat(strings(statement, "SELECT model FROM conversation WHERE id = 33"))
                 .containsExactly("example-model");
             assertThat(strings(statement, "SELECT model_selection_mode FROM conversation WHERE id = 34"))
+                .containsExactly((String)null);
+        }
+    }
+
+
+    @Test
+    @DisplayName("CUSTOM 대화는 선택 없음으로 바뀌고 칸과 provider 모델 effort 가 모두 비며 TIER 대화와 선택 없는 대화는 그대로다")
+    void clearsCustomSelectionAndItsValues() throws SQLException {
+        migrate(null);
+
+        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+            for (String column : List.of(
+                "model_selection_mode", "model_tier", "model_provider", "model", "reasoning_effort")) {
+                assertThat(strings(statement, "SELECT " + column + " FROM conversation WHERE id = 33"))
+                    .as("CUSTOM 대화의 %s", column)
+                    .containsExactly((String)null);
+            }
+            assertThat(strings(statement, "SELECT model_selection_mode FROM conversation WHERE id = 32"))
+                .containsExactly("TIER");
+            assertThat(strings(statement, "SELECT model_tier FROM conversation WHERE id = 32"))
+                .containsExactly("HIGH");
+            assertThat(strings(statement, "SELECT model_selection_mode FROM conversation WHERE id = 34"))
+                .containsExactly((String)null);
+            assertThat(strings(statement, "SELECT model_tier FROM conversation WHERE id = 34"))
                 .containsExactly((String)null);
         }
     }

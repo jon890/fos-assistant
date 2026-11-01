@@ -1,5 +1,6 @@
 import { parseRgb } from "./color.ts";
-import { CONVERSATION_URL, expect, test, setSession, SWITCH_AGENT_CODE } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, test, setSession } from "./fixtures.ts";
+import { filledTierProvider } from "./helpers.ts";
 
 test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴다", async ({
   page, context, isolatedMember,
@@ -273,47 +274,55 @@ test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨�
 
 test("막힌 모델을 고른 대화는 넘기지 않고 실패한다", async ({
   page,
+  context,
   hermes,
-}, testInfo) => {
-  const blockedProvider = `blocked-${testInfo.project.name}`;
-  const created = await page.request.post("/api/chat/conversations", {
-    data: { agentCode: SWITCH_AGENT_CODE },
+  isolatedMember,
+}) => {
+  // 칸을 고르면 그 사용자의 기본 칸도 바뀐다. 관리자 세션의 기본 칸을 남기지 않도록 따로 만든 사용자로 고른다.
+  const blockedProvider = await filledTierProvider(page, "HIGH");
+  await setSession(context, isolatedMember);
+  const agent = await page.request.post("/api/agents", {
+    data: { name: "막힘 검사 비서" },
   });
-  expect(
-    created.ok(),
-    `빈 대화를 만들지 못했다: ${created.status()}`,
-  ).toBeTruthy();
-  const { conversationId } = (await created.json()) as {
-    conversationId: string;
-  };
-  const chosen = await page.request.put(
-    `/api/chat/conversations/${conversationId}/model`,
-    {
-      data: {
-        provider: blockedProvider,
-        model: "blocked-model",
-        reasoningEffort: null,
-      },
-    },
-  );
-  expect(chosen.ok(), `모델을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
-
-  await hermes.blockProvider(blockedProvider);
+  expect(agent.status()).toBe(201);
+  const { code: agentCode } = (await agent.json()) as { code: string };
   try {
-    const response = await page.request.post("/api/chat", {
-      data: { conversationId, text: "막힘 화면 검사" },
+    const created = await page.request.post("/api/chat/conversations", {
+      data: { agentCode },
     });
-    expect(response.ok()).toBeFalsy();
-    expect(((await response.json()) as { code: string }).code).toBe(
-      "PROVIDER_BLOCKED",
+    expect(
+      created.ok(),
+      `빈 대화를 만들지 못했다: ${created.status()}`,
+    ).toBeTruthy();
+    const { conversationId } = (await created.json()) as {
+      conversationId: string;
+    };
+    const chosen = await page.request.put(
+      `/api/chat/conversations/${conversationId}/model-tier`,
+      { data: { mode: "TIER", tier: "HIGH" } },
     );
-  } finally {
-    await hermes.clearBlockedProviders();
-  }
+    expect(chosen.ok(), `칸을 고르지 못했다: ${chosen.status()}`).toBeTruthy();
 
-  await page.goto(`/chat/${conversationId}`);
-  await expect(page.getByTestId("user-message").last()).toContainText(
-    "막힘 화면 검사",
-  );
-  await expect(page.getByTestId("provider-switched")).toHaveCount(0);
+    await hermes.blockProvider(blockedProvider);
+    try {
+      const response = await page.request.post("/api/chat", {
+        data: { conversationId, text: "막힘 화면 검사" },
+      });
+      expect(response.ok()).toBeFalsy();
+      expect(((await response.json()) as { code: string }).code).toBe(
+        "PROVIDER_BLOCKED",
+      );
+    } finally {
+      await hermes.clearBlockedProviders();
+    }
+
+    await page.goto(`/chat/${conversationId}`);
+    await expect(page.getByTestId("user-message").last()).toContainText(
+      "막힘 화면 검사",
+    );
+    await expect(page.getByTestId("provider-switched")).toHaveCount(0);
+  } finally {
+    const removed = await page.request.delete(`/api/agents/${agentCode}`);
+    expect(removed.status()).toBe(204);
+  }
 });

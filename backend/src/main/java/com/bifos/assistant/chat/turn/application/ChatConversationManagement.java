@@ -10,7 +10,6 @@ import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -51,37 +50,11 @@ class ChatConversationManagement {
 
 
     /**
-     * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
+     * 대화가 고른 칸을 저장하고 그 칸을 요청자의 기본 칸으로도 남긴다. 칸을 고르는 모드만 받는다.
      *
-     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 그룹이 숨긴 모델은 {@code MODEL_HIDDEN} 으로 거절한다. effort
-     * {@code none} 은 그 에이전트의 목록에서 끄기 지원이 확인된 모델에서만 받고, 아니면 {@code VALIDATION_FAILED} 다. 대화 목록의 순서는 주고받은 시각으로 정하므로
-     * {@code updatedAt} 을 건드리지 않는다.
-     *
-     * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
+     * <p>ChatGPT 가 고른 thinking 시간을 다음 대화에 남기듯, 고른 칸이 다음 새 대화의 처음 위치가 된다
+     * (ADR-20261101 / model-setting 의 「기본 칸」). 부르는 쪽({@code ChatService})의 트랜잭션 안에서 함께 바꾼다.
      */
-    Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
-        Conversation conversation = access.requireOwn(user, conversationId);
-        modelTiers.requireVisible(user, choice);
-        // none 일 때만 에이전트를 얻는다. 꺼진 에이전트나 에이전트가 없는 대화의 다른 effort 저장은 그대로 둔다.
-        if (ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())) {
-            Agent agent = agents.requireStartable(
-                user, agents.requireById(conversation.agentId()).code());
-            modelTiers.requireEffortAllowed(user, agent, choice);
-        }
-        if (conversations.chooseModelIfActive(
-            conversationId,
-            user.id(),
-            choice.provider(),
-            choice.model(),
-            choice.reasoningEffort(),
-            ModelSelectionMode.CUSTOM) == 0) {
-            throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
-        }
-        return access.requireOwn(user, conversationId);
-    }
-
-
-    /** 대화가 고른 단계를 저장한다. 단계를 고르는 모드만 받는다. */
     Conversation chooseModelTier(CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
         Conversation conversation = access.requireOwn(user, conversationId);
         if (mode != ModelSelectionMode.TIER || tier == null) {
@@ -93,6 +66,7 @@ class ChatConversationManagement {
         if (conversations.chooseModelTierIfActive(conversationId, user.id(), mode, tier) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
+        modelTiers.saveUserDefault(user, tier);
         return access.requireOwn(user, conversationId);
     }
 

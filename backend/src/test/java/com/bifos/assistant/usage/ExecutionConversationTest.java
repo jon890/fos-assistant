@@ -7,7 +7,6 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /** 대화가 실행 줄에 넘기는 값이 대화 번호와 effort 출처 판정을 그대로 전하는지 확인한다. */
 @BackendIntegrationTest
@@ -35,9 +33,6 @@ class ExecutionConversationTest {
     private static final String PROVIDER = "example-provider";
 
     private static final String MODEL = "example-agent";
-
-    /** 대화가 고른 effort 다. Hermes 에 보낸 effort 와 다른 값으로 두어 어느 쪽을 읽었는지 구분한다. */
-    private static final String CHOSEN_EFFORT = "high";
 
     /** Hermes 에 보낸 값이다. 에이전트 기본 effort 가 없어, 보낸 effort 가 있으면 출처는 언제나 REQUESTED 다. */
     private static final ModelChoice SENT = ModelChoice.stored(PROVIDER, MODEL, "medium");
@@ -51,9 +46,6 @@ class ExecutionConversationTest {
     @Autowired
     ConversationRepository conversations;
 
-    @Autowired
-    TransactionTemplate transaction;
-
     private Conversation conversation;
 
 
@@ -61,23 +53,6 @@ class ExecutionConversationTest {
     void setUp() {
         executions.deleteAll();
         conversation = conversations.save(Conversation.startedBy(USER_ID, "실행", null, Instant.now()));
-    }
-
-
-    @Test
-    @DisplayName("대화가 effort 를 골랐으면 그 값을 담아 내고 실행 줄의 출처는 REQUESTED 다")
-    void carriesEffortChosenByConversationAndRecordsRequestedSource() {
-        transaction.executeWithoutResult(status -> conversations.chooseModelIfActive(
-            conversation.id(), USER_ID, PROVIDER, MODEL, CHOSEN_EFFORT, ModelSelectionMode.CUSTOM));
-        Conversation chosen = conversations.findById(conversation.id()).orElseThrow();
-
-        ExecutionConversation value = chosen.executionConversation();
-        AgentExecution execution = start(value);
-
-        assertThat(value.id()).isEqualTo(conversation.id());
-        assertThat(value.reasoningEffort()).isEqualTo(CHOSEN_EFFORT);
-        assertThat(saved(execution).conversationId()).isEqualTo(conversation.id());
-        assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
     }
 
 

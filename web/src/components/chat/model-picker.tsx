@@ -1,134 +1,18 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { Popover } from "radix-ui";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { NativeSelect } from "@/components/ui/native-select";
-import {
   getModelTiers,
   MODEL_TIER_LABELS,
-  saveDefaultTier,
   type ModelSelectionMode,
   type ModelTier,
   type ModelTierCode,
   type ModelTiers,
 } from "@/lib/model-tiers";
-import { fetchModelOptions } from "@/lib/chat-api";
-
-/** 대화에 적힌 모델 선택이다. 셋 다 null 이면 그 profile 의 기본값으로 돈다 */
-export type ModelChoice = {
-  provider: string | null;
-  model: string | null;
-  reasoningEffort: string | null;
-};
-
-/** `GET /api/chat/model-options` 의 응답이다 */
-type ModelOptions = {
-  defaultProvider: string | null;
-  /** 요청에 모델을 싣지 않을 때 도는 모델이다. profile 의 값이다 */
-  defaultModel: string | null;
-  /** 기본 모델이 `providers` 에 있는가. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이다 */
-  defaultAvailable?: boolean;
-  providers: {
-    provider: string;
-    name: string;
-    models: string[];
-    /** 모델 이름을 열쇠로 한 reasoning 지원과 끄기(`none`) 지원이다. Hermes 가 밝히지 않은 칸은 `UNKNOWN` 이다 */
-    reasoning: Record<string, ReasoningCapability>;
-  }[];
-  reasoningEfforts: string[];
-};
-
-/** 지원 여부다. Hermes 가 밝히지 않았으면 `UNKNOWN` 이다(ADR-060) */
-type Support = "SUPPORTED" | "UNSUPPORTED" | "UNKNOWN";
-
-type ReasoningCapability = { support: Support; disable: Support };
-
-/** 목록을 읽지 못했거나 표에 없는 모델이다. 모르는 것을 지원한다고 채우지 않는다 */
-const UNKNOWN_CAPABILITY: ReasoningCapability = {
-  support: "UNKNOWN",
-  disable: "UNKNOWN",
-};
-
-/** reasoning 을 끄는 effort 다. 「기본」(effort 를 보내지 않음)과 다른 의도다 */
-const EFFORT_NONE = "none";
-
-type OptionsState =
-  | { status: "loading" }
-  | { status: "loaded"; options: ModelOptions }
-  | { status: "failed" };
-
-/** Control Plane 이 받는 effort 다. 목록을 읽지 못했을 때만 쓴다. 그때도 effort 는 고를 수 있어야 해서 화면이 따로 갖는다 */
-const REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-
-/** 모델 고르기의 「기본」 자리 값이다 */
-const DEFAULT_KEY = "";
-
-/** provider 와 모델을 한 값으로 묶는다. 모델 이름에 `/` 가 들어갈 수 있어 구분자로 잇지 않는다 */
-function modelKey(provider: string, model: string): string {
-  return JSON.stringify([provider, model]);
-}
-
-function parseModelKey(
-  key: string,
-): { provider: string; model: string } | null {
-  if (key === DEFAULT_KEY) return null;
-  const [provider, model] = JSON.parse(key) as [string, string];
-  return { provider, model };
-}
-
-/** 단추에 보일 글자다. 대화에 적힌 값만으로 정한다. 목록은 창을 열 때 읽어 이때는 기본 모델 이름을 모른다 */
-export function modelChoiceLabel(choice: ModelChoice | null): string {
-  const name = choice?.model ?? "기본";
-  return choice?.reasoningEffort ? `${name} · ${choice.reasoningEffort}` : name;
-}
-
-/**
- * 그 모델의 reasoning 지원과 끄기 지원이다.
- *
- * <p>「기본」 이면 기본 모델을 본다. 목록을 읽지 못했거나 표에 값이 없으면 둘 다 `UNKNOWN` 이다.
- */
-function capabilityOf(
-  options: ModelOptions | null,
-  picked: { provider: string; model: string } | null,
-): ReasoningCapability {
-  if (options === null) return UNKNOWN_CAPABILITY;
-  const provider = picked?.provider ?? options.defaultProvider;
-  const model = picked?.model ?? options.defaultModel;
-  if (model === null) return UNKNOWN_CAPABILITY;
-  const row = options.providers.find((item) => item.provider === provider);
-  return row?.reasoning?.[model] ?? UNKNOWN_CAPABILITY;
-}
-
-/** effort 선택지에 보이는 글자다. `none` 만 뜻을 풀어 보인다 */
-function effortLabel(effort: string): string {
-  return effort === EFFORT_NONE ? "끄기" : effort;
-}
-
-function sameChoice(left: ModelChoice | null, right: ModelChoice): boolean {
-  return (
-    (left?.provider ?? null) === right.provider &&
-    (left?.model ?? null) === right.model &&
-    (left?.reasoningEffort ?? null) === right.reasoningEffort
-  );
-}
 
 /**
  * 저장한 결과다. 실패하면 단추가 이전 값으로 돌아간다.
@@ -136,518 +20,267 @@ function sameChoice(left: ModelChoice | null, right: ModelChoice): boolean {
  * <p>`reported` 는 실패했지만 부르는 쪽이 이미 알렸다는 뜻이다. 빈 대화를 만들지 못하면 입력창이 알리므로
  * 이 부품은 안내를 더 띄우지 않는다. 두 안내가 겹치면 무엇이 실패했는지 읽기 어렵다.
  */
-export type ModelChoiceSaveResult = "saved" | "failed" | "reported";
-
-export type ModelTierSaveResult = ModelChoiceSaveResult;
+export type ModelTierSaveResult = "saved" | "failed" | "reported";
 
 type Props = {
-  agentCode: string;
-  choice: ModelChoice | null;
-  /** 고른 값을 저장한다 */
-  onChange(choice: ModelChoice): Promise<ModelChoiceSaveResult>;
-  disabled: boolean;
-  inSettings?: boolean;
-};
-
-/** 입력창 아래에서 대화의 모델과 effort 를 고른다. 고른 값은 다음 보내기부터 쓰인다 */
-export function ModelPicker({
-  agentCode,
-  choice,
-  onChange,
-  disabled,
-  inSettings = false,
-}: Props) {
-  const [open, setOpen] = useState(false);
-  const [optionsState, setOptionsState] = useState<OptionsState>({
-    status: "loading",
-  });
-  const [draftModel, setDraftModel] = useState(DEFAULT_KEY);
-  const [draftEffort, setDraftEffort] = useState("");
-  /** 저장하는 동안 단추가 먼저 보이는 값이다. 저장이 끝나면 비우고 대화에 적힌 값을 다시 보인다 */
-  const [saving, setSaving] = useState<ModelChoice | null>(null);
-  const [failed, setFailed] = useState(false);
-  /** 목록 읽기의 순번이다. 창을 닫았다 다시 열면 앞선 응답을 버린다 */
-  const loadVersion = useRef(0);
-  const modelSelectId = useId();
-  const effortSelectId = useId();
-
-  const shown = saving ?? choice;
-  const label = modelChoiceLabel(shown);
-
-  async function loadOptions() {
-    const version = ++loadVersion.current;
-    if (!agentCode) {
-      setOptionsState({ status: "failed" });
-      return;
-    }
-    setOptionsState({ status: "loading" });
-    try {
-      const response = await fetchModelOptions(agentCode);
-      if (!response.ok) throw new Error("모델 목록을 읽지 못했어요.");
-      const options = (await response.json()) as ModelOptions;
-      if (loadVersion.current === version)
-        setOptionsState({ status: "loaded", options });
-    } catch {
-      if (loadVersion.current === version)
-        setOptionsState({ status: "failed" });
-    }
-  }
-
-  function changeOpen(next: boolean) {
-    setOpen(next);
-    if (!next) {
-      loadVersion.current += 1;
-      return;
-    }
-    // 다시 고르러 왔으니 지난 저장 실패 안내는 거둔다.
-    setFailed(false);
-    setDraftModel(
-      shown?.provider && shown.model
-        ? modelKey(shown.provider, shown.model)
-        : DEFAULT_KEY,
-    );
-    setDraftEffort(shown?.reasoningEffort ?? "");
-    void loadOptions();
-  }
-
-  const options =
-    optionsState.status === "loaded" ? optionsState.options : null;
-  const pickedModel = parseModelKey(draftModel);
-  const capability = capabilityOf(options, pickedModel);
-  // 지원 미확인도 고르게 둔다. 막으면 고를 수 있는 것을 못 고르게 된다(ADR-060).
-  const effortEnabled = capability.support !== "UNSUPPORTED";
-  const effortUnknown =
-    options !== null && effortEnabled && capability.support === "UNKNOWN";
-  const knownKeys = new Set(
-    options?.providers.flatMap((row) =>
-      row.models.map((model) => modelKey(row.provider, model)),
-    ),
-  );
-  // 대화에 적힌 모델이 목록에 없으면(목록에서 빠졌거나 목록을 읽지 못했으면) 그 값도 둔다. 없으면 창을 열어
-  // effort 만 바꿔도 모델이 「기본」 으로 돌아간다.
-  const keptKey =
-    shown?.provider &&
-    shown.model &&
-    !knownKeys.has(modelKey(shown.provider, shown.model))
-      ? modelKey(shown.provider, shown.model)
-      : null;
-  const defaultLabel = options?.defaultModel
-    ? `기본 (${options.defaultModel})`
-    : "기본";
-  // `none` 은 끄기 지원이 확인된 모델에서만 고른다.
-  const listedEfforts = [
-    ...(effortEnabled && capability.disable === "SUPPORTED"
-      ? [EFFORT_NONE]
-      : []),
-    ...(options?.reasoningEfforts ?? REASONING_EFFORTS),
-  ];
-  // 대화에 적힌 effort 가 목록에 없으면 그 값도 둔다. 선택지에 없으면 창은 「기본」 을 보이는데 적용하면 옛 값이 나간다.
-  // `none` 을 더한 뒤의 목록으로 견주므로 저장된 `none` 이 둘로 보이지 않는다.
-  const efforts =
-    shown?.reasoningEffort && !listedEfforts.includes(shown.reasoningEffort)
-      ? [...listedEfforts, shown.reasoningEffort]
-      : listedEfforts;
-
-  async function apply(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    // 창은 body 로 옮겨 그리지만 React 의 사건은 부품 트리를 따라 올라간다. 막지 않으면 입력창의 form 이
-    // 이 제출을 받아 메시지를 보낸다.
-    event.stopPropagation();
-    const next: ModelChoice = {
-      provider: pickedModel?.provider ?? null,
-      model: pickedModel?.model ?? null,
-      reasoningEffort: effortEnabled && draftEffort !== "" ? draftEffort : null,
-    };
-    // 바꾼 것이 없는지는 `none` 을 거르기 전의 값으로 정한다. 그래야 그대로 적용해도 저장된 `none` 이 남는다.
-    const unchanged = sameChoice(choice, next);
-    // `none` 을 새로 골랐는데 그 모델이 끄기를 받는다고 확인되지 않았으면 보내지 않는다. 목록을 읽지 못했으면
-    // 판정할 수 없으니 그대로 둔다.
-    if (
-      !unchanged &&
-      options !== null &&
-      next.reasoningEffort === EFFORT_NONE &&
-      capability.disable !== "SUPPORTED"
-    ) {
-      next.reasoningEffort = null;
-    }
-    changeOpen(false);
-    if (unchanged || sameChoice(choice, next)) return;
-    setSaving(next);
-    setFailed(false);
-    const result = await onChange(next);
-    setSaving(null);
-    if (result === "failed") setFailed(true);
-  }
-
-  return (
-    <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
-      {inSettings ? null : (
-        <span className="px-2 text-xs text-muted-foreground">고급</span>
-      )}
-      <Dialog open={open} onOpenChange={changeOpen}>
-        <DialogTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid="model-picker"
-            aria-label={`모델 고르기, 지금 ${label}`}
-            disabled={disabled || saving !== null}
-            className="max-w-full min-w-0 text-xs text-muted-foreground"
-          >
-            <span className="truncate">{label}</span>
-            <ChevronDown aria-hidden="true" />
-          </Button>
-        </DialogTrigger>
-        <DialogContent closeLabel="모델 고르기 닫기">
-          <form onSubmit={(event) => void apply(event)} className="grid gap-4">
-            <DialogHeader>
-              <DialogTitle>모델 고르기</DialogTitle>
-              <DialogDescription>
-                고른 모델은 이 대화의 다음 메시지부터 쓰여요.
-              </DialogDescription>
-            </DialogHeader>
-            {optionsState.status === "failed" ? (
-              <p
-                data-testid="model-options-failed"
-                className="text-sm text-muted-foreground"
-              >
-                모델 목록을 불러오지 못했어요. 기본 모델로는 계속 보낼 수
-                있어요.
-              </p>
-            ) : null}
-            <div className="grid gap-2">
-              <label htmlFor={modelSelectId} className="text-sm font-medium">
-                모델
-              </label>
-              <NativeSelect
-                id={modelSelectId}
-                value={draftModel}
-                disabled={optionsState.status === "loading"}
-                onChange={(event) => {
-                  const nextModel = event.target.value;
-                  setDraftModel(nextModel);
-                  // 새 모델이 끄기를 받지 않으면 창의 임시 선택만 「기본」 으로 비운다. 저장된 값은 적용하기 전에는 그대로다.
-                  if (
-                    draftEffort === EFFORT_NONE &&
-                    capabilityOf(options, parseModelKey(nextModel)).disable !==
-                      "SUPPORTED"
-                  ) {
-                    setDraftEffort("");
-                  }
-                }}
-              >
-                <option value={DEFAULT_KEY}>{defaultLabel}</option>
-                {keptKey !== null ? (
-                  <option value={keptKey}>{shown?.model}</option>
-                ) : null}
-                {options?.providers.map((row) => (
-                  <optgroup key={row.provider} label={row.name}>
-                    {row.models.map((model) => (
-                      <option key={model} value={modelKey(row.provider, model)}>
-                        {model}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </NativeSelect>
-              {optionsState.status === "loading" ? (
-                <p className="text-xs text-muted-foreground">
-                  모델 목록을 불러오고 있어요.
-                </p>
-              ) : null}
-              {draftModel === DEFAULT_KEY &&
-              options?.defaultAvailable === false ? (
-                <p
-                  data-testid="model-default-unavailable"
-                  className="text-xs text-warning"
-                >
-                  기본 모델을 지금 쓸 수 없어요. 다른 모델을 골라 주세요.
-                </p>
-              ) : null}
-              {options !== null &&
-              keptKey !== null &&
-              draftModel === keptKey ? (
-                <p
-                  data-testid="model-choice-unlisted"
-                  className="text-xs text-warning"
-                >
-                  이 대화에 적힌 모델이 목록에 없어요. 숨겼거나 없어진 모델이면
-                  답하지 못하니 다른 모델을 골라 주세요.
-                </p>
-              ) : null}
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor={effortSelectId} className="text-sm font-medium">
-                effort
-              </label>
-              <NativeSelect
-                id={effortSelectId}
-                value={effortEnabled ? draftEffort : ""}
-                disabled={!effortEnabled}
-                onChange={(event) => setDraftEffort(event.target.value)}
-              >
-                <option value="">기본</option>
-                {efforts.map((effort) => (
-                  <option key={effort} value={effort}>
-                    {effortLabel(effort)}
-                  </option>
-                ))}
-              </NativeSelect>
-              {effortEnabled ? null : (
-                <p className="text-xs text-muted-foreground">
-                  이 모델은 effort 를 고를 수 없어요.
-                </p>
-              )}
-              {effortUnknown ? (
-                <p
-                  data-testid="effort-support-unknown"
-                  className="text-xs text-muted-foreground"
-                >
-                  이 모델의 effort 지원을 확인하지 못했어요. 골라도 모델이
-                  무시할 수 있어요.
-                </p>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button
-                type="submit"
-                disabled={optionsState.status === "loading"}
-              >
-                적용
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      {failed ? (
-        <p
-          role="alert"
-          data-testid="model-picker-error"
-          className="px-2 text-xs text-destructive"
-        >
-          모델을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-type TierPickerProps = {
   agentCode: string;
   mode: ModelSelectionMode | null;
   tier: ModelTierCode | null;
   disabled: boolean;
   onChange(mode: "TIER", tier: ModelTierCode): Promise<ModelTierSaveResult>;
-  advancedPicker: ReactNode;
 };
 
-/** 단계를 읽기 전과 읽지 못했을 때 자리를 잡는 칸이다. 누를 수 없다. 읽은 뒤에는 관리자가 채운 칸만 보인다. */
-const FALLBACK_TIERS: ModelTier[] = (
-  Object.keys(MODEL_TIER_LABELS) as ModelTierCode[]
-).map((tier) => ({
-  tier,
-  label: MODEL_TIER_LABELS[tier],
-  provider: null,
-  model: null,
-  reasoningEffort: null,
-}));
+type LoadState =
+  | { status: "loading" }
+  | { status: "loaded"; data: ModelTiers }
+  | { status: "failed" };
 
-/** 입력창 가까이에서 칸과 기본값을 고른다. 고급 직접 선택은 설정 안에 둔다. */
+/**
+ * 처음 위치다. 대화에 적힌 칸, 사용자 기본 칸, 그룹 기본 칸 차례다.
+ *
+ * <p>사용자 기본 칸은 사용자가 마지막으로 고른 칸이다. 고른 칸을 다음 새 대화에 남기는 ChatGPT 의 동작을 따른다
+ * (ADR-20261101 / model-setting 의 「기본 칸」).
+ */
+function initialTier(
+  mode: ModelSelectionMode | null,
+  tier: ModelTierCode | null,
+  data: ModelTiers | null,
+): ModelTierCode | null {
+  if (mode === "TIER" && tier !== null) return tier;
+  return data?.userDefaultTier ?? data?.groupDefaultTier ?? null;
+}
+
+/**
+ * 입력창 아래의 모델 단추다. 누르면 ChatGPT 의 Thinking 슬라이더처럼 칸을 고르는 조절 하나가 열린다.
+ *
+ * <p>관리자가 비운 칸은 보이지 않고, 칸이 하나도 없으면 단추를 그리지 않는다. 칸 뒤의 provider 와 모델, effort 는
+ * 역할과 상관없이 그리지 않는다. 관리자 영역에만 그린다(ADR-063).
+ *
+ * <p>칸은 radio 묶음으로 그린다. 방향키로 움직이면 고른 칸이 바로 저장되고, 앞 저장이 끝나기 전에 또 고르면 마지막
+ * 칸만 이어서 저장한다. 저장이 겹쳐 늦게 끝난 요청이 마지막 선택을 덮지 않게 한다.
+ */
 export function ModelTierPicker({
   agentCode,
   mode,
   tier,
   disabled,
   onChange,
-  advancedPicker,
-}: TierPickerProps) {
-  const [state, setState] = useState<{
-    loading: boolean;
-    data: ModelTiers | null;
-  }>({ loading: true, data: null });
-  const [saving, setSaving] = useState(false);
+}: Props) {
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const [open, setOpen] = useState(false);
+  /** 저장하는 동안 먼저 보이는 칸이다. 저장이 끝나면 비우고 대화에 적힌 칸을 다시 보인다 */
+  const [draft, setDraft] = useState<ModelTierCode | null>(null);
   const [failed, setFailed] = useState(false);
-  const [defaultsOpen, setDefaultsOpen] = useState(false);
-  const [ownDefaultSaveFailed, setOwnDefaultSaveFailed] = useState(false);
+  const pending = useRef<ModelTierCode | null>(null);
+  const saving = useRef(false);
+  const groupName = useId();
 
   useEffect(() => {
     let active = true;
-    const result = agentCode
-      ? getModelTiers(agentCode)
-      : Promise.resolve({ ok: false as const });
-    void result.then((result) => {
+    if (!agentCode) return;
+    void getModelTiers(agentCode).then((result) => {
       if (!active) return;
-      if (result.ok) {
-        setState({ loading: false, data: result.data });
-      } else {
-        setState({ loading: false, data: null });
-      }
+      setState(
+        result.ok
+          ? { status: "loaded", data: result.data }
+          : { status: "failed" },
+      );
     });
     return () => {
       active = false;
     };
   }, [agentCode]);
 
-  const tiers = state.data?.tiers ?? FALLBACK_TIERS;
-  const selectedTier = mode === "TIER" ? tier : null;
-  // 아무것도 고르지 않은 대화는 실행할 때 내 기본 단계, 그룹 기본 단계 차례로 쓴다. 대화에는 적히지 않으므로
-  // 여기서 보여 주지 않으면 기본값을 저장하고도 저장되지 않은 것처럼 보인다.
-  const inheritedTier =
-    mode === null
-      ? (state.data?.userDefaultTier ?? state.data?.groupDefaultTier ?? null)
-      : null;
-  const groupDefaultTierLabel =
-    tiers.find((item) => item.tier === state.data?.groupDefaultTier)?.label ??
-    null;
-  async function choose(nextTier: ModelTierCode) {
-    setSaving(true);
-    setFailed(false);
-    const result = await onChange("TIER", nextTier);
-    setSaving(false);
-    if (result === "failed") setFailed(true);
-  }
+  const data = state.status === "loaded" ? state.data : null;
+  const tiers: ModelTier[] = data?.tiers ?? [];
+  // 관리자가 칸을 하나도 채우지 않았으면 고를 것이 없다. 단추를 그리지 않고 Hermes profile 의 값으로 돈다.
+  if (data !== null && tiers.length === 0) return null;
 
-  async function saveOwnDefault(nextTier: ModelTierCode | null) {
-    setOwnDefaultSaveFailed(false);
-    const result = await saveDefaultTier(nextTier);
-    if (result.ok) {
+  const shown = draft ?? initialTier(mode, tier, data);
+  const label = shown === null ? "모델" : MODEL_TIER_LABELS[shown];
+  const ready = agentCode.length > 0 && data !== null;
+
+  async function choose(next: ModelTierCode) {
+    setDraft(next);
+    setFailed(false);
+    pending.current = next;
+    if (saving.current) return;
+    saving.current = true;
+    while (pending.current !== null) {
+      const target = pending.current;
+      pending.current = null;
+      const result = await onChange("TIER", target);
+      if (result !== "saved") {
+        pending.current = null;
+        if (result === "failed") setFailed(true);
+        break;
+      }
+      // 서버가 같은 트랜잭션에서 사용자 기본 칸도 바꿨다. 같은 화면에서 새 대화를 열어도 이 칸에서 시작한다.
       setState((current) =>
-        current.data === null
-          ? current
-          : {
-              ...current,
-              data: { ...current.data, userDefaultTier: nextTier },
-            },
+        current.status === "loaded"
+          ? {
+              status: "loaded",
+              data: { ...current.data, userDefaultTier: target },
+            }
+          : current,
       );
-      setDefaultsOpen(false);
-    } else {
-      setOwnDefaultSaveFailed(true);
     }
+    saving.current = false;
+    setDraft(null);
   }
 
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-center gap-1"
-      data-testid="model-tier-picker"
-    >
-      {tiers.map((item) => (
-        <Button
-          key={item.tier}
-          type="button"
-          size="sm"
-          variant={selectedTier === item.tier ? "secondary" : "ghost"}
-          aria-pressed={selectedTier === item.tier}
-          data-inherited={inheritedTier === item.tier || undefined}
-          // 고른 단계는 옅은 강조 바탕으로, 고르지 않아 기본값으로 적용되는 단계는 테두리로 그린다.
-          className={cn(
-            "rounded-full",
-            selectedTier === item.tier &&
-              "bg-primary-soft text-primary-soft-foreground hover:bg-primary-soft",
-            inheritedTier === item.tier && "border border-border",
-          )}
-          disabled={disabled || state.loading || state.data === null || saving}
-          data-testid={`model-tier-${item.tier.toLowerCase()}`}
-          onClick={() => void choose(item.tier)}
-        >
-          {item.label}
-          {inheritedTier === item.tier ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="text-xs text-muted-foreground"
-              >
-                기본
-              </span>
-              <span className="sr-only">, 지금 적용되는 기본 단계</span>
-            </>
-          ) : null}
-        </Button>
-      ))}
-      <Dialog>
-        <DialogTrigger asChild>
+    <div className="flex min-w-0 max-w-full flex-col items-start gap-1">
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
           <Button
             type="button"
-            size="sm"
             variant="ghost"
-            disabled={disabled || saving}
-            data-testid="model-tier-settings"
+            size="sm"
+            data-testid="model-tier-picker"
+            aria-label={`모델 단계 고르기, 지금 ${label}`}
+            disabled={disabled || !ready}
+            className="max-w-full min-w-0 text-xs text-muted-foreground"
           >
-            설정
+            <span className="truncate">{label}</span>
+            <ChevronDown aria-hidden="true" />
           </Button>
-        </DialogTrigger>
-        <DialogContent
-          closeLabel="모델 단계 설정 닫기"
-          className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side="top"
+            align="start"
+            sideOffset={6}
+            collisionPadding={8}
+            // 열리는 순간에는 아직 자리를 잡기 전이라, 기본 초점 이동이 화면을 그 자리로 스크롤한다. 스크롤 없이
+            // 고른 칸에 초점을 둔다. 방향키로 바로 옮길 수 있다.
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              const content = event.currentTarget as HTMLElement;
+              const target =
+                content.querySelector<HTMLInputElement>("input:checked") ??
+                content.querySelector<HTMLInputElement>("input");
+              target?.focus({ preventScroll: true });
+            }}
+            data-testid="model-tier-slider"
+            className="z-50 w-[min(22rem,calc(100vw-1rem))] rounded-lg border bg-popover p-4 text-popover-foreground shadow-md outline-none"
+          >
+            <p
+              id={`${groupName}-title`}
+              className="text-sm font-medium text-foreground"
+            >
+              모델 단계
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              고른 단계는 이 대화와 다음 새 대화에 쓰여요.
+            </p>
+            <TierSlider
+              tiers={tiers}
+              shown={shown}
+              disabled={disabled}
+              name={groupName}
+              labelledBy={`${groupName}-title`}
+              onPick={(next) => void choose(next)}
+            />
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+      {failed ? (
+        <p
+          role="alert"
+          data-testid="model-picker-error"
+          className="px-2 text-xs text-destructive"
         >
-          <DialogHeader>
-            <DialogTitle>모델 단계 설정</DialogTitle>
-            <DialogDescription>
-              기본 단계를 고르거나 이 대화에서만 쓸 모델을 정할 수 있어요.
-            </DialogDescription>
-          </DialogHeader>
-          {failed ? (
-            <p role="alert" className="text-sm text-destructive">
-              단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
-            </p>
+          모델 단계를 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type SliderProps = {
+  tiers: ModelTier[];
+  shown: ModelTierCode | null;
+  disabled: boolean;
+  name: string;
+  labelledBy: string;
+  onPick(tier: ModelTierCode): void;
+};
+
+/**
+ * 칸을 고르는 조절이다. 같은 이름의 radio 묶음이라 방향키로 움직이고, 점을 잇는 선이 고른 칸까지 채워진다.
+ *
+ * <p>`input type="range"` 대신 radio 를 쓴다. 칸마다 이름이 보이고, 브라우저 테스트가 칸 이름으로 바로 고른다.
+ */
+function TierSlider({
+  tiers,
+  shown,
+  disabled,
+  name,
+  labelledBy,
+  onPick,
+}: SliderProps) {
+  const selectedIndex = tiers.findIndex((item) => item.tier === shown);
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      className="relative mt-4 flex"
+    >
+      {tiers.length > 1 ? (
+        <>
+          {/* 칸의 점을 잇는 선이다. 양 끝 칸의 가운데에서 멈춘다. */}
+          <span
+            aria-hidden="true"
+            className="absolute top-[7px] h-0.5 rounded-full bg-border"
+            // 칸 수가 관리자가 채운 만큼 달라져 끝점을 클래스로 정할 수 없다.
+            style={{
+              left: `${50 / tiers.length}%`,
+              right: `${50 / tiers.length}%`,
+            }}
+          />
+          {selectedIndex > 0 ? (
+            <span
+              aria-hidden="true"
+              className="absolute top-[7px] h-0.5 rounded-full bg-primary"
+              // 고른 칸까지 채우는 길이도 칸 수와 고른 자리에 따라 이어지는 수다.
+              style={{
+                left: `${50 / tiers.length}%`,
+                width: `${(selectedIndex * 100) / tiers.length}%`,
+              }}
+            />
           ) : null}
-          {state.data === null ? (
-            <p className="text-sm text-muted-foreground">
-              단계를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.
-            </p>
-          ) : null}
-          <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={state.data === null}
-              >
-                내 기본값
-              </Button>
-            </DialogTrigger>
-            <DialogContent closeLabel="내 기본값 닫기">
-              <DialogHeader>
-                <DialogTitle>내 기본값</DialogTitle>
-                <DialogDescription>
-                  {groupDefaultTierLabel
-                    ? `새 대화에서 먼저 쓸 단계를 고르세요. 정하지 않으면 그룹 기본 단계(${groupDefaultTierLabel})로 돌아요.`
-                    : "새 대화에서 먼저 쓸 단계를 고르세요. 정하지 않으면 에이전트 기본 모델로 돌아요."}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-2">
-                {tiers.map((item) => (
-                  <Button
-                    key={item.tier}
-                    variant="outline"
-                    onClick={() => void saveOwnDefault(item.tier)}
-                  >
-                    {item.label}
-                    {state.data?.userDefaultTier === item.tier
-                      ? " · 지금 기본값"
-                      : ""}
-                  </Button>
-                ))}
-                <Button
-                  variant="outline"
-                  onClick={() => void saveOwnDefault(null)}
-                >
-                  내 기본값 지우기
-                </Button>
-                {ownDefaultSaveFailed ? (
-                  <p role="alert" className="text-sm text-destructive">
-                    내 기본값을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.
-                  </p>
-                ) : null}
-              </div>
-            </DialogContent>
-          </Dialog>
-          <section className="grid gap-2">
-            <h3 className="text-sm font-medium">고급 직접 선택</h3>
-            {advancedPicker}
-          </section>
-        </DialogContent>
-      </Dialog>
+        </>
+      ) : null}
+      {tiers.map((item) => (
+        <label
+          key={item.tier}
+          className="relative flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-2"
+        >
+          <input
+            type="radio"
+            name={name}
+            value={item.tier}
+            checked={shown === item.tier}
+            disabled={disabled}
+            onChange={() => onPick(item.tier)}
+            data-testid={`model-tier-${item.tier.toLowerCase()}`}
+            // 칸 전체를 덮는 투명한 radio 다. 점과 이름을 눌러도 radio 가 직접 받는다.
+            className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+          />
+          <span
+            aria-hidden="true"
+            className={cn(
+              "size-4 rounded-full border-2 border-border bg-background transition-colors",
+              "peer-checked:border-primary peer-checked:bg-primary",
+              "peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
+            )}
+          />
+          <span className="truncate text-xs text-muted-foreground peer-checked:font-medium peer-checked:text-foreground">
+            {item.label}
+          </span>
+        </label>
+      ))}
     </div>
   );
 }
