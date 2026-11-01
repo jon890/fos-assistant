@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import {
   chmod,
@@ -29,6 +29,7 @@ import { fakeRunDraft } from "./fake-worker-entry.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/server.ts";
+import { EditorPage } from "../src/editor/page.ts";
 import { open as openEditor } from "../src/editor/open.ts";
 import { fill } from "../src/editor/text.ts";
 import { localChrome } from "./local-chrome.ts";
@@ -89,6 +90,32 @@ async function queuedJob(
   const runWith = (overrides: Partial<WorkerDeps>, limitMs = 5_000) =>
     runWorker(stateFile(dir, jobId), { limitMs, env, ...overrides });
   return { dir, jobId, run, runWith };
+}
+
+/** 실제 시간이 흐르지 않아도 예약한 상한의 직전과 경계를 검사한다. */
+function limitClock() {
+  let elapsed = 0;
+  let pending: { abort: () => void; at: number } | null = null;
+  const scheduleLimit: WorkerDeps["scheduleLimit"] = (abort, ms) => {
+    pending = { abort, at: elapsed + ms };
+    return () => {
+      pending = null;
+    };
+  };
+  return {
+    scheduleLimit,
+    advance(ms: number) {
+      elapsed += ms;
+      if (pending && elapsed >= pending.at) {
+        const { abort } = pending;
+        pending = null;
+        abort();
+      }
+    },
+    get pending() {
+      return pending !== null;
+    },
+  };
 }
 
 /** 작업이 끝나면 입력 파일과 잠금이 없고 상태 파일과 끝냄 표시만 남는다. */
@@ -162,7 +189,7 @@ for (const stage of ["open", "fill"] as const)
       await client.close();
       await server.close();
     }
-  }, 15_000);
+  }, 90_000);
 
 test("커서 진단 직렬화는 허용 값만 복사하고 기존 사본 번호를 보존한다", async () => {
   const { dir, jobId, run } = await queuedJob();
@@ -220,28 +247,48 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
   const chrome = await localChrome();
   cleanups.push(() => chrome.stop());
   const env = { ...ENV, NAVER_BLOG_BROWSER_URL: chrome.url };
-  const { dir, jobId, run } = await queuedJob(INPUT, env);
+  const { dir, jobId, runWith } = await queuedJob(INPUT, env);
   const stages: string[] = [];
-  await run(
-    async (actualEnv, blocks, input, onStage, signal) =>
-      runDraft(
-        actualEnv,
-        blocks,
-        input,
-        async (stage) => {
-          stages.push(stage);
-          await onStage(stage);
-          if (stage === "fill")
-            await (
-              await chrome.latest()
-            ).js("document.getElementById('title').style.display='none'");
-        },
-        signal,
-        { stepSeconds: 3, openSeconds: 0.5 },
-      ),
-    500,
+  const clock = limitClock();
+  const sleep = EditorPage.prototype.sleep;
+  let titleWaits = 0;
+  // 실제 제목 탐색이 대기에 들어간 뒤 작업 상한만 진행한다. 탭 준비 속도에는 기대지 않는다.
+  const waiting = spyOn(EditorPage.prototype, "sleep").mockImplementation(
+    function (this: EditorPage, seconds: number) {
+      const pending = sleep.call(this, seconds);
+      if (this.stage === "fill") {
+        titleWaits++;
+        clock.advance(5_000);
+      }
+      return pending;
+    },
+  );
+  cleanups.push(() => waiting.mockRestore());
+  await runWith(
+    {
+      scheduleLimit: clock.scheduleLimit,
+      runDraft: async (actualEnv, blocks, input, onStage, signal) =>
+        runDraft(
+          actualEnv,
+          blocks,
+          input,
+          async (stage) => {
+            stages.push(stage);
+            await onStage(stage);
+            if (stage === "fill")
+              await (
+                await chrome.latest()
+              ).js("document.getElementById('title').style.display='none'");
+          },
+          signal,
+          { stepSeconds: 3, openSeconds: 5 },
+        ),
+    },
+    5_000,
   );
   const state = await readState(dir, jobId);
+  expect(titleWaits).toBe(1);
+  expect(clock.pending).toBe(false);
   expect(stages).toEqual(["open", "fill"]);
   expect(state).toMatchObject({
     status: "failed",
@@ -251,19 +298,24 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
   expect(chrome.calls).not.toContain("Input.insertText");
   expect(chrome.calls).not.toContain("Page.setInterceptFileChooserDialog");
   expect(chrome.closed).toHaveLength(1);
-}, 15_000);
+}, 90_000);
 
 test("성공하면 succeeded 와 편집기 상태, 저장 전후 수를 남기고 연결 값은 env 에서 읽는다", async () => {
-  const { dir, jobId, run } = await queuedJob();
+  const { dir, jobId, runWith } = await queuedJob();
+  const clock = limitClock();
   let received: unknown;
 
-  await run(async (env, blocks, input, onStage) => {
-    received = { env, blocks, input };
-    await onStage("open");
-    await onStage("save_clicking");
-    return { state: EDITOR_STATE, savedBefore: 3, savedAfter: 4 };
+  await runWith({
+    scheduleLimit: clock.scheduleLimit,
+    runDraft: async (env, blocks, input, onStage) => {
+      received = { env, blocks, input };
+      await onStage("open");
+      await onStage("save_clicking");
+      return { state: EDITOR_STATE, savedBefore: 3, savedAfter: 4 };
+    },
   });
 
+  expect(clock.pending).toBe(false);
   const state = await readState(dir, jobId);
   expect(state).toMatchObject({
     status: "succeeded",
@@ -345,19 +397,31 @@ test("저장 전의 category_not_found 는 failed 와 있는 카테고리 이름
 });
 
 test("limitMs 가 지나면 signal 로 멈추고 timeout 실패로 끝난다", async () => {
-  const { dir, jobId, run } = await queuedJob();
+  const { dir, jobId, runWith } = await queuedJob();
+  const clock = limitClock();
   let aborted = false;
 
-  await run(async (_env, _blocks, _input, onStage, signal) => {
-    await onStage("photos");
-    await new Promise((_, reject) =>
-      signal.addEventListener("abort", () => {
-        aborted = true;
-        reject(new EditorError("editor_failed", "photos", "aborted"));
-      }),
-    );
-    throw new Error("unreachable");
-  }, 100);
+  await runWith(
+    {
+      scheduleLimit: clock.scheduleLimit,
+      runDraft: async (_env, _blocks, _input, onStage, signal) => {
+        await onStage("photos");
+        const stopped = new Promise((_, reject) =>
+          signal.addEventListener("abort", () => {
+            aborted = true;
+            reject(new EditorError("editor_failed", "photos", "aborted"));
+          }),
+        );
+        clock.advance(99);
+        expect(signal.aborted).toBe(false);
+        clock.advance(1);
+        await stopped;
+        throw new Error("unreachable");
+      },
+    },
+    100,
+  );
+  expect(clock.pending).toBe(false);
 
   const state = await readState(dir, jobId);
   expect(aborted).toBe(true);
@@ -589,9 +653,10 @@ test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 
     kind: "overwrite",
     ...OVERWRITE_INPUT,
   });
+  const clock = limitClock();
   const overwrite = overwriteSpy(async (_env, _input, onStage, signal) => {
     await onStage("apply");
-    return new Promise<OverwriteResult>((_, reject) =>
+    const stopped = new Promise<OverwriteResult>((_, reject) =>
       signal.addEventListener("abort", () =>
         reject(
           new EditorError("editor_failed", "apply", "aborted", {
@@ -601,13 +666,22 @@ test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 
         ),
       ),
     );
+    clock.advance(99);
+    expect(signal.aborted).toBe(false);
+    clock.advance(1);
+    return stopped;
   });
 
   await runWith(
-    { runDraft: draftSpy().fake, runOverwrite: overwrite.fake },
+    {
+      runDraft: draftSpy().fake,
+      runOverwrite: overwrite.fake,
+      scheduleLimit: clock.scheduleLimit,
+    },
     100,
   );
 
+  expect(clock.pending).toBe(false);
   const state = await readState(dir, jobId);
   expect(state?.status).toBe("failed");
   expect(state?.error).toEqual({

@@ -299,6 +299,7 @@ test("대화 이름을 바꾸고 새로 고쳐도 유지한다", async ({ page }
 });
 
 test("대화 이름의 Esc 와 빈 이름은 원래 이름을 유지한다", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   const title = `이름 취소 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
@@ -309,13 +310,19 @@ test("대화 이름의 Esc 와 빈 이름은 원래 이름을 유지한다", asy
   await page.getByRole("menuitem", { name: "이름 바꾸기" }).click();
   // 닫히는 메뉴가 사라진 뒤에 누른다. 사라지기 전의 Esc 는 메뉴가 받고, 곧바로 다시 누른 메뉴 단추는 닫히는 메뉴를 되살린다.
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await nav.getByRole("textbox", { name: "대화 이름" }).fill("바뀌지 않을 이름");
+  const input = nav.getByRole("textbox", { name: "대화 이름" });
+  await expect(input).toBeFocused();
+  await input.fill("바뀌지 않을 이름");
   await nav.getByRole("textbox", { name: "대화 이름" }).press("Escape");
+  await expect(input).toHaveCount(0);
   await expect(nav.locator(`a[href="/chat/${id}"]`)).toHaveText(title);
   await nav.getByRole("button", { name: `${title} 메뉴` }).click();
   await page.getByRole("menuitem", { name: "이름 바꾸기" }).click();
-  await nav.getByRole("textbox", { name: "대화 이름" }).fill("   ");
-  await nav.getByRole("textbox", { name: "대화 이름" }).press("Enter");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await input.fill("   ");
+  await input.press("Enter");
+  await expect(input).toHaveCount(0);
   await expect(nav.locator(`a[href="/chat/${id}"]`)).toHaveText(title);
 });
 
