@@ -16,8 +16,10 @@ const HTML = `<!doctype html><meta charset="utf-8"><title>네이버 블로그 ·
 <div class="se-component se-text"><p class="se-text-paragraph" contenteditable="true" id="body"><br></p></div>
 <div id="outside">synthetic-private-dom-marker</div>`;
 
+export const CHROME_STARTUP_MS = 30_000;
+
 /** 전용 임시 profile과 합성 HTML만 사용한다. 실제 글쓰기 주소는 로컬 fixture로 바꾼다. */
-export async function localChrome() {
+export async function localChrome({ now = () => performance.now() } = {}) {
   const binary =
     process.env.FOS_TEST_CHROME ||
     [
@@ -32,7 +34,7 @@ export async function localChrome() {
   const profile = await mkdtemp(join(tmpdir(), "fos-synthetic-chrome-"));
   // 파이프가 차서 Chrome을 막지 않도록 파일에 받고, 실패했을 때만 끝부분을 읽는다.
   const stderr = Bun.file(join(profile, "chrome-stderr.log"));
-  const startedAt = performance.now();
+  const startedAt = now();
   let devtoolsReadyMs: number | null = null;
   const proc = Bun.spawn(
     [
@@ -79,8 +81,8 @@ export async function localChrome() {
       CdpSession.prototype.send = originalSend;
   };
   try {
-    const deadline = performance.now() + 30_000;
-    while (performance.now() < deadline) {
+    const deadline = now() + CHROME_STARTUP_MS;
+    while (now() < deadline) {
       const port = (
         await readFile(join(profile, "DevToolsActivePort"), "utf8").catch(
           () => "",
@@ -88,7 +90,7 @@ export async function localChrome() {
       ).split("\n")[0];
       if (port && /^\d+$/.test(port)) {
         chromeUrl = `http://127.0.0.1:${port}`;
-        devtoolsReadyMs = Math.round(performance.now() - startedAt);
+        devtoolsReadyMs = Math.round(now() - startedAt);
         break;
       }
       if (proc.exitCode !== null) throw new Error("합성 Chrome 시작 실패");
@@ -239,7 +241,7 @@ export async function localChrome() {
     const log = Bun.file(join(profile, "chrome-stderr.log"));
     // 정리가 보낸 SIGKILL을 Chrome 자체의 실패로 오해하지 않게 정리 전에 상태를 찍는다.
     const diagnostics = {
-      elapsed_ms: Math.round(performance.now() - startedAt),
+      elapsed_ms: Math.round(now() - startedAt),
       devtools_ready_ms: devtoolsReadyMs,
       exit_code: proc.exitCode,
       signal_code: proc.signalCode,
