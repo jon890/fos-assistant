@@ -60,12 +60,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -117,7 +119,17 @@ class ConnectorGuardBindingRoundTripTest {
     TestClock clock;
     @Autowired
     SignInRevocation access;
-    private ConnectorBindingHttpFixture remote;
+    /**
+     * 이 클래스의 검사가 함께 쓰는 Python guard plugin 과 중계 서버다.
+     *
+     * <p>클래스의 첫 검사가 띄우고 {@link #closeRemote} 가 끈다. 검사가 끝날 때마다 {@link ConnectorBindingHttpFixture#resetPlugin} 과
+     * {@link ConnectorBindingHttpFixture#resetObservations} 로 되돌리고, 다음 검사의 준비가 클래스 처음의 상태와 같은지 확인한다.
+     */
+    private static ConnectorBindingHttpFixture remote;
+    /** 클래스 처음에 Python 쪽에서 읽은 상태와 선언 SHA 다. 검사마다 되돌린 뒤 이것과 비교한다. */
+    private static JsonNode initialState;
+    private static String initialSha;
+    private static int starts;
     private ConnectorConnectionService concurrent;
     private Target target;
 
@@ -126,7 +138,14 @@ class ConnectorGuardBindingRoundTripTest {
     void setUp() throws Exception {
         target = null;
         clock.set(NOW);
-        remote = new ConnectorBindingHttpFixture(port, properties.dashboardToken());
+        if (remote == null) {
+            remote = new ConnectorBindingHttpFixture(port, properties.dashboardToken());
+            starts++;
+            initialState = remote.inspect();
+            initialSha = catalogSha();
+        }
+        assertThat(remote.inspect()).as("앞 검사를 되돌린 뒤 Python 상태").isEqualTo(initialState);
+        assertThat(catalogSha()).as("앞 검사를 되돌린 뒤 선언").isEqualTo(initialSha);
         remote.delegate(hermes);
         concurrent = new ConnectorConnectionService(connections, bindings, users, bindingService, hermes, manager,
             new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
@@ -150,7 +169,8 @@ class ConnectorGuardBindingRoundTripTest {
     @AfterEach
     void tearDown() throws Exception {
         if (remote != null) {
-            remote.close();
+            remote.resetObservations();
+            remote.resetPlugin();
         }
         if (target != null) {
             bindings.deleteById(target.bindingId());
@@ -160,6 +180,23 @@ class ConnectorGuardBindingRoundTripTest {
             agents.deleteById(target.agentId());
             jdbc.update("delete from allowed_person where email = ?", target.user().email());
             users.deleteById(target.user().id());
+        }
+    }
+
+
+    @AfterAll
+    static void closeRemote() throws Exception {
+        try {
+            if (remote != null) {
+                remote.close();
+            }
+            LoggerFactory.getLogger(ConnectorGuardBindingRoundTripTest.class).info("guard plugin 기동 {}회", starts);
+            assertThat(starts).as("guard plugin 기동 횟수").isLessThanOrEqualTo(1);
+        } finally {
+            remote = null;
+            initialState = null;
+            initialSha = null;
+            starts = 0;
         }
     }
 
@@ -335,6 +372,12 @@ class ConnectorGuardBindingRoundTripTest {
         assertThat(attempts.execute(capture())).contains(ResyncOutcome.APPLY_SCHEDULED);
         clock.set(NOW.plusSeconds(300));
         assertThat(attempts.execute(capture())).contains(ResyncOutcome.READY);
+    }
+
+
+    private static String catalogSha() {
+        return remote.actual.readCatalog().stream().filter(item -> item.id().equals(CONNECTOR)).findFirst().orElseThrow()
+            .executionGuardManifestSha256();
     }
 
 

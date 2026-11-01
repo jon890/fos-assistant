@@ -69,3 +69,24 @@
 - H2 에서만 돌게 된 검사는 MySQL 고유의 실패를 보지 못한다. 저장소 쿼리는 `RepositoryQueryMysqlTest` 가, 스키마와 엔티티의 대조는 `MysqlMigrationTest` 가 계속 본다. 그 밖에 저장 callback 의 시각 정밀도처럼 H2 와 달라질 수 있는 동작은 H2 로만 본다.
 - 새 H2 검사를 MySQL 에서도 돌리려면 `@MysqlCase` 의 이유를 단다. 이유가 넷에 들지 않으면 H2 에서만 돈다.
 
+
+## 실제 plugin 을 띄우는 검사
+
+2026-11-01 에 더했다.
+
+**개정 전.** 금융 producer 왕복 검사와 guard 왕복 검사는 검사마다 Python plugin 대역을 새로 띄웠다.
+금융 대역은 기동할 때 bun 거래 대역을 띄우고 bun 으로 SDK 원고를 생성해 한 번에 2초 가까이 걸렸다.
+대상 클래스의 검사 시간 대부분이 이 기동이었다.
+
+**결정.** plugin 대역은 검사 클래스마다 한 번 띄우고, 검사마다 처음 상태로 되돌린다.
+
+- **금융 대역은 검사마다 `/fixture/configure` 로 되돌린다.** 검사마다 새 profile 이름을 쓰고, configure 가 거래 대역의 카운터와 응답 mode, 준비·실행 카운터를 되돌린다. 기반 클래스가 configure 직후 카운터가 처음 값인지 확인한다.
+- **되돌리지 못하는 조작을 부른 검사 뒤에는 새로 띄운다.** 설치 원본을 다시 쓰는 `/fixture/manifest-change` 가 그렇다. configure 와 counters 밖의 조작은 모두 되돌리지 못한 것으로 보고, 그 검사가 끝나면 프로세스를 끈다.
+- **guard 대역은 준비 직후의 임시 디렉터리를 통째로 떠 두고 `/fixture/reset` 으로 되돌린다.** profile 하나를 모든 검사가 함께 쓰고, 해제해도 뗀 서버 이름이 기록에 남아 다음 붙이기가 재시작을 기다리기 때문이다. reset 은 되돌린 파일이 처음과 같은지 답하고, 다르면 그 검사가 실패한다.
+- **기동 횟수를 클래스가 끝날 때 확인한다.** 금융 대역은 되돌리지 못한 검사 수 더하기 1, guard 대역은 1 을 넘으면 실패한다. 같은 수를 로그에 남긴다.
+
+**감당할 것.**
+
+- 기동 자체를 검사마다 확인하던 효과가 없어진다. 기동 실패와 비정상 종료는 클래스의 첫 검사와 종료 코드 확인이 잡는다.
+- 새 fixture 조작이 Python 쪽에 상태를 남기면 되돌림 범위에 넣거나, 되돌리지 못한 조작으로 둔다. `FinancialPluginResetTest` 가 같은 프로세스의 다음 검사가 처음 상태로 시작하는지와 다시 띄우는 조건을 본다.
+- 앞 검사가 남긴 상태를 찾으려면 메서드 순서를 바꿔 돌린다. `-Pjunit.jupiter.testmethod.order.default` 에 `org.junit.jupiter.api.MethodOrderer$MethodName` 과 `com.bifos.assistant.testsupport.ReversedMethodNameOrder` 를 한 번씩 준다.
