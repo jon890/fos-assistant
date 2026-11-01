@@ -6,7 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { buildBundle } from "../scripts/build.ts";
 import { CURRENT_OPERATIONS } from "../src/api-contract.ts";
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import fixture from "./fixtures/openapi-1.2.24.json";
 import { FakeToss, credentials, sampleOrder, tool } from "./support.ts";
 

@@ -8,7 +8,7 @@ covers: `backend/src/main/java/com/bifos/assistant/browser/`, `web/src/component
 
 - 사용자는 웹의 「내 브라우저」(`/browser`)에서 자기 브라우저를 만들고 켜고 끄고 지운다. 그 화면에서 서비스에 직접 로그인한다.
 - 로그인 세션은 그 사용자의 프로필 디렉터리에만 남는다. 데이터베이스와 응답, 로그에는 남기지 않는다.
-- 커넥터는 브라우저 주소를 받지 않는다. 바인딩이 준 중계 주소로만 그 바인딩 주인의 브라우저에 닿는다.
+- 플러그인은 브라우저 주소를 받지 않는다. 바인딩이 준 중계 주소로만 그 바인딩 주인의 브라우저에 닿는다.
 - 관리자는 관리자 영역의 「브라우저」(`/admin/browsers`)에서 모든 사용자 브라우저의 상태와 오류 코드를 보고 끄거나 지운다. `/browser` 는 내 브라우저만 보이고 오류 코드를 그리지 않는다.
 - 기능이 꺼져 있으면 상태 읽기만 되고 쓰기는 503 이다.
 
@@ -22,7 +22,7 @@ sequenceDiagram
     participant C as Control Plane
     participant P as 브라우저 proxy
     participant B as Chrome
-    participant K as 커넥터
+    participant K as 플러그인
 
     W->>C: GET /api/v1/browser/screen
     C->>P: 같은 프로필의 남은 컨테이너를 지우고 새 컨테이너를 켠다
@@ -158,7 +158,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 ### 중계
 
 결정은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「중계」 와 [ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md) 이 갖는다.
-바인딩 설치와 확인 도구 호출이 `<gateway-base-url>/<접근 표식>` 을 커넥터의 env 에 넣고, 커넥터는 그 주소를 Chrome 의 CDP 주소처럼 부른다.
+바인딩 설치와 확인 도구 호출이 `<gateway-base-url>/<접근 표식>` 을 플러그인의 env 에 넣고, 플러그인은 그 주소를 Chrome 의 CDP 주소처럼 부른다.
 
 #### 접근 표식
 
@@ -169,7 +169,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 
 경로는 `/internal/browser-gateway/<접근 표식>/` 아래다. 웹의 서버 라우트는 이 경로를 넘기지 않는다.
 넘기는 경로와 응답을 바꾸는 규칙은 `BrowserGatewayController` 와 `GatewayRewriter` 가 갖는다. 정한 `json/` 경로와 `devtools/` 아래 WebSocket 만 넘기고, 응답 속 WebSocket 주소를 중계 주소로 바꾼다.
-커넥터는 중계 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 `gateway-base-url` 과 호스트가 달라도 된다.
+플러그인은 중계 주소의 경로만 꺼내 자기가 받은 주소의 호스트에 붙이므로 `gateway-base-url` 과 호스트가 달라도 된다.
 
 요청마다 이 순서로 판정한다.
 
@@ -181,7 +181,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 6. 동시 수가 찼으면 503, 켜지 못했으면 502, 기다려도 `RUNNING` 이 되지 않으면 503 이다
 7. 활동을 기록하고 Chrome 에 넘긴다. Chrome 이 닿지 않거나 200 이 아닌 답을 주면 502 다
 
-오류 응답의 본문은 비운다. 커넥터는 상태 코드만 본다.
+오류 응답의 본문은 비운다. 플러그인은 상태 코드만 본다.
 Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 보낸다. `Host` 가 IP 라 Chrome 의 `Host` 검사를 지난다.
 
 #### WebSocket
@@ -195,9 +195,9 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 �
 - 표식은 열 때만 확인한다. 열린 뒤 바인딩을 떼도 그 연결은 닫힐 때까지 간다. 떼기는 도구 목록에서 서버를 빼므로 새 호출은 오지 않는다
 - `org.springframework.web.socket` 로그를 DEBUG 로 올리지 않는다. 표식이 든 주소가 로그에 남는다
 
-#### 커넥터에 건네기
+#### 플러그인에 건네기
 
-`connector.json` 이 `owner_browser_env` 를 선언한 커넥터에만 중계 주소를 싣는다.
+`assistant.json` 이 `owner_browser_env` 를 선언한 플러그인에만 중계 주소를 싣는다.
 
 | 호출 | 싣는 주소 |
 | --- | --- |
@@ -205,5 +205,5 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 �
 | 확인 도구와 선택지 호출 | 요청자의 호출 표식 주소(`BrowserGatewayTokens#callAddress`) |
 | 승인한 실행 | 싣지 않는다. 대시보드가 설치한 서버 정의의 값을 쓴다 |
 
-중계가 꺼졌으면 빈 값을 싣는다. 설치는 막지 않고, 커넥터가 브라우저에 닿지 못한다고 답해 연결 확인이 실패로 보인다.
-요청 본문의 칸과 대시보드가 값을 넣는 규칙은 [커넥터 설치](connector.md) 의 「바인딩 설치」 와 [`hermes/README.md`](../../hermes/README.md) 의 커넥터 경로가 갖는다.
+중계가 꺼졌으면 빈 값을 싣는다. 설치는 막지 않고, 플러그인이 브라우저에 닿지 못한다고 답해 연결 확인이 실패로 보인다.
+요청 본문의 칸과 대시보드가 값을 넣는 규칙은 [플러그인 설치](connector.md) 의 「바인딩 설치」 와 [`hermes/README.md`](../../hermes/README.md) 의 플러그인 경로가 갖는다.

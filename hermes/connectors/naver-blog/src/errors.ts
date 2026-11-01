@@ -1,6 +1,6 @@
 import { filterPopupDiagnostics } from "./editor/popup.ts";
 
-/** 도구가 내는 오류 코드. connector.json 의 `errors` 표와 같은 이름이다. */
+/** 도구가 내는 오류 코드. assistant.json 의 `errors` 표와 같은 이름이다. */
 export type ErrorCode =
   | "NAVER_BLOG_INVALID_INPUT"
   | "NAVER_BLOG_PHOTO_INVALID"

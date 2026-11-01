@@ -155,7 +155,7 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
               event({ event: "message.delta", delta: streamedOutput.slice(offset, offset + 80) });
             }
           }
-          // 정책이 허용한 커넥터 도구 호출이다. 실제 Hermes(v0.21.5)가 붙은 서버의 도구에 보내는 모양이다. 모든 사건에 `run_id` 와
+          // 정책이 허용한 플러그인 도구 호출이다. 실제 Hermes(v0.21.5)가 붙은 서버의 도구에 보내는 모양이다. 모든 사건에 `run_id` 와
           // `timestamp` 가 있다. 시작 사건의 `preview` 는 인자 하나의 값이고, 완료 사건의 `preview` 는 결과다.
           // 정책 hook 이 막은 호출은 시작도 완료도 보내지 않으므로 허용된 호출만 여기에 온다.
           for (const connectorCall of run.connectorCalls ?? []) {

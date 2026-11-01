@@ -17,15 +17,15 @@ Hermes core 는 고치지 않는다.
 | `POST /api/profiles` | profile 을 만든다. `profiles.py` 의 「만든 자리에서 설정 틀을 쓴다」 를 거친다 |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 |
-| `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
-| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 |
+| `DELETE /api/env` | 관리 profile 의 플러그인 칸 key 만 지운다 |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
+| `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
 | `POST /api/connectors/<id>/tools` | 후보 값이나 보관 파일의 값으로 표준 플러그인(`schema: 3`)의 MCP 서버에 붙어 도구 이름과 읽기 표시만 받는다 |
-| `GET PUT /api/connectors` | 커넥터의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
+| `GET PUT /api/connectors` | 플러그인의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 |
-| `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 |
+| `POST /api/mcp/servers/<서버>/test` | 그 profile 에 설치한 플러그인의 MCP 서버만 probe 한다 |
 | `GET /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 읽는다 |
 | `PUT /api/profiles/<이름>/soul` | profile 의 SOUL.md 를 쓴다 |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 |
@@ -43,8 +43,8 @@ Hermes core 는 고치지 않는다.
 
 사람의 쿠키 요청은 기존 Hermes 처리기가 맡는다. 검사하지 않는다.
 
-커넥터 경로의 계약은 `docs/features/connector.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
-이 plugin 은 커넥터의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽는다.
+플러그인 경로의 계약은 `docs/features/connector.md` 의 「대시보드 plugin 계약」 이 소유한다(ADR-043).
+이 plugin 은 플러그인의 이름을 코드에 두지 않는다. 운영 목록의 plugin 디렉터리마다 `assistant.json` 을 읽는다.
 
 ## 비밀값
 
@@ -362,7 +362,7 @@ def register(ctx) -> None:
     # 판이 범위 밖이어도 등록은 한다. profile 관리 경로까지 닫으면 사용자 추가가 멈춘다.
     problem = _mcp_sdk_problem()
     if problem is not None:
-        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 플러그인 도구를 부르지 않는다: %s",
                        _mcp_sdk_version(), problem)
 
     opened = {}
@@ -381,7 +381,7 @@ def register(ctx) -> None:
             ["%s %s" % (" ".join(sorted(methods)), path) for path, methods in sorted(opened.items())]
             + ["GET PUT /api/profiles/<이름>/soul", "DELETE /api/profiles/<관리 표식 profile>",
                "POST /api/connectors/<id>/call", "POST /api/connectors/<id>/tools",
-               "POST /api/mcp/servers/<설치한 커넥터의 서버>/test"]
+               "POST /api/mcp/servers/<설치한 플러그인의 서버>/test"]
         ),
         _skill_root() or "설정되지 않음",
     )

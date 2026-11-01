@@ -1,30 +1,30 @@
-# 커넥터 만들기
+# 플러그인 만들기
 
-이 저장소가 갖는 범용 커넥터를 만드는 방법과 `connector.json` 의 형식을 갖는다.
-커넥터를 연결하고 붙이는 흐름은 [`docs/features/connector.md`](../../docs/features/connector.md), 승인은 [`docs/features/connector-policy.md`](../../docs/features/connector-policy.md) 의 「커넥터 승인」 이 갖는다.
+이 저장소가 갖는 범용 플러그인을 만드는 방법과 `assistant.json` 의 형식을 갖는다.
+플러그인을 연결하고 붙이는 흐름은 [`docs/features/connector.md`](../../docs/features/connector.md), 승인은 [`docs/features/connector-policy.md`](../../docs/features/connector-policy.md) 의 「플러그인 승인」 이 갖는다.
 
-이 저장소가 유지보수하는 범용 커넥터를 만들고 PR 로 올리는 방법이다.
-어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
-`connector.json` 의 형식은 이 파일의 「connector.json」 이, 위험도와 승인은 [커넥터 도구 정책](../../docs/features/connector-policy.md) 이 갖는다.
-따라 할 본보기는 [`hermes/connectors/gmail/`](gmail) 이고, 개발 문서는 [Gmail 커넥터](../../docs/features/gmail-connector.md), 사용자 안내는 [Gmail README](gmail/README.md) 다.
+이 저장소가 유지보수하는 범용 플러그인을 만들고 PR 로 올리는 방법이다.
+어떤 플러그인을 여기 두는지와 그 근거는 [ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
+`assistant.json` 의 형식은 이 파일의 「assistant.json」 이, 위험도와 승인은 [플러그인 도구 정책](../../docs/features/connector-policy.md) 이 갖는다.
+따라 할 본보기는 [`hermes/connectors/gmail/`](gmail) 이고, 개발 문서는 [Gmail 플러그인](../../docs/features/gmail-connector.md), 사용자 안내는 [Gmail README](gmail/README.md) 다.
 
-## 여기 두는 커넥터
+## 여기 두는 플러그인
 
 | 여기 둔다 | 여기 두지 않는다 |
 | --- | --- |
 | 공개된 서비스에 사용자 자신의 자격 증명으로 붙는다 | 한 집이나 한 조직만 쓰는 서비스다 |
 | 운영자가 줄 값 없이 돈다 | 주소나 계정 같은 운영 값이 있어야 돈다 |
 
-여기 두지 않는 커넥터도 같은 `connector.json` 으로 붙는다. 그 서비스의 저장소에 두고 운영 목록에 올리면 된다.
+여기 두지 않는 플러그인도 같은 `assistant.json` 으로 붙는다. 그 서비스의 저장소에 두고 운영 목록에 올리면 된다.
 
-예외는 서비스 자체가 공개 오픈소스라 누구나 띄울 수 있는 커넥터다. 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md)). 「비밀값과 권한」 의 `operator_env` 줄이 범위를 갖는다.
+예외는 서비스 자체가 공개 오픈소스라 누구나 띄울 수 있는 플러그인다. 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md)). 「비밀값과 권한」 의 `operator_env` 줄이 범위를 갖는다.
 
 ## 디렉터리
 
 ```
 hermes/connectors/<id>/
-  connector.json           입력 칸, 확인 도구, 도구 정책, 아이콘과 링크
-  icon.svg                 커넥터 카드의 아이콘. 출처와 사용 범위를 확인한 서비스 아이콘 또는 직접 만든 첫 글자 SVG
+  assistant.json           입력 칸, 확인 도구, 도구 정책, 아이콘과 링크
+  icon.svg                 플러그인 카드의 아이콘. 출처와 사용 범위를 확인한 서비스 아이콘 또는 직접 만든 첫 글자 SVG
   ICON-SOURCE.md           아이콘 출처, 라이선스와 내려받은 주소
   .mcp.json                MCP 서버 하나의 정의
   .claude-plugin/plugin.json
@@ -40,14 +40,14 @@ hermes/connectors/<id>/
 .github/CODEOWNERS                      `/hermes/connectors/<id>/` 한 줄
 ```
 
-`<id>` 는 `connector.json` 의 `id`, `plugin.json` 의 `name`, 디렉터리 이름이 모두 같다.
+`<id>` 는 `assistant.json` 의 `id`, `plugin.json` 의 `name`, 디렉터리 이름이 모두 같다.
 
 ## 갖출 것
 
 ### 도구 정책
 
 - `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. `default_tool_policy: ask` 가 아니면 선언과 서버의 도구 목록이 정확히 같아야 한다
-- 도구마다 위험도를 고르고 그 까닭을 커넥터 개발 문서의 표에 적는다
+- 도구마다 위험도를 고르고 그 까닭을 플러그인 개발 문서의 표에 적는다
 - 남이 만든 MCP 서버처럼 도구를 빠짐없이 선언하기 어려우면 `"default_tool_policy": "ask"` 를 선언해 일부만 선언할 수 있다. `tools` 에 없는 도구는 `assistant.json` 이 없는 플러그인과 같이 호출마다 승인을 받는다. 받는 값은 `deny`(기본값)와 `ask` 뿐이다([도구 정책](../../docs/features/connector-policy.md) 의 「일부 도구만 선언하기」)
 
 | 도구가 하는 일 | 선언 |
@@ -60,7 +60,7 @@ hermes/connectors/<id>/
 
 - **쓰는 도구는 모두 승인을 받는다.** `WRITE` 의 하한이 `required` 다
 - **`READ` 가 아닌 도구는 `outbound` 를 참이나 거짓으로 적는다.** 밖으로 나가는지를 만든 사람이 도구마다 판단했다는 표시다. 참이면 `"grant": false` 여야 한다
-- **한 대화에서 계속 허용해도 되는 도구만 `"conversation_grant": true` 를 적는다.** 적지 않은 도구는 승인 카드에 「이 대화에서 계속 허용」 이 없고 매번 묻는다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 적을 수 있다. 열 때는 대화 안에서 여러 번 불려도 그 위험을 감당할 수 있는 까닭을 커넥터 문서에 적는다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md))
+- **한 대화에서 계속 허용해도 되는 도구만 `"conversation_grant": true` 를 적는다.** 적지 않은 도구는 승인 카드에 「이 대화에서 계속 허용」 이 없고 매번 묻는다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 적을 수 있다. 열 때는 대화 안에서 여러 번 불려도 그 위험을 감당할 수 있는 까닭을 플러그인 문서에 적는다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md))
 - **밖으로 나가는 도구는 `"grant": false` 를 기본으로 한다.** 외부의 글을 읽는 에이전트가 속았을 때 사람이 보지 않은 것이 나가지 않게 한다([ADR-065](../../docs/adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). 참으로 두려면 그 까닭을 PR 에 적는다
 - **`DESTRUCTIVE` 는 선언하지 않는다. `FINANCIAL` 은 `execution_guard` 의 `operations` 에 든 도구만 선언한다.** `DESTRUCTIVE` 호출은 늘 거절되므로 도구를 만들 까닭이 없다. 서비스의 권한이 지우기까지 허용하면, 서버가 그 호출을 하지 않는다는 것을 검사로 보인다. `FINANCIAL` 도구는 모델 목록에 두지 않고 준비 도구가 승인 줄을 만들며 호출마다 승인을 받는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md))
 - 쓰는 도구의 인자는 사람이 읽을 수 있는 글로 받는다. 승인 카드가 인자를 키와 값으로 그대로 보인다. 번호만 받아 서버가 나머지를 채우면 사람이 무엇을 승인하는지 읽지 못한다
@@ -87,16 +87,16 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - 자격 증명은 `fields` 에 선언한 env 로만 받는다. 파일에서 읽거나 파일에 쓰지 않는다
 - 토큰, secret, 비밀번호, key 를 받는 칸은 `"secret": true` 다
 - 결과와 로그와 오류 글에 자격 증명과 서비스가 준 오류 원문을 싣지 않는다. 오류는 코드만 내고 `errors` 표로 공통 어휘에 잇는다
-- 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 커넥터 문서에 적는다
+- 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 플러그인 문서에 적는다
 - `operator_secrets` 를 두지 않는다
-- `operator_env` 를 두지 않는다. 예외는 공개 오픈소스 서비스의 기준 주소 하나다. 그 서비스를 운영자가 띄우고, 값은 비밀이 아닌 `https://` 주소이고, 커넥터가 그 모양이 아니면 부르지 않는다. 허용하는 커넥터와 env 이름은 `hermes/tests/test_connectors_contract.py` 의 `OPERATOR_BASE_URL_ENV` 가 갖는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md))
+- `operator_env` 를 두지 않는다. 예외는 공개 오픈소스 서비스의 기준 주소 하나다. 그 서비스를 운영자가 띄우고, 값은 비밀이 아닌 `https://` 주소이고, 플러그인이 그 모양이 아니면 부르지 않는다. 허용하는 플러그인과 env 이름은 `hermes/tests/test_connectors_contract.py` 의 `OPERATOR_BASE_URL_ENV` 가 갖는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md))
 - **서비스가 권한 범위를 나누지 못해, 쓰는 도구가 없어도 키 하나로 돈이 움직이거나 되돌리기 어려운 일을 할 수 있으면 `"sandbox_required": true` 를 선언한다.** 실행 공간이 없는 profile 의 셸은 `.env` 를 읽기 때문이다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md))
 - **서비스가 계정이나 클라이언트마다 유효한 토큰을 하나만 두면 `"single_binding": true` 를 선언한다.** 여러 에이전트의 MCP 프로세스가 번갈아 토큰을 받아 서로의 호출을 깨기 때문이다. 한 프로세스 안에서도 토큰을 다시 받는 일은 한 번에 하나만 한다
 
-### 사용자 첨부를 읽는 커넥터
+### 사용자 첨부를 읽는 플러그인
 
-대화에 올린 사진처럼 사용자의 첨부 파일을 읽는 커넥터는 `owner_attachments_env` 에 env 이름 하나를 선언하고, 그 env 가 가리키는 디렉터리 아래의 파일만 읽는다([ADR-20261007 / connector-owner-attachments](../../docs/adr/ADR-20261007-connector-owner-attachments.md)).
-커넥터 MCP 서버는 실행 공간 밖에서 돌아 모든 사용자의 첨부를 읽을 수 있기 때문이다.
+대화에 올린 사진처럼 사용자의 첨부 파일을 읽는 플러그인은 `owner_attachments_env` 에 env 이름 하나를 선언하고, 그 env 가 가리키는 디렉터리 아래의 파일만 읽는다([ADR-20261007 / connector-owner-attachments](../../docs/adr/ADR-20261007-connector-owner-attachments.md)).
+플러그인 MCP 서버는 실행 공간 밖에서 돌아 모든 사용자의 첨부를 읽을 수 있기 때문이다.
 
 - 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다. 모델이 준 경로를 그대로 믿지 않는다
 - 값이 비었으면 첨부를 읽지 않는다. 등록 화면의 확인 도구와 선택지 호출에서는 비어 있다. 이 두 호출에도 값이 오는 것은 아래 `owner_browser_env` 뿐이다
@@ -105,25 +105,25 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - 경로가 밖이든, 없든, 링크든 같은 오류 문장으로 거절한다. 승인 없는 읽기 도구로 다른 경로가 있는지 떠볼 수 없게 한다
 - 본보기는 `hermes/connectors/naver-blog/` 다
 
-### 계산할 목록을 파일로 내는 커넥터
+### 계산할 목록을 파일로 내는 플러그인
 
 합계와 통계는 집계 도구를 따로 만들지 않는다. 목록 도구가 기간 전체를 파일로 쓰고, 모델이 `execute_code` 스크립트로 그 파일을 읽어 계산한다([ADR-20261008 / connector-output-files](../docs/adr/ADR-20261008-connector-output-files.md)).
-스크립트는 커넥터 도구를 부르지 못하고, 모델이 받은 목록을 코드에 옮겨 적으면 토큰이 늘고 옮기다 틀리기 때문이다.
+스크립트는 플러그인 도구를 부르지 못하고, 모델이 받은 목록을 코드에 옮겨 적으면 토큰이 늘고 옮기다 틀리기 때문이다.
 
 - `owner_output_env` 에 env 이름 하나를 선언한다. 값은 바인딩 설치가 넣는 디렉터리다. 그 디렉터리는 그 에이전트의 실행 공간에 같은 경로로 읽기 전용으로 붙는다
 - 도구를 늘리지 않는다. 기존 목록 도구에 `output: "file"` 같은 선택 칸을 둔다. 칸이 없으면 지금처럼 결과를 돌려준다
-- 파일 출력은 기간 전체를 한 파일에 담는다. 페이지를 커넥터 안에서 모두 돈다. 상한을 넘으면 일부만 쓰지 않고 오류로 끝낸다
+- 파일 출력은 기간 전체를 한 파일에 담는다. 페이지를 플러그인 안에서 모두 돈다. 상한을 넘으면 일부만 쓰지 않고 오류로 끝낸다
 - 결과에는 파일 경로, 건수, 기간, 칸 목록만 담는다. 항목 내용은 담지 않는다
-- 파일 이름은 커넥터가 정한다. 모델이 준 이름이나 경로를 쓰지 않는다. 기존 파일을 덮지 않는다
+- 파일 이름은 플러그인이 정한다. 모델이 준 이름이나 경로를 쓰지 않는다. 기존 파일을 덮지 않는다
 - 값이 비었으면 파일 출력을 `errors` 표의 코드로 거절한다. 등록 화면의 확인 도구, 선택지 호출, 승인한 실행에는 늘 빈 값이 온다
 - 쓸 때마다 그 디렉터리에서 24시간 지난 자기 파일을 지운다
 - 자격 증명과 서비스의 오류 원문을 파일에 쓰지 않는다
 - 계산에 쓸 칸만 담은 JSON Lines 를 권한다. 금액은 정수로 담아 스크립트가 정수로 더하게 한다
 
-### 사용자 브라우저를 쓰는 커넥터
+### 사용자 브라우저를 쓰는 플러그인
 
-사용자가 로그인해 둔 브라우저로 서비스를 다루는 커넥터는 `owner_browser_env` 에 env 이름 하나를 선언하고, 그 env 의 주소를 Chrome 의 CDP 주소처럼 부른다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)).
-커넥터는 브라우저 주소를 직접 받지 않는다. 값은 Control Plane 의 중계 주소이고, 중계가 그 주소의 표식으로 어느 사용자의 브라우저인지 고른다.
+사용자가 로그인해 둔 브라우저로 서비스를 다루는 플러그인은 `owner_browser_env` 에 env 이름 하나를 선언하고, 그 env 의 주소를 Chrome 의 CDP 주소처럼 부른다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)).
+플러그인은 브라우저 주소를 직접 받지 않는다. 값은 Control Plane 의 중계 주소이고, 중계가 그 주소의 표식으로 어느 사용자의 브라우저인지 고른다.
 
 - 바인딩 설치는 그 바인딩의 표식 주소를 넣는다. 같은 바인딩은 늘 같은 주소라 다시 설치해도 서버 정의가 바뀌지 않는다
 - 등록 화면의 확인 도구와 선택지 호출에는 요청자의 호출 표식 주소가 온다. 5분 뒤 만료된다. 앞의 두 owner env 와 달리 이 호출에도 값이 오므로 확인 도구가 로그인 여부를 볼 수 있다
@@ -147,10 +147,10 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 
 연결을 에이전트에 붙이면 `skills/<이름>/` 이 그 에이전트 profile 의 스킬로 설치된다. `SKILL.md` 와 `references/`, `templates/` 아래 파일을 복사한다.
 스킬 하나는 파일 20개, 파일마다 10만 자까지다. Control Plane 이 올린 스킬에 거는 제한과 같다.
-`SKILL.md` 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 있으면 그 커넥터를 카탈로그에 내지 않는다.
-Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파일을 셸 실행 공간에 넣는다. 붙인 profile 의 `.env` 에는 커넥터 값이 있다([ADR-086](../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
+`SKILL.md` 앞머리에 `required_environment_variables`, `required_credential_files`, `setup.collect_secrets`, `prerequisites.env_vars` 가 있으면 그 플러그인을 카탈로그에 내지 않는다.
+Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파일을 셸 실행 공간에 넣는다. 붙인 profile 의 `.env` 에는 플러그인 값이 있다([ADR-086](../../docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)).
 지침은 매 turn 실리지 않고 모델이 그 스킬을 읽을 때 들어간다. `skills` 도구가 꺼진 에이전트는 읽지 못한다.
-스킬 이름이 그 에이전트의 다른 스킬이나 함께 붙은 커넥터의 스킬과 겹치면 붙이지 못하므로, 서비스를 알 수 있는 이름을 쓴다.
+스킬 이름이 그 에이전트의 다른 스킬이나 함께 붙은 플러그인의 스킬과 겹치면 붙이지 못하므로, 서비스를 알 수 있는 이름을 쓴다.
 
 스킬 파일의 크기와 개수 상한은 `connector_schema.py`가 갖고, 카탈로그가 상한과 경로·앞머리 조건을 확인한다. 바인딩은 스킬 파일을 복사하고 에이전트의 성격은 바꾸지 않는다.
 도구를 언제 쓰는지와 함께 아래를 적는다.
@@ -169,14 +169,14 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 ### 문서와 소유자
 
-`hermes/connectors/<id>/README.md` 는 연결 카드의 「커넥터 README」 가 여는 사용자 안내다. 「~해요」체로 짧게 아래만 둔다.
+`hermes/connectors/<id>/README.md` 는 연결 카드의 「플러그인 README」 가 여는 사용자 안내다. 「~해요」체로 짧게 아래만 둔다.
 
 - 할 수 있는 일과 하지 않는 일
 - 연결하는 방법. 자격 증명을 만들고 넣는 단계
-- 도구 목록. `connector.json` 의 `title` 과 `summary` 를 `| title | summary |` 줄로 그대로 옮긴다
+- 도구 목록. `assistant.json` 의 `title` 과 `summary` 를 `| title | summary |` 줄로 그대로 옮긴다
 - 문제가 생겼을 때. 만료와 철회, 다시 연결하기
 
-개발 내용은 커넥터마다 `docs/features/<id>-connector.md` 기능 파일에 적는다. 본보기는 [Gmail 커넥터](../../docs/features/gmail-connector.md) 다.
+개발 내용은 플러그인마다 `docs/features/<id>-connector.md` 기능 파일에 적는다. 본보기는 [Gmail 플러그인](../../docs/features/gmail-connector.md) 다.
 
 - 등록 칸과 도구 표. 도구마다 위험도, 승인, 상시 허락, 그 까닭
 - 인자와 결과, 오류 코드
@@ -190,9 +190,9 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 ## 배포 묶음
 
-`Dockerfile`과 `package.ts`는 소스 checkout과 같은 SHA의 커넥터 설치 묶음을 만든다.
+`Dockerfile`과 `package.ts`는 소스 checkout과 같은 SHA의 플러그인 설치 묶음을 만든다.
 운영 저장소는 이 빌드 정의를 재사용하고, Hermes runtime에는 검증한 파일만 설치한다.
-커넥터마다 하나인 생성 entry는 Git 추적에서 제외하고 루트 `.gitignore`에 정확한 경로를 적는다. 설치 경로와 manifest 계약은 유지한다. 토스증권의 생성 API 계약 소스와 공식 fixture는 빌드 산출물이 아니므로 계속 추적한다.
+플러그인마다 하나인 생성 entry는 Git 추적에서 제외하고 루트 `.gitignore`에 정확한 경로를 적는다. 설치 경로와 manifest 계약은 유지한다. 토스증권의 생성 API 계약 소스와 공식 fixture는 빌드 산출물이 아니므로 계속 추적한다.
 
 소스 변경 뒤 생성 entry를 수정한 다른 브랜치와 병합할 때 생기는 modify/delete 충돌은 생성 파일의 삭제를 유지해 해결한다. 병합한 소스에서 다시 빌드하며 생성 entry를 Git에 다시 넣지 않는다.
 
@@ -200,11 +200,11 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 | --- | --- |
 | Docker context | `hermes/connectors/` |
 | 빌드 인자 | `SOURCE_COMMIT`: 40자 소문자 hex. 없거나 형식이 틀리면 실패 |
-| 빌드 도구 | Bun `1.3.14`, 커넥터마다 `bun install --frozen-lockfile`. 새 의존성 없음 |
+| 빌드 도구 | Bun `1.3.14`, 플러그인마다 `bun install --frozen-lockfile`. 새 의존성 없음 |
 | 기본 이미지 | `oven/bun:1.3.14-alpine`, amd64와 arm64를 포함한 공식 이미지 index digest를 Dockerfile에 고정 |
 | 출력 | `/bundle/manifest.json`, `/bundle/hermes/connectors/<id>/` |
 | 실행 방식 | 최종 이미지는 `scratch`. `docker create`와 `docker cp`로 꺼내고 실행하지 않음. `/none`은 create를 위한 자리표시 명령 |
-| 재현성 | 같은 프로세스와 의존성에서 각 커넥터의 기존 `buildBundle(outdir)`로 출력 디렉터리만 나눠 두 번 빌드하고 entry 바이트가 같을 때만 출력 |
+| 재현성 | 같은 프로세스와 의존성에서 각 플러그인의 기존 `buildBundle(outdir)`로 출력 디렉터리만 나눠 두 번 빌드하고 entry 바이트가 같을 때만 출력 |
 | 파일 권한 | 소스 git mode `100644`는 `0644`, `100755`는 `0755`. git 없는 context는 실행 비트 유무로 같은 두 권한으로 정규화. 생성 entry는 추적 mode가 있으면 보존하고 없으면 `0644` |
 | 디렉터리 권한 | `0755`. symlink와 특수 파일, 추가 빈 디렉터리, setuid 등 다른 권한은 거절 |
 
@@ -214,15 +214,15 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 ### 포함하는 파일
 
-`connector.json`이 있는 각 커넥터 디렉터리의 git 추적 파일 전체와 `.mcp.json`이 선언한 정확한 생성 entry를 포함한다.
+`assistant.json`이 있는 각 플러그인 디렉터리의 git 추적 파일 전체와 `.mcp.json`이 선언한 정확한 생성 entry를 포함한다.
 plugin manifest, `.mcp.json`, 아이콘, 스킬, 전체 source와 테스트도 설치 파일이다.
-커넥터 밖의 root `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`, `README.md`는 포함하지 않는다.
+플러그인 밖의 root `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`, `README.md`는 포함하지 않는다.
 `node_modules`는 설치 파일이 아니며 추적하면 실패한다.
 
-`.dockerignore`는 `node_modules`와 각 커넥터의 생성 entry만 제외한다.
+`.dockerignore`는 `node_modules`와 각 플러그인의 생성 entry만 제외한다.
 `dist` 전체를 제외하지 않으므로 그 아래 다른 추적 파일도 보존한다.
-커넥터를 추가할 때 Dockerfile의 의존성 COPY와 `.dockerignore`의 정확한 entry를 함께 추가한다.
-context에 커넥터가 있는데 의존성 설치 층이 빠졌으면 묶음 생산이 실패한다.
+플러그인을 추가할 때 Dockerfile의 의존성 COPY와 `.dockerignore`의 정확한 entry를 함께 추가한다.
+context에 플러그인이 있는데 의존성 설치 층이 빠졌으면 묶음 생산이 실패한다.
 
 ### manifest와 검증
 
@@ -233,22 +233,22 @@ manifest의 모든 객체 키는 사전순으로 정렬하고 UTF-8 JSON과 마�
 | 칸 | 값 |
 | --- | --- |
 | `entry` | `dist/<id>-mcp.js`. `.mcp.json`의 command는 `bun`, args는 `${CLAUDE_PLUGIN_ROOT}/`를 붙인 이 경로 하나 |
-| `files` | 커넥터 기준 상대 경로를 키로, 파일 바이트의 sha256 소문자 hex를 값으로 갖는 객체 |
+| `files` | 플러그인 기준 상대 경로를 키로, 파일 바이트의 sha256 소문자 hex를 값으로 갖는 객체 |
 | `modes` | `files`와 같은 키를 갖고, 권한 문자열 `0644` 또는 `0755`를 값으로 갖는 객체 |
 
 `bun run hermes/connectors/package.ts build <출력 디렉터리> <SHA>`로 생산한다. 출력 디렉터리는 아직 없어야 한다.
 `bun run hermes/connectors/package.ts verify <묶음 디렉터리> <SHA>`는 git checkout에서 실행한다.
-검증기는 checkout HEAD와 SHA, index와 해당 SHA, 커넥터별 git inventory와 mode를 대조한다.
+검증기는 checkout HEAD와 SHA, index와 해당 SHA, 플러그인별 git inventory와 mode를 대조한다.
 묶음 전체의 파일과 디렉터리 목록, 해시, 권한, entry, 소스 바이트가 모두 맞아야 통과한다.
 entry를 추적하는 동안에는 entry 바이트도 해당 SHA의 git blob과 같아야 한다.
 경로 탈출과 symlink는 허용하지 않는다.
 
-**받는 쪽은 manifest의 SHA와 해시만 믿으면 안 된다.** Docker context에는 `.git`이 없어 producer는 context의 커넥터 파일을 복사한다.
+**받는 쪽은 manifest의 SHA와 해시만 믿으면 안 된다.** Docker context에는 `.git`이 없어 producer는 context의 플러그인 파일을 복사한다.
 git checkout에서 생산할 때는 추적 파일만 선택해 테스트가 남긴 캐시를 포함하지 않는다.
 `SOURCE_COMMIT`은 소스의 정체를 증명하지 않는다. 받는 쪽이 신뢰하는 해당 SHA의 checkout과 정확히 대조해야 한다.
-각 선언 커넥터 prefix에 한정한 `git ls-files --stage` 목록에 정확한 생성 entry를 합친 것만 허용한다.
+각 선언 플러그인 prefix에 한정한 `git ls-files --stage` 목록에 정확한 생성 entry를 합친 것만 허용한다.
 생성 entry 이외 파일은 해당 SHA의 바이트와 같아야 하고, mode도 git mode와 같아야 한다.
-root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 제외하면 안 된다.
+root 빌드 정의를 플러그인 inventory에 넣거나 `*/dist/*`를 통째로 제외하면 안 된다.
 추적하지 않는 entry의 재현성은 같은 SHA의 고정 빌드 정의와 CI로 검증한다.
 비공개 소비 검사기도 `modes`와 실제 파일 권한을 검사해야 한다.
 
@@ -264,13 +264,13 @@ CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않�
 ## 공통 검사
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
-CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
-`scripts/checks/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
-전용 시험은 각 커넥터의 `tests/` 에 모으고, 여러 커넥터에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
+CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 플러그인을 더하면 검사 대상이 된다.
+`scripts/checks/check-connectors.sh` 는 플러그인마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
+전용 시험은 각 플러그인의 `tests/` 에 모으고, 여러 플러그인에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
 
 | 보는 것 | 어긋나면 |
 | --- | --- |
-| 대시보드 plugin 의 manifest 검증을 통과한다 | 카탈로그에 나오지 않는 커넥터다 |
+| 대시보드 plugin 의 manifest 검증을 통과한다 | 카탈로그에 나오지 않는 플러그인다 |
 | 디렉터리 이름, `id`, `plugin.json` 의 `name` 이 같다 | 운영 목록의 이름과 맞지 않는다 |
 | `schema` 가 `2` 다 | 조회 도구도 승인 대상이 된다 |
 | 서버를 띄워 읽은 도구 이름이 `tools` 의 키와 정확히 같다 | 선언 없는 도구는 거절되고, 없는 도구의 선언은 죽은 글이다 |
@@ -282,7 +282,7 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를
 | `identifiers` 에 적은 이름이 모두 서버의 그 도구 입력 스키마에 있다 | 없는 인자의 선언은 아무것도 가림에서 빼지 않는 죽은 글이다 |
 | `arg_labels`를 선언한 도구의 표시 이름이 검증을 통과하고 키가 실제 입력 스키마와 정확히 같다 | 승인 카드의 이름이 빠지거나 실행 인자와 다른 칸을 가리킨다 |
 | env 이름에 `TOKEN`, `SECRET`, `PASSWORD`, `KEY` 가 든 칸이 `secret: true` 다 | 비밀값이 화면과 응답에 보인다 |
-| `operator_secrets` 가 비었고, `operator_env` 는 비었거나 허용 목록의 그 커넥터 기준 주소 env 하나뿐이다 | 운영 값 없이 돌지 않는다 |
+| `operator_secrets` 가 비었고, `operator_env` 는 비었거나 허용 목록의 그 플러그인 기준 주소 env 하나뿐이다 | 운영 값 없이 돌지 않는다 |
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 붙인 에이전트에 지침이 없다 |
 | `icon` 과 `link` 를 선언했고, `.svg` 아이콘이 `xmlns="http://www.w3.org/2000/svg"` 를 선언했다 | 카드가 기본 아이콘이나 빈 아이콘으로 보이고 서비스로 가는 길이 없다 |
@@ -293,26 +293,26 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를
 ## PR 에 필요한 것
 
 - 위 「갖출 것」 과 공통 검사 통과
-- 도구마다의 분류 까닭이 커넥터 문서에 있다
-- [`hermes/README.md`](../README.md) 의 커넥터 표에 한 줄. `README.md` 와 `README.ko.md` 의 커넥터 소개도 맞는지 본다
+- 도구마다의 분류 까닭이 플러그인 문서에 있다
+- [`hermes/README.md`](../README.md) 의 플러그인 표에 한 줄. `README.md` 와 `README.ko.md` 의 플러그인 소개도 맞는지 본다
 - `test/unit/connector-neutral.test.ts` 의 금지 낱말에 그 서비스의 이름을 더한다. Control Plane 과 웹과 `hermes/plugins` 에 그 이름이 들어오지 않게 한다
 - 실제 계정으로 확인한 결과를 PR 에 적는다. 계정 주소와 토큰은 적지 않는다
 - 저장소의 검사는 [`AGENTS.md`](../../AGENTS.md) 의 「확인」 이 갖는다
 
 ## 운영자가 켜는 방법
 
-저장소에 있는 커넥터는 운영자가 대시보드의 커넥터 목록에 올려야 카탈로그에 나온다.
-목록의 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+저장소에 있는 플러그인은 운영자가 대시보드의 플러그인 목록에 올려야 카탈로그에 나온다.
+목록의 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
 그 항목의 `command` 는 Bun 실행 파일이어야 한다. 의존성은 빌드한 묶음 파일에 들어 있다.
 
-## connector.json
+## assistant.json
 
-새 이름은 `assistant.json` 이다. 대시보드 plugin 은 `assistant.json` 을 먼저 읽고, 없으면 `connector.json` 을 같은 규칙으로 읽는다. 둘 다 두면 카탈로그에서 빠진다.
-이 저장소의 커넥터는 이름 변경 단계에서 함께 옮긴다([ADR-20261026 / plugin-standard-format](../docs/adr/ADR-20261026-plugin-standard-format.md)).
+대시보드 plugin 은 `assistant.json` 을 먼저 읽고, 없으면 옛 이름 `connector.json` 을 같은 규칙으로 읽는다. 둘 다 두면 카탈로그에서 빠진다.
+이 저장소의 플러그인은 모두 `assistant.json` 을 쓴다([ADR-20261026 / plugin-standard-format](../docs/adr/ADR-20261026-plugin-standard-format.md)).
 플러그인 manifest 는 `.claude-plugin/plugin.json` 과 `.codex-plugin/plugin.json` 가운데 하나 이상이면 된다.
-원격 MCP(`type: http`) 서버를 둔 플러그인은 아래 칸에 더해 `headers` 를 선언할 수 있다. 규칙은 [`dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+원격 MCP(`type: http`) 서버를 둔 플러그인은 아래 칸에 더해 `headers` 를 선언할 수 있다. 규칙은 [`dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
 
-plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같은 디렉터리의 `.mcp.json` 이 MCP 서버 하나를 정의하고, `connector.json` 은 그 서버를 사람에게 어떻게 연결하는지를 정한다.
+plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같은 디렉터리의 `.mcp.json` 이 MCP 서버 하나를 정의하고, `assistant.json` 은 그 서버를 사람에게 어떻게 연결하는지를 정한다.
 
 ```json
 {
@@ -344,17 +344,17 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | 칸 | 뜻 |
 | --- | --- |
 | `default_tool_policy` | 선택. `deny`(기본값)나 `ask`. `schema: 2` 에서만 선언한다 |
-| `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
+| `schema` | `1` 이나 `2`. `2` 는 [플러그인 도구 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
 | `tools.<이름>.arg_labels` | 선택. 도구별 승인 인자의 표시 이름 객체다. 누락·불량 metadata는 빈 객체로 읽고 원래 키로 표시한다 |
-| `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
+| `id` | 플러그인 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
 | `title`, `description` | 화면에 그대로 보인다 |
-| `tools.<이름>.title`, `tools.<이름>.summary` | 화면에 보일 한글 도구 이름과 「~해요」체 한두 문장의 요약. 모든 도구에 둔다. 화면은 도구 이름을 보이지 않는다. 쓰는 법은 [커넥터 연결](../../docs/features/connector.md) 의 「도구 이름과 요약」 이 갖는다 |
+| `tools.<이름>.title`, `tools.<이름>.summary` | 화면에 보일 한글 도구 이름과 「~해요」체 한두 문장의 요약. 모든 도구에 둔다. 화면은 도구 이름을 보이지 않는다. 쓰는 법은 [플러그인 연결](../../docs/features/connector.md) 의 「도구 이름과 요약」 이 갖는다 |
 | `tools.<이름>.description` | 모델이 읽는 설명. 화면에 보이지 않는다 |
-| `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
+| `icon` | 선택. 플러그인 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
 | `link` | 선택. 서비스의 공식 사이트나 프로젝트 GitHub의 HTTPS 주소 |
-| `readme_url` | 선택. 커넥터 README의 HTTPS 주소. `link`와 따로 검사한다 |
+| `readme_url` | 선택. 플러그인 README의 HTTPS 주소. `link`와 따로 검사한다 |
 | `link_kind` | 선택. `project`면 `link`를 「프로젝트 GitHub」로 표시한다. 없거나 다른 값이면 `service`로 읽고 「공식 사이트」로 표시한다 |
-| `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
+| `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 플러그인 안에서 유일 |
 | `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
 | `fields[].secret` | 참이면 화면이 가리고 응답에 원문을 담지 않는다. 저장하는 것은 아래 「저장과 비밀값」 이 갖는다 |
 | `fields[].required` | 거짓이면 비워 둘 수 있다. 비우면 그 env 를 지운다 |
@@ -362,18 +362,18 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `fields[].options` | 선택지 칸. `tool` 을 불러 결과의 `items` 배열에서 `value`, `label` 칸을 꺼낸다. `auto_select_single` 이 참이면 하나뿐일 때 화면이 고른다 |
 | `verify.tool` | 등록 전에 후보 값으로 부르는 확인 도구. 성공하면 값이 유효하다고 본다 |
 | `operator_env` | 사용자가 넣지 않고 운영자가 주는 env 이름. 값은 운영 설정이 갖는다. **비밀이 아닌 운영 설정만 둔다.** 값이 profile 설정과 소유 기록에 그대로 복제된다 |
-| `owner_attachments_env` | 선택. 사용자 첨부를 읽는 커넥터가 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-20261007 / connector-owner-attachments](../../docs/adr/ADR-20261007-connector-owner-attachments.md)) |
-| `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 커넥터 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](../docs/adr/ADR-20261008-connector-output-files.md)) |
-| `owner_browser_env` | 선택. 사용자 브라우저를 쓰는 커넥터가 중계 주소를 받을 env 이름 하나. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구와 선택지 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
+| `owner_attachments_env` | 선택. 사용자 첨부를 읽는 플러그인이 받을 env 이름 하나. 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다. 값은 운영 정책과 Control Plane 이 정한 주인에서만 온다([ADR-20261007 / connector-owner-attachments](../../docs/adr/ADR-20261007-connector-owner-attachments.md)) |
+| `owner_output_env` | 선택. 목록 도구가 계산할 데이터를 파일로 쓸 디렉터리를 받을 env 이름 하나. 바인딩 설치가 그 에이전트 실행 공간에 읽기 전용으로 붙는 그 profile 의 플러그인 출력 디렉터리를 넣는다. 실행 공간 정책에 `connector_output_root` 가 없으면 빈 값이다([ADR-20261008 / connector-output-files](../docs/adr/ADR-20261008-connector-output-files.md)) |
+| `owner_browser_env` | 선택. 사용자 브라우저를 쓰는 플러그인이 중계 주소를 받을 env 이름 하나. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구와 선택지 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
 | `owner_browser_login_url` | 선택. `owner_browser_env` 가 있을 때만 받는다. 사용자가 브라우저에서 먼저 로그인할 곳이고 화면이 안내에만 쓴다. `https://` 로 시작하고 512자 이하이며 빈칸과 제어 문자가 없다 |
-| `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
-| `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 커넥터가 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
-| `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 커넥터를 카탈로그에 내지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
+| `single_binding` | 선택 boolean. 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다. 없으면 거짓이다. 서비스가 계정마다 유효한 토큰을 하나만 두어 바인딩끼리 토큰을 깨는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
+| `sandbox_required` | 선택 boolean. 참이면 실행 공간 정책에 등록된 profile 에만 붙는다. 없으면 거짓이다. 키에 권한 범위가 없어 셸이 읽으면 안 되는 플러그인이 선언한다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md)) |
+| `operator_secrets` | 운영자가 주는 비밀의 env 이름 목록. 지금은 지원하지 않는다. 비어 있지 않으면 그 플러그인을 카탈로그에 내지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)) |
 | `errors` | 도구 오류 코드를 공통 어휘로 바꾸는 표. 키는 `^[A-Z][A-Z0-9_]{0,63}$` 이다. 값은 공통 어휘 글이거나 아래 「오류 복구 계약」 의 객체다. 표에 없는 코드는 `unavailable` 이다. `outcome_unknown` 은 쓰기를 보냈는데 됐는지 모른다는 뜻이다 |
 
 - `options.tool` 과 `verify.tool` 은 `.mcp.json` 서버의 도구 가운데 `readOnlyHint: true` 인 것만 된다. 대시보드가 도구를 부를 때 `tools/list` 로 확인한다. manifest 를 읽을 때는 도구 이름의 형식만 본다. 카탈로그는 요청마다 읽으므로 읽을 때마다 MCP 서버를 띄우지 않는다
-- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
-- `icon`, `link`, `readme_url`이 아래 「아이콘과 링크」를 어기면 그 칸만 null로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
+- `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 플러그인을 카탈로그에 내지 않는다
+- `icon`, `link`, `readme_url`이 아래 「아이콘과 링크」를 어기면 그 칸만 null로 내고 경고 로그를 남긴다. 플러그인은 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
 ### 아이콘과 링크
@@ -385,8 +385,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
 - `link`와 `readme_url`은 각각 500자 이하의 HTTPS·ASCII 주소다. 모양은 ADR의 「링크 모양」을 따른다. 선언이 없으면 각각 `null`이고 주소 하나가 틀려도 다른 링크는 유지한다
 - 카탈로그는 `readme_url`, `link_kind`를 싣고 Control Plane은 웹에 `readmeUrl`, `linkKind`로 전달한다. 옛 응답에 칸이 없으면 README 주소는 `null`, 종류는 `service`로 읽는다. 로그인 안내 주소 `owner_browser_login_url`과는 다른 칸이다
-- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
-- 화면은 아이콘을 `<img>`로만 그리고, 없으면 기본 아이콘을 보인다. 목록 카드와 상세 머리는 `link`와 「커넥터 README」를 따로 표시한다. 두 링크는 새 탭으로 열고 `rel="noopener noreferrer"`를 붙이며, 웹에서도 브라우저가 해석할 수 있는 HTTPS 주소인지 검사한다
+- Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 플러그인 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
+- 화면은 아이콘을 `<img>`로만 그리고, 없으면 기본 아이콘을 보인다. 목록 카드와 상세 머리는 `link`와 「플러그인 README」를 따로 표시한다. 두 링크는 새 탭으로 열고 `rel="noopener noreferrer"`를 붙이며, 웹에서도 브라우저가 해석할 수 있는 HTTPS 주소인지 검사한다
 - 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
 
 공통 오류 어휘는 다섯이다.
@@ -413,10 +413,10 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `retry_key` | `outcome_unknown` 에서만 쓰고 그때는 필수다. 결과를 모를 때 다시 보내며 같은 값을 넣는 칸의 이름이다. `^[A-Za-z][A-Za-z0-9_]{0,31}$`. 도구 오류 객체의 칸을 먼저 보고 없으면 결과 맨 위의 칸을 본다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md)) |
 
 - 세부 값은 절댓값 10억 이하의 정수와 boolean 만 옮긴다. 글, 실수, 배열, 객체, null 은 그 칸만 버린다. 외부 서비스의 오류 원문은 이 길로 가지 않는다
-- `retry_key` 의 값은 `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` 인 글만 옮긴다. UUID 를 쓴다. 형식이 틀리면 식별자만 버리고 코드는 남긴다. Control Plane 은 다시 보내지 않고, 같은 식별자를 실은 재호출은 허락과 상관없이 승인을 받게 한다. 같은 식별자로 다시 받은 요청을 한 번만 기록하는 것은 커넥터가 지킨다
-- 복구 어휘의 안내 글은 Control Plane 이 정한다. 커넥터는 글을 쓰지 않는다
+- `retry_key` 의 값은 `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` 인 글만 옮긴다. UUID 를 쓴다. 형식이 틀리면 식별자만 버리고 코드는 남긴다. Control Plane 은 다시 보내지 않고, 같은 식별자를 실은 재호출은 허락과 상관없이 승인을 받게 한다. 같은 식별자로 다시 받은 요청을 한 번만 기록하는 것은 플러그인이 지킨다
+- 복구 어휘의 안내 글은 Control Plane 이 정한다. 플러그인은 글을 쓰지 않는다
 - 글로 선언한 코드도 승인한 실행의 실패 답에 코드는 실린다. 복구 어휘와 세부는 없다
 - 선택지와 확인 도구의 `call` 은 공통 어휘만 준다
-- 이 형식을 모르는 옛 대시보드 plugin 은 객체 항목이 있는 커넥터를 카탈로그에서 뺀다. plugin 과 커넥터를 함께 배포한다
+- 이 형식을 모르는 옛 대시보드 plugin 은 객체 항목이 있는 플러그인을 카탈로그에서 뺀다. plugin 과 플러그인을 함께 배포한다
 
-사용자별 호출 제한에 걸린 요청은 공통 어휘가 아니라 `CONNECTOR_RATE_LIMITED`(429) 로 끝난다. [커넥터 도구 정책](../../docs/features/connector-policy.md) 의 「사용자별 호출 제한」 이 갖는다.
+사용자별 호출 제한에 걸린 요청은 공통 어휘가 아니라 `CONNECTOR_RATE_LIMITED`(429) 로 끝난다. [플러그인 도구 정책](../../docs/features/connector-policy.md) 의 「사용자별 호출 제한」 이 갖는다.

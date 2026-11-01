@@ -502,14 +502,14 @@ test("가려진 내용이 있는 줄은 가려진 칸과 할 일을 보이고 �
     "가려진 칸(filter_id, body)이 있어 승인할 수 없어요. 비밀값처럼 보이는 글은 [가림] 으로 바뀌고, 사람이 다 읽지 못한 요청은 실행하지 않아요.",
   );
   await expect(card.getByTestId("approval-hidden-args-next")).toHaveText(
-    "거절한 뒤 에이전트에게 그 부분을 빼거나 풀어 쓰게 해 주세요. 가려진 것이 지우거나 바꿀 대상의 id 라면 커넥터가 그 칸을 식별자로 선언해야 하니 관리자에게 알려 주세요.",
+    "거절한 뒤 에이전트에게 그 부분을 빼거나 풀어 쓰게 해 주세요. 가려진 것이 지우거나 바꿀 대상의 id 라면 플러그인이 그 칸을 식별자로 선언해야 하니 관리자에게 알려 주세요.",
   );
   await expect(card.getByTestId("approval-approve")).toHaveCount(0);
   await expect(card.getByTestId("approval-grant")).toHaveCount(0);
   await expect(card.getByTestId("approval-reject")).toBeEnabled();
 });
 
-test("커넥터가 식별자로 선언해 가리지 않은 긴 id 는 그대로 보이고 승인 단추가 있다", async ({
+test("플러그인이 식별자로 선언해 가리지 않은 긴 id 는 그대로 보이고 승인 단추가 있다", async ({
   page,
 }) => {
   const filterId = "ANe1BmhXxP8kq3Lr0sT9vUwYzA2bC4dE6fG8hJ";

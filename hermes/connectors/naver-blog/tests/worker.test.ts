@@ -413,7 +413,7 @@ test("작업 디렉터리 확인이 실패하면 상태를 쓰지 않고 입력�
 
 /** 주인의 첨부 디렉터리 아래에 사진 한 장을 둔 사진 디렉터리. */
 async function ownerPhotos() {
-  // 링크가 없도록 실제 경로를 쓴다. 커넥터가 링크를 거절한다.
+  // 링크가 없도록 실제 경로를 쓴다. 플러그인이 링크를 거절한다.
   const attachmentDir = await realpath(
     await mkdtemp(join(tmpdir(), "naver-blog-worker-photos-")),
   );

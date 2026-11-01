@@ -89,20 +89,20 @@ export const SUBAGENT_PROVIDER_PROBE = "자식 provider 확인 검사";
 /**
  * 이 글로 시작하는 입력을 받으면 그 뒤의 줄마다 `<등록 이름> <JSON 인자>` 를 읽어, profile 플러그인의 hook 처럼
  * 차례로 Control Plane 에 판정을 묻는다. 답은 줄마다 `<등록 이름>: allow` 나 `<등록 이름>: block <글>` 이다.
- * `allow` 인 호출만 커넥터 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
+ * `allow` 인 호출만 플러그인 서버에 닿은 것으로 치고 `connectorToolCalls` 에 남긴다.
  */
-export const CONNECTOR_TOOL_PROBE = "커넥터 도구 검사";
+export const CONNECTOR_TOOL_PROBE = "플러그인 도구 검사";
 
 /** 이 글을 보내면 도구를 부르지 않고 답만 한다. 사건 스트림에는 답 조각과 끝 사건만 온다. */
 export const NO_TOOL_CALL_PROBE = "도구 없는 실행 검사";
 
 /**
- * 허용된 커넥터 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
+ * 허용된 플러그인 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
  * 어디에도 남지 않아야 한다.
  */
 export const CONNECTOR_RESULT_SAMPLE = "외부-결과-4821";
 
-/** 허용된 커넥터 도구 호출의 `query` 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
+/** 허용된 플러그인 도구 호출의 `query` 인자로 보내 시작 사건의 미리보기에 실리는 가짜 값이다. 실행 기록과 화면에는 남지 않아야 한다. */
 export const CONNECTOR_ARGUMENT_SAMPLE = "외부-인자-4821";
 
 /**

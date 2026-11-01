@@ -61,7 +61,7 @@ async def _check_env_update(request):
 
 
 async def _check_env_delete(request):
-    """연결 해제는 커넥터 칸의 key 만 지운다. 모델과 Control Plane credential 은 보존한다."""
+    """연결 해제는 플러그인 칸의 key 만 지운다. 모델과 Control Plane credential 은 보존한다."""
     body = await _json_object(request)
     if body is None or set(body) != {"profile", "key"}:
         return _rejected("profile 과 key 만 필요하다")
@@ -70,7 +70,7 @@ async def _check_env_delete(request):
         return rejected
     field_keys, operator_keys = _connector_env_keys()
     if not isinstance(body["key"], str) or body["key"] not in field_keys | operator_keys:
-        return _rejected("커넥터 환경 변수만 지울 수 있다")
+        return _rejected("플러그인 환경 변수만 지울 수 있다")
     missing = _missing_profile(body["profile"])
     if missing is not None:
         return missing

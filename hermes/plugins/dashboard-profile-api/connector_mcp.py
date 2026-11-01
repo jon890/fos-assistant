@@ -1,4 +1,4 @@
-"""MCP SDK 판을 확인하고 커넥터 도구를 부른 뒤 결과를 해석한다."""
+"""MCP SDK 판을 확인하고 플러그인 도구를 부른 뒤 결과를 해석한다."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from .connector_schema import (
 ERROR_DETAIL_INT_MAX = 1_000_000_000
 
 
-# 커넥터 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
+# 플러그인 도구 호출이 기대는 mcp SDK 의 주 판이다. 다른 판은 결과 속성 이름이 달라 호출하지 않는다.
 MCP_SDK_MAJOR = 2
 
 
@@ -38,7 +38,7 @@ _mcp_sdk_version_cache: Optional[str] = None
 
 @contextlib.asynccontextmanager
 async def _open_connector_session(manifest: dict, values: dict, timeout: float, seen: Optional[dict] = None):
-    """커넥터 MCP 서버에 붙어 `initialize` 를 마친 `ClientSession` 을 내준다.
+    """플러그인 MCP 서버에 붙어 `initialize` 를 마친 `ClientSession` 을 내준다.
 
     로컬 서버(`stdio`)는 자식 프로세스로 띄우고 `values` 를 그 env 로 준다.
     원격 서버(`http`)는 Streamable HTTP 로 붙고 `values` 는 선언한 헤더의 `${이름}` 자리에만 들어간다.
@@ -68,7 +68,7 @@ async def _open_connector_session(manifest: dict, values: dict, timeout: float, 
 
 
 async def _run_connector_tool(manifest: dict, tool: str, values: dict, timeout: float):
-    """커넥터 MCP 서버에 한 번 붙어 도구 하나를 부르고 닫는다. `timeout` 은 원격 요청 하나의 시간 제한이다.
+    """플러그인 MCP 서버에 한 번 붙어 도구 하나를 부르고 닫는다. `timeout` 은 원격 요청 하나의 시간 제한이다.
 
     도구가 `tools/list` 에서 읽기 전용이 아니면 부르지 않고 None 을 돌려준다.
     """
@@ -86,7 +86,7 @@ def _read_only(item) -> bool:
 
 
 async def _run_connector_tool_list(manifest: dict, values: dict, timeout: float, seen: dict) -> list:
-    """커넥터 MCP 서버에 한 번 붙어 `tools/list` 만 받고 닫는다. 도구를 부르지 않는다.
+    """플러그인 MCP 서버에 한 번 붙어 `tools/list` 만 받고 닫는다. 도구를 부르지 않는다.
 
     도구마다 `{"name", "read_only"}` 다. 이름이 글이 아닌 항목은 뺀다. 설명과 입력 schema 는 싣지 않는다.
     """
@@ -107,7 +107,7 @@ def _mcp_sdk_version() -> str:
 
 
 def _mcp_sdk_problem() -> Optional[str]:
-    """커넥터 도구 호출이 기대는 SDK 가 아니면 까닭 한 줄을 돌려주고, 지원 범위이면 None 이다."""
+    """플러그인 도구 호출이 기대는 SDK 가 아니면 까닭 한 줄을 돌려주고, 지원 범위이면 None 이다."""
     if _mcp_sdk_version().split(".")[0] != str(MCP_SDK_MAJOR):
         return "지원 범위 mcp>=%d.0,<%d 밖이다" % (MCP_SDK_MAJOR, MCP_SDK_MAJOR + 1)
     try:
@@ -118,7 +118,7 @@ def _mcp_sdk_problem() -> Optional[str]:
         import mcp.types as mcp_types
     except ImportError:
         return "mcp SDK 를 읽어 오지 못했다"
-    # 원격 커넥터는 redirect 를 따라가지 않는 클라이언트를 직접 만들어 넘긴다. 받지 못하는 SDK 로는 부르지 않는다.
+    # 원격 플러그인은 redirect 를 따라가지 않는 클라이언트를 직접 만들어 넘긴다. 받지 못하는 SDK 로는 부르지 않는다.
     if "http_client" not in inspect.signature(streamable_http_client).parameters:
         return "Streamable HTTP 클라이언트가 http_client 인자를 받지 않는다"
     if "read_only_hint" not in mcp_types.ToolAnnotations.model_fields:
@@ -179,7 +179,7 @@ def _safe_error_detail(value) -> bool:
 
 
 def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
-    """실패 답에 커넥터가 선언한 오류 코드와 복구 계약을 더한다(ADR-092).
+    """실패 답에 플러그인이 선언한 오류 코드와 복구 계약을 더한다(ADR-092).
 
     `errors` 표에 있는 코드만 더한다. 세부 칸은 그 코드의 `details` 가 적은 이름이고 값이 정수나 boolean 인 것만 옮긴다.
     도구 오류의 다른 칸, 원문 메시지, 중첩 값은 옮기지 않는다. 복구 어휘는 도구 결과가 아니라 manifest 에서 꺼낸다.
@@ -219,7 +219,7 @@ def _retry_value(payload, error: dict, key: str):
 
 async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, values: dict, progress: dict,
                                  timeout: float):
-    """커넥터 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
+    """플러그인 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
 
     등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
     선언에 없어도 `default_tool_policy: ask` 이면 부른다. Control Plane 이 승인 필요로 판정한 호출만 여기 온다.

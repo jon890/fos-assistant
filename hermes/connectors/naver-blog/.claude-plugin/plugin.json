@@ -1,5 +1,5 @@
 {
   "name": "naver-blog",
-  "description": "로그인해 둔 Chrome 에 붙어 네이버 블로그 글을 미리보고 승인한 글을 임시저장하는 커넥터 plugin",
+  "description": "로그인해 둔 Chrome 에 붙어 네이버 블로그 글을 미리보고 승인한 글을 임시저장하는 플러그인 plugin",
   "skills": "./skills"
 }

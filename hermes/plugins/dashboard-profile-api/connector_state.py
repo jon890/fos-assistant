@@ -1,4 +1,4 @@
-"""커넥터 소유 기록과 도구 이름 대응, profile 파일의 공통 규칙이다."""
+"""플러그인 소유 기록과 도구 이름 대응, profile 파일의 공통 규칙이다."""
 
 from __future__ import annotations
 from .connector_guard import _binding_guard
@@ -39,7 +39,7 @@ from .connector_vault import (
 )
 
 
-# 바인딩 설치가 커넥터의 스킬을 복사하는 profile 안의 디렉터리와, 스킬 디렉터리 아래에서 복사하는 하위 디렉터리다.
+# 바인딩 설치가 플러그인의 스킬을 복사하는 profile 안의 디렉터리와, 스킬 디렉터리 아래에서 복사하는 하위 디렉터리다.
 PROFILE_SKILLS_DIR = "skills"
 
 
@@ -47,12 +47,12 @@ PROFILE_SKILLS_DIR = "skills"
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 
 
-# 바인딩 떼기가 뗀 서버 이름을 남기는 기록이다. `{커넥터 id: 서버 이름}` 이다. 소유 기록 곁에 두고 이름 대응을 만들 때 함께 읽는다.
+# 바인딩 떼기가 뗀 서버 이름을 남기는 기록이다. `{플러그인 id: 서버 이름}` 이다. 소유 기록 곁에 두고 이름 대응을 만들 때 함께 읽는다.
 # 떼기 전에 시작한 실행은 그 서버를 쥔 채 돌므로, 대응에서 서버가 빠지면 그 호출이 판정 없이 나간다.
 CONNECTOR_DETACHED = ".fos-connector-detached.json"
 
 
-# 커넥터 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
+# 플러그인 도구 호출을 판정하는 hook 을 가진 profile plugin 과, 묶음의 판과 견주는 그 파일들이다.
 POLICY_PLUGIN = "fos-ctx"
 
 
@@ -91,13 +91,13 @@ def _connector_server(manifest: dict) -> dict:
 
 
 def _connector_tool_map(state: dict, detached: dict | None = None) -> dict:
-    """소유 기록의 커넥터와 뗀 서버 기록으로 만든 이름 대응이다. 형식은 `docs/features/connector-policy.md` 의 「이름 대응」 이 갖는다.
+    """소유 기록의 플러그인과 뗀 서버 기록으로 만든 이름 대응이다. 형식은 `docs/features/connector-policy.md` 의 「이름 대응」 이 갖는다.
 
     바인딩 설치는 `isolated: false` 를 싣고 소유 기록의 모든 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 다.
     바인딩 항목의 서버 이름은 기록의 이름이다. 기록의 이름이나 실행 정의가 지금 manifest 와 다르면 그 서버도 빈 `tools` 다.
     떼기는 남는 항목을 manifest 와 견주지 않으므로, 운영자가 manifest 를 바꾼 뒤에도 `config.yaml` 에 남은 서버가 대응에 있어야 한다.
     뗀 서버(`detached`)도 빈 `tools` 로 싣는다. 떼기 전에 시작한 실행이 그 서버를 쥐고 있어도 그 호출을 판정이 막는다.
-    같은 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽이 이긴다. 뗀 서버만 남아도 바인딩 profile 이다.
+    같은 이름을 지금 붙은 플러그인이 쓰면 붙은 쪽이 이긴다. 뗀 서버만 남아도 바인딩 profile 이다.
     바인딩 profile 의 hook 은 대응에 없는 서버를 통과시키므로, 서버가 빠지면 그 도구가 판정 없이 나간다(ADR-083).
     """
     roots = _connector_roots()
@@ -149,13 +149,13 @@ def _tool_map_bytes(tool_map: dict) -> bytes:
 
 
 def _connector_state(value, target: str | None = None) -> dict:
-    """소유 기록의 모양을 보고, 운영 목록의 커넥터는 지금 manifest 의 실행 정의와 맞는지 본다.
+    """소유 기록의 모양을 보고, 운영 목록의 플러그인은 지금 manifest 의 실행 정의와 맞는지 본다.
 
-    운영 목록에서 빠진 커넥터의 기록은 모양만 본다. 그 기록으로는 설치를 끄는 것만 한다.
+    운영 목록에서 빠진 플러그인의 기록은 모양만 본다. 그 기록으로는 설치를 끄는 것만 한다.
     바인딩 항목(`mode: bind`)은 서버 이름, 보관 파일 이름, 설치한 스킬 이름을 갖는다.
     스킬 이름은 떼기가 지울 디렉터리 이름이라 경로 조각으로 쓸 수 있는지 여기서 본다.
-    바인딩 항목은 요청이 가리키는 커넥터(`target`)의 것만 manifest 와 견주고 나머지는 모양만 본다.
-    운영자가 커넥터 하나를 바꿔도 같은 profile 에 붙은 다른 커넥터의 실행, probe, 조회, 붙이기가 실패하지 않게 한다.
+    바인딩 항목은 요청이 가리키는 플러그인(`target`)의 것만 manifest 와 견주고 나머지는 모양만 본다.
+    운영자가 플러그인 하나를 바꿔도 같은 profile 에 붙은 다른 플러그인의 실행, probe, 조회, 붙이기가 실패하지 않게 한다.
     맞지 않는 다른 항목은 이름 대응이 빈 `tools` 로 싣는다. 옛 설치 항목은 지금처럼 모두 견준다.
     """
     if not isinstance(value, dict):
@@ -240,7 +240,7 @@ def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
 
 
 def _entry_field_env(plugin: str, entry: dict) -> set:
-    """소유 기록 항목의 커넥터가 profile `.env` 에 두는 이름이다.
+    """소유 기록 항목의 플러그인이 profile `.env` 에 두는 이름이다.
 
     manifest 가 있으면 칸의 env 이름이고, 운영 목록에서 빠졌으면 기록의 서버 정의가 `${이름}` 으로 참조하던 이름이다.
     원격 MCP 의 기록이면 헤더 값이 참조하던 이름이다.

@@ -1,4 +1,4 @@
-"""커넥터 운영 목록과 manifest 원문을 읽는다."""
+"""플러그인 운영 목록과 manifest 원문을 읽는다."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .connector_remote import _portable_remote_server
 
 
 def _connector_roots() -> dict[str, dict]:
-    """운영 목록을 읽는다. `{"<커넥터 이름>": {"root", "command", "env", "url"}}` 다. 없거나 틀리면 빈 dict 다.
+    """운영 목록을 읽는다. `{"<플러그인 이름>": {"root", "command", "env", "url"}}` 다. 없거나 틀리면 빈 dict 다.
 
     환경 변수의 값은 이름마다 문자열(plugin 디렉터리)이나
     `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<이름>": "<값>"}, "url": "<원격 MCP 주소>"}` 다.
@@ -48,7 +48,7 @@ def _connector_roots() -> dict[str, dict]:
 
 
 def _connector_command() -> str | None:
-    """커넥터 MCP 서버를 실행할 파일의 기본 절대 경로다. 없거나 절대 경로가 아니면 None 이다."""
+    """플러그인 MCP 서버를 실행할 파일의 기본 절대 경로다. 없거나 절대 경로가 아니면 None 이다."""
     command = os.environ.get(CONNECTOR_COMMAND_ENV, "").strip()
     if not command:
         return None

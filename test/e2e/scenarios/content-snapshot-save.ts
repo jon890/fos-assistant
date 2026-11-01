@@ -43,7 +43,7 @@ export const contentSnapshotSaveScenario: Scenario = {
     let tokenId: number | undefined;
     let failed = true;
     try {
-      step("snapshot 커넥터를 연결하고 비공개 에이전트에 붙인다");
+      step("snapshot 플러그인을 연결하고 비공개 에이전트에 붙인다");
       const agent = await setup.attachedAgent("원고 저장 검사", [SNAPSHOT_CONNECTOR.id]);
       const issued = expectStatus(await call(context, "/admin/agent-tokens", { method: "POST", token: context.tokens.dad,
         body: { profileName: agent.profile, label: "snapshot-e2e" } }), 200, "MCP 토큰 발급").json<{ id: number; token: string }>();

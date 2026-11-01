@@ -110,7 +110,7 @@ final class ConnectorCatalogDecoder {
     }
 
 
-    /** manifest 에서 생략할 수 있는 칸의 기본값은 {@code hermes/connectors/README.md} 의 「connector.json」 과 같다. */
+    /** manifest 에서 생략할 수 있는 칸의 기본값은 {@code hermes/connectors/README.md} 의 「assistant.json」 과 같다. */
     private static ConnectorField field(JsonNode field) {
         String key = requiredText(field, "key");
         String label = text(field, "label");

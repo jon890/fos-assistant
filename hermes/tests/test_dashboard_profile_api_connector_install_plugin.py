@@ -27,7 +27,7 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "SENSITIVE", "outbound": False},
                                   "write_note": {"risk": "WRITE", "outbound": False}})
         # manifest 가 바뀌면 다시 설치하기 전까지 대응의 그 서버 `tools` 가 옛것이다. 서버 목록과 접두사는 같으므로
-        # hook 은 접두사로 서버를 잡아 묻는다. 그 커넥터 항목만 설치가 덜 된 것이고 `policy_hook` 은 참이다.
+        # hook 은 접두사로 서버를 잡아 묻는다. 그 플러그인 항목만 설치가 덜 된 것이고 `policy_hook` 은 참이다.
         status = self.connector_status()
         self.assertEqual(status.body["connectors"], [
             {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
@@ -192,7 +192,7 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         self.assertIs(self.policy_hook(), True)
 
         # `purge` 는 승인 방식만 올랐고 `erase` 가 더해졌다. 서버 정의의 `tools.exclude` 와 대응의 그 서버 `tools` 가 옛것이다.
-        # 둘 다 그 커넥터 항목만 거짓으로 만든다. 대응의 서버 목록과 접두사는 같으므로 `policy_hook` 은 참이다.
+        # 둘 다 그 플러그인 항목만 거짓으로 만든다. 대응의 서버 목록과 접두사는 같으므로 `policy_hook` 은 참이다.
         self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "DESTRUCTIVE"},
                                   "erase": {"risk": "WRITE", "approval": "always"}})
         status = self.connector_status()

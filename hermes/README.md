@@ -1,6 +1,6 @@
 # Hermes 쪽 코드
 
-Hermes 에 설치하는 plugin 과 profile 틀, 범용 커넥터다. 이 파일은 설치 묶음과 운영 값, 검사를 갖는다.
+Hermes 에 설치하는 plugin 과 profile 틀, 범용 플러그인다. 이 파일은 설치 묶음과 운영 값, 검사를 갖는다.
 모듈의 규칙과 문서는 [`hermes/AGENTS.md`](AGENTS.md) 가 가리킨다.
 
 ## 설치 묶음
@@ -31,12 +31,12 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | 값 | 받는 곳 | 모양과 없을 때의 동작 |
 | --- | --- | --- |
 | Control Plane MCP 주소 | `bundle.sh --mcp-url` | 묶음을 만들 때 틀에 채운다 |
-| 커넥터 목록 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` | 값의 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](plugins/dashboard-profile-api/README.md) 의 「커넥터」 에 있다. 이 목록에 있고 `connector.json` 검증을 통과한 것만 카탈로그에 나온다. 비었거나 읽지 못하면 커넥터가 하나도 없는 것으로 본다 |
-| 커넥터 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
+| 플러그인 목록 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` | 값의 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](plugins/dashboard-profile-api/README.md) 의 「플러그인」 에 있다. 이 목록에 있고 `assistant.json` 검증을 통과한 것만 카탈로그에 나온다. 비었거나 읽지 못하면 플러그인이 하나도 없는 것으로 본다 |
+| 플러그인 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
 | 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |
-| 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 커넥터를 설치한 profile 의 커넥터 도구를 모두 막는다 |
+| 플러그인 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 플러그인을 설치한 profile 의 플러그인 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
 | 사진 원본을 조회할 주소 | gateway 프로세스의 환경 변수 `FOS_ATTACHMENT_INSPECT_URL` | Control Plane의 `/internal/hermes/attachment-inspect`다. 없으면 원본 도구가 명시한 실패를 반환한다. profile의 `fos-attachments` toolset을 함께 켠다 |
 
@@ -50,7 +50,7 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | `workspace_root` | 예 | 사용자 디렉터리를 둘 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. 사용자 디렉터리 `<workspace_root>/<sandbox_owner>` 가 `/workspace` 에 붙는다 |
 | `attachment_root` | 예 | Docker 호스트에서 첨부를 사용자별로 둔 절대 경로. Hermes에서도 그 경로를 검증할 수 있어야 한다. `<attachment_root>/users/<sha256(sandbox_owner UTF-8)>` 만 읽기 전용으로 붙는다 |
 | `attachment_agent_root` | 예 | Hermes와 실행 컨테이너가 함께 보는 첨부 절대 경로. `<attachment_agent_root>/users/<sha256(sandbox_owner UTF-8)>` 가 위 원본의 실행 공간 경로다. Docker 호스트와 Hermes의 경로는 달라도 된다 |
-| `connector_output_root` | 아니오 | 커넥터가 계산할 목록을 파일로 쓰는 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. `<connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>` 이 같은 경로에 읽기 전용으로 붙는다. 없으면 붙이지 않고 커넥터의 `owner_output_env` 는 빈 값이다([ADR-20261008 / connector-output-files](docs/adr/ADR-20261008-connector-output-files.md)) |
+| `connector_output_root` | 아니오 | 플러그인이 계산할 목록을 파일로 쓰는 절대 경로. **Docker 호스트와 Hermes 컨테이너에서 같은 경로**여야 한다. `<connector_output_root>/users/<sha256(sandbox_owner UTF-8)>/<profile>` 이 같은 경로에 읽기 전용으로 붙는다. 없으면 붙이지 않고 플러그인의 `owner_output_env` 는 빈 값이다([ADR-20261008 / connector-output-files](docs/adr/ADR-20261008-connector-output-files.md)) |
 | `skill_root` | 아니오 | Docker 호스트에서 올린 스킬 루트의 절대 경로. Hermes 쪽 경로 `FOS_ASSISTANT_SKILL_AGENT_ROOT` 와 같은 디렉터리여야 한다. 있으면 `<skill_root>/<profile>` 을 `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>` 에 읽기 전용으로 붙인다. 없으면 붙이지 않고 `scripts/` 가 든 스킬의 게시를 409 로 거절한다([ADR-20261009 / skill-package](../docs/adr/ADR-20261009-skill-package.md)) |
 | `network` | 아니오 | 실행 공간을 붙일 Docker 망 이름. 없으면 Docker 기본 망이다 |
 | `cpu` | 아니오 | 0 보다 크고 8 이하. 기본 1 |
@@ -91,7 +91,7 @@ token 과 API key 값 자체는 받지 않는다. 파일을 읽게 할 경우 �
 양쪽 루트에 `users/<sha256(sandbox_owner UTF-8)>` 가 없으면 409다. 두 루트는 Control Plane 의 `assistant.attachment.root` 와 같은 디렉터리여야 한다.
 중간 경로를 포함한 링크를 따라가지 않고 디렉터리를 열며, 실제 경로가 허용 루트 아래의 그 사용자 디렉터리인지 확인한다.
 처음 확인한 뒤 mount 문자열 생성 직전, 설정 저장 직전에 경로와 디렉터리 식별자를 다시 대조한다.
-검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 커넥터 설치에도 같은 검사를 적용한다.
+검증이 실패하거나 검사 뒤 디렉터리가 바뀌면 409로 중단하고 기존 terminal 설정을 보존한다. 사진 플러그인 설치에도 같은 검사를 적용한다.
 API 완료 뒤 Docker 생성까지의 변경은 첨부 루트를 Hermes 에 읽기 전용으로 붙여 막는다. 실제 생성 시점의 검증은 Docker socket proxy가 맡는다.
 
 정책이 유효하고 profile 이 등록돼 있으면 plugin 은 아래 `terminal:` 전체를 쓴다.
@@ -137,7 +137,7 @@ terminal:
 
 docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_mode: approve` 도 쓴다. `approvals` 의 다른 키는 그대로 둔다.
 `backend: local` 을 쓸 때는 `approvals.unattended_mode` 를 지운다. 남은 `approvals` 가 비면 블록째 지운다.
-그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 커넥터 승인은 그대로 승인 카드로 간다.
+그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 플러그인 승인은 그대로 승인 카드로 간다.
 판정 경로는 [실행 공간](docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
 
 **기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다.**
@@ -155,10 +155,10 @@ python3 -m unittest discover -s hermes/tests
 
 Hermes 모듈은 가짜로 끼우므로 Hermes 를 설치하지 않아도 돈다. 실제 Hermes 와 맞는지는 운영 저장소의 live 검사가 본다.
 
-Python 3.14 와 PyYAML 과 `mcp` SDK, 커넥터를 실행할 Bun 이 있어야 한다. Hermes 이미지와 같은 버전이다.
-검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [커넥터 설치](../docs/features/connector.md) 의 「MCP SDK 계약」 이 갖는다.
-커넥터 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 커넥터를 자식 프로세스로 띄운다.
-`tests/test_connectors_contract.py` 는 `connectors/` 아래 커넥터를 모두 찾아 계약을 본다. 커넥터 전용 시험은 각 커넥터의 `tests/` 에 있다.
+Python 3.14 와 PyYAML 과 `mcp` SDK, 플러그인을 실행할 Bun 이 있어야 한다. Hermes 이미지와 같은 버전이다.
+검사는 `mcp==2.0.0` 으로 돌고 plugin 의 지원 범위는 `mcp>=2.0,<3` 이다. SDK 계약은 [플러그인 설치](../docs/features/connector.md) 의 「MCP SDK 계약」 이 갖는다.
+플러그인 도구 호출 검사는 `tests/fixtures/demo-connector/` 의 시험 플러그인을 자식 프로세스로 띄운다.
+`tests/test_connectors_contract.py` 는 `connectors/` 아래 플러그인을 모두 찾아 계약을 본다. 플러그인 전용 시험은 각 플러그인의 `tests/` 에 있다.
 타입 검사와 전용 시험, 묶음 파일 비교는 저장소 루트의 `bash scripts/checks/check-connectors.sh` 로 돌린다.
 
 `dashboard-profile-api` 가 기대는 Hermes 내부 지점은 `tests/hermes_contract.py` 가 한곳에 선언한다([ADR-088](docs/adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md)).

@@ -1,4 +1,4 @@
-"""커넥터 조회, 설치, 떼기와 MCP 서버 probe 요청을 검사한다."""
+"""플러그인 조회, 설치, 떼기와 MCP 서버 probe 요청을 검사한다."""
 
 from __future__ import annotations
 from .connector_guard import _binding_guard, _guard_support, _guard_hide_financial
@@ -94,7 +94,7 @@ from .sandbox import (
 )
 
 
-# 설치한 커넥터의 MCP 서버 probe 다. 서버 이름은 그 profile 의 소유 기록과 manifest 로 확인한다.
+# 설치한 플러그인의 MCP 서버 probe 다. 서버 이름은 그 profile 의 소유 기록과 manifest 로 확인한다.
 PROBE_ROUTE_RE = re.compile(r"^/api/mcp/servers/([^/]+)/test$")
 
 
@@ -113,7 +113,7 @@ async def _connector_request(request):
         # 운영 목록에 없는 이름은 끄기만 받는다. 소유 기록이 있으면 설치를 끄고, 없으면 바꾸지 않고 성공이다.
         # `sandbox_owner`는 사용자 첨부를 읽는 바인딩의 주인이다(ADR-20261007 connector-owner-attachments).
         # 바인딩 설치는 API 도구 목록의 내장 toolset 을 바꾸지 않는다. 그 값으로 주인의 첨부 디렉터리만 정한다.
-        # `owner_browser` 는 그 바인딩의 브라우저 중계 주소다. 선언한 커넥터의 바인딩 설치만 쓴다(ADR-20261008 browser-gateway-token).
+        # `owner_browser` 는 그 바인딩의 브라우저 중계 주소다. 선언한 플러그인의 바인딩 설치만 쓴다(ADR-20261008 browser-gateway-token).
         if (body is None
                 or not {"profile", "plugin", "enabled"} <= set(body)
                 <= {"profile", "plugin", "enabled", "bind", "sandbox_owner", "owner_browser"}
@@ -165,7 +165,7 @@ async def _connector_request(request):
             for plugin in roots:
                 manifest = _connector_manifest(plugin)
                 entry = state.get(plugin)
-                # 설치하지 않은 커넥터도 현재 바인딩 설치 방식으로 답한다.
+                # 설치하지 않은 플러그인도 현재 바인딩 설치 방식으로 답한다.
                 mode = _entry_mode(entry) if entry is not None else BIND_MODE
                 if entry is None or manifest is None or servers.get(manifest["mcp_server"]) != entry["server"]:
                     configured = False
@@ -186,7 +186,7 @@ async def _connector_request(request):
                 connectors.append({"plugin": plugin, "enabled": entry is not None, "configured": configured,
                                    "mode": mode, **({"execution_guard": support} if manifest is not None
                                    and manifest.get("execution_guard") is not None else {})})
-            # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
+            # 운영 목록에서 빠진 플러그인의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": BIND_MODE}
                               for plugin, entry in state.items() if plugin not in roots)
             # 거짓이면 어느 조건인지 이름만 남긴다. profile 이름, 경로, 파일 내용은 남기지 않는다.
@@ -204,7 +204,7 @@ async def _connector_request(request):
             if manifest is None:
                 raise ValueError("쓸 수 없는 connector 는 설치하지 않는다")
             if manifest["sandbox_required"]:
-                # 실행 공간을 전제로 하는 커넥터는 정책에 등록된 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
+                # 실행 공간을 전제로 하는 플러그인은 정책에 등록된 profile 에만 붙인다. 셸이 지금 켜져 있는지는 보지 않는다.
                 # 셸은 붙인 뒤에 켤 수 있기 때문이다(ADR-20261008 connector-binding-guards).
                 sandbox = _sandbox_policy()
                 if sandbox is None or profile not in sandbox["profiles"]:
@@ -212,7 +212,7 @@ async def _connector_request(request):
             owner_attachments = None
             if manifest["owner_attachments_env"] is not None:
                 # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인에서만 만든다. 모델, 요청의 다른 칸, manifest 는
-                # 경로를 정하지 못한다. 선언하지 않은 커넥터는 `sandbox_owner` 를 받아도 쓰지 않는다(ADR-20261007 connector-owner-attachments).
+                # 경로를 정하지 못한다. 선언하지 않은 플러그인은 `sandbox_owner` 를 받아도 쓰지 않는다(ADR-20261007 connector-owner-attachments).
                 if owner is None:
                     return _rejected("사용자 첨부를 읽는 connector 에는 sandbox_owner 가 필요하다")
                 sandbox = _sandbox_policy()
@@ -229,23 +229,23 @@ async def _connector_request(request):
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
-            # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 커넥터의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
+            # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 플러그인의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
             fields = {field["key"] for field in manifest["fields"]}
             values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields})
             if values is None:
                 return _rejected("보관 파일의 값이 지금 칸 선언과 맞지 않는다")
             owner_output = None
             if manifest["owner_output_env"] is not None and owner is not None:
-                # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 커넥터 id 로만 만든다.
+                # 경로는 운영 정책의 루트와 Control Plane 이 정한 주인, profile, 플러그인 id 로만 만든다.
                 # 실행 공간 정책에 등록된 profile 에만 준다. 미등록 profile 은 그 디렉터리를 붙이지 않는다.
-                # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 커넥터가 파일 출력만 거절한다(ADR-20261008 connector-output-files).
+                # 정책이나 키가 없거나 만들지 못하면 빈 값으로 붙인다. 플러그인이 파일 출력만 거절한다(ADR-20261008 connector-output-files).
                 sandbox = _sandbox_policy()
                 if sandbox is not None and profile in sandbox["profiles"]:
                     try:
                         owner_output = await asyncio.to_thread(_sandbox_connector_output_directory, sandbox,
                                                                profile, owner, body["plugin"])
                     except (OSError, ValueError, RuntimeError) as error:
-                        logger.warning("dashboard-profile-api: 커넥터 출력 디렉터리를 만들지 못해 빈 값으로 붙인다: %s",
+                        logger.warning("dashboard-profile-api: 플러그인 출력 디렉터리를 만들지 못해 빈 값으로 붙인다: %s",
                                        type(error).__name__)
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
@@ -276,7 +276,7 @@ async def _connector_request(request):
 
 
 async def _check_connector_probe(request):
-    """probe 는 그 profile 에 설치한 커넥터의 MCP 서버 이름일 때만 넘긴다."""
+    """probe 는 그 profile 에 설치한 플러그인의 MCP 서버 이름일 때만 넘긴다."""
     rejected = await _check_skills_list(request)
     if rejected is not None:
         return rejected
@@ -297,9 +297,9 @@ async def _check_connector_probe(request):
                        and (_connector_manifest(plugin) or {}).get("mcp_server") == server), None)
         if target is None:
             return _rejected("설치하지 않은 connector 다", 404)
-        # 이 서버의 커넥터 항목만 지금 manifest 의 실행 정의와 맞는지 본다.
+        # 이 서버의 플러그인 항목만 지금 manifest 의 실행 정의와 맞는지 본다.
         owned = _connector_state(state, target)[target]
-        # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다.
+        # 플러그인 표식만 있는 profile 은 바인딩 설치만 받는다.
         if not managed and _entry_mode(owned) != BIND_MODE:
             return _rejected("관리 표식이 없는 profile 이다", 401)
         config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}

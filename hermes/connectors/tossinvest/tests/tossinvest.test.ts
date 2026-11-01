@@ -16,7 +16,7 @@ import {
 } from "./support.ts";
 
 const manifest = JSON.parse(
-  readFileSync(join(import.meta.dir, "../connector.json"), "utf8"),
+  readFileSync(join(import.meta.dir, "../assistant.json"), "utf8"),
 );
 
 const accountRows = {
@@ -55,7 +55,7 @@ function setup(options: Record<string, unknown> = {}) {
   return { fake, server };
 }
 
-describe("토스증권 커넥터 계약", () => {
+describe("토스증권 플러그인 계약", () => {
   test("manifest 의 도구 선언과 서버의 도구 목록이 같고 READ 만 읽기 전용이다", async () => {
     await withMcp(createTossinvestServer({ env: {} }), async (client) => {
       const tools = (await client.listTools()).tools;

@@ -33,7 +33,7 @@ base는 id·권한·행위자를 갖지 않는다. 생성 전용 엔티티에 �
 복합 ID와 지정 ID의 신규 merge에서는 반환된 managed 객체를 사용한다.
 DB에 있는 ID에 C가 NULL인 새 factory 객체를 merge하는 경로는 허용하지 않는다.
 
-대화 활동·커넥터 권한 snapshot·revision·사건·큐 수명 시각은 기존 인자로 전달한다.
+대화 활동·플러그인 권한 snapshot·revision·사건·큐 수명 시각은 기존 인자로 전달한다.
 생성 C만 자동화한 Conversation·ConnectorConnection·ConnectorBinding·Memory·ResultDelivery·UserBrowser의 U는 업무 필드로 남는다.
 생성 시각을 기준으로 목록을 읽는 커서와 기간 정리는 저장 시각을 계속 사용한다. 별도의 사건 발생 시각을 이 값으로 바꾸지 않는다.
 
@@ -128,7 +128,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
 | `orchestration` | 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 스킬 zip 묶음의 받기와 검사, 미리보기와 올리기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
-| `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
+| `connector` | 플러그인 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 플러그인 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/features/schedule.md`](../../docs/features/schedule.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`docs/features/attention.md`](../../docs/features/attention.md)) |
@@ -199,7 +199,7 @@ CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치�
 `agent.application`의 도구 서비스(`AgentToolService`, `ToolsetCatalogService`, `ToolsetRequestService`, `ToolsetVisibilityService`, `AgentDefaultToolsets`)는 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
 이 서비스들의 공개 반환값은 `agent.application.dto`에 둔다.
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
-profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application.port`에,
+profile 스킬 파일과 플러그인 바인딩을 읽는 port는 `agent.application.port`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
 ### 브라우저 활동 시각
@@ -291,7 +291,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
-`browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
+`browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 플러그인 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
 `agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.application.port`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
@@ -313,7 +313,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 ### connector
 
-`connector`는 커넥터 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
+`connector`는 플러그인 카탈로그와 사용자별 연결의 등록, 확인, 해제와 비밀값을 제외한 상태를 소유한다.
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
@@ -329,16 +329,16 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 특정 서비스 이름이 코드에 들어왔는지는 `test/unit/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
-계약은 [커넥터 연결](../../docs/features/connector.md)에 있다.
+계약은 [플러그인 연결](../../docs/features/connector.md)에 있다.
 
-`connector` 는 커넥터 도구 호출의 판정과 그 기록도 소유한다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
+`connector` 는 플러그인 도구 호출의 판정과 그 기록도 소유한다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
 
 | 클래스 | 하는 일 |
 | --- | --- |
 | `connector.approval.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.approval.application.dto.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
 | `connector.approval.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
-| `connector.approval.application.ConnectorFinancialIntake` | 커넥터의 금융 준비 도구 호출을 금융 준비로 넘긴다. 살펴보기 트리와 지금 열지 않는 동작은 줄 없이 막는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)) |
+| `connector.approval.application.ConnectorFinancialIntake` | 플러그인의 금융 준비 도구 호출을 금융 준비로 넘긴다. 살펴보기 트리와 지금 열지 않는 동작은 줄 없이 막는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)) |
 | `connector.approval.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
 | `connector.connection.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
@@ -487,7 +487,7 @@ class UserExecutionLimitBackgroundTest { ... }
 - **기반의 spy 는 `verify(...)` 의 matcher 사이에서 부르지 않는다.** Mockito 가 그 호출을 matcher 를 쓰는 호출로 읽는다. 값을 먼저 지역 변수로 받는다.
 - **검사가 바꾼 static 상태는 `@BeforeEach` 에서 되돌린다.**
 - **운영 빈이 JVM 메모리에 두는 캐시는 다음 검사에 남는다.** 보관 시간을 test profile 에서 짧게 두거나, 그 캐시가 시험 시계를 쓰게 해 검사가 시간을 옮긴다. 검사가 private 필드를 바꿔 비우지 않는다.
-  - 커넥터 카탈로그 캐시는 카탈로그 하나를 열쇠 없이 들고 있어 실제 시각으로 판정한다. 시험 시계를 쓰면 시계를 과거로 멈추는 검사에서 앞 검사의 카탈로그가 보관 시간 안으로 들어온다. test profile 의 보관 시간과 실패 기억 시간을 1ms 로 두고, 지나가게 하려는 검사는 2ms 를 기다린다.
+  - 플러그인 카탈로그 캐시는 카탈로그 하나를 열쇠 없이 들고 있어 실제 시각으로 판정한다. 시험 시계를 쓰면 시계를 과거로 멈추는 검사에서 앞 검사의 카탈로그가 보관 시간 안으로 들어온다. test profile 의 보관 시간과 실패 기억 시간을 1ms 로 두고, 지나가게 하려는 검사는 2ms 를 기다린다.
   - 스킬 커맨드 캐시는 `Clock` 빈을 받아 검사에서 `TestClock` 을 쓴다. 열쇠가 에이전트 번호이고 검사마다 에이전트를 새로 만들어, 시계를 과거로 멈춰도 앞 검사의 목록을 받지 않는다.
 
 ## 코드 품질 검사

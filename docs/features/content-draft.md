@@ -82,7 +82,7 @@ compiler 회귀와 공유 golden vector는 `hermes/connectors/naver-blog/tests/c
 대시보드 쿠키만 있는 요청은 거절한다. 요청의 정확한 키는 `profile`, `operation`, `args`이며 operation은 `compile`, `start`, `status`다.
 compile args는 서버가 검증한 `canonicalDraft`와 `resolvedAssets`다. start·status args는 아래 private worker 계약을 따른다. 모델 공개 도구에는 내부 경로와 private 도구를 등록하지 않는다.
 
-connector.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`의 다섯 키만 받는다.
+assistant.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`의 다섯 키만 받는다.
 protocol은 `content-snapshot-v1`, 도구 이름은 서로 다르고 공개 도구와 겹치지 않는다.
 capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 운영 선언은 `{compile:true,start:true,status:true}`다.
 카탈로그의 별도 snapshot 칸과 성공 HTTP 응답은 같은 검증된 선언을 사용한다.
@@ -127,11 +127,11 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 요청이 실패하면 고정 Hermes가 원고 본문과 사진을 진단 파일에 남길 수 있다. 본문 없는 writer의 운영 연결은 하지 않기로 했고(2026-10-13) 이 위험을 감수한다. upstream 추적은 [#518](https://github.com/jon890/fos-assistant/issues/518)이 갖는다.
 private transport와 preview snapshot 서비스는 합성 원고로 검증한다. 원고 최초 MCP 생성과 승인, 공개 preview API도 구현되어 있으며 실제 네이버 저장은 운영 capability를 켠 뒤의 범위다.
 
-### 커넥터의 예약 job 시작과 조회
+### 플러그인의 예약 job 시작과 조회
 
-커넥터에는 승인한 snapshot을 기존 worker로 한 번 저장하는 private start와 같은 job만 읽는 private status가 있다.
-운영 선언은 `{compile:true,start:true,status:true}`다. 묶음의 connector.json이 capability를 끄면 `--content-snapshot-operation start|status` 자식도 열리지 않는다.
-아래는 plugin 전달과 Control Plane 호출이 따르는 커넥터 쪽 계약이다.
+플러그인에는 승인한 snapshot을 기존 worker로 한 번 저장하는 private start와 같은 job만 읽는 private status가 있다.
+운영 선언은 `{compile:true,start:true,status:true}`다. 묶음의 assistant.json이 capability를 끄면 `--content-snapshot-operation start|status` 자식도 열리지 않는다.
+아래는 plugin 전달과 Control Plane 호출이 따르는 플러그인 쪽 계약이다.
 
 | 칸 | 계약 |
 | --- | --- |
@@ -139,8 +139,8 @@ private transport와 preview snapshot 서비스는 합성 원고로 검증한다
 | start 입력 | `{snapshot, jobId, ticket, stamp}`. snapshot은 CompiledSnapshotV1, `stamp.jobId`와 `stamp.snapshotHash`는 jobId·snapshot과 같아야 한다. ticket은 공백 없는 ASCII 1~4,096자 |
 | start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
 | status 입력 | `{stamp}`만 받는다 |
-| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`에 실패 사유가 있으면 `error_reason`이 더해진다. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다. `error_reason`은 `error_code`와 같은 모양(`[a-z][a-z_]{0,63}`)의 고정 코드이고, 허용 밖이거나 없으면 칸을 싣지 않는다. Control Plane의 decoder와 Hermes 플러그인의 `connector_snapshot_job.py`가 둘 다 같은 규칙으로 이 칸을 선택으로 받는다. 둘 중 하나라도 모르면 키 집합이 다르다며 응답 전체를 거절하므로 Control Plane과 플러그인을 먼저 배포하고 커넥터를 나중에 배포한다 |
-| 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}`. 커넥터는 isError 결과의 text 하나로 보내고, plugin은 이 모양만 `ok:true` 결과로 넘기며 다른 isError는 503이다 |
+| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`에 실패 사유가 있으면 `error_reason`이 더해진다. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다. `error_reason`은 `error_code`와 같은 모양(`[a-z][a-z_]{0,63}`)의 고정 코드이고, 허용 밖이거나 없으면 칸을 싣지 않는다. Control Plane의 decoder와 Hermes 플러그인의 `connector_snapshot_job.py`가 둘 다 같은 규칙으로 이 칸을 선택으로 받는다. 둘 중 하나라도 모르면 키 집합이 다르다며 응답 전체를 거절하므로 Control Plane과 플러그인을 먼저 배포하고 플러그인을 나중에 배포한다 |
+| 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}`. 플러그인은 isError 결과의 text 하나로 보내고, plugin은 이 모양만 `ok:true` 결과로 넘기며 다른 isError는 503이다 |
 
 private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.
 요청 profile의 SHA-256과 stamp.profileHash는 plugin이 자식 실행 전에 대조한다. authorize 주소는 dashboard의 기존 `FOS_CONNECTOR_EXECUTIONS_BASE_URL` 접두사에 고정 내부 경로를 붙인다. 요청·manifest·profile이 다른 주소를 지정하지 못한다.
@@ -149,7 +149,7 @@ authorize 주소는 private 자식 env `FOS_CONTENT_SAVE_AUTHORIZE_URL`에서만
 start는 같은 jobId의 상태 파일을 `O_EXCL`로 먼저 만들어 예약 ID를 고정한다. 이미 있으면 stamp가 모두 같을 때 그 상태만 돌려주고 worker를 띄우지 않는다.
 그 뒤의 세션 확인·잠금·입력 쓰기·spawn 실패는 상태를 지우지 않고 failed로 끝낸다. 잠금이 바쁘면 code는 `busy`다.
 worker가 시작 확인 시간 안에 pid를 적지 않으면 `start_unknown`이고 예약 ID는 그대로 남는다. 다시 보내도 새 worker는 없다.
-상태 파일은 끝난 뒤 24시간에 지워지므로 그 뒤의 재전송은 커넥터가 막지 못한다. 같은 job의 두 번째 실행은 Control Plane의 authorize(start) 단일 claim이 거절해야 한다.
+상태 파일은 끝난 뒤 24시간에 지워지므로 그 뒤의 재전송은 플러그인이 막지 못한다. 같은 job의 두 번째 실행은 Control Plane의 authorize(start) 단일 claim이 거절해야 한다.
 ticket은 입력 파일과 상태 파일에 쓰지 않는다. 기존 env whitelist에 ticket과 authorize 주소만 더해 그 worker에 넘긴다. worker는 무엇을 하기 전에 런타임 env에서 지워 이후 코드와 자식 프로세스에 넘기지 않는다. 커널이 보여 주는 최초 environ까지 지우지는 못한다.
 
 worker는 snapshot의 canonical tuple·manifest·notes로 원고를 다시 compile해 결과 전체와 두 지문이 같은지 본다. 상태 파일 stamp의 jobId·snapshotHash와도 맞춘다.
@@ -185,7 +185,7 @@ chat은 `ContentDraftBindingAccess`의 불변 stamp만 사용하고 connector �
 observationRef는 고정한 attachment·owner·conversation·revision·지문과 일치하고 읽을 수 있는 관찰이어야 한다.
 설명은 그 관찰 summary의 앞 300 code point이며 새 분석을 하지 않는다. 반복 사진의 설명이 서로 다르면 거절한다.
 resolvedAssets에는 asset마다 한 번만 전달한다. 새로 쓴 판에는 반복 자리가 없다.
-규칙 전에 저장한 판에 반복 자리가 있으면 preview는 커넥터를 부르기 전에 400 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 멈춘다. 그 판은 고쳐 저장한 뒤에 preview를 만든다.
+규칙 전에 저장한 판에 반복 자리가 있으면 preview는 플러그인을 부르기 전에 400 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 멈춘다. 그 판은 고쳐 저장한 뒤에 preview를 만든다.
 미리보기에는 canonical 원고와 포함·빠진 첨부 ID를 돌려주고 파일명·내부 경로·compiled payload는 내보내지 않는다.
 
 `readCurrentSnapshot`은 외부 트랜잭션 없이 coordinator에 한 번 들어가는 독립 조회다.
@@ -218,7 +218,7 @@ Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두
 ## 승인 snapshot과 저장 job
 
 #396·#398의 새 글 임시저장을 기존 승인 줄과 서버가 예약한 worker jobId로 잇는다. 결정 근거는 [ADR-20261011 / content-snapshot-job](../adr/ADR-20261011-content-snapshot-job.md)이다.
-토스 주문, Gmail 보내기와 견준 준비, 승인, 실행, 확인의 요약과 실사용 Go/No-Go 는 [커넥터별 준비, 승인, 실행, 확인](connector-policy.md#커넥터별-준비-승인-실행-확인)이 갖는다.
+토스 주문, Gmail 보내기와 견준 준비, 승인, 실행, 확인의 요약과 실사용 Go/No-Go 는 [플러그인별 준비, 승인, 실행, 확인](connector-policy.md#플러그인별-준비-승인-실행-확인)이 갖는다.
 승인 요청·jobId 예약·worker 허가·보관 상태 조회는 Control Plane에 구현되어 있다.
 worker 시작 전송과 private 상태 조회, MCP 도구와 REST·화면 연결이 구현되어 있다. catalog가 시작을 선언하지 않는 동안 승인은 실행 없이 거절한다.
 
@@ -352,8 +352,8 @@ FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장
 
 정의와 처리는 `mcp.application.McpContentDraftSnapshots`가 맡고 등록 순서는 `content_draft_read` 뒤, `memory_remember` 앞이다.
 인자 검사와 오류 변환, 실행 전후 별도 읽기 트랜잭션의 현재 caller 검사는 「MCP와 배치」의 원고 도구와 같다. 사후 검사 실패는 이미 만든 snapshot·승인 줄을 되돌리지 않고 결과만 차단한다.
-bindingId는 선택 정수이고 소유자·profile·실행·파일 경로 인자는 받지 않는다. 실행할 profile과 커넥터는 그 바인딩에서 정한다.
-모델은 바인딩 번호를 알 경로가 없으므로 bindingId를 생략할 수 있다. 생략하면 서명된 origin의 에이전트에 붙은 요청자 연결 가운데 catalog가 snapshot을 선언한 커넥터의 바인딩이 정확히 하나일 때만 그것을 쓴다.
+bindingId는 선택 정수이고 소유자·profile·실행·파일 경로 인자는 받지 않는다. 실행할 profile과 플러그인은 그 바인딩에서 정한다.
+모델은 바인딩 번호를 알 경로가 없으므로 bindingId를 생략할 수 있다. 생략하면 서명된 origin의 에이전트에 붙은 요청자 연결 가운데 catalog가 snapshot을 선언한 플러그인의 바인딩이 정확히 하나일 때만 그것을 쓴다.
 0개나 2개 이상이면 `VALIDATION_FAILED`와 고정 까닭 `message`를 isError 결과로 돌려주며 snapshot을 만들지 않는다. 지정한 bindingId도 같은 에이전트·요청자 범위인지 preview가 검사한다.
 살펴보기 허용 집합은 넓히지 않는다. fos-ctx 서명 필수 목록과 실행 사건 가림에도 두 도구를 넣는다.
 
@@ -578,7 +578,7 @@ native 자식 session 등록은 부모 등록의 origin을 잇는다. FOS 자식
 새 turn이나 새 루트에서 새 원고를 의도할 때는 새 requestId와 새 tool_call_id가 필요하다.
 
 HMAC은 도구 이름·root/session·tool_call_id의 권한 맥락 증명이다. args·requestId·본문은 서명하지 않으므로 동일성 검사가 별도로 필요하다.
-현재 `_fos_ctx`에는 REQUEST nonce나 purpose 필드가 없다. 커넥터 지원 확인의 SupportRequest nonce는 요청과 응답 대응용이며 원고 키가 아니다.
+현재 `_fos_ctx`에는 REQUEST nonce나 purpose 필드가 없다. 플러그인 지원 확인의 SupportRequest nonce는 요청과 응답 대응용이며 원고 키가 아니다.
 REQUEST nonce/signature 같은 권한 증명을 후속 계약에서 만나도 생성 재시도 식별자로 대체하지 않는다. 일반 JSON-RPC와 서명 v1을 재설계하지 않는다.
 
 #### 최초 본문 지문과 충돌
@@ -690,7 +690,7 @@ revision·asset·현재 번호·만료 단축은 한 트랜잭션으로 커밋�
 
 preview snapshot 서비스와 Java 재계산, 승인 요청과 jobId 예약, worker 허가·시작 전송·상태 조회, 공개 preview API와 승인 카드는 구현되어 있다. 웹 편집은 후속 범위다.
 무효화 포트·빈 구현·preview 파일을 미리 만들지 않는다.
-일반 커넥터 승인 줄은 job 링크가 없으므로 원고 승인으로 취급하지 않는다. 잠금 순서는 위 「잠금 순서와 철회의 선형화」가 갖는다.
+일반 플러그인 승인 줄은 job 링크가 없으므로 원고 승인으로 취급하지 않는다. 잠금 순서는 위 「잠금 순서와 철회의 선형화」가 갖는다.
 Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 거래·발행 금지와 신규 네이버 테스트만 실행하는 기존 경계를 유지한다.
 
 | 검증 | 관측할 결과 |

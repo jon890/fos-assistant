@@ -263,7 +263,7 @@ def _install_gate() -> bool:
             _restore_config(checked[0], checked[1], written)
         if request.url.path == "/api/env" and response.status_code < 400:
             body = await _json_object(request)
-            # 그 key 를 칸으로 가진 커넥터다. 기본 key 는 여기 걸리지 않는다.
+            # 그 key 를 칸으로 가진 플러그인다. 기본 key 는 여기 걸리지 않는다.
             owners = [manifest for manifest in _connector_catalog().values()
                       if body and any(field["env"] == body.get("key") for field in manifest["fields"])]
             if owners:

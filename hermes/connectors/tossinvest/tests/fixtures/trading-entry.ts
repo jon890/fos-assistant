@@ -133,7 +133,7 @@ export async function generateTradingFixture(destination: string) {
   for (const name of [".claude-plugin", ".mcp.json", "icon.png", "skills"])
     await cp(join(source, name), join(root, name), { recursive: true });
   const manifest = JSON.parse(
-    await readFile(join(source, "connector.json"), "utf8"),
+    await readFile(join(source, "assistant.json"), "utf8"),
   );
   manifest.tools.prepare_trade = { risk: "READ" };
   for (const tool of Object.keys(TRADE_OPERATIONS))
@@ -145,7 +145,7 @@ export async function generateTradingFixture(destination: string) {
     operations: TRADE_OPERATIONS,
   };
   await writeFile(
-    join(root, "connector.json"),
+    join(root, "assistant.json"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
   const mcp = JSON.parse(await readFile(join(root, ".mcp.json"), "utf8"));

@@ -31,7 +31,7 @@ const env = { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "9223372036854775807" };
 
 test("manifest와 env는 양의 int64 경계가 같고 모델의 URL/계좌/token 입력은 HTTP 전에 거절한다", async () => {
   const manifest = JSON.parse(
-    readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
+    readFileSync(`${import.meta.dir}/../assistant.json`, "utf8"),
   );
   const pattern = new RegExp(
     manifest.fields.find((field: any) => field.key === "account").pattern,

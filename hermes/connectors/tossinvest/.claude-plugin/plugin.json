@@ -1,5 +1,5 @@
 {
   "name": "tossinvest",
-  "description": "토스증권 계좌와 시세를 읽는 커넥터 plugin",
+  "description": "토스증권 계좌와 시세를 읽는 플러그인 plugin",
   "skills": "./skills"
 }

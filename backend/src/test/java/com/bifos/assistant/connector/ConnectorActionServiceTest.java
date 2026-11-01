@@ -125,7 +125,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 승인 줄을 만들고 승인, 거절, 만료, 상시 허락으로 다루는 흐름을 실제 DB 로 확인한다(ADR-050).
  *
- * <p>계약은 {@code docs/features/connector-policy.md} 의 「커넥터 승인」 이다. 대시보드의 실행 경로는 대역이 답한다. 카탈로그는 보관 시간에
+ * <p>계약은 {@code docs/features/connector-policy.md} 의 「플러그인 승인」 이다. 대시보드의 실행 경로는 대역이 답한다. 카탈로그는 보관 시간에
  * 걸리지 않게 검사가 시계를 보관 시간보다 멀리 옮긴다. 컨텍스트 수를 늘리지 않으려고 판정 경로의 끝단 검사와 같은
  * 구성을 쓴다.
  */
@@ -1025,7 +1025,7 @@ class ConnectorActionServiceTest {
     @DisplayName("네이버 글 불러오기는 READ 전용 실행에서 막히고 정확한 인자로 매번 승인받으며 상시 허락을 줄 수 없다")
     void naverReadDraftRequiresApprovalBeforeExecutingStoredArguments() throws Exception {
         // 실제 manifest 를 읽어 분류가 되돌아가면 승인 경계 검사도 함께 실패하게 한다.
-        var spec = JSON.readTree(Files.readString(Path.of("../hermes/connectors/naver-blog/connector.json")))
+        var spec = JSON.readTree(Files.readString(Path.of("../hermes/connectors/naver-blog/assistant.json")))
             .path("tools")
             .path("read_draft");
         String risk = spec.path("risk").asText();
