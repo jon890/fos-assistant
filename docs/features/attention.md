@@ -163,15 +163,16 @@ sequenceDiagram
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전. 요청자의 지우지 않은 대화에 속한다 | 늘 | 승인, 거절, 만료 | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `revision` | `MODEL_INFERRED` |
 | `MEMORY_SUPERSEDE_PROPOSED` | `needs_me` | 요청자가 옛 항목을 고칠 수 있는 `memory_link` 의 `SUPERSEDES` 줄 | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
-| `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
+| `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up`. 제안 카드이고 `SuggestionCandidates` 가 낸다 | `PROPOSED` 이고 `expires_at` 전 | 아니다 | 받아들임, 거절, 만료 | `updated_at` | `MODEL_INFERRED` |
 | `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각 | `USER_CONFIRMED` |
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 지우지 않은 대화 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `updated_at` | `CONTROL_PLANE` |
-| `PROBLEM_SURFACED` | `needs_me` | 요청자의 [매일 루프](proactive.md) 시도가 만든 `SURFACE`, `ASK_APPROVAL` 판정 | 시도가 `surface-window` 안이고, 점검 대화를 지우지 않았고, 사용자의 반응이 없다. 같은 문제 키는 가장 최근 판정 하나만, 최근 것부터 `surface-max-items` 개까지 | 아니다 | 받아들임, 관심 없음, 점검 대화 삭제, 창이 지남 | 판정 번호 | `MODEL_INFERRED` |
 | `PROACTIVE_REPORT_TRIGGER` | `reports` | 요청자의 `proactive_check` | 검사를 거친 보고가 있고 점검 대화가 지워지지 않았다 | 아니다 | 보고 열람 | `proactive_check` 번호 | `CONTROL_PLANE` |
 
-기간과 개수 이름은 `assistant.attention` 설정이고 기본값은 `application.yml` 과 `AttentionProperties` 가 갖는다. `surface-window` 와 `surface-max-items` 만 `ProactiveLoopProperties` 다.
+기간과 개수 이름은 `assistant.attention` 설정이고 기본값은 `application.yml` 과 `AttentionProperties` 가 갖는다.
+
+제안 카드는 「먼저 다룰 문제」(`PROBLEM_SURFACED`) 자리를 대신한다([ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)). 먼저 살펴보기의 제안과 대화 중 에이전트가 낸 할 일 제안이 모두 같은 `PROPOSED` 줄이다. 받아들이면 같은 줄이 `OPEN` 이 되어 `FOLLOW_UP_OPEN` 후보가 되고, 받아들임은 쓰기 승인이 아니다. `PROBLEM_SURFACED` 값은 옛 사건을 읽으려고 enum 에만 남고 후보를 내지 않는다.
 
 **같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
 `trigger` 는 둘 가운데 더 최근 쪽이고, `signals` 와 `sources` 는 둘을 함께 담는다.
@@ -235,7 +236,6 @@ sequenceDiagram
 | `CONVERSATION` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
 | `FOLLOW_UP` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
 | `RESULT_DELIVERY` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
-| `AUTONOMY_DECISION` | 판정의 `created_at` | `PROBLEM_SURFACED` |
 | `PROACTIVE_CHECK` | 살펴보기의 `finished_at` | `PROACTIVE_REPORT_TRIGGER` |
 
 응답에 실행의 오류 코드, 모델, 금액을 싣지 않는 까닭은 [ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 이 갖는다.

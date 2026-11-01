@@ -31,8 +31,8 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 | --- | --- |
 | 기억에서 꺼내기 | 구현했다. 모든 살펴보기의 입력에 싣는다 |
 | 읽기만 하며 살펴보기 | 지금의 읽기 경계를 쓴다. 쓰기 허용을 켠 에이전트도 쓰기는 승인 카드로만 간다 |
-| 제안 저장 | 구현했다. 기능 스위치 `assistant.proactive-suggestion.enabled`(기본 꺼짐) 뒤에서 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 아래 「제안 저장」 이다 |
-| 제안 카드 | 아직 만들지 않았다. 지금은 발견, 문제 후보, 「내 차례」 의 「먼저 다룰 문제」 가 그 자리다. 제안 줄은 할 일 목록과 「내 차례」 의 할 일 후보로만 보인다 |
+| 제안 저장 | 구현했다. 기능 스위치 `assistant.proactive-suggestion.enabled`(기본 켜짐)가 켜져 있으면 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 깨우기 지시(`ProactiveCheckInstructions.COMMON_RULES`)가 이 배열을 알린다. 아래 「제안 저장」 이다 |
+| 제안 카드 | 구현했다. 「내 차례」 의 「먼저 다룰 문제」 자리를 제안 카드가 대신한다. `SuggestionCandidates` 가 만료되지 않은 `PROPOSED` 줄을 낸다([attention.md](attention.md) 의 「후보와 trigger」) |
 | 반응을 신호로 | 아직 만들지 않았다. 지금은 판단 피드백 사건이다. 지금 화면의 노출, 열기, 숨김, 미루기, 복원은 이 반응 기록에 남는다([attention.md](attention.md) 의 「저장」). 반응을 기억 정비의 신호로 읽는 일은 아직 없다 |
 
 바뀌지 않아야 하는 경계는 판단 로직이 아니라 계약 테스트가 지킨다.
@@ -61,7 +61,8 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 제안 저장
 
-스위치가 켜져 있을 때만, 살펴보기가 답을 저장한 뒤 발견과 같은 자리에서 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 꺼져 있거나 알리지 않는 자동 실행이면 아무것도 하지 않아 지금 동작 그대로다.
+스위치가 켜져 있으면(기본), 살펴보기가 답을 저장한 뒤 발견과 같은 자리에서 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 끄거나 알리지 않는 자동 실행이면 제안을 저장하지 않는다.
+칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultParser` 가 갖는다. 지시는 제안을 받아들여도 쓰기 승인이 아니고 외부 쓰기는 승인 카드로만 간다고 함께 알린다.
 
 - 사용자와 대화는 넘긴 실행의 실행 줄에서 정한다. 요청 본문이 사용자를 정하지 못한다
 - 제목은 1자부터 200자까지, `detail`(모델의 자유 JSON)은 4000자까지다. 서버는 이 크기와 소유만 검사하고 `detail` 의 구조나 근거의 가치를 보지 않는다. 어긋난 항목은 건너뛰고 나머지를 저장한다
