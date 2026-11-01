@@ -1,9 +1,9 @@
-package com.bifos.assistant.proactive.surface.presentation;
+package com.bifos.assistant.proactive.check.presentation;
 
 import com.bifos.assistant.proactive.check.application.CheckFindingReactions;
 import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.CheckFindingsResponse;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.FindingReactionRequest;
+import com.bifos.assistant.proactive.check.presentation.ProactiveCheckDtos.CheckFindingsResponse;
+import com.bifos.assistant.proactive.check.presentation.ProactiveCheckDtos.FindingReactionRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.UUID;

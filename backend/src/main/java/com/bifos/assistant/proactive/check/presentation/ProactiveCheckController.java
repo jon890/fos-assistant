@@ -1,9 +1,9 @@
-package com.bifos.assistant.proactive.surface.presentation;
+package com.bifos.assistant.proactive.check.presentation;
 
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.StartedResponse;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.StatusResponse;
+import com.bifos.assistant.proactive.check.presentation.ProactiveCheckDtos.StartedResponse;
+import com.bifos.assistant.proactive.check.presentation.ProactiveCheckDtos.StatusResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
