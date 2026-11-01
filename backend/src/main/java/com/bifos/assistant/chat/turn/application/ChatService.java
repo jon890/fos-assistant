@@ -21,7 +21,6 @@ import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -401,22 +400,7 @@ public class ChatService {
     }
 
 
-    /**
-     * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
-     *
-     * <p>고른 모델이 Hermes 목록에 있는지는 보지 않는다. 그룹이 숨긴 모델은 {@code MODEL_HIDDEN} 으로 거절한다. effort
-     * {@code none} 은 그 에이전트의 목록에서 끄기 지원이 확인된 모델에서만 받고, 아니면 {@code VALIDATION_FAILED} 다. 대화 목록의 순서는 주고받은 시각으로 정하므로
-     * {@code updatedAt} 을 건드리지 않는다.
-     *
-     * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택
-     */
-    @Transactional
-    public Conversation chooseModel(CurrentUser user, Long conversationId, ModelChoice choice) {
-        return chatConversationManagement.chooseModel(user, conversationId, choice);
-    }
-
-
-    /** 대화가 고른 단계를 저장한다. DEFAULT 는 에이전트 기본 모델만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
+    /** 대화가 고른 칸을 저장하고 같은 트랜잭션에서 요청자의 기본 칸도 그 칸으로 바꾼다. */
     @Transactional
     public Conversation chooseModelTier(
         CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {

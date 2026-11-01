@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
@@ -16,7 +17,9 @@ import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
 import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
@@ -30,17 +33,18 @@ import com.bifos.assistant.hermes.application.dto.ReasoningCapability.Support;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.ConversationTierChoice;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.execution.domain.type.ReasoningEffortSource;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -48,14 +52,16 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 실행이 대화가 고른 모델과 effort 로 Hermes 를 부르고, 실제로 돈 모델을 적고, 막혀도 넘기지 않는 것을 본다.
+ * 실행이 대화가 고른 칸의 모델과 effort 로 Hermes 를 부르고, 실제로 돈 모델을 적고, 막혀도 넘기지 않는 것을 본다.
  *
  * <p>한 provider 안에서 계정을 돌려 쓰는 것은 Hermes 가 이미 하므로 검사하지 않는다.
  */
@@ -132,6 +138,15 @@ class ModelSelectionTest {
     @Autowired
     HermesRunEventStream eventStream;
 
+    @Autowired
+    ModelSettingStore settings;
+
+    @Autowired
+    GroupSettingRepository groupSettings;
+
+    @Autowired
+    TransactionTemplate transactions;
+
     /**
      * profile 의 기본 모델을 읽는 길이다. 숨김이 있는 그룹의 기본값 실행만 이 목록을 읽는다.
      *
@@ -153,6 +168,8 @@ class ModelSelectionTest {
     void setUp() {
         stub().reset();
         when(modelClient.readCatalog(anyString(), anyString())).thenReturn(PROFILE_CATALOG);
+        // 칸 모델이 목록에 없으면 실행이 목록을 한 번 다시 읽는다. 다시 읽어도 없으면 그 값 그대로 보낸다.
+        when(modelClient.readCatalog(anyString(), anyString(), anyBoolean())).thenReturn(PROFILE_CATALOG);
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -171,6 +188,13 @@ class ModelSelectionTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             saved.id()));
+    }
+
+
+    @AfterEach
+    void tearDown() {
+        // 칸 정의는 그룹 설정 줄이라 같은 그룹을 쓰는 다른 검사에 남는다.
+        ConversationTierChoice.clear(groupSettings, transactions, user.groupId());
     }
 
 
@@ -359,7 +383,9 @@ class ModelSelectionTest {
         stub().willReturn(succeeded("run-1", "sess-1"));
         chat.send(user, conversationId, "안녕", null);
 
-        chat.chooseModel(user, conversationId, new ModelChoice("openai-codex", "example-model", "low"));
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transactions, user.groupId(), user.id(), conversationId,
+            ModelTier.INSTANT, new ModelChoice("openai-codex", "example-model", "low"));
         chat.send(user, conversationId, "하나 더", null);
 
         assertThat(stub().received()).hasSize(2);
@@ -418,69 +444,11 @@ class ModelSelectionTest {
     }
 
 
-    @Test
-    @DisplayName("끄기 지원이 SUPPORTED 인 모델은 대화에 none 을 저장한다")
-    void storesNoneForModelThatSupportsDisabling() {
-        Long conversationId = chat.startEmpty(user, AGENT_CODE).id();
-
-        Conversation saved = chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none"));
-
-        assertThat(saved.modelChoice().model()).isEqualTo(CAN_DISABLE_MODEL);
-        assertThat(saved.modelChoice().reasoningEffort()).isEqualTo("none");
-    }
-
-
-    @Test
-    @DisplayName("끄기 지원이 UNKNOWN 이나 UNSUPPORTED 인 모델은 none 을 VALIDATION FAILED 로 거절하고 저장된 값을 남긴다")
-    void rejectsNoneForModelWithUnknownOrUnsupportedDisablingAndKeepsStoredChoice() {
-        Long conversationId = conversationChoosing(ModelChoice.of("example-provider", "example-model", "high"));
-
-        for (String model : List.of(DISABLE_UNKNOWN_MODEL, CANNOT_DISABLE_MODEL)) {
-            assertThatThrownBy(() -> chat.chooseModel(user, conversationId, ModelChoice.of("example-provider", model, "none")))
-                .as("모델 %s", model)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException)ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
-        }
-
-        ModelChoice stored = conversations.findById(conversationId).orElseThrow().modelChoice();
-        assertThat(stored.model()).isEqualTo("example-model");
-        assertThat(stored.reasoningEffort()).isEqualTo("high");
-    }
-
-
-    @Test
-    @DisplayName("none 을 저장한 대화의 실행은 none 을 요청 값으로 적고 Hermes 가 다른 모델을 알려도 effort 를 바꾸지 않는다")
-    void recordsNoneAsRequestedEffortEvenWhenHermesReportsOtherModel() {
-        Long conversationId = conversationChoosing(ModelChoice.of("example-provider", CAN_DISABLE_MODEL, "none"));
-        stub().willReturn(new HermesRunResult(
-            "run-1",
-            "sess-1",
-            "completed",
-            "네",
-            "dad",
-            null,
-            null,
-            PRICED_USAGE,
-            new SessionRuntime("example-model-large", "anthropic")));
-        stub().willReportSessionRuntime(new SessionRuntime("example-model-large", "anthropic"));
-
-        ChatTurn turn = chat.send(user, conversationId, "안녕", null);
-
-        assertThat(stub().received())
-            .singleElement()
-            .satisfies(command -> assertThat(command.reasoningEffort()).isEqualTo("none"));
-        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.model()).as("실제로 돈 모델").isEqualTo("example-model-large");
-        assertThat(execution.reasoningEffort()).as("보낸 effort").isEqualTo("none");
-        assertThat(execution.reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
-    }
-
-
-    /** 빈 대화를 만들어 모델을 고른다. 화면이 첫 메시지 전에 고를 때 밟는 길이다. */
+    /** 빈 대화를 만들고 {@code choice} 를 가리키는 HIGH 칸을 고른다. 화면이 첫 메시지 전에 칸을 고를 때와 같은 상태다. */
     private Long conversationChoosing(ModelChoice choice) {
         Conversation conversation = chat.startEmpty(user, AGENT_CODE);
-        chat.chooseModel(user, conversation.id(), choice);
+        ConversationTierChoice.defineAndChoose(
+            settings, conversations, transactions, user.groupId(), user.id(), conversation.id(), ModelTier.HIGH, choice);
         return conversation.id();
     }
 

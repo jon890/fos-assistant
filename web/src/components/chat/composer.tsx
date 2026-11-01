@@ -8,7 +8,7 @@ import { attachmentPlaceholder } from "./variants";
 import { AgentMention, mentionOptionId } from "./agent-mention";
 import { SkillCommandMenu } from "./skill-command-menu";
 import { skillOptionId } from "./skill-command";
-import { ModelPicker, ModelTierPicker } from "./model-picker";
+import { ModelTierPicker } from "./model-picker";
 import { Props } from "./composer-types";
 import { ACCEPTED_TYPES } from "./composer-attachment-utils";
 import { useComposerState } from "./use-composer-state";
@@ -36,7 +36,6 @@ export function Composer(props: Props) {
     modelSelectionMode,
     modelTier,
     modelChoiceUnknown,
-    modelChoice,
   } = props;
   const {
     blocking,
@@ -51,7 +50,7 @@ export function Composer(props: Props) {
     outgoing,
   } = state;
   const composerModel = useComposerModel({ ...state, ...props });
-  const { saveModelChoice, saveModelTier } = composerModel;
+  const { saveModelTier } = composerModel;
   const composerAttachments = useComposerAttachments({
     ...state,
     ...props,
@@ -274,17 +273,6 @@ export function Composer(props: Props) {
             tier={modelTier}
             onChange={saveModelTier}
             disabled={disabled || agentCode.length === 0 || modelChoiceUnknown}
-            advancedPicker={
-              <ModelPicker
-                agentCode={agentCode}
-                choice={modelChoice}
-                onChange={saveModelChoice}
-                disabled={
-                  disabled || agentCode.length === 0 || modelChoiceUnknown
-                }
-                inSettings
-              />
-            }
           />
         </div>
       </div>

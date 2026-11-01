@@ -108,7 +108,6 @@ class ConversationMissingAgentTest {
             agentService,
             access,
             new ChatEventStreams(Duration.ofSeconds(20)),
-            null,
             mock(ModelTierService.class),
             List.of(),
             mock(SourceReadSummaries.class)))

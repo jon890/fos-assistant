@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,7 +26,7 @@ class ModelTierRequestValidationTest {
     private final ChatService chat = mock(ChatService.class);
     private final ModelTierService tiers = mock(ModelTierService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ChatController(
-        chat, null, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
+        chat, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -60,11 +61,6 @@ class ModelTierRequestValidationTest {
     @DisplayName("지난 단계 이름(FAST, BALANCED, DEEP)으로 온 요청은 새 칸으로 바꾸지 않고 400 으로 거절한다")
     void rejectsLegacyTierNames() throws Exception {
         for (String legacy : new String[] {"FAST", "BALANCED", "DEEP"}) {
-            mvc.perform(put("/api/v1/chat/model-tiers/default")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tier\":\"" + legacy + "\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
             mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"mode\":\"TIER\",\"tier\":\"" + legacy + "\"}"))
@@ -81,15 +77,36 @@ class ModelTierRequestValidationTest {
 
 
     @Test
-    @DisplayName("대화에 DEFAULT 선택을 저장하라는 요청은 400 으로 거절한다")
-    void rejectsDefaultSelectionMode() throws Exception {
-        for (String body : new String[] {"{\"mode\":\"DEFAULT\"}", "{\"mode\":\"DEFAULT\",\"tier\":null}"}) {
+    @DisplayName("대화에 DEFAULT 나 CUSTOM 선택을 저장하라는 요청은 400 으로 거절한다")
+    void rejectsDefaultAndCustomSelectionMode() throws Exception {
+        for (String body : new String[] {
+            "{\"mode\":\"DEFAULT\"}",
+            "{\"mode\":\"DEFAULT\",\"tier\":null}",
+            "{\"mode\":\"CUSTOM\"}",
+            "{\"mode\":\"CUSTOM\",\"provider\":\"example-provider\",\"model\":\"example-model\",\"reasoningEffort\":\"high\"}"}) {
             mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
+        verifyNoInteractions(chat, tiers);
+    }
+
+
+    @Test
+    @DisplayName("provider 와 모델, effort 를 직접 저장하던 경로와 사용자 기본 칸만 저장하던 경로는 없다")
+    void directModelAndDefaultTierPathsAreGone() throws Exception {
+        mvc.perform(put("/api/v1/chat/conversations/{id}/model", UUID.randomUUID())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"provider\":\"example-provider\",\"model\":\"example-model\",\"reasoningEffort\":\"high\"}"))
+            .andExpect(status().is4xxClientError());
+        mvc.perform(put("/api/v1/chat/model-tiers/default")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"tier\":\"HIGH\"}"))
+            .andExpect(status().is4xxClientError());
+        mvc.perform(get("/api/v1/chat/model-options").param("agentCode", "dad"))
+            .andExpect(status().is4xxClientError());
         verifyNoInteractions(chat, tiers);
     }
 }
