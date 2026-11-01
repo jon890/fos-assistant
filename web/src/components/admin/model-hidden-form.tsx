@@ -8,13 +8,13 @@ import {
   modelKey,
   sameHiddenEntry,
   saveHiddenModels,
-  type AgentModelSettings,
+  type HiddenModelSettings,
   type HiddenModelEntry,
 } from "@/lib/model-settings";
 import { knownProviderLabel } from "@/lib/provider-label";
 
 type Props = {
-  settings: AgentModelSettings;
+  settings: HiddenModelSettings;
   onSaved(entries: HiddenModelEntry[]): void;
   /** 제목 「모델 숨김」 을 그릴지다. 부모가 같은 제목을 이미 그렸으면 거짓을 준다 */
   showTitle?: boolean;
@@ -23,7 +23,7 @@ type Props = {
 /** 한 제공사의 모델이 이보다 많으면 숨김 목록을 접어 둔다 */
 const MODELS_OPEN_LIMIT = 10;
 
-type ProviderRow = AgentModelSettings["catalog"]["providers"][number];
+type ProviderRow = HiddenModelSettings["catalog"]["providers"][number];
 
 /**
  * 숨김을 편집하는 관리자에게 보일 제공사 이름이다. 표에 없는 id 는 「다른 제공사」 로 뭉치지 않고 id 를 그대로
@@ -108,8 +108,9 @@ function ProviderHiddenFields({
 /**
  * 그룹이 숨길 모델 제공사와 모델을 고른다. 저장을 눌러야 목록 전체가 한 번에 바뀐다.
  *
- * <p>이 에이전트의 목록에 없는 숨김 항목도 따로 보인다. 저장은 목록을 통째로 바꾸므로, 보이지 않는 항목을
- * 그대로 두지 않으면 다른 에이전트의 목록에만 있는 숨김이 지워진다.
+ * <p>후보는 켜진 모든 에이전트 profile 목록의 합집합이다. 어느 profile 에서 도는 모델이든 숨길 수 있어야 해서다.
+ * 후보에 없는 숨김 항목도 따로 보인다. 저장은 목록을 통째로 바꾸므로, 보이지 않는 항목을 그대로 두지 않으면
+ * 목록에서 빠진 모델의 숨김이 지워진다.
  */
 export function ModelHiddenForm({
   settings,
@@ -173,9 +174,7 @@ export function ModelHiddenForm({
       ))}
       {unlisted.length > 0 ? (
         <fieldset className="grid gap-2 rounded-md border border-border p-3">
-          <legend className="px-1 text-sm font-medium">
-            이 에이전트의 목록에 없는 숨김
-          </legend>
+          <legend className="px-1 text-sm font-medium">후보에 없는 숨김</legend>
           {unlisted.map((entry) => (
             <label
               key={modelKey(entry.provider, entry.model ?? "")}

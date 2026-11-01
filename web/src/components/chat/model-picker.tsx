@@ -42,7 +42,7 @@ export type ModelChoice = {
 /** `GET /api/chat/model-options` 의 응답이다 */
 type ModelOptions = {
   defaultProvider: string | null;
-  /** 고르지 않았을 때 도는 모델이다. 에이전트 기본값이 있으면 그 값이고 없으면 profile 의 값이다 */
+  /** 요청에 모델을 싣지 않을 때 도는 모델이다. profile 의 값이다 */
   defaultModel: string | null;
   /** 기본 모델이 `providers` 에 있는가. 그룹이 숨겼거나 목록에서 빠졌으면 거짓이다 */
   defaultAvailable?: boolean;
@@ -438,10 +438,7 @@ type TierPickerProps = {
   mode: ModelSelectionMode | null;
   tier: ModelTierCode | null;
   disabled: boolean;
-  onChange(
-    mode: "DEFAULT" | "TIER",
-    tier: ModelTierCode | null,
-  ): Promise<ModelTierSaveResult>;
+  onChange(mode: "TIER", tier: ModelTierCode): Promise<ModelTierSaveResult>;
   advancedPicker: ReactNode;
 };
 
@@ -507,14 +504,6 @@ export function ModelTierPicker({
     setSaving(true);
     setFailed(false);
     const result = await onChange("TIER", nextTier);
-    setSaving(false);
-    if (result === "failed") setFailed(true);
-  }
-
-  async function returnToProfileDefault() {
-    setSaving(true);
-    setFailed(false);
-    const result = await onChange("DEFAULT", null);
     setSaving(false);
     if (result === "failed") setFailed(true);
   }
@@ -607,21 +596,6 @@ export function ModelTierPicker({
               단계를 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.
             </p>
           ) : null}
-          <section className="grid gap-2">
-            <h3 className="text-sm font-medium">에이전트 기본값</h3>
-            <p className="text-sm text-muted-foreground">
-              이 대화의 단계 선택을 지우고 에이전트 기본값으로 돌아가요.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={disabled || saving}
-              data-testid="model-tier-profile-default"
-              onClick={() => void returnToProfileDefault()}
-            >
-              에이전트 기본값으로 돌아가기
-            </Button>
-          </section>
           <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
             <DialogTrigger asChild>
               <Button

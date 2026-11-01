@@ -78,4 +78,18 @@ class ModelTierRequestValidationTest {
         }
         verifyNoInteractions(chat, tiers);
     }
+
+
+    @Test
+    @DisplayName("대화에 DEFAULT 선택을 저장하라는 요청은 400 으로 거절한다")
+    void rejectsDefaultSelectionMode() throws Exception {
+        for (String body : new String[] {"{\"mode\":\"DEFAULT\"}", "{\"mode\":\"DEFAULT\",\"tier\":null}"}) {
+            mvc.perform(put("/api/v1/chat/conversations/{id}/model-tier", UUID.randomUUID())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        verifyNoInteractions(chat, tiers);
+    }
 }

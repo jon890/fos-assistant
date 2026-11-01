@@ -400,7 +400,7 @@ test("저장된 끄기가 있는 대화는 선택지에 끄기가 하나만 있�
   await expect(picker(page)).toHaveText("example-model · none");
 });
 
-test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전트 기본값으로 돌아갈 수 있다", async ({
+test("단계를 고르면 빈 대화에 단계 선택을 저장하고 설정 창에 에이전트 기본값으로 돌아가는 단추가 없다", async ({
   page,
 }) => {
   const savedBodies: unknown[] = [];
@@ -436,8 +436,8 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
         provider: null,
         model: null,
         reasoningEffort: null,
-        modelSelectionMode: savedBodies.length === 1 ? "TIER" : "DEFAULT",
-        modelTier: savedBodies.length === 1 ? "HIGH" : null,
+        modelSelectionMode: "TIER",
+        modelTier: "HIGH",
       };
       await route.fulfill({ json: savedConversation });
     },
@@ -460,18 +460,12 @@ test("단계를 고르면 빈 대화에 단계 선택을 저장하고 에이전�
   );
   await expect(page.getByTestId("model-tier-high")).toBeEnabled();
   await tierSettings(page).click();
-  await page.getByTestId("model-tier-profile-default").click();
-  await expect(page.getByTestId("model-tier-high")).toHaveAttribute(
-    "data-variant",
-    "ghost",
-  );
-  await expect(page.getByTestId("model-tier-profile-default")).toBeEnabled();
+  // 에이전트 기본 모델과 DEFAULT 모드가 없어져 기본값으로 돌아가는 단추도 없다
+  await expect(page.getByTestId("model-tier-profile-default")).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
-  await expect.poll(() => savedBodies.length).toBe(2);
-  expect(savedBodies).toEqual([
-    { mode: "TIER", tier: "HIGH" },
-    { mode: "DEFAULT", tier: null },
-  ]);
+  await expect.poll(() => savedBodies.length).toBe(1);
+  expect(savedBodies).toEqual([{ mode: "TIER", tier: "HIGH" }]);
 });
 
 test("관리자도 대화 화면의 설정 창에서는 그룹 모델 설정을 보지 않는다", async ({

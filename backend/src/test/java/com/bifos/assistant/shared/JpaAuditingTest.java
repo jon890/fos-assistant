@@ -123,7 +123,7 @@ class JpaAuditingTest {
             if (row instanceof AppUser user) {
                 user.rename("고친 이름");
             } else if (row instanceof Agent agent) {
-                agent.changeDefaultModel("provider", "model", null);
+                agent.changeApiBaseUrl("http://changed.test");
             } else if (row instanceof AllowedPerson person) {
                 person.disable();
             } else if (row instanceof AttentionControlEntry entry) {

@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 신규 그룹과 기존 빈 단계 정의의 기본 모델 해석을 실제 컨텍스트에서 확인한다. */
+/** 신규 그룹과 기존 빈 단계 정의가 요청에 모델을 싣지 않는 해석을 실제 컨텍스트에서 확인한다. */
 @BackendIntegrationTest
 class ModelTierFallbackIntegrationTest {
 
@@ -71,19 +71,15 @@ class ModelTierFallbackIntegrationTest {
 
 
     @Test
-    @DisplayName("정의가 없는 신규 그룹은 다섯 칸 모두 에이전트 기본 모델로 해석하고 정의를 만들지 않는다")
-    void newGroupUsesAgentDefaultsWithoutPersistingDefinitions() {
+    @DisplayName("정의가 없는 신규 그룹은 다섯 칸 모두 요청에 모델을 싣지 않고 정의를 만들지 않는다")
+    void newGroupSendsNoModelWithoutPersistingDefinitions() {
         Agent configuredAgent = mock(Agent.class);
-        ModelChoice defaults = new ModelChoice("example-provider", "example-model", "medium");
-        when(configuredAgent.defaultModelProvider()).thenReturn(defaults.provider());
-        when(configuredAgent.defaultModel()).thenReturn(defaults.model());
-        when(configuredAgent.defaultReasoningEffort()).thenReturn(defaults.reasoningEffort());
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
 
         for (ModelTier tier : ModelTier.values()) {
             ResolvedModelTier resolved = tiers.resolveTier(user, tier, configuredAgent);
             assertThat(resolved.tier()).isEqualTo(tier);
-            assertThat(resolved.choice()).isEqualTo(defaults);
+            assertThat(resolved.choice()).isEqualTo(ModelChoice.defaults());
         }
         assertThat(settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL))).isEmpty();
     }

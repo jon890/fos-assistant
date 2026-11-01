@@ -266,6 +266,31 @@ class ChatServiceTest {
 
 
     @Test
+    @DisplayName("대화 단계 저장은 TIER 와 단계가 함께 올 때만 받고 CUSTOM 이나 단계 없는 TIER 는 거절한다")
+    void chooseModelTierAcceptsOnlyTierModeWithTier() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent agent = agents.findByCode("dad").orElseThrow();
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
+
+        for (var invalid : List.of(
+            new ModelTierSelection(null, ModelTier.INSTANT),
+            new ModelTierSelection(ModelSelectionMode.CUSTOM, null),
+            new ModelTierSelection(ModelSelectionMode.CUSTOM, ModelTier.INSTANT),
+            new ModelTierSelection(ModelSelectionMode.TIER, null))) {
+            assertThatThrownBy(() -> chat.chooseModelTier(dad, conversation.id(), invalid.mode(), invalid.tier()))
+                .as("%s", invalid)
+                .isInstanceOfSatisfying(
+                    ApiException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        }
+        assertThat(conversations.findById(conversation.id()).orElseThrow().modelSelectionMode()).isNull();
+    }
+
+
+    private record ModelTierSelection(ModelSelectionMode mode, ModelTier tier) {
+    }
+
+
+    @Test
     @DisplayName("깨진 그룹 모델 설정으로 모델 해석이 실패해도 질문과 FAILED 실행을 남기고 Hermes에는 제출하지 않는다")
     void recordsFailedExecutionWhenStoredTierDefinitionIsMalformed() {
         CurrentUser dad = member("dad@example.com", "dad");
