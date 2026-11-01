@@ -419,7 +419,7 @@ sequenceDiagram
 
 - 열쇠는 `memory:<번호>`, 주체는 `USER` 다. 대화와 그 답의 실행 번호, 누른 때의 revision 번호(`subject_version`)를 함께 적는다
 - 그 대화의 그 답이 지금 목록(위의 판정)에 그 기억을 실었을 때만 받는다. 남의 대화, 그 답이 쓰지 않은 기억, 지금 볼 수 없는 기억은 모두 404 `MEMORY_NOT_FOUND` 다
-- 같은 단추를 다시 누르면 사건이 하나 더 남는다. 반응 읽기(`FeedbackLabeler`)는 이 두 사건을 받아들임이나 거절로 읽지 않고, replay 읽기 모델(`DecisionFeedbackExporter`)도 싣지 않는다. 정비 규칙의 입력 신호로만 읽는다
+- 같은 단추를 다시 누르면 사건이 하나 더 남는다. 반응 읽기(`FeedbackLabeler`)는 이 두 사건을 받아들임이나 거절로 읽지 않는다. 정비 규칙의 입력 신호로만 읽는다
 - 단추를 누른 대화를 지우면 그 단추 사건은 지우지만, 같은 기억의 다른 대화 사건(제안과 받아들임)까지 넓혀 지우지 않는다. 단추 사건은 그 답에 대한 반응이지 기억을 제안한 흐름이 아니다
 
 ## 정비 루프
@@ -438,7 +438,7 @@ sequenceDiagram
 
 - 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다. 제목과 본문은 남기지 않고 화면이 지금 제목을 `memory` 에서 읽는다
 - `detail` 은 후보 사건이면 규칙 버전(`ruleVersion`), 모드(`mode`, 제안 모드는 `PROPOSE`), 그때의 신호 값(`evidence`)이고, 확인 사건이면 확인한 후보 사건의 번호(`candidateId`)다. 신호 값의 이름은 규칙이 정해 규칙이 바뀌어도 스키마는 그대로다
-- 반응 읽기(`FeedbackLabeler`)와 replay 읽기 모델(`DecisionFeedbackExporter`)은 정비 사건을 싣지 않는다(`FeedbackEventType.marksMemoryUse`). 단계 4 가 `MAINTENANCE_APPLIED`, `MAINTENANCE_REVERTED` 를 더한다
+- 반응 읽기(`FeedbackLabeler`)는 정비 사건을 읽지 않는다(`FeedbackEventType.marksMemoryUse`). 단계 4 가 `MAINTENANCE_APPLIED`, `MAINTENANCE_REVERTED` 를 더한다
 - 개인 항목의 후보는 주인에게, 그룹 항목의 후보는 그 그룹의 `ADMIN` 마다 하나씩 남긴다. 사건이 사용자의 것이라 `user_id` 가 비지 않게 하려는 배치다. 한 사람이 확인하면 같은 열쇠와 동작의 다른 관리자 후보도 닫힌 것으로 본다
 - 열린 후보는 같은 열쇠와 동작의 `MAINTENANCE_PROPOSED` 뒤에 확인 사건이 없는 것이다. 같은 항목과 동작의 후보가 열려 있으면 항목을 고쳐 revision 번호가 올라도 새 후보를 만들지 않는다. 이미 확인한 후보는 같은 revision 번호로 다시 열리지 않고, 항목을 고쳐 revision 번호가 오르면 다시 후보가 될 수 있다. 두 관리자가 같은 후보를 동시에 확인해도 항목을 잠가 확인 사건이 하나만 남는다
 - 사건은 마지막 사건 뒤 365일이 지나면 보관 기간 정리가 지운다. 기억을 제안한 대화를 지울 때는 같은 열쇠의 정비 사건을 남긴다. 지우면 확인한 후보가 다시 열리고 정밀도 표본이 사라진다

@@ -24,6 +24,9 @@ from test_connector_execute import ConnectorExecuteTest
 
 class Fixture(ConnectorExecuteTest):
     def setUp(self):
+        if not (REPO / "hermes/connectors/tossinvest/node_modules").is_dir():
+            raise RuntimeError("tossinvest 의존성이 없다. "
+                               "bun install --frozen-lockfile --cwd hermes/connectors/tossinvest 를 먼저 돌린다.")
         self.temporary = tempfile.TemporaryDirectory(prefix="fos-producer-")
         self.base = pathlib.Path(self.temporary.name).resolve()
         self.addCleanup(self.temporary.cleanup)

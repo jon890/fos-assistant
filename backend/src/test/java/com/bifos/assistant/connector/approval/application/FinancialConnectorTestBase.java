@@ -48,6 +48,8 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -141,6 +143,9 @@ abstract class FinancialConnectorTestBase {
 
     @BeforeEach
     void setupProducer() throws Exception {
+        if (!Files.isDirectory(Path.of("../hermes/connectors/tossinvest/node_modules"))) {
+            throw new IllegalStateException("tossinvest 의존성이 없다. bun install --frozen-lockfile --cwd hermes/connectors/tossinvest 를 먼저 돌린다.");
+        }
         now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         clock.set(now);
         plugin = new ProcessBuilder("python3", "../test/e2e/financial/producer_plugin_http.py",
