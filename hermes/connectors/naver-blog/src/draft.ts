@@ -171,7 +171,7 @@ function matchesSignature(extension: string, head: Uint8Array) {
   }
 }
 
-/** 설치가 바인딩 주인의 첨부 디렉터리를 넣는 env 이름. assistant.json 의 `owner_attachments_env` 와 같다. */
+/** 설치가 바인딩 주인의 첨부 디렉터리를 넣는 env 이름. connector.json 의 `owner_attachments_env` 와 같다. */
 export const ATTACHMENT_DIR_ENV = "NAVER_BLOG_ATTACHMENT_DIR";
 
 /**

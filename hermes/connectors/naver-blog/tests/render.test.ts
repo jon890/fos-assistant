@@ -17,10 +17,8 @@ let attachmentDir: string;
 let photoDir: string;
 
 beforeEach(async () => {
-  // macOS 의 임시 디렉터리는 링크 아래에 있다. 플러그인이 링크를 거절하므로 실제 경로를 쓴다.
-  attachmentDir = await realpath(
-    await mkdtemp(join(tmpdir(), "naver-blog-render-")),
-  );
+  // macOS 의 임시 디렉터리는 링크 아래에 있다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  attachmentDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-render-")));
   photoDir = join(attachmentDir, "conversation");
   await mkdir(photoDir);
   await writeFile(join(photoDir, "101.jpg"), JPEG);

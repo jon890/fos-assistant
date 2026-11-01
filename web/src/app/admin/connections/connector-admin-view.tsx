@@ -19,7 +19,7 @@ export function ConnectorAdminView() {
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <h1 className="mb-4 text-xl font-semibold">플러그인</h1>
+      <h1 className="mb-4 text-xl font-semibold">외부 서비스 연결</h1>
       {error ? (
         <Notice variant="error" role="alert">
           플러그인 목록을 읽지 못했어요. {error}

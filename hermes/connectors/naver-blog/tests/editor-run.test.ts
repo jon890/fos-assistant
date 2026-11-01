@@ -36,10 +36,8 @@ afterEach(async () => {
 
 /** 가짜 브라우저 하나에 다른 탭 하나를 미리 열어 두고, 편집기 대역과 초안을 준비한다. */
 async function setup() {
-  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 플러그인이 링크를 거절하므로 실제 경로를 쓴다.
-  const photoDir = await realpath(
-    await mkdtemp(join(tmpdir(), "naver-blog-run-")),
-  );
+  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
+  const photoDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-run-")));
   cleanups.push(() => rm(photoDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), PHOTO);
   const cdp = new FakeCdp({ allowed: EDITOR_METHODS });

@@ -27,7 +27,7 @@ let otherDir: string;
 let photoDir: string;
 
 beforeEach(async () => {
-  // macOS 의 임시 디렉터리는 링크 아래에 있다. 플러그인이 링크를 거절하므로 실제 경로를 쓴다.
+  // macOS 의 임시 디렉터리는 링크 아래에 있다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
   root = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-draft-")));
   attachmentDir = join(root, "users", "owner");
   otherDir = join(root, "users", "other");
