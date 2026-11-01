@@ -133,12 +133,34 @@ export function withoutSlow(result, full) {
   return next;
 }
 
-/** PR 의 merge 커밋이 첫 부모(base) 에 대해 바꾼 파일. 이름 변경은 옛 경로와 새 경로를 모두 낸다. */
+// 지우거나 이름을 바꾸면 e2e 와 브라우저 검사가 그 경로를 부르는지 PR 에서 확인해야 하는 파일.
+// 컨트롤러는 API 경로를, 웹 api·page·components 는 화면과 호출 경로를 정한다.
+export const ROUTE_FILES = [
+  /^backend\/src\/main\/java\/.*\/presentation\/(?:.*\/)?[^/]*Controller\.java$/,
+  /^web\/src\/app\/api\//,
+  /^web\/src\/app\/(?:.*\/)?page\.tsx$/,
+  /^web\/src\/components\//,
+];
+
+/** 지워진(이름 변경의 옛 경로 포함) 파일 중 API 나 화면 경로를 정하던 것이 있으면 true. */
+export function removesRoute(removed) {
+  return removed.some((file) => ROUTE_FILES.some((pattern) => pattern.test(file)));
+}
+
+/** PR 의 merge 커밋이 첫 부모(base) 에 대해 바꾼 파일과 지운 파일. 이름 변경은 옛 경로(지움)와 새 경로(추가)로 낸다. */
 function changedFiles() {
   const parents = execFileSync("git", ["rev-list", "--parents", "-n", "1", "HEAD"], { encoding: "utf8" }).trim().split(" ");
   if (parents.length !== 3) throw new Error(`PR merge 커밋이 아니다(부모 ${parents.length - 1}개). checkout 의 ref 와 fetch-depth 를 확인한다`);
-  const output = execFileSync("git", ["diff", "--name-only", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8" });
-  return output.split("\0").filter(Boolean);
+  const output = execFileSync("git", ["diff", "--name-status", "--no-renames", "-z", "HEAD^1", "HEAD"], { encoding: "utf8" });
+  const tokens = output.split("\0").filter(Boolean);
+  const files = [];
+  const removed = [];
+  // --name-status -z 는 상태와 경로를 번갈아 낸다. --no-renames 라 경로는 항상 하나다.
+  for (let i = 0; i + 1 < tokens.length; i += 2) {
+    files.push(tokens[i + 1]);
+    if (tokens[i] === "D") removed.push(tokens[i + 1]);
+  }
+  return { files, removed };
 }
 
 function main() {
@@ -147,11 +169,16 @@ function main() {
     // main 에 들어온 커밋은 PR CI 를 이미 통과했다. push 는 빌드가 깨졌는지만 보고,
     // 정기 실행과 수동 실행이 모든 검사를 돌려 판정 규칙이 놓친 것을 잡는다.
     const event = process.env.GITHUB_EVENT_NAME;
-    const result = event === "pull_request"
-      ? withoutSlow(classify(changedFiles()), process.env.FULL_LABEL === "true")
-      : Object.fromEntries(JOBS.map((job) => [job, event === "push"
+    let result;
+    if (event === "pull_request") {
+      const { files, removed } = changedFiles();
+      // 경로를 지운 PR 은 라벨이 없어도 e2e 와 브라우저를 돌린다. 지운 경로를 부르는 쪽은 PR 에서 드러나야 한다.
+      result = withoutSlow(classify(files), process.env.FULL_LABEL === "true" || removesRoute(removed));
+    } else {
+      result = Object.fromEntries(JOBS.map((job) => [job, event === "push"
         ? { run: PUSH_JOBS.includes(job), because: "(main push 빠른 검사)" }
         : { run: true, because: `(${event || "PR 밖"} 실행)` }]));
+    }
     const lines = JOBS.map((job) => `${job}=${result[job].run}`);
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
     const table = ["| job | 실행 | 처음 맞은 파일 |", "| --- | --- | --- |",
