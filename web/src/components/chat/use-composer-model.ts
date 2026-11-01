@@ -1,13 +1,8 @@
 "use client";
 
-import {
-  type ModelChoice,
-  type ModelChoiceSaveResult,
-  type ModelTierSaveResult,
-} from "./model-picker";
+import { type ModelTierSaveResult } from "./model-picker";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { saveConversationTier, type ModelTierCode } from "@/lib/model-tiers";
-import { saveConversationModel } from "@/lib/chat-api";
 import { Props } from "./composer-types";
 import type { ComposerState } from "./use-composer-state";
 
@@ -55,35 +50,11 @@ export function useComposerModel({
   }
 
   /**
-   * 고른 모델을 대화에 저장한다. 대화가 아직 없으면 사진을 먼저 올릴 때처럼 빈 대화를 만든다.
+   * 고른 칸을 대화에 저장한다. 대화가 아직 없으면 사진을 먼저 올릴 때처럼 빈 대화를 만든다.
    *
-   * <p>대화를 만든 것은 `ensureConversationId` 가 이미 알렸으므로 여기서 다시 알리지 않는다.
+   * <p>대화를 만든 것은 `ensureConversationId` 가 이미 알렸으므로 여기서 다시 알리지 않는다. 서버는 같은 저장에서
+   * 사용자 기본 칸도 바꾼다.
    */
-  async function saveModelChoice(
-    choice: ModelChoice,
-  ): Promise<ModelChoiceSaveResult> {
-    setSavingModel(true);
-    try {
-      const targetConversationId = await ensureConversationId();
-      // 빈 대화를 만들지 못했으면 `ensureConversationId` 가 이미 알렸다.
-      if (targetConversationId === null || !mountedRef.current)
-        return "reported";
-      const response = await saveConversationModel(
-        targetConversationId,
-        choice,
-      );
-      if (!response.ok) return "failed";
-      // 기다리는 동안 대화를 바꿨어도 알린다. 받은 줄은 그 대화의 것이라 목록의 그 줄만 바뀐다.
-      onModelChoiceSaved((await response.json()) as Conversation);
-      return "saved";
-    } catch {
-      return "failed";
-    } finally {
-      if (mountedRef.current) setSavingModel(false);
-    }
-  }
-
-  /** 고른 단계를 대화에 저장한다. */
   async function saveModelTier(
     mode: "TIER",
     tier: ModelTierCode,
@@ -107,6 +78,6 @@ export function useComposerModel({
       if (mountedRef.current) setSavingModel(false);
     }
   }
-  return { ensureConversationId, saveModelChoice, saveModelTier };
+  return { ensureConversationId, saveModelTier };
 }
 export type ComposerModel = ReturnType<typeof useComposerModel>;

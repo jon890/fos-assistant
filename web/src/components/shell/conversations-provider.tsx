@@ -25,12 +25,8 @@ export type Conversation = {
   agentCode: string | null;
   agentName: string | null;
   updatedAt: string;
-  /** 대화에서 고른 모델 제공사다. 고르지 않았으면 null 이고 profile 의 기본값으로 돈다 */
-  provider: string | null;
-  model: string | null;
-  reasoningEffort: string | null;
-  /** 선택하지 않은 새 대화는 null 이고, 서버가 새 선택 방식을 주면 그 값을 쓴다. */
-  modelSelectionMode?: "TIER" | "CUSTOM" | null;
+  /** 칸을 고른 대화는 `TIER` 다. 고르지 않은 대화는 null 이고 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. */
+  modelSelectionMode?: "TIER" | null;
   modelTier?: ModelTierCode | null;
   /**
    * 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 이 provider 가 서버 응답을 읽을 때 없으면 `CHAT` 으로 채운다.

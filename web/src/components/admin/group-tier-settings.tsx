@@ -236,8 +236,8 @@ export function GroupTierSettings() {
       <section className="grid gap-2">
         <h3 className="text-sm font-medium">그룹 기본 단계</h3>
         <p className="text-xs text-muted-foreground">
-          따로 고르지 않은 사용자는 이 단계로 돌아요. 각자 「내 기본값」 을
-          정하면 그것이 먼저예요.
+          아직 단계를 고른 적 없는 사용자는 이 단계로 돌아요. 사용자가
+          입력창에서 고른 단계는 그 사용자의 다음 새 대화에도 남아요.
         </p>
         <label className="grid gap-1 text-sm">
           그룹 기본 단계
