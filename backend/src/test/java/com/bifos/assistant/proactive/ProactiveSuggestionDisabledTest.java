@@ -6,12 +6,14 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverrideProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 기능 스위치 {@code assistant.proactive-suggestion.enabled} 가 기본값(꺼짐)일 때 지금 동작이 그대로인지 본다. */
+/** 기능 스위치 {@code assistant.proactive-suggestion.enabled} 를 끄면 제안 줄을 만들지 않고 발견과 문제 후보만 저장하는지 본다. */
 @BackendIntegrationTest
+@OverrideProperties("assistant.proactive-suggestion.enabled=false")
 class ProactiveSuggestionDisabledTest extends ProactiveLoopTestSupport {
 
     @Autowired
