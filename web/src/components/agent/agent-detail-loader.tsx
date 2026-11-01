@@ -13,7 +13,6 @@ import type {
 import type { AgentConnectionsList } from "@/lib/agent-connection";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
-import type { EvaluationOverview } from "@/lib/value-evaluation";
 
 /**
  * 에이전트 상세 화면을 읽어 그린다. 일반 화면과 관리자 영역이 함께 쓴다.
@@ -64,25 +63,6 @@ export async function loadAgentDetail(
         )
       : Promise.resolve(null),
   ]);
-  // 살펴보기 절을 그리는 에이전트에서만 읽는다. 상태 조회를 본 뒤여야 하므로 위 묶음에 넣지 않는다.
-  const valueEvaluationResult =
-    admin && proactiveCheckResult?.ok
-      ? await callControlPlane<EvaluationOverview>(
-          `/api/v1/admin/agents/${code}/value-evaluation`,
-        )
-      : null;
-  const valueEvaluation =
-    valueEvaluationResult === null
-      ? null
-      : valueEvaluationResult.ok
-        ? { ok: true as const, data: valueEvaluationResult.data }
-        : {
-            ok: false as const,
-            message: describeError(
-              valueEvaluationResult.code,
-              valueEvaluationResult.message,
-            ),
-          };
   const adminAgent = adminAgentsResult?.ok
     ? adminAgentsResult.data.find((agent) => agent.code === code)
     : undefined;
@@ -167,7 +147,6 @@ export async function loadAgentDetail(
           tools={tools}
           skills={skills}
           proactiveCheck={proactiveCheck}
-          valueEvaluation={valueEvaluation}
           connections={connections}
           initialVisibility={visibility}
           adminAgent={adminAgent}
@@ -200,7 +179,6 @@ export async function loadAgentDetail(
       tools={tools}
       skills={skills}
       proactiveCheck={proactiveCheck}
-      valueEvaluation={valueEvaluation}
       connections={connections}
       initialVisibility={visibility}
       adminAgent={adminAgent}
