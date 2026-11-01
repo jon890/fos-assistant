@@ -109,7 +109,9 @@ const REASONS: Record<
   MEMORY_SUPERSEDE_PROPOSED: [
     { signal: null, text: "새 기억이 옛 기억을 대신하자는 제안이 왔어요" },
   ],
-  FOLLOW_UP_PROPOSED: [{ signal: null, text: "에이전트가 챙길 것을 제안했어요" }],
+  FOLLOW_UP_PROPOSED: [
+    { signal: null, text: "에이전트가 챙길 것을 제안했어요" },
+  ],
   FOLLOW_UP_OPEN: [
     { signal: "DUE_SOON", text: "기한이 다가왔어요" },
     { signal: "OVERDUE", text: "기한이 지났어요" },
