@@ -1,8 +1,8 @@
-package com.bifos.assistant.proactive.surface.presentation;
+package com.bifos.assistant.proactive.loop.presentation;
 
 import com.bifos.assistant.proactive.loop.application.ProactiveLoopSettingService;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.LoopSettingBody;
-import com.bifos.assistant.proactive.surface.presentation.ProactiveCheckDtos.LoopSettingResponse;
+import com.bifos.assistant.proactive.loop.presentation.ProactiveLoopDtos.LoopSettingBody;
+import com.bifos.assistant.proactive.loop.presentation.ProactiveLoopDtos.LoopSettingResponse;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
