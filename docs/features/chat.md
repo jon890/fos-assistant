@@ -384,7 +384,6 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 | 실행 한 줄의 `errorCode`, `RUN_FAILED` 사건의 `detail`, SSE `error` 사건의 `code` | 화면이 코드를 사람 말 문구로 바꾸는 데 쓴다. 빼면 모든 실패가 같은 문구가 되고 화면의 분기가 깨진다. 코드 원문은 화면이 `MEMBER` 역할에게 그리지 않는다 |
 | `latencyMs`, `modelTier`, `skillNames` | `MEMBER` 역할에게 보이는 값이다 |
 | `subagentName` | 목표가 비었을 때 도우미 줄의 이름으로 쓴다 |
-| `GET /api/v1/chat/model-options` 와 대화 응답의 `provider`, `model`, `reasoningEffort` | `MEMBER` 역할도 쓰는 모델 선택의 입력이다. 숨김 목록을 적용한 것만 간다 |
 | 에이전트 목록의 `code`, 대화의 `agentCode` | 주소와 요청 본문에 쓰는 열쇠다 |
 
 ## 대기열과 중지
