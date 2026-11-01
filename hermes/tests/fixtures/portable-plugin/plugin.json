@@ -1,0 +1,6 @@
+{
+  "name": "portable-notes",
+  "description": "이식형 MCP 와 스킬을 갖춘 검사용 플러그인",
+  "skills": "./skills/",
+  "extensions": {"com.openai": {"hooks": "./unused-hooks.json", "onboardingSkill": "unused"}}
+}

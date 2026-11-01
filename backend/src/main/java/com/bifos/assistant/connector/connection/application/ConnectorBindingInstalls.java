@@ -153,7 +153,9 @@ public class ConnectorBindingInstalls {
             }
             step = STEP_PROBE;
             ProbeResult probe = connector.probe(attempt.profile(), attempt.mcpServer());
-            int undeclared = (int)probe.tools().stream().filter(name -> !attempt.declaredTools().contains(name)).count();
+            // `default_tool_policy: ask` 는 선언하지 않은 도구를 거절하지 않고 호출마다 물으므로 세지 않는다.
+            int undeclared = attempt.undeclaredAsk() ? 0
+                : (int)probe.tools().stream().filter(name -> !attempt.declaredTools().contains(name)).count();
             if (!probe.ok()) {
                 outcome = ResyncOutcome.PROBE_FAILED;
             } else if (probe.tools().isEmpty()) {

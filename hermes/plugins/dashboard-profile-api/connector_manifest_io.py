@@ -8,6 +8,7 @@ import pathlib
 from .common import logger
 from .connector_guard import _strict_json
 from .connector_schema import CONNECTOR_COMMAND_ENV, CONNECTOR_ROOTS_ENV
+from .connector_remote import _portable_remote_server
 
 
 def _connector_roots() -> dict[str, dict]:
@@ -65,21 +66,21 @@ def _read_connector_json(root: pathlib.Path, relative: str):
 
 
 def _read_plugin_manifest(root: pathlib.Path) -> dict:
-    """`.claude-plugin/plugin.json` 과 `.codex-plugin/plugin.json` 가운데 있는 것을 읽는다.
+    """Claude Code, 이식형, Codex manifest 순으로 있는 것을 읽는다.
 
-    둘 다 있으면 이름이 같아야 하고 `.claude-plugin` 쪽을 쓴다. 두 쪽의 스킬 목록은 합치지 않는다.
+    여럿 있으면 이름이 같아야 하고 앞선 것을 쓴다. 스킬 목록은 합치지 않는다.
     합치면 Claude Code 나 Codex 에서 보이는 스킬과 assistant 가 설치하는 스킬이 달라진다.
     """
     # 없는 파일과 링크를 가른다. 링크는 `_read_connector_json` 이 거절한다.
-    present = [relative for relative in (".claude-plugin/plugin.json", ".codex-plugin/plugin.json")
+    present = [relative for relative in (".claude-plugin/plugin.json", "plugin.json", ".codex-plugin/plugin.json")
                if os.path.lexists(root / relative)]
     if not present:
         raise ValueError("플러그인 manifest 가 없다")
     manifests = [_read_connector_json(root, relative) for relative in present]
     if any(not isinstance(manifest, dict) for manifest in manifests):
         raise ValueError("플러그인 manifest 는 객체여야 한다")
-    if len(manifests) == 2 and manifests[0].get("name") != manifests[1].get("name"):
-        raise ValueError("두 플러그인 manifest 의 이름이 다르다")
+    if any(manifest.get("name") != manifests[0].get("name") for manifest in manifests[1:]):
+        raise ValueError("플러그인 manifest 의 이름이 다르다")
     return manifests[0]
 
 
@@ -98,15 +99,29 @@ def _read_assistant_json(root: pathlib.Path):
 
 
 def _read_mcp_definition(root: pathlib.Path, plugin: dict):
-    """플러그인 manifest 의 `mcpServers` 경로에서 MCP 정의를 읽는다. 칸이 없으면 `.mcp.json` 이다.
+    """manifest 의 `mcpServers` 경로, 없으면 `.mcp.json` 이나 이식형 `mcp.json` 을 읽는다.
 
     인라인 정의(객체)는 받지 않는다. 경로는 플러그인 안의 링크 없는 파일이어야 한다.
     """
-    relative = plugin.get("mcpServers", ".mcp.json")
+    present = [name for name in (".mcp.json", "mcp.json") if os.path.lexists(root / name)]
+    if len(present) > 1:
+        raise ValueError(".mcp.json 과 mcp.json 이 함께 있다")
+    relative = plugin.get("mcpServers", present[0] if present else ".mcp.json")
     if not isinstance(relative, str):
         raise ValueError("MCP 정의 경로가 올바르지 않다")
     relative = relative.removeprefix("./")
     path = pathlib.Path(os.path.normpath(root / relative))
     if not relative or path == root or not path.is_relative_to(root):
         raise ValueError("MCP 정의 경로가 올바르지 않다")
-    return _read_connector_json(root, relative)
+    mcp = _read_connector_json(root, relative)
+    if isinstance(mcp, dict) and "mcpServers" in mcp:
+        # 이식형 문서의 schema 주소는 실행 설정이 아니다. 나머지 모양은 기존 검증에 맡긴다.
+        mcp.pop("$schema", None)
+        servers = mcp["mcpServers"]
+    else:
+        servers = mcp
+    if isinstance(servers, dict):
+        for name, server in servers.items():
+            if isinstance(server, dict) and server.get("type") in ("http", "streamable-http"):
+                servers[name] = _portable_remote_server(name, server)
+    return mcp

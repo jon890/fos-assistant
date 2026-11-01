@@ -1476,6 +1476,44 @@ class ConnectorActionServiceTest {
 
 
     @Test
+    @DisplayName("default_tool_policy: ask 커넥터의 선언하지 않은 도구는 승인 줄이 되고, 읽기 표시가 있는 도구만 첫 승인 때 상시 허락을 준다")
+    void askConnectorUndeclaredToolsFollowTheStandardRules() {
+        catalogBecomes(askManifest());
+        markListedTools(Map.of(STANDARD_READ, true, WRITE, false));
+        UUID read = ask(STANDARD_READ, "{}").actionId();
+        UUID write = ask(WRITE, ARGS).actionId();
+
+        assertThat(read).isNotNull();
+        assertThat(write).isNotNull();
+        assertThat(service.listForConversation(me, CONVERSATION))
+            .extracting(ConnectorActionView::actionId, ConnectorActionView::grantAllowed, ConnectorActionView::conversationGrantAllowed)
+            .containsExactly(tuple(read, true, false), tuple(write, false, false));
+        assertCode(() -> service.approve(me, write, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(true));
+        assertThat(service.approve(me, read, GrantPeriod.HOUR).status()).isEqualTo(ActionStatus.SUCCEEDED);
+
+        assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isTrue();
+        assertThat(ask(WRITE, "{\"text\":\"다른 글\"}").allowed()).isFalse();
+        // 선언한 도구는 선언대로 승인 없이 지난다.
+        assertThat(ask("list_scopes", "{}").allowed()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("default_tool_policy 칸이 없는 schema 2 커넥터의 선언하지 않은 도구는 승인 줄 없이 거절된다")
+    void declaringConnectorWithoutAskRefusesUndeclaredTools() {
+        catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null, null))));
+        markListedTools(Map.of(STANDARD_READ, true));
+
+        ConnectorPolicyAnswer answer = ask(STANDARD_READ, "{}");
+
+        assertThat(answer.allowed()).isFalse();
+        assertThat(answer.actionId()).isNull();
+    }
+
+
+    @Test
     @DisplayName("표준 플러그인의 승인 실행이 읽기 표시가 거짓이라고 답하면 그 도구의 표시와 상시 허락을 거두고 다음 호출은 다시 승인을 받는다")
     void standardPluginExecutionThatDropsTheMarkRevokesTheGrant() {
         catalogBecomes(standardManifest());
@@ -2050,6 +2088,15 @@ class ConnectorActionServiceTest {
     /** 확인 도구와 도구 선언이 없는 표준 플러그인이다(ADR-20261101 / plugin-without-assistant-json). 서버 이름은 {@link #DECLARING} 와 같다. */
     private static ConnectorManifest standardManifest() {
         return new ConnectorManifest(DEMO, "검사용 메모", "", List.of(), null, "demo", 3, List.of());
+    }
+
+
+    /** 도구 하나만 선언하고 나머지를 호출마다 묻는 {@code default_tool_policy: ask} 커넥터다. 서버 이름은 {@link #DECLARING} 와 같다. */
+    private static ConnectorManifest askManifest() {
+        return new ConnectorManifest(
+            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", 2,
+            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
+            List.of(), null, false, false, null, null, null, null, null, ConnectorManifest.DEFAULT_TOOL_POLICY_ASK);
     }
 
 

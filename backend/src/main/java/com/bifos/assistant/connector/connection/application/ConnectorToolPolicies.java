@@ -32,6 +32,31 @@ public final class ConnectorToolPolicies {
     public static final int STANDARD_SCHEMA = 3;
 
 
+    /**
+     * 선언하지 않은 도구를 {@code schema: 3} 처럼 다루는가. 표준 플러그인이거나, 도구를 선언하는 {@code schema: 2} 가
+     * {@code default_tool_policy: ask} 로 선언했을 때 참이다. 칸이 없는 카탈로그는 거짓이라 선언하지 않은 도구를 거절한다.
+     */
+    public static boolean undeclaredAsk(ConnectorManifest manifest) {
+        return manifest.schema() == STANDARD_SCHEMA || partialAsk(manifest);
+    }
+
+
+    /** 일부 도구만 선언하고({@code schema: 2}) 나머지를 호출마다 묻도록({@code default_tool_policy: ask}) 선언한 manifest 인가. */
+    public static boolean partialAsk(ConnectorManifest manifest) {
+        return manifest.schema() == DECLARING_SCHEMA
+            && ConnectorManifest.DEFAULT_TOOL_POLICY_ASK.equals(manifest.defaultToolPolicy());
+    }
+
+
+    /**
+     * 판정({@code ToolPolicyDecision.decide})에 넘기는 schema 다. 선언하지 않은 도구를 호출마다 묻는 manifest 는 표준 플러그인과
+     * 같은 {@link #STANDARD_SCHEMA} 로 넘겨 같은 규칙을 쓴다. 선언한 도구는 schema 와 상관없이 선언으로 판정한다.
+     */
+    public static int decisionSchema(ConnectorManifest manifest) {
+        return undeclaredAsk(manifest) ? STANDARD_SCHEMA : manifest.schema();
+    }
+
+
     /** 이 manifest 의 도구 정책으로 판정해도 되는가. 거짓이면 그 커넥터를 없는 것으로 다룬다. */
     public static boolean valid(ConnectorManifest manifest) {
         if (manifest.schema() == STANDARD_SCHEMA) {
@@ -92,9 +117,12 @@ public final class ConnectorToolPolicies {
     }
 
 
-    /** MCP 서버가 낸 도구 이름 가운데 manifest 가 선언하지 않은 수다. 도구를 선언하지 않는 판은 세지 않는다. */
+    /**
+     * MCP 서버가 낸 도구 이름 가운데 manifest 가 선언하지 않은 수다. 도구를 선언하지 않는 판은 세지 않는다.
+     * {@code default_tool_policy: ask} 는 선언하지 않은 도구를 거절하지 않고 호출마다 물으므로 세지 않는다.
+     */
     static int undeclared(ConnectorManifest manifest, List<String> toolNames) {
-        if (manifest.schema() != DECLARING_SCHEMA) {
+        if (manifest.schema() != DECLARING_SCHEMA || partialAsk(manifest)) {
             return 0;
         }
         Set<String> declared = manifest.tools().stream().map(ConnectorTool::name).collect(Collectors.toSet());

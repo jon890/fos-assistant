@@ -51,7 +51,11 @@ public class AttentionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void hide(@RequestBody HideRequest request) {
         controls.hide(
-            currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.stateKey());
+            currentUser.require(),
+            AttentionDtos.cardOf(request.card()),
+            request.itemKey(),
+            request.stateKey(),
+            request.requestKey());
     }
 
 
@@ -59,14 +63,19 @@ public class AttentionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void snooze(@RequestBody SnoozeRequest request) {
         controls.snooze(
-            currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.until());
+            currentUser.require(),
+            AttentionDtos.cardOf(request.card()),
+            request.itemKey(),
+            request.until(),
+            request.requestKey());
     }
 
 
     @PostMapping("/restore")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void restore(@RequestBody RestoreRequest request) {
-        controls.restore(currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey());
+        controls.restore(
+            currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.requestKey());
     }
 
 

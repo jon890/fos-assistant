@@ -910,16 +910,22 @@ action을 지우면 실행 내용도 지운다.
 | `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
 | `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
 
+옛 발견과 문제 후보를 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>`(예: `legacy:proactive_check_finding:<번호>`)이고, 옛 분류 원문은 `detail_json` 의 `legacy` 필드에 있다. 옮기는 방법과 반응 사건의 열쇠 이관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「옛 발견과 문제 후보 옮기기」 가 갖는다. 이 작업은 마이그레이션이 아니라 기동 뒤 한 번 도는 backfill 이라 칸을 더하지 않는다.
+
 **`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
 같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
 
 ### attention_control
 
-한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고친다.
+**읽고 쓰는 곳이 없다.** 지금 화면의 숨김과 미루기는 `decision_feedback_event` 의 제어 사건으로 옮겼고, 이 표의 살아 있는 줄은 마이그레이션이 처음 제어 사건으로 복사했다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
+
+한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고쳤다.
 **유일 제약 `uk_attention_control_item` 에 `card_key` 를 넣어 카드마다 제어를 나눈다.** 같은 대화가 두 카드에 나와도 제어가 서로 덮어쓰지 않는다.
 `card_key` 는 API 의 소문자 카드 열쇠를 대문자로 쓴 값이다. `state_key` 는 `HIDE` 일 때 숨긴 상태이고, 판정의 `stateKey` 가 이것과 다르면 다시 보인다.
 
 ### attention_event
+
+**읽고 쓰는 곳이 없다.** 노출, 열기, 동작은 `decision_feedback_event` 의 사건으로 옮겼고 옛 줄 가운데 이 셋은 마이그레이션이 복사했다. `AttentionEventCleaner` 가 남은 줄을 보관 기간이 지나며 비운다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
 
 **유일 제약 `uk_attention_event_once`(`user_id`, `item_key`, `state_key`, `event_type`, `attention`)는 화면을 열 때마다 같은 사건이 쌓이는 것을 막는다.**
 판정 칸이 제약에 들어 있어, 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다.
@@ -1035,19 +1041,29 @@ action을 지우면 실행 내용도 지운다.
 
 ### decision_feedback_event
 
-제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
+제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 할 일의 제안 줄로 옮길 때 그 줄이 생긴 발견의 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 한 번 바꾸는 이관뿐이다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
 사용자를 지우면 함께 지운다. 다른 사용자는 관리자여도 읽지 못한다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
 실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
-카드 범위와 미루기, 재전송 합치기를 위한 칸이 있다. 아직 쓰는 곳이 없고 기본은 모두 비어 있다(ADR-20261101 의 순서 5 가 쓴다).
+지금 화면의 숨김, 미루기, 복원과 노출, 열기, 동작도 이 표의 사건이다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「저장」). 아래 칸이 쓰인다.
 
 | 칸 | 뜻 |
 | --- | --- |
-| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다 |
+| `card_key` | 같은 항목이 다른 카드에 있을 때 숨김과 미루기의 범위를 나눈다. 값은 카드 열쇠를 대문자로 쓴 것이다. 제어 사건(`DISMISSED`, `POSTPONED`, `RESTORED`)만 갖고 노출, 열기, 동작은 비어 있다 |
 | `until_at` | 미루기가 끝나는 시각 |
-| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일해 같은 키의 재전송이 한 줄이 된다 |
+| `event_key` | 서버가 검증한 요청 키나 노출 키. `(user_id, event_key)` 가 유일(`uk_decision_feedback_event_user_event_key`)해 같은 키의 재전송이 한 줄이 된다 |
+| `subject_version` | 제어 사건에서는 그때 항목의 상태 지문이다. 숨김은 숨긴 상태이고, 이 값이 바뀌면 다시 보인다. 노출, 열기, 동작도 그때의 상태 지문이다 |
+| `reason_code` | 제어 사건은 `ATTENTION_HIDE`, `ATTENTION_SNOOZE`, `ATTENTION_RESTORE` 다. 노출, 열기, 동작은 `<계기>@<판정>`(예: `EXECUTION_FAILED@NOW`)이고 이관한 옛 사건은 `<계기>` 뿐이다 |
+
+- 지금 화면의 항목 가운데 제안이 아닌 것과 노출, 열기, 복원은 `subject_type` 이 `ATTENTION_ITEM` 이고 `subject_key` 는 지금 화면의 `itemKey` 다. 제안 항목의 숨김과 미루기는 그 제안의 종류와 열쇠로 남기고 제안한 대화와 실행을 채운다
+- 새 사건 종류는 `SHOWN`(노출, 주체 `SYSTEM`), `OPENED`, `ACTED`, `RESTORED` 다
+- **색인 `idx_decision_feedback_event_control`(`user_id`, `card_key`, `subject_key`, `id`)이 현재 제어를 읽는다.** 카드와 항목마다 `id` 가 가장 큰 제어 사건이 현재값이다
+- 숨김, 미루기, 복원은 부르는 쪽 트랜잭션에서 필수로 저장하고 실패하면 요청도 실패한다. 노출, 열기, 동작은 관측용이라 실패해도 응답을 낸다
+- 보관 기간 정리(`DecisionFeedbackCleaner`)는 카드마다 항목마다 마지막 숨김과 기한이 안 지난 미루기를 남긴다
+- 옛 `attention_control`, `attention_event` 의 값은 `event_key` 가 `legacy:attention_control:<번호>`, `legacy:attention_event:<번호>` 인 줄로 복사했다. 이관한 줄은 `subject_type` 이 `ATTENTION_ITEM` 이고 판정(`attention`)과 신선도는 옮기지 않았다
+- 지금 화면의 사건은 reaction replay 읽기 모델에 싣지 않는다
 
 정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.
 `detail`(JSON, 비어 있을 수 있음)이 후보 사건의 규칙 버전, 모드(`PROPOSE`), 그때의 신호 값과 확인 사건이 확인한 후보 사건의 번호를 담는다. 정비 사건이 아닌 줄은 비어 있다. 제목과 본문은 담지 않는다.

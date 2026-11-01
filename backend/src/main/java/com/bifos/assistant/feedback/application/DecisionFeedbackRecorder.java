@@ -1,6 +1,7 @@
 package com.bifos.assistant.feedback.application;
 
 import com.bifos.assistant.feedback.application.dto.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,18 @@ public class DecisionFeedbackRecorder {
             count += events.deleteOfSubjectsKeepingMaintenance(userId, subjects);
         }
         return count;
+    }
+
+
+    /**
+     * 한 제안 열쇠에 남은 사건을 다른 제안 열쇠로 옮긴다. 옛 제안을 새 제안 줄로 옮긴 작업이 반응도 새 줄을 가리키게 하려고 부른다.
+     * 사건은 덧붙이기만 하는 기록이라 이 이관 말고는 열쇠를 바꾸지 않는다. 다시 불러도 옮길 사건이 없을 뿐 결과는 같다.
+     *
+     * @return 옮긴 사건 수
+     */
+    @Transactional
+    public int repointSubject(Long userId, String fromKey, FeedbackSubjectType toType, String toKey) {
+        return events.repointSubject(userId, fromKey, toType, toKey);
     }
 
 

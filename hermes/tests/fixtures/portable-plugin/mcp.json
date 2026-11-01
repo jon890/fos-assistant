@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "portable-notes": {
+      "type": "streamable-http",
+      "url": "https://plugin-file.invalid/mcp",
+      "extensions": {"com.openai": {"auth": {"type": "api_key", "headerScheme": "bearer"}}},
+      "_meta": {"ui": {"resourceUri": "ui://unused/widget.html"}, "openai/outputTemplate": "ui://unused/widget.html"}
+    }
+  }
+}

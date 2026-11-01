@@ -10,6 +10,7 @@ from .common import (
 )
 
 from .connector_schema import (
+    DEFAULT_TOOL_POLICIES,
     ENV_NAME_RE,
     ERROR_CODE_RE,
     ERROR_DETAILS_MAX,
@@ -111,6 +112,18 @@ def _tool_identifiers(declared_tool: dict, approval: str, risk: str | None = Non
     return list(identifiers)
 
 
+def _default_tool_policy(declared: dict) -> str:
+    """`default_tool_policy` 를 검증해 `deny`(기본값)나 `ask` 로 낸다. 틀리면 예외다.
+
+    `tools` 에 없는 그 서버의 도구를 거절(`deny`)할지, `schema: 3` 의 도구처럼 호출마다 묻고 읽기 표시가 있는 도구만 상시 허락을
+    열지(`ask`) 정한다. 사람이 보지 않는 기본값(선언하지 않은 도구를 읽기로 보는 것 등)은 받지 않는다.
+    """
+    value = declared.get("default_tool_policy", "deny")
+    if not isinstance(value, str) or value not in DEFAULT_TOOL_POLICIES:
+        raise ValueError("default_tool_policy 는 deny 나 ask 만 받는다")
+    return value
+
+
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
     """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers"}}` 로 낸다.
 
@@ -139,8 +152,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     tools = declared.get("tools")
     if not isinstance(tools, dict) or not tools:
         raise ValueError("schema 2 의 tools 는 비어 있지 않은 객체다")
-    if "default_tool_policy" in declared and declared["default_tool_policy"] != "deny":
-        raise ValueError("default_tool_policy 는 deny 만 받는다")
+    _default_tool_policy(declared)
     policies = {}
     for name, declared_tool in tools.items():
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):

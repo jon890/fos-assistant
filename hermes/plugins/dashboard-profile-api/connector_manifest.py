@@ -28,6 +28,7 @@ from .connector_policy import (
     _connector_errors,
     _connector_fields,
     _connector_tools,
+    _default_tool_policy,
     _hermes_tool_name,
     _tool_identifiers,
 )
@@ -224,6 +225,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     # 표준 플러그인은 도구 정책을 선언하지 않는다. Control Plane 이 그 서버의 도구를 모두 호출마다 승인으로 판정한다.
     tools = {} if standard else _connector_tools(declared, verify["tool"], option_tools, mcp_server)
+    # `ask` 는 tools 에 없는 도구를 표준 플러그인처럼 호출마다 묻는다. 칸이 없거나 `deny` 면 지금처럼 거절한다.
+    default_tool_policy = "deny" if standard or declared["schema"] != 2 else _default_tool_policy(declared)
     # 원격 서버는 자식 프로세스의 env 로 건네는 선언을 받지 않았다. snapshot 은 자식 프로세스의 인자로 켜므로 없다.
     snapshot = None
     if not remote:
@@ -267,6 +270,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset(option_tools if standard else {verify["tool"]} | option_tools),
         "tools": tools,
+        "default_tool_policy": default_tool_policy,
         "snapshot": snapshot,
         "tool_descriptions": _tool_descriptions(declared),
         "tool_summaries": _tool_summaries(declared),
@@ -372,6 +376,8 @@ def _connector_catalog_response(include_standard: bool = False):
           # (ADR-20261013 unknown-retry-key). `retry_key` 를 선언하지 않은 코드는 null 이다.
           "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")
                              for code, word in sorted(manifest["errors"].items()) if word == OUTCOME_UNKNOWN},
+          # `ask` 일 때만 싣는다. 이 칸을 모르는 옛 Control Plane 은 선언하지 않은 도구를 지금처럼 거절한다(rule-66).
+          **({"default_tool_policy": "ask"} if manifest["default_tool_policy"] == "ask" else {}),
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목과 요약이 없는 도구는 `title` 과 `summary` 를 내지 않는다. 화면은 도구 이름 대신 대체 문구를 보인다.
