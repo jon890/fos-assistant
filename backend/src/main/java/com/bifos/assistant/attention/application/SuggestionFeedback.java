@@ -11,7 +11,6 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.proactive.surface.application.SurfacedProblems;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.Optional;
@@ -23,7 +22,7 @@ import org.springframework.stereotype.Component;
 /**
  * 지금 화면에서 항목을 숨기거나 미룰 때 반응 기록에 남길 사건을 만든다(ADR-20261101 / proactive-suggestion 의 순서 5).
  *
- * <p>제안 항목(할 일, Memory, 승인 줄, 먼저 다룰 문제)이면 그 제안의 열쇠와 종류로 사건을 만들고, 제안의 원천(대화, 제안한 실행)을
+ * <p>제안 항목(할 일, Memory, 승인 줄)이면 그 제안의 열쇠와 종류로 사건을 만들고, 제안의 원천(대화, 제안한 실행)을
  * 채워 대화를 지울 때 함께 지워지게 한다. 제안이 아닌 항목은 {@code ATTENTION_ITEM} 으로 만든다. 원천을 읽다 실패하거나 찾지 못하면
  * 원천 없는 사건으로 둔다. 숨김과 미루기의 현재값을 이 사건에서 구하므로, 원천 때문에 사건을 버리지 않는다.
  */
@@ -35,7 +34,6 @@ public class SuggestionFeedback {
     private final FollowUpService followUps;
     private final MemoryService memories;
     private final ConnectorActionService actions;
-    private final SurfacedProblems surfacedProblems;
 
 
     /**
@@ -52,7 +50,6 @@ public class SuggestionFeedback {
             case FOLLOW_UP_PROPOSED -> FeedbackSubjectType.FOLLOW_UP;
             case MEMORY_PROPOSED -> FeedbackSubjectType.MEMORY;
             case APPROVAL_PENDING -> FeedbackSubjectType.CONNECTOR_ACTION;
-            case PROBLEM_SURFACED -> FeedbackSubjectType.AUTONOMY_DECISION;
             default -> null;
         };
         if (subject == null || subject != FeedbackSubjectType.ofKey(candidate.itemKey())) {
@@ -73,7 +70,7 @@ public class SuggestionFeedback {
     }
 
 
-    /** 제안의 대화와 제안한 실행을 채운다. 판정이면 원천 점검 대화와 원천 살펴보기를 채운다. 원천을 모르면 지운 대화인지 가릴 수 없어 빈 값이다. */
+    /** 제안의 대화와 제안한 실행을 채운다. 원천을 모르면 지운 대화인지 가릴 수 없어 빈 값이다. */
     private Optional<FeedbackEntry> withOrigin(
         CurrentUser user, FeedbackSubjectType subject, String id, FeedbackEntry base) {
         Optional<FeedbackEntry> filled = switch (subject) {
@@ -95,7 +92,6 @@ public class SuggestionFeedback {
                     .findFirst()
                     .map(PendingApproval::conversationId)
                     .map(base::conversation);
-            case AUTONOMY_DECISION -> surfacedProblems.withOrigin(user.id(), Long.valueOf(id), base);
             default -> Optional.empty();
         };
         return filled;
