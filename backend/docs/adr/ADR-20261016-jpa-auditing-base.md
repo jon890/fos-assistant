@@ -82,7 +82,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `proactive_check_finding` / `ProactiveCheckFinding` | C: 살펴보기 발견 기록의 저장 시각. 관측 시점은 checkedAt이 담당 | checkedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `proactive_check_problem` / `ProactiveCheckProblem` | C: 문제 후보 기록의 저장 시각. 근거 시점은 evidenceCheckedAt이 담당 | evidenceCheckedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `proactive_loop_run` / `ProactiveLoopRun` | 제외: 루프 시작 시각을 C에 기록하며 finishedAt과 실행 수명을 이룸 | 수명·재시도 시각 유지 |
-| `proactive_value_evaluation` / `ValueEvaluation` | 제외: 같은 평가 배치의 동일 시각. ValueEvaluationOverviews가 C의 동등성으로 최신 묶음을 선택 | 한 배치의 같은 Clock 인자 유지 |
 | `result_delivery` / `ResultDelivery` | C: 결과 전달 묶음 행의 저장 시각 | U는 전달 상태의 업무 시각. 상태·attempt bulk 인자 유지 |
 | `subagent_usage_job` / `SubagentUsageJob` | 제외: 사용량 대조 큐의 수락 시각. C+120초로 실패 조건을 계산 | nextAttemptAt/expiresAt/recordedAt 유지 |
 | `task` / `Task` | C+U: 예약 작업 설정 행의 저장 시각. 실행 수명은 TaskRun이 담당 | archivedAt은 명시 전달. 대화 연결 bulk는 U 명시 |
