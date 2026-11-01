@@ -50,7 +50,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 - 제목은 평문으로 그리고, 누르면 아래 「카드의 단추와 승인 경계」 의 원래 기록으로 간다
 - `NOW` 표시는 색과 글을 함께 쓴다
 - 할 일의 출처 「대화에서」 와 「직접 더함」 은 `followUp.agentProposed` 로 정하고, 에이전트 제안을 받아들인 뒤에도 「대화에서」 를 유지한다
-- 먼저 다룰 문제는 제안한 다음 행동(`problem.action`)을 한 줄 더 그리고, 받아들임은 기록만 하고 할 일이나 승인을 만들지 않는다고 알린다. `problem.level` 이 `ASK_APPROVAL` 이면 승인 요청이 아니라 직접 처리할 일이라고 덧붙인다
+- 먼저 다룰 문제(서버가 더 내지 않는 옛 항목이다. 화면 코드는 판단 층을 지우는 뒤 PR 에서 지운다)는 제안한 다음 행동(`problem.action`)을 한 줄 더 그리고, 받아들임은 기록만 하고 할 일이나 승인을 만들지 않는다고 알린다. `problem.level` 이 `ASK_APPROVAL` 이면 승인 요청이 아니라 직접 처리할 일이라고 덧붙인다
 
 ### 이유 문구
 
@@ -64,7 +64,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 | `APPROVAL_PENDING` | `EXPIRES_SOON` | 승인을 기다리고 있어요. 곧 만료돼요 |
 | `MEMORY_PROPOSED` | 없음 | 에이전트가 기억할 것을 제안했어요 |
 | `MEMORY_SUPERSEDE_PROPOSED` | 없음 | 새 기억이 옛 기억을 대신하자는 제안이 왔어요 |
-| `FOLLOW_UP_PROPOSED` | 없음 | 에이전트가 할 일로 제안했어요 |
+| `FOLLOW_UP_PROPOSED` | 없음 | 에이전트가 챙길 것을 제안했어요 |
 | `FOLLOW_UP_OPEN` | `DUE_SOON` | 기한이 다가왔어요 |
 | `FOLLOW_UP_OPEN` | `OVERDUE` | 기한이 지났어요 |
 | `FOLLOW_UP_OPEN` | `LINKED_UPDATE` | 연결한 대화에 결과가 도착했어요 |
@@ -91,11 +91,11 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 | 할 일 제안 | 「받아들이기」, 「거절」, 「고치기」 |
 | 열린 할 일 | 「끝냄」, 「그만둠」, 「고치기」 |
 | 맡긴 일 | 「작업 과정 보기」 |
-| 먼저 다룰 문제 | 「점검 대화에서 보기」, 「받아들임」, 「관심 없음」 |
+| 먼저 다룰 문제(옛 항목) | 「점검 대화에서 보기」, 「받아들임」, 「관심 없음」 |
 | 이어서 하기 | 제목을 누르면 대화가 열린다 |
 
 「내 차례」 카드 끝의 「할 일 더하기」 는 「고치기」 와 같은 창을 연다. 기한은 `Asia/Seoul` 의 날짜와 시각으로 넣고, 읽을 수 없으면 저장하지 않는다. 「고치기」 에서 기한을 비우면 기한을 지운다.
-먼저 다룰 문제의 「받아들임」 과 「관심 없음」 은 반응만 남긴다. 성공하거나 판정이 이미 없다는 거절(`AUTONOMY_DECISION_NOT_FOUND`)이면 화면을 다시 읽고, 그 밖의 실패는 항목 아래에 다시 눌러 달라는 문구를 보인다.
+먼저 다룰 문제(서버가 더 내지 않는 옛 항목이다. 화면 코드는 판단 층을 지우는 뒤 PR 에서 지운다)의 「받아들임」 과 「관심 없음」 은 반응만 남긴다. 성공하거나 판정이 이미 없다는 거절(`AUTONOMY_DECISION_NOT_FOUND`)이면 화면을 다시 읽고, 그 밖의 실패는 항목 아래에 다시 눌러 달라는 문구를 보인다.
 
 **항목의 제목이나 단추를 누르면 사건을 남긴다.** 원래 기록으로 가는 것은 `OPENED`, 받아들이기와 끝냄 같은 동작은 `ACTED` 다. 사건을 남기지 못해도 동작은 그대로 한다.
 
@@ -163,15 +163,16 @@ sequenceDiagram
 | `APPROVAL_PENDING` | `needs_me` | `connector_action` | `PENDING` 이고 `expires_at` 전. 요청자의 지우지 않은 대화에 속한다 | 늘 | 승인, 거절, 만료 | `status` | `CONTROL_PLANE` |
 | `MEMORY_PROPOSED` | `needs_me` | 주인의 `USER` Memory | `PROPOSED` | 아니다 | 받아들임, 거절 | `revision` | `MODEL_INFERRED` |
 | `MEMORY_SUPERSEDE_PROPOSED` | `needs_me` | 요청자가 옛 항목을 고칠 수 있는 `memory_link` 의 `SUPERSEDES` 줄 | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
-| `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up` | `PROPOSED` | 아니다 | 받아들임, 거절 | `updated_at` | `MODEL_INFERRED` |
+| `FOLLOW_UP_PROPOSED` | `needs_me` | `follow_up`. 제안 카드이고 `SuggestionCandidates` 가 낸다 | `PROPOSED` 이고 `expires_at` 전 | 아니다 | 받아들임, 거절, 만료 | `updated_at` | `MODEL_INFERRED` |
 | `FOLLOW_UP_OPEN` | `needs_me` | `follow_up` | `OPEN` | 기한이 `due-soon` 안이거나 지났다. 또는 연결한 대화에 결과가 도착했다 | 끝냄, 그만둠 | `updated_at`, 기한 구간(없음, `DUE_SOON`, `OVERDUE`), 연결한 대화의 마지막 결과 전달 시각 | `USER_CONFIRMED` |
 | `DELEGATION_RUNNING` | `delegated` | 주인의 위임 실행 | `RUNNING`. 요청자의 지우지 않은 대화에 속한다 | 시작한 지 `long-running-after` 를 넘었다 | 끝남 | `status` | `CONTROL_PLANE` |
 | `DELEGATION_FINISHED` | `delegated` | 주인의 위임 실행 | 끝났고 `finished_at` 이 `delegated-window` 안. 요청자의 지우지 않은 대화에 속한다 | 아니다 | 없다 | `status` | `CONTROL_PLANE` |
 | `CONVERSATION_RECENT` | `continue` | 주인의 지우지 않은 대화 | `updated_at` 순으로 `continue-count` 개 | 아니다 | 없다 | `updated_at` | `CONTROL_PLANE` |
-| `PROBLEM_SURFACED` | `needs_me` | 요청자의 [매일 루프](proactive.md) 시도가 만든 `SURFACE`, `ASK_APPROVAL` 판정 | 시도가 `surface-window` 안이고, 점검 대화를 지우지 않았고, 사용자의 반응이 없다. 같은 문제 키는 가장 최근 판정 하나만, 최근 것부터 `surface-max-items` 개까지 | 아니다 | 받아들임, 관심 없음, 점검 대화 삭제, 창이 지남 | 판정 번호 | `MODEL_INFERRED` |
 | `PROACTIVE_REPORT_TRIGGER` | `reports` | 요청자의 `proactive_check` | 검사를 거친 보고가 있고 점검 대화가 지워지지 않았다 | 아니다 | 보고 열람 | `proactive_check` 번호 | `CONTROL_PLANE` |
 
-기간과 개수 이름은 `assistant.attention` 설정이고 기본값은 `application.yml` 과 `AttentionProperties` 가 갖는다. `surface-window` 와 `surface-max-items` 만 `ProactiveLoopProperties` 다.
+기간과 개수 이름은 `assistant.attention` 설정이고 기본값은 `application.yml` 과 `AttentionProperties` 가 갖는다.
+
+제안 카드는 「먼저 다룰 문제」(`PROBLEM_SURFACED`) 자리를 대신한다([ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)). 먼저 살펴보기의 제안과 대화 중 에이전트가 낸 할 일 제안이 모두 같은 `PROPOSED` 줄이다. 받아들이면 같은 줄이 `OPEN` 이 되어 `FOLLOW_UP_OPEN` 후보가 되고, 받아들임은 쓰기 승인이 아니다. `PROBLEM_SURFACED` 값은 옛 사건을 읽으려고 enum 에만 남고 후보를 내지 않는다.
 
 **같은 대화에 실패한 turn 과 결과 전달 실패가 함께 있으면 한 항목으로 합친다.**
 `trigger` 는 둘 가운데 더 최근 쪽이고, `signals` 와 `sources` 는 둘을 함께 담는다.
@@ -202,7 +203,7 @@ sequenceDiagram
 | 1 | 숨김 | 사용자가 같은 카드의 같은 `itemKey` 와 같은 `stateKey` 를 숨겼다 |
 | 2 | 미룸 | 사용자가 같은 카드의 그 항목을 미룬 기한이 아직 지나지 않았다 |
 | 3 | 해결됨 | 위 표의 「해결된 상태」 다 |
-| 4 | 중복 | 같은 `itemKey` 가 앞선 카드에 이미 있다. 앞선 카드는 `CardKey` 의 선언 순서다 |
+| 4 | 중복 | 같은 `itemKey` 가 앞선 카드에 이미 있다. 앞선 카드는 `CardKey` 의 선언 순서다. 같은 카드 안에 같은 열쇠가 둘 오면 먼저 온 후보만 남긴다. 제안과 할 일의 두 소스가 따로 읽는 사이에 받아들인 줄이 그렇다 |
 
 `MODEL_INFERRED` 항목은 위에 걸리지 않아도 `NOW` 가 되지 못하고 `LATER` 다.
 
@@ -235,7 +236,6 @@ sequenceDiagram
 | `CONVERSATION` | 대화의 `updated_at` | `CONVERSATION_RECENT` |
 | `FOLLOW_UP` | 할 일의 `updated_at` | `FOLLOW_UP_PROPOSED`, `FOLLOW_UP_OPEN` |
 | `RESULT_DELIVERY` | 묶음의 `updated_at` | `DELIVERY_FAILED` |
-| `AUTONOMY_DECISION` | 판정의 `created_at` | `PROBLEM_SURFACED` |
 | `PROACTIVE_CHECK` | 살펴보기의 `finished_at` | `PROACTIVE_REPORT_TRIGGER` |
 
 응답에 실행의 오류 코드, 모델, 금액을 싣지 않는 까닭은 [ADR-063](../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 이 갖는다.
@@ -246,7 +246,7 @@ sequenceDiagram
 
 - 실패한 turn, 결과 전달 실패, 이어서 하기는 `/chat/{대화 공개 식별자}` 로 간다. 다시 보낼지는 사람이 대화에서 정하고, 결과 전달 실패의 응답에는 묶음 번호를 싣지 않는다
 - 승인 대기는 그 대화의 승인 카드로 가고, 승인과 거절은 기존 커넥터 승인 경로다. Memory 제안은 `/memory`, 맡긴 일은 `/executions/{번호}`, 할 일은 아래 「API(할 일)」 로 간다
-- 먼저 다룰 문제는 점검 대화로 가고, 반응은 `PUT /api/v1/autonomy-decisions/{id}/reaction`([매일 루프](proactive.md)의 「사용자에게 보이는 것」)이다. 반응은 기록할 뿐 할 일, 승인 줄, 실행을 만들지 않는다
+- 먼저 다룰 문제(서버가 더 내지 않는 옛 항목이다. 화면 코드는 판단 층을 지우는 뒤 PR 에서 지운다)는 점검 대화로 가고, 반응은 `PUT /api/v1/autonomy-decisions/{id}/reaction`([매일 루프](proactive.md)의 「사용자에게 보이는 것」)이다. 반응은 기록할 뿐 할 일, 승인 줄, 실행을 만들지 않는다
 
 ### API(먼저 알리기와 지금 화면의 판정)
 
@@ -273,7 +273,7 @@ sequenceDiagram
 **건수는 서버가 한 가지로 센다.** 카드의 `nowCount` 는 그 카드에서 `NOW` 인 항목 수이고 상한으로 자르기 전에 센다. 응답 맨 위와 `summary` 의 `nowCount` 는 카드 `nowCount` 의 합이다.
 화면은 카드 배지와 사이드바와 홈의 한 줄에 이 값만 쓴다. 그래서 사이드바의 수는 늘 카드 배지의 합과 같다. 상한 때문에 보이지 않는 `NOW` 항목은 `moreCount` 에 함께 든다.
 
-`title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이고, 먼저 다룰 문제면 모델이 쓴 문제 글이다. 화면은 평문으로 그린다(ADR-009).
+`title` 은 대화 제목이나 할 일 제목이나 승인 줄의 동작 이름이다. 제안이면 모델이 쓴 제안 제목이다. 화면은 평문으로 그린다(ADR-009).
 항목 종류에 따라 `execution`, `followUp`, `report`, `actionId`, `problem` 칸을 더 채운다. 화면이 `itemKey` 를 잘라 식별자를 얻지 않게 하려는 것이다.
 
 ### 저장
@@ -288,7 +288,7 @@ sequenceDiagram
 | 미루기 | `POSTPONED`, 까닭 `ATTENTION_SNOOZE` | 필수 | 위와 같다 |
 | 복원 | `RESTORED`, 까닭 `ATTENTION_RESTORE` | 필수 | 위와 같다 |
 
-- 제안 항목(할 일, Memory, 승인 줄, 먼저 다룰 문제)의 숨김과 미루기는 그 제안의 열쇠와 종류로 남기고 제안한 대화와 실행을 채운다. 대화를 지우면 그 제안의 사건과 함께 지워진다. 그 밖의 항목(실패한 대화, 맡긴 일, 보고, 최근 대화)과 노출, 열기, 복원은 `ATTENTION_ITEM` 이다
+- 제안 항목(할 일과 제안, Memory, 승인 줄. 옛 사건에는 먼저 다룰 문제도 있다)의 숨김과 미루기는 그 제안의 열쇠와 종류로 남기고 제안한 대화와 실행을 채운다. 대화를 지우면 그 제안의 사건과 함께 지워진다. 그 밖의 항목(실패한 대화, 맡긴 일, 보고, 최근 대화)과 노출, 열기, 복원은 `ATTENTION_ITEM` 이다
 - 제어 사건에는 `card_key` 가 있다. 숨김은 숨긴 상태의 지문을 `subject_version` 에, 미루기는 끝나는 시각을 `until_at` 에 둔다. 미루기의 `subject_version` 은 그때 후보의 상태다
 - **현재 제어는 카드와 항목마다 마지막 제어 사건(`DISMISSED`, `POSTPONED`, `RESTORED`)이다.** `(user_id, card_key, subject_key, id)` 색인으로 읽고, 가장 큰 `id` 를 마지막으로 본다. `RESTORED` 가 마지막이면 제어가 없다
 - 노출, 열기, 동작의 `reason_code` 는 `<계기>@<판정>` 이다. 같은 항목, 상태, 판정, 종류는 `event_key` 로 한 줄이 된다

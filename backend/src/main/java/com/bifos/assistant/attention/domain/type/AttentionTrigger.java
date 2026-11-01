@@ -16,6 +16,7 @@ public enum AttentionTrigger {
     DELEGATION_RUNNING,
     DELEGATION_FINISHED,
     CONVERSATION_RECENT,
+    /** 옛 「먼저 다룰 문제」 다. 제안 카드가 대신해 후보를 내지 않고, 이미 저장된 사건을 읽으려고 이름만 남긴다. */
     PROBLEM_SURFACED,
     PROACTIVE_REPORT_TRIGGER
 }
