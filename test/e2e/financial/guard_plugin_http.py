@@ -1,12 +1,15 @@
 """실제 plugin 설치·상태·support를 loopback HTTP로 Spring 시험에 연결한다."""
 
 import asyncio
+import hashlib
 import http.server
 import importlib
 import json
 import os
 import pathlib
+import shutil
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 import mcp
@@ -76,6 +79,51 @@ class Fixture(ProfileApiRouteTest):
                 raise
 
         urllib.request.OpenerDirector.open = observed
+        self.snapshot()
+
+    def snapshot(self):
+        """준비를 마친 임시 디렉터리를 통째로 떠 둔다. 검사 클래스가 프로세스를 함께 쓸 때 reset 이 이것으로 되돌린다."""
+        # profile, 보관 파일, 플러그인 원본이 모두 이 디렉터리 아래에 있다. 파일 이름을 고르지 않고 디렉터리째 뜬다.
+        self.workspace = self.root.parent
+        held = tempfile.TemporaryDirectory(prefix="fos-guard-snapshot-")
+        self.addCleanup(held.cleanup)
+        self.saved = pathlib.Path(held.name) / "workspace"
+        shutil.copytree(self.workspace, self.saved, symlinks=True)
+        self.initial_digest = self.digest(self.workspace)
+
+    @staticmethod
+    def digest(base):
+        """디렉터리 아래 경로, 권한, 내용, 링크 대상을 한 값으로 줄인다. 되돌린 뒤 처음과 같은지 비교한다."""
+        summary = hashlib.sha256()
+        for path in sorted(base.rglob("*")):
+            relative = str(path.relative_to(base))
+            if path.is_symlink():
+                summary.update(("L %s %s\n" % (relative, os.readlink(path))).encode())
+            elif path.is_dir():
+                summary.update(("D %s %o\n" % (relative, path.stat().st_mode)).encode())
+            else:
+                content = hashlib.sha256(path.read_bytes()).hexdigest()
+                summary.update(("F %s %o %s\n" % (relative, path.stat().st_mode, content)).encode())
+        return summary.hexdigest()
+
+    def reset(self):
+        """앞 검사가 바꾼 파일과 관측값을 준비 직후로 되돌리고, 파일이 처음과 같은지 답한다."""
+        for child in self.workspace.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        shutil.copytree(self.saved, self.workspace, symlinks=True, dirs_exist_ok=True)
+        # guard 판정은 매번 Spring 에 묻지만, 다시 읽는 것으로 모듈에 남은 값이 없게 한다.
+        importlib.reload(importlib.import_module(self.plugin.__name__ + ".connector_guard"))
+        type(self).deleted = []
+        type(self).reloads = []
+        type(self).list_fails = False
+        type(self).reload_fails = False
+        self.nonces.clear()
+        self.support_codes.clear()
+        self.financial_posts = self.financial_deletes = self.auth_posts = 0
+        return {"restored": self.digest(self.workspace) == self.initial_digest}
 
     def write_manifest(self, declared):
         (self.connector / "connector.json").write_text(json.dumps(declared, ensure_ascii=False))
@@ -119,6 +167,8 @@ def main():
             status, answer = 200, {}
             if parsed.path == "/fixture/inspect":
                 answer = fixture.inspect()
+            elif parsed.path == "/fixture/reset":
+                answer = fixture.reset()
             elif parsed.path == "/fixture/change":
                 declared = json.loads(json.dumps(fixture.original))
                 if body["mode"] == "changedSha":
