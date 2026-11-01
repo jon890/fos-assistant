@@ -14,10 +14,10 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`docs/code-rules/INDEX.md`](docs/code-rules/INDEX.md) | 코드 규칙의 고정 번호, 까닭과 예외, 연결한 검사 |
 | [`backend/AGENTS.md`](backend/AGENTS.md) | Control Plane 을 고칠 때 |
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
-| [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 커넥터를 고칠 때 |
+| [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 플러그인 선언을 고칠 때 |
 
 기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
-새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 커넥터마다 하나인 `docs/features/<id>-connector.md`와 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다. 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
+새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다. 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
 
 ## 용어
 
@@ -38,8 +38,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | #161 의 Living View | **지금 화면**, 주소는 `/now` | Living View |
 | `notification` 표의 줄. 알림 단추와 알림 화면에 보이는 것 | **알림** | 알림 줄 |
 | 대화 안에 끼우는 안내 줄(`SYSTEM` 메시지) | **알림 줄** | |
-| 에이전트에게 쥐어 주는 도구 묶음. plugin 의 `connector.json` 이 선언한다 | **커넥터** | 커넥터 에이전트(옮겨 가기 설명 밖) |
-| 사용자가 커넥터 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection`. 그 화면(`/connections`)과 메뉴는 「외부 서비스 연결」 | 화면 이름으로 「연결」 |
+| 에이전트에게 쥐어 주는 도구 묶음. 플러그인 root 의 `assistant.json` 이 assistant 쪽 정보를 선언한다 | **플러그인**, 코드는 `connector` | 커넥터, 커넥터 에이전트 |
+| 사용자가 플러그인 하나에 계정을 연결한 것 | **연결**, 코드는 `connector_connection`. 그 화면(`/connections`)과 메뉴는 「외부 서비스 연결」 | 화면 이름으로 「연결」 |
 | 에이전트에 연결을 붙인 것 | **바인딩**, 화면에서는 「붙이기」, 코드는 `agent_connector_binding` | |
 | 매 실행에 본문까지 싣는 짧은 개인 기억의 구역 | **개인 사실 구역**, 코드는 `MEMORY_FACTS` | 프로필 구역, 사용자 프로필 |
 

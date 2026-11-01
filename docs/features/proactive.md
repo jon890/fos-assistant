@@ -40,7 +40,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 | 계약 | 테스트 |
 | --- | --- |
 | 에이전트가 받지 않는 기억, 남의 기억, 대체된 기억은 연결이 있어도 깨우기 입력에 실리지 않는다 | `WakeMemoryContractTest` |
-| 깨우기 트리에서 커넥터 쓰기 도구는 쓰기 허용과 관계없이 실행되지 않고, Control Plane 의 기억 쓰기 도구는 받지 않는다 | `WakeWriteBoundaryContractTest` |
+| 깨우기 트리에서 플러그인 쓰기 도구는 쓰기 허용과 관계없이 실행되지 않고, Control Plane 의 기억 쓰기 도구는 받지 않는다 | `WakeWriteBoundaryContractTest` |
 | 예산에 닿거나 Hermes 가 실패한 깨우기도 끝난 까닭과 실행 줄을 남긴다 | `WakeRunContractTest` |
 | 챙길 것이 없는 깨우기도 성공한 실행으로 남고 대화와 알림에는 아무것도 남지 않는다 | `WakeRunContractTest` |
 | 서버가 다시 떠도 같은 예정 시각의 깨우기는 한 번만 돈다 | `WakeRunContractTest` |
@@ -57,7 +57,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 건수 상한은 `WakeMemoryRead` 의 상수가 갖는다.
 
-아직 정하지 않은 다음 후보는 오늘과 다음 카드(일정 커넥터가 생긴 뒤), 비용 이상 알림(관리자 영역 안에서), 문맥 묶음에서 고른 중요 맥락 카드, 할 일에서 Hermes 위임으로 이어지는 실행(승인 정책을 먼저 정한다), 그룹이 함께 보는 맥락과 할 일이다.
+아직 정하지 않은 다음 후보는 오늘과 다음 카드(일정 플러그인이 생긴 뒤), 비용 이상 알림(관리자 영역 안에서), 문맥 묶음에서 고른 중요 맥락 카드, 할 일에서 Hermes 위임으로 이어지는 실행(승인 정책을 먼저 정한다), 그룹이 함께 보는 맥락과 할 일이다.
 
 ### 제안 저장
 
@@ -127,14 +127,14 @@ sequenceDiagram
     participant W as 화면
     participant C as Control Plane
     participant H as Hermes
-    participant D as 붙은 커넥터 서버
+    participant D as 붙은 플러그인 서버
     W->>C: POST proactive-check/runs
     C->>C: 시작 전 점검, 점검 대화 찾기나 만들기, turn 자리와 대화 잠금
     C->>C: proactive_check 줄 저장, 쓰기 허용 값 옮겨 적기
     C-->>W: 202 conversationId
     W->>C: 점검 대화의 SSE 를 따라간다
     C->>H: POST /v1/runs, 분야 지침을 읽으라는 입력과 Control Plane 지시
-    H->>D: 커넥터 도구 직접 호출, 호출마다 Control Plane 이 판정
+    H->>D: 플러그인 도구 직접 호출, 호출마다 Control Plane 이 판정
     H-->>C: 답 끝의 fos-check-result 블록
     C->>C: 블록 검사, 답이나 알림 줄 저장
     C-->>W: 대화 SSE done
@@ -202,7 +202,7 @@ sequenceDiagram
 | 관리자 등급 toolset 전부 | 셸, 파일, 브라우저, 일정, 외부 메시지는 쓰기나 외부 연락이 된다 |
 | Control Plane MCP 가 아니고 그 에이전트에 붙지 않은 MCP 서버 | 무엇을 하는지 Control Plane 이 판정하지 못한다 |
 
-붙은 커넥터 MCP 서버는 쓰기 허용과 상관없이 받는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 붙은 서버 이름은 점검마다 바인딩에서 읽는다.
+붙은 플러그인 MCP 서버는 쓰기 허용과 상관없이 받는다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 붙은 서버 이름은 점검마다 바인딩에서 읽는다.
 쓰기 도구를 허용했을 때 넓어지는 목록은 [ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md)가 갖는다.
 허용은 `agent.proactive_check_writes_allowed` 로 보고 시작할 때 `proactive_check.writes_allowed` 에 옮겨 적는다. 그 살펴보기의 경계는 옮겨 적은 값이 정한다.
 
@@ -241,9 +241,9 @@ sequenceDiagram
 ### 읽기 경계
 
 무엇을 막는지는 ADR-080 의 경계 표가, 쓰기 도구를 허용한 경계는 ADR-082 가 갖는다.
-판정은 커넥터 도구가 `ConnectorPolicyService.decide`, Control Plane MCP 가 `McpController`, 위임이 `AgentDelegationService.delegate` 에서 한다. 위임은 그 살펴보기가 이미 끝났는지를 실행 직전에 한 번 더 본다.
+판정은 플러그인 도구가 `ConnectorPolicyService.decide`, Control Plane MCP 가 `McpController`, 위임이 `AgentDelegationService.delegate` 에서 한다. 위임은 그 살펴보기가 이미 끝났는지를 실행 직전에 한 번 더 본다.
 살펴보기 트리인지는 `ProactiveCheckGuard.isCheckTree(AgentExecution)` 가, 쓰기 허용인지는 `ProactiveCheckGuard.checkOf` 로 한 번 읽은 살펴보기 줄의 `writes_allowed` 가 정한다.
-붙은 커넥터 도구를 직접 부른 호출은 트리 루트(`AgentExecution.treeRootId()`)가 살펴보기 turn 이다. 그래서 커넥터 판정은 이 호출에도 같은 기준으로 막는다.
+붙은 플러그인 도구를 직접 부른 호출은 트리 루트(`AgentExecution.treeRootId()`)가 살펴보기 turn 이다. 그래서 플러그인 판정은 이 호출에도 같은 기준으로 막는다.
 
 ### 상한
 
@@ -325,7 +325,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 - 문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다. 새 자료가 나왔다는 사실만으로 만들지 않는다
 
 커리어 분야의 영역은 `study`, `position`, `trend` 다. 공고는 지금 열린 원문과 요구 조건을 확인해 마감이면 `CLOSED`, 오래된 동향은 `STALE` 로 적는다.
-커리어 커넥터(MCP 서버 `career`)의 도구는 분야 패키지가 갖고 모두 `READ` 다. 제외 기준을 읽지 못한 `hold` 면 포지션을 추천으로 확정하지 않는다.
+커리어 플러그인(MCP 서버 `career`)의 도구는 분야 패키지가 갖고 모두 `READ` 다. 제외 기준을 읽지 못한 `hold` 면 포지션을 추천으로 확정하지 않는다.
 이력서 원문을 도구 인자나 검색어에 넣지 않는다.
 
 ## 매일 루프
@@ -417,7 +417,7 @@ timeout 뒤 원격 실행의 끝을 확인할 때까지 요청자의 자리를 �
 
 ### 저장과 replay
 
-`proactive_value_evaluation` 에 시도마다 새 줄을 남긴다. 모양은 `DecisionEvidence` 가 갖는다. 원시 응답, 전체 개인 문맥, 원문 본문, 커넥터 응답은 남기지 않는다.
+`proactive_value_evaluation` 에 시도마다 새 줄을 남긴다. 모양은 `DecisionEvidence` 가 갖는다. 원시 응답, 전체 개인 문맥, 원문 본문, 플러그인 응답은 남기지 않는다.
 모델 호출 전에 `RUNNING` 과 입력을 저장하고 호출 뒤 결과를 붙인다. 모델을 기다리는 동안 트랜잭션을 열지 않는다.
 판단 중 대화를 지워도 평가 기록은 완료로 닫고, 이후 조회와 replay 에는 대화의 조회 권한을 다시 확인한다.
 기동할 때 남은 `RUNNING` 은 `FALLBACK / INTERRUPTED` 로 닫고 다시 부르지 않는다. 한 줄의 복구가 실패해도 다른 줄과 서버 기동을 이어 간다.
@@ -514,7 +514,7 @@ replay 평가는 과거에 고정한 입력이라 지금의 실행 근거가 아
 자동 실행한 살펴보기 자신은 그 문제 후보와 판단, 정책을 가진 상황 하나로 따로 남고, 사용자 반응은 모두 원천 결정에 모인다.
 기간 안에 사건이 있는 제안은 기간 앞의 사건도 함께 읽어 첫 반응을 잃지 않는다.
 지운 대화에 묶인 사건이 있는 제안과, 점검 대화를 지운 살펴보기의 결정은 싣지 않는다.
-모델과 사용자가 쓴 글(문제와 행동 글, 설명, 할 일 제목, Memory 본문, 커넥터 인자와 결과)은 싣지 않는다. 문제 키, 행동 종류, 부작용 힌트, 확신은 정규화한 짧은 열쇠라 싣는다.
+모델과 사용자가 쓴 글(문제와 행동 글, 설명, 할 일 제목, Memory 본문, 플러그인 인자와 결과)은 싣지 않는다. 문제 키, 행동 종류, 부작용 힌트, 확신은 정규화한 짧은 열쇠라 싣는다.
 
 ### 보관과 삭제
 

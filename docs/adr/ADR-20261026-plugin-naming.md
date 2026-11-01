@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-26
-- 형식은 [ADR-20261026 / plugin-standard-format](../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md), 옮기는 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다. 이름 변경은 그 순서의 셋째 단계이고, 그때까지 화면과 문서는 「커넥터」 를 쓴다.
+- 형식은 [ADR-20261026 / plugin-standard-format](../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md), 옮기는 순서는 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 의 「옮기는 순서」 가 갖는다. 이름 변경은 그 순서의 셋째 단계이고, 적용했다(2026-11-01).
 
 ### 결정
 
