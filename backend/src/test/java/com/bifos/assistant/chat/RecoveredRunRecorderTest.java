@@ -18,6 +18,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
+import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
@@ -33,12 +34,14 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
+import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.user.application.ArtifactAutoVaultSetting;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.IOException;
@@ -124,6 +127,12 @@ class RecoveredRunRecorderTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    ArtifactAutoVaultSetting autoVaultSetting;
+
+    @Autowired
+    TrackingBackgroundTasks backgroundTasks;
 
     private final List<ChatEvent> received = new CopyOnWriteArrayList<>();
     private Runnable unsubscribe = () -> {
@@ -318,6 +327,38 @@ class RecoveredRunRecorderTest {
         assertThat(artifactRows.findByMessageId(answer.id()))
             .extracting(ChatArtifact::conversationId, ChatArtifact::path)
             .containsExactly(tuple(conversation.id(), "a/index.html"));
+    }
+
+
+    @Test
+    @DisplayName("자동 보관을 켠 요청자의 복구 turn 은 완료일 때만 묶은 결과물을 보관한다")
+    void recoveredTurnKeepsArtifactsOnlyWhenCompleted() throws Exception {
+        autoVaultSetting.change(dad.id(), true);
+        Path folder = Path.of(artifactProperties.root()).toAbsolutePath().resolve(String.valueOf(conversation.id()));
+        deleteTree(folder);
+        Path done = folder.resolve("done.html");
+        Files.createDirectories(folder);
+        Files.writeString(done, "<!doctype html><p>완성</p>");
+        Files.setLastModifiedTime(done, FileTime.from(Instant.now()));
+        recorder.settle(chatTurn(conversation, chief).id(), result("completed", "만들었어요"));
+        Path stopped = folder.resolve("stopped.html");
+        Files.writeString(stopped, "<!doctype html><p>멈춤</p>");
+        Files.setLastModifiedTime(stopped, FileTime.from(Instant.now().plusSeconds(1)));
+        recorder.settle(chatTurn(conversation, chief).id(), result("cancelled", "일부 답"));
+        backgroundTasks.awaitIdle(Duration.ofSeconds(20));
+
+        List<ChatMessage> answers = messages.findByConversationIdOrderByIdAsc(conversation.id());
+        assertThat(artifactRows.findByMessageId(answers.getFirst().id()))
+            .extracting(ChatArtifact::path, ChatArtifact::autoVaultState)
+            .containsExactly(tuple("done.html", AutoVaultState.DONE));
+        // 두 실행이 같은 시각에 시작해 둘째 답에는 두 파일이 모두 묶인다. 중지한 turn 의 줄은 어느 것도 보관 대상이 아니다.
+        assertThat(artifactRows.findByMessageId(answers.getLast().id()))
+            .extracting(ChatArtifact::path, ChatArtifact::autoVaultState)
+            .as("중지한 turn 의 파일은 완성본이 아니라 보관하지 않는다")
+            .contains(tuple("stopped.html", null))
+            .allSatisfy(row -> assertThat(row.toList().get(1)).isNull());
+        artifactRows.deleteAll();
+        deleteTree(folder);
     }
 
 

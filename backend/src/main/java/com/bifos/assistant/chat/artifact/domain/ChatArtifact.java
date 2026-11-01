@@ -1,8 +1,11 @@
 package com.bifos.assistant.chat.artifact.domain;
 
+import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -18,6 +21,9 @@ import lombok.experimental.Accessors;
  *
  * <p>본문은 파일로 두고 이 행은 그 파일을 가리키기만 한다. 행을 지우지 않는다. 보관 기간이 지나 파일을 지우면
  * {@code deletedAt} 을 적어, 지난 대화에 그 자리에 파일이 있었다는 것을 남긴다. 근거는 ADR-027 에 있다.
+ *
+ * <p>보관 사본 행({@code vaultUserId} 가 채워진 행)의 {@code deletedAt} 은 사용자가 그 보관본을 지운 시각이다. 지운 뿌리 행은
+ * 본문과 경로를 비우고 지문만 남겨, 자동 보관이 같은 보관본을 다시 만들지 못하게 한다(ADR-20261101 / artifact-vault).
  */
 @Entity
 @Table(name = "chat_artifact")
@@ -79,6 +85,22 @@ public class ChatArtifact extends CreatedAtEntity {
     @Column(name = "vault_bundle_id")
     @Getter
     private Long vaultBundleId;
+
+    /** 결과물 행의 자동 보관 상태. 비어 있으면 자동 보관 대상이 아니다. 보관 사본 행은 비어 있다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auto_vault_state", length = 16)
+    @Getter
+    private AutoVaultState autoVaultState;
+
+    /** 자동 보관이 실패한 까닭의 오류 코드. */
+    @Column(name = "auto_vault_error", length = 64)
+    @Getter
+    private String autoVaultError;
+
+    /** 자동 보관을 시도한 횟수. */
+    @Column(name = "auto_vault_attempts", nullable = false)
+    @Getter
+    private int autoVaultAttempts;
 
 
     private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize) {
