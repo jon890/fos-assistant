@@ -10,7 +10,7 @@ import {
   matchesOperation,
 } from "../src/api-contract.ts";
 import canonical from "./fixtures/openapi-1.2.24.json";
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import { FakeToss, credentials, tool } from "./support.ts";
 import {
   readUnionCases,

@@ -111,7 +111,7 @@ SDK_INVALID_PARAMS_PREFIX = "MCP error -32602:"
 
 
 def _sdk_error_code(result):
-    """커넥터가 선언하지 않은 오류 가운데 SDK 의 입력 검증 거절만 고정 코드로 가린다. 글 본문은 남기지 않는다."""
+    """플러그인이 선언하지 않은 오류 가운데 SDK 의 입력 검증 거절만 고정 코드로 가린다. 글 본문은 남기지 않는다."""
     text = next((item.text for item in result.content if item.type == "text"), "")
     return "sdk_invalid_params" if isinstance(text, str) and text.startswith(SDK_INVALID_PARAMS_PREFIX) else None
 

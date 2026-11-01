@@ -1,4 +1,4 @@
-# Gmail 커넥터
+# Gmail 플러그인
 
 내 Gmail 계정을 비서의 에이전트에 연결해요.
 연결하면 에이전트가 메일을 찾아 읽고, 내가 승인한 메일만 보내요.
@@ -93,4 +93,4 @@ Google 비밀번호를 바꾸거나 6개월 동안 쓰지 않으면 토큰이 �
 
 ---
 
-인자와 오류 코드, scope, 보안 설계 같은 개발 내용은 [Gmail 커넥터 개발 문서](../../../docs/features/gmail-connector.md)에 있어요.
+인자와 오류 코드, scope, 보안 설계 같은 개발 내용은 [Gmail 플러그인 개발 문서](../../../docs/features/gmail-connector.md)에 있어요.

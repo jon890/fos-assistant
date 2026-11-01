@@ -1,4 +1,4 @@
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { guard } from "./errors.ts";
 

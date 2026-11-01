@@ -15,14 +15,14 @@ from .context import (
 
 
 
-# 커넥터 도구 호출의 판정을 물을 Control Plane 주소다. 경로는 fos-assistant 가 정한다.
+# 플러그인 도구 호출의 판정을 물을 Control Plane 주소다. 경로는 fos-assistant 가 정한다.
 POLICY_URL_ENV = "FOS_CTX_POLICY_URL"
 # 판정을 기다리는 동안 run 의 스레드가 묶인다. 한 번만 부르고 이 시간 안에 답이 없으면 막는다.
 POLICY_TIMEOUT = 3.0
 # 판정에 보내는 인자 글의 UTF-8 바이트 상한이다. Control Plane 은 이보다 작은 글도 크다고 거절하므로,
 # 이 상한은 판정할 수 없는 큰 본문을 보내 Control Plane 이 요청째로 버리는 일을 막는 값이다.
 POLICY_ARGS_MAX_BYTES = 60 * 1024
-# 커넥터를 설치한 profile 디렉터리에 설치가 쓰는 이름 대응 파일이다. 이 파일이 있어야 커넥터 정책이 걸린다.
+# 플러그인을 설치한 profile 디렉터리에 설치가 쓰는 이름 대응 파일이다. 이 파일이 있어야 플러그인 정책이 걸린다.
 CONNECTOR_TOOL_MAP = ".fos-connector-tools.json"
 MCP_PREFIX = "mcp__"
 # 코드 안에서 도구를 부르는 내장 도구다. 그 안의 호출은 이 hook 이 실행 맥락을 알 수 없다.
@@ -106,7 +106,7 @@ def _connector_server(tool_name: str, servers: dict):
 
 
 def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, servers: dict):
-    """커넥터 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다."""
+    """플러그인 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다."""
     server = _connector_server(tool_name, servers)
     if server is None:
         return _block(UNKNOWN_SERVER_MESSAGE)
@@ -140,7 +140,7 @@ def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, s
     }
     status, answer = _post_json(url, body, token, POLICY_TIMEOUT)
     if status != 200 or not isinstance(answer, dict):
-        logger.warning("fos-ctx: 커넥터 정책 질의가 쓸 수 있는 답을 주지 않았다: HTTP %d", status)
+        logger.warning("fos-ctx: 플러그인 정책 질의가 쓸 수 있는 답을 주지 않았다: HTTP %d", status)
         return _block(POLICY_BLOCK_MESSAGE)
     decision = answer.get("decision")
     if decision == "allow":

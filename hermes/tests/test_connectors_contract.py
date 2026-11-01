@@ -1,6 +1,6 @@
-"""`hermes/connectors/` 아래의 모든 커넥터가 `hermes/connectors/README.md` 「공통 검사」 를 지키는지 본다(ADR-064).
+"""`hermes/connectors/` 아래의 모든 플러그인이 `hermes/connectors/README.md` 「공통 검사」 를 지키는지 본다(ADR-064).
 
-커넥터 목록을 코드에 적지 않는다. 디렉터리를 찾아 돌므로 커넥터를 더하면 검사 대상이 된다.
+플러그인 목록을 코드에 적지 않는다. 디렉터리를 찾아 돌므로 플러그인을 더하면 검사 대상이 된다.
 서버는 자식으로 띄우되 `initialize` 와 `tools/list` 만 부른다. 외부 서비스를 부르지 않는다.
 """
 
@@ -25,8 +25,8 @@ SERVER_TIMEOUT_SECONDS = 30
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 # 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
 TOOL_SUMMARY_MAX_CHARS = 200
-# 운영자가 띄운 공개 오픈소스 서비스의 기준 주소 하나만 `operator_env` 로 받는 커넥터다(ADR-20261025 / connector-operator-base-url).
-# 커넥터 id 와 env 이름을 함께 고정한다. 다른 커넥터나 다른 이름의 운영 값은 위반이다.
+# 운영자가 띄운 공개 오픈소스 서비스의 기준 주소 하나만 `operator_env` 로 받는 플러그인다(ADR-20261025 / connector-operator-base-url).
+# 플러그인 id 와 env 이름을 함께 고정한다. 다른 플러그인나 다른 이름의 운영 값은 위반이다.
 OPERATOR_BASE_URL_ENV = {"financial-workbench": "FINANCIAL_WORKBENCH_BASE_URL"}
 # 검사에서 운영 목록 대신 넣는 자리표시 주소다. 실제 서비스 주소가 아니다.
 PLACEHOLDER_BASE_URL = "https://workbench.example"
@@ -37,7 +37,7 @@ def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
 
 
 def operator_values(name: str) -> dict[str, str]:
-    """운영 목록이 그 커넥터에 줄 `env` 를 자리표시 값으로 만든다. 허용 목록 밖이면 비어 있다."""
+    """운영 목록이 그 플러그인에 줄 `env` 를 자리표시 값으로 만든다. 허용 목록 밖이면 비어 있다."""
     return {OPERATOR_BASE_URL_ENV[name]: PLACEHOLDER_BASE_URL} if name in OPERATOR_BASE_URL_ENV else {}
 
 
@@ -66,7 +66,7 @@ def server_tools(server: dict, root: pathlib.Path) -> dict[str, tuple[bool, set[
     env = {name: "placeholder" for name in server.get("env", {})}
     command = shutil.which(server.get("command", ""))
     if command is None:
-        raise ValueError("커넥터 실행 파일을 찾지 못한다")
+        raise ValueError("플러그인 실행 파일을 찾지 못한다")
     return asyncio.run(asyncio.wait_for(_list_tools(command, args, env), SERVER_TIMEOUT_SECONDS))
 
 
@@ -113,7 +113,7 @@ def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names:
 def closed_risk_problems(declared: dict) -> list[str]:
     """닫힌 위험도 선언의 위반이다. `DESTRUCTIVE` 는 늘 닫는다.
 
-    `FINANCIAL` 은 그 커넥터의 `execution_guard.operations` 에 든 도구만 연다(ADR-20261013 / financial-order-opening).
+    `FINANCIAL` 은 그 플러그인의 `execution_guard.operations` 에 든 도구만 연다(ADR-20261013 / financial-order-opening).
     보호 선언 밖의 금융 도구는 승인과 claim 을 거치지 않으므로 위반이다.
     """
     guard = declared.get("execution_guard")
@@ -128,7 +128,7 @@ def closed_risk_problems(declared: dict) -> list[str]:
 
 
 def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> list[str]:
-    """커넥터 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
+    """플러그인 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
     name = root.name
     problems: list[str] = []
 
@@ -140,7 +140,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         problems.append("manifest 검증 실패: %s" % error)
 
     try:
-        declared = read_json(root / "connector.json")
+        declared = read_json(root / "assistant.json")
         plugin = read_json(root / ".claude-plugin/plugin.json")
         mcp_config = read_json(root / ".mcp.json")
     except (OSError, ValueError) as error:
@@ -151,7 +151,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     if declared.get("schema") != 2:
         problems.append("schema 가 2 가 아니다: %r" % declared.get("schema"))
 
-    # 이 저장소의 커넥터는 카드의 아이콘과 링크를 갖춘다(ADR-20261008 connector-card).
+    # 이 저장소의 플러그인은 카드의 아이콘과 링크를 갖춘다(ADR-20261008 connector-card).
     # manifest 검증은 틀린 칸을 예외 없이 None 으로 버리므로, 선언했는데 None 이면 여기서 위반으로 센다.
     for key in ("icon", "link"):
         if not declared.get(key):
@@ -262,7 +262,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
 class ConnectorsContractTest(base.ConnectorGateCase):
     def test_at_least_one_connector_is_found(self):
         """경로가 바뀌어 아무것도 보지 않는 검사가 통과하지 않는다."""
-        self.assertTrue(connector_dirs(), "%s 아래에 커넥터가 없다" % CONNECTORS)
+        self.assertTrue(connector_dirs(), "%s 아래에 플러그인이 없다" % CONNECTORS)
 
     def test_every_connector_keeps_the_contract(self):
         for root in connector_dirs():
@@ -277,12 +277,12 @@ class ConnectorsContractTest(base.ConnectorGateCase):
                 self.assertEqual(loaded["readme_url"], "https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/%s/README.md" % name)
                 self.assertTrue((root / "README.md").is_file())
                 self.assertEqual(loaded["link_kind"], "service")
-                self.assertEqual(loaded["link"], read_json(root / "connector.json")["link"])
+                self.assertEqual(loaded["link"], read_json(root / "assistant.json")["link"])
 
     def test_connector_skills_do_not_request_secrets(self):
-        """커넥터 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-086).
+        """플러그인 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-086).
 
-        Hermes 는 이 칸들에 적힌 값과 파일을 셸 실행 공간에 넘긴다. 커넥터 값은 MCP 서버만 받는다.
+        Hermes 는 이 칸들에 적힌 값과 파일을 셸 실행 공간에 넘긴다. 플러그인 값은 MCP 서버만 받는다.
         """
         skills = sorted(CONNECTORS.rglob("SKILL.md"))
         self.assertTrue(skills, "%s 아래에 SKILL.md 가 없다" % CONNECTORS)
@@ -346,7 +346,7 @@ def secret_requests(path: pathlib.Path) -> list[str]:
 
 
 class ContractCatchesViolationsTest(base.ConnectorGateCase):
-    """실제 커넥터를 복사해 하나씩 망가뜨리면 같은 검사가 위반을 내는지 본다."""
+    """실제 플러그인을 복사해 하나씩 망가뜨리면 같은 검사가 위반을 내는지 본다."""
 
     def broken_copy(self, change, source: pathlib.Path = CONNECTORS / "gmail", operator_env=None) -> list[str]:
         """`operator_env` 를 주면 운영 목록이 그 값을 준 것처럼 로더에 넘긴다. 로더를 통과한 뒤의 검사를 보려는 것이다."""
@@ -363,7 +363,7 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
 
     def edit_declaration(self, mutate):
         def change(root):
-            path = root / "connector.json"
+            path = root / "assistant.json"
             value = read_json(path)
             mutate(value)
             path.write_text(json.dumps(value), encoding="utf-8")
@@ -393,7 +393,7 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                 self.assertEqual(self.broken_copy(check_copy, source), [])
 
     def test_operator_env_outside_the_base_url_allowlist_is_reported(self):
-        """허용 목록 밖의 커넥터가 운영 값을 두거나, 허용한 커넥터가 다른 이름을 더하면 위반이다."""
+        """허용 목록 밖의 플러그인이 운영 값을 두거나, 허용한 플러그인이 다른 이름을 더하면 위반이다."""
         def add_operator_env(names):
             def change(root):
                 self.edit_declaration(lambda v: v.update(operator_env=names))(root)
@@ -491,7 +491,7 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
 
     def test_invalid_link_is_reported(self):
         def change(root):
-            path = root / "connector.json"
+            path = root / "assistant.json"
             declared = json.loads(path.read_text(encoding="utf-8"))
             declared["link"] = "http://example.com/a b"
             path.write_text(json.dumps(declared), encoding="utf-8")

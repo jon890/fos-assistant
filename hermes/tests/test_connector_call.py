@@ -1,6 +1,6 @@
-"""dashboard-profile-api 가 후보 값으로 커넥터의 읽기 전용 도구를 대신 부르는 규칙을 검사한다(ADR-043).
+"""dashboard-profile-api 가 후보 값으로 플러그인의 읽기 전용 도구를 대신 부르는 규칙을 검사한다(ADR-043).
 
-시험 커넥터의 MCP 서버를 실제 자식 프로세스로 띄운다. 검사가 끝날 때마다 남은 자식이 없는지 본다.
+시험 플러그인의 MCP 서버를 실제 자식 프로세스로 띄운다. 검사가 끝날 때마다 남은 자식이 없는지 본다.
 """
 
 import asyncio
@@ -33,7 +33,7 @@ SCOPES = {"scopes": [{"id": "a", "name": "A"}]}
 CALL_ADDRESS = "http://cp.example.test/internal/browser-gateway/u1.1700000300." + "c" * 64
 UNAVAILABLE = (200, {"ok": False, "error": "unavailable"})
 INVALID = (200, {"ok": False, "error": "invalid_input"})
-# 대시보드 프로세스에만 있어야 하는 값이다. 서비스 토큰과 다른 커넥터의 값 구실이다. 자식에게 넘어가면 안 된다.
+# 대시보드 프로세스에만 있어야 하는 값이다. 서비스 토큰과 다른 플러그인의 값 구실이다. 자식에게 넘어가면 안 된다.
 PARENT_ONLY = {"HERMES_DASHBOARD_PROFILE_API_SECRET": "parent-secret", "OTHER_CONNECTOR_TOKEN": "other-secret",
                "DEMO_SCOPE": "from-parent"}
 # MCP SDK 가 자식에게 늘 더하는 기본 env 다. 대시보드 프로세스에 있는 것만 간다.
@@ -94,7 +94,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
             json.dumps({"v": 1, "connector": connector, "values": values}), encoding="utf-8")
 
     def children(self):
-        """시험 커넥터 사본의 서버를 돌리고 있는 프로세스 번호다."""
+        """시험 플러그인 사본의 서버를 돌리고 있는 프로세스 번호다."""
         found = subprocess.run(["pgrep", "-f", str(self.connector_root / "server.py")],
                                capture_output=True, text=True)
         return found.stdout.split()
@@ -122,7 +122,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertNotIn(BAD_TOKEN, json.dumps(body))
 
     def test_vault_call_needs_exactly_one_source_and_the_connectors_own_vault(self):
-        """`values` 와 `vault` 를 함께 보내거나, 이름이 틀리거나, 없거나, 다른 커넥터의 보관 파일이면 400 이고 자식을 띄우지 않는다."""
+        """`values` 와 `vault` 를 함께 보내거나, 이름이 틀리거나, 없거나, 다른 플러그인의 보관 파일이면 400 이고 자식을 띄우지 않는다."""
         self.store_vault("c1", token=OK_TOKEN)
         self.store_vault("c3", connector="other-notes", token=OK_TOKEN)
         with patch_plugin(self.plugin, "_run_connector_tool") as runner:
@@ -139,7 +139,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
             runner.assert_not_called()
 
     def test_connector_without_fields_is_verified_with_an_empty_vault(self):
-        """칸이 없는 커넥터는 빈 `values` 의 보관 파일로 확인 도구를 부른다. 자식은 운영자 env 만 받는다."""
+        """칸이 없는 플러그인은 빈 `values` 의 보관 파일로 확인 도구를 부른다. 자식은 운영자 env 만 받는다."""
         self.rewrite("connector.json", lambda value: value.update(fields=[], verify={"tool": "env_view"}))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(env={"DEMO_BASE": "${DEMO_BASE}"}))
         self.store_vault("c4")
@@ -160,7 +160,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(self.call(LOST_TOKEN), UNAVAILABLE)
 
     def test_only_declared_tools_and_known_connectors_are_called(self):
-        """manifest 가 선택지나 확인에 쓰지 않는 도구와 모르는 커넥터는 4xx 이고 자식을 띄우지 않는다."""
+        """manifest 가 선택지나 확인에 쓰지 않는 도구와 모르는 플러그인은 4xx 이고 자식을 띄우지 않는다."""
         with patch_plugin(self.plugin, "_run_connector_tool") as runner:
             for label, path, body, expected in (
                 ("write tool", CALL, {"tool": "write_note", "values": {"token": OK_TOKEN}}, 400),
@@ -220,7 +220,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
     def test_child_receives_an_empty_owner_attachments_directory(self):
-        """주인의 첨부 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 이 경로에는 바인딩 주인이 없다(ADR-20261007 connector-owner-attachments)."""
+        """주인의 첨부 디렉터리를 선언한 플러그인의 확인 도구는 그 env 를 빈 값으로 받는다. 이 경로에는 바인딩 주인이 없다(ADR-20261007 connector-owner-attachments)."""
         self.rewrite("connector.json", lambda value: value.update(
             verify={"tool": "env_view"}, owner_attachments_env="DEMO_ATTACHMENT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
@@ -234,7 +234,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["attachments"], "")
 
     def test_child_receives_an_empty_owner_output_directory(self):
-        """출력 디렉터리를 선언한 커넥터의 확인 도구는 그 env 를 빈 값으로 받는다. 확인 도구는 파일을 내지 않는다(ADR-20261008 connector-output-files)."""
+        """출력 디렉터리를 선언한 플러그인의 확인 도구는 그 env 를 빈 값으로 받는다. 확인 도구는 파일을 내지 않는다(ADR-20261008 connector-output-files)."""
         self.rewrite("connector.json", lambda value: value.update(
             verify={"tool": "env_view"}, owner_output_env="DEMO_OUTPUT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
@@ -246,7 +246,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["output"], "")
 
     def test_child_receives_the_callers_relay_address(self):
-        """브라우저 중계 주소를 선언한 커넥터의 확인 도구는 요청의 `owner_browser` 를 그 env 로 받는다. 모양이 틀리거나 없으면 빈 값이다(ADR-20261008 browser-gateway-token)."""
+        """브라우저 중계 주소를 선언한 플러그인의 확인 도구는 요청의 `owner_browser` 를 그 env 로 받는다. 모양이 틀리거나 없으면 빈 값이다(ADR-20261008 browser-gateway-token)."""
         self.rewrite("connector.json", lambda value: value.update(
             verify={"tool": "env_view"}, owner_browser_env="DEMO_BROWSER_URL"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
@@ -269,7 +269,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
                 self.assertEqual(answer["result"]["browser"], expected)
 
     def test_connector_without_the_declaration_ignores_the_relay_address(self):
-        """선언하지 않은 커넥터는 `owner_browser` 를 받아도 자식에게 넘기지 않는다."""
+        """선언하지 않은 플러그인은 `owner_browser` 를 받아도 자식에게 넘기지 않는다."""
         self.rewrite("connector.json", lambda value: value.update(verify={"tool": "env_view"}))
         status, body = self.request(CALL, "POST", {"tool": "env_view", "values": {"token": OK_TOKEN},
                                                    "owner_browser": CALL_ADDRESS})
@@ -452,7 +452,7 @@ class ConnectorCallTest(base.ConnectorGateCase):
         for token in (OK_TOKEN, BAD_TOKEN, ODD_TOKEN, SLOW_TOKEN):
             self.assertNotIn(token, json.dumps(responses))
             self.assertNotIn(token, "\n".join(records))
-        # 시험 커넥터의 서버 파일에는 토큰이 적혀 있다. 원문을 찾지 않고 파일이 그대로인지를 본다.
+        # 시험 플러그인의 서버 파일에는 토큰이 적혀 있다. 원문을 찾지 않고 파일이 그대로인지를 본다.
         after = files()
         self.assertEqual(sorted(after), sorted(before), "도구 호출이 파일을 만들거나 지웠다")
         self.assertEqual(after, before, "도구 호출이 파일을 바꿨다")

@@ -1,6 +1,6 @@
 """dashboard-profile-api 가 Control Plane 이 승인한 호출을 그 profile 의 값으로 한 번 실행하는 규칙을 검사한다(ADR-050).
 
-시험 커넥터의 MCP 서버를 실제 자식 프로세스로 띄운다. 검사가 끝날 때마다 남은 자식이 없는지 본다.
+시험 플러그인의 MCP 서버를 실제 자식 프로세스로 띄운다. 검사가 끝날 때마다 남은 자식이 없는지 본다.
 """
 
 import asyncio
@@ -25,7 +25,7 @@ EXECUTE = "/api/connectors/%s/execute" % base.DEMO
 PROFILE = "alice"
 WRITE_NOTE = "mcp__demo__write_note"
 UNAVAILABLE = (200, {"ok": False, "error": "unavailable"})
-# 그 profile 의 `.env` 에 함께 있는 다른 값이다. 이 커넥터의 칸이 아니므로 자식에게 가면 안 된다.
+# 그 profile 의 `.env` 에 함께 있는 다른 값이다. 이 플러그인의 칸이 아니므로 자식에게 가면 안 된다.
 PROFILE_ONLY = {"API_SERVER_KEY": "profile-api-key", "OTHER_CONNECTOR_TOKEN": "profile-other"}
 
 
@@ -56,9 +56,9 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.addCleanup(self.assert_no_child_left)
 
     def install(self, name, token=call_base.OK_TOKEN, managed=True, installed=True, host=False, bind=True):
-        """커넥터를 설치한 profile 의 파일을 만든다. 표식과 소유 기록은 빼고 만들 수 있다.
+        """플러그인을 설치한 profile 의 파일을 만든다. 표식과 소유 기록은 빼고 만들 수 있다.
 
-        `host` 는 운영자가 사람이 만든 profile 에 두는 커넥터 표식이고, `bind` 는 소유 기록을 바인딩 항목으로 둔다.
+        `host` 는 운영자가 사람이 만든 profile 에 두는 플러그인 표식이고, `bind` 는 소유 기록을 바인딩 항목으로 둔다.
         """
         profile = self.profile_root / name
         profile.mkdir()
@@ -77,7 +77,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps({base.DEMO: entry}), encoding="utf-8")
 
     def test_binding_on_a_profile_with_only_the_connector_marker_runs(self):
-        """커넥터 표식만 있는 profile 에서는 바인딩만 실행하고, 구형 기록과 표식 없는 profile 은 거절한다."""
+        """플러그인 표식만 있는 profile 에서는 바인딩만 실행하고, 구형 기록과 표식 없는 profile 은 거절한다."""
         self.install("human", managed=False, host=True, bind=True)
         self.install("human-old", managed=False, host=True, bind=False)
         self.install("plain", managed=False, bind=True)
@@ -93,7 +93,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(self.execute(args={"text": "a"}, profile="managed-bind")[0], 200)
 
     def children(self):
-        """시험 커넥터 사본의 서버를 돌리고 있는 프로세스 번호다."""
+        """시험 플러그인 사본의 서버를 돌리고 있는 프로세스 번호다."""
         found = subprocess.run(["pgrep", "-f", str(self.connector_root / "server.py")],
                                capture_output=True, text=True)
         return found.stdout.split()
@@ -124,7 +124,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         return self.request(EXECUTE, "POST", body, **request)
 
     def declare_schema_two(self):
-        """시험 커넥터를 `schema: 2` 로 바꾼다. `env_view` 는 선언하지 않는다."""
+        """시험 플러그인을 `schema: 2` 로 바꾼다. `env_view` 는 선언하지 않는다."""
         self.rewrite("connector.json", lambda value: value.update(
             schema=2, tools={"list_scopes": {"risk": "READ"}, "write_note": {"risk": "WRITE", "outbound": False}}))
 
@@ -149,7 +149,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["path"], os.path.dirname(sys.executable))
 
     def declare_owner_attachments(self):
-        """시험 커넥터가 주인의 첨부 디렉터리를 `DEMO_ATTACHMENT_DIR` 로 받게 하고 실행 공간 정책을 준다(ADR-20261007 connector-owner-attachments)."""
+        """시험 플러그인이 주인의 첨부 디렉터리를 `DEMO_ATTACHMENT_DIR` 로 받게 하고 실행 공간 정책을 준다(ADR-20261007 connector-owner-attachments)."""
         self.rewrite("connector.json", lambda value: value.update(owner_attachments_env="DEMO_ATTACHMENT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
             DEMO_ATTACHMENT_DIR="${DEMO_ATTACHMENT_DIR}"))
@@ -177,7 +177,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": server}}), encoding="utf-8")
 
     def test_child_receives_an_empty_owner_output_directory(self):
-        """출력 디렉터리를 선언한 커넥터의 승인 실행은 설치한 값이 있어도 빈 값을 받는다. 승인한 쓰기는 파일을 내지 않는다."""
+        """출력 디렉터리를 선언한 플러그인의 승인 실행은 설치한 값이 있어도 빈 값을 받는다. 승인한 쓰기는 파일을 내지 않는다."""
         self.rewrite("connector.json", lambda value: value.update(owner_output_env="DEMO_OUTPUT_DIR"))
         self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"]["env"].update(
             DEMO_OUTPUT_DIR="${DEMO_OUTPUT_DIR}"))
@@ -195,7 +195,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(body["result"]["output"], "")
 
     def test_child_receives_the_installed_owner_attachments_directory(self):
-        """선언한 커넥터의 실행은 그 profile 에 설치한 서버 정의의 주인 디렉터리를 자식 env 에 넣는다."""
+        """선언한 플러그인의 실행은 그 profile 에 설치한 서버 정의의 주인 디렉터리를 자식 env 에 넣는다."""
         self.declare_owner_attachments()
         self.install("bob")
         alice = self.agent_root + "/users/" + "a" * 64
@@ -251,7 +251,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         (profile / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"demo": server}}), encoding="utf-8")
 
     def test_child_receives_the_installed_relay_address(self):
-        """선언한 커넥터의 승인 실행은 그 profile 에 설치한 서버 정의의 중계 주소를 자식 env 에 넣는다(ADR-20261008 browser-gateway-token)."""
+        """선언한 플러그인의 승인 실행은 그 profile 에 설치한 서버 정의의 중계 주소를 자식 env 에 넣는다(ADR-20261008 browser-gateway-token)."""
         self.install("bob")
         alice = "http://cp.example.test/internal/browser-gateway/b1." + "a" * 64
         bob = "http://cp.example.test/internal/browser-gateway/b2." + "b" * 64
@@ -322,7 +322,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(self.execute("mcp__other__write_note")[0], 400)
 
     def test_profile_and_connector_are_checked_before_the_child_starts(self):
-        """설치하지 않았거나 관리 표식이 없는 profile, 모르는 커넥터, 틀린 본문은 4xx 이고 자식을 띄우지 않는다."""
+        """설치하지 않았거나 관리 표식이 없는 profile, 모르는 플러그인, 틀린 본문은 4xx 이고 자식을 띄우지 않는다."""
         self.install("plain", installed=False)
         self.install("human", managed=False)
         valid = {"profile": PROFILE, "hermes_tool": WRITE_NOTE, "args": {}}

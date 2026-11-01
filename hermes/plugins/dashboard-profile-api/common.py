@@ -18,14 +18,14 @@ PLUGIN_DIR = pathlib.Path(__file__).resolve().parent
 
 # 이 토큰으로 만든 profile 이라는 표식이다. 지우기 판정이 이 파일 하나를 본다.
 MANAGED_MARKER = ".fos-assistant-managed"
-# 운영자가 사람이 만든 profile 에 두는 표식이다. 그 profile 이 커넥터의 바인딩 설치를 받는다는 뜻이다.
+# 운영자가 사람이 만든 profile 에 두는 표식이다. 그 profile 이 플러그인의 바인딩 설치를 받는다는 뜻이다.
 # 이 plugin 은 이 파일을 쓰지 않는다(ADR-083).
 CONNECTOR_HOST_MARKER = ".fos-connector-host"
 # Control Plane MCP 서버 이름이다.
 CONTROL_PLANE_MCP = "fos-assistant"
 
 # PUT /api/env 로 쓸 수 있는 기본 key 다. Control Plane 이 profile 마다 넣는 값만 둔다.
-# 커넥터 key 는 여기 두지 않는다. 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
+# 플러그인 key 는 여기 두지 않는다. 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
 BASE_ENV_KEYS = frozenset({"API_SERVER_KEY", "API_SERVER_MODEL_NAME", "MCP_FOS_ASSISTANT_API_KEY"})
 
 # 올린 스킬 이름이다. fos-assistant 의 스킬 이름 규칙보다 넓어 Hermes 기본 스킬도 켜고 끌 수 있다.

@@ -1,5 +1,5 @@
 {
   "name": "financial-workbench",
-  "description": "금융 온톨로지 워크벤치의 투자 근거를 읽는 커넥터 plugin",
+  "description": "금융 온톨로지 워크벤치의 투자 근거를 읽는 플러그인 plugin",
   "skills": "./skills"
 }

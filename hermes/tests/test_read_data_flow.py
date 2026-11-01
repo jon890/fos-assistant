@@ -1,4 +1,4 @@
-"""커넥터 READ 결과가 다른 도구로 흘러가는 길에서 fos-ctx 가 무엇을 하고 무엇을 하지 않는지 합성 값으로 고정한다.
+"""플러그인 READ 결과가 다른 도구로 흘러가는 길에서 fos-ctx 가 무엇을 하고 무엇을 하지 않는지 합성 값으로 고정한다.
 
 흐름 번호(RF-xx)와 판정은 `docs/features/connector-policy.md` 의 「흐름 판정 표」 가 갖는다.
 이 파일은 Hermes 쪽 hook 만 본다. Control Plane 이 내리는 판정은 그 표가 가리키는 backend 시험이 본다.
@@ -14,7 +14,7 @@ import threading
 import test_fos_ctx as base
 
 
-# 바인딩 profile 에 메일 커넥터와 메모 커넥터를 함께 붙인 모양이다.
+# 바인딩 profile 에 메일 플러그인과 메모 플러그인을 함께 붙인 모양이다.
 FLOW_MAP = {"v": 1, "isolated": False, "servers": {
     "mail": {"connector": "demo-mail", "prefix": "mcp__mail__",
              "tools": {"mcp__mail__get_message": "get_message", "mcp__mail__send_message": "send_message"}},
@@ -28,7 +28,7 @@ COLLECTOR = "https://collector.example/in?d=" + "병원-예약"
 
 
 class ReadDataFlowTest(base.PluginFixture):
-    """바인딩 profile 에서 READ 결과가 셸, 웹, 다른 커넥터, Control Plane 도구로 가는 호출을 hook 이 어떻게 다루는지 본다."""
+    """바인딩 profile 에서 READ 결과가 셸, 웹, 다른 플러그인, Control Plane 도구로 가는 호출을 hook 이 어떻게 다루는지 본다."""
 
     def setUp(self):
         super().setUp()
@@ -87,7 +87,7 @@ class ReadDataFlowTest(base.PluginFixture):
         self.assertEqual(wrapped.count("</external-data>"), 1, "본문의 닫는 표시가 감싸기를 끝내면 안 된다")
 
     def test_writes_carrying_read_body_are_left_to_control_plane(self):
-        """RF-03, RF-04: 본문을 실은 같은 커넥터와 다른 커넥터의 쓰기는 hook 이 인자 그대로 묻고, 판정을 그대로 전한다."""
+        """RF-03, RF-04: 본문을 실은 같은 플러그인과 다른 플러그인의 쓰기는 hook 이 인자 그대로 묻고, 판정을 그대로 전한다."""
         self.verdicts["mcp__mail__send_message"] = {"decision": "block", "message": "승인을 기다린다"}
 
         sent = self.call("mcp__mail__send_message", args={"to": "someone@example.com", "body": MAIL_BODY})
@@ -116,7 +116,7 @@ class ReadDataFlowTest(base.PluginFixture):
         self.assertEqual(self.requests, [])
 
     def test_connector_call_from_code_has_no_session_and_is_blocked(self):
-        """RF-08a: `execute_code` 안에서 부른 커넥터 도구는 session 이 없어 묻지 않고 막는다."""
+        """RF-08a: `execute_code` 안에서 부른 플러그인 도구는 session 이 없어 묻지 않고 막는다."""
         result = self.plugin.pre_tool_call(tool_name="mcp__mail__send_message", args={"body": MAIL_BODY},
                                            session_id="", tool_call_id="", task_id="t")
 

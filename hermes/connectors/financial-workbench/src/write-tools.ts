@@ -253,7 +253,7 @@ const proposalSchema = z.looseObject({
       urls: z.array(z.string()).optional(),
     })
     .optional(),
-  // 꼭 받지만 빠졌을 때 SDK 의 글 대신 이 커넥터의 오류 코드로 끝내려고 선택으로 둔다.
+  // 꼭 받지만 빠졌을 때 SDK 의 글 대신 이 플러그인의 오류 코드로 끝내려고 선택으로 둔다.
   dedupeKey: z.string().optional(),
 });
 

@@ -1,4 +1,4 @@
-"""일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다."""
+"""일반 에이전트의 profile 에 플러그인을 붙이거나 뗀다."""
 
 from __future__ import annotations
 from .connector_guard import _binding_guard
@@ -109,16 +109,16 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                            vault: str | None = None, values: dict | None = None,
                            owner_attachments: str | None = None, owner_output: str | None = None,
                            owner_browser: str | None = None, guard: dict | None = None) -> dict:
-    """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
+    """일반 에이전트의 profile 에 플러그인을 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
     plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
     새로 붙이기는 그 profile 에서 정책 hook plugin 이 켜져 있어야 한다. 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다.
-    이미 붙은 커넥터를 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
+    이미 붙은 플러그인을 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
     떼기는 그 서버와 이름과 env 와 스킬만 지운다(ADR-083).
     떼기는 서버 이름을 뗀 서버 기록에 남기고 이름 대응에 빈 `tools` 로 남긴다. 대응 파일은 지우지 않는다.
     뗀 기록에 남은 이름을 다시 붙이면 gateway 가 옛 연결을 쥐고 있을 수 있어 재시작을 기다린다.
-    같은 커넥터를 같은 이름으로 다시 붙이면 그 기록을 지운다.
+    같은 플러그인을 같은 이름으로 다시 붙이면 그 기록을 지운다.
     공유 gateway 는 주기마다 profile 의 `mcp_servers` 이름과 살아 있는 연결을 맞춘다. 새 이름은 연결하고 빠진 이름은 끊는다.
     그래서 새 서버를 더하거나 스킬, 이름 대응만 바꾼 설치는 재시작 없이 반영되므로 `reload_pending` 을 참으로 답한다.
     이름만 비교하므로 이미 있던 서버의 정의나 그 서버의 `.env` 값을 바꾼 붙이기는 `restart_required` 를 참으로 답한다.
@@ -193,7 +193,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         if not isinstance(allowed, list) or CONTROL_PLANE_MCP not in allowed:
             raise FileExistsError("API 도구 목록에 Control Plane MCP 가 없는 profile 이다")
         # 이 설치는 plugin 파일만 맞추고 profile 의 plugin 설정은 쓰지 않는다. 운영자가 끈 hook 을 대신 켜지 않는다.
-        # 이미 붙은 커넥터를 다시 설치하는 것은 받는다. 연결 확인이 다시 설치하고, hook 상태가 거짓이라 반영 완료가 `READY` 로 두지 않는다.
+        # 이미 붙은 플러그인을 다시 설치하는 것은 받는다. 연결 확인이 다시 설치하고, hook 상태가 거짓이라 반영 완료가 `READY` 로 두지 않는다.
         if not owned and not _policy_plugin_enabled(saved):
             raise FileExistsError("정책 hook plugin 이 켜져 있지 않은 profile 이다")
         name = manifest["mcp_server"]
@@ -226,11 +226,11 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 raise ValueError("주인의 첨부 디렉터리 없이 사용자 첨부를 읽는 connector 를 설치하지 않는다")
             server["env"][manifest["owner_attachments_env"]] = owner_attachments
         if manifest["owner_output_env"] is not None:
-            # 출력 디렉터리가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 파일 출력만 거절한다.
+            # 출력 디렉터리가 없어도 붙이기는 막지 않는다. 빈 값을 받은 플러그인은 파일 출력만 거절한다.
             server["env"][manifest["owner_output_env"]] = (
                 owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.fullmatch(owner_output) else "")
         if manifest["owner_browser_env"] is not None:
-            # 중계가 꺼져 주소가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다.
+            # 중계가 꺼져 주소가 없어도 붙이기는 막지 않는다. 빈 값을 받은 플러그인은 브라우저에 닿지 못한다고 답한다.
             server["env"][manifest["owner_browser_env"]] = (
                 owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser)
                 else "")
@@ -256,7 +256,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             kept[-1] += "\n"
         kept.extend(wanted.values())
         new_env = "".join(kept).encode("utf-8") if kept or originals[env_path] is not None else None
-        # 이 커넥터 칸의 값이 바뀌었는지다. 떠 있는 서버 프로세스는 옛 값을 쥐고 있다.
+        # 이 플러그인 칸의 값이 바뀌었는지다. 떠 있는 서버 프로세스는 옛 값을 쥐고 있다.
         env_changed = ([line for line in env_lines if _env_line_key(line) in field_env]
                        != [line for line in kept if _env_line_key(line) in field_env])
         # 뗀 뒤 같은 이름을 다시 붙이면 gateway 는 이름이 계속 있다고 보고 옛 연결을 쥘 수 있다.
@@ -297,7 +297,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         skills = []
         desired = {}
 
-    # 이 커넥터가 전에 설치한 스킬의 파일 가운데 이번에 쓰지 않는 것은 지운다.
+    # 이 플러그인이 전에 설치한 스킬의 파일 가운데 이번에 쓰지 않는 것은 지운다.
     stale = []
     for skill in previous_skills:
         found = _skill_tree_files(skills_dir / skill) or {}
@@ -382,7 +382,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 pass
         raise
     for value in removed_outputs:
-        # 커넥터가 읽은 데이터가 뗀 뒤에 남지 않게 한다. 지우지 못해도 떼기는 끝난 것이다.
+        # 플러그인이 읽은 데이터가 뗀 뒤에 남지 않게 한다. 지우지 못해도 떼기는 끝난 것이다.
         _sandbox_remove_connector_output(value, profile_dir.name, plugin)
     # 파일을 모두 지운 스킬 디렉터리는 빈 디렉터리만 남는다. 지우지 못해도 설치는 끝난 것이다.
     for skill in previous_skills:

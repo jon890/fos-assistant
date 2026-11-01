@@ -1,4 +1,4 @@
-"""profile에 복사할 커넥터 스킬 파일을 읽는다."""
+"""profile에 복사할 플러그인 스킬 파일을 읽는다."""
 
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ def _skill_name(skill_md: str, fallback: str) -> str:
     Hermes 가 스킬 목록을 만들 때 같은 규칙으로 이름을 정한다(`tools/skills_tool.py` 의 `_find_all_skills`).
 
     앞머리가 환경 값이나 자격 증명 파일을 요청하면 예외다. Hermes 는 스킬을 읽을 때 그 칸의 이름으로
-    profile `.env` 의 값과 profile 안의 파일을 셸 실행 공간에 넣는다. 바인딩 설치는 커넥터 값을 그 `.env` 에
-    복사하므로 실행 공간이 커넥터 비밀을 받게 된다. 칸 목록은 Control Plane 이 올린 스킬에 거는 것과 같다(ADR-086).
+    profile `.env` 의 값과 profile 안의 파일을 셸 실행 공간에 넣는다. 바인딩 설치는 플러그인 값을 그 `.env` 에
+    복사하므로 실행 공간이 플러그인 비밀을 받게 된다. 칸 목록은 Control Plane 이 올린 스킬에 거는 것과 같다(ADR-086).
     """
     import yaml
     text = skill_md.lstrip("﻿").replace("\r\n", "\n")

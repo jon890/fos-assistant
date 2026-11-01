@@ -1,4 +1,4 @@
-"""dashboard-profile-api 가 커넥터 경로와 실행 파일을 환경 변수에서 읽는 규칙을 검사한다."""
+"""dashboard-profile-api 가 플러그인 경로와 실행 파일을 환경 변수에서 읽는 규칙을 검사한다."""
 
 import json
 import logging
@@ -80,7 +80,7 @@ class ConnectorEnvironmentTest(unittest.TestCase):
         })
 
     def test_roots_is_empty_when_missing_or_malformed(self):
-        """없거나 읽지 못하는 값은 커넥터가 없는 것으로 본다. 예외를 던지지 않는다."""
+        """없거나 읽지 못하는 값은 플러그인이 없는 것으로 본다. 예외를 던지지 않는다."""
         self.environment()
         self.assertEqual(self.plugin._connector_roots(), {})
         for raw in ("", "   ", "not json", "[]", "null", '"text"', '{"x": 1}', '{"x": null}', '{"x": ["/abs"]}'):
@@ -119,7 +119,7 @@ class ConnectorEnvironmentTest(unittest.TestCase):
                 self.assertEqual(self.plugin._connector_roots(), {"y": self.entry("/abs/y")})
 
     def test_roots_reads_the_remote_url(self):
-        """원격 MCP 커넥터의 항목은 `url` 을 갖는다. 실행 파일과 운영자 env 는 없다."""
+        """원격 MCP 플러그인의 항목은 `url` 을 갖는다. 실행 파일과 운영자 env 는 없다."""
         self.environment(**{ROOTS_ENV: json.dumps({
             "remote-notes": {"root": "/abs/remote", "url": "http://mcp.internal.test/mcp"},
             "plain": "/abs/plain",

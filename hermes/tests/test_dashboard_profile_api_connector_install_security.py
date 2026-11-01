@@ -95,7 +95,7 @@ class ProfileApiConnectorInstallSecurityTest(support.ProfileApiRouteTest):
         self.assertFalse((self.root / "alice" / self.plugin.CONNECTOR_STATE).exists())
 
     def test_connector_status_and_probe_are_limited_to_installed_managed_profile(self):
-        """상태 조회는 비밀값을 내지 않고 probe 는 그 profile 에 설치한 커넥터의 서버만 부른다."""
+        """상태 조회는 비밀값을 내지 않고 probe 는 그 profile 에 설치한 플러그인의 서버만 부른다."""
         self.connector_fixture()
         self.assertEqual(self.connector_probe(), 404)
         self.binding_install()
@@ -104,7 +104,7 @@ class ProfileApiConnectorInstallSecurityTest(support.ProfileApiRouteTest):
         self.assertEqual(response.body["connectors"], [{"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"}])
         self.assertNotIn(DEMO_BASE, json.dumps(response.body))
         self.assertEqual(self.connector_probe(), 204)
-        # 설치한 커넥터의 서버가 아니면 등록된 MCP 서버여도 넘기지 않는다.
+        # 설치한 플러그인의 서버가 아니면 등록된 MCP 서버여도 넘기지 않는다.
         self.assertEqual(self.connector_probe("fos-assistant"), 404)
         self.assertEqual(self.connector_probe("other"), 404)
         self.assertEqual(self.connector_probe(profile="owner"), 401)

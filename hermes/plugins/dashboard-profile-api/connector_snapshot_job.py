@@ -63,7 +63,7 @@ def _job_result(operation, args, result):
     keys = {"job_id", "status", "stamp", "error_code"}
     if operation == "status":
         keys |= {"stage", "save_clicked", "finished_at", "saved_before", "saved_after"}
-        # 실패 사유 코드는 커넥터가 사유가 있을 때만 더하는 선택 칸이다. 없는 응답도 받고, 있으면 고정 코드 모양만 받는다.
+        # 실패 사유 코드는 플러그인이 사유가 있을 때만 더하는 선택 칸이다. 없는 응답도 받고, 있으면 고정 코드 모양만 받는다.
         if "error_reason" in result:
             keys.add("error_reason")
             if not _matches(result["error_reason"], r"[a-z][a-z_]{0,63}"):

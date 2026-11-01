@@ -1,6 +1,6 @@
 # hermes 모듈의 구조
 
-이 저장소가 Hermes 에 설치하는 plugin 과 profile 틀, 범용 커넥터를 어디에 두는지 갖는다.
+이 저장소가 Hermes 에 설치하는 plugin 과 profile 틀, 범용 플러그인을 어디에 두는지 갖는다.
 설치 묶음과 운영 값은 [`hermes/README.md`](../README.md), Hermes 의 동작은 [`hermes/docs/hermes-contract.md`](hermes-contract.md) 가 갖는다.
 
 ## 모듈이 갖는 것
@@ -11,7 +11,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | plugin | 하는 일 | 두는 곳 | 읽는 프로세스 |
 | --- | --- | --- | --- |
 | `dashboard-profile-api` | 대시보드의 profile 관리와 도구 목록 경로를 `Authorization: Bearer` 로 연다 | Hermes 기본 루트의 `plugins/` | 대시보드 |
-| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 와 자식의 로컬 이미지 전달을 막고, 자식 session 을 등록하고, 커넥터를 설치한 profile 의 커넥터 도구 호출을 Control Plane 에 묻고, 바인딩 profile 의 커넥터 도구 결과를 `<external-data>` 로 감싼다 | Control Plane MCP 를 등록한 profile 과 커넥터를 설치한 profile 마다 | gateway |
+| `fos-ctx` | Control Plane MCP 호출 인자에 서명한 run 맥락 `_fos_ctx` 를 덮어쓰고, `skill_manage` 와 자식의 로컬 이미지 전달을 막고, 자식 session 을 등록하고, 플러그인을 설치한 profile 의 플러그인 도구 호출을 Control Plane 에 묻고, 바인딩 profile 의 플러그인 도구 결과를 `<external-data>` 로 감싼다 | Control Plane MCP 를 등록한 profile 과 플러그인을 설치한 profile 마다 | gateway |
 
 ## plugin 파일 안내
 
@@ -28,14 +28,14 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | `dashboard-profile-api` | `connector_state.py`, `connector_status.py` | 소유 기록과 도구 이름 대응, 스킬과 정책 hook 상태 확인 |
 | `dashboard-profile-api` | `connector_isolated.py`, `connector_binding.py`, `connector_install.py` | 옛 설치, 바인딩 설치, 요청 처리와 probe |
 | `dashboard-profile-api` | `connector_mcp.py`, `connector_run.py` | MCP 호출과 결과 해석, call·execute 요청과 공유 동시 호출 한도 |
-| `dashboard-profile-api` | `connector_output.py`, `connector_owner_env.py` | 바인딩마다 만드는 커넥터 출력 디렉터리, 주인 env 검증 |
+| `dashboard-profile-api` | `connector_output.py`, `connector_owner_env.py` | 바인딩마다 만드는 플러그인 출력 디렉터리, 주인 env 검증 |
 | `dashboard-profile-api` | `routes.py` | 인증 provider, 경로 표, 토큰 미들웨어 |
 | `fos-ctx` | `context.py` | 서명, 토큰 읽기, 루트 session 조회, 호출 문맥 |
 | `fos-ctx` | `connector_policy.py` | 이름 대응 파일, 정책 질의, 서버 선택 |
 | `fos-ctx` | `subagent.py`, `hooks.py` | 자식 session 등록, hook 진입점, 이미지 검사와 외부 데이터 감싸기 |
 
 설치 묶음은 대시보드 plugin 과 profile plugin 의 모든 Python 모듈을 함께 담는다.
-커넥터 설치와 `policy_hook` 조회도 `fos-ctx` 의 하위 모듈까지 묶음과 비교한다.
+플러그인 설치와 `policy_hook` 조회도 `fos-ctx` 의 하위 모듈까지 묶음과 비교한다.
 
 `runtime/`은 관리 bootstrap이 명시 import하는 일반 addon이다. `bodyless_install.py`는 process-global
 writer 소유와 설치 검사를, `bodyless_requests.py`는 profile별 안전한 파일 쓰기를,
@@ -43,26 +43,26 @@ writer 소유와 설치 검사를, `bodyless_requests.py`는 profile별 안전�
 일반 동작 계약은 [본문 없는 요청 진단](hermes-contract.md#본문-없는-요청-진단)이 갖고,
 명시 기동과 고정 manifest·새 interpreter 연결은 `fos-home-infra`가 맡는다.
 
-## 범용 커넥터
+## 범용 플러그인
 
 `connector_guard.py`는 보호 선언과 바인딩 지원 응답을 검증하고,
 `connector_guard_validation.py`는 원문·SDK 인자와 준비 결과를 대조한다.
 `connector_prepare.py`는 준비 도구만 호출하고 실행 자식의 일회성 환경을 구성한다.
 이 소비자들은 서비스 이름을 모르며 실제 지원 제공자와 승인 경로가 없으면 금융을 숨긴다.
 
-`hermes/connectors/<커넥터 이름>/` 은 이 저장소가 유지보수하는 커넥터다([ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
-대시보드 plugin 이 읽는 plugin 디렉터리 모양 그대로이고, 운영자가 아래 「커넥터」 의 운영 목록에 그 디렉터리를 올려야 카탈로그에 나온다.
+`hermes/connectors/<플러그인 이름>/` 은 이 저장소가 유지보수하는 플러그인다([ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
+대시보드 plugin 이 읽는 plugin 디렉터리 모양 그대로이고, 운영자가 아래 「플러그인」 의 운영 목록에 그 디렉터리를 올려야 카탈로그에 나온다.
 설치 묶음에는 들어가지 않는다.
 
-| 커넥터 | 하는 일 | 문서 |
+| 플러그인 | 하는 일 | 문서 |
 | --- | --- | --- |
 | `gmail` | Gmail 을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다 | [개발 문서](../../docs/features/gmail-connector.md), [사용자 안내](../connectors/gmail/README.md) |
 | `naver-blog` | 「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고, 승인받은 글을 임시저장하거나 덮어쓴다. 발행하지 않는다 | [개발 문서](../../docs/features/naver-blog-connector.md), [사용자 안내](../connectors/naver-blog/README.md) |
 | `tossinvest` | 토스증권 계좌의 보유 종목, 시세, 주문 가능 현금, 주문 내역을 읽는다. 승인받은 일반 주문을 넣거나 취소한다. 정정과 조건주문은 하지 않는다 | [개발 문서](../../docs/features/tossinvest-connector.md), [사용자 안내](../connectors/tossinvest/README.md) |
 
-커넥터의 MCP 서버는 TypeScript 로 쓰고 의존성까지 검사와 패키징 때 한 JavaScript 파일로 묶는다. 생성된 실행 파일은 Git 으로 추적하지 않는다.
+플러그인의 MCP 서버는 TypeScript 로 쓰고 의존성까지 검사와 패키징 때 한 JavaScript 파일로 묶는다. 생성된 실행 파일은 Git 으로 추적하지 않는다.
 운영 목록의 `command` 는 Bun 실행 파일이어야 한다. 서버 실행 중 패키지를 내려받지 않는다.
-만드는 방법과 공통 검사는 [커넥터 만들기](../connectors/README.md) 가 갖는다.
+만드는 방법과 공통 검사는 [플러그인 만들기](../connectors/README.md) 가 갖는다.
 
 ## 디렉터리 배치와 배포 순서
 
@@ -72,10 +72,10 @@ Control Plane 이 기대는 Hermes 쪽 코드는 이 저장소가 갖는다.
 ```
 hermes/
   plugins/
-    dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 커넥터
-    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
+    dashboard-profile-api/   대시보드 plugin. profile 만들기와 지우기, env, 도구와 스킬 설정, 플러그인
+    fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 플러그인 도구 호출을 Control Plane 에 물어 막는다
   connectors/
-    <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
+    <플러그인 이름>/            범용 플러그인 하나. assistant.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
   runtime/                   관리 bootstrap이 설치하는 일반 addon. plugin 등록과 별개
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
@@ -83,7 +83,7 @@ hermes/
   tests/                     Python unittest. Hermes 모듈은 가짜로 끼운다
 ```
 
-`connectors/` 루트의 `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`는 [커넥터 만들기의 배포 묶음 계약](../connectors/README.md#배포-묶음)을 따른다.
+`connectors/` 루트의 `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`는 [플러그인 만들기의 배포 묶음 계약](../connectors/README.md#배포-묶음)을 따른다.
 
 **서비스 이름은 `hermes/connectors/` 와 그 검사와 문서에만 둔다.** `backend/src/main`, `web/src`, `hermes/plugins` 는 어느 서비스도 모른다. `test/unit/connector-neutral.test.ts` 가 본다.
 
@@ -96,7 +96,7 @@ hermes/
 
 ## 토스증권 REST 전체 지원의 배치
 
-서비스의 REST 입력·필드·권한은 [토스증권 커넥터](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
+서비스의 REST 입력·필드·권한은 [토스증권 플러그인](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 새 의존성, 서비스, DB 표와 profile 설정은 추가하지 않는다. 기존 Bun MCP와 범용 Java 승인, Python 실행 전달을 재사용한다.
 
 | 자리 | 책임 |
@@ -110,5 +110,5 @@ hermes/
 
 현재 client/api-contract/rate-limit과 기존 READ 도구는 구현했다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)이 열었고, 일반 주문 정정과 조건주문 쓰기 producer는 아직 운영에 등록하지 않았다. 저장과 claim, prepare·transport, 바인딩 지원과 일반주문 producer는 각 선행 구현의 책임이며 이 확장에서 중복 작성하지 않는다.
 조회 기반과 조건주문 READ는 금융 후속과 별도 착수한다. 계좌 원문 마스킹은 표시뿐 아니라 공식 result를 만드는 producer의 책임이다.
-금융 execution_baseline은 argsJson 원문 해시에 묶어 실행 자식에 전달하고 summary.executionBaseline과 대조한다. HTTP body·경제적 request_key·scope에는 넣지 않는다. 정확한 schema는 커넥터 도구 정책의 「예약 실행 메타데이터」가 갖는다.
+금융 execution_baseline은 argsJson 원문 해시에 묶어 실행 자식에 전달하고 summary.executionBaseline과 대조한다. HTTP body·경제적 request_key·scope에는 넣지 않는다. 정확한 schema는 플러그인 도구 정책의 「예약 실행 메타데이터」가 갖는다.
 계약·schema 소비자, 승인 카드와 producer는 같은 작동 단계에서 호환을 확인한다. 미지원 소비자는 새 금융 도구를 열지 않는다.

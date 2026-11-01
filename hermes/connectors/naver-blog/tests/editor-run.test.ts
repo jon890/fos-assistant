@@ -6,7 +6,12 @@ import { type DraftInput, parseBody } from "../src/draft.ts";
 import { runDraft, type RunStage } from "../src/editor/run.ts";
 import { EDITOR_METHODS, FakeCdp, FakeEditor } from "./fake-cdp.ts";
 
-const TIMES = { stepSeconds: 0.1, photoSeconds: 0.3, saveSeconds: 0.3, openSeconds: 0.2 };
+const TIMES = {
+  stepSeconds: 0.1,
+  photoSeconds: 0.3,
+  saveSeconds: 0.3,
+  openSeconds: 0.2,
+};
 const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 const PLACE = { name: "가상국수", address: "서울특별시 가상구 예시로 1" };
 const BODY = [
@@ -36,8 +41,10 @@ afterEach(async () => {
 
 /** 가짜 브라우저 하나에 다른 탭 하나를 미리 열어 두고, 편집기 대역과 초안을 준비한다. */
 async function setup() {
-  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 커넥터가 링크를 거절하므로 실제 경로를 쓴다.
-  const photoDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-run-")));
+  // 사진 디렉터리를 주인의 첨부 디렉터리로도 쓴다. 플러그인이 링크를 거절하므로 실제 경로를 쓴다.
+  const photoDir = await realpath(
+    await mkdtemp(join(tmpdir(), "naver-blog-run-")),
+  );
   cleanups.push(() => rm(photoDir, { recursive: true, force: true }));
   await writeFile(join(photoDir, "101.jpg"), PHOTO);
   const cdp = new FakeCdp({ allowed: EDITOR_METHODS });
@@ -60,13 +67,22 @@ async function setup() {
   };
   const stages: string[] = [];
   const run = (signal = new AbortController().signal) =>
-    runDraft(env, parseBody(BODY), input, (stage) => void stages.push(stage), signal, TIMES);
+    runDraft(
+      env,
+      parseBody(BODY),
+      input,
+      (stage) => void stages.push(stage),
+      signal,
+      TIMES,
+    );
   return { cdp, editor, input, env, stages, run, otherTab };
 }
 
 /** 연 탭 하나만 한 번 닫혔고 미리 열려 있던 탭은 그대로인지 본다. */
 function expectOnlyOwnTabClosed(cdp: FakeCdp, otherTab: string) {
-  const closes = cdp.httpRequests.filter((request) => request.startsWith("GET /json/close/"));
+  const closes = cdp.httpRequests.filter((request) =>
+    request.startsWith("GET /json/close/"),
+  );
   expect(closes).toHaveLength(1);
   expect(closes[0]).not.toBe(`GET /json/close/${otherTab}`);
   expect(cdp.targetIds()).toEqual([otherTab]);
@@ -92,9 +108,13 @@ test("모든 단계가 기대한 화면이면 단계를 차례로 알리고 저�
   });
   expect(editor.stickers).toEqual(["ogq_abc123-4"]);
   expect(editor.maps).toEqual([PLACE]);
-  expect(cdp.opened).toEqual(["https://blog.naver.com/PostWriteForm.naver?blogId=example-blog"]);
+  expect(cdp.opened).toEqual([
+    "https://blog.naver.com/PostWriteForm.naver?blogId=example-blog",
+  ]);
   expect(editor.scripts.length).toBeGreaterThan(0);
-  expect(editor.scripts.filter((script) => script.includes("tpb*i.publish"))).toEqual([]);
+  expect(
+    editor.scripts.filter((script) => script.includes("tpb*i.publish")),
+  ).toEqual([]);
   expect(cdp.methods()).not.toContain("DOM.setFileInputFiles");
   expect(cdp.violations).toEqual([]);
   expectOnlyOwnTabClosed(cdp, otherTab);
@@ -150,7 +170,9 @@ test("움직임이 멈추길 기다린 뒤 발행 단추가 레이어를 열지 
   expect(editor.animatingPolls).toBe(0);
   // settings 단계에서 셋(둘은 열리지 않음), 닫기 하나, 저장 전 대조와 state 에서 열고 닫기 둘씩이다.
   expect(editor.publishClicks).toBe(8);
-  expect(editor.scripts.filter((script) => script.includes("tpb*i.publish"))).toEqual([]);
+  expect(
+    editor.scripts.filter((script) => script.includes("tpb*i.publish")),
+  ).toEqual([]);
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
 
@@ -221,7 +243,9 @@ test("열린 alert 이벤트가 오면 Page.handleJavaScriptDialog 로 수락하
 
   await run();
 
-  const dialogs = cdp.calls.filter((call) => call.method === "Page.handleJavaScriptDialog");
+  const dialogs = cdp.calls.filter(
+    (call) => call.method === "Page.handleJavaScriptDialog",
+  );
   expect(dialogs.map((call) => call.params)).toEqual([{ accept: true }]);
   expect(stages).toEqual(ALL_STAGES);
   expectOnlyOwnTabClosed(cdp, otherTab);

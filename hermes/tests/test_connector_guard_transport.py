@@ -200,7 +200,7 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
         self.assertIn("stage=" + stage, text)
         if status == 200:
             self.assertIn("code=" + code, text)
-        # 계좌, 인자, 커넥터 오류 문구, profile 의 값은 남기지 않는다.
+        # 계좌, 인자, 플러그인 오류 문구, profile 의 값은 남기지 않는다.
         for value in ("000007", "demo_ok_0123456789", "거절", json.dumps(body["args"])):
             self.assertNotIn(value, text)
 

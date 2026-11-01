@@ -59,7 +59,7 @@ export async function httpJson(
 
 /**
  * 브라우저가 준 `webSocketDebuggerUrl` 의 경로만 꺼내 받은 주소의 호스트와 포트에 붙인다.
- * 중계가 적는 호스트는 커넥터가 닿는 호스트와 다를 수 있어서다.
+ * 중계가 적는 호스트는 플러그인이 닿는 호스트와 다를 수 있어서다.
  * 받은 주소에 경로(중계의 접근 표식)가 있으면 그 경로 아래의 `devtools/` 만 받는다.
  * 다른 경로를 받으면 표식 밖의 창구로 붙게 되므로 닿지 않음으로 끝낸다.
  */
@@ -112,10 +112,13 @@ export class CdpSession {
         reject(unreachable());
         return;
       }
-      const timer = setTimeout(() => {
-        socket.close();
-        reject(unreachable());
-      }, Math.max(1, timeoutMs));
+      const timer = setTimeout(
+        () => {
+          socket.close();
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
       const fail = () => {
         clearTimeout(timer);
         reject(unreachable());
@@ -144,10 +147,13 @@ export class CdpSession {
     if (this.closed) return Promise.reject(unreachable());
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(unreachable());
-      }, Math.max(1, timeoutMs));
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.socket.send(JSON.stringify({ id, method, params }));
@@ -160,7 +166,10 @@ export class CdpSession {
   }
 
   /** 이름이 같은 이벤트 하나를 기다려 그 `params` 를 돌려준다. */
-  waitEvent<T = any>(method: string, timeoutMs = COMMAND_TIMEOUT_MS): Promise<T> {
+  waitEvent<T = any>(
+    method: string,
+    timeoutMs = COMMAND_TIMEOUT_MS,
+  ): Promise<T> {
     if (this.closed) return Promise.reject(unreachable());
     return new Promise<T>((resolve, reject) => {
       const waiters = this.waiters.get(method) ?? new Set<Pending>();
@@ -168,10 +177,13 @@ export class CdpSession {
       const waiter: Pending = {
         resolve,
         reject,
-        timer: setTimeout(() => {
-          waiters.delete(waiter);
-          reject(unreachable());
-        }, Math.max(1, timeoutMs)),
+        timer: setTimeout(
+          () => {
+            waiters.delete(waiter);
+            reject(unreachable());
+          },
+          Math.max(1, timeoutMs),
+        ),
       };
       waiters.add(waiter);
     });
@@ -209,7 +221,8 @@ export class CdpSession {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error) pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
+      if (message.error)
+        pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
       else pending.resolve(message.result ?? {});
       return;
     }

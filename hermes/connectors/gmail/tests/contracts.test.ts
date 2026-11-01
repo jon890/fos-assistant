@@ -5,7 +5,7 @@ import { createGmailServer, isSupportedBunVersion } from "../src/server.ts";
 import { withMcp } from "./support.ts";
 
 const root = join(import.meta.dir, "..");
-const manifest = JSON.parse(readFileSync(join(root, "connector.json"), "utf8"));
+const manifest = JSON.parse(readFileSync(join(root, "assistant.json"), "utf8"));
 
 test("manifest는 dashboard 필수 필드와 Gmail client ID pattern을 유지한다", () => {
   expect(manifest.id).toBe("gmail");

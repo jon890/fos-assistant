@@ -63,7 +63,7 @@ class ConnectorAppearancesTest {
     @ValueSource(strings = {"gmail", "naver-blog"})
     void acceptsBundledServiceIcons(String connectorId) throws IOException {
         Path root = Path.of("../hermes/connectors", connectorId);
-        JsonNode manifest = JSON.readTree(Files.readString(root.resolve("connector.json")));
+        JsonNode manifest = JSON.readTree(Files.readString(root.resolve("assistant.json")));
         byte[] svg = Files.readAllBytes(root.resolve(manifest.path("icon").asText()));
         String data = Base64.getEncoder().encodeToString(svg);
         String link = manifest.path("link").asText();

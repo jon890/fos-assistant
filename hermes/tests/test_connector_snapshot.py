@@ -399,7 +399,7 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
                 self.module._snapshot_tool_result(result)
 
     def test_job_error_code_passes_only_from_single_error_text(self):
-        # 실제 커넥터는 start·status 의 고정 code 를 isError 결과의 text 하나로 보낸다. 일시 장애와 not_found 를 CP 가 가른다.
+        # 실제 플러그인은 start·status 의 고정 code 를 isError 결과의 text 하나로 보낸다. 일시 장애와 not_found 를 CP 가 가른다.
         def error(text, **extra):
             return CallToolResult(content=[TextContent(type="text", text=text)], isError=True, **extra)
         self.assertEqual(self.module._snapshot_tool_result(error('{"error":"not_found"}'), job=True), {"error": "not_found"})

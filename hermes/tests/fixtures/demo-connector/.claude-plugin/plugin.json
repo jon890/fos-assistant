@@ -1,5 +1,5 @@
 {
   "name": "demo-notes",
-  "description": "검사용 커넥터 plugin",
+  "description": "검사용 플러그인 plugin",
   "skills": "./skills"
 }

@@ -499,7 +499,7 @@ test("운영 SDK·manifest는 주문과 취소만 금융으로 열고 정정은 
   const { fake, env, claims } = setup();
   try {
     const manifest = JSON.parse(
-      await readFile(resolve(import.meta.dir, "../connector.json"), "utf8"),
+      await readFile(resolve(import.meta.dir, "../assistant.json"), "utf8"),
     );
     expect(manifest.execution_guard).toEqual({
       protocol: "approval-claim-v2",

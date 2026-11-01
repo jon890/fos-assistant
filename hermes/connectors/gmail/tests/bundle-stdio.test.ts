@@ -6,7 +6,7 @@ import { join } from "node:path";
 // 테스트 명령이 만든 실제 entry를 실행한다. 계정 없이 목록만 읽는다.
 test("빌드한 entry의 stdio 도구 목록은 manifest와 정확히 같다", async () => {
   const root = join(import.meta.dir, "..");
-  const manifest = await Bun.file(join(root, "connector.json")).json();
+  const manifest = await Bun.file(join(root, "assistant.json")).json();
   const client = new Client({ name: "bundle-contract-test", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,

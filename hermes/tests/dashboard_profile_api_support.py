@@ -25,12 +25,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BUNDLE_SCRIPT = ROOT / "bundle.sh"
 # 묶음을 만들 때 주는 검사용 Control Plane MCP 주소다.
 MCP_URL = "http://control-plane.test/mcp"
-# 시험 커넥터다. 운영 목록의 이름과 운영자가 주는 env 값이다.
+# 시험 플러그인다. 운영 목록의 이름과 운영자가 주는 env 값이다.
 DEMO_CONNECTOR = ROOT / "tests/fixtures/demo-connector"
 DEMO = "demo-notes"
 DEMO_BASE = "http://demo.test/base"
-# 앞선 판의 plugin 이 이름으로 알던 커넥터다. 그 판이 남긴 소유 기록을 인정하는지 보는 검사만 쓴다.
-# 바인딩 설치 검사가 시험 커넥터와 함께 붙이는 두 번째 커넥터다. 시험 커넥터를 복사해 이름과 env 이름만 바꾼다.
+# 앞선 판의 plugin 이 이름으로 알던 플러그인다. 그 판이 남긴 소유 기록을 인정하는지 보는 검사만 쓴다.
+# 바인딩 설치 검사가 시험 플러그인과 함께 붙이는 두 번째 플러그인다. 시험 플러그인을 복사해 이름과 env 이름만 바꾼다.
 OTHER = "other-notes"
 OTHER_BASE = "http://other.test/base"
 # 보관 파일에 넣는 칸 값이다. 응답과 백업 어디에도 나오면 안 된다.
@@ -67,7 +67,7 @@ def remote_connector(root: pathlib.Path, url: str | None = REMOTE_URL) -> pathli
     (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"remote": server}}), encoding="utf-8")
     (root / "skills/remote").mkdir(parents=True)
     (root / "skills/remote/SKILL.md").write_text(
-        "---\nname: remote\ndescription: 원격 메모 커넥터의 스킬이다.\n---\n\n# 원격 메모\n", encoding="utf-8")
+        "---\nname: remote\ndescription: 원격 메모 플러그인의 스킬이다.\n---\n\n# 원격 메모\n", encoding="utf-8")
     return root
 
 
@@ -241,7 +241,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.attachment_root.mkdir()
         self.attachment_agent_root = str(base / "agent-attachments")
         pathlib.Path(self.attachment_agent_root).mkdir()
-        # 커넥터 출력 루트다. 기본 정책에는 넣지 않는다. 넣는 검사만 `sandbox_policy(connector_output_root=...)` 로 준다.
+        # 플러그인 출력 루트다. 기본 정책에는 넣지 않는다. 넣는 검사만 `sandbox_policy(connector_output_root=...)` 로 준다.
         self.connector_output_root = str(base / "connector-output")
         # Docker 호스트 쪽 스킬 루트다. 기본 정책에는 넣지 않는다. 넣는 검사만 `sandbox_policy(skill_root=...)` 로 준다.
         # Hermes 쪽 스킬 루트는 `self.skill_root` 다.
@@ -249,7 +249,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         # Control Plane 이 Hermes 를 부르기 전에 주인의 첨부 디렉터리를 만든다. plugin 은 만들지 않는다(ADR-091).
         for owner in ("user-1", "user-2", "user-a", "user-b"):
             self.prepare_attachment_directory(owner)
-        # 커넥터 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.
+        # 플러그인 검사도 환경 변수를 바꿔 끼운다. 되돌리는 순서가 엇갈리지 않게 같은 방식으로 건다.
         skill_env = mock.patch.dict(os.environ, {"FOS_ASSISTANT_SKILL_AGENT_ROOT": str(self.skill_root),
                                                  "FOS_ASSISTANT_SANDBOX": json.dumps(self.sandbox_policy())})
         skill_env.start()
@@ -313,7 +313,7 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def connector_environment(self, roots):
         """운영 목록과 기본 실행 파일을 환경 변수로 준다. 검사가 끝나면 되돌린다."""
-        # 커넥터 실행 파일은 검사가 만든 파일이다. 실행 정의가 이 경로를 그대로 싣는지 본다.
+        # 플러그인 실행 파일은 검사가 만든 파일이다. 실행 정의가 이 경로를 그대로 싣는지 본다.
         command = self.root.parent / "bin/connector-runner"
         command.parent.mkdir()
         command.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -327,7 +327,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.addCleanup(environ.stop)
 
     def connector_fixture(self):
-        """일반 바인딩 설치를 검증할 커넥터 하나와 vault를 준비한다."""
+        """일반 바인딩 설치를 검증할 플러그인 하나와 vault를 준비한다."""
         demo, _ = self.bind_fixture()
         roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])
         roots.pop(OTHER)
@@ -358,14 +358,14 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     @contextlib.contextmanager
     def without_environment(self, *names):
-        """그 안에서만 환경 변수를 뺀다. 나오면 커넥터 준비가 준 값으로 돌아간다."""
+        """그 안에서만 환경 변수를 뺀다. 나오면 플러그인 준비가 준 값으로 돌아간다."""
         with mock.patch.dict(os.environ):
             for name in names:
                 os.environ.pop(name, None)
             yield
 
     def declare_tools(self, root, tools):
-        """그 커넥터의 `connector.json` 을 `schema: 2` 로 바꾸고 도구 정책을 선언한다."""
+        """그 플러그인의 `connector.json` 을 `schema: 2` 로 바꾸고 도구 정책을 선언한다."""
         path = root / "connector.json"
         declared = json.loads(path.read_text(encoding="utf-8"))
         declared.update(schema=2, tools=tools)
@@ -404,7 +404,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(written[-1], "__init__.py")
 
     def other_connector(self):
-        """시험 커넥터를 복사해 이름, 서버 이름, env 이름, 스킬 이름을 바꾼 두 번째 커넥터를 만든다."""
+        """시험 플러그인을 복사해 이름, 서버 이름, env 이름, 스킬 이름을 바꾼 두 번째 플러그인을 만든다."""
         root = self.root.parent / "other-connector"
         shutil.copytree(DEMO_CONNECTOR, root)
         declared = json.loads((root / "connector.json").read_text(encoding="utf-8"))
@@ -421,11 +421,11 @@ class ProfileApiRouteTest(unittest.TestCase):
         shutil.rmtree(root / "skills/demo")
         (root / "skills/other-dir").mkdir()
         (root / "skills/other-dir/SKILL.md").write_text(
-            "---\nname: other\ndescription: 두 번째 커넥터의 스킬이다.\n---\n\n# 다른 메모\n", encoding="utf-8")
+            "---\nname: other\ndescription: 두 번째 플러그인의 스킬이다.\n---\n\n# 다른 메모\n", encoding="utf-8")
         return root
 
     def bind_fixture(self):
-        """바인딩 설치 검사의 준비다. 커넥터 둘을 운영 목록에 올리고 일반 에이전트의 관리 profile 과 보관 파일 둘을 둔다."""
+        """바인딩 설치 검사의 준비다. 플러그인 둘을 운영 목록에 올리고 일반 에이전트의 관리 profile 과 보관 파일 둘을 둔다."""
         self.make_profile("alice")
         self.plugin._apply_template("alice")
         demo = self.root.parent / "demo-connector"
@@ -471,7 +471,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         return self.request("/api/connectors", "PUT", token="valid", full_response=True, body=body)
 
     def declare_owner_attachments(self, connector, server="demo", name="DEMO_ATTACHMENT_DIR"):
-        """시험 커넥터 사본이 주인의 첨부 디렉터리를 받는 env 를 선언하게 한다(ADR-20261007 connector-owner-attachments)."""
+        """시험 플러그인 사본이 주인의 첨부 디렉터리를 받는 env 를 선언하게 한다(ADR-20261007 connector-owner-attachments)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["owner_attachments_env"] = name
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
@@ -480,7 +480,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
     def declare_owner_output(self, connector, server="demo", name="DEMO_OUTPUT_DIR"):
-        """시험 커넥터 사본이 커넥터 출력 디렉터리를 받는 env 를 선언하게 한다(ADR-20261008 connector-output-files)."""
+        """시험 플러그인 사본이 플러그인 출력 디렉터리를 받는 env 를 선언하게 한다(ADR-20261008 connector-output-files)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["owner_output_env"] = name
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
@@ -489,7 +489,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
     def declare_owner_browser(self, connector, server="demo", name="DEMO_BROWSER_URL"):
-        """시험 커넥터 사본이 브라우저 중계 주소를 받는 env 를 선언하게 한다(ADR-20261008 browser-gateway-token)."""
+        """시험 플러그인 사본이 브라우저 중계 주소를 받는 env 를 선언하게 한다(ADR-20261008 browser-gateway-token)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["owner_browser_env"] = name
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
@@ -498,7 +498,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         (connector / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
 
     def declare_sandbox_required(self, connector):
-        """시험 커넥터 사본이 실행 공간 정책에 등록된 profile 에만 붙게 선언하게 한다(ADR-20261008 connector-binding-guards)."""
+        """시험 플러그인 사본이 실행 공간 정책에 등록된 profile 에만 붙게 선언하게 한다(ADR-20261008 connector-binding-guards)."""
         declared = json.loads((connector / "connector.json").read_text(encoding="utf-8"))
         declared["sandbox_required"] = True
         (connector / "connector.json").write_text(json.dumps(declared), encoding="utf-8")
@@ -520,7 +520,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         return response.body
 
     def host_profile(self):
-        """커넥터 표식만 있는 사람이 만든 profile `human` 을 만든다. Control Plane MCP 와 정책 hook 이 켜져 있다."""
+        """플러그인 표식만 있는 사람이 만든 profile `human` 을 만든다. Control Plane MCP 와 정책 hook 이 켜져 있다."""
         self.make_profile("human")
         config = yaml.safe_load((self.root / "human/config.yaml").read_text(encoding="utf-8"))
         config.update(
@@ -662,7 +662,7 @@ class ProfileApiRouteTest(unittest.TestCase):
         return body
 
     def connector_output_directory(self, owner, profile, connector=None):
-        """정책의 `connector_output_root` 아래 그 profile 의 커넥터 출력 디렉터리다(ADR-20261008 connector-output-files)."""
+        """정책의 `connector_output_root` 아래 그 profile 의 플러그인 출력 디렉터리다(ADR-20261008 connector-output-files)."""
         directory = "%s/users/%s/%s" % (self.connector_output_root, hashlib.sha256(owner.encode("utf-8")).hexdigest(),
                                         profile)
         return directory if connector is None else "%s/%s" % (directory, connector)

@@ -440,7 +440,7 @@ test("빌드한 production stdio bundle의 계좌·시세 도구가 실제 HTTP 
     });
     const listed = (await client.listTools()).tools;
     const manifest = JSON.parse(
-      readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
+      readFileSync(`${import.meta.dir}/../assistant.json`, "utf8"),
     );
     for (const entry of listed)
       expect(entry.description).toBe(manifest.tools[entry.name].description);

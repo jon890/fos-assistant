@@ -74,7 +74,7 @@ export class FakeCdp {
     this.sockets.get(target)?.send(JSON.stringify({ method, params }));
   }
 
-  /** 시험이 미리 열어 둔 다른 탭. 커넥터가 닫으면 안 된다. */
+  /** 시험이 미리 열어 둔 다른 탭. 플러그인이 닫으면 안 된다. */
   addTarget(page: string) {
     const id = `page-${this.nextTarget++}`;
     this.targets.set(id, page);

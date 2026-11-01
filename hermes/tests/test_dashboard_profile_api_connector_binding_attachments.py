@@ -10,7 +10,7 @@ import dashboard_profile_api_support as support
 
 class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
     def test_binding_a_connector_that_reads_owner_attachments_writes_the_owner_directory(self):
-        """선언한 커넥터의 바인딩 설치는 서버 정의 env 에 정책 루트 아래 그 주인의 디렉터리를 넣고 `.env` 에는 쓰지 않는다."""
+        """선언한 플러그인의 바인딩 설치는 서버 정의 env 에 정책 루트 아래 그 주인의 디렉터리를 넣고 `.env` 에는 쓰지 않는다."""
         demo, _ = self.bind_fixture()
         self.declare_owner_attachments(demo)
 
@@ -84,7 +84,7 @@ class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
         self.assertEqual(self.tree("alice"), before)
 
     def test_binding_a_connector_without_the_declaration_ignores_the_owner(self):
-        """선언하지 않은 커넥터의 설치는 `sandbox_owner` 를 받아도 쓰지 않고, 실행 공간 정책 없이 지금처럼 붙는다."""
+        """선언하지 않은 플러그인의 설치는 `sandbox_owner` 를 받아도 쓰지 않고, 실행 공간 정책 없이 지금처럼 붙는다."""
         self.bind_fixture()
         with self.without_environment("FOS_ASSISTANT_SANDBOX"):
             response = self.bind(owner="user-9")
@@ -94,7 +94,7 @@ class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
                          {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE})
 
     def test_owner_directory_in_a_record_must_keep_its_shape(self):
-        """소유 기록의 주인 디렉터리 값이 참조나 다른 모양으로 바뀌면 그 커넥터의 실행 정의가 manifest 와 다르다."""
+        """소유 기록의 주인 디렉터리 값이 참조나 다른 모양으로 바뀌면 그 플러그인의 실행 정의가 manifest 와 다르다."""
         demo, _ = self.bind_fixture()
         self.declare_owner_attachments(demo)
         self.assertEqual(self.bind(owner="user-1").status_code, 200)

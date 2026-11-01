@@ -1,7 +1,7 @@
-"""커넥터가 선언한 주인 env 를 검증한다.
+"""플러그인이 선언한 주인 env 를 검증한다.
 
 주인 env 는 바인딩 설치가 그 에이전트 주인의 값으로 채우는 env 이름이다.
-첨부 디렉터리, 커넥터 출력 디렉터리, 브라우저 중계 주소가 있고, 브라우저 로그인 안내 주소도 여기서 본다.
+첨부 디렉터리, 플러그인 출력 디렉터리, 브라우저 중계 주소가 있고, 브라우저 로그인 안내 주소도 여기서 본다.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from .connector_schema import (
 
 
 def _connector_owner_env(declared: dict, field_env: set, operator_env: list):
-    """`connector.json` 의 주인 env 선언을 읽는다. 틀리면 예외다.
+    """`assistant.json` 의 주인 env 선언을 읽는다. 틀리면 예외다.
 
     `(owner_attachments_env, owner_output_env, owner_browser_env, owner_browser_login_url, owner_env)` 를 낸다.
     `owner_env` 는 선언한 주인 env 이름의 집합이다.
     """
-    # 사용자 첨부를 읽는 커넥터가 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-20261007 connector-owner-attachments).
+    # 사용자 첨부를 읽는 플러그인이 받을 env 이름이다. 값은 바인딩 설치가 그 에이전트 주인의 디렉터리로 넣는다(ADR-20261007 connector-owner-attachments).
     owner_attachments_env = declared.get("owner_attachments_env")
     if owner_attachments_env is not None and (
             not isinstance(owner_attachments_env, str) or not OWNER_ATTACHMENTS_ENV_RE.fullmatch(owner_attachments_env)

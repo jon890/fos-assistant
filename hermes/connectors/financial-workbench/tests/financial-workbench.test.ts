@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import manifest from "../connector.json";
+import manifest from "../assistant.json";
 import { baseUrlOf, createWorkbenchServer } from "../src/server.ts";
 import {
   credentials,

@@ -128,7 +128,7 @@ async function connectors(root: string) {
     if (!stat.isDirectory()) continue;
     requireValue(/^[a-z][a-z0-9-]*$/.test(name), "INVALID_CONNECTOR_ID");
     const metadata = JSON.parse(
-      await readFile(join(root, name, "connector.json"), "utf8"),
+      await readFile(join(root, name, "assistant.json"), "utf8"),
     );
     requireValue(metadata.id === name, "CONNECTOR_ID_MISMATCH");
     const mcp = JSON.parse(

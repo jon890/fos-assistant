@@ -8,7 +8,7 @@ import { createServer, isSupportedBunVersion } from "../src/server.ts";
 import { BLOG_ID_PATTERN, BROWSER_URL_PATTERN } from "../src/session.ts";
 
 const root = join(import.meta.dir, "..");
-const manifest = JSON.parse(readFileSync(join(root, "connector.json"), "utf8"));
+const manifest = JSON.parse(readFileSync(join(root, "assistant.json"), "utf8"));
 const CONNECTOR_SCHEMA = join(
   root,
   "../../plugins/dashboard-profile-api/connector_schema.py",

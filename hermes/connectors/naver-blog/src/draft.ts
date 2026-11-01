@@ -20,7 +20,9 @@ export const draftShape = {
   photo_dir: z
     .string()
     .optional()
-    .describe("사진 지시가 있으면 필수. 대화 입력이 적은 첨부 사진 디렉터리의 절대 경로"),
+    .describe(
+      "사진 지시가 있으면 필수. 대화 입력이 적은 첨부 사진 디렉터리의 절대 경로",
+    ),
 };
 
 export type DraftInput = {
@@ -69,7 +71,8 @@ export function parseBody(body: string): Block[] {
   return body.split("\n").map((raw): Block => {
     const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
     const image = IMAGE_LINE.exec(line);
-    if (image) return { type: "image", number: Number(image[1]), file: image[2]! };
+    if (image)
+      return { type: "image", number: Number(image[1]), file: image[2]! };
     const sticker = STICKER_LINE.exec(line);
     if (sticker) return { type: "sticker", code: sticker[1]! };
     const map = MAP_LINE.exec(line);
@@ -89,14 +92,18 @@ export function validateDraft(input: DraftInput): string[] {
   const problems: string[] = [];
   const titleLength = length(input.title);
   if (titleLength < 1 || titleLength > TITLE_MAX)
-    problems.push(`제목은 1자에서 ${TITLE_MAX}자까지입니다. 지금 ${titleLength}자입니다.`);
+    problems.push(
+      `제목은 1자에서 ${TITLE_MAX}자까지입니다. 지금 ${titleLength}자입니다.`,
+    );
   const categoryLength = length(input.category);
   if (categoryLength < 1 || categoryLength > CATEGORY_MAX)
     problems.push(
       `카테고리는 1자에서 ${CATEGORY_MAX}자까지입니다. 지금 ${categoryLength}자입니다.`,
     );
   if (input.tags.length > TAGS_MAX)
-    problems.push(`태그는 ${TAGS_MAX}개까지입니다. 지금 ${input.tags.length}개입니다.`);
+    problems.push(
+      `태그는 ${TAGS_MAX}개까지입니다. 지금 ${input.tags.length}개입니다.`,
+    );
   input.tags.forEach((tag, index) => {
     const tagLength = length(tag);
     if (tagLength < 1 || tagLength > TAG_MAX)
@@ -118,10 +125,14 @@ export function validateDraft(input: DraftInput): string[] {
   });
   const bodyLength = length(input.body);
   if (bodyLength > BODY_MAX)
-    problems.push(`본문은 ${BODY_MAX}자까지입니다. 지금 ${bodyLength}자입니다.`);
+    problems.push(
+      `본문은 ${BODY_MAX}자까지입니다. 지금 ${bodyLength}자입니다.`,
+    );
 
   // `read_draft` 가 돌려준 기존 구성요소 줄은 그 글 안에서만 뜻이 있다. 새 글에 넣으면 글자로 들어간다.
-  const existing = input.body.split("\n").filter((raw) => EXISTING_LINE.test(raw.replace(/\r$/, "")));
+  const existing = input.body
+    .split("\n")
+    .filter((raw) => EXISTING_LINE.test(raw.replace(/\r$/, "")));
   if (existing.length)
     problems.push(
       `${existing[0]} 같은 기존 구성요소 줄은 새 글에 넣을 수 없습니다. 그 줄을 지우거나 [사진 N: 파일 이름] 으로 바꿉니다.`,
@@ -132,9 +143,13 @@ export function validateDraft(input: DraftInput): string[] {
   const stickers = blocks.filter((block) => block.type === "sticker").length;
   const maps = blocks.filter((block) => block.type === "map").length;
   if (images.length > PHOTOS_MAX)
-    problems.push(`사진은 ${PHOTOS_MAX}장까지입니다. 지금 ${images.length}장입니다.`);
+    problems.push(
+      `사진은 ${PHOTOS_MAX}장까지입니다. 지금 ${images.length}장입니다.`,
+    );
   if (stickers > STICKERS_MAX)
-    problems.push(`스티커는 ${STICKERS_MAX}개까지입니다. 지금 ${stickers}개입니다.`);
+    problems.push(
+      `스티커는 ${STICKERS_MAX}개까지입니다. 지금 ${stickers}개입니다.`,
+    );
   if (maps > MAPS_MAX)
     problems.push(`지도는 ${MAPS_MAX}개까지입니다. 지금 ${maps}개입니다.`);
   for (const image of images) {
@@ -158,7 +173,10 @@ function matchesSignature(extension: string, head: Uint8Array) {
       return head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
     case "png":
       return (
-        head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
+        head[0] === 0x89 &&
+        head[1] === 0x50 &&
+        head[2] === 0x4e &&
+        head[3] === 0x47
       );
     case "gif":
       return ascii(0, 4) === "GIF8";
@@ -171,7 +189,7 @@ function matchesSignature(extension: string, head: Uint8Array) {
   }
 }
 
-/** 설치가 바인딩 주인의 첨부 디렉터리를 넣는 env 이름. connector.json 의 `owner_attachments_env` 와 같다. */
+/** 설치가 바인딩 주인의 첨부 디렉터리를 넣는 env 이름. assistant.json 의 `owner_attachments_env` 와 같다. */
 export const ATTACHMENT_DIR_ENV = "NAVER_BLOG_ATTACHMENT_DIR";
 
 /**
@@ -184,7 +202,12 @@ export const photoProblem = (number: number) =>
 
 /** `..` 조각 없는 절대 경로를 끝의 `/` 없이 돌려준다. 아니면 `null`. */
 function plainAbsolute(path: string) {
-  if (!isAbsolute(path) || path.split("/").includes("..") || path.includes("\0")) return null;
+  if (
+    !isAbsolute(path) ||
+    path.split("/").includes("..") ||
+    path.includes("\0")
+  )
+    return null;
   const trimmed = path.replace(/\/+$/, "");
   return trimmed === "" ? null : trimmed;
 }
@@ -206,7 +229,11 @@ async function checkDirectory(
   if (directory !== root && !directory.startsWith(`${root}/`)) return null;
   try {
     // 실제 경로가 글자 그대로면 `.` 이나 빈 조각도 없다.
-    if ((await realpath(root)) !== root || (await realpath(directory)) !== directory) return null;
+    if (
+      (await realpath(root)) !== root ||
+      (await realpath(directory)) !== directory
+    )
+      return null;
     const paths = [root];
     if (directory !== root)
       for (const part of directory.slice(root.length + 1).split("/"))
@@ -237,7 +264,10 @@ export async function stillInPlace(
   try {
     const again = await lstat(path);
     return (
-      !again.isSymbolicLink() && again.isFile() && again.dev === opened.dev && again.ino === opened.ino
+      !again.isSymbolicLink() &&
+      again.isFile() &&
+      again.dev === opened.dev &&
+      again.ino === opened.ino
     );
   } catch {
     return false;
@@ -274,13 +304,15 @@ async function inspectPhoto(
   try {
     const stat = await handle.stat();
     // 확인한 파일과 연 파일이 다르면 그 사이에 바뀐 것이다.
-    if (!stat.isFile() || stat.dev !== linked.dev || stat.ino !== linked.ino) return null;
+    if (!stat.isFile() || stat.dev !== linked.dev || stat.ino !== linked.ino)
+      return null;
     if (!(await stillInPlace(photoDir, attachmentDir, path, stat))) return null;
     if (stat.size > PHOTO_MAX_BYTES) return null;
     const size = whole ? stat.size : Math.min(12, stat.size);
     const bytes = new Uint8Array(size);
     const { bytesRead } = await handle.read(bytes, 0, size, 0);
-    if (!matchesSignature(extensionOf(file), bytes.subarray(0, bytesRead))) return null;
+    if (!matchesSignature(extensionOf(file), bytes.subarray(0, bytesRead)))
+      return null;
     return bytes.subarray(0, bytesRead);
   } catch {
     return null;
@@ -310,7 +342,13 @@ export async function checkPhotoFiles(
     if (!usable.has(image.file))
       usable.set(
         image.file,
-        (await inspectPhoto(input.photo_dir, attachmentDir, directory, image.file, false)) !== null,
+        (await inspectPhoto(
+          input.photo_dir,
+          attachmentDir,
+          directory,
+          image.file,
+          false,
+        )) !== null,
       );
     if (!usable.get(image.file)) problems.push(photoProblem(image.number));
   }
@@ -324,7 +362,9 @@ export async function readPhoto(
   attachmentDir: string | undefined,
 ): Promise<{ bytes: Uint8Array; mime: string }> {
   const photoDir = input.photo_dir;
-  const directory = photoDir ? await checkDirectory(photoDir, attachmentDir) : null;
+  const directory = photoDir
+    ? await checkDirectory(photoDir, attachmentDir)
+    : null;
   const bytes =
     photoDir && directory
       ? await inspectPhoto(photoDir, attachmentDir, directory, file, true)

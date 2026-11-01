@@ -1,16 +1,16 @@
-"""커넥터 manifest 와 소유 기록이 함께 쓰는 형식 규칙이다."""
+"""플러그인 manifest 와 소유 기록이 함께 쓰는 형식 규칙이다."""
 
 from __future__ import annotations
 
 import re
 
 
-# 요청은 이름만 받는다. 실행 정의는 커넥터 checkout 의 manifest 가 소유한다.
-# 커넥터 이름과 plugin 디렉터리를 묶은 JSON 을 대시보드 프로세스의 환경 변수로 받는다. 근거는 ADR-041 이 갖는다.
+# 요청은 이름만 받는다. 실행 정의는 플러그인 checkout 의 manifest 가 소유한다.
+# 플러그인 이름과 plugin 디렉터리를 묶은 JSON 을 대시보드 프로세스의 환경 변수로 받는다. 근거는 ADR-041 이 갖는다.
 CONNECTOR_ROOTS_ENV = "FOS_ASSISTANT_CONNECTOR_ROOTS"
 
 
-# 커넥터 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
+# 플러그인 MCP 서버를 실행할 파일의 절대 경로다. 운영 목록 항목에 `command` 가 없을 때 쓴다.
 CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
 
 
@@ -24,7 +24,7 @@ BIND_MODE = "bind"
 CONNECTOR_SKILL_PARTS = ("references", "templates")
 
 
-# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다.
+# 플러그인 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다.
 # 그 값은 `SkillService` 의 `MAX_FILES` 와 `MAX_CHARS_PER_FILE` 이 갖는다. 바꾸면 함께 고친다.
 CONNECTOR_SKILL_MAX_FILES = 20
 
@@ -32,7 +32,7 @@ CONNECTOR_SKILL_MAX_FILES = 20
 CONNECTOR_SKILL_MAX_CHARS = 100_000
 
 
-# `connector.json` 의 형식 규칙이다. `hermes/connectors/README.md` 의 「connector.json」 표와 같다.
+# `assistant.json` 의 형식 규칙이다. `hermes/connectors/README.md` 의 「assistant.json」 표와 같다.
 CONNECTOR_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 
 
@@ -64,8 +64,8 @@ OWNER_ATTACHMENTS_ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 OWNER_ATTACHMENTS_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}$")
 
 
-# 커넥터 출력 디렉터리를 받을 env 에 설치가 넣는 값의 끝 모양이다.
-# `<connector_output_root>/users/<SHA-256 16진수>/<profile>/<커넥터 id>` 다(ADR-20261008 connector-output-files).
+# 플러그인 출력 디렉터리를 받을 env 에 설치가 넣는 값의 끝 모양이다.
+# `<connector_output_root>/users/<SHA-256 16진수>/<profile>/<플러그인 id>` 다(ADR-20261008 connector-output-files).
 OWNER_OUTPUT_VALUE_RE = re.compile(r"^/[^$\0\r\n]*/users/[0-9a-f]{64}/[^/$\0\r\n]+/[^/$\0\r\n]+$")
 
 
@@ -95,7 +95,7 @@ OUTCOME_UNKNOWN = "outcome_unknown"
 ERROR_CODE_RE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 
 
-# `errors` 표의 객체 항목이 고를 수 있는 복구 어휘다. 커넥터는 글을 쓰지 않고 어휘만 고른다.
+# `errors` 표의 객체 항목이 고를 수 있는 복구 어휘다. 플러그인은 글을 쓰지 않고 어휘만 고른다.
 # Control Plane 의 `ConnectorRecovery` 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
 ERROR_RECOVERIES = frozenset({"recheck", "reconnect", "fix_input", "retry_later"})
 
@@ -105,7 +105,7 @@ ERROR_DETAILS_MAX = 4
 
 
 # `outcome_unknown` 객체 항목의 `retry_key` 이름과 그 칸 값의 형식이다(ADR-20261013 unknown-retry-key).
-# 값은 커넥터가 만든 UUID 같은 식별자만 받는다. 공백과 `@`, 따옴표가 든 글은 받지 않아 오류 원문이나 개인 정보가 이 길로 가지 못한다.
+# 값은 플러그인이 만든 UUID 같은 식별자만 받는다. 공백과 `@`, 따옴표가 든 글은 받지 않아 오류 원문이나 개인 정보가 이 길로 가지 못한다.
 # Control Plane 의 `ConnectorUnknownDetail` 과 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
 RETRY_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,31}")
 
@@ -113,11 +113,11 @@ RETRY_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,31}")
 RETRY_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 
-# `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
+# `assistant.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 
 
-# `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
+# `assistant.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
 # 표는 `docs/features/connector-policy.md` 의 「도구 정책」 과 같다.
 TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 
@@ -175,7 +175,7 @@ HERMES_TOOL_PREFIX_MAX_CHARS = 40
 PLUGIN_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
 
 
-# 커넥터 카드의 `icon` 과 `link` 규칙이다. `hermes/connectors/README.md` 의 「아이콘과 링크」 와 같다(ADR-20261008 connector-card).
+# 플러그인 카드의 `icon` 과 `link` 규칙이다. `hermes/connectors/README.md` 의 「아이콘과 링크」 와 같다(ADR-20261008 connector-card).
 ICON_PATH_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$")
 
 
@@ -209,7 +209,7 @@ SVG_FORBIDDEN_RE = re.compile(
 
 
 def _connector_binding_flags(declared: dict) -> dict:
-    """`connector.json` 의 바인딩 제한 선언 둘이다. 없으면 거짓이다(ADR-20261008 connector-binding-guards).
+    """`assistant.json` 의 바인딩 제한 선언 둘이다. 없으면 거짓이다(ADR-20261008 connector-binding-guards).
 
     `single_binding` 은 Control Plane 이 에이전트 하나에만 붙게 판정할 때 쓴다. 카탈로그에 싣는다.
     `sandbox_required` 는 바인딩 설치가 실행 공간 정책에 등록된 profile 에만 붙일 때 쓴다. 카탈로그에 싣지 않는다.

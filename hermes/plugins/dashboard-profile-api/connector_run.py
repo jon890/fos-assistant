@@ -1,4 +1,4 @@
-"""커넥터 call 과 execute 요청을 처리하고 동시 호출 한도를 함께 지킨다."""
+"""플러그인 call 과 execute 요청을 처리하고 동시 호출 한도를 함께 지킨다."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ from .sandbox import (
 )
 
 
-# 커넥터 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
+# 플러그인 도구 호출 하나의 시간 제한과 대시보드 프로세스 전체의 동시 실행 수다.
 CONNECTOR_CALL_TIMEOUT_SECONDS = 10
 
 
@@ -93,10 +93,10 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     """후보 값이나 보관 파일의 값으로 선택지 도구나 확인 도구를 한 번 부른다. 값을 디스크와 응답과 로그에 남기지 않는다.
 
     `listing` 이 참이면 도구를 부르지 않고 `tools/list` 만 받아 `{"ok": true, "tools": [{"name", "read_only"}]}` 로 답한다.
-    `schema: 3` 커넥터만 받는다. 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다. 시간 제한과 동시 한도는 같다.
-    본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `listing` 이면 `tool` 이 없다. `vault` 는 그 커넥터의 보관 파일이어야 한다.
-    보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 확인된다.
-    `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 커넥터만 쓴다.
+    `schema: 3` 플러그인만 받는다. 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다. 시간 제한과 동시 한도는 같다.
+    본문은 `values` 와 `vault` 가운데 정확히 하나를 갖는다. `listing` 이면 `tool` 이 없다. `vault` 는 그 플러그인의 보관 파일이어야 한다.
+    보관 파일의 키 가운데 지금 manifest 의 칸에 없는 것은 버린다. 칸을 뺀 플러그인의 옛 연결도 확인된다.
+    `owner_browser` 는 선택이다. 요청자의 호출 표식을 실은 중계 주소이고, `owner_browser_env` 를 선언한 플러그인만 쓴다.
     """
     from starlette.responses import JSONResponse
     global _connector_calls
@@ -118,16 +118,16 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     # 도구 목록은 도구를 부르지 않는다. 로그에 남길 이름만 둔다.
     tool = "tools/list" if listing else body["tool"]
     if not listing and (not isinstance(tool, str) or tool not in manifest["call_tools"]):
-        return _rejected("이 커넥터가 선택지나 확인에 쓰는 도구가 아니다")
+        return _rejected("이 플러그인이 선택지나 확인에 쓰는 도구가 아니다")
     if "vault" in body:
         try:
             stored = await asyncio.to_thread(_read_vault, body["vault"])
         except Exception as error:
-            logger.warning("dashboard-profile-api: 커넥터 %s 의 보관 파일을 읽지 못했다: %s",
+            logger.warning("dashboard-profile-api: 플러그인 %s 의 보관 파일을 읽지 못했다: %s",
                            connector_id, type(error).__name__)
             return failed("unavailable")
         if stored is None or stored["connector"] != connector_id:
-            return _rejected("이 커넥터의 보관 파일이 없다")
+            return _rejected("이 플러그인의 보관 파일이 없다")
         known = {field["key"] for field in manifest["fields"]}
         candidates = {key: value for key, value in stored["values"].items() if key in known}
     else:
@@ -145,7 +145,7 @@ async def _connector_call_request(request, connector_id: str, listing=False):
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
     if manifest["owner_attachments_env"] is not None:
-        # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 커넥터가 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
+        # 이 경로에는 바인딩 주인이 없다. 빈 값을 주어 플러그인이 사용자 첨부를 읽지 않게 한다(ADR-20261007 connector-owner-attachments).
         env[manifest["owner_attachments_env"]] = ""
     if manifest["owner_output_env"] is not None:
         # 확인 도구와 선택지는 파일을 내지 않는다(ADR-20261008 connector-output-files).
@@ -161,13 +161,13 @@ async def _connector_call_request(request, connector_id: str, listing=False):
 
     problem = _mcp_sdk_problem()
     if problem is not None:
-        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 플러그인 도구를 부르지 않는다: %s",
                        _mcp_sdk_version(), problem)
         return failed("unavailable")
 
     # 줄을 세우지 않는다. 가득 차 있으면 기다리는 동안 요청이 쌓여 대시보드가 느려진다.
     if _connector_calls >= CONNECTOR_CALL_LIMIT:
-        logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
+        logger.warning("dashboard-profile-api: 플러그인 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
         return failed("unavailable")
     _connector_calls += 1
     seen = {"rejected": False}
@@ -187,14 +187,14 @@ async def _connector_call_request(request, connector_id: str, listing=False):
             # 선택지와 확인 도구는 읽기 전용이다. 결과를 모르는 쓰기가 없으므로 `unavailable` 과 같다.
             answer = {"ok": False, "error": "unavailable"}
     except ImportError:
-        logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 커넥터 도구를 부르지 못했다")
+        logger.warning("dashboard-profile-api: mcp SDK 를 읽어 오지 못해 플러그인 도구를 부르지 못했다")
         return failed("unavailable")
     except asyncio.TimeoutError:
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, tool)
         return failed(rejected_or("unavailable"))
     except Exception as error:
         # 예외 본문에는 자식의 출력이나 원격 주소가 섞일 수 있다. 가장 안쪽 예외의 종류만 남긴다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 도구 %s 를 부르지 못했다: %s (mcp SDK %s)",
                        connector_id, tool, ", ".join(sorted(set(_leaf_error_types(error)))), _mcp_sdk_version())
         return failed(rejected_or("unavailable"))
     finally:
@@ -225,7 +225,7 @@ def _installed_owner_attachments(installed_env: dict, manifest: dict) -> str:
 
     바인딩 설치가 운영 정책의 `attachment_agent_root` 와 주인으로 넣은 값만 돌려준다.
     값이 없거나, 지금 정책의 루트 아래 `users/<64자리 16진수>` 모양이 아니거나, 정책이 없으면 빈 값이다.
-    빈 값을 받은 커넥터는 사용자 첨부를 읽지 않는다(ADR-20261007 connector-owner-attachments).
+    빈 값을 받은 플러그인은 사용자 첨부를 읽지 않는다(ADR-20261007 connector-owner-attachments).
     """
     value = installed_env.get(manifest["owner_attachments_env"])
     if not isinstance(value, str) or not OWNER_ATTACHMENTS_VALUE_RE.match(value):
@@ -244,7 +244,7 @@ def _installed_owner_browser(installed_env: dict, manifest: dict) -> str:
     """설치한 서버 정의의 env(`_installed_server_env`)가 가진 브라우저 중계 주소다.
 
     바인딩 설치가 그 바인딩의 표식으로 넣은 값이다. 값이 없거나 `<gateway-base-url>/<접근 표식>` 모양이 아니면 빈 값이다.
-    빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다(ADR-20261008 browser-gateway-token).
+    빈 값을 받은 플러그인은 브라우저에 닿지 못한다고 답한다(ADR-20261008 browser-gateway-token).
     """
     value = installed_env.get(manifest["owner_browser_env"])
     if not isinstance(value, str) or not OWNER_BROWSER_VALUE_RE.fullmatch(value):
@@ -288,17 +288,17 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         if not managed and not (profile_dir / CONNECTOR_HOST_MARKER).is_file():
             return _rejected("관리 표식이 없는 profile 이다", 401)
         state_path = profile_dir / CONNECTOR_STATE
-        # 기록을 검증하면서 이 커넥터의 항목이 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
+        # 기록을 검증하면서 이 플러그인의 항목이 지금 manifest 의 실행 정의와 맞는지도 함께 본다.
         state = (_connector_state(json.loads(state_path.read_text(encoding="utf-8")), connector_id)
                  if state_path.is_file() else {})
         if connector_id not in state:
             return _rejected("설치하지 않은 connector 다", 404)
-        # 커넥터 표식만 있는 profile 은 바인딩 설치만 받는다. 그 밖의 항목으로는 실행하지 않는다.
+        # 플러그인 표식만 있는 profile 은 바인딩 설치만 받는다. 그 밖의 항목으로는 실행하지 않는다.
         if not managed and _entry_mode(state[connector_id]) != BIND_MODE:
             return _rejected("관리 표식이 없는 profile 이다", 401)
         env_path = profile_dir / ".env"
         env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
-        # 설치한 서버 정의는 주인의 값을 쓰는 커넥터만 읽는다. 한 번 읽어 두 값의 모양 검사에 함께 쓴다.
+        # 설치한 서버 정의는 주인의 값을 쓰는 플러그인만 읽는다. 한 번 읽어 두 값의 모양 검사에 함께 쓴다.
         installed_env = (_installed_server_env(profile_dir, manifest)
                          if manifest["owner_attachments_env"] is not None or manifest["owner_browser_env"] is not None
                          else {})
@@ -308,10 +308,10 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
                          if manifest["owner_browser_env"] is not None else None)
     except Exception as error:
         # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 를 실행할 profile 을 확인하지 못했다: %s",
+        logger.warning("dashboard-profile-api: 플러그인 %s 를 실행할 profile 을 확인하지 못했다: %s",
                        connector_id, type(error).__name__)
         return failed("unavailable")
-    # 그 profile 의 값 가운데 이 커넥터의 칸만 넘긴다. 비운 선택 칸은 빈 문자열이다.
+    # 그 profile 의 값 가운데 이 플러그인의 칸만 넘긴다. 비운 선택 칸은 빈 문자열이다.
     env = {field["env"]: _env_value(env_text, field["env"]) for field in manifest["fields"]}
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
@@ -326,7 +326,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         # 원격 서버에는 칸 값이 헤더로 간다. 헤더를 끊는 글자가 있으면 부르지 않는다. 실행되지 않았다.
         # 부르기 전에 까닭을 로그로 남기려는 검사다. 헤더를 만드는 `_remote_request_headers` 도 마지막 방어로 같은 글자를 본다.
         if any(ch in value for value in env.values() for ch in "\r\n\0"):
-            logger.warning("dashboard-profile-api: 커넥터 %s 의 칸 값에 헤더로 보낼 수 없는 글자가 있다", connector_id)
+            logger.warning("dashboard-profile-api: 플러그인 %s 의 칸 값에 헤더로 보낼 수 없는 글자가 있다", connector_id)
             return failed("unavailable")
     else:
         # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
@@ -337,18 +337,18 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
             guarded_tool = await _guard_operation(body["profile"], manifest, state[connector_id], body, env, prepare)
     except Exception as error:
         # 단계 코드만 남긴다. 인자와 profile 의 값은 남기지 않는다.
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 금융 보호 맥락을 확인하지 못했다 stage=%s",
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 금융 보호 맥락을 확인하지 못했다 stage=%s",
                        connector_id, _guard_stage(error)[0])
         return _rejected("금융 보호 맥락을 확인하지 못했다", 409)
     problem = _mcp_sdk_problem()
     if problem is not None:
-        logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
+        logger.warning("dashboard-profile-api: mcp SDK %s 로는 플러그인 도구를 부르지 않는다: %s",
                        _mcp_sdk_version(), problem)
         return failed("unavailable")
 
     # `call` 과 한도를 함께 쓴다. 줄을 세우지 않는다.
     if _connector_calls >= CONNECTOR_CALL_LIMIT:
-        logger.warning("dashboard-profile-api: 커넥터 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
+        logger.warning("dashboard-profile-api: 플러그인 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
         return failed("unavailable")
     _connector_calls += 1
     progress = {"sent": False}
@@ -363,12 +363,12 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         if "execution" in body:
             _guard_result_safe(answer, env)
     except asyncio.TimeoutError:
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
         return _rejected("도구가 시간 제한을 넘겨 실행 결과를 모른다", 504)
     except Exception as error:
         # 예외 본문에는 자식의 출력이나 원격 주소가 섞일 수 있다. 가장 안쪽 예외의 종류와 고정 단계 코드만 남긴다.
         stage, code = _guard_stage(error)
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s) stage=%s code=%s",
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 도구 %s 를 실행하지 못했다: %s (mcp SDK %s) stage=%s code=%s",
                        connector_id, hermes_tool, ", ".join(sorted(set(_leaf_error_types(error)))),
                        _mcp_sdk_version(), stage, code)
         if progress["sent"]:
@@ -384,13 +384,13 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     if answer.get("error") == OUTCOME_UNKNOWN:
         # 도구가 쓰기를 보낸 뒤 답을 받지 못했다고 알렸다. 실패로 답하면 이미 나간 쓰기가 실패로 기록된다.
         # 선언한 코드와 재시도 식별자만 더한다. 에이전트가 같은 식별자로 확인 호출을 하게 한다(ADR-20261013 unknown-retry-key).
-        logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 실행 결과를 모른다고 답했다",
+        logger.warning("dashboard-profile-api: 플러그인 %s 의 도구 %s 가 실행 결과를 모른다고 답했다",
                        connector_id, hermes_tool)
         unknown = {"detail": "도구가 실행 결과를 모른다고 답했다", "code": answer["code"]}
         if "retry" in answer:
             unknown["retry"] = answer["retry"]
         return JSONResponse(unknown, status_code=504)
     if (manifest["schema"] == TOOL_LIST_SCHEMA or manifest["default_tool_policy"] == "ask") and "read_only" in progress:
-        # 표준 플러그인과 `default_tool_policy: ask` 커넥터만 부르기 직전 `tools/list` 의 읽기 표시를 더한다. 옛 Control Plane 은 이 칸을 읽지 않는다(rule-66).
+        # 표준 플러그인과 `default_tool_policy: ask` 플러그인만 부르기 직전 `tools/list` 의 읽기 표시를 더한다. 옛 Control Plane 은 이 칸을 읽지 않는다(rule-66).
         answer = {**answer, "read_only": progress["read_only"]}
     return JSONResponse(answer, status_code=200)
