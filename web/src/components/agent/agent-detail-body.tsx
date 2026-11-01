@@ -14,7 +14,6 @@ import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
 import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
 import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
-import { AgentValueEvaluationSection } from "./agent-value-evaluation-section";
 import { PersonaEditor } from "./persona-editor";
 import {
   GROUP_VISIBILITY,
@@ -26,7 +25,6 @@ import { fetchPersona } from "@/lib/agent-api";
 import type { AgentConnectionsList } from "@/lib/agent-connection";
 import type { ProactiveCheckStatus } from "@/lib/proactive-check";
 import type { SkillListView } from "@/lib/skill";
-import type { EvaluationOverview } from "@/lib/value-evaluation";
 
 /** 서버가 읽어 온 값이거나, 읽지 못했을 때 화면에 보일 안내다. */
 export type Loaded<T> = { ok: true; data: T } | { ok: false; message: string };
@@ -42,8 +40,6 @@ type Props = {
   skills: Loaded<SkillListView> | null;
   /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
   proactiveCheck: Loaded<ProactiveCheckStatus> | null;
-  /** 가치 평가 절을 그리지 않으면 null 이다. 관리자 영역에서 먼저 살펴보기 절을 그릴 때만 읽는다. */
-  valueEvaluation?: Loaded<EvaluationOverview> | null;
   /** 「이 에이전트가 쓰는 연결」 절을 그리지 않으면 null 이다. 주인에게만 그린다. */
   connections?: Loaded<AgentConnectionsList> | null;
   initialVisibility: AdminAgent["visibility"] | undefined;
@@ -89,7 +85,6 @@ export function AgentDetailBody({
   tools,
   skills,
   proactiveCheck,
-  valueEvaluation = null,
   connections = null,
   initialVisibility,
   adminAgent,
@@ -230,19 +225,6 @@ export function AgentDetailBody({
             {proactiveCheck.message}
           </Notice>
           <AgentProactiveScheduleSection code={code} />
-        </section>
-      )}
-      {valueEvaluation === null ? null : valueEvaluation.ok ? (
-        <AgentValueEvaluationSection initialOverview={valueEvaluation.data} />
-      ) : (
-        <section
-          aria-label="가치 평가"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
-        >
-          <h2 className="font-semibold">가치 평가</h2>
-          <Notice variant="error" role="alert" className="mt-3">
-            {valueEvaluation.message}
-          </Notice>
         </section>
       )}
       {adminAgent ? <AgentMemorySection code={code} /> : null}

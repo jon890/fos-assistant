@@ -132,7 +132,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/features/schedule.md`](../../docs/features/schedule.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`docs/features/attention.md`](../../docs/features/attention.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/features/proactive.md`](../../docs/features/proactive.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/features/proactive.md`](../../docs/features/proactive.md)), 매일 루프의 이음매와 보일 판정, 판정 반응([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기, 관리자의 공간별 용량. 아래 「실행 공간 파일」 |
 
