@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import {
   chmod,
@@ -29,6 +29,7 @@ import { fakeRunDraft } from "./fake-worker-entry.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/server.ts";
+import { EditorPage } from "../src/editor/page.ts";
 import { open as openEditor } from "../src/editor/open.ts";
 import { fill } from "../src/editor/text.ts";
 import { localChrome } from "./local-chrome.ts";
@@ -246,28 +247,48 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
   const chrome = await localChrome();
   cleanups.push(() => chrome.stop());
   const env = { ...ENV, NAVER_BLOG_BROWSER_URL: chrome.url };
-  const { dir, jobId, run } = await queuedJob(INPUT, env);
+  const { dir, jobId, runWith } = await queuedJob(INPUT, env);
   const stages: string[] = [];
-  await run(
-    async (actualEnv, blocks, input, onStage, signal) =>
-      runDraft(
-        actualEnv,
-        blocks,
-        input,
-        async (stage) => {
-          stages.push(stage);
-          await onStage(stage);
-          if (stage === "fill")
-            await (
-              await chrome.latest()
-            ).js("document.getElementById('title').style.display='none'");
-        },
-        signal,
-        { stepSeconds: 30, openSeconds: 5 },
-      ),
+  const clock = limitClock();
+  const sleep = EditorPage.prototype.sleep;
+  let titleWaits = 0;
+  // 실제 제목 탐색이 대기에 들어간 뒤 작업 상한만 진행한다. 탭 준비 속도에는 기대지 않는다.
+  const waiting = spyOn(EditorPage.prototype, "sleep").mockImplementation(
+    function (this: EditorPage, seconds: number) {
+      const pending = sleep.call(this, seconds);
+      if (this.stage === "fill") {
+        titleWaits++;
+        clock.advance(5_000);
+      }
+      return pending;
+    },
+  );
+  cleanups.push(() => waiting.mockRestore());
+  await runWith(
+    {
+      scheduleLimit: clock.scheduleLimit,
+      runDraft: async (actualEnv, blocks, input, onStage, signal) =>
+        runDraft(
+          actualEnv,
+          blocks,
+          input,
+          async (stage) => {
+            stages.push(stage);
+            await onStage(stage);
+            if (stage === "fill")
+              await (
+                await chrome.latest()
+              ).js("document.getElementById('title').style.display='none'");
+          },
+          signal,
+          { stepSeconds: 3, openSeconds: 5 },
+        ),
+    },
     5_000,
   );
   const state = await readState(dir, jobId);
+  expect(titleWaits).toBe(1);
+  expect(clock.pending).toBe(false);
   expect(stages).toEqual(["open", "fill"]);
   expect(state).toMatchObject({
     status: "failed",
