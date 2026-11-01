@@ -95,17 +95,24 @@ class AttentionControlWriteFailureTest {
 
 
     @Test
-    @DisplayName("복원 사건을 남기지 못하면 되돌리기 요청이 실패한다. 풀 것이 없으면 사건을 남기지 않고 성공한다")
+    @DisplayName("복원 사건을 남기지 못하면 되돌리기 요청이 실패한다")
     void restoreFailsWhenEventCannotBeWritten() {
-        when(ledger.latestControl(USER.id(), CardKey.FAILURES.name(), ITEM)).thenReturn(Optional.empty());
-        controls.restore(USER, CardKey.FAILURES, ITEM);
-        verify(ledger, never()).append(any());
-
-        when(ledger.latestControl(USER.id(), CardKey.FAILURES.name(), ITEM))
-            .thenReturn(Optional.of(new ReactionRecord(
-                5L, USER.id(), ITEM, "state-a", FeedbackEventType.DISMISSED, "ATTENTION_HIDE", "FAILURES", null, NOW)));
         assertThatThrownBy(() -> controls.restore(USER, CardKey.FAILURES, ITEM))
             .isInstanceOf(IllegalStateException.class);
+        verify(ledger).append(any(ControlEntry.class));
+    }
+
+
+    @Test
+    @DisplayName("마지막 제어가 이미 복원이면 되돌리기는 사건을 더하지 않고 성공한다")
+    void restoreSkipsWhenAlreadyRestored() {
+        when(ledger.latestControl(USER.id(), CardKey.FAILURES.name(), ITEM))
+            .thenReturn(Optional.of(
+                new ReactionRecord(5L, USER.id(), ITEM, null, FeedbackEventType.RESTORED, "ATTENTION_RESTORE", "FAILURES", null, NOW)));
+
+        controls.restore(USER, CardKey.FAILURES, ITEM);
+
+        verify(ledger, never()).append(any());
     }
 
 

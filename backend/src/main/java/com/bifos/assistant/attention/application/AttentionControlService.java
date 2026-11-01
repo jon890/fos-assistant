@@ -169,14 +169,14 @@ public class AttentionControlService {
     }
 
 
-    /** 요청 키 없이 되돌린다. */
+    /** 요청 키 없이 되돌린다. 마지막 제어가 이미 복원이면 사건을 더하지 않는다. */
     public void restore(CurrentUser user, CardKey card, String itemKey) {
         restore(user, card, itemKey, null);
     }
 
 
     /**
-     * 그 카드의 그 항목의 숨기기와 미루기를 푼다. 풀 것이 없어도 끝난다. 푸는 일도 사건이라 이력은 남는다.
+     * 그 카드의 그 항목의 숨기기와 미루기를 푼다. 풀 것이 없어도 끝난다. 푸는 일도 사건이라 이력은 남고, 마지막 제어가 이미 복원일 때만 사건을 더하지 않는다.
      *
      * @param card 모르는 카드 글이면 null
      * @param requestKey 재전송을 한 사건으로 합치는 열쇠. 없으면 null
@@ -203,7 +203,8 @@ public class AttentionControlService {
                 card.name(),
                 null,
                 AttentionReactionCodec.controlEventKey(requestKey, FeedbackEventType.RESTORED, card.name(), itemKey)),
-            latest -> latest.isEmpty() || latest.get().type() == FeedbackEventType.RESTORED);
+            // 읽은 값이 비어 있어도 복원 사건은 남긴다. 아직 커밋되지 않은 숨김과 겹쳤을 때 복원이 빠지지 않게 한다.
+            latest -> latest.filter(record -> record.type() == FeedbackEventType.RESTORED).isPresent());
     }
 
 
