@@ -74,6 +74,9 @@ public class ToolsetVisibilityService {
         } catch (JacksonException ex) {
             throw new IllegalStateException("stored toolset setting is not readable", ex);
         }
+        if (stored == null) {
+            throw new IllegalStateException("stored toolset setting is empty");
+        }
         if (stored.version() == null || stored.version() != VERSION) {
             throw new IllegalStateException("stored toolset setting has an unknown version");
         }

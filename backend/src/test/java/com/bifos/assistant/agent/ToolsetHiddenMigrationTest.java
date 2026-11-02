@@ -87,7 +87,16 @@ class ToolsetHiddenMigrationTest {
                 "INSERT INTO group_setting (group_id, setting_key, setting_value) VALUES (1, 'TOOLSET', '{}')");
         }
 
-        assertThatThrownBy(() -> migrate(database, null)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> migrate(database, null))
+            .isInstanceOf(RuntimeException.class)
+            .hasRootCauseInstanceOf(SQLException.class);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT setting_value FROM group_setting WHERE setting_key = 'TOOLSET'"))
+                .as("기존 줄을 덮어쓰지 않고 다른 TOOLSET 줄도 만들지 않는다")
+                .containsExactly("{}");
+            assertThat(strings(statement, "SELECT COUNT(*) FROM toolset_hidden")).containsExactly("1");
+        }
     }
 
 

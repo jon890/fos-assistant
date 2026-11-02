@@ -104,5 +104,9 @@ class ToolsetVisibilityTest {
             .orElseThrow()
             .change("{\"version\":1}", Instant.parse("2026-11-02T00:00:00Z")));
         assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
+        transactions.executeWithoutResult(status -> settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET))
+            .orElseThrow()
+            .change("null", Instant.parse("2026-11-02T00:00:00Z")));
+        assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
     }
 }

@@ -74,7 +74,7 @@ public class V20261102074304__ToolsetHiddenToGroupSetting extends BaseJavaMigrat
     }
 
 
-    /** 옛 표의 줄 수와 옮긴 줄의 수를 대조한다. 옛 표를 지우는 PR 이 이 수를 믿고 지운다. */
+    /** 옛 표의 줄 수와 옮긴 이름 수를 대조한다. 핵심은 이 두 수의 비교다. 옛 표를 지우는 PR 이 이 수를 믿고 지운다. */
     private static void verify(Connection connection, Map<Long, TreeSet<String>> hidden) throws Exception {
         long oldRows = count(connection, "SELECT COUNT(*) FROM toolset_hidden");
         long storedRows = count(connection, "SELECT COUNT(*) FROM group_setting WHERE setting_key = '" + TOOLSET_KEY + "'");
