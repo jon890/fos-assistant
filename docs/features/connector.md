@@ -435,7 +435,10 @@ Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길�
 
 대시보드 plugin 은 운영 목록의 디렉터리를 Claude Code 플러그인이나 Codex 플러그인으로 읽고, assistant 쪽 정보는 `assistant.json`(옛 이름 `connector.json`)에서 읽는다([ADR-20261026 / plugin-standard-format](../../hermes/docs/adr/ADR-20261026-plugin-standard-format.md)).
 MCP 서버가 `type: http` 이면 자식 프로세스 대신 그 원격 서버에 붙고, 연결의 칸 값은 헤더로만 간다([ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md)).
-Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 전송과 무관하게 같다. 읽기 규칙과 운영 목록 항목은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
+Control Plane 이 보는 카탈로그, 연결, 바인딩, 승인의 흐름은 전송과 무관하게 같다.
+도구 오류는 `{"error": {...}}` 와 함께 원격 서버가 흔히 쓰는 맨 위 `{code, message, details}` 모양도 읽는다. 어느 모양이든 선언한 코드와 정수 세부만 넘기고 원문 메시지는 버린다([ADR-092](../adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md)).
+읽기 규칙과 운영 목록 항목은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
+다른 저장소의 원격 플러그인을 받은 예는 [금융 워크벤치 플러그인](financial-workbench.md) 이다.
 
 **`assistant.json` 이 없는 표준 플러그인도 카탈로그에 `schema: 3` 으로 오른다**([ADR-20261101 / plugin-without-assistant-json](../../hermes/docs/adr/ADR-20261101-plugin-without-assistant-json.md)).
 입력 칸은 MCP 정의의 env 와 헤더 참조에서 추론하고, 확인 도구(`verify`)는 null 이고 `tools` 는 비어 있다.

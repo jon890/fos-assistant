@@ -3,7 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-10-26
 - 플러그인을 읽는 규칙은 [ADR-20261026 / plugin-standard-format](ADR-20261026-plugin-standard-format.md) 이 갖는다. 이 ADR 은 그 가운데 `type: http` 서버를 받는 규칙과 옮기는 순서를 정한다.
-- 금융 워크벤치를 이 방식으로 옮긴 뒤 [ADR-20261025 / connector-operator-base-url](ADR-20261025-connector-operator-base-url.md) 을 `superseded` 로 바꾼다. 그 전까지는 둘 다 유효하다.
+- 금융 워크벤치를 이 방식으로 옮겨 [ADR-20261025 / connector-operator-base-url](archive/ADR-20261025-connector-operator-base-url.md) 을 대체했다(2026-11-02).
 
 ### 결정
 
@@ -21,6 +21,7 @@
 | 설치하는 서버 정의 | `{"url": ..., "headers": {...}, "strict_redirect_headers": true, "enabled": true}` 와 지금처럼 `tools.exclude`. 헤더 값의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다 |
 | 대시보드의 호출 | 확인 도구, 선택지, 승인 실행은 대시보드 plugin 이 직접 같은 원격 서버에 붙고 redirect 를 따라가지 않는다. MCP probe 는 Hermes 가 붙으므로 Hermes 의 redirect 규칙(아래 「감당할 것」)을 따른다 |
 | 도구 이름과 승인 | Hermes 등록 이름은 `mcp__<서버>__<도구>` 그대로이고 전송과 무관하다. `fos-ctx` 의 판정과 이름 대응 파일은 바뀌지 않는다 |
+| 도구 오류 모양 | `error` 객체가 없고 맨 위 `code` 가 글이면 `{code, message, details}` 모양으로 읽는다. 코드는 맨 위 `code`, 세부와 `outcome_unknown` 의 재시도 식별자는 `details` 객체의 칸이고 `message` 는 버린다. 선언한 코드와 세부만 넘기는 규칙([ADR-092](../../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))은 그대로다(2026-11-02 더함). 남의 서버가 흔히 쓰는 오류 모양을 고치지 않고 받으려는 것이다 |
 | 다른 저장소의 플러그인 | 운영자가 홈서버에 받아 둔 그 저장소의 checkout 을 운영 목록의 `root` 로 가리킨다. 실행 중에 marketplace 나 원격 저장소에서 내려받지 않는다. 경로와 갱신 절차는 `fos-home-infra` 가 갖는다 |
 
 원격 칸 env 검사는 [Hermes v0.21.6 `agent/secret_scope.py`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`가 근거다. OS·Python 이름은 정확히 일치할 때 거절하고, `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_`는 접두 전체를 거절한다. 소문자 context 변수도 이름 형식에서 빠진다.
@@ -34,7 +35,7 @@ PR 하나가 한 단계다. 앞 단계가 머지된 뒤 다음 단계를 계획�
 | 순서 | 단계 | 상태 | 담는 것 |
 | --- | --- | --- | --- |
 | 1 | 형식 수용과 원격 MCP | 머지 | 대시보드 plugin 의 manifest 읽기, `assistant.json` 과 옛 `connector.json`, `type: http` 서버의 설치와 호출, 문서. 이 저장소의 로컬 커넥터는 그대로 돈다 |
-| 2 | 금융 워크벤치 전환 | 대기 | 워크벤치 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다(사용자 결정 2026-10-26) |
+| 2 | 금융 워크벤치 전환 | 머지 | 워크벤치 저장소의 플러그인(`valuation-ontology`)에 `assistant.json` 이 생긴 뒤, 운영 목록을 그 플러그인으로 바꾸고 `hermes/connectors/financial-workbench/` 와 ADR-20261025 를 걷어 낸다. 이름이 달라 사용자는 한 번 다시 연결한다(사용자 결정 2026-10-26). 두 플러그인을 겹쳐 두지 않고 한 번에 바꾼다(사용자 결정 2026-11-02) |
 | 3 | 이름 변경 | 진행 | 화면과 문서, 용어표의 「커넥터」 를 「플러그인」 으로 바꾸고 이 저장소 커넥터의 `connector.json` 을 `assistant.json` 으로 옮긴다([ADR-20261026 / plugin-naming](../../../docs/adr/ADR-20261026-plugin-naming.md)) |
 | 4 | `assistant.json` 없는 플러그인 | 머지 | 선언하지 않은 도구를 「묻는다」 로 판정하고 입력 칸을 MCP 정의에서 추론한다. Control Plane 과 화면이 바뀐다. 결정과 그 안의 단계는 [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) 이 갖는다 |
 
