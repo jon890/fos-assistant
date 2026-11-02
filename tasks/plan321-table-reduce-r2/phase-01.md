@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `backend/docs/adr/ADR-20261010-media-observation-storage.md`, `backend/docs/adr/ADR-20261011-media-observation-cache.md`, `backend/docs/data-schema.md` 의 「media_observation와 media_observation_request」, 「마이그레이션 작성 규칙」, `docs/features/attachment.md` 의 「관찰 저장과 사용자 정정」
+**근거 문서**: `backend/docs/adr/ADR-20261010-media-observation-storage.md`, `backend/docs/adr/archive/ADR-20261011-media-observation-cache.md`, `backend/docs/data-schema.md` 의 「media_observation와 media_observation_request」, 「마이그레이션 작성 규칙」, `docs/features/attachment.md` 의 「관찰 저장과 사용자 정정」
 
 - 사용자 결정(2026-11-02)으로 사진 관찰 두 테이블을 하나로 합친다. 대가는 완료 결과 재사용(ADR-20261011)이다. 재사용은 새 요청 UUID 를 이미 있는 관찰에 alias 줄로 잇는 방식이라, alias 줄이 없으면 그 요청의 재시도가 같은 관찰을 돌려줄 수 없다
 - 운영 정확한 행 수는 둘 다 0 이다(코디네이터 확인 2026-11-02). 그래도 행이 있을 때 잃지 않게 옮기는 마이그레이션을 둔다
@@ -78,6 +78,7 @@ scripts/checks/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/chat/attachment/infra/MediaObservationRequestRepository.java` | 삭제 |
 | `backend/src/main/java/com/bifos/assistant/chat/attachment/application/MediaObservationService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/attachment/application/MediaObservationAnalysisKey.java` | 삭제 |
+| `backend/src/main/java/com/bifos/assistant/chat/attachment/application/MediaObservationCleaner.java` | 수정 |
 | `backend/config/archunit/store/**` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/MediaObservationMigrationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/MediaObservationRequestTest.java` | 수정 |
