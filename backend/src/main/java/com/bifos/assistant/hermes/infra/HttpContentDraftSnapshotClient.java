@@ -36,8 +36,9 @@ public class HttpContentDraftSnapshotClient {
     private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Semaphore SLOTS = new Semaphore(4);
     private static final Set<String> WORKER_ERRORS = Set.of("invalid_input", "not_found", "start_unknown", "unavailable");
-    /** compile 과 status 호출이 응답을 기다리는 운영 한도다. start 는 이 값이 아니라 60초를 쓴다. */
+    /** compile 과 status 호출이 응답을 기다리는 운영 한도다. */
     private static final Duration RESPONSE_LIMIT = Duration.ofSeconds(5);
+    private static final Duration START_LIMIT = Duration.ofSeconds(60);
     private final HermesProperties properties;
     private final Duration responseLimit;
     /**
@@ -56,6 +57,9 @@ public class HttpContentDraftSnapshotClient {
 
     /** 응답 한도를 실제로 기다리는 검사가 짧은 값을 줄 때만 쓴다. 운영 코드는 {@link #HttpContentDraftSnapshotClient(HermesProperties)} 를 쓴다. */
     public HttpContentDraftSnapshotClient(HermesProperties properties, Duration responseLimit) {
+        if (responseLimit == null || !responseLimit.isPositive()) {
+            throw new IllegalArgumentException("응답 한도는 양수여야 한다");
+        }
         this.properties = properties;
         this.responseLimit = responseLimit;
     }
@@ -69,7 +73,7 @@ public class HttpContentDraftSnapshotClient {
             }
             var args = JSON.createObjectNode().set("snapshot", snapshot).put("jobId", stamp.jobId().toString())
                 .put("ticket", ticket).set("stamp", JSON.valueToTree(stamp));
-            return jobRequest(profile, connectorId, "start", args, stamp, Duration.ofSeconds(60));
+            return jobRequest(profile, connectorId, "start", args, stamp, START_LIMIT);
         } catch (ApiException ex) {
             throw ex;
         } catch (RuntimeException ex) {
