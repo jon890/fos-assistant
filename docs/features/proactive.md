@@ -5,7 +5,7 @@
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
 가치 평가와 행동 정책, 자동 실행 동의, 매일 루프는 코드와 화면에서 지웠다. 그 테이블과 저장된 옛 줄은 그대로 있고 다음 plan 이 테이블을 지운다.
 
-covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
+covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`
 
 ## 요구
 
