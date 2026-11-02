@@ -16,7 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class MediaObservationMigrationTest {
-    /** 요청 칸을 더하는 마이그레이션 바로 앞의 버전이다. */
+    /** 요청 칸을 더하는 마이그레이션보다 앞선 버전이다. 그 사이 버전은 out-of-order 로 함께 적용된다. */
     private static final String BEFORE_REQUEST_MERGE = "20261102025855";
 
     private String[] database;

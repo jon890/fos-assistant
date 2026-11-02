@@ -297,6 +297,12 @@ class MediaObservationServiceTest extends ObservationFixture {
             "media-observation-v1",
             null);
         code(() -> record(1, UUID.randomUUID(), input(), synthetic), ErrorCode.VALIDATION_FAILED);
+        var unsupportedSchema = new ObservationProvenance(
+            ObservationProvenanceKind.MODEL_RESULT, 123L, "provider", null, "model", null, 2, "media-observation-v1", null);
+        code(() -> record(1, UUID.randomUUID(), input(), unsupportedSchema), ErrorCode.VALIDATION_FAILED);
+        var unsupportedPrompt = new ObservationProvenance(
+            ObservationProvenanceKind.MODEL_RESULT, 123L, "provider", null, "model", null, 1, "v2", null);
+        code(() -> record(1, UUID.randomUUID(), input(), unsupportedPrompt), ErrorCode.VALIDATION_FAILED);
         assertThat(observations.count()).isEqualTo(1);
     }
 

@@ -4,8 +4,10 @@
 UPDATE media_observation
    SET request_id = (SELECT r.request_id FROM media_observation_request r
                       WHERE r.id = (SELECT MIN(r2.id) FROM media_observation_request r2
-                                     WHERE r2.observation_id = media_observation.id)),
+                                     WHERE r2.attachment_id = media_observation.attachment_id
+                                       AND r2.observation_id = media_observation.id)),
        request_hash = (SELECT r.request_hash FROM media_observation_request r
                         WHERE r.id = (SELECT MIN(r2.id) FROM media_observation_request r2
-                                       WHERE r2.observation_id = media_observation.id))
+                                       WHERE r2.attachment_id = media_observation.attachment_id
+                                       AND r2.observation_id = media_observation.id))
  WHERE request_id IS NULL;

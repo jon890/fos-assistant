@@ -210,7 +210,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
 
 
     @Test
-    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision과 요청 alias를 새로 만들지 않는다")
+    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision을 새로 만들지 않는다")
     void revisesObservedDraftThreeTimesWithoutNewObservation() {
         var saved = record(0, UUID.randomUUID(), input(), model());
         var observation = observations.findAll().getFirst();

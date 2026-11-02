@@ -163,7 +163,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
 
 
     @Test
-    @DisplayName("암호화의 DEK SQL 실패는 revision과 alias를 롤백한다")
+    @DisplayName("암호화의 DEK SQL 실패는 revision 줄을 롤백한다")
     void propagatesDekLookupSqlFailureDuringSealAndRollsBackRevisionAndAlias() {
         record(0, UUID.randomUUID(), input(), model());
         var failingKeys = fail(UserDataKeyRepository.class, keys, "findByUserId", 1);

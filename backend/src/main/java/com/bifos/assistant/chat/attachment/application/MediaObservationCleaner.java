@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 사용자별 삭제 장벽 안에서 관찰과 FK로 연결한 alias를 함께 지운다. */
+/** 사용자별 삭제 장벽 안에서 관찰 줄을 지운다. */
 @Component
 @RequiredArgsConstructor
 @Slf4j

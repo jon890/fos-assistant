@@ -57,7 +57,7 @@ class MediaObservationCleanupTest extends ObservationFixture {
 
 
     @Test
-    @DisplayName("파일 작업 실패 전 관찰과 alias 삭제를 커밋하고 시작 때 재시도한다")
+    @DisplayName("파일 작업 실패 전 관찰 삭제를 커밋하고 시작 때 재시도한다")
     void commitsObservationAndAliasDeletionBeforeFailingFileOperationAndRetriesOnStartup() {
         record(0, UUID.randomUUID(), input(), model());
         AttachmentStore failing = new AttachmentStore(properties) {
@@ -99,8 +99,8 @@ class MediaObservationCleanupTest extends ObservationFixture {
     @Test
     @DisplayName("소유자 변경 후보는 차단하고 다른 사용자와 관찰 소유자 불일치를 정리한다")
     void keepsOwnerTransferBlockedWhileCleaningOtherUsersAndMismatchedObservationOwner() {
-        var alias = UUID.randomUUID();
-        record(0, alias, input(), model());
+        var request = UUID.randomUUID();
+        record(0, request, input(), model());
         var other = user();
         var otherConversation = conversations.save(Conversation.startedBy(other.id(), "독립 사용자", null, NOW));
         var otherPhoto = photo(other, otherConversation);
@@ -112,7 +112,7 @@ class MediaObservationCleanupTest extends ObservationFixture {
             otherPhoto.id());
         assertThat(observationCleaner.cleanExpired(NOW)).isEqualTo(1);
         assertThat(observations.count()).isEqualTo(1);
-        code(() -> record(0, alias, input(), model()), ErrorCode.CONVERSATION_NOT_FOUND);
+        code(() -> record(0, request, input(), model()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(service.list(other, conversation.id(), null, 10).getFirst().observation())
             .isNull();
         jdbc.update("update conversation set user_id=? where id=?", owner.id(), conversation.id());
@@ -123,7 +123,7 @@ class MediaObservationCleanupTest extends ObservationFixture {
 
 
     @Test
-    @DisplayName("대화 정리는 실행 기록을 보존하며 관찰과 alias를 함께 지운다")
+    @DisplayName("대화 정리는 실행 기록을 보존하며 관찰 줄을 함께 지운다")
     void purgesConversationAndCascadesAliasesWithoutChangingExecutionHistory() {
         // 공유 컨텍스트의 이전 검사에서 남은 정리 후보를 먼저 처리하고 이번 대화의 건수를 따로 검증한다.
         purger.purgeDue(NOW);
