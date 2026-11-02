@@ -3,7 +3,7 @@ package com.bifos.assistant.chat.turn.application;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
+import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TurnQuestions {
-    private final ExecutionQuestionRepository questions;
+    private final ExecutionQuestions questions;
     private final ChatMessageRepository messages;
 
 
@@ -28,8 +28,8 @@ public class TurnQuestions {
      */
     public Optional<String> questionOf(Long executionId, Long userId) {
         return questions
-            .findById(executionId)
-            .flatMap(question -> messages.findById(question.messageId()))
+            .messageIdOf(executionId)
+            .flatMap(messages::findById)
             .filter(message -> message.role() == MessageRole.USER)
             .filter(message -> Objects.equals(message.senderUserId(), userId))
             .map(ChatMessage::content);
@@ -38,6 +38,6 @@ public class TurnQuestions {
 
     /** 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 있는가. 그 실행의 입력은 이력으로 같은 session 에 남는다. */
     public boolean hasRunWithoutQuestion(Long conversationId) {
-        return questions.existsRunWithoutQuestion(conversationId);
+        return questions.hasRunWithoutQuestion(conversationId);
     }
 }
