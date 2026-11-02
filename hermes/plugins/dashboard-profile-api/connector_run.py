@@ -258,14 +258,19 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
     인자와 결과를 로그에 싣지 않는다.
     실행되지 않은 것이 분명한 실패는 `{"ok": false}` 로, 실행됐는지 모르는 실패는 504 로 답한다.
+    금융 준비의 `{"ok": false}` 에는 어느 검사에서 멈췄는지 고정 단계 코드(`stage`)와 선언된 오류 코드(`code`)를 싣는다.
+    Control Plane 이 로그에만 남기고 모델에게 가는 글에는 싣지 않는다. 인자, 계좌, 원격 응답은 담지 않는다.
     도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난 것도 실행됐는지 모르는 실패다.
     Control Plane 이 앞의 것은 실패로, 뒤의 것은 결과를 모르는 것으로 읽어 다시 돌리지 않는다.
     """
     from starlette.responses import JSONResponse
     global _connector_calls
 
-    def failed(word):
-        return JSONResponse({"ok": False, "error": word}, status_code=200)
+    def failed(word, stage, code="-"):
+        body = {"ok": False, "error": word}
+        if prepare:
+            body.update(stage=stage, code=code)
+        return JSONResponse(body, status_code=200)
 
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
@@ -310,7 +315,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         # 자식을 띄우기 전이다. 실행되지 않았다. profile 의 값이 섞일 수 있어 예외의 종류만 남긴다.
         logger.warning("dashboard-profile-api: 플러그인 %s 를 실행할 profile 을 확인하지 못했다: %s",
                        connector_id, type(error).__name__)
-        return failed("unavailable")
+        return failed("unavailable", "profile")
     # 그 profile 의 값 가운데 이 플러그인의 칸만 넘긴다. 비운 선택 칸은 빈 문자열이다.
     env = {field["env"]: _env_value(env_text, field["env"]) for field in manifest["fields"]}
     server = manifest["server"]
@@ -327,7 +332,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         # 부르기 전에 까닭을 로그로 남기려는 검사다. 헤더를 만드는 `_remote_request_headers` 도 마지막 방어로 같은 글자를 본다.
         if any(ch in value for value in env.values() for ch in "\r\n\0"):
             logger.warning("dashboard-profile-api: 플러그인 %s 의 칸 값에 헤더로 보낼 수 없는 글자가 있다", connector_id)
-            return failed("unavailable")
+            return failed("unavailable", "env_value")
     else:
         # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
         env["PATH"] = os.path.dirname(server["command"])
@@ -344,12 +349,12 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     if problem is not None:
         logger.warning("dashboard-profile-api: mcp SDK %s 로는 플러그인 도구를 부르지 않는다: %s",
                        _mcp_sdk_version(), problem)
-        return failed("unavailable")
+        return failed("unavailable", "mcp_sdk")
 
     # `call` 과 한도를 함께 쓴다. 줄을 세우지 않는다.
     if _connector_calls >= CONNECTOR_CALL_LIMIT:
         logger.warning("dashboard-profile-api: 플러그인 도구 호출이 %d개 돌고 있어 받지 않았다", _connector_calls)
-        return failed("unavailable")
+        return failed("unavailable", "busy")
     _connector_calls += 1
     progress = {"sent": False}
     try:
@@ -374,7 +379,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         if progress["sent"]:
             # 도구 호출을 보낸 뒤다. 실행됐는지 알 수 없다.
             return _rejected("도구 호출 뒤에 실패해 실행 결과를 모른다", 504)
-        return failed("unavailable")
+        return failed("unavailable", stage, code)
     finally:
         _connector_calls -= 1
         for name in EXECUTION_ENV:

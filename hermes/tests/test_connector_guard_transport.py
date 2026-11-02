@@ -193,13 +193,16 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
         logging.disable(logging.NOTSET)
         try:
             with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
-                self.assertEqual(self.request(PREPARE, "POST", body)[0], status)
+                actual, answer = self.request(PREPARE, "POST", body)
+                self.assertEqual(actual, status)
         finally:
             logging.disable(logging.CRITICAL)
         text = "\n".join(logs.output)
         self.assertIn("stage=" + stage, text)
         if status == 200:
             self.assertIn("code=" + code, text)
+            # Control Plane 이 로그에 남길 고정 코드만 응답에 싣는다. 플러그인 오류 문구와 값은 싣지 않는다.
+            self.assertEqual(answer, {"ok": False, "error": "unavailable", "stage": stage, "code": code})
         # 계좌, 인자, 플러그인 오류 문구, profile 의 값은 남기지 않는다.
         for value in ("000007", "demo_ok_0123456789", "거절", json.dumps(body["args"])):
             self.assertNotIn(value, text)

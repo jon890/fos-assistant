@@ -59,7 +59,7 @@ class ConnectorGuardDisplayTest(ConnectorGuardCase):
             case["executionArgsJson"], case["summaryJson"] = json.dumps(payload["executionArgs"]), json.dumps(payload["summary"])
             (self.connector_root / "prepare-case.json").write_text(json.dumps(case))
             status, answer = self.request(PREPARE, "POST", self.body())
-            self.assertEqual((status, answer), (200, {"ok": False, "error": "unavailable"}))
+            self.assertEqual((status, answer), (200, {"ok": False, "error": "unavailable", "stage": "prepare_result", "code": "-"}))
         self.assertEqual(self.claims + self.trades, [])
 
 
