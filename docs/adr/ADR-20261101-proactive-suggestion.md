@@ -4,10 +4,10 @@
 - Date: 2026-11-01
 - 2026-11-01 사용자 결정(테이블은 최대한 늘리지 않고 기존 테이블을 활용한다)에 따라 처음 조사가 권고한 새 테이블 `proactive_suggestion` 을 만들지 않고 `follow_up` 의 `PROPOSED` 줄을 제안으로 쓴다.
 - 2026-10-16 사용자 결정 두 개(#310 댓글 「proactive 와의 관계」, 「판단을 구조에 묶지 않는다」)를 구현 범위로 옮긴다. 선행 조건이던 기억 단계 2(연결과 대체)는 #568 로 끝났다.
-- 이 결정이 끝까지 구현되면 아래를 대체한다. 대체하는 ADR 은 마지막 단계(아래 「옮기는 순서」 의 6)가 머지될 때 `superseded` 로 바꾸고 `archive/` 로 옮긴다. 그 전까지는 지금 코드의 근거로 남는다.
-  - [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) 의 가치 평가 전체
-  - [ADR-20261007 / autonomy-policy](../../backend/docs/adr/ADR-20261007-autonomy-policy.md) 의 네 수준과 자동 실행 동의 전체
-  - [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 의 「살펴보기 뒤 평가와 정책을 한 번 잇는다」 전체
+- 아래 ADR 은 이 결정이 대체했다. 「옮기는 순서」 의 6 단계가 머지될 때 `superseded` 로 바꿔 `archive/` 로 옮겼다.
+  - [ADR-20261007 / value-evaluation](archive/ADR-20261007-value-evaluation.md) 의 가치 평가 전체
+  - [ADR-20261007 / autonomy-policy](../../backend/docs/adr/archive/ADR-20261007-autonomy-policy.md) 의 네 수준과 자동 실행 동의 전체
+  - [ADR-20261008 / daily-loop](archive/ADR-20261008-daily-loop.md) 의 「살펴보기 뒤 평가와 정책을 한 번 잇는다」 전체
   - [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 의 문제 후보 필드와 결정적 검사, [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 의 발견 단추는 제안과 반응으로 옮긴다
   - [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) 의 지금 화면 숨김·미루기 현재값 테이블(`attention_control`)과 사건 테이블(`attention_event`)은 반응 기록으로 합친다. 기본값이 알리지 않음이라는 결정은 그대로다
 

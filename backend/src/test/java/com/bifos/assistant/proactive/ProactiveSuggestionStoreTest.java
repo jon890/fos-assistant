@@ -33,7 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  */
 @BackendIntegrationTest
 @OverrideProperties("assistant.proactive-suggestion.enabled=true")
-class ProactiveSuggestionStoreTest extends ProactiveLoopTestSupport {
+class ProactiveSuggestionStoreTest extends ProactiveTestSupport {
 
     private static final String DETAIL = "{\"why\":\"합성 근거\",\"goalRef\":\"goal-1\"}";
 

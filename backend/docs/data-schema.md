@@ -560,7 +560,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 에이전트가 한 번 답한 기록이다. **이 줄은 실행이 끝난 뒤가 아니라 시작할 때 만들어진다**([ADR-011](adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)).
 모델 단계와 요청값은 시작할 때 옮겨 적고, 실제 provider 와 모델은 끝날 때 갱신한다.
 
-- `conversation_id` 가 비면 대화 밖에서 돈 실행이다. 추천 질문을 만드는 실행과 시스템 판단 실행(`ExecutionRecorder.startSystem`)이 그렇다. 시스템 판단 실행은 시스템 profile 로 돌아 `agent_id` 도 비어 있다
+- `conversation_id` 가 비면 대화 밖에서 돈 실행이다. 추천 질문을 만드는 실행과 옛 시스템 판단 실행이 그렇다. 옛 시스템 판단 실행은 시스템 profile 로 돌아 `agent_id` 도 비어 있다. 시작하는 코드는 지웠고 옛 줄만 남았다
 - `retry_of_execution_id` 는 지금 채우는 경로가 없어 늘 비어 있다
 - `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고, 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
 - `delegation_key` 는 `agent_delegate` 로 만든 실행만 채우고 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `output_text` 도 이 실행만 채우고, 대화 답은 `chat_message` 가 갖는다
@@ -977,7 +977,7 @@ action을 지우면 실행 내용도 지운다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
-- `loop_enabled` 와 `snoozed_until` 은 `CHECK` 줄만 쓰는 매일 루프의 동의와 쉬기 끝 시각(UTC)이다. 동의는 일정의 켜짐(`state`)과 다른 동의라 따로 둔다. 기본은 동의 없음이고 쉬기는 비어 있으면 쉬지 않는다
+- `loop_enabled` 와 `snoozed_until` 은 `CHECK` 줄만 쓰던 매일 루프의 동의와 쉬기 끝 시각(UTC)이다. 매일 루프를 지워 읽는 곳이 없고 값만 남는다. 동의는 일정의 켜짐(`state`)과 다른 동의라 따로 둔다. 기본은 동의 없음이고 쉬기는 비어 있으면 쉬지 않는다
 - `conversation_id` 는 `SINGLE` 일 때 결과를 쌓는 대화다. 첫 발화가 만들기 전에는 비어 있고, `NEW_PER_RUN` 은 늘 비어 있다
 - `model_tier` 가 비면 발화가 대화의 모델 선택을 건드리지 않는다
 - 외래 키는 `owner_user_id` 에만 둔다. 에이전트와 대화는 지워도 행이 남는 표라 걸지 않는다
@@ -1031,7 +1031,7 @@ action을 지우면 실행 내용도 지운다.
 
 ### `proactive_autonomy_decision`
 
-행동 정책의 판정 하나다. [행동 정책](../../docs/features/proactive.md)이 수준과 까닭, 실행 키 계약을 갖는다.
+행동 정책의 판정 하나다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 수준과 까닭, 실행 키는 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/archive/ADR-20261007-autonomy-policy.md)에 이력으로 남아 있다.
 `execution_key` 는 유일하다. 원천 살펴보기 하나에서 자동 실행이 한 번만 열리게 하는 장치이고, `EXECUTE` 만 채운다.
 `candidate_id` 는 FK 가 없다. 평가 스냅샷의 후보 식별자라 지금의 후보 줄이 지워져도 판정이 남는다.
 사용자, 평가, 원천 살펴보기를 지우면 함께 지운다. 시작한 살펴보기(`execution_check_id`)를 지우면 그 칸만 비운다. `inputs_json` 에는 판정에 쓴 값만 두고 축 설명과 후보 글은 두지 않는다.
@@ -1044,13 +1044,13 @@ action을 지우면 실행 내용도 지운다.
 
 ### `proactive_loop_setting`
 
-사용자가 에이전트마다 매일 루프를 켠 옛 설정이다. **읽는 곳이 없다.** 켜짐과 쉬기는 사용자와 에이전트마다 하나인 `CHECK` `task` 가 갖는다([매일 루프](../../docs/features/proactive.md)의 「사용자 설정」).
+사용자가 에이전트마다 매일 루프를 켠 옛 설정이다. **읽는 곳이 없다.** 이 표의 엔티티도 지웠다. 값은 사용자와 에이전트마다 하나인 `CHECK` `task` 의 `loop_enabled`, `snoozed_until` 로 복사됐고, 그 칸도 지금은 읽는 곳이 없다.
 `task.loop_enabled` 와 `task.snoozed_until` 을 더하는 마이그레이션이 켜진 줄의 동의와 쉬기 시각을 같은 사용자·에이전트의 `CHECK` 작업으로 복사했다. 꺼진 줄은 복사하지 않아 일정이 켜져 있어도 동의 없음으로 남고, 작업의 `state` 는 건드리지 않았다. 짝지을 `CHECK` 작업이 없는 켜진 줄은 옮길 곳이 없어 동의 없음이 된다.
-에이전트를 지울 때 이 표의 줄만 함께 지운다. 표 자체는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
+에이전트를 지우면 FK 의 `ON DELETE CASCADE` 가 이 표의 줄을 함께 지운다. 표 자체는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
 
 ### `proactive_loop_run`
 
-매일 깨우기 살펴보기 하나를 잇는 시도다. 상태와 순서는 [매일 루프](../../docs/features/proactive.md)가 갖는다.
+매일 깨우기 살펴보기 하나를 잇던 옛 시도다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 상태와 순서는 [ADR-20261008 / daily-loop](../../docs/adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있다.
 `source_check_id` 는 유일하다. 살펴보기 하나에 시도 하나라서, 서버가 도중에 멈춰도 같은 원천에서 평가와 판정이 두 번 생기지 않는다.
 사용자나 원천 살펴보기를 지우면 함께 지운다. 이 시도가 만든 평가를 지우면 `evaluation_id` 만 비운다. 기동 때 닫은 줄도 비어 있다.
 글과 원문, provider 이름은 두지 않는다. provider 는 평가의 `evidence_json` 이 갖는다.

@@ -34,7 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * {@code docs/features/proactive.md} 의 「기억에서 꺼내는 것」 이 갖는다. 모든 값은 합성이다.
  */
 @BackendIntegrationTest
-class WakeMemoryContractTest extends ProactiveLoopTestSupport {
+class WakeMemoryContractTest extends ProactiveTestSupport {
 
     private static final String GRANTED = "core";
     private static final String NOT_GRANTED = "health";

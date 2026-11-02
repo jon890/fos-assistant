@@ -329,32 +329,3 @@ def _model_defaults_response(name):
     except Exception:
         logger.warning("dashboard-profile-api: 모델 기본값을 읽지 못했다")
         return _rejected("profile 설정을 읽지 못했다", 503)
-
-
-def _decision_readiness_response(name):
-    """판단 profile 의 도구와 기억 차단만 확인한다. 설정과 파일 내용은 돌려주지 않는다."""
-    if not isinstance(name, str) or not PROFILE_NAME_RE.fullmatch(name):
-        return _rejected("profile 이름이 올바르지 않다", 400)
-    try:
-        from hermes_cli.profiles import get_profile_dir, profile_exists
-        from hermes_cli.tools_config import _get_platform_tools
-        from hermes_cli.web_server_profiles import _config_profile_scope
-        from starlette.responses import JSONResponse
-        import yaml
-
-        if not profile_exists(name):
-            return _rejected("없는 profile 이다", 404)
-        with _config_profile_scope(name):
-            config = yaml.safe_load((get_profile_dir(name) / "config.yaml").read_text(encoding="utf-8")) or {}
-            toolsets = _get_platform_tools(config, "api_server")
-        memory = config.get("memory") or {}
-        ready = (not toolsets
-                 and (config.get("platform_toolsets") or {}).get("api_server") == ["no_mcp"]
-                 and memory.get("provider") == "none"
-                 and memory.get("memory_enabled") is False
-                 and memory.get("user_profile_enabled") is False
-                 and config.get("fallback_providers") == [])
-        return JSONResponse({"version": 1, "ready": ready}, status_code=200)
-    except Exception:
-        logger.warning("dashboard-profile-api: 판단 profile 설정을 읽지 못했다")
-        return _rejected("profile 설정을 읽지 못했다", 503)

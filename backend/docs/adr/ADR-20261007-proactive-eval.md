@@ -5,7 +5,7 @@
 
 ### 맥락
 
-문제 찾기([ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)), 가치 판단([ADR-20261007 / value-evaluation](../../../docs/adr/ADR-20261007-value-evaluation.md)), 행동 정책([ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md)), 판단 피드백([ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md))은 각자 단위 시험을 가진다.
+문제 찾기([ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)), 가치 판단([ADR-20261007 / value-evaluation](../../../docs/adr/archive/ADR-20261007-value-evaluation.md)), 행동 정책([ADR-20261007 / autonomy-policy](archive/ADR-20261007-autonomy-policy.md)), 판단 피드백([ADR-20261007 / decision-feedback](ADR-20261007-decision-feedback.md))은 각자 단위 시험을 가진다.
 그러나 단계를 이었을 때 올바른 문제를 고르고 알맞은 때에 행동하거나 침묵하는지는 어느 시험도 보지 않는다.
 판단 provider 를 바꿨을 때 품질, 지연, 비용, 실패가 어떻게 달라지는지 견줄 자리도 없다.
 

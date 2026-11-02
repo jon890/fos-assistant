@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 /** 기능 스위치 {@code assistant.proactive-suggestion.enabled} 를 끄면 제안 줄을 만들지 않고 발견과 문제 후보만 저장하는지 본다. */
 @BackendIntegrationTest
 @OverrideProperties("assistant.proactive-suggestion.enabled=false")
-class ProactiveSuggestionDisabledTest extends ProactiveLoopTestSupport {
+class ProactiveSuggestionDisabledTest extends ProactiveTestSupport {
 
     @Autowired
     FollowUpRepository followUpRows;

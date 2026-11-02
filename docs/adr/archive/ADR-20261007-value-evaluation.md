@@ -1,7 +1,14 @@
 ## ADR-20261007 / value-evaluation: 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다
 
-- **status**: `accepted`
+- **status**: `superseded`
 - Date: 2026-10-07
+
+### 대체된 부분
+
+이 결정 전체를
+[ADR-20261101 / proactive-suggestion](../ADR-20261101-proactive-suggestion.md) 이 대체했다.
+가치 평가의 코드와 API, 화면은 지웠다. 저장된 옛 줄과 테이블은 그대로 두고 다음 plan 이 지운다.
+아래는 그 결정을 내리던 당시의 맥락이다. 이력으로만 읽는다.
 
 ### 맥락
 
@@ -44,4 +51,4 @@ Hermes v2026.9.24의 [도구 계산](https://github.com/NousResearch/hermes-agen
 [기억 저장](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/memory_tool.py)은
 `memory_enabled`, `user_profile_enabled`를 각각 읽는다.
 도구만 끄거나 `memory.enabled`만 정하는 것으로 기억 주입까지 차단했다고 판단하지 않는다.
-세부 계약은 [가치 평가](../features/proactive.md)가 갖는다.
+세부 계약은 [가치 평가](../../features/proactive.md)가 갖는다.
