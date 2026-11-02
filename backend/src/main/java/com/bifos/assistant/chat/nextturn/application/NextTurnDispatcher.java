@@ -8,9 +8,9 @@ import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
+import com.bifos.assistant.chat.conversation.domain.PendingMessages;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
@@ -34,7 +34,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 다음 turn 을 정한다.
@@ -59,12 +58,11 @@ public class NextTurnDispatcher {
 
     private final TurnCancellation turns;
     private final DelegationWakeService wake;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final ConversationRepository conversations;
     private final AppUserRepository users;
     private final ChatService chat;
     private final ConversationEventHub hub;
-    private final TransactionTemplate transactions;
     private final BackgroundTasks backgroundTasks;
 
     private final Clock clock = Clock.systemUTC();
@@ -101,7 +99,7 @@ public class NextTurnDispatcher {
 
 
     private void notifyHeld(Long conversationId) {
-        if (pendingMessages.findByConversationIdOrderByIdAsc(conversationId).isEmpty()) {
+        if (pendingMessages.read(conversationId).isEmpty()) {
             return;
         }
         conversations
@@ -137,7 +135,7 @@ public class NextTurnDispatcher {
     @EventListener(ApplicationReadyEvent.class)
     @Order(10)
     public void dispatchAfterStartup() {
-        Set<Long> conversationIds = new LinkedHashSet<>(pendingMessages.findConversationsReadyToSend());
+        Set<Long> conversationIds = new LinkedHashSet<>(pendingMessages.conversationsReadyToSend());
         conversationIds.addAll(wake.conversationsToWake());
         for (Long conversationId : conversationIds) {
             try {
@@ -172,8 +170,8 @@ public class NextTurnDispatcher {
      * turn 이 닫힐 때 다시 온다. 사용자 실행 한도로 대기 줄을 멈춘 때도 참이다
      */
     private boolean tryPending(Long conversationId) {
-        List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
-        if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
+        PendingMessages queue = pendingMessages.read(conversationId);
+        if (!queue.sendable()) {
             return false;
         }
         if (inFailureBackoff(conversationId)) {
@@ -190,7 +188,7 @@ public class NextTurnDispatcher {
             return false;
         }
         AppUser owner = user.get();
-        List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
+        List<Long> ids = queue.ids();
         TurnHandle handle;
         try {
             handle = turns.open(owner.id(), conversationId);
@@ -244,15 +242,16 @@ public class NextTurnDispatcher {
     }
 
 
-    /** 이 turn 이 보내려던 행이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 행이 없다. */
+    /**
+     * 이 turn 이 보내려던 글이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 글이 없다.
+     *
+     * <p>남았는지 보는 것과 멈추는 것은 대화 줄을 잠근 한 트랜잭션이다. 그 사이 모두 취소됐으면 멈추지 않는다.
+     */
     private void holdUnsent(Conversation conversation, List<Long> ids) {
         try {
-            boolean unsent = pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                .anyMatch(row -> ids.contains(row.id()));
-            if (!unsent) {
+            if (!pendingMessages.holdIfAnyLeft(conversation.id(), ids)) {
                 return;
             }
-            transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversation.id(), true));
             hub.publish(conversation.id(), ChatEvent.pending(conversation.publicId()));
         } catch (RuntimeException ex) {
             // 남았는지 모르거나 멈추지 못했다. 쉬지 않고 다시 여는 것보다 잠시 늦게 보내는 편이 낫다.

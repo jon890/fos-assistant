@@ -53,7 +53,6 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.chat.artifact.domain.ChatArtifact", new Contract("chat_artifact", "C")),
         Map.entry("com.bifos.assistant.chat.attachment.domain.ChatAttachment", new Contract("chat_attachment", "C")),
         Map.entry("com.bifos.assistant.chat.conversation.domain.ChatMessage", new Contract("chat_message", "제외")),
-        Map.entry("com.bifos.assistant.chat.conversation.domain.ChatPendingMessage", new Contract("chat_pending_message", "제외")),
         Map.entry("com.bifos.assistant.chat.conversation.domain.Conversation", new Contract("conversation", "C")),
         Map.entry("com.bifos.assistant.chat.conversation.domain.ExecutionQuestion", new Contract("execution_question", "C")),
         Map.entry("com.bifos.assistant.chat.attachment.domain.MediaObservation", new Contract("media_observation", "제외")),

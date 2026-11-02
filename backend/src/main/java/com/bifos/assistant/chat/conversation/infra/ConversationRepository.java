@@ -280,4 +280,29 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
 
     /** 그 사용자의 대화 가운데 아직 본문을 정리하지 않은 수다. 지우지 않은 대화도 센다. */
     long countByUserIdAndPurgedAtIsNull(Long userId);
+
+
+    /**
+     * 대기 줄의 JSON 이다(ADR-048). 비었거나 대화가 없으면 빈 값이다.
+     *
+     * <p>엔티티는 이 칸을 읽지 않으므로 전용 질의로 읽는다. 바꾸려고 읽을 때는 {@link #lockPendingMessages} 를 쓴다.
+     */
+    @Query(value = "select pending_messages from conversation where id = :id", nativeQuery = true)
+    Optional<String> findPendingMessages(@Param("id") Long id);
+
+
+    /** 대화 줄을 잠그고 대기 줄의 JSON 을 읽는다. 같은 대화의 대기 줄을 바꾸는 트랜잭션이 차례로 돈다. 트랜잭션은 부르는 쪽이 연다. */
+    @Query(value = "select pending_messages from conversation where id = :id for update", nativeQuery = true)
+    Optional<String> lockPendingMessages(@Param("id") Long id);
+
+
+    /** 대기 줄의 JSON 을 바꾼다. null 이면 비운다. {@link #lockPendingMessages} 로 잠근 트랜잭션 안에서만 부른다. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update conversation set pending_messages = :value where id = :id", nativeQuery = true)
+    int writePendingMessages(@Param("id") Long id, @Param("value") String value);
+
+
+    /** 대기 줄이 있는 대화의 번호다. 멈춘 줄도 낸다. 빈 줄은 저장하지 않으므로 보내지 않은 글이 있는 대화만 나온다. */
+    @Query(value = "select id from conversation where pending_messages is not null order by id", nativeQuery = true)
+    List<Long> findIdsWithPendingMessages();
 }

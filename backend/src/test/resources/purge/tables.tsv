@@ -13,7 +13,7 @@ app_user|USER|id|DELETE|KEEP|KEEP|사용자 루트다. 접근 해제는 지우�
 chat_artifact|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id에 속한다. ConversationPurgeWriter가 지운다.
 chat_attachment|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id와 uploaded_by_user_id에 속한다. 대화 purge가 행을 지운다.
 chat_message|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id에 속한다. 대화 purge가 본문 행을 지운다.
-chat_pending_message|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id와 user_id에 속한다. 대화 삭제 즉시 지운다.
+chat_pending_message|CONVERSATION|id|KEEP|KEEP|KEEP|코드가 읽고 쓰지 않는 옛 표다. 대기 메시지는 conversation.pending_messages 가 갖고 대화 삭제와 정리가 그 칸을 비운다. 이관이 옮긴 행은 지웠고, 직전 이미지가 쓴 행은 옛 표를 지우는 PR 이 다시 옮긴다(ADR-20261102 / table-reduce-r2).
 connector_action|CONVERSATION|id|DELETE|SCRUB|DETACH|user_id FK와 conversation_id에 속한다. 대화 purge는 인자·결과와 key만 지우고 감사와 금융 상한 변경 칸은 남긴다.
 connector_action_execution|CONVERSATION|action_id|DELETE|SCRUB|KEEP|action_id FK로 승인에 속한다. 대화 purge는 실행 인자·요약·범위와 key만 지우고 해시와 ticket·중복 방지 칸은 남긴다.
 connector_connection|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 연결은 사용자 소유라 에이전트 정리와 무관하게 보존한다.
@@ -26,7 +26,7 @@ content_draft_creation_request|CONVERSATION|id|GONE|GONE|KEEP|conversation_id와
 content_draft_job|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 원고 삭제 후에도 본문 없는 저장 상태 이력을 보존하는 계약이다.
 content_draft_revision|CONVERSATION|id|DELETE|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
 content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조를 보존하는 계약이다.
-conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session을 비운 뒤 purged_at을 적는다.
+conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session, 대기 줄(pending_messages)을 비운 뒤 purged_at을 적는다.
 decision_feedback_event|CONVERSATION|id|DELETE|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id FK를 NULL로 비운다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|SCRUB|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.

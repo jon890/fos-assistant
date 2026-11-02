@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepositor
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
@@ -34,7 +34,7 @@ class ConversationPurgeWriter {
 
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final ChatAttachmentRepository attachments;
     private final ChatArtifactRepository artifacts;
     private final ExecutionQuestionRepository questions;
@@ -60,7 +60,7 @@ class ConversationPurgeWriter {
         if (conversation == null || conversation.deletedAt() == null || conversation.purgedAt() != null) {
             return false;
         }
-        pendingMessages.deleteAllOf(conversationId);
+        pendingMessages.clear(conversationId);
         creationRequests.findByConversationIdOrderByIdAsc(conversationId).forEach(ContentDraftCreationRequest::markGone);
         creationRequests.flush();
         assets.deleteForConversation(conversationId);

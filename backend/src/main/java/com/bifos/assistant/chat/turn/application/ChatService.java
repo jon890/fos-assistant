@@ -15,12 +15,12 @@ import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.domain.PendingMessages;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -69,7 +69,7 @@ public class ChatService {
     private final AttachmentService attachments;
     private final TurnCancellation turns;
     private final Clock clock;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final ChatTurnRunner chatTurnRunner;
     private final ChatTurnRouting chatTurnRouting;
     private final ChatTurnStopper chatTurnStopper;
@@ -239,13 +239,13 @@ public class ChatService {
     public void runPendingMessages(
         CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         for (int attempt = 1;; attempt++) {
-            List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
-            if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
+            PendingMessages queue = pendingMessages.read(conversationId);
+            if (!queue.sendable()) {
                 return;
             }
-            String text = ChatPendingMessage.merged(rows);
+            String text = queue.merged();
             Routed routed = chatTurnRouting.route(owner, conversationId, text, null, List.of());
-            List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
+            List<Long> ids = queue.ids();
             try {
                 ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
                 onEvent.accept(ChatTurnCompletion.eventOf(turn));

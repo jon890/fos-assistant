@@ -31,7 +31,7 @@ import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
@@ -43,6 +43,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
@@ -63,6 +64,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 이전 프로세스가 {@code RUNNING} 으로 남긴 전달 시도를 기동할 때 닫고, 기동 정리가 정한 부모 실행 줄의 시도를 그 줄과 함께
@@ -119,7 +121,10 @@ class ResultDeliveryRecoveryTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ChatPendingMessageRepository pendingMessages;
+    PendingMessageStore pendingMessages;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     ChatAttachmentRepository attachmentRows;
@@ -165,7 +170,7 @@ class ResultDeliveryRecoveryTest {
         attempts.deleteAll();
         deliveries.deleteAll();
         artifactRows.deleteAll();
-        pendingMessages.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();

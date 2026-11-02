@@ -18,12 +18,13 @@ import com.bifos.assistant.chat.turn.application.dto.PendingQueue;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.PendingMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
 
 /**
@@ -100,7 +102,10 @@ class PendingMessageServiceTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     ChatAttachmentRepository attachmentRows;
@@ -132,7 +137,7 @@ class PendingMessageServiceTest {
         // 이 문맥이 뜰 때 기동 확인이 앞 검사들이 남긴 대기 행으로 연 turn 이 있을 수 있다. 지우기 전에 끝나기를 기다린다.
         awaitAllIdle();
         stub().reset();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();
@@ -152,7 +157,7 @@ class PendingMessageServiceTest {
     void tearDown() {
         stub().releaseSubmits();
         awaitAllIdle();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
     }
 
 
@@ -166,7 +171,7 @@ class PendingMessageServiceTest {
             pending.enqueue(dad, conversation.id(), "첫째 글");
             PendingQueue queued = pending.enqueue(dad, conversation.id(), "둘째 글");
             assertThat(queued.held()).isFalse();
-            assertThat(queued.items()).extracting(ChatPendingMessage::content).containsExactly("첫째 글", "둘째 글");
+            assertThat(queued.items()).extracting(PendingMessage::content).containsExactly("첫째 글", "둘째 글");
             assertThat(stub().received()).as("앞 turn 이 도는 동안 Hermes 에 보낸 것").hasSize(1);
 
             stub().releaseSubmits();
@@ -256,7 +261,7 @@ class PendingMessageServiceTest {
 
             assertThat(rowsOf(conversation)).hasSize(5);
         } finally {
-            pendingRows.deleteAll();
+            PendingQueueFixtures.clearAll(jdbc);
             turns.close(running);
         }
     }
@@ -277,7 +282,7 @@ class PendingMessageServiceTest {
             PendingQueue atLimit = pending.enqueue(dad, conversation.id(), "다".repeat(3998));
             assertThat(atLimit.items()).hasSize(2);
         } finally {
-            pendingRows.deleteAll();
+            PendingQueueFixtures.clearAll(jdbc);
             turns.close(running);
         }
     }
@@ -307,7 +312,7 @@ class PendingMessageServiceTest {
 
         assertThat(rowsOf(conversation))
             .as("중지한 turn 뒤의 대기 행")
-            .extracting(ChatPendingMessage::held)
+            .extracting(PendingQueueFixtures.Row::held)
             .containsExactly(true);
         assertThat(pending.queue(dad, conversation.id()).held()).isTrue();
         assertThat(executions.findById(stoppedExecutionId.get()).orElseThrow().status())
@@ -344,7 +349,7 @@ class PendingMessageServiceTest {
                 // stopped 는 잠금을 풀기 전에 온다. 이때 읽은 값이 잠금 안에서 멈췄는지를 말한다.
                 lockHeldAtStop.set(turns.markOf(conversation.id()).running());
                 heldAtStop.set(rowsOf(conversation).stream()
-                    .map(ChatPendingMessage::held)
+                    .map(PendingQueueFixtures.Row::held)
                     .toList());
                 dispatcher.tryNext(conversation.id());
             }
@@ -354,7 +359,7 @@ class PendingMessageServiceTest {
         assertThat(lockHeldAtStop.get()).as("stopped 를 받은 때 turn 잠금").isTrue();
         assertThat(heldAtStop.get()).as("잠금이 풀리기 전에 읽은 대기 행의 held").containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
-        assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
+        assertThat(rowsOf(conversation)).extracting(PendingQueueFixtures.Row::held).containsExactly(true);
     }
 
 
@@ -378,7 +383,7 @@ class PendingMessageServiceTest {
 
         assertThat(rowsOf(conversation))
             .as("중지한 turn 이 예외로 끝난 뒤의 대기 행")
-            .extracting(ChatPendingMessage::held)
+            .extracting(PendingQueueFixtures.Row::held)
             .containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
@@ -414,7 +419,7 @@ class PendingMessageServiceTest {
             .as("중지를 확정한 실행 줄")
             .isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(turns.markOf(conversation.id()).running()).as("turn 잠금").isFalse();
-        assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
+        assertThat(rowsOf(conversation)).extracting(PendingQueueFixtures.Row::held).containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
     }
 
@@ -422,13 +427,13 @@ class PendingMessageServiceTest {
     @Test
     @DisplayName("멈춘 대기 줄에 더한 글도 멈춘 채로 들어가고 turn 이 열리지 않는다")
     void addsHeldRowToHeldQueueWithoutOpeningTurn() {
-        pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "멈춘 글", true, QUEUED_AT));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "멈춘 글", true, QUEUED_AT);
 
         PendingQueue queued = pending.enqueue(dad, conversation.id(), "새 글");
         awaitIdle(conversation.id());
 
         assertThat(queued.held()).isTrue();
-        assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true, true);
+        assertThat(rowsOf(conversation)).extracting(PendingQueueFixtures.Row::held).containsExactly(true, true);
         assertThat(stub().received()).isEmpty();
     }
 
@@ -478,7 +483,7 @@ class PendingMessageServiceTest {
             unsubscribe.run();
         }
 
-        assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
+        assertThat(rowsOf(conversation)).extracting(PendingQueueFixtures.Row::held).containsExactly(true);
         assertThat(received.stream().filter(event -> "error".equals(event.type())))
             .as("같은 실패를 되풀이하지 않아 오류는 하나다")
             .singleElement()
@@ -505,8 +510,8 @@ class PendingMessageServiceTest {
     @DisplayName("기동 확인은 멈추지 않은 대기 메시지를 보내고 멈춘 대기 줄은 그대로 둔다")
     void startupDispatchSendsReadyQueueAndLeavesHeldQueue() {
         Conversation heldConversation = conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
-        pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기동 뒤에 갈 글", false, QUEUED_AT));
-        pendingRows.save(ChatPendingMessage.queued(heldConversation.id(), dad.id(), "멈춘 글", true, QUEUED_AT));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "기동 뒤에 갈 글", false, QUEUED_AT);
+        PendingQueueFixtures.queue(pendingRows, heldConversation.id(), "멈춘 글", true, QUEUED_AT);
 
         dispatcher.dispatchAfterStartup();
         awaitIdle(conversation.id());
@@ -516,7 +521,7 @@ class PendingMessageServiceTest {
         assertThat(stub().received().getFirst().input()).endsWith("기동 뒤에 갈 글");
         assertThat(rowsOf(conversation)).isEmpty();
         assertThat(rowsOf(heldConversation))
-            .extracting(ChatPendingMessage::content)
+            .extracting(PendingQueueFixtures.Row::content)
             .containsExactly("멈춘 글");
         assertThat(messages.findByConversationIdOrderByIdAsc(heldConversation.id()))
             .isEmpty();
@@ -527,8 +532,8 @@ class PendingMessageServiceTest {
     @DisplayName("대화를 지우면 그 대화의 대기 행도 지운다")
     void deletesQueuedRowsWithConversation() {
         Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", chief.id(), Instant.now()));
-        pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "지워질 글", true, QUEUED_AT));
-        pendingRows.save(ChatPendingMessage.queued(other.id(), dad.id(), "남을 글", true, QUEUED_AT));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "지워질 글", true, QUEUED_AT);
+        PendingQueueFixtures.queue(pendingRows, other.id(), "남을 글", true, QUEUED_AT);
 
         chat.delete(dad, conversation.id());
 
@@ -545,8 +550,8 @@ class PendingMessageServiceTest {
     }
 
 
-    private List<ChatPendingMessage> rowsOf(Conversation target) {
-        return pendingRows.findByConversationIdOrderByIdAsc(target.id());
+    private List<PendingQueueFixtures.Row> rowsOf(Conversation target) {
+        return PendingQueueFixtures.rows(pendingRows, target.id());
     }
 
 

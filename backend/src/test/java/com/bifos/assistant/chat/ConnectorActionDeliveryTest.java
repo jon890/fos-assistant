@@ -18,12 +18,12 @@ import com.bifos.assistant.chat.nextturn.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
@@ -142,7 +142,7 @@ class ConnectorActionDeliveryTest {
     HermesRunsClient hermes;
 
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -170,7 +170,7 @@ class ConnectorActionDeliveryTest {
         awaitAllIdle();
         stub().reset();
         jdbc.update("DELETE FROM connector_action");
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();
@@ -491,8 +491,7 @@ class ConnectorActionDeliveryTest {
     @Test
     @DisplayName("승인 결과 사건이 와도 보낼 대기 메시지가 있으면 그것을 먼저 보내고 그 turn 이 닫힌 뒤 결과를 전한다")
     void queuedMessageGoesBeforeApprovalResult() {
-        pendingRows.save(ChatPendingMessage.queued(
-            conversation.id(), dad.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z")));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z"));
         UUID actionId = action("SUCCEEDED", "{\"saved\":true}", null, conversation.id());
 
         changed(actionId);
@@ -501,7 +500,7 @@ class ConnectorActionDeliveryTest {
 
         assertThat(stub().received().getFirst().input()).endsWith("대기 글");
         assertThat(stub().received().get(1).input()).contains("승인한 동작의 결과가 도착했다.");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .isEmpty();
         assertThat(deliveredAt(actionId)).isNotNull();
     }

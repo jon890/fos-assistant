@@ -20,7 +20,7 @@ import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
@@ -50,6 +50,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -155,7 +156,7 @@ class ConnectorDeliveryRetryTest {
     ChatAttachmentRepository attachmentRows;
 
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -208,7 +209,7 @@ class ConnectorDeliveryRetryTest {
         deliveryItems.deleteAll();
         attempts.deleteAll();
         deliveries.deleteAll();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();

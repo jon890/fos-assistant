@@ -21,12 +21,12 @@ import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -55,6 +55,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 
@@ -80,7 +81,10 @@ class PendingBeforeDelegationTest {
 
     /** 대기 행을 멈추다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     PendingMessageService pending;
@@ -141,7 +145,7 @@ class PendingBeforeDelegationTest {
         // 이 문맥이 뜰 때 기동 확인이 앞 검사들이 남긴 것으로 연 turn 이 있을 수 있다. 지우기 전에 끝나기를 기다린다.
         awaitAllIdle();
         stub().reset();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();
@@ -172,7 +176,7 @@ class PendingBeforeDelegationTest {
     @AfterEach
     void tearDown() {
         awaitAllIdle();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
     }
 
 
@@ -196,7 +200,7 @@ class PendingBeforeDelegationTest {
         assertThat(history.get(2).content()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(stub().received()).hasSize(2);
         assertThat(stub().received().getFirst().input()).endsWith("대기 글");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .isEmpty();
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
             .as("전했다는 표시")
@@ -207,8 +211,7 @@ class PendingBeforeDelegationTest {
     @Test
     @DisplayName("대기 줄이 멈춰 있으면 위임 결과의 자동 turn 은 열리고 대기 행은 멈춘 채로 남는다")
     void opensAutoTurnAndKeepsHeldQueueWhenQueueIsHeld() {
-        pendingRows.save(ChatPendingMessage.queued(
-            conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z"));
         AgentExecution done = delegated();
 
         finished(done);
@@ -220,8 +223,8 @@ class PendingBeforeDelegationTest {
             .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(stub().received()).as("자동 turn 하나만 Hermes 에 갔다").hasSize(1);
         assertThat(stub().received().getFirst().input()).doesNotContain("멈춘 글");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
-            .extracting(ChatPendingMessage::held)
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
+            .extracting(PendingQueueFixtures.Row::held)
             .containsExactly(true);
     }
 
@@ -233,8 +236,7 @@ class PendingBeforeDelegationTest {
         doThrow(new IllegalStateException("알림을 보내지 못했다"))
             .when(hub)
             .publish(eq(conversation.id()), argThat(event -> event != null && "pending".equals(event.type())));
-        pendingRows.save(ChatPendingMessage.queued(
-            conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z"));
         AgentExecution done = delegated();
         TurnHandle running = turns.open(dad.id(), conversation.id());
         finished(done);
@@ -259,7 +261,7 @@ class PendingBeforeDelegationTest {
         doThrow(new IllegalStateException("사용자 메시지를 저장하기 전에 실패"))
             .when(chat)
             .runPendingMessages(any(), any(), any(), any());
-        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
+        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).holdIfAnyLeft(any(), any());
         TurnHandle running = turns.open(dad.id(), conversation.id());
         AgentExecution done = delegated();
         finished(done);
@@ -280,9 +282,9 @@ class PendingBeforeDelegationTest {
             .as("닫을 때와 뒤이은 호출이 다시 열지 않아 실패 알림은 하나다")
             .singleElement()
             .satisfies(error -> assertThat(error.code()).isEqualTo("INTERNAL_ERROR"));
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .as("멈추지 못한 대기 행")
-            .extracting(ChatPendingMessage::held)
+            .extracting(PendingQueueFixtures.Row::held)
             .containsExactly(false);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
             .extracting(ChatMessage::role)
@@ -296,7 +298,7 @@ class PendingBeforeDelegationTest {
     @Test
     @DisplayName("중지한 turn 의 대기 줄을 멈추지 못해도 실행은 CANCELLED 로 남고 stopped 사건이 온다")
     void recordsCancelledAndSendsStoppedEvenWhenHoldFails() {
-        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
+        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).hold(any(), eq(true));
         stub().willReturn(HermesRunResult.of(
             "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.stop(

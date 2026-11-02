@@ -5,7 +5,7 @@ import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -19,7 +19,6 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /** turn 을 중지하고 잠금을 풀기 전에 대기 메시지를 멈춘다. */
 @Component
@@ -29,8 +28,7 @@ class ChatTurnStopper {
     private final AgentService agents;
     private final AgentExecutionRepository executionRepository;
     private final TurnCancellation turns;
-    private final TransactionTemplate transactions;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final ChatTurnLifecycle chatTurnLifecycle;
 
 
@@ -46,7 +44,7 @@ class ChatTurnStopper {
     void markStoppedAndHoldPending(TurnHandle handle, Long conversationId) {
         turns.markStopped(handle);
         try {
-            transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversationId, true));
+            pendingMessages.hold(conversationId, true);
         } catch (RuntimeException ex) {
             log.warn("중지한 turn 의 대기 줄을 멈춰 두지 못했다 conversationId={}", conversationId, ex);
         }
