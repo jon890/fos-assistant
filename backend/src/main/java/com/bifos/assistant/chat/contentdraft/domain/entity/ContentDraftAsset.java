@@ -1,52 +1,13 @@
 package com.bifos.assistant.chat.contentdraft.domain.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.experimental.Accessors;
-
-/** 원고의 식별자와 불변 revision 참조를 저장한다. 본문은 암호문만 받는다. */
-@Entity
-@Table(name = "content_draft_asset")
-@Getter
-@Accessors(fluent = true)
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContentDraftAsset {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "revision_id", nullable = false)
-    private Long revisionId;
-
-    @Column(name = "position", nullable = false)
-    private int position;
-
-    @Column(name = "attachment_id", nullable = false)
-    private Long attachmentId;
-
-    @Column(name = "source_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
-    private String sourceFingerprint;
-
-    @Column(name = "observation_id")
-    private Long observationId;
-
-    @Column(name = "observation_revision")
-    private Long observationRevision;
-
-
-    public ContentDraftAsset(Long revisionId, int position, Long attachmentId, String fingerprint, Long observationId, Long observationRevision) {
-        this.revisionId = revisionId;
-        this.position = position;
-        this.attachmentId = attachmentId;
-        this.sourceFingerprint = fingerprint;
-        this.observationId = observationId;
-        this.observationRevision = observationRevision;
-    }
+/**
+ * 원고 revision 의 사진 블록 하나가 가리키는 첨부와 관찰이다. revision 의 {@code assets_json} 배열 항목으로 저장한다.
+ *
+ * @param position 블록 목록 안의 순서. 0 부터 499 까지
+ * @param attachmentId 첨부 id
+ * @param sourceFingerprint 원고를 저장할 때 읽은 첨부 원본의 SHA-256 16진수
+ * @param observationId 가리킨 관찰 id. 관찰을 가리키지 않으면 null
+ * @param observationRevision 가리킨 관찰 revision. observationId 와 함께 비거나 함께 찬다
+ */
+public record ContentDraftAsset(int position, Long attachmentId, String sourceFingerprint, Long observationId, Long observationRevision) {
 }

@@ -13,12 +13,12 @@
 
 **근거 문서**: `backend/docs/adr/ADR-20261008-data-encryption.md`, `backend/docs/data-schema.md` 의 「본문 칸과 운영 조회」, `backend/docs/data-schema.md` 의 「conversation」, `backend/docs/data-schema.md`
 
-- 본보기는 메시지다. `backend/src/main/java/com/bifos/assistant/chat/domain/ChatMessage.java` 의 저장 칸(`storedContent`)과 옆 칸(`contentKeyId`), 처음 꺼낼 때 푸는 `content()`, `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageLoadListener.java` 의 `POST_LOAD` 등록, `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageContents.java` 의 AAD 와 주인 조회를 따른다
+- 본보기는 메시지다. `backend/src/main/java/com/bifos/assistant/chat/conversation/domain/ChatMessage.java` 의 저장 칸(`storedContent`)과 옆 칸(`contentKeyId`), 처음 꺼낼 때 푸는 `content()`, `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageLoadListener.java` 의 `POST_LOAD` 등록, `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageContents.java` 의 AAD 와 주인 조회를 따른다
 - 대화 제목
-  - 엔티티 `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` 의 `title`(`VARCHAR(200) NOT NULL`). 주인은 `userId`(바뀌지 않는다). 만드는 자리는 `startedBy`, `startedForCheck`, `startedForTask` 와 `titleIfBlank`
-  - **JPQL 로 칸을 직접 쓰는 질의가 셋이다.** `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` 의 `fillTitleIfBlank`(`where c.title = ''`), `renameIfActive`, `markPurged`(`set c.title = ''`). 엔티티 리스너를 거치지 않으므로 부르는 쪽이 암호문과 key 번호를 넘긴다
-  - 부르는 쪽은 `backend/src/main/java/com/bifos/assistant/chat/application/ChatTurnRouting.java` 의 `conversationWriter.fillTitleIfBlank(conversation.id(), title)` 과 `backend/src/main/java/com/bifos/assistant/chat/application/ChatConversationManagement.java` 의 `conversationWriter.renameIfActive(...)` 다. 둘 다 `backend/src/main/java/com/bifos/assistant/chat/application/ConversationWriter.java` 를 지난다
-  - 읽는 곳은 목록과 응답(`backend/src/main/java/com/bifos/assistant/chat/presentation/ChatController.java`), 먼저 알리기의 후보(`backend/src/main/java/com/bifos/assistant/attention/application/RecentConversationCandidates.java`, `DelegationCandidates.java`, `FailedTurnCandidates.java`)다. 모두 `title()` 을 거치면 바꿀 것이 없다
+  - 엔티티 `backend/src/main/java/com/bifos/assistant/chat/conversation/domain/Conversation.java` 의 `title`(`VARCHAR(200) NOT NULL`). 주인은 `userId`(바뀌지 않는다). 만드는 자리는 `startedBy`, `startedForCheck`, `startedForTask` 와 `titleIfBlank`
+  - **JPQL 로 칸을 직접 쓰는 질의가 셋이다.** `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationRepository.java` 의 `fillTitleIfBlank`(`where c.title = ''`), `renameIfActive`, `markPurged`(`set c.title = ''`). 엔티티 리스너를 거치지 않으므로 부르는 쪽이 암호문과 key 번호를 넘긴다
+  - 부르는 쪽은 `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatTurnRouting.java` 의 `conversationWriter.fillTitleIfBlank(conversation.id(), title)` 과 `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatConversationManagement.java` 의 `conversationWriter.renameIfActive(...)` 다. 둘 다 `backend/src/main/java/com/bifos/assistant/chat/conversation/application/ConversationWriter.java` 를 지난다
+  - 읽는 곳은 목록과 응답(`backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatController.java`), 먼저 알리기의 후보(`backend/src/main/java/com/bifos/assistant/attention/application/RecentConversationCandidates.java`, `DelegationCandidates.java`, `FailedTurnCandidates.java`)다. 모두 `title()` 을 거치면 바꿀 것이 없다
 - 예약 작업
   - 엔티티 `backend/src/main/java/com/bifos/assistant/task/domain/Task.java` 의 `title`(`VARCHAR(100) NOT NULL`, `TITLE_MAX = 100`)과 `instruction`(`TEXT NULL`, 점검 작업은 null). 주인은 `ownerUserId`
   - 쓰기는 `create`, `check`, `apply`(편집)이고 `backend/src/main/java/com/bifos/assistant/task/application/TaskService.java` 가 부른다
@@ -50,7 +50,7 @@ ALTER TABLE task ADD COLUMN instruction_key_id BIGINT NULL;
 ### 2. 대화 제목
 
 - `Conversation` 의 `title` 필드를 `storedTitle`(`@Column(name = "title")`) 로 바꾸고 `titleKeyId` 와 복호화 도구를 둔다. `title()` 은 `ChatMessage.content()` 와 같은 규칙으로 푼다. 엔티티 접근자는 Lombok 으로 만든다
-- 새 대화를 저장하는 `ConversationRepository.save` 의 부르는 쪽은 많다. `ChatMessageWritesImpl` 처럼 `chat.infra` 에 `ConversationWrites` 조각을 두어 `save` 에서 빈 제목이 아니면 빈 글로 넣고 번호로 암호화한다
+- 새 대화를 저장하는 `ConversationRepository.save` 의 부르는 쪽은 많다. `ChatMessageWritesImpl` 처럼 `chat.conversation.infra` 에 `ConversationWrites` 조각을 두어 `save` 에서 빈 제목이 아니면 빈 글로 넣고 번호로 암호화한다
 - `fillTitleIfBlank(id, title, titleKeyId)` 와 `renameIfActive(id, userId, title, titleKeyId, now)` 로 바꾸고 `ConversationWriter` 가 `TextCipher` 로 암호화한 값을 넘긴다. `markPurged` 는 `c.titleKeyId = null` 도 적는다
 - `ChatMessageLoadListener.onPostLoad` 가 `Conversation` 에도 도구를 붙인다
 
@@ -86,18 +86,16 @@ scripts/checks/check-mysql-migration.sh
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/resources/db/migration/V*__title_and_task_content_key.sql` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/domain/Conversation.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationWrites.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationWritesImpl.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageContents.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageLoadListener.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/ConversationWriter.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/domain/Conversation.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationWrites.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationWritesImpl.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageContents.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageLoadListener.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/application/ConversationWriter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/domain/Task.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/infra/TaskLoadListener.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/ConversationTitleEncryptionTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/task/TaskContentEncryptionTest.java` | 신규 |
-| `backend/docs/data-schema.md` | 수정 |
-| `backend/docs/data-schema.md` | 수정 |
 | `backend/docs/data-schema.md` | 수정 |

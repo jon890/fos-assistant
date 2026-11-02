@@ -83,7 +83,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
     @DisplayName("기한 정리가 job 을 닫으면 앞선 조회가 남긴 실패 사유도 비운다")
     void clearsErrorReasonWhenClosingOverdueJob() {
         accepted();
-        jdbc.update("update content_draft_job set error_reason = 'title_cursor_covered'");
+        jdbc.update("update content_draft_snapshot set error_reason = 'title_cursor_covered' where job_status is not null");
         unreachable();
         assertThat(contentJobs.closeOverdue(clock.instant().plus(Duration.ofHours(1)))).isOne();
         var job = jobRows.findAll().getFirst();
@@ -96,7 +96,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
     @DisplayName("예약 커밋 뒤 시작 전송 전에 끊겨 DISPATCHED로 남은 job도 기한 정리가 FAILED로 닫는다")
     void closesDispatchedJobLeftByControlPlaneRestart() {
         var actionId = accepted();
-        jdbc.update("update content_draft_job set status = 'DISPATCHED'");
+        jdbc.update("update content_draft_snapshot set job_status = 'DISPATCHED' where job_status is not null");
         unreachable();
         assertThat(contentJobs.closeOverdue(clock.instant().minus(Duration.ofHours(1)))).isZero();
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.DISPATCHED);
@@ -151,7 +151,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
     @DisplayName("시작 전송 직후의 DISPATCHED job은 not_found를 일시 장애로 보고 닫지 않는다")
     void keepsFreshDispatchedJobOnNotFound() {
         accepted();
-        jdbc.update("update content_draft_job set status = 'DISPATCHED', approved_at = ?", Timestamp.from(clock.instant()));
+        jdbc.update("update content_draft_snapshot set job_status = 'DISPATCHED', approved_at = ? where job_status is not null", Timestamp.from(clock.instant()));
         when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
         code(this::refresh, ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.DISPATCHED);
@@ -197,8 +197,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
 
 
     private ContentDraftJobView refresh() {
-        var job = jobRows.findAll().getFirst();
-        var snapshot = snapshotRows.findById(job.snapshotId()).orElseThrow();
+        var snapshot = snapshotRows.findAll().stream().filter(row -> row.job() != null).findFirst().orElseThrow();
         return jobQueries.refresh(owner, conversation.id(), draftId, snapshot.publicId());
     }
 

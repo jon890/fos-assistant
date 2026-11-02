@@ -38,7 +38,7 @@ PR 하나의 운영 코드는 `scripts/pr/pr-size.mjs` 의 상한 안에 둔다.
 | --- | --- | --- |
 | 사진 관찰(D2) | 요청 UUID 와 hash 를 `media_observation` 칸으로 옮기고 완료 결과 재사용을 없앤다 | 끝났다(#655). DROP 만 남았다 |
 | 도구 숨김 설정 | `toolset_hidden` 을 `group_setting` 의 `TOOLSET` 키로 옮긴다. `GroupSetting` 과 저장소를 `user` 패키지로 옮기는 이동 커밋을 먼저 두고, 공통 저장소를 만든다 | 끝났다(#657). DROP 만 남았다 |
-| Memory collection 설정 | `memory_collection` 을 `group_setting` 의 `MEMORY_COLLECTIONS` 키로 옮긴다. 줄이 없으면 코드의 기본 collection 을 내고 저장하지 않는다 | 도구 숨김 설정의 PR 이 `GroupSetting` 을 `user` 로 옮긴 뒤(층 순서 검사) |
+| Memory collection 설정 | `memory_collection` 을 `group_setting` 의 `MEMORY_COLLECTIONS` 키로 옮긴다. 줄이 없으면 코드의 기본 collection 을 내고 저장하지 않는다 | 끝났다. DROP 만 남았다 |
 | 실행 질문 | `execution_question` 을 `agent_execution.question_message_id` 로 옮긴다. 조건부 UPDATE 로 채우고 대화 정리가 비운다 | 끝났다(#658). DROP 만 남았다. DROP 전에 다시 옮길 때 정리한 대화의 실행은 옮기지 않고 질문 번호를 비운다 |
 | 결과 전달(D3) | `result_delivery_item` 을 `result_delivery.items_json` 으로, `result_delivery_attempt` 를 마지막 시도 칸으로 옮긴다. 출처 줄의 전달 표시가 바꾼 줄 수가 1 이 아니면 예외로 되돌린다. ADR-075 를 고친다 | 끝났다(#660). DROP 만 남았다 |
 | 기억 벡터 | `memory_embedding` 을 `memory` 의 `embedding_*` 칸으로 옮긴다. 엔티티는 매핑하지 않고 채우는 작업과 캐시가 전용 쿼리로 다룬다. 벡터는 옮기지 않고 다시 계산한다 | 사용자 정리([ADR-20261101 / user-purge](ADR-20261101-user-purge.md))의 삭제 단계가 머지된 뒤. 정리 미리보기와 대상 목록이 겹친다 |

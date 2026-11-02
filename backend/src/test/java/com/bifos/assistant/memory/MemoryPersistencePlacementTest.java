@@ -4,12 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
-import com.bifos.assistant.memory.domain.entity.MemoryCollection;
-import com.bifos.assistant.memory.domain.entity.MemoryCollectionId;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
-import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -37,9 +34,8 @@ class MemoryPersistencePlacementTest {
         Repositories repositories = new Repositories(context);
         assertPersistence(repositories, Memory.class, Long.class, MemoryRepository.class);
         assertPersistence(repositories, MemoryCapture.class, Long.class, MemoryCaptureRepository.class);
-        assertPersistence(repositories, MemoryCollection.class, MemoryCollectionId.class, MemoryCollectionRepository.class);
         assertPersistence(repositories, MemoryRevision.class, MemoryRevisionId.class, MemoryRevisionRepository.class);
-        for (Class<?> idType : new Class<?>[] {MemoryCollectionId.class, MemoryRevisionId.class}) {
+        for (Class<?> idType : new Class<?>[] {MemoryRevisionId.class}) {
             assertThat(entityManager.getMetamodel().embeddable(idType).getJavaType()).isEqualTo(idType);
         }
     }

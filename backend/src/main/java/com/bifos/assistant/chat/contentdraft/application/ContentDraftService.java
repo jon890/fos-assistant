@@ -21,7 +21,6 @@ import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftRevision;
 import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftRevisionStatus;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
@@ -53,7 +52,6 @@ public class ContentDraftService {
     private final ChatContentMutationCoordinator mutations;
     private final ContentDraftRepository drafts;
     private final ContentDraftRevisionRepository revisions;
-    private final ContentDraftAssetRepository assets;
     private final ContentDraftReferences references;
     private final ContentDraftBodies bodies;
     private final ContentDraftInputReader reader;
@@ -281,8 +279,7 @@ public class ContentDraftService {
             expire(draft);
             return new ContentDraftException(ErrorCode.CONTENT_DRAFT_GONE, null);
         }
-        if (row.status() == ContentDraftRevisionStatus.STALE
-            || !references.valid(draft, assets.findByRevisionIdOrderByPositionAsc(row.id()), true)) {
+        if (row.status() == ContentDraftRevisionStatus.STALE || row.assetsMissing() || !references.valid(draft, row.assets(), true)) {
             revisions.invalidate(row.id());
             return new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, draft.currentRevision());
         }
@@ -310,12 +307,8 @@ public class ContentDraftService {
         if (draft.id() == null) {
             drafts.saveAndFlush(draft);
         }
-        var row = revisions.saveAndFlush(new ContentDraftRevision(draft.id(), revision,
-            clock.instant().truncatedTo(ChronoUnit.MICROS), sealed.content(), sealed.keyId()));
-        for (var asset : prepared) {
-            assets.save(new ContentDraftAsset(row.id(), asset.position(), asset.attachmentId(), asset.sourceFingerprint(),
-                asset.observationId(), asset.observationRevision()));
-        }
+        revisions.saveAndFlush(new ContentDraftRevision(draft.id(), revision,
+            clock.instant().truncatedTo(ChronoUnit.MICROS), sealed.content(), sealed.keyId(), prepared));
         if (!draft.expiresAt().isAfter(clock.instant()) || !references.valid(draft, prepared, true)) {
             throw ContentDraftBodies.unavailable();
         }

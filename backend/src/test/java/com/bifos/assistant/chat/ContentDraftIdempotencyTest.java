@@ -3,7 +3,6 @@ package com.bifos.assistant.chat;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftReferences;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftService;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraft;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
@@ -143,19 +142,16 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
 
 
     @Test
-    @DisplayName("암호화와 asset 대응 insert 및 commit 실패는 다섯 표 전체를 rollback하고 같은 키로 회복한다")
+    @DisplayName("암호화와 생성 대응 insert 및 commit 실패는 네 표 전체를 rollback하고 같은 키로 회복한다")
     void rollsBackEveryParticipantBeforeRetry() {
         var refs = new ContentDraftReferences(attachments, store, observations, bodies, clock, json);
-        for (String failure : List.of("seal", "asset", "request", "call", "commit")) {
-            var failedAssets = Mockito.mock(ContentDraftAssetRepository.class,
-                AdditionalAnswers.delegatesTo(assetRows));
+        for (String failure : List.of("seal", "request", "call", "commit")) {
             var failedRequests = Mockito.mock(ContentDraftCreationRequestRepository.class,
                 AdditionalAnswers.delegatesTo(creationRequests));
             var failedCalls = Mockito.mock(ContentDraftCreationCallRepository.class,
                 AdditionalAnswers.delegatesTo(creationCalls));
             var failureException = new DataAccessResourceFailureException("synthetic rollback");
             switch (failure) {
-                case "asset" -> Mockito.doThrow(failureException).when(failedAssets).save(ArgumentMatchers.any());
                 case "request" -> Mockito.doThrow(failureException).when(failedRequests).saveAndFlush(ArgumentMatchers.any());
                 case "call" -> Mockito.doThrow(failureException).when(failedCalls).saveAndFlush(ArgumentMatchers.any());
                 default -> {
@@ -180,20 +176,18 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
                 }
             };
             var local = new ContentDraftService(access, messages, mutations, draftRows,
-                revisionRows, failedAssets, refs, localBodies, reader, json, clock, failedRequests, failedCalls);
+                revisionRows, refs, localBodies, reader, json, clock, failedRequests, failedCalls);
             var id = UUID.randomUUID();
             var input = inputDraft("rollback", true);
             assertThatThrownBy(() -> local.createIdempotent(owner, scope("call_1"), id, input)).isInstanceOf(DataAccessResourceFailureException.class);
             assertThat(draftRows.count()).isZero();
             assertThat(revisionRows.count()).isZero();
-            assertThat(assetRows.count()).isZero();
             assertThat(creationRequests.count()).isZero();
             assertThat(creationCalls.count()).isZero();
             drafts.createIdempotent(owner, scope("call_1"), id, input);
             assertThat(draftRows.count()).isEqualTo(1);
             creationCalls.deleteAll();
             creationRequests.deleteAll();
-            assetRows.deleteAll();
             revisionRows.deleteAll();
             draftRows.deleteAll();
         }

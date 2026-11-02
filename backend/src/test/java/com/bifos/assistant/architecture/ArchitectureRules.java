@@ -700,8 +700,8 @@ public final class ArchitectureRules {
     private static final Map<String, Map<String, String>> OWNED_PERSISTENT_TYPES = Map.of(
         "crypto", Map.of("UserDataKey", "user_data_key"),
         "memory", Map.of(
-            "Memory", "memory", "MemoryCapture", "memory_capture", "MemoryCollection", "memory_collection",
-            "MemoryCollectionId", "", "MemoryRevision", "memory_revision", "MemoryRevisionId", ""));
+            "Memory", "memory", "MemoryCapture", "memory_capture", "MemoryRevision", "memory_revision",
+            "MemoryRevisionId", ""));
 
 
     /** fixture 도 운영 소유 목록과 선택 조건을 쓰며 루트와 검사할 기능만 지정한다. */

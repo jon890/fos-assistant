@@ -411,7 +411,6 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
         assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.STALE);
         assertThat(jobRows.findAll().getFirst().errorCode()).isEqualTo("CONTENT_DRAFT_STALE");
-        jobRows.deleteAll();
         snapshotRows.deleteAll();
         actionRows.deleteAll();
         UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
