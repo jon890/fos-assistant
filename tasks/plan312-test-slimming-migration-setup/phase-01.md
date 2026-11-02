@@ -1,5 +1,7 @@
 # Phase 01. 데이터 마이그레이션 검사의 setup 을 클래스마다 한 번으로 줄인다
 
+**상태**: 완료
+
 **Execution profile**: standard
 
 ## 목표
@@ -38,8 +40,20 @@ cd backend && ./gradlew test --tests '*MigrationTest'
 scripts/checks/check-mysql-migration.sh
 ```
 
+## 구현 결과
+
+계획서의 「18개」 는 추정이었다. 본문에 쓰기가 있거나 메서드 안에서 마이그레이션을 더 올리는 클래스를 빼니 H2 아홉 개와 상속으로 줄어드는 MySQL 하위 클래스 넷, 합쳐 열세 개가 남았다.
+
 ## 변경 파일
 
 | 파일 | 변경 |
 | --- | --- |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentPositionMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/modelchoice/GroupSettingMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/FinancialLimitsIntoOwnersMigrationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/SubagentUsageLedgerMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentModelDropMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/user/GroupRenameMigrationTest.java` | 수정 |
