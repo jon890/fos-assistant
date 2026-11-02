@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[MemoryCollection.java](../../backend/src/main/java/com/bifos/assistant/memory/domain/entity/MemoryCollection.java)에서 확인한다.
-MemoryCollection은 필드 접근자를 Getter와 fluent Accessors로 제공한다.
+[GroupSetting.java](../../backend/src/main/java/com/bifos/assistant/user/domain/GroupSetting.java)에서 확인한다.
+GroupSetting은 필드 접근자를 Getter와 fluent Accessors로 제공한다.

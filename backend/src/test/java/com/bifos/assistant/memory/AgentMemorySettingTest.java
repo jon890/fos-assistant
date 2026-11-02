@@ -15,7 +15,7 @@ import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.memory.application.AgentMemorySettingService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryCollection;
+import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -112,7 +112,6 @@ class AgentMemorySettingTest {
             jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
             jdbc.update("DELETE FROM agent WHERE id = ?", agentId);
         }
-        jdbc.update("DELETE FROM memory_collection WHERE group_id = ?", groupId);
         users.deleteAllById(userIds);
     }
 
