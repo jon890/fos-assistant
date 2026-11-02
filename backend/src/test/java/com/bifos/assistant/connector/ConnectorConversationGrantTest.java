@@ -24,6 +24,7 @@ import com.bifos.assistant.connector.connection.application.ConnectorBindingServ
 import com.bifos.assistant.connector.approval.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionResult;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
+import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.approval.application.dto.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
@@ -441,6 +442,34 @@ class ConnectorConversationGrantTest {
         assertThat(grants().tools()).singleElement().satisfies(grant -> assertThat(grant.revokedAt()).isNull());
         assertThat(grants().conversations()).isEmpty();
         assertThat(ask(root, WRITE, "{\"text\":\"실패한 뒤\"}").allowed()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("허락을 거두기 전에 읽어 둔 승인 줄을 다른 칸만 바꿔 저장해도 거둔 시각이 지워지지 않는다")
+    void staleActionSaveKeepsRevokedGrant() throws Exception {
+        UUID actionId = ask(root, WRITE, ARGS).actionId();
+        service.approve(me, actionId, GrantPeriod.HOUR, false);
+        Long grantId = grants().tools().getFirst().id();
+        ExecutorService other = Executors.newSingleThreadExecutor();
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                ConnectorAction stale = actions.findById(grantId).orElseThrow();
+                try {
+                    // 다른 트랜잭션이 허락 칸만 거두고 커밋한다.
+                    other.submit(() -> service.revokeGrant(me, grantId)).get();
+                } catch (Exception ex) {
+                    throw new IllegalStateException(ex);
+                }
+                stale.markDelivered(Instant.now());
+            });
+        } finally {
+            other.shutdownNow();
+        }
+
+        assertThat(grants().tools()).singleElement().satisfies(grant -> assertThat(grant.revokedAt()).isNotNull());
+        assertThat(actions.findById(grantId).orElseThrow().resultDeliveredAt()).isNotNull();
+        assertThat(ask(root, WRITE, "{\"text\":\"거둔 뒤\"}").allowed()).isFalse();
     }
 
 
