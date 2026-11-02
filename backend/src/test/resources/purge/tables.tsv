@@ -36,7 +36,6 @@ follow_up|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK�
 group_setting|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 설정이다. 모델 설정이 여기 있다.
 hermes_session_binding|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 origin_execution_id에 속한다. session 소유권 참조는 실행 기록과 함께 남기는 계약이다.
 media_observation|CONVERSATION|id|DELETE|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
-media_observation_request|CONVERSATION|id|DELETE|DELETE|KEEP|observation_id FK로 관찰에 속한다. 관찰 삭제 때 ON DELETE CASCADE로 지운다.
 memory|USER|id|DELETE|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
 memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
 memory_collection|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 기억 영역이다. 사용자 한 사람의 삭제 대상이 아니다.
@@ -53,6 +52,5 @@ result_delivery_item|CONVERSATION|id|KEEP|KEEP|KEEP|delivery_id FK로 전달에 
 subagent_usage_job|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|DELETE|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
 task_run|USER|id|DELETE|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.
-toolset_hidden|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 toolset 설정이다.
 user_browser|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 브라우저 제거와 유휴 정리는 별도 경로가 맡는다.
 user_data_key|USER|id|DELETE|KEEP|KEEP|user_id로 사용자에 속한다. 대화 하나를 지워도 다른 암호문을 읽어야 하므로 key를 남기고, 사용자 정리가 대화 정리를 확인한 뒤 마지막에 지운다.
