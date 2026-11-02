@@ -45,18 +45,15 @@ async function main() {
     await mkdir(context);
     const dockerfile = join(connector, "scripts/test.Dockerfile");
     const source = await readFile(dockerfile);
-    await writeFile(
-      join(context, "Dockerfile"),
-      Buffer.concat([
-        source,
-        Buffer.from(
-          "\nCOPY package.json bun.lock /synthetic-deps/\nRUN cd /synthetic-deps && bun --no-env-file install --frozen-lockfile --network-concurrency=1\n",
-        ),
-      ]),
-    );
-    const hashInput = createHash("sha256")
-      .update(source)
-      .update("loopback-deps-v1");
+    // 태그가 이 최종 Dockerfile 의 hash 라서, 덧붙이는 줄을 고치면 태그가 바뀌어 옛 image 를 쓰지 않는다.
+    const finalDockerfile = Buffer.concat([
+      source,
+      Buffer.from(
+        "\nCOPY package.json bun.lock /synthetic-deps/\nRUN cd /synthetic-deps && bun --no-env-file install --frozen-lockfile --network-concurrency=1\n",
+      ),
+    ]);
+    await writeFile(join(context, "Dockerfile"), finalDockerfile);
+    const hashInput = createHash("sha256").update(finalDockerfile);
     for (const file of ["package.json", "bun.lock"]) {
       const contents = await readFile(join(connector, file));
       hashInput.update(contents);
