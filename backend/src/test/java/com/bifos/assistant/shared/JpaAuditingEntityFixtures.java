@@ -29,7 +29,6 @@ import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
-import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
@@ -98,7 +97,6 @@ final class JpaAuditingEntityFixtures {
 
         add(entityManager, rows, AllowedPerson.of(unique + "@audit.test", "허용", unique));
         add(entityManager, rows, AgentMemoryCollection.of(agent.id(), "core", false));
-        add(entityManager, rows, MemoryCollection.defaultsFor(group).getFirst());
         add(entityManager, rows, UserBrowser.create(user.id(), unique, BUSINESS));
         add(entityManager, rows, AgentToken.issueFor(unique, "f".repeat(64), "검사"));
         add(entityManager, rows, UserDataKey.wrapped(user.id(), "audit", "wrapped"));
@@ -107,7 +105,7 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, Notification.of(user.id(), NotificationKind.TASK_SUCCEEDED, "알림", "본문", null));
         add(entityManager, rows, ChatArtifact.of(conversation.id(), 1L, unique, 1L));
         add(entityManager, rows, ChatAttachment.of(conversation.id(), user.id(), "audit.txt", "text/plain", 1, BUSINESS.plusSeconds(60)));
-        add(entityManager, rows, ResultDelivery.opened(conversation.id(), BUSINESS));
+        add(entityManager, rows, ResultDelivery.opened(conversation.id(), "{\"version\":1,\"items\":[]}", null, BUSINESS));
         add(entityManager, rows, ConnectorToolGrant.of(user.id(), "audit", "audit", BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorConversationGrant.of(action, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorActionExecution.stored(action, connection.id(), binding.id(), BUSINESS, BUSINESS,

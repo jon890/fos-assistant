@@ -20,7 +20,6 @@ import com.bifos.assistant.chat.attachment.infra.AttachmentFingerprint;
 import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
@@ -48,7 +47,6 @@ public class ContentDraftSnapshotInputs {
     private final ConversationAccess access;
     private final ContentDraftRepository drafts;
     private final ContentDraftRevisionRepository revisions;
-    private final ContentDraftAssetRepository assets;
     private final ContentDraftReferences references;
     private final ContentDraftBodies bodies;
     private final ContentDraftInputReader reader;
@@ -95,11 +93,12 @@ public class ContentDraftSnapshotInputs {
             .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다."));
         var row = revisions.findByDraftIdAndRevision(draft.id(), revision)
             .orElseThrow(() -> ContentDraftSnapshotHash.unavailable("input:revision-not-found"));
-        var links = assets.findByRevisionIdOrderByPositionAsc(row.id());
+        var links = row.assets();
         if (!draft.expiresAt().isAfter(clock.instant()) || row.status() == ContentDraftRevisionStatus.EXPIRED) {
             throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_GONE, null);
         }
-        if (draft.currentRevision() != revision || row.status() != ContentDraftRevisionStatus.VALID || !references.valid(draft, links, true)) {
+        if (draft.currentRevision() != revision || row.status() != ContentDraftRevisionStatus.VALID || row.assetsMissing()
+            || !references.valid(draft, links, true)) {
             throw stale();
         }
         if (!binding.agentId().equals(agent(user, conversationId, originId))) {

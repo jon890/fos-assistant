@@ -16,7 +16,7 @@
 
 ## 이 저장소의 사례
 
-[MemoryCollection.java](../../backend/src/main/java/com/bifos/assistant/memory/domain/entity/MemoryCollection.java)에서 확인한다.
-MemoryCollection은 memory.domain.entity에서 저장 모델을 소유한다.
+[Memory.java](../../backend/src/main/java/com/bifos/assistant/memory/domain/entity/Memory.java)에서 확인한다.
+Memory는 memory.domain.entity에서 저장 모델을 소유한다.
 
 책임과 실행 절차는 [code-architecture.md](../../backend/docs/code-architecture.md)에서 이어 읽는다.

@@ -12,7 +12,7 @@ import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
+import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
@@ -115,8 +115,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         ProactiveCheckGuard.class,
         ProactiveCheckService.class,
         RecoveredRunRecorder.class,
-        ResultDeliveryAttemptRepository.class,
         ResultDeliveryRecorder.class,
+        ResultDeliveryRepository.class,
         SkillCommandCatalog.class,
         SkillService.class,
         SkillStore.class,

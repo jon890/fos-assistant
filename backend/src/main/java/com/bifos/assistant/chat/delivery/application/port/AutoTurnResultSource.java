@@ -16,7 +16,7 @@ public interface AutoTurnResultSource {
      * 전달 묶음의 항목에 적는 출처 이름이다(ADR-075). 40자 안의 대문자 이름이다.
      *
      * <p>{@code "DELEGATION"} 은 위임 결과가 쓰므로 쓰지 못한다. 구현마다 다른 이름이어야 한다. 한 결과는
-     * {@code (출처 이름, 결과 이름)} 으로 한 묶음에만 든다.
+     * {@code (출처 이름, 결과 이름)} 으로 가리키고 {@link #markDelivered} 가 한 묶음에만 들게 한다.
      */
     String source();
 
@@ -26,11 +26,15 @@ public interface AutoTurnResultSource {
 
 
     /**
-     * 전했다고 적는다. 알림 줄을 저장하는 트랜잭션 안에서 부른다.
+     * 아직 전하지 않은 결과만 전했다고 적고 적은 줄 수를 돌려준다. 알림 줄을 저장하는 트랜잭션 안에서 부른다.
+     *
+     * <p>이미 전한 결과는 세지 않는다. 부르는 쪽은 그 수가 서로 다른 열쇠의 수와 다르면 트랜잭션을 되돌린다. 한 결과가 두
+     * 묶음에 들지 않게 막는 것이 이 수다(ADR-075).
      *
      * @param keys {@link AutoTurnResult#key()} 들
+     * @return 이 호출이 전했다고 적은 결과 수
      */
-    void markDelivered(List<String> keys, Instant now);
+    int markDelivered(List<String> keys, Instant now);
 
 
     /**

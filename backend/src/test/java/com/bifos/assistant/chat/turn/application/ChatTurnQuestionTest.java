@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.turn.application;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ class ChatTurnQuestionTest {
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.Fresh(List.of(1L, 2L)), "합친 글")).isEqualTo("합친 글");
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.Regenerate(null, null), "다시 묻는 글")).isEqualTo("다시 묻는 글");
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.Scheduled("예약 작업"), "예약 지시")).isNull();
-        assertThat(ChatTurnRunner.questionOf(new TurnIntent.DelegationResults(1L, false, List.of()), "결과 전달")).isNull();
+        assertThat(ChatTurnRunner.questionOf(new TurnIntent.DelegationResults(new DeliveryAttemptRef(1L, 1), false, List.of()), "결과 전달")).isNull();
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.ProactiveCheck(null), "살펴보기")).isNull();
     }
 }

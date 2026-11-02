@@ -15,12 +15,11 @@ import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
+import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -114,12 +113,6 @@ class ResultDeliveryRetryUserLimitTest {
     ResultDeliveryRepository deliveries;
 
     @Autowired
-    ResultDeliveryItemRepository deliveryItems;
-
-    @Autowired
-    ResultDeliveryAttemptRepository attempts;
-
-    @Autowired
     HermesRunsClient hermes;
 
     private CurrentUser dad;
@@ -138,8 +131,6 @@ class ResultDeliveryRetryUserLimitTest {
         awaitAllIdle();
         stub().reset();
         scheduler.capture();
-        deliveryItems.deleteAll();
-        attempts.deleteAll();
         deliveries.deleteAll();
         executionEvents.deleteAll();
         executions.deleteAll();
@@ -193,7 +184,7 @@ class ResultDeliveryRetryUserLimitTest {
         ResultDelivery rejected = deliveries.findById(delivery.id()).orElseThrow();
         assertThat(rejected.status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(rejected.attemptCount()).isEqualTo(1);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(rejected.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
         assertThat(stub().received()).as("첫 자동 turn 말고 Hermes 제출").hasSize(1);
         assertThat(scheduler.drain()).as("한도로 거절한 다시 전달의 예약").isEmpty();
 
