@@ -399,25 +399,27 @@ turn 이 도는 동안 보낸 글을 Control Plane 이 대기 메시지로 쌓�
 **다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다.**
 `TurnCancellation` 의 종료 리스너는 이것 하나만 건다.
 turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때, 기동 정리가 잠금을 풀 때 모두 이 자리를 지난다.
-멈춰 둔 행이 없는 대기 행이 있으면 turn 잠금을 잡고 `ChatService.runPendingMessages` 로 보내고, 없으면 `DelegationWakeService.tryWake` 로 넘긴다. 그래서 사용자의 말이 위임 결과보다 먼저 간다.
+멈추지 않은 대기 줄에 글이 있으면 turn 잠금을 잡고 `ChatService.runPendingMessages` 로 보내고, 없으면 `DelegationWakeService.tryWake` 로 넘긴다. 그래서 사용자의 말이 위임 결과보다 먼저 간다.
 
 **`POST .../pending` 은 저장한 뒤 언제나 `tryNext` 를 부른다.**
 turn 이 도는지 먼저 보고 저장할지 정하면, 보는 순간과 저장하는 순간 사이에 turn 이 닫혔을 때 그 글을 보낼 계기가 없다.
 
-**멈춤은 행마다 `held` 로 DB 에 적는다.**
-한 행이라도 멈춰 있으면 그 대화의 대기 줄 전체를 보내지 않고, 멈춰 있을 때 더한 행은 멈춘 채로 들어간다.
+**대기 줄은 대화 줄의 `conversation.pending_messages` JSON 칸 하나에 두고, 멈춤도 그 줄의 `held` 하나로 DB 에 적는다.**
+멈춘 줄은 통째로 보내지 않고, 멈춰 있을 때 더한 글도 멈춘 채로 들어간다. 글을 모두 빼면 칸을 비우고 멈춤도 사라진다.
+더하기, 취소, 멈춤, 보낸 글 빼기는 모두 `PendingMessageStore.change` 가 대화 줄을 잠근 뒤 읽고 쓰므로 같은 대화에서 차례로 돈다. 상한 확인도 그 잠금 안에서 한다.
 메모리에만 두면 서버가 다시 뜬 뒤 기동 확인이 사용자가 멈춘 글을 보내 버린다.
 
-**사용자 실행 한도에 닿으면 대기 행을 보내지 않고 멈춘다.**
-turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 대기 줄을 멈춘 뒤 대화 단위 SSE 로 `error` 사건을 낸다.
+**사용자 실행 한도에 닿으면 대기 글을 보내지 않고 멈춘다.**
+turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 글을 빼지 않고 대기 줄을 멈춘 뒤 대화 단위 SSE 로 `error` 사건을 낸다.
 멈추지 않고 두면 보낼 계기가 없다. 사용자의 다른 대화가 끝나도 이 대화의 `tryNext` 는 불리지 않는다.
 위임 결과 자동 turn 이 `USER_BUSY` 를 받으면 결과를 전했다고 적지 않고 `DelegationWakeService.FAILURE_BACKOFF` 뒤 다시 시도한다.
 연속 거절이 `MAX_BUSY_RETRIES` 를 넘으면 `LONG_BUSY_RETRY` 간격으로 늦추고, 한 대화에 예약을 하나만 둔다. 한도는 [`docs/features/execution.md`](execution.md) 가 갖는다.
 
-대기 행을 지우는 것과 `USER` 행을 저장하는 것은 `ChatTurnRouting.saveQuestion` 의 같은 트랜잭션이다.
-지운 행 수가 읽은 행 수와 다르면 읽은 뒤 취소된 행이 있었다는 뜻이라, 되돌리고 대기 행을 다시 읽어 합친다.
+대기 줄에서 보낸 글을 빼는 것과 `USER` 행을 저장하는 것은 `ChatTurnRouting.saveQuestion` 의 같은 트랜잭션이다.
+읽은 글 가운데 하나라도 줄에 없으면 읽은 뒤 취소됐다는 뜻이라, 되돌리고 대기 줄을 다시 읽어 합친다. 그 사이 더해진 글은 줄에 남아 다음 turn 으로 간다.
+글 번호는 줄 안의 마지막 번호보다 크고 받은 시각의 마이크로초 이상이다. 줄을 비운 뒤 더한 글이 이미 보낸 글의 번호를 받지 않아, 늦게 온 취소가 새 글을 지우지 않는다.
 
-사용자 메시지를 저장하기 전에 실패하면 남은 행을 멈춰 두고 `error` 사건을 낸다.
+사용자 메시지를 저장하기 전에 실패하면 남은 글이 있을 때 대기 줄을 멈춰 두고 `error` 사건을 낸다.
 멈추는 것까지 실패하면 그 대화는 `NextTurnDispatcher.FAILURE_BACKOFF` 동안 대기 메시지 turn 을 다시 열지 않는다. 그동안에도 위임 결과는 전한다.
 대기 메시지로 연 turn 은 사용자가 보낸 turn 과 같아 `auto_turn_count` 를 0 으로 돌린다.
 대기 메시지 경로는 `assistant.delegation-wake.enabled` 와 무관하게 켜져 있다.
@@ -440,7 +442,7 @@ turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 대
 | 상한을 넘는다(`PendingMessageService`) | `PENDING_QUEUE_FULL`. 저장하지 않고 글을 입력창에 되돌린다 |
 | 새 대화의 빈 대화를 만들고 있다 | 보내기를 막는다. 대화 식별자를 확보한 뒤 첫 turn을 보내며, 답이 도는 동안에는 대기 메시지를 받는다 |
 | 보낼 대기 메시지와 끝난 위임 결과가 함께 있다 | 대기 메시지를 먼저 보낸다. 그 turn 이 닫힌 뒤 위임 결과를 전한다 |
-| 대화를 지운다 | 그 대화의 대기 행을 함께 지운다 |
+| 대화를 지운다 | 그 대화의 대기 줄을 함께 비운다 |
 
 꺼지거나 지워진 에이전트(`AGENT_DISABLED`, `AGENT_NOT_FOUND`), `/이름` 의 스킬 커맨드 해석, 저장한 뒤의 실행 실패와 중지는 보통 보내기와 같다.
 
@@ -474,11 +476,11 @@ turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으
 `running` 경로는 표시가 가진 루트 실행 번호와 그 실행 줄의 `startedAt` 을 돌려준다.
 번호가 아직 붙지 않았으면 `running` 은 true 이고 `executionId` 와 `startedAt` 은 null 이다.
 
-**잠금을 풀기 전에 대기 행을 멈춘다.**
-turn 이 중지로 끝나면 `ChatTurnStopper` 가 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춘다.
+**잠금을 풀기 전에 대기 줄을 멈춘다.**
+turn 이 중지로 끝나면 `ChatTurnStopper` 가 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 줄을 멈춘다.
 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
 **사용자가 중지를 확정한 실행은 `RUNNING` 으로 남지 않는다.**
-중지가 확정된 turn 이 예외로 끝나면 실행 줄이 아직 끝나지 않았을 때 취소로 적고(이미 `FAILED` 면 그대로 둔다), 그 뒤 대기 행을 멈춘다.
+중지가 확정된 turn 이 예외로 끝나면 실행 줄이 아직 끝나지 않았을 때 취소로 적고(이미 `FAILED` 면 그대로 둔다), 그 뒤 대기 줄을 멈춘다.
 멈춤이나 `pending` 알림이 실패해도 경고 로그만 남기고 그 turn 은 `stopped` 로 끝나며, 잠금 해제와 `tryNext` 를 막지 않는다.
 
 **표시는 한 프로세스의 메모리에 있다.** Control Plane 이 하나라서 그것으로 된다. 둘 이상으로 늘리면 이 표시를 데이터베이스로 옮겨야 한다.

@@ -82,8 +82,8 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | --- | --- | --- |
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
-| `chat_pending_message` | `content` | 아직 |
-| `conversation` | `title` | 아직 |
+| `chat_pending_message` | `content` | 아직. 코드가 읽고 쓰지 않는 옛 표지만 직전 이미지가 쓸 수 있어 DROP 전까지 권한에서 뺀다 |
+| `conversation` | `title`, `pending_messages` | 아직 |
 | `agent_execution` | `output_text` | 아직 |
 | `execution_event` | `detail` | 아직 |
 | `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
@@ -196,7 +196,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 같은 트랜잭션에서 두 가지를 함께 지운다.
-아직 보내지 않은 대기 메시지(`chat_pending_message`)는 지운 대화에 보낼 곳이 없어 지운다.
+아직 보내지 않은 대기 메시지(`conversation.pending_messages`)는 지운 대화에 보낼 곳이 없어 비운다.
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다. 「참고한 기억」 단추 사건은 그 대화의 것만 지우고 넓히지 않는다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행의 답 본문과 질문 메시지 번호, 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
@@ -396,6 +396,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
+- `pending_messages` 는 응답 중에 보내 아직 다음 turn 으로 보내지 않은 대기 줄의 JSON 이다. 모양과 멈춤, 동시성은 [ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「저장 자리 개정」 이 갖는다. 비면 대기 글이 없다. 빈 줄은 저장하지 않는다. 엔티티는 이 칸을 쓰지 않고 `PendingMessageStore` 가 대화 줄을 잠근 뒤 전용 질의로만 읽고 바꾼다. 모르는 버전이거나 깨진 JSON 은 빈 줄로 보지 않고 오류로 올린다. 빈 줄로 보면 멈춰 둔 글이 다음 저장에서 사라진다. 대화를 지우거나 정리할 때 비운다
 - `task_id` 는 이 대화를 만든 예약 작업이다([ADR-078](../../docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md)). `agent_id` 와 같은 까닭으로 외래 키를 두지 않는다
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다. 지운 에이전트는 정리 작업이 행을 지우고 그 에이전트의 대화는 남는다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
@@ -416,10 +417,10 @@ AAD 에 줄 번호와 대화, 대화 주인이 들어가 암호문을 다른 줄
 
 ### chat_pending_message
 
-turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, 보내지기 전까지만 있다([ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
-**보낸 행은 지운다.** 대기 행을 지우는 것과 합친 글을 `chat_message` 의 `USER` 행으로 저장하는 것이 한 트랜잭션이다. 보낸 글은 `chat_message` 에 남으므로 여기에 이력을 두지 않는다. 취소한 행도 지운다.
-합칠 때는 `id` 순서로 잇는다. 개수와 길이의 상한은 표의 제약이 아니라 `PendingMessageService` 가 본다.
-**한 행이라도 `held` 가 참이면 그 대화의 대기 행을 모두 보내지 않는다.** 앞 turn 을 중지했거나 보내려다 저장 전에 실패하면 참이 되고, 사용자가 「보내기」 를 누르면 그 대화의 `held` 를 모두 내린다.
+`chat_pending_message` 테이블은 코드가 더는 읽고 쓰지 않는다. 대기 메시지는 `conversation.pending_messages` 가 갖는다.
+`V20261102074315` 가 이 테이블의 행을 대화마다 그 칸 하나로 옮기고 옮긴 행을 지웠다. 대화 줄이 없는 행은 보낼 곳이 없어 남겼다. 대화 줄은 지우지 않으므로 그런 행은 데이터베이스를 직접 고친 경우에만 생기고, DROP PR 이 테이블과 함께 지운다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
+옮긴 행을 남기지 않은 까닭은 직전 이미지로 되돌렸을 때 새 코드가 이미 보낸 글을 다시 보내지 않게 하려는 것이다.
+직전 이미지가 이 테이블에 쓴 행은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### chat_attachment
 

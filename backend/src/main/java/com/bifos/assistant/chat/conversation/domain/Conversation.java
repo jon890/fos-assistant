@@ -139,6 +139,17 @@ public class Conversation extends CreatedAtEntity {
     @Getter
     private Instant hiddenAt;
 
+    /**
+     * 대기 줄의 JSON 이다(ADR-048). 비면 대기 메시지가 없다.
+     *
+     * <p>엔티티로 읽지도 쓰지도 않는다. 먼저 읽어 둔 대화를 저장할 때 그 사이 바뀐 대기 줄을 옛 값으로 덮지 않게 한다.
+     * {@code PendingMessageStore} 가 줄을 잠그고 전용 질의로만 읽고 바꾼다. 칸을 매핑해 두는 것은 테스트가 엔티티로 만드는
+     * 스키마에도 이 칸이 있게 하려는 것이다.
+     */
+    @Column(name = "pending_messages", insertable = false, updatable = false, columnDefinition = "LONGTEXT")
+    @Getter(AccessLevel.NONE)
+    private String pendingMessages;
+
 
     private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;

@@ -20,11 +20,12 @@ import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
@@ -64,7 +66,10 @@ class PendingMessageControllerTest {
     TurnCancellation turns;
 
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     AgentRepository agents;
@@ -82,7 +87,7 @@ class PendingMessageControllerTest {
 
     @BeforeEach
     void setUp() {
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         mvc = MockMvcBuilders.standaloneSetup(new PendingMessageController(pending, currentUser, access))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
@@ -94,7 +99,7 @@ class PendingMessageControllerTest {
 
     @AfterEach
     void tearDown() {
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         turns.close(running);
     }
 
@@ -132,7 +137,7 @@ class PendingMessageControllerTest {
             .andReturn()
             .getResponse();
         assertThat(cancelled.getStatus()).isEqualTo(204);
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .isEmpty();
     }
 
@@ -156,7 +161,7 @@ class PendingMessageControllerTest {
 
         assertThat(response.getStatus()).isEqualTo(400);
         assertThat(bodyOf(response).path("code").asString()).isEqualTo("VALIDATION_FAILED");
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .isEmpty();
     }
 
@@ -185,7 +190,7 @@ class PendingMessageControllerTest {
         assertThat(added.getStatus()).isEqualTo(404);
         assertThat(bodyOf(added).path("code").asString()).isEqualTo("CONVERSATION_NOT_FOUND");
         assertThat(read.getStatus()).isEqualTo(404);
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, conversation.id()))
             .isEmpty();
     }
 

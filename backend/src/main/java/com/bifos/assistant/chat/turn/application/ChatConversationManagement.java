@@ -7,7 +7,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -29,7 +29,7 @@ class ChatConversationManagement {
     private final AgentService agents;
     private final ModelTierService modelTiers;
     private final Clock clock;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final DecisionFeedbackRecorder feedback;
 
 
@@ -89,7 +89,7 @@ class ChatConversationManagement {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
         // 지운 대화에는 더 보낼 수 없다. 남기면 기동 확인이 보낼 수 없는 행을 계속 만난다.
-        pendingMessages.deleteAllOf(conversationId);
+        pendingMessages.clear(conversationId);
         // 판단 피드백은 사용자의 기록이다. 대화를 지우면 그 대화에서 나온 제안의 사건도 함께 지운다.
         feedback.forgetConversation(user.id(), conversationId);
     }

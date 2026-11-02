@@ -24,10 +24,10 @@ import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.nextturn.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.turn.presentation.ChatController;
 import com.bifos.assistant.chat.turn.presentation.ChatEventStreams;
@@ -72,6 +72,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -122,7 +123,10 @@ class UserExecutionLimitChatTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ChatPendingMessageRepository pendingRows;
+    PendingMessageStore pendingRows;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -157,7 +161,7 @@ class UserExecutionLimitChatTest {
     @BeforeEach
     void setUp() {
         stub().reset();
-        pendingRows.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         messages.deleteAll();
@@ -311,8 +315,7 @@ class UserExecutionLimitChatTest {
     void pendingTurnAtLimitHoldsQueueAndPublishesUserBusy() {
         Conversation waiting = chat.startEmpty(dad, "dad");
         List<AgentExecution> fillers = fillSlotsWithRunningChildren(waiting);
-        pendingRows.save(ChatPendingMessage.queued(
-            waiting.id(), dad.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z")));
+        PendingQueueFixtures.queue(pendingRows, waiting.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z"));
         List<ChatEvent> received = new CopyOnWriteArrayList<>();
         Runnable unsubscribe = hub.subscribe(waiting.id(), received::add);
         try {
@@ -322,7 +325,7 @@ class UserExecutionLimitChatTest {
             executions.deleteAll(fillers);
         }
 
-        assertThat(pendingRows.findByConversationIdOrderByIdAsc(waiting.id()))
+        assertThat(PendingQueueFixtures.rows(pendingRows, waiting.id()))
             .as("대기 행")
             .singleElement()
             .satisfies(row -> {

@@ -5,7 +5,7 @@ import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
@@ -35,7 +35,6 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061).
@@ -77,8 +76,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final AgentService agents;
     private final RecoveredRunRecorder recorder;
     private final TurnCancellation turns;
-    private final ChatPendingMessageRepository pendingMessages;
-    private final TransactionTemplate transactions;
+    private final PendingMessageStore pendingMessages;
     private final Clock clock;
     private final UserExecutionLimiter limiter;
     private final BackgroundTasks backgroundTasks;
@@ -528,7 +526,7 @@ public class RestartReconciler implements SmartLifecycle {
             boolean stopped = handle.cancelled().get() && anyCancelled(executionIds);
             if (stopped) {
                 turns.markStopped(handle);
-                transactions.executeWithoutResult(status -> pendingMessages.markHeld(lock.conversationId, true));
+                pendingMessages.hold(lock.conversationId, true);
             }
         } catch (RuntimeException ex) {
             log.warn("중지한 turn 의 대기 줄을 멈춰 두지 못했다 conversationId={}", lock.conversationId, ex);
