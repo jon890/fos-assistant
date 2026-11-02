@@ -16,6 +16,7 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.people.application.PersonAccessService;
+import com.bifos.assistant.people.application.UserPurger;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -49,8 +50,8 @@ import org.springframework.test.context.DynamicPropertySource;
 /**
  * Flyway가 만든 실제 MySQL 스키마에 모든 테이블의 행을 넣고 운영 삭제 경로를 실행한다.
  *
- * <p>FK와 CHECK를 켠 채로 검사하며, 보존 대상과 다른 사용자의 행은 전체 칸을 비교한다. 사용자 물리 삭제는 구현되지 않았으므로
- * 접근 해제를 실행한 뒤 알려진 공백을 확인한다. Hermes는 기존 통합 테스트의 대역을 쓰며 파일 원본은 만들지 않는다.
+ * <p>FK와 CHECK를 켠 채로 검사하며, 보존 대상과 다른 사용자의 행은 전체 칸을 비교한다. 사용자 정리는 대화 정리와 에이전트 정리까지
+ * 돌린 뒤 모든 테이블을 확인한다. Hermes는 기존 통합 테스트의 대역을 쓰며 파일 원본은 만들지 않는다.
  */
 @Tag("mysql")
 @BackendIntegrationTest
@@ -72,6 +73,9 @@ class PurgeCoverageMysqlTest {
 
     @Autowired
     private PersonAccessService people;
+
+    @Autowired
+    private UserPurger users;
 
     @Autowired
     private ChatContentMutationCoordinator mutations;
@@ -129,14 +133,38 @@ class PurgeCoverageMysqlTest {
 
 
     @Test
-    @DisplayName("접근 해제 뒤 사용자 purge의 알려진 공백은 남는다")
-    void recordsMissingUserPurge() {
+    @DisplayName("접근 해제만으로는 아무것도 지우지 않는다")
+    void keepsEverythingAfterDisable() {
         people.setEnabled(target, false);
+
+        for (PurgeTable table : tables) {
+            if (!table.table().equals("allowed_person")) {
+                assertOutcome(table, Outcome.KEEP);
+            }
+        }
+        assertThat(value("allowed_person", "enabled")).isEqualTo(false);
+        assertOtherUntouched();
+    }
+
+
+    @Test
+    @DisplayName("예약한 지 30일이 지난 사용자 정리는 대화 정리를 기다린 뒤 모든 테이블을 기대값대로 지우고 다른 사용자는 건드리지 않는다")
+    void coversEveryTableAfterUserPurge() {
+        people.setEnabled(target, false);
+        jdbc.update("UPDATE allowed_person SET purge_scheduled_at = ? WHERE id = ?",
+            NOW.minus(UserPurger.GRACE).minusSeconds(60).atOffset(ZoneOffset.UTC).toLocalDateTime(), target);
+        before.put("allowed_person", rows(classified("allowed_person"), target));
+
+        assertThat(users.purgeDue(NOW)).as("대화 정리 전에는 key 와 사용자 줄을 지우지 않는다").isZero();
+        assertThat(rows(classified("user_data_key"), target)).hasSize(1);
+        assertThat(rows(classified("app_user"), target)).hasSize(1);
+        assertThat(conversations.purgeDue(NOW)).isEqualTo(1);
+        assertThat(users.purgeDue(NOW)).isEqualTo(1);
+        assertThat(agents.purge(target, NOW)).isEqualTo(AgentPurgeOutcome.PURGED);
 
         for (PurgeTable table : tables) {
             assertOutcome(table, table.user());
         }
-        assertThat(value("allowed_person", "enabled")).isEqualTo(false);
         assertOtherUntouched();
     }
 
@@ -345,6 +373,10 @@ class PurgeCoverageMysqlTest {
             }
             case SCRUB -> {
                 switch (table.table()) {
+                    case "allowed_person" -> {
+                        assertCleared("allowed_person", "purge_scheduled_at");
+                        assertThat(value("allowed_person", "enabled")).isEqualTo(false);
+                    }
                     case "conversation" -> {
                         assertThat(before.get("conversation").getFirst().get("title")).isNotEqualTo("");
                         assertThat(value("conversation", "title")).isEqualTo("");
