@@ -17,7 +17,9 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 플러그인 선언을 고칠 때 |
 
 기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
-새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다. 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
+새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 기능 스펙 `docs/features/<id>/spec.md`, 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다.
+기능 파일은 지금 동작하는 요구와 흐름을, 스펙은 합의한 변경의 요구사항 ID 와 인수 조건, 설계를 갖는다. 나눔은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가 갖는다.
+배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
 
 ## 용어
 
@@ -179,8 +181,11 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-Draft PR 을 열면 독립 리뷰(작성자와 다른 에이전트나 모델)를 CI 와 동시에 돌린다. Ready 뒤에 도는 GitHub 의 Claude 리뷰도 그 지적을 같은 방식으로 한 번에 반영한다.
+Draft 의 독립 리뷰는 verify 다. Draft CI 가 통과하고 최신 main 을 merge 한 뒤 verify 를 받고, 통과해야 Ready 로 올린다. 별도 리뷰 에이전트는 띄우지 않는다.
+인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 verify 대신 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
+Ready 뒤에는 GitHub 의 Claude 리뷰(`claude-review`)가 한 번 더 본다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
 **리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
+verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전체를 다시 돌리지 않는다. 바뀐 범위의 개발 테스트와 CI 만 다시 통과시킨다.
 등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
