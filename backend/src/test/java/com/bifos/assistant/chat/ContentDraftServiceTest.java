@@ -26,10 +26,11 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftRevisionStatus;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftBodies;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftAsset;
+import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftRevision;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -38,6 +39,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,7 +64,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
                 .isEqualTo(revision + 1);
         }
         assertThat(drafts.read(owner, conversation.id(), id, 1L).draft().title()).isEqualTo("첫 원고");
-        assertThat(assetRows.findAll()).extracting(a -> a.position()).containsExactly(0, 1);
+        assertThat(assets()).extracting(a -> a.position()).containsExactly(0, 1);
         assertThat(revisionRows.findAll()).allSatisfy(row -> {
             assertThat(row.body()).startsWith("v1.").doesNotContain("원고");
             assertThat(row.bodyKeyId()).isNotNull();
@@ -224,7 +226,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         }
         assertThat(drafts.read(owner, conversation.id(), id, null).draft().title()).isEqualTo("원고3");
         // 네 판 모두 저장된 참조 행이 같은 관찰 revision에 묶였다. 입력 JSON의 왕복만으로 판정하지 않는다.
-        assertThat(assetRows.findAll()).filteredOn(asset -> asset.position() == 0).hasSize(4).allSatisfy(asset -> {
+        assertThat(assets()).filteredOn(asset -> asset.position() == 0).hasSize(4).allSatisfy(asset -> {
             assertThat(asset.observationId()).isEqualTo(observation.id());
             assertThat(asset.observationRevision()).isEqualTo(observation.revision());
         });
@@ -251,7 +253,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         code(() -> drafts.create(owner, conversation.id(), reader.read(node)), ErrorCode.CONTENT_DRAFT_STALE);
         assertThat(draftRows.count()).isZero();
         assertThat(revisionRows.count()).isZero();
-        assertThat(assetRows.count()).isZero();
+        assertThat(assets().size()).isZero();
     }
 
 
@@ -340,7 +342,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         jdbc.update("update chat_attachment set uploaded_by_user_id=? where id=?", owner.id(), photo.id());
         jdbc.update("update conversation set deleted_at=? where id=?", NOW, conversation.id());
         assertThat(purger.purgeDue(NOW)).isEqualTo(1);
-        assertThat(assetRows.count()).isZero();
+        assertThat(assets().size()).isZero();
         assertThat(revisionRows.count()).isZero();
         assertThat(draftRows.count()).isZero();
         assertThat(attachments.findById(photo.id())).isEmpty();
@@ -352,7 +354,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     void rollsBackCasAndBodyOnSqlFailure() {
         var id = drafts.create(owner, conversation.id(), inputDraft("첫", false)).draft().draftId();
         var broken = fail(ContentDraftRevisionRepository.class, revisionRows, "saveAndFlush", 1);
-        var failing = new ContentDraftService(access, messages, mutations, draftRows, broken, assetRows,
+        var failing = new ContentDraftService(access, messages, mutations, draftRows, broken,
             new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock, creationRequests, creationCalls);
         assertThatThrownBy(() -> failing.revise(owner, conversation.id(), id, 1, inputDraft("새", false)))
             .isInstanceOf(DataAccessResourceFailureException.class);
@@ -399,7 +401,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     @Test
     @DisplayName("커밋 뒤 경쟁 수정이 끝나도 생성과 수정은 이번 수락 판을 응답한다")
     void returnsAcceptedRevisionWhenAnotherCasCommitsBeforeResponseRead() {
-        var racing = new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows,
+        var racing = new ContentDraftService(access, messages, mutations, draftRows, revisionRows,
             new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock, creationRequests, creationCalls) {
             @Override
             public ContentDraftView read(CurrentUser user, Long conversationId, UUID id, Long revision) {
@@ -433,8 +435,6 @@ abstract class ContentDraftFixture extends ObservationFixture {
     @Autowired
     ContentDraftRevisionRepository revisionRows;
     @Autowired
-    ContentDraftAssetRepository assetRows;
-    @Autowired
     ContentDraftCleaner cleaner;
     @Autowired
     ContentDraftBodies draftBodies;
@@ -459,14 +459,20 @@ abstract class ContentDraftFixture extends ObservationFixture {
     void removeDrafts() {
         creationCalls.deleteAll();
         creationRequests.deleteAll();
-        assetRows.deleteAll();
         revisionRows.deleteAll();
         draftRows.deleteAll();
     }
 
 
+    /** 모든 revision 의 사진 참조다. revision 번호 순서다. */
+    List<ContentDraftAsset> assets() {
+        return revisionRows.findAll().stream().sorted(Comparator.comparing(ContentDraftRevision::id))
+            .flatMap(row -> row.assets().stream()).toList();
+    }
+
+
     ContentDraftService localDrafts(ContentDraftReferences refs, ContentDraftBodies localBodies) {
-        return new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows, refs, localBodies, reader, json, clock, creationRequests, creationCalls);
+        return new ContentDraftService(access, messages, mutations, draftRows, revisionRows, refs, localBodies, reader, json, clock, creationRequests, creationCalls);
     }
 
 

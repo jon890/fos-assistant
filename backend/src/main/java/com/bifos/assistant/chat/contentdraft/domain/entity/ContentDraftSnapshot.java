@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.contentdraft.domain.entity;
 
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,6 +20,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "content_draft_snapshot", uniqueConstraints = {
     @UniqueConstraint(name = "uk_content_snapshot_public", columnNames = "public_id"),
+    @UniqueConstraint(name = "uk_content_snapshot_action", columnNames = "action_id"),
+    @UniqueConstraint(name = "uk_content_snapshot_job", columnNames = "job_id"),
     @UniqueConstraint(name = "uk_content_snapshot_revision_binding_hash", columnNames = {"revision_id", "binding_id", "snapshot_hash", "authorization_fingerprint"})
 })
 @Getter
@@ -80,6 +83,10 @@ public class ContentDraftSnapshot extends CreatedAtEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    /** 저장 요청이 만든 job 이다. 저장 요청 전이면 null 이다. */
+    @Embedded
+    private ContentDraftJob job;
+
 
     public ContentDraftSnapshot(UUID publicId, Long revisionId, Long ownerUserId, Long conversationId, Long originExecutionId, Long agentId, Long connectionId, Long bindingId, Instant connectionUpdatedAt, Instant bindingUpdatedAt, String policyFingerprint, int schemaVersion, String compilerVersion, String payloadFingerprint, String snapshotHash, String authorizationFingerprint, Instant expiresAt) {
         this.publicId = publicId;
@@ -99,5 +106,15 @@ public class ContentDraftSnapshot extends CreatedAtEntity {
         this.snapshotHash = snapshotHash;
         this.authorizationFingerprint = authorizationFingerprint;
         this.expiresAt = expiresAt;
+    }
+
+
+    /** 저장 요청의 승인 줄과 함께 job 을 한 번만 만든다. */
+    public ContentDraftJob requestJob(Long actionId, Instant at) {
+        if (job != null) {
+            throw new IllegalStateException("content draft snapshot already has a job");
+        }
+        this.job = new ContentDraftJob(actionId, at);
+        return job;
     }
 }

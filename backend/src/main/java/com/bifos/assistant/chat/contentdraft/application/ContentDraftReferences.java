@@ -61,7 +61,7 @@ public class ContentDraftReferences {
             var ref = block.get("observationRef");
             Long observationId = ref == null ? null : ContentDraftInputReader.id(ref.get("id"));
             Long revision = ref == null ? null : ContentDraftInputReader.revision(ref.get("revision"));
-            var asset = new ContentDraftAsset(null, position, id, fingerprint, observationId, revision);
+            var asset = new ContentDraftAsset(position, id, fingerprint, observationId, revision);
             if (!validObservation(draft, asset, true)) {
                 throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, draft.id() == null ? null : draft.currentRevision());
             }

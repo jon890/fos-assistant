@@ -4,7 +4,6 @@ import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordi
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshots;
 import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -42,7 +41,6 @@ public class ContentDraftJobAuthorizer {
     public static final String SAVE = "save";
 
     private final ContentDraftSaveTicket tickets;
-    private final ContentDraftJobRepository jobs;
     private final ContentDraftSnapshotRepository snapshotRows;
     private final ConnectorActionRepository actions;
     private final AppUserRepository users;
@@ -65,8 +63,8 @@ public class ContentDraftJobAuthorizer {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "content save authorize request rejected");
         }
         try {
-            var job = jobs.findByJobId(payload.jobId().toString()).orElseThrow(ContentDraftJobAuthorizer::denied);
-            var snapshot = snapshotRows.findById(job.snapshotId()).orElseThrow(ContentDraftJobAuthorizer::denied);
+            var snapshot = snapshotRows.findByJobJobId(payload.jobId().toString()).orElseThrow(ContentDraftJobAuthorizer::denied);
+            var job = snapshot.job();
             var action = actions.findById(job.actionId()).orElseThrow(ContentDraftJobAuthorizer::denied);
             require(snapshot.publicId().equals(payload.snapshotId()) && snapshot.snapshotHash().equals(payload.snapshotHash())
                 && action.publicId().equals(payload.actionId()) && payload.ownerUserId().equals(snapshot.ownerUserId())
@@ -86,7 +84,7 @@ public class ContentDraftJobAuthorizer {
                         tickets.authenticate(ticket);
                     }
                 });
-                claim(user, payload, stage, position, executionIds, job.id(), snapshot.id(), snapshot.agentId());
+                claim(user, payload, stage, position, executionIds, snapshot.id(), snapshot.agentId());
                 return null;
             });
         } catch (RuntimeException ex) {
@@ -98,8 +96,8 @@ public class ContentDraftJobAuthorizer {
 
 
     private void claim(CurrentUser user, ContentDraftSaveTicketPayload payload, String stage, Integer position,
-        List<Long> executionIds, Long jobRowId, Long snapshotRowId, Long agentId) {
-        var locked = locks.lock(user, payload.conversationId(), agentId, executionIds, payload.actionId(), snapshotRowId, jobRowId);
+        List<Long> executionIds, Long snapshotRowId, Long agentId) {
+        var locked = locks.lock(user, payload.conversationId(), agentId, executionIds, payload.actionId(), snapshotRowId);
         var action = locked.action();
         var job = locked.job();
         // 시작 응답을 잃으면 승인 줄은 UNKNOWN 이다. 승인 사실은 그대로다. 일반 실행 정리는 원고 승인 줄을 바꾸지 않는다.
@@ -113,8 +111,8 @@ public class ContentDraftJobAuthorizer {
             && binding.connectionUpdatedAt().equals(payload.connectionUpdatedAt()));
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         switch (stage) {
-            case START -> require(jobs.claimStart(jobRowId, now) == 1);
-            case SAVE -> require(jobs.claimSave(jobRowId, now) == 1);
+            case START -> require(snapshotRows.claimStart(snapshotRowId, now) == 1);
+            case SAVE -> require(snapshotRows.claimSave(snapshotRowId, now) == 1);
             default -> {
                 var blocks = input.canonicalDraft().path("blocks");
                 require(job.startClaimedAt() != null && job.saveClaimedAt() == null && IntStream.range(0, blocks.size())
