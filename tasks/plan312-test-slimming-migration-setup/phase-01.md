@@ -1,5 +1,7 @@
 # Phase 01. 데이터 마이그레이션 검사의 setup 을 클래스마다 한 번으로 줄인다
 
+**상태**: 완료
+
 **Execution profile**: standard
 
 ## 목표
@@ -42,4 +44,12 @@ scripts/checks/check-mysql-migration.sh
 
 | 파일 | 변경 |
 | --- | --- |
+| `backend/src/test/java/com/bifos/assistant/chat/ChatAttachmentPositionMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/modelchoice/GroupSettingMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/FinancialLimitsIntoOwnersMigrationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/usage/SubagentUsageLedgerMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentModelDropMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/DelegationWakeMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorConnectionMigrationTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/user/GroupRenameMigrationTest.java` | 수정 |
