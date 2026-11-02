@@ -13,14 +13,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * 주문 상한 두 표의 줄을 {@code app_user} 와 {@code connector_action} 의 컬럼으로 옮기고 옛 표를 지우는지 본다
  * (ADR-20261015 / financial-user-limits).
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class FinancialLimitsIntoOwnersMigrationTest {
     private Database database;
     private long owner;
@@ -29,7 +32,7 @@ class FinancialLimitsIntoOwnersMigrationTest {
     private long other;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         database = createDatabase();
         migrate("20261015104355");

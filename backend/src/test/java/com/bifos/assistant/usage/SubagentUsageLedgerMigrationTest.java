@@ -14,15 +14,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * 재조회 작업 줄을 사용량 원장으로 넓히는 마이그레이션이 칸을 더하고 지난 자식을 다시 조회 대기로 넣는지 본다(ADR-062).
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SubagentUsageLedgerMigrationTest {
     private static final Timestamp CREATED_AT = Timestamp.valueOf("2026-09-01 00:00:00");
     private static final Timestamp OLD_NEXT_ATTEMPT_AT = Timestamp.valueOf("2026-09-01 00:05:00");
@@ -31,7 +34,7 @@ class SubagentUsageLedgerMigrationTest {
     private Database database;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         database = createDatabase();
         migrate("54");

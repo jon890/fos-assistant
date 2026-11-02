@@ -9,9 +9,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * V45 가 그때까지 {@code READY} 이던 연결만 내리는지 본다.
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.Test;
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 앞선 상태의 행을
  * 넣으려고 V45 앞의 마이그레이션까지만 올린 뒤 V45 를 올린다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConnectorPolicyMigrationTest {
     private static final int READY = 901;
     private static final int PENDING = 902;
@@ -31,7 +34,7 @@ class ConnectorPolicyMigrationTest {
     private String url;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-policy-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrate("44");

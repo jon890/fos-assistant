@@ -14,9 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * V25 가 사용자들이 모인 단위의 컬럼과 저장 값을 family 에서 group 으로 옮기는지 본다.
@@ -24,12 +25,14 @@ import org.junit.jupiter.api.Test;
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 옮김을 한 번도 지나지 않는다. 옮기지 못하면 배포할 때
  * 스키마 검증이 실패하거나, 이미 저장된 {@code FAMILY} 값을 enum 으로 읽지 못해 목록이 깨진다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GroupRenameMigrationTest {
 
     private String url;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUpV24Data() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 

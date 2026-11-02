@@ -12,9 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -23,13 +24,15 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다. 옛 표에 행을 넣으려고
  * V37 까지만 올린 뒤 V38 을 올린다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConnectorConnectionMigrationTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String FAMILY = "11111111-2222-3333-4444-555555555555";
     private String url;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         migrate("37");

@@ -11,9 +11,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * V27 이 에이전트의 모델 목록과 막힌 provider 표, 에이전트의 모델 칸을 지우는지 본다.
@@ -21,12 +22,14 @@ import org.junit.jupiter.api.Test;
  * <p>다른 검사들은 엔티티로 스키마를 만들어 이 마이그레이션을 한 번도 지나지 않는다. 칸이 남아 있으면 배포할 때
  * 엔티티에 없는 {@code NOT NULL} 칸 때문에 에이전트를 저장하지 못한다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AgentModelDropMigrationTest {
 
     private String url;
 
 
-    @BeforeEach
+    @BeforeAll
     void migrateUpFromV26WithAgent() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 

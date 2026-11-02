@@ -14,16 +14,19 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationVersion;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /** 지난 첨부의 메시지 안 순서를 번호 오름차순으로 채우는지 확인한다. */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ChatAttachmentPositionMigrationTest {
     private Database database;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         database = createDatabase();
         migrateBeforePosition();
