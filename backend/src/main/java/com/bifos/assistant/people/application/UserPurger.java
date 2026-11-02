@@ -106,12 +106,13 @@ public class UserPurger {
             }
             try {
                 UserPurgeOutcome outcome = purgeOne(personId, cutoff, at);
+                // 모든 단계를 실패 없이 지났으므로 잇단 실패 수를 비운다.
+                backoffs.remove(personId);
                 if (outcome == UserPurgeOutcome.WAITING) {
                     waits.put(personId, at.plus(WAITING_RECHECK));
                 } else {
                     // 마쳤거나 그 사이 취소된 사람이다. 기다리는 간격을 남겨 두지 않는다.
                     waits.remove(personId);
-                    backoffs.remove(personId);
                     if (outcome == UserPurgeOutcome.DONE) {
                         purged++;
                     }
