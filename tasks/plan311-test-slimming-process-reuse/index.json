@@ -4,7 +4,7 @@
   "status": "pending",
   "created_at": "2026-11-01",
   "total_phases": 3,
-  "current_phase": 2,
+  "current_phase": 3,
   "phases": [
     {
       "number": 1,
@@ -15,12 +15,21 @@
     {
       "number": 2,
       "file": "phase-02.md",
-      "execution_profile": "standard"
+      "execution_profile": "standard",
+      "status": "completed"
     },
     {
       "number": 3,
       "file": "phase-03.md",
       "execution_profile": "standard"
+    }
+  ],
+  "pr_scope": "금융·guard 왕복 검사의 프로세스 재사용, 남은 상속 재실행 제거와 커넥터 MySQL 검사 이관, image 캐시와 timeout 검사 단축을 phase 별 PR 로 차례로 끝낸다.",
+  "deferred": [
+    {
+      "what": "합성 image 의 CI 캐시와 실제로 기다리는 timeout 검사 단축(phase 03)",
+      "why": "CI 설정과 검사 코드를 함께 바꿔 테스트 기반만 바꾸는 phase 02 와 확인 방법이 다르다",
+      "after": "phase 02 가 머지된 뒤"
     }
   ]
 }

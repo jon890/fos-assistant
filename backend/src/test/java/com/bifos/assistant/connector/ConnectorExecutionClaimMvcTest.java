@@ -20,7 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 /** 실제 HTTP의 SecurityFilterChain, 원문 controller, 서비스, DB를 왕복한다. */
-class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
+class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimBase {
     private static final String CLAIM = "/internal/connector-executions/claim";
 
     @LocalServerPort
