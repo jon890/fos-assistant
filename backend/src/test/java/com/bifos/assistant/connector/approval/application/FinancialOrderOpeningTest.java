@@ -243,9 +243,14 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     @Test
     @DisplayName("생성 승인 뒤 같은 지정가 주문의 취소 준비는 원주문에 orderAmount 가 채워져 와도 승인 카드를 만들고 승인 대기로 답한다")
     void cancelAfterApprovedLimitOrderCreatesApprovalCard() {
-        var created = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        String createCall = UUID.randomUUID().toString();
+        var created = prepare(createCall, trade("create_order", ARGS));
         assertThat(created.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE);
         assertThat(publicApproval.approve(user, created.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        // 승인을 마친 뒤 같은 호출이 다시 오면 승인 대기라고 말하지 않는다.
+        var replayed = prepare(createCall, trade("create_order", ARGS));
+        assertThat(replayed.actionId()).isEqualTo(created.actionId());
+        assertThat(replayed.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_SETTLED_MESSAGE);
         assertThat(action(created).resultText()).contains("new-official-id");
         // 대역의 원주문은 실제 토스처럼 지정가 수량 주문에도 orderAmount 를 채운다.
         var cancel = prepare(UUID.randomUUID().toString(), trade("cancel_order", "{\"orderId\":\"new-official-id\"}"));
