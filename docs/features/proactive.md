@@ -324,7 +324,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 다음은 읽는 코드 없이 남는다.
 
 - 테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` 과 그 옛 줄. 테이블은 다음 plan 이 지운다
-- `task.loop_enabled`, `task.snoozed_until` 칸. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
+- `task.loop_enabled`, `task.snoozed_until` 컬럼. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
 - 옛 `AUTONOMY` 계기의 살펴보기 줄과 실패 이력, 저장된 enum 값(`CheckTrigger.AUTONOMY`, `FeedbackSubjectType.AUTONOMY_DECISION`)
 
 옛 결정은 [ADR-20261008 / daily-loop](../adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있고, 대체한 결정은 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)이다.
