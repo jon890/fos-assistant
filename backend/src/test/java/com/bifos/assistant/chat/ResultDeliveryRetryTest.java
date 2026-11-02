@@ -444,6 +444,28 @@ class ResultDeliveryRetryTest {
 
 
     @Test
+    @DisplayName("새 시도가 마지막 시도 칸을 덮은 뒤 앞 시도 번호로 늦게 온 닫기와 실행 줄 잇기는 아무 줄도 바꾸지 않는다")
+    void ignoresLateFinishAndAttachOfOverwrittenAttempt() {
+        ResultDelivery delivery = failedDelivery(delegated(ExecutionStatus.SUCCEEDED, "조사 결과"));
+        transactions.executeWithoutResult(status -> recorder.claimRetry(delivery.id(), null, Instant.now()));
+
+        Integer finished = transactions.execute(status -> deliveries.finishAttempt(
+            delivery.id(), 1, DeliveryAttemptStatus.SUCCEEDED, DeliveryStatus.DELIVERED, null, Instant.now()));
+        Integer attached = transactions.execute(status -> deliveries.attachExecution(delivery.id(), 1, Long.MAX_VALUE));
+
+        assertThat(finished).as("앞 시도를 닫는 update").isZero();
+        assertThat(attached).as("앞 시도에 실행 줄을 잇는 update").isZero();
+        assertThat(deliveries.findById(delivery.id()).orElseThrow())
+            .extracting(
+                ResultDelivery::status,
+                ResultDelivery::attemptCount,
+                ResultDelivery::lastAttemptStatus,
+                ResultDelivery::lastAttemptExecutionId)
+            .containsExactly(DeliveryStatus.DELIVERING, 2, DeliveryAttemptStatus.RUNNING, null);
+    }
+
+
+    @Test
     @DisplayName("남의 대화이면 CONVERSATION_NOT_FOUND, 같은 사용자의 다른 대화 번호이면 DELIVERY_NOT_FOUND 다")
     void hidesDeliveryOfOtherConversation() {
         ResultDelivery delivery = failedDelivery(delegated(ExecutionStatus.SUCCEEDED, "조사 결과"));
