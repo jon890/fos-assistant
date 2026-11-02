@@ -1,5 +1,7 @@
 # Phase 02. 남은 상속 재실행을 끊고 커넥터 MySQL 검사를 공유 컨텍스트로 옮긴다
 
+**상태**: 완료
+
 **Execution profile**: standard
 
 ## 목표
