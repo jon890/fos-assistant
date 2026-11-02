@@ -266,4 +266,18 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
     int deleteIfActive(@Param("id") Long id, @Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /**
+     * 사용자 정리 때 그 사용자의 지우지 않은 대화 모두에 지운 시각을 적는다. 숨긴 대화도 포함한다(ADR-20261101 / user-purge).
+     *
+     * <p>본문은 대화 정리(ADR-20261008 / conversation-purge)가 지운다. 트랜잭션은 부르는 쪽이 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Conversation c set c.deletedAt = :now where c.userId = :userId and c.deletedAt is null")
+    int deleteAllActiveOf(@Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /** 그 사용자의 대화 가운데 아직 본문을 정리하지 않은 수다. 지우지 않은 대화도 센다. */
+    long countByUserIdAndPurgedAtIsNull(Long userId);
 }

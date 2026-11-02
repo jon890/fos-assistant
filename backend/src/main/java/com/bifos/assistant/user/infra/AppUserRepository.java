@@ -64,4 +64,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
         nativeQuery = true)
     int updateArtifactAutoVault(
         @Param("userId") Long userId, @Param("enabled") boolean enabled, @Param("at") Instant at);
+
+
+    /**
+     * 사용자 정리의 마지막에 사용자 줄을 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다.
+     *
+     * <p>{@code ON DELETE CASCADE} 가 아닌 외래 키 표의 줄을 모두 지운 뒤에만 부른다. 남아 있으면 외래 키가 거절한다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AppUser u where u.id = :id")
+    int deletePurged(@Param("id") Long id);
 }

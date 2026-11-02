@@ -129,4 +129,10 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
         @Param("connectorId") String connectorId,
         @Param("agentId") Long agentId,
         @Param("now") Instant now);
+
+
+    /** 사용자 정리 때 그 사용자의 대화 권한을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ConnectorConversationGrant g where g.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

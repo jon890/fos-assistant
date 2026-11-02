@@ -17,6 +17,8 @@ import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 사용자별 데이터 key 로 본문을 암호화하고 푼다(ADR-20261008 / data-encryption).
@@ -114,6 +116,30 @@ public class DataKeyService implements TextCipher, BinaryCipher {
             log.warn("본문을 풀지 못했다 keyId={} ownerUserId={} reason={}", keyId, ownerUserId, e.getMessage());
             return Optional.empty();
         }
+    }
+
+
+    /**
+     * 사용자 정리의 마지막에 그 사용자의 데이터 key 줄을 지운다(ADR-20261101 / user-purge). 부르는 쪽의 트랜잭션 안에서 지운다.
+     *
+     * <p>지운 뒤에는 그 key 로 감싼 암호문을 백업으로도 풀 수 없다. 커밋한 뒤 메모리에 둔 key 도 모두 버린다. 줄이 없으면 0 이고 다시
+     * 불러도 같다. 이 빈은 암호화 경로마다 불리므로 트랜잭션 프록시를 씌우지 않는다. 트랜잭션 밖에서 부르면 커밋 뒤 동작을 걸 수 없어
+     * {@link IllegalStateException} 으로 끝난다.
+     *
+     * @return 지운 줄 수
+     */
+    public int deleteUserKey(Long userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("deleting a data key requires a transaction");
+        }
+        int deleted = keys.deleteAllOfUser(userId);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                forgetCachedKeys();
+            }
+        });
+        return deleted;
     }
 
 

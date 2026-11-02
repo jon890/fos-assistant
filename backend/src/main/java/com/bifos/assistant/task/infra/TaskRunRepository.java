@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -47,4 +48,10 @@ public interface TaskRunRepository extends JpaRepository<TaskRun, Long> {
     /** 그 번호들 가운데 발화의 루트 실행인 번호를 읽는다. 예약 작업이 연 turn 을 가릴 때 쓴다. */
     @Query("select r.executionId from TaskRun r where r.executionId in :executionIds")
     List<Long> findExecutionIdsIn(@Param("executionIds") Collection<Long> executionIds);
+
+
+    /** 사용자 정리 때 그 사용자의 예약 작업 실행 이력을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from TaskRun r where r.ownerUserId = :userId")
+    int deleteAllOfOwner(@Param("userId") Long userId);
 }

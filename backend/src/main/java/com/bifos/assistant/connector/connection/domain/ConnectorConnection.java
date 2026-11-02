@@ -100,7 +100,13 @@ public class ConnectorConnection extends CreatedAtEntity {
      * <p>형식은 {@code docs/features/connector.md} 의 「보관 파일」 이 갖는다.
      */
     public String vault() {
-        return "c" + id;
+        return vaultOf(id);
+    }
+
+
+    /** 연결 번호로 보관 파일의 이름을 만든다. 엔티티를 읽지 않는 정리 경로가 쓴다. */
+    public static String vaultOf(Long connectionId) {
+        return "c" + connectionId;
     }
 
 
