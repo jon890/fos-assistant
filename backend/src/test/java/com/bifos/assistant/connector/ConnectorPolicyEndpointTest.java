@@ -13,11 +13,9 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.connector.action.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -133,9 +131,6 @@ class ConnectorPolicyEndpointTest {
 
     @Autowired
     AgentExecutionRepository executions;
-
-    @Autowired
-    ConnectorToolGrantRepository grants;
 
     @Autowired
     ConnectorActionRepository actions;
@@ -256,8 +251,8 @@ class ConnectorPolicyEndpointTest {
     void toolWithClosedGrantIsBlockedEvenWithValidGrantRow() throws Exception {
         connect(true);
         Instant later = NOW.plus(Duration.ofDays(3650));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "mail_note", later));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", later));
+        grants().tool(owner.id(), DEMO, "mail_note", later);
+        grants().tool(owner.id(), DEMO, "write_note", later);
 
         HttpResponse<String> closed = ask("mcp__demo__mail_note", "mail_note");
         // 같은 모양의 허락 줄이 닫지 않은 도구는 통과시킨다. 위의 block 이 선언 때문임을 확인한다.
@@ -266,7 +261,7 @@ class ConnectorPolicyEndpointTest {
         assertApprovalRequested(closed);
         assertThat(json.readTree(open.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList("SELECT decision, passed, approval_mode, tool_name, status"
-            + " FROM connector_action ORDER BY id"))
+            + " FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("PASSED"),
@@ -438,7 +433,7 @@ class ConnectorPolicyEndpointTest {
         assertApprovalRequested(unknown);
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList("SELECT decision, passed, risk, approval_mode, tool_name, status"
-            + " FROM connector_action ORDER BY id"))
+            + " FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("PASSED"),
@@ -637,7 +632,7 @@ class ConnectorPolicyEndpointTest {
 
         assertThat(json.readTree(notes.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(json.readTree(mail.body()).path("decision").asString()).isEqualTo("allow");
-        assertThat(jdbc.queryForList("SELECT connector_id, tool_name, agent_id FROM connector_action ORDER BY id"))
+        assertThat(jdbc.queryForList("SELECT connector_id, tool_name, agent_id FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
             .extracting(
                 row -> row.get("CONNECTOR_ID"),
                 row -> row.get("TOOL_NAME"),
@@ -852,7 +847,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("살펴보기 트리에서 READ 와 required 로 선언한 도구는 상시 허락이 있어도 READ_ONLY_RUN 이고 승인 줄과 알림이 없다")
     void readToolDeclaringApprovalInCheckTreeIsDeniedEvenWithGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650))));
+        grants().tool(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650)));
         String checkRoot = startCheckTreeChild();
 
         HttpResponse<String> response = askIn(checkRoot, "mcp__demo__peek_note", "peek_note", ARGS);
@@ -886,7 +881,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("같은 사용자의 보통 turn 에서는 쓰기 도구가 지금처럼 승인 필요이고 상시 허락한 READ 와 required 도구는 allow 다")
     void sameUserNormalTurnKeepsApprovalAndGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650))));
+        grants().tool(owner.id(), DEMO, "peek_note", NOW.plus(Duration.ofDays(3650)));
         startCheckTreeChild();
         String normalRoot = startNormalRun();
 
@@ -896,7 +891,7 @@ class ConnectorPolicyEndpointTest {
         assertApprovalRequested(write);
         assertThat(json.readTree(peek.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList(
-            "SELECT decision, deny_reason, tool_name, status FROM connector_action ORDER BY id"))
+            "SELECT decision, deny_reason, tool_name, status FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("DENY_REASON"),
@@ -921,7 +916,7 @@ class ConnectorPolicyEndpointTest {
         assertBlocked(write, READ_ONLY_RUN_MESSAGE);
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList(
-            "SELECT decision, deny_reason, tool_name, status FROM connector_action ORDER BY id"))
+            "SELECT decision, deny_reason, tool_name, status FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("DENY_REASON"),
@@ -938,7 +933,7 @@ class ConnectorPolicyEndpointTest {
     @DisplayName("쓰기를 허용한 살펴보기에서 쓰기 도구는 상시 허락이 있어도 action_id 와 PENDING 승인 줄과 승인 알림을 만든다")
     void writeToolInWritesAllowedCheckTreeAsksApprovalEvenWithGrant() throws Exception {
         connect(true);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "write_note", NOW.plus(Duration.ofDays(3650))));
+        grants().tool(owner.id(), DEMO, "write_note", NOW.plus(Duration.ofDays(3650)));
         String checkRoot = startCheckTreeChild(true);
 
         HttpResponse<String> response = askIn(checkRoot, "mcp__demo__write_note", "write_note", ARGS);
@@ -966,7 +961,7 @@ class ConnectorPolicyEndpointTest {
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertBlocked(purge, "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.");
         assertThat(jdbc.queryForList(
-            "SELECT decision, deny_reason, tool_name, status FROM connector_action ORDER BY id"))
+            "SELECT decision, deny_reason, tool_name, status FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("DENY_REASON"),
@@ -993,7 +988,7 @@ class ConnectorPolicyEndpointTest {
         assertBlocked(write, READ_ONLY_RUN_MESSAGE);
         assertThat(json.readTree(read.body()).path("decision").asString()).isEqualTo("allow");
         assertThat(jdbc.queryForList(
-            "SELECT decision, deny_reason, tool_name, status, agent_id FROM connector_action ORDER BY id"))
+            "SELECT decision, deny_reason, tool_name, status, agent_id FROM connector_action WHERE grant_scope IS NULL ORDER BY id"))
                 .extracting(
                     row -> row.get("DECISION"),
                     row -> row.get("DENY_REASON"),
@@ -1237,7 +1232,8 @@ class ConnectorPolicyEndpointTest {
 
 
     private Map<String, Object> onlyRow() {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM connector_action");
+        // 허락만 실으려고 넣은 승인 줄(GrantRows)은 판정 줄이 아니라 뺀다.
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM connector_action WHERE grant_scope IS NULL");
         assertThat(rows).as("connector_action 의 줄").hasSize(1);
         return rows.get(0);
     }
@@ -1262,8 +1258,6 @@ class ConnectorPolicyEndpointTest {
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
     private void deleteRows() {
         jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
-        jdbc.update("DELETE FROM connector_conversation_grant");
         notifications.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();
@@ -1271,5 +1265,10 @@ class ConnectorPolicyEndpointTest {
         agents.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
+    }
+
+
+    private GrantRows grants() {
+        return new GrantRows(jdbc);
     }
 }

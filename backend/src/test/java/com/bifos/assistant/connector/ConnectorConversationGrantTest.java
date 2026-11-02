@@ -34,7 +34,6 @@ import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.connector.action.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import com.bifos.assistant.hermes.application.port.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
@@ -138,9 +137,6 @@ class ConnectorConversationGrantTest {
     ConnectorActionRepository actions;
 
     @Autowired
-    ConnectorConversationGrantRepository conversationGrants;
-
-    @Autowired
     ConnectorConnectionRepository connections;
 
     @Autowired
@@ -231,10 +227,10 @@ class ConnectorConversationGrantTest {
                 assertThat(action.decision()).isEqualTo(ActionDecision.ALLOWED);
                 assertThat(action.argsJson()).isNull();
             });
-        assertThat(conversationGrants.findAll()).singleElement().satisfies(grant -> {
+        assertThat(grants().conversations()).singleElement().satisfies(grant -> {
             assertThat(grant.conversationId()).isEqualTo(conversation.id());
             assertThat(grant.agentId()).isEqualTo(agent.id());
-            assertThat(grant.expiresAt()).isEqualTo(actions.findById(grant.actionId()).orElseThrow().decidedAt().plus(Duration.ofHours(24)));
+            assertThat(grant.expiresAt()).isEqualTo(actions.findById(grant.id()).orElseThrow().decidedAt().plus(Duration.ofHours(24)));
         });
         assertThat(service.conversationGrants(me, conversation.id()))
             .singleElement()
@@ -258,7 +254,7 @@ class ConnectorConversationGrantTest {
                 tuple(granted, true), tuple(plain, false));
         String until = DateTimeFormatter.ofPattern("M월 d일 HH:mm")
             .withZone(ZoneId.of("Asia/Seoul"))
-            .format(conversationGrants.findAll().getFirst().expiresAt());
+            .format(grants().conversations().getFirst().expiresAt());
         assertThat(resultSource.resultsFor(conversation.id(), owner.id(), List.of(granted.toString(), plain.toString())))
             .satisfiesExactly(
                 result -> {
@@ -274,12 +270,12 @@ class ConnectorConversationGrantTest {
     void redeliveredResultDropsEndedConversationGrant() {
         UUID revoked = ask(root, WRITE, ARGS).actionId();
         service.approve(me, revoked, null, true);
-        Long revokedGrant = conversationGrants.findAll().getFirst().id();
+        Long revokedGrant = grants().conversations().getFirst().id();
         service.revokeConversationGrant(me, conversation.id(), revokedGrant);
         UUID expired = ask(root, DRAFT, ARGS).actionId();
         service.approve(me, expired, null, true);
         jdbc.update(
-            "UPDATE connector_conversation_grant SET expires_at = ? WHERE id <> ?",
+            "UPDATE connector_action SET grant_expires_at = ? WHERE grant_scope = 'CONVERSATION' AND id <> ?",
             Instant.parse("2020-01-01T00:00:00Z"),
             revokedGrant);
 
@@ -343,7 +339,7 @@ class ConnectorConversationGrantTest {
                 .singleElement()
                 .satisfies(action -> assertThat(action.status()).isEqualTo(ActionStatus.PENDING));
         }
-        assertThat(conversationGrants.findAll()).isEmpty();
+        assertThat(grants().conversations()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -370,7 +366,7 @@ class ConnectorConversationGrantTest {
 
         assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR, true), ErrorCode.VALIDATION_FAILED);
 
-        assertThat(conversationGrants.findAll()).isEmpty();
+        assertThat(grants().conversations()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -407,7 +403,8 @@ class ConnectorConversationGrantTest {
         assertThat(service.conversationGrants(me, conversation.id())).isEmpty();
 
         service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
-        jdbc.update("UPDATE connector_conversation_grant SET expires_at = ?", Instant.parse("2020-01-01T00:00:00Z"));
+        jdbc.update("UPDATE connector_action SET grant_expires_at = ? WHERE grant_scope = 'CONVERSATION'",
+            Instant.parse("2020-01-01T00:00:00Z"));
         assertThat(ask(root, WRITE, "{\"text\":\"기간이 지난 뒤\"}").allowed()).isFalse();
     }
 
@@ -426,9 +423,58 @@ class ConnectorConversationGrantTest {
             .isEqualTo(ActionStatus.UNKNOWN);
         assertThat(ask(root, DRAFT, "{\"text\":\"결과를 모른 뒤\"}").allowed()).isFalse();
 
-        assertThat(conversationGrants.findAll()).hasSize(2)
+        assertThat(grants().conversations()).hasSize(2)
             .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(service.conversationGrants(me, conversation.id())).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("상시 허락과 함께 승인한 실행이 실패해도 상시 허락은 거두지 않는다. 옮기기 전에도 실패가 거두는 것은 대화 허락뿐이었다")
+    void failedExecutionKeepsStandingGrant() {
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.failure(ConnectorCallError.FORBIDDEN));
+
+        assertThat(service.approve(me, ask(root, WRITE, ARGS).actionId(), GrantPeriod.HOUR, false).status())
+            .isEqualTo(ActionStatus.FAILED);
+
+        assertThat(grants().tools()).singleElement().satisfies(grant -> assertThat(grant.revokedAt()).isNull());
+        assertThat(grants().conversations()).isEmpty();
+        assertThat(ask(root, WRITE, "{\"text\":\"실패한 뒤\"}").allowed()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("허락의 번호는 승인 줄의 번호라, 상시 허락 거두기로 대화 허락을, 대화 허락 거두기로 상시 허락을 거두지 못한다")
+    void grantIdsDoNotCrossScopes() {
+        service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
+        Long conversationGrant = service.conversationGrants(me, conversation.id()).getFirst().grantId();
+        long standing = grants().tool(owner.id(), DEMO, MAIL, Instant.now().plus(Duration.ofDays(1)));
+
+        assertCode(() -> service.revokeGrant(me, conversationGrant), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
+        assertCode(() -> service.revokeConversationGrant(me, conversation.id(), standing),
+            ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
+
+        assertThat(ask(root, WRITE, "{\"text\":\"거두지 못한 뒤\"}").allowed()).isTrue();
+        assertThat(grants().tools()).singleElement().satisfies(grant -> assertThat(grant.revokedAt()).isNull());
+    }
+
+
+    @Test
+    @DisplayName("지운 에이전트를 정리해 승인 줄의 에이전트가 비면 그 대화 허락은 목록에 없고 어느 실행에도 통하지 않으며, 번호로는 거둘 수 있다")
+    void conversationGrantOfPurgedAgentIsInert() {
+        service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
+        Long grantId = service.conversationGrants(me, conversation.id()).getFirst().grantId();
+
+        jdbc.update("UPDATE connector_action SET agent_id = NULL WHERE id = ?", grantId);
+
+        assertThat(service.conversationGrants(me, conversation.id())).isEmpty();
+        assertThat(ask(root, WRITE, "{\"text\":\"에이전트를 정리한 뒤\"}").allowed()).isFalse();
+        service.revokeConversationGrant(me, conversation.id(), grantId);
+        assertThat(grants().conversations())
+            .filteredOn(grant -> grant.id().equals(grantId))
+            .singleElement()
+            .satisfies(grant -> assertThat(grant.revokedAt()).isNotNull());
     }
 
 
@@ -510,15 +556,15 @@ class ConnectorConversationGrantTest {
         service.approve(me, first, null, true);
         service.approve(me, second, null, true);
 
-        assertThat(conversationGrants.findAll()).hasSize(2);
+        assertThat(grants().conversations()).hasSize(2);
         assertThat(service.conversationGrants(me, conversation.id())).hasSize(1);
         // 거둔 줄과 같은 도구의 다른 줄이 남아 있으면 그 줄로 계속 통과한다. 남은 줄까지 거두는지 본다.
-        jdbc.update("UPDATE connector_conversation_grant SET revoked_at = NULL");
+        jdbc.update("UPDATE connector_action SET grant_revoked_at = NULL WHERE grant_scope = 'CONVERSATION'");
         Long grantId = service.conversationGrants(me, conversation.id()).getFirst().grantId();
 
         service.revokeConversationGrant(me, conversation.id(), grantId);
 
-        assertThat(conversationGrants.findAll()).allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
+        assertThat(grants().conversations()).allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(ask(root, WRITE, "{\"text\":\"거둔 뒤\"}").allowed()).isFalse();
     }
 
@@ -531,7 +577,7 @@ class ConnectorConversationGrantTest {
         bindingService.unbind(me, agent.code(), DEMO);
         bind(agent);
 
-        assertThat(conversationGrants.findAll()).singleElement()
+        assertThat(grants().conversations()).singleElement()
             .satisfies(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(ask(root, WRITE, "{\"text\":\"다시 붙인 뒤\"}").allowed()).isFalse();
     }
@@ -545,7 +591,7 @@ class ConnectorConversationGrantTest {
         new TransactionTemplate(transactionManager)
             .executeWithoutResult(status -> service.rejectPendingFor(connection, Instant.now()));
 
-        assertThat(conversationGrants.findAll()).singleElement()
+        assertThat(grants().conversations()).singleElement()
             .satisfies(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(ask(root, WRITE, "{\"text\":\"다시 등록한 뒤\"}").allowed()).isFalse();
     }
@@ -580,7 +626,7 @@ class ConnectorConversationGrantTest {
             pool.shutdownNow();
         }
         verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
-        assertThat(conversationGrants.findAll()).hasSize(1);
+        assertThat(grants().conversations()).hasSize(1);
     }
 
 
@@ -658,14 +704,17 @@ class ConnectorConversationGrantTest {
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
     private void deleteRows() {
         jdbc.update("DELETE FROM decision_feedback_event");
-        jdbc.update("DELETE FROM connector_conversation_grant");
         jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
         agents.deleteAll();
         tokens.deleteAll();
         users.deleteAll();
+    }
+
+
+    private GrantRows grants() {
+        return new GrantRows(jdbc);
     }
 }

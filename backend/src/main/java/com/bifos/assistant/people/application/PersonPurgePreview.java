@@ -49,7 +49,6 @@ public class PersonPurgePreview {
         new Target("task_run", "owner_user_id = :userId", Action.DELETE),
         new Target("notification", "user_id = :userId", Action.DELETE),
         new Target("connector_connection", "user_id = :userId", Action.DELETE),
-        new Target("connector_tool_grant", "user_id = :userId", Action.DELETE),
         new Target("user_browser", "user_id = :userId", Action.DELETE),
         new Target("user_data_key", "user_id = :userId", Action.DELETE),
         new Target("agent", "owner_user_id = :userId and deleted_at is null and visibility = 'PRIVATE'", Action.DELETE),

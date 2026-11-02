@@ -143,7 +143,7 @@ public class ConnectorActionService {
         this.financialApproval = financialApproval;
         this.limitChanges = limitChanges;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
-        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock, connections);
+        this.details = new ConnectorActionDetails(actions, catalog, clock, connections);
         this.signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
             actions,

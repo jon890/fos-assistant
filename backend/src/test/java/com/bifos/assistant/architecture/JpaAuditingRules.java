@@ -64,8 +64,6 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.connector.action.domain.ConnectorActionExecution", new Contract("connector_action_execution", "C")),
         Map.entry("com.bifos.assistant.connector.connection.domain.ConnectorBinding", new Contract("agent_connector_binding", "C")),
         Map.entry("com.bifos.assistant.connector.connection.domain.ConnectorConnection", new Contract("connector_connection", "C")),
-        Map.entry("com.bifos.assistant.connector.action.domain.ConnectorConversationGrant", new Contract("connector_conversation_grant", "C")),
-        Map.entry("com.bifos.assistant.connector.action.domain.ConnectorToolGrant", new Contract("connector_tool_grant", "C")),
         Map.entry("com.bifos.assistant.crypto.domain.entity.UserDataKey", new Contract("user_data_key", "C")),
         Map.entry("com.bifos.assistant.followup.domain.FollowUp", new Contract("follow_up", "제외")),
         Map.entry("com.bifos.assistant.mcp.domain.AgentToken", new Contract("agent_token", "C")),

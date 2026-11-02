@@ -12,7 +12,6 @@ import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
-import com.bifos.assistant.connector.action.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.hermes.domain.ToolDetailRedactor;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -50,7 +49,6 @@ public class ConnectorActionDetails {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
 
     private final ConnectorActionRepository actions;
-    private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorCatalogCache catalog;
     private final Clock clock;
     /** 표준 플러그인 연결의 읽기 표시를 읽는다. null 이면 읽기 표시를 보지 않고 모든 선언 없는 도구의 상시 허락을 닫는다. */
@@ -60,21 +58,18 @@ public class ConnectorActionDetails {
     /** 읽기 표시를 보지 않는 조회다. 표준 플러그인을 다루지 않는 원고 저장 승인이 쓴다. */
     public ConnectorActionDetails(
         ConnectorActionRepository actions,
-        ConnectorConversationGrantRepository conversationGrants,
         ConnectorCatalogCache catalog,
         Clock clock) {
-        this(actions, conversationGrants, catalog, clock, null);
+        this(actions, catalog, clock, null);
     }
 
 
     public ConnectorActionDetails(
         ConnectorActionRepository actions,
-        ConnectorConversationGrantRepository conversationGrants,
         ConnectorCatalogCache catalog,
         Clock clock,
         ConnectorConnectionRepository connections) {
         this.actions = actions;
-        this.conversationGrants = conversationGrants;
         this.catalog = catalog;
         this.clock = clock;
         this.connections = connections;
@@ -226,7 +221,7 @@ public class ConnectorActionDetails {
             action.resultText(),
             action.userId(),
             action.executedAt(),
-            action.status() == null ? null : conversationGrants.findActiveExpiresAtByActionId(action.id(), Instant.now(clock)));
+            action.status() == null ? null : action.activeConversationGrantExpiresAt(Instant.now(clock)));
     }
 
 
