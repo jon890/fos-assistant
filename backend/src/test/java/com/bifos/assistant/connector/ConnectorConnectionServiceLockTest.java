@@ -47,6 +47,7 @@ import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -148,6 +149,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("같은 고정 시계의 두 재등록은 서로 다른 시도와 revision을 커밋하고 늦은 성공과 실패가 새 설치를 덮지 못한다")
@@ -199,6 +201,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("check의 probe가 멈춘 동안 해제가 완료되고 늦은 성공이 삭제한 바인딩을 되살리지 않는다")
     void completesDisconnectWhileProbeWaits() throws Exception {
@@ -240,6 +243,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("verify 중 바뀐 계정의 PENDING을 이전 계정의 성공으로 READY로 올리지 않는다")
     void discardsVerifyForReplacedAccount() throws Exception {
@@ -277,6 +281,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("설치 응답을 기다리는 동안 접근 철회가 완료되고 결과는 FORBIDDEN이며 PENDING이 남는다")
     void refusesResultAfterAccessRevocation() throws Exception {
@@ -330,6 +335,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("시도 UUID와 연결 상태가 같아도 연결 revision만 달라지면 결과를 버린다")
     void discardsResultWhenOnlyConnectionRevisionChanges() throws Exception {
@@ -395,6 +401,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("새 붙이기를 해제하고 다시 붙인 뒤 이전 거절이 새 바인딩을 지우지 않는다")
     void preservesNewBindingAfterEarlierBindIsRejected() throws Exception {
@@ -434,6 +441,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("떼기와 에이전트 정리 뒤 늦은 설치 성공은 행을 되살리지 않고 남은 외부 설치의 정책 호출은 차단된다")
@@ -497,6 +505,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(strings = {"confirm", "scheduled", "drift"})
     @DisplayName("관리자 확인과 예약 반영과 어긋남 재설치의 HTTP도 트랜잭션 밖에서 커밋된 시도를 본다")
@@ -556,6 +565,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(strings = {"confirm", "scheduled", "drift"})
     @DisplayName("철회된 주인의 관리자 확인과 예약과 드리프트는 설치 시작과 외부 설치를 보내지 않는다")

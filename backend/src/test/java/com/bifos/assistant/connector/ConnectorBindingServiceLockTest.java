@@ -41,6 +41,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -141,6 +142,8 @@ class ConnectorBindingServiceLockTest {
         actions.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();
+        // 에이전트 생성 사건이 만든 기본 Memory 허락이 실제 MySQL 스키마의 FK 로 에이전트 삭제를 막는다.
+        jdbc.update("DELETE FROM agent_memory_collection");
         agents.deleteAll();
         users.deleteAll();
     }
@@ -152,6 +155,7 @@ class ConnectorBindingServiceLockTest {
      * <p>반영 완료의 트랜잭션이 잠금 없는 읽기로 시작하면 MySQL 의 REPEATABLE READ 에서는 그때 읽기 시점이 정해져, 잠금을
      * 기다린 뒤에도 바인딩의 옛 시각을 읽고 대기를 풀어 버린다. 앞선 트랜잭션은 새 재시작 시각을 적고 잠금을 쥔 자리에서 멈춘다.
      */
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("사용자 행 잠금을 기다린 반영 완료는 커밋된 새 재시작 대기를 보고 CONNECTOR_RESTART_AGAIN 이다")
     void confirmAppliedWaitsForRegistrationAndSeesNewRestartWait() throws Exception {
@@ -206,6 +210,7 @@ class ConnectorBindingServiceLockTest {
 
 
     /** 반영 완료가 트랜잭션 밖에서 주인을 읽은 뒤 주인이 바뀌면, 잠근 사용자 행이 지금 주인의 것이 아니라 대기를 풀지 않는다. */
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("반영 완료가 주인을 읽은 뒤 잠금을 기다리는 사이 주인이 바뀌면 AGENT_BUSY 이고 대기를 풀지 않는다")
     void confirmAppliedRefusesWhenOwnerChangesWhileWaiting() throws Exception {
