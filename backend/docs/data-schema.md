@@ -350,6 +350,14 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - 저장은 줄 전체를 바꾼다. 활성 도구는 Hermes profile 이 갖고 이 줄은 활성 상태를 저장하거나 바꾸지 않는다([ADR-20261008 / tool-catalog-visibility](../../docs/adr/ADR-20261008-tool-catalog-visibility.md))
 - `updated_at` 은 옮겨 온 줄에서 비어 있다
 
+`MEMORY_COLLECTIONS` 는 그룹이 쓰는 Memory collection 목록이다. `{"version":1,"collections":[{"key":"<key>","name":"<화면 이름>"}, ...]}` 이고 배열 순서가 화면 순서다. 읽는 일은 `MemoryCollectionService` 가 한다.
+
+- 줄이 없는 그룹은 코드의 기본 목록(`MemoryCollection.DEFAULTS`)을 쓰고 읽을 때 줄을 만들지 않는다. 기본 목록과 같은 그룹은 줄을 갖지 않는다
+- 이 목록을 바꾸는 화면과 API 는 아직 없다. 기본과 다른 목록은 줄을 직접 써서 정한다
+- 모르는 버전이거나 형식이 깨진 JSON, 비었거나 key 가 겹치는 목록은 기본 목록으로 대신하지 않고 오류로 올린다. 대신하면 그룹이 정한 목록이 화면과 에이전트 접근 설정에서 조용히 바뀐다
+- 에이전트가 받는 collection(`agent_memory_collection`)은 이 목록과 따로 저장한다. 목록에서 빠진 key 를 이미 받고 있어도 그대로 둔다
+- `updated_at` 은 옮겨 온 줄에서 비어 있다
+
 옛 표 `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 은 `V20261031171501` 부터 `V20261031171503` 이 이 표로 옮기고 지웠다. 기본 단계 표의 이름을 바꿔 넓혔으므로 표 수는 둘 줄었다.
 옛 단계 코드 `FAST`, `BALANCED`, `DEEP` 은 같은 이관에서 `INSTANT`, `MEDIUM`, `HIGH` 로 바뀌었다. `app_user.model_default_tier`, `conversation.model_tier`, `task.model_tier` 가 대상이고, `agent_execution.model_tier` 는 그때 고른 값의 기록이라 옛 이름 그대로다.
 
@@ -716,11 +724,9 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 ### memory_collection
 
-그룹이 쓰는 collection 하나가 한 줄이다. 화면의 탭과 에이전트 접근 설정이 고를 목록이고, 누가 읽는지는 이 표가 정하지 않는다.
-그룹마다 `MemoryCollection.DEFAULT_KEYS` 로 시작한다. 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
-
-`created_at`은 JPA `PrePersist`에서 기록하는 생성 시각이며 commit 완료 시각은 아니다.
-시계와 정밀도, 기존 행과 SQL의 처리 계약은 [`code-architecture.md`의 「JPA 생성 시각」](code-architecture.md#jpa-생성-시각)이 갖는다.
+`memory_collection` 테이블은 코드가 더는 읽고 쓰지 않는다. 그룹이 쓰는 collection 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖는다.
+`V20261102074313` 이 이 테이블에서 기본 목록과 다른 그룹만 `MEMORY_COLLECTIONS` 줄 하나로 옮겼다. 기본 목록과 key, 이름, 순서가 모두 같은 그룹은 줄을 만들지 않는다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
+직전 이미지가 이 테이블에 쓴 줄은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### agent_memory_collection
 
