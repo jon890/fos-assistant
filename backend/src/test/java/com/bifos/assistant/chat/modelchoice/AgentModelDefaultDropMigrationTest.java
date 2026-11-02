@@ -78,13 +78,15 @@ class AgentModelDefaultDropMigrationTest {
 
 
     @Test
-    @DisplayName("CUSTOM 대화는 선택 없음으로 바뀌고 칸과 provider 모델 effort 가 모두 비며 TIER 대화와 선택 없는 대화는 그대로다")
-    void clearsCustomSelectionAndItsValues() throws SQLException {
+    @DisplayName("CUSTOM 대화는 선택 없음으로 바뀌고 대화의 모델 컬럼 셋은 지워지며 TIER 대화와 선택 없는 대화는 그대로다")
+    void clearsCustomSelectionAndDropsItsColumns() throws SQLException {
         migrate(null);
 
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            for (String column : List.of(
-                "model_selection_mode", "model_tier", "model_provider", "model", "reasoning_effort")) {
+            for (String column : List.of("model_provider", "model", "reasoning_effort")) {
+                assertThat(columnExists(connection, "conversation", column)).as("대화의 %s 컬럼", column).isFalse();
+            }
+            for (String column : List.of("model_selection_mode", "model_tier")) {
                 assertThat(strings(statement, "SELECT " + column + " FROM conversation WHERE id = 33"))
                     .as("CUSTOM 대화의 %s", column)
                     .containsExactly((String)null);

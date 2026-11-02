@@ -1,12 +1,10 @@
 {
   "schema": 2,
-  "id": "financial-workbench",
+  "id": "valuation-ontology",
   "title": "금융 워크벤치",
   "description": "금융 온톨로지 워크벤치에 쌓은 투자 결정과 밸류에이션, 근거 문서와 주장, 내 공부 목록을 읽고, 토스증권 체결을 기록하며 해석은 제안으로 올립니다.",
-  "icon": "icon.svg",
   "link": "https://github.com/jon890/fos-graphrag",
   "link_kind": "project",
-  "readme_url": "https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/financial-workbench/README.md",
   "fields": [
     {
       "key": "token",
@@ -18,12 +16,12 @@
       "pattern": "^fwb_[A-Za-z0-9_-]{43}$"
     }
   ],
+  "headers": {
+    "Authorization": "Bearer ${FINANCIAL_WORKBENCH_TOKEN}"
+  },
   "verify": {
     "tool": "get_connection"
   },
-  "operator_env": [
-    "FINANCIAL_WORKBENCH_BASE_URL"
-  ],
   "default_tool_policy": "deny",
   "tools": {
     "get_connection": {
@@ -109,62 +107,85 @@
       "title": "내 제안 보기",
       "summary": "워크벤치에 올린 제안이 대기 중인지, 승인됐는지, 거절됐다면 왜인지 읽어요.",
       "description": "토큰 주인의 제안을 읽습니다. status에 PENDING, ACCEPTED, REJECTED 가운데 하나를 넣어 좁히고 비우면 전체입니다. page는 0부터, size는 기본 20, 1~50입니다. 항목마다 kind, status, payload, rationale, dedupeKey, decidedAt, decisionNote(거절 까닭), result(승인으로 생긴 nodeIds, relationshipIds, tradeIds), lastError가 있습니다. 같은 제안을 다시 올리기 전에 이미 승인했거나 거절했는지 봅니다. 거절된 제안은 같은 내용으로 다시 올리지 않습니다."
+    },
+    "get_ontology_yaml": {
+      "risk": "READ",
+      "title": "온톨로지 정의 받기",
+      "summary": "온톨로지 정의 전체를 YAML 과 버전으로 읽어요.",
+      "description": "온톨로지 정의 전체를 YAML 로 받습니다. 항목 종류, 속성, 관계 종류 같은 정의를 바꾸려 할 때만 부릅니다. 입력 인자는 없으며 결과의 version 을 propose_ontology_change 의 baseVersion 에 넣습니다."
+    },
+    "propose_ontology_change": {
+      "risk": "WRITE",
+      "approval": "required",
+      "outbound": false,
+      "conversation_grant": true,
+      "title": "온톨로지 변경 제안하기",
+      "summary": "온톨로지 정의를 바꾸자는 제안을 올려요. 워크벤치에서 관리자가 승인해야 반영돼요.",
+      "description": "항목 종류, 속성, 관계 종류 같은 온톨로지 정의를 바꾸자고 제안합니다. 올리기만 하고 바로 바뀌지 않으며 관리자가 워크벤치의 「제안」 에서 승인해야 반영됩니다. baseVersion(get_ontology_yaml 의 version), yaml(고친 정의 전체), rationale(사람이 승인할지 판단할 까닭, 2000자까지)을 넣고 note(1000자까지)와 dedupeKey(100자까지)는 선택입니다. 정의가 틀리면 ONTOLOGY_INVALID 의 details.errors 를 읽고 고쳐 다시 올립니다. REVISION_CONFLICT 면 get_ontology_yaml 로 다시 받아 고칩니다. 같은 dedupeKey 로 다시 올리면 새로 생기지 않고 있던 제안을 돌려줍니다.",
+      "arg_labels": {
+        "baseVersion": "기준 버전",
+        "yaml": "온톨로지 정의",
+        "rationale": "까닭",
+        "note": "메모",
+        "dedupeKey": "중복 방지 키"
+      }
     }
   },
   "errors": {
-    "WORKBENCH_UNAUTHORIZED": {
+    "UNAUTHENTICATED": {
       "category": "credential_rejected",
       "recovery": "reconnect"
     },
-    "WORKBENCH_FORBIDDEN": "forbidden",
-    "WORKBENCH_INSUFFICIENT_SCOPE": {
+    "FORBIDDEN": "forbidden",
+    "INSUFFICIENT_SCOPE": {
       "category": "forbidden",
       "recovery": "reconnect"
     },
-    "WORKBENCH_INVALID_INPUT": {
-      "category": "invalid_input",
-      "recovery": "fix_input",
-      "details": [
-        "item_index"
-      ]
-    },
-    "WORKBENCH_NOT_FOUND": {
-      "category": "invalid_input",
-      "recovery": "fix_input",
-      "details": [
-        "item_index"
-      ]
-    },
-    "WORKBENCH_CONFLICT": {
-      "category": "invalid_input",
-      "recovery": "fix_input",
-      "details": [
-        "item_index"
-      ]
-    },
-    "WORKBENCH_PAYLOAD_TOO_LARGE": {
+    "VALIDATION_FAILED": {
       "category": "invalid_input",
       "recovery": "fix_input"
     },
-    "WORKBENCH_PROPOSAL_LIMIT": {
-      "category": "unavailable",
-      "details": [
-        "max_pending",
-        "pending"
-      ]
+    "ONTOLOGY_VIOLATION": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
     },
-    "WORKBENCH_RATE_LIMITED": {
-      "category": "unavailable",
-      "recovery": "retry_later",
-      "details": [
-        "retry_after_seconds"
-      ]
+    "ONTOLOGY_INVALID": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
     },
-    "WORKBENCH_NOT_CONFIGURED": "unavailable",
-    "WORKBENCH_UNAVAILABLE": {
+    "NOT_FOUND": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "ARCHIVED": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "REVISION_CONFLICT": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "PAYLOAD_TOO_LARGE": {
+      "category": "invalid_input",
+      "recovery": "fix_input"
+    },
+    "PROPOSAL_LIMIT": "unavailable",
+    "TRANSIENT_CONFLICT": {
       "category": "unavailable",
       "recovery": "retry_later"
     },
-    "WORKBENCH_WRITE_UNKNOWN": "outcome_unknown"
+    "RATE_LIMITED": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    },
+    "QUERY_TIMEOUT": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    },
+    "DATABASE_UNAVAILABLE": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    },
+    "INTERNAL_ERROR": "unavailable"
   }
 }
