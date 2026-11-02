@@ -52,7 +52,7 @@ fos-agents 의 career 면접 기록 도구는 Backend 의 5xx 를 `CAREER_OUTCOM
 
 ### 대안 기각
 
-- **고정 허용 목록(`attemptId`, `idempotency_key` 같은 이름)을 plugin 에 둔다**: 커넥터를 고치지 않아도 되지만 plugin 이 서비스마다 다른 칸 이름을 알아야 한다. [`hermes/AGENTS.md`](../../hermes/AGENTS.md) 의 「plugin 은 어느 서비스도 모른다」 와 어긋나고, 목록에 든 이름을 다른 뜻으로 쓰는 커넥터의 값이 그대로 나간다.
+- **고정 허용 목록(`attemptId`, `idempotency_key` 같은 이름)을 plugin 에 둔다**: 커넥터를 고치지 않아도 되지만 plugin 이 서비스마다 다른 칸 이름을 알아야 한다. [rule-65](../../docs/code-rules/rule-65.md) 의 「plugin 은 서비스 이름을 모른다」 와 어긋나고, 목록에 든 이름을 다른 뜻으로 쓰는 커넥터의 값이 그대로 나간다.
 - **ADR-092 의 `details` 를 `outcome_unknown` 에도 열고 글 값을 받는다**: 세부 칸은 정수와 boolean 만 받는다는 결정이 무너진다. 글 칸 하나로 원문 메시지를 옮길 수 있다.
 - **도구 오류 객체를 그대로 504 본문에 싣는다**: career 의 오류에는 사용자의 답변을 되풀이하는 칸이 없지만, 다른 커넥터가 그렇게 만든다는 보장이 없다.
 - **Control Plane 이 식별자로 한 번 자동 재전송한다**: 커넥터가 그 식별자로 중복을 막는지 Control Plane 은 알 수 없다. ADR-050 의 「UNKNOWN 은 다시 실행하지 않는다」 를 지킨다.
