@@ -15,8 +15,8 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.ExecutionException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -32,18 +32,37 @@ import tools.jackson.core.StreamReadFeature;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class HttpContentDraftSnapshotClient {
     private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Semaphore SLOTS = new Semaphore(4);
     private static final Set<String> WORKER_ERRORS = Set.of("invalid_input", "not_found", "start_unknown", "unavailable");
+    /** compile 과 status 호출이 응답을 기다리는 운영 한도다. */
+    private static final Duration RESPONSE_LIMIT = Duration.ofSeconds(5);
+    private static final Duration START_LIMIT = Duration.ofSeconds(60);
     private final HermesProperties properties;
+    private final Duration responseLimit;
     /**
      * HTTP/1.1 로 고정한다. 기본값(HTTP/2)은 평문 주소에 h2c upgrade 를 붙이고, 대시보드의 uvicorn(httptools)은 그 POST 의 본문을
      * 버린 채 처리해 plugin 이 빈 본문을 400 으로 거절한다.
      */
     private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
         .connectTimeout(Duration.ofSeconds(5)).build();
+
+
+    @Autowired
+    public HttpContentDraftSnapshotClient(HermesProperties properties) {
+        this(properties, RESPONSE_LIMIT);
+    }
+
+
+    /** 응답 한도를 실제로 기다리는 검사가 짧은 값을 줄 때만 쓴다. 운영 코드는 {@link #HttpContentDraftSnapshotClient(HermesProperties)} 를 쓴다. */
+    public HttpContentDraftSnapshotClient(HermesProperties properties, Duration responseLimit) {
+        if (responseLimit == null || !responseLimit.isPositive()) {
+            throw new IllegalArgumentException("응답 한도는 양수여야 한다");
+        }
+        this.properties = properties;
+        this.responseLimit = responseLimit;
+    }
 
 
     public JsonNode start(String profile, String connectorId, JsonNode snapshot, ContentDraftWorkerStamp stamp, String ticket) {
@@ -54,7 +73,7 @@ public class HttpContentDraftSnapshotClient {
             }
             var args = JSON.createObjectNode().set("snapshot", snapshot).put("jobId", stamp.jobId().toString())
                 .put("ticket", ticket).set("stamp", JSON.valueToTree(stamp));
-            return jobRequest(profile, connectorId, "start", args, stamp, 60);
+            return jobRequest(profile, connectorId, "start", args, stamp, START_LIMIT);
         } catch (ApiException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -66,7 +85,7 @@ public class HttpContentDraftSnapshotClient {
     /** @throws ContentDraftJobNotFound worker 가 그 stamp 의 job 을 모른다고 답했을 때. 전송 실패와 timeout 은 {@code CONTENT_DRAFT_JOB_UNAVAILABLE} 이다 */
     public JsonNode status(String profile, String connectorId, ContentDraftWorkerStamp stamp) {
         var args = JSON.createObjectNode().set("stamp", JSON.valueToTree(stamp));
-        var result = jobRequest(profile, connectorId, "status", args, stamp, 5);
+        var result = jobRequest(profile, connectorId, "status", args, stamp, responseLimit);
         if (result.has("error")) {
             if ("not_found".equals(result.path("error").stringValue())) {
                 throw new ContentDraftJobNotFound();
@@ -78,7 +97,7 @@ public class HttpContentDraftSnapshotClient {
     }
 
 
-    private JsonNode jobRequest(String profile, String connectorId, String operation, JsonNode args, ContentDraftWorkerStamp stamp, int seconds) {
+    private JsonNode jobRequest(String profile, String connectorId, String operation, JsonNode args, ContentDraftWorkerStamp stamp, Duration limit) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw jobFailure(operation, connectorId, "transaction", null, null);
         }
@@ -99,12 +118,12 @@ public class HttpContentDraftSnapshotClient {
                 throw jobFailure(operation, connectorId, "request-size", null, null);
             }
             var request = HttpRequest.newBuilder(URI.create(properties.dashboardBaseUrl() + "/api/connectors/" + connectorId + "/snapshot"))
-                .timeout(Duration.ofSeconds(seconds)).header("Authorization", "Bearer " + properties.dashboardToken())
+                .timeout(limit).header("Authorization", "Bearer " + properties.dashboardToken())
                 .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(raw)).build();
             stage = "send";
             var pending = http.sendAsync(request, ignored -> new CappedSnapshotBody());
             try {
-                var response = pending.get(seconds, TimeUnit.SECONDS);
+                var response = pending.get(limit.toNanos(), TimeUnit.NANOSECONDS);
                 status = response.statusCode();
                 if (status != 200) {
                     throw jobFailure(operation, connectorId, "status", status, null);
@@ -180,12 +199,12 @@ public class HttpContentDraftSnapshotClient {
                 throw compileFailure(connectorId, "request-size", null, null);
             }
             var request = HttpRequest.newBuilder(URI.create(properties.dashboardBaseUrl() + "/api/connectors/" + connectorId + "/snapshot"))
-                .timeout(Duration.ofSeconds(5)).header("Authorization", "Bearer " + properties.dashboardToken())
+                .timeout(responseLimit).header("Authorization", "Bearer " + properties.dashboardToken())
                 .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(raw)).build();
             stage = "send";
             var pending = http.sendAsync(request, ignored -> new CappedSnapshotBody());
             try {
-                var response = pending.get(5, TimeUnit.SECONDS);
+                var response = pending.get(responseLimit.toNanos(), TimeUnit.NANOSECONDS);
                 status = response.statusCode();
                 if (status != 200) {
                     throw compileFailure(connectorId, "status", status, null);

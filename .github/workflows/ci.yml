@@ -106,10 +106,34 @@ jobs:
       # 금융 producer 왕복 검사가 tossinvest 테스트 원본을 생성하고 금융 SDK를 bundle한다.
       - name: 금융 producer 왕복 fixture 의존성
         run: bun install --cwd hermes/connectors/tossinvest --frozen-lockfile
+      # ContentDraftJobLoopbackTest 의 합성 runner 가 첫 검사에서 Chrome image 를 빌드한다(66~76초). 그 image 의 태그는
+      # 최종 Dockerfile(test.Dockerfile 에 runner 가 줄을 덧붙인 것), package.json, bun.lock 의 hash 다. 캐시 키는
+      # 이 입력 파일들에 runner 파일을 더한 hash 라서 태그보다 넓게 바뀐다.
+      # 복원한 image 가 있으면 runner 가 빌드를 건너뛴다. 키에 든 파일이 바뀌면 다른 키라 옛 image 로 돌지 않는다.
+      - name: 합성 loopback image 캐시
+        id: loopback-image
+        if: matrix.suite == 'unit'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/loopback-image.tar
+          key: loopback-image-${{ runner.os }}-${{ hashFiles('hermes/connectors/naver-blog/scripts/test.Dockerfile', 'hermes/connectors/naver-blog/tests/content-snapshot-loopback-runner.ts', 'hermes/connectors/naver-blog/package.json', 'hermes/connectors/naver-blog/bun.lock') }}
+      - name: 합성 loopback image 복원
+        if: matrix.suite == 'unit' && steps.loopback-image.outputs.cache-hit == 'true'
+        run: docker load --input "${{ runner.temp }}/loopback-image.tar"
       - name: 백엔드 테스트
         if: matrix.suite == 'unit'
         working-directory: backend
         run: ./gradlew test
+      # 캐시를 놓친 실행만 runner 가 빌드한 image 를 파일로 남긴다. cache 액션이 job 이 성공했을 때 이 파일을 저장한다.
+      - name: 합성 loopback image 저장
+        if: matrix.suite == 'unit' && steps.loopback-image.outputs.cache-hit != 'true'
+        run: |
+          images=$(docker image ls --filter reference='fos-synthetic-loopback-test:*' --format '{{.Repository}}:{{.Tag}}')
+          if [ -z "$images" ]; then
+            echo "::warning::저장할 합성 loopback image 가 없어 캐시를 만들지 않는다"
+            exit 0
+          fi
+          docker save --output "${{ runner.temp }}/loopback-image.tar" $images
       # H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다. 운영과 같은 판과 기본 정렬 규칙으로 띄워
       # 마이그레이션과 저장소 쿼리를 검사한다.
       - name: 실제 MySQL 검사

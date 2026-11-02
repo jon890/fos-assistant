@@ -44,6 +44,8 @@ import ch.qos.logback.core.read.ListAppender;
 import org.slf4j.LoggerFactory;
 
 class HttpContentDraftSnapshotClientTest {
+    /** 응답을 끝내 주지 않는 서버를 기다리는 두 검사가 쓰는 한도다. 서버는 이 시간이 지나도 응답하지 않으므로 줄여도 흔들리지 않는다. */
+    private static final Duration SHORT_LIMIT = Duration.ofSeconds(1);
     private final JsonMapper json = JsonMapper.builder().build();
     private HttpServer server;
     private ExecutorService executor;
@@ -223,13 +225,14 @@ class HttpContentDraftSnapshotClientTest {
 
 
     @Test
-    @DisplayName("5초 전체 응답 한도와 호출 중단은 slot을 반환한다")
+    @DisplayName("전체 응답 한도와 호출 중단은 slot을 반환한다")
     void timesOutAndCancelsWithoutLeakingSlots() throws Exception {
+        client = shortLimitClient();
         stall = true;
         delayBody = true;
         var start = System.nanoTime();
         unavailable();
-        assertThat(Duration.ofNanos(System.nanoTime() - start)).isBetween(Duration.ofSeconds(4), Duration.ofSeconds(7));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isBetween(SHORT_LIMIT.minusMillis(100), SHORT_LIMIT.multipliedBy(3));
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var interrupted = pool.submit(() -> {
                 Thread.currentThread().interrupt();
@@ -383,6 +386,7 @@ class HttpContentDraftSnapshotClientTest {
     @Test
     @DisplayName("status 응답 timeout은 재전송 없이 취소하고 본문·ticket·원문 cause를 내보내지 않는다")
     void cancelsStatusTimeoutWithoutRetryOrDiagnosticsBody() {
+        client = shortLimitClient();
         stall = true;
         delayBody = true;
         var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
@@ -391,8 +395,15 @@ class HttpContentDraftSnapshotClientTest {
             assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
             assertThat(ex.getCause()).isNull();
         });
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofSeconds(4), Duration.ofSeconds(7));
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(SHORT_LIMIT.minusMillis(100), SHORT_LIMIT.multipliedBy(3));
         assertThat(requests.get()).isEqualTo(1);
+    }
+
+
+    /** 응답을 끝내 주지 않는 서버를 짧게 기다리는 검사용이다. 운영 한도(5초)를 실제로 기다리지 않는다. */
+    private HttpContentDraftSnapshotClient shortLimitClient() {
+        return new HttpContentDraftSnapshotClient(new HermesProperties(null, "http://127.0.0.1:" + server.getAddress().getPort(),
+            "synthetic-token", null, null, null, null, null), SHORT_LIMIT);
     }
 
 

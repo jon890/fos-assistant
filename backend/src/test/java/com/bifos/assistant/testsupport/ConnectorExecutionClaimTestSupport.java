@@ -81,7 +81,9 @@ public abstract class ConnectorExecutionClaimTestSupport {
             "hermes.dashboard-base-url",
             () -> "http://127.0.0.1:" + REMOTE.getAddress().getPort());
         registry.add("hermes.dashboard-token", () -> TOKEN);
-        registry.add("hermes.read-timeout", () -> "5s");
+        // timeout 사례는 대역이 응답을 끝내 주지 않아 이 시간을 그대로 기다린다. 응답을 쥔 채 다른 작업(최대 2초)을 기다리는
+        // 사례가 있어, 이 값은 그 대기보다 충분히 길게(2배) 둔다.
+        registry.add("hermes.read-timeout", () -> "4s");
         registry.add("assistant.attachment.root", () -> System.getProperty("java.io.tmpdir"));
     }
 

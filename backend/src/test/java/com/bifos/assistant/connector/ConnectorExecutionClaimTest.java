@@ -356,7 +356,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimBase {
                     .extracting("code")
                     .isEqualTo(ErrorCode.CONNECTOR_ACTION_EXECUTING);
             });
-            changed.get(3, TimeUnit.SECONDS);
+            changed.get(2, TimeUnit.SECONDS);
             tx().executeWithoutResult(status -> {
                 var c = connections.findById(f.connection()).orElseThrow();
                 var b = bindings.findById(f.binding()).orElseThrow();
@@ -445,7 +445,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimBase {
             var changed = pool.submit(() -> assertThatThrownBy(
                 () -> bindingService.confirmApplied(admin, f.agentCode(), "demo-financial", null))
                     .isInstanceOf(ApiException.class));
-            changed.get(3, TimeUnit.SECONDS);
+            changed.get(2, TimeUnit.SECONDS);
             assertThat(jdbc.queryForObject(
                 "select status from agent_connector_binding where id = ?", String.class, f.binding()))
                     .isEqualTo("PENDING");

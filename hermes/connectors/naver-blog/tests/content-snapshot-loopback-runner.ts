@@ -45,25 +45,30 @@ async function main() {
     await mkdir(context);
     const dockerfile = join(connector, "scripts/test.Dockerfile");
     const source = await readFile(dockerfile);
-    await writeFile(
-      join(context, "Dockerfile"),
-      Buffer.concat([
-        source,
-        Buffer.from(
-          "\nCOPY package.json bun.lock /synthetic-deps/\nRUN cd /synthetic-deps && bun --no-env-file install --frozen-lockfile --network-concurrency=1\n",
-        ),
-      ]),
-    );
-    const hashInput = createHash("sha256")
-      .update(source)
-      .update("loopback-deps-v1");
+    // 태그가 이 최종 Dockerfile 의 hash 라서, 덧붙이는 줄을 고치면 태그가 바뀌어 옛 image 를 쓰지 않는다.
+    const finalDockerfile = Buffer.concat([
+      source,
+      Buffer.from(
+        "\nCOPY package.json bun.lock /synthetic-deps/\nRUN cd /synthetic-deps && bun --no-env-file install --frozen-lockfile --network-concurrency=1\n",
+      ),
+    ]);
+    await writeFile(join(context, "Dockerfile"), finalDockerfile);
+    const hashInput = createHash("sha256").update(finalDockerfile);
     for (const file of ["package.json", "bun.lock"]) {
       const contents = await readFile(join(connector, file));
       hashInput.update(contents);
       await writeFile(join(context, file), contents);
     }
     const image = `fos-synthetic-loopback-test:${hashInput.digest("hex").slice(0, 16)}`;
-    if ((await run(["docker", "build", "--tag", image, context])) !== 0)
+    // CI 가 캐시에서 복원한 image 가 있으면 빌드를 건너뛴다. 태그가 입력 hash 라서 입력이 바뀌면 없는 태그가 되어 빌드한다.
+    const cached = Bun.spawn(["docker", "image", "inspect", image], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    if (
+      (await cached.exited) !== 0 &&
+      (await run(["docker", "build", "--tag", image, context])) !== 0
+    )
       throw new Error("합성 image 빌드 실패");
     const listing = Bun.spawn(
       ["git", "ls-files", "-z", "--", "hermes/connectors/naver-blog"],
