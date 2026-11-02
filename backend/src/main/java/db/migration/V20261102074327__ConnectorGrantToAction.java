@@ -24,8 +24,8 @@ import org.flywaydb.core.api.migration.Context;
  *
  * <p>고를 줄이 없는 허락은 옮기지 않는다. 그 도구는 다시 승인을 받는다. 허락이 넓어지는 쪽으로는 옮기지 않는다.
  *
- * <p>옮긴 줄은 옛 표에서 지운다. 남기면 직전 이미지로 되돌렸을 때 새 코드가 거둔 허락이 옛 표에서 다시 통한다. 옮기지 못한 줄은
- * 그대로 둔다. 표는 지우지 않는다.
+ * <p>옛 표의 줄은 지우지 않는다. 배포를 되돌리면 직전 이미지가 그 표를 그대로 읽는다. 이 배포 뒤 직전 이미지가 옛 표에 새로 쓴
+ * 줄은 옛 표를 지우는 PR 이 다시 옮긴다.
  */
 public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
 
@@ -66,9 +66,7 @@ public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
                SET grant_scope = 'CONVERSATION', grant_expires_at = ?, grant_revoked_at = ?
              WHERE id = ? AND grant_scope IS NULL AND user_id = ? AND conversation_id = ?
                AND (agent_id = ? OR agent_id IS NULL) AND connector_id = ? AND tool_name = ?
-            """);
-            PreparedStatement delete = connection.prepareStatement(
-                "DELETE FROM connector_conversation_grant WHERE id = ?")) {
+            """)) {
             for (ConversationGrant grant : grants) {
                 update.setObject(1, grant.expiresAt());
                 update.setObject(2, grant.revokedAt());
@@ -78,9 +76,7 @@ public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
                 update.setLong(6, grant.agentId());
                 update.setString(7, grant.connectorId());
                 update.setString(8, grant.toolName());
-                if (update.executeUpdate() == 1) {
-                    deleteRow(delete, grant.id());
-                }
+                update.executeUpdate();
             }
         }
     }
@@ -113,8 +109,7 @@ public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
             PreparedStatement update = connection.prepareStatement("""
                 UPDATE connector_action SET grant_scope = 'TOOL', grant_expires_at = ?, grant_revoked_at = ?
                  WHERE id = ? AND grant_scope IS NULL
-                """);
-            PreparedStatement delete = connection.prepareStatement("DELETE FROM connector_tool_grant WHERE id = ?")) {
+                """)) {
             for (ToolGrant grant : grants) {
                 Long actionId = closestAction(candidates, grant);
                 if (actionId == null) {
@@ -123,9 +118,7 @@ public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
                 update.setObject(1, grant.expiresAt());
                 update.setObject(2, grant.revokedAt());
                 update.setLong(3, actionId);
-                if (update.executeUpdate() == 1) {
-                    deleteRow(delete, grant.id());
-                }
+                update.executeUpdate();
             }
         }
     }
@@ -150,14 +143,6 @@ public class V20261102074327__ConnectorGrantToAction extends BaseJavaMigration {
             }
         }
         return closest;
-    }
-
-
-    private static void deleteRow(PreparedStatement delete, long id) throws Exception {
-        delete.setLong(1, id);
-        if (delete.executeUpdate() != 1) {
-            throw new IllegalStateException("grant row changed while moving: " + id);
-        }
     }
 
 

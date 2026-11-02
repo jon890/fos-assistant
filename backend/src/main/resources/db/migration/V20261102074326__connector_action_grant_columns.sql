@@ -5,7 +5,7 @@ ALTER TABLE connector_action ADD COLUMN grant_revoked_at DATETIME(6) NULL COMMEN
 
 CREATE INDEX idx_connector_action_grant ON connector_action (grant_scope, user_id, connector_id);
 
--- 코드가 더는 읽고 쓰지 않는 옛 표가 사용자 정리와 빈 작업 대화 삭제를 막지 않게 외래 키를 뗀다. 표는 DROP PR 이 지운다.
+-- 코드가 더는 읽고 쓰지 않는 옛 표의 줄이 사용자 정리와 빈 작업 대화 삭제를 막지 않게 외래 키를 뗀다. 직전 이미지는 외래 키에 기대지 않는다. 표는 DROP PR 이 지운다.
 ALTER TABLE connector_tool_grant DROP FOREIGN KEY fk_connector_tool_grant_user;
 ALTER TABLE connector_conversation_grant DROP FOREIGN KEY fk_connector_conversation_grant_user;
 ALTER TABLE connector_conversation_grant DROP FOREIGN KEY fk_connector_conversation_grant_conversation;

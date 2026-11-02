@@ -37,7 +37,7 @@ class ConnectorGrantToActionMigrationTest {
 
 
     @Test
-    @DisplayName("대화 허락은 허락을 준 승인 줄로 기간과 거둔 시각을 그대로 옮기고 옛 줄을 지우며, 열쇠가 다른 줄은 옮기지 않고 남긴다")
+    @DisplayName("대화 허락은 허락을 준 승인 줄로 기간과 거둔 시각을 그대로 옮기고 열쇠가 다른 줄은 옮기지 않으며, 옛 표는 그대로 둔다")
     void movesConversationGrantsOntoTheirAction() throws SQLException {
         Database database = createDatabase();
         migrate(database, BEFORE);
@@ -72,8 +72,8 @@ class ConnectorGrantToActionMigrationTest {
                     List.of("13", "-", "-", "-"),
                     List.of("14", "-", "-", "-"));
             assertThat(strings(statement, "SELECT id FROM connector_conversation_grant ORDER BY id"))
-                .as("옮긴 줄은 지우고 옮기지 못한 줄은 남긴다")
-                .containsExactly("3", "4");
+                .as("직전 이미지로 되돌릴 수 있게 옛 표는 지우지 않는다")
+                .containsExactly("1", "2", "3", "4");
         }
     }
 
@@ -118,8 +118,8 @@ class ConnectorGrantToActionMigrationTest {
                     List.of("24", "-", "-"),
                     List.of("25", "CONVERSATION", "2026-11-02T06:00"));
             assertThat(strings(statement, "SELECT id FROM connector_tool_grant ORDER BY id"))
-                .as("고를 줄이 없던 허락만 남는다")
-                .containsExactly("2", "3");
+                .as("옛 표는 지우지 않는다")
+                .containsExactly("1", "2", "3");
         }
     }
 

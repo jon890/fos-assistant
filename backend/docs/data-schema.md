@@ -912,7 +912,7 @@ action을 지우면 실행 내용도 지운다.
 
 ### connector_tool_grant
 
-**코드가 읽고 쓰지 않는 옛 표다.** 상시 허락은 `connector_action` 의 허락 칸이 갖는다. 이관이 옮긴 줄은 지웠고, 사용자 외래 키는 떼어 사용자 정리를 막지 않는다. 직전 이미지가 쓴 줄은 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
+**코드가 읽고 쓰지 않는 옛 표다.** 상시 허락은 `connector_action` 의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자 외래 키는 떼어 사용자 정리를 막지 않는다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
 
 사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다([ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
 `expires_at` 은 비지 않는다. 무기한 허락은 없다. `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다.
@@ -922,7 +922,7 @@ action을 지우면 실행 내용도 지운다.
 
 ### connector_conversation_grant
 
-**코드가 읽고 쓰지 않는 옛 표다.** 대화 허락은 `action_id` 가 가리키던 `connector_action` 줄의 허락 칸이 갖는다. 이관이 옮긴 줄은 지웠고, 사용자와 대화 외래 키는 떼었다. 직전 이미지가 쓴 줄은 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
+**코드가 읽고 쓰지 않는 옛 표다.** 대화 허락은 `action_id` 가 가리키던 `connector_action` 줄의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자와 대화 외래 키는 떼었다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
 
 사용자가 한 대화에서 도구 하나를 계속 허용한 것이다. 승인하면서 「이 대화에서 계속 허용」 을 골라 준다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md)).
 `conversation_id`, `agent_id`, `connector_id`, `tool_name` 이 모두 맞는 호출에만 통한다. `agent_id` 는 그 승인 줄을 판정한 실행의 에이전트다.
