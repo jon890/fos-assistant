@@ -210,7 +210,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
 
 
     @Test
-    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision과 요청 alias를 새로 만들지 않는다")
+    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision을 새로 만들지 않는다")
     void revisesObservedDraftThreeTimesWithoutNewObservation() {
         var saved = record(0, UUID.randomUUID(), input(), model());
         var observation = observations.findAll().getFirst();
@@ -230,7 +230,6 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         });
         // 원고 경로는 관찰을 읽기만 한다. 앞으로 관찰 쓰기가 생기는 회귀를 막는다.
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
         // 두 번째 이미지 블록은 다른 첨부다(같은 사진은 한 번만 쓴다). 그 첨부도 관찰이 새로 생기지 않는다.
         var listed = service.list(owner, conversation.id(), null, 10);
         assertThat(listed).filteredOn(view -> view.assetId().equals(photo.id().toString())).containsExactly(saved);

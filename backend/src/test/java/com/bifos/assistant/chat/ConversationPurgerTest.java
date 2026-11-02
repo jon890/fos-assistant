@@ -24,7 +24,6 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -113,9 +112,6 @@ class ConversationPurgerTest {
 
     @Autowired
     MediaObservationRepository observations;
-
-    @Autowired
-    MediaObservationRequestRepository observationRequests;
 
     private AppUser owner;
     private Agent agent;
@@ -268,8 +264,6 @@ class ConversationPurgerTest {
         assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(
             filled.attachment().id()))
                 .isEmpty();
-        assertThat(observationRequests.findAll())
-            .noneMatch(row -> row.attachmentId().equals(filled.attachment().id()));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
             .hasSize(2);

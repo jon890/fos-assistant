@@ -24,7 +24,6 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationBodies;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -113,7 +112,6 @@ class MediaObservationServiceTest extends ObservationFixture {
         } while (cursor != null);
         assertThat(reread).containsExactlyElementsOf(saved);
         assertThat(observations.count()).isEqualTo(30);
-        assertThat(requests.count()).isEqualTo(30);
         attachmentCleaner.delete(storedAttachments.get(14), NOW);
         var after = service.list(owner, target.id(), null, 100);
         assertThat(after).hasSize(30);
@@ -128,13 +126,12 @@ class MediaObservationServiceTest extends ObservationFixture {
             }
         }
         assertThat(observations.count()).isEqualTo(29);
-        assertThat(requests.count()).isEqualTo(29);
         assertThat(file(storedAttachments.get(14))).doesNotExist();
     }
 
 
     @Test
-    @DisplayName("다른 사용자와 같은 소유자의 다른 대화 접근은 유효 이미지로도 DB 본문과 alias를 만들지 않는다")
+    @DisplayName("다른 사용자와 같은 소유자의 다른 대화 접근은 유효 이미지로도 관찰 줄과 본문을 만들지 않는다")
     void deniesForeignOwnerAndConversationWithoutCreatingRows() {
         var other = user();
         var foreignConversation = conversations.save(Conversation.startedBy(other.id(), "다른 사용자", null, NOW));
@@ -150,7 +147,6 @@ class MediaObservationServiceTest extends ObservationFixture {
         code(() -> service.record(other, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
             ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         assertThat(jdbc.queryForObject("select count(body) from media_observation", Long.class)).isZero();
     }
 
@@ -186,7 +182,6 @@ class MediaObservationServiceTest extends ObservationFixture {
             .extracting(MediaObservationView::ordinal)
             .containsExactly(21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
     }
 
 
@@ -244,7 +239,7 @@ class MediaObservationServiceTest extends ObservationFixture {
                 "media-observation-v1",
                 clock.instant()));
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst()).isEqualTo(third);
-        assertThat(requests.count()).isEqualTo(3);
+        assertThat(observations.count()).isEqualTo(3);
     }
 
 
@@ -302,8 +297,13 @@ class MediaObservationServiceTest extends ObservationFixture {
             "media-observation-v1",
             null);
         code(() -> record(1, UUID.randomUUID(), input(), synthetic), ErrorCode.VALIDATION_FAILED);
+        var unsupportedSchema = new ObservationProvenance(
+            ObservationProvenanceKind.MODEL_RESULT, 123L, "provider", null, "model", null, 2, "media-observation-v1", null);
+        code(() -> record(1, UUID.randomUUID(), input(), unsupportedSchema), ErrorCode.VALIDATION_FAILED);
+        var unsupportedPrompt = new ObservationProvenance(
+            ObservationProvenanceKind.MODEL_RESULT, 123L, "provider", null, "model", null, 1, "v2", null);
+        code(() -> record(1, UUID.randomUUID(), input(), unsupportedPrompt), ErrorCode.VALIDATION_FAILED);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 
 
@@ -351,7 +351,7 @@ class MediaObservationServiceTest extends ObservationFixture {
             UUID.randomUUID(),
             new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "MODEL_ERROR"),
             model());
-        assertThat(requests.count()).isEqualTo(1);
+        assertThat(observations.count()).isEqualTo(1);
     }
 
 
@@ -372,12 +372,11 @@ class MediaObservationServiceTest extends ObservationFixture {
         code(() -> record(1, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(0, id, input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 
 
     @Test
-    @DisplayName("소유자 변경과 업로더 불일치를 alias 재시도에도 차단한다")
+    @DisplayName("소유자 변경과 업로더 불일치를 같은 UUID 재시도에도 차단한다")
     void blocksOwnerChangesAndUploaderMismatchIncludingAliasRetry() {
         UUID request = UUID.randomUUID();
         record(0, request, input(), model());
@@ -404,12 +403,12 @@ class MediaObservationServiceTest extends ObservationFixture {
     void closesOriginalOnSuccessIoSizeExpiryAndSqlFailure() {
         AtomicBoolean closed = new AtomicBoolean();
         var tracked = trackingStore(closed, 0);
-        var reading = local(tracked, bodies, observations, requests, attachments, access);
+        var reading = local(tracked, bodies, observations, attachments, access);
         reading.record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model());
         assertThat(closed).isTrue();
         for (int mode = 1; mode <= 3; mode++) {
             closed.set(false);
-            var failing = local(trackingStore(closed, mode), bodies, observations, requests, attachments, access);
+            var failing = local(trackingStore(closed, mode), bodies, observations, attachments, access);
             code(
                 () -> failing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
                 ErrorCode.ATTACHMENT_GONE);
@@ -418,7 +417,7 @@ class MediaObservationServiceTest extends ObservationFixture {
         clock.set(NOW);
         closed.set(false);
         var broken = fail(MediaObservationRepository.class, observations, "findFirstByAttachmentIdOrderByRevisionDesc", 1);
-        assertThatThrownBy(() -> local(tracked, bodies, broken, requests, attachments, access)
+        assertThatThrownBy(() -> local(tracked, bodies, broken, attachments, access)
             .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(closed).isTrue();
@@ -465,12 +464,11 @@ class MediaObservationServiceTest extends ObservationFixture {
             attachments,
             "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
             3);
-        assertThatThrownBy(() -> local(trackingStore(closed, 0), bodies, observations, requests, broken, access)
+        assertThatThrownBy(() -> local(trackingStore(closed, 0), bodies, observations, broken, access)
             .list(owner, conversation.id(), null, 10))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(closed).isTrue();
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 }
 
@@ -485,9 +483,6 @@ abstract class ObservationFixture {
 
     @Autowired
     MediaObservationRepository observations;
-
-    @Autowired
-    MediaObservationRequestRepository requests;
 
     @Autowired
     MediaObservationBodies bodies;
@@ -546,7 +541,6 @@ abstract class ObservationFixture {
     @BeforeEach
     void prepare() {
         clock.set(NOW);
-        requests.deleteAll();
         observations.deleteAll();
         attachments.deleteAll();
         owner = user();
@@ -624,7 +618,6 @@ abstract class ObservationFixture {
         AttachmentStore localStore,
         MediaObservationBodies localBodies,
         MediaObservationRepository localRows,
-        MediaObservationRequestRepository localRequests,
         ChatAttachmentRepository localAttachments,
         ConversationAccess localAccess) {
         return new MediaObservationService(
@@ -632,7 +625,6 @@ abstract class ObservationFixture {
             localAttachments,
             localStore,
             localRows,
-            localRequests,
             localBodies,
             mutations,
             json,

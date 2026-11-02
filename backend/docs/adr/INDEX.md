@@ -67,8 +67,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) | 지운 에이전트는 7일 뒤 정리 작업이 행을 지우고, 설정과 권한은 함께 지우되 대화와 실행과 승인 이력은 남긴다 | Accepted. ADR-033 이 기각한 「지우면 에이전트 행도 지운다」 를 7일 뒤에 한해 뒤집는다 |
 | [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 | [ADR-20261010 / attachment-deletion-request](ADR-20261010-attachment-deletion-request.md) | 첨부 삭제 요청을 파일 작업 전에 커밋한다 | Accepted |
-| [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted |
-| [ADR-20261011 / media-observation-cache](ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Accepted |
+| [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted. 요청 alias 테이블은 [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)가 대체한다 |
 | [ADR-20261013 / financial-digest-key-rotation](ADR-20261013-financial-digest-key-rotation.md) | 금융 해시 key 를 바꾸면 이전 key 의 열린 줄이 끝날 때까지 금융 관문을 닫는다 | Accepted |
 | [ADR-20261015 / memory-eval-gate](ADR-20261015-memory-eval-gate.md) | 기억 선별을 바꾸기 전에 측정을 세 층으로 두고 조립 측정을 악화 금지 게이트로 건다 | Accepted. ADR-071 의 실행마다 남기는 참조에 선택 근거 컬럼을 더한다 |
 | [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 |
@@ -76,6 +75,8 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 | [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |
 | [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 단계마다 바꾼다. 첫 단계는 읽기 전용 미리보기다 |
+| [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. ADR-20261010 / media-observation-storage 의 요청 alias 테이블과 ADR-20261011 / media-observation-cache 를 대체한다 |
+| [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
 
 ## 보관
 
@@ -87,3 +88,4 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-016](archive/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](../../../docs/adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
 | [ADR-056](archive/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Retired. 2026-10-15 사용자 결정으로 발급 2건을 모두 취소했고, 2026-10-05 뒤 사용이 없어 기능 전체를 제거한다 |
 | [ADR-20261007 / autonomy-policy](archive/ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | Superseded ([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md)) |
+| [ADR-20261011 / media-observation-cache](archive/ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Superseded ([ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)) |

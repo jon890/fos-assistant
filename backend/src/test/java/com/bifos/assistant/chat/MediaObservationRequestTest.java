@@ -10,7 +10,6 @@ import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind
 import com.bifos.assistant.chat.attachment.domain.type.ObservationStatus;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -21,6 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 class MediaObservationRequestTest extends ObservationFixture {
     @Test
@@ -35,7 +35,6 @@ class MediaObservationRequestTest extends ObservationFixture {
         assertThat(second.revision()).isEqualTo(1);
         assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(first, second);
         assertThat(observations.count()).isEqualTo(2);
-        assertThat(requests.count()).isEqualTo(2);
         for (var row : observations.findAll()) {
             assertThat(row.bodyKeyId()).isNotNull();
             assertThat(row.body()).doesNotContain("픽셀");
@@ -45,14 +44,14 @@ class MediaObservationRequestTest extends ObservationFixture {
 
 
     @Test
-    @DisplayName("서비스 재생성 뒤 모든 수락 UUID의 alias를 복원한다")
-    void restoresEveryAcceptedAliasAfterServiceRestart() {
+    @DisplayName("서비스 재생성 뒤에도 수락한 UUID마다 처음 만든 revision을 돌려준다")
+    void restoresEveryAcceptedRequestAfterServiceRestart() {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
         var first = record(0, a, input(), model());
         clock.advance(Duration.ofSeconds(1));
         var second = record(1, b, input(), changedModel());
-        var restarted = local(store, bodies, observations, requests, attachments, access);
+        var restarted = local(store, bodies, observations, attachments, access);
         assertThat(restarted.record(owner, conversation.id(), photo.id(), 0, a, input(), model()))
             .isEqualTo(first);
         assertThat(restarted.record(owner, conversation.id(), photo.id(), 1, b, input(), changedModel()))
@@ -60,7 +59,6 @@ class MediaObservationRequestTest extends ObservationFixture {
         code(() -> record(1, b, input("변경"), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(0, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         assertThat(observations.count()).isEqualTo(2);
-        assertThat(requests.count()).isEqualTo(2);
     }
 
 
@@ -71,7 +69,7 @@ class MediaObservationRequestTest extends ObservationFixture {
         var source = model();
         var first = record(0, id, input(), source);
         jdbc.update(
-            "update media_observation_request set request_hash=? where request_id=?",
+            "update media_observation set request_hash=? where request_id=?",
             "773b2831653352837aa15a2ac9a8083629014e353d72a46612f7ddbf51a69b33",
             id.toString());
         var changedTimestamp = new ObservationProvenance(
@@ -97,7 +95,7 @@ class MediaObservationRequestTest extends ObservationFixture {
             source.modelVersion(),
             1,
             "media-observation-v1"));
-        assertThat(requests.findAll().getFirst().requestHash())
+        assertThat(observations.findAll().getFirst().requestHash())
             .isEqualTo("773b2831653352837aa15a2ac9a8083629014e353d72a46612f7ddbf51a69b33")
             .isEqualTo(HexFormat.of().formatHex(digest.digest(fixed)));
         var changedModel = new ObservationProvenance(
@@ -141,7 +139,6 @@ class MediaObservationRequestTest extends ObservationFixture {
         code(() -> record(0, id, input(), differentVersion), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(1, id, input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 
 
@@ -173,7 +170,6 @@ class MediaObservationRequestTest extends ObservationFixture {
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst()).isEqualTo(corrected);
         assertThat(corrected.observation().summary()).isEqualTo("사용자 정정");
         assertThat(observations.count()).isEqualTo(2);
-        assertThat(requests.count()).isEqualTo(2);
         jdbc.update("update media_observation set body='broken' where revision=2");
         code(() -> record(2, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         assertThat(record(0, old, input(), model())).isEqualTo(first);
@@ -182,43 +178,59 @@ class MediaObservationRequestTest extends ObservationFixture {
         assertThat(current.provenance().kind()).isEqualTo(ObservationProvenanceKind.USER_CORRECTION);
         assertThat(current.observation()).isNull();
         assertThat(observations.count()).isEqualTo(2);
-        assertThat(requests.count()).isEqualTo(2);
     }
 
 
     @Test
-    @DisplayName("alias 삽입 실패는 관찰과 암호화 본문을 함께 롤백한다")
-    void rollsBackObservationAndEncryptedBodyWhenAliasInsertFails() {
-        var broken = fail(MediaObservationRequestRepository.class, requests, "saveAndFlush", 1);
-        var writing = local(store, bodies, observations, broken, attachments, access);
-        assertThatThrownBy(() -> writing.record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()))
-            .isInstanceOf(DataAccessResourceFailureException.class);
-        assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
-        record(0, UUID.randomUUID(), input(), model());
+    @DisplayName("같은 분석 조건의 새 UUID는 앞 결과를 재사용하지 않고 새 revision을 만든다")
+    void createsNewRevisionForSameConditionWithNewUuid() {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        var first = record(0, a, input(), model());
+        var second = record(1, b, input("다른 실행의 본문"), model());
+        assertThat(first.revision()).isEqualTo(1);
+        assertThat(second.revision()).isEqualTo(2);
+        assertThat(second.observation().summary()).isEqualTo("다른 실행의 본문");
+        assertThat(observations.findAll())
+            .extracting(row -> row.requestId())
+            .containsExactlyInAnyOrder(a.toString(), b.toString());
+        assertThat(record(0, a, input(), model())).isEqualTo(first);
     }
 
 
     @Test
-    @DisplayName("응답 SQL 실패 뒤에도 alias를 보존하고 재시도는 원래 시각을 반환한다")
-    void preservesCommittedAliasWhenResponseSqlFailsAndRetryReturnsOriginalTimestamp() {
+    @DisplayName("같은 첨부의 같은 요청 UUID 줄은 DB 유일 제약이 막는다")
+    void rejectsDuplicateRequestIdForSameAttachmentInDatabase() {
+        UUID id = UUID.randomUUID();
+        record(0, id, input(), model());
+        assertThatThrownBy(() -> jdbc.update(
+            "insert into media_observation (attachment_id,conversation_id,owner_user_id,revision,source_fingerprint,"
+                + "status,provenance_kind,schema_version,prompt_version,request_id,request_hash,created_at,expires_at) "
+                + "select attachment_id,conversation_id,owner_user_id,revision+1,source_fingerprint,status,provenance_kind,"
+                + "schema_version,prompt_version,request_id,request_hash,created_at,expires_at from media_observation"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(observations.count()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("응답 SQL 실패 뒤에도 저장한 revision을 보존하고 재시도는 원래 시각을 반환한다")
+    void preservesCommittedRevisionWhenResponseSqlFailsAndRetryReturnsOriginalTimestamp() {
         UUID id = UUID.randomUUID();
         var broken = fail(
             ChatAttachmentRepository.class,
             attachments,
             "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
             2);
-        assertThatThrownBy(() -> local(store, bodies, observations, requests, broken, access)
+        assertThatThrownBy(() -> local(store, bodies, observations, broken, access)
             .record(owner, conversation.id(), photo.id(), 0, id, input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
         clock.advance(Duration.ofSeconds(2));
         var retried = record(0, id, input(), model());
         assertThat(retried.revision()).isEqualTo(1);
         assertThat(retried.provenance().observedAt()).isEqualTo(NOW);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 
 
@@ -227,10 +239,9 @@ class MediaObservationRequestTest extends ObservationFixture {
     void propagatesOwnerSqlFailureWithoutContentUnavailableFallback() {
         var broken = fail(ConversationRepository.class, conversations, "findByIdAndUserIdAndDeletedAtIsNull", 1);
         assertThatThrownBy(
-            () -> local(store, bodies, observations, requests, attachments, new ConversationAccess(broken))
+            () -> local(store, bodies, observations, attachments, new ConversationAccess(broken))
                 .list(owner, conversation.id(), null, 10))
                     .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
     }
 }

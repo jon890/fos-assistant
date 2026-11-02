@@ -116,14 +116,14 @@ class RepositoryQueryMysqlTest {
         assertThat(expected).as("문맥에서 찾은 저장소 빈").isNotEmpty();
         assertThat(result.repositories()).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(result.executed()).contains("ExecutionEventRepository.findUnscheduledChildren");
-        assertThat(result.repositories()).contains("MediaObservationRepository", "MediaObservationRequestRepository");
+        assertThat(result.repositories()).contains("MediaObservationRepository");
         assertThat(result.executed())
             .contains(
                 "MediaObservationRepository.findFirstByAttachmentIdOrderByRevisionDesc",
                 "MediaObservationRepository.deleteForAttachment",
                 "MediaObservationRepository.deleteForConversation",
                 "MediaObservationRepository.findCleanupCandidates",
-                "MediaObservationRequestRepository.findByAttachmentIdAndRequestId");
+                "MediaObservationRepository.findByAttachmentIdAndRequestId");
     }
 
 
