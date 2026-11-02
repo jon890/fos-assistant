@@ -26,7 +26,7 @@ covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connecto
 
 필수다. env 는 `FINANCIAL_WORKBENCH_TOKEN` 이고, 값은 `Authorization: Bearer` 헤더로만 원격 서버에 간다. 옛 로컬 커넥터와 env 이름이 같지만 플러그인 이름이 달라 연결은 새로 만든다.
 확인 도구는 `get_connection` 이다. 등록할 때 사용자 표시 이름과 연결 범위가 읽히면 저장한다.
-「조회만」(`READ`) 토큰도 등록은 된다. 조회 도구는 그대로 쓰고, 쓰는 도구는 `INSUFFICIENT_SCOPE` 로 끝난다. 범위는 `get_connection` 결과의 `connection.scope` 에 보인다.
+「조회만」(`READ`) 토큰도 등록은 된다. 조회 도구는 그대로 쓰고, 쓰는 도구는 `INSUFFICIENT_SCOPE` 로 끝난다. 범위는 `get_connection` 결과의 `token.scope` 에 보인다.
 원격 서버가 받는 OAuth 로그인은 쓰지 않는다. 원격 MCP ADR 의 「인증」 이 미뤘다.
 받은 스킬의 연결 안내는 Claude Code·Codex 의 OAuth 로그인 기준이라, 연동 토큰을 넣는 이 저장소의 등록 방식과 다를 수 있다. 스킬은 워크벤치 저장소가 갖는다.
 
