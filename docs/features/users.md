@@ -89,8 +89,16 @@ sequenceDiagram
 - 관리자에게 넘긴다: 그룹에 공개한 에이전트(그룹 공용 기억은 그룹이 소유하므로 그대로 둔다). 관리자가 여럿이면 `app_user.id` 가 가장 작은 관리자다
 - 남긴다: 사용량 원장, 그룹 공용 설정, 허용 목록 줄(꺼진 채)
 
-지금 열린 것은 읽기 전용 미리보기 하나다. `GET /api/v1/admin/people/{id}/purge-preview` 가 `ADMIN` 에게 표마다 정리 때 하는 일(`DELETE`, `TRANSFER`)과 줄 수를 준다. 로그인한 적이 없는 사람은 빈 목록이다.
-예약과 실제 삭제는 아직 없다. `PersonPurgePreviewTest` 가 그 사용자의 줄만 세고 아무것도 바꾸지 않는 것을 확인한다.
+지금 열린 것은 읽기 전용 미리보기와 예약, 취소다. 실제 삭제는 아직 없다.
+
+| 요청 | 하는 일 |
+| --- | --- |
+| `GET /api/v1/admin/people/{id}/purge-preview` | `ADMIN` 에게 표마다 정리 때 하는 일(`DELETE`, `TRANSFER`)과 줄 수를 준다. 로그인한 적이 없는 사람은 빈 목록이다 |
+| `POST /api/v1/admin/people/{id}/purge-schedule` | 꺼진 사람에게 `allowed_person.purge_scheduled_at` 을 지금 시각으로 적는다. 켜져 있으면 409(`PERSON_STILL_ENABLED`)이고, 이미 예약했으면 시각을 바꾸지 않는다 |
+| `DELETE /api/v1/admin/people/{id}/purge-schedule` | 예약을 비운다. 예약이 없어도 성공한다 |
+
+세 요청 모두 `ADMIN` 만 부르고, 예약과 취소의 응답(`PersonView`)과 목록은 `purgeScheduledAt` 을 싣는다. 다시 켜면(`PATCH` 의 `enabled`) 예약도 함께 비워진다.
+`PersonPurgePreviewTest` 가 미리보기가 그 사용자의 줄만 세고 아무것도 바꾸지 않는 것을, `PersonPurgeScheduleTest` 가 예약과 취소의 규칙을 확인한다.
 
 ## 로그인 활동 기록
 
