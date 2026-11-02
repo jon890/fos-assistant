@@ -119,7 +119,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
-| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision과 요청 alias |
+| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
 | `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
@@ -167,10 +167,8 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 `MediaObservationCleaner`의 참가 메서드는 MANDATORY이며 첨부·대화 삭제의 사전 callback에서 호출한다.
 만료 정리는 대상마다 별도 coordinator 트랜잭션을 연다. [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 서비스 범위를 갖는다.
 
-`chat.attachment.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
-재사용 판단과 alias 저장은 기존 `MediaObservationService.record`가 맡으며 별도 cache 서비스는 두지 않는다.
-복호화·파싱·검증은 서비스의 조회와 재사용이 같은 함수로 수행한다.
-재사용의 조건과 수명은 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.
+`MediaObservationService.record`는 요청 UUID 로 그 요청이 만든 관찰 줄을 찾아 재시도에 답하고, 새 요청이면 새 revision 을 저장한다.
+완료 결과 재사용은 없다. 까닭은 [ADR-20261102 / media-observation-request-merge](adr/ADR-20261102-media-observation-request-merge.md)가 갖는다.
 
 ### 에이전트 설정
 

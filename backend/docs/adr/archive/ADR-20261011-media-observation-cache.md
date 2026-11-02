@@ -1,11 +1,14 @@
 ## ADR-20261011 / media-observation-cache: 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다
 
-- **status**: `accepted`
+- **status**: `superseded`
 - Date: 2026-10-11
+- **대체된 부분**: 결정 전체를 [ADR-20261102 / media-observation-request-merge](../ADR-20261102-media-observation-request-merge.md)가 대체한다. 요청 UUID 를 관찰 줄에 두면서 완료 결과 재사용과 `analysis_key` 를 없앴다.
+
+아래는 재사용을 두던 때의 맥락이다.
 
 ### 맥락
 
-[관찰 저장 ADR](ADR-20261010-media-observation-storage.md)은 불변 revision과 영속 UUID alias를 제공한다.
+[관찰 저장 ADR](../ADR-20261010-media-observation-storage.md)은 불변 revision과 영속 UUID alias를 제공한다.
 같은 조건의 완료 제출도 새 revision을 만들던 동작을 최신 완료 결과 재사용으로 확장한다.
 분석 실행을 생략하는 provider cache API는 이번 결정의 대상이 아니다.
 
