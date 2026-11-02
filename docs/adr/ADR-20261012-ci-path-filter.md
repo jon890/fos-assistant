@@ -208,3 +208,21 @@ PR 이 여러 개 열리면 동시 job 20개를 이 검사들이 먼저 채워 �
 - `labeled` 이벤트로는 CI 를 돌리지 않는다. `pr-size` workflow 가 PR 마다 규모 라벨을 붙여서, 받으면 진행 중인 CI 가 취소되고 처음부터 다시 돈다. 라벨만 붙이고 바로 돌려야 하면 빈 커밋을 push 한다. run 을 다시 실행하면 처음 이벤트의 라벨 목록을 써서 새 라벨이 보이지 않는다.
 - 라벨이 붙어 있는 동안에는 이후 push 마다 브라우저와 E2E 가 돈다. 확인이 끝나면 라벨을 뗀다.
 - 되돌릴 때는 `scripts/ci/ci-paths.mjs` 의 `withoutSlow` 호출을 빼고 `ci.yml` 의 `FULL_LABEL` 을 지운다.
+
+### 경로를 지운 PR 은 라벨 없이도 브라우저와 E2E 를 돌린다 (2026-11-01)
+
+PR 에서 브라우저와 E2E 를 건너뛰는 결정 뒤, 같은 날 두 번 main 이 깨진 채 머지됐다.
+- #634: 「먼저 다룰 문제」 화면을 제안 카드로 바꿨는데 `now.spec.ts` 가 옛 화면을 기대했다(#637 이 고쳤다).
+- #639: `GET /decision-feedback/export` 를 지웠는데 E2E `proactive-check.ts` 가 그 API 를 불렀다(#636 이 고쳤다).
+
+지운 경로를 부르는 쪽은 단위 검사가 아니라 E2E 와 브라우저 검사에만 있다. 라벨을 사람이 붙여야 한다는 규칙으로는 이 실수를 막지 못했다.
+
+| PR 이 지우거나 이름을 바꾼 파일 | 결과 |
+| --- | --- |
+| backend `src/main` 의 `presentation` 패키지 아래 `*Controller.java` | 라벨 없이 `browser`, `e2e` 도 돈다 |
+| web 의 `src/app/api/**`, `src/app/**/page.tsx`, `src/components/**` | 같다 |
+| 위 파일을 수정만 한 PR, 그 밖의 파일 | 지금처럼 정기 실행으로 미룬다 |
+
+- 이름을 바꾸면 옛 경로가 지워진 것이므로 같은 규칙이 적용된다. 판정은 `--name-status --no-renames` 의 `D` 줄을 쓴다.
+- 규칙은 `ci-paths.mjs` 의 `ROUTE_FILES` 와 `removesRoute` 가 갖고, `withoutSlow` 의 「전체」 인자를 라벨 또는 경로 삭제로 켠다.
+- 남은 빈틈: 파일은 두고 안에서 경로 매핑(`@GetMapping` 등)만 지운 경우, 화면에서 컴포넌트 일부만 지운 경우는 잡지 못한다. 줄 단위로 읽으면 판정이 무거워져서 이번에는 넣지 않았다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
