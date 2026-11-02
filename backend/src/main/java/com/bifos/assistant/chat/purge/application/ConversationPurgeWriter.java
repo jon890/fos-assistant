@@ -13,7 +13,6 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.usage.subagent.application.ConversationExecutionPurge;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,6 @@ class ConversationPurgeWriter {
     private final ChatPendingMessageRepository pendingMessages;
     private final ChatAttachmentRepository attachments;
     private final ChatArtifactRepository artifacts;
-    private final ExecutionQuestionRepository questions;
     private final ConversationExecutionPurge executions;
     private final ConversationActionPurge actions;
     private final ConversationSuggestionPurge suggestions;
@@ -65,7 +63,6 @@ class ConversationPurgeWriter {
         drafts.deleteForConversation(conversationId);
         attachments.deleteAllOf(conversationId);
         artifacts.deleteAllOf(conversationId);
-        questions.deleteAllOf(conversationId);
         messages.clearReplacesOf(conversationId);
         messages.deleteAllOf(conversationId);
         executions.eraseBodies(conversationId);

@@ -9,7 +9,6 @@ import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraft;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationRequest;
@@ -108,7 +107,6 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, Notification.of(user.id(), NotificationKind.TASK_SUCCEEDED, "알림", "본문", null));
         add(entityManager, rows, ChatArtifact.of(conversation.id(), 1L, unique, 1L));
         add(entityManager, rows, ChatAttachment.of(conversation.id(), user.id(), "audit.txt", "text/plain", 1, BUSINESS.plusSeconds(60)));
-        add(entityManager, rows, ExecutionQuestion.of(execution.id(), 1L));
         add(entityManager, rows, ResultDelivery.opened(conversation.id(), BUSINESS));
         add(entityManager, rows, ConnectorToolGrant.of(user.id(), "audit", "audit", BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorConversationGrant.of(action, BUSINESS.plusSeconds(60)));
