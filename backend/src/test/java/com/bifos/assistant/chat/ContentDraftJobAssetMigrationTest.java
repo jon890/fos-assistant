@@ -136,7 +136,7 @@ class ContentDraftJobAssetMigrationTest {
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             // 직전 이미지로 되돌린 동안 옛 코드가 쓴 줄이다. 3번 revision 은 옛 코드가 만들었고 2번 snapshot 의 job 은 옛 테이블에만 있다.
             statement.executeUpdate(job(8, 2, 32, "PREVIEW_READY"));
-            // 1번 snapshot 에는 새 코드가 이미 옮긴 job 이 있어 같은 snapshot 의 옛 job 을 덮어쓰지 않는다.
+            // 3번 snapshot 에는 새 코드가 이미 옮긴 job 이 있어 같은 snapshot 의 옛 job 을 덮어쓰지 않는다.
             statement.executeUpdate("UPDATE content_draft_snapshot SET action_id = 41, job_status = 'DISPATCHED' WHERE id = 3");
             statement.executeUpdate(job(9, 3, 33, "FAILED"));
             statement.executeUpdate("INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body,"

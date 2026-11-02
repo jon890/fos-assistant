@@ -61,7 +61,7 @@ public interface ContentDraftRevisionRepository extends JpaRepository<ContentDra
 
     /**
      * 기한이 남은 원고의 유효한 revision 번호와 사진 참조, 그 원고, 현재 대화 주인이다. 정리가 사진 참조를 확인하는 데 쓴다.
-     * 본문은 읽지 않는다. 사진 참조가 NULL 이면 옛 코드가 쓴 줄이다.
+     * 본문은 읽지 않는다.
      */
     @Query("""
         select r.id, r.assets, d, c.userId from ContentDraftRevision r

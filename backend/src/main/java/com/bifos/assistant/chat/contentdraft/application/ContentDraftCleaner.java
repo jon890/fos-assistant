@@ -111,7 +111,7 @@ public class ContentDraftCleaner {
         for (var row : revisions.findValidWithDraft(now)) {
             var draft = (ContentDraft)row[2];
             var assets = (List<ContentDraftAsset>)row[1];
-            if (!result.containsKey(draft.conversationId()) && (assets == null || !references.valid(draft, assets, false))) {
+            if (!result.containsKey(draft.conversationId()) && !references.valid(draft, assets, false)) {
                 result.put(draft.conversationId(), (Long)row[3]);
             }
         }

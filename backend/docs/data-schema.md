@@ -454,7 +454,7 @@ CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs
 
 V20261011060038 마이그레이션으로 생성하는 원고 revision 저장 모델이다.
 생성·조회·수정과 참조 검사, 오류 응답과 삭제 참가 지점은 [원고 저장 계약](../../docs/features/content-draft.md#원고-revision-저장-계약)이 갖는다.
-preview·approval·job 표는 이 저장 모델에 포함하지 않는다.
+preview·approval 표는 이 저장 모델에 포함하지 않는다. 저장 job 은 snapshot 의 칸이다.
 
 | 표 | 칸과 타입 | 필수와 제약 |
 | --- | --- | --- |
