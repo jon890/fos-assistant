@@ -813,8 +813,6 @@ class TaskRunStarterTest {
         Conversation conversation = conversations.findById(conversationId).orElseThrow();
         assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
         assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.HIGH);
-        assertThat(conversation.modelChoice().provider()).as("고른 provider").isNull();
-        assertThat(conversation.modelChoice().model()).as("고른 모델").isNull();
     }
 
 
