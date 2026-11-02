@@ -12,7 +12,7 @@
 
 **근거 문서**: `docs/features/tossinvest-connector.md`의 「조건주문 REST 쓰기의 구현 보완안」과 `docs/features/connector-policy.md`의 「금융 실행 내용의 저장과 검증」이다.
 #481 로 ConnectorFinancialProducer/ConnectorFinancialApproval/ConnectorFinancialConflicts 가 main 에 있다. #507 로 승인 본문은 `ConnectorActionBodies` 로 암호화하고 claim 미소비 실패는 FAILED 로 끝난다.
-실제 producer 는 package-private request와 approve를 테스트 내부에서 호출하며, phase-04 가 공개 진입점을 연결한 뒤에도 조건주문 도구는 운영에 등록하지 않는다.
+실제 producer 는 package-private request와 approve를 테스트 내부에서 호출하며, 일반 주문 개방이 공개 진입점을 연결한 뒤에도 조건주문 도구는 운영에 등록하지 않는다.
 이 phase는 그 실제 업무 구현을 재사용한다. 착수 시 선행 통합된 조건 snapshot의 검증 분기를 사용하므로 generic JSON producer나 별도 테스트 금융 policy를 추가하지 않는다.
 sourceContext라는 현재 없는 DTO를 가정하지 않는다. 준비 전 실제 producer가 복사한 owner/profile/connection/binding/revision/manifest 맥락을 직접 관측한다.
 
@@ -34,7 +34,7 @@ sourceContext라는 현재 없는 DTO를 가정하지 않는다. 준비 전 실�
 
 ### 1. 실제 producer 테스트와 red-green
 
-신규 `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerRoundTripTest.java`를 connector.application 패키지에 둔다.
+신규 `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialConditionalProducerRoundTripTest.java`를 `connector.approval.application` 패키지에 둔다. `ConnectorFinancialProducer.request` 가 package-private 이라서다.
 실제 service/repository/cipher/request/approve를 사용하고 fake NEEDS_APPROVAL/action status/summary를 주입하지 않는다.
 조건 계약을 받지 못하는 일반 주문 환경에서 red를 확인하고 실제 조건 소비 계약·SDK 연결 뒤 green을 확인한다.
 이미 조건을 받아 red가 나지 않으면 replay 또는 snapshot 변조 회귀의 실패를 먼저 확인한다.
@@ -51,7 +51,7 @@ approve가 저장 원문을 쓰고 EXECUTING 커밋 뒤 ticket1회·executeAppro
 실제 Spring claim HTTP의 서명 인증과 consumeTicket 커밋 뒤에만 SDK가 금융 요청을 보내게 연결한다. 실제 인증·DB 소비는 이 테스트의 책임이다.
 DB-INTENT는 clientOrderId만 변경하거나 expected_conditional_order만 변경해도 동일 의도 PENDING/EXECUTING/UNKNOWN이 차단되는지 실제 conflicts 구현으로 확인한다. CREATE AAPL/MSFT는 서로 다른 키여서 차단하지 않고 MODIFY/CANCEL의 다른 대상 ID도 구분한다. 사용자 잠금과 실제 H2/MySQL DB를 쓰며 가짜 conflicts 결과를 주입하지 않는다. supersedes_unknown_action_id는 NULL이다.
 
-조건주문 금액 규칙을 phase-02 gate 에 더한다. leg 마다 `quantity × max(orderPrice, triggerPrice)` 를 한 건 금액으로 보고 OTO 는 두 leg 중 큰 값을 쓴다. MARKET 조건주문은 주문가가 없어 계속 거절한다.
+조건주문 금액 규칙을 금융 관문 `backend/src/main/java/com/bifos/assistant/connector/financial/application/ConnectorFinancialGate.java` 에 더한다. leg 마다 `quantity × max(orderPrice, triggerPrice)` 를 한 건 금액으로 보고 OTO 는 두 leg 중 큰 값을 쓴다. MARKET 조건주문은 주문가가 없어 계속 거절한다.
 하루 합계에는 생성만 그 금액으로 넣고 정정은 바뀐 뒤 금액으로 바꿔 센다. 이 규칙이 들어오기 전까지 gate 는 조건 생성과 정정을 닫는다.
 
 ### 3. 수신·실패 주입·MySQL 회귀
@@ -63,7 +63,7 @@ MODIFY 새 ID, CREATE optional/null clientOrderId, CANCEL 빈204를 실제 결�
 429/5xx/끊김/timeout/불량2xx는 DB UNKNOWN, 공식 명백 거절은 FAILED, 정상은 SUCCEEDED다. UNKNOWN 뒤 ticket/UUID 교체와 추가 전송0회를 확인한다.
 동일 의도 경쟁, claim 직전 철회, 금융 성공 뒤 결과 저장 실패와 기동 정리 경쟁을 bounded latch로 주입한다.
 늦은 결과가 정산된 줄을 바꾸지 않고 프로세스 재기동이 재실행하지 않는지 확인한다.
-신규 `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerMysqlRoundTripTest.java`는 기존 ConnectorExecutionClaimMysqlTest의 mysql 태그·공용 설정으로 같은 테스트를 상속한다.
+신규 `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialConditionalProducerMysqlRoundTripTest.java`는 기존 ConnectorExecutionClaimMysqlTest의 mysql 태그·공용 설정으로 같은 테스트를 상속한다.
 운영 금융 목록0개·exclude·RISK_NOT_OPEN/noGrant와 일반 금융/READ 회귀를 보존한다.
 
 ## 검증
@@ -85,7 +85,7 @@ scripts/checks/check-mysql-migration.sh는 set -Eeuo pipefail로 실패를 전�
 
 | 파일 | 변경 |
 | --- | --- |
-| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerRoundTripTest.java` | 신규 (480줄 이내) |
-| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerMysqlRoundTripTest.java` | 신규 (80줄 이내) |
+| `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialConditionalProducerRoundTripTest.java` | 신규 (480줄 이내) |
+| `backend/src/test/java/com/bifos/assistant/connector/approval/application/FinancialConditionalProducerMysqlRoundTripTest.java` | 신규 (80줄 이내) |
 | `test/e2e/financial/conditional_plugin_http.py` | 신규 (360줄 이내) |
 | `docs/features/tossinvest-connector.md` | 수정 |

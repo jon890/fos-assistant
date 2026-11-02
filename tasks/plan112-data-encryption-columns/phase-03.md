@@ -5,7 +5,7 @@
 ## 목표
 
 KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상은 `chat_message.content` 와 phase 01, 02 의 칸이다.
-옛 판으로 되돌려야 할 때를 위해, 같은 배치를 반대로 돌려 암호문을 평문으로 되돌리는 방식도 둔다.
+옛 버전으로 되돌려야 할 때를 위해, 같은 배치를 반대로 돌려 암호문을 평문으로 되돌리는 방식도 둔다.
 
 **범위 외**: 알림, 할 일, 승인 기록, 실행 사건, 먼저 살펴보기 결과, 일반 Memory 본문. 민감 Memory 는 이미 `MemoryContentBackfill` 이 기동 때 암호화한다.
 
@@ -25,13 +25,13 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 - AAD 와 엔티티의 칸 이름은 phase 01, 02 와 `ChatMessageContents` 가 정한 것을 그대로 쓴다. 배치가 새 규칙을 만들지 않는다
 - 본보기는 민감 Memory 의 기동 보정이다. `backend/src/main/java/com/bifos/assistant/memory/application/MemoryContentBackfill.java` 가 대상 번호를 읽고 `MemoryContentSealer` 가 줄마다 쓰기 잠금으로 다시 읽어 한 트랜잭션으로 고친다. 실패하면 클래스 이름만 로그에 남긴다
-- 주기 작업의 끄기 방식은 `backend/src/main/java/com/bifos/assistant/chat/application/ConversationPurger.java` 의 `@Scheduled(cron = "${assistant.chat.purge-cron}")` 와 시험 설정의 `"-"` 를 따른다
+- 주기 작업의 끄기 방식은 `backend/src/main/java/com/bifos/assistant/chat/purge/application/ConversationPurger.java` 의 `@Scheduled(cron = "${assistant.chat.purge-cron}")` 와 시험 설정의 `"-"` 를 따른다
 
 ## 의도 메모
 
 - 기동 때 한꺼번에 돌리지 않는다. 메시지가 많으면 기동이 늦어지고, 중간에 멈추면 처음부터 다시 읽는다. 매분 정한 수만큼 번호 순으로 고친다. key 칸이 null 인 줄만 고르므로 멈춘 자리에서 저절로 이어진다
 - 줄마다 쓰기 잠금으로 다시 읽고 조건을 다시 본다. 그 사이 사용자가 그 대화를 지웠거나 정리 작업이 지웠으면 건너뛴다
-- 되돌리기는 설정 하나로 방향을 바꾼다. `assistant.data-encryption.backfill` 이 `SEAL` 이면 암호화하고, `UNSEAL` 이면 key 칸이 있는 줄을 평문으로 되돌리고, `OFF` 면 돌지 않는다. 기본은 `SEAL` 이다. `UNSEAL` 은 옛 판으로 내리기 직전에만 켜고, 그동안 새 메시지는 계속 암호화된다는 것을 운영 문서에 적는다. 그래서 내리기 전에 새 쓰기를 멈춘다
+- 되돌리기는 설정 하나로 방향을 바꾼다. `assistant.data-encryption.backfill` 이 `SEAL` 이면 암호화하고, `UNSEAL` 이면 key 칸이 있는 줄을 평문으로 되돌리고, `OFF` 면 돌지 않는다. 기본은 `SEAL` 이다. `UNSEAL` 은 옛 버전으로 내리기 직전에만 켜고, 그동안 새 메시지는 계속 암호화된다는 것을 운영 문서에 적는다. 그래서 내리기 전에 새 쓰기를 멈춘다
 - 풀지 못하는 줄(데이터 key 가 없거나 태그가 맞지 않음)은 `UNSEAL` 에서 건너뛰고 수만 센다
 - 진행은 칸마다 남은 줄 수를 info 로그에 남긴다. 본문은 남기지 않는다
 
@@ -39,13 +39,13 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 ### 1. 설정
 
-`assistant.data-encryption.backfill`(`SEAL`, `UNSEAL`, `OFF`), `assistant.data-encryption.backfill-cron`(기본 `"40 * * * * *"`), `assistant.data-encryption.backfill-batch`(기본 200)를 `backend/src/main/java/com/bifos/assistant/crypto/infra/DataEncryptionProperties.java` 에 더한다. `application.yml` 에 기본값을, `application-test.yml` 에 `backfill-cron: "-"` 를 둔다.
-방향 값의 enum 은 저장하지 않으므로 `crypto.application.model` 에 둔다(`backend/AGENTS.md` 의 「enum 은 저장 여부로 둘 곳을 정한다」).
+`assistant.data-encryption.backfill`(`SEAL`, `UNSEAL`, `OFF`), `assistant.data-encryption.backfill-cron`(기본 `"40 * * * * *"`), `assistant.data-encryption.backfill-batch`(기본 200)를 `backend/src/main/java/com/bifos/assistant/crypto/config/DataEncryptionProperties.java` 에 더한다. `application.yml` 에 기본값을, `application-test.yml` 에 `backfill-cron: "-"` 를 둔다.
+방향 값의 enum 은 저장하지 않으므로 `crypto.application.dto` 에 둔다([rule-26](../../docs/code-rules/rule-26.md) 의 「예외와 검토 범위」).
 
 ### 2. 배치
 
-- `chat.application.ChatPlaintextBackfill`(신규): `chat_message`, `chat_pending_message`, `conversation.title` 을 맡는다. 저장소에 `findIdsByContentKeyIdIsNullAndIdGreaterThan...` 처럼 번호만 읽는 질의를 더하고, 줄마다 `ChatPlaintextSealer`(신규, `@Transactional`)가 대화 줄을 잠근 뒤 엔티티의 `seal` 로 고친다
-- `usage.application.ExecutionOutputBackfill`(신규)과 `task.application.TaskPlaintextBackfill`(신규)도 같은 모양이다
+- `chat.conversation.application.ChatPlaintextBackfill`(신규): `chat_message`, `chat_pending_message`, `conversation.title` 을 맡는다. 저장소에 `findIdsByContentKeyIdIsNullAndIdGreaterThan...` 처럼 번호만 읽는 질의를 더하고, 줄마다 `ChatPlaintextSealer`(신규, `@Transactional`)가 대화 줄을 잠근 뒤 엔티티의 `seal` 로 고친다
+- `usage.execution.application.ExecutionOutputBackfill`(신규)과 `task.application.TaskPlaintextBackfill`(신규)도 같은 모양이다
 - 각 배치는 `TextCipher.enabled()` 가 거짓이면 남은 줄 수만 경고하고 끝난다
 - `UNSEAL` 이면 key 칸이 있는 줄을 골라 풀어서 평문과 null 로 적는다
 
@@ -76,15 +76,15 @@ scripts/checks/check-mysql-migration.sh
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/crypto/infra/DataEncryptionProperties.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/crypto/application/model/BackfillDirection.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/crypto/config/DataEncryptionProperties.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/crypto/application/dto/BackfillDirection.java` | 신규 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/resources/application-test.yml` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/ChatPlaintextBackfill.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/application/ChatPlaintextSealer.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ChatMessageRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ChatPendingMessageRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/infra/ConversationRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/application/ChatPlaintextBackfill.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/application/ChatPlaintextSealer.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatPendingMessageRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ConversationRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionOutputBackfill.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/task/application/TaskPlaintextBackfill.java` | 신규 |

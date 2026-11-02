@@ -12,7 +12,6 @@ import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshots;
 import com.bifos.assistant.chat.attachment.application.dto.ChatContentMutationTarget;
 import com.bifos.assistant.chat.contentdraft.application.dto.ContentDraftSnapshotInput;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.connector.contentdraft.application.dto.PreparedContentDraftApproval;
@@ -73,7 +72,6 @@ public class ContentDraftSaveApproval {
 
     private final ConnectorActionRepository actions;
     private final ConnectorConversationGrantRepository conversationGrants;
-    private final ContentDraftJobRepository jobs;
     private final ContentDraftSnapshotRepository snapshotRows;
     private final ContentDraftSnapshots snapshots;
     private final ContentDraftBindingAccess bindings;
@@ -125,8 +123,7 @@ public class ContentDraftSaveApproval {
         requireNoTransaction();
         return actions.findByPublicId(actionId)
             .filter(action -> action.userId().equals(user.id()))
-            .flatMap(action -> jobs.findByActionId(action.id()))
-            .flatMap(job -> snapshotRows.findById(job.snapshotId()))
+            .flatMap(action -> snapshotRows.findByJobActionId(action.id()))
             .map(snapshot -> snapshot.publicId());
     }
 
@@ -136,8 +133,7 @@ public class ContentDraftSaveApproval {
         requireNoTransaction();
         var action = actions.findByPublicId(actionId).filter(found -> found.userId().equals(user.id()))
             .orElseThrow(ConnectorActionDetails::notFound);
-        var job = jobs.findByActionId(action.id()).orElseThrow(ConnectorActionDetails::notFound);
-        var snapshot = snapshotRows.findById(job.snapshotId()).orElseThrow(ConnectorActionDetails::notFound);
+        var snapshot = snapshotRows.findByJobActionId(action.id()).orElseThrow(ConnectorActionDetails::notFound);
         List<Long> executionIds;
         try {
             executionIds = locks.executionIds(action.originExecutionId(), snapshot.originExecutionId());
@@ -150,7 +146,7 @@ public class ContentDraftSaveApproval {
             && Boolean.TRUE.equals(manifest.snapshot().capabilities().get("start"))
             && Boolean.TRUE.equals(manifest.snapshot().capabilities().get("status"))
             && starters.getIfAvailable() != null;
-        return new PreparedContentDraftApproval(actionId, job.id(), snapshot.id(), snapshot.publicId(),
+        return new PreparedContentDraftApproval(actionId, snapshot.id(), snapshot.publicId(),
             snapshot.conversationId(), snapshot.agentId(), executionIds, stamp, manifest, supported);
     }
 
@@ -213,7 +209,7 @@ public class ContentDraftSaveApproval {
             throw new ContentDraftRefusal("origin");
         }
         var locked = locks.lock(user, prepared.conversationId(), prepared.agentId(), prepared.executionIds(), prepared.actionId(),
-            prepared.snapshotRowId(), prepared.jobRowId());
+            prepared.snapshotRowId());
         var action = locked.action();
         if (action.status() != ActionStatus.PENDING || locked.job().status() != ContentDraftJobStatus.PREVIEW_READY) {
             throw notPending();
@@ -245,7 +241,7 @@ public class ContentDraftSaveApproval {
         actions.save(action);
         var job = locked.job();
         job.approve(user.id(), now, jobId.toString());
-        jobs.save(job);
+        snapshotRows.save(locked.snapshot());
         var snapshot = locked.snapshot();
         var stamp = input.binding();
         var payload = new ContentDraftSaveTicketPayload(jobId, snapshot.publicId(), snapshot.snapshotHash(), action.publicId(),
@@ -259,7 +255,8 @@ public class ContentDraftSaveApproval {
     private ConnectorAction refuse(CurrentUser user, PreparedContentDraftApproval prepared, String code) {
         var action = actions.findByPublicIdForUpdate(prepared.actionId()).filter(found -> found.userId().equals(user.id()))
             .orElseThrow(ConnectorActionDetails::notFound);
-        var job = jobs.lockById(prepared.jobRowId()).orElseThrow(ConnectorActionDetails::notFound);
+        var snapshot = snapshotRows.lockById(prepared.snapshotRowId()).orElseThrow(ConnectorActionDetails::notFound);
+        var job = Optional.ofNullable(snapshot.job()).orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.PENDING || job.status() != ContentDraftJobStatus.PREVIEW_READY) {
             throw notPending();
         }
@@ -270,7 +267,7 @@ public class ContentDraftSaveApproval {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
         }
         job.stale(code.equals("stale") ? ErrorCode.CONTENT_DRAFT_STALE.name() : ConnectorAction.NOT_EXECUTABLE);
-        jobs.save(job);
+        snapshotRows.save(snapshot);
         return actions.save(action);
     }
 
@@ -279,7 +276,8 @@ public class ContentDraftSaveApproval {
     private ConnectorAction record(PreparedContentDraftApproval prepared, Outcome outcome) {
         Instant now = now();
         var action = actions.findByPublicIdForUpdate(prepared.actionId()).orElseThrow(ConnectorActionDetails::notFound);
-        var job = jobs.lockById(prepared.jobRowId()).orElseThrow(ConnectorActionDetails::notFound);
+        var snapshot = snapshotRows.lockById(prepared.snapshotRowId()).orElseThrow(ConnectorActionDetails::notFound);
+        var job = Optional.ofNullable(snapshot.job()).orElseThrow(ConnectorActionDetails::notFound);
         if (outcome.kind() == Outcome.Kind.ACCEPTED) {
             if (job.running()) {
                 job.accepted(now);
@@ -297,7 +295,7 @@ public class ContentDraftSaveApproval {
                 action.fail("unavailable", null, null, now);
             }
         }
-        jobs.save(job);
+        snapshotRows.save(snapshot);
         return actions.save(action);
     }
 

@@ -112,7 +112,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     @Query("""
             select a from ConnectorAction a
             where a.status = :status
-              and not exists (select j.id from ContentDraftJob j where j.actionId = a.id)
+              and not exists (select s.id from ContentDraftSnapshot s where s.job.actionId = a.id)
             """)
     List<ConnectorAction> findByStatusWithoutContentJob(@Param("status") ActionStatus status);
 
@@ -122,7 +122,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             select a from ConnectorAction a
             where a.status = :status
               and a.decidedAt < :before
-              and not exists (select j.id from ContentDraftJob j where j.actionId = a.id)
+              and not exists (select s.id from ContentDraftSnapshot s where s.job.actionId = a.id)
             """)
     List<ConnectorAction> findByStatusWithoutContentJobDecidedBefore(
         @Param("status") ActionStatus status, @Param("before") Instant before);

@@ -20,7 +20,6 @@ import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftJob;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftRevision;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftSnapshot;
 import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
@@ -69,7 +68,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 원고 snapshot 의 저장 요청과 보관한 job 조회를 맡는다. chat 의 두 port 를 구현한다.
  *
- * <p>저장 요청은 기존 승인 줄 하나와 job 링크 하나를 같은 트랜잭션에서 만든다. 같은 snapshot 의 두 번째 요청은 앞의 줄을 그대로
+ * <p>저장 요청은 기존 승인 줄 하나와 snapshot 줄의 job 칸을 같은 트랜잭션에서 만든다. 같은 snapshot 의 두 번째 요청은 앞의 줄을 그대로
  * 돌려준다. 현재 연결이 같은 조회만 예약한 private job을 읽고 시작은 재전송하지 않는다.
  */
 @Slf4j
@@ -89,7 +88,6 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final ContentDraftBindingAccess bindings;
     private final ChatContentMutationCoordinator mutations;
     private final ConversationAccess access;
-    private final ContentDraftJobRepository jobs;
     private final ContentDraftSnapshotRepository snapshotRows;
     private final ContentDraftRevisionRepository revisions;
     private final ContentDraftRepository drafts;
@@ -114,9 +112,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         if (!snapshot.agentId().equals(inputs.agent(user, conversationId, originExecutionId))) {
             throw ContentDraftSnapshotHash.unavailable("save:other-agent");
         }
-        var existing = jobs.findBySnapshotId(snapshot.id());
-        if (existing.isPresent()) {
-            return requestView(snapshot, existing.get());
+        if (snapshot.job() != null) {
+            return requestView(snapshot, snapshot.job());
         }
         var stamp = bindings.prepare(user, snapshot.agentId(), snapshot.bindingId());
         var manifest = catalog.find(stamp.connectorId()).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("save:catalog-missing"));
@@ -130,13 +127,14 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 if (!input.binding().equals(stamp)) {
                     throw ContentDraftSnapshotInputs.stale();
                 }
-                var again = jobs.findBySnapshotId(snapshot.id());
-                if (again.isPresent()) {
-                    return requestView(snapshot, again.get());
+                // 같은 snapshot 의 저장 요청끼리는 이 잠금에서 줄을 선다. 뒤에 온 요청은 앞이 만든 job 을 돌려준다.
+                var locked = snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+                if (locked.job() != null) {
+                    return requestView(locked, locked.job());
                 }
                 // 앞 저장의 결과가 UNKNOWN 으로 남은 원고는 새 snapshot 을 저장하지 않는다. 외부 서비스에 글이 이미 생겼을 수 있다.
                 var revision = revisions.findById(snapshot.revisionId()).orElseThrow(ContentDraftJobs::notFound);
-                if (jobs.existsUnknownForOtherSnapshot(user.id(), conversationId, snapshot.connectionId(), revision.draftId(), snapshot.id())) {
+                if (snapshotRows.existsUnknownForOtherSnapshot(user.id(), conversationId, snapshot.connectionId(), revision.draftId(), snapshot.id())) {
                     throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_RESULT_UNKNOWN, null);
                 }
                 Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
@@ -149,9 +147,10 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 action.awaitApproval(now.plus(policy.current().approvalTtl()));
                 var saved = actions.saveAndFlush(action);
                 bodies.sealArgs(saved, argsJson);
-                var job = jobs.saveAndFlush(new ContentDraftJob(snapshot.id(), saved.id(), user.id(), conversationId, now));
+                var job = locked.requestJob(saved.id(), now);
+                snapshotRows.saveAndFlush(locked);
                 inserted.set(true);
-                return requestView(snapshot, job);
+                return requestView(locked, job);
             });
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽을 때 승인 줄이 있어야 한다.
             if (inserted.get()) {
@@ -159,7 +158,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             }
             return created;
         } catch (DataIntegrityViolationException ex) {
-            return jobs.findBySnapshotId(snapshot.id()).map(job -> requestView(snapshot, job)).orElseThrow(() -> ex);
+            return snapshotRows.findById(snapshot.id()).filter(row -> row.job() != null).map(row -> requestView(row, row.job()))
+                .orElseThrow(() -> ex);
         }
     }
 
@@ -169,8 +169,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         access.requireOwn(user, conversationId);
         var snapshot = snapshotRows.findByPublicIdAndOwnerUserIdAndConversationId(snapshotId, user.id(), conversationId)
             .orElseThrow(ContentDraftJobs::notFound);
-        var job = jobs.findBySnapshotId(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
-        var view = views(List.of(job)).getFirst();
+        var job = Optional.ofNullable(snapshot.job()).orElseThrow(ContentDraftJobs::notFound);
+        var view = views(List.of(snapshot)).getFirst();
         if (!draftId.equals(view.draftId())) {
             throw notFound();
         }
@@ -218,12 +218,12 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             try {
                 bindings.requireUnchanged(user, binding);
             } catch (ApiException ignored) {
-                return views(List.of(jobs.findById(job.id()).orElseThrow(ContentDraftJobs::notFound))).getFirst();
+                return views(List.of(snapshotRows.findById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound))).getFirst();
             }
             // 승인과 같은 행 순서다. 원격 IO 동안 잡았던 행·TX는 없다.
             var action = actions.findByPublicIdForUpdate(view.actionId()).orElseThrow(ContentDraftJobs::notFound);
             var currentSnapshot = snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
-            var currentJob = jobs.lockById(job.id()).orElseThrow(ContentDraftJobs::notFound);
+            var currentJob = Optional.ofNullable(currentSnapshot.job()).orElseThrow(ContentDraftJobs::notFound);
             if (!sameBinding(currentSnapshot, binding) || !currentJob.jobId().equals(stamp.jobId().toString())) {
                 throw ContentDraftWorkerStatusDecoder.unavailable();
             }
@@ -235,7 +235,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 currentJob.close(ContentDraftJob.NOT_FOUND, clock.instant());
             }
             finishAction(action, currentJob);
-            return views(List.of(currentJob)).getFirst();
+            return views(List.of(currentSnapshot)).getFirst();
         });
     }
 
@@ -245,13 +245,13 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         return mutations.run(user.id(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
             access.requireOwn(user, snapshot.conversationId());
             var action = actions.findByPublicIdForUpdate(view.actionId()).orElseThrow(ContentDraftJobs::notFound);
-            snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
-            var currentJob = jobs.lockById(job.id()).orElseThrow(ContentDraftJobs::notFound);
+            var currentSnapshot = snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+            var currentJob = Optional.ofNullable(currentSnapshot.job()).orElseThrow(ContentDraftJobs::notFound);
             if (currentJob.awaitingResult()) {
                 currentJob.close(ContentDraftJob.BINDING_CHANGED, clock.instant());
                 finishAction(action, currentJob);
             }
-            return views(List.of(currentJob)).getFirst();
+            return views(List.of(currentSnapshot)).getFirst();
         });
     }
 
@@ -265,36 +265,36 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
      */
     public int closeOverdue(Instant before) {
         int closed = 0;
-        for (var due : jobs.findByStatusInAndApprovedAtBefore(RUNNING, before)) {
+        for (var due : snapshotRows.findByJobStatusInAndJobApprovedAtBefore(RUNNING, before)) {
             try {
                 if (closeOverdue(due)) {
                     closed++;
                 }
             } catch (RuntimeException ex) {
-                log.warn("기한이 지난 원고 저장 job 을 닫지 못했다 jobId={} kind={}", due.jobId(), ex.getClass().getSimpleName());
+                log.warn("기한이 지난 원고 저장 job 을 닫지 못했다 jobId={} kind={}", due.job().jobId(), ex.getClass().getSimpleName());
             }
         }
         return closed;
     }
 
 
-    private boolean closeOverdue(ContentDraftJob due) {
-        var snapshot = snapshotRows.findById(due.snapshotId()).orElseThrow(ContentDraftJobs::notFound);
-        var owner = owners.findById(due.ownerUserId()).orElse(null);
+    private boolean closeOverdue(ContentDraftSnapshot snapshot) {
+        var due = snapshot.job();
+        var owner = owners.findById(snapshot.ownerUserId()).orElse(null);
         if (owner != null) {
             try {
                 var user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
-                refreshJob(user, snapshot, due, views(List.of(due)).getFirst());
+                refreshJob(user, snapshot, due, views(List.of(snapshot)).getFirst());
             } catch (RuntimeException ex) {
                 // 마지막 조회에 실패해도 닫는다. 결과는 start claim 유무로 정한다. 조회 실패가 닫힘 사유로 묻히지 않게 종류만 남긴다.
                 log.warn("기한 정리 직전 원고 저장 job 조회에 실패했다 jobId={} kind={}", due.jobId(), ex.getClass().getSimpleName());
             }
         }
         var actionId = actions.findById(due.actionId()).orElseThrow(ContentDraftJobs::notFound).publicId();
-        var closed = mutations.run(due.ownerUserId(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
+        var closed = mutations.run(snapshot.ownerUserId(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ContentDraftJobs::notFound);
-            snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
-            var job = jobs.lockById(due.id()).orElseThrow(ContentDraftJobs::notFound);
+            var current = snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+            var job = Optional.ofNullable(current.job()).orElseThrow(ContentDraftJobs::notFound);
             if (!job.running()) {
                 return false;
             }
@@ -339,13 +339,13 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }
         access.requireOwn(user, conversationId);
         var page = PageRequest.of(0, limit + 1);
-        List<ContentDraftJob> rows;
+        List<ContentDraftSnapshot> rows;
         if (beforeSnapshotId == null) {
-            rows = jobs.findByOwnerUserIdAndConversationIdOrderByIdDesc(user.id(), conversationId, page);
+            rows = snapshotRows.findJobs(user.id(), conversationId, page);
         } else {
             var cursor = snapshotRows.findByPublicIdAndOwnerUserIdAndConversationId(beforeSnapshotId, user.id(), conversationId)
-                .flatMap(snapshot -> jobs.findBySnapshotId(snapshot.id())).orElseThrow(ContentDraftJobs::notFound);
-            rows = jobs.findByOwnerUserIdAndConversationIdAndIdLessThanOrderByIdDesc(user.id(), conversationId, cursor.id(), page);
+                .filter(snapshot -> snapshot.job() != null).orElseThrow(ContentDraftJobs::notFound);
+            rows = snapshotRows.findJobsBefore(user.id(), conversationId, cursor.job().createdAt(), cursor.id(), page);
         }
         var items = views(rows.subList(0, Math.min(limit, rows.size())));
         return new ContentDraftJobPage(items, rows.size() > limit ? items.getLast().snapshotId() : null);
@@ -365,8 +365,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }
         var rowIds = actions.findByConversationIdAndUserIdAndPublicIdIn(conversationId, user.id(), actionIds).stream()
             .map(ConnectorAction::id).toList();
-        var rows = jobs.findByActionIdIn(rowIds).stream()
-            .filter(job -> job.ownerUserId().equals(user.id()) && job.conversationId().equals(conversationId)).toList();
+        var rows = snapshotRows.findByJobActionIdIn(rowIds).stream()
+            .filter(snapshot -> snapshot.ownerUserId().equals(user.id()) && snapshot.conversationId().equals(conversationId)).toList();
         return views(rows).stream().filter(view -> view.actionId() != null).collect(Collectors.toMap(ContentDraftJobView::actionId,
             view -> summary(view, conversationPublicId)));
     }
@@ -379,10 +379,10 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     @Transactional(readOnly = true)
     public Optional<ContentDraftActionSummary> summaryOf(CurrentUser user, UUID actionId) {
         return actions.findByPublicId(actionId).filter(action -> user.id().equals(action.userId()))
-            .flatMap(action -> jobs.findByActionId(action.id()))
-            .filter(job -> job.ownerUserId().equals(user.id()))
-            .flatMap(job -> conversations.findById(job.conversationId())
-                .map(conversation -> summary(views(List.of(job)).getFirst(), conversation.publicId())));
+            .flatMap(action -> snapshotRows.findByJobActionId(action.id()))
+            .filter(snapshot -> snapshot.ownerUserId().equals(user.id()))
+            .flatMap(snapshot -> conversations.findById(snapshot.conversationId())
+                .map(conversation -> summary(views(List.of(snapshot)).getFirst(), conversation.publicId())));
     }
 
 
@@ -400,17 +400,15 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
 
 
     /** 몇 개의 묶음 조회로 공개 ID 와 원고 판을 붙인다. 본문은 읽지 않는다. */
-    private List<ContentDraftJobView> views(List<ContentDraftJob> rows) {
-        Map<Long, ContentDraftSnapshot> snapshotById = byId(snapshotRows.findAllById(rows.stream().map(ContentDraftJob::snapshotId).toList()),
-            ContentDraftSnapshot::id);
-        Map<Long, ConnectorAction> actionById = byId(actions.findAllById(rows.stream().map(ContentDraftJob::actionId).toList()),
+    private List<ContentDraftJobView> views(List<ContentDraftSnapshot> rows) {
+        Map<Long, ConnectorAction> actionById = byId(actions.findAllById(rows.stream().map(row -> row.job().actionId()).toList()),
             ConnectorAction::id);
-        Map<Long, ContentDraftRevision> revisionById = byId(revisions.findAllById(snapshotById.values().stream()
-            .map(ContentDraftSnapshot::revisionId).toList()), ContentDraftRevision::id);
+        Map<Long, ContentDraftRevision> revisionById = byId(revisions.findAllById(rows.stream()
+            .map(ContentDraftSnapshot::revisionId).distinct().toList()), ContentDraftRevision::id);
         Map<Long, ContentDraft> draftById = byId(drafts.findAllById(revisionById.values().stream().map(ContentDraftRevision::draftId).toList()),
             ContentDraft::id);
-        return rows.stream().map(job -> {
-            var snapshot = snapshotById.get(job.snapshotId());
+        return rows.stream().map(snapshot -> {
+            var job = snapshot.job();
             var action = actionById.get(job.actionId());
             var revision = revisionById.get(snapshot.revisionId());
             var draft = revision == null ? null : draftById.get(revision.draftId());

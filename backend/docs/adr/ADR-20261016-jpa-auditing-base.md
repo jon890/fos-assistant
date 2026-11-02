@@ -39,7 +39,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 `C`는 순수 저장 생성 시각만 base로 옮기고, `C+U`는 순수 저장 생성·변경 시각을 모두 옮긴다.
 `제외`는 createdAt 자체가 업무 시각이므로 어느 base도 상속하지 않는다.
 판정 결과는 생성 전용 25개, 생성·변경 8개, 제외 13개이며 auditing 대상은 33개다.
-기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다.
+기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다. `MemoryCollection`은 표를 `group_setting`의 `MEMORY_COLLECTIONS` 줄로 옮기며 엔티티를 지워 표에서 뺐다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)).
 변경 시각이 없던 엔티티에 새 updated_at을 추가하는 대상은 Agent/AppUser/AllowedPerson 세 개뿐이다.
 「없음」은 UPDATE bulk가 없다는 뜻이며 DELETE bulk는 callback 대상이 아니다.
 
@@ -61,7 +61,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `connector_tool_grant` / `ConnectorToolGrant` | C: 도구 허락 행의 저장 시각 | expiresAt/revokedAt 유지 |
 | `content_draft` / `ContentDraft` | C: 원고 본체 행의 저장 시각. 본문 시점은 revision이 소유 | currentRevision/expiresAt 조건부 bulk 유지 |
 | `content_draft_creation_request` / `ContentDraftCreationRequest` | C: 재시도 식별을 위한 요청 행의 저장 시각 | 불변 본문·요청 지문 유지. UPDATE bulk 없음 |
-| `content_draft_job` / `ContentDraftJob` | 제외: 임시저장 job의 큐 등록 시각 | 승인·확인·startClaimedAt/saveClaimedAt과 claim bulk 유지 |
+| `content_draft_snapshot` 의 job 칸 / `ContentDraftJob`(snapshot 에 끼운 값, 2026-11-02 부터) | 제외: 임시저장 job의 큐 등록 시각(`job_created_at`) | 승인·확인·startClaimedAt/saveClaimedAt과 claim bulk 유지 |
 | `content_draft_revision` / `ContentDraftRevision` | 제외: 본문 revision의 생성 시각. ContentDraftReferences가 revision 시각을 반환 | 만료·파기 상태 bulk는 revision C를 보존 |
 | `content_draft_snapshot` / `ContentDraftSnapshot` | C: 확정 snapshot 행의 저장 시각 | connectionUpdatedAt/bindingUpdatedAt/expiresAt과 지문은 업무 값으로 보존 |
 | `conversation` / `Conversation` | C: 대화 행의 최초 저장만 자동화 | U는 활동·목록 정렬 시각. rename/touch/delete bulk 인자 유지 |
@@ -73,7 +73,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
 | `memory_embedding` / `MemoryEmbedding` | C+U: 벡터 행의 저장·교체 시각. 문서 revision과 지문은 별도 속성 | memoryId 지정 ID. 기존 행을 읽어 replace하고 신규 ID만 save/merge |
 | `memory_link` / `MemoryLink` | C+U: 연결 행의 저장·상태 변경 시각. 대체 판정은 status 가 소유 | revokedAt은 끊거나 거절한 업무 시각으로 명시 전달. UPDATE bulk 없음 |
-| `memory_collection` / `MemoryCollection` | C: collection 행의 최초 저장. 현재 auditing 대상 | 복합 ID saveAll의 merge 반환값 사용 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
 | `proactive_check_finding` / `ProactiveCheckFinding` | C: 살펴보기 발견 기록의 저장 시각. 관측 시점은 checkedAt이 담당 | checkedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `proactive_check_problem` / `ProactiveCheckProblem` | C: 문제 후보 기록의 저장 시각. 근거 시점은 evidenceCheckedAt이 담당 | evidenceCheckedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
@@ -92,7 +91,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 
 ### 복합 키와 지정 ID
 
-`MemoryCollection`, `AgentMemoryCollection`, `ExecutionContextSource`는 복합 ID,
+`AgentMemoryCollection`, `ExecutionContextSource`는 복합 ID,
 `MemoryEmbedding`은 memoryId를 직접 지정한다. base는 ID와 Persistable 정책을 소유하지 않는다.
 새 복합 ID를 save/merge할 때는 반환된 managed 객체를 사용하고, 기존 DB 객체의 detach/merge에서는 C를 보존한다.
 `AgentMemoryCollectionService.replace`는 현재 행을 먼저 읽어 민감 허용만 고치므로 C를 유지한다.
@@ -144,7 +143,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | `ConversationRepository`의 bulk 갱신 | 기존 인자와 조건을 보존한다 |
 | `ResultDeliveryRepository`의 상태·attempt 갱신 | 기존 시각 인자를 보존한다 |
 | `TaskRepository`의 대화 연결 갱신 | 기존 `updatedAt` 인자를 보존한다 |
-| `ContentDraftJobRepository`의 claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
+| `ContentDraftSnapshotRepository`의 job claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
 | `ContentDraftRepository`, `ContentDraftRevisionRepository` | 현재 revision·만료·파기 상태를 조건부 갱신한다. 생성 C는 보존한다 |
 | `ChatAttachmentRepository`, `ChatPendingMessageRepository` | 삭제 요청·삭제 시각과 held 상태만 갱신한다. 큐 수락 C는 보존한다 |
 | `ConnectorConversationGrantRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
@@ -158,7 +157,7 @@ bulk 뒤에는 기존 영속성 문맥의 오래된 값을 다시 저장해 덮�
 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`은 대상 수 1 제한을 전수 표의 엔티티별 상속 목록과 두 base로 바꾼다.
 설정과 provider는 각각 하나만 허용한다. 누락·중복·다른 상속·업무 필드나 getter의 annotation도 실패시킨다.
 `Auditable`, `AbstractAuditable`, `@CreatedBy`, `@LastModifiedBy`는 계속 거절한다.
-기존 MemoryCollection의 callback·merge·rollback 검사를 유지하고 모든 적용 엔티티의 생성 및 C+U 대상의 변경·no-op과 bulk 검사를 더한다.
+복합 ID 엔티티(`AgentMemoryCollection`)의 callback·merge·rollback 검사를 유지하고 모든 적용 엔티티의 생성 및 C+U 대상의 변경·no-op과 bulk 검사를 더한다.
 전수 표의 46개 createdAt 선택 수를 검사해 누락·추가를 발견하면 표와 판정을 함께 고치게 한다.
 생성 전용 엔티티가 AuditedEntity를 상속하거나 불필요한 updated_at을 얻으면 구조·스키마 검사에서 실패한다.
 업무 시각 제외 목록은 필드와 getter의 annotation, 상속으로 유입되는 auditing을 모두 거절한다.

@@ -239,7 +239,7 @@ requestSave는 호출한 origin이 같은 사용자·대화의 취소되지 않�
 잠금 밖에서 바인딩 stamp와 catalog를 준비하고, coordinator 안에서 `requireCurrentSnapshotParticipant`의 입력 binding과 준비한 stamp가 같을 때만 승인 줄과 job을 한 트랜잭션에 만든다.
 승인 줄은 기존 `save_draft` 선언의 위험도로 판정하되 승인 방식은 `always`로 저장한다. 상시 허락을 보지 않고 승인 카드에 허락 선택을 내지 않는다.
 인자는 `{"snapshotId":"<UUID>"}` 하나이고 dedupe key는 `v1-content-save`와 owner·snapshotId의 SHA-256이다. 최초 MCP 생성의 중복 방지 키와 섞지 않는다.
-같은 snapshot의 두 번째 요청은 상태와 상관없이 앞의 승인 줄과 job을 돌려준다. 동시 요청은 사용자 잠금과 snapshot 유일 색인으로 하나가 된다.
+같은 snapshot의 두 번째 요청은 상태와 상관없이 앞의 승인 줄과 job을 돌려준다. 동시 요청은 사용자 잠금과 snapshot 줄 잠금으로 하나가 되고, `action_id` 유일 제약이 마지막으로 막는다.
 같은 사용자·대화·원고·연결에서 앞 snapshot 의 job 이 UNKNOWN 으로 남아 있으면 다른 snapshot 의 새 요청은 `CONTENT_DRAFT_RESULT_UNKNOWN`(409)으로 거절한다. 네이버에 임시저장 글이 이미 생겼을 수 있어서다. 결과를 기다리는 UNKNOWN 만 센다. 앞 job 의 결과 조회가 UNKNOWN 을 풀면(SUCCEEDED·FAILED) 다시 받고, Control Plane 이 닫은 UNKNOWN(기한 만료, worker 가 모름, 연결 변경)은 다시 조회하지 않아 막지 않는다. 사용자 확인으로 넘기는 경로는 두지 않는다. 승인 줄과 job 은 이 검사를 통과한 뒤에만 만든다.
 
 refresh와 list는 원래 대화 주인에게 Control Plane이 보관한 상태만 돌려주고 외부를 부르지 않는다. 남의 것과 없는 것은 같은 404다.
@@ -416,7 +416,7 @@ flowchart TD
     B --> C{현재 revision과 원본·관찰 검사}
     C -->|CAS 불일치| D[409와 currentRevision, 다시 조회]
     C -->|삭제 요청·만료·참조 불일치| E[본문 없이 거절]
-    C -->|유효| F[본문 암호화 후 revision과 asset 저장]
+    C -->|유효| F[본문 암호화 후 revision과 사진 참조 저장]
     F --> G[현재 revision 갱신과 커밋]
     G --> H[안전한 원고 응답]
     X[첨부 삭제·대화 purge] --> Y[같은 잠금 안에서 본문·key 무효화 커밋]
@@ -609,7 +609,7 @@ MCP용 `createIdempotent`와 검증된 호출 범위 타입을 추가하고 기�
 잠금 안에서 requireWritable을 다시 확인하고 두 식별 고정 키와 생성·전송 키를 조회한다. 고정 키의 origin·루트 불일치는 본문 없이 먼저 거절한다.
 권한과 범위가 맞는 대응의 본문 충돌을 판정하기 전에 현재 원고의 접근·만료·참조 상태도 확인한다.
 대응이 없을 때만 서버 UUID·revision 1을 만들고 원본·관찰 검사와 암호화를 수행한다.
-원고·revision·asset·생성 요청·전송 대응은 한 TX로 커밋한다. save 실패·unique 위반·암호화 실패는 모두 rollback하여 원고만 남거나 키만 소비되지 않는다.
+원고·revision(사진 참조 `assets_json` 포함)·생성 요청·전송 대응은 한 TX로 커밋한다. save 실패·unique 위반·암호화 실패는 모두 rollback하여 원고만 남거나 키만 소비되지 않는다.
 DB UNIQUE는 여러 프로세스에서도 최종 장벽이다. unique 예외를 삼켜 rollback-only TX 안에서 성공 결과를 읽지 않는다.
 경합 패자는 TX 종료 뒤 새 coordinator TX에서 현재 권한과 대응을 다시 검사한다. 최대 한 번 재조회하고 미확정이면 UNAVAILABLE로 응답하며 새 원고를 만들지 않는다.
 대응이 있으면 원본 재분석·새 암호화·신규 revision 없이 그 draft의 현재 revision을 읽는다. 새 tool_call_id의 전송 대응도 같은 잠금·TX에서 추가한다.
@@ -639,7 +639,7 @@ tombstone은 두 식별 고정 키와 정확한 범위 대응을 포함한 본�
 
 ### 원고 서비스 배치
 
-신규 엔티티는 `chat.contentdraft.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
+신규 엔티티는 `chat.contentdraft.domain.entity`의 ContentDraft, ContentDraftRevision에 둔다. `ContentDraftAsset`은 revision의 `assets_json`에 담는 값 record다.
 기존 엔티티를 옮기거나 최상위 기능 패키지를 늘리지 않는다. `domain..`의 기존 층 규칙이 이 하위 패키지도 검사한다.
 상태 enum은 `chat.contentdraft.domain.type`, 공개 서비스 반환 타입은 `chat.contentdraft.application.dto`, 저장소와 암호화는 `chat.contentdraft.infra`에 둔다.
 REST는 `chat.contentdraft.presentation.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
@@ -668,7 +668,7 @@ ID는 첨부 ID가 아닌 관찰 행 ID다. SUCCEEDED·PARTIAL·NEEDS_REVIEW 중
 읽기도 이 경계 안에서 검사·복호화하며 REPEATABLE_READ의 오래된 스냅샷으로 삭제 상태를 놓치지 않는다.
 읽기 결과 반환 직전에 현재 권한·삭제 상태·Clock 만료를 다시 확인한다. 목록은 최대 100개만 처리한다.
 원고 CAS는 잠금 안에서 확인한 currentRevision과 조건부 갱신 결과 1을 함께 검사한다.
-revision·asset·현재 번호·만료 단축은 한 트랜잭션으로 커밋하며 실패하면 모두 되돌린다.
+revision(사진 참조 포함)·현재 번호·만료 단축은 한 트랜잭션으로 커밋하며 실패하면 모두 되돌린다.
 
 `ContentDraftCleaner.invalidateForAttachment`와 `invalidateForConversation`은 MANDATORY로 참가한다.
 첨부 삭제는 기존 `AttachmentCleaner.delete`의 requestDeletion 사전 트랜잭션에 참조 원고 무효화를 넣고, 커밋 뒤 파일을 지운다.
@@ -699,7 +699,7 @@ Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 �
 | 같은 expectedRevision의 두 요청 | 성공 1회, 충돌 1회, currentRevision 일치 |
 | 다른 사용자·대화·미전송 첨부·교차 관찰 | 본문 없이 거절, 신규 revision 0개 |
 | 삭제 사전 커밋 뒤 파일 삭제 장벽·실패·재시작 | 생성·CAS·현재/이전 본문 차단, body/key 모두 null |
-| 만료·purge·암호화 실패 | 만료 즉시 차단, purge 원고·revision·asset 0개와 생성 tombstone 유지, 실패 시 쓰기 전체 rollback |
+| 만료·purge·암호화 실패 | 만료 즉시 차단, purge 원고·revision 0개와 생성 tombstone 유지, 실패 시 쓰기 전체 rollback |
 | 실제 REST | 내부 경로·storedName·원문 오류 미노출, typed currentRevision |
 | MCP·실행 사건 | origin 실행 재검사, 도구 사건 본문 없음 |
 | H2·Flyway MySQL 8.4 | CHECK와 FK 유효, CAS 경쟁·삭제 실제 갱신·새 저장소 SQL 실행 |

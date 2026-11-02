@@ -16,7 +16,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** 실제 annotation을 컴파일해 상속·업무 필드·선택 수 회귀를 검사한다. */
 @Tag("architecture")
 class JpaAuditingPlacementTest {
-    private static final String COLLECTION = "com.bifos.assistant.memory.domain.entity.MemoryCollection";
+    private static final String CAPTURE = "com.bifos.assistant.memory.domain.entity.MemoryCapture";
     private static final String CREATED_SOURCE = """
             package com.bifos.assistant.shared.domain;
             import java.time.Instant;
@@ -86,10 +86,10 @@ class JpaAuditingPlacementTest {
             case "column" -> created = created.replace("updatable=false", "updatable=true");
             case "type" -> created = created.replace("Instant createdAt", "String createdAt");
             case "inheritance" -> audited = audited.replace(" extends CreatedAtEntity", "");
-            case "missingEntity" -> sources.remove(COLLECTION);
-            case "duplicateEntity" -> sources.put("fixture.Duplicate", entity("fixture.Duplicate", "memory_collection", "C"));
+            case "missingEntity" -> sources.remove(CAPTURE);
+            case "duplicateEntity" -> sources.put("fixture.Duplicate", entity("fixture.Duplicate", "memory_capture", "C"));
             case "unexpectedEntity" -> sources.put("fixture.Unclassified", entity("fixture.Unclassified", "unclassified", "C"));
-            case "unnecessaryModified" -> sources.put(COLLECTION, sources.get(COLLECTION).replace("extends CreatedAtEntity", "extends AuditedEntity"));
+            case "unnecessaryModified" -> sources.put(CAPTURE, sources.get(CAPTURE).replace("extends CreatedAtEntity", "extends AuditedEntity"));
             case "businessInheritance" -> {
                 String name = "com.bifos.assistant.task.domain.TaskRun";
                 sources.put(name, entity(name, "task_run", "C"));
@@ -124,7 +124,7 @@ class JpaAuditingPlacementTest {
     @ValueSource(strings = {
         "Conversation.updatedAt", "ConnectorConnection.updatedAt", "ConnectorBinding.updatedAt", "Memory.updatedAt",
         "UserBrowser.updatedAt", "ResultDelivery.updatedAt", "ContentDraftSnapshot.connectionUpdatedAt",
-        "ConnectorActionExecution.bindingUpdatedAt", "TaskRun.startedAt", "TaskRun.finishedAt", "ContentDraftJob.startClaimedAt",
+        "ConnectorActionExecution.bindingUpdatedAt", "TaskRun.startedAt", "TaskRun.finishedAt",
         "ContentDraftRevision.createdAt", "MediaObservation.createdAt", "SubagentUsageJob.createdAt"
     })
     @DisplayName("활동과 snapshot 및 사건과 revision 및 큐 업무 시각에는 auditing을 붙이지 못한다")

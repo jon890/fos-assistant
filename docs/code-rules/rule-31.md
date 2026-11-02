@@ -16,7 +16,7 @@ private 비영속 구현 값은 허용한다.
 
 ## 이 저장소의 사례
 
-[MemoryCollectionId.java](../../backend/src/main/java/com/bifos/assistant/memory/domain/entity/MemoryCollectionId.java)에서 확인한다.
-MemoryCollectionId는 소유 엔티티와 같은 memory.domain.entity에 둔다.
+[MemoryRevisionId.java](../../backend/src/main/java/com/bifos/assistant/memory/domain/entity/MemoryRevisionId.java)에서 확인한다.
+MemoryRevisionId는 소유 엔티티와 같은 memory.domain.entity에 둔다.
 
 책임과 실행 절차는 [code-architecture.md](../../backend/docs/code-architecture.md)에서 이어 읽는다.

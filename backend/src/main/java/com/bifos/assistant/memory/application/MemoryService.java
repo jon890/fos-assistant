@@ -8,8 +8,8 @@ import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.memory.application.dto.MemorySearchPage;
+import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
@@ -102,12 +102,8 @@ public class MemoryService {
     }
 
 
-    /**
-     * 요청자의 그룹이 쓰는 collection 이다. 그룹이 없으면 빈 목록이다.
-     *
-     * <p>줄이 없는 그룹이면 기본 목록을 저장하므로 읽기 전용 트랜잭션으로 두지 않는다.
-     */
-    @Transactional
+    /** 요청자의 그룹이 쓰는 collection 이다. 그룹이 없으면 빈 목록이다. */
+    @Transactional(readOnly = true)
     public List<MemoryCollection> collectionsFor(CurrentUser user) {
         return user.groupId() == null ? List.of() : collections.collectionsOf(user.groupId());
     }

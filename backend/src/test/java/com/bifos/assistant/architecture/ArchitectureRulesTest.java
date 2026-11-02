@@ -96,7 +96,7 @@ class ArchitectureRulesTest {
 
 
     @Test
-    @DisplayName("MemoryCollection 생성 시각만 지정한 listener 와 시계 선언을 쓴다")
+    @DisplayName("생성 시각만 지정한 listener 와 시계 선언을 쓴다")
     void checksAuditingDeclarations() {
         ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.check(MAIN);
     }
