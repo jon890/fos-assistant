@@ -5,7 +5,7 @@
 
 ### 맥락
 
-문제 후보([ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)), 가치 판단([ADR-20261007 / value-evaluation](../../../docs/adr/ADR-20261007-value-evaluation.md)), 행동 정책([ADR-20261007 / autonomy-policy](ADR-20261007-autonomy-policy.md))은 각자 자기 줄을 남긴다.
+문제 후보([ADR-093](ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)), 가치 판단([ADR-20261007 / value-evaluation](../../../docs/adr/archive/ADR-20261007-value-evaluation.md)), 행동 정책([ADR-20261007 / autonomy-policy](archive/ADR-20261007-autonomy-policy.md))은 각자 자기 줄을 남긴다.
 그러나 사용자가 그 결과에 어떻게 반응했는지, 실행이 어떻게 끝났는지는 각 기능의 상태 칸에 흩어져 있고 지난 상태는 덮어쓴다.
 사용자마다 무엇을 가치 있게 여기는지 나중에 견주려면 「상황 → 후보 → 판단 → 정책 → 사용자 반응 → 실행 결과」 를 다시 읽을 수 있어야 한다.
 

@@ -328,14 +328,11 @@ class UsageCostRecordingTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"SUCCEEDED", "FAILED", "CANCELLED", "SYSTEM"})
+    @ValueSource(strings = {"SUCCEEDED", "FAILED", "CANCELLED"})
     @DisplayName("완료 경로마다 불완전한 토큰은 보존하고 비용은 월 합계의 미확인 실행으로 센다")
     void preservesPartialUsageAndCountsUnpricedCompletion(String route) {
         Agent agent = apiAgent();
-        boolean system = "SYSTEM".equals(route);
-        AgentExecution started = system
-            ? recorder.startSystem(caller(), "system-test", CostMode.API, requested(agent))
-            : recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
+        AgentExecution started = recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
         TokenUsage usage = new TokenUsage(120L, 20L, null, 160L);
         HermesRunResult result = new HermesRunResult(
             "partial-run", "partial-session", "FAILED".equals(route) ? "failed" : "completed",
@@ -343,12 +340,11 @@ class UsageCostRecordingTest {
         AgentExecution finished = switch (route) {
             case "FAILED" -> recorder.fail(started, agent, result, requested(agent), "FAILED");
             case "CANCELLED" -> recorder.cancel(started, agent, result, requested(agent));
-            case "SYSTEM" -> recorder.completeSystem(started, result, agent.apiBaseUrl());
             default -> recorder.complete(started, agent, result, requested(agent));
         };
         AgentExecution stored = executions.findById(finished.id()).orElseThrow();
 
-        assertThat(stored.status()).isEqualTo(system ? ExecutionStatus.SUCCEEDED : ExecutionStatus.valueOf(route));
+        assertThat(stored.status()).isEqualTo(ExecutionStatus.valueOf(route));
         assertThat(stored.errorCode()).isEqualTo("FAILED".equals(route) ? "FAILED" : null);
         assertThat(stored.inputTokens()).isEqualTo(120L);
         assertThat(stored.cachedInputTokens()).isEqualTo(20L);

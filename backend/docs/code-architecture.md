@@ -121,7 +121,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision과 요청 alias |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
-| `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
+| `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
@@ -132,7 +132,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/features/schedule.md`](../../docs/features/schedule.md)) |
 | `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`docs/features/attention.md`](../../docs/features/attention.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/features/proactive.md`](../../docs/features/proactive.md)), 매일 루프의 설정과 기동 복구([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/features/proactive.md`](../../docs/features/proactive.md)) |
 | `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`docs/features/attention.md`](../../docs/features/attention.md)) |
 | `workspace` | 사용자 실행 공간의 파일 목록과 본문, 권한 도우미로 지우기, 관리자의 공간별 용량. 아래 「실행 공간 파일」 |
 
@@ -301,7 +301,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 ### proactive
 
-하위 기능은 `check` 와 `loop` 둘이다. 가치 평가와 행동 정책, 살펴보기 뒤에 평가를 잇던 조정자는 지웠다([매일 루프](../../docs/features/proactive.md)).
+하위 기능은 `check` 하나다. 가치 평가와 행동 정책, 자동 실행 동의, 매일 루프는 지웠다([옛 판단 층의 자료](../../docs/features/proactive.md)).
 
 `proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
 `chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다. 사용자가 점검 대화를 읽으면 그 대화의 보고를 연 것으로 적도록 `chat` 의 port `CheckReportReads` 도 `proactive` 가 구현한다.
@@ -363,7 +363,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
 `ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.
-provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 사건의 버전 차이」](../../hermes/docs/hermes-contract.md#runs-응답과-사건의-버전-차이)가 갖는다. 시스템 판단은 실제 모델을 모르면 요청값으로 대체하지 않는다.
+provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 사건의 버전 차이」](../../hermes/docs/hermes-contract.md#runs-응답과-사건의-버전-차이)가 갖는다.
 최종 결과 없는 실패·취소는 이미 저장한 사용량을 보존하고, 취소의 후속 저장은 기존 종료 시각을 보존한다. 두 서비스 사이에 새 트랜잭션을 두지 않는다.
 
 `AgentExecution`은 실행 한 줄의 상태 전이와 사용량 대입을 맡는다. 성공·실패·취소가 받은 provider와 모델,

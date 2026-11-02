@@ -160,7 +160,7 @@ collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면�
 
 - **Hermes core 를 고치지 않는다.** profile, API server, plugin hook 이라는 공식 확장 지점만 쓴다.
 - **사용자가 말하지 않은 것을 바로 기억하지 않는다.** 바로 저장하는 것은 사람이 보낸 대화에서 사용자가 직접 말한 사실뿐이고, 나머지는 사람이 받아들여야 쓰인다. Hermes 내장 memory 도구를 에이전트에 주지 않는다. 기억에 닿는 길은 Control Plane 하나다.
-- **모델의 판단만으로 행동 범위를 넓히지 않는다.** 무엇까지 할지는 Control Plane 의 결정적 규칙이 정하고, 그 규칙이 스스로 시작하는 것은 읽기 전용 살펴보기뿐이다. 플러그인의 쓰기 호출은 승인 카드나 사용자가 준 상시 허락을 거친다([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
+- **모델의 판단만으로 행동 범위를 넓히지 않는다.** 스스로 시작하는 것은 제안 카드를 내는 읽기 전용 깨우기뿐이다. 플러그인의 쓰기 호출은 승인 카드나 사용자가 준 상시 허락을 거친다([ADR-20261101 / proactive-suggestion](docs/adr/ADR-20261101-proactive-suggestion.md)).
 - **비밀값을 데이터베이스에 넣지 않는다.** AI credential 과 플러그인 토큰은 Hermes 쪽에 둔다. 브라우저의 로그인 세션도 데이터베이스에 넣지 않는다. profile 을 나눴다고 AI 계정이 갈리지는 않는다. OAuth 로그인은 여러 profile 이 함께 쓸 수 있다. 무엇이 갈리고 무엇을 함께 쓰는지는 [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md) 의 「OAuth credential 은 여기서 빠진다」 에 있다.
 - **누구나 가입하는 서비스가 아니다.** 그룹에 사람을 더하는 것은 관리자가 한다.
 - **에이전트가 만든 페이지의 스크립트를 돌리지 않는다.**

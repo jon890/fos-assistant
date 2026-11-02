@@ -24,7 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 대화가 실행 줄에 넘기는 값이 대화 번호와 effort 출처 판정을 그대로 전하는지 확인한다. */
+/** 대화가 실행 줄에 넘기는 대화 번호와 effort 출처 판정을 확인한다. */
 @BackendIntegrationTest
 class ExecutionConversationTest {
 
@@ -57,13 +57,12 @@ class ExecutionConversationTest {
 
 
     @Test
-    @DisplayName("대화가 effort 를 고르지 않았으면 null 을 담아 내고 보낸 effort 가 있으면 실행 줄의 출처는 REQUESTED 다")
-    void carriesNullEffortWhenConversationChoseNoneAndRecordsRequestedSource() {
+    @DisplayName("대화 번호를 담아 내고 보낸 effort 가 있으면 실행 줄의 출처는 REQUESTED 다")
+    void carriesConversationIdAndRecordsRequestedSource() {
         ExecutionConversation value = conversation.executionConversation();
         AgentExecution execution = start(value);
 
         assertThat(value.id()).isEqualTo(conversation.id());
-        assertThat(value.reasoningEffort()).isNull();
         assertThat(saved(execution).conversationId()).isEqualTo(conversation.id());
         assertThat(saved(execution).reasoningEffortSource()).isEqualTo(ReasoningEffortSource.REQUESTED);
     }

@@ -2,7 +2,6 @@ package com.bifos.assistant.usage.execution.application;
 
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
@@ -288,42 +287,6 @@ public class ExecutionRecorder {
             null,
             modelTier,
             null);
-    }
-
-
-    /** 설치 설정의 시스템 profile 로 판단만 한다. 사용자 에이전트 줄을 만들지 않으며 요청자의 백그라운드 한도로 센다. */
-    public AgentExecution startSystem(CurrentUser user, String profileName, CostMode costMode, ModelChoice requested) {
-        return limiter.admit(
-            user.id(),
-            ExecutionAdmission.BACKGROUND,
-            () -> executions.save(AgentExecution.builder()
-                .userId(user.id())
-                .profileName(profileName)
-                .costMode(costMode)
-                .provider(requested.provider())
-                .model(requested.model())
-                .reasoningEffort(requested.reasoningEffort())
-                .reasoningEffortSource(
-                    requested.reasoningEffort() == null
-                        ? ReasoningEffortSource.UNKNOWN
-                        : ReasoningEffortSource.REQUESTED)
-                .contextChars(0L)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(clock.instant())
-                .build()));
-    }
-
-
-    /** 시스템 판단 실행의 실제 모델과 토큰을 남긴다. 실제 모델을 모르면 요청 모델로 대신하지 않는다. */
-    public AgentExecution completeSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl) {
-        return completion.completeSystem(execution, result, apiBaseUrl);
-    }
-
-
-    /** 실패한 시스템 판단도 실제 모델과 사용량을 보존한다. 실패 응답 본문은 남기지 않는다. */
-    public AgentExecution failSystem(
-        AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
-        return completion.failSystem(execution, result, apiBaseUrl, errorCode);
     }
 
 

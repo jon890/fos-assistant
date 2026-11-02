@@ -1,28 +1,16 @@
 package com.bifos.assistant.feedback.application;
 
-import com.bifos.assistant.feedback.application.dto.FeedbackLabel;
-import com.bifos.assistant.feedback.application.dto.SubjectLabel;
-import com.bifos.assistant.feedback.domain.FeedbackEvent;
-import com.bifos.assistant.feedback.domain.type.FeedbackActor;
-import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
-import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 제안 하나의 사건을 첫 반응으로 읽는다. 저장하지 않는 순수 함수다.
+ * 반응 사건의 {@code reason_code} 로 남기는 고정 이름을 갖는다.
  *
- * <p>잘못된 학습을 막는 규칙을 여기 둔다. 무응답은 싫어함이 아니다. 거절과 숨기기는 그 제안 하나에 대한 일회성 반응이고 오래 가는 선호가
- * 아니다. 오래 가는 선호의 근거는 사용자가 받아들였고 그 뒤 무르거나 거절하지 않은 Memory 제안 하나뿐이다(ADR-012).
+ * <p>사건을 첫 반응으로 읽는 함수는 호출하는 운영 코드가 없어 지웠다. 잘못된 학습을 막는 규칙(무응답은 싫어함이 아니고, 거절과 숨기기는
+ * 그 제안 하나에 대한 일회성 반응이다)은 ADR-012 가 갖는다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class FeedbackLabeler {
-
-    /** 반응 읽기 규칙의 버전이다. 규칙이 바뀌면 올린다. */
-    public static final int VERSION = 2;
 
     /** 지금 화면의 숨기기다. 상태가 바뀔 때까지만 가리므로 거절이 아니라 미루기처럼 읽는다. */
     public static final String ATTENTION_HIDE = "ATTENTION_HIDE";
@@ -35,79 +23,4 @@ public final class FeedbackLabeler {
 
     /** 사용자가 {@code memory_remember} 의 기록을 되돌려 받아들인 제안을 다시 제안으로 돌렸다. 받아들임을 무른 것이다. */
     public static final String MEMORY_UNDO = "MEMORY_UNDO";
-
-    private static final Set<FeedbackEventType> POSITIVE = Set.of(FeedbackEventType.ACCEPTED, FeedbackEventType.APPROVED);
-    private static final Set<FeedbackEventType> OUTCOMES = Set.of(FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackEventType.EXECUTION_FAILED);
-
-
-    /** @param events 같은 제안의 사건. 순서는 상관없다 */
-    public static SubjectLabel label(FeedbackSubjectType subject, List<FeedbackEvent> events) {
-        List<FeedbackEvent> ordered = events.stream()
-            .sorted(Comparator.comparing(FeedbackEvent::occurredAt)
-                .thenComparing(FeedbackEvent::id, Comparator.nullsLast(Comparator.naturalOrder())))
-            .toList();
-        FeedbackEventType decisive = ordered.stream()
-            .filter(event -> event.actor() == FeedbackActor.USER)
-            .filter(event -> POSITIVE.contains(event.eventType()) || declines(event))
-            .map(FeedbackEvent::eventType)
-            .findFirst()
-            .orElse(null);
-        boolean surfaced = ordered.stream().anyMatch(event -> event.eventType() == FeedbackEventType.SURFACED);
-        boolean postponed = ordered.stream()
-            .anyMatch(event -> event.actor() == FeedbackActor.USER
-                && (event.eventType() == FeedbackEventType.POSTPONED || hidden(event)));
-        FeedbackLabel label;
-        if (decisive != null) {
-            label = POSITIVE.contains(decisive) ? FeedbackLabel.ACCEPTED : FeedbackLabel.DECLINED;
-        } else if (postponed) {
-            label = FeedbackLabel.DEFERRED;
-        } else if (surfaced) {
-            label = FeedbackLabel.NO_RESPONSE;
-        } else {
-            label = FeedbackLabel.NOT_SURFACED;
-        }
-        boolean edited = ordered.stream()
-            .anyMatch(
-                event -> event.actor() == FeedbackActor.USER && event.eventType() == FeedbackEventType.EDITED);
-        FeedbackEventType outcome = ordered.stream()
-            .map(FeedbackEvent::eventType)
-            .filter(OUTCOMES::contains)
-            .reduce((first, second) -> second)
-            .orElse(null);
-        // 첫 반응은 그대로 두지만, 오래 가는 선호는 지금 유효한 결정만 근거로 삼는다. 받아들인 뒤 되돌리거나 거절했으면 선호가 아니다.
-        FeedbackEventType lastDecision = ordered.stream()
-            .filter(event -> event.actor() == FeedbackActor.USER)
-            .filter(event -> POSITIVE.contains(event.eventType()) || declines(event))
-            .map(FeedbackEvent::eventType)
-            .reduce((first, second) -> second)
-            .orElse(null);
-        return new SubjectLabel(
-            label,
-            wantsNow(label),
-            edited,
-            outcome,
-            subject == FeedbackSubjectType.MEMORY && lastDecision == FeedbackEventType.ACCEPTED);
-    }
-
-
-    /** 거절과, 받아들인 할 일을 그만둔 것이다. 지금 화면의 숨기기는 빼고 미루기로 읽는다. */
-    private static boolean declines(FeedbackEvent event) {
-        return event.eventType() == FeedbackEventType.REJECTED
-            || (event.eventType() == FeedbackEventType.DISMISSED && !hidden(event));
-    }
-
-
-    private static boolean hidden(FeedbackEvent event) {
-        return event.eventType() == FeedbackEventType.DISMISSED && ATTENTION_HIDE.equals(event.reasonCode());
-    }
-
-
-    /** 미루기는 「지금은 아니다」 라서 거짓이다. 반응이 없거나 보인 적이 없으면 표본이 아니다. */
-    private static Boolean wantsNow(FeedbackLabel label) {
-        return switch (label) {
-            case ACCEPTED -> Boolean.TRUE;
-            case DECLINED, DEFERRED -> Boolean.FALSE;
-            case NO_RESPONSE, NOT_SURFACED -> null;
-        };
-    }
 }

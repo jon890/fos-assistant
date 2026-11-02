@@ -3,7 +3,7 @@
 import json
 import yaml
 from plugin_loading import set_plugin
-from dashboard_profile_api_support import MCP_URL, ROOT, fake_platform_tools
+from dashboard_profile_api_support import MCP_URL, fake_platform_tools
 import dashboard_profile_api_support as support
 
 
@@ -17,37 +17,6 @@ class ProfileApiProfilesTest(support.ProfileApiRouteTest):
         response = self.request("/api/profiles/owner/model-defaults", "GET", token="valid", full_response=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.body, {"provider": "openai-codex", "model": "gpt-5.6-sol", "reasoningEffort": "medium"})
-
-    def test_decision_readiness_rejects_normal_profile_and_auth_failure(self):
-        route = "/api/profiles/owner/decision-readiness"
-        self.assertEqual(self.request(route, "GET", cookie=True), 401)
-        self.assertEqual(self.request(route, "GET", token="invalid"), 401)
-        response = self.request(route, "GET", token="valid", full_response=True)
-        self.assertEqual(response.body, {"version": 1, "ready": False})
-        self.assertEqual(self.request("/api/profiles/missing/decision-readiness", "GET", token="valid"), 404)
-
-    def test_decision_readiness_requires_no_tools_no_memory_and_no_fallback(self):
-        config_path = self.root / "owner/config.yaml"
-        template = yaml.safe_load((ROOT / "decision-profile/config.yaml.template").read_text())
-        template["secret"] = "must-not-return"
-        # 전역 MCP 설정이 있어도 no_mcp 를 통해 이 API 실행에서는 도구가 없다.
-        template["mcp_servers"] = {"demo": {"enabled": True}}
-        config_path.write_text(yaml.safe_dump(template), encoding="utf-8")
-        route = "/api/profiles/owner/decision-readiness"
-        self.assertEqual(self.request(route, "GET", token="valid", full_response=True).body,
-                         {"version": 1, "ready": True})
-        for section, key, unsafe in (("memory", "user_profile_enabled", True),
-                                     ("memory", "memory_enabled", True),
-                                     ("memory", "provider", "external"),
-                                     ("platform_toolsets", "api_server", []),
-                                     ("platform_toolsets", "api_server", ["no_mcp", "web"])):
-            changed = json.loads(json.dumps(template))
-            changed[section][key] = unsafe
-            config_path.write_text(yaml.safe_dump(changed), encoding="utf-8")
-            self.assertFalse(self.request(route, "GET", token="valid", full_response=True).body["ready"])
-        template["fallback_providers"] = [{"provider": "other"}]
-        config_path.write_text(yaml.safe_dump(template), encoding="utf-8")
-        self.assertFalse(self.request(route, "GET", token="valid", full_response=True).body["ready"])
 
     def test_model_defaults_requires_control_plane_token(self):
         self.assertEqual(self.request("/api/profiles/owner/model-defaults", "GET", cookie=True), 401)
