@@ -6,10 +6,7 @@ public enum CheckTrigger {
     MANUAL,
     /** 매일 깨우기가 열었다. */
     SCHEDULED,
-    /**
-     * 행동 정책의 {@code EXECUTE} 가 열었다(ADR-20261007 autonomy-policy). 읽기 경계에서만 돌고, 답과 보고와 발견을 남기지 않고
-     * 문제 후보만 저장한다.
-     */
+    /** 옛 행동 정책이 열었다. 새로 열지 않고, 저장된 옛 줄을 읽는 쪽이 건너뛰려고 값만 남겼다. */
     AUTONOMY;
 
 

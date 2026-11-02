@@ -127,24 +127,13 @@ public class ProactiveCheckService {
 
 
     /**
-     * 행동 정책의 {@code EXECUTE} 가 쓰는 진입점이다(ADR-20261007 autonomy-policy). 그 에이전트에 쓰기 도구 허용이 켜져 있으면 Hermes 를
-     * 부르기 전에 {@code PROACTIVE_CHECK_UNAVAILABLE} 로 거절한다. 판정 뒤 관리자가 켠 경우도 여기서 막는다.
-     *
-     * @param beforeRun 판정 줄이 시작한 살펴보기를 가리키도록 Hermes 호출 전에 저장한 점검 줄을 받는다
-     */
-    public UUID startAutonomous(CurrentUser user, String agentCode, Consumer<ProactiveCheck> beforeRun) {
-        return start(user, agentCode, CheckTrigger.AUTONOMY, beforeRun);
-    }
-
-
-    /**
      * 예약 작업이 자기 {@code task_run}에 정확히 그 점검 줄을 잇도록, Hermes 호출 전에 저장한 점검 줄을 넘긴다.
      * 기존 UUID 반환 경로는 위의 메서드가 유지한다.
      */
     public UUID start(CurrentUser user, String agentCode, CheckTrigger trigger, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
-        requireReady(agent, trigger);
-        OpenedCheck opened = open(user, agent, trigger);
+        requireReady(agent);
+        OpenedCheck opened = checkConversations.findOrCreate(user, agent);
         Conversation conversation = opened.conversation();
         if (trigger == CheckTrigger.SCHEDULED && hasUnreadReport(conversation.id())) {
             ProactiveCheck skipped = ProactiveCheck.started(
@@ -196,32 +185,8 @@ public class ProactiveCheckService {
     }
 
 
-    /**
-     * 점검 대화를 찾거나 만든다. 자동 실행은 사용자가 지운 점검 대화를 다시 만들지 않는다. 빈 대화가 목록에 나타나기 때문이다.
-     */
-    private OpenedCheck open(CurrentUser user, Agent agent, CheckTrigger trigger) {
-        if (trigger != CheckTrigger.AUTONOMY) {
-            return checkConversations.findOrCreate(user, agent);
-        }
-        return checkConversations
-            .find(user.id(), agent.id())
-            .map(conversation -> new OpenedCheck(conversation, false))
-            .orElseThrow(() -> new ApiException(
-                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
-                "an autonomous check needs an existing check conversation"));
-    }
-
-
-    /**
-     * 시작 전 점검을 통과해야 한다. 자동 실행은 쓰기 도구 허용이 켜진 에이전트를 Hermes 를 부르기 전에 거절한다. 판정 뒤 관리자가 켠 경우도
-     * 여기서 막는다.
-     */
-    private void requireReady(Agent agent, CheckTrigger trigger) {
-        if (trigger == CheckTrigger.AUTONOMY && agent.proactiveCheckWritesAllowed()) {
-            throw new ApiException(
-                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE,
-                "an autonomous check runs only within the read-only boundary");
-        }
+    /** 시작 전 점검을 통과해야 한다. 막는 까닭이 있으면 Hermes 를 부르기 전에 거절한다. */
+    private void requireReady(Agent agent) {
         if (!readiness.check(agent).available()) {
             throw new ApiException(
                 ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot run a proactive check now");

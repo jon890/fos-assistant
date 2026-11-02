@@ -64,7 +64,7 @@ import org.springframework.context.ApplicationEventPublisher;
 @BackendIntegrationTest
 @LongProactiveCheckTimeouts
 @OverrideProperties({"assistant.proactive-check.max-tool-calls=" + WakeRunContractTest.MAX_TOOL_CALLS})
-class WakeRunContractTest extends ProactiveLoopTestSupport {
+class WakeRunContractTest extends ProactiveTestSupport {
 
     static final int MAX_TOOL_CALLS = 2;
 
