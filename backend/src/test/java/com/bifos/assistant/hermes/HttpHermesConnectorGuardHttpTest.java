@@ -28,10 +28,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class HttpHermesConnectorGuardHttpTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private final AtomicInteger calls = new AtomicInteger();
@@ -165,6 +169,23 @@ class HttpHermesConnectorGuardHttpTest {
             assertThat(client.prepare("test-profile", "demo", "tool", "{}").error())
                 .isEqualTo(ConnectorCallError.UNAVAILABLE);
         }
+        assertThat(calls.get()).isEqualTo(3);
+    }
+
+
+    @Test
+    @DisplayName("준비 거절은 plugin 이 실은 고정 단계와 오류 코드만 로그에 남기고 모양이 다른 값과 옛 plugin 의 빈 칸은 -로 남긴다")
+    void prepareRejectionLogsFixedStageAndCode(CapturedOutput output) {
+        answer = "{\"ok\":false,\"error\":\"unavailable\",\"stage\":\"prepare_tool\",\"code\":\"TOSSINVEST_INVALID_INPUT\"}";
+        assertThat(client.prepare("test-profile", "demo", "tool", "{}").error()).isEqualTo(ConnectorCallError.UNAVAILABLE);
+        assertThat(output.getOut())
+            .contains("금융 준비 HTTP 가 실패했다 status=200 reason=not_ok stage=prepare_tool code=TOSSINVEST_INVALID_INPUT");
+        answer = "{\"ok\":false,\"error\":\"unavailable\",\"stage\":\"prepare\\nforged\",\"code\":\"account 000007\"}";
+        assertThat(client.prepare("test-profile", "demo", "tool", "{}").error()).isEqualTo(ConnectorCallError.UNAVAILABLE);
+        answer = "{\"ok\":false,\"error\":\"unavailable\"}";
+        assertThat(client.prepare("test-profile", "demo", "tool", "{}").error()).isEqualTo(ConnectorCallError.UNAVAILABLE);
+        assertThat(output.getOut().split("reason=not_ok stage=- code=-", -1)).hasSize(3);
+        assertThat(output.getOut()).doesNotContain("forged").doesNotContain("000007");
         assertThat(calls.get()).isEqualTo(3);
     }
 
