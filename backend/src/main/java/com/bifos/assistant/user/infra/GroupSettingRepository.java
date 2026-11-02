@@ -1,7 +1,7 @@
-package com.bifos.assistant.chat.modelchoice.infra;
+package com.bifos.assistant.user.infra;
 
-import com.bifos.assistant.chat.modelchoice.domain.GroupSetting;
-import com.bifos.assistant.chat.modelchoice.domain.GroupSettingId;
+import com.bifos.assistant.user.domain.GroupSetting;
+import com.bifos.assistant.user.domain.GroupSettingId;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

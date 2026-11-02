@@ -19,7 +19,7 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
 import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
-import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
+import com.bifos.assistant.user.infra.GroupSettingRepository;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;

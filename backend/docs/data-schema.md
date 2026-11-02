@@ -343,13 +343,21 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - 칸과 숨김을 따로 저장해도 줄 전체를 다시 쓰므로 잠그고 읽는다
 - `updated_at` 은 옮겨 온 줄에서 비어 있다. 바꾼 시각을 모른다
 
+`TOOLSET` 은 그룹이 일반 에이전트 도구 화면에서 숨긴 toolset 이다. `{"version":1,"hidden":["<toolset 이름>", ...]}` 이고 이름은 이름 순에 중복이 없다. 읽고 쓰는 일은 `ToolsetVisibilityService` 가 한다.
+
+- 줄이 없는 그룹은 숨김이 없어 모두 보인다
+- 모르는 버전이거나 형식이 깨진 JSON 은 숨김이 없는 것으로 보지 않고 오류로 올린다. 없는 것으로 보면 관리자가 숨긴 toolset 이 화면과 요청 검증에서 풀린다
+- 저장은 줄 전체를 바꾼다. 활성 도구는 Hermes profile 이 갖고 이 줄은 활성 상태를 저장하거나 바꾸지 않는다([ADR-20261008 / tool-catalog-visibility](../../docs/adr/ADR-20261008-tool-catalog-visibility.md))
+- `updated_at` 은 옮겨 온 줄에서 비어 있다
+
 옛 표 `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 은 `V20261031171501` 부터 `V20261031171503` 이 이 표로 옮기고 지웠다. 기본 단계 표의 이름을 바꿔 넓혔으므로 표 수는 둘 줄었다.
 옛 단계 코드 `FAST`, `BALANCED`, `DEEP` 은 같은 이관에서 `INSTANT`, `MEDIUM`, `HIGH` 로 바뀌었다. `app_user.model_default_tier`, `conversation.model_tier`, `task.model_tier` 가 대상이고, `agent_execution.model_tier` 는 그때 고른 값의 기록이라 옛 이름 그대로다.
 
 ### toolset_hidden
 
-그룹이 일반 에이전트 도구 화면에서 숨긴 toolset 이다. 행이 없으면 모두 보인다.
-활성 도구는 Hermes profile 이 갖고 이 표는 활성 상태를 저장하거나 바꾸지 않는다([ADR-20261008 / tool-catalog-visibility](../../docs/adr/ADR-20261008-tool-catalog-visibility.md)).
+`toolset_hidden` 테이블은 코드가 더는 읽고 쓰지 않는다. 그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다.
+`V20261102074304` 가 이 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
+직전 이미지가 이 테이블에 쓴 줄은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### agent_toolset_request
 

@@ -18,7 +18,7 @@ public class FakeModelSettingStore extends ModelSettingStore {
 
 
     public FakeModelSettingStore() {
-        super(null, null);
+        super(null);
     }
 
 
