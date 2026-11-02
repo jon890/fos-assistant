@@ -72,14 +72,13 @@ class MediaObservationControllerTest extends ObservationFixture {
             .statusCode())
                 .isEqualTo(409);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
         assertThat(body(get(owner, "")).path("items").get(0)).isEqualTo(result);
     }
 
 
     @Test
-    @DisplayName("HTTP CAS 경합은 수락한 본문과 alias 하나만 저장한다")
-    void racingHttpCorrectionsCommitOneRevisionAndMatchingAlias() throws Exception {
+    @DisplayName("HTTP CAS 경합은 수락한 본문과 요청 하나만 저장한다")
+    void racingHttpCorrectionsCommitOneRevisionAndMatchingRequest() throws Exception {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -100,10 +99,8 @@ class MediaObservationControllerTest extends ObservationFixture {
                 .findFirst()
                 .orElseThrow();
             assertThat(body(get(owner, "")).path("items").get(0)).isEqualTo(body(accepted));
-            assertThat(requests.findAll().getFirst().observationId())
-                .isEqualTo(observations.findAll().getFirst().id());
+            assertThat(observations.findAll().getFirst().requestId()).isNotNull();
             assertThat(observations.count()).isEqualTo(1);
-            assertThat(requests.count()).isEqualTo(1);
         }
     }
 
@@ -145,7 +142,6 @@ class MediaObservationControllerTest extends ObservationFixture {
             var dto = MediaObservationCorrectionRequest.from(json.readTree(correction(0, UUID.randomUUID(), SECRET)));
             assertThat(dto.toString()).doesNotContain(SECRET);
             assertThat(observations.count()).isZero();
-            assertThat(requests.count()).isZero();
             for (ILoggingEvent log : logs.list) {
                 assertThat(log.getFormattedMessage()).doesNotContain(SECRET, "unexpected error");
                 for (IThrowableProxy cause = log.getThrowableProxy(); cause != null; cause = cause.getCause()) {
@@ -211,7 +207,6 @@ class MediaObservationControllerTest extends ObservationFixture {
     @DisplayName("본문이 없으면 assurance는 null이고 stale 본문은 출처를 유지한다")
     void nullBodyTakesPriorityOverProvenanceWhileStaleBodyKeepsAssurance() throws Exception {
         for (boolean user : new boolean[] {false, true}) {
-            requests.deleteAll();
             observations.deleteAll();
             Files.write(file(photo), IMAGE);
             var source = user

@@ -12,6 +12,10 @@ public interface MediaObservationRepository extends JpaRepository<MediaObservati
     Optional<MediaObservation> findFirstByAttachmentIdOrderByRevisionDesc(Long attachmentId);
 
 
+    /** 같은 요청 UUID 재시도가 처음 만든 revision 을 찾는다. */
+    Optional<MediaObservation> findByAttachmentIdAndRequestId(Long attachmentId, String requestId);
+
+
     @Modifying(flushAutomatically = true)
     @Query("delete from MediaObservation o where o.conversationId = :conversationId and o.attachmentId = :attachmentId")
     int deleteForAttachment(Long conversationId, Long attachmentId);

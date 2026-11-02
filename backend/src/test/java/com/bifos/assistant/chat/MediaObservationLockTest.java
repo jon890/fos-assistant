@@ -35,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** 이 클래스가 선언한 잠금 회귀는 MySQL 에서도 다시 돈다. 상위 클래스의 요청 재시도와 USER 회귀는 H2 에서만 돈다. */
 @MysqlCase(MysqlCase.Reason.ROW_LOCK)
-class MediaObservationLockTest extends MediaObservationCacheTest {
+class MediaObservationLockTest extends MediaObservationRequestTest {
     @Test
     @DisplayName("같은 CAS로 경쟁하는 새 요청은 revision 하나만 만든다")
     void createsOneRevisionForRacingNewRequestsWithSameCas() throws Exception {
@@ -54,7 +54,6 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 .filteredOn(value -> value == ErrorCode.MEDIA_OBSERVATION_CONFLICT)
                 .hasSize(1);
             assertThat(observations.count()).isEqualTo(1);
-            assertThat(requests.count()).isEqualTo(1);
             assertThat(observations.findAll().getFirst().bodyKeyId()).isNotNull();
             assertThat(service.list(owner, conversation.id(), null, 10)
                 .getFirst()
@@ -65,8 +64,8 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
 
 
     @Test
-    @DisplayName("동일 UUID 경쟁은 alias 하나를 돌려준다")
-    void returnsOneAliasForRacingIdenticalUuid() throws Exception {
+    @DisplayName("동일 UUID 경쟁은 revision 하나를 돌려준다")
+    void returnsOneRevisionForRacingIdenticalUuid() throws Exception {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         UUID id = UUID.randomUUID();
@@ -77,7 +76,6 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
             start.countDown();
             assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(second.get(10, TimeUnit.SECONDS));
             assertThat(observations.count()).isEqualTo(1);
-            assertThat(requests.count()).isEqualTo(1);
         }
     }
 
@@ -94,9 +92,9 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
 
 
     @Test
-    @DisplayName("현재 완료 revision의 cache 경합은 두 성공이고 새 조건 경합은 한 승자다")
-    void allowsBothCacheAliasesButOnlyOneNewConditionRevision() throws Exception {
-        for (boolean hit : new boolean[] {true, false}) {
+    @DisplayName("현재 완료 revision에 같은 CAS로 경쟁하는 새 요청은 분석 조건이 같아도 한 승자다")
+    void allowsOnlyOneWinnerForRacingNewRequestsOnCompletedRevision() throws Exception {
+        for (boolean sameCondition : new boolean[] {true, false}) {
             photo = photo();
             record(0, UUID.randomUUID(), input(), model());
             CountDownLatch ready = new CountDownLatch(2);
@@ -108,7 +106,7 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                         ready.countDown();
                         await(start);
                         try {
-                            return record(1, UUID.randomUUID(), input(), hit ? model() : changedModel());
+                            return record(1, UUID.randomUUID(), input(), sameCondition ? model() : changedModel());
                         } catch (ApiException ex) {
                             return ex.code();
                         }
@@ -121,18 +119,14 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                     attempts.get(1).get(10, TimeUnit.SECONDS));
                 assertThat(results)
                     .filteredOn(value -> value instanceof MediaObservationView)
-                    .hasSize(hit ? 2 : 1);
+                    .hasSize(1);
                 assertThat(results)
                     .filteredOn(value -> value == ErrorCode.MEDIA_OBSERVATION_CONFLICT)
-                    .hasSize(hit ? 0 : 1);
+                    .hasSize(1);
                 assertThat(observations.findAll().stream()
                     .filter(row -> row.attachmentId().equals(photo.id()))
                     .toList())
-                        .hasSize(hit ? 1 : 2);
-                assertThat(requests.findAll().stream()
-                    .filter(row -> row.attachmentId().equals(photo.id()))
-                    .toList())
-                        .hasSize(hit ? 3 : 2);
+                        .hasSize(2);
             }
         }
     }
@@ -190,7 +184,7 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 };
             }
         };
-        var reading = local(paused, bodies, observations, requests, attachments, access);
+        var reading = local(paused, bodies, observations, attachments, access);
         var other = user();
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var pending = pool.submit(() -> {
@@ -246,7 +240,6 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                     null,
                     owner.id(),
                     photo.id());
-                requests.deleteAll();
                 observations.deleteAll();
                 attachments.deleteAll();
             }
@@ -255,10 +248,9 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
 
 
     @Test
-    @DisplayName("응답 원본 읽기 중 교체와 만료를 차단하고 이미 커밋한 alias는 보존한다")
-    void blocksSourceChangesAndExpiryDuringResponseButKeepsCommittedAlias() {
+    @DisplayName("응답 원본 읽기 중 교체와 만료를 차단하고 이미 커밋한 revision은 보존한다")
+    void blocksSourceChangesAndExpiryDuringResponseButKeepsCommittedRevision() {
         for (int change = 0; change < 6; change++) {
-            requests.deleteAll();
             observations.deleteAll();
             attachments.deleteAll();
             clock.set(NOW);
@@ -285,13 +277,13 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                     return super.open(attachment);
                 }
             };
-            UUID alias = UUID.randomUUID();
-            var reading = local(changed, bodies, observations, requests, attachments, access);
+            UUID request = UUID.randomUUID();
+            var reading = local(changed, bodies, observations, attachments, access);
             if (change < 3) {
                 code(
-                    () -> reading.record(owner, conversation.id(), photo.id(), 1, alias, input(), model()),
+                    () -> reading.record(owner, conversation.id(), photo.id(), 1, request, input(), model()),
                     currentChange == 0 ? ErrorCode.MEDIA_OBSERVATION_CONFLICT : ErrorCode.ATTACHMENT_GONE);
-                assertThat(requests.findByAttachmentIdAndRequestId(photo.id(), alias.toString()))
+                assertThat(observations.findByAttachmentIdAndRequestId(photo.id(), request.toString()))
                     .isPresent();
             } else {
                 var listed = reading.list(owner, conversation.id(), null, 10).getFirst();
@@ -321,7 +313,7 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 return stream;
             }
         };
-        var writing = local(paused, bodies, observations, requests, attachments, access);
+        var writing = local(paused, bodies, observations, attachments, access);
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var pending = pool.submit(() -> {
                 try {
@@ -339,7 +331,6 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 pending.get(10, TimeUnit.SECONDS);
                 deleting.get(10, TimeUnit.SECONDS);
                 assertThat(observations.count()).isZero();
-                assertThat(requests.count()).isZero();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
                     .isNotNull();
             } finally {
@@ -372,14 +363,13 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
             }
         };
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            var reading = pool.submit(() -> local(paused, bodies, observations, requests, attachments, access)
+            var reading = pool.submit(() -> local(paused, bodies, observations, attachments, access)
                 .list(owner, conversation.id(), null, 10));
             try {
                 assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                 pool.submit(() -> attachmentService.deleteByUser(owner, conversation.id(), photo.id()))
                     .get(10, TimeUnit.SECONDS);
                 assertThat(observations.count()).isZero();
-                assertThat(requests.count()).isZero();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
                     .isNotNull();
                 release.countDown();
@@ -421,12 +411,12 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 }));
             try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
                 var pending = pool.submit(() -> code(
-                    () -> local(store, bodies, observations, requests, guarded, access)
+                    () -> local(store, bodies, observations, guarded, access)
                         .record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
                     ErrorCode.ATTACHMENT_GONE));
                 try {
                     assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-                    assertThat(requests.count()).isEqualTo(1);
+                    assertThat(observations.count()).isEqualTo(1);
                     if (expire) {
                         clock.advance(Duration.ofDays(30));
                     } else {
@@ -435,10 +425,10 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                     release.countDown();
                     pending.get(10, TimeUnit.SECONDS);
                     if (expire) {
-                        assertThat(requests.count()).isEqualTo(1);
+                        assertThat(observations.count()).isEqualTo(1);
                         observationCleaner.cleanExpired(clock.instant());
                     }
-                    assertThat(requests.count()).isZero();
+                    assertThat(observations.count()).isZero();
                 } finally {
                     release.countDown();
                 }
@@ -495,7 +485,6 @@ class MediaObservationLockTest extends MediaObservationCacheTest {
                 ErrorCode.ATTACHMENT_GONE);
         });
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
     }
 
 

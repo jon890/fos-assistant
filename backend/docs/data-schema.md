@@ -29,7 +29,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 칸과 재시도 색인은 `V20261010004638__attachment_deletion_request.sql`이 갖는다.
 
 사전 트랜잭션은 요청을 커밋하고 파일 작업은 트랜잭션 밖에서 수행한다.
-관찰과 요청 alias도 삭제 요청과 같은 트랜잭션에서 물리 삭제한다.
+관찰 줄도 삭제 요청과 같은 트랜잭션에서 물리 삭제한다.
 파일 작업 성공 뒤 별도 트랜잭션에서 완료 시각을 기록한다.
 파일이 이미 없으면 멱등 성공이며 파일 삭제 뒤 완료 기록 전 종료도 복구한다.
 실패는 요청 상태와 완료 시각의 빈 값을 보존한다.
@@ -412,25 +412,22 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, �
 
 ### media_observation와 media_observation_request
 
-관찰은 첨부별 불변 revision으로 저장한다. 현재 관찰은 가장 큰 revision이고 별도 현재 행 표는 없다.
+관찰은 첨부별 불변 revision으로 저장한다. 현재 관찰은 가장 큰 revision이고 별도 현재 행 테이블은 없다.
 본문 JSON의 summary, claims, uncertainties, coverage와 evidence는 `body` 한 칸에만 암호화한다.
 `body`가 null이면 본문이 없고, 본문은 있는데 `body_key_id`가 null이면 호환 평문이다.
 새 저장에서 암호화가 꺼지거나 key를 얻지 못하면 전체 쓰기를 거절하며 평문을 새로 적지 않는다.
 본문과 key ID가 모두 있으면 enabled와 관계없이 복호화한다.
 
-요청 alias는 첨부와 UUID로 유일하다. 고정 요청 hash와 최초 수락한 관찰 ID를 가지며 자체 만료 칸은 없다.
-첨부·관찰 복합 FK가 다른 첨부의 revision을 참조하지 못하게 한다.
-관찰의 만료 시각은 첨부와 같고, 관찰·첨부 물리 삭제는 alias까지 cascade한다.
-삭제 요청, 만료와 소유 불일치 정리도 같은 사용자 잠금 안에서 관찰과 alias를 지운다.
+저장 요청 하나가 revision 하나를 만든다. 그 요청의 UUID와 고정 요청 hash는 `request_id CHAR(36)`, `request_hash CHAR(64)`에 둔다.
+같은 첨부의 같은 UUID는 `uk_media_observation_request_id (attachment_id, request_id)`가 막는다.
+두 칸은 지금 NULL을 허용한다. 이 칸을 모르는 직전 이미지로 되돌려도 관찰을 쓸 수 있게 하려는 것이고, 새 코드는 늘 채운다.
+관찰의 만료 시각은 첨부와 같다. 삭제 요청, 만료와 소유 불일치 정리는 같은 사용자 잠금 안에서 관찰 줄을 지운다.
 현재 소유자를 바꿔 관찰을 이관하거나 재암호화하지 않는다.
 CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 갖는다.
 
-완료 결과 재사용을 위해 `analysis_key CHAR(64) NULL`을 저장한다.
-기존 행은 null을 유지하며 자동 backfill과 재분석을 하지 않는다.
-신규 MODEL 완료 행에만 서버가 계산한 분석 key를 넣고, 나머지 행은 null이다.
-cache 후보는 `body_key_id`가 null이 아닌 행으로 제한한다. 기존 평문 호환 읽기는 보존한다.
-새 색인과 제약은 추가하지 않는다. 최신 revision 조회로 후보 하나만 비교한다.
-키의 입력과 null 의미는 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.
+`media_observation_request` 테이블과 `media_observation.analysis_key` 는 코드가 더는 읽고 쓰지 않는다. 운영의 관찰과 요청 테이블은 옮기기 전에 둘 다 0행이었다(2026-11-02 확인).
+이 변경의 배포를 확인한 뒤의 PR 이 두 칸을 다시 채워 NOT NULL 로 바꾸고 둘을 지운다.
+까닭과 지우는 순서는 [ADR-20261102 / media-observation-request-merge](adr/ADR-20261102-media-observation-request-merge.md)가 갖는다.
 
 ### content_draft・content_draft_revision・content_draft_asset
 

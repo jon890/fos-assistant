@@ -25,7 +25,6 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationBodies;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.mcp.application.AgentTokenService;
@@ -127,9 +126,6 @@ class McpMediaObservationToolTest {
     MediaObservationRepository observations;
 
     @Autowired
-    MediaObservationRequestRepository requests;
-
-    @Autowired
     MediaObservationBodies bodies;
 
     @Autowired
@@ -164,7 +160,6 @@ class McpMediaObservationToolTest {
     @BeforeEach
     void prepare() {
         clock.set(Instant.parse("2026-10-10T01:00:00Z"));
-        requests.deleteAll();
         observations.deleteAll();
         attachments.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
@@ -189,7 +184,6 @@ class McpMediaObservationToolTest {
 
     @AfterEach
     void cleanup() throws Exception {
-        requests.deleteAll();
         observations.deleteAll();
         attachments.deleteAll();
         jdbc.update("delete from proactive_check where user_id=?", user.id());
@@ -295,7 +289,6 @@ class McpMediaObservationToolTest {
             .get(0))
                 .isEqualTo(second);
         assertThat(observations.count()).isEqualTo(2);
-        assertThat(requests.count()).isEqualTo(2);
     }
 
 
@@ -338,7 +331,6 @@ class McpMediaObservationToolTest {
                     .toString())
                         .doesNotContain(SECRET);
             assertThat(observations.count()).isZero();
-            assertThat(requests.count()).isZero();
             for (ILoggingEvent log : logs.list) {
                 assertThat(log.getFormattedMessage()).doesNotContain(SECRET, "unexpected error");
                 for (IThrowableProxy cause = log.getThrowableProxy(); cause != null; cause = cause.getCause()) {
@@ -397,7 +389,6 @@ class McpMediaObservationToolTest {
             .asBoolean())
                 .isFalse();
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
     }
 
 
@@ -429,7 +420,6 @@ class McpMediaObservationToolTest {
         assertInvalid(call(McpMediaObservationTools.LIST, json.createObjectNode()));
         assertInvalid(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET)));
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
     }
 
 
@@ -531,7 +521,6 @@ class McpMediaObservationToolTest {
                 assertInvalid(result);
                 assertThat(result.toString()).doesNotContain(SECRET);
                 assertThat(observations.count()).isEqualTo(1);
-                assertThat(requests.count()).isEqualTo(1);
                 assertThat(service.list(current(), conversation.id(), null, 30)
                     .getFirst()
                     .observation()
@@ -548,7 +537,6 @@ class McpMediaObservationToolTest {
     @DisplayName("본문이 없는 관찰은 null assurance이고 stale 본문은 kind의 assurance를 유지한다")
     void distinguishesUnavailableAndStaleBodiesForBothKinds() throws Exception {
         for (boolean userSource : new boolean[] {false, true}) {
-            requests.deleteAll();
             observations.deleteAll();
             Files.write(file(photo), IMAGE);
             var kind = userSource ? ObservationProvenanceKind.USER_CORRECTION : ObservationProvenanceKind.MODEL_RESULT;

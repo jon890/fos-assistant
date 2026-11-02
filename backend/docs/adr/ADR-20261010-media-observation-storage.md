@@ -11,8 +11,8 @@
 
 ### 결정
 
-같은 MODEL 완료 제출도 새 revision을 만들던 부분은 [완료 결과 재사용 ADR](ADR-20261011-media-observation-cache.md)이 대체한다.
-나머지 저장·UUID·암호화·삭제 계약은 유지한다.
+- **대체된 부분**: 요청 UUID 를 `media_observation_request` 테이블의 alias 줄로 두던 부분은 [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)가 대체한다. 요청 UUID 와 hash 는 그 요청이 만든 관찰 줄에 두고, 새 UUID 는 늘 새 revision 을 만든다. 이 사이에 있던 [완료 결과 재사용 ADR](archive/ADR-20261011-media-observation-cache.md)도 그 결정이 대체했다.
+나머지 저장·UUID·암호화·삭제 계약은 유지한다. 아래 본문의 alias 는 이제 관찰 줄의 `request_id`, `request_hash` 다.
 
 `media_observation`은 첨부별 불변 revision이다. 새 요청 UUID는 현재 revision에 대한 CAS를 통과하면 같은 모델 결과라도 새 revision을 만든다.
 새 MODEL 제출은 현재 USER 정정을 대체할 수 없다. 요청 UUID마다 `media_observation_request`에 최초 수락한 revision과 고정 요청 hash를 함께 적는다.
