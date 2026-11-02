@@ -32,7 +32,7 @@ import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotHas
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshots;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotInputs;
 import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftBindingAccess;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
+import com.bifos.assistant.testsupport.ContentDraftJobRows;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
@@ -76,8 +76,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     ContentDraftBindingAccess bindingAccess;
     @Autowired
     ContentDraftSnapshotRepository snapshotRows;
-    @Autowired
-    ContentDraftJobRepository jobRows;
+    final ContentDraftJobRows jobRows = new ContentDraftJobRows(() -> snapshotRows);
     @Autowired
     AgentRepository agents;
     @Autowired
@@ -105,7 +104,6 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     @BeforeEach
     void prepareSnapshot() {
         snapshotRows.deleteAll();
-        jobRows.deleteAll();
         String profile = "preview-" + UUID.randomUUID();
         person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
         var agent = agents.save(Agent.of(profile, "preview", profile, "http://localhost", CostMode.SUBSCRIPTION,
@@ -136,7 +134,6 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
 
     @AfterEach
     void removeSnapshots() {
-        jobRows.deleteAll();
         snapshotRows.deleteAll();
         bindings.deleteById(binding.id());
         connections.deleteById(binding.connection().id());
@@ -282,7 +279,9 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
                     photo.expiresAt(), photo.messageId(), conversation.id(), photo.id());
             }
         }
-        jdbc.update("delete from content_draft_asset where revision_id=? and position=1", revisionRows.findAll().getFirst().id());
+        var row = revisionRows.findAll().getFirst();
+        jdbc.update("update content_draft_revision set assets_json=? where id=?",
+            json.writeValueAsString(row.assets().subList(0, 1)), row.id());
         code(this::preview, ErrorCode.CONTENT_DRAFT_STALE);
         assertThat(snapshotRows.count()).isZero();
     }

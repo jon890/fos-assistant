@@ -78,8 +78,8 @@ class MediaPipelineEventsTest {
         UUID draftId = UUID.randomUUID();
         TransactionSynchronizationManager.initSynchronization();
         MediaPipelineEvents.draftReferenced(7L, draftId.toString(), 2, List.of(
-            new ContentDraftAsset(1L, 0, 21L, "a".repeat(64), null, null),
-            new ContentDraftAsset(1L, 2, 22L, "b".repeat(64), 5L, 1L)));
+            new ContentDraftAsset(0, 21L, "a".repeat(64), null, null),
+            new ContentDraftAsset(2, 22L, "b".repeat(64), 5L, 1L)));
         assertThat(logs.list).isEmpty();
 
         List<TransactionSynchronization> registered = TransactionSynchronizationManager.getSynchronizations();
@@ -101,7 +101,7 @@ class MediaPipelineEventsTest {
     void draftReferencedSkipsRollback() {
         TransactionSynchronizationManager.initSynchronization();
         MediaPipelineEvents.draftReferenced(7L, UUID.randomUUID().toString(), 1,
-            List.of(new ContentDraftAsset(1L, 0, 21L, "a".repeat(64), null, null)));
+            List.of(new ContentDraftAsset(0, 21L, "a".repeat(64), null, null)));
 
         TransactionSynchronizationManager.getSynchronizations()
             .forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));

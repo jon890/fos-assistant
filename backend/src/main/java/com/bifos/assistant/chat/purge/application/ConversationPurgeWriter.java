@@ -9,7 +9,6 @@ import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
 import com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationRequest;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRevisionRepository;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
@@ -43,7 +42,6 @@ class ConversationPurgeWriter {
     private final ContentDraftRepository drafts;
     private final ContentDraftCreationRequestRepository creationRequests;
     private final ContentDraftRevisionRepository revisions;
-    private final ContentDraftAssetRepository assets;
 
 
     /**
@@ -61,7 +59,6 @@ class ConversationPurgeWriter {
         pendingMessages.clear(conversationId);
         creationRequests.findByConversationIdOrderByIdAsc(conversationId).forEach(ContentDraftCreationRequest::markGone);
         creationRequests.flush();
-        assets.deleteForConversation(conversationId);
         revisions.deleteForConversation(conversationId);
         drafts.deleteForConversation(conversationId);
         attachments.deleteAllOf(conversationId);

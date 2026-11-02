@@ -20,12 +20,12 @@ connector_connection|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 연결은
 connector_conversation_grant|CONVERSATION|id|DELETE|KEEP|KEEP|conversation_id FK가 있다. 삭제된 대화와 붙지 않은 에이전트의 권한은 읽기에서 거절하며 행은 만료 이력으로 남긴다.
 connector_tool_grant|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
 content_draft|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id FK와 owner_user_id에 속한다. 대화 purge가 지운다.
-content_draft_asset|CONVERSATION|id|DELETE|DELETE|KEEP|revision_id와 attachment_id FK로 원고와 첨부에 속한다. purge가 먼저 지운다.
+content_draft_asset|CONVERSATION|id|DELETE|DELETE|KEEP|revision_id와 attachment_id FK로 원고와 첨부에 속한다. 코드가 읽고 쓰지 않으며 revision 삭제의 FK cascade 로 지워진다. DROP PR 이 지운다.
 content_draft_creation_call|CONVERSATION|id|KEEP|KEEP|KEEP|creation_request_id FK에 속한다. 같은 호출의 재생을 막는 alias는 본문 없이 보존한다.
 content_draft_creation_request|CONVERSATION|id|GONE|GONE|KEEP|conversation_id와 owner_user_id에 속한다. GONE으로 바꾸고 request_hash와 draft_public_id를 비운다.
-content_draft_job|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 원고 삭제 후에도 본문 없는 저장 상태 이력을 보존하는 계약이다.
+content_draft_job|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 코드가 읽고 쓰지 않으며 저장 상태 이력은 snapshot 의 job 칸으로 옮겼다. DROP PR 이 지운다.
 content_draft_revision|CONVERSATION|id|DELETE|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
-content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조를 보존하는 계약이다.
+content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조, 저장 job 칸을 원고 삭제 후에도 보존하는 계약이다.
 conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session, 대기 줄(pending_messages)을 비운 뒤 purged_at을 적는다.
 decision_feedback_event|CONVERSATION|id|DELETE|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id FK를 NULL로 비운다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.

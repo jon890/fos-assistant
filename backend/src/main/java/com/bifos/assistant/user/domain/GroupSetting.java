@@ -28,6 +28,9 @@ public class GroupSetting {
     /** 그룹이 도구 화면에서 숨긴 toolset 이름 목록을 담는 설정 종류다. */
     public static final String TOOLSET = "TOOLSET";
 
+    /** 그룹이 쓰는 Memory collection 목록을 담는 설정 종류다. 줄이 없으면 코드의 기본 목록을 쓴다. */
+    public static final String MEMORY_COLLECTIONS = "MEMORY_COLLECTIONS";
+
     @EmbeddedId
     private GroupSettingId id;
 
