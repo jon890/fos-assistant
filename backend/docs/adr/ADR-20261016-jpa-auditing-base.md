@@ -61,7 +61,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `connector_tool_grant` / `ConnectorToolGrant` | C: 도구 허락 행의 저장 시각 | expiresAt/revokedAt 유지 |
 | `content_draft` / `ContentDraft` | C: 원고 본체 행의 저장 시각. 본문 시점은 revision이 소유 | currentRevision/expiresAt 조건부 bulk 유지 |
 | `content_draft_creation_request` / `ContentDraftCreationRequest` | C: 재시도 식별을 위한 요청 행의 저장 시각 | 불변 본문·요청 지문 유지. UPDATE bulk 없음 |
-| `content_draft_job` / `ContentDraftJob` | 제외: 임시저장 job의 큐 등록 시각 | 승인·확인·startClaimedAt/saveClaimedAt과 claim bulk 유지 |
+| `content_draft_snapshot` 의 job 칸 / `ContentDraftJob`(snapshot 에 끼운 값, 2026-11-02 부터) | 제외: 임시저장 job의 큐 등록 시각(`job_created_at`) | 승인·확인·startClaimedAt/saveClaimedAt과 claim bulk 유지 |
 | `content_draft_revision` / `ContentDraftRevision` | 제외: 본문 revision의 생성 시각. ContentDraftReferences가 revision 시각을 반환 | 만료·파기 상태 bulk는 revision C를 보존 |
 | `content_draft_snapshot` / `ContentDraftSnapshot` | C: 확정 snapshot 행의 저장 시각 | connectionUpdatedAt/bindingUpdatedAt/expiresAt과 지문은 업무 값으로 보존 |
 | `conversation` / `Conversation` | C: 대화 행의 최초 저장만 자동화 | U는 활동·목록 정렬 시각. rename/touch/delete bulk 인자 유지 |
@@ -145,7 +145,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | `ConversationRepository`의 bulk 갱신 | 기존 인자와 조건을 보존한다 |
 | `ResultDeliveryRepository`의 상태·attempt 갱신 | 기존 시각 인자를 보존한다 |
 | `TaskRepository`의 대화 연결 갱신 | 기존 `updatedAt` 인자를 보존한다 |
-| `ContentDraftJobRepository`의 claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
+| `ContentDraftSnapshotRepository`의 job claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
 | `ContentDraftRepository`, `ContentDraftRevisionRepository` | 현재 revision·만료·파기 상태를 조건부 갱신한다. 생성 C는 보존한다 |
 | `ChatAttachmentRepository`, `ChatPendingMessageRepository` | 삭제 요청·삭제 시각과 held 상태만 갱신한다. 큐 수락 C는 보존한다 |
 | `ConnectorConversationGrantRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
