@@ -16,7 +16,6 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftService;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationCallRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftCreationRequestRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftRepository;
@@ -89,8 +88,6 @@ class McpContentDraftToolTest {
     @Autowired
     ContentDraftRevisionRepository revisions;
     @Autowired
-    ContentDraftAssetRepository assets;
-    @Autowired
     ContentDraftCreationRequestRepository requests;
     @Autowired
     ContentDraftCreationCallRepository calls;
@@ -125,7 +122,6 @@ class McpContentDraftToolTest {
     void cleanup() {
         calls.deleteAll();
         requests.deleteAll();
-        assets.deleteAll();
         revisions.deleteAll();
         drafts.deleteAll();
         jdbc.update("delete from allowed_person where hermes_profile=?", PROFILE);

@@ -1,28 +1,21 @@
 package com.bifos.assistant.chat.contentdraft.domain.entity;
 
+import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
-import com.bifos.assistant.chat.contentdraft.domain.type.ContentDraftJobStatus;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.EnumType;
 
-/** 본문 대신 이력 참조와 확정 지문만 보존한다. */
-@Entity
-@Table(name = "content_draft_job", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_content_job_snapshot", columnNames = "snapshot_id"),
-    @UniqueConstraint(name = "uk_content_job_action", columnNames = "action_id"),
-    @UniqueConstraint(name = "uk_content_job_id", columnNames = "job_id")
-})
+/**
+ * 원고 snapshot 의 저장 job 이다. snapshot 줄의 칸으로 저장하고 저장 요청 전에는 칸이 모두 비어 있다(snapshot 의 job 이 null).
+ * 본문 대신 승인 줄 참조와 worker 가 알린 상태만 보존한다.
+ */
+@Embeddable
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -34,66 +27,50 @@ public class ContentDraftJob {
     /** 연결이나 바인딩 버전이 바뀌어 옛 stamp 로 결과를 확인하지 못했다. */
     public static final String BINDING_CHANGED = "CONTENT_DRAFT_BINDING_CHANGED";
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "snapshot_id", nullable = false, columnDefinition = "BIGINT")
-    private Long snapshotId;
-
-    @Column(name = "action_id", nullable = false, columnDefinition = "BIGINT")
+    @Column(name = "action_id", columnDefinition = "BIGINT")
     private Long actionId;
 
-    @Column(name = "owner_user_id", nullable = false, columnDefinition = "BIGINT")
-    private Long ownerUserId;
-
-    @Column(name = "conversation_id", nullable = false, columnDefinition = "BIGINT")
-    private Long conversationId;
-
-    @Column(name = "job_id", nullable = true, columnDefinition = "CHAR(36)")
+    @Column(name = "job_id", columnDefinition = "CHAR(36)")
     private String jobId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(32)")
+    @Column(name = "job_status", columnDefinition = "VARCHAR(32)")
     private ContentDraftJobStatus status;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "job_created_at")
     private Instant createdAt;
 
-    @Column(name = "approved_by", nullable = true, columnDefinition = "BIGINT")
+    @Column(name = "approved_by", columnDefinition = "BIGINT")
     private Long approvedBy;
 
-    @Column(name = "approved_at", nullable = true)
+    @Column(name = "approved_at")
     private Instant approvedAt;
 
-    @Column(name = "last_checked_at", nullable = true)
+    @Column(name = "last_checked_at")
     private Instant lastCheckedAt;
 
-    @Column(name = "start_claimed_at", nullable = true)
+    @Column(name = "start_claimed_at")
     private Instant startClaimedAt;
 
-    @Column(name = "save_claimed_at", nullable = true)
+    @Column(name = "save_claimed_at")
     private Instant saveClaimedAt;
 
-    @Column(name = "stage", nullable = true, columnDefinition = "VARCHAR(32)")
+    @Column(name = "job_stage", columnDefinition = "VARCHAR(32)")
     private String stage;
 
-    @Column(name = "save_clicked", nullable = false, columnDefinition = "BOOLEAN")
+    @Column(name = "save_clicked", columnDefinition = "BOOLEAN")
     private boolean saveClicked;
 
-    @Column(name = "error_code", nullable = true, columnDefinition = "VARCHAR(64)")
+    @Column(name = "error_code", columnDefinition = "VARCHAR(64)")
     private String errorCode;
 
     /** worker 가 알린 실패 사유의 고정 코드다. error_code 와 같은 모양만 담는다. */
-    @Column(name = "error_reason", nullable = true, columnDefinition = "VARCHAR(64)")
+    @Column(name = "error_reason", columnDefinition = "VARCHAR(64)")
     private String errorReason;
 
 
-    public ContentDraftJob(Long snapshotId, Long actionId, Long ownerUserId, Long conversationId, Instant createdAt) {
-        this.snapshotId = snapshotId;
+    ContentDraftJob(Long actionId, Instant createdAt) {
         this.actionId = actionId;
-        this.ownerUserId = ownerUserId;
-        this.conversationId = conversationId;
         this.createdAt = createdAt;
         this.status = ContentDraftJobStatus.PREVIEW_READY;
     }

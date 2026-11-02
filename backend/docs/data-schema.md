@@ -42,28 +42,34 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 `content_draft_snapshot`은 기존 암호화 revision의 참조, 최초 내부 origin 실행, 에이전트와 연결·바인딩 판, 정책 지문과 compiler의 두 지문을 보존한다.
 본문·canonical 블록·compiled payload·관찰 설명·사진 byte는 저장하지 않는다. 기존 `content_draft_revision`의 암호화 본문 한 곳만 사용한다.
-칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유한다.
-두 표의 시각 칸은 MySQL에서 `DATETIME(6)`이며, 엔티티의 `Instant`는 기존 원고처럼 dialect의 기본 매핑을 사용한다.
+칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유하고, 아래 job 칸은 `V20261102074316__content_draft_job_asset_columns.sql`이 소유한다.
+snapshot의 시각 칸(job 칸 포함)은 MySQL에서 `DATETIME(6)`이며, 엔티티의 `Instant`는 기존 원고처럼 dialect의 기본 매핑을 사용한다.
 H2에서도 Flyway 스키마와 `ddl-auto: validate`로 실제 JPA 기동을 검사한다.
-snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,snapshot_hash,authorization_fingerprint)`는 각각 유일하다.
+snapshot의 원래 칸은 모두 필수이며(아래 job 칸은 NULL 허용) 공개 UUID와 `(revision_id,binding_id,snapshot_hash,authorization_fingerprint)`는 각각 유일하다.
 `authorization_fingerprint`는 서버가 캡처한 권한 맥락의 SHA-256 지문이다. compiler의 두 지문과 별개이며 서명이나 ACL을 대신하지 않는다.
 `policy_fingerprint`는 잠금 밖에서 준비한 compile 전용 선언과 도구 정책의 SHA-256이다. 연결·바인딩 수정 시각과 함께 현재 판을 대조한다.
 기한은 원고와 참조 첨부 중 가장 이른 기한이다.
 
-`content_draft_job`은 후속 승인 요청을 위한 최소 이력 표다. preview는 job 행을 만들지 않는다.
-snapshot과 action 참조는 각각 유일하고 필수다. owner·conversation은 후속 목록을 같은 범위로 조회하기 위한 필수 칸이다.
-job ID는 예약 전 NULL이며 값이 있으면 유일하다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code·error reason도 처음에는 NULL이다.
+저장 요청의 job 은 그 snapshot 줄의 칸이다. preview 는 job 칸을 채우지 않아 저장 요청 전 snapshot 은 job 칸이 모두 NULL 이다.
+칸은 `action_id`, `job_id`, `job_status`, `job_created_at`, 승인자·승인 시각·확인 시각, 두 claim 시각, `job_stage`, `save_clicked`, `error_code`, `error_reason` 이고 `V20261102074316__content_draft_job_asset_columns.sql`이 소유한다.
+`action_id`와 `job_id`는 값이 있으면 각각 유일하다. 저장 요청은 `action_id`, `job_status`, `job_created_at`, `save_clicked`(false)를 함께 채운다.
+직전 이미지가 이 칸을 모르고 snapshot 을 쓸 수 있도록 모두 NULL 을 허용한다. 필수 칸의 NOT NULL 은 DROP PR 이 정한다.
+job ID는 예약 전 NULL이다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code·error reason도 처음에는 NULL이다.
 `error_reason`은 worker가 status 응답에 `error_reason`으로 알린 실패 사유의 고정 코드(`[a-z][a-z_]{0,63}`)다. 매 조회가 error code와 함께 덮어써 사유가 없으면 비운다. 화면의 글과 요소 이름은 담지 않는다.
-status·생성 시각·save_clicked는 필수이고 save_clicked 기본값은 false다.
-저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다.
-job 행은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 만들고, job ID는 승인 때 소문자 정규 UUID로 한 번 예약한다.
+저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다. 엔티티에서는 snapshot 에 끼운 `@Embedded` `ContentDraftJob` 이다.
+job 칸은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 snapshot 줄을 잠근 뒤 채우고, job ID는 승인 때 소문자 정규 UUID로 한 번 예약한다.
 `start_claimed_at`·`save_claimed_at`은 NULL 조건 갱신 결과 1에서만 MICROS 시각으로 채우며, 현재 권한·실행 잠금과 같은 트랜잭션에서 커밋한다.
-ticket과 본문은 두 표 어디에도 저장하지 않는다. worker 상태의 조회와 stage·save_clicked 반영은 아직 구현하지 않았다.
+저장 목록은 `job_created_at` 역순이고 같은 시각이면 snapshot 번호 역순이다.
+`content_draft_job` 테이블은 코드가 더는 읽고 쓰지 않는다. 그 줄은 `V20261102074317__ContentDraftJobAssetBackfill`이 snapshot 칸으로 옮겼다.
+이 변경의 배포를 확인한 뒤의 DROP PR 이 직전 이미지가 쓴 줄을 다시 옮기고 그 테이블을 지운다. 순서는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)가 갖는다.
+직전 이미지로 되돌리면 새 이미지가 snapshot 칸에 만든 job 은 옛 코드에 보이지 않아 승인 대기 줄은 승인할 때 찾지 못하고, 저장 중이던 실행은 기동 정리가 UNKNOWN 으로 끝낸다.
+다시 새 이미지로 올리면 그사이 옛 코드가 쓴 revision 은 `assets_json` 이 NULL 이라 STALE 로 닫히고, 옛 테이블에 생긴 job 은 DROP PR 의 재이관 전까지 보이지 않는다. 같은 snapshot 에 job 이 두 번 생긴 경우는 DROP PR 이 따로 다룬다.
+ticket과 본문은 snapshot 줄 어디에도 저장하지 않는다. worker 상태의 조회와 stage·save_clicked 반영은 아직 구현하지 않았다.
 
-두 표 모두 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
+snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 삭제 가능한 원고·첨부·binding·connection·대화·origin과 이력용 action·snapshot에는 물리 FK와 삭제 cascade를 두지 않는다.
 원고 만료·삭제·purge 뒤에도 참조와 terminal 이력은 남고, 본문을 복구하거나 권한을 우회하는 데 쓰지 않는다.
-같은 snapshot의 UNIQUE 경합은 실패 트랜잭션이 끝난 뒤 새 트랜잭션에서 owner·conversation 범위의 기존 행을 읽는다.
+같은 snapshot의 저장 요청 경합은 snapshot 줄 잠금이 먼저 막고, 유일 제약에 걸린 경우는 실패 트랜잭션이 끝난 뒤 새 트랜잭션에서 owner·conversation 범위의 기존 행을 읽는다.
 없는 기존 행이나 공개 UUID만 충돌한 경우는 안전한 실패로 끝내며 실패한 트랜잭션을 다시 쓰지 않는다.
 흐름과 현재 권한 검사는 [원고 기능](../../docs/features/content-draft.md#불변-preview-snapshot)에 있다.
 
@@ -445,7 +451,7 @@ CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs
 이 변경의 배포를 확인한 뒤의 PR 이 두 칸을 다시 채워 NOT NULL 로 바꾸고 둘을 지운다.
 까닭과 지우는 순서는 [ADR-20261102 / media-observation-request-merge](adr/ADR-20261102-media-observation-request-merge.md)가 갖는다.
 
-### content_draft・content_draft_revision・content_draft_asset
+### content_draft・content_draft_revision
 
 V20261011060038 마이그레이션으로 생성하는 원고 revision 저장 모델이다.
 생성·조회·수정과 참조 검사, 오류 응답과 삭제 참가 지점은 [원고 저장 계약](../../docs/features/content-draft.md#원고-revision-저장-계약)이 갖는다.
@@ -454,28 +460,29 @@ preview·approval·job 표는 이 저장 모델에 포함하지 않는다.
 | 표 | 칸과 타입 | 필수와 제약 |
 | --- | --- | --- |
 | `content_draft` | id BIGINT AUTO_INCREMENT, public_id CHAR(36), conversation_id BIGINT, owner_user_id BIGINT, current_revision BIGINT, created_at・expires_at DATETIME(6) | 모두 NOT NULL, id PK, public_id UNIQUE, current_revision 양수 |
-| `content_draft_revision` | id BIGINT AUTO_INCREMENT, draft_id BIGINT, revision BIGINT, status VARCHAR(32), schema_version INT, created_at DATETIME(6), body LONGTEXT, body_key_id BIGINT | body와 body_key_id만 NULL 허용, id PK, UNIQUE(draft_id, revision), revision 양수, schema_version=1 |
-| `content_draft_asset` | id BIGINT AUTO_INCREMENT, revision_id BIGINT, position INT, attachment_id BIGINT, source_fingerprint CHAR(64), observation_id BIGINT, observation_revision BIGINT | 관찰 두 칸만 NULL 허용, id PK, UNIQUE(revision_id, position), position 0..499, 관찰 쌍은 둘 다 NULL 또는 둘 다 비NULL |
+| `content_draft_revision` | id BIGINT AUTO_INCREMENT, draft_id BIGINT, revision BIGINT, status VARCHAR(32), schema_version INT, created_at DATETIME(6), body LONGTEXT, body_key_id BIGINT, assets_json LONGTEXT | body와 body_key_id, assets_json만 NULL 허용, id PK, UNIQUE(draft_id, revision), revision 양수, schema_version=1 |
 
-asset은 image 블록마다 한 줄이다. position은 전체 blocks 배열의 인덱스여서 사이가 비어도 되고 같은 attachment_id가 여러 번 나와도 된다.
-관찰을 지정했다면 observation_revision은 양수다. asset 지문은 서버가 읽은 원본의 SHA-256 소문자 64자리다.
+`assets_json`은 image 블록마다 항목 하나인 JSON 배열 문자열이다. 항목은 `position`, `attachmentId`, `sourceFingerprint`, `observationId`, `observationRevision`이고 position 순서다.
+position은 전체 blocks 배열의 인덱스(0..499)여서 사이가 비어도 되고 같은 attachmentId가 여러 번 나와도 된다. 사진이 없으면 `[]`다.
+관찰을 지정했다면 두 관찰 칸이 함께 차고 observationRevision은 양수다. 지문은 서버가 읽은 원본의 SHA-256 소문자 64자리다.
+H2 와 MySQL 의 JSON 형 바인딩이 달라 JSON 형이 아닌 LONGTEXT 로 두고, 모양은 `ContentDraftAssetsConverter`가 정한다.
+`assets_json`이 NULL 인 줄은 직전 이미지로 되돌린 동안 옛 코드가 쓴 줄이다. 참조를 확인할 수 없어 읽기와 정리가 STALE 로 바꾼다.
+`content_draft_asset` 테이블은 코드가 더는 읽고 쓰지 않는다. 그 줄은 `V20261102074317__ContentDraftJobAssetBackfill`이 `assets_json`으로 옮겼고, revision 을 지우면 FK cascade 로 함께 지워진다. DROP PR 이 지운다.
 title・category・tags・blocks는 revision.body에만 넣는다. 평문 제목 칸이나 본문 복제는 만들지 않는다.
 
 | 연결과 색인 | 뜻 |
 | --- | --- |
 | draft.conversation_id → conversation.id FK | 자동 cascade 없음, 대화 purge가 원고를 명시적으로 삭제 |
 | revision.draft_id → draft.id FK ON DELETE CASCADE | 원고 물리 삭제 시 revision 제거 |
-| asset.revision_id → revision.id FK ON DELETE CASCADE | revision 물리 삭제 시 asset 제거 |
-| asset.attachment_id → chat_attachment.id FK | 자동 cascade 없음, tombstone 보존, purge에서 원고를 첨부보다 먼저 삭제 |
-| asset.observation_id에는 FK 없음 | 관찰 정리 후에도 tombstone 식별자 보존, 대응은 서비스가 잠금 안에서 검증 |
+| assets_json 의 attachmentId, observationId 에는 FK 없음 | 관찰 정리 후에도 tombstone 식별자 보존, 대응은 서비스가 잠금 안에서 검증. purge 는 원고를 첨부보다 먼저 삭제 |
 | draft(conversation_id, created_at, id) | 생성 역순 목록 |
 | draft(expires_at, id) | 원고 만료 후보 |
-| asset(attachment_id, revision_id), asset(observation_id) | 첨부・관찰 참조의 무효화 후보 |
 
 owner_user_id는 저장 당시 주인으로 필수이며 현재 대화 주인과 매번 비교한다.
 body_key_id는 기존 본문 암호화와 같이 FK를 두지 않는다.
-관찰의 물리 삭제만으로 asset을 제거하지 않으며, 조회와 정리가 사라진 참조를 STALE로 만든다.
-본문을 지운 뒤에는 암호화한 blocks를 읽지 않아도 asset 행으로 참조 정리를 할 수 있다.
+관찰의 물리 삭제만으로 참조를 지우지 않으며, 조회와 정리가 사라진 참조를 STALE로 만든다.
+본문을 지운 뒤에도 암호화한 blocks를 읽지 않고 `assets_json`으로 참조 정리를 할 수 있다.
+첨부 하나를 지울 때는 그 대화의 VALID revision 을 읽어 그 첨부를 가리키는 줄과 `assets_json` 이 NULL 이라 참조를 확인할 수 없는 줄을 무효화하고, 정기 정리는 VALID revision 의 참조를 서비스가 확인한다.
 
 status는 VALID・STALE・EXPIRED 세 값이고 CHECK로 다른 값을 거절한다.
 CHECK는 VALID이면 body・body_key_id 모두 비NULL, STALE 또는 EXPIRED이면 둘 다 NULL임을 강제한다.

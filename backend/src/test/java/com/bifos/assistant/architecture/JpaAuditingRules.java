@@ -59,7 +59,6 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.chat.delivery.domain.ResultDelivery", new Contract("result_delivery", "C")),
         Map.entry("com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraft", new Contract("content_draft", "C")),
         Map.entry("com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftCreationRequest", new Contract("content_draft_creation_request", "C")),
-        Map.entry("com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftJob", new Contract("content_draft_job", "제외")),
         Map.entry("com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftRevision", new Contract("content_draft_revision", "제외")),
         Map.entry("com.bifos.assistant.chat.contentdraft.domain.entity.ContentDraftSnapshot", new Contract("content_draft_snapshot", "C")),
         Map.entry("com.bifos.assistant.connector.action.domain.ConnectorAction", new Contract("connector_action", "제외")),

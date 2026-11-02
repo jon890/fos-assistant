@@ -22,7 +22,6 @@ import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftJobQue
 import com.bifos.assistant.chat.contentdraft.application.port.ContentDraftSaveRequests;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshotHash;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftSnapshots;
-import com.bifos.assistant.chat.contentdraft.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.contentdraft.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.connection.application.ConnectorBindingService;
@@ -42,6 +41,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.people.application.PersonAccessService;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.testsupport.ContentDraftJobRows;
 import com.bifos.assistant.testsupport.RecordingContentDraftJobStarter;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -80,8 +80,7 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
     protected ConnectorActionRepository actionRows;
     @Autowired
     protected ContentDraftSnapshotRepository snapshotRows;
-    @Autowired
-    protected ContentDraftJobRepository jobRows;
+    protected final ContentDraftJobRows jobRows = new ContentDraftJobRows(() -> snapshotRows);
     @Autowired
     protected AgentRepository agents;
     @Autowired
@@ -144,7 +143,6 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
 
     @BeforeEach
     void prepareSave() throws Exception {
-        jobRows.deleteAll();
         snapshotRows.deleteAll();
         String profile = "save-" + UUID.randomUUID().toString().substring(0, 8);
         person = people.save(AllowedPerson.of(owner.email(), "주인", profile));
@@ -179,7 +177,6 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
 
     @AfterEach
     void removeSave() {
-        jobRows.deleteAll();
         snapshotRows.deleteAll();
         actionRows.deleteAll();
         bindings.deleteById(binding.id());
