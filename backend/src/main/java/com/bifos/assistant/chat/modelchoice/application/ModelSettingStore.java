@@ -2,12 +2,9 @@ package com.bifos.assistant.chat.modelchoice.application;
 
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelSetting;
-import com.bifos.assistant.user.domain.GroupSetting;
-import com.bifos.assistant.user.domain.GroupSettingId;
-import com.bifos.assistant.user.infra.GroupSettingRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import java.time.Clock;
-import java.time.temporal.ChronoUnit;
+import com.bifos.assistant.user.application.GroupSettingStore;
+import com.bifos.assistant.user.domain.GroupSetting;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -36,15 +33,14 @@ public class ModelSettingStore {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private final GroupSettingRepository settings;
-    private final Clock clock;
+    private final GroupSettingStore settings;
 
 
     /** 줄이 없는 그룹은 모든 칸이 빈 설정이다. */
     @Transactional(readOnly = true)
     public ModelSetting read(Long groupId) {
-        return settings.findById(new GroupSettingId(groupId, GroupSetting.MODEL))
-            .map(row -> decode(row.settingValue()))
+        return settings.read(groupId, GroupSetting.MODEL)
+            .map(ModelSettingStore::decode)
             .orElseGet(ModelSetting::empty);
     }
 
@@ -64,19 +60,14 @@ public class ModelSettingStore {
 
 
     private ModelSetting readForUpdate(Long groupId) {
-        return settings.findForUpdate(new GroupSettingId(groupId, GroupSetting.MODEL))
-            .map(row -> decode(row.settingValue()))
+        return settings.readForUpdate(groupId, GroupSetting.MODEL)
+            .map(ModelSettingStore::decode)
             .orElseGet(ModelSetting::empty);
     }
 
 
     private void update(Long groupId, ModelSetting setting) {
-        String value = encode(setting);
-        var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        GroupSettingId id = new GroupSettingId(groupId, GroupSetting.MODEL);
-        settings.findById(id).ifPresentOrElse(
-            row -> row.change(value, now),
-            () -> settings.save(GroupSetting.of(groupId, GroupSetting.MODEL, value, now)));
+        settings.write(groupId, GroupSetting.MODEL, encode(setting));
     }
 
 
