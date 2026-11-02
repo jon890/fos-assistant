@@ -18,7 +18,7 @@
 
 이번 PR 에 넣지 않는 것:
 
-- 워크벤치 저장소의 `plugin/assistant.json`. 그 저장소의 PR 이 이 PR 보다 먼저 머지된다(사용자 결정 2026-11-02)
+- 워크벤치 저장소의 `plugin/assistant.json`. 그 저장소 #27(main `23cc57b`)로 먼저 머지됐다(사용자 결정 2026-11-02)
 - 운영 목록 변경과 홈서버의 워크벤치 checkout. `fos-home-infra` 가 갖는다
 - Control Plane 과 화면. 원격 플러그인은 1단계와 4단계에서 이미 받는다
 
@@ -36,7 +36,7 @@
 | ID | 요구사항 | 인수 조건 |
 | --- | --- | --- |
 | R1 | 대시보드 plugin 이 도구 오류의 최상위 `{code, details}` 모양을 읽는다 | 승인 실행이 `isError` 결과 `{"code": "PROPOSAL_LIMIT", "message": "...", "details": {"max": 200, "pending": 200}}` 를 받으면, `errors` 에 선언한 코드와 복구 어휘, 선언한 정수 세부(`max`, `pending`)만 응답에 싣고 `message` 는 싣지 않는다. `error` 객체가 있으면 지금처럼 그 객체만 본다. 선언하지 않은 코드는 지금처럼 `unavailable` 이다. `outcome_unknown` 코드의 `retry_key` 도 같은 모양에서 읽는다 |
-| R2 | 워크벤치 플러그인 모양이 카탈로그에 오르고 원격으로 설치된다 | 검사용 사본(`hermes/tests/fixtures/valuation-ontology/`)을 운영 목록 `{root, url}` 로 올리면 카탈로그 항목이 `id` `valuation-ontology`, `schema: 2`, 가리는 필수 칸 하나, `verify.tool` `get_connection` 이다. 설치한 서버 정의의 `url` 은 운영 목록 값이고 `.mcp.json` 의 주소가 아니며, 헤더는 `Authorization: Bearer ${칸 env}` 하나다. 조회 도구는 승인이 없고 `record_trades`, `submit_proposals`, `propose_ontology_change` 는 `WRITE`, `required`, 대화 허락이다. 스킬 네 개가 읽힌다 |
+| R2 | 워크벤치 플러그인 모양이 카탈로그에 오르고 원격으로 설치된다 | 검사용 사본(`hermes/tests/fixtures/valuation-ontology/`)을 운영 목록 `{root, url}` 로 올리면 카탈로그 항목이 `id` `valuation-ontology`, `schema: 2`, 제목 「금융 워크벤치」, 가리는 필수 칸 하나(`FINANCIAL_WORKBENCH_TOKEN`), `verify.tool` `get_connection` 이다. 설치한 서버 정의의 `url` 은 운영 목록 값이고 `.mcp.json` 의 주소가 아니며, 헤더는 `Authorization: Bearer ${칸 env}` 하나다. 조회 도구는 승인이 없고 `record_trades`, `submit_proposals`, `propose_ontology_change` 는 `WRITE`, `required`, 대화 허락이다. 스킬 네 개가 읽힌다 |
 | R3 | 옛 로컬 커넥터와 운영자 기준 주소 예외를 걷어 낸다 | `hermes/connectors/financial-workbench/` 가 없고, 커넥터 이미지 빌드와 `.gitignore`, `.dockerignore`, `CODEOWNERS` 에 그 경로가 없다. `hermes/tests/test_connectors_contract.py` 는 이 저장소의 어느 플러그인에도 `operator_env` 를 허락하지 않는다. 커넥터 공통 검사와 묶음 검사가 통과한다 |
 | R4 | 문서가 원격 플러그인을 설명한다 | ADR-20261025 는 `superseded` 로 `hermes/docs/adr/archive/` 에 있고 목록의 「보관」 표에 있다. ADR-20261026 「옮기는 순서」 의 2단계가 끝난 것으로 적혀 있다. 기능 파일 `docs/features/financial-workbench.md` 는 등록 칸, 도구와 정책, 오류, 보안, 실제 계정 확인을 원격 플러그인 기준으로 갖고 `covers:` 가 R2 의 검사를 가리킨다. 문서 검사(`test/unit/`)가 통과한다 |
 
@@ -50,7 +50,7 @@
 - `error` 키가 없고 `payload["code"]` 가 글이면 `{**details, "code": code}` 를 오류 객체로 쓴다. `details` 는 `payload["details"]` 가 객체일 때만 쓴다. `message` 와 그 밖의 최상위 칸은 오류 객체에 들어가지 않는다
 - 세부를 옮기는 규칙(선언한 이름, 정수와 boolean, 상한)과 `retry_key` 를 찾는 순서는 바꾸지 않는다
 
-워크벤치의 세부 이름 가운데 `^[a-z][a-z0-9_]{0,31}$` 에 맞는 것(`index`, `max`, `pending`)만 선언할 수 있다. `retryAfterSeconds` 는 이름 규칙에 맞지 않아 넘기지 못한다. 그 값은 대화 허락과 상시 허락으로 바로 실행한 호출의 결과 글에는 남는다.
+세부 이름은 `^[a-z][a-z0-9_]{0,31}$` 여야 선언할 수 있다. 워크벤치의 선언은 세부를 넘기지 않는다. 세부는 대화 허락과 상시 허락으로 바로 실행한 호출의 결과 글에는 남는다.
 
 테스트는 `hermes/tests/test_connector_execute.py` 에 최상위 모양의 코드, 세부, 메시지 제외, `error` 객체 우선, 선언 없는 코드를 더한다.
 
@@ -60,13 +60,13 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `.claude-plugin/plugin.json` | `name` 과 `description` 만. `skills` 칸이 없다 |
+| `.claude-plugin/plugin.json` | 워크벤치 main `23cc57b` 의 파일 그대로. `skills` 칸이 없다 |
 | `.codex-plugin/plugin.json` | 같은 `name` 과 스킬 네 개의 경로 목록 |
 | `.mcp.json` | 서버 `valuation-ontology` 의 `type: http` 와 `url`. 헤더가 없다 |
-| `assistant.json` | `schema: 2`, `headers`, 칸 하나, `verify`, 도구 정책, `errors`. 워크벤치에 머지된 파일과 같게 맞춘다 |
+| `assistant.json` | 워크벤치 main `23cc57b` 의 파일 그대로 |
 | `skills/<이름>/SKILL.md` | 네 스킬의 머리말만 |
 
-워크벤치 PR 이 머지되면 그 `assistant.json` 과 이 사본을 대조하고 다르면 사본을 고친다. 이 PR 의 머지 조건이다.
+`.mcp.json` 의 주소는 자리표시로 바꿨다. 대시보드가 그 값을 무시하고 운영 목록의 `url` 만 쓰기 때문이다.
 
 테스트는 `hermes/tests/test_connector_workbench_plugin.py` 가 카탈로그 항목, 설치한 서버 정의, 도구 정책, 스킬을 본다.
 
@@ -97,7 +97,7 @@
 | 확인 | 절차 |
 | --- | --- |
 | 운영 목록이 새 플러그인을 가리키고 옛 항목이 없다 | 운영 목록 변경 |
-| 카탈로그에 「가치투자 온톨로지」 가 보이고 연동 토큰으로 연결된다 | 플러그인 연결 확인 |
+| 카탈로그에 「금융 워크벤치」 가 보이고 연동 토큰으로 연결된다 | 플러그인 연결 확인 |
 | 토스증권을 붙인 에이전트에 함께 붙고, 보유 종목 하나에 결정과 시나리오가 나온다 | Hermes 왕복 확인 |
 | 체결 기록이 승인 카드를 거쳐 저장되고 다시 보내면 `existing` 이다 | Hermes 왕복 확인 |
 | 「조회만」 토큰의 기록이 범위 부족으로 끝난다 | Hermes 왕복 확인 |

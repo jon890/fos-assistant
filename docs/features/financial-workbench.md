@@ -4,13 +4,13 @@
 
 covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connector_workbench_plugin.py`
 
-플러그인은 워크벤치 저장소 [`jon890/fos-graphrag`](https://github.com/jon890/fos-graphrag) 의 `plugin/`(이름 `valuation-ontology`, 제목 「가치투자 온톨로지」)이다.
-도구는 그 저장소의 서버가 연 원격 MCP(`/mcp`)에 있고, 도구의 입력과 결과, 오류는 그 저장소의 `docs/api-contract.md` 「원격 MCP(`/mcp`)」 절이 갖는다.
+플러그인은 워크벤치 저장소 [`jon890/fos-graphrag`](https://github.com/jon890/fos-graphrag) 의 `plugin/`(이름 `valuation-ontology`, 화면 제목 「금융 워크벤치」)이다.
+도구는 그 저장소의 서버가 연 원격 MCP(`/mcp`)에 있고, 도구의 입력과 결과, 오류는 그 저장소 API 계약 문서의 「원격 MCP」 절이 갖는다.
 이 저장소는 그 플러그인을 원격 MCP 플러그인으로 받는다. 받는 규칙은 [ADR-20261026 / remote-mcp-plugin](../../hermes/docs/adr/ADR-20261026-remote-mcp-plugin.md) 이 갖고, 플러그인 공통 계약은 [플러그인 연결](connector.md) 과 [플러그인 도구 정책](connector-policy.md) 이 갖는다.
 이 문서는 등록 칸과 운영 값, 도구 정책과 그 까닭, 오류, 보안, 실제 계정으로 확인할 것을 갖는다.
 
 **도구 정책은 워크벤치 저장소의 `plugin/assistant.json` 이 선언한다.** `.mcp.json` 에는 헤더가 없어 선언 없이 받으면 토큰 칸이 생기지 않고, 헤더를 `.mcp.json` 에 넣으면 Claude Code 와 Codex 의 OAuth 사용자가 깨진다(사용자 결정 2026-11-02).
-`hermes/tests/fixtures/valuation-ontology/` 는 그 플러그인 모양의 사본이고 `test_connector_workbench_plugin.py` 가 카탈로그와 설치, 정책을 본다. 워크벤치의 `assistant.json` 이 바뀌면 사본도 고친다.
+`hermes/tests/fixtures/valuation-ontology/` 는 그 플러그인의 사본이고(`assistant.json` 과 Claude Code manifest 는 그대로, `.mcp.json` 의 주소는 자리표시) `test_connector_workbench_plugin.py` 가 카탈로그와 설치, 정책을 본다. 워크벤치의 `assistant.json` 이 바뀌면 사본도 고친다.
 
 투자 판단을 「세상의 변화 → 병목 → 산업 → 기업 → 밸류에이션(시나리오) → 투자 결정」 으로 잇는 그래프이고, 근거 문서와 검토 상태가 있는 주장, 개념, 사용자별 공부 목록을 갖는다.
 
@@ -24,7 +24,7 @@ covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connecto
 | --- | --- | --- |
 | `token` | 그렇다 | 워크벤치의 「더보기 → 연동 토큰」 에서 「조회와 기록」(`READ_WRITE`) 범위로 발급한 개인 연동 토큰. `^fwb_[A-Za-z0-9_-]{43}$` 만 받는다 |
 
-필수다. env 이름은 `assistant.json` 이 정하고, 값은 `Authorization: Bearer` 헤더로만 원격 서버에 간다.
+필수다. env 는 `FINANCIAL_WORKBENCH_TOKEN` 이고, 값은 `Authorization: Bearer` 헤더로만 원격 서버에 간다. 옛 로컬 커넥터와 env 이름이 같지만 플러그인 이름이 달라 연결은 새로 만든다.
 확인 도구는 `get_connection` 이다. 등록할 때 사용자 표시 이름과 연결 범위가 읽히면 저장한다.
 「조회만」(`READ`) 토큰도 등록은 된다. 조회 도구는 그대로 쓰고, 쓰는 도구는 `INSUFFICIENT_SCOPE` 로 끝난다. 범위는 `get_connection` 결과의 `connection.scope` 에 보인다.
 원격 서버가 받는 OAuth 로그인은 쓰지 않는다. 원격 MCP ADR 의 「인증」 이 미뤘다.
@@ -78,19 +78,17 @@ MCP 서버 이름은 `valuation-ontology` 다. 조회 도구는 서버에서 `re
 ## 오류
 
 원격 서버는 도구 오류를 `isError` 결과의 `{code, message, details}` 로 돌려준다. 대시보드는 이 모양에서 `assistant.json` 의 `errors` 에 선언한 코드와 정수 세부만 넘기고 `message` 는 버린다([플러그인 연결](connector.md) 의 「대시보드 plugin 계약」).
-세부 이름은 `^[a-z][a-z0-9_]{0,31}$` 이어야 넘길 수 있다. 항목 번호(`index`)와 대기 제안 상한(`max`, `pending`)은 넘어가고, `retryAfterSeconds` 는 이름 규칙에 맞지 않아 승인한 실행에서는 넘어가지 않는다.
-대화 허락이나 상시 허락으로 바로 실행한 호출은 Hermes 가 결과 글을 그대로 모델에 주므로 `message` 와 모든 세부가 보인다.
+워크벤치의 선언은 세부(`details`)를 넘기지 않는다. 항목 번호와 `retryAfterSeconds` 같은 세부는 승인한 실행에서는 에이전트에 가지 않는다.
+대화 허락이나 상시 허락으로 바로 실행한 호출은 Hermes 가 결과 글을 그대로 모델에 주므로 `message` 와 세부가 보인다.
 
 | 코드 | 공통 어휘 | 복구 |
 | --- | --- | --- |
+| `UNAUTHENTICATED` | `credential_rejected` | `reconnect` |
+| `FORBIDDEN` | `forbidden` | |
 | `INSUFFICIENT_SCOPE` | `forbidden` | `reconnect` |
-| `RATE_LIMITED` | `unavailable` | `retry_later` |
-| `VALIDATION_FAILED`, `ONTOLOGY_VIOLATION`, `ARCHIVED`, `NOT_FOUND` | `invalid_input` | `fix_input`, 세부 `index` |
-| `ONTOLOGY_INVALID` | `invalid_input` | `fix_input` |
-| `REVISION_CONFLICT` | `invalid_input` | `recheck` |
-| `PROPOSAL_LIMIT` | `unavailable` | 세부 `max`, `pending` |
-| `TRANSIENT_CONFLICT`, `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE` | `unavailable` | `retry_later` |
-| `INTERNAL_ERROR` | `unavailable` | |
+| `VALIDATION_FAILED`, `ONTOLOGY_VIOLATION`, `ONTOLOGY_INVALID`, `NOT_FOUND`, `ARCHIVED`, `REVISION_CONFLICT`, `PAYLOAD_TOO_LARGE` | `invalid_input` | `fix_input` |
+| `PROPOSAL_LIMIT`, `INTERNAL_ERROR` | `unavailable` | |
+| `TRANSIENT_CONFLICT`, `RATE_LIMITED`, `QUERY_TIMEOUT`, `DATABASE_UNAVAILABLE` | `unavailable` | `retry_later` |
 
 토큰이 없거나 틀리면 원격 서버가 HTTP `401` 로 답하고, 대시보드의 연결 확인은 `credential_rejected` 다.
 쓰기를 보낸 뒤 답을 받지 못하면 대시보드가 결과 모름으로 다룬다. 같은 체결과 같은 `dedupeKey` 는 두 번 생기지 않으므로 조회 도구로 확인한 뒤 다시 보낼 수 있다.
@@ -109,7 +107,7 @@ MCP 서버 이름은 `valuation-ontology` 다. 조회 도구는 서버에서 `re
 
 배포 뒤 소유자가 자기 워크벤치 계정으로 한 번 확인한다. 실행 방법과 운영 값은 운영 저장소가 갖는다.
 
-1. 운영 목록을 바꾼 뒤 카탈로그에 「가치투자 온톨로지」 가 보이는지
+1. 운영 목록을 바꾼 뒤 카탈로그에 「금융 워크벤치」 가 보이는지
 2. 워크벤치에서 발급한 토큰으로 등록하면 확인 도구가 표시 이름과 범위를 읽는지, 폐기한 토큰은 거절되는지
 3. 토스증권을 붙인 에이전트에 함께 붙는지
 4. 대화에서 보유 종목 하나를 물으면 토스증권의 보유와 워크벤치의 결정, 시나리오가 함께 나오는지

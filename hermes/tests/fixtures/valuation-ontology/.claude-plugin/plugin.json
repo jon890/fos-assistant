@@ -3,5 +3,7 @@
   "description": "가치투자 온톨로지에 연결해 개념과 투자 근거를 찾아보고, 데이터와 온톨로지 정의를 고치는 제안을 올립니다.",
   "author": {
     "name": "jon890"
-  }
+  },
+  "homepage": "https://github.com/jon890/fos-valuation-ontology",
+  "repository": "https://github.com/jon890/fos-valuation-ontology"
 }

@@ -2,7 +2,7 @@
 
 `fixtures/valuation-ontology/` 는 그 저장소 `plugin/` 의 모양을 옮긴 사본이다. 근거는 ADR-20261026 remote-mcp-plugin 이다.
 Claude Code manifest 에는 `skills` 칸이 없고, Codex manifest 는 스킬 경로를 늘어놓고, `.mcp.json` 에는 헤더가 없다.
-토큰을 보낼 헤더와 도구 정책은 `assistant.json` 만 선언한다. 워크벤치의 `assistant.json` 이 바뀌면 이 사본도 고친다.
+토큰을 보낼 헤더와 도구 정책은 `assistant.json` 만 선언한다. `assistant.json` 과 manifest 는 워크벤치 저장소 main `23cc57b` 의 파일 그대로다. 그쪽이 바뀌면 이 사본도 고친다.
 """
 
 import json
@@ -35,9 +35,9 @@ class WorkbenchPluginTest(base.ConnectorGateCase):
         """`schema: 2` 로 오르고, 가리는 필수 칸 하나와 확인 도구 `get_connection` 을 갖는다. 운영 값은 없다."""
         entry = self.entry()
         self.assertEqual((entry["schema"], entry["title"], entry["verify"]),
-                         (2, "가치투자 온톨로지", {"tool": "get_connection"}))
+                         (2, "금융 워크벤치", {"tool": "get_connection"}))
         self.assertEqual([(field["key"], field["env"], field["secret"], field.get("required", True))
-                          for field in entry["fields"]], [("token", "VALUATION_ONTOLOGY_TOKEN", True, True)])
+                          for field in entry["fields"]], [("token", "FINANCIAL_WORKBENCH_TOKEN", True, True)])
         self.assertEqual(sorted(entry["skills"]),
                          ["ontology-change", "ontology-explore", "ontology-record", "ontology-start"])
         self.assertNotIn("workbench-plugin-file.invalid", json.dumps(entry))
@@ -48,7 +48,7 @@ class WorkbenchPluginTest(base.ConnectorGateCase):
         self.assertEqual(manifest["mcp_server"], NAME)
         server = manifest["server"]
         self.assertEqual({key: server[key] for key in ("url", "headers", "strict_redirect_headers", "enabled")},
-                         {"url": OPERATOR_URL, "headers": {"Authorization": "Bearer ${VALUATION_ONTOLOGY_TOKEN}"},
+                         {"url": OPERATOR_URL, "headers": {"Authorization": "Bearer ${FINANCIAL_WORKBENCH_TOKEN}"},
                           "strict_redirect_headers": True, "enabled": True})
         self.assertFalse((server.get("tools") or {}).get("exclude"))
 
