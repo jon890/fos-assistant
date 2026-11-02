@@ -25,6 +25,9 @@ public class GroupSetting {
     /** 단계별 모델과 그룹 기본 단계, 숨김 목록을 담는 설정 종류다. */
     public static final String MODEL = "MODEL";
 
+    /** 그룹이 도구 화면에서 숨긴 toolset 이름 목록을 담는 설정 종류다. */
+    public static final String TOOLSET = "TOOLSET";
+
     @EmbeddedId
     private GroupSettingId id;
 

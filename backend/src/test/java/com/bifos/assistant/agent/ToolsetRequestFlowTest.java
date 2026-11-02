@@ -139,7 +139,7 @@ class ToolsetRequestFlowTest {
         skillStore.deleteAll(agent.hermesProfile());
         jdbc.update("delete from notification where user_id in (select id from app_user where group_id = ?)", group);
         jdbc.update("delete from agent_toolset_request where group_id = ?", group);
-        jdbc.update("delete from toolset_hidden where group_id = ?", group);
+        jdbc.update("delete from group_setting where group_id = ? and setting_key = 'TOOLSET'", group);
         jdbc.update("delete from agent_memory_collection where agent_id = ?", agent.id());
         jdbc.update("delete from agent where id = ?", agent.id());
         jdbc.update("delete from allowed_person where email in (select email from app_user where group_id = ?)", group);
