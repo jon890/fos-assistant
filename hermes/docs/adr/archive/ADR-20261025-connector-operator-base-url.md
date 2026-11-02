@@ -1,9 +1,13 @@
 ## ADR-20261025 / connector-operator-base-url: 공개 오픈소스 서비스의 커넥터는 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다
 
-- **status**: `accepted`
+- **status**: `superseded`
 - Date: 2026-10-25
-- [ADR-064](ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 의 「운영 값이 있어야 도는 커넥터는 여기 두지 않는다」 에 예외 하나를 더한다. 나머지는 그대로다.
-- 금융 워크벤치를 원격 MCP 플러그인으로 옮기면 [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) 이 이 결정을 대체한다.
+
+### 대체된 부분
+
+이 결정 전체를 [ADR-20261026 / remote-mcp-plugin](../ADR-20261026-remote-mcp-plugin.md) 이 대체했다(2026-11-02).
+금융 워크벤치는 워크벤치 저장소의 원격 MCP 플러그인으로 옮겼고, 주소는 운영 목록의 `url` 이 갖는다.
+이 저장소의 로컬 커넥터와 `operator_env` 허용 목록은 지웠다. 아래는 결정 당시의 기록이다.
 
 ### 결정
 
@@ -16,7 +20,7 @@
 | 여전히 막는 것 | `operator_secrets`, 그 밖의 `operator_env`. 사용자의 자격 증명은 지금처럼 `fields` 로만 받는다 |
 | 허용 범위 | `hermes/tests/test_connectors_contract.py` 의 `OPERATOR_BASE_URL_ENV` 가 커넥터 id 와 env 이름을 함께 고정한다. 목록 밖이면 공통 검사가 실패한다 |
 | 값을 두는 곳 | 운영 목록. 이 저장소의 코드와 문서, 검사에는 실제 주소를 적지 않는다. 검사는 자리표시 주소를 쓴다 |
-| 첫 대상 | `financial-workbench`. [금융 워크벤치 커넥터](../../../docs/features/financial-workbench-connector.md) 가 갖는다 |
+| 첫 대상 | `financial-workbench`. [금융 워크벤치 커넥터](../../../../docs/features/financial-workbench.md) 가 갖는다 |
 
 ### 맥락
 

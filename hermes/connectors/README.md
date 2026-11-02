@@ -16,8 +16,7 @@
 | 운영자가 줄 값 없이 돈다 | 주소나 계정 같은 운영 값이 있어야 돈다 |
 
 여기 두지 않는 플러그인도 같은 `assistant.json` 으로 붙는다. 그 서비스의 저장소에 두고 운영 목록에 올리면 된다.
-
-예외는 서비스 자체가 공개 오픈소스라 누구나 띄울 수 있는 플러그인다. 운영자가 띄운 그 서비스의 기준 주소 하나만 운영 값으로 받는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md)). 「비밀값과 권한」 의 `operator_env` 줄이 범위를 갖는다.
+서비스가 MCP 를 직접 열면 그 저장소의 플러그인을 원격 MCP 플러그인으로 받는다. 주소는 운영 목록의 `url` 이 갖는다([ADR-20261026 / remote-mcp-plugin](../docs/adr/ADR-20261026-remote-mcp-plugin.md)). 금융 워크벤치가 그렇다.
 
 ## 디렉터리
 
@@ -70,7 +69,7 @@ hermes/connectors/<id>/
 - 필터처럼 다시 만들 수 있는 설정을 지우는 도구는 `WRITE`, `"grant": false`, `"outbound": false` 로 선언하고 `conversation_grant` 는 적지 않는다. 지울 설정을 조회한 뒤 대화 허락 없이 매번 승인받는다
 - 도구 하나는 프로세스 안의 상태에 기대지 않는다. 승인한 호출은 새 프로세스에서 돈다
 - 결과를 모를 때 쓰기를 다시 부르지 않는다. 보낸 뒤 답을 받지 못한 쓰기는 따로 둔 오류 코드로 끝내고 `errors` 표에서 `outcome_unknown` 에 잇는다. 그 호출은 실패가 아니라 「실행했는지 모름」 으로 기록된다
-- **에이전트가 실패 뒤에 할 일이 코드마다 다르면 `errors` 항목을 객체로 쓴다.** `recovery` 로 복구 어휘를 고르고, 다음 판단에 필요한 수는 오류 객체의 맨 위 칸에 정수로 내고 `details` 에 그 이름을 적는다. 글은 세부로 넘어가지 않는다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
+- **에이전트가 실패 뒤에 할 일이 코드마다 다르면 `errors` 항목을 객체로 쓴다.** `recovery` 로 복구 어휘를 고르고, 다음 판단에 필요한 수는 오류 객체의 맨 위 칸에 정수로 내고 `details` 에 그 이름을 적는다. 원격 서버가 `{code, message, details}` 로 답하면 `details` 객체의 칸이 그 자리다. 글은 세부로 넘어가지 않는다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
 
 #### 인자 표시 이름
 
@@ -89,7 +88,7 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - 결과와 로그와 오류 글에 자격 증명과 서비스가 준 오류 원문을 싣지 않는다. 오류는 코드만 내고 `errors` 표로 공통 어휘에 잇는다
 - 그 일을 하는 가장 작은 OAuth scope 나 권한을 쓴다. 고른 것과 더 작은 것을 못 쓰는 까닭을 플러그인 문서에 적는다
 - `operator_secrets` 를 두지 않는다
-- `operator_env` 를 두지 않는다. 예외는 공개 오픈소스 서비스의 기준 주소 하나다. 그 서비스를 운영자가 띄우고, 값은 비밀이 아닌 `https://` 주소이고, 플러그인이 그 모양이 아니면 부르지 않는다. 허용하는 플러그인과 env 이름은 `hermes/tests/test_connectors_contract.py` 의 `OPERATOR_BASE_URL_ENV` 가 갖는다([ADR-20261025 / connector-operator-base-url](../docs/adr/ADR-20261025-connector-operator-base-url.md))
+- `operator_env` 를 두지 않는다
 - **서비스가 권한 범위를 나누지 못해, 쓰는 도구가 없어도 키 하나로 돈이 움직이거나 되돌리기 어려운 일을 할 수 있으면 `"sandbox_required": true` 를 선언한다.** 실행 공간이 없는 profile 의 셸은 `.env` 를 읽기 때문이다([ADR-20261008 / connector-binding-guards](../../docs/adr/ADR-20261008-connector-binding-guards.md))
 - **서비스가 계정이나 클라이언트마다 유효한 토큰을 하나만 두면 `"single_binding": true` 를 선언한다.** 여러 에이전트의 MCP 프로세스가 번갈아 토큰을 받아 서로의 호출을 깨기 때문이다. 한 프로세스 안에서도 토큰을 다시 받는 일은 한 번에 하나만 한다
 
@@ -282,7 +281,7 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 플러그인
 | `identifiers` 에 적은 이름이 모두 서버의 그 도구 입력 스키마에 있다 | 없는 인자의 선언은 아무것도 가림에서 빼지 않는 죽은 글이다 |
 | `arg_labels`를 선언한 도구의 표시 이름이 검증을 통과하고 키가 실제 입력 스키마와 정확히 같다 | 승인 카드의 이름이 빠지거나 실행 인자와 다른 칸을 가리킨다 |
 | env 이름에 `TOKEN`, `SECRET`, `PASSWORD`, `KEY` 가 든 칸이 `secret: true` 다 | 비밀값이 화면과 응답에 보인다 |
-| `operator_secrets` 가 비었고, `operator_env` 는 비었거나 허용 목록의 그 플러그인 기준 주소 env 하나뿐이다 | 운영 값 없이 돌지 않는다 |
+| `operator_secrets` 와 `operator_env` 가 비었다 | 운영 값 없이 돌지 않는다 |
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
 | 스킬이 하나 이상 있다 | 붙인 에이전트에 지침이 없다 |
 | `icon` 과 `link` 를 선언했고, `.svg` 아이콘이 `xmlns="http://www.w3.org/2000/svg"` 를 선언했다 | 카드가 기본 아이콘이나 빈 아이콘으로 보이고 서비스로 가는 길이 없다 |
