@@ -36,12 +36,13 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -54,15 +55,12 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -113,6 +111,7 @@ class ConnectorConditionalSnapshotTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @ParameterizedTest(name = "{0}")
     @MethodSource("sharedCases")
     @DisplayName("공통 원문을 검증하고 정상 vector는 실제 암호화 DB에서 다시 읽는다")
@@ -138,6 +137,7 @@ class ConnectorConditionalSnapshotTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @Test
     @DisplayName("조건 의도 키는 잘못된 surrogate를 거절하고 한글과 정상 비 BMP 해시를 보존한다")
     void rejectsMalformedToolEncodingAndPreservesUtf8Hash() {
@@ -381,17 +381,7 @@ class ConnectorConditionalSnapshotTest {
     }
 }
 
-/** 같은 원문·암호화 DB 소비를 MySQL 스키마에서도 확인한다. */
-@Tag("mysql")
+/** 원문·암호화 DB 소비 가운데 저장 컬럼에 기대는 검사만 MySQL 스키마에서 확인한다. */
+@MysqlIntegrationTest
 class ConnectorConditionalSnapshotMysqlTest extends ConnectorConditionalSnapshotTest {
-    @DynamicPropertySource
-    static void selectTestDatabase(DynamicPropertyRegistry registry) {
-        MysqlTestDatabase database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    }
 }

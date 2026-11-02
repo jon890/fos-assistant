@@ -17,6 +17,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -33,7 +34,7 @@ import tools.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** 실제 DB 권한과 Spring claim HTTP, source Python, SDK bundle, mock 목적지를 왕복한다. */
-class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducerTest {
+class FinancialConnectorProducerRoundTripTest extends FinancialConnectorTestBase {
     @Autowired
     ConnectorExecutionTicket tickets;
     @Autowired
@@ -45,6 +46,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     TextCipher cipher;
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @DisplayName("실제 claim과 기동 정리가 같은 사용자 잠금에서 기다려도 미소비일 때만 실패로 끝낸다")
     @ValueSource(booleans = {false, true})
@@ -142,6 +144,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @DisplayName("claim과 정리가 겹쳐도 먼저 커밋한 쪽에 따라 미전송만 실패가 된다")
     @ValueSource(booleans = {false, true})
@@ -251,6 +254,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("동시 승인은 금융 요청을 한 번만 실행한다")
     void concurrentApprovalExecutesOnlyOnce() throws Exception {
@@ -432,6 +436,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @Test
     @DisplayName("같은 의도의 동시 준비는 PENDING 한 줄만 남긴다")
     void concurrentSameIntentRequestsLeaveOnePending() throws Exception {

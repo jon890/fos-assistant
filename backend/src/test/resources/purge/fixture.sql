@@ -4,8 +4,8 @@
 INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at, profile_managed, proactive_check_writes_allowed)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'http://agent-runtime.test', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 900000001, 1, '2020-01-01 00:00:00', 0, 1);
 
-INSERT INTO agent_execution (id, user_id, conversation_id, agent_id, profile_name, cost_mode, status, input_tokens, output_tokens, estimated_cost_micros, started_at, output_text, event_observation)
-VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'SUBSCRIPTION', 'SUCCEEDED', 17, 23, 123, '2020-01-01 00:00:00', '지워야 할 실행 본문', 'coverage-900000001');
+INSERT INTO agent_execution (id, user_id, conversation_id, agent_id, profile_name, cost_mode, status, input_tokens, output_tokens, estimated_cost_micros, started_at, output_text, event_observation, question_message_id)
+VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'SUBSCRIPTION', 'SUCCEEDED', 17, 23, 123, '2020-01-01 00:00:00', '지워야 할 실행 본문', 'coverage-900000001', 900000001);
 
 INSERT INTO agent_token (id, token_hash, label, created_at, profile_name)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', 'coverage-900000001');

@@ -46,6 +46,7 @@ import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.application.port.SignInRevocation;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import java.sql.Timestamp;
 import java.nio.ByteBuffer;
 import java.time.Instant;
@@ -239,6 +240,7 @@ class ConnectorGuardBindingRoundTripTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(strings = {"register", "check", "disconnect", "revoked", "owner", "profile", "revision"})
     @DisplayName("실제 설치 HTTP 응답보다 다음 등록·확인·해제·접근 및 맥락 변경이 먼저 커밋되면 옛 결과를 버린다")
@@ -269,6 +271,7 @@ class ConnectorGuardBindingRoundTripTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.ROW_LOCK)
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("같은 revision의 새 시도와 재생성한 결과 처리기는 늦은 성공·실패와 중복 결과를 한 번만 대조한다")

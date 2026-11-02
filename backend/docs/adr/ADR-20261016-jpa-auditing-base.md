@@ -66,7 +66,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `content_draft_snapshot` / `ContentDraftSnapshot` | C: 확정 snapshot 행의 저장 시각 | connectionUpdatedAt/bindingUpdatedAt/expiresAt과 지문은 업무 값으로 보존 |
 | `conversation` / `Conversation` | C: 대화 행의 최초 저장만 자동화 | U는 활동·목록 정렬 시각. rename/touch/delete bulk 인자 유지 |
 | `execution_context_source` / `ExecutionContextSource` | C: 문맥 참조 행의 저장 시각. freshness는 별도 snapshot 속성 | 복합 ID와 Persistable의 insert 우선·중복 PK 거절 유지 |
-| `execution_question` / `ExecutionQuestion` | C: 실행 안의 질문 식별 행 저장 시각 | UPDATE bulk 없음 |
 | `follow_up` / `FollowUp` | 제외: 할 일 제안 시각. FollowUpAttentionSource가 C와 U로 제안·최신 상태의 신호를 구성 | U와 dueAt/acceptedAt/closedAt도 명시 전달 |
 | `hermes_session_binding` / `HermesSessionBinding` | C: session과 최초 실행의 불변 대응 행 저장 시각 | session 재등록은 기존 행 재사용. UPDATE bulk 없음 |
 | `media_observation` / `MediaObservation` | 제외: 관찰 revision 시각. MediaObservationService가 C에서 15분 유효기간을 계산 | C와 expiresAt 유지 |
