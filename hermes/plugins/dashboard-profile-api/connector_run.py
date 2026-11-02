@@ -267,10 +267,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     global _connector_calls
 
     def failed(word, stage, code="-"):
-        body = {"ok": False, "error": word}
-        if prepare:
-            body.update(stage=stage, code=code)
-        return JSONResponse(body, status_code=200)
+        return JSONResponse({"ok": False, "error": word, **({"stage": stage, "code": code} if prepare else {})}, status_code=200)
 
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
