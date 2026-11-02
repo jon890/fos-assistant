@@ -385,7 +385,7 @@ bindingId는 선택 정수이고 소유자·profile·실행·파일 경로 인�
 CP 재기동 검사는 같은 합성 DB를 유지하며 JVM 안에서 운영 ApplicationContext·HTTP server·DB 연결을 종료하고 재생성한다. 별도 JVM 종료와 운영 DB 장애 복구를 검증한 것은 아니다.
 macOS와 Linux CI 모두 기존 합성 Chrome image에 고정 의존성을 더한 Docker runner를 쓴다. 합성 CP와 worker가 서로 다른 첨부 경로를 쓰는 기존 fixture 계약을 유지하고 Linux에서는 host-gateway로 CP에 닿는다. 실제 계정 env는 복사하지 않는다. Bun·Docker 부재를 skip하지 않으며 자식·컨테이너·합성 사진을 finally에서 정리한다.
 runner는 최종 Dockerfile(`test.Dockerfile`에 runner가 덧붙인 줄), `package.json`, `bun.lock`의 hash를 태그로 쓰는 image를 만들며, 같은 태그의 image가 이미 있으면 빌드를 건너뛴다. CI `backend-tests`의 `unit` 갈래는 이 입력 파일에 runner 파일을 더한 hash를 키로 image를 캐시에 두고 복원한다(첫 빌드 66~76초). 입력이 바뀌면 태그와 키가 바뀌어 옛 image로 돌지 않는다.
-응답 한도를 실제로 기다리는 검사는 한도를 줄여서 돌린다. `HttpContentDraftSnapshotClient`의 compile·status 응답 한도는 운영 5초이고, `HttpContentDraftSnapshotClientTest`의 두 검사는 한도를 받는 생성자로 1초를 준다. `ConnectorExecutionClaimTestSupport`는 `hermes.read-timeout`을 3초로 둔다. 응답을 쥔 채 다른 작업을 기다리는 사례의 대기(3초)보다 짧지 않게 잡은 값이다.
+응답 한도를 실제로 기다리는 검사는 한도를 줄여서 돌린다. `HttpContentDraftSnapshotClient`의 compile·status 응답 한도는 운영 5초이고, `HttpContentDraftSnapshotClientTest`의 두 검사는 한도를 받는 생성자로 1초를 준다. `ConnectorExecutionClaimTestSupport`는 `hermes.read-timeout`을 4초로 둔다. 응답을 쥔 채 다른 작업을 기다리는 사례의 대기 상한(2초)보다 충분히 길게(2배) 잡은 값이다.
 
 ## 단계별 합성 판정
 
