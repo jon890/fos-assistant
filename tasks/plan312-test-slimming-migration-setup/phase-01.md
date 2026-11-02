@@ -40,6 +40,10 @@ cd backend && ./gradlew test --tests '*MigrationTest'
 scripts/checks/check-mysql-migration.sh
 ```
 
+## 구현 결과
+
+계획서의 「18개」 는 추정이었다. 본문에 쓰기가 있거나 메서드 안에서 마이그레이션을 더 올리는 클래스를 빼니 H2 아홉 개와 상속으로 줄어드는 MySQL 하위 클래스 넷, 합쳐 열세 개가 남았다.
+
 ## 변경 파일
 
 | 파일 | 변경 |

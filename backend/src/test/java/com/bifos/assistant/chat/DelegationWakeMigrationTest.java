@@ -23,7 +23,7 @@ import org.junit.jupiter.api.TestInstance;
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다.
  */
-// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+// 공유 DB 의 줄을 바꾸는 메서드가 없다(쓰는 메서드는 자기 DB 를 따로 만든다). 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DelegationWakeMigrationTest {
     private String url;
