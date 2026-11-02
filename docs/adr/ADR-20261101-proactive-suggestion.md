@@ -69,7 +69,7 @@
 | `until_at` nullable | 미루기가 끝나는 시각 |
 | `event_key` nullable, `(user_id, event_key)` UNIQUE | 서버가 검증한 요청 키나 노출 키로 재전송을 하나로 합친다 |
 
-`source_check_id`, `autonomy_decision_id` 컬럼은 옛 테이블과 함께 없앤다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
+`autonomy_decision_id` 컬럼은 순서 7 에서 지웠다. `source_check_id` 는 `proactive_check` 를 남겨 함께 남기고, 그 테이블을 줄이는 별도 스펙에서 정한다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
 지표는 모델·프롬프트 버전별 수락률, 무반응 비율, 정정률이다. 분모는 그 버전으로 만든 제안의 처음 노출 수이고, 무응답은 사건으로 남기지 않고 관측 기간 뒤 계산한다.
 
 #### 숨김과 미루기를 반응 기록으로 옮기는 조건
