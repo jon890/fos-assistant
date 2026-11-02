@@ -168,18 +168,22 @@ class ConnectorGuardBindingRoundTripTest {
 
     @AfterEach
     void tearDown() throws Exception {
-        if (remote != null) {
-            remote.resetObservations();
-            remote.resetPlugin();
-        }
-        if (target != null) {
-            bindings.deleteById(target.bindingId());
-            connections.deleteById(target.connectionId());
-            // 에이전트 생성 사건이 만든 기본 Memory 허락도 이 시험의 행만 지운다.
-            jdbc.update("delete from agent_memory_collection where agent_id = ?", target.agentId());
-            agents.deleteById(target.agentId());
-            jdbc.update("delete from allowed_person where email = ?", target.user().email());
-            users.deleteById(target.user().id());
+        try {
+            if (remote != null) {
+                remote.resetObservations();
+                remote.resetPlugin();
+            }
+        } finally {
+            // 되돌림 단언이 실패해도 이 검사의 행은 지운다.
+            if (target != null) {
+                bindings.deleteById(target.bindingId());
+                connections.deleteById(target.connectionId());
+                // 에이전트 생성 사건이 만든 기본 Memory 허락도 이 시험의 행만 지운다.
+                jdbc.update("delete from agent_memory_collection where agent_id = ?", target.agentId());
+                agents.deleteById(target.agentId());
+                jdbc.update("delete from allowed_person where email = ?", target.user().email());
+                users.deleteById(target.user().id());
+            }
         }
     }
 
