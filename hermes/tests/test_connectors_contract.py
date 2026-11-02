@@ -25,20 +25,12 @@ SERVER_TIMEOUT_SECONDS = 30
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 # 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
 TOOL_SUMMARY_MAX_CHARS = 200
-# 운영자가 띄운 공개 오픈소스 서비스의 기준 주소 하나만 `operator_env` 로 받는 플러그인다(ADR-20261025 / connector-operator-base-url).
-# 플러그인 id 와 env 이름을 함께 고정한다. 다른 플러그인나 다른 이름의 운영 값은 위반이다.
-OPERATOR_BASE_URL_ENV = {"financial-workbench": "FINANCIAL_WORKBENCH_BASE_URL"}
 # 검사에서 운영 목록 대신 넣는 자리표시 주소다. 실제 서비스 주소가 아니다.
-PLACEHOLDER_BASE_URL = "https://workbench.example"
+PLACEHOLDER_BASE_URL = "https://service.example"
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
     return sorted(p for p in connectors.iterdir() if p.is_dir() and not p.name.startswith("."))
-
-
-def operator_values(name: str) -> dict[str, str]:
-    """운영 목록이 그 플러그인에 줄 `env` 를 자리표시 값으로 만든다. 허용 목록 밖이면 비어 있다."""
-    return {OPERATOR_BASE_URL_ENV[name]: PLACEHOLDER_BASE_URL} if name in OPERATOR_BASE_URL_ENV else {}
 
 
 def read_json(path: pathlib.Path):
@@ -135,7 +127,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     loaded = None
     served_args: set[str] = set()
     try:
-        loaded = load_connector(name, {"root": root, "command": sys.executable, "env": operator_values(name)})
+        loaded = load_connector(name, {"root": root, "command": sys.executable, "env": {}})
     except Exception as error:
         problems.append("manifest 검증 실패: %s" % error)
 
@@ -185,9 +177,9 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
 
     if declared.get("operator_secrets"):
         problems.append("operator_secrets 가 비어 있지 않다")
-    operator_env = declared.get("operator_env")
-    if operator_env and operator_env != list(operator_values(name)):
-        problems.append("operator_env 가 허용 목록의 기준 주소 하나가 아니다: %r" % operator_env)
+    # 이 저장소의 플러그인은 운영 값 없이 돈다. 운영 값이 필요한 플러그인은 그 서비스의 저장소에 둔다(ADR-064).
+    if declared.get("operator_env"):
+        problems.append("operator_env 가 비어 있지 않다: %r" % declared["operator_env"])
 
     servers = mcp_config.get("mcpServers", {})
     server = next(iter(servers.values()), None) if servers else None
@@ -384,7 +376,7 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                     server = original["mcpServers"][source.name]
                     command = shutil.which(server["command"])
                     loaded = self.plugin._load_connector(source.name, {"root": root, "command": command,
-                                                                        "env": operator_values(source.name)})
+                                                                        "env": {}})
                     self.assertEqual(loaded["server"]["command"], command)
                     self.assertEqual(loaded["server"]["args"], [
                         arg.replace("${CLAUDE_PLUGIN_ROOT}", str(root)) for arg in server["args"]])
@@ -392,27 +384,20 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
                     self.assertEqual((root / entry).read_bytes(), (source / entry).read_bytes())
                 self.assertEqual(self.broken_copy(check_copy, source), [])
 
-    def test_operator_env_outside_the_base_url_allowlist_is_reported(self):
-        """허용 목록 밖의 플러그인이 운영 값을 두거나, 허용한 플러그인이 다른 이름을 더하면 위반이다."""
+    def test_operator_env_and_secrets_are_reported(self):
+        """이 저장소의 플러그인이 운영 값이나 운영 비밀을 두면 위반이다(ADR-064)."""
         def add_operator_env(names):
             def change(root):
                 self.edit_declaration(lambda v: v.update(operator_env=names))(root)
                 self.edit_server(lambda server: server["env"].update({n: "${%s}" % n for n in names}))(root)
             return change
-        # 운영 목록이 값을 주어 로더는 통과한다. 막는 것은 허용 목록 검사 하나다.
-        outside = "허용 목록의 기준 주소 하나가 아니다"
+        # 운영 목록이 값을 주어 로더는 통과한다. 막는 것은 공통 검사다.
         gmail = self.broken_copy(add_operator_env(["GMAIL_API_BASE_URL"]),
                                  operator_env={"GMAIL_API_BASE_URL": PLACEHOLDER_BASE_URL})
         self.assertEqual([p for p in gmail if "manifest 검증 실패" in p], [])
-        self.assert_reported(gmail, outside)
-        workbench = CONNECTORS / "financial-workbench"
-        names = ["FINANCIAL_WORKBENCH_BASE_URL", "FINANCIAL_WORKBENCH_OTHER"]
-        extra = self.broken_copy(add_operator_env(names), workbench,
-                                 operator_env={name: PLACEHOLDER_BASE_URL for name in names})
-        self.assertEqual([p for p in extra if "manifest 검증 실패" in p], [])
-        self.assert_reported(extra, outside)
+        self.assert_reported(gmail, "operator_env 가 비어 있지 않다")
         self.assert_reported(self.broken_copy(self.edit_declaration(
-            lambda v: v.update(operator_secrets=["FINANCIAL_WORKBENCH_SECRET"])), workbench), "operator_secrets")
+            lambda v: v.update(operator_secrets=["GMAIL_API_SECRET"]))), "operator_secrets")
 
     def test_naver_blog_without_dotenv_blocking_option_is_reported(self):
         self.assert_reported(self.broken_copy(self.edit_server(lambda server: server.update(
