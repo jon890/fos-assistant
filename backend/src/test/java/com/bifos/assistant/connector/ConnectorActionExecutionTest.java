@@ -37,12 +37,13 @@ import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import com.bifos.assistant.testsupport.MysqlIntegrationTest;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.MysqlCase;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -61,7 +62,6 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,8 +70,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -316,6 +314,7 @@ class ConnectorActionExecutionTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @Test
     @DisplayName("암호화한 세 본문을 같은 key로 저장하고 두 revision 및 원래 인자를 보존한다")
     void storesAndOpensActualCiphertext() {
@@ -373,6 +372,7 @@ class ConnectorActionExecutionTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @Test
     @DisplayName("같은 승인 번호를 쓰는 두 새 객체의 저장은 기존 내용을 덮어쓰지 않고 거절한다")
     void refusesSecondNewEntityForSameAction() {
@@ -694,6 +694,7 @@ class ConnectorActionExecutionTest {
     }
 
 
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @Test
     @DisplayName("승인 줄을 지우면 실행 내용도 지우고 연결이나 바인딩 삭제는 이력을 남긴다")
     void actionOwnsLifetimeButConnectionAndBindingDoNot() {
@@ -903,17 +904,7 @@ class ConnectorActionExecutionTest {
     }
 }
 
-/** H2와 같은 저장 회귀를 실제 MySQL에 적용한다. mysqlMigrationTest가 이 클래스를 함께 돌린다. */
-@Tag("mysql")
+/** 실제 컬럼과 제약에 기대는 저장 회귀만 MySQL 에 적용한다. `@MysqlCase` 를 단 상위 클래스 검사만 돈다. */
+@MysqlIntegrationTest
 class ConnectorActionExecutionMysqlTest extends ConnectorActionExecutionTest {
-    @DynamicPropertySource
-    static void selectTestDatabase(DynamicPropertyRegistry registry) {
-        MysqlTestDatabase database = MysqlTestDatabase.create();
-        registry.add("spring.datasource.url", database::url);
-        registry.add("spring.datasource.username", database::username);
-        registry.add("spring.datasource.password", database::password);
-        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-    }
 }
