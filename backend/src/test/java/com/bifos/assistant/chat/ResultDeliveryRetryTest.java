@@ -23,15 +23,12 @@ import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
-import com.bifos.assistant.chat.delivery.domain.ResultDeliveryAttempt;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
@@ -61,7 +58,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -153,12 +149,6 @@ class ResultDeliveryRetryTest {
     ResultDeliveryRepository deliveries;
 
     @Autowired
-    ResultDeliveryItemRepository deliveryItems;
-
-    @Autowired
-    ResultDeliveryAttemptRepository attempts;
-
-    @Autowired
     HermesRunsClient hermes;
 
     @Autowired
@@ -183,8 +173,6 @@ class ResultDeliveryRetryTest {
         stub().reset();
         testResults.reset();
         events.clear();
-        deliveryItems.deleteAll();
-        attempts.deleteAll();
         deliveries.deleteAll();
         executionEvents.deleteAll();
         executions.deleteAll();
@@ -238,14 +226,12 @@ class ResultDeliveryRetryTest {
         ResultDelivery after = deliveries.findById(delivery.id()).orElseThrow();
         assertThat(after.status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(after.attemptCount()).isEqualTo(2);
-        List<ResultDeliveryAttempt> tries = attemptsOf(delivery.id());
-        assertThat(tries)
-            .extracting(ResultDeliveryAttempt::attemptNo, ResultDeliveryAttempt::status)
-            .containsExactly(tuple(1, DeliveryAttemptStatus.FAILED), tuple(2, DeliveryAttemptStatus.SUCCEEDED));
+        assertThat(after.lastAttemptStatus()).as("마지막 시도만 남는다").isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
+        assertThat(after.lastAttemptErrorCode()).as("앞 시도의 오류 코드는 지운다").isNull();
         ChatMessage retryNotice = messagesOf(MessageRole.SYSTEM).getLast();
         ChatMessage answer = messagesOf(MessageRole.ASSISTANT).getFirst();
-        assertThat(tries.get(1).noticeMessageId()).as("다시 전달의 알림 줄").isEqualTo(retryNotice.id());
-        assertThat(tries.get(1).executionId()).as("다시 전달 turn 의 실행 줄").isEqualTo(answer.executionId());
+        assertThat(after.lastAttemptNoticeMessageId()).as("다시 전달의 알림 줄").isEqualTo(retryNotice.id());
+        assertThat(after.lastAttemptExecutionId()).as("다시 전달 turn 의 실행 줄").isEqualTo(answer.executionId());
 
         List<HermesRunCommand> received = stub().received();
         assertThat(received).hasSize(2);
@@ -334,10 +320,10 @@ class ResultDeliveryRetryTest {
 
         chat.retryDelivery(dad, conversation.id(), delivery.id(), events::add);
 
-        assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
-        assertThat(attemptsOf(delivery.id()))
-            .extracting(ResultDeliveryAttempt::status)
-            .containsExactly(DeliveryAttemptStatus.STOPPED, DeliveryAttemptStatus.SUCCEEDED);
+        ResultDelivery after = deliveries.findById(delivery.id()).orElseThrow();
+        assertThat(after.status()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(after.attemptCount()).isEqualTo(2);
+        assertThat(after.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
         assertThat(messagesOf(MessageRole.ASSISTANT).getLast().content()).isEqualTo("다시 정리한 답");
     }
 
@@ -355,7 +341,7 @@ class ResultDeliveryRetryTest {
             () -> chat.retryDelivery(dad, conversation.id(), delivery.id(), events::add),
             ErrorCode.DELIVERY_NOT_RETRYABLE);
 
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(attemptTotal()).as("만든 시도 수").isEqualTo(1);
         assertThat(messagesOf(MessageRole.SYSTEM)).hasSize(1);
         assertThat(stub().received()).hasSize(1);
         assertThat(events).isEmpty();
@@ -401,7 +387,7 @@ class ResultDeliveryRetryTest {
             () -> chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {
             }),
             ErrorCode.DELIVERY_NOT_RETRYABLE);
-        assertThat(attempts.findAll()).hasSize(2);
+        assertThat(attemptTotal()).as("만든 시도 수").isEqualTo(2);
         assertThat(messagesOf(MessageRole.ASSISTANT)).hasSize(1);
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
@@ -427,7 +413,7 @@ class ResultDeliveryRetryTest {
             ErrorCode.CONVERSATION_BUSY);
 
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.FAILED);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(attemptTotal()).as("만든 시도 수").isEqualTo(1);
         assertThat(events).isEmpty();
         stub().releaseSubmits();
         userTurn.join(WAIT_LIMIT.toMillis());
@@ -438,22 +424,22 @@ class ResultDeliveryRetryTest {
     @DisplayName("잠금 뒤 다른 요청이 먼저 묶음을 바꿨으면 조건부 update 가 거절하고 그 트랜잭션의 알림 줄도 되돌아간다")
     void rollsBackNoticeWhenAnotherRequestClaimedFirst() {
         ResultDelivery delivery = failedDelivery(delegated(ExecutionStatus.SUCCEEDED, "조사 결과"));
-        transactions.executeWithoutResult(
-            status -> deliveries.changeStatus(delivery.id(), DeliveryStatus.DELIVERING, Instant.now()));
+        transactions.executeWithoutResult(status -> recorder.claimRetry(delivery.id(), null, Instant.now()));
         int linesBefore = history().size();
 
         assertCode(
             () -> transactions.executeWithoutResult(status -> {
-                messages.save(ChatMessage.fromSystem(conversation.id(), RETRY_NOTICE, Instant.now()));
-                recorder.claimRetry(delivery.id(), Instant.now());
+                ChatMessage line = messages.save(ChatMessage.fromSystem(conversation.id(), RETRY_NOTICE, Instant.now()));
+                recorder.claimRetry(delivery.id(), line.id(), Instant.now());
             }),
             ErrorCode.DELIVERY_NOT_RETRYABLE);
 
         assertThat(history()).as("되돌아간 알림 줄").hasSize(linesBefore);
         ResultDelivery after = deliveries.findById(delivery.id()).orElseThrow();
         assertThat(after.status()).isEqualTo(DeliveryStatus.DELIVERING);
-        assertThat(after.attemptCount()).isEqualTo(1);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(after.attemptCount()).as("먼저 바꾼 요청의 시도만 늘었다").isEqualTo(2);
+        assertThat(after.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.RUNNING);
+        assertThat(after.lastAttemptNoticeMessageId()).as("거절된 요청의 알림 줄을 잇지 않는다").isNull();
     }
 
 
@@ -492,7 +478,7 @@ class ResultDeliveryRetryTest {
             () -> chat.retryDelivery(dad, conversation.id(), delivery.id(), events::add), ErrorCode.AGENT_DISABLED);
 
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.FAILED);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(attemptTotal()).as("만든 시도 수").isEqualTo(1);
         assertThat(stub().received()).as("Hermes 제출").hasSize(submitted);
     }
 
@@ -512,16 +498,17 @@ class ResultDeliveryRetryTest {
             before)
             .deliveryId();
         assertThat(recorder.closeLeftovers(Instant.now())).isEqualTo(1);
-        assertThat(attemptsOf(deliveryId))
-            .extracting(ResultDeliveryAttempt::status, ResultDeliveryAttempt::errorCode)
-            .containsExactly(tuple(DeliveryAttemptStatus.FAILED, ResultDeliveryRecorder.INTERRUPTED));
+        ResultDelivery interrupted = deliveries.findById(deliveryId).orElseThrow();
+        assertThat(interrupted)
+            .extracting(ResultDelivery::lastAttemptStatus, ResultDelivery::lastAttemptErrorCode)
+            .containsExactly(DeliveryAttemptStatus.FAILED, ResultDeliveryRecorder.INTERRUPTED);
         stub().willReturn(result("retry", "completed", "다시 정리한 답"));
 
         chat.retryDelivery(dad, conversation.id(), deliveryId, events::add);
 
-        assertThat(attemptsOf(deliveryId))
-            .extracting(ResultDeliveryAttempt::attemptNo, ResultDeliveryAttempt::status)
-            .containsExactly(tuple(1, DeliveryAttemptStatus.FAILED), tuple(2, DeliveryAttemptStatus.SUCCEEDED));
+        assertThat(deliveries.findById(deliveryId).orElseThrow())
+            .extracting(ResultDelivery::attemptCount, ResultDelivery::lastAttemptStatus, ResultDelivery::lastAttemptErrorCode)
+            .containsExactly(2, DeliveryAttemptStatus.SUCCEEDED, null);
         assertThat(deliveries.findById(deliveryId).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(stub().received()).hasSize(1);
     }
@@ -615,11 +602,9 @@ class ResultDeliveryRetryTest {
     }
 
 
-    private List<ResultDeliveryAttempt> attemptsOf(Long deliveryId) {
-        return attempts.findAll().stream()
-            .filter(attempt -> attempt.deliveryId().equals(deliveryId))
-            .sorted(Comparator.comparingInt(ResultDeliveryAttempt::attemptNo))
-            .toList();
+    /** 모든 묶음이 지금까지 만든 시도 수의 합이다. 시도는 마지막 것만 남으므로 {@code attempt_count} 로 센다. */
+    private int attemptTotal() {
+        return deliveries.findAll().stream().mapToInt(ResultDelivery::attemptCount).sum();
     }
 
 

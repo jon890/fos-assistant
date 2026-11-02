@@ -109,7 +109,7 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, ChatArtifact.of(conversation.id(), 1L, unique, 1L));
         add(entityManager, rows, ChatAttachment.of(conversation.id(), user.id(), "audit.txt", "text/plain", 1, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ExecutionQuestion.of(execution.id(), 1L));
-        add(entityManager, rows, ResultDelivery.opened(conversation.id(), BUSINESS));
+        add(entityManager, rows, ResultDelivery.opened(conversation.id(), "{\"version\":1,\"items\":[]}", null, BUSINESS));
         add(entityManager, rows, ConnectorToolGrant.of(user.id(), "audit", "audit", BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorConversationGrant.of(action, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorActionExecution.stored(action, connection.id(), binding.id(), BUSINESS, BUSINESS,

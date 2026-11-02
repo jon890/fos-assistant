@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.artifact.application.ArtifactService;
 import com.bifos.assistant.chat.conversation.application.ConversationSessions;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.chat.starter.application.StarterSuggestionService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
@@ -107,7 +108,7 @@ class ChatTurnLifecycle {
             modelTier,
             requestReceivedAt);
         if (intent instanceof TurnIntent.DelegationResults results) {
-            attachDeliveryExecution(results.attemptId(), execution.id());
+            attachDeliveryExecution(results.attempt(), execution.id());
         }
         return new PendingTurn(
             user,
@@ -146,11 +147,11 @@ class ChatTurnLifecycle {
      * <p>실패해도 던지지 않는다. 던지면 방금 만든 실행 줄이 {@code RUNNING} 으로 남는다. 이 뒤에는 그 줄을 실패로 적는
      * 경로가 없다. 시도는 이어지지 않은 채 turn 이 끝난 방식으로 닫힌다.
      */
-    void attachDeliveryExecution(Long attemptId, Long executionId) {
+    void attachDeliveryExecution(DeliveryAttemptRef attempt, Long executionId) {
         try {
-            resultDeliveries.attachExecution(attemptId, executionId);
+            resultDeliveries.attachExecution(attempt, executionId);
         } catch (RuntimeException ex) {
-            log.warn("전달 시도에 실행 줄을 잇지 못했다 attemptId={} executionId={}", attemptId, executionId, ex);
+            log.warn("전달 시도에 실행 줄을 잇지 못했다 attempt={} executionId={}", attempt, executionId, ex);
         }
     }
 

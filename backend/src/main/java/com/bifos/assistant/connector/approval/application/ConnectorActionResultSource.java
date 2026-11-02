@@ -90,8 +90,8 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
 
 
     @Override
-    public void markDelivered(List<String> keys, Instant now) {
-        actions.markDelivered(keys.stream().map(UUID::fromString).toList(), now);
+    public int markDelivered(List<String> keys, Instant now) {
+        return actions.markDelivered(keys.stream().map(UUID::fromString).toList(), now);
     }
 
 

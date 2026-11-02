@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application.dto;
 
 import com.bifos.assistant.chat.turn.application.port.CheckTurn;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.List;
 
@@ -61,11 +62,11 @@ public sealed interface TurnIntent {
      *
      * <p>알림 줄과 전달 시도는 이 turn 을 열기 전에 이미 저장돼 있다(ADR-075).
      *
-     * @param attemptId 이 turn 의 전달 시도 번호. 실행 줄을 만들면 그 번호를 이 시도에 잇는다
+     * @param attempt 이 turn 의 전달 시도. 실행 줄을 만들면 그 번호를 이 시도에 잇는다
      * @param retry 사용자가 다시 전달한 turn 이다. 지시가 {@link #DELIVERY_RETRY_INSTRUCTION} 이 된다
      * @param items 입력에 실은 결과 항목(ADR-071). 실행 기록이 Memory 항목 뒤로 이 참조를 잇는다
      */
-    record DelegationResults(Long attemptId, boolean retry, List<ContextItem> items) implements TurnIntent {
+    record DelegationResults(DeliveryAttemptRef attempt, boolean retry, List<ContextItem> items) implements TurnIntent {
         public DelegationResults {
             items = items == null ? List.of() : List.copyOf(items);
         }

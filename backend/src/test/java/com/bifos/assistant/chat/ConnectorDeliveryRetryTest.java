@@ -22,8 +22,6 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.connector.approval.application.ConnectorActionResultSource;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
@@ -176,12 +174,6 @@ class ConnectorDeliveryRetryTest {
     ResultDeliveryRepository deliveries;
 
     @Autowired
-    ResultDeliveryItemRepository deliveryItems;
-
-    @Autowired
-    ResultDeliveryAttemptRepository attempts;
-
-    @Autowired
     HermesRunsClient hermes;
 
     @Autowired
@@ -205,8 +197,6 @@ class ConnectorDeliveryRetryTest {
         jdbc.update("DELETE FROM connector_action");
         bindings.deleteAll();
         connections.deleteAll();
-        deliveryItems.deleteAll();
-        attempts.deleteAll();
         deliveries.deleteAll();
         pendingRows.deleteAll();
         executionEvents.deleteAll();

@@ -23,6 +23,7 @@ import com.bifos.assistant.attention.presentation.AttentionController;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
+import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -146,14 +147,6 @@ class AttentionServiceTest {
         SecurityContextHolder.clearContext();
         for (Long userId : createdUsers) {
             String ownConversations = "(SELECT id FROM conversation WHERE user_id = ?)";
-            jdbc.update(
-                "DELETE FROM result_delivery_attempt WHERE delivery_id IN"
-                    + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
-                userId);
-            jdbc.update(
-                "DELETE FROM result_delivery_item WHERE delivery_id IN"
-                    + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
-                userId);
             jdbc.update("DELETE FROM result_delivery WHERE conversation_id IN " + ownConversations, userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
@@ -544,9 +537,17 @@ class AttentionServiceTest {
 
     /** 열린 묶음을 저장하고 상태와 바뀐 시각을 그 값으로 맞춘다. */
     private ResultDelivery deliveryOf(Conversation conversation, DeliveryStatus status, Instant updatedAt) {
-        ResultDelivery delivery = deliveries.save(ResultDelivery.opened(conversation.id(), updatedAt));
-        new TransactionTemplate(transactionManager)
-            .executeWithoutResult(transaction -> deliveries.changeStatus(delivery.id(), status, updatedAt));
+        ResultDelivery delivery = deliveries.save(ResultDelivery.opened(conversation.id(), "{\"version\":1,\"items\":[]}", null, updatedAt));
+        DeliveryAttemptStatus attemptStatus = switch (status) {
+            case DELIVERING -> null;
+            case DELIVERED -> DeliveryAttemptStatus.SUCCEEDED;
+            case FAILED -> DeliveryAttemptStatus.FAILED;
+            case STOPPED -> DeliveryAttemptStatus.STOPPED;
+        };
+        if (attemptStatus != null) {
+            new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> deliveries.finishAttempt(
+                delivery.id(), delivery.attemptCount(), attemptStatus, status, null, updatedAt));
+        }
         return delivery;
     }
 
