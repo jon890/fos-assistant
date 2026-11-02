@@ -240,15 +240,15 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 
 `PurgeCoverageMysqlTest`는 Flyway로 만든 실제 MySQL에서 모든 분류 테이블에 행을 넣는다.
 삭제 전 대상과 다른 사용자의 행이 모두 있어야 한다.
-사용자 접근 해제, `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
+사용자 접근 해제, 예약 30일 뒤 `UserPurger`(대화 정리를 기다린 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`까지), `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
 행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하며 `KEEP` 대상과 다른 사용자의 모든 칸이 같은지도 비교한다.
 Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검사의 범위 밖이다.
 
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
-현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
-접근 해제는 사용자와 개인 데이터를 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+사용자 물리 삭제는 사용자 정리(ADR-20261101 / user-purge)가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
+접근 해제만으로는 사용자와 개인 데이터를 지우지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
