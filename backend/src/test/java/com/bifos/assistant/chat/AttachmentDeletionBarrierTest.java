@@ -22,7 +22,6 @@ import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -122,9 +121,6 @@ public class AttachmentDeletionBarrierTest {
     MediaObservationRepository observationRows;
 
     @Autowired
-    MediaObservationRequestRepository observationRequests;
-
-    @Autowired
     TestClock clock;
 
     @Autowired
@@ -177,8 +173,6 @@ public class AttachmentDeletionBarrierTest {
                 assertBlocked();
                 assertThat(observationRows.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()))
                     .isEmpty();
-                assertThat(observationRequests.findAll())
-                    .noneMatch(row -> photo.id().equals(row.attachmentId()));
                 assertThat(file(photo)).exists();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt())
                     .isNull();

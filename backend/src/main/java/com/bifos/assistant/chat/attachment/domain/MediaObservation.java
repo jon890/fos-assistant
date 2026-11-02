@@ -15,6 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,13 +23,14 @@ import lombok.experimental.Accessors;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
-/** 관찰은 수정하지 않고 새 revision을 만든다. 본문은 같은 트랜잭션에서 암호화한 뒤에만 커밋한다. */
+/** 관찰은 수정하지 않고 저장 요청마다 새 revision을 만든다. 본문은 같은 트랜잭션에서 암호화한 뒤에만 커밋한다. */
 @Entity
 @Table(
     name = "media_observation",
     uniqueConstraints = {
         @UniqueConstraint(columnNames = {"attachment_id", "revision"}),
-        @UniqueConstraint(columnNames = {"attachment_id", "id"})
+        @UniqueConstraint(columnNames = {"attachment_id", "id"}),
+        @UniqueConstraint(columnNames = {"attachment_id", "request_id"})
     })
 @Getter
 @Accessors(fluent = true)
@@ -82,8 +84,13 @@ public class MediaObservation {
     @Column(name = "model_version", length = 128)
     private String modelVersion;
 
-    @Column(name = "analysis_key", columnDefinition = "CHAR(64)")
-    private String analysisKey;
+    /** 이 revision 을 만든 저장 요청의 UUID 다. 같은 첨부 안에서 유일하다. 새 줄은 늘 채우고, 칸은 직전 이미지와 함께 쓰려고 NULL 을 허용한다. */
+    @Column(name = "request_id", columnDefinition = "CHAR(36)")
+    private String requestId;
+
+    /** 그 요청 내용의 hash 다. 같은 UUID 재시도의 내용이 같은지 본다. */
+    @Column(name = "request_hash", columnDefinition = "CHAR(64)")
+    private String requestHash;
 
     @Column(columnDefinition = "LONGTEXT")
     private String body;
@@ -116,7 +123,8 @@ public class MediaObservation {
         String providerVersion,
         String model,
         String modelVersion,
-        String analysisKey,
+        UUID requestId,
+        String requestHash,
         Instant now) {
         this.attachmentId = attachment.id();
         this.conversationId = attachment.conversationId();
@@ -132,7 +140,8 @@ public class MediaObservation {
         this.providerVersion = providerVersion;
         this.model = model;
         this.modelVersion = modelVersion;
-        this.analysisKey = analysisKey;
+        this.requestId = requestId.toString();
+        this.requestHash = requestHash;
         this.createdAt = now;
         this.expiresAt = attachment.expiresAt();
     }

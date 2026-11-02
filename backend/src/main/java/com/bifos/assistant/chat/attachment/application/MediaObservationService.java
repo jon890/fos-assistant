@@ -7,7 +7,6 @@ import com.bifos.assistant.chat.attachment.application.dto.MediaObservationView;
 import com.bifos.assistant.chat.attachment.application.dto.ObservationProvenance;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.attachment.domain.MediaObservation;
-import com.bifos.assistant.chat.attachment.domain.MediaObservationRequest;
 import com.bifos.assistant.chat.attachment.domain.type.ObservationProvenanceKind;
 import com.bifos.assistant.chat.attachment.domain.type.ObservationStatus;
 import com.bifos.assistant.chat.attachment.infra.AttachmentFingerprint;
@@ -15,7 +14,6 @@ import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationBodies;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
-import com.bifos.assistant.chat.attachment.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -38,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/** 원본과 현재 권한을 검사하고 삭제 장벽 안에서 불변 revision과 요청 alias를 함께 저장한다. */
+/** 원본과 현재 권한을 검사하고 삭제 장벽 안에서 저장 요청마다 불변 revision을 저장한다. */
 @Service
 @RequiredArgsConstructor
 public class MediaObservationService {
@@ -46,7 +44,6 @@ public class MediaObservationService {
     private final ChatAttachmentRepository attachments;
     private final AttachmentStore store;
     private final MediaObservationRepository observations;
-    private final MediaObservationRequestRepository requests;
     private final MediaObservationBodies bodies;
     private final ChatContentMutationCoordinator mutations;
     private final ObjectMapper json;
@@ -141,14 +138,14 @@ public class MediaObservationService {
                 .orElse(null);
             long revision = latest == null ? 0 : latest.revision();
             checkStored(user, latest, fingerprint, revision);
-            var alias = requests.findByAttachmentIdAndRequestId(attachmentId, requestId.toString())
+            var retried = observations.findByAttachmentIdAndRequestId(attachmentId, requestId.toString())
                 .orElse(null);
             MediaObservation row;
-            if (alias != null) {
-                if (!requestHash.equals(alias.requestHash())) {
+            if (retried != null) {
+                if (!requestHash.equals(retried.requestHash())) {
                     throw conflict(revision);
                 }
-                row = observations.findById(alias.observationId()).orElseThrow(() -> conflict(revision));
+                row = retried;
                 checkStored(user, row, fingerprint, revision);
             } else {
                 if (expectedRevision != revision
@@ -157,32 +154,24 @@ public class MediaObservationService {
                         && source.kind() == ObservationProvenanceKind.MODEL_RESULT) {
                     throw conflict(revision);
                 }
-                String analysisKey = completed(source.kind(), input.status())
-                    ? MediaObservationAnalysisKey.compute(json, fingerprint, source, input.coverage())
-                    : null;
-                if (reusable(latest, user.id(), analysisKey)) {
-                    row = latest;
-                } else {
-                    bodies.requireEncryption();
-                    row = observations.saveAndFlush(new MediaObservation(
-                        attachment,
-                        revision + 1,
-                        fingerprint,
-                        input.status(),
-                        source.kind(),
-                        source.schemaVersion(),
-                        source.promptVersion(),
-                        source.executionId(),
-                        source.provider(),
-                        source.providerVersion(),
-                        source.model(),
-                        source.modelVersion(),
-                        analysisKey,
-                        clock.instant().truncatedTo(ChronoUnit.MICROS)));
-                    bodies.seal(row, plain);
-                }
-                requests.saveAndFlush(
-                    new MediaObservationRequest(attachmentId, requestId, requestHash, row.id()));
+                bodies.requireEncryption();
+                row = observations.saveAndFlush(new MediaObservation(
+                    attachment,
+                    revision + 1,
+                    fingerprint,
+                    input.status(),
+                    source.kind(),
+                    source.schemaVersion(),
+                    source.promptVersion(),
+                    source.executionId(),
+                    source.provider(),
+                    source.providerVersion(),
+                    source.model(),
+                    source.modelVersion(),
+                    requestId,
+                    requestHash,
+                    clock.instant().truncatedTo(ChronoUnit.MICROS)));
+                bodies.seal(row, plain);
             }
             return view(user, attachment, ordinal(sent(conversationId), attachmentId), fingerprint, row);
         });
@@ -200,30 +189,6 @@ public class MediaObservationService {
             throw conflict(revision);
         }
         return result;
-    }
-
-
-    private boolean reusable(MediaObservation row, Long owner, String analysisKey) {
-        if (analysisKey == null
-            || row == null
-            || row.bodyKeyId() == null
-            || !completed(row.provenanceKind(), row.status())
-            || MediaObservationAnalysisKey.hasUnknownIdentity(provenance(row))
-            || !analysisKey.equals(row.analysisKey())) {
-            return false;
-        }
-        return openValidatedBody(row, owner)
-            .filter(body -> analysisKey.equals(MediaObservationAnalysisKey.compute(
-                json, row.sourceFingerprint(), provenance(row), body.coverage())))
-            .isPresent();
-    }
-
-
-    private static boolean completed(ObservationProvenanceKind kind, ObservationStatus status) {
-        return kind == ObservationProvenanceKind.MODEL_RESULT
-            && (status == ObservationStatus.SUCCEEDED
-                || status == ObservationStatus.PARTIAL
-                || status == ObservationStatus.NEEDS_REVIEW);
     }
 
 

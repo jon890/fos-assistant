@@ -16,6 +16,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class MediaObservationMigrationTest {
+    /** 요청 칸을 더하는 마이그레이션 바로 앞의 버전이다. */
+    private static final String BEFORE_REQUEST_MERGE = "20261102025855";
+
     private String[] database;
 
 
@@ -164,6 +167,49 @@ class MediaObservationMigrationTest {
                 .isInstanceOf(SQLException.class);
             statement.executeUpdate("delete from media_observation where id=1");
             assertThat(count(statement, "media_observation_request")).isZero();
+        }
+    }
+
+
+    @Test
+    @DisplayName("요청 칸 이관은 관찰마다 가장 먼저 저장한 요청을 옮기고 같은 첨부의 같은 요청 UUID 를 막는다")
+    void backfillsEarliestRequestIntoObservationAndEnforcesRequestUnique() throws SQLException {
+        String[] before = createDatabase();
+        Flyway.configure()
+            .dataSource(before[0], before[1], before[2])
+            .locations("classpath:db/migration")
+            .outOfOrder(true)
+            .target(BEFORE_REQUEST_MERGE)
+            .load()
+            .migrate();
+        try (var connection = DriverManager.getConnection(before[0], before[1], before[2]);
+            var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    insert into chat_attachment (id,conversation_id,message_id,uploaded_by_user_id,original_name,
+                    stored_name,content_type,byte_size,position,created_at,expires_at)
+                    values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                    """);
+            insertObservation(statement, 1, 1, 1);
+            insertObservation(statement, 2, 1, 2);
+            alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "a");
+            alias(statement, 1, 1, "00000000-0000-0000-0000-000000000002", "b");
+            alias(statement, 1, 2, "00000000-0000-0000-0000-000000000003", "c");
+            Flyway.configure()
+                .dataSource(before[0], before[1], before[2])
+                .locations("classpath:db/migration")
+                .outOfOrder(true)
+                .load()
+                .migrate();
+            assertThat(count(statement, "media_observation where id=1 and request_id='00000000-0000-0000-0000-000000000001'"
+                + " and request_hash='" + "a".repeat(64) + "'")).isEqualTo(1);
+            assertThat(count(statement, "media_observation where id=2 and request_id='00000000-0000-0000-0000-000000000003'"
+                + " and request_hash='" + "c".repeat(64) + "'")).isEqualTo(1);
+            assertThatThrownBy(() -> statement.executeUpdate(
+                "update media_observation set request_id='00000000-0000-0000-0000-000000000001' where id=2"))
+                    .isInstanceOf(SQLException.class);
+            insertObservation(statement, 3, 1, 3);
+            insertObservation(statement, 4, 1, 4);
+            assertThat(count(statement, "media_observation where request_id is null")).isEqualTo(2);
         }
     }
 

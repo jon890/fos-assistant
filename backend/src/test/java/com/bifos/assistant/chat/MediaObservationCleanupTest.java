@@ -32,7 +32,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
         assertThat(observationCleaner.cleanExpired(clock.instant())).isEqualTo(1);
         assertThat(file(photo)).exists();
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         record(0, UUID.randomUUID(), input(), model());
         clock.set(photo.expiresAt().plusSeconds(1));
         var expiredAttachment = service.list(owner, conversation.id(), null, 10).getFirst();
@@ -43,7 +42,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
         code(() -> record(0, UUID.randomUUID(), input(), model()), ErrorCode.ATTACHMENT_GONE);
         attachmentCleaner.runScheduled();
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         assertThat(file(photo)).doesNotExist();
     }
 
@@ -66,7 +64,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
             @Override
             public void delete(ChatAttachment row) {
                 assertThat(observations.count()).isZero();
-                assertThat(requests.count()).isZero();
                 assertThat(attachments.findById(row.id()).orElseThrow().deletionRequestedAt())
                     .isEqualTo(NOW);
                 code(() -> record(0, UUID.randomUUID(), input(), model()), ErrorCode.ATTACHMENT_GONE);
@@ -76,7 +73,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
         var cleaner = new AttachmentCleaner(attachments, failing, clock, mutations, observationCleaner, drafts);
         assertThatThrownBy(() -> cleaner.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         assertThat(file(photo)).exists();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt()).isNull();
         clock.advance(Duration.ofSeconds(1));
@@ -93,7 +89,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
         jdbc.update("update media_observation set expires_at=?", Timestamp.from(NOW.minusSeconds(1)));
         assertThat(observationCleaner.cleanExpired(NOW)).isEqualTo(1);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
             .isNull();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt()).isNull();
@@ -117,14 +112,13 @@ class MediaObservationCleanupTest extends ObservationFixture {
             otherPhoto.id());
         assertThat(observationCleaner.cleanExpired(NOW)).isEqualTo(1);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
         code(() -> record(0, alias, input(), model()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(service.list(other, conversation.id(), null, 10).getFirst().observation())
             .isNull();
         jdbc.update("update conversation set user_id=? where id=?", owner.id(), conversation.id());
         jdbc.update("update media_observation set owner_user_id=? where attachment_id=?", other.id(), photo.id());
         assertThat(observationCleaner.cleanExpired(NOW)).isEqualTo(1);
-        assertThat(requests.count()).isZero();
+        assertThat(observations.count()).isZero();
     }
 
 
@@ -137,7 +131,6 @@ class MediaObservationCleanupTest extends ObservationFixture {
         writer.deleteIfActive(conversation.id(), owner.id(), NOW);
         assertThat(purger.purgeDue(NOW)).isEqualTo(1);
         assertThat(observations.count()).isZero();
-        assertThat(requests.count()).isZero();
         assertThat(attachments.findById(photo.id())).isEmpty();
         assertThat(conversations.findById(conversation.id()).orElseThrow().purgedAt())
             .isEqualTo(NOW);
@@ -154,6 +147,5 @@ class MediaObservationCleanupTest extends ObservationFixture {
             .executeWithoutResult(status -> observationCleaner.deleteForConversation(conversation.id())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(observations.count()).isEqualTo(1);
-        assertThat(requests.count()).isEqualTo(1);
     }
 }
