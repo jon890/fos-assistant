@@ -526,7 +526,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다. 그 turn 이 알림 줄을 저장할 때 생긴다.
 결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 상태가 바뀌는 흐름은 [`docs/features/agent-skill.md`](../../docs/features/agent-skill.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
-**항목과 마지막 시도를 이 줄의 칸으로 둔다**([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 다시 전달하면 마지막 시도 칸을 새 시도로 덮고, 앞의 시도는 남기지 않는다.
+**항목과 마지막 시도를 이 줄의 컬럼으로 둔다**([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 다시 전달하면 마지막 시도 컬럼을 새 시도로 덮고, 앞의 시도는 남기지 않는다.
 `status` 는 마지막 시도의 끝과 같고, 두 상태를 한 update 에서 바꾼다.
 **다시 전달은 `status` 를 `FAILED` 나 `STOPPED` 에서 `DELIVERING` 으로 바꾸는 조건부 update 로 시작한다.** 바뀐 줄이 없으면 시작하지 않는다. 한 묶음에 도는 시도가 둘이 되지 않는 근거다.
 시도를 잇고 닫는 update 는 `attempt_count` 가 그 시도의 번호와 같을 때만 바꾼다. 새 시도가 덮은 뒤 늦게 온 앞 시도의 쓰기는 0 줄을 바꾼다.
@@ -545,7 +545,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 `result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 플러그인 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
 **한 결과는 한 묶음에만 든다.** 묶음을 여는 트랜잭션에서 결과를 낸 쪽의 전달 표시(`result_delivered_at`)가 결과마다 아직 전하지 않은 줄 하나를 바꿔야 한다. 바꾼 줄 수가 다르면 알림 줄과 묶음까지 함께 되돌아간다.
 결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
-새 칸은 직전 이미지로 되돌릴 수 있게 NULL 을 허용한다. 직전 이미지가 쓴 묶음은 새 칸이 비어 있어 화면에 상태가 보이지 않고 다시 전달하지 못한다. 옛 테이블을 지우는 PR 이 그 줄을 다시 옮기고 NOT NULL 로 바꾼다.
+새 컬럼은 직전 이미지로 되돌릴 수 있게 NULL 을 허용한다. 직전 이미지가 쓴 묶음은 새 컬럼이 비어 있어 화면에 상태가 보이지 않고 다시 전달하지 못한다. 옛 테이블을 지우는 PR 이 그 줄을 다시 옮기고 NOT NULL 로 바꾼다.
 
 ### result_delivery_item, result_delivery_attempt
 
