@@ -8,8 +8,8 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
-| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_toolset_request`, `agent_token` |
+| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
@@ -369,9 +369,9 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 ### toolset_hidden
 
-`toolset_hidden` 테이블은 코드가 더는 읽고 쓰지 않는다. 그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다.
-`V20261102074304` 가 이 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
-직전 이미지가 이 테이블에 쓴 줄은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
+그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다. 옛 `toolset_hidden` 테이블은 지웠다.
+`V20261102074304` 가 그 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼고, 배포를 확인한 뒤 `V20261102074307` 이 직전 이미지가 옛 테이블에만 쓴 그룹을 다시 옮겼다.
+이미 `TOOLSET` 줄이 있는 그룹은 `V20261102074304` 가 옮긴 값인지 새 코드가 쓴 값인지 구별할 수 없어 덮어쓰지 않는다. 직전 이미지로 되돌린 동안 이미 옮겨진 그룹의 숨김을 바꿨다면 옛 테이블의 그 값은 버려진다. `V20261102074311` 이 옛 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### agent_toolset_request
 
@@ -432,7 +432,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, �
 읽기는 현재 대화 주인과 업로더, `deletion_requested_at`, `deleted_at`과 `expires_at`을 함께 확인한다.
 삭제 요청이나 만료가 있으면 파일 정리가 아직 끝나지 않았어도 원본과 관찰 본문을 제공하지 않는다.
 
-### media_observation와 media_observation_request
+### media_observation
 
 관찰은 첨부별 불변 revision으로 저장한다. 현재 관찰은 가장 큰 revision이고 별도 현재 행 테이블은 없다.
 본문 JSON의 summary, claims, uncertainties, coverage와 evidence는 `body` 한 칸에만 암호화한다.
@@ -442,13 +442,12 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, �
 
 저장 요청 하나가 revision 하나를 만든다. 그 요청의 UUID와 고정 요청 hash는 `request_id CHAR(36)`, `request_hash CHAR(64)`에 둔다.
 같은 첨부의 같은 UUID는 `uk_media_observation_request_id (attachment_id, request_id)`가 막는다.
-두 칸은 지금 NULL을 허용한다. 이 칸을 모르는 직전 이미지로 되돌려도 관찰을 쓸 수 있게 하려는 것이고, 새 코드는 늘 채운다.
+두 칸은 NOT NULL이다. 옛 `media_observation_request` 테이블과 `analysis_key` 칸은 지웠다.
+`V20261102074306` 이 직전 이미지가 칸 없이 쓴 줄을 옛 요청 테이블에서 다시 채웠고, `V20261102074308` 이 칸을 NOT NULL 로 바꾸고 `analysis_key` 를 지웠으며, `V20261102074309` 가 옛 테이블을 지웠다. 빈 줄이 남았다면 NOT NULL 단계가 실패해 옛 테이블을 지우지 않는다.
 관찰의 만료 시각은 첨부와 같다. 삭제 요청, 만료와 소유 불일치 정리는 같은 사용자 잠금 안에서 관찰 줄을 지운다.
 현재 소유자를 바꿔 관찰을 이관하거나 재암호화하지 않는다.
 CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 갖는다.
 
-`media_observation_request` 테이블과 `media_observation.analysis_key` 는 코드가 더는 읽고 쓰지 않는다. 운영의 관찰과 요청 테이블은 옮기기 전에 둘 다 0행이었다(2026-11-02 확인).
-이 변경의 배포를 확인한 뒤의 PR 이 두 칸을 다시 채워 NOT NULL 로 바꾸고 둘을 지운다.
 까닭과 지우는 순서는 [ADR-20261102 / media-observation-request-merge](adr/ADR-20261102-media-observation-request-merge.md)가 갖는다.
 
 ### content_draft・content_draft_revision

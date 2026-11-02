@@ -36,8 +36,8 @@ PR 하나의 운영 코드는 `scripts/pr/pr-size.mjs` 의 상한 안에 둔다.
 
 | 묶음 | 코드 PR 이 하는 일 | 선행 조건 |
 | --- | --- | --- |
-| 사진 관찰(D2) | 요청 UUID 와 hash 를 `media_observation` 칸으로 옮기고 완료 결과 재사용을 없앤다 | 끝났다(#655). DROP 만 남았다 |
-| 도구 숨김 설정 | `toolset_hidden` 을 `group_setting` 의 `TOOLSET` 키로 옮긴다. `GroupSetting` 과 저장소를 `user` 패키지로 옮기는 이동 커밋을 먼저 두고, 공통 저장소를 만든다 | 끝났다(#657). DROP 만 남았다 |
+| 사진 관찰(D2) | 요청 UUID 와 hash 를 `media_observation` 칸으로 옮기고 완료 결과 재사용을 없앤다 | 끝났다(#655). 옛 테이블과 칸은 첫 DROP PR 이 지웠다 |
+| 도구 숨김 설정 | `toolset_hidden` 을 `group_setting` 의 `TOOLSET` 키로 옮긴다. `GroupSetting` 과 저장소를 `user` 패키지로 옮기는 이동 커밋을 먼저 두고, 공통 저장소를 만든다 | 끝났다(#657). 옛 테이블은 첫 DROP PR 이 지웠다 |
 | Memory collection 설정 | `memory_collection` 을 `group_setting` 의 `MEMORY_COLLECTIONS` 키로 옮긴다. 줄이 없으면 코드의 기본 collection 을 내고 저장하지 않는다 | 끝났다. DROP 만 남았다 |
 | 실행 질문 | `execution_question` 을 `agent_execution.question_message_id` 로 옮긴다. 조건부 UPDATE 로 채우고 대화 정리가 비운다 | 끝났다(#658). DROP 만 남았다. DROP 전에 다시 옮길 때 정리한 대화의 실행은 옮기지 않고 질문 번호를 비운다 |
 | 결과 전달(D3) | `result_delivery_item` 을 `result_delivery.items_json` 으로, `result_delivery_attempt` 를 마지막 시도 칸으로 옮긴다. 출처 줄의 전달 표시가 바꾼 줄 수가 1 이 아니면 예외로 되돌린다. ADR-075 를 고친다 | 끝났다(#660). DROP 만 남았다 |
@@ -47,7 +47,7 @@ PR 하나의 운영 코드는 `scripts/pr/pr-size.mjs` 의 상한 안에 둔다.
 | 도구 사용 요청(D5) | `agent_toolset_request` 와 요청 기능, 관리자 화면을 지운다 | 사용자 정리의 삭제 단계가 머지되고 운영 행 수 0 을 확인한 뒤 |
 | 기억 연결(D4) | `memory_link` 를 지우고 대체만 `memory.superseded_by_memory_id` 로 남긴다. `RELATED`, 연결 제안, 자동 찾기와 화면을 지운다 | 사용자 정리의 삭제 단계가 머지되고 운영 행 수를 확인한 뒤 |
 | 원고(D1) | `content_draft_job` 의 칸을 `content_draft_snapshot` 으로, `content_draft_asset` 을 `content_draft_revision.assets_json` 으로 옮긴다. 배포 뒤 블로그 새 글 저장을 한 번 왕복시켜 본다 | 없다 |
-| DROP | 배포를 확인한 묶음의 옛 테이블과 칸을 모아 지운다. 첫 DROP 은 `media_observation_request` 와 `media_observation.analysis_key` 다 | 각 코드 PR 의 배포 확인. proactive 테이블 DROP([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md))과 정리 분류, fixture 가 겹치므로 그 PR 이 머지된 뒤 |
+| DROP | 배포를 확인한 묶음의 옛 테이블과 칸을 모아 지운다. 첫 DROP 은 `media_observation_request`, `media_observation.analysis_key`, `toolset_hidden` 이고 끝났다. 지우기 전에 직전 이미지가 쓴 줄을 다시 옮기고 요청 칸을 NOT NULL 로 바꿨다 | 각 코드 PR 의 배포 확인. proactive 테이블 DROP([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md))과 정리 분류, fixture 가 겹치므로 그 PR 이 머지된 뒤 |
 
 허용 목록(D6)과, 줄어드는 수에 비해 안전 계약을 바꾸는 범위가 큰 `connector_action_execution`, 하위 에이전트 두 테이블, `execution_skill_use`, `execution_context_source` 는 이번에 다루지 않는다.
 
