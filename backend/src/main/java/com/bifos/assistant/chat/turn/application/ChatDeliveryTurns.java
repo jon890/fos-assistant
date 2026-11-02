@@ -18,6 +18,7 @@ import com.bifos.assistant.chat.delivery.application.dto.DeliveryItemRef;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.delivery.domain.ResultAlreadyDeliveredException;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.config.ContextProperties;
@@ -205,7 +206,7 @@ class ChatDeliveryTurns {
      * 그 뒤로 결과를 낸 쪽의 순서대로다. 저장한 알림 줄마다 {@code system} 사건을 낸다.
      *
      * <p><b>한 결과는 한 묶음에만 든다.</b> 결과마다 전했다는 표시가 아직 전하지 않은 그 결과의 줄 하나를 바꿔야 한다. 바꾼 줄
-     * 수가 다르면 그 사이 다른 쪽이 먼저 전한 것이라 {@link IllegalStateException} 으로 알림 줄까지 함께 되돌린다(ADR-075).
+     * 수가 다르면 그 사이 다른 쪽이 먼저 전한 것이라 {@link ResultAlreadyDeliveredException} 으로 알림 줄까지 함께 되돌린다(ADR-075).
      */
     DeliveryAttemptRef recordDelivery(
         Conversation conversation,
@@ -245,8 +246,7 @@ class ChatDeliveryTurns {
     /** 전했다는 표시가 바꾼 줄 수가 기대와 다르면 던져 그 트랜잭션을 되돌린다. */
     private static void requireMarked(int changed, int expected, String source) {
         if (changed != expected) {
-            throw new IllegalStateException(
-                "result already delivered by another turn source=" + source + " changed=" + changed + " expected=" + expected);
+            throw new ResultAlreadyDeliveredException(source, changed, expected);
         }
     }
 

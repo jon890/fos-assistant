@@ -12,6 +12,8 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
 import com.bifos.assistant.chat.nextturn.application.DelegationWakeService;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
@@ -99,6 +101,9 @@ class ResultDeliveryRecordTest {
 
     @Autowired
     TestAutoTurnResultSource testResults;
+
+    @Autowired
+    ConversationEventHub hub;
 
     @Autowired
     AppUserRepository users;
@@ -383,9 +388,16 @@ class ResultDeliveryRecordTest {
         testResults.offerDeliveredElsewhere(
             conversation.id(), new AutoTurnResult(UUID.randomUUID().toString(), "승인한 「메모」 실행이 끝났어요", "메모를 남겼다"));
 
+        List<ChatEvent> published = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), published::add);
+
         finished(done);
         awaitIdle(conversation.id());
+        unsubscribe.run();
 
+        assertThat(published).as("예상된 경합이라 대화에 오류 사건을 내지 않는다")
+            .extracting(ChatEvent::type)
+            .doesNotContain("error");
         assertThat(deliveries.findAll()).as("묶음").isEmpty();
         assertThat(messagesOf(MessageRole.SYSTEM)).as("알림 줄").isEmpty();
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
