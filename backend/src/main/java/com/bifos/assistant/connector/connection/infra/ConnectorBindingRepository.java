@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.connection.infra;
 
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.DetachTarget;
 import com.bifos.assistant.connector.connection.domain.DueBinding;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
@@ -66,4 +67,17 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ConnectorBinding b where b.agent.id = :agentId")
     int deleteAllOfAgent(@Param("agentId") Long agentId);
+
+
+    /** 사용자 정리 때 그 연결의 바인딩마다 뗄 값을 읽는다. 연결의 칸 값은 읽지 않는다. JPQL 생성자 식이라 문자열로 둔다. */
+    @Query("select new com.bifos.assistant.connector.connection.domain.DetachTarget("
+        + "b.id, b.agent.hermesProfile, b.connection.connectorId)"
+        + " from ConnectorBinding b where b.connection.id = :connectionId order by b.id")
+    List<DetachTarget> findDetachTargets(@Param("connectionId") Long connectionId);
+
+
+    /** 사용자 정리 때 profile 에서 뗀 바인딩 행 하나를 지운다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ConnectorBinding b where b.id = :id")
+    int deleteDetached(@Param("id") Long id);
 }

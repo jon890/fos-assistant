@@ -101,7 +101,7 @@ INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool,
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
 INSERT INTO connector_connection (id, user_id, connector_id, status, fields, created_at, updated_at, undeclared_tools, vault_stored)
-VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
+VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', '{"values":{"field":"coverage-900000001"}}', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
 
 INSERT INTO connector_conversation_grant (id, user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001, '2099-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -140,7 +140,7 @@ INSERT INTO task (id, public_id, owner_user_id, agent_id, title, state, conversa
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 'coverage-900000001', 'ACTIVE', 'NEW_PER_RUN', 900000001, 'ALWAYS', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'TURN', 'CRON', 'UTC', 'SKIP');
 
 INSERT INTO user_browser (id, user_id, status, profile_key, created_at, updated_at, version)
-VALUES (900000001, 900000001, 'STOPPED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1);
+VALUES (900000001, 900000001, 'STOPPED', LOWER(LPAD(HEX(900000001), 64, '0')), '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1);
 
 INSERT INTO agent_connector_binding (id, agent_id, connection_id, status, restart_required, desired_enabled, created_at, updated_at)
 VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00');

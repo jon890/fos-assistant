@@ -59,4 +59,10 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
     @Modifying(clearAutomatically = true)
     @Query("update ConnectorToolGrant g set g.revokedAt = :now where g.id in :ids and g.revokedAt is null")
     int revokeAll(@Param("ids") List<Long> ids, @Param("now") Instant now);
+
+
+    /** 사용자 정리 때 그 사용자의 도구 권한을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ConnectorToolGrant g where g.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

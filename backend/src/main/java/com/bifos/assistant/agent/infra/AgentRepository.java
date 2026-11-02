@@ -94,4 +94,14 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Agent a where a.id = :id")
     int deletePurged(@Param("id") Long id);
+
+
+    /**
+     * 그 사용자가 주인인 지우지 않은 에이전트를 번호 순으로 잠가 읽는다(ADR-20261101 / user-purge).
+     *
+     * <p>사용자 정리가 그룹 공개 에이전트를 넘기고 비공개 에이전트를 지운 것으로 적을 때 쓴다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Agent a where a.ownerUserId = :ownerUserId and a.deletedAt is null order by a.id asc")
+    List<Agent> findOwnedForUpdate(@Param("ownerUserId") Long ownerUserId);
 }

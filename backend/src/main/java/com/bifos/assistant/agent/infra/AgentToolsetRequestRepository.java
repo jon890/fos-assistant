@@ -58,4 +58,16 @@ public interface AgentToolsetRequestRepository extends JpaRepository<AgentToolse
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from AgentToolsetRequest r where r.agentId = :agentId")
     int deleteAllOfAgent(@Param("agentId") Long agentId);
+
+
+    /** 사용자 정리 때 그 사용자가 낸 도구 요청을 모두 지운다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AgentToolsetRequest r where r.requesterUserId = :userId")
+    int deleteAllRequestedBy(@Param("userId") Long userId);
+
+
+    /** 사용자 정리 때 그 사용자가 처리한 남의 요청은 줄을 남기고 처리한 사람만 비운다. 바꾼 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update AgentToolsetRequest r set r.decidedByUserId = null where r.decidedByUserId = :userId")
+    int clearDecidedBy(@Param("userId") Long userId);
 }

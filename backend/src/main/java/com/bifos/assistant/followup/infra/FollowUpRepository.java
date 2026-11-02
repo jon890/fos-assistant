@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -63,4 +64,10 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
     /** 그 대화에서 먼저 살펴보기가 낸 제안 줄이다(중복 열쇠가 있는 줄). 대화를 지울 때 제안의 줄과 본문을 지우려고 읽는다. */
     List<FollowUp> findByConversationIdAndDedupeKeyIsNotNull(Long conversationId);
+
+
+    /** 사용자 정리 때 그 사용자의 할 일을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from FollowUp f where f.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

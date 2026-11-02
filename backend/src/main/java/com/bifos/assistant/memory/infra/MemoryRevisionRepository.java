@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,4 +30,10 @@ public interface MemoryRevisionRepository extends JpaRepository<MemoryRevision, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from MemoryRevision r where r.id = :id")
     Optional<MemoryRevision> findByIdForUpdate(@Param("id") MemoryRevisionId id);
+
+
+    /** 사용자 정리 때 그 사용자가 주인이던 변경 이력을 모두 지운다. 그룹 기억의 이력은 주인이 비어 있어 남는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from MemoryRevision r where r.ownerUserId = :userId")
+    int deleteAllOfOwner(@Param("userId") Long userId);
 }

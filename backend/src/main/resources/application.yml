@@ -54,6 +54,8 @@ assistant:
       - terminal
       - file
       - code_execution
+    # 정리를 예약한 지 30일이 지난 사용자의 데이터를 지우는 시각(ADR-20261101 / user-purge). 실패한 사람은 다음 차례에 다시 본다
+    purge-cron: "50 * * * * *"
   chat:
     stop-stream-grace: 10s
     # 사건이 없는 동안 SSE 주석 줄을 보내는 간격. 앞단 프록시가 약 100초 동안 바이트가 없으면 연결을 끊는다

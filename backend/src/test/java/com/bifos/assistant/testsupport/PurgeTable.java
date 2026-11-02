@@ -48,8 +48,10 @@ public record PurgeTable(String table, Scope scope, String fixtureKey, Outcome u
             assertThat(entry.fixtureKey()).matches("[a-z_]+");
             assertThat(entry.reason()).as("%s의 소유 관계와 예외 근거", entry.table()).isNotBlank();
             assertThat(tables.put(entry.table(), entry)).as("%s의 중복 분류", entry.table()).isNull();
-            assertThat(entry.user()).as("사용자 purge 부재는 개인 데이터의 알려진 공백이다")
-                .isEqualTo(entry.scope() == Scope.GLOBAL ? Outcome.KEEP : Outcome.GAP);
+            assertThat(entry.user()).as("사용자 정리(ADR-20261101 / user-purge)에는 알려진 공백을 두지 않는다").isNotEqualTo(Outcome.GAP);
+            if (entry.scope() == Scope.GLOBAL) {
+                assertThat(entry.user()).as("그룹 공용 표는 사용자 한 사람의 정리가 건드리지 않는다").isEqualTo(Outcome.KEEP);
+            }
         }
         assertThat(tables).as("빈 테이블 분류는 허용하지 않는다").isNotEmpty();
         return List.copyOf(tables.values());

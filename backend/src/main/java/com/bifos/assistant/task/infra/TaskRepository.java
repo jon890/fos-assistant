@@ -72,4 +72,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("select t from Task t where t.ownerUserId = :ownerUserId and t.kind = :kind order by t.id")
     List<Task> findByOwnerUserIdAndKindOrderByIdAscForUpdate(
         @Param("ownerUserId") Long ownerUserId, @Param("kind") TaskKind kind);
+
+
+    /** 사용자 정리 때 그 사용자의 예약 작업을 모두 지운다. 실행 이력을 먼저 지운 뒤 부른다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Task t where t.ownerUserId = :userId")
+    int deleteAllOfOwner(@Param("userId") Long userId);
 }
