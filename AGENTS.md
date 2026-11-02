@@ -195,8 +195,7 @@ CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이�
 머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.
 
-`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
-그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
+`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 라벨은 정보용이다. 머지 규칙은 바꾸지 않는다(사용자 결정 2026-11-02).
 
 ## 커밋
 

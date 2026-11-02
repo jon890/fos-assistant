@@ -28,6 +28,9 @@ class ToolsetHiddenMigrationTest {
     /** 옮기는 마이그레이션 바로 앞 버전이다. */
     private static final String BEFORE = "20261102053007";
 
+    /** 처음 옮기는 마이그레이션이다. 이 버전까지는 옛 표가 남아 있다. */
+    private static final String MOVED = "20261102074304";
+
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
     Database createDatabase() {
@@ -48,7 +51,7 @@ class ToolsetHiddenMigrationTest {
                     """);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT group_id FROM group_setting WHERE setting_key = 'TOOLSET' ORDER BY group_id"))
@@ -59,7 +62,7 @@ class ToolsetHiddenMigrationTest {
                 .as("MODEL 줄은 만들지 않는다")
                 .containsExactly("0");
             assertThat(strings(statement, "SELECT COUNT(*) FROM toolset_hidden"))
-                .as("옛 표는 직전 이미지로 되돌릴 수 있게 지우지 않는다")
+                .as("처음 옮긴 단계는 직전 이미지로 되돌릴 수 있게 옛 표를 지우지 않는다")
                 .containsExactly("4");
         }
     }
@@ -87,7 +90,7 @@ class ToolsetHiddenMigrationTest {
                 "INSERT INTO group_setting (group_id, setting_key, setting_value) VALUES (1, 'TOOLSET', '{}')");
         }
 
-        assertThatThrownBy(() -> migrate(database, null))
+        assertThatThrownBy(() -> migrate(database, MOVED))
             .isInstanceOf(RuntimeException.class)
             .hasRootCauseInstanceOf(SQLException.class);
 
@@ -96,6 +99,34 @@ class ToolsetHiddenMigrationTest {
                 .as("기존 줄을 덮어쓰지 않고 다른 TOOLSET 줄도 만들지 않는다")
                 .containsExactly("{}");
             assertThat(strings(statement, "SELECT COUNT(*) FROM toolset_hidden")).containsExactly("1");
+        }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 옛 표에만 쓴 그룹은 다시 옮기고 TOOLSET 줄이 있는 그룹은 건너뛴 뒤 옛 표를 지운다")
+    void remigratesGroupsWrittenByPreviousImageAndDropsOldTable() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, BEFORE);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("INSERT INTO toolset_hidden (group_id, name) VALUES (1, 'spotify')");
+        }
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            // 직전 이미지가 옛 표에 쓴 줄이다. 1번 그룹은 새 줄이 이미 있고 3번 그룹은 옛 표에만 있다.
+            statement.executeUpdate("INSERT INTO toolset_hidden (group_id, name) VALUES (1, 'discord'), (3, 'web'), (3, 'terminal')");
+        }
+
+        migrate(database, null);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT group_id FROM group_setting WHERE setting_key = 'TOOLSET' ORDER BY group_id"))
+                .containsExactly("1", "3");
+            assertThat(hiddenOf(statement, 1)).as("이미 있는 줄은 덮어쓰지 않는다").containsExactly("spotify");
+            assertThat(hiddenOf(statement, 3)).containsExactly("terminal", "web");
+            assertThatThrownBy(() -> strings(statement, "SELECT COUNT(*) FROM toolset_hidden"))
+                .as("옛 표는 지운다")
+                .isInstanceOf(SQLException.class);
         }
     }
 

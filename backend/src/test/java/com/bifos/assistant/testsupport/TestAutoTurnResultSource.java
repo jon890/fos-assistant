@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -23,6 +24,9 @@ public class TestAutoTurnResultSource implements AutoTurnResultSource {
     /** 전한 뒤에도 다시 읽을 수 있게 넣은 결과를 모두 둔다. */
     private final Map<Long, List<AutoTurnResult>> offered = new ConcurrentHashMap<>();
 
+    /** 다른 turn 이 먼저 전했다고 적은 것처럼 전달 표시가 세지 않는 열쇠들이다. */
+    private final Set<String> deliveredElsewhere = ConcurrentHashMap.newKeySet();
+
 
     /** 그 대화에 전할 결과를 하나 넣는다. */
     public void offer(Long conversationId, AutoTurnResult result) {
@@ -33,10 +37,21 @@ public class TestAutoTurnResultSource implements AutoTurnResultSource {
     }
 
 
+    /**
+     * 아직 전하지 않은 결과로 내지만 전달 표시는 바꾼 줄이 없다고 답하는 결과를 넣는다. 결과를 읽은 뒤 다른 turn 이 먼저 전한
+     * 경우를 흉내 낸다.
+     */
+    public void offerDeliveredElsewhere(Long conversationId, AutoTurnResult result) {
+        offer(conversationId, result);
+        deliveredElsewhere.add(result.key());
+    }
+
+
     /** 넣은 결과를 모두 비운다. */
     public void reset() {
         pending.clear();
         offered.clear();
+        deliveredElsewhere.clear();
     }
 
 
@@ -53,8 +68,14 @@ public class TestAutoTurnResultSource implements AutoTurnResultSource {
 
 
     @Override
-    public void markDelivered(List<String> keys, Instant now) {
-        pending.values().forEach(results -> results.removeIf(result -> keys.contains(result.key())));
+    public int markDelivered(List<String> keys, Instant now) {
+        int marked = 0;
+        for (List<AutoTurnResult> results : pending.values()) {
+            int before = results.size();
+            results.removeIf(result -> keys.contains(result.key()) && !deliveredElsewhere.contains(result.key()));
+            marked += before - results.size();
+        }
+        return marked;
     }
 
 

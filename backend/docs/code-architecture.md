@@ -555,7 +555,7 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 | 규칙 | 까닭 |
 | --- | --- |
 | `LineLength`, `Indentation`, `WhitespaceAround`, `CustomImportOrder` | 포매터가 정한다. 둘이 같은 것을 다르게 판정하면 고칠 수 없는 위반이 생긴다 |
-| `JavadocMethod`, `JavadocType`, `MissingJavadocMethod` 같은 Javadoc 규칙 | 주석은 한국어로 필요한 곳에만 쓴다(`backend/AGENTS.md` 의 「주석」 절). 모든 메서드에 요구하면 뜻 없는 주석이 늘어난다 |
+| `JavadocMethod`, `JavadocType`, `MissingJavadocMethod` 같은 Javadoc 규칙 | 주석은 한국어로 필요한 곳에만 쓴다(`backend/AGENTS.md` 의 「테스트와 주석」 절). 모든 메서드에 요구하면 뜻 없는 주석이 늘어난다 |
 | `MagicNumber` | 테스트와 설정 기본값에서 대부분 오탐이다 |
 | `FinalParameters`, `HiddenField` | 생성자 주입과 record 가 이름을 같게 쓰는 것이 이 저장소의 모양이다 |
 | `DesignForExtension` | Spring 빈과 싸운다 |

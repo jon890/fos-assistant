@@ -12,12 +12,13 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnDelivery;
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryInput;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryItemRef;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
-import com.bifos.assistant.chat.delivery.application.dto.ResultDeliveryStart;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.delivery.domain.ResultAlreadyDeliveredException;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.config.ContextProperties;
@@ -105,12 +106,12 @@ class ChatDeliveryTurns {
             clock.instant(),
             contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
-        Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
+        DeliveryAttemptRef attempt = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
         runDeliveryTurn(
             owner,
             routed,
             delivery.input(),
-            new TurnIntent.DelegationResults(attemptId, false, delivery.items()),
+            new TurnIntent.DelegationResults(attempt, false, delivery.items()),
             handle,
             onEvent);
     }
@@ -151,12 +152,12 @@ class ChatDeliveryTurns {
             if (!routed.agent().isReadableBy(user.id())) {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
             }
-            Long attemptId = recordRetry(routed.conversation(), deliveryId, onEvent);
+            DeliveryAttemptRef attempt = recordRetry(routed.conversation(), deliveryId, onEvent);
             runDeliveryTurn(
                 user,
                 routed,
                 delivery.input(),
-                new TurnIntent.DelegationResults(attemptId, true, delivery.items()),
+                new TurnIntent.DelegationResults(attempt, true, delivery.items()),
                 handle,
                 onEvent);
         } finally {
@@ -176,36 +177,38 @@ class ChatDeliveryTurns {
 
 
     /**
-     * 다시 전달을 시작한다. 묶음을 {@code DELIVERING} 으로 바꾸는 조건부 update, 알림 줄 저장, 새 시도 저장, 자동 turn 수
-     * 초기화를 한 트랜잭션에 적고 새 시도의 번호를 돌려준다. 커밋한 뒤 알림 줄의 {@code system} 사건을 낸다.
+     * 다시 전달을 시작한다. 알림 줄 저장, 묶음을 {@code DELIVERING} 으로 바꾸고 마지막 시도 칸을 새 시도로 덮는 조건부
+     * update, 자동 turn 수 초기화를 한 트랜잭션에 적고 새 시도를 돌려준다. 커밋한 뒤 알림 줄의 {@code system} 사건을 낸다.
      *
      * <p>그 사이 다른 요청이 묶음을 먼저 바꿨으면 {@code DELIVERY_NOT_RETRYABLE} 로 되돌아가 알림 줄도 시도도 남지 않는다.
      */
-    Long recordRetry(Conversation conversation, Long deliveryId, Consumer<ChatEvent> onEvent) {
-        record Saved(ChatMessage line, Long attemptId) {
+    DeliveryAttemptRef recordRetry(Conversation conversation, Long deliveryId, Consumer<ChatEvent> onEvent) {
+        record Saved(ChatMessage line, DeliveryAttemptRef attempt) {
         }
         Saved saved = transactions.execute(status -> {
             Instant now = Instant.now(clock);
-            int attemptNo = resultDeliveries.claimRetry(deliveryId, now);
             ChatMessage line = messages.save(ChatMessage.fromSystem(conversation.id(), ChatService.RETRY_NOTICE, now));
-            Long attemptId = resultDeliveries.addAttempt(deliveryId, attemptNo, line.id(), now);
+            DeliveryAttemptRef attempt = resultDeliveries.claimRetry(deliveryId, line.id(), now);
             // 사람이 요청한 turn 이라 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());
-            return new Saved(line, attemptId);
+            return new Saved(line, attempt);
         });
         onEvent.accept(ChatEvent.system(
             conversation.publicId(), saved.line().id(), saved.line().content()));
-        return saved.attemptId();
+        return saved.attempt();
     }
 
 
     /**
-     * 알림 줄, 전했다는 표시, 자동 turn 수, 전달 묶음과 항목과 첫 시도를 한 트랜잭션에 적고 그 시도의 번호를 돌려준다.
+     * 알림 줄, 전했다는 표시, 자동 turn 수, 전달 묶음과 항목과 첫 시도를 한 트랜잭션에 적고 그 시도를 돌려준다.
      *
      * <p>알림 줄이 곧 전했다는 표시다. 이 쓰기들이 모두 함께 남거나 함께 빠진다. 제목은 채우지 않는다. 항목은 위임 결과가 먼저이고
      * 그 뒤로 결과를 낸 쪽의 순서대로다. 저장한 알림 줄마다 {@code system} 사건을 낸다.
+     *
+     * <p><b>한 결과는 한 묶음에만 든다.</b> 결과마다 전했다는 표시가 아직 전하지 않은 그 결과의 줄 하나를 바꿔야 한다. 바꾼 줄
+     * 수가 다르면 그 사이 다른 쪽이 먼저 전한 것이라 {@link ResultAlreadyDeliveredException} 으로 알림 줄까지 함께 되돌린다(ADR-075).
      */
-    Long recordDelivery(
+    DeliveryAttemptRef recordDelivery(
         Conversation conversation,
         List<AgentExecution> results,
         List<String> notices,
@@ -215,23 +218,36 @@ class ChatDeliveryTurns {
         results.forEach(result -> items.add(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(result.id()))));
         deliveries.forEach(delivery -> delivery.keys()
             .forEach(key -> items.add(new DeliveryItemRef(delivery.source().source(), key))));
-        record Saved(List<ChatMessage> lines, Long attemptId) {
+        record Saved(List<ChatMessage> lines, DeliveryAttemptRef attempt) {
         }
         Saved saved = transactions.execute(status -> {
             Instant deliveredAt = Instant.now(clock);
             List<ChatMessage> lines = notices.stream()
                 .map(notice -> messages.save(ChatMessage.fromSystem(conversation.id(), notice, deliveredAt)))
                 .toList();
-            results.forEach(result -> deliveryWriter.markResultDelivered(result.id(), deliveredAt));
-            deliveries.forEach(delivery -> delivery.source().markDelivered(delivery.keys(), deliveredAt));
+            for (AgentExecution result : results) {
+                requireMarked(deliveryWriter.markResultDelivered(result.id(), deliveredAt), 1, ResultDeliveryRecorder.DELEGATION_SOURCE);
+            }
+            for (AutoTurnDelivery delivery : deliveries) {
+                int expected = (int)delivery.keys().stream().distinct().count();
+                requireMarked(delivery.source().markDelivered(delivery.keys(), deliveredAt), expected, delivery.source().source());
+            }
             conversationWriter.incrementAutoTurns(conversation.id());
-            ResultDeliveryStart start = resultDeliveries.open(
+            DeliveryAttemptRef attempt = resultDeliveries.open(
                 conversation.id(), items, lines.getLast().id(), deliveredAt);
-            return new Saved(lines, start.attemptId());
+            return new Saved(lines, attempt);
         });
         saved.lines()
             .forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
-        return saved.attemptId();
+        return saved.attempt();
+    }
+
+
+    /** 전했다는 표시가 바꾼 줄 수가 기대와 다르면 던져 그 트랜잭션을 되돌린다. */
+    private static void requireMarked(int changed, int expected, String source) {
+        if (changed != expected) {
+            throw new ResultAlreadyDeliveredException(source, changed, expected);
+        }
     }
 
 
@@ -251,28 +267,28 @@ class ChatDeliveryTurns {
         TurnIntent.DelegationResults intent,
         TurnHandle handle,
         Consumer<ChatEvent> onEvent) {
-        Long attemptId = intent.attemptId();
+        DeliveryAttemptRef attempt = intent.attempt();
         boolean closed = false;
         ChatTurn turn;
         try {
             turn = chatTurnRunner.runTurn(owner, routed, input, intent, onEvent, true, handle);
             closed = true;
             closeAttempt(
-                attemptId,
+                attempt,
                 turn.cancelled() ? DeliveryAttemptStatus.STOPPED : DeliveryAttemptStatus.SUCCEEDED,
                 null);
         } catch (RuntimeException ex) {
             closed = true;
             if (turns.isStopConfirmed(handle)) {
-                closeAttempt(attemptId, DeliveryAttemptStatus.STOPPED, null);
+                closeAttempt(attempt, DeliveryAttemptStatus.STOPPED, null);
             } else {
                 String code = ex instanceof ApiException api ? api.code().name() : ErrorCode.INTERNAL_ERROR.name();
-                closeAttempt(attemptId, DeliveryAttemptStatus.FAILED, code);
+                closeAttempt(attempt, DeliveryAttemptStatus.FAILED, code);
             }
             throw ex;
         } finally {
             if (!closed) {
-                closeAttempt(attemptId, DeliveryAttemptStatus.FAILED, ErrorCode.INTERNAL_ERROR.name());
+                closeAttempt(attempt, DeliveryAttemptStatus.FAILED, ErrorCode.INTERNAL_ERROR.name());
             }
         }
         onEvent.accept(
@@ -287,11 +303,11 @@ class ChatDeliveryTurns {
      *
      * <p>그렇게 남은 시도는 다음 기동의 정리가 닫는다.
      */
-    void closeAttempt(Long attemptId, DeliveryAttemptStatus status, String errorCode) {
+    void closeAttempt(DeliveryAttemptRef attempt, DeliveryAttemptStatus status, String errorCode) {
         try {
-            resultDeliveries.finish(attemptId, status, errorCode);
+            resultDeliveries.finish(attempt, status, errorCode);
         } catch (RuntimeException ex) {
-            log.warn("전달 시도를 닫지 못했다 attemptId={} status={}", attemptId, status, ex);
+            log.warn("전달 시도를 닫지 못했다 attempt={} status={}", attempt, status, ex);
         }
     }
 }

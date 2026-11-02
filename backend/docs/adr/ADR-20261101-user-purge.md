@@ -30,7 +30,7 @@
 | 사용자 줄(`app_user`) | 마지막에 지운다 |
 | `allowed_person` | 줄은 남기고 꺼진 채 둔다. 같은 주소가 다시 들어오려면 관리자가 켜야 한다. 켜면 새 사용자가 새로 만들어진다 |
 | 사용량 원장(`agent_execution`, 실행 사건) | 남긴다. 금액과 토큰은 회계에 필요하다. 본문은 대화 정리가 이미 비운다 |
-| 그룹 공용 설정(`group_setting`, `memory_collection`, `toolset_hidden`) | 사용자 한 사람의 것이 아니므로 건드리지 않는다 |
+| 그룹 공용 설정(`group_setting`, `memory_collection`) | 사용자 한 사람의 것이 아니므로 건드리지 않는다 |
 | Hermes profile 과 MCP 토큰 | 사용자의 기본 profile 은 기존 profile 거두기로 정리한다 |
 
 ### 되돌리기
