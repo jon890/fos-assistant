@@ -32,6 +32,9 @@ class ContentDraftJobAssetMigrationTest {
     /** 칸을 더하는 DDL 이다. 이 버전까지 적용하면 옮기는 Java 마이그레이션만 남는다. */
     private static final String COLUMNS = "20261102074316";
 
+    /** 처음 옮기는 Java 마이그레이션이다. 이 버전까지는 옛 테이블이 남아 있다. */
+    private static final String MOVED = "20261102074317";
+
     private static final String FINGERPRINT = "a".repeat(64);
 
     private static final DateTimeFormatter MICROS = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss.SSSSSS");
@@ -66,7 +69,7 @@ class ContentDraftJobAssetMigrationTest {
                 """.formatted(FINGERPRINT, FINGERPRINT));
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(row(statement, """
@@ -85,7 +88,7 @@ class ContentDraftJobAssetMigrationTest {
                 new ContentDraftAsset(3, 1L, FINGERPRINT, 5L, 2L));
             assertThat(assets(statement, 2)).as("사진이 없는 revision 은 빈 배열이다").isEmpty();
             assertThat(row(statement, "SELECT (SELECT COUNT(*) FROM content_draft_job) + (SELECT COUNT(*) FROM content_draft_asset)"))
-                .as("옛 테이블은 직전 이미지로 되돌릴 수 있게 지우지 않는다")
+                .as("처음 옮긴 단계는 직전 이미지로 되돌릴 수 있게 옛 테이블을 지우지 않는다")
                 .containsExactly("3");
         }
     }
@@ -106,12 +109,71 @@ class ContentDraftJobAssetMigrationTest {
                 """);
         }
 
-        assertThatThrownBy(() -> migrate(database, null)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> migrate(database, MOVED)).isInstanceOf(RuntimeException.class);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(row(statement, "SELECT action_id, job_status FROM content_draft_snapshot WHERE id = 1"))
                 .containsExactly("99", "SUCCEEDED");
         }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 옛 테이블에만 쓴 job 과 사진 참조를 다시 옮기고 이미 찬 칸은 덮어쓰지 않은 뒤 옛 테이블을 지운다")
+    void remigratesRowsWrittenByPreviousImageAndDropsOldTables() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, COLUMNS);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            parents(statement);
+            statement.executeUpdate(snapshot(1));
+            statement.executeUpdate(snapshot(2));
+            statement.executeUpdate(snapshot(3));
+            statement.executeUpdate(job(7, 1, 31, "SUCCEEDED"));
+            statement.executeUpdate("INSERT INTO content_draft_asset (revision_id, position, attachment_id, source_fingerprint)"
+                + " VALUES (1, 0, 1, '" + FINGERPRINT + "')");
+        }
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            // 직전 이미지로 되돌린 동안 옛 코드가 쓴 줄이다. 3번 revision 은 옛 코드가 만들었고 2번 snapshot 의 job 은 옛 테이블에만 있다.
+            statement.executeUpdate(job(8, 2, 32, "PREVIEW_READY"));
+            // 1번 snapshot 에는 새 코드가 이미 옮긴 job 이 있어 같은 snapshot 의 옛 job 을 덮어쓰지 않는다.
+            statement.executeUpdate("UPDATE content_draft_snapshot SET action_id = 41, job_status = 'DISPATCHED' WHERE id = 3");
+            statement.executeUpdate(job(9, 3, 33, "FAILED"));
+            statement.executeUpdate("INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body,"
+                + " body_key_id) VALUES (3, 1, 3, 'VALID', 1, CURRENT_TIMESTAMP, 'sealed', 1)");
+            statement.executeUpdate("INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body,"
+                + " body_key_id) VALUES (4, 1, 4, 'VALID', 1, CURRENT_TIMESTAMP, 'sealed', 1)");
+            statement.executeUpdate("INSERT INTO content_draft_asset (revision_id, position, attachment_id, source_fingerprint, observation_id,"
+                + " observation_revision) VALUES (3, 1, 2, '" + FINGERPRINT + "', 6, 1), (3, 0, 1, '" + FINGERPRINT + "', NULL, NULL)");
+        }
+
+        migrate(database, null);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(row(statement, "SELECT action_id, job_status FROM content_draft_snapshot WHERE id = 1"))
+                .as("처음 옮긴 줄은 그대로다").containsExactly("31", "SUCCEEDED");
+            assertThat(row(statement, "SELECT action_id, job_status FROM content_draft_snapshot WHERE id = 2"))
+                .as("옛 테이블에만 있던 job 을 옮긴다").containsExactly("32", "PREVIEW_READY");
+            assertThat(row(statement, "SELECT action_id, job_status FROM content_draft_snapshot WHERE id = 3"))
+                .as("이미 job 칸이 찬 snapshot 은 덮어쓰지 않는다").containsExactly("41", "DISPATCHED");
+            assertThat(assets(statement, 1)).hasSize(1);
+            assertThat(assets(statement, 3)).containsExactly(
+                new ContentDraftAsset(0, 1L, FINGERPRINT, null, null),
+                new ContentDraftAsset(1, 2L, FINGERPRINT, 6L, 1L));
+            assertThat(assets(statement, 4)).as("사진이 없는 revision 은 빈 배열이다").isEmpty();
+            assertThatThrownBy(() -> statement.executeUpdate("UPDATE content_draft_revision SET assets_json = NULL WHERE id = 1"))
+                .as("사진 참조 칸은 NOT NULL 이다").isInstanceOf(SQLException.class);
+            for (String table : List.of("content_draft_job", "content_draft_asset")) {
+                assertThatThrownBy(() -> row(statement, "SELECT COUNT(*) FROM " + table))
+                    .as("옛 테이블은 지운다").isInstanceOf(SQLException.class);
+            }
+        }
+    }
+
+
+    private static String job(int id, int snapshotId, int actionId, String status) {
+        return "INSERT INTO content_draft_job (id, snapshot_id, action_id, owner_user_id, conversation_id, status, created_at)"
+            + " VALUES (" + id + ", " + snapshotId + ", " + actionId + ", 1, 1, '" + status + "', '2026-11-01 01:02:03')";
     }
 
 

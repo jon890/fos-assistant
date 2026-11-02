@@ -42,59 +42,58 @@ class ContentDraftSnapshotMigrationTest {
 
 
     @Test
-    @DisplayName("두 표의 NULL 유일 제약 논리 참조와 terminal 이력을 보존한다")
+    @DisplayName("snapshot 의 job 칸은 NULL 허용이고 action 과 job 식별자는 유일하며 논리 참조와 terminal 이력을 보존한다")
     void enforcesUniqueAndNullableColumnsWithoutCascadingHistory() throws Exception {
         execute(snapshot(1, 1, 1));
         assertThatThrownBy(() -> execute(snapshot(2, 1, 1))).isInstanceOf(SQLException.class);
         execute(snapshot(3, 2, 1));
-        execute(job(1, 1, 1));
-        execute(job(2, 3, 2));
-        assertThatThrownBy(() -> execute(job(3, 1, 3))).isInstanceOf(SQLException.class);
-        execute("update content_draft_job set status='UNKNOWN', job_id='11111111-1111-4111-8111-111111111111' where id=1");
-        assertThatThrownBy(() -> execute("update content_draft_job set job_id='11111111-1111-4111-8111-111111111111' where id=2"))
+        execute(job(1, 1));
+        execute(job(2, 3));
+        assertThatThrownBy(() -> execute(job(1, 3))).isInstanceOf(SQLException.class);
+        execute("update content_draft_snapshot set job_status='UNKNOWN', job_id='11111111-1111-4111-8111-111111111111' where id=1");
+        assertThatThrownBy(() -> execute("update content_draft_snapshot set job_id='11111111-1111-4111-8111-111111111111' where id=3"))
             .isInstanceOf(SQLException.class);
-        for (String table : List.of("content_draft_snapshot", "content_draft_job")) {
-            try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
-                var rows = connection.getMetaData().getImportedKeys(connection.getCatalog(), null, tableName(connection, table))) {
-                assertThat(rows.next()).isFalse();
-            }
+        try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
+            var rows = connection.getMetaData().getImportedKeys(connection.getCatalog(), null, tableName(connection, "content_draft_snapshot"))) {
+            assertThat(rows.next()).isFalse();
         }
         execute("delete from content_draft where id=1");
         assertThat(count("content_draft_snapshot")).isEqualTo(2);
-        assertThat(count("content_draft_job")).isEqualTo(2);
     }
 
 
     @Test
-    @DisplayName("snapshot 칸에는 본문이 없고 job 승인 칸은 nullable이며 owner 대화 색인이 있다")
+    @DisplayName("snapshot 칸에는 본문이 없고 job 칸은 nullable이며 owner 대화 색인이 있다")
     void keepsReferencesOnlyWithOwnerConversationIndexes() throws Exception {
-        for (String table : List.of("content_draft_snapshot", "content_draft_job")) {
-            try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
-                var statement = connection.createStatement();
-                var rows = statement.executeQuery("select * from " + table + " where 1=0")) {
-                var metadata = rows.getMetaData();
-                var columns = new TreeSet<String>();
-                for (int i = 1; i <= metadata.getColumnCount(); i++) {
-                    columns.add(metadata.getColumnName(i).toLowerCase());
-                }
-                assertThat(columns).doesNotContain("body", "payload", "canonical_blocks", "photo_notes", "ticket", "image");
-                assertThat(columns).contains("owner_user_id", "conversation_id", "id");
-                try (var indexes = connection.getMetaData().getIndexInfo(connection.getCatalog(), null, tableName(connection, table), false, false)) {
-                    var found = new HashMap<String, List<String>>();
-                    while (indexes.next()) {
-                        String name = indexes.getString("INDEX_NAME");
-                        if (name != null) {
-                            found.computeIfAbsent(name, ignored -> new ArrayList<>()).add(indexes.getString("COLUMN_NAME").toLowerCase());
-                        }
+        try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
+            var statement = connection.createStatement();
+            var rows = statement.executeQuery("select * from content_draft_snapshot where 1=0")) {
+            var metadata = rows.getMetaData();
+            var columns = new TreeSet<String>();
+            for (int i = 1; i <= metadata.getColumnCount(); i++) {
+                columns.add(metadata.getColumnName(i).toLowerCase());
+            }
+            assertThat(columns).doesNotContain("body", "payload", "canonical_blocks", "photo_notes", "ticket", "image");
+            assertThat(columns).contains("owner_user_id", "conversation_id", "id");
+            try (var indexes = connection.getMetaData().getIndexInfo(connection.getCatalog(), null,
+                tableName(connection, "content_draft_snapshot"), false, false)) {
+                var found = new HashMap<String, List<String>>();
+                while (indexes.next()) {
+                    String name = indexes.getString("INDEX_NAME");
+                    if (name != null) {
+                        found.computeIfAbsent(name, ignored -> new ArrayList<>()).add(indexes.getString("COLUMN_NAME").toLowerCase());
                     }
-                    assertThat(found.values()).contains(List.of("owner_user_id", "conversation_id", "id"));
                 }
+                assertThat(found.values()).contains(List.of("owner_user_id", "conversation_id", "id"));
             }
         }
         execute(snapshot(1, 1, 1));
-        execute(job(1, 1, 1));
         for (String key : Set.of("public_id", "revision_id", "owner_user_id", "conversation_id", "origin_execution_id", "binding_id", "policy_fingerprint", "authorization_fingerprint")) {
             assertThatThrownBy(() -> execute("update content_draft_snapshot set " + key + "=null where id=1")).isInstanceOf(SQLException.class);
+        }
+        for (String nullable : Set.of("action_id", "job_id", "job_status", "job_created_at", "approved_by", "approved_at", "last_checked_at",
+            "start_claimed_at", "save_claimed_at", "job_stage", "save_clicked", "error_code", "error_reason")) {
+            execute("update content_draft_snapshot set " + nullable + "=null where id=1");
         }
     }
 
@@ -119,9 +118,9 @@ class ContentDraftSnapshotMigrationTest {
     }
 
 
-    private String job(int id, int snapshotId, int actionId) {
-        return "insert into content_draft_job(id,snapshot_id,action_id,owner_user_id,conversation_id,status,created_at) values("
-            + id + "," + snapshotId + "," + actionId + ",1,1,'PREVIEW_READY',CURRENT_TIMESTAMP)";
+    private String job(int actionId, int snapshotId) {
+        return "update content_draft_snapshot set action_id=" + actionId
+            + ",job_status='PREVIEW_READY',job_created_at=CURRENT_TIMESTAMP,save_clicked=false where id=" + snapshotId;
     }
 
 

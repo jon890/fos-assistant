@@ -97,7 +97,7 @@ public class ContentDraftSnapshotInputs {
         if (!draft.expiresAt().isAfter(clock.instant()) || row.status() == ContentDraftRevisionStatus.EXPIRED) {
             throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_GONE, null);
         }
-        if (draft.currentRevision() != revision || row.status() != ContentDraftRevisionStatus.VALID || row.assetsMissing()
+        if (draft.currentRevision() != revision || row.status() != ContentDraftRevisionStatus.VALID
             || !references.valid(draft, links, true)) {
             throw stale();
         }
