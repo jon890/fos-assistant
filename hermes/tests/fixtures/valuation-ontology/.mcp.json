@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "valuation-ontology": {
+      "type": "http",
+      "url": "https://workbench-plugin-file.invalid/mcp"
+    }
+  }
+}
