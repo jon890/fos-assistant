@@ -98,7 +98,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261009 / adr-per-module](ADR-20261009-adr-per-module.md) | ADR 은 지키는 코드의 모듈에 두고, 여러 모듈에 걸친 것과 작성 규칙만 루트에 둔다 | 공통 | Accepted. ADR-20261007 / numbering-scheme 의 ADR 제목 머리와 파일을 옮기지 않는다는 부분을 개정한다 |
 | [ADR-20261009 / connector-install-drift](ADR-20261009-connector-install-drift.md) | 서버 정의의 `tools` 어긋남은 그 커넥터만 막고, Control Plane 이 어긋난 바인딩을 찾아 다시 설치한다 | 공통 | Accepted. ADR-083 의 바인딩 판정과 ADR-20261007 / connector-live-reload 의 반영 예정 확인을 보완한다 |
 | [ADR-20261009 / docs-per-module](ADR-20261009-docs-per-module.md) | 문서는 모듈마다 정해진 파일 몇 개로 두고, 코드가 가진 값은 옮겨 적지 않는다 | 공통 | Accepted. ADR-20261009 / adr-per-module 의 자리 규칙을 문서 전체로 넓힌다. 모듈 prd 와 flow 를 두는 부분은 [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) 가 대체한다 |
-| [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) | 문서는 기능마다 한 파일로 두고 모듈 docs 에는 모듈 안의 규칙만 남긴다 | 공통 | Accepted. ADR-20261009 / docs-per-module 의 모듈 prd 와 flow 를 두는 부분을 대체한다 |
+| [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) | 문서는 기능마다 한 파일로 두고 모듈 docs 에는 모듈 안의 규칙만 남긴다 | 공통 | Accepted. ADR-20261009 / docs-per-module 의 모듈 prd 와 flow 를 두는 부분을 대체한다. 기능 스펙 예외는 [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) 가 더한다 |
 | [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |
 | [ADR-20261009 / workspace-explorer](ADR-20261009-workspace-explorer.md) | 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다 | backend, frontend | Accepted. ADR-086 의 사용자별 `/workspace` 를 사람이 보는 길이다. HTML 미리보기는 ADR-027 의 격리를 쓴다 |
@@ -120,6 +120,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261101 / artifact-vault](ADR-20261101-artifact-vault.md) | 사용자가 보관한 결과물은 chat_artifact 의 보관 사본 행에 암호화해 두고 대화와 따로 남긴다 | backend, frontend | Accepted. PR 1(HTML·CSS 선택 보관)만 구현했다. 이미지 묶음과 자동 보관은 아직이다 |
 | [ADR-20261101 / model-setting](ADR-20261101-model-setting.md) | 그룹에 모델 설정 하나를 두어 모든 에이전트가 따르고, 사용자는 ChatGPT 의 Thinking 슬라이더 칸으로만 고른다 | backend, frontend | Accepted. 구현을 마쳤다. ADR-054 의 에이전트 기본 모델과 ADR-030 의 대화 직접 선택을 대체했다 |
 | [ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md) | 먼저 살펴보기는 기억 위의 읽기 전용 깨우기와 제안 카드로 줄이고, 저장은 새 테이블 없이 할 일의 제안 상태와 기존 반응 기록으로 한다 | backend, frontend | Accepted. 새 읽기 경로만 구현했다. 옮기는 순서의 마지막 단계에서 ADR-20261007 / value-evaluation, ADR-20261008 / daily-loop 와 backend 의 autonomy-policy 를 대체한다 |
+| [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) | 기능 스펙은 기능 파일 옆 `docs/features/<id>/spec.md` 에 두고, Draft 의 독립 리뷰는 verify 로 한다 | 공통 | Accepted. ADR-20261009 / feature-docs 의 하위 디렉터리 금지에 스펙 예외를 더한다 |
 
 ## 보관
 
