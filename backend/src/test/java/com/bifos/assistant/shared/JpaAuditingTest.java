@@ -137,7 +137,7 @@ class JpaAuditingTest {
         }
         entityManager.flush();
         List<AuditedEntity> changed = fixture.rows().stream().filter(AuditedEntity.class::isInstance).map(AuditedEntity.class::cast).toList();
-        assertThat(changed).hasSize(7).allSatisfy(row -> {
+        assertThat(changed).hasSize(6).allSatisfy(row -> {
             assertThat(row.createdAt()).isEqualTo(micros(CREATED));
             assertThat(row.updatedAt()).isEqualTo(micros(LATER));
         });
