@@ -8,8 +8,10 @@ import json
 import os
 import pathlib
 import shutil
+import signal
 import sys
 import tempfile
+import threading
 import urllib.parse
 import urllib.request
 import mcp
@@ -202,6 +204,8 @@ def main():
         do_GET = do_POST = do_PUT = do_DELETE = handle_request
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    # Java 쪽 close() 는 SIGTERM 으로 끈다. serve_forever 를 멈춰 아래 finally 가 임시 디렉터리와 스냅샷을 지우게 한다.
+    signal.signal(signal.SIGTERM, lambda signum, frame: threading.Thread(target=server.shutdown).start())
     print(json.dumps({"port": server.server_port}), flush=True)
     try:
         server.serve_forever()
