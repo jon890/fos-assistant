@@ -3,7 +3,7 @@
 사용자가 묻지 않아도 에이전트가 기억 위에서 목표와 최근 일을 살피고, 챙길 것이 있으면 제안 카드로 보이는 기능이다.
 
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
-옮기는 동안 지금 코드는 아래 「먼저 살펴보기」 부터의 절대로 돈다. 매일 루프의 절은 옮기는 순서 6 의 마지막 PR 에서 지운다.
+가치 평가와 행동 정책, 자동 실행 동의, 매일 루프는 코드와 화면에서 지웠다. 그 테이블과 저장된 옛 줄은 그대로 있고 다음 plan 이 테이블을 지운다.
 
 covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`, `hermes/plugins/dashboard-profile-api/profiles.py`
 
@@ -86,7 +86,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 반응은 옮긴 줄이 있는 발견만 그 줄로 옮긴다. 그 발견의 사건(`check_finding:<번호>`)을 `follow_up:<공개 식별자>` 로 바꾼다. 같은 제목의 열린 할 일이 있어 줄을 만들지 않은 발견은 어느 줄에 해당하는지 정할 수 없으므로 추정해 붙이지 않고 옛 열쇠에 둔다.
 옛 번호로 들어오는 반응 요청(`PUT /api/v1/check-findings/{id}/reaction`)과 발견 목록의 응답 모양은 그대로이고, 옮긴 줄이 있으면 새 반응도 그 줄의 열쇠로 남고 두 열쇠의 사건을 함께 읽는다.
-문제 후보의 반응은 옮기지 않는다. 그 반응은 판정(`autonomy_decision`)에 묶여 있고 한 후보에 판정이 여럿일 수 있어서, 판정을 없애는 순서 6 에서 다룬다.
+문제 후보의 반응은 옮기지 않는다. 그 반응은 판정(`autonomy_decision`)에 묶여 있고 한 후보에 판정이 여럿일 수 있어서 옛 줄로 남긴다. 판정을 만들고 읽는 코드는 지웠다.
 
 ### 먼저 살펴보기 절
 
@@ -95,7 +95,6 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 시작할 수 없으면 단추를 끄고 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 의 이름을 보인다.
 시작이 `USER_BUSY`, `CONVERSATION_BUSY` 로 거절되면 끝난 뒤 다시 누르라고 안내하고, `PROACTIVE_CHECK_UNAVAILABLE` 이면 상태를 다시 읽어 까닭을 그린다.
 결과를 읽지 못한 마지막 살펴보기는 `lastCheck.invalidReason` 이 `EMPTY_ANSWER` 면 답을 받지 못했다고, 그 밖이거나 비었으면 형식이 맞지 않았다고 보인다.
-매일 루프 설정(`agent-proactive-loop-setting.tsx`)은 매일 깨우기 설정의 `form` 밖에 두고 스위치와 쉬기 단추가 바로 저장한다. 설치가 매일 루프를 열지 않았으면 꺼진 스위치만 막는다.
 관리자 영역 상세(`/admin/agents/{code}`)는 상태 조회가 성공했을 때만 이 절을 그린다. 관리자가 대화를 시작할 수 없는 남의 비공개 에이전트는 404 라 그리지 않는다.
 
 ### 에이전트 상세의 읽기와 주소 확인
@@ -147,7 +146,7 @@ sequenceDiagram
 
 경로는 `ProactiveCheckController`, `ProactiveScheduleController`, `ProactiveCheckReportController`, `CheckFindingController` 가 갖는다.
 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 일정 조회와 끄기는 읽기 권한만 본다. 다른 사용자의 보고를 열면 404 다.
-시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`), 자동 실행의 `AUTONOMY`(`ProactiveCheckService.startAutonomous`)다.
+시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`)다. 옛 자동 실행의 `AUTONOMY` 는 저장된 옛 줄을 읽으려고 값만 남았고 새로 시작하는 경로는 없다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 이 계기의 줄을 건너뛴다.
 점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다.
 
 | 경우 | 응답 |
@@ -304,7 +303,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 결정은 [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다. 칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultBlock` 이 갖는다.
 `problemKey` 는 앞뒤 공백을 지우고 소문자로 맞춰 비교한다. 검사 순서와 버린 까닭은 ADR-093 의 까닭 표와 `ProblemJudgement` 가 갖는다.
-단추로 연 살펴보기와 매일 깨우기는 가치 평가를 부르지 않는다.
+살펴보기는 문제 후보를 저장하기만 하고 가치 평가나 행동 정책을 잇지 않는다.
 
 ### 분야 지침이 지킬 것
 
@@ -319,26 +318,16 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 커리어 플러그인(MCP 서버 `career`)의 도구는 분야 패키지가 갖고 모두 `READ` 다. 제외 기준을 읽지 못한 `hold` 면 포지션을 추천으로 확정하지 않는다.
 이력서 원문을 도구 인자나 검색어에 넣지 않는다.
 
-## 매일 루프
+## 옛 판단 층의 자료
 
-매일 깨우기로 돈 살펴보기가 끝나도 가치 평가에 잇지 않는다.
-가치 평가를 잇던 조정자와 살펴보기의 끝을 알리던 사건, 행동 정책은 지웠다.
-이 절에는 설정과 기동 복구가 남아 있고, 키는 `ProactiveLoopProperties` 가 갖는다.
-결정은 [ADR-20261008 / daily-loop](../adr/ADR-20261008-daily-loop.md)에 있다.
+가치 평가, 행동 정책의 네 수준, 자동 실행 동의, 살펴보기 뒤에 평가를 잇던 매일 루프와 그 설정 화면은 지웠다. 시스템 판단용 Hermes profile 틀과 그 준비 상태를 읽던 대시보드 경로도 함께 지웠다.
+다음은 읽는 코드 없이 남는다.
 
-### 사용자 설정
+- 테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` 과 그 옛 줄. 테이블은 다음 plan 이 지운다
+- `task.loop_enabled`, `task.snoozed_until` 칸. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
+- 옛 `AUTONOMY` 계기의 살펴보기 줄과 실패 이력, 저장된 enum 값(`CheckTrigger.AUTONOMY`, `FeedbackSubjectType.AUTONOMY_DECISION`)
 
-사용자와 에이전트마다 하나다. 동의(켜짐)와 쉬기는 그 사용자와 에이전트의 `CHECK` 예약 작업(`task`)이 갖는다. 동의는 `task.loop_enabled`, 쉬기는 `task.snoozed_until` 이고, 작업이 없으면 꺼짐이다. 공유 에이전트도 사용자마다 작업이 따로라 설정이 서로 바뀌지 않는다.
-**루프 동의는 매일 깨우기 일정의 켜짐(`task.state`)과 다른 동의다.** 루프를 켜고 꺼도 일정은 바뀌지 않고, 일정을 켜고 꺼도 동의는 바뀌지 않는다. 작업이 없을 때 루프 설정을 저장하면 일정이 꺼진 작업을 만들어 동의를 담는다.
-이전에 `proactive_loop_setting` 이 갖던 값은 옮겼다. 옛 동의가 꺼져 있었으면 일정이 켜져 있어도 꺼진 채이고, 옛 동의가 켜져 있었으면 켜진 채다. 경로는 `ProactiveLoopController` 가 갖는다.
-조회와 끄기는 `AgentService.requireReadable`, 켜기는 `AgentService.requireStartable` 이다.
-설치 설정이 꺼져 있으면 꺼진 줄을 켜는 요청만 409 `PROACTIVE_LOOP_UNAVAILABLE` 이다. 끄기와 쉬기, 이미 켠 줄을 켠 채 두는 요청은 늘 받는다.
-`snoozedUntil` 이 `ProactiveLoopSettingService.MAX_SNOOZE` 를 넘으면 400 `VALIDATION_FAILED`, 지난 시각이면 비운 것과 같다.
-쉬기가 끝난 뒤 쉬는 동안의 깨우기를 몰아 잇지 않는다.
-
-### 서버가 멈췄을 때
-
-기동할 때 `ProactiveLoopRecovery` 가 `RUNNING` 시도 줄을 `FAILED`, `INTERRUPTED` 로 닫는다.
+옛 결정은 [ADR-20261008 / daily-loop](../adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있고, 대체한 결정은 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)이다.
 
 ## 판단 피드백
 
@@ -364,8 +353,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 ### 반응 읽기
 
 반응은 저장하지 않고 제안 하나의 사건을 읽을 때마다 정한다.
-읽기 규칙과 규칙 버전은 `FeedbackLabeler` 가, 잘못된 학습을 막는 규칙은 ADR 이 갖는다.
-규칙 버전 2 에서 `persistentPreference` 를 마지막 결정 기준으로 바꿨다. 버전 1 은 받아들인 사건이 하나라도 있으면 참이었다.
+지금은 사건을 첫 반응으로 읽는 코드가 없다(`FeedbackLabeler.label` 은 호출하는 곳이 테스트뿐이어서 지웠다). `FeedbackLabeler` 는 사건의 `reason_code` 이름만 갖는다. 읽는 코드를 다시 만들 때 지켜야 할 규칙, 곧 무응답은 싫어함이 아니고 거절과 숨기기는 그 제안 하나에 대한 일회성 반응이라는 규칙은 ADR 이 갖는다.
 
 ### 보관과 삭제
 

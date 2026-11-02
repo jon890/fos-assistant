@@ -159,7 +159,7 @@ The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.m
 
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember right away what you did not say.** The only thing stored at once is a fact you stated yourself in a conversation a person sent. Everything else is used only after a person accepts it. Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
-- **It does not widen what it does on a model's judgment alone.** Deterministic Control Plane rules decide how far to go, and the only thing those rules start on their own is a read-only check. A plugin write call goes through an approval card or a standing grant you gave ([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
+- **It does not widen what it does on a model's judgment alone.** The only thing it starts on its own is a read-only wake-up that proposes cards. A plugin write call goes through an approval card or a standing grant you gave ([ADR-20261101 / proactive-suggestion](docs/adr/ADR-20261101-proactive-suggestion.md)).
 - **It does not store secrets in the database.** AI credentials and plugin tokens stay on the Hermes side. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**

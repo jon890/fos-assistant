@@ -36,7 +36,7 @@
 | --- | --- |
 | `chat` | `conversation`, `delivery`, `modelchoice`, `attachment`, `artifact`, `contentdraft`, `starter`, `turn`, `nextturn`, `recovery`, `purge` |
 | `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval` |
-| `proactive` | `check`, `evaluation`, `autonomy`, `loop` |
+| `proactive` | `check` |
 | `usage` | `pricing`, `execution`, `subagent`, `tree`, `summary` |
 | `skill` | `usage`, `library`, `upload` |
 
@@ -61,8 +61,6 @@
 | `connector.contentdraft` | 원고 작업의 시작과 저장 승인 |
 | `connector.approval` | 도구 호출의 판정, 승인 흐름의 조율, 승인 API |
 | `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 문제 후보의 저장, 발견 반응 |
-| `proactive.autonomy` | 행동 수준의 판정과 자동 실행 |
-| `proactive.loop` | 매일 깨우기와 루프 설정, 지운 에이전트의 정리 참여 |
 | `usage.pricing` | 가격표와 비용 환산 |
 | `usage.execution` | 실행 기록, 실행 사건, 사용자 실행 한도 |
 | `usage.subagent` | native 하위 에이전트 사용량의 재조회와 원장 |
@@ -189,7 +187,7 @@
 4. 작은 기능 열네 개를 두 묶음으로 옮긴다. `user`, `crypto`, `followup`, `notification`, `model`, `context`, `feedback`, `people`, `task`, `workspace` 가 먼저이고, `browser`, `attention`, `orchestration`, `mcp` 가 다음이다.
 5. `memory` 와 `agent`, 그다음 `hermes`.
 6. `skill`, 그다음 `usage`.
-7. `proactive`. `check` 가 먼저이고 나머지 다섯 하위 기능이 다음이다.
+7. `proactive`. 하위 기능은 `check` 하나만 남았다.
 8. `connector`. `connection` 이 먼저이고 나머지 네 하위 기능이 다음이다.
 9. `chat`. `conversation`, `modelchoice`, `delivery`, `starter` 가 먼저이고, 그다음 `attachment` 와 `artifact`, 그다음 `contentdraft`, 마지막으로 `turn`, `nextturn`, `recovery`, `purge` 다.
 10. 기준 파일의 남은 줄을 확인하고, `admin` 규칙의 옛 이름 허용과 문서의 알림을 지운다.

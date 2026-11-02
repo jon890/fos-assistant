@@ -15,7 +15,7 @@
 | `agent_memory_collection`, `agent_memory_collection_change` | 지운다. 에이전트의 설정과 그 변경 기록이다 |
 | `agent_toolset_request` | 지운다. 에이전트의 권한 요청이다 |
 | `agent_connector_binding` | 지운다. 에이전트를 지울 때 이미 떼서 보통 없다 |
-| `proactive_loop_setting` | 지운다. FK 의 `ON DELETE CASCADE` 를 기다리지 않고 직접 지운다 |
+| `proactive_loop_setting` | 옛 매일 루프 설정이다. 읽고 쓰는 코드를 지워 직접 지우지 않고 FK 의 `ON DELETE CASCADE` 가 함께 지운다 |
 | `proactive_check` | 지운다. 발견, 문제, 평가, 자율 판정 표는 FK 가 함께 지우거나 비운다. 비용은 `agent_execution` 에 남는다 |
 | `connector_connection` | 연결은 사용자 소유라 보존한다. 옛 `agent_id` 칸은 ADR-083의 호환 폐기에서 제거했다 |
 | `connector_action.agent_id` | 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이고, 남은 대화의 승인 카드가 이 줄을 읽는다 |
