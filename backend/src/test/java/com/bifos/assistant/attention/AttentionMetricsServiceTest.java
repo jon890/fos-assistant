@@ -208,7 +208,7 @@ class AttentionMetricsServiceTest {
     }
 
 
-    /** 옛 {@code attention_event} 에서 이관한 노출처럼 판정이 없는 사건 한 줄을 넣는다. */
+    /** 이관 키를 단 노출처럼 판정이 없는 사건 한 줄을 넣는다. */
     private void saveLegacyShown(String itemKey, Instant at) {
         FeedbackEntry view = FeedbackEntry.ofKey(
             user, FeedbackSubjectType.ATTENTION_ITEM, itemKey, FeedbackEventType.SHOWN, FeedbackActor.SYSTEM, at)

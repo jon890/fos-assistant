@@ -5,8 +5,6 @@ import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
-import com.bifos.assistant.attention.domain.AttentionControlEntry;
-import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.browser.domain.UserBrowser;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
@@ -102,7 +100,6 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, AllowedPerson.of(unique + "@audit.test", "허용", unique));
         add(entityManager, rows, AgentMemoryCollection.of(agent.id(), "core", false));
         add(entityManager, rows, MemoryCollection.defaultsFor(group).getFirst());
-        add(entityManager, rows, AttentionControlEntry.hide(user.id(), CardKey.values()[0], "item", "state"));
         add(entityManager, rows, UserBrowser.create(user.id(), unique, BUSINESS));
         add(entityManager, rows, AgentToken.issueFor(unique, "f".repeat(64), "검사"));
         add(entityManager, rows, UserDataKey.wrapped(user.id(), "audit", "wrapped"));

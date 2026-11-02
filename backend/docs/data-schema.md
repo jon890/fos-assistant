@@ -13,10 +13,10 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
-| 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
+| 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
-| 「먼저 살펴보기 표」 | `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` |
+| 「먼저 살펴보기 표」 | `proactive_check`, `proactive_check_finding`, `proactive_check_problem` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
 | 「암호화 key 표」 | `user_data_key` |
@@ -87,7 +87,6 @@ ticket과 본문은 두 표 어디에도 저장하지 않는다. worker 상태�
 | `task` | `title`, `instruction` | 아직 |
 | `proactive_check` | `report_json` | 아직 |
 | `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
-| `proactive_value_evaluation` | `evidence_json` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
@@ -103,9 +102,8 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 사용자, 그룹, 에이전트에 1:1로 붙는 단순한 값은 `app_user`, `agent` 같은 본체의 컬럼에 둔다.
 동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
 새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
-예를 들어 자율 실행 동의처럼 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+예를 들어 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
 이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
-기존 `user_autonomy_preference`는 이 기준에 따라 본체 컬럼으로 옮길 대상이다. 이 문서 변경은 스키마를 옮기지 않으므로, 실제 이전 전까지 조회와 변경은 기존 표를 따른다.
 
 ## 마이그레이션 작성 규칙
 
@@ -255,7 +253,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 | `proactive_check` | 점검 보고 |
 | `proactive_check_finding` | 발견 제목과 출처 |
 | `proactive_check_problem` | 문제 본문과 근거 |
-| `proactive_value_evaluation` | 평가 근거 |
 
 공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
 새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
@@ -930,30 +927,6 @@ action을 지우면 실행 내용도 지운다.
 **`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
 같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
 
-### attention_control
-
-**읽고 쓰는 곳이 없다.** 지금 화면의 숨김과 미루기는 `decision_feedback_event` 의 제어 사건으로 옮겼고, 이 표의 살아 있는 줄은 마이그레이션이 처음 제어 사건으로 복사했다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
-
-한 사용자의 한 카드의 한 `itemKey` 에 한 줄이다. 새 제어는 그 줄을 고쳤다.
-**유일 제약 `uk_attention_control_item` 에 `card_key` 를 넣어 카드마다 제어를 나눈다.** 같은 대화가 두 카드에 나와도 제어가 서로 덮어쓰지 않는다.
-`card_key` 는 API 의 소문자 카드 열쇠를 대문자로 쓴 값이다. `state_key` 는 `HIDE` 일 때 숨긴 상태이고, 판정의 `stateKey` 가 이것과 다르면 다시 보인다.
-
-### attention_event
-
-**읽고 쓰는 곳이 없다.** 노출, 열기, 동작은 `decision_feedback_event` 의 사건으로 옮겼고 옛 줄 가운데 이 셋은 마이그레이션이 복사했다. `AttentionEventCleaner` 가 남은 줄을 보관 기간이 지나며 비운다. 표는 옛 표 정리 작업이 지울 때까지 둔다.
-
-**유일 제약 `uk_attention_event_once`(`user_id`, `item_key`, `state_key`, `event_type`, `attention`)는 화면을 열 때마다 같은 사건이 쌓이는 것을 막는다.**
-판정 칸이 제약에 들어 있어, 같은 상태에서 `LATER` 가 `NOW` 로 바뀌면 `NOW` 의 `SHOWN` 이 따로 남는다.
-`stale` 은 그때 출처의 신선도가 `STALE` 이었다는 뜻이다. 제목과 본문을 담는 칸이 없다.
-
-`attention` 은 아래를 차례로 보고 처음 맞는 것을 쓴다.
-
-1. 지금 응답에 그 항목이 있으면 그 판정이다. `HIDDEN`, `SNOOZED` 는 요청의 카드 안에서만 찾는다.
-2. 없으면 그 요청자가 그 항목으로 남긴 가장 최근 `SHOWN` 의 판정이다. `OPENED`, `ACTED` 는 `stateKey` 까지 같은 `SHOWN` 만 보고, `HIDDEN`, `SNOOZED` 는 상태와 상관없이 본다.
-3. 그것도 없고 숨겼거나 미뤄 억제 전 후보에만 있으면 `SUPPRESSED` 다.
-
-그래서 한 번 보였다가 숨긴 항목의 사건은 `SUPPRESSED` 가 아니라 그때 보인 `NOW` 나 `LATER` 로 남는다.
-
 ## 알림 표
 
 ### notification
@@ -1021,37 +994,6 @@ action을 지우면 실행 내용도 지운다.
 결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)). 받아들인 것과 버린 것을 모두 남긴다.
 칸의 뜻과 검사는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「문제 후보」 가 갖는다. 살펴보기 줄을 지우면 함께 지운다. 원문 본문과 플러그인 응답은 남기지 않는다.
 
-### `proactive_value_evaluation`
-
-가치 평가 시도 하나다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 표는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
-후보가 나온 살펴보기나 요청 사용자를 지우면 평가도 함께 지운다. 전체 개인 문맥과 원시 모델 응답을 저장하지 않는다.
-
-### `proactive_autonomy_decision`
-
-행동 정책의 판정 하나다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 수준과 까닭, 실행 키는 [ADR-20261007 / autonomy-policy](../../backend/docs/adr/archive/ADR-20261007-autonomy-policy.md)에 이력으로 남아 있다.
-`execution_key` 는 유일하다. 원천 살펴보기 하나에서 자동 실행이 한 번만 열리게 하는 장치이고, `EXECUTE` 만 채운다.
-`candidate_id` 는 FK 가 없다. 평가 스냅샷의 후보 식별자라 지금의 후보 줄이 지워져도 판정이 남는다.
-사용자, 평가, 원천 살펴보기를 지우면 함께 지운다. 시작한 살펴보기(`execution_check_id`)를 지우면 그 칸만 비운다. `inputs_json` 에는 판정에 쓴 값만 두고 축 설명과 후보 글은 두지 않는다.
-
-### `user_autonomy_preference`
-
-줄이 없으면 모두 꺼짐이다. 사용자를 지우면 함께 지운다.
-이 표는 「테이블을 추가하는 기준」에 따라 `app_user` 컬럼으로 옮길 대상이며, 새로운 단순 동의 칸을 이 표에 더하지 않는다.
-실제 이전 전까지 기존 동의의 저장과 조회는 이 표를 유지한다. 한 칸이 여러 종류의 허락을 뜻하지 않게 한다.
-
-### `proactive_loop_setting`
-
-사용자가 에이전트마다 매일 루프를 켠 옛 설정이다. **읽는 곳이 없다.** 이 표의 엔티티도 지웠다. 값은 사용자와 에이전트마다 하나인 `CHECK` `task` 의 `loop_enabled`, `snoozed_until` 로 복사됐고, 그 칸도 지금은 읽는 곳이 없다.
-`task.loop_enabled` 와 `task.snoozed_until` 을 더하는 마이그레이션이 켜진 줄의 동의와 쉬기 시각을 같은 사용자·에이전트의 `CHECK` 작업으로 복사했다. 꺼진 줄은 복사하지 않아 일정이 켜져 있어도 동의 없음으로 남고, 작업의 `state` 는 건드리지 않았다. 짝지을 `CHECK` 작업이 없는 켜진 줄은 옮길 곳이 없어 동의 없음이 된다.
-에이전트를 지우면 FK 의 `ON DELETE CASCADE` 가 이 표의 줄을 함께 지운다. 표 자체는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
-
-### `proactive_loop_run`
-
-매일 깨우기 살펴보기 하나를 잇던 옛 시도다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 상태와 순서는 [ADR-20261008 / daily-loop](../../docs/adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있다.
-`source_check_id` 는 유일하다. 살펴보기 하나에 시도 하나라서, 서버가 도중에 멈춰도 같은 원천에서 평가와 판정이 두 번 생기지 않는다.
-사용자나 원천 살펴보기를 지우면 함께 지운다. 이 시도가 만든 평가를 지우면 `evaluation_id` 만 비운다. 기동 때 닫은 줄도 비어 있다.
-글과 원문, provider 이름은 두지 않는다. provider 는 평가의 `evidence_json` 이 갖는다.
-
 ## 판단 피드백 표
 
 ### decision_feedback_event
@@ -1059,7 +1001,7 @@ action을 지우면 실행 내용도 지운다.
 제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 할 일의 제안 줄로 옮길 때 그 줄이 생긴 발견의 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 한 번 바꾸는 이관뿐이다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
 사용자를 지우면 함께 지운다. 다른 사용자는 관리자여도 읽지 못한다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
-실행, 살펴보기, 행동 정책 판정을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
+실행이나 살펴보기를 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
 지금 화면의 숨김, 미루기, 복원과 노출, 열기, 동작도 이 표의 사건이다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「저장」). 아래 칸이 쓰인다.
@@ -1077,7 +1019,7 @@ action을 지우면 실행 내용도 지운다.
 - **색인 `idx_decision_feedback_event_control`(`user_id`, `card_key`, `subject_key`, `id`)이 현재 제어를 읽는다.** 카드와 항목마다 `id` 가 가장 큰 제어 사건이 현재값이다
 - 숨김, 미루기, 복원은 부르는 쪽 트랜잭션에서 필수로 저장하고 실패하면 요청도 실패한다. 노출, 열기, 동작은 관측용이라 실패해도 응답을 낸다
 - 보관 기간 정리(`DecisionFeedbackCleaner`)는 카드마다 항목마다 마지막 숨김과 기한이 안 지난 미루기를 남긴다
-- 옛 `attention_control`, `attention_event` 의 값은 `event_key` 가 `legacy:attention_control:<번호>`, `legacy:attention_event:<번호>` 인 줄로 복사했다. 이관한 줄은 `subject_type` 이 `ATTENTION_ITEM` 이고 판정(`attention`)과 신선도는 옮기지 않았다
+- 옛 `attention_control`, `attention_event` 의 값은 `event_key` 가 `legacy:attention_control:<번호>`, `legacy:attention_event:<번호>` 인 줄로 복사했고 두 테이블은 지웠다. 이관한 줄은 `subject_type` 이 `ATTENTION_ITEM` 이고 판정(`attention`)과 신선도는 옮기지 않았다
 - 지금 화면의 사건은 reaction replay 읽기 모델에 싣지 않는다
 
 정비 사건(`MAINTENANCE_PROPOSED`, `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED`)은 같은 표에 남는다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「정비 루프」). 열쇠는 `memory:<번호>`, 동작 종류(`ARCHIVE`, `DEDUP`)는 `reason_code`, 그때의 revision 번호는 `subject_version` 이다.

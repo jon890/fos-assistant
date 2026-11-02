@@ -69,7 +69,7 @@
 | `until_at` nullable | 미루기가 끝나는 시각 |
 | `event_key` nullable, `(user_id, event_key)` UNIQUE | 서버가 검증한 요청 키나 노출 키로 재전송을 하나로 합친다 |
 
-`source_check_id`, `autonomy_decision_id` 컬럼은 옛 테이블과 함께 없앤다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
+`autonomy_decision_id` 컬럼은 순서 7 에서 지웠다. `source_check_id` 는 `proactive_check` 를 남겨 함께 남기고, 그 테이블을 줄이는 별도 스펙에서 정한다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
 지표는 모델·프롬프트 버전별 수락률, 무반응 비율, 정정률이다. 분모는 그 버전으로 만든 제안의 처음 노출 수이고, 무응답은 사건으로 남기지 않고 관측 기간 뒤 계산한다.
 
 #### 숨김과 미루기를 반응 기록으로 옮기는 조건
@@ -94,10 +94,10 @@ PR 하나가 한 걸음이다. 테이블에 데이터가 있다는 까닭만으�
 | 4 | 옛 발견과 문제 후보를 할 일의 `PROPOSED` 줄로 옮긴다. 이미 있는 할 일 줄은 그대로 둔다 | 제안별 사용자·대화·실행 연결, 기존 카드 링크와 반응 연결, 열린 할 일 중복 없음, 대화 삭제 뒤 본문 없음 |
 | 5 | 노출과 반응을 한 테이블로 쓰고 숨김·미루기 경로를 옮긴다. 옛 제어 현재값도 처음 제어 사건으로 옮긴다 | 카드별 제어 독립, 상태가 바뀐 뒤 다시 보임, 미루기 만료와 복원, 동시 조작과 재전송, 보관 기간 뒤 숨김 유지 |
 | 6 | 새 화면과 기록 경로로 바꾼 뒤 가치 평가, 네 수준, 자동 실행 동의, 다시 살펴보기 루프를 없앤다 | 승인 없이 외부 쓰기가 열리지 않음, 사라진 API·DTO·enum 참조 없음, 옛 실행·실패 이력 보존 |
-| 7 | 옛 읽기·쓰기가 없음을 확인하고 열 개 테이블을 지운다 | MySQL 마이그레이션 검사, 사용자·대화·에이전트 정리 계약, CI |
+| 7 | 옛 읽기·쓰기가 없음을 확인하고 테이블을 지운다. 일곱 개를 지웠고 살펴보기 세 개는 남겼다(아래) | MySQL 마이그레이션 검사, 사용자·대화·에이전트 정리 계약, CI |
 
-지우는 테이블은 `proactive_autonomy_decision`, `proactive_check`, `proactive_check_finding`, `proactive_check_problem`, `proactive_loop_run`, `proactive_loop_setting`, `proactive_value_evaluation`, `user_autonomy_preference`, `attention_control`, `attention_event` 다.
-`proactive_check` 가 갖던 실행 상태는 `agent_execution` 과 `task_run` 이 갖고, 깨우기 결과의 보고 본문은 대화 메시지의 보관 정책을 따른다.
+지운 테이블은 `proactive_autonomy_decision`, `proactive_loop_run`, `proactive_loop_setting`, `proactive_value_evaluation`, `user_autonomy_preference`, `attention_control`, `attention_event` 일곱 개다. 반응 기록의 `autonomy_decision_id` 컬럼도 함께 지웠다. `subject_type` 이 `AUTONOMY_DECISION` 인 옛 사건 줄이 남을 수 있어 그 enum 이름은 지우지 않았다.
+**`proactive_check`, `proactive_check_finding`, `proactive_check_problem` 은 지우지 않았다.** 순서 7 을 구현하며 코드로 확인하니 `proactive_check` 가 살펴보기 한 번의 상태 원장이었다. 결과(`outcome`, `invalid_reason`, `skipped_reason`), 쓰기 허용의 옮겨 적은 값(`writes_allowed`), 보고(`report_json`), 읽지 않은 보고 표시(`report_opened_at`)는 `agent_execution` 과 `task_run` 에 없고, 시작·상태·복구·읽기 경계·보고 카드가 이 줄을 읽고 쓴다. 이 세 테이블을 지우려면 그 칸들을 `agent_execution` 이나 `task_run`, 대화 메시지로 옮기는 설계가 먼저 필요하고, 별도 스펙으로 정한다.
 
 **그룹 본체 테이블은 테이블 수를 줄이려는 목적만으로 새로 만들지 않는다.** 그룹의 수명이나 설정 관리 요구가 생길 때 따로 정한다.
 
@@ -119,7 +119,7 @@ PR 하나가 한 걸음이다. 테이블에 데이터가 있다는 까닭만으�
 
 얻는 것:
 
-- 새 테이블 없이 테이블 열 개가 사라진다
+- 새 테이블 없이 테이블 일곱 개가 사라졌다. 남은 세 개는 위 설명대로 별도 스펙에서 줄인다
 - 모델과 프롬프트를 바꾸면 같은 지표로 바로 비교할 수 있다
 - 안전 경계가 판단 구조와 떨어져 모델을 바꿔도 경계 테스트가 그대로다
 
