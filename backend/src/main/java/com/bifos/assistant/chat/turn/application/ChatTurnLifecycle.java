@@ -17,10 +17,8 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.application.dto.HermesImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
@@ -31,6 +29,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
+import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
@@ -50,7 +49,7 @@ class ChatTurnLifecycle {
     private final ConversationWriter conversationWriter;
     private final ConversationSessions sessions;
     private final ChatMessageRepository messages;
-    private final ExecutionQuestionRepository executionQuestions;
+    private final ExecutionQuestions executionQuestions;
     private final ExecutionRecorder executions;
     private final StarterSuggestionService starterSuggestions;
     private final ArtifactService artifacts;
@@ -251,7 +250,7 @@ class ChatTurnLifecycle {
             return;
         }
         try {
-            executionQuestions.save(ExecutionQuestion.of(executionId, questionId));
+            executionQuestions.link(executionId, questionId);
         } catch (RuntimeException ex) {
             log.warn("could not link the turn question executionId={}", executionId, ex);
         }

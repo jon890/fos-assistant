@@ -15,14 +15,12 @@ import com.bifos.assistant.chat.attachment.application.MediaObservationService;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.attachment.infra.AttachmentStore;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.chat.attachment.infra.MediaObservationRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -30,6 +28,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
@@ -84,7 +83,7 @@ class ConversationPurgerTest {
     ArtifactProperties artifactProperties;
 
     @Autowired
-    ExecutionQuestionRepository questions;
+    ExecutionQuestions questions;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -150,6 +149,8 @@ class ConversationPurgerTest {
     @DisplayName("지운 대화의 메시지와 첨부, 결과물, 실행 본문, Hermes session 을 지우고 사용량은 남긴다")
     void purgesBodiesOfDeletedConversationAndKeepsUsage() throws Exception {
         Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);
+        Filled untouched = filledConversation(ExecutionStatus.SUCCEEDED);
+        assertThat(questions.messageIdOf(filled.executionId())).isPresent();
         conversationWriter.deleteIfActive(filled.conversationId(), owner.id(), NOW.minusSeconds(60));
 
         purger.purgeDue(NOW);
@@ -160,7 +161,8 @@ class ConversationPurgerTest {
             .isEmpty();
         assertThat(attachmentFile(filled.attachment())).doesNotExist();
         assertThat(artifactFolder(filled.conversationId())).doesNotExist();
-        assertThat(questions.findById(filled.executionId())).isEmpty();
+        assertThat(questions.messageIdOf(filled.executionId())).isEmpty();
+        assertThat(questions.messageIdOf(untouched.executionId())).as("정리하지 않은 대화의 질문 번호는 남는다").isPresent();
         AgentExecution execution = executions.findById(filled.executionId()).orElseThrow();
         assertThat(execution.outputText()).isNull();
         assertThat(execution.totalTokens()).isEqualTo(30L);
@@ -302,7 +304,7 @@ class ConversationPurgerTest {
     }
 
 
-    /** 메시지 둘과 사진 하나, 결과물 하나, 실행 하나와 그 사건과 질문 줄을 가진 대화를 만든다. */
+    /** 메시지 둘과 사진 하나, 결과물 하나, 실행 하나와 그 사건과 질문 메시지 번호를 가진 대화를 만든다. */
     private Filled filledConversation(ExecutionStatus status) throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(owner.id(), "건강검진 결과", agent.id(), NOW.minusSeconds(600)));
         String sessionId = "purge-session-" + UUID.randomUUID();
@@ -323,7 +325,7 @@ class ConversationPurgerTest {
         execution.recordOutput("위임한 답 본문");
         executions.save(execution);
         messages.save(ChatMessage.fromAssistant(conversation.id(), "식단을 조절해 보세요", execution.id(), NOW));
-        questions.save(ExecutionQuestion.of(execution.id(), question.id()));
+        questions.link(execution.id(), question.id());
         events.save(ExecutionEvent.builder()
             .executionId(execution.id())
             .sequence(1)
