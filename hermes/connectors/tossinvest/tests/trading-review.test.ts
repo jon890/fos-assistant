@@ -248,10 +248,23 @@ for (const name of ["modify_order", "cancel_order"] as const) {
 }
 
 test("지정가 원주문의 orderAmount 는 파생 값이라 원주문 대조에서 null 이고 시장가 금액 주문은 그대로다", () => {
-  const limit = { ...sampleOrder("old"), orderType: "LIMIT", price: "140", quantity: "1", orderAmount: "140" };
+  const limit = {
+    ...sampleOrder("old"),
+    orderType: "LIMIT",
+    price: "140",
+    quantity: "1",
+    orderAmount: "140",
+  };
   expect(expectedOrder(limit).orderAmount).toBeNull();
-  expect(expectedOrder({ ...limit, orderAmount: "garbage" }).orderAmount).toBeNull();
-  const market = { ...sampleOrder("old"), orderType: "MARKET", price: null, orderAmount: "50" };
+  expect(
+    expectedOrder({ ...limit, orderAmount: "garbage" }).orderAmount,
+  ).toBeNull();
+  const market = {
+    ...sampleOrder("old"),
+    orderType: "MARKET",
+    price: null,
+    orderAmount: "50",
+  };
   expect(expectedOrder(market).orderAmount).toBe("50");
 });
 
@@ -282,7 +295,11 @@ test("지정가 원주문에 orderAmount 가 채워져 와도 취소 준비→Py
     fake.on("POST", "/api/v1/orders/old/cancel", {
       result: { orderId: "old-cancel" },
     });
-    execute = await connect(root, fake.url, claims.authority("cancel_order", args));
+    execute = await connect(
+      root,
+      fake.url,
+      claims.authority("cancel_order", args),
+    );
     const response = await tool(execute, "cancel_order", args);
     expect(response.result.isError).toBeUndefined();
     expect(response.body).toEqual({ orderId: "old-cancel" });
