@@ -19,6 +19,9 @@ class MediaObservationMigrationTest {
     /** 요청 칸을 더하는 마이그레이션보다 앞선 버전이다. 그 사이 버전은 out-of-order 로 함께 적용된다. */
     private static final String BEFORE_REQUEST_MERGE = "20261102025855";
 
+    /** 요청 칸을 더하고 옮긴 뒤 옛 표를 아직 지우지 않은 마지막 버전이다. 직전 이미지가 이 스키마에서 돈다. */
+    private static final String BEFORE_REFILL = "20261102074304";
+
     private String[] database;
 
 
@@ -46,59 +49,56 @@ class MediaObservationMigrationTest {
                     values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
                     (2,1,100,1,'b.gif','2.gif','image/gif',9,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                     """);
-            insertObservation(statement, 1, 1, 1);
-            insertObservation(statement, 2, 2, 1);
+            insertObservation(statement, 1, 1, 1, "00000000-0000-0000-0000-000000000001");
+            insertObservation(statement, 2, 2, 1, "00000000-0000-0000-0000-000000000002");
         }
     }
 
 
     @Test
-    @DisplayName("요청 유일성과 복합 외래키 revision 유일성을 강제한다")
-    void enforcesRequestUniqueCompositeForeignKeyAndRevisionUnique() throws SQLException {
+    @DisplayName("같은 첨부의 같은 요청 UUID 와 같은 revision 을 막고 요청 칸이 비는 줄을 막는다")
+    void enforcesRequestUniqueRevisionUniqueAndNotNull() throws SQLException {
         try (var connection = connect();
             var statement = connection.createStatement()) {
-            alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "a");
-            assertThatThrownBy(() -> alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "b"))
+            assertThatThrownBy(() -> insertObservation(statement, 3, 1, 2, "00000000-0000-0000-0000-000000000001"))
                 .isInstanceOf(SQLException.class);
-            assertThatThrownBy(() -> alias(statement, 1, 2, "00000000-0000-0000-0000-000000000002", "a"))
+            assertThatThrownBy(() -> insertObservation(statement, 3, 1, 1, "00000000-0000-0000-0000-000000000003"))
                 .isInstanceOf(SQLException.class);
-            assertThatThrownBy(() -> insertObservation(statement, 3, 1, 1)).isInstanceOf(SQLException.class);
-            assertThat(count(statement, "media_observation_request")).isEqualTo(1);
+            assertThatThrownBy(() -> insertObservation(statement, 3, 1, 2, null)).isInstanceOf(SQLException.class);
+            insertObservation(statement, 3, 2, 2, "00000000-0000-0000-0000-000000000001");
+            assertThat(count(statement, "media_observation")).isEqualTo(3);
         }
     }
 
 
     @Test
-    @DisplayName("관찰과 첨부 삭제가 모든 alias에 전파된다")
-    void cascadesObservationAndAttachmentDeletionToEveryAlias() throws SQLException {
+    @DisplayName("옛 요청 표와 분석 key 칸은 없고 첨부 삭제가 관찰로 전파된다")
+    void dropsOldRequestTableAndAnalysisKeyAndCascadesAttachmentDeletion() throws SQLException {
         try (var connection = connect();
             var statement = connection.createStatement()) {
-            alias(statement, 1, 1, UUID.randomUUID().toString(), "a");
-            alias(statement, 1, 1, UUID.randomUUID().toString(), "b");
-            alias(statement, 2, 2, UUID.randomUUID().toString(), "c");
-            statement.executeUpdate("delete from media_observation where id=1");
-            assertThat(count(statement, "media_observation_request")).isEqualTo(1);
+            assertThatThrownBy(() -> count(statement, "media_observation_request")).isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> count(statement, "media_observation where analysis_key is null"))
+                .isInstanceOf(SQLException.class);
             statement.executeUpdate("delete from chat_attachment where id=2");
-            assertThat(count(statement, "media_observation")).isZero();
-            assertThat(count(statement, "media_observation_request")).isZero();
+            assertThat(count(statement, "media_observation")).isEqualTo(1);
         }
     }
 
 
     @Test
-    @DisplayName("nullable 분석 key와 기존 긴 본문 색인을 보존하고 cache 색인은 만들지 않는다")
-    void createsNullableAnalysisKeyAndPreservesBodyAndIndexes() throws SQLException {
+    @DisplayName("요청 칸은 NOT NULL 이고 기존 긴 본문 색인을 보존하며 분석 key 색인은 만들지 않는다")
+    void hasNotNullRequestColumnsAndPreservesBodyAndIndexes() throws SQLException {
         try (var connection = connect()) {
-            try (var columns = connection.getMetaData().getColumns(null, null, table(connection), "%")) {
+            try (var columns = connection.getMetaData().getColumns(connection.getCatalog(), null, table(connection), "%")) {
                 boolean body = false;
-                boolean key = false;
+                int requestColumns = 0;
                 while (columns.next()) {
                     String name = columns.getString("COLUMN_NAME");
-                    if ("analysis_key".equalsIgnoreCase(name)) {
-                        key = true;
+                    assertThat(name).isNotEqualToIgnoringCase("analysis_key");
+                    if ("request_id".equalsIgnoreCase(name) || "request_hash".equalsIgnoreCase(name)) {
+                        requestColumns++;
                         assertThat(columns.getInt("DATA_TYPE")).isEqualTo(Types.CHAR);
-                        assertThat(columns.getInt("COLUMN_SIZE")).isEqualTo(64);
-                        assertThat(columns.getInt("NULLABLE")).isEqualTo(DatabaseMetaData.columnNullable);
+                        assertThat(columns.getInt("NULLABLE")).isEqualTo(DatabaseMetaData.columnNoNulls);
                     }
                     if ("body".equalsIgnoreCase(name)) {
                         body = true;
@@ -106,9 +106,9 @@ class MediaObservationMigrationTest {
                     }
                 }
                 assertThat(body).isTrue();
-                assertThat(key).isTrue();
+                assertThat(requestColumns).isEqualTo(2);
             }
-            try (var indexes = connection.getMetaData().getIndexInfo(null, null, table(connection), false, false)) {
+            try (var indexes = connection.getMetaData().getIndexInfo(connection.getCatalog(), null, table(connection), false, false)) {
                 boolean found = false;
                 while (indexes.next()) {
                     assertThat(indexes.getString("COLUMN_NAME")).isNotEqualToIgnoringCase("analysis_key");
@@ -118,20 +118,13 @@ class MediaObservationMigrationTest {
                 }
                 assertThat(found).isTrue();
             }
-            try (var statement = connection.createStatement()) {
-                assertThat(count(statement, "media_observation where analysis_key is null"))
-                    .isEqualTo(2);
-                insertObservation(statement, 3, 1, 2);
-                statement.executeUpdate("update media_observation set analysis_key='" + "a".repeat(64) + "'");
-                assertThat(count(statement, "media_observation")).isEqualTo(3);
-            }
         }
     }
 
 
     @Test
-    @DisplayName("cache DDL 직전의 본문과 다중 alias를 보존하고 구행 key는 null로 둔다")
-    void upgradesLegacyRowsAndAliasesWithoutBackfill() throws SQLException {
+    @DisplayName("재사용 DDL 직전의 본문과 다중 alias를 올리면 본문은 보존하고 가장 먼저 저장한 요청을 관찰 줄로 옮긴다")
+    void upgradesLegacyRowsAndAliases() throws SQLException {
         String[] before = createDatabase();
         Flyway.configure()
             .dataSource(before[0], before[1], before[2])
@@ -147,7 +140,7 @@ class MediaObservationMigrationTest {
                     stored_name,content_type,byte_size,position,created_at,expires_at)
                     values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                     """);
-            insertObservation(statement, 1, 1, 1);
+            insertLegacyObservation(statement, 1, 1, 1);
             statement.executeUpdate("update media_observation set body='legacy-body',body_key_id=42");
             alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "a");
             alias(statement, 1, 1, "00000000-0000-0000-0000-000000000002", "b");
@@ -160,13 +153,10 @@ class MediaObservationMigrationTest {
             upgraded.validate();
             assertThat(count(
                 statement,
-                "media_observation where analysis_key is null and body='legacy-body' and body_key_id=42"))
-                    .isEqualTo(1);
-            assertThat(count(statement, "media_observation_request")).isEqualTo(2);
-            assertThatThrownBy(() -> alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "c"))
-                .isInstanceOf(SQLException.class);
-            statement.executeUpdate("delete from media_observation where id=1");
-            assertThat(count(statement, "media_observation_request")).isZero();
+                "media_observation where body='legacy-body' and body_key_id=42"
+                    + " and request_id='00000000-0000-0000-0000-000000000001' and request_hash='" + "a".repeat(64) + "'"))
+                        .isEqualTo(1);
+            assertThatThrownBy(() -> count(statement, "media_observation_request")).isInstanceOf(SQLException.class);
         }
     }
 
@@ -189,8 +179,8 @@ class MediaObservationMigrationTest {
                     stored_name,content_type,byte_size,position,created_at,expires_at)
                     values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                     """);
-            insertObservation(statement, 1, 1, 1);
-            insertObservation(statement, 2, 1, 2);
+            insertLegacyObservation(statement, 1, 1, 1);
+            insertLegacyObservation(statement, 2, 1, 2);
             alias(statement, 1, 1, "00000000-0000-0000-0000-000000000001", "a");
             alias(statement, 1, 1, "00000000-0000-0000-0000-000000000002", "b");
             alias(statement, 1, 2, "00000000-0000-0000-0000-000000000003", "c");
@@ -207,9 +197,82 @@ class MediaObservationMigrationTest {
             assertThatThrownBy(() -> statement.executeUpdate(
                 "update media_observation set request_id='00000000-0000-0000-0000-000000000001' where id=2"))
                     .isInstanceOf(SQLException.class);
-            insertObservation(statement, 3, 1, 3);
-            insertObservation(statement, 4, 1, 4);
-            assertThat(count(statement, "media_observation where request_id is null")).isEqualTo(2);
+        }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 요청 칸 없이 쓴 관찰 줄은 옛 요청 표에서 다시 채우고 이미 채운 줄은 그대로 둔다")
+    void refillsRowsWrittenByPreviousImage() throws SQLException {
+        String[] before = createDatabase();
+        Flyway.configure()
+            .dataSource(before[0], before[1], before[2])
+            .locations("classpath:db/migration")
+            .outOfOrder(true)
+            .target(BEFORE_REFILL)
+            .load()
+            .migrate();
+        try (var connection = DriverManager.getConnection(before[0], before[1], before[2]);
+            var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    insert into chat_attachment (id,conversation_id,message_id,uploaded_by_user_id,original_name,
+                    stored_name,content_type,byte_size,position,created_at,expires_at)
+                    values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                    """);
+            // 새 코드가 쓴 줄은 요청 칸이 차 있다. 직전 이미지가 쓴 줄은 칸이 비고 옛 요청 표에 줄이 있다.
+            insertObservation(statement, 1, 1, 1, "00000000-0000-0000-0000-0000000000aa");
+            statement.executeUpdate("update media_observation set request_hash='" + "e".repeat(64) + "' where id=1");
+            insertLegacyObservation(statement, 2, 1, 2);
+            insertLegacyObservation(statement, 3, 1, 3);
+            alias(statement, 1, 2, "00000000-0000-0000-0000-000000000002", "b");
+            alias(statement, 1, 2, "00000000-0000-0000-0000-000000000004", "d");
+            alias(statement, 1, 3, "00000000-0000-0000-0000-000000000003", "c");
+
+            Flyway.configure()
+                .dataSource(before[0], before[1], before[2])
+                .locations("classpath:db/migration")
+                .outOfOrder(true)
+                .load()
+                .migrate();
+
+            assertThat(count(statement, "media_observation where id=1 and request_id='00000000-0000-0000-0000-0000000000aa'"
+                + " and request_hash='" + "e".repeat(64) + "'")).isEqualTo(1);
+            assertThat(count(statement, "media_observation where id=2 and request_id='00000000-0000-0000-0000-000000000002'"
+                + " and request_hash='" + "b".repeat(64) + "'")).isEqualTo(1);
+            assertThat(count(statement, "media_observation where id=3 and request_id='00000000-0000-0000-0000-000000000003'"
+                + " and request_hash='" + "c".repeat(64) + "'")).isEqualTo(1);
+        }
+    }
+
+
+    @Test
+    @DisplayName("옛 요청 표에 줄이 없는 빈 관찰 줄이 남으면 NOT NULL 단계가 실패해 옛 표를 지우지 않는다")
+    void stopsBeforeDropWhenARequestCellCannotBeRefilled() throws SQLException {
+        String[] before = createDatabase();
+        Flyway.configure()
+            .dataSource(before[0], before[1], before[2])
+            .locations("classpath:db/migration")
+            .outOfOrder(true)
+            .target(BEFORE_REFILL)
+            .load()
+            .migrate();
+        try (var connection = DriverManager.getConnection(before[0], before[1], before[2]);
+            var statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    insert into chat_attachment (id,conversation_id,message_id,uploaded_by_user_id,original_name,
+                    stored_name,content_type,byte_size,position,created_at,expires_at)
+                    values (1,1,100,1,'a.gif','1.gif','image/gif',9,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                    """);
+            insertLegacyObservation(statement, 1, 1, 1);
+
+            assertThatThrownBy(() -> Flyway.configure()
+                .dataSource(before[0], before[1], before[2])
+                .locations("classpath:db/migration")
+                .outOfOrder(true)
+                .load()
+                .migrate()).isInstanceOf(RuntimeException.class);
+
+            assertThat(count(statement, "media_observation")).isEqualTo(1);
         }
     }
 
@@ -224,7 +287,21 @@ class MediaObservationMigrationTest {
     }
 
 
-    private static void insertObservation(Statement statement, long id, long attachment, long revision)
+    private static void insertObservation(Statement statement, long id, long attachment, long revision, String request)
+        throws SQLException {
+        statement.executeUpdate(
+            "insert into media_observation (id,attachment_id,conversation_id,owner_user_id,revision,"
+                + "source_fingerprint,status,provenance_kind,schema_version,prompt_version,created_at,expires_at,"
+                + "request_id,request_hash) values ("
+                + id + "," + attachment + ",1,1," + revision + ",'" + "a".repeat(64)
+                + "','SUCCEEDED','MODEL_RESULT',1,'media-observation-v1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,"
+                + (request == null ? "null" : "'" + request + "'") + "," + (request == null ? "null" : "'" + "f".repeat(64) + "'")
+                + ")");
+    }
+
+
+    /** 요청 칸을 모르는 직전 이미지(와 요청 칸을 더하기 전 스키마)가 쓰는 모양이다. */
+    private static void insertLegacyObservation(Statement statement, long id, long attachment, long revision)
         throws SQLException {
         statement.executeUpdate(
             "insert into media_observation (id,attachment_id,conversation_id,owner_user_id,revision,"
