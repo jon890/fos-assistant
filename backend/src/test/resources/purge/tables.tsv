@@ -1,7 +1,7 @@
 # table|scope|fixture_key|user|conversation|agent|근거와 예외
 # user 칸은 사용자 정리(ADR-20261101 / user-purge) 뒤 대화 정리와 에이전트 정리까지 끝난 상태다.
 # KEEP는 근거가 있는 보존이고 GAP는 사용자 결정 전의 알려진 공백이다.
-agent|AGENT|id|DELETE|KEEP|DELETE|owner_user_id로 사용자에 속한다. 지연 정리는 에이전트 행을 지운다.
+agent|AGENT|id|DELETE|KEEP|DELETE|owner_user_id로 사용자에 속한다. 지연 정리는 에이전트 행을 지운다. 표 하나에 기대값 하나라 user 칸은 fixture 의 비공개 에이전트 기준이다. 그룹 공개 에이전트는 지우지 않고 관리자에게 넘기며 UserPurgerTest 가 확인한다.
 agent_connector_binding|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. ConnectorAgentPurge가 지운다.
 agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text만 비운다.
 agent_memory_collection|AGENT|agent_id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.

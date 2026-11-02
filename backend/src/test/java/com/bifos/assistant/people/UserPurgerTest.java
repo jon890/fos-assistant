@@ -228,7 +228,9 @@ class UserPurgerTest {
 
         conversationPurger.purgeDue(NOW);
         assertThat(conversations.findById(conversation.id()).orElseThrow().purgedAt()).isNotNull();
-        assertThat(purger.purgeDue(NOW)).isEqualTo(1);
+        assertThat(purger.purgeDue(NOW.plusSeconds(60))).as("대화 정리를 기다리는 사람은 5분 동안 다시 보지 않는다").isZero();
+        assertThat(keys(target)).isEqualTo(1);
+        assertThat(purger.purgeDue(NOW.plusSeconds(301))).isEqualTo(1);
 
         assertThat(keys(target)).isZero();
         assertThat(users.findById(target.user().id())).isEmpty();

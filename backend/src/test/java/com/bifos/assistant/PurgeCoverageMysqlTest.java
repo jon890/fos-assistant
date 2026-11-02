@@ -154,18 +154,35 @@ class PurgeCoverageMysqlTest {
         jdbc.update("UPDATE allowed_person SET purge_scheduled_at = ? WHERE id = ?",
             NOW.minus(UserPurger.GRACE).minusSeconds(60).atOffset(ZoneOffset.UTC).toLocalDateTime(), target);
         before.put("allowed_person", rows(classified("allowed_person"), target));
+        long decided = insertRequestDecidedByTarget();
 
         assertThat(users.purgeDue(NOW)).as("대화 정리 전에는 key 와 사용자 줄을 지우지 않는다").isZero();
         assertThat(rows(classified("user_data_key"), target)).hasSize(1);
         assertThat(rows(classified("app_user"), target)).hasSize(1);
         assertThat(conversations.purgeDue(NOW)).isEqualTo(1);
-        assertThat(users.purgeDue(NOW)).isEqualTo(1);
+        assertThat(users.purgeDue(NOW.plusSeconds(301))).isEqualTo(1);
         assertThat(agents.purge(target, NOW)).isEqualTo(AgentPurgeOutcome.PURGED);
 
         for (PurgeTable table : tables) {
             assertOutcome(table, table.user());
         }
+        assertThat(jdbc.queryForMap("SELECT requester_user_id, decided_by_user_id FROM agent_toolset_request WHERE id = ?", decided))
+            .as("남의 요청을 처리한 기록은 줄을 남기고 처리한 사람만 비운다")
+            .containsEntry("requester_user_id", other).containsEntry("decided_by_user_id", null);
+        jdbc.update("DELETE FROM agent_toolset_request WHERE id = ?", decided);
         assertOtherUntouched();
+    }
+
+
+    /** 다른 사용자가 자기 에이전트에 낸 도구 요청을 정리 대상이 처리한 줄을 넣는다. 외래 키가 사용자 줄 삭제를 막는 자리다. */
+    private long insertRequestDecidedByTarget() {
+        long id = target + 3;
+        jdbc.update("""
+                INSERT INTO agent_toolset_request (id, public_id, group_id, agent_id, requester_user_id, toolset, status,
+                    requested_at, decided_by_user_id, decided_at)
+                VALUES (?, UNHEX(LPAD(HEX(?), 32, '0')), ?, ?, ?, 'coverage-decided', 'APPROVED', ?, ?, ?)
+                """, id, id, other, other, other, Timestamp.from(NOW), target, Timestamp.from(NOW));
+        return id;
     }
 
 

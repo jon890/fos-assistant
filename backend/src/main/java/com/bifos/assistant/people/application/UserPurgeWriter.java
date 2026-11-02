@@ -121,14 +121,16 @@ public class UserPurgeWriter {
     /**
      * 대화 정리가 모두 끝났으면 데이터 key 와 사용자 줄을 지운다.
      *
-     * <p>보관본을 한 번 더 지운다. 앞 단계 뒤에 남은 대화 결과물이 자동 보관으로 다시 들어왔을 수 있다. 대화 정리가 끝나 결과물 행이
-     * 없으므로 이 뒤로는 새로 들어오지 않는다.
+     * <p>보관본과 개인 데이터를 같은 트랜잭션에서 한 번 더 지운다. 앞 단계 뒤에 대화 결과물이 자동 보관으로 다시 들어왔거나 사용자를
+     * 가리키는 줄(알림 같은 것)이 새로 생겼을 수 있다. 남아 있으면 사용자 줄 삭제를 외래 키가 막는다. 대화 정리가 끝나 결과물 행이
+     * 없으므로 이 뒤로는 새 보관본이 들어오지 않는다.
      */
     private UserPurgeOutcome deleteUser(Long userId) {
         if (!conversations.allPurged(userId)) {
             return UserPurgeOutcome.WAITING;
         }
         vault.purgeUser(userId);
+        deletePersonalData(userId);
         keys.deleteUserKey(userId);
         users.deletePurged(userId);
         return UserPurgeOutcome.DONE;
