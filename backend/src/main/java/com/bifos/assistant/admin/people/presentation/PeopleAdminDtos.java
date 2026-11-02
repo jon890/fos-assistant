@@ -42,7 +42,8 @@ public final class PeopleAdminDtos {
         boolean enabled,
         boolean joined,
         Instant lastLoginAt,
-        Instant lastConversationAt) {
+        Instant lastConversationAt,
+        Instant purgeScheduledAt) {
 
         static PersonView of(AllowedPerson person, boolean joined, Instant lastConversationAt) {
             return new PersonView(
@@ -53,7 +54,8 @@ public final class PeopleAdminDtos {
                 person.enabled(),
                 joined,
                 person.lastLoginAt(),
-                lastConversationAt);
+                lastConversationAt,
+                person.purgeScheduledAt());
         }
     }
 
