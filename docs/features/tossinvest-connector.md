@@ -80,6 +80,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 �
 `args` 의 스키마는 그 두 도구의 strict 인자 스키마(`MODEL_SCHEMAS`)의 union 이다. 금액, 수량, 가격은 10진수 글이고 계좌 칸이 없다.
 계좌는 연결에서 고른 값으로만 정해진다. 모델이 넣은 계좌는 연결의 계좌와 같아도 받지 않는다. 받으면 scope 를 모델 인자와 대조하는 길이 하나 더 생기기 때문이다.
 Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 넘겨 승인 줄을 만들고, 모델에게는 언제나 막힘으로 답한다.
+Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 모델에게 준다. 승인 줄을 만든 답은 「오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절로 읽지 않게 한다.
+글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다. 준비가 거절된 답은 `ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE` 다.
 사용자가 승인 카드에서 승인하면 Control Plane 이 claim 을 한 번 소비하고 실행 도구를 부른다. 실행 도구는 모델 목록에 없다.
 실행 도구를 모델이 직접 부르면 거절하고, 살펴보기 트리 안의 준비 호출은 넘기지 않는다.
 근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
@@ -372,7 +374,9 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 
 상한 거절을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
 준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `FinancialPrepareStage` 가 갖는다.
-`stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유>` 와 대시보드 로그의 `stage=<단계> code=<선언된 오류 코드>` 를 함께 본다. 대시보드 단계는 `connector_prepare.py` 가 정한다. 어느 로그에도 인자, 계좌, 메일, 원격 응답은 남지 않는다.
+`stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유> stage=<대시보드 단계> code=<선언된 오류 코드>` 를 본다.
+대시보드 plugin 이 `{"ok": false}` 에 고정 단계와 오류 코드를 실어 보내고, Control Plane 은 그 둘을 로그에만 남기고 모델에게 가는 글에는 싣지 않는다. 옛 plugin 이거나 모양이 다른 값이면 `-` 다.
+대시보드 로그에도 같은 `stage=<단계> code=<선언된 오류 코드>` 가 남는다. 대시보드 단계는 `connector_prepare.py` 와 `connector_run.py` 가 정한다. 어느 로그에도 인자, 계좌, 메일, 원격 응답은 남지 않는다.
 `args` 가 스키마에 맞지 않으면(금액을 숫자로, 계좌를 인자로 넣는 경우) 플러그인 핸들러 전에 MCP SDK 가 거절하므로 `stage=prepare_tool code=sdk_invalid_params` 가 남는다. 스키마는 지났지만 플러그인이 거절한 주문은 `code=TOSSINVEST_INVALID_INPUT` 처럼 선언된 코드가 남는다.
 승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
 도중에 UNKNOWN 이 나오면 다시 요청하지 않는다. 토스증권 앱에서 주문 상태를 먼저 확인한다.
@@ -812,6 +816,8 @@ guard는 자식의 권한 env를 회수하고 실행 원문의 바이트 SHA와 
 env 계좌를 문자열 그대로 대조한 뒤 ticket·tool·argsSha256·scope로 claim을 한 번 호출한다.
 claim 응답의 v·allowed·ticketId·expiresAt을 검사하며 redirect나 재시도를 하지 않는다.
 정정·취소는 claim 뒤 원주문을 다시 읽어 expected_order와 filledQuantity까지 대조한다.
+원주문 투영(`expectedOrder`)은 지정가 주문의 orderAmount를 null로 둔다. 공식 문서는 금액 시장가 주문 밖에서 null이라 적지만, 실제 응답은 지정가 수량 주문에도 가격×수량을 채운다(2026-11-02 운영 관측).
+그 값을 그대로 두면 준비가 `TOSSINVEST_INVALID_INPUT` 으로 거절되어 지정가 주문을 취소하지 못했다. 지정가 주문의 의도는 price와 quantity가 갖고, 시장가 주문의 orderAmount는 그대로 대조한다.
 금융 fetch를 시작하는 quota queue callback에서 계좌와 ticket 만료를 마지막으로 검사한다.
 POST·DELETE는 GET 재시도 루프를 공유하지 않는다. 전송 전 실패와 공식 명백한 거절은 FAILED,
 429·5xx·timeout·불량2xx와 불분명한 오류는 UNKNOWN이며 자동 재전송하지 않는다.
