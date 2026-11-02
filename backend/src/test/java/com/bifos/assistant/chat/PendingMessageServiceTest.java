@@ -162,6 +162,17 @@ class PendingMessageServiceTest {
 
 
     @Test
+    @DisplayName("대기 줄이 깨진 대화도 다음 turn 을 정하는 자리가 예외 없이 지나 위임 결과로 넘어간다")
+    void skipsUnreadableQueueWithoutThrowing() {
+        jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", "{\"version\":2}", conversation.id());
+
+        // 예외가 나면 이 검사가 실패한다.
+        dispatcher.tryNext(conversation.id());
+        assertThat(stub().received()).as("깨진 줄로 연 turn").isEmpty();
+    }
+
+
+    @Test
     @DisplayName("turn 이 도는 동안 더한 두 글은 그 turn 이 끝난 뒤 합쳐져 사용자 메시지 하나로 간다")
     void sendsTwoQueuedMessagesMergedAfterRunningTurnEnds() throws InterruptedException {
         List<ChatEvent> received = new CopyOnWriteArrayList<>();

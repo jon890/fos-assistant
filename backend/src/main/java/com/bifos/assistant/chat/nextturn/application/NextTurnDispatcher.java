@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
 public class NextTurnDispatcher {
 
     /**
-     * 보내려다 실패했는데 대기 행을 멈추지도 못한 대화에서 대기 메시지 turn 을 다시 열지 않고 기다리는 시간이다.
+     * 보내려다 실패했는데 대기 줄을 멈추지도 못한 대화에서 대기 메시지 turn 을 다시 열지 않고 기다리는 시간이다.
      *
      * <p>행이 멈추지 않은 채 남으므로, 기다리지 않으면 그 turn 을 닫는 자리에서 같은 행으로 곧바로 다시 열어 같은 실패를
      * 쉬지 않고 되풀이한다. 이 시간이 지난 뒤의 turn 닫기, 위임 종료 사건, 더하기, 기동 확인이 다시 시도한다.
@@ -67,7 +67,7 @@ public class NextTurnDispatcher {
 
     private final Clock clock = Clock.systemUTC();
 
-    /** 대기 행을 멈추지 못한 대화와 그 시각이다. 메모리에만 두며 서버가 다시 뜨면 사라진다. */
+    /** 대기 줄을 멈추지 못한 대화와 그 시각이다. 메모리에만 두며 서버가 다시 뜨면 사라진다. */
     private final Map<Long, Instant> unheldFailures = new ConcurrentHashMap<>();
 
 
@@ -149,17 +149,28 @@ public class NextTurnDispatcher {
 
 
     public void tryNext(Long conversationId) {
-        if (tryPending(conversationId)) {
+        if (tryPendingOrSkipUnreadable(conversationId)) {
             return;
         }
         wake.tryWake(conversationId);
     }
 
 
+    /** 대기 줄이 깨졌으면 경고만 남기고 거짓이다. 그 대화의 위임 결과까지 막으면 안 된다. */
+    private boolean tryPendingOrSkipUnreadable(Long conversationId) {
+        try {
+            return tryPending(conversationId);
+        } catch (IllegalStateException ex) {
+            log.warn("대기 줄을 읽지 못해 보내지 않는다 conversationId={}", conversationId, ex);
+            return false;
+        }
+    }
+
+
     /**
      * 보낼 대기 메시지가 있으면 turn 잠금을 잡고 새 가상 스레드에서 보낸다.
      *
-     * <p>대기 행을 멈추지 못한 대화는 {@link #FAILURE_BACKOFF} 동안 열지 않고 거짓을 돌려준다. 그동안에도 위임 결과는
+     * <p>대기 줄을 멈추지 못한 대화는 {@link #FAILURE_BACKOFF} 동안 열지 않고 거짓을 돌려준다. 그동안에도 위임 결과는
      * 전한다.
      *
      * <p>사용자 실행 한도에 닿으면 기다리지 않는다(ADR-069). 대기 줄을 멈추고 그 대화에 {@code USER_BUSY} 를 알린다. 그대로
@@ -219,7 +230,7 @@ public class NextTurnDispatcher {
     /**
      * 대기 메시지 turn 을 돌리고 잠금을 푼다.
      *
-     * <p>사용자 메시지를 저장하기 전에 실패하면 대기 행이 그대로 남는다. 잠금을 풀기 전에 그 행을 멈춰 둔다. 그대로
+     * <p>사용자 메시지를 저장하기 전에 실패하면 대기 글이 그대로 남는다. 잠금을 풀기 전에 그 줄을 멈춰 둔다. 그대로
      * 닫으면 닫기 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다. 멈추지도 못하면 잠금을 풀기 전에 실패
      * 시각을 적어 한동안 다시 열지 않는다.
      */

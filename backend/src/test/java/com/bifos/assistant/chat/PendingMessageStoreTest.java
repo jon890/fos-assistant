@@ -167,6 +167,35 @@ class PendingMessageStoreTest {
 
 
     @Test
+    @DisplayName("읽어 둔 대화를 고쳐 저장해도 그 사이 바뀐 대기 줄을 덮지 않는다")
+    void entitySaveKeepsQueueChangedMeanwhile() {
+        Conversation loaded = conversations.findById(conversation).orElseThrow();
+        queue(conversation, "첫째");
+
+        loaded.assignNewSession("session-1");
+        conversations.saveAndFlush(loaded);
+
+        assertThat(pendingMessages.read(conversation).items()).extracting(PendingMessage::content).containsExactly("첫째");
+    }
+
+
+    @Test
+    @DisplayName("보낼 글이 모두 빠졌으면 멈추지 않고 남은 글이 있으면 멈춘다")
+    void holdsOnlyWhenSentItemIsLeft() {
+        queue(conversation, "첫째");
+        List<Long> sent = pendingMessages.read(conversation).ids();
+        pendingMessages.change(conversation, queue -> queue.without(sent).append("새 글", NOW.plusMillis(1)));
+
+        assertThat(pendingMessages.holdIfAnyLeft(conversation, sent)).isFalse();
+        assertThat(pendingMessages.read(conversation).held()).isFalse();
+
+        List<Long> left = pendingMessages.read(conversation).ids();
+        assertThat(pendingMessages.holdIfAnyLeft(conversation, left)).isTrue();
+        assertThat(pendingMessages.read(conversation).held()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("두 글을 빈 줄 하나로 잇고 이은 길이가 그 글의 길이와 같다")
     void mergesContentsWithOneBlankLine() {
         PendingMessages queue = PendingMessages.EMPTY.append("첫째", NOW).append("둘째", NOW);

@@ -210,7 +210,7 @@ class ChatTurnRouting {
             if (!proactive.check().notifyStart()) {
                 return null;
             }
-            // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
+            // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 줄은 건드리지 않는다.
             ChatMessage notice = transactions.execute(status -> messages.save(
                 ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
             onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), notice.content()));
@@ -264,7 +264,7 @@ class ChatTurnRouting {
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
         } else {
-            // 대기 행에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
+            // 대기 줄에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
             chatConversationQueries.markCheckReportsRead(user, conversation);
         }
         return question.id();

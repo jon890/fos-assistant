@@ -60,7 +60,7 @@ public class ChatService {
     /** 다시 전달할 때 남기는 알림 줄이다. 결과마다 알림 줄을 다시 남기지 않고 이 한 줄만 남긴다(ADR-075). */
     static final String RETRY_NOTICE = "맡긴 일의 결과를 다시 전해요";
 
-    /** 읽은 대기 행이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */
+    /** 읽은 대기 글이 저장 전에 취소돼 다시 읽는 횟수의 상한이다. */
     private static final int PENDING_READ_ATTEMPTS = 3;
 
     private final ConversationSessions sessions;
@@ -230,8 +230,8 @@ public class ChatService {
      * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 잠금을 잡기 전에 읽은 대기 줄은 그 사이 취소되거나 멈췄을 수
      * 있어 여기서 다시 읽는다. 비었거나 멈춘 행이 있으면 아무것도 남기지 않고 돌아간다.
      *
-     * <p>대기 행 삭제와 사용자 메시지 저장은 한 트랜잭션이다. 읽은 뒤 저장 전에 취소된 행이 있으면 되돌리고 다시
-     * 읽어 합친다. 사용자 메시지를 저장하기 전의 실패는 예외로 올라가고 대기 행은 그대로 남는다.
+     * <p>보낸 글을 대기 줄에서 빼는 것과 사용자 메시지 저장은 한 트랜잭션이다. 읽은 뒤 저장 전에 취소된 글이 있으면 되돌리고 다시
+     * 읽어 합친다. 사용자 메시지를 저장하기 전의 실패는 예외로 올라가고 대기 글은 그대로 남는다.
      *
      * @param owner 대화 주인. 요청이 없으므로 부르는 쪽이 사용자 행으로 만든다
      * @param onEvent {@code user}, {@code pending}, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
