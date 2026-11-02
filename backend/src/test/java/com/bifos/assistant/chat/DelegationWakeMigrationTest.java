@@ -13,20 +13,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * 맡긴 실행의 결과를 부모 대화에 전하는 데 쓰는 칸이 마이그레이션으로 생기는지 본다.
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로, 운영과 같은 Flyway 스키마는 여기서 따로 확인한다.
  */
+// 공유 DB 의 줄을 바꾸는 메서드가 없다(쓰는 메서드는 자기 DB 를 따로 만든다). 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DelegationWakeMigrationTest {
     private String url;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() {
         url = "jdbc:h2:mem:delegation-wake-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()

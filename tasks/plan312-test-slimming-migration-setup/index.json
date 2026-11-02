@@ -4,17 +4,26 @@
   "status": "pending",
   "created_at": "2026-11-01",
   "total_phases": 2,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "number": 1,
       "file": "phase-01.md",
-      "execution_profile": "standard"
+      "execution_profile": "standard",
+      "status": "completed"
     },
     {
       "number": 2,
       "file": "phase-02.md",
       "execution_profile": "standard"
+    }
+  ],
+  "pr_scope": "읽기만 하는 마이그레이션 검사의 setup 을 클래스마다 한 번으로 줄이는 일(phase 01)과 운영에 적용된 옛 마이그레이션의 데이터 검사를 정리하는 일(phase 02)을 phase 별 PR 로 차례로 끝낸다.",
+  "deferred": [
+    {
+      "what": "운영에 적용된 옛 마이그레이션의 데이터 검사 정리와 data-schema.md 의 보존 기간 규칙(phase 02)",
+      "why": "기준 버전을 운영 저장소의 배포 기록에서 받아야 하고, setup 이동과 달리 검사를 지우는 일이라 확인 방법이 다르다",
+      "after": "phase 01 이 머지된 뒤"
     }
   ]
 }

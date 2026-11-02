@@ -16,9 +16,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * 그룹 모델 설정 셋을 {@code group_setting} 하나로 합치고 옛 단계 코드를 다섯 칸으로 옮기는 마이그레이션을 본다
@@ -27,6 +28,8 @@ import org.junit.jupiter.api.Test;
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로 운영과 같은 Flyway 스키마는 여기서 따로 만든다. 옮긴 JSON 은 Control
  * Plane 이 쓰는 {@link ModelSettingStore} 의 해석으로 읽어, 두 쪽의 모양이 같은지도 함께 본다.
  */
+// 줄을 바꾸는 메서드가 없다. 새 DB 만들기와 마이그레이션을 메서드마다 하지 않고 클래스마다 한 번만 한다.
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GroupSettingMigrationTest {
 
     /** 옛 표 셋이 있는 버전이다. 이 뒤에 들어온 다른 마이그레이션은 줄을 넣은 다음 함께 적용된다. */
@@ -35,7 +38,7 @@ class GroupSettingMigrationTest {
     private Database database;
 
 
-    @BeforeEach
+    @BeforeAll
     void setUp() throws SQLException {
         database = createDatabase();
         Flyway.configure()
