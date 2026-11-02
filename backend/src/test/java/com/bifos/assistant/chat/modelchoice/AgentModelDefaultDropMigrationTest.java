@@ -33,6 +33,9 @@ class AgentModelDefaultDropMigrationTest {
     /** {@code CUSTOM} 선택을 비우는 파일 바로 앞 버전이다. */
     private static final String BEFORE_CUSTOM_CLEAR = "20261031171513";
 
+    /** {@code CUSTOM} 선택을 비우는 파일이다. 대화의 세 컬럼을 지우는 파일 바로 앞 버전이다. */
+    private static final String CUSTOM_CLEAR = "20261031171514";
+
     private Database database;
 
 
@@ -80,7 +83,7 @@ class AgentModelDefaultDropMigrationTest {
     @Test
     @DisplayName("CUSTOM 대화는 선택 없음으로 바뀌고 칸과 provider 모델 effort 가 모두 비며 TIER 대화와 선택 없는 대화는 그대로다")
     void clearsCustomSelectionAndItsValues() throws SQLException {
-        migrate(null);
+        migrate(CUSTOM_CLEAR);
 
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             for (String column : List.of(
@@ -112,6 +115,21 @@ class AgentModelDefaultDropMigrationTest {
             assertThat(columnExists(connection, "agent", "default_reasoning_effort")).isFalse();
             assertThat(columnExists(connection, "agent", "hermes_profile")).isTrue();
             assertThat(strings(statement, "SELECT hermes_profile FROM agent WHERE id = 21")).containsExactly("dad");
+        }
+    }
+
+
+    @Test
+    @DisplayName("대화의 provider 모델 effort 컬럼은 지워지고 대화 줄과 선택 방식 컬럼은 남는다")
+    void dropsConversationModelColumnsAndKeepsTheRow() throws SQLException {
+        migrate(null);
+
+        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+            assertThat(columnExists(connection, "conversation", "model_provider")).isFalse();
+            assertThat(columnExists(connection, "conversation", "model")).isFalse();
+            assertThat(columnExists(connection, "conversation", "reasoning_effort")).isFalse();
+            assertThat(columnExists(connection, "conversation", "model_selection_mode")).isTrue();
+            assertThat(strings(statement, "SELECT model_tier FROM conversation WHERE id = 32")).containsExactly("HIGH");
         }
     }
 
