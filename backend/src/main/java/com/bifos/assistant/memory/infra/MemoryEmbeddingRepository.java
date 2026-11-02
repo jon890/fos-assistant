@@ -91,4 +91,10 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
         + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
         + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE))")
     List<Long> findStaleMemoryIds();
+
+
+    /** 사용자 정리 때 그 기억 항목들의 임베딩을 지운다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from MemoryEmbedding e where e.memoryId in :memoryIds")
+    int deleteAllByMemoryIds(@Param("memoryIds") Collection<Long> memoryIds);
 }

@@ -130,4 +130,15 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
         CheckTrigger excludedTrigger,
         ProblemStatus problemStatus,
         Pageable page);
+
+
+    /**
+     * 사용자 정리 때 그 사용자의 먼저 살펴보기 점검을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다.
+     *
+     * <p>발견, 문제, 가치 평가, 루프 실행, 자동 실행 판단은 외래 키의 {@code ON DELETE CASCADE} 로 함께 지워지고, 판단 피드백 사건의
+     * 점검 참조는 {@code ON DELETE SET NULL} 로 비워진다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ProactiveCheck c where c.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

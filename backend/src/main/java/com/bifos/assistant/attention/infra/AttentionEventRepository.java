@@ -43,4 +43,16 @@ public interface AttentionEventRepository extends JpaRepository<AttentionEvent, 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from AttentionEvent e where e.createdAt < :before")
     int deleteCreatedBefore(@Param("before") Instant before);
+
+
+    /** 사용자 정리 때 그 사용자의 사건을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AttentionEvent e where e.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
+
+
+    /** 사용자 정리 때 그 사용자가 건 카드 제어를 모두 지운다. 제어 줄은 따로 저장소가 없어 여기 둔다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AttentionControlEntry c where c.userId = :userId")
+    int deleteAllControlsOfUser(@Param("userId") Long userId);
 }

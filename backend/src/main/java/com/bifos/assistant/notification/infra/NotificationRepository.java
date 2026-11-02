@@ -75,4 +75,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Notification n where n.createdAt < :before")
     int deleteByCreatedAtBefore(@Param("before") Instant before);
+
+
+    /** 사용자 정리 때 그 사용자의 알림을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Notification n where n.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

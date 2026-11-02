@@ -7,11 +7,13 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -78,4 +80,15 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
         + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
         + " group by m.collection, m.sensitivity")
     List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long userId, @Param("groupId") Long groupId);
+
+
+    /** 그 사용자의 개인 기억 번호다. 사용자 정리가 딸린 임베딩과 링크를 지우는 데 쓴다(ADR-20261101 / user-purge). */
+    @Query("select m.id from Memory m where m.ownerUserId = :userId and m.scope = :scope")
+    List<Long> findIdsByOwnerAndScope(@Param("userId") Long userId, @Param("scope") MemoryScope scope);
+
+
+    /** 사용자 정리 때 그 번호의 기억 항목을 지운다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Memory m where m.id in :ids")
+    int deleteAllByIds(@Param("ids") Collection<Long> ids);
 }

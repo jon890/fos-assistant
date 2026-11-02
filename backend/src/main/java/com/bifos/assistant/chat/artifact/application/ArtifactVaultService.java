@@ -28,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -201,6 +203,19 @@ public class ArtifactVaultService {
         if (deleted == 0) {
             throw missing();
         }
+    }
+
+
+    /**
+     * 사용자 정리 때 그 사용자의 보관 행을 모두 지운다(ADR-20261101 / user-purge). 부르는 쪽의 트랜잭션 안에서 지운다.
+     *
+     * <p>데이터 key 를 지우기 전에 부른다. key 가 없으면 남은 본문은 풀 수 없는 암호문이 된다. 없으면 0 이고 다시 불러도 같다.
+     *
+     * @return 지운 행 수
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int purgeUser(Long ownerUserId) {
+        return rows.deleteAllVaultOf(ownerUserId);
     }
 
 
