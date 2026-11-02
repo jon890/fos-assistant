@@ -30,7 +30,6 @@ import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
-import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
@@ -99,7 +98,6 @@ final class JpaAuditingEntityFixtures {
 
         add(entityManager, rows, AllowedPerson.of(unique + "@audit.test", "허용", unique));
         add(entityManager, rows, AgentMemoryCollection.of(agent.id(), "core", false));
-        add(entityManager, rows, MemoryCollection.defaultsFor(group).getFirst());
         add(entityManager, rows, UserBrowser.create(user.id(), unique, BUSINESS));
         add(entityManager, rows, AgentToken.issueFor(unique, "f".repeat(64), "검사"));
         add(entityManager, rows, UserDataKey.wrapped(user.id(), "audit", "wrapped"));
