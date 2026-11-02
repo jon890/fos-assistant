@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자를 정리하면 무엇이 얼마나 지워지는지 읽기만 해서 보인다(ADR-20261101 / user-purge).
  *
- * <p>아무것도 쓰지 않는다. 실제로 지우는 진입점은 뒤 단계에서 연다. 질의는 실제 표에 대해 돌아 칸 이름이 틀리면
+ * <p>아무것도 쓰지 않는다. 실제로 지우는 것은 {@link UserPurger} 다. 질의는 실제 표에 대해 돌아 칸 이름이 틀리면
  * 테스트가 잡는다. 세는 대상은 ADR 의 지울 범위 중 사용자 번호로 찾을 수 있는 표다. 대화는 아직 지우지 않은 줄만 센다.
  * 먼저 살펴보기 층을 지운 뒤 엔티티가 없는 표(`attention_*`, `user_autonomy_preference`)는 세지 않는다. 표 자체를 곧 없앤다(plan228).
  * 참조를 비우거나 줄을 지우는 `app_user` 외래 키 표(ADR 의 「app_user 를 가리키는 다른 표」)는 세지 않는다.
