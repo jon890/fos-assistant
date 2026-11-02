@@ -39,7 +39,7 @@
 | 컬럼 | 뜻 |
 | --- | --- |
 | `group_id` | 그룹 |
-| `setting_key` | 설정의 종류. 모델 설정은 `MODEL` 이다. 다른 기능의 그룹 설정(예: `toolset_hidden`)도 같은 테이블에 새 키로 옮길 수 있다 |
+| `setting_key` | 설정의 종류. 모델 설정은 `MODEL` 이다. 다른 기능의 그룹 설정도 같은 테이블에 새 키로 둔다. 도구 숨김은 `TOOLSET` 이다 |
 | `setting_value` | 설정 JSON 의 문자열. `value` 는 검사가 쓰는 H2 의 예약어라 `setting_key` 와 짝을 맞춘 이름으로 둔다. MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라서다(`connector_connection.fields` 와 같은 까닭) |
 | `updated_at` | 마지막으로 바꾼 시각. 옮겨 온 줄은 바꾼 시각을 몰라 비어 있다 |
 
