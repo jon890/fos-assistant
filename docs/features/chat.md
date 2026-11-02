@@ -504,9 +504,9 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/doc
 `RUNNING` 으로 남은 예약 발화(`task_run`)는 다시 돌리지 않고 닫는다([`docs/features/schedule.md`](schedule.md) 의 「기동할 때」).
 `RestartReconciler` 가 정하고 `RecoveredRunRecorder` 가 적는다. 켜고 끄는 값과 기다리는 상한은 `RestartReconcileProperties` 가 갖는다.
 
-**다른 복구가 먼저 돈다.** 가치 평가 복구와 매일 루프 복구([`docs/features/proactive.md`](proactive.md) 의 「서버가 멈췄을 때」)가 가장 앞 phase 에서, `ProactiveCheckRecovery` 가 `RestartReconciler.PHASE - 1` 에서 돈다.
-시스템 판단의 에이전트 없는 실행 줄과 남은 살펴보기를 이 정리가 잡기 전에 닫기 위해서다. 그래야 이 정리가 끝낸 위임 자식이 점검 대화에 자동 turn 을 열지 않는다.
-평가 복구의 한 줄이나 목록 조회가 실패해도 다른 복구와 서버 기동을 이어 간다.
+**다른 복구가 먼저 돈다.** 매일 루프 복구([`docs/features/proactive.md`](proactive.md) 의 「서버가 멈췄을 때」)가 가장 앞 phase 에서, `ProactiveCheckRecovery` 가 `RestartReconciler.PHASE - 1` 에서 돈다.
+남은 살펴보기를 이 정리가 잡기 전에 닫기 위해서다. 그래야 이 정리가 끝낸 위임 자식이 점검 대화에 자동 turn 을 열지 않는다.
+복구의 한 줄이나 목록 조회가 실패해도 다른 복구와 서버 기동을 이어 간다.
 
 그 뒤 `RestartReconciler` 가 두 단계로 돈다.
 

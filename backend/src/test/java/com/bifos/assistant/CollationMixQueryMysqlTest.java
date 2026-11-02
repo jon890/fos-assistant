@@ -7,7 +7,6 @@ import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
 import com.bifos.assistant.connector.approval.application.ConnectorActionSweeper;
 import com.bifos.assistant.connector.action.application.ConnectorActionBodyBackfill;
-import com.bifos.assistant.proactive.evaluation.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
 import java.sql.SQLException;
@@ -63,10 +62,6 @@ class CollationMixQueryMysqlTest {
 
     @Autowired
     private Flyway flyway;
-
-    /** V57 에는 가치 평가 표가 없어 현재 실행의 기동 복구를 실행하지 않는다. */
-    @MockitoBean
-    private ValueEvaluationRecovery valueEvaluationRecovery;
 
     /** V57에는 삭제 요청 칸이 없으므로 현재 첨부의 기동 복구는 실행하지 않는다. */
     @MockitoBean

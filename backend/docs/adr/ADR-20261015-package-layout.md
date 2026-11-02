@@ -61,7 +61,6 @@
 | `connector.contentdraft` | 원고 작업의 시작과 저장 승인 |
 | `connector.approval` | 도구 호출의 판정, 승인 흐름의 조율, 승인 API |
 | `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 문제 후보의 저장, 발견 반응 |
-| `proactive.evaluation` | 문제 후보의 가치 평가와 판단 provider |
 | `proactive.autonomy` | 행동 수준의 판정과 자동 실행 |
 | `proactive.loop` | 매일 깨우기와 루프 설정, 지운 에이전트의 정리 참여 |
 | `usage.pricing` | 가격표와 비용 환산 |
