@@ -2,7 +2,6 @@ package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.browser.domain.CdpProbe;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
-import com.bifos.assistant.proactive.eval.ReplayDecisionProvider;
 import com.bifos.assistant.shared.config.LiveProperties;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -177,46 +176,6 @@ public class IntegrationTestDoubles {
 
 
     /** 표본 가격표의 경로를 넣는다. 값을 읽을 때마다 파일의 수정 시각을 고정한다. */
-    /**
-     * 먼저 살펴보기 평가 검사의 판단 provider 다. 운영의 판단 경로는 provider 를 id 로만 고르므로, {@code fixture-} id 를 부르지
-     * 않는 검사에는 영향이 없다.
-     */
-    @Bean
-    ReplayDecisionProvider fixtureA() {
-        return ReplayDecisionProvider.forEval("fixture-a", "REPLAY");
-    }
-
-
-    @Bean
-    ReplayDecisionProvider fixtureB() {
-        return ReplayDecisionProvider.forEval("fixture-b", "REPLAY");
-    }
-
-
-    @Bean
-    ReplayDecisionProvider fixtureUnavailable() {
-        return ReplayDecisionProvider.forEval("fixture-unavailable", "UNAVAILABLE");
-    }
-
-
-    @Bean
-    ReplayDecisionProvider fixtureTimeout() {
-        return ReplayDecisionProvider.forEval("fixture-timeout", "TIMEOUT");
-    }
-
-
-    @Bean
-    ReplayDecisionProvider fixtureError() {
-        return ReplayDecisionProvider.forEval("fixture-error", "ERROR");
-    }
-
-
-    @Bean
-    ReplayDecisionProvider fixtureInvalid() {
-        return ReplayDecisionProvider.forEval("fixture-invalid", "INVALID");
-    }
-
-
     @Bean
     DynamicPropertyRegistrar samplePriceCatalogPath() {
         return registry -> registry.add(SAMPLE_PRICE_CATALOG_PATH, () -> sampleCatalog().toString());

@@ -277,7 +277,7 @@ SSE 와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도
 | turn 자리 | 보내기, 다시 생성, 결과 다시 전달, 스킬 커맨드, 대기 메시지 turn, 위임 결과와 플러그인 결과의 자동 turn, 먼저 살펴보기, 행동 정책의 자동 실행 |
 | turn 자리, 한도를 보지 않는다 | 기동 정리(`RestartReconciler`)가 다시 잡은 대화 turn |
 | 실행 줄 | 흐름의 Researcher, Engineer, Synthesizer, `agent_delegate` 로 맡긴 자식 |
-| 실행 줄, 백그라운드 | 추천 질문, 문제 후보의 가치 평가와 replay |
+| 실행 줄, 백그라운드 | 추천 질문 |
 
 Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다. 플러그인 도구 호출, 실행 조회, 중지, 사용량 재조회가 그렇다.
 Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, Hermes cron, 대시보드나 CLI 에서 직접 연 실행)은 세지 못한다.

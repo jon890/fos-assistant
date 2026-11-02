@@ -559,7 +559,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 에이전트가 한 번 답한 기록이다. **이 줄은 실행이 끝난 뒤가 아니라 시작할 때 만들어진다**([ADR-011](adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)).
 모델 단계와 요청값은 시작할 때 옮겨 적고, 실제 provider 와 모델은 끝날 때 갱신한다.
 
-- `conversation_id` 가 비면 대화 밖에서 돈 실행이다. 추천 질문을 만드는 실행과 가치 평가의 시스템 판단 실행(`ExecutionRecorder.startSystem`)이 그렇다. 시스템 판단 실행은 시스템 profile 로 돌아 `agent_id` 도 비어 있다
+- `conversation_id` 가 비면 대화 밖에서 돈 실행이다. 추천 질문을 만드는 실행과 시스템 판단 실행(`ExecutionRecorder.startSystem`)이 그렇다. 시스템 판단 실행은 시스템 profile 로 돌아 `agent_id` 도 비어 있다
 - `retry_of_execution_id` 는 지금 채우는 경로가 없어 늘 비어 있다
 - `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고, 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
 - `delegation_key` 는 `agent_delegate` 로 만든 실행만 채우고 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `output_text` 도 이 실행만 채우고, 대화 답은 `chat_message` 가 갖는다
@@ -1025,7 +1025,7 @@ action을 지우면 실행 내용도 지운다.
 
 ### `proactive_value_evaluation`
 
-가치 평가 시도 하나다. [가치 평가](../../docs/features/proactive.md)가 입력과 결과, replay 계약을 갖는다.
+가치 평가 시도 하나다. 이 표를 읽고 쓰는 코드는 지웠고 옛 줄만 남았다. 표는 [ADR-20261101 / proactive-suggestion](../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 순서 7 에서 지운다.
 후보가 나온 살펴보기나 요청 사용자를 지우면 평가도 함께 지운다. 전체 개인 문맥과 원시 모델 응답을 저장하지 않는다.
 
 ### `proactive_autonomy_decision`

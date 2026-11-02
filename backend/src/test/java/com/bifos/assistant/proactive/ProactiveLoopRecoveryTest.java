@@ -17,7 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 서버가 멈춰 남은 RUNNING 시도를 기동 복구가 닫는다. 평가와 판정을 다시 부르지 않는다. */
+/** 서버가 멈춰 남은 RUNNING 시도를 기동 복구가 닫는다. */
 @BackendIntegrationTest
 class ProactiveLoopRecoveryTest extends ProactiveLoopTestSupport {
 
@@ -26,14 +26,13 @@ class ProactiveLoopRecoveryTest extends ProactiveLoopTestSupport {
 
 
     @Test
-    @DisplayName("RUNNING 시도는 FAILED/INTERRUPTED 로 닫히고 평가 번호가 비며 평가 수가 그대로다. 끝난 시도는 그대로다")
+    @DisplayName("RUNNING 시도는 FAILED/INTERRUPTED 로 닫히고 평가 번호가 빈다. 끝난 시도는 그대로다")
     void closesRunningRunsAsInterrupted() {
         CurrentUser user = newUser();
         Agent agent = newAgent(user);
         Instant startedAt = BASE.minus(Duration.ofMinutes(5));
         ProactiveLoopRun stale = loopRuns.save(ProactiveLoopRun.running(user.id(), newCheck(user, agent), startedAt));
         ProactiveLoopRun finished = saveEarlierDecidedRun(user, agent, BASE.minus(Duration.ofHours(23)));
-        long evaluationsBefore = evaluationCount(user);
 
         recovery.recover();
 
@@ -46,7 +45,6 @@ class ProactiveLoopRecoveryTest extends ProactiveLoopTestSupport {
         assertThat(loopRuns.findById(finished.id()).orElseThrow().status())
             .as("끝난 시도")
             .isEqualTo(LoopRunStatus.DECIDED);
-        assertThat(evaluationCount(user)).as("평가 수").isEqualTo(evaluationsBefore);
     }
 
 
