@@ -82,9 +82,6 @@ VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-0
 INSERT INTO subagent_usage_job (id, execution_id, child_session_id, profile_name, api_base_url, status, created_at, next_attempt_at, expires_at, attempts, backoff_attempts)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'RECORDED', '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2099-01-01 00:00:00', 1, 1);
 
-INSERT INTO toolset_hidden (id, group_id, name)
-VALUES (900000001, 900000001, 'coverage-900000001');
-
 INSERT INTO user_data_key (id, user_id, kek_id, wrapped_key, created_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
@@ -121,8 +118,8 @@ VALUES (900000001, 900000001, 'FOLLOW_UP', 'coverage-900000001', 'SURFACED', 'US
 INSERT INTO follow_up (id, public_id, user_id, conversation_id, proposed_by_execution_id, title, title_key, waiting, status, created_at, updated_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
 
-INSERT INTO media_observation (id, attachment_id, conversation_id, owner_user_id, revision, source_fingerprint, status, provenance_kind, schema_version, prompt_version, origin_execution_id, body, body_key_id, created_at, expires_at)
-VALUES (900000001, 900000001, 900000001, 900000001, 1, 'coverage-900000001', 'VALID', 'coverage-900000001', 1, 'coverage-900000001', 900000001, '암호화 관찰 대역', 900000001, '2020-01-01 00:00:00', '2099-01-01 00:00:00');
+INSERT INTO media_observation (id, attachment_id, conversation_id, owner_user_id, revision, source_fingerprint, status, provenance_kind, schema_version, prompt_version, origin_execution_id, request_id, request_hash, body, body_key_id, created_at, expires_at)
+VALUES (900000001, 900000001, 900000001, 900000001, 1, 'coverage-900000001', 'VALID', 'coverage-900000001', 1, 'coverage-900000001', 900000001, '00000000-0000-0000-0000-000000000001', 'coverage-900000001', '암호화 관찰 대역', 900000001, '2020-01-01 00:00:00', '2099-01-01 00:00:00');
 
 INSERT INTO notification (id, public_id, user_id, kind, title, body, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
@@ -150,9 +147,6 @@ VALUES (900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:0
 
 INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body, body_key_id)
 VALUES (900000001, 900000001, 1, 'VALID', 1, '2020-01-01 00:00:00', '암호화 본문 대역', 900000001);
-
-INSERT INTO media_observation_request (id, attachment_id, request_id, request_hash, observation_id)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001);
 
 INSERT INTO proactive_check_finding (id, check_id, conversation_id, kind, area, title, created_at)
 VALUES (900000001, 900000001, 900000001, 'NEW', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
