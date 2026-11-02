@@ -9,9 +9,9 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 절 | 표 |
 | --- | --- |
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_toolset_request`, `agent_token` |
-| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
+| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
+| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
@@ -53,17 +53,15 @@ snapshot의 원래 칸은 모두 필수이며(아래 job 칸은 NULL 허용) 공
 저장 요청의 job 은 그 snapshot 줄의 칸이다. preview 는 job 칸을 채우지 않아 저장 요청 전 snapshot 은 job 칸이 모두 NULL 이다.
 칸은 `action_id`, `job_id`, `job_status`, `job_created_at`, 승인자·승인 시각·확인 시각, 두 claim 시각, `job_stage`, `save_clicked`, `error_code`, `error_reason` 이고 `V20261102074316__content_draft_job_asset_columns.sql`이 소유한다.
 `action_id`와 `job_id`는 값이 있으면 각각 유일하다. 저장 요청은 `action_id`, `job_status`, `job_created_at`, `save_clicked`(false)를 함께 채운다.
-직전 이미지가 이 칸을 모르고 snapshot 을 쓸 수 있도록 모두 NULL 을 허용한다. 필수 칸의 NOT NULL 은 DROP PR 이 정한다.
+저장 요청 전 snapshot 은 job 칸이 모두 비어 있으므로 NOT NULL 로 바꾸지 않는다. 칸을 채우는 규칙은 코드가 지킨다.
 job ID는 예약 전 NULL이다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code·error reason도 처음에는 NULL이다.
 `error_reason`은 worker가 status 응답에 `error_reason`으로 알린 실패 사유의 고정 코드(`[a-z][a-z_]{0,63}`)다. 매 조회가 error code와 함께 덮어써 사유가 없으면 비운다. 화면의 글과 요소 이름은 담지 않는다.
 저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다. 엔티티에서는 snapshot 에 끼운 `@Embedded` `ContentDraftJob` 이다.
 job 칸은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 snapshot 줄을 잠근 뒤 채우고, job ID는 승인 때 소문자 정규 UUID로 한 번 예약한다.
 `start_claimed_at`·`save_claimed_at`은 NULL 조건 갱신 결과 1에서만 MICROS 시각으로 채우며, 현재 권한·실행 잠금과 같은 트랜잭션에서 커밋한다.
 저장 목록은 `job_created_at` 역순이고 같은 시각이면 snapshot 번호 역순이다.
-`content_draft_job` 테이블은 코드가 더는 읽고 쓰지 않는다. 그 줄은 `V20261102074317__ContentDraftJobAssetBackfill`이 snapshot 칸으로 옮겼다.
-이 변경의 배포를 확인한 뒤의 DROP PR 이 직전 이미지가 쓴 줄을 다시 옮기고 그 테이블을 지운다. 순서는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)가 갖는다.
-직전 이미지로 되돌리면 새 이미지가 snapshot 칸에 만든 job 은 옛 코드에 보이지 않아 승인 대기 줄은 승인할 때 찾지 못하고, 저장 중이던 실행은 기동 정리가 UNKNOWN 으로 끝낸다.
-다시 새 이미지로 올리면 그사이 옛 코드가 쓴 revision 은 `assets_json` 이 NULL 이라 STALE 로 닫히고, 옛 테이블에 생긴 job 은 DROP PR 의 재이관 전까지 보이지 않는다. 같은 snapshot 에 job 이 두 번 생긴 경우는 DROP PR 이 따로 다룬다.
+옛 `content_draft_job` 테이블은 지웠다. `V20261102074317__ContentDraftJobAssetBackfill` 이 그 줄을 snapshot 칸으로 옮겼고, 배포를 확인한 뒤 `V20261102074320__ContentDraftJobAssetRemigrate` 가 직전 이미지가 옛 테이블에만 쓴 job 을 다시 옮긴 다음 `V20261102074324` 가 테이블을 지웠다. 순서는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)가 갖는다.
+다시 옮길 때 이미 job 칸이 찬 snapshot 은 덮어쓰지 않는다. 같은 snapshot 에 새 코드와 직전 이미지가 job 을 따로 만들었다면 어느 승인 줄이 맞는지 가릴 수 없어 새 칸을 지키고 옛 줄은 버린다. 되돌림이라는 예외 상황이라 값이 다르다고 배포를 멈추지 않는다.
 ticket과 본문은 snapshot 줄 어디에도 저장하지 않는다. worker 상태의 조회와 stage·save_clicked 반영은 아직 구현하지 않았다.
 
 snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
@@ -362,6 +360,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - 이 목록을 바꾸는 화면과 API 는 아직 없다. 기본과 다른 목록은 줄을 직접 써서 정한다
 - 모르는 버전이거나 형식이 깨진 JSON, 비었거나 key 가 겹치는 목록은 기본 목록으로 대신하지 않고 오류로 올린다. 대신하면 그룹이 정한 목록이 화면과 에이전트 접근 설정에서 조용히 바뀐다
 - 에이전트가 받는 collection(`agent_memory_collection`)은 이 목록과 따로 저장한다. 목록에서 빠진 key 를 이미 받고 있어도 그대로 둔다
+- 옛 `memory_collection` 테이블은 지웠다. `V20261102074313` 이 기본 목록과 다른 그룹만 이 줄로 옮겼고, 배포를 확인한 뒤 `V20261102074319` 가 직전 이미지가 옛 테이블에만 쓴 그룹을 다시 옮긴 다음 `V20261102074323` 이 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 이미 이 줄이 있는 그룹은 옮긴 값인지 새 코드가 쓴 값인지 구별할 수 없어 덮어쓰지 않으므로, 되돌린 동안 직전 이미지가 그 그룹의 목록을 바꿨다면 그 값은 버려진다
 - `updated_at` 은 옮겨 온 줄에서 비어 있다
 
 옛 표 `model_tier_definition`, `model_tier_group_setting`, `model_hidden` 은 `V20261031171501` 부터 `V20261031171503` 이 이 표로 옮기고 지웠다. 기본 단계 표의 이름을 바꿔 넓혔으므로 표 수는 둘 줄었다.
@@ -455,19 +454,18 @@ CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs
 
 V20261011060038 마이그레이션으로 생성하는 원고 revision 저장 모델이다.
 생성·조회·수정과 참조 검사, 오류 응답과 삭제 참가 지점은 [원고 저장 계약](../../docs/features/content-draft.md#원고-revision-저장-계약)이 갖는다.
-preview·approval·job 표는 이 저장 모델에 포함하지 않는다.
+preview·approval 표는 이 저장 모델에 포함하지 않는다. 저장 job 은 snapshot 의 칸이다.
 
 | 표 | 칸과 타입 | 필수와 제약 |
 | --- | --- | --- |
 | `content_draft` | id BIGINT AUTO_INCREMENT, public_id CHAR(36), conversation_id BIGINT, owner_user_id BIGINT, current_revision BIGINT, created_at・expires_at DATETIME(6) | 모두 NOT NULL, id PK, public_id UNIQUE, current_revision 양수 |
-| `content_draft_revision` | id BIGINT AUTO_INCREMENT, draft_id BIGINT, revision BIGINT, status VARCHAR(32), schema_version INT, created_at DATETIME(6), body LONGTEXT, body_key_id BIGINT, assets_json LONGTEXT | body와 body_key_id, assets_json만 NULL 허용, id PK, UNIQUE(draft_id, revision), revision 양수, schema_version=1 |
+| `content_draft_revision` | id BIGINT AUTO_INCREMENT, draft_id BIGINT, revision BIGINT, status VARCHAR(32), schema_version INT, created_at DATETIME(6), body LONGTEXT, body_key_id BIGINT, assets_json LONGTEXT | body와 body_key_id만 NULL 허용, id PK, UNIQUE(draft_id, revision), revision 양수, schema_version=1 |
 
 `assets_json`은 image 블록마다 항목 하나인 JSON 배열 문자열이다. 항목은 `position`, `attachmentId`, `sourceFingerprint`, `observationId`, `observationRevision`이고 position 순서다.
 position은 전체 blocks 배열의 인덱스(0..499)여서 사이가 비어도 되고 같은 attachmentId가 여러 번 나와도 된다. 사진이 없으면 `[]`다.
 관찰을 지정했다면 두 관찰 칸이 함께 차고 observationRevision은 양수다. 지문은 서버가 읽은 원본의 SHA-256 소문자 64자리다.
 H2 와 MySQL 의 JSON 형 바인딩이 달라 JSON 형이 아닌 LONGTEXT 로 두고, 모양은 `ContentDraftAssetsConverter`가 정한다.
-`assets_json`이 NULL 인 줄은 직전 이미지로 되돌린 동안 옛 코드가 쓴 줄이다. 참조를 확인할 수 없어 읽기와 정리가 STALE 로 바꾼다.
-`content_draft_asset` 테이블은 코드가 더는 읽고 쓰지 않는다. 그 줄은 `V20261102074317__ContentDraftJobAssetBackfill`이 `assets_json`으로 옮겼고, revision 을 지우면 FK cascade 로 함께 지워진다. DROP PR 이 지운다.
+`assets_json`은 NOT NULL 이다. 옛 `content_draft_asset` 테이블은 지웠다. `V20261102074317__ContentDraftJobAssetBackfill` 이 그 줄을 `assets_json`으로 옮겼고, 배포를 확인한 뒤 `V20261102074320__ContentDraftJobAssetRemigrate` 가 직전 이미지가 칸 없이 쓴 revision 을 옛 테이블에서 다시 채웠다(사진이 없으면 `[]`). `V20261102074321` 이 칸을 NOT NULL 로 바꾸고 `V20261102074325` 가 옛 테이블을 지웠다. 빈 줄이 남았다면 NOT NULL 단계가 실패해 옛 테이블을 지우지 않는다.
 title・category・tags・blocks는 revision.body에만 넣는다. 평문 제목 칸이나 본문 복제는 만들지 않는다.
 
 | 연결과 색인 | 뜻 |
@@ -482,7 +480,7 @@ owner_user_id는 저장 당시 주인으로 필수이며 현재 대화 주인과
 body_key_id는 기존 본문 암호화와 같이 FK를 두지 않는다.
 관찰의 물리 삭제만으로 참조를 지우지 않으며, 조회와 정리가 사라진 참조를 STALE로 만든다.
 본문을 지운 뒤에도 암호화한 blocks를 읽지 않고 `assets_json`으로 참조 정리를 할 수 있다.
-첨부 하나를 지울 때는 그 대화의 VALID revision 을 읽어 그 첨부를 가리키는 줄과 `assets_json` 이 NULL 이라 참조를 확인할 수 없는 줄을 무효화하고, 정기 정리는 VALID revision 의 참조를 서비스가 확인한다.
+첨부 하나를 지울 때는 그 대화의 VALID revision 을 읽어 그 첨부를 가리키는 줄을 무효화하고, 정기 정리는 VALID revision 의 참조를 서비스가 확인한다.
 
 status는 VALID・STALE・EXPIRED 세 값이고 CHECK로 다른 값을 거절한다.
 CHECK는 VALID이면 body・body_key_id 모두 비NULL, STALE 또는 EXPIRED이면 둘 다 NULL임을 강제한다.
@@ -567,12 +565,6 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 두 테이블은 코드가 더는 읽고 쓰지 않는다. 항목은 `result_delivery.items_json` 이, 마지막 시도는 `result_delivery.last_attempt_*` 가 갖는다.
 `V20261102074312__ResultDeliveryItemsAttemptBackfill` 이 옮겼고 앞의 시도는 옮기지 않았다. 배포를 확인한 뒤 DROP PR 이 지운다.
 
-### execution_question
-
-**코드가 더는 읽고 쓰지 않는 옛 테이블이다.** 사람이 보낸 turn 의 질문 메시지는 `agent_execution.question_message_id` 로 옮겼다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
-이 테이블의 줄은 배포를 확인한 뒤 DROP PR 이 지운다. 그 전에 옛 이미지가 쓴 줄을 `agent_execution` 으로 다시 옮기되, 이미 정리한 대화(`conversation.purged_at` 이 있는)의 실행은 옮기지 않고 그 실행의 `question_message_id` 를 비운다. 직전 이미지로 되돌린 동안 옛 코드가 정리한 대화에 백필 값이 남아 있을 수 있어서다.
-질문 메시지를 읽는 판정은 [`agent_execution`](#agent_execution) 의 `question_message_id` 설명이 갖는다.
-
 ## 실행 표
 
 ### agent_execution
@@ -601,7 +593,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 - 외래 키를 걸지 않는다. 읽는 쪽(`TurnQuestions`)은 메시지가 없거나, `USER` 가 아니거나, 그 실행의 사용자가 보낸 것이 아니면 없는 것으로 본다
 - 질문이 없는 루트 실행이 대화에 하나라도 있으면 그 대화의 `memory_remember` 는 그 뒤로 늘 제안으로 남는다. 판정은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「바로 저장 판정」 과 [ADR-20261008 / memory-remember-guard](../../docs/adr/ADR-20261008-memory-remember-guard.md) 가 갖는다
 - 대화를 정리하면 이 칸을 비운다. 값은 번호뿐이지만 정리한 대화의 메시지를 가리키지 않게 한다
-- 이 칸이 생기기 전의 줄은 마이그레이션이 `execution_question` 에서 옮겼다. 옛 이미지가 쓴 줄은 DROP PR 이 다시 옮긴다. 새 칸은 직전 이미지가 쓰는 줄 때문에 NULL 을 허용한다
+- 옛 `execution_question` 테이블은 지웠다. `V20261102053011` 이 그 줄을 이 칸으로 옮겼고, 배포를 확인한 뒤 `V20261102074318` 이 직전 이미지가 옛 테이블에만 쓴 질문을 다시 옮긴 다음 `V20261102074322` 가 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 다시 옮길 때 이미 정리한 대화(`conversation.purged_at` 이 있는)의 실행은 옮기지 않고 그 실행의 칸을 비운다. 직전 이미지로 되돌린 동안 옛 코드가 정리한 대화에 앞서 옮긴 값이 남아 있을 수 있어서다. 질문이 없는 실행이 있어 이 칸은 NULL 을 허용한다
 
 토큰 수는 실행 한 번의 **합계**다. 자식 실행의 토큰은 부모의 합계에 들어 있지 않다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「자식 session 으로 결과와 토큰을 보완한다」).
 그래서 부모와 자식을 더한 합계는 실행 트리의 줄과, 실행 줄이 없는 native 자식의 `subagent_usage_job` 줄을 더해 만든다. 어느 줄도 두 번 세지 않는다.
@@ -736,12 +728,6 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 판이 암호문인지는 `sensitivity` 가 아니라 `content_key_id` 로 본다. 일반 항목이었던 판도 그 항목이 뒤에 민감 항목이 되면 암호문으로 바뀐다
 - 출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다
 - 고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다
-
-### memory_collection
-
-`memory_collection` 테이블은 코드가 더는 읽고 쓰지 않는다. 그룹이 쓰는 collection 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖는다.
-`V20261102074313` 이 이 테이블에서 기본 목록과 다른 그룹만 `MEMORY_COLLECTIONS` 줄 하나로 옮겼다. 기본 목록과 key, 이름, 순서가 모두 같은 그룹은 줄을 만들지 않는다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
-직전 이미지가 이 테이블에 쓴 줄은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### agent_memory_collection
 

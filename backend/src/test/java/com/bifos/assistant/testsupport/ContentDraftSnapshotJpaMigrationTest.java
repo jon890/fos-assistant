@@ -28,7 +28,6 @@ class ContentDraftSnapshotJpaMigrationTest {
             assertThat(flyway.info().pending()).isEmpty();
             assertThat(flyway.info().applied()).isNotEmpty();
             assertThat(jdbc.queryForObject("select count(*) from content_draft_snapshot", Long.class)).isZero();
-            assertThat(jdbc.queryForObject("select count(*) from content_draft_job", Long.class)).isZero();
         }
     }
 }

@@ -279,7 +279,7 @@ public class ContentDraftService {
             expire(draft);
             return new ContentDraftException(ErrorCode.CONTENT_DRAFT_GONE, null);
         }
-        if (row.status() == ContentDraftRevisionStatus.STALE || row.assetsMissing() || !references.valid(draft, row.assets(), true)) {
+        if (row.status() == ContentDraftRevisionStatus.STALE || !references.valid(draft, row.assets(), true)) {
             revisions.invalidate(row.id());
             return new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, draft.currentRevision());
         }

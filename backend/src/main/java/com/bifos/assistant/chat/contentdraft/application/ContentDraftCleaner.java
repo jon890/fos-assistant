@@ -42,7 +42,7 @@ public class ContentDraftCleaner {
     public void invalidateForAttachment(Long conversationId, Long attachmentId) {
         mutations.requireParticipant(conversationId);
         for (var row : revisions.findValidForConversation(conversationId)) {
-            if (row.assetsMissing() || row.assets().stream().anyMatch(asset -> attachmentId.equals(asset.attachmentId()))) {
+            if (row.assets().stream().anyMatch(asset -> attachmentId.equals(asset.attachmentId()))) {
                 revisions.invalidate(row.id());
             }
         }
@@ -83,7 +83,7 @@ public class ContentDraftCleaner {
                         }
                         for (var row : revisions.findByDraftIdOrderByRevisionAsc(draft.id())) {
                             if (row.status() == ContentDraftRevisionStatus.VALID
-                                && (row.assetsMissing() || !references.valid(draft, row.assets(), false))) {
+                                && !references.valid(draft, row.assets(), false)) {
                                 count += revisions.invalidate(row.id());
                             }
                         }
@@ -111,7 +111,7 @@ public class ContentDraftCleaner {
         for (var row : revisions.findValidWithDraft(now)) {
             var draft = (ContentDraft)row[2];
             var assets = (List<ContentDraftAsset>)row[1];
-            if (!result.containsKey(draft.conversationId()) && (assets == null || !references.valid(draft, assets, false))) {
+            if (!result.containsKey(draft.conversationId()) && !references.valid(draft, assets, false)) {
                 result.put(draft.conversationId(), (Long)row[3]);
             }
         }

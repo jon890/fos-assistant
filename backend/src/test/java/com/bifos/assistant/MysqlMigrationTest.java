@@ -129,7 +129,7 @@ class MysqlMigrationTest {
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('memory', 'memory_collection', 'agent_memory_collection', 'agent_token')
                 """, String.class)).containsExactlyInAnyOrder(
-            "memory", "memory_collection", "agent_memory_collection", "agent_token");
+            "memory", "agent_memory_collection", "agent_token");
     }
 
 
