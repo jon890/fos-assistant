@@ -35,6 +35,10 @@ final class HttpHermesConnectorGuard {
         .build())
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .build();
+    /** 대시보드 plugin 이 금융 준비 실패에 싣는 고정 단계 코드의 모양이다. */
+    private static final String PREPARE_STAGE = "[a-z_]{1,32}";
+    /** 플러그인이 선언한 오류 코드나 SDK 거절 코드의 모양이다. 없으면 plugin 이 {@code -} 를 싣는다. */
+    private static final String PREPARE_CODE = "[A-Za-z0-9_-]{1,64}";
 
 
     static ObjectNode approved(String profile, String tool, ConnectorApprovedExecution execution) {
@@ -122,9 +126,11 @@ final class HttpHermesConnectorGuard {
             log.warn("금융 준비 HTTP 를 보내지 않았다 reason=body");
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
         }
-        // 실패 로그에는 HTTP 상태와 고정 이유만 남긴다. 대시보드의 본문과 cause 는 남기지 않는다.
+        // 실패 로그에는 HTTP 상태와 고정 이유, plugin 이 실은 고정 단계·오류 코드만 남긴다. 대시보드의 본문과 cause 는 남기지 않는다.
         int status = 0;
         String reason;
+        String stage = "-";
+        String code = "-";
         try {
             var response = client.post()
                 .uri(base + "/api/connectors/{id}/prepare", connector)
@@ -144,6 +150,11 @@ final class HttpHermesConnectorGuard {
             JsonNode answer = MAPPER.readTree(raw);
             JsonNode result = answer.get("result");
             reason = answer.path("ok").isBoolean() && !answer.path("ok").booleanValue() ? "not_ok" : "shape";
+            if ("not_ok".equals(reason)) {
+                // 옛 plugin 은 두 칸을 싣지 않는다. 모양이 다른 값은 로그를 흐리지 않게 버린다.
+                stage = fixed(answer.get("stage"), PREPARE_STAGE);
+                code = fixed(answer.get("code"), PREPARE_CODE);
+            }
             if (answer.path("ok").isBoolean()
                 && answer.path("ok").booleanValue()
                 && result != null
@@ -159,8 +170,13 @@ final class HttpHermesConnectorGuard {
             // 읽기 전용 준비는 재시도 없이 미지원으로 끝낸다. 원문과 cause는 남기지 않는다.
             reason = status == 0 ? "transport" : "unreadable";
         }
-        log.warn("금융 준비 HTTP 가 실패했다 status={} reason={}", status, reason);
+        log.warn("금융 준비 HTTP 가 실패했다 status={} reason={} stage={} code={}", status, reason, stage, code);
         return CallResult.failure(ConnectorCallError.UNAVAILABLE);
+    }
+
+
+    private static String fixed(JsonNode value, String pattern) {
+        return value != null && value.isString() && value.stringValue().matches(pattern) ? value.stringValue() : "-";
     }
 
 

@@ -235,7 +235,13 @@ const pick = (args: Args, fields: string[]): Args =>
       .map((key) => [key, args[key]]),
   );
 
-/** 재조회에서는 거래 의도와 체결 수량을 보존하고 표시용 부가 필드는 제외한다. */
+/**
+ * 재조회에서는 거래 의도와 체결 수량을 보존하고 표시용 부가 필드는 제외한다.
+ *
+ * 지정가 주문의 `orderAmount` 도 부가 필드로 본다. 공식 문서(1.2.24, 1.2.28)는 금액 시장가 주문 밖에서 null 이라 적지만,
+ * 실제 응답은 지정가 수량 주문에도 가격×수량을 채운다. 지정가 주문의 의도는 `price` 와 `quantity` 가 갖는다.
+ * 금액 주문은 시장가로만 낼 수 있어 시장가 주문의 값은 그대로 둔다.
+ */
 export function expectedOrder(order: Args): Args {
   const projected: Args = {
     ...pick(order, [
@@ -248,7 +254,8 @@ export function expectedOrder(order: Args): Args {
       "timeInForce",
       "status",
     ]),
-    orderAmount: order.orderAmount ?? null,
+    orderAmount:
+      order.orderType === "LIMIT" ? null : (order.orderAmount ?? null),
     price: order.price ?? null,
     execution: { filledQuantity: order.execution?.filledQuantity },
   };

@@ -7,6 +7,11 @@ let mode = "ok";
 fake.on("GET", "/api/v1/accounts", { result: [{ accountSeq: 7, accountNo, accountType: "BROKERAGE" }] });
 fake.on("GET", "/api/v1/stocks", { result: [stockInfo("ABC", "합성 종목")] });
 fake.on("GET", "/api/v1/orders/old", { result: { ...sampleOrder("old"), symbol: "ABC", quantity: "2", price: "12", orderAmount: null } });
+// 생성 승인이 받은 주문 번호다. 실제 토스처럼 지정가 수량 주문에도 orderAmount 에 가격×수량을 채운다. 공식 문서는 null 이라 적는다.
+fake.on("GET", "/api/v1/orders/new-official-id", {
+  result: { ...sampleOrder("new-official-id"), symbol: "ABC", quantity: "2", price: "12.34", orderAmount: "24.68" },
+});
+fake.on("POST", "/api/v1/orders/new-official-id/cancel", { result: { orderId: "new-cancel-id" } });
 for (const route of ["/api/v1/orders", "/api/v1/orders/old/modify", "/api/v1/orders/old/cancel"]) {
   fake.routes.set(`POST ${route}`, async () => {
     if (mode === "timeout") await Bun.sleep(2500);
