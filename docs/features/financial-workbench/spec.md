@@ -35,7 +35,7 @@
 
 | ID | 요구사항 | 인수 조건 |
 | --- | --- | --- |
-| R1 | 대시보드 plugin 이 도구 오류의 최상위 `{code, details}` 모양을 읽는다 | 승인 실행이 `isError` 결과 `{"code": "PROPOSAL_LIMIT", "message": "...", "details": {"max": 200, "pending": 200}}` 를 받으면, `errors` 에 선언한 코드와 복구 어휘, 선언한 정수 세부(`max`, `pending`)만 응답에 싣고 `message` 는 싣지 않는다. `error` 객체가 있으면 지금처럼 그 객체만 본다. 선언하지 않은 코드는 지금처럼 `unavailable` 이다. `outcome_unknown` 코드의 `retry_key` 도 같은 모양에서 읽는다 |
+| R1 | 대시보드 plugin 이 도구 오류의 최상위 `{code, details}` 모양을 읽는다 | 검사용 선언 기준으로, 승인 실행이 `isError` 결과 `{"code": "PROPOSAL_LIMIT", "message": "...", "details": {"max": 200, "pending": 200}}` 를 받으면, `errors` 에 선언한 코드와 복구 어휘, 선언한 정수 세부(`max`, `pending`)만 응답에 싣고 `message` 는 싣지 않는다. `error` 객체가 있으면 지금처럼 그 객체만 본다. 선언하지 않은 코드는 지금처럼 `unavailable` 이다. `outcome_unknown` 코드의 `retry_key` 도 같은 모양에서 읽는다 |
 | R2 | 워크벤치 플러그인 모양이 카탈로그에 오르고 원격으로 설치된다 | 검사용 사본(`hermes/tests/fixtures/valuation-ontology/`)을 운영 목록 `{root, url}` 로 올리면 카탈로그 항목이 `id` `valuation-ontology`, `schema: 2`, 제목 「금융 워크벤치」, 가리는 필수 칸 하나(`FINANCIAL_WORKBENCH_TOKEN`), `verify.tool` `get_connection` 이다. 설치한 서버 정의의 `url` 은 운영 목록 값이고 `.mcp.json` 의 주소가 아니며, 헤더는 `Authorization: Bearer ${칸 env}` 하나다. 조회 도구는 승인이 없고 `record_trades`, `submit_proposals`, `propose_ontology_change` 는 `WRITE`, `required`, 대화 허락이다. 스킬 네 개가 읽힌다 |
 | R3 | 옛 로컬 커넥터와 운영자 기준 주소 예외를 걷어 낸다 | `hermes/connectors/financial-workbench/` 가 없고, 커넥터 이미지 빌드와 `.gitignore`, `.dockerignore`, `CODEOWNERS` 에 그 경로가 없다. `hermes/tests/test_connectors_contract.py` 는 이 저장소의 어느 플러그인에도 `operator_env` 를 허락하지 않는다. 커넥터 공통 검사와 묶음 검사가 통과한다 |
 | R4 | 문서가 원격 플러그인을 설명한다 | ADR-20261025 는 `superseded` 로 `hermes/docs/adr/archive/` 에 있고 목록의 「보관」 표에 있다. ADR-20261026 「옮기는 순서」 의 2단계가 끝난 것으로 적혀 있다. 기능 파일 `docs/features/financial-workbench.md` 는 등록 칸, 도구와 정책, 오류, 보안, 실제 계정 확인을 원격 플러그인 기준으로 갖고 `covers:` 가 R2 의 검사를 가리킨다. 문서 검사(`test/unit/`)가 통과한다 |
@@ -48,7 +48,9 @@
 
 - `payload` 에 `error` 키가 있으면 지금 규칙 그대로다. 객체가 아니면 코드가 없다
 - `error` 키가 없고 `payload["code"]` 가 글이면 `{**details, "code": code}` 를 오류 객체로 쓴다. `details` 는 `payload["details"]` 가 객체일 때만 쓴다. `message` 와 그 밖의 최상위 칸은 오류 객체에 들어가지 않는다
-- 세부를 옮기는 규칙(선언한 이름, 정수와 boolean, 상한)과 `retry_key` 를 찾는 순서는 바꾸지 않는다
+- 세부를 옮기는 규칙(선언한 이름, 정수와 boolean, 상한)은 바꾸지 않는다
+- `retry_key` 는 이 모양에서 `details` 로 만든 오류 객체에서만 찾는다. 맨 위에는 원문 `message` 가 있어 지금처럼 맨 위까지 보면 원문이 재시도 식별자로 나갈 수 있다
+- 같은 `_tool_error` 를 쓰는 `call` 경로도 같은 모양에서 선언한 공통 어휘를 읽는다
 
 세부 이름은 `^[a-z][a-z0-9_]{0,31}$` 여야 선언할 수 있다. 워크벤치의 선언은 세부를 넘기지 않는다. 세부는 대화 허락과 상시 허락으로 바로 실행한 호출의 결과 글에는 남는다.
 

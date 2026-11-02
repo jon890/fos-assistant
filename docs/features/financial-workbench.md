@@ -10,7 +10,7 @@ covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connecto
 이 문서는 등록 칸과 운영 값, 도구 정책과 그 까닭, 오류, 보안, 실제 계정으로 확인할 것을 갖는다.
 
 **도구 정책은 워크벤치 저장소의 `plugin/assistant.json` 이 선언한다.** `.mcp.json` 에는 헤더가 없어 선언 없이 받으면 토큰 칸이 생기지 않고, 헤더를 `.mcp.json` 에 넣으면 Claude Code 와 Codex 의 OAuth 사용자가 깨진다(사용자 결정 2026-11-02).
-`hermes/tests/fixtures/valuation-ontology/` 는 그 플러그인의 사본이고(`assistant.json` 과 Claude Code manifest 는 그대로, `.mcp.json` 의 주소는 자리표시) `test_connector_workbench_plugin.py` 가 카탈로그와 설치, 정책을 본다. 워크벤치의 `assistant.json` 이 바뀌면 사본도 고친다.
+`hermes/tests/fixtures/valuation-ontology/` 는 그 플러그인의 사본이고(`assistant.json` 과 Claude Code manifest 는 그대로이고, `.mcp.json` 의 주소는 자리표시다. Codex manifest 와 스킬은 검사에 필요한 칸만 남겼다) `test_connector_workbench_plugin.py` 가 카탈로그와 설치, 정책을 본다. 워크벤치의 `assistant.json` 이 바뀌면 사본도 고친다.
 
 투자 판단을 「세상의 변화 → 병목 → 산업 → 기업 → 밸류에이션(시나리오) → 투자 결정」 으로 잇는 그래프이고, 근거 문서와 검토 상태가 있는 주장, 개념, 사용자별 공부 목록을 갖는다.
 
@@ -28,6 +28,7 @@ covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connecto
 확인 도구는 `get_connection` 이다. 등록할 때 사용자 표시 이름과 연결 범위가 읽히면 저장한다.
 「조회만」(`READ`) 토큰도 등록은 된다. 조회 도구는 그대로 쓰고, 쓰는 도구는 `INSUFFICIENT_SCOPE` 로 끝난다. 범위는 `get_connection` 결과의 `connection.scope` 에 보인다.
 원격 서버가 받는 OAuth 로그인은 쓰지 않는다. 원격 MCP ADR 의 「인증」 이 미뤘다.
+받은 스킬의 연결 안내는 Claude Code·Codex 의 OAuth 로그인 기준이라, 연동 토큰을 넣는 이 저장소의 등록 방식과 다를 수 있다. 스킬은 워크벤치 저장소가 갖는다.
 
 ### 운영 값
 
@@ -36,7 +37,7 @@ covers: `hermes/tests/fixtures/valuation-ontology/`, `hermes/tests/test_connecto
 
 | 선언 | 값 | 까닭 |
 | --- | --- | --- |
-| `single_binding` | 선언하지 않는다 | 토큰은 사람마다 5개까지 따로 발급되고, 서로를 무효로 만들지 않는다. 같은 연결을 여러 에이전트에 붙여도 된다 |
+| `single_binding` | 선언하지 않는다 | 토큰은 사람마다 여러 개를 따로 발급하고, 서로를 무효로 만들지 않는다. 같은 연결을 여러 에이전트에 붙여도 된다 |
 | `sandbox_required` | 선언하지 않는다 | 셸이 `.env` 의 토큰을 읽어도 할 수 있는 것은 이 플러그인의 도구와 같다. 돈이 움직이지 않고, 체결 기록은 주인이 워크벤치에서 지울 수 있으며, 제안은 사람이 승인해야 반영된다 |
 
 토스증권 플러그인은 두 선언을 모두 참으로 둔다. 두 선언은 토스증권 연결에만 걸리므로, 실행 공간이 있는 에이전트 하나에 토스증권과 워크벤치를 함께 붙일 수 있다.
@@ -80,6 +81,7 @@ MCP 서버 이름은 `valuation-ontology` 다. 조회 도구는 서버에서 `re
 원격 서버는 도구 오류를 `isError` 결과의 `{code, message, details}` 로 돌려준다. 대시보드는 이 모양에서 `assistant.json` 의 `errors` 에 선언한 코드와 정수 세부만 넘기고 `message` 는 버린다([플러그인 연결](connector.md) 의 「대시보드 plugin 계약」).
 워크벤치의 선언은 세부(`details`)를 넘기지 않는다. 항목 번호와 `retryAfterSeconds` 같은 세부는 승인한 실행에서는 에이전트에 가지 않는다.
 대화 허락이나 상시 허락으로 바로 실행한 호출은 Hermes 가 결과 글을 그대로 모델에 주므로 `message` 와 세부가 보인다.
+그래서 승인한 `propose_ontology_change` 가 `ONTOLOGY_INVALID` 로 실패하면 에이전트는 코드와 `fix_input` 만 받고, 정의의 어느 곳이 틀렸는지(`details.errors`)는 받지 못한다.
 
 | 코드 | 공통 어휘 | 복구 |
 | --- | --- | --- |
@@ -97,7 +99,7 @@ MCP 서버 이름은 `valuation-ontology` 다. 조회 도구는 서버에서 `re
 
 - **공유 지식을 바로 바꾸는 도구가 없다.** 외부 글이 모델을 속여도 노드와 관계, 이해 표시, 온톨로지 정의는 사람이 제안을 승인해야 바뀐다. 속은 모델이 바로 할 수 있는 것은 주인만 보는 체결 기록을 더하는 것과 대기 제안을 쌓는 것이다. 체결은 주인이 지우고, 제안은 거절한다
 - 읽은 내용을 다른 도구(셸, 웹)로 내보내는 길은 [READ 데이터 흐름](connector-policy.md) 의 RF-08, RF-09 와 같다. 쓰는 도구는 주인의 워크벤치로만 보내므로 `outbound` 가 거짓이다
-- 워크벤치의 메모, 주장, 근거 문서 발췌는 사용자와 다른 사람이 쓴 글이다. 스킬이 자료로만 다루게 하고, 그 글이 시키는 주문이나 전송을 하지 않게 한다
+- 워크벤치의 메모, 주장, 근거 문서 발췌는 사용자와 다른 사람이 쓴 글이다. 스킬은 워크벤치 저장소가 갖고 이 저장소의 검사는 스킬 본문을 보지 않는다. 속은 모델에 대한 방어는 쓰는 도구의 승인 정책과, 사람이 승인해야 반영되는 제안 구조가 맡는다
 - 토큰은 그 사용자의 역할로 인증된다. 새면 그 사용자가 볼 수 있는 워크벤치 내용이 읽히고, 「조회와 기록」 토큰이면 체결 기록과 제안이 더해진다. 워크벤치에서 그 토큰을 폐기하면 바로 막힌다
 - 주소는 운영 목록만 정한다. 사용자가 주소를 넣는 칸이 없고, 플러그인 갱신으로 토큰의 목적지가 바뀌지 않는다
 - 원격 서버가 도구 설명이나 목록을 바꾸면 이 저장소의 검사는 모른다. 운영자가 믿은 checkout 만 운영 목록에 올린다
