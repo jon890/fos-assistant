@@ -42,10 +42,10 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 `content_draft_snapshot`은 기존 암호화 revision의 참조, 최초 내부 origin 실행, 에이전트와 연결·바인딩 판, 정책 지문과 compiler의 두 지문을 보존한다.
 본문·canonical 블록·compiled payload·관찰 설명·사진 byte는 저장하지 않는다. 기존 `content_draft_revision`의 암호화 본문 한 곳만 사용한다.
-칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유한다.
-두 표의 시각 칸은 MySQL에서 `DATETIME(6)`이며, 엔티티의 `Instant`는 기존 원고처럼 dialect의 기본 매핑을 사용한다.
+칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유하고, 아래 job 칸은 `V20261102074316__content_draft_job_asset_columns.sql`이 소유한다.
+snapshot의 시각 칸(job 칸 포함)은 MySQL에서 `DATETIME(6)`이며, 엔티티의 `Instant`는 기존 원고처럼 dialect의 기본 매핑을 사용한다.
 H2에서도 Flyway 스키마와 `ddl-auto: validate`로 실제 JPA 기동을 검사한다.
-snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,snapshot_hash,authorization_fingerprint)`는 각각 유일하다.
+snapshot의 원래 칸은 모두 필수이며(아래 job 칸은 NULL 허용) 공개 UUID와 `(revision_id,binding_id,snapshot_hash,authorization_fingerprint)`는 각각 유일하다.
 `authorization_fingerprint`는 서버가 캡처한 권한 맥락의 SHA-256 지문이다. compiler의 두 지문과 별개이며 서명이나 ACL을 대신하지 않는다.
 `policy_fingerprint`는 잠금 밖에서 준비한 compile 전용 선언과 도구 정책의 SHA-256이다. 연결·바인딩 수정 시각과 함께 현재 판을 대조한다.
 기한은 원고와 참조 첨부 중 가장 이른 기한이다.
@@ -62,12 +62,14 @@ job 칸은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 snap
 저장 목록은 `job_created_at` 역순이고 같은 시각이면 snapshot 번호 역순이다.
 `content_draft_job` 테이블은 코드가 더는 읽고 쓰지 않는다. 그 줄은 `V20261102074317__ContentDraftJobAssetBackfill`이 snapshot 칸으로 옮겼다.
 이 변경의 배포를 확인한 뒤의 DROP PR 이 직전 이미지가 쓴 줄을 다시 옮기고 그 테이블을 지운다. 순서는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)가 갖는다.
+직전 이미지로 되돌리면 새 이미지가 snapshot 칸에 만든 job 은 옛 코드에 보이지 않아 승인 대기 줄은 승인할 때 찾지 못하고, 저장 중이던 실행은 기동 정리가 UNKNOWN 으로 끝낸다.
+다시 새 이미지로 올리면 그사이 옛 코드가 쓴 revision 은 `assets_json` 이 NULL 이라 STALE 로 닫히고, 옛 테이블에 생긴 job 은 DROP PR 의 재이관 전까지 보이지 않는다. 같은 snapshot 에 job 이 두 번 생긴 경우는 DROP PR 이 따로 다룬다.
 ticket과 본문은 snapshot 줄 어디에도 저장하지 않는다. worker 상태의 조회와 stage·save_clicked 반영은 아직 구현하지 않았다.
 
 snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 삭제 가능한 원고·첨부·binding·connection·대화·origin과 이력용 action·snapshot에는 물리 FK와 삭제 cascade를 두지 않는다.
 원고 만료·삭제·purge 뒤에도 참조와 terminal 이력은 남고, 본문을 복구하거나 권한을 우회하는 데 쓰지 않는다.
-같은 snapshot의 UNIQUE 경합은 실패 트랜잭션이 끝난 뒤 새 트랜잭션에서 owner·conversation 범위의 기존 행을 읽는다.
+같은 snapshot의 저장 요청 경합은 snapshot 줄 잠금이 먼저 막고, 유일 제약에 걸린 경우는 실패 트랜잭션이 끝난 뒤 새 트랜잭션에서 owner·conversation 범위의 기존 행을 읽는다.
 없는 기존 행이나 공개 UUID만 충돌한 경우는 안전한 실패로 끝내며 실패한 트랜잭션을 다시 쓰지 않는다.
 흐름과 현재 권한 검사는 [원고 기능](../../docs/features/content-draft.md#불변-preview-snapshot)에 있다.
 
