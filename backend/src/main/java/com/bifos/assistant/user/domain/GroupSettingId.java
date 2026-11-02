@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.modelchoice.domain;
+package com.bifos.assistant.user.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

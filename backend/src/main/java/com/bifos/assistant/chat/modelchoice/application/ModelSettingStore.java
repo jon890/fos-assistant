@@ -2,9 +2,9 @@ package com.bifos.assistant.chat.modelchoice.application;
 
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelSetting;
-import com.bifos.assistant.chat.modelchoice.domain.GroupSetting;
-import com.bifos.assistant.chat.modelchoice.domain.GroupSettingId;
-import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
+import com.bifos.assistant.user.domain.GroupSetting;
+import com.bifos.assistant.user.domain.GroupSettingId;
+import com.bifos.assistant.user.infra.GroupSettingRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
