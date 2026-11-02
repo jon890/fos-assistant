@@ -152,8 +152,17 @@ def _tool_payload(result):
 
 
 def _tool_error(payload) -> tuple:
-    """오류 결과의 `error` 객체와 그 코드다. 모양이 맞지 않으면 빈 객체와 None 이다."""
-    error = payload.get("error") if isinstance(payload, dict) else None
+    """오류 결과의 `error` 객체와 그 코드다. 모양이 맞지 않으면 빈 객체와 None 이다.
+
+    `error` 칸이 없고 맨 위 `code` 가 글이면 `{code, message, details}` 모양으로 보고, `details` 객체의 칸과
+    코드만으로 오류 객체를 만든다. `message` 와 그 밖의 맨 위 칸은 넣지 않는다(ADR-20261026 remote-mcp-plugin).
+    """
+    if not isinstance(payload, dict):
+        return {}, None
+    if "error" not in payload and isinstance(payload.get("code"), str):
+        details = payload.get("details")
+        return {**(details if isinstance(details, dict) else {}), "code": payload["code"]}, payload["code"]
+    error = payload.get("error")
     if not isinstance(error, dict):
         return {}, None
     code = error.get("code")

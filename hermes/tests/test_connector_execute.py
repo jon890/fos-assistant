@@ -533,6 +533,34 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_RAW_403", "actual_count": 1}}), UNAVAILABLE)
         self.assertEqual(self.fixed_execute({"error": "DEMO_STALE"}), UNAVAILABLE)
 
+    def test_top_level_code_and_details_shape_is_read_like_the_error_object(self):
+        """`error` 칸이 없는 `{code, message, details}` 오류도 선언한 코드와 세부만 넘긴다(ADR-20261026 remote-mcp-plugin).
+
+        워크벤치 `/mcp` 의 모양이다. 세부는 `details` 객체에서만 꺼내고, 원문 메시지와 맨 위의 다른 칸은 넘기지 않는다.
+        """
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            PROPOSAL_LIMIT={"category": "unavailable", "details": ["max", "pending"]},
+            DEMO_UNKNOWN={"category": "outcome_unknown", "retry_key": "attemptId"}))
+        limit = {"code": "PROPOSAL_LIMIT", "message": "대기 중인 제안이 너무 많습니다.",
+                 "details": {"max": 200, "pending": 200, "note": "raw"}, "pending": 1}
+        self.assertEqual(self.fixed_execute(limit), (200, {
+            "ok": False, "error": "unavailable", "code": "PROPOSAL_LIMIT", "details": {"max": 200, "pending": 200}}))
+        # 세부가 객체가 아니면 코드만 넘긴다.
+        self.assertEqual(self.fixed_execute({"code": "PROPOSAL_LIMIT", "details": [200]}),
+                         (200, {"ok": False, "error": "unavailable", "code": "PROPOSAL_LIMIT"}))
+        # `error` 칸이 있으면 그 객체만 본다. 맨 위 `code` 는 읽지 않는다.
+        self.assertEqual(self.fixed_execute({"error": "DEMO_STALE", "code": "PROPOSAL_LIMIT"}), UNAVAILABLE)
+        # 선언하지 않은 코드와 글이 아닌 코드는 지금처럼 unavailable 이다.
+        self.assertEqual(self.fixed_execute({"code": "VALIDATION_FAILED", "message": "raw"}), UNAVAILABLE)
+        self.assertEqual(self.fixed_execute({"code": 403}), UNAVAILABLE)
+        # `outcome_unknown` 의 재시도 식별자도 같은 모양에서 읽는다.
+        attempt = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f"
+        status, body = self.fixed_execute({"code": "DEMO_UNKNOWN", "message": "raw", "details": {"attemptId": attempt}})
+        self.assertEqual(status, 504, body)
+        self.assertEqual({key: body[key] for key in body if key != "detail"},
+                         {"code": "DEMO_UNKNOWN", "retry": {"attemptId": attempt}})
+        self.assertNotIn("raw", json.dumps(body, ensure_ascii=False))
+
     def test_outcome_unknown_forwards_only_code_and_declared_retry_identifier(self):
         """`outcome_unknown` 코드가 `retry_key` 를 선언하면 504 본문에 코드와 그 칸 하나만 싣는다.
 
