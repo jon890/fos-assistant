@@ -36,10 +36,10 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
      */
     public static final List<String> ACCEPTED_EFFORTS = List.of(EFFORT_NONE, "low", "medium", "high", "xhigh", "max");
 
-    /** provider 이름의 최대 길이다. {@code conversation.model_provider} 열의 길이와 같다. */
+    /** provider 이름의 최대 길이다. 그룹의 단계 설정이 이 길이를 넘는 값을 받지 않는다. */
     public static final int PROVIDER_MAX_LENGTH = 64;
 
-    /** 모델 이름의 최대 길이다. {@code conversation.model} 열의 길이와 같다. */
+    /** 모델 이름의 최대 길이다. 그룹의 단계 설정이 이 길이를 넘는 값을 받지 않는다. */
     public static final int MODEL_MAX_LENGTH = 128;
 
     /** 공백만 정리한다. 검증은 {@link #of} 가 한다. */
