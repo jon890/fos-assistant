@@ -177,7 +177,8 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
 
     if declared.get("operator_secrets"):
         problems.append("operator_secrets 가 비어 있지 않다")
-    # 이 저장소의 플러그인은 운영 값 없이 돈다. 운영 값이 필요한 플러그인은 그 서비스의 저장소에 둔다(ADR-064).
+    # 이 저장소의 플러그인은 운영 값 없이 돈다. 운영 값이 필요한 플러그인은 그 서비스의 저장소에 두고 원격 MCP 로 받는다
+    # (ADR-064, ADR-20261025 를 대체한 ADR-20261026 remote-mcp-plugin).
     if declared.get("operator_env"):
         problems.append("operator_env 가 비어 있지 않다: %r" % declared["operator_env"])
 

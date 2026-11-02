@@ -21,7 +21,7 @@
 | 설치하는 서버 정의 | `{"url": ..., "headers": {...}, "strict_redirect_headers": true, "enabled": true}` 와 지금처럼 `tools.exclude`. 헤더 값의 `${이름}` 은 profile `.env` 가 채운다. `strict_redirect_headers` 는 Hermes 가 다른 origin 으로 가는 redirect 에서 설정 헤더를 모두 지우게 한다 |
 | 대시보드의 호출 | 확인 도구, 선택지, 승인 실행은 대시보드 plugin 이 직접 같은 원격 서버에 붙고 redirect 를 따라가지 않는다. MCP probe 는 Hermes 가 붙으므로 Hermes 의 redirect 규칙(아래 「감당할 것」)을 따른다 |
 | 도구 이름과 승인 | Hermes 등록 이름은 `mcp__<서버>__<도구>` 그대로이고 전송과 무관하다. `fos-ctx` 의 판정과 이름 대응 파일은 바뀌지 않는다 |
-| 도구 오류 모양 | `error` 객체가 없고 맨 위 `code` 가 글이면 `{code, message, details}` 모양으로 읽는다. 코드는 맨 위 `code`, 세부는 `details` 객체의 칸이고 `message` 는 버린다. 선언한 코드와 세부만 넘기는 규칙([ADR-092](../../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))은 그대로다(2026-11-02 더함). 남의 서버가 흔히 쓰는 오류 모양을 고치지 않고 받으려는 것이다 |
+| 도구 오류 모양 | `error` 객체가 없고 맨 위 `code` 가 글이면 `{code, message, details}` 모양으로 읽는다. 코드는 맨 위 `code`, 세부와 `outcome_unknown` 의 재시도 식별자는 `details` 객체의 칸이고 `message` 는 버린다. 선언한 코드와 세부만 넘기는 규칙([ADR-092](../../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))은 그대로다(2026-11-02 더함). 남의 서버가 흔히 쓰는 오류 모양을 고치지 않고 받으려는 것이다 |
 | 다른 저장소의 플러그인 | 운영자가 홈서버에 받아 둔 그 저장소의 checkout 을 운영 목록의 `root` 로 가리킨다. 실행 중에 marketplace 나 원격 저장소에서 내려받지 않는다. 경로와 갱신 절차는 `fos-home-infra` 가 갖는다 |
 
 원격 칸 env 검사는 [Hermes v0.21.6 `agent/secret_scope.py`](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/agent/secret_scope.py)의 `_GLOBAL_ENV_EXACT`, `_GLOBAL_ENV_PREFIXES`가 근거다. OS·Python 이름은 정확히 일치할 때 거절하고, `HERMES_`, `TERMINAL_`, `GATEWAY_RELAY_`, `API_SERVER_`는 접두 전체를 거절한다. 소문자 context 변수도 이름 형식에서 빠진다.

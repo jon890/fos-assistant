@@ -203,7 +203,9 @@ def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
     if contract is None:
         return answer
     if contract["retry_key"] is not None:
-        value = _retry_value(payload, error, contract["retry_key"])
+        # 맨 위 `{code, message, details}` 모양이면 맨 위에 원문 메시지가 있다. 그때는 `details` 에서 만든 오류 객체만 본다.
+        outer = payload if isinstance(payload, dict) and "error" in payload else None
+        value = _retry_value(outer, error, contract["retry_key"])
         if value is not None:
             answer["retry"] = {contract["retry_key"]: value}
     if contract["recovery"] is not None:

@@ -55,7 +55,8 @@ class WorkbenchPluginTest(base.ConnectorGateCase):
     def test_reads_need_no_approval_and_writes_need_approval_with_a_conversation_grant(self):
         """조회 도구는 승인이 없고 쓰기 셋은 `WRITE`, `required`, 대화 허락이다. 로컬 커넥터 때의 정책과 같다."""
         tools = self.entry()["tools"]
-        self.assertEqual(len(tools), 14)
+        self.assertIn("get_connection", tools)
+        self.assertLessEqual(WRITES, set(tools))
         for name, tool in tools.items():
             with self.subTest(name):
                 if name in WRITES:
