@@ -380,7 +380,7 @@ class PurgeCoverageMysqlTest {
                 .usingRecursiveComparison().isEqualTo(before.get(table.table()));
             case DETACH -> {
                 List<String> columns = table.table().equals("decision_feedback_event")
-                    ? List.of("source_check_id", "autonomy_decision_id") : List.of("agent_id");
+                    ? List.of("source_check_id") : List.of("agent_id");
                 columns.forEach(column -> assertCleared(table.table(), column));
             }
             case GONE -> {

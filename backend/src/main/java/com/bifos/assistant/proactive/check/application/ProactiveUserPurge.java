@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자 정리 때 그 사용자의 먼저 살펴보기 점검을 지운다(ADR-20261101 / user-purge).
  *
- * <p>점검에 딸린 줄은 외래 키가 함께 지운다. 루프 설정과 자동 실행 동의는 사용자 줄을 지울 때 외래 키가 지운다. 부르는 쪽의 정리
+ * <p>점검에 딸린 줄은 외래 키가 함께 지운다. 부르는 쪽의 정리
  * 트랜잭션 안에서만 돈다.
  */
 @Component

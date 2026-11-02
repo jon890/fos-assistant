@@ -30,8 +30,6 @@ import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,14 +44,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.support.EncodedResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
 
 /**
  * 지금 화면의 숨김, 미루기, 복원을 반응 기록({@code decision_feedback_event})으로 본다. 현재 제어는 카드와 항목마다 마지막 제어
- * 사건에서 구하고, 보관 기간이 지나도 마지막 숨김은 남고, 옛 {@code attention_control} 의 값을 이관해도 그대로 숨고 미뤄져야 한다.
+ * 사건에서 구하고, 보관 기간이 지나도 마지막 숨김은 남아야 한다.
  * 계약은 {@code docs/features/attention.md} 의 「사용자 제어」 와 「저장」 이다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들고 끝나면 그 사용자의 줄을 지운다.
@@ -117,8 +112,6 @@ class AttentionReactionControlTest {
     void tearDown() {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
             jdbc.update(
                 "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
@@ -301,67 +294,6 @@ class AttentionReactionControlTest {
             .as("숨김은 남고 기한이 지난 미루기는 남지 않는다")
             .containsExactly("FAILURES:DISMISSED");
         assertThat(items(CardKey.FAILURES)).as("정리 뒤에도 숨겨져 있다").isEmpty();
-    }
-
-
-    @Test
-    @DisplayName("이관 전에 숨기거나 미룬 값은 이관 뒤에도 같은 상태로 숨고 미뤄져 그 시각에 풀린다")
-    void keepsMigratedHideAndSnooze() throws Exception {
-        Conversation conversation = failedConversation();
-        AttentionItem failure = onlyItem(attention.view(dad), CardKey.FAILURES);
-        Instant until = NOW.plus(Duration.ofHours(6));
-        // 옛 표에 있던 현재값이다. 숨김은 FAILURES 에서, 미루기는 CONTINUE 에서 걸었다.
-        jdbc.update(
-            "INSERT INTO attention_control (user_id, card_key, item_key, action, state_key, until_at, created_at, updated_at)"
-                + " VALUES (?, 'FAILURES', ?, 'HIDE', ?, NULL, ?, ?)",
-            dad.id(),
-            failure.itemKey(),
-            failure.stateKey(),
-            Timestamp.from(NOW),
-            Timestamp.from(NOW));
-        jdbc.update(
-            "INSERT INTO attention_control (user_id, card_key, item_key, action, state_key, until_at, created_at, updated_at)"
-                + " VALUES (?, 'CONTINUE', ?, 'SNOOZE', NULL, ?, ?, ?)",
-            dad.id(),
-            failure.itemKey(),
-            Timestamp.from(until),
-            Timestamp.from(NOW),
-            Timestamp.from(NOW));
-        assertThat(items(CardKey.FAILURES)).as("이관 전에는 반응 기록에 제어가 없어 보인다").hasSize(1);
-
-        runMigration("V20261031171513__attention_legacy_to_feedback_event.sql");
-
-        assertThat(items(CardKey.FAILURES)).as("이관한 숨김은 같은 상태에서 그대로 숨는다").isEmpty();
-        assertThat(items(CardKey.CONTINUE)).as("이관한 미루기는 기한 전에 그대로 미뤄진다").isEmpty();
-        clock.set(until.plusSeconds(1));
-        assertThat(items(CardKey.CONTINUE)).as("이관한 미루기는 그 시각에 풀린다").hasSize(1);
-        clock.set(NOW);
-
-        messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "한 번 더", NOW.minusSeconds(100)));
-        executions.save(root(conversation, NOW.minusSeconds(100), NOW.minusSeconds(50)));
-        assertThat(items(CardKey.FAILURES)).as("이관한 숨김도 상태가 바뀌면 다시 보인다").hasSize(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attention_control WHERE user_id = ?", Integer.class, dad.id()))
-            .as("옛 표는 지우지 않는다")
-            .isEqualTo(2);
-
-        runMigration("V20261031171513__attention_legacy_to_feedback_event.sql");
-        assertThat(jdbc.queryForObject(
-            "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ? AND event_key LIKE 'legacy:attention_control:%'",
-            Integer.class,
-            dad.id()))
-                .as("같은 이관을 다시 돌려도 사건이 늘지 않는다")
-                .isEqualTo(2);
-    }
-
-
-    /** 마이그레이션 파일의 문장을 그대로 한 번 더 돌린다. 이 검사가 쓰는 DB 는 이미 Flyway 가 한 번 적용했다. */
-    private void runMigration(String name) throws Exception {
-        try (var connection = jdbc.getDataSource().getConnection()) {
-            ScriptUtils.executeSqlScript(
-                connection,
-                new EncodedResource(
-                    new ClassPathResource("db/migration/" + name), StandardCharsets.UTF_8));
-        }
     }
 
 

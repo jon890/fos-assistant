@@ -49,8 +49,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `agent_memory_collection` / `AgentMemoryCollection` | C: 권한 관계 행의 최초 저장. 변경 사건은 별도 change 표 | 복합 ID. 민감 허용 변경은 기존 managed 행을 수정. 삭제 뒤 재부여는 새 C |
 | `allowed_person` / `AllowedPerson` | C+U: 허용 설정의 저장 시각 | lastLoginAt은 로그인 bulk만 갱신. 새 U는 과거 NULL |
 | `app_user` / `AppUser` | C+U: 사용자 설정의 저장 시각 | 모델 기본값 bulk는 U 명시. 새 U는 과거 NULL |
-| `attention_control` / `AttentionControlEntry` | C+U: 현재 숨기기·미루기 설정 행의 저장 시각. 실제 반응 사건은 AttentionEvent가 소유 | untilAt은 명시 전달. UPDATE bulk 없음 |
-| `attention_event` / `AttentionEvent` | 제외: SHOWN과 ACTIONED의 발생 시각. AttentionMetricsService가 두 C의 차이로 반응 시간을 계산 | C를 Clock 인자로 유지 |
 | `chat_artifact` / `ChatArtifact` | C: 결과물 행의 저장 시각. 목록·오래된 행 정리는 저장 순서를 사용 | deletedAt 및 삭제 bulk 유지 |
 | `chat_attachment` / `ChatAttachment` | C: 업로드 메타데이터 행의 저장 시각 | expiresAt/deletionRequestedAt/deletedAt 및 삭제 요청 bulk 유지 |
 | `chat_message` / `ChatMessage` | 제외: 메시지가 오간 시각. ChatMessageRepository가 마지막 사용자 발언과 특정 시각 뒤 메시지를 조회 | C와 메시지 생성 인자 유지. 본문 암호화 bulk도 C를 바꾸지 않음 |
@@ -78,7 +76,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `memory_link` / `MemoryLink` | C+U: 연결 행의 저장·상태 변경 시각. 대체 판정은 status 가 소유 | revokedAt은 끊거나 거절한 업무 시각으로 명시 전달. UPDATE bulk 없음 |
 | `memory_collection` / `MemoryCollection` | C: collection 행의 최초 저장. 현재 auditing 대상 | 복합 ID saveAll의 merge 반환값 사용 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
-| `proactive_autonomy_decision` / `AutonomyDecision` | 제외: 평가와 판정의 동일 배치 시각. AutonomyPolicyService가 평가 C를 전달 | C 명시 전달. 재설계와 무관하게 현재 업무 계약 보존 |
 | `proactive_check_finding` / `ProactiveCheckFinding` | C: 살펴보기 발견 기록의 저장 시각. 관측 시점은 checkedAt이 담당 | checkedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `proactive_check_problem` / `ProactiveCheckProblem` | C: 문제 후보 기록의 저장 시각. 근거 시점은 evidenceCheckedAt이 담당 | evidenceCheckedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `result_delivery` / `ResultDelivery` | C: 결과 전달 묶음 행의 저장 시각 | U는 전달 상태의 업무 시각. 상태·attempt bulk 인자 유지 |

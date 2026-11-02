@@ -1,8 +1,7 @@
 package com.bifos.assistant.feedback.domain.type;
 
 /**
- * 사건이 가리키는 제안의 종류와 그 열쇠의 머리다. 열쇠는 지금 화면의 {@code itemKey} 와 같은 모양이라 {@code attention_event} 와
- * 같은 항목으로 이어 읽을 수 있다.
+ * 사건이 가리키는 제안의 종류와 그 열쇠의 머리다. 열쇠는 지금 화면의 {@code itemKey} 와 같은 모양이다.
  */
 public enum FeedbackSubjectType {
     /** 에이전트가 제안한 할 일. 열쇠는 {@code follow_up:<공개 식별자>} 다. */
@@ -15,7 +14,10 @@ public enum FeedbackSubjectType {
     CHECK("proactive_check"),
     /** 살펴보기의 「새로 알릴 것」 발견 하나. 열쇠는 {@code check_finding:<번호>} 다. */
     CHECK_FINDING("check_finding"),
-    /** 행동 정책 판정. 자동 실행을 시작하지 못한 것과 매일 루프가 보인 판정의 반응이다. 열쇠는 {@code autonomy_decision:<번호>} 다. */
+    /**
+     * 옛 행동 정책 판정의 반응이다. 판정 테이블과 쓰는 코드는 지웠지만, 저장된 사건 줄이 남아 있을 수 있어 이름은 지우지 않는다. 열쇠는
+     * {@code autonomy_decision:<번호>} 다.
+     */
     AUTONOMY_DECISION("autonomy_decision"),
     /**
      * 지금 화면의 항목 가운데 제안이 아닌 것(실패한 대화, 맡긴 일, 보고, 최근 대화)과, 어떤 항목이든 지금 화면에서 보이고 열린 기록이다.

@@ -114,8 +114,6 @@ class FollowUpAttentionSourceTest {
     @AfterEach
     void tearDown() {
         for (Long userId : createdUsers) {
-            jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM follow_up WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
