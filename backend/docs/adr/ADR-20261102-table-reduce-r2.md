@@ -43,7 +43,7 @@ PR 하나의 운영 코드는 `scripts/pr/pr-size.mjs` 의 상한 안에 둔다.
 | 결과 전달(D3) | `result_delivery_item` 을 `result_delivery.items_json` 으로, `result_delivery_attempt` 를 마지막 시도 칸으로 옮긴다. 출처 줄의 전달 표시가 바꾼 줄 수가 1 이 아니면 예외로 되돌린다. ADR-075 를 고친다 | 없다 |
 | 기억 벡터 | `memory_embedding` 을 `memory` 의 `embedding_*` 칸으로 옮긴다. 엔티티는 매핑하지 않고 채우는 작업과 캐시가 전용 쿼리로 다룬다. 벡터는 옮기지 않고 다시 계산한다 | 사용자 정리([ADR-20261101 / user-purge](ADR-20261101-user-purge.md))의 삭제 단계가 머지된 뒤. 정리 미리보기와 대상 목록이 겹친다 |
 | 플러그인 허락 | `connector_tool_grant`, `connector_conversation_grant` 를 허락을 준 `connector_action` 줄의 기간과 거두기 칸으로 옮긴다 | 사용자 정리의 삭제 단계가 머지된 뒤. 그 ADR 의 외래 키 테이블 목록과 겹친다 |
-| 대기 메시지 | `chat_pending_message` 를 `conversation.pending_messages` JSON 칸으로 옮기고 ADR-048 을 고친다. 옮긴 행은 옛 표에서 지운다. 남기면 직전 이미지로 되돌렸을 때 보낸 글을 다시 보낸다 | 끝났다. DROP 만 남았다. 운영 조회 계정은 칸 단위 권한이라 새 칸은 권한을 다시 맞추기 전까지 보이지 않고, 배포 뒤 `fos-home-infra` 절차로 다시 맞춘다 |
+| 대기 메시지 | `chat_pending_message` 를 `conversation.pending_messages` JSON 칸으로 옮기고 ADR-048 을 고친다. 옮긴 행은 옛 표에서 지운다. 남기면 직전 이미지로 되돌렸을 때 보낸 글을 다시 보낸다 | 끝났다(#666). DROP 만 남았다. DROP PR 의 재이관은 직전 이미지가 옛 표에 쓴 글을 대화 줄에 이미 있는 JSON 뒤에 이어 붙인다. 이번 이관처럼 이미 값이 있으면 멈추게 두면 되돌렸다 다시 올린 대화에서 기동이 멈춘다. 운영 조회 계정은 칸 단위 권한이라 새 칸은 권한을 다시 맞추기 전까지 보이지 않고, 배포 뒤 `fos-home-infra` 절차로 다시 맞춘다 |
 | 도구 사용 요청(D5) | `agent_toolset_request` 와 요청 기능, 관리자 화면을 지운다 | 사용자 정리의 삭제 단계가 머지되고 운영 행 수 0 을 확인한 뒤 |
 | 기억 연결(D4) | `memory_link` 를 지우고 대체만 `memory.superseded_by_memory_id` 로 남긴다. `RELATED`, 연결 제안, 자동 찾기와 화면을 지운다 | 사용자 정리의 삭제 단계가 머지되고 운영 행 수를 확인한 뒤 |
 | 원고(D1) | `content_draft_job` 의 칸을 `content_draft_snapshot` 으로, `content_draft_asset` 을 `content_draft_revision.assets_json` 으로 옮긴다. 배포 뒤 블로그 새 글 저장을 한 번 왕복시켜 본다 | 없다 |

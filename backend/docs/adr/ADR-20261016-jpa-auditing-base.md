@@ -52,7 +52,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `chat_artifact` / `ChatArtifact` | C: 결과물 행의 저장 시각. 목록·오래된 행 정리는 저장 순서를 사용 | deletedAt 및 삭제 bulk 유지 |
 | `chat_attachment` / `ChatAttachment` | C: 업로드 메타데이터 행의 저장 시각 | expiresAt/deletionRequestedAt/deletedAt 및 삭제 요청 bulk 유지 |
 | `chat_message` / `ChatMessage` | 제외: 메시지가 오간 시각. ChatMessageRepository가 마지막 사용자 발언과 특정 시각 뒤 메시지를 조회 | C와 메시지 생성 인자 유지. 본문 암호화 bulk도 C를 바꾸지 않음 |
-| `chat_pending_message` / `ChatPendingMessage` | 제외: 실행 전에 받은 메시지의 큐 수락 시각 | held bulk 및 수락 C 유지 |
 | `connector_action` / `ConnectorAction` | 제외: 승인 요청의 발생 시각. ApprovalCandidates가 출처 시각으로 사용 | expiresAt/decidedAt/executedAt/resultDeliveredAt도 명시 전달 |
 | `connector_action_execution` / `ConnectorActionExecution` | C: ticket와 실행 snapshot 행의 저장 시각. 실행·소비 시각은 별도 필드 | connectionUpdatedAt/bindingUpdatedAt/ticketExpiresAt/consumedAt 유지 |
 | `connector_connection` / `ConnectorConnection` | C: 연결 행의 최초 저장만 자동화 | U는 금융 ticket·원고 snapshot·설치 비교 기준으로 명시 전달 |
@@ -146,7 +145,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | `TaskRepository`의 대화 연결 갱신 | 기존 `updatedAt` 인자를 보존한다 |
 | `ContentDraftJobRepository`의 claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
 | `ContentDraftRepository`, `ContentDraftRevisionRepository` | 현재 revision·만료·파기 상태를 조건부 갱신한다. 생성 C는 보존한다 |
-| `ChatAttachmentRepository`, `ChatPendingMessageRepository` | 삭제 요청·삭제 시각과 held 상태만 갱신한다. 큐 수락 C는 보존한다 |
+| `ChatAttachmentRepository` | 삭제 요청·삭제 시각만 갱신한다 |
 | `ConnectorConversationGrantRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
 | `NotificationRepository`의 읽음 갱신 | readAt만 갱신하고 생성 C는 보존한다 |
 

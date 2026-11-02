@@ -76,7 +76,7 @@ ticket과 본문은 두 표 어디에도 저장하지 않는다. worker 상태�
 | --- | --- | --- |
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
-| `chat_pending_message` | `content` | 아직 |
+| `chat_pending_message` | `content` | 아직. 코드가 읽고 쓰지 않는 옛 표지만 직전 이미지가 쓸 수 있어 DROP 전까지 권한에서 뺀다 |
 | `conversation` | `title`, `pending_messages` | 아직 |
 | `agent_execution` | `output_text` | 아직 |
 | `execution_event` | `detail` | 아직 |
