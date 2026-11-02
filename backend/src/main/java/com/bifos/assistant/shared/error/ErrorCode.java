@@ -297,10 +297,6 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     /** 없는 경로다. 지운 경로를 옛 화면이 부를 때도 여기 온다. */
     ROUTE_NOT_FOUND(HttpStatus.NOT_FOUND),
-    /** 없는 평가와 남의 평가, 지운 대화의 평가를 같은 응답으로 숨긴다. */
-    VALUE_EVALUATION_NOT_FOUND(HttpStatus.NOT_FOUND),
-    /** 끝나지 않았거나 실패한 살펴보기와 아직 평가 중인 시도는 replay 할 수 없다. */
-    VALUE_EVALUATION_STATE_CONFLICT(HttpStatus.CONFLICT),
     /** 요청자에게 브라우저가 없다. 관리자 경로에서는 그 번호의 브라우저가 없다. */
     BROWSER_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 사용자 브라우저 기능이 꺼져 있다. 상태 조회 말고 모든 쓰기가 이 코드다. */

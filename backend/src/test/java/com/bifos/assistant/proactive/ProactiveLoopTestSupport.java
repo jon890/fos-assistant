@@ -125,7 +125,6 @@ abstract class ProactiveLoopTestSupport {
             jdbc.update("DELETE FROM proactive_loop_run WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
             jdbc.update(
                 "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
                 userId);
@@ -248,11 +247,6 @@ abstract class ProactiveLoopTestSupport {
     /** 새 것이 없다는 버전 3 결과 블록이다. 문제 후보가 없다. */
     static String nothingNewOutput() {
         return block("{\"version\":3,\"outcome\":\"NOTHING_NEW\"}");
-    }
-
-
-    long evaluationCount(CurrentUser user) {
-        return count("SELECT COUNT(*) FROM proactive_value_evaluation WHERE user_id = ?", user.id());
     }
 
 
