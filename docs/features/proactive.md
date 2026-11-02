@@ -3,7 +3,7 @@
 사용자가 묻지 않아도 에이전트가 기억 위에서 목표와 최근 일을 살피고, 챙길 것이 있으면 제안 카드로 보이는 기능이다.
 
 설계와 옮기는 순서는 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 이 갖는다.
-가치 평가와 행동 정책, 자동 실행 동의, 매일 루프는 코드와 화면에서 지웠다. 그 테이블과 저장된 옛 줄은 그대로 있고 다음 plan 이 테이블을 지운다.
+가치 평가와 행동 정책, 자동 실행 동의, 매일 루프는 코드와 화면에서 지웠다. 그 테이블은 지웠다.
 
 covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/main/java/com/bifos/assistant/task/`, `web/src/components/agent/agent-proactive-*`, `web/src/app/admin/agents/[code]/`, `web/src/lib/proactive-check.ts`
 
@@ -321,9 +321,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 ## 옛 판단 층의 자료
 
 가치 평가, 행동 정책의 네 수준, 자동 실행 동의, 살펴보기 뒤에 평가를 잇던 매일 루프와 그 설정 화면은 지웠다. 시스템 판단용 Hermes profile 틀과 그 준비 상태를 읽던 대시보드 경로도 함께 지웠다.
-다음은 읽는 코드 없이 남는다.
+테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run`, `attention_control`, `attention_event` 와 반응 기록의 `autonomy_decision_id` 컬럼은 지웠다. 다음은 읽는 코드 없이 남는다.
 
-- 테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run` 과 그 옛 줄. 테이블은 다음 plan 이 지운다
 - `task.loop_enabled`, `task.snoozed_until` 컬럼. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
 - 옛 `AUTONOMY` 계기의 살펴보기 줄과 실패 이력, 저장된 enum 값(`CheckTrigger.AUTONOMY`, `FeedbackSubjectType.AUTONOMY_DECISION`)
 

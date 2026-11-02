@@ -60,7 +60,6 @@ class FeedbackEventWriter {
             conversationId,
             rootExecutionId,
             entry.sourceCheckId(),
-            entry.autonomyDecisionId(),
             entry.subjectVersion(),
             entry.reasonCode(),
             entry.changedFields(),

@@ -145,8 +145,6 @@ class AttentionServiceTest {
     void tearDown() {
         SecurityContextHolder.clearContext();
         for (Long userId : createdUsers) {
-            jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             String ownConversations = "(SELECT id FROM conversation WHERE user_id = ?)";
             jdbc.update(
                 "DELETE FROM result_delivery_attempt WHERE delivery_id IN"

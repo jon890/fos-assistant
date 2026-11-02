@@ -84,9 +84,6 @@ public class FeedbackEvent {
     @Column(name = "source_check_id", updatable = false)
     private Long sourceCheckId;
 
-    @Column(name = "autonomy_decision_id", updatable = false)
-    private Long autonomyDecisionId;
-
     @Column(name = "subject_version", length = SHORT_MAX_LENGTH, updatable = false)
     private String subjectVersion;
 
@@ -134,7 +131,6 @@ public class FeedbackEvent {
         Long conversationId,
         Long originExecutionId,
         Long sourceCheckId,
-        Long autonomyDecisionId,
         String subjectVersion,
         String reasonCode,
         List<String> changedFields,
@@ -148,7 +144,6 @@ public class FeedbackEvent {
         event.conversationId = conversationId;
         event.originExecutionId = originExecutionId;
         event.sourceCheckId = sourceCheckId;
-        event.autonomyDecisionId = autonomyDecisionId;
         event.subjectVersion = clip(subjectVersion, SHORT_MAX_LENGTH);
         event.reasonCode = clip(reasonCode, SHORT_MAX_LENGTH);
         event.changedFields = changedFields == null || changedFields.isEmpty()
@@ -180,7 +175,6 @@ public class FeedbackEvent {
             FeedbackSubjectType.MEMORY.key(memoryId),
             eventType,
             actor,
-            null,
             null,
             null,
             null,

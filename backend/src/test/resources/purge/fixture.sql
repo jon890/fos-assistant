@@ -97,12 +97,6 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'GRANTED', 1, 900000001, '20
 INSERT INTO agent_toolset_request (id, public_id, group_id, agent_id, requester_user_id, toolset, status, requested_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 'coverage-900000001', 'REJECTED', '2020-01-01 00:00:00');
 
-INSERT INTO attention_control (id, user_id, card_key, item_key, action, created_at, updated_at)
-VALUES (900000001, 900000001, 'test', 'coverage-900000001', 'test', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
-
-INSERT INTO attention_event (id, user_id, item_key, state_key, trigger_type, attention, event_type, stale, created_at)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'test', 'test', 1, '2020-01-01 00:00:00');
-
 INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
@@ -136,9 +130,6 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-90
 INSERT INTO proactive_check (id, user_id, agent_id, conversation_id, trigger_type, status, tool_calls, delegations, new_findings, reference_findings, started_at, writes_allowed, report_json)
 VALUES (900000001, 900000001, 900000001, 900000001, 'MANUAL', 'SUCCEEDED', 1, 1, 1, 1, '2020-01-01 00:00:00', 1, '{"private":"지울 보고"}');
 
-INSERT INTO proactive_loop_setting (id, user_id, agent_id, enabled, updated_at)
-VALUES (900000001, 900000001, 900000001, 1, '2020-01-01 00:00:00');
-
 INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, execution_id, started_at)
 VALUES (900000001, 900000001, 1, 'coverage-900000001', 900000001, '2020-01-01 00:00:00');
 
@@ -147,9 +138,6 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');
 
 INSERT INTO task (id, public_id, owner_user_id, agent_id, title, state, conversation_mode, conversation_id, notify, created_at, updated_at, kind, trigger_type, time_zone, missed_policy)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 'coverage-900000001', 'ACTIVE', 'NEW_PER_RUN', 900000001, 'ALWAYS', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'TURN', 'CRON', 'UTC', 'SKIP');
-
-INSERT INTO user_autonomy_preference (user_id, read_only_execution, updated_at)
-VALUES (900000001, 1, '2020-01-01 00:00:00');
 
 INSERT INTO user_browser (id, user_id, status, profile_key, created_at, updated_at, version)
 VALUES (900000001, 900000001, 'STOPPED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1);
@@ -172,17 +160,8 @@ VALUES (900000001, 900000001, 900000001, 'NEW', 'coverage-900000001', 'coverage-
 INSERT INTO proactive_check_problem (id, check_id, conversation_id, status, problem_key, problem, evidence_json, created_at)
 VALUES (900000001, 900000001, 900000001, 'ACCEPTED', 'coverage-900000001', '지울 문제 본문', '{"private":"지울 근거"}', '2020-01-01 00:00:00');
 
-INSERT INTO proactive_loop_run (id, user_id, source_check_id, status, created_at)
-VALUES (900000001, 900000001, 900000001, 'test', '2020-01-01 00:00:00');
-
-INSERT INTO proactive_value_evaluation (id, check_id, user_id, outcome, evidence_json, created_at)
-VALUES (900000001, 900000001, 900000001, 'RUNNING', '{"private":"지울 평가 근거"}', '2020-01-01 00:00:00');
-
 INSERT INTO content_draft_asset (id, revision_id, position, attachment_id, source_fingerprint)
 VALUES (900000001, 900000001, 1, 900000001, 'coverage-900000001');
-
-INSERT INTO proactive_autonomy_decision (id, user_id, evaluation_id, candidate_id, source_check_id, action_level, reasons_json, inputs_json, policy_version, created_at)
-VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'test', '{}', '{}', 1, '2020-01-01 00:00:00');
 
 INSERT INTO task_run (id, public_id, task_id, owner_user_id, scheduled_for, status, conversation_id, execution_id, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, '2020-01-01 00:00:00', 'coverage-900000001', 900000001, 900000001, '2020-01-01 00:00:00');
@@ -193,6 +172,4 @@ UPDATE connector_action_execution SET content_key_id = 900000001 WHERE action_id
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET source_check_id = 900000001 WHERE id = 900000001;
-UPDATE decision_feedback_event SET autonomy_decision_id = 900000001 WHERE id = 900000001;
 UPDATE proactive_check SET root_execution_id = 900000001 WHERE id = 900000001;
-UPDATE proactive_loop_run SET evaluation_id = 900000001 WHERE id = 900000001;
