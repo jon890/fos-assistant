@@ -104,6 +104,12 @@ Fixture.setUpClass()
 logging.disable(logging.CRITICAL)
 fixture = Fixture()
 fixture.setUp()
+# 운영 대시보드처럼 이벤트 루프 하나에서 요청을 처리한다. HTTP 스레드마다 asyncio.run 으로 새 루프를 만들면
+# plugin 의 전역 asyncio.Lock 을 두 루프가 함께 잡을 때 기다린 요청이 멈추고, 그 뒤 이 프로세스의 요청이 모두 실패한다.
+loop = asyncio.new_event_loop()
+threading.Thread(target=loop.run_forever, daemon=True).start()
+fixture.request = lambda path, method, body=None, token="valid": asyncio.run_coroutine_threadsafe(
+    fixture.send(path, method, body, token), loop).result()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -150,5 +156,6 @@ try:
     server.serve_forever()
 finally:
     server.server_close()
+    loop.call_soon_threadsafe(loop.stop)
     fixture.doCleanups()
     Fixture.doClassCleanups()
