@@ -1,7 +1,9 @@
 package com.bifos.assistant.admin.people.presentation;
 
 import com.bifos.assistant.people.application.PersonAccessService;
+import com.bifos.assistant.people.application.PersonPurgePreview;
 import com.bifos.assistant.people.application.PersonRegistrar;
+import com.bifos.assistant.people.application.dto.PurgePreview;
 import com.bifos.assistant.people.application.dto.PersonAccess;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.admin.people.presentation.PeopleAdminDtos.CreatePersonRequest;
@@ -33,6 +35,7 @@ public class PeopleAdminController {
     private final PersonRegistrar registrar;
     private final CurrentUserProvider currentUser;
     private final PersonAccessService access;
+    private final PersonPurgePreview purgePreview;
 
 
     /** 허용 목록 전체를 준다. */
@@ -65,5 +68,13 @@ public class PeopleAdminController {
         currentUser.requireAdmin();
         PersonAccess result = access.setEnabled(id, request.enabled());
         return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
+    }
+
+
+    /** 이 사람을 정리하면 지워지거나 넘어갈 데이터를 표마다 센다. 읽기만 하며 아무것도 지우지 않는다. */
+    @GetMapping("/{id}/purge-preview")
+    public PurgePreview purgePreview(@PathVariable Long id) {
+        currentUser.requireAdmin();
+        return purgePreview.preview(id);
     }
 }
