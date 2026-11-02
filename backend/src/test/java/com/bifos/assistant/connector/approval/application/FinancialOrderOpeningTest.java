@@ -240,6 +240,30 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     }
 
 
+    @Test
+    @DisplayName("생성 승인 뒤 같은 지정가 주문의 취소 준비는 원주문에 orderAmount 가 채워져 와도 승인 카드를 만들고 승인 대기로 답한다")
+    void cancelAfterApprovedLimitOrderCreatesApprovalCard() {
+        var created = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(created.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE);
+        assertThat(publicApproval.approve(user, created.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(action(created).resultText()).contains("new-official-id");
+        // 대역의 원주문은 실제 토스처럼 지정가 수량 주문에도 orderAmount 를 채운다.
+        var cancel = prepare(UUID.randomUUID().toString(), trade("cancel_order", "{\"orderId\":\"new-official-id\"}"));
+        assertThat(cancel.allowed()).isFalse();
+        assertThat(cancel.actionId()).as("준비가 거절되면 승인 번호가 없다: %s", cancel.message()).isNotNull();
+        assertThat(cancel.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE).startsWith("오류가 아니다.");
+        var pending = action(cancel);
+        assertThat(pending.status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(pending.toolName()).isEqualTo("cancel_order");
+        assertThat(pending.hermesTool()).isEqualTo("mcp__tossinvest__cancel_order");
+        assertThat(counters().path("financial").intValue()).isEqualTo(1);
+        assertThat(publicApproval.approve(user, cancel.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(action(cancel).resultText()).contains("new-cancel-id");
+        assertThat(counters().path("financial").intValue()).isEqualTo(2);
+        assertThat(claims()).isEqualTo(2);
+    }
+
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("금융 줄의 승인에 상시 허락이나 대화 허락을 주면 입력 오류이고, 남의 줄이면 입력보다 먼저 없는 줄이다")

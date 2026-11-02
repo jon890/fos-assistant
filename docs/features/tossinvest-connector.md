@@ -80,6 +80,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 �
 `args` 의 스키마는 그 두 도구의 strict 인자 스키마(`MODEL_SCHEMAS`)의 union 이다. 금액, 수량, 가격은 10진수 글이고 계좌 칸이 없다.
 계좌는 연결에서 고른 값으로만 정해진다. 모델이 넣은 계좌는 연결의 계좌와 같아도 받지 않는다. 받으면 scope 를 모델 인자와 대조하는 길이 하나 더 생기기 때문이다.
 Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 넘겨 승인 줄을 만들고, 모델에게는 언제나 막힘으로 답한다.
+Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 모델에게 준다. 승인 줄을 만든 답은 「오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절로 읽지 않게 한다.
+글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 준비가 거절된 답은 `ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE` 다.
 사용자가 승인 카드에서 승인하면 Control Plane 이 claim 을 한 번 소비하고 실행 도구를 부른다. 실행 도구는 모델 목록에 없다.
 실행 도구를 모델이 직접 부르면 거절하고, 살펴보기 트리 안의 준비 호출은 넘기지 않는다.
 근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
