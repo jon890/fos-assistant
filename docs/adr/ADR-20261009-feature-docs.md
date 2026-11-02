@@ -3,6 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-10-09
 - [ADR-20261009 / docs-per-module](ADR-20261009-docs-per-module.md) 의 「결정」 표 중 모듈의 `prd.md` 와 `flow.md` 를 두는 부분과, 「대안 기각」 의 「`flow/` 처럼 디렉터리 아래에 주제별 파일을 둔다」 를 대체한다.
+- 「`features/` 아래에 하위 디렉터리를 두지 않는다」 에 기능 스펙 `docs/features/<id>/spec.md` 의 예외를 [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) 가 더한다.
 
 ### 결정
 
@@ -30,10 +31,11 @@
 
 `docs/features/` 는 루트에만 둔다. 모듈 아래 `features/` 는 만들지 않는다. 기능은 여러 모듈을 가로지르기 때문이다.
 기능 파일 이름은 소문자 영문과 숫자, 하이픈이다(`agent-skill.md`). `features/` 아래에 하위 디렉터리를 두지 않는다.
+예외는 기능 파일과 같은 이름의 디렉터리에 두는 스펙 `spec.md` 하나다(2026-11-02 추가). 자리와 기능 파일과의 역할 나눔은 [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) 가 갖는다.
 
 다섯 검사가 이 자리를 지킨다.
 
-- `test/unit/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 만 통과한다.
+- `test/unit/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 와, 같은 이름의 기능 파일이 있는 `<id>/spec.md` 만 통과한다.
 - `test/unit/doc-code-references.test.ts`: 기능 파일도 백틱으로 적은 코드 이름이 코드에 있는지 본다.
 - `scripts/ci/check-feature-covers.mjs`: covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 경고만 낸다.
 - `test/unit/feature-covers.test.ts`: 모든 기능 파일에 covers 가 있고 각 경로가 추적 파일과 맞는지 본다.
