@@ -8,8 +8,8 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
-| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_toolset_request`, `agent_token` |
+| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
@@ -369,9 +369,9 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 ### toolset_hidden
 
-`toolset_hidden` 테이블은 코드가 더는 읽고 쓰지 않는다. 그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다.
-`V20261102074304` 가 이 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
-직전 이미지가 이 테이블에 쓴 줄은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
+그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다. 옛 `toolset_hidden` 테이블은 지웠다.
+`V20261102074304` 가 그 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼고, 배포를 확인한 뒤 `V20261102074307` 이 직전 이미지가 옛 테이블에만 쓴 그룹을 다시 옮겼다.
+이미 `TOOLSET` 줄이 있는 그룹은 `V20261102074304` 가 옮긴 값인지 새 코드가 쓴 값인지 구별할 수 없어 덮어쓰지 않는다. 직전 이미지로 되돌린 동안 이미 옮겨진 그룹의 숨김을 바꿨다면 옛 테이블의 그 값은 버려진다. `V20261102074311` 이 옛 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### agent_toolset_request
 
@@ -433,7 +433,7 @@ AAD 에 줄 번호와 대화, 대화 주인이 들어가 암호문을 다른 줄
 읽기는 현재 대화 주인과 업로더, `deletion_requested_at`, `deleted_at`과 `expires_at`을 함께 확인한다.
 삭제 요청이나 만료가 있으면 파일 정리가 아직 끝나지 않았어도 원본과 관찰 본문을 제공하지 않는다.
 
-### media_observation와 media_observation_request
+### media_observation
 
 관찰은 첨부별 불변 revision으로 저장한다. 현재 관찰은 가장 큰 revision이고 별도 현재 행 테이블은 없다.
 본문 JSON의 summary, claims, uncertainties, coverage와 evidence는 `body` 한 칸에만 암호화한다.
@@ -443,13 +443,12 @@ AAD 에 줄 번호와 대화, 대화 주인이 들어가 암호문을 다른 줄
 
 저장 요청 하나가 revision 하나를 만든다. 그 요청의 UUID와 고정 요청 hash는 `request_id CHAR(36)`, `request_hash CHAR(64)`에 둔다.
 같은 첨부의 같은 UUID는 `uk_media_observation_request_id (attachment_id, request_id)`가 막는다.
-두 칸은 지금 NULL을 허용한다. 이 칸을 모르는 직전 이미지로 되돌려도 관찰을 쓸 수 있게 하려는 것이고, 새 코드는 늘 채운다.
+두 칸은 NOT NULL이다. 옛 `media_observation_request` 테이블과 `analysis_key` 칸은 지웠다.
+`V20261102074306` 이 직전 이미지가 칸 없이 쓴 줄을 옛 요청 테이블에서 다시 채웠고, `V20261102074308` 이 칸을 NOT NULL 로 바꾸고 `analysis_key` 를 지웠으며, `V20261102074309` 가 옛 테이블을 지웠다. 빈 줄이 남았다면 NOT NULL 단계가 실패해 옛 테이블을 지우지 않는다.
 관찰의 만료 시각은 첨부와 같다. 삭제 요청, 만료와 소유 불일치 정리는 같은 사용자 잠금 안에서 관찰 줄을 지운다.
 현재 소유자를 바꿔 관찰을 이관하거나 재암호화하지 않는다.
 CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 갖는다.
 
-`media_observation_request` 테이블과 `media_observation.analysis_key` 는 코드가 더는 읽고 쓰지 않는다. 운영의 관찰과 요청 테이블은 옮기기 전에 둘 다 0행이었다(2026-11-02 확인).
-이 변경의 배포를 확인한 뒤의 PR 이 두 칸을 다시 채워 NOT NULL 로 바꾸고 둘을 지운다.
 까닭과 지우는 순서는 [ADR-20261102 / media-observation-request-merge](adr/ADR-20261102-media-observation-request-merge.md)가 갖는다.
 
 ### content_draft・content_draft_revision
@@ -542,24 +541,31 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 자동 turn 하나가 부모 대화에 넘긴 결과들의 묶음이다. 그 turn 이 알림 줄을 저장할 때 생긴다.
 결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 상태가 바뀌는 흐름은 [`docs/features/agent-skill.md`](../../docs/features/agent-skill.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
-`status` 는 마지막 시도의 끝과 같고, 묶음과 시도의 상태는 같은 트랜잭션에서 바꾼다.
+**항목과 마지막 시도를 이 줄의 컬럼으로 둔다**([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 다시 전달하면 마지막 시도 컬럼을 새 시도로 덮고, 앞의 시도는 남기지 않는다.
+`status` 는 마지막 시도의 끝과 같고, 두 상태를 한 update 에서 바꾼다.
 **다시 전달은 `status` 를 `FAILED` 나 `STOPPED` 에서 `DELIVERING` 으로 바꾸는 조건부 update 로 시작한다.** 바뀐 줄이 없으면 시작하지 않는다. 한 묶음에 도는 시도가 둘이 되지 않는 근거다.
+시도를 잇고 닫는 update 는 `attempt_count` 가 그 시도의 번호와 같을 때만 바꾼다. 새 시도가 덮은 뒤 늦게 온 앞 시도의 쓰기는 0 줄을 바꾼다.
 대화와 실행, 메시지에는 외래 키를 두지 않는다. `connector_action` 과 같이 대화가 지워져도 기록을 남기고, 지운 대화의 묶음은 다시 전달하지 못한다.
-묶음 안의 항목과 시도만 `delivery_id` 의 외래 키로 묶음을 가리킨다.
 
-### result_delivery_item
+| 컬럼 | 뜻 |
+| --- | --- |
+| `attempt_count` | 지금까지 만든 시도 수. 마지막 시도의 번호다 |
+| `items_json` | 묶음에 든 결과들. `{"version":1,"items":[{"source":..,"resultKey":..}]}` 이고 넣은 순서다. 다시 전달할 때 이 순서로 입력을 만든다 |
+| `last_attempt_status` | 마지막 시도의 `RUNNING`, `SUCCEEDED`, `FAILED`, `STOPPED`. `(last_attempt_status, last_attempt_started_at)` 에 색인이 있다 |
+| `last_attempt_execution_id` | 마지막 시도의 부모 turn 실행 줄. 실행 줄을 만들기 전에 끝났으면 비어 있다. 색인이 있다 |
+| `last_attempt_notice_message_id` | 마지막 시도가 저장한 마지막 `SYSTEM` 줄. 화면은 이 줄 아래에 상태와 버튼을 그린다 |
+| `last_attempt_error_code` | `FAILED` 의 원인. 실행 줄 없이 내려갔으면 `INTERRUPTED` 다 |
+| `last_attempt_started_at`, `last_attempt_finished_at` | 마지막 시도의 시작과 끝. 도는 중이면 끝이 비어 있다 |
 
-묶음에 든 결과 하나가 한 행이다. 다시 전달할 때 `id` 순서로 입력을 만든다.
 `result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 플러그인 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
-`(source, result_key)` 에 유일 제약이 있어 한 결과는 한 묶음에만 든다. 같은 결과를 두 자동 turn 이 함께 넘기려 하면 뒤의 트랜잭션이 알림 줄까지 함께 되돌아간다.
+**한 결과는 한 묶음에만 든다.** 묶음을 여는 트랜잭션에서 결과를 낸 쪽의 전달 표시(`result_delivered_at`)가 결과마다 아직 전하지 않은 줄 하나를 바꿔야 한다. 바꾼 줄 수가 다르면 알림 줄과 묶음까지 함께 되돌아간다.
 결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
+새 컬럼은 직전 이미지로 되돌릴 수 있게 NULL 을 허용한다. 직전 이미지가 쓴 묶음은 새 컬럼이 비어 있어 화면에 상태가 보이지 않고 다시 전달하지 못한다. 옛 테이블을 지우는 PR 이 그 줄을 다시 옮기고 NOT NULL 로 바꾼다.
 
-### result_delivery_attempt
+### result_delivery_item, result_delivery_attempt
 
-묶음을 부모에 넘긴 한 번이 한 행이다.
-`execution_id` 는 실행 줄을 만들기 전에 실패했거나 내려갔으면 비어 있고, 내려갔을 때 `error_code` 는 `INTERRUPTED` 다.
-`notice_message_id` 는 이 시도가 저장한 마지막 `SYSTEM` 줄이다. 화면은 묶음의 마지막 시도의 이 줄 아래에 상태와 버튼을 그린다.
-`execution_id` 와 `notice_message_id` 에는 외래 키를 두지 않는다. 그 줄이 지워져도 시도의 끝은 남는다.
+두 테이블은 코드가 더는 읽고 쓰지 않는다. 항목은 `result_delivery.items_json` 이, 마지막 시도는 `result_delivery.last_attempt_*` 가 갖는다.
+`V20261102074312__ResultDeliveryItemsAttemptBackfill` 이 옮겼고 앞의 시도는 옮기지 않았다. 배포를 확인한 뒤 DROP PR 이 지운다.
 
 ### execution_question
 

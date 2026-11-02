@@ -1,7 +1,6 @@
 package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,6 +12,8 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
 import com.bifos.assistant.chat.nextturn.application.DelegationWakeService;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
@@ -22,16 +23,12 @@ import com.bifos.assistant.chat.delivery.application.dto.DeliveryItemRef;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
-import com.bifos.assistant.chat.delivery.domain.ResultDeliveryAttempt;
-import com.bifos.assistant.chat.delivery.domain.ResultDeliveryItem;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
@@ -64,9 +61,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 자동 turn 이 부모 대화에 넘긴 결과를 전달 묶음과 시도로 남기고, 그 turn 이 끝난 방식으로 닫는지 본다(ADR-075).
@@ -105,10 +100,10 @@ class ResultDeliveryRecordTest {
     ApplicationEventPublisher publisher;
 
     @Autowired
-    TransactionTemplate transactions;
+    TestAutoTurnResultSource testResults;
 
     @Autowired
-    TestAutoTurnResultSource testResults;
+    ConversationEventHub hub;
 
     @Autowired
     AppUserRepository users;
@@ -138,12 +133,6 @@ class ResultDeliveryRecordTest {
     ResultDeliveryRepository deliveries;
 
     @Autowired
-    ResultDeliveryItemRepository deliveryItems;
-
-    @Autowired
-    ResultDeliveryAttemptRepository attempts;
-
-    @Autowired
     HermesRunsClient hermes;
 
     private CurrentUser dad;
@@ -163,8 +152,6 @@ class ResultDeliveryRecordTest {
         awaitAllIdle();
         stub().reset();
         testResults.reset();
-        deliveryItems.deleteAll();
-        attempts.deleteAll();
         deliveries.deleteAll();
         executionEvents.deleteAll();
         executions.deleteAll();
@@ -210,20 +197,21 @@ class ResultDeliveryRecordTest {
         ResultDelivery delivery = onlyDelivery();
         assertThat(delivery.status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(delivery.attemptCount()).isEqualTo(1);
-        assertThat(deliveryItems.findByDeliveryIdOrderByIdAsc(delivery.id()))
-            .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
+        assertThat(recorder.itemsOf(delivery.id()))
+            .extracting(DeliveryItemRef::source, DeliveryItemRef::resultKey)
             .containsExactly(tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())));
+        assertThat(delivery.itemsJson())
+            .as("옛 항목 표를 옮기는 마이그레이션과 같은 버전 1 모양")
+            .isEqualTo("{\"version\":1,\"items\":[{\"source\":\"DELEGATION\",\"resultKey\":\"" + done.id() + "\"}]}");
 
         ChatMessage notice = onlyMessage(MessageRole.SYSTEM);
         ChatMessage answer = onlyMessage(MessageRole.ASSISTANT);
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.deliveryId()).isEqualTo(delivery.id());
-        assertThat(attempt.attemptNo()).isEqualTo(1);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
-        assertThat(attempt.executionId()).as("자동 turn 의 실행 줄").isEqualTo(answer.executionId());
-        assertThat(attempt.noticeMessageId()).as("알림 줄").isEqualTo(notice.id());
-        assertThat(attempt.errorCode()).isNull();
-        assertThat(attempt.finishedAt()).isNotNull();
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
+        assertThat(attempt.lastAttemptExecutionId()).as("자동 turn 의 실행 줄").isEqualTo(answer.executionId());
+        assertThat(attempt.lastAttemptNoticeMessageId()).as("알림 줄").isEqualTo(notice.id());
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
+        assertThat(attempt.lastAttemptFinishedAt()).isNotNull();
     }
 
 
@@ -236,10 +224,10 @@ class ResultDeliveryRecordTest {
         finished(done);
         awaitIdle(conversation.id());
 
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(attempt.errorCode()).isEqualTo("HERMES_RUN_FAILED");
-        assertThat(attempt.finishedAt()).isNotNull();
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(attempt.lastAttemptErrorCode()).isEqualTo("HERMES_RUN_FAILED");
+        assertThat(attempt.lastAttemptFinishedAt()).isNotNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.FAILED);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
             .as("도착 알림 줄 저장은 그대로 남는다")
@@ -252,7 +240,7 @@ class ResultDeliveryRecordTest {
 
         assertThat(stub().received()).as("다시 깨워도 대역 Hermes 제출 수").hasSize(1);
         assertThat(deliveries.findAll()).hasSize(1);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(onlyDelivery().attemptCount()).isEqualTo(1);
     }
 
 
@@ -268,12 +256,12 @@ class ResultDeliveryRecordTest {
         finished(done);
         awaitIdle(conversation.id());
 
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(attempt.executionId()).isNull();
-        assertThat(attempt.errorCode()).isEqualTo("INTERNAL_ERROR");
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(attempt.lastAttemptExecutionId()).isNull();
+        assertThat(attempt.lastAttemptErrorCode()).isEqualTo("INTERNAL_ERROR");
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.FAILED);
-        assertThat(attempt.noticeMessageId())
+        assertThat(attempt.lastAttemptNoticeMessageId())
             .as("남은 알림 줄")
             .isEqualTo(onlyMessage(MessageRole.SYSTEM).id());
         assertThat(stub().received()).isEmpty();
@@ -289,10 +277,10 @@ class ResultDeliveryRecordTest {
         finished(done);
         awaitIdle(conversation.id());
 
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.STOPPED);
-        assertThat(attempt.errorCode()).isNull();
-        assertThat(attempt.finishedAt()).isNotNull();
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.STOPPED);
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
+        assertThat(attempt.lastAttemptFinishedAt()).isNotNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.STOPPED);
     }
 
@@ -309,12 +297,12 @@ class ResultDeliveryRecordTest {
         finished(done);
         awaitIdle(conversation.id());
 
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.STOPPED);
-        assertThat(attempt.errorCode()).isNull();
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.STOPPED);
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.STOPPED);
-        assertThat(attempt.executionId()).isNotNull();
-        assertThat(executions.findById(attempt.executionId()).orElseThrow().status())
+        assertThat(attempt.lastAttemptExecutionId()).isNotNull();
+        assertThat(executions.findById(attempt.lastAttemptExecutionId()).orElseThrow().status())
             .isEqualTo(ExecutionStatus.CANCELLED);
     }
 
@@ -332,9 +320,9 @@ class ResultDeliveryRecordTest {
         awaitIdle(conversation.id());
 
         assertThat(onlyMessage(MessageRole.ASSISTANT).content()).isEqualTo("정리한 답");
-        ResultDeliveryAttempt attempt = onlyAttempt();
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
-        assertThat(attempt.executionId()).isNull();
+        ResultDelivery attempt = onlyDelivery();
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
+        assertThat(attempt.lastAttemptExecutionId()).isNull();
         assertThat(onlyDelivery().status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 
@@ -350,12 +338,12 @@ class ResultDeliveryRecordTest {
         awaitIdle(conversation.id());
 
         ResultDelivery delivery = onlyDelivery();
-        assertThat(deliveryItems.findByDeliveryIdOrderByIdAsc(delivery.id()))
-            .extracting(ResultDeliveryItem::source, ResultDeliveryItem::resultKey)
+        assertThat(recorder.itemsOf(delivery.id()))
+            .extracting(DeliveryItemRef::source, DeliveryItemRef::resultKey)
             .containsExactly(
                 tuple(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(done.id())),
                 tuple(TEST_SOURCE, key));
-        assertThat(onlyAttempt().noticeMessageId())
+        assertThat(delivery.lastAttemptNoticeMessageId())
             .as("마지막 알림 줄")
             .isEqualTo(messagesOf(MessageRole.SYSTEM).getLast().id());
         assertThat(testResults.undelivered(conversation.id())).as("전했다고 적힌다").isEmpty();
@@ -387,40 +375,42 @@ class ResultDeliveryRecordTest {
 
         assertThat(errors).isEmpty();
         assertThat(deliveries.findAll()).hasSize(1);
-        assertThat(attempts.findAll()).hasSize(1);
+        assertThat(onlyDelivery().attemptCount()).isEqualTo(1);
         assertThat(messagesOf(MessageRole.ASSISTANT)).hasSize(1);
         assertThat(stub().received()).hasSize(1);
     }
 
 
     @Test
-    @DisplayName("같은 결과를 두 묶음에 넣으려 하면 유일 제약으로 실패하고 그 트랜잭션이 되돌아간다")
-    void rejectsSameResultInTwoDeliveries() {
-        List<DeliveryItemRef> items = List.of(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, "4242"));
-        Instant now = Instant.now();
+    @DisplayName("결과를 읽은 뒤 다른 쪽이 먼저 전했으면 전달 표시가 바꾼 줄 수가 달라 알림 줄과 묶음과 전달 표시가 함께 되돌아간다")
+    void rollsBackWhenResultWasDeliveredElsewhere() {
+        AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
+        testResults.offerDeliveredElsewhere(
+            conversation.id(), new AutoTurnResult(UUID.randomUUID().toString(), "승인한 「메모」 실행이 끝났어요", "메모를 남겼다"));
 
-        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
-            recorder.open(conversation.id(), items, null, now);
-            recorder.open(conversation.id(), items, null, now);
-        }))
-            .isInstanceOf(DataIntegrityViolationException.class);
+        List<ChatEvent> published = new CopyOnWriteArrayList<>();
+        Runnable unsubscribe = hub.subscribe(conversation.id(), published::add);
 
-        assertThat(deliveries.findAll()).as("첫 묶음도 함께 되돌아간다").isEmpty();
-        assertThat(deliveryItems.findAll()).isEmpty();
-        assertThat(attempts.findAll()).isEmpty();
+        finished(done);
+        awaitIdle(conversation.id());
+        unsubscribe.run();
+
+        assertThat(published).as("예상된 경합이라 대화에 오류 사건을 내지 않는다")
+            .extracting(ChatEvent::type)
+            .doesNotContain("error");
+        assertThat(deliveries.findAll()).as("묶음").isEmpty();
+        assertThat(messagesOf(MessageRole.SYSTEM)).as("알림 줄").isEmpty();
+        assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
+            .as("같은 트랜잭션의 위임 결과 전달 표시도 되돌아간다")
+            .isNull();
+        assertThat(stub().received()).as("대역 Hermes 제출").isEmpty();
+        testResults.reset();
     }
 
 
     private ResultDelivery onlyDelivery() {
         List<ResultDelivery> rows = deliveries.findAll();
         assertThat(rows).as("전달 묶음").hasSize(1);
-        return rows.getFirst();
-    }
-
-
-    private ResultDeliveryAttempt onlyAttempt() {
-        List<ResultDeliveryAttempt> rows = attempts.findAll();
-        assertThat(rows).as("전달 시도").hasSize(1);
         return rows.getFirst();
     }
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -22,9 +23,8 @@ import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecovery;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.chat.delivery.domain.ResultDelivery;
-import com.bifos.assistant.chat.delivery.domain.ResultDeliveryAttempt;
-import com.bifos.assistant.chat.delivery.domain.ResultDeliveryItem;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryAttemptStatus;
 import com.bifos.assistant.chat.delivery.domain.type.DeliveryStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
@@ -33,8 +33,6 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryAttemptRepository;
-import com.bifos.assistant.chat.delivery.infra.ResultDeliveryItemRepository;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -89,10 +87,6 @@ class ResultDeliveryRecoveryTest {
     @Autowired
     HermesRunEventStream eventStream;
 
-    /** 시도 하나를 닫다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
-    @Autowired
-    ResultDeliveryAttemptRepository attempts;
-
     @Autowired
     ResultDeliveryRecorder recorder;
 
@@ -141,11 +135,9 @@ class ResultDeliveryRecoveryTest {
     @Autowired
     MemoryRepository memories;
 
+    /** 시도 하나를 닫다 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
     @Autowired
     ResultDeliveryRepository deliveries;
-
-    @Autowired
-    ResultDeliveryItemRepository deliveryItems;
 
     @Autowired
     HermesRunsClient hermes;
@@ -166,8 +158,6 @@ class ResultDeliveryRecoveryTest {
         // 이 문맥이 뜰 때 기동 훑기가 앞 검사들이 남긴 결과로 연 turn 이 있을 수 있다. 지우기 전에 끝나기를 기다린다.
         awaitAllIdle();
         stub().reset();
-        deliveryItems.deleteAll();
-        attempts.deleteAll();
         deliveries.deleteAll();
         artifactRows.deleteAll();
         PendingQueueFixtures.clearAll(jdbc);
@@ -196,15 +186,15 @@ class ResultDeliveryRecoveryTest {
     @Test
     @DisplayName("실행 줄 없이 남은 시도는 FAILED 와 INTERRUPTED 로 닫히고 묶음도 FAILED 가 된다")
     void closesLeftoverWithoutExecutionAsInterrupted() {
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, null);
+        ResultDelivery left = leftover(conversation, BEFORE_START, null);
 
         int closed = recorder.closeLeftovers(STARTED_AT);
 
         assertThat(closed).as("닫은 시도 수").isEqualTo(1);
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(attempt.errorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
-        assertThat(attempt.finishedAt()).as("닫은 시각").isNotNull();
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(attempt.lastAttemptErrorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
+        assertThat(attempt.lastAttemptFinishedAt()).as("닫은 시각").isNotNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
@@ -212,18 +202,18 @@ class ResultDeliveryRecoveryTest {
     @Test
     @DisplayName("기준 시각과 같거나 뒤에 시작한 시도는 이 프로세스의 것이라 RUNNING 과 DELIVERING 으로 남는다")
     void keepsAttemptsStartedAtOrAfterStartup() {
-        ResultDeliveryAttempt atStart = leftover(conversation, STARTED_AT, null);
-        ResultDeliveryAttempt afterStart = leftover(conversation, AFTER_START, null);
+        ResultDelivery atStart = leftover(conversation, STARTED_AT, null);
+        ResultDelivery afterStart = leftover(conversation, AFTER_START, null);
 
         int closed = recorder.closeLeftovers(STARTED_AT);
 
         assertThat(closed).as("닫은 시도 수").isZero();
-        for (ResultDeliveryAttempt left : List.of(atStart, afterStart)) {
-            ResultDeliveryAttempt attempt = reload(left);
-            assertThat(attempt.status())
-                .as("%s 에 시작한 시도", attempt.startedAt())
+        for (ResultDelivery left : List.of(atStart, afterStart)) {
+            ResultDelivery attempt = reload(left);
+            assertThat(attempt.lastAttemptStatus())
+                .as("%s 에 시작한 시도", attempt.lastAttemptStartedAt())
                 .isEqualTo(DeliveryAttemptStatus.RUNNING);
-            assertThat(attempt.finishedAt()).isNull();
+            assertThat(attempt.lastAttemptFinishedAt()).isNull();
             assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERING);
         }
     }
@@ -233,15 +223,15 @@ class ResultDeliveryRecoveryTest {
     @DisplayName("실행 줄은 성공으로 끝났는데 시도가 남았으면 시도는 SUCCEEDED, 묶음은 DELIVERED 로 닫힌다")
     void closesLeftoverOfSucceededExecutionAsSucceeded() {
         AgentExecution parent = chatTurn(ExecutionStatus.SUCCEEDED);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, parent.id());
+        ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
 
         int closed = recorder.closeLeftovers(STARTED_AT);
 
         assertThat(closed).isEqualTo(1);
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
-        assertThat(attempt.errorCode()).isNull();
-        assertThat(attempt.finishedAt()).isNotNull();
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
+        assertThat(attempt.lastAttemptFinishedAt()).isNotNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 
@@ -250,13 +240,13 @@ class ResultDeliveryRecoveryTest {
     @DisplayName("실행 줄이 취소로 끝났으면 시도와 묶음이 STOPPED 로 닫힌다")
     void closesLeftoverOfCancelledExecutionAsStopped() {
         AgentExecution parent = chatTurn(ExecutionStatus.CANCELLED);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, parent.id());
+        ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
 
         recorder.closeLeftovers(STARTED_AT);
 
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.STOPPED);
-        assertThat(attempt.errorCode()).isNull();
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.STOPPED);
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.STOPPED);
     }
 
@@ -265,14 +255,14 @@ class ResultDeliveryRecoveryTest {
     @DisplayName("이은 실행 줄이 지워졌으면 FAILED 와 INTERRUPTED 로 닫힌다")
     void closesLeftoverOfDeletedExecutionAsInterrupted() {
         AgentExecution parent = chatTurn(ExecutionStatus.SUCCEEDED);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, parent.id());
+        ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
         executions.deleteById(parent.id());
 
         recorder.closeLeftovers(STARTED_AT);
 
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(attempt.errorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(attempt.lastAttemptErrorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
@@ -281,21 +271,21 @@ class ResultDeliveryRecoveryTest {
     @DisplayName("실행 줄이 아직 돌면 기동 때 건너뛰고, 기동 정리가 실패로 정할 때 시도가 그 오류 코드로 닫힌다")
     void leavesRunningExecutionToRestartReconcileAndClosesWhenItFails() {
         AgentExecution parent = chatTurn(ExecutionStatus.RUNNING);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, parent.id());
+        ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
 
         int closed = recorder.closeLeftovers(STARTED_AT);
 
         assertThat(closed).as("도는 실행 줄의 시도는 건너뛴다").isZero();
-        assertThat(reload(left).status()).isEqualTo(DeliveryAttemptStatus.RUNNING);
+        assertThat(reload(left).lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.RUNNING);
         assertThat(deliveryOf(left).status()).isEqualTo(DeliveryStatus.DELIVERING);
 
         boolean written = recovered.failWithout(parent.id(), "REMOTE_RUN_LOST");
 
         assertThat(written).as("RUNNING 줄을 적었다").isTrue();
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(attempt.errorCode()).isEqualTo("REMOTE_RUN_LOST");
-        assertThat(attempt.finishedAt()).isNotNull();
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(attempt.lastAttemptErrorCode()).isEqualTo("REMOTE_RUN_LOST");
+        assertThat(attempt.lastAttemptFinishedAt()).isNotNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
@@ -304,7 +294,7 @@ class ResultDeliveryRecoveryTest {
     @DisplayName("기동 정리가 성공으로 정하면 실행 줄과 답과 함께 시도는 SUCCEEDED, 묶음은 DELIVERED 로 닫힌다")
     void closesAttemptWhenRestartReconcileSettlesSucceeded() {
         AgentExecution parent = chatTurn(ExecutionStatus.RUNNING);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, parent.id());
+        ResultDelivery left = leftover(conversation, BEFORE_START, parent.id());
 
         boolean written = recovered.settle(parent.id(), result("completed", "다시 붙어 받은 답"));
 
@@ -314,9 +304,9 @@ class ResultDeliveryRecoveryTest {
             .filteredOn(message -> message.role() == MessageRole.ASSISTANT)
             .extracting(ChatMessage::content, ChatMessage::executionId)
             .containsExactly(tuple("다시 붙어 받은 답", parent.id()));
-        ResultDeliveryAttempt attempt = reload(left);
-        assertThat(attempt.status()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
-        assertThat(attempt.errorCode()).isNull();
+        ResultDelivery attempt = reload(left);
+        assertThat(attempt.lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.SUCCEEDED);
+        assertThat(attempt.lastAttemptErrorCode()).isNull();
         assertThat(deliveryOf(attempt).status()).isEqualTo(DeliveryStatus.DELIVERED);
     }
 
@@ -327,9 +317,7 @@ class ResultDeliveryRecoveryTest {
         AgentExecution root = chatTurn(ExecutionStatus.SUCCEEDED);
         AgentExecution child = delegated(conversation, root);
         deliveryWriter.markResultDelivered(child.id(), BEFORE_START);
-        ResultDeliveryAttempt left = leftover(conversation, BEFORE_START, null);
-        deliveryItems.save(ResultDeliveryItem.of(
-            left.deliveryId(), ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(child.id())));
+        ResultDelivery left = leftover(conversation, BEFORE_START, null, String.valueOf(child.id()));
 
         recorder.closeLeftovers(STARTED_AT);
         dispatcher.dispatchAfterStartup();
@@ -353,15 +341,15 @@ class ResultDeliveryRecoveryTest {
     @Test
     @DisplayName("기동 이벤트에서 빈을 만든 시각 전에 시작한 시도만 닫는다")
     void closesOnlyAttemptsStartedBeforeBeanCreationOnStartup() {
-        ResultDeliveryAttempt before = leftover(conversation, BEFORE_START, null);
-        ResultDeliveryAttempt after = leftover(conversation, AFTER_START, null);
+        ResultDelivery before = leftover(conversation, BEFORE_START, null);
+        ResultDelivery after = leftover(conversation, AFTER_START, null);
         ResultDeliveryRecovery recovery = new ResultDeliveryRecovery(recorder, Clock.fixed(STARTED_AT, ZoneOffset.UTC));
 
         recovery.closeAfterStartup();
 
-        assertThat(reload(before).status()).isEqualTo(DeliveryAttemptStatus.FAILED);
-        assertThat(reload(before).errorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
-        assertThat(reload(after).status()).isEqualTo(DeliveryAttemptStatus.RUNNING);
+        assertThat(reload(before).lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(reload(before).lastAttemptErrorCode()).isEqualTo(ResultDeliveryRecorder.INTERRUPTED);
+        assertThat(reload(after).lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.RUNNING);
     }
 
 
@@ -379,38 +367,47 @@ class ResultDeliveryRecoveryTest {
     @Test
     @DisplayName("한 시도를 닫다 실패해도 나머지 시도는 닫고 닫은 수만 센다")
     void continuesWithNextAttemptWhenOneFails() {
-        ResultDeliveryAttempt broken = leftover(conversation, BEFORE_START, null);
-        ResultDeliveryAttempt fine = leftover(conversation, BEFORE_START, null);
-        doThrow(new IllegalStateException("시도를 닫지 못했다")).when(attempts).finish(eq(broken.id()), any(), any(), any());
+        ResultDelivery broken = leftover(conversation, BEFORE_START, null);
+        ResultDelivery fine = leftover(conversation, BEFORE_START, null);
+        doThrow(new IllegalStateException("시도를 닫지 못했다"))
+            .when(deliveries)
+            .finishAttempt(eq(broken.id()), anyInt(), any(), any(), any(), any());
 
         int closed = recorder.closeLeftovers(STARTED_AT);
 
         assertThat(closed).as("닫은 시도 수").isEqualTo(1);
-        assertThat(reload(broken).status()).isEqualTo(DeliveryAttemptStatus.RUNNING);
+        assertThat(reload(broken).lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.RUNNING);
         assertThat(deliveryOf(broken).status()).as("되돌아간 묶음").isEqualTo(DeliveryStatus.DELIVERING);
-        assertThat(reload(fine).status()).isEqualTo(DeliveryAttemptStatus.FAILED);
+        assertThat(reload(fine).lastAttemptStatus()).isEqualTo(DeliveryAttemptStatus.FAILED);
         assertThat(deliveryOf(fine).status()).isEqualTo(DeliveryStatus.FAILED);
     }
 
 
-    /** 이전 프로세스가 남긴 것처럼 도는 중인 묶음과 첫 시도를 만든다. 실행 번호가 있으면 시도에 잇는다. */
-    private ResultDeliveryAttempt leftover(Conversation owner, Instant startedAt, Long executionId) {
-        ResultDelivery delivery = deliveries.save(ResultDelivery.opened(owner.id(), startedAt));
-        ResultDeliveryAttempt attempt = attempts.save(ResultDeliveryAttempt.started(delivery.id(), 1, null, startedAt));
+    /** 이전 프로세스가 남긴 것처럼 첫 시도가 도는 중인 묶음을 만든다. 실행 번호가 있으면 시도에 잇는다. */
+    private ResultDelivery leftover(Conversation owner, Instant startedAt, Long executionId) {
+        return leftover(owner, startedAt, executionId, "4242");
+    }
+
+
+    /** {@link #leftover(Conversation, Instant, Long)} 와 같고 위임 결과 하나를 항목으로 둔다. */
+    private ResultDelivery leftover(Conversation owner, Instant startedAt, Long executionId, String delegationKey) {
+        String itemsJson = "{\"version\":1,\"items\":[{\"source\":\"" + ResultDeliveryRecorder.DELEGATION_SOURCE
+            + "\",\"resultKey\":\"" + delegationKey + "\"}]}";
+        ResultDelivery delivery = deliveries.save(ResultDelivery.opened(owner.id(), itemsJson, null, startedAt));
         if (executionId != null) {
-            recorder.attachExecution(attempt.id(), executionId);
+            recorder.attachExecution(new DeliveryAttemptRef(delivery.id(), 1), executionId);
         }
-        return attempt;
+        return delivery;
     }
 
 
-    private ResultDeliveryAttempt reload(ResultDeliveryAttempt attempt) {
-        return attempts.findById(attempt.id()).orElseThrow();
+    private ResultDelivery reload(ResultDelivery delivery) {
+        return deliveries.findById(delivery.id()).orElseThrow();
     }
 
 
-    private ResultDelivery deliveryOf(ResultDeliveryAttempt attempt) {
-        return deliveries.findById(attempt.deliveryId()).orElseThrow();
+    private ResultDelivery deliveryOf(ResultDelivery delivery) {
+        return reload(delivery);
     }
 
 

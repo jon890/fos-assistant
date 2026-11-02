@@ -178,11 +178,13 @@ public class ConnectorActionDetails {
     }
 
 
-    /** 대화에 전했다고 적는다. 이미 전한 줄은 건드리지 않는다. 부르는 쪽의 트랜잭션에 함께 묶인다. */
-    public void markDelivered(List<UUID> actionIds, Instant now) {
-        if (!actionIds.isEmpty()) {
-            actions.markDelivered(actionIds, now);
-        }
+    /**
+     * 대화에 전했다고 적는다. 이미 전한 줄은 건드리지 않는다. 부르는 쪽의 트랜잭션에 함께 묶인다.
+     *
+     * @return 적은 줄 수. 이미 전한 줄은 세지 않는다
+     */
+    public int markDelivered(List<UUID> actionIds, Instant now) {
+        return actionIds.isEmpty() ? 0 : actions.markDelivered(actionIds, now);
     }
 
 

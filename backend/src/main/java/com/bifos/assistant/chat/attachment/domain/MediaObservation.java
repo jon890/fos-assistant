@@ -84,12 +84,12 @@ public class MediaObservation {
     @Column(name = "model_version", length = 128)
     private String modelVersion;
 
-    /** 이 revision 을 만든 저장 요청의 UUID 다. 같은 첨부 안에서 유일하다. 새 줄은 늘 채우고, 칸은 직전 이미지와 함께 쓰려고 NULL 을 허용한다. */
-    @Column(name = "request_id", columnDefinition = "CHAR(36)")
+    /** 이 revision 을 만든 저장 요청의 UUID 다. 같은 첨부 안에서 유일하다. 새 줄은 늘 채운다. */
+    @Column(name = "request_id", nullable = false, columnDefinition = "CHAR(36)")
     private String requestId;
 
     /** 그 요청 내용의 hash 다. 같은 UUID 재시도의 내용이 같은지 본다. */
-    @Column(name = "request_hash", columnDefinition = "CHAR(64)")
+    @Column(name = "request_hash", nullable = false, columnDefinition = "CHAR(64)")
     private String requestHash;
 
     @Column(columnDefinition = "LONGTEXT")
