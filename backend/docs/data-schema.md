@@ -193,7 +193,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 아직 보내지 않은 대기 메시지(`chat_pending_message`)는 지운 대화에 보낼 곳이 없어 지운다.
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다. 「참고한 기억」 단추 사건은 그 대화의 것만 지우고 넓히지 않는다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
-그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
+그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행의 답 본문과 질문 메시지 번호, 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
 승인 줄과 금융 실행 원장의 본문도 지우되 열린 줄과 당일 금융 합계가 읽는 성공 줄은 본문 삭제를 미룬다.
 이미 purge한 대화도 주기적으로 다시 찾아 지울 수 있는 승인 본문을 정리하므로 `purged_at`과 승인 본문 삭제 시각은 다를 수 있다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
@@ -554,13 +554,9 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 ### execution_question
 
-사람이 보낸 대화 turn 의 실행과 그 질문 메시지를 잇는다. 한 실행이 한 줄이다.
-`memory_remember` 가 바로 저장할 수 있는 실행인지 이 줄로 판정한다([ADR-20261007 / memory-remember](../../docs/adr/ADR-20261007-memory-remember.md)).
-
-- 새 질문과 다시 생성의 실행에만 남긴다. 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 줄이 없다
-- 외래 키를 걸지 않는다. 읽는 쪽(`TurnQuestions`)은 메시지가 없거나, `USER` 가 아니거나, 그 실행의 사용자가 보낸 것이 아니면 없는 줄로 본다
-- 줄을 남기지 못해도 turn 은 잇는다. 그 실행의 `memory_remember` 는 제안으로만 남는다
-- 질문 줄이 없는 루트 실행이 대화에 하나라도 있으면 그 대화의 `memory_remember` 는 그 뒤로 늘 제안으로 남는다. 판정은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「바로 저장 판정」 과 [ADR-20261008 / memory-remember-guard](../../docs/adr/ADR-20261008-memory-remember-guard.md) 가 갖는다
+**코드가 더는 읽고 쓰지 않는 옛 테이블이다.** 사람이 보낸 turn 의 질문 메시지는 `agent_execution.question_message_id` 로 옮겼다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
+이 테이블의 줄은 배포를 확인한 뒤 DROP PR 이 지운다. 그 전에 옛 이미지가 쓴 줄을 `agent_execution` 으로 다시 옮기되, 이미 정리한 대화(`conversation.purged_at` 이 있는)의 실행은 옮기지 않고 그 실행의 `question_message_id` 를 비운다. 직전 이미지로 되돌린 동안 옛 코드가 정리한 대화에 백필 값이 남아 있을 수 있어서다.
+질문 메시지를 읽는 판정은 [`agent_execution`](#agent_execution) 의 `question_message_id` 설명이 갖는다.
 
 ## 실행 표
 
@@ -582,6 +578,15 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 **`result_delivered_at` 은 위임 실행의 끝난 결과를 부모에게 전한 시각이다.** 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 부모 대화를 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 부모가 번호를 모르는 결과를 다시 전하지 않으려고, 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「끝날 때」).
 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`).
+
+**`question_message_id` 는 사람이 보낸 turn 의 질문 메시지 번호다.** 새 질문과 다시 생성의 실행에만 있고, 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 비어 있다.
+`memory_remember` 가 바로 저장할 수 있는 실행인지 이 칸으로 판정한다([ADR-20261007 / memory-remember](../../docs/adr/ADR-20261007-memory-remember.md)).
+
+- 비어 있을 때만 `ExecutionQuestionRepository` 의 조건부 update 로 채우고 엔티티 저장에서는 빠진다(`updatable = false`). 칸을 채우지 못해도 turn 은 잇고, 그 실행의 `memory_remember` 는 제안으로만 남는다
+- 외래 키를 걸지 않는다. 읽는 쪽(`TurnQuestions`)은 메시지가 없거나, `USER` 가 아니거나, 그 실행의 사용자가 보낸 것이 아니면 없는 것으로 본다
+- 질문이 없는 루트 실행이 대화에 하나라도 있으면 그 대화의 `memory_remember` 는 그 뒤로 늘 제안으로 남는다. 판정은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「바로 저장 판정」 과 [ADR-20261008 / memory-remember-guard](../../docs/adr/ADR-20261008-memory-remember-guard.md) 가 갖는다
+- 대화를 정리하면 이 칸을 비운다. 값은 번호뿐이지만 정리한 대화의 메시지를 가리키지 않게 한다
+- 이 칸이 생기기 전의 줄은 마이그레이션이 `execution_question` 에서 옮겼다. 옛 이미지가 쓴 줄은 DROP PR 이 다시 옮긴다. 새 칸은 직전 이미지가 쓰는 줄 때문에 NULL 을 허용한다
 
 토큰 수는 실행 한 번의 **합계**다. 자식 실행의 토큰은 부모의 합계에 들어 있지 않다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「자식 session 으로 결과와 토큰을 보완한다」).
 그래서 부모와 자식을 더한 합계는 실행 트리의 줄과, 실행 줄이 없는 native 자식의 `subagent_usage_job` 줄을 더해 만든다. 어느 줄도 두 번 세지 않는다.

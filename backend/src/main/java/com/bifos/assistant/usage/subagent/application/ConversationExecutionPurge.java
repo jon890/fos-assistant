@@ -4,6 +4,7 @@ import com.bifos.assistant.usage.execution.domain.ExecutionSessionRef;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.usage.subagent.infra.SubagentUsageJobRepository;
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +24,7 @@ public class ConversationExecutionPurge {
 
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
+    private final ExecutionQuestionRepository questions;
     private final SubagentUsageJobRepository usageJobs;
 
 
@@ -48,10 +50,13 @@ public class ConversationExecutionPurge {
     }
 
 
-    /** 답 본문과 사건의 {@code detail} 을 비운다. 대화 줄을 잠근 부르는 쪽의 트랜잭션 안에서만 돈다. */
+    /**
+     * 답 본문과 사건의 {@code detail} 을 비우고 질문 메시지와의 연결을 끊는다. 대화 줄을 잠근 부르는 쪽의 트랜잭션 안에서만 돈다.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public void eraseBodies(Long conversationId) {
         executions.clearOutputsOf(conversationId);
+        questions.clearOf(conversationId);
         events.clearDetailsOf(conversationId);
     }
 }

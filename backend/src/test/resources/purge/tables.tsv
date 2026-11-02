@@ -3,7 +3,7 @@
 # KEEP는 근거가 있는 보존이고 GAP는 사용자 결정 전의 알려진 공백이다.
 agent|AGENT|id|DELETE|KEEP|DELETE|owner_user_id로 사용자에 속한다. 지연 정리는 에이전트 행을 지운다. 표 하나에 기대값 하나라 user 칸은 fixture 의 비공개 에이전트 기준이다. 그룹 공개 에이전트는 지우지 않고 관리자에게 넘기며 UserPurgerTest 가 확인한다.
 agent_connector_binding|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. ConnectorAgentPurge가 지운다.
-agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text만 비운다.
+agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text를 비우며 질문 메시지 번호(question_message_id)를 끊는다.
 agent_memory_collection|AGENT|agent_id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.
 agent_memory_collection_change|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. 변경 이력도 지연 정리에서 지운다.
 agent_token|AGENT|id|KEEP|KEEP|KEEP|profile_name으로 profile에 속한다. 운영 등록 profile은 에이전트 삭제 후에도 남기는 계약이다.
@@ -30,7 +30,7 @@ conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 �
 decision_feedback_event|CONVERSATION|id|DELETE|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id FK를 NULL로 비운다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|SCRUB|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
-execution_question|CONVERSATION|execution_id|DELETE|DELETE|KEEP|execution_id와 message_id로 대화에 속한다. 대화 purge가 지운다.
+execution_question|CONVERSATION|execution_id|KEEP|KEEP|KEEP|코드가 읽고 쓰지 않는 옛 테이블이다. 질문은 agent_execution.question_message_id로 옮겼고 이 테이블은 번호 두 개만 담는다. 배포를 확인한 뒤 DROP PR이 지운다.
 execution_skill_use|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
 follow_up|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다. 먼저 살펴보기가 낸 제안 줄(dedupe_key가 있는 줄)은 대화 purge가 본문과 함께 지우고, 받아들인 줄은 제안 본문만 비운다.
 group_setting|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 설정이다. 모델 설정이 여기 있다.
