@@ -10,6 +10,8 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,10 +73,10 @@ class ContentDraftJobAssetMigrationTest {
                 SELECT action_id, job_id, job_status, job_created_at, approved_by, approved_at, last_checked_at, start_claimed_at,
                     save_claimed_at, job_stage, save_clicked, error_code, error_reason FROM content_draft_snapshot WHERE id = 1
                 """)).containsExactly(
-                    "31", "11111111-1111-4111-8111-111111111111", "UNKNOWN", "2026-11-01 01:02:03.123456", "1",
-                    "2026-11-01 01:03:00.000001", "2026-11-01 01:04:00.000000", "2026-11-01 01:05:00.000000",
-                    "2026-11-01 01:06:00.000000", "saving",
-                    "true", "CONTENT_DRAFT_JOB_EXPIRED", "title_cursor_covered");
+                "31", "11111111-1111-4111-8111-111111111111", "UNKNOWN", "2026-11-01 01:02:03.123456", "1",
+                "2026-11-01 01:03:00.000001", "2026-11-01 01:04:00.000000", "2026-11-01 01:05:00.000000",
+                "2026-11-01 01:06:00.000000", "saving",
+                "true", "CONTENT_DRAFT_JOB_EXPIRED", "title_cursor_covered");
             assertThat(row(statement, "SELECT action_id, job_status, save_clicked FROM content_draft_snapshot WHERE id = 2"))
                 .as("저장 요청 전 snapshot 은 job 칸이 비어 있다")
                 .containsOnlyNulls().hasSize(3);
@@ -157,8 +159,8 @@ class ContentDraftJobAssetMigrationTest {
                 values.add(switch (value) {
                     case null -> null;
                     case Boolean flag -> flag.toString();
-                    case java.sql.Timestamp at -> MICROS.format(at.toLocalDateTime());
-                    case java.time.LocalDateTime at -> MICROS.format(at);
+                    case Timestamp at -> MICROS.format(at.toLocalDateTime());
+                    case LocalDateTime at -> MICROS.format(at);
                     default -> value.toString();
                 });
             }
