@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
+import com.bifos.assistant.chat.delivery.domain.ResultAlreadyDeliveredException;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
@@ -214,6 +215,10 @@ public class DelegationWakeService {
             pending = undeliveredMarks(conversationId);
             chat.runDelegationResults(owner, conversationId, handle, event -> hub.publish(conversationId, event));
             lastFailures.remove(conversationId);
+        } catch (ResultAlreadyDeliveredException ex) {
+            // 다른 쪽이 먼저 전한 예상된 경합이다. 쓰기는 모두 되돌아갔고 아직 낸 사건이 없어 오류 사건을 내지 않는다.
+            log.warn("자동 turn 을 열기 전에 다른 쪽이 결과를 먼저 전했다 conversationId={} {}", conversationId, ex.getMessage());
+            rememberFailureIfUndelivered(conversationId, pending);
         } catch (ApiException ex) {
             log.warn("자동 turn 이 실패했다 conversationId={} code={}", conversationId, ex.code(), ex);
             rememberFailureIfUndelivered(conversationId, pending);
