@@ -10,6 +10,7 @@ import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.domain.PendingMessages;
+import com.bifos.assistant.chat.conversation.domain.UnreadablePendingMessagesException;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -160,7 +161,7 @@ public class NextTurnDispatcher {
     private boolean tryPendingOrSkipUnreadable(Long conversationId) {
         try {
             return tryPending(conversationId);
-        } catch (IllegalStateException ex) {
+        } catch (UnreadablePendingMessagesException ex) {
             log.warn("대기 줄을 읽지 못해 보내지 않는다 conversationId={}", conversationId, ex);
             return false;
         }

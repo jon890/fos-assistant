@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.conversation.application;
 
 import com.bifos.assistant.chat.conversation.domain.PendingMessage;
 import com.bifos.assistant.chat.conversation.domain.PendingMessages;
+import com.bifos.assistant.chat.conversation.domain.UnreadablePendingMessagesException;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -101,7 +102,7 @@ public class PendingMessageStore {
     private boolean readyToSend(Long conversationId) {
         try {
             return read(conversationId).sendable();
-        } catch (IllegalStateException ex) {
+        } catch (UnreadablePendingMessagesException ex) {
             log.warn("대기 줄을 읽지 못해 보내지 않는다 conversationId={}", conversationId, ex);
             return false;
         }
@@ -125,24 +126,24 @@ public class PendingMessageStore {
      *
      * <p>깨진 값을 빈 줄로 보지 않는다. 빈 줄로 보면 사용자가 멈춰 둔 글이 사라진 것처럼 보이고, 다음 저장이 그 글을 지운다.
      *
-     * @throws IllegalStateException 모르는 버전이거나 형식이 깨졌을 때
+     * @throws UnreadablePendingMessagesException 모르는 버전이거나 형식이 깨졌을 때
      */
     public static PendingMessages decode(String value) {
         Stored stored;
         try {
             stored = JSON.readValue(value, Stored.class);
         } catch (JacksonException ex) {
-            throw new IllegalStateException("stored pending messages are not readable", ex);
+            throw new UnreadablePendingMessagesException("stored pending messages are not readable", ex);
         }
         if (stored == null) {
-            throw new IllegalStateException("stored pending messages are empty");
+            throw new UnreadablePendingMessagesException("stored pending messages are empty");
         }
         if (stored.version() == null || stored.version() != VERSION) {
-            throw new IllegalStateException("stored pending messages have an unknown version");
+            throw new UnreadablePendingMessagesException("stored pending messages have an unknown version");
         }
         if (stored.held() == null || stored.items() == null || stored.items().isEmpty()
             || stored.items().stream().anyMatch(StoredItem::incomplete)) {
-            throw new IllegalStateException("stored pending messages are incomplete");
+            throw new UnreadablePendingMessagesException("stored pending messages are incomplete");
         }
         try {
             List<PendingMessage> items = stored.items().stream()
@@ -150,7 +151,7 @@ public class PendingMessageStore {
                 .toList();
             return new PendingMessages(stored.held(), items);
         } catch (DateTimeParseException ex) {
-            throw new IllegalStateException("stored pending messages have an unreadable time", ex);
+            throw new UnreadablePendingMessagesException("stored pending messages have an unreadable time", ex);
         }
     }
 

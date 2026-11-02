@@ -7,6 +7,7 @@ import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.PendingMessage;
 import com.bifos.assistant.chat.conversation.domain.PendingMessages;
+import com.bifos.assistant.chat.conversation.domain.UnreadablePendingMessagesException;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.time.Instant;
@@ -161,7 +162,7 @@ class PendingMessageStoreTest {
         jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", "{\"version\":2}", conversation);
         queue(otherConversation, "남의 글");
 
-        assertThatThrownBy(() -> pendingMessages.read(conversation)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> pendingMessages.read(conversation)).isInstanceOf(UnreadablePendingMessagesException.class);
         assertThat(readyToSend()).containsExactly(otherConversation);
     }
 
