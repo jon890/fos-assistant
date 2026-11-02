@@ -474,7 +474,7 @@ owner_user_id는 저장 당시 주인으로 필수이며 현재 대화 주인과
 body_key_id는 기존 본문 암호화와 같이 FK를 두지 않는다.
 관찰의 물리 삭제만으로 참조를 지우지 않으며, 조회와 정리가 사라진 참조를 STALE로 만든다.
 본문을 지운 뒤에도 암호화한 blocks를 읽지 않고 `assets_json`으로 참조 정리를 할 수 있다.
-첨부 하나를 지울 때는 그 대화의 VALID revision 을 읽어 그 첨부를 가리키는 줄만 무효화하고, 정기 정리는 VALID revision 의 참조를 서비스가 확인한다.
+첨부 하나를 지울 때는 그 대화의 VALID revision 을 읽어 그 첨부를 가리키는 줄과 `assets_json` 이 NULL 이라 참조를 확인할 수 없는 줄을 무효화하고, 정기 정리는 VALID revision 의 참조를 서비스가 확인한다.
 
 status는 VALID・STALE・EXPIRED 세 값이고 CHECK로 다른 값을 거절한다.
 CHECK는 VALID이면 body・body_key_id 모두 비NULL, STALE 또는 EXPIRED이면 둘 다 NULL임을 강제한다.
