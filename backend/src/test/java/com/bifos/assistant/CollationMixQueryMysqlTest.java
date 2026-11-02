@@ -2,6 +2,7 @@ package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.attachment.application.AttachmentCleaner;
 import com.bifos.assistant.chat.contentdraft.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.attachment.application.MediaObservationCleaner;
@@ -81,6 +82,10 @@ class CollationMixQueryMysqlTest {
 
     @MockitoBean
     private ConnectorActionBodyBackfill connectorActionBodyBackfill;
+
+    /** V57에는 대화의 대기 줄 칸이 없으므로 기동 뒤 대기 메시지 보내기의 읽기는 실행하지 않는다. */
+    @MockitoBean
+    private PendingMessageStore pendingMessageStore;
 
 
     @DynamicPropertySource

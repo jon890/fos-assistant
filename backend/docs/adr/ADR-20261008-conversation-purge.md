@@ -15,7 +15,7 @@
 | Hermes session | 그 대화의 실행이 보낸 session 과 대화의 두 session 칸(`hermes_session_id`, `hermes_root_session_id`)을 `DELETE /api/sessions/{id}` 로 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다. 404 는 이미 지운 것으로 본다 |
 | 첨부 | 파일과 `chat_attachment` 행을 지운다 |
 | 결과물 | 대화의 결과물 폴더를 통째로 지우고 `chat_artifact` 행을 지운다 |
-| 메시지 | `chat_message`, `chat_pending_message` 행을 지운다 |
+| 메시지 | `chat_message` 행을 지우고 대화 줄의 대기 줄(`pending_messages`)을 비운다 |
 | 실행 기록 | `agent_execution.output_text` 와 질문 메시지 번호(`question_message_id`), `execution_event.detail` 만 비운다. 실행 줄, 사건 줄, 토큰, 금액은 남긴다 |
 | 대화 줄 | 남긴다. 제목과 두 session 칸을 비우고 `purged_at` 을 적는다 |
 

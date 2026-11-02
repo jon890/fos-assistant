@@ -34,8 +34,8 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 64, '0')), UNHEX(LPAD(HEX(90000000
 INSERT INTO content_draft_snapshot (id, public_id, revision_id, owner_user_id, conversation_id, origin_execution_id, agent_id, connection_id, binding_id, connection_updated_at, binding_updated_at, policy_fingerprint, schema_version, compiler_version, payload_fingerprint, snapshot_hash, authorization_fingerprint, created_at, expires_at, action_id, job_status, job_created_at, save_clicked)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 1, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2099-01-01 00:00:00', 900000001, 'PREVIEW_READY', '2020-01-01 00:00:00', 1);
 
-INSERT INTO conversation (id, user_id, agent_id, hermes_session_id, title, created_at, updated_at, public_id, hermes_root_session_id, auto_turn_count, purpose)
-VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', UNHEX(LPAD(HEX(900000001), 32, '0')), 'coverage-root-900000001', 1, 'CHAT');
+INSERT INTO conversation (id, user_id, agent_id, hermes_session_id, title, created_at, updated_at, public_id, hermes_root_session_id, auto_turn_count, purpose, pending_messages)
+VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', UNHEX(LPAD(HEX(900000001), 32, '0')), 'coverage-root-900000001', 1, 'CHAT', '{"version":1,"held":true,"items":[{"id":900000001,"content":"coverage-900000001","createdAt":"2020-01-01T00:00:00Z"}]}');
 
 INSERT INTO execution_context_source (execution_id, position, source, source_ref, body_mode, freshness, created_at)
 VALUES (900000001, 1, 'coverage-900000001', 'coverage-900000001', 'test', 'test', '2020-01-01 00:00:00');

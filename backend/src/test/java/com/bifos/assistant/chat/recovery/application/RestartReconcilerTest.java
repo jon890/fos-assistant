@@ -21,12 +21,12 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -64,6 +64,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 
 /**
@@ -144,7 +145,10 @@ class RestartReconcilerTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ChatPendingMessageRepository pendingMessages;
+    PendingMessageStore pendingMessages;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     ChatAttachmentRepository attachmentRows;
@@ -171,7 +175,7 @@ class RestartReconcilerTest {
     void setUp() {
         awaitAllIdle();
         stub.reset();
-        pendingMessages.deleteAll();
+        PendingQueueFixtures.clearAll(jdbc);
         executionEvents.deleteAll();
         executions.deleteAll();
         attachmentRows.deleteAll();
@@ -520,7 +524,7 @@ class RestartReconcilerTest {
     void userStopOnReattachedTurnCancelsAndHoldsPendingQueue() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
-        pendingMessages.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기다리는 글", false, Instant.now()));
+        PendingQueueFixtures.queue(pendingMessages, conversation.id(), "기다리는 글", false, Instant.now());
 
         reconciler.claim();
         reconciler.reconcile(LONG_WAIT);
@@ -532,8 +536,8 @@ class RestartReconcilerTest {
 
         awaitStatus(row, ExecutionStatus.CANCELLED);
         awaitIdle(conversation.id());
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
+            .extracting(PendingQueueFixtures.Row::content, PendingQueueFixtures.Row::held)
             .containsExactly(tuple("기다리는 글", true));
         assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
     }
@@ -544,7 +548,7 @@ class RestartReconcilerTest {
     void holdsPendingQueueWhenCancelledResultArrivesBeforeStopIsConfirmed() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
-        pendingMessages.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기다리는 글", false, Instant.now()));
+        PendingQueueFixtures.queue(pendingMessages, conversation.id(), "기다리는 글", false, Instant.now());
 
         reconciler.claim();
         reconciler.reconcile(LONG_WAIT);
@@ -558,8 +562,8 @@ class RestartReconcilerTest {
 
         awaitStatus(row, ExecutionStatus.CANCELLED);
         awaitIdle(conversation.id());
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
+            .extracting(PendingQueueFixtures.Row::content, PendingQueueFixtures.Row::held)
             .containsExactly(tuple("기다리는 글", true));
         assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
     }
@@ -577,8 +581,8 @@ class RestartReconcilerTest {
         pendingService.enqueue(dad, conversation.id(), "쌓인 글");
         awaitLookups(row, 2);
 
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-            .extracting(ChatPendingMessage::content)
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
+            .extracting(PendingQueueFixtures.Row::content)
             .containsExactly("쌓인 글");
         assertThat(stub.received()).as("잠금이 잡힌 동안에는 보내지 않는다").isEmpty();
 
@@ -596,7 +600,7 @@ class RestartReconcilerTest {
                 tuple(MessageRole.USER, "쌓인 글"),
                 tuple(MessageRole.ASSISTANT, "다음 답"));
         assertThat(stub.received()).as("새 실행이 한 번 제출됐다").hasSize(1);
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
             .isEmpty();
     }
 

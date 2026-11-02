@@ -17,11 +17,11 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.testsupport.PendingQueueFixtures;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -120,7 +120,7 @@ class ProactiveCheckLimitTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ChatPendingMessageRepository pendingMessages;
+    PendingMessageStore pendingMessages;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -195,7 +195,7 @@ class ProactiveCheckLimitTest {
             .toList());
         executions.deleteAll(ownExecutions);
         transactions.executeWithoutResult(status -> {
-            pendingMessages.deleteAllOf(conversation.id());
+            pendingMessages.clear(conversation.id());
             messages.deleteAll(messages.findByConversationIdOrderByIdAsc(conversation.id()));
             conversations.deleteById(conversation.id());
         });
@@ -251,8 +251,7 @@ class ProactiveCheckLimitTest {
         stub().beforeAwait(() -> {
             // 살펴보기 turn 이 도는 동안 사용자가 대기 메시지를 보낸다.
             if (queued.compareAndSet(false, true)) {
-                pendingMessages.save(
-                    ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
+                PendingQueueFixtures.queue(pendingMessages, conversation.id(), PENDING_TEXT, false, Instant.now());
             }
             await(stopReceived);
         });
@@ -269,7 +268,7 @@ class ProactiveCheckLimitTest {
         ProactiveCheck check = onlyCheck();
         assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
         assertThat(check.errorCode()).isEqualTo("CHECK_TOOL_LIMIT");
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
             .as("보낸 대기 줄은 남지 않는다")
             .isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
@@ -298,8 +297,7 @@ class ProactiveCheckLimitTest {
         assertThat(awaiting.await(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS))
             .as("살펴보기 turn 이 완료 대기에 들어섰다")
             .isTrue();
-        pendingMessages.save(
-            ChatPendingMessage.queued(conversation.id(), owner.id(), PENDING_TEXT, false, Instant.now()));
+        PendingQueueFixtures.queue(pendingMessages, conversation.id(), PENDING_TEXT, false, Instant.now());
         // POST /api/v1/executions/{executionId}/stop 이 부르는 자리다.
         chat.stop(owner, turns.markOf(conversation.id()).executionId());
         awaitIdle(conversation.id());
@@ -310,8 +308,8 @@ class ProactiveCheckLimitTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
             .extracting(ChatMessage::content)
             .containsExactly(START_NOTICE, USER_STOP_NOTICE);
-        assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+        assertThat(PendingQueueFixtures.rows(pendingMessages, conversation.id()))
+            .extracting(PendingQueueFixtures.Row::content, PendingQueueFixtures.Row::held)
             .containsExactly(tuple(PENDING_TEXT, true));
         assertThat(stub().received())
             .as("대기 메시지로 연 turn")
