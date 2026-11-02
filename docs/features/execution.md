@@ -123,7 +123,6 @@ Control Plane 이 응답에서 빼고, 화면도 받은 것을 그대로 그리�
 | `MESSAGE_NOT_LATEST`, `DELIVERY_NOT_FOUND`, `DELIVERY_NOT_RETRYABLE` | 이력을 다시 읽는다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 사용량 목록으로 되돌린다 |
-| `PROACTIVE_LOOP_UNAVAILABLE` | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다([`docs/features/proactive.md`](proactive.md) 의 「사용자 설정」) |
 | `PROACTIVE_CHECK_UNAVAILABLE` | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다([`docs/features/proactive.md`](proactive.md) 의 「시작 전 점검」) |
 
 **사용자가 보낸 요청이 `HERMES_BUSY` 나 `USER_BUSY` 를 받으면 Control Plane 은 다시 보내지 않는다.**
@@ -274,7 +273,7 @@ SSE 와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도
 
 | 자리의 종류 | 진입점 |
 | --- | --- |
-| turn 자리 | 보내기, 다시 생성, 결과 다시 전달, 스킬 커맨드, 대기 메시지 turn, 위임 결과와 플러그인 결과의 자동 turn, 먼저 살펴보기, 행동 정책의 자동 실행 |
+| turn 자리 | 보내기, 다시 생성, 결과 다시 전달, 스킬 커맨드, 대기 메시지 turn, 위임 결과와 플러그인 결과의 자동 turn, 먼저 살펴보기 |
 | turn 자리, 한도를 보지 않는다 | 기동 정리(`RestartReconciler`)가 다시 잡은 대화 turn |
 | 실행 줄 | 흐름의 Researcher, Engineer, Synthesizer, `agent_delegate` 로 맡긴 자식 |
 | 실행 줄, 백그라운드 | 추천 질문 |
@@ -309,7 +308,7 @@ Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, 
 세는 세 자리(turn 자리, 실행 줄, 원격 종료 확인 자리)와, 사용자 잠금 하나 안에서 판정하고 실행 줄을 커밋까지 끝내는 규칙은 [ADR-069](../adr/ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) 의 결정이 갖는다.
 
 실행 줄은 `RUNNING` 이고 대화 turn 의 루트 줄이 아닌 것만 센다. 그 turn 은 turn 자리로 이미 세었다.
-추천 질문과 시스템 판단 줄은 대화가 없어 루트 줄이어도 센다.
+추천 질문 줄과 옛 시스템 판단 줄은 대화가 없어 루트 줄이어도 센다.
 
 **부르는 쪽은 트랜잭션을 열지 않는다.**
 트랜잭션 안에서 부르면 잠금을 푼 뒤에 커밋되어 다른 스레드가 그 줄을 세지 못한다. `UserExecutionLimiter` 는 그 경우 예외를 던진다.

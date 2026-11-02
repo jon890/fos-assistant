@@ -30,10 +30,8 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopSetting;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopSettingRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MysqlCase;
@@ -89,9 +87,6 @@ class AgentPurgeWriterTest {
 
     @Autowired
     ConnectorActionRepository actions;
-
-    @Autowired
-    ProactiveLoopSettingRepository loopSettings;
 
     @Autowired
     ProactiveCheckRepository checks;
@@ -154,7 +149,6 @@ class AgentPurgeWriterTest {
         assertThat(countOf("agent_memory_collection_change", "agent_id")).isZero();
         assertThat(countOf("agent_toolset_request", "agent_id")).isZero();
         assertThat(countOf("agent_connector_binding", "agent_id")).isZero();
-        assertThat(countOf("proactive_loop_setting", "agent_id")).isZero();
         assertThat(countOf("proactive_check", "agent_id")).isZero();
         assertThat(actions.findById(attached.actionId()))
             .as("승인 이력은 남고 에이전트만 비운다")
@@ -256,7 +250,6 @@ class AgentPurgeWriterTest {
             "synthetic-hash",
             NOW));
 
-        loopSettings.saveAndFlush(ProactiveLoopSetting.of(owner.id(), agent.id(), true, null, NOW));
         ProactiveCheck check = checks.saveAndFlush(
             ProactiveCheck.started(owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, NOW));
 
@@ -277,7 +270,6 @@ class AgentPurgeWriterTest {
         assertThat(countOf("agent_memory_collection_change", "agent_id")).isEqualTo(1);
         assertThat(countOf("agent_toolset_request", "agent_id")).isEqualTo(1);
         assertThat(countOf("agent_connector_binding", "agent_id")).isEqualTo(1);
-        assertThat(countOf("proactive_loop_setting", "agent_id")).isEqualTo(1);
         assertThat(countOf("proactive_check", "agent_id")).isEqualTo(1);
         assertThat(countOf("connector_action", "agent_id")).isEqualTo(1);
     }

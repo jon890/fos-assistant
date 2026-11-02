@@ -85,7 +85,6 @@ from .profiles import (
     _check_profile_create,
     _check_skill_toggle,
     _check_skills_list,
-    _decision_readiness_response,
     _delete_check,
     _model_defaults_response,
     _profile_names,
@@ -131,7 +130,6 @@ TOOLS_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/tools$")
 PREPARE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/prepare$")
 SNAPSHOT_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/snapshot$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
-DECISION_READINESS_RE = re.compile(r"^/api/profiles/([^/]+)/decision-readiness$")
 # native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
 SESSION_PROVIDER_RE = re.compile(r"^/api/profiles/([^/]+)/sessions/([^/]+)/provider$")
 
@@ -291,13 +289,6 @@ def _install_gate() -> bool:
         snapshot = SNAPSHOT_ROUTE_RE.fullmatch(path) if method == "POST" else None
         if snapshot is not None:
             return await _connector_snapshot_request(request, snapshot.group(1))
-
-        decision_match = DECISION_READINESS_RE.match(path) if method == "GET" else None
-        if decision_match is not None:
-            principal, _ = seam.authenticate_token(request)
-            if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
-                return _rejected("Control Plane 토큰이 필요하다", 401)
-            return await asyncio.to_thread(_decision_readiness_response, decision_match.group(1))
 
         defaults_match = MODEL_DEFAULTS_RE.match(path) if method == "GET" else None
         if defaults_match is not None:

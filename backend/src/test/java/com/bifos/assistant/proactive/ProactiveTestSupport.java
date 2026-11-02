@@ -11,7 +11,6 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.conversation.application.CheckConversations;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient;
 import com.bifos.assistant.hermes.application.port.HermesSkillClient.HermesSkill;
@@ -20,14 +19,8 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.loop.domain.ProactiveLoopRun;
-import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.loop.domain.type.LoopSkippedReason;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
-import com.bifos.assistant.proactive.loop.infra.ProactiveLoopRunRepository;
-import com.bifos.assistant.proactive.loop.application.port.LoopScheduleSettings;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.TestClock;
@@ -45,16 +38,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 매일 루프 통합 검사가 함께 쓰는 준비와 정리다. 설치 설정은 검사 클래스 단위로만 바꿀 수 있어, 설정 조합마다 검사 클래스를 나누고 이 클래스를
+ * 깨우기와 제안 통합 검사가 함께 쓰는 준비와 정리다. 설치 설정은 검사 클래스 단위로만 바꿀 수 있어, 설정 조합마다 검사 클래스를 나누고 이 클래스를
  * 이어받는다.
  *
  * <p>매일 깨우기는 {@link ProactiveCheckService#startScheduled} 를 직접 부르고, 대역 Hermes 가 버전 3 결과 블록을 답한다. 깨운 뒤에는
- * {@link TrackingBackgroundTasks#awaitIdle} 로 루프까지 끝나기를 기다린다. 모든 값은 합성이다.
+ * {@link TrackingBackgroundTasks#awaitIdle} 로 백그라운드 작업이 끝나기를 기다린다. 모든 값은 합성이다.
  */
-abstract class ProactiveLoopTestSupport {
+abstract class ProactiveTestSupport {
 
     static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
     static final String CANDIDATE_KEY = "career:deadline-tomorrow";
@@ -80,19 +72,7 @@ abstract class ProactiveLoopTestSupport {
     AgentRepository agents;
 
     @Autowired
-    CheckConversations checkConversations;
-
-    @Autowired
     ProactiveCheckRepository checks;
-
-    @Autowired
-    ProactiveLoopRunRepository loopRuns;
-
-    @Autowired
-    LoopScheduleSettings loopSettings;
-
-    @Autowired
-    TransactionTemplate transactions;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -122,7 +102,6 @@ abstract class ProactiveLoopTestSupport {
     @AfterEach
     void tearDown() {
         for (Long userId : createdUsers) {
-            jdbc.update("DELETE FROM proactive_loop_run WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
             jdbc.update(
@@ -169,41 +148,7 @@ abstract class ProactiveLoopTestSupport {
     }
 
 
-    /** 설정(CHECK 작업)을 서비스를 거치지 않고 저장한다. 설치 설정이 꺼져 있어도 켜진 줄을 둘 수 있다. */
-    void saveSetting(CurrentUser user, Agent agent, boolean enabled, Instant snoozedUntil) {
-        transactions.executeWithoutResult(
-            status -> loopSettings.save(user.id(), agent.id(), enabled, snoozedUntil, clock.instant()));
-    }
-
-
-    /**
-     * 이번 깨우기와 다른 매일 깨우기 살펴보기와 그 시도 줄을 그 시각으로 저장한다. 하루 상한을 셀 앞선 시도다.
-     *
-     * @param at 앞선 시도를 저장한 시각
-     */
-    ProactiveLoopRun saveEarlierDecidedRun(CurrentUser user, Agent agent, Instant at) {
-        ProactiveLoopRun run = ProactiveLoopRun.running(user.id(), saveEarlierCheck(user, agent, at), at);
-        run.decided(null, at);
-        return loopRuns.save(run);
-    }
-
-
-    /** {@link #saveEarlierDecidedRun} 과 같되 평가하지 않고 건너뛴 앞선 시도다. */
-    ProactiveLoopRun saveEarlierSkippedRun(CurrentUser user, Agent agent, Instant at, LoopSkippedReason reason) {
-        return loopRuns.save(ProactiveLoopRun.skipped(user.id(), saveEarlierCheck(user, agent, at), reason, at));
-    }
-
-
-    /** 앞선 시도의 원천이 될 다른 매일 깨우기 살펴보기다. 보고가 없어 이번 깨우기를 막지 않는다. */
-    private Long saveEarlierCheck(CurrentUser user, Agent agent, Instant at) {
-        Long conversationId = checkConversations.findOrCreate(user, agent).conversation().id();
-        ProactiveCheck earlier = ProactiveCheck.started(user.id(), agent.id(), conversationId, CheckTrigger.SCHEDULED, false, at);
-        earlier.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, at);
-        return checks.save(earlier).id();
-    }
-
-
-    /** 매일 깨우기 한 번을 돌리고 루프까지 끝나기를 기다린다. 이번 살펴보기 번호를 돌려준다. */
+    /** 매일 깨우기 한 번을 돌리고 끝나기를 기다린다. 이번 살펴보기 번호를 돌려준다. */
     Long wake(CurrentUser user, Agent agent, String output) throws InterruptedException {
         stub().willAnswer(command -> answer(output));
         AtomicReference<Long> started = new AtomicReference<>();

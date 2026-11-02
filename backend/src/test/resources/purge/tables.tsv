@@ -51,7 +51,7 @@ proactive_check|AGENT|id|GAP|GAP|DELETE|user_id와 agent_id와 conversation_id F
 proactive_check_finding|AGENT|id|GAP|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 발견 제목과 출처가 남는다.
 proactive_check_problem|AGENT|id|GAP|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 문제 본문과 근거가 남는다.
 proactive_loop_run|AGENT|id|GAP|KEEP|DELETE|source_check_id FK로 점검에 속한다. 에이전트 purge가 cascade로 지운다.
-proactive_loop_setting|AGENT|id|GAP|KEEP|DELETE|agent_id와 user_id FK에 속한다. ProactiveAgentPurge가 지운다.
+proactive_loop_setting|AGENT|id|GAP|KEEP|DELETE|agent_id와 user_id FK에 속한다. 에이전트 purge가 cascade로 지운다.
 proactive_value_evaluation|AGENT|id|GAP|GAP|DELETE|check_id FK로 점검에 속한다. 알려진 공백: 대화 purge 뒤 evidence_json이 남는다.
 result_delivery|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태와 시도 횟수만 보존한다.
 result_delivery_attempt|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 시도 상태와 실행 참조만 남긴다.
