@@ -5,13 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.application.ToolsetVisibilityService;
-import com.bifos.assistant.agent.infra.ToolsetHiddenRepository;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.user.domain.GroupSetting;
+import com.bifos.assistant.user.domain.GroupSettingId;
+import com.bifos.assistant.user.infra.GroupSettingRepository;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +31,7 @@ class ToolsetVisibilityTest {
     ToolsetVisibilityService visibility;
 
     @Autowired
-    ToolsetHiddenRepository hidden;
+    GroupSettingRepository settings;
 
     @Autowired
     TransactionTemplate transactions;
@@ -39,7 +42,10 @@ class ToolsetVisibilityTest {
 
     @AfterEach
     void cleanUp() {
-        transactions.executeWithoutResult(status -> hidden.deleteByGroupId(GROUP_ID));
+        transactions.executeWithoutResult(status -> {
+            settings.deleteById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET));
+            settings.deleteById(new GroupSettingId(GROUP_ID + 1, GroupSetting.TOOLSET));
+        });
     }
 
 
@@ -71,5 +77,36 @@ class ToolsetVisibilityTest {
                 ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThat(visibility.hiddenFor(GROUP_ID)).containsExactly("spotify");
         verifyNoInteractions(toolsets);
+    }
+
+
+    @Test
+    @DisplayName("저장은 이름 순에 중복 없는 버전 1 JSON 한 줄로 남고 TOOLSET 줄만 쓴다")
+    void storesSortedDistinctNamesAsOneToolsetRow() {
+        visibility.save(admin, List.of("spotify", "discord", "spotify"));
+        GroupSetting row = settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET)).orElseThrow();
+        assertThat(row.settingValue()).isEqualTo("{\"version\":1,\"hidden\":[\"discord\",\"spotify\"]}");
+        assertThat(settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.MODEL))).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("모르는 버전이거나 형식이 깨진 값은 숨김이 없는 것으로 보지 않고 오류로 올린다")
+    void failsLoudlyOnUnreadableStoredValue() {
+        transactions.executeWithoutResult(status -> settings.save(GroupSetting.of(
+            GROUP_ID, GroupSetting.TOOLSET, "{\"version\":99,\"hidden\":[]}", Instant.parse("2026-11-02T00:00:00Z"))));
+        assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
+        transactions.executeWithoutResult(status -> settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET))
+            .orElseThrow()
+            .change("not json", Instant.parse("2026-11-02T00:00:00Z")));
+        assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
+        transactions.executeWithoutResult(status -> settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET))
+            .orElseThrow()
+            .change("{\"version\":1}", Instant.parse("2026-11-02T00:00:00Z")));
+        assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
+        transactions.executeWithoutResult(status -> settings.findById(new GroupSettingId(GROUP_ID, GroupSetting.TOOLSET))
+            .orElseThrow()
+            .change("null", Instant.parse("2026-11-02T00:00:00Z")));
+        assertThatThrownBy(() -> visibility.hiddenFor(GROUP_ID)).isInstanceOf(IllegalStateException.class);
     }
 }

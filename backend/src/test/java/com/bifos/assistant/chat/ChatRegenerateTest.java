@@ -24,7 +24,7 @@ import com.bifos.assistant.chat.attachment.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
-import com.bifos.assistant.chat.modelchoice.infra.GroupSettingRepository;
+import com.bifos.assistant.user.infra.GroupSettingRepository;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;

@@ -5,7 +5,7 @@
 
 ### 결정
 
-그룹이 숨긴 toolset 이름만 Control Plane의 `toolset_hidden` 표에 둔다.
+그룹이 숨긴 toolset 이름만 Control Plane의 `group_setting` 테이블에 `TOOLSET` 키로 둔다. 처음에는 `toolset_hidden` 테이블에 두었고 [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md)에서 옮겼다.
 기본값은 모두 보임이다. 운영에서 쓸 이름은 코드나 마이그레이션에 넣지 않고 관리자가 정한다.
 숨김은 에이전트 도구 선택 목록에만 적용하며 Hermes의 활성 도구 목록은 그대로 둔다.
 기존 OWNER/ADMIN 등급과 비공개 에이전트 조건도 유지한다.
