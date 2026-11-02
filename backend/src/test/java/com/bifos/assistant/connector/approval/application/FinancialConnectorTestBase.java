@@ -59,11 +59,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.ConnectionCallback;
@@ -73,9 +76,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * 실제 plugin 과 loopback 토스 대역, Spring claim HTTP 를 띄우는 금융 통합 검사의 공용 준비다.
+ *
+ * <p>plugin 프로세스는 클래스마다 한 번 띄우고 검사마다 {@code /fixture/configure} 로 되돌린다. 되돌리는 범위와 다시 띄우는 조건은
+ * {@link SharedPlugin} 이 갖는다.
  *
  * <p>검사 클래스는 이것을 상속하고 자기 {@code @Test} 만 둔다. 다른 검사 클래스를 상속하면 부모의 검사가 한 번 더 돌아 plugin 을 띄우는
  * 묶음이 늘어난다.
@@ -84,6 +91,16 @@ import tools.jackson.databind.json.JsonMapper;
 @FinancialExecutionOpen
 abstract class FinancialConnectorTestBase {
     static final JsonMapper JSON = JsonMapper.builder().build();
+    /** {@code /fixture/configure} 가 되돌리는 대역 카운터의 처음 값이다. {@code url} 은 프로세스마다 다르므로 비교할 때 채운다. */
+    static final ObjectNode INITIAL_COUNTERS = JSON.createObjectNode().put("auth", 0).put("financial", 0).put("deletes", 0)
+        .put("prepare", 0).put("execute", 0);
+    /** 상태를 바꾸지 않거나 {@code /fixture/configure} 가 되돌리는 조작이다. 나머지는 프로세스를 다시 띄우게 한다. */
+    static final Set<String> RESETTABLE = Set.of("configure", "counters");
+    /** 이 클래스의 검사가 함께 쓰는 plugin 프로세스다. JUnit 이 클래스를 차례로 돌리므로 한 번에 하나만 살아 있다. */
+    static SharedPlugin shared;
+    /** 이 클래스에서 plugin 을 띄운 횟수다. 클래스가 끝날 때 되돌리지 못한 검사 수 더하기 1 을 넘지 않는지 본다. */
+    static int starts;
+    static int dirtyTests;
     static final String TEST_DIGEST_KEY = "src/test/resources/financial/test-digest.key";
     static final String ARGS = "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}";
     Instant now;
@@ -129,7 +146,6 @@ abstract class FinancialConnectorTestBase {
     JdbcTemplate jdbc;
     @LocalServerPort
     int springPort;
-    Process plugin;
     String pluginUrl;
     HttpHermesConnectorClient client;
     CurrentUser user;
@@ -148,18 +164,10 @@ abstract class FinancialConnectorTestBase {
         }
         now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         clock.set(now);
-        plugin = new ProcessBuilder("python3", "../test/e2e/financial/producer_plugin_http.py",
-            "http://127.0.0.1:" + springPort, properties.dashboardToken()).redirectError(ProcessBuilder.Redirect.INHERIT).start();
-        var reader = new BufferedReader(new InputStreamReader(plugin.getInputStream()));
-        try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {
-            try {
-                pluginUrl = JSON.readTree(startup.submit(reader::readLine).get(30, TimeUnit.SECONDS)).get("url").stringValue();
-            } catch (Exception failure) {
-                // 첫 줄이 오지 않으면 프로세스를 끝내 읽기 스레드와 executor 정리도 멈추지 않게 한다.
-                plugin.destroyForcibly();
-                throw failure;
-            }
+        if (shared == null) {
+            shared = SharedPlugin.start(springPort, properties.dashboardToken());
         }
+        pluginUrl = shared.url();
         client = new HttpHermesConnectorClient(new HermesProperties(properties.profileKeyDir(), pluginUrl,
             properties.dashboardToken(), properties.sharedListenerBaseUrl(), null, null, Duration.ofSeconds(2), Duration.ofSeconds(5)), attachmentDirectory);
         doAnswer(invocation -> client.readCatalog()).when(hermes).readCatalog();
@@ -204,16 +212,19 @@ abstract class FinancialConnectorTestBase {
         OverridableLiveProperties.during(gate, financial(true, List.of("7:" + user.email()), gate.current()));
         control("configure", Map.of("profile", profile, "guard", Map.of("v", 1, "protocol", "approval-claim-v2",
             "bindingId", bindingId.toString(), "connectionId", connectionId.toString(), "connectionUpdatedAt", connectionRevision.toString(), "manifestSha256", sha)));
+        // 앞 검사가 같은 프로세스에 남긴 카운터가 이 검사의 판정에 섞이지 않았는지 매번 확인한다.
+        var reset = counters();
+        assertThat(reset).as("configure 뒤 대역 카운터").isEqualTo(INITIAL_COUNTERS.deepCopy().put("url", reset.path("url").stringValue()));
     }
 
 
     @AfterEach
-    void stopPlugin() throws Exception {
+    void releasePlugin() throws Exception {
         try {
-            if (plugin != null) {
-                plugin.destroy();
-                assertThat(plugin.waitFor(15, TimeUnit.SECONDS)).isTrue();
-                assertThat(plugin.exitValue()).isZero();
+            // 되돌리지 못하는 상태를 남긴 검사 뒤에는 다음 검사가 새 프로세스를 띄운다.
+            // 검사 도중 끝난 프로세스도 여기서 종료 코드를 확인해 기동 실패와 비정상 종료를 그 검사의 실패로 남긴다.
+            if (shared != null && (shared.dirty() || !shared.process().isAlive())) {
+                stopShared();
             }
         } finally {
             // 다음 대화 테스트가 사용자를 지울 수 있도록 이 fixture의 연결과 FK를 먼저 정리한다.
@@ -228,6 +239,91 @@ abstract class FinancialConnectorTestBase {
             if (connectionId != null) {
                 connections.deleteById(connectionId);
             }
+        }
+    }
+
+
+    @AfterAll
+    static void stopPluginAfterClass() throws Exception {
+        try {
+            if (shared != null) {
+                stopShared();
+            }
+            LoggerFactory.getLogger(FinancialConnectorTestBase.class).info("금융 plugin 기동 {}회, 되돌리지 못한 검사 {}건", starts, dirtyTests);
+            assertThat(starts).as("plugin 기동 횟수(되돌리지 못한 검사 %d건)", dirtyTests).isLessThanOrEqualTo(dirtyTests + 1);
+        } finally {
+            starts = 0;
+            dirtyTests = 0;
+        }
+    }
+
+
+    private static void stopShared() throws InterruptedException {
+        var process = shared.process();
+        shared = null;
+        process.destroy();
+        assertThat(process.waitFor(15, TimeUnit.SECONDS)).isTrue();
+        assertThat(process.exitValue()).isZero();
+    }
+
+
+    /**
+     * 클래스가 함께 쓰는 {@code producer_plugin_http.py} 프로세스다.
+     *
+     * <p>기동할 때 bun 거래 대역과 SDK 원고 생성이 함께 돌아 한 번에 2초 가까이 걸린다. 검사마다 새 profile 이름을 쓰고
+     * {@code /fixture/configure} 가 대역 카운터와 응답 mode 를 되돌리므로 검사 사이에 다시 띄우지 않는다. 설치 원본을 다시 쓰는
+     * {@code /fixture/manifest-change} 처럼 되돌리지 못하는 조작을 부른 검사 뒤에만 새로 띄운다.
+     */
+    static final class SharedPlugin {
+        private final Process process;
+        private final String url;
+        private boolean dirty;
+
+
+        private SharedPlugin(Process process, String url) {
+            this.process = process;
+            this.url = url;
+        }
+
+
+        static SharedPlugin start(int springPort, String token) throws Exception {
+            var process = new ProcessBuilder("python3", "../test/e2e/financial/producer_plugin_http.py",
+                "http://127.0.0.1:" + springPort, token).redirectError(ProcessBuilder.Redirect.INHERIT).start();
+            var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {
+                try {
+                    String url = JSON.readTree(startup.submit(reader::readLine).get(30, TimeUnit.SECONDS)).get("url").stringValue();
+                    starts++;
+                    return new SharedPlugin(process, url);
+                } catch (Exception failure) {
+                    // 첫 줄이 오지 않으면 프로세스를 끝내 읽기 스레드와 executor 정리도 멈추지 않게 한다.
+                    process.destroyForcibly();
+                    throw failure;
+                }
+            }
+        }
+
+
+        Process process() {
+            return process;
+        }
+
+
+        String url() {
+            return url;
+        }
+
+
+        boolean dirty() {
+            return dirty;
+        }
+
+
+        void markDirty() {
+            if (!dirty) {
+                dirtyTests++;
+            }
+            dirty = true;
         }
     }
 
@@ -301,6 +397,9 @@ abstract class FinancialConnectorTestBase {
 
 
     JsonNode control(String operation, Object body) {
+        if (!RESETTABLE.contains(operation)) {
+            shared.markDirty();
+        }
         try {
             return post(pluginUrl + "/fixture/" + operation, body, null);
         } catch (Exception ex) {
