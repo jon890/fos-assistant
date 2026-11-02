@@ -4,7 +4,6 @@ import com.bifos.assistant.shared.domain.CreatedAtEntity;
 
 import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -93,18 +92,6 @@ public class Conversation extends CreatedAtEntity {
     @Getter
     private ConversationPurpose purpose;
 
-    /** 이 대화에서 고른 provider. {@code model} 과 함께 채우거나 함께 비운다. */
-    @Column(name = "model_provider", length = ModelChoice.PROVIDER_MAX_LENGTH)
-    private String modelProvider;
-
-    /** 이 대화에서 고른 모델. 비면 그 profile 의 기본 모델로 돈다. */
-    @Column(name = "model", length = ModelChoice.MODEL_MAX_LENGTH)
-    private String model;
-
-    /** 이 대화에서 고른 reasoning effort. 비면 그 profile 의 기본값이다. */
-    @Column(name = "reasoning_effort", length = 16)
-    private String reasoningEffort;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "model_selection_mode", length = 16)
     @Getter
@@ -181,19 +168,9 @@ public class Conversation extends CreatedAtEntity {
     }
 
 
-    /**
-     * 이 대화에서 고른 모델과 effort 다. 고르지 않았으면 셋 다 null 이다.
-     *
-     * <p>저장된 값은 다시 검증하지 않는다. 검증 규칙이 바뀌어도 이미 있는 대화를 열고 보낼 수 있어야 한다.
-     */
-    public ModelChoice modelChoice() {
-        return ModelChoice.stored(modelProvider, model, reasoningEffort);
-    }
-
-
-    /** 실행 줄이 이 대화에서 읽는 값만 담아 낸다. 대화 번호와 이 대화에서 고른 effort 다. */
+    /** 실행 줄이 이 대화에서 읽는 값만 담아 낸다. 대화 번호다. */
     public ExecutionConversation executionConversation() {
-        return new ExecutionConversation(id, modelChoice().reasoningEffort());
+        return new ExecutionConversation(id);
     }
 
 
