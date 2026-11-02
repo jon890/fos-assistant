@@ -171,6 +171,38 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
     }
 
 
+    /** 검사 하나가 Java 쪽에 남긴 관측과 주입한 결함을 처음 상태로 되돌린다. Python 쪽 되돌림은 {@link #resetPlugin} 이 한다. */
+    void resetObservations() {
+        if (release.get() != null) {
+            release.get().countDown();
+        }
+        wires.clear();
+        callbacks.clear();
+        callbackCodes.clear();
+        observeCommit.set(null);
+        callbackFailure.set(null);
+        supportFailure.set(0);
+        pluginFailure.set(0);
+        heldFailure.set(0);
+        supportDefect.set(null);
+        entered.set(null);
+        release.set(null);
+    }
+
+
+    /**
+     * Python 쪽에서 검사가 바꾼 profile, 보관 파일, 플러그인 원본과 관측값을 준비 직후로 되돌린다.
+     *
+     * <p>{@code /fixture/reset} 은 준비를 마친 임시 디렉터리를 통째로 떠 둔 것으로 되돌리고, 되돌린 파일이 처음과 같은지 답한다.
+     * 같지 않으면 다음 검사가 앞 검사의 상태를 보게 되므로 여기서 실패시킨다.
+     */
+    void resetPlugin() throws Exception {
+        var response = send(pythonBase + "/fixture/reset", "POST", "{}");
+        assertThat(response.statusCode()).as("Python fixture 되돌리기").isEqualTo(200);
+        assertThat(JSON.readTree(response.body()).path("restored").booleanValue()).as("되돌린 파일이 준비 직후와 같다").isTrue();
+    }
+
+
     JsonNode inspect() throws Exception {
         return JSON.readTree(send(pythonBase + "/fixture/inspect", "GET", "").body());
     }

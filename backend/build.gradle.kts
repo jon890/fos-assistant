@@ -96,6 +96,8 @@ tasks.withType<Test>().configureEach {
     archunitFreezeProperties.forEach { name ->
         providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
     }
+    // 검사 메서드의 순서를 바꿔 앞 검사가 남긴 상태를 찾을 때 준다. 예: -Pjunit.jupiter.testmethod.order.default=com.bifos.assistant.testsupport.ReversedMethodNameOrder
+    providers.gradleProperty("junit.jupiter.testmethod.order.default").orNull?.let { systemProperty("junit.jupiter.testmethod.order.default", it) }
     // 기억 합성 측정의 기준 파일을 다시 쓰는 속성이다. 절차는 docs/features/memory.md 의 「기준 파일」 이 갖는다.
     providers.gradleProperty("memoryEval.writeBaseline").orNull?.let { systemProperty("memoryEval.writeBaseline", it) }
     // 기준 파일만 바뀌어도 테스트가 옛 결과로 건너뛰지 않게 입력으로 둔다.

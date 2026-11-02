@@ -1,5 +1,7 @@
 # Phase 01. 금융 plugin 프로세스를 클래스마다 한 번만 띄운다
 
+**상태**: 완료
+
 **Execution profile**: deep
 
 ## 목표
