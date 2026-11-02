@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,5 +77,23 @@ public class PeopleAdminController {
     public PurgePreview purgePreview(@PathVariable Long id) {
         currentUser.requireAdmin();
         return purgePreview.preview(id);
+    }
+
+
+    /** 꺼진 사람에게 정리를 예약한다. 아무것도 지우지 않고, 이미 예약했으면 시각을 바꾸지 않는다. */
+    @PostMapping("/{id}/purge-schedule")
+    public PersonView schedulePurge(@PathVariable Long id) {
+        currentUser.requireAdmin();
+        PersonAccess result = access.schedulePurge(id);
+        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
+    }
+
+
+    /** 정리 예약을 취소한다. */
+    @DeleteMapping("/{id}/purge-schedule")
+    public PersonView cancelPurge(@PathVariable Long id) {
+        currentUser.requireAdmin();
+        PersonAccess result = access.cancelPurge(id);
+        return PersonView.of(result.person(), result.joined(), result.lastConversationAt());
     }
 }

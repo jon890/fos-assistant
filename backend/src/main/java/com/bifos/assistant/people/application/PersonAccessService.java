@@ -9,6 +9,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ public class PersonAccessService {
     private final AppUserRepository users;
     private final UserConversationActivity activity;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
 
     /**
@@ -73,14 +75,7 @@ public class PersonAccessService {
      */
     @Transactional
     public PersonAccess setEnabled(Long id, boolean enabled) {
-        String email = people.findEmailById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
-        // 원고 저장 허가처럼 사용자 행 다음 허용 목록 행을 잠그는 쪽과 같은 순서로 잠근다. 사용자 번호 오름차순이 먼저다.
-        users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(email)).stream()
-            .map(AppUser::id)
-            .sorted()
-            .forEach(userId -> users.findByIdForUpdate(userId));
-        AllowedPerson person = people.findByIdForUpdate(id)
-            .orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+        AllowedPerson person = lockPerson(id);
         if (enabled) {
             person.enable();
         } else {
@@ -92,6 +87,58 @@ public class PersonAccessService {
             // 아직 로그인한 적이 없는 사용자는 app_user가 없어 정리 사건을 보낼 대상도 없다.
             joined.forEach(found -> events.publishEvent(new UserAccessRevoked(found.id())));
         }
+        Instant lastConversationAt = joined.isEmpty()
+            ? null
+            : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
+                .max(Instant::compareTo)
+                .orElse(null);
+        return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt);
+    }
+
+
+    /**
+     * 꺼진 사람에게 정리를 예약한다. 이미 예약했으면 시각을 바꾸지 않는다. 아무것도 지우지 않는다.
+     *
+     * @throws ApiException 그 사람이 없으면 PERSON_NOT_FOUND, 켜져 있으면 PERSON_STILL_ENABLED
+     */
+    @Transactional
+    public PersonAccess schedulePurge(Long id) {
+        AllowedPerson person = lockPerson(id);
+        if (person.enabled()) {
+            throw new ApiException(ErrorCode.PERSON_STILL_ENABLED, "enabled person cannot be scheduled for purge");
+        }
+        person.schedulePurge(clock.instant());
+        return accessOf(people.save(person));
+    }
+
+
+    /**
+     * 정리 예약을 취소한다. 예약이 없어도 그대로 성공한다.
+     *
+     * @throws ApiException 그 사람이 없으면 PERSON_NOT_FOUND
+     */
+    @Transactional
+    public PersonAccess cancelPurge(Long id) {
+        AllowedPerson person = lockPerson(id);
+        person.cancelPurge();
+        return accessOf(people.save(person));
+    }
+
+
+    /** {@link #setEnabled} 와 같은 순서로 잠근다. 사용자 행 다음 허용 목록 행이다. */
+    private AllowedPerson lockPerson(Long id) {
+        String email = people.findEmailById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+        users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(email)).stream()
+            .map(AppUser::id)
+            .sorted()
+            .forEach(userId -> users.findByIdForUpdate(userId));
+        return people.findByIdForUpdate(id)
+            .orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+    }
+
+
+    private PersonAccess accessOf(AllowedPerson saved) {
+        List<AppUser> joined = users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(saved.email()));
         Instant lastConversationAt = joined.isEmpty()
             ? null
             : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
