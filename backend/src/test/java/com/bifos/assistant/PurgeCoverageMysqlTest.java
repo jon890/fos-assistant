@@ -401,7 +401,10 @@ class PurgeCoverageMysqlTest {
                         assertCleared("conversation", "hermes_root_session_id");
                         assertThat(value("conversation", "purged_at")).isNotNull();
                     }
-                    case "agent_execution" -> assertCleared("agent_execution", "output_text");
+                    case "agent_execution" -> {
+                        assertCleared("agent_execution", "output_text");
+                        assertCleared("agent_execution", "question_message_id");
+                    }
                     case "execution_event" -> assertCleared("execution_event", "detail");
                     case "connector_action" -> {
                         List<String> bodies = List.of("args_json", "args_key_id", "result_text", "result_key_id");

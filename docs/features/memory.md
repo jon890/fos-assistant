@@ -362,10 +362,10 @@ sequenceDiagram
 | 순서 | 조건 | 어디서 본다 |
 | --- | --- | --- |
 | 1 | origin 실행이 루트 실행이다 | `agent_execution` |
-| 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성만 해당한다 | `execution_question` 과 그 사용자의 `USER` 메시지 |
+| 2 | 그 실행이 사람이 보낸 turn 이다. 새 질문과 다시 생성만 해당한다 | `agent_execution.question_message_id` 와 그 사용자의 `USER` 메시지 |
 | 3 | 부정 표지가 질문 원문과 본문에 함께 있거나 함께 없다 | `chat_message.content`, 인자 `content` |
 | 4 | 그 대화의 어느 실행에도 안쪽 도구 밖의 `TOOL_STARTED` 사건이나 `SUBAGENT_STARTED` 사건이 없다 | `execution_event` |
-| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn, 질문 줄이 없는 실행이 여기 걸린다 | `agent_execution` 과 `execution_question` |
+| 5 | 그 대화에 사람의 질문 없이 Hermes 로 보낸 루트 실행이 없다. 맡긴 일의 결과를 전하는 turn 과 예약 작업 turn, 질문 메시지가 없는 실행이 여기 걸린다 | `agent_execution` 의 `question_message_id` |
 | 6 | 민감하지 않다 | 인자 `sensitive` |
 | 7 | 제목과 본문에 민감해 보이는 글이 없다 | 인자 `title`, `content` |
 

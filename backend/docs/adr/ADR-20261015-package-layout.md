@@ -44,7 +44,7 @@
 
 | 하위 기능 | 맡는 일 |
 | --- | --- |
-| `chat.conversation` | 대화와 메시지의 저장, 대화 접근 확인, 목록 읽기, 실행 질문, 메모리 사용 표시, 첫 응답 지연 집계 |
+| `chat.conversation` | 대화와 메시지의 저장, 대화 접근 확인, 목록 읽기, 메모리 사용 표시, 첫 응답 지연 집계 |
 | `chat.delivery` | 위임과 예약이 낸 결과를 대화에 전하는 기록과 재시도 상태 |
 | `chat.modelchoice` | 모델과 effort 선택, 모델 단계, 숨김 |
 | `chat.attachment` | 사진 첨부의 저장과 검사, 원본 조회, 첨부 관찰 |
@@ -62,7 +62,7 @@
 | `connector.approval` | 도구 호출의 판정, 승인 흐름의 조율, 승인 API |
 | `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 문제 후보의 저장, 발견 반응 |
 | `usage.pricing` | 가격표와 비용 환산 |
-| `usage.execution` | 실행 기록, 실행 사건, 사용자 실행 한도 |
+| `usage.execution` | 실행 기록, 실행 사건, 실행 질문 연결, 사용자 실행 한도 |
 | `usage.subagent` | native 하위 에이전트 사용량의 재조회와 원장 |
 | `usage.tree` | 실행 트리와 루트 실행 목록 |
 | `usage.summary` | 월 합계와 축별 집계 |
