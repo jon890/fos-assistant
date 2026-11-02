@@ -55,7 +55,9 @@ while IFS= read -r path; do
   esac
   case "$path" in
     hermes/connectors/tossinvest/* | \
-    backend/src/main/java/com/bifos/assistant/connector/financial/*)
+    backend/src/main/java/com/bifos/assistant/connector/financial/* | \
+    backend/src/main/java/com/bifos/assistant/connector/approval/application/*Financial* | \
+    backend/src/main/java/com/bifos/assistant/connector/approval/application/dto/Financial*)
       finance=1 ;;
   esac
 done
