@@ -20,17 +20,14 @@ connector_connection|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 연결은
 connector_conversation_grant|CONVERSATION|id|DELETE|KEEP|KEEP|conversation_id FK가 있다. 삭제된 대화와 붙지 않은 에이전트의 권한은 읽기에서 거절하며 행은 만료 이력으로 남긴다.
 connector_tool_grant|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
 content_draft|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id FK와 owner_user_id에 속한다. 대화 purge가 지운다.
-content_draft_asset|CONVERSATION|id|DELETE|DELETE|KEEP|revision_id와 attachment_id FK로 원고와 첨부에 속한다. 코드가 읽고 쓰지 않으며 revision 삭제의 FK cascade 로 지워진다. DROP PR 이 지운다.
 content_draft_creation_call|CONVERSATION|id|KEEP|KEEP|KEEP|creation_request_id FK에 속한다. 같은 호출의 재생을 막는 alias는 본문 없이 보존한다.
 content_draft_creation_request|CONVERSATION|id|GONE|GONE|KEEP|conversation_id와 owner_user_id에 속한다. GONE으로 바꾸고 request_hash와 draft_public_id를 비운다.
-content_draft_job|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 코드가 읽고 쓰지 않으며 저장 상태 이력은 snapshot 의 job 칸으로 옮겼다. DROP PR 이 지운다.
 content_draft_revision|CONVERSATION|id|DELETE|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
 content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조, 저장 job 칸을 원고 삭제 후에도 보존하는 계약이다.
 conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session을 비운 뒤 purged_at을 적는다.
 decision_feedback_event|CONVERSATION|id|DELETE|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id FK를 NULL로 비운다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|SCRUB|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
-execution_question|CONVERSATION|execution_id|KEEP|KEEP|KEEP|코드가 읽고 쓰지 않는 옛 테이블이다. 질문은 agent_execution.question_message_id로 옮겼고 이 테이블은 번호 두 개만 담는다. 배포를 확인한 뒤 DROP PR이 지운다.
 execution_skill_use|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
 follow_up|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다. 먼저 살펴보기가 낸 제안 줄(dedupe_key가 있는 줄)은 대화 purge가 본문과 함께 지우고, 받아들인 줄은 제안 본문만 비운다.
 group_setting|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 설정이다. 모델 설정이 여기 있다.
@@ -38,7 +35,6 @@ hermes_session_binding|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 origin_executio
 media_observation|CONVERSATION|id|DELETE|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
 memory|USER|id|DELETE|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
 memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
-memory_collection|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 기억 영역이다. 사용자 한 사람의 삭제 대상이 아니다.
 memory_embedding|USER|memory_id|DELETE|KEEP|KEEP|memory_id로 기억 항목에 속한다. 항목을 지우면 같은 트랜잭션에서 지운다.
 memory_link|USER|id|DELETE|KEEP|KEEP|양 끝 기억 항목에 속한다. 항목을 지우면 같은 트랜잭션에서 지운다.
 memory_revision|USER|memory_id|DELETE|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
