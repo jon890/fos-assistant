@@ -5,8 +5,11 @@
 # 전체 검사는 금융 대역이 쓰는 tossinvest 의존성도 준비하고, 브라우저 검사 때만 chromium 을 설치한다.
 # `pnpm build` 에는 web/Dockerfile 과 같은 자리표시자 환경 변수를 준다.
 #
-# 단계마다 임시 로그를 만들고, 처음 실패한 단계에서 멈춰 마지막 40줄을 보인다.
-# 정상·오류 종료 모두 임시 로그를 지운다.
+# 실행마다 $TMPDIR 아래 새 폴더에 단계별 원본 로그를 남긴다(없으면 /tmp).
+# 처음 실패한 단계에서 멈춰 마지막 40줄과 원본 로그의 절대 경로를 보인다.
+# 성공한 실행의 로그만 지우고, 실패한 실행의 로그는 조사할 수 있도록 보존한다.
+# public-safe 출력에는 비공개 값이 있을 수 있어 성공·실패 모두 화면에 보인 뒤 로그를 지운다.
+# 조사 뒤 로그 정리: rm -r -- "<출력한 원본 로그의 상위 폴더>". 자동으로 만료하지 않는다.
 #
 # 사용법: scripts/dev/check-local.sh [--fast | --skip-browser] [브라우저 spec ...]
 # --fast 는 Draft PR 을 열기 전에 쓴다. 몇 분 안에 끝나는 단계만 돈다.
@@ -24,9 +27,6 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-tmp_root="${TMPDIR:-/tmp}"
-LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
-trap 'rm -rf "${LOG_DIR}"' EXIT
 
 fast=false
 skip_browser=false
@@ -49,6 +49,11 @@ if ! node -e 'const [a]=process.versions.node.split(".").map(Number); process.ex
   exit 2
 fi
 
+tmp_root="${TMPDIR:-/tmp}"
+tmp_root="$(cd "${tmp_root}" && pwd)"
+LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
+trap 'if [ "$?" -eq 0 ]; then rm -rf "${LOG_DIR}"; else rmdir "${LOG_DIR}" 2>/dev/null || true; fi' EXIT
+
 step() {
   local name="$1"; shift
   local log="${LOG_DIR}/${name}.log"
@@ -62,10 +67,17 @@ step() {
     else
       grep -A3 '^알림:' "${log}" || true
     fi
+    if [ "${name}" = public-safe ]; then rm -f "${log}"; fi
   else
     echo "실패 ($((SECONDS - started))초)"
     echo "--- ${log} 의 끝 ---" >&2
     tail -n 40 "${log}" >&2
+    if [ "${name}" = public-safe ]; then
+      rm -f "${log}"
+      echo "공개 정보 검사 로그는 비공개 값이 남지 않도록 보존하지 않는다." >&2
+    else
+      echo "원본 로그: ${log}" >&2
+    fi
     exit 1
   fi
 }
@@ -128,7 +140,7 @@ PY
   python3 -m unittest discover -s hermes/tests
 }
 
-echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
+echo "임시 로그(성공 시 삭제, 실패 시 보존): ${LOG_DIR}"
 if [ "${fast}" = true ]; then
   step public-safe     "${ROOT}/scripts/checks/check-public-safe.sh"
   step pr-size         check_pr_size
