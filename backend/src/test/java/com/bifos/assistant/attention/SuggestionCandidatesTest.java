@@ -79,8 +79,6 @@ class SuggestionCandidatesTest {
     void tearDown() {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_event WHERE user_id = ?", userId);
-            jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM follow_up WHERE user_id = ?", userId);
         }
         createdUsers.clear();

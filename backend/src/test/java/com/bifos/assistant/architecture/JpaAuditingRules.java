@@ -49,8 +49,6 @@ final class JpaAuditingRules {
     static final Map<String, Contract> ENTITIES = Map.ofEntries(
         Map.entry("com.bifos.assistant.agent.domain.Agent", new Contract("agent", "C+U")),
         Map.entry("com.bifos.assistant.agent.domain.AgentMemoryCollection", new Contract("agent_memory_collection", "C")),
-        Map.entry("com.bifos.assistant.attention.domain.AttentionControlEntry", new Contract("attention_control", "C+U")),
-        Map.entry("com.bifos.assistant.attention.domain.AttentionEvent", new Contract("attention_event", "제외")),
         Map.entry("com.bifos.assistant.browser.domain.UserBrowser", new Contract("user_browser", "C")),
         Map.entry("com.bifos.assistant.chat.artifact.domain.ChatArtifact", new Contract("chat_artifact", "C")),
         Map.entry("com.bifos.assistant.chat.attachment.domain.ChatAttachment", new Contract("chat_attachment", "C")),

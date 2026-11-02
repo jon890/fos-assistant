@@ -9,7 +9,6 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
-import com.bifos.assistant.attention.domain.AttentionControlEntry;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.entity.Memory;
@@ -126,8 +125,6 @@ class JpaAuditingTest {
                 agent.changeApiBaseUrl("http://changed.test");
             } else if (row instanceof AllowedPerson person) {
                 person.disable();
-            } else if (row instanceof AttentionControlEntry entry) {
-                entry.rehide("changed");
             } else if (row instanceof Task task) {
                 task.changeCheckEnabled(false);
                 task.moveNext(LATER.plusSeconds(10));

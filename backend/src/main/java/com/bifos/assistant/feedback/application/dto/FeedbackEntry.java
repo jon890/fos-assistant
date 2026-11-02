@@ -26,7 +26,6 @@ public record FeedbackEntry(
     Long conversationId,
     Long originExecutionId,
     Long sourceCheckId,
-    Long autonomyDecisionId,
     String subjectVersion,
     String reasonCode,
     List<String> changedFields,
@@ -61,7 +60,6 @@ public record FeedbackEntry(
             null,
             null,
             null,
-            null,
             List.of(),
             occurredAt);
     }
@@ -86,7 +84,6 @@ public record FeedbackEntry(
             null,
             null,
             null,
-            null,
             List.of(),
             occurredAt);
     }
@@ -102,7 +99,6 @@ public record FeedbackEntry(
             id,
             originExecutionId,
             sourceCheckId,
-            autonomyDecisionId,
             subjectVersion,
             reasonCode,
             changedFields,
@@ -120,7 +116,6 @@ public record FeedbackEntry(
             conversationId,
             id,
             sourceCheckId,
-            autonomyDecisionId,
             subjectVersion,
             reasonCode,
             changedFields,
@@ -137,25 +132,6 @@ public record FeedbackEntry(
             actor,
             conversationId,
             originExecutionId,
-            id,
-            autonomyDecisionId,
-            subjectVersion,
-            reasonCode,
-            changedFields,
-            occurredAt);
-    }
-
-
-    public FeedbackEntry autonomyDecision(Long id) {
-        return new FeedbackEntry(
-            userId,
-            subjectType,
-            subjectKey,
-            eventType,
-            actor,
-            conversationId,
-            originExecutionId,
-            sourceCheckId,
             id,
             subjectVersion,
             reasonCode,
@@ -174,7 +150,6 @@ public record FeedbackEntry(
             conversationId,
             originExecutionId,
             sourceCheckId,
-            autonomyDecisionId,
             version,
             reasonCode,
             changedFields,
@@ -192,7 +167,6 @@ public record FeedbackEntry(
             conversationId,
             originExecutionId,
             sourceCheckId,
-            autonomyDecisionId,
             subjectVersion,
             code,
             changedFields,
@@ -210,7 +184,6 @@ public record FeedbackEntry(
             conversationId,
             originExecutionId,
             sourceCheckId,
-            autonomyDecisionId,
             subjectVersion,
             reasonCode,
             fields,
