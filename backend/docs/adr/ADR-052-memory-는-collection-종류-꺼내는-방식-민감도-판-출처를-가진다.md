@@ -17,7 +17,7 @@
 - **대체된 부분**: [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 가 「민감 항목의 본문은 아직 평문으로 저장한다」 를 대체한다. 민감 본문은 암호화해 저장한다. [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 가 둔 `always_inject` 한 칸을 `retrieval` 세 값으로 넓힌다. 층을 나눠 싣는다는 결정은 그대로다.
 - **대안 기각**:
   - 문서와 출처를 다른 표로 둔다: 범위 판정, 승인 상태, 에이전트 접근 판정을 표마다 다시 만들어야 한다. 판정이 두 벌이 되면 한쪽이 빠진다. 한 표에 두고 종류 칸으로 나눈다.
-  - `collection` 을 enum 으로 둔다: 그룹마다 쓰는 영역이 다르고 더할 때마다 배포해야 한다. 문자열 key 로 두고 목록은 `memory_collection` 이 갖는다.
+  - `collection` 을 enum 으로 둔다: 그룹마다 쓰는 영역이 다르고 더할 때마다 배포해야 한다. 문자열 key 로 두고 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖는다(처음에는 `memory_collection` 테이블이 가졌고 [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) 가 옮겼다).
   - `always_inject` 를 그대로 두고 보관 여부를 칸 하나 더 둔다: 불 값 둘은 「항상 싣는데 보관함」 같은 뜻 없는 조합을 만든다. 값 셋 가운데 하나로 둔다.
   - 판을 남기지 않고 `updated_at` 만 둔다: 다른 서비스가 「그 문서의 몇째 판으로 분석했는가」 를 적어 둔다. 시각으로는 그 대조를 할 수 없다.
   - 지울 때 판까지 지운다: 잘못 지운 것을 되살릴 길이 없고, 들여온 묶음을 되돌린 흔적도 사라진다.
@@ -34,7 +34,7 @@
 
   | 칸 | 값 | 뜻 |
   | --- | --- | --- |
-  | `collection` | 소문자 key. 기본 `core` | 영역. 그룹의 목록은 `memory_collection` 이 갖는다 |
+  | `collection` | 소문자 key. 기본 `core` | 영역. 그룹의 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖는다 |
   | `entry_type` | `MEMORY`, `DOCUMENT`, `SOURCE` | 사실 한 줄, 이름으로 찾는 긴 글, 출처로 남긴 원문 |
   | `document_key` | `DOCUMENT` 만 | 같은 주인과 collection 안에서 하나다 |
   | `retrieval` | `ALWAYS`, `SEARCH`, `ARCHIVE` | 본문을 매번 싣는다, 제목만 색인에 싣는다, 색인에도 싣지 않는다 |

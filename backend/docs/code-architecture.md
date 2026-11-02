@@ -46,7 +46,7 @@ AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 
 검사는 기준 파일 없는 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`과 `JpaAuditingPlacementTest`가 맡는다.
 두 base, 엔티티별 상속, 46개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
 `Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
-`JpaAuditingTest`와 기존 `MemoryCollectionAuditingTest`가 H2 에서 확인한다. 칸의 정밀도는 `MysqlMigrationTest`가 실제 스키마로 대조한다.
+`JpaAuditingTest`가 H2 에서 확인한다. 칸의 정밀도는 `MysqlMigrationTest`가 실제 스키마로 대조한다.
 `JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
 
 ## 패키지 배치 규칙
@@ -280,7 +280,7 @@ domain과 infra는 admin을 import하지 않는다.
 entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
 entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
 
-`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`과 복합 ID 두 타입을 소유한다.
+`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryRevision`과 복합 ID 한 타입을 소유한다.
 기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
 다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
 새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
