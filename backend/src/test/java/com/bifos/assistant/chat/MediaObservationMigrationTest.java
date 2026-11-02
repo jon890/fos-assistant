@@ -89,7 +89,7 @@ class MediaObservationMigrationTest {
     @DisplayName("요청 칸은 NOT NULL 이고 기존 긴 본문 색인을 보존하며 분석 key 색인은 만들지 않는다")
     void hasNotNullRequestColumnsAndPreservesBodyAndIndexes() throws SQLException {
         try (var connection = connect()) {
-            try (var columns = connection.getMetaData().getColumns(null, null, table(connection), "%")) {
+            try (var columns = connection.getMetaData().getColumns(connection.getCatalog(), null, table(connection), "%")) {
                 boolean body = false;
                 int requestColumns = 0;
                 while (columns.next()) {
@@ -108,7 +108,7 @@ class MediaObservationMigrationTest {
                 assertThat(body).isTrue();
                 assertThat(requestColumns).isEqualTo(2);
             }
-            try (var indexes = connection.getMetaData().getIndexInfo(null, null, table(connection), false, false)) {
+            try (var indexes = connection.getMetaData().getIndexInfo(connection.getCatalog(), null, table(connection), false, false)) {
                 boolean found = false;
                 while (indexes.next()) {
                     assertThat(indexes.getString("COLUMN_NAME")).isNotEqualToIgnoringCase("analysis_key");
