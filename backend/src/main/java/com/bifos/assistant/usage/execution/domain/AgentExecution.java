@@ -150,13 +150,13 @@ public class AgentExecution {
     @Column(name = "context_omitted_items")
     private Integer contextOmittedItems;
 
-    /** 실행 당시 Hermes 의 고정 프롬프트 구성 지문이다. 값을 주는 HTTP 경로가 아직 없어 늘 비어 있다. */
+    /** 실행 당시 Hermes 의 고정 프롬프트 구성 지문이다. 값을 주는 HTTP 경로가 아직 없어 늘 비어 있고, 값을 얻는 날 칸을 다시 만들지 않으려 미리 둔다. */
     @Column(name = "runtime_fingerprint", length = 64)
     private String runtimeFingerprint;
 
     /**
-     * 이 실행에 넣은 {@code instructions} 의 SHA-256 앞 16바이트를 16진수로 적은 값이다.
-     * 본문에 개인 Memory 가 있어 본문은 저장하지 않는다. 넣은 문맥이 없으면 비운다.
+     * 이 실행에 넣은 {@code instructions} 의 SHA-256 앞 16바이트를 16진수로 적은 값이다. {@code context_chars} 가 길이를,
+     * 이 칸이 내용이 같은지를 말한다. 본문에 개인 Memory 가 있어 본문은 저장하지 않는다. 넣은 문맥이 없으면 비운다.
      */
     @Column(name = "instructions_hash", length = 64)
     private String instructionsHash;

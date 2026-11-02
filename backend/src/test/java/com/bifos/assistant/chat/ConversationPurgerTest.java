@@ -149,6 +149,7 @@ class ConversationPurgerTest {
     @DisplayName("지운 대화의 메시지와 첨부, 결과물, 실행 본문, Hermes session 을 지우고 사용량은 남긴다")
     void purgesBodiesOfDeletedConversationAndKeepsUsage() throws Exception {
         Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);
+        Filled untouched = filledConversation(ExecutionStatus.SUCCEEDED);
         assertThat(questions.messageIdOf(filled.executionId())).isPresent();
         conversationWriter.deleteIfActive(filled.conversationId(), owner.id(), NOW.minusSeconds(60));
 
@@ -161,6 +162,7 @@ class ConversationPurgerTest {
         assertThat(attachmentFile(filled.attachment())).doesNotExist();
         assertThat(artifactFolder(filled.conversationId())).doesNotExist();
         assertThat(questions.messageIdOf(filled.executionId())).isEmpty();
+        assertThat(questions.messageIdOf(untouched.executionId())).as("정리하지 않은 대화의 질문 번호는 남는다").isPresent();
         AgentExecution execution = executions.findById(filled.executionId()).orElseThrow();
         assertThat(execution.outputText()).isNull();
         assertThat(execution.totalTokens()).isEqualTo(30L);
@@ -302,7 +304,7 @@ class ConversationPurgerTest {
     }
 
 
-    /** 메시지 둘과 사진 하나, 결과물 하나, 실행 하나와 그 사건과 질문 줄을 가진 대화를 만든다. */
+    /** 메시지 둘과 사진 하나, 결과물 하나, 실행 하나와 그 사건과 질문 메시지 번호를 가진 대화를 만든다. */
     private Filled filledConversation(ExecutionStatus status) throws Exception {
         Conversation conversation = conversations.save(Conversation.startedBy(owner.id(), "건강검진 결과", agent.id(), NOW.minusSeconds(600)));
         String sessionId = "purge-session-" + UUID.randomUUID();

@@ -10,8 +10,9 @@ import org.springframework.data.repository.query.Param;
 /**
  * 실행 줄의 {@code question_message_id} 만 다루는 저장소다(ADR-20261102 / table-reduce-r2).
  *
- * <p>이 칸은 엔티티에 매핑하지 않는다. 엔티티 저장이 이 칸을 건드리지 못하고, 아래 조건부 UPDATE 만 채우고 비운다.
- * 그래서 쿼리는 모두 네이티브 SQL 이다.
+ * <p>엔티티는 이 칸을 {@code updatable = false} 로만 매핑해 엔티티 저장이 덮지 못하고, 아래 조건부 UPDATE 만 채우고 비운다.
+ * 읽기도 영속성 컨텍스트에 남은 옛 값을 피하려고 여기 쿼리로 한다. {@code AgentExecution} 과 그 저장소가 파일 길이 상한에
+ * 가까워 쿼리는 이 저장소에 두고 네이티브 SQL 로 쓴다.
  */
 public interface ExecutionQuestionRepository extends Repository<AgentExecution, Long> {
 

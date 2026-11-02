@@ -468,7 +468,7 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
+    @DisplayName("질문 메시지 번호가 다른 사람의 메시지를 가리키면 없는 것으로 보고 제안이다")
     void proposesWhenQuestionIsOthers() throws Exception {
         ChatMessage foreign = messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
         questions.link(dadRun.id(), foreign.id());
@@ -764,7 +764,7 @@ class McpMemoryRememberToolTest {
     }
 
 
-    /** 같은 대화에서 Hermes 로 보낸 다른 루트 실행이다. 질문 줄은 잇지 않는다. */
+    /** 같은 대화에서 Hermes 로 보낸 다른 루트 실행이다. 질문 메시지는 잇지 않는다. */
     private AgentExecution otherRootRun(String runId) {
         return executions.save(AgentExecution.builder()
             .userId(dad.id())
