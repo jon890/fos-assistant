@@ -548,7 +548,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 ### execution_question
 
 **코드가 더는 읽고 쓰지 않는 옛 테이블이다.** 사람이 보낸 turn 의 질문 메시지는 `agent_execution.question_message_id` 로 옮겼다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
-이 테이블의 줄은 배포를 확인한 뒤 DROP PR 이 지운다. 그 전에 옛 이미지가 쓴 줄을 `agent_execution` 으로 다시 옮기되, 이미 정리한 대화(`conversation.purged_at` 이 있는)의 실행은 옮기지 않는다. 정리가 비운 질문 번호를 되살리지 않으려는 것이다.
+이 테이블의 줄은 배포를 확인한 뒤 DROP PR 이 지운다. 그 전에 옛 이미지가 쓴 줄을 `agent_execution` 으로 다시 옮기되, 이미 정리한 대화(`conversation.purged_at` 이 있는)의 실행은 옮기지 않고 그 실행의 `question_message_id` 를 비운다. 직전 이미지로 되돌린 동안 옛 코드가 정리한 대화에 백필 값이 남아 있을 수 있어서다.
 질문 메시지를 읽는 판정은 [`agent_execution`](#agent_execution) 의 `question_message_id` 설명이 갖는다.
 
 ## 실행 표
