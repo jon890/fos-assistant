@@ -63,7 +63,15 @@ async function main() {
       await writeFile(join(context, file), contents);
     }
     const image = `fos-synthetic-loopback-test:${hashInput.digest("hex").slice(0, 16)}`;
-    if ((await run(["docker", "build", "--tag", image, context])) !== 0)
+    // CI 가 캐시에서 복원한 image 가 있으면 빌드를 건너뛴다. 태그가 입력 hash 라서 입력이 바뀌면 없는 태그가 되어 빌드한다.
+    const cached = Bun.spawn(["docker", "image", "inspect", image], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    if (
+      (await cached.exited) !== 0 &&
+      (await run(["docker", "build", "--tag", image, context])) !== 0
+    )
       throw new Error("합성 image 빌드 실패");
     const listing = Bun.spawn(
       ["git", "ls-files", "-z", "--", "hermes/connectors/naver-blog"],
