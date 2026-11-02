@@ -52,6 +52,11 @@ public class AllowedPerson extends AuditedEntity {
     @Getter
     private Instant lastLoginAt;
 
+    /** 정리를 예약한 시각이다. 비어 있으면 예약이 없다. 이 시각에서 30일이 지나면 정리 작업이 데이터를 지운다. */
+    @Column(name = "purge_scheduled_at")
+    @Getter
+    private Instant purgeScheduledAt;
+
 
     protected AllowedPerson() {}
 
@@ -94,5 +99,27 @@ public class AllowedPerson extends AuditedEntity {
      */
     public void enable() {
         this.enabled = true;
+        this.purgeScheduledAt = null;
+    }
+
+
+    /**
+     * 정리를 예약한다. 꺼진 사람만 예약할 수 있고, 이미 예약했으면 시각을 바꾸지 않는다.
+     *
+     * @throws IllegalStateException 켜져 있으면
+     */
+    public void schedulePurge(Instant now) {
+        if (enabled) {
+            throw new IllegalStateException("enabled person cannot be scheduled for purge");
+        }
+        if (purgeScheduledAt == null) {
+            this.purgeScheduledAt = now;
+        }
+    }
+
+
+    /** 정리 예약을 취소한다. 예약이 없으면 아무것도 하지 않는다. */
+    public void cancelPurge() {
+        this.purgeScheduledAt = null;
     }
 }

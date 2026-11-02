@@ -95,6 +95,8 @@ public enum ErrorCode {
     /** 그 profile 이름을 허용 목록이나 에이전트가 이미 쓴다. */
     PERSON_PROFILE_TAKEN(HttpStatus.CONFLICT),
     PERSON_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 켜져 있는 사람에게는 정리를 예약할 수 없다. 먼저 꺼야 한다. */
+    PERSON_STILL_ENABLED(HttpStatus.CONFLICT),
     /**
      * profile 을 만들다 실패해 만든 것을 되돌렸다.
      *
