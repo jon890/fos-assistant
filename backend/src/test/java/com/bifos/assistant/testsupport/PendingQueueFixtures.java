@@ -4,6 +4,8 @@ import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.domain.PendingMessages;
 import java.time.Instant;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -11,11 +13,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *
  * <p>멈춤은 줄 하나에 하나다. {@link Row} 는 옛 검사가 행마다 보던 멈춤을 그 줄의 값으로 함께 싣는다.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PendingQueueFixtures {
-
-    private PendingQueueFixtures() {
-    }
-
 
     /** 글 하나를 더한다. {@code held} 가 참이면 그 대화의 대기 줄 전체를 멈춘다. */
     public static void queue(PendingMessageStore store, Long conversationId, String text, boolean held, Instant at) {
