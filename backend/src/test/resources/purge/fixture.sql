@@ -31,11 +31,8 @@ VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, '2020-01-01 00
 INSERT INTO content_draft_creation_request (id, creation_key, identity_key, owner_user_id, conversation_id, profile_name, origin_execution_id, root_execution_id, root_session_id, request_id, request_hash, draft_public_id, status, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 64, '0')), UNHEX(LPAD(HEX(900000001), 64, '0')), 900000001, 900000001, 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', UNHEX(REPEAT('01', 32)), '00000000-0000-4000-8000-000900000001', 'CREATED', '2020-01-01 00:00:00');
 
-INSERT INTO content_draft_job (id, snapshot_id, action_id, owner_user_id, conversation_id, status, created_at, save_clicked)
-VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'PREVIEW_READY', '2020-01-01 00:00:00', 1);
-
-INSERT INTO content_draft_snapshot (id, public_id, revision_id, owner_user_id, conversation_id, origin_execution_id, agent_id, connection_id, binding_id, connection_updated_at, binding_updated_at, policy_fingerprint, schema_version, compiler_version, payload_fingerprint, snapshot_hash, authorization_fingerprint, created_at, expires_at)
-VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 1, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2099-01-01 00:00:00');
+INSERT INTO content_draft_snapshot (id, public_id, revision_id, owner_user_id, conversation_id, origin_execution_id, agent_id, connection_id, binding_id, connection_updated_at, binding_updated_at, policy_fingerprint, schema_version, compiler_version, payload_fingerprint, snapshot_hash, authorization_fingerprint, created_at, expires_at, action_id, job_status, job_created_at, save_clicked)
+VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 1, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2099-01-01 00:00:00', 900000001, 'PREVIEW_READY', '2020-01-01 00:00:00', 1);
 
 INSERT INTO conversation (id, user_id, agent_id, hermes_session_id, title, created_at, updated_at, public_id, hermes_root_session_id, auto_turn_count, purpose, pending_messages)
 VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', UNHEX(LPAD(HEX(900000001), 32, '0')), 'coverage-root-900000001', 1, 'CHAT', '{"version":1,"held":true,"items":[{"id":900000001,"content":"coverage-900000001","createdAt":"2020-01-01T00:00:00Z"}]}');
@@ -45,9 +42,6 @@ VALUES (900000001, 1, 'coverage-900000001', 'coverage-900000001', 'test', 'test'
 
 INSERT INTO execution_event (id, execution_id, sequence, event_type, detail, occurred_at)
 VALUES (900000001, 900000001, 1, 'TOOL_STARTED', '지워야 할 사건 본문', '2020-01-01 00:00:00');
-
-INSERT INTO execution_question (execution_id, message_id, created_at)
-VALUES (900000001, 900000001, '2020-01-01 00:00:00');
 
 INSERT INTO execution_skill_use (id, execution_id, skill_name, source, occurred_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
@@ -60,9 +54,6 @@ VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage
 
 INSERT INTO memory_capture (id, memory_id, user_id, conversation_id, execution_id, kind, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-01-01 00:00:00');
-
-INSERT INTO memory_collection (group_id, collection_key, display_name, sort_order, created_at)
-VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
 INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)
 VALUES (900000001, 'coverage-900000001', 1, X'0000000000000000000000000000000000000000000000000000000000000000', X'0000803F', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -145,17 +136,14 @@ VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, 1, '2020-01-01
 INSERT INTO connector_action_execution (action_id, connection_id, binding_id, connection_updated_at, binding_updated_at, execution_args_json, summary_json, scope_json, execution_args_sha256, scope_sha256, request_key, protocol, created_at)
 VALUES (900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body, body_key_id)
-VALUES (900000001, 900000001, 1, 'VALID', 1, '2020-01-01 00:00:00', '암호화 본문 대역', 900000001);
+INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body, body_key_id, assets_json)
+VALUES (900000001, 900000001, 1, 'VALID', 1, '2020-01-01 00:00:00', '암호화 본문 대역', 900000001, '[{"position":1,"attachmentId":900000001,"sourceFingerprint":"coverage-900000001","observationId":null,"observationRevision":null}]');
 
 INSERT INTO proactive_check_finding (id, check_id, conversation_id, kind, area, title, created_at)
 VALUES (900000001, 900000001, 900000001, 'NEW', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
 INSERT INTO proactive_check_problem (id, check_id, conversation_id, status, problem_key, problem, evidence_json, created_at)
 VALUES (900000001, 900000001, 900000001, 'ACCEPTED', 'coverage-900000001', '지울 문제 본문', '{"private":"지울 근거"}', '2020-01-01 00:00:00');
-
-INSERT INTO content_draft_asset (id, revision_id, position, attachment_id, source_fingerprint)
-VALUES (900000001, 900000001, 1, 900000001, 'coverage-900000001');
 
 INSERT INTO task_run (id, public_id, task_id, owner_user_id, scheduled_for, status, conversation_id, execution_id, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, '2020-01-01 00:00:00', 'coverage-900000001', 900000001, 900000001, '2020-01-01 00:00:00');

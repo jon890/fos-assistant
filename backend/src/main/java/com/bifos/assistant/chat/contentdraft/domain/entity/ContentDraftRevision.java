@@ -50,9 +50,9 @@ public class ContentDraftRevision {
     @Column(name = "body_key_id")
     private Long bodyKeyId;
 
-    /** 본문의 사진 블록이 가리키는 첨부다. position 순서이고 사진이 없으면 빈 목록이다. 옛 코드가 쓴 줄은 NULL 일 수 있다. */
+    /** 본문의 사진 블록이 가리키는 첨부다. position 순서이고 사진이 없으면 빈 목록이다. */
     @Convert(converter = ContentDraftAssetsConverter.class)
-    @Column(name = "assets_json", columnDefinition = "LONGTEXT")
+    @Column(name = "assets_json", nullable = false, columnDefinition = "LONGTEXT")
     private List<ContentDraftAsset> assets;
 
 
@@ -65,20 +65,5 @@ public class ContentDraftRevision {
         this.body = body;
         this.bodyKeyId = keyId;
         this.assets = List.copyOf(assets);
-    }
-
-
-    /** 사진 참조 목록이다. {@link #assetsMissing()} 인 줄은 빈 목록으로 읽는다. */
-    public List<ContentDraftAsset> assets() {
-        return assets == null ? List.of() : assets;
-    }
-
-
-    /**
-     * 직전 이미지로 되돌린 동안 옛 코드가 사진 참조를 옛 테이블에만 쓴 줄이다. 참조를 확인할 수 없으므로 읽기와 정리는 이 줄을
-     * 낡은 원고로 본다. 남은 줄은 옛 테이블을 지우는 PR 이 다시 옮긴다.
-     */
-    public boolean assetsMissing() {
-        return assets == null;
     }
 }

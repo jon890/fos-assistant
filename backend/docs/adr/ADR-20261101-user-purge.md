@@ -25,12 +25,12 @@
 | 개인 기억(`scope = 'USER'`)과 그 임베딩, 링크, 변경 이력 | 지운다 |
 | 할 일, 예약 작업과 실행 이력, 알림, 커넥터 연결과 도구 권한, 브라우저 | 지운다. 커넥터 연결의 비밀값과 브라우저 profile 은 외부 정리까지 한다 |
 | `app_user` 를 가리키는 다른 표(`connector_action`, `connector_conversation_grant`, `connector_tool_grant`, `proactive_check`, `agent_toolset_request`) | 외래 키가 `ON DELETE CASCADE` 가 아니라 사용자 줄을 지우면 막힌다. 그 사용자 소유 줄(`user_id`, `requester_user_id`)은 지운다. 승인 줄의 실행 줄과 점검에 딸린 줄은 외래 키가 함께 지운다. 다른 사용자의 요청을 처리한 기록(`decided_by_user_id`)은 줄을 남기고 칸을 비운다. 결정 당시 목록에 있던 `service_token`, `accountbook_connection`, `financial_order_limit`, `financial_limit_change`, `attention_control`, `attention_event` 는 이미 없어진 표다 |
-| 외래 키 없이 사용자 번호만 남는 본문 없는 이력(`memory_capture`, `hermes_session_binding`, `content_draft_job`, `content_draft_snapshot`, `content_draft_creation_call`, `content_draft_creation_request`) | 남긴다. 본문이 없고 사용자 줄을 지우는 것을 막지 않는다. 대화 정리가 정한 대로 둔다 |
+| 외래 키 없이 사용자 번호만 남는 본문 없는 이력(`memory_capture`, `hermes_session_binding`, `content_draft_snapshot`, `content_draft_creation_call`, `content_draft_creation_request`) | 남긴다. 본문이 없고 사용자 줄을 지우는 것을 막지 않는다. 대화 정리가 정한 대로 둔다 |
 | 데이터 key(`user_data_key`) | 위가 모두 끝난 마지막에 지운다. 지운 뒤에는 남은 암호문을 풀 수 없다 |
 | 사용자 줄(`app_user`) | 마지막에 지운다 |
 | `allowed_person` | 줄은 남기고 꺼진 채 둔다. 같은 주소가 다시 들어오려면 관리자가 켜야 한다. 켜면 새 사용자가 새로 만들어진다 |
 | 사용량 원장(`agent_execution`, 실행 사건) | 남긴다. 금액과 토큰은 회계에 필요하다. 본문은 대화 정리가 이미 비운다 |
-| 그룹 공용 설정(`group_setting`, `memory_collection`) | 사용자 한 사람의 것이 아니므로 건드리지 않는다 |
+| 그룹 공용 설정(`group_setting`) | 사용자 한 사람의 것이 아니므로 건드리지 않는다 |
 | Hermes profile 과 MCP 토큰 | 사용자의 기본 profile 은 기존 profile 거두기로 정리한다 |
 
 ### 되돌리기

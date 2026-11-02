@@ -29,6 +29,9 @@ class MemoryCollectionMigrationTest {
     /** 옮기는 마이그레이션 바로 앞 버전이다. */
     private static final String BEFORE = "20261102074304";
 
+    /** 처음 옮기는 마이그레이션이다. 이 버전까지는 옛 표가 남아 있다. */
+    private static final String MOVED = "20261102074313";
+
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
     Database createDatabase() {
@@ -55,7 +58,7 @@ class MemoryCollectionMigrationTest {
                     """);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT group_id FROM group_setting WHERE setting_key = 'MEMORY_COLLECTIONS' ORDER BY group_id"))
@@ -79,7 +82,7 @@ class MemoryCollectionMigrationTest {
                 .as("다른 설정 줄은 만들지 않는다")
                 .containsExactly("0");
             assertThat(strings(statement, "SELECT COUNT(*) FROM memory_collection"))
-                .as("옛 표는 직전 이미지로 되돌릴 수 있게 지우지 않는다")
+                .as("처음 옮긴 단계는 직전 이미지로 되돌릴 수 있게 옛 표를 지우지 않는다")
                 .containsExactly("22");
         }
     }
@@ -94,7 +97,7 @@ class MemoryCollectionMigrationTest {
             insertDefaults(statement, 1);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT COUNT(*) FROM group_setting WHERE setting_key = 'MEMORY_COLLECTIONS'"))
@@ -123,7 +126,7 @@ class MemoryCollectionMigrationTest {
                 "INSERT INTO group_setting (group_id, setting_key, setting_value) VALUES (1, 'MEMORY_COLLECTIONS', '{}')");
         }
 
-        assertThatThrownBy(() -> migrate(database, null))
+        assertThatThrownBy(() -> migrate(database, MOVED))
             .isInstanceOf(RuntimeException.class)
             .hasRootCauseInstanceOf(SQLException.class);
 
@@ -132,6 +135,45 @@ class MemoryCollectionMigrationTest {
                 .as("기존 줄을 덮어쓰지 않는다")
                 .containsExactly("{}");
             assertThat(strings(statement, "SELECT COUNT(*) FROM memory_collection")).containsExactly("1");
+        }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 옛 표에만 쓴 그룹은 다시 옮기고 줄이 있는 그룹은 건너뛴 뒤 옛 표를 지운다")
+    void remigratesGroupsWrittenByPreviousImageAndDropsOldTable() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, BEFORE);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            insertDefaults(statement, 1);
+            statement.executeUpdate("""
+                    INSERT INTO memory_collection (group_id, collection_key, display_name, sort_order, created_at)
+                    VALUES (2, 'pets', '반려동물', 1, CURRENT_TIMESTAMP(6))
+                    """);
+        }
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            // 직전 이미지가 옛 표에 쓴 줄이다. 1번 그룹은 기본에서 바뀌었고, 2번 그룹은 새 줄이 이미 있으며, 3번 그룹은 기본과 같다.
+            statement.executeUpdate("UPDATE memory_collection SET display_name = '우리 집' WHERE group_id = 1 AND collection_key = 'home'");
+            statement.executeUpdate("INSERT INTO memory_collection (group_id, collection_key, display_name, sort_order, created_at)"
+                + " VALUES (2, 'core', '기본', 2, CURRENT_TIMESTAMP(6))");
+            insertDefaults(statement, 3);
+        }
+
+        migrate(database, null);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT group_id FROM group_setting WHERE setting_key = 'MEMORY_COLLECTIONS' ORDER BY group_id"))
+                .as("기본과 같은 3번 그룹은 줄이 없다")
+                .containsExactly("1", "2");
+            assertThat(collectionsOf(statement, 1)).extracting(MemoryCollection::displayName)
+                .containsExactly("기본", "커리어", "학습", "건강", "재무", "우리 집", "신원");
+            assertThat(collectionsOf(statement, 2))
+                .as("이미 있는 줄은 덮어쓰지 않는다")
+                .containsExactly(new MemoryCollection("pets", "반려동물"));
+            assertThatThrownBy(() -> strings(statement, "SELECT COUNT(*) FROM memory_collection"))
+                .as("옛 표는 지운다")
+                .isInstanceOf(SQLException.class);
         }
     }
 
