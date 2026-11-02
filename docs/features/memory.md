@@ -237,6 +237,7 @@ sequenceDiagram
 
 `ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 과 민감 허용을 바꾼다. 자동으로 붙이지 않는다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
 경로와 응답 칸은 `AgentMemorySettingController` 와 `MemoryAdminDtos` 가 갖는다. `PUT` 의 본문은 받을 collection 전체이고, 빈 목록이면 모두 뗀다.
+그룹의 collection 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖고, 줄이 없는 그룹은 코드의 기본 목록을 쓴다. 이 목록을 바꾸는 화면은 아직 없다([data-schema](../../backend/docs/data-schema.md) 「group_setting」).
 수는 주인이 있으면 주인의 `USER` 항목과 그룹의 `GROUP` 항목을, 없으면 그룹 항목만 센다(`countedFor`). 민감 항목도 센다.
 
 | 갈리는 지점 | 응답 |
