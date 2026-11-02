@@ -1,6 +1,6 @@
 # hermes
 
-Hermes 에 설치하는 plugin 과 profile 틀, 범용 플러그인다. Hermes core 변경의 경계와 검토 순서는 [rule-63](../docs/code-rules/rule-63.md)에 있다.
+Hermes 에 설치하는 plugin 과 profile 틀, 범용 플러그인이다. Hermes core 변경의 경계와 검토 순서는 [rule-63](../docs/code-rules/rule-63.md)에 있다.
 
 | 문서 | 언제 보는지 |
 | --- | --- |
