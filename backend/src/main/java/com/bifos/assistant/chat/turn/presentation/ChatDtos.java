@@ -9,7 +9,7 @@ import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.starter.application.dto.StarterSuggestions;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.domain.PendingMessage;
 import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;
@@ -104,7 +104,7 @@ public final class ChatDtos {
     }
 
     public record PendingMessageView(Long id, String text, Instant createdAt) {
-        static PendingMessageView from(ChatPendingMessage message) {
+        static PendingMessageView from(PendingMessage message) {
             return new PendingMessageView(message.id(), message.content(), message.createdAt());
         }
     }

@@ -15,7 +15,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -51,7 +51,7 @@ class ChatTurnRouting {
     private final TransactionTemplate transactions;
     private final SkillCommandCatalog skillCommands;
     private final Clock clock;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final UserExecutionLimiter limiter;
     private final ChatConversationQueries chatConversationQueries;
 
@@ -210,7 +210,7 @@ class ChatTurnRouting {
             if (!proactive.check().notifyStart()) {
                 return null;
             }
-            // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
+            // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 줄은 건드리지 않는다.
             ChatMessage notice = transactions.execute(status -> messages.save(
                 ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
             onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), notice.content()));
@@ -248,10 +248,15 @@ class ChatTurnRouting {
             conversationWriter.resetAutoTurns(conversation.id());
             // 사람이 질문했으니 「보고할 것 없음」 으로 숨긴 대화를 다시 목록에 보인다.
             conversationWriter.showInList(conversation.id());
-            // 대기 행을 지우는 것과 그 글을 사용자 메시지로 남기는 것은 함께 남거나 함께 빠진다.
-            // 지운 수가 읽은 수와 다르면 읽은 뒤 취소된 행이 있다. 취소한 글을 보내지 않게 되돌린다.
-            if (!pendingIds.isEmpty() && pendingMessages.deleteAllByIdIn(pendingIds) != pendingIds.size()) {
-                throw new PendingQueueChangedException();
+            // 대기 줄에서 보낸 글을 빼는 것과 그 글을 사용자 메시지로 남기는 것은 함께 남거나 함께 빠진다.
+            // 읽은 글 가운데 하나라도 줄에 없으면 읽은 뒤 취소됐다. 취소한 글을 보내지 않게 되돌린다.
+            if (!pendingIds.isEmpty()) {
+                pendingMessages.change(conversation.id(), queue -> {
+                    if (!queue.containsAll(pendingIds)) {
+                        throw new PendingQueueChangedException();
+                    }
+                    return queue.without(pendingIds);
+                });
             }
             return saved;
         });
@@ -259,7 +264,7 @@ class ChatTurnRouting {
             onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
         } else {
-            // 대기 행에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
+            // 대기 줄에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
             chatConversationQueries.markCheckReportsRead(user, conversation);
         }
         return question.id();

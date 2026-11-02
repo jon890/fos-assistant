@@ -11,7 +11,7 @@ import com.bifos.assistant.chat.recovery.application.RecoveredRunRecorder;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.delivery.infra.ResultDeliveryRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.port.FeedbackConversations;
@@ -100,7 +100,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         AppUserRepository.class,
         AttachmentService.class,
         ChatMessageRepository.class,
-        ChatPendingMessageRepository.class,
         ChatService.class,
         CheckNotificationPolicy.class,
         ContextAssembler.class,
@@ -111,6 +110,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         HermesProfileProvisioner.class,
         MemoryContentSealer.class,
         MemoryRepository.class,
+        PendingMessageStore.class,
         PriceCatalog.class,
         ProactiveCheckGuard.class,
         ProactiveCheckService.class,

@@ -8,9 +8,10 @@ import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
-import com.bifos.assistant.chat.conversation.domain.ChatPendingMessage;
+import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
+import com.bifos.assistant.chat.conversation.domain.PendingMessages;
+import com.bifos.assistant.chat.conversation.domain.UnreadablePendingMessagesException;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.infra.ChatPendingMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
@@ -34,7 +35,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * turn 이 닫힐 때, 위임이 끝났을 때, 서버가 뜰 때 다음 turn 을 정한다.
@@ -50,7 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class NextTurnDispatcher {
 
     /**
-     * 보내려다 실패했는데 대기 행을 멈추지도 못한 대화에서 대기 메시지 turn 을 다시 열지 않고 기다리는 시간이다.
+     * 보내려다 실패했는데 대기 줄을 멈추지도 못한 대화에서 대기 메시지 turn 을 다시 열지 않고 기다리는 시간이다.
      *
      * <p>행이 멈추지 않은 채 남으므로, 기다리지 않으면 그 turn 을 닫는 자리에서 같은 행으로 곧바로 다시 열어 같은 실패를
      * 쉬지 않고 되풀이한다. 이 시간이 지난 뒤의 turn 닫기, 위임 종료 사건, 더하기, 기동 확인이 다시 시도한다.
@@ -59,17 +59,16 @@ public class NextTurnDispatcher {
 
     private final TurnCancellation turns;
     private final DelegationWakeService wake;
-    private final ChatPendingMessageRepository pendingMessages;
+    private final PendingMessageStore pendingMessages;
     private final ConversationRepository conversations;
     private final AppUserRepository users;
     private final ChatService chat;
     private final ConversationEventHub hub;
-    private final TransactionTemplate transactions;
     private final BackgroundTasks backgroundTasks;
 
     private final Clock clock = Clock.systemUTC();
 
-    /** 대기 행을 멈추지 못한 대화와 그 시각이다. 메모리에만 두며 서버가 다시 뜨면 사라진다. */
+    /** 대기 줄을 멈추지 못한 대화와 그 시각이다. 메모리에만 두며 서버가 다시 뜨면 사라진다. */
     private final Map<Long, Instant> unheldFailures = new ConcurrentHashMap<>();
 
 
@@ -101,7 +100,7 @@ public class NextTurnDispatcher {
 
 
     private void notifyHeld(Long conversationId) {
-        if (pendingMessages.findByConversationIdOrderByIdAsc(conversationId).isEmpty()) {
+        if (pendingMessages.read(conversationId).isEmpty()) {
             return;
         }
         conversations
@@ -137,7 +136,7 @@ public class NextTurnDispatcher {
     @EventListener(ApplicationReadyEvent.class)
     @Order(10)
     public void dispatchAfterStartup() {
-        Set<Long> conversationIds = new LinkedHashSet<>(pendingMessages.findConversationsReadyToSend());
+        Set<Long> conversationIds = new LinkedHashSet<>(pendingMessages.conversationsReadyToSend());
         conversationIds.addAll(wake.conversationsToWake());
         for (Long conversationId : conversationIds) {
             try {
@@ -151,17 +150,28 @@ public class NextTurnDispatcher {
 
 
     public void tryNext(Long conversationId) {
-        if (tryPending(conversationId)) {
+        if (tryPendingOrSkipUnreadable(conversationId)) {
             return;
         }
         wake.tryWake(conversationId);
     }
 
 
+    /** 대기 줄이 깨졌으면 경고만 남기고 거짓이다. 그 대화의 위임 결과까지 막으면 안 된다. */
+    private boolean tryPendingOrSkipUnreadable(Long conversationId) {
+        try {
+            return tryPending(conversationId);
+        } catch (UnreadablePendingMessagesException ex) {
+            log.warn("대기 줄을 읽지 못해 보내지 않는다 conversationId={}", conversationId, ex);
+            return false;
+        }
+    }
+
+
     /**
      * 보낼 대기 메시지가 있으면 turn 잠금을 잡고 새 가상 스레드에서 보낸다.
      *
-     * <p>대기 행을 멈추지 못한 대화는 {@link #FAILURE_BACKOFF} 동안 열지 않고 거짓을 돌려준다. 그동안에도 위임 결과는
+     * <p>대기 줄을 멈추지 못한 대화는 {@link #FAILURE_BACKOFF} 동안 열지 않고 거짓을 돌려준다. 그동안에도 위임 결과는
      * 전한다.
      *
      * <p>사용자 실행 한도에 닿으면 기다리지 않는다(ADR-069). 대기 줄을 멈추고 그 대화에 {@code USER_BUSY} 를 알린다. 그대로
@@ -172,8 +182,8 @@ public class NextTurnDispatcher {
      * turn 이 닫힐 때 다시 온다. 사용자 실행 한도로 대기 줄을 멈춘 때도 참이다
      */
     private boolean tryPending(Long conversationId) {
-        List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
-        if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
+        PendingMessages queue = pendingMessages.read(conversationId);
+        if (!queue.sendable()) {
             return false;
         }
         if (inFailureBackoff(conversationId)) {
@@ -190,7 +200,7 @@ public class NextTurnDispatcher {
             return false;
         }
         AppUser owner = user.get();
-        List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
+        List<Long> ids = queue.ids();
         TurnHandle handle;
         try {
             handle = turns.open(owner.id(), conversationId);
@@ -221,7 +231,7 @@ public class NextTurnDispatcher {
     /**
      * 대기 메시지 turn 을 돌리고 잠금을 푼다.
      *
-     * <p>사용자 메시지를 저장하기 전에 실패하면 대기 행이 그대로 남는다. 잠금을 풀기 전에 그 행을 멈춰 둔다. 그대로
+     * <p>사용자 메시지를 저장하기 전에 실패하면 대기 글이 그대로 남는다. 잠금을 풀기 전에 그 줄을 멈춰 둔다. 그대로
      * 닫으면 닫기 리스너가 같은 행으로 곧바로 다시 열어 같은 실패를 되풀이한다. 멈추지도 못하면 잠금을 풀기 전에 실패
      * 시각을 적어 한동안 다시 열지 않는다.
      */
@@ -244,15 +254,16 @@ public class NextTurnDispatcher {
     }
 
 
-    /** 이 turn 이 보내려던 행이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 행이 없다. */
+    /**
+     * 이 turn 이 보내려던 글이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 글이 없다.
+     *
+     * <p>남았는지 보는 것과 멈추는 것은 대화 줄을 잠근 한 트랜잭션이다. 그 사이 모두 취소됐으면 멈추지 않는다.
+     */
     private void holdUnsent(Conversation conversation, List<Long> ids) {
         try {
-            boolean unsent = pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                .anyMatch(row -> ids.contains(row.id()));
-            if (!unsent) {
+            if (!pendingMessages.holdIfAnyLeft(conversation.id(), ids)) {
                 return;
             }
-            transactions.executeWithoutResult(status -> pendingMessages.markHeld(conversation.id(), true));
             hub.publish(conversation.id(), ChatEvent.pending(conversation.publicId()));
         } catch (RuntimeException ex) {
             // 남았는지 모르거나 멈추지 못했다. 쉬지 않고 다시 여는 것보다 잠시 늦게 보내는 편이 낫다.
