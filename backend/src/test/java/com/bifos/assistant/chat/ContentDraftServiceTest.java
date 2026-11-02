@@ -188,6 +188,17 @@ class ContentDraftServiceTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("옛 코드가 써서 사진 참조 칸이 빈 revision 은 정리와 읽기에서 STALE 이 된다")
+    void staleWhenAssetsColumnIsMissing() {
+        var id = drafts.create(owner, conversation.id(), inputDraft("첫", false)).draft().draftId();
+        jdbc.update("update content_draft_revision set assets_json=null");
+        cleaner.cleanExpired(clock.instant());
+        assertErased(ContentDraftRevisionStatus.STALE);
+        code(() -> drafts.read(owner, conversation.id(), id, null), ErrorCode.CONTENT_DRAFT_STALE);
+    }
+
+
+    @Test
     @DisplayName("타첨부 관찰과 지문 변경은 STALE이며 일시 복호화 장애는 보존한다")
     void distinguishesObservationMismatchFromTransientDecryption() throws IOException {
         record(0, UUID.randomUUID(), input(), model());
