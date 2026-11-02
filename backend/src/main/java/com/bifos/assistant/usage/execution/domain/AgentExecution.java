@@ -150,20 +150,13 @@ public class AgentExecution {
     @Column(name = "context_omitted_items")
     private Integer contextOmittedItems;
 
-    /**
-     * 실행 당시 Hermes 의 고정 프롬프트 구성을 가리키는 지문.
-     *
-     * <p>그 값을 주는 HTTP 경로가 아직 없어 지금은 항상 비어 있다. 값을 얻게 되는 날 칸을 다시 만들지
-     * 않도록 미리 둔다.
-     */
+    /** 실행 당시 Hermes 의 고정 프롬프트 구성 지문이다. 값을 주는 HTTP 경로가 아직 없어 늘 비어 있다. */
     @Column(name = "runtime_fingerprint", length = 64)
     private String runtimeFingerprint;
 
     /**
-     * 이 실행에 넣은 {@code instructions} 의 SHA-256 앞 16바이트를 16진수로 적은 값.
-     *
-     * <p>{@code context_chars} 가 길이를 말하고 이 칸이 내용이 같은지를 말한다. 본문에 개인 Memory 가
-     * 들어 있어 본문 자체는 어디에도 저장하지 않는다. 넣은 문맥이 없으면 비운다.
+     * 이 실행에 넣은 {@code instructions} 의 SHA-256 앞 16바이트를 16진수로 적은 값이다.
+     * 본문에 개인 Memory 가 있어 본문은 저장하지 않는다. 넣은 문맥이 없으면 비운다.
      */
     @Column(name = "instructions_hash", length = 64)
     private String instructionsHash;
@@ -210,6 +203,10 @@ public class AgentExecution {
     // 엔티티 저장이 이 칸을 메모리의 옛 값으로 덮지 않게 한다. 도는 위임 자식에 적은 표시가 그 자식이 끝날 때 지워지면 안 된다.
     @Column(name = "result_delivered_at", updatable = false)
     private Instant resultDeliveredAt;
+
+    /** 사람이 보낸 turn 의 질문 메시지 번호다. 조건부 UPDATE 로만 채우고 비운다(ADR-20261102 / table-reduce-r2). */
+    @Column(name = "question_message_id", updatable = false)
+    private Long questionMessageId;
 
 
     private AgentExecution(Builder builder) {

@@ -9,10 +9,8 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
-import com.bifos.assistant.chat.conversation.domain.ExecutionQuestion;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
-import com.bifos.assistant.chat.conversation.infra.ExecutionQuestionRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryLinkService;
@@ -34,6 +32,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
@@ -98,7 +97,7 @@ class McpMemoryRememberToolTest {
     ChatMessageRepository messages;
 
     @Autowired
-    ExecutionQuestionRepository questions;
+    ExecutionQuestions questions;
 
     @Autowired
     ExecutionEventRepository events;
@@ -406,10 +405,8 @@ class McpMemoryRememberToolTest {
     @DisplayName("같은 대화의 앞 실행이 바깥 도구를 썼으면 지금 실행이 쓰지 않았어도 제안이다")
     void proposesWhenEarlierRunReadOutsideText() throws Exception {
         AgentExecution earlier = otherRootRun("run-earlier");
-        questions.save(ExecutionQuestion.of(
-            earlier.id(),
-            messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()))
-                .id()));
+        ChatMessage earlierQuestion = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()));
+        questions.link(earlier.id(), earlierQuestion.id());
         toolStarted(earlier.id(), ExecutionEventType.TOOL_STARTED, "mcp__gmail__read_message");
         askedInThisTurn();
 
@@ -474,7 +471,7 @@ class McpMemoryRememberToolTest {
     @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
     void proposesWhenQuestionIsOthers() throws Exception {
         ChatMessage foreign = messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
-        questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id()));
+        questions.link(dadRun.id(), foreign.id());
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
             .isEqualTo(PROPOSED);
@@ -737,7 +734,7 @@ class McpMemoryRememberToolTest {
 
     private void askedInThisTurn(String text) {
         ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), text, Instant.now()));
-        questions.save(ExecutionQuestion.of(dadRun.id(), question.id()));
+        questions.link(dadRun.id(), question.id());
     }
 
 
@@ -746,7 +743,7 @@ class McpMemoryRememberToolTest {
         String root = McpCallSigner.newRoot();
         AgentExecution run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
         ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
-        questions.save(ExecutionQuestion.of(run.id(), question.id()));
+        questions.link(run.id(), question.id());
         return root;
     }
 
@@ -784,9 +781,6 @@ class McpMemoryRememberToolTest {
 
 
     private void clear() {
-        jdbc.update(
-            "DELETE FROM execution_question WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
-            PROFILE);
         jdbc.update(
             "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
             PROFILE);
