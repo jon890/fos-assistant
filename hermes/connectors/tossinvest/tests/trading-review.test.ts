@@ -59,10 +59,15 @@ async function connect(root: string, destination: string, authority = {}) {
   return client;
 }
 
-async function consume(root: string, prepared: unknown, model: unknown) {
+async function consume(
+  root: string,
+  prepared: unknown,
+  model: unknown,
+  name = "modify_order",
+) {
   await writeFile(
     join(root, "prepared.json"),
-    JSON.stringify({ prepared, model, tool: "modify_order" }),
+    JSON.stringify({ prepared, model, tool: name }),
   );
   const child = Bun.spawn(
     [
@@ -241,6 +246,57 @@ for (const name of ["modify_order", "cancel_order"] as const) {
     }
   });
 }
+
+test("지정가 원주문의 orderAmount 는 파생 값이라 원주문 대조에서 null 이고 시장가 금액 주문은 그대로다", () => {
+  const limit = { ...sampleOrder("old"), orderType: "LIMIT", price: "140", quantity: "1", orderAmount: "140" };
+  expect(expectedOrder(limit).orderAmount).toBeNull();
+  expect(expectedOrder({ ...limit, orderAmount: "garbage" }).orderAmount).toBeNull();
+  const market = { ...sampleOrder("old"), orderType: "MARKET", price: null, orderAmount: "50" };
+  expect(expectedOrder(market).orderAmount).toBe("50");
+});
+
+// 실제 토스 응답은 지정가 수량 주문에도 orderAmount 에 가격×수량을 채운다. 공식 문서는 null 이라 적는다.
+test("지정가 원주문에 orderAmount 가 채워져 와도 취소 준비→Python 소비자→실행이 통과한다", async () => {
+  const { fake, original } = setup();
+  const filled = { ...original, orderAmount: "24" };
+  fake.on("GET", "/api/v1/orders/old", { result: filled });
+  const claims = new ClaimFixture();
+  const root = await generateTradingFixture(fake.url);
+  const prepare = await connect(root, fake.url);
+  let execute: Client | undefined;
+  try {
+    const model = { orderId: "old" };
+    const prepared = await tool(prepare, "prepare_trade", {
+      v: 1,
+      tool: "cancel_order",
+      args: model,
+    });
+    expect(prepared.result.isError).toBeUndefined();
+    const args = prepared.body.executionArgs as any;
+    const summary = prepared.body.summary as any;
+    expect(args.expected_order.orderAmount).toBeNull();
+    expect(args.expected_order.price).toBe("12");
+    expect(summary.orderAmount).toBeNull();
+    expect(summary.original.orderAmount).toBeNull();
+    await consume(root, prepared.body, model, "cancel_order");
+    fake.on("POST", "/api/v1/orders/old/cancel", {
+      result: { orderId: "old-cancel" },
+    });
+    execute = await connect(root, fake.url, claims.authority("cancel_order", args));
+    const response = await tool(execute, "cancel_order", args);
+    expect(response.result.isError).toBeUndefined();
+    expect(response.body).toEqual({ orderId: "old-cancel" });
+    expect(claims.requests).toHaveLength(1);
+    expect(fake.seen("POST", "/api/v1/orders/old/cancel")).toHaveLength(1);
+    expect(fake.seen("DELETE")).toHaveLength(0);
+  } finally {
+    await prepare.close();
+    await execute?.close();
+    claims.stop();
+    fake.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("생산 금융 transport 호출자는 guarded trading-tools만 사용한다", async () => {
   const source = resolve(import.meta.dir, "../src");

@@ -812,6 +812,8 @@ guard는 자식의 권한 env를 회수하고 실행 원문의 바이트 SHA와 
 env 계좌를 문자열 그대로 대조한 뒤 ticket·tool·argsSha256·scope로 claim을 한 번 호출한다.
 claim 응답의 v·allowed·ticketId·expiresAt을 검사하며 redirect나 재시도를 하지 않는다.
 정정·취소는 claim 뒤 원주문을 다시 읽어 expected_order와 filledQuantity까지 대조한다.
+원주문 투영(`expectedOrder`)은 지정가 주문의 orderAmount를 null로 둔다. 공식 문서는 금액 시장가 주문 밖에서 null이라 적지만, 실제 응답은 지정가 수량 주문에도 가격×수량을 채운다(2026-11-02 운영 관측).
+그 값을 그대로 두면 준비가 `TOSSINVEST_INVALID_INPUT` 으로 거절되어 지정가 주문을 취소하지 못했다. 지정가 주문의 의도는 price와 quantity가 갖고, 시장가 주문의 orderAmount는 그대로 대조한다.
 금융 fetch를 시작하는 quota queue callback에서 계좌와 ticket 만료를 마지막으로 검사한다.
 POST·DELETE는 GET 재시도 루프를 공유하지 않는다. 전송 전 실패와 공식 명백한 거절은 FAILED,
 429·5xx·timeout·불량2xx와 불분명한 오류는 UNKNOWN이며 자동 재전송하지 않는다.
