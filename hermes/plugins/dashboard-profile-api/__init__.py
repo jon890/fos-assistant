@@ -229,7 +229,6 @@ from .profiles import (
     _check_skill_toggle,
     _check_skills_list,
     _copy_profile_plugin,
-    _decision_readiness_response,
     _delete_check,
     _model_defaults_response,
     _profile_names,
@@ -245,7 +244,6 @@ from .routes import (
     CALL_ROUTE_RE,
     CATALOG_PATH,
     CONNECTORS_PATH,
-    DECISION_READINESS_RE,
     EXECUTE_ROUTE_RE,
     MODEL_DEFAULTS_RE,
     PROFILES_PATH,
@@ -373,7 +371,6 @@ def register(ctx) -> None:
     for path, method in VAULT_ROUTES:
         opened.setdefault(path, []).append(method)
     opened["/api/profiles/<이름>/model-defaults"] = ["GET"]
-    opened["/api/profiles/<이름>/decision-readiness"] = ["GET"]
     opened["/api/profiles/<이름>/sessions/<session id>/provider"] = ["GET"]
     logger.info(
         "dashboard-profile-api: %s 를 토큰으로 연다. 스킬 루트는 %s 다",
