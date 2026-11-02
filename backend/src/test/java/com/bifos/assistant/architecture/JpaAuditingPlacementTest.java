@@ -124,7 +124,7 @@ class JpaAuditingPlacementTest {
     @ValueSource(strings = {
         "Conversation.updatedAt", "ConnectorConnection.updatedAt", "ConnectorBinding.updatedAt", "Memory.updatedAt",
         "UserBrowser.updatedAt", "ResultDelivery.updatedAt", "ContentDraftSnapshot.connectionUpdatedAt",
-        "ConnectorActionExecution.bindingUpdatedAt", "TaskRun.startedAt", "TaskRun.finishedAt", "ContentDraftJob.startClaimedAt",
+        "ConnectorActionExecution.bindingUpdatedAt", "TaskRun.startedAt", "TaskRun.finishedAt",
         "ContentDraftRevision.createdAt", "MediaObservation.createdAt", "SubagentUsageJob.createdAt"
     })
     @DisplayName("활동과 snapshot 및 사건과 revision 및 큐 업무 시각에는 auditing을 붙이지 못한다")

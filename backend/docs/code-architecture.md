@@ -794,7 +794,7 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 ### 원고 snapshot의 참가 경계
 
 chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 소유한다.
-`ContentDraftSnapshotInputs`는 기존 원고·revision·asset 저장소와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
+`ContentDraftSnapshotInputs`는 기존 원고·revision 저장소(사진 참조는 revision 의 `assets_json`)와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
 `ContentDraftBindingAccess`는 DB 권한 검사와 잠금 밖의 선언 준비를 나누고 connector의 `ConnectorContentDraftBindings`가 구현한다.
 `ContentDraftBindingStamp`에는 식별자·수정 시각·profile·connector ID·정책 지문만 담는다. catalog 전체와 비밀값은 넘기지 않는다.
 `HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.

@@ -13,7 +13,7 @@ import java.util.UUID;
  * @param manifest 준비할 때 읽은 불변 catalog 선언. 읽지 못했으면 null
  * @param startSupported catalog가 시작과 조회를 선언했고 전송 구현이 있는가
  */
-public record PreparedContentDraftApproval(UUID actionId, Long jobRowId, Long snapshotRowId, UUID snapshotId,
+public record PreparedContentDraftApproval(UUID actionId, Long snapshotRowId, UUID snapshotId,
     Long conversationId, Long agentId, List<Long> executionIds, ContentDraftBindingStamp stamp, ConnectorManifest manifest,
     boolean startSupported) {
     public PreparedContentDraftApproval {
