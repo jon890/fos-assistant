@@ -228,4 +228,13 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
     /** 금융 하루 상한이 KST 하루 안에 승인으로 넘어간 금융 줄을 읽는다. 호출자가 상태로 다시 거른다. */
     List<ConnectorAction> findByUserIdAndRiskAndDecidedAtGreaterThanEqual(Long userId, ToolRisk risk, Instant from);
+
+
+    /**
+     * 사용자 정리 때 그 사용자의 승인 줄을 모두 지운다(ADR-20261101 / user-purge). 실행 줄은 외래 키의 {@code ON DELETE CASCADE} 로
+     * 함께 지워진다. 지운 행 수를 돌려준다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ConnectorAction a where a.userId = :userId")
+    int deleteAllOfUser(@Param("userId") Long userId);
 }

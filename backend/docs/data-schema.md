@@ -238,15 +238,15 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 
 `PurgeCoverageMysqlTest`는 Flyway로 만든 실제 MySQL에서 모든 분류 테이블에 행을 넣는다.
 삭제 전 대상과 다른 사용자의 행이 모두 있어야 한다.
-사용자 접근 해제, `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
+사용자 접근 해제, 예약 30일 뒤 `UserPurger`(대화 정리를 기다린 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`까지), `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
 행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하며 `KEEP` 대상과 다른 사용자의 모든 칸이 같은지도 비교한다.
 Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검사의 범위 밖이다.
 
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
-현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
-접근 해제는 사용자와 개인 데이터를 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+사용자 물리 삭제는 사용자 정리(ADR-20261101 / user-purge)가 맡고, 표마다 기대값은 `tables.tsv`의 user 칸이 갖는다. 현재 알려진 공백은 다음 대화 purge 대상뿐이다.
+접근 해제만으로는 사용자와 개인 데이터를 지우지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
@@ -310,7 +310,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 **둘을 잇는 것은 `email` 이다.** 외래 키를 두지 않는다. 허용한 시점에는 `app_user` 가 없고, 지운 뒤에도 실행 기록은 `app_user` 를 가리켜야 한다.
 `hermes_profile` 이 유일한 이유는 두 사람이 같은 profile 을 쓰면 격리가 깨지기 때문이다. `agent` 표의 `hermes_profile` 도 유일하므로 같은 제약이 두 곳에 있다.
 `last_login_at` 은 웹 로그인 성공만 적는다. 이 칸이 생기기 전의 로그인은 비어 있다.
-`purge_scheduled_at` 은 관리자가 정리를 예약한 시각이다. 비어 있으면 예약이 없고, 이 시각에서 30일이 지나면 정리 작업이 사용자 데이터를 지운다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md)). 꺼진 사람에게만 적을 수 있고 다시 켜면 비워진다. 새 표를 만들지 않고 이 칸으로 예약 상태를 갖는다.
+`purge_scheduled_at` 은 관리자가 정리를 예약한 시각이다. 비어 있으면 예약이 없고, 이 시각에서 30일이 지나면 정리 작업이 사용자 데이터를 지운다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md)). 꺼진 사람에게만 적을 수 있고 다시 켜면 비워진다. 정리 작업이 그 사람의 사용자를 모두 지우면 비우고 줄은 꺼진 채 남긴다. 새 표를 만들지 않고 이 칸으로 예약 상태를 갖는다.
 
 #### 비어 있으면 아무도 들어오지 못한다
 
@@ -506,7 +506,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `vault_fingerprint` | 대화 번호, 경로, 본문 바이트의 SHA-256 16진수. `(vault_user_id, vault_fingerprint)` 에 유일 제약이 있어 같은 보관 요청은 한 건이다 |
 | `vault_bundle_id` | 이 행이 든 묶음의 뿌리 행 `id`. 뿌리 행과 묶음이 아닌 보관 사본, 대화 결과물 행은 비어 있다. `(vault_bundle_id, path)` 에 색인이 있다 |
 
-보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다.
+보관 사본 행의 `byte_size` 는 평문 바이트 수이고 사용자당 용량을 셀 때 쓴다. 대화를 정리할 때와 만료 표시 작업은 `vault_user_id` 가 빈 행만 건드린다. 사용자 정리는 데이터 key 를 지우기 전에 그 사용자의 보관 행(묶음 안 파일과 지우기 이력 포함)을 모두 지운다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md)).
 묶음 안 파일 행도 `vault_user_id` 가 채워져 있어 같이 남는다. 묶음 안 파일의 `vault_fingerprint` 는 묶음 지문과 경로로 만든다.
 **사용자가 보관본을 지우면 뿌리 행은 지우기 이력으로 남는다.** 같은 트랜잭션에서 묶음 안 행을 지우고, 뿌리 행은 `vault_body`, `vault_key_id` 를 비우고 `path` 를 빈 문자열로, `byte_size` 를 0 으로 바꾼 뒤 `deleted_at` 에 지운 시각을 적는다. `vault_fingerprint` 는 남아 자동 보관이 같은 보관본을 다시 만들지 못한다. 사용자가 직접 다시 보관하면 이 이력 행을 지우고 새로 넣는다. 목록과 읽기, 용량은 `deleted_at` 이 빈 행만 본다.
 그 대화를 정리할 때 이력 행도 함께 지운다. 대화가 이미 지워진 뒤에 보관본을 지우면 이력을 남기지 않고 행을 지운다. 지운 대화에서는 자동 보관이 다시 돌지 않는다. 사용자 접근 해제는 보관 사본과 이력을 지우지 않는다.

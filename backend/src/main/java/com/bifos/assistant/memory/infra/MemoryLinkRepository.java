@@ -91,4 +91,10 @@ public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
     @Modifying
     @Query("delete from MemoryLink l where l.fromMemoryId = :id or l.toMemoryId = :id")
     void deleteByMemoryId(@Param("id") Long id);
+
+
+    /** 사용자 정리 때 한 끝이라도 그 기억 항목들에 걸린 링크를 지운다. 지운 행 수를 돌려준다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from MemoryLink l where l.fromMemoryId in :memoryIds or l.toMemoryId in :memoryIds")
+    int deleteAllTouching(@Param("memoryIds") Collection<Long> memoryIds);
 }

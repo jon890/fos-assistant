@@ -74,7 +74,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261015 / package-layout](ADR-20261015-package-layout.md) | 기능은 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면은 admin 으로 모은다 | Accepted. ADR-068 의 최상위 층 순서를 보완한다 |
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 | [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |
-| [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 단계마다 바꾼다. 첫 단계는 읽기 전용 미리보기다 |
+| [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. 세 단계 모두 구현했다. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 바꿨다 |
 | [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. ADR-20261010 / media-observation-storage 의 요청 alias 테이블과 ADR-20261011 / media-observation-cache 를 대체한다 |
 | [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
 

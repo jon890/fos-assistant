@@ -163,6 +163,16 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     int deleteForgottenOfGoneConversation(@Param("id") Long id, @Param("userId") Long userId);
 
 
+    /**
+     * 그 사용자의 보관 행을 모두 지운다. 뿌리 행과 묶음 안 파일, 본문 없는 지우기 이력이 모두 대상이다(ADR-20261101 / user-purge).
+     *
+     * <p>다른 사용자의 행과 대화 결과물 행({@code vault_user_id} 가 빈 행)은 건드리지 않는다. 트랜잭션은 부르는 쪽이 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from ChatArtifact a where a.vaultUserId = :userId")
+    int deleteAllVaultOf(@Param("userId") Long userId);
+
+
     /** 사용자가 지운 보관본을 그 사용자가 다시 보관할 때 이력 행을 지운다. 새 보관본이 같은 지문을 쓴다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ChatArtifact a where a.id = :id and a.vaultUserId = :userId and a.deletedAt is not null")

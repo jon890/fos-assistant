@@ -405,8 +405,12 @@ public class UserBrowserService {
     }
 
 
-    /** 끈 줄을 그 버전으로 지운 뒤에 프로필을 지운다. 그 사이 다른 전이가 줄을 바꿨으면 줄과 프로필을 모두 남긴다. */
-    private void remove(UserBrowser browser) {
+    /**
+     * 끈 줄을 그 버전으로 지운 뒤에 프로필을 지운다. 그 사이 다른 전이가 줄을 바꿨으면 줄과 프로필을 모두 남긴다.
+     *
+     * <p>사용자 정리의 {@link UserBrowserPurge} 도 부른다. 이 빈은 프록시가 없어 패키지 안 호출이 그대로 닿는다.
+     */
+    void remove(UserBrowser browser) {
         UserBrowser stopped = halt(browser);
         try {
             browsers.delete(stopped);
