@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Test;
  */
 class FinancialPluginResetTest extends FinancialConnectorTestBase {
 
-
     @Test
     @DisplayName("거절 mode 와 카운터를 남긴 뒤에도 같은 프로세스의 다음 검사는 새 profile 과 처음 카운터, 기본 응답 mode 로 시작한다")
     void startsNextTestFromInitialState() throws Exception {
