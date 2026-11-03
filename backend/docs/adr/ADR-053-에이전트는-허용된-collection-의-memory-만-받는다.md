@@ -1,6 +1,6 @@
 ## ADR-053: 에이전트는 허용된 collection 의 Memory 만 받는다
 
-- **status**: `accepted`
+- **status**: `accepted` 세 번째 조건(민감 허용)은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 대체한다.
 - **결정**: 에이전트의 실행이 받는 Memory 는 세 조건을 모두 지난 항목이다.
   1. 범위. `USER` 는 주인, `GROUP` 은 같은 그룹
   2. 그 에이전트가 받는 collection. `agent_memory_collection` 에 줄이 있는 collection 만이다
