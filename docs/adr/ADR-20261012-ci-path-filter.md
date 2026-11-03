@@ -188,7 +188,7 @@ main 에 들어오는 커밋은 최신 main 을 포함한 head 로 PR CI 를 통
 - 정기 실행이 실패하면 실패한 run 이 Actions 에 남고, 브라우저 실패는 기존 `browser-failures` job 이 이슈로 모은다.
   백엔드와 Hermes 실패에 이슈를 따로 열지는 않는다. 새 외부 연동을 만들지 않는다는 제약을 지키고, 이슈 자동화는 같은 실패가 반복된 것을 본 뒤에 더한다.
   E2E 는 2026-11-03 에 더했다(아래 「정기 E2E 실패를 이슈로 남기고, 모델 지시문을 바꾸는 PR 에서 E2E 를 돌린다 (2026-11-03)」).
-  이 job 은 정기 실행과 수동 실행의 main 실패만 모은다. push 는 browser 를 돌리지 않으므로 대상에서 뺐다.
+  `browser-failures` 는 정기 실행과 수동 실행의 main 실패만 모은다. push 는 browser 를 돌리지 않으므로 대상에서 뺐다.
 
 되돌릴 때는 `scripts/ci/ci-paths.mjs` 의 `PUSH_JOBS` 와 `ci.yml` 의 `browser-failures` 조건을 함께 고친다.
 
