@@ -234,29 +234,26 @@ export function withoutAskGuide(instructions: string): string {
   return (instructions.slice(0, start).replace(/\n+$/, "") + instructions.slice(end)).replace(/^\n+/, "");
 }
 
+/**
+ * Control Plane 이 instructions 맨 앞에 붙이는 모델 지침 절의 제목이다. 붙는 순서대로 둔다.
+ * 「# 기억」 은 `memory_remember` 를 받는 실행에만 붙는다. 절마다 제목 뒤에 빈 줄 없는 한 단락이 온다.
+ * `ContextAssembler` 의 지침 상수와 같아야 한다. 절이 늘었는데 여기 없으면 그 절부터 답에 섞여 저장된 답을
+ * 비교하는 검사가 한꺼번에 깨진다. `test/unit/fake-hermes-controls.test.ts` 가 둘을 맞춰 본다.
+ */
+export const MODEL_GUIDE_HEADERS = ["# 답변 형식", "# 도구 호출", "# 승인 카드", "# 기억"] as const;
+
 /** 모델 지침은 답에 복사하지 않고, Memory 본문은 기존처럼 되돌려 검증한다. */
 export function withoutResponseGuide(instructions: string): string {
-  const header = "# 답변 형식\n\n";
-  if (!instructions.startsWith(header)) return instructions;
+  if (!instructions.startsWith(`${MODEL_GUIDE_HEADERS[0]}\n\n`)) return instructions;
 
-  const nextSection = instructions.indexOf("\n\n", header.length);
-  return withoutMemoryGuide(withoutToolCallGuide(nextSection < 0 ? "" : instructions.slice(nextSection + 2)));
-}
-
-/** 답변 형식 뒤에 붙는 로컬 MCP 단건 호출 지침이다. 빈 줄 없는 한 단락이라 그 단락만 뺀다. */
-function withoutToolCallGuide(instructions: string): string {
-  const header = "# 도구 호출\n\n";
-  if (!instructions.startsWith(header)) return instructions;
-  const nextSection = instructions.indexOf("\n\n", header.length);
-  return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
-}
-
-/** `memory_remember` 를 받는 실행에 답변 형식 뒤에 붙는 「# 기억」 지침이다. 빈 줄 없는 한 단락이라 그 단락만 뺀다. */
-export function withoutMemoryGuide(instructions: string): string {
-  const header = "# 기억\n\n";
-  if (!instructions.startsWith(header)) return instructions;
-  const nextSection = instructions.indexOf("\n\n", header.length);
-  return nextSection < 0 ? "" : instructions.slice(nextSection + 2);
+  let rest = instructions;
+  for (const header of MODEL_GUIDE_HEADERS) {
+    const prefix = `${header}\n\n`;
+    if (!rest.startsWith(prefix)) continue;
+    const nextSection = rest.indexOf("\n\n", prefix.length);
+    rest = nextSection < 0 ? "" : rest.slice(nextSection + 2);
+  }
+  return rest;
 }
 
 /** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
