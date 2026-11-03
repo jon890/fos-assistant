@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CONTRACT_SHA256, OPERATIONS, SCHEMAS } from "../src/api-contract.ts";
 import { Tossinvest } from "../src/client.ts";
 import { RESPONSE_MAX_BYTES } from "../src/constants.ts";
-import { GROUP_LIMITS } from "../src/rate-limit.ts";
+import { GROUP_LIMITS, clock } from "../src/rate-limit.ts";
 import { registerStockStatisticsTools } from "../src/stock-statistics-tools.ts";
 import { createToolRegistration } from "../src/tool-registration.ts";
 import {
@@ -17,7 +17,10 @@ import {
   tokenPrefix,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const cases = [
   ["getStockInvestorTrading", "get_stock_investor_trading", "investor-trading"],
@@ -658,7 +661,7 @@ test("서로 다른 client의 5개 통계 operation도 같은 초당 10회 그�
   try {
     for (const [, , segment] of cases)
       fake.routes.set(`GET ${pathFor(segment)}`, () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return json(example(segment, "noData"));
       });
     await withMcp(server(fake), (first) =>

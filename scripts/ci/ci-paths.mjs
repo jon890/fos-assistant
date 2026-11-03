@@ -64,7 +64,7 @@ export const RULES = [
   [/^test\/resources\/connector-argument-(?:masked-)?catalog\.json$/, ["backend", "hermes"]],
 
   [/^scripts\/checks\/check-mysql-migration\.sh$/, ["backend"]],
-  [/^scripts\/checks\/(check-connectors\.sh|check-hermes-contract\.sh)$/, ["hermes"]],
+  [/^scripts\/checks\/(check-connectors\.sh|check-hermes-contract\.sh|run-hermes-python-tests\.py)$/, ["hermes"]],
   [/^scripts\/ci\/check-connector-package\.sh$/, ["hermes"]],
   [/^scripts\/checks\/(quality\.sh|quality-report\.mjs|format-connectors\.mjs|check-file-length\.mjs|file-length-baseline\.json)$/, ["quality"]],
   [/^scripts\/(?:ci\/)?browser-[^/]+\.mjs$/, ["browser"]],

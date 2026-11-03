@@ -1,13 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { expect } from "bun:test";
+import { afterEach, beforeEach, expect, spyOn } from "bun:test";
 import {
   CURRENT_OPERATIONS,
   OPERATIONS,
   matchesOperation,
 } from "../src/api-contract.ts";
 import { clearClientState } from "../src/client.ts";
+import { clock } from "../src/rate-limit.ts";
 
 /** 모두 지어낸 값이다. 실제 계정이나 사람과 관계가 없다. */
 export const credentials = {
@@ -236,4 +237,36 @@ export async function expectFailure(
   const { result, body } = await tool(client, name, arguments_);
   expect(result.isError).toBe(true);
   expect(body).toEqual({ error: { code } });
+}
+
+/**
+ * 속도 제한 큐의 대기를 실제로 기다리지 않고 건너뛴다.
+ * 건너뛴 시간만큼 `clock.now()` 를 앞당겨 deadline 과 간격 계산은 운영 코드 그대로 돈다.
+ * 대기 길이는 `waits` 에 쌓이므로 「얼마나 기다리려 했는가」 는 이 배열로 확인한다.
+ * 대역이 `performance.now()` 같은 실제 시계로 도착 간격을 재면 건너뛴 시간이 보이지 않으니 이 helper 를 쓰지 않는다.
+ * 파일 맨 위에서 한 번 부르면 그 파일의 모든 테스트에 beforeEach/afterEach 로 걸린다.
+ */
+export function useSkippedWaits() {
+  const state = { waits: [] as number[], skipped: 0 };
+  let now: { mockRestore(): void } | undefined;
+  let sleep: { mockRestore(): void } | undefined;
+  beforeEach(() => {
+    state.waits = [];
+    state.skipped = 0;
+    const realNow = clock.now.bind(clock);
+    now = spyOn(clock, "now").mockImplementation(
+      () => realNow() + state.skipped,
+    );
+    sleep = spyOn(clock, "sleep").mockImplementation(async (ms: number) => {
+      state.waits.push(ms);
+      state.skipped += ms;
+      // 대기 중에 다른 작업이 진행될 틈은 남긴다.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  });
+  afterEach(() => {
+    now?.mockRestore();
+    sleep?.mockRestore();
+  });
+  return state;
 }

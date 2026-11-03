@@ -1,17 +1,35 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../e2e/fake-hermes.ts";
-import { withoutResponseGuide } from "../e2e/fake-hermes/scenario-fixtures.ts";
+import { readFileSync } from "node:fs";
+import { MODEL_GUIDE_HEADERS, withoutResponseGuide } from "../e2e/fake-hermes/scenario-fixtures.ts";
 
 const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
 const TOOL_CALL_GUIDE = "# 도구 호출\n\n로컬 MCP 도구 단건 호출 안내";
+const APPROVAL_CARD_GUIDE = "# 승인 카드\n\n[승인 대기] 판정 글 안내\n둘째 줄";
 const MEMORY_GUIDE = "# 기억\n\nmemory_remember 안내";
 const MEMORY_BODY = "# 지금 묻는 사람에 대해 아는 것\n\n- Memory 본문";
+const CONTEXT_ASSEMBLER = new URL(
+  "../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
+  import.meta.url,
+);
 
-test("답변 형식 뒤의 도구 호출과 기억 지침을 빼고 Memory 본문을 보존한다", () => {
-  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n");
+test("답변 형식 뒤의 도구 호출과 승인 카드, 기억 지침을 빼고 Memory 본문을 보존한다", () => {
+  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, APPROVAL_CARD_GUIDE, MEMORY_GUIDE, MEMORY_BODY].join("\n\n");
 
   assert.equal(withoutResponseGuide(instructions), MEMORY_BODY);
+});
+
+test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상수의 제목과 순서가 같다", () => {
+  // ContextAssembler 는 답변 형식, 도구 호출, 기억 상수를 이 순서로 잇는다. 상수 안의 절 제목을 모두 모은다.
+  const source = readFileSync(CONTEXT_ASSEMBLER, "utf8");
+  const headers = ["RESPONSE_INSTRUCTIONS", "TOOL_CALL_INSTRUCTIONS", "MEMORY_INSTRUCTIONS"].flatMap((name) => {
+    const block = new RegExp(`${name} = """([\\s\\S]*?)"""`).exec(source);
+    assert.ok(block, `${name} 상수를 찾지 못했다`);
+    return [...block[1]!.matchAll(/^\s*(# \S.*)$/gm)].map((match) => match[1]!.trim());
+  });
+
+  assert.deepEqual(headers, [...MODEL_GUIDE_HEADERS]);
 });
 
 test("도구 호출 또는 기억 지침이 없는 답변 형식도 Memory 본문을 보존한다", () => {

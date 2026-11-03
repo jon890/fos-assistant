@@ -8,7 +8,11 @@ import {
   json,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+import { clock } from "../src/rate-limit.ts";
+
+useSkippedWaits();
 
 const canonical = JSON.parse(
   readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`, "utf8"),
@@ -294,7 +298,7 @@ test("환율과 양 시장 캘린더는 서로 다른 client에서도 MARKET_INF
   const arrivals: number[] = [];
   for (const path of [exchangePath, krPath, usPath])
     fake.routes.set(`GET ${path}`, () => {
-      arrivals.push(Date.now());
+      arrivals.push(clock.now());
       return json(Object.values(examples(path))[0]!.value);
     });
   try {

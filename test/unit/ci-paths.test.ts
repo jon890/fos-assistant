@@ -308,8 +308,8 @@ test("필수 검사 이름 hermes 는 나눈 두 job 이 모두 있어야 하고
   assert.equal(jobs.has("hermes-tests"), false);
   const python = jobs.get("hermes-python") ?? assert.fail("hermes-python job 이 없다");
   // 새 checkout 에서 도는 Python 테스트는 커넥터의 dist 와 node_modules 를 읽으므로 설치와 빌드가 unittest 보다 앞서야 한다.
-  const unittest = python.indexOf("python -m unittest discover");
-  assert.ok(unittest >= 0, "unittest 단계가 없다");
+  const unittest = python.indexOf("run-hermes-python-tests.py");
+  assert.ok(unittest >= 0, "Python 테스트 단계가 없다");
   for (const step of ["bun install --cwd", "bun run --cwd"]) {
     const index = python.indexOf(step);
     assert.ok(index >= 0 && index < unittest, `${step} 가 unittest 앞에 없다`);
@@ -318,7 +318,7 @@ test("필수 검사 이름 hermes 는 나눈 두 job 이 모두 있어야 하고
   assert.doesNotMatch(python, /check-connector-package\.sh/);
   const connectors = jobs.get("hermes-connectors") ?? assert.fail("hermes-connectors job 이 없다");
   assert.match(connectors, /check-connector-package\.sh/);
-  assert.doesNotMatch(connectors, /python -m unittest/);
+  assert.doesNotMatch(connectors, /run-hermes-python-tests|python -m unittest/);
 });
 
 test("quality 는 판정 job 이 실패해도 생략되지 않고, 무거운 단계만 판정 값으로 건너뛴다", () => {

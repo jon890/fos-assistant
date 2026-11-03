@@ -26,7 +26,10 @@ import {
   withMcp,
   tool,
   json,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const operations = new Set(OPERATIONS.map((operation) => operation.id));
 const account = "9223372036854775807";

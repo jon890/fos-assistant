@@ -478,7 +478,8 @@ jobs:
             bun install --cwd "$connector" --frozen-lockfile
             bun run --cwd "$connector" build
           done
-      - run: python -m unittest discover -s hermes/tests -v
+      # 테스트 모듈마다 프로세스를 나눠 동시에 돌린다. 모듈 목록은 unittest discover 와 같다.
+      - run: python scripts/checks/run-hermes-python-tests.py -j 4
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 버전 소스에서 확인한다(ADR-088).
       - run: bash scripts/checks/check-hermes-contract.sh
 
