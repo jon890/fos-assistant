@@ -24,7 +24,6 @@ export function MemoryMeta({
           {formatRelative(changedAt, new Date(readAt))}
         </span>
       ) : null}
-      {memory.sensitive ? <Badge variant="warning">민감</Badge> : null}
       {memory.supersededBy ? (
         <Badge variant="outline" data-testid="memory-superseded">
           대체됨

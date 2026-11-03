@@ -2,6 +2,7 @@ package com.bifos.assistant.context.eval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -66,6 +67,9 @@ class MemoryEmbeddingEvalTest {
     private static final String HYBRID = "hybrid";
     /** {@code application.yml} 의 {@code assistant.memory.embedding.model} 기본값과 같다. */
     private static final String DEFAULT_MODEL = "onnx-community/bge-m3-ONNX";
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryLinkDiscovery linkDiscovery;
@@ -134,9 +138,9 @@ class MemoryEmbeddingEvalTest {
             }
             return vectors;
         };
-        MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings);
+        MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings, texts);
         MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(
-            settings, timed, embeddings, transactionManager, cache, backgroundTasks, linkDiscovery);
+            settings, timed, embeddings, transactionManager, cache, backgroundTasks, linkDiscovery, texts);
         MemorySearchSection hybridSection = new MemorySearchSection(
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),

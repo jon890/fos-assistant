@@ -15,13 +15,13 @@ import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -50,6 +50,9 @@ class MemoryEmbeddingRefresherTest {
 
     private static final CurrentUser USER = new CurrentUser(1L, "user1@example.com", "user1", 10L, UserRole.ADMIN);
     private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, 2, 16, null, null);
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryLinkDiscovery linkDiscovery;
@@ -99,12 +102,11 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("풀린 일반 항목만 줄이 생기고 민감, 풀지 못한, 제안, 보관, 출처 원문 항목은 생기지 않는다")
+    @DisplayName("풀린 색인 항목만 줄이 생기고 풀지 못한, 제안, 보관, 출처 원문 항목은 생기지 않는다")
     void embedsOnlyPlainSearchableItems() {
         Memory plain = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
         Memory group = memories.create(USER, MemoryScope.GROUP, "보일러", "10월에 점검한다", false);
-        memories.create(USER, MemoryScope.USER, "민감", "혈액형", Memory.DEFAULT_COLLECTION, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        memories.create(USER, MemoryScope.USER, "보관", "오래된 메모", Memory.DEFAULT_COLLECTION, MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL);
+        memories.create(USER, MemoryScope.USER, "보관", "오래된 메모", Memory.DEFAULT_COLLECTION, MemoryRetrieval.ARCHIVE);
         memories.create(USER, MemoryScope.USER, "항상", "항상 싣는 메모", true);
         memories.proposeUser(USER, "제안", "아직 받아들이지 않은 메모", null);
         Memory source = memories.create(USER, MemoryScope.USER, "출처", "원문", false);
@@ -158,7 +160,7 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("본문을 고치면 다음 주기에 지문이 바뀌고 민감으로 바꾸거나 지우면 줄이 지워진다")
+    @DisplayName("본문을 고치면 다음 주기에 지문이 바뀌고 보관으로 바꾸거나 지우면 줄이 지워진다")
     void refreshesChangedAndRemovesExcludedRows() {
         Memory edited = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
         Memory hidden = memories.create(USER, MemoryScope.USER, "혈액형", "O형이다", false);
@@ -167,7 +169,7 @@ class MemoryEmbeddingRefresherTest {
         byte[] before = MemoryEmbeddingRows.find(jdbc, edited.id()).orElseThrow().textFingerprint();
 
         memories.update(USER, edited.id(), "올해 3월에 다시 갈았다", false, null);
-        memories.update(USER, hidden.id(), "O형이다", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+        memories.update(USER, hidden.id(), "O형이다", MemoryRetrieval.ARCHIVE);
         jdbc.update("DELETE FROM memory WHERE id = ?", gone.id());
         int written = refresher(ENABLED).refreshOnce();
 
@@ -238,12 +240,12 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("주기 도중 민감으로 바뀐 항목은 다음 묶음을 보내기 직전에 다시 읽어 보내지 않는다")
-    void rereadsBatchBeforeSendingAndSkipsItemsTurnedSensitive() {
+    @DisplayName("주기 도중 보관으로 바뀐 항목은 다음 묶음을 보내기 직전에 다시 읽어 보내지 않는다")
+    void rereadsBatchBeforeSendingAndSkipsItemsArchived() {
         memories.create(USER, MemoryScope.USER, "첫째", "첫 본문", false);
         memories.create(USER, MemoryScope.USER, "둘째", "둘째 본문", false);
         Memory third = memories.create(USER, MemoryScope.USER, "셋째", "셋째 평문", false);
-        client.onFirstCall(() -> memories.update(USER, third.id(), "셋째 평문", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
+        client.onFirstCall(() -> memories.update(USER, third.id(), "셋째 평문", MemoryRetrieval.ARCHIVE));
 
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
 
@@ -319,7 +321,8 @@ class MemoryEmbeddingRefresherTest {
 
     private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties, MemoryLinkDiscovery discovery) {
         return new MemoryEmbeddingRefresher(
-            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks, discovery);
+            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties, texts), backgroundTasks, discovery,
+            texts);
     }
 
 

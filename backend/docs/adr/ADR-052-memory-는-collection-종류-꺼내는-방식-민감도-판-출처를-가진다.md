@@ -1,6 +1,6 @@
 ## ADR-052: Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다
 
-- **status**: `accepted`
+- **status**: `accepted` 민감도(`sensitivity`)와 「민감 항목은 `ALWAYS` 로 둘 수 없다」 는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 대체한다.
 - **결정**: 새 표 계층을 만들지 않고 `memory` 표에 칸을 더한다.
   한 줄이 속한 `collection`, 종류(`entry_type`), 에이전트가 닿는 방식(`retrieval`), 민감도(`sensitivity`), 판 번호(`revision`), 출처 한 개(`source_type`, `source_ref`, `source_date`)다.
   고치거나 지울 때 그 전의 값을 `memory_revision` 에 남긴다. 지운 항목도 마지막 값이 남는다.
@@ -14,7 +14,7 @@
   - 긴 문서와 원문을 사실 한 줄과 구분할 수 있는가. 문서는 이름으로 찾고 판을 쌓는다
   - 언제 무엇으로 바뀌었는가. 다른 서비스가 문서의 판 번호를 자기 결과의 기준으로 쓴다
   - 어디서 온 값인가. 들여온 항목을 묶어 되돌리려면 출처가 있어야 한다
-- **대체된 부분**: [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 가 「민감 항목의 본문은 아직 평문으로 저장한다」 를 대체한다. 민감 본문은 암호화해 저장한다. [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 가 둔 `always_inject` 한 칸을 `retrieval` 세 값으로 넓힌다. 층을 나눠 싣는다는 결정은 그대로다.
+- **대체된 부분**: [ADR-055](archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 가 「민감 항목의 본문은 아직 평문으로 저장한다」 를 대체한다. 민감 본문은 암호화해 저장한다. [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 가 둔 `always_inject` 한 칸을 `retrieval` 세 값으로 넓힌다. 층을 나눠 싣는다는 결정은 그대로다.
 - **대안 기각**:
   - 문서와 출처를 다른 표로 둔다: 범위 판정, 승인 상태, 에이전트 접근 판정을 표마다 다시 만들어야 한다. 판정이 두 벌이 되면 한쪽이 빠진다. 한 표에 두고 종류 칸으로 나눈다.
   - `collection` 을 enum 으로 둔다: 그룹마다 쓰는 영역이 다르고 더할 때마다 배포해야 한다. 문자열 key 로 두고 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖는다(처음에는 `memory_collection` 테이블이 가졌고 [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) 가 옮겼다).

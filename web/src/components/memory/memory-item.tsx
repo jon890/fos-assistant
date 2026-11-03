@@ -60,8 +60,8 @@ export function MemoryItem({
     exit(onChanged);
   }
 
-  // 민감한 기억과 풀지 못한 기억은 본문이 오지 않는다. 빈 칸으로 덮어쓰지 않게 고치기를 보이지 않는다.
-  const editable = canEdit && !memory.sensitive && !memory.unreadable;
+  // 풀지 못한 기억은 본문이 오지 않는다. 빈 칸으로 덮어쓰지 않게 고치기를 보이지 않는다.
+  const editable = canEdit && !memory.unreadable;
   const superseded = memory.supersededBy;
   return (
     <ExpandableRow
@@ -96,10 +96,6 @@ export function MemoryItem({
           {memory.unreadable ? (
             <p className="text-sm text-muted-foreground">
               이 기억은 지금 읽지 못해요.
-            </p>
-          ) : memory.sensitive ? (
-            <p className="text-sm text-muted-foreground">
-              민감한 내용이라 여기서는 보이지 않아요.
             </p>
           ) : (
             <p className="whitespace-pre-wrap break-words text-sm">

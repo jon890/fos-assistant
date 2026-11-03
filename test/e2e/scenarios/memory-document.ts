@@ -1,5 +1,5 @@
 /**
- * 사용자가 민감 문서를 만들고 자기 JWT로 본문과 판 번호를 읽는 흐름을 한 번 왕복한다.
+ * 사용자가 문서를 만들고 자기 JWT로 본문과 판 번호를 읽는 흐름을 한 번 왕복한다.
  *
  * <p>보안·암호화 설정과 Flyway로 만든 스키마를 함께 확인한다. 문서의 주인은 `people.ts`가 허용 목록에 더한 aunt이며,
  * 다른 사용자와 인증 없는 요청을 거절하고 접근 해제 뒤 기존 JWT도 막히는지 본다.
@@ -13,7 +13,6 @@ type DocumentView = {
   collection: string;
   documentKey: string;
   revision: number;
-  sensitive: boolean;
   content: string;
 };
 
@@ -40,7 +39,7 @@ export const memoryDocumentScenario: Scenario = {
     ).json<{ key: string }[]>();
     expect(collections.some((item) => item.key === "identity"), "collection 목록에 identity 가 없다");
 
-    step("민감 문서를 만든다");
+    step("문서를 만든다");
     const created = expectStatus(
       await call(context, "/memory-documents", {
         method: "POST",
@@ -50,31 +49,19 @@ export const memoryDocumentScenario: Scenario = {
           documentKey,
           title: "지원서 공통 프로필",
           content: FIRST,
-          sensitive: true,
         },
       }),
       200,
       "문서 만들기",
     ).json<DocumentView>();
-    expect(created.revision === 1 && created.sensitive, `만든 문서의 판이나 민감 표시가 다르다: ${JSON.stringify(created)}`);
-
-    step("민감 표시가 빠진 요청은 거절한다");
-    expectStatus(
-      await call(context, "/memory-documents", {
-        method: "POST",
-        token: aunt,
-        body: { collection: "identity", documentKey: "no-sensitive-flag", title: "t", content: FIRST },
-      }),
-      400,
-      "민감 표시가 없는 문서 만들기",
-    );
+    expect(created.revision === 1, `만든 문서의 판이 다르다: ${JSON.stringify(created)}`);
 
     step("같은 이름으로 다시 만들지 못한다");
     const duplicate = expectStatus(
       await call(context, "/memory-documents", {
         method: "POST",
         token: aunt,
-        body: { collection: "identity", documentKey, title: "t", content: FIRST, sensitive: true },
+        body: { collection: "identity", documentKey, title: "t", content: FIRST },
       }),
       409,
       "같은 이름의 문서",
@@ -103,7 +90,7 @@ export const memoryDocumentScenario: Scenario = {
       await call(context, `/memory-documents/${created.id}`, {
         method: "PUT",
         token: aunt,
-        body: { content: SECOND, sensitive: true, expectedRevision: 1 },
+        body: { content: SECOND, expectedRevision: 1 },
       }),
       200,
       "문서 고치기",
@@ -116,7 +103,7 @@ export const memoryDocumentScenario: Scenario = {
       await call(context, `/memory-documents/${created.id}`, {
         method: "PUT",
         token: aunt,
-        body: { content: "x", sensitive: true, expectedRevision: 1 },
+        body: { content: "x", expectedRevision: 1 },
       }),
       409,
       "낡은 판 번호",

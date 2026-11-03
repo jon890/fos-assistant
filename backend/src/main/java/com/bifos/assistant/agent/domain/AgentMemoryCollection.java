@@ -1,7 +1,6 @@
 package com.bifos.assistant.agent.domain;
 
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
-import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -29,19 +28,14 @@ public class AgentMemoryCollection extends CreatedAtEntity {
     @EmbeddedId
     private AgentMemoryCollectionId id;
 
-    /** 참이면 이 collection 의 민감 항목까지 받는다. */
-    @Column(name = "allow_sensitive", nullable = false)
-    private boolean allowSensitive;
 
-
-    private AgentMemoryCollection(Long agentId, String collection, boolean allowSensitive) {
+    private AgentMemoryCollection(Long agentId, String collection) {
         this.id = new AgentMemoryCollectionId(agentId, collection);
-        this.allowSensitive = allowSensitive;
     }
 
 
-    public static AgentMemoryCollection of(Long agentId, String collection, boolean allowSensitive) {
-        return new AgentMemoryCollection(agentId, collection, allowSensitive);
+    public static AgentMemoryCollection of(Long agentId, String collection) {
+        return new AgentMemoryCollection(agentId, collection);
     }
 
 
@@ -49,9 +43,4 @@ public class AgentMemoryCollection extends CreatedAtEntity {
         return id.collection();
     }
 
-
-    /** 민감 항목까지 받을지 바꾼다. 붙인 시각은 그대로 둔다. */
-    public void changeAllowSensitive(boolean allowSensitive) {
-        this.allowSensitive = allowSensitive;
-    }
 }

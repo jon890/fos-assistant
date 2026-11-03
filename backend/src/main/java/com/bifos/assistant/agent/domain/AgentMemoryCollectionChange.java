@@ -45,12 +45,6 @@ public class AgentMemoryCollectionChange {
     private AgentMemoryCollectionChangeType changeType;
 
     /**
-     * 붙임과 민감 허용 바꿈은 바꾼 뒤의 값, 뗌은 떼기 전의 값이다.
-     */
-    @Column(name = "allow_sensitive", nullable = false)
-    private boolean allowSensitive;
-
-    /**
      * 바꾼 관리자다. 사용자를 지워도 기록은 남으므로 외래 키를 걸지 않는다.
      */
     @Column(name = "changed_by_user_id", nullable = false)
@@ -64,14 +58,12 @@ public class AgentMemoryCollectionChange {
         Long agentId,
         String collection,
         AgentMemoryCollectionChangeType type,
-        boolean allowSensitive,
         Long changedByUserId,
         Instant now) {
         AgentMemoryCollectionChange change = new AgentMemoryCollectionChange();
         change.agentId = agentId;
         change.collection = collection;
         change.changeType = type;
-        change.allowSensitive = allowSensitive;
         change.changedByUserId = changedByUserId;
         change.changedAt = now;
         return change;

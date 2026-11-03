@@ -1,6 +1,6 @@
 ## ADR-20261016 / jpa-auditing-base: 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다
 
-- **status**: `accepted`
+- **status**: `accepted` 예시로 든 민감 허용 갱신은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 없앴다.
 - Date: 2026-10-16
 
 ### 맥락

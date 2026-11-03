@@ -5,12 +5,10 @@ import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.MemoryText;
 import com.bifos.assistant.memory.domain.MemoryTextOpener;
 import com.bifos.assistant.memory.domain.SealedMemoryText;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.StoredMemoryText;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -38,7 +36,7 @@ import org.hibernate.annotations.ColumnDefault;
  * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.
  *
  * <p>{@code storedTitle} 과 {@code storedContent} 는 저장된 글이다. {@code dataKeyId} 가 있으면 주인 데이터 key 의
- * 암호문이다(ADR-20261103 / memory-encryption). 옛 key 로 암호화한 줄은 {@code contentKeyId} 가 그 key 를 적는다(ADR-055).
+ * 암호문이다(ADR-20261103 / memory-encryption). 비어 있으면 암호화가 꺼진 설치의 평문이다.
  * 제목과 본문을 내는 곳은 {@link #title()} 과 {@link #content()} 를 쓴다. 처음 부를 때 읽어 올 때 붙인 복호화 도구로 푼다.
  */
 @Entity
@@ -82,17 +80,13 @@ public class Memory extends CreatedAtEntity {
     @Column(name = "title", nullable = false, length = 1200)
     private String storedTitle;
 
-    /** 저장된 본문이다. {@link #dataKeyId} 나 {@link #contentKeyId} 가 있으면 암호문이다. */
+    /** 저장된 본문이다. {@link #dataKeyId} 가 있으면 암호문이다. */
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String storedContent;
 
-    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이거나 옛 key 의 줄이다. */
+    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이다. */
     @Column(name = "data_key_id")
     private Long dataKeyId;
-
-    /** ADR-055 의 옛 key 로 본문을 암호화했으면 그 key 의 id 다. 이관하면 비운다. */
-    @Column(name = "content_key_id", length = 32)
-    private String contentKeyId;
 
     @Transient
     @Getter(AccessLevel.NONE)
@@ -112,10 +106,6 @@ public class Memory extends CreatedAtEntity {
 
     @Column(name = "always_inject", nullable = false)
     private boolean alwaysInject;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private MemorySensitivity sensitivity;
 
     /** 지금 값의 판 번호다. 1 에서 시작하고 고칠 때마다 1 씩 는다. */
     @Column(nullable = false)
@@ -163,7 +153,7 @@ public class Memory extends CreatedAtEntity {
         Long ownerUserId,
         Long groupId,
         String title,
-        StoredContent body,
+        String content,
         MemoryPlacement placement,
         MemoryStatus status,
         Long proposedByExecutionId,
@@ -172,12 +162,10 @@ public class Memory extends CreatedAtEntity {
         this.ownerUserId = ownerUserId;
         this.groupId = groupId;
         this.storedTitle = title;
-        this.storedContent = body.content();
-        this.contentKeyId = body.keyId();
-        this.plain = body.sealed() ? null : new MemoryText(title, body.content());
+        this.storedContent = content;
+        this.plain = new MemoryText(title, content);
         this.collection = placement.collection();
         this.entryType = MemoryEntryType.MEMORY;
-        this.sensitivity = placement.sensitivity();
         place(placement.retrieval());
         this.revision = 1;
         this.status = status;
@@ -191,36 +179,32 @@ public class Memory extends CreatedAtEntity {
         Long ownerUserId,
         Long groupId,
         String title,
-        StoredContent body,
+        String content,
         MemoryPlacement placement,
         Long acceptedByUserId,
         Instant now) {
-        Memory memory = new Memory(scope, ownerUserId, groupId, title, body, placement, MemoryStatus.ACCEPTED, null, now);
+        Memory memory = new Memory(scope, ownerUserId, groupId, title, content, placement, MemoryStatus.ACCEPTED, null, now);
         memory.acceptedByUserId = acceptedByUserId;
         memory.acceptedAt = now;
         return memory;
     }
 
 
-    /**
-     * 사용자가 직접 쓴 문서다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 로 고정한다. 민감 문서가 항상 층으로 올라갈 길을
-     * 만들지 않는다(ADR-057).
-     */
+    /** 사용자가 직접 쓴 문서다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 로 고정한다(ADR-057). */
     public static Memory document(
         Long ownerUserId,
         String collection,
         String documentKey,
         String title,
-        StoredContent body,
-        MemorySensitivity sensitivity,
+        String content,
         Instant now) {
         Memory memory = accepted(
             MemoryScope.USER,
             ownerUserId,
             null,
             title,
-            body,
-            new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity),
+            content,
+            new MemoryPlacement(collection, MemoryRetrieval.SEARCH),
             ownerUserId,
             now);
         memory.entryType = MemoryEntryType.DOCUMENT;
@@ -241,7 +225,7 @@ public class Memory extends CreatedAtEntity {
             ownerUserId,
             null,
             title,
-            StoredContent.plain(content),
+            content,
             MemoryPlacement.core(MemoryRetrieval.SEARCH),
             MemoryStatus.PROPOSED,
             proposedByExecutionId,
@@ -251,14 +235,11 @@ public class Memory extends CreatedAtEntity {
     }
 
 
-    /**
-     * 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-20261007 / memory-remember). 민감 항목이면 중복 키를 비운다. 키가 본문의 해시라
-     * 평문 칸에 지문이 남기 때문이다.
-     */
+    /** 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-20261007 / memory-remember). */
     public static Memory proposed(
         Long ownerUserId,
         String title,
-        StoredContent body,
+        String content,
         MemoryPlacement placement,
         Long proposedByExecutionId,
         String proposalDedupKey,
@@ -268,32 +249,29 @@ public class Memory extends CreatedAtEntity {
             ownerUserId,
             null,
             title,
-            body,
+            content,
             placement,
             MemoryStatus.PROPOSED,
             proposedByExecutionId,
             now);
-        memory.proposalDedupKey = placement.sensitivity() == MemorySensitivity.SENSITIVE ? null : proposalDedupKey;
+        memory.proposalDedupKey = proposalDedupKey;
         return memory;
     }
 
 
     /**
      * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-20261007 / memory-remember). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
-     * 주인이다. 민감 항목은 이 길로 오지 않는다.
+     * 주인이다.
      */
     public static Memory remembered(
         Long ownerUserId,
         String title,
-        StoredContent body,
+        String content,
         MemoryPlacement placement,
         Long proposedByExecutionId,
         String proposalDedupKey,
         Instant now) {
-        if (placement.sensitivity() == MemorySensitivity.SENSITIVE) {
-            throw new IllegalArgumentException("a sensitive memory cannot be remembered without review");
-        }
-        Memory memory = accepted(MemoryScope.USER, ownerUserId, null, title, body, placement, ownerUserId, now);
+        Memory memory = accepted(MemoryScope.USER, ownerUserId, null, title, content, placement, ownerUserId, now);
         memory.proposedByExecutionId = proposedByExecutionId;
         memory.proposalDedupKey = proposalDedupKey;
         return memory;
@@ -341,33 +319,25 @@ public class Memory extends CreatedAtEntity {
 
 
     /**
-     * 본문과 꺼내는 방식과 민감도를 고치고 revision 을 하나 올린다. 풀지 못한 줄은 부르는 쪽이 먼저 거절한다.
+     * 본문과 꺼내는 방식을 고치고 revision 을 하나 올린다. 풀지 못한 줄은 부르는 쪽이 먼저 거절한다.
      *
      * <p>고치기 전의 값은 부르는 쪽이 {@link MemoryRevision#of} 로 먼저 남긴다.
      *
      * @param sealed 주인 데이터 key 로 암호화한 제목과 새 본문. 암호화가 꺼진 설치면 null 이다
-     *
-     * @throws IllegalArgumentException 민감 항목을 항상 싣게 하려 할 때. {@link MemoryPlacement#allows} 로 먼저 본다
      */
     public void revise(
         String content,
         SealedMemoryText sealed,
         MemoryRetrieval retrieval,
-        MemorySensitivity sensitivity,
         String updatedProposalDedupKey,
         Instant at) {
-        if (!MemoryPlacement.allows(retrieval, sensitivity)) {
-            throw new IllegalArgumentException("a sensitive memory cannot always be injected");
-        }
         String title = title();
         // 암호문을 받았으면 저장 필드에 바로 적어 평문이 저장 필드에 놓이는 순간이 없다. 암호화가 꺼진 설치만 평문을 적는다
         this.storedTitle = sealed == null ? title : sealed.title();
         this.storedContent = sealed == null ? content : sealed.content();
         this.dataKeyId = sealed == null ? null : sealed.dataKeyId();
-        this.contentKeyId = null;
         this.plain = new MemoryText(title, content);
         this.unreadable = false;
-        this.sensitivity = sensitivity;
         place(retrieval);
         if (proposalDedupKey != null) {
             proposalDedupKey = updatedProposalDedupKey;
@@ -395,16 +365,16 @@ public class Memory extends CreatedAtEntity {
     }
 
 
-    /** 저장된 글이 암호문인가. 데이터 key 나 옛 key 의 줄이다. */
+    /** 저장된 글이 데이터 key 의 암호문인가. */
     public boolean sealed() {
-        return dataKeyId != null || contentKeyId != null;
+        return dataKeyId != null;
     }
 
 
     /** 저장된 글과 key, 주인이다. 암호화와 풀기가 같은 AAD 를 만든다. */
     public StoredMemoryText stored() {
         return new StoredMemoryText(
-            id, scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId, contentKeyId);
+            id, scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId);
     }
 
 
@@ -425,13 +395,24 @@ public class Memory extends CreatedAtEntity {
     }
 
 
-    /** 주인 데이터 key 의 암호문을 적는다. 옛 key 표시는 비운다. 판 번호와 갱신 시각은 건드리지 않는다. */
+    /** 주인 데이터 key 의 암호문을 적는다. 판 번호와 갱신 시각은 건드리지 않는다. */
     public void seal(SealedMemoryText sealed) {
         opened();
         this.storedTitle = sealed.title();
         this.storedContent = sealed.content();
         this.dataKeyId = sealed.dataKeyId();
-        this.contentKeyId = null;
+    }
+
+
+    /**
+     * 제안 중복 키를 주인 key 의 HMAC 으로 바꿔 적는다. 비어 있던 줄은 그대로 둔다(ADR-20261103 / memory-sensitivity-removal).
+     *
+     * @param dedupKey 새 키. 같은 키를 이미 다른 줄이 가졌으면 null 로 비운다
+     */
+    public void rekeyProposalDedup(String dedupKey) {
+        if (proposalDedupKey != null) {
+            proposalDedupKey = dedupKey;
+        }
     }
 
 

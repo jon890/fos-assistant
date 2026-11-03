@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -23,7 +24,6 @@ import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -293,7 +293,7 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("모델이 sensitive 를 주지 않아도 본문이 민감해 보이면 일반 민감도의 제안으로 내린다")
+    @DisplayName("모델이 sensitive 를 주지 않아도 본문이 민감해 보이면 제안으로 내린다")
     void proposesSensitiveLookingContent() throws Exception {
         askedInThisTurn("아빠 계좌는 국민은행이야.");
 
@@ -301,7 +301,6 @@ class McpMemoryRememberToolTest {
 
         Memory memory = onlyMemory();
         assertThat(memory.status()).isEqualTo(MemoryStatus.PROPOSED);
-        assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
     }
 
 
@@ -494,7 +493,7 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("민감한 내용은 바로 저장 조건이어도 제안이고 본문은 암호문이며 중복 키를 남기지 않는다")
+    @DisplayName("민감한 내용은 바로 저장 조건이어도 제안이고 본문은 암호문이며 중복 키는 평문의 해시가 아니다")
     void proposesSensitiveFacts() throws Exception {
         askedInThisTurn();
         ObjectNode arguments = remember("건강", "다른 사람은 홍길동이고 당뇨가 있다", "다른 사람은 홍길동이야");
@@ -504,9 +503,10 @@ class McpMemoryRememberToolTest {
 
         Memory memory = onlyMemory();
         assertThat(memory.status()).isEqualTo(MemoryStatus.PROPOSED);
-        assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.SENSITIVE);
         assertThat(memory.sealed()).isTrue();
-        assertThat(memory.proposalDedupKey()).isNull();
+        assertThat(memory.proposalDedupKey())
+            .isNotNull()
+            .isNotEqualTo(Sha256.hex(memory.ownerUserId() + "\u0000건강\u0000다른 사람은 홍길동이고 당뇨가 있다"));
     }
 
 

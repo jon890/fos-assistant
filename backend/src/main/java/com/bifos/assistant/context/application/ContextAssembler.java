@@ -15,7 +15,6 @@ import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.time.Duration;
@@ -164,7 +163,7 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * 사용자가 자기 Memory 목록을 볼 때의 조립이다. collection 과 민감도를 거르지 않는다.
+     * 사용자가 자기 Memory 목록을 볼 때의 조립이다. collection 을 거르지 않는다.
      *
      * <p>실행에 보내지 않는다. 목록에서 자리가 없어 빠질 항목에 표시를 다는 데만 쓴다.
      */
@@ -278,7 +277,6 @@ public class ContextAssembler implements OmittedMemories {
     private boolean factCandidate(Memory memory) {
         return memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
-            && memory.sensitivity() == MemorySensitivity.NORMAL
             && memory.readable()
             && memory.content().length() <= properties.factsItemMaxChars();
     }

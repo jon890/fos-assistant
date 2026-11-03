@@ -43,7 +43,7 @@ export async function createMemory(
 
 export async function createDocument(
   page: Page,
-  input: { collection?: string; documentKey: string; title: string; content: string; sensitive: boolean },
+  input: { collection?: string; documentKey: string; title: string; content: string },
 ) {
   const response = await page.request.post("/api/memory-documents", {
     data: { collection: "career", ...input },

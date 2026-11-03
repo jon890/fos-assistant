@@ -267,7 +267,7 @@ public class MemoryLinkService {
         return memory != null
             && endpoint(user, memory)
             && memory.retrieval() != MemoryRetrieval.ARCHIVE
-            && access.allows(memory.collection(), memory.sensitivity())
+            && access.allows(memory.collection())
             && !isSuperseded(memoryId);
     }
 

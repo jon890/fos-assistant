@@ -62,7 +62,6 @@ const MESSAGES: Record<string, string> = {
   SKILL_COMMAND_UNKNOWN:
     "이 스킬을 이 에이전트에서 쓸 수 없어요. 스킬이 꺼졌거나 지워졌는지 확인해 주세요.",
   ATTACHMENT_GONE: "보관 기간이 지나 볼 수 없어요.",
-  MEMORY_SENSITIVE_NOT_EDITABLE: "민감한 항목은 여기서 고칠 수 없어요.",
   MEMORY_DOCUMENT_EXISTS:
     "같은 이름의 문서가 이미 있어요. 다른 이름을 입력해 주세요.",
   MEMORY_REVISION_CONFLICT:

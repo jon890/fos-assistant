@@ -1,6 +1,6 @@
 ## ADR-20261008 / memory-remember-guard: 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다
 
-- **status**: `accepted`
+- **status**: `accepted` 민감도를 모델이 준 값 그대로 저장한다는 부분은 [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) 이 대체한다. `sensitive` 는 제안으로 내리는 데만 쓴다.
 - Date: 2026-10-08
 - [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) 의 「바로 저장 조건」 2 와 5, 「감당할 것」 의 민감도 항목과 `execution_question` 이전 실행 항목을 개정한다.
   사용자가 직접 말한 사실은 기억해 달라고 하지 않아도 바로 저장한다는 결정과 나머지 조건(루트 실행, 사람이 보낸 turn, 대화 단위 바깥 도구 검사)은 그대로다.

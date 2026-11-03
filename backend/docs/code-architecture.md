@@ -284,7 +284,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
 다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
 새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
-`MemoryPlacement`, `StoredContent`, `MemoryCollectionCount`와 event는 `memory.domain`에,
+`MemoryPlacement`, `MemoryCollectionCount`와 event는 `memory.domain`에,
 저장 enum은 `memory.domain.type`에 남는다. 표와 JPQL 엔티티 이름, 암호화 결합 값과 시각 계약은 유지한다.
 
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.

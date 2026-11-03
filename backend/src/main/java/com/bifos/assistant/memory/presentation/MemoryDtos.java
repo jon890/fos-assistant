@@ -6,7 +6,6 @@ import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -58,7 +57,6 @@ public final class MemoryDtos {
         Instant acceptedAt,
         Instant createdAt,
         Instant updatedAt,
-        boolean sensitive,
         boolean omittedFromContext,
         String sourceAgentName,
         boolean sourceAgentDeleted,
@@ -72,14 +70,13 @@ public final class MemoryDtos {
 
         static MemoryView from(
             Memory memory, boolean omittedFromContext, MemorySource source, SupersededByView supersededBy) {
-            boolean sensitive = memory.sensitivity() == MemorySensitivity.SENSITIVE;
             return new MemoryView(
                 memory.id(),
                 memory.scope().name(),
                 memory.ownerUserId(),
                 memory.groupId(),
                 memory.title(),
-                sensitive || !memory.readable() ? "" : memory.content(),
+                memory.readable() ? memory.content() : "",
                 memory.alwaysInject(),
                 memory.status().name(),
                 memory.proposedByExecutionId(),
@@ -87,7 +84,6 @@ public final class MemoryDtos {
                 memory.acceptedAt(),
                 memory.createdAt(),
                 memory.updatedAt(),
-                sensitive,
                 omittedFromContext,
                 source == null ? null : source.agentName(),
                 source != null && source.agentDeleted(),
@@ -134,14 +130,12 @@ public final class MemoryDtos {
         @NotBlank String collection,
         @NotBlank String documentKey,
         @NotBlank @Size(max = 200) String title,
-        @NotBlank @Size(max = 12000) String content,
-        @NotNull Boolean sensitive) {
+        @NotBlank @Size(max = 12000) String content) {
     }
 
     /** 문서를 고친다. {@code expectedRevision} 은 화면이 읽은 판 번호다. */
     public record UpdateDocumentRequest(
         @NotBlank @Size(max = 12000) String content,
-        @NotNull Boolean sensitive,
         @NotNull Integer expectedRevision) {
     }
 
@@ -151,7 +145,6 @@ public final class MemoryDtos {
         String collection,
         String documentKey,
         String title,
-        boolean sensitive,
         int revision,
         Instant updatedAt) {
         static DocumentSummaryView from(Memory memory) {
@@ -160,7 +153,6 @@ public final class MemoryDtos {
                 memory.collection(),
                 memory.documentKey(),
                 memory.title(),
-                memory.sensitivity() == MemorySensitivity.SENSITIVE,
                 memory.revision(),
                 memory.updatedAt());
         }
@@ -172,7 +164,6 @@ public final class MemoryDtos {
         String collection,
         String documentKey,
         String title,
-        boolean sensitive,
         int revision,
         Instant updatedAt,
         String content) {
@@ -182,7 +173,6 @@ public final class MemoryDtos {
                 memory.collection(),
                 memory.documentKey(),
                 memory.title(),
-                memory.sensitivity() == MemorySensitivity.SENSITIVE,
                 memory.revision(),
                 memory.updatedAt(),
                 content);

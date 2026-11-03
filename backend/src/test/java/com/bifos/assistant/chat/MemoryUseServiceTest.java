@@ -18,7 +18,6 @@ import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -279,14 +278,13 @@ class MemoryUseServiceTest {
 
 
     @Test
-    @DisplayName("읽은 항목은 그 에이전트가 받지 않는 collection 과 허용 없는 민감 항목과 항상 싣는 항목이면 빠진다")
+    @DisplayName("읽은 항목은 그 에이전트가 받지 않는 collection 과 항상 싣는 항목이면 빠진다")
     void dropsReadItemsTheAgentCannotReadNow() {
-        Memory career = memory(dad, "career", MemorySensitivity.NORMAL, MemoryRetrieval.SEARCH, "커리어");
-        Memory sensitive = memory(dad, "core", MemorySensitivity.SENSITIVE, MemoryRetrieval.SEARCH, "신원");
-        Memory always = memory(dad, "core", MemorySensitivity.NORMAL, MemoryRetrieval.ALWAYS, "항상");
-        Memory readable = memory(dad, "core", MemorySensitivity.NORMAL, MemoryRetrieval.SEARCH, "읽힘");
+        Memory career = memory(dad, "career", MemoryRetrieval.SEARCH, "커리어");
+        Memory always = memory(dad, "core", MemoryRetrieval.ALWAYS, "항상");
+        Memory readable = memory(dad, "core", MemoryRetrieval.SEARCH, "읽힘");
         AgentExecution run = answeredRun(conversation, true);
-        List<Memory> reads = List.of(career, sensitive, always, readable);
+        List<Memory> reads = List.of(career, always, readable);
         for (int position = 0; position < reads.size(); position++) {
             source(run, position, "MEMORY_READ", reads.get(position), "INLINE");
         }
@@ -321,17 +319,16 @@ class MemoryUseServiceTest {
 
     private Memory memory(
         CurrentUser owner, MemoryScope scope, String title, String content, MemoryRetrieval retrieval) {
-        return memory(owner, scope, "core", title, content, retrieval, MemorySensitivity.NORMAL);
+        return memory(owner, scope, "core", title, content, retrieval);
     }
 
 
     private Memory memory(
         CurrentUser owner,
         String collection,
-        MemorySensitivity sensitivity,
         MemoryRetrieval retrieval,
         String title) {
-        return memory(owner, MemoryScope.USER, collection, title, title + " 본문", retrieval, sensitivity);
+        return memory(owner, MemoryScope.USER, collection, title, title + " 본문", retrieval);
     }
 
 
@@ -341,9 +338,8 @@ class MemoryUseServiceTest {
         String collection,
         String title,
         String content,
-        MemoryRetrieval retrieval,
-        MemorySensitivity sensitivity) {
-        Memory saved = memoryService.create(owner, scope, title, content, collection, retrieval, sensitivity);
+        MemoryRetrieval retrieval) {
+        Memory saved = memoryService.create(owner, scope, title, content, collection, retrieval);
         createdMemoryIds.add(saved.id());
         return saved;
     }

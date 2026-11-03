@@ -25,7 +25,6 @@ import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
@@ -145,7 +144,7 @@ class McpMemoryLinkToolTest {
         conversation = conversations.save(Conversation.startedBy(user.id(), "연결 검사 대화", agent.id(), Instant.now()));
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), conversation.id(), PROFILE, root);
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core"));
         mvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -217,9 +216,9 @@ class McpMemoryLinkToolTest {
         Memory foreign = memories.create(other, MemoryScope.USER, "남의 항목", "남의 본문", false);
         Memory proposal = memories.proposeUser(user, "제안 항목", "제안 본문", null);
         Memory career = memories.create(
-            user, MemoryScope.USER, "경력", "경력 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            user, MemoryScope.USER, "경력", "경력 본문", "career", MemoryRetrieval.SEARCH);
         Memory archived = memories.create(
-            user, MemoryScope.USER, "보관한 것", "보관 본문", "core", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL);
+            user, MemoryScope.USER, "보관한 것", "보관 본문", "core", MemoryRetrieval.ARCHIVE);
         Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
         ListAppender<ILoggingEvent> logs = new ListAppender<>();
         logs.start();

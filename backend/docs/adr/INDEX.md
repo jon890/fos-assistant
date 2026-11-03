@@ -41,10 +41,9 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-047](ADR-047-도구-내용은-비밀값과-UUID를-가린-뒤-중계하고-저장한다.md) | 도구 내용은 비밀값과 UUID를 가린 뒤 중계하고 저장한다 | Accepted. ADR-038의 관리자 원문 보기를 가린 값으로 바꾼다 |
 | [ADR-049](ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) | 커넥터 도구 호출은 profile plugin 의 hook 이 Control Plane 에 물어 판정한다 | Accepted. ADR-043 의 manifest 에 도구 정책을 더한다. 연결용 profile 의 코드 실행 경로 부분은 ADR-083 이 대체한다 |
 | [ADR-050](ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) | 커넥터 쓰기는 Control Plane 이 승인 줄을 저장하고 승인한 인자로 한 번만 실행한다 | Accepted. ADR-040 의 깨우기를 승인 결과로 넓힌다. 승인한 실행이 실패했을 때 저장하고 전하는 결과는 ADR-092 가 정한다 |
-| [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다. 민감 본문은 평문이라는 부분은 ADR-055 가 대체한다 |
-| [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
+| [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다. 민감 본문은 평문이라는 부분은 ADR-055 가 대체했고, 민감도 자체는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 없앤다 |
+| [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다. 민감 항목의 허용 조건은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 없앤다 |
 | [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다. 「에이전트 기본 모델」 은 [ADR-20261101 / model-setting](../../../docs/adr/ADR-20261101-model-setting.md) 이 대체해 지웠다. 「모델 숨김」 은 그대로다 |
-| [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다. 민감 본문만 환경 변수 key 로 암호화하는 부분은 [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) 이 대체한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
 | [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다. 자식 provider 를 읽는 길은 ADR-067 이 대체한다 |
 | [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |
@@ -70,14 +69,14 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted. 요청 alias 테이블은 [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)가 대체한다 |
 | [ADR-20261013 / financial-digest-key-rotation](ADR-20261013-financial-digest-key-rotation.md) | 금융 해시 key 를 바꾸면 이전 key 의 열린 줄이 끝날 때까지 금융 관문을 닫는다 | Accepted |
 | [ADR-20261015 / memory-eval-gate](ADR-20261015-memory-eval-gate.md) | 기억 선별을 바꾸기 전에 측정을 세 층으로 두고 조립 측정을 악화 금지 게이트로 건다 | Accepted. ADR-071 의 실행마다 남기는 참조에 선택 근거 컬럼을 더한다 |
-| [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 |
+| [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다. 민감 항목을 빼는 부분은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 대체한다. |
 | [ADR-20261015 / package-layout](ADR-20261015-package-layout.md) | 기능은 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면은 admin 으로 모은다 | Accepted. ADR-068 의 최상위 층 순서를 보완한다 |
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 | [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |
 | [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. 세 단계 모두 구현했다. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 바꿨다 |
 | [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. ADR-20261010 / media-observation-storage 의 요청 alias 테이블과 ADR-20261011 / media-observation-cache 를 대체한다 |
 | [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
-| [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, ADR-20261008 / data-encryption 에 그룹 데이터 key 를 더한다 |
+| [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, ADR-20261008 / data-encryption 에 그룹 데이터 key 를 더한다. 남긴 평문 해시는 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 HMAC 으로 바꾼다 |
 
 ## 보관
 
@@ -87,6 +86,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | --- | --- | --- |
 | [ADR-006](archive/ADR-006-작업-영역은-읽기-전용-의존이고-공개-범위는-기본값이-없다.md) | 작업 영역은 읽기 전용 의존이고 공개 범위는 기본값이 없다 | Superseded ([ADR-010](ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)) |
 | [ADR-016](archive/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](../../../docs/adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
+| [ADR-055](archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Superseded ([ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md), [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md)) |
 | [ADR-056](archive/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Retired. 2026-10-15 사용자 결정으로 발급 2건을 모두 취소했고, 2026-10-05 뒤 사용이 없어 기능 전체를 제거한다 |
 | [ADR-20261007 / autonomy-policy](archive/ADR-20261007-autonomy-policy.md) | 행동 수준은 Control Plane 의 결정적 규칙이 정하고 첫 자동 실행은 읽기 전용 살펴보기 한 번이다 | Superseded ([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md)) |
 | [ADR-20261011 / media-observation-cache](archive/ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Superseded ([ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)) |

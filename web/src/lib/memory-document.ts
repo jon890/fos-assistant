@@ -8,7 +8,6 @@ export type MemoryDocument = {
   collection: string;
   documentKey: string;
   title: string;
-  sensitive: boolean;
   revision: number;
   updatedAt: string;
 };
@@ -23,12 +22,10 @@ export type NewMemoryDocument = {
   documentKey: string;
   title: string;
   content: string;
-  sensitive: boolean;
 };
 
 export type DocumentChange = {
   content: string;
-  sensitive: boolean;
   /** 화면이 읽은 판 번호다. 그사이 판이 올랐으면 거절된다. */
   expectedRevision: number;
 };

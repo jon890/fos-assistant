@@ -388,16 +388,14 @@ class ContextAssemblerTest {
             "커리어 항상",
             "커리어 내용",
             "career",
-            MemoryRetrieval.ALWAYS,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.ALWAYS);
         memories.create(
             ADMIN,
             MemoryScope.USER,
             "커리어 색인",
             "커리어 본문",
             "career",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -411,9 +409,9 @@ class ContextAssemblerTest {
     void skipsSealedRowsInAlwaysLayer() {
         // 그 에이전트는 core 만 받는다. collection 이 core 가 아니면 걸러지지 않아도 통과해 검사가 뜻을 잃는다
         jdbc.update("""
-                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, content_key_id,
+                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, data_key_id,
                     retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES ('USER', 1, 'core', 'MEMORY', '직접 넣은 줄', 'v1.봉인-표식-5512', 'test-1', 'ALWAYS', TRUE,
+                VALUES ('USER', 1, 'core', 'MEMORY', '직접 넣은 줄', 'v1.봉인-표식-5512', 999999999, 'ALWAYS', TRUE,
                     'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
@@ -433,8 +431,7 @@ class ContextAssemblerTest {
             "커리어 색인",
             "커리어 본문",
             "career",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
 
         assertThat(assembler.assembleForOwner(ADMIN).instructions()).contains("커리어 색인");
         assertThat(assembler.assembleForOwner(MEMBER)).isEqualTo(AssembledContext.empty());
@@ -659,45 +656,44 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("그룹 항목과 201자 본문과 민감 항목과 문서는 개인 사실 구역에 없고 색인에 제목으로 있다")
+    @DisplayName("그룹 항목과 201자 본문과 문서는 개인 사실 구역에 없고 색인에 제목으로 있으며 예전 민감 항목은 구역에 오른다")
     void leavesNonCandidatesInIndexByTitle() {
         Memory atLimit = memories.create(ADMIN, MemoryScope.USER, "상한 본문", "나".repeat(200), false);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
         Memory overLimit = memories.create(ADMIN, MemoryScope.USER, "넘친 본문", "다".repeat(201), false);
-        Memory sensitive = memories.create(
+        Memory formerSensitive = memories.create(
             ADMIN,
             MemoryScope.USER,
-            "민감 사실",
-            "민감 본문",
+            "예전 민감 사실",
+            "예전 민감 본문",
             Memory.DEFAULT_COLLECTION,
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
+            MemoryRetrieval.SEARCH);
+        // 직전 이미지가 민감으로 남긴 칸은 코드가 읽지 않는다. 이 항목은 다른 항목과 같이 개인 사실 구역에 오른다
+        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", formerSensitive.id());
         Long document = insertDocument("USER", ADMIN.id(), null, "short-note", "짧은 문서");
 
-        // 민감 항목은 이 시험의 에이전트가 받지 않으므로 collection 과 민감도를 거르지 않는 주인 조립으로 본다
         AssembledContext result = assembler.assembleForOwner(ADMIN);
 
         assertThat(factsSection(result))
-            .contains("- [" + atLimit.id() + "] 상한 본문: " + atLimit.content())
+            .contains(
+                "- [" + atLimit.id() + "] 상한 본문: " + atLimit.content(),
+                "- [" + formerSensitive.id() + "] 예전 민감 사실: 예전 민감 본문")
             .doesNotContain(
                 "[" + group.id() + "]",
                 "[" + overLimit.id() + "]",
-                "[" + sensitive.id() + "]",
                 "[" + document + "]");
         assertThat(indexSection(result))
             .contains(
                 "- [" + group.id() + "] 그룹 사실",
                 "- [" + overLimit.id() + "] 넘친 본문",
-                "- [" + sensitive.id() + "] 민감 사실",
                 "- [" + document + "] 짧은 문서")
-            .doesNotContain("그룹 본문", "다".repeat(201), "민감 본문", "문서 본문");
+            .doesNotContain("그룹 본문", "다".repeat(201), "문서 본문");
         assertThat(result.bundle().items())
             .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
             .extracting(ContextItem::ref, ContextItem::bodyMode)
             .containsExactly(
                 tuple("memory:" + group.id(), ContextBodyMode.TITLE_ONLY),
                 tuple("memory:" + overLimit.id(), ContextBodyMode.TITLE_ONLY),
-                tuple("memory:" + sensitive.id(), ContextBodyMode.TITLE_ONLY),
                 tuple("memory:" + document, ContextBodyMode.TITLE_ONLY));
     }
 
@@ -814,8 +810,7 @@ class ContextAssemblerTest {
             "커리어 사실",
             "커리어 본문",
             "career",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 

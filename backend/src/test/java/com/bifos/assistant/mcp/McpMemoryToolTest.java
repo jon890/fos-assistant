@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
@@ -18,7 +17,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -291,7 +289,7 @@ class McpMemoryToolTest {
 
 
     @Test
-    @DisplayName("에이전트가 받지 않는 collection 과 허용받지 않은 민감 항목은 없는 항목과 같은 응답이다")
+    @DisplayName("에이전트가 받지 않는 collection 의 항목과 남의 항목은 없는 항목과 같은 응답이다")
     void itemsOutsideTheAgentsCollectionsLookLikeMissingItems() throws Exception {
         Memory career = memories.create(
             current(dad),
@@ -299,25 +297,16 @@ class McpMemoryToolTest {
             "커리어",
             "커리어 본문",
             "career",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
-        Memory sensitive = memories.create(
-            current(dad),
-            MemoryScope.USER,
-            "신원",
-            "민감 본문",
-            "core",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
+            MemoryRetrieval.SEARCH);
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         Memory core = memories.create(current(dad), MemoryScope.USER, "기본", "기본 본문", false);
 
         JsonNode missing = body(call(dadToken, 999999L, null));
         assertThat(missing.path("result").path("isError").asBoolean()).isTrue();
-        for (Memory unreadable : List.of(career, sensitive, hidden)) {
+        for (Memory unreadable : List.of(career, hidden)) {
             HttpResponse<String> response = call(dadToken, unreadable.id(), null);
             assertThat(body(response).path("result")).isEqualTo(missing.path("result"));
-            assertThat(response.body()).doesNotContain("커리어 본문", "민감 본문", "아이 본문");
+            assertThat(response.body()).doesNotContain("커리어 본문", "아이 본문");
         }
         assertThat(body(call(dadToken, core.id(), null))
             .path("result")
@@ -330,7 +319,7 @@ class McpMemoryToolTest {
 
 
     @Test
-    @DisplayName("민감 허용을 받은 에이전트가 읽으면 암호화돼 저장된 민감 본문이 평문으로 나온다")
+    @DisplayName("collection 을 받은 에이전트가 읽으면 직전 이미지가 민감으로 남긴 항목도 암호화돼 저장된 본문이 평문으로 나온다")
     void allowedAgentReadsSensitiveBodyAsPlaintext() throws Exception {
         Memory sensitive = memories.create(
             current(dad),
@@ -338,9 +327,8 @@ class McpMemoryToolTest {
             "신원",
             "민감 본문",
             "core",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
-        agentCollections.save(AgentMemoryCollection.of(dadRun.agentId(), "core", true));
+            MemoryRetrieval.SEARCH);
+        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", sensitive.id());
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, sensitive.id()))
             .doesNotContain("민감 본문");

@@ -38,6 +38,9 @@ class MemoryLinkDiscoveryConflictTest {
     private static final CurrentUser ADMIN = new CurrentUser(1L, "owner@example.com", "주인", 10L, UserRole.ADMIN);
 
     @Autowired
+    MemoryTexts texts;
+
+    @Autowired
     MemoryService memories;
 
     @Autowired
@@ -116,7 +119,7 @@ class MemoryLinkDiscoveryConflictTest {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, title, content, false);
         String model = embeddingProperties.model();
         String text = EmbeddingText.of(title, content, embeddingProperties.maxTextChars());
-        MemoryEmbeddingRows.write(jdbc, memory.id(), model, EmbeddingText.fingerprint(model, text), vector);
+        MemoryEmbeddingRows.write(jdbc, memory.id(), model, texts.embeddingFingerprint(memory.scope(), memory.stored().ownerId(), model, text).orElseThrow(), vector);
         return memory;
     }
 }
