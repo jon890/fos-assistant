@@ -11,8 +11,8 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
-| 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
+| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_link` |
+| 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution` |
 | 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -220,7 +220,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
-그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)와 옛 벡터 표(`memory_embedding`)의 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
+그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)는 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -684,7 +684,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
 - `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문의 해시다. 직접 등록한 항목과 민감 항목은 비어 있다
-- `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
+- `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 옛 `memory_embedding` 테이블은 지웠다. 벡터는 옮기지 않고 채우는 작업이 다시 계산했고 `V20261103024545` 가 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
   - `embedding_model` 은 임베딩 서비스에 보낸 모델 이름, `embedding_vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 차원은 길이를 4로 나눈 값이다. 운영의 BGE-M3 는 1024차원이라 한 항목이 4KiB 다. 한 번에 한 모델만 쓰므로 모델을 바꾸면 같은 칸을 새 모델의 값으로 덮어쓴다
   - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
   - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 민감도 `NORMAL` 이며 풀 수 있는 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
@@ -757,17 +757,6 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 `previous_status` 가 `PROPOSED` 인 기록을 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다.
 기존 제안의 수락은 중복 후보의 번호만 조회한 뒤 항목을 쓰기 잠금으로 처음 읽는다. 중복 키를 다시 확인하고, 현재 `revision`을 `base_revision`에 남겨 동시에 커밋된 사용자 수정도 보존한다.
 
-### memory_embedding
-
-**코드가 읽고 쓰지 않는 옛 표다.** 벡터는 `memory` 의 `embedding_*` 칸이 갖는다. 벡터는 옮기지 않고 배포 뒤 채우는 작업이 다시 계산한다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 예외로 항목 삭제와 사용자 정리는 그 항목의 줄을 native 질의로 지우고, 정리 미리보기는 센다. 지운 항목의 벡터를 남기지 않는다는 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 지우지 않고 민감으로 바꾸거나 대체된 항목처럼 대상에서 빠진 항목의 옛 줄은 이 표를 지울 때까지 남는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
-
-임베딩 대상 항목 하나의 벡터 한 줄이었다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
-
-- 기본 키는 `memory_id` 다. 칸의 뜻은 `memory` 의 `embedding_*` 칸과 같고, `dimensions` 는 벡터의 차원이다
-- `memory_id` 에 외래 키를 걸지 않았다
-
-
-
 ### memory_link
 
 기억 두 개 사이의 연결 한 줄이다. 동작과 화면은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억 사이의 연결」 이, 근거는 [ADR-20261015 / memory-link](../../docs/adr/ADR-20261015-memory-link.md) 가 갖는다.
@@ -837,6 +826,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 같은 도구에 허락을 다시 주면 새 승인 줄이 허락을 갖는다. 대화 허락은 같은 대화와 에이전트, 도구의 앞선 허락을 거두어 유효한 줄이 하나다
 - 거두기는 허락 칸만 바꾸는 갱신이다. 엔티티는 바꾼 칸만 쓰므로(`@DynamicUpdate`) 그 사이 읽어 둔 엔티티의 저장이 거둔 시각을 지우지 않는다
 - 사용자 정리는 승인 줄과 함께 허락도 지운다. 대화 purge 는 허락 칸을 바꾸지 않는다
+- 옛 `connector_tool_grant`, `connector_conversation_grant` 테이블은 지웠다. `V20261102074327` 이 허락을 이 칸으로 옮겼고, 배포를 확인한 뒤 `V20261103024542` 가 직전 이미지가 옛 테이블에 새로 쓴 줄만(`created_at` 이 앞 이관이 시작한 시각 뒤인 줄) 같은 규칙으로 다시 옮긴 다음 `V20261103024543`, `V20261103024544` 가 두 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 이미 옮긴 줄을 다시 옮기면 새 코드가 거둔 상시 허락이 다른 승인 줄로 되살아나므로 다시 옮기지 않는다
 
 인자와 결과는 기존 사용자 데이터 key와 `TextCipher`로 각각 암호화한다.
 AAD는 `connector_action:<id>:column:<칸 이름>:user:<user_id>`다.
@@ -906,27 +896,6 @@ action을 지우면 실행 내용도 지운다.
 연결·바인딩과 이전 UNKNOWN의 번호는 당시 이력 값이며 해당 행 삭제에 따라 실행 내용을 지우지 않는다.
 `supersedes_unknown_action_id`는 명시적 새 요청 경로를 구현하기 전까지 NULL로 둔다.
 근거는 [ADR-20261010 / financial-execution-guard](../../docs/adr/ADR-20261010-financial-execution-guard.md)다.
-
-### connector_tool_grant
-
-**코드가 읽고 쓰지 않는 옛 표다.** 상시 허락은 `connector_action` 의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자 외래 키는 떼었다. 예외로 사용자 정리와 정리 미리보기만 그 사용자의 줄을 native 질의로 지우고 센다. [ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md) 의 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
-
-사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다([ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
-`expires_at` 은 비지 않는다. 무기한 허락은 없다. `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다.
-`revoked_at` 은 사용자가 거두었거나, 연결을 해제했거나, 선언이 상시 허락을 닫아 정리가 거둔 시각이다.
-상시 허락을 닫은 도구에는 만들지 않고, 판정할 때도 허락을 보지 않는다. 그 도구에 남은 줄은 주기 정리가 거둔다([ADR-065](../../docs/adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)).
-같은 도구에 허락을 다시 주면 새 줄을 만든다. 유일 제약은 없다.
-
-### connector_conversation_grant
-
-**코드가 읽고 쓰지 않는 옛 표다.** 대화 허락은 `action_id` 가 가리키던 `connector_action` 줄의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자와 대화 외래 키는 떼었다. 예외로 사용자 정리와 정리 미리보기만 그 사용자의 줄을 native 질의로 지우고 센다. 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
-
-사용자가 한 대화에서 도구 하나를 계속 허용한 것이다. 승인하면서 「이 대화에서 계속 허용」 을 골라 준다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md)).
-`conversation_id`, `agent_id`, `connector_id`, `tool_name` 이 모두 맞는 호출에만 통한다. `agent_id` 는 그 승인 줄을 판정한 실행의 에이전트다.
-`action_id` 는 허락을 함께 준 `connector_action` 의 번호다. 그 결과의 알림 줄이 이 칸으로 허락을 함께 알린다.
-`revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
-`revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
-외래 키는 사용자와 대화에 두었고 이관이 뗐다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
 
 ## 사용자 브라우저 표
 
