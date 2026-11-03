@@ -212,6 +212,14 @@ from .connector_vault import (
     _write_vault,
 )
 
+from .connector_vault_key import (
+    _vault_keys,
+)
+
+from .connector_vault_migration import (
+    _migrate_vault_files,
+)
+
 from .env import (
     _check_env_delete,
     _check_env_update,
@@ -348,6 +356,12 @@ def register(ctx) -> None:
             ENV_VAR, reason,
         )
         return
+
+    # 보관 파일을 활성 key 로 옮긴다. 경로를 감싸기 전에 돌아 요청과 겹치지 않는다. 실패해도 기동은 잇는다.
+    try:
+        _migrate_vault_files()
+    except Exception as error:
+        logger.warning("dashboard-profile-api: 보관 파일 이관이 멈췄다: %s", type(error).__name__)
 
     if not _install_gate():
         logger.error(
