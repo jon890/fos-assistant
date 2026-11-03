@@ -15,8 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자 정리 때 그 사용자의 개인 기억을 지운다(ADR-20261101 / user-purge).
  *
- * <p>개인 기억({@code scope = 'USER'})과 그 임베딩, 한 끝이라도 걸린 링크, 그 사용자가 주인이던 변경 이력을 지운다. 그룹 공용 기억은
- * 주인이 비어 있어 건드리지 않는다. 기억한 기록({@code memory_capture})은 본문 없이 남긴다. 부르는 쪽의 정리 트랜잭션 안에서만 돈다.
+ * <p>개인 기억({@code scope = 'USER'})과 그 벡터, 한 끝이라도 걸린 링크, 그 사용자가 주인이던 변경 이력을 지운다. 그룹 공용 기억은
+ * 주인이 비어 있어 건드리지 않는다. 벡터는 항목 줄의 칸이라 줄과 함께 지워지고,
+ * 직전 이미지가 옛 테이블 {@code memory_embedding} 에 남긴 줄은 따로 지운다(ADR-20261102 / table-reduce-r2). 기억한 기록({@code memory_capture})은 본문 없이 남긴다. 부르는 쪽의 정리 트랜잭션 안에서만 돈다.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,7 +42,7 @@ public class MemoryUserPurge {
         if (ids.isEmpty()) {
             return 0;
         }
-        embeddings.deleteAllByMemoryIds(ids);
+        embeddings.deleteLegacyRows(ids);
         links.deleteAllTouching(ids);
         int deleted = memories.deleteAllByIds(ids);
         ids.forEach(vectorCache::evict);
