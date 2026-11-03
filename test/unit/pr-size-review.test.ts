@@ -116,3 +116,9 @@ test("워크플로는 기본 브랜치 도구로 JSON을 얻고 모델 리뷰 �
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /"production":401/);
 });
+
+test("파일째 삭제 줄이 있으면 상한 제외로 따로 보인다", () => {
+  const body = sizeFinding({ ...size(LARGE_THRESHOLD + 1), deleted_lines: 1200 });
+  assert.match(body, /파일째 삭제 1200줄\(상한 제외\)/);
+  assert.ok(!sizeFinding(size(LARGE_THRESHOLD + 1)).includes("파일째 삭제"));
+});
