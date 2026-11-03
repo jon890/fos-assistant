@@ -479,7 +479,7 @@ class MemoryRecallEvalTest {
               "version": 1,
               "note": "검사용",
               "users": [ { "key": "parentA", "role": "ADMIN", "group": "home" } ],
-              "agents": [ { "key": "general", "collections": [ { "collection": "core", "allowSensitive": false } ] } ],
+              "agents": [ { "key": "general", "collections": [ { "collection": "core" } ] } ],
               "cases": [
                 {
                   "id": "X-01",
@@ -507,7 +507,7 @@ class MemoryRecallEvalTest {
                 { "key": "parentA", "role": "ADMIN", "group": "home" },
                 { "key": "parentB", "role": "ADMIN", "group": "home" }
               ],
-              "agents": [ { "key": "general", "collections": [ { "collection": "core", "allowSensitive": false } ] } ],
+              "agents": [ { "key": "general", "collections": [ { "collection": "core" } ] } ],
               "cases": [
                 {
                   "id": "KU-X",

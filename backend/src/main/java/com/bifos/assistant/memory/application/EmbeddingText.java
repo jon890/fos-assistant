@@ -16,8 +16,11 @@ public final class EmbeddingText {
     }
 
 
-    /** 모델 이름과 글의 SHA-256 이다. 모델을 바꾸면 모든 지문이 달라진다. */
-    public static byte[] fingerprint(String model, String text) {
+    /**
+     * 모델 이름과 글의 SHA-256 이다. KEK 가 없는 설치의 지문이고, 이관이 옛 지문을 알아보는 데도 쓴다. 지문은 {@link MemoryTexts#embeddingFingerprint}
+     * 가 낸다.
+     */
+    public static byte[] plainFingerprint(String model, String text) {
         return Sha256.newDigest().digest((model + "\n" + text).getBytes(StandardCharsets.UTF_8));
     }
 }

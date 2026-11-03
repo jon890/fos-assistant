@@ -57,12 +57,7 @@ public class AgentMemoryCollectionService {
             return AgentMemoryGrants.none();
         }
         List<AgentMemoryCollection> rows = grants.findByIdAgentId(agentId);
-        Set<String> collections = rows.stream().map(AgentMemoryCollection::collection).collect(Collectors.toSet());
-        Set<String> sensitive = rows.stream()
-            .filter(AgentMemoryCollection::allowSensitive)
-            .map(AgentMemoryCollection::collection)
-            .collect(Collectors.toSet());
-        return new AgentMemoryGrants(collections, sensitive);
+        return new AgentMemoryGrants(rows.stream().map(AgentMemoryCollection::collection).collect(Collectors.toSet()));
     }
 
 
@@ -76,7 +71,7 @@ public class AgentMemoryCollectionService {
     public void grantDefaultCollection(AgentCreated created) {
         Agent agent = created.agent();
         grants.save(
-            AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false));
+            AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION));
     }
 
 
@@ -98,10 +93,11 @@ public class AgentMemoryCollectionService {
     }
 
 
-    /** 그 에이전트의 받는 collection 이 바뀐 최근 기록 10줄이다. 새것부터 낸다. */
+    /** 그 에이전트의 받는 collection 을 붙이고 뗀 최근 기록 10줄이다. 새것부터 낸다. 없어진 민감 허용을 바꾼 옛 기록은 내지 않는다. */
     @Transactional(readOnly = true)
     public List<AgentMemoryCollectionChange> recentChangesOf(Long agentId) {
-        return changes.findTop10ByAgentIdOrderByIdDesc(agentId);
+        return changes.findTop10ByAgentIdAndChangeTypeNotOrderByIdDesc(
+            agentId, AgentMemoryCollectionChangeType.SENSITIVE_CHANGED);
     }
 
 
@@ -113,20 +109,20 @@ public class AgentMemoryCollectionService {
      * 뒤에도 다른 저장이 커밋한 줄을 보지 못해 같은 key 를 다시 넣다 기본 키 충돌이 난다.
      *
      * <p>목록에 없는 key 의 거절은 잠금 뒤에 지금 줄을 읽고 한다. 잠금 전에 판정하면 다른 저장이 동시에 뗀 줄을 기준으로 받아들인다.
-     * 바뀐 것이 없으면 아무것도 쓰지 않는다. 민감 허용만 바뀐 줄은 지우고 다시 넣지 않아 붙인 시각이 그대로 남는다.
+     * 바뀐 것이 없으면 아무것도 쓰지 않는다.
      *
-     * @param next 받을 collection 과 그 민감 허용 전체다. 비어 있으면 모두 뗀다
+     * @param next 받을 collection 전체다. 비어 있으면 모두 뗀다
      * @param listedCollections 그룹의 collection 목록 key 다. 지금 받는 줄의 key 는 목록에 없어도 둘 수 있다
      * @param changedByUserId 바꾸는 관리자다
      * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 목록에도 지금
      * 줄에도 없는 collection 이 있으면 {@code VALIDATION_FAILED}
      */
     @Transactional
-    public void replace(Long agentId, Map<String, Boolean> next, Set<String> listedCollections, Long changedByUserId) {
+    public void replace(Long agentId, Set<String> next, Set<String> listedCollections, Long changedByUserId) {
         requireEditable(agents.findByIdForUpdate(agentId));
         Map<String, AgentMemoryCollection> current = grants.findByIdAgentId(agentId).stream()
             .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
-        for (String key : next.keySet()) {
+        for (String key : next) {
             if (!listedCollections.contains(key) && !current.containsKey(key)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such memory collection");
             }
@@ -134,43 +130,30 @@ public class AgentMemoryCollectionService {
 
         Instant now = clock.instant();
         SortedSet<String> keys = new TreeSet<>(current.keySet());
-        keys.addAll(next.keySet());
+        keys.addAll(next);
         List<String> granted = new ArrayList<>();
         List<String> revoked = new ArrayList<>();
-        List<String> sensitiveChanged = new ArrayList<>();
         for (String key : keys) {
             AgentMemoryCollection row = current.get(key);
-            boolean allow = Boolean.TRUE.equals(next.get(key));
             if (row == null) {
-                grants.save(AgentMemoryCollection.of(agentId, key, allow));
-                record(agentId, key, AgentMemoryCollectionChangeType.GRANTED, allow, changedByUserId, now);
+                grants.save(AgentMemoryCollection.of(agentId, key));
+                record(agentId, key, AgentMemoryCollectionChangeType.GRANTED, changedByUserId, now);
                 granted.add(key);
-            } else if (!next.containsKey(key)) {
+            } else if (!next.contains(key)) {
                 grants.delete(row);
-                record(
-                    agentId,
-                    key,
-                    AgentMemoryCollectionChangeType.REVOKED,
-                    row.allowSensitive(),
-                    changedByUserId,
-                    now);
+                record(agentId, key, AgentMemoryCollectionChangeType.REVOKED, changedByUserId, now);
                 revoked.add(key);
-            } else if (row.allowSensitive() != allow) {
-                row.changeAllowSensitive(allow);
-                record(agentId, key, AgentMemoryCollectionChangeType.SENSITIVE_CHANGED, allow, changedByUserId, now);
-                sensitiveChanged.add(key);
             }
         }
-        if (granted.isEmpty() && revoked.isEmpty() && sensitiveChanged.isEmpty()) {
+        if (granted.isEmpty() && revoked.isEmpty()) {
             return;
         }
         log.info(
-            "agent memory collections changed agentId={} by={} granted={} revoked={} sensitiveChanged={}",
+            "agent memory collections changed agentId={} by={} granted={} revoked={}",
             agentId,
             changedByUserId,
             granted,
-            revoked,
-            sensitiveChanged);
+            revoked);
     }
 
 
@@ -178,10 +161,9 @@ public class AgentMemoryCollectionService {
         Long agentId,
         String collection,
         AgentMemoryCollectionChangeType type,
-        boolean allowSensitive,
         Long changedByUserId,
         Instant now) {
-        changes.save(AgentMemoryCollectionChange.of(agentId, collection, type, allowSensitive, changedByUserId, now));
+        changes.save(AgentMemoryCollectionChange.of(agentId, collection, type, changedByUserId, now));
     }
 
 

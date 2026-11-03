@@ -2,7 +2,6 @@ package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CollectionView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateDocumentRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.DocumentSummaryView;
@@ -57,8 +56,7 @@ public class MemoryDocumentController {
             request.collection(),
             request.documentKey(),
             request.title(),
-            request.content(),
-            sensitivity(request.sensitive()));
+            request.content());
         return DocumentView.from(memory, request.content());
     }
 
@@ -69,7 +67,6 @@ public class MemoryDocumentController {
             currentUser.require(),
             id,
             request.content(),
-            sensitivity(request.sensitive()),
             request.expectedRevision());
         return DocumentView.from(memory, request.content());
     }
@@ -81,10 +78,5 @@ public class MemoryDocumentController {
         return memories.collectionsFor(currentUser.require()).stream()
             .map(CollectionView::from)
             .toList();
-    }
-
-
-    private static MemorySensitivity sensitivity(Boolean sensitive) {
-        return sensitive ? MemorySensitivity.SENSITIVE : MemorySensitivity.NORMAL;
     }
 }

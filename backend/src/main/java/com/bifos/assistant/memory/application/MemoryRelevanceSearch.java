@@ -47,11 +47,13 @@ class MemoryRelevanceSearch {
             return new MemorySearchPage(List.of(), null, queryVector.isEmpty() ? MemoryRelevance.SEARCH_KEYWORD : MemoryRelevance.SEARCH_HYBRID);
         }
         List<MemorySearchCandidate> found = candidates.candidatesFor(
-            user.id(), user.groupId(), access.unrestricted() ? null : access.collections(), access.sensitiveCollections());
+            user.id(), user.groupId(), access.unrestricted() ? null : access.collections());
         RelevanceResult result = relevance.score(
             stripped,
             queryVector,
-            found.stream().map(each -> new RelevanceCandidate(each.id(), each.title(), each.plainContent())).toList());
+            found.stream()
+                .map(each -> new RelevanceCandidate(each.id(), each.title(), each.plainContent(), each.scope(), each.ownerId()))
+                .toList());
         Map<Long, MemorySearchCandidate> byId = found.stream()
             .collect(Collectors.toMap(MemorySearchCandidate::id, Function.identity()));
         int ranked = Math.min(result.ranked().size(), MemorySearchCursor.MAX_RANK);

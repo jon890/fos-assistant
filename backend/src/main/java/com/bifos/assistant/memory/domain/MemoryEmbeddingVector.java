@@ -6,7 +6,8 @@ import java.nio.ByteOrder;
 /**
  * 기억 항목 줄의 {@code embedding_*} 칸에 저장한 벡터다(ADR-20261015 / memory-hybrid-selection, ADR-20261102 / table-reduce-r2).
  *
- * <p>벡터는 float 을 little-endian 4바이트씩 이어 저장한다. {@code textFingerprint} 는 모델 이름과 임베딩한 글의 SHA-256 이다. 항목의
+ * <p>벡터는 float 을 little-endian 4바이트씩 이어 저장한다. {@code textFingerprint} 는 모델 이름과 임베딩한 글을 주인 key 로 낸
+ * HMAC 이다({@link com.bifos.assistant.memory.application.MemoryTexts#embeddingFingerprint}). 항목의
  * 글이나 모델이 바뀌면 지문이 달라져 다음 채우기가 바꾼다.
  */
 public record MemoryEmbeddingVector(Long memoryId, String model, byte[] textFingerprint, float[] vector) {

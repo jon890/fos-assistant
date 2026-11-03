@@ -202,7 +202,7 @@ class JpaAuditingTest {
     void preservesCompositeCreationAcrossMergeAndRegrant() {
         clock.set(CREATED);
         var fixture = JpaAuditingEntityFixtures.persistAll(entityManager);
-        AgentMemoryCollection original = AgentMemoryCollection.of(fixture.agent().id(), "career", false);
+        AgentMemoryCollection original = AgentMemoryCollection.of(fixture.agent().id(), "career");
         assertThat(original.createdAt()).isNull();
         AgentMemoryCollection saved = entityManager.merge(original);
         entityManager.flush();
@@ -210,7 +210,6 @@ class JpaAuditingTest {
         assertThat(saved.createdAt()).isEqualTo(micros(CREATED));
         assertThat(original.createdAt()).isNull();
         clock.set(LATER);
-        saved.changeAllowSensitive(true);
         entityManager.flush();
         entityManager.detach(saved);
         AgentMemoryCollection merged = entityManager.merge(saved);
@@ -219,7 +218,7 @@ class JpaAuditingTest {
         entityManager.remove(merged);
         entityManager.flush();
         entityManager.clear();
-        AgentMemoryCollection granted = entityManager.merge(AgentMemoryCollection.of(fixture.agent().id(), "career", false));
+        AgentMemoryCollection granted = entityManager.merge(AgentMemoryCollection.of(fixture.agent().id(), "career"));
         entityManager.flush();
         assertThat(granted.createdAt()).isEqualTo(micros(LATER));
     }

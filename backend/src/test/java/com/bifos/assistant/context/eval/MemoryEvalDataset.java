@@ -4,7 +4,6 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import java.io.IOException;
@@ -227,7 +226,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
 
     /**
      * @param key 사례에서 부르는 이름
-     * @param collections 받는 collection 과 민감 허용
+     * @param collections 받는 collection
      */
     record Agent(String key, List<Grant> collections) {
 
@@ -236,7 +235,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         }
     }
 
-    record Grant(String collection, boolean allowSensitive) {
+    record Grant(String collection) {
     }
 
     /**
@@ -297,7 +296,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         String collection,
         MemoryRetrieval retrieval,
         MemoryStatus status,
-        MemorySensitivity sensitivity,
         MemoryEntryType entryType,
         String documentKey,
         int updatedDaysAgo,
@@ -309,7 +307,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
             collection = collection == null ? Memory.DEFAULT_COLLECTION : collection;
             retrieval = retrieval == null ? MemoryRetrieval.SEARCH : retrieval;
             status = status == null ? MemoryStatus.ACCEPTED : status;
-            sensitivity = sensitivity == null ? MemorySensitivity.NORMAL : sensitivity;
             entryType = entryType == null ? MemoryEntryType.MEMORY : entryType;
             related = related == null ? List.of() : List.copyOf(related);
         }

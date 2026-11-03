@@ -6,7 +6,6 @@ import com.bifos.assistant.chat.starter.config.StarterProperties;
 import com.bifos.assistant.connector.financial.config.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
@@ -69,12 +68,6 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<PricingProperties> pricingPropertiesLive(PricingProperties value) {
         return LiveProperties.fixed(PricingProperties.class, value);
-    }
-
-
-    @Bean
-    public LiveProperties<MemoryEncryptionProperties> memoryEncryptionPropertiesLive(MemoryEncryptionProperties value) {
-        return LiveProperties.fixed(MemoryEncryptionProperties.class, value);
     }
 
 

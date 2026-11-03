@@ -160,7 +160,8 @@ public class MemoryLinkDiscovery {
             .toList();
         // 모델이 바뀌는 동안이나 본문을 고친 뒤 다시 임베딩하기 전의 벡터는 지금 글과 맞지 않는다. 조립과 같이 모델과 지문이 맞는 벡터만 쓴다
         Map<Long, float[]> vectors = vectorCache.vectorsFor(eligible.stream()
-            .map(memory -> new RelevanceCandidate(memory.id(), memory.title(), memory.content()))
+            .map(memory -> new RelevanceCandidate(
+                memory.id(), memory.title(), memory.content(), memory.scope(), memory.stored().ownerId()))
             .toList());
         return eligible.stream()
             .filter(memory -> vectors.containsKey(memory.id()))

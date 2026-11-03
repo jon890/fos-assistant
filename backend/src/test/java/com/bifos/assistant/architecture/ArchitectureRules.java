@@ -15,7 +15,6 @@ import com.bifos.assistant.chat.nextturn.config.DelegationWakeProperties;
 import com.bifos.assistant.chat.starter.config.StarterProperties;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.config.HermesProperties;
-import com.bifos.assistant.memory.config.MemoryEncryptionProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
@@ -621,7 +620,6 @@ public final class ArchitectureRules {
         StarterProperties.class,
         DelegationProperties.class,
         PricingProperties.class,
-        MemoryEncryptionProperties.class,
         ConnectorPolicyProperties.class,
         BrowserProperties.class,
         WorkspaceProperties.class);

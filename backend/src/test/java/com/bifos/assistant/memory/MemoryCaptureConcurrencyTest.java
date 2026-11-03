@@ -15,7 +15,6 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -42,7 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @MysqlCase(MysqlCase.Reason.ROW_LOCK)
 class MemoryCaptureConcurrencyTest {
     private static final CurrentUser USER = new CurrentUser(1L, "memory@example.com", "사용자", 10L, UserRole.ADMIN);
-    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
+    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"));
     private static final String ORIGINAL = "산책은 아침에 한다";
     private static final String CHANGED = "산책은 저녁에 한다";
 
@@ -133,7 +132,7 @@ class MemoryCaptureConcurrencyTest {
         try {
             Future<MemoryRememberResult> remembering = pool.submit(() -> captureService.remember(
                 USER, CORE, new MemoryRememberRequest("산책 시간", ORIGINAL, null,
-                    MemorySensitivity.NORMAL, null, 903L, null, true, false, false)));
+                    false, null, 903L, null, true, false, false)));
             if (!read.await(20, TimeUnit.SECONDS)) {
                 remembering.get(1, TimeUnit.SECONDS);
                 throw new AssertionError("중복 후보 조회에 도달하지 않았다");

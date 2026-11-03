@@ -9,7 +9,6 @@ import com.bifos.assistant.context.application.dto.ContextTrust;
 import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.context.config.MemorySearchSectionProperties;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
@@ -95,7 +94,7 @@ class ContextAssemblerQuestionTest {
                 null)))
             .id();
         if (grants.findById(new AgentMemoryCollectionId(agentId, HEALTH)).isEmpty()) {
-            grants.save(AgentMemoryCollection.of(agentId, HEALTH, true));
+            grants.save(AgentMemoryCollection.of(agentId, HEALTH));
         }
     }
 
@@ -142,43 +141,27 @@ class ContextAssemblerQuestionTest {
 
 
     @Test
-    @DisplayName("민감 항목은 본문으로 구역에 오르지 못하고 제목이 맞으면 색인 앞쪽에 점수 근거와 함께 오며, 풀지 못한 항목은 색인에도 없다")
-    void keepsSensitiveAndSealedItemsTitleOnly() {
-        Memory plain = group("가족 행사", "다음 달 첫째 주 토요일에 할머니 댁에 간다");
-        Memory sensitiveTitle = memories.create(
-            ADMIN,
-            MemoryScope.USER,
-            "땅콩 들어간 간식 진료",
-            "진료 기록 본문",
-            HEALTH,
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
-        Memory sensitiveBody = memories.create(
+    @DisplayName("예전 민감 항목도 받은 collection 이면 본문까지 실리고, 풀지 못한 항목은 색인에도 없다")
+    void placesFormerSensitiveItemsAndSkipsSealedOnes() {
+        group("가족 행사", "다음 달 첫째 주 토요일에 할머니 댁에 간다");
+        Memory former = memories.create(
             ADMIN,
             MemoryScope.USER,
             "병원 기록",
             "땅콩 들어간 음식은 먹으면 안 된다",
             HEALTH,
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
+            MemoryRetrieval.SEARCH);
+        // 직전 이미지가 민감으로 남긴 칸은 코드가 읽지 않는다
+        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", former.id());
         Long sealed = insertSealed("땅콩 들어간 과자 영수증");
 
         AssembledContext result = assembler.assemble(ADMIN, agentId, PEANUT_QUESTION);
 
-        assertThat(result.instructions()).doesNotContain(SEARCH_HEADER);
+        // 본문이 짧아 개인 사실 구역에 먼저 실릴 수 있다. 어느 구역이든 본문으로 실리는 것을 본다
         assertThat(result.bundle().items())
-            .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
-            .extracting(ContextItem::ref, item -> item.selection().selector())
-            .containsExactly(
-                tuple("memory:" + sensitiveTitle.id(), ContextSelection.INDEX_KEYWORD),
-                tuple("memory:" + plain.id(), ContextSelection.INDEX_BY_ID),
-                tuple("memory:" + sensitiveBody.id(), ContextSelection.INDEX_BY_ID));
-        assertThat(result.bundle().items())
-            .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
-            .extracting(item -> item.selection().rank())
-            .containsExactly(1, 2, 3);
+            .anyMatch(item -> item.ref().equals("memory:" + former.id()) && item.body() != null);
+        assertThat(result.instructions()).contains("땅콩 들어간 음식은 먹으면 안 된다");
         assertThat(result.bundle().items()).noneMatch(item -> item.ref().equals("memory:" + sealed));
-        assertThat(section(result, INDEX_HEADER)).doesNotContain("진료 기록 본문", "먹으면 안 된다");
     }
 
 
@@ -288,12 +271,12 @@ class ContextAssemblerQuestionTest {
     }
 
 
-    /** 본문이 암호문이라고 표시한 일반 민감도 줄이다. 데이터가 어긋난 경우를 흉내 낸다. */
+    /** 없는 데이터 key 의 암호문이라고 표시한 줄이다. 데이터가 어긋난 경우를 흉내 낸다. */
     private Long insertSealed(String title) {
         jdbc.update("""
-                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, content_key_id,
+                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, data_key_id,
                     retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.땅콩-들어간-봉인', 'test-1', 'SEARCH', FALSE,
+                VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.땅콩-들어간-봉인', 999999999, 'SEARCH', FALSE,
                     'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """, title);
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);

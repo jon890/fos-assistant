@@ -22,7 +22,6 @@ import com.bifos.assistant.memory.maintenance.application.dto.MaintenanceReview;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -258,7 +257,7 @@ class MemoryMaintenanceTest {
     @DisplayName("그룹 항목의 후보는 그룹 관리자마다 하나씩 남고 한 사람이 확인하면 다른 관리자의 후보도 닫힌다")
     void groupCandidateIsSharedByAdmins() {
         Memory group = memoryService.create(
-            dad, MemoryScope.GROUP, "정비 테스트 그룹", "오래된 그룹 상태", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            dad, MemoryScope.GROUP, "정비 테스트 그룹", "오래된 그룹 상태", "core", MemoryRetrieval.SEARCH);
         jdbc.update("UPDATE memory SET created_at = ? WHERE id = ?", Timestamp.from(now.minus(Duration.ofDays(100))), group.id());
         marked(dad, group, FeedbackEventType.MARKED_WRONG);
 
@@ -333,7 +332,7 @@ class MemoryMaintenanceTest {
 
     private Memory oldMemory(CurrentUser owner, String title, String content, int ageDays) {
         Memory memory = memoryService.create(
-            owner, MemoryScope.USER, title, content, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            owner, MemoryScope.USER, title, content, "core", MemoryRetrieval.SEARCH);
         jdbc.update("UPDATE memory SET created_at = ? WHERE id = ?", Timestamp.from(now.minus(Duration.ofDays(ageDays))), memory.id());
         return memory;
     }

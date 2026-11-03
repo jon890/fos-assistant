@@ -18,10 +18,9 @@ import lombok.NoArgsConstructor;
 public final class MemoryAdminDtos {
 
     /** 에이전트에 줄 collection 하나다. */
-    public record AgentMemoryGrantBody(
-        @NotBlank @Size(max = 64) String collection, boolean allowSensitive) {
+    public record AgentMemoryGrantBody(@NotBlank @Size(max = 64) String collection) {
         AgentMemoryGrantInput toInput() {
-            return new AgentMemoryGrantInput(collection, allowSensitive);
+            return new AgentMemoryGrantInput(collection);
         }
     }
 
@@ -53,29 +52,24 @@ public final class MemoryAdminDtos {
         String displayName,
         boolean listed,
         boolean granted,
-        boolean allowSensitive,
-        long entryCount,
-        long sensitiveEntryCount) {
+        long entryCount) {
         static AgentMemoryCollectionView from(AgentMemorySettingCollection collection) {
             return new AgentMemoryCollectionView(
                 collection.key(),
                 collection.displayName(),
                 collection.listed(),
                 collection.granted(),
-                collection.allowSensitive(),
-                collection.entryCount(),
-                collection.sensitiveEntryCount());
+                collection.entryCount());
         }
     }
 
     /** 받는 collection 이 바뀐 기록 한 줄이다. */
     public record AgentMemoryChangeView(
-        String collection, String changeType, boolean allowSensitive, String changedByName, Instant changedAt) {
+        String collection, String changeType, String changedByName, Instant changedAt) {
         static AgentMemoryChangeView from(AgentMemorySettingChange change) {
             return new AgentMemoryChangeView(
                 change.collection(),
                 change.changeType(),
-                change.allowSensitive(),
                 change.changedByName(),
                 change.changedAt());
         }

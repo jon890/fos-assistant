@@ -3,6 +3,7 @@ package com.bifos.assistant.memory.relevance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.application.dto.KeywordScore;
 import com.bifos.assistant.memory.application.KeywordScorer;
 import com.bifos.assistant.memory.application.KoreanBigramTokenizer;
@@ -46,10 +47,10 @@ class KeywordScorerTest {
     @DisplayName("본문에 질문 낱말이 있는 항목이 제목만 겹치는 항목보다 위에 오고, 본문에만 낱말이 있어도 점수를 받는다")
     void ranksBodyMatchesAboveTitleOnlyMatches() {
         List<RelevanceCandidate> candidates = List.of(
-            new RelevanceCandidate(1L, "알레르기 약", "학원은 화요일"),
-            new RelevanceCandidate(2L, "딸 건강", "딸은 땅콩 알레르기가 있다"),
-            new RelevanceCandidate(3L, "장보기", "우유와 계란"),
-            new RelevanceCandidate(4L, "음식", "땅콩 알레르기 조심"));
+            new RelevanceCandidate(1L, "알레르기 약", "학원은 화요일", MemoryScope.USER, 1L),
+            new RelevanceCandidate(2L, "딸 건강", "딸은 땅콩 알레르기가 있다", MemoryScope.USER, 1L),
+            new RelevanceCandidate(3L, "장보기", "우유와 계란", MemoryScope.USER, 1L),
+            new RelevanceCandidate(4L, "음식", "땅콩 알레르기 조심", MemoryScope.USER, 1L));
 
         List<KeywordScore> scores = scorer.score("딸 알레르기 뭐였지", candidates, 0.3);
 
@@ -62,8 +63,8 @@ class KeywordScorerTest {
     @DisplayName("한 글자로 묻는 질문은 그 글자를 담은 낱말을 찾는다")
     void findsSingleCharacterQueryInsideLongerWords() {
         List<RelevanceCandidate> candidates = List.of(
-            new RelevanceCandidate(1L, "혈압약 복용 시간", null),
-            new RelevanceCandidate(2L, "장보기", "우유와 계란"));
+            new RelevanceCandidate(1L, "혈압약 복용 시간", null, MemoryScope.USER, 1L),
+            new RelevanceCandidate(2L, "장보기", "우유와 계란", MemoryScope.USER, 1L));
 
         assertThat(scorer.score("약", candidates, 0.3)).extracting(KeywordScore::memoryId).containsExactly(1L);
         assertThat(KoreanBigramTokenizer.documentTermCounts("혈압약")).containsKeys("혈압", "압약", "혈", "압", "약");
@@ -75,8 +76,8 @@ class KeywordScorerTest {
     @DisplayName("공통 토큰이 coverage 아래인 항목은 빠진다")
     void dropsCandidatesBelowCoverage() {
         List<RelevanceCandidate> candidates = List.of(
-            new RelevanceCandidate(1L, "딸", null),
-            new RelevanceCandidate(2L, "딸 알레르기 뭐였지", null));
+            new RelevanceCandidate(1L, "딸", null, MemoryScope.USER, 1L),
+            new RelevanceCandidate(2L, "딸 알레르기 뭐였지", null, MemoryScope.USER, 1L));
 
         List<KeywordScore> scores = scorer.score("딸 알레르기 뭐였지", candidates, 0.3);
 
@@ -87,7 +88,7 @@ class KeywordScorerTest {
     @Test
     @DisplayName("본문이 null 인 항목은 본문의 낱말로 점수를 받지 못한다")
     void ignoresMissingBody() {
-        List<RelevanceCandidate> candidates = List.of(new RelevanceCandidate(1L, "건강", null));
+        List<RelevanceCandidate> candidates = List.of(new RelevanceCandidate(1L, "건강", null, MemoryScope.USER, 1L));
 
         assertThat(scorer.score("땅콩 알레르기", candidates, 0.3)).isEmpty();
     }
@@ -97,8 +98,8 @@ class KeywordScorerTest {
     @DisplayName("점수가 같으면 번호 오름차순이고, 빈 질문은 빈 목록이다")
     void breaksTiesByIdAndReturnsEmptyForBlankQuestion() {
         List<RelevanceCandidate> candidates = List.of(
-            new RelevanceCandidate(9L, "땅콩", null),
-            new RelevanceCandidate(3L, "땅콩", null));
+            new RelevanceCandidate(9L, "땅콩", null, MemoryScope.USER, 1L),
+            new RelevanceCandidate(3L, "땅콩", null, MemoryScope.USER, 1L));
 
         assertThat(scorer.score("땅콩", candidates, 0.3)).extracting(KeywordScore::memoryId).containsExactly(3L, 9L);
         assertThat(scorer.score("  ", candidates, 0.3)).isEmpty();

@@ -90,7 +90,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `task` | `title`, `instruction` | 아직 |
 | `proactive_check` | `report_json` | 아직 |
 | `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
-| `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄은 평문이거나 `content_key_id` 의 옛 key 줄이다 |
+| `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
 MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
@@ -219,12 +219,12 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 암호문으로 남는다.
 그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)와 옛 벡터 표(`memory_embedding`)의 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
-그 변경 기록(`agent_memory_collection_change`)도 그동안 남는다. 누가 언제 민감 허용을 열었는지가 남아야 한다. 에이전트 행을 정리할 때 둘을 함께 지운다.
+그 변경 기록(`agent_memory_collection_change`)도 그동안 남는다. 누가 언제 collection 을 붙이고 뗐는지가 남아야 한다. 에이전트 행을 정리할 때 둘을 함께 지운다.
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내리며 그 사람의 브라우저는 멈춘다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.
@@ -678,22 +678,22 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 지금 있는 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다. 문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다.
 
 - `scope` 가 `USER` 면 `owner_user_id` 가, `GROUP` 이면 `group_id` 가 주인이다. `scope` 에는 기본값이 없다
-- `title` 과 `content` 는 `data_key_id` 가 있으면 그 주인 데이터 key 의 암호문이다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 비어 있으면 평문이거나, `content_key_id` 가 찬 ADR-055 의 옛 key 줄이다. 기동할 때 둘 다 데이터 key 로 옮기며, KEK 가 없는 설치는 평문 줄이 남는다. `content_key_id` 는 이관을 운영에서 확인한 뒤 지운다
+- `title` 과 `content` 는 `data_key_id` 가 있으면 그 주인 데이터 key 의 암호문이다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 비어 있으면 평문이다. 기동할 때 데이터 key 로 옮기며, KEK 가 없는 설치는 평문 줄이 남는다
 - `title` 은 암호문이 들어가도록 `VARCHAR(1200)` 이다. 입력 제한 200자는 요청 검사가 지킨다
-- `SENSITIVE` 는 `retrieval` 을 `ALWAYS` 로 둘 수 없다
+- `sensitivity` 와 `content_key_id` 는 코드가 읽고 쓰지 않는 옛 칸이다. 기억에는 민감 구분이 없고([`docs/features/memory/spec.md`](../../docs/features/memory/spec.md) 의 REQ5), ADR-055 의 옛 key 는 읽지 않는다. 배포를 되돌릴 때 직전 이미지가 읽도록 칸을 남겨 두고 배포를 확인한 뒤 지운다. 새 줄은 `sensitivity` 의 기본값 `NORMAL` 을 받는다
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
-- `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문의 해시다. 직접 등록한 항목과 민감 항목은 비어 있다
+- `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문을 그 사용자의 데이터 key 에서 뽑은 key 로 낸 HMAC-SHA256 이다(`MemoryTexts.proposalDedupKey`). 평문의 해시를 두지 않는다. KEK 가 없는 설치는 SHA-256 이다. 직접 등록한 항목은 비어 있다
 - `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
   - `embedding_model` 은 임베딩 서비스에 보낸 모델 이름, `embedding_vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 차원은 길이를 4로 나눈 값이다. 운영의 BGE-M3 는 1024차원이라 한 항목이 4KiB 다. 한 번에 한 모델만 쓰므로 모델을 바꾸면 같은 칸을 새 모델의 값으로 덮어쓴다
-  - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
-  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 민감도 `NORMAL` 이며 풀 수 있는 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
+  - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 주인(사용자나 그룹)의 데이터 key 에서 뽑은 key 로 낸 HMAC-SHA256 이다(`MemoryTexts.embeddingFingerprint`). KEK 가 없는 설치는 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
+  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 풀 수 있는 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
   - 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지워진다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 대상에서 빠진 항목의 벡터가 남으면 다음 주기의 정리가 비운다
 - `archivable` 은 정비 루프가 자동 보관해도 되는지의 표시이고 기본은 거짓이다. `memory_remember` 가 새 항목을 만들 때만 모델의 인자로 적는다. 항목의 종류를 나누는 칸이 아니다([ADR-20261015 / memory-maintenance](../../docs/adr/ADR-20261015-memory-maintenance.md))
 
 **`ACCEPTED` 인 항목만 주입한다.** `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
 주입할 때 요청자의 `USER` 항목과 요청자가 속한 그룹의 `GROUP` 항목 가운데, 그 실행의 에이전트가 받는 `collection` 의 항목만 고른다.
-`SENSITIVE` 항목은 그 `collection` 에서 민감 항목을 허용받은 에이전트에만 고른다. `SOURCE` 와 `ARCHIVE` 는 고르지 않는다.
+`SOURCE` 와 `ARCHIVE` 는 고르지 않는다.
 다른 사용자의 `USER` 항목과 받지 않는 `collection` 의 항목은 고르는 단계에서 빠지므로 Hermes 로 나가는 문자열에 들어가지 않는다.
 
 | 유일 제약 | 막는 것 |
@@ -723,7 +723,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 - `memory_id` 는 지운 항목의 판도 남으므로 `memory` 에 없는 번호일 수 있다. 그래서 외래 키를 걸지 않는다
 - `scope`, `owner_user_id`, `group_id`, `entry_type`, `document_key`, `status` 는 그때의 값이다. 지운 뒤에도 누가 볼 수 있는지 이 칸으로 정하고, 지운 문서의 판을 이름으로 찾는다
-- `title` 과 `content`, `data_key_id`, `content_key_id` 의 뜻은 `memory` 와 같다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다
+- `title` 과 `content`, `data_key_id` 의 뜻은 `memory` 와 같다. `sensitivity` 와 `content_key_id` 는 `memory` 와 같이 코드가 읽고 쓰지 않는 옛 칸이고, 새 줄의 `sensitivity` 는 기본값 `NORMAL` 이다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다
 - 출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다
 - 고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다
 
@@ -731,13 +731,14 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 에이전트가 받는 collection 하나가 한 줄이다([ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)).
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
-에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다.
-그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 빼고 민감 허용을 바꾼다. `created_at` 은 그 collection 을 붙인 시각이고, 민감 허용만 바꾸면 그대로 둔다.
+에이전트를 처음 저장할 때 `core` 한 줄을 넣는다.
+그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 뺀다. `created_at` 은 그 collection 을 붙인 시각이다.
+`allow_sensitive` 는 코드가 읽고 쓰지 않는 옛 칸이다. 배포를 확인한 뒤 지운다.
 
 ### agent_memory_collection_change
 
 `agent_memory_collection` 의 줄 하나가 바뀐 것이 한 줄이다. 에이전트 행이 있는 동안 지우지 않고, 지운 에이전트를 정리할 때 함께 지운다([ADR-20261008 / agent-memory-grants-admin](../../docs/adr/ADR-20261008-agent-memory-grants-admin.md)).
-`allow_sensitive` 는 `GRANTED` 와 `SENSITIVE_CHANGED` 면 바꾼 뒤의 값이고, `REVOKED` 면 떼기 전의 값이다. `changed_by_user_id` 에는 외래 키를 걸지 않는다.
+`change_type` 은 `GRANTED` 나 `REVOKED` 다. `SENSITIVE_CHANGED` 는 없어진 민감 허용을 바꾼 옛 기록이라 새로 남기지 않고 화면의 최근 변경에도 내지 않는다. `allow_sensitive` 는 코드가 읽고 쓰지 않는 옛 칸이고 새 줄은 기본값 거짓을 받는다. 배포를 확인한 뒤 지운다. `changed_by_user_id` 에는 외래 키를 걸지 않는다.
 한 번의 저장이 여러 collection 을 바꾸면 줄도 여럿이고 `changed_at` 이 같다.
 사람이 바꾼 것만 남긴다. 바뀌지 않은 collection, 마이그레이션이 넣은 `core`, 새 에이전트에 넣는 `core` 는 남기지 않는다.
 
@@ -759,7 +760,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 ### memory_embedding
 
-**코드가 읽고 쓰지 않는 옛 표다.** 벡터는 `memory` 의 `embedding_*` 칸이 갖는다. 벡터는 옮기지 않고 배포 뒤 채우는 작업이 다시 계산한다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 예외로 항목 삭제와 사용자 정리는 그 항목의 줄을 native 질의로 지우고, 정리 미리보기는 센다. 지운 항목의 벡터를 남기지 않는다는 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 지우지 않고 민감으로 바꾸거나 대체된 항목처럼 대상에서 빠진 항목의 옛 줄은 이 표를 지울 때까지 남는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
+**코드가 읽고 쓰지 않는 옛 테이블이다.** 벡터는 `memory` 의 `embedding_*` 컬럼이 갖는다. 벡터는 옮기지 않고 배포 뒤 채우는 작업이 다시 계산한다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 예외로 항목 삭제와 사용자 정리는 그 항목의 줄을 native 질의로 지우고, 정리 미리보기는 센다. 지운 항목의 벡터를 남기지 않는다는 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 지우지 않고 보관하거나 대체된 항목처럼 대상에서 빠진 항목의 옛 줄은 이 표를 지울 때까지 남는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
 
 임베딩 대상 항목 하나의 벡터 한 줄이었다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
 

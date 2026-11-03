@@ -5,22 +5,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.context.application.ContextAssembler;
-import com.bifos.assistant.memory.application.MemoryContentCipher;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.MemoryTextMigration;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.application.dto.MemoryRememberOutcome;
 import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
 import com.bifos.assistant.memory.application.dto.MemoryRememberResult;
-import com.bifos.assistant.memory.domain.StoredContent;
+import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
@@ -33,6 +32,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MysqlCase;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,6 +45,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -61,14 +62,17 @@ class MemoryEncryptionTest {
     private static final String TITLE = "제목-표식-2290";
     private static final String FIRST = "평문-표식-7391";
     private static final String SECOND = "평문-표식-8802";
-    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
+    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"));
     private static final AtomicLong EXECUTIONS = new AtomicLong(980_000L);
 
     @Autowired
     MemoryService memories;
 
     @Autowired
-    MemoryContentCipher legacyCipher;
+    MemoryTexts texts;
+
+    @Autowired
+    Environment environment;
 
     @Autowired
     MemoryTextMigration migration;
@@ -103,13 +107,13 @@ class MemoryEncryptionTest {
 
 
     private Map<String, Object> memoryRow(Long id) {
-        return jdbc.queryForMap("SELECT title, content, data_key_id, content_key_id FROM memory WHERE id = ?", id);
+        return jdbc.queryForMap("SELECT title, content, data_key_id FROM memory WHERE id = ?", id);
     }
 
 
     private List<Map<String, Object>> revisionRows(Long memoryId) {
         return jdbc.queryForList(
-            "SELECT title, content, data_key_id, content_key_id FROM memory_revision WHERE memory_id = ? ORDER BY revision",
+            "SELECT title, content, data_key_id FROM memory_revision WHERE memory_id = ? ORDER BY revision",
             memoryId);
     }
 
@@ -122,7 +126,6 @@ class MemoryEncryptionTest {
             assertThat((String)row.get("CONTENT")).doesNotContain(plain);
         }
         assertThat(row.get("DATA_KEY_ID")).isNotNull();
-        assertThat(row.get("CONTENT_KEY_ID")).isNull();
     }
 
 
@@ -138,27 +141,29 @@ class MemoryEncryptionTest {
     }
 
 
-    private Long insertRow(String scope, Long owner, Long group, String title, String content, String legacyKeyId) {
+    /** 평문 줄을 넣는다. {@code sensitivity} 는 직전 이미지가 남긴 칸이고 코드는 읽지 않는다. */
+    private Long insertRow(String scope, Long owner, Long group, String title, String content, String sensitivity) {
         jdbc.update(
             """
-                INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, title, content, content_key_id,
+                INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, title, content,
                     retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'identity', 'MEMORY', ?, ?, ?, 'SEARCH', FALSE, ?, 1, 'ACCEPTED',
+                VALUES (?, ?, ?, 'core', 'MEMORY', ?, ?, 'SEARCH', FALSE, ?, 1, 'ACCEPTED',
                     CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """,
-            scope, owner, group, title, content, legacyKeyId, legacyKeyId == null ? "NORMAL" : "SENSITIVE");
+            scope, owner, group, title, content, sensitivity);
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }
 
 
     @Test
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
-    @DisplayName("화면, 그룹, 민감 문서, 제안으로 만든 기억은 제목과 본문이 모두 데이터 key 의 암호문이고 다시 읽으면 원래 글이다")
+    @DisplayName("옛 key 설정 없이 뜬 서버에서 화면, 그룹, 문서, 제안으로 만든 기억은 제목과 본문이 모두 데이터 key 의 암호문이고 다시 읽으면 원래 글이다")
     void everyCreatePathStoresCiphertext() {
+        assertThat(environment.getProperty("assistant.memory.encryption.keys")).isNull();
+        assertThat(environment.getProperty("assistant.memory.encryption.active-key-id")).isNull();
         Memory normal = memories.create(ADMIN, MemoryScope.USER, TITLE, FIRST, false);
-        Memory group = memories.create(
-            ADMIN, MemoryScope.GROUP, TITLE, FIRST, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
-        Memory document = memories.createDocument(ADMIN, "core", "doc-1", TITLE, FIRST, MemorySensitivity.SENSITIVE);
+        Memory group = memories.create(ADMIN, MemoryScope.GROUP, TITLE, FIRST, "core", MemoryRetrieval.SEARCH);
+        Memory document = memories.createDocument(ADMIN, "core", "doc-1", TITLE, FIRST);
         Memory proposed = memories.proposeUser(ADMIN, TITLE, FIRST, 1L);
 
         for (Memory memory : List.of(normal, group, document, proposed)) {
@@ -221,7 +226,7 @@ class MemoryEncryptionTest {
             swappedRow.get("CONTENT"), swappedRow.get("TITLE"), swapped.id());
         jdbc.update("UPDATE memory SET owner_user_id = 2 WHERE id = ?", moved.id());
         Memory group = memories.create(
-            ADMIN, MemoryScope.GROUP, "그룹 제목", SECOND, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            ADMIN, MemoryScope.GROUP, "그룹 제목", SECOND, "core", MemoryRetrieval.SEARCH);
         jdbc.update("UPDATE memory SET group_id = 2 WHERE id = ?", group.id());
 
         assertThat(repository.findById(group.id()).orElseThrow().readable()).as("다른 그룹으로 옮긴 그룹 기억").isFalse();
@@ -247,7 +252,7 @@ class MemoryEncryptionTest {
             .containsExactly(
                 tuple(readable.id(), TITLE, FIRST, false),
                 tuple(broken.id(), Memory.UNREADABLE_TITLE, "", true));
-        assertThat(memories.alwaysInjectedFor(ADMIN, MemoryAccess.of(Set.of("core"), Set.of())))
+        assertThat(memories.alwaysInjectedFor(ADMIN, MemoryAccess.of(Set.of("core"))))
             .extracting(Memory::id)
             .containsExactly(readable.id());
         assertCode(() -> memories.update(ADMIN, broken.id(), "덮어쓰기", false, null), ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE);
@@ -265,9 +270,9 @@ class MemoryEncryptionTest {
         jdbc.update(
             "INSERT INTO user_data_key (user_id, kek_id, wrapped_key, created_at) VALUES (4242, 'missing-kek', 'v1.x.y', CURRENT_TIMESTAMP(6))");
         Long lockedKeyId = jdbc.queryForObject("SELECT id FROM user_data_key WHERE user_id = 4242", Long.class);
-        Long plain = insertRow("USER", 4242L, null, "옮기기 전 제목", "옮기기 전 본문", null);
+        Long plain = insertRow("USER", 4242L, null, "옮기기 전 제목", "옮기기 전 본문", "NORMAL");
         jdbc.update("UPDATE memory SET collection = 'core' WHERE id = ?", plain);
-        Long sealed = insertRow("USER", 4242L, null, "v1.AAAAAAAAAAAAAAAA.AAAA", "v1.AAAAAAAAAAAAAAAA.AAAA", null);
+        Long sealed = insertRow("USER", 4242L, null, "v1.AAAAAAAAAAAAAAAA.AAAA", "v1.AAAAAAAAAAAAAAAA.AAAA", "NORMAL");
         jdbc.update("UPDATE memory SET data_key_id = ? WHERE id = ?", lockedKeyId, sealed);
         long before = repository.count();
 
@@ -296,52 +301,49 @@ class MemoryEncryptionTest {
 
 
     @Test
-    @DisplayName("민감 항목은 지금처럼 목록에서 본문이 비고 목록 수정 경로로 고치지 못하며 민감으로 고치면 제안 중복 키를 비운다")
-    void sensitiveRulesStayUntilTheyAreRemoved() {
-        Memory sensitive = memories.create(
-            ADMIN, MemoryScope.USER, TITLE, FIRST, "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        assertThat(listOf(ADMIN)).singleElement().satisfies(view -> {
-            assertThat(view.content()).isEmpty();
-            assertThat(view.sensitive()).isTrue();
-        });
-        assertCode(() -> memories.update(ADMIN, sensitive.id(), "x", false, null), ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE);
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("직전 이미지가 민감으로 남긴 줄도 목록에 본문이 보이고 목록 경로로 고치며 받은 collection 의 에이전트에 실린다")
+    void formerlySensitiveRowsAreOrdinary() {
+        Long former = insertRow("USER", ADMIN.id(), null, "옛 민감 제목", FIRST, "SENSITIVE");
+        assertThat(migration.migrate()).isEqualTo(1);
 
-        Memory proposed = memories.proposeUser(ADMIN, "제안", FIRST, 1L);
-        memories.accept(ADMIN, proposed.id());
-        memories.update(ADMIN, proposed.id(), SECOND, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        assertThat(jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id()))
-            .isNull();
+        assertThat(listOf(ADMIN)).singleElement().satisfies(view -> {
+            assertThat(view.title()).isEqualTo("옛 민감 제목");
+            assertThat(view.content()).isEqualTo(FIRST);
+            assertThat(view.unreadable()).isFalse();
+        });
+        memories.update(ADMIN, former, SECOND, false, null);
+        assertThat(reread(former).content()).isEqualTo(SECOND);
+        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(former);
+        assertThat(memories.bodyFor(ADMIN, CORE, former).content()).isEqualTo(SECOND);
     }
 
 
     @Test
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
-    @DisplayName("기동 이관은 평문 줄과 옛 key 줄, revision 을 데이터 key 로 다시 쓰고 글의 해시가 같으며 두 번 돌려도 바뀌지 않는다")
-    void migrationRewritesPlainAndLegacyRows() {
-        StoredContent legacy = legacyCipher.seal(SECOND, "USER:1");
-        Long legacyId = insertRow("USER", 1L, null, "옛 민감 제목", legacy.content(), legacy.keyId());
-        Long plainId = insertRow("GROUP", null, 1L, TITLE, FIRST, null);
+    @DisplayName("기동 이관은 평문 줄과 revision 을 데이터 key 로 다시 쓰고 글의 해시가 같으며 두 번 돌려도 바뀌지 않는다")
+    void migrationRewritesPlainRows() {
+        Long userId = insertRow("USER", 1L, null, "옛 제목", SECOND, "SENSITIVE");
+        Long groupId = insertRow("GROUP", null, 1L, TITLE, FIRST, "NORMAL");
         jdbc.update(
             """
                 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, collection, entry_type,
-                    status, title, content, content_key_id, retrieval, sensitivity, changed_at)
-                VALUES (?, 1, 'UPDATED', 'USER', 1, 'identity', 'MEMORY', 'ACCEPTED', '옛 민감 제목', ?, ?, 'SEARCH',
-                    'SENSITIVE', CURRENT_TIMESTAMP(6))
+                    status, title, content, retrieval, changed_at)
+                VALUES (?, 1, 'UPDATED', 'USER', 1, 'core', 'MEMORY', 'ACCEPTED', '옛 제목', ?, 'SEARCH', CURRENT_TIMESTAMP(6))
                 """,
-            legacyId, legacy.content(), legacy.keyId());
+            userId, SECOND);
         Map<Long, String> before = Map.of(
-            legacyId, Sha256.hex(reread(legacyId).content()), plainId, Sha256.hex(reread(plainId).content()));
+            userId, Sha256.hex(reread(userId).content()), groupId, Sha256.hex(reread(groupId).content()));
 
         assertThat(migration.migrate()).isEqualTo(3);
 
-        assertSealed(memoryRow(legacyId), SECOND);
-        assertSealed(memoryRow(plainId), TITLE, FIRST);
-        assertThat(revisionRows(legacyId)).singleElement().satisfies(row -> assertSealed(row, SECOND));
+        assertSealed(memoryRow(userId), SECOND);
+        assertSealed(memoryRow(groupId), TITLE, FIRST);
+        assertThat(revisionRows(userId)).singleElement().satisfies(row -> assertSealed(row, SECOND));
         before.forEach((id, hash) -> assertThat(Sha256.hex(reread(id).content())).isEqualTo(hash));
-        assertThat(reread(legacyId).title()).isEqualTo("옛 민감 제목");
-        assertThat(memories.revisionsOf(ADMIN, legacyId)).singleElement().extracting(MemoryRevision::content).isEqualTo(SECOND);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM memory WHERE data_key_id IS NULL OR content_key_id IS NOT NULL", Long.class))
-            .isZero();
+        assertThat(reread(userId).title()).isEqualTo("옛 제목");
+        assertThat(memories.revisionsOf(ADMIN, userId)).singleElement().extracting(MemoryRevision::content).isEqualTo(SECOND);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM memory WHERE data_key_id IS NULL", Long.class)).isZero();
         assertThat(migration.migrate()).isZero();
     }
 
@@ -350,24 +352,69 @@ class MemoryEncryptionTest {
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @DisplayName("이관이 한 줄에서 실패해도 다른 줄은 옮기고, 실패한 줄은 옛 모양 그대로이며 로그에 번호만 남는다")
     void migrationFailureLeavesOnlyThatRow(CapturedOutput output) {
-        Long broken = insertRow("USER", 1L, null, "깨진 옛 줄", "v1.깨진-표식-1188", "missing-key");
-        Long plain = insertRow("USER", 1L, null, TITLE, FIRST, null);
+        // 주인이 빈 개인 기억은 주인 key 를 고를 수 없어 옮기지 못한다
+        Long broken = insertRow("USER", null, null, "깨진 줄", "깨진-표식-1188", "NORMAL");
+        Long plain = insertRow("USER", 1L, null, TITLE, FIRST, "NORMAL");
 
         assertThat(migration.migrate()).isEqualTo(1);
 
         assertSealed(memoryRow(plain), TITLE, FIRST);
         assertThat(memoryRow(broken))
-            .containsEntry("CONTENT", "v1.깨진-표식-1188")
-            .containsEntry("CONTENT_KEY_ID", "missing-key")
+            .containsEntry("CONTENT", "깨진-표식-1188")
             .containsEntry("DATA_KEY_ID", null);
         assertThat(output.getOut()).contains("memoryIds=[" + broken + "]").doesNotContain("깨진-표식-1188", FIRST);
+    }
+
+
+    @Test
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("제안 중복 키는 평문의 SHA-256 이 아니라 주인 key 의 HMAC 이고 같은 글이면 같은 값이며 다른 사용자면 다르다")
+    void proposalDedupKeyIsOwnerHmac() {
+        Memory proposed = memories.proposeUser(ADMIN, TITLE, FIRST, 1L);
+        String stored = jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id());
+
+        assertThat(stored).hasSize(64).isNotEqualTo(Sha256.hex(ADMIN.id() + "\u0000" + TITLE + "\u0000" + FIRST));
+        assertThat(texts.proposalDedupKey(ADMIN.id(), TITLE, FIRST)).isEqualTo(stored);
+        assertThat(memories.proposeUser(ADMIN, TITLE, FIRST, 2L).id()).as("같은 글의 제안은 다시 만들지 않는다").isEqualTo(proposed.id());
+        assertThat(texts.proposalDedupKey(ADMIN.id() + 1, TITLE, FIRST)).isNotEqualTo(stored);
+    }
+
+
+    @Test
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("기동 이관은 평문 SHA-256 이던 제안 중복 키와 임베딩 지문을 주인 key 의 HMAC 으로 바꾸고 벡터는 그대로 두며 두 번 돌려도 바뀌지 않는다")
+    void rekeyHashesReplacesPlainHashes() {
+        Memory proposed = memories.proposeUser(ADMIN, TITLE, FIRST, 1L);
+        String plainKey = Sha256.hex(ADMIN.id() + "\u0000" + TITLE + "\u0000" + FIRST);
+        jdbc.update("UPDATE memory SET proposal_dedup_key = ? WHERE id = ?", plainKey, proposed.id());
+        String text = TITLE + "\n" + FIRST;
+        byte[] plainFingerprint = Sha256.newDigest().digest(("test-model\n" + text).getBytes(StandardCharsets.UTF_8));
+        MemoryEmbeddingRows.write(jdbc, proposed.id(), "test-model", plainFingerprint, new float[] {1f});
+        Memory stale = memories.create(ADMIN, MemoryScope.USER, "낡은 지문", SECOND, false);
+        MemoryEmbeddingRows.write(jdbc, stale.id(), "test-model", new byte[32], new float[] {1f});
+
+        assertThat(migration.rekeyHashes()).isEqualTo(3);
+
+        assertThat(jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id()))
+            .isEqualTo(texts.proposalDedupKey(ADMIN.id(), TITLE, FIRST))
+            .isNotEqualTo(plainKey);
+        Map<String, Object> vector = jdbc.queryForMap(
+            "SELECT embedding_fingerprint, embedding_vector FROM memory WHERE id = ?", proposed.id());
+        assertThat((byte[])vector.get("EMBEDDING_FINGERPRINT"))
+            .isEqualTo(texts.embeddingFingerprint(MemoryScope.USER, ADMIN.id(), "test-model", text).orElseThrow())
+            .isNotEqualTo(plainFingerprint);
+        assertThat((byte[])vector.get("EMBEDDING_VECTOR")).isEqualTo(MemoryEmbeddingVector.encode(new float[] {1f}));
+        assertThat(jdbc.queryForObject("SELECT embedding_fingerprint FROM memory WHERE id = ?", byte[].class, stale.id()))
+            .as("지금 글과 맞지 않는 지문은 벡터째 비워 다시 채우게 한다")
+            .isNull();
+        assertThat(migration.rekeyHashes()).isZero();
     }
 
 
     private static MemoryRememberRequest remember(String title, String content, boolean direct) {
         // 실행마다 남기는 수에 상한이 있어 호출마다 다른 실행 번호를 쓴다
         return new MemoryRememberRequest(
-            title, content, null, MemorySensitivity.NORMAL, null, EXECUTIONS.incrementAndGet(), null, direct, false, false);
+            title, content, null, false, null, EXECUTIONS.incrementAndGet(), null, direct, false, false);
     }
 
 

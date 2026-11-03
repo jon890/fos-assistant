@@ -23,7 +23,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -122,9 +121,9 @@ class MemoryFreshnessTest {
     void usesCollectionStaleAfterWhenDefaultFreshnessIsDisabled() {
         clock.set(NOW.minus(Duration.ofDays(31)));
         Memory career = memories.create(
-            USER, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.ALWAYS);
         Memory defaultDisabled = memories.create(
-            USER, MemoryScope.USER, "판정 끔", "본문", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "판정 끔", "본문", "core", MemoryRetrieval.SEARCH);
         clock.set(NOW.minus(Duration.ofDays(29)));
         Memory careerFresh = memories.create(
             USER,
@@ -132,8 +131,7 @@ class MemoryFreshnessTest {
             "새 커리어",
             "새 커리어 본문",
             "career",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
         clock.set(NOW);
         ContextAssembler configured = TestContextAssemblers.of(
             memories,
@@ -163,7 +161,6 @@ class MemoryFreshnessTest {
         Memory memory = mock(Memory.class);
         when(memory.id()).thenReturn(701L);
         when(memory.scope()).thenReturn(MemoryScope.USER);
-        when(memory.sensitivity()).thenReturn(MemorySensitivity.NORMAL);
         when(memory.collection()).thenReturn(Memory.DEFAULT_COLLECTION);
         when(memory.content()).thenReturn("본문");
         when(memory.readable()).thenReturn(true);
@@ -187,7 +184,7 @@ class MemoryFreshnessTest {
         clock.set(NOW.minus(Duration.ofDays(181)));
         Memory stale = memories.create(USER, MemoryScope.USER, "오래된 기억", "본문", true);
         Memory unknown = memories.create(
-            USER, MemoryScope.USER, "판정 없는 기억", "본문", "disabled", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "판정 없는 기억", "본문", "disabled", MemoryRetrieval.SEARCH);
         clock.set(NOW);
         ContextAssembler configured = TestContextAssemblers.of(
             memories,

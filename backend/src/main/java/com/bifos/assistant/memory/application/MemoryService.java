@@ -13,13 +13,11 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryQueries;
@@ -113,16 +111,10 @@ public class MemoryService {
      * 문서를 만든다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 다(ADR-057).
      *
      * @throws ApiException 이름이나 collection 이 틀리면 VALIDATION_FAILED, 같은 이름이 있으면 MEMORY_DOCUMENT_EXISTS,
-     * 민감 문서인데 key 가 없으면 MEMORY_ENCRYPTION_UNAVAILABLE
+     * 주인 데이터 key 를 풀지 못하면 MEMORY_ENCRYPTION_UNAVAILABLE
      */
     @Transactional
-    public Memory createDocument(
-        CurrentUser user,
-        String collection,
-        String documentKey,
-        String title,
-        String content,
-        MemorySensitivity sensitivity) {
+    public Memory createDocument(CurrentUser user, String collection, String documentKey, String title, String content) {
         if (documentKey == null || !DOCUMENT_KEY.matcher(documentKey).matches()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a document key is invalid");
         }
@@ -137,7 +129,7 @@ public class MemoryService {
         try {
             // key 를 풀지 못하면 넣기 전에 거절돼 평문이 저장되지 않는다
             return texts.insert(Memory.document(
-                user.id(), collection, documentKey, title, StoredContent.plain(content), sensitivity, clock.instant()));
+                user.id(), collection, documentKey, title, content, clock.instant()));
         } catch (DataIntegrityViolationException e) {
             // 두 요청이 중복 조회를 함께 지난 경우다. 유일 제약이 막는다
             throw documentExists();
@@ -151,13 +143,12 @@ public class MemoryService {
      * @throws ApiException 판이 다르면 MEMORY_REVISION_CONFLICT
      */
     @Transactional
-    public Memory reviseDocument(
-        CurrentUser user, Long id, String content, MemorySensitivity sensitivity, int expectedRevision) {
+    public Memory reviseDocument(CurrentUser user, Long id, String content, int expectedRevision) {
         Memory memory = requireOwnDocument(user, memories.findByIdForUpdate(id).orElseThrow(MemoryService::notFound));
         if (memory.revision() != expectedRevision) {
             throw new ApiException(ErrorCode.MEMORY_REVISION_CONFLICT, "the document revision has changed");
         }
-        return revise(user, memory, content, memory.retrieval(), sensitivity);
+        return revise(user, memory, content, memory.retrieval());
     }
 
 
@@ -170,7 +161,7 @@ public class MemoryService {
      */
     public MemoryAccess accessOf(Long agentId) {
         AgentMemoryGrants grants = agentCollections.grantsOf(agentId);
-        return MemoryAccess.of(grants.collections(), grants.sensitiveCollections());
+        return MemoryAccess.of(grants.collections());
     }
 
 
@@ -196,8 +187,8 @@ public class MemoryService {
     /**
      * 제목만 실렸던 ACCEPTED 항목의 본문을 낸다.
      *
-     * <p>볼 수 없는 항목, 승인 전인 항목, 색인에 실리지 않는 항목, 이 실행이 받지 않는 collection 의 항목, 허용받지 않은
-     * 민감 항목은 모두 없는 항목과 같은 MEMORY_NOT_FOUND 다. 다르게 답하면 그 항목이 있다는 사실이 새어 나간다.
+     * <p>볼 수 없는 항목, 승인 전인 항목, 색인에 실리지 않는 항목, 이 실행이 받지 않는 collection 의 항목은 모두 없는 항목과
+     * 같은 MEMORY_NOT_FOUND 다. 다르게 답하면 그 항목이 있다는 사실이 새어 나간다.
      */
     public Memory bodyFor(CurrentUser user, MemoryAccess access, Long id) {
         Memory memory = requireReadable(user, id);
@@ -216,7 +207,7 @@ public class MemoryService {
         return memory.status() == MemoryStatus.ACCEPTED
             && memory.retrieval() == MemoryRetrieval.SEARCH
             && memory.entryType() != MemoryEntryType.SOURCE
-            && access.allows(memory.collection(), memory.sensitivity())
+            && access.allows(memory.collection())
             && !links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
     }
 
@@ -227,7 +218,7 @@ public class MemoryService {
     }
 
 
-    /** 지금 화면이 만드는 항목이다. core collection 에 민감하지 않게 둔다. */
+    /** 지금 화면이 만드는 항목이다. core collection 에 둔다. */
     @Transactional
     public Memory create(CurrentUser user, MemoryScope scope, String title, String content, boolean alwaysInject) {
         return create(
@@ -236,8 +227,7 @@ public class MemoryService {
             title,
             content,
             Memory.DEFAULT_COLLECTION,
-            MemoryRetrieval.ofAlwaysInject(alwaysInject),
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.ofAlwaysInject(alwaysInject));
     }
 
 
@@ -248,26 +238,25 @@ public class MemoryService {
         String title,
         String content,
         String collection,
-        MemoryRetrieval retrieval,
-        MemorySensitivity sensitivity) {
+        MemoryRetrieval retrieval) {
         if (scope == null) {
             throw new ApiException(ErrorCode.MEMORY_SCOPE_REQUIRED, "memory scope is required");
         }
-        MemoryPlacement placement = placement(collection, retrieval, sensitivity);
+        MemoryPlacement placement = placement(collection, retrieval);
         if (scope == MemoryScope.GROUP) {
             requireAdmin(user);
             return texts.insert(Memory.accepted(
-                scope, null, user.groupId(), title, StoredContent.plain(content), placement, user.id(), clock.instant()));
+                scope, null, user.groupId(), title, content, placement, user.id(), clock.instant()));
         }
         return texts.insert(Memory.accepted(
-            scope, user.id(), null, title, StoredContent.plain(content), placement, user.id(), clock.instant()));
+            scope, user.id(), null, title, content, placement, user.id(), clock.instant()));
     }
 
 
     /** 에이전트가 제안한 개인 항목을 만든다. GROUP 제안은 만들지 않는다. */
     @Transactional
     public Memory proposeUser(CurrentUser user, String title, String content, Long proposedByExecutionId) {
-        String dedupKey = proposalDedupKey(user.id(), title, content);
+        String dedupKey = texts.proposalDedupKey(user.id(), title, content);
         return memories.findByProposalDedupKey(dedupKey).orElseGet(() -> {
             Instant now = clock.instant();
             Memory proposed = texts.insert(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
@@ -311,34 +300,27 @@ public class MemoryService {
 
 
     /**
-     * 지금 화면의 수정이다. 민감도는 그대로 두고 본문과 항상 실을지만 바꾼다. {@code archivable} 이 null 이 아니면 자동 보관 허락 표시도 정한다.
+     * 지금 화면의 수정이다. 본문과 항상 실을지만 바꾼다. {@code archivable} 이 null 이 아니면 자동 보관 허락 표시도 정한다.
      *
      * <p>항상 싣지 않게 바꾸면 색인으로 간다. 이미 보관(ARCHIVE)한 항목은 보관한 채로 둔다. 이 화면이 보관을 모르므로
      * 본문만 고친 것이 그 항목을 색인으로 되살리지 않게 한다.
      *
-     * <p>민감 항목은 이 경로로 고치지 못한다. 목록이 본문을 싣지 않아 이 요청이 본문을 읽지 않은 채 덮어쓴다(ADR-055).
-     *
-     * @throws ApiException 민감 항목일 때. MEMORY_SENSITIVE_NOT_EDITABLE
+     * @throws ApiException 풀지 못한 줄일 때. MEMORY_ENCRYPTION_UNAVAILABLE
      */
     @Transactional
     public Memory update(CurrentUser user, Long id, String content, boolean alwaysInject, Boolean archivable) {
         Memory memory = requireMemoryForUpdate(user, id);
-        if (memory.sensitivity() == MemorySensitivity.SENSITIVE) {
-            throw new ApiException(
-                ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE, "a sensitive memory cannot be edited from the list");
-        }
         MemoryRetrieval retrieval = alwaysInject
             ? MemoryRetrieval.ALWAYS
             : memory.retrieval() == MemoryRetrieval.ARCHIVE ? MemoryRetrieval.ARCHIVE : MemoryRetrieval.SEARCH;
-        return revise(user, memory, content, retrieval, memory.sensitivity()).withArchivable(archivable);
+        return revise(user, memory, content, retrieval).withArchivable(archivable);
     }
 
 
-    /** 본문과 꺼내는 방식과 민감도를 고친다. 고치기 전의 값을 판으로 남기고 판 번호를 하나 올린다. */
+    /** 본문과 꺼내는 방식을 고친다. 고치기 전의 값을 판으로 남기고 판 번호를 하나 올린다. */
     @Transactional
-    public Memory update(
-        CurrentUser user, Long id, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        return revise(user, requireMemoryForUpdate(user, id), content, retrieval, sensitivity);
+    public Memory update(CurrentUser user, Long id, String content, MemoryRetrieval retrieval) {
+        return revise(user, requireMemoryForUpdate(user, id), content, retrieval);
     }
 
 
@@ -388,15 +370,13 @@ public class MemoryService {
                 user.id(),
                 user.groupId(),
                 retrieval,
-                access.unrestricted() ? null : access.collections(),
-                access.sensitiveCollections()),
+                access.unrestricted() ? null : access.collections()),
             BY_ID).stream().filter(Memory::readable).toList();
     }
 
 
-    Memory revise(
-        CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        return revisionWriter.revise(user, memory, content, retrieval, sensitivity);
+    Memory revise(CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval) {
+        return revisionWriter.revise(user, memory, content, retrieval);
     }
 
 
@@ -450,13 +430,12 @@ public class MemoryService {
     }
 
 
-    private static MemoryPlacement placement(
-        String collection, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
+    private static MemoryPlacement placement(String collection, MemoryRetrieval retrieval) {
         if (!MemoryPlacement.isCollectionKey(collection)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a collection key is invalid");
         }
-        MemoryRevisionWriter.requirePlaceable(retrieval, sensitivity);
-        return new MemoryPlacement(collection, retrieval, sensitivity);
+        MemoryRevisionWriter.requirePlaceable(retrieval);
+        return new MemoryPlacement(collection, retrieval);
     }
 
 
@@ -483,8 +462,4 @@ public class MemoryService {
         return new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory");
     }
 
-
-    static String proposalDedupKey(Long ownerUserId, String title, String content) {
-        return MemoryRevisionWriter.proposalDedupKey(ownerUserId, title, content);
-    }
 }

@@ -13,7 +13,6 @@ import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -181,7 +180,7 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
         Agent agent = agent(user);
         clock.set(BASE.minus(Duration.ofDays(1)));
         Memory always = memories.create(
-            user, MemoryScope.USER, "항상표식 매일 아침 운동", "본문표식", GRANTED, MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+            user, MemoryScope.USER, "항상표식 매일 아침 운동", "본문표식", GRANTED, MemoryRetrieval.ALWAYS);
         Memory indexed = create(user, "색인표식 주말 계획", GRANTED);
         clock.set(BASE);
 
@@ -204,7 +203,7 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
     private Agent agent(CurrentUser user) {
         Agent agent = newAgent(user);
         createdAgents.add(agent.id());
-        grants.save(AgentMemoryCollection.of(agent.id(), GRANTED, false));
+        grants.save(AgentMemoryCollection.of(agent.id(), GRANTED));
         return agent;
     }
 
@@ -216,8 +215,7 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
             title,
             "본문표식 " + title,
             collection,
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
     }
 
 

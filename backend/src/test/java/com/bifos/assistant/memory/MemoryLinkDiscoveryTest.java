@@ -9,6 +9,7 @@ import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
@@ -37,6 +38,9 @@ class MemoryLinkDiscoveryTest {
     private static final float[] PARKING = {1f, 0f, 0f};
     private static final float[] TRIP = {0f, 1f, 0f};
     private static final float[] HOTEL = {0f, 0.95f, 0.3f};
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryLinkDiscovery discovery;
@@ -223,7 +227,7 @@ class MemoryLinkDiscoveryTest {
     private Memory embedded(CurrentUser owner, MemoryScope scope, String title, String content, float[] vector, String model) {
         Memory memory = memories.create(owner, scope, title, content, false);
         String text = EmbeddingText.of(title, content, embeddingProperties.maxTextChars());
-        MemoryEmbeddingRows.write(jdbc, memory.id(), model, EmbeddingText.fingerprint(model, text), vector);
+        MemoryEmbeddingRows.write(jdbc, memory.id(), model, texts.embeddingFingerprint(memory.scope(), memory.stored().ownerId(), model, text).orElseThrow(), vector);
         return memory;
     }
 }

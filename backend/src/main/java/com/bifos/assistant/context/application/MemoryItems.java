@@ -6,6 +6,7 @@ import com.bifos.assistant.context.application.dto.ContextItem;
 import com.bifos.assistant.context.application.dto.ContextSource;
 import com.bifos.assistant.context.application.dto.ContextTrust;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.List;
 import java.util.regex.Pattern;
 import lombok.AccessLevel;
@@ -31,7 +32,8 @@ final class MemoryItems {
             ContextItem.memoryRef(memory.id()),
             memory.scope(),
             memory.ownerUserId(),
-            memory.sensitivity(),
+            // 기억에는 민감 구분이 없다. 받은 collection 의 기억은 모두 같은 층에 실린다(스펙 DECISION1)
+            MemorySensitivity.NORMAL,
             ContextTrust.USER_APPROVED,
             memory.updatedAt(),
             freshness,

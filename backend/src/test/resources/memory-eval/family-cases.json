@@ -28,8 +28,7 @@
       "key": "general",
       "collections": [
         {
-          "collection": "core",
-          "allowSensitive": false
+          "collection": "core"
         }
       ]
     },
@@ -37,12 +36,10 @@
       "key": "health",
       "collections": [
         {
-          "collection": "core",
-          "allowSensitive": false
+          "collection": "core"
         },
         {
-          "collection": "health",
-          "allowSensitive": false
+          "collection": "health"
         }
       ]
     }
@@ -1085,8 +1082,7 @@
           "scope": "USER",
           "title": "혈압 기록",
           "content": "혈압 측정 기록 메모다",
-          "collection": "health",
-          "sensitivity": "SENSITIVE",
+          "collection": "private",
           "updatedDaysAgo": 5
         },
         {

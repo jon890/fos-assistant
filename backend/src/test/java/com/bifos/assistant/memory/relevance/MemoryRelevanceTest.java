@@ -3,6 +3,10 @@ package com.bifos.assistant.memory.relevance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+import com.bifos.assistant.crypto.domain.OwnedTextCipher;
+import com.bifos.assistant.memory.application.MemoryTexts;
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
@@ -32,7 +36,7 @@ class MemoryRelevanceTest {
 
     private final List<MemoryEmbeddingVector> stored = new ArrayList<>();
     private final MemoryRelevance relevance = new MemoryRelevance(
-        new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(repository(), EMBEDDING));
+        new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(repository(), EMBEDDING, plainTexts()));
 
 
     @Test
@@ -127,14 +131,20 @@ class MemoryRelevanceTest {
 
 
     private static RelevanceCandidate candidate(Long id, String title, String body) {
-        return new RelevanceCandidate(id, title, body);
+        return new RelevanceCandidate(id, title, body, MemoryScope.USER, 1L);
     }
 
 
     private void store(RelevanceCandidate candidate, float[] vector) {
         String text = EmbeddingText.of(candidate.title(), candidate.plainBody(), EMBEDDING.maxTextChars());
         stored.add(new MemoryEmbeddingVector(
-            candidate.memoryId(), EMBEDDING.model(), EmbeddingText.fingerprint(EMBEDDING.model(), text), vector));
+            candidate.memoryId(), EMBEDDING.model(), EmbeddingText.plainFingerprint(EMBEDDING.model(), text), vector));
+    }
+
+
+    /** KEK 가 없는 설치처럼 지문을 평문의 SHA-256 으로 내는 도구다. */
+    private static MemoryTexts plainTexts() {
+        return new MemoryTexts(Mockito.mock(OwnedTextCipher.class), Mockito.mock(MemoryRepository.class));
     }
 
 

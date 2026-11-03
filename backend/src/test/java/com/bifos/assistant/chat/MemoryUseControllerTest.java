@@ -23,7 +23,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -103,7 +102,7 @@ class MemoryUseControllerTest {
             .build();
         conversation = conversations.save(Conversation.startedBy(dad.id(), "참고한 기억 경로", null, Instant.now()));
         memory = memoryService.create(
-            dad, MemoryScope.USER, "딸 이름", SECRET_BODY, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            dad, MemoryScope.USER, "딸 이름", SECRET_BODY, "core", MemoryRetrieval.SEARCH);
         run = McpCallSigner.running(
             executions,
             agents,

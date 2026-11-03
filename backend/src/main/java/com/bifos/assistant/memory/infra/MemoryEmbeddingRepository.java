@@ -19,7 +19,7 @@ import org.springframework.data.repository.query.Param;
  * <p>{@link MemoryRepository} 가 이 인터페이스를 이어받아 Spring Data 가 쿼리를 만든다. 같은 엔티티에 저장소를 둘 두면 엔티티로 저장소를 찾는
  * Spring Data 의 조회가 어느 쪽을 낼지 정해지지 않아, 벡터 쿼리만 이 이름으로 나눠 주입받는다.
  *
- * <p>임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아니고, 민감도가 {@code NORMAL} 인 항목이다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고, 풀지 못한 줄은 뺀다(ADR-20261103 / memory-encryption).
+ * <p>임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아닌 항목이다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고, 풀지 못한 줄은 뺀다(ADR-20261103 / memory-encryption).
  * 효력 있는 대체 연결이 가리키는 항목도 빠진다. 이미 있던 그 항목의 벡터는 다음 주기의 정리가 비운다.
  */
 public interface MemoryEmbeddingRepository {
@@ -34,7 +34,6 @@ public interface MemoryEmbeddingRepository {
         + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
-        + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
         + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
         + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
         + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
@@ -55,7 +54,6 @@ public interface MemoryEmbeddingRepository {
         + " and m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
-        + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
         + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
         + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
         + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
@@ -72,7 +70,8 @@ public interface MemoryEmbeddingRepository {
     private static List<MemoryEmbeddingSource> sourcesOf(List<Memory> memories) {
         return memories.stream()
             .filter(Memory::readable)
-            .map(memory -> new MemoryEmbeddingSource(memory.id(), memory.title(), memory.content()))
+            .map(memory -> new MemoryEmbeddingSource(
+                memory.id(), memory.scope(), memory.stored().ownerId(), memory.title(), memory.content()))
             .toList();
     }
 
@@ -117,6 +116,20 @@ public interface MemoryEmbeddingRepository {
         @Param("model") String model,
         @Param("fingerprint") byte[] fingerprint,
         @Param("vector") byte[] vector);
+
+
+    /**
+     * 지문만 바꾼다. 지문이 아직 {@code expected} 일 때만 바꿔, 그 사이 채우는 작업이 쓴 새 벡터를 덮지 않는다.
+     *
+     * @return 바꾼 줄 수
+     */
+    @Modifying
+    @Query(value = "update memory set embedding_fingerprint = :fingerprint"
+        + " where id = :memoryId and embedding_fingerprint = :expected", nativeQuery = true)
+    int replaceFingerprint(
+        @Param("memoryId") Long memoryId,
+        @Param("expected") byte[] expected,
+        @Param("fingerprint") byte[] fingerprint);
 
 
     /** 그 항목들의 세 벡터 칸을 모두 비운다. 한 칸만 남은 줄도 함께 비운다. 비운 줄 수를 돌려준다. */

@@ -9,17 +9,16 @@ import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -56,9 +55,12 @@ class MemoryServiceTest {
     private static final CurrentUser OTHER_GROUP = user(3L, 20L, UserRole.ADMIN);
 
     /** core collection 만 받고 민감 항목은 받지 않는 에이전트의 실행이다. 표를 넓히기 전의 모든 실행과 같다. */
-    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
+    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"));
 
     private static final Instant NOW = Instant.parse("2026-10-02T00:00:00Z");
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryService memories;
@@ -100,9 +102,9 @@ class MemoryServiceTest {
         Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
         MemoryEmbeddingRows.write(jdbc, kept.id(), "test-model", new byte[32], new float[] {1f});
 
-        RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
+        RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용", MemoryScope.USER, ADMIN.id());
         String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
-        MemoryEmbeddingRows.write(jdbc, deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f});
+        MemoryEmbeddingRows.write(jdbc, deleted.id(), embeddingProperties.model(), texts.embeddingFingerprint(MemoryScope.USER, ADMIN.id(), embeddingProperties.model(), text).orElseThrow(), new float[] {1f});
         assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
         // 직전 이미지가 옛 테이블에 남긴 줄이다
         for (Long legacyId : List.of(deleted.id(), kept.id())) {
@@ -314,7 +316,7 @@ class MemoryServiceTest {
             transactions.executeWithoutResult(status -> {
                 Memory held = repository.findByIdForUpdate(proposed.id()).orElseThrow();
                 revisionRepository.save(MemoryRevision.of(held, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
-                held.revise("고친 내용", null, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
+                held.revise("고친 내용", null, MemoryRetrieval.SEARCH, null, NOW);
                 locked.countDown();
                 // 승인 쪽이 읽기에 닿을 틈을 준다. 잠금이 있으면 이 커밋 뒤에야 읽는다.
                 LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));
@@ -371,7 +373,7 @@ class MemoryServiceTest {
             null,
             null,
             "주인 없는 그룹 항목",
-            StoredContent.plain("내용"),
+            "내용",
             MemoryPlacement.core(MemoryRetrieval.SEARCH),
             1L,
             NOW));
@@ -400,37 +402,14 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("민감 항목은 만들 때도 고칠 때도 항상 싣게 둘 수 없다")
-    void sensitiveItemsCannotAlwaysBeInjected() {
-        assertSensitiveAlways(() -> memories.create(
-            ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
-
-        Memory sensitive = memories.create(
-            ADMIN, MemoryScope.USER, "민감", "내용", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-        assertThatThrownBy(() -> memories.update(ADMIN, sensitive.id(), "내용", true, null))
-            .isInstanceOfSatisfying(
-                ApiException.class,
-                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
-        assertSensitiveAlways(() -> memories.update(ADMIN, sensitive.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
-
-        Memory always = memories.create(ADMIN, MemoryScope.USER, "항상", "내용", true);
-        assertSensitiveAlways(
-            () -> memories.update(ADMIN, always.id(), "내용", MemoryRetrieval.ALWAYS, MemorySensitivity.SENSITIVE));
-        // 거절한 수정은 판을 남기지 않는다.
-        assertThat(memories.revisionsOf(ADMIN, sensitive.id())).isEmpty();
-        assertThat(repository.findById(sensitive.id()).orElseThrow().revision()).isOne();
-    }
-
-
-    @Test
     @DisplayName("에이전트가 받지 않는 collection 의 항목은 주입과 색인에 없고 본문은 없는 항목과 같다")
     void itemsOutsideTheAgentsCollectionsAreAbsentEverywhere() {
         Memory core = memories.create(ADMIN, MemoryScope.USER, "기본", "기본 본문", false);
         Memory career = memories.create(
-            ADMIN, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            ADMIN, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.SEARCH);
         Memory careerAlways = memories.create(
-            ADMIN, MemoryScope.USER, "커리어 항상", "항상 본문", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
-        MemoryAccess careerAgent = MemoryAccess.of(Set.of("core", "career"), Set.of());
+            ADMIN, MemoryScope.USER, "커리어 항상", "항상 본문", "career", MemoryRetrieval.ALWAYS);
+        MemoryAccess careerAgent = MemoryAccess.of(Set.of("core", "career"));
 
         assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(core.id());
         assertThat(memories.alwaysInjectedFor(ADMIN, CORE)).isEmpty();
@@ -459,45 +438,10 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("민감 항목은 그 collection 에서 허용받은 실행만 색인과 본문으로 받는다")
-    void sensitiveItemsNeedAnExplicitAllowance() {
-        Memory sensitive = memories.create(
-            ADMIN,
-            MemoryScope.USER,
-            "신원",
-            "민감 본문",
-            "identity",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.SENSITIVE);
-        Memory normal = memories.create(
-            ADMIN, MemoryScope.USER, "별명", "보통 본문", "identity", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
-        MemoryAccess withoutSensitive = MemoryAccess.of(Set.of("identity"), Set.of());
-        MemoryAccess withSensitive = MemoryAccess.of(Set.of("identity"), Set.of("identity"));
-        // 다른 collection 의 민감 허용은 이 collection 에 통하지 않는다.
-        MemoryAccess otherSensitive = MemoryAccess.of(Set.of("identity", "career"), Set.of("career"));
-
-        assertThat(memories.indexedFor(ADMIN, withoutSensitive))
-            .extracting(Memory::id)
-            .containsExactly(normal.id());
-        assertNotFound(() -> memories.bodyFor(ADMIN, withoutSensitive, sensitive.id()));
-        assertThat(memories.indexedFor(ADMIN, otherSensitive))
-            .extracting(Memory::id)
-            .containsExactly(normal.id());
-        assertNotFound(() -> memories.bodyFor(ADMIN, otherSensitive, sensitive.id()));
-
-        assertThat(memories.indexedFor(ADMIN, withSensitive))
-            .extracting(Memory::id)
-            .containsExactly(sensitive.id(), normal.id());
-        assertThat(memories.contentOf(memories.bodyFor(ADMIN, withSensitive, sensitive.id())))
-            .isEqualTo("민감 본문");
-    }
-
-
-    @Test
     @DisplayName("보관한 항목은 색인에 없고 본문도 읽지 못하며 옛 화면의 수정이 보관을 풀지 않는다")
     void archivedItemsStayOutOfTheIndex() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "옛 사실", "본문", false);
-        memories.update(ADMIN, memory.id(), "본문", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL);
+        memories.update(ADMIN, memory.id(), "본문", MemoryRetrieval.ARCHIVE);
 
         assertThat(memories.indexedFor(ADMIN, CORE)).isEmpty();
         assertThat(memories.alwaysInjectedFor(ADMIN, CORE)).isEmpty();
@@ -517,7 +461,6 @@ class MemoryServiceTest {
         assertThat(memory.retrieval()).isEqualTo(MemoryRetrieval.ALWAYS);
         assertThat(memory.alwaysInject()).isTrue();
         assertThat(memory.collection()).isEqualTo("core");
-        assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
 
         Memory changed = memories.update(ADMIN, memory.id(), "내용", false, null);
         assertThat(changed.retrieval()).isEqualTo(MemoryRetrieval.SEARCH);
@@ -530,7 +473,7 @@ class MemoryServiceTest {
     void rejectsMalformedCollectionKeys() {
         for (String key : List.of("", "Core", "커리어", "a b", "-core")) {
             assertThatThrownBy(() -> memories.create(
-                ADMIN, MemoryScope.USER, "제목", "내용", key, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL))
+                ADMIN, MemoryScope.USER, "제목", "내용", key, MemoryRetrieval.SEARCH))
                     .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         }
@@ -553,13 +496,6 @@ class MemoryServiceTest {
         assertThatThrownBy(action::run)
             .isInstanceOfSatisfying(
                 ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
-    }
-
-
-    private static void assertSensitiveAlways(ThrowingAction action) {
-        assertThatThrownBy(action::run)
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_ALWAYS));
     }
 
 

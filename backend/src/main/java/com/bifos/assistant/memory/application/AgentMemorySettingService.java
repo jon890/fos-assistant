@@ -11,7 +11,6 @@ import com.bifos.assistant.memory.application.dto.AgentMemorySettingChange;
 import com.bifos.assistant.memory.application.dto.AgentMemorySettingCollection;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryCollectionCount;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -20,7 +19,7 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,7 +51,7 @@ public class AgentMemorySettingService {
 
 
     /**
-     * 에이전트가 받는 collection 과 민감 허용, 셈 대상의 collection 마다 항목 수, 최근 변경 기록을 낸다.
+     * 에이전트가 받는 collection, 셈 대상의 collection 마다 항목 수, 최근 변경 기록을 낸다.
      *
      * <p>주인 번호가 있어도 그 사용자를 찾지 못하면 주인이 없는 에이전트처럼 관리자 그룹의 항목만 센다. 그룹의 collection
      * 목록이 비어 있으면 기본 목록을 넣으므로 쓰기 트랜잭션으로 돈다.
@@ -72,12 +71,7 @@ public class AgentMemorySettingService {
 
         Map<String, AgentMemoryCollection> rows = agentCollections.rowsOf(agent.id()).stream()
             .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
-        List<MemoryCollectionCount> counts = memories.countLoadableByCollection(userId, groupId);
-        Map<String, Long> entries = counts.stream()
-            .collect(Collectors.groupingBy(
-                MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
-        Map<String, Long> sensitiveEntries = counts.stream()
-            .filter(count -> count.sensitivity() == MemorySensitivity.SENSITIVE)
+        Map<String, Long> entries = memories.countLoadableByCollection(userId, groupId).stream()
             .collect(Collectors.groupingBy(
                 MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
 
@@ -85,10 +79,10 @@ public class AgentMemorySettingService {
         Set<String> unlisted = new TreeSet<>(rows.keySet());
         for (MemoryCollection collection : collections.collectionsOf(groupId)) {
             unlisted.remove(collection.key());
-            view.add(collectionView(collection.key(), collection.displayName(), true, rows, entries, sensitiveEntries));
+            view.add(collectionView(collection.key(), collection.displayName(), true, rows, entries));
         }
         for (String key : unlisted) {
-            view.add(collectionView(key, key, false, rows, entries, sensitiveEntries));
+            view.add(collectionView(key, key, false, rows, entries));
         }
 
         return new AgentMemorySetting(
@@ -115,9 +109,9 @@ public class AgentMemorySettingService {
         if (next.size() > MAX_COLLECTIONS) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "too many memory collections");
         }
-        Map<String, Boolean> grants = new LinkedHashMap<>();
+        Set<String> grants = new LinkedHashSet<>();
         for (AgentMemoryGrantInput input : next) {
-            if (grants.put(input.collection(), input.allowSensitive()) != null) {
+            if (!grants.add(input.collection())) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "duplicate memory collection");
             }
         }
@@ -148,7 +142,6 @@ public class AgentMemorySettingService {
             .map(change -> new AgentMemorySettingChange(
                 change.collection(),
                 change.changeType().name(),
-                change.allowSensitive(),
                 names.get(change.changedByUserId()),
                 change.changedAt()))
             .toList();
@@ -160,16 +153,12 @@ public class AgentMemorySettingService {
         String displayName,
         boolean listed,
         Map<String, AgentMemoryCollection> rows,
-        Map<String, Long> entries,
-        Map<String, Long> sensitiveEntries) {
-        AgentMemoryCollection row = rows.get(key);
+        Map<String, Long> entries) {
         return new AgentMemorySettingCollection(
             key,
             displayName,
             listed,
-            row != null,
-            row != null && row.allowSensitive(),
-            entries.getOrDefault(key, 0L),
-            sensitiveEntries.getOrDefault(key, 0L));
+            rows.containsKey(key),
+            entries.getOrDefault(key, 0L));
     }
 }

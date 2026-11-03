@@ -1,9 +1,13 @@
 package com.bifos.assistant.memory.domain;
 
+import com.bifos.assistant.memory.domain.type.MemoryScope;
+
 /**
- * 임베딩할 항목 하나의 글이다. 민감도가 {@code NORMAL} 이고 암호화하지 않은 항목만 이 모양으로 읽는다.
+ * 임베딩할 항목 하나의 푼 글이다.
+ *
+ * @param ownerId {@code USER} 면 주인 사용자 번호, {@code GROUP} 이면 그룹 번호. 지문을 만들 주인 key 를 고른다
  */
-public record MemoryEmbeddingSource(Long memoryId, String title, String content) {
+public record MemoryEmbeddingSource(Long memoryId, MemoryScope scope, Long ownerId, String title, String content) {
 
     /** 제목과 본문을 로그에 남기지 않는다. */
     @Override

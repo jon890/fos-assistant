@@ -17,10 +17,8 @@ import com.bifos.assistant.memory.application.AgentMemorySettingService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.admin.memory.presentation.AgentMemorySettingController;
 import com.bifos.assistant.admin.memory.presentation.MemoryAdminDtos.AgentMemoryChangeView;
@@ -121,28 +119,28 @@ class AgentMemorySettingTest {
     void countsOwnerAndGroupItemsPerCollectionIncludingUngrantedOnes() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
         save(Memory.document(
-            owner.id(), "career", key(), "이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            owner.id(), "career", key(), "이력", "본문", NOW));
         save(Memory.document(
-            owner.id(), "career", key(), "연봉", StoredContent.plain("본문"), MemorySensitivity.SENSITIVE, NOW));
+            owner.id(), "career", key(), "연봉", "본문", NOW));
         save(Memory.accepted(
             MemoryScope.USER,
             owner.id(),
             null,
             "보관한 항목",
-            StoredContent.plain("본문"),
-            new MemoryPlacement("career", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL),
+            "본문",
+            new MemoryPlacement("career", MemoryRetrieval.ARCHIVE),
             owner.id(),
             NOW));
         save(Memory.proposed(
             owner.id(),
             "제안만 된 항목",
-            StoredContent.plain("본문"),
-            new MemoryPlacement("career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            "본문",
+            new MemoryPlacement("career", MemoryRetrieval.SEARCH),
             null,
             null,
             NOW));
         save(Memory.document(
-            other.id(), "career", key(), "남의 이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            other.id(), "career", key(), "남의 이력", "본문", NOW));
         save(groupItem("core"));
 
         AgentMemorySettingView view = controller.get(agent.code());
@@ -158,16 +156,14 @@ class AgentMemorySettingTest {
                 AgentMemoryCollectionView::displayName,
                 AgentMemoryCollectionView::listed,
                 AgentMemoryCollectionView::granted,
-                AgentMemoryCollectionView::entryCount,
-                AgentMemoryCollectionView::sensitiveEntryCount)
+                AgentMemoryCollectionView::entryCount)
             .as("ARCHIVE, PROPOSED, 다른 사용자의 항목은 세지 않는다")
-            .containsExactly("커리어", true, false, 2L, 1L);
+            .containsExactly("커리어", true, false, 2L);
         assertThat(collection(view, "core"))
             .extracting(
                 AgentMemoryCollectionView::granted,
-                AgentMemoryCollectionView::allowSensitive,
                 AgentMemoryCollectionView::entryCount)
-            .containsExactly(true, false, 1L);
+            .containsExactly(true, 1L);
         assertThat(collection(view, "health").entryCount()).isZero();
         assertThat(view.changes()).isEmpty();
         assertThat(view.toString())
@@ -181,24 +177,20 @@ class AgentMemorySettingTest {
     void returnsChangedValuesAndRecordsAfterReplacing() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
 
-        AgentMemorySettingView view = controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true)));
+        AgentMemorySettingView view = controller.replace(agent.code(), request(new AgentMemoryGrantBody("career")));
 
-        assertThat(collection(view, "career"))
-            .extracting(AgentMemoryCollectionView::granted, AgentMemoryCollectionView::allowSensitive)
-            .containsExactly(true, true);
+        assertThat(collection(view, "career").granted()).isTrue();
         assertThat(collection(view, "core").granted()).isFalse();
         assertThat(view.changes())
             .extracting(
                 AgentMemoryChangeView::collection,
                 AgentMemoryChangeView::changeType,
-                AgentMemoryChangeView::allowSensitive,
                 AgentMemoryChangeView::changedByName)
-            .containsExactlyInAnyOrder(
-                tuple("career", "GRANTED", true, "관리자A"), tuple("core", "REVOKED", false, "관리자A"));
+            .containsExactlyInAnyOrder(tuple("career", "GRANTED", "관리자A"), tuple("core", "REVOKED", "관리자A"));
         assertThat(view.changes().get(0).changedByName()).isEqualTo("관리자A");
         assertThat(grants.findByIdAgentId(agent.id()))
-            .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-            .containsExactly(tuple("career", true));
+            .extracting(AgentMemoryCollection::collection)
+            .containsExactly("career");
 
         AgentMemorySettingView emptied = controller.replace(agent.code(), request());
         assertThat(emptied.collections()).noneMatch(AgentMemoryCollectionView::granted);
@@ -210,20 +202,19 @@ class AgentMemorySettingTest {
     @DisplayName("목록에 없는 받는 collection 은 key 이름으로 뒤에 붙이고 그대로 둘 수 있다")
     void appendsGrantedCollectionsOutsideTheListAndKeepsThem() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
-        grants.save(AgentMemoryCollection.of(agent.id(), "legacy-notes", false));
+        grants.save(AgentMemoryCollection.of(agent.id(), "legacy-notes"));
 
         AgentMemorySettingView view = controller.replace(
             agent.code(),
-            request(new AgentMemoryGrantBody("core", false), new AgentMemoryGrantBody("legacy-notes", true)));
+            request(new AgentMemoryGrantBody("core"), new AgentMemoryGrantBody("legacy-notes")));
 
         assertThat(view.collections().get(view.collections().size() - 1))
             .extracting(
                 AgentMemoryCollectionView::key,
                 AgentMemoryCollectionView::displayName,
                 AgentMemoryCollectionView::listed,
-                AgentMemoryCollectionView::granted,
-                AgentMemoryCollectionView::allowSensitive)
-            .containsExactly("legacy-notes", "legacy-notes", false, true, true);
+                AgentMemoryCollectionView::granted)
+            .containsExactly("legacy-notes", "legacy-notes", false, true);
     }
 
 
@@ -233,15 +224,15 @@ class AgentMemorySettingTest {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
 
         assertCode(
-            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("no-such", false))),
+            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("no-such"))),
             ErrorCode.VALIDATION_FAILED);
         assertCode(
             () -> controller.replace(
                 agent.code(),
-                request(new AgentMemoryGrantBody("career", false), new AgentMemoryGrantBody("career", true))),
+                request(new AgentMemoryGrantBody("career"), new AgentMemoryGrantBody("career"))),
             ErrorCode.VALIDATION_FAILED);
         AgentMemoryGrantBody[] tooMany = IntStream.range(0, 65)
-            .mapToObj(i -> new AgentMemoryGrantBody("c" + i, false))
+            .mapToObj(i -> new AgentMemoryGrantBody("c" + i))
             .toArray(AgentMemoryGrantBody[]::new);
         assertCode(() -> controller.replace(agent.code(), request(tooMany)), ErrorCode.VALIDATION_FAILED);
         assertCode(() -> controller.get("no-such-agent-" + key()), ErrorCode.AGENT_NOT_FOUND);
@@ -262,7 +253,7 @@ class AgentMemorySettingTest {
 
         assertCode(() -> controller.get(agent.code()), ErrorCode.FORBIDDEN);
         assertCode(
-            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true))),
+            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("career"))),
             ErrorCode.FORBIDDEN);
         assertThat(grants.findByIdAgentId(agent.id()))
             .extracting(AgentMemoryCollection::collection)
@@ -276,7 +267,7 @@ class AgentMemorySettingTest {
         Agent agent = agent(AgentVisibility.GROUP, null);
         save(groupItem("core"));
         save(Memory.document(
-            admin.id(), "core", key(), "관리자 개인 문서", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            admin.id(), "core", key(), "관리자 개인 문서", "본문", NOW));
 
         AgentMemorySettingView view = controller.get(agent.code());
 
@@ -333,8 +324,8 @@ class AgentMemorySettingTest {
             null,
             groupId,
             "그룹 항목",
-            StoredContent.plain("본문"),
-            new MemoryPlacement(collection, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            "본문",
+            new MemoryPlacement(collection, MemoryRetrieval.SEARCH),
             admin.id(),
             NOW);
     }
