@@ -19,8 +19,11 @@ const FEATURE_DOC = /^[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 /** 플러그인 하나의 개발 내용을 갖는 기능 파일이다. 「절로 더한다」 의 예외이고 ADR-20261009 / feature-docs 가 정한다. */
 const CONNECTOR_DOC = /^([a-z0-9]+(?:-[a-z0-9]+)*)-connector\.md$/;
 
-/** 기능 스펙이다. 같은 이름의 기능 파일 옆 디렉터리에 `spec.md` 하나만 둔다. 규칙은 ADR-20261102 / feature-loop 가 정한다. */
-const FEATURE_SPEC = /^([a-z0-9]+(?:-[a-z0-9]+)*)\/spec\.md$/;
+/**
+ * 기능 폴더 `docs/features/<id>/` 안에 둘 수 있는 파일이다. 같은 이름의 기능 파일이 있어야 한다.
+ * 스펙 `spec.md`, 기술 설계 `design.md`, 계획 `tasks/<계획>/index.json` 과 `phase-NN.md` 다. 규칙은 ADR-20261102 / feature-loop 가 정한다.
+ */
+const FEATURE_FOLDER_FILE = /^([a-z0-9]+(?:-[a-z0-9]+)*)\/(?:spec\.md|design\.md|tasks\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:index\.json|phase-\d{2}\.md))$/;
 
 /** 정해진 이름 밖에 두는 문서와 그 까닭이다. 까닭이 없으면 더하지 않는다. */
 export const EXCEPTIONS: Record<string, string> = {
@@ -50,11 +53,11 @@ export function problemOf(file: string): string | undefined {
     if (!inDocs[1] && /^code-rules\/(?:INDEX|rule-[1-9]\d*)\.md$/.test(rest)) return undefined;
     if (!inDocs[1] && rest.startsWith("features/")) {
       const name = rest.slice("features/".length);
-      const spec = FEATURE_SPEC.exec(name)?.[1];
-      if (spec) {
-        return existsSync(join(REPO_ROOT, "docs/features", `${spec}.md`)) ? undefined : "기능 스펙은 같은 이름의 기능 파일 docs/features/<id>.md 가 있어야 한다";
+      const folder = FEATURE_FOLDER_FILE.exec(name)?.[1];
+      if (folder) {
+        return existsSync(join(REPO_ROOT, "docs/features", `${folder}.md`)) ? undefined : "기능 폴더는 같은 이름의 기능 파일 docs/features/<id>.md 가 있어야 한다";
       }
-      if (name.includes("/")) return "docs/features/ 아래 하위 디렉터리에는 기능 스펙 <id>/spec.md 만 둔다";
+      if (name.includes("/")) return "docs/features/ 아래 하위 디렉터리에는 <id>/spec.md, <id>/design.md, <id>/tasks/<계획>/index.json 과 phase-NN.md 만 둔다";
       if (!FEATURE_DOC.test(name)) return "docs/features/ 아래에는 소문자 영문과 숫자, 하이픈 이름의 .md 만 둔다";
       const connector = CONNECTOR_DOC.exec(name)?.[1];
       if (connector && !existsSync(join(REPO_ROOT, "hermes/connectors", connector))) {
@@ -101,19 +104,39 @@ test("모듈 docs 의 정해진 이름과 예외는 통과하고 새 주제 파�
   }
 });
 
-test("기능 스펙은 같은 이름의 기능 파일이 있는 <id>/spec.md 만 허용한다", () => {
-  for (const file of ["docs/features/chat/spec.md", "docs/features/gmail-connector/spec.md", "docs/features/agent-skill/spec.md"]) {
+test("기능 폴더는 같은 이름의 기능 파일이 있는 <id>/ 의 스펙, 설계, 계획 파일만 허용한다", () => {
+  for (const file of [
+    "docs/features/chat/spec.md",
+    "docs/features/gmail-connector/spec.md",
+    "docs/features/agent-skill/spec.md",
+    "docs/features/chat/design.md",
+    "docs/features/chat/tasks/cancel-api/index.json",
+    "docs/features/chat/tasks/cancel-api/phase-01.md",
+    "docs/features/chat/tasks/plan313-test-slimming/phase-12.md",
+  ]) {
     assert.equal(problemOf(file), undefined, file);
   }
   for (const file of [
     "docs/features/no-such-feature/spec.md",
-    "docs/features/chat/design.md",
+    "docs/features/no-such-feature/design.md",
+    "docs/features/no-such-feature/tasks/cancel-api/phase-01.md",
     "docs/features/chat/SPEC.md",
+    "docs/features/chat/DESIGN.md",
+    "docs/features/chat/notes.md",
     "docs/features/chat/sub/spec.md",
+    "docs/features/chat/sub/design.md",
     "docs/features/Chat/spec.md",
     "docs/features/x/y.md",
+    "docs/features/chat/tasks/phase-01.md",
+    "docs/features/chat/tasks/index.json",
+    "docs/features/chat/tasks/cancel-api/notes.md",
+    "docs/features/chat/tasks/cancel-api/phase-1.md",
+    "docs/features/chat/tasks/cancel-api/Phase-01.md",
+    "docs/features/chat/tasks/cancel-api/sub/phase-01.md",
+    "docs/features/chat/tasks/Cancel_Api/phase-01.md",
     "docs/contracts/run.md",
     "backend/docs/features/chat/spec.md",
+    "backend/docs/features/chat/design.md",
   ]) {
     assert.notEqual(problemOf(file), undefined, file);
   }
