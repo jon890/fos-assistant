@@ -25,6 +25,7 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 | `dashboard-profile-api` | `sandbox.py`, `sandbox_paths.py`, `sandbox_approvals.py`, `toolconfig.py`, `env.py` | 실행 공간과 첨부 디렉터리, 실행 공간 정책의 경로 검사, 실행 공간과 함께 쓰는 승인 설정, 도구와 스킬 경로 설정, env 검사 |
 | `dashboard-profile-api` | `connector_schema.py`, `connector_policy.py`, `connector_skills.py`, `connector_appearance.py`, `connector_description.py` | manifest 형식 규칙, 입력 칸과 도구 정책·오류 계약, 스킬 읽기, 아이콘과 링크·도구 설명 검사 |
 | `dashboard-profile-api` | `connector_manifest.py`, `connector_vault.py` | manifest 읽기와 카탈로그, 연결 보관 파일 |
+| `dashboard-profile-api` | `connector_vault_key.py`, `connector_vault_migration.py` | 보관 파일 key 읽기와 암호화, 기동 때의 보관 파일 이관 |
 | `dashboard-profile-api` | `connector_state.py`, `connector_status.py` | 소유 기록과 도구 이름 대응, 스킬과 정책 hook 상태 확인 |
 | `dashboard-profile-api` | `connector_isolated.py`, `connector_binding.py`, `connector_install.py` | 옛 설치, 바인딩 설치, 요청 처리와 probe |
 | `dashboard-profile-api` | `connector_mcp.py`, `connector_run.py` | MCP 호출과 결과 해석, call·execute 요청과 공유 동시 호출 한도 |

@@ -489,6 +489,11 @@ Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 �
 경로와 형식, `PUT`·`DELETE` 경로의 검사는 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「플러그인」 이 갖는다.
 바인딩 설치도 같은 profile 쓰기 잠금 안에서 보관 파일을 읽으므로 그 사이에 값이 바뀌지 않는다.
 
+보관 파일은 대시보드 plugin 이 Control Plane KEK 와 다른 key 로 암호화한다([ADR-20261103 / connector-vault-key](../../hermes/docs/adr/ADR-20261103-connector-vault-key.md)).
+운영은 「key 필수」 를 켠다. 그때 key 를 쓸 수 없으면 보관 파일 쓰기가 실패해 연결은 위 「등록」 표대로 `PENDING` 으로 남고, 이미 붙은 바인딩의 도구 호출은 그대로 돈다.
+**key 를 잃으면 연결을 다시 등록한다. 이전 이미지로 되돌리면 연결을 해제한 뒤 다시 등록한다.** 평문으로 되돌리는 경로는 두지 않는다.
+붙인 에이전트 profile 의 `.env` 에는 아직 평문 사본이 남는다. 사본을 없애는 것은 [보관 파일 암호화 스펙](connector/spec.md) 의 REQ6, REQ7 이다.
+
 ## MCP SDK 계약
 
 대시보드 plugin 의 `call` 은 공식 `mcp` Python SDK 로 플러그인 서버를 부른다. plugin 은 SDK 를 스스로 설치하지 않고 Hermes 가 설치한 버전을 쓴다.
