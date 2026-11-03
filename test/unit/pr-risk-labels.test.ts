@@ -42,6 +42,12 @@ test("Hermes 문서에서 옮겨 온 절을 가진 기능 문서는 Hermes 연�
   assert.deepEqual(labelsFor("docs/features/mcp.md"), ["위험:Hermes연동"]);
 });
 
+test("기능 폴더 아래 계획서는 최상위 tasks/ 처럼 라벨이 붙지 않는다", () => {
+  assert.deepEqual(labelsFor("tasks/plan1/phase-01.md"), []);
+  assert.deepEqual(labelsFor("docs/features/mcp/tasks/cancel-api/phase-01.md", "docs/features/mcp/tasks/cancel-api/index.json"), []);
+  assert.deepEqual(labelsFor("docs/features/mcp/spec.md"), ["위험:Hermes연동"]);
+});
+
 test("Hermes 절이 없는 backend 문서는 Hermes 연동 라벨이 붙지 않는다", () => {
   assert.deepEqual(labelsFor("backend/docs/code-architecture.md"), []);
 });
