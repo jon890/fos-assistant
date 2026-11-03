@@ -12,7 +12,10 @@ import {
   tool,
   expectFailure,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const canonical = JSON.parse(
   readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`, "utf8"),

@@ -13,8 +13,11 @@ import {
   json,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
 import fixture from "./fixtures/openapi-1.2.24.json";
+
+const skipped = useSkippedWaits();
 
 const paths = fixture.paths as Record<string, any>;
 const examples = (path: string) =>
@@ -457,20 +460,19 @@ describe("섹터 조회 모듈의 SDK와 HTTP", () => {
 
   test("SECTOR는 큐를 공유하고 SECTOR_RANKING은 독립 큐를 쓴다", async () => {
     await session(async (fake, client) => {
-      const received = new Map<string, number>();
       for (const item of cases)
-        fake.routes.set(`GET ${item.path}`, () => {
-          received.set(item.path, performance.now());
-          return json(example(item.template, item.sample));
-        });
+        fake.routes.set(`GET ${item.path}`, () =>
+          json(example(item.template, item.sample)),
+        );
       await tool(client, "list_sectors");
-      const start = received.get(cases[0].path)!;
-      await Promise.all([
-        tool(client, "get_sector", cases[2].args),
-        tool(client, "get_sector_rankings", cases[1].args),
-      ]);
-      expect(received.get(cases[2].path)! - start).toBeGreaterThanOrEqual(190);
-      expect(received.get(cases[1].path)! - start).toBeLessThan(190);
+      expect(skipped.waits).toEqual([]);
+      // 요청을 하나씩 보내 대기가 어느 요청의 것인지 가린다. SECTOR_RANKING 은 방금 쓴 SECTOR 예산과 별개라 기다리지 않는다.
+      await tool(client, "get_sector_rankings", cases[1].args);
+      expect(skipped.waits).toEqual([]);
+      // 같은 SECTOR 그룹의 두 번째 요청은 간격을 기다린다.
+      await tool(client, "get_sector", cases[2].args);
+      expect(skipped.waits).toHaveLength(1);
+      expect(skipped.waits[0]!).toBeGreaterThanOrEqual(190);
       expect(operationFor("GET", cases[2].path).group).toBe("SECTOR");
       expect(operationFor("GET", cases[1].path).group).toBe("SECTOR_RANKING");
     });
