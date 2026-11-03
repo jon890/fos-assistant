@@ -31,7 +31,6 @@ hermes_session_binding|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 origin_executio
 media_observation|CONVERSATION|id|DELETE|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
 memory|USER|id|DELETE|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
 memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
-memory_link|USER|id|DELETE|KEEP|KEEP|양 끝 기억 항목에 속한다. 코드는 옛 표를 읽고 쓰지 않지만, 직전 이미지가 남긴 줄(자유 글 label 이 있을 수 있다)을 항목 삭제와 사용자 정리가 native 질의로 지운다(ADR-20261102 / table-reduce-r2). 표를 지우는 PR 이 이 줄을 지운다.
 memory_revision|USER|memory_id|DELETE|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
 notification|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대상은 공개 식별자이며 NotificationCleaner가 기간이 지난 행을 지운다.
 proactive_check|AGENT|id|DELETE|GAP|DELETE|user_id와 agent_id와 conversation_id FK가 있다. 알려진 공백: 대화 purge 뒤 report_json이 남는다.

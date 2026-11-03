@@ -52,9 +52,6 @@ VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage
 INSERT INTO memory_capture (id, memory_id, user_id, conversation_id, execution_id, kind, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-01-01 00:00:00');
 
-INSERT INTO memory_link (id, from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)
-VALUES (900000001, 900000001, 900000001, 'RELATED', 'HUMAN', 'ACTIVE', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
-
 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, changed_at)
 VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', '2020-01-01 00:00:00');
 

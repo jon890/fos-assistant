@@ -83,7 +83,6 @@ class MemoryServiceTest {
 
     @BeforeEach
     void setUp() {
-        MemorySupersedeRows.clearLegacyLinks(jdbc);
         repository.deleteAll();
         revisionRepository.deleteAll();
     }
@@ -107,22 +106,6 @@ class MemoryServiceTest {
         assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
         MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();
-    }
-
-
-    @Test
-    @DisplayName("항목을 지우면 직전 이미지가 옛 연결 테이블에 남긴 줄 가운데 그 항목을 어느 쪽 끝으로 둔 줄만 지운다")
-    void deletesLegacyLinksOnBothEndsWithMemory() {
-        Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
-        Memory a = memories.create(ADMIN, MemoryScope.USER, "가", "내용", false);
-        Memory b = memories.create(ADMIN, MemoryScope.USER, "나", "내용", false);
-        MemorySupersedeRows.insertLegacyLink(jdbc, deleted.id(), a.id(), "SUPERSEDES", "PROPOSED");
-        MemorySupersedeRows.insertLegacyLink(jdbc, b.id(), deleted.id(), "SUPERSEDES", "ACTIVE");
-        MemorySupersedeRows.insertLegacyLink(jdbc, a.id(), b.id(), "RELATED", "ACTIVE");
-
-        memories.delete(ADMIN, deleted.id());
-
-        assertThat(MemorySupersedeRows.legacyLinkCount(jdbc)).as("다른 두 항목 사이의 줄만 남는다").isEqualTo(1);
     }
 
 

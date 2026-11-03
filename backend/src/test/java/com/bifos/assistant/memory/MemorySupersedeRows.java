@@ -24,28 +24,4 @@ public final class MemorySupersedeRows {
     public static Long supersededBy(JdbcTemplate jdbc, Long memoryId) {
         return jdbc.queryForObject("SELECT superseded_by_memory_id FROM memory WHERE id = ?", Long.class, memoryId);
     }
-
-
-    /** 직전 이미지가 남긴 옛 연결 줄을 흉내 내 넣는다. 코드는 옛 테이블을 읽지 않고, 항목 삭제와 사용자 정리만 지운다. */
-    public static void insertLegacyLink(JdbcTemplate jdbc, Long fromId, Long toId, String type, String status) {
-        jdbc.update(
-            "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
-                + " VALUES (?, ?, ?, 'AGENT', ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
-            fromId,
-            toId,
-            type,
-            status);
-    }
-
-
-    /** 옛 연결 줄의 수다. */
-    public static int legacyLinkCount(JdbcTemplate jdbc) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM memory_link", Integer.class);
-    }
-
-
-    /** 옛 연결 줄을 모두 지운다. */
-    public static void clearLegacyLinks(JdbcTemplate jdbc) {
-        jdbc.update("DELETE FROM memory_link");
-    }
 }
