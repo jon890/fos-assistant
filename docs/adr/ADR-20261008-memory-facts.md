@@ -1,6 +1,6 @@
 ## ADR-20261008 / memory-facts: 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다
 
-- **status**: `accepted`
+- **status**: `accepted` 민감 허용과 민감도 `NORMAL` 조건은 [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) 이 없앤다.
 - Date: 2026-10-08
 - [ADR-20261007 / memory-remember](ADR-20261007-memory-remember.md) 의 「꺼내는 방식은 `SEARCH` 로 둔다. 다음 실행의 색인에 제목이 실리고 본문은 `memory_read` 로 읽는다」 를 개정한다.
   `memory_remember` 가 남기는 항목의 `retrieval` 은 그대로 `SEARCH` 다. 그 가운데 짧은 항목은 본문까지 실린다.

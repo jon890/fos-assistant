@@ -82,7 +82,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 | --- | --- | --- |
 | ChatGPT, Claude 같은 호스팅 비서 앱 | 모델을 만든 회사가 운영하고 설치할 것이 없다. 예를 들어 Claude 는 [대화하는 동안 기억을 저장](<https://support.claude.com/en/articles/11817273-using-claude-s-chat-search-and-memory-to-build-on-previous-context>)하고, 사용자는 설정에서 그 기억을 읽고 고치고 지운다. | 자기 서버에서 돈다. 단계가 어느 모델인지는 자기 데이터베이스의 정책 행이 정한다. 에이전트가 바로 기억하는 것은 사용자가 대화에서 직접 말한 사실뿐이고, 나머지는 사람이 받아들이기 전에는 쓰이지 않는다. |
 | [Open WebUI](https://docs.openwebui.com/), [LibreChat](https://www.librechat.ai/docs) 같은 자체 호스팅 채팅 화면 | Open WebUI 는 스스로를 Ollama 와 OpenAI 호환 API 를 지원하는 self-hosted AI platform 이라고 소개한다. LibreChat 은 agent 와 MCP, custom endpoint 를 갖춘 self-hosted web application 이다. | 이 프로젝트는 모델 API 를 직접 부르지 않고 에이전트 런타임 위에 얹는다. 거기에 사람마다 격리된 Hermes profile, 어느 에이전트가 어느 기억을 받는지 정하는 collection, 플러그인 쓰기의 승인 단계, 에이전트 사이의 위임과 실행 트리, 사용량을 API 가격으로 환산하는 원장을 더한다. |
-| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 를 혼자 쓰는 경우 | CLI 나 메시징 gateway 로 쓰는 자율 에이전트이고, 자체 persistent memory 와 skill 과 subagent 를 갖는다. | 여러 사람이 함께 쓰는 웹 화면을 더한다. 실행할 profile 은 요청자의 바인딩에서 꺼낸다. 기억은 Control Plane 만 거치고, Hermes 내장 memory 도구는 에이전트에 주지 않는다. 민감 항목은 암호화한다. 플러그인은 범용 구조 하나를 따른다([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
+| [Hermes Agent](https://hermes-agent.nousresearch.com/docs/) 를 혼자 쓰는 경우 | CLI 나 메시징 gateway 로 쓰는 자율 에이전트이고, 자체 persistent memory 와 skill 과 subagent 를 갖는다. | 여러 사람이 함께 쓰는 웹 화면을 더한다. 실행할 profile 은 요청자의 바인딩에서 꺼낸다. 기억은 Control Plane 만 거치고, Hermes 내장 memory 도구는 에이전트에 주지 않는다. 모든 기억은 암호화한다. 플러그인은 범용 구조 하나를 따른다([ADR-043](backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)). |
 
 ### 맞는 사람과 맞지 않는 사람
 
@@ -143,7 +143,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 ### Memory
 
-- **말한 것은 바로, 나머지는 제안으로.** 사용자가 이번 메시지에서 직접 말한 오래 쓰일 사실은 에이전트가 바로 기억하고, 그 답 아래에 「기억했어요」 와 고치기, 되돌리기가 보인다. 사용자가 직접 말한 사실은 모델이 본문을 다듬어도 바로 저장한다. 부정이 메시지와 본문 가운데 한쪽에만 있거나 글이 민감해 보이면 제안으로 남는다. 바깥 글을 읽었거나 사람이 보내지 않은 실행(맡긴 일의 결과, 예약 작업)이 섞인 대화에서 나온 것과 민감 항목은 늘 제안으로 남고 사람이 받아들여야 쓰인다([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [ADR-20261008 / memory-remember-guard](docs/adr/ADR-20261008-memory-remember-guard.md), [`docs/features/memory.md`](docs/features/memory.md)).
+- **말한 것은 바로, 나머지는 제안으로.** 사용자가 이번 메시지에서 직접 말한 오래 쓰일 사실은 에이전트가 바로 기억하고, 그 답 아래에 「기억했어요」 와 고치기, 되돌리기가 보인다. 사용자가 직접 말한 사실은 모델이 본문을 다듬어도 바로 저장한다. 부정이 메시지와 본문 가운데 한쪽에만 있거나 글이 민감해 보이면 제안으로 남는다. 바깥 글을 읽었거나 사람이 보내지 않은 실행(맡긴 일의 결과, 예약 작업)이 섞인 대화에서 나온 것과 에이전트가 민감하다고 표시한 것은 늘 제안으로 남고 사람이 받아들여야 쓰인다([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [ADR-20261008 / memory-remember-guard](docs/adr/ADR-20261008-memory-remember-guard.md), [`docs/features/memory.md`](docs/features/memory.md)).
 - **collection.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 모든 항목의 제목과 본문은 주인의 데이터 key 로 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-20261103 / memory-encryption](backend/docs/adr/ADR-20261103-memory-encryption.md)).
 
 collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/features/memory.md`](docs/features/memory.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.

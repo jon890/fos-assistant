@@ -6,6 +6,7 @@
 - [ADR-053](../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 의 세 번째 조건(민감 항목은 그 collection 의 민감 허용을 받은 에이전트만)을 이 결정이 대체한다. 범위와 collection 조건은 그대로다.
 - [ADR-20261008 / agent-memory-grants-admin](ADR-20261008-agent-memory-grants-admin.md) 의 collection 마다의 민감 허용과 `SENSITIVE_CHANGED` 기록을 이 결정이 대체한다.
 - [ADR-055](../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 남은 부분(옛 환경 변수 key 로 읽기)을 이 결정이 거둔다. 그 ADR 은 전체가 대체됐다.
+- [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 의 「민감 항목은 임베딩하지 않고 제목만 쓴다」, [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) 의 민감 조건, [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) 의 「민감도는 모델이 준 값 그대로 둔다」 도 이 결정이 대체한다.
 - [ADR-20261103 / memory-encryption](../../backend/docs/adr/ADR-20261103-memory-encryption.md) 이 「감당할 것」 에 남긴 평문 해시를 이 결정이 거둔다.
 - 스펙은 [`docs/features/memory/spec.md`](../features/memory/spec.md) 의 REQ5 와 DECISION1, DECISION10, DECISION17 이고, 설계는 [`design.md`](../features/memory/design.md) 의 「PR2」 절이 갖는다.
 
@@ -52,4 +53,6 @@ HMAC key 는 `HMAC-SHA256(데이터 key, "data_key_mac:" + 쓰임)` 으로 뽑�
   - 민감해 보이는 글을 에이전트에 싣지 않는 장치가 없다. 받는 collection 을 고르는 것이 그 장치다. 바로 저장 조건 6, 7 은 제안 카드로 내릴 뿐이다.
   - HMAC 과 임베딩 지문을 낼 때마다 주인 데이터 key 가 필요하다. 풀린 줄은 이미 그 key 를 캐시에 둔다.
   - 직전 이미지로 되돌린 동안 직전 이미지는 SHA-256 으로 중복 키를 내 같은 제안이 한 번 더 생길 수 있다. 되돌림이라는 예외 상황이라 막지 않는다.
+  - 예전 민감 기억도 이제 임베딩한다. 그 글이 임베딩 서비스로 가고 벡터는 평문으로 남는다(스펙 DECISION6 의 벡터 평문과 같다).
+  - 직전 이미지로 되돌리면 그 이미지는 HMAC 지문을 낡은 것으로 보고 벡터를 모두 다시 임베딩한다. 그때 연결 찾기가 다시 돌아 정리한 대체 제안이 다시 생길 수 있다.
   - 옛 칸은 지우는 PR 까지 남는다. 그 PR 은 이 PR 의 배포를 확인한 뒤 연다.

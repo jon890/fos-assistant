@@ -1,6 +1,6 @@
 ## ADR-20261015 / memory-hybrid-selection: 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다
 
-- **status**: `accepted`
+- **status**: `accepted` 민감 항목은 임베딩하지 않고 제목만 쓴다는 부분은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 대체한다. 풀리는 항목은 모두 임베딩하고 점수를 매긴다.
 - Date: 2026-10-15
 - [ADR-015](ADR-015-memory-는-층을-나눠-싣는다.md) 의 「제목만 싣는 층」 을 고치는 방식을 바꾼다. 층을 나눠 싣고 나머지를 도구로 읽는다는 결정은 그대로다.
   색인 층의 순서는 번호 순이 아니라 질문과의 관련도 순이 되고, 관련도가 높은 몇 건은 본문까지 싣는다.

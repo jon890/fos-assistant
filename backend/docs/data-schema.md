@@ -219,7 +219,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
-Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 암호문으로 남는다.
+Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
 그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)와 옛 벡터 표(`memory_embedding`)의 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
@@ -680,7 +680,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `scope` 가 `USER` 면 `owner_user_id` 가, `GROUP` 이면 `group_id` 가 주인이다. `scope` 에는 기본값이 없다
 - `title` 과 `content` 는 `data_key_id` 가 있으면 그 주인 데이터 key 의 암호문이다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 비어 있으면 평문이다. 기동할 때 데이터 key 로 옮기며, KEK 가 없는 설치는 평문 줄이 남는다
 - `title` 은 암호문이 들어가도록 `VARCHAR(1200)` 이다. 입력 제한 200자는 요청 검사가 지킨다
-- `sensitivity` 와 `content_key_id` 는 코드가 읽고 쓰지 않는 옛 칸이다. 기억에는 민감 구분이 없고([`docs/features/memory/spec.md`](../../docs/features/memory/spec.md) 의 REQ5), ADR-055 의 옛 key 는 읽지 않는다. 배포를 되돌릴 때 직전 이미지가 읽도록 칸을 남겨 두고 배포를 확인한 뒤 지운다. 새 줄은 `sensitivity` 의 기본값 `NORMAL` 을 받는다
+- `sensitivity` 와 `content_key_id` 는 코드가 읽고 쓰지 않는 옛 칸이다. 기억에는 민감 구분이 없고([ADR-20261103 / memory-sensitivity-removal](../../docs/adr/ADR-20261103-memory-sensitivity-removal.md)), ADR-055 의 옛 key 는 읽지 않는다. 배포를 되돌릴 때 직전 이미지가 읽도록 칸을 남겨 두고 배포를 확인한 뒤 지운다. 새 줄은 `sensitivity` 의 기본값 `NORMAL` 을 받는다
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
 - `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문을 그 사용자의 데이터 key 에서 뽑은 key 로 낸 HMAC-SHA256 이다(`MemoryTexts.proposalDedupKey`). 평문의 해시를 두지 않는다. KEK 가 없는 설치는 SHA-256 이다. 직접 등록한 항목은 비어 있다

@@ -69,7 +69,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted. 요청 alias 테이블은 [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md)가 대체한다 |
 | [ADR-20261013 / financial-digest-key-rotation](ADR-20261013-financial-digest-key-rotation.md) | 금융 해시 key 를 바꾸면 이전 key 의 열린 줄이 끝날 때까지 금융 관문을 닫는다 | Accepted |
 | [ADR-20261015 / memory-eval-gate](ADR-20261015-memory-eval-gate.md) | 기억 선별을 바꾸기 전에 측정을 세 층으로 두고 조립 측정을 악화 금지 게이트로 건다 | Accepted. ADR-071 의 실행마다 남기는 참조에 선택 근거 컬럼을 더한다 |
-| [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 |
+| [ADR-20261015 / memory-hybrid-selection](ADR-20261015-memory-hybrid-selection.md) | 색인 층은 매 turn 질문으로 키워드와 의미 점수를 섞어 고르고, 임베딩은 별도 서비스가 만든다 | Accepted. 아직 구현하지 않았다. ADR-015 의 색인 층을 번호 순에서 관련도 순으로 바꾼다 민감 항목을 빼는 부분은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 대체한다. |
 | [ADR-20261015 / package-layout](ADR-20261015-package-layout.md) | 기능은 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면은 admin 으로 모은다 | Accepted. ADR-068 의 최상위 층 순서를 보완한다 |
 | [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 | [ADR-20261016 / task-schedule-columns](ADR-20261016-task-schedule-columns.md) | 예약 작업의 일정은 작업 본체의 현재값으로 둔다 | Accepted. ADR-077의 일정 저장과 유일 제약 키, 행 잠금을 대체한다 |

@@ -1,6 +1,6 @@
 ## ADR-20261101 / proactive-suggestion: 먼저 살펴보기는 기억 위의 읽기 전용 깨우기와 제안 카드로 줄이고, 저장은 새 테이블 없이 할 일의 제안 상태와 기존 반응 기록으로 한다
 
-- **status**: `accepted`
+- **status**: `accepted` 기억 후보의 민감도 조건은 [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) 이 없앤다.
 - Date: 2026-11-01
 - 2026-11-01 사용자 결정(테이블은 최대한 늘리지 않고 기존 테이블을 활용한다)에 따라 처음 조사가 권고한 새 테이블 `proactive_suggestion` 을 만들지 않고 `follow_up` 의 `PROPOSED` 줄을 제안으로 쓴다.
 - 2026-10-16 사용자 결정 두 개(#310 댓글 「proactive 와의 관계」, 「판단을 구조에 묶지 않는다」)를 구현 범위로 옮긴다. 선행 조건이던 기억 단계 2(연결과 대체)는 #568 로 끝났다.

@@ -221,7 +221,7 @@ sequenceDiagram
 
 #### 에이전트의 실행에 보이는 항목
 
-판정은 두 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다. 기억에는 민감 구분이 없다([스펙](memory/spec.md) DECISION1). 에이전트마다 받을 기억은 collection 으로 나눈다.
+판정은 두 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다. 기억에는 민감 구분이 없다([ADR-20261103 / memory-sensitivity-removal](../adr/ADR-20261103-memory-sensitivity-removal.md)). 에이전트마다 받을 기억은 collection 으로 나눈다.
 
 | 조건 | 무엇을 본다 |
 | --- | --- |
@@ -495,7 +495,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_LINK` | 「연결된 기억 구역」 에 실린 이웃 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
-| `MEMORY_INDEX` | `memory` 의 `SEARCH` | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
+| `MEMORY_INDEX` | `memory` 의 `SEARCH` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
 | `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
