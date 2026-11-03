@@ -65,7 +65,18 @@ tasks.processTestResources {
     }
 }
 
+/**
+ * 테스트 JVM 을 둘로 나눠 돌린다. 하나로 직렬 실행하면 4 vCPU 의 CI runner 에서 CPU 대부분이 논다.
+ * JVM 마다 Spring 컨텍스트가 따로 뜨고(JVM 당 약 15초) H2 메모리 DB 도 따로 있다.
+ * JVM 이 함께 쓰는 것은 파일 시스템뿐이므로, 테스트가 쓰는 디렉터리는 Gradle 이 JVM 마다 주는
+ * org.gradle.test.worker 번호를 이름에 넣어 나눈다(application-test.yml 의 build/test-* 가 그렇다).
+ * 새 테스트가 고정된 경로나 포트를 쓰면 JVM 사이에 부딪히므로 번호가 든 경로나 임시 디렉터리, 0번 포트를 쓴다.
+ * 근거는 backend/docs/adr/ADR-20261007-test-context-base.md 의 「테스트 JVM 을 나눈다」 절이 갖는다.
+ */
+val testForks = 2
+
 tasks.test {
+    maxParallelForks = testForks
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
     // model-eval 태그는 실제 모델을 부르는 답 판정이고 memoryJudgeEval 이 따로 돌린다.
     // embedding-eval 태그는 실제 임베딩 서비스를 부르는 회수 측정이고 memoryEmbeddingEval 이 따로 돌린다.
@@ -160,6 +171,8 @@ tasks.register<Test>("mysqlMigrationTest") {
     useJUnitPlatform {
         includeTags("mysql")
     }
+    // 일반 test 와 같은 수로 나눈다. JVM 마다 DB 를 하나씩 만들어 데이터가 겹치지 않는다(MysqlTestDatabase.shared()).
+    maxParallelForks = testForks
     // 전체 MySQL 검사도 Spring 문맥을 보존하므로 일반 test와 같은 힙을 사용한다.
     maxHeapSize = "1g"
     // `@MysqlIntegrationTest` 가 데이터베이스와 컨텍스트 하나를 함께 쓴다. 남은 컨텍스트는 DB 를 직접 만들거나

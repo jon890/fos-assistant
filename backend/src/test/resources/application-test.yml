@@ -16,6 +16,9 @@ spring:
     enabled: false
     out-of-order: true
 
+# 아래 build/test-* 디렉터리는 Gradle 이 테스트 JVM 마다 주는 org.gradle.test.worker 번호를 이름에 넣는다.
+# maxParallelForks 로 JVM 이 둘 이상 돌 때 한 JVM 이 쓰거나 지운 파일을 다른 JVM 이 보지 않게 하려는 것이다.
+# Gradle 밖(IDE 등)에서 돌리면 번호가 없어 0 이다.
 assistant:
   agents:
     # 검사가 뜰 때마다 지운 에이전트의 정리가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
@@ -89,7 +92,7 @@ assistant:
   auth:
     jwt-secret: test-secret-test-secret-test-secret-test-secret
   attachment:
-    root: build/test-attachments
+    root: build/test-attachments-${org.gradle.test.worker:0}
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
     agent-root: /agent-side/attachments
     # 검사가 뜰 때마다 지우는 일이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
@@ -107,16 +110,16 @@ assistant:
     # 검사가 뜰 때마다 발화기가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     dispatch-cron: "-"
   artifact:
-    root: build/test-artifacts
+    root: build/test-artifacts-${org.gradle.test.worker:0}
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다
     agent-root: /agent-side/artifacts
   artifact-vault:
     # 검사가 뜰 때마다 자동 보관 훑기가 함께 돌지 않게 늦춘다. 검사는 그 메서드를 직접 부른다
     auto-retry-delay: 1h
   skill:
-    root: build/test-skills
+    root: build/test-skills-${org.gradle.test.worker:0}
     # 검사가 게시된 경로에 적힌 글자를 실제 디렉터리와 견주므로 두 루트를 같게 둔다
-    agent-root: build/test-skills
+    agent-root: build/test-skills-${org.gradle.test.worker:0}
   browser:
     # 기능을 켜는 검사가 이 값을 덮는다. 주소와 경로는 실재하지 않는 시험 값이다
     enabled: false
@@ -124,7 +127,7 @@ assistant:
     image: example/browser:test
     network: example-browser
     cdp-port: 9999
-    profile-root: build/test-browser-profiles
+    profile-root: build/test-browser-profiles-${org.gradle.test.worker:0}
     profile-host-root: /example/browser-profiles
     profile-mount: /example/profile
     memory-mb: 512
@@ -136,7 +139,7 @@ assistant:
     root: ""
     delete-socket: ""
 hermes:
-  profile-key-dir: build/test-hermes-keys
+  profile-key-dir: build/test-hermes-keys-${org.gradle.test.worker:0}
   # 실재하지 않는 주소다. 이 값으로 대시보드를 부르는 테스트가 없고, 부르면 닿지 못해 실패한다
   dashboard-base-url: https://hermes-dashboard.example.com
   dashboard-token: test-dashboard-token
