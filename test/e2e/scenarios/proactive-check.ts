@@ -45,7 +45,7 @@ const NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
 const TOOL_LIMIT_NOTICE = "도구 호출 한도에 닿아 살펴보기를 멈췄어요";
 const READ_ONLY_RUN = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
 /** 승인 줄을 만든 플러그인 호출에 Control Plane 이 답하는 글의 앞부분이다. 뒤에 승인 요청 번호가 온다. */
-const APPROVAL_PREFIX = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
+const APPROVAL_PREFIX = "[승인 대기] 오류가 아니다. 이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
 const NOT_ALLOWED_IN_CHECK = "먼저 살펴보기에서는 쓸 수 없는 도구입니다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";

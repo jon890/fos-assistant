@@ -69,18 +69,22 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 정책 판정이 준비 도구 호출을 넘기는 금융 준비·저장 규칙이다. 실행 도구를 직접 부른 호출의 금융 차단은 그대로 둔다.
  *
- * <p>거절은 사용자와 모델에게 어느 검사에 걸렸는지 밝히지 않는다. 운영 로그에는 고정 단계 코드({@link FinancialPrepareStage})만 남긴다.
+ * <p>상한 거절과 같은 의도 차단을 빼면 거절은 사용자와 모델에게 어느 검사에 걸렸는지 밝히지 않는다. 운영 로그에는 고정 단계 코드({@link FinancialPrepareStage})만 남긴다.
  */
 @Component
 @RequiredArgsConstructor
 class ConnectorFinancialProducer {
     /**
      * 승인 카드를 만든 준비 호출의 답이다. Hermes 는 막힌 호출의 글을 {@code {"error": ...}} 로 모델에게 주므로,
-     * 모델이 주문 거절로 읽지 않게 오류가 아니라 승인 대기라는 것을 글 첫머리에 밝힌다.
+     * 모델이 주문 거절로 읽지 않게 오류가 아니라 승인 대기라는 것을 글 첫머리에 밝힌다. 그 글이 외부 데이터 표시 안에 들어가도
+     * 판정임을 알아보도록 {@link ConnectorApprovalReply#PENDING_MARKER} 로 시작한다.
      */
-    static final String APPROVAL_PENDING_MESSAGE = "오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다. "
+    static final String APPROVAL_PENDING_MESSAGE = ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다. "
         + "아직 주문을 보내지 않았다. 사용자에게 승인 카드에서 내용을 확인하고 승인해 달라고 알린다. "
         + "승인하면 준비한 내용 그대로 한 번 실행된다. 같은 요청을 다시 부르지 않는다.";
+    /** 대화 없는 실행이 만든 승인 줄의 답이다. 카드와 알림이 없으므로 승인 대기 표시를 붙이지 않는다. */
+    static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 주문은 사용자의 승인이 필요하다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 "
+        + "실행되지 않는다. 같은 요청을 다시 부르지 않는다.";
     /** 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났을 때의 답이다. 실행 여부를 단정하지 않는다. */
     static final String APPROVAL_SETTLED_MESSAGE = "이 요청의 승인 카드는 이미 처리됐다. 승인 대기가 아니다. "
         + "같은 요청을 다시 부르지 말고 사용자에게 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내한다.";
@@ -161,12 +165,16 @@ class ConnectorFinancialProducer {
                 require(duplicate.get().hermesTool().equals(hermesTool) && duplicate.get().argsSha256().equals(hash), FinancialPrepareStage.REPLAY);
                 return duplicate.get();
             }
-            at(FinancialPrepareStage.CONFLICT, () -> conflicts.requireAvailable(
+            var origin = owners.resolve(profileName, rootSessionId, sessionId);
+            // 조회 실패는 막는 줄이 있다는 뜻이 아니다. 같은 의도 차단의 답과 섞이지 않게 단계를 나눈다.
+            var blocking = at(FinancialPrepareStage.CONFLICT_CHECK, () -> conflicts.blocking(
                 snapshot.storedRequestKey(digest, before.user(), before.connector(), toolName), null));
+            if (blocking.isPresent()) {
+                throw new FinancialPrepareRejected(conflictStage(blocking.get(), origin.conversationId()));
+            }
             at(FinancialPrepareStage.GATE, gate::requireOpen);
             at(FinancialPrepareStage.LIMITS, () -> gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant()));
             var binding = bindings.findById(before.binding()).orElseThrow(() -> new FinancialPrepareRejected(FinancialPrepareStage.BINDING));
-            var origin = owners.resolve(profileName, rootSessionId, sessionId);
             Instant now = clock.instant();
             var action = ConnectorAction.decided(binding.connection(), before.agent(), origin, hermesTool, toolName,
                 new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
@@ -192,6 +200,22 @@ class ConnectorFinancialProducer {
             return action;
         });
         return answer(saved);
+    }
+
+
+    /**
+     * 같은 의도를 막은 줄의 상태로 단계를 고른다. 승인 대기면 그 카드가 이 대화에 떠 있는지까지 가린다. 모델이 그 사실만 사용자에게
+     * 알리고, 대화 기록으로 짐작하지 않게 한다.
+     */
+    static FinancialPrepareStage conflictStage(ConnectorAction blocking, Long conversationId) {
+        if (blocking.status() != ActionStatus.PENDING) {
+            return FinancialPrepareStage.CONFLICT;
+        }
+        if (blocking.conversationId() == null) {
+            return FinancialPrepareStage.CONFLICT_PENDING_UNSEEN;
+        }
+        return conversationId != null && conversationId.equals(blocking.conversationId())
+            ? FinancialPrepareStage.CONFLICT_PENDING : FinancialPrepareStage.CONFLICT_PENDING_ELSEWHERE;
     }
 
 
@@ -281,7 +305,8 @@ class ConnectorFinancialProducer {
 
 
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
-        String message = action.status() == ActionStatus.PENDING ? APPROVAL_PENDING_MESSAGE : APPROVAL_SETTLED_MESSAGE;
+        String pending = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_PENDING_MESSAGE;
+        String message = action.status() == ActionStatus.PENDING ? pending : APPROVAL_SETTLED_MESSAGE;
         return new ConnectorPolicyAnswer(false, message, action.publicId());
     }
 
