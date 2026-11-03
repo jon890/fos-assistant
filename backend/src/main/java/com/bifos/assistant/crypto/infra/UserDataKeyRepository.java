@@ -13,6 +13,9 @@ public interface UserDataKeyRepository extends JpaRepository<UserDataKey, Long> 
     Optional<UserDataKey> findByUserId(Long userId);
 
 
+    Optional<UserDataKey> findByGroupId(Long groupId);
+
+
     /** 활성 KEK 가 아닌 KEK 로 감싼 줄의 번호다. KEK 를 바꾼 뒤 기동할 때 다시 감쌀 대상이다 */
     List<UserDataKey> findByKekIdNot(String kekId);
 

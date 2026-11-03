@@ -192,7 +192,7 @@ class IntegrationTestIsolationTest {
         when(message.contentKeyId()).thenReturn(3L);
         when(message.storedContent()).thenReturn("sealed");
         when(conversations.findOwnerId(2L)).thenReturn(Optional.of(11L)).thenReturn(Optional.of(22L));
-        when(dataKeys.open(any(), any(), anyString(), anyString()))
+        when(dataKeys.open(any(), any(Long.class), anyString(), anyString()))
             .thenAnswer(invocation -> Optional.of("owner=" + invocation.getArgument(1)));
         clock.set(Instant.parse("2100-01-01T00:00:00Z"));
         assertThat(messageContents.open(message)).isEqualTo("owner=11");
