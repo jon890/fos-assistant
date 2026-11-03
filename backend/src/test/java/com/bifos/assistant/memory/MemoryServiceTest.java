@@ -10,7 +10,6 @@ import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
@@ -22,7 +21,6 @@ import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
-import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -45,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -74,7 +73,7 @@ class MemoryServiceTest {
     TransactionTemplate transactions;
 
     @Autowired
-    MemoryEmbeddingRepository embeddings;
+    JdbcTemplate jdbc;
 
     @Autowired
     MemoryEmbeddingProperties embeddingProperties;
@@ -95,23 +94,29 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("항목을 지우면 그 벡터 줄도 같은 트랜잭션에서 지우고 다른 항목의 줄은 남긴다")
+    @DisplayName("항목을 지우면 그 벡터와 옛 벡터 테이블의 줄도 지우고 다른 항목의 것은 남긴다")
     void deletesEmbeddingWithMemory() {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
-        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}));
+        MemoryEmbeddingRows.write(jdbc, kept.id(), "test-model", new byte[32], new float[] {1f});
 
         RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
         String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
-        embeddings.save(MemoryEmbedding.of(
-            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}));
+        MemoryEmbeddingRows.write(jdbc, deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f});
         assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
+        // 직전 이미지가 옛 테이블에 남긴 줄이다
+        for (Long legacyId : List.of(deleted.id(), kept.id())) {
+            jdbc.update("INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)"
+                + " VALUES (?, 'old-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", legacyId, new byte[32], new byte[4]);
+        }
 
         memories.delete(ADMIN, deleted.id());
 
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(kept.id());
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(kept.id());
+        assertThat(jdbc.queryForList("SELECT memory_id FROM memory_embedding", Long.class)).containsExactly(kept.id());
+        jdbc.update("DELETE FROM memory_embedding");
         assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();
     }
 

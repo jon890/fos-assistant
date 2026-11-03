@@ -39,7 +39,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 `C`는 순수 저장 생성 시각만 base로 옮기고, `C+U`는 순수 저장 생성·변경 시각을 모두 옮긴다.
 `제외`는 createdAt 자체가 업무 시각이므로 어느 base도 상속하지 않는다.
 판정 결과는 생성 전용 25개, 생성·변경 8개, 제외 13개이며 auditing 대상은 33개다.
-기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다. `MemoryCollection`은 표를 `group_setting`의 `MEMORY_COLLECTIONS` 줄로 옮기며 엔티티를 지워 표에서 뺐다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)).
+기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다. `MemoryCollection`은 표를 `group_setting`의 `MEMORY_COLLECTIONS` 줄로 옮기며 엔티티를 지워 표에서 뺐다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)). `MemoryEmbedding`도 벡터를 `memory`의 `embedding_*` 칸으로 옮기며 엔티티를 지워 표에서 뺐다.
 변경 시각이 없던 엔티티에 새 updated_at을 추가하는 대상은 Agent/AppUser/AllowedPerson 세 개뿐이다.
 「없음」은 UPDATE bulk가 없다는 뜻이며 DELETE bulk는 callback 대상이 아니다.
 
@@ -68,7 +68,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `media_observation` / `MediaObservation` | 제외: 관찰 revision 시각. MediaObservationService가 C에서 15분 유효기간을 계산 | C와 expiresAt 유지 |
 | `memory` / `Memory` | C: 문서 본체의 최초 저장만 자동화 | U/acceptedAt은 문서 변경·수락의 업무 시각. revision.changedAt은 별도로 보존 |
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
-| `memory_embedding` / `MemoryEmbedding` | C+U: 벡터 행의 저장·교체 시각. 문서 revision과 지문은 별도 속성 | memoryId 지정 ID. 기존 행을 읽어 replace하고 신규 ID만 save/merge |
 | `memory_link` / `MemoryLink` | C+U: 연결 행의 저장·상태 변경 시각. 대체 판정은 status 가 소유 | revokedAt은 끊거나 거절한 업무 시각으로 명시 전달. UPDATE bulk 없음 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
 | `proactive_check_finding` / `ProactiveCheckFinding` | C: 살펴보기 발견 기록의 저장 시각. 관측 시점은 checkedAt이 담당 | checkedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
@@ -88,8 +87,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 
 ### 복합 키와 지정 ID
 
-`AgentMemoryCollection`, `ExecutionContextSource`는 복합 ID,
-`MemoryEmbedding`은 memoryId를 직접 지정한다. base는 ID와 Persistable 정책을 소유하지 않는다.
+`AgentMemoryCollection`, `ExecutionContextSource`는 복합 ID다. base는 ID와 Persistable 정책을 소유하지 않는다.
 새 복합 ID를 save/merge할 때는 반환된 managed 객체를 사용하고, 기존 DB 객체의 detach/merge에서는 C를 보존한다.
 `AgentMemoryCollectionService.replace`는 현재 행을 먼저 읽어 민감 허용만 고치므로 C를 유지한다.
 삭제한 권한을 다시 붙이면 새 행의 C가 생긴다. `ExecutionContextSource`의 isNew와 PostLoad/PostPersist 정책을 유지해 같은 position의 재삽입을 PK 오류로 거절한다.

@@ -221,7 +221,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
-그 항목의 벡터(`memory_embedding`)와 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)는 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
+그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)와 옛 벡터 표(`memory_embedding`)의 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -700,6 +700,11 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
 - `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문의 해시다. 직접 등록한 항목과 민감 항목은 비어 있다
+- `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
+  - `embedding_model` 은 임베딩 서비스에 보낸 모델 이름, `embedding_vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 차원은 길이를 4로 나눈 값이다. 운영의 BGE-M3 는 1024차원이라 한 항목이 4KiB 다. 한 번에 한 모델만 쓰므로 모델을 바꾸면 같은 칸을 새 모델의 값으로 덮어쓴다
+  - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
+  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 민감도 `NORMAL` 이며 암호화하지 않은 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
+  - 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지워진다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 대상에서 빠진 항목의 벡터가 남으면 다음 주기의 정리가 비운다
 - `archivable` 은 정비 루프가 자동 보관해도 되는지의 표시이고 기본은 거짓이다. `memory_remember` 가 새 항목을 만들 때만 모델의 인자로 적는다. 항목의 종류를 나누는 칸이 아니다([ADR-20261015 / memory-maintenance](../../docs/adr/ADR-20261015-memory-maintenance.md))
 
 **`ACCEPTED` 인 항목만 주입한다.** `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
@@ -770,13 +775,12 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 ### memory_embedding
 
-임베딩 대상 항목 하나의 벡터 한 줄이다. 질문과의 의미 점수를 앱이 전수 계산하는 데 쓴다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
+**코드가 읽고 쓰지 않는 옛 표다.** 벡터는 `memory` 의 `embedding_*` 칸이 갖는다. 벡터는 옮기지 않고 배포 뒤 채우는 작업이 다시 계산한다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 예외로 항목 삭제와 사용자 정리는 그 항목의 줄을 native 질의로 지우고, 정리 미리보기는 센다. 지운 항목의 벡터를 남기지 않는다는 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
 
-- 기본 키는 `memory_id` 다. 항목 하나에 벡터는 하나다. 모델을 바꾸면 같은 줄을 새 모델의 값으로 덮어쓴다. 모델마다 줄을 두지 않는 것은 한 번에 한 모델만 쓰기 때문이다
-- `model` 은 임베딩 서비스에 보낸 모델 이름, `dimensions` 는 벡터의 차원, `vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 길이는 `dimensions × 4` 바이트다. 운영의 BGE-M3 는 1024차원이라 한 줄이 4KiB 다
-- `text_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 줄은 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
-- 대상은 `ACCEPTED`, `SEARCH`, 민감도 `NORMAL`, 암호화하지 않은 항목이다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 줄은 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)이 다음 주기에 지운다
-- 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지운다. `memory_id` 에 외래 키를 걸지 않고, `MemoryService.delete` 가 같은 트랜잭션에서 그 줄을 지운다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 지운 항목의 줄이 남으면 다음 주기의 정리가 지운다
+임베딩 대상 항목 하나의 벡터 한 줄이었다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
+
+- 기본 키는 `memory_id` 다. 칸의 뜻은 `memory` 의 `embedding_*` 칸과 같고, `dimensions` 는 벡터의 차원이다
+- `memory_id` 에 외래 키를 걸지 않았다
 
 
 
