@@ -115,7 +115,7 @@ class ImageSupervisorTest(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "linux", "Linux의 실제 주소 공간·부모 종료 계약이다")
     def test_memory_limit_applies_and_parent_death_kills_helper(self):
-        helper = importlib.import_module("image_helper")
+        # image_helper 는 자식 프로세스가 argv 로 받은 plugin 디렉터리에서 읽는다. 이 프로세스의 sys.path 에는 기대지 않는다.
         child = self.real_popen([sys.executable, "-c",
             "import sys,os; sys.path.insert(0,sys.argv[1]); from image_helper import configure_limits; "
             "configure_limits(os.getppid()); import resource; print(resource.getrlimit(resource.RLIMIT_AS),flush=True); "
