@@ -10,8 +10,6 @@ import static com.bifos.assistant.connector.action.application.ConnectorActionDe
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
-import com.bifos.assistant.connector.action.domain.ConnectorConversationGrant;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.action.domain.ToolPolicyDecision.CheckBoundary;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
@@ -240,11 +238,7 @@ class ConnectorActionApproval {
             if (decision.get().approval() != ToolApproval.REQUIRED || !grantable(manifest, action, readOnlyMarked)) {
                 throw grantNotAllowed();
             }
-            grants.save(ConnectorToolGrant.of(
-                action.userId(),
-                action.connectorId(),
-                action.toolName(),
-                grant.expiresAt(now, HOUSEHOLD_ZONE)));
+            action.grantTool(grant.expiresAt(now, HOUSEHOLD_ZONE));
         }
         if (conversationGrant) {
             // 상시 허락과 같이 지금 정책으로 다시 본다. 그 사이 선언이 밖으로 나가는 도구로 바뀌었으면 주지 않는다.
@@ -254,7 +248,7 @@ class ConnectorActionApproval {
             // 같은 도구의 앞선 허락은 거두고 새 줄 하나만 남긴다. 기다리던 카드 둘을 모두 허락과 함께 승인해도 유효한 줄이 하나다.
             conversationGrants.revokeAllOfTool(
                 action.userId(), action.conversationId(), action.agentId(), action.connectorId(), action.toolName(), now);
-            conversationGrants.save(ConnectorConversationGrant.of(action, now.plus(CONVERSATION_GRANT_TTL)));
+            action.grantConversation(now.plus(CONVERSATION_GRANT_TTL));
         }
         action.beginExecution(now);
         return new Approval(actions.save(action), binding.get().agent().hermesProfile());
@@ -310,9 +304,7 @@ class ConnectorActionApproval {
 
     /** 그 줄의 사용자와 커넥터, 도구의 유효한 상시 허락을 거둔다. 트랜잭션 안에서만 부른다. */
     private void revokeToolGrants(ConnectorAction action, Instant now) {
-        grants.findActiveByUserIdAndConnectorId(action.userId(), action.connectorId(), now).stream()
-            .filter(grant -> grant.toolName().equals(action.toolName()))
-            .forEach(grant -> grant.revoke(now));
+        grants.revokeAllOfTool(action.userId(), action.connectorId(), action.toolName(), now);
     }
 
 
@@ -350,7 +342,7 @@ class ConnectorActionApproval {
         }
         if (result == null || !result.ok()) {
             // 사용자가 본 실행이 끝나지 않았는데 뒤 호출이 묻지 않고 나가지 않게 함께 준 대화 허락을 거둔다.
-            conversationGrants.revokeOfAction(action.id(), now);
+            action.revokeConversationGrant(now);
         }
         if (result == null) {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.

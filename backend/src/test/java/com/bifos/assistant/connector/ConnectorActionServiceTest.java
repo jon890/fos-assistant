@@ -36,7 +36,6 @@ import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDenyReason;
@@ -49,7 +48,6 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.connector.connection.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.connection.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.connector.action.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.port.FeedbackConversations;
 import com.bifos.assistant.hermes.application.port.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
@@ -179,9 +177,6 @@ class ConnectorActionServiceTest {
 
     @Autowired
     TextCipher cipher;
-
-    @Autowired
-    ConnectorToolGrantRepository grants;
 
     @Autowired
     ConnectorConnectionRepository connections;
@@ -546,7 +541,7 @@ class ConnectorActionServiceTest {
         assertThat(JSON.readTree(row.resultText())).isEqualTo(JSON.readTree("{\"saved\":true}"));
         assertThat(row.decidedAt()).isNotNull();
         assertThat(row.executedAt()).isNotNull();
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         assertThat(recorder.seen())
             .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
     }
@@ -612,7 +607,7 @@ class ConnectorActionServiceTest {
             .containsExactly(tuple(actionId, false));
         assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
 
         assertThat(service.approve(me, actionId, null).status()).isEqualTo(ActionStatus.SUCCEEDED);
@@ -965,7 +960,7 @@ class ConnectorActionServiceTest {
         assertThat(mine)
             .extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
             .containsExactly(tuple(DEMO, WRITE));
-        ConnectorToolGrant stored = grants.findAll().get(0);
+        GrantRows.Row stored = grants().tools().get(0);
         Instant decidedAt = actions.findByPublicId(actionId).orElseThrow().decidedAt();
         assertThat(stored.expiresAt()).isEqualTo(decidedAt.plus(Duration.ofHours(1)));
     }
@@ -975,7 +970,8 @@ class ConnectorActionServiceTest {
     @DisplayName("허락의 기간이 지나면 같은 도구의 호출이 다시 PENDING 이 되고 허락 목록에서 빠진다")
     void expiredGrantNoLongerPasses() {
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.HOUR);
-        jdbc.update("UPDATE connector_tool_grant SET expires_at = ?", Instant.parse("2020-01-01T00:00:00Z"));
+        jdbc.update("UPDATE connector_action SET grant_expires_at = ? WHERE grant_scope = 'TOOL'",
+            Instant.parse("2020-01-01T00:00:00Z"));
 
         ConnectorPolicyAnswer next = ask(WRITE, "{\"text\":\"다음 글\"}");
 
@@ -1013,7 +1009,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
 
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
         // 허락 없이는 승인할 수 있고, 허락이 없으므로 다음 호출은 다시 승인을 기다린다.
         assertThat(service.approve(me, actionId, null).grantAllowed()).isFalse();
@@ -1083,7 +1079,7 @@ class ConnectorActionServiceTest {
         assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
         assertThat(approved.title()).isEqualTo("임시저장 글 불러오기");
         verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__read_draft", args);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         assertThat(ask(tool.name(), "{\"draft_id\":\"987654321\"}").allowed()).isFalse();
     }
 
@@ -1099,7 +1095,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
 
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -1115,7 +1111,7 @@ class ConnectorActionServiceTest {
         assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
         assertThat(approved.title()).isEqualTo("메모 보내기");
         assertThat(approved.grantAllowed()).isFalse();
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         assertThat(ask(MAIL, "{\"text\":\"다음 글\"}").allowed()).isFalse();
     }
 
@@ -1138,7 +1134,7 @@ class ConnectorActionServiceTest {
         ConnectorAction row = onlyAction();
         assertThat(row.status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(row.errorCode()).isEqualTo("hidden_args");
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
         assertThat(recorder.seen())
             .containsExactly(new Seen(new ConnectorActionChanged(CONVERSATION, actionId), false));
@@ -1327,7 +1323,7 @@ class ConnectorActionServiceTest {
             new ConnectorTool("list_scopes", "READ", "none", null, null),
             new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", Boolean.FALSE))));
         assertThat(service.grants(me)).as("선언이 상시 허락을 닫았다").isEmpty();
-        assertThat(grants.findAll()).as("줄은 지우지 않는다").hasSize(1);
+        assertThat(grants().tools()).as("줄은 지우지 않는다").hasSize(1);
 
         ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
@@ -1343,7 +1339,7 @@ class ConnectorActionServiceTest {
     void closedGrantIsRevokedAndStaysRevokedWhenDeclarationReopens() {
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         Instant now = Instant.now();
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_note", now.plus(Duration.ofDays(1))));
+        grants().tool(owner.id(), DEMO, "other_note", now.plus(Duration.ofDays(1)));
         catalogBecomes(manifest(List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
             new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", Boolean.FALSE),
@@ -1351,8 +1347,8 @@ class ConnectorActionServiceTest {
 
         assertThat(service.revokeClosedGrants(now)).isEqualTo(1);
 
-        assertThat(grants.findAll())
-            .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+        assertThat(grants().tools())
+            .extracting(GrantRows.Row::toolName, grant -> grant.revokedAt() != null)
             .containsExactlyInAnyOrder(tuple(WRITE, true), tuple("other_note", false));
         assertThat(service.revokeClosedGrants(now)).as("거둔 줄은 다시 세지 않는다").isZero();
 
@@ -1378,7 +1374,7 @@ class ConnectorActionServiceTest {
 
         assertThat(service.revokeClosedGrants(Instant.now())).isEqualTo(1);
 
-        assertThat(grants.findAll())
+        assertThat(grants().tools())
             .extracting(grant -> grant.revokedAt() != null)
             .containsExactly(true);
     }
@@ -1389,24 +1385,23 @@ class ConnectorActionServiceTest {
     void closedGrantSweepLeavesUnknownAndFinishedLinesAlone() {
         // DB 칸이 마이크로초까지라 나노초가 남은 시각은 저장한 뒤 읽으면 달라진다.
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-        ConnectorToolGrant revoked = ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)));
+        long revoked = grants().tool(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)));
         Instant earlier = now.minus(Duration.ofHours(1));
-        revoked.revoke(earlier);
-        grants.save(revoked);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.minusSeconds(1)));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "removed_note", now.plus(Duration.ofDays(1))));
-        grants.save(ConnectorToolGrant.of(owner.id(), "other-connector", MAIL, now.plus(Duration.ofDays(1))));
+        grants().revoke(revoked, earlier);
+        grants().tool(owner.id(), DEMO, MAIL, now.minusSeconds(1));
+        grants().tool(owner.id(), DEMO, "removed_note", now.plus(Duration.ofDays(1)));
+        grants().tool(owner.id(), "other-connector", MAIL, now.plus(Duration.ofDays(1)));
 
         assertThat(service.revokeClosedGrants(now)).isZero();
 
-        assertThat(grants.findAll())
+        assertThat(grants().tools())
             .filteredOn(grant -> grant.revokedAt() != null)
             .singleElement()
-            .extracting(ConnectorToolGrant::revokedAt)
+            .extracting(GrantRows.Row::revokedAt)
             .as("처음 거둔 시각을 그대로 둔다")
             .isEqualTo(earlier);
 
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1))));
+        grants().tool(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)));
         ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.revokeClosedGrants(now)).as("카탈로그를 읽지 못했다").isZero();
@@ -1428,7 +1423,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
 
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -1471,7 +1466,7 @@ class ConnectorActionServiceTest {
 
         assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isTrue();
         assertThat(ask(WRITE, "{\"text\":\"다른 글\"}").allowed()).isFalse();
-        assertThat(grants.findAll()).extracting(ConnectorToolGrant::toolName).containsExactly(STANDARD_READ);
+        assertThat(grants().tools()).extracting(GrantRows.Row::toolName).containsExactly(STANDARD_READ);
     }
 
 
@@ -1519,7 +1514,7 @@ class ConnectorActionServiceTest {
         catalogBecomes(standardManifest());
         markListedTools(Map.of(STANDARD_READ, true, "other_read", true));
         Instant now = Instant.now();
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_read", now.plus(Duration.ofDays(1))));
+        grants().tool(owner.id(), DEMO, "other_read", now.plus(Duration.ofDays(1)));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
             .thenReturn(CallResult.success(JSON.readTree("{\"notes\":[]}")).withReadOnly(false));
 
@@ -1528,8 +1523,8 @@ class ConnectorActionServiceTest {
         ConnectorConnection connection = connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow();
         assertThat(connection.readOnlyMarked(STANDARD_READ)).isFalse();
         assertThat(connection.readOnlyMarked("other_read")).isTrue();
-        assertThat(grants.findAll())
-            .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+        assertThat(grants().tools())
+            .extracting(GrantRows.Row::toolName, grant -> grant.revokedAt() != null)
             .containsExactlyInAnyOrder(tuple(STANDARD_READ, true), tuple("other_read", false));
         assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isFalse();
     }
@@ -1558,7 +1553,7 @@ class ConnectorActionServiceTest {
         // 표시는 남았지만 허락이 없어 판정은 승인으로 돌아간다. 다음 연결 확인이 표시를 바꾼다.
         assertThat(connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow().readOnlyMarked(STANDARD_READ))
             .isTrue();
-        assertThat(grants.findAll()).extracting(grant -> grant.revokedAt() != null).containsExactly(true);
+        assertThat(grants().tools()).extracting(grant -> grant.revokedAt() != null).containsExactly(true);
         assertThat(ask(STANDARD_READ, "{\"page\":2}").allowed()).isFalse();
     }
 
@@ -1577,7 +1572,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
 
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -1727,7 +1722,7 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
 
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.PENDING);
-        assertThat(grants.findAll()).isEmpty();
+        assertThat(grants().tools()).isEmpty();
     }
 
 
@@ -1746,7 +1741,7 @@ class ConnectorActionServiceTest {
             .extracting(ConnectorAction::status)
             .containsExactlyInAnyOrder(ActionStatus.SUCCEEDED, ActionStatus.REJECTED);
         assertThat(service.grants(me)).isEmpty();
-        assertThat(grants.findAll())
+        assertThat(grants().tools())
             .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(recorder.seen())
             .extracting(Seen::event)
@@ -1896,7 +1891,7 @@ class ConnectorActionServiceTest {
         service.approve(me, actionId, GrantPeriod.TODAY);
 
         // 다음 날 0시는 UTC 로는 15시다. 서버 시간대(UTC)의 그날 끝이면 0시가 된다.
-        Instant expiresAt = grants.findAll().getFirst().expiresAt();
+        Instant expiresAt = grants().tools().getFirst().expiresAt();
         assertThat(expiresAt.atZone(ZoneId.of("Asia/Seoul")).toLocalTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(Duration.between(Instant.now(Clock.systemUTC()), expiresAt))
             .isBetween(Duration.ZERO, Duration.ofDays(1));
@@ -2140,13 +2135,16 @@ class ConnectorActionServiceTest {
     private void deleteRows() {
         jdbc.update("DELETE FROM decision_feedback_event");
         jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
-        jdbc.update("DELETE FROM connector_conversation_grant");
         bindings.deleteAll();
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));
         agents.deleteAll();
         tokens.deleteAll();
         users.deleteAll();
+    }
+
+
+    private GrantRows grants() {
+        return new GrantRows(jdbc);
     }
 }
