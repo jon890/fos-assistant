@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   updateDocument,
@@ -39,7 +38,6 @@ export function DocumentEditor({
     try {
       const result = await updateDocument(opened.id, {
         content: String(form.get("content")),
-        sensitive: form.get("sensitive") === "on",
         expectedRevision: opened.revision,
       });
       if (!result.ok) {
@@ -76,15 +74,6 @@ export function DocumentEditor({
         aria-label="문서 내용"
         className="field-sizing-fixed"
       />
-      <Label className="mt-2 font-normal">
-        <input
-          name="sensitive"
-          type="checkbox"
-          defaultChecked={opened.sensitive}
-          className="accent-primary"
-        />
-        민감한 내용이에요. 암호화해서 저장해요
-      </Label>
       <div className="mt-3 flex gap-2">
         <Button type="submit" size="sm" loading={busy} loadingText="저장 중">
           저장

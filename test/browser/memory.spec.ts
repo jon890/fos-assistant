@@ -33,7 +33,6 @@ function stub(
     proposedByExecutionId: null,
     sourceAgentName: null,
     sourceAgentDeleted: false,
-    sensitive: false,
     omittedFromContext: false,
     createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",
@@ -274,22 +273,6 @@ test("기억을 고치지 못하면 닫지 않고 오류를 보인다", async ({
   await row.getByRole("button", { name: "저장" }).click();
   await expect(row.getByRole("alert")).toHaveText("기억을 고치지 못했어요.");
   await expect(row.getByLabel("내용")).toBeVisible();
-});
-
-test("민감한 기억은 본문을 보이지 않고 고치기 없이 지우기만 둔다", async ({
-  page,
-}) => {
-  await showStubMemories(page, () => [
-    stub(960, "민감한 기억", { content: "", sensitive: true }),
-  ]);
-  const row = memoryRow(page, "민감한 기억");
-  await expect(row.getByText("민감", { exact: true })).toBeVisible();
-  await openRow(page, "민감한 기억");
-  await expect(
-    row.getByText("민감한 내용이라 여기서는 보이지 않아요."),
-  ).toBeVisible();
-  await expect(row.getByRole("button", { name: "고치기" })).toHaveCount(0);
-  await expect(row.getByRole("button", { name: "지우기" })).toBeVisible();
 });
 
 test("문맥에 실리지 않은 항목에 표시가 보인다", async ({ page }) => {

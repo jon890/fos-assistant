@@ -9,11 +9,11 @@ import {
   openRow,
 } from "./memory-page.ts";
 
-test("문서 탭에서 민감 문서를 눌러 열고 고치고 지운다", async ({ page }, testInfo) => {
+test("문서 탭에서 문서를 눌러 열고 고치고 지운다", async ({ page }, testInfo) => {
   const key = `profile-${testInfo.project.name}`;
   const title = `지원서 공통 프로필 ${testInfo.project.name}`;
   try {
-    await createDocument(page, { collection: "identity", documentKey: key, title, content: "평문-표식-7391", sensitive: true });
+    await createDocument(page, { collection: "identity", documentKey: key, title, content: "평문-표식-7391" });
     await page.goto("/memory");
     // 기억 탭에는 문서가 섞이지 않는다.
     await expect(memoryRow(page, title)).toHaveCount(0);
@@ -21,7 +21,7 @@ test("문서 탭에서 민감 문서를 눌러 열고 고치고 지운다", asyn
 
     const row = memoryRow(page, title);
     await expect(row).toBeVisible();
-    await expect(row.getByText("민감", { exact: true })).toBeVisible();
+    await expect(row.getByText("민감", { exact: true })).toHaveCount(0);
     await expect(row.getByText("신원")).toBeVisible();
     await expect(page.getByText("평문-표식-7391")).toHaveCount(0);
 
@@ -56,7 +56,7 @@ test("그사이 바뀐 문서는 다시 열게 하고 쓰던 글을 남긴다", 
   const key = `race-${testInfo.project.name}`;
   const title = `경합 검사 ${testInfo.project.name}`;
   try {
-    const { id } = await createDocument(page, { documentKey: key, title, content: "평문-표식-2200", sensitive: false });
+    const { id } = await createDocument(page, { documentKey: key, title, content: "평문-표식-2200" });
     await page.goto("/memory");
     await openDocumentTab(page);
     const row = memoryRow(page, title);
@@ -64,7 +64,7 @@ test("그사이 바뀐 문서는 다시 열게 하고 쓰던 글을 남긴다", 
     await expect(row.getByText("평문-표식-2200")).toBeVisible();
 
     const bumped = await page.request.put(`/api/memory-documents/${id}`, {
-      data: { content: "평문-표식-2201", sensitive: false, expectedRevision: 1 },
+      data: { content: "평문-표식-2201", expectedRevision: 1 },
     });
     expect(bumped.ok()).toBe(true);
 
@@ -94,7 +94,7 @@ test("긴 문서를 펼쳐도 좁은 화면에서 넘치지 않는다", async ({
   const key = `wide-${testInfo.project.name}`;
   const title = `넘침 검사 ${testInfo.project.name} ${"아주 긴 제목 ".repeat(6)}`.trim();
   try {
-    await createDocument(page, { documentKey: key, title, content: "평문-표식-3300 ".repeat(40), sensitive: false });
+    await createDocument(page, { documentKey: key, title, content: "평문-표식-3300 ".repeat(40) });
     await page.goto("/memory");
     await openDocumentTab(page);
     await openRow(page, title);
@@ -109,7 +109,7 @@ test("문서 목록 응답은 본문을 싣지 않는다", async ({ page }, test
   const key = `list-${testInfo.project.name}`;
   const title = `목록 검사 ${testInfo.project.name}`;
   try {
-    await createDocument(page, { documentKey: key, title, content: "평문-표식-4400", sensitive: true });
+    await createDocument(page, { documentKey: key, title, content: "평문-표식-4400" });
     const listed = await (await page.request.get("/api/memory-documents")).text();
     expect(listed).toContain(key);
     expect(listed).not.toContain("평문-표식-4400");

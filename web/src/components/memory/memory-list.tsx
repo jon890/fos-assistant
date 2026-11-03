@@ -30,13 +30,12 @@ export type Memory = MemorySourceFields & {
   scope: "USER" | "GROUP";
   ownerUserId: number | null;
   title: string;
-  /** 민감한 기억은 빈 글이다. */
+  /** 풀지 못한 기억은 빈 글이다. */
   content: string;
   alwaysInject: boolean;
   /** 정비가 자동으로 보관해도 된다고 허락한 기억이다. 서버가 보내지 않으면 허락하지 않은 것으로 본다. */
   archivable?: boolean;
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
-  sensitive?: boolean;
   /** 서버가 이 줄을 풀지 못했다. 제목은 「읽지 못함」, 본문은 빈 글이다 */
   unreadable?: boolean;
   omittedFromContext?: boolean;

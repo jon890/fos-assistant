@@ -38,7 +38,7 @@ function formatChangedAt(value: string) {
   }).format(new Date(value));
 }
 
-type Pick = { granted: boolean; allowSensitive: boolean };
+type Pick = { granted: boolean };
 
 /** 영역 하나의 줄이다. 안내는 저장된 값이 아니라 지금 고른 값 `row` 로 그린다. */
 function CollectionRow({
@@ -72,31 +72,9 @@ function CollectionRow({
             aria-label={`${collection.displayName} 받음`}
             checked={row.granted}
             disabled={disabled}
-            onChange={(event) =>
-              onPick({
-                granted: event.target.checked,
-                // 받음을 끄면 민감 허용도 함께 꺼진다.
-                allowSensitive: event.target.checked && row.allowSensitive,
-              })
-            }
+            onChange={(event) => onPick({ granted: event.target.checked })}
           />
           받음
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            aria-label={`${collection.displayName} 민감 항목까지`}
-            checked={row.granted && row.allowSensitive}
-            disabled={disabled || !row.granted}
-            onChange={(event) =>
-              onPick({
-                granted: row.granted,
-                allowSensitive: event.target.checked,
-              })
-            }
-          />
-          민감 항목까지
         </label>
       </div>
       {missing ? <p className="text-sm text-warning">{missing}</p> : null}
@@ -141,7 +119,7 @@ function RecentChanges({ setting }: { setting: AgentMemorySetting }) {
 }
 
 /**
- * 관리자가 이 에이전트가 대화에 쓸 기억의 영역과 영역별 민감 항목 허용을 고른다.
+ * 관리자가 이 에이전트가 대화에 쓸 기억의 영역을 고른다.
  *
  * <p>저장은 고른 전체를 보낸다. 빠진 영역의 안내는 저장된 값이 아니라 지금 고른 값으로 그려서,
  * 고르는 즉시 저장하면 어떻게 되는지 보인다. 읽지 못해도 에이전트의 다른 절은 그대로 쓴다.
@@ -172,10 +150,7 @@ export function AgentMemorySection({ code }: Props) {
     };
   }, [code]);
 
-  function pick(
-    key: string,
-    next: { granted: boolean; allowSensitive: boolean },
-  ) {
+  function pick(key: string, next: { granted: boolean }) {
     setMessage(null);
     setState((current) =>
       current.status === "loaded"
@@ -209,8 +184,7 @@ export function AgentMemorySection({ code }: Props) {
     >
       <h2 className="font-semibold">기억 영역</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        이 에이전트가 대화에 쓸 수 있는 기억의 영역이에요. 민감 항목은 영역마다
-        따로 허용해요.
+        이 에이전트가 대화에 쓸 수 있는 기억의 영역이에요.
       </p>
       {state.status === "loading" ? (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -230,7 +204,6 @@ export function AgentMemorySection({ code }: Props) {
                 row={
                   state.draft[collection.key] ?? {
                     granted: collection.granted,
-                    allowSensitive: collection.allowSensitive,
                   }
                 }
                 disabled={saving}

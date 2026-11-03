@@ -30,7 +30,6 @@ function stub(
     proposedByExecutionId: 7,
     sourceAgentName: null,
     sourceAgentDeleted: false,
-    sensitive: false,
     omittedFromContext: false,
     supersededBy: null,
     createdAt: "2026-10-01T00:00:00Z",
