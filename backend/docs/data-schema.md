@@ -181,7 +181,16 @@ Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unic
 **H2 에서 도는 검사를 MySQL 에서 되풀이하지 않는다.** MySQL 은 행 잠금, 정렬 규칙, 마이그레이션 DDL 처럼 H2 와 다르게 동작하는 것만 본다.
 그런 H2 검사만 `@MysqlCase` 로 표시하고, 근거와 이유 목록은 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
-H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
+H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `GroupSettingMysqlMigrationTest` 가 본보기다.
+
+**운영에 적용된 지 14일이 지난 마이그레이션의 데이터 검사는 지운다.**
+적용된 파일은 `test/unit/migration-immutable.test.ts` 와 Flyway checksum 이 바뀌지 않게 막는다. 그 파일의 데이터 변환은 운영에서 이미 한 번 돌았고, 새로 설치하는 DB 에는 옮길 줄이 없다. 이 검사가 새로 잡는 것은 H2, MySQL, Flyway 버전을 올렸을 때의 동작 차이뿐이라 오래 둘 값이 작다.
+
+- 지우는 기준은 **운영 적용 뒤 14일**이다. 기준 버전은 운영 저장소의 Flyway 적용 기록에서 읽는다. 적용 시각이 14일 전보다 앞선 마지막 버전이 기준 버전이고, 그 버전 이하 마이그레이션의 `*MigrationTest` 와 `*MysqlMigrationTest` 가 지울 대상이다. 버전 칸은 문자열이라 옛 정수 버전(`V9`, `V54`)과 날짜 버전을 숫자로 비교한다
+- 전체 마이그레이션을 적용한 뒤 스키마를 보는 검사는, 그 검사가 보는 칸이나 제약을 만든 마이그레이션까지 모두 기준 버전 이하일 때만 지운다. 이름의 마이그레이션이 기준 이하여도 뒤 마이그레이션이 만든 칸을 보면 남긴다
+- 지우는 PR 에는 기준 버전과 지운 목록을 적는다. 이 저장소는 운영 적용 기록을 볼 수 없으므로 기준 버전은 운영 저장소를 맡은 쪽이 읽어 알려 준다
+- 다른 검사가 그 클래스를 상속하거나 도우미, fixture 를 쓰면 지우지 않고 PR 에 적는다. 예를 들어 `SchemaCommentsMysqlTest` 는 `SchemaCommentsMigrationTest` 를 상속한다
+- **지우지 않는 것.** 스키마를 대조하는 `MysqlMigrationTest` 와 정렬 규칙을 보는 `CollationUnifyMysqlMigrationTest` 는 마이그레이션이 얼마나 오래됐는지와 상관없이 지금 스키마와 운영 MySQL 설정의 차이를 잡는다. 장애나 리뷰 지적에서 생긴 검사도 그 교훈이 이 두 검사나 이 절의 규칙으로 일반화돼 있을 때만 지운다
 
 ## 지울 때
 
@@ -826,6 +835,20 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 - `body_erased_at`은 대화 purge가 본문을 지운 시각이다. `args_json`, `result_text`와 두 key 참조를 NULL로 비운다. 조회는 「본문 삭제됨」을 표시하고 실행 인자를 제공하지 않는다
+- `grant_scope`, `grant_expires_at`, `grant_revoked_at` 은 승인하면서 함께 준 허락이다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래 「상시 허락과 대화 허락」 이 뜻을 갖는다
+
+#### 상시 허락과 대화 허락
+
+한 승인은 허락을 하나만 준다. 허락을 주지 않은 줄은 세 칸이 모두 비어 있다. 허락의 번호는 그 승인 줄의 `id` 다.
+
+- `grant_scope` 가 `TOOL` 이면 상시 허락이다([ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)). 그 줄의 `user_id`, `connector_id`, `tool_name` 이 모두 맞는 호출에 통한다. 승인하면서 기간을 골라 준다
+- `grant_scope` 가 `CONVERSATION` 이면 대화 허락이다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md)). 거기에 더해 그 줄의 `conversation_id`, `agent_id` 가 맞는 호출에만 통한다. 대화가 지워졌거나 지운 에이전트를 정리해 `agent_id` 가 빈 줄은 통하지 않는다. 기간은 승인한 때부터 24시간이다
+- `grant_expires_at` 은 비지 않는다. 무기한 허락은 없다. `grant_revoked_at` 이 비고 `grant_expires_at` 이 지금보다 뒤인 줄만 유효하다
+- `grant_revoked_at` 은 사용자가 거두었거나, 연결을 해제하거나 다시 등록했거나, 선언이 허락을 닫아 정리가 거둔 시각이다. 상시 허락은 표준 플러그인 도구의 읽기 표시를 연결 확인이나 승인 실행이 거둘 때도 거둔다. 대화 허락은 그 에이전트에서 연결을 뗐거나 함께 준 실행이 실패했거나 결과를 모를 때도 거둔다. 처음 거둔 시각을 그대로 둔다
+- 상시 허락을 닫은 도구에는 주지 않고, 판정할 때도 허락을 보지 않는다. 그 도구에 남은 허락은 주기 정리가 거둔다([ADR-065](../../docs/adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
+- 같은 도구에 허락을 다시 주면 새 승인 줄이 허락을 갖는다. 대화 허락은 같은 대화와 에이전트, 도구의 앞선 허락을 거두어 유효한 줄이 하나다
+- 거두기는 허락 칸만 바꾸는 갱신이다. 엔티티는 바꾼 칸만 쓰므로(`@DynamicUpdate`) 그 사이 읽어 둔 엔티티의 저장이 거둔 시각을 지우지 않는다
+- 사용자 정리는 승인 줄과 함께 허락도 지운다. 대화 purge 는 허락 칸을 바꾸지 않는다
 
 인자와 결과는 기존 사용자 데이터 key와 `TextCipher`로 각각 암호화한다.
 AAD는 `connector_action:<id>:column:<칸 이름>:user:<user_id>`다.
@@ -898,6 +921,8 @@ action을 지우면 실행 내용도 지운다.
 
 ### connector_tool_grant
 
+**코드가 읽고 쓰지 않는 옛 표다.** 상시 허락은 `connector_action` 의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자 외래 키는 떼었다. 예외로 사용자 정리와 정리 미리보기만 그 사용자의 줄을 native 질의로 지우고 센다. [ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md) 의 약속을 지키려는 것이고, 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
+
 사용자가 도구 하나에 준 상시 허락이다. 승인하면서 기간을 골라 준다([ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
 `expires_at` 은 비지 않는다. 무기한 허락은 없다. `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤인 줄만 유효하다.
 `revoked_at` 은 사용자가 거두었거나, 연결을 해제했거나, 선언이 상시 허락을 닫아 정리가 거둔 시각이다.
@@ -906,12 +931,14 @@ action을 지우면 실행 내용도 지운다.
 
 ### connector_conversation_grant
 
+**코드가 읽고 쓰지 않는 옛 표다.** 대화 허락은 `action_id` 가 가리키던 `connector_action` 줄의 허락 칸이 갖는다. 옛 줄은 배포를 되돌릴 때 직전 이미지가 읽도록 이 표를 지우는 PR 까지 그대로 둔다. 사용자와 대화 외래 키는 떼었다. 예외로 사용자 정리와 정리 미리보기만 그 사용자의 줄을 native 질의로 지우고 센다. 이 표를 지우는 PR 이 그 삭제를 걷어 낸다. 이 배포 뒤 직전 이미지가 이 표에 새로 쓴 줄만 이 표를 지우는 PR 이 다시 옮긴다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래는 옛 뜻이다.
+
 사용자가 한 대화에서 도구 하나를 계속 허용한 것이다. 승인하면서 「이 대화에서 계속 허용」 을 골라 준다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md)).
 `conversation_id`, `agent_id`, `connector_id`, `tool_name` 이 모두 맞는 호출에만 통한다. `agent_id` 는 그 승인 줄을 판정한 실행의 에이전트다.
 `action_id` 는 허락을 함께 준 `connector_action` 의 번호다. 그 결과의 알림 줄이 이 칸으로 허락을 함께 알린다.
 `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
 `revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
-외래 키는 사용자와 대화에 둔다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
+외래 키는 사용자와 대화에 두었고 이관이 뗐다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
 
 ## 사용자 브라우저 표
 

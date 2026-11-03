@@ -5,11 +5,13 @@ import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
+import com.bifos.assistant.connector.action.domain.type.GrantScope;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -30,6 +32,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
@@ -39,8 +42,12 @@ import org.hibernate.type.SqlTypes;
  *
  * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「connector_action」 이 갖는다. 허용과 거절도 한 줄씩 남긴다. 사용자와
  * 에이전트는 번호로만 둔다. 실행과 대화는 지워져도 이 줄을 남기므로 외래 키를 걸지 않는다.
+ *
+ * <p>승인하면서 준 허락도 이 줄의 {@code grant_*} 칸이 갖는다(ADR-20261102 / table-reduce-r2). 허락은 다른 트랜잭션이 허락 칸만
+ * 바꾸는 갱신으로 거두므로, 바꾼 칸만 쓰는 {@code @DynamicUpdate} 로 그 사이 읽어 둔 엔티티의 저장이 거둔 시각을 지우지 않게 한다.
  */
 @Entity
+@DynamicUpdate
 @Table(
     name = "connector_action",
     uniqueConstraints = {
@@ -208,6 +215,10 @@ public class ConnectorAction {
     /** 상한 변경 승인 줄을 만들 때 적용하던 상한이다. 카드가 바뀌기 전 값을 보인다. 바꾸지 않는다. */
     @Column(name = "limit_previous", precision = 20, scale = 6, updatable = false)
     private BigDecimal limitPrevious;
+
+    /** 승인하면서 함께 준 허락이다. 허락을 주지 않은 줄은 null 이다(ADR-20261102 / table-reduce-r2). */
+    @Embedded
+    private ActionGrant grant;
 
 
     /**
@@ -441,6 +452,41 @@ public class ConnectorAction {
      */
     public boolean conversationGrantAllowed() {
         return grantAllowed() && conversationId != null && agentId != null && !checkTree;
+    }
+
+
+    /** 승인하면서 이 도구에 상시 허락을 준다(ADR-050). 승인 중인 줄에 한 번만 부른다. 줄 수 있는지는 부르는 쪽이 지금 정책으로 본다. */
+    public void grantTool(Instant expiresAt) {
+        give(grantAllowed(), ActionGrant.of(GrantScope.TOOL, expiresAt));
+    }
+
+
+    /** 승인하면서 이 도구를 이 대화의 이 에이전트 실행에서 계속 허용한다(ADR-20261012 / conversation-grant). */
+    public void grantConversation(Instant expiresAt) {
+        give(conversationGrantAllowed(), ActionGrant.of(GrantScope.CONVERSATION, expiresAt));
+    }
+
+
+    /** 함께 준 대화 허락을 거둔다. 그 실행이 실패했거나 결과를 모를 때 부른다. 상시 허락은 건드리지 않는다. */
+    public void revokeConversationGrant(Instant now) {
+        if (grant != null && grant.scope() == GrantScope.CONVERSATION) {
+            grant.revoke(now);
+        }
+    }
+
+
+    /** 함께 준 대화 허락이 {@code now} 에 아직 유효하면 끝나는 시각이고 아니면 null 이다. */
+    public Instant activeConversationGrantExpiresAt(Instant now) {
+        boolean active = grant != null && grant.scope() == GrantScope.CONVERSATION && grant.activeAt(now);
+        return active ? grant.expiresAt() : null;
+    }
+
+
+    private void give(boolean allowed, ActionGrant given) {
+        if (!allowed || status != ActionStatus.PENDING || grant != null) {
+            throw new IllegalStateException("only a pending grantable action without a grant can carry one");
+        }
+        this.grant = given;
     }
 
 
