@@ -36,6 +36,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.skill.library.domain.SkillBundle;
+import com.bifos.assistant.skill.library.config.SkillProperties;
 import com.bifos.assistant.skill.library.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
@@ -118,6 +119,10 @@ class AgentLifecycleServiceTest {
     /** 실제 디렉터리에 쓰되, 지우기가 실패하는 경우만 흉내 낼 수 있게 감싼다. */
     @Autowired
     SkillStore skillStore;
+
+    /** 스킬 루트가 JVM 마다 다르므로 설정에서 읽는다. */
+    @Autowired
+    SkillProperties skillProperties;
 
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */
     private final List<String> createdProfiles = new ArrayList<>();
@@ -501,7 +506,7 @@ class AgentLifecycleServiceTest {
         verify(dashboard).deleteProfile(profile);
         verify(skillStore).deleteAll(profile);
         assertThat(skillStore.currentVersion(profile)).isEmpty();
-        assertThat(Path.of("build/test-skills", profile)).doesNotExist();
+        assertThat(Path.of(skillProperties.root(), profile)).doesNotExist();
         assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isTrue();
     }
 

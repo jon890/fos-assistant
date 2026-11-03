@@ -9,6 +9,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
+import com.bifos.assistant.chat.attachment.config.AttachmentProperties;
 import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.attachment.application.MediaObservationService;
@@ -108,6 +109,10 @@ class ConversationPurgerTest {
 
     @Autowired
     AttachmentService attachmentService;
+
+    /** 첨부 루트가 JVM 마다 다르므로 설정에서 읽는다. */
+    @Autowired
+    AttachmentProperties attachmentProperties;
 
     @Autowired
     MediaObservationRepository observations;
@@ -354,7 +359,7 @@ class ConversationPurgerTest {
 
 
     private Path attachmentFile(ChatAttachment attachment) {
-        return Path.of("build/test-attachments")
+        return Path.of(attachmentProperties.root())
             .toAbsolutePath()
             .resolve("users")
             .resolve(AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()))
