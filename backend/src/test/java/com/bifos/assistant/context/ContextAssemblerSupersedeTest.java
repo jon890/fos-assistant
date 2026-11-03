@@ -10,13 +10,10 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.memory.application.MemoryLinkService;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -26,8 +23,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-/** 효력 있는 대체 연결이 가리키는 기억을 조립의 모든 층에서 빼고, 연결을 끊으면 다시 싣는지 확인한다(ADR-20261015 / memory-link). */
+/** 다른 항목이 대신한 기억을 조립의 모든 층에서 빼고, 대신한 칸을 비우면 다시 싣는지 확인한다(ADR-20261102 / table-reduce-r2). */
 @BackendIntegrationTest
 class ContextAssemblerSupersedeTest {
 
@@ -41,13 +39,10 @@ class ContextAssemblerSupersedeTest {
     MemoryService memories;
 
     @Autowired
-    MemoryLinkService linkService;
-
-    @Autowired
     MemoryRepository repository;
 
     @Autowired
-    MemoryLinkRepository links;
+    JdbcTemplate jdbc;
 
     @Autowired
     AgentRepository agents;
@@ -57,7 +52,6 @@ class ContextAssemblerSupersedeTest {
 
     @BeforeEach
     void setUp() {
-        links.deleteAll();
         repository.deleteAll();
         agentId = agents.findByCode(AGENT_CODE)
             .orElseGet(() -> agents.save(Agent.of(
@@ -74,24 +68,19 @@ class ContextAssemblerSupersedeTest {
 
 
     @Test
-    @DisplayName("대체를 받아들이면 옛 항목이 개인 사실 구역과 색인 어디에도 없고 제안만으로는 바뀌지 않으며 끊으면 다시 실린다")
-    void dropsSupersededFactUntilRevoked() {
+    @DisplayName("다른 항목이 대신한 옛 항목은 개인 사실 구역과 색인 어디에도 없고 대신한 칸을 비우면 다시 실린다")
+    void dropsSupersededFactUntilCleared() {
         Memory old = memories.create(ADMIN, MemoryScope.USER, "사는 곳", "서울 마포구에 산다", false);
         Memory fresh = memories.create(ADMIN, MemoryScope.USER, "이사한 곳", "부산 해운대구에 산다", false);
         assertThat(refsOf(assembler.assemble(ADMIN, agentId))).contains(ref(old), ref(fresh));
 
-        MemoryLink link = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
-        AssembledContext proposed = assembler.assemble(ADMIN, agentId);
-
-        assertThat(refsOf(proposed)).as("제안은 주입을 바꾸지 않는다").contains(ref(old), ref(fresh));
-
-        linkService.accept(ADMIN, link.id());
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
         AssembledContext accepted = assembler.assemble(ADMIN, agentId, "서울 마포구 어디 살았지?");
 
         assertThat(refsOf(accepted)).contains(ref(fresh)).doesNotContain(ref(old));
         assertThat(accepted.instructions()).doesNotContain("서울 마포구에 산다");
 
-        linkService.revoke(ADMIN, link.id());
+        jdbc.update("UPDATE memory SET superseded_by_memory_id = NULL WHERE id = ?", old.id());
 
         assertThat(refsOf(assembler.assemble(ADMIN, agentId))).contains(ref(old), ref(fresh));
     }
@@ -102,8 +91,7 @@ class ContextAssemblerSupersedeTest {
     void dropsSupersededAlwaysItem() {
         Memory old = memories.create(ADMIN, MemoryScope.GROUP, "저녁 규칙", "저녁은 여섯 시에 먹는다", true);
         Memory fresh = memories.create(ADMIN, MemoryScope.GROUP, "새 저녁 규칙", "저녁은 일곱 시에 먹는다", true);
-        MemoryLink link = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
-        linkService.accept(ADMIN, link.id());
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
@@ -117,8 +105,7 @@ class ContextAssemblerSupersedeTest {
     void dropsSupersededItemFromQuestionSection() {
         Memory old = memories.create(ADMIN, MemoryScope.GROUP, "아이 학원", "피아노 학원은 화요일 네 시에 간다", false);
         Memory fresh = memories.create(ADMIN, MemoryScope.GROUP, "아이 학원 변경", "학원 시간이 목요일로 바뀌었다", false);
-        MemoryLink link = linkService.proposeSupersede(ADMIN, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
-        linkService.accept(ADMIN, link.id());
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
 
         AssembledContext result = assembler.assemble(ADMIN, agentId, "피아노 화요일에 가지?");
 

@@ -11,7 +11,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_link` |
+| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_link`(코드가 읽고 쓰지 않는 옛 표) |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution` |
 | 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
@@ -220,7 +220,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
-그 항목의 벡터는 줄의 `embedding_*` 칸이라 줄과 함께 지워지고, 그 항목을 한쪽 끝으로 둔 링크(`memory_link`)는 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 옛 항목이 다시 실린다.
+그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 코드는 옛 `memory_link` 를 읽고 쓰지 않지만, 직전 이미지가 그 표에 남긴 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -687,8 +687,9 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 옛 `memory_embedding` 테이블은 지웠다. 벡터는 옮기지 않고 채우는 작업이 다시 계산했고 `V20261103024545` 가 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
   - `embedding_model` 은 임베딩 서비스에 보낸 모델 이름, `embedding_vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 차원은 길이를 4로 나눈 값이다. 운영의 BGE-M3 는 1024차원이라 한 항목이 4KiB 다. 한 번에 한 모델만 쓰므로 모델을 바꾸면 같은 칸을 새 모델의 값으로 덮어쓴다
   - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 주인(사용자나 그룹)의 데이터 key 에서 뽑은 key 로 낸 HMAC-SHA256 이다(`MemoryTexts.embeddingFingerprint`). KEK 가 없는 설치는 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
-  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 풀 수 있는 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
+  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 풀 수 있는 항목이다. `superseded_by_memory_id` 가 찬 항목도 빠진다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
   - 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지워진다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 대상에서 빠진 항목의 벡터가 남으면 다음 주기의 정리가 비운다
+- `superseded_by_memory_id` 는 이 항목을 대신한 새 항목의 번호이고(NULL 허용), 비어 있지 않으면 어디에도 실리지 않는다(「memory 의 대체 칸」). 외래 키를 걸지 않는다
 - `archivable` 은 정비 루프가 자동 보관해도 되는지의 표시이고 기본은 거짓이다. `memory_remember` 가 새 항목을 만들 때만 모델의 인자로 적는다. 항목의 종류를 나누는 칸이 아니다([ADR-20261015 / memory-maintenance](../../docs/adr/ADR-20261015-memory-maintenance.md))
 
 **`ACCEPTED` 인 항목만 주입한다.** `PROPOSED` 는 사람이 아직 보지 않은 것이고, 에이전트가 그것을 사실로 쓰면 안 된다.
@@ -758,16 +759,22 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 `previous_status` 가 `PROPOSED` 인 기록을 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다.
 기존 제안의 수락은 중복 후보의 번호만 조회한 뒤 항목을 쓰기 잠금으로 처음 읽는다. 중복 키를 다시 확인하고, 현재 `revision`을 `base_revision`에 남겨 동시에 커밋된 사용자 수정도 보존한다.
 
+#### memory 의 대체 칸
+
+한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id` 한 칸에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 동작은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억의 대체」 가 갖는다.
+
+- 칸이 차 있으면 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 빠진다. 「대체됨」 을 `memory` 의 상태로 두지 않는다. 사람이 보는 목록에는 남는다
+- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 행 수는 `RELATED`·`ACTIVE` 한 줄이었고 `SUPERSEDES` 는 0 이었다
+- 대신한 새 항목을 지우거나 승인을 벗어나게 하면 그 항목이 대신한 옛 항목의 칸을 저장소 쿼리(`MemoryRepository.clearSupersededBy`)가 같은 트랜잭션에서 비운다. 외래 키가 없어 서비스가 비운다
+- `idx_memory_superseded_by` 는 새 항목을 지울 때 그 항목이 대신한 줄을 찾는 색인이다
+
 ### memory_link
 
-기억 두 개 사이의 연결 한 줄이다. 동작과 화면은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억 사이의 연결」 이, 근거는 [ADR-20261015 / memory-link](../../docs/adr/ADR-20261015-memory-link.md) 가 갖는다.
+**코드가 읽고 쓰지 않는 옛 표다.** 기억 두 개 사이의 연결 한 줄이었다. 대체는 `memory.superseded_by_memory_id` 로 옮겼고(위 「memory 의 대체 칸」), `RELATED` 연결과 연결 제안, 자동 찾기, 화면, `memory_link` 도구는 지웠다. 이 결정은 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이 갖는다. 근거였던 [ADR-20261015 / memory-link](../../docs/adr/ADR-20261015-memory-link.md) 는 이 결정이 대신한다.
 
-- `type` 은 `SUPERSEDES`(새 항목 `from` 이 옛 항목 `to` 를 대신한다)와 `RELATED`(방향 없음, 번호가 작은 쪽이 `from`) 둘이다. 연결의 뜻은 자유 글 `label` 에 두고 Control Plane 은 그 글로 판정하지 않는다
-- `origin` 은 `AUTO`(코드가 찾음), `AGENT`, `HUMAN` 이고 `status` 는 `PROPOSED`, `ACTIVE`, `REVOKED` 다. 끊거나 거절하면 지우지 않고 `REVOKED` 와 `revoked_at` 을 적는다
-- `(from_memory_id, to_memory_id, type)` 이 유일하다. 같은 쌍을 다시 맺으면 `REVOKED` 줄을 다시 쓴다
-- `to_memory_id` 와 `type`, `status` 로 「이 항목을 대신한 `ACTIVE` 줄이 있는가」 를 찾는 색인을 둔다. 조립과 검색의 권한 조건이 이 조회를 쓴다
-- `score` 는 코드가 찾은 줄의 유사도이고 사람과 에이전트가 맺은 줄은 비어 있다. `created_by_execution_id` 는 에이전트가 맺은 줄의 origin 실행이다
-- 양 끝에 외래 키를 걸지 않는다. 항목을 지우면 `MemoryService.delete` 가 같은 트랜잭션에서 그 항목을 한쪽 끝으로 둔 줄을 지운다
+- 표와 줄은 직전 이미지로 되돌렸을 때 옛 코드가 읽도록 남아 있고, 배포를 확인한 뒤 DROP PR 이 지운다. 그 PR 은 지우기 전에 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`created_at` 이 `V20261103054415` 를 적용한 시각 뒤인 줄)을 같은 규칙으로 다시 옮긴다
+- 사용자 정리와 정리 미리보기, 항목 삭제는 예외로 그 항목을 한쪽 끝으로 둔 옛 줄을 native 질의로 지우고 센다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md) 의 약속은 그대로다). 줄의 자유 글 `label` 에 사람에 관한 글이 있을 수 있어서다
+- 양 끝에 외래 키를 걸지 않았다. 칸의 뜻은 옛 `V20261016224028__memory_link.sql` 의 COMMENT 가 갖는다
 
 ## 플러그인 표
 

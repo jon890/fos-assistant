@@ -16,7 +16,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
-import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.OpenAiCompatibleEmbeddingClient;
 import com.bifos.assistant.memory.application.KeywordScorer;
 import com.bifos.assistant.memory.application.MemoryRelevance;
@@ -70,9 +69,6 @@ class MemoryEmbeddingEvalTest {
 
     @Autowired
     MemoryTexts texts;
-
-    @Autowired
-    MemoryLinkDiscovery linkDiscovery;
 
     @Autowired
     MemoryService memoryService;
@@ -140,7 +136,7 @@ class MemoryEmbeddingEvalTest {
         };
         MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings, texts);
         MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(
-            settings, timed, embeddings, transactionManager, cache, backgroundTasks, linkDiscovery, texts);
+            settings, timed, embeddings, transactionManager, cache, backgroundTasks, texts);
         MemorySearchSection hybridSection = new MemorySearchSection(
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),

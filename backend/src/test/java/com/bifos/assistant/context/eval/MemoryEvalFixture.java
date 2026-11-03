@@ -10,6 +10,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Filler;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.MemorySeed;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
@@ -19,16 +20,13 @@ import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.TestClock;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -75,9 +73,8 @@ final class MemoryEvalFixture {
     }
 
 
-    /** 넣은 Memory 와 연결, 만든 에이전트를 지운다. */
+    /** 넣은 Memory 와 만든 에이전트를 지운다. */
     void tearDown() {
-        jdbc.update("DELETE FROM memory_link");
         memories.deleteAll();
         for (Long agentId : createdAgentIds) {
             jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
@@ -87,18 +84,17 @@ final class MemoryEvalFixture {
     }
 
 
-    /** 사례의 Memory 와 대체 연결을 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
+    /** 사례의 Memory 와 대체를 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
     Map<String, Long> seed(Case each) {
         return seed(each, true);
     }
 
 
     /**
-     * 사례의 Memory 를 새로 넣는다. {@code links} 가 참이면 {@code supersedes} 마다 사람이 받아들인 대체 연결을, {@code related} 마다 효력
-     * 있는 관련 연결을 함께 넣는다. 거짓이면 연결이 없는 단계 1 의 구조다(ADR-20261015 / memory-link).
+     * 사례의 Memory 를 새로 넣는다. {@code supersedes} 가 참이면 {@code supersedes} 마다 옛 항목의 {@code superseded_by_memory_id} 에 새 항목을
+     * 적는다. 거짓이면 대체가 없는 구조다(ADR-20261102 / table-reduce-r2).
      */
-    Map<String, Long> seed(Case each, boolean links) {
-        jdbc.update("DELETE FROM memory_link");
+    Map<String, Long> seed(Case each, boolean supersedes) {
         memories.deleteAll();
         Instant now = clock.instant();
         if (each.filler() != null) {
@@ -108,19 +104,12 @@ final class MemoryEvalFixture {
         for (MemorySeed seed : each.memories()) {
             ids.put(seed.key(), memories.save(memoryOf(seed, now)).id());
         }
-        if (links) {
+        if (supersedes) {
             for (MemorySeed seed : each.memories()) {
                 if (seed.supersedes() != null) {
-                    jdbc.update(
-                        "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
-                            + " VALUES (?, ?, 'SUPERSEDES', 'HUMAN', 'ACTIVE', ?, ?)",
-                        ids.get(seed.key()),
-                        ids.get(seed.supersedes()),
-                        Timestamp.from(now),
-                        Timestamp.from(now));
+                    MemorySupersedeRows.supersede(jdbc, ids.get(seed.supersedes()), ids.get(seed.key()));
                 }
             }
-            insertRelated(each, ids, now);
         }
         // 측정이 운영과 같이 암호문을 푸는 길을 지나게 넣은 줄을 데이터 key 로 옮긴다(ADR-20261103 / memory-encryption)
         migration.migrate();
@@ -128,28 +117,6 @@ final class MemoryEvalFixture {
             throw new IllegalStateException("측정할 기억이 모두 데이터 key 로 암호화되지 않았다");
         }
         return ids;
-    }
-
-
-    /** 사례의 {@code related} 마다 번호가 작은 쪽을 {@code from} 으로 둔 효력 있는 관련 연결을 한 번씩 넣는다. */
-    private void insertRelated(Case each, Map<String, Long> ids, Instant now) {
-        Set<List<Long>> pairs = new HashSet<>();
-        for (MemorySeed seed : each.memories()) {
-            for (String key : seed.related()) {
-                Long a = ids.get(seed.key());
-                Long b = ids.get(key);
-                pairs.add(List.of(Math.min(a, b), Math.max(a, b)));
-            }
-        }
-        for (List<Long> pair : pairs) {
-            jdbc.update(
-                "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
-                    + " VALUES (?, ?, 'RELATED', 'HUMAN', 'ACTIVE', ?, ?)",
-                pair.get(0),
-                pair.get(1),
-                Timestamp.from(now),
-                Timestamp.from(now));
-        }
     }
 
 

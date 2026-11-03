@@ -30,8 +30,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>벡터는 기억 항목 줄의 {@code embedding_*} 칸에 둔다(ADR-20261102 / table-reduce-r2). 한 번에 대상에서 빠진 항목의 벡터를 비우고, 벡터가 없거나 모델이나 지문이 다른 대상을 번호 순으로 {@code batchSize} 씩
  * {@code maxBatchesPerRun} 묶음까지 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛰고, 그것도 모두 실패하면 그 주기를 끝내고 다음 주기에 다시 한다. 임베딩 호출 동안 트랜잭션을 열어 두지
  * 않는다. 로그에는 건수와 예외 클래스 이름만 남긴다.
- *
- * <p>주기마다 새로 쓴 항목은 {@link MemoryLinkDiscovery} 에 넘겨 대체 후보와 관련 기억을 찾는다(ADR-20261015 / memory-link).
  */
 @Slf4j
 @Component
@@ -44,7 +42,6 @@ public class MemoryEmbeddingRefresher {
     private final PlatformTransactionManager transactionManager;
     private final MemoryVectorCache vectorCache;
     private final BackgroundTasks backgroundTasks;
-    private final MemoryLinkDiscovery linkDiscovery;
     private final MemoryTexts texts;
     private final AtomicBoolean running = new AtomicBoolean();
 
@@ -121,8 +118,6 @@ public class MemoryEmbeddingRefresher {
             writtenIds.addAll(stored == null ? List.of() : stored);
         }
         int written = writtenIds.size();
-        // 새로 쓴 벡터로 대체 후보와 관련 기억을 찾는다. 연결을 찾지 못해도 채운 벡터는 그대로 둔다
-        linkDiscovery.discover(writtenIds);
         if (removed > 0 || written > 0) {
             log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, Math.max(0, pending.size() - written));
         }

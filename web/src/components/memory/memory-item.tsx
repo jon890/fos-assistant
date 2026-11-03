@@ -10,7 +10,6 @@ import { DeleteConfirm } from "./delete-confirm";
 import { ExpandableRow } from "./expandable-row";
 import { MemoryEditForm } from "./memory-edit-form";
 import { MemoryMeta } from "./memory-meta";
-import { MemorySuperseded } from "./memory-superseded";
 import type { Memory } from "./memory-list";
 
 /** 받아들인 기억 한 줄이다. 누르면 펼쳐 본문을 보이고 고치거나 지운다. */
@@ -62,7 +61,6 @@ export function MemoryItem({
 
   // 풀지 못한 기억은 본문이 오지 않는다. 빈 칸으로 덮어쓰지 않게 고치기를 보이지 않는다.
   const editable = canEdit && !memory.unreadable;
-  const superseded = memory.supersededBy;
   return (
     <ExpandableRow
       title={memory.title}
@@ -102,13 +100,6 @@ export function MemoryItem({
               {memory.content}
             </p>
           )}
-          {superseded ? (
-            <MemorySuperseded
-              superseded={superseded}
-              canEdit={canEdit}
-              onChanged={onChanged}
-            />
-          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Badge variant="outline">
               {memory.alwaysInject

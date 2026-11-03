@@ -3,10 +3,6 @@
 import { useState } from "react";
 import { fetchMemories } from "@/lib/memory-api";
 import {
-  fetchPendingSupersedes,
-  type SupersedeProposal,
-} from "@/lib/memory-link-api";
-import {
   fetchMaintenanceCandidates,
   type MaintenanceCandidate,
 } from "@/lib/memory-maintenance-api";
@@ -39,12 +35,6 @@ export type Memory = MemorySourceFields & {
   /** 서버가 이 줄을 풀지 못했다. 제목은 「읽지 못함」, 본문은 빈 글이다 */
   unreadable?: boolean;
   omittedFromContext?: boolean;
-  /** 이 기억을 대신한 기억이다. 대체된 기억은 다음 대화부터 쓰이지 않는다. 제목은 볼 수 없으면 null 이다. */
-  supersededBy?: {
-    linkId: number;
-    memoryId: number | null;
-    title: string | null;
-  } | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -59,7 +49,6 @@ function byRecent(left: Memory, right: Memory): number {
 
 export function MemoryList({
   initialMemories,
-  initialSupersedes = [],
   initialCandidates = [],
   focusMemoryId,
   isAdmin,
@@ -68,8 +57,6 @@ export function MemoryList({
   documents,
 }: {
   initialMemories: Memory[];
-  /** 받아들이거나 거절할 대체 제안이다. 읽지 못했으면 빈 목록이다. */
-  initialSupersedes?: SupersedeProposal[];
   /** 확인할 정비 후보다. 읽지 못했으면 빈 목록이다. */
   initialCandidates?: MaintenanceCandidate[];
   /** 주소의 `memory` 값이다. 그 줄을 펼치고 스크롤한다. */
@@ -82,7 +69,6 @@ export function MemoryList({
   documents?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
-  const [supersedes, setSupersedes] = useState(initialSupersedes);
   const [candidates, setCandidates] = useState(initialCandidates);
   const [tab, setTab] = useState<MemoryTab>("memory");
   const [filter, setFilter] = useState<MemoryFilter>("ALL");
@@ -94,15 +80,12 @@ export function MemoryList({
   );
   useMemoryFocus(focusMemoryId, { setOpenId, setTab, setFilter });
   async function reload() {
-    const [response, pending, candidateResponse] = await Promise.all([
+    const [response, candidateResponse] = await Promise.all([
       fetchMemories(),
-      fetchPendingSupersedes().catch(() => null),
       fetchMaintenanceCandidates().catch(() => null),
     ]);
     if (candidateResponse?.ok)
       setCandidates((await candidateResponse.json()) as MaintenanceCandidate[]);
-    if (pending?.ok)
-      setSupersedes((await pending.json()) as SupersedeProposal[]);
     if (response.ok) {
       const next = (await response.json()) as Memory[];
       setMemories(next);
@@ -132,7 +115,6 @@ export function MemoryList({
       ) : null}
       <MemoryReviewSection
         proposals={proposals}
-        supersedes={supersedes}
         openId={openId}
         readAt={readAt}
         onToggle={toggle}

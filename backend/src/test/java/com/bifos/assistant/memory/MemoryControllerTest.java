@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.context.application.ContextAssembler;
-import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.entity.Memory;
@@ -40,9 +39,6 @@ class MemoryControllerTest {
     @Autowired
     MemorySources sources;
 
-    @Autowired
-    MemoryLinkService linkService;
-
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MemoryController controller;
 
@@ -50,7 +46,7 @@ class MemoryControllerTest {
     @BeforeEach
     void setUp() {
         repository.deleteAll();
-        controller = new MemoryController(memories, context, sources, linkService, currentUser);
+        controller = new MemoryController(memories, context, sources, currentUser);
         when(currentUser.require()).thenReturn(ADMIN);
     }
 

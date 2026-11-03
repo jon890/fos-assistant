@@ -11,16 +11,13 @@ import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -83,13 +80,10 @@ class MemoryServiceTest {
     @Autowired
     MemoryVectorCache vectorCache;
 
-    @Autowired
-    MemoryLinkRepository links;
-
 
     @BeforeEach
     void setUp() {
-        links.deleteAll();
+        MemorySupersedeRows.clearLegacyLinks(jdbc);
         repository.deleteAll();
         revisionRepository.deleteAll();
     }
@@ -117,18 +111,50 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("항목을 지우면 그 항목을 어느 쪽 끝으로 둔 연결도 지우고 다른 연결은 남긴다")
-    void deletesLinksOnBothEndsWithMemory() {
+    @DisplayName("항목을 지우면 직전 이미지가 옛 연결 테이블에 남긴 줄 가운데 그 항목을 어느 쪽 끝으로 둔 줄만 지운다")
+    void deletesLegacyLinksOnBothEndsWithMemory() {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory a = memories.create(ADMIN, MemoryScope.USER, "가", "내용", false);
         Memory b = memories.create(ADMIN, MemoryScope.USER, "나", "내용", false);
-        links.save(MemoryLink.proposeSupersede(deleted.id(), a.id(), MemoryLinkOrigin.AGENT, null));
-        links.save(MemoryLink.proposeSupersede(b.id(), deleted.id(), MemoryLinkOrigin.AGENT, null));
-        MemoryLink kept = links.save(MemoryLink.related(a.id(), b.id(), null, MemoryLinkOrigin.AGENT, null, null));
+        MemorySupersedeRows.insertLegacyLink(jdbc, deleted.id(), a.id(), "SUPERSEDES", "PROPOSED");
+        MemorySupersedeRows.insertLegacyLink(jdbc, b.id(), deleted.id(), "SUPERSEDES", "ACTIVE");
+        MemorySupersedeRows.insertLegacyLink(jdbc, a.id(), b.id(), "RELATED", "ACTIVE");
 
         memories.delete(ADMIN, deleted.id());
 
-        assertThat(links.findAll()).extracting(MemoryLink::id).containsExactly(kept.id());
+        assertThat(MemorySupersedeRows.legacyLinkCount(jdbc)).as("다른 두 항목 사이의 줄만 남는다").isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("대신한 새 항목을 지우면 그 항목이 대신한 옛 항목이 다시 실리고 다른 항목이 대신한 것은 그대로다")
+    void deletingSupersederRestoresOlderItem() {
+        Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
+        Memory other = memories.create(ADMIN, MemoryScope.USER, "다른 옛", "내용", false);
+        Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
+        Memory another = memories.create(ADMIN, MemoryScope.USER, "다른 새", "내용", false);
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
+        MemorySupersedeRows.supersede(jdbc, other.id(), another.id());
+
+        memories.delete(ADMIN, fresh.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isNull();
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, other.id())).isEqualTo(another.id());
+        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(old.id(), another.id());
+    }
+
+
+    @Test
+    @DisplayName("대신한 새 항목을 거절하면 그 항목이 대신한 옛 항목이 다시 실린다")
+    void rejectingSupersederRestoresOlderItem() {
+        Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
+        Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
+
+        memories.reject(ADMIN, fresh.id());
+
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isNull();
+        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(old.id());
     }
 
 
@@ -137,9 +163,7 @@ class MemoryServiceTest {
     void keepsSupersededItemInListButNotInInjection() {
         Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
         Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
-        MemoryLink link = MemoryLink.proposeSupersede(fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null);
-        link.accept();
-        links.save(link);
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
 
         assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).containsExactly(old.id(), fresh.id());
         assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(fresh.id());

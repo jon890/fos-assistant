@@ -10,6 +10,7 @@ public enum AttentionTrigger {
     DELIVERY_FAILED,
     APPROVAL_PENDING,
     MEMORY_PROPOSED,
+    /** 옛 「대체 제안」 이다. 대체 제안 기능을 지워 후보를 내지 않고, 이미 저장된 사건을 읽으려고 이름만 남긴다. */
     MEMORY_SUPERSEDE_PROPOSED,
     FOLLOW_UP_PROPOSED,
     FOLLOW_UP_OPEN,

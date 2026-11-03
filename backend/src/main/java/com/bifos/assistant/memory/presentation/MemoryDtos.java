@@ -1,10 +1,8 @@
 package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.application.dto.MemorySource;
-import com.bifos.assistant.memory.application.dto.SupersedeProposal;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -37,9 +35,6 @@ public final class MemoryDtos {
      * <p>{@code sourceAgentName} 과 {@code sourceAgentDeleted} 는 에이전트가 남긴 기억의 출처다. 목록을 조회할 때만
      * 채우고 뜻은 {@link MemorySource} 가 갖는다. 에이전트가 남기지 않았거나 한 항목만 돌려주는 응답은 null 과 거짓이다.
      *
-     * <p>{@code supersededBy} 는 효력 있는 대체 연결이 이 항목을 가리킬 때 그 연결과 대신한 항목이다(ADR-20261015 / memory-link). 목록을
-     * 조회할 때만 채운다. 대체된 항목은 에이전트에게 실리지 않지만 이 목록에는 남아 되돌릴 수 있다.
-     *
      * <p>{@code unreadable} 이 참이면 그 줄을 풀지 못했다. 제목은 「읽지 못함」, 본문은 빈 글이고 화면은 고치기를 막는다
      * (ADR-20261103 / memory-encryption).
      */
@@ -60,16 +55,14 @@ public final class MemoryDtos {
         boolean omittedFromContext,
         String sourceAgentName,
         boolean sourceAgentDeleted,
-        SupersededByView supersededBy,
         boolean archivable,
         boolean unreadable) {
         static MemoryView from(Memory memory) {
-            return from(memory, false, null, null);
+            return from(memory, false, null);
         }
 
 
-        static MemoryView from(
-            Memory memory, boolean omittedFromContext, MemorySource source, SupersededByView supersededBy) {
+        static MemoryView from(Memory memory, boolean omittedFromContext, MemorySource source) {
             return new MemoryView(
                 memory.id(),
                 memory.scope().name(),
@@ -87,41 +80,8 @@ public final class MemoryDtos {
                 omittedFromContext,
                 source == null ? null : source.agentName(),
                 source != null && source.agentDeleted(),
-                supersededBy,
                 memory.archivable(),
                 !memory.readable());
-        }
-    }
-
-    /** 이 항목을 대신한 효력 있는 연결과 그 새 항목의 제목이다. 되돌리기는 {@code linkId} 로 한다. */
-    public record SupersededByView(Long linkId, Long memoryId, String title) {
-    }
-
-    /** 대체 제안 카드의 한 항목이다. 본문은 싣지 않는다. */
-    public record MemoryRefView(Long id, String title) {
-    }
-
-    /**
-     * 사람이 받아들이거나 거절할 대체 제안 하나다. 새 항목이 옛 항목을 대신한다.
-     *
-     * @param origin {@code AGENT}, {@code HUMAN}, {@code AUTO}
-     */
-    public record SupersedeProposalView(
-        Long id, MemoryRefView newMemory, MemoryRefView oldMemory, String origin, Instant createdAt) {
-        static SupersedeProposalView from(SupersedeProposal proposal) {
-            return new SupersedeProposalView(
-                proposal.link().id(),
-                new MemoryRefView(proposal.newMemory().id(), proposal.newMemory().title()),
-                new MemoryRefView(proposal.oldMemory().id(), proposal.oldMemory().title()),
-                proposal.link().origin().name(),
-                proposal.link().createdAt());
-        }
-    }
-
-    /** 받아들이기, 거절, 되돌리기의 결과다. */
-    public record MemoryLinkView(Long id, String type, String status) {
-        static MemoryLinkView from(MemoryLink link) {
-            return new MemoryLinkView(link.id(), link.type().name(), link.status().name());
         }
     }
 

@@ -14,14 +14,12 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
-import com.bifos.assistant.memory.application.MemoryLinkService;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.CapturedMemory;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
@@ -117,9 +115,6 @@ class McpMemoryRememberToolTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @Autowired
-    MemoryLinkService linkService;
-
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -147,11 +142,6 @@ class McpMemoryRememberToolTest {
         jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_capture WHERE user_id = ?", dad.id());
         jdbc.update("DELETE FROM memory_revision WHERE owner_user_id = ?", dad.id());
-        jdbc.update(
-            "DELETE FROM memory_link WHERE from_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)"
-                + " OR to_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
-            dad.id(),
-            dad.id());
         jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", dad.id());
         jdbc.update("DELETE FROM chat_message WHERE conversation_id = ?", conversation.id());
         jdbc.update("DELETE FROM conversation WHERE user_id = ?", dad.id());
@@ -553,16 +543,15 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("대체를 받아들인 새 기억이 되돌리기로 제안에 돌아가면 그 대체도 끊겨 옛 기억이 다시 실린다")
-    void revokesSupersedeWhenUndoingAcceptance() throws Exception {
+    @DisplayName("대체한 새 기억이 되돌리기로 제안에 돌아가면 대신한 칸이 비워져 옛 기억이 다시 실린다")
+    void clearsSupersedeWhenUndoingAcceptance() throws Exception {
         Memory old = memoryService.create(currentDad(), MemoryScope.USER, "사는 곳", "서울에 산다", false);
         call(remember("이사한 곳", "부산에 산다", null));
         Long fresh = memoriesOfDad().stream().filter(memory -> !memory.id().equals(old.id())).findFirst().orElseThrow().id();
         askedInThisTurn("나 부산에 살아");
         call(remember("이사한 곳", "부산에 산다", "나 부산에 살아"));
-        MemoryLink link = linkService.proposeSupersede(currentDad(), fresh, old.id(), MemoryLinkOrigin.AGENT, null);
-        linkService.accept(currentDad(), link.id());
-        assertThat(linkService.isSuperseded(old.id())).isTrue();
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh);
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).isEqualTo(fresh);
         MemoryCapture accepted = capturesOfDad().stream()
             .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
             .findFirst()
@@ -571,7 +560,7 @@ class McpMemoryRememberToolTest {
         captureService.undo(currentDad(), accepted.id());
 
         assertThat(memories.findById(fresh).orElseThrow().status()).isEqualTo(MemoryStatus.PROPOSED);
-        assertThat(linkService.isSuperseded(old.id())).as("되돌린 새 기억이 옛 기억을 가리지 않는다").isFalse();
+        assertThat(MemorySupersedeRows.supersededBy(jdbc, old.id())).as("되돌린 새 기억이 옛 기억을 가리지 않는다").isNull();
     }
 
 
@@ -591,15 +580,14 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("다른 기억이 대체한 항목과 같은 내용이면 이미 안다고 답하지 않고 되돌릴지 물으라고 답하며 memory_id 로도 고치지 않는다")
+    @DisplayName("다른 기억이 대체한 항목과 같은 내용이면 이미 안다고 답하지 않고 쓰이지 않는다고 답하며 memory_id 로도 고치지 않는다")
     void doesNotTreatSupersededFactAsKnown() throws Exception {
         askedInThisTurn();
         ObjectNode arguments = remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야");
         call(arguments.deepCopy());
         Long old = onlyMemory().id();
         Memory fresh = memoryService.create(currentDad(), MemoryScope.USER, "다른 사람 변경", "다른 사람은 김철수다", false);
-        MemoryLink link = linkService.proposeSupersede(currentDad(), fresh.id(), old, MemoryLinkOrigin.AGENT, null);
-        linkService.accept(currentDad(), link.id());
+        MemorySupersedeRows.supersede(jdbc, old, fresh.id());
 
         JsonNode again = call(arguments.deepCopy());
         ObjectNode update = remember("다른 사람", "다른 사람은 박영희다", "다른 사람은 홍길동이야");

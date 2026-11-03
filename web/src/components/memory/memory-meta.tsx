@@ -24,11 +24,6 @@ export function MemoryMeta({
           {formatRelative(changedAt, new Date(readAt))}
         </span>
       ) : null}
-      {memory.supersededBy ? (
-        <Badge variant="outline" data-testid="memory-superseded">
-          대체됨
-        </Badge>
-      ) : null}
       {memory.archivable ? (
         <Badge variant="outline" data-testid="memory-archivable">
           자동 보관 허락
