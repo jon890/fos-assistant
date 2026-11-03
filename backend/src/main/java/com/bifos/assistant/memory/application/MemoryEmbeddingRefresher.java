@@ -25,9 +25,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 임베딩 대상 항목의 벡터를 채우고 낡은 줄을 지운다(ADR-20261015 / memory-hybrid-selection).
+ * 임베딩 대상 항목의 벡터를 채우고 대상에서 빠진 항목의 벡터를 비운다(ADR-20261015 / memory-hybrid-selection).
  *
- * <p>벡터는 기억 항목 줄의 {@code embedding_*} 칸에 둔다(ADR-20261102 / table-reduce-r2). 한 번에 대상에서 빠진 항목의 벡터를 비우고, 줄이 없거나 지문이 다른 대상을 번호 순으로 {@code batchSize} 씩
+ * <p>벡터는 기억 항목 줄의 {@code embedding_*} 칸에 둔다(ADR-20261102 / table-reduce-r2). 한 번에 대상에서 빠진 항목의 벡터를 비우고, 벡터가 없거나 모델이나 지문이 다른 대상을 번호 순으로 {@code batchSize} 씩
  * {@code maxBatchesPerRun} 묶음까지 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛰고, 그것도 모두 실패하면 그 주기를 끝내고 다음 주기에 다시 한다. 임베딩 호출 동안 트랜잭션을 열어 두지
  * 않는다. 로그에는 건수와 예외 클래스 이름만 남긴다.
  *
@@ -82,16 +82,19 @@ public class MemoryEmbeddingRefresher {
             return 0;
         }
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        Integer removed = transaction.execute(status -> {
-            List<Long> stale = staleMemoryIds();
-            if (stale.isEmpty()) {
-                return 0;
+        // 대상 항목의 글과 벡터의 모델·지문을 한 번만 읽어 대상에서 빠진 벡터를 비우고 채울 대상을 고른다
+        Cycle cycle = transaction.execute(status -> {
+            List<MemoryEmbeddingSource> sources = embeddings.findEmbeddableSources();
+            List<MemoryEmbeddingStamp> stamps = embeddings.findStamps();
+            List<Long> stale = staleMemoryIds(sources, stamps);
+            if (!stale.isEmpty()) {
+                embeddings.clearVectors(stale);
+                stale.forEach(vectorCache::evict);
             }
-            embeddings.clearVectors(stale);
-            stale.forEach(vectorCache::evict);
-            return stale.size();
+            return new Cycle(stale.size(), pending(sources, stamps));
         });
-        List<MemoryEmbeddingSource> pending = pending();
+        int removed = cycle.removed();
+        List<MemoryEmbeddingSource> pending = cycle.pending();
         List<Long> writtenIds = new ArrayList<>();
         int batches = 0;
         for (int start = 0; start < pending.size() && batches < properties.maxBatchesPerRun(); start += properties.batchSize()) {
@@ -127,11 +130,9 @@ public class MemoryEmbeddingRefresher {
 
 
     /** 벡터가 있지만 임베딩 대상에서 빠진 항목의 번호다. 대체된 항목도 여기 든다. */
-    private List<Long> staleMemoryIds() {
-        Set<Long> eligible = embeddings.findEmbeddableSources().stream()
-            .map(MemoryEmbeddingSource::memoryId)
-            .collect(Collectors.toSet());
-        return embeddings.findStamps().stream()
+    private static List<Long> staleMemoryIds(List<MemoryEmbeddingSource> sources, List<MemoryEmbeddingStamp> stamps) {
+        Set<Long> eligible = sources.stream().map(MemoryEmbeddingSource::memoryId).collect(Collectors.toSet());
+        return stamps.stream()
             .map(MemoryEmbeddingStamp::memoryId)
             .filter(memoryId -> !eligible.contains(memoryId))
             .toList();
@@ -139,19 +140,21 @@ public class MemoryEmbeddingRefresher {
 
 
     /** 벡터가 없거나 모델이나 지문이 다른 대상이다. 번호 순이다. */
-    private List<MemoryEmbeddingSource> pending() {
-        return readOnly().execute(status -> {
-            Map<Long, MemoryEmbeddingStamp> stamps = embeddings.findStamps().stream()
-                .collect(Collectors.toMap(MemoryEmbeddingStamp::memoryId, Function.identity()));
-            return embeddings.findEmbeddableSources().stream()
-                .filter(source -> {
-                    MemoryEmbeddingStamp stamp = stamps.get(source.memoryId());
-                    return stamp == null
-                        || !stamp.model().equals(properties.model())
-                        || !Arrays.equals(stamp.textFingerprint(), EmbeddingText.fingerprint(properties.model(), textOf(source)));
-                })
-                .toList();
-        });
+    private List<MemoryEmbeddingSource> pending(List<MemoryEmbeddingSource> sources, List<MemoryEmbeddingStamp> stamps) {
+        Map<Long, MemoryEmbeddingStamp> byId = stamps.stream()
+            .collect(Collectors.toMap(MemoryEmbeddingStamp::memoryId, Function.identity()));
+        return sources.stream()
+            .filter(source -> {
+                MemoryEmbeddingStamp stamp = byId.get(source.memoryId());
+                return stamp == null
+                    || !stamp.model().equals(properties.model())
+                    || !Arrays.equals(stamp.textFingerprint(), EmbeddingText.fingerprint(properties.model(), textOf(source)));
+            })
+            .toList();
+    }
+
+
+    private record Cycle(int removed, List<MemoryEmbeddingSource> pending) {
     }
 
 

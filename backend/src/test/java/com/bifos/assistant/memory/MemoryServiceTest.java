@@ -110,11 +110,14 @@ class MemoryServiceTest {
                 + " VALUES (?, 'old-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", legacyId, new byte[32], new byte[4]);
         }
 
-        memories.delete(ADMIN, deleted.id());
+        try {
+            memories.delete(ADMIN, deleted.id());
 
-        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(kept.id());
-        assertThat(jdbc.queryForList("SELECT memory_id FROM memory_embedding", Long.class)).containsExactly(kept.id());
-        jdbc.update("DELETE FROM memory_embedding");
+            assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(kept.id());
+            assertThat(jdbc.queryForList("SELECT memory_id FROM memory_embedding", Long.class)).containsExactly(kept.id());
+        } finally {
+            jdbc.update("DELETE FROM memory_embedding");
+        }
         assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
         MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();

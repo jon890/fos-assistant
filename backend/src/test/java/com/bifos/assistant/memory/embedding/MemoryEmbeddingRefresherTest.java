@@ -12,6 +12,7 @@ import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.application.port.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
@@ -130,9 +131,10 @@ class MemoryEmbeddingRefresherTest {
     void writesVectorIntoMemoryRowWithoutTouchingAuditColumns() {
         Memory plain = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
         String before = jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id());
-        // 직전 이미지가 옛 테이블에 남긴 줄이다. 새 코드는 이 줄을 벡터로 쓰지 않고 다시 계산한다
+        // 직전 이미지가 옛 테이블에 남긴 지금 글과 모델의 줄이다. 새 코드가 이 줄을 읽었다면 이미 채워진 것으로 보고 다시 계산하지 않는다
         jdbc.update("INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)"
-            + " VALUES (?, 'test-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)", plain.id(), new byte[32], new byte[4]);
+            + " VALUES (?, 'test-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            plain.id(), EmbeddingText.fingerprint("test-model", "타이어\n작년 11월에 갈았다"), new byte[4]);
 
         try {
             assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);

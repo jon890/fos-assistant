@@ -23,6 +23,10 @@ import org.springframework.data.repository.query.Param;
  */
 public interface MemoryEmbeddingRepository {
 
+    /** 세 칸이 모두 찬 줄만 벡터가 있는 것으로 본다. 직접 고쳐 한 칸만 빈 줄이 읽기를 깨뜨리지 않게 한다. */
+    String HAS_VECTOR = " embedding_model is not null and embedding_fingerprint is not null and embedding_vector is not null";
+
+
     /** 임베딩 대상 항목의 글을 번호 순으로 읽는다. */
     @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingSource(m.id, m.title, m.content)"
         + " from Memory m"
@@ -70,14 +74,14 @@ public interface MemoryEmbeddingRepository {
 
 
     /** 벡터가 있는 줄의 번호, 모델, 지문이다. 벡터는 읽지 않는다. */
-    @Query(value = "select id, embedding_model, embedding_fingerprint from memory where embedding_model is not null order by id",
+    @Query(value = "select id, embedding_model, embedding_fingerprint from memory where" + HAS_VECTOR + " order by id",
         nativeQuery = true)
     List<Object[]> findStampTuples();
 
 
     /** 그 번호 가운데 벡터가 있는 줄의 번호, 모델, 지문, 벡터다. */
     @Query(value = "select id, embedding_model, embedding_fingerprint, embedding_vector from memory"
-        + " where id in (:ids) and embedding_model is not null", nativeQuery = true)
+        + " where id in (:ids) and" + HAS_VECTOR, nativeQuery = true)
     List<Object[]> findVectorTuples(@Param("ids") Collection<Long> ids);
 
 
