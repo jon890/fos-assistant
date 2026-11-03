@@ -1,5 +1,7 @@
 # Phase 01. backend 테스트를 JVM 두 개로 나눠 돌린다
 
+**상태**: 완료
+
 **Execution profile**: standard
 
 ## 목표
@@ -43,4 +45,10 @@ cd backend && ./gradlew test
 | 파일 | 변경 |
 | --- | --- |
 | `backend/build.gradle.kts` | 수정 |
+| `backend/src/test/resources/application-test.yml` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/skill/SkillServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/agent/AgentLifecycleServiceTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/chat/ConversationPurgerTest.java` | 수정 |
+| `backend/docs/adr/ADR-20261007-test-context-base.md` | 수정 |
+| `backend/docs/code-architecture.md` | 수정 |
 | `.github/workflows/ci.yml` | 수정 |
