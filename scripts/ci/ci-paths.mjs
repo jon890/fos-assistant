@@ -68,6 +68,8 @@ export const RULES = [
   [/^scripts\/ci\/check-connector-package\.sh$/, ["hermes"]],
   [/^scripts\/checks\/(quality\.sh|quality-report\.mjs|format-connectors\.mjs|check-file-length\.mjs|file-length-baseline\.json)$/, ["quality"]],
   [/^scripts\/(?:ci\/)?browser-[^/]+\.mjs$/, ["browser"]],
+  // 정기 E2E 실패 이슈 스크립트는 e2e-failures job 이 부른다. 그 job 은 정기·수동 실행에서만 돈다.
+  [/^scripts\/ci\/e2e-ci\.mjs$/, ["e2e"]],
   // unit 과 public-safe 가 언제나 부르는 검사와, CI job 이 부르지 않는 로컬 입구와 PR 스크립트다.
   [/^scripts\/checks\/(check-public-safe\.sh|check-migration-versions\.mjs)$/, NONE],
   [/^scripts\/ci\/check-feature-covers\.mjs$/, NONE],
@@ -122,13 +124,14 @@ export function gate({ changes, run, result }) {
 
 /**
  * PR 판정에서 느린 검사를 뺀다. 전체 검사 라벨이 붙었으면 그대로 둔다.
+ * keep 에 든 느린 job 은 라벨이 없어도 판정대로 돌린다.
  * 화면 회귀는 정기 실행이 하루 안에 잡는다. 결정과 까닭은 ADR-20261012-ci-path-filter 가 갖는다.
  */
-export function withoutSlow(result, full) {
+export function withoutSlow(result, full, keep = []) {
   if (full) return result;
   const next = { ...result };
   for (const job of SLOW_JOBS) {
-    if (next[job].run) next[job] = { run: false, because: `(PR 에서는 정기 실행으로 미룸. 「${FULL_LABEL}」 라벨로 돌린다)` };
+    if (next[job].run && !keep.includes(job)) next[job] = { run: false, because: `(PR 에서는 정기 실행으로 미룸. 「${FULL_LABEL}」 라벨로 돌린다)` };
   }
   return next;
 }
@@ -145,6 +148,18 @@ export const ROUTE_FILES = [
 /** 지워진(이름 변경의 옛 경로 포함) 파일 중 API 나 화면 경로를 정하던 것이 있으면 true. */
 export function removesRoute(removed) {
   return removed.some((file) => ROUTE_FILES.some((pattern) => pattern.test(file)));
+}
+
+// 모델이 받는 지시문을 만드는 파일. 고치면 가짜 Hermes 가 답에서 지침을 빼는 규칙과 어긋나 E2E 가 깨질 수 있다.
+// 앞은 지침 상수를 가진 Control Plane 클래스, 뒤는 가짜 Hermes 의 MODEL_GUIDE_HEADERS 를 가진 파일이다.
+export const GUIDE_FILES = [
+  /^backend\/src\/main\/java\/com\/bifos\/assistant\/context\/application\/ContextAssembler\.java$/,
+  /^test\/e2e\/fake-hermes\/scenario-fixtures\.ts$/,
+];
+
+/** 바꾼 파일(추가, 수정, 삭제, 이름 변경의 두 경로 모두) 중 모델 지시문을 만드는 것이 있으면 true. */
+export function touchesGuide(files) {
+  return files.some((file) => GUIDE_FILES.some((pattern) => pattern.test(file)));
 }
 
 /** PR 의 merge 커밋이 첫 부모(base) 에 대해 바꾼 파일과 지운 파일. 이름 변경은 옛 경로(지움)와 새 경로(추가)로 낸다. */
@@ -173,7 +188,8 @@ function main() {
     if (event === "pull_request") {
       const { files, removed } = changedFiles();
       // 경로를 지운 PR 은 라벨이 없어도 e2e 와 브라우저를 돌린다. 지운 경로를 부르는 쪽은 PR 에서 드러나야 한다.
-      result = withoutSlow(classify(files), process.env.FULL_LABEL === "true" || removesRoute(removed));
+      // 모델 지시문을 만드는 파일을 바꾼 PR 은 E2E 만 라벨 없이 돌린다. 브라우저는 그 파일을 읽지 않는다.
+      result = withoutSlow(classify(files), process.env.FULL_LABEL === "true" || removesRoute(removed), touchesGuide(files) ? ["e2e"] : []);
     } else {
       result = Object.fromEntries(JOBS.map((job) => [job, event === "push"
         ? { run: PUSH_JOBS.includes(job), because: "(main push 빠른 검사)" }
