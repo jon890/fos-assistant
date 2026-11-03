@@ -97,7 +97,7 @@ class MemorySupersedeMigrationTest {
     void remigratesOnlyLinksWrittenByPreviousImageThenDropsOldTable() throws SQLException {
         Database database = createDatabase();
         migrate(database, BEFORE);
-        long[] ids = new long[12];
+        long[] ids = new long[16];
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             for (int i = 0; i < ids.length; i++) {
                 ids[i] = insertMemory(statement, "항목 " + i);
@@ -121,16 +121,21 @@ class MemorySupersedeMigrationTest {
             insertLink(statement, ids[9], ids[8], "SUPERSEDES", "PROPOSED", "'2099-01-01 00:00:30'");
             insertLink(statement, ids[9], ids[10], "RELATED", "ACTIVE", "'2099-01-01 00:00:40'");
             insertLink(statement, ids[1], ids[11], "SUPERSEDES", "REVOKED", "'2099-01-01 00:00:50'");
+            // 12 번 항목은 처음 옮기기 앞에 제안 중이던 대체를 되돌려 지내는 동안 승인했다. 상태를 바꾼 시각이 뒤라 옮긴다
+            insertLink(statement, ids[13], ids[12], "SUPERSEDES", "ACTIVE", "'2026-11-01 00:00:00'", "'2099-01-01 00:01:00'");
+            // 14 번 항목을 대신한 15 번 새 항목은 이제 승인 상태가 아니다. 옮기지 않는다
+            statement.executeUpdate("UPDATE memory SET status = 'PROPOSED' WHERE id = " + ids[15]);
+            insertLink(statement, ids[15], ids[14], "SUPERSEDES", "ACTIVE", "'2099-01-01 00:01:10'");
         }
 
         migrate(database, null);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT id, superseded_by_memory_id FROM memory WHERE superseded_by_memory_id IS NOT NULL ORDER BY id"))
-                .as("칸이 찬 항목: 2 번은 새 코드가 채운 값 그대로, 5 번만 다시 옮겼다")
-                .containsExactly(ids[2] + "", ids[5] + "");
-            assertThat(strings(statement, "SELECT superseded_by_memory_id FROM memory WHERE id IN (" + ids[2] + ", " + ids[5] + ") ORDER BY id"))
-                .containsExactly(String.valueOf(ids[3]), String.valueOf(ids[7]));
+                .as("칸이 찬 항목: 2 번은 새 코드가 채운 값 그대로, 5 번과 12 번만 다시 옮겼다")
+                .containsExactly(ids[2] + "", ids[5] + "", ids[12] + "");
+            assertThat(strings(statement, "SELECT superseded_by_memory_id FROM memory WHERE id IN (" + ids[2] + ", " + ids[5] + ", " + ids[12] + ") ORDER BY id"))
+                .containsExactly(String.valueOf(ids[3]), String.valueOf(ids[7]), String.valueOf(ids[13]));
             assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM memory_link"))
                 .as("옛 표 memory_link 는 지운다").isInstanceOf(SQLException.class);
         }
@@ -151,13 +156,20 @@ class MemorySupersedeMigrationTest {
     }
 
 
-    /** {@code createdAt} 은 SQL 식이다(문자열 리터럴이면 따옴표를 포함한다). */
+    /** {@code createdAt} 은 SQL 식이다(문자열 리터럴이면 따옴표를 포함한다). 상태를 바꾼 시각도 같다. */
     private static void insertLink(Statement statement, long from, long to, String type, String status, String createdAt)
+        throws SQLException {
+        insertLink(statement, from, to, type, status, createdAt, createdAt);
+    }
+
+
+    private static void insertLink(
+        Statement statement, long from, long to, String type, String status, String createdAt, String updatedAt)
         throws SQLException {
         statement.executeUpdate(
             "INSERT INTO memory_link (from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)"
                 + " VALUES (" + from + ", " + to + ", '" + type + "', 'AGENT', '" + status + "',"
-                + " " + createdAt + ", " + createdAt + ")");
+                + " " + createdAt + ", " + updatedAt + ")");
     }
 
 
