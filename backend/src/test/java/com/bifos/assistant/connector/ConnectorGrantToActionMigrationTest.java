@@ -141,7 +141,7 @@ class ConnectorGrantToActionMigrationTest {
 
 
     @Test
-    @DisplayName("직전 이미지가 옛 표에 새로 쓴 허락만 다시 옮기고 이미 옮긴 허락은 되살리지 않은 뒤 옛 허락 두 표를 지운다")
+    @DisplayName("직전 이미지가 옛 표에 새로 쓴 허락만 다시 옮기고 이미 옮긴 허락은 되살리지 않은 뒤 옛 허락 두 표와 옛 벡터 표를 지운다")
     void remigratesOnlyGrantsWrittenByPreviousImageThenDropsOldTables() throws SQLException {
         Database database = createDatabase();
         migrate(database, BEFORE);
@@ -185,7 +185,7 @@ class ConnectorGrantToActionMigrationTest {
                     List.of("32", "-", "-", "-"),
                     List.of("33", "TOOL", "2099-02-01T00:00", "-"),
                     List.of("34", "CONVERSATION", "2099-01-02T00:00", "2099-01-01T01:00"));
-            for (String table : List.of("connector_tool_grant", "connector_conversation_grant")) {
+            for (String table : List.of("connector_tool_grant", "connector_conversation_grant", "memory_embedding")) {
                 assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM " + table))
                     .as("옛 표 " + table + " 는 지운다").isInstanceOf(SQLException.class);
             }

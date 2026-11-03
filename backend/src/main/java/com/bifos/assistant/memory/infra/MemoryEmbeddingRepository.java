@@ -126,15 +126,6 @@ public interface MemoryEmbeddingRepository {
     int clearVectors(@Param("ids") Collection<Long> ids);
 
 
-    /**
-     * 옛 벡터 테이블 {@code memory_embedding} 에서 그 항목들의 줄을 지운다. 코드는 옛 테이블을 읽고 쓰지 않지만, 직전 이미지가 남긴 줄을 항목
-     * 삭제와 사용자 정리의 약속대로 지운다. 옛 테이블을 지우는 PR 이 이 메서드를 걷어 낸다(ADR-20261102 / table-reduce-r2).
-     */
-    @Modifying(flushAutomatically = true)
-    @Query(value = "delete from memory_embedding where memory_id in (:memoryIds)", nativeQuery = true)
-    int deleteLegacyRows(@Param("memoryIds") Collection<Long> memoryIds);
-
-
     /** 벡터가 있는 줄의 모델과 지문이다. 번호 순이다. */
     default List<MemoryEmbeddingStamp> findStamps() {
         return findStampTuples().stream()
