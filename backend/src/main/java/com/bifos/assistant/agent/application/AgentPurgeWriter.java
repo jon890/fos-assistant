@@ -6,7 +6,6 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionChangeRepository;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.AgentToolsetRequestRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,6 @@ public class AgentPurgeWriter {
     private final AgentRepository agents;
     private final AgentMemoryCollectionRepository collections;
     private final AgentMemoryCollectionChangeRepository collectionChanges;
-    private final AgentToolsetRequestRepository toolsetRequests;
     private final List<AgentPurgeParticipant> participants;
 
 
@@ -50,7 +48,6 @@ public class AgentPurgeWriter {
             return AgentPurgeOutcome.WAITING;
         }
         participants.forEach(participant -> participant.release(agentId));
-        toolsetRequests.deleteAllOfAgent(agentId);
         collectionChanges.deleteAllOfAgent(agentId);
         collections.deleteAllOfAgent(agentId);
         agents.deletePurged(agentId);

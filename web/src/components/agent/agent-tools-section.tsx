@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useToolsetRequests } from "./use-toolset-requests";
-import { ToolsetRequestDecision } from "./toolset-request-decision";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -26,7 +24,6 @@ import {
 import { fetchAgentTools, saveAgentTools } from "@/lib/agent-api";
 import { SHELL_OR_FILE_TOOLSETS } from "@/lib/agent-connection";
 import { toolsetText } from "@/lib/toolset-label";
-import { requestStatusText } from "@/lib/toolset-request";
 
 const CONNECTION_RISK_MESSAGE =
   "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
@@ -95,7 +92,6 @@ export function AgentToolsSection({
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [confirming, setConfirming] = useState<ToolsetView | null>(null);
-  const requests = useToolsetRequests(code, admin);
 
   function apply(view: AgentToolsView) {
     setTools(view.toolsets);
@@ -172,9 +168,7 @@ export function AgentToolsSection({
     if (visibility === GROUP_VISIBILITY && tool.requiresPrivate)
       return "그룹 공개 에이전트에는 켤 수 없어요";
     if (!tool.editable)
-      return tool.enabled
-        ? "관리자만 끌 수 있어요"
-        : "관리자가 확인하면 켜져요";
+      return tool.enabled ? "관리자만 끌 수 있어요" : "관리자만 켤 수 있어요";
     return undefined;
   }
 
@@ -187,11 +181,6 @@ export function AgentToolsSection({
             const reason = disabledReason(tool);
             const disabled = pendingToolName !== null || reason !== undefined;
             const text = toolsetText(tool.name, tool);
-            const requested = requests.rows.find(
-              (row) => row.toolset === tool.name,
-            );
-            const mayRequest =
-              !tool.editable && tool.tier === "ADMIN" && !tool.enabled;
             return (
               <li
                 key={tool.name}
@@ -210,12 +199,6 @@ export function AgentToolsSection({
                       {reason}
                     </p>
                   ) : null}
-                  {!tool.editable && requested ? (
-                    <p className="mt-1 text-xs" role="status">
-                      {requestStatusText[requested.status]}
-                      {requested.reason ? ` · ${requested.reason}` : ""}
-                    </p>
-                  ) : null}
                   {missing.includes(tool.name) ? (
                     <p className="mt-1 text-xs text-destructive">
                       이 도구를 켜지 못했어요. 관리자에게 알려 주세요.
@@ -231,31 +214,6 @@ export function AgentToolsSection({
                     aria-label={`${text.label} 도구`}
                     onCheckedChange={() => toggle(tool)}
                   />
-                  {mayRequest ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={
-                        requests.loading ||
-                        requests.busy !== null ||
-                        (visibility === GROUP_VISIBILITY &&
-                          tool.requiresPrivate)
-                      }
-                      loading={requests.busy === tool.name}
-                      onClick={() =>
-                        void requests.change(
-                          tool.name,
-                          requested?.status === "PENDING"
-                            ? requested
-                            : undefined,
-                        )
-                      }
-                    >
-                      {requested?.status === "PENDING"
-                        ? "요청 취소"
-                        : "사용 요청"}
-                    </Button>
-                  ) : null}
                 </div>
               </li>
             );
@@ -279,36 +237,13 @@ export function AgentToolsSection({
           {error}
         </Notice>
       ) : null}
-      {requests.error ? (
-        <Notice variant="error" role="alert" className="mt-4">
-          {requests.error}
-        </Notice>
-      ) : null}
-      {admin && requests.rows.length > 0 ? (
-        <div className="mt-4">
-          <h3 className="text-sm font-semibold">도구 사용 요청</h3>
-          <div className="mt-2 grid gap-2 text-sm">
-            {requests.rows.map((row) => (
-              <ToolsetRequestDecision
-                key={row.id}
-                initial={row}
-                admin
-                onDecided={() => void reload()}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
       {unclassifiedEnabled.length > 0 ? (
         <Notice variant="warning" role="alert" className="mt-4">
           표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
         </Notice>
       ) : null}
       {list("바로 켤 수 있어요", ownerTools)}
-      {list(
-        admin ? "관리자만 켤 수 있어요" : "관리자 확인이 필요해요",
-        adminTools,
-      )}
+      {list("관리자만 켤 수 있어요", adminTools)}
       {confirming ? (
         <AlertDialog
           open

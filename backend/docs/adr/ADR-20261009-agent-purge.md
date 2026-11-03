@@ -13,7 +13,7 @@
 | 표 | 정리할 때 |
 | --- | --- |
 | `agent_memory_collection`, `agent_memory_collection_change` | 지운다. 에이전트의 설정과 그 변경 기록이다 |
-| `agent_toolset_request` | 지운다. 에이전트의 권한 요청이다 |
+| `agent_toolset_request` | 지운다. 에이전트의 권한 요청이다(표는 도구 사용 요청과 함께 지웠다) |
 | `agent_connector_binding` | 지운다. 에이전트를 지울 때 이미 떼서 보통 없다 |
 | `proactive_check` | 지운다. 발견과 문제 표는 FK 가 함께 지우거나 비운다. 비용은 `agent_execution` 에 남는다 |
 | `connector_connection` | 연결은 사용자 소유라 보존한다. 옛 `agent_id` 칸은 ADR-083의 호환 폐기에서 제거했다 |

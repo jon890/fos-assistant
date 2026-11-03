@@ -8,7 +8,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_toolset_request`, `agent_token` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
@@ -379,12 +379,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 그룹이 숨긴 toolset 은 `group_setting` 의 `TOOLSET` 줄이 갖는다. 옛 `toolset_hidden` 테이블은 지웠다.
 `V20261102074304` 가 그 테이블의 줄을 그룹마다 `TOOLSET` 줄 하나로 옮겼고, 배포를 확인한 뒤 `V20261102074307` 이 직전 이미지가 옛 테이블에만 쓴 그룹을 다시 옮겼다.
 이미 `TOOLSET` 줄이 있는 그룹은 `V20261102074304` 가 옮긴 값인지 새 코드가 쓴 값인지 구별할 수 없어 덮어쓰지 않는다. 직전 이미지로 되돌린 동안 이미 옮겨진 그룹의 숨김을 바꿨다면 옛 테이블의 그 값은 버려진다. `V20261102074311` 이 옛 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
-
-### agent_toolset_request
-
-에이전트 주인의 관리자 등급 도구 사용 요청과 결정 이력이다([ADR-20261009 / tool-request-flow](../../docs/adr/ADR-20261009-tool-request-flow.md)). 에이전트를 지워도 행이 남고, 지운 에이전트를 정리할 때 함께 지운다.
-`group_id` 와 `requester_user_id` 는 요청 당시의 값이고, 그 뒤 주인이 바뀌어도 고치지 않는다. `decided_by_user_id` 는 요청자가 취소하면 비어 있다.
-**대기 요청을 하나만 두려고 `pending_slot` 을 쓴다.** 대기 중에만 1 이고 끝나면 NULL 이다. 유일 제약에 이 칸이 들어 있어 대기 요청은 겹치지 못하고, 끝난 요청의 NULL 은 서로 겹쳐도 저장되어 이력이 남는다.
 
 ### agent_token
 
