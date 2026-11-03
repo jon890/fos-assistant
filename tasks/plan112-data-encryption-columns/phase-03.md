@@ -18,7 +18,6 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
   | 표 | 본문 칸 | key 칸 | 주인 | 줄을 잡는 잠금 |
   | --- | --- | --- | --- | --- |
   | `chat_message` | `content` | `content_key_id` | 대화의 `user_id` | `ConversationRepository.findByIdForMessageWrite` 로 대화 줄 |
-  | `chat_pending_message` | `content` | `content_key_id` | `user_id` | 같다 |
   | `conversation` | `title` | `title_key_id` | `user_id` | 같다 |
   | `agent_execution` | `output_text` | `output_key_id` | `user_id` | `AgentExecutionRepository.lockById` |
   | `task` | `title`, `instruction` | `title_key_id`, `instruction_key_id` | `owner_user_id` | 새 쓰기 잠금 조회 |
@@ -44,7 +43,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 
 ### 2. 배치
 
-- `chat.conversation.application.ChatPlaintextBackfill`(신규): `chat_message`, `chat_pending_message`, `conversation.title` 을 맡는다. 저장소에 `findIdsByContentKeyIdIsNullAndIdGreaterThan...` 처럼 번호만 읽는 질의를 더하고, 줄마다 `ChatPlaintextSealer`(신규, `@Transactional`)가 대화 줄을 잠근 뒤 엔티티의 `seal` 로 고친다
+- `chat.conversation.application.ChatPlaintextBackfill`(신규): `chat_message`, `conversation.title` 을 맡는다. 저장소에 `findIdsByContentKeyIdIsNullAndIdGreaterThan...` 처럼 번호만 읽는 질의를 더하고, 줄마다 `ChatPlaintextSealer`(신규, `@Transactional`)가 대화 줄을 잠근 뒤 엔티티의 `seal` 로 고친다
 - `usage.execution.application.ExecutionOutputBackfill`(신규)과 `task.application.TaskPlaintextBackfill`(신규)도 같은 모양이다
 - 각 배치는 `TextCipher.enabled()` 가 거짓이면 남은 줄 수만 경고하고 끝난다
 - `UNSEAL` 이면 key 칸이 있는 줄을 골라 풀어서 평문과 null 로 적는다

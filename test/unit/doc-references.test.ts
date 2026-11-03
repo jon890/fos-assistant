@@ -14,6 +14,9 @@ const PATH_FIXTURE_FILES = new Set([
   "test/unit/doc-files.test.ts",
   "test/unit/file-length.test.ts",
   "test/unit/doc-code-references.test.ts",
+  "test/unit/ci-paths.test.ts",
+  "test/unit/pr-size.test.ts",
+  "test/unit/pr-risk-labels.test.ts",
 ]);
 
 const CODE_EXTENSIONS = [

@@ -34,8 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
  * (ADR-20261102 / table-reduce-r2). 묶음과 시도의 상태는 늘 한 update 에서 바꾼다.
  *
  * <p>{@code items_json} 의 모양은 버전 1 의 {@code {"version":1,"items":[{"source":..,"resultKey":..}]}} 이고 항목은 넣은
- * 순서다. 옛 항목 표에서 옮기는 마이그레이션 {@code V20261102074312__ResultDeliveryItemsAttemptBackfill} 도 같은 모양을
- * 쓴다.
+ * 순서다. 옛 항목 표에서 옮긴 마이그레이션 {@code V20261102074312__ResultDeliveryItemsAttemptBackfill} 도 같은 모양을
+ * 썼다.
  */
 @Slf4j
 @Service
@@ -102,7 +102,7 @@ public class ResultDeliveryRecorder {
     /**
      * 묶음에 넣은 결과들이다. 넣은 순서다.
      *
-     * <p>{@code items_json} 이 비었거나(직전 이미지가 쓴 줄) 읽지 못하면 빈 목록이다. 다시 전달은 남은 항목이 없어 거절한다.
+     * <p>{@code items_json} 을 읽지 못하면 빈 목록이다. 다시 전달은 남은 항목이 없어 거절한다.
      */
     public List<DeliveryItemRef> itemsOf(Long deliveryId) {
         return deliveries.findById(deliveryId).map(ResultDelivery::itemsJson).map(json -> readItems(deliveryId, json))

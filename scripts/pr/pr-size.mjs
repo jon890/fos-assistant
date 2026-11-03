@@ -92,7 +92,8 @@ function splitCandidates(base, head, changes, cwd) {
   };
   const ancestor = git(["merge-base", base, head], cwd).trim();
   for (const file of [...new Set(changes.flatMap(change => change.files))].sort()) {
-    if (!/^tasks\/[^/]+\/phase-\d+\.md$/.test(file)) continue;
+    // 계획서는 최상위 tasks/ 와 기능 폴더 docs/features/<id>/tasks/ 에 있다.
+    if (!/^(?:docs\/features\/[^/]+\/)?tasks\/[^/]+\/phase-\d+\.md$/.test(file)) continue;
     // 지운 계획서도 이번 PR의 경계 근거로 쓸 수 있다.
     const exists = git(["ls-tree", "--name-only", head, "--", file], cwd).trim();
     const content = git(["show", `${exists ? head : ancestor}:${file}`], cwd);
