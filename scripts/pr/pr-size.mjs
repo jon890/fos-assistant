@@ -28,7 +28,8 @@ export function category(file) {
   return "production";
 }
 
-function parseChanges(numstat) {
+// wholeDeletedFiles 는 diff 에서 파일째 지운 경로 집합이다. 남는 파일 안의 삭제는 포함하지 않는다.
+function parseChanges(numstat, wholeDeletedFiles = new Set()) {
   const changes = [];
   const records = numstat.split("\0");
   for (let i = 0; i < records.length; i++) {
@@ -46,19 +47,26 @@ function parseChanges(numstat) {
       // 운영 코드를 다른 영역으로 옮기며 수정해도 그 변경을 상한에 넣는다.
       kind = kinds.includes("production") ? "production" : kinds.includes("tests") ? "tests" : "docs";
     }
-    changes.push({ files, changed, kind });
+    changes.push({ files, changed, kind, wholeDeleted: files.length === 1 && wholeDeletedFiles.has(files[0]) });
   }
   return changes;
 }
 
-export function countChanges(numstat) {
-  return sumChanges(parseChanges(numstat));
+export function countChanges(numstat, deleted) {
+  return sumChanges(parseChanges(numstat, deleted));
 }
+
+// 파일째 지운 운영 코드는 상한에 넣지 않는다. 시험과 문서는 어차피 상한 밖이라 그대로 둔다.
+const isExcludedDeletion = change => change.wholeDeleted && change.kind === "production";
 
 function sumChanges(changes) {
   const counts = { production: 0, tests: 0, docs: 0, ignored: 0 };
-  for (const change of changes) counts[change.kind] += change.changed;
+  for (const change of changes) if (!isExcludedDeletion(change)) counts[change.kind] += change.changed;
   return counts;
+}
+
+function sumDeleted(changes) {
+  return changes.filter(isExcludedDeletion).reduce((sum, change) => sum + change.changed, 0);
 }
 
 export function classify(production, labels = []) {
@@ -69,8 +77,21 @@ function git(args, cwd) {
   return execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
 
+function deletedFiles(base, head, cwd) {
+  const records = git(["diff", "--name-status", "-z", "--find-renames", `${base}...${head}`, "--"], cwd).split("\0");
+  const deleted = new Set();
+  for (let i = 0; i < records.length && records[i];) {
+    const status = records[i++];
+    const first = records[i++];
+    if (/^[RC]/.test(status)) i++;
+    else if (status === "D") deleted.add(first);
+  }
+  return deleted;
+}
+
 function changesBetween(base, head, cwd) {
-  return parseChanges(git(["diff", "--numstat", "-z", "--find-renames", `${base}...${head}`, "--"], cwd));
+  const numstat = git(["diff", "--numstat", "-z", "--find-renames", `${base}...${head}`, "--"], cwd);
+  return parseChanges(numstat, deletedFiles(base, head, cwd));
 }
 
 export function compare(base, head, cwd) {
@@ -124,7 +145,7 @@ export function report(base, head, cwd, labels = []) {
   const changes = changesBetween(base, head, cwd);
   const counts = sumChanges(changes);
   return { schema_version: 1, total_lines: counts.production + counts.tests + counts.docs,
-    counts, large_threshold: LARGE_THRESHOLD, max_lines: MAX_LINES,
+    counts, deleted_lines: sumDeleted(changes), large_threshold: LARGE_THRESHOLD, max_lines: MAX_LINES,
     ...classify(counts.production, labels), split_candidates: splitCandidates(base, head, changes, cwd) };
 }
 
@@ -135,13 +156,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!base) throw new Error("사용법: node scripts/pr/pr-size.mjs <base> [head] [--json]");
   const verdict = report(base, head, undefined, JSON.parse(process.env.PR_LABELS || "[]"));
   const result = verdict.counts;
-  const summary = `PR 변경: 운영 코드 ${result.production}줄, 시험 ${result.tests}줄, 문서 ${result.docs}줄 (생성 파일 제외 ${result.ignored}줄), 운영 코드 상한 ${MAX_LINES}줄, ${verdict.pass ? "통과" : "실패"}`;
+  const summary = `PR 변경: 운영 코드 ${result.production}줄, 시험 ${result.tests}줄, 문서 ${result.docs}줄 (생성 파일 제외 ${result.ignored}줄), 운영 코드 상한 ${MAX_LINES}줄, 파일째 삭제 ${verdict.deleted_lines}줄(상한 제외), ${verdict.pass ? "통과" : "실패"}`;
   const candidates = verdict.split_candidates.map(candidate =>
     `- ${candidate.kind}: ${candidate.name} (운영 코드 ${candidate.counts.production}줄, 파일 ${candidate.files.length}개)`);
   const detail = [summary, ...(verdict.large || verdict.split_candidates.some(candidate => candidate.kind === "move")
     ? ["나눌 경계 후보 (묶음끼리 겹칠 수 있음):", ...candidates] : [])].join("\n");
   console.log(json ? JSON.stringify(verdict) : detail);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `large=${verdict.large}\nproduction=${result.production}\ntests=${result.tests}\ndocs=${result.docs}\n`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `large=${verdict.large}\nproduction=${result.production}\ntests=${result.tests}\ndocs=${result.docs}\ndeleted=${verdict.deleted_lines}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${detail}\n`);
   if (!verdict.pass) {
     console.error(`::error::PR 운영 코드 변경이 ${MAX_LINES}줄을 넘었습니다. 단계별 PR로 나누세요. 규모:예외 라벨은 사람이나 코디네이터만 붙입니다.`);
