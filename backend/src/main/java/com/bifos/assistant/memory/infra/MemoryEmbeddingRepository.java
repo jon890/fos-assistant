@@ -62,13 +62,13 @@ public interface MemoryEmbeddingRepository {
      * 벡터가 있는 그 사용자의 개인 항목 번호다. 기억 사이의 연결을 찾을 때 같은 주인의 항목끼리만 비교한다. 벡터는 모델과 지문을 맞춰 보는
      * {@code MemoryVectorCache} 로 읽는다.
      */
-    @Query(value = "select id from memory where embedding_model is not null and scope = 'USER' and owner_user_id = :ownerUserId",
+    @Query(value = "select id from memory where" + HAS_VECTOR + " and scope = 'USER' and owner_user_id = :ownerUserId",
         nativeQuery = true)
     List<Long> findMemoryIdsOfOwner(@Param("ownerUserId") Long ownerUserId);
 
 
     /** 벡터가 있는 그 그룹의 그룹 항목 번호다. */
-    @Query(value = "select id from memory where embedding_model is not null and scope = 'GROUP' and group_id = :groupId",
+    @Query(value = "select id from memory where" + HAS_VECTOR + " and scope = 'GROUP' and group_id = :groupId",
         nativeQuery = true)
     List<Long> findMemoryIdsOfGroup(@Param("groupId") Long groupId);
 
@@ -100,10 +100,10 @@ public interface MemoryEmbeddingRepository {
         @Param("vector") byte[] vector);
 
 
-    /** 그 항목들의 벡터를 비운다. 비운 줄 수를 돌려준다. */
+    /** 그 항목들의 세 벡터 칸을 모두 비운다. 한 칸만 남은 줄도 함께 비운다. 비운 줄 수를 돌려준다. */
     @Modifying
     @Query(value = "update memory set embedding_model = null, embedding_fingerprint = null, embedding_vector = null"
-        + " where id in (:ids) and embedding_model is not null", nativeQuery = true)
+        + " where id in (:ids)", nativeQuery = true)
     int clearVectors(@Param("ids") Collection<Long> ids);
 
 
