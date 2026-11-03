@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, touchesGuide, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -66,6 +66,7 @@ test("job 이 부르는 스크립트는 그 job 을 돌린다", () => {
   assert.deepEqual(jobsFor("scripts/ci/check-connector-package.sh"), ["hermes"]);
   assert.deepEqual(jobsFor("scripts/checks/quality.sh"), ["quality"]);
   assert.deepEqual(jobsFor("scripts/ci/browser-ci.mjs"), ["browser"]);
+  assert.deepEqual(jobsFor("scripts/ci/e2e-ci.mjs"), ["e2e"]);
   assert.deepEqual(jobsFor("scripts/checks/new-check.sh"), JOBS);
 });
 
@@ -202,11 +203,11 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     mkdirSync(join(dir, dirName), { recursive: true });
     writeFileSync(join(dir, controller), "synthetic\n");
     commit("controller added");
-    const scenario = (name: string, change: () => void) => {
-      git("checkout", "-b", `${name}-pr`, "ctrl-base");
+    const scenario = (name: string, change: () => void, base = "ctrl-base") => {
+      git("checkout", "-b", `${name}-pr`, base);
       change();
       commit(name);
-      git("checkout", "-b", `${name}-merge`, "ctrl-base");
+      git("checkout", "-b", `${name}-merge`, base);
       writeFileSync(join(dir, `${name}.txt`), "synthetic\n");
       commit(`${name} base advances`);
       git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "merge", "--no-ff", `${name}-pr`, "-m", `merge ${name}`);
@@ -222,6 +223,21 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     const edited = scenario("edit", () => writeFileSync(join(dir, controller), "edited\n"));
     assert.equal(edited.browser, "false");
     assert.equal(edited.e2e, "false");
+
+    // 모델 지시문을 만드는 파일은 수정만 해도 라벨 없이 E2E 를 돌린다. 브라우저는 읽지 않으므로 건너뛴다.
+    const assembler = "backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java";
+    const fixtures = "test/e2e/fake-hermes/scenario-fixtures.ts";
+    git("checkout", "-b", "guide-base", "main");
+    for (const file of [assembler, fixtures]) {
+      mkdirSync(join(dir, file, ".."), { recursive: true });
+      writeFileSync(join(dir, file), "synthetic\n");
+    }
+    commit("guide files added");
+    for (const file of [assembler, fixtures]) {
+      const guide = scenario(`guide-${file.split("/").at(-1)}`, () => writeFileSync(join(dir, file), "edited\n"), "guide-base");
+      assert.equal(guide.e2e, "true", file);
+      assert.equal(guide.browser, "false", file);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -239,6 +255,31 @@ test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 
   assert.deepEqual(withoutSlow(judged, true), judged);
   // 원래 판정 결과는 바꾸지 않는다.
   assert.equal(judged.browser.run, true);
+});
+
+test("모델 지시문을 만드는 파일을 바꾸면 E2E 만 라벨 없이 돌린다", () => {
+  const guide = [
+    "backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
+    "test/e2e/fake-hermes/scenario-fixtures.ts",
+  ];
+  for (const file of guide) {
+    assert.equal(touchesGuide([file]), true, file);
+    assert.equal(touchesGuide(["docs/prd.md", file]), true, file);
+    const kept = withoutSlow(classify([file]), false, ["e2e"]);
+    assert.equal(kept.e2e.run, true, file);
+    assert.equal(kept.browser.run, false, file);
+    assert.match(kept.browser.because ?? "", new RegExp(FULL_LABEL), file);
+  }
+  // 같은 폴더의 다른 파일과 이름이 비슷한 테스트는 지침 파일이 아니다.
+  for (const file of [
+    "backend/src/main/java/com/bifos/assistant/context/application/ContextSelection.java",
+    "backend/src/test/java/com/bifos/assistant/context/application/ContextAssemblerTest.java",
+    "test/e2e/fake-hermes/other.ts", "docs/features/memory.md",
+  ]) assert.equal(touchesGuide([file]), false, file);
+  assert.equal(touchesGuide([]), false);
+  // keep 에 없는 느린 job 은 그대로 건너뛰고, 판정에서 돌지 않는 job 은 keep 에 들어도 돌지 않는다.
+  assert.equal(withoutSlow(classify(["web/src/app.tsx"]), false, ["e2e"]).browser.run, false);
+  assert.equal(withoutSlow(classify(["docs/prd.md"]), false, ["e2e"]).e2e.run, false);
 });
 
 test("API 컨트롤러와 웹 경로 파일을 지우면 경로 삭제로 본다", () => {
@@ -416,9 +457,9 @@ test("통합 뒤에도 필수 검사 이름 9개를 한 번씩 유지하고, 전
   for (const name of ["backend", "web", "e2e", "unit", "hermes", "quality", "public-safe", "browser-mobile", "browser-desktop"]) {
     assert.equal(names.filter((candidate) => candidate === name).length, 1, name);
   }
-  // browser-failures는 성공한 PR에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
+  // browser-failures 와 e2e-failures 는 성공한 PR 에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
   // hermes-tests 를 hermes-connectors 와 hermes-python 으로 나누어 전에는 19개였다.
-  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 20);
+  assert.equal(jobs.size - 2 + (2 - 1) + (6 - 1) + (2 - 1), 20);
 });
 
 test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다", () => {
@@ -441,4 +482,25 @@ test("main push 는 가벼운 검사만 돌고 전체 검사는 정기 실행과
   assert.doesNotMatch(failures, /github\.event_name == 'push'/);
   assert.match(failures, /github\.event_name == 'schedule'/);
   assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
+});
+
+test("정기와 수동 실행의 main E2E 실패만 이슈로 모으고, 실패한 시나리오 이름을 올린다", () => {
+  const jobs = workflowJobs();
+  const failures = jobs.get("e2e-failures") ?? assert.fail("e2e-failures job 이 없다");
+  // push 에서는 e2e 를 돌리지 않고, 취소된 실행은 테스트 실패가 아니다.
+  assert.doesNotMatch(failures, /github\.event_name == 'push'/);
+  assert.doesNotMatch(failures, /github\.event_name == 'pull_request'/);
+  assert.match(failures, /github\.event_name == 'schedule'/);
+  assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(failures, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(failures, /needs: e2e-tests\n/);
+  assert.match(failures, /needs\.e2e-tests\.result == 'failure'/);
+  assert.match(failures, /issues: write/);
+  assert.match(failures, /run: node scripts\/ci\/e2e-ci\.mjs issues "\$RUNNER_TEMP\/e2e-failure"/);
+  assert.match(failures, /pattern: e2e-failure-attempt-\$\{\{ github\.run_attempt \}\}/);
+  // e2e-tests 는 종료 코드를 잃지 않고 출력을 남기며, 실패한 줄 하나만 올린다.
+  const tests = jobs.get("e2e-tests") ?? assert.fail("e2e-tests job 이 없다");
+  assert.match(tests, /set -o pipefail\n\s+node test\/e2e\/run\.ts 2>&1 \| tee "\$RUNNER_TEMP\/e2e\.log"/);
+  assert.match(tests, /grep -m1 '\^실패: ' "\$RUNNER_TEMP\/e2e\.log"/);
+  assert.match(tests, /name: e2e-failure-attempt-\$\{\{ github\.run_attempt \}\}/);
 });
