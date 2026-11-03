@@ -723,7 +723,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 - `memory_id` 는 지운 항목의 판도 남으므로 `memory` 에 없는 번호일 수 있다. 그래서 외래 키를 걸지 않는다
 - `scope`, `owner_user_id`, `group_id`, `entry_type`, `document_key`, `status` 는 그때의 값이다. 지운 뒤에도 누가 볼 수 있는지 이 칸으로 정하고, 지운 문서의 판을 이름으로 찾는다
-- `title` 과 `content`, `data_key_id` 의 뜻은 `memory` 와 같다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다. 옛 `sensitivity` 와 `content_key_id` 칸은 `V20261103054418` 이 지웠다
+- `title` 과 `content`, `data_key_id` 의 뜻은 `memory` 와 같다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다. 옛 `sensitivity` 컬럼과 `content_key_id` 컬럼은 `V20261103054418` 이 지웠다
 - 출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다
 - 고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다
 
@@ -733,12 +733,12 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
 에이전트를 처음 저장할 때 `core` 한 줄을 넣는다.
 그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 뺀다. `created_at` 은 그 collection 을 붙인 시각이다.
-옛 `allow_sensitive` 칸은 `V20261103054419` 가 지웠다. 에이전트가 받을 기억은 이 표의 collection 줄만으로 나뉜다.
+옛 `allow_sensitive` 컬럼은 `V20261103054419` 가 지웠다. 에이전트가 받을 기억은 이 표의 collection 줄만으로 나뉜다.
 
 ### agent_memory_collection_change
 
 `agent_memory_collection` 의 줄 하나가 바뀐 것이 한 줄이다. 에이전트 행이 있는 동안 지우지 않고, 지운 에이전트를 정리할 때 함께 지운다([ADR-20261008 / agent-memory-grants-admin](../../docs/adr/ADR-20261008-agent-memory-grants-admin.md)).
-`change_type` 은 `GRANTED` 나 `REVOKED` 다. `SENSITIVE_CHANGED` 는 없어진 민감 허용을 바꾼 옛 기록이라 새로 남기지 않고 화면의 최근 변경에도 내지 않는다. 옛 `allow_sensitive` 칸은 `V20261103054420` 이 지웠고, 옛 `SENSITIVE_CHANGED` 줄은 종류만 남는다. `changed_by_user_id` 에는 외래 키를 걸지 않는다.
+`change_type` 은 `GRANTED` 나 `REVOKED` 다. `SENSITIVE_CHANGED` 는 없어진 민감 허용을 바꾼 옛 기록이라 새로 남기지 않고 화면의 최근 변경에도 내지 않는다. 옛 `allow_sensitive` 컬럼은 `V20261103054420` 이 지웠고, 옛 `SENSITIVE_CHANGED` 줄은 종류만 남는다. `changed_by_user_id` 에는 외래 키를 걸지 않는다.
 한 번의 저장이 여러 collection 을 바꾸면 줄도 여럿이고 `changed_at` 이 같다.
 사람이 바꾼 것만 남긴다. 바뀌지 않은 collection, 마이그레이션이 넣은 `core`, 새 에이전트에 넣는 `core` 는 남기지 않는다.
 
