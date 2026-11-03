@@ -6,7 +6,6 @@ import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.AgentToolsetRequestRepository;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentUserPurge {
 
     private final AgentRepository agents;
-    private final AgentToolsetRequestRepository toolsetRequests;
     private final AgentLifecycleService lifecycle;
     private final AgentConnectorDetacher connectorDetacher;
     private final ProfileProvisioning provisioner;
@@ -80,13 +78,6 @@ public class AgentUserPurge {
             agents.save(agent);
         }
         return owned.size();
-    }
-
-
-    /** 그 사용자가 낸 도구 요청은 지우고, 남의 요청을 처리한 기록은 줄을 남기고 처리한 사람만 비운다. */
-    public void releaseToolsetRequests(Long userId) {
-        toolsetRequests.deleteAllRequestedBy(userId);
-        toolsetRequests.clearDecidedBy(userId);
     }
 
 
