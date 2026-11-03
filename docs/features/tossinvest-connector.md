@@ -88,9 +88,9 @@ Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 만들어 `<untrusted_to
 | 거절 | 답 |
 | --- | --- |
 | 같은 주문의 카드가 이 대화에서 승인을 기다린다(`CONFLICT_PENDING`) | `INTENT_PENDING_MESSAGE`. `[승인 대기]` 로 시작하고 새 카드는 만들지 않았다고 말한다 |
-| 같은 주문의 카드가 다른 대화에서 승인을 기다린다(`CONFLICT_PENDING_ELSEWHERE`). 대화 없는 실행이 만든 줄은 카드가 없어 `CONFLICT_PENDING_UNSEEN` 으로 아래 「그 밖의 검사」 답을 준다 | `INTENT_PENDING_ELSEWHERE_MESSAGE`. 이 대화에는 카드가 없어 표시를 붙이지 않고, 알림에서 그 카드를 찾으라고 말한다 |
-| 같은 주문이 실행 중이거나 결과를 모른다(`CONFLICT`). 같은 의도를 조회하다 실패하면 `CONFLICT_CHECK` 로 아래 답을 준다 | `INTENT_BUSY_MESSAGE`. 다시 부르지 말고 주문 내역을 확인하라고 말한다 |
-| 그 밖의 검사 | `FINANCIAL_UNAVAILABLE_MESSAGE`. 승인 카드를 만들지 않았고, 사용자가 다시 요청하면 다시 불러도 된다고만 말한다 |
+| 같은 주문의 카드가 다른 대화에서 승인을 기다린다(`CONFLICT_PENDING_ELSEWHERE`) | `INTENT_PENDING_ELSEWHERE_MESSAGE`. 이 대화에는 카드가 없어 표시를 붙이지 않고, 알림에서 그 카드를 찾으라고 말한다 |
+| 같은 주문이 실행 중이거나 결과를 모른다(`CONFLICT`) | `INTENT_BUSY_MESSAGE`. 다시 부르지 말고 주문 내역을 확인하라고 말한다 |
+| 그 밖의 검사. 같은 의도 조회 실패(`CONFLICT_CHECK`)와 대화 없는 실행이 만들어 카드가 없는 승인 대기(`CONFLICT_PENDING_UNSEEN`)도 여기다 | `FINANCIAL_UNAVAILABLE_MESSAGE`. 승인 카드를 만들지 않았고, 사용자가 다시 요청하면 다시 불러도 된다고만 말한다 |
 
 승인 기한이 지난 `PENDING` 은 만료 작업이 돌기 전에도 같은 의도를 막지 않는다(`ConnectorFinancialConflicts.blocking`). 그 줄은 승인할 때 기한 검사에 걸려 실행되지 못한다.
 옛 답은 어느 거절에나 「같은 주문의 승인 요청이 이미 있을 수 있다. 다시 부르지 말라」 고 했다. 그 글이 대화 기록에 남아, 원인이 고쳐진 뒤 같은 취소를 다시 요청해도 모델이 준비를 부르지 않았다(2026-11-02 운영).
