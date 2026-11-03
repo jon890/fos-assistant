@@ -3,7 +3,7 @@ package com.bifos.assistant.memory.application;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
-import com.bifos.assistant.memory.domain.StoredContent;
+import com.bifos.assistant.memory.domain.SealedMemoryText;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
@@ -16,10 +16,15 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 잠가 읽은 기억의 판 저장과 민감 본문의 암호화, 지울 때 딸린 줄의 정리를 맡는다. 트랜잭션은 호출한 서비스가 정한다. */
+/**
+ * 잠가 읽은 기억의 revision 저장과 제목, 본문의 암호화, 지울 때 딸린 줄의 정리를 맡는다. 트랜잭션은 호출한 서비스가 정한다.
+ *
+ * <p>암호화는 {@link MemoryTexts} 가 한다(ADR-20261103 / memory-encryption).
+ */
 @Component
 @RequiredArgsConstructor
 class MemoryRevisionWriter {
@@ -29,24 +34,25 @@ class MemoryRevisionWriter {
     private final MemoryEmbeddingRepository embeddings;
     private final MemoryLinkRepository links;
     private final MemoryVectorCache vectorCache;
-    private final MemoryContentCipher cipher;
+    private final MemoryTexts texts;
     private final Clock clock;
 
 
     Memory revise(
         CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
         requirePlaceable(retrieval, sensitivity);
-        // 판을 남기기 전에 암호화한다. key 가 없으면 여기서 거절돼 판도 본문도 바뀌지 않는다
-        StoredContent body = stored(content, sensitivity, memory.contentBinding());
+        if (!memory.readable()) {
+            // 풀지 못한 줄은 제목도 모른다. 덮어쓰면 제목을 잃는다
+            throw new ApiException(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE, "an unreadable memory cannot be revised");
+        }
+        // revision 을 남기기 전에 암호화한다. key 를 풀지 못하면 여기서 거절돼 revision 도 본문도 바뀌지 않는다
+        Optional<SealedMemoryText> sealed = texts.seal(memory.stored(), memory.title(), content);
         // 제안 중복 키는 본문의 해시라, 민감 본문이면 지문이 평문 칸에 남는다. 민감 항목은 키를 비운다
         String dedupKey = memory.proposalDedupKey() == null || sensitivity == MemorySensitivity.SENSITIVE
             ? null
             : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
-        revisions.save(MemoryRevision.of(memory, MemoryChangeType.UPDATED, user.id(), null, clock.instant()));
-        if (sensitivity == MemorySensitivity.SENSITIVE) {
-            sealPlainRevisions(memory.id());
-        }
-        memory.revise(body, retrieval, sensitivity, dedupKey, clock.instant());
+        saveRevision(memory, MemoryChangeType.UPDATED, user);
+        memory.revise(content, sealed.orElse(null), retrieval, sensitivity, dedupKey, clock.instant());
         return memories.save(memory);
     }
 
@@ -55,7 +61,7 @@ class MemoryRevisionWriter {
      * 지우기 전에 마지막 값을 버전으로 남기고 그 항목의 벡터와 연결을 지운다. 둘 다 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다.
      */
     void beforeDelete(CurrentUser user, Memory memory) {
-        revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
+        saveRevision(memory, MemoryChangeType.DELETED, user);
         embeddings.deleteByMemoryId(memory.id());
         links.deleteByMemoryId(memory.id());
         vectorCache.evict(memory.id());
@@ -63,23 +69,15 @@ class MemoryRevisionWriter {
 
 
     /**
-     * 한 항목의 평문 판을 모두 암호화한다. 판의 민감도와 번호와 시각은 그대로이고 저장 모양만 바뀐다(ADR-055).
-     *
-     * <p>평문 판은 두 경우에 생긴다. 일반 항목을 민감으로 바꿀 때와, 민감 항목을 일반으로 바꿨다가 다시 민감으로 바꿀
-     * 때다. 방금 남긴 판도 평문이면 여기서 함께 암호화한다. 이미 민감 항목이었으면 평문 판이 없어 아무것도 하지 않는다.
+     * 지금 값을 revision 으로 남긴다. 지금 줄이 데이터 key 의 암호문이면 같은 AAD 라 그대로 옮긴다. 아직 이관하지 않은 줄이면 revision 은
+     * 주인 데이터 key 로 암호화해 남긴다.
      */
-    private void sealPlainRevisions(Long memoryId) {
-        // 방금 남긴 판이 조회에 들어오게 먼저 내보낸다. 조회한 줄은 이미 있는 줄이라 저장이 새 줄을 넣지 않는다
-        revisions.flush();
-        for (MemoryRevision row : revisions.findByIdMemoryIdAndContentKeyIdIsNull(memoryId)) {
-            row.sealInPlace(cipher.seal(row.content(), row.contentBinding()));
-            revisions.save(row);
+    private void saveRevision(Memory memory, MemoryChangeType changeType, CurrentUser user) {
+        MemoryRevision revision = MemoryRevision.of(memory, changeType, user.id(), null, clock.instant());
+        if (memory.dataKeyId() == null && memory.readable()) {
+            texts.seal(revision.stored(), memory.title(), memory.content()).ifPresent(revision::seal);
         }
-    }
-
-
-    StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
-        return sensitivity == MemorySensitivity.SENSITIVE ? cipher.seal(plain, binding) : StoredContent.plain(plain);
+        revisions.save(revision);
     }
 
 

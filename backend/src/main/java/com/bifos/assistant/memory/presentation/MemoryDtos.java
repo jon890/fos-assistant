@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 public final class MemoryDtos {
     public record CreateMemoryRequest(
         MemoryScope scope,
-        @NotBlank String title,
+        @NotBlank @Size(max = 200) String title,
         @NotBlank String content,
         Boolean alwaysInject) {
     }
@@ -40,6 +40,9 @@ public final class MemoryDtos {
      *
      * <p>{@code supersededBy} 는 효력 있는 대체 연결이 이 항목을 가리킬 때 그 연결과 대신한 항목이다(ADR-20261015 / memory-link). 목록을
      * 조회할 때만 채운다. 대체된 항목은 에이전트에게 실리지 않지만 이 목록에는 남아 되돌릴 수 있다.
+     *
+     * <p>{@code unreadable} 이 참이면 그 줄을 풀지 못했다. 제목은 「읽지 못함」, 본문은 빈 글이고 화면은 고치기를 막는다
+     * (ADR-20261103 / memory-encryption).
      */
     public record MemoryView(
         Long id,
@@ -60,7 +63,8 @@ public final class MemoryDtos {
         String sourceAgentName,
         boolean sourceAgentDeleted,
         SupersededByView supersededBy,
-        boolean archivable) {
+        boolean archivable,
+        boolean unreadable) {
         static MemoryView from(Memory memory) {
             return from(memory, false, null, null);
         }
@@ -75,7 +79,7 @@ public final class MemoryDtos {
                 memory.ownerUserId(),
                 memory.groupId(),
                 memory.title(),
-                sensitive || memory.sealed() ? "" : memory.content(),
+                sensitive || !memory.readable() ? "" : memory.content(),
                 memory.alwaysInject(),
                 memory.status().name(),
                 memory.proposedByExecutionId(),
@@ -88,7 +92,8 @@ public final class MemoryDtos {
                 source == null ? null : source.agentName(),
                 source != null && source.agentDeleted(),
                 supersededBy,
-                memory.archivable());
+                memory.archivable(),
+                !memory.readable());
         }
     }
 

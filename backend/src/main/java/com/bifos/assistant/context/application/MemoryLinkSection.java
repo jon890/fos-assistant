@@ -141,6 +141,6 @@ final class MemoryLinkSection {
 
 
     private static boolean plain(Memory memory) {
-        return memory.sensitivity() == MemorySensitivity.NORMAL && !memory.sealed();
+        return memory.sensitivity() == MemorySensitivity.NORMAL && memory.readable();
     }
 }

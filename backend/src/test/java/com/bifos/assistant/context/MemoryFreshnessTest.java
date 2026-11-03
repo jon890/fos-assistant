@@ -166,7 +166,7 @@ class MemoryFreshnessTest {
         when(memory.sensitivity()).thenReturn(MemorySensitivity.NORMAL);
         when(memory.collection()).thenReturn(Memory.DEFAULT_COLLECTION);
         when(memory.content()).thenReturn("본문");
-        when(memory.sealed()).thenReturn(false);
+        when(memory.readable()).thenReturn(true);
         when(mockedMemories.alwaysInjectedFor(any(), any())).thenReturn(List.of(memory));
         when(mockedMemories.indexedFor(any(), any())).thenReturn(List.of());
         ContextAssembler mockedAssembler = TestContextAssemblers.of(

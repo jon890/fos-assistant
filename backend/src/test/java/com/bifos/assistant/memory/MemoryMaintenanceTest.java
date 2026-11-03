@@ -213,6 +213,10 @@ class MemoryMaintenanceTest {
         assertThat(mine.get(0).title()).isEqualTo("정비 테스트 확인");
         assertThat(mine.get(0).archivable()).isFalse();
         assertThat(maintenance.candidatesFor(kid)).isEmpty();
+        assertThat(maintenance.candidatesFor(mom))
+            .as("같은 그룹의 관리자도 남의 개인 기억 후보와 그 제목을 보지 않는다")
+            .extracting(MaintenanceCandidate::title)
+            .doesNotContain("정비 테스트 확인");
         Long candidateId = mine.get(0).id();
 
         assertNotFound(() -> maintenance.review(kid, candidateId, MaintenanceReview.CORRECT));

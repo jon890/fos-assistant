@@ -10,6 +10,7 @@ import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryJudgeHarness.JudgeInput;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
@@ -55,6 +56,9 @@ class MemoryJudgeEvalTest {
     MemoryRepository memories;
 
     @Autowired
+    MemoryTextMigration migration;
+
+    @Autowired
     AgentRepository agents;
 
     @Autowired
@@ -83,7 +87,7 @@ class MemoryJudgeEvalTest {
         Optional<MemoryJudgeSettings> settings = MemoryJudgeSettings.fromEnv(System.getenv());
         Assumptions.assumeTrue(settings.isPresent(), MemoryJudgeSettings.BASE_URL + " 가 없어 답 판정을 건너뛴다");
         clock.set(BASE);
-        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
+        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock, migration);
         Map<String, Long> agentIds = fixture.createAgents();
         ContextAssembler assembler = TestContextAssemblers.of(memoryService, properties, clock);
         String withoutMemory = assembler.withResponseInstructions(AssembledContext.empty()).instructions();

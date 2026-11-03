@@ -234,7 +234,8 @@ class MemoryUseServiceTest {
         Memory proposal = memories.findById(reverted.id()).orElseThrow();
         proposal.restoreProposal(Instant.now());
         memories.save(proposal);
-        jdbc.update("UPDATE memory SET title = ? WHERE id = ?", "새 제목", renamed.id());
+        // 제목은 암호문이라 SQL 로 고치려면 평문 줄로 바꿔 넣는다
+        jdbc.update("UPDATE memory SET title = ?, content = ?, data_key_id = NULL WHERE id = ?", "새 제목", "본문", renamed.id());
 
         assertThat(service.usesOf(dad, conversation.id()))
             .extracting(MemoryUse::memoryId, MemoryUse::title)

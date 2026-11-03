@@ -98,7 +98,7 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("일반 항목만 줄이 생기고 민감 암호화 제안 보관 출처 원문 항목은 생기지 않는다")
+    @DisplayName("풀린 일반 항목만 줄이 생기고 민감, 풀지 못한, 제안, 보관, 출처 원문 항목은 생기지 않는다")
     void embedsOnlyPlainSearchableItems() {
         Memory plain = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
         Memory group = memories.create(USER, MemoryScope.GROUP, "보일러", "10월에 점검한다", false);
@@ -108,8 +108,8 @@ class MemoryEmbeddingRefresherTest {
         memories.proposeUser(USER, "제안", "아직 받아들이지 않은 메모", null);
         Memory source = memories.create(USER, MemoryScope.USER, "출처", "원문", false);
         jdbc.update("UPDATE memory SET entry_type = 'SOURCE' WHERE id = ?", source.id());
-        Memory sealed = memories.create(USER, MemoryScope.USER, "봉인", "본문", false);
-        jdbc.update("UPDATE memory SET content_key_id = 'test-1' WHERE id = ?", sealed.id());
+        Memory unreadable = memories.create(USER, MemoryScope.USER, "봉인", "본문", false);
+        jdbc.update("UPDATE memory SET content = title WHERE id = ?", unreadable.id());
 
         int written = refresher(ENABLED).refreshOnce();
 

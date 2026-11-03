@@ -135,13 +135,13 @@ public class MemorySearchSection {
     }
 
 
-    /** 본문을 풀지 않는다. 일반 항목만 본문을 점수에 넘긴다. */
+    /** 일반 항목이고 풀린 줄만 본문을 점수에 넘긴다. */
     private static RelevanceCandidate candidateOf(Memory memory) {
         return new RelevanceCandidate(memory.id(), memory.title(), plain(memory) ? memory.content() : null);
     }
 
 
     private static boolean plain(Memory memory) {
-        return memory.sensitivity() == MemorySensitivity.NORMAL && !memory.sealed();
+        return memory.sensitivity() == MemorySensitivity.NORMAL && memory.readable();
     }
 }

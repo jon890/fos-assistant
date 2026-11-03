@@ -4,7 +4,6 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollectionCount;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
@@ -43,9 +42,9 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
         MemoryScope scope, Long ownerUserId, String collection, String documentKey);
 
 
-    /** 암호화되지 않은 채 남은 줄의 번호를 찾는다. 잠그지 않고 읽으므로 쓰기 전에 잠가 다시 읽는다(ADR-055). */
-    @Query("select m.id from Memory m where m.sensitivity = :sensitivity and m.contentKeyId is null")
-    List<Long> findIdsBySensitivityAndContentKeyIdIsNull(@Param("sensitivity") MemorySensitivity sensitivity);
+    /** 데이터 key 로 옮기지 않은 줄의 번호를 찾는다. 잠그지 않고 읽으므로 쓰기 전에 잠가 다시 읽는다(ADR-20261103 / memory-encryption). */
+    @Query("select m.id from Memory m where m.dataKeyId is null order by m.id")
+    List<Long> findIdsWithoutDataKey();
 
 
     /**

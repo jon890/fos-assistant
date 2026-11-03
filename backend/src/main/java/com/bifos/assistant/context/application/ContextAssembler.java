@@ -270,7 +270,7 @@ public class ContextAssembler implements OmittedMemories {
         return memory.scope() == MemoryScope.USER
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.sensitivity() == MemorySensitivity.NORMAL
-            && !memory.sealed()
+            && memory.readable()
             && memory.content().length() <= properties.factsItemMaxChars();
     }
 
@@ -355,13 +355,11 @@ public class ContextAssembler implements OmittedMemories {
 
 
     /**
-     * 본문을 풀지 않는다. 암호문인 줄은 싣지 않는다(ADR-055).
-     *
-     * <p>민감 항목은 항상 층에 오지 못하므로 여기 암호문이 있으면 데이터가 어긋난 것이다. 번호만 경고로 남긴다.
+     * 풀지 못한 줄은 싣지 않는다(ADR-20261103 / memory-encryption). 번호만 경고로 남긴다.
      */
     private static boolean plainOrSkipped(Memory memory) {
-        if (memory.sealed()) {
-            log.warn("memory context skipped a sealed always item memoryId={}", memory.id());
+        if (!memory.readable()) {
+            log.warn("memory context skipped an unreadable always item memoryId={}", memory.id());
             return false;
         }
         return true;
