@@ -243,3 +243,13 @@ runner 를 하나 더 쓰지만 공개 저장소라 비용이 없고 동시 job 
 - 측정(PR 682 의 CI): `hermes-connectors` 264초, `hermes-python` 257초, 판정 7초. job 하나가 가장 오래 걸리던 시간이 중앙값 516초에서 264초로 줄었다.
 - 감수할 것: 전체 검사 job 이 19개에서 20개가 된다. 동시 job 한도를 채우는 PR 이 겹치면 대기가 늘 수 있다.
 - 되돌릴 때는 두 job 을 합치고 판정 job 의 `needs` 와 `JOB_RESULT` 를 하나로 되돌린다. `ci-paths.test.ts` 의 `GATED` 를 함께 고친다.
+
+### 두 job 안의 검사를 병렬로 돌린다 (2026-11-03)
+
+job 을 나눈 뒤에도 두 job 은 PR CI 6건에서 `hermes-connectors` 244~269초(중앙값 253초), `hermes-python` 209~317초(중앙값 268초)였다.
+둘 다 CPU 가 아니라 자식 프로세스와 속도 제한 대기를 기다리는 시간이 대부분이라 job 을 더 나누지 않고 job 안에서 줄였다.
+
+- `hermes-python`: `scripts/checks/run-hermes-python-tests.py` 가 테스트 모듈마다 프로세스를 나눠 4개씩 동시에 돈다. unittest 단계가 약 205초에서 83초가 됐다. 모듈마다 별도 프로세스라 한 모듈이 다른 모듈이 남긴 `sys.path` 에 기대면 드러난다(`test_image_supervisor.py` 에서 하나 고쳤다).
+- `hermes-connectors`: `check-connectors.sh` 가 커넥터마다 타입 검사, 테스트, 묶음 검사를 동시에 돈다. 가장 느린 tossinvest 는 테스트의 속도 제한 대기를 `clock` 이음매로 건너뛰어 테스트 시간이 128초에서 45초(로컬 측정)가 됐다. 운영 코드의 대기 값은 그대로다.
+- 측정(PR 686 의 CI): `hermes-connectors` 112초, `hermes-python` 140초(unittest 83초, 계약 검사 38초).
+- 하지 않은 것: `ArchitectureRulesTest` 전체가 5초 안쪽이라 fixture 컴파일 묶기는 효과가 없다. naver-blog 의 느린 테스트는 대기가 아니라 실제 Chrome 시작이라 대기 주입 대상이 아니다.
