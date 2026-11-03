@@ -60,7 +60,6 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
                 userId,
                 userId);
             jdbc.update("DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)", userId);
-            jdbc.update("DELETE FROM memory_embedding WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)", userId);
             jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", userId);
         }
         createdAgents.forEach(agentId -> jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId));

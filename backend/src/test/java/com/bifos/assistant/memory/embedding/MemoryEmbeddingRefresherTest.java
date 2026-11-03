@@ -12,7 +12,6 @@ import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.application.port.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
@@ -129,25 +128,17 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("벡터는 항목 줄의 칸에 쓰고 항목의 변경 시각과 판은 그대로이며 옛 벡터 테이블의 줄은 읽지 않는다")
+    @DisplayName("벡터는 항목 줄의 칸에 쓰고 항목의 변경 시각과 버전은 그대로다")
     void writesVectorIntoMemoryRowWithoutTouchingAuditColumns() {
         Memory plain = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
         String before = jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id());
-        // 직전 이미지가 옛 테이블에 남긴 지금 글과 모델의 줄이다. 새 코드가 이 줄을 읽었다면 이미 채워진 것으로 보고 다시 계산하지 않는다
-        jdbc.update("INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)"
-            + " VALUES (?, 'test-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-            plain.id(), EmbeddingText.plainFingerprint("test-model", "타이어\n작년 11월에 갈았다"), new byte[4]);
 
-        try {
-            assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);
+        assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);
 
-            assertThat(MemoryEmbeddingRows.find(jdbc, plain.id()).orElseThrow().vector())
-                .containsExactly(client.vectorOf("타이어\n작년 11월에 갈았다"));
-            assertThat(jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id()))
-                .isEqualTo(before);
-        } finally {
-            jdbc.update("DELETE FROM memory_embedding");
-        }
+        assertThat(MemoryEmbeddingRows.find(jdbc, plain.id()).orElseThrow().vector())
+            .containsExactly(client.vectorOf("타이어\n작년 11월에 갈았다"));
+        assertThat(jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id()))
+            .isEqualTo(before);
     }
 
 

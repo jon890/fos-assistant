@@ -32,7 +32,7 @@ public class PersonPurgePreview {
     }
 
 
-    /** 그 사용자의 개인 기억 번호를 고르는 부분 질의다. 임베딩과 링크는 사용자 칸이 없어 이것으로 찾는다. */
+    /** 그 사용자의 개인 기억 번호를 고르는 부분 질의다. 링크는 사용자 칸이 없어 이것으로 찾는다. */
     private static final String USER_MEMORY_IDS = "(select id from memory where owner_user_id = :userId and scope = 'USER')";
 
     private static final List<Target> TARGETS = List.of(
@@ -40,7 +40,6 @@ public class PersonPurgePreview {
         new Target("chat_attachment", "uploaded_by_user_id = :userId", Action.DELETE),
         new Target("chat_artifact", "vault_user_id = :userId", Action.DELETE),
         new Target("memory", "owner_user_id = :userId and scope = 'USER'", Action.DELETE),
-        new Target("memory_embedding", "memory_id in " + USER_MEMORY_IDS, Action.DELETE),
         new Target("memory_link", "from_memory_id in " + USER_MEMORY_IDS + " or to_memory_id in " + USER_MEMORY_IDS,
             Action.DELETE),
         new Target("memory_revision", "owner_user_id = :userId", Action.DELETE),
@@ -49,9 +48,6 @@ public class PersonPurgePreview {
         new Target("task_run", "owner_user_id = :userId", Action.DELETE),
         new Target("notification", "user_id = :userId", Action.DELETE),
         new Target("connector_connection", "user_id = :userId", Action.DELETE),
-        // 코드가 읽고 쓰지 않는 옛 허락 테이블이다. 옛 테이블을 지우는 PR 이 이 두 줄을 걷어 낸다(ADR-20261102 / table-reduce-r2).
-        new Target("connector_tool_grant", "user_id = :userId", Action.DELETE),
-        new Target("connector_conversation_grant", "user_id = :userId", Action.DELETE),
         new Target("user_browser", "user_id = :userId", Action.DELETE),
         new Target("user_data_key", "user_id = :userId", Action.DELETE),
         new Target("agent", "owner_user_id = :userId and deleted_at is null and visibility = 'PRIVATE'", Action.DELETE),

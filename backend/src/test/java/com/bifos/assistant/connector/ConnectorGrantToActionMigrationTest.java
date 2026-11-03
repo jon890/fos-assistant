@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,6 +28,9 @@ class ConnectorGrantToActionMigrationTest {
 
     /** 칸을 더하는 마이그레이션 바로 앞 버전이다. */
     private static final String BEFORE = "20261102074325";
+
+    /** 처음 옮기는 마이그레이션이다. 이 버전까지는 옛 표가 남아 있다. */
+    private static final String MOVED = "20261102074327";
 
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
@@ -58,7 +62,7 @@ class ConnectorGrantToActionMigrationTest {
                     """);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(rows(statement, """
@@ -103,7 +107,7 @@ class ConnectorGrantToActionMigrationTest {
                     """);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(rows(statement, """
@@ -132,6 +136,59 @@ class ConnectorGrantToActionMigrationTest {
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT COUNT(*) FROM connector_action WHERE grant_scope IS NOT NULL"))
                 .containsExactly("0");
+        }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 옛 표에 새로 쓴 허락만 다시 옮기고 이미 옮긴 허락은 되살리지 않은 뒤 옛 허락 두 표와 옛 벡터 표를 지운다")
+    void remigratesOnlyGrantsWrittenByPreviousImageThenDropsOldTables() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, BEFORE);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            seedOwner(statement);
+            statement.executeUpdate(action(31, 1, 10, "'WRITE'", "'2026-11-01 00:00:00'"));
+            statement.executeUpdate(action(32, 1, 10, "'WRITE'", "'2026-11-01 00:00:30'"));
+            statement.executeUpdate("""
+                    INSERT INTO connector_tool_grant (id, user_id, connector_id, tool_name, expires_at, created_at, revoked_at)
+                    VALUES (1, 1, 'demo', 'write_note', '2026-12-01 00:00:00', '2026-11-01 00:00:00', NULL)
+                    """);
+        }
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            // 새 코드가 31번 승인 줄의 허락을 거뒀다. 옛 표의 1번 줄을 다시 옮기면 32번 줄에 되살아난다
+            statement.executeUpdate("UPDATE connector_action SET grant_revoked_at = '2026-11-02 00:00:00' WHERE id = 31");
+            // 직전 이미지로 되돌린 동안 옛 코드가 옛 표에 쓴 허락이다
+            statement.executeUpdate(action(33, 1, 10, "'MAIL'", "'2099-01-01 00:00:10'"));
+            statement.executeUpdate(action(34, 1, 10, "'NOTE'", "'2099-01-01 00:00:20'"));
+            statement.executeUpdate("""
+                    INSERT INTO connector_tool_grant (id, user_id, connector_id, tool_name, expires_at, created_at, revoked_at)
+                    VALUES (2, 1, 'demo', 'mail_note', '2099-02-01 00:00:00', '2099-01-01 00:00:00', NULL)
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO connector_conversation_grant
+                        (id, user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at, revoked_at)
+                    VALUES (1, 1, 10, 1, 'demo', 'note_note', 34, '2099-01-02 00:00:00', '2099-01-01 00:00:20', '2099-01-01 01:00:00')
+                    """);
+        }
+
+        migrate(database, null);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(rows(statement, """
+                    SELECT id, grant_scope, grant_expires_at, grant_revoked_at
+                      FROM connector_action WHERE id >= 31 ORDER BY id
+                    """))
+                .as("32 는 이미 옮긴 1번 줄 때문에 되살아나지 않는다. 33 과 34 는 새로 쓴 줄이라 옮긴다")
+                .containsExactly(
+                    List.of("31", "TOOL", "2026-12-01T00:00", "2026-11-02T00:00"),
+                    List.of("32", "-", "-", "-"),
+                    List.of("33", "TOOL", "2099-02-01T00:00", "-"),
+                    List.of("34", "CONVERSATION", "2099-01-02T00:00", "2099-01-01T01:00"));
+            for (String table : List.of("connector_tool_grant", "connector_conversation_grant", "memory_embedding")) {
+                assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM " + table))
+                    .as("옛 표 " + table + " 는 지운다").isInstanceOf(SQLException.class);
+            }
         }
     }
 
