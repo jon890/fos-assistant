@@ -684,7 +684,9 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 지금 있는 화면과 제안이 만드는 줄은 모두 `core` collection 의 `MEMORY` 다. 문서 API 가 만드는 줄은 `USER` 범위의 `DOCUMENT` 이고 `ACCEPTED` 다.
 
 - `scope` 가 `USER` 면 `owner_user_id` 가, `GROUP` 이면 `group_id` 가 주인이다. `scope` 에는 기본값이 없다
-- `content_key_id` 가 비어 있으면 `content` 는 평문이다. `SENSITIVE` 인 줄은 key 가 있을 때 기동하며 암호화하므로, key 가 없으면 평문으로 남은 줄이 있을 수 있다. `SENSITIVE` 는 `retrieval` 을 `ALWAYS` 로 둘 수 없다
+- `title` 과 `content` 는 `data_key_id` 가 있으면 그 주인 데이터 key 의 암호문이다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 비어 있으면 평문이거나, `content_key_id` 가 찬 ADR-055 의 옛 key 줄이다. 기동할 때 둘 다 데이터 key 로 옮기며, KEK 가 없는 설치는 평문 줄이 남는다. `content_key_id` 는 이관을 운영에서 확인한 뒤 지운다
+- `title` 은 암호문이 들어가도록 `VARCHAR(1200)` 이다. 입력 제한 200자는 요청 검사가 지킨다
+- `SENSITIVE` 는 `retrieval` 을 `ALWAYS` 로 둘 수 없다
 - `always_inject` 는 `retrieval` 로 옮긴 옛 칸이다. `retrieval` 이 `ALWAYS` 일 때만 참으로 적고 읽지 않는다. 지우는 마이그레이션은 아직 없다
 - `source_type` 과 `source_ref` 는 사람이 직접 적었으면 비어 있다. `source_type` 이 `brain` 인 줄은 예전에 기존 개인 지식에서 들인 것이고, 지금 코드에는 줄을 들이는 경로가 없다
 - `proposal_dedup_key` 는 제안하거나 바로 저장한 사용자, 제목, 본문의 해시다. 직접 등록한 항목과 민감 항목은 비어 있다
@@ -722,7 +724,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 - `memory_id` 는 지운 항목의 판도 남으므로 `memory` 에 없는 번호일 수 있다. 그래서 외래 키를 걸지 않는다
 - `scope`, `owner_user_id`, `group_id`, `entry_type`, `document_key`, `status` 는 그때의 값이다. 지운 뒤에도 누가 볼 수 있는지 이 칸으로 정하고, 지운 문서의 판을 이름으로 찾는다
-- 판이 암호문인지는 `sensitivity` 가 아니라 `content_key_id` 로 본다. 일반 항목이었던 판도 그 항목이 뒤에 민감 항목이 되면 암호문으로 바뀐다
+- `title` 과 `content`, `data_key_id`, `content_key_id` 의 뜻은 `memory` 와 같다. 원래 기억의 번호로 같은 AAD 를 만들어, 지금 줄이 데이터 key 의 암호문이면 그 암호문을 그대로 옮긴다
 - 출처 칸은 판에 남기지 않는다. 고칠 때 바뀌지 않는 값이다
 - 고치거나 지울 때 그 항목을 쓰기 잠금으로 읽는다. 두 요청이 같은 판 번호로 판을 남기려 하지 않게 한 번에 하나씩 돈다
 
@@ -1063,12 +1065,14 @@ action을 지우면 실행 내용도 지운다.
 
 ### user_data_key
 
-사용자 한 명의 데이터 key(DEK)를 KEK 로 감싼 것이다. 사용자마다 한 줄이다.
+사용자 한 명이나 그룹 하나의 데이터 key(DEK)를 KEK 로 감싼 것이다. 주인마다 한 줄이다.
 원문 key 는 저장하지 않는다. KEK 는 데이터베이스 밖의 서버 파일에 있고, 이 표에는 어느 KEK 로 감쌌는지만 적는다.
 근거와 위협 모델, 감쌀 때의 AAD 는 [ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md) 에 있다.
 
 - `kek_id` 는 감싼 KEK 의 id 다. KEK 를 바꾸면 기동 작업이 새 id 로 다시 감싸고 `rewrapped_at` 을 적는다
-- `user_id` 가 유일하다. 사용자 한 명의 본문은 key 하나로 암호화한다. 같은 사용자의 첫 저장 둘이 겹치면 한쪽이 이 제약에 걸려 다시 읽는다
+- `user_id` 와 `group_id` 가운데 하나만 찬다(`ck_user_data_key_owner`). 그룹 줄은 그룹 기억을 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md))
+- `user_id` 와 `group_id` 가 각각 유일하다. 한 주인의 본문은 key 하나로 암호화한다. 같은 주인의 첫 저장 둘이 겹치면 한쪽이 이 제약에 걸려 다시 읽는다
+- 사용자 정리는 `user_id` 로만 지워 그룹 줄을 건드리지 않는다. 그룹 줄은 그룹을 지우는 흐름이 생기면 함께 지운다
 - `user_id` 에 외래 키를 두지 않는다. `conversation` 과 `agent_execution` 도 사용자에 외래 키가 없어, 메시지 저장이 이 표 때문에 실패하지 않게 한다
 
 **이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.** 사용자를 지우는 흐름이 생기면 이 줄을 지워 본문을 없앤다.
