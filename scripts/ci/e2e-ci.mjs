@@ -5,7 +5,7 @@
 //
 // 구조는 browser-ci.mjs 의 실패 이슈와 같다. 본문 marker 로 열린 이슈를 찾아 중복을 막고,
 // 실행 marker 로 같은 실행의 재시도가 댓글을 겹쳐 달지 않게 한다. 규칙과 까닭은
-// docs/adr/ADR-20261012-ci-path-filter.md 의 「정기 E2E 실패를 이슈로 남긴다」 가 갖는다.
+// docs/adr/ADR-20261012-ci-path-filter.md 의 「정기 E2E 실패를 이슈로 남기고, 모델 지시문을 바꾸는 PR 에서 E2E 를 돌린다 (2026-11-03)」 가 갖는다.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
