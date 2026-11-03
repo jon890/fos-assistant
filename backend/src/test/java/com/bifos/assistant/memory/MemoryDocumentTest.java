@@ -11,7 +11,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
@@ -28,8 +27,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
 import java.sql.Date;
 import java.util.List;
 import java.util.Map;
@@ -87,8 +84,8 @@ class MemoryDocumentTest {
     }
 
 
-    private DocumentView createSensitive() {
-        return controller.create(new CreateDocumentRequest("identity", NAME, "지원서 공통 프로필", MARK, true));
+    private DocumentView createDocument() {
+        return controller.create(new CreateDocumentRequest("identity", NAME, "지원서 공통 프로필", MARK));
     }
 
 
@@ -108,7 +105,7 @@ class MemoryDocumentTest {
     @DisplayName("이관한 문서는 읽고 고쳐도 기존 출처가 남고 다른 사용자에게 보이지 않는다")
     void preservesMigratedDocumentProvenance() {
         Long id = controller
-            .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문", false))
+            .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문"))
             .id();
         jdbc.update(
             "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
@@ -119,7 +116,7 @@ class MemoryDocumentTest {
 
         assertThat(controller.get(id).content()).isEqualTo("기존 본문");
         assertThat(controller.list()).extracting(DocumentSummaryView::id).contains(id);
-        controller.update(id, new UpdateDocumentRequest("고친 본문", false, 1));
+        controller.update(id, new UpdateDocumentRequest("고친 본문", 1));
         assertThat(controller.get(id).content()).isEqualTo("고친 본문");
         Map<String, Object> stored = row(id);
         assertThat(stored.get("SOURCE_TYPE")).isEqualTo("brain");
@@ -133,12 +130,11 @@ class MemoryDocumentTest {
 
 
     @Test
-    @DisplayName("민감 문서를 만들면 곧 승인되고 본문은 암호문으로 저장된다")
-    void createsAcceptedSensitiveDocument() {
-        DocumentView created = createSensitive();
+    @DisplayName("문서를 만들면 곧 승인되고 본문은 암호문으로 저장된다")
+    void createsAcceptedDocument() {
+        DocumentView created = createDocument();
 
         assertThat(created.revision()).isEqualTo(1);
-        assertThat(created.sensitive()).isTrue();
         assertThat(created.content()).isEqualTo(MARK);
         Map<String, Object> stored = row(created.id());
         assertThat(stored.get("ENTRY_TYPE")).isEqualTo("DOCUMENT");
@@ -152,32 +148,32 @@ class MemoryDocumentTest {
     @Test
     @DisplayName("같은 이름으로 한 번 더 만들면 거절하고 다른 주인은 같은 이름을 쓴다")
     void rejectsDuplicateNameButAllowsOtherOwner() {
-        createSensitive();
+        createDocument();
 
-        assertCode(this::createSensitive, ErrorCode.MEMORY_DOCUMENT_EXISTS);
+        assertCode(this::createDocument, ErrorCode.MEMORY_DOCUMENT_EXISTS);
 
         as(KID);
-        assertThat(createSensitive().id()).isNotNull();
+        assertThat(createDocument().id()).isNotNull();
     }
 
 
     @Test
     @DisplayName("남의 문서는 읽지도 고치지도 못한다")
     void hidesOthersDocument() {
-        Long id = createSensitive().id();
+        Long id = createDocument().id();
 
         as(KID);
         assertCode(() -> controller.get(id), ErrorCode.MEMORY_NOT_FOUND);
-        assertCode(() -> controller.update(id, new UpdateDocumentRequest("x", true, 1)), ErrorCode.MEMORY_NOT_FOUND);
+        assertCode(() -> controller.update(id, new UpdateDocumentRequest("x", 1)), ErrorCode.MEMORY_NOT_FOUND);
     }
 
 
     @Test
     @DisplayName("문서 목록은 자기 문서만 내고 본문 칸이 없다")
     void listsOwnDocumentsWithoutContent() {
-        createSensitive();
+        createDocument();
         as(KID);
-        createSensitive();
+        createDocument();
         as(DAD);
 
         List<DocumentSummaryView> list = controller.list();
@@ -193,9 +189,9 @@ class MemoryDocumentTest {
     @Test
     @DisplayName("판 번호를 견줘 고치고 낡은 판 번호는 거절한다")
     void revisesWithExpectedRevision() {
-        Long id = createSensitive().id();
+        Long id = createDocument().id();
 
-        DocumentView revised = controller.update(id, new UpdateDocumentRequest("평문-표식-8802", true, 1));
+        DocumentView revised = controller.update(id, new UpdateDocumentRequest("평문-표식-8802", 1));
 
         assertThat(revised.revision()).isEqualTo(2);
         assertThat(controller.get(id).content()).isEqualTo("평문-표식-8802");
@@ -207,7 +203,7 @@ class MemoryDocumentTest {
 
         long before = revisionRepository.count();
         assertCode(
-            () -> controller.update(id, new UpdateDocumentRequest("평문-표식-9913", true, 1)),
+            () -> controller.update(id, new UpdateDocumentRequest("평문-표식-9913", 1)),
             ErrorCode.MEMORY_REVISION_CONFLICT);
         assertThat(revisionRepository.count()).isEqualTo(before);
         assertThat(controller.get(id).content()).isEqualTo("평문-표식-8802");
@@ -218,31 +214,18 @@ class MemoryDocumentTest {
     @DisplayName("이름과 collection 의 모양이 틀리면 거절한다")
     void validatesNameAndCollection() {
         assertCode(
-            () -> controller.create(new CreateDocumentRequest("identity", "Application_Profile", "t", "c", false)),
+            () -> controller.create(new CreateDocumentRequest("identity", "Application_Profile", "t", "c")),
             ErrorCode.VALIDATION_FAILED);
         assertCode(
-            () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c", false)),
+            () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c")),
             ErrorCode.VALIDATION_FAILED);
-    }
-
-
-    @Test
-    @DisplayName("만드는 요청에 민감 표시가 빠지면 검증이 실패한다")
-    void createRequestRequiresSensitive() {
-        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-
-        assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", null)))
-            .extracting(violation -> violation.getPropertyPath().toString())
-            .containsExactly("sensitive");
-        assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", false)))
-            .isEmpty();
     }
 
 
     @Test
     @DisplayName("문서는 Memory 목록에 나오지 않는다")
     void documentIsNotListedAsMemory() {
-        Long id = createSensitive().id();
+        Long id = createDocument().id();
         MemoryController memoryController = new MemoryController(memories, context, sources, linkService, currentUser);
 
         assertThat(memoryController.readable()).extracting(MemoryView::id).doesNotContain(id);
@@ -252,12 +235,12 @@ class MemoryDocumentTest {
     @Test
     @DisplayName("Memory 의 수정과 승인과 거절은 문서를 찾지 못한다")
     void memoryPathsDoNotTouchDocuments() {
-        Long sensitiveId = createSensitive().id();
+        Long firstId = createDocument().id();
         Long plainId = controller
-            .create(new CreateDocumentRequest("career", "position-notes", "직무 메모", "일반 글", false))
+            .create(new CreateDocumentRequest("career", "position-notes", "직무 메모", "일반 글"))
             .id();
 
-        for (Long id : List.of(sensitiveId, plainId)) {
+        for (Long id : List.of(firstId, plainId)) {
             assertCode(() -> memories.update(DAD, id, "x", true, null), ErrorCode.MEMORY_NOT_FOUND);
             assertCode(() -> memories.reject(DAD, id), ErrorCode.MEMORY_NOT_FOUND);
             assertCode(() -> memories.accept(DAD, id), ErrorCode.MEMORY_NOT_FOUND);
@@ -271,11 +254,11 @@ class MemoryDocumentTest {
     @Test
     @DisplayName("문서를 지운 뒤 같은 이름으로 다시 만들 수 있고 지운 판의 본문은 암호문이다")
     void deleteThenRecreate() {
-        Long id = createSensitive().id();
+        Long id = createDocument().id();
 
         memories.delete(DAD, id);
 
-        assertThat(createSensitive().id()).isNotEqualTo(id);
+        assertThat(createDocument().id()).isNotEqualTo(id);
         String deleted = jdbc.queryForObject(
             "SELECT content FROM memory_revision WHERE memory_id = ? AND change_type = 'DELETED'",
             String.class,
@@ -292,9 +275,9 @@ class MemoryDocumentTest {
 
 
     @Test
-    @DisplayName("민감 문서의 꺼내는 방식은 요청으로 정하지 못하고 늘 SEARCH 다")
+    @DisplayName("문서의 꺼내는 방식은 요청으로 정하지 못하고 늘 SEARCH 다")
     void documentRetrievalIsAlwaysSearch() {
-        Memory memory = memories.createDocument(DAD, "identity", NAME, "제목", MARK, MemorySensitivity.SENSITIVE);
+        Memory memory = memories.createDocument(DAD, "identity", NAME, "제목", MARK);
 
         assertThat(memory.retrieval().name()).isEqualTo("SEARCH");
         assertThat(memory.scope()).isEqualTo(MemoryScope.USER);

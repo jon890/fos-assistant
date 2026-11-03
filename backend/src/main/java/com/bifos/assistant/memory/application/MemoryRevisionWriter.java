@@ -1,19 +1,16 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.SealedMemoryText;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -36,21 +33,20 @@ class MemoryRevisionWriter {
     private final Clock clock;
 
 
-    Memory revise(
-        CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        requirePlaceable(retrieval, sensitivity);
+    Memory revise(CurrentUser user, Memory memory, String content, MemoryRetrieval retrieval) {
+        requirePlaceable(retrieval);
         if (!memory.readable()) {
             // 풀지 못한 줄은 제목도 모른다. 덮어쓰면 제목을 잃는다
             throw new ApiException(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE, "an unreadable memory cannot be revised");
         }
         // revision 을 남기기 전에 암호화한다. key 를 풀지 못하면 여기서 거절돼 revision 도 본문도 바뀌지 않는다
         Optional<SealedMemoryText> sealed = texts.seal(memory.stored(), memory.title(), content);
-        // 제안 중복 키는 본문의 해시라, 민감 본문이면 지문이 평문 칸에 남는다. 민감 항목은 키를 비운다
-        String dedupKey = memory.proposalDedupKey() == null || sensitivity == MemorySensitivity.SENSITIVE
+        // 제안 중복 키는 주인 key 의 HMAC 이다. 평문의 해시를 남기지 않는다
+        String dedupKey = memory.proposalDedupKey() == null
             ? null
-            : proposalDedupKey(memory.ownerUserId(), memory.title(), content);
+            : texts.proposalDedupKey(memory.ownerUserId(), memory.title(), content);
         saveRevision(memory, MemoryChangeType.UPDATED, user);
-        memory.revise(content, sealed.orElse(null), retrieval, sensitivity, dedupKey, clock.instant());
+        memory.revise(content, sealed.orElse(null), retrieval, dedupKey, clock.instant());
         return memories.save(memory);
     }
 
@@ -79,17 +75,9 @@ class MemoryRevisionWriter {
     }
 
 
-    static void requirePlaceable(MemoryRetrieval retrieval, MemorySensitivity sensitivity) {
-        if (retrieval == null || sensitivity == null) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "retrieval and sensitivity are required");
+    static void requirePlaceable(MemoryRetrieval retrieval) {
+        if (retrieval == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "retrieval is required");
         }
-        if (!MemoryPlacement.allows(retrieval, sensitivity)) {
-            throw new ApiException(ErrorCode.MEMORY_SENSITIVE_ALWAYS, "a sensitive memory cannot always be injected");
-        }
-    }
-
-
-    static String proposalDedupKey(Long ownerUserId, String title, String content) {
-        return Sha256.hex(ownerUserId + "\u0000" + title + "\u0000" + content);
     }
 }

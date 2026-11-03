@@ -14,11 +14,6 @@ test("다시 생성한 스킬 커맨드가 거절되면 영어 원문 대신 해
     "이 스킬을 이 에이전트에서 쓸 수 없어요. 스킬이 꺼졌거나 지워졌는지 확인해 주세요.");
 });
 
-test("민감 항목을 목록에서 고치려다 거절되면 여기서 고칠 수 없다고 알린다", () => {
-  assert.equal(describeError("MEMORY_SENSITIVE_NOT_EDITABLE", "a sensitive memory cannot be edited from the list"),
-    "민감한 항목은 여기서 고칠 수 없어요.");
-});
-
 test("꺼진 사용자에게는 계정이 중지됐다고 알리고 관리자에게 문의하게 한다", () => {
   assert.equal(describeError("ACCESS_REVOKED", "x"),
     "사용이 중지된 계정이에요. 관리자에게 문의해 주세요.");

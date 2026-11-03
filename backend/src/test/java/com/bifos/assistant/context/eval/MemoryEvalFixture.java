@@ -11,7 +11,6 @@ import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Filler;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.MemorySeed;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -165,7 +164,7 @@ final class MemoryEvalFixture {
                 owner,
                 null,
                 "보조 사실 " + n,
-                StoredContent.plain("가".repeat(filler.contentChars())),
+                "가".repeat(filler.contentChars()),
                 MemoryPlacement.core(MemoryRetrieval.SEARCH),
                 owner,
                 at));
@@ -176,14 +175,14 @@ final class MemoryEvalFixture {
 
     private Memory memoryOf(MemorySeed seed, Instant now) {
         Instant at = now.minus(Duration.ofDays(seed.updatedDaysAgo()));
-        StoredContent body = StoredContent.plain(seed.content());
-        MemoryPlacement placement = new MemoryPlacement(seed.collection(), seed.retrieval(), seed.sensitivity());
+        String body = seed.content();
+        MemoryPlacement placement = new MemoryPlacement(seed.collection(), seed.retrieval());
         boolean group = seed.scope() == MemoryScope.GROUP;
         Long ownerId = group ? null : userOf(seed.owner()).id();
         Long groupId = group ? groupIdOf(seed.group()) : null;
         if (seed.entryType() == MemoryEntryType.DOCUMENT) {
             return Memory.document(
-                ownerId, seed.collection(), seed.documentKey(), seed.title(), body, seed.sensitivity(), at);
+                ownerId, seed.collection(), seed.documentKey(), seed.title(), body, at);
         }
         return switch (seed.status()) {
             case ACCEPTED ->
@@ -226,7 +225,7 @@ final class MemoryEvalFixture {
             jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
             each.collections()
                 .forEach(grant -> grants.save(
-                    AgentMemoryCollection.of(agentId, grant.collection(), grant.allowSensitive())));
+                    AgentMemoryCollection.of(agentId, grant.collection())));
             agentIds.put(each.key(), agentId);
         }
         return agentIds;

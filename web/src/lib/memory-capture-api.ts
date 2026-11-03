@@ -13,7 +13,6 @@ export type MemoryCapture = {
   status: "ACCEPTED" | "PROPOSED" | "REJECTED";
   title: string;
   content: string;
-  sensitive: boolean;
   alwaysInject: boolean;
   /** 이 기록을 남긴 대화가 그 전에 바깥 글을 읽었다. 제안 카드가 그 사실을 보인다. */
   externalRead?: boolean;

@@ -18,7 +18,6 @@ function capture(
     status: "ACCEPTED",
     title: "좋아하는 과일",
     content: "사과를 좋아해요.",
-    sensitive: false,
     alwaysInject: false,
     createdAt: "2026-10-07T12:00:00Z",
     ...overrides,
@@ -98,17 +97,6 @@ test("바로 저장한 기록이 답 아래에 보이고 되돌리면 사라진�
   await expect(page.getByTestId("memory-captures")).toHaveCount(0);
   expect(undone).toHaveLength(1);
   expect(undone[0]).toMatch(/\/api\/memory-captures\/1\/undo$/);
-});
-
-test("민감한 기록은 본문 대신 안내를 보인다", async ({ page }) => {
-  await open(page, "기억 기록 검사 민감", [
-    capture(0, { sensitive: true, content: "" }),
-  ]);
-
-  const row = page.getByTestId("memory-capture");
-  await expect(row).toContainText("기억했어요: 좋아하는 과일");
-  await expect(row).toContainText("민감한 내용이라 여기서 보이지 않아요.");
-  await expect(page.getByTestId("memory-capture-content")).toHaveCount(0);
 });
 
 test("제안 카드를 받아들이면 기억했어요 줄로 바뀐다", async ({ page }) => {

@@ -253,9 +253,6 @@ function startControlPlane(
       // 관찰 본문 저장은 공개 검사 전용 KEK만 쓴다.
       ASSISTANT_DATA_ENCRYPTION_KEK_FILE: join(ROOT, "backend/src/test/resources/data-encryption/test-kek.keys"),
       ASSISTANT_DATA_ENCRYPTION_ACTIVE_KEK_ID: "test-kek-1",
-      // 민감 Memory 문서를 만드는 시나리오가 쓴다. 운영 값이 아니라 글자 0123456789abcdef0123456789abcdef 의 base64 다.
-      ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
-      ASSISTANT_MEMORY_ENCRYPTION_KEYS: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
       // 검사는 같은 사용자로 짧은 시간에 플러그인을 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       // 답이 없는 승인 요청이 만료되는 것을 기본값 24시간을 기다리지 않고 본다. 승인과 거절을 보는 단계는

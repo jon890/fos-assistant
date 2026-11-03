@@ -88,7 +88,6 @@ export function DocumentItem({
             <span aria-hidden>· </span>
             {formatRelative(document.updatedAt, new Date(readAt))}
           </span>
-          {document.sensitive ? <Badge variant="warning">민감</Badge> : null}
         </>
       }
       open={open}

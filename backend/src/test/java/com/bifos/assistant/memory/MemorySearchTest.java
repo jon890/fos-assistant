@@ -12,14 +12,13 @@ import com.bifos.assistant.memory.application.dto.MemorySearchItem;
 import com.bifos.assistant.memory.application.dto.MemorySearchPage;
 import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -50,8 +49,11 @@ import tools.jackson.databind.json.JsonMapper;
 @MysqlCase(MysqlCase.Reason.COLLATION)
 public class MemorySearchTest {
     static final CurrentUser USER = new CurrentUser(811L, "search@example.test", "검색 검사", 10L, UserRole.ADMIN);
-    static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
+    static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"));
     static final Instant NOW = Instant.parse("2026-10-11T00:00:00Z");
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryService memories;
@@ -95,34 +97,24 @@ public class MemorySearchTest {
     @DisplayName("권한 상태 종류와 꺼내는 방식 밖의 항목은 제목과 본문에 질문 낱말이 있어도 검색되지 않는다")
     void excludesEveryUnreadableBoundary() {
         Memory own = save(
-            "일치 개인", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            "일치 개인", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH);
         Memory group = save(
             "일치 공유",
             MemoryScope.GROUP,
             null,
             USER.groupId(),
             "core",
-            MemoryRetrieval.SEARCH,
-            MemorySensitivity.NORMAL);
+            MemoryRetrieval.SEARCH);
         List<Memory> hidden = List.of(
-            save("다른 사용자 경계", MemoryScope.USER, 812L, null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
-            save("다른 그룹 경계", MemoryScope.GROUP, null, 20L, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            save("다른 사용자 경계", MemoryScope.USER, 812L, null, "core", MemoryRetrieval.SEARCH),
+            save("다른 그룹 경계", MemoryScope.GROUP, null, 20L, "core", MemoryRetrieval.SEARCH),
             save(
                 "다른 collection 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "career",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL),
-            save(
-                "민감 제한 경계",
-                MemoryScope.USER,
-                USER.id(),
-                null,
-                "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.SENSITIVE),
+                MemoryRetrieval.SEARCH),
             repository.save(Memory.proposedUser(USER.id(), "승인 전 경계", "합성", 1L, null, NOW)),
             save(
                 "거절됨 경계",
@@ -130,54 +122,48 @@ public class MemorySearchTest {
                 USER.id(),
                 null,
                 "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL),
+                MemoryRetrieval.SEARCH),
             save(
                 "출처 원문 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL),
+                MemoryRetrieval.SEARCH),
             save(
                 "보관됨 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "core",
-                MemoryRetrieval.ARCHIVE,
-                MemorySensitivity.NORMAL),
+                MemoryRetrieval.ARCHIVE),
             save(
                 "항상 주입 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "core",
-                MemoryRetrieval.ALWAYS,
-                MemorySensitivity.NORMAL),
+                MemoryRetrieval.ALWAYS),
             save(
                 "대체됨 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL));
-        MemoryLink superseding = MemoryLink.proposeSupersede(own.id(), hidden.get(9).id(), MemoryLinkOrigin.HUMAN, null);
+                MemoryRetrieval.SEARCH));
+        MemoryLink superseding = MemoryLink.proposeSupersede(own.id(), hidden.get(8).id(), MemoryLinkOrigin.HUMAN, null);
         superseding.accept();
         links.save(superseding);
         jdbc.update(
             "UPDATE memory SET status = 'REJECTED' WHERE id = ?",
-            hidden.get(5).id());
+            hidden.get(4).id());
         jdbc.update(
             "UPDATE memory SET entry_type = 'SOURCE' WHERE id = ?",
-            hidden.get(6).id());
-        // 경계 밖 항목의 본문에도 제목과 같은 낱말을 둔다. 민감 항목은 암호문 표시를 지워 평문 본문이 남은 어긋난 줄로 둔다
+            hidden.get(5).id());
+        // 경계 밖 항목의 본문에도 제목과 같은 낱말을 둔다
         for (Memory excluded : hidden) {
             jdbc.update("UPDATE memory SET content = ? WHERE id = ?", excluded.title() + " 본문", excluded.id());
         }
-        jdbc.update("UPDATE memory SET content_key_id = NULL WHERE id = ?", hidden.get(3).id());
         assertThat(search(USER, CORE, "일치", 50).items())
             .extracting(MemorySearchItem::id)
             .containsExactly(own.id(), group.id());
@@ -187,14 +173,6 @@ public class MemorySearchTest {
                 .isEmpty();
         }
         assertThat(search(USER, MemoryAccess.none(), "일치", 10).items())
-            .isEmpty();
-        MemoryAccess sensitive = MemoryAccess.of(Set.of("core"), Set.of("core"));
-        assertThat(search(USER, sensitive, "민감 제한", 10).items())
-            .extracting(MemorySearchItem::id)
-            .containsExactly(hidden.get(3).id());
-        jdbc.update("UPDATE memory SET content = '혈액형 기록' WHERE id = ?", hidden.get(3).id());
-        assertThat(search(USER, sensitive, "혈액형 기록", 10).items())
-            .as("민감 항목의 본문에만 있는 낱말")
             .isEmpty();
         CurrentUser noGroup = new CurrentUser(USER.id(), USER.email(), USER.displayName(), null, USER.role());
         assertThat(search(noGroup, CORE, "일치", 10).items())
@@ -221,7 +199,7 @@ public class MemorySearchTest {
     private void embedEverything(Memory memory, float[] vector) {
         String content = jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, memory.id());
         String text = EmbeddingText.of(memory.title(), content, embeddingProperties.maxTextChars());
-        MemoryEmbeddingRows.write(jdbc, memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector);
+        MemoryEmbeddingRows.write(jdbc, memory.id(), embeddingProperties.model(), texts.embeddingFingerprint(memory.scope(), memory.stored().ownerId(), embeddingProperties.model(), text).orElseThrow(), vector);
     }
 
 
@@ -250,24 +228,24 @@ public class MemorySearchTest {
 
 
     @Test
-    @DisplayName("검색은 후보를 질의 하나로 읽고 본문은 일반 줄에서만 점수에 넘기며 외부 timeout을 물려받지 않는다")
+    @DisplayName("검색은 후보를 질의 하나로 읽고 푼 본문을 점수에 넘기며 외부 timeout을 물려받지 않는다")
     void selectsOnlySearchFieldsWithinIndependentTimeout() {
         Memory plain = repository.save(Memory.accepted(
             MemoryScope.USER,
             USER.id(),
             null,
             "합성 큰 본문",
-            StoredContent.plain("가".repeat(16000)),
+            "가".repeat(16000),
             MemoryPlacement.core(MemoryRetrieval.SEARCH),
             USER.id(),
             NOW));
         Memory sealed = save(
-            "합성 암호문", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+            "합성 짧은 본문", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH);
         MemorySearchSqlProbe.capture();
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
         outer.setTimeout(30);
         MemorySearchPage page = outer.execute(
-            status -> search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 1));
+            status -> search(USER, MemoryAccess.of(Set.of("core")), "합성", 1));
         // 본문이 짧은 쪽의 BM25 가 높다
         assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(sealed.id());
         assertThat(page.nextCursor()).isNotNull();
@@ -275,26 +253,13 @@ public class MemorySearchTest {
         assertProjectionAndTimeout();
         MemorySearchSqlProbe.reset();
         MemorySearchSqlProbe.capture();
-        assertThat(search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 1, page.nextCursor()).items())
+        assertThat(search(USER, MemoryAccess.of(Set.of("core")), "합성", 1, page.nextCursor()).items())
             .extracting(MemorySearchItem::id)
             .containsExactly(plain.id());
         MemorySearchSqlProbe.reset();
         MemorySearchSqlProbe.capture();
         repository.findAll();
         assertThat(MemorySearchSqlProbe.timeout()).isEqualTo(0);
-    }
-
-
-    @Test
-    @DisplayName("민감 항목은 본문을 점수에 넘기지 않아 본문에만 있는 낱말로는 찾히지 않는다")
-    void sensitiveBodyIsNotScored() {
-        Memory normal = save("일반 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
-        save("민감 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
-
-        assertThat(search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 10).items())
-            .as("두 줄 모두 본문이 「합성 본문」 이다")
-            .extracting(MemorySearchItem::id)
-            .containsExactly(normal.id());
     }
 
 
@@ -310,7 +275,7 @@ public class MemorySearchTest {
                     USER.id(),
                     null,
                     "같은 점수 항목",
-                    StoredContent.plain("같은 본문"),
+                    "같은 본문",
                     MemoryPlacement.core(MemoryRetrieval.SEARCH),
                     USER.id(),
                     NOW));
@@ -343,7 +308,7 @@ public class MemorySearchTest {
                     USER.id(),
                     null,
                     "합성 색인 " + i,
-                    StoredContent.plain("본문에만 있는 단어 " + "가".repeat(220)),
+                    "본문에만 있는 단어 " + "가".repeat(220),
                     MemoryPlacement.core(MemoryRetrieval.SEARCH),
                     USER.id(),
                     NOW));
@@ -425,7 +390,7 @@ public class MemorySearchTest {
 
 
     Memory save(String title) {
-        return save(title, MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        return save(title, MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH);
     }
 
 
@@ -435,23 +400,22 @@ public class MemorySearchTest {
         Long ownerId,
         Long groupId,
         String collection,
-        MemoryRetrieval retrieval,
-        MemorySensitivity sensitivity) {
-        StoredContent body = StoredContent.plain("합성 본문");
+        MemoryRetrieval retrieval) {
+        String body = "합성 본문";
         return repository.save(Memory.accepted(
             scope,
             ownerId,
             groupId,
             title,
             body,
-            new MemoryPlacement(collection, retrieval, sensitivity),
+            new MemoryPlacement(collection, retrieval),
             USER.id(),
             NOW));
     }
 
 
     /**
-     * 후보는 질의 하나로 읽는다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고 민감 본문은 점수에 넘기지 않는다
+     * 후보는 질의 하나로 읽는다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 푼다
      * (ADR-20261103 / memory-encryption).
      */
     static void assertProjectionAndTimeout() {

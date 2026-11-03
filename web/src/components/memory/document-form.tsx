@@ -35,7 +35,6 @@ export function DocumentForm({
         documentKey: String(form.get("documentKey")),
         title: String(form.get("title")),
         content: String(form.get("content")),
-        sensitive: form.get("sensitive") === "on",
       });
       if (!result.ok) {
         setError(result.message);
@@ -105,10 +104,6 @@ export function DocumentForm({
           className="field-sizing-fixed"
         />
       </div>
-      <Label className="mt-3 font-normal">
-        <input type="checkbox" name="sensitive" className="accent-primary" />
-        민감한 내용이에요. 암호화해서 저장해요
-      </Label>
       {error ? (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}

@@ -135,9 +135,8 @@ class RepositoryQueryMysqlTest {
             MemoryQueries.readableBy(1L, 1L),
             MemoryQueries.readableBy(1L, null),
             MemoryQueries.listedFor(1L, 1L),
-            MemoryQueries.injectable(1L, 1L, retrieval, null, Set.of()),
-            MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of()),
-            MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of("core")));
+            MemoryQueries.injectable(1L, 1L, retrieval, null),
+            MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core")));
 
         for (int i = 0; i < specifications.size(); i++) {
             Specification<Memory> specification = specifications.get(i);
@@ -145,9 +144,9 @@ class RepositoryQueryMysqlTest {
                 .as("%d번째 조건", i + 1)
                 .doesNotThrowAnyException();
         }
-        assertThatCode(() -> searchCandidates.candidatesFor(1L, 1L, Set.of("core"), Set.of()))
+        assertThatCode(() -> searchCandidates.candidatesFor(1L, 1L, Set.of("core")))
             .doesNotThrowAnyException();
-        assertThatCode(() -> searchCandidates.candidatesFor(1L, null, null, Set.of()))
+        assertThatCode(() -> searchCandidates.candidatesFor(1L, null, null))
             .doesNotThrowAnyException();
     }
 

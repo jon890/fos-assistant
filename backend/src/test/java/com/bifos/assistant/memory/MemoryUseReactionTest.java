@@ -23,7 +23,6 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -105,9 +104,9 @@ class MemoryUseReactionTest {
         kid = new CurrentUser(saved.id() + 1_000_000L, "kid-" + saved.id() + "@example.com", "아이", 1L, UserRole.MEMBER);
         conversation = conversations.save(Conversation.startedBy(dad.id(), "참고한 기억 단추", null, Instant.now()));
         used = memoryService.create(
-            dad, MemoryScope.USER, "딸 이름", "딸 이름은 홍길순이다", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            dad, MemoryScope.USER, "딸 이름", "딸 이름은 홍길순이다", "core", MemoryRetrieval.SEARCH);
         unused = memoryService.create(
-            dad, MemoryScope.USER, "취미", "등산을 좋아한다", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            dad, MemoryScope.USER, "취미", "등산을 좋아한다", "core", MemoryRetrieval.SEARCH);
         run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, "fos-" + UUID.randomUUID());
         messages.save(ChatMessage.fromAssistant(conversation.id(), "답", run.id(), Instant.now()));
         contextSources.save(ExecutionContextSource.of(run.id(), 0, "MEMORY_FACTS", "memory:" + used.id(), "INLINE", "FRESH"));

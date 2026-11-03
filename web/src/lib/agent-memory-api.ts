@@ -13,7 +13,7 @@ export function getAgentMemorySetting(
 /** 에이전트가 받을 영역 전체를 보낸다. 빈 목록이면 모두 뗀다. */
 export function saveAgentMemorySetting(
   code: string,
-  collections: { collection: string; allowSensitive: boolean }[],
+  collections: { collection: string }[],
 ): Promise<MemoryApiResult<AgentMemorySetting>> {
   return memoryRequest(
     `/api/admin/agents/${code}/memory-collections`,

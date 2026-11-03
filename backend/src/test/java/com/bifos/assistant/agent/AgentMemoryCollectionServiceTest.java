@@ -23,7 +23,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 에이전트가 받는 Memory collection 과 새 에이전트의 기본 부여, 관리자의 변경과 그 기록을 확인한다
@@ -61,15 +61,16 @@ class AgentMemoryCollectionServiceTest {
     @Autowired
     TestClock clock;
 
+    @Autowired
+    JdbcTemplate jdbc;
+
 
     @Test
-    @DisplayName("새로 저장한 에이전트는 core 를 민감 항목 없이 받고 다시 저장해도 줄이 늘지 않는다")
-    void newAgentsReceiveCoreOnceWithoutSensitiveItems() {
+    @DisplayName("새로 저장한 에이전트는 core 를 받고 다시 저장해도 줄이 늘지 않는다")
+    void newAgentsReceiveCoreOnce() {
         Agent agent = agents.save(agent());
 
-        AgentMemoryGrants granted = service.grantsOf(agent.id());
-        assertThat(granted.collections()).containsExactly("core");
-        assertThat(granted.sensitiveCollections()).isEmpty();
+        assertThat(service.grantsOf(agent.id()).collections()).containsExactly("core");
 
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
@@ -81,16 +82,13 @@ class AgentMemoryCollectionServiceTest {
     @DisplayName("이미 저장한 에이전트를 다시 저장해도 관리자가 바꾼 허용을 되돌리지 않는다")
     void savingAnExistingAgentAgainDoesNotResetItsGrants() {
         Agent agent = agents.save(agent());
-        // 관리자가 core 의 민감 허용을 켰다. 사건이 다시 나가면 이 줄이 거짓으로 덮인다.
-        grants.save(AgentMemoryCollection.of(agent.id(), "core", true));
-        agents.save(agent);
-        agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
-        assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("core");
-
-        // 관리자가 core 를 뺐다. 사건이 다시 나가면 이 줄이 되살아난다.
+        // 관리자가 core 를 빼고 career 를 붙였다. 사건이 다시 나가면 core 가 되살아난다.
         grants.deleteAll(grants.findByIdAgentId(agent.id()));
+        grants.save(AgentMemoryCollection.of(agent.id(), "career"));
         agents.save(agents.findById(agent.id()).orElseThrow());
-        assertThat(grants.findByIdAgentId(agent.id())).isEmpty();
+        agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
+
+        assertThat(service.grantsOf(agent.id()).collections()).containsExactly("career");
     }
 
 
@@ -104,16 +102,15 @@ class AgentMemoryCollectionServiceTest {
 
 
     @Test
-    @DisplayName("관리자가 넓힌 collection 과 민감 허용을 그대로 낸다")
-    void returnsWidenedCollectionsAndSensitiveAllowance() {
+    @DisplayName("관리자가 넓힌 collection 을 그대로 낸다")
+    void returnsWidenedCollections() {
         Agent agent = agents.save(agent());
-        grants.save(AgentMemoryCollection.of(agent.id(), "career", false));
-        grants.save(AgentMemoryCollection.of(agent.id(), "identity", true));
+        grants.save(AgentMemoryCollection.of(agent.id(), "career"));
+        grants.save(AgentMemoryCollection.of(agent.id(), "identity"));
 
         AgentMemoryGrants granted = service.grantsOf(agent.id());
 
         assertThat(granted.collections()).containsExactlyInAnyOrder("core", "career", "identity");
-        assertThat(granted.sensitiveCollections()).containsExactly("identity");
     }
 
 
@@ -136,53 +133,52 @@ class AgentMemoryCollectionServiceTest {
 
 
     @Test
-    @DisplayName("관리자가 고른 목록으로 바꾸면 붙이고 떼고 민감 허용을 바꾸고 한 번에 기록한다")
+    @DisplayName("관리자가 고른 목록으로 바꾸면 붙이고 떼고 한 번에 기록하며 남은 줄의 붙인 시각은 그대로다")
     void replacesCollectionsAndRecordsEachChange() {
         Agent agent = agents.save(agent());
         Instant firstSave = Instant.parse("2026-10-08T01:00:00Z");
         clock.set(firstSave);
 
-        service.replace(agent.id(), Map.of("career", true), LISTED, ADMIN_ID);
+        service.replace(agent.id(), Set.of("career"), LISTED, ADMIN_ID);
 
-        AgentMemoryGrants granted = service.grantsOf(agent.id());
-        assertThat(granted.collections()).containsExactly("career");
-        assertThat(granted.sensitiveCollections()).containsExactly("career");
+        assertThat(service.grantsOf(agent.id()).collections()).containsExactly("career");
         // 새것부터 낸다. 한 저장의 기록은 collection key 순서로 들어가므로 core 가 career 보다 뒤에 들어갔다.
         assertThat(service.recentChangesOf(agent.id()))
             .extracting(
                 AgentMemoryCollectionChange::collection,
                 AgentMemoryCollectionChange::changeType,
-                AgentMemoryCollectionChange::allowSensitive,
                 AgentMemoryCollectionChange::changedByUserId,
                 AgentMemoryCollectionChange::changedAt)
             .containsExactly(
-                tuple("core", AgentMemoryCollectionChangeType.REVOKED, false, ADMIN_ID, firstSave),
-                tuple("career", AgentMemoryCollectionChangeType.GRANTED, true, ADMIN_ID, firstSave));
-        assertThat(service.rowsOf(agent.id()))
-            .extracting(AgentMemoryCollection::createdAt)
-            .containsExactly(firstSave);
+                tuple("core", AgentMemoryCollectionChangeType.REVOKED, ADMIN_ID, firstSave),
+                tuple("career", AgentMemoryCollectionChangeType.GRANTED, ADMIN_ID, firstSave));
 
         clock.advance(Duration.ofHours(1));
-        service.replace(agent.id(), Map.of("career", false), LISTED, ADMIN_ID);
+        service.replace(agent.id(), Set.of("career", "core"), LISTED, ADMIN_ID);
 
-        assertThat(service.grantsOf(agent.id()).sensitiveCollections()).isEmpty();
-        List<AgentMemoryCollectionChange> changes = service.recentChangesOf(agent.id());
-        assertThat(changes).hasSize(3);
-        assertThat(changes.getFirst())
-            .extracting(
-                AgentMemoryCollectionChange::collection,
-                AgentMemoryCollectionChange::changeType,
-                AgentMemoryCollectionChange::allowSensitive,
-                AgentMemoryCollectionChange::changedAt)
-            .containsExactly(
-                "career",
-                AgentMemoryCollectionChangeType.SENSITIVE_CHANGED,
-                false,
-                firstSave.plus(Duration.ofHours(1)));
+        assertThat(service.recentChangesOf(agent.id())).hasSize(3).first()
+            .extracting(AgentMemoryCollectionChange::collection, AgentMemoryCollectionChange::changeType)
+            .containsExactly("core", AgentMemoryCollectionChangeType.GRANTED);
         assertThat(service.rowsOf(agent.id()))
-            .as("민감 허용만 바꾼 줄은 붙인 시각을 그대로 둔다")
             .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::createdAt)
-            .containsExactly(tuple("career", firstSave));
+            .containsExactlyInAnyOrder(tuple("career", firstSave), tuple("core", firstSave.plus(Duration.ofHours(1))));
+    }
+
+
+    @Test
+    @DisplayName("없어진 민감 허용을 바꾼 옛 기록은 최근 변경에 내지 않는다")
+    void hidesFormerSensitiveChanges() {
+        Agent agent = agents.save(agent());
+        service.replace(agent.id(), Set.of("career"), LISTED, ADMIN_ID);
+        // 직전 이미지가 남긴 기록이다. 코드는 allow_sensitive 칸을 읽고 쓰지 않는다
+        jdbc.update(
+            "INSERT INTO agent_memory_collection_change (agent_id, collection, change_type, allow_sensitive, changed_by_user_id, changed_at)"
+                + " VALUES (?, 'career', 'SENSITIVE_CHANGED', TRUE, ?, CURRENT_TIMESTAMP(6))",
+            agent.id(), ADMIN_ID);
+
+        assertThat(service.recentChangesOf(agent.id()))
+            .extracting(AgentMemoryCollectionChange::changeType)
+            .containsExactly(AgentMemoryCollectionChangeType.REVOKED, AgentMemoryCollectionChangeType.GRANTED);
     }
 
 
@@ -191,12 +187,10 @@ class AgentMemoryCollectionServiceTest {
     void recordsNothingWhenNothingChanges() {
         Agent agent = agents.save(agent());
 
-        service.replace(agent.id(), Map.of("core", false), LISTED, ADMIN_ID);
+        service.replace(agent.id(), Set.of("core"), LISTED, ADMIN_ID);
 
         assertThat(service.recentChangesOf(agent.id())).isEmpty();
-        assertThat(service.rowsOf(agent.id()))
-            .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-            .containsExactly(tuple("core", false));
+        assertThat(service.rowsOf(agent.id())).extracting(AgentMemoryCollection::collection).containsExactly("core");
     }
 
 
@@ -205,7 +199,7 @@ class AgentMemoryCollectionServiceTest {
     void emptyListRevokesEverything() {
         Agent agent = agents.save(agent());
 
-        service.replace(agent.id(), Map.of(), LISTED, ADMIN_ID);
+        service.replace(agent.id(), Set.of(), LISTED, ADMIN_ID);
 
         assertThat(service.grantsOf(agent.id()).collections()).isEmpty();
         assertThat(service.recentChangesOf(agent.id()))
@@ -219,20 +213,17 @@ class AgentMemoryCollectionServiceTest {
     void rejectsCollectionsNeitherListedNorHeld() {
         Agent agent = agents.save(agent());
 
-        assertThatThrownBy(() -> service.replace(agent.id(), Map.of("nope", false), LISTED, ADMIN_ID))
+        assertThatThrownBy(() -> service.replace(agent.id(), Set.of("nope"), LISTED, ADMIN_ID))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
-        assertThat(service.rowsOf(agent.id()))
-            .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-            .containsExactly(tuple("core", false));
+        assertThat(service.rowsOf(agent.id())).extracting(AgentMemoryCollection::collection).containsExactly("core");
         assertThat(service.recentChangesOf(agent.id())).isEmpty();
 
-        // 목록에서 빠졌지만 지금 받는 줄은 그대로 두고 민감 허용도 바꿀 수 있다.
-        grants.save(AgentMemoryCollection.of(agent.id(), "identity", false));
-        service.replace(agent.id(), Map.of("core", false, "identity", true), LISTED, ADMIN_ID);
+        // 목록에서 빠졌지만 지금 받는 줄은 그대로 둘 수 있다.
+        grants.save(AgentMemoryCollection.of(agent.id(), "identity"));
+        service.replace(agent.id(), Set.of("core", "identity"), LISTED, ADMIN_ID);
 
         assertThat(service.grantsOf(agent.id()).collections()).containsExactlyInAnyOrder("core", "identity");
-        assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("identity");
     }
 
 
@@ -246,18 +237,18 @@ class AgentMemoryCollectionServiceTest {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> grantCareer = pool.submit(() -> {
+            Future<?> careerOnly = pool.submit(() -> {
                 start.await();
-                service.replace(agent.id(), Map.of("career", true), LISTED, first);
+                service.replace(agent.id(), Set.of("career"), LISTED, first);
                 return null;
             });
             Future<?> keepBoth = pool.submit(() -> {
                 start.await();
-                service.replace(agent.id(), Map.of("career", false, "core", false), LISTED, second);
+                service.replace(agent.id(), Set.of("career", "core"), LISTED, second);
                 return null;
             });
             start.countDown();
-            grantCareer.get(30, TimeUnit.SECONDS);
+            careerOnly.get(30, TimeUnit.SECONDS);
             keepBoth.get(30, TimeUnit.SECONDS);
         } finally {
             pool.shutdownNow();
@@ -275,36 +266,30 @@ class AgentMemoryCollectionServiceTest {
             .allMatch(c -> c.changedByUserId().equals(later));
 
         if (later.equals(second)) {
-            // core 만 받던 상태에서 career 를 붙이고 core 를 뗀 뒤, career 의 민감 허용을 끄고 core 를 다시 붙였다.
+            // core 만 받던 상태에서 career 를 붙이고 core 를 뗀 뒤, core 를 다시 붙였다.
             assertThat(changes)
                 .extracting(
                     AgentMemoryCollectionChange::changedByUserId,
                     AgentMemoryCollectionChange::collection,
-                    AgentMemoryCollectionChange::changeType,
-                    AgentMemoryCollectionChange::allowSensitive)
+                    AgentMemoryCollectionChange::changeType)
                 .containsExactly(
-                    tuple(first, "career", AgentMemoryCollectionChangeType.GRANTED, true),
-                    tuple(first, "core", AgentMemoryCollectionChangeType.REVOKED, false),
-                    tuple(second, "career", AgentMemoryCollectionChangeType.SENSITIVE_CHANGED, false),
-                    tuple(second, "core", AgentMemoryCollectionChangeType.GRANTED, false));
+                    tuple(first, "career", AgentMemoryCollectionChangeType.GRANTED),
+                    tuple(first, "core", AgentMemoryCollectionChangeType.REVOKED),
+                    tuple(second, "core", AgentMemoryCollectionChangeType.GRANTED));
             assertThat(service.rowsOf(agent.id()))
-                .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-                .containsExactlyInAnyOrder(tuple("career", false), tuple("core", false));
+                .extracting(AgentMemoryCollection::collection)
+                .containsExactlyInAnyOrder("career", "core");
         } else {
-            // core 만 받던 상태에서 career 를 민감 허용 없이 붙인 뒤, career 의 민감 허용을 켜고 core 를 뗐다.
+            // core 만 받던 상태에서 career 를 붙인 뒤, core 를 뗐다.
             assertThat(changes)
                 .extracting(
                     AgentMemoryCollectionChange::changedByUserId,
                     AgentMemoryCollectionChange::collection,
-                    AgentMemoryCollectionChange::changeType,
-                    AgentMemoryCollectionChange::allowSensitive)
+                    AgentMemoryCollectionChange::changeType)
                 .containsExactly(
-                    tuple(second, "career", AgentMemoryCollectionChangeType.GRANTED, false),
-                    tuple(first, "career", AgentMemoryCollectionChangeType.SENSITIVE_CHANGED, true),
-                    tuple(first, "core", AgentMemoryCollectionChangeType.REVOKED, false));
-            assertThat(service.rowsOf(agent.id()))
-                .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-                .containsExactly(tuple("career", true));
+                    tuple(second, "career", AgentMemoryCollectionChangeType.GRANTED),
+                    tuple(first, "core", AgentMemoryCollectionChangeType.REVOKED));
+            assertThat(service.rowsOf(agent.id())).extracting(AgentMemoryCollection::collection).containsExactly("career");
         }
     }
 
@@ -316,7 +301,7 @@ class AgentMemoryCollectionServiceTest {
         deleted.markDeleted(NOW);
         Agent savedDeleted = agents.save(deleted);
 
-        assertThatThrownBy(() -> service.replace(savedDeleted.id(), Map.of("core", false), LISTED, ADMIN_ID))
+        assertThatThrownBy(() -> service.replace(savedDeleted.id(), Set.of("core"), LISTED, ADMIN_ID))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThatThrownBy(() -> service.requireEditableAgent(savedDeleted.code()))

@@ -25,16 +25,18 @@ public class MemoryVectorCache {
 
     private final MemoryEmbeddingRepository embeddings;
     private final MemoryEmbeddingProperties properties;
+    private final MemoryTexts texts;
     private final Map<Long, Cached> cache = new ConcurrentHashMap<>();
 
 
-    /** 일반 본문이 있는 후보 가운데 지금 글과 모델에 맞는 벡터가 있는 것만 낸다. */
+    /** 본문이 있는 후보 가운데 지금 글과 모델에 맞는 벡터가 있는 것만 낸다. 주인 key 로 지문을 만들지 못한 후보는 뺀다. */
     public Map<Long, float[]> vectorsFor(List<RelevanceCandidate> candidates) {
         Map<Long, byte[]> fingerprints = new HashMap<>();
         for (RelevanceCandidate candidate : candidates) {
             if (candidate.plainBody() != null) {
                 String text = EmbeddingText.of(candidate.title(), candidate.plainBody(), properties.maxTextChars());
-                fingerprints.put(candidate.memoryId(), EmbeddingText.fingerprint(properties.model(), text));
+                texts.embeddingFingerprint(candidate.scope(), candidate.ownerId(), properties.model(), text)
+                    .ifPresent(fingerprint -> fingerprints.put(candidate.memoryId(), fingerprint));
             }
         }
         // 캐시의 지문이 지금 글과 다르면 없는 것으로 보고 다시 읽는다. 채우는 작업이 줄을 바꾼 뒤에 옛 줄을 캐시에 넣은 경우도 여기서 바로잡힌다

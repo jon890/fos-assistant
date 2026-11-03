@@ -1,11 +1,12 @@
 # 기억 전체 암호화 기술 설계
 
-스펙: [`spec.md`](spec.md). 이 설계는 PR1 이 구현하는 REQ1 부터 REQ4, REQ6 부터 REQ8 을 다룬다. REQ5 는 PR2 에서 이 파일에 더한다.
+스펙: [`spec.md`](spec.md). PR1 이 구현한 REQ1 부터 REQ4, REQ6 부터 REQ8 은 앞의 절들이, PR2 가 구현하는 REQ5 와 스펙 DECISION17 은 「PR2: 민감 구분 제거와 평문 해시」 절이 다룬다.
 되돌리기 어려운 결정과 근거는 [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 이 갖는다.
+PR2 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-20261103-memory-sensitivity-removal.md) 이 갖는다.
 
 ## 지금 구조
 
-- 민감 기억 본문만 환경 변수 key 로 암호화한다([ADR-055](../../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)). `content_key_id` 가 그 key id(글)를 적는다. 제목과 일반 본문은 평문이다.
+- 민감 기억 본문만 환경 변수 key 로 암호화한다([ADR-055](../../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)). `content_key_id` 가 그 key id(글)를 적는다. 제목과 일반 본문은 평문이다.
 - 대화 메시지는 KEK 로 감싼 사용자별 데이터 key 로 암호화한다([ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md)). 엔티티는 저장된 글을 들고, 읽어 온 엔티티에 Hibernate `POST_LOAD` 사건으로 복호화 도구를 붙여 본문을 처음 꺼낼 때 푼다(`ChatMessageLoadListener`).
 - 기억의 제목과 본문을 읽는 자리는 엔티티의 `title()`, `content()` 를 그대로 부른다. 조립(`context`), 도구(`mcp`), 화면 DTO, 정비, 대화의 「참고한 기억」 이 모두 그렇다. JPQL 이 제목과 본문을 직접 고르는 곳은 검색 후보(`MemorySearchCandidates`)와 임베딩 원천(`MemoryEmbeddingRepository`) 두 곳이다.
 
@@ -175,3 +176,94 @@
 | DECISION5 | 이관은 SQL 마이그레이션이 아니라 기동 작업이다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 SQL 이관 |
 | DECISION6 | 제안 중복 키(`proposal_dedup_key`)와 임베딩 지문은 PR1 에서 그대로 둔다 | 스펙 DECISION17. 원문 전체를 맞혀야 확인되는 해시다. PR2 가 둘을 주인 key 로 만든 HMAC 으로 바꾼다 |
 | DECISION7 | 「읽지 못함」 은 서버가 제목 자리에 내는 고정 글이고 목록 DTO 의 `unreadable` 로 화면이 고치기를 막는다 | 제목을 보이는 화면(목록, 제안 카드, 「기억했어요」, 「참고한 기억」)이 따로 고치지 않아도 같은 글을 보인다 |
+
+## 요구사항 연결
+
+| ID | 해결 방법 | PR |
+| --- | --- | --- |
+| REQ1 | 「REQ 마다 해결 방법」 의 REQ1. 제목과 본문을 주인 데이터 key 로 따로 암호화하고 새 줄은 빈 글로 넣은 뒤 같은 트랜잭션에서 암호문으로 고친다 | PR1 |
+| REQ2 | 「REQ 마다 해결 방법」 의 REQ2. `user_data_key` 에 그룹 줄을 더하고 풀 때 key 주인을 대조한다 | PR1 |
+| REQ3 | 「REQ 마다 해결 방법」 의 REQ3 과 「이관 순서와 실패 처리」. 기동 이관이 줄마다 다시 쓰고 평문 해시를 대조한다 | PR1 |
+| REQ4 | 「REQ 마다 해결 방법」 의 REQ4. 엔티티가 푼 글을 내고 `sealed()` 판정을 `readable()` 로 바꾼다 | PR1 |
+| REQ5 | 「PR2: 민감 구분 제거와 평문 해시」. 엔티티와 질의, 화면에서 민감도와 민감 허용을 빼고 칸은 다음 PR 이 지운다 | PR2 |
+| REQ6 | 「REQ 마다 해결 방법」 의 REQ6. key 를 풀지 못하면 저장을 거절하고 그 줄만 「읽지 못함」 이다 | PR1 |
+| REQ7 | 「REQ 마다 해결 방법」 의 REQ7. 관리자 응답에 남의 개인 기억 제목을 싣지 않는 것을 테스트로 고정한다 | PR1 |
+| REQ8 | 「REQ 마다 해결 방법」 의 REQ8. 실패한 줄은 번호만 남기고 기동을 잇는다 | PR1 |
+
+## PR2: 민감 구분 제거와 평문 해시
+
+PR1 을 배포한 뒤 운영에서 데이터 key 로 옮기지 않은 줄과 옛 key 줄이 모두 0건인 것을 확인했다(2026-11-03). 그래서 PR2 는 옛 key 를 읽지 않아도 된다.
+
+### 바꾸는 구조
+
+| 층 | 무엇을 바꾸나 |
+| --- | --- |
+| `memory.domain` | `Memory`, `MemoryRevision` 이 `sensitivity`, `content_key_id` 를 매핑하지 않는다. `MemoryPlacement` 는 collection 과 꺼내는 방식만 갖는다. `StoredContent` 를 지운다. `MemorySensitivity` 는 문맥 항목의 민감도로만 남는다 |
+| `memory.application` | `MemoryTexts` 가 옛 key 를 읽지 않고, 제안 중복 키와 임베딩 지문을 주인 key 의 HMAC 으로 낸다. `MemoryTextMigration` 이 기동할 때 남은 SHA-256 해시를 HMAC 으로 바꾼다. `MemoryContentCipher` 와 `MemoryEncryptionProperties` 를 지운다 |
+| `memory` 의 판정 | `MemoryAccess` 는 받는 collection 만 갖는다. 질의(`MemoryQueries`, 검색 후보, 임베딩 원천)에서 민감도 조건을 뺀다. 민감 항목 수정 거절(`MEMORY_SENSITIVE_NOT_EDITABLE`)과 `ALWAYS` 거절(`MEMORY_SENSITIVE_ALWAYS`)을 지운다 |
+| `crypto` | `OwnedTextCipher.mac(owner, purpose, text)` 을 더한다. `DataKeyService` 가 데이터 key 에서 쓰임마다 HMAC key 를 뽑는다 |
+| `agent` | `AgentMemoryCollection`, `AgentMemoryCollectionChange` 가 `allow_sensitive` 를 매핑하지 않는다. `AgentMemoryGrants` 는 collection 만 갖는다. 최근 변경은 옛 `SENSITIVE_CHANGED` 기록을 내지 않는다 |
+| 화면 | `/memory` 목록과 문서, 제안 카드, 대화의 「기억했어요」 에서 민감 배지와 숨김 문구, 문서의 민감 선택을 지운다. 에이전트 상세의 「민감 항목까지」 를 지운다 |
+| `memory_remember` | `sensitive` 인자는 그대로 받는다. 참이면 늘 제안이고 저장하지 않는다(스펙 DECISION8) |
+
+### HMAC
+
+- `DataKeyService.mac` 은 `HMAC-SHA256(데이터 key, "data_key_mac:" + 쓰임)` 으로 HMAC key 를 뽑고, 그 key 로 글의 HMAC-SHA256 을 낸다. 쓰임은 `memory:proposal_dedup`, `memory:embedding` 이다
+- 제안 중복 키는 `USER` 주인의 key 로 `주인 번호 \0 제목 \0 본문` 을 HMAC 한 64자 hex 다. 칸 길이(64)가 그대로다
+- 임베딩 지문은 기억의 주인(`USER` 는 사용자, `GROUP` 은 그룹)의 key 로 `모델 \n 글` 을 HMAC 한 32바이트다. 칸 길이(`BINARY(32)`)가 그대로다. 그래서 검색 후보(`RelevanceCandidate`, `MemorySearchCandidate`)와 임베딩 원천(`MemoryEmbeddingSource`)이 범위와 주인 번호를 든다
+- KEK 가 없는 설치는 글이 평문이라 지금처럼 SHA-256 을 쓴다. 주인 key 를 풀지 못하면 중복 키는 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 저장을 거절하고, 지문은 빈 값이라 그 기억은 벡터를 쓰지 않는다
+
+### 이미 있는 해시 바꾸기
+
+`MemoryTextMigration.rekeyHashes` 가 글 이관 다음에 돈다. 줄마다 `REQUIRES_NEW` 트랜잭션이고 실패한 줄은 번호만 남긴다.
+
+1. 제안 중복 키가 있는 줄을 쓰기 잠금으로 읽어 지금 글로 HMAC 을 내고, 다르면 바꾼다. 같은 HMAC 을 이미 다른 줄이 가졌으면(직전 이미지로 되돌린 동안이나 이관 전에 같은 글의 제안이 새 키로 먼저 생겼다) 이 줄의 키를 비운다. 유일 제약에 걸려 평문 해시가 남지 않게 한다
+2. 벡터가 있는 줄은 지금 글과 그 줄의 모델로 HMAC 을 낸다. 같으면 둔다. 저장된 지문이 같은 글의 SHA-256 이면 지문만 HMAC 으로 바꾸고(`replaceFingerprint`, 지문이 그대로일 때만 쓴다) 벡터는 그대로 둔다. 둘 다 아니면 낡은 벡터라 벡터째 비운다. 비우기도 지문이 그대로일 때만 쓴다
+3. 이미 HMAC 인 줄은 건드리지 않으므로 기동마다 돌아도 된다. KEK 가 없으면 돌지 않는다
+
+벡터를 다시 계산하지 않는 까닭은 다시 쓴 벡터마다 연결 찾기가 돌아, 사람이 정리한 대체 제안이 다시 생길 수 있어서다.
+
+## 인터페이스와 데이터
+
+| 자리 | 바뀐 뒤 |
+| --- | --- |
+| `GET /api/v1/memories` 의 `MemoryView` | `sensitive` 를 뺀다. 본문은 풀린 줄이면 늘 싣는다 |
+| 문서 요청(`CreateDocumentRequest`, `UpdateDocumentRequest`) | `sensitive` 를 받지 않는다. 옛 화면이 보내도 무시한다 |
+| 문서 응답(`DocumentSummaryView`, `DocumentView`) | `sensitive` 를 뺀다 |
+| 대화의 기억 기록(`MemoryCaptureView`) | `sensitive` 를 뺀다 |
+| 관리자 기억 영역(`AgentMemorySettingView`) | collection 의 `allowSensitive`, `sensitiveEntryCount`, 변경의 `allowSensitive` 를 뺀다. 저장 요청은 `collection` 만 받고 옛 `allowSensitive` 는 무시한다 |
+| 오류 코드 | `MEMORY_SENSITIVE_NOT_EDITABLE`, `MEMORY_SENSITIVE_ALWAYS` 를 지운다 |
+| 설정 | `assistant.memory.encryption.*`(옛 환경 변수 key)를 지운다. 환경 변수가 남아 있어도 읽지 않는다 |
+| `memory.sensitivity`, `memory.content_key_id`, `memory_revision.sensitivity`, `memory_revision.content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` | 엔티티가 매핑하지 않는 옛 칸이다. 기본값이 없던 `memory_revision.sensitivity` 와 `agent_memory_collection_change.allow_sensitive` 에 기본값만 둔다(`V20261103054413`, DDL 하나). 칸은 다음 PR 이 지운다 |
+| `proposal_dedup_key`, `embedding_fingerprint` | 칸 모양은 그대로이고 값이 HMAC 이다 |
+
+H2 테스트 DB 는 엔티티로 스키마를 만들므로, 옛 칸을 `memory-legacy-columns.sql` 로 따로 만들어 운영 스키마와 맞춘다. 옛 이미지가 남긴 줄을 흉내 내는 테스트가 그 칸에 값을 넣는다.
+
+## 실패와 일관성
+
+- **이 PR 을 배포한 뒤 PR1 이미지로 되돌릴 수 있다.** 칸이 남아 있어 `ddl-auto: validate` 가 지나간다. 되돌린 이미지는 칸에 남은 `SENSITIVE` 를 읽어 그 줄을 다시 숨긴다. PR2 이미지가 넣은 줄은 기본값 `NORMAL` 이라 숨지 않는다
+- 되돌린 동안 PR1 이미지는 SHA-256 으로 중복 키를 낸다. 다시 올리면 기동 이관이 HMAC 으로 바꾸고, 같은 글의 키가 겹치면 나중 줄의 키를 비운다. 그 사이 같은 제안이 한 번 더 생길 수 있다. 되돌림이라는 예외 상황이라 막지 않는다
+- 되돌린 PR1 이미지는 HMAC 지문을 낡은 것으로 보고 첫 주기에 벡터를 모두 다시 임베딩한다. 다시 쓴 벡터마다 연결 찾기가 돌아 정리한 대체 제안이 다시 생길 수 있다. 되돌리기 전에 임베딩을 끄면 막을 수 있고, 절차는 운영 저장소가 갖는다
+- 해시 바꾸기는 줄마다 따로 커밋한다. 한 줄이 실패해도 다음 줄로 가고 기동은 잇는다. 실패한 줄은 다음 기동이 다시 본다
+- 지문 바꾸기는 저장된 지문이 읽은 값 그대로일 때만 쓴다. 그 사이 채우는 작업이 새 벡터를 썼으면 덮지 않는다
+- 옛 key 줄이 남아 있으면 옛 key 를 읽지 않으므로 암호문을 평문으로 본다. 운영 0건을 확인한 뒤 이 PR 을 열었다(스펙 REQ8). 칸을 지우는 다음 PR 이 그 칸이 빈 것을 다시 본다
+
+## PR2 검증 전략
+
+| REQ | 테스트 | DB |
+| --- | --- | --- |
+| REQ5 | 직전 이미지가 `SENSITIVE` 로 남긴 줄이 목록에 본문과 함께 보이고 목록 경로로 고쳐지며, collection 을 받은 에이전트의 색인과 `memory_read` 에 실린다. 에이전트 기억 영역의 응답과 화면에 민감 허용이 없고, 옛 `SENSITIVE_CHANGED` 기록은 최근 변경에 없다 | H2 |
+| REQ5 | 옛 key 설정 없이 뜬 서버가 화면, 그룹, 문서, 제안 기억을 저장하고 다시 읽는다 | H2, MySQL |
+| DECISION17 | 제안 중복 키가 평문 SHA-256 이 아니고 같은 글이면 같은 값, 다른 사용자면 다른 값이다. 기동 이관이 SHA-256 이던 중복 키와 지문을 HMAC 으로 바꾸고 벡터는 그대로이며, 낡은 지문은 벡터째 비우고, 두 번 돌려도 바뀌지 않는다 | H2, MySQL |
+| REQ4 | 기존 기억, 조립, 도구, 측정 테스트를 통과시킨다. 측정 데이터의 민감 경계 사례(BO-04)는 받지 않는 collection 경계로 바꿔 같은 금지 판정을 유지한다 | H2 |
+
+## 결정
+
+| ID | 결정 | 답 | 누가 | 근거 |
+| --- | --- | --- | --- | --- |
+| DECISION8 | 칸을 이 PR 에서 지울지 | 지우지 않는다. 코드는 읽고 쓰지 않고 기본값 DDL 만 담는다. 칸은 배포를 확인한 뒤 따로 지운다 | 작성자(위임) | 코디네이터가 정했다(2026-11-03). 직전 이미지로 되돌릴 길을 남긴다(ADR-20261102 / table-reduce-r2 의 선례) |
+| DECISION9 | HMAC key | 데이터 key 에서 쓰임마다 HMAC 으로 뽑는다 | 작성자 | 암호화 key 를 HMAC key 로 그대로 쓰지 않는다. 데이터 key 를 지우면 해시도 맞혀 볼 수 없다 |
+| DECISION10 | 이미 있는 임베딩 지문 | 같은 글의 SHA-256 이면 그 자리에서 HMAC 으로 바꾸고, 아니면 벡터째 비운다 | 작성자 | 다시 임베딩하면 연결 찾기가 다시 돌아 정리한 대체 제안이 되살아날 수 있다 |
+| DECISION11 | `MemorySensitivity` | 문맥 항목의 민감도로 남긴다. 기억 항목은 늘 `NORMAL` 이다 | 작성자 | 위임 결과, 커넥터 결과, 할 일이 `SENSITIVE` 로 `instructions` 에서 빠지는 규칙은 그대로다 |
+| DECISION12 | 옛 `SENSITIVE_CHANGED` 기록 | 값은 읽을 수 있게 두고 최근 변경에 내지 않는다 | 작성자 | 없어진 설정의 변경을 보여도 뜻이 없다. 지우면 감사 기록이 사라진다 |
+

@@ -3,7 +3,7 @@
 확인: 2026-11-03
 
 구현을 마친 변경의 기록이며 지금 동작은 [기능 파일](../memory.md)이 갖는다.
-이 스펙은 PR 두 개로 구현한다. PR1 은 REQ1 부터 REQ4, REQ6 부터 REQ8 이고, REQ5 는 PR2 로 미룬다(`deferred`).
+이 스펙은 PR 세 개로 구현한다. PR1 은 REQ1 부터 REQ4, REQ6 부터 REQ8 이고, PR2 는 REQ5 의 코드와 화면, DECISION17 이다. REQ5 의 「칸이 없다」 는 PR2 배포를 확인한 뒤 칸을 지우는 PR3 이 채운다(`deferred`, 설계의 DECISION8).
 
 ## 목표
 
@@ -46,7 +46,7 @@
 
 - 암호화 PR 은 배포 뒤 직전 이미지로 되돌리지 않는다. 직전 이미지는 암호문을 그대로 화면과 답에 낸다. 이관 직전에 DB 백업을 하나 떠 두고, 문제가 생기면 앞으로 고친다
 - PR 은 둘 이상이다. 1) 그룹 key 와 기억 암호화, 이관(REQ1~REQ4, REQ6) 2) 민감 구분 제거(REQ5). 1 을 배포해 운영 건수를 확인한 뒤 2 를 연다
-- 사용자별 데이터 key 는 대화 메시지가 쓰는 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 key 다. 민감 본문의 환경 변수 key([ADR-055](../../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md))는 이관 뒤 쓰지 않는다
+- 사용자별 데이터 key 는 대화 메시지가 쓰는 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 key 다. 민감 본문의 환경 변수 key([ADR-055](../../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md))는 이관 뒤 쓰지 않는다
 - 검색은 지금도 후보를 SQL 로 읽고 점수를 앱에서 매긴다. 제목과 본문을 앱에서 풀어 점수를 매긴다. 운영 기억이 수십 건이라 속도 영향은 작고, 측정 게이트로 확인한다
 - 근거: `docs/features/memory.md` 의 「범위와 조립」 가운데 「제목과 본문」 단락, 「기억 검색의 구현 계약」, 「개인 사실 구역」, `backend/docs/data-schema.md` 의 `memory`, `user_data_key`
 

@@ -9,7 +9,6 @@ import com.bifos.assistant.context.application.dto.MemorySearchPlacement;
 import com.bifos.assistant.context.config.MemorySearchSectionProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,8 +25,8 @@ import lombok.NoArgsConstructor;
  * 연결된 기억 구역을 싣는다(ADR-20261015 / memory-link). 개인 사실 구역과 질문과 관련된 기억 구역에 본문으로 실린 항목과 효력 있는 {@code RELATED} 로
  * 이어진 한 단계 이웃을 본문으로 싣는다. 두 단계 이상은 따라가지 않는다.
  *
- * <p>이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한, 승인, 대체되지 않음 조건을 지났으므로 이 구역이 볼 수 없는 항목을 싣지 못한다. 민감 항목과
- * 암호화한 항목, 본문이 항목당 상한보다 긴 항목은 싣지 않고 색인에 둔다. 건수와 항목당 글자 수, 구역 글자 예산은 질문 구역의 설정
+ * <p>이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한, 승인, 대체되지 않음 조건을 지났으므로 이 구역이 볼 수 없는 항목을 싣지 못한다. 풀지 못한
+ * 항목, 본문이 항목당 상한보다 긴 항목은 싣지 않고 색인에 둔다. 건수와 항목당 글자 수, 구역 글자 예산은 질문 구역의 설정
  * ({@code assistant.context.search})과 같은 값을 이 구역의 몫으로 따로 쓴다. 예산이나 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -82,7 +81,7 @@ final class MemoryLinkSection {
             }
             Memory memory = candidates.get(neighbor.memoryId());
             rank++;
-            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > limits.itemMaxChars()) {
+            if (indexOnly.contains(memory.id()) || !memory.readable() || memory.content().length() > limits.itemMaxChars()) {
                 continue;
             }
             String line = MemoryItems.inlineLine(memory);
@@ -139,8 +138,4 @@ final class MemoryLinkSection {
         return ordered;
     }
 
-
-    private static boolean plain(Memory memory) {
-        return memory.sensitivity() == MemorySensitivity.NORMAL && memory.readable();
-    }
 }

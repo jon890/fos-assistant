@@ -24,7 +24,6 @@ import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
@@ -87,13 +86,13 @@ final class JpaAuditingEntityFixtures {
         ToolPolicyDecision decision = new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
         ConnectorAction action = ConnectorAction.decided(connection, agent.id(), execution, "audit", "audit", decision, false, unique, "f".repeat(64), BUSINESS);
         entityManager.persist(action);
-        Memory memory = add(entityManager, rows, Memory.accepted(MemoryScope.USER, user.id(), null, "기억", StoredContent.plain("본문"),
+        Memory memory = add(entityManager, rows, Memory.accepted(MemoryScope.USER, user.id(), null, "기억", "본문",
             MemoryPlacement.core(MemoryRetrieval.SEARCH), user.id(), BUSINESS));
         ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.values()[0], false, BUSINESS);
         entityManager.persist(check);
 
         add(entityManager, rows, AllowedPerson.of(unique + "@audit.test", "허용", unique));
-        add(entityManager, rows, AgentMemoryCollection.of(agent.id(), "core", false));
+        add(entityManager, rows, AgentMemoryCollection.of(agent.id(), "core"));
         add(entityManager, rows, UserBrowser.create(user.id(), unique, BUSINESS));
         add(entityManager, rows, AgentToken.issueFor(unique, "f".repeat(64), "검사"));
         add(entityManager, rows, UserDataKey.wrapped(user.id(), "audit", "wrapped"));

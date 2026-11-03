@@ -27,6 +27,7 @@ import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.config.MemoryRelevanceProperties;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.QueryEmbedder;
+import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
@@ -55,6 +56,9 @@ class ContextAssemblerHybridTest {
     private static final String AGENT_CODE = "context-hybrid-test";
     private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
     private static final String QUESTION = "바퀴 언제 바꿨지";
+
+    @Autowired
+    MemoryTexts texts;
 
     @Autowired
     MemoryLinkDiscovery linkDiscovery;
@@ -176,7 +180,7 @@ class ContextAssemblerHybridTest {
 
     private ContextAssembler assembler(MemoryEmbeddingProperties embedding) {
         MemoryRelevance relevance = new MemoryRelevance(
-            new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(embeddings, embedding));
+            new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(embeddings, embedding, texts));
         MemorySearchSection section = new MemorySearchSection(
             relevance, MemorySearchSectionProperties.defaults(), new QueryEmbedder(embedding, client));
         return new ContextAssembler(memories, properties, clock, section);
@@ -185,7 +189,8 @@ class ContextAssemblerHybridTest {
 
     private void refresh() {
         new MemoryEmbeddingRefresher(
-            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks, linkDiscovery)
+            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED, texts), backgroundTasks,
+            linkDiscovery, texts)
                 .refreshOnce();
     }
 

@@ -7,7 +7,6 @@ import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.criteria.CommonAbstractCriteria;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -45,17 +44,15 @@ public final class MemoryQueries {
      *
      * <p>볼 수 있는 항목 가운데 승인됐고, 출처 원문이 아니며, 대체되지 않았고, 꺼내는 방식이 맞는 것만 고른다. 대체됐다는 것은
      * 효력 있는 {@code SUPERSEDES} 연결이 그 항목을 가리킨다는 뜻이다(ADR-20261015 / memory-link). {@code collections} 가
-     * null 이면 collection 과 민감도를 거르지 않는다. 사용자가 자기 목록을 볼 때 쓴다.
+     * null 이면 collection 을 거르지 않는다. 사용자가 자기 목록을 볼 때 쓴다.
      *
      * @param collections 에이전트가 받는 collection. null 이면 거르지 않는다
-     * @param sensitiveCollections 그 가운데 민감 항목까지 받는 collection
      */
     public static Specification<Memory> injectable(
         Long userId,
         Long groupId,
         MemoryRetrieval retrieval,
-        Set<String> collections,
-        Set<String> sensitiveCollections) {
+        Set<String> collections) {
         return (root, query, builder) -> {
             Predicate selected = builder.and(
                 readable(root, builder, userId, groupId),
@@ -66,11 +63,7 @@ public final class MemoryQueries {
             if (collections == null) {
                 return selected;
             }
-            Predicate normal = builder.equal(root.get("sensitivity"), MemorySensitivity.NORMAL);
-            Predicate sensitivity = sensitiveCollections.isEmpty()
-                ? normal
-                : builder.or(normal, root.get("collection").in(sensitiveCollections));
-            return builder.and(selected, root.get("collection").in(collections), sensitivity);
+            return builder.and(selected, root.get("collection").in(collections));
         };
     }
 

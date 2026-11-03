@@ -12,9 +12,11 @@ import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.config.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -94,6 +96,18 @@ public class DataKeyService implements TextCipher, BinaryCipher, OwnedTextCipher
     @Override
     public Optional<String> open(Long keyId, KeyOwner owner, String aad, String sealed) {
         return openBytes(keyId, owner, aad, sealed).map(plain -> new String(plain, StandardCharsets.UTF_8));
+    }
+
+
+    @Override
+    public Optional<byte[]> mac(KeyOwner owner, String purpose, String text) {
+        if (!enabled()) {
+            return Optional.empty();
+        }
+        DataKey key = forWriting(owner);
+        // 암호화 key 를 HMAC key 로 그대로 쓰지 않는다. 쓰임마다 따로 뽑은 key 를 쓴다
+        byte[] derived = hmac(key.secret().getEncoded(), bytes("data_key_mac:" + purpose));
+        return Optional.of(hmac(derived, bytes(text)));
     }
 
 
@@ -213,6 +227,17 @@ public class DataKeyService implements TextCipher, BinaryCipher, OwnedTextCipher
         byId.put(row.id(), key);
         byOwner.put(owner, key);
         return key;
+    }
+
+
+    private static byte[] hmac(byte[] key, byte[] message) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            return mac.doFinal(message);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 is not available", e);
+        }
     }
 
 

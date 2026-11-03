@@ -24,7 +24,6 @@ import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -222,16 +221,18 @@ class ContextAssemblerLinkTest {
 
 
     @Test
-    @DisplayName("에이전트가 받지 않는 collection 과 민감 이웃은 본문으로 싣지 않고, 받지 않는 이웃과 풀지 못한 이웃은 색인에도 없다")
+    @DisplayName("에이전트가 받지 않는 collection 의 이웃과 풀지 못한 이웃은 싣지 않고, 예전 민감 이웃은 받은 collection 이면 본문까지 싣는다")
     void keepsNeighborsInsideAgentBoundary() {
         if (grants.findById(new AgentMemoryCollectionId(agentId, HEALTH)).isEmpty()) {
-            grants.save(AgentMemoryCollection.of(agentId, HEALTH, true));
+            grants.save(AgentMemoryCollection.of(agentId, HEALTH));
         }
         Memory trip = memories.create(ADMIN, MemoryScope.USER, "여름 여행", "8월에 제주에 간다", false);
         Memory career = memories.create(
-            ADMIN, MemoryScope.USER, "출장", "제주 출장 일정", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            ADMIN, MemoryScope.USER, "출장", "제주 출장 일정", "career", MemoryRetrieval.SEARCH);
         Memory sensitive = memories.create(
-            ADMIN, MemoryScope.USER, "멀미약", "제주 가는 배에서 먹는 약", HEALTH, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+            ADMIN, MemoryScope.USER, "멀미약", "제주 가는 배에서 먹는 약", HEALTH, MemoryRetrieval.SEARCH);
+        // 직전 이미지가 민감으로 남긴 칸은 코드가 읽지 않는다
+        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", sensitive.id());
         Long sealed = insertSealed("봉인한 숙소 메모");
         relate(trip, career, 0.9);
         relate(trip, sensitive, 0.9);
@@ -239,13 +240,14 @@ class ContextAssemblerLinkTest {
 
         AssembledContext result = assembler.assemble(ADMIN, agentId);
 
-        assertThat(result.bundle().items()).noneMatch(item -> item.source() == ContextSource.MEMORY_LINK);
+        // 예전 민감 이웃은 본문이 짧아 개인 사실 구역에 먼저 실린다. 어느 구역이든 본문으로 실리는 것을 본다
+        assertThat(result.bundle().items())
+            .anyMatch(item -> item.ref().equals("memory:" + sensitive.id()) && item.body() != null);
         assertThat(result.bundle().items()).noneMatch(item -> item.ref().equals("memory:" + career.id()));
-        assertThat(itemOf(result, sensitive, ContextSource.MEMORY_INDEX)).isPresent();
         assertThat(result.bundle().items())
             .as("풀지 못한 줄은 실행에 싣지 않는다(ADR-20261103 / memory-encryption)")
             .noneMatch(item -> item.ref().equals("memory:" + sealed));
-        assertThat(result.instructions()).doesNotContain("제주 출장 일정", "배에서 먹는 약", "v1.봉인");
+        assertThat(result.instructions()).contains("배에서 먹는 약").doesNotContain("제주 출장 일정", "v1.봉인");
     }
 
 
@@ -278,12 +280,12 @@ class ContextAssemblerLinkTest {
     }
 
 
-    /** 본문이 암호문이라고 표시한 일반 민감도 줄이다. 데이터가 어긋난 경우를 흉내 낸다. */
+    /** 없는 데이터 key 의 암호문이라고 표시한 줄이다. 데이터가 어긋난 경우를 흉내 낸다. */
     private Long insertSealed(String title) {
         jdbc.update("""
-                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, content_key_id,
+                INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, data_key_id,
                     retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.봉인-본문', 'test-1', 'SEARCH', FALSE,
+                VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.봉인-본문', 999999999, 'SEARCH', FALSE,
                     'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """, title);
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);

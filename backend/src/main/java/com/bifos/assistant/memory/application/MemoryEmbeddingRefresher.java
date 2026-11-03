@@ -45,6 +45,7 @@ public class MemoryEmbeddingRefresher {
     private final MemoryVectorCache vectorCache;
     private final BackgroundTasks backgroundTasks;
     private final MemoryLinkDiscovery linkDiscovery;
+    private final MemoryTexts texts;
     private final AtomicBoolean running = new AtomicBoolean();
 
 
@@ -101,7 +102,7 @@ public class MemoryEmbeddingRefresher {
             List<Long> ids = pending.subList(start, Math.min(start + properties.batchSize(), pending.size())).stream()
                 .map(MemoryEmbeddingSource::memoryId)
                 .toList();
-            // 주기 처음에 읽은 글은 몇 분 지났을 수 있다. 그 사이 민감으로 바뀐 항목의 평문을 보내지 않게 보내기 직전에 다시 읽는다
+            // 주기 처음에 읽은 글은 몇 분 지났을 수 있다. 그 사이 대상에서 빠진 항목의 글을 보내지 않게 보내기 직전에 다시 읽는다
             List<MemoryEmbeddingSource> batch = readOnly().execute(status -> embeddings.findEmbeddableSourcesByIds(ids));
             batches++;
             if (batch.isEmpty()) {
@@ -143,12 +144,14 @@ public class MemoryEmbeddingRefresher {
     private List<MemoryEmbeddingSource> pending(List<MemoryEmbeddingSource> sources, List<MemoryEmbeddingStamp> stamps) {
         Map<Long, MemoryEmbeddingStamp> byId = stamps.stream()
             .collect(Collectors.toMap(MemoryEmbeddingStamp::memoryId, Function.identity()));
+        // 주인 key 로 지문을 만들지 못한 항목은 벡터를 쓸 수 없어 이번 주기에 채우지 않는다
         return sources.stream()
+            .filter(source -> fingerprintOf(source) != null)
             .filter(source -> {
                 MemoryEmbeddingStamp stamp = byId.get(source.memoryId());
                 return stamp == null
                     || !stamp.model().equals(properties.model())
-                    || !Arrays.equals(stamp.textFingerprint(), EmbeddingText.fingerprint(properties.model(), textOf(source)));
+                    || !Arrays.equals(stamp.textFingerprint(), fingerprintOf(source));
             })
             .toList();
     }
@@ -226,12 +229,21 @@ public class MemoryEmbeddingRefresher {
             if (!stillEligible.contains(source.memoryId())) {
                 continue;
             }
-            byte[] fingerprint = EmbeddingText.fingerprint(properties.model(), textOf(source));
+            byte[] fingerprint = fingerprintOf(source);
+            if (fingerprint == null) {
+                continue;
+            }
             if (embeddings.writeVector(source.memoryId(), properties.model(), fingerprint, MemoryEmbeddingVector.encode(vectors.get(i))) == 1) {
                 written.add(source.memoryId());
             }
         }
         return written;
+    }
+
+
+    /** @return 주인 key 를 풀지 못하면 null 이다 */
+    private byte[] fingerprintOf(MemoryEmbeddingSource source) {
+        return texts.embeddingFingerprint(source.scope(), source.ownerId(), properties.model(), textOf(source)).orElse(null);
     }
 
 

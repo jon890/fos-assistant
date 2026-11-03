@@ -13,7 +13,6 @@ import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.application.dto.RelevanceResult;
 import com.bifos.assistant.memory.application.dto.RelevanceScore;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,7 +31,7 @@ import org.springframework.stereotype.Component;
  * <p>후보는 개인 사실 구역에 실리지 않은 색인 후보다. 관련 있는 항목을 점수 순으로 보며, 일반 본문이 {@code itemMaxChars} 이하이고 구역 합계가
  * {@code maxChars} 와 남은 자리 안에 드는 것을 {@code maxItems} 건까지 싣는다. 들어가지 않는 항목은 자르지 않고 건너뛰어 색인에 남긴다.
  *
- * <p>민감 항목과 암호화한 항목은 본문을 점수에 넘기지 않는다. 제목으로만 점수를 받고 이 구역에 싣지 않는다.
+ * <p>풀지 못한 항목은 본문을 점수에 넘기지 않고 이 구역에 싣지 않는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -84,7 +83,7 @@ public class MemorySearchSection {
         for (int i = 0; i < result.ranked().size() && placed.size() < properties.maxItems(); i++) {
             RelevanceScore score = result.ranked().get(i);
             Memory memory = byId.get(score.memoryId());
-            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > properties.itemMaxChars()) {
+            if (indexOnly.contains(memory.id()) || !memory.readable() || memory.content().length() > properties.itemMaxChars()) {
                 continue;
             }
             String line = MemoryItems.inlineLine(memory);
@@ -135,13 +134,9 @@ public class MemorySearchSection {
     }
 
 
-    /** 일반 항목이고 풀린 줄만 본문을 점수에 넘긴다. */
+    /** 풀린 줄만 본문을 점수에 넘긴다. */
     private static RelevanceCandidate candidateOf(Memory memory) {
-        return new RelevanceCandidate(memory.id(), memory.title(), plain(memory) ? memory.content() : null);
-    }
-
-
-    private static boolean plain(Memory memory) {
-        return memory.sensitivity() == MemorySensitivity.NORMAL && memory.readable();
+        return new RelevanceCandidate(
+            memory.id(), memory.title(), memory.readable() ? memory.content() : null, memory.scope(), memory.stored().ownerId());
     }
 }

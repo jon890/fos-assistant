@@ -248,7 +248,6 @@ test("기억했어요 줄에서 되돌리면 참고한 기억을 다시 읽는�
         status: "ACCEPTED",
         title: "딸 이름",
         content: "딸 이름은 하늘이에요.",
-        sensitive: false,
         alwaysInject: false,
         createdAt: "2026-10-07T12:00:00Z",
       },

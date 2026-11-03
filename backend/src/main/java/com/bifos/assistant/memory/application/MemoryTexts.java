@@ -12,6 +12,8 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.Sha256;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -28,6 +30,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>KEK 가 없는 설치는 평문으로 저장하고 한 번 경고한다. KEK 가 있는데 데이터 key 를 풀지 못하면 저장을 거절한다. 평문으로 내려 저장하지
  * 않는다. 로그에는 기억 번호만 남긴다.
+ *
+ * <p>같은 글이 같은 값이어야 하는 칸(제안 중복 키, 임베딩 지문)은 주인 key 에서 뽑은 HMAC 으로 만든다. 평문의 해시를 DB 에 남기지 않는다(ADR-20261103 / memory-sensitivity-removal). KEK 가 없는 설치는 글이 평문이라 SHA-256 을 쓴다.
  */
 @Slf4j
 @Component
@@ -35,7 +39,6 @@ import org.springframework.stereotype.Component;
 public class MemoryTexts implements MemoryTextOpener {
 
     private final OwnedTextCipher cipher;
-    private final MemoryContentCipher legacy;
     private final MemoryRepository memories;
     private final AtomicBoolean warnedPlain = new AtomicBoolean();
 
@@ -95,16 +98,45 @@ public class MemoryTexts implements MemoryTextOpener {
                 : cipher.open(stored.dataKeyId(), owner, aad(stored, "content"), stored.content());
             return content.map(body -> new MemoryText(title.get(), body));
         }
-        if (stored.legacyKeyId() != null) {
-            try {
-                return Optional.of(new MemoryText(
-                    stored.title(), legacy.open(stored.content(), stored.legacyKeyId(), legacyBinding(stored))));
-            } catch (ApiException | IllegalStateException e) {
-                log.warn("옛 key 로 기억 본문을 풀지 못했다 memoryId={}", stored.memoryId());
-                return Optional.empty();
-            }
-        }
         return Optional.of(new MemoryText(stored.title(), stored.content()));
+    }
+
+
+    /**
+     * 제안 중복 키다. 같은 사용자가 같은 제목과 본문을 다시 제안하면 같은 값이다.
+     *
+     * @throws ApiException 데이터 key 를 풀지 못할 때. MEMORY_ENCRYPTION_UNAVAILABLE
+     */
+    public String proposalDedupKey(Long ownerUserId, String title, String content) {
+        String text = ownerUserId + "\u0000" + title + "\u0000" + content;
+        try {
+            return cipher.mac(KeyOwner.user(ownerUserId), "memory:proposal_dedup", text)
+                .map(HexFormat.of()::formatHex)
+                .orElseGet(() -> Sha256.hex(text));
+        } catch (IllegalStateException e) {
+            log.warn("제안 중복 키를 만들지 못해 저장을 거절한다 ownerUserId={} reason={}", ownerUserId, e.getMessage());
+            throw new ApiException(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE, "memory encryption key is not available");
+        }
+    }
+
+
+    /**
+     * 임베딩 지문이다. 모델 이름과 임베딩한 글이 같으면 같은 값이다. 모델을 바꾸면 모든 지문이 달라진다.
+     *
+     * @param scope 기억의 범위. 주인 key 를 고른다
+     * @param ownerId {@code USER} 면 주인 사용자 번호, {@code GROUP} 이면 그룹 번호
+     * @return 주인 데이터 key 를 풀지 못하면 빈 값이다. 그 기억은 벡터를 쓰지 않는다
+     */
+    public Optional<byte[]> embeddingFingerprint(MemoryScope scope, Long ownerId, String model, String text) {
+        String message = model + "\n" + text;
+        KeyOwner owner = scope == MemoryScope.GROUP ? KeyOwner.group(ownerId) : KeyOwner.user(ownerId);
+        try {
+            return Optional.of(cipher.mac(owner, "memory:embedding", message)
+                .orElseGet(() -> EmbeddingText.plainFingerprint(model, text)));
+        } catch (IllegalStateException e) {
+            log.warn("임베딩 지문을 만들지 못했다 owner={} reason={}", owner, e.getMessage());
+            return Optional.empty();
+        }
     }
 
 
@@ -134,9 +166,4 @@ public class MemoryTexts implements MemoryTextOpener {
         return "memory:" + stored.memoryId() + ":" + column + ":" + stored.scope().name() + ":" + stored.ownerId();
     }
 
-
-    /** ADR-055 의 옛 AAD 다. */
-    private static String legacyBinding(StoredMemoryText stored) {
-        return stored.scope().name() + ":" + stored.ownerId();
-    }
 }

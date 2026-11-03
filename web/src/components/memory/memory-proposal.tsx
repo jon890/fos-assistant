@@ -50,9 +50,9 @@ export function MemoryProposal({
       onToggle={onToggle}
       tone="review"
     >
-      {memory.sensitive ? (
+      {memory.unreadable ? (
         <p className="text-sm text-muted-foreground">
-          민감한 내용이라 여기서는 보이지 않아요.
+          이 기억은 지금 읽지 못해요.
         </p>
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm">

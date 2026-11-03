@@ -13,7 +13,6 @@ type MemoryView = {
   scope: string;
   alwaysInject: boolean;
   status: string;
-  sensitive: boolean;
   omittedFromContext: boolean;
 };
 
@@ -340,14 +339,11 @@ export const memoryScenario: Scenario = {
       200,
       "기존 Memory 허용 읽기",
     ).json<{
-      collections: { key: string; granted: boolean; allowSensitive: boolean }[];
+      collections: { key: string; granted: boolean }[];
     }>();
     const previousGrants = settings.collections
       .filter((item) => item.granted)
-      .map((item) => ({
-        collection: item.key,
-        allowSensitive: item.allowSensitive,
-      }));
+      .map((item) => ({ collection: item.key }));
     let completed: Promise<void> | undefined;
     try {
       // 제목만으로도 조립 상한을 넘는 합성 자료를 만든다. 본문은 개인 사실 구역의 항목 상한보다 길다.

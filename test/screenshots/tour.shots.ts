@@ -380,14 +380,12 @@ test("문서와 영역", async ({ page }) => {
       documentKey: "weekly-routine",
       title: "주간 일과",
       content: "월요일 저녁 요가, 금요일 장보기, 토요일 나들이.",
-      sensitive: false,
     },
     {
       collection: keyOf("건강"),
       documentKey: "health-notes",
       title: "건강 메모",
       content: "봄철 꽃가루 알레르기가 있다.",
-      sensitive: true,
     },
   ];
   for (const document of documents) {

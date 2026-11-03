@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-11-03
-- [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 「민감 본문만 환경 변수 key 로 암호화한다」, 「제목과 일반 본문은 평문이다」, AAD 와 `content_key_id` 를 이 결정이 대체한다. 암호문 모양 `v1.<IV>.<암호문과 태그>` 와 AES-256-GCM 은 그대로다.
+- [ADR-055](archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 「민감 본문만 환경 변수 key 로 암호화한다」, 「제목과 일반 본문은 평문이다」, AAD 와 `content_key_id` 를 이 결정이 대체한다. 암호문 모양 `v1.<IV>.<암호문과 태그>` 와 AES-256-GCM 은 그대로다.
 - [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) 의 KEK, 데이터 key, 본문 세 층을 기억에도 쓴다. 그 ADR 의 「데이터 key 는 사용자마다 하나」 에 그룹마다 하나인 줄을 더한다.
 - 스펙과 설계는 [`docs/features/memory/spec.md`](../../../docs/features/memory/spec.md), [`design.md`](../../../docs/features/memory/design.md) 가 갖는다.
 
@@ -61,6 +61,6 @@ ADR-055 가 「모든 본문 암호화」 를 버린 까닭은 검색이 본문�
   - 새 기억은 넣고 고치는 쓰기 두 번이다.
   - 그룹 key 줄은 그룹 삭제 흐름이 없어 지우는 길이 없다. 그 흐름을 만들 때 함께 지운다.
   - 임베딩 벡터와 Hermes 의 실행 기록에 남는 글은 평문이다.
-  - 제안 중복 키와 임베딩 지문은 제목과 본문 평문의 해시로 남는다. 짐작한 원문 전체가 맞는지 확인할 수 있다. 민감 구분을 없애는 다음 PR 에서 주인 key 로 만든 HMAC 으로 바꾼다(사용자 결정 2026-11-03).
+  - 제안 중복 키와 임베딩 지문은 제목과 본문 평문의 해시로 남는다. 짐작한 원문 전체가 맞는지 확인할 수 있다. 민감 구분을 없애는 다음 PR 에서 주인 key 로 만든 HMAC 으로 바꾼다(사용자 결정 2026-11-03). 바꾼 방식은 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 갖는다.
   - 같은 기억 안에서는 지금 줄과 revision 사이, revision 끼리 암호문을 바꿔 넣으면 풀린다. 모두 같은 주인이 보던 글이다.
-  - 옛 환경 변수 key 읽기는 이관을 운영에서 확인할 때까지 남는다.
+  - 옛 환경 변수 key 읽기는 이관을 운영에서 확인할 때까지 남는다. 운영 확인 뒤 [ADR-20261103 / memory-sensitivity-removal](../../../docs/adr/ADR-20261103-memory-sensitivity-removal.md) 이 걷어 냈다.

@@ -10,7 +10,6 @@ import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
 import com.bifos.assistant.memory.application.dto.MemoryRememberResult;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import java.util.List;
@@ -158,7 +157,7 @@ public class McpMemoryRemember {
                 strippedTitle,
                 strippedContent,
                 collection,
-                sensitive ? MemorySensitivity.SENSITIVE : MemorySensitivity.NORMAL,
+                sensitive,
                 memoryId,
                 origin.id(),
                 origin.conversationId(),

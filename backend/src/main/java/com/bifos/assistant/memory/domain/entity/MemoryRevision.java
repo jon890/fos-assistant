@@ -8,7 +8,6 @@ import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
@@ -79,17 +78,13 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     @Column(name = "title", nullable = false, length = 1200)
     private String storedTitle;
 
-    /** 저장된 본문이다. {@link #dataKeyId} 나 {@link #contentKeyId} 가 있으면 암호문이다. */
+    /** 저장된 본문이다. {@link #dataKeyId} 가 있으면 암호문이다. */
     @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String storedContent;
 
-    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이거나 옛 key 의 줄이다. */
+    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이다. */
     @Column(name = "data_key_id")
     private Long dataKeyId;
-
-    /** ADR-055 의 옛 key 로 본문을 암호화했으면 그 key 의 id 다. 이관하면 비운다. */
-    @Column(name = "content_key_id", length = 32)
-    private String contentKeyId;
 
     @Transient
     @Getter(AccessLevel.NONE)
@@ -106,10 +101,6 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MemoryRetrieval retrieval;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private MemorySensitivity sensitivity;
 
     /** 이 판을 물러나게 한 사람이다. */
     @Column(name = "changed_by_user_id")
@@ -146,11 +137,9 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         revision.storedTitle = memory.storedTitle();
         revision.storedContent = memory.storedContent();
         revision.dataKeyId = memory.dataKeyId();
-        revision.contentKeyId = memory.contentKeyId();
         revision.plain = memory.readable() ? new MemoryText(memory.title(), memory.content()) : null;
         revision.unreadable = !memory.readable();
         revision.retrieval = memory.retrieval();
-        revision.sensitivity = memory.sensitivity();
         revision.changedByUserId = changedByUserId;
         revision.reason = reason;
         revision.changedAt = at;
@@ -179,8 +168,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     /** 저장된 글과 key, 주인이다. 원래 기억의 번호로 AAD 를 만든다. */
     public StoredMemoryText stored() {
         return new StoredMemoryText(
-            id.memoryId(), scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId,
-            contentKeyId);
+            id.memoryId(), scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId);
     }
 
 
@@ -190,20 +178,18 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     }
 
 
-    /** 남긴 revision 의 뜻은 바꾸지 않고 저장 모양만 주인 데이터 key 의 암호문으로 바꾼다. 옛 key 표시는 비운다. */
+    /** 남긴 revision 의 뜻은 바꾸지 않고 저장 모양만 주인 데이터 key 의 암호문으로 바꾼다. */
     public void seal(SealedMemoryText sealed) {
         opened();
         this.storedTitle = sealed.title();
         this.storedContent = sealed.content();
         this.dataKeyId = sealed.dataKeyId();
-        this.contentKeyId = null;
     }
 
 
     private Optional<MemoryText> opened() {
         if (plain == null && !unreadable) {
-            boolean sealed = dataKeyId != null || contentKeyId != null;
-            Optional<MemoryText> read = sealed
+            Optional<MemoryText> read = dataKeyId != null
                 ? (opener == null ? Optional.empty() : opener.open(stored()))
                 : Optional.of(new MemoryText(storedTitle, storedContent));
             plain = read.orElse(null);

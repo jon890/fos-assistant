@@ -10,11 +10,11 @@ covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components
 점수는 매 turn 의 「질문과 관련된 기억」 구역과 같은 것을 쓴다(아래 「범위와 조립」). 근거와 페이지 방식의 까닭은 [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 이 갖는다.
 
 - 기존 MCP 서버가 읽기 전용 `memory_search(query, limit?, cursor?)`를 받는다. `query`는 앞뒤 공백을 뺀 1자부터 200자까지, `limit`는 기본 10, 1부터 50까지이고 `cursor`는 앞 결과의 `nextCursor` 문자열이다. 모르는 인자와 잘못된 타입, 선택 인자의 null, 읽을 수 없는 커서, 다른 질문에 쓴 커서는 기존 MCP의 `-32602`로 거절한다.
-- 키워드 점수는 제목과 본문을 음절 bi-gram 으로 쪼갠 BM25 다. 기억 글은 낱말의 글자 하나하나도 토큰으로 더해, 한 글자로 묻는 질문(「약」)도 그 글자를 담은 낱말(「혈압약」)을 찾는다. 민감 항목은 제목만 쓴다. 풀지 못한 항목은 후보에서 뺀다. 의미 점수는 임베딩을 켰을 때만 더한다(아래 「질문과 관련된 기억 구역」). `%`, `_`, 역슬래시는 검색 문법이 아니라 낱말을 가르는 글자다. 이 글자만 있는 질문은 빈 결과다.
+- 키워드 점수는 제목과 본문을 음절 bi-gram 으로 쪼갠 BM25 다. 기억 글은 낱말의 글자 하나하나도 토큰으로 더해, 한 글자로 묻는 질문(「약」)도 그 글자를 담은 낱말(「혈압약」)을 찾는다. 풀지 못한 항목은 후보에서 뺀다. 의미 점수는 임베딩을 켰을 때만 더한다(아래 「질문과 관련된 기억 구역」). `%`, `_`, 역슬래시는 검색 문법이 아니라 낱말을 가르는 글자다. 이 글자만 있는 질문은 빈 결과다.
 - 관련 있다고 판정한 항목만 점수 순으로 내고, 점수가 같으면 번호 오름차순이다. 앞에서 200번째까지만 읽는다. 관련 있는 항목이 없으면 빈 결과이고 성공이다.
 - 결과는 `{items: [{id, title, revision, updatedAt}], nextCursor}`다. 다음 페이지가 없으면 `nextCursor`는 null이다. 점수와 총건수, 본문, 소유자, 비밀값, 출처 원문의 식별자를 내지 않는다.
-- 후보는 권한 조건을 건 질의 하나로 엔티티를 읽어 앱에서 푼다. 본문은 민감도가 `NORMAL` 인 줄만 점수에 넘긴다. 전체 count 를 읽지 않는다. 검색에만 독립된 읽기 전용 트랜잭션과 2초 제한을 적용한다. 지연·SQL 실패는 호출 실패로 전파되며 HTTP 경계는 내부 원문 없이 500으로 답한다. 빈 검색 결과와 구별된다. 질문 임베딩은 이 트랜잭션 밖에서 먼저 하고, 지연 예산 안에 오지 않거나 실패하면 호출 실패가 아니라 키워드 점수만 쓴다.
-- 서명한 호출의 origin 실행에서 사용자와 에이전트를 정한다. 매 호출마다 현재 collection 허용을 읽고, DB 질의에 사용자·그룹 범위, `ACCEPTED`, `SEARCH`, `SOURCE` 제외, collection과 민감도 조건을 먼저 건다. 인자나 커서가 권한을 정하지 못한다.
+- 후보는 권한 조건을 건 질의 하나로 엔티티를 읽어 앱에서 푼다. 푼 제목과 본문을 점수에 넘긴다. 전체 count 를 읽지 않는다. 검색에만 독립된 읽기 전용 트랜잭션과 2초 제한을 적용한다. 지연·SQL 실패는 호출 실패로 전파되며 HTTP 경계는 내부 원문 없이 500으로 답한다. 빈 검색 결과와 구별된다. 질문 임베딩은 이 트랜잭션 밖에서 먼저 하고, 지연 예산 안에 오지 않거나 실패하면 호출 실패가 아니라 키워드 점수만 쓴다.
+- 서명한 호출의 origin 실행에서 사용자와 에이전트를 정한다. 매 호출마다 현재 collection 허용을 읽고, DB 질의에 사용자·그룹 범위, `ACCEPTED`, `SEARCH`, `SOURCE` 제외, collection 조건을 먼저 건다. 인자나 커서가 권한을 정하지 못한다.
 - 검색 후 `memory_read(id)`는 현재 권한을 다시 검사한다. 그 사이 삭제·거절·권한 철회가 있으면 기존의 읽을 수 없다는 응답을 준다. 검색은 본문을 내지 않았으므로 「참고한 기억」에 본문을 읽은 것으로 기록하지 않는다. 본문을 낸 기존 `MEMORY_READ` 기록은 유지한다.
 - 검색 결과와 제목은 `<external-data>`로 감싼다. 일반 이름과 MCP 접두사가 붙은 이름 모두 시작·완료·실패 사건의 detail과 text를 가린다. 로그에는 실행 번호와 결과 개수, 고른 규칙 이름만 남긴다. 도구 설명이 검색 호출 방법을 안내한다.
 - 커서는 질문의 지문과 다음 순위, 앞 페이지를 키워드와 의미 점수를 합쳐 매겼는지만 담는다. 키워드만으로 매긴 검색은 다음 페이지도 키워드만 쓴다. 합쳐 매긴 검색의 다음 페이지에서 질문 임베딩이 실패하면 순위가 달라지므로 `-32602` 로 처음부터 다시 검색하게 한다. 키워드만 쓰던 때의 `v1` 커서는 키워드로 읽는다. 페이지마다 최신 권한과 항목으로 다시 점수를 매긴다. 항목과 임베딩 서비스 상태가 그대로면 끝까지 누락·중복 없이 탐색하고, 그 사이 바뀌면 처음부터 다시 검색한다. 별도 snapshot이나 검색 캐시는 만들지 않는다.
@@ -39,7 +39,7 @@ sequenceDiagram
     end
 ```
 
-`MemorySearchTest`와 `MemorySearchMysqlTest`는 권한 경계와 페이지를 검사한다. 타 사용자·다른 그룹·미허용 collection·민감 허용 없음·승인 전·거절·SOURCE·ARCHIVE 항목은 제목에도 본문에도 맞는 질문으로 찾아도 0건이다. 민감 항목의 본문에만 있는 낱말로는 찾지 못한다. 같은 점수의 항목 200건을 만들어 커서로 끝까지 읽은 누락과 중복은 0건이다. 실제 조립 예산의 `OMITTED` 항목을 검색한 뒤 본문을 읽어야 `MEMORY_READ`가 생기는 것은 `McpMemorySearchToolTest`가 검사한다.
+`MemorySearchTest`와 `MemorySearchMysqlTest`는 권한 경계와 페이지를 검사한다. 타 사용자·다른 그룹·미허용 collection·승인 전·거절·SOURCE·ARCHIVE 항목은 제목에도 본문에도 맞는 질문으로 찾아도 0건이다. 같은 점수의 항목 200건을 만들어 커서로 끝까지 읽은 누락과 중복은 0건이다. 실제 조립 예산의 `OMITTED` 항목을 검색한 뒤 본문을 읽어야 `MEMORY_READ`가 생기는 것은 `McpMemorySearchToolTest`가 검사한다.
 
 2026-10-16 의 로컬 합성 검사에서 본문에만 있는 사실을 묻는 질문으로 첫 10건을 30회 조회한 값이다. 자료마다 본문은 230자 남짓이고, 앱이 후보 전체를 읽어 점수를 매긴다. 30회 모두 그 사실이 든 항목이 첫 결과였다. 지연은 트랜잭션과 질의, 점수 계산을 포함한 서비스 호출 시간이고, 결과 글자 수는 JSON과 외부 데이터 표시까지 센다. 힙은 결과 직렬화를 포함한 검사 프로세스의 전후 차이여서 GC와 다른 검사에 따라 달라진다. 운영 부하나 한 호출의 최대 메모리를 뜻하지 않는다.
 
@@ -71,7 +71,6 @@ sequenceDiagram
 
 - collection 탭, 문서의 판 이력 화면, 출처 표시
 - 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](../adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
-- 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거
 
 #### 자동 기억 2단계
@@ -103,14 +102,14 @@ sequenceDiagram
 
 - **목록의 줄은 제목과 짧은 표시만 보인다.** 본문은 줄을 눌러 그 자리에서 펼칠 때만 보이고 한 번에 한 줄만 열린다. 휴대폰과 데스크톱이 같은 동작을 하도록 옆 패널이나 주소 이동을 쓰지 않는다
 - 「고치기」 와 「지우기」 는 고칠 수 있는 사람(개인 기억은 주인, 그룹 기억은 `ADMIN`)에게만 보인다
-- 민감한 기억은 목록이 본문을 싣지 않으므로 펼쳐도 안내만 보이고 「고치기」 가 없다
+- 풀지 못한 기억(`unreadable`)은 펼쳐도 「이 기억은 지금 읽지 못해요.」 만 보이고 「고치기」 가 없다
 - 에이전트가 남긴 줄은 남긴 에이전트를 보인다. 이름을 보일지는 서버가 정한다(아래 「범위와 조립」)
 - 줄에 「자동 보관 허락」 표시(`archivable`)를 보이고, 고칠 수 있는 사람이 「고치기」 에서 켜고 끈다. 목록에서 `PATCH /api/v1/memories/{id}` 의 선택 칸 `archivable` 로 보낸다. 없으면 지금 값을 그대로 둔다
 - `/memory?memory=<번호>` 로 열면 그 줄을 펼치고 스크롤한다. 「참고한 기억」 의 「틀림」 뒤 링크가 이 주소를 쓴다
 - 「기억」 탭 위에 「정비 후보」 절을 보인다. 후보가 없으면 그리지 않는다(아래 「정비 루프」)
 - 사람이 손으로 기억과 문서를 만드는 양식은 `web/src/lib/memory-features.ts` 의 `MEMORY_MANUAL_CREATE` 로 숨겨 두었다. 양식과 API 는 지우지 않았다
 
-관리자 에이전트 상세의 「기억 영역」 절(`components/agent/agent-memory-section.tsx`)은 collection 마다 「받음」 과 「민감 항목까지」, 실릴 수 있는 항목 수, 최근 변경을 보인다.
+관리자 에이전트 상세의 「기억 영역」 절(`components/agent/agent-memory-section.tsx`)은 collection 마다 「받음」, 실릴 수 있는 항목 수, 최근 변경을 보인다.
 읽지 못해도 상세의 다른 절은 그대로 쓴다. 받는 영역이 하나도 없거나 받지 않는 항목이 있으면 경고만 보이고 저장은 막지 않는다.
 
 ### 참고한 기억
@@ -139,7 +138,7 @@ sequenceDiagram
     C->>C: 요청자와 에이전트의 collection 으로 항목을 골라 항상 층, 개인 사실 구역, 색인 층을 조립한다
     C->>H: POST /v1/runs, instructions 에 Memory 와 기억 지침
     H->>C: POST /mcp memory_read 와 서명한 _fos_ctx
-    C->>C: origin 실행으로 사용자와 에이전트를 정하고 범위, collection, 민감도를 본다
+    C->>C: origin 실행으로 사용자와 에이전트를 정하고 범위와 collection 을 본다
     C->>C: 본문을 내 주면 그 실행에 MEMORY_READ 줄을 덧붙인다
     C-->>H: 본문 또는 읽을 수 없다는 같은 응답
     H->>C: POST /mcp memory_remember 와 서명한 _fos_ctx
@@ -165,22 +164,22 @@ sequenceDiagram
 
 - 요청자의 `USER` 항목과 요청자 그룹의 `GROUP` 항목 가운데 그 에이전트가 받는 collection 의 `ACCEPTED` 항목만 고른다. 고르는 조건은 `MemoryQueries` 가 데이터베이스에서 건다
 - `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다. 짧은 개인 항목은 아래 「개인 사실 구역」 에 본문까지 싣는다
-- `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. 그래서 민감 본문은 `instructions` 에 실리지 않는다
 - 조립한 Memory 문맥은 `assistant.context.max-chars` 로 제한한다. 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 싣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
 - **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 찾고 `memory_read` 로 읽을 수 있다
 - 질문이 있는 조립은 개인 사실 구역 뒤에 아래 「질문과 관련된 기억 구역」 을 싣고, 색인은 관련도가 있는 항목을 점수 순으로, 그 뒤에 나머지를 번호 순으로 싣는다. 질문이 없는 조립은 색인을 번호 순으로만 싣는다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
 - 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. turn 전용 지시는 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
-- 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다
+- 본문이나 `retrieval` 을 고치면 고치기 전의 값을 `memory_revision` 에 남기고 버전 번호를 올린다. 지울 때도 마지막 값을 남긴다
 - Memory 목록은 에이전트가 남긴 줄에 남긴 에이전트를 함께 낸다. 이름은 요청자가 그 에이전트를 읽을 수 있을 때만 싣고, 지운 에이전트는 `sourceAgentDeleted` 만 낸다. 볼 수 없는 비공개 에이전트의 이름이 목록으로 새지 않게 하려는 것이다. 판정은 `MemorySources` 가 갖는다
 - 기존 개인 지식에서 들인 항목의 출처 칸(`source_type=brain`, `source_ref`, `source_date`)은 출처 기록으로 보존한다
 
-**제목과 본문**은 민감도와 상관없이 `memory` 와 `memory_revision` 에 주인 데이터 key 의 암호문으로 저장한다([ADR-20261103 / memory-encryption](../../backend/docs/adr/ADR-20261103-memory-encryption.md)). `USER` 는 주인 사용자의 key, `GROUP` 은 그 그룹의 key 다. 엔티티의 `title()`, `content()` 가 처음 부를 때 푼다(`MemoryTexts`).
+**제목과 본문**은 모두 `memory` 와 `memory_revision` 에 주인 데이터 key 의 암호문으로 저장한다([ADR-20261103 / memory-encryption](../../backend/docs/adr/ADR-20261103-memory-encryption.md)). `USER` 는 주인 사용자의 key, `GROUP` 은 그 그룹의 key 다. 엔티티의 `title()`, `content()` 가 처음 부를 때 푼다(`MemoryTexts`).
 
 - 새 기억은 빈 글로 넣어 번호를 얻고 같은 트랜잭션에서 암호문으로 고친다. 넣기 전에 주인 key 를 쓸 수 있는지 본다
 - KEK 가 없는 설치는 평문으로 저장한다. KEK 가 있는데 주인 key 를 풀지 못하면 저장과 수정을 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 거절한다. 평문으로 내려 저장하지 않는다
 - 풀지 못한 줄은 목록에 「읽지 못함」 으로 보이고(`unreadable`) 실행, 검색, 임베딩에 쓰지 않는다. 고치지 못하고 지울 수 있다
-- 기동할 때 `MemoryTextMigration` 이 데이터 key 로 옮기지 않은 줄(평문 줄과 [ADR-055](../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 옛 key 줄)을 줄마다 쓰기 잠금으로 다시 읽어 옮기고, 같은 트랜잭션에서 다시 풀어 평문 해시를 비교한다. 실패한 줄은 번호만 로그에 남기고 기동은 잇는다
+- 기동할 때 `MemoryTextMigration` 이 데이터 key 로 옮기지 않은 평문 줄을 줄마다 쓰기 잠금으로 다시 읽어 옮기고, 같은 트랜잭션에서 다시 풀어 평문 해시를 비교한다. 실패한 줄은 번호만 로그에 남기고 기동은 잇는다. [ADR-055](../../backend/docs/adr/archive/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 옛 key 는 읽지 않는다
+- 같은 글이 같은 값이어야 하는 칸(제안 중복 키, 임베딩 지문)은 주인 key 에서 뽑은 HMAC 이다(`MemoryTexts`). 평문의 SHA-256 을 DB 에 두지 않는다. 기동 이관이 SHA-256 이던 값을 HMAC 으로 바꾼다. 지금 글과 맞는 임베딩 지문은 그 자리에서 바꾸고 맞지 않는 지문은 벡터째 비운다. KEK 가 없는 설치는 SHA-256 을 쓴다
 - 제목과 본문은 질의로 찾지 않는다. 검색 후보와 임베딩 원천은 엔티티를 읽어 앱에서 푼다
 
 #### 개인 사실 구역
@@ -188,7 +187,7 @@ sequenceDiagram
 짧은 개인 사실을 본문까지 매 실행에 싣는 구역이다. 모델이 `memory_read` 를 부르지 않아도 이름과 관계와 선호를 안다.
 근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있다.
 
-- 후보는 색인 층에 오를 항목(`MemoryService.indexedFor`) 가운데 범위 `USER`, 종류 `MEMORY`, 민감도 `NORMAL` 이고 본문이 `assistant.context.facts-item-max-chars` 이하인 것이다. 예산은 `assistant.context.facts-max-chars` 다
+- 후보는 색인 층에 오를 항목(`MemoryService.indexedFor`) 가운데 범위 `USER`, 종류 `MEMORY` 이고 풀리며 본문이 `assistant.context.facts-item-max-chars` 이하인 것이다. 예산은 `assistant.context.facts-max-chars` 다
 - 넘치면 최근에 고친 것부터 고르고 들어가지 않는 항목은 건너뛴다. 고르지 못한 후보는 색인에 제목으로 남고 빠진 항목으로 세지 않는다
 - 고른 항목은 번호 순으로 늘어놓는다. 고른 집합이 같으면 글이 같아 지시문 지문이 바뀌지 않는다
 - 제목과 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 색인 줄도 같다. 모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 하려는 것이다
@@ -203,7 +202,7 @@ sequenceDiagram
 - 질문은 사용자가 보낸 turn(`TurnIntent.Fresh`, `TurnIntent.Regenerate`)의 글과 위임받은 실행의 작업 글이다. 예약 작업, 위임 결과 전달, 먼저 살펴보기 turn 과 그 트리 아래의 위임 실행은 질문 없이 조립한다
 - 후보는 개인 사실 구역에 실리지 않은 색인 후보다. 키워드 순위와 의미 순위를 RRF(k=60, `assistant.memory.relevance.rrf-k`)로 합친다(`search-hybrid-v1`). 임베딩을 끄거나 질문 임베딩이 `assistant.memory.embedding.query-timeout` 안에 오지 않거나 실패하면 키워드 점수만 쓴다(`search-keyword-v1`). 어느 규칙으로 골랐는지는 선택 근거의 `selector` 에 남는다
 - 관련 있다는 판정은 키워드 쪽은 질문 토큰 가운데 그 항목에 있는 토큰의 비율이 `assistant.memory.relevance.keyword-min-coverage` 이상, 의미 쪽은 코사인이 `assistant.memory.relevance.semantic-min-similarity` 이상인 것이다. 둘 다 아니면 점수가 없다. 관련 항목이 없는 질문에는 이 구역을 싣지 않는다
-- 민감 항목은 제목으로만 점수를 받고 이 구역에 싣지 않는다. 색인에 제목으로 남는다. 풀지 못한 항목은 색인에도 싣지 않는다
+- 풀지 못한 항목은 이 구역에도 색인에도 싣지 않는다
 - 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context.search` 의 `max-items`, `item-max-chars`, `max-chars` 다. `max-items` 가 0 이면 구역을 끈다. 항목은 개인 사실 구역처럼 한 줄로 싣고, 넘치는 항목은 자르지 않고 건너뛴다. 이 구역에 실린 항목은 색인에 다시 싣지 않는다
 - 구역이 질문마다 바뀌므로 지시문 지문도 질문마다 바뀐다
 - 임베딩 서비스는 자체 서버의 로컬 모델이 OpenAI 호환 `POST /v1/embeddings` 로 받는다. 외부 임베딩 API 는 쓰지 않는다. 주소(`MEMORY_EMBEDDING_BASE_URL`)가 비어 있으면 임베딩을 끈 것이고 운영 기본값도 꺼짐이다. 주소와 띄우는 방법은 운영 저장소가 갖는다
@@ -217,18 +216,17 @@ sequenceDiagram
 - 이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한과 승인, 대체되지 않음 조건을 지났으므로 새 쿼리로 다른 항목을 읽지 않는다. 두 단계 이상은 따라가지 않는다
 - 사람과 에이전트가 맺은 연결을 먼저, 그다음 코드가 맺은 연결을 유사도 순으로 싣는다. 머리 줄은 「연결된 기억」 이다
 - 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context.search` 의 `max-items`(3), `item-max-chars`(600), `max-chars`(1,500)를 질문 구역과 따로 이 구역의 몫으로 쓴다. `max-items` 가 0 이면 이 구역도 끈다
-- 민감 항목, 항목당 글자 수보다 긴 항목, 다른 범위에 같은 이름의 짝이 있는 문서는 싣지 않고 색인에 둔다. 예산이나 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다. 실린 이웃은 색인에서 빠진다
+- 항목당 글자 수보다 긴 항목, 다른 범위에 같은 이름의 짝이 있는 문서는 싣지 않고 색인에 둔다. 예산이나 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다. 실린 이웃은 색인에서 빠진다
 - 연결이 없으면 조립한 글은 이 구역을 두기 전과 같다. 연결이 있으면 질문 없는 조립에서도 개인 사실 구역의 이웃이 실려 지시문 지문이 바뀐다
 
 #### 에이전트의 실행에 보이는 항목
 
-판정은 세 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다.
+판정은 두 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다. 기억에는 민감 구분이 없다([ADR-20261103 / memory-sensitivity-removal](../adr/ADR-20261103-memory-sensitivity-removal.md)). 에이전트마다 받을 기억은 collection 으로 나눈다.
 
 | 조건 | 무엇을 본다 |
 | --- | --- |
 | 범위 | `USER` 는 주인, `GROUP` 은 같은 그룹 |
 | collection | 그 에이전트가 받는 collection 인가(`agent_memory_collection` 의 줄) |
-| 민감도 | `SENSITIVE` 면 그 collection 의 `allow_sensitive` 가 참인가 |
 
 - 줄이 하나도 없는 에이전트, 찾지 못한 에이전트, 에이전트가 없는 실행은 아무것도 받지 않는다
 - 새 에이전트에는 `AgentCreated` 사건으로 `core` 한 줄을 넣는다. 에이전트를 만드는 경로가 셋이라 경로마다 넣지 않고 이 사건 하나로 넣는다
@@ -237,10 +235,10 @@ sequenceDiagram
 
 #### 관리자가 에이전트의 collection 을 바꿀 때
 
-`ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 과 민감 허용을 바꾼다. 자동으로 붙이지 않는다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
+`ADMIN` 이 관리자 영역의 에이전트 상세에서 받는 collection 을 바꾼다. 자동으로 붙이지 않는다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
 경로와 응답 칸은 `AgentMemorySettingController` 와 `MemoryAdminDtos` 가 갖는다. `PUT` 의 본문은 받을 collection 전체이고, 빈 목록이면 모두 뗀다.
 그룹의 collection 목록은 `group_setting` 의 `MEMORY_COLLECTIONS` 줄이 갖고, 줄이 없는 그룹은 코드의 기본 목록을 쓴다. 이 목록을 바꾸는 화면은 아직 없다([data-schema](../../backend/docs/data-schema.md) 「group_setting」).
-수는 주인이 있으면 주인의 `USER` 항목과 그룹의 `GROUP` 항목을, 없으면 그룹 항목만 센다(`countedFor`). 민감 항목도 센다.
+수는 주인이 있으면 주인의 `USER` 항목과 그룹의 `GROUP` 항목을, 없으면 그룹 항목만 센다(`countedFor`).
 
 | 갈리는 지점 | 응답 |
 | --- | --- |
@@ -270,7 +268,7 @@ sequenceDiagram
 | 무엇이 | 어떻게 되는가 |
 | --- | --- |
 | 남의 개인 항목, 다른 그룹의 항목, 없는 번호 | 읽을 수 없다는 같은 응답이다 |
-| 받지 않는 collection 의 항목, 허용받지 않은 민감 항목 | 같은 응답이다 |
+| 받지 않는 collection 의 항목 | 같은 응답이다 |
 | 승인 전인 항목, 항상 층에 이미 실린 항목, 보관한 항목, 출처 원문 | 같은 응답이다 |
 | origin 실행에 에이전트가 없거나 그 에이전트를 찾지 못한다 | 같은 응답이다. 받는 collection 이 없다 |
 | 위임받아 도는 에이전트가 읽는다 | 그 에이전트의 허용으로 판정한다 |
@@ -278,7 +276,7 @@ sequenceDiagram
 #### Memory 를 고치고 지울 때
 
 판을 남기는 것과 항목을 고치는 것은 한 트랜잭션이다. 거절한 수정은 판을 남기지 않는다.
-**민감 항목은 `PATCH /api/v1/memories/{id}` 로 고치지 못한다.** 목록이 민감 본문을 싣지 않아 화면이 본문을 읽지 않은 채 덮어쓰게 되기 때문이다.
+풀지 못한 항목은 `MEMORY_ENCRYPTION_UNAVAILABLE` 로 고치지 못한다. 제목을 몰라 덮어쓰면 제목을 잃는다.
 항상 싣는 설정을 끄면 색인으로 간다. 이미 보관한 항목은 보관한 채로 둔다.
 문서(`DOCUMENT`)는 `/api/v1/memory-documents` 가 따로 다루고, Memory 목록과 수정, 승인 경로는 문서를 없는 항목과 같은 응답으로 답한다. 문서를 고칠 때 화면이 읽은 판 번호가 지금 판과 다르면 거절한다.
 
@@ -346,7 +344,7 @@ sequenceDiagram
 - 사용자와 범위를 인자로 받지 않는다. 주인은 origin 실행의 사용자이고 범위는 늘 `USER` 다. 「사용자가 요청했다」 같은 인자도 없다
 - `evidence` 는 판정에 쓰지 않는다. 앞선 도구 정의로 부르는 모델이 인자 오류를 받지 않게 받기만 한다
 - `memory_id` 는 같은 사실을 고칠 기존 항목 번호이고, 지시문의 개인 사실 구역이나 색인에 있는 번호다
-- `sensitive` 가 참이면 늘 제안이다. 제목과 본문은 다른 항목과 같이 암호문으로 저장한다
+- `sensitive` 가 참이면 늘 제안이다. 저장하는 값이 아니고 바로 저장을 막는 데만 쓴다
 - `archivable` 은 자동 보관 허락 표시(`memory.archivable`)이고 기본은 거짓이다. 모델이 기간이 있는 상태나 지난 일이라고 판단할 때만 참으로 준다. 새 항목을 만들 때만 적고, `memory_id` 로 기존 항목을 고칠 때와 같은 제안이 이미 있을 때는 그 항목의 값을 바꾸지 않는다. 정비 루프가 이 값을 읽는다([ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md))
 - 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다
 - 먼저 살펴보기 트리에서는 받지 않는다
@@ -374,14 +372,14 @@ sequenceDiagram
 1 부터 5 는 `McpMemoryRemember` 가, 6 과 7 은 `MemoryCaptureService` 가 본다.
 안쪽 도구는 바깥 글을 읽지 않는다고 보는 도구이고, 목록과 넣지 않는 도구의 까닭은 `McpMemoryRemember.INTERNAL_TOOLS` 의 Javadoc 이 갖는다.
 부정 표지의 모양은 `NegationMarkers` 가 갖는다. 한쪽에만 있으면 뜻이 뒤집혔을 수 있어 제안으로 내린다. 글 전체를 보므로 질문의 다른 문장에 있는 부정도 센다.
-민감해 보이는 낱말과 숫자열의 모양은 `MemorySensitiveHints` 가 갖는다. 잘못 걸려도 제안 카드가 될 뿐이고, 민감도는 모델이 준 값 그대로 저장해 사람이 제안 카드에서 정한다.
+민감해 보이는 낱말과 숫자열의 모양은 `MemorySensitiveHints` 가 갖는다. 잘못 걸려도 제안 카드가 될 뿐이다.
 
 이 판정 뒤에 공통으로 본다.
 
 - 한 실행이 남긴 기록이 `MemoryCaptureService.PER_EXECUTION_MAX` 에 닿았거나, `collection` 이 그 에이전트가 받는 collection 이 아니면 저장하지 않는다
 - 같은 사용자의 같은 제목과 본문이 있으면 새 줄을 만들지 않는다. 그 줄이 제안이고 지금이 바로 저장 조건이면 받아들인다
 - 중복 후보는 번호만 찾은 뒤 쓰기 잠금으로 처음 읽는다. 잠근 뒤에도 중복 키가 같을 때 현재 상태로 수락과 기록을 정한다. 그 사이 본문이 바뀌어 키가 달라졌으면 원래 항목은 보존하고 새 항목을 만든다
-- `memory_id` 는 바로 저장 조건일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 민감하지 않고 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
+- `memory_id` 는 바로 저장 조건일 때만 그 항목의 본문을 고친다. 요청자의 `USER` 범위 `MEMORY` 항목이고 `ACCEPTED` 이고 풀리며 받는 collection 이어야 한다. 제목과 꺼내는 방식은 그대로다
 - 상한과 새 중복 항목의 INSERT는 직렬화하지 않는다. 한 실행이 도구를 나란히 부르면 상한을 넘거나 도구 오류가 날 수 있다. 할 일 제안과 같은 수준으로 둔다
 
 #### 대화에 보이는 것
@@ -396,7 +394,7 @@ sequenceDiagram
 | `PROPOSED` | 제안 카드 [받아들이기] [고쳐서 받아들이기] [거절] | 없다 |
 
 - 되돌리기는 그 뒤에 항목이 다시 바뀌었으면 409 `MEMORY_REVISION_CONFLICT` 다. 남의 기록과 없는 기록은 같은 404, 제안 기록은 409 이고, 이미 되돌린 기록은 그대로 둔다
-- 대화의 기록 목록은 되돌린 기록과 항목이 없어진 기록을 빼고, 민감 항목은 본문을 싣지 않는다
+- 대화의 기록 목록은 되돌린 기록과 항목이 없어진 기록을 빼고, 풀지 못한 항목은 본문을 싣지 않는다
 - 제목과 본문은 모델이 쓴 글이라 평문으로만 그린다(ADR-009). 로그에는 사용자, 항목, 실행, 기록 번호와 결과만 남긴다
 
 ### 답마다 참고한 기억
@@ -407,7 +405,7 @@ sequenceDiagram
 - 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH`, `MEMORY_LINK` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
 - 읽은 항목은 지금 권한으로 다시 판정해, 그 실행의 에이전트가 지금도 `memory_read` 로 읽을 수 있는 항목(`MemoryService.readableByTool`)만 넣는다
 - 지금 요청자가 읽을 수 있고 `ACCEPTED` 인 항목만 지금 제목으로 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다
-- 본문은 싣지 않는다. 민감 항목도 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다
+- 본문은 싣지 않고 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다
 - 같은 항목이 실은 것과 읽은 것에 둘 다 있으면 앞의 것 하나만 남긴다
 - Control Plane 이 맡겨서 도는 하위 실행이 읽은 항목은 넣지 않는다. 그 실행의 답 메시지가 대화에 없다. Hermes 안의 하위 에이전트는 부모의 origin 실행을 물려받으므로, 그 하위 에이전트가 읽은 항목은 origin 실행의 답에 붙는다
 
@@ -453,7 +451,7 @@ sequenceDiagram
 | 동작 | 후보가 되는 항목 | 근거에 적는 값 |
 | --- | --- | --- |
 | `ARCHIVE` | `ACCEPTED` 인 `MEMORY` 이고 `retrieval` 이 `ARCHIVE` 가 아니며, `archive-idle-days`(90일) 전에 만들었고, 그 기간 동안 `execution_context_source` 에 한 번도 실리거나 읽히지 않았고, 「관련 없음」 이나 「틀림」 단추 사건이 1건 이상 | `idleDays`, `unwantedMarks`, `archivable`, `retrieval` |
-| `DEDUP` | 같은 주인과 같은 지문(범위, 주인, 제목, 본문의 해시)을 가진 `ACCEPTED` 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽. 민감 항목과 풀지 못한 항목은 보지 않는다 | `keepMemoryId`, `sameCount`, `archivable` |
+| `DEDUP` | 같은 주인과 같은 지문(범위, 주인, 제목, 본문의 해시)을 가진 `ACCEPTED` 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽. 풀지 못한 항목은 보지 않는다 | `keepMemoryId`, `sameCount`, `archivable` |
 
 - **`archivable` 이 거짓인 항목도 `ARCHIVE` 후보는 만들고 근거에 그 값을 적는다.** 제안 모드는 동작을 적용하지 않으므로 안전하고, 후보로만 보이게 한다. 거짓인 항목은 단계 4 의 자동 보관에서도 제외한다
 - `SUPERSEDES` 후보는 이 작업이 다시 만들지 않는다. 「기억 사이의 연결」 의 제안이 그대로 `/memory` 에 보인다
@@ -493,11 +491,11 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 
 | `source` | 원래 기록 | `sensitivity` | `trust` | `bodyMode` | 쓰는 곳 |
 | --- | --- | --- | --- | --- | --- |
-| `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
+| `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_LINK` | 「연결된 기억 구역」 에 실린 이웃 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
-| `MEMORY_INDEX` | `memory` 의 `SEARCH` | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
+| `MEMORY_INDEX` | `memory` 의 `SEARCH` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
 | `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
@@ -562,7 +560,7 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 | 상황 | 기대 |
 | --- | --- |
 | 승인한 호출의 결과(`CONNECTOR_RESULT`)를 몇 시간 뒤 다시 전한다 | 머리줄에 오래됨이 붙는다. 같은 승인 줄은 다시 실행되지 않고(ADR-050) 결과 글만 다시 싣는다 |
-| 민감 문서 하나와 같은 이름의 개인 문서, 그룹 문서가 있다 | 민감 문서는 민감 허용을 받는 에이전트에만 제목으로 오른다. 두 문서는 따로 오르고 서로를 가리키는 충돌 표시가 붙는다. 받지 않는 에이전트에는 오르지 않고, 빠진 수는 로그에 개수로만 남는다 |
+| `identity` 문서 하나와 같은 이름의 개인 문서, 그룹 문서가 있다 | `identity` 문서는 그 collection 을 받는 에이전트에만 제목으로 오른다. 두 문서는 따로 오르고 서로를 가리키는 충돌 표시가 붙는다. 받지 않는 에이전트에는 오르지 않고, 빠진 수는 로그에 개수로만 남는다 |
 
 ## Memory 회수 측정
 

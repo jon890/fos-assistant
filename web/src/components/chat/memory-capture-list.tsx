@@ -151,13 +151,7 @@ function ProposalCard({
         </p>
       ) : null}
       <p className="mt-1 font-semibold">{capture.title}</p>
-      {capture.sensitive ? (
-        <p className="mt-1 text-xs text-muted-foreground">
-          민감한 내용이라 여기서 보이지 않아요.
-        </p>
-      ) : (
-        <p className="mt-1 whitespace-pre-wrap">{capture.content}</p>
-      )}
+      <p className="mt-1 whitespace-pre-wrap">{capture.content}</p>
       <CaptureEditor actions={actions} />
       <CaptureError actions={actions} />
       {actions.mode === null ? (
@@ -170,17 +164,15 @@ function ProposalCard({
           >
             받아들이기
           </Button>
-          {capture.sensitive ? null : (
-            <Button
-              size="xs"
-              variant="outline"
-              data-testid="memory-capture-edit-accept"
-              disabled={actions.busy}
-              onClick={() => actions.open("edit-accept")}
-            >
-              고쳐서 받아들이기
-            </Button>
-          )}
+          <Button
+            size="xs"
+            variant="outline"
+            data-testid="memory-capture-edit-accept"
+            disabled={actions.busy}
+            onClick={() => actions.open("edit-accept")}
+          >
+            고쳐서 받아들이기
+          </Button>
           <Button
             size="xs"
             variant="outline"
@@ -218,17 +210,15 @@ function RememberedLine({
         </span>
         {actions.mode === null ? (
           <>
-            {capture.sensitive ? null : (
-              <Button
-                size="xs"
-                variant="link"
-                data-testid="memory-capture-edit"
-                disabled={actions.busy}
-                onClick={() => actions.open("edit")}
-              >
-                고치기
-              </Button>
-            )}
+            <Button
+              size="xs"
+              variant="link"
+              data-testid="memory-capture-edit"
+              disabled={actions.busy}
+              onClick={() => actions.open("edit")}
+            >
+              고치기
+            </Button>
             {capture.kind === "PROPOSED" ? null : (
               <Button
                 size="xs"
@@ -243,9 +233,7 @@ function RememberedLine({
           </>
         ) : null}
       </div>
-      {actions.mode !== null ? null : capture.sensitive ? (
-        <p className="mt-1 text-xs">민감한 내용이라 여기서 보이지 않아요.</p>
-      ) : (
+      {actions.mode !== null ? null : (
         <p
           data-testid="memory-capture-content"
           className="mt-1 whitespace-pre-wrap break-words text-foreground"

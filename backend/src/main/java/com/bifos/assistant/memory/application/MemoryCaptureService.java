@@ -14,14 +14,12 @@ import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
-import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
@@ -86,21 +84,26 @@ public class MemoryCaptureService {
         if (!access.collections().contains(collection)) {
             return MemoryRememberResult.of(MemoryRememberOutcome.COLLECTION_NOT_ALLOWED);
         }
-        MemorySensitivity sensitivity = request.sensitivity();
         boolean direct = request.direct()
-            && sensitivity == MemorySensitivity.NORMAL
+            && !request.sensitive()
             && !MemorySensitiveHints.suspected(request.title(), request.content());
-        String dedupKey = MemoryService.proposalDedupKey(user.id(), request.title(), request.content());
-        if (sensitivity == MemorySensitivity.NORMAL) {
-            // 본문을 먼저 읽으면 뒤에 잠가도 관리 중인 옛 값이 남는다. 번호만 찾고 처음 읽을 때 잠근다.
-            Optional<Memory> existing = memories.findIdByProposalDedupKey(dedupKey).flatMap(memories::findByIdForUpdate)
-                .filter(memory -> dedupKey.equals(memory.proposalDedupKey()));
-            if (existing.isPresent()) {
-                return existingOutcome(user, existing.get(), direct, request);
+        String dedupKey;
+        try {
+            dedupKey = texts.proposalDedupKey(user.id(), request.title(), request.content());
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
+                return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
             }
+            throw ex;
         }
-        MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity);
-        StoredContent body = StoredContent.plain(request.content());
+        // 본문을 먼저 읽으면 뒤에 잠가도 관리 중인 옛 값이 남는다. 번호만 찾고 처음 읽을 때 잠근다.
+        Optional<Memory> existing = memories.findIdByProposalDedupKey(dedupKey).flatMap(memories::findByIdForUpdate)
+            .filter(memory -> dedupKey.equals(memory.proposalDedupKey()));
+        if (existing.isPresent()) {
+            return existingOutcome(user, existing.get(), direct, request);
+        }
+        MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH);
+        String body = request.content();
         Memory created = direct
             ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
             : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
@@ -223,14 +226,14 @@ public class MemoryCaptureService {
         if (!before.readable()) {
             throw conflict("an unreadable revision is not restored here");
         }
-        memoryService.revise(user, memory, before.content(), before.retrieval(), before.sensitivity());
+        memoryService.revise(user, memory, before.content(), before.retrieval());
     }
 
 
-    /** 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 일반 민감도이며 이 에이전트가 받는 collection 에 있다. */
+    /** 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 풀리며 이 에이전트가 받는 collection 에 있다. */
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
         if (!request.direct()
-            || request.sensitivity() != MemorySensitivity.NORMAL
+            || request.sensitive()
             || MemorySensitiveHints.suspected(request.title(), request.content())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
@@ -245,7 +248,7 @@ public class MemoryCaptureService {
         int base = memory.revision();
         try {
             // 암호화는 revision 을 남기기 전에 하므로 거절돼도 줄과 revision 이 바뀌지 않는다
-            memoryService.revise(user, memory, request.content(), memory.retrieval(), MemorySensitivity.NORMAL);
+            memoryService.revise(user, memory, request.content(), memory.retrieval());
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
                 return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
@@ -262,9 +265,8 @@ public class MemoryCaptureService {
             && Objects.equals(memory.ownerUserId(), user.id())
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.status() == MemoryStatus.ACCEPTED
-            && memory.sensitivity() == MemorySensitivity.NORMAL
             && memory.readable()
-            && access.allows(memory.collection(), MemorySensitivity.NORMAL);
+            && access.allows(memory.collection());
     }
 
 

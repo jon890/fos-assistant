@@ -124,7 +124,7 @@ class McpMemorySearchToolTest {
         token = tokens.issue(PROFILE, "합성 검사").rawToken();
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), 1L, PROFILE, root);
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core"));
         mvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -205,7 +205,7 @@ class McpMemorySearchToolTest {
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
             .path("items"))
                 .isEmpty();
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core"));
         jdbc.update("UPDATE memory SET status = 'REJECTED' WHERE id = ?", memory.id());
         assertUnavailable(memory.id());
         jdbc.update("UPDATE memory SET status = 'ACCEPTED' WHERE id = ?", memory.id());

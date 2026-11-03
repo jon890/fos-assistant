@@ -35,19 +35,12 @@ public enum ErrorCode {
     /** 묶음이 {@code DELIVERING} 이나 {@code DELIVERED} 이거나, 넘길 결과가 남지 않았거나, 대화에 흐름이 붙었다(ADR-075). */
     DELIVERY_NOT_RETRYABLE(HttpStatus.CONFLICT),
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
-    /** 민감 항목을 항상 싣게 하려 했다. 조립 판정이 틀려도 민감 본문이 나가지 않게 저장할 때 막는다. */
-    MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
     /** 기억을 암호화하거나 풀 주인 데이터 key 를 쓸 수 없다. 평문으로 내려 저장하지 않는다(ADR-20261103 / memory-encryption). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 같은 주인과 collection 에 같은 이름의 문서가 이미 있다(ADR-057). */
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */
     MEMORY_REVISION_CONFLICT(HttpStatus.CONFLICT),
-    /**
-     * 민감 항목은 Memory 목록의 수정 경로로 고치지 못한다. 목록이 본문을 싣지 않아 그 요청이 본문을 읽지 않은 채
-     * 덮어쓴다(ADR-055).
-     */
-    MEMORY_SENSITIVE_NOT_EDITABLE(HttpStatus.CONFLICT),
     /** 그 기억 연결의 지금 상태에서 허용하지 않는 전이다. 이미 받아들였거나 끊은 줄을 다시 받아들이는 경우다(ADR-20261015 / memory-link). */
     MEMORY_LINK_STATE_CONFLICT(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),

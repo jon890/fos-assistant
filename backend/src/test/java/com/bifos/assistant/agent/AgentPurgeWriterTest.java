@@ -214,9 +214,9 @@ class AgentPurgeWriterTest {
 
     /** 에이전트를 가리키는 표마다 한 줄씩 만든다. 지우지 않은 대화 하나와 그 대화의 실행 하나도 만든다. */
     Attached attachEverything() {
-        collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core", false));
+        collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core"));
         collectionChanges.saveAndFlush(AgentMemoryCollectionChange.of(
-            agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, false, owner.id(), NOW));
+            agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, owner.id(), NOW));
 
         ConnectorConnection connection = connections.saveAndFlush(ConnectorConnection.pending(owner.id(), "demo-mail", NOW));
         bindings.saveAndFlush(ConnectorBinding.pending(agent, connection, "demo-mail", NOW));
