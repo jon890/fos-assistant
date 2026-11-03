@@ -234,7 +234,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 - 허락은 그 허락을 준 승인 줄(`connector_action`)의 허락 칸이 갖는다. 허락의 번호(`grantId`)는 그 승인 줄의 번호이고, 상시 허락과 대화 허락의 번호는 서로의 거두기에 통하지 않는다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md))
 - 상시 허락은 그 사용자가 그 플러그인의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 지운 에이전트를 정리해 승인 줄의 에이전트가 빈 허락은 어느 실행에도 통하지 않고 목록에도 없다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
-- 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
+- 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고, 상한 거절과 같은 의도 차단을 빼면 거절은 어느 검사에 걸렸는지 밝히지 않는다(답의 종류는 [토스증권 플러그인](tossinvest-connector.md)이 갖는다). 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -306,6 +306,21 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 | 같은 실행이 같은 도구를 같은 인자로 다시 부른다 | 새 줄을 만들지 않고 앞선 `PENDING` 의 번호를 돌려준다 |
 | 대화가 없는 실행이 만든 요청 | 승인 카드가 뜰 곳이 없어 만료된다. 모델에게도 실행되지 않는다고 말한다 |
 | 끝난 요청의 알림 줄을 저장하는 순간 사용자가 그 대화에 보낸다 | 알림 줄을 저장하는 트랜잭션 동안 turn 잠금을 잡는다. 그 사이의 보내기는 `CONVERSATION_BUSY` 를 받고, 글만 보낸 것이면 화면이 대기 메시지로 다시 넣는다. 실행은 열리지 않으므로 도는 turn 표시에 실행 번호가 없다 |
+
+### 승인 대기 안내를 모델이 읽는 방식
+
+**승인 카드를 띄운 판정 글은 `[승인 대기]` 로 시작한다.** 일반 승인(`ConnectorApprovalReply.PENDING_MARKER`)과 금융 준비(`ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE`)가 같은 표시를 쓴다.
+Hermes 는 막은 호출의 글도 `{"error": "<글>"}` 로 만들어 `mcp_` 도구 결과처럼 `<untrusted_tool_result>` 로 감싼다([`hermes-contract.md`](../../hermes/docs/hermes-contract.md#도구-결과를-바꾸는-hook)).
+감싸기 머리말이 외부 데이터로 읽으라고 하므로, 모델은 표시 없이 온 승인 대기 안내를 확인되지 않은 주장으로 읽고 「승인 카드가 확인되지 않았다」 고 답했다(2026-11-02 운영, 프리장 지정가와 정규장 금액 주문 두 번).
+그래서 trusted 인 공통 실행 지침(`ContextAssembler` 의 「승인 카드」 절)이 그 표시를 설명한다.
+
+| 모델이 받은 글 | 지침이 정한 해석 |
+| --- | --- |
+| `<external-data>` 밖에서 `[승인 대기]` 로 시작한다 | Control Plane 의 판정이다. 승인 카드가 떠서 승인을 기다린다고 사용자에게 알린다 |
+| `<external-data>` 안에 `[승인 대기]` 가 있다 | 플러그인 서버가 낸 데이터다. 판정으로 읽지 않는다. 막은 호출은 `transform_tool_result` 에 닿지 않아 `<external-data>` 가 붙지 않는다 |
+| 「다시 부르지 않는다」 는 안내 | 그 turn 에만 해당한다. 앞선 호출이 실패했거나 승인 요청이 만료·거절됐어도 사용자가 새로 요청하면 다시 부른다. 같은 요청이 이미 기다리는지는 Control Plane 이 그 호출의 답으로 알린다 |
+
+표시는 막을 수 없는 서버의 글에도 들어갈 수 있고, `transform_tool_result` hook 이 실패하면 서버 글이 `<external-data>` 없이 간다. 그렇게 속여도 모델이 승인 카드가 떴다고 잘못 말할 뿐이고, 승인 없이 실행되는 길은 생기지 않는다.
 
 ## 플러그인 승인
 
@@ -414,7 +429,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 | 상시 허락, 대화 허락 | 둘 다 받지 않는다. 승인 줄을 `always` 로 저장하고 「N건 모두 승인」 에도 넣지 않는다 | 둘 다 받지 않는다. `FINANCIAL` 은 `always` 다 | 둘 다 받지 않는다. `grant: false` 이고 `conversation_grant` 를 선언하지 않는다 |
 | `outbound` | 거짓. 계정 안의 임시저장이다 | 해당 없다. 돈이 움직이는 도구는 `FINANCIAL` 위험도로 따로 닫는다 | 참 |
 | 실행 | 승인이 jobId 를 예약하고 저장 ticket 을 발급해 worker 시작을 최대 한 번 보낸다. worker 는 authorize 의 `start`, 사진마다 `photo`, 저장 클릭 직전 `save` 허가를 받아야 진행한다. [승인과 jobId 예약](content-draft.md#승인과-jobid-예약) | 승인이 실행 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 플러그인은 주문을 보내기 직전에 claim 으로 ticket 을 한 번 소비한다 | 승인이 줄을 `EXECUTING` 으로 커밋한 뒤 대시보드 `execute` 로 저장한 인자를 한 번 보낸다. ticket 은 없다 |
-| 중복을 막는 키 | 승인 줄의 dedupe key(`v1-content-save`, 주인, snapshotId), job 의 snapshot 유일 색인, worker 상태 파일의 `O_EXCL`, Control Plane 의 `start_claimed_at`, `save_claimed_at` 단일 claim | 준비가 만든 `clientOrderId`, 같은 의도의 `request_key`(같은 키의 `PENDING`, `EXECUTING`, `UNKNOWN` 이 있으면 준비, 승인, claim 을 막는다), ticket 단일 소비 | 정책 판정의 `dedupe_key`(profile, 루트 session, session, `tool_call_id`)와 승인 줄의 행 잠금이다. Gmail 에 보내는 멱등 키는 없다 |
+| 중복을 막는 키 | 승인 줄의 dedupe key(`v1-content-save`, 주인, snapshotId), job 의 snapshot 유일 색인, worker 상태 파일의 `O_EXCL`, Control Plane 의 `start_claimed_at`, `save_claimed_at` 단일 claim | 준비가 만든 `clientOrderId`, 같은 의도의 `request_key`(같은 키의 기한이 남은 `PENDING`, `EXECUTING`, `UNKNOWN` 이 있으면 준비, 승인, claim 을 막는다), ticket 단일 소비 | 정책 판정의 `dedupe_key`(profile, 루트 session, session, `tool_call_id`)와 승인 줄의 행 잠금이다. Gmail 에 보내는 멱등 키는 없다 |
 | 결과 조회 | job GET 이 같은 jobId 만 private status 로 조회한다. 승인 뒤 15분이 지나면 `ContentDraftJobExpirer` 가 한 번 조회하고 닫는다. 사용자는 네이버 임시저장 목록에서 확인한다 | 실행 응답으로 끝난다. 사용자는 `list_orders`, `get_order` 와 토스증권 앱에서 확인한다 | 실행 응답으로 끝난다. 사용자는 Gmail 보낸편지함에서 확인한다 |
 | `UNKNOWN` 이 되는 때 | 시작 응답을 잃었다. save claim 이나 저장 클릭 뒤에 실패했다. 바인딩 버전이 바뀌었거나 15분 정리에 걸렸는데 start claim 이 있었다. [job 상태와 재접속](content-draft.md#job-상태와-재접속) | 응답을 잃었거나 결과가 불확실한데 claim 을 소비했다. 소비하지 않았음을 잠금 안에서 증명하면 `FAILED` 다 | `GMAIL_SEND_UNKNOWN`(보낸 뒤 시간 초과, 연결 끊김, 5xx), execute 시간 초과, 실행 중 서버 재시작(`ConnectorActionSweeper`), 오래 남은 `EXECUTING`(`ConnectorActionExpirer`) |
 | 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다. 새 snapshot 의 재저장은 감수한다(아래 「남은 공백」) | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 플러그인도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다. 같은 메일의 새 호출은 감수한다(아래 「남은 공백」) |

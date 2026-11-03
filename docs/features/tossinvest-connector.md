@@ -80,8 +80,20 @@ MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 �
 `args` 의 스키마는 그 두 도구의 strict 인자 스키마(`MODEL_SCHEMAS`)의 union 이다. 금액, 수량, 가격은 10진수 글이고 계좌 칸이 없다.
 계좌는 연결에서 고른 값으로만 정해진다. 모델이 넣은 계좌는 연결의 계좌와 같아도 받지 않는다. 받으면 scope 를 모델 인자와 대조하는 길이 하나 더 생기기 때문이다.
 Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 넘겨 승인 줄을 만들고, 모델에게는 언제나 막힘으로 답한다.
-Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 모델에게 준다. 승인 줄을 만든 답은 「오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절로 읽지 않게 한다.
-글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다. 준비가 거절된 답은 `ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE` 다.
+Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 만들어 `<untrusted_tool_result>` 로 감싸 모델에게 준다. 승인 줄을 만든 답은 「[승인 대기] 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절이나 외부 서비스의 확인되지 않은 주장으로 읽지 않게 한다. 표시의 뜻은 공통 실행 지침이 설명한다([플러그인 도구 정책과 승인](connector-policy.md)의 「승인 대기 안내를 모델이 읽는 방식」).
+글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다. 대화 없는 실행이 만든 줄은 카드가 없어 표시 없는 `APPROVAL_WITHOUT_CONVERSATION_MESSAGE` 로 답한다.
+
+준비가 거절된 답은 `ConnectorFinancialIntake.rejectedMessage` 가 고른다. 이 함수가 고르는 거절 가운데서는 같은 의도 차단만 까닭을 밝힌다. 상한 거절은 「주문 상한」 의 답을 따로 쓴다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)).
+
+| 거절 | 답 |
+| --- | --- |
+| 같은 주문의 카드가 이 대화에서 승인을 기다린다(`CONFLICT_PENDING`) | `INTENT_PENDING_MESSAGE`. `[승인 대기]` 로 시작하고 새 카드는 만들지 않았다고 말한다 |
+| 같은 주문의 카드가 다른 대화에서 승인을 기다린다(`CONFLICT_PENDING_ELSEWHERE`) | `INTENT_PENDING_ELSEWHERE_MESSAGE`. 이 대화에는 카드가 없어 표시를 붙이지 않고, 알림에서 그 카드를 찾으라고 말한다 |
+| 같은 주문이 실행 중이거나 결과를 모른다(`CONFLICT`) | `INTENT_BUSY_MESSAGE`. 다시 부르지 말고 주문 내역을 확인하라고 말한다 |
+| 그 밖의 검사. 같은 의도 조회 실패(`CONFLICT_CHECK`)와 대화 없는 실행이 만들어 카드가 없는 승인 대기(`CONFLICT_PENDING_UNSEEN`)도 여기다 | `FINANCIAL_UNAVAILABLE_MESSAGE`. 승인 카드를 만들지 않았고, 사용자가 다시 요청하면 다시 불러도 된다고만 말한다 |
+
+승인 기한이 지난 `PENDING` 은 만료 작업이 돌기 전에도 같은 의도를 막지 않는다(`ConnectorFinancialConflicts.blocking`). 그 줄은 승인할 때 기한 검사에 걸려 실행되지 못한다.
+옛 답은 어느 거절에나 「같은 주문의 승인 요청이 이미 있을 수 있다. 다시 부르지 말라」 고 했다. 그 글이 대화 기록에 남아, 원인이 고쳐진 뒤 같은 취소를 다시 요청해도 모델이 준비를 부르지 않았다(2026-11-02 운영).
 사용자가 승인 카드에서 승인하면 Control Plane 이 claim 을 한 번 소비하고 실행 도구를 부른다. 실행 도구는 모델 목록에 없다.
 실행 도구를 모델이 직접 부르면 거절하고, 살펴보기 트리 안의 준비 호출은 넘기지 않는다.
 근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
@@ -283,7 +295,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | 호출마다 승인 | FINANCIAL 도구는 `always` 다. 상시 허락과 대화 허락을 받지 않는다(grant 불가) | 있음 |
 | 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 있음. `allowed-accounts`. 항목은 `<계좌 순번>:<사용자 메일>` 이고 한 계좌는 한 사용자에게만 연다. 메일은 대소문자를 가리지 않고, 계좌 순번은 연결 칸의 값과 글자 그대로 견준다. 형식이 틀리거나 같은 계좌가 두 번 나오면 기동을 멈춘다. 승인과 claim 에서도 저장 scope 로 다시 본다 |
 | 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 상한을 둔다. 운영 설정의 값은 최대치이고, 실제 상한은 계좌 주인이 그 안에서 정한다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. 최대치는 `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd`. USD 금액 주문은 환율로 바꾸지 않고 USD 상한과만 견준다. 사용자 상한은 아래 「주문 상한」 이 갖는다 |
-| 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
+| 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING(기한이 남은 것), EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
 | UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
 | 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 플러그인, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 있음. `fos-financial-intent-v2`. 저장 줄의 protocol 을 `approval-claim-v2` 로 올렸고, 열린 v1 줄이 남으면 관문이 닫힌다 |
 | 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 있음. `FinancialDigest`, key 파일은 `digest-key-file`. 없으면 관문이 닫힌다 |
@@ -372,7 +384,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 11. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
 12. 계속 쓰지 않을 거면 아래 「되돌리기」 로 다시 닫는다
 
-상한 거절을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
+상한 거절과 같은 의도 차단을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
 준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `FinancialPrepareStage` 가 갖는다.
 `stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유> stage=<대시보드 단계> code=<선언된 오류 코드>` 를 본다.
 대시보드 plugin 이 `{"ok": false}` 에 고정 단계와 오류 코드를 실어 보내고, Control Plane 은 그 둘을 로그에만 남기고 모델에게 가는 글에는 싣지 않는다. 옛 plugin 이거나 모양이 다른 값이면 `-` 다.
