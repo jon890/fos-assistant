@@ -1,8 +1,8 @@
 # 기억 전체 암호화 기술 설계
 
-스펙: [`spec.md`](spec.md). PR1 이 구현한 REQ1 부터 REQ4, REQ6 부터 REQ8 은 앞의 절들이, PR2 가 구현하는 REQ5 와 스펙 DECISION17 은 「PR2: 민감 구분 제거와 평문 해시」 절이 다룬다.
+스펙: [`spec.md`](spec.md). PR1 이 구현한 REQ1 부터 REQ4, REQ6 부터 REQ8 은 앞의 절들이, PR2 가 구현한 REQ5 의 코드와 화면, 스펙 DECISION17 은 「PR2: 민감 구분 제거와 평문 해시」 절이, REQ5 의 「칸이 없다」 는 「PR3: 옛 칸 삭제」 절이 다룬다.
 되돌리기 어려운 결정과 근거는 [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 이 갖는다.
-PR2 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-20261103-memory-sensitivity-removal.md) 이 갖는다.
+PR2 와 PR3 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-20261103-memory-sensitivity-removal.md) 이 갖는다.
 
 ## 지금 구조
 
@@ -26,7 +26,7 @@ PR2 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-2026
 ### REQ1 제목과 본문을 평문으로 두지 않는다
 
 - 새 컬럼 `data_key_id BIGINT NULL` 을 `memory` 와 `memory_revision` 에 둔다. 제목과 본문을 암호화한 `user_data_key.id` 다. 비어 있으면 두 컬럼이 평문이거나 옛 key 의 줄이다.
-  옛 컬럼 `content_key_id`(환경 변수 key 의 id)는 이관이 끝날 때까지 읽기만 하고 PR2 가 지운다. 숫자 key 번호와 글 key id 를 한 컬럼에 섞지 않는다(DECISION1).
+  옛 컬럼 `content_key_id`(환경 변수 key 의 id)는 이관이 끝날 때까지 읽기만 하고 PR2 가 읽기를 걷어 냈으며 PR3 이 칸을 지웠다. 숫자 key 번호와 글 key id 를 한 컬럼에 섞지 않는다(DECISION1).
 - 제목과 본문은 같은 데이터 key 로 따로 암호화한다. 모양은 기존 `v1.<IV>.<암호문과 태그>` 다.
 - **AAD 는 `memory:<memory_id>:<컬럼>:<USER|GROUP>:<주인 번호>` 다.** `<컬럼>` 은 `title` 이나 `content` 다. revision(`memory_revision`)은 자기 `memory_id` 로 같은 AAD 를 만든다(DECISION2).
   그래서 revision 을 남길 때 지금 줄의 암호문을 다시 쓰지 않고 그대로 옮긴다. 암호문을 다른 기억이나 다른 컬럼, 다른 주인으로 옮기면 풀리지 않는다.
@@ -185,7 +185,7 @@ PR2 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/ADR-2026
 | REQ2 | 「REQ 마다 해결 방법」 의 REQ2. `user_data_key` 에 그룹 줄을 더하고 풀 때 key 주인을 대조한다 | PR1 |
 | REQ3 | 「REQ 마다 해결 방법」 의 REQ3 과 「이관 순서와 실패 처리」. 기동 이관이 줄마다 다시 쓰고 평문 해시를 대조한다 | PR1 |
 | REQ4 | 「REQ 마다 해결 방법」 의 REQ4. 엔티티가 푼 글을 내고 `sealed()` 판정을 `readable()` 로 바꾼다 | PR1 |
-| REQ5 | 「PR2: 민감 구분 제거와 평문 해시」. 엔티티와 질의, 화면에서 민감도와 민감 허용을 빼고 칸은 다음 PR 이 지운다 | PR2 |
+| REQ5 | 「PR2: 민감 구분 제거와 평문 해시」. 엔티티와 질의, 화면에서 민감도와 민감 허용을 빼고, 「PR3: 옛 칸 삭제」 가 칸을 지운다 | PR2, PR3 |
 | REQ6 | 「REQ 마다 해결 방법」 의 REQ6. key 를 풀지 못하면 저장을 거절하고 그 줄만 「읽지 못함」 이다 | PR1 |
 | REQ7 | 「REQ 마다 해결 방법」 의 REQ7. 관리자 응답에 남의 개인 기억 제목을 싣지 않는 것을 테스트로 고정한다 | PR1 |
 | REQ8 | 「REQ 마다 해결 방법」 의 REQ8. 실패한 줄은 번호만 남기고 기동을 잇는다 | PR1 |
@@ -234,10 +234,10 @@ PR1 을 배포한 뒤 운영에서 데이터 key 로 옮기지 않은 줄과 옛
 | 관리자 기억 영역(`AgentMemorySettingView`) | collection 의 `allowSensitive`, `sensitiveEntryCount`, 변경의 `allowSensitive` 를 뺀다. 저장 요청은 `collection` 만 받고 옛 `allowSensitive` 는 무시한다 |
 | 오류 코드 | `MEMORY_SENSITIVE_NOT_EDITABLE`, `MEMORY_SENSITIVE_ALWAYS` 를 지운다 |
 | 설정 | `assistant.memory.encryption.*`(옛 환경 변수 key)를 지운다. 환경 변수가 남아 있어도 읽지 않는다 |
-| `memory.sensitivity`, `memory.content_key_id`, `memory_revision.sensitivity`, `memory_revision.content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` | 엔티티가 매핑하지 않는 옛 칸이다. 기본값이 없던 `memory_revision.sensitivity` 와 `agent_memory_collection_change.allow_sensitive` 에 기본값만 둔다(`V20261103054413`, DDL 하나). 칸은 다음 PR 이 지운다 |
+| `memory.sensitivity`, `memory.content_key_id`, `memory_revision.sensitivity`, `memory_revision.content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` | 엔티티가 매핑하지 않는 옛 칸이다. 기본값이 없던 `memory_revision.sensitivity` 와 `agent_memory_collection_change.allow_sensitive` 에 기본값만 둔다(`V20261103054413`, DDL 하나). 칸은 「PR3」 절의 마이그레이션이 지웠다 |
 | `proposal_dedup_key`, `embedding_fingerprint` | 칸 모양은 그대로이고 값이 HMAC 이다 |
 
-H2 테스트 DB 는 엔티티로 스키마를 만들므로, 옛 칸을 `memory-legacy-columns.sql` 로 따로 만들어 운영 스키마와 맞춘다. 옛 이미지가 남긴 줄을 흉내 내는 테스트가 그 칸에 값을 넣는다.
+H2 테스트 DB 는 엔티티로 스키마를 만들므로 PR2 동안은 옛 칸을 테스트 자원 `memory-legacy-columns.sql` 로 따로 만들어 운영 스키마와 맞췄다. PR3 이 칸과 그 파일을 함께 지웠다.
 
 ## 실패와 일관성
 
@@ -246,7 +246,7 @@ H2 테스트 DB 는 엔티티로 스키마를 만들므로, 옛 칸을 `memory-l
 - 되돌린 PR1 이미지는 HMAC 지문을 낡은 것으로 보고 첫 주기에 벡터를 모두 다시 임베딩한다. 다시 쓴 벡터마다 연결 찾기가 돌아 정리한 대체 제안이 다시 생길 수 있다. 되돌리기 전에 임베딩을 끄면 막을 수 있고, 절차는 운영 저장소가 갖는다
 - 해시 바꾸기는 줄마다 따로 커밋한다. 한 줄이 실패해도 다음 줄로 가고 기동은 잇는다. 실패한 줄은 다음 기동이 다시 본다
 - 지문 바꾸기는 저장된 지문이 읽은 값 그대로일 때만 쓴다. 그 사이 채우는 작업이 새 벡터를 썼으면 덮지 않는다
-- 옛 key 줄이 남아 있으면 옛 key 를 읽지 않으므로 암호문을 평문으로 본다. 운영 0건을 확인한 뒤 이 PR 을 열었다(스펙 REQ8). 칸을 지우는 다음 PR 이 그 칸이 빈 것을 다시 본다
+- 옛 key 줄이 남아 있으면 옛 key 를 읽지 않으므로 암호문을 평문으로 본다. 운영 0건을 확인한 뒤 이 PR 을 열었다(스펙 REQ8). 칸을 지우는 PR3 이 그 칸이 빈 것을 다시 보고, 남았으면 지우지 않고 멈춘다
 
 ## PR2 검증 전략
 
@@ -267,3 +267,27 @@ H2 테스트 DB 는 엔티티로 스키마를 만들므로, 옛 칸을 `memory-l
 | DECISION11 | `MemorySensitivity` | 문맥 항목의 민감도로 남긴다. 기억 항목은 늘 `NORMAL` 이다 | 작성자 | 위임 결과, 커넥터 결과, 할 일이 `SENSITIVE` 로 `instructions` 에서 빠지는 규칙은 그대로다 |
 | DECISION12 | 옛 `SENSITIVE_CHANGED` 기록 | 값은 읽을 수 있게 두고 최근 변경에 내지 않는다 | 작성자 | 없어진 설정의 변경을 보여도 뜻이 없다. 지우면 감사 기록이 사라진다 |
 
+## PR3: 옛 칸 삭제
+
+PR2 를 배포한 뒤 운영에서 옛 key 줄(`content_key_id` 가 찬 줄)이 0건인 것을 확인했다(2026-11-03). PR3 은 코드가 읽고 쓰지 않는 옛 칸 여섯 개를 지워 REQ5 의 「칸이 없다」 를 닫는다.
+
+| 표 | 지우는 칸 |
+| --- | --- |
+| `memory` | `sensitivity`, `content_key_id` |
+| `memory_revision` | `sensitivity`, `content_key_id` |
+| `agent_memory_collection` | `allow_sensitive` |
+| `agent_memory_collection_change` | `allow_sensitive` |
+
+- `V20261103054416__MemoryLegacyKeyGuard`(Java)가 먼저 돈다. `memory` 와 `memory_revision` 에서 `content_key_id` 가 찬 줄을 세어 하나라도 있으면 줄 수만 담은 예외로 멈춘다. DDL 을 하지 않으므로 멈춰도 칸은 그대로이고, 줄을 데이터 key 로 옮긴 뒤 실패한 기록을 정리하고 다시 올린다. 본문과 key id 는 예외에 넣지 않는다
+- 칸을 지우는 SQL 은 표마다 파일이다(`V20261103054417` 부터 `V20261103054420`). MySQL DDL 은 되돌려지지 않아 한 표가 실패해도 앞 표의 삭제는 남는다. H2 가 한 문장에서 칸 여럿을 지우는 문법을 받지 않아 칸마다 문장을 나눈다
+- `sensitivity` 와 `allow_sensitive` 는 확인하지 않는다. 코드가 PR2 부터 읽지 않는 값이고 지워도 잃는 동작이 없다
+- 테스트 자원 `memory-legacy-columns.sql` 과 `application-test.yml` 의 import 항목을 지우고, 칸에 값을 넣던 테스트와 사용자 purge fixture(`purge/fixture.sql`)에서 옛 칸을 뺀다
+- **이 PR 을 배포한 뒤에는 PR1 이전 이미지로 되돌리지 못한다.** 그 이미지는 칸을 매핑해 `ddl-auto: validate` 가 실패한다. PR2 이미지는 칸을 매핑하지 않아 칸이 없어도 뜬다
+
+### PR3 검증 전략
+
+| REQ | 테스트 | DB |
+| --- | --- | --- |
+| REQ5 | 옛 칸이 있는 Flyway 스키마에 줄을 넣고 끝까지 적용하면 줄은 그대로이고 여섯 칸이 모두 없다(`MemoryLegacyColumnsDropMigrationTest`) | H2, MySQL |
+| REQ8 | 옛 key 줄이 있으면 줄 수를 알리고 멈추며 어느 칸도 지우지 않는다(같은 테스트) | H2, MySQL |
+| REQ4 | 기억을 읽고 쓰는 기존 테스트, 조립, 도구, 사용자 purge 가 칸 없는 스키마에서 통과한다 | H2, MySQL |
