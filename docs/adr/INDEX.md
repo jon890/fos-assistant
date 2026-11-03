@@ -98,7 +98,6 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261009 / docs-per-module](ADR-20261009-docs-per-module.md) | 문서는 모듈마다 정해진 파일 몇 개로 두고, 코드가 가진 값은 옮겨 적지 않는다 | 공통 | Accepted. ADR-20261009 / adr-per-module 의 자리 규칙을 문서 전체로 넓힌다. 모듈 prd 와 flow 를 두는 부분은 [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) 가 대체한다 |
 | [ADR-20261009 / feature-docs](ADR-20261009-feature-docs.md) | 문서는 기능마다 한 파일로 두고 모듈 docs 에는 모듈 안의 규칙만 남긴다 | 공통 | Accepted. ADR-20261009 / docs-per-module 의 모듈 prd 와 flow 를 두는 부분을 대체한다. 기능 스펙 예외는 [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) 가 더한다 |
 | [ADR-20261009 / skill-package](ADR-20261009-skill-package.md) | 스킬은 zip 묶음으로도 올리고, 스크립트는 실행 공간이 있는 에이전트에만 받는다 | 공통 | Accepted. ADR-034 의 스크립트 기각을 대체한다 |
-| [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |
 | [ADR-20261009 / workspace-explorer](ADR-20261009-workspace-explorer.md) | 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다 | backend, frontend | Accepted. ADR-086 의 사용자별 `/workspace` 를 사람이 보는 길이다. HTML 미리보기는 ADR-027 의 격리를 쓴다 |
 
 | [ADR-20261010 / attachment-inspect](ADR-20261010-attachment-inspect.md) | 현재 실행이 같은 대화의 원본 사진을 native 도구 결과로 다시 읽는다 | backend, hermes | Accepted |
@@ -129,3 +128,4 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-058](archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) | 기존 개인 지식 저장소는 주인이 검토한 묶음을 화면에서 올려 들여온다 | backend, frontend | Retired. 목적지 대조 미완료. 사용자 결정으로 원본·아카이브 퇴역, 도구 제거, 기존 출처 보존 |
 | [ADR-20261007 / value-evaluation](archive/ADR-20261007-value-evaluation.md) | 가치 판단은 축별 근거와 재평가 입력을 남기고 행동 정책과 분리한다 | backend, hermes | Superseded ([ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md)) |
 | [ADR-20261008 / daily-loop](archive/ADR-20261008-daily-loop.md) | 매일 깨우기가 끝나면 동의한 사용자의 살펴보기 한 번에 가치 평가와 행동 정책을 한 번만 잇는다 | backend, frontend | Superseded ([ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md)) |
+| [ADR-20261009 / tool-request-flow](archive/ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Retired. 사용자 결정으로 기능과 `agent_toolset_request` 를 지웠다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) 의 D5) |
