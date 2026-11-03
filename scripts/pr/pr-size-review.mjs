@@ -16,6 +16,7 @@ export function sizeFinding(size) {
   const boundaries = candidates.length
     ? candidates.map(candidate => `- ${candidate.kind}: ${code(candidate.name)} (운영 코드 ${candidate.counts.production}줄)`).join("\n")
     : "- 자동으로 찾은 경계 후보가 없습니다. 변경 목적에 따라 나눌 곳을 확인하세요.";
+  const deleted = size.deleted_lines > 0 ? `\n파일째 삭제 ${size.deleted_lines}줄(상한 제외)\n` : "";
   return `${MARKER}
 ## 코드 리뷰: PR 크기
 
@@ -29,7 +30,7 @@ export function sizeFinding(size) {
 수정: 다음 경계 후보를 참고해 단계별 PR로 나누세요. 후보끼리는 겹칠 수 있으며 독립 PR 확정안은 아닙니다.
 
 ${boundaries}
-`;
+${deleted}`;
 }
 
 function gh(args, input) {
