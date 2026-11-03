@@ -39,7 +39,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 `C`는 순수 저장 생성 시각만 base로 옮기고, `C+U`는 순수 저장 생성·변경 시각을 모두 옮긴다.
 `제외`는 createdAt 자체가 업무 시각이므로 어느 base도 상속하지 않는다.
 판정 결과는 생성 전용 25개, 생성·변경 8개, 제외 13개이며 auditing 대상은 33개다.
-기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다. `MemoryCollection`은 표를 `group_setting`의 `MEMORY_COLLECTIONS` 줄로 옮기며 엔티티를 지워 표에서 뺐다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)). `MemoryEmbedding`도 벡터를 `memory`의 `embedding_*` 칸으로 옮기며 엔티티를 지워 표에서 뺐다.
+기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다. 기억 단계 2가 MemoryLink를 더했다. `MemoryCollection`은 표를 `group_setting`의 `MEMORY_COLLECTIONS` 줄로 옮기며 엔티티를 지워 표에서 뺐다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)). `MemoryEmbedding`도 벡터를 `memory`의 `embedding_*` 칸으로 옮기며 엔티티를 지워 표에서 뺐다. `MemoryLink`도 기억 연결을 지우고 대체만 `memory`의 `superseded_by_memory_id` 칸으로 남기며 엔티티를 지워 표에서 뺐다.
 변경 시각이 없던 엔티티에 새 updated_at을 추가하는 대상은 Agent/AppUser/AllowedPerson 세 개뿐이다.
 「없음」은 UPDATE bulk가 없다는 뜻이며 DELETE bulk는 callback 대상이 아니다.
 
@@ -68,7 +68,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `media_observation` / `MediaObservation` | 제외: 관찰 revision 시각. MediaObservationService가 C에서 15분 유효기간을 계산 | C와 expiresAt 유지 |
 | `memory` / `Memory` | C: 문서 본체의 최초 저장만 자동화 | U/acceptedAt은 문서 변경·수락의 업무 시각. revision.changedAt은 별도로 보존 |
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
-| `memory_link` / `MemoryLink` | C+U: 연결 행의 저장·상태 변경 시각. 대체 판정은 status 가 소유 | revokedAt은 끊거나 거절한 업무 시각으로 명시 전달. UPDATE bulk 없음 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
 | `proactive_check_finding` / `ProactiveCheckFinding` | C: 살펴보기 발견 기록의 저장 시각. 관측 시점은 checkedAt이 담당 | checkedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |
 | `proactive_check_problem` / `ProactiveCheckProblem` | C: 문제 후보 기록의 저장 시각. 근거 시점은 evidenceCheckedAt이 담당 | evidenceCheckedAt 명시 전달. 기존 C만 이동하고 새 칸 없음 |

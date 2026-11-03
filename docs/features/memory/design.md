@@ -67,7 +67,7 @@ PR2 와 PR3 의 결정은 [ADR-20261103 / memory-sensitivity-removal](../../adr/
 | 자리 | 지금 | 바꾼 뒤 |
 | --- | --- | --- |
 | 개인 사실 구역, 항상 층(`ContextAssembler`) | `!memory.sealed()` 인 줄만 싣는다 | `memory.readable()` 인 줄만 싣는다 |
-| 질문·연결 구역(`MemorySearchSection`, `MemoryLinkSection`) | 일반이고 평문인 줄만 본문을 점수에 넘긴다 | 일반이고 풀린 줄만 본문을 넘긴다 |
+| 질문 구역(`MemorySearchSection`) | 일반이고 평문인 줄만 본문을 점수에 넘긴다 | 일반이고 풀린 줄만 본문을 넘긴다 |
 | `memory_search` 후보(`MemorySearchCandidates`) | SQL 이 민감·암호문 본문을 `NULL` 로 바꾼다 | 권한 조건 그대로 엔티티를 읽고, 풀리지 않은 줄은 빼고, 민감 줄의 본문은 앱에서 `null` 로 바꾼다 |
 | 임베딩 원천(`MemoryEmbeddingRepository`) | `content_key_id is null` 인 일반 줄 | `content_key_id` 조건을 빼고 엔티티를 읽어 풀린 줄만 낸다. 민감 줄은 지금처럼 `sensitivity` 조건으로 빠진다 |
 | 바로 저장의 되돌리기(`MemoryCaptureService.restore`) | 암호문 revision 이면 되돌리지 않는다 | 풀린 revision 이면 되돌린다. 민감 revision 은 지금처럼 이 길로 오지 않는다 |

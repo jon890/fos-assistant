@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryCaptureService;
-import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.MemoryTextMigration;
@@ -93,9 +92,6 @@ class MemoryEncryptionTest {
     MemorySources sources;
 
     @Autowired
-    MemoryLinkService linkService;
-
-    @Autowired
     JdbcTemplate jdbc;
 
 
@@ -137,7 +133,7 @@ class MemoryEncryptionTest {
     private List<MemoryView> listOf(CurrentUser user) {
         CurrentUserProvider currentUser = Mockito.mock(CurrentUserProvider.class);
         Mockito.when(currentUser.require()).thenReturn(user);
-        return new MemoryController(memories, context, sources, linkService, currentUser).readable();
+        return new MemoryController(memories, context, sources, currentUser).readable();
     }
 
 

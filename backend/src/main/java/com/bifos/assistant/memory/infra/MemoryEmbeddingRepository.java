@@ -20,7 +20,7 @@ import org.springframework.data.repository.query.Param;
  * Spring Data 의 조회가 어느 쪽을 낼지 정해지지 않아, 벡터 쿼리만 이 이름으로 나눠 주입받는다.
  *
  * <p>임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아닌 항목이다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고, 풀지 못한 줄은 뺀다(ADR-20261103 / memory-encryption).
- * 효력 있는 대체 연결이 가리키는 항목도 빠진다. 이미 있던 그 항목의 벡터는 다음 주기의 정리가 비운다.
+ * 다른 항목이 대신한 항목({@code superseded_by_memory_id} 가 찬 줄)도 빠진다. 이미 있던 그 항목의 벡터는 다음 주기의 정리가 비운다.
  */
 public interface MemoryEmbeddingRepository {
 
@@ -34,9 +34,7 @@ public interface MemoryEmbeddingRepository {
         + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
-        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
-        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
-        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
+        + " and m.supersededByMemoryId is null"
         + " order by m.id")
     List<Memory> findEmbeddableMemories();
 
@@ -54,9 +52,7 @@ public interface MemoryEmbeddingRepository {
         + " and m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
-        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
-        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
-        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
+        + " and m.supersededByMemoryId is null"
         + " order by m.id")
     List<Memory> findEmbeddableMemoriesByIds(@Param("ids") Collection<Long> ids);
 
@@ -74,21 +70,6 @@ public interface MemoryEmbeddingRepository {
                 memory.id(), memory.scope(), memory.stored().ownerId(), memory.title(), memory.content()))
             .toList();
     }
-
-
-    /**
-     * 벡터가 있는 그 사용자의 개인 항목 번호다. 기억 사이의 연결을 찾을 때 같은 주인의 항목끼리만 비교한다. 벡터는 모델과 지문을 맞춰 보는
-     * {@code MemoryVectorCache} 로 읽는다.
-     */
-    @Query(value = "select id from memory where" + HAS_VECTOR + " and scope = 'USER' and owner_user_id = :ownerUserId",
-        nativeQuery = true)
-    List<Long> findMemoryIdsOfOwner(@Param("ownerUserId") Long ownerUserId);
-
-
-    /** 벡터가 있는 그 그룹의 그룹 항목 번호다. */
-    @Query(value = "select id from memory where" + HAS_VECTOR + " and scope = 'GROUP' and group_id = :groupId",
-        nativeQuery = true)
-    List<Long> findMemoryIdsOfGroup(@Param("groupId") Long groupId);
 
 
     /** 벡터가 있는 줄의 번호, 모델, 지문이다. 벡터는 읽지 않는다. */

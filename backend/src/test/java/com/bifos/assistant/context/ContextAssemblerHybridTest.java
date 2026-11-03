@@ -21,7 +21,6 @@ import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
-import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.KeywordScorer;
 import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.config.MemoryRelevanceProperties;
@@ -59,9 +58,6 @@ class ContextAssemblerHybridTest {
 
     @Autowired
     MemoryTexts texts;
-
-    @Autowired
-    MemoryLinkDiscovery linkDiscovery;
 
     @Autowired
     MemoryService memories;
@@ -190,7 +186,7 @@ class ContextAssemblerHybridTest {
     private void refresh() {
         new MemoryEmbeddingRefresher(
             ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED, texts), backgroundTasks,
-            linkDiscovery, texts)
+            texts)
                 .refreshOnce();
     }
 

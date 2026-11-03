@@ -1,6 +1,6 @@
 ## ADR-20261015 / memory-link: 기억 사이의 연결은 링크 표에 두고, 옛 값은 지우지 않고 「대체함」 링크로 주입에서 뺀다
 
-- **status**: `accepted`
+- **status**: `accepted` 연결 테이블과 `RELATED`, 연결 제안, 자동 찾기, 연결된 기억 구역, `memory_link` 도구는 [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) 의 D4 가 지웠다. 대체는 `memory.superseded_by_memory_id` 로 남는다.
 - Date: 2026-10-15
 - #310 의 처음 계획에 있던 `fact_kind` 로 값을 가르는 대체와, 저장할 때 ADD/UPDATE/NOOP 를 고르는 대체를 이 결정이 대신한다. 변하는 정도의 분류는 두지 않고, 정비 루프의 안전 규칙에 필요한 값 하나만 [ADR-20261015 / memory-maintenance](ADR-20261015-memory-maintenance.md) 가 둔다.
 - 2026-10-16 사용자 결정(판단의 분류를 테이블 컬럼이나 enum 으로 굳히지 않는다, #310 댓글)에 따라 링크 종류는 Control Plane 이 다르게 동작해야 하는 둘만 둔다.
@@ -111,3 +111,18 @@
 | 바뀌는 테이블 | 새 `memory_link`(번호, `from_memory_id`, `to_memory_id`, `type`(`SUPERSEDES`, `RELATED`), 자유 글 `label`, `origin`, `status`, `score`, 만든 실행 번호, 만든 시각, 끊은 시각. `from`, `to`, `type` 이 유일하다). `memory_capture` 에 외부 글을 읽었는지 적는 컬럼 |
 | 바뀌는 클래스 | `MemoryQueries`(대체되지 않은 항목 조건), `ContextAssembler`(한 단계 확장, `MEMORY_LINK`), `ContextSource`, 새 링크 서비스와 대체 후보 탐지, `McpMemoryRemember` 와 `MemoryCaptureService`(외부 글 기록), `/memory` 화면과 승인 카드(대체 받아들이기, 대체됨 표시, 되돌리기) |
 | 완료 조건 | 대체 사례의 오기억 노출률이 기준 파일보다 내려가고 기준 파일을 새 값으로 다시 만든다. 대체된 항목이 조립, `memory_search`, `memory_read` 에서 빠지는 테스트가 있다. 링크를 끊으면 다시 실린다. `USER` 와 `GROUP` 사이 링크와 `PROPOSED` 항목 링크를 거절하는 테스트가 있다 |
+
+### 개정(2026-11-03, 사용자 결정 D4)
+
+잘 쓰지 않는 연결 기능을 줄이려고 위 결정의 대부분을 걷어 냈다. 운영에서 `memory_link` 는 `RELATED`·`ACTIVE` 한 줄뿐이었고 `SUPERSEDES` 는 0 줄이었다.
+근거와 진행은 [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이 갖는다.
+
+| 위 결정 | 지금 |
+| --- | --- |
+| `memory_link` 테이블 | 코드가 읽고 쓰지 않는다. 직전 이미지가 읽도록 남기고 DROP PR 이 지운다 |
+| `SUPERSEDES`(대체) | `memory.superseded_by_memory_id` 한 칸으로 옮겼다. 「대체됨」 의 판정은 그 칸이 차 있는지다. 주입, `memory_search`, `memory_read`, 임베딩에서 빼는 조건은 그대로다 |
+| 대체를 만들고 받아들이고 되돌리는 경로(`memory_link` 도구, 코드가 찾는 대체 후보, 승인 카드, 되돌리기) | 지웠다. 지금 코드에는 이 칸을 채우는 경로가 없다. 대신한 새 항목을 지우거나 승인을 벗어나게 하면 칸을 비운다 |
+| `RELATED`(관련), 자동 `RELATED`, 연결된 기억 구역(`MEMORY_LINK`) | 지웠다 |
+| 구현 순서의 2a, 2b | 모두 지웠다 |
+
+**기억 측정의 대가.** 관련 연결로만 닿던 두 항목이 빠져 `factsOn` 의 recall@5 가 0.8769 에서 0.8462 로 내렸다. 오기억 노출률 0.5714 는 그대로다. 측정 사례 묶음의 `related` 를 지우고 버전을 4 로 올려 기준 파일을 다시 만들었다.

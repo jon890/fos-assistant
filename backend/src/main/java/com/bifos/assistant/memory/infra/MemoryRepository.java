@@ -66,7 +66,7 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     /**
      * 한 사용자와 그 그룹의 실릴 수 있는 항목을 collection 마다 센다.
      *
-     * <p>실릴 수 있는 항목은 {@code ACCEPTED} 이고 {@code SOURCE} 도 {@code ARCHIVE} 도 아니며 대체되지 않은 줄이다. collection 은
+     * <p>실릴 수 있는 항목은 {@code ACCEPTED} 이고 {@code SOURCE} 도 {@code ARCHIVE} 도 아니며 대체되지 않은({@code superseded_by_memory_id} 가 빈) 줄이다. collection 은
      * 거르지 않는다. 범위는 그 사용자의 {@code USER} 항목과 그 그룹의 {@code GROUP} 항목이다.
      *
      * @param userId 항목 주인이다. null 이면 {@code USER} 조건이 참이 되지 않아 그룹 항목만 센다
@@ -77,16 +77,14 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
         + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.retrieval <> com.bifos.assistant.memory.domain.type.MemoryRetrieval.ARCHIVE"
-        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
-        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
-        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
+        + " and m.supersededByMemoryId is null"
         + " and ((m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER and m.ownerUserId = :userId)"
         + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
         + " group by m.collection")
     List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long userId, @Param("groupId") Long groupId);
 
 
-    /** 그 사용자의 개인 기억 번호다. 사용자 정리가 딸린 임베딩과 링크를 지우는 데 쓴다(ADR-20261101 / user-purge). */
+    /** 그 사용자의 개인 기억 번호다. 사용자 정리가 딸린 줄을 지우는 데 쓴다(ADR-20261101 / user-purge). */
     @Query("select m.id from Memory m where m.ownerUserId = :userId and m.scope = :scope")
     List<Long> findIdsByOwnerAndScope(@Param("userId") Long userId, @Param("scope") MemoryScope scope);
 
@@ -95,4 +93,27 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Memory m where m.id in :ids")
     int deleteAllByIds(@Param("ids") Collection<Long> ids);
+
+
+    /**
+     * 그 항목을 대신한 것으로 적힌 옛 항목의 칸을 비운다. 대신한 새 항목이 지워지거나 승인을 벗어나면 옛 항목이 다시 실리게 한다. 칸은 엔티티가
+     * 쓰지 않아 native 쿼리로 바꾼다.
+     *
+     * @return 비운 줄 수
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update memory set superseded_by_memory_id = null where superseded_by_memory_id = :newerId", nativeQuery = true)
+    int clearSupersededBy(@Param("newerId") Long newerId);
+
+
+    /**
+     * 옛 연결 테이블 {@code memory_link} 에서 그 항목들을 한쪽 끝으로 둔 줄을 지운다. 코드는 옛 테이블을 읽고 쓰지 않지만, 직전 이미지가 남긴
+     * 줄(자유 글 label 이 있을 수 있다)을 항목 삭제와 사용자 정리의 약속대로 지운다. 옛 테이블을 지우는 PR 이 이 메서드를 걷어 낸다(ADR-20261102 /
+     * table-reduce-r2).
+     *
+     * @return 지운 줄 수
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "delete from memory_link where from_memory_id in (:memoryIds) or to_memory_id in (:memoryIds)", nativeQuery = true)
+    int deleteLegacyLinks(@Param("memoryIds") Collection<Long> memoryIds);
 }

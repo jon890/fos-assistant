@@ -123,7 +123,7 @@ class MemoryMaintenanceTest {
         Memory stale = oldMemory(dad, "정비 테스트 오래된 상태", "이번 달 출장 중이다", 100);
         marked(dad, stale, FeedbackEventType.MARKED_WRONG);
         Memory before = memories.findById(stale.id()).orElseThrow();
-        long linksBefore = linkCount();
+        long supersededBefore = supersededCount();
 
         job.run(now);
 
@@ -140,7 +140,7 @@ class MemoryMaintenanceTest {
             .containsEntry("idleDays", 90)
             .containsEntry("unwantedMarks", 1);
         assertUnchanged(before);
-        assertThat(linkCount()).isEqualTo(linksBefore);
+        assertThat(supersededCount()).isEqualTo(supersededBefore);
     }
 
 
@@ -359,8 +359,8 @@ class MemoryMaintenanceTest {
     }
 
 
-    private long linkCount() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM memory_link", Long.class);
+    private long supersededCount() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM memory WHERE superseded_by_memory_id IS NOT NULL", Long.class);
     }
 
 

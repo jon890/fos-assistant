@@ -82,7 +82,7 @@ sequenceDiagram
 | --- | --- | --- |
 | 0 | 측정 세 층과 악화 금지 게이트, 실행 기록의 선택 근거 컬럼(아래 「Memory 회수 측정」). 서버의 임베딩 지연은 운영 저장소가 재고 결과 수치만 여기 적는다 | [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) |
 | 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 개인 사실 구역은 그대로다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
-| 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록 | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) |
+| 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록. 연결 기능은 지웠고 대체만 `memory.superseded_by_memory_id` 로 남았다(아래 「기억의 대체」) | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md), [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) |
 | 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드. 모두 만들었다(아래 「참고한 기억의 단추」, 「도구 계약(Memory)」, 「정비 루프」, 「기억 화면」). 제안 모드는 후보와 근거만 기록하고 기억을 바꾸지 않는다 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
 | 4 | 정비의 자동 전환과 먼저 살펴보기 연결 | 같은 ADR |
 
@@ -209,16 +209,6 @@ sequenceDiagram
 - 운영 모델은 BGE-M3 의 int8 ONNX(`onnx-community/bge-m3-ONNX`)이고 1024차원이다. 서비스가 글을 1024토큰에서 자르므로 그보다 긴 제목과 본문의 뒤쪽은 의미 점수에 들지 않는다. 앱은 `max-text-chars`(4,000자)까지만 보낸다
 - 벡터는 기억 항목 줄의 `embedding_*` 칸에 둔다(옛 `memory_embedding` 테이블은 지웠다). 채우는 작업이 `refresh-delay` 마다 벡터가 없거나 모델이나 지문이 다른 대상을 `batch-size` 건씩 묶어 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛴다. 늘 실패하는 글이 앞 번호에 있어도 뒤 항목이 채워진다. 한 건씩 보낸 것까지 모두 실패하면 서비스가 내려간 것으로 보고 그 주기를 끝낸다. 조립은 프로세스 안 캐시에서 지문과 모델이 맞는 벡터만 쓴다. 벡터가 없는 후보는 의미 순위에 들지 않고 키워드 순위로만 합쳐진다
 
-#### 연결된 기억 구역
-
-개인 사실 구역과 질문과 관련된 기억 구역에 본문으로 실린 항목과 효력 있는 `RELATED` 로 이어진 한 단계 이웃을 본문까지 싣는다(`MEMORY_LINK`, `link-related-v1`). 계산은 `MemoryLinkSection` 이 갖는다.
-
-- 이웃 후보는 색인에 놓일 항목뿐이다. 그 목록은 이미 권한과 승인, 대체되지 않음 조건을 지났으므로 새 쿼리로 다른 항목을 읽지 않는다. 두 단계 이상은 따라가지 않는다
-- 사람과 에이전트가 맺은 연결을 먼저, 그다음 코드가 맺은 연결을 유사도 순으로 싣는다. 머리 줄은 「연결된 기억」 이다
-- 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context.search` 의 `max-items`(3), `item-max-chars`(600), `max-chars`(1,500)를 질문 구역과 따로 이 구역의 몫으로 쓴다. `max-items` 가 0 이면 이 구역도 끈다
-- 항목당 글자 수보다 긴 항목, 다른 범위에 같은 이름의 짝이 있는 문서는 싣지 않고 색인에 둔다. 예산이나 남은 자리에 들지 않는 이웃도 자르지 않고 색인에 둔다. 실린 이웃은 색인에서 빠진다
-- 연결이 없으면 조립한 글은 이 구역을 두기 전과 같다. 연결이 있으면 질문 없는 조립에서도 개인 사실 구역의 이웃이 실려 지시문 지문이 바뀐다
-
 #### 에이전트의 실행에 보이는 항목
 
 판정은 두 조건이다. 하나라도 지나지 못한 항목은 그 실행에 없는 항목이다. 기억에는 민감 구분이 없다([ADR-20261103 / memory-sensitivity-removal](../adr/ADR-20261103-memory-sensitivity-removal.md)). 에이전트마다 받을 기억은 collection 으로 나눈다.
@@ -280,55 +270,17 @@ sequenceDiagram
 항상 싣는 설정을 끄면 색인으로 간다. 이미 보관한 항목은 보관한 채로 둔다.
 문서(`DOCUMENT`)는 `/api/v1/memory-documents` 가 따로 다루고, Memory 목록과 수정, 승인 경로는 문서를 없는 항목과 같은 응답으로 답한다. 문서를 고칠 때 화면이 읽은 판 번호가 지금 판과 다르면 거절한다.
 
-### 기억 사이의 연결
+### 기억의 대체
 
-기억 두 개 사이의 연결을 `memory_link` 의 줄로 둔다. 종류는 Control Plane 이 다르게 동작하는 둘뿐이고, 연결의 뜻(「이 목표의 일부」, 「같은 여행」)은 `RELATED` 의 자유 글 `label` 이다.
-근거는 [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) 에 있다. 테이블은 `backend/docs/data-schema.md` 의 「memory_link」 가 갖는다.
+한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id`(NULL 허용, 대신한 새 항목의 번호)에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 처음 연결 기능을 만든 [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) 의 `RELATED` 연결, 연결 제안, 자동 찾기, 연결된 기억 구역, `memory_link` 도구는 지웠다. 테이블은 `backend/docs/data-schema.md` 의 「memory 의 대체 칸」 이 갖는다.
 
-| 종류 | 방향 | 만들 때 상태 | Control Plane 의 동작 |
-| --- | --- | --- | --- |
-| `SUPERSEDES` | 새 항목 → 옛 항목 | 늘 `PROPOSED`. 사람이 받아들이면 `ACTIVE` | `ACTIVE` 면 옛 항목을 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 뺀다 |
-| `RELATED` | 방향 없음. 번호가 작은 쪽이 `from` | 조건을 지나면 바로 `ACTIVE` | 조립이 실린 항목의 한 단계 이웃으로 싣는다(「연결된 기억 구역」) |
-
-- 양 끝은 `ACCEPTED` 이고 같은 범위여야 한다. `USER` 항목끼리는 주인이 같아야 하고 `GROUP` 항목끼리는 그룹이 같아야 한다. `USER` 와 `GROUP` 사이에는 맺지 않는다
-- 자기 자신, 출처 원문(`SOURCE`), 이미 같은 `from`, `to`, 종류의 줄이 있는 쌍은 거절한다. 끊은(`REVOKED`) 줄이 있으면 그 줄을 다시 쓴다
-- 「대체됨」 은 `memory` 의 상태가 아니라 `ACTIVE` 인 `SUPERSEDES` 줄이 그 항목을 가리키는지로만 판정한다. 대체를 되돌리는 것은 그 줄을 `REVOKED` 로 바꾸는 것 하나다. 되돌리면 옛 항목이 다음 조립부터 다시 실린다
-- 사용자가 대화에서 직접 정정해 모델이 옛 번호를 `memory_remember` 의 `memory_id` 로 주면 지금처럼 그 항목을 고친다. 이것이 「바로 대체」 이고 링크를 만들지 않는다
-- 대체된 항목은 `memory_remember` 가 같은 사실로 보지도, `memory_id` 로 고치지도 않는다. 같은 제목과 본문을 다시 남기면 「이미 안다」 대신 사용자에게 기억 화면에서 대체를 되돌릴지 물으라는 결과 글이 간다
-- 에이전트가 대체라고 추정하면 `memory_link` 로 `SUPERSEDES` 를 건다. 늘 `PROPOSED` 라 사람이 받아들이기 전에는 주입이 바뀌지 않는다. LLM 이 옛 항목을 고치거나 지우지 않는다
-- 받아들이기, 거절, 되돌리기는 옛 항목을 고칠 수 있는 사람(개인 기억은 주인, 그룹 기억은 `ADMIN`)만 한다. 거절은 `REVOKED` 다
-- 항목을 거절하거나 바로 저장을 되돌려 승인 전으로 돌아가면 그 항목을 한쪽 끝으로 둔 연결을 모두 `REVOKED` 로 바꾼다. 실리지 않는 새 항목이 옛 항목을 가리지 않게 한다
-- 줄마다 누가 만들었는지(`AGENT`, `HUMAN`, 코드가 찾은 `AUTO`)와 만든 실행 번호를 남긴다
+- 「대체됨」 은 `memory` 의 상태가 아니라 이 칸이 차 있는지로만 판정한다. 칸이 찬 항목은 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상, 「참고한 기억」, 먼저 살펴보기 입력에서 빠진다. 사람이 보는 목록(`GET /api/v1/memories`)에는 남는다
+- 엔티티는 이 칸을 읽기만 하고 쓰지 않는다. 지금 코드에는 이 칸을 채우는 경로가 없다. 옛 `memory_link` 의 효력 있는 `SUPERSEDES` 줄을 옮기는 마이그레이션이 채웠을 뿐이다(운영 행 수는 0 이었다)
+- 대신한 새 항목을 지우거나 승인을 벗어나게(거절하거나 바로 저장을 되돌려 제안으로 돌아가게) 하면 그 항목이 대신한 옛 항목의 칸을 비워 옛 항목이 다음 조립부터 다시 실린다. 외래 키를 걸지 않아 서비스가 같은 트랜잭션에서 비운다
+- 사용자가 대화에서 직접 정정해 모델이 옛 번호를 `memory_remember` 의 `memory_id` 로 주면 그 항목을 고친다. 옛 값은 판 기록에 남는다
+- 대체된 항목은 `memory_remember` 가 같은 사실로 보지도, `memory_id` 로 고치지도 않는다. 같은 제목과 본문을 다시 남기면 「이미 안다」 대신 「다른 기억이 대신하고 있어 쓰이지 않는다」 는 결과 글이 간다
+- 옛 `memory_link` 테이블은 직전 이미지가 읽도록 남아 있다. 코드는 읽고 쓰지 않으며, 항목 삭제와 사용자 정리만 그 항목을 한쪽 끝으로 둔 옛 줄을 지운다. 표는 DROP PR 이 지운다
 - 외부 글을 읽은 대화에서 만든 저장 제안은 `memory_capture.external_read` 가 참이고, 승인 카드가 「바깥 글을 읽은 대화에서 나온 제안」 이라고 보인다. 값은 「바로 저장 판정」 의 조건 4 다
-
-에이전트는 Control Plane MCP 도구 `memory_link(from_id, to_id, type, label?)` 로 링크를 건다.
-
-- `type` 은 `SUPERSEDES` 나 `RELATED` 다. `label` 은 200자까지의 자유 글이고 `RELATED` 에만 받는다
-- 두 번호는 그 실행이 볼 수 있는 항목이어야 한다(`memory_read` 와 같은 권한). 보관(`ARCHIVE`)한 항목과 대체된 항목도 잇지 못한다. 볼 수 없거나 조건을 어기면 없는 항목과 같은 결과 글을 낸다
-- 결과 글은 「대체 제안으로 남겼습니다. 사용자가 받아들여야 바뀝니다」, 「이미 사용자가 받아들인 대체입니다」, 「연결했습니다」 가운데 하나다. 사용자와 범위를 인자로 받지 않는다
-- 한 실행이 맺는 링크는 10개까지다(`McpMemoryLink.PER_EXECUTION_MAX`). 먼저 살펴보기 트리에서는 받지 않는다
-- `memory_remember` 가 바로 저장하면 결과 글에 새 기억의 번호가 실린다. 모델은 그 번호를 `from_id` 로 쓴다
-- fos-ctx 가 이 도구를 서명 필수로 안다. 실행 사건에 인자와 결과를 남기지 않는다. 인자에 기억 번호와 사람에 관한 글이 실린다
-
-화면에서는 이렇게 보인다.
-
-- `/memory` 의 「검토할 기억」 에 대체 제안 카드가 「새 기억이 옛 기억을 대신해요」 와 두 항목의 제목, [받아들이기] [거절] 로 보인다. 제안 목록은 `GET /api/v1/memory-links/pending` 이고 결정은 `POST /api/v1/memory-links/{id}/accept`, `/reject`, `/revoke` 다
-- 「지금 화면」 은 `MEMORY_SUPERSEDE_PROPOSED` 줄로 그 카드에 가는 링크만 보인다. 받아들이기는 기억 화면에서 한다. 대화 답 아래의 대체 카드는 아직 두지 않는다
-- 「알고 있는 것」 에서 대체된 항목은 「대체됨」 표시와 대신한 항목의 제목(목록 응답의 `supersededBy`)을 보이고, 고칠 수 있는 사람에게 [되돌리기] 가 보인다. 대체된 항목은 「참고한 기억」 에서도 빠진다
-- 바깥 글을 읽은 대화의 저장 제안 카드는 「바깥 글을 읽은 대화에서 나온 제안이에요」 한 줄을 함께 보인다
-
-임베딩이 켜져 있으면 코드가 연결을 찾는다. 채우는 작업(`MemoryEmbeddingRefresher`)이 한 주기에 새로 벡터를 쓴 항목마다 `MemoryLinkDiscovery` 가 같은 주인(`USER` 는 같은 주인, `GROUP` 은 같은 그룹)의 대체되지 않은 승인 항목과 코사인 유사도로 견준다. 값은 `assistant.memory.link` 설정이다.
-
-| 무엇 | 조건 | 만드는 줄 |
-| --- | --- | --- |
-| 대체 후보(`SupersedeCandidates`) | 유사도가 `supersede-min-similarity`(0.85) 이상이고 두 글의 숫자, 날짜 낱말, 부정 표지 가운데 하나라도 다르다. 유사도 순으로 보며 만든 제안이 항목마다 `supersede-max-per-item`(2)건에 닿으면 멈춘다. 이미 줄이 있어 건너뛴 쌍은 세지 않는다 | 나중에 고친 항목을 `from` 으로 둔 `PROPOSED` `SUPERSEDES`, `origin=AUTO`, 유사도를 `score` 에 |
-| 자동 관련(`RelatedLinker`) | 유사도가 `related-min-similarity`(0.7) 이상이고 서로의 상위 `related-top-k`(3) 안에 들며 대체 후보가 아니다. 항목마다 효력 있는 `RELATED` 는 `related-max-per-item`(5)개까지 | `ACTIVE` `RELATED`, `origin=AUTO` |
-
-- 같은 쌍에 어느 상태든 줄이 이미 있으면 코드는 새로 만들지 않는다. 사람이 거절하거나 끊은 쌍을 다시 묻거나 잇지 않는다
-- 대체 후보는 유사도가 높아도 뜻이 반대일 수 있어(「땅콩 알레르기 있음」 과 「없음」) 늘 제안이다. 사람이 받아들이기 전에는 주입이 바뀌지 않는다
-- 한 항목에서 실패해도 다음 항목을 이어 보고, 채운 벡터는 그대로 둔다. 로그에는 번호와 점수만 남긴다
-- 새로 벡터를 쓴 항목만 견준다. 이미 벡터가 있던 항목은 본문을 고치거나 모델을 바꿔 다시 임베딩될 때 연결을 찾는다. 옛 항목끼리의 연결을 한꺼번에 찾는 작업은 두지 않는다
-- 자동 연결이 맞는지는 운영 집계의 `memory_links` 와 `auto_link_revoked` 로 보고 임계값을 고친다
 
 ### 에이전트가 기억을 남기는 길
 
@@ -402,7 +354,7 @@ sequenceDiagram
 대화의 답 아래에 그 답을 만든 실행이 본문을 받은 기억을 모은다. 근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있고, 화면(작업 과정 안의 절)은 위 「참고한 기억」 이 갖는다.
 경로와 응답 칸은 `MemoryUseController` 가, 받은 길의 뜻은 `MemoryUseVia` 가 갖는다.
 
-- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH`, `MEMORY_LINK` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
+- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH` 줄(연결된 기억 구역을 지우기 전에 남은 `MEMORY_LINK` 줄도 읽는다), 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
 - 읽은 항목은 지금 권한으로 다시 판정해, 그 실행의 에이전트가 지금도 `memory_read` 로 읽을 수 있는 항목(`MemoryService.readableByTool`)만 넣는다
 - 지금 요청자가 읽을 수 있고 `ACCEPTED` 인 항목만 지금 제목으로 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다
 - 본문은 싣지 않고 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다
@@ -425,7 +377,7 @@ sequenceDiagram
 
 ## 정비 루프
 
-하루에 한 번 도는 정비 작업(`MemoryMaintenanceJob`)이 정해진 규칙으로 정비 후보를 만든다. 처음 4주는 **제안 모드**라 후보와 근거만 `decision_feedback_event` 의 정비 사건으로 남기고, 기억의 제목, 본문, 판, 상태, `retrieval`, `archivable` 과 `memory_link` 를 바꾸지 않는다. LLM 이 기억을 고쳐 쓰지 않는다. 근거는 [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) 에 있다.
+하루에 한 번 도는 정비 작업(`MemoryMaintenanceJob`)이 정해진 규칙으로 정비 후보를 만든다. 처음 4주는 **제안 모드**라 후보와 근거만 `decision_feedback_event` 의 정비 사건으로 남기고, 기억의 제목, 본문, 판, 상태, `retrieval`, `archivable` 과 대체 칸을 바꾸지 않는다. LLM 이 기억을 고쳐 쓰지 않는다. 근거는 [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) 에 있다.
 
 ### 사건
 
@@ -454,7 +406,6 @@ sequenceDiagram
 | `DEDUP` | 같은 주인과 같은 지문(범위, 주인, 제목, 본문의 해시)을 가진 `ACCEPTED` 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽. 풀지 못한 항목은 보지 않는다 | `keepMemoryId`, `sameCount`, `archivable` |
 
 - **`archivable` 이 거짓인 항목도 `ARCHIVE` 후보는 만들고 근거에 그 값을 적는다.** 제안 모드는 동작을 적용하지 않으므로 안전하고, 후보로만 보이게 한다. 거짓인 항목은 단계 4 의 자동 보관에서도 제외한다
-- `SUPERSEDES` 후보는 이 작업이 다시 만들지 않는다. 「기억 사이의 연결」 의 제안이 그대로 `/memory` 에 보인다
 
 ### 후보 확인
 
@@ -494,7 +445,6 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
-| `MEMORY_LINK` | 「연결된 기억 구역」 에 실린 이웃 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | `NORMAL`. 기억에는 민감 구분이 없다 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
 | `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | `AGENT` | `INLINE` | 자동 turn 의 `input` |
@@ -582,9 +532,9 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
 | `questionOff` | 질문을 넘기지 않은 운영 기본값의 조립. 질문 기반 선별이 무엇을 더했는지 견주는 기준선이다 |
 | `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 기준 파일 게이트는 이 모드에만 건다 |
-| `linksOff` | `factsOn` 과 같은 조립에 대체 연결과 관련 연결을 넣지 않는다. 연결이 옛 사실의 노출과 여러 대화에 걸친 사실의 회수에 미친 효과를 견주는 기준선이다 |
+| `linksOff` | `factsOn` 과 같은 조립에 대체(`superseded_by_memory_id`)를 적지 않는다. 대체가 옛 사실의 노출에 미친 효과를 비교하는 기준선이다. 모드 이름은 관련 연결을 지우기 전의 것을 그대로 쓴다 |
 
-`linksOff` 를 뺀 모든 모드는 사례의 `supersedes` 마다 사람이 받아들인 대체 연결을, `related` 마다 효력 있는 관련 연결을 넣고 조립한다. 대체된 항목은 에이전트가 볼 수 없는 항목이라 `fullInjection` 에도 실리지 않는다.
+`linksOff` 를 뺀 모든 모드는 사례의 `supersedes` 마다 옛 항목의 대체 칸에 새 항목을 적고 조립한다. 대체된 항목은 에이전트가 볼 수 없는 항목이라 `fullInjection` 에도 실리지 않는다.
 | `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
 
 #### 사례 묶음
@@ -605,7 +555,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `RECALL_GAP` | 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목 |
 
 `forbidden` 의 `BOUNDARY` 항목은 묶음에 있으면 `OMITTED` 여도 실패다. 고르는 단계를 지났다는 뜻이기 때문이다.
-`SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. `MemoryEvalFixture` 가 이 값으로 효력 있는 `SUPERSEDES` 연결(`origin=HUMAN`)을 넣는다.
+`SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. `MemoryEvalFixture` 가 이 값으로 옛 항목의 대체 칸에 새 항목을 적는다.
 `judge` 는 답 판정이 쓰는 「예, 아니오」 질문과 기대 답이다. 조립 측정은 읽지 않는다.
 
 #### 지표(Memory 회수 측정)
@@ -624,13 +574,12 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 `MEMORY_SEARCH` 항목을 앞에 세는 것은 그 구역만 관련도 순으로 고른 본문이라서다. 개인 사실 구역은 최근 순으로 고르므로, 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5위 밖에 놓인다.
 임베딩을 켠 조립은 CI 에서 재지 않는다. 임베딩 서비스를 띄운 개발 머신에서 `./gradlew memoryEmbeddingEval` 이 같은 사례 묶음으로 `hybrid` 모드를 재고 `factsOn` 과 나란히 보고서만 남긴다(`MEMORY_EMBEDDING_BASE_URL` 이 없으면 건너뛰고, `MEMORY_EMBEDDING_MODEL` 이 없으면 운영 기본 모델 이름을 쓴다). 질문 임베딩 지연의 p50 과 p95 도 쓴다. 모델 후보를 견주고 `semantic-min-similarity` 를 정할 때 쓴다.
 
-**실패 조건은 다섯이다.**
+**실패 조건은 아래와 같다.**
 
 - 어느 모드에서든 권한 경계 노출이 0 이 아니다
 - `factsOn` 모드의 전체 recall@5 가 기준 파일보다 낮거나, 전체 오기억 노출률이 기준 파일보다 높다
 - `factsOn` 모드의 `RECALL_GAP` recall@5 가 `questionOff` 보다 높지 않다
 - `factsOn` 모드의 `KNOWLEDGE_UPDATE` 오기억 노출률이 `linksOff` 보다 낮지 않다
-- `factsOn` 모드의 `MULTI_SESSION` recall@5 가 `linksOff` 보다 높지 않다
 
 #### 기준 파일
 
@@ -687,7 +636,5 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | `proposal_outcomes` | 수락률. 제안 기록의 지금 상태별 수. 지운 항목은 따로 센다 | `memory_capture.kind`, `memory.status` | 바로 저장 판정이 너무 좁거나 넓은지 |
 | `undo_rate` | 되돌리기 비율. `CREATED`, `UPDATED` 가운데 `undone_at` 이 있는 비율 | `memory_capture` | 뒤처리 추출을 켤지 |
 | `regenerate_by_memory` | 본문 기억이 실린 답과 아닌 답의 다시 생성 비율 | `chat_message.replaces_message_id`, `execution_context_source` | 기억이 답을 돕는지. 관찰 비교다 |
-| `memory_links` | 기억 연결 수. 기간 안에 만든 줄을 종류, 만든 쪽, 지금 상태별로 센다 | `memory_link` 의 `type`, `origin`, `status` | 자동 연결과 대체 제안이 얼마나 생기는지 |
-| `auto_link_revoked` | 자동 연결을 사람이 끊은 비율. 코드가 만든 줄 가운데 `REVOKED` 인 비율 | `memory_link` 의 `origin`, `status` | 자동 연결의 임계값을 고칠지 |
 | `maintenance_precision` | 정비 후보의 확인 결과. 동작별 확인 수, 「맞음」 수, 기준(30건, 0.9)을 넘었는지 | `decision_feedback_event` 의 `MAINTENANCE_CONFIRMED`, `MAINTENANCE_DENIED` 와 `reason_code` | 동작을 자동으로 바꿀지(단계 4) |
 | `context_size` | 실행당 문맥 글자 수와 빠진 항목 | 대화 루트 실행의 `context_chars`, `context_omitted_items`. `context_chars` 는 공통 답변 지침을 함께 센다 | 예산과 길이 상한 |

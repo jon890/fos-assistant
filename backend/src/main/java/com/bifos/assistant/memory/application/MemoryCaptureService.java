@@ -16,13 +16,10 @@ import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
-import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
-import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -61,8 +58,6 @@ public class MemoryCaptureService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
-    private final MemoryLinkRepository links;
-    private final MemoryLinkService linkService;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -201,7 +196,7 @@ public class MemoryCaptureService {
             }
             memory.restoreProposal(clock.instant());
             Memory restored = memories.save(memory);
-            linkService.revokeAllOf(memory.id());
+            memories.clearSupersededBy(memory.id());
             // 받아들임을 무른 것이다. 첫 반응은 그대로 두고, 오래 가는 선호로 읽히지 않게 사용자의 마지막 결정을 남긴다.
             feedback.record(MemoryProposalFeedback.of(
                 user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())
@@ -293,9 +288,9 @@ public class MemoryCaptureService {
     }
 
 
-    /** 효력 있는 대체 연결이 이 항목을 가리킨다. 그 항목은 실리지 않으므로 같은 사실로 보거나 고칠 대상으로 삼지 않는다. */
-    private boolean superseded(Memory memory) {
-        return links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
+    /** 다른 항목이 이 항목을 대신했다. 그 항목은 실리지 않으므로 같은 사실로 보거나 고칠 대상으로 삼지 않는다. */
+    private static boolean superseded(Memory memory) {
+        return memory.supersededByMemoryId() != null;
     }
 
 

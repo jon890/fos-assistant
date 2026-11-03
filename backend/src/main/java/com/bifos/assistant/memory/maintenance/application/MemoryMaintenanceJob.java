@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 하루에 한 번 정해진 규칙으로 기억의 정비 후보를 만든다(ADR-20261015 / memory-maintenance).
  *
- * <p>처음 4주는 제안 모드다. 후보와 근거만 {@code decision_feedback_event} 의 정비 사건으로 남기고 기억과 연결을 바꾸지 않는다. 같은 항목,
+ * <p>처음 4주는 제안 모드다. 후보와 근거만 {@code decision_feedback_event} 의 정비 사건으로 남기고 기억을 바꾸지 않는다. 같은 항목,
  * 같은 동작, 같은 revision 의 후보가 이미 있으면(열려 있든 확인했든) 다시 만들지 않는다. 개인 항목의 후보는 주인에게, 그룹 항목의 후보는 그 그룹의
  * 관리자마다 하나씩 남긴다. 로그에는 동작별 후보 수만 남긴다.
  */

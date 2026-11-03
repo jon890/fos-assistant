@@ -9,7 +9,6 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
@@ -122,14 +121,11 @@ class JpaAuditingTest {
             } else if (row instanceof Task task) {
                 task.changeCheckEnabled(false);
                 task.moveNext(LATER.plusSeconds(10));
-            } else if (row instanceof MemoryLink link) {
-                // 업무 시각은 DB 정밀도로 넣는다. 나노초가 남으면 detach merge 가 바뀐 값으로 보고 변경 시각을 옮긴다
-                link.revoke(micros(LATER));
             }
         }
         entityManager.flush();
         List<AuditedEntity> changed = fixture.rows().stream().filter(AuditedEntity.class::isInstance).map(AuditedEntity.class::cast).toList();
-        assertThat(changed).hasSize(5).allSatisfy(row -> {
+        assertThat(changed).hasSize(4).allSatisfy(row -> {
             assertThat(row.createdAt()).isEqualTo(micros(CREATED));
             assertThat(row.updatedAt()).isEqualTo(micros(LATER));
         });

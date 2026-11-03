@@ -1,15 +1,12 @@
 package com.bifos.assistant.memory.presentation;
 
-import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.port.OmittedMemories;
 import com.bifos.assistant.memory.application.dto.MemorySource;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateMemoryRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
-import com.bifos.assistant.memory.presentation.MemoryDtos.SupersededByView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.UpdateMemoryRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -17,8 +14,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +31,6 @@ public class MemoryController {
     private final MemoryService memories;
     private final OmittedMemories omittedMemories;
     private final MemorySources sources;
-    private final MemoryLinkService links;
     private final CurrentUserProvider currentUser;
 
 
@@ -47,8 +41,6 @@ public class MemoryController {
      * 하나가 실리지 않는 것을 쓴 사람이 알 길이 없다. 대화 화면에는 끼우지 않고 이 목록에서만 보인다.
      *
      * <p>에이전트가 남긴 항목에는 남긴 에이전트를 함께 보낸다. 사용자가 무엇을 에이전트가 기억했는지 검토하는 데 쓴다.
-     *
-     * <p>대체된 항목에는 대신한 항목의 제목을 함께 보낸다. 대신한 항목을 요청자가 볼 수 없으면 제목 없이 연결 번호만 보낸다.
      */
     @GetMapping
     public List<MemoryView> readable() {
@@ -56,24 +48,9 @@ public class MemoryController {
         Set<Long> omitted = omittedMemories.omittedFor(user);
         List<Memory> readable = memories.readableBy(user);
         Map<Long, MemorySource> bySource = sources.of(user, readable);
-        Map<Long, Memory> byId = readable.stream().collect(Collectors.toMap(Memory::id, Function.identity()));
-        Map<Long, MemoryLink> superseded = links.supersededBy(byId.keySet());
         return readable.stream()
-            .map(memory -> MemoryView.from(
-                memory,
-                omitted.contains(memory.id()),
-                bySource.get(memory.id()),
-                supersededBy(superseded.get(memory.id()), byId)))
+            .map(memory -> MemoryView.from(memory, omitted.contains(memory.id()), bySource.get(memory.id())))
             .toList();
-    }
-
-
-    private static SupersededByView supersededBy(MemoryLink link, Map<Long, Memory> byId) {
-        if (link == null) {
-            return null;
-        }
-        Memory newer = byId.get(link.fromMemoryId());
-        return new SupersededByView(link.id(), newer == null ? null : newer.id(), newer == null ? null : newer.title());
     }
 
 

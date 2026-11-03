@@ -14,12 +14,9 @@ import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -73,16 +70,12 @@ public class MemorySearchTest {
     @Autowired
     MemoryVectorCache vectorCache;
 
-    @Autowired
-    MemoryLinkRepository links;
-
 
     @BeforeEach
     void setUp() {
         MemorySearchSqlProbe.reset();
         MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();
-        links.deleteAll();
         repository.deleteAll();
     }
 
@@ -151,9 +144,7 @@ public class MemorySearchTest {
                 null,
                 "core",
                 MemoryRetrieval.SEARCH));
-        MemoryLink superseding = MemoryLink.proposeSupersede(own.id(), hidden.get(8).id(), MemoryLinkOrigin.HUMAN, null);
-        superseding.accept();
-        links.save(superseding);
+        MemorySupersedeRows.supersede(jdbc, hidden.get(8).id(), own.id());
         jdbc.update(
             "UPDATE memory SET status = 'REJECTED' WHERE id = ?",
             hidden.get(4).id());

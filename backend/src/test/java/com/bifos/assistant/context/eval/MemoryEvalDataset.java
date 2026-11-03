@@ -116,7 +116,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
                 where + "한 Memory 가 expect 와 forbidden 에 겹쳐 있거나 두 번 적혔다: " + forbidden.memory());
         }
         validateSupersedes(where, each);
-        validateRelated(where, each);
         Set<String> checkIds = new HashSet<>();
         for (JudgeCheck check : each.judge()) {
             require(
@@ -156,25 +155,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         require(
             superseded.equals(forbiddenSuperseded),
             where + "supersedes 가 가리키는 항목 " + superseded + " 와 SUPERSEDED 오답지 " + forbiddenSuperseded + " 가 다르다");
-    }
-
-
-    /** {@code related} 는 같은 사례의 다른 항목 가운데 범위와 주인이 같은 것을 가리켜야 한다. 연결의 규칙과 같다. */
-    private static void validateRelated(String where, Case each) {
-        Map<String, MemorySeed> byKey = new HashMap<>();
-        each.memories().forEach(memory -> byKey.put(memory.key(), memory));
-        for (MemorySeed memory : each.memories()) {
-            for (String key : memory.related()) {
-                MemorySeed other = byKey.get(key);
-                require(other != null, where + "related 가 없는 Memory 를 가리킨다: " + key);
-                require(!other.key().equals(memory.key()), where + "related 가 자기 자신을 가리킨다: " + key);
-                require(
-                    other.scope() == memory.scope()
-                        && Objects.equals(other.owner(), memory.owner())
-                        && Objects.equals(other.group(), memory.group()),
-                    where + "related 가 범위나 주인이 다른 Memory 를 가리킨다: " + key);
-            }
-        }
     }
 
 
@@ -284,7 +264,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param group {@code GROUP} 항목의 그룹 이름
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
      * @param supersedes 이 항목이 대체하는 같은 사례의 옛 항목 key. 없으면 null
-     * @param related 이 항목과 {@code RELATED} 로 이을 같은 사례의 항목 key. 없으면 빈 목록이다
      */
     record MemorySeed(
         String key,
@@ -299,8 +278,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         MemoryEntryType entryType,
         String documentKey,
         int updatedDaysAgo,
-        String supersedes,
-        List<String> related) {
+        String supersedes) {
 
         MemorySeed {
             scope = scope == null ? MemoryScope.USER : scope;
@@ -308,7 +286,6 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
             retrieval = retrieval == null ? MemoryRetrieval.SEARCH : retrieval;
             status = status == null ? MemoryStatus.ACCEPTED : status;
             entryType = entryType == null ? MemoryEntryType.MEMORY : entryType;
-            related = related == null ? List.of() : List.copyOf(related);
         }
     }
 

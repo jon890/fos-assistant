@@ -41,8 +41,6 @@ public enum ErrorCode {
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),
     /** 화면이 읽은 판이 지금 판이 아니다. 그 사이에 다른 수정이 있었다(ADR-057). */
     MEMORY_REVISION_CONFLICT(HttpStatus.CONFLICT),
-    /** 그 기억 연결의 지금 상태에서 허용하지 않는 전이다. 이미 받아들였거나 끊은 줄을 다시 받아들이는 경우다(ADR-20261015 / memory-link). */
-    MEMORY_LINK_STATE_CONFLICT(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),

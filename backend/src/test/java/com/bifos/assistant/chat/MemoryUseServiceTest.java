@@ -11,11 +11,9 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
-import com.bifos.assistant.memory.application.MemoryLinkService;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
@@ -73,9 +71,6 @@ class MemoryUseServiceTest {
     @Autowired
     JdbcTemplate jdbc;
 
-    @Autowired
-    MemoryLinkService links;
-
     private CurrentUser dad;
     private CurrentUser kid;
     private Conversation conversation;
@@ -105,7 +100,6 @@ class MemoryUseServiceTest {
         }
         for (Long memoryId : createdMemoryIds) {
             jdbc.update("DELETE FROM memory_revision WHERE memory_id = ?", memoryId);
-            jdbc.update("DELETE FROM memory_link WHERE from_memory_id = ? OR to_memory_id = ?", memoryId, memoryId);
         }
         memories.deleteAllById(createdMemoryIds);
     }
@@ -152,7 +146,7 @@ class MemoryUseServiceTest {
 
 
     @Test
-    @DisplayName("연결된 기억 구역에 본문까지 실린 항목은 연결로 찾은 길로 나온다")
+    @DisplayName("연결된 기억 구역을 지우기 전에 남은 실행 기록의 줄은 연결로 찾은 길로 나온다")
     void listsLinkSectionItemsAsLinkVia() {
         Memory neighbor = memory(dad, MemoryScope.USER, "제주 숙소", "숙소는 바닷가 앞이다", MemoryRetrieval.SEARCH);
         AgentExecution run = answeredRun(conversation, true);
@@ -180,19 +174,18 @@ class MemoryUseServiceTest {
 
 
     @Test
-    @DisplayName("대체된 항목은 빠지고 대체를 되돌리면 다시 나온다")
-    void dropsSupersededItemsUntilRevoked() {
+    @DisplayName("대체된 항목은 빠지고 대신한 칸을 비우면 다시 나온다")
+    void dropsSupersededItemsUntilCleared() {
         Memory old = memory(dad, MemoryScope.USER, "옛 주소", "서울", MemoryRetrieval.SEARCH);
         Memory fresh = memory(dad, MemoryScope.USER, "새 주소", "부산", MemoryRetrieval.SEARCH);
         AgentExecution run = answeredRun(conversation, true);
         source(run, 0, "MEMORY_FACTS", old, "INLINE");
         source(run, 1, "MEMORY_READ", fresh, "INLINE");
-        MemoryLink link = links.proposeSupersede(dad, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
-        links.accept(dad, link.id());
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
 
         assertThat(service.usesOf(dad, conversation.id())).extracting(MemoryUse::memoryId).containsExactly(fresh.id());
 
-        links.revoke(dad, link.id());
+        jdbc.update("UPDATE memory SET superseded_by_memory_id = NULL WHERE id = ?", old.id());
 
         assertThat(service.usesOf(dad, conversation.id()))
             .extracting(MemoryUse::memoryId)
