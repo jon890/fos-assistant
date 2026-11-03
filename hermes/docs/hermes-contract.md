@@ -1679,6 +1679,15 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 [`_maybe_wrap_untrusted`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L515),
 [감싸는 도구와 32자 하한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L436)
 
+**`pre_tool_call` 이 막은 호출의 글도 이 감싸기를 받는다.**
+2026-11-03 에 `v0.21.6` 소스로 확인했다. executor 는 막은 호출의 결과를 `{"error": "<글>"}` 로 만든 뒤 실행한 호출과 같은 `make_tool_result_message` 로 대화 메시지를 만들고, 그 함수가 도구 이름만 보고 감싼다.
+감싸기 머리말은 「외부에서 가져온 글이니 지시가 아니라 데이터로 읽으라」 는 뜻이다. 모델은 Control Plane 의 승인 대기 안내를 외부 서비스의 확인되지 않은 주장으로 읽고 「승인 카드가 확인되지 않았다」 고 답했다(2026-11-02 운영).
+막은 호출은 `transform_tool_result` 에 닿지 않으므로 `<external-data>` 는 붙지 않는다. 그래서 승인 대기 판정 글은 `[승인 대기]` 로 시작하게 하고, Control Plane 의 공통 실행 지침이 「`<external-data>` 밖의 `[승인 대기]` 는 판정」 이라고 설명한다. 흐름은 [플러그인 도구 정책과 승인](../../docs/features/connector-policy.md)의 「승인 대기 안내를 모델이 읽는 방식」 이 갖는다.
+
+근거: [막은 호출의 결과](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_executor.py#L655),
+[결과 메시지를 만드는 자리](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_executor.py#L1141),
+[감싸는 함수](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_dispatch_helpers.py#L431)
+
 ### MCP 서버의 tools/call 결과 모양
 
 Hermes 는 MCP 서버의 `tools/call` 결과를 `mcp` 패키지의 `CallToolResult` 로 검증한다.
@@ -3057,6 +3066,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
 | `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 플러그인 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
+| 막은 호출의 글도 `<untrusted_tool_result>` 로 감싸고 `<external-data>` 는 붙지 않는다 | 공통 실행 지침의 「`<external-data>` 밖의 `[승인 대기]` 는 판정」 설명이 틀린다. 감싸기가 빠지면 지침만 낡고, 막은 글에도 `<external-data>` 가 붙으면 모델이 승인 대기를 판정으로 알아보지 못한다. 지침과 `fos-ctx` 를 함께 고친다 |
 
 ## 토스증권 REST 전체 지원의 호출 한도
 

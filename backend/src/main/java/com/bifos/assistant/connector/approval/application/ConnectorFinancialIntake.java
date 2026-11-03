@@ -34,9 +34,23 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 @RequiredArgsConstructor
 class ConnectorFinancialIntake {
-    /** 금융 준비를 거절한 답이다. 어느 검사에 걸렸는지 밝히지 않는다. 같은 의도의 다른 호출이 받는 답도 이것이다. */
-    static final String FINANCIAL_UNAVAILABLE_MESSAGE = "금융 요청을 준비하지 못해 실행하지 않았다. 같은 주문의 승인 요청이 이미 있을 수 있다. "
-        + "다시 부르지 말고 사용자에게 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내한다.";
+    /**
+     * 금융 준비를 거절한 답이다. 어느 검사에 걸렸는지 밝히지 않는다. 같은 주문의 요청이 있을 수 있다고 짐작하게 하지 않는다.
+     * 그 짐작이 대화 기록에 남아 뒤의 다시 요청까지 막았다(2026-11-02 운영). 같은 의도의 줄이 있으면 아래 답들이 따로 밝힌다.
+     */
+    static final String FINANCIAL_UNAVAILABLE_MESSAGE = "금융 요청을 준비하지 못했다. 승인 카드를 만들지 않았고 실행하지도 않았다. "
+        + "이 turn 에서는 다시 부르지 않고 사용자에게 준비하지 못했다고 알린다. 사용자가 다시 요청하면 다시 불러도 된다.";
+    /** 같은 의도의 승인 줄이 이 대화에서 승인을 기다린다. Control Plane 이 확인한 상태다. */
+    static final String INTENT_PENDING_MESSAGE = ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 같은 주문의 승인 카드가 이 대화에 이미 떠 있고 "
+        + "사용자의 승인을 기다린다. 새 카드는 만들지 않았다. 사용자에게 그 카드에서 내용을 확인하고 승인하거나 거절해 달라고 알린다. "
+        + "같은 요청을 다시 부르지 않는다.";
+    /** 같은 의도의 승인 줄이 다른 대화에서 승인을 기다린다. 이 대화에는 카드가 없으므로 승인 대기 표시를 붙이지 않는다. */
+    static final String INTENT_PENDING_ELSEWHERE_MESSAGE = "같은 주문의 승인 카드가 다른 대화에 이미 떠 있고 사용자의 승인을 기다린다. "
+        + "이 대화에는 새 카드를 만들지 않았다. 사용자에게 알림에서 그 카드를 찾아 승인하거나 거절해 달라고 알린다. "
+        + "그 카드를 거절하거나 기한이 지나면 다시 요청할 수 있다.";
+    /** 같은 의도의 줄이 실행 중이거나 결과를 모른다. 다시 보내면 두 번 나갈 수 있어 새로 준비하지 않는다. */
+    static final String INTENT_BUSY_MESSAGE = "같은 주문이 이미 실행 중이거나 결과를 확인하는 중이라 새로 준비하지 않았다. 승인 카드를 만들지 않았다. "
+        + "다시 부르지 말고 사용자에게 그 서비스의 주문 내역에서 주문 상태를 확인해 달라고 안내한다.";
     /** 지금 여는 금융 동작이다. 정정과 조건주문은 열지 않는다. */
     private static final Set<String> OPEN_OPERATIONS = Set.of("CREATE", "CANCEL");
     /** 준비 도구 인자를 읽는다. 중복 키와 뒤에 붙은 값은 거절한다. 서명한 글과 다른 값으로 읽히지 않게 한다. */
@@ -131,8 +145,24 @@ class ConnectorFinancialIntake {
         } catch (RuntimeException ex) {
             // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 단계 코드와 종류만 남긴다.
             log.warn("금융 준비를 거절했다 stage={} kind={}", stageOf(ex), ex.getClass().getSimpleName());
-            return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
+            return new ConnectorPolicyAnswer(false, rejectedMessage(ex), null);
         }
+    }
+
+
+    /**
+     * 거절의 답이다. 같은 의도의 줄이 막은 경우만 그 상태를 밝히고(ADR-20261013 / financial-order-opening), 나머지 검사는 숨긴다.
+     */
+    static String rejectedMessage(RuntimeException ex) {
+        if (!(ex instanceof FinancialPrepareRejected rejected)) {
+            return FINANCIAL_UNAVAILABLE_MESSAGE;
+        }
+        return switch (rejected.stage()) {
+            case CONFLICT_PENDING -> INTENT_PENDING_MESSAGE;
+            case CONFLICT_PENDING_ELSEWHERE -> INTENT_PENDING_ELSEWHERE_MESSAGE;
+            case CONFLICT -> INTENT_BUSY_MESSAGE;
+            default -> FINANCIAL_UNAVAILABLE_MESSAGE;
+        };
     }
 
 
