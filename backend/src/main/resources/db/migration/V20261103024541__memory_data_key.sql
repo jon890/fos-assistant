@@ -8,6 +8,8 @@ ALTER TABLE user_data_key ADD CONSTRAINT uk_user_data_key_group UNIQUE (group_id
 ALTER TABLE user_data_key ADD CONSTRAINT ck_user_data_key_owner CHECK ((user_id IS NULL AND group_id IS NOT NULL) OR (user_id IS NOT NULL AND group_id IS NULL));
 
 ALTER TABLE memory MODIFY COLUMN title VARCHAR(1200) NOT NULL COMMENT 'Memory 또는 문서의 제목. data_key_id 가 있으면 암호문';
+ALTER TABLE memory MODIFY COLUMN content LONGTEXT NOT NULL COMMENT '저장한 본문. data_key_id 가 있으면 암호문이고, content_key_id 가 있으면 옛 key 의 암호문. 암호문은 평문보다 약 4/3 배 길어 TEXT 를 넘을 수 있다';
 ALTER TABLE memory ADD COLUMN data_key_id BIGINT NULL COMMENT '제목과 본문을 암호화한 user_data_key.id. NULL 이면 평문이거나 content_key_id 의 옛 key 로 암호화한 줄';
 ALTER TABLE memory_revision MODIFY COLUMN title VARCHAR(1200) NOT NULL COMMENT '변경 전 제목. data_key_id 가 있으면 암호문';
+ALTER TABLE memory_revision MODIFY COLUMN content LONGTEXT NOT NULL COMMENT '변경 전 본문. data_key_id 가 있으면 암호문이고, content_key_id 가 있으면 옛 key 의 암호문';
 ALTER TABLE memory_revision ADD COLUMN data_key_id BIGINT NULL COMMENT '제목과 본문을 암호화한 user_data_key.id. NULL 이면 평문이거나 content_key_id 의 옛 key 로 암호화한 줄';

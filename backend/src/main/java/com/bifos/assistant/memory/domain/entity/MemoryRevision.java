@@ -80,7 +80,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     private String storedTitle;
 
     /** 저장된 본문이다. {@link #dataKeyId} 나 {@link #contentKeyId} 가 있으면 암호문이다. */
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String storedContent;
 
     /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이거나 옛 key 의 줄이다. */

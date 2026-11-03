@@ -243,7 +243,15 @@ public class MemoryCaptureService {
             return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
         }
         int base = memory.revision();
-        memoryService.revise(user, memory, request.content(), memory.retrieval(), MemorySensitivity.NORMAL);
+        try {
+            // 암호화는 revision 을 남기기 전에 하므로 거절돼도 줄과 revision 이 바뀌지 않는다
+            memoryService.revise(user, memory, request.content(), memory.retrieval(), MemorySensitivity.NORMAL);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
+                return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
+            }
+            throw ex;
+        }
         record(memory.id(), user, request, MemoryCaptureKind.UPDATED, base);
         return new MemoryRememberResult(MemoryRememberOutcome.UPDATED, memory.id());
     }

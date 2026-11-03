@@ -102,6 +102,8 @@ public class MemoryTextMigration implements ApplicationRunner {
         try {
             return transactions.execute(status -> work.get());
         } catch (RuntimeException e) {
+            // 예외 메시지는 본문을 담을 수 있어 클래스 이름만 남긴다. 번호는 끝에 한 줄로 모아 남긴다
+            log.warn("기억 줄 하나를 데이터 key 로 옮기지 못했다 exception={}", e.getClass().getName());
             onFailure.run();
             return null;
         }
@@ -149,7 +151,11 @@ public class MemoryTextMigration implements ApplicationRunner {
     }
 
 
-    /** 다시 쓴 암호문을 풀어 옮기기 전 평문과 해시를 비교한다. 다르면 예외로 그 줄의 트랜잭션을 되돌린다. */
+    /**
+     * 다시 쓴 암호문을 풀어 옮기기 전 평문과 해시를 비교한다. 다르면 예외로 그 줄의 트랜잭션을 되돌린다.
+     *
+     * <p>flush 한 엔티티의 값으로 푼다. 컬럼보다 긴 글은 MySQL strict 모드가 flush 에서 오류로 거절하므로 잘린 채 커밋되지 않는다.
+     */
     private void verify(StoredMemoryText sealed, MemoryText plain) {
         MemoryText reopened = texts.open(sealed).orElseThrow(() -> new IllegalStateException("the rewritten text cannot be opened"));
         if (!Objects.equals(Sha256.hex(reopened.title()), Sha256.hex(plain.title()))
