@@ -280,6 +280,7 @@ PR2 를 배포한 뒤 운영에서 옛 key 줄(`content_key_id` 가 찬 줄)이 
 
 - `V20261103054416__MemoryLegacyKeyGuard`(Java)가 먼저 돈다. `memory` 와 `memory_revision` 에서 `content_key_id` 가 찬 줄을 세어 하나라도 있으면 줄 수만 담은 예외로 멈춘다. DDL 을 하지 않으므로 멈춰도 칸은 그대로이고, 줄을 데이터 key 로 옮긴 뒤 실패한 기록을 정리하고 다시 올린다. 본문과 key id 는 예외에 넣지 않는다
 - 칸을 지우는 SQL 은 표마다 파일이다(`V20261103054417` 부터 `V20261103054420`). MySQL DDL 은 되돌려지지 않아 한 표가 실패해도 앞 표의 삭제는 남는다. H2 가 한 문장에서 칸 여럿을 지우는 문법을 받지 않아 칸마다 문장을 나눈다
+- `V20261103054421` 이 지운 `content_key_id` 를 가리키던 `content`, `data_key_id` 컬럼 설명을 지금 뜻으로 다시 적는다. 타입은 그대로다
 - `sensitivity` 와 `allow_sensitive` 는 확인하지 않는다. 코드가 PR2 부터 읽지 않는 값이고 지워도 잃는 동작이 없다
 - 테스트 자원 `memory-legacy-columns.sql` 과 `application-test.yml` 의 import 항목을 지우고, 칸에 값을 넣던 테스트와 사용자 purge fixture(`purge/fixture.sql`)에서 옛 칸을 뺀다
 - **이 PR 을 배포한 뒤에는 PR1 이전 이미지로 되돌리지 못한다.** 그 이미지는 칸을 매핑해 `ddl-auto: validate` 가 실패한다. PR2 이미지는 칸을 매핑하지 않아 칸이 없어도 뜬다
