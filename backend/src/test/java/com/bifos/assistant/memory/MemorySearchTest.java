@@ -13,7 +13,6 @@ import com.bifos.assistant.memory.application.dto.MemorySearchPage;
 import com.bifos.assistant.memory.application.MemoryRelevance;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -21,7 +20,6 @@ import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
-import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -68,9 +66,6 @@ public class MemorySearchTest {
     PlatformTransactionManager transactionManager;
 
     @Autowired
-    MemoryEmbeddingRepository embeddings;
-
-    @Autowired
     MemoryEmbeddingProperties embeddingProperties;
 
     @Autowired
@@ -83,7 +78,7 @@ public class MemorySearchTest {
     @BeforeEach
     void setUp() {
         MemorySearchSqlProbe.reset();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();
         links.deleteAll();
         repository.deleteAll();
@@ -217,7 +212,7 @@ public class MemorySearchTest {
                     .doesNotContainAnyElementsOf(hidden.stream().map(Memory::id).toList())
                     .containsExactlyInAnyOrder(own.id(), group.id());
         }
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         vectorCache.clear();
     }
 
@@ -226,8 +221,7 @@ public class MemorySearchTest {
     private void embedEverything(Memory memory, float[] vector) {
         String content = jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, memory.id());
         String text = EmbeddingText.of(memory.title(), content, embeddingProperties.maxTextChars());
-        embeddings.save(MemoryEmbedding.of(
-            memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector));
+        MemoryEmbeddingRows.write(jdbc, memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector);
     }
 
 

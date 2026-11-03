@@ -24,7 +24,7 @@
 | 그룹 공용 기억 항목(`memory` 의 `scope = 'GROUP'`) | 지우지 않고 넘기지도 않는다. 이 줄은 `owner_user_id` 가 비어 있고 `group_id` 가 소유한다. 사용자 번호는 `accepted_by_user_id` 에 외래 키 없이 남을 뿐이라 사용자 줄을 지워도 막지 않는다 |
 | 개인 기억(`scope = 'USER'`)과 그 임베딩, 링크, 변경 이력 | 지운다 |
 | 할 일, 예약 작업과 실행 이력, 알림, 커넥터 연결과 도구 권한, 브라우저 | 지운다. 커넥터 연결의 비밀값과 브라우저 profile 은 외부 정리까지 한다 |
-| `app_user` 를 가리키는 다른 표(`connector_action`, `connector_conversation_grant`, `connector_tool_grant`, `proactive_check`, `agent_toolset_request`) | 외래 키가 `ON DELETE CASCADE` 가 아니라 사용자 줄을 지우면 막힌다. 그 사용자 소유 줄(`user_id`, `requester_user_id`)은 지운다. 승인 줄의 실행 줄과 점검에 딸린 줄은 외래 키가 함께 지운다. 다른 사용자의 요청을 처리한 기록(`decided_by_user_id`)은 줄을 남기고 칸을 비운다. 결정 당시 목록에 있던 `service_token`, `accountbook_connection`, `financial_order_limit`, `financial_limit_change`, `attention_control`, `attention_event` 는 이미 없어진 표다 |
+| `app_user` 를 가리키는 다른 표(`connector_action`, `connector_conversation_grant`, `connector_tool_grant`, `proactive_check`) | 외래 키가 `ON DELETE CASCADE` 가 아니라 사용자 줄을 지우면 막힌다. 그 사용자 소유 줄(`user_id`)은 지운다. 승인 줄의 실행 줄과 점검에 딸린 줄은 외래 키가 함께 지운다. 결정 당시 목록에 있던 `agent_toolset_request`(도구 사용 요청과 함께 지웠다), `service_token`, `accountbook_connection`, `financial_order_limit`, `financial_limit_change`, `attention_control`, `attention_event` 는 이미 없어진 표다 |
 | 외래 키 없이 사용자 번호만 남는 본문 없는 이력(`memory_capture`, `hermes_session_binding`, `content_draft_snapshot`, `content_draft_creation_call`, `content_draft_creation_request`) | 남긴다. 본문이 없고 사용자 줄을 지우는 것을 막지 않는다. 대화 정리가 정한 대로 둔다 |
 | 데이터 key(`user_data_key`) | 위가 모두 끝난 마지막에 지운다. 지운 뒤에는 남은 암호문을 풀 수 없다 |
 | 사용자 줄(`app_user`) | 마지막에 지운다 |
@@ -47,7 +47,7 @@
 
 1. 그룹 공개 에이전트를 넘긴다.
 2. 보관본 행을 지운다.
-3. 개인 기억과 딸린 표, 할 일, 예약 작업, 알림, 먼저 살펴보기 점검, 도구 요청, 커넥터 연결과 권한, 승인 줄, 브라우저를 지운다. 커넥터 연결은 바인딩을 profile 에서 떼고 보관 파일까지 지운다.
+3. 개인 기억과 딸린 표, 할 일, 예약 작업, 알림, 먼저 살펴보기 점검, 커넥터 연결과 권한, 승인 줄, 브라우저를 지운다. 커넥터 연결은 바인딩을 profile 에서 떼고 보관 파일까지 지운다.
 4. 대화와 비공개 에이전트를 지운 것으로 적는다. 비공개 에이전트는 사용자가 지울 때와 같이 바인딩을 떼고 관리형 profile 을 거둔다.
 5. 그 사용자의 대화가 모두 정리됐으면 보관본을 한 번 더 지우고(앞 단계 뒤 자동 보관으로 들어온 것) 데이터 key 와 사용자 줄을 지운다. 아니면 다음 차례로 미룬다.
 

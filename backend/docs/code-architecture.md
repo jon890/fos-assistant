@@ -194,7 +194,7 @@ CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치�
 
 ### 에이전트 도구
 
-`agent.application`의 도구 서비스(`AgentToolService`, `ToolsetCatalogService`, `ToolsetRequestService`, `ToolsetVisibilityService`, `AgentDefaultToolsets`)는 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
+`agent.application`의 도구 서비스(`AgentToolService`, `ToolsetCatalogService`, `ToolsetVisibilityService`, `AgentDefaultToolsets`)는 기본 도구 설정, 도구 조회와 저장, 카탈로그와 숨김을 맡는다.
 이 서비스들의 공개 반환값은 `agent.application.dto`에 둔다.
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
 profile 스킬 파일과 플러그인 바인딩을 읽는 port는 `agent.application.port`에,
@@ -430,12 +430,17 @@ class ConversationPagingTest {
 ```
 
 기반이 주는 대역과 mock, spy 는 `BackendIntegrationTest` 의 주석 선언과 `IntegrationTestDoubles` 가 갖는다.
-MySQL 에서 돌릴 이유가 있는 검사는 `@MysqlIntegrationTest` 를 더한다. 그 검사는 JVM 하나가 쓰는 MySQL 데이터베이스와 컨텍스트 하나를 함께 쓴다.
+MySQL 에서 돌릴 이유가 있는 검사는 `@MysqlIntegrationTest` 를 더한다. 그 검사는 테스트 JVM 하나가 쓰는 MySQL 데이터베이스와 컨텍스트 하나를 함께 쓴다.
 스키마를 처음부터 적용해 보는 마이그레이션 검사처럼 DB 를 직접 만들어야 하는 검사만 `@Tag("mysql")` 에 `MysqlTestDatabase.create()` 를 쓴다.
 H2 검사 클래스를 상속한 MySQL 검사는 `@MysqlCase` 를 단 메서드만 돈다. 이유는 `MysqlCase.Reason` 이 갖고, 근거는 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 
 **검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@MysqlIntegrationTest` 검사도 이 규칙을 지킨다. 직접 `@Tag("mysql")` 을 단 검사만 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+
+**테스트 JVM 이 둘이라 파일 경로와 포트를 JVM 마다 나눈다.** `./gradlew test` 와 `mysqlMigrationTest` 는 JVM 두 개로 나눠 돈다.
+컨텍스트와 H2 메모리 DB 는 JVM 마다 따로 있지만 `build/` 아래 파일은 두 JVM 이 함께 본다.
+`application-test.yml` 의 `build/test-*` 디렉터리는 이름에 `${org.gradle.test.worker:0}` 를 넣었다. 검사가 그 디렉터리를 열 때는 경로를 적지 않고 `SkillProperties.root()` 처럼 설정 값을 읽는다.
+새로 파일을 쓰는 검사는 `@TempDir` 이나 위 설정 값을 쓰고, 서버 소켓은 0번 포트로 연다. 고정된 경로나 포트는 두 JVM 이 같은 곳을 쓰게 만든다. 근거는 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「테스트 JVM 을 나눈다」 가 갖는다.
 
 `ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.
 기동용 컨텍스트를 Spring 검사 캐시에 넣으면 캐시에서 밀려난 `create-drop` 컨텍스트가 다른 검사의 공유 스키마를 지울 수 있다.

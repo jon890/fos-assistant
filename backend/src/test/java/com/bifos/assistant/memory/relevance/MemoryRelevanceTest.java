@@ -14,7 +14,7 @@ import com.bifos.assistant.memory.application.QueryEmbedder;
 import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.application.dto.RelevanceResult;
 import com.bifos.assistant.memory.application.dto.RelevanceScore;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,7 +30,7 @@ class MemoryRelevanceTest {
     private static final MemoryEmbeddingProperties EMBEDDING = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
     private static final float[] QUERY = {1f, 0f, 0f};
 
-    private final List<MemoryEmbedding> stored = new ArrayList<>();
+    private final List<MemoryEmbeddingVector> stored = new ArrayList<>();
     private final MemoryRelevance relevance = new MemoryRelevance(
         new KeywordScorer(), MemoryRelevanceProperties.defaults(), new MemoryVectorCache(repository(), EMBEDDING));
 
@@ -133,7 +133,7 @@ class MemoryRelevanceTest {
 
     private void store(RelevanceCandidate candidate, float[] vector) {
         String text = EmbeddingText.of(candidate.title(), candidate.plainBody(), EMBEDDING.maxTextChars());
-        stored.add(MemoryEmbedding.of(
+        stored.add(new MemoryEmbeddingVector(
             candidate.memoryId(), EMBEDDING.model(), EmbeddingText.fingerprint(EMBEDDING.model(), text), vector));
     }
 
@@ -141,7 +141,7 @@ class MemoryRelevanceTest {
     @SuppressWarnings("unchecked")
     private MemoryEmbeddingRepository repository() {
         MemoryEmbeddingRepository repository = Mockito.mock(MemoryEmbeddingRepository.class);
-        Mockito.when(repository.findByMemoryIdIn(Mockito.any())).thenAnswer(invocation -> {
+        Mockito.when(repository.findVectors(Mockito.any())).thenAnswer(invocation -> {
             Collection<Long> ids = invocation.getArgument(0, Collection.class);
             return stored.stream().filter(row -> ids.contains(row.memoryId())).toList();
         });

@@ -2,6 +2,7 @@ package com.bifos.assistant.context.eval;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.context.application.dto.AssembledContext;
@@ -82,9 +83,6 @@ class MemoryEmbeddingEvalTest {
     MemoryTextMigration migration;
 
     @Autowired
-    MemoryEmbeddingRepository embeddings;
-
-    @Autowired
     AgentRepository agents;
 
     @Autowired
@@ -92,6 +90,9 @@ class MemoryEmbeddingEvalTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MemoryEmbeddingRepository embeddings;
 
     @Autowired
     PlatformTransactionManager transactionManager;
@@ -107,7 +108,7 @@ class MemoryEmbeddingEvalTest {
 
     @AfterEach
     void tearDown() {
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         if (fixture != null) {
             fixture.tearDown();
         }
@@ -154,7 +155,7 @@ class MemoryEmbeddingEvalTest {
             refresher.refreshOnce();
             AssembledContext hybridContext = hybrid.assemble(fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
             scoreboard.add(HYBRID, MemoryRecallEvalTest.verdictOf(each, ids, hybridContext));
-            embeddings.deleteAll();
+            MemoryEmbeddingRows.clearAll(jdbc);
         }
 
         queryMillis.sort(Double::compare);
