@@ -26,8 +26,8 @@
 
 HMAC key 는 `HMAC-SHA256(데이터 key, "data_key_mac:" + 쓰임)` 으로 뽑는다. 쓰임은 `memory:proposal_dedup` 과 `memory:embedding` 이다. 암호화 key 를 HMAC key 로 그대로 쓰지 않는다.
 
-**칸은 이번에 지우지 않는다.** `memory.sensitivity`, `memory_revision.sensitivity`, 두 표의 `content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` 는 코드가 읽고 쓰지 않는 옛 칸이다.
-새 코드가 넣는 줄을 위해 기본값이 없던 두 칸에 기본값만 둔다(`V20261103054413`). 배포를 확인한 뒤 따로 지운다.
+**칸은 PR2 에서 지우지 않았다.** `memory.sensitivity`, `memory_revision.sensitivity`, 두 표의 `content_key_id`, `agent_memory_collection.allow_sensitive`, `agent_memory_collection_change.allow_sensitive` 는 코드가 읽고 쓰지 않는 옛 칸이다.
+새 코드가 넣는 줄을 위해 기본값이 없던 두 칸에 기본값만 두었고(`V20261103054413`), 배포를 확인한 뒤 PR3 이 지웠다. 지우기 전에 `V20261103054416` 이 옛 key 줄이 0건인지 보고 남았으면 멈춘다. 이 칸을 지운 뒤에는 PR1 이전 이미지로 되돌리지 못한다.
 
 ### 맥락
 
@@ -48,11 +48,11 @@ HMAC key 는 `HMAC-SHA256(데이터 key, "data_key_mac:" + 쓰임)` 으로 뽑�
 - 얻는 것:
   - 주인은 자기 기억을 모두 보고 고친다. collection 을 받은 에이전트는 예전 민감 기억도 쓴다.
   - DB 에 기억 글의 평문 해시가 남지 않는다. 사용자의 데이터 key 줄을 지우면 그 사용자의 해시도 맞혀 볼 수 없다.
-  - 직전 이미지로 되돌려도 뜬다. 되돌린 이미지는 칸에 남은 `SENSITIVE` 를 다시 읽어 그 줄을 숨긴다.
+  - 칸을 지우기 전까지는 직전 이미지로 되돌려도 떴다. 되돌린 이미지는 칸에 남은 `SENSITIVE` 를 다시 읽어 그 줄을 숨겼다. 칸을 지운 뒤에는 그렇게 되돌리지 못한다.
 - 감당할 것:
   - 민감해 보이는 글을 에이전트에 싣지 않는 장치가 없다. 받는 collection 을 고르는 것이 그 장치다. 바로 저장 조건 6, 7 은 제안 카드로 내릴 뿐이다.
   - HMAC 과 임베딩 지문을 낼 때마다 주인 데이터 key 가 필요하다. 풀린 줄은 이미 그 key 를 캐시에 둔다.
   - 직전 이미지로 되돌린 동안 직전 이미지는 SHA-256 으로 중복 키를 내 같은 제안이 한 번 더 생길 수 있다. 되돌림이라는 예외 상황이라 막지 않는다.
   - 예전 민감 기억도 이제 임베딩한다. 그 글이 임베딩 서비스로 가고 벡터는 평문으로 남는다(스펙 DECISION6 의 벡터 평문과 같다).
   - 직전 이미지로 되돌리면 그 이미지는 HMAC 지문을 낡은 것으로 보고 벡터를 모두 다시 임베딩한다. 그때 연결 찾기가 다시 돌아 정리한 대체 제안이 다시 생길 수 있다.
-  - 옛 칸은 지우는 PR 까지 남는다. 그 PR 은 이 PR 의 배포를 확인한 뒤 연다.
+  - 옛 칸은 PR2 배포를 확인한 PR3 이 지웠다. 그 뒤에는 PR1 이전 이미지로 되돌리지 못한다.

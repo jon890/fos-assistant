@@ -318,8 +318,8 @@ class McpMemoryToolTest {
 
 
     @Test
-    @DisplayName("collection 을 받은 에이전트가 읽으면 직전 이미지가 민감으로 남긴 항목도 암호화돼 저장된 본문이 평문으로 나온다")
-    void allowedAgentReadsSensitiveBodyAsPlaintext() throws Exception {
+    @DisplayName("collection 을 받은 에이전트가 읽으면 암호화돼 저장된 본문이 평문으로 나온다")
+    void allowedAgentReadsSealedBodyAsPlaintext() throws Exception {
         Memory sensitive = memories.create(
             current(dad),
             MemoryScope.USER,
@@ -327,7 +327,6 @@ class McpMemoryToolTest {
             "민감 본문",
             "core",
             MemoryRetrieval.SEARCH);
-        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", sensitive.id());
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, sensitive.id()))
             .doesNotContain("민감 본문");

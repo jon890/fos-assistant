@@ -46,8 +46,8 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-
 INSERT INTO hermes_session_binding (id, profile_name, session_id, user_id, origin_execution_id, root_session_id, parent_session_id, created_at)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO memory (id, scope, owner_user_id, group_id, title, content, always_inject, status, proposed_by_execution_id, accepted_by_user_id, accepted_at, created_at, updated_at, collection, entry_type, retrieval, sensitivity, revision)
-VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'ACCEPTED', 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'MEMORY', 'ALWAYS', 'NORMAL', 1);
+INSERT INTO memory (id, scope, owner_user_id, group_id, title, content, always_inject, status, proposed_by_execution_id, accepted_by_user_id, accepted_at, created_at, updated_at, collection, entry_type, retrieval, revision)
+VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'ACCEPTED', 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'MEMORY', 'ALWAYS', 1);
 
 INSERT INTO memory_capture (id, memory_id, user_id, conversation_id, execution_id, kind, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-01-01 00:00:00');
@@ -55,8 +55,8 @@ VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-
 INSERT INTO memory_link (id, from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)
 VALUES (900000001, 900000001, 900000001, 'RELATED', 'HUMAN', 'ACTIVE', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
 
-INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, sensitivity, changed_at)
-VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
+INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, changed_at)
+VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', '2020-01-01 00:00:00');
 
 INSERT INTO group_setting (group_id, setting_key, setting_value)
 VALUES (900000001, 'coverage-900000001', '{}');
@@ -70,11 +70,11 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'cover
 INSERT INTO user_data_key (id, user_id, kek_id, wrapped_key, created_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO agent_memory_collection (agent_id, collection, allow_sensitive, created_at)
-VALUES (900000001, 'coverage-900000001', 1, '2020-01-01 00:00:00');
+INSERT INTO agent_memory_collection (agent_id, collection, created_at)
+VALUES (900000001, 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO agent_memory_collection_change (id, agent_id, collection, change_type, allow_sensitive, changed_by_user_id, changed_at)
-VALUES (900000001, 900000001, 'coverage-900000001', 'GRANTED', 1, 900000001, '2020-01-01 00:00:00');
+INSERT INTO agent_memory_collection_change (id, agent_id, collection, change_type, changed_by_user_id, changed_at)
+VALUES (900000001, 900000001, 'coverage-900000001', 'GRANTED', 900000001, '2020-01-01 00:00:00');
 
 INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
