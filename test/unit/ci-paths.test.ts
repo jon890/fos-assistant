@@ -272,28 +272,53 @@ function workflowJobs(): Map<string, string> {
 }
 
 // 무거운 검사 job 과 그 결과를 필수 검사 이름으로 판정하는 job 이다.
+// 한 판정이 job 여럿을 묶으면 works 에 모두 적는다.
 const GATED = [
-  { flag: "backend", work: "backend-tests", gate: "backend" },
-  { flag: "browser", work: "browser", gate: "browser-required" },
-  { flag: "e2e", work: "e2e-tests", gate: "e2e" },
-  { flag: "hermes", work: "hermes-tests", gate: "hermes" },
+  { flag: "backend", works: ["backend-tests"], gate: "backend" },
+  { flag: "browser", works: ["browser"], gate: "browser-required" },
+  { flag: "e2e", works: ["e2e-tests"], gate: "e2e" },
+  { flag: "hermes", works: ["hermes-connectors", "hermes-python"], gate: "hermes" },
 ];
 
-test("무거운 job 은 자기 판정 값으로만 돌고, 필수 검사 job 은 같은 값과 그 job 의 결과로 판정한다", () => {
+test("무거운 job 은 자기 판정 값으로만 돌고, 필수 검사 job 은 같은 값과 그 job 들의 결과로 판정한다", () => {
   const jobs = workflowJobs();
-  for (const { flag, work, gate: gateJob } of GATED) {
-    const workBody = jobs.get(work) ?? assert.fail(`${work} job 이 없다`);
-    assert.match(workBody, /^ {4}needs: changes\n {4}if: needs\.changes\.outputs\.([a-z0-9]+) == 'true'\n/m, work);
-    assert.equal(/needs\.changes\.outputs\.([a-z0-9]+) == 'true'/.exec(workBody)?.[1], flag, work);
+  for (const { flag, works, gate: gateJob } of GATED) {
+    for (const work of works) {
+      const workBody = jobs.get(work) ?? assert.fail(`${work} job 이 없다`);
+      assert.match(workBody, /^ {4}needs: changes\n {4}if: needs\.changes\.outputs\.([a-z0-9]+) == 'true'\n/m, work);
+      assert.equal(/needs\.changes\.outputs\.([a-z0-9]+) == 'true'/.exec(workBody)?.[1], flag, work);
+    }
 
     const gateBody = jobs.get(gateJob) ?? assert.fail(`${gateJob} job 이 없다`);
-    assert.match(gateBody, new RegExp(`^ {4}needs: \\[changes, ${work}\\]\\n {4}if: always\\(\\)\\n`, "m"), gateJob);
+    assert.match(gateBody, new RegExp(`^ {4}needs: \\[changes, ${works.join(", ")}\\]\\n {4}if: always\\(\\)\\n`, "m"), gateJob);
     assert.match(gateBody, /CHANGES_RESULT: \$\{\{ needs\.changes\.result \}\}/, gateJob);
     assert.match(gateBody, new RegExp(`SHOULD_RUN: \\$\\{\\{ needs\\.changes\\.outputs\\.${flag} \\}\\}`), gateJob);
-    assert.match(gateBody, new RegExp(`JOB_RESULT: \\$\\{\\{ needs\\.${work}\\.result \\}\\}`), gateJob);
+    // job 하나면 그 결과를 그대로, 여럿이면 앞에서부터 success 가 아닌 첫 결과를 넘긴다. 모두 success 여야 success 다.
+    const jobResult = works.length === 1
+      ? `needs\\.${works[0]}\\.result`
+      : works.slice(0, -1).map((work) => `needs\\.${work}\\.result != 'success' && needs\\.${work}\\.result`).join(" \\|\\| ") + ` \\|\\| needs\\.${works.at(-1)}\\.result`;
+    assert.match(gateBody, new RegExp(`JOB_RESULT: \\$\\{\\{ ${jobResult} \\}\\}`), gateJob);
     assert.match(gateBody, /run: node scripts\/ci\/ci-paths\.mjs gate/, gateJob);
   }
   for (const job of JOBS) assert.match(jobs.get("changes") ?? "", new RegExp(`${job}: \\$\\{\\{ steps\\.paths\\.outputs\\.${job} \\}\\}`), job);
+});
+
+test("필수 검사 이름 hermes 는 나눈 두 job 이 모두 있어야 하고 Python 테스트 job 은 커넥터 entry 를 직접 만든다", () => {
+  const jobs = workflowJobs();
+  assert.equal(jobs.has("hermes-tests"), false);
+  const python = jobs.get("hermes-python") ?? assert.fail("hermes-python job 이 없다");
+  // 새 checkout 에서 도는 Python 테스트는 커넥터의 dist 와 node_modules 를 읽으므로 설치와 빌드가 unittest 보다 앞서야 한다.
+  const unittest = python.indexOf("python -m unittest discover");
+  assert.ok(unittest >= 0, "unittest 단계가 없다");
+  for (const step of ["bun install --cwd", "bun run --cwd"]) {
+    const index = python.indexOf(step);
+    assert.ok(index >= 0 && index < unittest, `${step} 가 unittest 앞에 없다`);
+  }
+  assert.match(python, /check-hermes-contract\.sh/);
+  assert.doesNotMatch(python, /check-connector-package\.sh/);
+  const connectors = jobs.get("hermes-connectors") ?? assert.fail("hermes-connectors job 이 없다");
+  assert.match(connectors, /check-connector-package\.sh/);
+  assert.doesNotMatch(connectors, /python -m unittest/);
 });
 
 test("quality 는 판정 job 이 실패해도 생략되지 않고, 무거운 단계만 판정 값으로 건너뛴다", () => {
@@ -381,7 +406,7 @@ test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 �
   }
 });
 
-test("통합 뒤에도 필수 검사 이름 9개와 전체 검사 job 19개를 유지한다", () => {
+test("통합 뒤에도 필수 검사 이름 9개를 한 번씩 유지하고, 전체 검사 job 은 hermes 를 나눈 뒤 20개다", () => {
   const jobs = workflowJobs();
   const names = [...jobs.values()].flatMap((body) => {
     const name = /^ {4}name: (.+)$/m.exec(body)?.[1];
@@ -392,12 +417,13 @@ test("통합 뒤에도 필수 검사 이름 9개와 전체 검사 job 19개를 �
     assert.equal(names.filter((candidate) => candidate === name).length, 1, name);
   }
   // browser-failures는 성공한 PR에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
-  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 19);
+  // hermes-tests 를 hermes-connectors 와 hermes-python 으로 나누어 전에는 19개였다.
+  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 20);
 });
 
 test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다", () => {
   const jobs = workflowJobs();
-  const owners = [...GATED.map(({ flag, work }) => [flag, work]), ["quality", "quality"]];
+  const owners = [...GATED.flatMap(({ flag, works }) => works.map((work) => [flag, work])), ["quality", "quality"]];
   for (const [flag, work] of owners) {
     for (const [file] of (jobs.get(work) ?? "").matchAll(/scripts\/[\w./-]+\.(?:mjs|sh)/g)) {
       assert.ok(jobsFor(file).includes(flag), `${work} 가 부르는 ${file} 이 ${flag} 를 돌리지 않는다`);

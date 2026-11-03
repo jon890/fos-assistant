@@ -226,3 +226,20 @@ PR 에서 브라우저와 E2E 를 건너뛰는 결정 뒤, 같은 날 두 번 ma
 - 이름을 바꾸면 옛 경로가 지워진 것이므로 같은 규칙이 적용된다. 판정은 `--name-status --no-renames` 의 `D` 줄을 쓴다.
 - 규칙은 `ci-paths.mjs` 의 `ROUTE_FILES` 와 `removesRoute` 가 갖고, `withoutSlow` 의 「전체」 인자를 라벨 또는 경로 삭제로 켠다.
 - 남은 빈틈: 파일은 두고 안에서 경로 매핑(`@GetMapping` 등)만 지운 경우, 화면에서 컴포넌트 일부만 지운 경우는 잡지 못한다. 줄 단위로 읽으면 판정이 무거워져서 이번에는 넣지 않았다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
+
+### hermes-tests 를 두 job 으로 나눈다 (2026-11-03)
+
+`hermes-tests` 는 최근 PR CI 7건에서 480~545초(중앙값 516초)였고, PR 마다 가장 늦게 끝나는 검사 중 하나였다.
+안에서 커넥터 배포 묶음 검사가 약 250초, Python unittest 가 약 210초, Hermes 계약 검사가 약 35초를 차지하고 서로 입력을 기다리지 않는다.
+runner 를 하나 더 쓰지만 공개 저장소라 비용이 없고 동시 job 한도 안이므로 나누기로 했다(2026-11-03 사용자 결정).
+
+| job | 하는 일 |
+| --- | --- |
+| `hermes-connectors` | Chrome 설치 확인, 커넥터 배포 묶음과 기존 HTTP 대역 검사 |
+| `hermes-python` | 커넥터 의존성과 entry 준비, Python unittest, Hermes 계약 검사 |
+
+- 필수 검사 이름은 `hermes` 그대로다. 판정 job 이 두 job 을 `needs` 에 두고, 둘이 모두 `success` 일 때만 통과시킨다. 건너뛰는 경우는 두 job 이 함께 건너뛴다. 브랜치 보호는 바꾸지 않는다.
+- 나누면서 드러난 의존: Python 테스트는 커넥터의 `dist` entry 와 `node_modules` 를 읽는다. 전에는 같은 job 에서 앞서 도는 배포 묶음 검사가 그것을 남겼다. 새 checkout 에서 도는 `hermes-python` 은 `bun install --frozen-lockfile` 과 `bun run build` 로 직접 만든다(PR 682 의 CI 에서 1초 안에 끝났다).
+- 측정(PR 682 의 CI): `hermes-connectors` 264초, `hermes-python` 257초, 판정 7초. job 하나가 가장 오래 걸리던 시간이 중앙값 516초에서 264초로 줄었다.
+- 감수할 것: 전체 검사 job 이 19개에서 20개가 된다. 동시 job 한도를 채우는 PR 이 겹치면 대기가 늘 수 있다.
+- 되돌릴 때는 두 job 을 합치고 판정 job 의 `needs` 와 `JOB_RESULT` 를 하나로 되돌린다. `ci-paths.test.ts` 의 `GATED` 를 함께 고친다.
