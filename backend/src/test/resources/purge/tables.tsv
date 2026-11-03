@@ -7,7 +7,6 @@ agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 �
 agent_memory_collection|AGENT|agent_id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.
 agent_memory_collection_change|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. 변경 이력도 지연 정리에서 지운다.
 agent_token|AGENT|id|KEEP|KEEP|KEEP|profile_name으로 profile에 속한다. 운영 등록 profile은 에이전트 삭제 후에도 남기는 계약이다.
-agent_toolset_request|AGENT|id|DELETE|KEEP|DELETE|agent_id와 requester_user_id FK가 있다. 에이전트 지연 정리에서 지운다.
 allowed_person|USER|id|SCRUB|KEEP|KEEP|FK 없이 정규화한 email로 app_user에 연결된다. 접근 해제와 사용자 정리 모두 허용 목록 행을 꺼진 채 남기고, 정리는 purge_scheduled_at만 비운다.
 app_user|USER|id|DELETE|KEEP|KEEP|사용자 루트다. 접근 해제는 지우지 않고, 예약한 지 30일이 지나면 사용자 정리가 대화 정리를 기다린 뒤 마지막에 지운다.
 chat_artifact|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id에 속한다. ConversationPurgeWriter가 지운다.

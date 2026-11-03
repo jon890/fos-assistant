@@ -7,7 +7,6 @@ import com.bifos.assistant.agent.application.dto.AgentPurgeOutcome;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.domain.AgentMemoryCollectionChange;
-import com.bifos.assistant.agent.domain.AgentToolsetRequest;
 import com.bifos.assistant.agent.domain.type.AgentMemoryCollectionChangeType;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -15,7 +14,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionChangeRepository;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.infra.AgentToolsetRequestRepository;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -75,9 +73,6 @@ class AgentPurgeWriterTest {
 
     @Autowired
     AgentMemoryCollectionChangeRepository collectionChanges;
-
-    @Autowired
-    AgentToolsetRequestRepository toolsetRequests;
 
     @Autowired
     ConnectorConnectionRepository connections;
@@ -147,7 +142,6 @@ class AgentPurgeWriterTest {
         assertThat(agents.findById(agent.id())).isEmpty();
         assertThat(countOf("agent_memory_collection", "agent_id")).isZero();
         assertThat(countOf("agent_memory_collection_change", "agent_id")).isZero();
-        assertThat(countOf("agent_toolset_request", "agent_id")).isZero();
         assertThat(countOf("agent_connector_binding", "agent_id")).isZero();
         assertThat(countOf("proactive_check", "agent_id")).isZero();
         assertThat(actions.findById(attached.actionId()))
@@ -223,7 +217,6 @@ class AgentPurgeWriterTest {
         collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core", false));
         collectionChanges.saveAndFlush(AgentMemoryCollectionChange.of(
             agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, false, owner.id(), NOW));
-        toolsetRequests.saveAndFlush(AgentToolsetRequest.of(1L, agent.id(), owner.id(), "image_gen", NOW));
 
         ConnectorConnection connection = connections.saveAndFlush(ConnectorConnection.pending(owner.id(), "demo-mail", NOW));
         bindings.saveAndFlush(ConnectorBinding.pending(agent, connection, "demo-mail", NOW));
@@ -268,7 +261,6 @@ class AgentPurgeWriterTest {
     void assertAttachedRowsRemain() {
         assertThat(countOf("agent_memory_collection", "agent_id")).isEqualTo(1);
         assertThat(countOf("agent_memory_collection_change", "agent_id")).isEqualTo(1);
-        assertThat(countOf("agent_toolset_request", "agent_id")).isEqualTo(1);
         assertThat(countOf("agent_connector_binding", "agent_id")).isEqualTo(1);
         assertThat(countOf("proactive_check", "agent_id")).isEqualTo(1);
         assertThat(countOf("connector_action", "agent_id")).isEqualTo(1);

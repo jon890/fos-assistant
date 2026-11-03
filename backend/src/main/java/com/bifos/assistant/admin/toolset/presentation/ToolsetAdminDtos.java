@@ -2,13 +2,9 @@ package com.bifos.assistant.admin.toolset.presentation;
 
 import com.bifos.assistant.agent.application.dto.AgentToolView;
 import com.bifos.assistant.agent.application.dto.ToolsetCatalogView;
-import com.bifos.assistant.agent.application.dto.ToolsetRequestView;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -38,10 +34,6 @@ public final class ToolsetAdminDtos {
     }
 
     public record HiddenToolsetsRequest(@NotNull List<@NotBlank String> hidden) {
-    }
-
-    public record DecideToolsetRequest(
-        @NotNull Boolean approve, @Size(max = 200) String reason) {
     }
 
     public record ToolsetsView(
@@ -76,31 +68,5 @@ public final class ToolsetAdminDtos {
 
     /** 에이전트 API 실행에 켤 toolset 전체다. */
     public record UpdateToolsetsRequest(@NotNull List<@NotBlank String> enabled) {
-    }
-
-    public record ToolsetRequestResponse(
-        UUID id,
-        String agentCode,
-        String agentName,
-        boolean agentDeleted,
-        String requesterName,
-        String toolset,
-        String status,
-        String reason,
-        Instant requestedAt,
-        Instant decidedAt) {
-        static ToolsetRequestResponse from(ToolsetRequestView row) {
-            return new ToolsetRequestResponse(
-                row.id(),
-                row.agentCode(),
-                row.agentName(),
-                row.agentDeleted(),
-                row.requesterName(),
-                row.toolset(),
-                row.status().name(),
-                row.reason(),
-                row.requestedAt(),
-                row.decidedAt());
-        }
     }
 }
