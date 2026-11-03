@@ -3,5 +3,3 @@
 ALTER TABLE memory ADD COLUMN embedding_model VARCHAR(128) NULL;
 ALTER TABLE memory ADD COLUMN embedding_fingerprint BINARY(32) NULL;
 ALTER TABLE memory ADD COLUMN embedding_vector BLOB NULL;
--- 옛 벡터 테이블이다. 항목 삭제와 사용자 정리, 정리 미리보기만 native 질의로 지우고 센다. 옛 테이블을 지우는 PR 이 이 문장을 지운다.
-CREATE TABLE IF NOT EXISTS memory_embedding (memory_id BIGINT NOT NULL PRIMARY KEY, model VARCHAR(128) NOT NULL, dimensions INT NOT NULL, text_fingerprint BINARY(32) NOT NULL, vector BLOB NOT NULL, created_at DATETIME(6) NOT NULL, updated_at DATETIME(6) NOT NULL);

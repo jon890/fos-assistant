@@ -2,7 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-12
-- 2026-11-02 개정: 저장하는 자리를 `connector_conversation_grant` 테이블에서 허락을 준 `connector_action` 줄의 `grant_*` 칸으로 옮겼다. 상시 허락도 같은 칸에 두고 `grant_scope` 로 나눈다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md)). 판정 범위는 바뀌지 않았다.
+- 2026-11-02 개정: 저장하는 자리를 `connector_conversation_grant` 테이블에서 허락을 준 `connector_action` 줄의 `grant_*` 칸으로 옮겼다. 상시 허락도 같은 칸에 두고 `grant_scope` 로 나눈다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md)). 판정 범위는 바뀌지 않았다. 옛 테이블은 2026-11-03 에 지웠다.
 - [ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 의 상시 허락 옆에 범위가 한 대화인 허락을 더한다. [ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) 의 `outbound` 가 참인 도구는 선언해도 열지 않는다.
 
 ### 결정

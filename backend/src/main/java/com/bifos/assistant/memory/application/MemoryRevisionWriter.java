@@ -7,7 +7,6 @@ import com.bifos.assistant.memory.domain.SealedMemoryText;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
-import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -16,7 +15,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import java.time.Clock;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -32,7 +30,6 @@ class MemoryRevisionWriter {
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
-    private final MemoryEmbeddingRepository embeddings;
     private final MemoryLinkRepository links;
     private final MemoryVectorCache vectorCache;
     private final MemoryTexts texts;
@@ -60,11 +57,10 @@ class MemoryRevisionWriter {
 
     /**
      * 지우기 전에 마지막 값을 버전으로 남기고 그 항목의 연결을 지운다. 연결은 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다. 벡터는 항목 줄의 칸이라
-     * 줄과 함께 지워지고, 직전 이미지가 옛 테이블에 남긴 줄만 따로 지운다.
+     * 줄과 함께 지워진다.
      */
     void beforeDelete(CurrentUser user, Memory memory) {
         saveRevision(memory, MemoryChangeType.DELETED, user);
-        embeddings.deleteLegacyRows(List.of(memory.id()));
         links.deleteByMemoryId(memory.id());
         vectorCache.evict(memory.id());
     }

@@ -26,7 +26,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,22 +112,6 @@ class UserPurgerTest {
         assertThat(after.enabled()).isFalse();
         assertThat(after.purgeScheduledAt()).isNull();
         assertThat(purger.purgeDue(NOW)).as("예약을 비웠으므로 다시 고르지 않는다").isZero();
-    }
-
-
-    @Test
-    @DisplayName("코드가 읽고 쓰지 않는 옛 허락 테이블도 정리하는 사용자의 행만 지우고 다른 사용자의 행은 남긴다")
-    void deletesOnlyPurgedUsersLegacyGrantRows() {
-        Member target = member("target", UserRole.MEMBER);
-        Member other = member("other", UserRole.MEMBER);
-        schedule(target, NOW.minus(Duration.ofDays(31)));
-        legacyGrants(target);
-        legacyGrants(other);
-
-        assertThat(purger.purgeDue(NOW)).isEqualTo(1);
-
-        assertThat(legacyGrantRows(target)).containsExactly(0L, 0L);
-        assertThat(legacyGrantRows(other)).containsExactly(1L, 1L);
     }
 
 
@@ -306,28 +289,6 @@ class UserPurgerTest {
 
     private long keys(Member owner) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM user_data_key WHERE user_id = ?", Long.class, owner.user().id());
-    }
-
-
-    /** 직전 이미지가 쓴 것처럼 옛 허락 두 테이블에 한 줄씩 넣는다(ADR-20261102 / table-reduce-r2). */
-    private void legacyGrants(Member owner) {
-        jdbc.update("""
-                INSERT INTO connector_tool_grant (user_id, connector_id, tool_name, expires_at, created_at)
-                VALUES (?, 'legacy', 'legacy_tool', NULL, CURRENT_TIMESTAMP)
-                """, owner.user().id());
-        jdbc.update("""
-                INSERT INTO connector_conversation_grant
-                    (user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at)
-                VALUES (?, 1, 1, 'legacy', 'legacy_tool', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, owner.user().id());
-    }
-
-
-    private List<Long> legacyGrantRows(Member owner) {
-        return List.of(
-            jdbc.queryForObject("SELECT COUNT(*) FROM connector_tool_grant WHERE user_id = ?", Long.class, owner.user().id()),
-            jdbc.queryForObject("SELECT COUNT(*) FROM connector_conversation_grant WHERE user_id = ?", Long.class,
-                owner.user().id()));
     }
 
 

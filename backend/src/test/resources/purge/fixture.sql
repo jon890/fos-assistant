@@ -52,9 +52,6 @@ VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage
 INSERT INTO memory_capture (id, memory_id, user_id, conversation_id, execution_id, kind, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-01-01 00:00:00');
 
-INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)
-VALUES (900000001, 'coverage-900000001', 1, X'0000000000000000000000000000000000000000000000000000000000000000', X'0000803F', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
-
 INSERT INTO memory_link (id, from_memory_id, to_memory_id, type, origin, status, created_at, updated_at)
 VALUES (900000001, 900000001, 900000001, 'RELATED', 'HUMAN', 'ACTIVE', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
 
@@ -84,12 +81,6 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-90
 
 INSERT INTO connector_connection (id, user_id, connector_id, status, fields, created_at, updated_at, undeclared_tools, vault_stored)
 VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', '{"values":{"field":"coverage-900000001"}}', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
-
-INSERT INTO connector_conversation_grant (id, user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at)
-VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001, '2099-01-01 00:00:00', '2020-01-01 00:00:00');
-
-INSERT INTO connector_tool_grant (id, user_id, connector_id, tool_name, expires_at, created_at)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2099-01-01 00:00:00', '2020-01-01 00:00:00');
 
 INSERT INTO content_draft (id, public_id, conversation_id, owner_user_id, current_revision, created_at, expires_at)
 VALUES (900000001, '00000000-0000-4000-8000-000900000001', 900000001, 900000001, 1, '2020-01-01 00:00:00', '2099-01-01 00:00:00');
