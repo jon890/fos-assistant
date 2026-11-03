@@ -13,7 +13,7 @@
 
 범위 밖: Hermes core 가 직접 읽는 profile `.env` 값(`API_SERVER_KEY` 등). 원격(HTTP) 플러그인의 비밀값(DECISION8, 예외로 `.env` 에 둔다). 사용자 브라우저 중계 주소의 접근 표식(DECISION11, 다음 스펙). Hermes core 는 고치지 않는다. Control Plane 은 바뀌지 않는다.
 
-함께 고칠 문서: `docs/privacy.md` 의 평문 보관 서술, `docs/features/connector.md`, `hermes/docs/hermes-contract.md` 의 운영 값 표.
+함께 고칠 문서: `docs/privacy.md` 의 평문 보관 서술, `docs/features/connector.md`, `hermes/README.md` 의 운영 값 표(스펙 확인 때는 `hermes/docs/hermes-contract.md` 로 적었으나 운영 값 표는 README 에 있다).
 
 ## 요구사항과 인수 조건
 

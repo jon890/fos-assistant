@@ -221,8 +221,8 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
 대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.
 `vault` 는 `^c[1-9][0-9]{0,18}$` 이다. Control Plane 의 연결 번호 앞에 `c` 를 붙인 것이다.
-보관 파일 key 가 있으면 본문은 `{"v": 2, "connector": "<id>", "key_id": "<key id>", "sealed": "v1.<IV>.<암호문과 태그>"}` 다. `sealed` 는 AES-256-GCM 이고 풀면 `{"<field key>": "<값>"}` 이며, AAD 는 `connector-vault:<vault>:<connector>` 라 파일을 다른 연결 이름으로 옮기거나 `connector` 를 바꾸면 풀리지 않는다.
-key 가 없으면 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 평문이다. 빈 선택 칸은 넣지 않는다. 칸이 없는 플러그인은 빈 `values` 다.
+보관 파일 key 가 준비됐으면(두 환경 변수가 있고 key 파일을 읽었으며 활성 id 가 파일에 있다) 본문은 `{"v": 2, "connector": "<id>", "key_id": "<key id>", "sealed": "v1.<IV>.<암호문과 태그>"}` 다. `sealed` 는 AES-256-GCM 이고 풀면 `{"<field key>": "<값>"}` 이며, AAD 는 `connector-vault:<vault>:<connector>` 라 파일을 다른 연결 이름으로 옮기거나 `connector` 를 바꾸면 풀리지 않는다.
+key 가 준비되지 않고 「key 필수」 가 꺼져 있으면 `{"v": 1, "connector": "<id>", "values": {"<field key>": "<값>"}}` 평문이다. 빈 선택 칸은 넣지 않는다. 칸이 없는 플러그인은 빈 `values` 다.
 읽기는 둘을 모두 받는다. v2 는 그 `key_id` 의 key 가 key 파일에 있으면 활성 key 가 아니어도 푼다. 쓰기 전의 소유 확인은 풀지 않고 `connector` 만 본다. 모양을 읽지 못하는 파일은 경고를 남기고 덮어쓴다.
 plugin 이 올라올 때 평문 파일과 옛 key 의 파일을 활성 key 로 다시 쓰고, 다시 읽어 값이 같은지 본다. 깨진 파일과 풀지 못하는 파일은 건드리지 않는다. 쓰다 남은 임시 파일은 지운다. 남은 평문 파일, 옛 key 파일, 풀지 못한 파일의 수를 info 한 줄로, 그 파일 이름을 warning 한 줄로 남긴다. 운영 값과 동작은 [`hermes/README.md`](../../README.md) 의 「운영 값」 과 [ADR-20261103 / connector-vault-key](../../docs/adr/ADR-20261103-connector-vault-key.md) 가 갖는다.
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
