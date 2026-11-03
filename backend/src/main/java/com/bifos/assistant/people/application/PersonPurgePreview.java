@@ -32,16 +32,11 @@ public class PersonPurgePreview {
     }
 
 
-    /** 그 사용자의 개인 기억 번호를 고르는 부분 질의다. 링크는 사용자 칸이 없어 이것으로 찾는다. */
-    private static final String USER_MEMORY_IDS = "(select id from memory where owner_user_id = :userId and scope = 'USER')";
-
     private static final List<Target> TARGETS = List.of(
         new Target("conversation", "user_id = :userId and deleted_at is null", Action.DELETE),
         new Target("chat_attachment", "uploaded_by_user_id = :userId", Action.DELETE),
         new Target("chat_artifact", "vault_user_id = :userId", Action.DELETE),
         new Target("memory", "owner_user_id = :userId and scope = 'USER'", Action.DELETE),
-        new Target("memory_link", "from_memory_id in " + USER_MEMORY_IDS + " or to_memory_id in " + USER_MEMORY_IDS,
-            Action.DELETE),
         new Target("memory_revision", "owner_user_id = :userId", Action.DELETE),
         new Target("follow_up", "user_id = :userId", Action.DELETE),
         new Target("task", "owner_user_id = :userId", Action.DELETE),

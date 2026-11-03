@@ -11,7 +11,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_link`(코드가 읽고 쓰지 않는 옛 표) |
+| 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution` |
 | 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
@@ -220,7 +220,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
-그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 코드는 옛 `memory_link` 를 읽고 쓰지 않지만, 직전 이미지가 그 표에 남긴 줄은 같은 트랜잭션에서 지운다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
+그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -764,17 +764,9 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 한 기억을 다른 기억이 대신했다는 사실을 `memory.superseded_by_memory_id` 한 칸에 둔다. 근거는 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이다. 동작은 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「기억의 대체」 가 갖는다.
 
 - 칸이 차 있으면 조립의 모든 층과 `memory_search`, `memory_read`, 임베딩 대상에서 빠진다. 「대체됨」 을 `memory` 의 상태로 두지 않는다. 사람이 보는 목록에는 남는다
-- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 행 수는 `RELATED`·`ACTIVE` 한 줄이었고 `SUPERSEDES` 는 0 이었다
+- 엔티티가 칸을 읽기만 하고 쓰지 않는다(`insertable = false, updatable = false`). 코드가 채우는 경로는 없다. `V20261103054415` 가 효력 있는 `SUPERSEDES` 줄(`ACTIVE`)을 옛 항목의 칸으로 옮겼다. 줄이 여럿이면 번호가 큰(가장 나중에 맺은) 줄의 새 항목을 썼다. 제안 중이거나 끊은 줄과 `RELATED` 줄은 옮기지 않았다. 옮길 때 운영 `SUPERSEDES` 는 0 행이었다(`memory_link` 는 `RELATED`·`ACTIVE` 8 행뿐이었다). 옛 `memory_link` 테이블은 지웠다. 지우기 전에 `V20261103054422`(Java 마이그레이션)가 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`updated_at` 이 `V20261103054415` 가 시작한 시각 뒤이고 새 항목이 `ACCEPTED` 인 줄)을 같은 규칙으로 다시 옮겼다. 칸이 이미 찬 항목은 덮지 않는다. `V20261103054423` 이 테이블을 지웠다
 - 대신한 새 항목을 지우거나 승인을 벗어나게 하면 그 항목이 대신한 옛 항목의 칸을 저장소 쿼리(`MemoryRepository.clearSupersededBy`)가 같은 트랜잭션에서 비운다. 외래 키가 없어 서비스가 비운다
 - `idx_memory_superseded_by` 는 새 항목을 지울 때 그 항목이 대신한 줄을 찾는 색인이다
-
-### memory_link
-
-**코드가 읽고 쓰지 않는 옛 표다.** 기억 두 개 사이의 연결 한 줄이었다. 대체는 `memory.superseded_by_memory_id` 로 옮겼고(위 「memory 의 대체 칸」), `RELATED` 연결과 연결 제안, 자동 찾기, 화면, `memory_link` 도구는 지웠다. 이 결정은 [ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md) 의 기억 연결 묶음(D4)이 갖는다. 근거였던 [ADR-20261015 / memory-link](../../docs/adr/ADR-20261015-memory-link.md) 는 이 결정이 대신한다.
-
-- 표와 줄은 직전 이미지로 되돌렸을 때 옛 코드가 읽도록 남아 있고, 배포를 확인한 뒤 DROP PR 이 지운다. 그 PR 은 지우기 전에 직전 이미지가 새로 맺은 효력 있는 `SUPERSEDES` 줄(`created_at` 이 `V20261103054415` 를 적용한 시각 뒤인 줄)을 같은 규칙으로 다시 옮긴다
-- 사용자 정리와 정리 미리보기, 항목 삭제는 예외로 그 항목을 한쪽 끝으로 둔 옛 줄을 native 질의로 지우고 센다([ADR-20261101 / user-purge](adr/ADR-20261101-user-purge.md) 의 약속은 그대로다). 줄의 자유 글 `label` 에 사람에 관한 글이 있을 수 있어서다
-- 양 끝에 외래 키를 걸지 않았다. 칸의 뜻은 옛 `V20261016224028__memory_link.sql` 의 COMMENT 가 갖는다
 
 ## 플러그인 표
 

@@ -11,7 +11,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -52,12 +51,11 @@ class MemoryRevisionWriter {
 
     /**
      * 지우기 전에 마지막 값을 버전으로 남기고, 그 항목이 대신한 옛 항목을 다시 싣게 칸을 비운다. 외래 키가 없어 서비스가 같은 트랜잭션에서 비운다.
-     * 벡터는 항목 줄의 칸이라 줄과 함께 지워지고, 직전 이미지가 옛 연결 테이블에 남긴 줄만 따로 지운다.
+     * 벡터는 항목 줄의 칸이라 줄과 함께 지워진다.
      */
     void beforeDelete(CurrentUser user, Memory memory) {
         saveRevision(memory, MemoryChangeType.DELETED, user);
         memories.clearSupersededBy(memory.id());
-        memories.deleteLegacyLinks(List.of(memory.id()));
         vectorCache.evict(memory.id());
     }
 

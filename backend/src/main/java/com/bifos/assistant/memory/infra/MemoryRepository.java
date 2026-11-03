@@ -104,16 +104,4 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     @Modifying(flushAutomatically = true)
     @Query(value = "update memory set superseded_by_memory_id = null where superseded_by_memory_id = :newerId", nativeQuery = true)
     int clearSupersededBy(@Param("newerId") Long newerId);
-
-
-    /**
-     * 옛 연결 테이블 {@code memory_link} 에서 그 항목들을 한쪽 끝으로 둔 줄을 지운다. 코드는 옛 테이블을 읽고 쓰지 않지만, 직전 이미지가 남긴
-     * 줄(자유 글 label 이 있을 수 있다)을 항목 삭제와 사용자 정리의 약속대로 지운다. 옛 테이블을 지우는 PR 이 이 메서드를 걷어 낸다(ADR-20261102 /
-     * table-reduce-r2).
-     *
-     * @return 지운 줄 수
-     */
-    @Modifying(flushAutomatically = true)
-    @Query(value = "delete from memory_link where from_memory_id in (:memoryIds) or to_memory_id in (:memoryIds)", nativeQuery = true)
-    int deleteLegacyLinks(@Param("memoryIds") Collection<Long> memoryIds);
 }
