@@ -12,8 +12,6 @@ import com.bifos.assistant.connector.approval.application.dto.ConnectorGrantView
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
-import com.bifos.assistant.connector.action.domain.ConnectorConversationGrant;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.connection.domain.ToolPolicy;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;
@@ -94,7 +92,7 @@ class ConnectorActionLifecycle {
     List<ConnectorGrantView> grants(CurrentUser user) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         List<ConnectorGrantView> views = new ArrayList<>();
-        for (ConnectorToolGrant grant : grants.findActiveByUserId(user.id(), now())) {
+        for (ConnectorAction grant : grants.findActiveByUserId(user.id(), now())) {
             Optional<ToolPolicy> declared = manifests
                 .computeIfAbsent(grant.connectorId(), details::readManifest)
                 .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
@@ -128,7 +126,7 @@ class ConnectorActionLifecycle {
                 .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
                 .filter(declared -> !declared.grantable())
                 .isPresent())
-            .map(ConnectorToolGrant::id)
+            .map(ConnectorAction::id)
             .toList();
         if (closed.isEmpty()) {
             return 0;
@@ -153,7 +151,7 @@ class ConnectorActionLifecycle {
                 .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
                 .filter(declared -> !declared.conversationGrantable())
                 .isPresent())
-            .map(ConnectorConversationGrant::id)
+            .map(ConnectorAction::id)
             .toList();
         if (closed.isEmpty()) {
             return 0;
@@ -163,13 +161,12 @@ class ConnectorActionLifecycle {
     }
 
 
-    /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
+    /**
+     * 허락을 거둔다. 허락의 번호는 그 허락을 준 승인 줄의 번호다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다.
+     */
     void revokeGrant(CurrentUser user, Long grantId) {
-        ConnectorToolGrant grant = grants.findById(grantId)
-            .filter(found -> found.userId().equals(user.id()))
-            .orElseThrow(ConnectorActionDetails::notFound);
-        grant.revoke(now());
-        grants.save(grant);
+        ConnectorAction grant = grants.findOwn(grantId, user.id()).orElseThrow(ConnectorActionDetails::notFound);
+        grants.revokeAll(List.of(grant.id()), now());
     }
 
 
@@ -184,16 +181,16 @@ class ConnectorActionLifecycle {
     List<ConnectorConversationGrantView> conversationGrants(CurrentUser user, Long conversationId) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         List<ConnectorConversationGrantView> views = new ArrayList<>();
-        List<ConnectorConversationGrant> active = conversationGrants.findActiveInConversation(user.id(), conversationId, now());
+        List<ConnectorAction> active = conversationGrants.findActiveInConversation(user.id(), conversationId, now());
         Long conversationAgent = conversations.findById(conversationId).map(Conversation::agentId).orElse(null);
         Map<Long, String> otherAgents = agents
             .findAllById(active.stream()
-                .map(ConnectorConversationGrant::agentId)
+                .map(ConnectorAction::agentId)
                 .filter(agentId -> !Objects.equals(agentId, conversationAgent))
                 .collect(Collectors.toSet()))
             .stream()
             .collect(Collectors.toMap(Agent::id, Agent::name));
-        for (ConnectorConversationGrant grant : active) {
+        for (ConnectorAction grant : active) {
             Optional<ToolPolicy> declared = manifests
                 .computeIfAbsent(grant.connectorId(), details::readManifest)
                 .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
@@ -212,11 +209,13 @@ class ConnectorActionLifecycle {
      * 모두 거둔다. 사용자가 고른 것은 그 줄이 아니라 그 도구를 다시 묻는 것이다.
      */
     void revokeConversationGrant(CurrentUser user, Long conversationId, Long grantId) {
-        ConnectorConversationGrant grant = conversationGrants.findById(grantId)
-            .filter(found -> found.userId().equals(user.id()) && found.conversationId().equals(conversationId))
+        ConnectorAction grant = conversationGrants.findOwnInConversation(grantId, user.id(), conversationId)
             .orElseThrow(ConnectorActionDetails::notFound);
+        Instant now = now();
         conversationGrants.revokeAllOfTool(
-            grant.userId(), grant.conversationId(), grant.agentId(), grant.connectorId(), grant.toolName(), now());
+            grant.userId(), grant.conversationId(), grant.agentId(), grant.connectorId(), grant.toolName(), now);
+        // 지운 에이전트를 정리해 에이전트가 빈 줄은 위 갱신에 걸리지 않는다. 고른 줄 자체는 거둔다.
+        conversationGrants.revokeAll(List.of(grant.id()), now);
     }
 
 
@@ -318,7 +317,7 @@ class ConnectorActionLifecycle {
                                 null,
                                 bodies,
                                 now);
-                            conversationGrants.revokeOfAction(action.id(), now);
+                            action.revokeConversationGrant(now);
                             return actions.save(action);
                         });
                 });
@@ -354,9 +353,7 @@ class ConnectorActionLifecycle {
             connection.userId(), connection.connectorId(), ActionStatus.PENDING);
         pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
         List<ConnectorAction> rejected = actions.saveAll(pending);
-        List<ConnectorToolGrant> active = grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
-        active.forEach(grant -> grant.revoke(now));
-        grants.saveAll(active);
+        grants.revokeAllOfConnector(connection.userId(), connection.connectorId(), now);
         conversationGrants.revokeAllOfConnector(connection.userId(), connection.connectorId(), now);
         signals.publishAfterCommit(rejected);
     }
@@ -370,12 +367,14 @@ class ConnectorActionLifecycle {
      * 되살아나지 않게 한다. 답을 기다리는 줄은 건드리지 않는다. 그 줄은 승인할 때 지금 표시로 다시 본다.
      */
     void revokeUnmarkedGrants(ConnectorConnection connection, ListedTools listed, Instant now) {
-        List<ConnectorToolGrant> unmarked = grants
+        List<Long> unmarked = grants
             .findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now).stream()
             .filter(grant -> !listed.readOnly(grant.toolName()))
+            .map(ConnectorAction::id)
             .toList();
-        unmarked.forEach(grant -> grant.revoke(now));
-        grants.saveAll(unmarked);
+        if (!unmarked.isEmpty()) {
+            grants.revokeAll(unmarked, now);
+        }
     }
 
 
