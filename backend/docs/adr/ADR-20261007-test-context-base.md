@@ -91,3 +91,23 @@
 - 기동 자체를 검사마다 확인하던 효과가 없어진다. 기동 실패와 비정상 종료는 클래스의 첫 검사와 종료 코드 확인이 잡는다.
 - 새 fixture 조작이 Python 쪽에 상태를 남기면 되돌림 범위에 넣거나, 되돌리지 못한 조작으로 둔다. `FinancialPluginResetTest` 가 같은 프로세스의 다음 검사가 처음 상태로 시작하는지와 다시 띄우는 조건을 본다.
 - 앞 검사가 남긴 상태를 찾으려면 메서드 순서를 바꿔 돌린다. `-Pjunit.jupiter.testmethod.order.default` 에 `org.junit.jupiter.api.MethodOrderer$MethodName` 과 `com.bifos.assistant.testsupport.ReversedMethodNameOrder` 를 한 번씩 준다.
+
+
+## 테스트 JVM 을 나눈다
+
+2026-11-03 에 더했다.
+
+**결정.** `./gradlew test` 와 `mysqlMigrationTest` 는 `maxParallelForks = 2` 로 테스트 JVM 두 개에 나눠 돈다. 위의 컨텍스트 하나는 「테스트 JVM 하나가 띄우는 컨텍스트」 로 읽는다.
+
+- **배경.** 앞선 계획으로 검사 수와 기동을 줄인 뒤에도 JVM 하나에서 직렬로 돌아, 4 vCPU runner 의 CPU 대부분이 놀았다.
+- **JVM 사이에 겹치는 것은 파일 시스템뿐이다.** H2 메모리 DB 와 Spring 컨텍스트는 JVM 마다 따로 있고, MySQL 검사는 `MysqlTestDatabase.shared()` 가 JVM 마다 무작위 이름의 DB 를 하나씩 만든다. 검사가 여는 서버 소켓은 모두 0번 포트이고, 외부 프로세스 fixture 는 임시 디렉터리와 임의 포트를 쓴다.
+- **겹치던 것은 `application-test.yml` 의 `build/test-*` 다.** 첨부, 결과물, 스킬, 브라우저 profile, Hermes key 디렉터리다. 스킬 검사는 디렉터리 안의 버전과 비어 있음을 단언하고, 다른 검사는 지운 대화의 파일이 없는지 단언해서 두 JVM 이 같은 디렉터리를 쓰면 서로의 파일 때문에 실패한다.
+  이름에 Gradle 이 JVM 마다 주는 `org.gradle.test.worker` 번호를 넣어 JVM 마다 다른 디렉터리를 쓴다. Gradle 밖에서 돌리면 번호가 없어 0 이다.
+- **디렉터리를 직접 여는 검사는 설정 값을 읽는다.** 경로 문자열을 검사에 적으면 번호가 든 이름과 어긋난다.
+
+**감당할 것.**
+
+- 컨텍스트 기동이 JVM 마다 한 번씩 늘어 CPU 를 합친 시간은 늘고, 걸린 시간은 줄어든다. 걸린 시간의 변화는 PR 의 CI 시간으로 잰다.
+- 힙이 JVM 마다 1g 라 runner 메모리를 두 배 쓴다.
+- 클래스가 어느 JVM 에 가는지는 Gradle 이 정한다. 검사는 다른 클래스가 같은 JVM 에서 먼저 돌았다는 것에 기대지 않는다.
+- 새 검사가 고정된 경로나 포트를 쓰면 두 JVM 이 부딪힌다. 번호가 든 설정 경로, `@TempDir`, 0번 포트를 쓴다.
