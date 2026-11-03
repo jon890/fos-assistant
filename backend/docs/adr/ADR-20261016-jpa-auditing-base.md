@@ -113,7 +113,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `ExecutionEvent.occurredAt`, `FeedbackEvent.occurredAt`, `ExecutionSkillUse.occurredAt` | 사건이 실제 발생한 시각 |
 | `ContentDraftRevision.createdAt`, `MediaObservation.createdAt` | revision 생성·분석 조건과 유효기간의 기준 |
 | `TaskRun.createdAt/startedAt/finishedAt`, `ContentDraftJob.createdAt`과 claim 시각, `SubagentUsageJob.createdAt`과 재시도·기록 시각 | 큐 수락, 시작 제한, 독점 claim과 실행 수명 |
-| `AgentExecution`, `ProactiveCheck`, `ResultDeliveryAttempt`의 시작·완료 시각 | 실행과 시도 수명 |
+| `AgentExecution`, `ProactiveCheck`, `ResultDelivery`의 마지막 시도 시작·완료 시각 | 실행과 시도 수명 |
 | `ResultDelivery.updatedAt`, `FollowUp.updatedAt` | 결과 전달 상태와 알림 신호의 시점 |
 | `UserBrowser.updatedAt/lastActiveAt/startedAt` | 목록을 읽은 뒤 변경됐는지와 정리 조건 |
 | `Notification.readAt`, 토큰의 사용·폐기·만료 시각, 삭제·수락·승인 시각 | 각각의 업무 사건과 수명 |
