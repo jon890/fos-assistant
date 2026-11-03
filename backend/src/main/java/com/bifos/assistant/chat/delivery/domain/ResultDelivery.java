@@ -24,7 +24,7 @@ import lombok.experimental.Accessors;
  * {@code last_attempt_*} 칸에 둔다. 다시 전달하면 마지막 시도 칸을 새 시도로 덮는다. 묶음의 상태는 마지막 시도가 끝난
  * 방식과 같고, 두 상태를 한 update 에서 바꾼다.
  *
- * <p>마지막 시도의 번호는 {@code attempt_count} 다. 직전 이미지가 쓴 줄은 새 칸이 비어 있을 수 있다.
+ * <p>마지막 시도의 번호는 {@code attempt_count} 다.
  */
 @Entity
 @Table(name = "result_delivery")
@@ -53,11 +53,11 @@ public class ResultDelivery extends CreatedAtEntity {
     private Instant updatedAt;
 
     /** 묶음에 든 결과들의 JSON 문자열이다. 모양은 {@code ResultDeliveryRecorder} 가 정한다. */
-    @Column(name = "items_json", columnDefinition = "TEXT")
+    @Column(name = "items_json", nullable = false, columnDefinition = "TEXT")
     private String itemsJson;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "last_attempt_status", length = 20)
+    @Column(name = "last_attempt_status", nullable = false, length = 20)
     private DeliveryAttemptStatus lastAttemptStatus;
 
     /** 마지막 시도의 부모 turn 실행 줄이다. 실행 줄이 생기기 전에 끝났으면 비어 있다. */
@@ -72,7 +72,7 @@ public class ResultDelivery extends CreatedAtEntity {
     @Column(name = "last_attempt_error_code", length = 64)
     private String lastAttemptErrorCode;
 
-    @Column(name = "last_attempt_started_at")
+    @Column(name = "last_attempt_started_at", nullable = false)
     private Instant lastAttemptStartedAt;
 
     /** 마지막 시도가 {@code RUNNING} 이면 비어 있다. */

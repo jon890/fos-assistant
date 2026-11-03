@@ -9,7 +9,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 절 | 표 |
 | --- | --- |
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `group_setting`, `agent_toolset_request`, `agent_token` |
-| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt` |
+| 「대화 표」 | `conversation`, `chat_message`, `chat_attachment`, `media_observation`, `chat_artifact`, `result_delivery` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding`, `memory_link` |
 | 「플러그인 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
@@ -80,7 +80,6 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | --- | --- | --- |
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
-| `chat_pending_message` | `content` | 아직. 코드가 읽고 쓰지 않는 옛 표지만 직전 이미지가 쓸 수 있어 DROP 전까지 권한에서 뺀다 |
 | `conversation` | `title`, `pending_messages` | 아직 |
 | `agent_execution` | `output_text` | 아직 |
 | `execution_event` | `detail` | 아직 |
@@ -404,7 +403,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
-- `pending_messages` 는 응답 중에 보내 아직 다음 turn 으로 보내지 않은 대기 줄의 JSON 이다. 모양과 멈춤, 동시성은 [ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「저장 자리 개정」 이 갖는다. 비면 대기 글이 없다. 빈 줄은 저장하지 않는다. 엔티티는 이 칸을 쓰지 않고 `PendingMessageStore` 가 대화 줄을 잠근 뒤 전용 질의로만 읽고 바꾼다. 모르는 버전이거나 깨진 JSON 은 빈 줄로 보지 않고 오류로 올린다. 빈 줄로 보면 멈춰 둔 글이 다음 저장에서 사라진다. 대화를 지우거나 정리할 때 비운다
+- `pending_messages` 는 응답 중에 보내 아직 다음 turn 으로 보내지 않은 대기 줄의 JSON 이다. 모양과 멈춤, 동시성은 [ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「저장 자리 개정」 이 갖는다. 비면 대기 글이 없다. 빈 줄은 저장하지 않는다. 엔티티는 이 칸을 쓰지 않고 `PendingMessageStore` 가 대화 줄을 잠근 뒤 전용 질의로만 읽고 바꾼다. 모르는 버전이거나 깨진 JSON 은 빈 줄로 보지 않고 오류로 올린다. 빈 줄로 보면 멈춰 둔 글이 다음 저장에서 사라진다. 대화를 지우거나 정리할 때 비운다. 옛 `chat_pending_message` 테이블은 지웠다. `V20261102074315` 가 그 행을 이 칸으로 옮기고 옮긴 행을 지웠으며, 배포를 확인한 뒤 `V20261102074329` 가 직전 이미지가 옛 테이블에만 쓴 행을 이미 있는 대기 줄 뒤에 이어 붙인 다음 `V20261102074333` 이 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 이어 붙일 때 번호가 겹치면 가장 큰 번호 다음 번호를 받고, 옛 행 하나라도 멈췄으면 줄이 멈춘다. 대화 줄이 없는 옛 행은 보낼 곳이 없어 버렸다
 - `task_id` 는 이 대화를 만든 예약 작업이다([ADR-078](../../docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md)). `agent_id` 와 같은 까닭으로 외래 키를 두지 않는다
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다. 지운 에이전트는 정리 작업이 행을 지우고 그 에이전트의 대화는 남는다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
@@ -422,13 +421,6 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 AAD 에 줄 번호와 대화, 대화 주인이 들어가 암호문을 다른 줄로 옮기거나 대화 주인을 바꾸면 풀리지 않는다. 본문은 `ChatMessage.content()` 로만 꺼낸다.
 **이전 판(`replaces_message_id` 가 가리키는 줄)을 지우지 않는다.** 화면이 넘겨 볼 수 있어야 하고, 그 판을 만든 실행이 그것을 가리킨다([ADR-022](../../docs/adr/ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md)).
 예전에 수정한 사용자 메시지도 고치기 전 메시지를 가리킨 채 남아 있다([ADR-024](../../docs/adr/ADR-024-메시지-수정을-없애고-중지한-뒤-다시-보낸다.md)).
-
-### chat_pending_message
-
-`chat_pending_message` 테이블은 코드가 더는 읽고 쓰지 않는다. 대기 메시지는 `conversation.pending_messages` 가 갖는다.
-`V20261102074315` 가 이 테이블의 행을 대화마다 그 칸 하나로 옮기고 옮긴 행을 지웠다. 대화 줄이 없는 행은 보낼 곳이 없어 남겼다. 대화 줄은 지우지 않으므로 그런 행은 데이터베이스를 직접 고친 경우에만 생기고, DROP PR 이 테이블과 함께 지운다. 직전 이미지로 되돌려도 뜨도록 테이블은 지우지 않았다.
-옮긴 행을 남기지 않은 까닭은 직전 이미지로 되돌렸을 때 새 코드가 이미 보낸 글을 다시 보내지 않게 하려는 것이다.
-직전 이미지가 이 테이블에 쓴 행은 이 변경의 배포를 확인한 뒤의 DROP PR 이 다시 옮기고 테이블을 지운다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)).
 
 ### chat_attachment
 
@@ -567,12 +559,8 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 `result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 플러그인 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
 **한 결과는 한 묶음에만 든다.** 묶음을 여는 트랜잭션에서 결과를 낸 쪽의 전달 표시(`result_delivered_at`)가 결과마다 아직 전하지 않은 줄 하나를 바꿔야 한다. 바꾼 줄 수가 다르면 알림 줄과 묶음까지 함께 되돌아간다.
 결과 본문은 여기 두지 않는다. 다시 전달할 때 실행 줄의 `output_text` 와 승인 줄의 `result_text` 를 다시 읽는다.
-새 컬럼은 직전 이미지로 되돌릴 수 있게 NULL 을 허용한다. 직전 이미지가 쓴 묶음은 새 컬럼이 비어 있어 화면에 상태가 보이지 않고 다시 전달하지 못한다. 옛 테이블을 지우는 PR 이 그 줄을 다시 옮기고 NOT NULL 로 바꾼다.
-
-### result_delivery_item, result_delivery_attempt
-
-두 테이블은 코드가 더는 읽고 쓰지 않는다. 항목은 `result_delivery.items_json` 이, 마지막 시도는 `result_delivery.last_attempt_*` 가 갖는다.
-`V20261102074312__ResultDeliveryItemsAttemptBackfill` 이 옮겼고 앞의 시도는 옮기지 않았다. 배포를 확인한 뒤 DROP PR 이 지운다.
+옛 `result_delivery_item`, `result_delivery_attempt` 테이블은 지웠다. `V20261102074312` 가 항목과 마지막 시도를 이 줄로 옮겼고(앞의 시도는 옮기지 않았다), 배포를 확인한 뒤 `V20261102074328` 이 직전 이미지가 옛 테이블에만 쓴 항목과 시도를 다시 옮겼다. `V20261102074330` 이 `items_json`, `last_attempt_status`, `last_attempt_started_at` 을 NOT NULL 로 바꾸고 `V20261102074331`, `V20261102074332` 가 두 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 비어 있는 줄이 남았다면 NOT NULL 단계가 실패해 옛 테이블을 지우지 않는다.
+다시 옮길 때 이미 칸이 찬 묶음은 덮어쓰지 않는다. 직전 이미지로 되돌린 동안 옛 코드가 그런 묶음의 옛 시도 테이블에 시도를 더했어도 새 칸을 지키고 옛 줄은 버린다. 되돌림이라는 예외 상황이라 값이 다르다고 배포를 멈추지 않는다. 실행 줄, 알림 줄, 오류 코드, 끝 시각은 시도가 도는 동안이나 실행 줄 없이 끝난 경우 비므로 NULL 을 허용한다.
 
 ## 실행 표
 
