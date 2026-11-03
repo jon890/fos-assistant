@@ -286,6 +286,19 @@ public class MemorySearchTest {
 
 
     @Test
+    @DisplayName("민감 항목은 본문을 점수에 넘기지 않아 본문에만 있는 낱말로는 찾히지 않는다")
+    void sensitiveBodyIsNotScored() {
+        Memory normal = save("일반 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        save("민감 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+
+        assertThat(search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 10).items())
+            .as("두 줄 모두 본문이 「합성 본문」 이다")
+            .extracting(MemorySearchItem::id)
+            .containsExactly(normal.id());
+    }
+
+
+    @Test
     @DisplayName("같은 점수의 항목은 커서로 끝까지 누락과 중복 없이 읽고 200번째에서 끝난다")
     void pagesEqualScoresUntilMaxRank() {
         for (int count : List.of(200, 250)) {

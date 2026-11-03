@@ -6,11 +6,15 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryContentCipher;
+import com.bifos.assistant.memory.application.MemoryCaptureService;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
+import com.bifos.assistant.memory.application.dto.MemoryRememberOutcome;
+import com.bifos.assistant.memory.application.dto.MemoryRememberRequest;
+import com.bifos.assistant.memory.application.dto.MemoryRememberResult;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
@@ -32,6 +36,7 @@ import com.bifos.assistant.testsupport.MysqlCase;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +61,8 @@ class MemoryEncryptionTest {
     private static final String TITLE = "제목-표식-2290";
     private static final String FIRST = "평문-표식-7391";
     private static final String SECOND = "평문-표식-8802";
+    private static final MemoryAccess CORE = MemoryAccess.of(Set.of("core"), Set.of());
+    private static final AtomicLong EXECUTIONS = new AtomicLong(980_000L);
 
     @Autowired
     MemoryService memories;
@@ -65,6 +72,9 @@ class MemoryEncryptionTest {
 
     @Autowired
     MemoryTextMigration migration;
+
+    @Autowired
+    MemoryCaptureService captures;
 
     @Autowired
     MemoryRepository repository;
@@ -163,6 +173,21 @@ class MemoryEncryptionTest {
 
 
     @Test
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("에이전트의 바로 저장과 제안도 제목과 본문을 데이터 key 의 암호문으로 남긴다")
+    void rememberPathsStoreCiphertext() {
+        MemoryRememberResult direct = captures.remember(ADMIN, CORE, remember(TITLE, FIRST, true));
+        MemoryRememberResult proposed = captures.remember(ADMIN, CORE, remember("제안 " + TITLE, SECOND, false));
+
+        assertThat(direct.outcome()).isEqualTo(MemoryRememberOutcome.REMEMBERED);
+        assertThat(proposed.outcome()).isEqualTo(MemoryRememberOutcome.PROPOSED);
+        assertSealed(memoryRow(direct.memoryId()), TITLE, FIRST);
+        assertSealed(memoryRow(proposed.memoryId()), TITLE, SECOND);
+        assertThat(reread(direct.memoryId()).content()).isEqualTo(FIRST);
+    }
+
+
+    @Test
     @DisplayName("고치면 지금 줄과 물러난 revision 이 모두 암호문이고 지우면 DELETED revision 도 암호문이며 revision 은 원래 글로 읽힌다")
     void reviseAndDeleteKeepCiphertextOnly() {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, TITLE, FIRST, false);
@@ -195,7 +220,11 @@ class MemoryEncryptionTest {
             "UPDATE memory SET title = ?, content = ? WHERE id = ?",
             swappedRow.get("CONTENT"), swappedRow.get("TITLE"), swapped.id());
         jdbc.update("UPDATE memory SET owner_user_id = 2 WHERE id = ?", moved.id());
+        Memory group = memories.create(
+            ADMIN, MemoryScope.GROUP, "그룹 제목", SECOND, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        jdbc.update("UPDATE memory SET group_id = 2 WHERE id = ?", group.id());
 
+        assertThat(repository.findById(group.id()).orElseThrow().readable()).as("다른 그룹으로 옮긴 그룹 기억").isFalse();
         for (Long id : List.of(target.id(), swapped.id(), moved.id())) {
             Memory read = reread(id);
             assertThat(read.readable()).isFalse();
@@ -230,17 +259,37 @@ class MemoryEncryptionTest {
 
     @Test
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
-    @DisplayName("KEK 가 있는데 주인 데이터 key 를 풀지 못하면 저장을 거절하고 줄을 남기지 않는다")
+    @DisplayName("KEK 가 있는데 주인 데이터 key 를 풀지 못하면 저장과 고치기를 거절하고 줄과 revision 이 그대로이며 그 사용자의 목록은 실패하지 않는다")
     void unusableDataKeyRejectsSave() {
         CurrentUser locked = new CurrentUser(4242L, "locked@example.com", "locked", 42L, UserRole.ADMIN);
         jdbc.update(
             "INSERT INTO user_data_key (user_id, kek_id, wrapped_key, created_at) VALUES (4242, 'missing-kek', 'v1.x.y', CURRENT_TIMESTAMP(6))");
+        Long lockedKeyId = jdbc.queryForObject("SELECT id FROM user_data_key WHERE user_id = 4242", Long.class);
+        Long plain = insertRow("USER", 4242L, null, "옮기기 전 제목", "옮기기 전 본문", null);
+        jdbc.update("UPDATE memory SET collection = 'core' WHERE id = ?", plain);
+        Long sealed = insertRow("USER", 4242L, null, "v1.AAAAAAAAAAAAAAAA.AAAA", "v1.AAAAAAAAAAAAAAAA.AAAA", null);
+        jdbc.update("UPDATE memory SET data_key_id = ? WHERE id = ?", lockedKeyId, sealed);
         long before = repository.count();
 
         assertCode(() -> memories.create(locked, MemoryScope.USER, TITLE, FIRST, false), ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE);
         assertCode(() -> memories.proposeUser(locked, TITLE, FIRST, 1L), ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE);
+        assertCode(() -> memories.update(locked, plain, SECOND, false, null), ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE);
+        assertThat(captures.remember(locked, CORE, remember(TITLE, FIRST, true)).outcome())
+            .isEqualTo(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
 
         assertThat(repository.count()).isEqualTo(before);
+        assertThat(memoryRow(plain))
+            .containsEntry("TITLE", "옮기기 전 제목")
+            .containsEntry("CONTENT", "옮기기 전 본문")
+            .containsEntry("DATA_KEY_ID", null);
+        assertThat(revisionRows(plain)).isEmpty();
+        assertThat(listOf(locked))
+            .filteredOn(view -> view.id().equals(sealed))
+            .singleElement()
+            .satisfies(view -> {
+                assertThat(view.unreadable()).isTrue();
+                assertThat(view.title()).isEqualTo(Memory.UNREADABLE_TITLE);
+            });
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM memory WHERE content LIKE ?", Long.class, "%" + FIRST + "%"))
             .isZero();
     }
@@ -312,6 +361,13 @@ class MemoryEncryptionTest {
             .containsEntry("CONTENT_KEY_ID", "missing-key")
             .containsEntry("DATA_KEY_ID", null);
         assertThat(output.getOut()).contains("memoryIds=[" + broken + "]").doesNotContain("깨진-표식-1188", FIRST);
+    }
+
+
+    private static MemoryRememberRequest remember(String title, String content, boolean direct) {
+        // 실행마다 남기는 수에 상한이 있어 호출마다 다른 실행 번호를 쓴다
+        return new MemoryRememberRequest(
+            title, content, null, MemorySensitivity.NORMAL, null, EXECUTIONS.incrementAndGet(), null, direct, false, false);
     }
 
 
