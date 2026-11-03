@@ -150,6 +150,10 @@ docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_m
 
 ```bash
 # cwd: 저장소 root
+# 테스트 모듈마다 프로세스를 나눠 동시에 돈다. CI 도 이 명령을 쓴다
+python3 scripts/checks/run-hermes-python-tests.py
+# 모듈 하나만, 또는 프로세스 하나로 차례로 돌릴 때
+python3 scripts/checks/run-hermes-python-tests.py test_fos_ctx.py
 python3 -m unittest discover -s hermes/tests
 ```
 
