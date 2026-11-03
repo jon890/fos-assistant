@@ -40,11 +40,11 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET` | Web | Google OAuth 클라이언트와 NextAuth 세션 암호화 key |
 | `CONTROL_PLANE_BASE_URL` | Web | Control Plane 주소 |
 | `APP_NAME` | Web | 사이드바 머리, 로그인 화면, 브라우저 제목에 보일 앱 이름. 웹 서버가 실행할 때 읽으므로 이미지를 다시 빌드하지 않고 바꾼다. 비우면 `fos-assistant` |
-| `ASSISTANT_DATA_ENCRYPTION_KEK_FILE` | Backend | 대화 본문을 감싸는 KEK 목록 파일. 한 줄에 `<id>:<base64 32바이트>`. 데이터베이스 백업과 다른 자리에 두고 소유자만 읽게 한다. 잃으면 암호화한 대화를 되찾지 못한다. 비우면 새 대화를 평문으로 저장한다 |
+| `ASSISTANT_DATA_ENCRYPTION_KEK_FILE` | Backend | 대화 본문과 기억의 제목·본문을 암호화하는 데이터 key 를 감싸는 KEK 목록 파일. 한 줄에 `<id>:<base64 32바이트>`. 데이터베이스 백업과 다른 자리에 두고 소유자만 읽게 한다. 잃으면 암호화한 대화와 기억을 되찾지 못한다. 비우면 새 대화와 기억을 평문으로 저장한다 |
 | `ASSISTANT_DATA_ENCRYPTION_ACTIVE_KEK_ID` | Backend | 새 데이터 key 를 감쌀 KEK 의 id. KEK 를 바꿀 때 파일에 새 key 를 더하고 이 값을 바꿔 기동한다 |
 | `ASSISTANT_DATA_ENCRYPTION_REQUIRED` | Backend | `true` 면 KEK 가 없을 때 기동하지 않는다. 기본 `false` |
-| `ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID` | Backend | 민감 Memory 본문을 새로 암호화할 때 쓰는 key 의 id. 비우면 민감 항목을 저장하거나 수정하지 못한다 |
-| `ASSISTANT_MEMORY_ENCRYPTION_KEYS` | Backend | `<id>:<base64 32바이트>` 를 쉼표로 이은 목록. 잃으면 민감 본문을 되찾지 못한다 |
+| `ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID` | Backend | ADR-055 의 옛 민감 Memory key 의 id. 새로 암호화하지 않고, 아직 데이터 key 로 옮기지 않은 옛 줄을 읽을 때만 쓴다. 기동 이관이 옛 줄을 모두 옮긴 것을 확인한 뒤 뺀다([ADR-20261103 / memory-encryption](../backend/docs/adr/ADR-20261103-memory-encryption.md)) |
+| `ASSISTANT_MEMORY_ENCRYPTION_KEYS` | Backend | 옛 민감 Memory key 의 `<id>:<base64 32바이트>` 를 쉼표로 이은 목록. 이관 전에 잃으면 옮기지 않은 민감 본문을 되찾지 못한다. 이관을 확인한 뒤 뺀다 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
 | `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
 | `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |

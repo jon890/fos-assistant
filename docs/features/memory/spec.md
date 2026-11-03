@@ -22,7 +22,7 @@
 범위 밖:
 
 - 임베딩 벡터의 암호화. 벡터는 평문으로 둔다
-- 기억 밖의 데이터(대화 제목, 예약 작업 등). 기존 데이터 암호화 계획(plan112)이 갖는다
+- 기억 밖의 데이터(대화 제목, 예약 작업 등). [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 과 `backend/docs/data-schema.md` 의 「본문 칸과 운영 조회」 가 갖는다
 - 기억 쓰임(usage) 스펙. 이 스펙이 머지된 뒤 그 스펙을 이어 쓴다
 - 「민감해 보이는 글은 제안 카드로」 저장 규칙(바로 저장 조건 6, 7). 저장 정책이라 이번에 바꾸지 않는다
 - Hermes 쪽 실행 기록(`state.db`)에 남는, 실행 때 실은 기억 글. Hermes 가 갖는 저장소라 이번 암호화 대상이 아니다
@@ -48,7 +48,7 @@
 - PR 은 둘 이상이다. 1) 그룹 key 와 기억 암호화, 이관(REQ1~REQ4, REQ6) 2) 민감 구분 제거(REQ5). 1 을 배포해 운영 건수를 확인한 뒤 2 를 연다
 - 사용자별 데이터 key 는 대화 메시지가 쓰는 [ADR-20261008 / data-encryption](../../../backend/docs/adr/ADR-20261008-data-encryption.md) 의 key 다. 민감 본문의 환경 변수 key([ADR-055](../../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md))는 이관 뒤 쓰지 않는다
 - 검색은 지금도 후보를 SQL 로 읽고 점수를 앱에서 매긴다. 제목과 본문을 앱에서 풀어 점수를 매긴다. 운영 기억이 수십 건이라 속도 영향은 작고, 측정 게이트로 확인한다
-- 근거: `docs/features/memory.md` 의 「민감 본문」, 「검색」, 「개인 사실 구역」, `backend/docs/data-schema.md` 의 `memory`, `user_data_key`
+- 근거: `docs/features/memory.md` 의 「범위와 조립」 가운데 「제목과 본문」 단락, 「기억 검색의 구현 계약」, 「개인 사실 구역」, `backend/docs/data-schema.md` 의 `memory`, `user_data_key`
 
 ## 결정
 

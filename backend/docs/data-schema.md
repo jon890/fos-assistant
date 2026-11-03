@@ -90,7 +90,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `task` | `title`, `instruction` | 아직 |
 | `proactive_check` | `report_json` | 아직 |
 | `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
-| `memory`, `memory_revision` | `title`, `content` | 민감 항목의 `content` 만 함([ADR-055](adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)) |
+| `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄은 평문이거나 `content_key_id` 의 옛 key 줄이다 |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
 MySQL 의 칸 단위 권한(`GRANT SELECT (칸, ...) ON 표`)으로 위 칸을 뺀 칸만 준다.
@@ -687,7 +687,7 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 - `embedding_model`, `embedding_fingerprint`, `embedding_vector` 는 그 항목의 의미 검색용 벡터다. 세 칸은 함께 채우고 함께 비우며, 비어 있으면 벡터가 없다. 엔티티는 이 칸을 매핑하지 않고 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)과 벡터 캐시가 `MemoryEmbeddingRepository` 의 native 쿼리로 읽고 쓴다. 벡터를 쓸 때 `updated_at` 과 `revision` 은 바꾸지 않는다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md))
   - `embedding_model` 은 임베딩 서비스에 보낸 모델 이름, `embedding_vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 차원은 길이를 4로 나눈 값이다. 운영의 BGE-M3 는 1024차원이라 한 항목이 4KiB 다. 한 번에 한 모델만 쓰므로 모델을 바꾸면 같은 칸을 새 모델의 값으로 덮어쓴다
   - `embedding_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 벡터는 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
-  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 민감도 `NORMAL` 이며 암호화하지 않은 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
+  - 대상은 `ACCEPTED`, `SEARCH`, 출처 원문이 아니고 민감도 `NORMAL` 이며 풀 수 있는 항목이다. 효력 있는 대체 연결이 가리키는 항목도 빠진다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 벡터는 채우는 작업이 다음 주기에 비운다
   - 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지워진다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 대상에서 빠진 항목의 벡터가 남으면 다음 주기의 정리가 비운다
 - `archivable` 은 정비 루프가 자동 보관해도 되는지의 표시이고 기본은 거짓이다. `memory_remember` 가 새 항목을 만들 때만 모델의 인자로 적는다. 항목의 종류를 나누는 칸이 아니다([ADR-20261015 / memory-maintenance](../../docs/adr/ADR-20261015-memory-maintenance.md))
 

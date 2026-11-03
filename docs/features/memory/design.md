@@ -56,7 +56,7 @@
 - 대상은 `data_key_id` 가 빈 `memory` 줄과 `memory_revision` 줄 전부다. 평문 줄과 옛 key 줄이 함께 든다.
 - 줄마다 트랜잭션 하나에서 쓰기 잠금으로 다시 읽고, 평문을 얻어(옛 key 줄은 `MemoryContentCipher.open`) 주인 데이터 key 로 다시 쓴다. `content_key_id` 는 비운다. revision 번호와 `updated_at`, `changed_at` 은 그대로 둔다.
 - **같은 트랜잭션에서 새 암호문을 다시 풀어 옮기기 전 평문의 SHA-256 과 비교한다.** 다르면 그 줄을 되돌리고 실패로 센다. 그래서 줄마다 해시 대조를 지난 줄만 커밋된다.
-- 끝나면 건수를 한 줄 로그로 남긴다: 옮긴 기억과 revision 의 수, 그 가운데 옛 key 줄의 수, 해시 대조를 지난 수, 실패한 줄의 번호. 본문과 해시 값은 로그에 넣지 않는다.
+- 끝나면 옮긴 수(해시 대조를 지난 줄만 센다)와 그 가운데 옛 key 줄 수(`legacyVerified`), 실패 수를 info 한 줄로, 실패한 줄 번호를 error 한 줄로 남긴다. 줄마다의 실패는 예외 클래스 이름만 남긴다. 본문과 해시 값은 로그에 넣지 않는다.
 - 옛 key 줄이 0건이 되면 옛 key 설정은 읽을 줄이 없다. 옛 key 를 빼는 일은 운영 확인 뒤 코디네이터가 한다(스펙 DECISION12).
 
 ### REQ4 화면과 에이전트의 동작은 같다
@@ -168,10 +168,10 @@
 
 | ID | 결정 | 까닭 |
 | --- | --- | --- |
-| DECISION1 | 데이터 key 번호는 새 컬럼 `data_key_id` 에 적고 옛 `content_key_id` 는 PR2 까지 읽기만 한다 | 옛 컬럼은 글 key id 이고 새 key 는 숫자 번호다. 한 컬럼에 섞으면 이관 전후를 질의로 셀 수 없다 |
-| DECISION2 | AAD 에 기억 번호와 컬럼을 묶고 revision 번호는 묶지 않는다 | revision 이 지금 줄의 암호문을 그대로 옮길 수 있다. 한 기억의 revision 끼리 암호문을 바꿔 넣는 것은 막지 못하나, 모두 같은 주인이 보던 글이다 |
-| DECISION3 | 그룹 key 는 `user_data_key` 에 `group_id` 줄로 둔다. 테이블 이름은 바꾸지 않는다 | 스펙 DECISION5. 이름을 바꾸면 이관과 정리 경로가 함께 바뀐다 |
+| DECISION1 | 데이터 key 번호는 새 컬럼 `data_key_id` 에 적고 옛 `content_key_id` 는 PR2 까지 읽기만 한다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 `content_key_id` 재사용 |
+| DECISION2 | AAD 에 기억 번호와 컬럼을 묶고 revision 번호는 묶지 않는다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 AAD 두 항목 |
+| DECISION3 | 그룹 key 는 `user_data_key` 에 `group_id` 줄로 둔다. 테이블 이름은 바꾸지 않는다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 그룹 key 새 테이블 |
 | DECISION4 | 제목도 본문과 같은 key 로 따로 암호화한다. 풀 때는 둘을 함께 푼다 | 스펙 DECISION4. 컬럼마다 AAD 가 달라 제목과 본문을 바꿔 넣으면 풀리지 않는다. 함께 풀어 한 줄의 읽기 결과가 하나다 |
-| DECISION5 | 이관은 SQL 마이그레이션이 아니라 기동 작업이다 | key 가 DB 밖에 있다. 줄마다 실패를 나눌 수 있다 |
+| DECISION5 | 이관은 SQL 마이그레이션이 아니라 기동 작업이다 | [ADR-20261103 / memory-encryption](../../../backend/docs/adr/ADR-20261103-memory-encryption.md) 「대안 기각」 의 SQL 이관 |
 | DECISION6 | 제안 중복 키(`proposal_dedup_key`)와 임베딩 지문은 PR1 에서 그대로 둔다 | 스펙 DECISION17. 원문 전체를 맞혀야 확인되는 해시다. PR2 가 둘을 주인 key 로 만든 HMAC 으로 바꾼다 |
 | DECISION7 | 「읽지 못함」 은 서버가 제목 자리에 내는 고정 글이고 목록 DTO 의 `unreadable` 로 화면이 고치기를 막는다 | 제목을 보이는 화면(목록, 제안 카드, 「기억했어요」, 「참고한 기억」)이 따로 고치지 않아도 같은 글을 보인다 |
