@@ -82,7 +82,6 @@ public class ContextAssembler implements OmittedMemories {
             사용자가 이번 메시지에서 자기에 관한 오래 쓰일 사실을 말하면 memory_remember 로 남긴다. 기억해 달라고 하지 않아도 남긴다.
             남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다. 작업 기록, 한 번만 쓰일 요청, 대화 요약은 남기지 않는다.
             사용자의 말에 있는 부정(못, 안, 않, 없, 아니)은 content 에 그대로 살린다. 사용자가 기억한 사실을 직접 고쳐 말하면 그 번호를 memory_id 로 주어 고친다.
-            고쳐 달라는 말은 없지만 새 사실이 기억한 옛 사실을 대신한다고 보이면 새 사실을 남긴 뒤 memory_link 로 SUPERSEDES 를 건다. from_id 는 새 번호, to_id 는 옛 번호다.
             도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
             """.stripTrailing();
 
@@ -197,19 +196,8 @@ public class ContextAssembler implements OmittedMemories {
         Set<Long> conflicting = sameNameDocuments(afterFacts).keySet();
         MemorySearchPlacement search = searchSection.place(
             question, afterFacts, conflicting, builder, memory -> memoryFreshness(memory, now));
-        // 실린 항목과 RELATED 로 이어진 한 단계 이웃을 남은 자리에 싣고 색인에서 뺀다(ADR-20261015 / memory-link)
-        Set<Long> anchors = new HashSet<>(facts);
-        anchors.addAll(search.placed());
-        MemorySearchPlacement index = MemoryLinkSection.place(
-            anchors,
-            memories.activeRelatedOf(anchors),
-            search,
-            conflicting,
-            builder,
-            searchSection.limits(),
-            memory -> memoryFreshness(memory, now)).index();
         builder.limit(maxChars);
-        appendIndex(builder, index, sameNameDocuments(index.indexOrder()), now);
+        appendIndex(builder, search, sameNameDocuments(search.indexOrder()), now);
         return withSelections(builder.build());
     }
 

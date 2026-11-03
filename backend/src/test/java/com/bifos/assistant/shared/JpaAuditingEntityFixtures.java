@@ -26,8 +26,6 @@ import com.bifos.assistant.mcp.domain.AgentToken;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCapture;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -110,7 +108,6 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, new ContentDraftSnapshot(UUID.randomUUID(), 1L, user.id(), conversation.id(), execution.id(), agent.id(),
             connection.id(), binding.id(), BUSINESS, BUSINESS, "f".repeat(64), 1, "audit", "f".repeat(64), "f".repeat(64), "f".repeat(64), BUSINESS.plusSeconds(60)));
         add(entityManager, rows, MemoryCapture.of(memory.id(), user.id(), conversation.id(), execution.id(), MemoryCaptureKind.CREATED, 1, null, false));
-        add(entityManager, rows, MemoryLink.related(memory.id(), memory.id() + 1, "audit", MemoryLinkOrigin.HUMAN, null, null));
         Task task = Task.check(user.id(), agent.id(), "예약");
         task.reschedule(TriggerType.ONCE, null, BUSINESS.plusSeconds(60), ZoneOffset.UTC, BUSINESS.plusSeconds(60));
         task.changeMissedPolicy(MissedPolicy.SKIP);

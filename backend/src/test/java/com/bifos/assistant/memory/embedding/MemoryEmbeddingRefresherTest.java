@@ -1,29 +1,22 @@
 package com.bifos.assistant.memory.embedding;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.bifos.assistant.memory.MemoryEmbeddingRows;
-import com.bifos.assistant.memory.application.MemoryLinkService;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.application.port.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
-import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryTexts;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -55,9 +48,6 @@ class MemoryEmbeddingRefresherTest {
     MemoryTexts texts;
 
     @Autowired
-    MemoryLinkDiscovery linkDiscovery;
-
-    @Autowired
     MemoryService memories;
 
     @Autowired
@@ -76,12 +66,6 @@ class MemoryEmbeddingRefresherTest {
     TestClock clock;
 
     @Autowired
-    MemoryLinkService linkService;
-
-    @Autowired
-    MemoryLinkRepository links;
-
-    @Autowired
     TrackingBackgroundTasks backgroundTasks;
 
     private final FakeClient client = new FakeClient();
@@ -90,7 +74,6 @@ class MemoryEmbeddingRefresherTest {
     @BeforeEach
     void setUp() {
         MemoryEmbeddingRows.clearAll(jdbc);
-        links.deleteAll();
         repository.deleteAll();
     }
 
@@ -143,23 +126,6 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("새로 벡터를 쓴 항목만 연결 탐지에 넘기고 바뀐 것이 없거나 임베딩이 꺼져 있으면 아무것도 넘기지 않는다")
-    void passesOnlyWrittenItemsToLinkDiscovery() {
-        MemoryLinkDiscovery discovery = mock(MemoryLinkDiscovery.class);
-        Memory first = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
-        Memory second = memories.create(USER, MemoryScope.USER, "보일러", "10월에 점검한다", false);
-
-        refresher(ENABLED, discovery).refreshOnce();
-        refresher(ENABLED, discovery).refreshOnce();
-        refresher(MemoryEmbeddingProperties.disabled(), discovery).refreshOnce();
-
-        verify(discovery).discover(List.of(first.id(), second.id()));
-        verify(discovery).discover(List.of());
-        verifyNoMoreInteractions(discovery);
-    }
-
-
-    @Test
     @DisplayName("본문을 고치면 다음 주기에 지문이 바뀌고 보관으로 바꾸거나 지우면 줄이 지워진다")
     void refreshesChangedAndRemovesExcludedRows() {
         Memory edited = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
@@ -180,24 +146,22 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("대체된 항목은 줄이 생기지 않고 이미 있던 줄은 다음 주기에 지워지며 대체를 끊으면 다시 생긴다")
+    @DisplayName("대체된 항목은 줄이 생기지 않고 이미 있던 줄은 다음 주기에 지워지며 대체한 칸을 비우면 다시 생긴다")
     void skipsAndRemovesSupersededItems() {
         Memory old = memories.create(USER, MemoryScope.USER, "옛 주소", "서울에 산다", false);
         Memory fresh = memories.create(USER, MemoryScope.USER, "새 주소", "부산에 산다", false);
         Memory other = memories.create(USER, MemoryScope.USER, "다른 옛 것", "대체될 메모", false);
-        MemoryLink before = linkService.proposeSupersede(USER, fresh.id(), other.id(), MemoryLinkOrigin.AGENT, null);
-        linkService.accept(USER, before.id());
+        MemorySupersedeRows.supersede(jdbc, other.id(), fresh.id());
         refresher(ENABLED).refreshOnce();
         assertThat(MemoryEmbeddingRows.memoryIds(jdbc))
             .containsExactlyInAnyOrder(old.id(), fresh.id());
 
-        MemoryLink link = linkService.proposeSupersede(USER, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
-        linkService.accept(USER, link.id());
+        MemorySupersedeRows.supersede(jdbc, old.id(), fresh.id());
         refresher(ENABLED).refreshOnce();
 
         assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(fresh.id());
 
-        linkService.revoke(USER, link.id());
+        jdbc.update("UPDATE memory SET superseded_by_memory_id = NULL WHERE id = ?", old.id());
         refresher(ENABLED).refreshOnce();
 
         assertThat(MemoryEmbeddingRows.memoryIds(jdbc))
@@ -315,14 +279,8 @@ class MemoryEmbeddingRefresherTest {
 
 
     private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties) {
-        return refresher(properties, linkDiscovery);
-    }
-
-
-    private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties, MemoryLinkDiscovery discovery) {
         return new MemoryEmbeddingRefresher(
-            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties, texts), backgroundTasks, discovery,
-            texts);
+            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties, texts), backgroundTasks, texts);
     }
 
 

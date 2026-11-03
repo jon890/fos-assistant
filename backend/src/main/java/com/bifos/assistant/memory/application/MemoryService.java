@@ -10,16 +10,12 @@ import com.bifos.assistant.memory.application.dto.MemorySearchCursor;
 import com.bifos.assistant.memory.application.dto.MemorySearchPage;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
-import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
-import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryQueries;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -28,7 +24,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -59,8 +54,6 @@ public class MemoryService {
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
-    private final MemoryLinkRepository links;
-    private final MemoryLinkService linkService;
     private final AgentMemoryCollectionService agentCollections;
     private final MemoryCollectionService collections;
     private final MemoryTexts texts;
@@ -200,21 +193,15 @@ public class MemoryService {
 
 
     /**
-     * 한 항목이 그 접근 범위의 {@code memory_read} 로 읽히는 항목인가. {@link #bodyFor} 가 같은 판정을 쓴다. 대체된 항목은 읽히지 않는다(ADR-20261015
-     * / memory-link).
+     * 한 항목이 그 접근 범위의 {@code memory_read} 로 읽히는 항목인가. {@link #bodyFor} 가 같은 판정을 쓴다. 대체된 항목은 읽히지 않는다(ADR-20261102
+     * / table-reduce-r2).
      */
     public boolean readableByTool(Memory memory, MemoryAccess access) {
         return memory.status() == MemoryStatus.ACCEPTED
             && memory.retrieval() == MemoryRetrieval.SEARCH
             && memory.entryType() != MemoryEntryType.SOURCE
             && access.allows(memory.collection())
-            && !links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
-    }
-
-
-    /** 그 번호들 가운데 하나를 한쪽 끝으로 둔 효력 있는 {@code RELATED} 다. 조립이 실린 항목의 이웃을 찾는다. */
-    public List<MemoryLink> activeRelatedOf(Collection<Long> memoryIds) {
-        return memoryIds.isEmpty() ? List.of() : links.findActiveRelatedTouching(memoryIds);
+            && memory.supersededByMemoryId() == null;
     }
 
 
@@ -289,8 +276,8 @@ public class MemoryService {
         Instant now = clock.instant();
         memory.reject(now);
         Memory rejected = memories.save(memory);
-        // 받아들인 항목을 거절했으면 그 항목의 연결도 끊는다. 실리지 않는 새 항목이 옛 항목을 가리지 않게 한다
-        linkService.revokeAllOf(id);
+        // 받아들인 항목을 거절했으면 그 항목이 대신한 옛 항목을 다시 싣는다. 실리지 않는 새 항목이 옛 항목을 가리지 않게 한다
+        memories.clearSupersededBy(id);
         if (proposal) {
             feedback.record(
                 MemoryProposalFeedback.of(user, rejected, FeedbackEventType.REJECTED, FeedbackActor.USER, now));

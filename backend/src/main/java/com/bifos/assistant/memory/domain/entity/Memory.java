@@ -140,6 +140,13 @@ public class Memory extends CreatedAtEntity {
     private Instant updatedAt;
 
     /**
+     * 이 항목을 대신한 새 항목의 번호다(ADR-20261102 / table-reduce-r2). 비어 있지 않으면 어디에도 실리지 않는다. 엔티티는 이 칸을 읽기만 하고
+     * 쓰지 않는다. 칸을 비우는 일은 저장소의 전용 쿼리가 한다.
+     */
+    @Column(name = "superseded_by_memory_id", insertable = false, updatable = false)
+    private Long supersededByMemoryId;
+
+    /**
      * 정비 루프가 이 항목을 자동 보관해도 되는가(ADR-20261015 / memory-maintenance). 기본은 거짓이다. 거짓이면 변하지 않는 사실이거나 모르는
      * 것으로 보고 자동 보관하지 않는다. 항목의 종류를 나누는 칸이 아니다.
      */

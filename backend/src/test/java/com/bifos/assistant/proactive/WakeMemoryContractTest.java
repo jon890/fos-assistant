@@ -9,11 +9,9 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
+import com.bifos.assistant.memory.MemorySupersedeRows;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -42,9 +40,6 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
     MemoryService memories;
 
     @Autowired
-    MemoryLinkRepository links;
-
-    @Autowired
     AgentMemoryCollectionRepository grants;
 
     private final List<Long> createdAgents = new ArrayList<>();
@@ -54,11 +49,6 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
     @AfterEach
     void removeMemory() {
         for (Long userId : createdUsers) {
-            jdbc.update(
-                "DELETE FROM memory_link WHERE from_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)"
-                    + " OR to_memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
-                userId,
-                userId);
             jdbc.update("DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)", userId);
             jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", userId);
         }
@@ -69,27 +59,21 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
 
 
     @Test
-    @DisplayName("깨우기 입력은 에이전트가 받는 기억 가운데 최근에 바뀐 항목과 그 한 단계 이웃의 제목만 싣고, 받지 않는 collection 과 남의 기억과 대체된 기억은 연결이 있어도 싣지 않는다")
-    void wakeInputCarriesOnlyGrantedRecentMemoryAndItsLinks() throws InterruptedException {
+    @DisplayName("깨우기 입력은 에이전트가 받는 기억 가운데 최근에 바뀐 항목의 제목만 싣고, 받지 않는 collection 과 남의 기억과 대체된 기억은 싣지 않는다")
+    void wakeInputCarriesOnlyGrantedRecentMemory() throws InterruptedException {
         CurrentUser user = user();
         CurrentUser stranger = user();
         Agent agent = agent(user);
 
         clock.set(BASE.minus(Duration.ofDays(30)));
-        Memory goal = create(user, "목표표식 이번 분기 이직 준비", GRANTED);
+        create(user, "오래표식 이번 분기 이직 준비", GRANTED);
         Memory replaced = create(user, "대체표식 옛 희망 연봉", GRANTED);
         clock.set(BASE.minus(Duration.ofDays(1)));
         Memory recent = create(user, "최근표식 예시 회사 1차 면접 통과", GRANTED);
         Memory hidden = create(user, "숨김표식 병원 예약", NOT_GRANTED);
         Memory replacement = create(user, "새값표식 새 희망 연봉", GRANTED);
         Memory others = create(stranger, "남의표식 다른 사람 메모", GRANTED);
-        links.save(MemoryLink.related(recent.id(), goal.id(), "이 목표의 일부", MemoryLinkOrigin.HUMAN, null, null));
-        links.save(MemoryLink.related(recent.id(), hidden.id(), null, MemoryLinkOrigin.HUMAN, null, null));
-        links.save(MemoryLink.related(recent.id(), others.id(), null, MemoryLinkOrigin.HUMAN, null, null));
-        links.save(MemoryLink.related(recent.id(), replaced.id(), null, MemoryLinkOrigin.HUMAN, null, null));
-        MemoryLink supersede = MemoryLink.proposeSupersede(replacement.id(), replaced.id(), MemoryLinkOrigin.HUMAN, null);
-        supersede.accept();
-        links.save(supersede);
+        MemorySupersedeRows.supersede(jdbc, replaced.id(), replacement.id());
         clock.set(BASE);
 
         wake(user, agent, nothingNewOutput());
@@ -99,8 +83,8 @@ class WakeMemoryContractTest extends ProactiveTestSupport {
             .contains("기억에서 꺼낸 최근 일")
             .contains("[" + recent.id() + "] 최근표식")
             .contains("[" + replacement.id() + "] 새값표식")
-            .as("오래된 목표는 바뀐 항목이 아니지만 이어진 항목으로 label 과 함께 실린다")
-            .contains("[" + goal.id() + "] 목표표식 이번 분기 이직 준비 · [" + recent.id() + "] 에 이어짐 · 이 목표의 일부")
+            .as("오래된 항목은 바뀐 항목이 아니므로 싣지 않는다")
+            .doesNotContain("오래표식")
             .doesNotContain("숨김표식")
             .doesNotContain("남의표식")
             .doesNotContain("대체표식");
