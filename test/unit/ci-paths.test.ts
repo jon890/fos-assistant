@@ -66,6 +66,7 @@ test("job 이 부르는 스크립트는 그 job 을 돌린다", () => {
   assert.deepEqual(jobsFor("scripts/ci/check-connector-package.sh"), ["hermes"]);
   assert.deepEqual(jobsFor("scripts/checks/quality.sh"), ["quality"]);
   assert.deepEqual(jobsFor("scripts/ci/browser-ci.mjs"), ["browser"]);
+  assert.deepEqual(jobsFor("scripts/ci/e2e-ci.mjs"), ["e2e"]);
   assert.deepEqual(jobsFor("scripts/checks/new-check.sh"), JOBS);
 });
 
@@ -456,9 +457,9 @@ test("통합 뒤에도 필수 검사 이름 9개를 한 번씩 유지하고, 전
   for (const name of ["backend", "web", "e2e", "unit", "hermes", "quality", "public-safe", "browser-mobile", "browser-desktop"]) {
     assert.equal(names.filter((candidate) => candidate === name).length, 1, name);
   }
-  // browser-failures는 성공한 PR 에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
+  // browser-failures 와 e2e-failures 는 성공한 PR 에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
   // hermes-tests 를 hermes-connectors 와 hermes-python 으로 나누어 전에는 19개였다.
-  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 20);
+  assert.equal(jobs.size - 2 + (2 - 1) + (6 - 1) + (2 - 1), 20);
 });
 
 test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다", () => {
@@ -481,4 +482,25 @@ test("main push 는 가벼운 검사만 돌고 전체 검사는 정기 실행과
   assert.doesNotMatch(failures, /github\.event_name == 'push'/);
   assert.match(failures, /github\.event_name == 'schedule'/);
   assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
+});
+
+test("정기와 수동 실행의 main E2E 실패만 이슈로 모으고, 실패한 시나리오 이름을 올린다", () => {
+  const jobs = workflowJobs();
+  const failures = jobs.get("e2e-failures") ?? assert.fail("e2e-failures job 이 없다");
+  // push 에서는 e2e 를 돌리지 않고, 취소된 실행은 테스트 실패가 아니다.
+  assert.doesNotMatch(failures, /github\.event_name == 'push'/);
+  assert.doesNotMatch(failures, /github\.event_name == 'pull_request'/);
+  assert.match(failures, /github\.event_name == 'schedule'/);
+  assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(failures, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(failures, /needs: e2e-tests\n/);
+  assert.match(failures, /needs\.e2e-tests\.result == 'failure'/);
+  assert.match(failures, /issues: write/);
+  assert.match(failures, /run: node scripts\/ci\/e2e-ci\.mjs issues "\$RUNNER_TEMP\/e2e-failure"/);
+  assert.match(failures, /pattern: e2e-failure-attempt-\$\{\{ github\.run_attempt \}\}/);
+  // e2e-tests 는 종료 코드를 잃지 않고 출력을 남기며, 실패한 줄 하나만 올린다.
+  const tests = jobs.get("e2e-tests") ?? assert.fail("e2e-tests job 이 없다");
+  assert.match(tests, /set -o pipefail\n\s+node test\/e2e\/run\.ts 2>&1 \| tee "\$RUNNER_TEMP\/e2e\.log"/);
+  assert.match(tests, /grep -m1 '\^실패: ' "\$RUNNER_TEMP\/e2e\.log"/);
+  assert.match(tests, /name: e2e-failure-attempt-\$\{\{ github\.run_attempt \}\}/);
 });
