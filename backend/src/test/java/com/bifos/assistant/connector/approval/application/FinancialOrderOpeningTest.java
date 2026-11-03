@@ -571,6 +571,18 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("같은 주문의 승인 대기가 대화 없는 실행의 것이면 찾을 카드가 없어 일반 거절 답을 받는다")
+    void pendingWithoutConversationGetsGeneralAnswer() {
+        var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        jdbc.update("update connector_action set conversation_id = null where id = ?", action(first).id());
+        var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(again.actionId()).isNull();
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE);
+        assertThat(rows()).isEqualTo(1);
+    }
+
+
+    @Test
     @DisplayName("승인 기한이 지난 PENDING 은 만료 작업이 돌기 전에도 같은 주문의 새 카드를 막지 않는다")
     void expiredPendingDoesNotBlockNewCard() {
         var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));

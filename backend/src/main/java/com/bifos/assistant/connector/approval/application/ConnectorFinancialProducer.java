@@ -69,7 +69,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 정책 판정이 준비 도구 호출을 넘기는 금융 준비·저장 규칙이다. 실행 도구를 직접 부른 호출의 금융 차단은 그대로 둔다.
  *
- * <p>거절은 사용자와 모델에게 어느 검사에 걸렸는지 밝히지 않는다. 운영 로그에는 고정 단계 코드({@link FinancialPrepareStage})만 남긴다.
+ * <p>상한 거절과 같은 의도 차단을 빼면 거절은 사용자와 모델에게 어느 검사에 걸렸는지 밝히지 않는다. 운영 로그에는 고정 단계 코드({@link FinancialPrepareStage})만 남긴다.
  */
 @Component
 @RequiredArgsConstructor
@@ -163,7 +163,8 @@ class ConnectorFinancialProducer {
                 return duplicate.get();
             }
             var origin = owners.resolve(profileName, rootSessionId, sessionId);
-            var blocking = at(FinancialPrepareStage.CONFLICT, () -> conflicts.blocking(
+            // 조회 실패는 막는 줄이 있다는 뜻이 아니다. 같은 의도 차단의 답과 섞이지 않게 단계를 나눈다.
+            var blocking = at(FinancialPrepareStage.CONFLICT_CHECK, () -> conflicts.blocking(
                 snapshot.storedRequestKey(digest, before.user(), before.connector(), toolName), null));
             if (blocking.isPresent()) {
                 throw new FinancialPrepareRejected(conflictStage(blocking.get(), origin.conversationId()));
@@ -206,6 +207,9 @@ class ConnectorFinancialProducer {
     static FinancialPrepareStage conflictStage(ConnectorAction blocking, Long conversationId) {
         if (blocking.status() != ActionStatus.PENDING) {
             return FinancialPrepareStage.CONFLICT;
+        }
+        if (blocking.conversationId() == null) {
+            return FinancialPrepareStage.CONFLICT_PENDING_UNSEEN;
         }
         return conversationId != null && conversationId.equals(blocking.conversationId())
             ? FinancialPrepareStage.CONFLICT_PENDING : FinancialPrepareStage.CONFLICT_PENDING_ELSEWHERE;
