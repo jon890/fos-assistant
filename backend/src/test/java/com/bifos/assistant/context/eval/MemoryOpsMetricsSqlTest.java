@@ -322,7 +322,6 @@ class MemoryOpsMetricsSqlTest {
         row.put("status", status);
         row.put("retrieval", retrieval);
         row.put("entry_type", "MEMORY");
-        row.put("sensitivity", "NORMAL");
         row.put("collection", "core");
         row.put("created_at", at(createdAt));
         row.put("updated_at", at(createdAt));
@@ -340,7 +339,6 @@ class MemoryOpsMetricsSqlTest {
         row.put("entry_type", "MEMORY");
         row.put("status", "ACCEPTED");
         row.put("retrieval", "SEARCH");
-        row.put("sensitivity", "NORMAL");
         row.put("changed_at", at(changedAt));
         insert("memory_revision", row, memory);
     }

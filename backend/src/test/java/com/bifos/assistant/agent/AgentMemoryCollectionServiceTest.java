@@ -170,10 +170,10 @@ class AgentMemoryCollectionServiceTest {
     void hidesFormerSensitiveChanges() {
         Agent agent = agents.save(agent());
         service.replace(agent.id(), Set.of("career"), LISTED, ADMIN_ID);
-        // 직전 이미지가 남긴 기록이다. 코드는 allow_sensitive 칸을 읽고 쓰지 않는다
+        // 직전 이미지가 남긴 기록이다. 없어진 민감 허용을 바꾼 줄이라 값은 남지 않고 종류만 읽힌다
         jdbc.update(
-            "INSERT INTO agent_memory_collection_change (agent_id, collection, change_type, allow_sensitive, changed_by_user_id, changed_at)"
-                + " VALUES (?, 'career', 'SENSITIVE_CHANGED', TRUE, ?, CURRENT_TIMESTAMP(6))",
+            "INSERT INTO agent_memory_collection_change (agent_id, collection, change_type, changed_by_user_id, changed_at)"
+                + " VALUES (?, 'career', 'SENSITIVE_CHANGED', ?, CURRENT_TIMESTAMP(6))",
             agent.id(), ADMIN_ID);
 
         assertThat(service.recentChangesOf(agent.id()))
