@@ -1,16 +1,11 @@
 {
   "name": "plan313-test-slimming-parallel",
   "description": "backend 테스트 JVM 을 나누고 hermes-tests job 을 둘로 나눠 병렬로 돌린다",
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-11-01",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
-    {
-      "number": 1,
-      "file": "phase-01.md",
-      "execution_profile": "standard"
-    },
     {
       "number": 2,
       "file": "phase-02.md",
@@ -20,6 +15,19 @@
       "number": 3,
       "file": "phase-03.md",
       "execution_profile": "standard"
+    }
+  ],
+  "pr_scope": "backend 테스트 JVM 을 나누는 일(phase 01)과 hermes-tests job 을 둘로 나누는 일(phase 02), 그 안의 검사를 병렬화하는 일(phase 03)을 phase 별 PR 로 차례로 끝낸다.",
+  "deferred": [
+    {
+      "what": "hermes-tests job 을 hermes-connectors 와 hermes-python 두 job 으로 나누는 일(phase 02)",
+      "why": "runner 를 하나 더 쓰므로 동시 job 한도와 맞는지 사용자가 정해야 하고, backend 와 다른 job 이라 확인 방법이 다르다",
+      "after": "phase 01 이 머지된 뒤"
+    },
+    {
+      "what": "hermes 검사 내부의 병렬화(phase 03)",
+      "why": "job 을 나눈 뒤의 시간을 재야 어느 검사를 병렬화할지 정해진다",
+      "after": "phase 02 가 머지된 뒤"
     }
   ]
 }
