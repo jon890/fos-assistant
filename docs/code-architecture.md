@@ -88,7 +88,7 @@ profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
 | 어디 | 무엇 | 언제 지워지는가 |
 | --- | --- | --- |
-| 보관 파일 | 연결마다 하나인 원본. 대시보드 plugin 이 둔다 | 연결을 해제할 때 |
+| 보관 파일 | 연결마다 하나인 원본. 대시보드 plugin 이 Control Plane KEK 와 다른 key 로 암호화해 둔다([ADR-20261103 / connector-vault-key](../hermes/docs/adr/ADR-20261103-connector-vault-key.md)) | 연결을 해제할 때 |
 | 붙인 에이전트 profile 의 `.env` | 붙일 때 보관 파일에서 복사한 값. 서버 정의의 `env` 는 `${이름}` 참조만 갖고 그 profile 의 secret scope 에서 풀린다 | 그 에이전트에서 뗄 때. 연결 해제는 붙은 바인딩을 모두 떼므로 함께 지워진다 |
 
 값을 바꾸면 보관 파일을 다시 쓰고 붙은 profile 마다 복사본을 다시 쓴다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있어 그 바인딩들이 재시작 대기가 된다.
