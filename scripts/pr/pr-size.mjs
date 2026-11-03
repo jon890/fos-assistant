@@ -94,10 +94,6 @@ function changesBetween(base, head, cwd) {
   return parseChanges(numstat, deletedFiles(base, head, cwd));
 }
 
-export function deletedLines(base, head, cwd) {
-  return sumDeleted(changesBetween(base, head, cwd));
-}
-
 export function compare(base, head, cwd) {
   return sumChanges(changesBetween(base, head, cwd));
 }
