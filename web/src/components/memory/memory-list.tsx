@@ -37,6 +37,8 @@ export type Memory = MemorySourceFields & {
   archivable?: boolean;
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
   sensitive?: boolean;
+  /** 서버가 이 줄을 풀지 못했다. 제목은 「읽지 못함」, 본문은 빈 글이다 */
+  unreadable?: boolean;
   omittedFromContext?: boolean;
   /** 이 기억을 대신한 기억이다. 대체된 기억은 다음 대화부터 쓰이지 않는다. 제목은 볼 수 없으면 null 이다. */
   supersededBy?: {
