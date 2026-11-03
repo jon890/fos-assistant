@@ -90,6 +90,18 @@ test("Markdown 파일은 정해진 이름과 예외 자리에만 있다", () => 
   assert.deepEqual(problems, []);
 });
 
+test("docs/features 아래 추적 파일은 확장자와 상관없이 정해진 자리에 있다", () => {
+  // markdownFiles() 는 .md 만 보므로 tasks/<계획>/index.json 같은 다른 확장자는 여기서 확인한다.
+  const files = execFileSync("git", ["ls-files", "-z", "-co", "--exclude-standard", "docs/features"], { cwd: REPO_ROOT, encoding: "utf8" })
+    .split("\0")
+    .filter((file) => file !== "" && !file.endsWith(".md") && existsSync(join(REPO_ROOT, file)));
+  const problems = files.flatMap((file) => {
+    const problem = problemOf(file);
+    return problem ? [`${file}: ${problem}`] : [];
+  });
+  assert.deepEqual(problems, []);
+});
+
 test("예외 목록의 파일이 있다", () => {
   const missing = Object.keys(EXCEPTIONS).filter((file) => !existsSync(join(REPO_ROOT, file)));
   assert.deepEqual(missing, []);
