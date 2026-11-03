@@ -9,13 +9,7 @@ import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
-import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
@@ -128,8 +122,6 @@ class JpaAuditingTest {
             } else if (row instanceof Task task) {
                 task.changeCheckEnabled(false);
                 task.moveNext(LATER.plusSeconds(10));
-            } else if (row instanceof MemoryEmbedding embedding) {
-                embedding.replace("different", new byte[32], new float[] {3, 4});
             } else if (row instanceof MemoryLink link) {
                 // 업무 시각은 DB 정밀도로 넣는다. 나노초가 남으면 detach merge 가 바뀐 값으로 보고 변경 시각을 옮긴다
                 link.revoke(micros(LATER));
@@ -137,7 +129,7 @@ class JpaAuditingTest {
         }
         entityManager.flush();
         List<AuditedEntity> changed = fixture.rows().stream().filter(AuditedEntity.class::isInstance).map(AuditedEntity.class::cast).toList();
-        assertThat(changed).hasSize(6).allSatisfy(row -> {
+        assertThat(changed).hasSize(5).allSatisfy(row -> {
             assertThat(row.createdAt()).isEqualTo(micros(CREATED));
             assertThat(row.updatedAt()).isEqualTo(micros(LATER));
         });
@@ -244,32 +236,6 @@ class JpaAuditingTest {
             entityManager.persist(ExecutionContextSource.of(fixture.execution().id(), 0, "MEMORY", "memory:duplicate", "FULL", "FRESH"));
             entityManager.flush();
         }).isInstanceOf(PersistenceException.class);
-    }
-
-
-    @Test
-    @DisplayName("지정 memoryId의 새 벡터 merge는 반환값에 시각을 채우고 기존 벡터 교체는 생성 시각을 보존한다")
-    void preservesAssignedEmbeddingCreationOnMerge() {
-        clock.set(CREATED);
-        var fixture = JpaAuditingEntityFixtures.persistAll(entityManager);
-        Memory memory = Memory.accepted(MemoryScope.USER, fixture.user().id(), null, "벡터", StoredContent.plain("본문"),
-            MemoryPlacement.core(MemoryRetrieval.SEARCH), fixture.user().id(), JpaAuditingEntityFixtures.BUSINESS);
-        entityManager.persist(memory);
-        MemoryEmbedding original = MemoryEmbedding.of(memory.id(), "first", new byte[32], new float[] {1, 2});
-        MemoryEmbedding managed = entityManager.merge(original);
-        entityManager.flush();
-        assertThat(managed).isNotSameAs(original);
-        assertThat(original.createdAt()).isNull();
-        assertThat(managed.createdAt()).isEqualTo(micros(CREATED));
-        entityManager.detach(managed);
-        clock.set(LATER);
-        managed.replace("second", new byte[32], new float[] {3, 4});
-        MemoryEmbedding replaced = entityManager.merge(managed);
-        entityManager.flush();
-        entityManager.clear();
-        MemoryEmbedding loaded = entityManager.find(MemoryEmbedding.class, replaced.memoryId());
-        assertThat(loaded.createdAt()).isEqualTo(micros(CREATED));
-        assertThat(loaded.updatedAt()).isEqualTo(micros(LATER));
     }
 
 

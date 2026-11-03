@@ -7,10 +7,10 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
+import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.config.MemoryLinkProperties;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -47,6 +48,9 @@ class MemoryLinkDiscoveryConflictTest {
 
     @Autowired
     MemoryLinkRepository links;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     MemoryEmbeddingRepository embeddings;
@@ -74,7 +78,7 @@ class MemoryLinkDiscoveryConflictTest {
     void setUp() {
         vectorCache.clear();
         links.deleteAll();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         repository.deleteAll();
     }
 
@@ -82,7 +86,7 @@ class MemoryLinkDiscoveryConflictTest {
     @AfterEach
     void tearDown() {
         links.deleteAll();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
     }
 
 
@@ -112,7 +116,7 @@ class MemoryLinkDiscoveryConflictTest {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, title, content, false);
         String model = embeddingProperties.model();
         String text = EmbeddingText.of(title, content, embeddingProperties.maxTextChars());
-        embeddings.save(MemoryEmbedding.of(memory.id(), model, EmbeddingText.fingerprint(model, text), vector));
+        MemoryEmbeddingRows.write(jdbc, memory.id(), model, EmbeddingText.fingerprint(model, text), vector);
         return memory;
     }
 }

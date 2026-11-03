@@ -5,17 +5,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.port.EmbeddingClient;
 import com.bifos.assistant.memory.application.port.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.port.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
+import com.bifos.assistant.memory.application.EmbeddingText;
 import com.bifos.assistant.memory.application.MemoryEmbeddingRefresher;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -60,13 +62,13 @@ class MemoryEmbeddingRefresherTest {
     MemoryRepository repository;
 
     @Autowired
-    MemoryEmbeddingRepository embeddings;
-
-    @Autowired
     PlatformTransactionManager transactionManager;
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MemoryEmbeddingRepository embeddings;
 
     @Autowired
     TestClock clock;
@@ -85,7 +87,7 @@ class MemoryEmbeddingRefresherTest {
 
     @BeforeEach
     void setUp() {
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         links.deleteAll();
         repository.deleteAll();
     }
@@ -93,7 +95,7 @@ class MemoryEmbeddingRefresherTest {
 
     @AfterEach
     void tearDown() {
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
     }
 
 
@@ -114,13 +116,36 @@ class MemoryEmbeddingRefresherTest {
         int written = refresher(ENABLED).refreshOnce();
 
         assertThat(written).isEqualTo(2);
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactlyInAnyOrder(plain.id(), group.id());
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactlyInAnyOrder(plain.id(), group.id());
         assertThat(client.inputs()).containsExactly("타이어\n작년 11월에 갈았다", "보일러\n10월에 점검한다");
-        MemoryEmbedding row = embeddings.findById(plain.id()).orElseThrow();
+        MemoryEmbeddingVector row = MemoryEmbeddingRows.find(jdbc, plain.id()).orElseThrow();
         assertThat(row.model()).isEqualTo("test-model");
-        assertThat(row.dimensions()).isEqualTo(3);
+        assertThat(row.vector()).hasSize(3);
         assertThat(row.vector()).containsExactly(client.vectorOf("타이어\n작년 11월에 갈았다"));
         assertThat(refresher(ENABLED).refreshOnce()).as("바뀐 것이 없는 두 번째 주기").isZero();
+    }
+
+
+    @Test
+    @DisplayName("벡터는 항목 줄의 칸에 쓰고 항목의 변경 시각과 판은 그대로이며 옛 벡터 테이블의 줄은 읽지 않는다")
+    void writesVectorIntoMemoryRowWithoutTouchingAuditColumns() {
+        Memory plain = memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
+        String before = jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id());
+        // 직전 이미지가 옛 테이블에 남긴 지금 글과 모델의 줄이다. 새 코드가 이 줄을 읽었다면 이미 채워진 것으로 보고 다시 계산하지 않는다
+        jdbc.update("INSERT INTO memory_embedding (memory_id, model, dimensions, text_fingerprint, vector, created_at, updated_at)"
+            + " VALUES (?, 'test-model', 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            plain.id(), EmbeddingText.fingerprint("test-model", "타이어\n작년 11월에 갈았다"), new byte[4]);
+
+        try {
+            assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);
+
+            assertThat(MemoryEmbeddingRows.find(jdbc, plain.id()).orElseThrow().vector())
+                .containsExactly(client.vectorOf("타이어\n작년 11월에 갈았다"));
+            assertThat(jdbc.queryForObject("SELECT CONCAT(updated_at, '/', revision) FROM memory WHERE id = ?", String.class, plain.id()))
+                .isEqualTo(before);
+        } finally {
+            jdbc.update("DELETE FROM memory_embedding");
+        }
     }
 
 
@@ -148,7 +173,7 @@ class MemoryEmbeddingRefresherTest {
         Memory hidden = memories.create(USER, MemoryScope.USER, "혈액형", "O형이다", false);
         Memory gone = memories.create(USER, MemoryScope.USER, "지울 것", "곧 지운다", false);
         refresher(ENABLED).refreshOnce();
-        byte[] before = embeddings.findById(edited.id()).orElseThrow().textFingerprint();
+        byte[] before = MemoryEmbeddingRows.find(jdbc, edited.id()).orElseThrow().textFingerprint();
 
         memories.update(USER, edited.id(), "올해 3월에 다시 갈았다", false, null);
         memories.update(USER, hidden.id(), "O형이다", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
@@ -156,8 +181,8 @@ class MemoryEmbeddingRefresherTest {
         int written = refresher(ENABLED).refreshOnce();
 
         assertThat(written).isEqualTo(1);
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(edited.id());
-        assertThat(embeddings.findById(edited.id()).orElseThrow().textFingerprint()).isNotEqualTo(before);
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(edited.id());
+        assertThat(MemoryEmbeddingRows.find(jdbc, edited.id()).orElseThrow().textFingerprint()).isNotEqualTo(before);
     }
 
 
@@ -170,21 +195,19 @@ class MemoryEmbeddingRefresherTest {
         MemoryLink before = linkService.proposeSupersede(USER, fresh.id(), other.id(), MemoryLinkOrigin.AGENT, null);
         linkService.accept(USER, before.id());
         refresher(ENABLED).refreshOnce();
-        assertThat(embeddings.findAll())
-            .extracting(MemoryEmbedding::memoryId)
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc))
             .containsExactlyInAnyOrder(old.id(), fresh.id());
 
         MemoryLink link = linkService.proposeSupersede(USER, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
         linkService.accept(USER, link.id());
         refresher(ENABLED).refreshOnce();
 
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(fresh.id());
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(fresh.id());
 
         linkService.revoke(USER, link.id());
         refresher(ENABLED).refreshOnce();
 
-        assertThat(embeddings.findAll())
-            .extracting(MemoryEmbedding::memoryId)
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc))
             .containsExactlyInAnyOrder(old.id(), fresh.id());
     }
 
@@ -200,11 +223,11 @@ class MemoryEmbeddingRefresherTest {
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
         // 둘째 묶음 하나와 그 두 항목을 한 건씩 보낸 둘. 셋째 묶음은 부르지 않는다
         assertThat(client.calls()).isEqualTo(4);
-        assertThat(embeddings.count()).isEqualTo(2);
+        assertThat(MemoryEmbeddingRows.count(jdbc)).isEqualTo(2);
 
         client.failFromCall(-1);
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(3);
-        assertThat(embeddings.count()).isEqualTo(5);
+        assertThat(MemoryEmbeddingRows.count(jdbc)).isEqualTo(5);
     }
 
 
@@ -218,8 +241,8 @@ class MemoryEmbeddingRefresherTest {
 
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
 
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactlyInAnyOrder(next.id(), last.id());
-        assertThat(embeddings.findById(slow.id())).isEmpty();
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactlyInAnyOrder(next.id(), last.id());
+        assertThat(MemoryEmbeddingRows.find(jdbc, slow.id())).isEmpty();
     }
 
 
@@ -234,7 +257,7 @@ class MemoryEmbeddingRefresherTest {
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
 
         assertThat(client.inputs()).noneMatch(input -> input.contains("셋째"));
-        assertThat(embeddings.findById(third.id())).isEmpty();
+        assertThat(MemoryEmbeddingRows.find(jdbc, third.id())).isEmpty();
     }
 
 
@@ -247,7 +270,7 @@ class MemoryEmbeddingRefresherTest {
 
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);
 
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(kept.id());
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactly(kept.id());
     }
 
 
@@ -261,8 +284,8 @@ class MemoryEmbeddingRefresherTest {
 
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
 
-        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactlyInAnyOrder(next.id(), last.id());
-        assertThat(embeddings.findById(poison.id())).isEmpty();
+        assertThat(MemoryEmbeddingRows.memoryIds(jdbc)).containsExactlyInAnyOrder(next.id(), last.id());
+        assertThat(MemoryEmbeddingRows.find(jdbc, poison.id())).isEmpty();
     }
 
 
@@ -275,7 +298,7 @@ class MemoryEmbeddingRefresherTest {
         refresher(new MemoryEmbeddingProperties("http://embedding.test", "", null, null, null, null, null, null)).refresh();
 
         assertThat(client.calls()).isZero();
-        assertThat(embeddings.count()).isZero();
+        assertThat(MemoryEmbeddingRows.count(jdbc)).isZero();
     }
 
 
@@ -294,7 +317,7 @@ class MemoryEmbeddingRefresherTest {
 
         assertThat(client.calls()).isEqualTo(1);
         assertThat(client.threadNames()).allMatch(name -> name.startsWith("memory-embedding-refresh"));
-        assertThat(embeddings.count()).isEqualTo(1);
+        assertThat(MemoryEmbeddingRows.count(jdbc)).isEqualTo(1);
     }
 
 

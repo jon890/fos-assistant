@@ -10,13 +10,11 @@ import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.MemoryLinkDiscovery;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
-import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -28,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 새로 임베딩한 항목에서 대체 제안과 자동 RELATED 가 같은 주인 안에서만 생기는지 확인한다(ADR-20261015 / memory-link). */
 @BackendIntegrationTest
@@ -55,7 +54,7 @@ class MemoryLinkDiscoveryTest {
     MemoryLinkRepository links;
 
     @Autowired
-    MemoryEmbeddingRepository embeddings;
+    JdbcTemplate jdbc;
 
     @Autowired
     MemoryEmbeddingProperties embeddingProperties;
@@ -68,7 +67,7 @@ class MemoryLinkDiscoveryTest {
     void setUp() {
         vectorCache.clear();
         links.deleteAll();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         repository.deleteAll();
     }
 
@@ -76,7 +75,7 @@ class MemoryLinkDiscoveryTest {
     @AfterEach
     void tearDown() {
         links.deleteAll();
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
     }
 
 
@@ -224,7 +223,7 @@ class MemoryLinkDiscoveryTest {
     private Memory embedded(CurrentUser owner, MemoryScope scope, String title, String content, float[] vector, String model) {
         Memory memory = memories.create(owner, scope, title, content, false);
         String text = EmbeddingText.of(title, content, embeddingProperties.maxTextChars());
-        embeddings.save(MemoryEmbedding.of(memory.id(), model, EmbeddingText.fingerprint(model, text), vector));
+        MemoryEmbeddingRows.write(jdbc, memory.id(), model, EmbeddingText.fingerprint(model, text), vector);
         return memory;
     }
 }

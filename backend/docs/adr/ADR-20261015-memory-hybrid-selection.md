@@ -83,7 +83,7 @@
 
 | 무엇 | 내용 |
 | --- | --- |
-| 바뀌는 표 | 새 `memory_embedding`(항목 번호, 모델 이름, 차원, 글 지문, float32 벡터, 만든 시각). 항목이 지워지면 함께 지운다 |
+| 바뀌는 표 | 새 `memory_embedding`(항목 번호, 모델 이름, 차원, 글 지문, float32 벡터, 만든 시각). 항목이 지워지면 함께 지운다. 뒤에 [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) 가 `memory` 의 `embedding_*` 칸으로 옮겼다 |
 | 바뀌는 클래스 | `ContextAssembler`(질문을 받는 조립, `MEMORY_SEARCH` 구역), `ContextSource`(`MEMORY_SEARCH`), 새 `EmbeddingClient` 와 그 OpenAI 호환 구현, 새 키워드 점수와 RRF 를 맡는 선별기, 임베딩을 채우는 백그라운드 작업, `MemoryTitleSearch` 를 대신하는 본문 검색, 조립을 부르는 `ChatTurnRunner` 와 `AgentRunner`. `ProactiveCheckInput` 은 질문 없는 조립을 그대로 쓴다 |
 | 바뀌는 설정 | 임베딩 서비스 주소와 모델 이름과 지연 예산, 「질문과 관련된 기억」 구역의 건수와 글자 예산, 관련도 임계값 |
 | 완료 조건 | 조립 측정의 recall@5 와 오기억 노출이 기준 파일보다 나빠지지 않고 놓침 범주의 recall@5 가 오른다. 서버에서 잰 질문 임베딩 p95 가 지연 예산 안이다. 임베딩 서비스를 끈 상태에서 키워드만으로 답하는 테스트가 있다. `memory_search` 의 권한 경계 테스트(`MemorySearchTest`, `MemorySearchMysqlTest`)가 그대로 통과한다 |
