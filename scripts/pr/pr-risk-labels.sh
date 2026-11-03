@@ -40,6 +40,9 @@ while IFS= read -r path; do
       security=1 ;;
   esac
   case "$path" in
+    # 기능 폴더 아래 계획서는 최상위 tasks/ 처럼 라벨을 붙이지 않는다.
+    docs/features/*/tasks/*)
+      ;;
     backend/src/main/java/com/bifos/assistant/hermes/* | \
     test/e2e/fake-hermes.ts | \
     test/e2e/fake-hermes/* | \
