@@ -79,9 +79,6 @@ VALUES (900000001, 'coverage-900000001', 1, '2020-01-01 00:00:00');
 INSERT INTO agent_memory_collection_change (id, agent_id, collection, change_type, allow_sensitive, changed_by_user_id, changed_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'GRANTED', 1, 900000001, '2020-01-01 00:00:00');
 
-INSERT INTO agent_toolset_request (id, public_id, group_id, agent_id, requester_user_id, toolset, status, requested_at)
-VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 'coverage-900000001', 'REJECTED', '2020-01-01 00:00:00');
-
 INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
