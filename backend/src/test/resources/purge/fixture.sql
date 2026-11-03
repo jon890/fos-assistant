@@ -25,9 +25,6 @@ VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', '90000
 INSERT INTO chat_message (id, conversation_id, role, content, execution_id, created_at)
 VALUES (900000001, 900000001, 'USER', 'coverage-900000001', 900000001, '2020-01-01 00:00:00');
 
-INSERT INTO chat_pending_message (id, conversation_id, user_id, content, held, created_at)
-VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, '2020-01-01 00:00:00');
-
 INSERT INTO content_draft_creation_request (id, creation_key, identity_key, owner_user_id, conversation_id, profile_name, origin_execution_id, root_execution_id, root_session_id, request_id, request_hash, draft_public_id, status, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 64, '0')), UNHEX(LPAD(HEX(900000001), 64, '0')), 900000001, 900000001, 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', UNHEX(REPEAT('01', 32)), '00000000-0000-4000-8000-000900000001', 'CREATED', '2020-01-01 00:00:00');
 
@@ -67,8 +64,8 @@ VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-9000000
 INSERT INTO group_setting (group_id, setting_key, setting_value)
 VALUES (900000001, 'coverage-900000001', '{}');
 
-INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
-VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00');
+INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at, items_json, last_attempt_status, last_attempt_execution_id, last_attempt_started_at)
+VALUES (900000001, 900000001, 'DELIVERING', 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '{"version":1,"items":[{"source":"coverage-900000001","resultKey":"coverage-900000001"}]}', 'RUNNING', 900000001, '2020-01-01 00:00:00');
 
 INSERT INTO subagent_usage_job (id, execution_id, child_session_id, profile_name, api_base_url, status, created_at, next_attempt_at, expires_at, attempts, backoff_attempts)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'RECORDED', '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2099-01-01 00:00:00', 1, 1);
@@ -117,12 +114,6 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-90
 
 INSERT INTO proactive_check (id, user_id, agent_id, conversation_id, trigger_type, status, tool_calls, delegations, new_findings, reference_findings, started_at, writes_allowed, report_json)
 VALUES (900000001, 900000001, 900000001, 900000001, 'MANUAL', 'SUCCEEDED', 1, 1, 1, 1, '2020-01-01 00:00:00', 1, '{"private":"지울 보고"}');
-
-INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, execution_id, started_at)
-VALUES (900000001, 900000001, 1, 'coverage-900000001', 900000001, '2020-01-01 00:00:00');
-
-INSERT INTO result_delivery_item (id, delivery_id, source, result_key)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');
 
 INSERT INTO task (id, public_id, owner_user_id, agent_id, title, state, conversation_mode, conversation_id, notify, created_at, updated_at, kind, trigger_type, time_zone, missed_policy)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 'coverage-900000001', 'ACTIVE', 'NEW_PER_RUN', 900000001, 'ALWAYS', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'TURN', 'CRON', 'UTC', 'SKIP');

@@ -27,6 +27,9 @@ class ResultDeliveryBackfillMigrationTest {
     /** 옮기는 마이그레이션 바로 앞 버전이다. */
     private static final String BEFORE = "20261102074304";
 
+    /** 처음 옮기는 마이그레이션이다. 이 버전까지는 옛 표가 남아 있다. */
+    private static final String MOVED = "20261102074312";
+
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
     Database createDatabase() {
@@ -62,7 +65,7 @@ class ResultDeliveryBackfillMigrationTest {
                     """);
         }
 
-        migrate(database, null);
+        migrate(database, MOVED);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT items_json FROM result_delivery ORDER BY id"))
@@ -88,7 +91,7 @@ class ResultDeliveryBackfillMigrationTest {
                 .as("시작과 끝 시각을 마이크로초까지 그대로 옮긴다")
                 .containsExactly("2");
             assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_item"))
-                .as("옛 표는 직전 이미지로 되돌릴 수 있게 지우지 않는다")
+                .as("처음 옮긴 단계는 옛 표를 지우지 않는다")
                 .containsExactly("3");
             assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_attempt")).containsExactly("3");
         }
@@ -124,7 +127,7 @@ class ResultDeliveryBackfillMigrationTest {
                     """);
         }
 
-        assertThatThrownBy(() -> migrate(database, null))
+        assertThatThrownBy(() -> migrate(database, MOVED))
             .isInstanceOf(RuntimeException.class)
             .hasRootCauseInstanceOf(IllegalStateException.class);
 
@@ -132,6 +135,88 @@ class ResultDeliveryBackfillMigrationTest {
             assertThat(strings(statement, "SELECT COALESCE(items_json, '-') FROM result_delivery"))
                 .as("항목도 옮기지 않는다")
                 .containsExactly("-");
+        }
+    }
+
+
+    @Test
+    @DisplayName("직전 이미지가 옛 표에만 쓴 항목과 시도는 다시 옮기고 이미 칸이 찬 묶음은 덮어쓰지 않은 뒤 옛 표를 지운다")
+    void remigratesRowsWrittenByPreviousImageAndDropsOldTables() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, BEFORE);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at) VALUES
+                        (1, 10, 'DELIVERED', 1, '2026-11-01 00:00:00', '2026-11-01 00:05:00')
+                    """);
+            statement.executeUpdate(
+                "INSERT INTO result_delivery_item (id, delivery_id, source, result_key) VALUES (5, 1, 'DELEGATION', '42')");
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, execution_id, started_at, finished_at)
+                    VALUES (1, 1, 1, 'SUCCEEDED', 100, '2026-11-01 00:00:00', '2026-11-01 00:01:00')
+                    """);
+        }
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            // 직전 이미지로 되돌린 동안 옛 코드가 한 일이다. 2번 묶음은 옛 표에만 있고,
+            // 1번 묶음은 새 칸이 이미 찬 채 옛 표에 시도 하나가 더 붙었다.
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at) VALUES
+                        (2, 10, 'FAILED', 2, '2026-11-02 00:00:00', '2026-11-02 00:05:00')
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery_item (id, delivery_id, source, result_key) VALUES
+                        (6, 2, 'DELEGATION', '43'),
+                        (7, 2, 'CONNECTOR_ACTION', 'c3d4')
+                    """);
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, execution_id, started_at, finished_at, error_code)
+                    VALUES (2, 2, 1, 'FAILED', 101, '2026-11-02 00:00:00', '2026-11-02 00:01:00', 'HERMES_RUN_FAILED'),
+                           (3, 2, 2, 'FAILED', 102, '2026-11-02 00:04:00', '2026-11-02 00:05:00', 'HERMES_RUN_FAILED'),
+                           (4, 1, 2, 'FAILED', 103, '2026-11-02 01:00:00', '2026-11-02 01:01:00', 'HERMES_RUN_FAILED')
+                    """);
+        }
+
+        migrate(database, null);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT items_json FROM result_delivery ORDER BY id"))
+                .containsExactly(
+                    "{\"version\":1,\"items\":[{\"source\":\"DELEGATION\",\"resultKey\":\"42\"}]}",
+                    "{\"version\":1,\"items\":[{\"source\":\"DELEGATION\",\"resultKey\":\"43\"},"
+                        + "{\"source\":\"CONNECTOR_ACTION\",\"resultKey\":\"c3d4\"}]}");
+            assertThat(rows(statement, """
+                    SELECT last_attempt_status, last_attempt_execution_id, last_attempt_error_code
+                      FROM result_delivery ORDER BY id
+                    """))
+                .as("1번은 이미 찬 칸을 지키고 2번은 옛 표의 마지막 시도를 옮긴다")
+                .containsExactly(
+                    List.of("SUCCEEDED", "100", "-"),
+                    List.of("FAILED", "102", "HERMES_RUN_FAILED"));
+            assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM result_delivery_item"))
+                .as("옛 항목 표는 지운다").isInstanceOf(SQLException.class);
+            assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM result_delivery_attempt"))
+                .as("옛 시도 표는 지운다").isInstanceOf(SQLException.class);
+        }
+    }
+
+
+    @Test
+    @DisplayName("옛 표에 항목이 없는 묶음이 남으면 NOT NULL 로 바꾸다 멈추고 옛 표를 지우지 않는다")
+    void stopsBeforeDroppingWhenDeliveryHasNoItems() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
+                    VALUES (1, 10, 'FAILED', 1, '2026-11-01 00:00:00', '2026-11-01 00:00:00')
+                    """);
+        }
+
+        assertThatThrownBy(() -> migrate(database, null)).isInstanceOf(RuntimeException.class);
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_item")).containsExactly("0");
         }
     }
 
