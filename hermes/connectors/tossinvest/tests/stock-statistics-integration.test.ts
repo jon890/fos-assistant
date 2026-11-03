@@ -7,7 +7,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { buildBundle } from "../scripts/build.ts";
 import { createTossinvestServer } from "../src/server.ts";
-import { FakeToss, credentials, tool, withMcp } from "./support.ts";
+import {
+  FakeToss,
+  credentials,
+  tool,
+  withMcp,
+  useSkippedWaits,
+} from "./support.ts";
+
+useSkippedWaits();
 
 // 모듈의 등록 함수를 직접 부르지 않고 production 등록과 stdio를 독립적으로 검사한다.
 const cases = [

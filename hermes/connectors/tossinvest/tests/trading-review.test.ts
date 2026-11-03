@@ -13,9 +13,12 @@ import {
   stockInfo,
   sampleOrder,
   tool,
+  useSkippedWaits,
 } from "./support.ts";
 import { OPERATIONS } from "../src/api-contract.ts";
 import { expectedOrder, tradingBody, UNKNOWN } from "../src/trading-body.ts";
+
+useSkippedWaits();
 
 const account = "9223372036854775807";
 const env = () => ({ ...credentials, TOSSINVEST_ACCOUNT_SEQ: account });

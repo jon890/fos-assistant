@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { groupLimit } from "../src/rate-limit.ts";
+import { clock, groupLimit } from "../src/rate-limit.ts";
 import { Tossinvest } from "../src/client.ts";
 import { createTossinvestServer } from "../src/server.ts";
 import {
@@ -10,7 +10,10 @@ import {
   json,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const env = { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" };
 const accountBodies = {
@@ -48,7 +51,7 @@ function limitedAccountRoutes(fake: FakeToss) {
   for (const [path, body] of Object.entries(accountBodies)) {
     fake.routes.set(`GET ${path}`, async () => {
       const group = groups[path as keyof typeof groups];
-      const now = performance.now();
+      const now = clock.now();
       arrivals.push({ group: group.name, at: now, interval: group.interval });
       if (
         active.has(group.name) ||
@@ -217,13 +220,13 @@ describe("계좌 조회 호출 간격", () => {
     const arrivals: number[] = [];
     fake.sequence("GET", "/api/v1/buying-power", [
       () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return json({ error: { code: "too-many-requests" } }, 429, {
           "retry-after": "1.2",
         });
       },
       () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return json(accountBodies["/api/v1/buying-power"]);
       },
     ]);
@@ -244,11 +247,11 @@ describe("계좌 조회 호출 간격", () => {
     const arrivals: number[] = [];
     fake.sequence("GET", "/api/v1/accounts", [
       () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return apiError(429, "too-many-requests")();
       },
       () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return json({ result: [] });
       },
     ]);
@@ -282,7 +285,7 @@ describe("계좌 조회 호출 간격", () => {
       "GET",
       "/api/v1/accounts",
       responses.map((response) => () => {
-        arrivals.push(performance.now());
+        arrivals.push(clock.now());
         return response();
       }),
     );

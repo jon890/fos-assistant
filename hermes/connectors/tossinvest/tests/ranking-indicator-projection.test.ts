@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { createTossinvestServer } from "../src/server.ts";
-import { FakeToss, credentials, withMcp } from "./support.ts";
+import { FakeToss, credentials, withMcp, useSkippedWaits } from "./support.ts";
+
+useSkippedWaits();
 
 const official = JSON.parse(
   readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`, "utf8"),

@@ -13,7 +13,10 @@ import {
   tokenPrefix,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const manifest = JSON.parse(
   readFileSync(join(import.meta.dir, "../assistant.json"), "utf8"),

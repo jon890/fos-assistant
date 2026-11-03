@@ -18,7 +18,11 @@ import {
   json,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+import { clock } from "../src/rate-limit.ts";
+
+useSkippedWaits();
 
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 const canonical = JSON.parse(raw.toString());
@@ -460,7 +464,7 @@ test("서로 다른 client도 STOCK_ALL 1회/초를 공유하고 STOCK은 별도
   const arrivals: Array<{ path: string; at: number }> = [];
   for (const path of [paths.get_stocks, paths.list_stocks])
     fake.routes.set(`GET ${path}`, () => {
-      arrivals.push({ path, at: Date.now() });
+      arrivals.push({ path, at: clock.now() });
       return json({ result: [] });
     });
   try {

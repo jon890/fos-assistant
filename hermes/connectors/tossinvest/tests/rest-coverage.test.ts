@@ -22,7 +22,10 @@ import {
   credentials,
   tool,
   withMcp,
+  useSkippedWaits,
 } from "./support.ts";
+
+useSkippedWaits();
 
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
