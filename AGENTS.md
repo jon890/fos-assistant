@@ -17,8 +17,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 플러그인 선언을 고칠 때 |
 
 기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
-새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 기능 스펙 `docs/features/<id>/spec.md`, 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다.
-기능 파일은 지금 동작하는 요구와 흐름을, 스펙은 합의한 변경의 요구사항 ID 와 인수 조건, 설계를 갖는다. 나눔은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가 갖는다.
+새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 새 기능의 기능 폴더 `docs/features/<id>/`(스펙 `spec.md`, 설계 `design.md`, 계획 `tasks/<계획>/`), 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다.
+기능 파일은 지금 동작하는 요구와 흐름을, 스펙은 합의한 변경의 요구사항 ID(`REQ1`)와 인수 조건을, 설계는 그 요구사항을 어떻게 구현할지를 갖는다. 나눔과 ID 꼴은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가 갖는다.
 배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
 
 ## 용어
@@ -110,7 +110,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 
 | 단계 | 하는 일 | 끝난 조건 |
 | --- | --- | --- |
-| 계획 | 범위와 검증 기준을 정해 `docs/` 와 `tasks/` 에 남긴다 | 구현자가 이 대화 없이 읽고 실행할 수 있다 |
+| 계획 | 범위와 검증 기준을 정해 `docs/` 와 계획서 자리(`tasks/` 나 `docs/features/<id>/tasks/`)에 남긴다 | 구현자가 이 대화 없이 읽고 실행할 수 있다 |
 | 구현 | 워크트리 하나에서 브랜치 하나로 만들고 PR 로 머지한다 | 「머지는 PR 로 한다」 의 순서로 PR 이 머지됐다 |
 | 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 |
 
@@ -133,6 +133,10 @@ scripts/dev/finish-task.sh "$BRANCH"
 남겨 두면 다음에 읽는 사람이 끝난 것과 앞으로 할 것을 구분하지 못하고,
 이미 바뀐 설계를 그대로 읽는다.
 오래 남을 것은 지우기 전에 `docs/` 나 ADR 로 옮긴다.
+
+새 기능의 계획서는 그 기능 폴더 `docs/features/<id>/tasks/<계획>/` 에 둔다.
+기능에 속하지 않는 정리 작업과 이미 있는 계획은 최상위 `tasks/` 를 쓴다.
+두 자리는 구현 문서만 담고 지우는 규칙도 같다. 기능 아래 계획은 `tasks/<계획>/` 폴더만 지우고 `spec.md` 와 `design.md` 는 남긴다.
 
 조사를 phase 로 만들지 않는다.
 조사 절차를 phase 에 적으면 구현 문서에 홈서버 접근 명령이 섞이고,
