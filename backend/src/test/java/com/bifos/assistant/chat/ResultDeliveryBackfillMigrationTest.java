@@ -167,7 +167,8 @@ class ResultDeliveryBackfillMigrationTest {
             statement.executeUpdate("""
                     INSERT INTO result_delivery_item (id, delivery_id, source, result_key) VALUES
                         (6, 2, 'DELEGATION', '43'),
-                        (7, 2, 'CONNECTOR_ACTION', 'c3d4')
+                        (7, 2, 'CONNECTOR_ACTION', 'c3d4'),
+                        (8, 1, 'DELEGATION', '99')
                     """);
             statement.executeUpdate("""
                     INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, execution_id, started_at, finished_at, error_code)
@@ -181,6 +182,7 @@ class ResultDeliveryBackfillMigrationTest {
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             assertThat(strings(statement, "SELECT items_json FROM result_delivery ORDER BY id"))
+                .as("1번은 이미 찬 항목을 지키고 2번은 옛 표의 항목을 옮긴다")
                 .containsExactly(
                     "{\"version\":1,\"items\":[{\"source\":\"DELEGATION\",\"resultKey\":\"42\"}]}",
                     "{\"version\":1,\"items\":[{\"source\":\"DELEGATION\",\"resultKey\":\"43\"},"
@@ -203,7 +205,7 @@ class ResultDeliveryBackfillMigrationTest {
 
     @Test
     @DisplayName("옛 표에 항목이 없는 묶음이 남으면 NOT NULL 로 바꾸다 멈추고 옛 표를 지우지 않는다")
-    void stopsBeforeDroppingWhenDeliveryHasNoItems() throws SQLException {
+    void stopsAtNotNullWhenDeliveryHasNoItems() throws SQLException {
         Database database = createDatabase();
         migrate(database, MOVED);
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
@@ -211,12 +213,74 @@ class ResultDeliveryBackfillMigrationTest {
                     INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
                     VALUES (1, 10, 'FAILED', 1, '2026-11-01 00:00:00', '2026-11-01 00:00:00')
                     """);
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, started_at, finished_at)
+                    VALUES (1, 1, 1, 'FAILED', '2026-11-01 00:00:00', '2026-11-01 00:00:01')
+                    """);
         }
 
-        assertThatThrownBy(() -> migrate(database, null)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> migrate(database, null))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("V20261102074330");
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_attempt")).containsExactly("1");
             assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_item")).containsExactly("0");
+        }
+    }
+
+
+    @Test
+    @DisplayName("옛 표에 시도가 없는 묶음이 남으면 NOT NULL 로 바꾸다 멈추고 옛 표를 지우지 않는다")
+    void stopsAtNotNullWhenDeliveryHasNoAttempt() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
+                    VALUES (1, 10, 'FAILED', 1, '2026-11-01 00:00:00', '2026-11-01 00:00:00')
+                    """);
+            statement.executeUpdate(
+                "INSERT INTO result_delivery_item (id, delivery_id, source, result_key) VALUES (1, 1, 'DELEGATION', '42')");
+        }
+
+        assertThatThrownBy(() -> migrate(database, null))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("V20261102074330");
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_item")).containsExactly("1");
+        }
+    }
+
+
+    @Test
+    @DisplayName("다시 옮길 때 칸이 빈 묶음의 마지막 시도 번호가 시도 수와 다르면 멈추고 옛 표를 지우지 않는다")
+    void remigrationStopsWhenLastAttemptDoesNotMatchAttemptCount() throws SQLException {
+        Database database = createDatabase();
+        migrate(database, MOVED);
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery (id, conversation_id, status, attempt_count, created_at, updated_at)
+                    VALUES (1, 10, 'FAILED', 3, '2026-11-01 00:00:00', '2026-11-01 00:00:00')
+                    """);
+            statement.executeUpdate(
+                "INSERT INTO result_delivery_item (id, delivery_id, source, result_key) VALUES (1, 1, 'DELEGATION', '42')");
+            statement.executeUpdate("""
+                    INSERT INTO result_delivery_attempt (id, delivery_id, attempt_no, status, started_at, finished_at)
+                    VALUES (1, 1, 2, 'FAILED', '2026-11-01 00:00:00', '2026-11-01 00:00:01')
+                    """);
+        }
+
+        assertThatThrownBy(() -> migrate(database, null))
+            .isInstanceOf(RuntimeException.class)
+            .hasRootCauseInstanceOf(IllegalStateException.class)
+            .rootCause().hasMessageContaining("attempt_count does not match");
+
+        try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
+            assertThat(strings(statement, "SELECT COALESCE(items_json, '-') FROM result_delivery"))
+                .as("항목도 옮기지 않는다").containsExactly("-");
+            assertThat(strings(statement, "SELECT COUNT(*) FROM result_delivery_item")).containsExactly("1");
         }
     }
 

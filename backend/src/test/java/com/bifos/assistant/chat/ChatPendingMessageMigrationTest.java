@@ -129,10 +129,11 @@ class ChatPendingMessageMigrationTest {
         Database database = createDatabase();
         migrate(database, BEFORE);
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
-            insertConversations(statement, 1, 2, 3);
+            insertConversations(statement, 1, 2, 3, 4);
             statement.executeUpdate("""
                     INSERT INTO chat_pending_message (id, conversation_id, user_id, content, held, created_at) VALUES
-                        (11, 1, 7, '옮긴 글', FALSE, '2026-09-30 00:00:01')
+                        (11, 1, 7, '옮긴 글', FALSE, '2026-09-30 00:00:01'),
+                        (41, 4, 7, '멈춘 채 옮긴 글', TRUE, '2026-09-30 00:00:01')
                     """);
         }
         migrate(database, MOVED);
@@ -144,7 +145,8 @@ class ChatPendingMessageMigrationTest {
                         (11, 1, 7, '겹친 번호의 옛 글', FALSE, '2026-09-30 00:00:02'),
                         (12, 1, 7, '멈춘 옛 글', TRUE, '2026-09-30 00:00:03'),
                         (13, 2, 7, '빈 줄의 옛 글', FALSE, '2026-09-30 00:00:04'),
-                        (14, 99, 7, '갈 곳 없는 글', FALSE, '2026-09-30 00:00:05')
+                        (14, 99, 7, '갈 곳 없는 글', FALSE, '2026-09-30 00:00:05'),
+                        (42, 4, 7, '멈추지 않은 옛 글', FALSE, '2026-09-30 00:00:06')
                     """);
         }
 
@@ -157,6 +159,10 @@ class ChatPendingMessageMigrationTest {
                 .containsExactly("옮긴 글", "겹친 번호의 옛 글", "멈춘 옛 글");
             assertThat(queue.ids()).as("번호가 겹치지 않는다").doesNotHaveDuplicates().startsWith(11L);
             assertThat(queueOf(statement, 2).items()).extracting(PendingMessage::content).containsExactly("빈 줄의 옛 글");
+            PendingMessages heldQueue = queueOf(statement, 4);
+            assertThat(heldQueue.held()).as("이미 멈춘 줄은 멈추지 않은 옛 행을 붙여도 멈춰 있다").isTrue();
+            assertThat(heldQueue.items()).extracting(PendingMessage::content)
+                .containsExactly("멈춘 채 옮긴 글", "멈추지 않은 옛 글");
             assertThat(strings(statement, "SELECT pending_messages FROM conversation WHERE id = 3"))
                 .as("옛 행이 없던 대화").containsExactly((String)null);
             assertThatThrownBy(() -> statement.executeQuery("SELECT COUNT(*) FROM chat_pending_message"))
