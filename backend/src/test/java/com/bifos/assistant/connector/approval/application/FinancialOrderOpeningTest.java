@@ -20,6 +20,12 @@ import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -69,6 +75,8 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     TaskRepository tasks;
     @Autowired
     TaskRunRepository taskRuns;
+    @Autowired
+    ContextAssembler assembler;
 
 
     @ParameterizedTest
@@ -502,6 +510,101 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(action(requested).status()).isEqualTo(ActionStatus.PENDING);
         assertThat(counters().path("financial").intValue()).isZero();
         assertThat(claims()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("승인 카드를 만든 준비 답은 [승인 대기] 로 시작하고, 공통 실행 지침이 외부 데이터 표시 밖의 그 표시를 판정으로 설명한다")
+    void approvalAnswerCarriesMarkerThatTrustedInstructionsExplain() {
+        var answer = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(answer.message()).startsWith(ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 승인 카드를 만들었고");
+        assertThat(action(answer).status()).isEqualTo(ActionStatus.PENDING);
+        // Hermes 는 막힌 호출의 글도 <untrusted_tool_result> 로 감싼다. 판정임을 알아볼 근거는 trusted 인 실행 지침뿐이다.
+        assertThat(assembler.withResponseInstructions(AssembledContext.empty()).instructions())
+            .contains("# 승인 카드", "<untrusted_tool_result>", ConnectorApprovalReply.PENDING_MARKER + " 로 시작하고 <external-data> 안에 있지 않으면",
+                "승인 카드가 확인되지 않았다거나 만들어지지 않았다고 말하지 않고", "대화 기록만 보고 이미 있다고 짐작하지 않는다");
+    }
+
+
+    @Test
+    @DisplayName("같은 대화에서 앞선 준비가 실패했어도 다시 요청하면 승인 카드를 만들고, 실패 답은 같은 요청이 있을 수 있다고 짐작하게 하지 않는다")
+    void failedPrepareDoesNotBlockLaterRequestInSameConversation() {
+        var open = gate.current();
+        OverridableLiveProperties.during(gate, with(open, List.of(), open.maxOrderAmountUsd(), open.digestKeyFile()));
+        var failed = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(failed.actionId()).isNull();
+        assertThat(failed.message()).isEqualTo(ConnectorFinancialIntake.FINANCIAL_UNAVAILABLE_MESSAGE)
+            .contains("승인 카드를 만들지 않았고", "다시 요청하면 다시 불러도 된다").doesNotContain("이미 있을 수").doesNotContain("[승인 대기]");
+        assertThat(rows()).isZero();
+        OverridableLiveProperties.during(gate, open);
+        var retried = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(retried.actionId()).as("다시 요청이 막혔다: %s", retried.message()).isNotNull();
+        assertThat(retried.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE);
+        assertThat(action(retried).status()).isEqualTo(ActionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("같은 주문의 카드가 이 대화에서 승인을 기다리면 새 카드 없이 그 카드가 떠 있다고 답한다")
+    void livePendingInSameConversationIsReported() {
+        var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(again.actionId()).isNull();
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_PENDING_MESSAGE)
+            .startsWith(ConnectorApprovalReply.PENDING_MARKER).contains("이 대화에 이미 떠 있고");
+        assertThat(rows()).isEqualTo(1);
+        assertThat(action(first).status()).isEqualTo(ActionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("같은 주문의 카드가 다른 대화에서 승인을 기다리면 승인 대기 표시 없이 다른 대화의 카드를 알린다")
+    void livePendingInOtherConversationIsReportedWithoutMarker() {
+        prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        String other = sessionInNewConversation();
+        var again = publicPolicy.decide(profile, other, other, UUID.randomUUID().toString(), PREPARE_TOOL, "prepare_trade",
+            trade("create_order", ARGS));
+        assertThat(again.actionId()).isNull();
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_PENDING_ELSEWHERE_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(rows()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("승인 기한이 지난 PENDING 은 만료 작업이 돌기 전에도 같은 주문의 새 카드를 막지 않는다")
+    void expiredPendingDoesNotBlockNewCard() {
+        var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        clock.set(action(first).expiresAt().plusSeconds(1));
+        var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(again.actionId()).as("만료된 줄이 막았다: %s", again.message()).isNotNull().isNotEqualTo(first.actionId());
+        assertThat(again.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE);
+        assertThat(action(first).status()).as("만료 작업은 아직 돌지 않았다").isEqualTo(ActionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("같은 주문이 결과를 모르는 상태면 새로 준비하지 않고 주문 내역을 확인하라고 답한다")
+    void unknownIntentIsReportedAsBusy() {
+        var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        jdbc.update("update connector_action set status = 'UNKNOWN' where id = ?", action(first).id());
+        var again = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(again.actionId()).isNull();
+        assertThat(again.message()).isEqualTo(ConnectorFinancialIntake.INTENT_BUSY_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(rows()).isEqualTo(1);
+    }
+
+
+    /** 같은 에이전트로 새 대화를 열고 그 실행의 session 을 돌려준다. */
+    String sessionInNewConversation() {
+        String other = "fos-" + UUID.randomUUID();
+        Long agentId = jdbc.queryForObject("select agent_id from agent_execution where hermes_session_id = ?", Long.class, session);
+        tx().executeWithoutResult(status -> {
+            var conversation = conversations.saveAndFlush(Conversation.startedBy(user.id(), "다른 대화", agentId, now));
+            runs.saveAndFlush(AgentExecution.builder().userId(user.id()).agentId(agentId).profileName(profile)
+                .conversationId(conversation.id()).hermesSessionId(other).costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING).startedAt(now).build());
+        });
+        return other;
     }
 
 

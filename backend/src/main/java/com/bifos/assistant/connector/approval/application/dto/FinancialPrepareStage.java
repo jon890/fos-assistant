@@ -4,6 +4,7 @@ import java.util.Locale;
 
 /**
  * 금융 준비를 거절한 검사의 고정 이름이다. 운영 로그에만 {@link #code()} 로 남기고 사용자와 모델에게는 밝히지 않는다.
+ * 예외는 같은 의도의 줄이 이미 있는 세 단계다. 사용자 자신의 화면에 보이는 상태라 모델에게 그 사실만 밝힌다.
  * 원격 응답, 인자 값, 계좌, 메일은 담지 않는다. 운영에서 다시 시도할 때 어느 검사부터 볼지 정하는 데 쓴다.
  *
  * <p>{@code ConnectorFinancialProducer} 가 붙이고 {@code ConnectorFinancialIntake} 가 로그에 남긴다.
@@ -53,8 +54,12 @@ public enum FinancialPrepareStage {
     USER,
     /** 준비하는 동안 바인딩, 연결, 요청자의 맥락이 바뀌었다. */
     CONTEXT_CHANGED,
-    /** 같은 주문 의도의 승인 줄이 이미 열려 있다. */
+    /** 같은 주문 의도의 승인 줄이 실행 중이거나 결과를 모른다. */
     CONFLICT,
+    /** 같은 주문 의도의 승인 줄이 이 대화에서 승인을 기다린다. 모델에게 밝히는 유일한 검사다(ADR-20261013 / financial-order-opening). */
+    CONFLICT_PENDING,
+    /** 같은 주문 의도의 승인 줄이 다른 대화에서 승인을 기다린다. 모델에게 밝힌다. */
+    CONFLICT_PENDING_ELSEWHERE,
     /** 상한 판정 전에 실행 인자의 금액 모양이 맞지 않는다. 상한에 걸린 것은 이 단계가 아니다. */
     LIMITS,
     /** 저장한 snapshot 에 key 번호가 없다. */

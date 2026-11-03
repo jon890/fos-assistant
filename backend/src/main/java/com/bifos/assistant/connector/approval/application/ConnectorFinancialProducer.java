@@ -162,12 +162,15 @@ class ConnectorFinancialProducer {
                 require(duplicate.get().hermesTool().equals(hermesTool) && duplicate.get().argsSha256().equals(hash), FinancialPrepareStage.REPLAY);
                 return duplicate.get();
             }
-            at(FinancialPrepareStage.CONFLICT, () -> conflicts.requireAvailable(
+            var origin = owners.resolve(profileName, rootSessionId, sessionId);
+            var blocking = at(FinancialPrepareStage.CONFLICT, () -> conflicts.blocking(
                 snapshot.storedRequestKey(digest, before.user(), before.connector(), toolName), null));
+            if (blocking.isPresent()) {
+                throw new FinancialPrepareRejected(conflictStage(blocking.get(), origin.conversationId()));
+            }
             at(FinancialPrepareStage.GATE, gate::requireOpen);
             at(FinancialPrepareStage.LIMITS, () -> gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant()));
             var binding = bindings.findById(before.binding()).orElseThrow(() -> new FinancialPrepareRejected(FinancialPrepareStage.BINDING));
-            var origin = owners.resolve(profileName, rootSessionId, sessionId);
             Instant now = clock.instant();
             var action = ConnectorAction.decided(binding.connection(), before.agent(), origin, hermesTool, toolName,
                 new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
@@ -193,6 +196,19 @@ class ConnectorFinancialProducer {
             return action;
         });
         return answer(saved);
+    }
+
+
+    /**
+     * 같은 의도를 막은 줄의 상태로 단계를 고른다. 승인 대기면 그 카드가 이 대화에 떠 있는지까지 가린다. 모델이 그 사실만 사용자에게
+     * 알리고, 대화 기록으로 짐작하지 않게 한다.
+     */
+    static FinancialPrepareStage conflictStage(ConnectorAction blocking, Long conversationId) {
+        if (blocking.status() != ActionStatus.PENDING) {
+            return FinancialPrepareStage.CONFLICT;
+        }
+        return conversationId != null && conversationId.equals(blocking.conversationId())
+            ? FinancialPrepareStage.CONFLICT_PENDING : FinancialPrepareStage.CONFLICT_PENDING_ELSEWHERE;
     }
 
 
