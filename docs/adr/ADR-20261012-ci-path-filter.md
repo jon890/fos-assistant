@@ -186,7 +186,8 @@ main 에 들어오는 커밋은 최신 main 을 포함한 head 로 PR CI 를 통
   push 에서 뺀 검사가 깨지면 늦어도 하루 안에 드러난다. 더 자주 돌릴 이유는 아직 없다.
 - 필수 검사 이름 9개는 PR 에서 그대로 결과를 낸다. main push 는 필수 검사 대상이 아니므로 브랜치 보호는 바꾸지 않는다.
 - 정기 실행이 실패하면 실패한 run 이 Actions 에 남고, 브라우저 실패는 기존 `browser-failures` job 이 이슈로 모은다.
-  백엔드, e2e, Hermes 실패에 이슈를 따로 열지는 않는다. 새 외부 연동을 만들지 않는다는 제약을 지키고, 이슈 자동화는 같은 실패가 반복된 것을 본 뒤에 더한다.
+  백엔드와 Hermes 실패에 이슈를 따로 열지는 않는다. 새 외부 연동을 만들지 않는다는 제약을 지키고, 이슈 자동화는 같은 실패가 반복된 것을 본 뒤에 더한다.
+  E2E 는 2026-11-03 에 더했다(아래 「정기 E2E 실패를 이슈로 남기고 모델 지시문을 바꾸는 PR 에서 E2E 를 돌린다」).
   이 job 은 정기 실행과 수동 실행의 main 실패만 모은다. push 는 browser 를 돌리지 않으므로 대상에서 뺐다.
 
 되돌릴 때는 `scripts/ci/ci-paths.mjs` 의 `PUSH_JOBS` 와 `ci.yml` 의 `browser-failures` 조건을 함께 고친다.
@@ -253,3 +254,35 @@ job 을 나눈 뒤에도 두 job 은 PR CI 6건에서 `hermes-connectors` 244~26
 - `hermes-connectors`: `check-connectors.sh` 가 커넥터마다 타입 검사, 테스트, 묶음 검사를 동시에 돈다. 가장 느린 tossinvest 는 테스트의 속도 제한 대기를 `clock` 이음매로 건너뛰어 테스트 시간이 128초에서 45초(로컬 측정)가 됐다. 운영 코드의 대기 값은 그대로다.
 - 측정(PR 686 의 CI): `hermes-connectors` 112초, `hermes-python` 140초(unittest 83초, 계약 검사 38초).
 - 하지 않은 것: `ArchitectureRulesTest` 전체가 5초 안쪽이라 fixture 컴파일 묶기는 효과가 없다. naver-blog 의 느린 테스트는 대기가 아니라 실제 Chrome 시작이라 대기 주입 대상이 아니다.
+
+### 정기 E2E 실패를 이슈로 남기고, 모델 지시문을 바꾸는 PR 에서 E2E 를 돌린다 (2026-11-03)
+
+main 의 세 검사가 깨진 것을 고치는 PR(#689)에서 두 빈틈이 드러났다.
+- 정기 실행에서 브라우저 실패는 `browser-failures` 가 이슈로 모으지만 E2E 실패는 이슈로 남는 경로가 없어, Actions 의 실패 run 을 보러 가야 알 수 있었다.
+- #676 이 모델 지시문(`ContextAssembler` 의 지침 상수)에 절을 더했는데 PR CI 가 E2E 를 건너뛰어 main 에 들어갔고, 가짜 Hermes 의 `MODEL_GUIDE_HEADERS` 가 그 절을 몰라 E2E 가 깨졌다.
+
+**E2E 실패 이슈 (`e2e-failures` job)**
+
+| 항목 | 내용 |
+| --- | --- |
+| 조건 | main 의 정기 실행과 수동 실행에서 `e2e-tests` 가 `failure` 일 때. 취소는 테스트 실패가 아니라 제외하고, 시간 초과는 `failure` 로 온다 |
+| 이슈 | 라벨 `E2E 실패`, 제목 `[E2E 실패] <시나리오 이름>`. 본문의 marker 로 열린 이슈를 찾아 같은 시나리오는 새 이슈 없이 재발 댓글을 단다 |
+| 중복 | 실행 marker 로 같은 실행의 재시도가 댓글을 겹쳐 달지 않는다. 이슈가 닫히면 다음 실패가 새 이슈를 연다 |
+| 입력 | `e2e-tests` 가 `test/e2e/run.ts` 의 출력을 파일에 남기고, 실패하면 run.ts 가 남기는 `실패: {...}` 한 줄만 artifact 로 올린다. 로그 전체는 올리지 않는다 |
+| 공개 | 이슈는 공개된다. 시나리오 이름도 `publicError` 필터를 거쳐 주소, 경로, 인증값, 인용값을 지우고 120자로 줄인다. 줄이 없으면 「시나리오 기록 없음」 으로 연다 |
+
+- 스크립트는 `scripts/ci/e2e-ci.mjs` 이고 browser-ci.mjs 의 `githubApi` 와 `publicError` 를 가져다 쓴다. 이슈를 모으는 방식(marker 와 재발 댓글)은 브라우저 실패와 같다.
+- 시나리오를 이름으로 가르는 까닭: 한 시나리오가 깨지면 뒤 시나리오가 이어서 돌지 않는 구조(run.ts 는 첫 실패에서 멈춘다)라 한 실행의 실패는 하나다. 같은 원인의 반복은 한 이슈에 모인다.
+- 감수할 것: 기동 전 실패나 시간 초과는 시나리오 이름이 없어 「시나리오 기록 없음」 한 이슈에 모인다. 원인은 이슈의 CI 결과 링크에서 본다.
+
+**모델 지시문을 바꾸는 PR 은 라벨 없이도 E2E 를 돌린다**
+
+| PR 이 바꾼 파일(추가, 수정, 삭제 모두) | 결과 |
+| --- | --- |
+| `ContextAssembler.java`(지침 상수를 가진 Control Plane 클래스) | 라벨 없이 `e2e` 도 돈다 |
+| `test/e2e/fake-hermes/scenario-fixtures.ts`(가짜 Hermes 의 `MODEL_GUIDE_HEADERS`) | 같다 |
+
+- 브라우저는 그 두 파일이 만드는 지시문을 읽지 않으므로 건너뛴다. `withoutSlow` 의 세 번째 인자 `keep` 이 라벨 없이 돌릴 느린 job 을 정하고, 판정은 `GUIDE_FILES` 와 `touchesGuide` 가 갖는다.
+- 경로 삭제 규칙(`removesRoute`)과 달리 수정만 해도 돈다. 지침 절을 더하는 것이 곧 #676 의 실수였기 때문이다.
+- 남은 빈틈: 지침을 만드는 다른 파일(새 지침 상수를 다른 클래스에 두는 경우)은 `GUIDE_FILES` 에 더해야 잡힌다. 지침이 어디서 만들어지는지는 파일 목록으로 고정했고, 위치가 바뀌면 이 표와 상수를 함께 고친다. 이런 PR 은 작성자가 `검사:전체` 라벨을 붙인다.
+- 되돌릴 때는 `ci-paths.mjs` 의 `touchesGuide` 호출 인자를 빼고 `GUIDE_FILES` 를 지운다. `e2e-failures` 는 `ci.yml` 에서 job 을 지우고 `e2e-tests` 의 실패 기록 단계를 함께 뺀다.
