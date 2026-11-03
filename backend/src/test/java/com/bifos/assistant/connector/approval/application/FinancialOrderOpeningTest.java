@@ -256,7 +256,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         var cancel = prepare(UUID.randomUUID().toString(), trade("cancel_order", "{\"orderId\":\"new-official-id\"}"));
         assertThat(cancel.allowed()).isFalse();
         assertThat(cancel.actionId()).as("준비가 거절되면 승인 번호가 없다: %s", cancel.message()).isNotNull();
-        assertThat(cancel.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE).startsWith("오류가 아니다.");
+        assertThat(cancel.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE).startsWith("[승인 대기] 오류가 아니다.");
         var pending = action(cancel);
         assertThat(pending.status()).isEqualTo(ActionStatus.PENDING);
         assertThat(pending.toolName()).isEqualTo("cancel_order");

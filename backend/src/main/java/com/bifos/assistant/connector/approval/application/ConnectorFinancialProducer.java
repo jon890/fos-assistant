@@ -76,9 +76,10 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectorFinancialProducer {
     /**
      * 승인 카드를 만든 준비 호출의 답이다. Hermes 는 막힌 호출의 글을 {@code {"error": ...}} 로 모델에게 주므로,
-     * 모델이 주문 거절로 읽지 않게 오류가 아니라 승인 대기라는 것을 글 첫머리에 밝힌다.
+     * 모델이 주문 거절로 읽지 않게 오류가 아니라 승인 대기라는 것을 글 첫머리에 밝힌다. 그 글이 외부 데이터 표시 안에 들어가도
+     * 판정임을 알아보도록 {@link ConnectorApprovalReply#PENDING_MARKER} 로 시작한다.
      */
-    static final String APPROVAL_PENDING_MESSAGE = "오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다. "
+    static final String APPROVAL_PENDING_MESSAGE = ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다. "
         + "아직 주문을 보내지 않았다. 사용자에게 승인 카드에서 내용을 확인하고 승인해 달라고 알린다. "
         + "승인하면 준비한 내용 그대로 한 번 실행된다. 같은 요청을 다시 부르지 않는다.";
     /** 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났을 때의 답이다. 실행 여부를 단정하지 않는다. */

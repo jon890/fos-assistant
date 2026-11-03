@@ -54,7 +54,7 @@ const BINDING_PENDING = "이 에이전트에 붙인 연결이 아직 반영되�
 const BINDING_RESTART = "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
 /** 그 실행의 에이전트에 그 서버를 붙인 연결이 없어 줄을 남기지 않고 막은 호출의 글이다. */
 const NO_CONTEXT = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
-const APPROVAL_PREFIX = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
+const APPROVAL_PREFIX = "[승인 대기] 오류가 아니다. 이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 ";
 
 async function connectionsOf(context: Context, token: string, agentCode: string): Promise<AgentConnectionsView> {
   return expectStatus(

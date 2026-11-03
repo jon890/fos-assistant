@@ -9,10 +9,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorApprovalReply {
     /**
+     * 승인 카드를 띄운 판정 답의 첫머리다. Hermes 는 막힌 호출의 글도 {@code mcp_} 도구 결과처럼 외부 데이터 표시로 감싸므로,
+     * 모델은 공통 실행 지침(trusted)이 설명한 이 표시로 Control Plane 의 판정임을 알아본다. 지침의 글과 같아야 한다.
+     */
+    static final String PENDING_MARKER = "[승인 대기]";
+    /**
      * 모델이 읽는 승인 대기 안내다. 번호는 사용자에게 읽어 주지 않는다.
      * 승인 카드에서 허락하면 저장한 인자로 한 번 실행하고 결과가 같은 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}).
      */
-    private static final String APPROVAL_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
+    private static final String APPROVAL_MESSAGE = PENDING_MARKER + " 오류가 아니다. 이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
         + "대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "
         + "같은 도구를 다시 부르지 않는다. 승인하면 저장한 인자 그대로 한 번 실행되고 결과가 이 대화로 온다.";
 
