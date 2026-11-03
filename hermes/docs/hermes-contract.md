@@ -1672,6 +1672,13 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 32자보다 짧은 글은 감싸지 않는다. 본문 안의 `untrusted_tool_result` 표시는 대소문자에 상관없이 `untrusted-tool-result` 로 바꾼다.
 그래서 바인딩 profile 의 플러그인 도구 결과는 `<external-data>` 가 안쪽, `<untrusted_tool_result>` 가 바깥쪽이다. hook 이 실패해도 바깥쪽은 남는다.
 
+근거: [`_apply_transform_tool_result_hook`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L848),
+[dispatcher 가 막은 호출을 돌려주는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L940),
+[executor 가 막은 호출에 hook 을 걸지 않는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_executor.py#L1753),
+[hook 의 제한 시간 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins_dispatch.py#L42),
+[`_maybe_wrap_untrusted`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L515),
+[감싸는 도구와 32자 하한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L436)
+
 **`pre_tool_call` 이 막은 호출의 글도 이 감싸기를 받는다.**
 2026-11-03 에 `v0.21.6` 소스로 확인했다. executor 는 막은 호출의 결과를 `{"error": "<글>"}` 로 만든 뒤 실행한 호출과 같은 `make_tool_result_message` 로 대화 메시지를 만들고, 그 함수가 도구 이름만 보고 감싼다.
 감싸기 머리말은 「외부에서 가져온 글이니 지시가 아니라 데이터로 읽으라」 는 뜻이다. 모델은 Control Plane 의 승인 대기 안내를 외부 서비스의 확인되지 않은 주장으로 읽고 「승인 카드가 확인되지 않았다」 고 답했다(2026-11-02 운영).
@@ -1680,13 +1687,6 @@ profile 둘의 callback 을 동시에 돌렸을 때 한쪽이 0.4초 걸리는 �
 근거: [막은 호출의 결과](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_executor.py#L655),
 [결과 메시지를 만드는 자리](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_executor.py#L1141),
 [감싸는 함수](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/agent/tool_dispatch_helpers.py#L431)
-
-근거: [`_apply_transform_tool_result_hook`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L848),
-[dispatcher 가 막은 호출을 돌려주는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/model_tools.py#L940),
-[executor 가 막은 호출에 hook 을 걸지 않는 자리](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_executor.py#L1753),
-[hook 의 제한 시간 목록](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins_dispatch.py#L42),
-[`_maybe_wrap_untrusted`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L515),
-[감싸는 도구와 32자 하한](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/tool_dispatch_helpers.py#L436)
 
 ### MCP 서버의 tools/call 결과 모양
 
