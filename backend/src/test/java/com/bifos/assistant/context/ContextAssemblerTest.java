@@ -410,9 +410,9 @@ class ContextAssemblerTest {
         // 그 에이전트는 core 만 받는다. collection 이 core 가 아니면 걸러지지 않아도 통과해 검사가 뜻을 잃는다
         jdbc.update("""
                 INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, data_key_id,
-                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                    retrieval, always_inject, revision, status, created_at, updated_at)
                 VALUES ('USER', 1, 'core', 'MEMORY', '직접 넣은 줄', 'v1.봉인-표식-5512', 999999999, 'ALWAYS', TRUE,
-                    'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", true);
 
@@ -656,28 +656,18 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("그룹 항목과 201자 본문과 문서는 개인 사실 구역에 없고 색인에 제목으로 있으며 예전 민감 항목은 구역에 오른다")
+    @DisplayName("그룹 항목과 201자 본문과 문서는 개인 사실 구역에 없고 색인에 제목으로 있다")
     void leavesNonCandidatesInIndexByTitle() {
         Memory atLimit = memories.create(ADMIN, MemoryScope.USER, "상한 본문", "나".repeat(200), false);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 사실", "그룹 본문", false);
         Memory overLimit = memories.create(ADMIN, MemoryScope.USER, "넘친 본문", "다".repeat(201), false);
-        Memory formerSensitive = memories.create(
-            ADMIN,
-            MemoryScope.USER,
-            "예전 민감 사실",
-            "예전 민감 본문",
-            Memory.DEFAULT_COLLECTION,
-            MemoryRetrieval.SEARCH);
-        // 직전 이미지가 민감으로 남긴 칸은 코드가 읽지 않는다. 이 항목은 다른 항목과 같이 개인 사실 구역에 오른다
-        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", formerSensitive.id());
         Long document = insertDocument("USER", ADMIN.id(), null, "short-note", "짧은 문서");
 
         AssembledContext result = assembler.assembleForOwner(ADMIN);
 
         assertThat(factsSection(result))
             .contains(
-                "- [" + atLimit.id() + "] 상한 본문: " + atLimit.content(),
-                "- [" + formerSensitive.id() + "] 예전 민감 사실: 예전 민감 본문")
+                "- [" + atLimit.id() + "] 상한 본문: " + atLimit.content())
             .doesNotContain(
                 "[" + group.id() + "]",
                 "[" + overLimit.id() + "]",
@@ -901,8 +891,8 @@ class ContextAssemblerTest {
     private Long insertDocument(String scope, Long ownerUserId, Long groupId, String documentKey, String title) {
         jdbc.update("""
                 INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, document_key, title,
-                    content, retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '문서 본문', 'SEARCH', FALSE, 'NORMAL', 1, 'ACCEPTED',
+                    content, retrieval, always_inject, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '문서 본문', 'SEARCH', FALSE, 1, 'ACCEPTED',
                     CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """, scope, ownerUserId, groupId, documentKey, title);
         return jdbc.queryForObject(

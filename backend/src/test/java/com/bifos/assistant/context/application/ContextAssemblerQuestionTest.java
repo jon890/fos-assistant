@@ -141,8 +141,8 @@ class ContextAssemblerQuestionTest {
 
 
     @Test
-    @DisplayName("예전 민감 항목도 받은 collection 이면 본문까지 실리고, 풀지 못한 항목은 색인에도 없다")
-    void placesFormerSensitiveItemsAndSkipsSealedOnes() {
+    @DisplayName("건강 collection 의 개인 기억도 받은 collection 이면 본문까지 실리고, 풀지 못한 항목은 색인에도 없다")
+    void placesHealthItemsAndSkipsSealedOnes() {
         group("가족 행사", "다음 달 첫째 주 토요일에 할머니 댁에 간다");
         Memory former = memories.create(
             ADMIN,
@@ -151,8 +151,6 @@ class ContextAssemblerQuestionTest {
             "땅콩 들어간 음식은 먹으면 안 된다",
             HEALTH,
             MemoryRetrieval.SEARCH);
-        // 직전 이미지가 민감으로 남긴 칸은 코드가 읽지 않는다
-        jdbc.update("UPDATE memory SET sensitivity = 'SENSITIVE' WHERE id = ?", former.id());
         Long sealed = insertSealed("땅콩 들어간 과자 영수증");
 
         AssembledContext result = assembler.assemble(ADMIN, agentId, PEANUT_QUESTION);
@@ -262,8 +260,8 @@ class ContextAssemblerQuestionTest {
     private Long insertDocument(String scope, Long ownerUserId, Long groupId, String documentKey, String title) {
         jdbc.update("""
                 INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, document_key, title,
-                    content, retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '땅콩 들어간 음식은 먹지 않는다', 'SEARCH', FALSE, 'NORMAL', 1, 'ACCEPTED',
+                    content, retrieval, always_inject, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '땅콩 들어간 음식은 먹지 않는다', 'SEARCH', FALSE, 1, 'ACCEPTED',
                     CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """, scope, ownerUserId, groupId, documentKey, title);
         return jdbc.queryForObject(
@@ -275,9 +273,9 @@ class ContextAssemblerQuestionTest {
     private Long insertSealed(String title) {
         jdbc.update("""
                 INSERT INTO memory (scope, owner_user_id, collection, entry_type, title, content, data_key_id,
-                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                    retrieval, always_inject, revision, status, created_at, updated_at)
                 VALUES ('USER', 1, 'core', 'MEMORY', ?, 'v1.땅콩-들어간-봉인', 999999999, 'SEARCH', FALSE,
-                    'NORMAL', 1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                    1, 'ACCEPTED', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """, title);
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }

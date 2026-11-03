@@ -141,16 +141,16 @@ class MemoryEncryptionTest {
     }
 
 
-    /** 평문 줄을 넣는다. {@code sensitivity} 는 직전 이미지가 남긴 칸이고 코드는 읽지 않는다. */
-    private Long insertRow(String scope, Long owner, Long group, String title, String content, String sensitivity) {
+    /** 직전 이미지가 남긴 것처럼 평문 줄을 넣는다. */
+    private Long insertRow(String scope, Long owner, Long group, String title, String content) {
         jdbc.update(
             """
                 INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, title, content,
-                    retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'core', 'MEMORY', ?, ?, 'SEARCH', FALSE, ?, 1, 'ACCEPTED',
+                    retrieval, always_inject, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'MEMORY', ?, ?, 'SEARCH', FALSE, 1, 'ACCEPTED',
                     CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                 """,
-            scope, owner, group, title, content, sensitivity);
+            scope, owner, group, title, content);
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }
 
@@ -270,9 +270,9 @@ class MemoryEncryptionTest {
         jdbc.update(
             "INSERT INTO user_data_key (user_id, kek_id, wrapped_key, created_at) VALUES (4242, 'missing-kek', 'v1.x.y', CURRENT_TIMESTAMP(6))");
         Long lockedKeyId = jdbc.queryForObject("SELECT id FROM user_data_key WHERE user_id = 4242", Long.class);
-        Long plain = insertRow("USER", 4242L, null, "옮기기 전 제목", "옮기기 전 본문", "NORMAL");
+        Long plain = insertRow("USER", 4242L, null, "옮기기 전 제목", "옮기기 전 본문");
         jdbc.update("UPDATE memory SET collection = 'core' WHERE id = ?", plain);
-        Long sealed = insertRow("USER", 4242L, null, "v1.AAAAAAAAAAAAAAAA.AAAA", "v1.AAAAAAAAAAAAAAAA.AAAA", "NORMAL");
+        Long sealed = insertRow("USER", 4242L, null, "v1.AAAAAAAAAAAAAAAA.AAAA", "v1.AAAAAAAAAAAAAAAA.AAAA");
         jdbc.update("UPDATE memory SET data_key_id = ? WHERE id = ?", lockedKeyId, sealed);
         long before = repository.count();
 
@@ -302,13 +302,13 @@ class MemoryEncryptionTest {
 
     @Test
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
-    @DisplayName("직전 이미지가 민감으로 남긴 줄도 목록에 본문이 보이고 목록 경로로 고치며 받은 collection 의 에이전트에 실린다")
-    void formerlySensitiveRowsAreOrdinary() {
-        Long former = insertRow("USER", ADMIN.id(), null, "옛 민감 제목", FIRST, "SENSITIVE");
+    @DisplayName("이관한 옛 줄도 목록에 본문이 보이고 목록 경로로 고치며 받은 collection 의 에이전트에 실린다")
+    void migratedRowsAreOrdinary() {
+        Long former = insertRow("USER", ADMIN.id(), null, "옛 제목", FIRST);
         assertThat(migration.migrate()).isEqualTo(1);
 
         assertThat(listOf(ADMIN)).singleElement().satisfies(view -> {
-            assertThat(view.title()).isEqualTo("옛 민감 제목");
+            assertThat(view.title()).isEqualTo("옛 제목");
             assertThat(view.content()).isEqualTo(FIRST);
             assertThat(view.unreadable()).isFalse();
         });
@@ -323,8 +323,8 @@ class MemoryEncryptionTest {
     @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
     @DisplayName("기동 이관은 평문 줄과 revision 을 데이터 key 로 다시 쓰고 글의 해시가 같으며 두 번 돌려도 바뀌지 않는다")
     void migrationRewritesPlainRows() {
-        Long userId = insertRow("USER", 1L, null, "옛 제목", SECOND, "SENSITIVE");
-        Long groupId = insertRow("GROUP", null, 1L, TITLE, FIRST, "NORMAL");
+        Long userId = insertRow("USER", 1L, null, "옛 제목", SECOND);
+        Long groupId = insertRow("GROUP", null, 1L, TITLE, FIRST);
         jdbc.update(
             """
                 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, collection, entry_type,
@@ -353,8 +353,8 @@ class MemoryEncryptionTest {
     @DisplayName("이관이 한 줄에서 실패해도 다른 줄은 옮기고, 실패한 줄은 옛 모양 그대로이며 로그에 번호만 남는다")
     void migrationFailureLeavesOnlyThatRow(CapturedOutput output) {
         // 주인이 빈 개인 기억은 주인 key 를 고를 수 없어 옮기지 못한다
-        Long broken = insertRow("USER", null, null, "깨진 줄", "깨진-표식-1188", "NORMAL");
-        Long plain = insertRow("USER", 1L, null, TITLE, FIRST, "NORMAL");
+        Long broken = insertRow("USER", null, null, "깨진 줄", "깨진-표식-1188");
+        Long plain = insertRow("USER", 1L, null, TITLE, FIRST);
 
         assertThat(migration.migrate()).isEqualTo(1);
 
@@ -418,7 +418,7 @@ class MemoryEncryptionTest {
         Memory first = memories.proposeUser(ADMIN, TITLE, FIRST, 1L);
         // 직전 이미지로 되돌린 동안 같은 글의 제안이 SHA-256 키로 하나 더 생겼다
         String plainKey = Sha256.hex(ADMIN.id() + "\u0000" + TITLE + "\u0000" + FIRST);
-        Long second = insertRow("USER", ADMIN.id(), null, TITLE, FIRST, "NORMAL");
+        Long second = insertRow("USER", ADMIN.id(), null, TITLE, FIRST);
         jdbc.update("UPDATE memory SET status = 'PROPOSED', proposal_dedup_key = ? WHERE id = ?", plainKey, second);
         assertThat(migration.migrate()).isEqualTo(1);
 
