@@ -234,6 +234,12 @@ class ConnectorVaultEncryptionTest(VaultKeyTest):
         self.assertTrue(any("모양을 읽지 못하는" in line for line in logs))
         self.assertEqual(self.plugin._read_vault("c1")["connector"], OTHER)
 
+    def test_vault_name_with_newline_is_rejected(self):
+        """보관 파일 이름 끝의 줄바꿈을 받지 않는다. 이관이 보지 못하는 이름의 파일이 생기지 않게 한다."""
+        self.bind_fixture()
+        self.assertEqual(self.put(vault="c8\n").status_code, 400)
+        self.assertFalse(any("\n" in name for name in os.listdir(self.hermes_root / "connector-vault")))
+
     def test_tampered_v2_shapes_are_rejected(self):
         """v2 의 키 집합, key id, 암호문 모양이 틀리면 읽기 실패다."""
         self.use_keys()
@@ -250,6 +256,7 @@ class ConnectorVaultEncryptionTest(VaultKeyTest):
             ("short iv", {**good, "sealed": "v1.AAAA.%s" % pieces[2]}),
             ("flipped tag", {**good, "sealed": ".".join(pieces[:2] + [flipped])}),
             ("version 3", {**good, "v": 3}),
+            ("bool version", {"v": True, "connector": DEMO, "values": {"token": SECRET}}),
         ):
             with self.subTest(label):
                 path.write_text(json.dumps(changed), encoding="utf-8")

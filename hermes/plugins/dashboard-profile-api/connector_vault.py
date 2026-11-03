@@ -30,7 +30,7 @@ from .connector_vault_key import (
 # 연결의 칸 값을 두는 보관 파일의 디렉터리다. 대시보드의 Hermes 루트 아래에 둔다(ADR-083).
 CONNECTOR_VAULT_DIR = "connector-vault"
 # 보관 파일 이름이다. Control Plane 의 연결 id 앞에 `c` 를 붙인다. 경로 조각으로 쓰기 전에 본다.
-VAULT_ID_RE = re.compile(r"^c[1-9][0-9]{0,18}$")
+VAULT_ID_RE = re.compile(r"^c[1-9][0-9]{0,18}\Z")
 VAULT_PATH = "/api/connector-vault"
 VAULT_ROUTES = frozenset({(VAULT_PATH, "PUT"), (VAULT_PATH, "DELETE")})
 # 보관 파일 쓰기의 임시 파일 이름 앞부분이다. 쓰는 중에 프로세스가 죽으면 평문이 남을 수 있어 기동 이관이 지운다.
@@ -73,12 +73,13 @@ def _parse_vault(raw: bytes) -> dict:
     if (not isinstance(value, dict) or not isinstance(value.get("connector"), str)
             or not CONNECTOR_ID_RE.match(value["connector"])):
         raise ValueError("보관 파일의 모양이 올바르지 않다")
-    if value.get("v") == 1 and set(value) == {"v", "connector", "values"}:
+    version = value.get("v") if type(value.get("v")) is int else None
+    if version == 1 and set(value) == {"v", "connector", "values"}:
         values = value["values"]
         if isinstance(values, dict) and all(isinstance(key, str) and isinstance(item, str)
                                             for key, item in values.items()):
             return value
-    if (value.get("v") == 2 and set(value) == {"v", "connector", "key_id", "sealed"}
+    if (version == 2 and set(value) == {"v", "connector", "key_id", "sealed"}
             and isinstance(value["key_id"], str) and KEY_ID_RE.match(value["key_id"])
             and isinstance(value["sealed"], str)):
         return value

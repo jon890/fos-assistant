@@ -73,6 +73,10 @@ def _migrate_vault_files() -> dict:
                 "남은 평문 파일 %d, 남은 옛 key 파일 %d, 풀지 못한 파일 %d, 지운 임시 파일 %d",
                 keys.state, "참" if keys.required else "거짓", counts["kept"], counts["from_plain"], counts["from_old_key"],
                 counts["plain"], counts["old_key"], counts["unopened"], counts["temp_removed"])
+    if not keys.ready and counts["kept"]:
+        # 활성 key 를 모르면 옛 key 파일을 가를 수 없다. 이 기동의 옛 key 파일 수 0 은 key 를 빼도 된다는 근거가 아니다.
+        logger.warning("dashboard-profile-api: 보관 파일 key 가 %s 라 암호화한 파일 %d 개의 옛 key 여부를 세지 않았다",
+                       keys.state, counts["kept"])
     if left:
         logger.warning("dashboard-profile-api: 이관하지 못하고 남은 보관 파일: %s", ", ".join(left))
     return counts

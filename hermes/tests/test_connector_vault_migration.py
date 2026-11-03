@@ -87,6 +87,7 @@ class ConnectorVaultMigrationTest(VaultKeyTest):
                 counts, logs = self.migrate()
                 self.assertEqual(self.snapshot(), before)
                 self.assertEqual((counts["plain"], counts["kept"], counts["from_plain"]), (1, 2, 0))
+                self.assertTrue(any("옛 key 여부를 세지 않았다" in line for line in logs))
 
     def test_rewrite_that_does_not_read_back_is_restored(self):
         """다시 쓴 파일을 다시 읽어 값이 다르면 원래 바이트로 되돌리고 남은 파일로 센다."""
