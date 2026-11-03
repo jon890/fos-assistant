@@ -35,6 +35,23 @@ for connector in "${connectors[@]}"; do
   (check_connector "${connector}") >"${log_dir}/$(basename "${connector}").log" 2>&1 &
   pids+=("$!")
 done
+# 커넥터 하나가 멈추면 CI 시간 제한에 묻히지 않게 1분마다 아직 도는 커넥터 이름을 알린다.
+(
+  sleeper=""
+  trap '[ -z "${sleeper}" ] || kill "${sleeper}" 2>/dev/null; exit 0' TERM
+  while true; do
+    sleep 60 &
+    sleeper=$!
+    wait "${sleeper}"
+    for index in "${!connectors[@]}"; do
+      if kill -0 "${pids[$index]}" 2>/dev/null; then
+        echo "아직 도는 중: $(basename "${connectors[$index]}")" >&2
+      fi
+    done
+  done
+) >/dev/null &
+progress_pid=$!
+trap 'kill "${progress_pid}" 2>/dev/null || true; rm -rf "${log_dir}"' EXIT
 failed=()
 for index in "${!connectors[@]}"; do
   name="$(basename "${connectors[$index]}")"
@@ -44,6 +61,7 @@ for index in "${!connectors[@]}"; do
   cat "${log_dir}/${name}.log"
   if [ "${status}" -ne 0 ]; then failed+=("${name}"); fi
 done
+kill "${progress_pid}" 2>/dev/null || true
 if [ "${#failed[@]}" -gt 0 ]; then
   echo "커넥터 검사가 실패했다: ${failed[*]}" >&2
   exit 1

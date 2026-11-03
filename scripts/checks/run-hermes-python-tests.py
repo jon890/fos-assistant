@@ -12,6 +12,7 @@
 - 동시 수의 기본값은 CPU 수와 4 중 작은 값이다. `-j 1` 이면 차례로 돈다.
 - 모듈 이름을 주면(예: test_fos_ctx.py) 그것만 돈다.
 - 통과한 모듈은 한 줄만 보이고, 실패한 모듈은 그 출력을 모두 보인다.
+- 모듈 하나가 300초 안에 끝나지 않으면 이름과 그때까지의 출력을 보이고 실패로 센다.
 - 하나라도 실패하면 종료 코드 1 이다. 돈 테스트가 없는 모듈도 실패다(unittest 의 종료 코드 5).
 """
 import argparse
@@ -24,6 +25,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TESTS = ROOT / "hermes" / "tests"
+# 가장 느린 모듈이 CI 에서 약 45초다. 멈춘 모듈을 job 시간 제한(10분)보다 먼저 찾아낸다.
+MODULE_TIMEOUT_SECONDS = 300
 
 
 def modules(selected: list[str]) -> list[Path]:
@@ -40,14 +43,22 @@ def modules(selected: list[str]) -> list[Path]:
 
 def run(module: Path) -> tuple[Path, int, float, str]:
     started = time.monotonic()
-    done = subprocess.run(
-        [sys.executable, "-m", "unittest", "discover", "-s", str(TESTS), "-p", module.name],
-        cwd=ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        errors="replace",
-    )
+    try:
+        done = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", str(TESTS), "-p", module.name],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            timeout=MODULE_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as expired:
+        # 멈춘 모듈이 job 시간 제한에 묻히지 않게 이름과 그때까지의 출력을 남기고 실패로 센다.
+        partial = expired.stdout or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        return module, 124, time.monotonic() - started, f"{MODULE_TIMEOUT_SECONDS}초 안에 끝나지 않았다\n{partial}"
     return module, done.returncode, time.monotonic() - started, done.stdout
 
 
