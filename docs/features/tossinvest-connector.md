@@ -81,7 +81,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 �
 계좌는 연결에서 고른 값으로만 정해진다. 모델이 넣은 계좌는 연결의 계좌와 같아도 받지 않는다. 받으면 scope 를 모델 인자와 대조하는 길이 하나 더 생기기 때문이다.
 Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 넘겨 승인 줄을 만들고, 모델에게는 언제나 막힘으로 답한다.
 Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 만들어 `<untrusted_tool_result>` 로 감싸 모델에게 준다. 승인 줄을 만든 답은 「[승인 대기] 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절이나 외부 서비스의 확인되지 않은 주장으로 읽지 않게 한다. 표시의 뜻은 공통 실행 지침이 설명한다([플러그인 도구 정책과 승인](connector-policy.md)의 「승인 대기 안내를 모델이 읽는 방식」).
-글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다.
+글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다. 대화 없는 실행이 만든 줄은 카드가 없어 표시 없는 `APPROVAL_WITHOUT_CONVERSATION_MESSAGE` 로 답한다.
 
 준비가 거절된 답은 `ConnectorFinancialIntake.rejectedMessage` 가 고른다. 이 함수가 고르는 거절 가운데서는 같은 의도 차단만 까닭을 밝힌다. 상한 거절은 「주문 상한」 의 답을 따로 쓴다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)).
 

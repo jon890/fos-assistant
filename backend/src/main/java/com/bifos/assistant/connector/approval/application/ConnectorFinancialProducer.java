@@ -82,6 +82,9 @@ class ConnectorFinancialProducer {
     static final String APPROVAL_PENDING_MESSAGE = ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다. "
         + "아직 주문을 보내지 않았다. 사용자에게 승인 카드에서 내용을 확인하고 승인해 달라고 알린다. "
         + "승인하면 준비한 내용 그대로 한 번 실행된다. 같은 요청을 다시 부르지 않는다.";
+    /** 대화 없는 실행이 만든 승인 줄의 답이다. 카드와 알림이 없으므로 승인 대기 표시를 붙이지 않는다. */
+    static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 주문은 사용자의 승인이 필요하다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 "
+        + "실행되지 않는다. 같은 요청을 다시 부르지 않는다.";
     /** 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났을 때의 답이다. 실행 여부를 단정하지 않는다. */
     static final String APPROVAL_SETTLED_MESSAGE = "이 요청의 승인 카드는 이미 처리됐다. 승인 대기가 아니다. "
         + "같은 요청을 다시 부르지 말고 사용자에게 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내한다.";
@@ -302,7 +305,8 @@ class ConnectorFinancialProducer {
 
 
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
-        String message = action.status() == ActionStatus.PENDING ? APPROVAL_PENDING_MESSAGE : APPROVAL_SETTLED_MESSAGE;
+        String pending = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_PENDING_MESSAGE;
+        String message = action.status() == ActionStatus.PENDING ? pending : APPROVAL_SETTLED_MESSAGE;
         return new ConnectorPolicyAnswer(false, message, action.publicId());
     }
 

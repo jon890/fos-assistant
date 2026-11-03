@@ -583,6 +583,17 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("대화 없는 실행의 준비 답은 승인 대기 표시 없이 승인받을 화면이 없다고 말한다")
+    void prepareWithoutConversationHasNoMarker() {
+        jdbc.update("update agent_execution set conversation_id = null where hermes_session_id = ?", session);
+        var answer = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+        assertThat(answer.actionId()).isNotNull();
+        assertThat(answer.message()).isEqualTo(ConnectorFinancialProducer.APPROVAL_WITHOUT_CONVERSATION_MESSAGE).doesNotContain("[승인 대기]");
+        assertThat(action(answer).conversationId()).isNull();
+    }
+
+
+    @Test
     @DisplayName("승인 기한이 지난 PENDING 은 만료 작업이 돌기 전에도 같은 주문의 새 카드를 막지 않는다")
     void expiredPendingDoesNotBlockNewCard() {
         var first = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
