@@ -37,8 +37,6 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary
 import com.bifos.assistant.connector.connection.application.dto.ConnectorToolSummary;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
-import com.bifos.assistant.connector.action.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
@@ -190,9 +188,6 @@ class ConnectorConnectionServiceTest {
     @Autowired
     BrowserGatewayTokens tokens;
 
-    @Autowired
-    ConnectorToolGrantRepository grants;
-
 
     @BeforeEach
     void setUp() {
@@ -213,7 +208,6 @@ class ConnectorConnectionServiceTest {
 
     @AfterEach
     void tearDown() {
-        jdbc.update("DELETE FROM connector_tool_grant");
         bindings.deleteAll();
         connections.deleteAll();
         agents.deleteAll();
@@ -286,8 +280,8 @@ class ConnectorConnectionServiceTest {
             .thenReturn(ConnectorToolListing.success(Map.of("list_notes", true, "find_note", true)));
         service.register(user, STANDARD, STANDARD_VALUES);
         Instant later = Instant.now().plus(Duration.ofDays(1));
-        grants.save(ConnectorToolGrant.of(user.id(), STANDARD, "list_notes", later));
-        grants.save(ConnectorToolGrant.of(user.id(), STANDARD, "find_note", later));
+        grants().tool(user.id(), STANDARD, "list_notes", later);
+        grants().tool(user.id(), STANDARD, "find_note", later);
         // 서버가 `list_notes` 의 표시를 거두고 `find_note` 를 목록에서 뺐다.
         when(connector.listToolsWithVault(STANDARD, stored(user, STANDARD).vault()))
             .thenReturn(ConnectorToolListing.success(Map.of("list_notes", false, "delete_note", false)));
@@ -298,8 +292,8 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.status()).isEqualTo(ConnectionStatus.READY);
         assertThat(checked.listedTools()).isEqualTo(2);
         assertThat(checked.readOnlyTools()).isZero();
-        assertThat(grants.findAll())
-            .extracting(ConnectorToolGrant::toolName, grant -> grant.revokedAt() != null)
+        assertThat(grants().tools())
+            .extracting(GrantRows.Row::toolName, grant -> grant.revokedAt() != null)
             .containsExactlyInAnyOrder(tuple("list_notes", true), tuple("find_note", true));
     }
 
@@ -1350,5 +1344,10 @@ class ConnectorConnectionServiceTest {
         String suffix = UUID.randomUUID().toString();
         AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
+    }
+
+
+    private GrantRows grants() {
+        return new GrantRows(jdbc);
     }
 }

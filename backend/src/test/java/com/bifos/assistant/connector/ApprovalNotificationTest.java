@@ -499,8 +499,6 @@ class ApprovalNotificationTest {
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
     private void deleteRows() {
         jdbc.update("DELETE FROM connector_action");
-        jdbc.update("DELETE FROM connector_tool_grant");
-        jdbc.update("DELETE FROM connector_conversation_grant");
         notifications.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();

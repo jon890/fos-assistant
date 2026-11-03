@@ -17,8 +17,6 @@ import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.ConnectorActionExecution;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
-import com.bifos.assistant.connector.action.domain.ConnectorConversationGrant;
-import com.bifos.assistant.connector.action.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.action.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
@@ -106,8 +104,6 @@ final class JpaAuditingEntityFixtures {
         add(entityManager, rows, ChatArtifact.of(conversation.id(), 1L, unique, 1L));
         add(entityManager, rows, ChatAttachment.of(conversation.id(), user.id(), "audit.txt", "text/plain", 1, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ResultDelivery.opened(conversation.id(), "{\"version\":1,\"items\":[]}", null, BUSINESS));
-        add(entityManager, rows, ConnectorToolGrant.of(user.id(), "audit", "audit", BUSINESS.plusSeconds(60)));
-        add(entityManager, rows, ConnectorConversationGrant.of(action, BUSINESS.plusSeconds(60)));
         add(entityManager, rows, ConnectorActionExecution.stored(action, connection.id(), binding.id(), BUSINESS, BUSINESS,
             "{}", "{}", "{}", null, "f".repeat(64), "f".repeat(64), unique, "audit"));
         add(entityManager, rows, new ContentDraft(unique, conversation.id(), user.id(), BUSINESS.plusSeconds(60)));

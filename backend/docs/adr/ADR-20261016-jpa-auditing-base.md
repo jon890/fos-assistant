@@ -52,12 +52,10 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `chat_artifact` / `ChatArtifact` | C: 결과물 행의 저장 시각. 목록·오래된 행 정리는 저장 순서를 사용 | deletedAt 및 삭제 bulk 유지 |
 | `chat_attachment` / `ChatAttachment` | C: 업로드 메타데이터 행의 저장 시각 | expiresAt/deletionRequestedAt/deletedAt 및 삭제 요청 bulk 유지 |
 | `chat_message` / `ChatMessage` | 제외: 메시지가 오간 시각. ChatMessageRepository가 마지막 사용자 발언과 특정 시각 뒤 메시지를 조회 | C와 메시지 생성 인자 유지. 본문 암호화 bulk도 C를 바꾸지 않음 |
-| `connector_action` / `ConnectorAction` | 제외: 승인 요청의 발생 시각. ApprovalCandidates가 출처 시각으로 사용 | expiresAt/decidedAt/executedAt/resultDeliveredAt도 명시 전달 |
+| `connector_action` / `ConnectorAction` | 제외: 승인 요청의 발생 시각. ApprovalCandidates가 출처 시각으로 사용 | expiresAt/decidedAt/executedAt/resultDeliveredAt와 허락의 grant_expires_at/grant_revoked_at도 명시 전달. 허락 거두기 bulk 유지 |
 | `connector_action_execution` / `ConnectorActionExecution` | C: ticket와 실행 snapshot 행의 저장 시각. 실행·소비 시각은 별도 필드 | connectionUpdatedAt/bindingUpdatedAt/ticketExpiresAt/consumedAt 유지 |
 | `connector_connection` / `ConnectorConnection` | C: 연결 행의 최초 저장만 자동화 | U는 금융 ticket·원고 snapshot·설치 비교 기준으로 명시 전달 |
 | `agent_connector_binding` / `ConnectorBinding` | C: 붙인 관계 행의 최초 저장만 자동화 | U와 restartRequiredSince/checkedAt/applyDueAt은 명시 전달 |
-| `connector_conversation_grant` / `ConnectorConversationGrant` | C: 대화 허락 행의 저장 시각 | expiresAt/revokedAt 및 권한 철회 bulk 유지 |
-| `connector_tool_grant` / `ConnectorToolGrant` | C: 도구 허락 행의 저장 시각 | expiresAt/revokedAt 유지 |
 | `content_draft` / `ContentDraft` | C: 원고 본체 행의 저장 시각. 본문 시점은 revision이 소유 | currentRevision/expiresAt 조건부 bulk 유지 |
 | `content_draft_creation_request` / `ContentDraftCreationRequest` | C: 재시도 식별을 위한 요청 행의 저장 시각 | 불변 본문·요청 지문 유지. UPDATE bulk 없음 |
 | `content_draft_snapshot` 의 job 칸 / `ContentDraftJob`(snapshot 에 끼운 값, 2026-11-02 부터) | 제외: 임시저장 job의 큐 등록 시각(`job_created_at`) | 승인·확인·startClaimedAt/saveClaimedAt과 claim bulk 유지 |
@@ -145,7 +143,8 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | `ContentDraftSnapshotRepository`의 job claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
 | `ContentDraftRepository`, `ContentDraftRevisionRepository` | 현재 revision·만료·파기 상태를 조건부 갱신한다. 생성 C는 보존한다 |
 | `ChatAttachmentRepository` | 삭제 요청·삭제 시각만 갱신한다 |
-| `ConnectorConversationGrantRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
+| `ConnectorToolGrantRepository`, `ConnectorConversationGrantRepository` | 승인 줄의 `grant_revoked_at` 만 bulk 로 갱신한다([ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md)) |
+| `AgentTokenRepository` | 토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
 | `NotificationRepository`의 읽음 갱신 | readAt만 갱신하고 생성 C는 보존한다 |
 
 감사 대상의 새 bulk 경로는 같은 트랜잭션에서 업무 값과 감사 시각을 함께 갱신해야 한다.

@@ -24,7 +24,6 @@ import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
-import com.bifos.assistant.connector.action.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -71,7 +70,6 @@ public class ContentDraftSaveApproval {
     static final String SAVE_TOOL = "save_draft";
 
     private final ConnectorActionRepository actions;
-    private final ConnectorConversationGrantRepository conversationGrants;
     private final ContentDraftSnapshotRepository snapshotRows;
     private final ContentDraftSnapshots snapshots;
     private final ContentDraftBindingAccess bindings;
@@ -114,7 +112,7 @@ public class ContentDraftSaveApproval {
             FeedbackEventType.APPROVED, FeedbackActor.USER, now()).conversation(finished.conversationId())
             .originExecution(finished.originExecutionId()).version(finished.argsSha256()));
         new ConnectorActionSignals(events, notifications, conversations).publish(finished);
-        return new ConnectorActionDetails(actions, conversationGrants, catalog, clock).view(finished);
+        return new ConnectorActionDetails(actions, catalog, clock).view(finished);
     }
 
 
