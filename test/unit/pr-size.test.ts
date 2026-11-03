@@ -132,6 +132,7 @@ test("JSON 계약과 phase·순수 이동·기능 영역 후보를 실제 git di
     put("backend/src/main/java/com/bifos/assistant/chat/App.java", "code\n".repeat(MAX_LINES + 1));
     put("web/src/app/page.tsx", "page\n");
     put("tasks/plan-test/phase-02.md", "## 변경 파일\n- `web/src/app/page.tsx`\n");
+    put("docs/features/chat/tasks/plan-feature/phase-03.md", "## 변경 파일\n- `web/src/app/page.tsx`\n");
     rmSync(join(cwd, "tasks/plan-test/phase-01.md"));
     git("add", "."); git("commit", "-qm", "changes");
     const result = spawnSync("node", [SCRIPT, "--json", base], { cwd, encoding: "utf8", env: CLI_ENV });
@@ -147,6 +148,9 @@ test("JSON 계약과 phase·순수 이동·기능 영역 후보를 실제 git di
     const phase = json.split_candidates.find((c: any) => c.name === "tasks/plan-test/phase-01.md");
     assert.deepEqual(phase, { kind: "phase", name: "tasks/plan-test/phase-01.md", files: ["backend/src/main/java/com/bifos/assistant/chat/App.java"], counts: { production: MAX_LINES + 1, tests: 0, docs: 0, ignored: 0 } });
     assert.equal(json.split_candidates.find((c: any) => c.name === "tasks/plan-test/phase-02.md").counts.production, 1);
+    const featurePhase = json.split_candidates.find((c: any) => c.name === "docs/features/chat/tasks/plan-feature/phase-03.md");
+    assert.equal(featurePhase.kind, "phase");
+    assert.deepEqual(featurePhase.files, ["web/src/app/page.tsx"]);
     const move = json.split_candidates.find((c: any) => c.kind === "move");
     assert.deepEqual(move.files, ["web/src/features/chat/new.ts", "web/src/features/chat/old.ts"]);
     assert.deepEqual(move.counts, { production: 0, tests: 0, docs: 0, ignored: 0 });

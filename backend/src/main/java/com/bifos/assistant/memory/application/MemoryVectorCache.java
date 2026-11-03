@@ -2,7 +2,7 @@ package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.application.dto.RelevanceCandidate;
 import com.bifos.assistant.memory.config.MemoryEmbeddingProperties;
-import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * 저장한 벡터를 프로세스 안에 둔다. 매 질문마다 모든 벡터를 데이터베이스에서 읽지 않으려는 것이다.
  *
  * <p>후보의 지금 글로 채우는 작업과 같은 지문을 계산해, 모델과 지문이 같은 줄만 쓴다. 본문을 고친 항목의 낡은 벡터는 쓰지 않는다. 캐시에 없는 번호만 한 번에
- * 읽는다. 서버 인스턴스가 하나라 여러 프로세스가 맞추는 장치를 두지 않는다. 채우는 작업이 줄을 바꾸거나 지우면 그 번호를 뺀다.
+ * 기억 항목 줄의 {@code embedding_*} 칸에서 읽는다. 서버 인스턴스가 하나라 여러 프로세스가 맞추는 장치를 두지 않는다. 채우는 작업이 벡터를 바꾸거나 비우면 그 번호를 뺀다.
  */
 @Component
 @RequiredArgsConstructor
@@ -45,7 +45,7 @@ public class MemoryVectorCache {
             }
         });
         if (!missing.isEmpty()) {
-            for (MemoryEmbedding row : embeddings.findByMemoryIdIn(missing)) {
+            for (MemoryEmbeddingVector row : embeddings.findVectors(missing)) {
                 cache.put(row.memoryId(), new Cached(row.model(), row.textFingerprint(), row.vector()));
             }
         }
@@ -65,13 +65,13 @@ public class MemoryVectorCache {
     }
 
 
-    /** 채우는 작업이 줄을 넣거나 바꾸거나 지운 뒤 부른다. */
+    /** 채우는 작업이 벡터를 넣거나 바꾸거나 비운 뒤, 항목을 지운 뒤 부른다. */
     public void evict(Long memoryId) {
         cache.remove(memoryId);
     }
 
 
-    /** 모두 비운다. 저장한 줄을 한꺼번에 지운 테스트가 쓴다. */
+    /** 모두 비운다. 저장한 벡터를 한꺼번에 비운 테스트가 쓴다. */
     public void clear() {
         cache.clear();
     }

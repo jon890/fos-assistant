@@ -7,13 +7,11 @@ agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 �
 agent_memory_collection|AGENT|agent_id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.
 agent_memory_collection_change|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. 변경 이력도 지연 정리에서 지운다.
 agent_token|AGENT|id|KEEP|KEEP|KEEP|profile_name으로 profile에 속한다. 운영 등록 profile은 에이전트 삭제 후에도 남기는 계약이다.
-agent_toolset_request|AGENT|id|DELETE|KEEP|DELETE|agent_id와 requester_user_id FK가 있다. 에이전트 지연 정리에서 지운다.
 allowed_person|USER|id|SCRUB|KEEP|KEEP|FK 없이 정규화한 email로 app_user에 연결된다. 접근 해제와 사용자 정리 모두 허용 목록 행을 꺼진 채 남기고, 정리는 purge_scheduled_at만 비운다.
 app_user|USER|id|DELETE|KEEP|KEEP|사용자 루트다. 접근 해제는 지우지 않고, 예약한 지 30일이 지나면 사용자 정리가 대화 정리를 기다린 뒤 마지막에 지운다.
 chat_artifact|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id에 속한다. ConversationPurgeWriter가 지운다.
 chat_attachment|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id와 uploaded_by_user_id에 속한다. 대화 purge가 행을 지운다.
 chat_message|CONVERSATION|id|DELETE|DELETE|KEEP|conversation_id에 속한다. 대화 purge가 본문 행을 지운다.
-chat_pending_message|CONVERSATION|id|KEEP|KEEP|KEEP|코드가 읽고 쓰지 않는 옛 표다. 대기 메시지는 conversation.pending_messages 가 갖고 대화 삭제와 정리가 그 칸을 비운다. 이관이 옮긴 행은 지웠고, 직전 이미지가 쓴 행은 옛 표를 지우는 PR 이 다시 옮긴다(ADR-20261102 / table-reduce-r2).
 connector_action|CONVERSATION|id|DELETE|SCRUB|DETACH|user_id FK와 conversation_id에 속한다. 대화 purge는 인자·결과와 key만 지우고 감사와 금융 상한 변경 칸은 남긴다. 승인하면서 준 허락(grant_*)도 이 줄과 함께 지워지고 대화 purge 는 허락 칸을 바꾸지 않는다.
 connector_action_execution|CONVERSATION|action_id|DELETE|SCRUB|KEEP|action_id FK로 승인에 속한다. 대화 purge는 실행 인자·요약·범위와 key만 지우고 해시와 ticket·중복 방지 칸은 남긴다.
 connector_connection|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 연결은 사용자 소유라 에이전트 정리와 무관하게 보존한다.
@@ -35,7 +33,7 @@ hermes_session_binding|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 origin_executio
 media_observation|CONVERSATION|id|DELETE|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
 memory|USER|id|DELETE|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
 memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
-memory_embedding|USER|memory_id|DELETE|KEEP|KEEP|memory_id로 기억 항목에 속한다. 항목을 지우면 같은 트랜잭션에서 지운다.
+memory_embedding|USER|memory_id|DELETE|KEEP|KEEP|코드가 읽고 쓰지 않는 옛 표다. 벡터는 memory 의 embedding_* 칸이 갖는다. 예외로 항목 삭제와 사용자 정리만 그 항목의 행을 native 삭제로 지운다. 옛 표를 지우는 PR 이 이 줄을 걷어 낸다(ADR-20261102 / table-reduce-r2).
 memory_link|USER|id|DELETE|KEEP|KEEP|양 끝 기억 항목에 속한다. 항목을 지우면 같은 트랜잭션에서 지운다.
 memory_revision|USER|memory_id|DELETE|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
 notification|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대상은 공개 식별자이며 NotificationCleaner가 기간이 지난 행을 지운다.
@@ -43,8 +41,6 @@ proactive_check|AGENT|id|DELETE|GAP|DELETE|user_id와 agent_id와 conversation_i
 proactive_check_finding|AGENT|id|DELETE|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 발견 제목과 출처가 남는다.
 proactive_check_problem|AGENT|id|DELETE|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 문제 본문과 근거가 남는다.
 result_delivery|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태, 시도 횟수, 항목의 출처와 결과 식별자, 마지막 시도의 상태와 실행 참조만 보존한다.
-result_delivery_attempt|CONVERSATION|id|KEEP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 코드가 더는 읽고 쓰지 않는 옛 표다. 마지막 시도는 result_delivery로 옮겼고 DROP PR이 지운다.
-result_delivery_item|CONVERSATION|id|KEEP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 코드가 더는 읽고 쓰지 않는 옛 표다. 항목은 result_delivery.items_json으로 옮겼고 DROP PR이 지운다.
 subagent_usage_job|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|DELETE|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
 task_run|USER|id|DELETE|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.

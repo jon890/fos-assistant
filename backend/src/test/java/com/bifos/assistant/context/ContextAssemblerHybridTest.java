@@ -1,5 +1,6 @@
 package com.bifos.assistant.context;
 
+import com.bifos.assistant.memory.MemoryEmbeddingRows;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.context.application.MemorySearchSection;
 import com.bifos.assistant.context.application.dto.AssembledContext;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -62,6 +64,9 @@ class ContextAssemblerHybridTest {
 
     @Autowired
     MemoryRepository repository;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     MemoryEmbeddingRepository embeddings;
@@ -87,7 +92,7 @@ class ContextAssemblerHybridTest {
 
     @BeforeEach
     void setUp() {
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
         repository.deleteAll();
         agentId = agents.findByCode(AGENT_CODE)
             .orElseGet(() -> agents.save(Agent.of(
@@ -105,7 +110,7 @@ class ContextAssemblerHybridTest {
 
     @AfterEach
     void tearDown() {
-        embeddings.deleteAll();
+        MemoryEmbeddingRows.clearAll(jdbc);
     }
 
 

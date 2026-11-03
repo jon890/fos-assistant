@@ -14,8 +14,6 @@ public enum ErrorCode {
     /** 관찰 본문을 암호화할 수 없어 새 저장을 거절한다. */
     MEDIA_ENCRYPTION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
-    TOOLSET_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND),
-    TOOLSET_REQUEST_UNAVAILABLE(HttpStatus.CONFLICT),
     MEMORY_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 없는 실행과 남의 실행을 같은 응답으로 숨긴다. 번호를 훑어 남의 것이 있는지 알아낼 수 없게 한다. */
     EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),

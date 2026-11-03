@@ -112,7 +112,6 @@ public class UserPurgeWriter {
         followUps.purgeUser(userId);
         notifications.purgeUser(userId);
         proactive.purgeUser(userId);
-        agents.releaseToolsetRequests(userId);
         participants.forEach(participant -> participant.purgeUser(userId));
         browsers.purgeUser(userId);
     }

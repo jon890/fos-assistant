@@ -17,7 +17,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecificationExecutor<Memory> {
+public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecificationExecutor<Memory>, MemoryEmbeddingRepository {
 
     /** 정비 규칙이 읽을 항목이다. 종류와 승인 상태가 같은 줄을 번호 순서로 낸다. */
     List<Memory> findByEntryTypeAndStatusOrderByIdAsc(MemoryEntryType entryType, MemoryStatus status);

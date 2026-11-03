@@ -69,7 +69,6 @@ final class JpaAuditingRules {
         Map.entry("com.bifos.assistant.mcp.domain.AgentToken", new Contract("agent_token", "C")),
         Map.entry("com.bifos.assistant.memory.domain.entity.Memory", new Contract("memory", "C")),
         Map.entry("com.bifos.assistant.memory.domain.entity.MemoryCapture", new Contract("memory_capture", "C")),
-        Map.entry("com.bifos.assistant.memory.domain.entity.MemoryEmbedding", new Contract("memory_embedding", "C+U")),
         Map.entry("com.bifos.assistant.memory.domain.entity.MemoryLink", new Contract("memory_link", "C+U")),
         Map.entry("com.bifos.assistant.notification.domain.Notification", new Contract("notification", "C")),
         Map.entry("com.bifos.assistant.orchestration.domain.HermesSessionBinding", new Contract("hermes_session_binding", "C")),
