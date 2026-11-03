@@ -181,8 +181,9 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-Draft 의 독립 리뷰는 verify 다. Draft CI 가 통과하고 최신 main 을 merge 한 뒤 verify 를 받고, 통과해야 Ready 로 올린다. 별도 리뷰 에이전트는 띄우지 않는다.
-인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 verify 대신 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
+Draft CI 가 통과하고 최신 main 을 merge 한 뒤 검증을 받고, 통과해야 Ready 로 올린다. 별도 리뷰 에이전트는 띄우지 않는다.
+독립 verify(대화를 모르는 하위 에이전트)는 기능 루프를 쓴 PR(확인받은 스펙이 있는 PR)과 위험 라벨이 하나라도 붙은 PR 만 받는다. 그 밖의 PR 은 구현한 세션이 verify 절차(인수 조건 대조, 검사 재실행, diff 읽기)를 스스로 하고 PR 본문에 「같은 세션 검증」 이라고 적는다.
+인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
 Ready 뒤에는 GitHub 의 Claude 리뷰(`claude-review`)가 한 번 더 본다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
 **리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
 verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전체를 다시 돌리지 않는다. 바뀐 범위의 개발 테스트와 CI 만 다시 통과시킨다.
@@ -195,7 +196,7 @@ CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이�
 머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.
 
-`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 라벨은 정보용이다. 머지 규칙은 바꾸지 않는다(사용자 결정 2026-11-02).
+`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 라벨은 머지 규칙을 바꾸지 않고, 독립 verify 를 받을 PR 을 가르는 데 쓴다(사용자 결정 2026-11-02, 2026-11-03). 근거와 버린 대안은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 의 4절이 갖는다.
 
 ## 커밋
 
