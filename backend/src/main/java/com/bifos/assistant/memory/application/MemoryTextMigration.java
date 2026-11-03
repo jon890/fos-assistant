@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>대상은 평문 줄이다. 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽고, 다시 쓴 암호문을 같은 트랜잭션에서 풀어 옮기기 전 평문의 해시와
  * 비교한다. 다르면 그 줄을 되돌린다. revision 번호와 갱신 시각은 바꾸지 않는다.
  *
- * <p>글을 옮긴 뒤 제안 중복 키와 임베딩 지문을 주인 key 의 HMAC 으로 바꾼다(스펙 DECISION17). 평문의 SHA-256 이던 지문은 그 자리에서
+ * <p>글을 옮긴 뒤 제안 중복 키와 임베딩 지문을 주인 key 의 HMAC 으로 바꾼다(ADR-20261103 / memory-sensitivity-removal). 평문의 SHA-256 이던 지문은 그 자리에서
  * HMAC 으로 바꿔 다시 임베딩하지 않는다. 지금 글과 맞지 않는 낡은 지문은 벡터째 비워 채우는 작업이 다시 만든다.
  *
  * <p>한 줄이 실패해도 다음 줄로 가고 기동을 멈추지 않는다. 실패한 줄의 번호만 로그에 남기고, 남은 줄은 다음 기동에서 다시 본다. KEK 가
@@ -156,7 +156,9 @@ public class MemoryTextMigration implements ApplicationRunner {
         if (rekeyed.equals(row.proposalDedupKey())) {
             return false;
         }
-        row.rekeyProposalDedup(rekeyed);
+        // 직전 이미지로 되돌린 동안이나 이관 전에 같은 글의 제안이 새 키로 먼저 생겼으면 이 줄의 키를 비운다. 평문 해시를 남기지 않는다
+        boolean taken = memories.findIdByProposalDedupKey(rekeyed).filter(other -> !other.equals(id)).isPresent();
+        row.rekeyProposalDedup(taken ? null : rekeyed);
         memories.saveAndFlush(row);
         return true;
     }
@@ -180,7 +182,7 @@ public class MemoryTextMigration implements ApplicationRunner {
         }
         int updated = Arrays.equals(EmbeddingText.plainFingerprint(stamp.model(), text), stamp.textFingerprint())
             ? embeddings.replaceFingerprint(stamp.memoryId(), stamp.textFingerprint(), rekeyed)
-            : embeddings.clearVectors(List.of(stamp.memoryId()));
+            : embeddings.clearVectorIfFingerprint(stamp.memoryId(), stamp.textFingerprint());
         vectorCache.evict(stamp.memoryId());
         return updated > 0;
     }
@@ -192,7 +194,7 @@ public class MemoryTextMigration implements ApplicationRunner {
             return transactions.execute(status -> work.get());
         } catch (RuntimeException e) {
             // 예외 메시지는 본문을 담을 수 있어 클래스 이름만 남긴다. 번호는 끝에 한 줄로 모아 남긴다
-            log.warn("기억 줄 하나를 데이터 key 로 옮기지 못했다 exception={}", e.getClass().getName());
+            log.warn("기억 줄 하나를 데이터 key 로 옮기거나 해시를 바꾸지 못했다 exception={}", e.getClass().getName());
             onFailure.run();
             return null;
         }

@@ -10,7 +10,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * AES-256-GCM 한 번의 암호화와 복호화다. 모양은 ADR-055 의 {@code v1.<IV>.<암호문과 태그>} 를 그대로 쓴다.
+ * AES-256-GCM 한 번의 암호화와 복호화다. 모양은 {@code v1.<IV>.<암호문과 태그>} 다(ADR-20261008 / data-encryption, ADR-20261103 / memory-encryption).
  *
  * <p>IV 는 부를 때마다 12바이트를 새로 뽑는다. 인증 태그는 128비트다. 실패는 {@link IllegalStateException} 하나로 낸다.
  * 예외 메시지에 본문과 key 를 넣지 않는다.

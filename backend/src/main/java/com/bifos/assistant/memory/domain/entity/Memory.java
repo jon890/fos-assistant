@@ -404,7 +404,11 @@ public class Memory extends CreatedAtEntity {
     }
 
 
-    /** 제안 중복 키를 주인 key 의 HMAC 으로 바꿔 적는다. 비어 있던 줄은 그대로 둔다(스펙 DECISION17). */
+    /**
+     * 제안 중복 키를 주인 key 의 HMAC 으로 바꿔 적는다. 비어 있던 줄은 그대로 둔다(ADR-20261103 / memory-sensitivity-removal).
+     *
+     * @param dedupKey 새 키. 같은 키를 이미 다른 줄이 가졌으면 null 로 비운다
+     */
     public void rekeyProposalDedup(String dedupKey) {
         if (proposalDedupKey != null) {
             proposalDedupKey = dedupKey;

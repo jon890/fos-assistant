@@ -31,8 +31,7 @@ import org.springframework.stereotype.Component;
  * <p>KEK 가 없는 설치는 평문으로 저장하고 한 번 경고한다. KEK 가 있는데 데이터 key 를 풀지 못하면 저장을 거절한다. 평문으로 내려 저장하지
  * 않는다. 로그에는 기억 번호만 남긴다.
  *
- * <p>같은 글이 같은 값이어야 하는 칸(제안 중복 키, 임베딩 지문)은 주인 key 에서 뽑은 HMAC 으로 만든다. 평문의 해시를 DB 에 남기지 않는다(스펙
- * DECISION17). KEK 가 없는 설치는 글이 평문이라 SHA-256 을 쓴다.
+ * <p>같은 글이 같은 값이어야 하는 칸(제안 중복 키, 임베딩 지문)은 주인 key 에서 뽑은 HMAC 으로 만든다. 평문의 해시를 DB 에 남기지 않는다(ADR-20261103 / memory-sensitivity-removal). KEK 가 없는 설치는 글이 평문이라 SHA-256 을 쓴다.
  */
 @Slf4j
 @Component

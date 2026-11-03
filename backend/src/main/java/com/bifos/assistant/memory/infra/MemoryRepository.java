@@ -47,7 +47,7 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     List<Long> findIdsWithoutDataKey();
 
 
-    /** 제안 중복 키가 있는 줄의 번호다. 기동할 때 그 키를 주인 key 의 HMAC 으로 바꾸는 데 쓴다(스펙 DECISION17). */
+    /** 제안 중복 키가 있는 줄의 번호다. 기동할 때 그 키를 주인 key 의 HMAC 으로 바꾸는 데 쓴다(ADR-20261103 / memory-sensitivity-removal). */
     @Query("select m.id from Memory m where m.proposalDedupKey is not null order by m.id")
     List<Long> findIdsWithProposalDedupKey();
 

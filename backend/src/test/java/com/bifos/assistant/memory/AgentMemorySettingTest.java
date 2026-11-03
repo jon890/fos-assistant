@@ -46,6 +46,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 관리자가 에이전트의 Memory collection 설정을 읽고 바꾸는 API 를 확인한다(ADR-20261008 / agent-memory-grants-admin).
@@ -60,6 +61,9 @@ class AgentMemorySettingTest {
 
     /** 다른 시험이 쓰지 않는 그룹 번호에서 시작한다. */
     private static final AtomicLong NEXT_GROUP = new AtomicLong(7_295_000_000L);
+
+    @Autowired
+    ObjectMapper jsonMapper;
 
     @Autowired
     AgentMemorySettingService service;
@@ -242,6 +246,16 @@ class AgentMemorySettingTest {
             .as("거절한 요청은 받는 줄을 바꾸지 않는다")
             .containsExactly("core");
         assertThat(controller.get(agent.code()).changes()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("옛 화면이 보내던 allowSensitive 는 저장 요청에서 무시한다")
+    void ignoresAllowSensitiveFromOldClients() {
+        ReplaceAgentMemoryRequest request = jsonMapper.readValue(
+            "{\"collections\":[{\"collection\":\"career\",\"allowSensitive\":true}]}", ReplaceAgentMemoryRequest.class);
+
+        assertThat(request.collections()).extracting(AgentMemoryGrantBody::collection).containsExactly("career");
     }
 
 

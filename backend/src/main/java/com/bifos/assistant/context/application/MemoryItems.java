@@ -32,7 +32,7 @@ final class MemoryItems {
             ContextItem.memoryRef(memory.id()),
             memory.scope(),
             memory.ownerUserId(),
-            // 기억에는 민감 구분이 없다. 받은 collection 의 기억은 모두 같은 층에 실린다(스펙 DECISION1)
+            // 기억에는 민감 구분이 없다. 받은 collection 의 기억은 모두 같은 층에 실린다(ADR-20261103 / memory-sensitivity-removal)
             MemorySensitivity.NORMAL,
             ContextTrust.USER_APPROVED,
             memory.updatedAt(),

@@ -411,6 +411,26 @@ class MemoryEncryptionTest {
     }
 
 
+    @Test
+    @MysqlCase(MysqlCase.Reason.MIGRATION_DDL)
+    @DisplayName("같은 글의 제안이 이미 HMAC 키를 가졌으면 SHA-256 키로 남은 줄은 키를 비워 평문 해시를 남기지 않는다")
+    void rekeyClearsCollidingDedupKey() {
+        Memory first = memories.proposeUser(ADMIN, TITLE, FIRST, 1L);
+        // 직전 이미지로 되돌린 동안 같은 글의 제안이 SHA-256 키로 하나 더 생겼다
+        String plainKey = Sha256.hex(ADMIN.id() + "\u0000" + TITLE + "\u0000" + FIRST);
+        Long second = insertRow("USER", ADMIN.id(), null, TITLE, FIRST, "NORMAL");
+        jdbc.update("UPDATE memory SET status = 'PROPOSED', proposal_dedup_key = ? WHERE id = ?", plainKey, second);
+        assertThat(migration.migrate()).isEqualTo(1);
+
+        assertThat(migration.rekeyHashes()).isEqualTo(1);
+
+        assertThat(jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, second)).isNull();
+        assertThat(jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, first.id()))
+            .isEqualTo(texts.proposalDedupKey(ADMIN.id(), TITLE, FIRST));
+        assertThat(migration.rekeyHashes()).isZero();
+    }
+
+
     private static MemoryRememberRequest remember(String title, String content, boolean direct) {
         // 실행마다 남기는 수에 상한이 있어 호출마다 다른 실행 번호를 쓴다
         return new MemoryRememberRequest(

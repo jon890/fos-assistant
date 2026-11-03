@@ -132,6 +132,17 @@ public interface MemoryEmbeddingRepository {
         @Param("fingerprint") byte[] fingerprint);
 
 
+    /**
+     * 한 항목의 세 벡터 칸을 지문이 아직 {@code expected} 일 때만 비운다. 그 사이 채우는 작업이 쓴 새 벡터를 지우지 않는다.
+     *
+     * @return 비운 줄 수
+     */
+    @Modifying
+    @Query(value = "update memory set embedding_model = null, embedding_fingerprint = null, embedding_vector = null"
+        + " where id = :memoryId and embedding_fingerprint = :expected", nativeQuery = true)
+    int clearVectorIfFingerprint(@Param("memoryId") Long memoryId, @Param("expected") byte[] expected);
+
+
     /** 그 항목들의 세 벡터 칸을 모두 비운다. 한 칸만 남은 줄도 함께 비운다. 비운 줄 수를 돌려준다. */
     @Modifying
     @Query(value = "update memory set embedding_model = null, embedding_fingerprint = null, embedding_vector = null"

@@ -102,7 +102,7 @@ public class MemoryEmbeddingRefresher {
             List<Long> ids = pending.subList(start, Math.min(start + properties.batchSize(), pending.size())).stream()
                 .map(MemoryEmbeddingSource::memoryId)
                 .toList();
-            // 주기 처음에 읽은 글은 몇 분 지났을 수 있다. 그 사이 민감으로 바뀐 항목의 평문을 보내지 않게 보내기 직전에 다시 읽는다
+            // 주기 처음에 읽은 글은 몇 분 지났을 수 있다. 그 사이 대상에서 빠진 항목의 글을 보내지 않게 보내기 직전에 다시 읽는다
             List<MemoryEmbeddingSource> batch = readOnly().execute(status -> embeddings.findEmbeddableSourcesByIds(ids));
             batches++;
             if (batch.isEmpty()) {
