@@ -37,7 +37,7 @@ test("문서를 만들고 고치다 거절되면 사용자가 할 일을 알린�
   assert.equal(describeError("MEMORY_REVISION_CONFLICT", "conflict"),
     "그사이 문서가 바뀌었어요. 문서를 다시 열어 주세요.");
   assert.equal(describeError("MEMORY_ENCRYPTION_UNAVAILABLE", "no key"),
-    "민감한 문서를 지금 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.");
+    "지금은 기억을 저장하거나 열 수 없어요. 관리자에게 문의해 주세요.");
 });
 
 test("사용자 동시 실행 한도에 닿으면 끝난 뒤 다시 보내라고 알린다", () => {
