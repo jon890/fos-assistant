@@ -48,9 +48,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 「합성 측정」 이 갖는다.
  *
  * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출, 기준 파일보다 나빠진
- * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것, 대체 연결을 넣은 조립의
- * {@code KNOWLEDGE_UPDATE} 오기억 노출률이 연결 없는 조립보다 낮지 않은 것, 관련 연결을 넣은 조립의 {@code MULTI_SESSION} recall@5 가 연결 없는
- * 조립보다 높지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
+ * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것, 대체를 적은 조립의
+ * {@code KNOWLEDGE_UPDATE} 오기억 노출률이 대체 없는 조립보다 낮지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
  */
 @BackendIntegrationTest
 class MemoryRecallEvalTest {
@@ -116,7 +115,7 @@ class MemoryRecallEvalTest {
         assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
         assemblies.put(FACTS_OFF, factsOff::assemble);
         assemblies.put(FACTS_ON, factsOn::assemble);
-        // linksOff 는 factsOn 과 같은 조립에 대체 연결만 넣지 않은 단계 1 의 구조다. 연결이 옛 사실의 노출을 줄였는지 견준다
+        // linksOff 는 factsOn 과 같은 조립에 대체만 적지 않은 구조다. 대체가 옛 사실의 노출을 줄였는지 비교한다
         assemblies.put(LINKS_OFF, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
@@ -155,12 +154,6 @@ class MemoryRecallEvalTest {
             .as("KNOWLEDGE_UPDATE 오기억 노출률: factsOn=%s linksOff=%s", updateWithLinks, updateWithoutLinks)
             .isNotNull()
             .isLessThan(updateWithoutLinks);
-        Double multiWithLinks = scoreboard.metrics(FACTS_ON, MemoryEvalDataset.Category.MULTI_SESSION).recallAt5().rate();
-        Double multiWithoutLinks = scoreboard.metrics(LINKS_OFF, MemoryEvalDataset.Category.MULTI_SESSION).recallAt5().rate();
-        assertThat(multiWithLinks)
-            .as("MULTI_SESSION recall@5: factsOn=%s linksOff=%s", multiWithLinks, multiWithoutLinks)
-            .isNotNull()
-            .isGreaterThan(multiWithoutLinks);
         MemoryEvalScoreboard.Metrics factsOnMetrics = scoreboard.metrics(FACTS_ON, null);
         if (Boolean.getBoolean(MemoryEvalBaseline.WRITE_PROPERTY)) {
             MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOnMetrics).write(MemoryEvalBaseline.SOURCE);

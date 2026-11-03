@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "note": "합성 시험 세트. 이름과 사실은 모두 지어낸 것이다",
   "users": [
     {
@@ -1821,10 +1821,7 @@
           "group": "home",
           "title": "가족 캠핑",
           "content": "다음 달 가족 캠핑은 강원도 홍천 계곡으로 간다",
-          "updatedDaysAgo": 10,
-          "related": [
-            "m2"
-          ]
+          "updatedDaysAgo": 10
         },
         {
           "key": "m2",
@@ -1860,10 +1857,7 @@
           "group": "home",
           "title": "할머니 생신",
           "content": "할머니 생신 모임은 토요일 점심 12시 한식당이다",
-          "updatedDaysAgo": 7,
-          "related": [
-            "m2"
-          ]
+          "updatedDaysAgo": 7
         },
         {
           "key": "m2",

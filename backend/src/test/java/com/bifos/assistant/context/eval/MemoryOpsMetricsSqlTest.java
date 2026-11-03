@@ -50,8 +50,6 @@ class MemoryOpsMetricsSqlTest {
         "undo_rate",
         "regenerate_by_memory",
         "context_size",
-        "memory_links",
-        "auto_link_revoked",
         "maintenance_precision");
 
     /** 이 검사가 넣는 줄의 번호는 여기서 시작한다. 다른 검사가 쓰는 번호와 겹치지 않게 크게 잡는다. */
@@ -135,14 +133,6 @@ class MemoryOpsMetricsSqlTest {
         assertThat(delta(before, after, "context_size", "", "executions")).isEqualTo(2);
         assertThat(delta(before, after, "context_size", "", "omitted_items")).isEqualTo(2);
 
-        assertThat(delta(before, after, "memory_links", "SUPERSEDES|AUTO|PROPOSED", "links")).isEqualTo(1);
-        assertThat(delta(before, after, "memory_links", "RELATED|AUTO|ACTIVE", "links")).isEqualTo(1);
-        assertThat(delta(before, after, "memory_links", "RELATED|AUTO|REVOKED", "links")).isEqualTo(1);
-        assertThat(delta(before, after, "memory_links", "RELATED|AGENT|ACTIVE", "links")).isEqualTo(1);
-
-        assertThat(delta(before, after, "auto_link_revoked", "", "auto_links")).isEqualTo(3);
-        assertThat(delta(before, after, "auto_link_revoked", "", "revoked")).isEqualTo(1);
-
         // 기간 안에 ARCHIVE 확인이 셋(맞음 둘, 아님 하나), DEDUP 확인이 서른(모두 맞음)이다. 기간 밖과 후보 사건은 세지 않는다
         assertThat(delta(before, after, "maintenance_precision", "ARCHIVE", "reviewed")).isEqualTo(3);
         assertThat(delta(before, after, "maintenance_precision", "ARCHIVE", "correct")).isEqualTo(2);
@@ -215,12 +205,6 @@ class MemoryOpsMetricsSqlTest {
         message(regenerated, conversation, "ASSISTANT", child, answerWithMemory, in);
         message(BASE + 53, conversation, "USER", null, null, in);
 
-        // 기간 안의 자동 연결 셋 가운데 사람이 끊은 것은 하나다. 에이전트가 맺은 줄과 기간 밖의 자동 줄은 비율에 들지 않는다
-        link(BASE + 60, readMemory, unreadMemory, "SUPERSEDES", "AUTO", "PROPOSED", in);
-        link(BASE + 61, readMemory, idleMemory, "RELATED", "AUTO", "ACTIVE", in);
-        link(BASE + 62, unreadMemory, idleMemory, "RELATED", "AUTO", "REVOKED", in);
-        link(BASE + 63, readMemory, unreadMemory, "RELATED", "AGENT", "ACTIVE", in);
-        link(BASE + 64, readMemory, correctedMemory, "RELATED", "AUTO", "ACTIVE", out);
         maintenanceEvents();
     }
 
@@ -259,20 +243,6 @@ class MemoryOpsMetricsSqlTest {
         row.put("contract_version", 1);
         row.put("occurred_at", at(occurredAt));
         insert("decision_feedback_event", row);
-    }
-
-
-    private void link(long id, long from, long to, String type, String origin, String status, Instant createdAt) {
-        Map<String, Object> row = new HashMap<>();
-        row.put("id", id);
-        row.put("from_memory_id", from);
-        row.put("to_memory_id", to);
-        row.put("type", type);
-        row.put("origin", origin);
-        row.put("status", status);
-        row.put("created_at", at(createdAt));
-        row.put("updated_at", at(createdAt));
-        insert("memory_link", row);
     }
 
 

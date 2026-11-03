@@ -1,6 +1,6 @@
 {
-  "datasetVersion" : 3,
+  "datasetVersion" : 4,
   "mode" : "factsOn",
-  "recallAt5" : 0.8769230769230769,
+  "recallAt5" : 0.8461538461538461,
   "falseMemoryExposure" : 0.5714285714285714
 }
