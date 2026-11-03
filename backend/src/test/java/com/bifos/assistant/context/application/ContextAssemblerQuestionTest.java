@@ -142,7 +142,7 @@ class ContextAssemblerQuestionTest {
 
 
     @Test
-    @DisplayName("민감 항목과 암호화한 항목은 본문으로 구역에 오르지 못하고 제목이 맞으면 색인 앞쪽에 점수 근거와 함께 온다")
+    @DisplayName("민감 항목은 본문으로 구역에 오르지 못하고 제목이 맞으면 색인 앞쪽에 점수 근거와 함께 오며, 풀지 못한 항목은 색인에도 없다")
     void keepsSensitiveAndSealedItemsTitleOnly() {
         Memory plain = group("가족 행사", "다음 달 첫째 주 토요일에 할머니 댁에 간다");
         Memory sensitiveTitle = memories.create(
@@ -171,13 +171,13 @@ class ContextAssemblerQuestionTest {
             .extracting(ContextItem::ref, item -> item.selection().selector())
             .containsExactly(
                 tuple("memory:" + sensitiveTitle.id(), ContextSelection.INDEX_KEYWORD),
-                tuple("memory:" + sealed, ContextSelection.INDEX_KEYWORD),
                 tuple("memory:" + plain.id(), ContextSelection.INDEX_BY_ID),
                 tuple("memory:" + sensitiveBody.id(), ContextSelection.INDEX_BY_ID));
         assertThat(result.bundle().items())
             .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
             .extracting(item -> item.selection().rank())
-            .containsExactly(1, 2, 3, 4);
+            .containsExactly(1, 2, 3);
+        assertThat(result.bundle().items()).noneMatch(item -> item.ref().equals("memory:" + sealed));
         assertThat(section(result, INDEX_HEADER)).doesNotContain("진료 기록 본문", "먹으면 안 된다");
     }
 

@@ -10,13 +10,13 @@ import javax.crypto.SecretKey;
 public final class DataKey {
 
     private final Long id;
-    private final Long userId;
+    private final KeyOwner owner;
     private final SecretKey secret;
 
 
-    public DataKey(Long id, Long userId, SecretKey secret) {
+    public DataKey(Long id, KeyOwner owner, SecretKey secret) {
         this.id = id;
-        this.userId = userId;
+        this.owner = owner;
         this.secret = secret;
     }
 
@@ -26,8 +26,8 @@ public final class DataKey {
     }
 
 
-    public Long userId() {
-        return userId;
+    public KeyOwner owner() {
+        return owner;
     }
 
 
@@ -38,6 +38,6 @@ public final class DataKey {
 
     @Override
     public String toString() {
-        return "DataKey[id=" + id + ", userId=" + userId + "]";
+        return "DataKey[id=" + id + ", owner=" + owner + "]";
     }
 }

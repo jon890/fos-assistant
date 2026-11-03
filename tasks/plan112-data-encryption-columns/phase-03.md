@@ -7,7 +7,7 @@
 KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상은 `chat_message.content` 와 phase 01, 02 의 칸이다.
 옛 버전으로 되돌려야 할 때를 위해, 같은 배치를 반대로 돌려 암호문을 평문으로 되돌리는 방식도 둔다.
 
-**범위 외**: 알림, 할 일, 승인 기록, 실행 사건, 먼저 살펴보기 결과, 일반 Memory 본문. 민감 Memory 는 이미 `MemoryContentBackfill` 이 기동 때 암호화한다.
+**범위 외**: 알림, 할 일, 승인 기록, 실행 사건, 먼저 살펴보기 결과, Memory. Memory 의 제목과 본문은 ADR-20261103 / memory-encryption 이 모두 암호화한다.
 
 ## 컨텍스트
 
@@ -23,7 +23,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
   | `task` | `title`, `instruction` | `title_key_id`, `instruction_key_id` | `owner_user_id` | 새 쓰기 잠금 조회 |
 
 - AAD 와 엔티티의 칸 이름은 phase 01, 02 와 `ChatMessageContents` 가 정한 것을 그대로 쓴다. 배치가 새 규칙을 만들지 않는다
-- 본보기는 민감 Memory 의 기동 보정이다. `backend/src/main/java/com/bifos/assistant/memory/application/MemoryContentBackfill.java` 가 대상 번호를 읽고 `MemoryContentSealer` 가 줄마다 쓰기 잠금으로 다시 읽어 한 트랜잭션으로 고친다. 실패하면 클래스 이름만 로그에 남긴다
+- 본보기는 Memory 의 기동 이관이다. `backend/src/main/java/com/bifos/assistant/memory/application/MemoryTextMigration.java` 가 대상 번호를 읽고 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽어 고친다. 실패하면 클래스 이름과 번호만 로그에 남긴다
 - 주기 작업의 끄기 방식은 `backend/src/main/java/com/bifos/assistant/chat/purge/application/ConversationPurger.java` 의 `@Scheduled(cron = "${assistant.chat.purge-cron}")` 와 시험 설정의 `"-"` 를 따른다
 
 ## 의도 메모

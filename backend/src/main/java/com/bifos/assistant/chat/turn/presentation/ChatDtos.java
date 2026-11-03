@@ -242,7 +242,7 @@ public final class ChatDtos {
                 capture.kind().name(),
                 memory.status().name(),
                 memory.title(),
-                sensitive || memory.sealed() ? "" : memory.content(),
+                sensitive || !memory.readable() ? "" : memory.content(),
                 sensitive,
                 memory.alwaysInject(),
                 capture.externalRead(),

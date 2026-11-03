@@ -250,7 +250,7 @@ public class MemorySearchTest {
 
 
     @Test
-    @DisplayName("검색은 암호문 없이 다섯 칸만 읽고 본문은 일반 줄에서만 고르며 외부 timeout을 물려받지 않는다")
+    @DisplayName("검색은 후보를 질의 하나로 읽고 본문은 일반 줄에서만 점수에 넘기며 외부 timeout을 물려받지 않는다")
     void selectsOnlySearchFieldsWithinIndependentTimeout() {
         Memory plain = repository.save(Memory.accepted(
             MemoryScope.USER,
@@ -282,6 +282,19 @@ public class MemorySearchTest {
         MemorySearchSqlProbe.capture();
         repository.findAll();
         assertThat(MemorySearchSqlProbe.timeout()).isEqualTo(0);
+    }
+
+
+    @Test
+    @DisplayName("민감 항목은 본문을 점수에 넘기지 않아 본문에만 있는 낱말로는 찾히지 않는다")
+    void sensitiveBodyIsNotScored() {
+        Memory normal = save("일반 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        save("민감 제목", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+
+        assertThat(search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 10).items())
+            .as("두 줄 모두 본문이 「합성 본문」 이다")
+            .extracting(MemorySearchItem::id)
+            .containsExactly(normal.id());
     }
 
 
@@ -424,9 +437,7 @@ public class MemorySearchTest {
         String collection,
         MemoryRetrieval retrieval,
         MemorySensitivity sensitivity) {
-        StoredContent body = sensitivity == MemorySensitivity.SENSITIVE
-            ? new StoredContent("synthetic-ciphertext", "synthetic-key")
-            : StoredContent.plain("합성 본문");
+        StoredContent body = StoredContent.plain("합성 본문");
         return repository.save(Memory.accepted(
             scope,
             ownerId,
@@ -439,19 +450,13 @@ public class MemorySearchTest {
     }
 
 
+    /**
+     * 후보는 질의 하나로 읽는다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고 민감 본문은 점수에 넘기지 않는다
+     * (ADR-20261103 / memory-encryption).
+     */
     static void assertProjectionAndTimeout() {
         assertThat(MemorySearchSqlProbe.selects()).hasSize(1);
         String select = MemorySearchSqlProbe.selects().getFirst();
-        String fields = select.substring(0, select.indexOf(" from "));
-        assertThat(fields.split(",")).hasSize(5);
-        String caseExpression = fields.substring(fields.indexOf("case "), fields.indexOf(" end") + " end".length());
-        assertThat(fields)
-            .contains(".id", ".title", ".revision", ".updated_at", "case ")
-            .doesNotContain("owner", "count(");
-        assertThat(caseExpression).contains("content_key_id", "sensitivity", ".content");
-        assertThat(fields.replace(caseExpression, ""))
-            .as("case 밖의 칸")
-            .doesNotContain("content", "key_id");
         assertThat(select)
             .contains("order by")
             .doesNotContain("count(");

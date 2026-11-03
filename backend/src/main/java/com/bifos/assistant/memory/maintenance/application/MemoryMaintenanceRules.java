@@ -71,13 +71,13 @@ final class MemoryMaintenanceRules {
 
 
     /**
-     * {@code DEDUP}: 같은 주인과 같은 지문(제목과 본문의 해시)을 가진 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽을 후보로 둔다. 암호문으로
-     * 저장된 민감 항목은 본문을 읽지 않으므로 보지 않는다.
+     * {@code DEDUP}: 같은 주인과 같은 지문(제목과 본문의 해시)을 가진 항목이 둘 이상이면 오래된 쪽을 남기고 새 쪽을 후보로 둔다. 민감 항목과
+     * 풀지 못한 항목은 보지 않는다.
      */
     static List<Proposal> dedup(List<Memory> accepted) {
         Map<String, List<Memory>> byFingerprint = new LinkedHashMap<>();
         for (Memory memory : accepted) {
-            if (memory.sensitivity() == MemorySensitivity.SENSITIVE || memory.sealed()) {
+            if (memory.sensitivity() == MemorySensitivity.SENSITIVE || !memory.readable()) {
                 continue;
             }
             String fingerprint = Sha256.hex(

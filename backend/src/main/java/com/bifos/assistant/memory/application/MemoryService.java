@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>에이전트의 실행이 받는 항목은 세 조건을 모두 지난 것이다. 범위(USER 의 주인, GROUP 의 같은 그룹), 그 에이전트가
  * 받는 collection, 그 collection 에서 허용받은 민감도다(ADR-053). 사람이 화면에서 보는 목록은 범위만 본다.
  *
- * <p>민감 항목의 본문은 암호문으로 저장한다(ADR-055).
+ * <p>제목과 본문은 주인 데이터 key 의 암호문으로 저장한다(ADR-20261103 / memory-encryption). 풀지 못한 줄은 실행에 싣지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -65,7 +65,7 @@ public class MemoryService {
     private final MemoryLinkService linkService;
     private final AgentMemoryCollectionService agentCollections;
     private final MemoryCollectionService collections;
-    private final MemoryContentCipher cipher;
+    private final MemoryTexts texts;
     private final MemoryRevisionWriter revisionWriter;
     private final MemoryRelevanceSearch relevanceSearch;
     private final DecisionFeedbackRecorder feedback;
@@ -134,11 +134,10 @@ public class MemoryService {
             .isPresent()) {
             throw documentExists();
         }
-        // 암호화는 저장 전에 한다. key 가 없으면 여기서 거절돼 평문이 저장되지 않는다
-        StoredContent body = stored(content, sensitivity, "USER:" + user.id());
         try {
-            return memories.saveAndFlush(
-                Memory.document(user.id(), collection, documentKey, title, body, sensitivity, clock.instant()));
+            // key 를 풀지 못하면 넣기 전에 거절돼 평문이 저장되지 않는다
+            return texts.insert(Memory.document(
+                user.id(), collection, documentKey, title, StoredContent.plain(content), sensitivity, clock.instant()));
         } catch (DataIntegrityViolationException e) {
             // 두 요청이 중복 조회를 함께 지난 경우다. 유일 제약이 막는다
             throw documentExists();
@@ -257,13 +256,11 @@ public class MemoryService {
         MemoryPlacement placement = placement(collection, retrieval, sensitivity);
         if (scope == MemoryScope.GROUP) {
             requireAdmin(user);
-            StoredContent body = stored(content, sensitivity, "GROUP:" + user.groupId());
-            return memories.save(
-                Memory.accepted(scope, null, user.groupId(), title, body, placement, user.id(), clock.instant()));
+            return texts.insert(Memory.accepted(
+                scope, null, user.groupId(), title, StoredContent.plain(content), placement, user.id(), clock.instant()));
         }
-        StoredContent body = stored(content, sensitivity, "USER:" + user.id());
-        return memories.save(
-            Memory.accepted(scope, user.id(), null, title, body, placement, user.id(), clock.instant()));
+        return texts.insert(Memory.accepted(
+            scope, user.id(), null, title, StoredContent.plain(content), placement, user.id(), clock.instant()));
     }
 
 
@@ -273,7 +270,7 @@ public class MemoryService {
         String dedupKey = proposalDedupKey(user.id(), title, content);
         return memories.findByProposalDedupKey(dedupKey).orElseGet(() -> {
             Instant now = clock.instant();
-            Memory proposed = memories.save(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
+            Memory proposed = texts.insert(Memory.proposedUser(user.id(), title, content, proposedByExecutionId, dedupKey, now));
             feedback.record(
                 MemoryProposalFeedback.of(user, proposed, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
             return proposed;
@@ -369,19 +366,15 @@ public class MemoryService {
 
 
     /**
-     * 본문을 평문으로 낸다. 본문을 밖으로 내는 자리는 엔티티의 {@code content()} 가 아니라 이것을 쓴다.
+     * 본문을 평문으로 낸다. 도구처럼 본문 하나를 꼭 내야 하는 자리가 쓴다.
      *
-     * @throws ApiException 암호화 key 가 없을 때. MEMORY_ENCRYPTION_UNAVAILABLE
+     * @throws ApiException 그 줄을 풀지 못할 때. MEMORY_ENCRYPTION_UNAVAILABLE
      */
     public String contentOf(Memory memory) {
-        return memory.sealed()
-            ? cipher.open(memory.content(), memory.contentKeyId(), memory.contentBinding())
-            : memory.content();
-    }
-
-
-    StoredContent stored(String plain, MemorySensitivity sensitivity, String binding) {
-        return revisionWriter.stored(plain, sensitivity, binding);
+        if (!memory.readable()) {
+            throw new ApiException(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE, "the memory cannot be opened");
+        }
+        return memory.content();
     }
 
 
@@ -389,6 +382,7 @@ public class MemoryService {
         if (access.isEmpty()) {
             return List.of();
         }
+        // 풀지 못한 줄은 싣지 않는다. 제목 자리의 「읽지 못함」 이 실행으로 나가지 않게 한다
         return memories.findAll(
             MemoryQueries.injectable(
                 user.id(),
@@ -396,7 +390,7 @@ public class MemoryService {
                 retrieval,
                 access.unrestricted() ? null : access.collections(),
                 access.sensitiveCollections()),
-            BY_ID);
+            BY_ID).stream().filter(Memory::readable).toList();
     }
 
 

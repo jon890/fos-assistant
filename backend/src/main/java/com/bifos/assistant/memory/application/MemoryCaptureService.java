@@ -59,6 +59,7 @@ public class MemoryCaptureService {
     public static final int PER_EXECUTION_MAX = 3;
 
     private final MemoryService memoryService;
+    private final MemoryTexts texts;
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
@@ -99,21 +100,22 @@ public class MemoryCaptureService {
             }
         }
         MemoryPlacement placement = new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity);
-        StoredContent body;
+        StoredContent body = StoredContent.plain(request.content());
+        Memory created = direct
+            ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
+            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
+        // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
+        created.allowArchive(request.archivable());
+        Memory saved;
         try {
-            body = memoryService.stored(request.content(), sensitivity, "USER:" + user.id());
+            // key 를 풀지 못하면 줄을 넣기 전에 거절된다
+            saved = texts.insert(created);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
                 return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
             }
             throw ex;
         }
-        Memory created = direct
-            ? Memory.remembered(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant())
-            : Memory.proposed(user.id(), request.title(), body, placement, request.executionId(), dedupKey, clock.instant());
-        // 자동 보관 허락은 새 항목에만 적는다. 고치는 길은 사람이 정한 값을 모델이 뒤집지 못하게 그대로 둔다
-        created.allowArchive(request.archivable());
-        Memory saved = memories.save(created);
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
         record(saved.id(), user, request, kind, direct ? saved.revision() : null);
         if (!direct) {
@@ -218,11 +220,10 @@ public class MemoryCaptureService {
         MemoryRevision before = revisions
             .findById(new MemoryRevisionId(memory.id(), capture.baseRevision()))
             .orElseThrow(() -> conflict("the previous revision is missing"));
-        String content = before.contentKeyId() == null ? before.content() : null;
-        if (content == null) {
-            throw conflict("a sealed revision is not restored here");
+        if (!before.readable()) {
+            throw conflict("an unreadable revision is not restored here");
         }
-        memoryService.revise(user, memory, content, before.retrieval(), before.sensitivity());
+        memoryService.revise(user, memory, before.content(), before.retrieval(), before.sensitivity());
     }
 
 
@@ -242,7 +243,15 @@ public class MemoryCaptureService {
             return new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, memory.id());
         }
         int base = memory.revision();
-        memoryService.revise(user, memory, request.content(), memory.retrieval(), MemorySensitivity.NORMAL);
+        try {
+            // 암호화는 revision 을 남기기 전에 하므로 거절돼도 줄과 revision 이 바뀌지 않는다
+            memoryService.revise(user, memory, request.content(), memory.retrieval(), MemorySensitivity.NORMAL);
+        } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE) {
+                return MemoryRememberResult.of(MemoryRememberOutcome.ENCRYPTION_UNAVAILABLE);
+            }
+            throw ex;
+        }
         record(memory.id(), user, request, MemoryCaptureKind.UPDATED, base);
         return new MemoryRememberResult(MemoryRememberOutcome.UPDATED, memory.id());
     }
@@ -254,7 +263,7 @@ public class MemoryCaptureService {
             && memory.entryType() == MemoryEntryType.MEMORY
             && memory.status() == MemoryStatus.ACCEPTED
             && memory.sensitivity() == MemorySensitivity.NORMAL
-            && !memory.sealed()
+            && memory.readable()
             && access.allows(memory.collection(), MemorySensitivity.NORMAL);
     }
 

@@ -16,6 +16,7 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
+import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.TestClock;
@@ -54,6 +55,7 @@ final class MemoryEvalFixture {
     private final JdbcTemplate jdbc;
     private final TestClock clock;
     private final List<Long> createdAgentIds = new ArrayList<>();
+    private final MemoryTextMigration migration;
 
 
     MemoryEvalFixture(
@@ -62,7 +64,9 @@ final class MemoryEvalFixture {
         AgentRepository agents,
         AgentMemoryCollectionRepository grants,
         JdbcTemplate jdbc,
-        TestClock clock) {
+        TestClock clock,
+        MemoryTextMigration migration) {
+        this.migration = migration;
         this.dataset = dataset;
         this.memories = memories;
         this.agents = agents;
@@ -118,6 +122,11 @@ final class MemoryEvalFixture {
                 }
             }
             insertRelated(each, ids, now);
+        }
+        // 측정이 운영과 같이 암호문을 푸는 길을 지나게 넣은 줄을 데이터 key 로 옮긴다(ADR-20261103 / memory-encryption)
+        migration.migrate();
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM memory WHERE data_key_id IS NULL", Long.class) != 0L) {
+            throw new IllegalStateException("측정할 기억이 모두 데이터 key 로 암호화되지 않았다");
         }
         return ids;
     }

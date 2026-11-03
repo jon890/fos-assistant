@@ -44,7 +44,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-052](ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) | Memory 는 collection, 종류, 꺼내는 방식, 민감도, 판, 출처를 가진다 | Accepted. ADR-015 의 `always_inject` 를 `retrieval` 로 넓힌다. 민감 본문은 평문이라는 부분은 ADR-055 가 대체한다 |
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
 | [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다. 「에이전트 기본 모델」 은 [ADR-20261101 / model-setting](../../../docs/adr/ADR-20261101-model-setting.md) 이 대체해 지웠다. 「모델 숨김」 은 그대로다 |
-| [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다 |
+| [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다. 민감 본문만 환경 변수 key 로 암호화하는 부분은 [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) 이 대체한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
 | [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다. 자식 provider 를 읽는 길은 ADR-067 이 대체한다 |
 | [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |
@@ -77,6 +77,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261101 / user-purge](ADR-20261101-user-purge.md) | 관리자가 끈 사용자를 「정리 예약」 하면 30일 뒤 정리 작업이 그 사용자의 데이터를 지우고, 그룹 공유 데이터는 관리자에게 넘긴다 | Accepted. 세 단계 모두 구현했다. purge 분류의 「USER 는 물리 삭제 경로가 없다」 를 바꿨다 |
 | [ADR-20261102 / media-observation-request-merge](ADR-20261102-media-observation-request-merge.md) | 관찰 저장 요청은 관찰 줄에 두고 완료 결과 재사용을 없앤다 | Accepted. ADR-20261010 / media-observation-storage 의 요청 alias 테이블과 ADR-20261011 / media-observation-cache 를 대체한다 |
 | [ADR-20261102 / table-reduce-r2](ADR-20261102-table-reduce-r2.md) | 테이블 줄이기 2차는 묶음마다 코드 PR, 배포, DROP PR 순서로 한다 | Accepted |
+| [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) | 모든 기억의 제목과 본문을 주인의 데이터 key 로 암호화하고, 그룹 key 를 `user_data_key` 의 줄로 둔다 | Accepted. ADR-055 의 민감 본문 암호화와 AAD 를 대체하고, ADR-20261008 / data-encryption 에 그룹 데이터 key 를 더한다 |
 
 ## 보관
 

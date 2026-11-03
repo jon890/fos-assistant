@@ -37,7 +37,7 @@ public enum ErrorCode {
     MEMORY_SCOPE_REQUIRED(HttpStatus.BAD_REQUEST),
     /** 민감 항목을 항상 싣게 하려 했다. 조립 판정이 틀려도 민감 본문이 나가지 않게 저장할 때 막는다. */
     MEMORY_SENSITIVE_ALWAYS(HttpStatus.BAD_REQUEST),
-    /** 민감 본문을 암호화하거나 풀 key 가 없다. 평문으로 내려 저장하지 않는다(ADR-055). */
+    /** 기억을 암호화하거나 풀 주인 데이터 key 를 쓸 수 없다. 평문으로 내려 저장하지 않는다(ADR-20261103 / memory-encryption). */
     MEMORY_ENCRYPTION_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 같은 주인과 collection 에 같은 이름의 문서가 이미 있다(ADR-057). */
     MEMORY_DOCUMENT_EXISTS(HttpStatus.CONFLICT),

@@ -19,6 +19,7 @@ import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.dto.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -74,6 +75,9 @@ class MemoryRecallEvalTest {
     MemoryRepository memories;
 
     @Autowired
+    MemoryTextMigration migration;
+
+    @Autowired
     AgentRepository agents;
 
     @Autowired
@@ -90,7 +94,7 @@ class MemoryRecallEvalTest {
 
     @BeforeEach
     void setUp() {
-        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
+        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock, migration);
     }
 
 

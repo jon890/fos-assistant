@@ -2,6 +2,7 @@
 
 - **status**: `accepted`
 - Date: 2026-10-08
+- 기억에도 이 구조를 쓰고 그룹마다 하나인 데이터 key 줄을 더하는 것은 [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) 이 정한다.
 - [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 의 암호문 모양(`v1.<IV>.<암호문과 태그>`)과 AES-256-GCM 을 그대로 쓴다.
   ADR-055 의 민감 Memory 암호화는 이 결정이 바꾸지 않는다. 같은 key 구조로 옮기는 일은 다음 단계에서 정한다.
 

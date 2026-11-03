@@ -15,7 +15,7 @@ mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출�
 McpToolCatalog는 기존 도구와 관찰 도구의 순서를 유지하고 끝에 memory_search 정의를 더하며 호출 시점의 설정을 읽는다.
 McpToolService는 catalog를 호출하고 실행 handler를 유지한다. McpController는 검색과 관찰 도구를 같은 요청자 판정 뒤에 처리한다.
 HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
-공용 시험 컨텍스트는 변경하지 않는다. Memory 검색의 detail·text 가림과 본문·암호문·COUNT 비조회를 확인하는 SQL 관측 대역도 유지한다.
+공용 시험 컨텍스트는 변경하지 않는다. Memory 검색의 detail·text 가림과 후보 질의 하나, COUNT 비조회를 확인하는 SQL 관측 대역도 유지한다.
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
 MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
 
@@ -267,7 +267,7 @@ domain과 infra는 admin을 import하지 않는다.
 거꾸로 써야 하면 아래 패키지에 port 를 두고 위 패키지가 구현한다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
-`crypto` 는 맨 아래다. 사용자별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)).
+`crypto` 는 맨 아래다. 사용자별·그룹별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 기억은 주인(사용자나 그룹)을 받는 `OwnedTextCipher` 로 암호화한다([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)).
 
 `crypto.domain.entity`는 `UserDataKey`와 이후 추가하는 crypto 엔티티, 그 엔티티의 영속 ID를 둔다.
 암호화 정책과 port는 `crypto.domain`에 남긴다. `UserDataKey`의 단순 이름 또는
@@ -626,9 +626,9 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 마지막 실행을 정한 뒤 대기 줄 멈춤과 끝 사건을 처리하고 handle을 닫는 순서도 그 클래스에 남는다.
 
 `MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
-`MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
-writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
-민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
+`MemoryRevisionWriter`는 revision 저장, 배치 검증과 제안 중복 키 계산을 맡는다.
+writer는 facade의 트랜잭션 안에서 동작한다. 제목과 새 본문을 먼저 암호화한 뒤 이전 값을 revision 으로 저장하고 현재 줄에 암호문을 적는다.
+제목과 본문의 암호화는 `MemoryTexts` 가 한다. 아직 옮기지 않은 줄의 revision 은 주인 데이터 key 로 새로 암호화해 남긴다.
 `MemoryRelevanceSearch`는 기억 검색의 입력 검사와 관련도 점수, 커서 위치에서 자르기를 맡는다.
 권한 조건을 건 후보 SQL은 `memory.infra`의 `MemorySearchCandidates`가 맡는다. 둘 다
 `MemoryService.searchFor`의 읽기 전용 `REQUIRES_NEW`, 2초 제한 트랜잭션 안에서 실행한다.

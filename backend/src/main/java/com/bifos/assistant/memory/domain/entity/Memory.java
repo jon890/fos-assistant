@@ -2,7 +2,11 @@ package com.bifos.assistant.memory.domain.entity;
 
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
+import com.bifos.assistant.memory.domain.MemoryText;
+import com.bifos.assistant.memory.domain.MemoryTextOpener;
+import com.bifos.assistant.memory.domain.SealedMemoryText;
 import com.bifos.assistant.memory.domain.StoredContent;
+import com.bifos.assistant.memory.domain.StoredMemoryText;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -16,9 +20,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,8 +37,9 @@ import org.hibernate.annotations.ColumnDefault;
  * <p>{@code alwaysInject} 는 {@code retrieval} 로 옮겨 가는 옛 칸이다. 한 배포 동안 남기고 쓸 때마다 {@code retrieval}
  * 과 맞춘다. 읽을 때는 {@code retrieval} 만 본다.
  *
- * <p>{@code content} 는 저장된 글이다. 민감 줄이면 암호문이고 {@code contentKeyId} 가 그 key 를 적는다. 평문은
- * {@code MemoryService.contentOf} 로 읽는다(ADR-055).
+ * <p>{@code storedTitle} 과 {@code storedContent} 는 저장된 글이다. {@code dataKeyId} 가 있으면 주인 데이터 key 의
+ * 암호문이다(ADR-20261103 / memory-encryption). 옛 key 로 암호화한 줄은 {@code contentKeyId} 가 그 key 를 적는다(ADR-055).
+ * 제목과 본문을 내는 곳은 {@link #title()} 과 {@link #content()} 를 쓴다. 처음 부를 때 읽어 올 때 붙인 복호화 도구로 푼다.
  */
 @Entity
 @Table(name = "memory")
@@ -68,15 +75,36 @@ public class Memory extends CreatedAtEntity {
     @Column(name = "document_key", length = 128)
     private String documentKey;
 
-    @Column(nullable = false, length = 200)
-    private String title;
+    /** 풀지 못한 줄의 제목 자리에 내는 글이다. */
+    public static final String UNREADABLE_TITLE = "읽지 못함";
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
+    /** 저장된 제목이다. {@link #dataKeyId} 가 있으면 암호문이다. */
+    @Column(name = "title", nullable = false, length = 1200)
+    private String storedTitle;
 
-    /** 본문을 암호화한 key 의 id 다. 비어 있으면 {@code content} 는 평문이다. */
+    /** 저장된 본문이다. {@link #dataKeyId} 나 {@link #contentKeyId} 가 있으면 암호문이다. */
+    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
+    private String storedContent;
+
+    /** 제목과 본문을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 평문이거나 옛 key 의 줄이다. */
+    @Column(name = "data_key_id")
+    private Long dataKeyId;
+
+    /** ADR-055 의 옛 key 로 본문을 암호화했으면 그 key 의 id 다. 이관하면 비운다. */
     @Column(name = "content_key_id", length = 32)
     private String contentKeyId;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private MemoryText plain;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private boolean unreadable;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private MemoryTextOpener opener;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -143,9 +171,10 @@ public class Memory extends CreatedAtEntity {
         this.scope = scope;
         this.ownerUserId = ownerUserId;
         this.groupId = groupId;
-        this.title = title;
-        this.content = body.content();
+        this.storedTitle = title;
+        this.storedContent = body.content();
         this.contentKeyId = body.keyId();
+        this.plain = body.sealed() ? null : new MemoryText(title, body.content());
         this.collection = placement.collection();
         this.entryType = MemoryEntryType.MEMORY;
         this.sensitivity = placement.sensitivity();
@@ -312,14 +341,17 @@ public class Memory extends CreatedAtEntity {
 
 
     /**
-     * 본문과 꺼내는 방식과 민감도를 고치고 판을 하나 올린다.
+     * 본문과 꺼내는 방식과 민감도를 고치고 revision 을 하나 올린다. 풀지 못한 줄은 부르는 쪽이 먼저 거절한다.
      *
      * <p>고치기 전의 값은 부르는 쪽이 {@link MemoryRevision#of} 로 먼저 남긴다.
+     *
+     * @param sealed 주인 데이터 key 로 암호화한 제목과 새 본문. 암호화가 꺼진 설치면 null 이다
      *
      * @throws IllegalArgumentException 민감 항목을 항상 싣게 하려 할 때. {@link MemoryPlacement#allows} 로 먼저 본다
      */
     public void revise(
-        StoredContent body,
+        String content,
+        SealedMemoryText sealed,
         MemoryRetrieval retrieval,
         MemorySensitivity sensitivity,
         String updatedProposalDedupKey,
@@ -327,8 +359,14 @@ public class Memory extends CreatedAtEntity {
         if (!MemoryPlacement.allows(retrieval, sensitivity)) {
             throw new IllegalArgumentException("a sensitive memory cannot always be injected");
         }
-        this.content = body.content();
-        this.contentKeyId = body.keyId();
+        String title = title();
+        // 암호문을 받았으면 저장 필드에 바로 적어 평문이 저장 필드에 놓이는 순간이 없다. 암호화가 꺼진 설치만 평문을 적는다
+        this.storedTitle = sealed == null ? title : sealed.title();
+        this.storedContent = sealed == null ? content : sealed.content();
+        this.dataKeyId = sealed == null ? null : sealed.dataKeyId();
+        this.contentKeyId = null;
+        this.plain = new MemoryText(title, content);
+        this.unreadable = false;
         this.sensitivity = sensitivity;
         place(retrieval);
         if (proposalDedupKey != null) {
@@ -339,29 +377,73 @@ public class Memory extends CreatedAtEntity {
     }
 
 
-    /** 본문이 암호문으로 저장돼 있는가. */
-    public boolean sealed() {
-        return contentKeyId != null;
+    /** 제목이다. 암호문이면 처음 부를 때 푼다. 풀지 못하면 {@link #UNREADABLE_TITLE} 이다. */
+    public String title() {
+        return opened().map(MemoryText::title).orElse(UNREADABLE_TITLE);
     }
 
 
-    /** 암호문이 누구의 것인지 적은 글이다. 암호화와 풀기가 같은 값을 써야 한다(ADR-055). */
-    public String contentBinding() {
-        return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
+    /** 본문이다. 암호문이면 처음 부를 때 푼다. 풀지 못하면 빈 글이다. */
+    public String content() {
+        return opened().map(MemoryText::content).orElse("");
+    }
+
+
+    /** 제목과 본문을 풀었는가. 거짓이면 실행에 싣지 않고 고치지 않는다. */
+    public boolean readable() {
+        return opened().isPresent();
+    }
+
+
+    /** 저장된 글이 암호문인가. 데이터 key 나 옛 key 의 줄이다. */
+    public boolean sealed() {
+        return dataKeyId != null || contentKeyId != null;
+    }
+
+
+    /** 저장된 글과 key, 주인이다. 암호화와 풀기가 같은 AAD 를 만든다. */
+    public StoredMemoryText stored() {
+        return new StoredMemoryText(
+            id, scope, scope == MemoryScope.USER ? ownerUserId : groupId, storedTitle, storedContent, dataKeyId, contentKeyId);
+    }
+
+
+    /** 읽어 올 때 복호화 도구를 붙인다. */
+    public void attachOpener(MemoryTextOpener opener) {
+        this.opener = opener;
     }
 
 
     /**
-     * 평문으로 남은 본문의 저장 모양만 암호문으로 바꾼다. 판 번호와 갱신 시각은 건드리지 않는다.
-     *
-     * @throws IllegalStateException 이미 암호문일 때
+     * 처음 넣기 전에 저장 필드를 빈 글로 바꾼다. 푼 글은 그대로 둔다. 줄 번호가 생긴 뒤 같은 트랜잭션에서 {@link #seal} 로 암호문을
+     * 적어 데이터베이스에 평문이 쓰이지 않게 한다(ADR-20261103 / memory-encryption).
      */
-    public void sealInPlace(StoredContent body) {
-        if (sealed()) {
-            throw new IllegalStateException("memory content is already sealed");
+    public void detachForSealing() {
+        opened();
+        this.storedTitle = "";
+        this.storedContent = "";
+    }
+
+
+    /** 주인 데이터 key 의 암호문을 적는다. 옛 key 표시는 비운다. 판 번호와 갱신 시각은 건드리지 않는다. */
+    public void seal(SealedMemoryText sealed) {
+        opened();
+        this.storedTitle = sealed.title();
+        this.storedContent = sealed.content();
+        this.dataKeyId = sealed.dataKeyId();
+        this.contentKeyId = null;
+    }
+
+
+    private Optional<MemoryText> opened() {
+        if (plain == null && !unreadable) {
+            Optional<MemoryText> read = sealed()
+                ? (opener == null ? Optional.empty() : opener.open(stored()))
+                : Optional.of(new MemoryText(storedTitle, storedContent));
+            plain = read.orElse(null);
+            unreadable = read.isEmpty();
         }
-        this.content = body.content();
-        this.contentKeyId = body.keyId();
+        return Optional.ofNullable(plain);
     }
 
 

@@ -4,6 +4,8 @@ import com.bifos.assistant.crypto.domain.AesGcm;
 import com.bifos.assistant.crypto.domain.BinaryCipher;
 import com.bifos.assistant.crypto.domain.DataKey;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
+import com.bifos.assistant.crypto.domain.KeyOwner;
+import com.bifos.assistant.crypto.domain.OwnedTextCipher;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
@@ -23,7 +25,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * 사용자별 데이터 key 로 본문을 암호화하고 푼다(ADR-20261008 / data-encryption).
  *
- * <p>데이터 key 는 사용자마다 하나이고 KEK 로 감싸 {@code user_data_key} 에 둔다. 푼 key 는 정한 수명과 개수 안에서 메모리에
+ * <p>데이터 key 는 주인(사용자나 그룹)마다 하나이고 KEK 로 감싸 {@code user_data_key} 에 둔다. 그룹 key 는 그룹 기억이 쓴다
+ * (ADR-20261103 / memory-encryption). 푼 key 는 정한 수명과 개수 안에서 메모리에
  * 둔다. 그래서 같은 사용자의 본문을 여러 개 풀 때 KEK 풀기는 처음 한 번만 돈다.
  *
  * <p>글({@link TextCipher})과 바이트({@link BinaryCipher})는 같은 key 와 같은 모양을 쓴다. 글은 UTF-8 바이트로 바꿔 암호화한다.
@@ -32,7 +35,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Component
 @Slf4j
-public class DataKeyService implements TextCipher, BinaryCipher {
+public class DataKeyService implements TextCipher, BinaryCipher, OwnedTextCipher {
 
     private static final Duration UNAVAILABLE_TTL = Duration.ofMinutes(1);
 
@@ -40,7 +43,7 @@ public class DataKeyService implements TextCipher, BinaryCipher {
     private final DataKeyWriter writer;
     private final UserDataKeyRepository keys;
     private final KeyCache<Long, DataKey> byId;
-    private final KeyCache<Long, DataKey> byUser;
+    private final KeyCache<KeyOwner, DataKey> byOwner;
 
     /**
      * 풀지 못한 데이터 key 번호다. 1분 동안 다시 읽지 않고 경고도 다시 남기지 않는다. KEK 를 뺐거나 데이터 key 줄을 지웠을 때
@@ -59,7 +62,7 @@ public class DataKeyService implements TextCipher, BinaryCipher {
         this.writer = writer;
         this.keys = keys;
         this.byId = new KeyCache<>(properties.dekCacheTtl(), properties.dekCacheMaxEntries(), clock);
-        this.byUser = new KeyCache<>(properties.dekCacheTtl(), properties.dekCacheMaxEntries(), clock);
+        this.byOwner = new KeyCache<>(properties.dekCacheTtl(), properties.dekCacheMaxEntries(), clock);
         this.unavailable = new KeyCache<>(UNAVAILABLE_TTL, properties.dekCacheMaxEntries(), clock);
     }
 
@@ -72,29 +75,51 @@ public class DataKeyService implements TextCipher, BinaryCipher {
 
     @Override
     public Optional<SealedText> seal(Long ownerUserId, String aad, String plain) {
-        return sealBytes(ownerUserId, aad, plain.getBytes(StandardCharsets.UTF_8));
+        return seal(KeyOwner.user(ownerUserId), aad, plain);
     }
 
 
     @Override
     public Optional<String> open(Long keyId, Long ownerUserId, String aad, String sealed) {
-        return openBytes(keyId, ownerUserId, aad, sealed).map(plain -> new String(plain, StandardCharsets.UTF_8));
+        return open(keyId, KeyOwner.user(ownerUserId), aad, sealed);
+    }
+
+
+    @Override
+    public Optional<SealedText> seal(KeyOwner owner, String aad, String plain) {
+        return sealBytes(owner, aad, plain.getBytes(StandardCharsets.UTF_8));
+    }
+
+
+    @Override
+    public Optional<String> open(Long keyId, KeyOwner owner, String aad, String sealed) {
+        return openBytes(keyId, owner, aad, sealed).map(plain -> new String(plain, StandardCharsets.UTF_8));
     }
 
 
     @Override
     public Optional<SealedText> sealBytes(Long ownerUserId, String aad, byte[] plain) {
-        if (!enabled()) {
-            return Optional.empty();
-        }
-        DataKey key = forWriting(ownerUserId);
-        String content = AesGcm.seal(key.secret(), plain, bytes(aad));
-        return Optional.of(new SealedText(content, key.id()));
+        return sealBytes(KeyOwner.user(ownerUserId), aad, plain);
     }
 
 
     @Override
     public Optional<byte[]> openBytes(Long keyId, Long ownerUserId, String aad, String sealed) {
+        return openBytes(keyId, KeyOwner.user(ownerUserId), aad, sealed);
+    }
+
+
+    private Optional<SealedText> sealBytes(KeyOwner owner, String aad, byte[] plain) {
+        if (!enabled()) {
+            return Optional.empty();
+        }
+        DataKey key = forWriting(owner);
+        String content = AesGcm.seal(key.secret(), plain, bytes(aad));
+        return Optional.of(new SealedText(content, key.id()));
+    }
+
+
+    private Optional<byte[]> openBytes(Long keyId, KeyOwner owner, String aad, String sealed) {
         if (unavailable.get(keyId).isPresent()) {
             return Optional.empty();
         }
@@ -107,13 +132,13 @@ public class DataKeyService implements TextCipher, BinaryCipher {
             return Optional.empty();
         }
         try {
-            if (!key.userId().equals(ownerUserId)) {
-                log.warn("데이터 key 의 주인이 본문의 주인과 다르다 keyId={} ownerUserId={}", keyId, ownerUserId);
+            if (!key.owner().equals(owner)) {
+                log.warn("데이터 key 의 주인이 본문의 주인과 다르다 keyId={} owner={}", keyId, owner);
                 return Optional.empty();
             }
             return Optional.of(AesGcm.open(key.secret(), sealed, bytes(aad)));
         } catch (IllegalStateException e) {
-            log.warn("본문을 풀지 못했다 keyId={} ownerUserId={} reason={}", keyId, ownerUserId, e.getMessage());
+            log.warn("본문을 풀지 못했다 keyId={} owner={} reason={}", keyId, owner, e.getMessage());
             return Optional.empty();
         }
     }
@@ -146,27 +171,27 @@ public class DataKeyService implements TextCipher, BinaryCipher {
     /** 메모리에 둔 데이터 key 를 모두 버린다. 검사가 key 를 바꿀 때 쓴다 */
     public void forgetCachedKeys() {
         byId.clear();
-        byUser.clear();
+        byOwner.clear();
         unavailable.clear();
     }
 
 
-    private DataKey forWriting(Long userId) {
-        Optional<DataKey> cached = byUser.get(userId);
+    private DataKey forWriting(KeyOwner owner) {
+        Optional<DataKey> cached = byOwner.get(owner);
         if (cached.isPresent()) {
             return cached.get();
         }
-        UserDataKey row = writer.find(userId).orElseGet(() -> create(userId));
+        UserDataKey row = writer.find(owner).orElseGet(() -> create(owner));
         return remember(row);
     }
 
 
-    private UserDataKey create(Long userId) {
+    private UserDataKey create(KeyOwner owner) {
         try {
-            return writer.create(userId);
+            return writer.create(owner);
         } catch (DataIntegrityViolationException e) {
-            // 같은 사용자의 다른 저장이 먼저 만들었다. 새 트랜잭션에서 다시 읽으면 그 줄이 보인다.
-            return writer.find(userId).orElseThrow(() -> e);
+            // 같은 주인의 다른 저장이 먼저 만들었다. 새 트랜잭션에서 다시 읽으면 그 줄이 보인다.
+            return writer.find(owner).orElseThrow(() -> e);
         }
     }
 
@@ -182,10 +207,11 @@ public class DataKeyService implements TextCipher, BinaryCipher {
 
 
     private DataKey remember(UserDataKey row) {
-        byte[] secret = keks.unwrap(row.kekId(), row.wrappedKey(), UserDataKey.wrapBinding(row.userId()));
-        DataKey key = new DataKey(row.id(), row.userId(), new SecretKeySpec(secret, "AES"));
+        KeyOwner owner = row.owner();
+        byte[] secret = keks.unwrap(row.kekId(), row.wrappedKey(), owner.wrapBinding());
+        DataKey key = new DataKey(row.id(), owner, new SecretKeySpec(secret, "AES"));
         byId.put(row.id(), key);
-        byUser.put(row.userId(), key);
+        byOwner.put(owner, key);
         return key;
     }
 

@@ -144,7 +144,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 ### Memory
 
 - **말한 것은 바로, 나머지는 제안으로.** 사용자가 이번 메시지에서 직접 말한 오래 쓰일 사실은 에이전트가 바로 기억하고, 그 답 아래에 「기억했어요」 와 고치기, 되돌리기가 보인다. 사용자가 직접 말한 사실은 모델이 본문을 다듬어도 바로 저장한다. 부정이 메시지와 본문 가운데 한쪽에만 있거나 글이 민감해 보이면 제안으로 남는다. 바깥 글을 읽었거나 사람이 보내지 않은 실행(맡긴 일의 결과, 예약 작업)이 섞인 대화에서 나온 것과 민감 항목은 늘 제안으로 남고 사람이 받아들여야 쓰인다([ADR-20261007 / memory-remember](docs/adr/ADR-20261007-memory-remember.md), [ADR-20261008 / memory-remember-guard](docs/adr/ADR-20261008-memory-remember-guard.md), [`docs/features/memory.md`](docs/features/memory.md)).
-- **collection 과 민감 항목.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 민감 항목의 본문은 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
+- **collection 과 민감 항목.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 모든 항목의 제목과 본문은 주인의 데이터 key 로 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-20261103 / memory-encryption](backend/docs/adr/ADR-20261103-memory-encryption.md)).
 
 collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/features/memory.md`](docs/features/memory.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
 

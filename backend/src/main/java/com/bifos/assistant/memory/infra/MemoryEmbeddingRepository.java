@@ -3,6 +3,7 @@ package com.bifos.assistant.memory.infra;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingSource;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingStamp;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingVector;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import java.sql.Blob;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -18,7 +19,7 @@ import org.springframework.data.repository.query.Param;
  * <p>{@link MemoryRepository} 가 이 인터페이스를 이어받아 Spring Data 가 쿼리를 만든다. 같은 엔티티에 저장소를 둘 두면 엔티티로 저장소를 찾는
  * Spring Data 의 조회가 어느 쪽을 낼지 정해지지 않아, 벡터 쿼리만 이 이름으로 나눠 주입받는다.
  *
- * <p>임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아니고, 민감도가 {@code NORMAL} 이며 암호화하지 않은 항목이다.
+ * <p>임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아니고, 민감도가 {@code NORMAL} 인 항목이다. 제목과 본문은 암호문이라 엔티티를 읽어 앱에서 풀고, 풀지 못한 줄은 뺀다(ADR-20261103 / memory-encryption).
  * 효력 있는 대체 연결이 가리키는 항목도 빠진다. 이미 있던 그 항목의 벡터는 다음 주기의 정리가 비운다.
  */
 public interface MemoryEmbeddingRepository {
@@ -27,35 +28,53 @@ public interface MemoryEmbeddingRepository {
     String HAS_VECTOR = " embedding_model is not null and embedding_fingerprint is not null and embedding_vector is not null";
 
 
-    /** 임베딩 대상 항목의 글을 번호 순으로 읽는다. */
-    @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingSource(m.id, m.title, m.content)"
+    /** 임베딩 대상 항목을 번호 순으로 읽는다. */
+    @Query("select m"
         + " from Memory m"
         + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
-        + " and m.contentKeyId is null"
         + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
         + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
         + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
         + " order by m.id")
-    List<MemoryEmbeddingSource> findEmbeddableSources();
+    List<Memory> findEmbeddableMemories();
 
 
-    /** 그 번호 가운데 지금도 임베딩 대상인 항목의 글을 번호 순으로 읽는다. 묶음을 보내기 직전과 쓰기 직전에 다시 읽는 데 쓴다. */
-    @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingSource(m.id, m.title, m.content)"
+    /** 임베딩 대상 항목의 푼 글을 번호 순으로 낸다. 풀지 못한 줄은 뺀다. 제목과 본문이 암호문이라 엔티티를 읽어 푼다. */
+    default List<MemoryEmbeddingSource> findEmbeddableSources() {
+        return sourcesOf(findEmbeddableMemories());
+    }
+
+
+    /** 그 번호 가운데 지금도 임베딩 대상인 항목을 번호 순으로 읽는다. 묶음을 보내기 직전과 쓰기 직전에 다시 읽는 데 쓴다. */
+    @Query("select m"
         + " from Memory m"
         + " where m.id in :ids"
         + " and m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
-        + " and m.contentKeyId is null"
         + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
         + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
         + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
         + " order by m.id")
-    List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(@Param("ids") Collection<Long> ids);
+    List<Memory> findEmbeddableMemoriesByIds(@Param("ids") Collection<Long> ids);
+
+
+    /** 그 번호 가운데 지금도 임베딩 대상인 항목의 푼 글이다. */
+    default List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(Collection<Long> ids) {
+        return sourcesOf(findEmbeddableMemoriesByIds(ids));
+    }
+
+
+    private static List<MemoryEmbeddingSource> sourcesOf(List<Memory> memories) {
+        return memories.stream()
+            .filter(Memory::readable)
+            .map(memory -> new MemoryEmbeddingSource(memory.id(), memory.title(), memory.content()))
+            .toList();
+    }
 
 
     /**

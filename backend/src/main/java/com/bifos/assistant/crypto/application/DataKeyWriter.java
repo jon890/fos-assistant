@@ -1,6 +1,7 @@
 package com.bifos.assistant.crypto.application;
 
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
+import com.bifos.assistant.crypto.domain.KeyOwner;
 import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import java.security.SecureRandom;
@@ -31,18 +32,18 @@ public class DataKeyWriter {
 
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public Optional<UserDataKey> find(Long userId) {
-        return keys.findByUserId(userId);
+    public Optional<UserDataKey> find(KeyOwner owner) {
+        return owner.group() ? keys.findByGroupId(owner.id()) : keys.findByUserId(owner.id());
     }
 
 
     /** 새 데이터 key 를 뽑아 활성 KEK 로 감싸 저장한다. 이미 있으면 유일 제약 위반이 난다 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public UserDataKey create(Long userId) {
+    public UserDataKey create(KeyOwner owner) {
         byte[] dataKey = new byte[KEY_BYTES];
         RANDOM.nextBytes(dataKey);
-        String wrapped = keks.wrap(dataKey, UserDataKey.wrapBinding(userId));
-        return keys.saveAndFlush(UserDataKey.wrapped(userId, keks.activeKeyId(), wrapped));
+        String wrapped = keks.wrap(dataKey, owner.wrapBinding());
+        return keys.saveAndFlush(UserDataKey.wrapped(owner, keks.activeKeyId(), wrapped));
     }
 
 
@@ -60,7 +61,7 @@ public class DataKeyWriter {
         if (!keks.has(row.kekId())) {
             return false;
         }
-        byte[] binding = UserDataKey.wrapBinding(row.userId());
+        byte[] binding = row.owner().wrapBinding();
         byte[] dataKey = keks.unwrap(row.kekId(), row.wrappedKey(), binding);
         row.rewrap(keks.activeKeyId(), keks.wrap(dataKey, binding), clock.instant());
         return true;

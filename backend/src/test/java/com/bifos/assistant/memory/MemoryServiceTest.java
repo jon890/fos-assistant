@@ -314,7 +314,7 @@ class MemoryServiceTest {
             transactions.executeWithoutResult(status -> {
                 Memory held = repository.findByIdForUpdate(proposed.id()).orElseThrow();
                 revisionRepository.save(MemoryRevision.of(held, MemoryChangeType.UPDATED, ADMIN.id(), null, NOW));
-                held.revise(StoredContent.plain("고친 내용"), MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
+                held.revise("고친 내용", null, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL, null, NOW);
                 locked.countDown();
                 // 승인 쪽이 읽기에 닿을 틈을 준다. 잠금이 있으면 이 커밋 뒤에야 읽는다.
                 LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(500));

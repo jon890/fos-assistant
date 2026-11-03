@@ -23,6 +23,7 @@ import com.bifos.assistant.memory.config.MemoryRelevanceProperties;
 import com.bifos.assistant.memory.application.MemoryVectorCache;
 import com.bifos.assistant.memory.application.QueryEmbedder;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.memory.application.MemoryTextMigration;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -77,6 +78,9 @@ class MemoryEmbeddingEvalTest {
 
     @Autowired
     MemoryRepository memories;
+
+    @Autowired
+    MemoryTextMigration migration;
 
     @Autowired
     AgentRepository agents;
@@ -141,7 +145,7 @@ class MemoryEmbeddingEvalTest {
         ContextAssembler keyword = TestContextAssemblers.of(memoryService, properties, clock);
 
         clock.set(BASE);
-        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
+        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock, migration);
         Map<String, Long> agentIds = fixture.createAgents();
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
         for (Case each : DATASET.cases()) {

@@ -1,6 +1,6 @@
 ## ADR-055: 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다
 
-- **status**: `accepted`.
+- **status**: `accepted`. 민감 본문만 환경 변수 key 로 암호화하는 결정과 AAD, `content_key_id` 는 [ADR-20261103 / memory-encryption](ADR-20261103-memory-encryption.md) 이 대체한다. 이관을 확인할 때까지 옛 key 로 읽기만 한다.
 - **결정**: `sensitivity` 가 `SENSITIVE` 인 줄의 본문을 AES-256-GCM 으로 암호화해 `content` 칸에 넣는다.
   `memory` 와 `memory_revision` 두 표가 모두 해당한다. 어느 key 로 암호화했는지는 새 칸 `content_key_id` 가 적는다. 이 칸이 비어 있으면 평문이다.
   key 는 환경 변수로 받는다. key 마다 id 가 있고, 새로 쓰는 본문은 `active-key-id` 가 가리키는 key 로 암호화한다.

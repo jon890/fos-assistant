@@ -7,15 +7,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.nio.charset.StandardCharsets;
+import com.bifos.assistant.crypto.domain.KeyOwner;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
- * 사용자 한 명의 데이터 key(DEK)를 KEK 로 감싼 것이다(ADR-20261008 / data-encryption).
+ * 사용자 한 명이나 그룹 하나의 데이터 key(DEK)를 KEK 로 감싼 것이다(ADR-20261008 / data-encryption).
  *
- * <p>사용자마다 한 줄이다. 원문 key 는 저장하지 않는다. KEK 를 바꾸면 이 줄만 새 KEK 로 다시 감싼다. 본문은 다시 쓰지 않는다.
+ * <p>주인마다 한 줄이다. {@code userId} 와 {@code groupId} 가운데 하나만 찬다. 그룹 줄은 그룹 기억을 암호화한다
+ * (ADR-20261103 / memory-encryption). 원문 key 는 저장하지 않는다. KEK 를 바꾸면 이 줄만 새 KEK 로 다시 감싼다. 본문은 다시 쓰지 않는다.
  * 이 줄을 지우면 그 사용자의 암호문은 누구도 풀지 못한다.
  */
 @Entity
@@ -28,8 +29,11 @@ public class UserDataKey extends CreatedAtEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, unique = true)
+    @Column(name = "user_id", unique = true)
     private Long userId;
+
+    @Column(name = "group_id", unique = true)
+    private Long groupId;
 
     @Column(name = "kek_id", nullable = false, length = 32)
     private String kekId;
@@ -46,21 +50,33 @@ public class UserDataKey extends CreatedAtEntity {
     protected UserDataKey() {}
 
 
-    private UserDataKey(Long userId, String kekId, String wrappedKey) {
-        this.userId = userId;
+    private UserDataKey(KeyOwner owner, String kekId, String wrappedKey) {
+        this.userId = owner.group() ? null : owner.id();
+        this.groupId = owner.group() ? owner.id() : null;
         this.kekId = kekId;
         this.wrappedKey = wrappedKey;
     }
 
 
     public static UserDataKey wrapped(Long userId, String kekId, String wrappedKey) {
-        return new UserDataKey(userId, kekId, wrappedKey);
+        return wrapped(KeyOwner.user(userId), kekId, wrappedKey);
+    }
+
+
+    public static UserDataKey wrapped(KeyOwner owner, String kekId, String wrappedKey) {
+        return new UserDataKey(owner, kekId, wrappedKey);
     }
 
 
     /** 감싸기 AAD. 감싼 key 를 다른 사용자의 줄로 옮기면 풀리지 않는다 */
     public static byte[] wrapBinding(Long userId) {
-        return ("user_data_key:user:" + userId).getBytes(StandardCharsets.UTF_8);
+        return KeyOwner.user(userId).wrapBinding();
+    }
+
+
+    /** 이 줄의 주인이다 */
+    public KeyOwner owner() {
+        return groupId != null ? KeyOwner.group(groupId) : KeyOwner.user(userId);
     }
 
 

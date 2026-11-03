@@ -170,6 +170,9 @@ class AgentMemorySettingTest {
             .containsExactly(true, false, 1L);
         assertThat(collection(view, "health").entryCount()).isZero();
         assertThat(view.changes()).isEmpty();
+        assertThat(view.toString())
+            .as("관리자 화면은 남의 개인 기억을 건수로만 보이고 제목을 싣지 않는다")
+            .doesNotContain("이력", "연봉", "남의 이력", "제안만 된 항목");
     }
 
 

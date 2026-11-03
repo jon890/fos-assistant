@@ -222,7 +222,7 @@ class ContextAssemblerLinkTest {
 
 
     @Test
-    @DisplayName("에이전트가 받지 않는 collection 과 민감, 암호화한 이웃은 본문으로 싣지 않고 받지 않는 이웃은 색인에도 없다")
+    @DisplayName("에이전트가 받지 않는 collection 과 민감 이웃은 본문으로 싣지 않고, 받지 않는 이웃과 풀지 못한 이웃은 색인에도 없다")
     void keepsNeighborsInsideAgentBoundary() {
         if (grants.findById(new AgentMemoryCollectionId(agentId, HEALTH)).isEmpty()) {
             grants.save(AgentMemoryCollection.of(agentId, HEALTH, true));
@@ -243,7 +243,8 @@ class ContextAssemblerLinkTest {
         assertThat(result.bundle().items()).noneMatch(item -> item.ref().equals("memory:" + career.id()));
         assertThat(itemOf(result, sensitive, ContextSource.MEMORY_INDEX)).isPresent();
         assertThat(result.bundle().items())
-            .anyMatch(item -> item.source() == ContextSource.MEMORY_INDEX && item.ref().equals("memory:" + sealed));
+            .as("풀지 못한 줄은 실행에 싣지 않는다(ADR-20261103 / memory-encryption)")
+            .noneMatch(item -> item.ref().equals("memory:" + sealed));
         assertThat(result.instructions()).doesNotContain("제주 출장 일정", "배에서 먹는 약", "v1.봉인");
     }
 
