@@ -12,6 +12,8 @@ import signal
 import sys
 import tempfile
 import threading
+import time
+import traceback
 import urllib.parse
 import urllib.request
 import mcp
@@ -110,11 +112,20 @@ class Fixture(ProfileApiRouteTest):
 
     def reset(self):
         """앞 검사가 바꾼 파일과 관측값을 준비 직후로 되돌리고, 파일이 처음과 같은지 답한다."""
-        for child in self.workspace.iterdir():
-            if child.is_dir() and not child.is_symlink():
-                shutil.rmtree(child)
-            else:
-                child.unlink()
+        # 앞 검사가 띄운 stdio MCP 서버가 종료 중에 plugin 디렉터리 아래에 파일(__pycache__ 등)을 쓸 수 있다.
+        # 지우는 도중 그 쓰기와 겹치면 OSError 가 나므로 몇 번 다시 지운다.
+        for attempt in range(5):
+            try:
+                for child in self.workspace.iterdir():
+                    if child.is_dir() and not child.is_symlink():
+                        shutil.rmtree(child)
+                    else:
+                        child.unlink()
+                break
+            except OSError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.2)
         shutil.copytree(self.saved, self.workspace, symlinks=True, dirs_exist_ok=True)
         # guard 판정은 매번 Spring 에 묻지만, 다시 읽는 것으로 모듈에 남은 값이 없게 한다.
         importlib.reload(importlib.import_module(self.plugin.__name__ + ".connector_guard"))
@@ -158,11 +169,45 @@ def main():
     fixture = Fixture()
     fixture.prepare(sys.argv[1], sys.argv[2])
 
+    # reset 은 진행 중인 다른 요청이 끝난 뒤에 돌고, 도는 동안 새 요청은 기다린다.
+    # reset 이 디렉터리를 지우는 동안 다른 요청이 같은 파일을 읽거나 쓰면 한쪽이 예외로 끝나 연결이 끊긴다.
+    gate = threading.Condition()
+    gate_state = {"active": 0, "resetting": False}
+
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
 
         def handle_request(self):
+            resetting = urllib.parse.urlsplit(self.path).path == "/fixture/reset"
+            with gate:
+                if resetting:
+                    gate_state["resetting"] = True
+                    gate_state["active"] += 1
+                    gate.wait_for(lambda: gate_state["active"] == 1, timeout=5)
+                else:
+                    gate.wait_for(lambda: not gate_state["resetting"], timeout=30)
+                    gate_state["active"] += 1
+            try:
+                self.dispatch()
+            except Exception:
+                # 처리기가 예외로 끝나면 Java 쪽은 응답 없는 연결 종료만 본다. 원인을 응답 본문에 싣는다.
+                detail = traceback.format_exc()
+                sys.stderr.write(detail)
+                encoded = json.dumps({"error": detail}, ensure_ascii=False).encode()
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+            finally:
+                with gate:
+                    gate_state["active"] -= 1
+                    if resetting:
+                        gate_state["resetting"] = False
+                    gate.notify_all()
+
+        def dispatch(self):
             parsed = urllib.parse.urlsplit(self.path)
             length = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(length)) if length else None

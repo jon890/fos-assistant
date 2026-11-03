@@ -147,6 +147,15 @@ jobs:
           path: backend/build/test-results
           if-no-files-found: ignore
           retention-days: 7
+      # JVM 을 나눈 효과를 클래스별 시간으로 재려고 성공한 실행의 보고서도 짧게 둔다.
+      - name: 성공한 백엔드 검사 보고서
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-report-ok-${{ matrix.suite }}-attempt-${{ github.run_attempt }}
+          path: backend/build/test-results
+          if-no-files-found: ignore
+          retention-days: 1
 
   backend:
     name: backend

@@ -198,7 +198,7 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
      */
     void resetPlugin() throws Exception {
         var response = send(pythonBase + "/fixture/reset", "POST", "{}");
-        assertThat(response.statusCode()).as("Python fixture 되돌리기").isEqualTo(200);
+        assertThat(response.statusCode()).as("Python fixture 되돌리기: " + response.body()).isEqualTo(200);
         assertThat(JSON.readTree(response.body()).path("restored").booleanValue()).as("되돌린 파일이 준비 직후와 같다").isTrue();
     }
 

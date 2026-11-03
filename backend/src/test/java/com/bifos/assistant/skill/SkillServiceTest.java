@@ -45,6 +45,7 @@ import com.bifos.assistant.skill.library.application.dto.SkillsChanged;
 import com.bifos.assistant.skill.library.domain.SkillBundle;
 import com.bifos.assistant.skill.library.domain.SkillFile;
 import com.bifos.assistant.skill.library.infra.PreviousSkillStore;
+import com.bifos.assistant.skill.library.config.SkillProperties;
 import com.bifos.assistant.skill.library.infra.SkillStore;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.IOException;
@@ -97,9 +98,6 @@ class SkillServiceTest {
     private static final CurrentUser ADMIN = new CurrentUser(81L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = new CurrentUser(82L, "kid@example.com", "아이", 1L, UserRole.MEMBER);
 
-    /** {@code application-test.yml} 의 스킬 루트다. 두 루트가 같아 게시된 경로를 그대로 열 수 있다. */
-    private static final Path SKILL_ROOT = Path.of("build/test-skills");
-
     private static final List<String> WITHOUT_SKILLS = List.of("web", "fos-assistant");
     private static final List<String> WITH_SKILLS = List.of("web", "skills", "fos-assistant");
     private static final List<String> TERMINAL_WITH_SKILLS = List.of("skills", "terminal", "web", "fos-assistant");
@@ -108,6 +106,10 @@ class SkillServiceTest {
 
     @Autowired
     SkillService skills;
+
+    /** {@code application-test.yml} 의 스킬 루트가 JVM 마다 다르므로 설정에서 읽는다. 두 루트가 같아 게시된 경로를 그대로 열 수 있다. */
+    @Autowired
+    SkillProperties skillProperties;
 
     @Autowired
     SkillStore store;
@@ -436,7 +438,7 @@ class SkillServiceTest {
         skills.delete(OWNER, GROUP, "cooking");
 
         verify(skillClient).publish(GROUP_PROFILE, List.of(), null, "u" + OWNER.id());
-        assertThat(SKILL_ROOT.resolve(GROUP_PROFILE))
+        assertThat(skillRoot().resolve(GROUP_PROFILE))
             .as("실행 공간이 붙이는 profile 디렉터리는 비운 채 남긴다")
             .isEmptyDirectory();
     }
@@ -695,7 +697,7 @@ class SkillServiceTest {
 
         verify(skillClient).publish(OWNED_PROFILE, List.of(), null, "u" + OWNER.id());
         assertThat(store.currentVersion(OWNED_PROFILE)).isEmpty();
-        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE))
+        assertThat(skillRoot().resolve(OWNED_PROFILE))
             .as("실행 공간이 붙이는 profile 디렉터리는 비운 채 남긴다")
             .isEmptyDirectory();
     }
@@ -975,7 +977,7 @@ class SkillServiceTest {
 
         verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
         verify(skillClient, never()).publishRequiringSandbox(anyString(), anyList(), any(), anyString());
-        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).as("버전 디렉터리를 쓰기 전에 거절한다").doesNotExist();
+        assertThat(skillRoot().resolve(OWNED_PROFILE)).as("버전 디렉터리를 쓰기 전에 거절한다").doesNotExist();
     }
 
 
@@ -1136,7 +1138,7 @@ class SkillServiceTest {
         skills.delete(OWNER, OWNED, "shopping");
 
         assertThat(previousStore.readPrevious(OWNED_PROFILE, "shopping")).isEmpty();
-        assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).isEmptyDirectory();
+        assertThat(skillRoot().resolve(OWNED_PROFILE)).isEmptyDirectory();
     }
 
 
@@ -1144,7 +1146,7 @@ class SkillServiceTest {
     @DisplayName("이전 버전 쓰기가 실패해도 새 본문이 게시되고 저장 응답의 이전 시각은 비어 있다")
     void savingSucceedsWhenPreviousWriteFails() throws IOException {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
-        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
+        Files.writeString(skillRoot().resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
         clearInvocations(skillClient);
 
         String changed = skillMd("weekly-plan") + "\n고침";
@@ -1164,7 +1166,7 @@ class SkillServiceTest {
         skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         String changed = skillMd("weekly-plan") + "\n고침";
         skills.save(OWNER, OWNED, "weekly-plan", changed, List.of());
-        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE)
+        Files.writeString(skillRoot().resolve(OWNED_PROFILE)
             .resolve(PreviousSkillStore.PREVIOUS_DIR).resolve("weekly-plan")
             .resolve(PreviousSkillStore.SAVED_AT), "손상된 시각");
         clearInvocations(skillClient);
@@ -1183,7 +1185,7 @@ class SkillServiceTest {
     @DisplayName("이전 버전 삭제가 실패해도 새 스킬 저장과 기존 스킬 삭제의 게시와 사건은 성공한다")
     void savingAndDeletingSucceedWhenPreviousDeleteFails() throws IOException {
         skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
-        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
+        Files.writeString(skillRoot().resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
 
         SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
         assertThat(saved.previousSavedAt()).isNull();
@@ -1270,8 +1272,13 @@ class SkillServiceTest {
     }
 
 
-    private static List<String> versionDirs(String profile) {
-        try (var stream = Files.list(SKILL_ROOT.resolve(profile))) {
+    private Path skillRoot() {
+        return Path.of(skillProperties.root());
+    }
+
+
+    private List<String> versionDirs(String profile) {
+        try (var stream = Files.list(skillRoot().resolve(profile))) {
             return stream.map(path -> path.getFileName().toString())
                 .filter(name -> name.startsWith("v"))
                 .toList();
