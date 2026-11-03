@@ -16,6 +16,7 @@ migration=0
 security=0
 hermes=0
 deploy=0
+finance=0
 
 while IFS= read -r path; do
   [ -z "$path" ] && continue
@@ -52,10 +53,18 @@ while IFS= read -r path; do
     .github/workflows/*)
       deploy=1 ;;
   esac
+  case "$path" in
+    hermes/connectors/tossinvest/* | \
+    backend/src/main/java/com/bifos/assistant/connector/financial/* | \
+    backend/src/main/java/com/bifos/assistant/connector/approval/application/*Financial* | \
+    backend/src/main/java/com/bifos/assistant/connector/approval/application/dto/Financial*)
+      finance=1 ;;
+  esac
 done
 
 [ "$migration" = 1 ] && echo "위험:마이그레이션"
 [ "$security" = 1 ] && echo "위험:보안"
 [ "$hermes" = 1 ] && echo "위험:Hermes연동"
 [ "$deploy" = 1 ] && echo "위험:배포설정"
+[ "$finance" = 1 ] && echo "위험:금융"
 exit 0

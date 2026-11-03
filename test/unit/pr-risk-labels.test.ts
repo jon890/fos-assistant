@@ -51,3 +51,23 @@ test("hermes 와 무관한 파일은 Hermes 연동과 보안 라벨이 붙지 �
   assert.ok(!labels.includes("위험:Hermes연동"), `라벨: ${labels.join(",")}`);
   assert.ok(!labels.includes("위험:보안"), `라벨: ${labels.join(",")}`);
 });
+
+test("토스 커넥터와 backend 금융 경로에는 금융 위험 라벨이 붙는다", () => {
+  const toss = labelsFor("hermes/connectors/tossinvest/assistant.json");
+  assert.ok(toss.includes("위험:금융"), `라벨: ${toss.join(",")}`);
+  const backend = labelsFor("backend/src/main/java/com/bifos/assistant/connector/financial/domain/Order.java");
+  assert.deepEqual(backend, ["위험:금융"]);
+  for (const name of [
+    "approval/application/ConnectorFinancialApproval.java",
+    "approval/application/FinancialLimitChanges.java",
+    "approval/application/dto/FinancialActionSummary.java",
+  ]) {
+    assert.deepEqual(labelsFor(`backend/src/main/java/com/bifos/assistant/connector/${name}`), ["위험:금융"]);
+  }
+});
+
+test("금융이 아닌 커넥터에는 금융 위험 라벨이 붙지 않는다", () => {
+  const labels = labelsFor("hermes/connectors/gmail/assistant.json");
+  assert.ok(!labels.includes("위험:금융"), `라벨: ${labels.join(",")}`);
+  assert.deepEqual(labelsFor("backend/src/main/java/com/bifos/assistant/connector/application/X.java"), []);
+});

@@ -181,7 +181,16 @@ Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unic
 **H2 에서 도는 검사를 MySQL 에서 되풀이하지 않는다.** MySQL 은 행 잠금, 정렬 규칙, 마이그레이션 DDL 처럼 H2 와 다르게 동작하는 것만 본다.
 그런 H2 검사만 `@MysqlCase` 로 표시하고, 근거와 이유 목록은 [ADR-20261007 / test-context-base](adr/ADR-20261007-test-context-base.md) 의 「MySQL 검사」 가 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
-H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
+H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `GroupSettingMysqlMigrationTest` 가 본보기다.
+
+**운영에 적용된 지 14일이 지난 마이그레이션의 데이터 검사는 지운다.**
+적용된 파일은 `test/unit/migration-immutable.test.ts` 와 Flyway checksum 이 바뀌지 않게 막는다. 그 파일의 데이터 변환은 운영에서 이미 한 번 돌았고, 새로 설치하는 DB 에는 옮길 줄이 없다. 이 검사가 새로 잡는 것은 H2, MySQL, Flyway 버전을 올렸을 때의 동작 차이뿐이라 오래 둘 값이 작다.
+
+- 지우는 기준은 **운영 적용 뒤 14일**이다. 기준 버전은 운영 저장소의 Flyway 적용 기록에서 읽는다. 적용 시각이 14일 전보다 앞선 마지막 버전이 기준 버전이고, 그 버전 이하 마이그레이션의 `*MigrationTest` 와 `*MysqlMigrationTest` 가 지울 대상이다. 버전 칸은 문자열이라 옛 정수 버전(`V9`, `V54`)과 날짜 버전을 숫자로 비교한다
+- 전체 마이그레이션을 적용한 뒤 스키마를 보는 검사는, 그 검사가 보는 칸이나 제약을 만든 마이그레이션까지 모두 기준 버전 이하일 때만 지운다. 이름의 마이그레이션이 기준 이하여도 뒤 마이그레이션이 만든 칸을 보면 남긴다
+- 지우는 PR 에는 기준 버전과 지운 목록을 적는다. 이 저장소는 운영 적용 기록을 볼 수 없으므로 기준 버전은 운영 저장소를 맡은 쪽이 읽어 알려 준다
+- 다른 검사가 그 클래스를 상속하거나 도우미, fixture 를 쓰면 지우지 않고 PR 에 적는다. 예를 들어 `SchemaCommentsMysqlTest` 는 `SchemaCommentsMigrationTest` 를 상속한다
+- **지우지 않는 것.** 스키마를 대조하는 `MysqlMigrationTest` 와 정렬 규칙을 보는 `CollationUnifyMysqlMigrationTest` 는 마이그레이션이 얼마나 오래됐는지와 상관없이 지금 스키마와 운영 MySQL 설정의 차이를 잡는다. 장애나 리뷰 지적에서 생긴 검사도 그 교훈이 이 두 검사나 이 절의 규칙으로 일반화돼 있을 때만 지운다
 
 ## 지울 때
 
