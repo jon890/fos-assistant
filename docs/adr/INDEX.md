@@ -118,7 +118,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261101 / artifact-vault](ADR-20261101-artifact-vault.md) | 사용자가 보관한 결과물은 chat_artifact 의 보관 사본 행에 암호화해 두고 대화와 따로 남긴다 | backend, frontend | Accepted. PR 1(HTML·CSS 선택 보관)만 구현했다. 이미지 묶음과 자동 보관은 아직이다 |
 | [ADR-20261101 / model-setting](ADR-20261101-model-setting.md) | 그룹에 모델 설정 하나를 두어 모든 에이전트가 따르고, 사용자는 ChatGPT 의 Thinking 슬라이더 칸으로만 고른다 | backend, frontend | Accepted. 구현을 마쳤다. ADR-054 의 에이전트 기본 모델과 ADR-030 의 대화 직접 선택을 대체했다 |
 | [ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md) | 먼저 살펴보기는 기억 위의 읽기 전용 깨우기와 제안 카드로 줄이고, 저장은 새 테이블 없이 할 일의 제안 상태와 기존 반응 기록으로 한다 | backend, frontend | Accepted. 옮기는 순서의 6 단계까지 구현했다. ADR-20261007 / value-evaluation, ADR-20261008 / daily-loop 와 backend 의 autonomy-policy 를 대체했다. 옛 테이블 삭제(7 단계)는 아직이다 |
-| [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) | 기능 스펙은 기능 파일 옆 `docs/features/<id>/spec.md` 에 두고, Draft 의 독립 리뷰는 verify 로 한다 | 공통 | Accepted. ADR-20261009 / feature-docs 의 하위 디렉터리 금지에 스펙 예외를 더한다 |
+| [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) | 기능 스펙은 기능 파일 옆 `docs/features/<id>/spec.md` 에 두고, Draft 의 독립 리뷰는 verify 로 한다 | 공통 | Accepted. ADR-20261009 / feature-docs 의 하위 디렉터리 금지에 스펙 예외를 더한다. 독립 verify 는 기능 루프 PR 과 위험 라벨 PR 만 받는다(2026-11-03 개정) |
 
 ## 보관
 
