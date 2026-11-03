@@ -1,0 +1,47 @@
+{
+  "name": "vault-encryption",
+  "description": "커넥터 보관 파일을 별도 key 로 암호화하고, 기동 때 평문 파일과 옛 key 파일을 활성 key 로 다시 쓴다",
+  "pr_scope": "대시보드 plugin 의 보관 파일을 v2 암호문으로 쓰고 읽으며, 「key 필수」 와 기동 이관, 문서를 완성한다(REQ1 부터 REQ5).",
+  "deferred": [
+    {
+      "what": "PR2: 실행기로 stdio MCP 서버를 띄우고 profile .env 사본을 없앤다(REQ6, REQ7, REQ8, REQ1 의 원격 플러그인만 .env 에 쓰는 조건)",
+      "why": "실행기와 사본 제거는 바인딩 설치와 실행 경로 전체를 바꿔 PR 하나의 크기를 넘는다",
+      "after": "이 PR 배포 뒤 운영의 평문 파일 수와 옛 key 파일 수가 0"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-03",
+  "spec": "docs/features/connector/spec.md",
+  "design": "docs/features/connector/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3",
+    "REQ4",
+    "REQ5"
+  ],
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ3",
+        "REQ4"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5"
+      ]
+    }
+  ]
+}

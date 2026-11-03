@@ -22,6 +22,7 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 | [ADR-20261026 / plugin-standard-format](ADR-20261026-plugin-standard-format.md) | 플러그인은 Claude Code·Codex 플러그인 형식을 그대로 읽고, assistant 전용 정보는 `assistant.json` 하나에 덧붙인다 | Accepted. ADR-043 의 선언 파일 이름과 manifest 읽기 규칙을 바꾼다. `assistant.json` 이 없는 플러그인의 기본값은 ADR-20261101 / plugin-without-assistant-json 이 정한다 |
 | [ADR-20261026 / remote-mcp-plugin](ADR-20261026-remote-mcp-plugin.md) | 원격 MCP 플러그인은 운영자가 믿은 주소에만 붙고, 사용자의 토큰은 헤더로만 간다 | Accepted. 옮기는 순서의 1, 2, 4단계를 구현했다. 2단계(금융 워크벤치 전환)로 ADR-20261025 / connector-operator-base-url 을 대체했다 |
 | [ADR-20261101 / plugin-without-assistant-json](ADR-20261101-plugin-without-assistant-json.md) | `assistant.json` 이 없는 표준 플러그인도 받고, 그 도구는 모두 호출마다 사람이 승인한다 | Accepted. ADR-20261026 / plugin-standard-format 의 기본값과 원격 MCP ADR 「옮기는 순서」 의 4단계를 정한다. 1단계(카탈로그와 판정)를 구현했다 |
+| [ADR-20261103 / connector-vault-key](ADR-20261103-connector-vault-key.md) | 커넥터 보관 파일은 Control Plane KEK 와 다른 key 로 대시보드 plugin 이 암호화한다 | Accepted. ADR-083 의 보관 파일을 평문으로 두던 것을 바꾼다. profile `.env` 사본은 스펙 REQ6, REQ7 의 다음 PR 이 없앤다 |
 
 ## 보관
 
