@@ -425,7 +425,8 @@ jobs:
           FEATURE_BASE: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci/check-feature-covers.mjs "$FEATURE_BASE"
 
-  # hermes-tests 를 둘로 나눈 것이다(plan313). 두 job 이 서로 입력을 기다리지 않고 동시에 돈다.
+  # 예전 hermes-tests 를 둘로 나눈 것이다. 두 job 이 서로 입력을 기다리지 않고 동시에 돈다.
+  # 나눈 까닭과 측정은 ADR-20261012 / ci-path-filter 가 갖는다.
   # 필수 검사 이름 `hermes` 는 아래 판정 job 이 두 결과를 합쳐 그대로 낸다.
   hermes-connectors:
     name: hermes-connectors

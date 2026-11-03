@@ -239,7 +239,7 @@ runner 를 하나 더 쓰지만 공개 저장소라 비용이 없고 동시 job 
 | `hermes-python` | 커넥터 의존성과 entry 준비, Python unittest, Hermes 계약 검사 |
 
 - 필수 검사 이름은 `hermes` 그대로다. 판정 job 이 두 job 을 `needs` 에 두고, 둘이 모두 `success` 일 때만 통과시킨다. 건너뛰는 경우는 두 job 이 함께 건너뛴다. 브랜치 보호는 바꾸지 않는다.
-- 나누면서 드러난 의존: Python 테스트는 커넥터의 `dist` entry 와 `node_modules` 를 읽는다. 전에는 같은 job 에서 앞서 도는 배포 묶음 검사가 그것을 남겼다. 새 checkout 에서 도는 `hermes-python` 은 `bun install --frozen-lockfile` 과 `bun run build` 로 직접 만든다(캐시가 데워지면 수 초다).
+- 나누면서 드러난 의존: Python 테스트는 커넥터의 `dist` entry 와 `node_modules` 를 읽는다. 전에는 같은 job 에서 앞서 도는 배포 묶음 검사가 그것을 남겼다. 새 checkout 에서 도는 `hermes-python` 은 `bun install --frozen-lockfile` 과 `bun run build` 로 직접 만든다(PR 682 의 CI 에서 1초 안에 끝났다).
 - 측정(PR 682 의 CI): `hermes-connectors` 264초, `hermes-python` 257초, 판정 7초. job 하나가 가장 오래 걸리던 시간이 중앙값 516초에서 264초로 줄었다.
 - 감수할 것: 전체 검사 job 이 19개에서 20개가 된다. 동시 job 한도를 채우는 PR 이 겹치면 대기가 늘 수 있다.
 - 되돌릴 때는 두 job 을 합치고 판정 job 의 `needs` 와 `JOB_RESULT` 를 하나로 되돌린다. `ci-paths.test.ts` 의 `GATED` 를 함께 고친다.
