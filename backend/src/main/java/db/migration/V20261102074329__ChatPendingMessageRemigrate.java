@@ -28,6 +28,8 @@ import tools.jackson.databind.node.ObjectNode;
  * 보내지 않은 글이어서 하나도 버리지 않는다. 옛 {@code id} 가 이미 쓰인 번호와 겹치면 가장 큰 번호 다음 번호를 받는다.
  * 멈춤({@code held})은 어느 한쪽이라도 멈췄으면 멈춘다.
  *
+ * <p>읽을 때 대화 줄을 잠근다. 배포 중에 이전 컨테이너가 같은 대화의 대기 줄을 바꾸고 있어도 그 변경을 덮지 않는다.
+ *
  * <p>옮긴 행은 옛 테이블에서 지우고, 지운 수가 옮긴 수와 다르면 멈춘다. 대화 줄이 없는 행은 보낼 곳이 없어 옮기지 않고
  * 테이블과 함께 버린다. 이미 있는 대기 줄을 읽지 못하면 이어 붙일 수 없어 멈춘다.
  */
@@ -42,7 +44,7 @@ public class V20261102074329__ChatPendingMessageRemigrate extends BaseJavaMigrat
     public void migrate(Context context) throws Exception {
         Connection connection = context.getConnection();
         Map<Long, List<Row>> byConversation = readRows(connection);
-        try (PreparedStatement read = connection.prepareStatement("SELECT pending_messages FROM conversation WHERE id = ?");
+        try (PreparedStatement read = connection.prepareStatement("SELECT pending_messages FROM conversation WHERE id = ? FOR UPDATE");
             PreparedStatement update = connection.prepareStatement("UPDATE conversation SET pending_messages = ? WHERE id = ?");
             PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM chat_pending_message WHERE conversation_id = ?")) {
