@@ -234,7 +234,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 - 허락은 그 허락을 준 승인 줄(`connector_action`)의 허락 칸이 갖는다. 허락의 번호(`grantId`)는 그 승인 줄의 번호이고, 상시 허락과 대화 허락의 번호는 서로의 거두기에 통하지 않는다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md))
 - 상시 허락은 그 사용자가 그 플러그인의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 지운 에이전트를 정리해 승인 줄의 에이전트가 빈 허락은 어느 실행에도 통하지 않고 목록에도 없다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
-- 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
+- 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고, 상한 거절과 같은 의도 차단을 빼면 거절은 어느 검사에 걸렸는지 밝히지 않는다(답의 종류는 [토스증권 플러그인](tossinvest-connector.md)이 갖는다). 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -320,7 +320,7 @@ Hermes 는 막은 호출의 글도 `{"error": "<글>"}` 로 만들어 `mcp_` 도
 | `<external-data>` 안에 `[승인 대기]` 가 있다 | 플러그인 서버가 낸 데이터다. 판정으로 읽지 않는다. 막은 호출은 `transform_tool_result` 에 닿지 않아 `<external-data>` 가 붙지 않는다 |
 | 「다시 부르지 않는다」 는 안내 | 그 turn 에만 해당한다. 앞선 호출이 실패했거나 승인 요청이 만료·거절됐어도 사용자가 새로 요청하면 다시 부른다. 같은 요청이 이미 기다리는지는 Control Plane 이 그 호출의 답으로 알린다 |
 
-표시는 막을 수 없는 서버의 글에도 들어갈 수 있다. 그렇게 속여도 모델이 승인 카드가 떴다고 잘못 말할 뿐이고, 승인 없이 실행되는 길은 생기지 않는다.
+표시는 막을 수 없는 서버의 글에도 들어갈 수 있고, `transform_tool_result` hook 이 실패하면 서버 글이 `<external-data>` 없이 간다. 그렇게 속여도 모델이 승인 카드가 떴다고 잘못 말할 뿐이고, 승인 없이 실행되는 길은 생기지 않는다.
 
 ## 플러그인 승인
 

@@ -83,13 +83,13 @@ Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 
 Hermes 는 막힌 호출의 글을 `{"error": ...}` 로 만들어 `<untrusted_tool_result>` 로 감싸 모델에게 준다. 승인 줄을 만든 답은 「[승인 대기] 오류가 아니다. 승인 카드를 만들었고 사용자의 승인을 기다린다」 로 시작해 모델이 주문 거절이나 외부 서비스의 확인되지 않은 주장으로 읽지 않게 한다. 표시의 뜻은 공통 실행 지침이 설명한다([플러그인 도구 정책과 승인](connector-policy.md)의 「승인 대기 안내를 모델이 읽는 방식」).
 글은 `ConnectorFinancialProducer.APPROVAL_PENDING_MESSAGE` 가 갖는다. 같은 호출이 다시 왔는데 그 승인 줄이 이미 승인 대기를 벗어났으면 승인 대기라고 말하지 않고 `APPROVAL_SETTLED_MESSAGE` 로 승인 카드와 주문 내역을 확인하라고 답한다.
 
-준비가 거절된 답은 `ConnectorFinancialIntake.rejectedMessage` 가 고른다. 어느 검사에 걸렸는지는 같은 의도 차단만 밝힌다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)).
+준비가 거절된 답은 `ConnectorFinancialIntake.rejectedMessage` 가 고른다. 이 함수가 고르는 거절 가운데서는 같은 의도 차단만 까닭을 밝힌다. 상한 거절은 「주문 상한」 의 답을 따로 쓴다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)).
 
 | 거절 | 답 |
 | --- | --- |
 | 같은 주문의 카드가 이 대화에서 승인을 기다린다(`CONFLICT_PENDING`) | `INTENT_PENDING_MESSAGE`. `[승인 대기]` 로 시작하고 새 카드는 만들지 않았다고 말한다 |
-| 같은 주문의 카드가 다른 대화에서 승인을 기다린다(`CONFLICT_PENDING_ELSEWHERE`) | `INTENT_PENDING_ELSEWHERE_MESSAGE`. 이 대화에는 카드가 없어 표시를 붙이지 않고, 알림에서 그 카드를 찾으라고 말한다 |
-| 같은 주문이 실행 중이거나 결과를 모른다(`CONFLICT`) | `INTENT_BUSY_MESSAGE`. 다시 부르지 말고 주문 내역을 확인하라고 말한다 |
+| 같은 주문의 카드가 다른 대화에서 승인을 기다린다(`CONFLICT_PENDING_ELSEWHERE`). 대화 없는 실행이 만든 줄은 카드가 없어 `CONFLICT_PENDING_UNSEEN` 으로 아래 「그 밖의 검사」 답을 준다 | `INTENT_PENDING_ELSEWHERE_MESSAGE`. 이 대화에는 카드가 없어 표시를 붙이지 않고, 알림에서 그 카드를 찾으라고 말한다 |
+| 같은 주문이 실행 중이거나 결과를 모른다(`CONFLICT`). 같은 의도를 조회하다 실패하면 `CONFLICT_CHECK` 로 아래 답을 준다 | `INTENT_BUSY_MESSAGE`. 다시 부르지 말고 주문 내역을 확인하라고 말한다 |
 | 그 밖의 검사 | `FINANCIAL_UNAVAILABLE_MESSAGE`. 승인 카드를 만들지 않았고, 사용자가 다시 요청하면 다시 불러도 된다고만 말한다 |
 
 승인 기한이 지난 `PENDING` 은 만료 작업이 돌기 전에도 같은 의도를 막지 않는다(`ConnectorFinancialConflicts.blocking`). 그 줄은 승인할 때 기한 검사에 걸려 실행되지 못한다.
@@ -384,7 +384,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 11. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
 12. 계속 쓰지 않을 거면 아래 「되돌리기」 로 다시 닫는다
 
-상한 거절을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
+상한 거절과 같은 의도 차단을 뺀 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
 준비가 거절되면 Control Plane 로그에 `금융 준비를 거절했다 stage=<단계> kind=<예외>` 한 줄이 남는다. 단계 코드와 뜻은 `FinancialPrepareStage` 가 갖는다.
 `stage=prepare_http` 면 바로 앞의 `금융 준비 HTTP 가 실패했다 status=<HTTP 상태> reason=<이유> stage=<대시보드 단계> code=<선언된 오류 코드>` 를 본다.
 대시보드 plugin 이 `{"ok": false}` 에 고정 단계와 오류 코드를 실어 보내고, Control Plane 은 그 둘을 로그에만 남기고 모델에게 가는 글에는 싣지 않는다. 옛 plugin 이거나 모양이 다른 값이면 `-` 다.
