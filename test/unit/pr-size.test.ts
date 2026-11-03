@@ -95,7 +95,7 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
     const boundary = spawnSync("node", [SCRIPT, head], { cwd, encoding: "utf8", env: CLI_ENV });
     assert.equal(boundary.status, 0, boundary.stderr);
     assert.ok(boundary.stdout.includes(`운영 코드 ${MAX_LINES}줄`), boundary.stdout);
-    assert.ok(boundary.stdout.includes(`상한 ${MAX_LINES}줄, 통과`), boundary.stdout);
+    assert.ok(boundary.stdout.includes(`상한 ${MAX_LINES}줄, 파일째 삭제 0줄(상한 제외), 통과`), boundary.stdout);
     writeFileSync(join(cwd, "large.ts"), "change\n".repeat(MAX_LINES + 1));
     git("add", "."); git("commit", "-qm", "over-limit");
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: CLI_ENV }).status, 1);
@@ -139,7 +139,7 @@ test("JSON 계약과 phase·순수 이동·기능 영역 후보를 실제 git di
     assert.equal(result.status, 1);
     const json = JSON.parse(result.stdout);
     assert.deepEqual(json, report(base, "HEAD", cwd));
-    assert.deepEqual(Object.keys(json).sort(), ["schema_version", "total_lines", "counts", "large_threshold", "max_lines", "large", "pass", "split_candidates"].sort());
+    assert.deepEqual(Object.keys(json).sort(), ["schema_version", "total_lines", "counts", "deleted_lines", "large_threshold", "max_lines", "large", "pass", "split_candidates"].sort());
     assert.equal(json.schema_version, 1);
     assert.equal(json.max_lines, MAX_LINES);
     assert.equal(json.large_threshold, LARGE_THRESHOLD);
@@ -177,4 +177,45 @@ test("로컬 크기 단계는 main·공통 조상 없음만 건너뛰고 상한 
     assert.equal(result.status, expected, result.stderr);
     assert.match(result.stdout, expected ? /경계 후보/ : /건너뛴다/);
   }
+});
+
+test("파일째 지운 운영 코드는 상한에서 빼고 따로 센다", () => {
+  const deleted = new Set(["src/gone.ts", "test/unit/gone.test.ts"]);
+  // 파일째 삭제만 있는 PR 은 상한 안이다.
+  assert.deepEqual(countChanges(`0\t${MAX_LINES * 2}\tsrc/gone.ts\0`, deleted), { production: 0, tests: 0, docs: 0, ignored: 0 });
+  // 시험 파일의 삭제는 원래 상한 밖이라 시험 칸에 남는다.
+  assert.deepEqual(countChanges("0\t30\ttest/unit/gone.test.ts\0", deleted), { production: 0, tests: 30, docs: 0, ignored: 0 });
+  // 집합에 없는 파일은 삭제가 많아도 지금처럼 센다.
+  assert.deepEqual(countChanges("0\t900\tsrc/kept.ts\0", deleted), { production: 900, tests: 0, docs: 0, ignored: 0 });
+});
+
+test("실제 git diff 에서 파일째 삭제와 남는 파일 안의 삭제를 가르고 따로 보인다", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "pr-size-deleted-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  const put = (file: string, content: string) => {
+    mkdirSync(join(cwd, file, ".."), { recursive: true });
+    writeFileSync(join(cwd, file), content);
+  };
+  try {
+    git("init", "-q"); git("config", "user.name", "Test"); git("config", "user.email", "test@example.com");
+    put("src/gone.ts", "g\n".repeat(1000));
+    put("src/kept.ts", "k\n".repeat(300));
+    put("src/moved.ts", "m\n".repeat(50));
+    git("add", "."); git("commit", "-qm", "initial");
+    const base = git("rev-parse", "HEAD");
+    rmSync(join(cwd, "src/gone.ts"));
+    // 남는 파일은 큰 덩어리를 지워도 센다.
+    put("src/kept.ts", "k\n".repeat(100));
+    renameSync(join(cwd, "src/moved.ts"), join(cwd, "src/renamed.ts"));
+    put("src/added.ts", "a\n".repeat(10));
+    git("add", "-A"); git("commit", "-qm", "changes");
+    assert.deepEqual(compare(base, "HEAD", cwd), { production: 210, tests: 0, docs: 0, ignored: 0 });
+    const json = report(base, "HEAD", cwd);
+    assert.equal(json.deleted_lines, 1000);
+    assert.equal(json.counts.production, 210);
+    const text = spawnSync("node", [SCRIPT, base], { cwd, encoding: "utf8", env: CLI_ENV });
+    assert.equal(text.status, 0, text.stderr);
+    assert.match(text.stdout, /운영 코드 210줄/);
+    assert.match(text.stdout, /파일째 삭제 1000줄\(상한 제외\)/);
+  } finally { rmSync(cwd, { recursive: true, force: true }); }
 });
