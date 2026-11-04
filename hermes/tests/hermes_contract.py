@@ -34,7 +34,9 @@ NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
 NATIVE_IMAGE_PLUGIN_LOADER = ("hermes_cli/plugins_loader.py", "_directory_module_name", "_evict_modules")
 
 # `httpx2` 는 `mcp` SDK 2 가 함께 설치하는 HTTP 클라이언트다. 원격 MCP 플러그인의 클라이언트를 redirect 없이 직접 만든다.
-THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "httpx2", "starlette", "PIL"})
+# `cryptography` 는 Hermes core 가 고정한 의존이다. 보관 파일을 AES-256-GCM 으로 암호화한다(ADR-20261103 connector-vault-key).
+# Hermes 를 올릴 때 core 의존에 남아 있는지 본다. 검사 환경에는 `mcp` 가 `pyjwt[crypto]` 로 함께 설치한다.
+THIRD_PARTY_PACKAGES = frozenset({"yaml", "mcp", "httpx2", "starlette", "PIL", "cryptography"})
 
 
 @dataclass(frozen=True)

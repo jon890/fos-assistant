@@ -2790,6 +2790,10 @@ PyYAML이 없으면 plugin 진입점이 필요한 패키지와 버전을 오류�
 근거는 [plugins_manifest.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugins_manifest.py)와
 [plugins_loader.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugins_loader.py)의 `_warn_python_dependencies`다.
 
+dashboard plugin 은 보관 파일을 암호화하는 데 `cryptography` 의 `AESGCM` 을 쓴다([ADR-20261103 / connector-vault-key](adr/ADR-20261103-connector-vault-key.md)).
+v0.21.6 의 core 의존성이 `cryptography==50.0.1` 을 고정하므로 `python_dependencies` 에 선언하지 않는다([pyproject.toml](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/pyproject.toml)).
+Hermes 를 올릴 때 core 의존성에 남아 있는지 본다. 빠지면 보관 파일을 읽고 쓰지 못한다.
+
 관리 bootstrap의 source 계약도 바뀐다. constructor에 `setup_choose_callback`을 더하고,
 secret scope는 관리 env를 마지막에 합쳐 사용자 값을 덮어쓴다.
 cron worker는 UTF-8 BOM을 받으며, profile의 plugin discovery와 config hook 등록 뒤에 소유권을 인수한다.
