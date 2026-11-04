@@ -35,6 +35,7 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | 플러그인 실행 파일 기본값 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_COMMAND` | 절대 경로다. 목록 항목에 `command` 가 없을 때 쓴다 |
 | 대시보드 서비스 토큰 | 환경 변수 `HERMES_DASHBOARD_PROFILE_API_SECRET` | |
 | 보관 파일 key | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE`, `FOS_ASSISTANT_CONNECTOR_VAULT_ACTIVE_KEY_ID` | key 파일의 절대 경로와 새로 암호화할 key 의 id 다. 파일은 한 줄에 `<id>:<base64 32바이트>` 이고 빈 줄과 `#` 줄을 건너뛴다. Control Plane 의 KEK 파일과 모양만 같고, 값은 Control Plane KEK 와 다른 key 를 쓴다. 둘 다 비우면 「key 필수」 가 꺼져 있을 때만 보관 파일을 평문으로 쓴다. **key 를 잃으면 연결을 다시 등록해야 한다.** key 파일의 자리와 사본은 `fos-home-infra` 가 갖는다([ADR-20261103 / connector-vault-key](docs/adr/ADR-20261103-connector-vault-key.md)) |
+| 실행기에 넘기는 key 파일 위치 | 바인딩 설치가 대시보드의 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE` 값과 보관 파일 디렉터리를 로컬 플러그인의 서버 정의 env 에 넣는다 | gateway 의 MCP 자식이 그 경로로 key 파일과 보관 파일을 읽는다. 대시보드와 gateway 가 같은 파일 시스템과 계정에서 돌아야 한다. key 파일 자리를 바꾸면 상태 조회가 그 바인딩들을 「설치 안 됨」 으로 답하므로 연결 확인으로 다시 설치하고 gateway 를 재시작한다 |
 | 「key 필수」 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_REQUIRED` | `true` 면 key 를 쓸 수 없을 때 보관 파일 쓰기를 503 으로 거절한다. 비우거나 `false` 면 평문으로 쓰고 경고한다. 그 밖의 값은 켠 것으로 본다. 운영은 켠다 |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
 | 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |

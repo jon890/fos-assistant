@@ -13,7 +13,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `GET /api/profiles` | 이름이 이미 있는지 본다 | 없음 | 200 | |
 | `POST /api/profiles` | profile 을 만들고 같은 요청 안에서 설정 틀과 서명 plugin 과 관리 표식을 둔다 | `name`, `no_skills`, `description` 셋을 받고 다른 키는 거절한다. Control Plane 은 `{name, no_skills: true}` 를 보낸다 | 200. 이때 안전한 도구 목록, Control Plane MCP 등록(토큰 값 없음), 서명 plugin 켜짐, 관리 표식이 모두 있다 | 400 이름 규칙, 이미 있는 이름(Hermes 는 409 가 아니라 400), 허용하지 않는 키. 500 틀 적용 실패(만든 것은 지웠다) |
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
-| `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 플러그인의 `fields[].env` 뿐 | 200. 플러그인 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
+| `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 뿐. 운영자 env 이름은 쓰지 않고 성공으로 답한다 | 200. 운영자 env 이름은 `{profile, key, restart_required: false}` | 400 다른 key, 카탈로그 플러그인의 `fields[].env`(칸 값은 보관 파일에만 둔다), `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 플러그인 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 플러그인이면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 플러그인의 보관 파일이 없다 |
@@ -95,7 +95,7 @@ MCP 도구는 만든 뒤 1~2분 안에 붙는다. 이유는 운영 저장소의 
 사람이 만든 profile 과 기본 profile 은 401 이다. 파일이라 대시보드를 다시 띄워도 남는다.
 
 **`PUT /api/env` 는 [plugin 의 허용 목록](common.py) 에 있는 key 만 받는다.**
-기본 key 는 plugin 이 갖고, 플러그인 key 는 카탈로그 manifest 의 `fields[].env` 로 요청마다 계산한다.
+기본 key 는 plugin 이 갖는다. 플러그인 칸 key(카탈로그 manifest 의 `fields[].env`)는 받지 않는다. 그 값은 보관 파일에만 두고, 로컬 플러그인은 실행기가, 원격 플러그인은 바인딩 설치가 넘긴다. `DELETE /api/env` 는 남은 사본을 지울 수 있게 칸 key 를 받는다.
 본문은 `{profile, key, value}` 이고 값은 한 줄이어야 한다.
 provider credential 은 이 토큰으로 쓰지 못한다.
 
@@ -179,7 +179,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **`POST /api/connectors/<id>/execute` 는 Control Plane 이 승인한 호출만 부른다. 대시보드는 승인 여부를 다시 확인하지 않는다.**
 
-- 그 profile 에 관리 표식이나 플러그인 표식과 그 플러그인의 소유 기록이 있어야 한다. 플러그인 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 profile `.env` 의 칸 값과 운영 목록의 `env` 다. `owner_attachments_env` 를 선언한 플러그인은 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. `owner_browser_env` 를 선언한 플러그인은 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다
+- 그 profile 에 관리 표식이나 플러그인 표식과 그 플러그인의 소유 기록이 있어야 한다. 플러그인 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 바인딩의 칸 값과 운영 목록의 `env` 다. 칸 값은 실행기 정의면 소유 기록의 보관 파일에서, 옛 정의와 원격 정의면 그 profile `.env` 에서 읽는다. 보관 파일을 풀지 못하면 자식을 띄우지 않고 `{ok: false}` 다. `owner_attachments_env` 를 선언한 플러그인은 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. `owner_browser_env` 를 선언한 플러그인은 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. 본문은 `{detail, code}` 이고, 그 코드가 `retry_key` 를 선언했으면 `retry: {<retry_key>: <값>}` 을 더한다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)). `call` 에서는 그 코드를 `unavailable` 로 돌려준다
@@ -198,7 +198,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 바인딩의 실행과 probe 는 요청이 가리키는 플러그인의 항목만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 플러그인은 probe 와 실행과 붙이기가 그대로 된다.
 바인딩 설치는 기록의 형식과 실제 설정의 소유권을 확인한 뒤, command, args, env 가 바뀌었어도 새 manifest 로 다시 설치한다. 보관 파일과 연결 값은 유지한다. 떼기는 바인딩 항목을 지금 manifest 와 견주지 않는다.
 
-바인딩 설치는 `config.yaml`, `.fos-connectors.json`, `.env`, 뗀 서버 기록, 도구 이름 대응, 스킬, 정책 plugin 파일을 차례로 교체한다.
+바인딩 설치는 `config.yaml`, `.fos-connectors.json`, `.env`, 뗀 서버 기록, 도구 이름 대응, 스킬, 정책 plugin 파일을 차례로 교체한다. 로컬 플러그인의 설치는 `.env` 에서 그 칸 줄을 지우기만 한다.
 파일마다 임시 파일을 원자적으로 교체하며, 예외가 나면 이번 요청이 쓴 값이 남은 파일만 역순으로 복원한다.
 교체 직후 예외가 난 파일도 복원하고, 한 파일의 복원이 실패해도 나머지 파일을 계속 복원한다.
 복원 실패 로그에는 예외 종류만 남긴다. 여러 파일 전체의 교체는 원자적이지 않으며 프로세스 강제 종료나 지속적인 디스크 오류는 복원을 막을 수 있다.
@@ -206,14 +206,14 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 설정만 새 정의로 남았으면 재설치가 소유 기록을 복구할 수 있다.
 기존 바인딩 소유 기록이 있고, 현재 서버 설정이 이번 요청으로 만들 새 정의와 정확히 같으며, 기록과의 차이가 plugin이 관리하는 `tools.exclude`뿐인 경우다.
 이때 `restart_required: true`로 답한다. gateway가 옛 서버를 쥐고 있을 수 있기 때문이다.
-소유 기록 부재나 command, args, env, enabled, 다른 tools 설정의 차이는 계속 409다.
+실행기 정의의 보관 파일 리비전(`FOS_ASSISTANT_CONNECTOR_VAULT_REVISION`)은 이 견줌에서 뺀다. 소유 기록 부재나 command, args, env, enabled, 다른 tools 설정의 차이는 계속 409다.
 연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [플러그인 설치](../../../docs/features/connector.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.**
 
-**플러그인은 바인딩으로만 붙인다.** 관리 표식이나 플러그인 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile 이 받는다. `enabled: true` 요청은 보관 파일의 값을 profile `.env` 에 복사하고 서버 이름만 더한다. 다른 API 도구와 Control Plane MCP 등록은 그대로 두며, 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다.
+**플러그인은 바인딩으로만 붙인다.** 관리 표식이나 플러그인 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile 이 받는다. `enabled: true` 요청은 로컬 플러그인이면 실행기 정의를 쓰고 칸 값을 어디에도 복사하지 않는다. 원격 플러그인이면 보관 파일의 값을 profile `.env` 에 복사한다. 둘 다 서버 이름만 더한다. 다른 API 도구와 Control Plane MCP 등록은 그대로 두며, 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다.
 
 대응 파일은 `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다.
-이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 붙이기의 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 붙이기는 `restart_required` 가 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)).
+이미 있던 서버의 정의(로컬 플러그인은 보관 파일 리비전 포함)나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 붙이기의 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 붙이기는 `restart_required` 가 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)).
 바인딩을 떼면 `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다.
 `reload_pending` 은 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓일 때 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다.
 스킬 파일을 바꾼 붙이기는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다.
@@ -226,9 +226,15 @@ key 가 준비되지 않고 「key 필수」 가 꺼져 있으면 `{"v": 1, "con
 읽기는 둘을 모두 받는다. v2 는 그 `key_id` 의 key 가 key 파일에 있으면 활성 key 가 아니어도 푼다. 쓰기 전의 소유 확인은 풀지 않고 `connector` 만 본다. 모양을 읽지 못하는 파일은 경고를 남기고 덮어쓴다.
 plugin 이 올라올 때 평문 파일과 옛 key 의 파일을 활성 key 로 다시 쓰고, 다시 읽어 값이 같은지 본다. 깨진 파일과 풀지 못하는 파일은 건드리지 않는다. 쓰다 남은 임시 파일은 지운다. 남은 평문 파일, 옛 key 파일, 풀지 못한 파일의 수를 info 한 줄로, 그 파일 이름을 warning 한 줄로 남긴다. 운영 값과 동작은 [`hermes/README.md`](../../README.md) 의 「운영 값」 과 [ADR-20261103 / connector-vault-key](../../docs/adr/ADR-20261103-connector-vault-key.md) 가 갖는다.
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
+이미 있는 파일이 지금 쓸 모양과 같은 값이면 다시 쓰지 않는다. 같은 값으로 다시 등록해도 실행기 정의의 보관 파일 리비전이 바뀌지 않는다.
+
+**로컬 플러그인의 서버는 실행기(`connector_launcher.py`)로 띄운다.**
+서버 정의는 `command: <대시보드의 python>`, `args: ["-I", <실행기>, <vault>, <플러그인 id>, "<칸 key>=<env>", ..., "--", <실제 command>, <실제 args>...]` 이고, `env` 에는 운영자 env, 주인 env, 보관 파일 디렉터리와 key 파일 위치, 보관 파일 리비전이 있다. 칸 값은 없다.
+실행기는 보관 파일을 풀어 칸 값을 자식 env 에만 넣고 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작하는 이름을 지운 뒤 `execve` 한다. 풀지 못하면 값과 경로 없이 이유 단어 하나를 stderr 에 쓰고 78 로 끝난다.
+plugin 이 올라올 때 보관 파일 이관 뒤에 옛 정의의 로컬 바인딩을 실행기 정의로 옮기고 `.env` 사본을 지운다. 풀지 못한 바인딩은 그대로 둔다. 수를 info 한 줄로 남기고, 옮긴 것이 있으면 「gateway 재시작이 필요하다」 를 남긴다. 정의 모양, 이관 순서, 되돌리기는 [보관 파일 암호화 설계](../../../docs/features/connector/design.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다.
 
 **플러그인 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
-운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 플러그인의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 플러그인 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
+운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 플러그인의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 플러그인 칸 key 의 `PUT /api/env` 는 400, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일의 모양(서버 목록, `connector`, `prefix`)이 지금 manifest 로 계산한 것과 맞을 때만 참이다. 서버 정의의 `tools.exclude` 와 대응 파일의 서버별 `tools` 가 어긋나면 그 플러그인 항목만 `configured` 가 거짓이며, 조건은 [플러그인 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.

@@ -1851,6 +1851,12 @@ MCP 서버의 `env`에 그 이름의 `${이름}` 참조가 있어야 한다. 가
 운영자가 주는 비밀은 이 방식으로 넘기지 못한다. `${이름}` 은 그 profile 의 secret scope 에서만 풀리고, 공유 gateway 는 scope 에 없는 이름을 프로세스 env 에서 찾지 않는다(v0.21.5 의 `agent/secret_scope.py` `get_secret`). 그래서 `operator_secrets` 는 지원하지 않는다([ADR-046](../../backend/docs/adr/ADR-046-운영-비밀은-operator-env-와-다른-칸으로-선언하고-자식-mcp-프로세스에만-넣는다.md)).
 선택 값을 쓰지 않을 때에는 MCP 설정의 해당 env 항목을 빼거나 값으로 빈 문자열을 직접 쓴다.
 profile `.env`의 빈 값을 참조하면 보간 함수가 `${VAR}` 원문을 남긴다.
+
+로컬 플러그인의 바인딩은 이 참조 대신 실행기 정의를 쓴다. 정의 모양은 [보관 파일 암호화 설계](../../docs/features/connector/design.md) 의 「PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)」 가 갖는다. 2026-11-04 에 `v0.21.6` 의 `tools/mcp_tool_config.py` 를 읽어 기대는 점을 확인했다.
+
+- 자식 env 는 `PATH`, `HOME`, `USER`, `LANG`, `LC_ALL`, `TERM`, `SHELL`, `TMPDIR`, `XDG_*` 와 정의의 `env` 다(`_build_safe_env`). `HERMES_HOME` 은 오지 않는다. 그래서 실행기가 쓸 보관 파일 디렉터리와 key 파일 위치를 정의의 `env` 에 값으로 넣는다
+- command 가 절대 경로면 그대로 쓰고, 그 디렉터리를 자식 `PATH` 앞에 붙인다(`_resolve_stdio_command`). 실행기도 실제 command 에 같은 일을 한다
+- Hermes 를 올릴 때 이 두 함수가 정의의 `env` 를 그대로 넘기는지 다시 본다. 바뀌면 로컬 플러그인 서버가 모두 `vault_missing` 으로 뜨지 않는다
 다른 profile의 값을 기본값으로 쓰지 않는다.
 
 새 profile의 MCP 발견은 profile 문맥을 복사해 별도 실행 스레드로 전달한다.
