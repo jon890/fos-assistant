@@ -29,7 +29,7 @@ from .connector_vault_migration import _migrate_vault_files
 
 
 # 기동 로그에 남기는 수의 이름이다. 운영은 배포 뒤 `left` 가 0 인지 본다(REQ7).
-# `moved` 는 이번 기동에 실행기로 옮긴 바인딩, `kept` 는 이미 실행기로 돌던 바인딩, `remote` 는 예외로 `.env` 를 쓰는 원격 바인딩이다.
+# `moved` 는 이번 기동에 실행기로 옮긴 바인딩, `kept` 는 이미 실행기로 돌던 바인딩(남은 사본만 지운 것 포함), `remote` 는 예외로 `.env` 를 쓰는 원격 바인딩이다.
 # `unreadable` 은 소유 기록을 읽지 못해 들여다보지 못한 profile 수다.
 BINDING_MIGRATION_COUNTS = ("moved", "kept", "left", "remote", "unreadable")
 
@@ -77,7 +77,7 @@ def _migrate_bindings() -> dict:
                 "읽지 못한 소유 기록 %d", counts["moved"], counts["kept"], counts["left"], counts["remote"],
                 counts["unreadable"])
     if left:
-        logger.warning("dashboard-profile-api: 옛 정의와 .env 사본이 남은 바인딩: %s",
+        logger.warning("dashboard-profile-api: 실행기로 옮기지 못하고 남은 바인딩: %s",
                        ", ".join("%s %d" % item for item in sorted(left.items())))
     if counts["moved"]:
         logger.warning("dashboard-profile-api: 바인딩 %d 개를 실행기 정의로 옮겼다. gateway 재시작이 필요하다", counts["moved"])
@@ -156,4 +156,5 @@ def _migrate_binding(profile_dir, plugin: str, entry: dict) -> str:
     except Exception:
         _restore_binding_files(written, originals, targets, lambda path: False)
         raise
-    return "moved"
+    # 정의가 그대로이고 사본만 지웠으면 gateway 가 쥔 정의도 그대로라 재시작이 필요 없다.
+    return "kept" if target is server else "moved"

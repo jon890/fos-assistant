@@ -123,6 +123,17 @@ class ConnectorBindingMigrationTest(support.ProfileApiRouteTest):
         self.assertEqual(self.alice_config()["mcp_servers"]["other"], operator_definition)
         self.assertIn("OTHER_TOKEN=" + OTHER_VALUE, self.env_text().splitlines())
 
+    def test_leftover_copy_of_a_current_launcher_binding_is_removed_without_a_restart(self):
+        """지금 값의 실행기 정의에 사본만 남았으면 사본만 지우고 그대로 둔 수에 센다. 재시작을 요구하지 않는다."""
+        (self.root / "alice/.env").write_text(self.env_text() + "DEMO_TOKEN=leftover\n", encoding="utf-8")
+        before = self.alice_config()["mcp_servers"]["demo"]
+        with self.logs() as logs:
+            counts = self.plugin._migrate_bindings()
+        self.assertEqual(counts, {"moved": 0, "kept": 2, "left": 0, "remote": 1, "unreadable": 0})
+        self.assertNotIn("DEMO_TOKEN", self.env_text())
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"], before)
+        self.assertNotIn("gateway 재시작이 필요하다", "\n".join(logs))
+
     def test_unreadable_record_is_counted_and_migration_never_raises(self):
         """소유 기록을 읽지 못한 profile 은 세고 넘어간다. 이관 전체가 실패해도 기동은 잇는다."""
         self.state_path.write_text("{", encoding="utf-8")

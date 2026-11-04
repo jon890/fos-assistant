@@ -117,7 +117,7 @@ def _connector_tool_map(state: dict, detached: dict | None = None) -> dict:
         recorded = entry["mcp_server"]
         try:
             matches = _server_matches(manifest, entry["server"])
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError, ValueError):
             matches = False
         if recorded != name or not matches:
             name, tools = recorded, {}
@@ -292,7 +292,7 @@ def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
     if manifest is not None:
         try:
             matches = _server_matches(manifest, server)
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError, ValueError):
             matches = False
         if matches:
             names |= {field["env"] for field in manifest["fields"]}
