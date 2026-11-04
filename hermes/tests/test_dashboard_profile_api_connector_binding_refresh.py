@@ -15,7 +15,7 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
         connector, _ = self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
         self.assertEqual(self.bind("other-notes", "c2").status_code, 200)
-        before_env = (self.root / "alice/.env").read_bytes()
+        before_env = self.env_text()
         before_vault = {path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}
         before_other = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))["other-notes"]
 
@@ -25,7 +25,7 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
 
         self.assertEqual(rebound.status_code, 200, rebound.body)
         self.assertIs(rebound.body["restart_required"], True)
-        self.assertEqual((self.root / "alice/.env").read_bytes(), before_env)
+        self.assertEqual(self.env_text(), before_env)
         self.assertEqual({path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}, before_vault)
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_OUTPUT_DIR"], "")
         record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
@@ -112,7 +112,7 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
         self.assertEqual(self.tree("alice"), before)
 
     def test_rebinding_removes_renamed_field_env_and_detach_removes_the_new_secret(self):
-        """같은 보관 파일의 field env 이름을 바꾸면 옛 줄을 지우고 이후 떼기도 새 줄을 지운다."""
+        """같은 보관 파일의 field env 이름을 바꾸면 실행기가 새 이름으로 넘기고, 떼면 정의가 지워진다. `.env` 에는 줄이 생기지 않는다."""
         connector, _ = self.bind_fixture()
         self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
                                     values={"token": "demo_ok_0123456789", "scope": "scope-a"}).status_code, 200)
@@ -136,18 +136,16 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
         rebound = self.bind()
 
         self.assertEqual(rebound.status_code, 200, rebound.body)
-        lines = (self.root / "alice/.env").read_text(encoding="utf-8")
-        self.assertNotIn("DEMO_TOKEN=", lines)
-        self.assertNotIn("DEMO_SCOPE=", lines)
-        self.assertIn("DEMO_TOKEN_RENAMED=demo_ok_0123456789", lines)
-        self.assertIn("DEMO_SCOPE_RENAMED=scope-a", lines)
-        self.assertIn("OTHER_TOKEN=other_1234", lines)
+        # 로컬 플러그인은 `.env` 에 쓰지 않는다. 실행기가 새 env 이름으로 같은 보관 파일 값을 넘긴다.
+        self.assertEqual(self.env_text(), "")
+        child = self.launched()[1]["env"]
+        self.assertEqual((child["DEMO_TOKEN_RENAMED"], child["DEMO_SCOPE_RENAMED"]), ("demo_ok_0123456789", "scope-a"))
+        self.assertNotIn("DEMO_TOKEN", child)
+        self.assertEqual(self.launched("other")[1]["env"]["OTHER_TOKEN"], "other_1234")
         self.assertEqual({path.name: path.read_bytes() for path in self.hermes_root.rglob("*") if path.is_file()}, vault_before)
         self.assertEqual(self.bind(enabled=False).status_code, 200)
-        after = (self.root / "alice/.env").read_text(encoding="utf-8")
-        self.assertNotIn("DEMO_TOKEN_RENAMED", after)
-        self.assertNotIn("DEMO_SCOPE_RENAMED", after)
-        self.assertIn("OTHER_TOKEN=other_1234", after)
+        self.assertNotIn("demo", self.alice_config()["mcp_servers"])
+        self.assertEqual(self.launched("other")[1]["env"]["OTHER_TOKEN"], "other_1234")
 
     def test_rebinding_rejects_renamed_field_env_that_an_operator_already_uses(self):
         """새 field env 이름이 profile의 비플러그인 값과 겹치면 그 값을 덮어쓰지 않는다."""
@@ -165,8 +163,7 @@ class ProfileApiConnectorBindingRefreshTest(support.ProfileApiRouteTest):
         env["DEMO_REPLACEMENT_TOKEN"] = "${DEMO_REPLACEMENT_TOKEN}"
         mcp_path.write_text(json.dumps(mcp), encoding="utf-8")
         env_path = self.root / "alice/.env"
-        env_path.write_text(env_path.read_text(encoding="utf-8") + "DEMO_REPLACEMENT_TOKEN=operator-value\n",
-                            encoding="utf-8")
+        env_path.write_text(self.env_text() + "DEMO_REPLACEMENT_TOKEN=operator-value\n", encoding="utf-8")
         before = self.tree("alice")
 
         response = self.bind()

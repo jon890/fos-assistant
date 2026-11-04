@@ -97,16 +97,34 @@ def _write_vault(vault: str, connector: str, values: dict) -> None:
     os.chmod(path.parent, 0o700)
     if path.exists():
         try:
-            owner = _parse_vault(path.read_bytes())["connector"]
+            existing = _parse_vault(path.read_bytes())
+            owner = existing["connector"]
         except ValueError:
             # 주인을 알 수 없는 파일이다. 이름은 연결마다 하나라 덮어써야 다시 등록으로 고칠 수 있다.
             logger.warning("dashboard-profile-api: 모양을 읽지 못하는 보관 파일 %s 를 덮어쓴다", vault)
-            owner = connector
+            existing, owner = None, connector
         if owner != connector:
             raise FileExistsError("다른 플러그인의 보관 파일이다")
+        if existing is not None and _vault_unchanged(vault, existing, values, keys):
+            return
     if not keys.ready:
         logger.warning("dashboard-profile-api: 보관 파일 key 가 %s 라 보관 파일 %s 를 평문으로 쓴다", keys.state, vault)
     _durable_private_write(path, _vault_bytes(vault, connector, values, keys))
+
+
+def _vault_unchanged(vault: str, existing: dict, values: dict, keys) -> bool:
+    """이미 있는 파일이 지금 쓸 모양과 값 그대로인가. 그렇다면 다시 쓰지 않는다.
+
+    v2 는 IV 를 매번 새로 뽑아 같은 값도 다른 바이트가 된다. 같은 값으로 다시 등록할 때 파일을 바꾸지 않아야
+    실행기 정의의 보관 파일 리비전이 그대로이고 붙은 바인딩이 까닭 없이 재시작 대기가 되지 않는다(REQ8).
+    """
+    try:
+        if keys.ready:
+            return (existing["v"] == 2 and existing["key_id"] == keys.active_id
+                    and _unseal_vault(vault, existing, keys)["values"] == values)
+        return existing["v"] == 1 and existing["values"] == values
+    except ValueError:
+        return False
 
 
 def _durable_private_write(path: pathlib.Path, value: bytes) -> None:

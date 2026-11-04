@@ -73,7 +73,10 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
         self.assertEqual(self.bind().status_code, 200)
 
     def test_binding_rolls_back_every_file_it_wrote_when_the_last_write_fails(self):
-        """마지막 파일의 쓰기가 실패하면 먼저 쓴 설정, 소유 기록, 대응 파일, `.env`, 스킬을 되돌리고 만든 디렉터리를 지운다."""
+        """마지막 파일의 쓰기가 실패하면 먼저 쓴 설정, 소유 기록, 대응 파일, 스킬을 되돌리고 만든 디렉터리를 지운다.
+
+        로컬 플러그인의 붙이기는 `.env` 를 바꾸지 않는다. 운영자의 줄은 그대로 남는다.
+        """
         self.bind_fixture()
         profile = self.root / "alice"
         (profile / ".env").write_text("OTHER=keep\n", encoding="utf-8")
@@ -102,7 +105,7 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
             self.assertEqual(self.bind().status_code, 503)
         # 실패한 쓰기가 마지막이었다. 그 앞에 나머지 파일을 모두 썼어야 되돌리기를 검사한 것이다.
         self.assertEqual(attempted[-1], None)
-        self.assertLessEqual({profile / "config.yaml", profile / ".env", profile / self.plugin.CONNECTOR_STATE,
+        self.assertLessEqual({profile / "config.yaml", profile / self.plugin.CONNECTOR_STATE,
                               profile / self.plugin.CONNECTOR_TOOL_MAP, profile / "skills/demo/SKILL.md"},
                              set(attempted))
         self.assertEqual(files(), before)
@@ -159,7 +162,7 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
                                                        "mode": "bind"})
             self.assertIs(status["policy_hook"], True)
             self.assertEqual(self.bind(OTHER, enabled=False).status_code, 200)
-        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8").splitlines(),
-                         ["DEMO_TOKEN=demo_new_0123456789"])
+        self.assertEqual(self.env_text(), "")
+        self.assertEqual(self.launched()[1]["env"]["DEMO_TOKEN"], "demo_new_0123456789")
         self.assertFalse((self.root / "alice/skills/other").exists())
         self.assertNotIn("other", self.alice_config()["platform_toolsets"]["api_server"])

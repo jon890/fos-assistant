@@ -57,7 +57,7 @@ class ProfileApiConnectorBindingAtomicTest(support.ProfileApiRouteTest):
         self.assertEqual(self.files(), before)
 
     def test_one_restore_failure_does_not_skip_config_and_state_restore(self):
-        """env 복원이 실패해도 설정과 소유 기록의 복원을 계속한다."""
+        """이름 대응 파일의 복원이 실패해도 설정과 소유 기록의 복원을 계속한다. 로컬 붙이기는 `.env` 를 쓰지 않는다."""
         connector, _ = self.bind_fixture()
         self.assertEqual(self.bind().status_code, 200)
         profile = self.root / "alice"
@@ -70,12 +70,12 @@ class ProfileApiConnectorBindingAtomicTest(support.ProfileApiRouteTest):
 
         def fail(target, value):
             nonlocal failed
-            if target == profile / ".env":
+            if target == profile / self.plugin.CONNECTOR_TOOL_MAP:
                 if failed:
                     raise OSError("injected restore failure")
                 write(target, value)
                 failed = True
-                raise OSError("injected after env replace")
+                raise OSError("injected after tool map replace")
             return write(target, value)
 
         with patch_plugin(self.plugin, "_atomic_private_write", side_effect=fail):

@@ -45,8 +45,9 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertEqual(config["mcp_servers"]["other"], before["mcp_servers"]["other"])
         self.assertEqual(config["mcp_servers"]["fos-assistant"], before["mcp_servers"]["fos-assistant"])
         self.assertEqual(config["platform_toolsets"]["api_server"], ["delegation", "fos-assistant", "terminal", "other"])
-        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8").splitlines(),
-                         ["OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a"])
+        # 로컬 바인딩은 `.env` 에 사본을 두지 않는다. 남은 바인딩은 실행기가 그 보관 파일로 띄운다.
+        self.assertEqual(self.env_text(), "")
+        self.assertEqual(self.launched("other")[1]["env"]["OTHER_TOKEN"], OTHER_VALUE)
         self.assertFalse((self.root / "alice/skills/demo").exists())
         self.assertTrue((self.root / "alice/skills/other/SKILL.md").is_file())
         self.assertEqual(sorted(json.loads((self.root / "alice/.fos-connectors.json").read_text())), [OTHER])
@@ -68,7 +69,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertEqual(json.loads((self.root / "alice/.fos-connectors.json").read_text()), {})
         self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"],
                          ["delegation", "fos-assistant", "terminal"])
-        self.assertEqual((self.root / "alice/.env").read_text(encoding="utf-8"), "")
+        self.assertEqual(self.env_text(), "")
         self.assertEqual(list((self.root / "alice/skills").iterdir()), [])
         self.assertIs(self.bind(OTHER, enabled=False).body["changed"], False)
 
@@ -82,7 +83,8 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
                                             values={"token": DEMO_VALUE, "scope": "a"}).status_code, 200)
                 self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
                 self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
-                (alice / ".env").write_text((alice / ".env").read_text(encoding="utf-8") + "KEEP=me\n",
+                # 옛 방식이 남긴 `.env` 사본이다. 떼기가 실행기 정의와 함께 지운다.
+                (alice / ".env").write_text(self.env_text() + "DEMO_TOKEN=%s\nKEEP=me\n" % DEMO_VALUE,
                                             encoding="utf-8")
                 declared = json.loads((demo / ".mcp.json").read_text(encoding="utf-8"))
                 original = json.dumps(declared)
@@ -110,8 +112,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
                 self.assertNotIn("demo", config["mcp_servers"])
                 self.assertEqual(config["platform_toolsets"]["api_server"],
                                  ["delegation", "fos-assistant", "terminal", "other"])
-                self.assertEqual((alice / ".env").read_text(encoding="utf-8").splitlines(),
-                                 ["OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a", "KEEP=me"])
+                self.assertEqual((alice / ".env").read_text(encoding="utf-8").splitlines(), ["KEEP=me"])
                 self.assertFalse((alice / "skills/demo").exists())
                 self.assertEqual(sorted(json.loads((alice / ".fos-connectors.json").read_text())), [OTHER])
                 # 다음 경우를 위해 되돌린다.

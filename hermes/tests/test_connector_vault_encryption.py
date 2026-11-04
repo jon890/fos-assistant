@@ -126,7 +126,12 @@ class ConnectorVaultEncryptionTest(VaultKeyTest):
         # `tools` 는 `call` 과 같은 함수의 같은 `_read_vault` 로 값을 읽는다(`connector_run.py`).
         installed = self.bind(vault="c1")
         self.assertEqual(installed.status_code, 200, installed.body)
-        self.assertIn("DEMO_TOKEN=%s" % SECRET, (self.root / "alice/.env").read_text(encoding="utf-8"))
+        # 바인딩 설치는 로컬 플러그인의 값을 `.env` 에 쓰지 않는다. 실행기가 v2 파일을 풀어 자식에게 준다(REQ6).
+        self.assertNotIn(SECRET, self.env_text())
+        self.assertNotIn(SECRET, (self.root / "alice/config.yaml").read_text(encoding="utf-8"))
+        code, child = self.launched()
+        self.assertEqual(code, 0)
+        self.assertEqual(child["env"]["DEMO_TOKEN"], SECRET)
 
     def test_moved_file_does_not_open(self):
         """REQ2: 다른 연결 이름으로 복사한 파일과 `connector` 만 고친 파일은 풀리지 않고, 값이 새지 않는다."""
@@ -199,6 +204,8 @@ class ConnectorVaultEncryptionTest(VaultKeyTest):
         self.bind_fixture()
         for value in (None, "false", "FALSE"):
             with self.subTest(value):
+                # 같은 값의 파일이 이미 있으면 다시 쓰지 않는다. 쓰기 경로를 보려고 지운다.
+                (self.hermes_root / "connector-vault" / "c1.json").unlink(missing_ok=True)
                 os.environ.pop(REQUIRED_ENV, None)
                 if value is not None:
                     os.environ[REQUIRED_ENV] = value

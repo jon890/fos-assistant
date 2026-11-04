@@ -8,6 +8,7 @@ from .connector_description import _tool_descriptions, _tool_summaries
 from .connector_appearance import _tool_arg_labels
 from .connector_snapshot_manifest import _snapshot_manifest
 from .connector_remote import _is_remote, _remote_server, _remote_server_matches
+from .connector_launch import _is_launcher, _launcher_current, _launcher_inner
 from .connector_standard import STANDARD_SCHEMA, _standard_declaration
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
@@ -325,11 +326,16 @@ def _server_matches(manifest: dict, server: dict) -> bool:
     `<루트>/users/<64자리 16진수>` 모양인지만 본다. 참조(`${...}`)를 받으면 profile `.env` 가 경로를 정하게 된다(ADR-20261007 connector-owner-attachments).
     플러그인 출력 디렉터리 env 도 같다. `<루트>/users/<64자리 16진수>/<profile>/<id>` 모양인지만 본다(ADR-20261008 connector-output-files).
     브라우저 중계 주소 env 도 같다. 빈 값이거나 `<gateway-base-url>/<접근 표식>` 모양인지만 본다(ADR-20261008 browser-gateway-token).
+    실행기 정의는 실행기 칸이 지금 값과 맞는지 본 뒤 옛 모양으로 펼쳐 같은 규칙으로 견준다(`connector_launch.py`).
     """
     expected = manifest["server"]
     if manifest["transport"] == "http" or _is_remote(server):
         # 원격 정의는 칸 값이 profile `.env` 를 거치는 헤더뿐이라 주소와 헤더, redirect 헤더 처리만 비교한다.
         return manifest["transport"] == "http" and _remote_server_matches(expected, server)
+    if _is_launcher(server):
+        if not _launcher_current(manifest, server):
+            return False
+        server = _launcher_inner(server)
     if (server["command"] != expected["command"] or server["args"] != expected["args"]
             or set(server["env"]) != set(expected["env"])):
         return False

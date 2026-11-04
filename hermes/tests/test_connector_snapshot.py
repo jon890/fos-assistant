@@ -20,6 +20,7 @@ from mcp.types import CallToolResult, TextContent
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+import launcher_support
 import test_connector_manifest as base
 from test_connector_call import collected_logs
 
@@ -122,6 +123,27 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
         self.assertEqual(captured[0].args[-2:], ["--content-snapshot-operation", "compile"])
         self.assertEqual(set(captured[0].env), {"PATH", "DEMO_TOKEN", "DEMO_SCOPE", "DEMO_BASE"})
         self.assertFalse(self.module.SNAPSHOT_ENV & set(captured[0].env))
+
+    def test_launcher_binding_gives_the_snapshot_child_the_vault_values(self):
+        """실행기 정의의 바인딩은 스냅샷 자식에게 `.env` 가 아니라 보관 파일 값을 준다(REQ6). 풀지 못하면 503 이다."""
+        launcher_support.use_vault_root(self, self.base / "hermes")
+        launcher_support.launcher_entry(self, self.profile, base.DEMO, {"token": "vault-only-token"})
+        (self.profile / ".env").write_text("OTHER_TOKEN=profile-only\n")
+        import mcp.client.stdio
+        original = mcp.client.stdio.stdio_client
+        captured = []
+
+        def capture(params, **kwargs):
+            captured.append(params)
+            return original(params, **kwargs)
+        with mock.patch.object(mcp.client.stdio, "stdio_client", side_effect=capture):
+            self.assertEqual(self.call()[0], 200)
+        self.assertEqual(captured[0].env["DEMO_TOKEN"], "vault-only-token")
+        self.assertEqual(set(captured[0].env), {"PATH", "DEMO_TOKEN", "DEMO_SCOPE", "DEMO_BASE"})
+        (self.base / "hermes/connector-vault/c1.json").unlink()
+        with mock.patch.object(self.module, "_run_connector_snapshot", new_callable=mock.AsyncMock) as runner:
+            self.assertEqual(self.call()[0], 503)
+            runner.assert_not_called()
 
     def test_auth_install_unsupported_and_invalid_manifest_never_spawn(self):
         with mock.patch.object(self.module, "_run_connector_snapshot", new_callable=mock.AsyncMock) as runner:

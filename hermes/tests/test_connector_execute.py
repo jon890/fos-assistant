@@ -16,6 +16,7 @@ from unittest import mock
 from plugin_loading import patch_plugin
 
 
+import launcher_support
 import test_connector_call as call_base
 import test_connector_manifest as base
 
@@ -135,6 +136,21 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         # 토큰은 그 profile 의 `.env` 에서 왔다. 시험 도구는 앞 4자만 돌려준다.
         self.assertEqual(body, {"ok": True, "result": {"written": True, "text": "안녕", "token": "demo"}})
         self.assert_no_child_left()
+
+    def test_launcher_binding_runs_with_the_vault_values_not_the_profile_env(self):
+        """실행기 정의의 바인딩은 `.env` 가 아니라 소유 기록의 보관 파일 값으로 실행한다(REQ6). 풀지 못하면 자식을 띄우지 않는다."""
+        launcher_support.use_vault_root(self, self.base / "hermes")
+        profile = self.profile_root / PROFILE
+        launcher_support.launcher_entry(self, profile, base.DEMO, {"token": call_base.OK_TOKEN})
+        (profile / ".env").write_text("".join("%s=%s\n" % item for item in PROFILE_ONLY.items()), encoding="utf-8")
+        status, body = self.execute(args={"text": "안녕"})
+        self.assertEqual(status, 200, body)
+        self.assertEqual(body, {"ok": True, "result": {"written": True, "text": "안녕", "token": "demo"}})
+        (self.base / "hermes/connector-vault/c1.json").write_text("{}", encoding="utf-8")
+        with call_base.collected_logs() as logs, patch_plugin(self.plugin, "_run_connector_execute") as runner:
+            self.assertEqual(self.execute(), UNAVAILABLE)
+            runner.assert_not_called()
+        self.assertFalse([line for line in logs if call_base.OK_TOKEN in line or str(self.base) in line])
 
     def test_child_receives_only_the_connector_fields_of_that_profile(self):
         """자식이 받는 env 는 그 profile 의 칸 값, 운영자 env, MCP SDK 의 기본 env 뿐이다."""

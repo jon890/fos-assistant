@@ -19,11 +19,11 @@ class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
         self.assertEqual(response.status_code, 200, response.body)
         expected = self.owner_attachments("user-1")
         server = self.alice_config()["mcp_servers"]["demo"]
-        self.assertEqual(server["env"], {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE,
-                                         "DEMO_ATTACHMENT_DIR": expected})
+        self.assertEqual(server["env"], {"DEMO_BASE": DEMO_BASE, "DEMO_ATTACHMENT_DIR": expected, **self.launcher_env()})
+        self.assertEqual(self.launched()[1]["env"]["DEMO_ATTACHMENT_DIR"], expected)
         record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
         self.assertEqual(record[DEMO]["server"], server)
-        self.assertNotIn("DEMO_ATTACHMENT_DIR", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertNotIn("DEMO_ATTACHMENT_DIR", self.env_text())
         status = self.status_of()
         self.assertEqual(status["connectors"][0], {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"})
         self.assertNotIn(expected, json.dumps(response.body))
@@ -90,8 +90,7 @@ class ProfileApiConnectorBindingAttachmentsTest(support.ProfileApiRouteTest):
             response = self.bind(owner="user-9")
 
         self.assertEqual(response.status_code, 200, response.body)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"],
-                         {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE})
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"], {"DEMO_BASE": DEMO_BASE, **self.launcher_env()})
 
     def test_owner_directory_in_a_record_must_keep_its_shape(self):
         """소유 기록의 주인 디렉터리 값이 참조나 다른 모양으로 바뀌면 그 플러그인의 실행 정의가 manifest 와 다르다."""
