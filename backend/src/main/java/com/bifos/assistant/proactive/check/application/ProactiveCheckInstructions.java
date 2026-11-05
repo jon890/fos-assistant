@@ -4,7 +4,7 @@ package com.bifos.assistant.proactive.check.application;
 class ProactiveCheckInstructions {
     /**
      * 지시의 첫 줄이다. 그 아래 경계 줄 하나를 두고 {@link #COMMON_RULES} 를 잇는다. 분야 지침 스킬은 쓰지 않는다. 스킬이 주던 공통 지침은
-     * {@link #COMMON_RULES} 가 갖는다(ADR-080 의 「분야 지침 개정」).
+     * {@link #COMMON_RULES} 가 갖는다(ADR-080 의 분야 지침 개정).
      */
     static final String PREAMBLE = "이번 실행은 사용자의 질문 없이 Control Plane 이 연 먼저 살펴보기다. 아래 규칙대로 살펴본다.";
 
