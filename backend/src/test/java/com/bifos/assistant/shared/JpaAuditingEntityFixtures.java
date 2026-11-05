@@ -34,11 +34,7 @@ import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.domain.type.FindingKind;
-import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.task.domain.Task;
@@ -112,9 +108,6 @@ final class JpaAuditingEntityFixtures {
         task.reschedule(TriggerType.ONCE, null, BUSINESS.plusSeconds(60), ZoneOffset.UTC, BUSINESS.plusSeconds(60));
         task.changeMissedPolicy(MissedPolicy.SKIP);
         add(entityManager, rows, task);
-        add(entityManager, rows, ProactiveCheckFinding.of(check.id(), conversation.id(), FindingKind.NEW, null, "검사", unique, "발견", "https://example.test", BUSINESS));
-        add(entityManager, rows, ProactiveCheckProblem.of(check.id(), conversation.id(), ProblemStatus.ACCEPTED, null, unique,
-            "문제", null, null, null, null, null, null, null, null, List.of(), BUSINESS));
         return new Fixture(List.copyOf(rows), user, agent, conversation, connection, binding, memory, execution);
     }
 

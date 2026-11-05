@@ -9,7 +9,6 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.check.domain.ReportedFinding;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
@@ -17,7 +16,6 @@ import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.domain.type.FindingKind;
 import com.bifos.assistant.proactive.check.domain.type.FindingReason;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -57,9 +55,6 @@ class ProactiveCheckRepositoryTest {
 
     @Autowired
     ProactiveCheckRepository checks;
-
-    @Autowired
-    ProactiveCheckFindingRepository findings;
 
     @Autowired
     TransactionTemplate transactions;
@@ -218,35 +213,6 @@ class ProactiveCheckRepositoryTest {
     }
 
 
-    @Test
-    @DisplayName("발견의 글이 칸 길이를 넘으면 칸 길이까지 잘라 저장한다")
-    void truncatesFindingTextToColumnLength() {
-        ProactiveCheck check = saveCheck(CONVERSATION, "session-a", 31L);
-        String surrogatePair = "😀";
-        // 120번째 글자 자리에서 대리 쌍이 나뉘므로 그 글자를 빼고 119자가 남는다.
-        String titleSplittingPair = "가".repeat(119) + surrogatePair;
-        ProactiveCheckFinding saved = transactions.execute(status -> findings.save(ProactiveCheckFinding.of(
-            check.id(),
-            CONVERSATION,
-            FindingKind.REFERENCE,
-            FindingReason.NO_SOURCE,
-            "a".repeat(41),
-            "k".repeat(121),
-            titleSplittingPair,
-            "https://example.com/" + "p".repeat(2000),
-            null)));
-
-        ProactiveCheckFinding read = transactions.execute(status -> findings.findById(saved.id()).orElseThrow());
-
-        assertThat(read.area()).hasSize(40);
-        assertThat(read.topicKey()).hasSize(120);
-        assertThat(read.title()).isEqualTo("가".repeat(119));
-        assertThat(read.sourceUrl()).hasSize(2000).startsWith("https://example.com/");
-        assertThat(read.reason()).isEqualTo(FindingReason.NO_SOURCE);
-        assertThat(read.checkedAt()).isNull();
-    }
-
-
     private Conversation save(Conversation conversation) {
         Conversation saved = transactions.execute(status -> conversations.save(conversation));
         createdConversations.add(saved.id());
@@ -282,7 +248,6 @@ class ProactiveCheckRepositoryTest {
 
     private void clearProactiveRows() {
         transactions.executeWithoutResult(status -> {
-            findings.deleteAll();
             checks.deleteAll();
         });
     }

@@ -178,8 +178,6 @@ class WakeRunContractTest extends ProactiveTestSupport {
         assertThat(count("SELECT COUNT(*) FROM chat_message WHERE conversation_id = ?", check.conversationId()))
             .as("대화에 남은 줄")
             .isZero();
-        assertThat(count("SELECT COUNT(*) FROM proactive_check_finding WHERE check_id = ?", checkId)).isZero();
-        assertThat(count("SELECT COUNT(*) FROM proactive_check_problem WHERE check_id = ?", checkId)).isZero();
         assertThat(notificationCount(user)).isZero();
     }
 

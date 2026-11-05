@@ -96,9 +96,7 @@ public class ProactiveCheckService {
                 .find(user.id(), agent.id())
                 .map(Conversation::publicId)
                 .orElse(null),
-            checks.findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
-                user.id(), agent.id(), CheckTrigger.AUTONOMY)
-                .orElse(null));
+            checks.findFirstByUserIdAndAgentIdOrderByIdDesc(user.id(), agent.id()).orElse(null));
     }
 
 

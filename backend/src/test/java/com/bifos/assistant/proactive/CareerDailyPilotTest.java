@@ -33,12 +33,10 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -141,9 +139,6 @@ class CareerDailyPilotTest {
     ProactiveCheckRepository checks;
 
     @Autowired
-    ProactiveCheckFindingRepository findings;
-
-    @Autowired
     ChatMessageRepository messages;
 
     @Autowired
@@ -202,9 +197,6 @@ class CareerDailyPilotTest {
     @AfterEach
     void tearDown() {
         createdChecks.addAll(checksOfAgent().stream().map(ProactiveCheck::id).toList());
-        findings.deleteAll(findings.findAll().stream()
-            .filter(finding -> createdChecks.contains(finding.checkId()))
-            .toList());
         cleanTasks();
     }
 
@@ -269,7 +261,6 @@ class CareerDailyPilotTest {
             .contains("그 뒤 사용자 메시지 1개");
         assertThat(thirdCommand.sessionId()).as("같은 점검 대화 session").isEqualTo(firstCommand.sessionId());
         assertThat(third.report()).as("되풀이만 있으면 보고를 만들지 않는다").isNull();
-        assertThat(findingsOf(third)).as("발견 테이블에 쓰지 않는다").isEmpty();
         assertThat(lastMessage(third).content()).as("3일 뒤 마지막 메시지").isEqualTo(FEEDBACK);
 
         // 사용자가 Memory 제안을 받아들인다.
@@ -471,13 +462,6 @@ class CareerDailyPilotTest {
         return checks.findAll().stream()
             .filter(check -> check.agentId().equals(agent.id()))
             .sorted(Comparator.comparing(ProactiveCheck::id))
-            .toList();
-    }
-
-
-    private List<ProactiveCheckFinding> findingsOf(ProactiveCheck check) {
-        return findings.findAll().stream()
-            .filter(finding -> finding.checkId().equals(check.id()))
             .toList();
     }
 

@@ -41,15 +41,11 @@ import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.check.domain.ReportedFinding;
 import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -136,12 +132,6 @@ class ProactiveCheckTurnTest {
     ProactiveCheckRepository checks;
 
     @Autowired
-    ProactiveCheckFindingRepository findings;
-
-    @Autowired
-    ProactiveCheckProblemRepository problems;
-
-    @Autowired
     FollowUpService followUps;
 
     @Autowired
@@ -202,12 +192,6 @@ class ProactiveCheckTurnTest {
             .toList();
         owned.forEach(conversation -> awaitIdle(conversation.id()));
         List<Long> conversationIds = owned.stream().map(Conversation::id).toList();
-        problems.deleteAll(problems.findAll().stream()
-            .filter(problem -> conversationIds.contains(problem.conversationId()))
-            .toList());
-        findings.deleteAll(findings.findAll().stream()
-            .filter(finding -> conversationIds.contains(finding.conversationId()))
-            .toList());
         checks.deleteAll(checks.findAll().stream()
             .filter(check -> check.userId().equals(owner.id()))
             .toList());
@@ -259,7 +243,6 @@ class ProactiveCheckTurnTest {
         assertThat(check.report().announced())
             .as("다음 살펴보기의 되풀이 판정 재료")
             .containsExactly(new ReportedFinding(TOPIC_KEY, SOURCE_URL, "Kafka 정확히 한 번 처리"));
-        assertThat(findingsOf(conversation)).as("발견 테이블에 쓰지 않는다").isEmpty();
     }
 
 
@@ -277,7 +260,6 @@ class ProactiveCheckTurnTest {
         ProactiveCheck check = onlyCheckOf(conversation);
         assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(check.outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
-        assertThat(findingsOf(conversation)).isEmpty();
     }
 
 
@@ -297,7 +279,6 @@ class ProactiveCheckTurnTest {
             .contains("새로 알릴 것은 없어요", "**확인하지 못한 출처**")
             .contains("시험 출처를 읽지 못했어요 \\[링크\\]\\(https\\://example\\.com\\)");
         assertThat(onlyCheckOf(conversation).outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
-        assertThat(findingsOf(conversation)).isEmpty();
     }
 
 
@@ -316,7 +297,6 @@ class ProactiveCheckTurnTest {
             .contains("**물어보고 싶은 것**", "이번 달도 같은 분야를 볼까요")
             .doesNotContain("새로 알릴 것은 없어요");
         assertThat(onlyCheckOf(conversation).outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
-        assertThat(findingsOf(conversation)).isEmpty();
     }
 
 
@@ -515,7 +495,6 @@ class ProactiveCheckTurnTest {
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(second.report()).as("단추로 연 살펴보기는 되풀이만 있어도 보고를 남긴다").isNotNull();
         assertThat(second.report().announced()).as("되풀이로 내린 발견은 알린 것으로 다시 담지 않는다").isEmpty();
-        assertThat(findingsOf(conversation)).isEmpty();
     }
 
 
@@ -614,7 +593,6 @@ class ProactiveCheckTurnTest {
             .doesNotContain("목표 없는 관찰");
         ProactiveCheck check = onlyCheckOf(conversation);
         assertThat(check.report().acceptedProblemKeys()).as("목표 없는 관찰 후보는 버린다").containsExactly(PROBLEM_KEY);
-        assertThat(problemsOf(conversation)).as("문제 후보 테이블에 쓰지 않는다").isEmpty();
     }
 
 
@@ -781,7 +759,6 @@ class ProactiveCheckTurnTest {
 
         Conversation conversation = runCheck();
 
-        assertThat(findingsOf(conversation)).as("남은 발견").isEmpty();
         assertThat(onlyCheckOf(conversation).status()).isEqualTo(CheckStatus.FAILED);
         assertThat(onlyCheckOf(conversation).report()).as("알리지 못한 발견을 다음 판정에서 알린 것으로 보지 않는다").isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
@@ -819,22 +796,6 @@ class ProactiveCheckTurnTest {
         return checks.findAll().stream()
             .filter(check -> check.conversationId().equals(conversation.id()))
             .sorted(Comparator.comparing(ProactiveCheck::id))
-            .toList();
-    }
-
-
-    private List<ProactiveCheckFinding> findingsOf(Conversation conversation) {
-        return findings.findAll().stream()
-            .filter(finding -> finding.conversationId().equals(conversation.id()))
-            .sorted(Comparator.comparing(ProactiveCheckFinding::id))
-            .toList();
-    }
-
-
-    private List<ProactiveCheckProblem> problemsOf(Conversation conversation) {
-        return problems.findAll().stream()
-            .filter(problem -> problem.conversationId().equals(conversation.id()))
-            .sorted(Comparator.comparing(ProactiveCheckProblem::id))
             .toList();
     }
 
