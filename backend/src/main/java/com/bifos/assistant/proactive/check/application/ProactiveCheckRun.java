@@ -136,7 +136,7 @@ public class ProactiveCheckRun implements CheckTurn {
         this.event = event;
         this.deps = deps;
         this.checkInput = new ProactiveCheckInput(owner, agentId, check, event, deps);
-        this.results = new ProactiveCheckResults(owner, check, deps);
+        this.results = new ProactiveCheckResults(owner, check, event, deps);
         this.limits = new ProactiveCheckLimits(owner, check, deps);
     }
 
@@ -241,6 +241,18 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 이 turn 의 살펴보기 줄. {@link #record} 뒤에는 끝난 상태를 담는다. */
     ProactiveCheck check() {
         return check;
+    }
+
+
+    /** 사건 실행이 살펴본 새 항목이다. 다른 계기는 null 이다. */
+    EventBatch event() {
+        return event;
+    }
+
+
+    /** 사건 실행이 알릴 항목 수다. 답을 남기지 않았거나 다른 계기면 0 이다. */
+    int notifyCount() {
+        return results.notifyCount();
     }
 
 

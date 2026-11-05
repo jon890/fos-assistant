@@ -790,7 +790,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
-- `event_watch_enabled` 와 `event_watch_state` 는 사건 감지의 켜짐과 상태다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)). 같은 연결에서는 바인딩 하나만 켠다. 상태는 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`TEXT`)이고 끄면 비운다. 칸은 시간대, 확인 지점(결과를 다 쓴 마지막 조회를 시작한 Control Plane 시각), 겹침 구간에서 이미 본 식별자와 처음 본 시각, 마지막 확인 시각과 결과(`EventWatchResult`), 새 항목 수, 연결 문제의 연속 실패 수, 하루 실행 수와 그 날짜다. 제목과 본문은 없다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 `ConnectorEventWatches` 의 조건부 update 만 쓴다. `updated_at` 은 바꾸지 않는다. H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 `TEXT` 로 둔다
+- `event_watch_enabled` 와 `event_watch_state` 는 사건 감지의 켜짐과 상태다([ADR-20261105 / event-watch](../../docs/adr/ADR-20261105-event-watch.md)). 같은 연결에서는 바인딩 하나만 켠다. 상태는 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`TEXT`)이고 끄면 비운다. 칸은 시간대, 확인 지점(결과를 다 쓴 마지막 조회를 시작한 Control Plane 시각), 겹침 구간에서 이미 본 식별자와 처음 본 시각, 마지막 확인 시각과 결과(`EventWatchResult`), 새 항목 수, 연결 문제의 연속 실패 수, 하루 실행 수와 그 날짜, 이번 연속 실패에 다시 연결 알림을 냈는지, 조용한 시간에 미룬 알림(실행 수, 새 항목 수, 알릴 수, 마지막 점검 대화 번호, 원천 이름과 항목 이름)이다. 항목의 제목과 본문은 없다. 뒤에 더한 칸이 없는 옛 글은 기본값으로 읽는다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 `ConnectorEventWatches` 의 조건부 update 만 쓴다. `updated_at` 은 바꾸지 않는다. H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 `TEXT` 로 둔다
 
 ### connector_action
 
@@ -935,7 +935,7 @@ action을 지우면 실행 내용도 지운다.
 알림 하나다([ADR-070](../../docs/adr/ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md)).
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
-`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
+`target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 와 `CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
 `source_public_id` 는 알림을 만든 원인(승인 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 

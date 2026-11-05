@@ -17,5 +17,9 @@ public enum NotificationKind {
     /** 예약 작업의 발화를 열지 않고 건너뛰었다. */
     TASK_SKIPPED,
     /** 정의 어긋남 점검이 다시 맞춘 연결에 관리자가 할 일이 남았다(ADR-20261009 / connector-install-drift). */
-    CONNECTOR_REINSTALLED
+    CONNECTOR_REINSTALLED,
+    /** 사건 감지가 연 살펴보기가 알릴 항목을 골랐다. 조용한 시간에 미룬 것을 아침에 묶어 낸 것도 이 종류다(ADR-20261105 / event-watch). */
+    EVENT_CHECK_REPORTED,
+    /** 사건 감지의 목록 조회가 연결 문제로 정한 횟수만큼 연달아 실패했다. 다시 연결해야 한다. */
+    EVENT_WATCH_FAILED
 }

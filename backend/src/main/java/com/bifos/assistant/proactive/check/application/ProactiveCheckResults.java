@@ -9,6 +9,7 @@ import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.proactive.check.application.dto.AnnouncedKey;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultRead;
+import com.bifos.assistant.proactive.check.application.dto.EventBatch;
 import com.bifos.assistant.proactive.check.application.dto.JudgedFinding;
 import com.bifos.assistant.proactive.check.application.dto.JudgedProblem;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
@@ -33,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 class ProactiveCheckResults {
     private final CurrentUser owner;
     private final ProactiveCheck check;
+    private final EventBatch event;
     private final ProactiveCheckRun.Deps deps;
 
     private volatile CheckOutcome outcome;
@@ -45,12 +47,32 @@ class ProactiveCheckResults {
     private volatile List<SuggestedItem> pendingSuggestions = List.of();
     /** 제안 항목을 낸 turn 의 실행 번호다. */
     private volatile Long suggestionExecutionId;
+    /** 사건 실행이 알릴 항목 수다. 다른 계기와 침묵한 실행은 0 이다. */
+    private volatile int notifyCount;
 
 
-    ProactiveCheckResults(CurrentUser owner, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
+    /** @param event 사건 실행이 살펴본 새 항목. 다른 계기는 null */
+    ProactiveCheckResults(CurrentUser owner, ProactiveCheck check, EventBatch event, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
         this.check = check;
+        this.event = event;
         this.deps = deps;
+    }
+
+
+    /**
+     * 「새로 알릴 것」 으로 남은 발견 가운데 {@code topicKey} 가 입력의 식별자인 것의 서로 다른 수다(ADR-20261105 / event-watch). 입력 밖
+     * 식별자의 발견은 {@link FindingJudgement#withinEvent} 가 이미 「참고」 로 내려 답에 보이는 목록과 알림의 수가 같다. 같은 항목을 두 칸에
+     * 쓰면 하나로 센다.
+     */
+    static int notifiable(List<JudgedFinding> judged, EventBatch event) {
+        Set<String> ids = Set.copyOf(event.ids());
+        return Math.toIntExact(judged.stream()
+            .filter(each -> each.kind() == FindingKind.NEW)
+            .map(each -> each.finding().topicKey())
+            .filter(ids::contains)
+            .distinct()
+            .count());
     }
 
 
@@ -94,9 +116,7 @@ class ProactiveCheckResults {
         }
         Instant now = deps.clock().instant();
         Announced announced = announcedSince(now.minus(deps.properties().current().digestWindow()));
-        List<JudgedFinding> judged = block.findings().stream()
-            .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced.keys()))
-            .toList();
+        List<JudgedFinding> judged = judge(block, now, announced.keys());
         long newFindings = judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
         List<JudgedProblem> problems = block.problemCandidates().isEmpty() || judged.isEmpty()
             ? List.of()
@@ -119,8 +139,19 @@ class ProactiveCheckResults {
             }
             return new CheckAnswer("", false, true);
         }
+        notifyCount = event == null ? 0 : notifiable(judged, event);
         pendingReport = deps.reportFactory().create(block, judged, problems, executionId);
         return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
+    }
+
+
+    /** 발견마다 판정한다. 사건 실행이면 입력 밖 식별자의 발견을 「참고」 로 내린다. */
+    private List<JudgedFinding> judge(CheckResultBlock block, Instant now, Set<AnnouncedKey> announced) {
+        Set<String> eventIds = event == null ? null : Set.copyOf(event.ids());
+        return block.findings().stream()
+            .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced))
+            .map(each -> eventIds == null ? each : FindingJudgement.withinEvent(each, eventIds))
+            .toList();
     }
 
 
@@ -185,5 +216,10 @@ class ProactiveCheckResults {
 
     CheckReport pendingReport() {
         return pendingReport;
+    }
+
+
+    int notifyCount() {
+        return notifyCount;
     }
 }

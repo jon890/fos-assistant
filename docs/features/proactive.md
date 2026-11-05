@@ -84,7 +84,8 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 ### 먼저 살펴보기 절
 
 에이전트 상세의 절이다. `components/agent/agent-proactive-check-section.tsx` 가 그리고 `GET /api/v1/agents/{code}/proactive-check` 가 상태를 준다.
-상태를 읽지 못하면 절 안에 실패 문구만 그린다. 그래도 끝의 「매일 깨우기」 소절(`agent-proactive-schedule-section.tsx`)은 실패 문구 아래에 그린다.
+상태를 읽지 못하면 절 안에 실패 문구만 그린다. 그래도 끝의 「매일 깨우기」 소절(`agent-proactive-schedule-section.tsx`)과 「새 항목 살펴보기」 소절(`agent-event-watch-section.tsx`)은 실패 문구 아래에 그린다.
+「새 항목 살펴보기」 소절은 이 에이전트에 붙인 내 연결 가운데 사건 감지를 선언한 것마다 켜기 스위치와 시간대, 막는 까닭, 마지막 확인, 「오늘 상한 도달」, 다시 연결 필요를 보인다. 지원하는 연결이 없으면 안내 한 줄만 보인다. 아래 「사건 감지」 를 본다.
 시작할 수 없으면 단추를 끄고 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 의 이름을 보인다.
 시작이 `USER_BUSY`, `CONVERSATION_BUSY` 로 거절되면 끝난 뒤 다시 누르라고 안내하고, `PROACTIVE_CHECK_UNAVAILABLE` 이면 상태를 다시 읽어 까닭을 그린다.
 결과를 읽지 못한 마지막 살펴보기는 `lastCheck.invalidReason` 이 `EMPTY_ANSWER` 면 답을 받지 못했다고, 그 밖이거나 비었으면 형식이 맞지 않았다고 보인다.
@@ -170,7 +171,7 @@ sequenceDiagram
 #### 사건 감지
 
 붙인 플러그인에 새 항목이 생기면 에이전트가 스스로 살펴본다. 첫 원천은 Gmail 새 메일이다. 결정은 [ADR-20261105 / event-watch](../adr/ADR-20261105-event-watch.md), 요구사항과 설계는 [스펙](proactive/spec.md) 과 [설계](proactive/design.md) 가 갖는다.
-지금 들어간 것은 확인과 실행이다. 알림, 조용한 시간, 켜고 끄는 화면은 아직 없어 켠 바인딩이 없다.
+기본은 꺼짐이고 사용자가 에이전트 상세의 「새 항목 살펴보기」 소절에서 켠다. 실제 Gmail 로 한 번 왕복하는 운영 확인은 배포 뒤에 한다.
 
 - **확인은 모델 없이 돈다.** `EventWatchPoller` 가 `assistant.event-watch.check-cron`(기본 15분)마다 사건 감지를 켠 바인딩을 차례로 본다. 대시보드 plugin 의 `events` 경로가 그 profile 의 연결 값으로 플러그인의 `event_watch` 조회 도구를 부르고 식별자, 받은 시각, 라벨만 돌려준다. 새 항목이 없으면 살펴보기 줄과 실행 줄을 만들지 않고 바인딩 줄의 상태만 덮어쓴다
 - **같은 항목으로 두 번 깨우지 않는다.** 확인 지점은 결과를 다 쓴 마지막 조회를 시작한 Control Plane 의 시각이다. 다음 조회는 지점보다 `overlap`(30분) 앞부터 받고, 그 구간에서 이미 본 식별자를 뺀다. 메일의 `Date` 머리는 보낸 사람이 쓰는 값이라 지점으로 쓰지 않는다. 처음 켜면 지점은 켠 시각이다
@@ -180,6 +181,10 @@ sequenceDiagram
 - **하루 상한이 둘이다.** 바인딩마다 그 시간대의 하루에 `max-runs-per-day`(12) 번까지 깨운다. 사용자의 하루 발화 상한(`assistant.task.max-runs-per-day`)은 예약 작업의 발화와 사건 실행을 함께 센다. 상한에 닿으면 조회하지 않고 지점을 둔다. 모델 없이 끝난 확인은 어느 상한에도 들지 않는다
 - **연결 문제만 연속 실패로 센다.** `credential_rejected` 와 `forbidden` 은 실패 수를 늘리고, 동시 호출 한도나 장애의 `unavailable` 은 세지 않는다. 어느 실패든 지점은 그대로이고 목록을 받으면 실패 수를 비운다
 - **사건 실행의 보고는 매일 깨우기를 건너뛰게 하지 않는다.** 읽지 않은 보고 판정에서 `EVENT` 를 뺀다
+- **알릴 항목이 있으면 실행마다 알림 한 건이다.** 알릴 항목은 「새로 알릴 것」 으로 남은 발견 가운데 `topicKey` 가 입력 식별자인 것이다. 입력 밖 식별자의 발견은 `NOT_IN_EVENT` 의 「참고」 로 내린다. 알림 `EVENT_CHECK_REPORTED` 는 「새 메일 N건 중 M건 확인이 필요해요」 와 원천 이름만 싣고 메일 제목을 넣지 않으며, 누르면 점검 대화로 간다. 질문이나 출처 장애만 있는 실행은 답을 남기되 알리지 않는다. 답을 저장한 뒤 알림을 만들기 전에 서버가 내려가면 그 실행의 알림은 없다
+- **조용한 시간(켤 때 저장한 시간대의 22시~07시)에는 살펴보되 알림을 미룬다.** 바인딩 상태의 `deferred` 에 실행 수, 새 항목 수, 알릴 수를 더하고, 07시 뒤 첫 확인에서 알릴 수가 있으면 「밤사이 새 메일 N건 중 M건 확인이 필요해요」 한 건을 낸다. 실행 중에 사건 감지를 껐으면 미룰 자리가 없어 바로 알린다. 미룬 알림이 있는 채로 끄면 상태를 지우기 전에 같은 트랜잭션에서 그 묶음을 낸다
+- **연결 문제의 연속 실패가 `failure-threshold`(4, 한 시간)에 닿으면 「Gmail 다시 연결이 필요해요」 알림 `EVENT_WATCH_FAILED` 를 한 번 낸다.** 누르면 외부 서비스 연결로 간다. 조용한 시간에는 내지 않고 07시 뒤에도 실패가 이어지면 그때 낸다. 목록을 받으면 실패 수와 알림 표시를 비워, 다시 닿으면 한 번 더 낸다
+- **켜기는 그 에이전트에 붙은 내 연결에서만 한다.** `GET`·`PUT /api/v1/agents/{code}/event-watches[/{connectorId}]`(`EventWatchController`)다. 켜려면 대화를 시작할 수 있고, 사건 실행의 준비 판정을 통과하고, 연결과 바인딩이 `READY` 이고, 조회 도구가 `READ`·승인 `none` 이고, 같은 연결의 다른 에이전트가 켜지 않았어야 한다. 막히면 `PROACTIVE_CHECK_UNAVAILABLE` 이고 조회가 까닭(`EventWatchBlocker`)을 싣는다. 끄기는 읽기 권한만 보고 Hermes 를 부르지 않는다. 계약은 [설계](proactive/design.md) 의 「Control Plane API(PR2)」 가 갖는다
 
 ### 시작 전 점검
 

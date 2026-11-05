@@ -15,5 +15,7 @@ public enum FindingReason {
     /** 제목, 이유, 사실, 다음 행동 가운데 빠진 것이 있다. */
     INCOMPLETE,
     /** 최근에 같은 주제와 같은 원문을 이미 알렸다. */
-    REPEATED
+    REPEATED,
+    /** 사건 실행에서 주제 키가 입력의 새 항목 식별자가 아니다(ADR-20261105 / event-watch). */
+    NOT_IN_EVENT
 }

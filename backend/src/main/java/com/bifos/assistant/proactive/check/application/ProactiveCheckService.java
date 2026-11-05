@@ -20,6 +20,7 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.FollowUpSuggestions;
 import com.bifos.assistant.proactive.check.application.dto.CheckReadiness;
 import com.bifos.assistant.proactive.check.application.dto.EventBatch;
+import com.bifos.assistant.proactive.check.application.dto.EventCheckEnded;
 import com.bifos.assistant.proactive.check.application.dto.CheckStatusView;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
@@ -289,6 +290,10 @@ public class ProactiveCheckService {
             // 돌아왔으면 답 메시지는 저장됐다. 답을 저장하지 못한 turn 은 예외로 끝나 제안과 보고를 남기지 않는다.
             recordQuietly(run::saveSuggestions, conversationId);
             recordQuietly(() -> run.record(delegations), conversationId);
+            if (run.event() != null) {
+                recordQuietly(() -> events.publishEvent(new EventCheckEnded(
+                    run.check().userId(), conversationId, run.event(), run.notifyCount(), clock.instant())), conversationId);
+            }
         } else if (run.limitStopped() || turns.isStopConfirmed(handle)) {
             log.info("멈춘 살펴보기가 예외로 끝났다 conversationId={}", conversationId, failure);
             if (!run.stoppedNoticeSaved()) {

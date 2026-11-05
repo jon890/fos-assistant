@@ -9,11 +9,12 @@ import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 매일 깨우기가 조용한 시간에 만든 승인 알림을 억제한다. */
+/** 매일 깨우기가 조용한 시간에 만든 승인 알림을 억제한다. 조용한 시간의 값은 {@link #quiet} 가 갖는다. */
 @Component
 @RequiredArgsConstructor
 public class ProactiveQuietHours implements CheckNotificationPolicy {
@@ -47,7 +48,13 @@ public class ProactiveQuietHours implements CheckNotificationPolicy {
 
 
     private static boolean outsideQuietHours(Task task, Instant now) {
-        LocalTime localTime = now.atZone(task.zone()).toLocalTime();
-        return !localTime.isBefore(QUIET_END) && localTime.isBefore(QUIET_START);
+        return !quiet(task.zone(), now);
+    }
+
+
+    /** 그 시간대의 22시부터 07시 전까지면 참이다. 사건 감지의 알림 미루기(ADR-20261105 / event-watch)도 같은 시간을 쓴다. */
+    public static boolean quiet(ZoneId zone, Instant now) {
+        LocalTime localTime = now.atZone(zone).toLocalTime();
+        return localTime.isBefore(QUIET_END) || !localTime.isBefore(QUIET_START);
     }
 }

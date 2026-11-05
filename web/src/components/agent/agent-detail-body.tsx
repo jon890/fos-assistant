@@ -11,6 +11,7 @@ import { AgentAdminSection } from "./agent-admin-section";
 import { AgentConnectionsSection } from "./agent-connections-section";
 import { AgentMemorySection } from "./agent-memory-section";
 import { AgentProactiveCheckSection } from "./agent-proactive-check-section";
+import { AgentEventWatchSection } from "./agent-event-watch-section";
 import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
 import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
@@ -225,6 +226,7 @@ export function AgentDetailBody({
             {proactiveCheck.message}
           </Notice>
           <AgentProactiveScheduleSection code={code} />
+          <AgentEventWatchSection code={code} />
         </section>
       )}
       {adminAgent ? <AgentMemorySection code={code} /> : null}

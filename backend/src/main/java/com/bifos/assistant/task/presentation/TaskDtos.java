@@ -3,6 +3,7 @@ package com.bifos.assistant.task.presentation;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
+import com.bifos.assistant.task.application.dto.EventWatchView;
 import com.bifos.assistant.task.application.dto.ProactiveSchedule;
 import com.bifos.assistant.task.application.dto.ProactiveSchedule.LastCheck;
 import com.bifos.assistant.task.application.dto.ScheduleInput;
@@ -62,11 +63,47 @@ public final class TaskDtos {
         }
     }
 
-    /** 매일 깨우기를 막는 까닭이다. */
+    /** 매일 깨우기와 사건 감지를 막는 까닭이다. */
     public record ProactiveBlockerView(String code, List<String> toolsets) {
 
         static ProactiveBlockerView from(CheckBlocker blocker) {
             return new ProactiveBlockerView(blocker.code().name(), blocker.toolsets());
+        }
+    }
+
+    /** 사건 감지를 켜거나 끄는 요청이다. {@code timezone} 이 비면 기본 시간대다. */
+    public record EventWatchRequest(@NotNull Boolean enabled, @Size(max = 64) String timezone) {
+    }
+
+    /** 에이전트 상세의 연결 하나의 사건 감지다. 계약은 {@code docs/features/proactive/design.md} 의 「Control Plane API(PR2)」 가 갖는다. */
+    public record EventWatchResponse(
+        String connectorId,
+        String title,
+        String noun,
+        boolean enabled,
+        boolean available,
+        List<ProactiveBlockerView> blockers,
+        String timezone,
+        Instant lastCheckedAt,
+        String lastResult,
+        int lastNewCount,
+        boolean dailyLimitReached,
+        boolean failing) {
+
+        public static EventWatchResponse from(EventWatchView view) {
+            return new EventWatchResponse(
+                view.connectorId(),
+                view.title(),
+                view.noun(),
+                view.enabled(),
+                view.available(),
+                view.blockers().stream().map(each -> new ProactiveBlockerView(each.code(), each.toolsets())).toList(),
+                view.timeZone(),
+                view.lastCheckedAt(),
+                view.lastResult() == null ? null : view.lastResult().name(),
+                view.lastNewCount(),
+                view.dailyLimitReached(),
+                view.failing());
         }
     }
 

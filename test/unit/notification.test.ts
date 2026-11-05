@@ -49,3 +49,10 @@ test("읽지 않은 수는 그대로 보이고 99 를 넘으면 99+ 로 줄인�
   assert.equal(unreadBadge(99), "99");
   assert.equal(unreadBadge(100), "99+");
 });
+
+test("다시 연결 알림은 공개 식별자 없이 외부 서비스 연결 목록으로 간다", () => {
+  assert.equal(
+    notificationHref(view({ kind: "EVENT_WATCH_FAILED", targetType: "CONNECTIONS", targetId: null })),
+    "/connections",
+  );
+});

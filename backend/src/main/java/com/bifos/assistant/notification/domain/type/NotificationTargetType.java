@@ -7,5 +7,13 @@ public enum NotificationTargetType {
     /** 예약 작업. 공개 식별자로 가리킨다. */
     TASK,
     /** 관리자의 「연결 반영 확인」 목록 화면이다. 목록이라 공개 식별자 없이 가리킨다. */
-    ADMIN_CONNECTIONS
+    ADMIN_CONNECTIONS,
+    /** 사용자의 「외부 서비스 연결」 목록 화면이다. 목록이라 공개 식별자 없이 가리킨다. */
+    CONNECTIONS;
+
+
+    /** 목록 화면이라 공개 식별자 없이 가리키는 갈 곳인가. */
+    public boolean list() {
+        return this == ADMIN_CONNECTIONS || this == CONNECTIONS;
+    }
 }

@@ -75,8 +75,8 @@ public class Notification extends CreatedAtEntity {
     private String body;
 
     /**
-     * 갈 곳이 없으면 비운다. {@code targetPublicId} 와 함께 채우거나 함께 비운다. 목록 화면을 가리키는 {@code ADMIN_CONNECTIONS} 만
-     * 이 칸을 채우고 {@code targetPublicId} 를 비운다.
+     * 갈 곳이 없으면 비운다. {@code targetPublicId} 와 함께 채우거나 함께 비운다. 목록 화면을 가리키는 종류
+     * ({@code ADMIN_CONNECTIONS}, {@code CONNECTIONS})만 이 칸을 채우고 {@code targetPublicId} 를 비운다.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", length = 20)

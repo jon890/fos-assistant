@@ -59,4 +59,26 @@ class EventWatchStateTest {
         EventWatchState moved = fresh.consumed(later, List.of(), false, TODAY);
         assertThat(moved.since(Duration.ofMinutes(30))).isEqualTo(moved.checkpoint().minus(Duration.ofMinutes(30)));
     }
+
+
+    @Test
+    @DisplayName("미룬 알림은 쌓이고 비울 수 있으며, 다시 연결 알림 표시는 목록을 받으면 풀린다. 두 칸이 없는 옛 JSON 도 읽는다")
+    void defersNoticesAndReadsOldJson() {
+        EventWatchState fresh = EventWatchState.fresh(ZoneId.of("Asia/Seoul"), NOW);
+        EventWatchState deferred = fresh.defer(3, 1, 7L, "메모", "메모").defer(2, 0, 8L, "메모함", "메모");
+        assertThat(deferred.deferred()).isEqualTo(new EventWatchState.Deferred(2, 5, 1, 8L, "메모함", "메모"));
+        assertThat(deferred.withoutDeferred().deferred()).isNull();
+
+        EventWatchState noticed = fresh.failed(NOW, true).failureNoticed();
+        assertThat(noticed.failureNotified()).isTrue();
+        assertThat(noticed.failed(NOW, true).failureNotified()).as("실패가 이어지는 동안 표시가 남는다").isTrue();
+        assertThat(noticed.reachable().failureNotified()).isFalse();
+
+        String old = "{\"timeZone\":\"Asia/Seoul\",\"checkpoint\":\"2026-11-05T00:00:00Z\",\"seen\":[],\"failures\":2,"
+            + "\"runs\":0,\"lastNewCount\":0}";
+        EventWatchState read = EventWatchState.fromJson(old);
+        assertThat(read.failureNotified()).isFalse();
+        assertThat(read.deferred()).isNull();
+        assertThat(read.failures()).isEqualTo(2);
+    }
 }
