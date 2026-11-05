@@ -14,6 +14,7 @@ import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.check.application.dto.EventBatch;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -82,8 +83,8 @@ class ProactiveCheckInput {
         }
         text.append("\n\n변화 신호\n");
         Optional<ProactiveCheck> last = deps.checks()
-            .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
-                conversationId, CheckStatus.RUNNING);
+            .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullAndTriggerNotOrderByIdDesc(
+                conversationId, CheckStatus.RUNNING, CheckTrigger.EVENT);
         if (last.isEmpty()) {
             text.append("- 지난 살펴보기: 처음\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
                 .append(UNKNOWN)
@@ -99,9 +100,11 @@ class ProactiveCheckInput {
                 .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
                 .append(memorySignal(previous));
         }
+        // 사건 실행은 새 항목만 보므로 두 경계에서 뺀다(ADR-20261105 / event-watch).
         // 앞 살펴보기는 시작할 때 입력을 만들었으므로 그 시작 시각부터 본다. 실패하거나 멈춘 살펴보기는 모델이 결과를 내지 못해 경계를 옮기지 않는다
         Instant since = deps.checks()
-            .findFirstByConversationIdAndStatusOrderByIdDesc(conversationId, CheckStatus.SUCCEEDED)
+            .findFirstByConversationIdAndStatusAndTriggerNotOrderByIdDesc(
+                conversationId, CheckStatus.SUCCEEDED, CheckTrigger.EVENT)
             .map(ProactiveCheck::startedAt)
             .orElse(null);
         text.append("\n\n").append(deps.wakeMemory().section(owner, agentId, since, now));

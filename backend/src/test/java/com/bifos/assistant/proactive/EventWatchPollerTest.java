@@ -315,6 +315,21 @@ class EventWatchPollerTest extends ProactiveTestSupport {
     }
 
 
+    @Test
+    @DisplayName("사건 실행은 다음 매일 깨우기의 「지난 살펴보기」 와 기억 변화의 시작 경계를 옮기지 않는다")
+    void eventCheckDoesNotMoveDailyWakeBoundary() throws InterruptedException {
+        Long daily = wake(user, agent, nothingNewOutput());
+        Instant dailyEnded = checks.findById(daily).orElseThrow().finishedAt();
+        listing("m1");
+        wakeOnce();
+        clock.set(clock.instant().plus(Duration.ofMinutes(15)));
+
+        wake(user, agent, nothingNewOutput());
+
+        assertThat(stub().received().getLast().input()).contains("- 지난 살펴보기: " + dailyEnded);
+    }
+
+
     /** 확인 한 번으로 사건 실행 하나를 열고 끝나기를 기다린다. */
     private ProactiveCheck wakeOnce() throws InterruptedException {
         clock.set(clock.instant().plus(Duration.ofMinutes(15)));

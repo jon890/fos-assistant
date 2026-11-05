@@ -77,11 +77,6 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
     List<EventWatchTarget> findEventWatchTargets();
 
 
-    /** 그 연결의 바인딩 가운데 사건 감지를 켠 것의 번호다. 같은 연결에서 하나뿐이어야 한다. */
-    @Query("select b.id from ConnectorBinding b where b.connection.id = :connectionId and b.eventWatchEnabled = true")
-    List<Long> findEventWatchIdsOfConnection(@Param("connectionId") Long connectionId);
-
-
     /** 그 연결의 바인딩 줄을 모두 잠근다. 같은 연결에 사건 감지를 둘 켜지 않게 한다. 잠그는 순서는 번호 순이다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from ConnectorBinding b where b.connection.id = :connectionId order by b.id")
