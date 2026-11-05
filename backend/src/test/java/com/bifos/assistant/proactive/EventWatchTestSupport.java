@@ -165,6 +165,15 @@ abstract class EventWatchTestSupport extends ProactiveTestSupport {
     }
 
 
+    /** 확인 도구는 따로 두고 조회 도구에만 그 승인 방식을 준 선언이다. 확인 도구에 승인이 걸리면 카탈로그가 선언을 받지 않는다. */
+    static ConnectorManifest watchToolApproval(String approval) {
+        return new ConnectorManifest(CONNECTOR, "메모", "", List.of(), "verify_notes", "notes", 2,
+            List.of(new ConnectorTool("verify_notes", "READ", "none", null, null), new ConnectorTool(LIST_TOOL, "READ", approval, null, null)),
+            List.of(), ConnectorAppearance.NONE, false, false, null, null, null, null, ConnectorUnknownErrors.NONE, null,
+            new ConnectorEventWatch(LIST_TOOL, "메모", LINK));
+    }
+
+
     static ConnectorManifest manifest(String approval) {
         return new ConnectorManifest(CONNECTOR, "메모", "", List.of(), LIST_TOOL, "notes", 2,
             List.of(new ConnectorTool(LIST_TOOL, "READ", approval, null, null)), List.of(), ConnectorAppearance.NONE,

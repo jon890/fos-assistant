@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.connection.application;
 
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
+import com.bifos.assistant.connector.connection.domain.EventWatchBinding;
 import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.connector.connection.domain.EventWatchTarget;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
@@ -39,7 +40,7 @@ public class ConnectorEventWatches {
      * 사건 감지를 켠다. 같은 연결의 바인딩을 모두 잠근 뒤 다른 바인딩이 켜져 있거나, 바인딩이 쓸 수 없거나, 조회 도구가 승인 없이 불리지 않으면
      * {@code PROACTIVE_CHECK_UNAVAILABLE} 로 거절한다. 이미 켜져 있으면 시간대만 바꾸고 지점과 셈은 그대로 둔다.
      *
-     * <p>켜는 화면과 API 는 다음 PR 이 더한다. 막는 toolset 판정은 그 쪽이 이 메서드 앞에서 한다.
+     * <p>막는 toolset 판정은 {@code EventWatchService} 가 트랜잭션 밖에서 이 메서드 앞에 한다.
      */
     @Transactional
     public EventWatchState enable(Long userId, Long agentId, String connectorId, ZoneId zone, Instant now) {
@@ -64,6 +65,23 @@ public class ConnectorEventWatches {
     public void disable(Long userId, Long agentId, String connectorId) {
         ConnectorBinding binding = requireBinding(userId, agentId, connectorId);
         bindings.switchEventWatch(binding.id(), false, null);
+    }
+
+
+    /** 그 에이전트에 붙은 그 사용자의 연결마다 사건 감지 사실을 읽는다. 다른 사용자의 연결은 싣지 않는다. */
+    @Transactional(readOnly = true)
+    public List<EventWatchBinding> bindingsOf(Long userId, Long agentId) {
+        return bindings.findByAgentId(agentId).stream()
+            .filter(binding -> binding.connection().userId().equals(userId))
+            .map(binding -> new EventWatchBinding(
+                binding.id(),
+                binding.connection().connectorId(),
+                usable(binding),
+                binding.eventWatchEnabled(),
+                bindings.findByConnectionId(binding.connection().id()).stream()
+                    .anyMatch(other -> !other.id().equals(binding.id()) && other.eventWatchEnabled()),
+                binding.eventWatchState()))
+            .toList();
     }
 
 
