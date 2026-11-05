@@ -100,6 +100,20 @@ PR1 은 읽기와 쓰기를 끊고, PR2 는 PR1 배포를 확인한 뒤 테이�
 남기는 것(PR2 가 지운다): 두 엔티티와 저장소의 이관용 조회, `LegacySuggestionBackfill`, `LegacySuggestionKeys`, 사용자·에이전트 정리의 두 테이블 처리, `CheckTrigger.AUTONOMY` 값과 「마지막 살펴보기」 조회의 자동 실행 제외, 두 테이블의 정리 분류(`purge/tables.tsv`).
 `CheckTrigger.AUTONOMY` 를 PR1 에서 지우지 않는 까닭은 아래 DECISION3 이다.
 
+### 지우는 것(PR2)
+
+PR2 는 위 「남기는 것」 을 지운다. 마이그레이션은 DML 과 DDL 을 나눠 네 개다.
+
+| 버전 | 하는 일 |
+| --- | --- |
+| `V20261105040321` | 계기가 `AUTONOMY` 인 살펴보기 줄을 지운다. FK CASCADE 로 그 발견과 문제 후보가 함께 지워진다. 표를 지우기 전이라 이관을 마지막으로 돌린 뒤다 |
+| `V20261105040322` | `proactive_check_finding`, `proactive_check_problem` 을 지운다 |
+| `V20261105040323` | `decision_feedback_event` 의 외래 키와 `source_check_id` 칸을 지운다 |
+| `V20261105040324` | `proactive_check` 의 `new_findings`, `reference_findings`, `tree_*_tokens` 다섯 칸을 지운다 |
+
+코드는 두 엔티티와 저장소, `LegacySuggestionBackfill`, `LegacySuggestionKeys` 와 그 보고 record, 이관만 쓰던 `FollowUpService.migrateLegacySuggestion` 과 `FeedbackEventRepository.repointSubject`, `CheckTrigger.AUTONOMY`, `CheckTurn.silent` 와 `ChatTurnLifecycle` 의 두 분기를 지운다. 「마지막 살펴보기」 조회는 계기를 가리지 않는 `findFirstByUserIdAndAgentIdOrderByIdDesc` 로 바꾼다.
+정리 분류(`purge/tables.tsv`)와 fixture 는 두 표와 `source_check_id` 를 뺀다. 에이전트 정리는 반응 기록의 칸을 비우지 않으므로 `decision_feedback_event` 의 에이전트 칸은 `KEEP` 이다.
+
 ### 문서와 ADR
 
 | 문서 | 바꾸는 것 |

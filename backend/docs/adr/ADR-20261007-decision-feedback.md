@@ -26,7 +26,7 @@
 할 일 제목, Memory 본문, 커넥터 인자와 결과, 모델이 쓴 글을 담는 칸이 없다.
 판은 해시나 판 번호(`subject_version`)로, 고친 내용은 칸 이름(`changed_fields`)으로만 남긴다.
 상황, 후보, 판단, 정책은 이미 있는 줄을 번호로 가리킨다. 제안을 낸 실행은 트리 루트(`origin_execution_id`)로 남겨 살펴보기 트리와 잇는다.
-살펴보기 줄을 직접 가리키던 `source_check_id` 는 읽는 곳이 없어 2026-11-05 에 쓰기를 끊었다. 살펴보기와는 `origin_execution_id` 가 그 살펴보기의 `root_execution_id` 와 같은지로 잇는다([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 「발견과 문제 후보 테이블을 지운다」).
+살펴보기 줄을 직접 가리키던 `source_check_id` 는 읽는 곳이 없어 2026-11-05 에 쓰기를 끊고 칸을 지웠다. 살펴보기와는 `origin_execution_id` 가 그 살펴보기의 `root_execution_id` 와 같은지로 잇는다([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 「발견과 문제 후보 테이블을 지운다」).
 
 **반응은 저장하지 않고 읽을 때 정한다.**
 replay 읽기 모델이 사건을 `ACCEPTED`, `DECLINED`, `DEFERRED`, `NO_RESPONSE`, `NOT_SURFACED` 로 읽는다. 규칙에는 버전을 둔다.

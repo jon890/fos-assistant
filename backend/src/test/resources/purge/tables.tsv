@@ -21,7 +21,7 @@ content_draft_creation_request|CONVERSATION|id|GONE|GONE|KEEP|conversation_id와
 content_draft_revision|CONVERSATION|id|DELETE|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
 content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조, 저장 job 칸을 원고 삭제 후에도 보존하는 계약이다.
 conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session, 대기 줄(pending_messages)을 비운 뒤 purged_at을 적는다.
-decision_feedback_event|CONVERSATION|id|DELETE|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id FK를 NULL로 비운다.
+decision_feedback_event|CONVERSATION|id|DELETE|DELETE|KEEP|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지운다. 에이전트 정리는 사건을 건드리지 않는다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|SCRUB|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
 execution_skill_use|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
@@ -34,8 +34,6 @@ memory_capture|CONVERSATION|id|KEEP|KEEP|KEEP|user_id와 conversation_id에 속�
 memory_revision|USER|memory_id|DELETE|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
 notification|USER|id|DELETE|KEEP|KEEP|user_id FK에 속한다. 대상은 공개 식별자이며 NotificationCleaner가 기간이 지난 행을 지운다.
 proactive_check|AGENT|id|DELETE|GAP|DELETE|user_id와 agent_id와 conversation_id FK가 있다. 알려진 공백: 대화 purge 뒤 report_json이 남는다.
-proactive_check_finding|AGENT|id|DELETE|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 발견 제목과 출처가 남는다.
-proactive_check_problem|AGENT|id|DELETE|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 문제 본문과 근거가 남는다.
 result_delivery|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태, 시도 횟수, 항목의 출처와 결과 식별자, 마지막 시도의 상태와 실행 참조만 보존한다.
 subagent_usage_job|CONVERSATION|id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|DELETE|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.

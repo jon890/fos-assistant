@@ -34,7 +34,6 @@ import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.check.presentation.ProactiveCheckController;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -111,9 +110,6 @@ class ProactiveCheckStartTest {
     ProactiveCheckRepository checks;
 
     @Autowired
-    ProactiveCheckFindingRepository findings;
-
-    @Autowired
     TransactionTemplate transactions;
 
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
@@ -172,9 +168,6 @@ class ProactiveCheckStartTest {
             .toList();
         owned.forEach(conversation -> awaitIdle(conversation.id()));
         List<Long> conversationIds = owned.stream().map(Conversation::id).toList();
-        findings.deleteAll(findings.findAll().stream()
-            .filter(finding -> conversationIds.contains(finding.conversationId()))
-            .toList());
         checks.deleteAll(checks.findAll().stream()
             .filter(check -> createdUsers.contains(check.userId()))
             .toList());

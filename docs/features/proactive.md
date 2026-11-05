@@ -73,19 +73,13 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 옛 발견과 문제 후보 옮기기
 
-옮기는 순서 4 다. 기동할 때 `LegacySuggestionBackfill` 이 한 번 돌아 옛 줄을 제안 줄로 옮긴다. 살펴보기는 더 이상 옛 테이블에 쓰지 않는다. 테이블을 지우기 직전 기동에서 이 이관을 마지막으로 돌리고, 테이블을 지우는 PR 이 이 코드도 지운다([설계](proactive/design.md)).
+옮기는 순서 4 는 끝났다. 기동 때 한 번 돌던 이관(`LegacySuggestionBackfill`)이 사용자에게 보였던 「새로 알릴 것」 발견과 받아들인 문제 후보를 제안 줄로 옮겼고, 마지막 실행의 로그가 실패 0건임을 확인한 뒤 이관 코드와 옛 표(`proactive_check_finding`, `proactive_check_problem`)를 지웠다([설계](proactive/design.md)).
 
-- 옮기는 것은 사용자에게 보였던 「새로 알릴 것」 발견과 받아들인 문제 후보뿐이다. 「참고」 발견과 버린 후보는 제안으로 보인 적이 없어 옮기지 않는다
-- 제안 줄의 사용자, 대화, 실행은 옛 줄(살펴보기의 `user_id`, 옛 줄의 `conversation_id`, 살펴보기의 `root_execution_id`)과 같다. 제목은 발견이면 발견 제목, 문제 후보이면 행동 글(없으면 문제 글)이다
-- 옛 분류 원문(종류, 까닭, 영역, 확신, 부작용, 근거 참조 같은 값)은 본문의 `legacy` 자유 필드에만 두고 암호화한다. 이 값으로 지금의 실행을 판정하지 않는다
-- `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>` 다. 다시 돌려도 줄이 늘지 않고, 중간에 멈추면 다음 기동이 남은 줄과 옮기지 못한 반응을 이어서 옮긴다. 한 줄이 실패해도 나머지를 옮기고, 옮긴 줄 수를 로그에 남긴다
-- 옛 줄이 생긴 지 7일이 지났으면 만료된 제안으로 옮긴다. 목록에 보이지 않고 열린 줄에서도 빠져 같은 제목의 새 제안을 막지 않는다
-- 같은 제목의 열린 할 일이 있거나 같은 대화에서 30일 안에 거절한 제목이면 새 줄을 만들지 않는다. 이미 있는 할 일 줄은 고치지 않는다
-- 대화를 지우면 「제안 저장」 과 같이 옮긴 줄과 본문을 지운다. 지웠거나 정리한 대화의 옛 줄은 다음 기동에서도 옮기지 않는다. 정리 작업은 옛 발견과 문제 후보를 남기므로, 건너뛰지 않으면 지운 대화의 제안이 되살아난다
-
-반응은 옮긴 줄이 있는 발견만 그 줄로 옮긴다. 그 발견의 사건(`check_finding:<번호>`)을 `follow_up:<공개 식별자>` 로 바꾼다. 같은 제목의 열린 할 일이 있어 줄을 만들지 않은 발견은 어느 줄에 해당하는지 정할 수 없으므로 추정해 붙이지 않고 옛 열쇠에 둔다.
-옛 발견에 반응하던 경로와 발견 목록은 지웠다(404). 옛 열쇠에 남은 사건 줄과 `CHECK_FINDING` 이름은 그대로 둔다.
-문제 후보의 반응은 옮기지 않는다. 그 반응은 판정(`autonomy_decision`)에 묶여 있고 한 후보에 판정이 여럿일 수 있어서 옛 줄로 남긴다. 판정을 만들고 읽는 코드는 지웠다.
+- 옮긴 줄의 사용자, 대화, 실행은 옛 줄과 같다. 옛 분류 원문은 본문의 `legacy` 자유 필드에만 두고 암호화했다. 이 값으로 지금의 실행을 판정하지 않는다
+- 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>` 다. 대화를 지우면 다른 제안 줄과 같이 본문과 함께 지운다
+- 보인 적 없는 「참고」 발견과 버린 후보, 지운 대화의 옛 줄, 같은 제목의 열린 할 일이 이미 있던 발견은 옮기지 않았다. 지운 표와 함께 사라졌다
+- 반응은 옮긴 줄이 있는 발견만 그 줄로 옮겼다. 옮기지 못한 발견의 사건 줄(`check_finding:<번호>`)과 `CHECK_FINDING` 이름은 그대로 둔다. 문제 후보의 반응은 옮기지 않았다(판정 `autonomy_decision` 에 묶여 있었다)
+- 옛 발견에 반응하던 경로와 발견 목록은 지웠다(404)
 
 ### 먼저 살펴보기 절
 
@@ -144,7 +138,7 @@ sequenceDiagram
 
 경로는 `ProactiveCheckController`, `ProactiveScheduleController`, `ProactiveCheckReportController` 가 갖는다.
 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 일정 조회와 끄기는 읽기 권한만 본다. 다른 사용자의 보고를 열면 404 다.
-시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`)다. 옛 자동 실행의 `AUTONOMY` 는 저장된 옛 줄을 읽으려고 값만 남았고 새로 시작하는 경로는 없다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 이 계기의 줄을 건너뛴다.
+시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`)다. 옛 자동 실행의 `AUTONOMY` 계기와 그 줄은 지웠다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 계기를 가리지 않는 마지막 줄이다.
 점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다.
 
 | 경우 | 응답 |
@@ -315,7 +309,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run`, `attention_control`, `attention_event` 와 반응 기록의 `autonomy_decision_id` 컬럼은 지웠다. 다음은 읽는 코드 없이 남는다.
 
 - `task.loop_enabled`, `task.snoozed_until` 컬럼. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
-- 옛 `AUTONOMY` 계기의 살펴보기 줄과 실패 이력, 저장된 enum 값(`CheckTrigger.AUTONOMY`, `FeedbackSubjectType.AUTONOMY_DECISION`)
+- 저장된 enum 값 `FeedbackSubjectType.AUTONOMY_DECISION`. 옛 `AUTONOMY` 계기의 살펴보기 줄과 그 enum 값은 지웠다
 
 옛 결정은 [ADR-20261008 / daily-loop](../adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있고, 대체한 결정은 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)이다.
 
@@ -324,7 +318,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남긴다.
 결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
-사건은 `origin_execution_id` 가 살펴보기의 `root_execution_id` 와 같은지로 상황에 이어진다. 살펴보기 번호를 직접 담던 `source_check_id` 는 읽는 곳이 없어 쓰지 않는다.
+사건은 `origin_execution_id` 가 살펴보기의 `root_execution_id` 와 같은지로 상황에 이어진다. 살펴보기 번호를 직접 담던 `source_check_id` 칸은 읽는 곳이 없어 지웠다.
 
 ### 사건
 

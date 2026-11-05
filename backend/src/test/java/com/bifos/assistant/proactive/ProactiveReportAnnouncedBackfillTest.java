@@ -27,6 +27,9 @@ class ProactiveReportAnnouncedBackfillTest {
     /** 채우는 마이그레이션 바로 앞 버전이다. */
     private static final String BEFORE = "20261103054423";
 
+    /** 채우는 마이그레이션 버전이다. 이 뒤의 마이그레이션은 옛 표를 지우므로 여기까지만 적용한다. */
+    private static final String BACKFILL = "20261105040320";
+
     private static final String REPORT = """
             {"changed":["합성 변화"],"done":[],"evidence":["https://example.com/a"],"needsApproval":[],"next":[]}""";
 
@@ -58,7 +61,7 @@ class ProactiveReportAnnouncedBackfillTest {
             });
         }
 
-        migrate(database, null);
+        migrate(database, BACKFILL);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             CheckReport report = reportOf(statement, 1);
@@ -82,7 +85,7 @@ class ProactiveReportAnnouncedBackfillTest {
             withoutForeignKeys(connection, () -> insertCheck(connection, 1, REPORT));
         }
 
-        migrate(database, null);
+        migrate(database, BACKFILL);
 
         try (Connection connection = connect(database); Statement statement = connection.createStatement()) {
             String raw = rawReportOf(statement, 1);

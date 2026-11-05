@@ -2,7 +2,6 @@ package com.bifos.assistant.proactive.check.infra;
 
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
@@ -15,9 +14,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
-    /** 마지막 살펴보기를 보일 때 자동 실행으로 시작한 줄은 뺀다. 그 결과는 사용자에게 바로 알리지 않는다. */
-    Optional<ProactiveCheck> findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
-        Long userId, Long agentId, CheckTrigger trigger);
+    /** 그 사용자의 그 에이전트의 마지막 살펴보기. 상태 조회와 일정 응답의 「마지막 살펴보기」 를 읽는다. */
+    Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
 
 
     boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(Long conversationId);
@@ -73,7 +71,7 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     /**
      * 지운 에이전트를 정리할 때 그 에이전트의 살펴보기를 모두 지운다. 지운 행 수를 돌려준다.
      *
-     * <p>자식 표의 줄은 MySQL FK 의 {@code ON DELETE CASCADE} 와 {@code ON DELETE SET NULL} 이 함께 지우거나 비운다.
+     * <p>외래 키로 이 살펴보기를 가리키는 표는 없다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ProactiveCheck c where c.agentId = :agentId")
@@ -83,8 +81,7 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     /**
      * 사용자 정리 때 그 사용자의 먼저 살펴보기 점검을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다.
      *
-     * <p>발견과 문제는 외래 키의 {@code ON DELETE CASCADE} 로 함께 지워지고, 판단 피드백 사건의
-     * 점검 참조는 {@code ON DELETE SET NULL} 로 비워진다.
+     * <p>외래 키로 이 살펴보기를 가리키는 표는 없다. 반응 기록은 살펴보기 줄이 아니라 실행 번호로 잇는다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ProactiveCheck c where c.userId = :userId")

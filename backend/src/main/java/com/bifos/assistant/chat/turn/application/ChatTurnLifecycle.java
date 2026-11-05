@@ -189,7 +189,7 @@ class ChatTurnLifecycle {
     ChatTurn finishCheck(PendingTurn pending, CheckTurn check, Long executionId, String output) {
         CheckAnswer checked = check.answer(executionId, output);
         Conversation conversation = pending.conversation();
-        if (checked.omit() || check.silent()) {
+        if (checked.omit()) {
             return new ChatTurn(conversation.id(), conversation.publicId(), executionId, "", null, false);
         }
         ChatMessage message;
@@ -219,12 +219,10 @@ class ChatTurnLifecycle {
             // 검사하지 않은 답이 대화에 남지 않게 그때까지의 답 대신 멈춤 알림 줄만 남긴다.
             answer = "";
             String stopped = proactive.check().stoppedNotice();
-            if (!proactive.check().silent()) {
-                ChatMessage notice = messages.save(
-                    ChatMessage.fromSystem(pending.conversation().id(), stopped, clock.instant()));
-                pending.onEvent()
-                    .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
-            }
+            ChatMessage notice = messages.save(
+                ChatMessage.fromSystem(pending.conversation().id(), stopped, clock.instant()));
+            pending.onEvent()
+                .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
         if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {

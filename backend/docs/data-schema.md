@@ -16,7 +16,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「할 일과 먼저 알리기 표」 | `follow_up` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
-| 「먼저 살펴보기 표」 | `proactive_check`, `proactive_check_finding`, `proactive_check_problem` |
+| 「먼저 살펴보기 표」 | `proactive_check` |
 | 「예약 작업 표」 | `task`, `task_run` |
 | 「사용자 브라우저 표」 | `user_browser` |
 | 「암호화 key 표」 | `user_data_key` |
@@ -89,7 +89,6 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `follow_up` | `title` | 아직 |
 | `task` | `title`, `instruction` | 아직 |
 | `proactive_check` | `report_json` | 아직 |
-| `proactive_check_problem` | `problem`, `related_goal`, `action_text`, `expected_benefit`, `risk`, `change_since_last` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 
 **운영 조회 계정의 계약.** 운영자가 데이터베이스를 살피는 계정에는 위 칸의 SELECT 를 주지 않는다.
@@ -263,8 +262,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
 | `proactive_check` | 점검 보고 |
-| `proactive_check_finding` | 발견 제목과 출처 |
-| `proactive_check_problem` | 문제 본문과 근거 |
 
 공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
 새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
@@ -925,7 +922,7 @@ action을 지우면 실행 내용도 지운다.
 | `dedupe_key` | 실행 번호와 결과 블록 안의 항목 식별자(없으면 순번)의 SHA-256 16진수. `(user_id, dedupe_key)` 가 유일해 같은 실행의 같은 결과를 다시 받아도 제안이 하나다. 모델이 정한 topic 값으로 날짜를 넘는 중복을 막지 않는다 |
 | `expires_at` | 받아들이지 않은 제안이 할 일 목록과 지금 화면에서 빠지는 시각. 받아들이면 비운다 |
 
-옛 발견과 문제 후보를 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>`(예: `legacy:proactive_check_finding:<번호>`)이고, 옛 분류 원문은 `detail_json` 의 `legacy` 필드에 있다. 옮기는 방법과 반응 사건의 열쇠 이관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「옛 발견과 문제 후보 옮기기」 가 갖는다. 이 작업은 마이그레이션이 아니라 기동 뒤 한 번 도는 backfill 이라 칸을 더하지 않는다.
+옛 발견과 문제 후보를 옮긴 줄의 `dedupe_key` 는 `legacy:<옛 테이블>:<옛 번호>`(예: `legacy:proactive_check_finding:<번호>`)이고, 옛 분류 원문은 `detail_json` 의 `legacy` 필드에 있다. 그 옛 표와 옮기던 기동 이관 코드는 지웠고, 옮긴 줄은 다른 제안 줄과 같게 다룬다. 옮기는 방법은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「옛 발견과 문제 후보 옮기기」 가 갖는다.
 
 **`dedupe_key` 가 있는 줄이 제안 줄이다.** 대화를 지우면(정리 작업이 대화 본문을 지울 때) 받아들이지 않았거나 거절한 제안 줄은 본문과 함께 지우고, 받아들여 `OPEN` 이 된 줄은 할 일이라 남기되 `detail_json` 과 `detail_key_id` 를 비운다.
 같은 제목의 열린 줄이 있으면 `uk_follow_up_open_title` 때문에 새 제안 줄을 만들지 않는다.
@@ -984,28 +981,24 @@ action을 지우면 실행 내용도 지운다.
 - `root_execution_id` 는 유일하다. 살펴보기 트리를 나누는 기준이라 실행 줄 하나가 두 살펴보기에 속하지 않게 한다. 실행 줄을 만들기 전에 실패하면 비어 있다
 - `writes_allowed` 는 시작할 때 그 에이전트의 `proactive_check_writes_allowed` 를 옮겨 적는다. 도중에 관리자가 바꿔도 그 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082)
 - `report_opened_at` 은 요청자가 「보고 열기」 를 누르거나, 점검 대화를 처음 읽거나, 그 대화에 메시지를 보낸 때 채운다
-- 지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 딸린 줄은 FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 지우거나 비우고, 비용은 `agent_execution` 에 남는다
+- 지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 비용은 `agent_execution` 에 남는다. 외래 키로 이 줄을 가리키는 표는 없다
 - `trigger` 는 MySQL 의 예약어라 칸 이름을 `trigger_type` 으로 둔다
 - `report_json` 은 다섯 칸 보고에 더해 다음 살펴보기의 되풀이 판정 재료를 담는다. `announced` 는 「새로 알릴 것」 으로 알린 발견 가운데 주제 키가 있는 것의 `topicKey`, `sourceUrl`, `title` 이고, `acceptedProblemKeys` 는 받아들인 문제 후보의 정규화한 문제 키다. 화면에는 다섯 칸만 보낸다. 두 칸이 없는 옛 보고는 `V20261105040320` 이 옛 발견·문제 후보 표에서 채웠다
-- `new_findings`, `reference_findings`, `tree_input_tokens`, `tree_cached_input_tokens`, `tree_output_tokens` 는 읽는 곳이 없어 엔티티에서 뺐다. 칸은 기본값이나 `NULL` 로 남고 발견·문제 후보 표를 지우는 PR 이 함께 지운다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md))
-- `trigger_type` 이 `AUTONOMY` 인 옛 줄은 같은 PR 이 지운다. 그 전까지 「마지막 살펴보기」 조회가 그 줄을 건너뛴다
+- `new_findings`, `reference_findings`, `tree_input_tokens`, `tree_cached_input_tokens`, `tree_output_tokens` 는 읽는 곳이 없어 지웠다(`V20261105040324`). 비용은 `root_execution_id` 로 실행 줄을 합쳐 얻는다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md))
+- `trigger_type` 은 `MANUAL` 과 `SCHEDULED` 만 쓴다. 옛 자동 실행(`AUTONOMY`)이 연 줄은 `V20261105040321` 이 지웠고 값도 지웠다. 「마지막 살펴보기」 조회는 계기를 가리지 않는다
 
-### proactive_check_finding
+### 지운 발견·문제 후보 표
 
-옛 결과 블록의 발견 하나다. 새 줄을 쓰지 않는다. 기동 때 옛 줄을 할 일의 제안 줄로 옮기는 `LegacySuggestionBackfill` 만 읽고, 그 마지막 실행 뒤 표를 지운다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md)). 살펴보기 줄을 지우면 함께 지운다.
-
-### proactive_check_problem
-
-옛 결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)). 새 줄을 쓰지 않는다. 받아들인 문제 키는 이제 `proactive_check.report_json` 에 남는다. 기동 이관만 읽고 발견 표와 함께 지운다. 살펴보기 줄을 지우면 함께 지운다.
+`proactive_check_finding`(결과 블록의 발견 하나)과 `proactive_check_problem`(버전 3 의 문제 후보 하나, [ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md))은 `V20261105040322` 가 지웠다. 쓰임이던 다음 입력과 되풀이 판정은 제안 줄과 `proactive_check.report_json` 이 갖고, 받아들인 문제 키는 `report_json` 에 남는다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md)).
 
 ## 판단 피드백 표
 
 ### decision_feedback_event
 
-제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 할 일의 제안 줄로 옮길 때 그 줄이 생긴 발견의 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 한 번 바꾸는 이관뿐이다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
+제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 옛 발견을 제안 줄로 옮길 때 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 바꾼 줄이 있다. 그 이관 코드는 지웠고 옮기지 못한 옛 열쇠의 줄은 그대로 남는다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
 사용자를 지우면 함께 지운다. 다른 사용자는 관리자여도 읽지 못한다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
-실행이나 살펴보기를 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`). `source_check_id` 는 읽는 곳이 없어 쓰지 않는다. 살펴보기와는 `origin_execution_id` 로 잇고, 칸은 발견·문제 후보 표를 지우는 PR 이 지운다.
+실행을 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`). 살펴보기 줄을 가리키던 `source_check_id` 는 읽는 곳이 없어 지웠다(`V20261105040323`). 살펴보기와는 `origin_execution_id` 로 잇는다.
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
 지금 화면의 숨김, 미루기, 복원과 노출, 열기, 동작도 이 표의 사건이다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「저장」). 아래 칸이 쓰인다.

@@ -104,12 +104,6 @@ abstract class ProactiveTestSupport {
         for (Long userId : createdUsers) {
             jdbc.update("DELETE FROM task WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", userId);
-            jdbc.update(
-                "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                userId);
-            jdbc.update(
-                "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                userId);
             jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
             jdbc.update(
                 "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE user_id = ?)",
