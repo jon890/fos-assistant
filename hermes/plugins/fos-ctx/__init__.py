@@ -82,6 +82,18 @@ Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
   글이 아닌 결과는 그대로 둔다. 예외는 잡아 None 을 돌려준다. Hermes 는 그때 원래 결과를 그대로 넘기고,
   MCP 결과에 거는 `<untrusted_tool_result>` 감싸기는 남는다
 
+## 도구 판정
+
+플러그인 도구, Control Plane MCP 도구, 첨부 원본 도구가 아닌 호출은 안전 목록(`SAFE_TOOLS`)에 없으면
+Control Plane 의 `tool-guard` 경로에 그 session 이 사건 실행 트리인지 묻는다(fos-assistant ADR-20261105 / event-watch).
+계약의 정본은 fos-assistant `hermes/plugins/fos-ctx/README.md` 의 「도구 판정 계약」 이다.
+
+- 주소는 `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `tool-guard` 로 바꾼 것이다. 없으면 막는다
+- 서명할 글은 `v1-tool-guard`, 등록 이름, 루트 session, session, tool_call_id 를 줄바꿈 하나로 잇는다
+- `vision_analyze` 는 이미지가 원격 주소나 data URL 일 때만 안전 목록이다. 로컬 경로면 묻는다
+- session 이 없으면 묻지 않고 통과한다. 코드 실행 안의 호출이고 그 코드를 연 `execute_code` 가 이미 판정을 받았다
+- 200 의 `allow` 만 통과한다. 404 는 그 경로가 없는 옛 Control Plane 이라 통과한다. 그 밖과 모든 예외는 막는다
+
 `skill_manage` 는 막는다. 올린 스킬은 Control Plane 이 쓰고 Hermes 는 읽기만 하는데,
 모델이 같은 이름의 로컬 스킬을 만들면 로컬이 먼저 선택되어 올린 스킬이 가려진다.
 읽기 전용 마운트로는 이것을 막지 못한다. 근거는 fos-assistant ADR-034 가 갖는다.
@@ -116,6 +128,7 @@ from .context import (
     CTX_VERSION,
     KEY_NAME,
     MAX_DEPTH,
+    GUARD_VERSION,
     POLICY_VERSION,
     REGISTER_VERSION,
     _read_token,
@@ -126,6 +139,7 @@ from .context import (
     sign,
     sign_policy,
     sign_subagent,
+    sign_tool_guard,
     signing_key,
 )
 
@@ -142,9 +156,20 @@ from .hooks import (
     _control_plane_context,
     _delegate_images_allowed,
     _remote_images_only,
+    event_guard,
     pre_tool_call,
     transform_tool_result,
     wrap_external_data,
+)
+
+from .tool_guard import (
+    GUARD_BLOCK_MESSAGE,
+    GUARD_PATH,
+    SAFE_TOOLS,
+    VISION_TOOL,
+    guard_url,
+    is_safe,
+    tool_guard,
 )
 
 from .subagent import (
@@ -168,4 +193,4 @@ def register(ctx):
     ctx.register_hook("subagent_start", subagent_start)
     ctx.register_hook("transform_tool_result", transform_tool_result)
     logger.info("fos-ctx: Control Plane MCP 호출에 _fos_ctx 를 서명해 붙이고 skill_manage 를 막고 자식 session 을 등록하고 "
-                "플러그인 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싼다")
+                "플러그인 도구와 안전 목록 밖의 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싼다")

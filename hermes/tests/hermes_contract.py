@@ -416,3 +416,38 @@ REVISIT_SIGNALS = {
     ("hermes_cli.dashboard_auth.token_auth", "register_token_route"): ("path",),
     ("hermes_cli.dashboard_auth.token_auth", "is_token_route"): ("path",),
 }
+
+
+# 사건 실행의 도구 판정(fos-assistant ADR-20261105 / event-watch)이 기대는 Hermes 의 도구 목록이다.
+# `toolsets.py` 의 `_HERMES_CORE_TOOLS` 와 `TOOLSETS` 의 도구 이름을 모두 모은 것이다. Hermes 를 올려 도구가 생기거나
+# 빠지면 `test_tool_guard_contract.py` 가 실패한다. 새 도구는 fos-ctx 의 안전 목록(`SAFE_TOOLS`)에 넣지 않는 한
+# 사건 실행에서 막히므로, 넣을지만 정하고 이 목록을 고친다.
+HERMES_BUILTIN_TOOLS = frozenset({
+    "annotate_preview", "browser_back", "browser_cdp", "browser_click", "browser_console", "browser_dialog",
+    "browser_exec", "browser_get_images", "browser_navigate", "browser_press", "browser_scroll", "browser_snapshot",
+    "browser_type", "browser_vault_enter_code", "browser_vault_fill", "browser_vault_list",
+    "browser_vault_save_login", "browser_vault_unlock", "browser_vision", "clarify", "close_terminal",
+    "computer_use", "cronjob_manage", "delegate_task", "desktop_preview", "desktop_project", "discord",
+    "discord_admin", "drive_preview", "execute_code", "feishu_doc_read", "feishu_drive_add_comment",
+    "feishu_drive_list_comment_replies", "feishu_drive_list_comments", "feishu_drive_reply_comment", "focus_pane",
+    "gui_tour", "image_generate", "kanban_attach", "kanban_attach_url", "kanban_attachments", "kanban_block",
+    "kanban_comment", "kanban_complete", "kanban_create", "kanban_heartbeat", "kanban_link", "kanban_list",
+    "kanban_request_changes", "kanban_request_review", "kanban_show", "kanban_unblock", "manage_catalog",
+    "manage_connections", "memory", "patch", "process_manage", "react_to_message", "read_file", "read_terminal",
+    "read_window_below", "search_files", "session_search", "setup_choose", "show_tip", "skill_manage", "skill_view",
+    "skills_list", "spotify_albums", "spotify_devices", "spotify_library", "spotify_playback", "spotify_playlists",
+    "spotify_queue", "spotify_search", "start_chat", "terminal", "text_to_speech", "todo_list", "video_analyze",
+    "video_generate", "vision_analyze", "web_extract", "web_search", "write_file", "x_search", "xai_video_edit",
+    "xai_video_extend", "yb_query_group_info", "yb_query_group_members", "yb_search_sticker", "yb_send_dm",
+    "yb_send_sticker",
+})
+# 안전 목록의 내장 도구가 든 기본 toolset 이다. 읽기 경계 toolset 밖으로 옮겨지면 안전한지 다시 본다.
+TOOL_GUARD_SAFE_TOOLSETS = {
+    "web_search": "web", "web_extract": "web", "vision_analyze": "vision",
+    "skills_list": "skills", "skill_view": "skills", "todo_list": "todo",
+}
+# 도구 찾기 중계 이름이다. `tool_call` 은 hook 에 안쪽 이름이 가므로 안전 목록에 넣지 않는다.
+TOOL_GUARD_BRIDGE = ("tools/tool_search_catalog.py", "BRIDGE_TOOL_NAMES", frozenset({"tool_search", "tool_describe", "tool_call"}))
+# 코드 실행 안의 도구 호출이 `handle_function_call` 에 session 없이 `task_id` 만 넘기는 자리다.
+# fos-ctx 는 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. 이 자리에 session 이 생기면 다시 본다.
+TOOL_GUARD_SESSIONLESS_CALLS = ("tools/code_execution_rpc.py", "tools/code_kernel.py")

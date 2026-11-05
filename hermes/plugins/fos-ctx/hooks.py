@@ -18,6 +18,7 @@ from .context import (
     build_context,
     logger,
 )
+from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 
 
 
@@ -96,30 +97,47 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
     except Exception as exc:  # noqa: BLE001 - 읽지 못한 까닭을 가리지 않고 플러그인으로 갈 수 있는 호출을 막는다
         # 옛 설치 profile 일 수 있다. 그 profile 에는 Control Plane MCP 가 없으므로 그 접두사의 도구도 막는다.
         logger.warning("fos-ctx: 이름 대응 파일을 읽지 못했다: %s", type(exc).__name__)
-        return _block(POLICY_BLOCK_MESSAGE) if guarded else None
+        return _block(POLICY_BLOCK_MESSAGE) if guarded else event_guard(tool_name, args, session_id, tool_call_id)
     if tool_name == INSPECT_TOOL:
         return authorize_inspect(args, session_id or "", tool_call_id or "", isolated)
     if servers is None:
-        # 플러그인을 설치한 profile 이 아니다. 여기까지가 플러그인 정책이 없던 때와 같은 동작이다.
-        return _control_plane_context(tool_name, session_id, tool_call_id) if control_plane else None
+        # 플러그인을 설치한 profile 이 아니다. Control Plane MCP 도구는 서명을 붙이고 나머지는 도구 판정에 묻는다.
+        if control_plane:
+            return _control_plane_context(tool_name, session_id, tool_call_id)
+        return event_guard(tool_name, args, session_id, tool_call_id)
     connector = tool_name.startswith(MCP_PREFIX) and _connector_server(tool_name, servers) is not None
     if control_plane and not connector:
         return _control_plane_context(tool_name, session_id, tool_call_id)
     if not isolated:
-        # 바인딩 profile 이다. 플러그인 서버의 도구만 묻고 나머지는 플러그인이 없는 profile 과 같게 둔다.
+        # 바인딩 profile 이다. 플러그인 서버의 도구는 플러그인 정책에, 나머지는 도구 판정에 묻는다.
         # `execute_code` 안의 플러그인 도구 호출은 session 이 없어 `connector_policy` 가 막는다.
         if not connector:
-            return None
+            return event_guard(tool_name, args, session_id, tool_call_id)
     elif tool_name == CODE_EXECUTION_TOOL:
         return _block(CODE_EXECUTION_MESSAGE)
     elif not tool_name.startswith(MCP_PREFIX):
-        return None
+        return event_guard(tool_name, args, session_id, tool_call_id)
     try:
         return connector_policy(tool_name, args, session_id or "", tool_call_id or "", servers)
     except Exception as exc:  # noqa: BLE001 - 예외를 던지면 본문 일부가 모델에게 간다
         # 예외 본문에 비밀값이 섞일 수 있어 종류만 남긴다.
         logger.warning("fos-ctx: 플러그인 정책을 확인하지 못했다: %s", type(exc).__name__)
         return _block(POLICY_BLOCK_MESSAGE)
+
+
+def event_guard(tool_name: str, args, session_id, tool_call_id):
+    """플러그인 도구와 Control Plane MCP 도구가 아닌 호출을 도구 판정에 묻는다. 통과면 None 이다.
+
+    사건 실행 트리의 위험한 도구 호출을 막는 자리다(fos-assistant ADR-20261105 / event-watch). 안전 목록과
+    session 없는 호출은 묻지 않는다. 어떤 예외든 잡아 정해 둔 글로 막는다. 예외를 던지면 Hermes 의 dispatcher
+    바깥에서 판정 없이 나갈 수 있다.
+    """
+    try:
+        return tool_guard(tool_name, args, session_id or "", tool_call_id or "", _remote_images_only)
+    except Exception as exc:  # noqa: BLE001 - 예외를 던지면 본문 일부가 모델에게 가거나 판정 없이 나간다
+        # 예외 본문에 비밀값이 섞일 수 있어 종류만 남긴다.
+        logger.warning("fos-ctx: 도구 판정을 확인하지 못했다: %s", type(exc).__name__)
+        return _block(GUARD_BLOCK_MESSAGE)
 
 
 def wrap_external_data(body: str) -> str:

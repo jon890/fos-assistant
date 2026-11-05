@@ -68,7 +68,7 @@ FORBIDDEN_TOOLSETS = frozenset({"memory", "terminal", "file", "code_execution", 
 PROFILE_PLUGIN_FILES = (
     "plugin.yaml", "context.py", "connector_policy.py", "subagent.py", "hooks.py",
     "image_headers.py", "image_conversion.py", "image_helper.py", "image_runtime.py", "attachment_inspect.py",
-    "__init__.py",
+    "tool_guard.py", "__init__.py",
 )
 # POST /api/profiles 본문에 둘 수 있는 키다. clone_from 처럼 다른 profile 의 파일을 끌어오는 키를 막는다.
 PROFILE_CREATE_KEYS = frozenset({"name", "no_skills", "description"})

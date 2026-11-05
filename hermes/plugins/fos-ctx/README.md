@@ -91,7 +91,7 @@ Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서
 | --- | --- |
 | `agent_*`, `memory_read`, `memory_search`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change` | 막는다. 모델에게 막은 이유가 간다 |
 | 그 밖의 Control Plane MCP 도구 | 막지 않고 원래 인자 그대로 보낸다 |
-| Control Plane MCP 가 아닌 도구 | 건드리지 않는다. `skill_manage` 만 아래처럼 막는다 |
+| Control Plane MCP 가 아닌 도구 | 서명하지 않는다. `skill_manage` 는 아래처럼 막고, 안전 목록 밖의 도구는 아래 「도구 판정」 으로 묻는다 |
 
 `memory_search`는 색인에서 빠진 항목도 현재 origin의 권한으로 제목과 일반 본문에서 관련도 순으로 찾는 읽기 도구다.
 필수 서명이 없으면 호출 전에 막는다. 호출된 서버의 지연·SQL 실패는 빈 결과로 처리하지 않는다.
@@ -182,6 +182,29 @@ hook 은 등록 이름이 대응 파일의 `tools` 에 있는 서버를 먼저 �
 
 Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버 이름의 `-` 가 `_` 로 바뀐다.
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
+
+### 도구 판정
+
+사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 「도구 판정 계약」 의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
+
+**묻지 않는 도구.** 플러그인 도구(플러그인 정책이 판정), Control Plane MCP 도구(서명), 첨부 원본 도구, `skill_manage`(늘 막음), 그리고 안전 목록 `SAFE_TOOLS` 다. 안전 목록은 `web_search`, `web_extract`, `vision_analyze`, `skills_list`, `skill_view`, `todo_list`, `tool_search`, `tool_describe` 이고, `vision_analyze` 는 `image_url` 이 HTTP(S) 나 이미지 data URL 일 때만 든다. 그 밖은 내장 도구, 붙지 않은 MCP 서버의 도구, 다른 plugin 의 도구를 가리지 않고 묻는다.
+
+**session 이 없는 호출은 묻지 않고 통과한다.** 코드 실행(`execute_code` 의 RPC, 상주 kernel) 안의 호출만 session 이 없다. 그 코드를 연 `execute_code` 가 판정을 받는다. `hermes/tests/test_tool_guard_contract.py` 가 이 두 지점을 고정한다.
+
+| 칸 | 값 |
+| --- | --- |
+| 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `tool-guard` 로 바꾼 것(`/internal/hermes/tool-guard`). http(s) 가 아니거나 없으면 묻지 않고 막는다 |
+| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>`. 토큰이 없으면 묻지 않고 막는다 |
+| 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "sig"}`. 도구 인자는 싣지 않는다 |
+| 서명할 글 | `v1-tool-guard`, `hermes_tool`, 루트 session, session, `tool_call_id` 를 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
+| 답 | 200 의 `{"decision": "allow"}` 면 통과, 200 의 `{"decision": "block", "message"}` 이고 글이 있으면 그 글로 막는다 |
+| 그 밖의 답 | 정해 둔 글(`GUARD_BLOCK_MESSAGE`)로 막는다. 404 만 그 경로가 없는 옛 Control Plane 이라 통과한다. 다음 배포에서 뺀다 |
+| 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
+| 예외 | 어떤 예외든 잡아 정해 둔 글로 막는다. 토큰, 서명, 응답 본문은 로그에 남기지 않는다 |
+
+확인 값: key `2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b`, 도구 `terminal`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1` 의 서명은 `86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273` 다. backend 의 `ToolGuardRequestTest` 도 같은 값을 쓴다.
+
+이 판정은 1.5.0 부터다. 대시보드의 설치 상태는 이 묶음의 `fos-ctx` 가 그 profile 에 깔려 있을 때 `tool_guard: true` 를 낸다. Control Plane 은 그 값이 참일 때만 사건 실행을 연다.
 
 **서명은 그 profile 의 모델이 셸로 파일을 읽지 못하는 동안만 위조를 막는다.**
 key 는 그 profile `.env` 의 MCP 토큰에서 나온다. terminal backend 가 `local` 이면 terminal 도구는 Hermes 프로세스의 사용자가 읽을 수 있는 파일을 모두 읽는다. docker 실행 공간이 적용된 profile 은 [실행 공간](../../docs/hermes-contract.md) 이 갖는다. 스킬 앞머리의 비밀 요청 칸이 그 토큰을 실행 공간에 넣을 수 있어 올린 스킬과 플러그인 스킬은 그 칸을 거절한다.

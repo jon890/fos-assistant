@@ -69,6 +69,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
             {"plugin": DEMO, "enabled": True, "configured": True, "mode": "bind"},
             {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
         self.assertIs(status["policy_hook"], True)
+        # 사건 실행의 도구 판정을 하는 fos-ctx 가 묶음과 같다. Control Plane 은 이 칸이 참일 때만 사건 실행을 연다.
+        self.assertIs(status["tool_guard"], True)
 
         repeated = self.bind()
         self.assertIs(repeated.body["changed"], False)
@@ -262,6 +264,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         status, warnings = self.warnings_of_status()
 
         self.assertIs(status["policy_hook"], False)
+        self.assertIs(status["tool_guard"], False)
         self.assertEqual(warnings, ["dashboard-profile-api: policy_hook 거짓 조건=tool_map"])
 
     def test_disabled_policy_plugin_is_logged_by_condition_name_only(self):

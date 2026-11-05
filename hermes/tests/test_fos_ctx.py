@@ -50,6 +50,9 @@ POLICY_VECTOR_SESSION = "fos-session-1"
 POLICY_VECTOR_CALL = "call_1"
 POLICY_VECTOR_ARGS_JSON = '{"text":"안녕"}'
 POLICY_VECTOR_SIG = "e23e297aec4837aeddd50e71dcde79969ad5544e6c93ea7b9ab7657f221037da"
+# 도구 판정 질의의 서명 확인 값이다. 위 정책 확인 값의 key, 루트, session, 호출 id 와 도구 `terminal` 이다.
+# 서버 쪽 `backend/src/test/java/com/bifos/assistant/mcp/ToolGuardRequestTest.java` 와 같은 값이어야 한다.
+TOOL_GUARD_VECTOR_SIG = "86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273"
 
 
 def load_ctx(add_cleanup):
@@ -171,7 +174,8 @@ class HookTest(PluginFixture):
         for args in ({}, {"images": []}, {"images": images},
                      {"tasks": [{"prompt": "사진", "images": images}, {"prompt": "글"}]}):
             with self.subTest(args=args):
-                self.assertIsNone(self.call("delegate_task", args=args))
+                # 이미지 검사를 지난 호출은 도구 판정으로 간다. session 없는 호출은 묻지 않고 통과한다.
+                self.assertIsNone(self.call("delegate_task", args=args, session=""))
 
     def test_delegate_invalid_image_shapes_fail_closed(self):
         for args in ({"images": "/photo.png"}, {"tasks": "invalid"}, {"tasks": ["invalid"]},
@@ -180,11 +184,21 @@ class HookTest(PluginFixture):
                 self.assertEqual(self.call("delegate_task", args=args),
                                  {"action": "block", "message": self.plugin.DELEGATE_IMAGE_MESSAGE})
 
-    def test_other_tools_are_untouched(self):
-        """대상이 아닌 도구의 호출은 건드리지 않는다."""
+    def test_safe_and_sessionless_tools_are_untouched(self):
+        """안전 목록의 도구와 session 없는 호출(`execute_code` 안의 호출)은 묻지 않고 그대로 둔다."""
+        for tool in sorted(self.plugin.SAFE_TOOLS):
+            with self.subTest(tool=tool):
+                self.assertIsNone(self.call(tool, args={"image_url": "https://images.example/a.png"}))
+        for tool in ("terminal", "write_file", "mcp__other__agent_delegate"):
+            with self.subTest(tool=tool, session=""):
+                self.assertIsNone(self.call(tool, session=""))
+
+    def test_other_tools_block_without_guard_url(self):
+        """판정 주소가 없으면 안전 목록 밖의 도구를 막는다. 다른 MCP 서버의 도구도 같다."""
+        os.environ.pop("FOS_CTX_POLICY_URL", None)
         for tool in ("terminal", "mcp__other__agent_delegate", "mcp__fos_assistant_memory__memory_read"):
             with self.subTest(tool=tool):
-                self.assertIsNone(self.call(tool))
+                self.assertEqual(self.call(tool), {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
 
     def test_agent_tool_gets_signed_context_over_forged_value(self):
         """agent 도구 호출은 위조된 값 대신 서명된 context 를 받는다."""
@@ -282,8 +296,8 @@ class HookTest(PluginFixture):
         self.assertEqual(result["action"], "block")
         self.assertEqual(result["message"],
                          "이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다")
-        # MCP 이름에 같은 글자가 들어가도 막지 않는다.
-        self.assertIsNone(self.call("mcp__other__skill_manage"))
+        # MCP 이름에 같은 글자가 들어가도 스킬 막기로 막지 않는다. 그 호출은 도구 판정으로 간다.
+        self.assertIsNone(self.call("mcp__other__skill_manage", session=""))
 
     def test_missing_state_db_falls_back_to_session(self):
         """state DB 가 없으면 session 값으로 대신한다."""
@@ -472,6 +486,10 @@ class ConnectorPolicyTest(PluginFixture):
     def answer_json(self, body, status=200):
         self.answer = (status, json.dumps(body, ensure_ascii=False).encode("utf-8"), 0.0)
 
+    def policy_requests(self):
+        """플러그인 정책 경로로 간 질의만 고른다. 안전 목록 밖의 내장 도구는 도구 판정 경로로 따로 묻는다."""
+        return [request for request in self.requests if request["path"] == "/internal/hermes/connector-policy"]
+
     def assertBlocked(self, result, message):
         """막는 결과는 늘 비지 않은 글을 갖는다. Hermes 는 글이 없는 block 을 통과로 읽는다."""
         self.assertIsInstance(result, dict, "막아야 하는데 %r 를 돌려줬다" % (result,))
@@ -481,13 +499,16 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(result["message"], message)
         self.assertEqual(set(result), {"action", "message"})
 
-    def test_profile_without_tool_map_is_untouched(self):
-        """대응 파일이 없는 profile 은 플러그인 도구를 건드리지 않고 서버를 부르지 않는다."""
+    def test_profile_without_tool_map_skips_connector_policy(self):
+        """대응 파일이 없는 profile 은 플러그인 정책을 묻지 않는다. 안전 목록 밖의 도구는 도구 판정만 묻는다."""
         self.map_path.unlink()
         for tool in ("mcp__demo__write_note", "execute_code", "vision_analyze"):
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
+        # 플러그인 도구로 읽히지 않는 MCP 도구, execute_code, 이미지 없는 vision_analyze 는 도구 판정에 묻는다.
+        self.assertEqual([request["body"]["hermes_tool"] for request in self.requests],
+                         ["mcp__demo__write_note", "execute_code", "vision_analyze"])
 
     def test_allow_passes_with_signed_request(self):
         """서버가 allow 로 답하면 통과하고, 요청은 계약의 본문과 서명을 갖는다."""
@@ -649,7 +670,7 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(self.requests, [])
 
     def test_unreadable_tool_map_blocks_mcp_tools_only(self):
-        """대응 파일을 읽지 못하면 MCP 도구와 execute_code 만 막는다."""
+        """대응 파일을 읽지 못하면 MCP 도구와 execute_code 만 막는다. 내장 도구는 플러그인 정책이 아니라 도구 판정에 묻는다."""
         broken = {
             "broken json": "{",
             "not an object": "[]",
@@ -676,14 +697,14 @@ class ConnectorPolicyTest(PluginFixture):
             self.map_path.mkdir()
             self.assertBlocked(self.call("mcp__demo__x"), self.plugin.POLICY_BLOCK_MESSAGE)
             self.assertIsNone(self.call("vision_analyze"))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
 
     def test_other_tools_pass_on_connector_profile(self):
-        """연결용 profile 에서도 MCP 가 아닌 도구는 서버를 부르지 않고 통과한다."""
+        """연결용 profile 에서도 MCP 가 아닌 도구는 플러그인 정책을 묻지 않는다. 안전 목록 밖이면 도구 판정이 통과시킨다."""
         for tool in ("vision_analyze", "terminal"):
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
 
     def test_control_plane_tool_keeps_signed_context(self):
         """연결용 profile 에서도 Control Plane MCP 도구는 서명한 _fos_ctx 를 받고 정책 서버를 부르지 않는다."""
@@ -757,17 +778,17 @@ class ConnectorPolicyTest(PluginFixture):
         self.assertEqual(self.requests[0]["body"]["root_session_id"], VECTOR_SESSION)
 
     def test_binding_profile_asks_only_connector_tools(self):
-        """바인딩 profile 에서는 대응의 서버 도구만 묻고 다른 MCP 서버의 도구, execute_code, 내장 도구는 통과한다."""
+        """바인딩 profile 에서는 대응의 서버 도구만 플러그인 정책에 묻는다. 다른 MCP 서버의 도구, execute_code, 내장 도구는 도구 판정이 통과시킨다."""
         self.write_map(BIND_MAP)
         for tool in ("mcp__other__x", "mcp__demo_x__write_note", "execute_code", "terminal", "vision_analyze"):
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool, args={"code": "x"}))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
         self.answer_json({"decision": "block", "message": "승인이 필요하다"})
         self.assertBlocked(self.call("mcp__demo__write_note", args={"text": "안녕"}), "승인이 필요하다")
         # manifest 를 읽지 못해 도구가 없는 서버도 대응에 있으므로 묻는다. 원래 이름을 몰라 `tool` 은 null 이다.
         self.assertBlocked(self.call("mcp__gone__send"), "승인이 필요하다")
-        self.assertEqual([(request["body"]["hermes_tool"], request["body"]["tool"]) for request in self.requests],
+        self.assertEqual([(request["body"]["hermes_tool"], request["body"]["tool"]) for request in self.policy_requests()],
                          [("mcp__demo__write_note", "write_note"), ("mcp__gone__send", None)])
 
     def test_binding_profile_blocks_connector_tools_without_context(self):
@@ -796,7 +817,7 @@ class ConnectorPolicyTest(PluginFixture):
                 self.assertBlocked(self.call("mcp__other__x"), self.plugin.UNKNOWN_SERVER_MESSAGE)
                 self.assertBlocked(self.call("execute_code"), self.plugin.CODE_EXECUTION_MESSAGE)
                 self.assertIsNone(self.call("terminal"))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
 
     def test_non_boolean_isolated_blocks_mcp_and_code_execution(self):
         """isolated 가 boolean 이 아니면 대응 파일을 읽지 못한 것으로 보고 MCP 도구와 execute_code 를 모두 막는다."""
@@ -807,7 +828,7 @@ class ConnectorPolicyTest(PluginFixture):
                              "execute_code"):
                     self.assertBlocked(self.call(tool), self.plugin.POLICY_BLOCK_MESSAGE)
                 self.assertIsNone(self.call("terminal"))
-        self.assertEqual(self.requests, [])
+        self.assertEqual(self.policy_requests(), [])
 
     def test_logs_hide_token_signature_and_args(self):
         """토큰, 서명, 인자, 응답 본문을 로그에 남기지 않는다."""
@@ -817,6 +838,163 @@ class ConnectorPolicyTest(PluginFixture):
         log = "\n".join(logs.output)
         for secret in (FAKE_MCP_CREDENTIAL, self.requests[0]["body"]["sig"], "인자-비밀", "응답-본문-글"):
             self.assertNotIn(secret, log)
+
+
+class ToolGuardTest(PluginFixture):
+    """안전 목록 밖의 도구 호출을 가짜 Control Plane 의 `tool-guard` 에 묻는 모양과 막는 분기를 본다.
+
+    사건 실행 트리에서 막을 도구마다 실제 `pre_tool_call` 을 지난다. 판정 자체는 Control Plane 이 하고,
+    여기서는 답대로 막거나 통과시키는지, 답을 받지 못하면 막는지를 본다.
+    """
+
+    # 사건 실행에서 막혀야 하는 도구다. 위임, 셸·프로세스, 파일 넷, 코드 실행, 원격 연결, 브라우저, 다른 MCP 서버다.
+    GUARDED = ("delegate_task", "terminal", "process_manage", "read_file", "write_file", "patch", "search_files",
+               "execute_code", "manage_connections", "browser_navigate", "cronjob_manage", "session_search",
+               "mcp__other__send")
+
+    def setUp(self):
+        super().setUp()
+        self.requests = []
+        self.answer = (200, b'{"decision": "allow"}')
+        test = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                test.requests.append({"path": self.path, "headers": dict(self.headers), "body": json.loads(raw)})
+                status, payload = test.answer
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.saved_env = os.environ.get("FOS_CTX_POLICY_URL")
+        os.environ["FOS_CTX_POLICY_URL"] = (
+            "http://127.0.0.1:%d/internal/hermes/connector-policy" % self.server.server_address[1])
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        if self.saved_env is None:
+            os.environ.pop("FOS_CTX_POLICY_URL", None)
+        else:
+            os.environ["FOS_CTX_POLICY_URL"] = self.saved_env
+        super().tearDown()
+
+    def test_guarded_tools_send_signed_request_and_follow_block(self):
+        """막을 도구마다 서명한 질의를 보내고, Control Plane 의 block 글로 막는다."""
+        self.answer = (200, json.dumps({"decision": "block", "message": "사건 실행에서는 못 쓴다"}).encode("utf-8"))
+        for tool in self.GUARDED:
+            with self.subTest(tool=tool):
+                self.requests.clear()
+                self.assertEqual(self.call(tool, args={"command": "rm -rf /"}),
+                                 {"action": "block", "message": "사건 실행에서는 못 쓴다"})
+                self.assertEqual(len(self.requests), 1)
+                request = self.requests[0]
+                self.assertEqual(request["path"], "/internal/hermes/tool-guard")
+                self.assertEqual(request["headers"]["Authorization"], "Bearer " + FAKE_MCP_CREDENTIAL)
+                self.assertEqual(request["body"], {
+                    "v": 1,
+                    "root_session_id": VECTOR_ROOT,
+                    "session_id": VECTOR_SESSION,
+                    "tool_call_id": VECTOR_CALL,
+                    "hermes_tool": tool,
+                    "sig": self.plugin.sign_tool_guard(VECTOR_KEY, tool, VECTOR_ROOT, VECTOR_SESSION, VECTOR_CALL),
+                })
+                # 인자는 보내지 않는다. 판정은 session 과 도구 이름으로만 한다.
+                self.assertNotIn("args_json", request["body"])
+
+    def test_allow_passes(self):
+        """Control Plane 이 allow 로 답하면 보통 대화의 도구는 그대로 돈다."""
+        for tool in self.GUARDED:
+            with self.subTest(tool=tool):
+                self.assertIsNone(self.call(tool))
+
+    def test_safe_tools_and_control_plane_tools_do_not_ask(self):
+        """안전 목록과 Control Plane MCP 도구는 묻지 않는다."""
+        for tool in sorted(self.plugin.SAFE_TOOLS):
+            with self.subTest(tool=tool):
+                self.assertIsNone(self.call(tool, args={"image_url": "data:image/png;base64,cGhvdG8="}))
+        self.assertEqual(self.call("mcp__fos_assistant__memory_read")["action"], "modify")
+        self.assertEqual(self.requests, [])
+
+    def test_vision_with_local_path_asks(self):
+        """`vision_analyze` 가 로컬 경로를 받으면 Hermes 쪽 사진 파일을 읽으므로 묻는다. 막히면 그 글로 막는다."""
+        self.answer = (200, b'{"decision": "block", "message": "x"}')
+        for args in ({"image_url": "/attachments/other-user/1.png"}, {"image_url": "file:///etc/x.png"}, {}):
+            with self.subTest(args=args):
+                self.assertEqual(self.call("vision_analyze", args=args), {"action": "block", "message": "x"})
+
+    def test_unusable_answers_block(self):
+        """allow 가 아닌 답, 5xx, JSON 이 아닌 답, 글 없는 block 은 정해 둔 글로 막는다. 404 만 옛 Control Plane 이라 통과한다."""
+        cases = {
+            "500": (500, b'{"decision": "allow"}'),
+            "403": (403, b'{}'),
+            "not json": (200, b'allow'),
+            "block without message": (200, b'{"decision": "block"}'),
+            "unknown": (200, b'{"decision": "maybe"}'),
+        }
+        for label, answer in cases.items():
+            with self.subTest(label=label):
+                self.answer = answer
+                self.assertEqual(self.call("terminal"), {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
+        self.answer = (404, b'{}')
+        self.assertIsNone(self.call("terminal"))
+
+    def test_missing_material_blocks_without_request(self):
+        """토큰이나 tool_call_id 가 없거나, 주소가 http(s) 가 아니면 묻지 않고 막는다."""
+        cases = {
+            "no token": lambda: setattr(self, "token", None),
+            "no tool_call_id": lambda: None,
+            "bad url": lambda: os.environ.__setitem__("FOS_CTX_POLICY_URL", "file:///etc/passwd"),
+        }
+        for label, prepare in cases.items():
+            with self.subTest(label=label):
+                saved_url = os.environ["FOS_CTX_POLICY_URL"]
+                self.requests.clear()
+                prepare()
+                call_id = "" if label == "no tool_call_id" else VECTOR_CALL
+                self.assertEqual(self.call("terminal", call_id=call_id),
+                                 {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
+                self.assertEqual(self.requests, [])
+                self.token = FAKE_MCP_CREDENTIAL
+                os.environ["FOS_CTX_POLICY_URL"] = saved_url
+
+    def test_exceptions_inside_hook_block(self):
+        """hook 안의 예외는 잡아 막는다. Hermes 의 dispatcher 바깥 예외는 판정 없이 나가기 때문이다."""
+        self.secret_error = RuntimeError("secret scope 밖")
+        self.assertEqual(self.call("terminal"), {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
+        self.secret_error = None
+        os.environ["FOS_CTX_POLICY_URL"] = "http://127.0.0.1:1/internal/hermes/connector-policy"
+        self.assertEqual(self.call("terminal"), {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
+
+    def test_unreadable_tool_map_still_guards_builtin_tools(self):
+        """이름 대응 파일을 읽지 못해도 내장 도구는 도구 판정에 묻는다."""
+        (pathlib.Path(self.tmp.name) / ".fos-connector-tools.json").write_text("{", encoding="utf-8")
+        self.answer = (200, b'{"decision": "block", "message": "x"}')
+        self.assertEqual(self.call("terminal"), {"action": "block", "message": "x"})
+
+    def test_binding_profile_guards_builtin_tools(self):
+        """바인딩 profile 에서도 플러그인 서버가 아닌 도구는 도구 판정에 묻는다."""
+        (pathlib.Path(self.tmp.name) / ".fos-connector-tools.json").write_text(json.dumps(
+            {"v": 1, "isolated": False, "servers": {"demo": {"connector": "demo", "prefix": "mcp__demo__",
+                                                              "tools": {"mcp__demo__list": "list"}}}}), encoding="utf-8")
+        self.answer = (200, b'{"decision": "block", "message": "x"}')
+        self.assertEqual(self.call("execute_code"), {"action": "block", "message": "x"})
+        self.assertEqual(self.requests[-1]["path"], "/internal/hermes/tool-guard")
+
+    def test_signature_vector(self):
+        """서명 확인 값이다. 서버 쪽 `ToolGuardRequestTest` 의 값과 같아야 한다."""
+        self.assertEqual(
+            self.plugin.sign_tool_guard(POLICY_VECTOR_KEY, "terminal", POLICY_VECTOR_ROOT, POLICY_VECTOR_SESSION,
+                                        POLICY_VECTOR_CALL),
+            TOOL_GUARD_VECTOR_SIG)
 
 
 class TransformToolResultTest(PluginFixture):
