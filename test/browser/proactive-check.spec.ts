@@ -414,7 +414,7 @@ test("단추 하나로 살펴보기를 시작하고 결과와 배지를 보며 �
   }
 });
 
-test("점검 대화의 발견에 관심 없음을 누르면 눌린 상태가 남고 다시 열어도 그대로다", async ({
+test("점검 대화의 답 아래에 발견 반응 단추가 없고 옛 반응 경로는 404 다", async ({
   page,
 }) => {
   try {
@@ -423,37 +423,19 @@ test("점검 대화의 발견에 관심 없음을 누르면 눌린 상태가 남
     await section(page).getByRole("button", { name: "지금 살펴보기" }).click();
     await expect(page).toHaveURL(CONVERSATION_URL);
 
-    // 발견은 답을 보낸 뒤에 저장되므로 화면이 다시 읽어 그릴 때까지 기다린다.
-    const finding = page
-      .getByTestId("check-findings")
-      .getByTestId("check-finding")
-      .first();
-    const dismiss = finding.getByRole("button", {
-      name: "관심 없음",
-      exact: true,
-    });
-    await expect(dismiss).toHaveAttribute("aria-pressed", "false");
-    const response = await clickAndWaitForResponse(
-      page,
-      dismiss,
-      "PUT",
-      /^\/api\/check-findings\/\d+\/reaction$/,
-    );
-    expect(response.status(), "반응 저장은 본문 없이 204 로 끝나야 한다").toBe(
-      204,
-    );
-    await expect(dismiss).toHaveAttribute("aria-pressed", "true");
+    // 답이 그려진 뒤에도 반응 단추가 없다. 반응은 지금 화면의 제안 카드와 할 일 목록에서만 받는다.
     await expect(
-      finding.getByRole("button", { name: "받아들임", exact: true }),
-    ).toHaveAttribute("aria-pressed", "false");
-
-    await page.reload();
-    await expect(dismiss).toHaveAttribute("aria-pressed", "true");
-    await expect(
-      page
-        .getByTestId("check-findings")
-        .getByText("일 동안 다시 알리지 않아요", { exact: false }),
+      page.getByRole("link", { name: "example.com" }).first(),
     ).toBeVisible();
+    for (const name of ["받아들임", "나중에", "관심 없음"]) {
+      await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+        0,
+      );
+    }
+    const reaction = await page.request.put("/api/check-findings/1/reaction", {
+      data: { reaction: "DISMISSED" },
+    });
+    expect(reaction.status(), "옛 반응 경로").toBe(404);
   } finally {
     await restore(page);
   }

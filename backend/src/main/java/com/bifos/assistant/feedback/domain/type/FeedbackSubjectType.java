@@ -12,7 +12,10 @@ public enum FeedbackSubjectType {
     CONNECTOR_ACTION("connector_action"),
     /** 먼저 살펴보기 한 번. 보고를 보였거나 자동 실행이 끝났다. 열쇠는 {@code proactive_check:<번호>} 다. */
     CHECK("proactive_check"),
-    /** 살펴보기의 「새로 알릴 것」 발견 하나. 열쇠는 {@code check_finding:<번호>} 다. */
+    /**
+     * 옛 살펴보기의 「새로 알릴 것」 발견 하나다. 발견 반응 단추와 그 API 를 지웠지만, 저장된 사건 줄이 남아 있을 수 있어 이름은 지우지
+     * 않는다. 열쇠는 {@code check_finding:<번호>} 다.
+     */
     CHECK_FINDING("check_finding"),
     /**
      * 옛 행동 정책 판정의 반응이다. 판정 테이블과 쓰는 코드는 지웠지만, 저장된 사건 줄이 남아 있을 수 있어 이름은 지우지 않는다. 열쇠는

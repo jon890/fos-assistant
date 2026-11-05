@@ -10,6 +10,7 @@ import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
+import com.bifos.assistant.proactive.check.domain.ReportedFinding;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
@@ -34,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -87,13 +87,20 @@ class ProactiveCheckRepositoryTest {
 
 
     @Test
-    @DisplayName("보고 읽음 표시는 소유권을 검사하고 첫 시각과 JSON과 트리 토큰을 유지한다")
+    @DisplayName("보고 읽음 표시는 소유권을 검사하고 첫 시각과 판정 재료를 담은 보고 JSON 을 유지한다")
     void reportOpeningChecksOwnershipAndKeepsFirstTimestamp() {
         ProactiveCheck check = saveCheck(CONVERSATION, "report-session", 77L);
-        CheckReport report = new CheckReport(List.of("변화"), List.of("확인"), List.of(), List.of(), List.of("다음"));
+        CheckReport report = new CheckReport(
+            List.of("변화"),
+            List.of("확인"),
+            List.of(),
+            List.of(),
+            List.of("다음"),
+            List.of(new ReportedFinding("trend:topic", "https://example.com/topic", "제목")),
+            List.of("trend:problem"));
         transactions.executeWithoutResult(status -> checks.findById(check.id())
             .orElseThrow()
-            .succeed(CheckOutcome.FINDINGS, 1, 0, report, 2, 0, 10, 3, 4, NOW.plusSeconds(10)));
+            .succeed(CheckOutcome.FINDINGS, report, 2, 0, NOW.plusSeconds(10)));
         CurrentUser other = new CurrentUser(OTHER_USER, "other@example.com", "다른 사용자", 1L, UserRole.MEMBER);
         CurrentUser owner = new CurrentUser(USER, "owner@example.com", "주인", 1L, UserRole.MEMBER);
 
@@ -110,9 +117,6 @@ class ProactiveCheckRepositoryTest {
         ProactiveCheck stored = checks.findById(check.id()).orElseThrow();
         assertThat(stored.reportOpenedAt()).isEqualTo(opened);
         assertThat(stored.report()).isEqualTo(report);
-        assertThat(stored.treeInputTokens()).isEqualTo(10);
-        assertThat(stored.treeCachedInputTokens()).isEqualTo(3);
-        assertThat(stored.treeOutputTokens()).isEqualTo(4);
     }
 
 
@@ -172,7 +176,7 @@ class ProactiveCheckRepositoryTest {
         ProactiveCheck finished = saveCheck(CONVERSATION, "session-a", 11L);
         transactions.executeWithoutResult(status -> {
             ProactiveCheck row = checks.findById(finished.id()).orElseThrow();
-            row.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 2, 0, 0, 0, 0, NOW.plusSeconds(60));
+            row.succeed(CheckOutcome.NOTHING_NEW, null, 2, 0, NOW.plusSeconds(60));
         });
         ProactiveCheck skipped = saveCheck(CONVERSATION, null, null);
         transactions.executeWithoutResult(status -> {
@@ -193,38 +197,24 @@ class ProactiveCheckRepositoryTest {
 
 
     @Test
-    @DisplayName("최근 발견 읽기는 그 대화와 종류와 기간으로 거르고 최근 것부터 주제 키와 함께 돌려준다")
-    void readsRecentFindingsFilteredByConversationKindAndCreatedAt() {
+    @DisplayName("최근 보고 읽기는 그 대화에서 기간 안에 시작해 보고를 남긴 살펴보기만 최근 것부터 돌려준다")
+    void readsRecentReportedChecksOfConversation() {
         Instant after = NOW.minus(Duration.ofDays(30));
-        ProactiveCheck check = saveCheck(CONVERSATION, "session-a", 21L);
-        ProactiveCheck otherCheck = saveCheck(OTHER_CONVERSATION, "session-a", 22L);
-        saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-old", after.minusSeconds(1));
-        saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-boundary", after);
-        ProactiveCheckFinding first = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-1", after.plusSeconds(1));
-        ProactiveCheckFinding second = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-2", NOW);
-        saveFinding(check, CONVERSATION, FindingKind.REFERENCE, "topic-reference", NOW);
-        saveFinding(otherCheck, OTHER_CONVERSATION, FindingKind.NEW, "topic-other", NOW);
+        ProactiveCheck old = reportedCheck(CONVERSATION, after.minusSeconds(1));
+        ProactiveCheck boundary = reportedCheck(CONVERSATION, after);
+        ProactiveCheck first = reportedCheck(CONVERSATION, after.plusSeconds(1));
+        ProactiveCheck second = reportedCheck(CONVERSATION, NOW);
+        ProactiveCheck silent = saveCheck(CONVERSATION, "session-a", 21L);
+        ProactiveCheck elsewhere = reportedCheck(OTHER_CONVERSATION, NOW);
 
-        List<ProactiveCheckFinding> recent = transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-            CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 10)));
-        List<ProactiveCheckFinding> limited = transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-            CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 1)));
-        List<ProactiveCheckFinding> notified = transactions.execute(
-            status -> findings.findByConversationIdAndKindAndCreatedAtAfter(CONVERSATION, FindingKind.NEW, after));
+        List<ProactiveCheck> recent = transactions.execute(
+            status -> checks.findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc(CONVERSATION, after));
 
         assertThat(recent)
-            .as("기간 안의 NEW 발견. 기간의 시작 시각과 같은 줄은 빠진다")
-            .extracting(ProactiveCheckFinding::id)
-            .containsExactly(second.id(), first.id());
-        assertThat(recent).extracting(ProactiveCheckFinding::topicKey).containsExactly("topic-2", "topic-1");
-        assertThat(limited)
-            .as("쪽 크기 1")
-            .extracting(ProactiveCheckFinding::topicKey)
-            .containsExactly("topic-2");
-        assertThat(notified)
-            .as("이미 알린 묶음")
-            .extracting(ProactiveCheckFinding::topicKey)
-            .containsExactlyInAnyOrder("topic-1", "topic-2");
+            .as("기간의 시작 시각과 같은 줄, 보고 없는 줄, 다른 대화는 빠진다")
+            .extracting(ProactiveCheck::id)
+            .containsExactly(second.id(), first.id())
+            .doesNotContain(old.id(), boundary.id(), silent.id(), elsewhere.id());
     }
 
 
@@ -271,20 +261,16 @@ class ProactiveCheckRepositoryTest {
     }
 
 
-    private ProactiveCheckFinding saveFinding(
-        ProactiveCheck check, long conversationId, FindingKind kind, String topicKey, Instant createdAt) {
-        contextClock.set(createdAt);
-        ProactiveCheckFinding finding = ProactiveCheckFinding.of(
-            check.id(),
-            conversationId,
-            kind,
-            kind == FindingKind.REFERENCE ? FindingReason.REPEATED : null,
-            "trend",
-            topicKey,
-            "제목 " + topicKey,
-            "https://example.com/" + topicKey,
-            createdAt);
-        return transactions.execute(status -> findings.save(finding));
+    /** 그 시각에 시작해 보고를 남긴 살펴보기 줄이다. */
+    private ProactiveCheck reportedCheck(long conversationId, Instant startedAt) {
+        ProactiveCheck check = ProactiveCheck.started(USER, AGENT, conversationId, CheckTrigger.MANUAL, false, startedAt);
+        check.succeed(
+            CheckOutcome.FINDINGS,
+            new CheckReport(List.of("변화"), List.of(), List.of(), List.of(), List.of()),
+            0,
+            0,
+            startedAt.plusSeconds(10));
+        return transactions.execute(status -> checks.save(check));
     }
 
 

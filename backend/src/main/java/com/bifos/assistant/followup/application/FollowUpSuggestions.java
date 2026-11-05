@@ -5,6 +5,7 @@ import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.followup.application.dto.LegacySuggestion;
+import com.bifos.assistant.followup.application.dto.RecentSuggestion;
 import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.followup.application.dto.SuggestionOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -27,7 +28,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -63,6 +66,22 @@ public class FollowUpSuggestions {
     private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
+
+
+    /**
+     * 그 사용자의 그 대화에서 {@code since} 뒤에 에이전트가 낸 줄을 최근 것부터 {@code limit} 개까지 낸다. 결과 블록의 제안과 실행이
+     * 제안한 할 일이다. 거절한 줄은 넣고 받아들이지 않은 채 만료한 줄은 뺀다. 먼저 살펴보기가 다음 입력에 싣는다.
+     */
+    @Transactional(readOnly = true)
+    public List<RecentSuggestion> recent(
+        Long userId, Long conversationId, Instant since, Instant now, int limit) {
+        return followUps
+            .findRecentSuggestions(
+                userId, conversationId, since, now, FollowUpStatus.PROPOSED, PageRequest.ofSize(limit))
+            .stream()
+            .map(row -> new RecentSuggestion(row.publicId(), row.title(), row.status()))
+            .toList();
+    }
 
 
     /**

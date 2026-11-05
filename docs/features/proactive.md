@@ -31,7 +31,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 | --- | --- |
 | 기억에서 꺼내기 | 구현했다. 모든 살펴보기의 입력에 싣는다 |
 | 읽기만 하며 살펴보기 | 지금의 읽기 경계를 쓴다. 쓰기 허용을 켠 에이전트도 쓰기는 승인 카드로만 간다 |
-| 제안 저장 | 구현했다. 기능 스위치 `assistant.proactive-suggestion.enabled`(기본 켜짐)가 켜져 있으면 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 깨우기 지시(`ProactiveCheckInstructions.COMMON_RULES`)가 이 배열을 알린다. 아래 「제안 저장」 이다 |
+| 제안 저장 | 구현했다. 결과 블록의 `suggestions` 를 `follow_up` 의 `PROPOSED` 줄로 저장한다. 깨우기 지시(`ProactiveCheckInstructions.COMMON_RULES`)가 이 배열을 알린다. 아래 「제안 저장」 이다 |
 | 제안 카드 | 구현했다. 「내 차례」 의 「먼저 다룰 문제」 자리를 제안 카드가 대신한다. `SuggestionCandidates` 가 만료되지 않은 `PROPOSED` 줄을 낸다([attention.md](attention.md) 의 「후보와 trigger」) |
 | 반응을 신호로 | 아직 만들지 않았다. 지금은 판단 피드백 사건이다. 지금 화면의 노출, 열기, 숨김, 미루기, 복원은 이 반응 기록에 남는다([attention.md](attention.md) 의 「저장」). 반응을 기억 정비의 신호로 읽는 일은 아직 없다 |
 
@@ -47,7 +47,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 기억에서 꺼내는 것
 
-`WakeMemoryRead` 가 입력의 「기억에서 꺼낸 최근 일」 절을 만든다. 변화 신호 뒤, 최근에 알린 발견 앞에 둔다.
+`WakeMemoryRead` 가 입력의 「기억에서 꺼낸 최근 일」 절을 만든다. 변화 신호 뒤, 최근 제안 앞에 둔다.
 
 - 후보는 그 에이전트가 받는 항목뿐이다. `MemoryService.alwaysInjectedFor` 와 `indexedFor` 가 낸 목록이라 요청자의 읽기 권한, collection, 승인, 대체되지 않음을 이미 지났다
 - 바뀐 항목은 받아들인 시각과 고친 시각 가운데 늦은 쪽이 마지막으로 성공한 살펴보기의 시작 시각 뒤인 항목이다. 앞 살펴보기가 도는 동안 바뀐 항목도 다음에 실린다. 실패하거나 멈춘 살펴보기는 경계를 옮기지 않는다. 성공한 살펴보기가 없으면 7일 앞부터 본다. 늦게 바뀐 것부터 싣는다
@@ -60,7 +60,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 제안 저장
 
-스위치가 켜져 있으면(기본), 살펴보기가 답을 저장한 뒤 발견과 같은 자리에서 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 끄거나 알리지 않는 자동 실행이면 제안을 저장하지 않는다.
+살펴보기가 답을 저장한 뒤 결과 블록의 `suggestions`(최대 5개, `id`, `title`, `detail`)를 `FollowUpService.proposeSuggestion` 으로 넘긴다. 항목마다 따로 저장해 한 항목의 실패가 나머지를 막지 않는다.
 칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultParser` 가 갖는다. 지시는 제안을 받아들여도 쓰기 승인이 아니고 외부 쓰기는 승인 카드로만 간다고 함께 알린다.
 
 - 사용자와 대화는 넘긴 실행의 실행 줄에서 정한다. 요청 본문이 사용자를 정하지 못한다
@@ -73,7 +73,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 옛 발견과 문제 후보 옮기기
 
-옮기는 순서 4 다. 기동할 때 `LegacySuggestionBackfill` 이 한 번 돌아 옛 줄을 제안 줄로 옮긴다. 옛 테이블은 지우지 않고, 지우는 일은 따로 한다.
+옮기는 순서 4 다. 기동할 때 `LegacySuggestionBackfill` 이 한 번 돌아 옛 줄을 제안 줄로 옮긴다. 살펴보기는 더 이상 옛 테이블에 쓰지 않는다. 테이블을 지우기 직전 기동에서 이 이관을 마지막으로 돌리고, 테이블을 지우는 PR 이 이 코드도 지운다([설계](proactive/design.md)).
 
 - 옮기는 것은 사용자에게 보였던 「새로 알릴 것」 발견과 받아들인 문제 후보뿐이다. 「참고」 발견과 버린 후보는 제안으로 보인 적이 없어 옮기지 않는다
 - 제안 줄의 사용자, 대화, 실행은 옛 줄(살펴보기의 `user_id`, 옛 줄의 `conversation_id`, 살펴보기의 `root_execution_id`)과 같다. 제목은 발견이면 발견 제목, 문제 후보이면 행동 글(없으면 문제 글)이다
@@ -84,7 +84,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 - 대화를 지우면 「제안 저장」 과 같이 옮긴 줄과 본문을 지운다. 지웠거나 정리한 대화의 옛 줄은 다음 기동에서도 옮기지 않는다. 정리 작업은 옛 발견과 문제 후보를 남기므로, 건너뛰지 않으면 지운 대화의 제안이 되살아난다
 
 반응은 옮긴 줄이 있는 발견만 그 줄로 옮긴다. 그 발견의 사건(`check_finding:<번호>`)을 `follow_up:<공개 식별자>` 로 바꾼다. 같은 제목의 열린 할 일이 있어 줄을 만들지 않은 발견은 어느 줄에 해당하는지 정할 수 없으므로 추정해 붙이지 않고 옛 열쇠에 둔다.
-옛 번호로 들어오는 반응 요청(`PUT /api/v1/check-findings/{id}/reaction`)과 발견 목록의 응답 모양은 그대로이고, 옮긴 줄이 있으면 새 반응도 그 줄의 열쇠로 남고 두 열쇠의 사건을 함께 읽는다.
+옛 발견에 반응하던 경로와 발견 목록은 지웠다(404). 옛 열쇠에 남은 사건 줄과 `CHECK_FINDING` 이름은 그대로 둔다.
 문제 후보의 반응은 옮기지 않는다. 그 반응은 판정(`autonomy_decision`)에 묶여 있고 한 후보에 판정이 여럿일 수 있어서 옛 줄로 남긴다. 판정을 만들고 읽는 코드는 지웠다.
 
 ### 먼저 살펴보기 절
@@ -128,8 +128,7 @@ sequenceDiagram
     H-->>C: 답 끝의 fos-check-result 블록
     C->>C: 블록 검사, 답이나 알림 줄 저장
     C-->>W: 대화 SSE done
-    C->>C: 발견과 문제 후보 저장, 끝 정리, 잠금 풀기
-    W->>C: 발견 목록을 다시 읽는다
+    C->>C: 제안 저장, 보고와 결과를 살펴보기 줄에 적기, 끝 정리, 잠금 풀기
 ```
 
 갈리는 지점은 아래 「진입점」, 「대화에 남는 것」, 「끝날 때」 가 갖는다.
@@ -139,11 +138,11 @@ sequenceDiagram
 결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 한 번의 실행이 `proactive_check` 이고, 그 결과가 남는 점검 대화는 `conversation.purpose = CHECK` 다.
 분야 지침은 그 에이전트의 스킬 `proactive-check` 이고 분야 패키지가 소유한다.
-발견은 `proactive_check_finding`, 문제 후보는 `proactive_check_problem` 이다. 살펴보기 트리는 루트가 살펴보기 turn 인 실행 트리다.
+발견과 문제 후보는 따로 저장하지 않는다. 다음 살펴보기가 쓸 것은 보고(`report_json`)에 담는다. 살펴보기 트리는 루트가 살펴보기 turn 인 실행 트리다.
 
 ### 진입점
 
-경로는 `ProactiveCheckController`, `ProactiveScheduleController`, `ProactiveCheckReportController`, `CheckFindingController` 가 갖는다.
+경로는 `ProactiveCheckController`, `ProactiveScheduleController`, `ProactiveCheckReportController` 가 갖는다.
 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 일정 조회와 끄기는 읽기 권한만 본다. 다른 사용자의 보고를 열면 404 다.
 시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`)다. 옛 자동 실행의 `AUTONOMY` 는 저장된 옛 줄을 읽으려고 값만 남았고 새로 시작하는 경로는 없다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 이 계기의 줄을 건너뛴다.
 점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다.
@@ -170,7 +169,7 @@ sequenceDiagram
 이 설정은 전역이다. [ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)의 실행 공간을 셸 계열 도구가 켜진 profile 모두에 운영에서 확인한 뒤에만 켜고, 일부만 격리했으면 기본값 `false` 를 유지한다. 절차는 `fos-home-infra` 가 갖는다.
 
 예약 실행에서 검사를 통과한 새 발견, 질문, 출처 장애가 모두 없으면 모델이 `FINDINGS` 로 답했어도 무소식으로 다룬다.
-대화 답과 무소식 알림 줄, 보고를 남기지 않고 참고로 내린 발견만 셈을 위해 저장한다. 그래서 이미 알린 발견의 되풀이가 다음 날 깨우기를 `UNREAD_REPORT` 로 막지 않는다.
+대화 답과 무소식 알림 줄, 보고를 남기지 않는다. 그래서 이미 알린 발견의 되풀이가 다음 날 깨우기를 `UNREAD_REPORT` 로 막지 않는다. 같은 블록의 제안은 저장한다.
 다섯 칸 보고의 칸과 상한은 ADR-085 와 `CheckResultParser` 가 갖는다. `report_opened_at` 은 요청자가 자신의 보고를 열 때 채운다. 점검 대화의 메시지 목록을 읽거나 질문을 보낼 때도 그 대화에서 열지 않은 자신의 보고를 모두 채운다(`ChatService` 의 `CheckReportReads` port).
 대기 줄에서 꺼내 보낸 질문은 기록하지 않는다. 앞 turn 이 끝난 뒤에 저장되므로 그 사이 만든 보고를 사용자가 보지 않았을 수 있다.
 
@@ -205,9 +204,14 @@ sequenceDiagram
 
 ### Control Plane 지시
 
-실행 입력에는 Memory 문맥, 점검 대화의 session, 변화 신호, 기억에서 꺼낸 최근 일, 최근에 알린 발견과 그 반응, 최근에 받아들인 문제 후보를 싣는다. `ProactiveCheckRun` 이 조립한다.
-모델이 쓴 글에서 온 발견과 문제 후보는 `<external-data>` 로 감싼다. 다른 대화의 내용은 싣지 않는다.
-까닭은 ADR-080, [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md), [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md) 이 갖는다.
+실행 입력에는 Memory 문맥, 점검 대화의 session, 변화 신호, 기억에서 꺼낸 최근 일, 최근 제안, 최근 보고에서 알린 것을 싣는다. `ProactiveCheckInput` 이 조립한다.
+
+- 최근 제안은 그 점검 대화에서 에이전트가 낸 할 일 줄(결과 블록의 제안과 `follow_up_propose` 로 낸 줄)의 제목, 상태, 마지막 사용자 반응이다. 거절한 줄은 싣고 받아들이지 않은 채 만료한 줄은 싣지 않는다
+- 최근 보고에서 알린 것은 그 대화의 최근 보고가 알린 발견(주제 키, 제목, 원문, 알린 날, 그 뒤 사용자 메시지 수)과 받아들인 문제 키다
+- 두 절은 `digest-window` 안의 것을 각각 `digest-max-items` 줄까지 최근 것부터 싣는다. 상태와 반응의 낱말은 `ProactiveCheckInput` 이 갖는다
+
+모델이 쓴 글(제목, 주제 키, 문제 키)은 `<external-data>` 로 감싼다. 다른 대화의 내용은 싣지 않는다.
+까닭은 ADR-080, [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md), [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md) 의 「발견과 문제 후보 테이블을 지운다」 가 갖는다.
 그 위에 모든 살펴보기에 같은 지시가 붙는다. 글은 `ProactiveCheckInstructions` 가 갖는다.
 경계 줄은 쓰기 허용이 고른다. 모든 살펴보기는 필요한 도구를 직접 부르고 다른 에이전트에 맡기지 말라는 같은 지시를 받는다.
 
@@ -251,8 +255,8 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 잠금을 풀면 닫기 리스너가 곧바로 다음 turn 을 정하므로, 그 전에 전달을 적어야 점검 대화에 자동 turn 이 열리지 않는다.
 실패하면 끝내지 못했다는 알림 줄과 SSE `error` 를, 멈춘 뒤 예외로 끝나면 멈췄다는 알림 줄과 `stopped` 를 보낸다. 알림 줄은 한 살펴보기에 하나다.
 
-**발견은 대화에 답을 남긴 뒤 저장한다.** 답 저장이 실패하면 발견도 남기지 않는다. 사용자가 보지 못한 발견이 다음 살펴보기에서 「이미 알린 것」 으로 내려가지 않게 하기 위해서다.
-발견과 문제 후보는 한 트랜잭션에 남긴다. 한쪽만 남으면 다음 살펴보기의 중복 판정이 어긋난다.
+**보고는 대화에 답을 남긴 살펴보기에만 적는다.** 답 저장이 실패하면 보고도 남기지 않는다. 보고가 알린 발견을 다음 살펴보기가 「이미 알린 것」 으로 읽으므로, 사용자가 보지 못한 발견이 내려가지 않게 하기 위해서다.
+알린 발견과 받아들인 문제 키는 보고와 함께 살펴보기 줄 하나의 저장에 들어가 어긋나지 않는다. 제안은 답을 저장한 뒤 항목마다 따로 저장한다.
 
 **전달 표시는 실행 줄의 저장이 덮어쓰지 않는다.** `agent_execution.result_delivered_at` 은 조건부 update 로만 채우고 엔티티 저장에서 빠진다. 위임 자식이 끝날 때 처음부터 들고 있던 엔티티를 저장해도 표시가 남게 하기 위해서다.
 
@@ -279,30 +283,18 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 
 #### 검사
 
-순서와 조건, 시계 차이 허용 폭은 `FindingJudgement` 가, 결정은 ADR-081 의 조건 표와 ADR-20261008 / check-finding-reaction 이 갖는다.
+순서와 조건, 시계 차이 허용 폭은 `FindingJudgement` 가, 결정은 ADR-081 의 조건 표가 갖는다. 「이미 알린 것」 은 같은 점검 대화에서 `digest-window` 안에 시작해 보고를 남긴 살펴보기의 `announced` 와 주제 키·원문 주소가 같고 달라진 점이 없는 발견이다.
 
 ### 발견 반응
 
-점검 대화는 답의 실행 번호가 같은 발견을 그 답 아래에 「받아들임」, 「나중에」, 「관심 없음」 단추와 함께 둔다. 반응은 그 발견의 마지막 단추다.
-결정과 400 분기는 [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md)이, 경로는 `CheckFindingController` 가 갖는다.
-
-| 때 | 하는 일 |
-| --- | --- |
-| 발견 목록을 읽지 못했다 | 앞 목록을 그대로 두고 대화를 막지 않는다 |
-| 다시 읽은 목록에 마지막 답의 발견이 없다 | backend 가 SSE `done` 뒤에 발견을 저장하므로 `use-check-findings.ts` 의 간격으로 몇 번 더 읽는다. 「새로 알릴 것」 이 없는 답이면 그 횟수를 다 읽고 멈춘다 |
-| 남의 발견이거나 참고로 내린 발견에 반응한다 | 404 `PROACTIVE_CHECK_NOT_FOUND` |
-| 지금 반응과 같은 단추를 누른다 | 204. 사건을 더 남기지 않는다 |
-| 다른 단추를 누른다 | `decision_feedback_event` 에 사건을 덧붙이고 204. 화면이 목록을 다시 읽는다 |
-| 반응을 남기지 못했다 | 그 줄 아래에 잠시 뒤 다시 누르라는 안내를 보인다 |
-| 다음 살펴보기가 돈다 | 최근에 알린 발견과 그 반응을 입력에 싣는다. 「관심 없음」 주제 키는 `digest-window` 동안 `REPEATED` 로 내린다 |
-
-점검 대화를 지우면 그 대화의 사건이 함께 지워져 반응도 사라진다.
+점검 대화의 답 아래에 발견마다 두던 「받아들임」, 「나중에」, 「관심 없음」 단추와 그 API 는 지웠다. 같은 반응을 두 곳에서 받지 않으려는 것이다.
+반응은 지금 화면의 제안 카드와 할 일 목록에서만 받고, 다음 살펴보기는 입력의 최근 제안(거절 포함)과 마지막 반응을 보고 판단한다. 「관심 없음」 주제를 기간 동안 자동으로 내리던 판정도 없어, 같은 주제가 가끔 다시 알려질 수 있다.
 
 ### 문제 후보
 
 결정은 [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 에 있다. 칸과 상한은 「결과 계약」 과 같이 `ProactiveCheckInstructions.COMMON_RULES` 와 `CheckResultBlock` 이 갖는다.
 `problemKey` 는 앞뒤 공백을 지우고 소문자로 맞춰 비교한다. 검사 순서와 버린 까닭은 ADR-093 의 까닭 표와 `ProblemJudgement` 가 갖는다.
-살펴보기는 문제 후보를 저장하기만 하고 가치 평가나 행동 정책을 잇지 않는다.
+살펴보기는 문제 후보를 따로 저장하지 않는다. 받아들인 후보의 문제 키만 보고에 담아 다음 살펴보기의 `DUPLICATE` 판정과 입력에 쓴다. 가치 평가나 행동 정책을 잇지 않는다.
 
 ### 분야 지침이 지킬 것
 
@@ -332,8 +324,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 사용자에게 보인 제안에 사용자가 어떻게 반응했고 실행이 어떻게 끝났는지를 남긴다.
 결정은 [ADR-20261007 / decision-feedback](../../backend/docs/adr/ADR-20261007-decision-feedback.md)에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 이 기록은 개인화 모델이 아니다. Memory, 할 일의 억제 규칙, 지금 화면의 판정을 바꾸지 않는다.
-예외는 하나다. 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다.
-사건은 `source_check_id` 로, 또는 `origin_execution_id` 가 살펴보기의 `root_execution_id` 와 같은지로 상황에 이어진다.
+사건은 `origin_execution_id` 가 살펴보기의 `root_execution_id` 와 같은지로 상황에 이어진다. 살펴보기 번호를 직접 담던 `source_check_id` 는 읽는 곳이 없어 쓰지 않는다.
 
 ### 사건
 

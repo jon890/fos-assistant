@@ -71,7 +71,7 @@ class ProblemJudgementTest {
             finding("position", CLOSED_TOPIC, "https://jobs.example.com/closed", CHECKED_AT, "CLOSED"),
             finding("trend", UNSOURCED_TOPIC, "", CHECKED_AT, "CURRENT"))
             .stream()
-            .map(each -> FindingJudgement.judge(each, START, NOW, announced, Set.of()))
+            .map(each -> FindingJudgement.judge(each, START, NOW, announced))
             .toList();
     }
 

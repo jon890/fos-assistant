@@ -8,7 +8,7 @@
   - [ADR-20261007 / value-evaluation](archive/ADR-20261007-value-evaluation.md) 의 가치 평가 전체
   - [ADR-20261007 / autonomy-policy](../../backend/docs/adr/archive/ADR-20261007-autonomy-policy.md) 의 네 수준과 자동 실행 동의 전체
   - [ADR-20261008 / daily-loop](archive/ADR-20261008-daily-loop.md) 의 「살펴보기 뒤 평가와 정책을 한 번 잇는다」 전체
-  - [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 의 문제 후보 필드와 결정적 검사, [ADR-20261008 / check-finding-reaction](ADR-20261008-check-finding-reaction.md) 의 발견 단추는 제안과 반응으로 옮긴다
+  - [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md) 의 문제 후보 필드와 결정적 검사, [ADR-20261008 / check-finding-reaction](archive/ADR-20261008-check-finding-reaction.md) 의 발견 단추는 제안과 반응으로 옮긴다
   - [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) 의 지금 화면 숨김·미루기 현재값 테이블(`attention_control`)과 사건 테이블(`attention_event`)은 반응 기록으로 합친다. 기본값이 알리지 않음이라는 결정은 그대로다
 
 ### 결정
@@ -69,7 +69,7 @@
 | `until_at` nullable | 미루기가 끝나는 시각 |
 | `event_key` nullable, `(user_id, event_key)` UNIQUE | 서버가 검증한 요청 키나 노출 키로 재전송을 하나로 합친다 |
 
-`autonomy_decision_id` 컬럼은 순서 7 에서 지웠다. `source_check_id` 는 `proactive_check` 를 남겨 함께 남기고, 그 테이블을 줄이는 별도 스펙에서 정한다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
+`autonomy_decision_id` 컬럼은 순서 7 에서 지웠다. `source_check_id` 는 읽는 곳이 없어 아래 「발견과 문제 후보 테이블을 지운다」 에서 쓰기를 끊었고 그 PR2 가 칸을 지운다. 반응 기록에 판단 분류 컬럼이나 본문을 넣지 않는다.
 지표는 모델·프롬프트 버전별 수락률, 무반응 비율, 정정률이다. 분모는 그 버전으로 만든 제안의 처음 노출 수이고, 무응답은 사건으로 남기지 않고 관측 기간 뒤 계산한다.
 
 #### 숨김과 미루기를 반응 기록으로 옮기는 조건
@@ -98,6 +98,18 @@ PR 하나가 한 걸음이다. 테이블에 데이터가 있다는 까닭만으�
 
 지운 테이블은 `proactive_autonomy_decision`, `proactive_loop_run`, `proactive_loop_setting`, `proactive_value_evaluation`, `user_autonomy_preference`, `attention_control`, `attention_event` 일곱 개다. 반응 기록의 `autonomy_decision_id` 컬럼도 함께 지웠다. `subject_type` 이 `AUTONOMY_DECISION` 인 옛 사건 줄이 남을 수 있어 그 enum 이름은 지우지 않았다.
 **`proactive_check`, `proactive_check_finding`, `proactive_check_problem` 은 지우지 않았다.** 순서 7 을 구현하며 코드로 확인하니 `proactive_check` 가 살펴보기 한 번의 상태 원장이었다. 결과(`outcome`, `invalid_reason`, `skipped_reason`), 쓰기 허용의 옮겨 적은 값(`writes_allowed`), 보고(`report_json`), 읽지 않은 보고 표시(`report_opened_at`)는 `agent_execution` 과 `task_run` 에 없고, 시작·상태·복구·읽기 경계·보고 카드가 이 줄을 읽고 쓴다. 이 세 테이블을 지우려면 그 칸들을 `agent_execution` 이나 `task_run`, 대화 메시지로 옮기는 설계가 먼저 필요하고, 별도 스펙으로 정한다.
+
+#### 발견과 문제 후보 테이블을 지운다
+
+2026-11-05 에 [스펙](../features/proactive/spec.md)으로 정했다. 설계는 [`docs/features/proactive/design.md`](../features/proactive/design.md) 가 갖는다.
+
+- `proactive_check` 는 남긴다. 쓰기 허용 경계, 복구, 보고 카드가 매번 읽는 상태 원장이라 옮기면 보안 경계를 다시 짜야 한다
+- `proactive_check_finding`, `proactive_check_problem` 은 지운다. 그 쓰임은 다음 입력, 되풀이 판정, 점검 대화의 발견 반응 단추였다. 제안과 반응은 제안 줄 한 곳에서만 받는다
+- 다음 살펴보기 입력은 그 점검 대화의 최근 제안 줄(거절한 줄 포함, 만료한 줄 제외)과 마지막 반응, 최근 보고가 알린 발견과 받아들인 문제 키를 싣는다
+- 되풀이 판정은 저장된 보고(`report_json`)에 담은 알린 발견의 주제 키·원문 주소와 받아들인 문제 키로 한다. 예약 살펴보기가 되풀이만 내면 보고 없이 조용히 끝나는 동작은 그대로다
+- 발견 반응 단추와 그 API, 「관심 없음」 주제를 digest 기간 동안 내리던 판정을 없앤다([ADR-20261008 / check-finding-reaction](archive/ADR-20261008-check-finding-reaction.md) 을 대체한다). 같은 주제가 가끔 다시 알려질 수 있음을 받아들인다. 다음 살펴보기는 거절한 제안을 입력으로 보고 판단한다
+- 반응 기록의 옛 `CHECK_FINDING` 사건 줄과 그 이름은 남긴다. 이름을 지우면 옛 줄을 읽다 실패한다
+- 두 단계로 한다. PR1 은 읽기와 쓰기를 끊는다. 기동 이관(`LegacySuggestionBackfill`)과 읽기 전용 엔티티는 남겨 PR2 직전 기동에서 마지막으로 돌린다. PR2 는 PR1 배포와 그 이관 로그의 실패 0건을 확인한 뒤 두 테이블과 `decision_feedback_event.source_check_id`, `proactive_check` 의 읽지 않는 칸을 지우고 `AUTONOMY` 계기의 줄과 값을 지운다
 
 **그룹 본체 테이블은 테이블 수를 줄이려는 목적만으로 새로 만들지 않는다.** 그룹의 수명이나 설정 관리 요구가 생길 때 따로 정한다.
 

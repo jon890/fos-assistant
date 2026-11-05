@@ -14,8 +14,6 @@ import type { OutgoingMessage } from "./composer-attachment-utils";
 import { MemoryCaptureList } from "./memory-capture-list";
 import type { MemoryCapture } from "@/lib/memory-capture-api";
 import type { MemoryUse } from "@/lib/memory-use-api";
-import { CheckFindingReactions } from "./check-finding-reactions";
-import type { CheckFinding } from "@/lib/check-finding-api";
 import {
   foldVersions,
   isLatestView,
@@ -56,12 +54,6 @@ type Props = {
   onMemoryCapturesChanged?(removedId?: number): void;
   /** 이 대화의 답마다 그 실행이 본문을 받은 기억이다. 각 답 아래에 그 답의 실행 것만 접어 보인다 */
   memoryUses?: MemoryUse[];
-  /** 점검 대화의 발견과 지금 반응이다. 각 답 아래에 그 답의 실행 것만 보인다 */
-  checkFindings?: CheckFinding[];
-  /** 「관심 없음」 을 고른 주제를 다시 알리지 않는 날 수다 */
-  dismissWindowDays?: number;
-  /** 발견에 반응을 남겼다. 목록을 다시 읽는다 */
-  onCheckFindingsChanged?(): void;
 };
 export function MessageList({
   turns,
@@ -88,9 +80,6 @@ export function MessageList({
   memoryCaptures = [],
   onMemoryCapturesChanged,
   memoryUses = [],
-  checkFindings = [],
-  dismissWindowDays = 0,
-  onCheckFindingsChanged,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -172,10 +161,7 @@ export function MessageList({
   const usesVersion = memoryUses
     .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
-  const findingsVersion = checkFindings
-    .map((finding) => `${finding.id}:${finding.reaction}`)
-    .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${findingsVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
@@ -298,18 +284,6 @@ export function MessageList({
                             : undefined
                         }
                       />
-                      {turn.role === "ASSISTANT" &&
-                      typeof turn.executionId === "number" &&
-                      onCheckFindingsChanged ? (
-                        <CheckFindingReactions
-                          findings={checkFindings.filter(
-                            (finding) =>
-                              finding.executionId === turn.executionId,
-                          )}
-                          dismissWindowDays={dismissWindowDays}
-                          onChanged={onCheckFindingsChanged}
-                        />
-                      ) : null}
                       {turn.role === "ASSISTANT" &&
                       typeof turn.executionId === "number" &&
                       onMemoryCapturesChanged ? (

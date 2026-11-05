@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.purge.application.ConversationPurger;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
@@ -22,12 +23,8 @@ import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.followup.infra.FollowUpSuggestionBodies;
-import com.bifos.assistant.proactive.check.application.CheckFeedback;
-import com.bifos.assistant.proactive.check.application.CheckFindingReactions;
 import com.bifos.assistant.proactive.check.application.LegacySuggestionBackfill;
 import com.bifos.assistant.proactive.check.application.dto.BackfillReport;
-import com.bifos.assistant.proactive.check.application.dto.CheckFindingView;
-import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
@@ -75,12 +72,6 @@ class LegacySuggestionBackfillTest {
 
     @Autowired
     LegacySuggestionBackfill backfill;
-
-    @Autowired
-    CheckFindingReactions reactions;
-
-    @Autowired
-    CheckFeedback checkFeedback;
 
     @Autowired
     FollowUpService followUps;
@@ -226,8 +217,9 @@ class LegacySuggestionBackfillTest {
     void repointsReactionEventsAndKeepsOldIdAndResponseShape() {
         ProactiveCheckFinding shown = finding(FindingKind.NEW, "career:deadline", "합성 공고 마감");
         ProactiveCheckFinding untouched = finding(FindingKind.NEW, null, "합성 행사 신청");
-        checkFeedback.ended(check);
-        reactions.react(owner, shown.id(), FindingReaction.DISMISSED);
+        oldEvent(shown, FeedbackEventType.SURFACED, FeedbackActor.SYSTEM);
+        oldEvent(untouched, FeedbackEventType.SURFACED, FeedbackActor.SYSTEM);
+        oldEvent(shown, FeedbackEventType.DISMISSED, FeedbackActor.USER);
         assertThat(eventsUnder(FeedbackSubjectType.CHECK_FINDING.key(shown.id()))).hasSize(2);
 
         BackfillReport report = backfill.backfill();
@@ -243,35 +235,7 @@ class LegacySuggestionBackfillTest {
             assertThat(event.subjectType()).isEqualTo(FeedbackSubjectType.FOLLOW_UP);
             assertThat(event.conversationId()).isEqualTo(conversation.id());
             assertThat(event.originExecutionId()).isEqualTo(root.id());
-            assertThat(event.sourceCheckId()).isEqualTo(check.id());
         });
-        assertThat(reactions.current(owner.id(), List.of(shown.id(), untouched.id())))
-            .containsOnlyKeys(shown.id())
-            .containsEntry(shown.id(), FindingReaction.DISMISSED);
-        List<CheckFindingView> listed = reactions.list(owner, conversation.publicId());
-        assertThat(listed).extracting(CheckFindingView::id).containsExactly(shown.id(), untouched.id());
-        assertThat(listed.getFirst().reaction()).isEqualTo(FindingReaction.DISMISSED);
-        assertThat(listed.get(1).reaction()).isNull();
-    }
-
-
-    @Test
-    @DisplayName("옛 번호로 들어온 새 반응은 옮긴 줄의 열쇠로 남고 지금 반응이 바뀐다")
-    void reactionByOldIdAfterMigrationLandsOnMigratedRow() {
-        ProactiveCheckFinding shown = finding(FindingKind.NEW, "career:deadline", "합성 공고 마감");
-        backfill.backfill();
-        FollowUp moved = byKey("legacy:proactive_check_finding:" + shown.id());
-
-        reactions.react(owner, shown.id(), FindingReaction.ACCEPTED);
-        reactions.react(owner, shown.id(), FindingReaction.ACCEPTED);
-        reactions.react(owner, shown.id(), FindingReaction.POSTPONED);
-
-        assertThat(eventsUnder(FeedbackSubjectType.CHECK_FINDING.key(shown.id()))).isEmpty();
-        assertThat(eventsUnder(FeedbackSubjectType.FOLLOW_UP.key(moved.publicId())))
-            .extracting(FeedbackEvent::eventType)
-            .containsExactly(FeedbackEventType.ACCEPTED, FeedbackEventType.POSTPONED);
-        assertThat(reactions.current(owner.id(), List.of(shown.id())))
-            .containsEntry(shown.id(), FindingReaction.POSTPONED);
     }
 
 
@@ -280,7 +244,7 @@ class LegacySuggestionBackfillTest {
     void sameTitleOpenFollowUpIsNotDuplicatedOrTouchedAndReactionStaysLegacy() {
         FollowUpSnapshot mine = followUps.create(owner, new NewFollowUp("합성 공고 마감", null, false, null));
         ProactiveCheckFinding shown = finding(FindingKind.NEW, "career:deadline", "합성 공고 마감");
-        reactions.react(owner, shown.id(), FindingReaction.DISMISSED);
+        oldEvent(shown, FeedbackEventType.DISMISSED, FeedbackActor.USER);
 
         BackfillReport report = backfill.backfill();
 
@@ -294,8 +258,6 @@ class LegacySuggestionBackfillTest {
         });
         assertThat(eventsUnder(FeedbackSubjectType.CHECK_FINDING.key(shown.id()))).hasSize(1);
         assertThat(eventsUnder(FeedbackSubjectType.FOLLOW_UP.key(mine.publicId()))).isEmpty();
-        assertThat(reactions.current(owner.id(), List.of(shown.id())))
-            .containsEntry(shown.id(), FindingReaction.DISMISSED);
     }
 
 
@@ -364,7 +326,7 @@ class LegacySuggestionBackfillTest {
         ProactiveCheckFinding second = finding(FindingKind.NEW, "career:two", "합성 둘째");
         ProactiveCheckFinding third = finding(FindingKind.NEW, "career:three", "합성 셋째");
         for (ProactiveCheckFinding each : List.of(first, second, third)) {
-            reactions.react(owner, each.id(), FindingReaction.DISMISSED);
+            oldEvent(each, FeedbackEventType.DISMISSED, FeedbackActor.USER);
         }
         backfill.backfill();
         FollowUp keptRow = byKey("legacy:proactive_check_finding:" + first.id());
@@ -390,8 +352,10 @@ class LegacySuggestionBackfillTest {
         assertThat(byKey("legacy:proactive_check_finding:" + third.id()).id()).isEqualTo(thirdRow.id());
         for (ProactiveCheckFinding each : List.of(first, second, third)) {
             assertThat(eventsUnder(FeedbackSubjectType.CHECK_FINDING.key(each.id()))).as("finding=%s", each.id()).isEmpty();
-            assertThat(reactions.current(owner.id(), List.of(each.id())))
-                .containsEntry(each.id(), FindingReaction.DISMISSED);
+            assertThat(eventsUnder(FeedbackSubjectType.FOLLOW_UP.key(
+                byKey("legacy:proactive_check_finding:" + each.id()).publicId())))
+                    .extracting(FeedbackEvent::eventType)
+                    .containsExactly(FeedbackEventType.DISMISSED);
         }
     }
 
@@ -424,7 +388,7 @@ class LegacySuggestionBackfillTest {
         ProactiveCheckFinding shown = finding(FindingKind.NEW, "career:deadline", "합성 공고 마감");
         ProactiveCheckFinding accepted = finding(FindingKind.NEW, "career:event", "합성 행사 신청");
         problem(ProblemStatus.ACCEPTED, "career:apply", "합성 지원 문제", "합성 지원서를 보낸다");
-        reactions.react(owner, shown.id(), FindingReaction.DISMISSED);
+        oldEvent(shown, FeedbackEventType.DISMISSED, FeedbackActor.USER);
         backfill.backfill();
         FollowUp toAccept = byKey("legacy:proactive_check_finding:" + accepted.id());
         followUps.accept(owner, toAccept.publicId());
@@ -477,12 +441,7 @@ class LegacySuggestionBackfillTest {
         started.attachRoot(root.id(), "session-fixture");
         started.succeed(
             CheckOutcome.FINDINGS,
-            2,
-            1,
             new CheckReport(List.of("합성 변화"), List.of(), List.of(), List.of(), List.of("합성 다음")),
-            0,
-            0,
-            0,
             0,
             0,
             NOW.minusSeconds(60));
@@ -546,6 +505,24 @@ class LegacySuggestionBackfillTest {
 
     private String detailOf(FollowUp row) {
         return bodies.open(owner.id(), row.dedupeKey(), row.detailJson(), row.detailKeyId()).orElseThrow();
+    }
+
+
+    /** 지운 반응 API 와 발견별 노출 기록이 옛 발견의 열쇠로 남긴 사건 한 줄을 만든다. */
+    private void oldEvent(ProactiveCheckFinding finding, FeedbackEventType type, FeedbackActor actor) {
+        events.saveAndFlush(FeedbackEvent.of(
+            owner.id(),
+            FeedbackSubjectType.CHECK_FINDING,
+            FeedbackSubjectType.CHECK_FINDING.key(finding.id()),
+            type,
+            actor,
+            conversation.id(),
+            root.id(),
+            null,
+            null,
+            List.of(),
+            clock.instant()));
+        clock.advance(Duration.ofSeconds(1));
     }
 
 

@@ -3,13 +3,10 @@ package com.bifos.assistant.proactive.check.infra;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -18,22 +15,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, Long> {
 
-    Optional<ProactiveCheck> findByIdAndUserId(Long id, Long userId);
-
-
-    /** 그 사용자가 그 에이전트로 연 마지막 살펴보기. */
-    Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
-
-
-    boolean existsByRootExecutionIdAndTrigger(Long rootExecutionId, CheckTrigger trigger);
-
-
     /** 마지막 살펴보기를 보일 때 자동 실행으로 시작한 줄은 뺀다. 그 결과는 사용자에게 바로 알리지 않는다. */
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdAndTriggerNotOrderByIdDesc(
         Long userId, Long agentId, CheckTrigger trigger);
-
-
-    boolean existsByUserIdAndAgentIdAndReportIsNotNullAndReportOpenedAtIsNull(Long userId, Long agentId);
 
 
     boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(Long conversationId);
@@ -78,15 +62,12 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     Optional<ProactiveCheck> findFirstByConversationIdAndStatusOrderByIdDesc(Long conversationId, CheckStatus status);
 
 
-    /** 그 사용자가 그 시각 뒤에 연 살펴보기. 판단 피드백의 replay 읽기 모델이 상황으로 읽는다. */
-    List<ProactiveCheck> findByUserIdAndStartedAtGreaterThanEqualOrderByIdAsc(Long userId, Instant since);
-
-
-    List<ProactiveCheck> findByUserIdAndIdIn(Long userId, Collection<Long> ids);
-
-
-    /** 그 사용자의 그 루트 실행들의 살펴보기. 제안을 낸 실행에서 살펴보기를 찾는다. */
-    List<ProactiveCheck> findByUserIdAndRootExecutionIdIn(Long userId, Collection<Long> rootExecutionIds);
+    /**
+     * 그 점검 대화에서 그 시각 뒤에 시작해 보고를 남긴 살펴보기를 최근 것부터 읽는다. 되풀이 판정과 입력의 「최근 보고에서 알린 발견」 이 보고에
+     * 담긴 판정 재료를 읽는다.
+     */
+    List<ProactiveCheck> findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc(
+        Long conversationId, Instant after);
 
 
     /**
@@ -97,39 +78,6 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ProactiveCheck c where c.agentId = :agentId")
     int deleteAllOfAgent(@Param("agentId") Long agentId);
-
-
-    /**
-     * 그 사용자가 그 에이전트로 연, 평가할 수 있는 살펴보기를 최근 것부터 읽는다. 끝났고 자동 실행이 연 줄이 아니며 받아들인 문제 후보가 있고 점검
-     * 대화를 지우지 않은 줄만 읽는다. 개수는 {@code page} 가 정한다.
-     */
-    default List<ProactiveCheck> findEvaluable(Long userId, Long agentId, Pageable page) {
-        return findEvaluable(
-            userId, agentId, CheckStatus.SUCCEEDED, CheckTrigger.AUTONOMY, ProblemStatus.ACCEPTED, page);
-    }
-
-
-    /**
-     * {@link #findEvaluable(Long, Long, Pageable)} 의 조회다. 직접 부르지 않는다. 3인자 default 메서드가 상태와 계기 값을 정해 부른다. 값을
-     * JPQL 에 전체 이름으로 쓰지 않고 넘기는 까닭은 코드 규칙이 전체 이름을 막기 때문이다.
-     */
-    @Query("""
-            select c from ProactiveCheck c
-             where c.userId = :userId and c.agentId = :agentId
-               and c.status = :status and c.trigger <> :excludedTrigger
-               and exists (select p.id from ProactiveCheckProblem p
-                            where p.checkId = c.id and p.status = :problemStatus)
-               and exists (select v.id from Conversation v
-                            where v.id = c.conversationId and v.userId = :userId and v.deletedAt is null)
-             order by c.id desc
-            """)
-    List<ProactiveCheck> findEvaluable(
-        Long userId,
-        Long agentId,
-        CheckStatus status,
-        CheckTrigger excludedTrigger,
-        ProblemStatus problemStatus,
-        Pageable page);
 
 
     /**

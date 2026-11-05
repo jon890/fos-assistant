@@ -9,29 +9,27 @@ import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.proactive.check.application.dto.AnnouncedKey;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultRead;
-import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
 import com.bifos.assistant.proactive.check.application.dto.JudgedFinding;
 import com.bifos.assistant.proactive.check.application.dto.JudgedProblem;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.domain.type.FindingKind;
 import com.bifos.assistant.proactive.check.domain.type.FindingReason;
-import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
-/** 결과 블록을 판정하고 답을 만든 뒤, 답 저장 후 발견과 문제 후보를 저장한다. */
+/**
+ * 결과 블록을 판정하고 답과 보고를 만든 뒤, 답 저장 후 제안을 할 일 줄로 저장한다. 발견과 문제 후보는 답과 보고를 그리는 데만 쓰고 따로
+ * 저장하지 않는다. 다음 살펴보기의 되풀이 판정 재료는 보고({@link CheckReport})에 함께 담긴다.
+ */
 @Slf4j
 class ProactiveCheckResults {
     private final CurrentUser owner;
@@ -42,15 +40,9 @@ class ProactiveCheckResults {
     /** 결과 블록을 읽지 못한 까닭. {@link #outcome} 이 {@code INVALID_RESULT} 일 때만 있다. */
     private volatile CheckInvalidReason invalidReason;
 
-    private volatile int newFindings;
-    private volatile int referenceFindings;
-    /** 검사한 발견. 답 메시지를 저장한 뒤 {@link #saveFindings} 가 저장한다. 블록에 발견이 없으면 비어 있다. */
-    private volatile List<ProactiveCheckFinding> pendingFindings = List.of();
-    /** 검사한 문제 후보. 발견과 함께 {@link #saveFindings} 가 저장한다. 발견이 없으면 비어 있다. */
-    private volatile List<ProactiveCheckProblem> pendingProblems = List.of();
-    /** 결과 블록 v2를 검사해 만든 보고다. */
+    /** 검사해 만든 보고다. 보고를 남기지 않는 살펴보기면 비어 있다. */
     private volatile CheckReport pendingReport;
-    /** 결과 블록의 제안 항목. 스위치가 켜져 있을 때만 {@link #saveFindings} 가 할 일 줄로 저장한다. */
+    /** 결과 블록의 제안 항목. 답 메시지를 저장한 뒤 {@link #saveSuggestions} 가 할 일 줄로 저장한다. */
     private volatile List<SuggestedItem> pendingSuggestions = List.of();
     /** 제안 항목을 낸 turn 의 실행 번호다. */
     private volatile Long suggestionExecutionId;
@@ -64,10 +56,9 @@ class ProactiveCheckResults {
 
 
     /**
-     * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
-     * 저장하고, 결과와 셈은 {@link ProactiveCheckRun#record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
-     * 이미 알린 것으로 내려가기 때문이다.
-     * NOTHING_NEW 여도 질문이나 읽지 못한 출처가 있으면 그린다.
+     * 결과 블록을 읽고 발견과 문제 후보를 검사해 대화에 남길 글과 보고를 정한다. 보고와 결과는 {@link ProactiveCheckRun#record} 가 줄에
+     * 적는다. turn 이 답을 저장하지 못하고 예외로 끝나면 보고도 남지 않아, 사용자가 보지 못한 발견이 다음 살펴보기에서 이미 알린 것으로 내려가지
+     * 않는다. NOTHING_NEW 여도 질문이나 읽지 못한 출처가 있으면 그린다.
      *
      * <p>블록을 읽지 못하면 까닭과 답의 길이만 로그에 남긴다. 답은 개인 맥락을 담을 수 있어 본문을 남기지 않는다.
      */
@@ -105,39 +96,21 @@ class ProactiveCheckResults {
         Instant now = deps.clock().instant();
         Announced announced = announcedSince(now.minus(deps.properties().current().digestWindow()));
         List<JudgedFinding> judged = block.findings().stream()
-            .map(finding -> FindingJudgement.judge(
-                finding, check.startedAt(), now, announced.keys(), announced.dismissedTopics()))
+            .map(finding -> FindingJudgement.judge(finding, check.startedAt(), now, announced.keys()))
             .toList();
-        newFindings = (int)judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
-        referenceFindings = judged.size() - newFindings;
-        pendingFindings = judged.stream()
-            .map(each -> ProactiveCheckFinding.of(
-                check.id(),
-                check.conversationId(),
-                each.kind(),
-                each.reason(),
-                Objects.requireNonNullElse(each.finding().area(), ""),
-                each.finding().topicKey(),
-                Objects.requireNonNullElse(each.finding().title(), ""),
-                each.sourceUrl(),
-                each.checkedAt()))
-            .toList();
-        pendingProblems = block.problemCandidates().isEmpty() || judged.isEmpty()
+        long newFindings = judged.stream().filter(each -> each.kind() == FindingKind.NEW).count();
+        List<JudgedProblem> problems = block.problemCandidates().isEmpty() || judged.isEmpty()
             ? List.of()
             : ProblemJudgement.judge(
                 block.problemCandidates(),
                 judged,
-                acceptedProblemKeysSince(
-                    now.minus(deps.properties().current().digestWindow())),
-                title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
-                .stream()
-                .map(this::problemRow)
-                .toList();
+                announced.acceptedProblemKeys(),
+                title -> deps.followUps().hasOpenWithTitle(owner.id(), title));
         if (check.trigger() == CheckTrigger.SCHEDULED
             && newFindings == 0
             && block.questions().isEmpty()
             && block.sourceFailures().isEmpty()) {
-            // 검사를 통과한 새 발견이 없으면 정상 무변화와 같다. 참고로 내린 발견은 셈을 위해 저장하되 답과 보고를 남기지 않는다.
+            // 검사를 통과한 새 발견이 없으면 정상 무변화와 같다. 답과 보고를 남기지 않아 다음 깨우기가 읽지 않은 보고로 막히지 않는다.
             // 되풀이가 아닌 까닭으로 내린 발견은 결과 형식이나 분야 지침의 문제일 수 있어 까닭만 로그에 남긴다.
             Map<FindingReason, Long> reasons = judged.stream()
                 .filter(each -> each.reason() != null && each.reason() != FindingReason.REPEATED)
@@ -147,36 +120,18 @@ class ProactiveCheckResults {
             }
             return new CheckAnswer("", false, true);
         }
-        pendingReport = deps.reportFactory().create(block, judged, executionId);
+        pendingReport = deps.reportFactory().create(block, judged, problems, executionId);
         return new CheckAnswer(deps.renderer().render(block, judged, pendingReport), false, false);
     }
 
 
     /**
-     * 들고 있던 발견과 문제 후보를 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 없으면 아무것도 하지 않는다. 사용자가 보지 못한
-     * 발견을 근거로 한 후보가 다음 살펴보기에서 중복으로 걸리지 않게 하기 위해 발견과 같은 자리에서 저장한다.
+     * 결과 블록의 제안 항목을 할 일 줄로 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 저장 실패가 살펴보기의 끝을 막지 않게
+     * 로그만 남긴다.
      */
-    void saveFindings() {
-        // 사용자가 보지 못한 발견이 다음 살펴보기에서 이미 알린 것으로 내려가지 않게, 알리지 않는 살펴보기는 발견을 남기지 않는다.
-        List<ProactiveCheckFinding> judged = silent() ? List.of() : pendingFindings;
-        if (!judged.isEmpty()) {
-            deps.findings().saveAll(judged);
-        }
-        List<ProactiveCheckProblem> problems = pendingProblems;
-        if (!problems.isEmpty()) {
-            deps.problems().saveAll(problems);
-        }
-        saveSuggestions();
-    }
-
-
-    /**
-     * 기능 스위치가 켜져 있을 때만 제안 항목을 할 일 줄로 저장한다. 꺼져 있으면 지금 동작 그대로 아무것도 하지 않는다. 알리지 않는
-     * 살펴보기(자동 실행)는 저장하지 않는다. 저장 실패가 발견 저장과 살펴보기의 끝을 막지 않게 로그만 남긴다.
-     */
-    private void saveSuggestions() {
+    void saveSuggestions() {
         List<SuggestedItem> items = pendingSuggestions;
-        if (items.isEmpty() || silent() || !deps.suggestionProperties().current().enabled()) {
+        if (items.isEmpty()) {
             return;
         }
         try {
@@ -191,79 +146,31 @@ class ProactiveCheckResults {
     }
 
 
-    /** 검사한 후보 하나를 줄로 만든다. 행동이 없으면 그 칸을 비운다. */
-    private ProactiveCheckProblem problemRow(JudgedProblem judged) {
-        CheckResultBlock.ProblemCandidate candidate = judged.candidate();
-        CheckResultBlock.Next action = candidate.proposedAction();
-        return ProactiveCheckProblem.of(
-            check.id(),
-            check.conversationId(),
-            judged.status(),
-            judged.reason(),
-            judged.problemKey(),
-            candidate.problem(),
-            candidate.relatedGoal(),
-            action == null ? null : action.type(),
-            action == null ? null : action.text(),
-            candidate.confidence(),
-            candidate.expectedBenefit(),
-            candidate.sideEffect(),
-            candidate.risk(),
-            candidate.changeSinceLast(),
-            judged.evidence(),
-            judged.evidenceCheckedAt());
-    }
-
-
-    /** 그 시각 뒤에 받아들인 문제 후보의 정규화한 문제 키다. */
-    private Set<String> acceptedProblemKeysSince(Instant after) {
-        return deps
-            .problems()
-            .findByConversationIdAndStatusAndCreatedAtAfter(check.conversationId(), ProblemStatus.ACCEPTED, after)
-            .stream()
-            .map(ProactiveCheckProblem::problemKey)
-            .filter(key -> !key.isEmpty())
-            .collect(Collectors.toSet());
-    }
-
-
     /**
-     * 그 시각 뒤에 알린 발견을 한 번 읽어 이미 알린 주제 키와 원문 주소, 그 가운데 지금 반응이 「관심 없음」 인 주제 키를 만든다. 주제 키가 빈
-     * 발견은 되풀이 판정을 하지 않으므로 넣지 않는다.
+     * 그 시각 뒤에 시작해 보고를 남긴 같은 점검 대화의 살펴보기를 한 번 읽어, 이미 알린 주제 키와 원문 주소, 받아들인 문제 키를 만든다. 보고를
+     * 남긴 살펴보기만 사용자에게 알린 것이다.
      */
     private Announced announcedSince(Instant after) {
-        List<ProactiveCheckFinding> recent = deps
-            .findings()
-            .findByConversationIdAndKindAndCreatedAtAfter(check.conversationId(), FindingKind.NEW, after)
+        List<CheckReport> reports = deps.checks()
+            .findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc(check.conversationId(), after)
             .stream()
-            .filter(finding -> finding.topicKey() != null && !finding.topicKey().isBlank())
+            .map(ProactiveCheck::report)
             .toList();
-        Set<AnnouncedKey> keys = recent.stream()
+        Set<AnnouncedKey> keys = reports.stream()
+            .flatMap(report -> report.announced().stream())
+            .filter(finding -> finding.topicKey() != null && !finding.topicKey().isBlank())
             .map(finding -> new AnnouncedKey(finding.topicKey(), finding.sourceUrl()))
             .collect(Collectors.toSet());
-        Map<Long, FindingReaction> reactions = deps.reactions()
-            .current(
-                owner.id(),
-                recent.stream().map(ProactiveCheckFinding::id).toList());
-        Set<String> dismissedTopics = recent.stream()
-            .filter(finding -> reactions.get(finding.id()) == FindingReaction.DISMISSED)
-            .map(ProactiveCheckFinding::topicKey)
+        Set<String> problemKeys = reports.stream()
+            .flatMap(report -> report.acceptedProblemKeys().stream())
+            .filter(key -> !key.isEmpty())
             .collect(Collectors.toSet());
-        return new Announced(keys, dismissedTopics);
+        return new Announced(keys, problemKeys);
     }
 
 
-    /** 되풀이 판정에 쓰는 이미 알린 묶음과 「관심 없음」 주제 키다. */
-    private record Announced(Set<AnnouncedKey> keys, Set<String> dismissedTopics) {
-    }
-
-
-    /**
-     * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
-     * 한다.
-     */
-    boolean silent() {
-        return check.trigger() == CheckTrigger.AUTONOMY;
+    /** 되풀이 판정에 쓰는 이미 알린 묶음과 받아들인 문제 키다. */
+    private record Announced(Set<AnnouncedKey> keys, Set<String> acceptedProblemKeys) {
     }
 
 
@@ -279,15 +186,5 @@ class ProactiveCheckResults {
 
     CheckReport pendingReport() {
         return pendingReport;
-    }
-
-
-    int newFindings() {
-        return newFindings;
-    }
-
-
-    int referenceFindings() {
-        return referenceFindings;
     }
 }

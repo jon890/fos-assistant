@@ -1,35 +1,56 @@
 package com.bifos.assistant.proactive.check.application;
 
-import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_FINDINGS;
-import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_PROBLEMS;
+import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_REPORTED;
+import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_SUGGESTIONS;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.OPENING;
 
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
-import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
+import com.bifos.assistant.followup.application.dto.RecentSuggestion;
+import com.bifos.assistant.followup.domain.type.FollowUpStatus;
+import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.check.domain.type.FindingKind;
-import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.PageRequest;
+import java.util.stream.Stream;
 
-/** 변화 신호와 기억에서 꺼낸 최근 일, 최근 발견·문제 후보를 살펴보기 입력으로 조립한다. */
+/** 변화 신호와 기억에서 꺼낸 최근 일, 그 점검 대화의 최근 제안과 최근 보고가 알린 것을 살펴보기 입력으로 조립한다. */
 class ProactiveCheckInput {
     private static final String UNKNOWN = "모름";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
+
+    /** 입력에 싣는 제안 줄의 상태 낱말이다. */
+    private static final Map<FollowUpStatus, String> STATUS_LABELS = new EnumMap<>(Map.of(
+        FollowUpStatus.PROPOSED, "제안됨",
+        FollowUpStatus.OPEN, "챙기는 중",
+        FollowUpStatus.DONE, "끝남",
+        FollowUpStatus.DROPPED, "그만둠",
+        FollowUpStatus.REJECTED, "거절함"));
+
+    /**
+     * 입력에 싣는 반응 낱말이다. 노출과 열기는 반응이 아니라 싣지 않는다. {@code DISMISSED} 는 지금 화면에서 숨긴 것과 받아들인 할 일을
+     * 그만둔 것을 함께 가리켜 「내림」 으로 적는다. 어느 쪽인지는 같은 줄의 상태가 보인다.
+     */
+    private static final Map<FeedbackEventType, String> REACTION_LABELS = new EnumMap<>(Map.of(
+        FeedbackEventType.ACCEPTED, "받아들임",
+        FeedbackEventType.REJECTED, "거절",
+        FeedbackEventType.DISMISSED, "내림",
+        FeedbackEventType.POSTPONED, "미룸",
+        FeedbackEventType.RESTORED, "되돌림",
+        FeedbackEventType.EDITED, "고침",
+        FeedbackEventType.EXECUTION_SUCCEEDED, "끝냄"));
 
     private final CurrentUser owner;
     private final Long agentId;
@@ -72,8 +93,8 @@ class ProactiveCheckInput {
             .map(ProactiveCheck::startedAt)
             .orElse(null);
         text.append("\n\n").append(deps.wakeMemory().section(owner, agentId, since, now));
-        text.append("\n\n최근에 알린 발견\n").append(recentFindings(now));
-        text.append("\n\n최근에 받아들인 문제 후보\n").append(recentProblems(now));
+        text.append("\n\n최근 제안\n").append(recentSuggestions(now));
+        text.append("\n\n최근 보고에서 알린 것\n").append(recentReported(now));
         return text.toString();
     }
 
@@ -112,81 +133,60 @@ class ProactiveCheckInput {
 
 
     /**
-     * 최근에 알린 발견을 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다.
+     * 그 점검 대화의 최근 제안 줄을 한 줄씩 적고 {@code <external-data>} 로 감싼다. 제목이 모델이 쓴 글이기 때문이다. 상태와 반응 낱말은
+     * Control Plane 이 정하지만 같은 줄의 제목과 함께 감싼다.
      *
-     * <p>줄 끝에 그 발견의 지금 반응을 붙인다. 반응 낱말은 Control Plane 이 정하지만 같은 줄의 제목이 모델 글이라 함께 감싼다.
-     *
-     * <p>메시지 수는 그 발견을 낸 살펴보기가 끝난 뒤부터 센다. 같은 살펴보기의 발견은 한 번만 센다. 그 살펴보기가 끝난 시각이 없으면(서버가
-     * 도중에 내려가 {@code RUNNING} 으로 남은 줄) 「모름」 이다.
+     * <p>거절한 줄은 싣고 받아들이지 않은 채 만료한 줄은 싣지 않는다. 반응은 그 줄에 사용자가 남긴 마지막 반응 사건이다.
      */
-    private String recentFindings(Instant now) {
-        List<ProactiveCheckFinding> recent = deps.findings()
-            .findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-                check.conversationId(),
-                FindingKind.NEW,
-                now.minus(deps.properties().current().digestWindow()),
-                PageRequest.ofSize(deps.properties().current().digestMaxItems()));
+    private String recentSuggestions(Instant now) {
+        ProactiveCheckProperties limits = deps.properties().current();
+        List<RecentSuggestion> recent = deps.suggestions()
+            .recent(
+                owner.id(), check.conversationId(), now.minus(limits.digestWindow()), now, limits.digestMaxItems());
         if (recent.isEmpty()) {
-            return NO_RECENT_FINDINGS;
+            return NO_RECENT_SUGGESTIONS;
         }
-        Map<Long, ProactiveCheck> checksById = deps
-            .checks()
-            .findAllById(recent.stream()
-                .map(ProactiveCheckFinding::checkId)
-                .distinct()
-                .toList())
-            .stream()
-            .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
-        Map<Long, FindingReaction> reactions = deps.reactions()
-            .current(
+        Map<String, FeedbackEventType> reactions = deps.reactions()
+            .lastUserReactions(
                 owner.id(),
-                recent.stream().map(ProactiveCheckFinding::id).toList());
+                recent.stream().map(row -> FeedbackSubjectType.FOLLOW_UP.key(row.publicId())).toList(),
+                REACTION_LABELS.keySet());
+        String lines = recent.stream()
+            .map(row -> "- " + orDash(row.title())
+                + " · " + STATUS_LABELS.get(row.status())
+                + " · 반응 " + REACTION_LABELS.getOrDefault(
+                    reactions.get(FeedbackSubjectType.FOLLOW_UP.key(row.publicId())), "없음"))
+            .collect(Collectors.joining("\n"));
+        return ExternalData.wrap(lines);
+    }
+
+
+    /**
+     * 같은 점검 대화의 최근 보고가 알린 발견과 받아들인 문제 키를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 제목과 문제 키가 모델이 쓴
+     * 글이기 때문이다. 둘을 합쳐 {@code digest-max-items} 줄까지 최근 보고부터 싣는다.
+     *
+     * <p>메시지 수는 그 보고를 남긴 살펴보기가 끝난 뒤부터 센다. 같은 살펴보기의 발견은 한 번만 센다.
+     */
+    private String recentReported(Instant now) {
+        ProactiveCheckProperties limits = deps.properties().current();
+        List<ProactiveCheck> reported = deps.checks()
+            .findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc(
+                check.conversationId(), now.minus(limits.digestWindow()));
         Map<Long, String> countsByCheck = new HashMap<>();
-        String lines = recent.stream()
-            .map(finding -> "- [" + finding.area() + "] " + orDash(finding.topicKey())
-                + " · " + orDash(finding.title())
-                + " · " + orDash(finding.sourceUrl())
-                + " · 확인 " + (finding.checkedAt() == null ? UNKNOWN : DATE.format(finding.checkedAt()))
-                + " · 그 뒤 사용자 메시지 "
-                + countsByCheck.computeIfAbsent(
-                    finding.checkId(),
-                    id -> userMessagesAfter(Optional.ofNullable(checksById.get(id))
-                        .map(ProactiveCheck::finishedAt)
-                        .orElse(null)))
-                + " · 반응 " + reactionLabel(reactions.get(finding.id())))
+        String lines = reported.stream()
+            .flatMap(previous -> Stream.concat(
+                previous.report().announced().stream()
+                    .map(finding -> "- " + orDash(finding.topicKey())
+                        + " · " + orDash(finding.title())
+                        + " · " + orDash(finding.sourceUrl())
+                        + " · 알린 날 " + DATE.format(previous.startedAt())
+                        + " · 그 뒤 사용자 메시지 "
+                        + countsByCheck.computeIfAbsent(previous.id(), id -> userMessagesAfter(previous.finishedAt()))),
+                previous.report().acceptedProblemKeys().stream()
+                    .map(key -> "- 받아들인 문제 키 · " + key + " · 알린 날 " + DATE.format(previous.startedAt()))))
+            .limit(limits.digestMaxItems())
             .collect(Collectors.joining("\n"));
-        return ExternalData.wrap(lines);
-    }
-
-
-    /** 최근에 받아들인 문제 후보를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다. */
-    private String recentProblems(Instant now) {
-        List<ProactiveCheckProblem> recent = deps.problems()
-            .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
-                check.conversationId(),
-                ProblemStatus.ACCEPTED,
-                now.minus(deps.properties().current().digestWindow()),
-                PageRequest.ofSize(deps.properties().current().digestMaxItems()));
-        if (recent.isEmpty()) {
-            return NO_RECENT_PROBLEMS;
-        }
-        String lines = recent.stream()
-            .map(problem -> "- " + orDash(problem.problemKey()) + " · " + orDash(problem.problem()))
-            .collect(Collectors.joining("\n"));
-        return ExternalData.wrap(lines);
-    }
-
-
-    /** 입력에 싣는 지금 반응의 낱말이다. 반응이 없으면 「없음」 이다. */
-    private static String reactionLabel(FindingReaction reaction) {
-        if (reaction == null) {
-            return "없음";
-        }
-        return switch (reaction) {
-            case ACCEPTED -> "받아들임";
-            case POSTPONED -> "나중에";
-            case DISMISSED -> "관심 없음";
-        };
+        return lines.isEmpty() ? NO_RECENT_REPORTED : ExternalData.wrap(lines);
     }
 
 

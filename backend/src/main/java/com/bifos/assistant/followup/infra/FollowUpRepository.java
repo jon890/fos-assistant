@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -64,6 +65,28 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
 
     /** 그 대화에서 먼저 살펴보기가 낸 제안 줄이다(중복 열쇠가 있는 줄). 대화를 지울 때 제안의 줄과 본문을 지우려고 읽는다. */
     List<FollowUp> findByConversationIdAndDedupeKeyIsNotNull(Long conversationId);
+
+
+    /**
+     * 그 사용자의 그 대화에서 {@code createdAfter} 뒤에 에이전트가 낸 줄을 최근 것부터 읽는다. 결과 블록의 제안(중복 열쇠가 있는 줄)과
+     * 실행이 제안한 줄(제안한 실행이 있는 줄)이다. 받아들이지 않은 채 만료한 줄({@code PROPOSED} 이고 만료 시각이 {@code now} 이전)은
+     * 뺀다. 거절한 줄과 끝난 줄은 넣는다. 다음 살펴보기의 입력이 읽는다.
+     */
+    @Query("""
+            select f from FollowUp f
+             where f.userId = :userId and f.conversationId = :conversationId
+               and (f.dedupeKey is not null or f.proposedByExecutionId is not null)
+               and f.createdAt > :createdAfter
+               and (f.status <> :proposed or f.expiresAt is null or f.expiresAt > :now)
+             order by f.id desc
+            """)
+    List<FollowUp> findRecentSuggestions(
+        @Param("userId") Long userId,
+        @Param("conversationId") Long conversationId,
+        @Param("createdAfter") Instant createdAfter,
+        @Param("now") Instant now,
+        @Param("proposed") FollowUpStatus proposed,
+        Pageable page);
 
 
     /** 사용자 정리 때 그 사용자의 할 일을 모두 지운다(ADR-20261101 / user-purge). 지운 행 수를 돌려준다. */

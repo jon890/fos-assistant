@@ -59,7 +59,6 @@ class FeedbackEventWriter {
             entry.actor(),
             conversationId,
             rootExecutionId,
-            entry.sourceCheckId(),
             entry.subjectVersion(),
             entry.reasonCode(),
             entry.changedFields(),

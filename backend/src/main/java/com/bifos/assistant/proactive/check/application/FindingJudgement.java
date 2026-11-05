@@ -29,8 +29,7 @@ import lombok.NoArgsConstructor;
  * <li>{@code freshness} 가 {@code STALE} 이 아니다. 아니면 {@link FindingReason#STALE}
  * <li>{@code freshness} 가 {@code CURRENT} 다. 아니면 {@link FindingReason#FRESHNESS_UNKNOWN}
  * <li>제목, 이유, 사실 하나, 다음 행동이 있다. 아니면 {@link FindingReason#INCOMPLETE}
- * <li>최근에 알린 발견에 같은 주제 키와 같은 원문 주소가 없거나 달라진 점이 있다. 아니면 {@link FindingReason#REPEATED}
- * <li>최근에 알린 발견 가운데 지금 반응이 「관심 없음」 인 것과 주제 키가 같지 않다. 아니면 {@link FindingReason#REPEATED}
+ * <li>최근 보고가 알린 발견에 같은 주제 키와 같은 원문 주소가 없거나 달라진 점이 있다. 아니면 {@link FindingReason#REPEATED}
  * </ol>
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -49,19 +48,16 @@ public final class FindingJudgement {
      *
      * @param checkStartedAt 이번 살펴보기를 시작한 시각이다
      * @param now 지금이다
-     * @param alreadyAnnounced 같은 점검 대화에서 최근에 이미 알린 주제 키와 원문 주소다
-     * @param dismissedTopics 같은 기간에 알린 발견 가운데 지금 반응이 「관심 없음」 인 것의 주제 키다. 검사 순서 8 에서 원문 주소와
-     * {@code changeSinceLast} 를 보지 않고 {@code REPEATED} 로 내린다
+     * @param alreadyAnnounced 같은 점검 대화의 최근 보고가 이미 알린 주제 키와 원문 주소다
      */
     public static JudgedFinding judge(
         Finding finding,
         Instant checkStartedAt,
         Instant now,
-        Set<AnnouncedKey> alreadyAnnounced,
-        Set<String> dismissedTopics) {
+        Set<AnnouncedKey> alreadyAnnounced) {
         String sourceUrl = isHttpAbsolute(finding.sourceUrl()) ? finding.sourceUrl() : null;
         Instant checkedAt = parseInstant(finding.checkedAt());
-        FindingReason reason = reasonOf(finding, sourceUrl, checkedAt, checkStartedAt, now, alreadyAnnounced, dismissedTopics);
+        FindingReason reason = reasonOf(finding, sourceUrl, checkedAt, checkStartedAt, now, alreadyAnnounced);
         FindingKind kind = reason == null ? FindingKind.NEW : FindingKind.REFERENCE;
         return new JudgedFinding(finding, kind, reason, sourceUrl, checkedAt);
     }
@@ -74,8 +70,7 @@ public final class FindingJudgement {
         Instant checkedAt,
         Instant checkStartedAt,
         Instant now,
-        Set<AnnouncedKey> alreadyAnnounced,
-        Set<String> dismissedTopics) {
+        Set<AnnouncedKey> alreadyAnnounced) {
         if (sourceUrl == null) {
             return FindingReason.NO_SOURCE;
         }
@@ -96,7 +91,7 @@ public final class FindingJudgement {
         if (isIncomplete(finding)) {
             return FindingReason.INCOMPLETE;
         }
-        if (isRepeated(finding, sourceUrl, alreadyAnnounced, dismissedTopics)) {
+        if (isRepeated(finding, sourceUrl, alreadyAnnounced)) {
             return FindingReason.REPEATED;
         }
         return null;
@@ -112,18 +107,13 @@ public final class FindingJudgement {
     }
 
 
-    /**
-     * 주제 키가 있고 같은 주제 키와 원문 주소를 이미 알렸으며 지난번과 달라진 점도 없을 때(순서 7), 또는 그 주제 키에 지금 반응이 「관심 없음」
-     * 인 발견이 있을 때(순서 8)다. 「관심 없음」 은 사용자가 그 주제를 거절한 것이라 새 원문이나 달라진 점이 있어도 내린다.
-     */
-    private static boolean isRepeated(
-        Finding finding, String sourceUrl, Set<AnnouncedKey> alreadyAnnounced, Set<String> dismissedTopics) {
+    /** 주제 키가 있고 같은 주제 키와 원문 주소를 이미 알렸으며 지난번과 달라진 점도 없을 때다(순서 7). */
+    private static boolean isRepeated(Finding finding, String sourceUrl, Set<AnnouncedKey> alreadyAnnounced) {
         if (isBlank(finding.topicKey())) {
             return false;
         }
-        return (isBlank(finding.changeSinceLast())
-            && alreadyAnnounced.contains(new AnnouncedKey(finding.topicKey(), sourceUrl)))
-            || dismissedTopics.contains(finding.topicKey());
+        return isBlank(finding.changeSinceLast())
+            && alreadyAnnounced.contains(new AnnouncedKey(finding.topicKey(), sourceUrl));
     }
 
 

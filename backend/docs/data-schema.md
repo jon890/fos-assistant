@@ -979,23 +979,24 @@ action을 지우면 실행 내용도 지운다.
 
 ### proactive_check
 
-살펴보기 한 번이다. 실행별 토큰과 금액은 `agent_execution` 이 갖고, 깨우기 예산을 측정할 트리 토큰 합계만 여기에도 남긴다.
+살펴보기 한 번이다. 실행별 토큰과 금액은 `agent_execution` 이 갖는다. 살펴보기 한 번의 비용은 `root_execution_id` 로 그 트리의 실행 줄을 합쳐 얻는다.
 
 - `root_execution_id` 는 유일하다. 살펴보기 트리를 나누는 기준이라 실행 줄 하나가 두 살펴보기에 속하지 않게 한다. 실행 줄을 만들기 전에 실패하면 비어 있다
 - `writes_allowed` 는 시작할 때 그 에이전트의 `proactive_check_writes_allowed` 를 옮겨 적는다. 도중에 관리자가 바꿔도 그 살펴보기의 경계는 옮겨 적은 값이 정한다(ADR-082)
 - `report_opened_at` 은 요청자가 「보고 열기」 를 누르거나, 점검 대화를 처음 읽거나, 그 대화에 메시지를 보낸 때 채운다
 - 지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 딸린 줄은 FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 지우거나 비우고, 비용은 `agent_execution` 에 남는다
 - `trigger` 는 MySQL 의 예약어라 칸 이름을 `trigger_type` 으로 둔다
+- `report_json` 은 다섯 칸 보고에 더해 다음 살펴보기의 되풀이 판정 재료를 담는다. `announced` 는 「새로 알릴 것」 으로 알린 발견 가운데 주제 키가 있는 것의 `topicKey`, `sourceUrl`, `title` 이고, `acceptedProblemKeys` 는 받아들인 문제 후보의 정규화한 문제 키다. 화면에는 다섯 칸만 보낸다. 두 칸이 없는 옛 보고는 `V20261105040320` 이 옛 발견·문제 후보 표에서 채웠다
+- `new_findings`, `reference_findings`, `tree_input_tokens`, `tree_cached_input_tokens`, `tree_output_tokens` 는 읽는 곳이 없어 엔티티에서 뺐다. 칸은 기본값이나 `NULL` 로 남고 발견·문제 후보 표를 지우는 PR 이 함께 지운다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md))
+- `trigger_type` 이 `AUTONOMY` 인 옛 줄은 같은 PR 이 지운다. 그 전까지 「마지막 살펴보기」 조회가 그 줄을 건너뛴다
 
 ### proactive_check_finding
 
-결과 블록의 발견 하나다. 다음 살펴보기의 입력과, 「지금」 화면과 할 일로 이을 때의 원래 기록이 된다. 살펴보기 줄을 지우면 함께 지운다.
-발견의 이유, 사실, 추정, 다음 행동은 대화 메시지에만 있고 이 표에 두지 않는다. 같은 글을 두 곳에 두면 사용자가 대화를 지워도 한쪽에 남는다.
+옛 결과 블록의 발견 하나다. 새 줄을 쓰지 않는다. 기동 때 옛 줄을 할 일의 제안 줄로 옮기는 `LegacySuggestionBackfill` 만 읽고, 그 마지막 실행 뒤 표를 지운다([`docs/features/proactive/design.md`](../../docs/features/proactive/design.md)). 살펴보기 줄을 지우면 함께 지운다.
 
 ### proactive_check_problem
 
-결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)). 받아들인 것과 버린 것을 모두 남긴다.
-칸의 뜻과 검사는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「문제 후보」 가 갖는다. 살펴보기 줄을 지우면 함께 지운다. 원문 본문과 플러그인 응답은 남기지 않는다.
+옛 결과 블록 버전 3의 문제 후보 하나다([ADR-093](adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md)). 새 줄을 쓰지 않는다. 받아들인 문제 키는 이제 `proactive_check.report_json` 에 남는다. 기동 이관만 읽고 발견 표와 함께 지운다. 살펴보기 줄을 지우면 함께 지운다.
 
 ## 판단 피드백 표
 
@@ -1004,7 +1005,7 @@ action을 지우면 실행 내용도 지운다.
 제안 하나의 사건 한 줄이다. 덧붙이기만 하고 고치지 않는다. 예외는 옛 발견을 할 일의 제안 줄로 옮길 때 그 줄이 생긴 발견의 사건 열쇠를 `check_finding:<번호>` 에서 `follow_up:<공개 식별자>` 로 한 번 바꾸는 이관뿐이다. 사건의 뜻과 보관은 [`docs/features/proactive.md`](../../docs/features/proactive.md) 가 갖는다. `subject_key` 가 같은 제안의 사건을 잇는 열쇠이고, 지금 화면의 `itemKey` 와 같은 모양이다.
 사용자를 지우면 함께 지운다. 다른 사용자는 관리자여도 읽지 못한다.
 `conversation_id` 의 외래 키도 `ON DELETE CASCADE` 지만 대화 줄은 지우지 않으므로, 대화를 지우면 서비스가 `conversation_id` 로 그 대화의 사건을 지운다.
-실행이나 살펴보기를 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`).
+실행이나 살펴보기를 지우면 그 번호 칸만 비운다(`ON DELETE SET NULL`). `source_check_id` 는 읽는 곳이 없어 쓰지 않는다. 살펴보기와는 `origin_execution_id` 로 잇고, 칸은 발견·문제 후보 표를 지우는 PR 이 지운다.
 제목, 본문, 인자, 결과 글, 모델이 쓴 글을 담는 칸이 없다. 바뀐 칸은 이름만 남기고 값은 담지 않는다.
 
 지금 화면의 숨김, 미루기, 복원과 노출, 열기, 동작도 이 표의 사건이다([`docs/features/attention.md`](../../docs/features/attention.md) 의 「저장」). 아래 칸이 쓰인다.

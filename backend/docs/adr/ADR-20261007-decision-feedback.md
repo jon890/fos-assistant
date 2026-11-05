@@ -26,6 +26,7 @@
 할 일 제목, Memory 본문, 커넥터 인자와 결과, 모델이 쓴 글을 담는 칸이 없다.
 판은 해시나 판 번호(`subject_version`)로, 고친 내용은 칸 이름(`changed_fields`)으로만 남긴다.
 상황, 후보, 판단, 정책은 이미 있는 줄을 번호로 가리킨다. 제안을 낸 실행은 트리 루트(`origin_execution_id`)로 남겨 살펴보기 트리와 잇는다.
+살펴보기 줄을 직접 가리키던 `source_check_id` 는 읽는 곳이 없어 2026-11-05 에 쓰기를 끊었다. 살펴보기와는 `origin_execution_id` 가 그 살펴보기의 `root_execution_id` 와 같은지로 잇는다([ADR-20261101 / proactive-suggestion](../../../docs/adr/ADR-20261101-proactive-suggestion.md) 의 「발견과 문제 후보 테이블을 지운다」).
 
 **반응은 저장하지 않고 읽을 때 정한다.**
 replay 읽기 모델이 사건을 `ACCEPTED`, `DECLINED`, `DEFERRED`, `NO_RESPONSE`, `NOT_SURFACED` 로 읽는다. 규칙에는 버전을 둔다.
@@ -34,7 +35,7 @@ replay 읽기 모델이 사건을 `ACCEPTED`, `DECLINED`, `DEFERRED`, `NO_RESPON
 **잘못된 학습을 막는 규칙을 읽기 규칙에 둔다.**
 무응답은 표본에서 뺀다. 거절은 그 제안 하나의 일회성 반응이고, 지금 화면의 숨기기는 미루기로 읽는다. 첫 반응을 나중의 그만둠이 덮지 않는다.
 오래 가는 선호는 Memory 에만 남는다([ADR-012](ADR-012-memory-는-사람이-승인한-것만-남는다.md), [ADR-20261007 / memory-remember](../../../docs/adr/ADR-20261007-memory-remember.md)). 판단 피드백이 그 근거로 읽는 것은 사용자가 받아들인 Memory 제안뿐이다. 이 기록은 Memory 도 억제 규칙도 바꾸지 않는다.
-예외는 하나다. 살펴보기 발견의 「관심 없음」 은 같은 점검 대화의 digest 기간 안에서만 같은 주제를 내린다([ADR-20261008 / check-finding-reaction](../../../docs/adr/ADR-20261008-check-finding-reaction.md)).
+살펴보기 발견의 「관심 없음」 이 같은 점검 대화의 digest 기간 안에서 같은 주제를 내리던 예외([ADR-20261008 / check-finding-reaction](../../../docs/adr/archive/ADR-20261008-check-finding-reaction.md))는 없앴다. 이제 예외는 없다.
 
 **기록은 사용자의 것이다.**
 사용자 줄을 지우면 함께 지운다(FK `ON DELETE CASCADE`). 대화를 지우면 그 대화에 묶인 사건과, 그 사건이 가리키는 제안의 다른 사건을 같은 트랜잭션에서 지운다.
