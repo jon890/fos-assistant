@@ -1784,6 +1784,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
 - `fos-ctx` 1.5.0 을 올린 profile 에서 안전 목록 밖의 도구가 `tool-guard` 를 묻는지. gateway 로그의 `fos-ctx:` 줄과 Control Plane 의 「도구 호출을 막았다」 로그로 본다. Hermes 가 plugin 을 불러오지 못하면 판정 없이 나가고 설치 상태의 `tool_guard` 는 이것을 알지 못한다
+- 사건 실행에서 막는 판정이 실제로 한 번 나오는지(Control Plane 의 「도구 호출을 막았다」 로그)와 gateway 에 `FOS_CTX_POLICY_URL` 이 있는지. Hermes 와 Control Plane 사이가 새 경로를 열지 않아 404 를 내면 hook 이 옛 Control Plane 으로 읽고 통과시킨다
 - 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지
 - `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
 

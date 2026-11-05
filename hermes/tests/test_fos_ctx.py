@@ -51,7 +51,7 @@ POLICY_VECTOR_CALL = "call_1"
 POLICY_VECTOR_ARGS_JSON = '{"text":"안녕"}'
 POLICY_VECTOR_SIG = "e23e297aec4837aeddd50e71dcde79969ad5544e6c93ea7b9ab7657f221037da"
 # 도구 판정 질의의 서명 확인 값이다. 위 정책 확인 값의 key, 루트, session, 호출 id 와 도구 `terminal` 이다.
-# 서버 쪽 `backend/src/test/java/com/bifos/assistant/mcp/ToolGuardRequestTest.java` 와 같은 값이어야 한다.
+# 서버 쪽 `backend/src/test/java/com/bifos/assistant/mcp/ToolGuardEndpointTest.java` 와 같은 값이어야 한다.
 TOOL_GUARD_VECTOR_SIG = "86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273"
 
 
@@ -990,7 +990,7 @@ class ToolGuardTest(PluginFixture):
         self.assertEqual(self.requests[-1]["path"], "/internal/hermes/tool-guard")
 
     def test_signature_vector(self):
-        """서명 확인 값이다. 서버 쪽 `ToolGuardRequestTest` 의 값과 같아야 한다."""
+        """서명 확인 값이다. 서버 쪽 `ToolGuardEndpointTest` 의 값과 같아야 한다."""
         self.assertEqual(
             self.plugin.sign_tool_guard(POLICY_VECTOR_KEY, "terminal", POLICY_VECTOR_ROOT, POLICY_VECTOR_SESSION,
                                         POLICY_VECTOR_CALL),

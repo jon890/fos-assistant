@@ -143,7 +143,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 
 **자식 등록은 바꾸지 않는다.** 사건 실행 트리의 자식도 지금처럼 origin 에 묶어 등록한다. hook 이 `delegate_task` 를 막지 못한 경우에도 그 자식은 판정 1 로 막히고, Control Plane MCP 호출은 살펴보기 트리의 읽기 경계를 받는다. 등록을 거절하면 판정이 state.db 의 자식 줄에만 기대게 된다.
 
-**판정 plugin 이 있는지 깨울 때마다 본다.** 바인딩 줄의 `READY` 는 마지막 연결 확인 때의 것이라 배포 뒤 옛 `fos-ctx` 를 놓칠 수 있다. 그래서 `EventWatchPoller` 는 깨우기 직전에, `EventWatchService` 는 조회와 켜기 때 `HermesConnectorClient.readConnector` 로 그 바인딩의 설치 상태를 읽고 `tool_guard`, `policy_hook`, 켜짐, 설정됨, 재시작 필요 없음을 모두 요구한다. 아니면 깨우지 않고 `BLOCKED`, 켜기는 `TOOL_GUARD_MISSING` 이다. Hermes 를 읽지 못하면 깨우지 않고 `BLOCKED`, 조회는 `READINESS_UNKNOWN` 이다. `fos-ctx` 파일이 바뀌면 바인딩이 재시작 대기가 되어(`plugin_updated`) 떠 있는 gateway 가 옛 코드를 쥔 동안에도 깨우지 않는다.
+**판정 plugin 이 있는지 깨울 때마다 본다.** 바인딩 줄의 `READY` 는 마지막 연결 확인 때의 것이라 배포 뒤 옛 `fos-ctx` 를 놓칠 수 있다. 그래서 `EventWatchPoller` 는 깨우기 직전에, `EventWatchService` 는 조회와 켜기 때 `HermesConnectorClient.readConnector` 로 그 바인딩의 설치 상태를 읽고 `tool_guard`, `policy_hook`, 켜짐, 설정됨을 요구하고, 그 에이전트의 바인딩 줄 가운데 재시작을 기다리는 것(`restart_required`)이 없어야 한다. 설치 상태의 응답에는 재시작 칸이 없고, 같은 profile 의 다른 바인딩 설치가 `fos-ctx` 를 바꿔도 gateway 가 옛 코드를 쥘 수 있어서다(독립 verify). 아니면 깨우지 않고 `BLOCKED`, 켜기는 `TOOL_GUARD_MISSING` 이다. Hermes 를 읽지 못하면 깨우지 않고 `BLOCKED`, 조회는 `READINESS_UNKNOWN` 이다. `fos-ctx` 파일을 바꾼 설치는 그 바인딩을 재시작 대기로 두므로(`plugin_updated`) 관리자 반영 완료 전에는 같은 에이전트의 사건 실행이 열리지 않는다.
 
 **도구 목록을 버전마다 고정한다.** `hermes/tests/hermes_contract.py` 에 Hermes 내장 도구 이름 전체와 안전 목록이 든 toolset 을 적고, `test_tool_guard_contract.py` 가 지정한 Hermes 소스의 `toolsets.py` 와 견준다. Hermes 를 올려 도구가 생기거나 안전 목록 도구의 toolset 이 바뀌면 실패한다. 코드 실행 안의 호출이 `handle_function_call` 에 session 없이 들어가는 두 지점(`code_execution_rpc`, `code_kernel`)과 중계 도구 이름도 같은 테스트가 본다.
 
@@ -154,7 +154,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 | `GET /api/v1/agents/{code}/event-watches` | 그 에이전트에 붙은 요청자 연결 가운데 `event_watch` 를 선언한 것마다 켜짐, 켤 수 있는지와 까닭, 시간대, 마지막 확인과 결과, `dailyLimitReached`, `failing` |
 | `PUT /api/v1/agents/{code}/event-watches/{connectorId}` | 본문 `{enabled, timezone}`. 켜기는 대화를 시작할 수 있어야 하고(`requireStartable`), 끄기는 읽기 권한만 본다 |
 
-막는 까닭은 `{code, toolsets}` 꼴이다. 사건 실행의 준비 판정(`checkEvent`)이 낸 까닭(`DISABLED`, `TOOLSETS_NOT_ALLOWED`, `ISOLATED_EXECUTION_REQUIRED`)에 연결 쪽 까닭 `EVENT_TOOL_NOT_ALLOWED`, `CONNECTION_NOT_READY`, `EVENT_WATCH_ELSEWHERE` 를 더한다. 연결 쪽 까닭은 `proactive` 가 모르는 뜻이라 `CheckBlockerCode` 에 넣지 않고 `task` 의 값(`EventWatchBlocker`)으로 둔다. 분야 지침 스킬(`SKILL_MISSING`)은 보지 않는다. 매일 깨우기의 `ProactiveScheduleService.blockers` 를 쓰지 않는 까닭은 그것이 `readiness.check`(스킬과 쓰기 허용 목록)를 거치기 때문이다. 조회에서 Hermes 를 읽지 못하면 매일 깨우기 조회처럼 `READINESS_UNKNOWN` 하나로 바꿔 켤 수 없다고 보이고, 끄기는 그대로 받는다. 켜기는 Hermes 실패를 그대로 올린다. 준비 판정은 트랜잭션 밖에서 하고 그 뒤에 `ConnectorEventWatches.enable` 의 트랜잭션을 연다. 잠그는 동안 Hermes 를 부르지 않는다.
+막는 까닭은 `{code, toolsets}` 꼴이다. 사건 실행의 준비 판정(`checkEvent`)이 낸 까닭(PR2 까지 `DISABLED`, `TOOLSETS_NOT_ALLOWED`, `ISOLATED_EXECUTION_REQUIRED`. PR3 부터 `DISABLED` 만)에 연결 쪽 까닭 `EVENT_TOOL_NOT_ALLOWED`, `CONNECTION_NOT_READY`, `EVENT_WATCH_ELSEWHERE`, (PR3) `TOOL_GUARD_MISSING` 을 더한다. 연결 쪽 까닭은 `proactive` 가 모르는 뜻이라 `CheckBlockerCode` 에 넣지 않고 `task` 의 값(`EventWatchBlocker`)으로 둔다. 분야 지침 스킬(`SKILL_MISSING`)은 보지 않는다. 매일 깨우기의 `ProactiveScheduleService.blockers` 를 쓰지 않는 까닭은 그것이 `readiness.check`(스킬과 쓰기 허용 목록)를 거치기 때문이다. 조회에서 Hermes 를 읽지 못하면 매일 깨우기 조회처럼 `READINESS_UNKNOWN` 하나로 바꿔 켤 수 없다고 보이고, 끄기는 그대로 받는다. 켜기는 Hermes 실패를 그대로 올린다. 준비 판정은 트랜잭션 밖에서 하고 그 뒤에 `ConnectorEventWatches.enable` 의 트랜잭션을 연다. 잠그는 동안 Hermes 를 부르지 않는다.
 켜기를 거절하면 `PROACTIVE_CHECK_UNAVAILABLE`, 그 에이전트에 요청자의 그 연결이 붙어 있지 않으면 `CONNECTOR_NOT_FOUND` 다. `timezone` 이 비면 `assistant.task.default-time-zone`(Asia/Seoul) 이고, 읽지 못하면 매일 깨우기와 같은 `TASK_SCHEDULE_INVALID` 다.
 `dailyLimitReached` 는 그 시간대의 오늘 사건 실행 수가 바인딩 상한에 닿았거나 오늘 마지막 확인이 `DAILY_LIMIT` 이면 참이다. 사용자 하루 상한에 닿은 날도 보이기 위해서다. `failing` 은 연속 실패 수가 `failure-threshold` 이상이면 참이다.
 
@@ -212,8 +212,8 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 | REQ7 | backend 통합 | 상한에 닿은 뒤 조회를 부르지 않고 지점이 그대로다. 날이 바뀌면 다시 깨운다 |
 | REQ7(PR2 화면) | backend 통합과 브라우저 | 상한에 닿은 바인딩의 조회 응답이 `dailyLimitReached` 이고 화면이 「오늘 상한 도달」 을 보인다 |
 | REQ8 | 기존 계약 테스트 | `writes_allowed` 가 거짓으로 적힌다. 쓰기 거절은 `WakeWriteBoundaryContractTest` 의 경계를 그대로 쓴다 |
-| REQ9, REQ10(PR2) | backend 통합 | 켜기 API 가 셸 toolset 과 격리 꺼짐, 조회 도구 승인 필요, 다른 에이전트에서 켜짐, 연결이 준비되지 않음을 각각 거절하고 조회가 그 까닭을 싣는다. 기본은 꺼짐이다 |
-| REQ9, REQ10 | backend 통합 | 셸 toolset 과 격리 꺼짐, 쓰기 허용 에이전트의 browser toolset 이면 깨우지 않는다. 조회 도구 승인 필요, 다른 에이전트에서 켜짐이면 켜기가 거절된다 |
+| REQ9, REQ10(PR2, PR3 이 대체) | backend 통합 | 켜기 API 가 셸 toolset 과 격리 꺼짐, 조회 도구 승인 필요, 다른 에이전트에서 켜짐, 연결이 준비되지 않음을 각각 거절하고 조회가 그 까닭을 싣는다. 기본은 꺼짐이다 |
+| REQ9, REQ10(PR1, PR3 이 대체) | backend 통합 | 셸 toolset 과 격리 꺼짐, 쓰기 허용 에이전트의 browser toolset 이면 깨우지 않는다. 조회 도구 승인 필요, 다른 에이전트에서 켜짐이면 켜기가 거절된다 |
 | REQ11 | backend 통합 | 연결 문제만 실패 수를 늘리고 지점은 그대로이며, 성공하면 비운다. (PR2) 네 번째 연속 실패에서만 알림 한 건이고 다섯째에는 없으며, 성공 뒤 다시 네 번이면 한 건 더 |
 | REQ12 | backend 통합 | 대화가 바쁘면 지점이 그대로이고 다음 확인에서 깨운다 |
 

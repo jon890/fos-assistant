@@ -202,7 +202,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 | 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
 | 예외 | 어떤 예외든 잡아 정해 둔 글로 막는다. 토큰, 서명, 응답 본문은 로그에 남기지 않는다 |
 
-확인 값: key `2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b`, 도구 `terminal`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1` 의 서명은 `86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273` 다. backend 의 `ToolGuardRequestTest` 도 같은 값을 쓴다.
+확인 값: key `2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b`, 도구 `terminal`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1` 의 서명은 `86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273` 다. backend 의 `ToolGuardEndpointTest` 도 같은 값을 쓴다.
 
 이 판정은 1.5.0 부터다. 대시보드의 설치 상태는 이 묶음의 `fos-ctx` 가 그 profile 에 깔려 있을 때 `tool_guard: true` 를 낸다. Control Plane 은 그 값이 참일 때만 사건 실행을 연다.
 
