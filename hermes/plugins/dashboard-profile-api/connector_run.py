@@ -16,13 +16,14 @@ from .connector_guard_validation import _guard_stage
 from .common import (
     CONNECTOR_HOST_MARKER,
     MANAGED_MARKER,
-    _env_value,
     _json_object,
     _missing_profile,
     _profile_rejection,
     _rejected,
     logger,
 )
+
+from .connector_launch import _binding_env
 
 from .connector_manifest import (
     _connector_manifest,
@@ -298,8 +299,8 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         # 플러그인 표식만 있는 profile 은 바인딩 설치만 받는다. 그 밖의 항목으로는 실행하지 않는다.
         if not managed and _entry_mode(state[connector_id]) != BIND_MODE:
             return _rejected("관리 표식이 없는 profile 이다", 401)
-        env_path = profile_dir / ".env"
-        env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
+        # 실행기 정의면 소유 기록의 보관 파일, 옛 정의와 원격이면 `.env` 에서 이 플러그인의 칸만 읽는다. 비운 선택 칸은 빈 문자열이다.
+        field_env = _binding_env(profile_dir, manifest, state[connector_id])
         # 설치한 서버 정의는 주인의 값을 쓰는 플러그인만 읽는다. 한 번 읽어 두 값의 모양 검사에 함께 쓴다.
         installed_env = (_installed_server_env(profile_dir, manifest)
                          if manifest["owner_attachments_env"] is not None or manifest["owner_browser_env"] is not None
@@ -313,8 +314,7 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         logger.warning("dashboard-profile-api: 플러그인 %s 를 실행할 profile 을 확인하지 못했다: %s",
                        connector_id, type(error).__name__)
         return failed("unavailable", "profile")
-    # 그 profile 의 값 가운데 이 플러그인의 칸만 넘긴다. 비운 선택 칸은 빈 문자열이다.
-    env = {field["env"]: _env_value(env_text, field["env"]) for field in manifest["fields"]}
+    env = dict(field_env)
     server = manifest["server"]
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
     if owner_attachments is not None:

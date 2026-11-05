@@ -37,7 +37,9 @@ class ProfileApiConnectorInstallSecurityTest(support.ProfileApiRouteTest):
         value["mcpServers"]["demo"]["command"] = "sh"
         manifest.write_text(json.dumps(value), encoding="utf-8")
         self.assertEqual(self.binding_install().status_code, 200)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["command"], self.connector_command)
+        # 실행기 정의의 `--` 뒤가 실제 command 다. 운영 목록의 실행 파일이다.
+        args = self.alice_config()["mcp_servers"]["demo"]["args"]
+        self.assertEqual(args[args.index("--") + 1], self.connector_command)
         self.assertEqual(self.binding_install(enabled=False).status_code, 200)
         script = root / "server.py"
         script.unlink()
@@ -173,4 +175,5 @@ class ProfileApiConnectorInstallSecurityTest(support.ProfileApiRouteTest):
         value["demo"]["env"]["DEMO_SCOPE"] = "${DEMO_SCOPE}"
         path.write_text(json.dumps(value))
         self.assertEqual(self.binding_install().status_code, 200)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
+        self.assertNotIn("DEMO_SCOPE", self.alice_config()["mcp_servers"]["demo"]["env"])
+        self.assertEqual(self.launched()[1]["env"]["DEMO_SCOPE"], "")

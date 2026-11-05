@@ -31,7 +31,7 @@ PR1 만 배포한 동안에는 바인딩 설치가 지금처럼 보관 파일을
 | REQ5 | 문서에 「분실·되돌림 때 연결을 다시 등록한다」 와 「Control Plane KEK 와 다른 key」 만 적는다. key 사본 위치와 만드는 명령은 `fos-home-infra` 가 갖는다 |
 | REQ6 | (PR2) 바인딩 설치가 stdio 서버 정의를 실행기 정의로 쓴다. 실행기가 띄울 때 보관 파일을 풀어 자식 프로세스 env 에만 넘긴다 |
 | REQ7 | (PR2) 기동 이관이 이미 붙은 stdio 바인딩을 실행기 정의로 다시 쓰고 `.env` 사본을 지운다. 풀지 못한 바인딩은 옛 방식대로 둔다 |
-| REQ8 | (PR2) 소유 기록에 보관 파일 내용의 해시를 두고, 보관 파일이 바뀐 뒤 다시 설치하면 `restart_required` 를 참으로 답한다 |
+| REQ8 | (PR2) 실행기 정의에 보관 파일 바이트의 해시(`REVISION`)를 두고, 보관 파일이 바뀐 뒤 다시 설치하면 정의가 달라져 `restart_required` 를 참으로 답한다 |
 
 ## 책임과 경계
 
@@ -43,6 +43,10 @@ PR1 만 배포한 동안에는 바인딩 설치가 지금처럼 보관 파일을
   | `connector_vault_key.py` | 운영 환경 변수와 key 파일 읽기, key 상태, AES-256-GCM 의 봉인과 풀기 |
   | `connector_vault.py` | 보관 파일의 경로, 모양 검사, 읽기와 쓰기, `PUT`·`DELETE` 처리. 지금 자리 그대로다 |
   | `connector_vault_migration.py` | 기동 이관. 파일을 하나씩 분류해 다시 쓰고 수를 센다 |
+  | `connector_vault_format.py` | (PR2) 보관 파일의 모양 검사, AAD, 풀기. 실행기가 plugin 패키지 없이 읽도록 `connector_vault.py` 에서 옮긴다 |
+  | `connector_launch.py` | (PR2) 실행기 정의를 만들고 알아보고 펼친다. 바인딩의 칸 값을 정의의 종류에 맞는 자리에서 읽는다 |
+  | `connector_launcher.py` | (PR2) 실행기 스크립트. 보관 파일을 풀어 자식 env 를 만들고 실제 서버가 된다 |
+  | `connector_binding_migration.py` | (PR2) 이미 붙은 stdio 바인딩을 실행기 정의로 다시 설치하는 기동 이관 |
 
 - **key 는 Control Plane KEK 와 다른 key 다.** 파일 모양만 같다. Hermes 쪽이 Control Plane KEK 를 갖지 않게 한다(ADR).
 - 암호화는 Hermes 이미지가 core 의존으로 고정한 `cryptography` 의 `AESGCM` 을 쓴다. 새 의존을 더하지 않는다. `hermes/tests/hermes_contract.py` 의 제3자 패키지 목록에 `cryptography` 를 더해, plugin 이 기대는 패키지를 Hermes 를 올릴 때 다시 확인하게 한다.
@@ -152,17 +156,112 @@ Control Plane 의 KEK 파일(`FileKeyEncryptionKeys`)과 같은 모양이다. �
 
 ## PR2: 실행기와 사본 제거(REQ6, REQ7, REQ8)
 
-PR2 는 이 설계를 다시 쓰지 않고 이어서 쓴다. 바뀌는 결정만 이 절을 고친다.
+PR2 는 위 설계를 다시 쓰지 않고 이어서 쓴다. 보관 파일의 모양, key 상태, 기동 이관은 그대로다.
 
-- **실행기 정의**: 바인딩 설치가 stdio 서버 정의를 `command: <Hermes 의 python>`, `args: [<실행기 경로>, <보관 파일 id>, "--", <실제 command>, <실제 args>…]` 로 쓴다. `env` 에는 운영 env 값, 주인 디렉터리 같은 비밀이 아닌 값, key 파일 위치를 가리키는 운영 환경 변수 셋만 둔다(스펙 DECISION12). 칸 값은 정의와 `.env` 어디에도 두지 않는다. Hermes 는 정의의 `env` 만 자식에게 넘기므로 실행기가 key 위치를 받을 길은 이것뿐이다.
-- **실행기**: 대시보드 plugin 안의 독립 스크립트다. 이 PR 의 `connector_vault_key.py` 의 읽기와 풀기를 그대로 쓴다. 보관 파일을 풀고, manifest 의 칸과 env 이름 대응으로 자식 env 를 만든 뒤 `execve` 로 실제 서버가 된다. 풀지 못하면 값 없이 이유 종류만 stderr 에 쓰고 0 이 아닌 코드로 끝난다. 그 MCP 서버만 뜨지 않는다.
-- **원래 값을 받는 다른 자리**: 대시보드 직접 실행(`connector_run.py`)과 실행 가드 scope 검사(`connector_prepare.py`), 스냅샷(`connector_snapshot.py`)은 `.env` 대신 소유 기록의 보관 파일 id 로 `_read_vault` 를 부른다.
-- **실행기가 넘기지 않는 것**: `execve` 전에 key 위치를 가리키는 운영 환경 변수 셋을 자식 env 에서 지운다. 플러그인 코드가 key 위치를 받지 않게 한다.
-- **되돌리기**: PR2 를 이전 이미지로 되돌리면 `config.yaml` 에 실행기 정의가 남고 `.env` 사본은 지워진 뒤라 그 MCP 서버가 뜨지 않는다. 바인딩을 떼고 다시 붙여 옛 방식으로 다시 설치한다. 운영 절차에 적는다.
-- **비교와 떼기**: `_server_matches` 가 실행기 정의와 옛 정의를 모두 알아본다. 떼기는 실행기 정의와 남은 `.env` 사본을 함께 지운다. `PUT /api/env` 는 플러그인 칸 key 를 거절한다.
-- **원격 플러그인**: 지금처럼 `.env` 에 쓴다(DECISION8). REQ1 의 「바인딩 설치는 원격 플러그인만 `.env` 에 쓴다」 가 여기서 채워진다.
-- **토큰 교체(REQ8)**: 소유 기록의 바인딩 항목에 보관 파일 내용의 SHA-256(암호문의 해시라 값이 드러나지 않는다)을 둔다. 다시 설치할 때 그 값이 바뀌었으면 `restart_required` 가 참이다. Control Plane 은 지금처럼 보관 파일을 쓴 뒤 붙은 바인딩을 다시 설치한다.
-- **기동 이관(REQ7)**: 이 PR 의 기동 이관 뒤에 이어 돈다. 소유 기록에 stdio 바인딩이 있고 그 보관 파일을 풀 수 있으면 실행기 정의로 다시 쓰고 `.env` 사본을 지운다. 풀지 못하면 옛 정의와 사본을 남긴다(DECISION10). 남은 사본 수와 「gateway 재시작이 필요하다」 를 기동 로그에 남긴다.
+### 실행기 정의(DECISION12)
+
+stdio 플러그인의 바인딩 설치는 서버 정의를 아래 모양으로 쓴다. 원격 플러그인은 지금처럼 `.env` 에 쓴다(DECISION8).
+
+```yaml
+command: <대시보드 프로세스의 python>
+args: ["-I", <plugin 의 connector_launcher.py>, <보관 파일 id>, <플러그인 id>, "<칸 key>=<env 이름>", ..., "--", <실제 command>, <실제 args>...]
+env:
+  <운영자 env>: <운영 목록의 값>
+  <주인 env>: <그 바인딩의 값이나 빈 값>
+  FOS_ASSISTANT_CONNECTOR_VAULT_DIR: <보관 파일 디렉터리>
+  FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE: <대시보드 프로세스의 같은 이름의 값. 없으면 빈 값>
+  FOS_ASSISTANT_CONNECTOR_VAULT_REVISION: <보관 파일의 판>
+enabled: true
+```
+
+- 칸 env 는 정의에도 `.env` 에도 없다. 실행기가 띄울 때 채운다.
+- 경로 값은 모두 설치할 때 대시보드 프로세스에서 읽는다(`sys.executable`, 이 plugin 의 디렉터리, `_vault_dir()`, 운영 env). 코드에 경로 상수나 기본값을 두지 않으므로 공개 저장소에는 이름만 있다.
+- **보관 파일 디렉터리를 정의로 넘긴다.** Hermes 는 자식 env 를 `PATH`, `HOME` 같은 몇 이름과 정의의 `env` 로만 만든다(`_build_safe_env`, [`hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「MCP 프로세스의 환경 값」). `HERMES_HOME` 이 오지 않아 실행기가 Hermes 루트를 스스로 구하지 못한다.
+- **활성 key id 는 넘기지 않는다.** 실행기는 읽기만 하고, 읽기는 활성 id 와 상관없이 key 파일의 key 로 푼다(위 DECISION7). 넘기면 key 를 회전할 때마다 모든 정의가 낡는다.
+- **보관 파일 리비전(`REVISION`)을 정의에 둔다(REQ8).** 리비전은 파일의 inode, 수정 시각(ns), 크기의 SHA-256 이다. 파일 내용을 해시하지 않아 v1 평문에서도 값의 단서가 정의와 설정 백업에 남지 않는다. 토큰을 바꾸면 파일이 바뀌어 리비전이 달라지고, 다시 설치가 쓰는 정의가 달라져 지금 규칙(`previous != server`) 그대로 `restart_required` 가 참이다. 소유 기록의 모양은 바꾸지 않는다. 그래서 이전 이미지도 그 기록을 읽는다(아래 「되돌리기」).
+- **같은 값의 보관 파일은 다시 쓰지 않는다.** v2 는 IV 를 매번 새로 뽑아 같은 값도 다른 바이트가 된다. `_write_vault` 는 이미 있는 파일이 활성 key 의 v2(key 가 준비되지 않았으면 v1)이고 값이 같으면 쓰지 않는다. 같은 값으로 다시 등록해도 리비전이 그대로라 붙은 바인딩이 재시작 대기가 되지 않는다. key 회전과 v1 이관은 파일을 다시 쓰므로 그 뒤 첫 다시 설치는 재시작 대기를 답한다.
+- 정의는 그 profile 의 `config.yaml` 과 설정 백업에만 남는다. 칸 값은 어디에도 없다.
+
+### 실행기(`connector_launcher.py`)
+
+대시보드 plugin 디렉터리 안의 독립 스크립트다. Hermes 의 python 이 스크립트로 연다.
+
+- python 은 격리 모드(`-I`)로 연다. `PYTHON` 으로 시작하는 env, 사용자 site, 스크립트 디렉터리를 import 경로에 넣지 않는다. 실행기는 표준 라이브러리와 venv 의 `cryptography` 만 쓴다. Hermes 가 자기 프로세스에 더하는 site 경로에 기대지 않는다.
+
+- plugin 패키지의 `__init__.py` 를 실행하지 않는다. 자기 디렉터리를 하위 모듈 검색 경로로 둔 빈 패키지를 만들어 `connector_vault_format.py`(보관 파일 모양, AAD, 풀기)와 `connector_vault_key.py`(key 파일, AES-GCM)만 읽는다. 두 모듈은 표준 라이브러리, `cryptography`, `connector_schema.py` 만 쓴다. 대시보드와 같은 풀기 코드를 쓰려는 것이다.
+- 순서는 이렇다.
+  1. 인자를 본다. 보관 파일 id, 플러그인 id, 칸 key, env 이름은 대시보드와 같은 정규식이고, `--` 뒤에 command 가 있어야 한다. 칸 대응의 순서는 manifest 의 칸 순서다.
+  2. `FOS_ASSISTANT_CONNECTOR_VAULT_DIR` 아래 `<id>.json` 을 읽는다. 디렉터리나 파일이 링크면 거절한다.
+  3. v1 이면 그대로, v2 면 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE` 을 `_parse_key_file` 로 직접 읽은 key 묶음으로 푼다. `_vault_keys()` 는 활성 id 가 없으면 key 를 내지 않으므로 쓰지 않는다. AAD 는 대시보드와 같다.
+  4. 파일의 `connector` 가 인자의 플러그인 id 와 같은지 본다.
+  5. 자식 env 는 받은 env 에서 `FOS_ASSISTANT_CONNECTOR_VAULT_` 로 시작하는 이름을 모두 지우고 칸 값을 넣은 것이다. 보관 파일에 없는 칸은 빈 값이다. 플러그인 코드가 key 위치를 받지 않게 한다.
+  6. `PATH` 앞에 실제 command 의 디렉터리를 붙인다. Hermes 가 정의의 command 에 하는 것과 같다. 그 뒤 `os.execve` 로 실제 서버가 된다.
+- 칸 값은 칸 대응에 있는 칸만 넘긴다. 대응은 설치 때 지금 manifest 의 칸으로 만든 것이다. 값의 모양은 보관 파일을 쓸 때 이미 검사했다.
+- 모듈 읽기와 `execve` 까지 모두 예외 처리 안에 둔다. 잡지 못한 예외의 traceback 이 경로를 stderr 에 쓰지 않게 한다.
+- 실패하면 값과 경로 없이 이유 단어 하나(`arguments`, `vault_missing`, `vault_unreadable`, `connector_mismatch`, `exec_failed`)를 stderr 에 쓰고 78 로 끝난다. 그 MCP 서버만 연결되지 않고, stderr 는 그 profile 의 MCP stderr 기록에 모인다.
+
+### 정의 비교와 옛 정의 호환
+
+- **실행기 정의를 알아보는 규칙**은 args 가 `-I`, 파일 이름이 `connector_launcher.py` 인 경로, 보관 파일 id, 플러그인 id 로 시작하고 `--` 와 그 뒤의 command 가 있는 것이다(`_launcher_parts`). 그 밖은 옛 정의나 원격 정의로 본다.
+- **`_server_matches` 는 실행기 정의를 옛 모양으로 펼쳐 지금 규칙으로 비교한다.** 펼친 모양(`_launcher_inner`)은 command 가 실제 command, args 가 실제 args, env 가 실행기 env 셋을 뺀 env 에 칸 env 를 `${이름}` 으로 더한 것이다.
+- 실행기 칸은 따로 본다. python, 실행기 경로, 보관 파일 디렉터리, key 파일 값이 지금 대시보드의 값과 같고, 칸 대응이 지금 manifest 의 칸 key 와 env 이름과 같고, 플러그인 id 가 manifest 의 id 와 같아야 한다. 정의 env 에 칸 env 이름이 없어야 한다. `REVISION` 은 64자리 16진수인지만 본다.
+- 경로가 바뀌면(이미지의 python 자리, key 파일 자리) 맞지 않음으로 본다. 상태 조회가 `configured: false` 로 답하고, Control Plane 의 연결 확인이 다시 설치해 새 정의를 쓴다. 이 비교가 없으면 재시작 뒤 서버가 조용히 뜨지 않는다.
+- 옛 정의(`${이름}` 참조)는 지금 규칙 그대로 맞다고 본다. 보관 파일을 풀지 못해 남긴 바인딩(DECISION10)과 원격 플러그인이 끊기지 않는다.
+- `_connector_state` 의 모양 검사는 실행기 정의의 보관 파일 id 가 기록의 `vault` 와 같은지도 본다.
+- `_recoverable_server`(설정만 새 `tools.exclude` 인 정의의 복구)는 `REVISION` 을 빼고 비교한다. 금융 도구를 숨긴 profile 에서 보관 파일이 바뀌어도 다시 설치가 거절되지 않는다.
+- `_entry_manifest_mismatches`, `_bind_entry_env`, `_entry_field_env` 는 펼친 모양으로 본다. 그래서 떼기는 실행기 정의를 지우고, `.env` 에 남은 그 칸 줄(옛 사본)도 지운다.
+
+### 바인딩 설치
+
+- stdio 는 실행기 정의를 쓰고 `.env` 에서 이 플러그인의 칸 줄을 지운다. 칸 env 이름의 겹침 검사는 지금과 같다.
+- 설치 요청은 보관 파일을 읽는 같은 잠금 안에서 리비전을 구해 넘긴다.
+- python 경로(`sys.executable`)가 비었거나 절대 경로가 아니면 설치를 거절한다(503).
+- `restart_required` 는 지금 규칙 그대로다. 옛 정의에서 실행기 정의로 바뀌거나 `REVISION` 이 바뀌면 참이다.
+
+### 원래 값을 받는 다른 자리
+
+`_binding_env(profile_dir, manifest, entry)` 하나가 바인딩의 칸 env 값을 낸다. 실행기 정의면 기록의 `vault` 를 `_read_vault` 로 읽고 `connector` 가 같은지 본다. 옛 정의와 원격이면 지금처럼 `.env` 를 읽는다. 값의 자리가 정의의 종류를 따라가므로, 옛 방식으로 남은 바인딩도 지금처럼 돈다.
+
+| 자리 | 쓰는 곳 | 풀지 못하면 |
+| --- | --- | --- |
+| 직접 실행 | `connector_run.py` 의 execute 와 prepare | 지금의 `profile` 단계 실패(`unavailable`) |
+| 실행 가드 scope 검사 | `connector_prepare.py` 가 `_binding_env` 를 다시 불러 같은 값인지 본다 | `scope` 단계 거절 |
+| 스냅샷 | `connector_snapshot.py` | 503 |
+
+### `PUT /api/env`
+
+칸 env 이름(카탈로그 플러그인의 `fields[].env`)을 400 으로 거절한다. Control Plane 은 이 경로로 칸 값을 쓰지 않는다. 기본 key 셋만 쓴다(`HermesProfileProvisioner`). 운영자 env 는 지금처럼 쓰지 않고 성공으로 답한다(ADR-041). `DELETE /api/env` 는 남은 사본을 지울 수 있게 그대로 받는다.
+
+### 기동 이관(REQ7, DECISION10)
+
+`register` 가 보관 파일 이관 바로 뒤, 경로를 감싸기 전에 한 번 돌린다(위 DECISION8 과 같은 까닭). 둘을 따로 예외로 감싸 하나가 멈춰도 다른 것은 돌고, 기동은 잇는다.
+
+**바인딩 설치(`_connector_bind_config`)를 다시 돌리지 않는다.** 설치는 스킬, hook plugin 파일, API 도구 목록도 검사해 거절할 수 있고, 그러면 풀 수 있는 바인딩의 사본이 남는다. 이관은 그 서버 정의, 소유 기록의 그 항목, 이름 대응, `.env` 의 그 칸 줄만 바꾼다.
+
+1. `list_profile_names()` 의 profile 마다 소유 기록이 있고 관리 표식이나 플러그인 표식이 있는 것만 본다. 소유 기록을 읽지 못하면 세고 넘어간다.
+2. 항목마다 원격이면 건너뛰고 원격 수에 센다.
+3. 실행기 정의이고, `.env` 에 그 칸 줄이 없고, 실행기 칸이 지금 값과 맞으면(manifest 가 없으면 그것만 빼고) 이미 옮긴 것으로 두고 손대지 않는다.
+4. 펼친 모양이 지금 manifest 와 맞지 않으면 남긴다. 칸 대응을 알 수 없다. 다시 연결하면 새 정의로 설치된다.
+5. `config.yaml` 의 그 서버가 소유 기록과 다르면 남긴다. 운영자가 바꾼 정의는 `.env` 를 참조할 수 있다.
+6. 보관 파일이 없거나 풀지 못하거나 그 플러그인의 것이 아니면 남긴다(DECISION10). 옛 정의와 `.env` 사본으로 계속 돈다.
+7. 그 밖이면 펼친 모양에서 실행기 정의를 만들어 `config.yaml`, 소유 기록, 이름 대응을 쓰고, 마지막에 `.env` 의 그 칸 줄을 지운다. 이미 지금 값의 실행기 정의에 사본만 남았으면 사본만 지우고 「그대로 둔 실행기 바인딩」 에 센다. 정의가 그대로라 재시작이 필요 없다. 판은 이관이 푼 바로 그 파일로 구한다. 쓰기 전에 설정 백업을 남기고, 쓰기가 실패하면 쓴 파일을 되돌린다. `.env` 를 맨 뒤에 써서 앞에서 멈추면 사본이 남고 다음 기동이 다시 지운다.
+8. 끝나면 info 한 줄을 남긴다. `바인딩 이관: 실행기로 옮김 N, 그대로 둔 실행기 바인딩 N, 남은 사본 N, 원격 N, 읽지 못한 소유 기록 N` 꼴이다. 남은 바인딩은 플러그인 id 와 수만 warning 한 줄로 남기고, profile 이름과 경로는 남기지 않는다. 옮긴 것이 있으면 「gateway 재시작이 필요하다」 를 warning 으로 남긴다. 이관은 요청이 아니라 Control Plane 에 신호가 가지 않는다. 운영이 이 줄을 보고 재시작한다.
+
+- 다시 돌리면 옮긴 바인딩은 3 에서 그대로 두므로 바뀌는 파일이 없다.
+- 「남은 사본」 은 4 부터 6 으로 남긴 stdio 바인딩 수다. 운영은 배포 뒤 이 수가 0 인지 본다.
+- 이미지를 바꿔 python 이나 plugin 경로가 바뀐 실행기 정의도 3 을 지나지 않으므로 7 에서 지금 경로로 다시 쓴다.
+
+### 되돌리기
+
+- PR1 이미지로 되돌리면 그 이미지에는 실행기가 없어 실행기 정의의 서버가 뜨지 않는다. 소유 기록의 모양은 같으므로 그 이미지의 바인딩 설치가 기록을 읽는다. 모든 연결의 연결 확인을 돌리면 다시 설치가 옛 정의와 `.env` 사본을 다시 쓰고 `restart_required` 로 답한다. 그 뒤 gateway 를 재시작한다.
+- 이미 재시작 대기로 남은 바인딩은 연결 확인이 설치를 다시 보내지 않는다. 그런 바인딩과 다시 설치가 거절된 바인딩은 떼고 다시 붙인다.
+- 실행기 정의를 평문 방식으로 되돌리는 스크립트는 두지 않는다.
+
+### 운영 순서
+
+배포 → 대시보드 기동 로그의 「바인딩 이관」 줄에서 남은 사본이 0 인지 본다 → gateway 재시작 → stdio 연결마다 도구 호출을 한 번 왕복시킨다. 남은 사본이 있으면 그 연결을 다시 등록한다. 확인 절차는 `fos-home-infra` 가 갖는다.
+대시보드와 gateway 가 같은 파일 시스템과 계정에서 돈다는 것이 전제다. 정의의 경로를 gateway 의 MCP 자식이 그대로 연다(운영 확인 2026-11-04: 같은 컨테이너, 같은 계정, 같은 venv python).
+배포와 gateway 재시작 사이에는 떠 있는 서버가 옛 값을 쥔 채 돈다. 그 사이 서버가 다시 뜨면 옛 정의의 `${이름}` 이 지워진 사본을 가리켜 값 없이 뜰 수 있으므로, 재시작은 배포 직후에 한다.
 
 ## 검증 전략
 
@@ -176,8 +275,17 @@ PR1 의 요구사항은 대시보드 plugin 의 Python 단위 테스트로 실�
 | REQ4 | `PUT`, `call` | 「key 필수」 와 key 없음·틀림에서 PUT 이 503 이고 파일이 바뀌지 않는다. 같은 상태에서 v1 보관 파일의 `call` 은 돈다. 끄면 v1 로 쓰고 경고 로그가 남는다 |
 | REQ5 | 문서 | 공개 정보 검사(`check-public-safe.sh`)와 리뷰 |
 
+PR2 의 요구사항도 같은 테스트 기반으로 실제 파일과 실제 자식 프로세스를 만들어 확인한다. 실행기는 테스트의 python 으로 실제로 띄워, 받은 env 를 파일로 내는 대역 서버로 바꿔 끼운다.
+
+| REQ | 경계 | 확인 |
+| --- | --- | --- |
+| REQ6 | 바인딩 설치, 실행기, 직접 실행, prepare, 스냅샷, `PUT /api/env` | 설치 뒤 `.env` 와 `config.yaml` 에 칸 값이 없고 정의가 실행기 모양이다. 그 정의의 command 와 args, env 로 실행기를 띄우면 대역 서버가 원래 값을 받고 `FOS_ASSISTANT_CONNECTOR_VAULT_` 이름은 받지 않는다. 직접 실행, prepare 의 scope 검사, 스냅샷의 자식 env 가 원래 값이다. 보관 파일을 지우거나 다른 연결로 바꾸면 실행기가 78 로 끝나고 stderr 에 값과 경로가 없다. 떼면 실행기 정의와 남은 사본이 지워진다. `PUT /api/env` 의 칸 key 가 400 이다. `_server_matches` 가 옛 정의와 실행기 정의를 모두 맞다고 보고, 경로가 바뀐 실행기 정의는 맞지 않다고 본다 |
+| REQ7 | 기동 이관 함수 | 옛 정의와 `.env` 사본을 가진 바인딩, 보관 파일을 풀지 못하는 바인딩, 원격 바인딩을 두고 이관한 뒤, 앞의 것은 실행기 정의이고 사본이 없으며, 가운데 것은 옛 정의와 사본이 그대로이고, 원격은 그대로인지와 로그의 수를 본다. 다시 돌리면 파일이 바뀌지 않는다 |
+| REQ8 | 보관 파일 PUT 과 다시 설치 | 같은 값으로 다시 설치하면 `changed: false` 이고, 값을 바꿔 PUT 한 뒤 다시 설치하면 `restart_required: true` 다 |
+| 원격 | 바인딩 설치 | 원격 플러그인은 지금처럼 `.env` 에 쓴다 |
+
 예외와 로그에 값이 없다는 것은 모든 실패 테스트에서 칸 값과 key 의 base64 가 로그 출력과 응답에 없는지로 본다.
-운영의 수(평문 파일 0, 옛 key 파일 0)와 도구 호출 왕복은 배포 뒤 코디네이터가 `fos-home-infra` 의 절차로 본다.
+운영의 수(평문 파일 0, 옛 key 파일 0, 남은 사본 0)와 gateway 재시작 뒤 도구 호출 왕복은 배포 뒤 코디네이터가 `fos-home-infra` 의 절차로 본다.
 
 ## 결정
 
@@ -192,3 +300,10 @@ PR1 의 요구사항은 대시보드 plugin 의 Python 단위 테스트로 실�
 | DECISION7 | 활성 id 가 틀릴 때의 읽기 | 읽기는 활성 id 와 상관없이 파일의 key 로 푼다 | 작성자 | 활성 id 하나가 틀려 모든 연결이 멈추지 않게 한다. 쓰기만 활성 key 를 요구한다 |
 | DECISION8 | 이관을 돌리는 때 | 이관을 경로 감싸기와 provider 등록보다 먼저 돌린다 | 작성자 | 요청과 겹치지 않음을 Hermes 의 호출 순서 가정 없이 보장한다 |
 | DECISION9 | 모양을 읽지 못하는 파일의 덮어쓰기 | 모양을 읽지 못하는 파일은 덮어쓴다 | 작성자 | 주인을 알 수 없고 연결마다 이름이 하나라, 막으면 다시 등록으로 고칠 수 없다 |
+| DECISION10 | 토큰 교체를 알리는 자리 | 보관 파일의 판(파일 stat 의 해시)을 소유 기록이 아니라 실행기 정의의 env(`REVISION`)에 둔다. 같은 값은 다시 쓰지 않는다 | 작성자 | 정의가 바뀌어 지금 규칙으로 `restart_required` 가 참이 된다. 소유 기록의 모양이 그대로라 이전 이미지가 기록을 읽어 되돌리기가 다시 설치로 끝난다 |
+| DECISION11 | 실행기에 주는 key 정보 | key 파일 위치만 주고 활성 key id 는 주지 않는다 | 작성자 | 읽기는 활성 id 를 쓰지 않는다. 주면 key 회전마다 모든 정의가 낡는다 |
+| DECISION12 | 보관 파일 디렉터리 | 설치 때 대시보드가 구한 디렉터리를 정의의 env 로 준다 | 작성자 | Hermes 가 자식에게 `HERMES_HOME` 을 넘기지 않아 실행기가 루트를 구하지 못한다 |
+| DECISION13 | 대시보드 직접 실행이 읽는 값의 자리 | 실행기 정의면 보관 파일, 옛 정의와 원격이면 `.env` | 작성자 | 이관하지 못해 남긴 바인딩(스펙 DECISION10)이 지금처럼 돈다 |
+| DECISION14 | 실행기 정의의 경로 비교 | python, 실행기, 보관 파일 디렉터리, key 파일 값을 지금 값과 견준다 | 작성자 | 경로가 바뀐 정의는 재시작 뒤 서버가 뜨지 않는다. 맞지 않음으로 드러내야 연결 확인이 다시 설치한다 |
+| DECISION15 | 실행기가 읽는 코드 | plugin 패키지를 실행하지 않고 빈 패키지로 `connector_vault_format.py` 와 `connector_vault_key.py` 만 읽는다 | 작성자 | 대시보드와 같은 풀기 코드를 쓰되 Hermes 와 starlette 를 읽지 않아 자식이 가볍고 실패할 자리가 적다 |
+| DECISION16 | 기동 이관의 범위 | 바인딩 설치를 다시 돌리지 않고 정의, 소유 기록, 이름 대응, `.env` 칸 줄만 바꾼다 | 작성자 | 설치의 다른 검사가 거절하면 풀 수 있는 바인딩의 사본이 남아 REQ7 을 어긴다. 기동 때 hook plugin 파일이 바뀌는 부작용도 없앤다 |

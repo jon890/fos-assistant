@@ -18,10 +18,15 @@ from .connector_manifest import (
     _connector_roots,
 )
 
+from .connector_vault_format import (
+    VAULT_ID_RE,
+    _parse_vault,
+    _unseal_vault,
+    _vault_aad,
+)
+
 from .connector_vault_key import (
-    KEY_ID_RE,
     VaultKeyUnavailable,
-    _open,
     _seal,
     _vault_keys,
 )
@@ -29,8 +34,6 @@ from .connector_vault_key import (
 
 # 연결의 칸 값을 두는 보관 파일의 디렉터리다. 대시보드의 Hermes 루트 아래에 둔다(ADR-083).
 CONNECTOR_VAULT_DIR = "connector-vault"
-# 보관 파일 이름이다. Control Plane 의 연결 id 앞에 `c` 를 붙인다. 경로 조각으로 쓰기 전에 본다.
-VAULT_ID_RE = re.compile(r"^c[1-9][0-9]{0,18}\Z")
 VAULT_PATH = "/api/connector-vault"
 VAULT_ROUTES = frozenset({(VAULT_PATH, "PUT"), (VAULT_PATH, "DELETE")})
 # 보관 파일 쓰기의 임시 파일 이름 앞부분이다. 쓰는 중에 프로세스가 죽으면 평문이 남을 수 있어 기동 이관이 지운다.
@@ -53,52 +56,6 @@ def _vault_path(vault: str) -> pathlib.Path:
     if directory.is_symlink() or path.is_symlink():
         raise ValueError("보관 파일 경로에 심볼릭 링크가 있다")
     return path
-
-
-def _vault_aad(vault: str, connector: str) -> bytes:
-    """암호문을 그 연결 이름과 플러그인에 묶는 글이다. 파일을 다른 연결로 옮기거나 `connector` 를 바꾸면 풀리지 않는다."""
-    return ("connector-vault:%s:%s" % (vault, connector)).encode("utf-8")
-
-
-def _parse_vault(raw: bytes) -> dict:
-    """보관 파일 글의 모양을 엄격히 본다. 풀지 않는다. 틀리면 예외다. 값은 예외 메시지에 싣지 않는다.
-
-    v1 은 `{"v": 1, "connector", "values"}` 평문이고, v2 는 `{"v": 2, "connector", "key_id", "sealed"}` 다
-    (ADR-20261103 connector-vault-key).
-    """
-    try:
-        value = json.loads(raw.decode("utf-8"))
-    except (UnicodeError, ValueError):
-        raise ValueError("보관 파일의 모양이 올바르지 않다") from None
-    if (not isinstance(value, dict) or not isinstance(value.get("connector"), str)
-            or not CONNECTOR_ID_RE.match(value["connector"])):
-        raise ValueError("보관 파일의 모양이 올바르지 않다")
-    version = value.get("v") if type(value.get("v")) is int else None
-    if version == 1 and set(value) == {"v", "connector", "values"}:
-        values = value["values"]
-        if isinstance(values, dict) and all(isinstance(key, str) and isinstance(item, str)
-                                            for key, item in values.items()):
-            return value
-    if (version == 2 and set(value) == {"v", "connector", "key_id", "sealed"}
-            and isinstance(value["key_id"], str) and KEY_ID_RE.match(value["key_id"])
-            and isinstance(value["sealed"], str)):
-        return value
-    raise ValueError("보관 파일의 모양이 올바르지 않다")
-
-
-def _unseal_vault(vault: str, stored: dict, keys) -> dict:
-    """v2 보관 파일을 풀어 v1 과 같은 모양으로 돌려준다. 그 key 가 없거나 풀지 못하면 `ValueError` 다."""
-    # 활성 id 가 틀려도 파일의 key 로 푼다. 쓰기만 활성 key 를 요구한다.
-    key = keys.keys.get(stored["key_id"])
-    if key is None:
-        raise ValueError("보관 파일을 풀 key 가 없다")
-    try:
-        values = json.loads(_open(key, stored["sealed"], _vault_aad(vault, stored["connector"])).decode("utf-8"))
-    except (UnicodeError, ValueError):
-        raise ValueError("보관 파일을 풀지 못했다") from None
-    if not isinstance(values, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in values.items()):
-        raise ValueError("보관 파일의 모양이 올바르지 않다")
-    return {"v": 2, "connector": stored["connector"], "values": values}
 
 
 def _read_vault(vault: str, keys=None) -> dict | None:
@@ -140,16 +97,34 @@ def _write_vault(vault: str, connector: str, values: dict) -> None:
     os.chmod(path.parent, 0o700)
     if path.exists():
         try:
-            owner = _parse_vault(path.read_bytes())["connector"]
+            existing = _parse_vault(path.read_bytes())
+            owner = existing["connector"]
         except ValueError:
             # 주인을 알 수 없는 파일이다. 이름은 연결마다 하나라 덮어써야 다시 등록으로 고칠 수 있다.
             logger.warning("dashboard-profile-api: 모양을 읽지 못하는 보관 파일 %s 를 덮어쓴다", vault)
-            owner = connector
+            existing, owner = None, connector
         if owner != connector:
             raise FileExistsError("다른 플러그인의 보관 파일이다")
+        if existing is not None and _vault_unchanged(vault, existing, values, keys):
+            return
     if not keys.ready:
         logger.warning("dashboard-profile-api: 보관 파일 key 가 %s 라 보관 파일 %s 를 평문으로 쓴다", keys.state, vault)
     _durable_private_write(path, _vault_bytes(vault, connector, values, keys))
+
+
+def _vault_unchanged(vault: str, existing: dict, values: dict, keys) -> bool:
+    """이미 있는 파일이 지금 쓸 모양과 값 그대로인가. 그렇다면 다시 쓰지 않는다.
+
+    v2 는 IV 를 매번 새로 뽑아 같은 값도 다른 바이트가 된다. 같은 값으로 다시 등록할 때 파일을 바꾸지 않아야
+    실행기 정의의 보관 파일 리비전이 그대로이고 붙은 바인딩이 까닭 없이 재시작 대기가 되지 않는다(REQ8).
+    """
+    try:
+        if keys.ready:
+            return (existing["v"] == 2 and existing["key_id"] == keys.active_id
+                    and _unseal_vault(vault, existing, keys)["values"] == values)
+        return existing["v"] == 1 and existing["values"] == values
+    except ValueError:
+        return False
 
 
 def _durable_private_write(path: pathlib.Path, value: bytes) -> None:

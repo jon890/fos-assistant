@@ -17,6 +17,7 @@ import types
 import unittest
 from unittest import mock
 
+import launcher_support
 import test_connector_execute as execute_base
 import test_connector_manifest as base
 
@@ -167,6 +168,30 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
         self.assertEqual(self.trades, [])
         self.assertEqual(before, ((self.profile / ".env").read_bytes(), (self.profile / self.plugin.CONNECTOR_STATE).read_bytes()))
         self.assertNotIn(body["execution"]["ticket"], json.dumps(answer))
+
+    def test_launcher_binding_prepares_and_executes_with_vault_scope(self):
+        """실행기 정의의 바인딩은 scope 검사와 실행이 보관 파일 값을 쓴다(REQ6). `.env` 에 값이 없어도 된다."""
+        launcher_support.use_vault_root(self, self.base / "hermes")
+        self.entry = launcher_support.launcher_entry(self, self.profile, base.DEMO,
+                                                     {"token": "demo_ok_0123456789", "scope": "000007"}, entry=self.entry)
+        (self.profile / ".env").write_text("", encoding="utf-8")
+        status, answer = self.request(PREPARE, "POST", self.body())
+        self.assertEqual(status, 200, answer)
+        self.assertTrue(answer["ok"], answer)
+        status, answer = self.request(EXECUTE, "POST", self.body(execution=True))
+        self.assertEqual(status, 200, answer)
+        self.assertEqual(len(self.claims), 1)
+        # 실행을 시작한 뒤 보관 파일의 scope 가 바뀌면 다시 읽은 값이 달라 scope 단계에서 거절한다.
+        launch = importlib.import_module(self.plugin.__name__ + ".connector_launch")
+        changed = {"DEMO_TOKEN": "demo_ok_0123456789", "DEMO_SCOPE": "000008"}
+        with mock.patch.object(launch, "_binding_env", return_value=changed):
+            self.assertEqual(self.request(PREPARE, "POST", self.body())[0], 409)
+        self.assertEqual(len(self.claims), 1)
+        # 보관 파일을 풀지 못하면 칸 값을 읽는 profile 단계에서 멈추고 자식을 띄우지 않는다.
+        (self.base / "hermes/connector-vault/c1.json").write_text("{}", encoding="utf-8")
+        status, answer = self.request(PREPARE, "POST", self.body())
+        self.assertEqual((status, answer), (200, {"ok": False, "error": "unavailable", "stage": "profile", "code": "-"}))
+        self.assertEqual(len(self.claims), 1)
 
     def test_missing_support_and_legacy_financial_have_no_calls(self):
         self.mode = "missing"

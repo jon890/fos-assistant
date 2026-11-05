@@ -86,6 +86,6 @@ class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
 
         installed = self.bind(vault="c7")
         self.assertEqual(installed.status_code, 200, installed.body)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"], {"DEMO_BASE": DEMO_BASE})
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"], {"DEMO_BASE": DEMO_BASE, **self.launcher_env("c7")})
         self.assertFalse((self.root / "alice/.env").exists())
         self.assertEqual(self.status_of()["connectors"][0]["configured"], True)

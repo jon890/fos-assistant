@@ -80,10 +80,12 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
                                       body={"profile": "owner", "key": "DEMO_TOKEN"}), 401)
 
     def test_connector_env_keys_follow_the_catalog(self):
-        """플러그인 key 는 카탈로그에 있는 동안만 쓸 수 있다. 목록에서 빠지면 400 이다."""
+        """플러그인 칸 key 는 쓸 수 없고(REQ6), 지우기는 카탈로그에 있는 동안만 받는다. 목록에서 빠지면 둘 다 400 이다."""
         self.connector_fixture()
         body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
-        self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 200)
+        self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 400)
+        self.assertEqual(self.request("/api/env", "DELETE", token="valid",
+                                      body={"profile": "alice", "key": "DEMO_TOKEN"}), 200)
         with self.without_environment("FOS_ASSISTANT_CONNECTOR_ROOTS"):
             self.assertEqual(self.request("/api/env", "PUT", token="valid", body=body), 400)
             self.assertEqual(self.request("/api/env", "DELETE", token="valid",
@@ -106,36 +108,33 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
         self.assertEqual(self.request("/api/env", "PUT", token="valid", body={
             "profile": "owner", "key": "DEMO_BASE", "value": "x"}), 401)
 
-    def test_connector_env_update_does_not_reinstall_a_bound_connector(self):
-        """연결 칸을 직접 바꿔도 vault 바인딩을 다시 설치하지 않고 값은 응답에 싣지 않는다."""
+    def test_connector_env_update_is_rejected_before_or_after_binding(self):
+        """연결 칸을 `PUT /api/env` 로 쓰면 붙이기 전이든 뒤든 400 이고 `.env` 에 사본이 생기지 않는다(REQ6). 값은 응답에 없다."""
         self.connector_fixture()
-        body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
-        response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.body["restart_required"])
-        self.binding_install()
-        response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.body["restart_required"])
-        self.assertNotIn("demo_ok_0123456789", json.dumps(response.body))
-        self.assertEqual(self.request("/api/env", "PUT", token="valid", body={**body, "profile": "owner"}), 401)
+        for key, value in (("DEMO_TOKEN", "demo_ok_0123456789"), ("DEMO_SCOPE", "scope-value-123")):
+            body = {"profile": "alice", "key": key, "value": value}
+            response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(self.binding_install().status_code, 200)
+            response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
+            self.assertEqual(response.status_code, 400)
+            self.assertNotIn(value, json.dumps(response.body))
+            self.assertNotIn(key, self.env_text())
 
-    def test_optional_field_updates_explicit_empty_env(self):
-        """선택 칸을 채우고 비우면 MCP 설정의 변수 참조와 빈 값이 함께 바뀐다."""
+    def test_optional_field_is_an_empty_child_env_without_a_definition_entry(self):
+        """비운 선택 칸은 실행기 정의에 없고 실행기가 빈 값으로 넘긴다. 칸을 지워도 정의는 그대로이고 probe 가 된다."""
         self.connector_fixture()
         self.binding_install()
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
-        response = self.request("/api/env", "PUT", token="valid", body={
-            "profile": "alice", "key": "DEMO_SCOPE", "value": "a"})
-        self.assertEqual(response, 200)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
+        self.assertNotIn("DEMO_SCOPE", self.alice_config()["mcp_servers"]["demo"]["env"])
+        self.assertEqual(self.launched()[1]["env"]["DEMO_SCOPE"], "")
+        before = (self.root / "alice/config.yaml").read_bytes()
         self.assertEqual(self.request("/api/env", "DELETE", token="valid", body={
             "profile": "alice", "key": "DEMO_SCOPE"}), 200)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
+        self.assertEqual((self.root / "alice/config.yaml").read_bytes(), before)
         self.assertEqual(self.connector_probe(), 204)
 
-    def test_optional_field_update_does_not_reinstall_the_bound_plugin(self):
-        """연결 칸의 직접 변경은 bound plugin 을 다시 쓰지 않지만 재시작 표시는 낸다."""
+    def test_rejected_field_update_does_not_reinstall_the_bound_plugin(self):
+        """거절한 연결 칸 쓰기는 붙은 plugin 파일을 다시 쓰지 않는다."""
         self.connector_fixture()
         self.assertEqual(self.binding_install().status_code, 200)
         installed = self.root / "alice/plugins/fos-ctx/__init__.py"
@@ -143,24 +142,23 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
         installed.write_bytes(bundled + b"# changed\n")
         response = self.request("/api/env", "PUT", token="valid", full_response=True, body={
             "profile": "alice", "key": "DEMO_SCOPE", "value": "a"})
-        self.assertEqual(response.status_code, 200)
-        self.assertIs(response.body["restart_required"], True)
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(installed.read_bytes(), bundled + b"# changed\n")
         self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
         self.assertIs(self.policy_hook(), False)
 
     def test_values_with_quotes_and_backslashes_round_trip_through_vault_binding(self):
-        """`"` 와 `\\` 가 든 값은 보관 파일에서 바인딩 `.env` 로 같은 값으로 쓰인다."""
+        """`"` 와 `\\` 가 든 값은 보관 파일에서 실행기의 자식 env 로 같은 값으로 간다. `.env` 의 줄 모양은 `_env_line` 이 갖는다."""
         self.bind_fixture()
         tricky = 'a "quoted" path\\to\\ dir #1'
         self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
                                     values={"token": DEMO_VALUE, "scope": tricky}).status_code, 200)
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
 
-        env_text = (self.root / "alice/.env").read_text(encoding="utf-8")
-        self.assertIn('DEMO_SCOPE="', env_text)
-        self.assertEqual(self.plugin._env_value(env_text, "DEMO_SCOPE"), tricky)
-        self.assertEqual(self.plugin._env_value(env_text, "DEMO_TOKEN"), DEMO_VALUE)
+        child = self.launched()[1]["env"]
+        self.assertEqual(child["DEMO_SCOPE"], tricky)
+        self.assertEqual(child["DEMO_TOKEN"], DEMO_VALUE)
+        self.assertEqual(self.env_text(), "")
     def test_env_value_reads_what_env_line_writes(self):
         """`_env_value` 는 `_env_line` 의 역이고 `export` 꼴과 `=` 둘레의 공백과 작은따옴표도 읽는다."""
         for value in ('plain', 'a "b" c', 'back\\slash', 'end\\', '"', "it's #hash", ""):

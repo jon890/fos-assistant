@@ -31,15 +31,19 @@ def _operator_env_ignored(body: dict):
 
 
 async def _check_env_update(request):
-    """`.env` 쓰기를 허용한 key 와 Control Plane 이 쓰는 profile 로 제한한다."""
+    """`.env` 쓰기를 허용한 key 와 Control Plane 이 쓰는 profile 로 제한한다.
+
+    플러그인 칸 env 는 받지 않는다. 로컬 플러그인의 칸 값은 실행기가 보관 파일에서 풀고, 원격 플러그인의 값은 바인딩 설치가 쓴다.
+    이 경로로 쓴 사본은 지울 곳이 없어 평문으로 남는다(docs/features/connector/design.md 의 「`PUT /api/env`」).
+    """
     body = await _json_object(request)
     if body is None or set(body) != {"profile", "key", "value"}:
         return _rejected("profile, key, value 만 필요하다")
     rejected = _profile_rejection(body["profile"], request)
     if rejected is not None:
         return rejected
-    field_keys, operator_keys = _connector_env_keys()
-    if not isinstance(body["key"], str) or body["key"] not in BASE_ENV_KEYS | field_keys | operator_keys:
+    _, operator_keys = _connector_env_keys()
+    if not isinstance(body["key"], str) or body["key"] not in BASE_ENV_KEYS | operator_keys:
         return _rejected("쓸 수 없는 key 다")
     value = body["value"]
     if not isinstance(value, str) or any(ch in value for ch in "\r\n\0"):

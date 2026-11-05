@@ -18,6 +18,8 @@ from .common import (
     logger,
 )
 
+from .connector_launch import _launcher_server
+from .connector_remote import _is_remote
 from .connector_manifest import (
     _connector_manifest,
     _connector_roots,
@@ -108,10 +110,11 @@ def _skills_with_index_marker(skills_config) -> dict | None:
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
                            owner_attachments: str | None = None, owner_output: str | None = None,
-                           owner_browser: str | None = None, guard: dict | None = None) -> dict:
+                           owner_browser: str | None = None, guard: dict | None = None, revision: str | None = None) -> dict:
     """일반 에이전트의 profile 에 플러그인을 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
-    붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
+    붙이기는 로컬 플러그인이면 실행기 정의(보관 파일 리비전 `revision`)를 쓰고 `.env` 의 칸 줄을 지운다. 원격이면 값을 `.env` 에 쓴다.
+    그리고 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
     plugin 의 스킬을 그 profile 의 스킬로 복사한다. Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
     새로 붙이기는 그 profile 에서 정책 hook plugin 이 켜져 있어야 한다. 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다.
     이미 붙은 플러그인을 다시 설치하는 것은 hook 이 꺼져 있어도 받는다. 그때 그 바인딩은 hook 상태로 `PENDING` 에 남는다.
@@ -234,6 +237,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             server["env"][manifest["owner_browser_env"]] = (
                 owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser)
                 else "")
+        if not _is_remote(server):
+            server = _launcher_server(manifest, server, vault, revision or "")
         previous = servers.get(name)
         if name in servers and (not owned or (
                 previous != owned["server"] and not _recoverable_server(previous, owned["server"], server))):
@@ -244,7 +249,7 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
             allowed.append(name)
         # 있던 줄은 그 자리에서 바꾸고 새 줄은 뒤에 붙인다. 같은 값으로 다시 붙이면 파일이 그대로다.
         wanted = {field["env"]: _env_line(field["env"], values[field["key"]]) for field in manifest["fields"]
-                  if values.get(field["key"])}
+                  if values.get(field["key"]) and _is_remote(server)}
         kept = []
         for line in env_lines:
             key = _env_line_key(line)

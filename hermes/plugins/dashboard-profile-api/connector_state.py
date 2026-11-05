@@ -25,6 +25,7 @@ from .connector_policy import (
     _hermes_tool_name,
 )
 
+from .connector_launch import _launcher_current, _launcher_inner, _launcher_parts, _without_revision
 from .connector_remote import _is_remote, _remote_header_env, _remote_record_ok
 
 from .connector_schema import (
@@ -57,7 +58,8 @@ POLICY_PLUGIN = "fos-ctx"
 
 
 def _recoverable_server(current: dict, recorded: dict, desired: dict) -> bool:
-    """설정이 새 정의이고 소유 기록과 tools.exclude만 다를 때만 복구한다."""
+    """설정이 새 정의이고 소유 기록과 tools.exclude만 다를 때만 복구한다. 실행기 정의의 보관 파일 리비전은 견주지 않는다."""
+    current, recorded, desired = (_without_revision(server) for server in (current, recorded, desired))
     return (current == desired
             and {key: value for key, value in current.items() if key != "tools"}
             == {key: value for key, value in recorded.items() if key != "tools"})
@@ -115,7 +117,7 @@ def _connector_tool_map(state: dict, detached: dict | None = None) -> dict:
         recorded = entry["mcp_server"]
         try:
             matches = _server_matches(manifest, entry["server"])
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError, ValueError):
             matches = False
         if recorded != name or not matches:
             name, tools = recorded, {}
@@ -192,6 +194,10 @@ def _connector_state(value, target: str | None = None) -> dict:
                     or any(not isinstance(name, str) or not isinstance(item, str)
                            for name, item in server["env"].items())))):
             raise ValueError("소유 기록의 실행 정의 모양이 올바르지 않다")
+        # 실행기 정의는 기록의 보관 파일을 연다. 다른 보관 파일을 가리키면 다른 연결의 값이 그 바인딩에 간다.
+        launcher = _launcher_parts(server)
+        if launcher is not None and launcher["vault"] != entry["vault"]:
+            raise ValueError("실행기 정의의 보관 파일이 소유 기록과 다르다")
         if plugin not in roots or plugin != target:
             continue
         if not _entry_matches_manifest(plugin, entry):
@@ -211,8 +217,10 @@ def _entry_manifest_mismatches(plugin: str, entry: dict) -> tuple[str, ...]:
     manifest = _connector_manifest(plugin)
     if manifest is None or not isinstance(entry.get("server"), dict):
         return ()
-    recorded = entry["server"]
+    recorded = _launcher_inner(entry["server"])
     expected = manifest["server"]
+    # 실행기 칸(python, 실행기, 보관 파일 디렉터리, key 파일, 칸 대응)이 지금 값과 다르면 `launcher` 로 알린다.
+    stale = ["launcher"] if recorded is not entry["server"] and not _launcher_current(manifest, entry["server"]) else []
     if manifest["transport"] == "http" or _is_remote(recorded):
         mismatches = [name for name in ("url", "headers", "strict_redirect_headers") if recorded.get(name) != expected.get(name)]
     else:
@@ -224,7 +232,7 @@ def _entry_manifest_mismatches(plugin: str, entry: dict) -> tuple[str, ...]:
             mismatches.append("env")
     if entry.get("mcp_server", manifest["mcp_server"]) != manifest["mcp_server"]:
         mismatches.append("mcp_server")
-    return tuple(mismatches)
+    return tuple(stale + mismatches)
 
 
 def _remove_backup_env_copies(profile_dir: pathlib.Path) -> None:
@@ -250,7 +258,7 @@ def _entry_field_env(plugin: str, entry: dict) -> set:
         return {field["env"] for field in manifest["fields"]}
     if _is_remote(entry["server"]):
         return _remote_header_env(entry["server"])
-    return {key for key, value in entry["server"]["env"].items() if value == "${%s}" % key}
+    return {key for key, value in _launcher_inner(entry["server"])["env"].items() if value == "${%s}" % key}
 
 
 def _bind_entry_shape(entry) -> None:
@@ -274,7 +282,8 @@ def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
     이름이 거기 남아 있다. manifest 가 있고 기록의 실행 정의가 지금과 같으면 칸의 env 이름도 지운다.
     Control Plane 이 쓰는 이름은 지우지 않는다.
     """
-    server = entry.get("server")
+    # 실행기 정의는 칸 env 를 `${이름}` 으로 펼쳐 본다. 떼기가 `.env` 에 남은 옛 사본도 지운다.
+    server = _launcher_inner(entry.get("server"))
     env = server.get("env") if isinstance(server, dict) else None
     names = {key for key, value in env.items() if isinstance(key, str) and value == "${%s}" % key} \
         if isinstance(env, dict) else set()
@@ -283,7 +292,7 @@ def _bind_entry_env(manifest: dict | None, entry: dict) -> set:
     if manifest is not None:
         try:
             matches = _server_matches(manifest, server)
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError, ValueError):
             matches = False
         if matches:
             names |= {field["env"] for field in manifest["fields"]}

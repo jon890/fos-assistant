@@ -6,11 +6,12 @@ import asyncio
 import json
 import os
 
-from .common import (CONNECTOR_HOST_MARKER, MANAGED_MARKER, _env_value, _env_line_key,
+from .common import (CONNECTOR_HOST_MARKER, MANAGED_MARKER, _env_line_key,
                      _missing_profile, _profile_rejection)
 from .connector_guard import _strict_json
 from .connector_diagnostics import snapshot_diagnostics_scope
 from .connector_guard_validation import _same_json
+from .connector_launch import _binding_env
 from .connector_manifest import _connector_manifest, _entry_mode
 from .connector_mcp import _mcp_sdk_problem
 from .connector_run import (_installed_server_env, _installed_owner_attachments,
@@ -83,7 +84,8 @@ def _snapshot_env(profile, manifest):
     if set(installed) & SNAPSHOT_ENV or {_env_line_key(line) for line in text.splitlines()} & SNAPSHOT_ENV:
         raise PermissionError
     server = manifest["server"]
-    env = {field["env"]: _env_value(text, field["env"]) for field in manifest["fields"]}
+    # 실행기 정의면 소유 기록의 보관 파일, 옛 정의면 `.env` 에서 칸 값을 읽는다.
+    env = dict(_binding_env(directory, manifest, state[manifest["id"]]))
     env.update({name: server["env"][name] for name in manifest["operator_env"]})
     if manifest["owner_attachments_env"] is not None:
         env[manifest["owner_attachments_env"]] = _installed_owner_attachments(installed, manifest)

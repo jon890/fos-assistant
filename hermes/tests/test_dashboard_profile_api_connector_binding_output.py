@@ -26,7 +26,7 @@ class ProfileApiConnectorBindingOutputTest(support.ProfileApiRouteTest):
         self.assertEqual(pathlib.Path(expected).stat().st_mode & 0o777, 0o700)
         record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
         self.assertEqual(record[DEMO]["server"], server)
-        self.assertNotIn("DEMO_OUTPUT_DIR", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertNotIn("DEMO_OUTPUT_DIR", self.env_text())
         self.assertIs(self.status_of()["connectors"][0]["configured"], True)
         self.assertNotIn(expected, json.dumps(response.body))
         # 같은 값으로 다시 붙이면 바뀐 것이 없다.

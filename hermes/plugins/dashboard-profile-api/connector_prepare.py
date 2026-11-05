@@ -45,12 +45,13 @@ async def _guard_operation(profile, manifest, entry, body, env, prepare=False):
         _require(current.get(manifest["id"]) == entry and latest is not None
                  and latest["execution_guard_manifest_sha256"] == manifest["execution_guard_manifest_sha256"])
     fields = {field["key"]: field for field in manifest["fields"]}
-    from .common import _env_value
+    from .connector_launch import _binding_env
     with _stage("scope"):
-        fresh_env = (get_profile_dir(profile) / ".env").read_text(encoding="utf-8")
+        # 실행기 정의면 보관 파일을, 옛 정의면 `.env` 를 다시 읽어 그 사이에 값이 바뀌지 않았는지 본다.
+        fresh_env = _binding_env(get_profile_dir(profile), manifest, entry)
         for scope in guard["scope_fields"]:
             name = fields[scope["field"]]["env"]
-            _require(bool(env.get(name)) and _env_value(fresh_env, name) == env[name])
+            _require(bool(env.get(name)) and fresh_env.get(name) == env[name])
             if not prepare:
                 _require(body["args"].get(scope["arg"]) == env[name], "scope_arg")
     if not prepare:

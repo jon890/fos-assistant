@@ -35,15 +35,21 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertTrue(markers[0].startswith("fos-skill-index-"), markers)
         self.assertEqual(config["mcp_servers"]["fos-assistant"], before["mcp_servers"]["fos-assistant"])
         self.assertEqual(config["agent"], before["agent"])
-        self.assertEqual(config["mcp_servers"]["demo"]["env"],
-                         {"DEMO_TOKEN": "${DEMO_TOKEN}", "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE})
-        self.assertEqual(config["mcp_servers"]["other"]["env"],
-                         {"OTHER_TOKEN": "${OTHER_TOKEN}", "OTHER_SCOPE": "${OTHER_SCOPE}", "OTHER_BASE": OTHER_BASE})
+        # 로컬 플러그인은 실행기 정의다. 칸 env 는 정의에도 `.env` 에도 없고, 실행기가 보관 파일에서 풀어 자식에게만 준다.
+        self.assertEqual(config["mcp_servers"]["demo"]["env"], {"DEMO_BASE": DEMO_BASE, **self.launcher_env("c1")})
+        self.assertEqual(config["mcp_servers"]["other"]["env"], {"OTHER_BASE": OTHER_BASE, **self.launcher_env("c2")})
+        demo_args = config["mcp_servers"]["demo"]["args"]
+        self.assertEqual(demo_args[2:7], ["c1", DEMO, "token=DEMO_TOKEN", "scope=DEMO_SCOPE", "--"])
+        self.assertEqual(demo_args[7], self.connector_command)
         self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
-        env = self.root / "alice/.env"
-        self.assertEqual(env.read_text(encoding="utf-8").splitlines(),
-                         ["DEMO_TOKEN=" + DEMO_VALUE, "OTHER_TOKEN=" + OTHER_VALUE, "OTHER_SCOPE=a"])
-        self.assertEqual(env.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.env_text(), "")
+        for server, expected in (("demo", {"DEMO_TOKEN": DEMO_VALUE, "DEMO_SCOPE": "", "DEMO_BASE": DEMO_BASE}),
+                                 ("other", {"OTHER_TOKEN": OTHER_VALUE, "OTHER_SCOPE": "a", "OTHER_BASE": OTHER_BASE})):
+            code, child = self.launched(server)
+            self.assertEqual(code, 0, server)
+            self.assertEqual(child["command"], self.connector_command)
+            self.assertEqual({name: child["env"][name] for name in expected}, expected)
+            self.assertFalse([name for name in child["env"] if name.startswith("FOS_ASSISTANT_CONNECTOR_VAULT_")])
         for target, source in (("skills/demo/SKILL.md", demo / "skills/demo/SKILL.md"),
                                ("skills/demo/references/guide.md", demo / "skills/demo/references/guide.md"),
                                ("skills/other/SKILL.md", other / "skills/other-dir/SKILL.md")):
@@ -79,7 +85,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertNotIn(DEMO_VALUE, json.dumps(status))
 
     def test_rebinding_with_changed_values_requires_restart(self):
-        """이미 있던 서버의 `.env` 값을 바꾸면 gateway 가 같은 이름을 다시 연결하지 않으므로 재시작을 기다린다."""
+        """보관 파일 값을 바꾼 뒤 다시 설치하면 정의의 판이 달라지고, gateway 가 같은 이름을 다시 연결하지 않으므로 재시작을 기다린다(REQ8)."""
         self.bind_fixture()
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
 
@@ -89,8 +95,10 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertEqual(changed_value.status_code, 200, changed_value.body)
         self.assertEqual({key: changed_value.body[key] for key in ("changed", "restart_required", "reload_pending")},
                          {"changed": True, "restart_required": True, "reload_pending": False})
-        self.assertIn("DEMO_TOKEN=demo_new_9876543210",
-                      (self.root / "alice/.env").read_text(encoding="utf-8").splitlines())
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["FOS_ASSISTANT_CONNECTOR_VAULT_REVISION"],
+                         self.launcher_env("c1")["FOS_ASSISTANT_CONNECTOR_VAULT_REVISION"])
+        self.assertEqual(self.launched()[1]["env"]["DEMO_TOKEN"], "demo_new_9876543210")
+        self.assertEqual(self.env_text(), "")
 
     def test_rebinding_with_the_same_values_changes_nothing(self):
         """같은 값으로 다시 붙이면 모든 칸이 거짓이고 `config.yaml` 이 그대로다. 표식도 새로 쓰지 않는다."""
@@ -122,7 +130,8 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         removed = self.bind(DEMO, enabled=False)
         self.assertEqual(removed.status_code, 200, removed.body)
         self.assertIs(removed.body["changed"], True)
-        self.assertNotIn("DEMO_TOKEN", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertNotIn("DEMO_TOKEN", self.env_text())
+        self.assertNotIn("demo", self.alice_config()["mcp_servers"])
         self.assertEqual(self.alice_config()["skills"], {"disabled": {"operator": True}})
 
     def test_string_skills_disabled_is_rewritten_as_the_list_hermes_reads(self):
@@ -428,7 +437,8 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         self.assertEqual(server["env"]["DEMO_BROWSER_URL"], BROWSER_ADDRESS)
         record = json.loads((self.root / "alice/.fos-connectors.json").read_text(encoding="utf-8"))
         self.assertEqual(record[DEMO]["server"], server)
-        self.assertNotIn("DEMO_BROWSER_URL", (self.root / "alice/.env").read_text(encoding="utf-8"))
+        self.assertNotIn("DEMO_BROWSER_URL", self.env_text())
+        self.assertEqual(self.launched()[1]["env"]["DEMO_BROWSER_URL"], BROWSER_ADDRESS)
         self.assertNotIn(BROWSER_ADDRESS, json.dumps(response.body))
         self.assertIs(self.status_of()["connectors"][0]["configured"], True)
         before = (self.root / "alice/config.yaml").read_bytes()
@@ -493,22 +503,20 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         config["mcp_servers"]["demo"] = record[DEMO]["server"]
         self.write_config("alice", config)
         env_path = self.root / "alice/.env"
-        env_path.write_text(env_path.read_text(encoding="utf-8") + "DEMO_OLD_URL=http://192.0.2.1:9222\n",
-                            encoding="utf-8")
+        env_path.write_text(self.env_text() + "DEMO_OLD_URL=http://192.0.2.1:9222\nOPERATOR_NOTE=x\n", encoding="utf-8")
         self.declare_owner_browser(demo)
 
         response = self.bind(browser=BROWSER_ADDRESS)
 
         self.assertEqual(response.status_code, 200, response.body)
         lines = env_path.read_text(encoding="utf-8").splitlines()
-        self.assertEqual([line for line in lines if line.startswith("DEMO_OLD_URL=")], [], lines)
-        self.assertIn("DEMO_TOKEN=" + DEMO_VALUE, lines)
+        self.assertEqual(lines, ["OPERATOR_NOTE=x"])
         server_env = self.alice_config()["mcp_servers"]["demo"]["env"]
         self.assertNotIn("DEMO_OLD_URL", server_env)
         self.assertEqual(server_env["DEMO_BROWSER_URL"], BROWSER_ADDRESS)
 
     def test_vault_with_a_field_no_longer_declared_still_binds(self):
-        """지금 manifest 에 없는 칸이 남은 보관 파일로도 설치된다. 남은 칸만 `.env` 에 쓴다. 보관 파일을 쓰는 검사는 그대로 거절한다."""
+        """지금 manifest 에 없는 칸이 남은 보관 파일로도 설치된다. 실행기는 남은 칸만 넘긴다. 보관 파일을 쓰는 검사는 그대로 거절한다."""
         self.bind_fixture()
         vault = self.hermes_root / "connector-vault" / "c3.json"
         vault.write_text(json.dumps({"v": 1, "connector": DEMO,
@@ -517,9 +525,10 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
         response = self.bind(vault="c3")
 
         self.assertEqual(response.status_code, 200, response.body)
-        env = (self.root / "alice/.env").read_text(encoding="utf-8")
-        self.assertIn("DEMO_TOKEN=" + DEMO_VALUE, env.splitlines())
-        self.assertNotIn("old-value", env)
+        self.assertEqual(self.env_text(), "")
+        child = self.launched()[1]["env"]
+        self.assertEqual(child["DEMO_TOKEN"], DEMO_VALUE)
+        self.assertNotIn("old-value", child.values())
         written = self.vault("PUT", vault="c4", connector=DEMO, values={"token": DEMO_VALUE, "retired": "old-value"})
         self.assertEqual(written.status_code, 400)
 

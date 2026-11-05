@@ -43,7 +43,7 @@ Control Plane 은 이미 KEK 로 사용자 데이터 key 를 감싸 대화와 �
 - 감당할 것:
   - **key 를 잃으면 모든 연결을 다시 등록해야 한다.** key 사본은 운영이 한 곳에 따로 보관한다. 자리는 `fos-home-infra` 가 갖는다.
   - key 는 Hermes 컨테이너 안에 있다. 같은 계정으로 도는 플러그인과 실행 공간을 적용하지 않은 profile 의 셸은 key 와 보관 파일을 함께 읽을 수 있다. 이 결정은 디스크와 백업을 막고, 실행 중인 프로세스의 격리 수준은 바꾸지 않는다.
-  - profile `.env` 의 평문 사본은 실행기가 들어올 때까지 남는다(스펙 REQ6, REQ7).
+  - 로컬 플러그인의 profile `.env` 평문 사본은 실행기가 없앴다(스펙 REQ6, REQ7). 원격 플러그인의 값은 예외로 `.env` 에 남는다(스펙 DECISION8).
   - 이 결정을 배포한 뒤 이전 이미지로 되돌리면 v2 파일을 읽지 못하고, 이전 이미지의 쓰기도 그 파일을 덮어쓰지 못한다. 그때는 연결을 해제한 뒤 다시 등록한다.
   - plugin 이 Hermes 이미지의 `cryptography` 에 기댄다. Hermes 를 올릴 때 core 의존에 남아 있는지 확인한다.
 - **적용 범위**: `hermes/plugins/dashboard-profile-api` 의 `connector_vault_key.py`, `connector_vault.py`, `connector_vault_migration.py`.

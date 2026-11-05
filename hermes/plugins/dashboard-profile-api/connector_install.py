@@ -25,6 +25,8 @@ from .connector_binding import (
     _connector_bind_config,
 )
 
+from .connector_launch import _vault_revision
+
 from .connector_manifest import (
     _connector_manifest,
     _connector_roots,
@@ -229,6 +231,8 @@ async def _connector_request(request):
             stored = await asyncio.to_thread(_read_vault, body["bind"]["vault"])
             if stored is None or stored["connector"] != body["plugin"]:
                 return _rejected("그 connector 의 보관 파일이 없다")
+            # 실행기 정의에 둘 보관 파일 리비전이다. 같은 잠금 안에서 읽어 위의 값과 같은 파일이다.
+            revision = await asyncio.to_thread(_vault_revision, body["bind"]["vault"])
             # 지금 manifest 에 없는 칸은 버린다. 칸을 뺀 플러그인의 옛 연결도 다시 설치된다. 남은 값은 지금처럼 검사한다.
             fields = {field["key"] for field in manifest["fields"]}
             values = _vault_values(manifest, {key: value for key, value in stored["values"].items() if key in fields})
@@ -250,7 +254,7 @@ async def _connector_request(request):
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
                                              body["bind"]["vault"], values, owner_attachments, owner_output,
-                                             body.get("owner_browser"), body["bind"].get("guard"))
+                                             body.get("owner_browser"), body["bind"].get("guard"), revision)
             if manifest.get("execution_guard") is not None:
                 installed = _connector_state(json.loads((profile_dir / CONNECTOR_STATE).read_text(encoding="utf-8")))
                 support = await asyncio.to_thread(_guard_support, profile, manifest, installed.get(body["plugin"]))

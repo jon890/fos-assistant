@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -355,6 +356,39 @@ class ProfileApiRouteTest(unittest.TestCase):
 
     def alice_config(self):
         return yaml.safe_load((self.root / "alice/config.yaml").read_text(encoding="utf-8"))
+
+    def launcher_env(self, vault="c1"):
+        """바인딩 설치가 실행기 정의의 env 에 넣는 실행기 칸이다. 보관 파일 리비전은 지금 파일의 inode, 수정 시각, 크기의 해시다."""
+        stat = (self.hermes_root / "connector-vault" / ("%s.json" % vault)).stat()
+        revision = "%d:%d:%d" % (stat.st_ino, stat.st_mtime_ns, stat.st_size)
+        return {"FOS_ASSISTANT_CONNECTOR_VAULT_DIR": str(self.hermes_root / "connector-vault"),
+                "FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE": os.environ.get("FOS_ASSISTANT_CONNECTOR_VAULT_KEY_FILE", ""),
+                "FOS_ASSISTANT_CONNECTOR_VAULT_REVISION": hashlib.sha256(revision.encode("ascii")).hexdigest()}
+
+    def env_text(self, profile="alice"):
+        """그 profile 의 `.env` 본문이다. 파일이 없으면 빈 문자열이다. 로컬 바인딩은 `.env` 를 만들지 않는다."""
+        path = self.root / profile / ".env"
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
+    def launched(self, server="demo", profile="alice", base=None):
+        """그 profile 의 실행기 정의대로 실행기를 열어 실제 서버가 받을 command, argv, env 를 돌려준다.
+
+        Hermes 가 하듯 몇 기본 이름(`base`)에 정의의 `env` 를 얹어 넘긴다. `execve` 를 바꿔 끼워 서버는 띄우지 않는다.
+        `(종료 코드, {"command", "argv", "env"})` 를 돌려준다. 종료 코드가 0 이 아니면 dict 는 비어 있다.
+        """
+        definition = yaml.safe_load((self.root / profile / "config.yaml").read_text(encoding="utf-8"))["mcp_servers"][server]
+        self.assertEqual(definition["command"], sys.executable)
+        self.assertEqual(definition["args"][0], "-I")
+        spec = importlib.util.spec_from_file_location("connector_launcher_under_test", definition["args"][1])
+        launcher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(launcher)
+        captured = {}
+
+        def execve(command, argv, env):
+            captured.update(command=command, argv=list(argv), env=dict(env))
+
+        environ = {"PATH": "/usr/bin:/bin", "HOME": "/home/test", **(base or {}), **definition["env"]}
+        return launcher.launch(definition["args"][2:], environ, execve), captured
 
     @contextlib.contextmanager
     def without_environment(self, *names):
