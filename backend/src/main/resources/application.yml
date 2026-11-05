@@ -276,6 +276,15 @@ assistant:
     max-runs-per-day: 48
     # 시간대를 비운 작업의 시간대
     default-time-zone: Asia/Seoul
+  event-watch:
+    # 사건 감지의 목록 확인이 도는 때(초 포함 6필드, ADR-20261105 / event-watch). 검사에서는 - 로 끈다
+    check-cron: "0 */15 * * * *"
+    # 확인 지점보다 이만큼 앞부터 겹쳐 받아 늦게 들어온 항목을 놓치지 않는다
+    overlap: 30m
+    # 바인딩마다 그 시간대의 하루에 여는 사건 실행 수
+    max-runs-per-day: 12
+    # 사건 실행 하나의 입력에 싣는 새 항목 수. 수는 모두 센다
+    max-items-per-run: 20
   attention:
     # 실패한 turn 을 지금 화면에 보이는 기간
     failure-window: 7d

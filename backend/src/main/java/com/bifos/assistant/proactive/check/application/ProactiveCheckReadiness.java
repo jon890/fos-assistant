@@ -43,6 +43,15 @@ public class ProactiveCheckReadiness {
      */
     static final Set<String> ALWAYS_BLOCKED_TOOLSETS = Set.of("delegation", "clarify", "cronjob");
 
+    /**
+     * 사건 실행(ADR-20261105 / event-watch)에 켜 둘 수 있는 toolset 이다. 쓰기 허용과 상관없이 읽기 경계의 목록을 쓴다. 외부인이 보낸
+     * 메일이 깨우는 사람 없는 실행이라 쓰기 허용 에이전트의 넓은 목록을 받지 않는다.
+     */
+    static final Set<String> EVENT_ALLOWED_TOOLSETS = ALLOWED_TOOLSETS;
+
+    /** 격리 실행 공간 설정이 켜졌을 때만 사건 실행에 받는 셸·파일·코드 실행 toolset 이다(ADR-086). */
+    public static final Set<String> ISOLATION_REQUIRED_TOOLSETS = Set.of("terminal", "file", "code_execution");
+
     /** 무엇을 읽고 무엇을 고를지 정하는 분야 지침 스킬의 이름이다. */
     static final String SKILL_NAME = "proactive-check";
 
@@ -69,6 +78,38 @@ public class ProactiveCheckReadiness {
             .toList();
         if (!notAllowed.isEmpty()) {
             blockers.add(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, notAllowed));
+        }
+        return new CheckReadiness(blockers);
+    }
+
+
+    /**
+     * 그 에이전트로 사건 실행을 열 수 있는지 판정한다(ADR-20261105 / event-watch). 분야 지침 스킬은 보지 않는다. 사건 실행은 지시와 입력의
+     * 「새 사건」 만으로 돈다.
+     *
+     * @param isolatedExecution 격리 실행 공간 설정이 켜졌는가. 꺼져 있으면 셸·파일·코드 실행 toolset 이 켜진 에이전트를
+     * {@code ISOLATED_EXECUTION_REQUIRED} 로 막는다
+     */
+    public CheckReadiness checkEvent(Agent agent, boolean isolatedExecution) {
+        List<CheckBlocker> blockers = new ArrayList<>();
+        if (!properties.current().enabled()) {
+            blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
+        }
+        Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
+            .filter(name -> !connectorServers.contains(name) && !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
+            .distinct()
+            .sorted()
+            .toList();
+        List<String> shell = enabled.stream().filter(ISOLATION_REQUIRED_TOOLSETS::contains).toList();
+        List<String> notAllowed = enabled.stream()
+            .filter(name -> !EVENT_ALLOWED_TOOLSETS.contains(name) && !ISOLATION_REQUIRED_TOOLSETS.contains(name))
+            .toList();
+        if (!notAllowed.isEmpty()) {
+            blockers.add(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, notAllowed));
+        }
+        if (!isolatedExecution && !shell.isEmpty()) {
+            blockers.add(new CheckBlocker(CheckBlockerCode.ISOLATED_EXECUTION_REQUIRED, shell));
         }
         return new CheckReadiness(blockers);
     }

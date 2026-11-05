@@ -2,6 +2,7 @@ package com.bifos.assistant.proactive.check.infra;
 
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
@@ -18,7 +19,16 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
 
 
-    boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(Long conversationId);
+    /**
+     * 그 점검 대화에 그 계기가 아닌 살펴보기가 남긴 열지 않은 보고가 있는가. 매일 깨우기의 건너뛰기가 사건 실행의 보고로 바뀌지 않게
+     * {@code EVENT} 를 뺀다(ADR-20261105 / event-watch).
+     */
+    boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNullAndTriggerNot(
+        Long conversationId, CheckTrigger trigger);
+
+
+    /** 그 사용자가 그 시각 뒤에 그 계기로 연 살펴보기 수. 사건 실행을 하루 발화 상한에 넣을 때 센다. */
+    long countByUserIdAndTriggerAndStartedAtAfter(Long userId, CheckTrigger trigger, Instant after);
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

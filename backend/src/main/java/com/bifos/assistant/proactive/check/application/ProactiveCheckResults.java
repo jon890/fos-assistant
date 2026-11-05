@@ -15,7 +15,6 @@ import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
-import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.domain.type.FindingKind;
 import com.bifos.assistant.proactive.check.domain.type.FindingReason;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -88,7 +87,7 @@ class ProactiveCheckResults {
             && block.findings().isEmpty()
             && block.questions().isEmpty()
             && block.sourceFailures().isEmpty()) {
-            if (check.trigger() == CheckTrigger.SCHEDULED) {
+            if (check.trigger().silentWhenEmpty()) {
                 return new CheckAnswer("", false, true);
             }
             return new CheckAnswer(NOTHING_NEW_NOTICE, true, false);
@@ -106,7 +105,7 @@ class ProactiveCheckResults {
                 judged,
                 announced.acceptedProblemKeys(),
                 title -> deps.followUps().hasOpenWithTitle(owner.id(), title));
-        if (check.trigger() == CheckTrigger.SCHEDULED
+        if (check.trigger().silentWhenEmpty()
             && newFindings == 0
             && block.questions().isEmpty()
             && block.sourceFailures().isEmpty()) {
