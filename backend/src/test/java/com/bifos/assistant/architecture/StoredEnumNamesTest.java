@@ -59,7 +59,7 @@ class StoredEnumNamesTest {
                 "SUBAGENT_STARTED",
                 "SUBAGENT_COMPLETED",
                 "PROVIDER_SWITCHED")),
-        Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED")),
+        Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED", "EVENT")),
         Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
         Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
         Map.entry(
