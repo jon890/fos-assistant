@@ -128,7 +128,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 
 **질의와 답.** `POST /internal/hermes/tool-guard`, 인증은 `connector-policy` 와 같은 profile 토큰이다. 주소는 `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `tool-guard` 로 바꾼 것이라 운영 환경 값을 더하지 않는다. 본문은 `{v, root_session_id, session_id, tool_call_id, hermes_tool, sig}` 이고 서명할 글은 `v1-tool-guard`, `hermes_tool`, 루트 session, session, `tool_call_id` 를 줄바꿈으로 잇는다. 답은 `connector-policy` 와 같은 `{"decision": "allow" | "block", "message"}` 다. 제한 시간은 `POLICY_TIMEOUT` 이고 한 번만 부른다.
 
-**hook 이 막는 경우.** Control Plane 이 `allow` 로 답하지 않았다(404 만 예외, 아래 「실패와 일관성」 의 배포 순서), 주소나 토큰이 없다, tool_call_id 가 없다, 무엇이든 예외가 났다. 예외는 hook 안에서 잡아 정해 둔 글로 막는다. callback 예외도 Hermes 가 막지만 그때는 예외 본문 일부가 모델에게 간다. 새 Control Plane 은 이 경로에서 404 를 내지 않는다. 판정 중의 어떤 예외든 200 의 `block` 으로 답하고, 본문을 읽지 못하면 다른 거절과 같은 401 계열 오류다.
+**hook 이 막는 경우.** Control Plane 이 `allow` 로 답하지 않았다(404 만 예외, 아래 「실패와 일관성」 의 배포 순서), 주소나 토큰이 없다, tool_call_id 가 없다, 무엇이든 예외가 났다. 예외는 hook 안에서 잡아 정해 둔 글로 막는다. callback 예외도 Hermes 가 막지만 그때는 예외 본문 일부가 모델에게 간다. 새 Control Plane 은 이 경로에서 404 를 내지 않는다. 판정 중의 어떤 예외든 200 의 `block` 으로 답하고, 본문을 읽지 못하거나 서명이 틀리면 다른 거절과 같은 `TOOL_GUARD_REJECTED`(403)다.
 
 **session 이 없는 호출은 통과시킨다.** 코드 실행 안의 도구 호출(`execute_code` 의 RPC 와 상주 kernel)은 hook 에 `task_id` 만 넘긴다(계약 테스트가 고정). 그 코드를 연 `execute_code` 는 session 을 들고 와 판정을 받았고, 사건 실행 트리에서는 그 `execute_code` 가 막힌다. 보통 대화의 kernel 안 스레드가 cell 이 끝난 뒤에도 부를 수 있지만 그 kernel 은 사건 실행 트리에서 열리지 않는다. session 이 없는 호출을 막으면 보통 대화의 코드 실행이 깨진다.
 
