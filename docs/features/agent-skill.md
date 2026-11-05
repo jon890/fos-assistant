@@ -386,8 +386,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../h
 
 #### 이름이 정해진 스킬
 
-`proactive-check` 는 먼저 살펴보기의 분야 지침이다. 에이전트에 이 이름의 스킬이 켜져 있으면 그 에이전트는 살펴보기를 할 수 있다.
-살펴보기 turn 은 Control Plane 이 이 스킬을 읽으라는 입력을 만들어 보내고 호출 이력에는 남기지 않는다.
+이름으로 뜻이 정해진 스킬은 없다. 먼저 살펴보기의 분야 지침이던 `proactive-check` 는 2026-11-05 에 요구하지 않기로 했다. 살펴보기는 그 스킬 없이 Control Plane 지시만으로 돌고, 그 이름의 스킬이 남아 있어도 읽게 하지 않는다.
 사용자가 `/proactive-check` 로 직접 부르면 보통 스킬 커맨드이고 읽기 경계를 받지 않는다. 계약은 [`docs/features/proactive.md`](proactive.md) 가 갖는다.
 
 ### 호출 이력

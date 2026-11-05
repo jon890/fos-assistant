@@ -345,6 +345,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
         JsonNode hook = response.get("policy_hook");
         boolean policyHook = hook != null && hook.isBoolean() && hook.asBoolean();
+        JsonNode guard = response.get("tool_guard");
+        boolean toolGuard = guard != null && guard.isBoolean() && guard.asBoolean();
         for (JsonNode item : connectors) {
             if (connectorId.equals(text(item, PLUGIN))) {
                 String mode = requiredText(item, "mode");
@@ -358,7 +360,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                     false,
                     policyHook,
                     mode,
-                    HttpHermesConnectorGuard.supportState(item.get("execution_guard")));
+                    HttpHermesConnectorGuard.supportState(item.get("execution_guard")),
+                    toolGuard);
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.

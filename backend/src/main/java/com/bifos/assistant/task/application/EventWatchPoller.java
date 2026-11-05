@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorEventListing;
 import com.bifos.assistant.hermes.application.dto.ConnectorEventWatch;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.hermes.application.port.HermesEventFeedClient;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.check.application.dto.EventBatch;
@@ -19,7 +20,6 @@ import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.config.EventWatchProperties;
-import com.bifos.assistant.task.config.ProactiveScheduleProperties;
 import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.task.domain.type.TaskRunStatus;
 import com.bifos.assistant.task.infra.TaskRunRepository;
@@ -61,6 +61,7 @@ public class EventWatchPoller {
     private final ConnectorEventWatches watches;
     private final EventWatchNotices notices;
     private final HermesEventFeedClient feed;
+    private final HermesConnectorClient installs;
     private final ProactiveCheckService proactiveChecks;
     private final ProactiveCheckRepository checks;
     private final TaskRunRepository runs;
@@ -68,7 +69,6 @@ public class EventWatchPoller {
     private final AppUserRepository users;
     private final SignInRevocation revocation;
     private final EventWatchProperties properties;
-    private final ProactiveScheduleProperties isolation;
     private final TaskProperties taskProperties;
     private final TaskRunRecovery recovery;
     private final TransactionTemplate transactions;
@@ -161,7 +161,26 @@ public class EventWatchPoller {
                 .consumed(queriedAt, nowSeen, false, today));
             return;
         }
+        if (!toolGuardInstalled(target)) {
+            // 판정 plugin 이 없거나 옛 버전이면 위험한 도구를 막을 수 없어 깨우지 않는다. 지점을 두고 다음 확인에서 다시 본다.
+            update(target.bindingId(), current -> current.reachable().checked(now, EventWatchResult.BLOCKED, fresh.size()));
+            return;
+        }
         wake(target, manifest.get(), owner.get(), fresh, nowSeen, queriedAt, today, now);
+    }
+
+
+    /**
+     * 그 profile 에 사건 실행의 도구 판정을 하는 {@code fos-ctx} 가 깔려 있고 재시작을 기다리지 않는가(ADR-20261105 / event-watch). 바인딩의
+     * {@code READY} 는 마지막 연결 확인 때의 값이라 깨울 때마다 설치 상태를 다시 읽는다. 읽지 못하면 깨우지 않는다.
+     */
+    private boolean toolGuardInstalled(EventWatchTarget target) {
+        try {
+            return installs.readConnector(target.profile(), target.connectorId()).guardsEventRuns();
+        } catch (RuntimeException ex) {
+            log.warn("사건 감지의 설치 상태를 읽지 못해 깨우지 않았다 bindingId={}", target.bindingId(), ex);
+            return false;
+        }
     }
 
 
@@ -172,7 +191,7 @@ public class EventWatchPoller {
         EventBatch batch = new EventBatch(target.bindingId(), manifest.title(), watch.noun(), watch.link(), fresh.size(),
             fresh.stream().limit(properties.maxItemsPerRun()).toList());
         try {
-            proactiveChecks.startEvent(owner, target.agentCode(), batch, isolation.isolatedExecutionEnabled(),
+            proactiveChecks.startEvent(owner, target.agentCode(), batch,
                 check -> watches.update(target.bindingId(), current -> current.reachable()
                     .checked(now, EventWatchResult.WOKE, fresh.size())
                     .consumed(queriedAt, nowSeen, true, today)));

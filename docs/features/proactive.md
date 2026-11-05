@@ -16,7 +16,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 - 결과는 그 사용자와 에이전트의 점검 대화 하나에만 남는다. 같은 에이전트를 쓰는 다른 사용자의 점검 대화와 살펴보기는 따로다.
 - 관리자가 쓰기 도구를 허용하지 않은 에이전트의 살펴보기는 읽기만 하고, 그 경계는 Control Plane 이 강제한다.
 - 살펴보기가 끝나도 문제 후보를 가치 평가에 잇지 않는다. 지금 화면에는 결과 블록의 제안이 제안 카드로 보인다.
-- 사용자에게 스킬을 부르라고 안내하지 않는다. 스킬은 에이전트를 준비하는 사람이 설치한다.
+- 사용자에게 스킬을 부르라고 안내하지 않는다. 살펴보기는 분야 지침 스킬 없이 Control Plane 지시만으로 돈다(2026-11-05 사용자 결정).
 
 ### 새 설계
 
@@ -118,7 +118,7 @@ sequenceDiagram
     C->>C: proactive_check 줄 저장, 쓰기 허용 값 옮겨 적기
     C-->>W: 202 conversationId
     W->>C: 점검 대화의 SSE 를 따라간다
-    C->>H: POST /v1/runs, 분야 지침을 읽으라는 입력과 Control Plane 지시
+    C->>H: POST /v1/runs, 맥락을 실은 입력과 Control Plane 지시
     H->>D: 플러그인 도구 직접 호출, 호출마다 Control Plane 이 판정
     H-->>C: 답 끝의 fos-check-result 블록
     C->>C: 블록 검사, 답이나 알림 줄 저장
@@ -132,7 +132,7 @@ sequenceDiagram
 
 결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 한 번의 실행이 `proactive_check` 이고, 그 결과가 남는 점검 대화는 `conversation.purpose = CHECK` 다.
-분야 지침은 그 에이전트의 스킬 `proactive-check` 이고 분야 패키지가 소유한다.
+분야 지침 스킬은 쓰지 않는다. 무엇을 살펴볼지는 모델이 입력의 맥락과 Control Plane 지시로 고른다. 옛 `proactive-check` 스킬은 2026-11-05 에 요구하지 않기로 했다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「분야 지침 개정」).
 발견과 문제 후보는 따로 저장하지 않는다. 다음 살펴보기가 쓸 것은 보고(`report_json`)에 담는다. 살펴보기 트리는 루트가 살펴보기 turn 인 실행 트리다.
 
 ### 진입점
@@ -175,8 +175,10 @@ sequenceDiagram
 
 - **확인은 모델 없이 돈다.** `EventWatchPoller` 가 `assistant.event-watch.check-cron`(기본 15분)마다 사건 감지를 켠 바인딩을 차례로 본다. 대시보드 plugin 의 `events` 경로가 그 profile 의 연결 값으로 플러그인의 `event_watch` 조회 도구를 부르고 식별자, 받은 시각, 라벨만 돌려준다. 새 항목이 없으면 살펴보기 줄과 실행 줄을 만들지 않고 바인딩 줄의 상태만 덮어쓴다
 - **같은 항목으로 두 번 깨우지 않는다.** 확인 지점은 결과를 다 쓴 마지막 조회를 시작한 Control Plane 의 시각이다. 다음 조회는 지점보다 `overlap`(30분) 앞부터 받고, 그 구간에서 이미 본 식별자를 뺀다. 메일의 `Date` 머리는 보낸 사람이 쓰는 값이라 지점으로 쓰지 않는다. 처음 켜면 지점은 켠 시각이다
-- **새 항목이 있으면 `EVENT` 살펴보기 하나를 연다.** 입력의 「새 사건」 절에 원천 이름, 새 항목 수, 식별자와 원문 링크를 `<external-data>` 로 싣는다(20개까지). 지시는 사건 실행 규칙(`ProactiveCheckInstructions.EVENT_RULES`)을 더하고, 분야 지침 스킬을 읽게 하지 않는다. 알릴 항목은 결과 블록의 `findings` 한 칸씩이고 `topicKey` 가 항목 식별자다. 지점과 이미 본 식별자는 살펴보기 줄과 같은 트랜잭션에서 옮긴다
-- **사건 실행은 늘 읽기 경계다.** 에이전트의 쓰기 허용과 상관없이 `writes_allowed` 를 거짓으로 적고, 준비 판정도 읽기 경계의 toolset 목록(`ProactiveCheckReadiness.checkEvent`)으로 한다. 셸·파일·코드 실행 toolset 은 `isolated-execution-enabled` 가 참일 때만 받는다
+- **새 항목이 있으면 `EVENT` 살펴보기 하나를 연다.** 사용자의 메인 에이전트에서 돈다. 입력의 「새 사건」 절에 원천 이름, 새 항목 수, 식별자와 원문 링크를 `<external-data>` 로 싣는다(20개까지). 지시는 사건 실행 규칙(`ProactiveCheckInstructions.EVENT_RULES`)을 더하고, 쓸 수 있는 도구를 적는다. 알릴 항목은 결과 블록의 `findings` 한 칸씩이고 `topicKey` 가 항목 식별자다. 지점과 이미 본 식별자는 살펴보기 줄과 같은 트랜잭션에서 옮긴다
+- **사건 실행은 늘 읽기 경계다.** 에이전트의 쓰기 허용과 상관없이 `writes_allowed` 를 거짓으로 적는다. 준비 판정(`ProactiveCheckReadiness.checkEvent`)은 설정 꺼짐만 보고 켜 둔 toolset 으로 막지 않는다
+- **사건 실행 트리의 위험한 도구 호출은 막는다.** fos-ctx 의 `pre_tool_call` 이 안전 목록(`web`, `vision`, `todo`, `skills` 의 읽기 도구와 도구 찾기) 밖의 도구 호출마다 Control Plane 의 `POST /internal/hermes/tool-guard` 에 묻는다. `EventToolGuard` 가 자식 등록, 루트에서 도는 실행, 점검 대화, 그 profile 에서 도는 사건 살펴보기 순으로 보고 사건 실행 트리이거나 풀지 못하면 막는다. 위임, 셸·프로세스, 파일, 코드 실행, 원격 연결(`manage_connections`), 로컬 경로의 사진 읽기가 막힌다. 보통 대화에서는 같은 도구가 그대로 돈다. 순서와 예외는 [설계](proactive/design.md) 의 「사건 실행의 도구 판정」 과 [`fos-ctx` README](../../hermes/plugins/fos-ctx/README.md) 의 「도구 판정」 이 갖는다
+- **판정 plugin 이 없으면 깨우지 않는다.** 깨울 때마다 그 바인딩의 설치 상태를 읽어 `tool_guard`, `policy_hook`, 재시작 필요 없음을 요구한다. 아니면 `BLOCKED` 로 적고 지점을 둔다
 - **바쁘거나 막히면 지점을 옮기지 않는다.** 사용자나 점검 대화에 도는 turn 이 있으면 `BUSY`, 바인딩·연결·에이전트·도구 조건이 맞지 않으면 `BLOCKED` 로 적고 다음 확인에서 같은 항목을 다시 받는다. 읽지 않은 보고로는 건너뛰지 않는다. 점검 대화가 없으면 만든다
 - **하루 상한이 둘이다.** 바인딩마다 그 시간대의 하루에 `max-runs-per-day`(12) 번까지 깨운다. 사용자의 하루 발화 상한(`assistant.task.max-runs-per-day`)은 예약 작업의 발화와 사건 실행을 함께 센다. 상한에 닿으면 조회하지 않고 지점을 둔다. 모델 없이 끝난 확인은 어느 상한에도 들지 않는다
 - **연결 문제만 연속 실패로 센다.** `credential_rejected` 와 `forbidden` 은 실패 수를 늘리고, 동시 호출 한도나 장애의 `unavailable` 은 세지 않는다. 어느 실패든 지점은 그대로이고 목록을 받으면 실패 수를 비운다
@@ -184,11 +186,11 @@ sequenceDiagram
 - **알릴 항목이 있으면 실행마다 알림 한 건이다.** 알릴 항목은 「새로 알릴 것」 으로 남은 발견 가운데 `topicKey` 가 입력 식별자인 것이다. 입력 밖 식별자의 발견은 `NOT_IN_EVENT` 의 「참고」 로 내린다. 알림 `EVENT_CHECK_REPORTED` 는 「새 메일 N건 중 M건 확인이 필요해요」 와 원천 이름만 싣고 메일 제목을 넣지 않으며, 누르면 점검 대화로 간다. 질문이나 출처 장애만 있는 실행은 답을 남기되 알리지 않는다. 답을 저장한 뒤 알림을 만들기 전에 서버가 내려가면 그 실행의 알림은 없다
 - **조용한 시간(켤 때 저장한 시간대의 22시~07시)에는 살펴보되 알림을 미룬다.** 바인딩 상태의 `deferred` 에 실행 수, 새 항목 수, 알릴 수를 더하고, 07시 뒤 첫 확인에서 알릴 수가 있으면 「밤사이 새 메일 N건 중 M건 확인이 필요해요」 한 건을 낸다. 실행 중에 사건 감지를 껐으면 미룰 자리가 없어 바로 알린다. 미룬 알림이 있는 채로 끄면 상태를 지우기 전에 같은 트랜잭션에서 그 묶음을 낸다
 - **연결 문제의 연속 실패가 `failure-threshold`(4, 한 시간)에 닿으면 「Gmail 다시 연결이 필요해요」 알림 `EVENT_WATCH_FAILED` 를 한 번 낸다.** 누르면 외부 서비스 연결로 간다. 조용한 시간에는 내지 않고 07시 뒤에도 실패가 이어지면 그때 낸다. 목록을 받으면 실패 수와 알림 표시를 비워, 다시 닿으면 한 번 더 낸다
-- **켜기는 그 에이전트에 붙은 내 연결에서만 한다.** `GET`·`PUT /api/v1/agents/{code}/event-watches[/{connectorId}]`(`EventWatchController`)다. 켜려면 대화를 시작할 수 있고, 사건 실행의 준비 판정을 통과하고, 연결과 바인딩이 `READY` 이고, 조회 도구가 `READ`·승인 `none` 이고, 같은 연결의 다른 에이전트가 켜지 않았어야 한다. 막히면 `PROACTIVE_CHECK_UNAVAILABLE` 이고 조회가 까닭(`EventWatchBlocker`)을 싣는다. 끄기는 읽기 권한만 보고 Hermes 를 부르지 않는다. 계약은 [설계](proactive/design.md) 의 「Control Plane API(PR2)」 가 갖는다
+- **켜기는 그 에이전트에 붙은 내 연결에서만 한다.** `GET`·`PUT /api/v1/agents/{code}/event-watches[/{connectorId}]`(`EventWatchController`)다. 켜려면 대화를 시작할 수 있고, 사건 실행의 준비 판정을 통과하고, 그 profile 에 판정 plugin 이 있고(없으면 `TOOL_GUARD_MISSING`), 연결과 바인딩이 `READY` 이고, 조회 도구가 `READ`·승인 `none` 이고, 같은 연결의 다른 에이전트가 켜지 않았어야 한다. 막히면 `PROACTIVE_CHECK_UNAVAILABLE` 이고 조회가 까닭(`EventWatchBlocker`)을 싣는다. 끄기는 읽기 권한만 보고 Hermes 를 부르지 않는다. 계약은 [설계](proactive/design.md) 의 「Control Plane API(PR2)」 가 갖는다
 
 ### 시작 전 점검
 
-`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다.
+`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다. 단추 살펴보기와 매일 깨우기에 걸린다. 분야 지침 스킬은 보지 않는다. 사건 실행은 위 「사건 감지」 처럼 toolset 대신 도구 호출을 막는다.
 
 사진이 있는 일반 turn에서 자동 추가하는 내부 `fos-attachments`도 읽기 전용과 쓰기 허용 모두 받는다.
 이 도구는 현재 실행의 같은 대화에서 보낸 사진만 읽으며 사용자 설정에 노출하지 않는다.
@@ -309,18 +311,16 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 `problemKey` 는 앞뒤 공백을 지우고 소문자로 맞춰 비교한다. 검사 순서와 버린 까닭은 ADR-093 의 까닭 표와 `ProblemJudgement` 가 갖는다.
 살펴보기는 문제 후보를 따로 저장하지 않는다. 받아들인 후보의 문제 키만 보고에 담아 다음 살펴보기의 `DUPLICATE` 판정과 입력에 쓴다. 가치 평가나 행동 정책을 잇지 않는다.
 
-### 분야 지침이 지킬 것
+### 공통 지침
 
-분야 패키지의 `proactive-check` 스킬은 아래를 지킨다. Control Plane 이 지시와 검사로 지키는 것과 겹쳐도 지침에 다시 적는다.
+옛 분야 지침 스킬이 지키던 것은 모든 살펴보기의 Control Plane 지시(`ProactiveCheckInstructions.COMMON_RULES`)가 갖는다. 글은 그 상수가 원본이다.
 
 - 매번 무엇을 조사할지 맥락을 보고 고른다. 고를 것이 없으면 조사하지 않고 `NOTHING_NEW` 로 끝낸다
-- 저장된 후보는 출발점이다. 후보가 없어도 허용된 웹 조사로 새 근거를 찾는다
+- 저장된 후보는 출발점이다. 후보가 없어도 허용된 웹 조사로 새 근거를 찾을 수 있다
 - 원문을 열어 확인한 것만 사실로 적고 나머지는 추정이나 아직 모르는 것으로 적는다
-- 문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다. 새 자료가 나왔다는 사실만으로 만들지 않는다
+- 문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다
 
-커리어 분야의 영역은 `study`, `position`, `trend` 다. 공고는 지금 열린 원문과 요구 조건을 확인해 마감이면 `CLOSED`, 오래된 동향은 `STALE` 로 적는다.
-커리어 플러그인(MCP 서버 `career`)의 도구는 분야 패키지가 갖고 모두 `READ` 다. 제외 기준을 읽지 못한 `hold` 면 포지션을 추천으로 확정하지 않는다.
-이력서 원문을 도구 인자나 검색어에 넣지 않는다.
+커리어 분야에만 있던 규칙은 일반 원칙으로 바꿨다. 영역(`area`)은 모델이 고른 짧은 이름이고, 기한이 지났거나 닫힌 원문은 `CLOSED`, 오래된 정보는 `STALE` 다. 도구가 판단 기준을 읽지 못했다고 답하면 그 판단을 확정하지 않는다. 개인 이력 원문을 검색어에 넣지 않는다.
 
 ## 옛 판단 층의 자료
 

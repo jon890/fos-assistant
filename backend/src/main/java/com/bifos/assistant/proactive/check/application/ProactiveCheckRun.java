@@ -71,7 +71,7 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 멈추기가 실패한 뒤 다시 시도하기까지 기다리는 시간이다. */
     static final Duration STOP_RETRY_INTERVAL = Duration.ofSeconds(1);
 
-    static final String OPENING = "먼저 살펴보기를 시작한다. `skill_view(name=\"proactive-check\")` 로 지침을 읽고 그 절차대로 살펴본다.";
+    static final String OPENING = "먼저 살펴보기를 시작한다. 아래 맥락을 보고 이번에 살펴볼 것을 골라 Control Plane 지시대로 살펴본다.";
     static final String EVENT_OPENING = "새 사건 살펴보기를 시작한다. 아래 「새 사건」 의 항목을 사건 실행 규칙대로 살펴본다.";
     static final String NO_RECENT_REPORTED = "최근 보고에서 알린 것이 없다.";
     static final String NO_RECENT_SUGGESTIONS = "최근 제안이 없다.";

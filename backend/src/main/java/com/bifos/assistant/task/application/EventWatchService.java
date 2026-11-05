@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.connection.application.dto.EventWatchBindin
 import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.connector.connection.domain.type.EventWatchResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckReadiness;
 import com.bifos.assistant.proactive.check.application.dto.CheckBlockerCode;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -15,18 +16,18 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.task.application.dto.EventWatchBlocker;
 import com.bifos.assistant.task.application.dto.EventWatchView;
 import com.bifos.assistant.task.config.EventWatchProperties;
-import com.bifos.assistant.task.config.ProactiveScheduleProperties;
 import com.bifos.assistant.task.config.TaskProperties;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -36,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 「Control Plane API(PR2)」 가 갖는다.
  *
  * <p>요청자 자신의 연결만 다룬다. 같은 에이전트에 붙은 다른 사용자의 연결은 싣지 않는다(rule-47). 켜기는 트랜잭션을 열지 않는다. 준비 판정이
- * Hermes 를 부르므로 잠금 밖에서 한 뒤 {@link ConnectorEventWatches} 의 트랜잭션을 연다. 끄기는 미룬 알림과 끄기를 한 트랜잭션에서 한다.
+ * Hermes 의 설치 상태를 부르므로 잠금 밖에서 한 뒤 {@link ConnectorEventWatches} 의 트랜잭션을 연다. 끄기는 미룬 알림과 끄기를 한 트랜잭션에서 한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,7 +50,7 @@ public class EventWatchService {
     private final AgentService agents;
     private final ConnectorEventWatches watches;
     private final ProactiveCheckReadiness readiness;
-    private final ProactiveScheduleProperties isolation;
+    private final HermesConnectorClient hermes;
     private final EventWatchProperties properties;
     private final TaskProperties taskProperties;
     private final EventWatchNotices notices;
@@ -60,7 +61,7 @@ public class EventWatchService {
     /** 그 에이전트에 붙은 요청자의 연결 가운데 사건 감지를 선언한 것마다 상태를 읽는다. Hermes 장애 중에는 켤 수 없다고 보인다. */
     public List<EventWatchView> list(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
-        return views(user, agent, () -> displayReadiness(agent));
+        return views(user, agent, memo(binding -> displayReadiness(agent, binding)));
     }
 
 
@@ -86,19 +87,20 @@ public class EventWatchService {
         }
         Agent agent = agents.requireStartable(user, agentCode);
         ZoneId zone = timeZone == null || timeZone.isBlank() ? taskProperties.defaultZone() : TaskSchedule.parseZone(timeZone.strip());
-        List<EventWatchBlocker> checked = readinessBlockers(agent);
-        if (!find(views(user, agent, () -> checked), connectorId).blockers().isEmpty()) {
+        // 켜기 앞의 판정은 Hermes 를 부르므로 트랜잭션 밖에서 한 번 하고, 켠 뒤의 응답은 그 값을 다시 쓴다.
+        Function<EventWatchBinding, List<EventWatchBlocker>> checked = memo(binding -> readinessBlockers(agent, binding));
+        if (!find(views(user, agent, checked), connectorId).blockers().isEmpty()) {
             throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "event watch cannot be enabled on this agent now");
         }
         watches.enable(user.id(), agent.id(), connectorId, zone, clock.instant());
-        return find(views(user, agent, () -> checked), connectorId);
+        return find(views(user, agent, checked), connectorId);
     }
 
 
     /** 끈 뒤의 응답이다. 카탈로그를 읽지 못해도({@code CONNECTOR_UNAVAILABLE}) 끄기는 이미 커밋됐으므로 꺼진 모양만 돌려준다. */
     private EventWatchView disabledView(CurrentUser user, Agent agent, String connectorId) {
         try {
-            return find(views(user, agent, () -> displayReadiness(agent)), connectorId);
+            return find(views(user, agent, memo(binding -> displayReadiness(agent, binding))), connectorId);
         } catch (ApiException ex) {
             if (ex.code() != ErrorCode.CONNECTOR_UNAVAILABLE) {
                 throw ex;
@@ -110,8 +112,9 @@ public class EventWatchService {
     }
 
 
-    /** 사건 감지를 선언한 바인딩마다 보기를 만든다. 선언한 것이 없으면 Hermes 준비 판정을 부르지 않는다. */
-    private List<EventWatchView> views(CurrentUser user, Agent agent, Supplier<List<EventWatchBlocker>> readiness) {
+    /** 사건 감지를 선언한 바인딩마다 보기를 만든다. 선언한 것이 없으면 Hermes 를 부르지 않는다. */
+    private List<EventWatchView> views(
+        CurrentUser user, Agent agent, Function<EventWatchBinding, List<EventWatchBlocker>> readiness) {
         Map<EventWatchBinding, ConnectorManifest> declared = new LinkedHashMap<>();
         for (EventWatchBinding binding : watches.bindingsOf(user.id(), agent.id())) {
             watches.declaring(binding.connectorId()).ifPresent(manifest -> declared.put(binding, manifest));
@@ -119,10 +122,9 @@ public class EventWatchService {
         if (declared.isEmpty()) {
             return List.of();
         }
-        List<EventWatchBlocker> readinessBlockers = readiness.get();
         Instant now = clock.instant();
         return declared.entrySet().stream()
-            .map(entry -> view(entry.getKey(), entry.getValue(), readinessBlockers, now))
+            .map(entry -> view(entry.getKey(), entry.getValue(), readiness.apply(entry.getKey()), now))
             .toList();
     }
 
@@ -166,24 +168,41 @@ public class EventWatchService {
     }
 
 
-    /** 사건 실행의 준비 판정이다. Hermes 를 읽지 못하면 그 예외를 그대로 올린다. */
-    private List<EventWatchBlocker> readinessBlockers(Agent agent) {
-        return readiness.checkEvent(agent, isolation.isolatedExecutionEnabled()).blockers().stream()
+    /**
+     * 사건 실행의 준비 판정이다. 설정 꺼짐을 보고, 쓸 수 있는 바인딩이면 그 profile 의 설치 상태에서 도구 판정 plugin 을 본다. 켜 둔 toolset
+     * 과 분야 지침 스킬은 보지 않는다(ADR-20261105 / event-watch). Hermes 를 읽지 못하면 그 예외를 그대로 올린다.
+     */
+    private List<EventWatchBlocker> readinessBlockers(Agent agent, EventWatchBinding binding) {
+        List<EventWatchBlocker> blockers = new ArrayList<>(readiness.checkEvent().blockers().stream()
             .map(EventWatchBlocker::of)
-            .toList();
+            .toList());
+        if (binding.usable() && !hermes.readConnector(agent.hermesProfile(), binding.connectorId()).guardsEventRuns()) {
+            blockers.add(EventWatchBlocker.of(EventWatchBlocker.TOOL_GUARD_MISSING));
+        }
+        return List.copyOf(blockers);
     }
 
 
-    /** 조회용 준비 판정이다. Hermes 장애면 확인하지 못했다는 까닭 하나로 바꿔 켤 수 없다고 보인다. */
-    private List<EventWatchBlocker> displayReadiness(Agent agent) {
+    /** 조회용 준비 판정이다. Hermes 장애나 틀린 응답이면 확인하지 못했다는 까닭 하나로 바꿔 켤 수 없다고 보인다. */
+    private List<EventWatchBlocker> displayReadiness(Agent agent, EventWatchBinding binding) {
         try {
-            return readinessBlockers(agent);
+            return readinessBlockers(agent, binding);
         } catch (ApiException ex) {
             if (!RUNTIME_UNAVAILABLE.contains(ex.code())) {
                 throw ex;
             }
             return List.of(EventWatchBlocker.of(CheckBlockerCode.READINESS_UNKNOWN.name()));
+        } catch (IllegalStateException ex) {
+            return List.of(EventWatchBlocker.of(CheckBlockerCode.READINESS_UNKNOWN.name()));
         }
+    }
+
+
+    /** 연결마다 한 번만 판정한다. 켜기 앞과 뒤의 응답이 같은 판정을 쓰고, 켠 뒤에 Hermes 를 다시 부르지 않는다. */
+    private static Function<EventWatchBinding, List<EventWatchBlocker>> memo(
+        Function<EventWatchBinding, List<EventWatchBlocker>> judge) {
+        Map<String, List<EventWatchBlocker>> judged = new HashMap<>();
+        return binding -> judged.computeIfAbsent(binding.connectorId(), ignored -> judge.apply(binding));
     }
 
 
