@@ -110,7 +110,7 @@ PR 하나가 한 걸음이다. 테이블에 데이터가 있다는 까닭만으�
 - 발견 반응 단추와 그 API, 「관심 없음」 주제를 digest 기간 동안 내리던 판정을 없앤다([ADR-20261008 / check-finding-reaction](archive/ADR-20261008-check-finding-reaction.md) 을 대체한다). 같은 주제가 가끔 다시 알려질 수 있음을 받아들인다. 다음 살펴보기는 거절한 제안을 입력으로 보고 판단한다
 - 반응 기록의 옛 `CHECK_FINDING` 사건 줄과 그 이름은 남긴다. 이름을 지우면 옛 줄을 읽다 실패한다
 - 두 단계로 한다. PR1 은 읽기와 쓰기를 끊는다. 기동 이관(`LegacySuggestionBackfill`)과 읽기 전용 엔티티는 남겨 PR2 직전 기동에서 마지막으로 돌린다. PR2 는 PR1 배포와 그 이관 로그의 실패 0건을 확인한 뒤 두 테이블과 `decision_feedback_event.source_check_id`, `proactive_check` 의 읽지 않는 칸을 지우고 `AUTONOMY` 계기의 줄과 값을 지운다
-- 진행: 끝났다. PR1(#694)을 배포한 기동의 마지막 이관 로그는 `created=0 existing=2 skipped=0 failed=0 repointed=0` 이었다. PR2 는 `AUTONOMY` 줄을 먼저 지우고(그 문제 후보는 외래 키 CASCADE 로 함께 지워진다) 표 둘, 반응 기록의 칸, 쓰지 않는 다섯 칸을 지웠고, 이관 코드와 읽기 전용 엔티티·저장소도 지웠다. 운영 테이블은 41개에서 39개가 된다
+- 진행: 끝났다. PR1(#694)을 배포한 기동의 마지막 이관 로그는 `created=0 existing=2 skipped=0 failed=0 repointed=0` 이었다. PR2 는 `AUTONOMY` 줄을 먼저 지우고(그 문제 후보는 외래 키 CASCADE 로 함께 지워진다) 표 둘, 반응 기록의 칸, 쓰지 않는 다섯 칸을 지웠고, 이관 코드와 읽기 전용 엔티티·저장소도 지웠다.
 
 **그룹 본체 테이블은 테이블 수를 줄이려는 목적만으로 새로 만들지 않는다.** 그룹의 수명이나 설정 관리 요구가 생길 때 따로 정한다.
 
