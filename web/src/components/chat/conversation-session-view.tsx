@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
 import type { Props } from "./conversation-session-view-types";
-import { useCheckFindings } from "./use-check-findings";
 
 export function ConversationSessionView({
   notFound,
@@ -77,21 +76,6 @@ export function ConversationSessionView({
   skillNames,
   starters,
 }: Props) {
-  // 저장된 답만 본다. 흘러오는 중인 답의 발견은 아직 없고, 저장된 답으로 바뀌면 번호가 바뀌어 다시 읽는다.
-  const lastAnswerExecutionId =
-    turns.findLast(
-      (turn) =>
-        turn.role === "ASSISTANT" &&
-        typeof turn.id === "number" &&
-        typeof turn.executionId === "number",
-    )?.executionId ?? null;
-  const checkFindings = useCheckFindings(
-    conversationId,
-    currentConversation?.purpose === "CHECK",
-    String(turns.length),
-    lastAnswerExecutionId,
-  );
-
   if (notFound) {
     return (
       <section
@@ -216,9 +200,6 @@ export function ConversationSessionView({
               memoryUses.reload();
             }}
             memoryUses={memoryUses.uses}
-            checkFindings={checkFindings.findings}
-            dismissWindowDays={checkFindings.dismissWindowDays}
-            onCheckFindingsChanged={checkFindings.changed}
             // 질문 카드는 답이 오는 중에도 보인다. 그때 고른 답은 입력창의 보내기와 같이 대기 메시지로 들어간다.
             onAnswer={(text) => {
               void submit([], text);

@@ -25,7 +25,6 @@ type ToolsetsView = { toolsets: { name: string; enabled: boolean }[] };
 type AgentView = { code: string };
 type AdminAgentView = { code: string; enabled: boolean; visibility: string; proactiveCheckWritesAllowed: boolean };
 type ConnectorActionView = { actionId: string; status: string };
-type CheckFindingsView = { dismissWindowDays: number; findings: { id: number; topicKey: string | null; reaction: string | null }[] };
 
 /** 살펴볼 일반 에이전트다. 연결의 주인인 아빠의 비공개 에이전트라 그 연결을 붙일 수 있다. */
 const AGENT = "dad";
@@ -463,17 +462,17 @@ export const proactiveCheckScenario: Scenario = {
         expect(!webAnswer.includes(hidden), `답에 문제 후보의 「${hidden}」 가 그려졌다:\n${webAnswer}`);
       }
 
-      step("침묵: NOTHING_NEW 면 「살펴봤지만 새로 알릴 것이 없어요」 한 줄만 더해지고 답이 없으며, 입력에는 앞서 받아들인 문제 후보가 실린다");
+      step("침묵: NOTHING_NEW 면 「살펴봤지만 새로 알릴 것이 없어요」 한 줄만 더해지고 답이 없으며, 입력에는 앞선 보고의 받아들인 문제 키가 실린다");
       const beforeSilent = await messagesOf(context, conversationId);
       const beforeSilentCheck = (await statusOf(context)).lastCheck;
       context.hermes.setProactiveScript({ output: proactiveOutput({ version: 1, outcome: "NOTHING_NEW", findings: [] }) });
       await startCheck(context);
       const silent = await awaitFinished(context, beforeSilentCheck, "침묵");
       const silentInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
-      const recentProblems = silentInput.slice(silentInput.indexOf("최근에 받아들인 문제 후보"));
+      const recentReported = silentInput.slice(silentInput.indexOf("최근 보고에서 알린 것"));
       expect(
-        recentProblems.includes("<external-data>") && recentProblems.includes(`- ${PROBLEM.problemKey} · ${PROBLEM.problem}`),
-        `다음 살펴보기 입력에 받아들인 문제 후보가 감싸여 실리지 않았다:\n${silentInput}`,
+        recentReported.includes("<external-data>") && recentReported.includes(`- 받아들인 문제 키 · ${PROBLEM.problemKey} · `),
+        `다음 살펴보기 입력에 받아들인 문제 키가 감싸여 실리지 않았다:\n${silentInput}`,
       );
       expect(silent.status === "SUCCEEDED" && silent.outcome === "NOTHING_NEW", `침묵한 살펴보기의 줄이 다르다: ${JSON.stringify(silent)}`);
       const added = (await messagesOf(context, conversationId)).slice(beforeSilent.length);
@@ -533,43 +532,18 @@ export const proactiveCheckScenario: Scenario = {
         `보고 근거와 발견 상세에 달라진 발견의 링크만 남아야 한다: ${JSON.stringify(linkTargets(contextAnswer))}\n${contextAnswer}`,
       );
 
-      step("발견 반응: 「관심 없음」 을 누른 주제는 원문 주소와 달라진 점이 새로워도 이미 알린 것으로 내려가고 입력에 반응이 실린다");
-      const reacted = expectStatus(
+      step("발견 반응: 점검 대화의 발견 목록과 반응 경로가 없다");
+      expectStatus(
         await call(context, `/chat/conversations/${conversationId}/check-findings`, { token: context.tokens.dad }),
-        200,
-        "점검 대화의 발견 목록",
-      ).json<CheckFindingsView>().findings.filter((finding) => finding.topicKey === WEB_ONLY.topicKey).at(-1);
-      if (reacted === undefined) fail(`발견 목록에 ${WEB_ONLY.topicKey} 가 없다`);
-      const reactionPath = `/check-findings/${reacted.id}/reaction`;
-      expectStatus(
-        await call(context, reactionPath, { method: "PUT", token: context.tokens.dad, body: { reaction: "DISMISSED" } }),
-        204,
-        "관심 없음 반응",
-      );
-      expectStatus(
-        await call(context, reactionPath, { method: "PUT", token: context.tokens.kid, body: { reaction: "DISMISSED" } }),
         404,
-        "다른 사용자의 반응",
+        "점검 대화의 발견 목록",
       );
-      const beforeDismissed = (await statusOf(context)).lastCheck;
-      context.hermes.setProactiveScript({
-        output: proactiveOutput({
-          version: 1,
-          outcome: "FINDINGS",
-          findings: [{
-            ...currentFinding({ ...WEB_ONLY, sourceUrl: `${WEB_ONLY.sourceUrl}/next` }, new Date().toISOString()),
-            changeSinceLast: CHANGE,
-          }],
+      expectStatus(
+        await call(context, "/check-findings/1/reaction", {
+          method: "PUT", token: context.tokens.dad, body: { reaction: "DISMISSED" },
         }),
-      });
-      await startCheck(context);
-      await awaitFinished(context, beforeDismissed, "관심 없음 뒤 살펴보기");
-      const dismissedInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
-      expect(dismissedInput.includes("· 반응 관심 없음"), `살펴보기 입력에 「관심 없음」 반응이 없다:\n${dismissedInput}`);
-      const dismissedAnswer = lastAnswer(await messagesOf(context, conversationId), "관심 없음 뒤 살펴보기").content;
-      expect(
-        dismissedAnswer.includes(`- ${WEB_ONLY.title}: 이미 알린 것이에요`),
-        `관심 없음 주제가 이미 알린 것으로 내려가지 않았다:\n${dismissedAnswer}`,
+        404,
+        "발견 반응",
       );
 
       step("다른 사용자: 이 에이전트의 상태 조회와 시작이 404 이고 대화 목록에 이 점검 대화가 없다");
@@ -602,7 +576,10 @@ export const proactiveCheckScenario: Scenario = {
       expect(kidConversation !== conversationId, "다른 사용자의 살펴보기가 이 사용자의 점검 대화로 갔다");
       await awaitFinished(context, null, "다른 사용자의 살펴보기", context.tokens.kid, kidPath);
       const kidInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
-      expect(kidInput.includes("최근에 알린 발견이 없다."), `다른 사용자의 입력에 최근 발견이 실렸다:\n${kidInput}`);
+      expect(
+        kidInput.includes("최근 보고에서 알린 것이 없다.") && kidInput.includes("최근 제안이 없다."),
+        `다른 사용자의 입력에 최근 보고나 제안이 실렸다:\n${kidInput}`,
+      );
       for (const leaked of [STUDY.topicKey, WEB_ONLY.topicKey, STUDY.sourceUrl, WEB_ONLY.sourceUrl]) {
         expect(!kidInput.includes(leaked), `다른 사용자의 입력에 이 사용자의 발견 「${leaked}」 가 있다`);
       }
