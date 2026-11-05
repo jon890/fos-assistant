@@ -16,6 +16,7 @@ import {
   startProactiveCheck,
   type ProactiveCheckStatus,
 } from "@/lib/proactive-check";
+import { AgentEventWatchSection } from "./agent-event-watch-section";
 import { AgentProactiveScheduleSection } from "./agent-proactive-schedule-section";
 
 type Props = {
@@ -142,6 +143,7 @@ export function AgentProactiveCheckSection({ code, initialStatus }: Props) {
         </p>
       ) : null}
       <AgentProactiveScheduleSection code={code} />
+      <AgentEventWatchSection code={code} />
     </section>
   );
 }
