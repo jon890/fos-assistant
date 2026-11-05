@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -202,7 +205,7 @@ class EventWatchControllerTest extends EventWatchTestSupport {
 
 
     @Test
-    @DisplayName("요청자가 읽을 수 있는 에이전트라도 다른 사용자의 연결은 싣지 않고 켜지 못한다")
+    @DisplayName("요청자가 읽을 수 있는 에이전트라도 다른 사용자의 연결은 싣지 않고 켜지 못하며, 실을 것이 없으면 Hermes 를 부르지 않는다")
     void otherUsersConnectionsAreInvisible() throws Exception {
         stranger = newUser();
         Agent shared = agents.save(Agent.of("loop-" + UUID.randomUUID().toString().substring(0, 8), "공유", "공유",
@@ -216,7 +219,9 @@ class EventWatchControllerTest extends EventWatchTestSupport {
         bound.ready(now);
         bindings.save(bound);
 
+        clearInvocations(toolsets);
         mvc.perform(get(PATH, shared.code())).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        verify(toolsets, never()).readEnabled(anyString(), anyString());
         mvc.perform(put(PATH + "/{connectorId}", shared.code(), CONNECTOR)
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"enabled\":false,\"timezone\":\"\"}"))

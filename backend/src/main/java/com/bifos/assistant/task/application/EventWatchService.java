@@ -22,9 +22,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -58,7 +60,7 @@ public class EventWatchService {
     /** 그 에이전트에 붙은 요청자의 연결 가운데 사건 감지를 선언한 것마다 상태를 읽는다. Hermes 장애 중에는 켤 수 없다고 보인다. */
     public List<EventWatchView> list(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
-        return views(user, agent, displayReadiness(agent));
+        return views(user, agent, () -> displayReadiness(agent));
     }
 
 
@@ -85,18 +87,18 @@ public class EventWatchService {
         Agent agent = agents.requireStartable(user, agentCode);
         ZoneId zone = timeZone == null || timeZone.isBlank() ? taskProperties.defaultZone() : TaskSchedule.parseZone(timeZone.strip());
         List<EventWatchBlocker> checked = readinessBlockers(agent);
-        if (!find(views(user, agent, checked), connectorId).blockers().isEmpty()) {
+        if (!find(views(user, agent, () -> checked), connectorId).blockers().isEmpty()) {
             throw new ApiException(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "event watch cannot be enabled on this agent now");
         }
         watches.enable(user.id(), agent.id(), connectorId, zone, clock.instant());
-        return find(views(user, agent, checked), connectorId);
+        return find(views(user, agent, () -> checked), connectorId);
     }
 
 
     /** 끈 뒤의 응답이다. 카탈로그를 읽지 못해도({@code CONNECTOR_UNAVAILABLE}) 끄기는 이미 커밋됐으므로 꺼진 모양만 돌려준다. */
     private EventWatchView disabledView(CurrentUser user, Agent agent, String connectorId) {
         try {
-            return find(views(user, agent, displayReadiness(agent)), connectorId);
+            return find(views(user, agent, () -> displayReadiness(agent)), connectorId);
         } catch (ApiException ex) {
             if (ex.code() != ErrorCode.CONNECTOR_UNAVAILABLE) {
                 throw ex;
@@ -108,16 +110,20 @@ public class EventWatchService {
     }
 
 
-    private List<EventWatchView> views(CurrentUser user, Agent agent, List<EventWatchBlocker> readinessBlockers) {
-        List<EventWatchView> views = new ArrayList<>();
-        Instant now = clock.instant();
+    /** 사건 감지를 선언한 바인딩마다 보기를 만든다. 선언한 것이 없으면 Hermes 준비 판정을 부르지 않는다. */
+    private List<EventWatchView> views(CurrentUser user, Agent agent, Supplier<List<EventWatchBlocker>> readiness) {
+        Map<EventWatchBinding, ConnectorManifest> declared = new LinkedHashMap<>();
         for (EventWatchBinding binding : watches.bindingsOf(user.id(), agent.id())) {
-            Optional<ConnectorManifest> manifest = watches.declaring(binding.connectorId());
-            if (manifest.isPresent()) {
-                views.add(view(binding, manifest.get(), readinessBlockers, now));
-            }
+            watches.declaring(binding.connectorId()).ifPresent(manifest -> declared.put(binding, manifest));
         }
-        return List.copyOf(views);
+        if (declared.isEmpty()) {
+            return List.of();
+        }
+        List<EventWatchBlocker> readinessBlockers = readiness.get();
+        Instant now = clock.instant();
+        return declared.entrySet().stream()
+            .map(entry -> view(entry.getKey(), entry.getValue(), readinessBlockers, now))
+            .toList();
     }
 
 
