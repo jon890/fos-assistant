@@ -507,8 +507,10 @@ export const proactiveCheckScenario: Scenario = {
       await awaitFinished(context, beforeContext, "맥락 반영");
       const contextInput = context.hermes.proactiveInputs().at(-1)?.input ?? "";
       for (const expected of [
-        `- [study] ${STUDY.topicKey} · ${STUDY.title} · ${STUDY.sourceUrl} · 확인 ${checkedAt.slice(0, 10)} · 그 뒤 사용자 메시지 1개`,
-        `- [study] ${WEB_ONLY.topicKey} · ${WEB_ONLY.title} · ${WEB_ONLY.sourceUrl} · 확인 `,
+        `- ${STUDY.topicKey} · ${STUDY.title} · ${STUDY.sourceUrl} · 알린 날 `,
+        `- ${WEB_ONLY.topicKey} · ${WEB_ONLY.title} · ${WEB_ONLY.sourceUrl} · 알린 날 `,
+        " · 그 뒤 사용자 메시지 1개",
+        "최근 보고에서 알린 것",
         "<external-data>",
         "- 지난 살펴보기: ",
         "- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개",
