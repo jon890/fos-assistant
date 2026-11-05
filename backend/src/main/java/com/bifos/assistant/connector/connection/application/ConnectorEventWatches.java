@@ -54,7 +54,8 @@ public class ConnectorEventWatches {
         EventWatchState next = current == null
             ? EventWatchState.fresh(zone, now)
             : new EventWatchState(zone.getId(), current.checkpoint(), current.seen(), current.lastCheckedAt(),
-                current.lastResult(), current.lastNewCount(), current.failures(), current.day(), current.runs());
+                current.lastResult(), current.lastNewCount(), current.failures(), current.day(), current.runs(),
+                current.enabledAt());
         bindings.switchEventWatch(binding.id(), true, next.toJson());
         return next;
     }

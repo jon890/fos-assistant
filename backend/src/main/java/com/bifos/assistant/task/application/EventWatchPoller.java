@@ -127,7 +127,7 @@ public class EventWatchPoller {
             update(target.bindingId(), current -> current.checked(now, EventWatchResult.DAILY_LIMIT, 0));
             return;
         }
-        Instant since = state.checkpoint().minus(properties.overlap());
+        Instant since = state.since(properties.overlap());
         Instant queriedAt = clock.instant();
         ConnectorEventListing listing = feed.listEvents(target.connectorId(), target.profile(), since);
         if (listing == null || !listing.ok()) {

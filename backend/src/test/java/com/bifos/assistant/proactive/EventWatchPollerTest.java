@@ -138,7 +138,8 @@ class EventWatchPollerTest extends ProactiveTestSupport {
         assertThat(state.lastResult()).isEqualTo(EventWatchResult.NO_NEW);
         assertThat(state.checkpoint()).isEqualTo(clock.instant());
         assertThat(state.runs()).as("모델 없이 끝난 확인은 하루 실행 수에 들지 않는다").isZero();
-        verify(feed).listEvents(eq(CONNECTOR), eq(agent.hermesProfile()), eq(BASE.minus(Duration.ofMinutes(30))));
+        // 겹쳐 받더라도 켠 시각 앞은 받지 않는다. 켜기 전에 온 메일로 깨우지 않는다.
+        verify(feed).listEvents(eq(CONNECTOR), eq(agent.hermesProfile()), eq(BASE));
     }
 
 
@@ -214,7 +215,7 @@ class EventWatchPollerTest extends ProactiveTestSupport {
     @DisplayName("바인딩의 하루 실행 상한에 닿으면 조회하지 않고 지점을 두며, 다음 날 쌓인 항목을 함께 본다 (REQ7)")
     void dailyLimitStopsUntilTomorrow() throws InterruptedException {
         watches.update(binding.id(), state -> new EventWatchState(state.timeZone(), state.checkpoint(), state.seen(),
-            null, null, 0, 0, clock.instant().atZone(SEOUL).toLocalDate(), 12));
+            null, null, 0, 0, clock.instant().atZone(SEOUL).toLocalDate(), 12, state.enabledAt()));
         listing("m1");
         clearInvocations(feed);
 
@@ -228,7 +229,7 @@ class EventWatchPollerTest extends ProactiveTestSupport {
 
         clock.set(BASE.plus(Duration.ofDays(1)));
         wakeOnce();
-        verify(feed).listEvents(eq(CONNECTOR), anyString(), eq(BASE.minus(Duration.ofMinutes(30))));
+        verify(feed).listEvents(eq(CONNECTOR), anyString(), eq(BASE));
     }
 
 

@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.connection.domain;
 
 import com.bifos.assistant.connector.connection.domain.type.EventWatchResult;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -25,6 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
  * @param failures 연결 문제로 연달아 실패한 수
  * @param day {@code runs} 를 센 날. {@code timeZone} 의 날짜다
  * @param runs 그날 연 사건 실행 수
+ * @param enabledAt 켠 시각. 겹쳐 받더라도 이 시각 앞은 받지 않아 켜기 전에 온 메일로 깨우지 않는다
  */
 public record EventWatchState(
     String timeZone,
@@ -35,7 +37,8 @@ public record EventWatchState(
     int lastNewCount,
     int failures,
     LocalDate day,
-    int runs) {
+    int runs,
+    Instant enabledAt) {
 
 
     private static final JsonMapper JSON = JsonMapper.builder()
@@ -58,12 +61,19 @@ public record EventWatchState(
 
     /** 켤 때의 상태다. 지점은 켠 시각이라 켜기 전에 온 메일로 깨우지 않는다. */
     public static EventWatchState fresh(ZoneId zone, Instant now) {
-        return new EventWatchState(zone.getId(), micros(now), List.of(), null, null, 0, 0, null, 0);
+        return new EventWatchState(zone.getId(), micros(now), List.of(), null, null, 0, 0, null, 0, micros(now));
     }
 
 
     public ZoneId zone() {
         return ZoneId.of(timeZone);
+    }
+
+
+    /** 다음 조회가 받을 시작 시각이다. 지점보다 {@code overlap} 앞이되 켠 시각보다 앞서지 않는다. */
+    public Instant since(Duration overlap) {
+        Instant overlapped = checkpoint.minus(overlap);
+        return enabledAt != null && overlapped.isBefore(enabledAt) ? enabledAt : overlapped;
     }
 
 
@@ -75,20 +85,20 @@ public record EventWatchState(
 
     /** 지점과 이미 본 식별자를 그대로 두고 마지막 결과만 적는다. */
     public EventWatchState checked(Instant now, EventWatchResult result, int newCount) {
-        return new EventWatchState(timeZone, checkpoint, seen, micros(now), result, newCount, failures, day, runs);
+        return new EventWatchState(timeZone, checkpoint, seen, micros(now), result, newCount, failures, day, runs, enabledAt);
     }
 
 
     /** 목록을 받았다. 연결 실패 수를 비운다. 지점은 옮기지 않는다. */
     public EventWatchState reachable() {
-        return new EventWatchState(timeZone, checkpoint, seen, lastCheckedAt, lastResult, lastNewCount, 0, day, runs);
+        return new EventWatchState(timeZone, checkpoint, seen, lastCheckedAt, lastResult, lastNewCount, 0, day, runs, enabledAt);
     }
 
 
     /** 목록을 받지 못했다. 연결 문제({@code connectionProblem})일 때만 연속 실패 수를 늘린다. 지점은 옮기지 않는다. */
     public EventWatchState failed(Instant now, boolean connectionProblem) {
         return new EventWatchState(timeZone, checkpoint, seen, micros(now), EventWatchResult.FAILED, 0,
-            connectionProblem ? failures + 1 : failures, day, runs);
+            connectionProblem ? failures + 1 : failures, day, runs, enabledAt);
     }
 
 
@@ -102,7 +112,7 @@ public record EventWatchState(
     public EventWatchState consumed(Instant queriedAt, List<Seen> nowSeen, boolean woke, LocalDate today) {
         int todayRuns = runsOn(today) + (woke ? 1 : 0);
         return new EventWatchState(timeZone, micros(queriedAt), nowSeen, lastCheckedAt, lastResult, lastNewCount, failures,
-            today, todayRuns);
+            today, todayRuns, enabledAt);
     }
 
 

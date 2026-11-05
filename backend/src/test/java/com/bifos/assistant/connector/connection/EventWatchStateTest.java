@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.connector.connection.domain.type.EventWatchResult;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -45,5 +46,17 @@ class EventWatchStateTest {
         assertThat(failed.failures()).isEqualTo(1);
         assertThat(failed.checkpoint()).as("실패는 지점을 옮기지 않는다").isEqualTo(woke.checkpoint());
         assertThat(failed.reachable().failures()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("조회 시작은 지점보다 겹침만큼 앞이되 켠 시각보다 앞서지 않는다")
+    void sinceNeverPrecedesEnabling() {
+        EventWatchState fresh = EventWatchState.fresh(ZoneId.of("Asia/Seoul"), NOW);
+        assertThat(fresh.since(Duration.ofMinutes(30))).isEqualTo(fresh.enabledAt());
+
+        Instant later = NOW.plus(Duration.ofHours(2));
+        EventWatchState moved = fresh.consumed(later, List.of(), false, TODAY);
+        assertThat(moved.since(Duration.ofMinutes(30))).isEqualTo(moved.checkpoint().minus(Duration.ofMinutes(30)));
     }
 }
