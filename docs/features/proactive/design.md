@@ -1,163 +1,148 @@
-# 먼저 살펴보기의 발견·문제 후보 테이블 정리 기술 설계
+# 사건 감지형 살펴보기 기술 설계
 
 스펙은 [spec.md](spec.md), 지금 동작은 [기능 파일](../proactive.md)이 갖는다.
-PR1 은 읽기와 쓰기를 끊고, PR2 는 PR1 배포를 확인한 뒤 테이블과 칸을 지운다(스펙의 「설계」).
+새 신뢰 경계(실행 밖의 메일 목록 조회)의 결정과 근거는 [ADR-20261105 / event-watch](../../adr/ADR-20261105-event-watch.md) 가 갖는다.
 
 ## 지금 구조
 
-살펴보기 한 번(`ProactiveCheckRun`)은 입력 조립(`ProactiveCheckInput`)과 결과 처리(`ProactiveCheckResults`)로 나뉜다.
+| 무엇 | 지금 |
+| --- | --- |
+| 살펴보기 실행 | `ProactiveCheckService.start` 가 점검 대화를 찾거나 만들고, turn 자리를 잡고, `proactive_check` 줄을 저장한 뒤 가상 스레드에서 `ProactiveCheckRun` 을 돌린다. 계기는 `MANUAL`, `SCHEDULED` 다 |
+| 매일 깨우기 | `task` 의 `CHECK` 작업과 `TaskFiring` 이 발화마다 `task_run` 줄을 하나 만든다. 조용한 시간(`ProactiveQuietHours`)은 승인 알림만 생략한다 |
+| 플러그인 선언 | 대시보드 plugin 이 `assistant.json` 을 검증해 카탈로그로 내고, backend 는 `ConnectorManifest` 로 읽는다. 둘 다 서비스 이름을 모른다(rule-65). backend 에는 `gmail` 이 한 번도 나오지 않는다 |
+| 실행 밖 도구 호출 | `POST /api/connectors/<id>/call` 은 확인 도구와 선택지 도구만 인자 없이 부른다. `execute` 는 승인한 호출을 그 profile 의 값으로 한 번 실행한다 |
+| 층 순서 | `proactive` 는 `connector` 보다 아래이고 `task` 는 둘보다 위다(`TopLevelPackageOrder`). 그래서 바인딩과 살펴보기를 함께 쓰는 조정자는 `task` 에 둔다 |
 
-| 무엇 | 지금 쓰는 곳 | 지금 읽는 곳 |
+## PR 나눔
+
+운영 코드가 PR 하나의 상한을 넘어 둘로 나눈다. 두 PR 모두 이 설계를 쓴다.
+
+| PR | 담는 것 | 요구사항 |
 | --- | --- | --- |
-| 발견 `proactive_check_finding` | `ProactiveCheckResults.saveFindings` | 다음 입력의 「최근에 알린 발견」, 되풀이 판정(`announcedSince`), 반응 단추 목록과 반응(`CheckFindingReactions`), 보고를 보일 때 발견마다 남기는 `SURFACED`, 기동 이관 |
-| 문제 후보 `proactive_check_problem` | 같은 자리 | 다음 입력의 「최근에 받아들인 문제 후보」, 문제 키 중복 판정(`acceptedProblemKeysSince`), 호출 없는 조회 `findEvaluable`, 기동 이관 |
-| `proactive_check.report_json` | `ProactiveCheckRun.record` | 지금 화면의 보고 카드, 읽지 않은 보고의 깨우기 건너뛰기 |
-| `proactive_check.new_findings`, `reference_findings`, `tree_*_tokens` | `ProactiveCheck.succeed` | 없다 |
-| `decision_feedback_event.source_check_id` | `CheckFeedback`, `CheckFindingReactions`, `ConnectorPolicyService` | 없다. 지표(`AttentionMetricsService`)와 정리 작업도 읽지 않는다 |
-| 결과 저장 스위치 `assistant.proactive-suggestion.enabled` | 설정 | `ProactiveCheckResults.saveSuggestions` |
+| PR1 | 대시보드 plugin 의 `events` 경로와 Gmail 선언, Control Plane 의 조회 클라이언트, 바인딩 줄 두 컬럼과 상태, `EventWatchPoller`, 계기 `EVENT` 살펴보기, 하루 상한, 연결 실패 세기. 켜기는 `ConnectorEventWatches.enable` 만 있고 API 와 화면이 없어 배포해도 켜진 바인딩이 없다 | REQ1, REQ2, REQ3, REQ4, REQ7, REQ8, REQ9(깨우기 쪽), REQ10(켜기 조건), REQ11(세기), REQ12 |
+| PR2 | 알림 두 종류와 갈 곳, 조용한 시간 미루기와 아침 묶음, 「다시 연결 필요」 알림, 켜고 끄는 API 와 에이전트 상세 소절 | REQ5, REQ6, REQ9·REQ10(화면), REQ11(알림), REQ7(화면 표시) |
 
 ## 요구사항 연결
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `ProactiveCheckResults` 가 발견과 문제 후보를 판정해 답과 보고를 그리는 데만 쓰고 저장하지 않는다. 제안 저장은 그대로다. 두 엔티티와 저장소는 기동 이관이 읽으려고 PR2 까지 남기고, 쓰는 메서드와 이관 밖의 조회는 지운다(DECISION1) |
-| REQ2 | 입력의 두 절을 「최근 제안」 과 「최근 보고에서 알린 것」 으로 바꾼다. 제안은 `FollowUpSuggestions` 의 새 조회가, 마지막 반응은 `ReactionLedger` 의 새 조회가 준다. 보고 절에는 알린 발견과 함께 받아들인 문제 키를 싣는다(DECISION7) |
-| REQ7 | 보고(`CheckReport`)에 알린 발견의 주제 키·원문 주소·제목과 받아들인 문제 키를 함께 저장하고, 되풀이 판정이 같은 점검 대화의 최근 보고에서 읽는다. 이미 저장된 보고는 Java 마이그레이션이 옛 표에서 채운다(DECISION2) |
-| REQ3 | `CheckFindingController`, `CheckFindingReactions`, 화면의 반응 단추와 API 경로를 지운다. 판정의 「관심 없음」 순서를 지운다 |
-| REQ4 | `report_json` 이 비었는지와 `report_opened_at` 만 보는 지금 경로를 바꾸지 않는다. 새로 담는 칸은 보고가 있는지에 영향을 주지 않는다 |
-| REQ5 | PR2 가 맡는다. PR1 은 지울 칸을 엔티티에서 빼고 쓰기를 멈춘다. 칸은 모두 `NULL` 허용이거나 기본값이 있어 엔티티에서 빼도 넣기가 실패하지 않는다 |
-| REQ6 | PR2 가 맡는다. PR1 은 `LegacySuggestionBackfill` 과 그 읽기를 그대로 둔다(DECISION11) |
+| REQ1 | `task` 의 `EventWatchPoller` 가 `assistant.event-watch.check-cron`(기본 15분)마다 켜진 바인딩을 차례로 본다. 목록 조회는 대시보드 plugin 의 새 경로 `POST /api/connectors/<id>/events` 이고 모델을 부르지 않는다. 결과는 바인딩 줄의 `event_watch_state` 컬럼 하나에 덮어쓴다. 새 항목이 없으면 `proactive_check` 줄도 실행 줄도 만들지 않고, 하루 실행 수도 세지 않는다 |
+| REQ2 | 확인 지점은 마지막으로 결과를 다 쓴 조회를 시작한 Control Plane 의 시각이다. 다음 조회는 지점보다 `overlap`(기본 30분) 앞부터 받고, 그 겹치는 구간에서 이미 본 식별자(`seen`)를 뺀다. 보낸 사람이 쓰는 메일의 `Date` 머리는 지점으로 쓰지 않는다. 미래 날짜 하나가 지점을 밀어 뒤의 메일을 모두 놓치게 하기 때문이다. 상태는 바인딩 줄에 있어 서버를 다시 띄워도 같은 값을 읽는다 |
+| REQ3 | 플러그인 선언 `event_watch.query` 가 분류를 빼는 검색식(`-category:promotions -category:social`)을 갖고, `skip_labels` 가 같은 분류의 라벨을 갖는다. plugin 이 결과에서 그 라벨이 붙은 항목을 한 번 더 뺀다. 남은 항목이 없으면 REQ1 의 「새 항목 없음」 이다 |
+| REQ4 | 새 항목이 있으면 `ProactiveCheckService.startEvent` 가 계기 `EVENT` 로 살펴보기를 연다. 입력에 「새 사건」 절(원천 이름, 새 항목 수, 식별자와 원문 링크 20개까지)을 `<external-data>` 로 감싸 싣고, 지시에 사건 실행 규칙(`EVENT_RULES`)을 더한다. 분야 지침 스킬은 읽게 하지 않고 준비 판정에서도 보지 않는다. 지점과 `seen` 은 `startEvent` 의 `beforeRun` 으로 살펴보기 줄과 같은 트랜잭션에서 옮긴다. 모델은 붙은 플러그인의 읽기 도구로 내용을 읽는다. 도구 판정과 읽기 경계는 지금의 살펴보기 트리 그대로다 |
+| REQ5 | (PR2) 결과 블록에 새 칸을 두지 않는다. 알릴 메일은 「새로 알릴 것」 으로 판정된 `findings` 가운데 `topicKey` 가 입력의 식별자인 것이다. 그래서 답에 보이는 목록과 알림의 수가 늘 같고 입력 밖 식별자는 세지 않는다. 발견 상한이 5개라 한 실행이 알리는 메일도 5통까지이고 나머지 수는 `summary` 에 쓴다. 하나 이상이면 실행이 끝난 뒤 `EventCheckEnded` 사건을 받은 `EventWatchNotices` 가 알림 `EVENT_CHECK_REPORTED` 한 건(「새 메일 N건 중 M건 확인이 필요해요」, 제목 없음)을 점검 대화로 만든다. 답에 보일 메일 목록과 까닭, 원문 링크는 지시가 `findings` 한 칸씩 쓰게 하고 지금의 `CheckAnswerRenderer` 가 그린다. 제안은 지금의 `suggestions` 저장과 상한을 그대로 쓴다 |
+| REQ6 | (PR2) 켤 때 받은 시간대(없으면 `Asia/Seoul`)를 상태에 둔다. 실행이 끝난 시각이 그 시간대의 22시~07시면 알림을 만들지 않고 상태의 `deferred` 에 실행 수, 새 항목 수, 알릴 수를 더한다. 07시 뒤 첫 확인에서 「밤사이 새 메일 N건 중 M건 확인이 필요해요」 한 건을 만들고 비운다 |
+| REQ7 | 상태의 `day`(그 시간대의 날짜)와 `runs` 로 바인딩마다 하루 사건 실행 수를 센다. 상한 `max-runs-per-day`(기본 12)에 닿으면 그날은 목록을 조회하지 않고 지점을 옮기지 않으며 마지막 결과를 `DAILY_LIMIT` 으로 적는다. 다음 날 첫 확인은 옮기지 않은 지점에서 받아 쌓인 메일을 함께 본다. 사용자의 하루 발화 상한(`assistant.task.max-runs-per-day`, ADR-079)도 예약 작업의 발화와 모델을 부른 사건 실행을 함께 센다. `TaskFiring` 도 같은 합으로 본다. 화면의 「오늘 상한 도달」 은 PR2 다 |
+| REQ8 | `EVENT` 살펴보기는 시작할 때 `writes_allowed` 를 에이전트 값과 상관없이 거짓으로 적는다. 그래서 지금의 읽기 경계가 플러그인 쓰기 도구를 거절하고, `follow_up_propose` 는 지금처럼 받는다 |
+| REQ9 | 사건 실행의 준비 판정은 `ProactiveCheckReadiness.checkEvent` 다. 에이전트의 쓰기 허용과 상관없이 읽기 경계의 toolset 목록만 받는다. 쓰기 허용 에이전트의 넓은 목록(browser, 외부 메시지 등)을 받으면 메일 본문이 그 도구를 부를 수 있어서다. 셸·파일·코드 실행 toolset 은 `isolated-execution-enabled` 가 참일 때만 받고, 거짓이면 `ISOLATED_EXECUTION_REQUIRED` 로 막는다. `delegation` 은 목록 밖이라 막힌다. `web` 은 사용자 결정(스펙 DECISION24)으로 받는다 |
+| REQ10 | 기본은 꺼짐(`event_watch_enabled = false`)이다. 켜려면 그 에이전트에 붙은 연결의 바인딩과 연결이 `READY` 이고, manifest 가 `event_watch` 를 선언했고, 그 조회 도구의 선언이 `READ` 이고 승인 `none` 이어야 한다(살펴보기 트리가 승인 없이 부를 수 있는 도구). 같은 연결의 바인딩을 모두 잠근 뒤 다른 바인딩이 켜져 있으면 거절한다 |
+| REQ11 | 조회가 실패하면 지점을 둔다. `credential_rejected` 와 `forbidden` 만 `failures` 를 늘린다. 동시 호출 한도나 Hermes 장애의 `unavailable` 은 다시 연결할 일이 아니라서다. (PR2) `failure-threshold`(기본 4, 한 시간)에 처음 닿을 때 알림 `EVENT_WATCH_FAILED`(「Gmail 다시 연결 필요」) 한 건을 외부 서비스 연결 화면으로 낸다. 성공하면 `failures` 와 알림 표시를 비운다. 상태 응답의 `failing` 으로 화면이 다시 연결하라고 보인다 |
+| REQ12 | `startEvent` 가 `USER_BUSY` 나 `CONVERSATION_BUSY` 로 거절되면 지점과 `seen` 을 옮기지 않고 결과를 `BUSY` 로 적는다. 다음 15분에 같은 메일을 다시 받는다. 읽지 않은 보고의 건너뛰기는 `SCHEDULED` 만 하므로 `EVENT` 는 받지 않는다. 거꾸로 사건 실행이 남긴 보고도 매일 깨우기의 건너뛰기 판정에서 뺀다(매일 깨우기를 바꾸지 않는다). 점검 대화는 `CheckConversations.findOrCreate` 가 없으면 새로 만든다 |
 
 ## 책임과 경계
 
-- `proactive.check` 가 살펴보기 줄, 보고, 되풀이 판정을 계속 소유한다. 새 서비스는 만들지 않는다
-- 제안 줄은 `followup` 이 소유한다. 살펴보기는 `FollowUpSuggestions` 의 읽기 메서드 하나로 그 대화의 최근 제안을 받는다. `followup` 은 살펴보기를 모른다
-- 반응 사건은 `feedback` 이 소유한다. 살펴보기는 `ReactionLedger` 의 읽기 메서드로 제안마다 마지막 사용자 반응을 받는다. 지금처럼 `feedback.infra` 를 직접 읽지 않는다
-- 의존 방향은 그대로다. `proactive → followup`, `proactive → feedback` 은 이미 있다
+| 모듈 | 맡는 것 |
+| --- | --- |
+| 대시보드 plugin | `event_watch` 선언 검증과 카탈로그 노출, `events` 경로. 그 profile 에 설치한 연결의 값으로 조회 도구를 부르고 식별자, 받은 시각, 라벨만 돌려준다. 서비스 이름을 모른다 |
+| Gmail 플러그인 | `assistant.json` 의 `event_watch` 선언 하나. 도구 코드는 바꾸지 않는다 |
+| `hermes`(backend) | 새 port `HermesEventFeedClient` 와 HTTP 구현 `HttpHermesEventFeedClient`, 카탈로그의 `event_watch` 해석(`ConnectorEventWatch`) |
+| `connector.connection` | 바인딩 줄의 두 컬럼을 갖는다. `ConnectorEventWatches` 가 켜기 조건과 같은 연결의 하나뿐 규칙, 켜진 바인딩 목록, 잠금 아래 상태 갱신을 맡는다. 다른 패키지는 그 컬럼을 직접 쓰지 않는다 |
+| `proactive.check` | 계기 `EVENT`, `startEvent`, `checkEvent`, 입력의 「새 사건」 절, 지시의 사건 실행 규칙. (PR2) 끝날 때 알릴 메일 수를 실은 사건. 바인딩과 알림을 모른다 |
+| `task` | `EventWatchPoller`(주기 확인과 깨우기, 가상 스레드 하나에서 돈다), (PR2) `EventWatchNotices`(알림, 조용한 시간 미루기), `EventWatchService` 와 `EventWatchController`(에이전트 상세의 조회와 켜고 끄기. 켜기는 요청자 자신의 연결만 다룬다). 막는 까닭은 `ProactiveScheduleService` 의 판정을 함께 쓴다 |
+| `notification` | (PR2) 종류 `EVENT_CHECK_REPORTED`, `EVENT_WATCH_FAILED` 와 갈 곳 `CONNECTIONS`(목록 화면) |
+| web | 먼저 살펴보기 절의 「새 메일 살펴보기」 소절, 알림 종류와 갈 곳 |
+
+`task` 가 `connector` 와 `proactive` 를 쓰는 방향은 지금 층 순서 그대로다. 새 최상위 패키지와 새 하위 기능은 없다.
 
 ## 인터페이스와 데이터
 
-### 보고에 담는 것(REQ7)
+### 플러그인 선언 `event_watch`
 
-`CheckReport` 에 두 칸을 더한다. 화면에 보내는 `AttentionReport`, `ReportView` 는 다섯 칸을 하나씩 옮겨 담으므로 새 칸은 API 로 나가지 않는다.
+`assistant.json` 의 새 칸이다. 칸의 계약은 [`hermes/plugins/dashboard-profile-api/README.md`](../../../hermes/plugins/dashboard-profile-api/README.md) 의 선언 표가 갖는다.
 
-| 칸 | 값 | 비면 |
+| 칸 | 뜻 |
+| --- | --- |
+| `tool` | 조회 도구. `tools` 에 `READ` 로 선언한 도구여야 한다 |
+| `args` | 도구 인자. 글 값의 `{since}` 를 조회 시작 시각(초 단위 epoch)으로 바꾼다 |
+| `items` | 결과에서 항목 배열의 칸 이름 |
+| `page_token` | 다음 쪽 식별자의 결과 칸과 인자 이름. 선택 |
+| `id`, `received_at`, `labels` | 항목에서 읽을 칸 이름. 이 셋만 돌려준다 |
+| `skip_labels` | 이 라벨이 붙은 항목은 돌려주지 않는다 |
+| `noun` | 화면과 알림이 쓰는 항목 이름(「메일」) |
+| `link` | 원문 링크 틀. `{id}` 를 식별자로 바꾼다. `https` 만 받는다 |
+
+### 대시보드 plugin 경로
+
+`POST /api/connectors/<id>/events`, 서비스 토큰. 본문은 `{"profile", "since"}` 만 받는다. `since` 는 0 이상의 정수 초다.
+`execute` 와 같은 확인(관리 표식, 설치 기록, 그 profile 의 값)을 거친 뒤 `tool` 을 쪽마다 부르고, 쪽 상한(4쪽)에 닿으면 멈춘다.
+답은 `{"ok": true, "items": [{"id", "received_at", "labels"}], "truncated"}` 이거나 `call` 과 같은 `{"ok": false, "error"}` 다.
+`received_at` 은 읽을 수 있으면 UTC ISO-8601, 아니면 null 이다. 식별자는 영문, 숫자, `_`, `-` 만 받고 128자까지다. 제목, 보낸 사람, 요약은 응답과 로그에 싣지 않는다.
+
+### 바인딩 줄의 두 컬럼
+
+`agent_connector_binding` 에 컬럼 둘을 더한다. 새 테이블은 없다.
+
+| 컬럼 | 타입 | 뜻 |
 | --- | --- | --- |
-| `announced` | 「새로 알릴 것」 으로 판정한 발견 가운데 주제 키가 있는 것의 `topicKey`, `sourceUrl`, `title`. 도메인 record `ReportedFinding` | 빈 목록 |
-| `acceptedProblemKeys` | 받아들인 문제 후보의 정규화한 문제 키(`ProblemJudgement.normalizedKey`) | 빈 목록 |
+| `event_watch_enabled` | `BOOLEAN NOT NULL DEFAULT FALSE` | 사건 감지를 켰는가 |
+| `event_watch_state` | `TEXT NULL` | 켤 때 만들고 확인마다 덮어쓰는 JSON 글(`EventWatchState`). 시간대, 지점, `seen`, 마지막 확인 시각과 결과, 새 항목 수, 연속 실패 수, 하루 실행 수와 날짜. PR2 가 알림 표시와 미룬 알림을 더한다 |
 
-- 보고는 지금처럼 답을 저장하고 돌아온 살펴보기에만 남는다(`ProactiveCheckService.finish` 의 `returned`). 그래서 「사용자가 보지 못한 발견을 이미 알린 것으로 내리지 않는다」 는 지금 규칙이 그대로 지켜진다
-- 예약 살펴보기가 새 발견 없이 조용히 끝나면 보고를 남기지 않는다. 지금도 그때 남기는 것은 참고 발견뿐이고 되풀이 판정은 「새로 알릴 것」 만 읽으므로 판정 결과가 같다. 그때 받아들인 문제 후보는 다음 중복 판정에서 빠진다. 곧 REQ7 의 「받아들인 문제 후보의 중복도 걸러진다」 는 보고를 남긴 살펴보기의 후보에만 걸리는 예외가 있다. 문제 후보는 답과 보고에 그리지 않으므로 사용자에게 닿는 차이는 없다. 같은 블록의 제안은 지금처럼 저장돼 지금 화면에 보인다
-- 옛 보고는 두 칸이 없다. Jackson 3 의 기본값이 모르는 칸을 무시하고 없는 칸을 `null` 로 읽으므로, 직전 이미지로 되돌려도 새 보고를 읽고 새 이미지는 `null` 을 빈 목록으로 읽는다
-- 기존 보고는 `V20261105040320__ProactiveReportAnnouncedBackfill`(Java)이 채운다. 보고가 있는 살펴보기마다 그 살펴보기의 `NEW` 발견(주제 키가 빈 것 제외)과 `ACCEPTED` 문제 후보를 읽어 두 칸을 쓴다. JSON 을 H2 와 MySQL 에서 같은 SQL 로 만들기 어려워 Java 로 쓴다. `report_json` 은 `JSON` 칸이라 H2 에서는 `? FORMAT JSON` 으로 넣어야 글이 JSON 문자열 값이 되지 않는다. 이 마이그레이션이 없으면 배포 직후 첫 살펴보기가 지난 30일에 알린 발견을 다시 알릴 수 있다
+엔티티는 두 컬럼을 넣기와 고치기에서 뺀다(`insertable = false, updatable = false`). 다른 흐름이 바인딩 엔티티를 저장할 때 상태를 옛 값으로 덮지 않게 하기 위해서다(rule-68). 쓰기는 `ConnectorEventWatches` 의 조건부 update 뿐이다. `updated_at` 은 승인의 바인딩 revision 이라 바꾸지 않는다.
+JSON 컬럼이 아니라 `TEXT` 인 까닭은 H2 의 `JSON` 컬럼이 글 인자를 JSON 문자열 하나로 저장해 두 DB 의 동작이 갈리기 때문이다. DB 가 이 컬럼을 조회하지 않는다.
 
-### 되풀이 판정(REQ7, DECISION7)
+### 계기와 결과 블록
 
-`ProactiveCheckResults.answer` 가 판정 직전에 그 점검 대화에서 `digest-window` 안에 시작했고 보고가 있는 살펴보기를 한 번 읽는다(`ProactiveCheckRepository.findByConversationIdAndReportIsNotNullAndStartedAtAfter`).
-그 보고들의 `announced` 로 `Set<AnnouncedKey>` 를, `acceptedProblemKeys` 로 받아들인 문제 키 집합을 만든다.
-판정 순서는 ADR-081 의 1부터 7까지 그대로이고 8(「관심 없음」 주제)만 지운다. `FindingJudgement.judge` 의 `dismissedTopics` 인자를 지운다.
-문제 후보의 판정(ADR-093)은 그대로이고 받아들인 문제 키의 출처만 바뀐다.
-같은 주제만 다시 나온 예약 살펴보기가 답과 보고 없이 끝나는 분기(`ProactiveCheckResults.answer` 의 `SCHEDULED` 분기)는 바꾸지 않는다. 그래서 다음 매일 깨우기가 `UNREAD_REPORT` 로 막히지 않는다.
+- `CheckTrigger.EVENT`. `unattended()` 가 참이고, 예약 실행처럼 알릴 것이 없으면 대화와 보고를 남기지 않는다
+- 결과 블록은 바꾸지 않는다. 알릴 메일은 `findings` 의 `topicKey` 로 받는다(REQ5)
+- `EventBatch(sourceId, sourceTitle, noun, link, newCount, ids)`. `sourceId` 는 바인딩 번호이고 `proactive` 는 그 뜻을 모른다
+- (PR2) 끝날 때 `EventBatch` 와 알릴 메일 수를 실은 사건을 낸다
 
-### 입력(REQ2, DECISION6)
+### Control Plane API(PR2)
 
-`ProactiveCheckInput.buildInput` 의 마지막 두 절을 바꾼다. 앞의 변화 신호와 기억에서 꺼낸 최근 일은 그대로다.
-
-| 절 | 읽는 것 | 줄 | 상한 |
-| --- | --- | --- | --- |
-| 최근 제안 | 그 점검 대화에서 에이전트가 낸 할 일 줄(결과 블록의 제안이라 `dedupe_key` 가 있거나, 살펴보기 turn 이 `follow_up_propose` 로 내 `proposed_by_execution_id` 가 있는 줄). `digest-window` 안에 만든 줄. 거절한 줄을 포함하고 만료한 줄(`PROPOSED` 이고 `expires_at` 이 지금 이전)을 뺀다 | `- 제목 · 상태 · 반응` | `digest-max-items`, 최근 것부터 |
-| 최근 보고에서 알린 것 | 위 「되풀이 판정」 과 같은 보고들의 `announced` 와 `acceptedProblemKeys` | 발견은 `- 주제 키 · 제목 · 원문 · 알린 날 · 그 뒤 사용자 메시지 수`, 문제 키는 `- 받아들인 문제 키 · 키 · 알린 날` | 발견과 문제 키를 합쳐 `digest-max-items`, 최근 보고부터 |
-
-- 두 절 모두 모델이 쓴 글(제목)을 담으므로 절 전체를 `ExternalData.wrap` 으로 감싼다. 비면 감싸지 않은 「없다」 문장 하나다
-- 상태 낱말은 `FollowUpStatus` 마다 Control Plane 이 정한다(제안됨, 챙기는 중, 끝남, 그만둠, 거절함)
-- 반응은 그 줄의 사건 열쇠(`follow_up:<공개 식별자>`) 가운데 사용자가 남긴 마지막 반응 사건이다. 받아들임, 거절, 내림, 미룸, 되돌림, 고침, 끝냄만 읽고 노출과 열기는 반응으로 치지 않는다. `DISMISSED` 는 지금 화면에서 숨긴 것과 받아들인 할 일을 그만둔 것을 함께 가리키므로 「내림」 으로 적고, 어느 쪽인지는 같은 줄의 상태가 보인다. 없으면 「없음」 이다
-- 만료한 줄을 빼므로 받아들이지 않고 내리기만 한 제안은 7일(제안 수명) 뒤 입력에서 빠진다. 스펙이 「만료한 줄 제외」 로 정했고, 30일 동안 실리는 것은 거절한 줄이다
-- 상한은 지금의 `digest-window`(30일)와 `digest-max-items`(20)를 그대로 쓴다. 지금 두 절이 각각 20줄이었으므로 입력 크기가 같다
-- `ProactiveCheckInstructions.COMMON_RULES` 의 「관심 없음」 줄은 「최근 제안 가운데 거절했거나 내린 것과 같은 주제는 다시 알리지 않는다」 로 바꾼다. 「최근에 알린 발견」, 「최근에 받아들인 문제 후보」 를 가리키는 줄은 「최근 보고에서 알린 것」 에 맞춘다
-
-새로 더하는 읽기:
-
-| 자리 | 메서드 | 돌려주는 것 |
-| --- | --- | --- |
-| `FollowUpSuggestions` | `recent(userId, conversationId, since, now, limit)` | `followup.application.dto.RecentSuggestion(publicId, title, status)` 목록 |
-| `FollowUpRepository` | 위 조건의 JPQL 조회 하나 | `FollowUp` 목록. 쪽 크기는 `Pageable` |
-| `ReactionLedger` | `lastUserReactions(userId, subjectKeys, types)` | 열쇠마다 마지막 사용자 사건 종류. 기존 `findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc` 를 쓴다 |
-| `ProactiveCheckRepository` | `findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc` | 보고가 있는 최근 살펴보기 |
-
-### 지우는 것(PR1)
-
-| 무엇 | 까닭 |
+| 경로 | 뜻 |
 | --- | --- |
-| `ProactiveCheckResults` 의 발견·문제 후보 저장, `ProactiveCheckRun.Deps` 의 `findings`, `problems`, `reactions`, `suggestionProperties`, `ProactiveCheckService.finish` 가 저장을 감싸던 트랜잭션 | REQ1, DECISION12. 발견과 문제 후보를 함께 남길 까닭이 사라졌고, 감싼 트랜잭션이 제안 저장의 항목별 트랜잭션을 하나로 묶어 한 항목의 유일 제약 충돌이 전체를 되돌렸다 |
-| `CheckFindingController`, `CheckFindingReactions`, `FindingReaction`, `CheckFindingView`, `ProactiveCheckDtos` 의 발견 응답, 웹의 두 API 경로와 `check-finding-api.ts`, `use-check-findings.ts`, `check-finding-reactions.tsx`, `message-list.tsx` 와 `conversation-session-view.tsx` 의 발견 칸 | REQ3, DECISION3 |
-| 보고를 보일 때 발견마다 남기던 `SURFACED` | 발견 열쇠가 사라진다. 살펴보기의 `SURFACED` 는 남긴다 |
-| `ProactiveSuggestionProperties` 와 `application.yml` 의 그 키, `LivePropertiesConfig` 의 등록 | DECISION12 |
-| `ProactiveCheck` 의 `newFindings`, `referenceFindings`, `treeInputTokens`, `treeCachedInputTokens`, `treeOutputTokens` 와 `ProactiveCheckRun.treeTokens` | 읽는 곳이 없다. 비용은 `root_execution_id` 로 실행 줄을 합쳐 얻는다 |
-| `FeedbackEntry.sourceCheck`, `FeedbackEvent.sourceCheckId` 와 부르는 세 곳 | DECISION10. 읽는 곳이 없음을 위 표에서 확인했다 |
-| `ProactiveCheckRepository` 에서 운영 코드가 부르지 않는 조회(`findEvaluable`, `existsByRootExecutionIdAndTrigger`, `findByIdAndUserId`, `findFirstByUserIdAndAgentIdOrderByIdDesc`, `existsByUserIdAndAgentIdAndReportIsNotNullAndReportOpenedAtIsNull`, `findByUserIdAndStartedAtGreaterThanEqualOrderByIdAsc`, `findByUserIdAndIdIn`, `findByUserIdAndRootExecutionIdIn`), 발견·문제 후보 저장소에서 이관이 쓰지 않는 조회 | 호출이 없거나 이번에 호출이 사라진다 |
-| `ProactiveCheckResults.silent`, `ProactiveCheckRun.silent`, `CheckFeedback` 의 자동 실행 분기, `ProactiveCheckAnswerGuard` 의 자동 실행 분기 | 자동 실행 줄을 새로 만드는 경로가 없어 도는 자동 실행도 없다. `chat` 의 `CheckTurn.silent` 기본값과 그것을 읽는 `ChatTurnLifecycle` 의 두 분기는 이 기능의 파일 범위 밖이라 남기고 PR2 에서 함께 지운다 |
+| `GET /api/v1/agents/{code}/event-watches` | 그 에이전트에 붙은 요청자 연결 가운데 `event_watch` 를 선언한 것마다 켜짐, 켤 수 있는지와 까닭, 시간대, 마지막 확인과 결과, `dailyLimitReached`, `failing` |
+| `PUT /api/v1/agents/{code}/event-watches/{connectorId}` | 본문 `{enabled, timezone}`. 켜기는 대화를 시작할 수 있어야 하고(`requireStartable`), 끄기는 읽기 권한만 본다 |
 
-남기는 것(PR2 가 지운다): 두 엔티티와 저장소의 이관용 조회, `LegacySuggestionBackfill`, `LegacySuggestionKeys`, 사용자·에이전트 정리의 두 테이블 처리, `CheckTrigger.AUTONOMY` 값과 「마지막 살펴보기」 조회의 자동 실행 제외, 두 테이블의 정리 분류(`purge/tables.tsv`).
-`CheckTrigger.AUTONOMY` 를 PR1 에서 지우지 않는 까닭은 아래 DECISION3 이다.
-
-### 지우는 것(PR2)
-
-PR2 는 위 「남기는 것」 을 지운다. 마이그레이션은 DML 과 DDL 을 나눠 네 개다.
-
-| 버전 | 하는 일 |
-| --- | --- |
-| `V20261105040321` | 계기가 `AUTONOMY` 인 살펴보기 줄을 지운다. FK CASCADE 로 그 발견과 문제 후보가 함께 지워진다. 표를 지우기 전이라 이관을 마지막으로 돌린 뒤다 |
-| `V20261105040322` | `proactive_check_finding`, `proactive_check_problem` 을 지운다 |
-| `V20261105040323` | `decision_feedback_event` 의 외래 키와 `source_check_id` 칸을 지운다 |
-| `V20261105040324` | `proactive_check` 의 `new_findings`, `reference_findings`, `tree_*_tokens` 다섯 칸을 지운다 |
-
-코드는 두 엔티티와 저장소, `LegacySuggestionBackfill`, `LegacySuggestionKeys` 와 그 보고 record, 이관만 쓰던 `FollowUpService.migrateLegacySuggestion` 과 `FeedbackEventRepository.repointSubject`, `CheckTrigger.AUTONOMY`, `CheckTurn.silent` 와 `ChatTurnLifecycle` 의 두 분기를 지운다. 「마지막 살펴보기」 조회는 계기를 가리지 않는 `findFirstByUserIdAndAgentIdOrderByIdDesc` 로 바꾼다.
-정리 분류(`purge/tables.tsv`)와 fixture 는 두 표와 `source_check_id` 를 뺀다. 에이전트 정리는 반응 기록의 칸을 비우지 않으므로 `decision_feedback_event` 의 에이전트 칸은 `KEEP` 이다.
-
-### 문서와 ADR
-
-| 문서 | 바꾸는 것 |
-| --- | --- |
-| ADR-081 | 판정 조건 표의 8(「관심 없음」)을 지우고, 이미 알린 발견을 보고에서 읽는다고 고친다. 발견을 저장한다는 서술을 고친다. `backend/docs/adr/INDEX.md` 의 요약 줄도 맞춘다 |
-| ADR-093 | 문제 후보를 저장하지 않고 받아들인 문제 키만 보고에 남긴다고 고친다. `backend/docs/adr/INDEX.md` 의 요약 줄도 맞춘다 |
-| ADR-20261008 / check-finding-reaction | 결정 전체가 대체된다. status 를 `superseded` 로 바꿔 `docs/adr/archive/` 로 옮긴다. 대체한 결정은 ADR-20261101 / proactive-suggestion 의 새 절이다 |
-| ADR-20261101 / proactive-suggestion | 옮기는 순서 뒤에 「발견·문제 후보 테이블을 지운다」 절을 더한다. 반응은 제안 줄에서만 받고, 입력과 되풀이 판정이 제안 줄과 보고를 읽는다 |
-| ADR-20261007 / decision-feedback | `source_check_id` 를 쓰지 않는다고 고친다 |
-| `docs/features/proactive.md` | 「발견 반응」 절을 지운 사실과 반응을 받는 곳만 남기고, 「Control Plane 지시」, 「끝날 때」, 「검사」, 「문제 후보」, 「제안 저장」, 「판단 피드백」 을 고친다 |
-| `docs/features/attention.md` | 발견 반응을 가리키는 줄이 있으면 고친다 |
-| `backend/docs/data-schema.md` | 두 테이블은 쓰지 않고 이관만 읽는다고, 지운 칸은 엔티티에서 빠졌고 PR2 가 지운다고, `report_json` 의 새 칸을 적는다 |
+막는 까닭은 매일 깨우기의 `CheckBlockerCode` 에 `EVENT_TOOL_NOT_ALLOWED`, `CONNECTION_NOT_READY`, `EVENT_WATCH_ELSEWHERE` 를 더해 쓴다.
 
 ## 실패와 일관성
 
-- 보고와 판정 재료가 한 줄(`proactive_check`)의 한 저장(`record`)에 들어간다. 지금은 발견 저장과 줄 저장이 따로라 한쪽만 남을 수 있었는데, 이 틈이 사라진다
-- 보고 저장이 실패하면 다음 살펴보기는 그 살펴보기를 알린 것으로 보지 않는다. 지금 발견 저장이 실패했을 때와 같다
-- 백필 마이그레이션은 보고가 있는 줄만 줄마다 고치고, 한 줄의 갱신 수가 1 이 아니면 멈춘다. 이미 두 칸이 있는 보고는 건너뛰어 다시 돌려도 같다
-- PR1 을 직전 이미지로 되돌린 동안 옛 이미지가 남긴 보고에는 두 칸이 없다. 다시 PR1 로 올리면 백필은 이미 돈 버전이라 다시 돌지 않고, 그 기간에 알린 소식이 한 번 더 알려질 수 있다. 되돌리기는 드문 일이고 결과가 「한 번 더 알림」 이라 받아들인다
-- 배포 순서: PR1 은 DDL 이 없다. 직전 이미지로 되돌려도 뜬다(지운 칸은 남아 있고 기본값이 있으며, 새 보고 칸은 옛 이미지가 무시한다). 되돌린 동안 옛 이미지가 쓴 발견과 문제 후보는 PR2 직전 기동 이관이 옮긴다
-- `CheckTrigger.AUTONOMY` 를 지우려면 그 줄을 먼저 지워야 한다. 그 줄을 지우면 FK 의 `ON DELETE CASCADE` 로 그 살펴보기의 문제 후보가 함께 지워져, PR2 직전 기동 이관이 옮길 대상이 줄어든다. 그래서 줄 삭제와 값 삭제는 이관을 마지막으로 돌린 뒤인 PR2 의 DROP 과 함께 한다
+- **상태 갱신은 바인딩 줄을 잠그고 다시 읽은 뒤 쓴다.** 확인 스레드와 실행이 끝난 스레드가 같은 줄을 고칠 수 있어서다. 잠그는 동안 Hermes 를 부르지 않는다. 조회는 잠금 밖에서 하고, 결과를 쓸 때 다시 잠가 그 사이 꺼졌으면 버린다
+- **지점은 깨우기를 시작하는 트랜잭션에서 옮긴다.** `startEvent` 의 `beforeRun` 이 살펴보기 줄 저장과 같은 트랜잭션에서 상태를 쓴다. 그래서 서버가 그 사이에 내려가도 둘이 어긋나지 않는다. 시작이 거절되면(바쁨, 막는 까닭, 상한) 옮기지 않는다. 시작한 실행이 뒤에 실패해도 같은 메일로 다시 깨우지 않는다. 실패는 점검 대화의 알림 줄과 실행 기록이 남긴다(REQ2 가 앞선다)
+- **쪽 상한을 넘으면 최근 것만 본다.** `truncated` 면 받은 항목으로 깨우고 지점을 옮긴다. 4쪽(Gmail 은 100통)을 넘는 메일이 15분 안에 오면 오래된 쪽은 깨우지 않는다. 입력에는 새 항목을 20개까지 싣고 수는 모두 센다
+- **서버 한 대 전제다.** 확인은 `BackgroundTasks` 의 가상 스레드 하나가 차례로 돈다. 일정 스레드를 붙잡지 않고, 앞 확인이 안 끝났으면 다음 일정은 건너뛴다. 기동 정리(`TaskRunRecovery`)가 끝나기 전에는 돌지 않는다
+- **매 확인 앞에서 값싼 조건을 다시 본다.** 바인딩과 연결이 `READY` 인지, 주인이 허용 목록에 있고 그 에이전트로 대화를 시작할 수 있는지, 조회 도구가 아직 승인 없이 불리는지를 본다. 하나라도 아니면 조회하지 않고 `BLOCKED` 다. toolset 판정은 Hermes 를 불러 깨울 때만 한다
+- **배포 순서는 plugin 먼저다.** 옛 plugin 은 `events` 경로가 없어 404 이고 Control Plane 은 실패로 센다. 옛 Control Plane 은 카탈로그의 새 칸을 읽지 않는다(rule-66)
+- **session 교체가 빨라진다.** 사건 실행도 `session-max-checks`(14회)를 센다. 하루 상한 12회를 다 쓰면 하루에 한 번쯤 점검 대화의 session 이 바뀐다. 이전 맥락은 Memory 와 입력의 최근 제안·보고가 잇는다
 
 ## 검증 전략
 
-| ID | 경계와 환경 | 확인 |
+| ID | 경계 | 확인 |
 | --- | --- | --- |
-| REQ1 | 가짜 Hermes 로 도는 살펴보기 통합 테스트(H2) | 결과 블록의 발견과 문제 후보가 답과 보고에 그려지고 제안 줄이 생기며 두 테이블에 줄이 없다. 운영 코드에서 두 테이블을 쓰는 곳이 없다. 인수 조건의 「엔티티가 없다」 는 이관을 남기는 PR1 이 아니라 PR2 가 확인한다(스펙 DECISION11) |
-| REQ2 | 같은 통합 테스트 | 입력에 그 대화의 제안 줄(거절 포함, 만료 제외, 다른 대화 제외)과 반응, 보고의 발견 주제와 받아들인 문제 키가 `<external-data>` 안에 실리고 상한을 넘지 않는다 |
-| REQ7 | 판정 단위 테스트와 통합 테스트 | 기존 되풀이 테스트를 보고 기반으로 옮겨, 같은 주제 키와 원문만 다시 나온 예약 살펴보기가 보고 없이 끝나고 다음 예약이 `UNREAD_REPORT` 로 건너뛰지 않는다. 받아들인 문제 키가 같은 기간 안에서 `DUPLICATE` 로 걸린다. 백필 마이그레이션이 옛 표에서 두 칸을 채운다 |
-| REQ3 | MockMvc 와 브라우저 테스트 | 옛 반응 경로와 목록 경로가 404 다. 점검 대화 답 아래에 반응 단추가 없다. 지금 화면의 제안 카드 반응 테스트가 그대로 통과한다 |
-| REQ4 | 기존 테스트 | 읽지 않은 보고의 건너뛰기와 보고 열기 테스트가 그대로 통과한다 |
-| REQ5, REQ6 | PR2 | PR2 의 마이그레이션 테스트와 운영 확인(`fos-home-infra`) |
+| REQ1 | backend 통합(가짜 Hermes 클라이언트) | 새 항목 없는 확인 뒤 `proactive_check`, `agent_execution` 줄 수가 그대로이고 상태만 바뀐다 |
+| REQ2 | backend 통합 | 같은 항목을 두 번 돌려줘도 깨우기는 한 번. 저장소에서 다시 읽은 상태로 새 poller 를 만들어도 같다. 지점보다 앞이지만 겹침 안의 새 식별자는 깨운다 |
+| REQ3 | hermes 단위 | `skip_labels` 항목을 빼고, 검색식에 분류 제외가 들어간다 |
+| REQ4 | backend 단위와 통합 | 입력에 「새 사건」 절과 식별자가 `<external-data>` 안에 있고 계기가 `EVENT` 다 |
+| REQ5(PR2) | backend 단위 | 입력 밖 식별자를 센 수에서 뺀다. 알림 본문에 제목이 없다 |
+| REQ6(PR2) | backend 단위(고정 시계) | 23시에 끝난 실행은 알림이 없고, 07시 뒤 첫 확인에서 한 건이 생긴다 |
+| REQ7 | backend 통합 | 상한에 닿은 뒤 조회를 부르지 않고 지점이 그대로다. 날이 바뀌면 다시 깨운다 |
+| REQ8 | 기존 계약 테스트 | `writes_allowed` 가 거짓으로 적힌다. 쓰기 거절은 `WakeWriteBoundaryContractTest` 의 경계를 그대로 쓴다 |
+| REQ9, REQ10 | backend 통합 | 셸 toolset 과 격리 꺼짐, 쓰기 허용 에이전트의 browser toolset 이면 깨우지 않는다. 조회 도구 승인 필요, 다른 에이전트에서 켜짐이면 켜기가 거절된다 |
+| REQ11 | backend 통합 | 연결 문제만 실패 수를 늘리고 지점은 그대로이며, 성공하면 비운다. (PR2) 네 번째 연속 실패에서만 알림 한 건 |
+| REQ12 | backend 통합 | 대화가 바쁘면 지점이 그대로이고 다음 확인에서 깨운다 |
 
-저장소의 새 JPQL 조회는 `RepositoryQueryMysqlTest` 에도 넣는다(rule-51). 백필 마이그레이션의 데이터 테스트는 H2 와 MySQL 에서 함께 돌린다(`ToolsetHiddenMigrationTest` 와 그 MySQL 하위 클래스의 꼴).
+화면은 PR2 의 브라우저 테스트 하나가 소절의 켜기와 상한·실패 표시를 본다. 실제 Gmail 왕복은 배포 뒤 운영 확인이 맡는다.
 
 ## 결정
 
-| ID | 결정 | 답 | 누가 | 근거 |
-| --- | --- | --- | --- | --- |
-| DECISION1 | 되풀이 판정의 재료를 둘 곳 | `proactive_check.report_json` 의 새 칸 두 개. 제안 줄의 `detail_json` 은 쓰지 않는다 | 작성자 | 제안 줄에는 주제 키가 없고 본문은 암호화돼 판정마다 풀어야 한다. 보고는 「사용자에게 보였다」 는 경계와 정확히 같은 때 저장된다 |
-| DECISION2 | 이미 있는 보고의 판정 재료 | Java 마이그레이션으로 옛 표에서 채운다 | 작성자 | 채우지 않으면 배포 직후 지난 30일의 소식을 다시 알린다. SQL 의 JSON 함수는 H2 와 MySQL 에서 다르다 |
-| DECISION3 | `AUTONOMY` 줄과 값을 지우는 PR | PR2. PR1 은 그 값으로 동작하는 코드만 지운다 | 작성자 | 줄을 지우면 그 문제 후보가 CASCADE 로 지워져 PR2 직전의 마지막 이관 대상이 준다(스펙 DECISION11 과 같은 까닭) |
-| DECISION4 | 지울 `proactive_check` 칸 | `new_findings`, `reference_findings`, `tree_input_tokens`, `tree_cached_input_tokens`, `tree_output_tokens`. `tool_calls`, `delegations` 는 남긴다 | 작성자 | 앞의 다섯은 쓰기만 하고 읽지 않는다. 뒤의 둘은 상한으로 멈춘 까닭을 설명하는 값이고 실행 줄에서 다시 얻지 못한다 |
-| DECISION5 | 입력의 반응 낱말 | 사용자 반응 사건의 마지막 하나. 노출과 열기는 빼고 상태는 따로 싣는다 | 작성자 | 상태만으로는 숨김과 미룸이 보이지 않는다. 노출은 반응이 아니다(ADR-20261007 / decision-feedback 의 「무응답」) |
-| DECISION6 | 대체할 ADR | ADR-20261008 / check-finding-reaction 은 보관으로 옮기고, ADR-081, ADR-093, ADR-20261101 / proactive-suggestion, ADR-20261007 / decision-feedback 은 고친다 | 작성자 | 반응 단추 결정은 전체가 사라지고, 나머지는 일부만 바뀐다(ADR 목록의 「일부만 대체된 ADR 은 옮기지 않는다」) |
-| DECISION7 | 받아들인 문제 키를 입력에 싣는가 | 「최근 보고에서 알린 것」 절에 키만 싣는다 | 작성자 | 문제 후보는 답과 보고에 그리지 않아, 입력에 없으면 모델이 무엇을 받아들였는지 모르고 지시의 「같은 문제 키는 달라진 점이 있을 때만」 을 지킬 수 없다. 문제 후보 경로를 통째로 걷어내는 것은 출력 계약을 바꾸는 일이라 이 스펙 범위 밖이다 |
-| DECISION8 | 「최근 제안」 에 넣는 줄 | 결과 블록의 제안 줄과 살펴보기 turn 이 `follow_up_propose` 로 낸 줄 | 작성자 | 두 줄 모두 그 점검 대화에서 에이전트가 낸 제안이다. 하나만 실으면 도구로 낸 제안이 되풀이된다 |
+| ID | 결정 | 근거 |
+| --- | --- | --- |
+| DECISION1 | 상태는 바인딩 줄의 두 컬럼에 둔다. 예약 작업 줄이나 `task_run` 을 쓰지 않는다 | 「같은 연결에 하나뿐」 과 도구 허용이 바인딩 단위이고, 떼면 상태도 함께 사라진다. `TaskFiring` 은 발화마다 `task_run` 줄을 만들어 REQ1 의 「행을 쌓지 않는다」 와 맞지 않는다 |
+| DECISION2 | 발화기는 따로 둔다(`EventWatchPoller`). 예약 작업 발화기를 다시 쓰지 않는다 | 위와 같은 까닭이고, 확인은 모델 없이 끝나 turn 자리와 시작 단계가 필요 없다 |
+| DECISION3 | 하루 상한 12회, 연속 실패 4회(PR2), 겹침 30분, 쪽 상한 4쪽, 입력 식별자 20개 | 깨어 있는 시간에 한 시간 남짓마다 한 번 살펴볼 수 있는 수다. 실패 4회는 한 시간이라 잠깐의 장애로 알리지 않는다. 값은 설정(`assistant.event-watch`)이 갖는다 |
+| DECISION4 | 지점은 Control Plane 의 조회 시작 시각이다 | 메일의 `Date` 는 보낸 사람이 쓰는 값이다(REQ2) |
+| DECISION5 | 메일 목록과 까닭은 결과 블록의 `findings` 로 그리고, 알릴 메일 수도 그 `topicKey` 로 센다 | 블록 밖의 글은 버리는 계약(ADR-081)을 지키고 새 그리기 틀을 만들지 않는다. 별도 칸(`notifyItems`)을 두면 답에 없는 메일로 알리거나 답에만 있고 알림이 없는 경우가 생긴다(독립 검토) |
+| DECISION6 | 플러그인 선언으로 원천을 일반화한다 | rule-65. 다음 원천(가계부, 토스, 커리어)은 선언만 더한다 |
+| DECISION7 | 사건 실행의 조회 클라이언트는 새 port `HermesEventFeedClient` 로 둔다 | `HttpHermesConnectorClient` 는 파일 길이 상한 가까이 있고, 목록 조회는 다른 읽기 제한(40초)을 쓴다 |
+| DECISION8 | 연속 실패는 `credential_rejected` 와 `forbidden` 만 센다 | `unavailable` 은 동시 호출 한도나 장애로도 나와 다시 연결할 일이 아니다(독립 검토) |
