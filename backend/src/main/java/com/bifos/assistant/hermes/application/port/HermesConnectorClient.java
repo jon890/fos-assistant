@@ -50,9 +50,12 @@ public interface HermesConnectorClient {
         }
 
 
-        /** 사건 실행을 열 수 있는 설치인가. 켜졌고 설정됐고 정책 hook 과 도구 판정이 그 profile 에 있고 재시작을 기다리지 않는다. */
+        /**
+         * 그 profile 의 파일로 보아 사건 실행을 열 수 있는 설치인가. 켜졌고 설정됐고 정책 hook 과 도구 판정이 그 profile 에 있다. 떠 있는
+         * gateway 가 새 파일을 읽었는지는 알지 못한다. 재시작 대기는 Control Plane 의 바인딩 줄이 갖는다.
+         */
         public boolean guardsEventRuns() {
-            return enabled && configured && policyHook && toolGuard && !restartRequired && MODE_BIND.equals(mode);
+            return enabled && configured && policyHook && toolGuard && MODE_BIND.equals(mode);
         }
 
 

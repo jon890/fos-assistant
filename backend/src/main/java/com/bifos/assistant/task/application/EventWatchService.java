@@ -169,14 +169,16 @@ public class EventWatchService {
 
 
     /**
-     * 사건 실행의 준비 판정이다. 설정 꺼짐을 보고, 쓸 수 있는 바인딩이면 그 profile 의 설치 상태에서 도구 판정 plugin 을 본다. 켜 둔 toolset
+     * 사건 실행의 준비 판정이다. 설정 꺼짐을 보고, 쓸 수 있는 바인딩이면 그 profile 의 설치 상태에서 도구 판정 plugin 을, 바인딩 줄에서 재시작
+     * 대기를 본다. 켜 둔 toolset
      * 과 분야 지침 스킬은 보지 않는다(ADR-20261105 / event-watch). Hermes 를 읽지 못하면 그 예외를 그대로 올린다.
      */
     private List<EventWatchBlocker> readinessBlockers(Agent agent, EventWatchBinding binding) {
         List<EventWatchBlocker> blockers = new ArrayList<>(readiness.checkEvent().blockers().stream()
             .map(EventWatchBlocker::of)
             .toList());
-        if (binding.usable() && !hermes.readConnector(agent.hermesProfile(), binding.connectorId()).guardsEventRuns()) {
+        if (binding.usable() && (watches.restartPending(agent.id())
+            || !hermes.readConnector(agent.hermesProfile(), binding.connectorId()).guardsEventRuns())) {
             blockers.add(EventWatchBlocker.of(EventWatchBlocker.TOOL_GUARD_MISSING));
         }
         return List.copyOf(blockers);

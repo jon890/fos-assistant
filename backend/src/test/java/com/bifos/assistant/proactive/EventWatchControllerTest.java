@@ -120,7 +120,7 @@ class EventWatchControllerTest extends EventWatchTestSupport {
 
 
     @Test
-    @DisplayName("셸·위임 toolset 이 켜진 에이전트도 켤 수 있고, 판정 plugin 이 없으면 TOOL_GUARD_MISSING 으로 켜지 못한다 (REQ9, REQ10)")
+    @DisplayName("셸·위임 toolset 이 켜진 에이전트도 켤 수 있고, 판정 plugin 이 없거나 재시작을 기다리면 TOOL_GUARD_MISSING 으로 켜지 못한다 (REQ9, REQ10)")
     void toolsetsDoNotBlockButMissingGuardDoes() throws Exception {
         watches.disable(user.id(), agent.id(), CONNECTOR);
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal", "delegation"));
@@ -128,6 +128,10 @@ class EventWatchControllerTest extends EventWatchTestSupport {
         expectBlocked(agent, "TOOL_GUARD_MISSING");
 
         when(connector.readConnector(anyString(), anyString())).thenReturn(installed(true));
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = TRUE WHERE id = ?", binding.id());
+        expectBlocked(agent, "TOOL_GUARD_MISSING");
+
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = FALSE WHERE id = ?", binding.id());
         mvc.perform(get(PATH, agent.code())).andExpect(jsonPath("$[0].available").value(true));
         save(true, "").andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
     }

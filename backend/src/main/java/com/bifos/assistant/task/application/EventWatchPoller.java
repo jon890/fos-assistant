@@ -171,12 +171,14 @@ public class EventWatchPoller {
 
 
     /**
-     * 그 profile 에 사건 실행의 도구 판정을 하는 {@code fos-ctx} 가 깔려 있고 재시작을 기다리지 않는가(ADR-20261105 / event-watch). 바인딩의
-     * {@code READY} 는 마지막 연결 확인 때의 값이라 깨울 때마다 설치 상태를 다시 읽는다. 읽지 못하면 깨우지 않는다.
+     * 그 profile 에 사건 실행의 도구 판정을 하는 {@code fos-ctx} 가 깔려 있고, 그 에이전트의 어느 바인딩도 gateway 재시작을 기다리지 않는가
+     * (ADR-20261105 / event-watch). 바인딩의 {@code READY} 는 마지막 연결 확인 때의 값이라 깨울 때마다 설치 상태를 다시 읽는다. 읽지
+     * 못하면 깨우지 않는다.
      */
     private boolean toolGuardInstalled(EventWatchTarget target) {
         try {
-            return installs.readConnector(target.profile(), target.connectorId()).guardsEventRuns();
+            return !watches.restartPending(target.agentId())
+                && installs.readConnector(target.profile(), target.connectorId()).guardsEventRuns();
         } catch (RuntimeException ex) {
             log.warn("사건 감지의 설치 상태를 읽지 못해 깨우지 않았다 bindingId={}", target.bindingId(), ex);
             return false;

@@ -208,6 +208,22 @@ class EventWatchPollerTest extends EventWatchTestSupport {
 
 
     @Test
+    @DisplayName("그 에이전트의 바인딩이 gateway 재시작을 기다리면 파일이 새 판이어도 깨우지 않는다 (REQ9)")
+    void restartPendingBindingBlocksWaking() throws InterruptedException {
+        // 같은 profile 의 다른 설치가 fos-ctx 를 바꿔 떠 있는 gateway 가 옛 코드를 쥘 수 있는 상태다.
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = TRUE WHERE id = ?", binding.id());
+        listing("m1");
+
+        poller.checkAll();
+        awaitIdle();
+
+        assertThat(state().lastResult()).isEqualTo(EventWatchResult.BLOCKED);
+        assertThat(state().checkpoint()).isEqualTo(BASE);
+        assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
+    }
+
+
+    @Test
     @DisplayName("같은 연결에서는 바인딩 하나만 켜고, 조회 도구가 승인 없이 불리지 않으면 켜지 않는다 (REQ10)")
     void enableRequiresSingleBindingAndApprovalFreeTool() {
         Agent other = newAgent(user);

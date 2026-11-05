@@ -272,7 +272,6 @@ public final class McpDtos {
         }
     }
 
-    /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
     /** 도구 판정의 답이다. 모양은 플러그인 정책 판정과 같다(ADR-20261105 / event-watch). */
     public record ToolGuardResponse(String decision, String message) {
         public static ToolGuardResponse allow() {
@@ -285,6 +284,7 @@ public final class McpDtos {
         }
     }
 
+    /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
     public record SubagentRegistrationResponse(String result) {
     }
 }
