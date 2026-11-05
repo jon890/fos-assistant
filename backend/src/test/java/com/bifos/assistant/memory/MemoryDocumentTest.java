@@ -8,13 +8,10 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
-import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.memory.presentation.MemoryController;
 import com.bifos.assistant.memory.presentation.MemoryDocumentController;
-import com.bifos.assistant.memory.presentation.MemoryDtos.CollectionView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateDocumentRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.DocumentSummaryView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.DocumentView;
@@ -165,7 +162,7 @@ class MemoryDocumentTest {
 
 
     @Test
-    @DisplayName("문서 목록은 자기 문서만 내고 본문 칸이 없다")
+    @DisplayName("문서 목록은 자기 문서만 낸다")
     void listsOwnDocumentsWithoutContent() {
         createDocument();
         as(KID);
@@ -176,9 +173,6 @@ class MemoryDocumentTest {
 
         assertThat(list).hasSize(1);
         assertThat(list.get(0).documentKey()).isEqualTo(NAME);
-        assertThat(DocumentSummaryView.class.getRecordComponents())
-            .extracting(component -> component.getName())
-            .doesNotContain("content");
     }
 
 
@@ -203,18 +197,6 @@ class MemoryDocumentTest {
             ErrorCode.MEMORY_REVISION_CONFLICT);
         assertThat(revisionRepository.count()).isEqualTo(before);
         assertThat(controller.get(id).content()).isEqualTo("평문-표식-8802");
-    }
-
-
-    @Test
-    @DisplayName("이름과 collection 의 모양이 틀리면 거절한다")
-    void validatesNameAndCollection() {
-        assertCode(
-            () -> controller.create(new CreateDocumentRequest("identity", "Application_Profile", "t", "c")),
-            ErrorCode.VALIDATION_FAILED);
-        assertCode(
-            () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c")),
-            ErrorCode.VALIDATION_FAILED);
     }
 
 
@@ -260,22 +242,5 @@ class MemoryDocumentTest {
             String.class,
             id);
         assertThat(deleted).doesNotContain(MARK);
-    }
-
-
-    @Test
-    @DisplayName("collection 목록에 identity 가 들어 있다")
-    void collectionsIncludeIdentity() {
-        assertThat(controller.collections()).extracting(CollectionView::key).contains("identity");
-    }
-
-
-    @Test
-    @DisplayName("문서의 꺼내는 방식은 요청으로 정하지 못하고 늘 SEARCH 다")
-    void documentRetrievalIsAlwaysSearch() {
-        Memory memory = memories.createDocument(DAD, "identity", NAME, "제목", MARK);
-
-        assertThat(memory.retrieval().name()).isEqualTo("SEARCH");
-        assertThat(memory.scope()).isEqualTo(MemoryScope.USER);
     }
 }

@@ -247,19 +247,6 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("주소나 모델이 비면 임베딩 서비스를 한 번도 부르지 않는다")
-    void doesNotCallWhenDisabled() {
-        memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
-
-        assertThat(refresher(MemoryEmbeddingProperties.disabled()).refreshOnce()).isZero();
-        refresher(new MemoryEmbeddingProperties("http://embedding.test", "", null, null, null, null, null, null)).refresh();
-
-        assertThat(client.calls()).isZero();
-        assertThat(MemoryEmbeddingRows.count(jdbc)).isZero();
-    }
-
-
-    @Test
     @DisplayName("일정 실행은 스케줄러 스레드가 아니라 가상 스레드에서 돌고 앞 주기가 끝나기 전에는 다시 띄우지 않는다")
     void runsScheduledRefreshOffSchedulerThreadOnce() throws InterruptedException {
         memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);

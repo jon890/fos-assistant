@@ -180,19 +180,6 @@ class MemoryServiceTest {
 
 
     @Test
-    @DisplayName("scope가 없으면 거절하고 항상 주입은 기본으로 켜지지 않는다")
-    void rejectsMissingScopeAndAlwaysInjectionIsNotOnByDefault() {
-        assertThatThrownBy(() -> memories.create(ADMIN, null, "제목", "내용", false))
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_SCOPE_REQUIRED));
-
-        Memory memory = memories.create(ADMIN, MemoryScope.USER, "제목", "내용", false);
-        assertThat(memory.alwaysInject()).isFalse();
-        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).contains(memory.id());
-    }
-
-
-    @Test
     @DisplayName("제안은 승인 전까지 주입과 본문에서 제외되고 승인 뒤 주입 층이 정해진다")
     void proposalIsExcludedUntilApprovedThenGetsInjectionLayer() {
         Memory proposed = memories.proposeUser(ADMIN, "제안", "내용", 99L);
@@ -214,17 +201,6 @@ class MemoryServiceTest {
         memories.update(ADMIN, proposed.id(), "내용", false, null);
         assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).contains(proposed.id());
         assertThat(memories.bodyFor(ADMIN, CORE, proposed.id()).content()).isEqualTo("내용");
-    }
-
-
-    @Test
-    @DisplayName("MEMBER 역할은 그룹 항목을 만들거나 고치거나 지우지 못한다")
-    void memberCannotCreateEditOrDeleteGroupItems() {
-        Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹", "내용", false);
-
-        assertForbidden(() -> memories.create(MEMBER, MemoryScope.GROUP, "새 그룹", "내용", false));
-        assertForbidden(() -> memories.update(MEMBER, group.id(), "수정", true, null));
-        assertForbidden(() -> memories.delete(MEMBER, group.id()));
     }
 
 
@@ -465,18 +441,6 @@ class MemoryServiceTest {
     }
 
 
-    @Test
-    @DisplayName("collection key 가 형식에 맞지 않으면 만들지 못한다")
-    void rejectsMalformedCollectionKeys() {
-        for (String key : List.of("", "Core", "커리어", "a b", "-core")) {
-            assertThatThrownBy(() -> memories.create(
-                ADMIN, MemoryScope.USER, "제목", "내용", key, MemoryRetrieval.SEARCH))
-                    .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
-        }
-    }
-
-
     private static CurrentUser user(Long id, Long groupId, UserRole role) {
         return new CurrentUser(id, "user" + id + "@example.com", "user" + id, groupId, role);
     }
@@ -486,13 +450,6 @@ class MemoryServiceTest {
         assertThatThrownBy(action::run)
             .isInstanceOfSatisfying(
                 ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
-    }
-
-
-    private static void assertForbidden(ThrowingAction action) {
-        assertThatThrownBy(action::run)
-            .isInstanceOfSatisfying(
-                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
 

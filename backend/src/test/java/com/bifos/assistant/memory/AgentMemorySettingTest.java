@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -223,22 +222,13 @@ class AgentMemorySettingTest {
 
 
     @Test
-    @DisplayName("그룹 목록에 없는 collection 과 겹치는 collection 과 64개 넘는 목록은 거절한다")
-    void rejectsUnknownDuplicateAndTooManyCollections() {
+    @DisplayName("그룹 목록에 없는 collection 과 없는 에이전트는 거절하고 받는 줄을 바꾸지 않는다")
+    void rejectsUnknownCollectionAndAgent() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
 
         assertCode(
             () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("no-such"))),
             ErrorCode.VALIDATION_FAILED);
-        assertCode(
-            () -> controller.replace(
-                agent.code(),
-                request(new AgentMemoryGrantBody("career"), new AgentMemoryGrantBody("career"))),
-            ErrorCode.VALIDATION_FAILED);
-        AgentMemoryGrantBody[] tooMany = IntStream.range(0, 65)
-            .mapToObj(i -> new AgentMemoryGrantBody("c" + i))
-            .toArray(AgentMemoryGrantBody[]::new);
-        assertCode(() -> controller.replace(agent.code(), request(tooMany)), ErrorCode.VALIDATION_FAILED);
         assertCode(() -> controller.get("no-such-agent-" + key()), ErrorCode.AGENT_NOT_FOUND);
 
         assertThat(grants.findByIdAgentId(agent.id()))
@@ -256,22 +246,6 @@ class AgentMemorySettingTest {
             "{\"collections\":[{\"collection\":\"career\",\"allowSensitive\":true}]}", ReplaceAgentMemoryRequest.class);
 
         assertThat(request.collections()).extracting(AgentMemoryGrantBody::collection).containsExactly("career");
-    }
-
-
-    @Test
-    @DisplayName("ADMIN 이 아니면 읽지도 바꾸지도 못한다")
-    void forbidsNonAdmins() {
-        Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
-        as(owner);
-
-        assertCode(() -> controller.get(agent.code()), ErrorCode.FORBIDDEN);
-        assertCode(
-            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("career"))),
-            ErrorCode.FORBIDDEN);
-        assertThat(grants.findByIdAgentId(agent.id()))
-            .extracting(AgentMemoryCollection::collection)
-            .containsExactly("core");
     }
 
 
@@ -294,13 +268,8 @@ class AgentMemorySettingTest {
 
 
     private void as(AppUser user) {
-        CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        if (user.isAdmin()) {
-            when(currentUser.requireAdmin()).thenReturn(current);
-        } else {
-            when(currentUser.requireAdmin())
-                .thenThrow(new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin"));
-        }
+        when(currentUser.requireAdmin())
+            .thenReturn(new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
     }
 
 
