@@ -36,6 +36,27 @@
   "verify": {
     "tool": "get_profile"
   },
+  "event_watch": {
+    "tool": "search_messages",
+    "args": {
+      "query": "in:inbox -category:promotions -category:social after:{since}",
+      "max_results": 25
+    },
+    "items": "messages",
+    "page_token": {
+      "result": "next_page_token",
+      "arg": "page_token"
+    },
+    "id": "id",
+    "received_at": "date",
+    "labels": "labels",
+    "skip_labels": [
+      "CATEGORY_PROMOTIONS",
+      "CATEGORY_SOCIAL"
+    ],
+    "noun": "메일",
+    "link": "https://mail.google.com/mail/#all/{id}"
+  },
   "default_tool_policy": "deny",
   "tools": {
     "get_profile": {

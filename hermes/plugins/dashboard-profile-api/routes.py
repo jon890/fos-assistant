@@ -70,6 +70,7 @@ from .connector_run import (
     _connector_execute_request,
 )
 from .connector_snapshot import _connector_snapshot_request
+from .connector_events import _connector_events_request
 
 from .connector_vault import (
     VAULT_ROUTES,
@@ -128,6 +129,8 @@ EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 # 표준 플러그인의 연결 확인이 쓰는 `tools/list` 경로다(ADR-20261101 plugin-without-assistant-json).
 TOOLS_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/tools$")
 PREPARE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/prepare$")
+# 사건 감지의 목록 조회 경로다(ADR-20261105 / event-watch).
+EVENTS_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/events$")
 SNAPSHOT_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/snapshot$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
 # native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
@@ -317,9 +320,10 @@ def _install_gate() -> bool:
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
         prepare = PREPARE_ROUTE_RE.match(path) if method == "POST" else None
         tools = TOOLS_ROUTE_RE.match(path) if method == "POST" else None
+        events = EVENTS_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
                 or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None
-                or prepare is not None or tools is not None):
+                or prepare is not None or tools is not None or events is not None):
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
@@ -338,6 +342,9 @@ def _install_gate() -> bool:
                 return await _connector_execute_request(request, execute.group(1))
             if prepare is not None:
                 return await _connector_execute_request(request, prepare.group(1), prepare=True)
+            if events is not None:
+                # `call` 과 같은 까닭으로 profile 쓰기 잠금 밖에서 돈다.
+                return await _connector_events_request(request, events.group(1))
             async with PROFILE_WRITE_LOCK:
                 return await _connector_request(request)
 
