@@ -40,12 +40,12 @@
 
 ### 5. 시험
 
-`EventToolGuardTest`(통합), `ToolGuardRequestTest`, `ToolGuardControllerTest`.
+`mcp/ToolGuardEndpointTest`(실제 HTTP 경계의 통합 시험). 판정 순서의 경우마다, 서명 거절, 404 를 내지 않음, fos-ctx 와 같은 서명 확인 값을 본다.
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*EventToolGuard*' --tests '*ToolGuard*' 
+cd backend && ./gradlew test --tests '*ToolGuardEndpointTest'
 cd backend && ./gradlew archTest
 ```
 
@@ -62,4 +62,6 @@ cd backend && ./gradlew archTest
 | `backend/src/main/java/com/bifos/assistant/mcp/application/dto/ToolGuardRequest.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/mcp/presentation/AgentTokenAuthenticationFilter.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/orchestration/EventToolGuardTest.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpDtos.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/ToolGuardEndpointTest.java` | 신규 |
