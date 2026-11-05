@@ -54,6 +54,7 @@
 - 실행마다 `web` 을 끄는 길이 생기면 이 결정을 다시 본다. 도구 판정이 생겼으므로 `web` 을 안전 목록에서 빼는 것만으로 막을 수 있다. 그 결정은 사용자가 한다
 - `execute_code` 안의 도구 호출은 hook 에 session 이 오지 않아 판정하지 못하고 통과한다. 사건 실행 트리에서는 그 `execute_code` 가 막혀 이 길이 열리지 않는다. 운영 이미지에서 실제로 그런지는 배포 뒤 실측한다
 - Hermes 가 plugin 을 불러오지 못하거나 hook dispatcher 자체가 실패하면 호출이 판정 없이 나간다(fail-open, [`hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「막히는 것과 통과하는 것」). plugin 이 막을 수 없는 Hermes core 의 동작이다. 설치 상태의 `tool_guard` 는 파일만 보므로 import 실패를 알지 못한다. 배포 뒤 hook 로그로 확인한다
+- 보통 대화에서도 안전 목록 밖의 도구는 호출마다 Control Plane 에 묻고, Control Plane 이 답하지 않으면 막힌다(fail-closed). 사용자가 이 영향을 감수했다(2026-11-05)
 - `web_extract` 와 `vision_analyze` 의 주소 요청은 Hermes 의 내부망 차단(`allow_private_urls` 꺼짐)에 기댄다. 켜져 있으면 사건 실행이 내부 서비스에 GET 할 수 있다
 
 ### 다음 단계
