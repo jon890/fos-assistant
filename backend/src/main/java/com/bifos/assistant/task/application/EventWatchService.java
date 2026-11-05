@@ -84,11 +84,14 @@ public class EventWatchService {
     }
 
 
-    /** 끈 뒤의 응답이다. 카탈로그를 읽지 못해도 끄기는 이미 커밋됐으므로 꺼진 모양만 돌려준다. */
+    /** 끈 뒤의 응답이다. 카탈로그를 읽지 못해도({@code CONNECTOR_UNAVAILABLE}) 끄기는 이미 커밋됐으므로 꺼진 모양만 돌려준다. */
     private EventWatchView disabledView(CurrentUser user, Agent agent, String connectorId) {
         try {
             return find(views(user, agent, displayReadiness(agent)), connectorId);
         } catch (ApiException ex) {
+            if (ex.code() != ErrorCode.CONNECTOR_UNAVAILABLE) {
+                throw ex;
+            }
             return new EventWatchView(connectorId, connectorId, "", false, false,
                 List.of(EventWatchBlocker.of(CheckBlockerCode.READINESS_UNKNOWN.name())),
                 taskProperties.defaultZone().getId(), null, null, 0, false, false);

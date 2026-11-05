@@ -72,7 +72,7 @@ public final class TaskDtos {
     }
 
     /** 사건 감지를 켜거나 끄는 요청이다. {@code timezone} 이 비면 기본 시간대다. */
-    public record EventWatchRequest(boolean enabled, @Size(max = 64) String timezone) {
+    public record EventWatchRequest(@NotNull Boolean enabled, @Size(max = 64) String timezone) {
     }
 
     /** 에이전트 상세의 연결 하나의 사건 감지다. 계약은 {@code docs/features/proactive/design.md} 의 「Control Plane API(PR2)」 가 갖는다. */

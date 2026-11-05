@@ -191,6 +191,17 @@ class EventWatchControllerTest extends EventWatchTestSupport {
 
 
     @Test
+    @DisplayName("켜짐 값이 빠진 요청은 끄기로 읽지 않고 거절한다")
+    void missingEnabledIsRejected() throws Exception {
+        mvc.perform(put(PATH + "/{connectorId}", agent.code(), CONNECTOR)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"timezone\":\"Asia/Seoul\"}"))
+            .andExpect(status().isBadRequest());
+        assertThat(state()).as("사건 감지는 켜진 채다").isNotNull();
+    }
+
+
+    @Test
     @DisplayName("요청자가 읽을 수 있는 에이전트라도 다른 사용자의 연결은 싣지 않고 켜지 못한다")
     void otherUsersConnectionsAreInvisible() throws Exception {
         stranger = newUser();
