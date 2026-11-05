@@ -12,6 +12,7 @@ import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.application.dto.ConnectorEventListing;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
+import com.bifos.assistant.task.application.EventWatchService;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import java.time.Duration;
@@ -36,6 +37,9 @@ class EventWatchNoticesTest extends EventWatchTestSupport {
 
     @Autowired
     ChatMessageRepository messages;
+
+    @Autowired
+    EventWatchService service;
 
     /** 서울 23시 15분 전이다. 확인 한 번이 15분을 더해 23시에 깨운다. */
     private static final Instant SEOUL_NIGHT = Instant.parse("2026-11-02T13:45:00Z");
@@ -207,6 +211,22 @@ class EventWatchNoticesTest extends EventWatchTestSupport {
         wakeOnce();
 
         assertThat(notices()).extracting(row -> row.get("TITLE")).containsExactly("새 메모 1건 중 1건 확인이 필요해요");
+    }
+
+
+    @Test
+    @DisplayName("미룬 알림이 있는 채로 07시 전에 끄면 지우기 전에 밤사이 알림 한 건을 낸다 (REQ6)")
+    void disablingFlushesDeferredNotice() throws InterruptedException {
+        clock.set(SEOUL_NIGHT);
+        listing("m1");
+        stub().willAnswer(command -> answer(eventFinding("m1")));
+        wakeOnce();
+        assertThat(notices()).isEmpty();
+
+        clock.set(SEOUL_BEFORE_DAWN);
+        service.update(user, agent.code(), CONNECTOR, false, "");
+
+        assertThat(notices()).extracting(row -> row.get("TITLE")).containsExactly("밤사이 새 메모 1건 중 1건 확인이 필요해요");
     }
 
 

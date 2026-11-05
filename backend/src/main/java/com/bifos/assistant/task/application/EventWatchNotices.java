@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -73,9 +74,24 @@ public class EventWatchNotices {
      * 이름은 미룰 때 적어 둔 것을 쓴다.
      */
     public void flushDeferred(Long bindingId, Long userId, Instant now) {
+        flush(bindingId, userId, current -> ProactiveQuietHours.quiet(current.zone(), now));
+    }
+
+
+    /**
+     * 끄기 직전에 미룬 알림을 조용한 시간과 상관없이 낸다. 끄면 상태가 지워져 아침 묶음이 사라지기 때문이다. 부르는 쪽 트랜잭션 안에서 끄기 전에
+     * 부른다.
+     */
+    public void flushBeforeDisable(Long bindingId, Long userId) {
+        flush(bindingId, userId, current -> false);
+    }
+
+
+    /** 미룬 알림을 비우고 알릴 항목이 있었으면 한 건으로 낸다. {@code hold} 가 참이면 그대로 둔다. */
+    private void flush(Long bindingId, Long userId, Predicate<EventWatchState> hold) {
         AtomicReference<EventWatchState.Deferred> flushed = new AtomicReference<>();
         watches.update(bindingId, current -> {
-            if (current.deferred() == null || ProactiveQuietHours.quiet(current.zone(), now)) {
+            if (current.deferred() == null || hold.test(current)) {
                 return current;
             }
             flushed.set(current.deferred());

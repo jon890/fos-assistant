@@ -27,13 +27,14 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 에이전트 상세의 사건 감지 조회와 켜고 끄기다(ADR-20261105 / event-watch). 계약은 {@code docs/features/proactive/design.md} 의
  * 「Control Plane API(PR2)」 가 갖는다.
  *
- * <p>요청자 자신의 연결만 다룬다. 같은 에이전트에 붙은 다른 사용자의 연결은 싣지 않는다(rule-47). 이 서비스는 트랜잭션을 열지 않는다. 준비 판정이
- * Hermes 를 부르므로 잠금 밖에서 한 뒤 {@link ConnectorEventWatches} 의 트랜잭션을 연다.
+ * <p>요청자 자신의 연결만 다룬다. 같은 에이전트에 붙은 다른 사용자의 연결은 싣지 않는다(rule-47). 켜기는 트랜잭션을 열지 않는다. 준비 판정이
+ * Hermes 를 부르므로 잠금 밖에서 한 뒤 {@link ConnectorEventWatches} 의 트랜잭션을 연다. 끄기는 미룬 알림과 끄기를 한 트랜잭션에서 한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,6 +50,8 @@ public class EventWatchService {
     private final ProactiveScheduleProperties isolation;
     private final EventWatchProperties properties;
     private final TaskProperties taskProperties;
+    private final EventWatchNotices notices;
+    private final TransactionTemplate transactions;
     private final Clock clock;
 
 
@@ -61,7 +64,7 @@ public class EventWatchService {
 
     /**
      * 사건 감지를 켜거나 끈다. 켜기는 그 에이전트로 대화를 시작할 수 있어야 하고 막는 까닭이 없어야 한다. 끄기는 읽기 권한만 보고 Hermes 를 부르지
-     * 않는다.
+     * 않는다. 끄면 상태가 지워지므로 미룬 알림이 있으면 같은 트랜잭션에서 먼저 낸다.
      *
      * @param timeZone 켤 때 저장할 시간대. 비면 기본 시간대다
      * @throws ApiException {@code CONNECTOR_NOT_FOUND}(그 에이전트에 요청자의 그 연결이 없거나 사건 감지를 선언하지 않았다),
@@ -70,7 +73,13 @@ public class EventWatchService {
     public EventWatchView update(CurrentUser user, String agentCode, String connectorId, boolean enabled, String timeZone) {
         if (!enabled) {
             Agent agent = agents.requireReadable(user, agentCode);
-            watches.disable(user.id(), agent.id(), connectorId);
+            transactions.executeWithoutResult(status -> {
+                watches.bindingsOf(user.id(), agent.id()).stream()
+                    .filter(binding -> binding.enabled() && binding.connectorId().equals(connectorId))
+                    .findFirst()
+                    .ifPresent(binding -> notices.flushBeforeDisable(binding.bindingId(), user.id()));
+                watches.disable(user.id(), agent.id(), connectorId);
+            });
             return disabledView(user, agent, connectorId);
         }
         Agent agent = agents.requireStartable(user, agentCode);
