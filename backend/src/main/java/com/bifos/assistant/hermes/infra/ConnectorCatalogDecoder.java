@@ -1,5 +1,6 @@
 package com.bifos.assistant.hermes.infra;
 
+import com.bifos.assistant.hermes.application.dto.ConnectorEventWatch;
 import com.bifos.assistant.hermes.application.dto.ConnectorField;
 import com.bifos.assistant.hermes.application.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
@@ -56,7 +57,8 @@ final class ConnectorCatalogDecoder {
             text(item, "execution_guard_manifest_sha256"),
             ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()),
             ConnectorUnknownErrors.read(item.get("unknown_errors")),
-            readable && schema(schema) == SCHEMA_DECLARING ? defaultToolPolicy(item) : null);
+            readable && schema(schema) == SCHEMA_DECLARING ? defaultToolPolicy(item) : null,
+            ConnectorEventWatch.read(item.get("event_watch")));
     }
 
 

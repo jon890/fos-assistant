@@ -3,8 +3,10 @@ package com.bifos.assistant.connector.connection.infra;
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
 import com.bifos.assistant.connector.connection.domain.DetachTarget;
 import com.bifos.assistant.connector.connection.domain.DueBinding;
+import com.bifos.assistant.connector.connection.domain.EventWatchTarget;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -12,6 +14,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -61,6 +64,48 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
         + " where b.status = :status and b.id > :after"
         + " order by b.id")
     List<ReadyBinding> findReadyAfter(@Param("status") BindingStatus status, @Param("after") Long after, Pageable page);
+
+
+    /**
+     * 사건 감지를 켠 바인딩을 번호 순으로 읽는다(ADR-20261105 / event-watch). 생성자 식을 문자열로 두는 까닭은
+     * {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.EventWatchTarget(b.id, b.agent.id, b.agent.code,"
+        + " b.connection.userId, b.agent.hermesProfile, b.connection.connectorId, b.status, b.desiredEnabled,"
+        + " b.connection.status, b.eventWatchState)"
+        + " from ConnectorBinding b where b.eventWatchEnabled = true order by b.id")
+    List<EventWatchTarget> findEventWatchTargets();
+
+
+    /** 그 연결의 바인딩 가운데 사건 감지를 켠 것의 번호다. 같은 연결에서 하나뿐이어야 한다. */
+    @Query("select b.id from ConnectorBinding b where b.connection.id = :connectionId and b.eventWatchEnabled = true")
+    List<Long> findEventWatchIdsOfConnection(@Param("connectionId") Long connectionId);
+
+
+    /** 그 연결의 바인딩 줄을 모두 잠근다. 같은 연결에 사건 감지를 둘 켜지 않게 한다. 잠그는 순서는 번호 순이다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from ConnectorBinding b where b.connection.id = :connectionId order by b.id")
+    List<ConnectorBinding> lockByConnectionId(@Param("connectionId") Long connectionId);
+
+
+    /** 바인딩 줄을 잠그고 사건 감지 상태만 다시 읽는다. 엔티티의 칸은 고치기에서 빠져 있어 DB 의 값을 직접 읽는다. */
+    @Query(value = "SELECT event_watch_state FROM agent_connector_binding WHERE id = :id AND event_watch_enabled = TRUE FOR UPDATE",
+        nativeQuery = true)
+    Optional<String> lockEventWatchState(@Param("id") Long id);
+
+
+    /** 사건 감지 상태만 덮어쓴다. 켜져 있는 줄만 바꾸고 {@code updated_at} 은 바꾸지 않는다. 바꾼 줄 수를 돌려준다. */
+    @Modifying
+    @Query(value = "UPDATE agent_connector_binding SET event_watch_state = :state WHERE id = :id AND event_watch_enabled = TRUE",
+        nativeQuery = true)
+    int writeEventWatchState(@Param("id") Long id, @Param("state") String state);
+
+
+    /** 사건 감지를 켜거나 끈다. 끌 때는 상태도 비운다. {@code updated_at} 은 바꾸지 않는다. 바꾼 줄 수를 돌려준다. */
+    @Modifying
+    @Query(value = "UPDATE agent_connector_binding SET event_watch_enabled = :enabled, event_watch_state = :state WHERE id = :id",
+        nativeQuery = true)
+    int switchEventWatch(@Param("id") Long id, @Param("enabled") boolean enabled, @Param("state") String state);
 
 
     /** 지운 에이전트를 정리할 때 그 에이전트의 바인딩을 모두 지운다. 에이전트를 지울 때 이미 떼서 보통 없다. 지운 행 수를 돌려준다. */
