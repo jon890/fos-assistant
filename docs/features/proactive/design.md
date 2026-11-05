@@ -111,7 +111,7 @@ JSON 컬럼이 아니라 `TEXT` 인 까닭은 H2 의 `JSON` 컬럼이 글 인자
 - `EventBatch(sourceId, sourceTitle, noun, link, newCount, ids)`. `sourceId` 는 바인딩 번호이고 `proactive` 는 그 뜻을 모른다
 - (PR2) 끝날 때 `EventCheckEnded(userId, conversationId, batch, notifyCount, endedAt)` 를 낸다. turn 이 답을 저장하고 돌아왔을 때만 낸다. 실패하거나 멈춘 실행은 점검 대화의 알림 줄이 알린다. `notifyCount` 는 「새로 알릴 것」 으로 남은 발견 가운데 `topicKey` 가 `batch.ids` 안에 있는 것의 서로 다른 수다. 침묵한 실행은 0 이다
 
-### 사건 실행의 도구 판정(PR3)
+### 사건 실행의 도구 판정
 
 Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같다). 그래서 켜 둔 도구를 시작 전에 보는 대신 호출마다 막는다. fos-ctx 의 `pre_tool_call` 은 `{"action": "block", "message"}` 로 호출 하나를 막을 수 있다([`hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「막히는 것과 통과하는 것」).
 

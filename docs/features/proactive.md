@@ -132,7 +132,7 @@ sequenceDiagram
 
 결정은 [ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 과 [ADR-081](../../backend/docs/adr/ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md) 에, 저장 모델은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 에 있다.
 한 번의 실행이 `proactive_check` 이고, 그 결과가 남는 점검 대화는 `conversation.purpose = CHECK` 다.
-분야 지침 스킬은 쓰지 않는다. 무엇을 살펴볼지는 모델이 입력의 맥락과 Control Plane 지시로 고른다. 옛 `proactive-check` 스킬은 2026-11-05 에 요구하지 않기로 했다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「분야 지침 개정」).
+분야 지침 스킬은 쓰지 않는다. 무엇을 살펴볼지는 모델이 입력의 맥락과 Control Plane 지시로 고른다. 옛 `proactive-check` 스킬은 2026-11-05 에 요구하지 않기로 했다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 분야 지침 개정).
 발견과 문제 후보는 따로 저장하지 않는다. 다음 살펴보기가 쓸 것은 보고(`report_json`)에 담는다. 살펴보기 트리는 루트가 살펴보기 turn 인 실행 트리다.
 
 ### 진입점

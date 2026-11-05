@@ -185,7 +185,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 ### 도구 판정
 
-사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 「도구 판정 계약」 의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
+사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 도구 판정 계약의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
 
 **묻지 않는 도구.** 플러그인 도구(플러그인 정책이 판정), Control Plane MCP 도구(서명), 첨부 원본 도구, `skill_manage`(늘 막음), 그리고 안전 목록 `SAFE_TOOLS` 다. 안전 목록은 `web_search`, `web_extract`, `vision_analyze`, `skills_list`, `skill_view`, `todo_list`, `tool_search`, `tool_describe` 이고, `vision_analyze` 는 `image_url` 이 HTTP(S) 나 이미지 data URL 일 때만 든다. 그 밖은 내장 도구, 붙지 않은 MCP 서버의 도구, 다른 plugin 의 도구를 가리지 않고 묻는다.
 

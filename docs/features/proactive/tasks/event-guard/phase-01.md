@@ -12,7 +12,7 @@ fos-ctx 의 `pre_tool_call` 이 안전 목록 밖의 도구 호출을 Control Pl
 
 **요구사항**: REQ9
 
-**근거 문서**: `docs/features/proactive/spec.md`, `docs/features/proactive/design.md` 의 「사건 실행의 도구 판정(PR3)」, `docs/adr/ADR-20261105-event-watch.md`
+**근거 문서**: `docs/features/proactive/spec.md`, `docs/features/proactive/design.md` 의 「사건 실행의 도구 판정」, `docs/adr/ADR-20261105-event-watch.md`
 
 - 질의 모양은 `hermes/plugins/fos-ctx/connector_policy.py` 의 `connector_policy` 와 `_post_json` 을 따른다. 서명 함수는 `context.py` 에 둔다
 - 판정 순서는 `hooks.py` 의 `pre_tool_call` 이다. `skill_manage`, 이미지 위임, 첨부 원본, 플러그인 도구, Control Plane MCP 도구를 먼저 가르고 남은 것만 묻는다

@@ -86,7 +86,7 @@ Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
 
 플러그인 도구, Control Plane MCP 도구, 첨부 원본 도구가 아닌 호출은 안전 목록(`SAFE_TOOLS`)에 없으면
 Control Plane 의 `tool-guard` 경로에 그 session 이 사건 실행 트리인지 묻는다(fos-assistant ADR-20261105 / event-watch).
-계약의 정본은 fos-assistant `hermes/plugins/fos-ctx/README.md` 의 「도구 판정 계약」 이다.
+계약의 정본은 fos-assistant `hermes/plugins/fos-ctx/README.md` 의 「도구 판정」 이다.
 
 - 주소는 `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `tool-guard` 로 바꾼 것이다. 없으면 막는다
 - 서명할 글은 `v1-tool-guard`, 등록 이름, 루트 session, session, tool_call_id 를 줄바꿈 하나로 잇는다

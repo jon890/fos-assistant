@@ -12,7 +12,7 @@
 
 **요구사항**: REQ9, REQ10
 
-**근거 문서**: `docs/features/proactive/design.md` 의 「사건 실행의 도구 판정(PR3)」 판정 순서 1~4
+**근거 문서**: `docs/features/proactive/design.md` 의 「사건 실행의 도구 판정」 판정 순서 1~4
 
 - 서명 확인은 `mcp/application/dto/SubagentRegistration.java` 와 `connector/approval/application/dto/ConnectorPolicyRequest.java` 를 따른다
 - 경로 인증은 `AgentTokenAuthenticationFilter.AGENT_TOKEN_PATHS` 와 `ControlPlaneJwtFilter.UNFILTERED_PATHS` 에 함께 더한다
