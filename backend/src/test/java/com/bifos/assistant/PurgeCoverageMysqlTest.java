@@ -361,11 +361,7 @@ class PurgeCoverageMysqlTest {
         switch (outcome) {
             case KEEP -> assertThat(rows(table, target)).as("%s의 보존 대상은 모든 칸이 유지돼야 한다", table.table())
                 .usingRecursiveComparison().isEqualTo(before.get(table.table()));
-            case DETACH -> {
-                List<String> columns = table.table().equals("decision_feedback_event")
-                    ? List.of("source_check_id") : List.of("agent_id");
-                columns.forEach(column -> assertCleared(table.table(), column));
-            }
+            case DETACH -> assertCleared(table.table(), "agent_id");
             case GONE -> {
                 assertThat(value(table.table(), "status")).isEqualTo("GONE");
                 assertCleared(table.table(), "request_hash");
