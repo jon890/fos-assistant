@@ -63,6 +63,21 @@ public final class FindingJudgement {
     }
 
 
+    /**
+     * 사건 실행의 발견을 한 번 더 본다(ADR-20261105 / event-watch). 「새로 알릴 것」 이어도 주제 키가 입력의 새 항목 식별자가 아니면
+     * {@link FindingReason#NOT_IN_EVENT} 의 「참고」 로 내린다. 그래서 답의 「새로 알릴 것」 과 알림의 수가 같다.
+     *
+     * @param eventIds 입력에 실은 새 항목 식별자
+     */
+    public static JudgedFinding withinEvent(JudgedFinding judged, Set<String> eventIds) {
+        if (judged.kind() != FindingKind.NEW || eventIds.contains(judged.finding().topicKey())) {
+            return judged;
+        }
+        return new JudgedFinding(judged.finding(), FindingKind.REFERENCE, FindingReason.NOT_IN_EVENT, judged.sourceUrl(),
+            judged.checkedAt());
+    }
+
+
     /** 걸린 까닭을 순서대로 찾는다. 모두 통과하면 {@code null} 이다. */
     private static FindingReason reasonOf(
         Finding finding,

@@ -49,7 +49,8 @@ public class CheckAnswerRenderer {
         FindingReason.STALE, "오래된 소식이에요",
         FindingReason.FRESHNESS_UNKNOWN, "지금도 유효한지 모르겠어요",
         FindingReason.INCOMPLETE, "근거가 부족해요",
-        FindingReason.REPEATED, "이미 알린 것이에요");
+        FindingReason.REPEATED, "이미 알린 것이에요",
+        FindingReason.NOT_IN_EVENT, "이번에 새로 온 항목이 아니에요");
 
 
     /**

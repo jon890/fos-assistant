@@ -75,7 +75,8 @@ class StoredEnumNamesTest {
                 "STALE",
                 "FRESHNESS_UNKNOWN",
                 "INCOMPLETE",
-                "REPEATED")),
+                "REPEATED",
+                "NOT_IN_EVENT")),
         Map.entry(
             FeedbackEventType.class,
             List.of(

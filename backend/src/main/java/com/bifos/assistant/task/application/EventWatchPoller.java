@@ -59,6 +59,7 @@ public class EventWatchPoller {
     private static final Set<ConnectorCallError> CONNECTION_PROBLEMS = Set.of(ConnectorCallError.CREDENTIAL_REJECTED, ConnectorCallError.FORBIDDEN);
 
     private final ConnectorEventWatches watches;
+    private final EventWatchNotices notices;
     private final HermesEventFeedClient feed;
     private final ProactiveCheckService proactiveChecks;
     private final ProactiveCheckRepository checks;
@@ -116,6 +117,9 @@ public class EventWatchPoller {
             return;
         }
         Instant now = clock.instant();
+        if (state.deferred() != null) {
+            transactions.executeWithoutResult(status -> notices.flushDeferred(target.bindingId(), target.userId(), now));
+        }
         Optional<ConnectorManifest> manifest = declaration(target);
         Optional<CurrentUser> owner = owner(target);
         if (manifest.isEmpty() || owner.isEmpty() || !target.usable() || !ConnectorEventWatches.toolAllowed(manifest.get())) {
@@ -132,7 +136,13 @@ public class EventWatchPoller {
         ConnectorEventListing listing = feed.listEvents(target.connectorId(), target.profile(), since);
         if (listing == null || !listing.ok()) {
             boolean connectionProblem = listing != null && CONNECTION_PROBLEMS.contains(listing.error());
-            update(target.bindingId(), current -> current.failed(now, connectionProblem));
+            String title = manifest.get().title();
+            transactions.executeWithoutResult(status -> {
+                watches.update(target.bindingId(), current -> current.failed(now, connectionProblem));
+                if (connectionProblem) {
+                    notices.failed(target.bindingId(), target.userId(), title, properties.failureThreshold(), now);
+                }
+            });
             return;
         }
         Set<String> seenIds = state.seen().stream().map(EventWatchState.Seen::id).collect(Collectors.toSet());

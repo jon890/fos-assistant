@@ -53,9 +53,7 @@ public class ConnectorEventWatches {
         EventWatchState current = binding.eventWatchEnabled() ? EventWatchState.fromJson(binding.eventWatchState()) : null;
         EventWatchState next = current == null
             ? EventWatchState.fresh(zone, now)
-            : new EventWatchState(zone.getId(), current.checkpoint(), current.seen(), current.lastCheckedAt(),
-                current.lastResult(), current.lastNewCount(), current.failures(), current.day(), current.runs(),
-                current.enabledAt());
+            : current.inZone(zone);
         bindings.switchEventWatch(binding.id(), true, next.toJson());
         return next;
     }
