@@ -21,7 +21,7 @@ PR1 은 읽기와 쓰기를 끊고, PR2 는 PR1 배포를 확인한 뒤 테이�
 | ID | 해결 방법 |
 | --- | --- |
 | REQ1 | `ProactiveCheckResults` 가 발견과 문제 후보를 판정해 답과 보고를 그리는 데만 쓰고 저장하지 않는다. 제안 저장은 그대로다. 두 엔티티와 저장소는 기동 이관이 읽으려고 PR2 까지 남기고, 쓰는 메서드와 이관 밖의 조회는 지운다(DECISION1) |
-| REQ2 | 입력의 두 절을 「최근 제안」 과 「최근 보고에서 알린 것」 으로 바꾼다. 제안은 `FollowUpService` 의 새 조회가, 마지막 반응은 `ReactionLedger` 의 새 조회가 준다. 보고 절에는 알린 발견과 함께 받아들인 문제 키를 싣는다(DECISION7) |
+| REQ2 | 입력의 두 절을 「최근 제안」 과 「최근 보고에서 알린 것」 으로 바꾼다. 제안은 `FollowUpSuggestions` 의 새 조회가, 마지막 반응은 `ReactionLedger` 의 새 조회가 준다. 보고 절에는 알린 발견과 함께 받아들인 문제 키를 싣는다(DECISION7) |
 | REQ7 | 보고(`CheckReport`)에 알린 발견의 주제 키·원문 주소·제목과 받아들인 문제 키를 함께 저장하고, 되풀이 판정이 같은 점검 대화의 최근 보고에서 읽는다. 이미 저장된 보고는 Java 마이그레이션이 옛 표에서 채운다(DECISION2) |
 | REQ3 | `CheckFindingController`, `CheckFindingReactions`, 화면의 반응 단추와 API 경로를 지운다. 판정의 「관심 없음」 순서를 지운다 |
 | REQ4 | `report_json` 이 비었는지와 `report_opened_at` 만 보는 지금 경로를 바꾸지 않는다. 새로 담는 칸은 보고가 있는지에 영향을 주지 않는다 |
@@ -31,7 +31,7 @@ PR1 은 읽기와 쓰기를 끊고, PR2 는 PR1 배포를 확인한 뒤 테이�
 ## 책임과 경계
 
 - `proactive.check` 가 살펴보기 줄, 보고, 되풀이 판정을 계속 소유한다. 새 서비스는 만들지 않는다
-- 제안 줄은 `followup` 이 소유한다. 살펴보기는 `FollowUpService` 의 읽기 메서드 하나로 그 대화의 최근 제안을 받는다. `followup` 은 살펴보기를 모른다
+- 제안 줄은 `followup` 이 소유한다. 살펴보기는 `FollowUpSuggestions` 의 읽기 메서드 하나로 그 대화의 최근 제안을 받는다. `followup` 은 살펴보기를 모른다
 - 반응 사건은 `feedback` 이 소유한다. 살펴보기는 `ReactionLedger` 의 읽기 메서드로 제안마다 마지막 사용자 반응을 받는다. 지금처럼 `feedback.infra` 를 직접 읽지 않는다
 - 의존 방향은 그대로다. `proactive → followup`, `proactive → feedback` 은 이미 있다
 
@@ -79,7 +79,7 @@ PR1 은 읽기와 쓰기를 끊고, PR2 는 PR1 배포를 확인한 뒤 테이�
 
 | 자리 | 메서드 | 돌려주는 것 |
 | --- | --- | --- |
-| `FollowUpService` | `recentSuggestions(userId, conversationId, since, now, limit)` | `followup.application.dto.RecentSuggestion(publicId, title, status)` 목록 |
+| `FollowUpSuggestions` | `recent(userId, conversationId, since, now, limit)` | `followup.application.dto.RecentSuggestion(publicId, title, status)` 목록 |
 | `FollowUpRepository` | 위 조건의 JPQL 조회 하나 | `FollowUp` 목록. 쪽 크기는 `Pageable` |
 | `ReactionLedger` | `lastUserReactions(userId, subjectKeys, types)` | 열쇠마다 마지막 사용자 사건 종류. 기존 `findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc` 를 쓴다 |
 | `ProactiveCheckRepository` | `findByConversationIdAndReportIsNotNullAndStartedAtAfterOrderByIdDesc` | 보고가 있는 최근 살펴보기 |

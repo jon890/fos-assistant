@@ -17,6 +17,7 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.ReactionLedger;
 import com.bifos.assistant.followup.application.FollowUpService;
+import com.bifos.assistant.followup.application.FollowUpSuggestions;
 import com.bifos.assistant.proactive.check.application.dto.CheckReadiness;
 import com.bifos.assistant.proactive.check.application.dto.CheckStatusView;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
@@ -72,6 +73,7 @@ public class ProactiveCheckService {
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ApplicationEventPublisher events;
     private final CheckFeedback feedback;
+    private final FollowUpSuggestions suggestions;
     private final ReactionLedger reactions;
     private final WakeMemoryRead wakeMemory;
     private final Clock clock;
@@ -328,6 +330,7 @@ public class ProactiveCheckService {
             properties,
             checks,
             followUps,
+            suggestions,
             reactions,
             wakeMemory,
             messages,

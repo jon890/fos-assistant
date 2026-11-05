@@ -22,14 +22,14 @@
 ## 의도 메모
 
 - 상한은 `ProactiveCheckProperties` 의 `digestWindow`, `digestMaxItems` 를 그대로 쓴다(스펙 DECISION6)
-- 반응은 사용자 사건 가운데 받아들임, 거절, 숨김, 미룸, 되돌림, 고침, 끝냄만 읽는다(설계 DECISION5)
+- 반응은 사용자 사건 가운데 받아들임, 거절, 내림, 미룸, 되돌림, 고침, 끝냄만 읽는다(설계 DECISION5)
 
 ## 작업 항목
 
 ### 1. `followup`
 
 - `FollowUpRepository` 에 그 대화의 제안 줄을 `since` 뒤 만든 것만, 만료한 `PROPOSED` 를 빼고 최근 것부터 읽는 JPQL 조회를 더한다
-- `FollowUpService.recentSuggestions(Long conversationId, Instant since, Instant now, int limit)` 가 `followup.application.dto.RecentSuggestion(UUID publicId, String title, FollowUpStatus status)` 목록을 낸다
+- `FollowUpSuggestions.recent(Long userId, Long conversationId, Instant since, Instant now, int limit)` 가 `followup.application.dto.RecentSuggestion(UUID publicId, String title, FollowUpStatus status)` 목록을 낸다
 
 ### 2. `feedback/application/ReactionLedger.java`
 
@@ -55,7 +55,7 @@ cd backend && ./gradlew test --tests 'com.bifos.assistant.proactive.*' --tests '
 | 파일 | 변경 |
 |---|---|
 | `backend/src/main/java/com/bifos/assistant/followup/infra/FollowUpRepository.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/followup/application/FollowUpService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/followup/application/FollowUpSuggestions.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/followup/application/dto/RecentSuggestion.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/feedback/application/ReactionLedger.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/proactive/check/application/ProactiveCheckInput.java` | 수정 |

@@ -8,6 +8,7 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.ReactionLedger;
 import com.bifos.assistant.followup.application.FollowUpService;
+import com.bifos.assistant.followup.application.FollowUpSuggestions;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
@@ -90,7 +91,8 @@ public class ProactiveCheckRun implements CheckTurn {
      *
      * @param executions 지난 살펴보기의 루트 실행 줄을 읽어 Memory 문맥 지문을 견준다
      * @param chat 상한에 닿은 turn 을 멈춘다
-     * @param followUps 결과 블록의 제안을 저장하고, 문제 후보가 이미 챙기는 할 일과 같은지 보고, 입력에 그 대화의 최근 제안을 싣는다
+     * @param followUps 결과 블록의 제안을 저장하고, 문제 후보가 이미 챙기는 할 일과 같은지 본다
+     * @param suggestions 입력에 그 대화의 최근 제안을 싣는다
      * @param reactions 최근 제안의 마지막 사용자 반응을 읽어 입력에 싣는다
      * @param wakeMemory 그 에이전트가 받는 기억에서 지난 살펴보기 뒤에 바뀐 항목과 이어진 항목을 꺼내 입력에 싣는다
      */
@@ -98,6 +100,7 @@ public class ProactiveCheckRun implements CheckTurn {
         LiveProperties<ProactiveCheckProperties> properties,
         ProactiveCheckRepository checks,
         FollowUpService followUps,
+        FollowUpSuggestions suggestions,
         ReactionLedger reactions,
         WakeMemoryRead wakeMemory,
         ChatMessageRepository messages,

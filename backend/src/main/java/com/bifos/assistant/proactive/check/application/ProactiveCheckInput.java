@@ -140,8 +140,8 @@ class ProactiveCheckInput {
      */
     private String recentSuggestions(Instant now) {
         ProactiveCheckProperties limits = deps.properties().current();
-        List<RecentSuggestion> recent = deps.followUps()
-            .recentSuggestions(
+        List<RecentSuggestion> recent = deps.suggestions()
+            .recent(
                 owner.id(), check.conversationId(), now.minus(limits.digestWindow()), now, limits.digestMaxItems());
         if (recent.isEmpty()) {
             return NO_RECENT_SUGGESTIONS;
