@@ -60,7 +60,7 @@
 | `connector.financial` | 금융 준비, 주문 상한, 실행 보증(claim, ticket, guard) |
 | `connector.contentdraft` | 원고 작업의 시작과 저장 승인 |
 | `connector.approval` | 도구 호출의 판정, 승인 흐름의 조율, 승인 API |
-| `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 문제 후보의 저장, 발견 반응 |
+| `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 보고와 되풀이 판정 |
 | `usage.pricing` | 가격표와 비용 환산 |
 | `usage.execution` | 실행 기록, 실행 사건, 실행 질문 연결, 사용자 실행 한도 |
 | `usage.subagent` | native 하위 에이전트 사용량의 재조회와 원장 |

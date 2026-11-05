@@ -15,9 +15,10 @@ import org.springframework.validation.annotation.Validated;
  * @param maxToolCalls 살펴보기 turn 하나가 시작할 수 있는 도구 호출 수
  * @param maxDelegations 살펴보기 트리에서 맡길 수 있는 위임 자식 수. 0 이면 맡기지 않는다
  * @param sessionMaxChecks 점검 대화의 루트 session 하나로 보내는 살펴보기 수. 닿으면 session 을 바꾼다
- * @param digestWindow 최근에 알린 발견과 받아들인 문제 후보로 읽는 기간. 발견과 후보의 중복 검사, 「관심 없음」 이 같은 주제를
- * 내리는 기간도 이 값이다
- * @param digestMaxItems 다음 살펴보기의 입력에 싣는 최근 발견 수와 받아들인 문제 후보 수. 둘을 따로 센다
+ * @param digestWindow 최근 제안과 최근 보고로 읽는 기간. 보고가 알린 발견과 받아들인 문제 키의 되풀이 판정도 이 기간 안의 보고로
+ * 한다
+ * @param digestMaxItems 다음 살펴보기의 입력에 싣는 줄 수. 「최근 제안」 절과 「최근 보고에서 알린 것」 절(발견과 받아들인 문제 키를
+ * 합쳐서)을 따로 센다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.proactive-check")

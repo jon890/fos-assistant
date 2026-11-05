@@ -39,6 +39,7 @@ import com.bifos.assistant.followup.domain.FollowUp;
 import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
+import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
@@ -65,6 +66,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -563,6 +565,37 @@ class ProactiveCheckTurnTest {
         String section = input.substring(input.indexOf("최근 제안\n"), input.indexOf("최근 보고에서 알린 것"));
         assertThat(section.lines().filter(line -> line.startsWith("- "))).hasSize(20);
         assertThat(section).contains("- 도구로 낸 제안 21 · 제안됨 · 반응 없음").doesNotContain("- 도구로 낸 제안 1 ·");
+    }
+
+
+    @Test
+    @DisplayName("입력의 최근 보고 절은 알린 발견과 받아들인 문제 키를 합쳐 digest-max-items 줄까지 싣는다")
+    void capsRecentReportedAtDigestMaxItems() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+        Conversation conversation = runCheck();
+        List<ReportedFinding> announced = new ArrayList<>();
+        List<String> problemKeys = new ArrayList<>();
+        for (int i = 1; i <= 15; i++) {
+            announced.add(new ReportedFinding("study:topic-" + i, "https://example.test/" + i, "알린 소식 " + i));
+            problemKeys.add("study:problem-" + i);
+        }
+        ProactiveCheck reported = ProactiveCheck.started(
+            owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now().minusSeconds(60));
+        reported.succeed(
+            CheckOutcome.FINDINGS,
+            new CheckReport(List.of(), List.of(), List.of(), List.of(), List.of(), announced, problemKeys),
+            0,
+            0,
+            Instant.now().minusSeconds(30));
+        checks.save(reported);
+
+        runCheck();
+
+        String input = stub().received().getLast().input();
+        String section = input.substring(input.indexOf("최근 보고에서 알린 것"));
+        assertThat(section.lines().filter(line -> line.startsWith("- "))).hasSize(20);
+        assertThat(section).contains("- study:topic-15 · ").contains("- 받아들인 문제 키 · study:problem-5 · ")
+            .doesNotContain("study:problem-6 ");
     }
 
 
