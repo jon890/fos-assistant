@@ -18,6 +18,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다 | query `include=standard` 가 있으면 `schema: 3` 항목도 싣는다 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 플러그인이면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 플러그인의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}`. 도구를 찾아 부른 응답에는 부르기 직전 `tools/list` 의 `read_only`(그 도구의 `readOnlyHint` 가 참인가)를 더한다 | 504 실행됐는지 모른다 |
+| `POST /api/connectors/<id>/events` | 사건 감지를 선언한 플러그인의 조회 도구를 그 profile 의 값으로 불러 새 항목을 낸다 | `{profile, since}`. `since` 는 0 이상의 정수 초다 | `{ok: true, items: [{id, received_at, labels}], truncated}` 또는 `{ok: false, error: <공통 어휘>}` | 404 사건 감지를 선언하지 않았거나 설치하지 않은 플러그인 |
 | `POST /api/connectors/<id>/prepare` | Control Plane 이 금융 준비를 위해 그 플러그인의 준비 도구(`execution_guard.prepare_tool`)를 한 번 부른다. 주문을 보내지 않는다 | `{profile, hermes_tool, args}` | `{ok: true, result: {v, executionArgs, summary}}` 또는 `{ok: false, error: <공통 어휘>, stage, code}`. `stage` 는 멈춘 검사의 고정 단계 코드, `code` 는 플러그인이 선언한 오류 코드나 SDK 입력 거절 코드이고 없으면 `-` 다. 인자, 계좌, 원격 응답은 싣지 않는다. Control Plane 은 두 칸을 로그에만 남긴다 | 409 금융 보호 맥락을 확인하지 못했다. 504 시간 제한을 넘겼다 |
 | `POST /api/connectors/<id>/tools` | 표준 플러그인(`schema: 3`)의 연결 확인. 후보 값이나 보관 파일의 값으로 MCP 서버에 붙어 `tools/list` 만 받는다. 도구는 부르지 않는다 | `{values}` 또는 `{vault}`. 둘 가운데 정확히 하나다. 시간 제한과 동시 한도는 `call` 과 같다 | `{ok: true, tools: [{name, read_only}]}`. `read_only` 는 `readOnlyHint` 가 참일 때만 참이다. 붙지 못하면 `{ok: false, error: "unavailable"}`, 원격 서버가 401 이나 403 으로 답하면 `credential_rejected` 다 | 400 `schema: 3` 이 아닌 플러그인, 본문 모양 |
 | `GET /api/connectors?profile=<p>` | 플러그인의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 플러그인 표식이 모두 없다 |
@@ -184,6 +185,13 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. 본문은 `{detail, code}` 이고, 그 코드가 `retry_key` 를 선언했으면 `retry: {<retry_key>: <값>}` 을 더한다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)). `call` 에서는 그 코드를 `unavailable` 로 돌려준다
 - 요청과 응답은 [플러그인 연결](../../../docs/features/connector-policy.md) 의 「플러그인 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
+
+**`POST /api/connectors/<id>/events` 는 Control Plane 이 실행 밖에서 새 항목이 있는지만 보는 경로다([ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)).**
+
+- profile 확인과 자식의 env 는 `execute` 와 같다. 다만 첨부, 출력, 브라우저 env 는 모두 빈 값이다
+- 선언의 `tool` 이 `tools/list` 에서 읽기 전용이 아니면 부르지 않는다. 쪽은 4쪽까지 읽고 전체 제한은 30초다. 동시 호출 한도는 `call`, `execute` 와 함께 쓴다
+- 항목마다 식별자, 받은 시각, 라벨만 돌려주고 `skip_labels` 가 붙은 항목은 뺀다. 도구 결과의 다른 칸은 응답과 로그에 싣지 않는다
+- 선언 칸은 [플러그인 만들기](../../connectors/README.md) 의 「사건 감지 선언」 이 갖는다
 
 **소유 기록 `.fos-connectors.json` 은 바인딩할 때의 서버 정의를 갖는다.**
 

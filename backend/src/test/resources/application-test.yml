@@ -107,6 +107,9 @@ assistant:
   task:
     # 검사가 뜰 때마다 발화기가 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
     dispatch-cron: "-"
+  event-watch:
+    # 검사가 뜰 때마다 사건 감지 확인이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
+    check-cron: "-"
   artifact:
     root: build/test-artifacts-${org.gradle.test.worker:0}
     # 검사는 이 경로를 열지 않고 Hermes 로 간 입력에 적힌 글자만 본다

@@ -51,6 +51,11 @@
     "unknown_errors": {
       "GMAIL_SEND_UNKNOWN": null
     },
+    "event_watch": {
+      "tool": "search_messages",
+      "noun": "메일",
+      "link": "https://mail.google.com/mail/#all/{id}"
+    },
     "tools": {
       "get_profile": {
         "risk": "READ",

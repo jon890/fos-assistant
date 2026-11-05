@@ -1,5 +1,6 @@
 package com.bifos.assistant.proactive.check.application;
 
+import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.EVENT_OPENING;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_REPORTED;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_SUGGESTIONS;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.OPENING;
@@ -10,8 +11,10 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.dto.RecentSuggestion;
 import com.bifos.assistant.followup.domain.type.FollowUpStatus;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
+import com.bifos.assistant.proactive.check.application.dto.EventBatch;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -55,23 +58,33 @@ class ProactiveCheckInput {
     private final CurrentUser owner;
     private final Long agentId;
     private final ProactiveCheck check;
+    /** 사건 실행이 살펴볼 새 항목이다. 다른 계기는 null 이다. */
+    private final EventBatch event;
     private final ProactiveCheckRun.Deps deps;
 
 
-    ProactiveCheckInput(CurrentUser owner, Long agentId, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
+    ProactiveCheckInput(
+        CurrentUser owner, Long agentId, ProactiveCheck check, EventBatch event, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
         this.agentId = agentId;
         this.check = check;
+        this.event = event;
         this.deps = deps;
     }
 
 
     String buildInput(Instant now) {
         Long conversationId = check.conversationId();
-        StringBuilder text = new StringBuilder(OPENING).append("\n\n지금 시각: ").append(now).append("\n\n변화 신호\n");
+        StringBuilder text = new StringBuilder(event == null ? OPENING : EVENT_OPENING)
+            .append("\n\n지금 시각: ")
+            .append(now);
+        if (event != null) {
+            text.append("\n\n").append(eventSection());
+        }
+        text.append("\n\n변화 신호\n");
         Optional<ProactiveCheck> last = deps.checks()
-            .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
-                conversationId, CheckStatus.RUNNING);
+            .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullAndTriggerNotOrderByIdDesc(
+                conversationId, CheckStatus.RUNNING, CheckTrigger.EVENT);
         if (last.isEmpty()) {
             text.append("- 지난 살펴보기: 처음\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
                 .append(UNKNOWN)
@@ -87,9 +100,11 @@ class ProactiveCheckInput {
                 .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
                 .append(memorySignal(previous));
         }
+        // 사건 실행은 새 항목만 보므로 두 경계에서 뺀다(ADR-20261105 / event-watch).
         // 앞 살펴보기는 시작할 때 입력을 만들었으므로 그 시작 시각부터 본다. 실패하거나 멈춘 살펴보기는 모델이 결과를 내지 못해 경계를 옮기지 않는다
         Instant since = deps.checks()
-            .findFirstByConversationIdAndStatusOrderByIdDesc(conversationId, CheckStatus.SUCCEEDED)
+            .findFirstByConversationIdAndStatusAndTriggerNotOrderByIdDesc(
+                conversationId, CheckStatus.SUCCEEDED, CheckTrigger.EVENT)
             .map(ProactiveCheck::startedAt)
             .orElse(null);
         text.append("\n\n").append(deps.wakeMemory().section(owner, agentId, since, now));
@@ -187,6 +202,20 @@ class ProactiveCheckInput {
             .limit(limits.digestMaxItems())
             .collect(Collectors.joining("\n"));
         return lines.isEmpty() ? NO_RECENT_REPORTED : ExternalData.wrap(lines);
+    }
+
+
+    /**
+     * 사건 실행의 「새 사건」 절이다. 항목마다 식별자와 원문 링크를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 식별자와 링크는 플러그인이
+     * 낸 값이기 때문이다. 제목과 본문은 싣지 않는다. 모델이 도구로 읽는다.
+     */
+    private String eventSection() {
+        String lines = event.ids().stream()
+            .map(id -> "- " + id + " · " + event.linkOf(id))
+            .collect(Collectors.joining("\n"));
+        return "새 사건\n- 원천: " + event.sourceTitle()
+            + "\n- 새 " + event.noun() + ": " + event.newCount() + "건, 아래에 " + event.ids().size() + "건을 싣는다\n"
+            + ExternalData.wrap(lines);
     }
 
 

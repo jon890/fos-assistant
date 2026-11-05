@@ -39,7 +39,6 @@ public class ProactiveScheduleService {
 
     private static final String DEFAULT_TIME = "09:00";
     private static final String CHECK_TITLE = "매일 먼저 살펴보기";
-    private static final List<String> ISOLATION_REQUIRED_TOOLSETS = List.of("terminal", "file", "code_execution");
 
     private final AgentService agents;
     private final ProactiveCheckReadiness readiness;
@@ -144,7 +143,7 @@ public class ProactiveScheduleService {
         List<CheckBlocker> blockers = new ArrayList<>(checked.blockers());
         if (!properties.isolatedExecutionEnabled()) {
             List<String> unsafe = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                .filter(ISOLATION_REQUIRED_TOOLSETS::contains)
+                .filter(ProactiveCheckReadiness.ISOLATION_REQUIRED_TOOLSETS::contains)
                 .sorted()
                 .toList();
             if (!unsafe.isEmpty()) {

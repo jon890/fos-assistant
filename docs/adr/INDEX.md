@@ -118,6 +118,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261101 / proactive-suggestion](ADR-20261101-proactive-suggestion.md) | 먼저 살펴보기는 기억 위의 읽기 전용 깨우기와 제안 카드로 줄이고, 저장은 새 테이블 없이 할 일의 제안 상태와 기존 반응 기록으로 한다 | backend, frontend | Accepted. 옮기는 순서를 모두 구현했다. ADR-20261007 / value-evaluation, ADR-20261008 / daily-loop 와 backend 의 autonomy-policy 를 대체했다. 옛 테이블 삭제(7 단계)와 발견·문제 후보 테이블 삭제도 끝났다. 기억 후보의 민감도 조건은 [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) 이 없앤다. |
 | [ADR-20261102 / feature-loop](ADR-20261102-feature-loop.md) | 기능 스펙은 기능 파일 옆 `docs/features/<id>/spec.md` 에 두고, Draft 의 독립 리뷰는 verify 로 한다 | 공통 | Accepted. ADR-20261009 / feature-docs 의 하위 디렉터리 금지에 기능 폴더 예외(스펙, 설계, 계획)를 더한다. 독립 verify 는 기능 루프 PR 과 위험 라벨 PR 만 받는다. 새 스펙과 설계의 ID 는 REQ1, DECISION1 이다(2026-11-03 개정) |
 | [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) | 기억의 민감 구분을 없애고, 같은 글이 같은 값이어야 하는 칸은 주인 key 의 HMAC 으로 둔다 | backend, frontend | Accepted. ADR-052 의 민감도, ADR-053 의 민감 허용 조건, ADR-20261008 / agent-memory-grants-admin 의 민감 허용을 대체하고 ADR-055 의 남은 옛 key 읽기를 거둔다. 옛 칸 여섯 개는 배포를 확인한 뒤 지웠다 |
+| [ADR-20261105 / event-watch](ADR-20261105-event-watch.md) | 사건 감지는 Control Plane 이 실행 밖에서 플러그인의 목록을 식별자와 받은 시각, 라벨만 받아 보고, 새 항목이 있을 때만 읽기 경계의 살펴보기를 연다 | backend, frontend, hermes | Accepted. ADR-080 의 읽기 경계와 ADR-085 의 깨우기 제한 위에 계기 `EVENT` 를 더한다 |
 
 ## 보관
 

@@ -9,6 +9,7 @@ import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.feedback.application.ReactionLedger;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.FollowUpSuggestions;
+import com.bifos.assistant.proactive.check.application.dto.EventBatch;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
@@ -71,11 +72,14 @@ public class ProactiveCheckRun implements CheckTurn {
     static final Duration STOP_RETRY_INTERVAL = Duration.ofSeconds(1);
 
     static final String OPENING = "먼저 살펴보기를 시작한다. `skill_view(name=\"proactive-check\")` 로 지침을 읽고 그 절차대로 살펴본다.";
+    static final String EVENT_OPENING = "새 사건 살펴보기를 시작한다. 아래 「새 사건」 의 항목을 사건 실행 규칙대로 살펴본다.";
     static final String NO_RECENT_REPORTED = "최근 보고에서 알린 것이 없다.";
     static final String NO_RECENT_SUGGESTIONS = "최근 제안이 없다.";
 
     private final ProactiveCheck check;
     private final boolean renewSession;
+    /** 사건 실행이 살펴볼 새 항목이다. 다른 계기는 null 이다. */
+    private final EventBatch event;
     private final Deps deps;
     private final ProactiveCheckInput checkInput;
     private final ProactiveCheckResults results;
@@ -118,17 +122,20 @@ public class ProactiveCheckRun implements CheckTurn {
     /**
      * @param check 이미 저장한 {@code RUNNING} 살펴보기 줄
      * @param renewSession 이번 살펴보기를 새 session 으로 보낼지
+     * @param event 사건 실행이 살펴볼 새 항목. 다른 계기는 null
      */
     ProactiveCheckRun(
         CurrentUser owner,
         Long agentId,
         ProactiveCheck check,
         boolean renewSession,
+        EventBatch event,
         Deps deps) {
         this.check = check;
         this.renewSession = renewSession;
+        this.event = event;
         this.deps = deps;
-        this.checkInput = new ProactiveCheckInput(owner, agentId, check, deps);
+        this.checkInput = new ProactiveCheckInput(owner, agentId, check, event, deps);
         this.results = new ProactiveCheckResults(owner, check, deps);
         this.limits = new ProactiveCheckLimits(owner, check, deps);
     }
@@ -137,7 +144,8 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 시작할 때 옮겨 적은 쓰기 허용 값으로 지시를 고른다. */
     @Override
     public String instructions() {
-        return instructions(check.writesAllowed());
+        String base = instructions(check.writesAllowed());
+        return event == null ? base : base + "\n" + ProactiveCheckInstructions.EVENT_RULES;
     }
 
 

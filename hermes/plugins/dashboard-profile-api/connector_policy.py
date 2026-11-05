@@ -251,3 +251,56 @@ def _connector_errors(declared) -> tuple:
             raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
         words[code] = entry
     return words, contracts
+
+
+# 사건 감지 선언의 칸 이름, 라벨, 링크 모양이다(ADR-20261105 / event-watch).
+EVENT_FIELD_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+EVENT_LABEL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+EVENT_SKIP_LABELS_MAX = 20
+EVENT_NOUN_MAX_CHARS = 20
+EVENT_LINK_MAX_CHARS = 300
+
+
+def _connector_event_watch(declared: dict, tools: dict):
+    """`assistant.json` 의 `event_watch` 를 검증한다. 없으면 None 이고 틀리면 예외다(ADR-20261105 / event-watch).
+
+    조회 도구는 `tools` 에 READ 와 none 으로 선언한 도구다. Control Plane 이 승인 없이 실행 밖에서 부르기 때문이다.
+    `args` 의 글 값은 `{since}` 자리만 갖고, 대시보드가 조회 시작 시각(초 단위 epoch)으로 바꾼다.
+    돌려줄 칸은 `id`, `received_at`, `labels` 셋으로 고정이다. 제목과 본문 칸을 이 선언으로 내보낼 수 없다.
+    """
+    watch = declared.get("event_watch")
+    if watch is None:
+        return None
+    required = {"tool", "args", "items", "id", "received_at", "labels", "noun", "link"}
+    if not isinstance(watch, dict) or not required <= set(watch) or set(watch) - required - {"page_token", "skip_labels"}:
+        raise ValueError("event_watch 는 tool, args, items, id, received_at, labels, noun, link 와 선택 칸 page_token, "
+                         "skip_labels 만 갖는다")
+    policy = tools.get(watch["tool"]) if isinstance(watch["tool"], str) else None
+    if policy is None or policy["risk"] != "READ" or policy["approval"] != "none":
+        raise ValueError("event_watch.tool 은 tools 에 READ 와 none 으로 선언한 도구다")
+    args = watch["args"]
+    if (not isinstance(args, dict) or any(not isinstance(key, str) or not EVENT_FIELD_RE.match(key) for key in args)
+            or any(type(value) not in (str, int, bool) for value in args.values())
+            or any(isinstance(value, str) and value.replace("{since}", "").count("{") for value in args.values())):
+        raise ValueError("event_watch.args 는 칸 이름과 글, 정수, boolean 값이고 글의 자리는 {since} 하나다")
+    if any(not isinstance(watch[key], str) or not EVENT_FIELD_RE.match(watch[key])
+           for key in ("items", "id", "received_at", "labels")):
+        raise ValueError("event_watch 의 items, id, received_at, labels 는 칸 이름이다")
+    page = watch.get("page_token")
+    if page is not None and (not isinstance(page, dict) or set(page) != {"result", "arg"}
+                             or any(not isinstance(value, str) or not EVENT_FIELD_RE.match(value) for value in page.values())
+                             or page["arg"] in args):
+        raise ValueError("event_watch.page_token 은 결과 칸 result 와 args 에 없는 인자 arg 다")
+    skip = watch.get("skip_labels", [])
+    if (not isinstance(skip, list) or len(skip) > EVENT_SKIP_LABELS_MAX
+            or any(not isinstance(label, str) or not EVENT_LABEL_RE.match(label) for label in skip)):
+        raise ValueError("event_watch.skip_labels 는 라벨 이름 %d개까지다" % EVENT_SKIP_LABELS_MAX)
+    noun, link = watch["noun"], watch["link"]
+    if not isinstance(noun, str) or not 1 <= len(noun.strip()) <= EVENT_NOUN_MAX_CHARS:
+        raise ValueError("event_watch.noun 은 %d자까지의 글이다" % EVENT_NOUN_MAX_CHARS)
+    if (not isinstance(link, str) or not link.startswith("https://") or len(link) > EVENT_LINK_MAX_CHARS
+            or link.count("{id}") != 1 or link.replace("{id}", "").count("{") or any(ch.isspace() for ch in link)):
+        raise ValueError("event_watch.link 는 {id} 자리 하나를 가진 https 주소다")
+    return {"tool": watch["tool"], "args": dict(args), "items": watch["items"], "id": watch["id"],
+            "received_at": watch["received_at"], "labels": watch["labels"], "page_token": page,
+            "skip_labels": frozenset(skip), "noun": noun.strip(), "link": link}

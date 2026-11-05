@@ -2,6 +2,7 @@ package com.bifos.assistant.proactive.check.infra;
 
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
@@ -18,7 +19,16 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
     Optional<ProactiveCheck> findFirstByUserIdAndAgentIdOrderByIdDesc(Long userId, Long agentId);
 
 
-    boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(Long conversationId);
+    /**
+     * 그 점검 대화에 그 계기가 아닌 살펴보기가 남긴 열지 않은 보고가 있는가. 매일 깨우기의 건너뛰기가 사건 실행의 보고로 바뀌지 않게
+     * {@code EVENT} 를 뺀다(ADR-20261105 / event-watch).
+     */
+    boolean existsByConversationIdAndReportIsNotNullAndReportOpenedAtIsNullAndTriggerNot(
+        Long conversationId, CheckTrigger trigger);
+
+
+    /** 그 사용자가 그 시각 뒤에 그 계기로 연 살펴보기 수. 사건 실행을 하루 발화 상한에 넣을 때 센다. */
+    long countByUserIdAndTriggerAndStartedAtAfter(Long userId, CheckTrigger trigger, Instant after);
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -56,8 +66,21 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
         Long conversationId, CheckStatus status);
 
 
+    /**
+     * 위와 같되 그 계기의 살펴보기를 뺀다. 새 항목만 보는 사건 실행이 변화 신호의 「지난 살펴보기」 를 옮기지 않게 한다(ADR-20261105 /
+     * event-watch).
+     */
+    Optional<ProactiveCheck> findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullAndTriggerNotOrderByIdDesc(
+        Long conversationId, CheckStatus status, CheckTrigger trigger);
+
+
     /** 그 점검 대화에서 그 상태로 끝난 마지막 살펴보기. 기억에서 꺼낸 최근 일의 시작 경계를 읽는다. */
     Optional<ProactiveCheck> findFirstByConversationIdAndStatusOrderByIdDesc(Long conversationId, CheckStatus status);
+
+
+    /** 위와 같되 그 계기의 살펴보기를 뺀다. 사건 실행이 기억에서 꺼낸 최근 일의 시작 경계를 옮기지 않게 한다. */
+    Optional<ProactiveCheck> findFirstByConversationIdAndStatusAndTriggerNotOrderByIdDesc(
+        Long conversationId, CheckStatus status, CheckTrigger trigger);
 
 
     /**

@@ -138,7 +138,7 @@ sequenceDiagram
 
 경로는 `ProactiveCheckController`, `ProactiveScheduleController`, `ProactiveCheckReportController` 가 갖는다.
 상태 조회와 수동 시작, 일정 켜기는 요청자가 그 에이전트로 대화를 시작할 수 있어야 한다(`AgentService.requireStartable`). 일정 조회와 끄기는 읽기 권한만 본다. 다른 사용자의 보고를 열면 404 다.
-시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`)다. 옛 자동 실행의 `AUTONOMY` 계기와 그 줄은 지웠다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 계기를 가리지 않는 마지막 줄이다.
+시작 계기는 단추의 `MANUAL`, 매일 깨우기의 `SCHEDULED`(`ProactiveCheckService.startScheduled`), 사건 감지의 `EVENT`(`ProactiveCheckService.startEvent`)다. 옛 자동 실행의 `AUTONOMY` 계기와 그 줄은 지웠다. 상태 조회와 일정 응답의 「마지막 살펴보기」 는 계기를 가리지 않는 마지막 줄이다.
 점검 저장과 `task_run.proactive_check_id` 연결은 Hermes 호출 전 같은 짧은 트랜잭션에서 끝낸다.
 
 | 경우 | 응답 |
@@ -166,6 +166,20 @@ sequenceDiagram
 대화 답과 무소식 알림 줄, 보고를 남기지 않는다. 그래서 이미 알린 발견의 되풀이가 다음 날 깨우기를 `UNREAD_REPORT` 로 막지 않는다. 같은 블록의 제안은 저장한다.
 다섯 칸 보고의 칸과 상한은 ADR-085 와 `CheckResultParser` 가 갖는다. `report_opened_at` 은 요청자가 자신의 보고를 열 때 채운다. 점검 대화의 메시지 목록을 읽거나 질문을 보낼 때도 그 대화에서 열지 않은 자신의 보고를 모두 채운다(`ChatService` 의 `CheckReportReads` port).
 대기 줄에서 꺼내 보낸 질문은 기록하지 않는다. 앞 turn 이 끝난 뒤에 저장되므로 그 사이 만든 보고를 사용자가 보지 않았을 수 있다.
+
+#### 사건 감지
+
+붙인 플러그인에 새 항목이 생기면 에이전트가 스스로 살펴본다. 첫 원천은 Gmail 새 메일이다. 결정은 [ADR-20261105 / event-watch](../adr/ADR-20261105-event-watch.md), 요구사항과 설계는 [스펙](proactive/spec.md) 과 [설계](proactive/design.md) 가 갖는다.
+지금 들어간 것은 확인과 실행이다. 알림, 조용한 시간, 켜고 끄는 화면은 아직 없어 켠 바인딩이 없다.
+
+- **확인은 모델 없이 돈다.** `EventWatchPoller` 가 `assistant.event-watch.check-cron`(기본 15분)마다 사건 감지를 켠 바인딩을 차례로 본다. 대시보드 plugin 의 `events` 경로가 그 profile 의 연결 값으로 플러그인의 `event_watch` 조회 도구를 부르고 식별자, 받은 시각, 라벨만 돌려준다. 새 항목이 없으면 살펴보기 줄과 실행 줄을 만들지 않고 바인딩 줄의 상태만 덮어쓴다
+- **같은 항목으로 두 번 깨우지 않는다.** 확인 지점은 결과를 다 쓴 마지막 조회를 시작한 Control Plane 의 시각이다. 다음 조회는 지점보다 `overlap`(30분) 앞부터 받고, 그 구간에서 이미 본 식별자를 뺀다. 메일의 `Date` 머리는 보낸 사람이 쓰는 값이라 지점으로 쓰지 않는다. 처음 켜면 지점은 켠 시각이다
+- **새 항목이 있으면 `EVENT` 살펴보기 하나를 연다.** 입력의 「새 사건」 절에 원천 이름, 새 항목 수, 식별자와 원문 링크를 `<external-data>` 로 싣는다(20개까지). 지시는 사건 실행 규칙(`ProactiveCheckInstructions.EVENT_RULES`)을 더하고, 분야 지침 스킬을 읽게 하지 않는다. 알릴 항목은 결과 블록의 `findings` 한 칸씩이고 `topicKey` 가 항목 식별자다. 지점과 이미 본 식별자는 살펴보기 줄과 같은 트랜잭션에서 옮긴다
+- **사건 실행은 늘 읽기 경계다.** 에이전트의 쓰기 허용과 상관없이 `writes_allowed` 를 거짓으로 적고, 준비 판정도 읽기 경계의 toolset 목록(`ProactiveCheckReadiness.checkEvent`)으로 한다. 셸·파일·코드 실행 toolset 은 `isolated-execution-enabled` 가 참일 때만 받는다
+- **바쁘거나 막히면 지점을 옮기지 않는다.** 사용자나 점검 대화에 도는 turn 이 있으면 `BUSY`, 바인딩·연결·에이전트·도구 조건이 맞지 않으면 `BLOCKED` 로 적고 다음 확인에서 같은 항목을 다시 받는다. 읽지 않은 보고로는 건너뛰지 않는다. 점검 대화가 없으면 만든다
+- **하루 상한이 둘이다.** 바인딩마다 그 시간대의 하루에 `max-runs-per-day`(12) 번까지 깨운다. 사용자의 하루 발화 상한(`assistant.task.max-runs-per-day`)은 예약 작업의 발화와 사건 실행을 함께 센다. 상한에 닿으면 조회하지 않고 지점을 둔다. 모델 없이 끝난 확인은 어느 상한에도 들지 않는다
+- **연결 문제만 연속 실패로 센다.** `credential_rejected` 와 `forbidden` 은 실패 수를 늘리고, 동시 호출 한도나 장애의 `unavailable` 은 세지 않는다. 어느 실패든 지점은 그대로이고 목록을 받으면 실패 수를 비운다
+- **사건 실행의 보고는 매일 깨우기를 건너뛰게 하지 않는다.** 읽지 않은 보고 판정에서 `EVENT` 를 뺀다
 
 ### 시작 전 점검
 

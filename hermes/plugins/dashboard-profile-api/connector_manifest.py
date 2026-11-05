@@ -27,6 +27,7 @@ from .connector_appearance import (
 from .connector_policy import (
     _canonical_server_name,
     _connector_errors,
+    _connector_event_watch,
     _connector_fields,
     _connector_tools,
     _default_tool_policy,
@@ -73,9 +74,7 @@ from .connector_schema import (
     _connector_binding_flags,
 )
 
-from .connector_owner_env import (
-    _connector_owner_env,
-)
+from .connector_owner_env import _connector_owner_env
 
 from .connector_skills import (
     _connector_skills,
@@ -273,6 +272,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "tools": tools,
         "default_tool_policy": default_tool_policy,
         "snapshot": snapshot,
+        "event_watch": None if standard else _connector_event_watch(declared, tools),
         "tool_descriptions": _tool_descriptions(declared),
         "tool_summaries": _tool_summaries(declared),
         "tool_arg_labels": {name: _tool_arg_labels(tool) for name, tool in declared.get("tools", {}).items()},
@@ -385,6 +385,7 @@ def _connector_catalog_response(include_standard: bool = False):
           # `ask` 일 때만 싣는다. 이 칸을 모르는 옛 Control Plane 은 선언하지 않은 도구를 지금처럼 거절한다(rule-66).
           **({"default_tool_policy": "ask"} if manifest["default_tool_policy"] == "ask" else {}),
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
+          **({"event_watch": {key: manifest["event_watch"][key] for key in ("tool", "noun", "link")}} if manifest.get("event_watch") else {}),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목과 요약이 없는 도구는 `title` 과 `summary` 를 내지 않는다. 화면은 도구 이름 대신 대체 문구를 보인다.
           "tools": {name: {key: value for key, value in {**policy, "description": manifest["tool_descriptions"].get(name),

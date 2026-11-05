@@ -1,5 +1,7 @@
 package com.bifos.assistant.task.application;
 
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.task.config.TaskProperties;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskRun;
@@ -38,6 +40,7 @@ public class TaskFiring {
 
     private final TaskRepository tasks;
     private final TaskRunRepository runs;
+    private final ProactiveCheckRepository checks;
     private final TaskNotices notices;
     private final TaskProperties properties;
     private final TransactionTemplate transactions;
@@ -110,10 +113,14 @@ public class TaskFiring {
     }
 
 
-    /** 그 주인이 24시간 안에 건너뛰지 않은 발화를 상한만큼 만들었는가. */
+    /**
+     * 그 주인이 24시간 안에 건너뛰지 않은 발화와 모델을 부른 사건 실행(ADR-20261105 / event-watch)을 합쳐 상한만큼 만들었는가. 모델 없이 끝난
+     * 사건 감지 확인은 줄을 남기지 않아 세지 않는다.
+     */
     private boolean reachedDailyLimit(Task task, Instant now) {
         long recent = runs.countByOwnerUserIdAndCreatedAtAfterAndStatusNot(
-            task.ownerUserId(), now.minus(DAY), TaskRunStatus.SKIPPED);
+            task.ownerUserId(), now.minus(DAY), TaskRunStatus.SKIPPED)
+            + checks.countByUserIdAndTriggerAndStartedAtAfter(task.ownerUserId(), CheckTrigger.EVENT, now.minus(DAY));
         return recent >= properties.maxRunsPerDay();
     }
 }

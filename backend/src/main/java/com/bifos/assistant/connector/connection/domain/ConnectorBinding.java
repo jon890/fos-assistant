@@ -23,6 +23,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * 에이전트 하나에 연결 하나를 붙인 것이다(ADR-083). 에이전트와 연결은 다대다다.
@@ -102,6 +103,20 @@ public class ConnectorBinding extends CreatedAtEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * 사건 감지를 켰는가(ADR-20261105 / event-watch).
+     *
+     * <p>두 사건 감지 컬럼은 넣기와 고치기에서 뺀다. 다른 흐름이 이 엔티티를 저장할 때 상태를 옛 값으로 덮지 않게 하려는 것이다. 쓰기는
+     * {@code ConnectorEventWatches} 의 조건부 update 만 하고 {@code updated_at} 을 바꾸지 않는다.
+     */
+    @ColumnDefault("false")
+    @Column(name = "event_watch_enabled", nullable = false, insertable = false, updatable = false)
+    private boolean eventWatchEnabled;
+
+    /** 사건 감지 상태 JSON 글이다. 뜻은 {@link EventWatchState} 가 갖는다. */
+    @Column(name = "event_watch_state", insertable = false, updatable = false, columnDefinition = "TEXT")
+    private String eventWatchState;
 
 
     private ConnectorBinding(Agent agent, ConnectorConnection connection, String mcpServer, Instant now) {

@@ -151,6 +151,12 @@ Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않�
 승인한 수가 0이고 검색도 비어 있으면 쓰기 없이 대상 수 0으로 끝난다.
 수가 같아도 검색과 변경 사이에 새 메일이 오면 그 메일은 이번 적용 대상에 들지 않는다.
 
+## 사건 감지
+
+`assistant.json` 의 `event_watch` 가 새 메일 확인을 선언한다([ADR-20261105 / event-watch](../adr/ADR-20261105-event-watch.md)). 조회 도구는 `search_messages` 이고 검색식은 `in:inbox -category:promotions -category:social after:{since}` 다. 프로모션과 소셜 분류는 검색식이 빼고, 결과에 그 라벨(`CATEGORY_PROMOTIONS`, `CATEGORY_SOCIAL`)이 붙은 메일은 대시보드가 한 번 더 뺀다.
+대시보드는 메일마다 ID, `Date` 머리, 라벨만 Control Plane 에 넘긴다. `search_messages` 가 함께 읽는 제목, 보낸 사람, 요약은 넘기지 않는다. 원문 링크 틀은 `https://mail.google.com/mail/#all/{id}` 다.
+흐름은 [먼저 살펴보기](proactive.md) 의 「사건 감지」 가 갖는다. 도구 코드는 바꾸지 않았다.
+
 ## 서버와 검사
 
 TypeScript 서버를 의존성까지 `dist/gmail-mcp.js` 하나로 묶는다. 생성 entry는 Git에서 추적하지 않는다. 실행 파일은 Bun 이다.

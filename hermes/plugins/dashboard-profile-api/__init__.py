@@ -21,6 +21,7 @@ Hermes core 는 고치지 않는다.
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 플러그인의 manifest 를 낸다. `schema` 와 도구마다의 위험도와 승인 방식(`tools`)을 함께 낸다 |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 플러그인의 선택지 도구나 확인 도구를 한 번 부른다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 |
+| `POST /api/connectors/<id>/events` | 사건 감지를 선언한 플러그인의 조회 도구를 그 profile 의 값으로 불러 항목마다 식별자, 받은 시각, 라벨만 낸다(ADR-20261105 / event-watch) |
 | `POST /api/connectors/<id>/tools` | 후보 값이나 보관 파일의 값으로 표준 플러그인(`schema: 3`)의 MCP 서버에 붙어 도구 이름과 읽기 표시만 받는다 |
 | `GET PUT /api/connectors` | 플러그인의 상태를 읽거나 profile 에 바인딩을 붙이고 뗀다. 붙이기는 `bind.vault`의 보관 파일 값과 plugin 의 스킬을 그 profile 에 복사한다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 |
@@ -390,7 +391,7 @@ def register(ctx) -> None:
         ", ".join(
             ["%s %s" % (" ".join(sorted(methods)), path) for path, methods in sorted(opened.items())]
             + ["GET PUT /api/profiles/<이름>/soul", "DELETE /api/profiles/<관리 표식 profile>",
-               "POST /api/connectors/<id>/call", "POST /api/connectors/<id>/tools",
+               "POST /api/connectors/<id>/call", "POST /api/connectors/<id>/tools", "POST /api/connectors/<id>/events",
                "POST /api/mcp/servers/<설치한 플러그인의 서버>/test"]
         ),
         _skill_root() or "설정되지 않음",

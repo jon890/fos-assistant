@@ -109,7 +109,7 @@ sequenceDiagram
 | 예정 시각이 지난 지 `assistant.task.missed-grace` 안이다 | 그 시각으로 `QUEUED` 를 만든다 |
 | 그보다 늦었고 놓친 발화가 `RUN_ONCE` 다 | 지금 앞의 예정 시각 가운데 가장 늦은 것 하나로 `QUEUED` 를 만든다 |
 | 그보다 늦었고 `SKIP` 이다 | 그 시각으로 `SKIPPED`(`MISSED`)를 하나 남긴다. 알리지 않는다 |
-| 그 사용자의 24시간 안 발화가 `assistant.task.max-runs-per-day` 에 닿았다 | `SKIPPED`(`DAILY_LIMIT`)로 남기고 알린다 |
+| 그 사용자의 24시간 안 발화와 모델을 부른 사건 실행([먼저 살펴보기](proactive.md) 의 「사건 감지」)을 합친 수가 `assistant.task.max-runs-per-day` 에 닿았다 | `SKIPPED`(`DAILY_LIMIT`)로 남기고 알린다 |
 | 같은 `(task_id, scheduled_for)` 줄이 이미 있다 | 새로 만들지 않는다. `next_fire_at` 만 옮긴다 |
 
 어느 경우든 같은 트랜잭션에서 `next_fire_at` 을 지금 뒤의 첫 예정 시각으로 옮긴다. `ONCE` 는 비운다.
