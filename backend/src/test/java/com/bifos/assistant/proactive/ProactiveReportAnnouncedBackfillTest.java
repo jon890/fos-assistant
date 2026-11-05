@@ -17,8 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 이미 남긴 살펴보기 보고에 되풀이 판정 재료를 채우는 마이그레이션을 본다({@code docs/features/proactive/design.md} 의 「보고에 담는
- * 것」).
+ * 이미 남긴 살펴보기 보고에 되풀이 판정 재료를 채우는 마이그레이션을 본다({@code docs/features/proactive/design.md}).
  *
  * <p>테스트 DB 는 엔티티로 스키마를 만들므로 운영과 같은 Flyway 스키마는 여기서 따로 만든다. 채운 JSON 은 Control Plane 이 쓰는
  * {@link CheckReportJsonConverter} 로 읽어 두 쪽의 모양이 같은지도 함께 본다. 모든 값은 합성이다.

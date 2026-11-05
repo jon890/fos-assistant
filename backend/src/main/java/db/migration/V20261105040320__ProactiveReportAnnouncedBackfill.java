@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 이미 남긴 살펴보기 보고({@code proactive_check.report_json})에 되풀이 판정 재료를 채운다. 그 살펴보기가 옛 표에 남긴 「새로 알릴 것」
  * 발견(주제 키가 있는 것)을 {@code announced} 에, 받아들인 문제 후보의 문제 키를 {@code acceptedProblemKeys} 에 쓴다
- * ({@code docs/features/proactive/design.md} 의 「보고에 담는 것」).
+ * ({@code docs/features/proactive/design.md}).
  *
  * <p>이 마이그레이션 뒤로 Control Plane 은 되풀이 판정을 보고에서 읽고 옛 표를 읽지 않는다. 채우지 않으면 배포 직후 첫 살펴보기가 지난
  * 기간에 이미 알린 소식을 다시 알린다. 칸 모양은 Control Plane 의 {@code CheckReport} 와 {@code ReportedFinding} 이 읽는 것과 같다.
