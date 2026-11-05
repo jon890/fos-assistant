@@ -1,13 +1,13 @@
 /**
  * 먼저 살펴보기가 웹 도구 사건, 붙은 플러그인 도구의 직접 호출, 결과 블록을 거쳐 점검 대화에 검사한 결과를 남기는지 전체 흐름으로 본다.
  *
- * <p>대역은 모델이 아니다. 무엇을 조사할지 고르는 것은 분야 지침과 실제 모델의 몫이고, 여기서는 Control Plane 이 맥락을 싣고,
+ * <p>대역은 모델이 아니다. 무엇을 조사할지 고르는 것은 Control Plane 지시를 받은 실제 모델의 몫이고, 여기서는 Control Plane 이 맥락을 싣고,
  * 읽기 경계를 지키고, 결과를 검사해 남기는지를 본다. 대역이 살펴보기 실행을 붙잡은 동안 시나리오가 그 실행의 모델과 profile
  * 플러그인 역할을 한다. `_fos_ctx` 를 서명해 MCP 를 부르고, 플러그인 도구는 대역의 hook 으로 판정을 물어 직접 부른다(ADR-083).
- * 시험 플러그인의 읽기 도구가 분야 플러그인의 후보 읽기 자리를 맡는다.
+ * 시험 플러그인의 읽기 도구가 분야 플러그인의 후보 읽기 자리를 맡는다. 분야 지침 스킬은 올리지 않는다. 살펴보기는 스킬 없이 돈다.
  *
  * <p>앞 시나리오가 남긴 연결 상태에 기대지 않게 시작에서 연결을 등록해 살펴볼 에이전트에 붙이고 끝에서 해제한다. 바꾼 toolset 과
- * 스킬도 끝에서 되돌린다. 모든 글과 주소는 합성 값이다.
+ * 끝에서 되돌린다. 모든 글과 주소는 합성 값이다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
 import { DEMO_CONNECTOR, proactiveOutput } from "../fake-hermes.ts";
@@ -31,8 +31,6 @@ const AGENT = "dad";
 const CHECK_PATH = `/agents/${AGENT}/proactive-check`;
 const CONNECTION = connectionPath(DEMO_CONNECTOR.id);
 const PREFIX = `mcp__${DEMO_CONNECTOR.mcp_server}__`;
-const SKILL_NAME = "proactive-check";
-const SKILL_MD = `---\nname: ${SKILL_NAME}\ndescription: 먼저 살펴볼 때 따르는 시험용 지침\n---\n# 살펴보기\n\n웹을 읽고 결과 블록으로 답한다.\n`;
 /** 허용 목록의 toolset 만 켠다. Control Plane MCP 는 도구 저장이 늘 함께 켠다. */
 const ALLOWED_TOOLSETS = ["web", "skills"];
 /** `ProactiveCheckProperties` 의 `max-tool-calls` 를 Spring 이 읽는 환경 변수 이름이다. */
@@ -203,7 +201,6 @@ export const proactiveCheckScenario: Scenario = {
     useConnectorPolicy(context);
     const setup = new ConnectorSetup(context, context.tokens.dad);
     let originalToolsets: string[] | undefined;
-    let skillSaved = false;
     let tokenId: number | undefined;
     let held = false;
     let kidAgent: string | undefined;
@@ -214,18 +211,10 @@ export const proactiveCheckScenario: Scenario = {
       await setup.connect();
       const reached = () => context.hermes.connectorToolCalls().filter((entry) => entry.profile === PROFILE);
 
-      step("준비: 살펴볼 에이전트에 proactive-check 스킬을 올리고 허용 목록의 toolset 만 켠다");
+      step("준비: 살펴볼 에이전트에 허용 목록의 toolset 만 켠다. 분야 지침 스킬은 올리지 않는다");
       originalToolsets = expectStatus(
         await call(context, `/agents/${AGENT}/tools`, { token: context.tokens.dad }), 200, "원래 toolset 읽기",
       ).json<ToolsetsView>().toolsets.filter((toolset) => toolset.enabled).map((toolset) => toolset.name);
-      expectStatus(
-        await call(context, `/agents/${AGENT}/skills/${SKILL_NAME}`, {
-          method: "PUT", token: context.tokens.dad, body: { skillMd: SKILL_MD },
-        }),
-        200,
-        "지침 스킬 저장",
-      );
-      skillSaved = true;
       expectStatus(
         await call(context, `/agents/${AGENT}/tools`, {
           method: "PUT", token: context.tokens.dad, body: { enabled: ALLOWED_TOOLSETS },
@@ -338,7 +327,7 @@ export const proactiveCheckScenario: Scenario = {
           `점검 대화의 처음이 시작 알림 줄 하나가 아니다: ${JSON.stringify(opening)}`,
         );
         const input = context.hermes.proactiveInputs().at(-1)?.input ?? "";
-        expect(input.includes('skill_view(name="proactive-check")'), `살펴보기 입력에 지침 읽기가 없다: ${input}`);
+        expect(!input.includes('skill_view(name="proactive-check")'), `살펴보기 입력이 분야 지침 스킬을 읽게 한다: ${input}`);
         const instructions = context.hermes.lastSubmittedInstructions() ?? "";
         expect(
           instructions.includes(DIRECT_RULE),
@@ -565,13 +554,6 @@ export const proactiveCheckScenario: Scenario = {
         "다른 사용자의 에이전트 만들기",
       ).json<AgentView>().code;
       const kidPath = `/agents/${kidAgent}/proactive-check`;
-      expectStatus(
-        await call(context, `/agents/${kidAgent}/skills/${SKILL_NAME}`, {
-          method: "PUT", token: context.tokens.kid, body: { skillMd: SKILL_MD },
-        }),
-        200,
-        "다른 사용자의 지침 스킬 저장",
-      );
       const kidStatus = await statusOf(context, context.tokens.kid, kidPath);
       expect(kidStatus.available && kidStatus.conversationId === null, `다른 사용자가 살펴볼 수 없다: ${JSON.stringify(kidStatus)}`);
       const kidConversation = await startCheck(context, context.tokens.kid, kidPath);
@@ -780,13 +762,6 @@ export const proactiveCheckScenario: Scenario = {
       }
       // 해제가 살펴볼 에이전트에 붙인 바인딩을 떼므로 그 profile 의 도구 목록을 되돌리기 전에 한다.
       await cleanup(async () => setup.cleanUp(false));
-      if (skillSaved) {
-        await cleanup(async () => expectStatus(
-          await call(context, `/agents/${AGENT}/skills/${SKILL_NAME}`, { method: "DELETE", token: context.tokens.dad }),
-          204,
-          "지침 스킬 지우기",
-        ));
-      }
       if (originalToolsets !== undefined) {
         const enabled = originalToolsets;
         await cleanup(async () => expectStatus(

@@ -113,11 +113,12 @@ export const CONNECTOR_ARGUMENT_SAMPLE = "외부-인자-4821";
 export const LONG_ACTIVITY_PROBE = "긴 작업 과정 검사";
 
 /**
- * Control Plane 이 먼저 살펴보기 입력에 넣는 지침 읽기 호출이다. 입력에 이것이 있으면 살펴보기 실행으로 본다.
+ * Control Plane 이 먼저 살펴보기 입력의 첫 줄로 넣는 글이다. 입력에 이것이 있으면 살펴보기 실행으로 본다.
  *
  * <p>`ProactiveCheckRun.OPENING` 과 같아야 한다. 어긋나면 살펴보기 실행이 보통 실행으로 답을 받아 결과 블록이 없다.
  */
-export const PROACTIVE_CHECK_CALL = 'skill_view(name="proactive-check")';
+export const PROACTIVE_CHECK_CALL =
+  "먼저 살펴보기를 시작한다. 아래 맥락을 보고 이번에 살펴볼 것을 골라 Control Plane 지시대로 살펴본다.";
 
 /** 각본 없는 살펴보기가 내는 발견 하나의 주제 키와 원문 주소다. 브라우저 검사가 두 번째 답의 「이미 알린 것이에요」 를 이것으로 안다. */
 export const PROACTIVE_DEFAULT_FINDING = {

@@ -2,10 +2,9 @@ import {
   describeBlocker,
   type ProactiveCheckBlocker,
 } from "@/lib/proactive-check";
-import { toolsetText } from "@/lib/toolset-label";
 
 /**
- * 사건 감지를 막는 까닭이다. 사건 실행의 준비 판정이 낸 까닭에 연결 쪽 까닭 셋을 더한다.
+ * 사건 감지를 막는 까닭이다. 사건 실행의 준비 판정이 낸 까닭에 연결 쪽 까닭을 더한다. 켜 둔 도구는 까닭이 아니다.
  * `toolsets` 는 toolset 이 걸린 까닭일 때만 차 있다.
  */
 export type EventWatchBlocker = {
@@ -13,6 +12,7 @@ export type EventWatchBlocker = {
     | ProactiveCheckBlocker["code"]
     | "EVENT_TOOL_NOT_ALLOWED"
     | "CONNECTION_NOT_READY"
+    | "TOOL_GUARD_MISSING"
     | "EVENT_WATCH_ELSEWHERE";
   toolsets: string[];
 };
@@ -69,14 +69,8 @@ export function describeEventWatchBlocker(
       return `${watch.title} 연결이 아직 준비되지 않았어요. 위 연결 절에서 반영을 마친 뒤 켤 수 있어요.`;
     case "EVENT_WATCH_ELSEWHERE":
       return `같은 ${watch.title} 연결을 다른 에이전트가 이미 살펴보고 있어요. 연결 하나에는 에이전트 하나만 켤 수 있어요.`;
-    case "ISOLATED_EXECUTION_REQUIRED": {
-      const names = blocker.toolsets
-        .map(
-          (name) => toolsetText(name, { label: name, description: "" }).label,
-        )
-        .join(", ");
-      return `${names} 도구가 켜져 있어요. 격리된 실행 공간이 준비되기 전에는 켤 수 없어요.`;
-    }
+    case "TOOL_GUARD_MISSING":
+      return "이 에이전트가 쓰는 실행 환경에 위험한 도구를 막는 장치가 아직 없어서 켤 수 없어요. 관리자가 반영을 마치면 켤 수 있어요.";
     case "READINESS_UNKNOWN":
       return "지금 준비 상태를 확인하지 못했어요. 켜 둔 것은 끌 수 있어요. 다시 켜려면 화면을 새로 열어 주세요.";
     default:
