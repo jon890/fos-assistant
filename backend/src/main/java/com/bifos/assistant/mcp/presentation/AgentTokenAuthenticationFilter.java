@@ -36,6 +36,7 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
         "/mcp",
         "/internal/hermes/session-bindings/subagent",
         "/internal/hermes/connector-policy",
+        "/internal/hermes/tool-guard",
         "/internal/hermes/attachment-inspect",
         "/internal/hermes/attachment-inspect/validate");
 

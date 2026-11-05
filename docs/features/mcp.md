@@ -156,6 +156,12 @@ Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그�
 | Control Plane 이 다시 떴다 | 등록은 데이터베이스에 있어 그대로 쓴다 |
 | 부모 turn 이 끝난 뒤 하위 에이전트가 결과물을 썼다 | 파일은 대화 폴더에 남지만 어느 답에도 묶이지 않는다. 답에 묶는 것은 turn 이 끝날 때 폴더를 훑는 방식이다 |
 
+#### 도구 판정에 답할 때
+
+fos-ctx 는 안전 목록 밖의 도구 호출마다 `POST /internal/hermes/tool-guard` 로 그 session 이 사건 살펴보기 트리인지 묻는다([ADR-20261105 / event-watch](../adr/ADR-20261105-event-watch.md)). 인증은 위와 같은 profile 토큰이고, 본문과 서명은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「도구 판정」 이 갖는다.
+`EventToolGuard` 는 위 요청자 판정과 같은 자료(자식 등록, 루트 session 에서 도는 실행)로 트리를 풀되, 풀지 못한 session 을 늘 거절하지 않는다. 점검 대화의 session 이거나 그 profile 에서 사건 살펴보기가 도는 동안만 막는다. 보통 대화와 Hermes 의 다른 플랫폼 대화를 깨지 않으려는 것이다. 순서는 [사건 감지 설계](proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
+판정 중 예외는 200 의 `block` 이고 서명이 틀리면 `403 TOOL_GUARD_REJECTED` 다. 이 경로는 404 를 내지 않는다. fos-ctx 가 404 를 이 경로가 없는 옛 Control Plane 으로 읽고 통과시키기 때문이다.
+
 ### Control Plane MCP
 
 Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기를 Control Plane 의 MCP 서버 하나가 맡는다.

@@ -120,16 +120,20 @@ class EventWatchControllerTest extends EventWatchTestSupport {
 
 
     @Test
-    @DisplayName("격리 설정이 꺼진 동안 셸 toolset 이 켜졌거나 위임 toolset 이 켜진 에이전트는 켜지 못하고 조회가 까닭을 싣는다 (REQ9)")
-    void shellAndDelegationToolsetsBlockEnabling() throws Exception {
+    @DisplayName("셸·위임 toolset 이 켜진 에이전트도 켤 수 있고, 판정 plugin 이 없거나 재시작을 기다리면 TOOL_GUARD_MISSING 으로 켜지 못한다 (REQ9, REQ10)")
+    void toolsetsDoNotBlockButMissingGuardDoes() throws Exception {
         watches.disable(user.id(), agent.id(), CONNECTOR);
+        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal", "delegation"));
+        when(connector.readConnector(anyString(), anyString())).thenReturn(installed(false));
+        expectBlocked(agent, "TOOL_GUARD_MISSING");
 
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal"));
-        expectBlocked(agent, "ISOLATED_EXECUTION_REQUIRED");
-        mvc.perform(get(PATH, agent.code())).andExpect(jsonPath("$[0].blockers[0].toolsets[0]").value("terminal"));
+        when(connector.readConnector(anyString(), anyString())).thenReturn(installed(true));
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = TRUE WHERE id = ?", binding.id());
+        expectBlocked(agent, "TOOL_GUARD_MISSING");
 
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "delegation"));
-        expectBlocked(agent, "TOOLSETS_NOT_ALLOWED");
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = FALSE WHERE id = ?", binding.id());
+        mvc.perform(get(PATH, agent.code())).andExpect(jsonPath("$[0].available").value(true));
+        save(true, "").andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(true));
     }
 
 
@@ -181,7 +185,7 @@ class EventWatchControllerTest extends EventWatchTestSupport {
     @Test
     @DisplayName("Hermes 장애 중에는 조회가 확인하지 못했다고 보이고 끄기는 되며, 켜기는 그 오류로 거절한다")
     void runtimeOutageKeepsReadAndDisable() throws Exception {
-        when(toolsets.readEnabled(anyString(), anyString()))
+        when(connector.readConnector(anyString(), anyString()))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "runtime went away"));
 
         mvc.perform(get(PATH, agent.code()))
@@ -219,9 +223,9 @@ class EventWatchControllerTest extends EventWatchTestSupport {
         bound.ready(now);
         bindings.save(bound);
 
-        clearInvocations(toolsets);
+        clearInvocations(connector);
         mvc.perform(get(PATH, shared.code())).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
-        verify(toolsets, never()).readEnabled(anyString(), anyString());
+        verify(connector, never()).readConnector(anyString(), anyString());
         mvc.perform(put(PATH + "/{connectorId}", shared.code(), CONNECTOR)
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"enabled\":false,\"timezone\":\"\"}"))

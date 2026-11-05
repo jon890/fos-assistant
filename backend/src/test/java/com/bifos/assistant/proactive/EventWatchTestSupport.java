@@ -3,7 +3,6 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
@@ -27,7 +26,6 @@ import com.bifos.assistant.hermes.application.port.HermesEventFeedClient;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.auth.CurrentUser;
-import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import com.bifos.assistant.task.application.EventWatchPoller;
 import com.bifos.assistant.testsupport.ConnectorCatalogTimes;
 import java.time.Duration;
@@ -35,7 +33,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.concurrent.CountDownLatch;
@@ -80,14 +77,13 @@ abstract class EventWatchTestSupport extends ProactiveTestSupport {
     Agent agent;
     ConnectorBinding binding;
 
-    @Autowired
-    SkillCommandCatalog skills;
-
 
     @BeforeEach
     void prepareWatch() {
         reset(feed);
-        doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
+        // 분야 지침 스킬은 준비하지 않는다. 사건 실행과 살펴보기는 스킬 없이 돈다(REQ13).
+        // 판정 plugin 이 깔린 설치 상태다. 깨우기와 켜기가 이 값을 다시 읽는다(REQ9).
+        when(connector.readConnector(anyString(), anyString())).thenReturn(installed(true));
         stub().willAnswer(command -> answer(nothingNewOutput()));
         when(connector.readCatalog()).thenReturn(List.of(manifest("none")));
         ConnectorCatalogTimes.expire();
@@ -106,6 +102,12 @@ abstract class EventWatchTestSupport extends ProactiveTestSupport {
         jdbc.update("DELETE FROM agent_connector_binding WHERE connection_id IN"
             + " (SELECT id FROM connector_connection WHERE user_id = ?)", user.id());
         jdbc.update("DELETE FROM connector_connection WHERE user_id = ?", user.id());
+    }
+
+
+    /** 그 profile 의 설치 상태다. {@code toolGuard} 가 거짓이면 옛 fos-ctx 나 옛 대시보드다. */
+    static HermesConnectorClient.ConnectorState installed(boolean toolGuard) {
+        return new HermesConnectorClient.ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND, null, toolGuard);
     }
 
 

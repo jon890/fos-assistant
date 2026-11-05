@@ -27,6 +27,23 @@ public interface ProactiveCheckRepository extends JpaRepository<ProactiveCheck, 
         Long conversationId, CheckTrigger trigger);
 
 
+    /** 그 루트 실행의 살펴보기가 그 계기인가. 도구 판정이 사건 실행 트리를 가린다(ADR-20261105 / event-watch). */
+    boolean existsByRootExecutionIdAndTrigger(Long rootExecutionId, CheckTrigger trigger);
+
+
+    /**
+     * 그 profile 의 에이전트로 그 계기와 상태의 살펴보기가 있는가. 도구 판정이 풀지 못한 session 을 막을지 정할 때, 그 profile 에서 사건
+     * 살펴보기가 도는지 본다(ADR-20261105 / event-watch).
+     */
+    @Query("""
+            select case when count(c) > 0 then true else false end
+              from ProactiveCheck c, Agent a
+             where a.id = c.agentId and a.hermesProfile = :profile and c.trigger = :trigger and c.status = :status
+            """)
+    boolean existsOnProfile(
+        @Param("profile") String profile, @Param("trigger") CheckTrigger trigger, @Param("status") CheckStatus status);
+
+
     /** 그 사용자가 그 시각 뒤에 그 계기로 연 살펴보기 수. 사건 실행을 하루 발화 상한에 넣을 때 센다. */
     long countByUserIdAndTriggerAndStartedAtAfter(Long userId, CheckTrigger trigger, Instant after);
 

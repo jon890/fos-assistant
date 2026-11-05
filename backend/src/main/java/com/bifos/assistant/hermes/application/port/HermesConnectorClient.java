@@ -25,6 +25,8 @@ public interface HermesConnectorClient {
      *
      * @param policyHook 그 profile 의 도구 호출이 정책 판정을 거치는가. 대시보드가 참이라고 답했을 때만 참이다
      * @param mode 설치 방식. {@link #MODE_BIND} 여야 한다
+     * @param toolGuard 그 profile 의 {@code fos-ctx} 가 사건 실행의 도구 판정을 하는 묶음과 같은가(ADR-20261105 / event-watch). 대시보드가
+     * 참이라고 답했을 때만 참이다. 옛 대시보드는 이 칸을 내지 않는다
      */
     record ConnectorState(
         String profile,
@@ -33,7 +35,30 @@ public interface HermesConnectorClient {
         boolean restartRequired,
         boolean policyHook,
         String mode,
-        JsonNode executionGuard) {
+        JsonNode executionGuard,
+        boolean toolGuard) {
+        /** 도구 판정을 모르는 상태다. {@code toolGuard} 는 거짓이다. */
+        public ConnectorState(
+            String profile,
+            boolean enabled,
+            boolean configured,
+            boolean restartRequired,
+            boolean policyHook,
+            String mode,
+            JsonNode executionGuard) {
+            this(profile, enabled, configured, restartRequired, policyHook, mode, executionGuard, false);
+        }
+
+
+        /**
+         * 그 profile 의 파일로 보아 사건 실행을 열 수 있는 설치인가. 켜졌고 설정됐고 정책 hook 과 도구 판정이 그 profile 에 있다. 떠 있는
+         * gateway 가 새 파일을 읽었는지는 알지 못한다. 재시작 대기는 Control Plane 의 바인딩 줄이 갖는다.
+         */
+        public boolean guardsEventRuns() {
+            return enabled && configured && policyHook && toolGuard && MODE_BIND.equals(mode);
+        }
+
+
         /** 기존 상태 생성자는 보호 지원이 없는 상태다. */
         public ConnectorState(
             String profile,

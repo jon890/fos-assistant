@@ -147,6 +147,27 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     boolean existsByHermesSessionIdOrHermesRootSessionId(String hermesSessionId, String hermesRootSessionId);
 
 
+    /**
+     * 그 session 이나 루트가 점검 대화의 것인가. 대화의 지금 session 과 루트, 그 profile 의 실행 줄이 적은 session 을 함께 본다. 점검
+     * 대화의 session 을 새로 연 뒤에도 옛 session 은 실행 줄에 남아서다. 도구 판정이 도는 실행 없는 호출을 막을지 정한다
+     * (ADR-20261105 / event-watch).
+     */
+    @Query("""
+            select case when count(c) > 0 then true else false end
+              from Conversation c
+             where c.purpose = :purpose
+               and (c.hermesSessionId in (:sessionId, :rootSessionId)
+                    or c.hermesRootSessionId in (:sessionId, :rootSessionId)
+                    or c.id in (select e.conversationId from AgentExecution e
+                                 where e.profileName = :profile and e.hermesSessionId in (:sessionId, :rootSessionId)))
+            """)
+    boolean existsSessionWithPurpose(
+        @Param("profile") String profile,
+        @Param("sessionId") String sessionId,
+        @Param("rootSessionId") String rootSessionId,
+        @Param("purpose") ConversationPurpose purpose);
+
+
     /** 보낼 session 을 채우고 {@code updatedAt} 을 올린다. session 이 null 이면 있던 값을 둔다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
     @Modifying
     @Query("update Conversation c set c.hermesSessionId = coalesce(:sessionId, c.hermesSessionId), c.updatedAt = :now where c.id = :id")

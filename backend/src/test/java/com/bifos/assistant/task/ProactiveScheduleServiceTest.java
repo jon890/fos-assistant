@@ -118,11 +118,11 @@ class ProactiveScheduleServiceTest {
 
 
     @Test
-    @DisplayName("격리 설정을 켜도 스킬이 없는 에이전트의 매일 깨우기 차단 사유는 유지한다")
+    @DisplayName("격리 설정을 켜도 준비 판정의 매일 깨우기 차단 사유는 유지한다")
     void retainsReadinessBlockerWhenIsolationIsConfirmed() {
         when(agents.requireStartable(user, "career")).thenReturn(agent);
         when(readiness.check(agent))
-            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING))));
+            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.DISABLED))));
 
         assertThat(service(true).schedulingAvailable(user, "career")).isFalse();
         verifyNoInteractions(toolsets);

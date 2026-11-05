@@ -39,7 +39,7 @@ upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조�
 | 「key 필수」 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_CONNECTOR_VAULT_KEY_REQUIRED` | `true` 면 key 를 쓸 수 없을 때 보관 파일 쓰기를 503 으로 거절한다. 비우거나 `false` 면 평문으로 쓰고 경고한다. 그 밖의 값은 켠 것으로 본다. 운영은 켠다 |
 | 스킬 루트 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SKILL_AGENT_ROOT` | |
 | 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |
-| 플러그인 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 플러그인을 설치한 profile 의 플러그인 도구를 모두 막는다 |
+| 플러그인 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 플러그인을 설치한 profile 의 플러그인 도구를 모두 막는다. 도구 판정 주소(`/internal/hermes/tool-guard`)도 이 값의 마지막 조각을 바꿔 만든다. 없으면 안전 목록 밖의 도구가 모든 profile 에서 막힌다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
 | 사진 원본을 조회할 주소 | gateway 프로세스의 환경 변수 `FOS_ATTACHMENT_INSPECT_URL` | Control Plane의 `/internal/hermes/attachment-inspect`다. 없으면 원본 도구가 명시한 실패를 반환한다. profile의 `fos-attachments` toolset을 함께 켠다 |
 

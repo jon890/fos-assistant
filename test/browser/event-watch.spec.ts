@@ -128,7 +128,7 @@ test("오늘 상한과 다시 연결 필요, 켜지 못하는 까닭을 보인�
       available: false,
       blockers: [
         { code: "EVENT_WATCH_ELSEWHERE", toolsets: [] },
-        { code: "ISOLATED_EXECUTION_REQUIRED", toolsets: ["terminal"] },
+        { code: "TOOL_GUARD_MISSING", toolsets: [] },
       ],
     }),
   ]);
@@ -150,9 +150,8 @@ test("오늘 상한과 다시 연결 필요, 켜지 못하는 까닭을 보인�
   await expect(blocked).toContainText(
     "같은 다른 메일 연결을 다른 에이전트가 이미 살펴보고 있어요.",
   );
-  await expect(blocked).toContainText("명령 실행 도구가 켜져 있어요.");
   await expect(blocked).toContainText(
-    "격리된 실행 공간이 준비되기 전에는 켤 수 없어요.",
+    "위험한 도구를 막는 장치가 아직 없어서 켤 수 없어요.",
   );
   expect(
     await page.evaluate(

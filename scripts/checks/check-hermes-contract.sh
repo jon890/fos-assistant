@@ -55,6 +55,9 @@ HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_hermes_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_hermes_runs_stream_contract.py' -v
+# 사건 실행의 도구 판정이 기대는 내장 도구 목록과 코드 실행 안의 session 없는 호출 지점이다(ADR-20261105 / event-watch).
+HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
+  python3 -I -m unittest discover -s hermes/tests -p 'test_tool_guard_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_bodyless_request_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \

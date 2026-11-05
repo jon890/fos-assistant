@@ -195,8 +195,10 @@ async def _connector_request(request):
             failure = _policy_hook_failure(profile_dir, config, state, drift)
             if failure is not None:
                 logger.warning("dashboard-profile-api: policy_hook 거짓 조건=%s", failure)
+            # `tool_guard` 는 그 profile 의 `fos-ctx` 가 사건 실행의 도구 판정을 하는 묶음과 같은가다. 이 묶음의 `fos-ctx` 는
+            # 늘 판정을 하므로 `policy_hook` 과 같은 값이다. 옛 대시보드는 이 칸을 내지 않아 Control Plane 이 거짓으로 읽는다.
             return JSONResponse({"profile": body["profile"], "connectors": connectors,
-                                 "policy_hook": failure is None}, status_code=200)
+                                 "policy_hook": failure is None, "tool_guard": failure is None}, status_code=200)
         response = {key: body[key] for key in ("profile", "plugin", "enabled", "bind") if key in body}
         if body["enabled"] and "bind" in body:
             # 붙이는 요청 안에서 보관 파일을 읽는다. 보관 파일 쓰기와 같은 잠금 안이라 그 사이에 바뀌지 않는다.

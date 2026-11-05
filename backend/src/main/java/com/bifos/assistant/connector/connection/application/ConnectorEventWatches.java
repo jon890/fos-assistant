@@ -40,7 +40,7 @@ public class ConnectorEventWatches {
      * 사건 감지를 켠다. 같은 연결의 바인딩을 모두 잠근 뒤 다른 바인딩이 켜져 있거나, 바인딩이 쓸 수 없거나, 조회 도구가 승인 없이 불리지 않으면
      * {@code PROACTIVE_CHECK_UNAVAILABLE} 로 거절한다. 이미 켜져 있으면 시간대만 바꾸고 지점과 셈은 그대로 둔다.
      *
-     * <p>막는 toolset 판정은 {@code EventWatchService} 가 트랜잭션 밖에서 이 메서드 앞에 한다.
+     * <p>준비 판정과 판정 plugin 확인은 {@code EventWatchService} 가 트랜잭션 밖에서 이 메서드 앞에 한다.
      */
     @Transactional
     public EventWatchState enable(Long userId, Long agentId, String connectorId, ZoneId zone, Instant now) {
@@ -82,6 +82,16 @@ public class ConnectorEventWatches {
                     .anyMatch(other -> !other.id().equals(binding.id()) && other.eventWatchEnabled()),
                 binding.eventWatchState()))
             .toList();
+    }
+
+
+    /**
+     * 그 에이전트의 바인딩 가운데 gateway 재시작을 기다리는 것이 있는가(ADR-20261105 / event-watch). 어느 바인딩의 설치든 그 profile 의
+     * {@code fos-ctx} 파일을 바꾸면 떠 있는 gateway 가 옛 코드를 쥐고 있을 수 있다. 대시보드의 설치 상태는 파일만 보므로 이 줄로 가린다.
+     */
+    @Transactional(readOnly = true)
+    public boolean restartPending(Long agentId) {
+        return bindings.findByAgentId(agentId).stream().anyMatch(ConnectorBinding::restartRequired);
     }
 
 

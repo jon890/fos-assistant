@@ -171,9 +171,24 @@ class EventWatchPollerTest extends EventWatchTestSupport {
 
 
     @Test
-    @DisplayName("격리 실행 공간 설정이 꺼진 동안 셸 toolset 이 켜진 에이전트는 깨우지 않고 지점을 둔다 (REQ9)")
-    void shellToolsetBlocksWithoutIsolation() throws InterruptedException {
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "terminal"));
+    @DisplayName("셸·파일·코드 실행·위임 toolset 이 켜진 메인 에이전트도 스킬 없이 깨운다 (REQ9, REQ10, REQ13)")
+    void mainAgentWithDangerousToolsetsStillWakes() throws InterruptedException {
+        when(toolsets.readEnabled(anyString(), anyString()))
+            .thenReturn(List.of("web", "terminal", "file", "code_execution", "delegation", "browser", "connections"));
+        listing("m1");
+
+        ProactiveCheck check = wakeOnce();
+
+        assertThat(check.trigger()).isEqualTo(CheckTrigger.EVENT);
+        assertThat(state().lastResult()).isEqualTo(EventWatchResult.WOKE);
+        assertThat(stub().received().getLast().input()).doesNotContain("skill_view(name=\"proactive-check\")");
+    }
+
+
+    @Test
+    @DisplayName("판정 plugin 이 없거나 설치 상태를 읽지 못하면 깨우지 않고 지점을 둔다 (REQ9)")
+    void missingToolGuardBlocksWaking() throws InterruptedException {
+        when(connector.readConnector(anyString(), anyString())).thenReturn(installed(false));
         listing("m1");
 
         poller.checkAll();
@@ -182,21 +197,29 @@ class EventWatchPollerTest extends EventWatchTestSupport {
         assertThat(state().lastResult()).isEqualTo(EventWatchResult.BLOCKED);
         assertThat(state().checkpoint()).isEqualTo(BASE);
         assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
+
+        when(connector.readConnector(anyString(), anyString())).thenThrow(new IllegalStateException());
+        clock.set(clock.instant().plus(Duration.ofMinutes(15)));
+        poller.checkAll();
+        awaitIdle();
+        assertThat(state().lastResult()).isEqualTo(EventWatchResult.BLOCKED);
+        assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
     }
 
 
     @Test
-    @DisplayName("쓰기 허용 에이전트도 사건 실행은 읽기 경계의 toolset 목록으로 판정한다")
-    void writesAllowedAgentStillNeedsReadOnlyToolsets() throws InterruptedException {
-        agent.changeProactiveCheckWritesAllowed(true);
-        agents.save(agent);
-        when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "browser"));
+    @DisplayName("그 에이전트의 바인딩이 gateway 재시작을 기다리면 파일이 새 판이어도 깨우지 않는다 (REQ9)")
+    void restartPendingBindingBlocksWaking() throws InterruptedException {
+        // 같은 profile 의 다른 설치가 fos-ctx 를 바꿔 떠 있는 gateway 가 옛 코드를 쥘 수 있는 상태다.
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = TRUE WHERE id = ?", binding.id());
         listing("m1");
 
         poller.checkAll();
         awaitIdle();
 
         assertThat(state().lastResult()).isEqualTo(EventWatchResult.BLOCKED);
+        assertThat(state().checkpoint()).isEqualTo(BASE);
+        assertThat(count("SELECT COUNT(*) FROM proactive_check WHERE user_id = ?")).isZero();
     }
 
 

@@ -185,6 +185,13 @@ public enum ErrorCode {
      * 그 호출을 막는다. 근거는 ADR-049 이다.
      */
     CONNECTOR_POLICY_REJECTED(HttpStatus.FORBIDDEN),
+    /**
+     * 도구 판정 요청을 믿을 수 없다.
+     *
+     * <p>본문의 모양과 서명 중 무엇이 틀렸는지 밖에 알리지 않는다. hook 은 이 답을 받으면 그 호출을 막는다. 404 가 아니어야 한다.
+     * hook 이 404 를 판정 경로가 없는 옛 Control Plane 으로 읽기 때문이다(ADR-20261105 / event-watch).
+     */
+    TOOL_GUARD_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
     SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
     /** 그 에이전트의 지금 버전 디렉터리에 그 이름의 올린 스킬이 없다. */

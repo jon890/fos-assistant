@@ -3,15 +3,10 @@ import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 
 const AGENT_CODE = "browser";
-const SKILL_NAME = "proactive-check";
 const START_NOTICE = "먼저 살펴보기를 시작했어요";
 
 function section(page: Page) {
   return page.getByRole("region", { name: "먼저 살펴보기", exact: true });
-}
-
-function skillMd(): string {
-  return `---\nname: ${SKILL_NAME}\ndescription: 살펴볼 것을 정해요\n---\n# 먼저 살펴보기\n\n읽기만 해요.\n`;
 }
 
 function reportOutput(): string {
@@ -64,26 +59,15 @@ async function deleteCheckConversation(page: Page) {
     await page.request.delete(`/api/chat/conversations/${conversationId}`);
 }
 
-/** 살펴보기 스킬을 올리고 허용된 도구만 켠다. `extraTools` 는 허용 목록 밖의 도구다. */
+/** 허용된 도구만 켠다. 분야 지침 스킬은 올리지 않는다. 살펴보기는 스킬 없이 돈다. `extraTools` 는 허용 목록 밖의 도구다. */
 async function prepare(page: Page, extraTools: string[] = []) {
   await deleteCheckConversation(page);
-  const uploaded = await page.request.put(
-    `/api/agents/${AGENT_CODE}/skills/${SKILL_NAME}`,
-    {
-      data: { skillMd: skillMd(), files: [] },
-    },
-  );
-  if (!uploaded.ok())
-    throw new Error(
-      `스킬을 올리지 못했다: ${uploaded.status()} ${await uploaded.text()}`,
-    );
   await putTools(page, ["skills", ...extraTools]);
 }
 
-/** 검사가 바꾼 도구와 스킬을 되돌리고 점검 대화를 지운다. */
+/** 검사가 바꾼 도구를 되돌리고 점검 대화를 지운다. */
 async function restore(page: Page) {
   await deleteCheckConversation(page);
-  await page.request.delete(`/api/agents/${AGENT_CODE}/skills/${SKILL_NAME}`);
   await putTools(page, []);
   await page.request.put(`/api/agents/${AGENT_CODE}/proactive-check/schedule`, {
     data: { enabled: false, time: "09:00", timezone: "Asia/Seoul" },

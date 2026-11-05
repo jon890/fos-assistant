@@ -9,7 +9,6 @@ import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
 import com.bifos.assistant.proactive.check.application.dto.CheckBlockerCode;
 import com.bifos.assistant.proactive.check.application.dto.CheckReadiness;
 import com.bifos.assistant.shared.config.LiveProperties;
-import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,8 +18,9 @@ import org.springframework.stereotype.Component;
 /**
  * 그 에이전트로 살펴보기를 시작할 수 있는지 판정한다(ADR-080).
  *
- * <p>까닭은 {@code docs/features/proactive.md} 의 「시작 전 점검」 순서대로 보고 걸린 것을 모두 모은다. 켜진 스킬과
- * toolset 을 읽다 Hermes 가 실패하면 그 예외를 그대로 올린다. 확인하지 못한 에이전트를 시작할 수 있다고 하지 않기 위해서다.
+ * <p>까닭은 {@code docs/features/proactive.md} 의 「시작 전 점검」 순서대로 보고 걸린 것을 모두 모은다. 켜진 toolset 을
+ * 읽다 Hermes 가 실패하면 그 예외를 그대로 올린다. 확인하지 못한 에이전트를 시작할 수 있다고 하지 않기 위해서다. 분야 지침 스킬은
+ * 보지 않는다(2026-11-05 사용자 결정, ADR-080 의 분야 지침 개정).
  *
  * <p>그 에이전트에 붙은 커넥터 MCP 서버(ADR-083)는 쓰기 허용과 상관없이 받는다. 그 서버의 도구는 Control Plane 이 호출마다 판정해
  * 읽기만 하는 살펴보기에서는 읽기 도구만, 쓰기를 허용한 살펴보기에서는 나머지를 승인 카드로 보내므로 읽기 경계를 깨지 않는다. 붙지
@@ -43,20 +43,10 @@ public class ProactiveCheckReadiness {
      */
     static final Set<String> ALWAYS_BLOCKED_TOOLSETS = Set.of("delegation", "clarify", "cronjob");
 
-    /**
-     * 사건 실행(ADR-20261105 / event-watch)에 켜 둘 수 있는 toolset 이다. 쓰기 허용과 상관없이 읽기 경계의 목록을 쓴다. 외부인이 보낸
-     * 메일이 깨우는 사람 없는 실행이라 쓰기 허용 에이전트의 넓은 목록을 받지 않는다.
-     */
-    static final Set<String> EVENT_ALLOWED_TOOLSETS = ALLOWED_TOOLSETS;
-
-    /** 격리 실행 공간 설정이 켜졌을 때만 사건 실행에 받는 셸·파일·코드 실행 toolset 이다(ADR-086). */
+    /** 격리 실행 공간 설정이 켜졌을 때만 매일 깨우기에 받는 셸·파일·코드 실행 toolset 이다(ADR-085, ADR-086). */
     public static final Set<String> ISOLATION_REQUIRED_TOOLSETS = Set.of("terminal", "file", "code_execution");
 
-    /** 무엇을 읽고 무엇을 고를지 정하는 분야 지침 스킬의 이름이다. */
-    static final String SKILL_NAME = "proactive-check";
-
     private final LiveProperties<ProactiveCheckProperties> properties;
-    private final SkillCommandCatalog skills;
     private final HermesToolsetClient toolsets;
     private final AgentConnectorBindings connectorBindings;
 
@@ -65,9 +55,6 @@ public class ProactiveCheckReadiness {
         List<CheckBlocker> blockers = new ArrayList<>();
         if (!properties.current().enabled()) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
-        }
-        if (!skills.enabledNames(agent).contains(SKILL_NAME)) {
-            blockers.add(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING));
         }
         boolean writesAllowed = agent.proactiveCheckWritesAllowed();
         Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
@@ -84,32 +71,14 @@ public class ProactiveCheckReadiness {
 
 
     /**
-     * 그 에이전트로 사건 실행을 열 수 있는지 판정한다(ADR-20261105 / event-watch). 분야 지침 스킬은 보지 않는다. 사건 실행은 지시와 입력의
-     * 「새 사건」 만으로 돈다.
-     *
-     * @param isolatedExecution 격리 실행 공간 설정이 켜졌는가. 꺼져 있으면 셸·파일·코드 실행 toolset 이 켜진 에이전트를
-     * {@code ISOLATED_EXECUTION_REQUIRED} 로 막는다
+     * 그 에이전트로 사건 실행을 열 수 있는지 판정한다(ADR-20261105 / event-watch). 설정 꺼짐만 본다. 켜 둔 toolset 으로 막지 않고,
+     * 사건 실행 트리의 위험한 도구 호출은 fos-ctx 의 도구 판정이 막는다. 그 plugin 이 profile 에 있는지는 부르는 쪽({@code task})이
+     * 설치 상태로 본다. Hermes 를 부르지 않는다.
      */
-    public CheckReadiness checkEvent(Agent agent, boolean isolatedExecution) {
+    public CheckReadiness checkEvent() {
         List<CheckBlocker> blockers = new ArrayList<>();
         if (!properties.current().enabled()) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
-        }
-        Set<String> connectorServers = connectorBindings.connectorServers(agent.id());
-        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-            .filter(name -> !connectorServers.contains(name) && !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
-            .distinct()
-            .sorted()
-            .toList();
-        List<String> shell = enabled.stream().filter(ISOLATION_REQUIRED_TOOLSETS::contains).toList();
-        List<String> notAllowed = enabled.stream()
-            .filter(name -> !EVENT_ALLOWED_TOOLSETS.contains(name) && !ISOLATION_REQUIRED_TOOLSETS.contains(name))
-            .toList();
-        if (!notAllowed.isEmpty()) {
-            blockers.add(new CheckBlocker(CheckBlockerCode.TOOLSETS_NOT_ALLOWED, notAllowed));
-        }
-        if (!isolatedExecution && !shell.isEmpty()) {
-            blockers.add(new CheckBlocker(CheckBlockerCode.ISOLATED_EXECUTION_REQUIRED, shell));
         }
         return new CheckReadiness(blockers);
     }

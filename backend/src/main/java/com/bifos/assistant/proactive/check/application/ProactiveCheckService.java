@@ -138,13 +138,12 @@ public class ProactiveCheckService {
      * 사건 감지가 새 항목으로 살펴보기를 연다(ADR-20261105 / event-watch). 계기는 {@code EVENT} 이고 에이전트의 쓰기 허용과 상관없이 읽기
      * 경계로 돈다. 점검 대화가 없으면 만든다. 바쁘면 {@code USER_BUSY} 나 {@code CONVERSATION_BUSY} 로 거절한다.
      *
-     * @param isolatedExecution 격리 실행 공간 설정이 켜졌는가
      * @param beforeRun 살펴보기 줄과 같은 트랜잭션에서 부른다. 확인 지점을 이 안에서 옮겨 둘이 어긋나지 않게 한다
      */
     public UUID startEvent(
-        CurrentUser user, String agentCode, EventBatch batch, boolean isolatedExecution, Consumer<ProactiveCheck> beforeRun) {
+        CurrentUser user, String agentCode, EventBatch batch, Consumer<ProactiveCheck> beforeRun) {
         Agent agent = agents.requireStartable(user, agentCode);
-        requireReady(readiness.checkEvent(agent, isolatedExecution));
+        requireReady(readiness.checkEvent());
         return open(user, agent, CheckTrigger.EVENT, beforeRun, batch);
     }
 

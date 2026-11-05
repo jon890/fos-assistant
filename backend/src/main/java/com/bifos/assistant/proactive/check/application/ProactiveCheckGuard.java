@@ -4,6 +4,8 @@ import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
+import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -31,6 +33,18 @@ public class ProactiveCheckGuard {
     /** 그 실행의 트리 루트가 살펴보기 turn 인가. */
     public boolean isCheckTree(AgentExecution execution) {
         return checks.existsByRootExecutionId(execution.treeRootId());
+    }
+
+
+    /** 그 실행의 트리 루트가 사건 살펴보기 turn 인가(ADR-20261105 / event-watch). 도구 판정이 위험한 도구를 막는 트리다. */
+    public boolean isEventTree(AgentExecution execution) {
+        return checks.existsByRootExecutionIdAndTrigger(execution.treeRootId(), CheckTrigger.EVENT);
+    }
+
+
+    /** 그 profile 의 에이전트로 도는 사건 살펴보기가 있는가. 도구 판정이 풀지 못한 session 을 그동안만 막는다. */
+    public boolean eventRunningOn(String profileName) {
+        return checks.existsOnProfile(profileName, CheckTrigger.EVENT, CheckStatus.RUNNING);
     }
 
 

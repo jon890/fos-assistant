@@ -364,7 +364,7 @@ class ProactiveCheckTurnTest {
 
 
     @Test
-    @DisplayName("Hermes 에 보낸 명령이 Control Plane 지시와 지침 읽기 문장과 감싼 최근 발견을 싣는다")
+    @DisplayName("Hermes 에 보낸 명령이 Control Plane 지시와 공통 지침, 감싼 최근 발견을 싣고 분야 지침 스킬을 읽게 하지 않는다 (REQ13)")
     void sendsInstructionsAndInputWithWrappedRecentFindings() {
         stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
         runCheck();
@@ -383,9 +383,15 @@ class ProactiveCheckTurnTest {
             .contains("- suggestions: 배열, 5개까지")
             .contains("suggestions 의 한 칸:")
             .contains("- detail: JSON 객체")
-            .contains("외부에 쓰는 일은 승인 카드로만 간다");
+            .contains("외부에 쓰는 일은 승인 카드로만 간다")
+            .as("스킬이 주던 공통 지침")
+            .contains("매번 무엇을 조사할지 입력의 맥락")
+            .contains("원문을 열어 확인한 것만 facts 에 사실로 적는다")
+            .contains("문제 후보는 사용자의 목표나 맥락과 이어지고 이번 발견이 근거인 것만 낸다")
+            .doesNotContain("분야 지침");
         assertThat(second.input())
-            .contains("skill_view(name=\"proactive-check\")")
+            .doesNotContain("skill_view(name=\"proactive-check\")")
+            .contains("Control Plane 지시대로 살펴본다")
             .contains("<external-data>")
             .contains("</external-data>");
         String wrapped = second.input().substring(second.input().indexOf("<external-data>"));

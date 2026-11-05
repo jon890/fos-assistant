@@ -16,6 +16,8 @@ public record EventWatchBlocker(String code, List<String> toolsets) {
     public static final String EVENT_TOOL_NOT_ALLOWED = "EVENT_TOOL_NOT_ALLOWED";
     /** 연결이나 바인딩이 쓸 수 있는 상태가 아니다. */
     public static final String CONNECTION_NOT_READY = "CONNECTION_NOT_READY";
+    /** 그 profile 에 사건 실행의 도구 판정을 하는 {@code fos-ctx} 가 없거나 옛 버전이거나 재시작을 기다린다. */
+    public static final String TOOL_GUARD_MISSING = "TOOL_GUARD_MISSING";
     /** 같은 연결의 다른 에이전트가 사건 감지를 켰다. */
     public static final String EVENT_WATCH_ELSEWHERE = "EVENT_WATCH_ELSEWHERE";
 

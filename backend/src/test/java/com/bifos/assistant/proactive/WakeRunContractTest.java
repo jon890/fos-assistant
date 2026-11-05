@@ -3,7 +3,6 @@ package com.bifos.assistant.proactive;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -22,7 +21,6 @@ import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.skill.library.application.SkillCommandCatalog;
 import com.bifos.assistant.task.application.ProactiveScheduleService;
 import com.bifos.assistant.task.application.TaskFiring;
 import com.bifos.assistant.task.application.TaskRunRecovery;
@@ -37,13 +35,11 @@ import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,9 +76,6 @@ class WakeRunContractTest extends ProactiveTestSupport {
     HermesRunEventStream eventStream;
 
     @Autowired
-    SkillCommandCatalog skills;
-
-    @Autowired
     ProactiveScheduleService schedules;
 
     @Autowired
@@ -101,12 +94,6 @@ class WakeRunContractTest extends ProactiveTestSupport {
     ApplicationEventPublisher events;
 
     private final List<Long> scheduledUsers = new ArrayList<>();
-
-
-    @BeforeEach
-    void enableSkill() {
-        doReturn(Set.of("proactive-check")).when(skills).enabledNames(any(Agent.class));
-    }
 
 
     @AfterEach

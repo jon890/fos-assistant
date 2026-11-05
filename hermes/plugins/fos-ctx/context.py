@@ -14,6 +14,7 @@ CTX_VERSION = 1
 MAX_DEPTH = 16
 REGISTER_VERSION = "v1-subagent"
 POLICY_VERSION = "v1-connector-policy"
+GUARD_VERSION = "v1-tool-guard"
 
 
 def signing_key(token: str) -> str:
@@ -42,6 +43,12 @@ def sign_policy(key: str, hermes_tool: str, root_session_id: str, session_id: st
     """
     digest = hashlib.sha256(args_json.encode("utf-8")).hexdigest()
     message = "\n".join([POLICY_VERSION, hermes_tool, root_session_id, session_id, tool_call_id, digest])
+    return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def sign_tool_guard(key: str, hermes_tool: str, root_session_id: str, session_id: str, tool_call_id: str) -> str:
+    """도구 판정 질의의 서명을 소문자 16진수로 돌려준다. key 는 `sign` 과 같다."""
+    message = "\n".join([GUARD_VERSION, hermes_tool, root_session_id, session_id, tool_call_id])
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
