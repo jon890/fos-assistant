@@ -34,7 +34,6 @@ import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.proactive.check.application.port.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
-import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
@@ -310,7 +309,7 @@ public class ConnectorPolicyService {
                 return stored;
             });
             if (needsApproval) {
-                recordSurfaced(saved, origin, now);
+                recordSurfaced(saved, now);
             }
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽었을 때 줄이 있어야 한다.
             if (needsApproval && saved.conversationId() != null) {
@@ -329,16 +328,8 @@ public class ConnectorPolicyService {
     }
 
 
-    /** 승인 줄을 보인 판단 피드백 사건이다. 커밋한 뒤에 부르므로 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다. */
-    private void recordSurfaced(ConnectorAction saved, AgentExecution origin, Instant now) {
-        Long checkId;
-        try {
-            checkId = checkGuard.checkOf(origin).map(ProactiveCheck::id).orElse(null);
-        } catch (RuntimeException ex) {
-            // 기록은 관측용이다. 살펴보기를 읽지 못해도 승인 줄의 답과 사건을 막지 않는다.
-            log.warn("승인 줄의 살펴보기를 읽지 못했다 actionId={}", saved.publicId());
-            checkId = null;
-        }
+    /** 승인 줄을 보인 판단 피드백 사건이다. 커밋한 뒤에 부르므로 바로 남는다. */
+    private void recordSurfaced(ConnectorAction saved, Instant now) {
         feedback.record(FeedbackEntry.of(
             saved.userId(),
             FeedbackSubjectType.CONNECTOR_ACTION,
@@ -348,7 +339,6 @@ public class ConnectorPolicyService {
             now)
             .conversation(saved.conversationId())
             .originExecution(saved.originExecutionId())
-            .sourceCheck(checkId)
             .version(saved.argsSha256()));
     }
 

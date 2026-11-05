@@ -6,9 +6,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
-import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +16,7 @@ import org.springframework.stereotype.Component;
  * 끝난 살펴보기의 판단 피드백 사건을 남긴다(ADR-20261007 decision-feedback).
  *
  * <p>사용자가 연 살펴보기와 매일 깨우기는 검사한 보고를 남겼을 때만 {@code SURFACED} 다. 알릴 것이 없어 보고를 남기지 않은 침묵은 사건이
- * 아니다. 보고를 보이면 그 살펴보기의 「새로 알릴 것」 발견마다 {@code SURFACED} 도 남긴다. 자동 실행({@code AUTONOMY})은 사용자에게
- * 보이지 않으므로 실행 결과만 남긴다.
+ * 아니다.
  */
 @Component
 @RequiredArgsConstructor
@@ -27,7 +24,6 @@ public class CheckFeedback {
 
     private final DecisionFeedbackRecorder feedback;
     private final ProactiveCheckRepository checks;
-    private final CheckFindingReactions reactions;
     private final Clock clock;
 
 
@@ -40,20 +36,8 @@ public class CheckFeedback {
         if (check == null || check.status() == CheckStatus.RUNNING) {
             return;
         }
-        if (check.trigger() == CheckTrigger.AUTONOMY) {
-            boolean succeeded = check.status() == CheckStatus.SUCCEEDED && check.outcome() != CheckOutcome.INVALID_RESULT;
-            String reason = succeeded
-                ? null
-                : check.status() == CheckStatus.SUCCEEDED ? CheckOutcome.INVALID_RESULT.name() : check.errorCode();
-            feedback.record(entry(
-                check,
-                succeeded ? FeedbackEventType.EXECUTION_SUCCEEDED : FeedbackEventType.EXECUTION_FAILED)
-                    .reason(reason == null && !succeeded ? check.status().name() : reason));
-            return;
-        }
         if (check.report() != null) {
             feedback.record(entry(check, FeedbackEventType.SURFACED));
-            reactions.surfaced(check);
         }
     }
 
@@ -67,7 +51,6 @@ public class CheckFeedback {
             FeedbackActor.SYSTEM,
             clock.instant())
             .conversation(check.conversationId())
-            .originExecution(check.rootExecutionId())
-            .sourceCheck(check.id());
+            .originExecution(check.rootExecutionId());
     }
 }

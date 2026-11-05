@@ -13,6 +13,7 @@ import com.bifos.assistant.followup.application.dto.FollowUpProposalOutcome;
 import com.bifos.assistant.followup.application.dto.FollowUpSnapshot;
 import com.bifos.assistant.followup.application.dto.LegacySuggestion;
 import com.bifos.assistant.followup.application.dto.NewFollowUp;
+import com.bifos.assistant.followup.application.dto.RecentSuggestion;
 import com.bifos.assistant.followup.application.dto.SuggestedItem;
 import com.bifos.assistant.followup.application.dto.SuggestionOutcome;
 import com.bifos.assistant.followup.domain.FollowUp;
@@ -39,6 +40,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -264,6 +266,22 @@ public class FollowUpService {
     /** 옮긴 제안 줄의 공개 식별자를 {@code dedupe_key} 로 찾는다. 옮기지 않은 열쇠는 맵에 없다. */
     public Map<String, UUID> suggestionPublicIds(Long userId, Collection<String> dedupeKeys) {
         return suggestions.publicIdsOf(userId, dedupeKeys);
+    }
+
+
+    /**
+     * 그 사용자의 그 대화에서 {@code since} 뒤에 에이전트가 낸 줄을 최근 것부터 {@code limit} 개까지 낸다. 결과 블록의 제안과 실행이
+     * 제안한 할 일이다. 거절한 줄은 넣고 받아들이지 않은 채 만료한 줄은 뺀다. 먼저 살펴보기가 다음 입력에 싣는다.
+     */
+    @Transactional(readOnly = true)
+    public List<RecentSuggestion> recentSuggestions(
+        Long userId, Long conversationId, Instant since, Instant now, int limit) {
+        return followUps
+            .findRecentSuggestions(
+                userId, conversationId, since, now, FollowUpStatus.PROPOSED, PageRequest.ofSize(limit))
+            .stream()
+            .map(row -> new RecentSuggestion(row.publicId(), row.title(), row.status()))
+            .toList();
     }
 
 

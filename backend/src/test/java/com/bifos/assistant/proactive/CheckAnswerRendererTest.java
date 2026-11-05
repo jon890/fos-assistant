@@ -58,7 +58,7 @@ class CheckAnswerRendererTest {
 
     private String render(CheckResultBlock block) {
         List<JudgedFinding> judged = block.findings().stream()
-            .map(each -> FindingJudgement.judge(each, START, NOW, Set.of(), Set.of()))
+            .map(each -> FindingJudgement.judge(each, START, NOW, Set.of()))
             .toList();
         return renderer.render(block, judged);
     }
@@ -365,7 +365,7 @@ class CheckAnswerRendererTest {
     @DisplayName("제목이 없는 참고 발견도 그린다")
     void rendersReferenceWithoutTitle() {
         Finding untitled = finding(null, "https://example.com/a", "CLOSED");
-        JudgedFinding judged = FindingJudgement.judge(untitled, START, NOW, Set.of(), Set.of());
+        JudgedFinding judged = FindingJudgement.judge(untitled, START, NOW, Set.of());
 
         String rendered = renderer.render(block(null, List.of(untitled), List.of(), List.of(), List.of()), List.of(judged));
 

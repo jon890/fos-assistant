@@ -25,7 +25,6 @@ public record FeedbackEntry(
     FeedbackActor actor,
     Long conversationId,
     Long originExecutionId,
-    Long sourceCheckId,
     String subjectVersion,
     String reasonCode,
     List<String> changedFields,
@@ -59,7 +58,6 @@ public record FeedbackEntry(
             null,
             null,
             null,
-            null,
             List.of(),
             occurredAt);
     }
@@ -83,7 +81,6 @@ public record FeedbackEntry(
             null,
             null,
             null,
-            null,
             List.of(),
             occurredAt);
     }
@@ -98,7 +95,6 @@ public record FeedbackEntry(
             actor,
             id,
             originExecutionId,
-            sourceCheckId,
             subjectVersion,
             reasonCode,
             changedFields,
@@ -114,24 +110,6 @@ public record FeedbackEntry(
             eventType,
             actor,
             conversationId,
-            id,
-            sourceCheckId,
-            subjectVersion,
-            reasonCode,
-            changedFields,
-            occurredAt);
-    }
-
-
-    public FeedbackEntry sourceCheck(Long id) {
-        return new FeedbackEntry(
-            userId,
-            subjectType,
-            subjectKey,
-            eventType,
-            actor,
-            conversationId,
-            originExecutionId,
             id,
             subjectVersion,
             reasonCode,
@@ -149,7 +127,6 @@ public record FeedbackEntry(
             actor,
             conversationId,
             originExecutionId,
-            sourceCheckId,
             version,
             reasonCode,
             changedFields,
@@ -166,7 +143,6 @@ public record FeedbackEntry(
             actor,
             conversationId,
             originExecutionId,
-            sourceCheckId,
             subjectVersion,
             code,
             changedFields,
@@ -183,7 +159,6 @@ public record FeedbackEntry(
             actor,
             conversationId,
             originExecutionId,
-            sourceCheckId,
             subjectVersion,
             reasonCode,
             fields,

@@ -3,12 +3,15 @@ package com.bifos.assistant.feedback.application;
 import com.bifos.assistant.feedback.application.dto.ControlEntry;
 import com.bifos.assistant.feedback.application.dto.ReactionRecord;
 import com.bifos.assistant.feedback.domain.FeedbackEvent;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link DecisionFeedbackRecorder} 와 달리 부르는 쪽의 트랜잭션 안에서 바로 저장하고 실패를 삼키지 않는다. 숨김과 미루기의 현재값을
  * 이 기록의 마지막 제어 사건에서 구하므로, 기록하지 못했으면 부르는 쪽의 동작도 실패해야 한다. 같은 {@code event_key} 가 이미 있으면
  * 넣지 않고 {@code false} 를 낸다. 동시에 같은 열쇠가 들어오면 유일 제약이 한쪽을 거절해 예외가 부르는 쪽으로 간다.
+ *
+ * <p>먼저 살펴보기가 다음 입력에 싣는 제안의 마지막 사용자 반응도 이 기록에서 읽는다({@link #lastUserReactions}).
  */
 @Component
 @RequiredArgsConstructor
@@ -84,6 +89,26 @@ public class ReactionLedger {
     @Transactional(readOnly = true)
     public Set<String> existingKeys(Long userId, Collection<String> eventKeys) {
         return eventKeys.isEmpty() ? Set.of() : new HashSet<>(events.findEventKeys(userId, eventKeys));
+    }
+
+
+    /**
+     * 열쇠마다 그 사용자가 남긴 마지막 사건 종류다. {@code types} 에 든 종류만 보고, 그 종류의 사용자 사건이 없는 열쇠는 맵에 없다. 먼저
+     * 살펴보기가 최근 제안의 마지막 반응을 입력에 싣는다.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, FeedbackEventType> lastUserReactions(
+        Long userId, Collection<String> subjectKeys, Collection<FeedbackEventType> types) {
+        if (subjectKeys.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, FeedbackEventType> last = new HashMap<>();
+        for (FeedbackEvent event : events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(userId, subjectKeys)) {
+            if (event.actor() == FeedbackActor.USER && types.contains(event.eventType())) {
+                last.put(event.subjectKey(), event.eventType());
+            }
+        }
+        return last;
     }
 
 

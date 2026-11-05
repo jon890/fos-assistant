@@ -38,7 +38,6 @@ import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckSkippedReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.domain.type.FindingReason;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -222,11 +221,11 @@ class CareerDailyPilotTest {
         // 1일: 새 포지션을 찾는다.
         answerWith(command -> result(positionFindings(null)));
         ProactiveCheck first = wake(1);
-        assertThat(first.newFindings()).as("1일 새 발견").isEqualTo(1);
         assertThat(first.report()).as("1일 보고").isNotNull();
+        assertThat(first.report().announced()).as("1일 새 발견").hasSize(1);
         assertThat(first.report().evidence()).containsExactly(POSITION_URL);
         HermesRunCommand firstCommand = stub().received().getLast();
-        assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근에 알린 발견이 없다.");
+        assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근 보고에서 알린 것이 없다.");
         assertThat(firstCommand.instructions())
             .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
             .contains("- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다.")
@@ -266,13 +265,11 @@ class CareerDailyPilotTest {
             .contains("- 지난 살펴보기: " + first.finishedAt())
             .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
             .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
-            .contains("[position] " + POSITION_KEY)
+            .contains("- " + POSITION_KEY + " · ")
             .contains("그 뒤 사용자 메시지 1개");
         assertThat(thirdCommand.sessionId()).as("같은 점검 대화 session").isEqualTo(firstCommand.sessionId());
-        assertThat(third.newFindings()).isZero();
-        assertThat(third.referenceFindings()).isEqualTo(1);
         assertThat(third.report()).as("되풀이만 있으면 보고를 만들지 않는다").isNull();
-        assertThat(findingsOf(third)).extracting(ProactiveCheckFinding::reason).containsExactly(FindingReason.REPEATED);
+        assertThat(findingsOf(third)).as("발견 테이블에 쓰지 않는다").isEmpty();
         assertThat(lastMessage(third).content()).as("3일 뒤 마지막 메시지").isEqualTo(FEEDBACK);
 
         // 사용자가 Memory 제안을 받아들인다.
@@ -304,7 +301,7 @@ class CareerDailyPilotTest {
         assertThat(runsOfAgent()).as("끈 뒤 발화 줄").hasSize(5);
         assertThat(stub().received()).hasSize(submittedBeforeOff);
 
-        // 지표: 깨우기 5번, 모델 4번, 메시지 2번, 침묵 2번, 건너뛰기 1번, 되풀이 억제 1번, 출처 장애 1번.
+        // 지표: 깨우기 5번, 모델 4번, 메시지 2번, 침묵 2번, 건너뛰기 1번, 출처 장애 1번. 되풀이 억제는 3일 단언이 본다.
         List<ProactiveCheck> all = checksOfAgent();
         assertThat(runsOfAgent()).as("wake count").hasSize(5);
         assertThat(all.stream().filter(check -> check.skippedReason() == null))
@@ -319,9 +316,6 @@ class CareerDailyPilotTest {
                 && check.report() == null))
                     .as("silence count")
                     .hasSize(2);
-        assertThat(all.stream().filter(check -> check.referenceFindings() > 0 && check.report() == null))
-            .as("되풀이를 억제한 깨우기")
-            .hasSize(1);
         assertThat(messagesOf(first).stream().filter(message -> message.role() == MessageRole.ASSISTANT))
             .as("점검 대화의 답")
             .hasSize(2);
@@ -397,12 +391,7 @@ class CareerDailyPilotTest {
         ProactiveCheck check = ProactiveCheck.started(userId, agentId, conversationId, CheckTrigger.SCHEDULED, false, ENABLED_AT);
         check.succeed(
             CheckOutcome.FINDINGS,
-            1,
-            0,
             new CheckReport(List.of("새 포지션"), List.of(), List.of(POSITION_URL), List.of(), List.of()),
-            0,
-            0,
-            0,
             0,
             0,
             ENABLED_AT.plusSeconds(60));

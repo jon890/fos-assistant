@@ -8,6 +8,10 @@ import com.bifos.assistant.proactive.check.application.CheckResultParser;
 import com.bifos.assistant.proactive.check.application.FindingJudgement;
 import com.bifos.assistant.proactive.check.application.dto.CheckResultBlock;
 import com.bifos.assistant.proactive.check.application.dto.JudgedFinding;
+import com.bifos.assistant.proactive.check.domain.type.ProblemDropReason;
+import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
+import com.bifos.assistant.proactive.check.domain.ReportedFinding;
+import com.bifos.assistant.proactive.check.application.dto.JudgedProblem;
 import com.bifos.assistant.proactive.check.domain.CheckReport;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.FindingKind;
@@ -47,7 +51,7 @@ class CheckReportFactoryTest {
             judged("https://example.com/c"),
             judged("https://example.com/d"));
 
-        CheckReport report = factory.create(block, judged, 31L);
+        CheckReport report = factory.create(block, judged, List.of(), 31L);
 
         assertThat(report.changed()).containsExactly("바뀜");
         assertThat(report.done()).containsExactly("확인");
@@ -80,14 +84,45 @@ class CheckReportFactoryTest {
                 """).block();
         Instant now = Instant.parse("2026-10-05T00:00:00Z");
         List<JudgedFinding> judged = block.findings().stream()
-            .map(finding -> FindingJudgement.judge(finding, now, now, Set.of(), Set.of()))
+            .map(finding -> FindingJudgement.judge(finding, now, now, Set.of()))
             .toList();
 
-        CheckReport report = new CheckReportFactory(rootId -> List.of()).create(block, judged, null);
+        CheckReport report = new CheckReportFactory(rootId -> List.of()).create(block, judged, List.of(), null);
 
         assertThat(report.changed()).containsExactly("새 소식");
         assertThat(report.done()).containsExactly("원문을 확인했어요");
         assertThat(report.next()).containsExactly("조건 확인");
         assertThat(report.evidence()).containsExactly("https://example.com/new");
+    }
+
+
+    @Test
+    @DisplayName("보고는 주제 키가 있는 새로 알릴 발견과 받아들인 문제 키만 판정 재료로 담는다")
+    void keepsAnnouncedFindingsAndAcceptedProblemKeys() {
+        CheckResultBlock block = new CheckResultBlock(
+            3, CheckOutcome.FINDINGS, null, List.of(), List.of(), List.of(), List.of(), null, List.of());
+        CheckResultBlock.Finding withTopic = new CheckResultParser().read("""
+                <fos-check-result>
+                {"version":1,"outcome":"FINDINGS","findings":[{"topicKey":"trend:a","title":"알린 소식"}]}
+                </fos-check-result>
+                """).block().findings().getFirst();
+        CheckResultBlock.Finding withoutTopic = new CheckResultParser().read("""
+                <fos-check-result>
+                {"version":1,"outcome":"FINDINGS","findings":[{"title":"주제 키 없는 소식"}]}
+                </fos-check-result>
+                """).block().findings().getFirst();
+        List<JudgedFinding> judged = List.of(
+            new JudgedFinding(withTopic, FindingKind.NEW, null, "https://example.com/a", null),
+            new JudgedFinding(withoutTopic, FindingKind.NEW, null, "https://example.com/b", null),
+            new JudgedFinding(withTopic, FindingKind.REFERENCE, FindingReason.REPEATED, "https://example.com/c", null));
+        List<JudgedProblem> problems = List.of(
+            new JudgedProblem(null, "trend:accepted", ProblemStatus.ACCEPTED, null, List.of(), null),
+            new JudgedProblem(null, "trend:accepted", ProblemStatus.ACCEPTED, null, List.of(), null),
+            new JudgedProblem(null, "trend:dropped", ProblemStatus.DROPPED, ProblemDropReason.DUPLICATE, List.of(), null));
+
+        CheckReport report = new CheckReportFactory(rootId -> List.of()).create(block, judged, problems, null);
+
+        assertThat(report.announced()).containsExactly(new ReportedFinding("trend:a", "https://example.com/a", "알린 소식"));
+        assertThat(report.acceptedProblemKeys()).containsExactly("trend:accepted");
     }
 }

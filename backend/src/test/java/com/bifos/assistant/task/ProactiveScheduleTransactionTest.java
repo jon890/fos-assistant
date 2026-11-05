@@ -165,8 +165,8 @@ class ProactiveScheduleTransactionTest {
         assertThat(runs.findById(queued.id()).orElseThrow())
             .extracting(TaskRun::status, TaskRun::reason, TaskRun::proactiveCheckId)
             .containsExactly(TaskRunStatus.SKIPPED, TaskRunReason.PAUSED, null);
-        assertThat(checks.findFirstByUserIdAndAgentIdOrderByIdDesc(
-            fixture.owner().id(), fixture.agent().id()))
+        assertThat(checks.findAll().stream()
+            .filter(check -> check.userId().equals(fixture.owner().id()) && check.agentId().equals(fixture.agent().id())))
                 .isEmpty();
     }
 

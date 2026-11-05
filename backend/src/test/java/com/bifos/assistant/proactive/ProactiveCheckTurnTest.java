@@ -34,21 +34,19 @@ import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.RunEvent;
 import com.bifos.assistant.hermes.domain.TokenUsage;
-import com.bifos.assistant.proactive.check.application.CheckFindingReactions;
+import com.bifos.assistant.followup.application.FollowUpService;
+import com.bifos.assistant.followup.domain.FollowUp;
+import com.bifos.assistant.followup.infra.FollowUpRepository;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckService;
-import com.bifos.assistant.proactive.check.application.dto.FindingReaction;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckFinding;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheckProblem;
+import com.bifos.assistant.proactive.check.domain.ReportedFinding;
 import com.bifos.assistant.proactive.check.domain.type.CheckInvalidReason;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckStatus;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.domain.type.FindingKind;
-import com.bifos.assistant.proactive.check.domain.type.FindingReason;
-import com.bifos.assistant.proactive.check.domain.type.ProblemDropReason;
-import com.bifos.assistant.proactive.check.domain.type.ProblemStatus;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
@@ -64,6 +62,7 @@ import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -77,6 +76,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -140,7 +140,13 @@ class ProactiveCheckTurnTest {
     ProactiveCheckProblemRepository problems;
 
     @Autowired
-    CheckFindingReactions reactions;
+    FollowUpService followUps;
+
+    @Autowired
+    FollowUpRepository followUpRows;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     TransactionTemplate transactions;
@@ -210,6 +216,9 @@ class ProactiveCheckTurnTest {
             .filter(event -> ownExecutions.stream()
                 .anyMatch(execution -> execution.id().equals(event.executionId())))
             .toList());
+        followUpRows.deleteAll(followUpRows.findAll().stream()
+            .filter(row -> row.userId().equals(owner.id()))
+            .toList());
         executions.deleteAll(ownExecutions);
         transactions.executeWithoutResult(status -> {
             conversationIds.forEach(id -> messages.deleteAll(messages.findByConversationIdOrderByIdAsc(id)));
@@ -221,7 +230,7 @@ class ProactiveCheckTurnTest {
 
 
     @Test
-    @DisplayName("결과 블록이 든 답이면 시작 알림 줄과 그려진 답이 남고 살펴보기 줄과 발견 줄이 생긴다")
+    @DisplayName("결과 블록이 든 답이면 시작 알림 줄과 그려진 답이 남고 보고에 알린 발견이 담기며 발견 줄은 생기지 않는다")
     void leavesStartNoticeAndRenderedAnswerForFindings() {
         stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
 
@@ -243,16 +252,12 @@ class ProactiveCheckTurnTest {
         ProactiveCheck check = onlyCheckOf(conversation);
         assertThat(check.status()).isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(check.outcome()).isEqualTo(CheckOutcome.FINDINGS);
-        assertThat(check.newFindings()).isEqualTo(1);
-        assertThat(check.referenceFindings()).isZero();
         assertThat(check.rootExecutionId()).isEqualTo(answer.executionId());
         assertThat(check.finishedAt()).isNotNull();
-        List<ProactiveCheckFinding> saved = findingsOf(conversation);
-        assertThat(saved).hasSize(1);
-        assertThat(saved.getFirst().kind()).isEqualTo(FindingKind.NEW);
-        assertThat(saved.getFirst().topicKey()).isEqualTo(TOPIC_KEY);
-        assertThat(saved.getFirst().sourceUrl()).isEqualTo(SOURCE_URL);
-        assertThat(saved.getFirst().checkId()).isEqualTo(check.id());
+        assertThat(check.report().announced())
+            .as("다음 살펴보기의 되풀이 판정 재료")
+            .containsExactly(new ReportedFinding(TOPIC_KEY, SOURCE_URL, "Kafka 정확히 한 번 처리"));
+        assertThat(findingsOf(conversation)).as("발견 테이블에 쓰지 않는다").isEmpty();
     }
 
 
@@ -500,48 +505,70 @@ class ProactiveCheckTurnTest {
             .contains("- 지난 살펴보기: " + first.finishedAt())
             .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
             .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
-            .contains("[study] " + TOPIC_KEY + " · Kafka 정확히 한 번 처리 · " + SOURCE_URL)
-            .contains("그 뒤 사용자 메시지 1개 · 반응 없음");
+            .contains("- " + TOPIC_KEY + " · Kafka 정확히 한 번 처리 · " + SOURCE_URL + " · 알린 날 ")
+            .contains("그 뒤 사용자 메시지 1개");
         ChatMessage answer = messages.findByConversationIdOrderByIdAsc(conversation.id()).getLast();
         assertThat(answer.role()).isEqualTo(MessageRole.ASSISTANT);
         assertThat(answer.content()).contains("새로 알릴 것은 없어요").contains("이미 알린 것이에요");
         ProactiveCheck second = checksOf(conversation).getLast();
-        assertThat(second.newFindings()).isZero();
-        assertThat(second.referenceFindings()).isEqualTo(1);
         assertThat(second.report()).as("단추로 연 살펴보기는 되풀이만 있어도 보고를 남긴다").isNotNull();
-        assertThat(findingsOf(conversation))
-            .filteredOn(finding -> finding.checkId().equals(second.id()))
-            .extracting(ProactiveCheckFinding::reason)
-            .containsExactly(FindingReason.REPEATED);
+        assertThat(second.report().announced()).as("되풀이로 내린 발견은 알린 것으로 다시 담지 않는다").isEmpty();
+        assertThat(findingsOf(conversation)).isEmpty();
     }
 
 
     @Test
-    @DisplayName("관심 없음으로 반응한 발견의 주제는 다음 살펴보기 입력에 반응이 실리고 원문과 달라진 점이 새로워도 이미 알린 참고로 내려간다")
-    void dismissedFindingTopicIsCarriedAndMarkedRepeat() {
-        // 반응이 없으면 같은 topicKey 의 다른 sourceUrl 이나 changeSinceLast 가 있는 발견은 NEW 다. 그 대조는 FindingJudgementTest 의
-        // sameTopicKeyWithNewSourceUrlIsNew, repeatedWithChangeSinceLastIsNew 가 보인다.
-        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
+    @DisplayName("다음 살펴보기 입력은 그 대화의 거절한 제안과 반응을 싣고 만료한 제안과 다른 대화의 제안은 싣지 않는다")
+    void carriesRecentSuggestionsWithStatusAndReaction() {
+        stub().willAnswer(command -> answer(suggestionsBlock("거절할 제안", "그대로 둘 제안", "만료될 제안", "옮길 제안")));
         Conversation conversation = runCheck();
-        ProactiveCheckFinding announced = findingsOf(conversation).getFirst();
-        assertThat(announced.kind()).isEqualTo(FindingKind.NEW);
-        reactions.react(owner, announced.id(), FindingReaction.DISMISSED);
-        stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, "https://docs.example.test/kafka/exactly-once-v2", "새 버전 문서가 나왔다")));
+        followUps.reject(owner, suggestion("거절할 제안").publicId());
+        jdbc.update(
+            "UPDATE follow_up SET expires_at = ? WHERE id = ?",
+            Timestamp.from(Instant.now().minusSeconds(1)),
+            suggestion("만료될 제안").id());
+        Conversation elsewhere = conversations.save(Conversation.startedBy(owner.id(), "다른 대화", agent.id(), Instant.now()));
+        jdbc.update("UPDATE follow_up SET conversation_id = ? WHERE id = ?", elsewhere.id(), suggestion("옮길 제안").id());
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
 
         runCheck();
 
-        assertThat(stub().received().getLast().input()).contains(TOPIC_KEY).contains(" · 반응 관심 없음");
-        ProactiveCheck second = checksOf(conversation).getLast();
-        assertThat(findingsOf(conversation))
-            .filteredOn(finding -> finding.checkId().equals(second.id()))
-            .extracting(ProactiveCheckFinding::kind, ProactiveCheckFinding::reason)
-            .containsExactly(tuple(FindingKind.REFERENCE, FindingReason.REPEATED));
+        String input = stub().received().getLast().input();
+        String section = input.substring(input.indexOf("최근 제안\n"), input.indexOf("최근 보고에서 알린 것"));
+        assertThat(section)
+            .contains("<external-data>\n- ")
+            .contains("- 거절할 제안 · 거절함 · 반응 거절")
+            .contains("- 그대로 둘 제안 · 제안됨 · 반응 없음")
+            .doesNotContain("만료될 제안")
+            .doesNotContain("옮길 제안");
     }
 
 
     @Test
-    @DisplayName("버전 3의 문제 후보는 검사해 받아들인 것과 버린 것을 모두 남기고 답에는 그리지 않는다")
-    void savesJudgedProblemCandidatesWithoutRenderingThem() {
+    @DisplayName("입력의 최근 제안 절은 digest-max-items 줄까지 최근 것부터 싣는다")
+    void capsRecentSuggestionsAtDigestMaxItems() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+        Conversation conversation = runCheck();
+        Long rootExecutionId = onlyCheckOf(conversation).rootExecutionId();
+        // 살펴보기 turn 이 follow_up_propose 로 낸 줄과 같은 모양이다. 기본 상한 20 보다 하나 많다.
+        for (int i = 1; i <= 21; i++) {
+            String title = "도구로 낸 제안 " + i;
+            followUpRows.save(FollowUp.proposed(
+                owner.id(), conversation.id(), rootExecutionId, title, FollowUpService.titleKey(title), null, false, Instant.now()));
+        }
+
+        runCheck();
+
+        String input = stub().received().getLast().input();
+        String section = input.substring(input.indexOf("최근 제안\n"), input.indexOf("최근 보고에서 알린 것"));
+        assertThat(section.lines().filter(line -> line.startsWith("- "))).hasSize(20);
+        assertThat(section).contains("- 도구로 낸 제안 21 · 제안됨 · 반응 없음").doesNotContain("- 도구로 낸 제안 1 ·");
+    }
+
+
+    @Test
+    @DisplayName("버전 3의 문제 후보는 검사해 받아들인 문제 키만 보고에 담고 답에 그리지 않으며 문제 후보 줄은 생기지 않는다")
+    void keepsAcceptedProblemKeysInReportWithoutRenderingThem() {
         stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, true)));
 
         Conversation conversation = runCheck();
@@ -553,25 +580,13 @@ class ProactiveCheckTurnTest {
             .doesNotContain(PROBLEM_KEY)
             .doesNotContain("목표 없는 관찰");
         ProactiveCheck check = onlyCheckOf(conversation);
-        List<ProactiveCheckProblem> saved = problemsOf(conversation);
-        assertThat(saved)
-            .extracting(ProactiveCheckProblem::status)
-            .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
-        ProactiveCheckProblem accepted = saved.getFirst();
-        assertThat(accepted.checkId()).isEqualTo(check.id());
-        assertThat(accepted.problemKey()).isEqualTo(PROBLEM_KEY);
-        assertThat(accepted.problem()).isEqualTo(PROBLEM_TEXT);
-        assertThat(accepted.actionType()).isEqualTo("ACTION");
-        assertThat(accepted.evidence()).hasSize(1);
-        assertThat(accepted.evidence().getFirst().topicKey()).isEqualTo(TOPIC_KEY);
-        assertThat(accepted.evidence().getFirst().sourceUrl()).isEqualTo(SOURCE_URL);
-        assertThat(accepted.evidenceCheckedAt()).isNotNull();
-        assertThat(saved.getLast().dropReason()).isEqualTo(ProblemDropReason.NO_GOAL);
+        assertThat(check.report().acceptedProblemKeys()).as("목표 없는 관찰 후보는 버린다").containsExactly(PROBLEM_KEY);
+        assertThat(problemsOf(conversation)).as("문제 후보 테이블에 쓰지 않는다").isEmpty();
     }
 
 
     @Test
-    @DisplayName("다음 살펴보기는 받아들인 문제 후보를 감싸 싣고, 같은 문제 키를 다시 내면 중복으로 버린다")
+    @DisplayName("다음 살펴보기는 보고의 받아들인 문제 키를 감싸 싣고, 같은 문제 키를 다시 내면 중복으로 버린다")
     void secondCheckCarriesAcceptedProblemsAndDropsDuplicate() {
         stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
         Conversation conversation = runCheck();
@@ -579,19 +594,16 @@ class ProactiveCheckTurnTest {
         runCheck();
 
         String input = stub().received().getLast().input();
-        String wrapped = input.substring(input.indexOf("최근에 받아들인 문제 후보"));
-        assertThat(wrapped).contains("<external-data>").contains("- " + PROBLEM_KEY + " · " + PROBLEM_TEXT);
+        String wrapped = input.substring(input.indexOf("최근 보고에서 알린 것"));
+        assertThat(wrapped).contains("<external-data>").contains("- 받아들인 문제 키 · " + PROBLEM_KEY + " · 알린 날 ");
         ProactiveCheck second = checksOf(conversation).getLast();
-        assertThat(problemsOf(conversation))
-            .filteredOn(problem -> problem.checkId().equals(second.id()))
-            .extracting(ProactiveCheckProblem::dropReason)
-            .containsExactly(ProblemDropReason.DUPLICATE);
+        assertThat(second.report().acceptedProblemKeys()).as("같은 문제 키는 중복으로 버린다").isEmpty();
     }
 
 
     @Test
-    @DisplayName("예약 살펴보기는 되풀이 발견의 새 문제 후보를 저장하면서 답과 보고는 남기지 않는다")
-    void savesProblemFromRepeatedFindingWithoutScheduledReport() {
+    @DisplayName("예약 살펴보기가 이미 알린 발견만 다시 내면 답과 보고 없이 끝나고 다음 예약 살펴보기는 읽지 않은 보고로 건너뛰지 않는다")
+    void scheduledRepeatEndsQuietlyAndDoesNotBlockNextWake() {
         stub().willAnswer(command -> answer(problemBlock(PROBLEM_KEY, null, false)));
         Conversation conversation = runCheck();
         ProactiveCheck first = onlyCheckOf(conversation);
@@ -605,18 +617,16 @@ class ProactiveCheckTurnTest {
 
         ProactiveCheck second = checksOf(conversation).getLast();
         assertThat(second.status()).isEqualTo(CheckStatus.SUCCEEDED);
-        assertThat(second.newFindings()).isZero();
-        assertThat(second.referenceFindings()).isEqualTo(1);
         assertThat(second.report()).isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).hasSize(messageCount);
-        assertThat(problemsOf(conversation))
-            .filteredOn(problem -> problem.checkId().equals(second.id()))
-            .extracting(ProactiveCheckProblem::status)
-            .containsExactly(ProblemStatus.ACCEPTED);
-        assertThat(findingsOf(conversation))
-            .filteredOn(finding -> finding.checkId().equals(second.id()))
-            .extracting(ProactiveCheckFinding::reason)
-            .containsExactly(FindingReason.REPEATED);
+
+        service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
+        awaitIdle(conversation.id());
+
+        ProactiveCheck third = checksOf(conversation).getLast();
+        assertThat(third.id()).isNotEqualTo(second.id());
+        assertThat(third.skippedReason()).as("읽지 않은 보고가 없어 건너뛰지 않는다").isNull();
+        assertThat(third.rootExecutionId()).isNotNull();
     }
 
 
@@ -627,39 +637,7 @@ class ProactiveCheckTurnTest {
 
         Conversation conversation = runCheck();
 
-        assertThat(problemsOf(conversation)).isEmpty();
-    }
-
-
-    @Test
-    @DisplayName("발견을 낸 살펴보기가 끝난 시각이 없으면 그 발견 뒤의 사용자 메시지 수를 모름으로 싣는다")
-    void writesUnknownMessageCountWhenFindingCheckHasNoFinishTime() {
-        Conversation existing = conversations.save(
-            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
-        ProactiveCheck interrupted = checks.save(ProactiveCheck.started(
-            owner.id(),
-            agent.id(),
-            existing.id(),
-            CheckTrigger.MANUAL,
-            false,
-            Instant.now().minusSeconds(60)));
-        findings.save(ProactiveCheckFinding.of(
-            interrupted.id(),
-            existing.id(),
-            FindingKind.NEW,
-            null,
-            "study",
-            TOPIC_KEY,
-            "Kafka 정확히 한 번 처리",
-            SOURCE_URL,
-            Instant.now().minusSeconds(60)));
-        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
-
-        runCheck();
-
-        assertThat(stub().received().getLast().input())
-            .contains("[study] " + TOPIC_KEY)
-            .contains("그 뒤 사용자 메시지 모름");
+        assertThat(onlyCheckOf(conversation).report().acceptedProblemKeys()).isEmpty();
     }
 
 
@@ -673,8 +651,8 @@ class ProactiveCheckTurnTest {
         assertThat(stub().received().getFirst().input())
             .contains("- 지난 살펴보기: 처음")
             .contains("- Memory 문맥이 지난 살펴보기와 같은지: 모름")
-            .contains("최근에 알린 발견이 없다.")
-            .contains("최근에 받아들인 문제 후보가 없다.")
+            .contains("최근 제안이 없다.")
+            .contains("최근 보고에서 알린 것이 없다.")
             .doesNotContain("<external-data>");
     }
 
@@ -760,7 +738,7 @@ class ProactiveCheckTurnTest {
 
 
     @Test
-    @DisplayName("답 메시지를 저장하지 못하면 발견을 남기지 않고 살펴보기는 실패로 남는다")
+    @DisplayName("답 메시지를 저장하지 못하면 보고와 발견을 남기지 않고 살펴보기는 실패로 남는다")
     void leavesNoFindingWhenAnswerMessageFailsToSave() {
         stub().willAnswer(command -> answer(findingsBlock(TOPIC_KEY, SOURCE_URL, null)));
         // 답 메시지 저장만 실패시킨다. 알림 줄 저장은 실제로 저장된다.
@@ -772,6 +750,7 @@ class ProactiveCheckTurnTest {
 
         assertThat(findingsOf(conversation)).as("남은 발견").isEmpty();
         assertThat(onlyCheckOf(conversation).status()).isEqualTo(CheckStatus.FAILED);
+        assertThat(onlyCheckOf(conversation).report()).as("알리지 못한 발견을 다음 판정에서 알린 것으로 보지 않는다").isNull();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
             .extracting(ChatMessage::content)
             .containsExactly("먼저 살펴보기를 시작했어요", "살펴보기를 끝내지 못했어요. 잠시 뒤 다시 눌러 주세요");
@@ -850,6 +829,25 @@ class ProactiveCheckTurnTest {
             + "\"proposedAction\":{\"type\":\"ACTION\",\"text\":\"예제를 한 번 돌려 본다\"},"
             + "\"confidence\":\"MEDIUM\",\"expectedBenefit\":\"면접에서 설계 근거를 말한다\","
             + "\"sideEffect\":\"NONE\"" + change + "}" + observation + "]}");
+    }
+
+
+    /** 그 제목의 owner 제안 줄이다. */
+    private FollowUp suggestion(String title) {
+        return followUpRows.findAll().stream()
+            .filter(row -> row.userId().equals(owner.id()) && row.title().equals(title))
+            .findFirst()
+            .orElseThrow();
+    }
+
+
+    /** 그 제목들의 제안을 담은 버전 3 NOTHING_NEW 블록이다. 제안은 블록의 순서대로 저장된다. */
+    private static String suggestionsBlock(String... titles) {
+        StringBuilder items = new StringBuilder();
+        for (int i = 0; i < titles.length; i++) {
+            items.append(i == 0 ? "" : ",").append("{\"id\":\"s").append(i).append("\",\"title\":\"").append(titles[i]).append("\"}");
+        }
+        return block("{\"version\":3,\"outcome\":\"NOTHING_NEW\",\"suggestions\":[" + items + "]}");
     }
 
 

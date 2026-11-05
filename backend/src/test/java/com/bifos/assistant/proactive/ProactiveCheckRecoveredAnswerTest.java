@@ -141,22 +141,6 @@ class ProactiveCheckRecoveredAnswerTest {
 
 
     @Test
-    @DisplayName("기동 정리가 끝낸 자동 실행 살펴보기는 성공이든 취소든 답도 알림 줄도 남기지 않는다")
-    void leavesNothingForRecoveredAutonomousCheck() {
-        AgentExecution completed = checkRoot(CheckTrigger.AUTONOMY);
-        AgentExecution cancelled = checkRoot(CheckTrigger.AUTONOMY);
-
-        assertThat(recorder.settle(completed.id(), ended("completed", CHECK_ANSWER)))
-            .isTrue();
-        assertThat(recorder.settle(cancelled.id(), ended("cancelled", CHECK_ANSWER)))
-            .isTrue();
-
-        assertThat(executions.findById(completed.id()).orElseThrow().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
-    }
-
-
-    @Test
     @DisplayName("기동 정리가 끝낸 살펴보기 turn 이 취소로 끝났으면 그때까지의 답 대신 멈춤 알림 줄 하나만 남는다")
     void leavesOnlyStoppedNoticeForCancelledCheckTurn() {
         AgentExecution root = checkRoot();

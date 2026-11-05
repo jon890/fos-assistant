@@ -25,8 +25,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 먼저 살펴보기 한 번이다(ADR-080). 시작할 때 만들고 끝날 때 갱신한다.
  *
- * <p>실행별 토큰과 금액은 {@code agent_execution} 이 갖는다. 여기에는 결과를 기록할 때 트리 전체의 토큰 합계를 남긴다.
- * 살펴보기 한 번의 비용은 {@code rootExecutionId} 로 그 트리의 실행 줄을 합쳐 얻는다.
+ * <p>실행별 토큰과 금액은 {@code agent_execution} 이 갖는다. 살펴보기 한 번의 비용은 {@code rootExecutionId} 로 그 트리의 실행 줄을 합쳐 얻는다.
  *
  * <p>도구 호출 수와 위임 수는 실행 중에 이 엔티티에서 세지 않는다. 스트림 스레드와 작업 스레드가 같은 엔티티를 고치지 않게, 실행 중의 셈은
  * 부르는 쪽이 들고 끝날 때 넘긴다.
@@ -97,12 +96,6 @@ public class ProactiveCheck {
     @Column(name = "writes_allowed", nullable = false, updatable = false)
     private boolean writesAllowed;
 
-    @Column(name = "new_findings", nullable = false)
-    private int newFindings;
-
-    @Column(name = "reference_findings", nullable = false)
-    private int referenceFindings;
-
     /** Control Plane 이 검사해 다시 쓴 다섯 칸 보고다. */
     @Convert(converter = CheckReportJsonConverter.class)
     @JdbcTypeCode(SqlTypes.JSON)
@@ -117,18 +110,6 @@ public class ProactiveCheck {
     /** 사용자가 보고 카드를 연 시각이다. */
     @Column(name = "report_opened_at")
     private Instant reportOpenedAt;
-
-    /** 이 트리의 입력 토큰 합계다. */
-    @Column(name = "tree_input_tokens")
-    private Long treeInputTokens;
-
-    /** 이 트리의 캐시 입력 토큰 합계다. */
-    @Column(name = "tree_cached_input_tokens")
-    private Long treeCachedInputTokens;
-
-    /** 이 트리의 출력 토큰 합계다. */
-    @Column(name = "tree_output_tokens")
-    private Long treeOutputTokens;
 
     @Column(name = "started_at", nullable = false, updatable = false)
     private Instant startedAt;
@@ -163,23 +144,11 @@ public class ProactiveCheck {
     }
 
 
-    public void succeed(
-        CheckOutcome outcome,
-        int newFindings,
-        int referenceFindings,
-        CheckReport report,
-        int toolCalls,
-        int delegations,
-        long treeInputTokens,
-        long treeCachedInputTokens,
-        long treeOutputTokens,
-        Instant now) {
+    /** 결과 블록을 읽었다. 보고를 남기지 않는 살펴보기면 {@code report} 는 null 이다. */
+    public void succeed(CheckOutcome outcome, CheckReport report, int toolCalls, int delegations, Instant now) {
         this.status = CheckStatus.SUCCEEDED;
         this.outcome = outcome;
-        this.newFindings = newFindings;
-        this.referenceFindings = referenceFindings;
         this.report = report;
-        recordTreeTokens(treeInputTokens, treeCachedInputTokens, treeOutputTokens);
         finish(null, toolCalls, delegations, now);
     }
 
@@ -229,10 +198,4 @@ public class ProactiveCheck {
         this.finishedAt = now;
     }
 
-
-    private void recordTreeTokens(long input, long cachedInput, long output) {
-        this.treeInputTokens = input;
-        this.treeCachedInputTokens = cachedInput;
-        this.treeOutputTokens = output;
-    }
 }

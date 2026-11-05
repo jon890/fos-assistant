@@ -17,7 +17,6 @@ import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import com.bifos.assistant.usage.pricing.config.PricingProperties;
 import com.bifos.assistant.workspace.config.WorkspaceProperties;
@@ -616,7 +615,6 @@ public final class ArchitectureRules {
         DelegationWakeProperties.class,
         UserExecutionProperties.class,
         ProactiveCheckProperties.class,
-        ProactiveSuggestionProperties.class,
         StarterProperties.class,
         DelegationProperties.class,
         PricingProperties.class,

@@ -18,7 +18,6 @@ import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,11 +27,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * 제안 저장 경로(기능 스위치 켬)를 실제 DB 로 본다(ADR-20261101 / proactive-suggestion). 제안은 새 테이블이 아니라 할 일의
- * {@code PROPOSED} 줄이다. 스위치가 꺼졌을 때는 {@link ProactiveSuggestionDisabledTest} 가 본다. 모든 값은 합성이다.
+ * 제안 저장 경로를 실제 DB 로 본다(ADR-20261101 / proactive-suggestion). 제안은 새 테이블이 아니라 할 일의
+ * {@code PROPOSED} 줄이다. 모든 값은 합성이다.
  */
 @BackendIntegrationTest
-@OverrideProperties("assistant.proactive-suggestion.enabled=true")
 class ProactiveSuggestionStoreTest extends ProactiveTestSupport {
 
     private static final String DETAIL = "{\"why\":\"합성 근거\",\"goalRef\":\"goal-1\"}";
@@ -65,7 +63,7 @@ class ProactiveSuggestionStoreTest extends ProactiveTestSupport {
 
 
     @Test
-    @DisplayName("스위치를 켜고 깨우면 결과 블록의 제안이 그 사용자와 점검 대화의 PROPOSED 줄로 저장되고 본문을 열 수 있다")
+    @DisplayName("깨우면 결과 블록의 제안이 그 사용자와 점검 대화의 PROPOSED 줄로 저장되고 본문을 열 수 있다")
     void storesSuggestionsAsProposedRows() throws InterruptedException {
         CurrentUser user = owner();
         Agent agent = newAgent(user);

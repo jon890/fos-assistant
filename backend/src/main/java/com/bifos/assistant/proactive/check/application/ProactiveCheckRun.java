@@ -1,29 +1,24 @@
 package com.bifos.assistant.proactive.check.application;
 
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.port.CheckTurn;
 import com.bifos.assistant.chat.turn.application.dto.CheckAnswer;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.feedback.application.ReactionLedger;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.check.domain.type.CheckOutcome;
 import com.bifos.assistant.proactive.check.domain.type.CheckTrigger;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckFindingRepository;
-import com.bifos.assistant.proactive.check.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.check.infra.ProactiveCheckRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
-import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 먼저 살펴보기 한 번의 {@link CheckTurn} 이다(ADR-080, ADR-081). 살펴보기마다 새로 만들고 빈으로 두지 않는다.
@@ -75,8 +70,8 @@ public class ProactiveCheckRun implements CheckTurn {
     static final Duration STOP_RETRY_INTERVAL = Duration.ofSeconds(1);
 
     static final String OPENING = "먼저 살펴보기를 시작한다. `skill_view(name=\"proactive-check\")` 로 지침을 읽고 그 절차대로 살펴본다.";
-    static final String NO_RECENT_FINDINGS = "최근에 알린 발견이 없다.";
-    static final String NO_RECENT_PROBLEMS = "최근에 받아들인 문제 후보가 없다.";
+    static final String NO_RECENT_REPORTED = "최근 보고에서 알린 것이 없다.";
+    static final String NO_RECENT_SUGGESTIONS = "최근 제안이 없다.";
 
     private final ProactiveCheck check;
     private final boolean renewSession;
@@ -95,19 +90,15 @@ public class ProactiveCheckRun implements CheckTurn {
      *
      * @param executions 지난 살펴보기의 루트 실행 줄을 읽어 Memory 문맥 지문을 견준다
      * @param chat 상한에 닿은 turn 을 멈춘다
-     * @param followUps 문제 후보가 이미 챙기는 할 일과 같은지 본다
-     * @param suggestionProperties 제안 저장 경로의 기능 스위치다. 꺼져 있으면 결과 블록의 제안 항목을 저장하지 않는다
-     * @param reactions 최근에 알린 발견의 지금 반응을 읽어 입력에 싣고 「관심 없음」 주제를 되풀이로 내린다
+     * @param followUps 결과 블록의 제안을 저장하고, 문제 후보가 이미 챙기는 할 일과 같은지 보고, 입력에 그 대화의 최근 제안을 싣는다
+     * @param reactions 최근 제안의 마지막 사용자 반응을 읽어 입력에 싣는다
      * @param wakeMemory 그 에이전트가 받는 기억에서 지난 살펴보기 뒤에 바뀐 항목과 이어진 항목을 꺼내 입력에 싣는다
      */
     record Deps(
         LiveProperties<ProactiveCheckProperties> properties,
         ProactiveCheckRepository checks,
-        ProactiveCheckFindingRepository findings,
-        ProactiveCheckProblemRepository problems,
         FollowUpService followUps,
-        LiveProperties<ProactiveSuggestionProperties> suggestionProperties,
-        CheckFindingReactions reactions,
+        ReactionLedger reactions,
         WakeMemoryRead wakeMemory,
         ChatMessageRepository messages,
         AgentExecutionRepository executions,
@@ -189,24 +180,7 @@ public class ProactiveCheckRun implements CheckTurn {
     }
 
 
-    /**
-     * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
-     * 한다.
-     */
-    @Override
-    public boolean silent() {
-        return results.silent();
-    }
-
-
-    /**
-     * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
-     * 저장하고, 결과와 셈은 {@link #record} 가 적는다. 답을 저장하지 못했는데 발견이 남으면 사용자가 보지 못한 발견이 다음 살펴보기에서
-     * 이미 알린 것으로 내려가기 때문이다.
-     * NOTHING_NEW 여도 질문이나 읽지 못한 출처가 있으면 그린다.
-     *
-     * <p>블록을 읽지 못하면 까닭과 답의 길이만 로그에 남긴다. 답은 개인 맥락을 담을 수 있어 본문을 남기지 않는다.
-     */
+    /** 결과 블록을 읽고 검사해 대화에 남길 글과 보고를 정한다. 규칙은 {@link ProactiveCheckResults#answer} 가 갖는다. */
     @Override
     public CheckAnswer answer(Long executionId, String output) {
         return results.answer(executionId, output);
@@ -278,29 +252,15 @@ public class ProactiveCheckRun implements CheckTurn {
         } else if (results.outcome() == CheckOutcome.INVALID_RESULT) {
             check.succeedInvalid(results.invalidReason(), limits.toolCalls(), delegations, now);
         } else {
-            TreeTokens tokens = treeTokens();
-            check.succeed(
-                results.outcome(),
-                results.newFindings(),
-                results.referenceFindings(),
-                silent() ? null : results.pendingReport(),
-                limits.toolCalls(),
-                delegations,
-                tokens.input(),
-                tokens.cachedInput(),
-                tokens.output(),
-                now);
+            check.succeed(results.outcome(), results.pendingReport(), limits.toolCalls(), delegations, now);
         }
         deps.checks().save(check);
     }
 
 
-    /**
-     * 들고 있던 발견과 문제 후보를 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 없으면 아무것도 하지 않는다. 사용자가 보지 못한
-     * 발견을 근거로 한 후보가 다음 살펴보기에서 중복으로 걸리지 않게 하기 위해 발견과 같은 자리에서 저장한다.
-     */
-    void saveFindings() {
-        results.saveFindings();
+    /** 결과 블록의 제안을 할 일 줄로 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. */
+    void saveSuggestions() {
+        results.saveSuggestions();
     }
 
 
@@ -308,32 +268,5 @@ public class ProactiveCheckRun implements CheckTurn {
     void recordFailure(String errorCode, int delegations) {
         check.fail(errorCode, limits.toolCalls(), delegations, deps.clock().instant());
         deps.checks().save(check);
-    }
-
-
-    /** 루트와 자식 실행의 토큰을 모두 더한다. 아직 적히지 않은 토큰은 0으로 센다. */
-    private TreeTokens treeTokens() {
-        Long rootId = check.rootExecutionId();
-        if (rootId == null) {
-            return TreeTokens.ZERO;
-        }
-        List<AgentExecution> tree = new ArrayList<>(deps.executions().findByRootExecutionId(rootId));
-        deps.executions().findById(rootId).ifPresent(tree::add);
-        long input = tree.stream().mapToLong(each -> orZero(each.inputTokens())).sum();
-        long cachedInput = tree.stream()
-            .mapToLong(each -> orZero(each.cachedInputTokens()))
-            .sum();
-        long output = tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
-        return new TreeTokens(input, cachedInput, output);
-    }
-
-
-    private static long orZero(Long value) {
-        return value == null ? 0 : value;
-    }
-
-
-    private record TreeTokens(long input, long cachedInput, long output) {
-        private static final TreeTokens ZERO = new TreeTokens(0, 0, 0);
     }
 }

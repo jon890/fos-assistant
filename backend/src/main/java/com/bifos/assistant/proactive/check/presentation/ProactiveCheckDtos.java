@@ -1,10 +1,8 @@
 package com.bifos.assistant.proactive.check.presentation;
 
 import com.bifos.assistant.proactive.check.application.dto.CheckBlocker;
-import com.bifos.assistant.proactive.check.application.dto.CheckFindingView;
 import com.bifos.assistant.proactive.check.application.dto.CheckStatusView;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
-import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -87,22 +85,5 @@ public final class ProactiveCheckDtos {
                 check.startedAt(),
                 check.finishedAt());
         }
-    }
-
-    /**
-     * 점검 대화의 「새로 알릴 것」 발견과 지금 반응이다.
-     *
-     * @param dismissWindowDays 「관심 없음」 이 같은 주제를 내리는 기간. {@code digest-window} 를 하루 단위로 올림한 값이다
-     * @param findings 오래된 것부터
-     */
-    public record CheckFindingsResponse(long dismissWindowDays, List<CheckFindingView> findings) {
-    }
-
-    /**
-     * 발견 하나에 누른 단추다. 모르는 값은 서비스가 {@code VALIDATION_FAILED} 로 거절한다.
-     *
-     * @param reaction {@code ACCEPTED}, {@code POSTPONED}, {@code DISMISSED} 가운데 하나
-     */
-    public record FindingReactionRequest(@NotBlank String reaction) {
     }
 }

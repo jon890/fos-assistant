@@ -52,6 +52,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -292,12 +293,7 @@ class ProactiveCheckStartTest {
         ProactiveCheck old = ProactiveCheck.started(owner.id(), agent.id(), deleted.id(), CheckTrigger.MANUAL, false, Instant.now());
         old.succeed(
             CheckOutcome.FINDINGS,
-            0,
-            0,
             new CheckReport(List.of("지난 보고"), List.of(), List.of(), List.of(), List.of()),
-            0,
-            0,
-            0,
             0,
             0,
             Instant.now());
@@ -312,8 +308,7 @@ class ProactiveCheckStartTest {
             .orElseThrow();
         awaitIdle(created.id());
 
-        ProactiveCheck current = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
-            .orElseThrow();
+        ProactiveCheck current = latestCheck();
         assertThat(returned).isEqualTo(created.publicId()).isNotEqualTo(deleted.publicId());
         assertThat(current.skippedReason()).isNull();
         assertThat(current.rootExecutionId()).isNotNull();
@@ -330,12 +325,7 @@ class ProactiveCheckStartTest {
             owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, Instant.now()));
         report.succeed(
             CheckOutcome.FINDINGS,
-            0,
-            0,
             new CheckReport(List.of("바뀜"), List.of(), List.of(), List.of(), List.of()),
-            0,
-            0,
-            0,
             0,
             0,
             Instant.now());
@@ -344,8 +334,7 @@ class ProactiveCheckStartTest {
 
         UUID returned = service.start(owner, agent.code(), CheckTrigger.SCHEDULED);
 
-        ProactiveCheck skipped = checks.findFirstByUserIdAndAgentIdOrderByIdDesc(owner.id(), agent.id())
-            .orElseThrow();
+        ProactiveCheck skipped = latestCheck();
         assertThat(returned).isEqualTo(conversation.publicId());
         assertThat(skipped.skippedReason()).isEqualTo(CheckSkippedReason.UNREAD_REPORT);
         assertThat(skipped.rootExecutionId()).isNull();
@@ -431,5 +420,14 @@ class ProactiveCheckStartTest {
                 fail("기다리는 중에 끊겼다");
             }
         }
+    }
+
+
+    /** owner 가 agent 로 연 마지막 살펴보기 줄이다. */
+    private ProactiveCheck latestCheck() {
+        return checks.findAll().stream()
+            .filter(check -> check.userId().equals(owner.id()) && check.agentId().equals(agent.id()))
+            .max(Comparator.comparing(ProactiveCheck::id))
+            .orElseThrow();
     }
 }

@@ -8,7 +8,6 @@ import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.proactive.check.config.ProactiveCheckProperties;
-import com.bifos.assistant.proactive.check.config.ProactiveSuggestionProperties;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.usage.execution.config.UserExecutionProperties;
 import com.bifos.assistant.usage.pricing.config.PricingProperties;
@@ -55,13 +54,6 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<DelegationProperties> delegationPropertiesLive(DelegationProperties value) {
         return LiveProperties.fixed(DelegationProperties.class, value);
-    }
-
-
-    @Bean
-    public LiveProperties<ProactiveSuggestionProperties> proactiveSuggestionPropertiesLive(
-        ProactiveSuggestionProperties value) {
-        return LiveProperties.fixed(ProactiveSuggestionProperties.class, value);
     }
 
 
