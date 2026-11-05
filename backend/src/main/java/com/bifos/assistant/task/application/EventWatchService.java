@@ -3,7 +3,7 @@ package com.bifos.assistant.task.application;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.connection.application.ConnectorEventWatches;
-import com.bifos.assistant.connector.connection.domain.EventWatchBinding;
+import com.bifos.assistant.connector.connection.application.dto.EventWatchBinding;
 import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.connector.connection.domain.type.EventWatchResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;

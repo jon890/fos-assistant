@@ -1,7 +1,7 @@
 package com.bifos.assistant.connector.connection.application;
 
 import com.bifos.assistant.connector.connection.domain.ConnectorBinding;
-import com.bifos.assistant.connector.connection.domain.EventWatchBinding;
+import com.bifos.assistant.connector.connection.application.dto.EventWatchBinding;
 import com.bifos.assistant.connector.connection.domain.EventWatchState;
 import com.bifos.assistant.connector.connection.domain.EventWatchTarget;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
