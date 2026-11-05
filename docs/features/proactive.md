@@ -309,7 +309,7 @@ turn 이 어떻게 끝나든 잠금을 풀기 전에 `ProactiveCheckService` 가
 테이블 `proactive_value_evaluation`, `proactive_autonomy_decision`, `user_autonomy_preference`, `proactive_loop_setting`, `proactive_loop_run`, `attention_control`, `attention_event` 와 반응 기록의 `autonomy_decision_id` 컬럼은 지웠다. 다음은 읽는 코드 없이 남는다.
 
 - `task.loop_enabled`, `task.snoozed_until` 컬럼. 매일 루프 설정이 쓰던 값이고 읽는 곳이 없다
-- 저장된 enum 값 `FeedbackSubjectType.AUTONOMY_DECISION`. 옛 `AUTONOMY` 계기의 살펴보기 줄과 값(`CheckTrigger.AUTONOMY`)은 지웠다
+- 저장된 enum 값 `FeedbackSubjectType.AUTONOMY_DECISION`. 옛 `AUTONOMY` 계기의 살펴보기 줄과 그 enum 값은 지웠다
 
 옛 결정은 [ADR-20261008 / daily-loop](../adr/archive/ADR-20261008-daily-loop.md)에 이력으로 남아 있고, 대체한 결정은 [ADR-20261101 / proactive-suggestion](../adr/ADR-20261101-proactive-suggestion.md)이다.
 
