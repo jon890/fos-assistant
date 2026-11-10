@@ -1,0 +1,24 @@
+{
+  "name": "shopping-read",
+  "description": "네이버 쇼핑 PR1: 플러그인 틀, 상품 검색과 상세 읽기, 사람이 없는 실행 거절, 플러그인 선언 검사 강화",
+  "pr_scope": "계정 상태를 바꾸는 도구 없이 naver-shopping 플러그인의 검색·상세·확인 도구와, 사람이 없는 실행이 그 도구를 못 부르게 하는 attended_only 판정, 영어 키워드·이름 중복 선언 검사를 완성한다.",
+  "deferred": [
+    {"what": "화면 넘기기 카드·알림·「다 했어요」와 내 브라우저 화면의 확인 창 처리(REQ7, REQ8)", "why": "공통 기반이라 PR 하나를 따로 쓰고 사용자 결정으로 PR2 로 정했다", "after": "이 PR 의 플러그인과 사람이 해야 하는 화면 오류 코드가 머지된 뒤"},
+    {"what": "구매 상한, 승인 카드, 주문서 채우기, 결제 직전 재확인(REQ9 부터 REQ13)", "why": "돈이 걸린 경로라 사람이 diff 를 따로 본다", "after": "PR2 머지 뒤"},
+    {"what": "결제 뒤 주문 확인(REQ14)", "why": "PR3 의 승인 줄이 넘긴 시각과 금액을 가져야 한다", "after": "PR3 머지 뒤"}
+  ],
+  "status": "pending",
+  "created_at": "2026-11-10",
+  "spec": "docs/features/naver-shopping/spec.md",
+  "design": "docs/features/naver-shopping/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": ["REQ1", "REQ2", "REQ3", "REQ4", "REQ5", "REQ6"],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ6"]},
+    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ1"]},
+    {"number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ2", "REQ3", "REQ4"]},
+    {"number": 4, "file": "phase-04.md", "execution_profile": "standard", "requirements": ["REQ5"]}
+  ]
+}
