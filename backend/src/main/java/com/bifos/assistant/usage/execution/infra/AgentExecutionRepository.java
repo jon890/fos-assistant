@@ -474,7 +474,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
 
     /**
      * 사람이 없는 실행(예약 작업, 먼저 살펴보기, 그 트리의 결과를 전하는 turn)으로 적는다. 엔티티에 칸을 두지 않아 엔티티 저장이 이 값을
-     * 덮지 않는다. 뜻은 {@code backend/docs/data-schema.md} 의 「agent_execution」 이 갖는다. 트랜잭션은 {@code ExecutionRecorder} 가
+     * 덮지 않는다. 뜻은 {@code backend/docs/data-schema.md} 의 「agent_execution」 이 갖는다. 트랜잭션은 {@code ExecutionDeliveryWriter} 가
      * 연다.
      */
     @Modifying

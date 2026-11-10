@@ -46,7 +46,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -128,7 +128,7 @@ class DelegationWakeServiceTest {
     AgentExecutionRepository executions;
 
     @Autowired
-    ExecutionRecorder recorder;
+    ExecutionDeliveryWriter executionMarks;
 
     @Autowired
     ExecutionEventRepository executionEvents;
@@ -255,7 +255,7 @@ class DelegationWakeServiceTest {
         awaitIdle(conversation.id());
         assertThat(unattended(deliveryTurn())).as("사람이 연 트리의 결과를 전한 turn").isFalse();
 
-        recorder.markUnattended(root);
+        executionMarks.markUnattended(root.id());
         finished(delegated(root, ExecutionStatus.SUCCEEDED, "예약 작업이 맡긴 결과", null));
         awaitIdle(conversation.id());
         assertThat(unattended(deliveryTurn())).as("예약 작업 트리의 결과를 전한 turn").isTrue();

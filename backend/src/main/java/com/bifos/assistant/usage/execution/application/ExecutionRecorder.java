@@ -20,7 +20,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
@@ -288,13 +287,6 @@ public class ExecutionRecorder {
             null,
             modelTier,
             null);
-    }
-
-
-    /** 사람이 없는 실행으로 적는다. Hermes 에 보내기 전에 커밋해 도구 판정이 도는 중에 읽게 한다. */
-    @Transactional
-    public void markUnattended(AgentExecution execution) {
-        executions.markUnattended(execution.id());
     }
 
 
