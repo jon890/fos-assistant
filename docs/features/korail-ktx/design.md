@@ -22,7 +22,7 @@ PR1 은 Control Plane, 웹, 대시보드 plugin 을 고치지 않는다. 플러�
 
 | ID | PR | 해결 방법 |
 | --- | --- | --- |
-| REQ1 | PR1 | 새 플러그인 `hermes/connectors/korail-ktx/` 과 저장소 등록(아래 「저장소 등록」). 입력 칸 없이 `owner_browser_env` 하나를 선언하고, 확인 도구 `check_korail_login` 이 코레일 로그인 쿠키만 본다(spec DECISION17) |
+| REQ1 | PR1 | 새 플러그인 `hermes/connectors/korail-ktx/` 과 저장소 등록(아래 「저장소 등록」). 입력 칸 없이 `owner_browser_env` 하나를 선언하고, 확인 도구 `check_korail_login` 이 코레일 쿠키가 하나라도 있는지만 보고 `logged_in` 을 `unknown` 으로 답한다(spec DECISION17) |
 | REQ2 | PR1 | `search_trains` 가 빈 탭을 열어 처리기를 건 뒤 코레일 조회 화면으로 이동하고, 「조작 단계」 표의 고정 단계로 조건을 넣어 조회 단추를 한 번 누른 뒤, 고정 식 하나로 결과 표를 꺼내 순수 함수가 결과로 바꾼다 |
 | REQ3 | PR1 | 모든 이동과 조작 단계 뒤에 같은 「화면 분류」 를 거친다. 사람이 해야 하는 화면이면 아무것도 더 누르지 않고 탭을 남긴 채 그 종류의 오류로 끝난다. 역 이름과 날짜는 화면을 열기 전에 플러그인이 확인한다 |
 | REQ4 | PR1 | 도구 이름과 설명 첫 문장(아래 「도구」). 쇼핑 PR1 의 계약 검사가 본다 |
@@ -84,7 +84,7 @@ CDP 연결 부분(`cdp.ts`)은 쇼핑과 블로그처럼 같은 모양으로 새
 
 | 도구 | 위험도 | `attended_only` | 인자 | 결과 |
 | --- | --- | --- | --- | --- |
-| `check_korail_login` | `READ` | 참 | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `KORAIL_LOGIN_REQUIRED` |
+| `check_korail_login` | `READ` | 참 | 없음 | `{browser: "connected", logged_in: "unknown"}`. 코레일 쿠키가 하나도 없으면 `KORAIL_LOGIN_REQUIRED` |
 | `search_trains` | `READ` | 참 | 아래 표 | `{query, count, trains: [...]}` |
 
 설명 첫 문장은 영어다. 예: `check_korail_login` 은 「Check korail login session in the user browser.」, `search_trains` 는 「Search korail ktx trains for one route, date and time.」 로 시작하고 한국어 설명을 잇는다. 확인 도구 이름은 블로그의 `session_status`, 쇼핑의 `check_shopping_login` 과 겹치지 않는다.
@@ -234,7 +234,7 @@ PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시,
 
 | ID | 무엇 | 어떻게 |
 | --- | --- | --- |
-| K1 | 로그인했을 때만 생기는 쿠키 | 가설 상수로 둔다. 사용자의 실제 계정 확인에서 그런 쿠키가 없다고 나오면, 연결 확인이 쿠키로 로그인을 가리지 못하므로 spec DECISION17 을 바꿀지 사용자에게 묻는다(예: 브라우저에 닿는지만 보고 로그인은 다음 도구의 `login` 분류에 맡긴다) |
+| K1 | 로그인했을 때만 생기는 쿠키 | 사용자 결정(spec DECISION17)으로 지금은 코레일 쿠키가 있는지만 본다. 사용자가 실제 계정 확인에서 로그인 전후 쿠키 이름을 비교해 로그인 전용 쿠키를 찾으면 그 쿠키로 바꾼다 |
 | K2 | 역 입력 방식, 날짜 달력, 인원 층, 목록 한 줄의 칸, 예약 가능 표시 | 가설 표(`steps.ts`, `fields.ts`)에 모으고 사용자가 맞춘다 |
 | K3 | 「서울·용산 - 수서 함께 보기」 로 나온 수서발 열차가 어느 탭에 들고 코레일에서 잡히는지 | 사용자가 실제 계정 확인에서 본다. 잡히지 않으면 PR2 가 그 열차의 좌석 확보를 거절한다 |
 | K4 | 보안 문자 화면과 `-8003` 밖의 탐지 화면 | 가설 상수로 두고, 사용자가 만나면 진단 줄의 주소 경로로 맞춘다 |
