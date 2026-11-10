@@ -753,6 +753,9 @@ class TaskRunStarterTest {
         ProactiveCheck completed = checks.findById(check.id()).orElseThrow();
         assertThat(completed.rootExecutionId()).isNotNull();
         assertThat(finished.executionId()).isEqualTo(completed.rootExecutionId());
+        assertThat(executions.countUnattendedIn(List.of(completed.rootExecutionId())))
+            .as("매일 깨우기의 살펴보기 turn 은 사람이 없는 실행으로 적힌다")
+            .isEqualTo(1);
     }
 
 

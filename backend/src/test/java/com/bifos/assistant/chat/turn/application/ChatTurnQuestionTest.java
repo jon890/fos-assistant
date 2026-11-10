@@ -30,7 +30,9 @@ class ChatTurnQuestionTest {
         assertThat(TurnIntent.unattended(new TurnIntent.Scheduled("예약 작업"))).isTrue();
         assertThat(TurnIntent.unattended(new TurnIntent.ProactiveCheck(null))).isTrue();
         assertThat(TurnIntent.unattended(new TurnIntent.DelegationResults(attempt, false, List.of(), true))).isTrue();
+        // 승인 결과만 전하는 turn 과 사람이 누른 다시 전달은 사람이 있는 실행이다.
         assertThat(TurnIntent.unattended(new TurnIntent.DelegationResults(attempt, false, List.of()))).isFalse();
+        assertThat(TurnIntent.unattended(new TurnIntent.DelegationResults(attempt, true, List.of(), false))).isFalse();
         assertThat(TurnIntent.unattended(new TurnIntent.Fresh())).isFalse();
         assertThat(TurnIntent.unattended(new TurnIntent.Regenerate(null, null))).isFalse();
     }
