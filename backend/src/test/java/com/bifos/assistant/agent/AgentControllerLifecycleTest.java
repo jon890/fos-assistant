@@ -1,6 +1,7 @@
 package com.bifos.assistant.agent;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,8 +52,9 @@ class AgentControllerLifecycleTest {
     private final AgentRepository agents = mock(AgentRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
+    private final AgentCapabilitiesReader capabilitiesReader = mock(AgentCapabilitiesReader.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new AgentController(new AgentService(agents), currentUser, lifecycle, mock(AgentCapabilitiesReader.class)))
+        new AgentController(new AgentService(agents), currentUser, lifecycle, capabilitiesReader))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -124,6 +126,24 @@ class AgentControllerLifecycleTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.editable").value(true))
             .andExpect(jsonPath("$.ownedByMe").value(false));
+    }
+
+
+    @Test
+    @DisplayName("ADMIN 이 남의 비공개 에이전트 소개를 고친 응답에는 주인의 연결 이름을 싣지 않는다")
+    void adminChangingOthersPrivateIntroductionGetsNoCapabilities() throws Exception {
+        when(currentUser.require()).thenReturn(ADMIN);
+        when(lifecycle.changeIntroduction(eq(ADMIN), eq("a0123456789"), any()))
+            .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
+
+        mvc.perform(patch("/api/v1/agents/{code}/introduction", "a0123456789")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"숙제 도우미\",\"description\":null,\"icon\":null,\"color\":null}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.capabilities.connectors").isEmpty())
+            .andExpect(jsonPath("$.capabilities.skills").isEmpty());
+
+        verify(capabilitiesReader, never()).read(any());
     }
 
 

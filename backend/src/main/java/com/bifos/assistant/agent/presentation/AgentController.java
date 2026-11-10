@@ -82,8 +82,15 @@ public class AgentController {
     }
 
 
+    /**
+     * 할 수 있는 일은 요청자가 읽을 수 있는 에이전트에만 채운다. {@code ADMIN} 이 남의 비공개 에이전트를 고친 응답에는 주인이 붙인 연결의
+     * 이름을 싣지 않는다. 관리자도 남의 에이전트의 연결은 보지 않는다(docs/features/agent-skill.md 「에이전트 화면」).
+     */
     private AgentView view(CurrentUser user, Agent agent) {
-        return view(user, agent, capabilitiesReader.read(List.of(agent)).getOrDefault(agent.id(), AgentCapabilities.NONE));
+        AgentCapabilities capabilities = agent.isReadableBy(user.id())
+            ? capabilitiesReader.read(List.of(agent)).getOrDefault(agent.id(), AgentCapabilities.NONE)
+            : AgentCapabilities.NONE;
+        return view(user, agent, capabilities);
     }
 
 

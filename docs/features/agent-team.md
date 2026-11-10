@@ -18,6 +18,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 
 **할 수 있는 일은 저장하지 않고 읽을 때 모은다.** 연결과 바인딩이 모두 `READY` 인 플러그인의 이름(카탈로그의 `title`)과 올린 스킬 이름이다. 올린 스킬에는 게시가 timeout 으로 끝나 표식 없이 남은 더 새 버전도 든다.
 에이전트 목록(`GET /api/v1/agents`)과 `agent_list` 가 `AgentCapabilitiesReader` 로 같은 값을 쓴다. 카탈로그나 스킬 디렉터리를 읽지 못하면 실패하지 않고 그 칸을 비운다.
+`ADMIN` 이 남의 비공개 에이전트를 고친 응답에는 할 수 있는 일을 비워 낸다. 관리자도 남의 에이전트의 연결은 보지 않는다.
 
 | 자리 | 무엇을 보이나 |
 | --- | --- |
