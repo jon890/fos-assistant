@@ -283,6 +283,17 @@ public class Task extends AuditedEntity {
     }
 
 
+    /** 암호문을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다. 지시문이 없으면({@code null}) 그 칸은 비운다. */
+    public void unsealContent(String title, String instruction) {
+        this.plainTitle = title;
+        this.plainInstruction = instruction;
+        this.storedTitle = title;
+        this.titleKeyId = null;
+        this.storedInstruction = instruction;
+        this.instructionKeyId = null;
+    }
+
+
     /** 저장된 시간대 이름을 읽은 값이다. */
     public ZoneId zone() {
         return ZoneId.of(timeZone);

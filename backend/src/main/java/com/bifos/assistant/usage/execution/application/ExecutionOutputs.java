@@ -51,6 +51,35 @@ public class ExecutionOutputs {
     }
 
 
+    /** 방금 적은 암호문이 그 평문으로 풀리는지 본다. 이미 있는 줄을 암호화하는 배치가 옛 답을 잃지 않게 한다. */
+    public boolean opensTo(AgentExecution execution, String plain) {
+        return execution.outputKeyId() != null
+            && cipher.open(
+                execution.outputKeyId(),
+                execution.userId(),
+                aad(execution, execution.userId()),
+                execution.outputText())
+                .filter(plain::equals)
+                .isPresent();
+    }
+
+
+    /**
+     * 암호문 답을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다.
+     *
+     * @return 풀지 못하면 거짓이고 줄은 그대로다
+     */
+    public boolean unseal(AgentExecution execution) {
+        if (execution.userId() == null || execution.outputText() == null) {
+            return false;
+        }
+        Optional<String> opened = cipher.open(
+            execution.outputKeyId(), execution.userId(), aad(execution, execution.userId()), execution.outputText());
+        opened.ifPresent(execution::recordOutput);
+        return opened.isPresent();
+    }
+
+
     /**
      * 답을 낸다. 암호문이면 풀고, 풀지 못하면 {@link #UNREADABLE_OUTPUT} 이다.
      *

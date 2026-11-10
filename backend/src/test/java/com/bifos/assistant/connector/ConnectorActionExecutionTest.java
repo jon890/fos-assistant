@@ -428,7 +428,7 @@ class ConnectorActionExecutionTest {
         assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, new ForcedCipher(cipher, false), digest)
             .scopeJson())
                 .isEqualTo(value(BASE, "scopeJson"));
-        DataEncryptionProperties disabled = new DataEncryptionProperties("", "", false, Duration.ofMinutes(1), 20);
+        DataEncryptionProperties disabled = new DataEncryptionProperties("", "", false, Duration.ofMinutes(1), 20, null, 0);
         DataKeyService withoutKek = new DataKeyService(new FileKeyEncryptionKeys(disabled), writer, keys, disabled, Clock.systemUTC());
         assertThat(withoutKek.enabled()).isFalse();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, withoutKek, digest))

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -40,6 +41,24 @@ public interface TaskRepository extends JpaRepository<Task, Long>, TaskWrites<Ta
     @Query("select t from Task t where t.publicId = :publicId and t.ownerUserId = :ownerUserId and t.kind = :kind")
     Optional<Task> findByPublicIdAndOwnerUserIdAndKindForUpdate(
         @Param("publicId") UUID publicId, @Param("ownerUserId") Long ownerUserId, @Param("kind") TaskKind kind);
+
+
+    /** 평문으로 남은 작업의 번호를 번호 순으로 읽는다(ADR-20261008 / data-encryption). */
+    @Query("select t.id from Task t where t.titleKeyId is null and t.id > :after order by t.id")
+    List<Long> findPlainIds(@Param("after") Long after, Pageable pageable);
+
+
+    /** 암호문으로 저장된 작업의 번호를 번호 순으로 읽는다. 풀기 배치가 쓴다. */
+    @Query("select t.id from Task t where t.titleKeyId is not null and t.id > :after order by t.id")
+    List<Long> findSealedIds(@Param("after") Long after, Pageable pageable);
+
+
+    @Query("select count(t) from Task t where t.titleKeyId is null")
+    long countPlain();
+
+
+    @Query("select count(t) from Task t where t.titleKeyId is not null")
+    long countSealed();
 
 
     /** 그 사용자의 작업 가운데 그 상태가 아닌 것을 만든 순서의 역순으로 읽는다. */
