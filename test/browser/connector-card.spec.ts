@@ -53,6 +53,9 @@ test("아이콘과 링크가 있는 카드가 도구 요약과 함께 보인다"
     "src",
     SVG_ICON,
   );
+  // 도구 수와 링크는 「자세히」 안에 접혀 있다.
+  await expect(card.getByTestId("connector-link")).toBeHidden();
+  await card.getByTestId("connector-details").locator("summary").click();
   const link = card.getByTestId("connector-link");
   await expect(link).toHaveAttribute("href", "https://example.com/rich");
   await expect(link).toHaveAttribute("target", "_blank");
@@ -252,6 +255,7 @@ test("외부 링크는 새 탭으로 열고 현재 주소는 그대로다", asyn
   await page.goto("/connections");
   const before = page.url();
   const popup = page.waitForEvent("popup");
+  await page.getByTestId("connector-details").locator("summary").click();
   await page.getByTestId("connector-link").click();
   const opened = await popup;
   await opened.waitForLoadState();
@@ -280,6 +284,7 @@ test("상세 화면 머리에 아이콘과 링크가 보인다", async ({ page }
     "src",
     SVG_ICON,
   );
+  await page.getByTestId("connector-details").locator("summary").click();
   await expect(page.getByTestId("connector-link")).toHaveAttribute(
     "href",
     "https://example.com/rich",
@@ -513,6 +518,13 @@ test("README만 있는 카드와 프로젝트 링크는 키보드로 새 탭을 
     .route("https://example.com/**", (route) => route.fulfill({ body: "ok" }));
   await page.goto("/connections");
   const cards = page.getByTestId("connector-card");
+  for (const index of [0, 1]) {
+    await cards
+      .nth(index)
+      .getByTestId("connector-details")
+      .locator("summary")
+      .click();
+  }
   await expect(cards.nth(0).getByTestId("connector-link")).toHaveCount(0);
   await expect(cards.nth(0).getByTestId("connector-readme-link")).toBeVisible();
   await expect(cards.nth(1).getByTestId("connector-link")).toHaveAccessibleName(

@@ -37,7 +37,7 @@ export function BoundAgents({
                 {binding.agentName}
               </Link>
               {binding.restartRequired || binding.status === "PENDING" ? (
-                <Badge variant="warning">반영 대기</Badge>
+                <Badge variant="warning">붙이는 중</Badge>
               ) : null}
             </li>
           ))}
