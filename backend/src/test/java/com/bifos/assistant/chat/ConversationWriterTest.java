@@ -51,7 +51,7 @@ class ConversationWriterTest {
     void fillsBlankTitleOutsideTransactionThroughWriter() {
         Conversation conversation = newUntitledConversation();
 
-        int updated = conversationWriter.fillTitleIfBlank(conversation.id(), "새 제목");
+        int updated = conversationWriter.fillTitleIfBlank(conversation, "새 제목");
 
         assertThat(updated).isEqualTo(1);
         assertThat(storedTitle(conversation)).isEqualTo("새 제목");
@@ -62,9 +62,9 @@ class ConversationWriterTest {
     @DisplayName("이미 제목이 있으면 Writer 가 0 을 돌려주고 제목을 바꾸지 않는다")
     void keepsExistingTitleAndReturnsZero() {
         Conversation conversation = newUntitledConversation();
-        conversationWriter.fillTitleIfBlank(conversation.id(), "먼저 채운 제목");
+        conversationWriter.fillTitleIfBlank(conversation, "먼저 채운 제목");
 
-        int updated = conversationWriter.fillTitleIfBlank(conversation.id(), "나중 제목");
+        int updated = conversationWriter.fillTitleIfBlank(conversation, "나중 제목");
 
         assertThat(updated).isZero();
         assertThat(storedTitle(conversation)).isEqualTo("먼저 채운 제목");
@@ -76,7 +76,7 @@ class ConversationWriterTest {
     void rejectsDirectRepositoryUpdateOutsideTransaction() {
         Conversation conversation = newUntitledConversation();
 
-        assertThatThrownBy(() -> conversations.fillTitleIfBlank(conversation.id(), "새 제목"))
+        assertThatThrownBy(() -> conversations.fillTitleIfBlank(conversation.id(), "새 제목", null))
             .isInstanceOf(InvalidDataAccessApiUsageException.class);
 
         assertThat(storedTitle(conversation)).isEmpty();
