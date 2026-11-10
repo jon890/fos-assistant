@@ -43,6 +43,8 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 | `ASSISTANT_DATA_ENCRYPTION_KEK_FILE` | Backend | 대화 본문과 기억의 제목·본문을 암호화하는 데이터 key 를 감싸는 KEK 목록 파일. 한 줄에 `<id>:<base64 32바이트>`. 데이터베이스 백업과 다른 자리에 두고 소유자만 읽게 한다. 잃으면 암호화한 대화와 기억을 되찾지 못한다. 비우면 새 대화와 기억을 평문으로 저장한다 |
 | `ASSISTANT_DATA_ENCRYPTION_ACTIVE_KEK_ID` | Backend | 새 데이터 key 를 감쌀 KEK 의 id. KEK 를 바꿀 때 파일에 새 key 를 더하고 이 값을 바꿔 기동한다 |
 | `ASSISTANT_DATA_ENCRYPTION_REQUIRED` | Backend | `true` 면 KEK 가 없을 때 기동하지 않는다. 기본 `false` |
+| `ASSISTANT_DATA_ENCRYPTION_BACKFILL` | Backend | KEK 를 넣기 전에 저장한 옛 줄(메시지 본문, 대화 제목, 위임 답, 예약 작업)을 고치는 배치의 방향. `SEAL`(기본)은 평문을 암호화하고, `UNSEAL` 은 암호문을 평문으로 되돌리고, `OFF` 는 돌지 않는다. `UNSEAL` 은 암호화한 본문을 모르는 옛 버전으로 내리기 직전에만 켠다. 그동안에도 새 메시지는 계속 암호화되므로 내리기 전에 새 쓰기를 멈춘다. 기억의 제목·본문은 기동 때 따로 옮기고 이 값과 상관없다 |
+| `ASSISTANT_DATA_ENCRYPTION_BACKFILL_BATCH` | Backend | 위 배치가 한 번에 칸마다 고치는 줄 수. 기본 `200`. 주기는 `ASSISTANT_DATA_ENCRYPTION_BACKFILL_CRON`(기본 매분)이다 |
 | `HERMES_PROFILE_KEY_DIR` | Backend | profile 이름으로 된 key 파일이 들어 있는 디렉터리 |
 | `HERMES_DASHBOARD_BASE_URL` | Backend | profile 을 만드는 Hermes 대시보드 주소 |
 | `HERMES_DASHBOARD_TOKEN` | Backend | 그 대시보드가 기계에게 여는 경로에 보낼 토큰 |

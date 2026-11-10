@@ -107,7 +107,7 @@ class FileKeyEncryptionKeysTest {
 
 
     private static DataEncryptionProperties properties(String file, String activeId, boolean required) {
-        return new DataEncryptionProperties(file, activeId, required, Duration.ofMinutes(10), 1000);
+        return new DataEncryptionProperties(file, activeId, required, Duration.ofMinutes(10), 1000, null, 0);
     }
 
 

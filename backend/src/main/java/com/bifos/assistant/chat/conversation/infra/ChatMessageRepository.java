@@ -4,11 +4,14 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.TurnTiming;
 import com.bifos.assistant.chat.conversation.domain.UserLastMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -96,6 +99,42 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ChatMessage m where m.conversationId = :conversationId")
     int deleteAllOf(@Param("conversationId") Long conversationId);
+
+
+    /** 평문으로 남은 메시지의 번호를 번호 순으로 읽는다. 빈 본문은 암호화할 것이 없어 뺀다(ADR-20261008 / data-encryption). */
+    @Query("""
+            select m.id from ChatMessage m
+            where m.contentKeyId is null and length(m.storedContent) > 0 and m.id > :after
+            order by m.id
+            """)
+    List<Long> findPlainIds(@Param("after") Long after, Pageable pageable);
+
+
+    /** 암호문으로 저장된 메시지의 번호를 번호 순으로 읽는다. 풀기 배치가 쓴다. */
+    @Query("select m.id from ChatMessage m where m.contentKeyId is not null and m.id > :after order by m.id")
+    List<Long> findSealedIds(@Param("after") Long after, Pageable pageable);
+
+
+    @Query("select count(m) from ChatMessage m where m.contentKeyId is null and length(m.storedContent) > 0")
+    long countPlain();
+
+
+    @Query("select count(m) from ChatMessage m where m.contentKeyId is not null")
+    long countSealed();
+
+
+    /**
+     * 메시지 줄을 쓰기 잠금으로 읽는다. 대화 줄을 먼저 잡은 트랜잭션이 쓴다. 잠금 읽기는 가장 최근 커밋을 읽으므로, 이 트랜잭션 앞쪽의 일반 읽기가
+     * 잡은 MySQL 스냅샷의 옛 값을 보지 않는다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from ChatMessage m where m.id = :id")
+    Optional<ChatMessage> findByIdForUpdate(@Param("id") Long id);
+
+
+    /** 메시지 줄을 잠그기 전에 어느 대화 줄을 먼저 잠글지 알아낸다. 본문은 읽지 않는다. */
+    @Query("select m.conversationId from ChatMessage m where m.id = :id")
+    Optional<Long> findConversationId(@Param("id") Long id);
 
 
     @Query("""

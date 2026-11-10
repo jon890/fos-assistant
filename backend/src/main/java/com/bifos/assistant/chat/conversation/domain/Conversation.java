@@ -266,6 +266,14 @@ public class Conversation extends CreatedAtEntity {
     }
 
 
+    /** 암호문 제목을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다. */
+    public void unsealTitle(String plain) {
+        this.plainTitle = plain;
+        this.storedTitle = plain;
+        this.titleKeyId = null;
+    }
+
+
     /**
      * 질의로 채운 제목을 이 객체에 옮긴다. 저장소의 같은 칸에 적은 값과 같게 맞춘다. 평문이면 key 번호가 비어 있다.
      *
