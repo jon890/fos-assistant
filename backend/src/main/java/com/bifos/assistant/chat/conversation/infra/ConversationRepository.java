@@ -20,7 +20,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
-public interface ConversationRepository extends JpaRepository<Conversation, Long> {
+public interface ConversationRepository extends JpaRepository<Conversation, Long>, ConversationWrites<Conversation> {
 
     Optional<Conversation> findByIdAndUserIdAndDeletedAtIsNull(Long id, Long userId);
 
@@ -58,7 +58,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Conversation c
-               set c.title = '', c.hermesSessionId = null, c.hermesRootSessionId = null, c.purgedAt = :now
+               set c.storedTitle = '', c.titleKeyId = null, c.hermesSessionId = null, c.hermesRootSessionId = null, c.purgedAt = :now
              where c.id = :id and c.deletedAt is not null and c.purgedAt is null
             """)
     int markPurged(@Param("id") Long id, @Param("now") Instant now);
@@ -212,22 +212,31 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     int incrementAutoTurns(@Param("id") Long id);
 
 
-    /** 제목이 비어 있을 때만 채운다. 채웠으면 1 이다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
+    /**
+     * 제목이 비어 있을 때만 채운다. 채웠으면 1 이다. 트랜잭션은 {@code ConversationWriter} 가 연다.
+     *
+     * <p>엔티티 리스너를 거치지 않으므로 부르는 쪽이 암호문과 그 데이터 key 번호를 넘긴다. 암호화하지 않으면 {@code titleKeyId} 는 null 이다.
+     */
     @Modifying
-    @Query("update Conversation c set c.title = :title where c.id = :id and c.title = ''")
-    int fillTitleIfBlank(@Param("id") Long id, @Param("title") String title);
+    @Query("update Conversation c set c.storedTitle = :title, c.titleKeyId = :titleKeyId where c.id = :id and c.storedTitle = ''")
+    int fillTitleIfBlank(@Param("id") Long id, @Param("title") String title, @Param("titleKeyId") Long titleKeyId);
 
 
-    /** 그 사용자의 지우지 않은 대화일 때만 제목을 바꾼다. 트랜잭션은 {@code ConversationWriter} 가 연다. */
+    /**
+     * 그 사용자의 지우지 않은 대화일 때만 제목을 바꾼다. 트랜잭션은 {@code ConversationWriter} 가 연다.
+     *
+     * <p>{@code title} 과 {@code titleKeyId} 는 {@link #fillTitleIfBlank} 와 같다.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update Conversation c set c.title = :title, c.updatedAt = :now
+            update Conversation c set c.storedTitle = :title, c.titleKeyId = :titleKeyId, c.updatedAt = :now
              where c.id = :id and c.userId = :userId and c.deletedAt is null
             """)
     int renameIfActive(
         @Param("id") Long id,
         @Param("userId") Long userId,
         @Param("title") String title,
+        @Param("titleKeyId") Long titleKeyId,
         @Param("now") Instant now);
 
 
