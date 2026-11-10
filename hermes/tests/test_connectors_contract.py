@@ -27,6 +27,15 @@ SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 TOOL_SUMMARY_MAX_CHARS = 200
 # 검사에서 운영 목록 대신 넣는 자리표시 주소다. 실제 서비스 주소가 아니다.
 PLACEHOLDER_BASE_URL = "https://service.example"
+# Hermes 도구 검색은 등록 이름과 설명을 `[A-Za-z0-9]+` 로 잘라 색인한다. 한국어는 걸리지 않는다
+# (docs/features/naver-shopping.md 의 「도구와 정책」). 그래서 이름은 영어 낱말 둘 이상의 snake_case 다.
+TOOL_NAME_WORDS_RE = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)+")
+# 설명은 영어 요지 한 문장으로 시작한다. 첫 `.` 까지가 ASCII 이고 세 글자 이상의 낱말이 셋 이상이다.
+ENGLISH_LEAD_RE = re.compile(r"([A-Za-z0-9 ,'()/-]+)\.(\s|$)")
+# 영어 요지 검사를 받지 않는 플러그인이다. **늘리지 않는다.** 설명을 고치는 PR 에서 목록에서 뺀다.
+# 토스증권은 설명을 바꾸면 manifest SHA 가 바뀌어 열린 금융 승인이 무효가 되고, Gmail 과 네이버 블로그는 설명이 모델 지시문이라
+# 따로 동작을 확인해야 한다.
+ENGLISH_LEAD_EXEMPT = frozenset({"gmail", "naver-blog", "tossinvest"})
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
@@ -119,6 +128,31 @@ def closed_risk_problems(declared: dict) -> list[str]:
     return problems
 
 
+def tool_search_problems(name: str, tools: dict) -> list[str]:
+    """도구 검색이 영어 낱말로 도구를 찾게 하는 선언의 위반이다."""
+    problems = []
+    for tool, spec in tools.items():
+        if not TOOL_NAME_WORDS_RE.fullmatch(tool):
+            problems.append("도구 이름이 영어 낱말 둘 이상의 snake_case 가 아니다: %s" % tool)
+        if name in ENGLISH_LEAD_EXEMPT:
+            continue
+        lead = ENGLISH_LEAD_RE.match(str(spec.get("description", "")))
+        words = [w.lower() for w in re.findall(r"[A-Za-z]{3,}", lead.group(1))] if lead else []
+        if len(words) < 3 or not set(words) & set(tool.split("_")):
+            problems.append("설명이 도구 이름의 낱말을 담은 영어 요지 문장으로 시작하지 않는다: %s" % tool)
+    return problems
+
+
+def cross_connector_problems(roots: list[pathlib.Path]) -> list[str]:
+    """플러그인 사이의 위반이다. 도구 검색이 서버 이름 없이 걸리므로 같은 도구 이름이 두 플러그인에 있으면 안 된다."""
+    owners: dict[str, list[str]] = {}
+    for root in roots:
+        for tool in read_json(root / "assistant.json").get("tools", {}):
+            owners.setdefault(tool, []).append(root.name)
+    return ["두 플러그인이 같은 도구 이름을 쓴다: %s %s" % (tool, sorted(names))
+            for tool, names in sorted(owners.items()) if len(names) > 1]
+
+
 def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> list[str]:
     """플러그인 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
     name = root.name
@@ -161,6 +195,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
 
     tools = declared.get("tools", {})
     problems.extend(closed_risk_problems(declared))
+    problems.extend(tool_search_problems(name, tools))
     for tool, spec in tools.items():
         if spec.get("risk") != "READ" and not str(spec.get("title", "")).strip():
             problems.append("READ 가 아닌 도구에 title 이 없다: %s" % tool)
@@ -190,8 +225,8 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         if server.get("command") != "bun":
             problems.append(".mcp.json 의 command 가 bun 이 아니다: %r" % server.get("command"))
         entry = "dist/%s-mcp.js" % name
-        # Naver의 dotenv 차단은 필수다. 다른 옵션이나 인자 순서는 허용하지 않는다.
-        expected_args = (["--no-env-file"] if name == "naver-blog" else []) + ["${CLAUDE_PLUGIN_ROOT}/" + entry]
+        # 네이버 플러그인의 dotenv 차단은 필수다. 다른 옵션이나 인자 순서는 허용하지 않는다.
+        expected_args = (["--no-env-file"] if name in ("naver-blog", "naver-shopping") else []) + ["${CLAUDE_PLUGIN_ROOT}/" + entry]
         if server.get("args") != expected_args:
             problems.append(".mcp.json 이 빌드한 묶음 파일 하나를 실행하지 않는다")
         if not (root / entry).is_file():
@@ -261,6 +296,9 @@ class ConnectorsContractTest(base.ConnectorGateCase):
         for root in connector_dirs():
             with self.subTest(connector=root.name):
                 self.assertEqual(check_connector(root, REPO, self.plugin._load_connector), [])
+
+    def test_tool_names_do_not_repeat_across_connectors(self):
+        self.assertEqual(cross_connector_problems(connector_dirs()), [])
 
     def test_bundled_readme_links_survive_manifest_loading(self):
         for name in ("gmail", "naver-blog"):
@@ -399,6 +437,34 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
         self.assert_reported(gmail, "operator_env 가 비어 있지 않다")
         self.assert_reported(self.broken_copy(self.edit_declaration(
             lambda v: v.update(operator_secrets=["GMAIL_API_SECRET"]))), "operator_secrets")
+
+    def test_tool_without_english_lead_is_reported(self):
+        """새 플러그인의 설명이 영어 요지로 시작하지 않거나 도구 이름의 낱말이 없으면 위반이다."""
+        shopping = CONNECTORS / "naver-shopping"
+        for description in ("네이버 쇼핑에서 상품을 찾습니다.", "Find goods quickly online. 상품을 찾습니다.", "Search. 찾습니다."):
+            with self.subTest(description=description):
+                problems = self.broken_copy(self.edit_declaration(
+                    lambda v: v["tools"]["search_products"].update(description=description)), shopping)
+                self.assert_reported(problems, "영어 요지")
+
+    def test_single_word_tool_name_is_reported(self):
+        def rename(value):
+            value["tools"]["search"] = value["tools"].pop("search_products")
+        self.assert_reported(self.broken_copy(self.edit_declaration(rename), CONNECTORS / "naver-shopping"), "snake_case")
+
+    def test_same_tool_name_in_two_connectors_is_reported(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        roots = []
+        for name in ("naver-blog", "naver-shopping"):
+            root = pathlib.Path(tmp.name) / name
+            root.mkdir()
+            shutil.copy(CONNECTORS / name / "assistant.json", root / "assistant.json")
+            roots.append(root)
+        value = read_json(roots[1] / "assistant.json")
+        value["tools"]["session_status"] = value["tools"].pop("check_shopping_login")
+        (roots[1] / "assistant.json").write_text(json.dumps(value), encoding="utf-8")
+        self.assert_reported(cross_connector_problems(roots), "session_status")
 
     def test_naver_blog_without_dotenv_blocking_option_is_reported(self):
         self.assert_reported(self.broken_copy(self.edit_server(lambda server: server.update(

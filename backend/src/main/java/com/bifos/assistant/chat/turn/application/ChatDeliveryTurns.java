@@ -111,9 +111,19 @@ class ChatDeliveryTurns {
             owner,
             routed,
             delivery.input(),
-            new TurnIntent.DelegationResults(attempt, false, delivery.items()),
+            new TurnIntent.DelegationResults(attempt, false, delivery.items(), fromUnattended(results)),
             handle,
             onEvent);
+    }
+
+
+    /**
+     * 전할 위임 결과 가운데 사람이 없는 트리(예약 작업, 먼저 살펴보기)가 낸 것이 있는가. 있으면 결과를 전하는 turn 도 사람이 없는
+     * 실행이다. 승인한 동작의 결과는 사람이 승인한 뒤라 보지 않는다.
+     */
+    private boolean fromUnattended(List<AgentExecution> results) {
+        List<Long> roots = results.stream().map(AgentExecution::treeRootId).distinct().toList();
+        return !roots.isEmpty() && executionRepository.countUnattendedIn(roots) > 0;
     }
 
 
@@ -157,7 +167,7 @@ class ChatDeliveryTurns {
                 user,
                 routed,
                 delivery.input(),
-                new TurnIntent.DelegationResults(attempt, true, delivery.items()),
+                new TurnIntent.DelegationResults(attempt, true, delivery.items(), false),
                 handle,
                 onEvent);
         } finally {

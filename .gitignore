@@ -32,4 +32,5 @@ worktrees/
 # 커넥터의 생성 entry만 제외한다. 다른 dist 파일은 추적할 수 있다.
 /hermes/connectors/gmail/dist/gmail-mcp.js
 /hermes/connectors/naver-blog/dist/naver-blog-mcp.js
+/hermes/connectors/naver-shopping/dist/naver-shopping-mcp.js
 /hermes/connectors/tossinvest/dist/tossinvest-mcp.js

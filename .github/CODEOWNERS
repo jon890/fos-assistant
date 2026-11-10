@@ -3,5 +3,7 @@
 /hermes/connectors/gmail/tests/ @jon890
 /hermes/connectors/naver-blog/ @jon890
 /hermes/connectors/naver-blog/tests/ @jon890
+/hermes/connectors/naver-shopping/ @jon890
+/hermes/connectors/naver-shopping/tests/ @jon890
 /hermes/connectors/tossinvest/ @jon890
 /hermes/connectors/tossinvest/tests/ @jon890
