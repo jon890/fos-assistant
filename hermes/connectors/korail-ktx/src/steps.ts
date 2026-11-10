@@ -18,33 +18,66 @@ function station(name: string, input: string, value: string): Step[] {
     { name: `${name}.open`, kind: "click", target: input },
     { name: `${name}.clear`, kind: "select_all" },
     { name: `${name}.type`, kind: "type", text: value },
-    { name: `${name}.pick`, kind: "click", target: fill(F.STATION_OPTION, value), optional: true },
+    {
+      name: `${name}.pick`,
+      kind: "click",
+      target: fill(F.STATION_OPTION, value),
+      optional: true,
+    },
   ];
 }
 
 /** 어른은 처음에 1명이고 나머지는 0명이다. 그 차이만큼 더하기·빼기를 누른다. */
 function passengers(query: Query): Step[] {
-  const steps: Step[] = [{ name: "passengers.open", kind: "click", target: F.PASSENGER_OPEN }];
-  for (const [field, kind] of Object.entries(F.PASSENGER_KINDS) as [keyof typeof F.PASSENGER_KINDS, string][]) {
+  const steps: Step[] = [
+    { name: "passengers.open", kind: "click", target: F.PASSENGER_OPEN },
+  ];
+  for (const [field, kind] of Object.entries(F.PASSENGER_KINDS) as [
+    keyof typeof F.PASSENGER_KINDS,
+    string,
+  ][]) {
     const diff = query[field] - (field === "adults" ? 1 : 0);
     const target = fill(diff > 0 ? F.PASSENGER_PLUS : F.PASSENGER_MINUS, kind);
     for (let i = 0; i < Math.abs(diff); i++)
       steps.push({ name: `passengers.${field}`, kind: "click", target });
   }
-  steps.push({ name: "passengers.confirm", kind: "click", target: F.PASSENGER_CONFIRM, optional: true });
+  steps.push({
+    name: "passengers.confirm",
+    kind: "click",
+    target: F.PASSENGER_CONFIRM,
+    optional: true,
+  });
   return steps;
 }
 
 /** 조건 화면의 단계. 끝은 「열차 조회」 한 번이다. */
 export function conditionSteps(query: Query): Step[] {
   return [
-    { name: "notice.close", kind: "click", target: F.NOTICE_CLOSE, optional: true },
+    {
+      name: "notice.close",
+      kind: "click",
+      target: F.NOTICE_CLOSE,
+      optional: true,
+    },
     ...station("departure", F.DEPARTURE_INPUT, query.departure),
     ...station("arrival", F.ARRIVAL_INPUT, query.arrival),
     { name: "date.open", kind: "click", target: F.DATE_INPUT },
-    { name: "date.day", kind: "click", target: fill(F.CALENDAR_DAY, query.date.replaceAll("-", "")) },
-    { name: "date.hour", kind: "click", target: fill(F.CALENDAR_HOUR, String(query.hour).padStart(2, "0")) },
-    { name: "date.confirm", kind: "click", target: F.CALENDAR_CONFIRM, optional: true },
+    {
+      name: "date.day",
+      kind: "click",
+      target: fill(F.CALENDAR_DAY, query.date.replaceAll("-", "")),
+    },
+    {
+      name: "date.hour",
+      kind: "click",
+      target: fill(F.CALENDAR_HOUR, String(query.hour).padStart(2, "0")),
+    },
+    {
+      name: "date.confirm",
+      kind: "click",
+      target: F.CALENDAR_CONFIRM,
+      optional: true,
+    },
     ...passengers(query),
     { name: "lookup", kind: "click", target: F.LOOKUP_BUTTON },
   ];
@@ -53,9 +86,24 @@ export function conditionSteps(query: Query): Step[] {
 /** 목록 화면의 단계. 수서 함께 보기는 아직 안 골랐을 때만 누른다(spec DECISION12). */
 export function listSteps(query: Query, suseoChecked: boolean): Step[] {
   return [
-    { name: "list.notice", kind: "click", target: F.NOTICE_CLOSE, optional: true },
-    ...(suseoChecked ? [] : [{ name: "list.suseo", kind: "click", target: F.SUSEO_TOGETHER } as Step]),
+    {
+      name: "list.notice",
+      kind: "click",
+      target: F.NOTICE_CLOSE,
+      optional: true,
+    },
+    ...(suseoChecked
+      ? []
+      : [
+          {
+            name: "list.suseo",
+            kind: "click",
+            target: F.SUSEO_TOGETHER,
+          } as Step,
+        ]),
     { name: "list.ktx", kind: "click", target: F.KTX_TAB },
-    ...(query.seat_class === "first" ? [{ name: "list.first", kind: "click", target: F.FIRST_CLASS } as Step] : []),
+    ...(query.seat_class === "first"
+      ? [{ name: "list.first", kind: "click", target: F.FIRST_CLASS } as Step]
+      : []),
   ];
 }

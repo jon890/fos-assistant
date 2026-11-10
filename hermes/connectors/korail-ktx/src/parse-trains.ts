@@ -49,16 +49,20 @@ export function parseTrains(state: Json, query: Query): Train[] {
   for (const row of list(value.rows)) {
     const r = (row ?? {}) as Record<string, Json>;
     const type = text(r.type, 30);
-    const no = typeof r.no === "string" ? /\d{1,5}/.exec(r.no)?.[0] ?? null : null;
+    const no =
+      typeof r.no === "string" ? (/\d{1,5}/.exec(r.no)?.[0] ?? null) : null;
     const departs = minute(r.departs);
     const arrives = minute(r.arrives);
-    const seat = r[query.seat_class] as { text?: Json; bookable?: Json } | null | undefined;
+    const seat = r[query.seat_class] as
+      { text?: Json; bookable?: Json } | null | undefined;
     const missing = [
       ...(type === null ? ["type"] : []),
       ...(no === null ? ["no"] : []),
       ...(departs === null ? ["departs"] : []),
       ...(arrives === null ? ["arrives"] : []),
-      ...(seat === null || seat === undefined ? [`seat.${query.seat_class}`] : []),
+      ...(seat === null || seat === undefined
+        ? [`seat.${query.seat_class}`]
+        : []),
     ];
     if (missing.length) throw new MissingFields(missing);
     if (departs! < query.fromMinute) continue;
@@ -66,12 +70,19 @@ export function parseTrains(state: Json, query: Query): Train[] {
     const seatText = text(seat!.text, 200) ?? "";
     const fare = /([\d,]+)\s*원/.exec(seatText)?.[1];
     trains.push({
-      train_ref: [query.date, clock(departs!), type, no, query.departure, query.arrival].join("|"),
+      train_ref: [
+        query.date,
+        clock(departs!),
+        type,
+        no,
+        query.departure,
+        query.arrival,
+      ].join("|"),
       train_type: type!,
       train_no: no!,
       departs_at: `${query.date}T${clock(departs!)}`,
       arrives_at: `${overnight ? nextDay(query.date) : query.date}T${clock(arrives!)}`,
-      duration_min: (arrives! - departs! + (overnight ? 1440 : 0)),
+      duration_min: arrives! - departs! + (overnight ? 1440 : 0),
       seat_status: seat!.bookable === true ? "available" : "sold_out",
       status_text: [...seatText].slice(0, 30).join(""),
       adult_fare_krw: fare === undefined ? null : won(fare),

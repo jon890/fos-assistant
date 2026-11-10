@@ -10,7 +10,12 @@
 import { CdpSession, httpJson, wsUrlFor } from "./cdp.ts";
 import { classifyPage, pageError } from "./classify.ts";
 import { logDiagnostic, ToolError } from "./errors.ts";
-import { LIST_STATE, PAGE_PROBE, READY_STATE, SUSEO_CHECKED } from "./expressions.ts";
+import {
+  LIST_STATE,
+  PAGE_PROBE,
+  READY_STATE,
+  SUSEO_CHECKED,
+} from "./expressions.ts";
 import { LIST_PATH, SEARCH_URL } from "./fields.ts";
 import type { Query } from "./input.ts";
 import { conditionSteps, listSteps, type Step } from "./steps.ts";
@@ -56,7 +61,10 @@ class Tab {
   /** 화면을 분류해 사람이 해야 하는 화면이나 코레일의 거절이면 그 오류로 멈춘다. */
   async check() {
     if ((await this.evaluate(READY_STATE)) !== "complete") return false;
-    const probe = ((await this.evaluate(PAGE_PROBE)) ?? {}) as Record<string, unknown>;
+    const probe = ((await this.evaluate(PAGE_PROBE)) ?? {}) as Record<
+      string,
+      unknown
+    >;
     const error = pageError(classifyPage({ ...probe, dialog: this.dialog }));
     if (error) {
       this.keep = error.human;
@@ -66,7 +74,10 @@ class Tab {
   }
 
   /** 화면이 준비되고 `found` 가 값을 낼 때까지 기다린다. 기다리는 내내 분류한다. `limitMs` 를 넘으면 `null` 이다. */
-  async waitFor<T>(found: () => Promise<T | null>, limitMs: number): Promise<T | null> {
+  async waitFor<T>(
+    found: () => Promise<T | null>,
+    limitMs: number,
+  ): Promise<T | null> {
     const until = Date.now() + limitMs;
     for (;;) {
       if (await this.check()) {
@@ -88,47 +99,79 @@ class Tab {
     );
     try {
       if (!search.resultCount) return null;
-      const { nodeIds } = await this.send<{ nodeIds: number[] }>("DOM.getSearchResults", {
-        searchId: search.searchId,
-        fromIndex: 0,
-        toIndex: 1,
-      });
+      const { nodeIds } = await this.send<{ nodeIds: number[] }>(
+        "DOM.getSearchResults",
+        {
+          searchId: search.searchId,
+          fromIndex: 0,
+          toIndex: 1,
+        },
+      );
       const nodeId = nodeIds[0];
       if (!nodeId) return null;
       await this.send("DOM.scrollIntoViewIfNeeded", { nodeId }).catch(() => {});
-      const box = await this.send<{ model?: { content?: number[] } }>("DOM.getBoxModel", { nodeId }).catch(() => null);
+      const box = await this.send<{ model?: { content?: number[] } }>(
+        "DOM.getBoxModel",
+        { nodeId },
+      ).catch(() => null);
       const quad = box?.model?.content;
       if (!quad || quad.length < 8) return null;
       const x = (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4;
       const y = (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4;
       return { x, y };
     } finally {
-      await this.send("DOM.discardSearchResults", { searchId: search.searchId }).catch(() => {});
+      await this.send("DOM.discardSearchResults", {
+        searchId: search.searchId,
+      }).catch(() => {});
     }
   }
 
   async run(step: Step) {
-    if (step.kind === "type") return this.send("Input.insertText", { text: step.text });
+    if (step.kind === "type")
+      return this.send("Input.insertText", { text: step.text });
     if (step.kind === "select_all") {
       for (const type of ["keyDown", "keyUp"])
-        await this.send("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", modifiers: 2, windowsVirtualKeyCode: 65 });
+        await this.send("Input.dispatchKeyEvent", {
+          type,
+          key: "a",
+          code: "KeyA",
+          modifiers: 2,
+          windowsVirtualKeyCode: 65,
+        });
       return;
     }
-    const point = await this.waitFor(() => this.locate(step.target), step.optional ? 0 : this.options.stepMs);
+    const point = await this.waitFor(
+      () => this.locate(step.target),
+      step.optional ? 0 : this.options.stepMs,
+    );
     if (point === null) {
       if (step.optional) return;
       logDiagnostic(TOOL, `step.${step.name}`);
       throw new ToolError("KORAIL_PAGE_CHANGED");
     }
     const base = { x: point.x, y: point.y, button: "left", clickCount: 1 };
-    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y });
-    await this.send("Input.dispatchMouseEvent", { type: "mousePressed", ...base });
-    await this.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...base });
+    await this.send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: point.x,
+      y: point.y,
+    });
+    await this.send("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      ...base,
+    });
+    await this.send("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      ...base,
+    });
   }
 }
 
 /** 조건을 넣고 「열차 조회」 를 한 번 누른 뒤 목록 화면의 고르기를 하고 목록 JSON 글을 꺼낸다. */
-export async function searchInTab(cdpUrl: string, query: Query, options: TabOptions = {}) {
+export async function searchInTab(
+  cdpUrl: string,
+  query: Query,
+  options: TabOptions = {},
+) {
   const settings: Required<TabOptions> = {
     timeoutMs: options.timeoutMs ?? 60_000,
     stepMs: options.stepMs ?? 10_000,
@@ -152,26 +195,32 @@ export async function searchInTab(cdpUrl: string, query: Query, options: TabOpti
     const current = new Tab(session, deadline, settings);
     tab = current;
     session.onEvent("Page.javascriptDialogOpening", (params) => {
-      current.dialog = typeof params?.message === "string" ? params.message : "";
-      current.page.send("Page.handleJavaScriptDialog", { accept: false }).catch(() => {});
+      current.dialog =
+        typeof params?.message === "string" ? params.message : "";
+      current.page
+        .send("Page.handleJavaScriptDialog", { accept: false })
+        .catch(() => {});
     });
     await current.send("Page.enable");
     const nav = await current.send("Page.navigate", { url: SEARCH_URL });
     if (nav?.errorText) throw new ToolError("KORAIL_UNAVAILABLE");
     for (const step of conditionSteps(query)) await current.run(step);
-    const onList = await current.waitFor(
-      async () => {
-        const probe = ((await current.evaluate(PAGE_PROBE)) ?? {}) as { href?: unknown };
-        return typeof probe.href === "string" && new URL(probe.href).pathname.startsWith(LIST_PATH) ? true : null;
-      },
-      settings.stepMs,
-    );
+    const onList = await current.waitFor(async () => {
+      const probe = ((await current.evaluate(PAGE_PROBE)) ?? {}) as {
+        href?: unknown;
+      };
+      return typeof probe.href === "string" &&
+        new URL(probe.href).pathname.startsWith(LIST_PATH)
+        ? true
+        : null;
+    }, settings.stepMs);
     if (onList === null) {
       logDiagnostic(TOOL, "list.open");
       throw new ToolError("KORAIL_PAGE_CHANGED");
     }
     const suseo = await current.evaluate(SUSEO_CHECKED);
-    for (const step of listSteps(query, suseo === true)) await current.run(step);
+    for (const step of listSteps(query, suseo === true))
+      await current.run(step);
     const raw = await current.waitFor(async () => {
       const value = await current.evaluate(LIST_STATE);
       return typeof value === "string" ? value : null;
@@ -187,6 +236,9 @@ export async function searchInTab(cdpUrl: string, query: Query, options: TabOpti
   } finally {
     session?.close();
     if (!tab?.keep)
-      await httpJson(cdpUrl, `/json/close/${encodeURIComponent(targetId)}`).catch(() => {});
+      await httpJson(
+        cdpUrl,
+        `/json/close/${encodeURIComponent(targetId)}`,
+      ).catch(() => {});
   }
 }

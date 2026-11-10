@@ -198,8 +198,7 @@ export class CdpSession {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error)
-        pending.reject(new ToolError("KORAIL_UNAVAILABLE"));
+      if (message.error) pending.reject(new ToolError("KORAIL_UNAVAILABLE"));
       else pending.resolve(message.result ?? {});
       return;
     }

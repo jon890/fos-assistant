@@ -22,23 +22,34 @@ export const DATE_INPUT = 'input[name="startDate"]';
 export const LOOKUP_BUTTON = "button.btn_lookup";
 
 /** 가설: 역 이름을 넣은 뒤 고르는 자동완성 항목, 날짜 달력의 날과 시, 달력 확인 단추. */
-export const STATION_OPTION = '//li[contains(@class,"station")]//*[normalize-space(text())="{}"]';
+export const STATION_OPTION =
+  '//li[contains(@class,"station")]//*[normalize-space(text())="{}"]';
 export const CALENDAR_DAY = '[data-date="{}"]';
 export const CALENDAR_HOUR = '[data-hour="{}"]';
-export const CALENDAR_CONFIRM = '//button[normalize-space(.)="확인"][ancestor::*[contains(@class,"calendar")]]';
+export const CALENDAR_CONFIRM =
+  '//button[normalize-space(.)="확인"][ancestor::*[contains(@class,"calendar")]]';
 
 /** 본 것: 인원 선택을 여는 「총 1명」. 가설: 인원 층의 종류별 더하기·빼기 단추와 확인 단추. */
-export const PASSENGER_OPEN = '//a[contains(normalize-space(.),"총") and contains(normalize-space(.),"명")]';
-export const PASSENGER_PLUS = '//*[@data-psg="{}"]//button[contains(@class,"plus")]';
-export const PASSENGER_MINUS = '//*[@data-psg="{}"]//button[contains(@class,"minus")]';
-export const PASSENGER_CONFIRM = '//button[normalize-space(.)="확인"][ancestor::*[contains(@class,"psg") or contains(@class,"person")]]';
+export const PASSENGER_OPEN =
+  '//a[contains(normalize-space(.),"총") and contains(normalize-space(.),"명")]';
+export const PASSENGER_PLUS =
+  '//*[@data-psg="{}"]//button[contains(@class,"plus")]';
+export const PASSENGER_MINUS =
+  '//*[@data-psg="{}"]//button[contains(@class,"minus")]';
+export const PASSENGER_CONFIRM =
+  '//button[normalize-space(.)="확인"][ancestor::*[contains(@class,"psg") or contains(@class,"person")]]';
 /** 가설: 코레일 인원 층의 종류 이름. 어른은 처음에 1명이다(본 것: 「총 1명」). */
-export const PASSENGER_KINDS = { adults: "adult", children: "child", seniors: "senior" } as const;
+export const PASSENGER_KINDS = {
+  adults: "adult",
+  children: "child",
+  seniors: "senior",
+} as const;
 
 /** 본 것: 목록 화면의 「KTX/KTX-산천」 탭과 「서울·용산 - 수서 함께 보기」 고르기. 가설: 특실로 바꾸는 자리. */
 export const KTX_TAB = '//button[normalize-space(.)="KTX/KTX-산천"]';
 export const SUSEO_TOGETHER = 'input[name="adjStnScdlOfrFlg2"]';
-export const FIRST_CLASS = '//*[normalize-space(.)="특실"][self::a or self::button or self::label]';
+export const FIRST_CLASS =
+  '//*[normalize-space(.)="특실"][self::a or self::button or self::label]';
 
 /** 본 것: 운행 열차가 없을 때의 글. */
 export const EMPTY_TEXT = "운행하는 열차가 없습니다";
@@ -50,7 +61,8 @@ export const BOT_CHECK_WORD = "매크로";
 export const BOT_CHECK_CODE = /CODE\s*:\s*-8\d{3}/;
 
 /** 가설: 보안 문자 입력 요소. */
-export const CAPTCHA_SELECTOR = '[id*="captcha" i], [class*="captcha" i], img[src*="captcha" i]';
+export const CAPTCHA_SELECTOR =
+  '[id*="captcha" i], [class*="captcha" i], img[src*="captcha" i]';
 
 /**
  * 가설: 열차 목록 한 줄과 그 칸. 목록 꺼내기 식이 이 선택자로 칸마다 화면 글을 꺼낸다.

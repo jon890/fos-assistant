@@ -29,9 +29,7 @@ export function toolFailure(error: unknown) {
     ...(known?.detail ? { message: known.detail } : {}),
   };
   return {
-    content: [
-      { type: "text" as const, text: JSON.stringify({ error: body }) },
-    ],
+    content: [{ type: "text" as const, text: JSON.stringify({ error: body }) }],
     isError: true,
   };
 }

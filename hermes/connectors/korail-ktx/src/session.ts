@@ -24,7 +24,8 @@ const KORAIL_DOMAINS = new Set(["www.korail.com", ".korail.com", "korail.com"]);
 export function browserUrl(env: Env) {
   const cdpUrl = env[BROWSER_URL_ENV] ?? "";
   if (!cdpUrl) throw new ToolError("KORAIL_BROWSER_UNREACHABLE");
-  if (!BROWSER_URL_PATTERN.test(cdpUrl)) throw new ToolError("KORAIL_INVALID_INPUT");
+  if (!BROWSER_URL_PATTERN.test(cdpUrl))
+    throw new ToolError("KORAIL_INVALID_INPUT");
   return cdpUrl;
 }
 
@@ -32,18 +33,34 @@ export function browserUrl(env: Env) {
  * 브라우저 대상에 붙어 코레일 쿠키가 있는지 본다. 탭은 열지 않는다.
  * 코레일 쿠키가 하나도 없으면 「내 브라우저」 에서 코레일을 연 적이 없는 것이라 로그인이 필요하다고 답한다.
  */
-export async function checkLogin(env: Env, { timeoutMs = 8_000 }: { timeoutMs?: number } = {}) {
+export async function checkLogin(
+  env: Env,
+  { timeoutMs = 8_000 }: { timeoutMs?: number } = {},
+) {
   const cdpUrl = browserUrl(env);
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   // 중계는 꺼진 브라우저를 켜느라 이 요청을 붙잡을 수 있어 남은 시간을 모두 쓴다.
-  const version = await httpJson(cdpUrl, "/json/version", { timeoutMs: remaining() });
-  const debuggerUrl = (version as { webSocketDebuggerUrl?: unknown } | null)?.webSocketDebuggerUrl;
-  if (typeof debuggerUrl !== "string") throw new ToolError("KORAIL_BROWSER_UNREACHABLE");
-  const session = await CdpSession.connect(wsUrlFor(cdpUrl, debuggerUrl), remaining());
+  const version = await httpJson(cdpUrl, "/json/version", {
+    timeoutMs: remaining(),
+  });
+  const debuggerUrl = (version as { webSocketDebuggerUrl?: unknown } | null)
+    ?.webSocketDebuggerUrl;
+  if (typeof debuggerUrl !== "string")
+    throw new ToolError("KORAIL_BROWSER_UNREACHABLE");
+  const session = await CdpSession.connect(
+    wsUrlFor(cdpUrl, debuggerUrl),
+    remaining(),
+  );
   try {
-    const { cookies } = await session.send<{ cookies?: unknown }>("Storage.getCookies", {}, remaining());
-    const korail = (Array.isArray(cookies) ? cookies : []).some((cookie) => KORAIL_DOMAINS.has(cookie?.domain));
+    const { cookies } = await session.send<{ cookies?: unknown }>(
+      "Storage.getCookies",
+      {},
+      remaining(),
+    );
+    const korail = (Array.isArray(cookies) ? cookies : []).some((cookie) =>
+      KORAIL_DOMAINS.has(cookie?.domain),
+    );
     if (!korail) throw new ToolError("KORAIL_LOGIN_REQUIRED");
     return { browser: "connected", logged_in: "unknown" };
   } finally {

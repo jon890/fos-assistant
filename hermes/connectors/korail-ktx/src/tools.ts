@@ -5,11 +5,19 @@ import { browserUrl, type Env } from "./session.ts";
 import { searchInTab, type TabOptions } from "./tab.ts";
 import { parseJson } from "./values.ts";
 
-export type ToolDeps = { search: typeof searchInTab; tab?: TabOptions; now?: () => Date };
+export type ToolDeps = {
+  search: typeof searchInTab;
+  tab?: TabOptions;
+  now?: () => Date;
+};
 const DEFAULT_DEPS: ToolDeps = { search: searchInTab };
 
 /** 인자를 확인한 뒤 한 번만 조회한다. 「다음」 을 읽지 않고 다시 부르지 않는다(spec DECISION8, DECISION9). */
-export async function searchTrains(env: Env, args: SearchArgs, deps: ToolDeps = DEFAULT_DEPS) {
+export async function searchTrains(
+  env: Env,
+  args: SearchArgs,
+  deps: ToolDeps = DEFAULT_DEPS,
+) {
   const cdpUrl = browserUrl(env);
   const query = checkSearch(args, deps.now?.() ?? new Date());
   const raw = await deps.search(cdpUrl, query, deps.tab);

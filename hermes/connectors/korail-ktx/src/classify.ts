@@ -44,8 +44,10 @@ export function classifyPage(probe: Probe): PageKind {
 export function pageError(
   page: PageKind,
 ): { code: ErrorCode; human: boolean; message?: string } | null {
-  if (page.kind === "login") return { code: "KORAIL_LOGIN_REQUIRED", human: true };
-  if (page.kind === "bot_check") return { code: "KORAIL_BOT_CHECK", human: true };
+  if (page.kind === "login")
+    return { code: "KORAIL_LOGIN_REQUIRED", human: true };
+  if (page.kind === "bot_check")
+    return { code: "KORAIL_BOT_CHECK", human: true };
   if (page.kind === "captcha") return { code: "KORAIL_CAPTCHA", human: true };
   if (page.kind === "site_alert")
     return { code: "KORAIL_REJECTED", human: false, message: page.message };
