@@ -34,7 +34,7 @@
 
 ## 요구사항과 인수 조건
 
-인수 조건은 가짜 코레일 화면(테스트용 HTML)과 가짜 중계 위에서 확인한다. 실제 코레일 계정과 운영 브라우저로 확인하는 절차는 플러그인 기능 파일(`docs/features/korail-ktx-connector.md`)이 갖고 사용자가 직접 돈다. PR 마다 그 PR 의 도구만큼 절차를 더한다.
+인수 조건은 가짜 코레일 화면(테스트용 HTML)과 가짜 중계 위에서 확인한다. 실제 코레일 계정과 운영 브라우저로 확인하는 절차는 플러그인 기능 파일(`docs/features/korail-ktx.md`)이 갖고 사용자가 직접 돈다. PR 마다 그 PR 의 도구만큼 절차를 더한다.
 
 | ID | 요구사항 | 관측할 인수 조건 |
 | --- | --- | --- |
@@ -86,5 +86,5 @@
 
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| DECISION2, DECISION8, DECISION9 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-korail-ktx-connector.md` 를 새로 쓴다 | `docs/features/korail-ktx-connector.md` |
-| DECISION6, DECISION7, DECISION10, DECISION11 | 좌석 확보 경계 | PR2 가 같은 ADR 에 절을 더한다 | `docs/features/korail-ktx-connector.md` |
+| DECISION2, DECISION8, DECISION9 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-korail-ktx-connector.md` 를 새로 쓴다 | `docs/features/korail-ktx.md` |
+| DECISION6, DECISION7, DECISION10, DECISION11 | 좌석 확보 경계 | PR2 가 같은 ADR 에 절을 더한다 | `docs/features/korail-ktx.md` |
