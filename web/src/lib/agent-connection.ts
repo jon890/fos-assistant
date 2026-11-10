@@ -37,12 +37,12 @@ export function hasShellOrFileTool(enabled: readonly string[]): boolean {
   return enabled.some((name) => SHELL_OR_FILE_TOOLSETS.includes(name));
 }
 
-/** 줄의 상태를 화면 말로 바꾼다. 붙었지만 아직 쓸 수 있다고 확인되지 않았으면 반영 대기다. */
+/** 줄의 상태를 화면 말로 바꾼다. 붙었지만 아직 쓸 수 있다고 확인되지 않았으면 붙이는 중이다. */
 export function agentConnectionLabel(view: AgentConnectionView): string {
   if (!view.bound) return "붙지 않음";
   return view.status === "READY" && !view.restartRequired
     ? "붙음"
-    : "반영 대기";
+    : "붙이는 중";
 }
 
 export const listAgentConnections = (code: string) =>

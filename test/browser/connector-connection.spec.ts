@@ -972,7 +972,7 @@ test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async 
   ).toBe(true);
 });
 
-test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이어지며 카드에 수가 보인다", async ({
+test("붙인 에이전트는 이름과 붙이는 중으로 보이고 상세로 이어지며 카드에 수가 보인다", async ({
   page,
 }) => {
   const bindings = [
@@ -1010,8 +1010,8 @@ test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이�
   await page.goto(`/connections/${DEMO_ID}`);
   const rows = page.getByTestId("connection-binding");
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toContainText("반영 대기");
-  await expect(rows.nth(1)).not.toContainText("반영 대기");
+  await expect(rows.nth(0)).toContainText("붙이는 중");
+  await expect(rows.nth(1)).not.toContainText("붙이는 중");
   await expect(
     rows.nth(0).getByRole("link", { name: "숙제 도우미" }),
   ).toHaveAttribute("href", "/agents/agent-first");

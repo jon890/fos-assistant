@@ -273,11 +273,12 @@ test("저장 뒤 도구가 빠지면 다시 읽은 상태와 안내를 보인다
   await expect(
     web.getByText("이 도구를 켜지 못했어요. 관리자에게 알려 주세요."),
   ).toBeVisible();
+  // 표에 없는 도구 안내는 관리자 영역에서만 보인다. 일반 화면에서는 일반 사용자가 할 일이 없다.
   await expect(
     toolsSection(page).getByText(
       "표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.",
     ),
-  ).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("저장하는 동안 누른 도구에만 저장 중 표시를 한다", async ({ page }) => {

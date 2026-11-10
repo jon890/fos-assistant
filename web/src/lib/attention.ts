@@ -125,6 +125,11 @@ const REASONS: Record<
   PROACTIVE_REPORT_TRIGGER: [{ signal: null, text: "새 보고가 있어요" }],
 };
 
+/** 이유 줄을 그릴지다. 「이어서 하기」 카드의 항목은 이유가 모두 같은 말이라 줄을 감춘다. */
+export function showsReason(why: AttentionWhy): boolean {
+  return why.trigger !== "CONVERSATION_RECENT";
+}
+
 /**
  * 항목의 이유 한 줄이다. `signals` 가 여럿이면 표의 위쪽 줄을, 표에 없는 조합은 그 `trigger` 의 「없음」 줄을 쓴다.
  *
