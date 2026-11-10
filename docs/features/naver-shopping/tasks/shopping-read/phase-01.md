@@ -39,7 +39,7 @@
 
 ### 3. 실행 줄의 표식과 마이그레이션
 
-`agent_execution.unattended`(boolean, not null, 기본 거짓) 컬럼을 예약한 마이그레이션의 `ADD COLUMN ... COMMENT` 로 더한다. 이미 적용된 `db/comments/*.tsv` 는 Flyway 체크섬에 들어가 고치지 않는다. `TurnIntent.unattended(intent)` 가 `Scheduled`, `ProactiveCheck`, `DelegationResults.fromUnattended` 를 참으로 보고, `ChatTurnLifecycle.begin` 이 실행 줄을 만든 직후 `ExecutionRecorder.markUnattended` 로 적는다. `fromUnattended` 는 `ChatDeliveryTurns.runDelegationResults` 가 전할 위임 결과의 트리 루트로 계산한다(`AgentExecutionRepository.existsByIdInAndUnattendedTrue`). 승인 결과(extras)는 세지 않고, 다시 전달(`retryDelivery`)은 거짓이다.
+`agent_execution.unattended`(boolean, not null, 기본 거짓) 컬럼을 예약한 마이그레이션의 `ADD COLUMN ... COMMENT` 로 더한다. 이미 적용된 `db/comments/*.tsv` 는 Flyway 체크섬에 들어가 고치지 않는다. `TurnIntent.unattended(intent)` 가 `Scheduled`, `ProactiveCheck`, `DelegationResults.fromUnattended` 를 참으로 보고, `ChatTurnLifecycle.begin` 이 실행 줄을 만든 직후 `ExecutionRecorder.markUnattended` 로 적는다. `fromUnattended` 는 `ChatDeliveryTurns.runDelegationResults` 가 전할 위임 결과의 트리 루트로 계산한다(`AgentExecutionRepository.countUnattendedIn`). 엔티티 칸은 `insertable = false, updatable = false` 이고 쓰기와 읽기는 저장소의 쿼리만 한다. 승인 결과(extras)는 세지 않고, 다시 전달(`retryDelivery`)은 거짓이다.
 
 ### 4. 판정
 

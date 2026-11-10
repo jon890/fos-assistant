@@ -176,7 +176,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 
 #### 사람이 없는 실행의 표식
 
-`agent_execution` 에 컬럼 `unattended`(boolean, 기본 거짓)를 더한다. turn 을 열어 실행 줄을 만드는 `ChatTurnLifecycle.begin` 이 줄을 만든 직후, Hermes 에 보내기 전에 turn 의 의도로 정해 적는다(`ExecutionRecorder.markUnattended`). 그 뒤 바꾸지 않는다. 도구 호출은 Hermes 가 도는 동안에만 오므로 판정은 늘 적힌 값을 본다.
+`agent_execution` 에 컬럼 `unattended`(boolean, 기본 거짓)를 더한다. turn 을 열어 실행 줄을 만드는 `ChatTurnLifecycle.begin` 이 줄을 만든 직후, Hermes 에 보내기 전에 turn 의 의도로 정해 적는다(`ExecutionRecorder.markUnattended`). 엔티티 칸은 넣지도 고치지도 않게 두고 저장소의 쿼리로만 쓰고 읽어, 다른 흐름의 엔티티 저장이 값을 덮지 않게 한다. 그 뒤 바꾸지 않는다. 도구 호출은 Hermes 가 도는 동안에만 오므로 판정은 늘 적힌 값을 본다.
 
 | turn 의도 | 표식 |
 | --- | --- |
