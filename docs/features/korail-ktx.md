@@ -5,7 +5,7 @@
 covers: `hermes/connectors/korail-ktx/`
 
 코드는 [`hermes/connectors/korail-ktx/`](../../hermes/connectors/korail-ktx) 에 있다. 사용자 안내는 [코레일 KTX 플러그인 README](../../hermes/connectors/korail-ktx/README.md) 가 갖는다.
-요구와 결정은 스펙 [`korail-ktx/spec.md`](korail-ktx/spec.md), 구조는 설계 [`korail-ktx/design.md`](korail-ktx/design.md), 결정의 근거는 [ADR-20261110 / korail-ktx-connector](../adr/ADR-20261110-korail-ktx-connector.md) 가 갖는다.
+요구와 결정은 스펙 [`korail-ktx/spec.md`](korail-ktx/spec.md), 구조는 설계 [`korail-ktx/design.md`](korail-ktx/design.md), 결정의 근거는 [ADR-20261110 / korail-ktx-connector](../../hermes/docs/adr/ADR-20261110-korail-ktx-connector.md) 가 갖는다.
 사람이 연 대화에서만 부르는 도구(`attended_only`)와 도구 이름 검사는 [네이버 쇼핑 플러그인](naver-shopping.md)이 만든 공통 기반이다.
 
 **예매하거나 결제하지 않는다.** 지금은 조회뿐이다. 좌석 확보와 결제 화면 넘기기는 스펙의 PR2 가 더한다.

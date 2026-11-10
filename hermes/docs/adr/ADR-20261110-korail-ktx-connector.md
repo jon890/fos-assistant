@@ -4,13 +4,13 @@
 - Date: 2026-11-10
 - **decision-type**: `architecture`
 - **areas**: `security, operations`
-- **현재 규칙의 원본**: [코레일 KTX 플러그인](../features/korail-ktx.md), 스펙 [`docs/features/korail-ktx/spec.md`](../features/korail-ktx/spec.md)(사용자 확인 2026-11-10), 설계 [`design.md`](../features/korail-ktx/design.md)
-- [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) 의 `attended_only` 경계와 도구 이름 검사, [ADR-20261007 / user-browser](ADR-20261007-user-browser.md) 의 사용자 브라우저와 중계를 그대로 쓴다.
+- **현재 규칙의 원본**: [코레일 KTX 플러그인](../../../docs/features/korail-ktx.md), 스펙 [`docs/features/korail-ktx/spec.md`](../../../docs/features/korail-ktx/spec.md)(사용자 확인 2026-11-10), 설계 [`design.md`](../../../docs/features/korail-ktx/design.md)
+- [ADR-20261110 / naver-shopping-connector](../../../docs/adr/ADR-20261110-naver-shopping-connector.md) 의 `attended_only` 경계와 도구 이름 검사, [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 사용자 브라우저와 중계를 그대로 쓴다.
 
 ### 결정
 
 **코레일 KTX 플러그인은 「내 브라우저」 의 새 탭에서 코레일 조회 조건 화면을 열고, 고정 단계로 조건을 넣어 「열차 조회」 를 한 번 누른 뒤 목록을 고정 식으로 읽는다.**
-좌석 확보는 이 결정의 PR1 범위 밖이고, PR2 가 이 ADR 에 절을 더한다.
+좌석 확보는 이 결정의 범위 밖이다. PR2 는 backend 의 승인 틀에 걸쳐 루트 `docs/adr/` 에 따로 ADR 을 쓴다.
 
 | 항목 | 정한 것 |
 | --- | --- |

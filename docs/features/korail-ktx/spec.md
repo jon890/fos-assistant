@@ -86,5 +86,5 @@
 
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| DECISION2, DECISION8, DECISION9 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-korail-ktx-connector.md` 를 새로 쓴다 | `docs/features/korail-ktx.md` |
-| DECISION6, DECISION7, DECISION10, DECISION11 | 좌석 확보 경계 | PR2 가 같은 ADR 에 절을 더한다 | `docs/features/korail-ktx.md` |
+| DECISION2, DECISION8, DECISION9 | 플러그인 정책 | PR1 이 `hermes/docs/adr/ADR-20261110-korail-ktx-connector.md` 를 새로 쓴다 | `docs/features/korail-ktx.md` |
+| DECISION6, DECISION7, DECISION10, DECISION11 | 좌석 확보 경계 | PR2 가 루트 `docs/adr/` 에 좌석 확보 ADR 을 새로 쓴다(backend 승인 틀에 걸친다) | `docs/features/korail-ktx.md` |
