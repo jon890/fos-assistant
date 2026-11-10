@@ -27,7 +27,7 @@
 
 | ID | 해결 방법 |
 | --- | --- |
-| REQ1 | `agent` 에 `description`, `icon`, `color` 컬럼을 더한다. 주인과 `ADMIN` 이 `PATCH /api/v1/agents/{code}/introduction` 으로, `ADMIN` 은 남의 비공개 에이전트를 관리자 경로로 이름과 셋을 고친다. 아이콘과 색은 Control Plane 의 고정 목록으로 검사한다. 할 수 있는 일은 `AgentCapabilitiesReader` 가 연결과 바인딩이 모두 READY 인 플러그인 이름과 올린 스킬 이름으로 모은다 |
+| REQ1 | `agent` 에 `description`, `icon`, `color` 컬럼을 더한다. 주인과 `ADMIN` 이 `PATCH /api/v1/agents/{code}/introduction` 으로 이름과 셋을 고친다. `ADMIN` 은 지우기처럼 남의 비공개 에이전트에도 닿는다. 아이콘과 색은 Control Plane 의 고정 목록으로 검사한다. 할 수 있는 일은 `AgentCapabilitiesReader` 가 연결과 바인딩이 모두 READY 인 플러그인 이름과 올린 스킬 이름으로 모은다 |
 | REQ2 | `AgentView` 에 소개, 아이콘, 색, 할 수 있는 일을 싣는다. 화면은 부품 `AgentBadge` 하나로 답, 대화 머리, 목록, 새 대화 카드, `@` 목록을 그린다. 답 이름표는 대화 줄(`ConversationView`)의 에이전트 칸으로 그린다. `agent_list` 결과에도 소개와 할 수 있는 일을 싣는다. 첫 에이전트는 이름 「비서」 와 고정 소개로 만들고, 이미 있는 첫 에이전트는 마이그레이션이 바꾼다 |
 | REQ3 | (PR2) 이력 API 의 `ASSISTANT` 줄에 그 실행이 바로 맡긴 위임 자식(`delegation_key` 가 있는 자식 실행)의 에이전트와 상태를 싣는다. 도는 동안은 기존 `subagent` 사건과 대화 단위 SSE 로 상태를 바꾼다 |
 | REQ4 | (PR2) `SYSTEM` 알림 줄에 전달 묶음(`result_delivery`)의 자식 실행 에이전트를 싣는다. 승인 줄(`connector_action.agent_id`)이 대화의 에이전트와 다르면 카드에 그 에이전트를 싣는다 |
@@ -44,9 +44,10 @@ PR1 의 책임이다.
 | 자리 | 맡는 것 |
 | --- | --- |
 | `agent.domain.Agent` | 소개, 아이콘, 색 칸과 `changeIntroduction(introduction)` |
+| `agent.domain.type.AgentColor` | 색 이름 enum |
 | `agent.domain.AgentIntroduction` | 이름(100자), 소개(60자) 상한과 아이콘 목록, 색 목록을 갖는 값. 앞뒤 공백을 떼고 빈 소개·아이콘·색은 null 로 둔다. 지금 `AgentLifecycleService.requireName` 의 이름 판정을 여기로 옮기고 만들기도 이것을 부른다 |
-| `agent.application.AgentService` | `changeIntroduction(user, code, introduction)`. 다른 쓰기 경로처럼 `requireReadableForUpdate` 로 행을 잠그고 다시 읽은 뒤 `isEditableBy` 로 판정한다. `Agent` 는 `@DynamicUpdate` 가 없어 저장할 때 모든 칸을 쓰므로, 잠그지 않으면 그 사이 바뀐 공개 범위·사용 여부·주인·`deleted_at` 을 옛 값으로 덮는다 |
-| `admin.agent` | `PATCH /api/v1/admin/agents/{code}/introduction` 과 `AdminAgentView` 의 새 칸. 관리자가 남의 비공개 에이전트를 고치는 길이다. 일반 경로는 `requireReadable` 을 먼저 지나 남의 비공개 에이전트를 찾지 못한다. 페르소나와 같은 나눔이다(docs/features/agent-skill.md 「에이전트 화면」) |
+| `agent.application.AgentLifecycleService` | `changeIntroduction(user, code, introduction)`. 공개 범위 바꾸기와 같이 트랜잭션 밖에서 번호를 찾고 안에서 `findByIdForUpdate` 로 행을 잠가 다시 읽은 뒤, 지우기와 같은 판정(`ADMIN` 이거나 읽을 수 있고, `ADMIN` 이거나 주인)을 한다. `Agent` 는 `@DynamicUpdate` 가 없어 저장할 때 모든 칸을 쓰므로, 잠그지 않으면 그 사이 바뀐 공개 범위·사용 여부·주인·`deleted_at` 을 옛 값으로 덮는다 |
+| `admin.agent.presentation.AgentAdminDtos` | `AdminAgentView` 에 소개, 아이콘, 색을 더한다. 관리자 영역 상세가 남의 비공개 에이전트의 값을 읽는 자리다. 쓰기는 일반 경로를 쓴다 |
 | `agent.application.AgentCapabilitiesReader` | 에이전트 목록의 할 수 있는 일을 한 번에 모은다. 두 port 를 부른다 |
 | `agent.application.port.AgentConnectorNames` (새 port) | `readyConnectorNames(Collection<Long> agentIds)`. `connector` 가 연결과 바인딩이 모두 READY 인 줄을 한 번에 읽고 플러그인 이름을 카탈로그 캐시로 찾는다. 대시보드를 부를 수 있어 「대시보드를 부르지 않는다」 가 약속인 `AgentConnectorBindings` 와 나눈다 |
 | `agent.application.port.ProfileSkillFiles` | `uploadedNames(String profile)` 을 더한다. 지금 버전과 표식 없이 남은 더 새 버전의 이름을 합친다(`NewSkillRules.uploadedNames` 와 같은 기준). `SkillStore` 에 번들 본문을 읽지 않고 디렉터리 이름만 읽는 메서드를 더한다 |
@@ -55,10 +56,10 @@ PR1 의 책임이다.
 | `people.application.FirstAgentCreator` | 새 첫 에이전트를 「비서」 와 고정 소개로 만든다 |
 | `web/src/app/globals.css` | 색 여덟의 밝은 화면·어두운 화면 토큰 쌍([rule-56](../../code-rules/rule-56.md)) |
 | `web/src/lib/agent-badge.ts` | 색 목록과 토큰 class 대응, 자동 색, 머리글자. 서버 목록과 같은 값을 갖는다 |
-| `web/src/components/agent/agent-badge.tsx` | 아이콘이나 머리글자를 색 원 안에 그리는 부품 하나 |
+| `web/src/components/agent/agent-badge.tsx` | 아이콘이나 머리글자를 색 원 안에 그리는 부품 하나와, 답 줄에 그 대화의 에이전트를 알리는 context(`AnswerAgentProvider`). 답 말풍선과 기다림 줄이 같은 값을 props 를 거치지 않고 읽는다 |
 | `web/src/components/agent/agent-introduction-section.tsx` | 상세의 「소개」 절. 이름, 소개, 아이콘, 색을 고치고 고칠 수 없는 사람에게는 읽기만 보인다 |
 
-상세 화면의 「소개」 절은 일반 상세와 관리자 영역 상세가 같은 부품을 쓰고, 부르는 경로만 다르다. 성격 절이 이미 같은 방식이다.
+상세 화면의 「소개」 절은 일반 상세와 관리자 영역 상세가 같은 부품과 같은 쓰기 경로를 쓴다. 읽는 값만 관리자 영역은 `AdminAgentView` 에서 온다.
 
 ## 인터페이스와 데이터
 
@@ -80,11 +81,11 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 - 주인이 그 사람이다. `agent.owner_user_id` 가 `allowed_person.email` 로 찾은 `app_user.id` 다. 관리자가 주인을 바꾼 에이전트는 바꾸지 않는다
 - `deleted_at` 이 비었다
 
-바꾸는 값은 `name = '비서'`, `description` 이 비었을 때 고정 소개, `updated_at` 은 이관 시각이다(「저장 감사 시각」 규칙).
+바꾸는 값은 `name = '비서'` 와, `description` 이 비었을 때 고정 소개다. 사람이 저장한 것이 아니어서 `updated_at` 은 바꾸지 않는다.
 
 ### 값의 목록
 
-목록은 `AgentIntroduction` 이 원본이고 화면의 `agent-badge.ts` 가 같은 값을 갖는다. 둘이 어긋나면 서버가 거절하므로, 화면 테스트가 서버 목록 응답과 대조하지 않고 단위 테스트가 두 목록의 글자를 대조한다.
+아이콘 목록과 상한은 `AgentIntroduction`, 색 이름은 enum `AgentColor` 가 원본이고 화면의 `agent-badge.ts` 가 같은 값을 갖는다. 둘이 어긋나면 서버가 거절하므로, 단위 테스트 `test/unit/agent-badge.test.ts` 가 두 Java 파일과 화면 목록의 글자를 대조한다.
 
 - 색: `VIOLET`, `BLUE`, `TEAL`, `GREEN`, `AMBER`, `ORANGE`, `ROSE`, `SLATE`. 테마의 밝은 화면과 어두운 화면 모두에서 글자 대비가 맞는 class 를 `agent-badge.ts` 가 고른다([rule-56](../../code-rules/rule-56.md))
 - 아이콘: 쇼핑, 기차, 메일, 일정, 돈, 글쓰기, 책, 집, 요리, 건강, 여행, 음악, 사진, 코드, 별, 비서 같은 뜻의 이모지 24개 안쪽. 코드에 목록 하나로 둔다
@@ -130,9 +131,9 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 | --- | --- |
 | 답 말풍선 `AssistantRow` | 그 대화의 에이전트 `AgentBadge` 와 이름. `MessageBubble` 과 `message-list.tsx` 의 기다림 줄, 모든 호출처에 넘긴다. 값은 `ConversationView` 에 더하는 `agentIcon`, `agentColor` 와 기존 `agentCode`, `agentName` 이다. 지웠지만 정리 전인 에이전트(`deleted_at` 이 있다)도 `agentCode`, `agentName` 을 null 로 내 「지운 에이전트」 로 그린다. 꺼진 에이전트도 대화 줄의 값으로 아이콘과 색을 그린다 |
 | 대화 머리 | 이름 앞에 `AgentBadge`. 좁은 화면의 잠긴 대화는 이름을 숨기던 자리에 `AgentBadge` 만 보인다(DECISION15) |
-| 새 대화 화면 카드, 에이전트 목록 `/agents` | `AgentBadge`, 이름, 소개 한 줄과 그 아래 할 수 있는 일 「네이버 쇼핑 · 장보기」. 소개가 없으면 소개 자리를 비우고 할 수 있는 일만 보인다 |
+| 새 대화 화면 카드, 에이전트 목록 `/agents` | `AgentBadge`, 이름, 소개 한 줄과 그 아래 할 수 있는 일 「네이버 쇼핑 · 장보기」. 소개가 없으면 소개 자리를 비우고 할 수 있는 일만 보인다. 카드와 `@` 줄의 접근성 이름은 에이전트 이름만 둔다 |
 | `@` 목록 | `AgentBadge` 와 이름, 소개 한 줄. 좁은 목록이라 할 수 있는 일은 싣지 않는다 |
-| 에이전트 상세 | 맨 위에 「소개」 절. 이름, 소개(남은 글자 수), 아이콘 고르기, 색 고르기, 저장. 할 수 있는 일은 읽기만 |
+| 에이전트 상세 | 성격 다음에 「소개」 절. 이름, 소개(남은 글자 수), 아이콘 고르기, 색 고르기, 저장. 할 수 있는 일은 읽기만. 대화 줄이 아직 없는 새 대화는 목록의 값으로 그린다 |
 
 답마다 에이전트를 싣지 않는다. PR1 에서 한 대화의 답은 모두 그 대화의 에이전트가 쓰기 때문이다. `@` 로 다른 에이전트가 답하는 PR4 에서 `MessageView` 에 답을 쓴 에이전트를 더한다.
 
@@ -147,7 +148,7 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 
 | 요구사항 | 경계와 환경 |
 | --- | --- |
-| REQ1 | backend 통합 테스트: 주인·`ADMIN` 은 저장, 관리자 경로로 남의 비공개 에이전트 저장, 다른 사용자는 거절, 상한과 목록 밖 값 거절, 빈 값은 null, 저장이 공개 범위를 덮지 않음. 할 수 있는 일은 연결과 바인딩이 모두 READY 인 것만, 카탈로그 실패에 플러그인만 빠짐, 표식 없는 더 새 버전의 스킬 이름 포함. 마이그레이션은 H2 와 CI 의 MySQL job. DML 은 `GroupSettingMysqlMigrationTest` 처럼 MySQL 하위 검사를 둔다 |
+| REQ1 | backend 통합 테스트: 주인·`ADMIN` 은 저장, `ADMIN` 이 남의 비공개 에이전트 저장, 다른 사용자는 거절, 상한과 목록 밖 값 거절, 빈 값은 null, 저장이 공개 범위를 덮지 않음. 할 수 있는 일은 연결과 바인딩이 모두 READY 인 것만, 카탈로그 실패에 플러그인만 빠짐, 표식 없는 더 새 버전의 스킬 이름 포함. 마이그레이션은 H2 와 CI 의 MySQL job. DML 은 `GroupSettingMysqlMigrationTest` 처럼 MySQL 하위 검사를 둔다 |
 | REQ2 | backend: `GET /api/v1/agents` 와 `agent_list` 의 새 칸, 첫 로그인 에이전트의 이름과 소개, DML 이 조건에 맞는 줄만 바꾸는지. 브라우저: 답 이름표, 좁은 화면 이름표, 상세 저장 뒤 목록과 대화에 반영, 읽기 전용 표시. 화면 흐름이 바뀌므로 PR 에 `검사:전체` 라벨 |
 | 공통 | 두 목록(아이콘, 색)의 글자 대조 단위 테스트 |
 
