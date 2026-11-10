@@ -77,6 +77,28 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     Optional<Conversation> findActiveByIdAndUserIdForUpload(@Param("id") Long id, @Param("userId") Long userId);
 
 
+    /** 평문으로 남은 제목의 대화 번호를 번호 순으로 읽는다. 빈 제목은 평문 빈 글이 규칙이라 뺀다(ADR-20261008 / data-encryption). */
+    @Query("""
+            select c.id from Conversation c
+            where c.titleKeyId is null and length(c.storedTitle) > 0 and c.id > :after
+            order by c.id
+            """)
+    List<Long> findPlainTitleIds(@Param("after") Long after, Pageable pageable);
+
+
+    /** 암호문 제목의 대화 번호를 번호 순으로 읽는다. 풀기 배치가 쓴다. */
+    @Query("select c.id from Conversation c where c.titleKeyId is not null and c.id > :after order by c.id")
+    List<Long> findSealedTitleIds(@Param("after") Long after, Pageable pageable);
+
+
+    @Query("select count(c) from Conversation c where c.titleKeyId is null and length(c.storedTitle) > 0")
+    long countPlainTitles();
+
+
+    @Query("select count(c) from Conversation c where c.titleKeyId is not null")
+    long countSealedTitles();
+
+
     /** 메시지 저장과 빈 대화 삭제가 같은 대화 줄을 먼저 잠근다. 목록에서 숨긴 대화도 물리적으로 남아 있으면 읽는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Conversation c where c.id = :id")

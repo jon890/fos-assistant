@@ -56,6 +56,28 @@ public class ChatMessageContents implements MessageContentOpener {
     }
 
 
+    /**
+     * 방금 적은 암호문이 그 평문으로 풀리는지 본다. 이미 있는 줄을 암호화하는 배치가 잘못된 암호문으로 옛 본문을 잃지 않게 한다.
+     */
+    public boolean opensTo(ChatMessage message, Long ownerUserId, String plain) {
+        return cipher.open(message.contentKeyId(), ownerUserId, aad(message, ownerUserId), message.storedContent())
+            .filter(plain::equals)
+            .isPresent();
+    }
+
+
+    /**
+     * 암호문 본문을 주인의 key 로 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다.
+     *
+     * @return 풀지 못하면(key 가 없거나 태그가 맞지 않음) 거짓이고 줄은 그대로다
+     */
+    public boolean unseal(ChatMessage message, Long ownerUserId) {
+        Optional<String> opened = cipher.open(message.contentKeyId(), ownerUserId, aad(message, ownerUserId), message.storedContent());
+        opened.ifPresent(message::unseal);
+        return opened.isPresent();
+    }
+
+
     /** 새 메시지를 암호화해 저장하는가. 거짓이면 평문으로 저장한다 */
     public boolean sealing() {
         return cipher.enabled();

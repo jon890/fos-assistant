@@ -1,5 +1,6 @@
 package com.bifos.assistant.crypto.config;
 
+import com.bifos.assistant.crypto.application.dto.BackfillDirection;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -15,11 +16,19 @@ import org.springframework.validation.annotation.Validated;
  * @param required 참이면 KEK 가 없을 때 기동을 멈춘다
  * @param dekCacheTtl 푼 데이터 key 를 메모리에 두는 시간
  * @param dekCacheMaxEntries 메모리에 두는 데이터 key 의 수. 넘으면 가장 오래 쓰지 않은 것부터 버린다
+ * @param backfill 이미 있는 줄을 매분 고치는 배치의 방향. 비우면 {@code SEAL} 이다
+ * @param backfillBatch 한 번에 칸마다 고치는 줄 수의 상한. 0 이하면 200 이다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.data-encryption")
 public record DataEncryptionProperties(
-    String kekFile, String activeKekId, boolean required, Duration dekCacheTtl, int dekCacheMaxEntries) {
+    String kekFile,
+    String activeKekId,
+    boolean required,
+    Duration dekCacheTtl,
+    int dekCacheMaxEntries,
+    BackfillDirection backfill,
+    int backfillBatch) {
 
     public DataEncryptionProperties {
         kekFile = kekFile == null ? "" : kekFile.strip();
@@ -27,6 +36,10 @@ public record DataEncryptionProperties(
         dekCacheTtl = dekCacheTtl == null ? Duration.ofMinutes(10) : dekCacheTtl;
         if (dekCacheMaxEntries <= 0) {
             dekCacheMaxEntries = 1000;
+        }
+        backfill = backfill == null ? BackfillDirection.SEAL : backfill;
+        if (backfillBatch <= 0) {
+            backfillBatch = 200;
         }
         if (kekFile.isEmpty() != activeKekId.isEmpty()) {
             throw new IllegalArgumentException("data encryption: kek-file 과 active-kek-id 는 함께 채우거나 함께 비워야 한다");

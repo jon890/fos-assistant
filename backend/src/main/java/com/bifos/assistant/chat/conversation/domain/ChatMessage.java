@@ -147,6 +147,14 @@ public class ChatMessage {
     }
 
 
+    /** 암호문을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다. */
+    public void unseal(String plainContent) {
+        this.plain = plainContent;
+        this.storedContent = plainContent;
+        this.contentKeyId = null;
+    }
+
+
     public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content, Instant now) {
         return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
     }
