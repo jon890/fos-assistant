@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -219,6 +220,23 @@ class McpAgentToolsTest {
             .isEqualTo("integer");
         assertThat(status.path("required").get(0).asString()).isEqualTo("execution_id");
         assertThat(status.path("additionalProperties").asBoolean()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("agent list 는 소개가 있는 에이전트에 description 을 싣고 없는 에이전트에는 싣지 않는다")
+    void agentListCarriesDescriptionOnlyWhenPresent() throws Exception {
+        Agent group = agents.findByCode(GROUP_CODE).orElseThrow();
+        group.changeIntroduction(AgentIntroduction.of(group.name(), "자료를 찾아 정리해요", null, null));
+        agents.save(group);
+        String root = McpCallSigner.newRoot();
+        McpCallSigner.running(executions, userA.id(), null, PRIVATE_A, root);
+
+        JsonNode listed = agentList(privateAToken, root);
+
+        assertThat(find(listed, GROUP_CODE).propertyNames()).containsExactly("code", "name", "description");
+        assertThat(find(listed, GROUP_CODE).path("description").asString()).isEqualTo("자료를 찾아 정리해요");
+        assertThat(find(listed, OWN_A_CODE).propertyNames()).containsExactly("code", "name");
     }
 
 

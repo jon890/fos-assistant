@@ -99,9 +99,14 @@ export const delegationScenario: Scenario = {
       expect(codes.includes(AGENT_CODE), `맡길 수 있는 에이전트가 목록에 없다: ${codes}`);
       expect(!codes.includes("kid-tools"), `아이의 개인 에이전트가 아빠 목록에 있다: ${codes}`);
       expect(!codes.includes("native-delegation"), `꺼진 에이전트가 목록에 있다: ${codes}`);
+      // 소개와 할 수 있는 일은 비어 있지 않을 때만 실린다(docs/features/agent-team/spec.md 의 REQ2). profile 과 주소는 싣지 않는다.
+      const allowedKeys = new Set(["code", "name", "description", "connectors", "skills"]);
       expect(
-        listed.every((agent) => Object.keys(agent).join(",") === "code,name"),
-        `목록 항목에 code 와 name 밖의 칸이 있다: ${JSON.stringify(listed)}`,
+        listed.every(
+          (agent) =>
+            "code" in agent && "name" in agent && Object.keys(agent).every((key) => allowedKeys.has(key)),
+        ),
+        `목록 항목에 code, name, 소개, 할 수 있는 일 밖의 칸이 있다: ${JSON.stringify(listed)}`,
       );
 
       step("agent_delegate 가 바로 번호와 RUNNING 을 주고, 붙잡은 자식은 agent_status 가 RUNNING 이다");

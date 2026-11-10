@@ -1,15 +1,19 @@
 package com.bifos.assistant.agent.presentation;
 
+import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.dto.AgentCapabilities;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
+import com.bifos.assistant.agent.presentation.AgentDtos.ChangeIntroductionRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.ChangeVisibilityRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateOwnAgentRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,13 +34,18 @@ public class AgentController {
     private final AgentService agents;
     private final CurrentUserProvider currentUser;
     private final AgentLifecycleService lifecycle;
+    private final AgentCapabilitiesReader capabilitiesReader;
 
 
     /** 요청자가 쓸 수 있는 에이전트를 준다. 추천 질문은 에이전트마다 따로 읽는다. */
     @GetMapping
     public List<AgentView> readable() {
         CurrentUser user = currentUser.require();
-        return agents.readableBy(user).stream().map(agent -> view(user, agent)).toList();
+        List<Agent> readable = agents.readableBy(user);
+        Map<Long, AgentCapabilities> capabilities = capabilitiesReader.read(readable);
+        return readable.stream()
+            .map(agent -> view(user, agent, capabilities.getOrDefault(agent.id(), AgentCapabilities.NONE)))
+            .toList();
     }
 
 
@@ -46,6 +55,14 @@ public class AgentController {
     public AgentView create(@RequestBody CreateOwnAgentRequest request) {
         CurrentUser user = currentUser.require();
         return view(user, lifecycle.create(user, request.name(), request.visibility()));
+    }
+
+
+    /** 주인이나 {@code ADMIN} 이 이름과 소개, 아이콘, 색을 바꾼다(docs/features/agent-team/spec.md 의 REQ1). */
+    @PatchMapping("/{code}/introduction")
+    public AgentView changeIntroduction(@PathVariable String code, @RequestBody ChangeIntroductionRequest request) {
+        CurrentUser user = currentUser.require();
+        return view(user, lifecycle.changeIntroduction(user, code, request.toIntroduction()));
     }
 
 
@@ -66,9 +83,15 @@ public class AgentController {
 
 
     private AgentView view(CurrentUser user, Agent agent) {
+        return view(user, agent, capabilitiesReader.read(List.of(agent)).getOrDefault(agent.id(), AgentCapabilities.NONE));
+    }
+
+
+    private AgentView view(CurrentUser user, Agent agent, AgentCapabilities capabilities) {
         return AgentView.from(
             agent,
             agents.isEditableBy(user, agent),
-            Objects.equals(agent.ownerUserId(), user.id()));
+            Objects.equals(agent.ownerUserId(), user.id()),
+            capabilities);
     }
 }

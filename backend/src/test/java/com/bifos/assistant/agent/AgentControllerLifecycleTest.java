@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -51,7 +52,7 @@ class AgentControllerLifecycleTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new AgentController(new AgentService(agents), currentUser, lifecycle))
+        new AgentController(new AgentService(agents), currentUser, lifecycle, mock(AgentCapabilitiesReader.class)))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 

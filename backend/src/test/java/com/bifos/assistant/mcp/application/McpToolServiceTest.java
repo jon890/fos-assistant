@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
@@ -60,6 +61,7 @@ class McpToolServiceTest {
         QueryEmbedder.disabled(),
         artifacts,
         mock(AgentDelegationService.class),
+        mock(AgentCapabilitiesReader.class),
         mock(ExecutionDeliveryWriter.class),
         mock(ExecutionOutputs.class),
         mock(ExecutionContextSourceWriter.class),
@@ -136,6 +138,7 @@ class McpToolServiceTest {
             embedder,
             artifacts,
             mock(AgentDelegationService.class),
+            mock(AgentCapabilitiesReader.class),
             mock(ExecutionDeliveryWriter.class),
             mock(ExecutionOutputs.class),
             mock(ExecutionContextSourceWriter.class),

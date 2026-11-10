@@ -7,9 +7,11 @@ import com.bifos.assistant.skill.library.infra.SkillStore;
 import java.util.List;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /** {@link ProfileSkillFiles} 를 {@link SkillStore} 로 넘겨 준다. */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProfileSkillFilesAdapter implements ProfileSkillFiles {
@@ -33,6 +35,18 @@ public class ProfileSkillFilesAdapter implements ProfileSkillFiles {
             .distinct()
             .sorted()
             .toList();
+    }
+
+
+    /** 읽지 못하면 빈 목록과 경고 로그다. 에이전트 목록이 스킬 디렉터리 장애로 실패하지 않게 한다. */
+    @Override
+    public List<String> uploadedNames(String profile) {
+        try {
+            return skillStore.uploadedNames(profile);
+        } catch (RuntimeException ex) {
+            log.warn("uploaded skill names unreadable profile={} reason={}", profile, ex.getClass().getSimpleName());
+            return List.of();
+        }
     }
 
 

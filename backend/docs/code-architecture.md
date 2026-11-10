@@ -315,12 +315,13 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
 `connector.connection.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
-`agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 셋으로 부른다. `connector` 가 `agent` 보다 위라서다.
+`agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 아래 port 로 부른다. `connector` 가 `agent` 보다 위라서다.
 
 | port | 하는 일 | 구현 | 부르는 곳 |
 | --- | --- | --- | --- |
 | `AgentConnectorBindings` | `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 저장한 바인딩만 읽고 대시보드를 부르지 않는다 | `ConnectorBindingLookup` | 공개 범위 변경과 관리자 수정(비공개 유지), 도구 저장과 스킬 게시(붙은 서버 이름을 함께 보낸다), 실행 기록의 도구 내용 가림, 먼저 살펴보기의 시작 전 점검과 지시 |
 | `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
+| `AgentConnectorNames` | `readyConnectorNames`. 연결과 바인딩이 모두 `READY` 인 플러그인의 이름이다. 카탈로그 캐시가 비었으면 대시보드를 부르고, 읽지 못하면 이름을 비운다 | `ConnectorNameLookup` | 에이전트 목록과 `agent_list` 의 할 수 있는 일(`AgentCapabilitiesReader`) |
 | `AgentPurgeParticipant` | 지운 에이전트를 정리할 때 바인딩을 지우고, 연결과 승인 줄의 `agent_id` 를 비운다 | `ConnectorAgentPurge` | 지운 에이전트 정리 |
 
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
@@ -336,7 +337,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.approval.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
 | `connector.approval.application.ConnectorFinancialIntake` | 플러그인의 금융 준비 도구 호출을 금융 준비로 넘긴다. 살펴보기 트리와 지금 열지 않는 동작은 줄 없이 막는다([ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)) |
 | `connector.approval.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
-| `connector.connection.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
+| `connector.connection.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 연결 화면은 쓰지 않는다. 에이전트 목록의 플러그인 이름(`ConnectorNameLookup`)만 쓴다. 이름은 60초 늦어도 위험이 없다 |
 | `connector.action.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.action.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
 

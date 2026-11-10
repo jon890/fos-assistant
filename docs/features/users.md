@@ -162,6 +162,7 @@ profile 을 만드는 경로가 에이전트 만들기와 같아 MCP 등록과 �
 ### 첫 에이전트의 기본 도구
 
 첫 로그인에 만든 에이전트에 `assistant.people.default-toolsets` 의 도구를 켠다.
+이 에이전트가 그 사용자의 기본 비서이고, 이름 「비서」 와 고정 소개(`AgentIntroduction.PRIMARY_DESCRIPTION`)로 만든다. 사용자 표시 이름을 쓰면 답 이름표에 사람 이름이 뜨기 때문이다([에이전트 팀](agent-team/spec.md) 의 DECISION5).
 주인 등급이거나 실행 공간에서만 도는 도구가 아니면 기동하지 않는다.
 결정과 감당할 것은 [ADR-20261008 / default-toolsets](../adr/ADR-20261008-default-toolsets.md) 가 갖는다.
 

@@ -144,6 +144,40 @@ class ProfileSkillFilesAdapterTest {
     }
 
 
+    @Test
+    @DisplayName("올린 스킬 이름은 지금 버전과 표식 없는 더 새 버전을 합쳐 이름순으로 돌린다")
+    void listsUploadedNamesFromCurrentAndPendingVersions(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        ProfileSkillFilesAdapter adapter = new ProfileSkillFilesAdapter(store);
+        assertThat(adapter.uploadedNames(PROFILE)).isEmpty();
+
+        writeWeeklyPlan(store, SKILL_MD, true);
+        store.writeVersion(
+            PROFILE,
+            Map.of(
+                "weekly-plan", new SkillBundle("weekly-plan", SKILL_MD, List.of()),
+                "meal-plan", new SkillBundle("meal-plan", skillNamed("meal-plan"), List.of())));
+
+        assertThat(adapter.uploadedNames(PROFILE)).containsExactly("meal-plan", "weekly-plan");
+    }
+
+
+    @Test
+    @DisplayName("새 게시가 성공하면 그보다 오래된 표식 없는 버전의 이름은 빠진다")
+    void excludesNamesOfSupersededPendingVersions(@TempDir Path root) {
+        SkillStore store = storeAt(root);
+        store.writeVersion(PROFILE, Map.of("meal-plan", new SkillBundle("meal-plan", skillNamed("meal-plan"), List.of())));
+        writeWeeklyPlan(store, SKILL_MD, true);
+
+        assertThat(new ProfileSkillFilesAdapter(store).uploadedNames(PROFILE)).containsExactly("weekly-plan");
+    }
+
+
+    private static String skillNamed(String name) {
+        return "---\nname: " + name + "\ndescription: 검사용 스킬\n---\n# " + name + "\n";
+    }
+
+
     private static void writeWeeklyPlan(SkillStore store, String skillMd, boolean published) {
         String version = store.writeVersion(PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", skillMd, List.of())));
         if (published) {
