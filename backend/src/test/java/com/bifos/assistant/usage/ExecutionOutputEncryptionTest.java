@@ -131,6 +131,18 @@ class ExecutionOutputEncryptionTest {
 
 
     @Test
+    @DisplayName("실행 줄의 주인을 바꾸면 암호문이 풀리지 않는다")
+    void changedOwnerMakesCiphertextUnreadable() {
+        AgentExecution execution = finishedWith(ANSWER);
+        jdbc.update("UPDATE agent_execution SET user_id = ? WHERE id = ?", user().id(), execution.id());
+        dataKeys.forgetCachedKeys();
+
+        assertThat(outputs.open(executions.findById(execution.id()).orElseThrow()))
+            .isEqualTo(ExecutionOutputs.UNREADABLE_OUTPUT);
+    }
+
+
+    @Test
     @DisplayName("대화 정리가 답과 key 칸을 모두 비운다")
     void clearOutputsOfNullsBothColumns() {
         AgentExecution execution = finishedWith(ANSWER);
