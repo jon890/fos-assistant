@@ -44,7 +44,7 @@ const COLOR_LABELS: Record<AgentColor, string> = {
 type ErrorPayload = { code: string; message: string };
 
 /**
- * 에이전트의 이름, 한 줄 소개, 아이콘, 색을 고치는 절이다(docs/features/agent-skill.md 「소개와 할 수 있는 일」).
+ * 에이전트의 이름, 한 줄 소개, 아이콘, 색을 고치는 절이다(docs/features/agent-team.md 「소개와 할 수 있는 일」).
  * 고칠 수 없는 사람에게는 읽기만 보인다. 할 수 있는 일은 붙인 서비스와 스킬에서 모으므로 여기서 고치지 않는다.
  */
 export function AgentIntroductionSection({

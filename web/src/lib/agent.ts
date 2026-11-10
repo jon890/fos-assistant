@@ -17,7 +17,7 @@ export type AdminAgent = {
   color?: string | null;
 };
 
-/** 에이전트가 할 수 있는 일이다. 붙어 쓸 수 있는 플러그인 이름과 올린 스킬 이름이다(docs/features/agent-skill.md 「소개와 할 수 있는 일」). */
+/** 에이전트가 할 수 있는 일이다. 붙어 쓸 수 있는 플러그인 이름과 올린 스킬 이름이다(docs/features/agent-team.md 「소개와 할 수 있는 일」). */
 export type AgentCapabilities = {
   connectors: string[];
   skills: string[];
