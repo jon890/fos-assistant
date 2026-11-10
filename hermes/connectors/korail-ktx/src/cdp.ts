@@ -27,10 +27,7 @@ export function endpoint(cdpUrl: string) {
   return cdpUrl.replace(/\/+$/, "");
 }
 
-/**
- * Chrome 디버깅 HTTP 창구(`/json/version`, `/json/list`, `/json/new?<주소>`, `/json/close/<id>`)를 부른다.
- * JSON 이 아닌 답(`/json/close` 의 글)은 글 그대로 돌려준다. 닿지 않거나 2xx 가 아니면 원문 없이 실패한다.
- */
+/** Chrome 디버깅 HTTP 창구를 부른다. JSON 이 아닌 답은 글 그대로 주고, 닿지 않거나 2xx 가 아니면 원문 없이 실패한다. */
 export async function httpJson(
   cdpUrl: string,
   path: string,
@@ -60,10 +57,8 @@ export async function httpJson(
 }
 
 /**
- * 브라우저가 준 `webSocketDebuggerUrl` 의 경로만 꺼내 받은 주소의 호스트와 포트에 붙인다.
- * 중계가 적는 호스트는 커넥터가 닿는 호스트와 다를 수 있어서다.
- * 받은 주소에 경로(중계의 접근 표식)가 있으면 그 경로 아래의 `devtools/` 만 받는다.
- * 다른 경로를 받으면 표식 밖의 창구로 붙게 되므로 닿지 않음으로 끝낸다.
+ * 브라우저가 준 `webSocketDebuggerUrl` 의 경로만 꺼내 받은 주소의 호스트에 붙인다(중계가 적는 호스트는 다를 수 있다).
+ * 중계의 접근 표식 아래 `devtools/` 만 받는다. 다른 경로는 표식 밖의 창구라 닿지 않음으로 끝낸다.
  */
 export function wsUrlFor(cdpUrl: string, webSocketDebuggerUrl: string) {
   let base: URL;
@@ -99,10 +94,7 @@ export class CdpSession {
     socket.addEventListener("error", () => this.shutdown());
   }
 
-  /**
-   * 대상 하나에 붙는다. 브라우저 대상에는 Page 도메인이 없어 붙자마자 아무것도 켜지 않는다.
-   * `Origin` 머리를 싣지 않는다. 중계는 `Origin` 이 있는 요청을 브라우저 페이지의 요청으로 보고 거절한다.
-   */
+  /** 대상 하나에 붙고 아무것도 켜지 않는다. 중계가 거절하므로 `Origin` 머리를 싣지 않는다. */
   static connect(wsUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
     clearProxyEnvironment();
     return new Promise<CdpSession>((resolve, reject) => {
@@ -166,10 +158,7 @@ export class CdpSession {
     });
   }
 
-  /**
-   * 이름이 같은 이벤트가 올 때마다 부를 함수를 건다. 돌려준 함수를 부르면 뗀다.
-   * 탭에 뜬 대화 상자처럼 언제 올지 모르는 이벤트를 연결 내내 받을 때 쓴다.
-   */
+  /** 이름이 같은 이벤트가 올 때마다 부를 함수를 건다(탭의 대화 상자 등). 돌려준 함수를 부르면 뗀다. */
   onEvent(method: string, listener: (params: any) => void) {
     const listeners = this.listeners.get(method) ?? new Set();
     this.listeners.set(method, listeners);
