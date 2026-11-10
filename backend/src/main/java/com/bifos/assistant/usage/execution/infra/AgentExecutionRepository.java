@@ -466,7 +466,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /** 그 대화 실행의 답 본문을 비운다. 토큰과 금액은 남긴다. 트랜잭션은 {@code ConversationExecutionPurge} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update AgentExecution e set e.outputText = null
+            update AgentExecution e set e.outputText = null, e.outputKeyId = null
              where e.conversationId = :conversationId and e.outputText is not null
             """)
     int clearOutputsOf(@Param("conversationId") Long conversationId);

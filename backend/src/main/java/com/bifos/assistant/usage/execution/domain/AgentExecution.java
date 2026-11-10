@@ -85,9 +85,18 @@ public class AgentExecution {
     @Column(name = "delegation_key", unique = true, length = 64)
     private String delegationKey;
 
-    /** 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다. */
+    /**
+     * 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다.
+     *
+     * <p>{@link #outputKeyId()} 가 있으면 암호문이다. 이 접근자는 저장된 글을 그대로 내므로 답을 읽는 곳은
+     * {@code ExecutionOutputs#open} 을 쓴다.
+     */
     @Column(name = "output_text", columnDefinition = "MEDIUMTEXT")
     private String outputText;
+
+    /** {@code output_text} 를 암호화한 사용자 데이터 key 번호. 비어 있으면 평문이다(ADR-20261008 / data-encryption). */
+    @Column(name = "output_key_id")
+    private Long outputKeyId;
 
     @Column(name = "provider", length = 64)
     private String provider;
@@ -342,6 +351,14 @@ public class AgentExecution {
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
     public void recordOutput(String outputText) {
         this.outputText = outputText;
+        this.outputKeyId = null;
+    }
+
+
+    /** 암호화한 답과 그것을 연 데이터 key 의 번호를 함께 적는다. */
+    public void recordSealedOutput(String sealed, Long keyId) {
+        this.outputText = sealed;
+        this.outputKeyId = keyId;
     }
 
 
