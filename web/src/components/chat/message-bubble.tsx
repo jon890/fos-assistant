@@ -354,6 +354,7 @@ export function MessageBubble({
       >
         <AnswerBody
           content={turn.content}
+          reveal={turn.reveal}
           streaming={streaming}
           nextUserMessage={nextUserMessage}
           onAnswer={streaming ? undefined : onAnswer}

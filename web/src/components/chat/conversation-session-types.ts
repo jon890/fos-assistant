@@ -4,6 +4,7 @@ import { type useConversation } from "@/components/shell/conversations-provider"
 import type { ChatEvent } from "@/lib/chat-event";
 import type { AgentView } from "@/lib/agent";
 import type { TurnStreamText } from "./turn-stream-text";
+import type { PendingAnswer } from "./pending-answer";
 
 export type ErrorPayload = { code: string; message: string };
 
@@ -62,12 +63,18 @@ export type ObservedTurnFilter = {
   phase: "waiting" | "skipping" | "passed";
 };
 /** 대화 단위 SSE 로 받아 그리고 있는 자동 turn 이다. `pendingId` 는 흘러오는 답 조각의 임시 식별자다. */
-export type AutoTurn = { state: TurnStreamState; pendingId: string };
+export type AutoTurn = {
+  state: TurnStreamState;
+  pendingId: string;
+  answer: PendingAnswer;
+};
 export type TurnStreamCallbacks = {
   onSystem?(event: ChatEvent): void;
   onStarted?(event: ChatEvent): void | Promise<void>;
   onDelta?(text: string): void;
   onReset?(): void;
+  /** 중간 안내로 받은 글이 `text` 로 줄었다. 이미 보인 앞부분은 그대로 둔다. */
+  onReplace?(text: string): void;
   onDone?(event: ChatEvent): void | Promise<void>;
   onError?(event: ChatEvent): void | Promise<void>;
 };
