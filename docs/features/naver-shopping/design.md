@@ -182,7 +182,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 | --- | --- |
 | `Scheduled`(예약 작업) | 참 |
 | `ProactiveCheck`(먼저 살펴보기, 매일 깨우기, 사건 감지) | 참 |
-| `DelegationResults`(맡긴 일의 결과를 전하는 자동 turn) | `ChatDeliveryTurns` 가 전할 위임 결과(`AgentExecution`)의 트리 루트를 읽어 하나라도 참이면 참(`TurnIntent.DelegationResults.fromUnattended`). 승인한 동작의 결과(`AutoTurnResult`)는 사람이 승인한 뒤라 세지 않는다. 사람이 누른 다시 전달(`retry`)은 사람이 있는 turn 이라 거짓 |
+| `DelegationResults`(맡긴 일의 결과를 전하는 자동 turn) | `ChatDeliveryTurns` 가 전할 위임 결과(`AgentExecution`)의 트리 루트를 읽어 하나라도 참이면 참(`TurnIntent.DelegationResults.fromUnattended`). 승인한 동작의 결과(`AutoTurnResult`)는 사람이 승인한 뒤라 세지 않는다. 사람이 누른 다시 전달(`retry`)은 사람이 그 자리에서 요청한 turn 이라 결과의 출처와 상관없이 거짓(spec DECISION32 의 「사람이 연 대화 안의 흐름」) |
 | `Fresh`, `Regenerate` | 거짓 |
 
 판정은 호출한 실행의 트리 루트 줄의 표식을 `SessionOwnerResolver.unattendedTree` 로 본다. 이 빈은 이미 실행 줄 저장소를 갖고 도구 판정이 origin 을 찾을 때 쓴다. 루트 줄을 찾지 못하면 사람이 없는 쪽(참)으로 본다. 위임 자식은 루트로 판정하므로 살펴보기나 예약 작업이 맡긴 자식도 막힌다.
@@ -215,6 +215,9 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 실제 네이버 화면과 계정은 이 작업에서 쓰지 못한다. 기능 파일의 「실제 계정으로 확인하기」 를 사용자가 배포 뒤 돈다. 그 전까지 REQ2, REQ3 은 가짜 화면에서만 확인된 것으로 PR 본문에 적는다.
 
 ## PR2 방향(화면 넘기기)
+
+- 사람이 해야 하는 화면에서 남긴 탭이 반복되면 쌓인다. 사람이 마친 뒤와 같은 종류의 화면을 다시 만났을 때 앞서 남긴 탭을 닫는 규칙을 정한다
+- 이동한 뒤 최종 주소가 네이버 호스트가 아니면 읽지 않고 끝내는 검사를 더한다. PR1 은 네이버 상품과 묶음 주소만 열고 고정 읽기 식만 부르므로 다른 사이트로 넘어가도 누르기나 입력은 없다
 
 - 화면 넘기기 카드는 Control Plane 이 만든다. 카드의 종류와 탭은 플러그인 결과에서 오고, 모델이 쓴 글로 결제 금액 같은 값을 그리지 않는다
 - 읽기 도구는 승인 없이 결과가 모델에게 바로 가 Control Plane 이 결과를 보지 못한다. PR2 는 아래에서 고른다.

@@ -13,4 +13,4 @@
 | REQ2 | 배포한 플러그인, 사용자의 실제 네이버 계정과 「내 브라우저」 | 기능 파일의 「실제 계정으로 확인하기」 의 검색 | 검색이 실제 화면에서 결과를 낸다. 안 되면 `fields.ts` 를 맞춘다 | 운영(사용자가 직접 돈다) | 코디네이터 | 배포 | PR 뒤 |
 | REQ3 | 배포한 플러그인, 사용자의 실제 네이버 계정과 「내 브라우저」 | 기능 파일의 「실제 계정으로 확인하기」 의 상세 | 상세가 실제 화면에서 결과를 낸다. 안 되면 `fields.ts` 를 맞춘다 | 운영(사용자가 직접 돈다) | 코디네이터 | 배포 | PR 뒤 |
 | REQ1 | 카탈로그의 naver-shopping 항목 | 계약 검사의 로그인 주소 단언 | `owner_browser_login_url` 이 네이버 로그인 화면 주소다 | 로컬 Python | worker | 없음 | PR 전 |
-| REQ6 | 승인 결과만 전하는 turn, 매일 깨우기(살펴보기) turn | `ChatTurnQuestionTest` 와 `ToolPolicyDecisionTest` | 승인 결과 turn 은 사람이 있는 실행이고, 살펴보기 turn 은 사람이 없는 실행이라 거절된다 | 로컬 Gradle | worker | 없음 | PR 전 |
+| REQ6 | 승인 결과만 전하는 turn, 다시 전달, 매일 깨우기 turn, 사람이 연 루트와 사람이 없는 루트의 위임 자식, 루트 줄이 없는 실행, 카탈로그의 `attended_only` | `ChatTurnQuestionTest`, `TaskRunStarterTest` 의 깨우기 사례, `SessionOwnerResolverTest`, `HttpHermesConnectorClientTest` | 승인 결과 turn 과 다시 전달은 사람이 있는 실행, 깨우기 turn 은 표식이 적히고, 위임 자식은 루트를 따르며, 루트 줄이 없으면 사람이 없는 쪽, boolean 이 아닌 선언은 참 | 로컬 Gradle | worker | 없음 | PR 전 |
