@@ -6,6 +6,7 @@ import {
   AGENT_COLORS,
   AGENT_DESCRIPTION_MAX_CHARS,
   AGENT_ICONS,
+  AGENT_NAME_MAX_CHARS,
   autoColor,
   badgeColorClass,
   capabilitiesLine,
@@ -30,6 +31,7 @@ test("아이콘 목록과 소개 상한은 backend 의 AgentIntroduction 과 같
   const icons = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(icons, [...AGENT_ICONS]);
   assert.match(source, new RegExp(`MAX_DESCRIPTION_CHARS = ${AGENT_DESCRIPTION_MAX_CHARS};`));
+  assert.match(source, new RegExp(`MAX_NAME_CHARS = ${AGENT_NAME_MAX_CHARS};`));
 });
 
 test("자동 색은 같은 코드에 늘 같고 코드가 없으면 회색이다", () => {

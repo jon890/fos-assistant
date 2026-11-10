@@ -122,7 +122,7 @@ export function AgentIntroductionSection({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{preview.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {description.trim() || capabilities || "아직 소개가 없어요"}
+            {description.trim() || capabilities}
           </p>
         </div>
       </div>
