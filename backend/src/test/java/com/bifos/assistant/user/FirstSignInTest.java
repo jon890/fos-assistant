@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.infra.HermesModelClient;
@@ -79,7 +80,7 @@ class FirstSignInTest {
         assertThat(agents.findByCode(PROFILE))
             .get()
             .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl)
-            .containsExactly(NAME, PROFILE, expectedApiBaseUrl());
+            .containsExactly(AgentIntroduction.PRIMARY_NAME, PROFILE, expectedApiBaseUrl());
     }
 
 
