@@ -76,6 +76,27 @@ export function ConnectorLink({
   );
 }
 
+/** 개발자에게만 뜻 있는 정보(도구 수, 설명서 링크)를 접어 둔다. 일반 사용자는 펼치지 않아도 연결할 수 있다. */
+export function ConnectorDetailsFold({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <details
+      data-testid="connector-details"
+      className={cn("min-w-0 text-sm", className)}
+    >
+      <summary className="w-fit cursor-pointer rounded-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
+        자세히
+      </summary>
+      <div className="mt-1 space-y-1">{children}</div>
+    </details>
+  );
+}
+
 /** 공식 서비스나 프로젝트와 플러그인 설명서를 서로 다른 이름으로 연다. */
 export function ConnectorLinks({
   connector,
@@ -126,7 +147,12 @@ export function ConnectorHeading({
         {connector?.description ? (
           <CardDescription>{connector.description}</CardDescription>
         ) : null}
-        <ConnectorLinks connector={connector} title={title} />
+        {connectorAppearanceLinkHref(connector?.link) ||
+        connectorAppearanceLinkHref(connector?.readmeUrl) ? (
+          <ConnectorDetailsFold>
+            <ConnectorLinks connector={connector} title={title} />
+          </ConnectorDetailsFold>
+        ) : null}
       </div>
     </div>
   );

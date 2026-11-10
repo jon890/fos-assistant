@@ -18,6 +18,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   ConnectorIcon,
+  ConnectorDetailsFold,
   ConnectorLinks,
 } from "@/components/connector/connector-identity";
 import {
@@ -110,14 +111,7 @@ function ConnectorCard({
       {hasCardContent(connector, loginHref) ? (
         <CardContent className="min-w-0 space-y-1">
           {connector.available ? (
-            connector.tools.length > 0 ? (
-              <p
-                className="line-clamp-2 break-words text-sm text-muted-foreground"
-                data-testid="connector-tool-summary"
-              >
-                {toolSummary(connector.tools)}
-              </p>
-            ) : connector.standardPlugin ? (
+            connector.tools.length > 0 ? null : connector.standardPlugin ? (
               <p
                 className="text-sm text-muted-foreground"
                 data-testid="connector-standard-notice"
@@ -143,11 +137,21 @@ function ConnectorCard({
               아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라 주세요.
             </p>
           ) : null}
-          <ConnectorLinks
-            connector={connector}
-            title={connector.title}
-            className="relative z-10"
-          />
+          {(connector.available && connector.tools.length > 0) ||
+          connectorAppearanceLinkHref(connector.link) ||
+          connectorAppearanceLinkHref(connector.readmeUrl) ? (
+            <ConnectorDetailsFold className="relative z-10">
+              {connector.available && connector.tools.length > 0 ? (
+                <p
+                  className="break-words text-muted-foreground"
+                  data-testid="connector-tool-summary"
+                >
+                  {toolSummary(connector.tools)}
+                </p>
+              ) : null}
+              <ConnectorLinks connector={connector} title={connector.title} />
+            </ConnectorDetailsFold>
+          ) : null}
           {loginHref ? (
             <div
               className="space-y-1 text-sm"

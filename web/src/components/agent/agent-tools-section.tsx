@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
+import { useAdminView } from "@/components/shell/app-shell";
 import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/components/error-message";
 import {
@@ -85,6 +86,7 @@ export function AgentToolsSection({
   onToolsChange,
 }: Props) {
   const [tools, setTools] = useState(initialTools.toolsets);
+  const adminView = useAdminView();
   const [unclassifiedEnabled, setUnclassifiedEnabled] = useState(
     initialTools.unclassifiedEnabled,
   );
@@ -237,7 +239,7 @@ export function AgentToolsSection({
           {error}
         </Notice>
       ) : null}
-      {unclassifiedEnabled.length > 0 ? (
+      {adminView && unclassifiedEnabled.length > 0 ? (
         <Notice variant="warning" role="alert" className="mt-4">
           표에 없는 도구가 켜져 있어요. 관리자에게 알려 주세요.
         </Notice>
