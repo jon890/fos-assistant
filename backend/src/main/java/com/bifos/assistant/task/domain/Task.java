@@ -17,6 +17,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -47,8 +48,14 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Task extends AuditedEntity {
 
-    /** {@code title} 칸의 길이다. */
+    /** 평문 제목의 글자 수 상한이다. 칸은 암호문이 들어가도록 이보다 넓다. */
     public static final int TITLE_MAX = 100;
+
+    /** 칸의 길이다. 암호문은 평문 UTF-8 바이트의 약 4/3 에 44자쯤이 붙는다(ADR-20261008 / data-encryption). */
+    private static final int TITLE_COLUMN = 512;
+
+    /** 풀지 못한 제목이나 지시문 대신 내는 글이다. 데이터 key 가 없거나 암호문이 다른 줄에서 옮겨 왔을 때다. */
+    public static final String UNREADABLE_CONTENT = "읽을 수 없는 글입니다.";
 
     /** 지시 글의 상한이다. 대화 메시지 상한과 같다. */
     public static final int INSTRUCTION_MAX = 8000;
@@ -73,11 +80,36 @@ public class Task extends AuditedEntity {
     @Column(name = "agent_id", nullable = false)
     private Long agentId;
 
-    @Column(name = "title", nullable = false, length = TITLE_MAX)
-    private String title;
+    /** 칸에 저장된 제목 그대로다. {@link #titleKeyId} 가 있으면 암호문이다. 제목을 내는 곳은 {@link #title()} 을 쓴다. */
+    @Column(name = "title", nullable = false, length = TITLE_COLUMN)
+    private String storedTitle;
 
+    /** 제목을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 제목은 평문이다. */
+    @Column(name = "title_key_id")
+    private Long titleKeyId;
+
+    /** 칸에 저장된 지시문 그대로다. {@link #instructionKeyId} 가 있으면 암호문이다. 점검 작업은 비어 있다. */
     @Column(name = "instruction", columnDefinition = "TEXT")
-    private String instruction;
+    private String storedInstruction;
+
+    /** 지시문을 암호화한 데이터 key. 비어 있으면 지시문은 평문이거나 없다. */
+    @Column(name = "instruction_key_id")
+    private Long instructionKeyId;
+
+    /** 푼 제목이다. 처음 꺼낼 때 채운다. 저장하지 않는다. */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private volatile String plainTitle;
+
+    /** 푼 지시문이다. 처음 꺼낼 때 채운다. 저장하지 않는다. */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private volatile String plainInstruction;
+
+    /** 읽어 올 때 붙인 복호화 도구다. 새로 만든 작업은 비어 있다. */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private TaskContentOpener opener;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "kind", nullable = false, length = 16)
@@ -187,6 +219,70 @@ public class Task extends AuditedEntity {
     }
 
 
+    /**
+     * 제목을 낸다. 암호문이면 처음 부를 때 풀어 둔다. 풀지 못하면 {@link #UNREADABLE_CONTENT} 다.
+     *
+     * <p>제목을 내는 곳은 모두 이 메서드를 거친다. 저장된 글이 필요하면 {@code storedTitle()} 을 쓴다.
+     */
+    public String title() {
+        String opened = plainTitle;
+        if (opened != null) {
+            return opened;
+        }
+        if (titleKeyId == null) {
+            return storedTitle;
+        }
+        opened = opener == null ? UNREADABLE_CONTENT : opener.openTitle(this);
+        plainTitle = opened;
+        return opened;
+    }
+
+
+    /** 지시문을 낸다. 규칙은 {@link #title()} 과 같다. 점검 작업은 null 이다. */
+    public String instruction() {
+        String opened = plainInstruction;
+        if (opened != null) {
+            return opened;
+        }
+        if (instructionKeyId == null) {
+            return storedInstruction;
+        }
+        opened = opener == null ? UNREADABLE_CONTENT : opener.openInstruction(this);
+        plainInstruction = opened;
+        return opened;
+    }
+
+
+    public void attachOpener(TaskContentOpener opener) {
+        this.opener = opener;
+    }
+
+
+    /**
+     * 처음 저장하기 전에 평문 제목과 지시문을 칸에서 빼 둔다. 제목 칸에는 빈 글이, 지시문 칸에는 null 이 들어간다.
+     *
+     * <p>줄 번호가 생긴 뒤에야 AAD 를 만들 수 있어, 비워 넣은 다음 같은 트랜잭션에서 {@link #sealContent} 로 암호문을 적는다.
+     * 데이터베이스에 평문이 한 번도 쓰이지 않는다. 푼 글은 이 객체가 계속 들고 있다.
+     */
+    public void detachPlainForSealing() {
+        this.plainTitle = storedTitle;
+        this.plainInstruction = storedInstruction;
+        this.storedTitle = "";
+        this.storedInstruction = null;
+    }
+
+
+    /** 암호문과 그 데이터 key 를 적는다. 지시문이 없으면({@code null}) 그 칸은 비운 채 둔다. */
+    public void sealContent(String sealedTitle, Long titleKey, String sealedInstruction, Long instructionKey) {
+        this.plainTitle = title();
+        this.plainInstruction = instruction();
+        this.storedTitle = sealedTitle;
+        this.titleKeyId = titleKey;
+        this.storedInstruction = sealedInstruction;
+        this.instructionKeyId = instructionKey;
+    }
+
+
     /** 저장된 시간대 이름을 읽은 값이다. */
     public ZoneId zone() {
         return ZoneId.of(timeZone);
@@ -215,9 +311,9 @@ public class Task extends AuditedEntity {
         Task task = new Task();
         task.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
         task.agentId = Objects.requireNonNull(agentId, "agentId");
-        task.title = Objects.requireNonNull(title, "title");
+        task.storedTitle = Objects.requireNonNull(title, "title");
         task.kind = TaskKind.CHECK;
-        task.instruction = null;
+        task.storedInstruction = null;
         task.state = TaskState.ACTIVE;
         task.conversationMode = ConversationMode.SINGLE;
         task.notifyPolicy = NotifyPolicy.NEVER;
@@ -306,8 +402,12 @@ public class Task extends AuditedEntity {
     private void apply(
         Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify) {
         this.agentId = Objects.requireNonNull(agentId, "agentId");
-        this.title = Objects.requireNonNull(title, "title");
-        this.instruction = Objects.requireNonNull(instruction, "instruction");
+        this.storedTitle = Objects.requireNonNull(title, "title");
+        this.titleKeyId = null;
+        this.plainTitle = null;
+        this.storedInstruction = Objects.requireNonNull(instruction, "instruction");
+        this.instructionKeyId = null;
+        this.plainInstruction = null;
         this.conversationMode = Objects.requireNonNull(mode, "mode");
         this.notifyPolicy = Objects.requireNonNull(notify, "notify");
     }
