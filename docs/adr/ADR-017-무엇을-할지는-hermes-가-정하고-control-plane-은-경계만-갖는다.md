@@ -138,7 +138,7 @@ profile 플러그인의 hook 이 루트 session 과 `tool_call_id` 를 도구 �
 
 | 도구 | 받는 것 | 돌려주는 것 |
 | --- | --- | --- |
-| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 이름. 한 줄 소개 칸은 [ADR-036](../../backend/docs/adr/ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) 에서 없앴다 |
+| `agent_list` | 없음 | 요청자가 쓸 수 있고 켜진 에이전트의 `code` 와 이름. 비어 있지 않으면 한 줄 소개와 할 수 있는 일도 싣는다([ADR-20261110 / agent-introduction](ADR-20261110-agent-introduction.md)) |
 | `agent_delegate` | `agent_code`, `task` | 새 실행 번호와 `RUNNING`. 제출까지만 기다린다 |
 | `agent_status` | `execution_id` | `RUNNING`, `SUCCEEDED` 와 답, `FAILED` 와 오류 코드, `CANCELLED` 와 멈춘 자리까지의 답(있을 때만) |
 | `agent_stop` | `execution_id` | 그 실행의 상태. 이미 끝났으면 끝난 상태를 그대로 준다. 짧게 기다려도 `CANCELLED` 가 적히지 않으면 `RUNNING` 을 주고, 중지를 실제로 요청했으면 `stop_requested: true` 를 더한다 |

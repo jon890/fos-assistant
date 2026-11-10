@@ -30,7 +30,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-033](ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md) | 사용자가 에이전트를 만들고, 공개해도 만든 사람이 관리한다 | Accepted. 연결용 에이전트의 일반 편집 권한은 ADR-039 가 대체한다. 지운 에이전트의 행을 남긴다는 부분은 [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) 가 7일 뒤에 한해 대체한다 |
 | [ADR-034](ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) | 올린 스킬은 Control Plane 이 버전 디렉터리에 쓰고 Hermes 는 읽기만 한다 | Accepted. 스크립트를 받지 않는다는 부분은 [ADR-20261009 / skill-package](../../../docs/adr/ADR-20261009-skill-package.md) 가 대체한다 |
 | [ADR-035](ADR-035-대화창의-스킬-커맨드는-control-plane-이-해석해-hermes-에-넘긴다.md) | 대화창의 스킬 커맨드는 Control Plane 이 해석해 Hermes 에 넘긴다 | Accepted |
-| [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) | 추천 질문은 사용자의 대화 이력으로 모델이 만들고 메모리에만 둔다 | Accepted |
+| [ADR-036](ADR-036-추천-질문은-사용자의-대화-이력으로-모델이-만들고-메모리에만-둔다.md) | 추천 질문은 사용자의 대화 이력으로 모델이 만들고 메모리에만 둔다 | Accepted. 에이전트의 한 줄 소개를 없앤 부분은 [ADR-20261110 / agent-introduction](../../../docs/adr/ADR-20261110-agent-introduction.md) 이 대체한다 |
 | [ADR-037](ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) | Hermes 하위 에이전트 session 의 주인은 만들 때 등록한 줄로 정한다 | Accepted. ADR-031, ADR-032 의 하위 에이전트 session 판정을 대체한다 |
 | [ADR-039](ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md) | 외부 서비스 연결은 사용자별 전용 에이전트로 실행한다 | Accepted. ADR-033의 일반 편집 권한에 연결용 에이전트 예외를 둔다. 전용 profile 과 에이전트, 도구 차단, 토큰 저장 부분은 새 연결에 대해 ADR-083 이 대체한다 |
 | [ADR-040](ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) | 위임 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다 | Accepted. ADR-017 의 「결과는 모델이 다시 묻는다」 를 대체한다 |

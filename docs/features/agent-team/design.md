@@ -169,4 +169,8 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 
 ## 결정 기록 연결
 
-없음: PR1 은 기존 저장·권한 규칙 안에서 칸만 더한다. PR4 의 ADR-017 예외는 그 PR 에서 ADR 로 남긴다.
+| 결정 | 종류 | ADR | 현재 규칙의 원본 |
+| --- | --- | --- | --- |
+| DECISION1 과 할 수 있는 일을 읽을 때 모으기 | architecture | [ADR-20261110 / agent-introduction](../../adr/ADR-20261110-agent-introduction.md). ADR-036 의 소개를 없앤 부분을 대체한다 | [에이전트 팀](../agent-team.md) 의 「소개와 할 수 있는 일」 |
+
+PR4 의 ADR-017 예외는 그 PR 에서 ADR 로 남긴다.
