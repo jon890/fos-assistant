@@ -1,0 +1,62 @@
+import { logDiagnostic, ToolError } from "./errors.ts";
+import { CATALOG_STATE, PRODUCT_STATE, SEARCH_STATE } from "./expressions.ts";
+import { MissingFields, parseCatalog, parseStoreProduct } from "./parse-product.ts";
+import { parseSearch, searchLooksChanged } from "./parse-search.ts";
+import { browserUrl, type Env } from "./session.ts";
+import { readInTab, type TabOptions } from "./tab.ts";
+import { classifyUrl, searchUrl } from "./urls.ts";
+import { parseJson } from "./values.ts";
+
+export const QUERY_MAX = 100;
+
+export type ToolDeps = { read: typeof readInTab; tab?: TabOptions };
+const DEFAULT_DEPS: ToolDeps = { read: readInTab };
+
+/** 검색어는 한 줄의 1자에서 100자다. 제어 문자를 받지 않는다. */
+function checkQuery(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed || [...trimmed].length > QUERY_MAX || /[\u0000-\u001f\u007f]/.test(trimmed))
+    throw new ToolError("NAVER_SHOPPING_INVALID_INPUT");
+  return trimmed;
+}
+
+/** 검색어 하나로 첫 페이지 한 번만 읽는다. 다음 페이지와 내리기는 하지 않는다. */
+export async function searchProducts(env: Env, query: string, deps: ToolDeps = DEFAULT_DEPS) {
+  const cdpUrl = browserUrl(env);
+  const checked = checkQuery(query);
+  const state = parseJson(await deps.read(cdpUrl, searchUrl(checked), SEARCH_STATE, deps.tab));
+  const products = parseSearch(state);
+  if (products === null || searchLooksChanged(state, products)) {
+    logDiagnostic("search_products", "parse", products === null ? ["products.list"] : ["item"]);
+    throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
+  }
+  return { query: checked, count: products.length, products };
+}
+
+/**
+ * 주소 분류 표가 `store` 나 `catalog` 로 본 주소만 탭을 연다. `external` 은 탭 없이 링크만 돌려주고, 거절은 입력 오류다.
+ */
+export async function productDetail(env: Env, rawUrl: string, deps: ToolDeps = DEFAULT_DEPS) {
+  const target = classifyUrl(rawUrl);
+  if (target === null) throw new ToolError("NAVER_SHOPPING_INVALID_INPUT");
+  if (target.kind === "external") return { kind: "external" as const, url: target.url, buyable: false };
+  const cdpUrl = browserUrl(env);
+  const raw = await deps.read(cdpUrl, target.url, target.kind === "store" ? PRODUCT_STATE : CATALOG_STATE, deps.tab);
+  const tool = "get_product_detail";
+  try {
+    if (target.kind === "catalog") {
+      const state = parseJson(raw);
+      if (state === undefined || state === null) throw new MissingFields(["catalog"]);
+      return parseCatalog(state, target.url);
+    }
+    const wrapped = parseJson(raw) as { present?: unknown; value?: unknown } | undefined;
+    if (wrapped?.present !== true) throw new MissingFields(["preloaded_state"]);
+    const product = parseStoreProduct(wrapped.value, target.url);
+    if (product === null) throw new ToolError("NAVER_SHOPPING_NOT_FOUND");
+    return product;
+  } catch (error) {
+    if (!(error instanceof MissingFields)) throw error;
+    logDiagnostic(tool, `parse.${target.kind}`, error.fields);
+    throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
+  }
+}

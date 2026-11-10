@@ -190,8 +190,8 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         if server.get("command") != "bun":
             problems.append(".mcp.json 의 command 가 bun 이 아니다: %r" % server.get("command"))
         entry = "dist/%s-mcp.js" % name
-        # Naver의 dotenv 차단은 필수다. 다른 옵션이나 인자 순서는 허용하지 않는다.
-        expected_args = (["--no-env-file"] if name == "naver-blog" else []) + ["${CLAUDE_PLUGIN_ROOT}/" + entry]
+        # 네이버 플러그인의 dotenv 차단은 필수다. 다른 옵션이나 인자 순서는 허용하지 않는다.
+        expected_args = (["--no-env-file"] if name in ("naver-blog", "naver-shopping") else []) + ["${CLAUDE_PLUGIN_ROOT}/" + entry]
         if server.get("args") != expected_args:
             problems.append(".mcp.json 이 빌드한 묶음 파일 하나를 실행하지 않는다")
         if not (root / entry).is_file():
