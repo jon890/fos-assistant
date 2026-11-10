@@ -34,6 +34,7 @@ export type TabOptions = {
 const TOOL = "search_trains";
 /** 같은 자리의 사본 가운데 상자가 있는 첫 것을 고를 때 보는 수. */
 const CANDIDATES = 10;
+type Box = { content?: number[]; width?: number; height?: number };
 
 class Tab {
   dialog: string | null = null;
@@ -119,20 +120,14 @@ class Tab {
         },
       );
       for (const nodeId of nodeIds) {
-        const box = await this.send<{
-          model?: { content?: number[]; width?: number; height?: number };
-        }>("DOM.getBoxModel", { nodeId }).catch(() => null);
-        const quad = box?.model?.content;
-        if (!quad || quad.length < 8 || !box?.model?.width) continue;
-        if (!box.model.height) continue;
         await this.send("DOM.scrollIntoViewIfNeeded", { nodeId }).catch(
           () => {},
         );
-        const again = await this.send<{ model?: { content?: number[] } }>(
-          "DOM.getBoxModel",
-          { nodeId },
-        ).catch(() => box);
-        const q = again?.model?.content ?? quad;
+        const { model } = await this.send<{ model?: Box }>("DOM.getBoxModel", {
+          nodeId,
+        }).catch(() => ({ model: undefined }));
+        const q = model?.content;
+        if (!q || q.length < 8 || !model?.width || !model.height) continue;
         return {
           x: (q[0]! + q[2]! + q[4]! + q[6]!) / 4,
           y: (q[1]! + q[3]! + q[5]! + q[7]!) / 4,
