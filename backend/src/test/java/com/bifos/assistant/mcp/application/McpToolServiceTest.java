@@ -15,7 +15,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
+import com.bifos.assistant.agent.application.dto.AgentCapabilities;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactWriteRequest;
 import com.bifos.assistant.chat.artifact.application.ArtifactWriteService;
@@ -129,6 +131,51 @@ class McpToolServiceTest {
 
         assertThat(embedded).isEmpty();
         verify(memories).searchFor(any(), any(), eq("바퀴"), eq(10), eq(keywordNext), eq(Optional.empty()));
+    }
+
+
+    @Test
+    @DisplayName("agent list 는 소개와 붙은 서비스, 스킬을 비어 있지 않을 때만 싣는다")
+    void agentListCarriesIntroductionAndCapabilitiesOnlyWhenPresent() {
+        AgentDelegationService delegations = mock(AgentDelegationService.class);
+        AgentCapabilitiesReader capabilities = mock(AgentCapabilitiesReader.class);
+        Agent shopper = listedAgent(1L, "shop", "쇼핑 담당", "쇼핑을 맡아요");
+        Agent plain = listedAgent(2L, "plain", "비서", null);
+        when(delegations.list(user)).thenReturn(List.of(shopper, plain));
+        when(capabilities.read(List.of(shopper, plain))).thenReturn(Map.of(
+            1L, new AgentCapabilities(List.of("네이버 쇼핑"), List.of("장보기")),
+            2L, AgentCapabilities.NONE));
+        McpCaller caller = mock(McpCaller.class);
+        when(caller.user()).thenReturn(user);
+        McpToolService service = new McpToolService(
+            memories, QueryEmbedder.disabled(), artifacts, delegations, capabilities,
+            mock(ExecutionDeliveryWriter.class), mock(ExecutionOutputs.class), mock(ExecutionContextSourceWriter.class),
+            mock(AgentRepository.class), mock(AgentConnectorBindings.class), mock(FollowUpService.class),
+            mock(McpMemoryRemember.class), mock(McpToolCatalog.class), Clock.systemUTC());
+
+        String text = resultText(service.listAgents(caller));
+
+        assertThat(text).isEqualTo(
+            "[{\"code\":\"shop\",\"name\":\"쇼핑 담당\",\"description\":\"쇼핑을 맡아요\","
+                + "\"connectors\":[\"네이버 쇼핑\"],\"skills\":[\"장보기\"]},"
+                + "{\"code\":\"plain\",\"name\":\"비서\"}]");
+    }
+
+
+    private static Agent listedAgent(Long id, String code, String name, String description) {
+        Agent agent = mock(Agent.class);
+        when(agent.id()).thenReturn(id);
+        when(agent.code()).thenReturn(code);
+        when(agent.name()).thenReturn(name);
+        when(agent.description()).thenReturn(description);
+        return agent;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private static String resultText(Map<String, Object> result) {
+        List<Map<String, Object>> content = (List<Map<String, Object>>)result.get("content");
+        return (String)content.getFirst().get("text");
     }
 
 

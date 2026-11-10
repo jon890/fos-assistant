@@ -77,6 +77,9 @@ class AgentPrimaryNameMigrationTest {
             assertThat(strings(statement, "SELECT description FROM agent WHERE id = 11"))
                 .containsExactly(AgentIntroduction.PRIMARY_DESCRIPTION);
             assertThat(strings(statement, "SELECT COUNT(*) FROM agent WHERE description IS NOT NULL")).containsExactly("2");
+            assertThat(strings(statement, "SELECT COUNT(*) FROM agent WHERE updated_at IS NOT NULL"))
+                .as("사람이 저장한 것이 아니어서 updated_at 은 바꾸지 않는다")
+                .containsExactly("0");
         }
     }
 

@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.AgentColor;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -165,6 +167,31 @@ class ConversationMissingAgentTest {
             .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentCode")
                 .value(Matchers.contains((Object)null)))
             .andExpect(jsonPath("$.items[?(@.id == '" + orphanId + "')].agentName")
+                .value(Matchers.contains((Object)null)));
+    }
+
+
+    @Test
+    @DisplayName("지웠지만 정리 전인 에이전트의 대화도 에이전트 칸과 이름표 칸이 비어 있고, 남은 에이전트는 아이콘과 색을 싣는다")
+    void deletedButUnpurgedAgentLeavesAgentColumnsEmpty() throws Exception {
+        Agent kept = agent("kept");
+        kept.changeIntroduction(AgentIntroduction.of("kept", null, "🛍️", AgentColor.ROSE));
+        agents.save(kept);
+        Agent deleted = agent("deleted");
+        UUID keptId = conversationOf(kept.id(), "남은 대화");
+        UUID deletedId = conversationOf(deleted.id(), "지운 에이전트의 대화");
+        deleted.markDeleted(Instant.now());
+        agents.save(deleted);
+
+        mvc.perform(get("/api/v1/chat/conversations"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentIcon").value(Matchers.contains("🛍️")))
+            .andExpect(jsonPath("$.items[?(@.id == '" + keptId + "')].agentColor").value(Matchers.contains("ROSE")))
+            .andExpect(jsonPath("$.items[?(@.id == '" + deletedId + "')].agentCode")
+                .value(Matchers.contains((Object)null)))
+            .andExpect(jsonPath("$.items[?(@.id == '" + deletedId + "')].agentName")
+                .value(Matchers.contains((Object)null)))
+            .andExpect(jsonPath("$.items[?(@.id == '" + deletedId + "')].agentIcon")
                 .value(Matchers.contains((Object)null)));
     }
 
