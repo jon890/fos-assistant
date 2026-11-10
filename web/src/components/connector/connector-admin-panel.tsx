@@ -29,7 +29,7 @@ const key = (connection: AdminConnection) =>
  * 바인딩의 `READY` 는 에이전트에 붙었다는 뜻이라 연결 상태의 「연결됨」 이 아니라 「붙음」 이다.
  */
 function statusText(connection: AdminConnection): string {
-  if (connection.restartRequired) return "준비 중";
+  if (connection.restartRequired) return "반영 대기";
   if (connection.status === "PENDING") return "반영 중";
   return "붙음";
 }

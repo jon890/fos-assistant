@@ -239,7 +239,7 @@ export function AgentConnectionsSection({
     setError(null);
     const result = await bindAgentConnection(code, view.connectorId);
     if (!result.ok) {
-      // 실패해도 서버에는 바인딩이 남았을 수 있다(대시보드가 실패해 준비 중로 남는 경우).
+      // 실패해도 서버에는 바인딩이 남았을 수 있다(대시보드가 실패해 붙이는 중으로 남는 경우).
       // 목록을 다시 읽어 화면과 도구 절의 위험 안내를 서버 상태에 맞춘다. 다시 읽기도 실패하면 지금 화면을 둔다.
       const reloaded = await listAgentConnections(code);
       setPending(null);

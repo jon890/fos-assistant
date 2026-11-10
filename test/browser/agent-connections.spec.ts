@@ -81,7 +81,7 @@ test.afterEach(async ({ context, page }, testInfo) => {
   await disconnectDemoConnector(owner.email);
 });
 
-test("비공개 에이전트에 연결을 붙이면 위험을 알리고 준비 중이 되며 떼면 붙지 않음이 된다", async ({
+test("비공개 에이전트에 연결을 붙이면 위험을 알리고 붙이는 중이 되며 떼면 붙지 않음이 된다", async ({
   page,
 }) => {
   const code = await createAgent(page);
@@ -114,19 +114,19 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 준비 �
   await expect(dialog).toBeHidden();
   await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
-    "준비 중",
+    "붙이는 중",
   );
 
   // 새로 읽어도 붙은 채이고, 외부 서비스 연결 화면의 붙인 에이전트 목록에도 이 에이전트가 보인다.
   await page.reload();
   await expect(
     section(page).getByTestId("agent-connection-state"),
-  ).toHaveText("준비 중");
+  ).toHaveText("붙이는 중");
   await page.goto("/connections/demo-notes");
   const bound = page.getByTestId("connection-binding");
   await expect(bound).toHaveCount(1);
   await expect(bound).toContainText(NAME);
-  await expect(bound).toContainText("준비 중");
+  await expect(bound).toContainText("붙이는 중");
 
   await page.goto(`/agents/${code}`);
   await section(page).getByRole("button", { name: "떼기" }).click();
@@ -167,7 +167,7 @@ test("붙이기가 실패해도 서버에 남은 바인딩을 다시 읽어 보�
   page,
 }) => {
   const code = await createAgent(page);
-  // 서버는 바인딩을 만들었지만 응답이 실패로 온 경우를 흉내 낸다. 대시보드가 실패해 준비 중로 남는 경우가 이렇게 보인다.
+  // 서버는 바인딩을 만들었지만 응답이 실패로 온 경우를 흉내 낸다. 대시보드가 실패해 붙이는 중으로 남는 경우가 이렇게 보인다.
   await page.route(
     `**/api/agents/${code}/connections/demo-notes`,
     async (route) => {
@@ -196,7 +196,7 @@ test("붙이기가 실패해도 서버에 남은 바인딩을 다시 읽어 보�
   await expect(dialog).toBeHidden();
 
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
-    "준비 중",
+    "붙이는 중",
   );
   await expect(row.getByRole("button", { name: "떼기" })).toBeVisible();
   await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
@@ -219,7 +219,7 @@ for (const restartRequired of [false, true]) {
     await row.getByRole("button", { name: "붙이기" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "붙이기" }).click();
     await expect(row).toContainText(restartRequired ? "관리자가 반영을 확인하면 쓸 수 있어요." : "바로 쓸 수 있어요.");
-    await expect(row.getByTestId("agent-connection-state")).toHaveText(restartRequired ? "준비 중" : "붙음");
+    await expect(row.getByTestId("agent-connection-state")).toHaveText(restartRequired ? "붙이는 중" : "붙음");
     await row.getByRole("button", { name: "떼기" }).focus();
     await row.getByRole("button", { name: "떼기" }).press("Enter");
     await expect(row.getByTestId("agent-connection-state")).toHaveText("붙지 않음");
