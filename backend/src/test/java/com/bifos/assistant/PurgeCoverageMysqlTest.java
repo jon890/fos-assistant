@@ -376,6 +376,7 @@ class PurgeCoverageMysqlTest {
                     case "conversation" -> {
                         assertThat(before.get("conversation").getFirst().get("title")).isNotEqualTo("");
                         assertThat(value("conversation", "title")).isEqualTo("");
+                        assertCleared("conversation", "title_key_id");
                         assertCleared("conversation", "hermes_session_id");
                         assertCleared("conversation", "hermes_root_session_id");
                         assertCleared("conversation", "pending_messages");

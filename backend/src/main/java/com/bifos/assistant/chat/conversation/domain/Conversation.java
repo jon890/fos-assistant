@@ -16,6 +16,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -78,9 +79,32 @@ public class Conversation extends CreatedAtEntity {
     @Getter
     private String hermesRootSessionId;
 
-    @Column(name = "title", nullable = false, length = 200)
+    /** 풀지 못한 제목 대신 내는 글이다. 데이터 key 가 없거나 암호문이 다른 줄에서 옮겨 왔을 때다. */
+    public static final String UNREADABLE_TITLE = "읽을 수 없는 제목입니다.";
+
+    /**
+     * 칸에 저장된 글 그대로다. {@link #titleKeyId} 가 있으면 암호문이다(ADR-20261008 / data-encryption). 빈 제목은 평문 빈 글이다.
+     *
+     * <p>제목을 내는 곳은 {@link #title()} 을 쓴다. 칸 길이는 암호문이 들어가도록 평문 상한(200자)보다 넓다.
+     */
+    @Column(name = "title", nullable = false, length = 1024)
     @Getter
-    private String title;
+    private String storedTitle;
+
+    /** 제목을 암호화한 데이터 key({@code user_data_key.id}). 비어 있으면 {@link #storedTitle} 은 평문이다. */
+    @Column(name = "title_key_id")
+    @Getter
+    private Long titleKeyId;
+
+    /** 푼 제목이다. 처음 꺼낼 때 채운다. 저장하지 않는다. */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private volatile String plainTitle;
+
+    /** 읽어 올 때 붙인 복호화 도구다. 새로 만든 대화는 비어 있다. */
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private ConversationTitleOpener opener;
 
     /**
      * 보통 대화인지 먼저 살펴보기의 점검 대화인지다. 만들 때 정하고 바뀌지 않는다.
@@ -153,7 +177,7 @@ public class Conversation extends CreatedAtEntity {
 
     private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;
-        this.title = title;
+        this.storedTitle = title;
         this.agentId = agentId;
         this.purpose = purpose;
         this.updatedAt = now;
@@ -194,11 +218,63 @@ public class Conversation extends CreatedAtEntity {
     }
 
 
-    /** 제목이 비어 있을 때만 채운다. 사진을 먼저 올리려고 만든 대화는 첫 메시지가 제목을 정한다. */
-    public void titleIfBlank(String title) {
-        if (this.title == null || this.title.isBlank()) {
-            this.title = title;
+    /**
+     * 제목을 낸다. 암호문이면 처음 부를 때 풀어 둔다. 풀지 못하면 {@link #UNREADABLE_TITLE} 이다.
+     *
+     * <p>제목을 내는 곳은 모두 이 메서드를 거친다. 저장된 글이 필요하면 {@code storedTitle()} 을 쓴다.
+     */
+    public String title() {
+        String opened = plainTitle;
+        if (opened != null) {
+            return opened;
         }
+        if (titleKeyId == null) {
+            return storedTitle;
+        }
+        opened = opener == null ? UNREADABLE_TITLE : opener.open(this);
+        plainTitle = opened;
+        return opened;
+    }
+
+
+    public void attachOpener(ConversationTitleOpener opener) {
+        this.opener = opener;
+    }
+
+
+    /**
+     * 처음 저장하기 전에 평문 제목을 칸에서 빼 둔다. 칸에는 빈 글이 들어간다.
+     *
+     * <p>줄 번호가 생긴 뒤에야 AAD 를 만들 수 있어, 빈 글로 넣은 다음 같은 트랜잭션에서 {@link #sealTitle} 로 암호문을 적는다.
+     * 데이터베이스에 평문 제목이 한 번도 쓰이지 않는다.
+     *
+     * @return 뺀 평문
+     */
+    public String detachPlainTitleForSealing() {
+        String detached = storedTitle;
+        this.plainTitle = detached;
+        this.storedTitle = "";
+        return detached;
+    }
+
+
+    /** 암호문과 그 데이터 key 를 적는다. 푼 제목은 그대로 둔다. */
+    public void sealTitle(String sealedTitle, Long keyId) {
+        this.plainTitle = title();
+        this.storedTitle = sealedTitle;
+        this.titleKeyId = keyId;
+    }
+
+
+    /**
+     * 질의로 채운 제목을 이 객체에 옮긴다. 저장소의 같은 칸에 적은 값과 같게 맞춘다. 평문이면 key 번호가 비어 있다.
+     *
+     * <p>이미 읽어 둔 대화를 저장할 때 질의가 채운 제목을 빈 글이나 평문으로 덮지 않게 한다.
+     */
+    public void adoptTitle(String plain, String stored, Long keyId) {
+        this.plainTitle = plain;
+        this.storedTitle = stored;
+        this.titleKeyId = keyId;
     }
 
 

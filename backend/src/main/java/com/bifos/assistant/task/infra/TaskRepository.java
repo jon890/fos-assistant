@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface TaskRepository extends JpaRepository<Task, Long> {
+public interface TaskRepository extends JpaRepository<Task, Long>, TaskWrites<Task> {
 
     /** 발화할 작업 번호를 예정 시각 순으로 읽는다. 실제 발화 전에는 작업을 잠그고 다시 읽는다. */
     @Query("select t.id from Task t where t.state = :state and t.nextFireAt <= :now order by t.nextFireAt, t.id")

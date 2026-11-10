@@ -23,6 +23,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
   | `task` | `title`, `instruction` | `title_key_id`, `instruction_key_id` | `owner_user_id` | 새 쓰기 잠금 조회 |
 
 - AAD 와 엔티티의 칸 이름은 phase 01, 02 와 `ChatMessageContents` 가 정한 것을 그대로 쓴다. 배치가 새 규칙을 만들지 않는다
+- 대화 제목의 암호화와 풀기는 `ConversationTitles`(`chat.conversation.infra`)와 엔티티의 `sealTitle`, 예약 작업은 `TaskContents`(`task.infra`)와 엔티티의 `sealContent` 가 갖는다. 배치는 이것을 부르고 새로 만들지 않는다. 대화 제목이 빈 글인 줄은 평문으로 두는 것이 규칙이므로 배치 대상에서 뺀다
 - 본보기는 Memory 의 기동 이관이다. `backend/src/main/java/com/bifos/assistant/memory/application/MemoryTextMigration.java` 가 대상 번호를 읽고 줄마다 새 트랜잭션에서 쓰기 잠금으로 다시 읽어 고친다. 실패하면 클래스 이름과 번호만 로그에 남긴다
 - 주기 작업의 끄기 방식은 `backend/src/main/java/com/bifos/assistant/chat/purge/application/ConversationPurger.java` 의 `@Scheduled(cron = "${assistant.chat.purge-cron}")` 와 시험 설정의 `"-"` 를 따른다
 
