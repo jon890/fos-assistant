@@ -1,4 +1,4 @@
-## ADR-20261110 / korail-ktx-connector: 코레일 KTX 는 내 브라우저의 코레일 화면을 사람처럼 눌러 한 번 조회하고, 약관 위험은 사용자가 감수한다
+## ADR-20261110 / korail-ktx-connector: 코레일 KTX 는 내 브라우저의 코레일 화면을 고정 단계로 눌러 한 번 조회하고, 약관 위험은 사용자가 감수한다
 
 - **status**: `accepted`
 - Date: 2026-11-10

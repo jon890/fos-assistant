@@ -47,7 +47,7 @@ CDP 연결 부분(`cdp.ts`)은 쇼핑과 블로그처럼 같은 모양으로 새
 
 ### 저장소 등록(PR1)
 
-쇼핑 설계의 「저장소 등록」 표와 같은 자리를 고친다. `hermes/connectors/Dockerfile` 의 의존성 층, `.gitignore` 와 `hermes/connectors/.dockerignore` 의 생성 entry `dist/korail-ktx-mcp.js`, `.github/CODEOWNERS`, `hermes/README.md` 의 플러그인 표, 기능 파일 `docs/features/korail-ktx.md`(`covers:` 가 플러그인 디렉터리), 플러그인 `README.md` 의 「도구 목록」 표다.
+쇼핑 설계의 「저장소 등록」 표와 같은 자리를 고친다. `hermes/connectors/Dockerfile` 의 의존성 층, `.gitignore` 와 `hermes/connectors/.dockerignore` 의 생성 entry `dist/korail-ktx-mcp.js`, `.github/CODEOWNERS`, 기능 파일 `docs/features/korail-ktx.md`(`covers:` 가 플러그인 디렉터리), 플러그인 `README.md` 의 「도구 목록」 표다.
 계약 검사(`hermes/tests/test_connectors_contract.py`)가 요구하는 아래도 함께 둔다.
 
 | 자리 | 더하는 것 |
@@ -94,7 +94,7 @@ CDP 연결 부분(`cdp.ts`)은 쇼핑과 블로그처럼 같은 모양으로 새
 | 인자 | 모양 | 플러그인이 확인하는 것 |
 | --- | --- | --- |
 | `departure`, `arrival` | 역 이름 문자열, 30자까지 | 끝의 「역」 을 뗀 뒤 「역 이름 표」 에 정확히 있어야 한다. 없으면 `KORAIL_UNKNOWN_STATION`. 둘이 같으면 `KORAIL_INVALID_INPUT` (spec DECISION21) |
-| `date` | `YYYY-MM-DD`, KST | 오늘(KST)보다 이르면 `KORAIL_DATE_UNAVAILABLE`. 늦은 쪽의 끝은 코레일 화면이 정한다 |
+| `date` | `YYYY-MM-DD`, KST | 오늘(KST)보다 이르면 `KORAIL_DATE_UNAVAILABLE`. 늦은 쪽의 끝은 코레일 달력이 정하고, 달력에 그날 칸이 없어도 `KORAIL_DATE_UNAVAILABLE` 이다 |
 | `time_from` | `HH:MM`, 24시간 | 모양만 본다 |
 | `adults`, `children`, `seniors` | 0 이상 정수 | 합이 1 이상 9 이하. 넘으면 `KORAIL_INVALID_INPUT` |
 | `seat_class` | `general` 이나 `first` | 둘 밖이면 `KORAIL_INVALID_INPUT` |
@@ -103,7 +103,7 @@ CDP 연결 부분(`cdp.ts`)은 쇼핑과 블로그처럼 같은 모양으로 새
 
 `trains` 의 항목은 `{train_ref, train_type, train_no, departs_at, arrives_at, duration_min, seat_status, status_text, adult_fare_krw}` 다.
 
-- `train_type` 은 화면 글을 그대로 싣는다(`KTX`, `KTX-산천`, `KTX-이음`, `SRT` 등, 30자까지). 조회 조건에서 KTX 계열을 골라 조회하므로 종류로 빼지 않는다(spec DECISION12, DECISION18)
+- `train_type` 은 화면 글을 그대로 싣는다(`KTX`, `KTX-산천`, `KTX-이음`, `SRT` 등, 30자까지). 조회 조건에서 KTX 계열을 골라 조회하고, 그래도 `KTX` 나 `SRT` 로 시작하지 않는 줄이 남으면 뺀다(spec DECISION12, DECISION18. 탭을 누른 뒤 남은 줄을 막는 마지막 확인이다)
 - `departs_at`, `arrives_at` 은 `YYYY-MM-DDTHH:MM`(KST)다. `time_from` 보다 이른 열차는 뺀다(spec DECISION18)
 - `seat_status` 는 `available` 이나 `sold_out` 이고 `status_text` 는 고른 좌석 종류 칸의 화면 글이다(30자까지, spec DECISION19)
 - `adult_fare_krw` 는 화면이 보인 어른 1인 운임이다. 화면에 없으면 `null` 이다
@@ -147,19 +147,19 @@ KTX 계열과 SRT 가 서는 역의 이름을 `stations.ts` 상수 표로 둔다
 4. 조건 화면과 목록 화면에서 공지 층이 있으면 「창닫기」 로 닫는다. 층의 선택자는 상수이고, 닫기 말고 공지 안의 다른 것은 누르지 않는다
 5. 「조작 단계」 를 차례로 한 번씩 돈다. 사람 속도 간격과 조회 간격 제한을 두지 않는다(spec DECISION9). 기다림은 요소가 나타날 때까지만이고 일부러 늦추지 않는다
 6. 열차 목록이 나타나면 고정 식 하나로 목록을 JSON 으로 꺼내고, 순수 함수(`parse-trains.ts`)가 결과로 바꾼다
-7. 탭 닫기: 정상, 인자 뒤의 실패(`REJECTED`, `PAGE_CHANGED`, `UNAVAILABLE`, 시간 초과)는 탭을 닫는다. 사람이 해야 하는 세 분류(`login`, `captcha`, `bot_check`)만 탭을 남긴다(spec DECISION20 과 같은 뜻)
+7. 탭 닫기: 정상, 인자 뒤의 실패(`REJECTED`, `PAGE_CHANGED`, `UNAVAILABLE`, 시간 초과)는 탭을 닫는다. 사람이 해야 하는 세 분류(`login`, `captcha`, `bot_check`)만 탭을 남긴다(spec REQ3)
 
 자동 재시도는 어느 단계에도 없다(spec DECISION9). 단계가 실패하면 그 자리에서 오류로 끝난다.
 
-탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 집합(준비 상태 묻기, 요소 찾기와 위치 읽기, 화면 분류, 목록 꺼내기)뿐이다. 식에 넘기는 값은 선택자 상수와 검증한 인자뿐이다.
+탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 넷(`READY_STATE` 준비 상태, `PAGE_PROBE` 화면 분류 값, `SUSEO_CHECKED` 수서 함께 보기를 골랐는지, `LIST_STATE` 목록 꺼내기)뿐이다. 식에 끼우는 값은 `fields.ts` 의 상수뿐이다. 자리 찾기와 위치 읽기는 식이 아니라 CDP `DOM.performSearch`, `DOM.getBoxModel` 이 하고, 사본이 여럿이면 상자가 있는 첫 것을 누른다.
 
 #### 조작 단계
 
-조건 넣기는 코레일 화면이 클라이언트 렌더링이라 값을 식으로 바로 넣으면 화면 상태에 반영되지 않을 수 있다. 그래서 사람이 하는 것과 같은 CDP 입력(`Input.dispatchMouseEvent` 로 요소 가운데 누르기, `Input.insertText` 로 글 넣기, `Input.dispatchKeyEvent` 로 Enter·Tab 같은 정해 둔 키)을 쓴다.
-단계는 `steps.ts` 의 상수 표다. 단계마다 선택자, 동작(`click`, `type`, `key`), 넣을 값의 출처(검증한 인자 이름이나 상수)만 있다.
-고를 항목이 값마다 다른 경우(역 자동완성의 항목, 시 고르기, 인원 수)의 선택자는 상수 틀에 검증한 값(역 표의 이름, 0~23 의 시, 0~9 의 수)만 끼운다. 모델이나 인자는 선택자 틀과 동작을 정하지 못한다.
+조건 넣기는 코레일 화면이 클라이언트 렌더링이라 값을 식으로 바로 넣으면 화면 상태에 반영되지 않을 수 있다. 그래서 사람이 하는 것과 같은 CDP 입력(`Input.dispatchMouseEvent` 로 요소 가운데 누르기, `Input.insertText` 로 글 넣기, `Input.dispatchKeyEvent` 로 모두 고르기)을 쓴다.
+단계는 `steps.ts` 의 상수 표다. 단계마다 선택자, 동작(`click`, `type`, `select_all`), 넣을 값의 출처(검증한 인자 이름이나 상수)만 있다.
+고를 항목이 값마다 다른 경우(역 자동완성의 항목, 날짜 칸, 시 고르기, 인원 종류)의 선택자는 상수 틀에 검증한 값(역 표의 이름, 날짜 숫자, 0~23 의 시, 인원 종류 이름)만 끼운다. 인원은 종류 이름을 끼운 더하기·빼기를 기본값(어른 1명)과의 차이만큼 누른다. 생략할 수 있는 단계(공지 닫기, 역 고르기, 달력 확인)는 1.5초까지 기다리고 없으면 건너뛴다. 달력에 그날 칸이 없으면 예매 기간 밖이라 `KORAIL_DATE_UNAVAILABLE` 로 끝난다(spec REQ3). 모델이나 인자는 선택자 틀과 동작을 정하지 못한다.
 
-PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시, 인원 셋, 조회 단추, 목록 화면의 좌석 종류와 「직통」, 「서울·용산 - 수서 함께 보기」(spec DECISION12), 「KTX/KTX-산천」 탭이다. 예매·결제·「다음」·「더보기」·「다음날」 단추의 선택자는 PR1 소스에 없다.
+PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시, 인원 셋, 조회 단추, 목록 화면의 「서울·용산 - 수서 함께 보기」(칸이 있고 안 골랐을 때만, spec DECISION12), 「KTX/KTX-산천」 탭, 특실(고른 때만)이다. 「일반석」 과 「직통」 은 목록 화면의 기본값으로 보여(공개 화면 확인 결과) 누르지 않는다. 기본값이 아닌지는 실제 계정 확인에서 본다. 누른 뒤에는 목록을 두 번 이어 같은 값이 나올 때까지 읽어 다시 그려지기 전의 낡은 목록을 돌려주지 않는다. 예매·결제·「다음」·「더보기」·「다음날」 단추의 선택자는 PR1 소스에 없다.
 역 입력이 글 넣기로 되는지, 역 고르기 층을 거쳐야 하는지, 날짜 달력의 모양, 인원 층의 단추, 목록 한 줄의 칸은 탐지 때문에 보지 못했다. 본 자리와 보지 못한 부분을 모두 가설 표(`steps.ts`, `fields.ts`)에 모아 사용자가 「실제 계정으로 확인하기」 로 맞춘다. 비면 지어내지 않고 `PAGE_CHANGED` 로 끝낸다.
 
 #### 화면 분류(PR1)
@@ -194,7 +194,7 @@ PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시,
 | `KORAIL_INVALID_INPUT` | `invalid_input` | | 인자 모양이 틀리다 |
 | `KORAIL_UNKNOWN_STATION` | `invalid_input` | | 역 이름 표에 없는 역이다 |
 | `KORAIL_DATE_UNAVAILABLE` | `invalid_input` | | 날짜가 오늘보다 이르다 |
-| `KORAIL_REJECTED` | `invalid_input` | | 코레일이 대화상자로 거절했다 |
+| `KORAIL_REJECTED` | `invalid_input` | | 코레일이 대화상자나 안내 층으로 거절했다. 거절로 보인 화면은 한 번 더 분류해 확정한다 |
 | `KORAIL_BROWSER_UNREACHABLE` | `unavailable` | `retry_later` | 중계에 닿지 않거나 비어 있다 |
 | `KORAIL_LOGIN_REQUIRED` | `credential_rejected` | `reconnect` | 로그인 쿠키가 없거나 로그인 화면으로 넘어갔다 |
 | `KORAIL_CAPTCHA` | `unavailable` | | 보안 문자 화면이다 |
@@ -212,7 +212,7 @@ PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시,
 - PR1 의 도구는 모두 읽기라 다시 불러도 예약 상태가 바뀌지 않는다. 그래도 자동 재시도는 하지 않는다. 다시 부를지는 에이전트가 사용자의 요청으로 정한다(spec DECISION9)
 - 같은 브라우저에서 조회 둘이 겹치면 각자 새 탭을 쓴다. 잠그지 않는다. 겹친 조회가 탐지에 걸리는 위험은 사용자가 정한 속도의 감수 안에 든다
 - 사람이 해야 하는 화면에서 남긴 탭은 사람이 닫을 때까지 남는다. 쇼핑 PR2 의 화면 넘기기가 그 탭을 쓴다
-- 제한 시간: 확인 도구 8초(대시보드 10초 안), 조회 60초. 꺼진 브라우저를 켜는 데 30초까지 걸린다. 넘으면 `KORAIL_UNAVAILABLE` 이고 탭을 닫는다. 기다림이 분류를 함께 하므로 사람이 해야 하는 화면은 시간 초과보다 먼저 잡혀 탭이 남는다
+- 제한 시간: 확인 도구 8초(대시보드 10초 안), 조회 60초. 꺼진 브라우저를 켜는 데 30초까지 걸린다. 조회가 60초를 넘기면 사람이 해야 하는 화면이 아닌 한 `KORAIL_UNAVAILABLE` 이고 탭을 닫는다. 확인 도구의 8초 초과는 `KORAIL_BROWSER_UNREACHABLE` 이다. 필수 단계 하나가 10초 안에 자리를 찾지 못하면 `KORAIL_PAGE_CHANGED` 다. 기다림이 분류를 함께 하므로 사람이 해야 하는 화면은 시간 초과보다 먼저 잡혀 탭이 남는다
 - 배포 순서: KTX PR1 은 Hermes 묶음만 바꾼다. 쇼핑 PR1 의 Control Plane 이 배포되기 전에 KTX 묶음이 올라가면 그사이 옛 Control Plane 이 `attended_only` 를 몰라 예약 작업의 호출을 막지 않는다. 쇼핑 설계와 같이 감수한다. 읽기 도구뿐이고 배포 전에 붙은 바인딩이 없어서다. 기능 파일의 배포 확인 항목에 「쇼핑 PR1 의 Control Plane 이 배포됐는지」 를 둔다
 - 옛 대시보드 plugin 은 모르는 키를 거절해 이 플러그인을 카탈로그에 올리지 않는다. 닫히는 쪽이다
 
