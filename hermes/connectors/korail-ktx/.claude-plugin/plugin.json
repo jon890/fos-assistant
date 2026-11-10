@@ -1,0 +1,5 @@
+{
+  "name": "korail-ktx",
+  "description": "로그인해 둔 내 브라우저로 코레일 KTX 열차를 한 번 조회하는 플러그인 plugin",
+  "skills": "./skills"
+}
