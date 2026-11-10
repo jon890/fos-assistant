@@ -25,7 +25,7 @@
 
 ### 2. 문서
 
-`docs/features/naver-shopping-connector.md`(covers, 등록 칸, 도구와 정책, 주소 분류, 오류, 보안, 설정 안내, 실제 계정으로 확인하기), `docs/adr/ADR-20261110-naver-shopping-connector.md` 와 `docs/adr/INDEX.md`, `docs/features/connector-policy.md` 의 `attended_only` 와 `ATTENDED_ONLY`, `hermes/connectors/README.md` 의 선언 칸, `hermes/plugins/dashboard-profile-api/README.md` 의 정책 키, `backend/docs/data-schema.md` 의 `agent_execution.unattended`.
+`docs/features/naver-shopping.md`(covers, 등록 칸, 도구와 정책, 주소 분류, 오류, 보안, 설정 안내, 실제 계정으로 확인하기), `docs/adr/ADR-20261110-naver-shopping-connector.md` 와 `docs/adr/INDEX.md`, `docs/features/connector-policy.md` 의 `attended_only` 와 `ATTENDED_ONLY`, `hermes/connectors/README.md` 의 선언 칸, `hermes/plugins/dashboard-profile-api/README.md` 의 정책 키, `backend/docs/data-schema.md` 의 `agent_execution.unattended`.
 
 ### 3. 계획 폴더 지우기
 
@@ -44,7 +44,7 @@ scripts/dev/check-local.sh --fast
 | 파일 | 변경 |
 |---|---|
 | `hermes/tests/test_connectors_contract.py` | 수정 |
-| `docs/features/naver-shopping-connector.md` | 신규 |
+| `docs/features/naver-shopping.md` | 신규 |
 | `docs/adr/ADR-20261110-naver-shopping-connector.md` | 신규 |
 | `docs/adr/INDEX.md` | 수정 |
 | `docs/features/connector-policy.md` | 수정 |

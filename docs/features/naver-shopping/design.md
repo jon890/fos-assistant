@@ -48,7 +48,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `.gitignore`, `hermes/connectors/.dockerignore` | 생성 entry `dist/naver-shopping-mcp.js` 와 블로그와 같은 무시 줄 |
 | `.github/CODEOWNERS` | `/hermes/connectors/naver-shopping/` 와 `tests/` 줄 |
 | `hermes/README.md` | 플러그인 표의 한 줄 |
-| `docs/features/naver-shopping-connector.md` | 플러그인 개발 문서. `covers:` 가 플러그인 디렉터리를 가리킨다 |
+| `docs/features/naver-shopping.md` | 플러그인 개발 문서. `covers:` 가 플러그인 디렉터리를 가리킨다 |
 | `hermes/connectors/naver-shopping/README.md` | 사용자 안내와 「도구 목록」 표(계약 검사가 title, summary 줄을 대조한다) |
 
 플러그인 코드는 네이버 블로그 플러그인과 나누지 않는다. CDP 연결 부분(`cdp.ts`)을 같은 모양으로 새로 둔다.
@@ -187,7 +187,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 
 판정은 호출한 실행의 트리 루트 줄의 표식을 `SessionOwnerResolver.unattendedTree` 로 본다. 이 빈은 이미 실행 줄 저장소를 갖고 도구 판정이 origin 을 찾을 때 쓴다. 루트 줄을 찾지 못하면 사람이 없는 쪽(참)으로 본다. 위임 자식은 루트로 판정하므로 살펴보기나 예약 작업이 맡긴 자식도 막힌다.
 기존 `CheckTrigger.unattended()` 는 단추로 연 살펴보기(`MANUAL`)를 거짓으로 두지만, 이 컬럼은 살펴보기 turn 을 모두 참으로 둔다. 쇼핑 도구는 살펴보기 전체에서 막기 때문이다(spec DECISION13). 두 이름의 뜻이 달라 `data-schema.md` 에 함께 적는다.
-먼저 살펴보기는 지금의 `ProactiveCheckGuard.isCheckTree` 로도 가려지지만, 하나의 표식으로 모아 판정이 두 원천을 함께 보지 않게 한다. 살펴보기 읽기 경계(ADR-080)는 그대로 둔다.
+먼저 살펴보기는 지금의 `ProactiveCheckGuard.isCheckTree` 로도 가려지지만, `attended_only` 판정은 이 표식 하나만 본다. 살펴보기 읽기 경계(ADR-080)는 그대로 둔다.
 승인 결과를 전하는 자동 turn 은 사람이 승인 카드를 누른 뒤 도는 것이라 표식이 거짓이다(spec DECISION32). 사람이 없는 실행에서는 `attended_only` 도구가 승인 줄을 만들지 않으므로 이 길로 열리지 않는다.
 
 `task_run.execution_id` 는 turn 이 끝날 때만 채워져 도는 중의 판정에 쓸 수 없다. 그래서 그 칸을 쓰지 않는다.
@@ -249,6 +249,6 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 | DECISION5 | 사람이 없는 실행을 막는 방법 | 범용 도구 칸 `attended_only` 와 Control Plane 판정. 표식은 turn 을 열 때 실행 줄에 적는다 | 작성자 | 판정은 Control Plane 이 한다(ADR-049). 플러그인과 plugin 은 서비스와 실행 종류를 모른다(rule-65). `task_run` 은 도는 중에 실행 번호가 없고 connector 가 읽으면 순환이 생긴다 |
 | DECISION6 | 영어 요지 검사의 대상 | 새 플러그인만. 기존 세 플러그인은 늘리지 않는 예외 목록 | 작성자 | 토스는 manifest SHA 가 바뀌어 금융 승인이 무효가 되고, Gmail 과 블로그는 설명이 모델 지시문이라 따로 확인해야 한다 |
 | DECISION7 | 읽기 탭의 대화상자 | 우리가 연 탭에서만 닫기로 넘긴다. 사람이 쓰는 탭은 건드리지 않는다 | 작성자 | 읽기 탭은 사람이 보지 않는다. 사람 탭의 확인 창은 PR2 가 화면에 보인다 |
-| DECISION9 | 검색 결과를 내려 더 읽는지 | 내리지 않는다. 처음 실린 상태 JSON 만 읽는다 | 작성자 | 내려서 실리는 상품은 상태 JSON 에 들어가지 않는다. 다른 원천(DOM, 응답 가로채기)을 섞으면 칸 위치 가설이 두 벌이 된다. spec DECISION19 를 같이 고쳤다 |
+| DECISION9 | 검색 결과를 내려 더 읽는지 | 내리지 않는다. 처음 실린 상태 JSON 만 읽는다 | 작성자 | 내려서 실리는 상품은 상태 JSON 에 들어가지 않는다. 다른 출처(DOM, 응답 가로채기)을 섞으면 칸 위치 가설이 두 벌이 된다. spec DECISION19 를 같이 고쳤다 |
 | DECISION10 | 플러그인이 여는 주소 | 「주소 분류」 의 `store`, `catalog` 만 탭을 연다 | 작성자 | 모델이 준 주소로 로그인된 브라우저가 아무 사이트나 열지 않게 한다 |
 | DECISION8 | 결정 기록 | 루트 `docs/adr/ADR-20261110-naver-shopping-connector.md` 하나. 브라우저 화면을 읽는 쇼핑 플러그인과 `attended_only` 의 선택 이유를 갖는다 | 작성자 | 플러그인(hermes)과 판정(backend)에 걸쳐 루트에 둔다(ADR 배치 규칙) |

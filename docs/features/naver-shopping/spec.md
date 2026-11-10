@@ -38,7 +38,7 @@
 
 ## 요구사항과 인수 조건
 
-인수 조건은 가짜 네이버 화면(테스트용 HTML)과 가짜 중계 위에서 확인한다. 실제 네이버 계정과 운영 브라우저로 확인하는 절차는 플러그인 기능 파일(`docs/features/naver-shopping-connector.md`)이 갖고 사용자가 직접 돈다. PR 마다 그 PR 의 도구만큼 절차를 더한다.
+인수 조건은 가짜 네이버 화면(테스트용 HTML)과 가짜 중계 위에서 확인한다. 실제 네이버 계정과 운영 브라우저로 확인하는 절차는 플러그인 기능 파일(`docs/features/naver-shopping.md`)이 갖고 사용자가 직접 돈다. PR 마다 그 PR 의 도구만큼 절차를 더한다.
 
 | ID | 요구사항 | 관측할 인수 조건 |
 | --- | --- | --- |
@@ -103,6 +103,6 @@
 
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| DECISION6, DECISION7, DECISION13 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-naver-shopping-connector.md` 를 새로 쓴다 | `docs/features/naver-shopping-connector.md` |
+| DECISION6, DECISION7, DECISION13 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-naver-shopping-connector.md` 를 새로 쓴다 | `docs/features/naver-shopping.md` |
 | DECISION11 | 공통 기반 | PR2 가 화면 넘기기 ADR 을 새로 쓴다 | 그 PR 의 기능 파일 절 |
-| DECISION8, DECISION9, DECISION10 | 구매 경계 | PR3 가 구매 상한과 주문서 준비 ADR 을 새로 쓴다 | `docs/features/naver-shopping-connector.md` |
+| DECISION8, DECISION9, DECISION10 | 구매 경계 | PR3 가 구매 상한과 주문서 준비 ADR 을 새로 쓴다 | `docs/features/naver-shopping.md` |

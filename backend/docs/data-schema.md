@@ -574,6 +574,9 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 부모가 번호를 모르는 결과를 다시 전하지 않으려고, 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「끝날 때」).
 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`).
 
+**`unattended` 는 사람이 없는 실행인지다.** 예약 작업 turn, 먼저 살펴보기 turn, 사람이 없는 트리가 맡긴 일의 결과를 전하는 turn 이 참이다. turn 을 열어 줄을 만든 직후 Hermes 에 보내기 전에 적고 바꾸지 않는다. 도구 판정이 `attended_only` 도구를 거절할 때 트리 루트 줄의 이 값을 본다([ADR-20261110 / naver-shopping-connector](../../docs/adr/ADR-20261110-naver-shopping-connector.md)).
+`CheckTrigger.unattended()` 와 이름이 같지만 뜻이 다르다. 그 값은 단추로 연 살펴보기(`MANUAL`)를 거짓으로 두고, 이 칸은 살펴보기 turn 을 모두 참으로 둔다. 이 칸이 생기기 전의 줄은 거짓이다.
+
 **`question_message_id` 는 사람이 보낸 turn 의 질문 메시지 번호다.** 새 질문과 다시 생성의 실행에만 있고, 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 비어 있다.
 `memory_remember` 가 바로 저장할 수 있는 실행인지 이 칸으로 판정한다([ADR-20261007 / memory-remember](../../docs/adr/ADR-20261007-memory-remember.md)).
 

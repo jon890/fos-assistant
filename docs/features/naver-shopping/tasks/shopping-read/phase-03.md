@@ -15,7 +15,6 @@
 **근거 문서**: `docs/features/naver-shopping/design.md` 의 「주소 분류」, 「화면을 읽는 방식」, 「화면 분류」, `docs/features/naver-shopping/spec.md` 의 DECISION16 부터 DECISION21, DECISION28
 
 - 탭 열기는 블로그 `src/editor/page.ts`(`/json/new`), 준비 기다리기는 `src/editor/open.ts` 의 `readyState` 폴링을 따른다
-- 로컬 Chrome 테스트는 블로그 `tests/local-chrome.ts` 와 `*.chrome.test.ts` 를 따른다
 
 ## 의도 메모
 
@@ -39,13 +38,13 @@
 
 ### 4. 테스트
 
-`tests/tools.test.ts`(가짜 CDP 로 도구를 직접 불러 external, 거절, store, catalog 주소마다 탭 열기 횟수와 결과, `NAVER_SHOPPING_NOT_FOUND`, `options_truncated`), `tests/urls.test.ts`, `tests/classify.test.ts`, `tests/parse-search.test.ts`, `tests/parse-product.test.ts`(합성 fixture), `tests/tab.test.ts`(가짜 CDP: 명령 순서, `Input.*` 없음, evaluate 식이 상수 집합 안, 사람이 해야 하는 분류에서 탭을 닫지 않음, 대화상자 닫기), `tests/read-page.chrome.test.ts`(가짜 HTML 에서 상태 JSON 꺼내기).
+`tests/tools.test.ts`(가짜 CDP 로 도구를 직접 불러 external, 거절, store, catalog 주소마다 탭 열기 횟수와 결과, `NAVER_SHOPPING_NOT_FOUND`, `options_truncated`), `tests/urls.test.ts`(주소와 화면 분류), `tests/parse.test.ts`(합성 fixture), `tests/tab.test.ts`(가짜 브라우저: 명령 순서, `Input.*` 없음, evaluate 식이 상수 집합 안, 사람이 해야 하는 분류에서 탭을 닫지 않음, 대화상자 닫기, 시간 초과), `tests/expressions.test.ts`(고정 식을 가짜 `document` 로 돌려 상태 JSON 꺼내기). 블로그의 Docker Chrome 실행기는 쓰지 않고 Gmail 처럼 `bun test` 로 돈다.
 
 ## 검증
 
 ```bash
 cd hermes/connectors/naver-shopping && bun run typecheck && bun run test && bun run check:bundle
-cd hermes/connectors/naver-shopping && bun test tests/tools.test.ts tests/urls.test.ts tests/classify.test.ts tests/parse-search.test.ts tests/parse-product.test.ts tests/tab.test.ts tests/read-page.chrome.test.ts
+cd hermes/connectors/naver-shopping && bun test tests/tools.test.ts tests/urls.test.ts tests/parse.test.ts tests/tab.test.ts tests/expressions.test.ts
 ```
 
 ## 변경 파일
@@ -61,9 +60,8 @@ cd hermes/connectors/naver-shopping && bun test tests/tools.test.ts tests/urls.t
 | `hermes/connectors/naver-shopping/src/tab.ts` | 신규 |
 | `hermes/connectors/naver-shopping/src/*.ts` | 신규·수정 (server.ts 는 phase 2 가 만든다) |
 | `hermes/connectors/naver-shopping/tests/tools.test.ts` | 신규 |
-| `hermes/connectors/naver-shopping/tests/urls.test.ts` | 신규 |
-| `hermes/connectors/naver-shopping/tests/classify.test.ts` | 신규 |
-| `hermes/connectors/naver-shopping/tests/parse-search.test.ts` | 신규 |
-| `hermes/connectors/naver-shopping/tests/parse-product.test.ts` | 신규 |
+| `hermes/connectors/naver-shopping/tests/urls.test.ts` | 신규 (주소 분류와 화면 분류) |
+| `hermes/connectors/naver-shopping/tests/parse.test.ts` | 신규 (검색, 상품, 묶음 파서) |
 | `hermes/connectors/naver-shopping/tests/tab.test.ts` | 신규 |
-| `hermes/connectors/naver-shopping/tests/read-page.chrome.test.ts` | 신규 |
+| `hermes/connectors/naver-shopping/tests/expressions.test.ts` | 신규 (고정 식을 가짜 document 로 돌린다) |
+| `hermes/connectors/naver-shopping/tests/fake-browser.ts` | 신규 |

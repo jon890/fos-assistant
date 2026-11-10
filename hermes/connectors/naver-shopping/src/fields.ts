@@ -3,7 +3,7 @@
  *
  * **실제 네이버 화면으로 확인하지 않은 가설이다.** 칸마다 후보 이름을 차례로 보고, 필수 칸이 비면 결과를 지어내지 않고
  * `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다. 사용자가 실제 계정으로 확인한 뒤 이 표만 고친다
- * (docs/features/naver-shopping-connector.md 의 「실제 계정으로 확인하기」).
+ * (docs/features/naver-shopping.md 의 「실제 계정으로 확인하기」).
  */
 
 /** 검색 화면(Next.js)의 `__NEXT_DATA__` 에서 상품 목록까지의 경로. */

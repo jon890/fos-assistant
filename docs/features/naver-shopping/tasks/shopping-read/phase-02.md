@@ -16,7 +16,8 @@
 
 - 본보기는 `hermes/connectors/naver-blog/`: `src/cdp.ts`, `src/session.ts`, `src/errors.ts`, `src/server.ts`, `scripts/build.ts`, `scripts/check-bundle.ts`, `scripts/test.ts`, `tests/fake-cdp.ts`, `.mcp.json`, `.claude-plugin/plugin.json`, `tsconfig.json`, `package.json`
 - 의존성 버전은 블로그 `package.json` 과 같게 두고 `bun install` 로 lockfile 을 만든다
-- 블로그 `scripts/test.ts` 는 macOS 에서 `scripts/test.Dockerfile` 컨테이너로 돌고 `git ls-files` 로 추적 파일만 복사한다. 경로를 `naver-shopping` 으로 바꾸고, 새 파일을 `git add` 한 뒤 테스트를 돌린다
+- 테스트 실행은 Gmail 처럼 `bun test` 하나다. 블로그의 Docker Chrome 실행기(`scripts/test.ts`)는 실제 Chrome 이 필요한 편집기 테스트 때문이라 옮기지 않는다
+- 플러그인 폴더에 `node_modules/` 를 무시하는 `.gitignore` 를 둔다
 - 계약 검사는 모든 플러그인의 `dist/<id>-mcp.js` 를 요구한다. 새 작업 공간에서는 플러그인마다 `bun install --frozen-lockfile && bun run build` 를 먼저 한다
 - `.mcp.json` 서버의 env 는 선언(`owner_browser_env`)의 합과 같아야 한다. READ 도구는 서버에서 `readOnlyHint` 를 참으로 둔다
 
