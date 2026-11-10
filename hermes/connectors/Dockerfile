@@ -4,6 +4,7 @@ WORKDIR /src
 # 소스보다 의존성 층을 먼저 두어 lockfile이 같으면 설치를 재사용한다.
 COPY gmail/package.json gmail/bun.lock gmail/
 COPY naver-blog/package.json naver-blog/bun.lock naver-blog/
+COPY naver-shopping/package.json naver-shopping/bun.lock naver-shopping/
 COPY tossinvest/package.json tossinvest/bun.lock tossinvest/
 RUN set -e; for connector in */; do bun install --cwd "$connector" --frozen-lockfile --network-concurrency=1; done
 COPY . .

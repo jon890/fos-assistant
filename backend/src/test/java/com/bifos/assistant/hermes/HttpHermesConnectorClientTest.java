@@ -528,6 +528,32 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("도구의 attended_only 는 칸이 없으면 거짓, boolean 이면 그 값이고 그 밖의 모양은 참으로 읽는다")
+    @Test
+    void readsAttendedOnlyOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String read = "{\"risk\":\"READ\",\"approval\":\"none\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(
+                CATALOG.replace(
+                    tail,
+                    tail + ",\"schema\":2,\"tools\":{"
+                        + "\"absent\":" + read + "},"
+                        + "\"open\":" + read + ",\"attended_only\":true},"
+                        + "\"closed\":" + read + ",\"attended_only\":false},"
+                        + "\"word\":" + read + ",\"attended_only\":\"false\"}}"),
+                MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+            .extracting(ConnectorTool::name, ConnectorTool::attendedOnly)
+            // 읽을 수 없는 선언은 사람이 없는 실행에 도구를 여는 쪽으로 읽지 않는다.
+            .containsExactly(tuple("absent", false), tuple("open", true), tuple("closed", false), tuple("word", true));
+        server.verify();
+    }
+
+
     @DisplayName("도구의 identifiers 는 문자열 배열이면 그 순서대로 읽고, 칸이 없거나 그 밖의 모양이면 빈 목록으로 읽는다")
     @Test
     void readsIdentifiersOfToolPolicies() {

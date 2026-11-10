@@ -101,6 +101,28 @@ public record ToolPolicyDecision(
         boolean readOnlyMarked,
         int argsBytes,
         CheckBoundary boundary) {
+        return decide(connectionStatus, ownServerTool, schema, declared, granted, conversationGranted, readOnlyMarked, argsBytes,
+            boundary, false);
+    }
+
+
+    /**
+     * 사람이 없는 실행인지까지 보는 판정이다. 나머지 인자의 뜻은 위와 같다.
+     *
+     * @param unattended 호출한 실행의 트리 루트가 사람이 없는 실행(먼저 살펴보기, 예약 작업)인가. 참이면 {@link
+     * ToolPolicy#attendedOnly()} 도구를 거절한다
+     */
+    public static ToolPolicyDecision decide(
+        ConnectionStatus connectionStatus,
+        boolean ownServerTool,
+        int schema,
+        Optional<ToolPolicy> declared,
+        boolean granted,
+        boolean conversationGranted,
+        boolean readOnlyMarked,
+        int argsBytes,
+        CheckBoundary boundary,
+        boolean unattended) {
         if (connectionStatus != ConnectionStatus.READY) {
             return denied(ActionDenyReason.NOT_READY, null);
         }
@@ -117,6 +139,11 @@ public record ToolPolicyDecision(
             () -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, grantable));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
+        }
+        // 사람이 연 대화에서만 부르라고 선언한 도구는 사람이 없는 실행에서 승인 줄도 만들지 않는다. 선언으로만 알 수 있어
+        // 선언 없음 뒤에 보고, 살펴보기의 읽기 경계보다 먼저 본다. 읽기 도구도 막는다.
+        if (unattended && policy.attendedOnly()) {
+            return denied(ActionDenyReason.ATTENDED_ONLY, policy);
         }
         // 살펴보기는 사람이 보지 않는 실행이라 승인 줄을 만들지 않는다. manifest 는 READ 도구에도 required 나 always 를
         // 선언할 수 있어 위험도만 보면 승인 줄이 생기거나 상시 허락으로 통과한다. 그래서 승인 방식까지 본다.
