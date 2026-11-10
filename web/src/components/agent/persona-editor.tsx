@@ -101,7 +101,13 @@ export function PersonaEditor({ code, name, initialPersona }: Props) {
         aria-label={`${name} 성격`}
         className="field-sizing-fixed leading-6"
       />
-      <p className="mt-2 text-xs text-muted-foreground">남은 {remaining}자</p>
+      {remaining <= maxChars * 0.1 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {remaining >= 0
+            ? `${remaining}자까지 쓸 수 있어요`
+            : `${-remaining}자 넘게 썼어요`}
+        </p>
+      ) : null}
       {error ? (
         <Notice variant="error" role="alert" className="mt-2 break-all">
           {error}

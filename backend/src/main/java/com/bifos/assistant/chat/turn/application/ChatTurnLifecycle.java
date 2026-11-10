@@ -31,6 +31,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
@@ -52,6 +53,7 @@ class ChatTurnLifecycle {
     private final ChatMessageRepository messages;
     private final ExecutionQuestions executionQuestions;
     private final ExecutionRecorder executions;
+    private final ExecutionDeliveryWriter executionMarks;
     private final StarterSuggestionService starterSuggestions;
     private final ArtifactService artifacts;
     private final ArtifactAutoVault autoVault;
@@ -108,6 +110,10 @@ class ChatTurnLifecycle {
             requestReceivedAt);
         if (intent instanceof TurnIntent.DelegationResults results) {
             attachDeliveryExecution(results.attempt(), execution.id());
+        }
+        // 사람이 없는 실행은 Hermes 에 보내기 전에 적는다. 도구 판정이 도는 중에 이 값을 읽는다.
+        if (TurnIntent.unattended(intent)) {
+            executionMarks.markUnattended(execution.id());
         }
         return new PendingTurn(
             user,

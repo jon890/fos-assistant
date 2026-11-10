@@ -80,14 +80,15 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | --- | --- | --- |
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
-| `conversation` | `title`, `pending_messages` | 아직 |
-| `agent_execution` | `output_text` | 아직 |
+| `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `conversation` | `pending_messages` | 아직 |
+| `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 | `execution_event` | `detail` | 아직 |
 | `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
 | `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
 | `notification` | `title`, `body` | 아직 |
 | `follow_up` | `title` | 아직 |
-| `task` | `title`, `instruction` | 아직 |
+| `task` | `title`, `instruction` | 함. 옆 칸은 각각 `title_key_id`, `instruction_key_id`. 점검 작업의 지시문은 없어 옆 칸도 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 | `proactive_check` | `report_json` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 
@@ -391,8 +392,9 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `hermes_session_id` 는 다음 turn 에 보낼 Hermes session 이고 특정 profile 안의 값이다. 그래서 대화의 에이전트는 중간에 바뀌지 않는다. 새 대화는 첫 turn 을 보내기 전에 Control Plane 이 `fos-<uuid>` 로 정하고, 압축 교체로 Hermes 가 다른 session 을 돌려주면 그 값으로 바뀐다
 - `hermes_root_session_id` 는 처음의 session 이고 압축 교체에도 바뀌지 않는다. MCP `agent_*` 호출이 들고 오는 서명한 루트 session 이 이 값이다. 이 칸이 생기기 전의 대화는 비어 있다
 - `model_selection_mode` 가 비면 사용자와 그룹 기본값을 따른다. 값은 `TIER` 뿐이다. 옛 `DEFAULT`(에이전트 기본값으로 돌아가기)는 `V20261031171509` 가, 옛 `CUSTOM`(provider, 모델, effort 를 직접 고르기)은 `V20261031171514` 가 선택 없음으로 바꿨다. `CUSTOM` 이 쓰던 `model_provider`, `model`, `reasoning_effort` 세 컬럼은 운영에서 모든 줄이 비어 있음을 확인한 뒤 `V20261102025856` 이 지웠다
-- `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
+- `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 `title_key_id`, 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
+- `title_key_id` 가 비어 있으면 `title` 은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `conversation:<id>:title:user:<user_id>` 다. 외래 키를 두지 않는다. 칸은 암호문이 들어가도록 `VARCHAR(1024)` 이고 글자 수 상한(200자)은 평문에 대해 요청 검사가 지킨다. 읽는 곳은 `Conversation.title()` 이고 풀지 못하면 읽을 수 없다는 글을 받는다. 제목을 질의로 직접 쓰는 곳(`fillTitleIfBlank`, `renameIfActive`, `markPurged`)은 암호문과 key 번호를 함께 적는다. 사이드바의 대화 검색은 브라우저가 받은 평문 제목으로 목록을 좁히므로 서버가 이 칸을 비교하지 않는다
 - `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
 - `pending_messages` 는 응답 중에 보내 아직 다음 turn 으로 보내지 않은 대기 줄의 JSON 이다. 모양과 멈춤, 동시성은 [ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「저장 자리 개정」 이 갖는다. 비면 대기 글이 없다. 빈 줄은 저장하지 않는다. 엔티티는 이 칸을 쓰지 않고 `PendingMessageStore` 가 대화 줄을 잠근 뒤 전용 질의로만 읽고 바꾼다. 모르는 버전이거나 깨진 JSON 은 빈 줄로 보지 않고 오류로 올린다. 빈 줄로 보면 멈춰 둔 글이 다음 저장에서 사라진다. 대화를 지우거나 정리할 때 비운다. 옛 `chat_pending_message` 테이블은 지웠다. `V20261102074315` 가 그 행을 이 칸으로 옮기고 옮긴 행을 지웠으며, 배포를 확인한 뒤 `V20261102074329` 가 직전 이미지가 옛 테이블에만 쓴 행을 이미 있는 대기 줄 뒤에 이어 붙인 다음 `V20261102074333` 이 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 이어 붙일 때 번호가 겹치면 가장 큰 번호 다음 번호를 받고, 옛 행 하나라도 멈췄으면 줄이 멈춘다. 대화 줄이 없는 옛 행은 보낼 곳이 없어 버렸다
 - `task_id` 는 이 대화를 만든 예약 작업이다([ADR-078](../../docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md)). `agent_id` 와 같은 까닭으로 외래 키를 두지 않는다
@@ -564,6 +566,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 - `retry_of_execution_id` 는 지금 채우는 경로가 없어 늘 비어 있다
 - `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고, 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
 - `delegation_key` 는 `agent_delegate` 로 만든 실행만 채우고 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `output_text` 도 이 실행만 채우고, 대화 답은 `chat_message` 가 갖는다
+- `output_key_id` 가 비어 있으면 `output_text` 는 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `agent_execution:<id>:output:user:<user_id>` 다. 외래 키를 두지 않는다. 읽는 곳은 엔티티의 `outputText()` 가 아니라 `ExecutionOutputs.open` 을 쓰고, 풀지 못하면 null 이 아니라 읽을 수 없다는 글을 받는다. 대화 purge 는 두 칸을 함께 NULL 로 비운다
 - `provider` 와 `model` 은 Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다
 - `reasoning_effort` 가 비면 기본값으로 보낸 것이다. `reasoning_defaults_checked_at` 은 그때 profile 기본값을 정상 응답으로 읽은 시각이고, 조회가 실패하면 비워 다시 시도한다. `reasoning_effort_source` 는 이 칸이 생기기 전의 실행에서 비어 있고 추정해 채우지 않는다
 - `instructions_hash` 는 공통 답변 지침과 Memory 문맥의 지문이다. 본문은 개인 Memory 를 담을 수 있어 저장하지 않는다. `runtime_fingerprint` 는 그 값을 주는 Hermes 경로가 아직 없어 늘 비어 있다
@@ -573,6 +576,9 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 **`result_delivered_at` 은 위임 실행의 끝난 결과를 부모에게 전한 시각이다.** 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 부모 대화를 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
 부모가 번호를 모르는 결과를 다시 전하지 않으려고, 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「끝날 때」).
 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`).
+
+**`unattended` 는 사람이 없는 실행인지다.** 예약 작업 turn, 먼저 살펴보기 turn, 사람이 없는 트리가 맡긴 일의 결과를 전하는 turn 이 참이다. turn 을 열어 줄을 만든 직후 Hermes 에 보내기 전에 적고 바꾸지 않는다. 엔티티에 칸이 없고 `AgentExecutionRepository` 의 쿼리로만 읽고 쓴다. 다른 흐름의 엔티티 저장이 이 값을 덮지 않게 한다. 도구 판정이 `attended_only` 도구를 거절할 때 트리 루트 줄의 이 값을 본다([ADR-20261110 / naver-shopping-connector](../../docs/adr/ADR-20261110-naver-shopping-connector.md)).
+`CheckTrigger.unattended()` 와 이름이 같지만 뜻이 다르다. 그 값은 단추로 연 살펴보기(`MANUAL`)를 거짓으로 두고, 이 칸은 살펴보기 turn 을 모두 참으로 둔다. 이 칸이 생기기 전의 줄은 거짓이다.
 
 **`question_message_id` 는 사람이 보낸 turn 의 질문 메시지 번호다.** 새 질문과 다시 생성의 실행에만 있고, 예약 작업, 먼저 살펴보기, 맡긴 일의 결과를 전하는 turn, 맡겨서 도는 실행은 비어 있다.
 `memory_remember` 가 바로 저장할 수 있는 실행인지 이 칸으로 판정한다([ADR-20261007 / memory-remember](../../docs/adr/ADR-20261007-memory-remember.md)).
@@ -947,6 +953,7 @@ action을 지우면 실행 내용도 지운다.
 일정을 본체에 두고 작업 기준으로 발화하는 근거는 [ADR-20261016 / task-schedule-columns](adr/ADR-20261016-task-schedule-columns.md)가 갖는다.
 
 - `owner_user_id` 는 누구의 권한으로 도는가이고 바뀌지 않는다. `agent_id` 는 주인이 고칠 수 있다
+- `title_key_id` 와 `instruction_key_id` 가 비어 있으면 그 칸은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `task:<id>:title:user:<owner_user_id>` 와 `task:<id>:instruction:user:<owner_user_id>` 다. 외래 키를 두지 않는다. `title` 은 암호문이 들어가도록 `VARCHAR(512)` 이고 글자 수 상한(100자)은 평문에 대해 지킨다. 읽는 곳은 `Task.title()` 과 `Task.instruction()` 이다
 - `kind` 가 `CHECK` 인 줄은 매일 깨우기이고 `instruction` 과 `model_tier` 를 비운다
 - `loop_enabled` 와 `snoozed_until` 은 `CHECK` 줄만 쓰던 매일 루프의 동의와 쉬기 끝 시각(UTC)이다. 매일 루프를 지워 읽는 곳이 없고 값만 남는다. 동의는 일정의 켜짐(`state`)과 다른 동의라 따로 둔다. 기본은 동의 없음이고 쉬기는 비어 있으면 쉬지 않는다
 - `conversation_id` 는 `SINGLE` 일 때 결과를 쌓는 대화다. 첫 발화가 만들기 전에는 비어 있고, `NEW_PER_RUN` 은 늘 비어 있다

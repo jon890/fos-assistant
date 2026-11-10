@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 /**
  * 실행 종료 때 실제 모델과 사용량, 당시 가격의 비용을 같은 실행 줄에 저장한다.
  *
- * <p>종료 상태와 답을 함께 저장하며 시작과 실행 한도, 문맥 출처 기록은 실행 facade가 맡는다.
+ * <p>답은 {@link ExecutionOutputs} 가 암호화해 적는다. 종료 상태와 답을 함께 저장하며 시작과 실행 한도, 문맥 출처 기록은 실행 facade가 맡는다.
  */
 @Service
 @Slf4j
@@ -27,6 +27,7 @@ public class ExecutionCompletionRecorder {
     private final AgentExecutionRepository executions;
     private final CostEstimator costs;
     private final HermesRunsClient hermes;
+    private final ExecutionOutputs outputs;
 
 
     /**
@@ -61,9 +62,7 @@ public class ExecutionCompletionRecorder {
         execution.attachRunId(result.runId());
         execution.markSucceeded(
             provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
-        if (outputText != null) {
-            execution.recordOutput(outputText);
-        }
+        outputs.record(execution, outputText);
         return executions.save(execution);
     }
 
@@ -123,9 +122,7 @@ public class ExecutionCompletionRecorder {
         execution.attachRunId(result.runId());
         execution.markCancelled(
             provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
-        if (outputText != null) {
-            execution.recordOutput(outputText);
-        }
+        outputs.record(execution, outputText);
         return executions.save(execution);
     }
 

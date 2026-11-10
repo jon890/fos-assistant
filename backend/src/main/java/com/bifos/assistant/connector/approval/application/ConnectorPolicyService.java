@@ -86,6 +86,7 @@ public class ConnectorPolicyService {
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
     private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
+    private static final String ATTENDED_ONLY_MESSAGE = "사람이 연 대화에서만 쓸 수 있는 도구입니다. 예약 작업과 먼저 살펴보기에서는 부르지 않습니다.";
 
     private final ConnectorActionRepository actions;
     private final ConnectorBindingRepository bindings;
@@ -266,7 +267,8 @@ public class ConnectorPolicyService {
             // 표준 플러그인은 연결의 마지막 확인에서 읽기 표시를 받은 도구만 상시 허락을 본다(ADR-20261101 / plugin-without-assistant-json).
             connection.readOnlyMarked(confirmedTool),
             argsJson.getBytes(StandardCharsets.UTF_8).length,
-            boundary))
+            boundary,
+            owners.unattendedTree(origin)))
             .orElseGet(ToolPolicyDecision::policyUnavailable);
         // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
         boolean passed = decision.decision() == ActionDecision.ALLOWED;
@@ -467,6 +469,7 @@ public class ConnectorPolicyService {
             case RISK_NOT_OPEN -> RISK_NOT_OPEN_MESSAGE;
             case ARGS_TOO_LARGE -> ARGS_TOO_LARGE_MESSAGE;
             case READ_ONLY_RUN -> READ_ONLY_RUN_MESSAGE;
+            case ATTENDED_ONLY -> ATTENDED_ONLY_MESSAGE;
         };
     }
 

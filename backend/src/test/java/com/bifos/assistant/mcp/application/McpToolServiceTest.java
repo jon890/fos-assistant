@@ -34,6 +34,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -60,6 +61,7 @@ class McpToolServiceTest {
         artifacts,
         mock(AgentDelegationService.class),
         mock(ExecutionDeliveryWriter.class),
+        mock(ExecutionOutputs.class),
         mock(ExecutionContextSourceWriter.class),
         mock(AgentRepository.class),
         mock(AgentConnectorBindings.class),
@@ -135,6 +137,7 @@ class McpToolServiceTest {
             artifacts,
             mock(AgentDelegationService.class),
             mock(ExecutionDeliveryWriter.class),
+            mock(ExecutionOutputs.class),
             mock(ExecutionContextSourceWriter.class),
             mock(AgentRepository.class),
             mock(AgentConnectorBindings.class),

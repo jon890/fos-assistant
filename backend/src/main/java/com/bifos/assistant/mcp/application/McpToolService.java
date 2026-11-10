@@ -27,6 +27,7 @@ import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.application.dto.ContextSourceRef;
 import com.bifos.assistant.usage.execution.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
@@ -78,6 +79,7 @@ public class McpToolService {
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
     private final ExecutionDeliveryWriter deliveryWriter;
+    private final ExecutionOutputs executionOutputs;
     /** {@code memory_read} 로 본문을 낸 항목을 그 실행의 문맥 기록 끝에 덧붙인다. */
     private final ExecutionContextSourceWriter contextSourceWriter;
 
@@ -348,11 +350,11 @@ public class McpToolService {
         status.put("execution_id", execution.id());
         status.put("status", execution.status().name());
         ExecutionStatus value = execution.status();
-        if ((value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED)
-            && execution.outputText() != null) {
-            status.put(
-                "output",
-                isExternalResult(execution) ? ExternalData.wrap(execution.outputText()) : execution.outputText());
+        if (value == ExecutionStatus.SUCCEEDED || value == ExecutionStatus.CANCELLED) {
+            String output = executionOutputs.open(execution);
+            if (output != null) {
+                status.put("output", isExternalResult(execution) ? ExternalData.wrap(output) : output);
+            }
         }
         if (value == ExecutionStatus.FAILED && execution.errorCode() != null) {
             status.put("error_code", execution.errorCode());

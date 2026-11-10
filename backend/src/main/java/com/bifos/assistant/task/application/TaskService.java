@@ -19,6 +19,7 @@ import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskState;
 import com.bifos.assistant.task.domain.type.TriggerType;
+import com.bifos.assistant.task.infra.TaskContents;
 import com.bifos.assistant.task.infra.TaskRepository;
 import com.bifos.assistant.task.infra.TaskRunRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -57,6 +58,7 @@ public class TaskService {
     private final AgentService agents;
     private final ConversationPublicIdLookup conversations;
     private final TaskProperties properties;
+    private final TaskContents contents;
     private final Clock clock;
 
 
@@ -98,6 +100,8 @@ public class TaskService {
         Task task = requireTaskForUpdate(user, taskId);
         Agent agent = requireAgent(user, input.agentCode());
         task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
+        // 고친 글이 평문으로 flush 되기 전에 바로 암호화한다. 같은 트랜잭션이다.
+        contents.seal(task);
         task.chooseModelTier(input.modelTier());
         if (!sameSchedule(task, input.schedule())) {
             Schedule schedule = validated(input.schedule(), now);

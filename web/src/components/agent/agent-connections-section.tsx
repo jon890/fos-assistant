@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConnectorDetailsFold } from "@/components/connector/connector-identity";
 import { Notice } from "@/components/ui/notice";
 import {
   GROUP_VISIBILITY,
@@ -140,9 +141,9 @@ function ConnectionRow({
     >
       <div className="min-w-0 text-sm">
         <p className="font-medium break-all">{view.title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          도구 {view.toolCount}개
-        </p>
+        <ConnectorDetailsFold className="mt-1 text-xs">
+          <p className="text-muted-foreground">도구 {view.toolCount}개</p>
+        </ConnectorDetailsFold>
         {view.bound ? (
           <p className="mt-1 text-xs text-muted-foreground">
             {boundReadiness(view)}
@@ -238,7 +239,7 @@ export function AgentConnectionsSection({
     setError(null);
     const result = await bindAgentConnection(code, view.connectorId);
     if (!result.ok) {
-      // 실패해도 서버에는 바인딩이 남았을 수 있다(대시보드가 실패해 반영 대기로 남는 경우).
+      // 실패해도 서버에는 바인딩이 남았을 수 있다(대시보드가 실패해 붙이는 중으로 남는 경우).
       // 목록을 다시 읽어 화면과 도구 절의 위험 안내를 서버 상태에 맞춘다. 다시 읽기도 실패하면 지금 화면을 둔다.
       const reloaded = await listAgentConnections(code);
       setPending(null);

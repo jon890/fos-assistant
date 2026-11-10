@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "naver-shopping": {
+      "command": "bun",
+      "args": ["--no-env-file", "${CLAUDE_PLUGIN_ROOT}/dist/naver-shopping-mcp.js"],
+      "env": {
+        "NAVER_SHOPPING_BROWSER_URL": "${NAVER_SHOPPING_BROWSER_URL}"
+      }
+    }
+  }
+}

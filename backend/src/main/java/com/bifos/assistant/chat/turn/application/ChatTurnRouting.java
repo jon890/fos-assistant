@@ -155,9 +155,7 @@ class ChatTurnRouting {
      */
     void fillBlankTitle(Conversation conversation, String text) {
         if (conversation.title().isBlank()) {
-            String title = titleFrom(text);
-            conversationWriter.fillTitleIfBlank(conversation.id(), title);
-            conversation.titleIfBlank(title);
+            conversationWriter.fillTitleIfBlank(conversation, titleFrom(text));
         }
     }
 

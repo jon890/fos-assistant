@@ -3,7 +3,7 @@
 # KEEP는 근거가 있는 보존이고 GAP는 사용자 결정 전의 알려진 공백이다.
 agent|AGENT|id|DELETE|KEEP|DELETE|owner_user_id로 사용자에 속한다. 지연 정리는 에이전트 행을 지운다. 표 하나에 기대값 하나라 user 칸은 fixture 의 비공개 에이전트 기준이다. 그룹 공개 에이전트는 지우지 않고 관리자에게 넘기며 UserPurgerTest 가 확인한다.
 agent_connector_binding|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. ConnectorAgentPurge가 지운다.
-agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text를 비우며 질문 메시지 번호(question_message_id)를 끊는다.
+agent_execution|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text와 그 key(output_key_id)를 비우며 질문 메시지 번호(question_message_id)를 끊는다.
 agent_memory_collection|AGENT|agent_id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.
 agent_memory_collection_change|AGENT|id|DELETE|KEEP|DELETE|agent_id FK로 에이전트에 속한다. 변경 이력도 지연 정리에서 지운다.
 agent_token|AGENT|id|KEEP|KEEP|KEEP|profile_name으로 profile에 속한다. 운영 등록 profile은 에이전트 삭제 후에도 남기는 계약이다.
@@ -20,7 +20,7 @@ content_draft_creation_call|CONVERSATION|id|KEEP|KEEP|KEEP|creation_request_id F
 content_draft_creation_request|CONVERSATION|id|GONE|GONE|KEEP|conversation_id와 owner_user_id에 속한다. GONE으로 바꾸고 request_hash와 draft_public_id를 비운다.
 content_draft_revision|CONVERSATION|id|DELETE|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
 content_draft_snapshot|CONVERSATION|id|KEEP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조, 저장 job 칸을 원고 삭제 후에도 보존하는 계약이다.
-conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session, 대기 줄(pending_messages)을 비운 뒤 purged_at을 적는다.
+conversation|CONVERSATION|id|SCRUB|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 그 key(title_key_id), Hermes session, 대기 줄(pending_messages)을 비운 뒤 purged_at을 적는다.
 decision_feedback_event|CONVERSATION|id|DELETE|DELETE|KEEP|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지운다. 에이전트 정리는 사건을 건드리지 않는다.
 execution_context_source|CONVERSATION|execution_id|KEEP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|SCRUB|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.

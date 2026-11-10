@@ -266,7 +266,7 @@ export function SkillPackageUpload({
         loadingText="읽는 중"
         onClick={() => inputRef.current?.click()}
       >
-        zip 으로 올리기
+        스킬 파일 올리기
       </Button>
       <Dialog
         open={file !== null}

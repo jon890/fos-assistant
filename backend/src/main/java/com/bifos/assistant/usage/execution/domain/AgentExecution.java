@@ -1,6 +1,5 @@
 package com.bifos.assistant.usage.execution.domain;
 
-import com.bifos.assistant.usage.pricing.domain.EstimatedCost;
 import com.bifos.assistant.usage.pricing.domain.ExecutionCost;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.domain.TokenUsage;
@@ -20,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * 사용량과 비용 보고를 위해 남기는 에이전트 turn 하나다.
@@ -55,12 +55,7 @@ public class AgentExecution {
     @Column(name = "root_execution_id")
     private Long rootExecutionId;
 
-    /**
-     * 막혀서 다음 모델로 넘어갈 때 만든 실행이 가리키는 직전 실행.
-     *
-     * <p>자식이 아니라 같은 turn 을 다시 시도한 것이라 {@code parentExecutionId} 를 쓰지 않는다. 첫
-     * 시도는 비어 있다.
-     */
+    /** 막혀서 다음 모델로 넘어갈 때 만든 직전 실행. 같은 turn 의 재시도라 {@code parentExecutionId} 를 쓰지 않고 첫 시도는 비어 있다. */
     @Column(name = "retry_of_execution_id")
     private Long retryOfExecutionId;
 
@@ -85,9 +80,13 @@ public class AgentExecution {
     @Column(name = "delegation_key", unique = true, length = 64)
     private String delegationKey;
 
-    /** 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다. */
+    /** 맡겨 만든 실행이 끝났을 때의 답. {@link #outputKeyId} 가 있으면 암호문이라 읽는 곳은 {@code ExecutionOutputs#open} 을 쓴다. */
     @Column(name = "output_text", columnDefinition = "MEDIUMTEXT")
     private String outputText;
+
+    /** {@code output_text} 를 암호화한 사용자 데이터 key 번호. 비어 있으면 평문이다. */
+    @Column(name = "output_key_id")
+    private Long outputKeyId;
 
     @Column(name = "provider", length = 64)
     private String provider;
@@ -123,6 +122,11 @@ public class AgentExecution {
     @Column(name = "error_code", length = 64)
     private String errorCode;
 
+    /** 사람이 없는 실행인가. 저장소 쿼리로만 쓰고 읽어 엔티티 저장이 덮지 않는다(data-schema 의 「agent_execution」). */
+    @ColumnDefault("false")
+    @Column(name = "unattended", nullable = false, insertable = false, updatable = false)
+    private boolean unattended;
+
     @Column(name = "input_tokens")
     private Long inputTokens;
 
@@ -142,10 +146,8 @@ public class AgentExecution {
     private Long contextChars;
 
     /**
-     * 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수.
-     *
-     * <p>0 보다 크면 요청자가 볼 수 있는 Memory 를 전부 싣지 못한 실행이다. 이 칸이 생기기 전의
-     * 기록과 문맥을 조립하지 않은 실행은 비어 있다.
+     * 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수. 0 보다 크면 요청자가 볼 수 있는 Memory 를 전부 싣지 못한 실행이다.
+     * 이 칸이 생기기 전의 기록과 문맥을 조립하지 않은 실행은 비어 있다.
      */
     @Column(name = "context_omitted_items")
     private Integer contextOmittedItems;
@@ -342,33 +344,22 @@ public class AgentExecution {
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
     public void recordOutput(String outputText) {
         this.outputText = outputText;
+        this.outputKeyId = null;
     }
 
 
-    /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
-    public void markSucceeded(String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
-        recordUsage(provider, model, usage);
-        this.estimatedCostMicros = cost.micros();
-        this.costCurrency = cost.currency();
-        this.pricingVersion = cost.pricingVersion();
-        this.finishedAt = finishedAt;
-        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
-        closeInterruptedObservation();
-        this.status = ExecutionStatus.SUCCEEDED;
+    /** 암호화한 답과 그것을 연 데이터 key 의 번호를 함께 적는다. */
+    public void recordSealedOutput(String sealed, Long keyId) {
+        recordOutput(sealed);
+        this.outputKeyId = keyId;
     }
 
 
     /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         recordUsage(provider, model, usage);
-        this.estimatedCostMicros = cost.estimatedMicros();
-        this.actualCostMicros = cost.actualMicros();
-        this.costCurrency = cost.currency();
-        this.pricingVersion = cost.pricingVersion();
-        this.finishedAt = finishedAt;
-        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
-        closeInterruptedObservation();
-        this.status = ExecutionStatus.SUCCEEDED;
+        recordCost(cost);
+        finish(finishedAt, ExecutionStatus.SUCCEEDED);
     }
 
 
@@ -376,10 +367,7 @@ public class AgentExecution {
     public void markFailed(
         String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
         recordUsage(provider, model, usage);
-        this.estimatedCostMicros = cost.estimatedMicros();
-        this.actualCostMicros = cost.actualMicros();
-        this.costCurrency = cost.currency();
-        this.pricingVersion = cost.pricingVersion();
+        recordCost(cost);
         markFailed(errorCode, finishedAt);
     }
 
@@ -387,20 +375,14 @@ public class AgentExecution {
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
         this.errorCode = errorCode;
-        this.finishedAt = finishedAt;
-        this.latencyMs = finishedAt.toEpochMilli() - startedAt.toEpochMilli();
-        closeInterruptedObservation();
-        this.status = ExecutionStatus.FAILED;
+        finish(finishedAt, ExecutionStatus.FAILED);
     }
 
 
     /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
     public void markCancelled(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         recordUsage(provider, model, usage);
-        this.estimatedCostMicros = cost.estimatedMicros();
-        this.actualCostMicros = cost.actualMicros();
-        this.costCurrency = cost.currency();
-        this.pricingVersion = cost.pricingVersion();
+        recordCost(cost);
         markCancelled(finishedAt);
     }
 
@@ -415,6 +397,22 @@ public class AgentExecution {
         }
         closeInterruptedObservation();
         this.status = ExecutionStatus.CANCELLED;
+    }
+
+
+    private void recordCost(ExecutionCost cost) {
+        this.estimatedCostMicros = cost.estimatedMicros();
+        this.actualCostMicros = cost.actualMicros();
+        this.costCurrency = cost.currency();
+        this.pricingVersion = cost.pricingVersion();
+    }
+
+
+    private void finish(Instant at, ExecutionStatus terminal) {
+        this.finishedAt = at;
+        this.latencyMs = at.toEpochMilli() - startedAt.toEpochMilli();
+        closeInterruptedObservation();
+        this.status = terminal;
     }
 
 
@@ -586,15 +584,6 @@ public class AgentExecution {
             this.cachedInputTokens = cachedInput;
             this.outputTokens = output;
             this.totalTokens = total;
-            return this;
-        }
-
-
-        /** 비용을 모르면 금액 칸을 모두 null 로 둔다. 어느 것도 공짜로 읽히지 않게 하기 위해서다. */
-        public Builder cost(EstimatedCost cost) {
-            this.estimatedCostMicros = cost.micros();
-            this.costCurrency = cost.currency();
-            this.pricingVersion = cost.pricingVersion();
             return this;
         }
 

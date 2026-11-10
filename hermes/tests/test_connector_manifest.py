@@ -970,6 +970,25 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertIs(tools["filter_note"]["conversation_grant"], False)
         self.assertIs(tools["env_view"]["conversation_grant"], False)
 
+    def test_declared_attended_only_reaches_the_catalog_only_when_true(self):
+        """`"attended_only": true` 는 위험도와 상관없이 받아 카탈로그에 싣고, 거짓이나 없으면 칸을 내지 않는다."""
+        self.declare(lambda tools: tools.update(
+            read_note={"risk": "READ", "attended_only": True},
+            write_note={"risk": "WRITE", "outbound": False, "attended_only": True},
+            list_note={"risk": "READ", "attended_only": False}))
+        tools = self.catalog()[0]["tools"]
+        self.assertIs(tools["read_note"]["attended_only"], True)
+        self.assertIs(tools["write_note"]["attended_only"], True)
+        self.assertNotIn("attended_only", tools["list_note"])
+        self.assertNotIn("attended_only", tools["env_view"])
+
+    def test_non_boolean_attended_only_leaves_the_connector_out(self):
+        """boolean 이 아닌 `attended_only` 는 고쳐 읽지 않고 그 플러그인을 카탈로그에서 뺀다."""
+        for value in ("true", 1, None):
+            with self.subTest(value=value):
+                self.declare(lambda tools: tools.update(read_note={"risk": "READ", "attended_only": value}))
+                self.assertEqual(self.catalog(), [])
+
     def test_identifiers_reach_the_catalog_in_declared_order(self):
         """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-089)."""
         self.declare(lambda tools: tools.update(

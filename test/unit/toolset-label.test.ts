@@ -5,13 +5,12 @@ import { toolsetText } from "../../web/src/lib/toolset-label.ts";
 const NAMES = [
   "web", "vision", "todo", "clarify", "session_search", "skills", "tts", "delegation", "terminal", "file",
   "code_execution", "browser", "computer_use", "cronjob", "image_gen", "video_gen", "homeassistant", "spotify",
-  "discord",
+  "discord", "connections",
 ];
 /** 표에 있으면 쓰이지 않아야 하는 값이다. 이 값이 돌아오면 그 이름이 표에 없다는 뜻이다. */
 const FALLBACK = { label: "English Label", description: "설명한다" };
 
-test("도구 묶음 열아홉이 모두 한국어 이름을 갖는다", () => {
-  assert.equal(NAMES.length, 19);
+test("도구 묶음이 모두 한국어 이름을 갖는다", () => {
   for (const name of NAMES) {
     const { label } = toolsetText(name, FALLBACK);
     assert.notEqual(label, FALLBACK.label, `${name} 이 표에 없다`);

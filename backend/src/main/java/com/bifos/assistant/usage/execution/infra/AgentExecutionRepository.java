@@ -466,8 +466,23 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /** 그 대화 실행의 답 본문을 비운다. 토큰과 금액은 남긴다. 트랜잭션은 {@code ConversationExecutionPurge} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update AgentExecution e set e.outputText = null
+            update AgentExecution e set e.outputText = null, e.outputKeyId = null
              where e.conversationId = :conversationId and e.outputText is not null
             """)
     int clearOutputsOf(@Param("conversationId") Long conversationId);
+
+
+    /**
+     * 사람이 없는 실행(예약 작업, 먼저 살펴보기, 그 트리의 결과를 전하는 turn)으로 적는다. 엔티티에 칸을 두지 않아 엔티티 저장이 이 값을
+     * 덮지 않는다. 뜻은 {@code backend/docs/data-schema.md} 의 「agent_execution」 이 갖는다. 트랜잭션은 {@code ExecutionDeliveryWriter} 가
+     * 연다.
+     */
+    @Modifying
+    @Query(value = "update agent_execution set unattended = true where id = :id", nativeQuery = true)
+    int markUnattended(@Param("id") Long id);
+
+
+    /** 그 번호들 가운데 사람이 없는 실행으로 적힌 줄의 수다. */
+    @Query(value = "select count(*) from agent_execution where id in (:ids) and unattended = true", nativeQuery = true)
+    long countUnattendedIn(@Param("ids") Collection<Long> ids);
 }

@@ -138,6 +138,8 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `conversation_grant` 는 그 도구를 한 대화에서 계속 허용할 수 있는지다(ADR-20261012 / conversation-grant). 참이라고
     선언한 도구만 열고 기본값은 거짓이다. `approval` 이 `required` 이고 밖으로 나가지 않는 도구에만 선언한다.
     `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
+    `attended_only` 는 사람이 연 대화에서만 부를 수 있는 도구라는 선언이다. 참이라고 선언한 도구의 정책에만 싣는다.
+    먼저 살펴보기와 예약 작업처럼 사람이 없는 실행의 호출은 Control Plane 이 거절한다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
@@ -159,9 +161,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
             raise ValueError("tools 의 키는 도구 이름이다")
         if not isinstance(declared_tool, dict) or set(declared_tool) - {
                 "risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers", "description",
-                "summary", "arg_labels"}:
+                "summary", "arg_labels", "attended_only"}:
             raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, conversation_grant, identifiers, description,"
-                             " summary, arg_labels 만 갖는 객체다")
+                             " summary, arg_labels, attended_only 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -201,6 +203,12 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         identifiers = _tool_identifiers(declared_tool, approval, risk)
         policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound,
                           "conversation_grant": conversation_grant, "identifiers": identifiers}
+        if "attended_only" in declared_tool:
+            if type(declared_tool["attended_only"]) is not bool:
+                raise ValueError("attended_only 는 true 나 false 다")
+            # 옛 Control Plane 과 옛 정책 비교가 칸 하나로 달라지지 않게 참일 때만 싣는다.
+            if declared_tool["attended_only"]:
+                policies[name]["attended_only"] = True
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
