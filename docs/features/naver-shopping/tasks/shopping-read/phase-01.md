@@ -23,7 +23,7 @@
 
 - `task_run.execution_id` 는 turn 이 끝날 때만 채워져 쓰지 않는다
 - 칸이 있는데 boolean 이 아니면 참으로 읽는다(`outbound` 와 같은 닫힌 쪽)
-- 마이그레이션은 `orch queue reserve` 로 예약한 `V20261105074402__agent_execution_unattended.sql` 을 쓴다. 기준 브랜치를 합친 뒤 다시 예약한다
+- 마이그레이션은 `orch queue reserve` 로 예약한 `V20261105074405__agent_execution_unattended.sql` 을 쓴다. 기준 브랜치를 합친 뒤 다시 예약한다
 
 - Gradle 은 같은 맥의 다른 worker 와 겹치지 않게 공통 지시서의 무거운 검사 대기열(`orch slot heavy --`)로 감싸 돌린다
 
@@ -79,7 +79,7 @@ python3 -m unittest discover -s hermes/tests -p 'test_connector_manifest.py'
 | `backend/src/main/java/com/bifos/assistant/usage/execution/application/ExecutionRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/SessionOwnerResolver.java` | 수정 |
-| `backend/src/main/resources/db/migration/V20261105074402__agent_execution_unattended.sql` | 신규 |
+| `backend/src/main/resources/db/migration/V20261105074405__agent_execution_unattended.sql` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/ToolPolicyDecisionTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/task/TaskRunStarterTest.java` | 수정 (사람이 없는 실행 거절 통합 테스트) |
 | `hermes/tests/test_connector_manifest.py` | 수정 |
