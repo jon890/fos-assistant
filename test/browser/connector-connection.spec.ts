@@ -515,7 +515,7 @@ test("관리자는 바인딩마다 한 줄을 보고 반영 완료에 목록에�
   await expect(rows.nth(0)).toContainText("연결 확인 사용자");
   await expect(rows.nth(0)).toContainText("검사용 메모");
   await expect(rows.nth(0)).toContainText("에이전트 agent-first");
-  await expect(rows.nth(0)).toContainText("반영 대기");
+  await expect(rows.nth(0)).toContainText("준비 중");
   await expect(rows.nth(1)).toContainText("에이전트 agent-second");
   await expect(panel).toContainText("공유 gateway 를 재시작한 뒤 눌러 주세요.");
 
@@ -559,7 +559,7 @@ test("재시작 대기가 아닌 PENDING 바인딩은 반영 중으로 보이고
     "몇 분이 지나도 남아 있으면 눌러 다시 확인해요.",
   );
   await expect(live).not.toContainText("재시작한 뒤 눌러 주세요");
-  await expect(restart).toContainText("반영 대기");
+  await expect(restart).toContainText("준비 중");
   await expect(
     restart.getByRole("button", { name: "반영 완료" }),
   ).toBeVisible();
@@ -972,7 +972,7 @@ test("390px 폭에서도 도구 목록이 가로로 넘치지 않는다", async 
   ).toBe(true);
 });
 
-test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이어지며 카드에 수가 보인다", async ({
+test("붙인 에이전트는 이름과 준비 중로 보이고 상세로 이어지며 카드에 수가 보인다", async ({
   page,
 }) => {
   const bindings = [
@@ -1010,8 +1010,8 @@ test("붙인 에이전트는 이름과 반영 대기로 보이고 상세로 이�
   await page.goto(`/connections/${DEMO_ID}`);
   const rows = page.getByTestId("connection-binding");
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toContainText("반영 대기");
-  await expect(rows.nth(1)).not.toContainText("반영 대기");
+  await expect(rows.nth(0)).toContainText("준비 중");
+  await expect(rows.nth(1)).not.toContainText("준비 중");
   await expect(
     rows.nth(0).getByRole("link", { name: "숙제 도우미" }),
   ).toHaveAttribute("href", "/agents/agent-first");
