@@ -136,7 +136,7 @@ test("8000자를 넘겨 적는다", async ({ page, personaAgent }) => {
   const textarea = page.getByRole("textbox", { name: "성격 비서 성격" });
   await textarea.fill("가".repeat(8005));
 
-  await expect(page.getByText("남은 -5자")).toBeVisible();
+  await expect(page.getByText("5자 넘게 썼어요")).toBeVisible();
   await expect(savePersonaButton(page)).toBeDisabled();
 });
 

@@ -13,6 +13,7 @@ import {
   pruneControls,
   ratioText,
   reasonText,
+  showsReason,
   seoulInputToIso,
   snoozeUntil,
   visibleNowCount,
@@ -253,4 +254,9 @@ test("비율은 반올림한 퍼센트이고 전체가 0 이면 대시다", () =
   assert.equal(ratioText(2, 3), "67%");
   assert.equal(ratioText(0, 5), "0%");
   assert.equal(ratioText(0, 0), "-");
+});
+
+test("「이어서 하기」 항목의 이유 줄은 감추고 나머지는 그린다", () => {
+  assert.equal(showsReason(why("CONVERSATION_RECENT", [])), false);
+  assert.equal(showsReason(why("APPROVAL_PENDING", [])), true);
 });
