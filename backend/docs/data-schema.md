@@ -78,17 +78,17 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 
 | 표 | 칸 | 암호화 |
 | --- | --- | --- |
-| `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
+| `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이고 옛 줄 배치가 암호화한다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
-| `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `conversation` | `title` | 함. 옆 칸 `title_key_id`. 빈 제목은 평문 빈 글이고 옆 칸이 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `conversation` | `pending_messages` | 아직 |
-| `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
 | `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
 | `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
 | `notification` | `title`, `body` | 아직 |
 | `follow_up` | `title` | 아직 |
-| `task` | `title`, `instruction` | 함. 옆 칸은 각각 `title_key_id`, `instruction_key_id`. 점검 작업의 지시문은 없어 옆 칸도 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
+| `task` | `title`, `instruction` | 함. 옆 칸은 각각 `title_key_id`, `instruction_key_id`. 점검 작업의 지시문은 없어 옆 칸도 비어 있다. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다 |
 | `proactive_check` | `report_json` | 아직 |
 | `memory`, `memory_revision` | `title`, `content` | 함. 옆 칸 `data_key_id`([ADR-20261103 / memory-encryption](adr/ADR-20261103-memory-encryption.md)). 옮기기 전의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 
