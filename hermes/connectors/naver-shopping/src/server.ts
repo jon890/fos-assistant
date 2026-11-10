@@ -5,12 +5,20 @@ import { z } from "zod";
 import { PROXY_ENVIRONMENT_KEYS } from "./cdp.ts";
 import { guard } from "./errors.ts";
 import { checkLogin, type Env } from "./session.ts";
-import { productDetail, QUERY_MAX, searchProducts, type ToolDeps } from "./tools.ts";
+import {
+  productDetail,
+  QUERY_MAX,
+  searchProducts,
+  type ToolDeps,
+} from "./tools.ts";
 import { URL_MAX } from "./urls.ts";
 
 /** 도구를 등록한 서버. 테스트는 이 서버를 InMemoryTransport 로 부른다. */
 export function createServer(env: Env = process.env, deps?: ToolDeps) {
-  const server = new McpServer({ name: "fos-naver-shopping", version: "1.0.0" });
+  const server = new McpServer({
+    name: "fos-naver-shopping",
+    version: "1.0.0",
+  });
   server.registerTool(
     "check_shopping_login",
     {
@@ -24,7 +32,12 @@ export function createServer(env: Env = process.env, deps?: ToolDeps) {
     "search_products",
     {
       description: manifest.tools.search_products.description,
-      inputSchema: { query: z.string().min(1).max(QUERY_MAX * 2) },
+      inputSchema: {
+        query: z
+          .string()
+          .min(1)
+          .max(QUERY_MAX * 2),
+      },
       annotations: { readOnlyHint: true },
     },
     ({ query }) => guard(() => searchProducts(env, query, deps)),

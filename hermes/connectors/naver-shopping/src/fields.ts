@@ -7,9 +7,20 @@
  */
 
 /** 검색 화면(Next.js)의 `__NEXT_DATA__` 에서 상품 목록까지의 경로. */
-export const SEARCH_LIST_PATH = ["props", "pageProps", "initialState", "products", "list"];
+export const SEARCH_LIST_PATH = [
+  "props",
+  "pageProps",
+  "initialState",
+  "products",
+  "list",
+];
 /** 가격비교 묶음 화면(Next.js)의 `__NEXT_DATA__` 에서 묶음 상태까지의 경로. */
-export const CATALOG_STATE_PATH = ["props", "pageProps", "initialState", "catalog"];
+export const CATALOG_STATE_PATH = [
+  "props",
+  "pageProps",
+  "initialState",
+  "catalog",
+];
 /** 스마트스토어·브랜드스토어 상품 화면의 `window.__PRELOADED_STATE__` 에서 상품까지의 경로. */
 export const PRODUCT_STATE_PATH = ["product", "A"];
 
@@ -29,7 +40,10 @@ export const PRODUCT = {
   title: ["name", "productName"],
   store: [["channel", "channelName"], ["channelName"]],
   salePrice: ["salePrice"],
-  discountedPrice: [["benefitsView", "discountedSalePrice"], ["discountedSalePrice"]],
+  discountedPrice: [
+    ["benefitsView", "discountedSalePrice"],
+    ["discountedSalePrice"],
+  ],
   status: ["statusType", "productStatusType"],
   optionGroups: ["options"],
   groupName: ["groupName", "optionName"],

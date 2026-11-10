@@ -39,7 +39,9 @@ export function parseSearch(state: Json): SearchProduct[] | null {
       url: url.url,
       kind: url.kind,
       naver_pay: yes(pick(item, SEARCH_ITEM.naverPay)) ? "yes" : "unknown",
-      ad: pick(entry, SEARCH_ITEM.ad) !== undefined || pick(item, SEARCH_ITEM.ad) !== undefined,
+      ad:
+        pick(entry, SEARCH_ITEM.ad) !== undefined ||
+        pick(item, SEARCH_ITEM.ad) !== undefined,
     });
   }
   return products;

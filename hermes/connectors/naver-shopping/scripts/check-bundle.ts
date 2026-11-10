@@ -7,7 +7,8 @@ const filename = "naver-shopping-mcp.js";
 const mcp = await Bun.file(new URL("../.mcp.json", import.meta.url)).json();
 const server = mcp.mcpServers["naver-shopping"];
 if (
-  JSON.stringify(Object.keys(mcp.mcpServers)) !== JSON.stringify(["naver-shopping"]) ||
+  JSON.stringify(Object.keys(mcp.mcpServers)) !==
+    JSON.stringify(["naver-shopping"]) ||
   server.command !== "bun" ||
   JSON.stringify(server.args) !==
     JSON.stringify(["--no-env-file", `\${CLAUDE_PLUGIN_ROOT}/dist/${filename}`])

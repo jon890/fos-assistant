@@ -21,7 +21,12 @@ const DEFAULT_POLL_MS = 250;
  * 로그인·캡차·기기 인증 화면이면 아무것도 누르지 않고 그 탭을 남긴 채 그 종류의 오류로 끝난다. 사람이 그 탭에서 푼다.
  * 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. 다른 탭은 읽지도 닫지도 않는다.
  */
-export async function readInTab(cdpUrl: string, url: string, expression: string, options: TabOptions = {}) {
+export async function readInTab(
+  cdpUrl: string,
+  url: string,
+  expression: string,
+  options: TabOptions = {},
+) {
   const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const remaining = () => {
     const left = deadline - Date.now();
@@ -29,7 +34,10 @@ export async function readInTab(cdpUrl: string, url: string, expression: string,
     return left;
   };
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
-  const target = (await httpJson(cdpUrl, "/json/new?about:blank", { method: "PUT", timeoutMs: remaining() })) as {
+  const target = (await httpJson(cdpUrl, "/json/new?about:blank", {
+    method: "PUT",
+    timeoutMs: remaining(),
+  })) as {
     id?: unknown;
     webSocketDebuggerUrl?: unknown;
   } | null;
@@ -39,10 +47,15 @@ export async function readInTab(cdpUrl: string, url: string, expression: string,
   let keepTab = false;
   let session: CdpSession | null = null;
   try {
-    session = await CdpSession.connect(wsUrlFor(cdpUrl, target.webSocketDebuggerUrl), remaining());
+    session = await CdpSession.connect(
+      wsUrlFor(cdpUrl, target.webSocketDebuggerUrl),
+      remaining(),
+    );
     const page = session;
     page.onEvent("Page.javascriptDialogOpening", () => {
-      page.send("Page.handleJavaScriptDialog", { accept: false }).catch(() => {});
+      page
+        .send("Page.handleJavaScriptDialog", { accept: false })
+        .catch(() => {});
     });
     await page.send("Page.enable", {}, remaining());
     await page.send("Page.navigate", { url }, remaining());
@@ -54,8 +67,11 @@ export async function readInTab(cdpUrl: string, url: string, expression: string,
       );
       return result?.value;
     };
-    while ((await evaluate(READY_STATE)) !== "complete") await Bun.sleep(Math.min(pollMs, remaining()));
-    const human = humanStepError(classifyPage(((await evaluate(PAGE_PROBE)) ?? {}) as { href?: unknown }));
+    while ((await evaluate(READY_STATE)) !== "complete")
+      await Bun.sleep(Math.min(pollMs, remaining()));
+    const human = humanStepError(
+      classifyPage(((await evaluate(PAGE_PROBE)) ?? {}) as { href?: unknown }),
+    );
     if (human !== null) {
       keepTab = true;
       throw new ToolError(human);
@@ -63,6 +79,10 @@ export async function readInTab(cdpUrl: string, url: string, expression: string,
     return await evaluate(expression);
   } finally {
     session?.close();
-    if (!keepTab) await httpJson(cdpUrl, `/json/close/${encodeURIComponent(targetId)}`).catch(() => {});
+    if (!keepTab)
+      await httpJson(
+        cdpUrl,
+        `/json/close/${encodeURIComponent(targetId)}`,
+      ).catch(() => {});
   }
 }

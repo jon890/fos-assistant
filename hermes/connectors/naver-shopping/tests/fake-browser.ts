@@ -41,10 +41,18 @@ export function startFakeBrowser(page: FakePage = {}): FakeBrowser {
       const rest = url.pathname.replace(`/${TOKEN}`, "");
       http.push(`${request.method} ${rest}${url.search}`);
       const ws = `ws://${url.host}/${TOKEN}/devtools/page/tab-1`;
-      if (rest.startsWith("/devtools/")) return srv.upgrade(request) ? undefined : new Response("", { status: 400 });
-      if (rest === "/json/version") return Response.json({ webSocketDebuggerUrl: `ws://${url.host}/${TOKEN}/devtools/browser/b` });
-      if (rest === "/json/new") return Response.json({ id: "tab-1", webSocketDebuggerUrl: ws });
-      if (rest.startsWith("/json/close/")) return new Response("Target is closing");
+      if (rest.startsWith("/devtools/"))
+        return srv.upgrade(request)
+          ? undefined
+          : new Response("", { status: 400 });
+      if (rest === "/json/version")
+        return Response.json({
+          webSocketDebuggerUrl: `ws://${url.host}/${TOKEN}/devtools/browser/b`,
+        });
+      if (rest === "/json/new")
+        return Response.json({ id: "tab-1", webSocketDebuggerUrl: ws });
+      if (rest.startsWith("/json/close/"))
+        return new Response("Target is closing");
       return new Response("", { status: 404 });
     },
     websocket: {
@@ -57,19 +65,40 @@ export function startFakeBrowser(page: FakePage = {}): FakeBrowser {
         if (message.method === "Storage.getCookies") return reply({ cookies });
         if (message.method === "Page.navigate") {
           reply({ frameId: "f" });
-          if (page.dialog) socket.send(JSON.stringify({ method: "Page.javascriptDialogOpening", params: { type: "confirm" } }));
+          if (page.dialog)
+            socket.send(
+              JSON.stringify({
+                method: "Page.javascriptDialogOpening",
+                params: { type: "confirm" },
+              }),
+            );
           return;
         }
         if (message.method === "Runtime.evaluate") {
           const expression = message.params.expression;
           if (!EXPRESSIONS.has(expression)) {
-            socket.send(JSON.stringify({ id: message.id, error: { message: "unknown" } }));
+            socket.send(
+              JSON.stringify({ id: message.id, error: { message: "unknown" } }),
+            );
             return;
           }
           if (expression === READY_STATE)
-            return reply({ result: { value: polls++ < (page.loadingPolls ?? 0) ? "loading" : "complete" } });
+            return reply({
+              result: {
+                value:
+                  polls++ < (page.loadingPolls ?? 0) ? "loading" : "complete",
+              },
+            });
           if (expression === PAGE_PROBE)
-            return reply({ result: { value: { href: page.href ?? "https://search.shopping.naver.com/ns/search", captcha: page.captcha === true } } });
+            return reply({
+              result: {
+                value: {
+                  href:
+                    page.href ?? "https://search.shopping.naver.com/ns/search",
+                  captcha: page.captcha === true,
+                },
+              },
+            });
           return reply({ result: { value: page.state ?? null } });
         }
         reply({});
