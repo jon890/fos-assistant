@@ -20,6 +20,7 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.ExternalData;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
@@ -48,6 +49,7 @@ class ChatDeliveryInput {
     private final Clock clock;
     private final List<AutoTurnResultSource> resultSources;
     private final ContextProperties contextProperties;
+    private final ExecutionOutputs executionOutputs;
 
 
     /**
@@ -119,7 +121,7 @@ class ChatDeliveryInput {
      *
      * <p>결과마다 {@code DELEGATION_RESULT} 항목을 하나씩 만든다. 본문은 입력에만 싣고 항목에 두지 않는다.
      */
-    static DeliveryInput delegationInput(
+    DeliveryInput delegationInput(
         List<AgentExecution> results,
         Map<Long, Agent> resultAgents,
         Set<Long> externalAgents,
@@ -139,8 +141,9 @@ class ChatDeliveryInput {
                 fields.add("오류: " + result.errorCode());
             }
             input.append("\n\n").append(ResultHeader.render("맡긴 일", fields, item.asOf(), item.freshness(), staleAfter));
-            if (result.outputText() != null && !result.outputText().isBlank()) {
-                input.append('\n').append(external ? ExternalData.wrap(result.outputText()) : result.outputText());
+            String output = executionOutputs.open(result);
+            if (output != null && !output.isBlank()) {
+                input.append('\n').append(external ? ExternalData.wrap(output) : output);
             }
         }
         return new DeliveryInput(input.toString(), items);
@@ -176,7 +179,7 @@ class ChatDeliveryInput {
      *
      * @param now 묶음을 만든 시각. 결과의 신선도를 이 시각으로 판정한다
      */
-    static DeliveryInput deliveryInput(
+    DeliveryInput deliveryInput(
         List<AgentExecution> results,
         Map<Long, Agent> resultAgents,
         Set<Long> externalAgents,

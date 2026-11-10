@@ -44,6 +44,7 @@ import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
@@ -97,6 +98,9 @@ class RestartReconcilerTest {
     private static final SessionRuntime PRICED_RUNTIME = new SessionRuntime("example-model-large", "anthropic");
 
     /** 대기 메시지 turn 과 자동 turn 의 답 조각은 이 검사가 보지 않는다. 실제 스트림 주소로 연결하지 않게 대역으로 둔다. */
+    @Autowired
+    ExecutionOutputs outputs;
+
     @Autowired
     HermesRunEventStream eventStream;
 
@@ -419,7 +423,7 @@ class RestartReconcilerTest {
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "조사 결과"));
 
         AgentExecution saved = awaitStatus(row, ExecutionStatus.SUCCEEDED);
-        assertThat(saved.outputText()).isEqualTo("조사 결과");
+        assertThat(outputs.open(saved)).isEqualTo("조사 결과");
         awaitUntil(() -> delivered(row), "위임 결과가 부모 대화에 전해지지 않았다");
         awaitIdle(conversation.id());
         assertThat(notices()).as("부모 대화의 알림 줄").hasSize(1);

@@ -32,6 +32,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
@@ -91,6 +92,9 @@ class AgentDelegationServiceTest {
     private static final String CONNECTOR = "delegation-connector";
     /** 다른 사용자의 비공개 에이전트다. */
     private static final String OTHER_CONNECTOR = "delegation-other-connector";
+
+    @Autowired
+    ExecutionOutputs outputs;
 
     @Autowired
     AgentDelegationService delegations;
@@ -195,7 +199,7 @@ class AgentDelegationServiceTest {
 
         AgentExecution finished = awaitFinished(result.executionId());
         assertThat(finished.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(finished.outputText()).isEqualTo("붙잡혔던 답");
+        assertThat(outputs.open(finished)).isEqualTo("붙잡혔던 답");
         assertThat(finished.hermesRunId()).isNotNull();
     }
 
@@ -209,11 +213,11 @@ class AgentDelegationServiceTest {
         DelegationResult longer = delegate("길다");
         DelegationResult exact = delegate("딱 맞다");
 
-        assertThat(awaitFinished(longer.executionId()).outputText())
+        assertThat(outputs.open(awaitFinished(longer.executionId())))
             .isEqualTo("가".repeat(20) + "\n\n[답이 20자를 넘어 뒷부분을 잘랐다]");
         AgentExecution exactRow = awaitFinished(exact.executionId());
         assertThat(exactRow.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(exactRow.outputText()).as("상한과 같은 길이는 그대로 둔다").isEqualTo("나".repeat(20));
+        assertThat(outputs.open(exactRow)).as("상한과 같은 길이는 그대로 둔다").isEqualTo("나".repeat(20));
     }
 
 
@@ -284,7 +288,7 @@ class AgentDelegationServiceTest {
         assertThat(stub().stopped()).containsExactly(runId);
         AgentExecution finished = awaitFinished(started.executionId());
         assertThat(finished.status()).isEqualTo(ExecutionStatus.CANCELLED);
-        assertThat(finished.outputText()).isEqualTo("멈춘 자리까지의 답");
+        assertThat(outputs.open(finished)).isEqualTo("멈춘 자리까지의 답");
     }
 
 
@@ -342,7 +346,7 @@ class AgentDelegationServiceTest {
         DelegationStop stopped = delegations.stop(user, origin, started.executionId()).orElseThrow();
 
         assertThat(stopped.execution().status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(stopped.execution().outputText()).isEqualTo("끝난 답");
+        assertThat(outputs.open(stopped.execution())).isEqualTo("끝난 답");
         assertThat(stopped.stopRequested()).as("끝난 실행은 멈추지 않는다").isFalse();
         assertThat(stub().stopped()).isEmpty();
     }
@@ -470,7 +474,7 @@ class AgentDelegationServiceTest {
             assertThat(finishedWhileCancelled.get().status())
                 .as("확정되지 않은 중지로 멈추지 않는다")
                 .isEqualTo(ExecutionStatus.SUCCEEDED);
-            assertThat(finishedWhileCancelled.get().outputText()).isEqualTo("멀쩡한 답");
+            assertThat(outputs.open(finishedWhileCancelled.get())).isEqualTo("멀쩡한 답");
         } finally {
             turns.close(handle);
         }
@@ -628,7 +632,7 @@ class AgentDelegationServiceTest {
 
         AgentExecution finished = awaitFinished(started.executionId());
         assertThat(finished.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(finished.outputText()).isEqualTo("늦게 끝난 답");
+        assertThat(outputs.open(finished)).isEqualTo("늦게 끝난 답");
         assertThat(finished.resultDeliveredAt())
             .as("run 번호를 적는 저장과 SUCCEEDED 저장 뒤의 전달 표시")
             .isNotNull();
@@ -738,7 +742,7 @@ class AgentDelegationServiceTest {
             .orElseThrow();
 
         assertThat(read.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(read.outputText()).isEqualTo("기다린 답");
+        assertThat(outputs.open(read)).isEqualTo("기다린 답");
         awaitFinished(started.executionId());
     }
 

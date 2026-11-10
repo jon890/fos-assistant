@@ -98,7 +98,7 @@ class ChatDeliveryTurns {
         if (notices.isEmpty()) {
             return;
         }
-        DeliveryInput delivery = ChatDeliveryInput.deliveryInput(
+        DeliveryInput delivery = chatDeliveryInput.deliveryInput(
             results,
             resultAgents,
             chatDeliveryInput.externalAgentsOf(resultAgents),
