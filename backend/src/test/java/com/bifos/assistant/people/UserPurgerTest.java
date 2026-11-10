@@ -281,7 +281,11 @@ class UserPurgerTest {
     }
 
 
+    /** 데이터 key 가 아직 없을 때만 넣는다. 제목을 암호화해 저장하는 줄이 먼저 만들었으면 그것을 쓴다. */
     private void dataKey(Member owner) {
+        if (keys(owner) > 0) {
+            return;
+        }
         jdbc.update("INSERT INTO user_data_key (user_id, kek_id, wrapped_key, created_at) VALUES (?, 'test', 'wrapped', CURRENT_TIMESTAMP)",
             owner.user().id());
     }

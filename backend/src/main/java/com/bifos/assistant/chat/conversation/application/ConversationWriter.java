@@ -1,9 +1,13 @@
 package com.bifos.assistant.chat.conversation.application;
 
+import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.infra.ConversationTitles;
+import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import java.time.Instant;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConversationWriter {
 
     private final ConversationRepository repository;
+    private final ConversationTitles titles;
 
 
     @Transactional
@@ -52,15 +57,28 @@ public class ConversationWriter {
     }
 
 
+    /**
+     * 제목이 비어 있을 때만 채우고, 채웠으면 그 값을 이 객체에도 옮긴다. 암호화가 켜져 있으면 암호문으로 적는다(ADR-20261008 /
+     * data-encryption).
+     */
     @Transactional
-    public int fillTitleIfBlank(Long id, String title) {
-        return repository.fillTitleIfBlank(id, title);
+    public int fillTitleIfBlank(Conversation conversation, String title) {
+        Optional<SealedText> sealed = titles.seal(conversation.id(), conversation.userId(), title);
+        String stored = sealed.map(SealedText::content).orElse(title);
+        Long keyId = sealed.map(SealedText::keyId).orElse(null);
+        int filled = repository.fillTitleIfBlank(conversation.id(), stored, keyId);
+        if (filled == 1) {
+            conversation.adoptTitle(title, stored, keyId);
+        }
+        return filled;
     }
 
 
     @Transactional
     public int renameIfActive(Long id, Long userId, String title, Instant now) {
-        return repository.renameIfActive(id, userId, title, now);
+        Optional<SealedText> sealed = titles.seal(id, userId, title);
+        return repository.renameIfActive(
+            id, userId, sealed.map(SealedText::content).orElse(title), sealed.map(SealedText::keyId).orElse(null), now);
     }
 
 
