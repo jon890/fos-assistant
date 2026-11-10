@@ -74,7 +74,6 @@ public class SessionOwnerResolver {
     }
 
 
-    /** 루트 자신은 {@code root_execution_id} 가 비어 있다. 루트 줄이 없으면 origin 판정만 따른다. */
     /**
      * 그 실행의 트리 루트가 사람이 없는 실행(예약 작업, 먼저 살펴보기)인가. 위임 자식은 루트로 판정한다. 루트 줄을 찾지 못하면
      * 사람이 없는 쪽으로 본다. 도구 판정이 닫히는 쪽으로 읽게 한다.
@@ -85,6 +84,7 @@ public class SessionOwnerResolver {
     }
 
 
+    /** 루트 자신은 {@code root_execution_id} 가 비어 있다. 루트 줄이 없으면 origin 판정만 따른다. */
     private boolean rootCancelled(AgentExecution origin) {
         Long rootId = origin.rootExecutionId();
         if (rootId == null || rootId.equals(origin.id())) {
