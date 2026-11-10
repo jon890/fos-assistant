@@ -35,6 +35,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
 import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
@@ -82,6 +83,9 @@ class RecoveredRunRecorderTest {
 
     /** 표본 가격표가 아는 provider 와 모델이다. 이 짝으로 끝나야 금액이 적힌다. */
     private static final SessionRuntime PRICED_RUNTIME = new SessionRuntime("example-model-large", "anthropic");
+
+    @Autowired
+    ExecutionOutputs outputs;
 
     @Autowired
     HermesRunEventStream eventStream;
@@ -388,7 +392,7 @@ class RecoveredRunRecorderTest {
         assertThat(written).isTrue();
         AgentExecution saved = executions.findById(row.id()).orElseThrow();
         assertThat(saved.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(saved.outputText()).isEqualTo("조사 결과");
+        assertThat(outputs.open(saved)).isEqualTo("조사 결과");
         assertThat(saved.totalTokens()).isEqualTo(1_500L);
         assertThat(applicationEvents.stream(DelegationFinished.class))
             .containsExactly(new DelegationFinished(conversation.id(), row.id()));
@@ -415,10 +419,10 @@ class RecoveredRunRecorderTest {
         recorder.settle(exact.id(), result("completed", atLimit));
         recorder.settle(longer.id(), result("completed", atLimit + "나"));
 
-        assertThat(executions.findById(exact.id()).orElseThrow().outputText())
+        assertThat(outputs.open(executions.findById(exact.id()).orElseThrow()))
             .as("상한과 같은 길이")
             .isEqualTo(atLimit);
-        assertThat(executions.findById(longer.id()).orElseThrow().outputText())
+        assertThat(outputs.open(executions.findById(longer.id()).orElseThrow()))
             .as("상한을 한 글자 넘는 길이")
             .isEqualTo(atLimit + "\n\n[답이 " + OUTPUT_MAX_CHARS + "자를 넘어 뒷부분을 잘랐다]");
     }
