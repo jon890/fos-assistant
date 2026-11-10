@@ -66,7 +66,7 @@ sequenceDiagram
 
 ### 소개와 할 수 있는 일
 
-에이전트마다 한 줄 소개, 아이콘, 색을 둔다. 주인과 `ADMIN` 이 상세 맨 위의 「소개」 절에서 이름과 함께 고친다(`PATCH /api/v1/agents/{code}/introduction`). `ADMIN` 은 지우기처럼 남의 비공개 에이전트에도 닿는다.
+에이전트마다 한 줄 소개, 아이콘, 색을 둔다. 주인과 `ADMIN` 이 상세의 「소개」 절(성격 다음)에서 이름과 함께 고친다(`PATCH /api/v1/agents/{code}/introduction`). `ADMIN` 은 지우기처럼 남의 비공개 에이전트에도 닿는다.
 고를 수 있는 아이콘과 색, 소개 상한은 `AgentIntroduction` 과 `AgentColor` 가 갖고, 화면의 `web/src/lib/agent-badge.ts` 가 같은 목록을 갖는다. 목록 밖 값과 상한을 넘는 소개는 `VALIDATION_FAILED` 다.
 저장은 에이전트 행을 잠근 뒤 한다. `Agent` 는 저장할 때 모든 칸을 쓰므로 잠그지 않으면 그 사이 바뀐 공개 범위나 주인을 옛 값으로 덮는다.
 

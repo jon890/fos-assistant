@@ -235,11 +235,11 @@ for (const { durationMs, duration } of [
 });
 }
 
-/** 블록의 위쪽이 같은 줄 「비서」 이름의 아래쪽보다 위에 있지 않다. */
+/** 블록의 위쪽이 같은 줄 답 에이전트 이름의 아래쪽보다 위에 있지 않다. */
 async function expectBlockBelowName(row: Locator): Promise<void> {
-  const name = await row.getByText("비서", { exact: true }).boundingBox();
+  const name = await row.getByTestId("answer-agent-name").boundingBox();
   const block = await row.locator('[data-testid="activity-block"][data-mode="live"]').boundingBox();
-  expect(name, "비서 이름의 자리").not.toBeNull();
+  expect(name, "답 에이전트 이름의 자리").not.toBeNull();
   expect(block, "진행 중 블록의 자리").not.toBeNull();
   expect(block!.y, "진행 중 블록의 top 과 이름의 bottom").toBeGreaterThanOrEqual(name!.y + name!.height);
 }

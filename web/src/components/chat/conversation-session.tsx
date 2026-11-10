@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  AnswerAgentProvider,
+  type AgentIdentity,
+} from "@/components/agent/agent-badge";
 import { useEffect } from "react";
 import { ConversationSessionView } from "./conversation-session-view";
 import { commandSkillNames } from "./skill-command";
@@ -120,22 +124,43 @@ export function ConversationSession(props: ConversationSessionProps) {
     };
   }, [commandAgentCode]);
 
+  // 답 이름표는 대화 줄의 값으로 그린다. 꺼진 에이전트는 목록에 없기 때문이다. 대화 줄이 아직 없는 새 대화만 목록 값을 쓴다.
+  const listedAgent = agents.find((agent) => agent.code === agentCode);
+  const answerAgent: AgentIdentity = currentConversation
+    ? {
+        name: agentLabel(currentConversation.agentName),
+        code: currentConversation.agentCode,
+        icon: currentConversation.agentIcon,
+        color: currentConversation.agentColor,
+      }
+    : listedAgent
+      ? {
+          name: listedAgent.name,
+          code: listedAgent.code,
+          icon: listedAgent.icon,
+          color: listedAgent.color,
+        }
+      : { name: "비서", code: null };
+
   return (
-    <ConversationSessionView
-      {...state}
-      {...props}
-      {...conversationHistory}
-      {...conversationQueue}
-      {...conversationSend}
-      {...conversationRetry}
-      {...conversationControls}
-      agentLocked={agentLocked}
-      agentMissing={agentMissing}
-      currentAgent={currentAgent}
-      startScreen={startScreen}
-      skillCommandsEnabled={skillCommandsEnabled}
-      skillNames={skillNames}
-      starters={starters}
-    />
+    <AnswerAgentProvider value={answerAgent}>
+      <ConversationSessionView
+        {...state}
+        {...props}
+        {...conversationHistory}
+        {...conversationQueue}
+        {...conversationSend}
+        {...conversationRetry}
+        {...conversationControls}
+        agentLocked={agentLocked}
+        agentMissing={agentMissing}
+        currentAgent={currentAgent}
+        startScreen={startScreen}
+        skillCommandsEnabled={skillCommandsEnabled}
+        skillNames={skillNames}
+        starters={starters}
+        answerAgent={answerAgent}
+      />
+    </AnswerAgentProvider>
   );
 }

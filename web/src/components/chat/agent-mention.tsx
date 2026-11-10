@@ -1,5 +1,6 @@
 "use client";
 
+import { AgentBadge } from "@/components/agent/agent-badge";
 import { cn } from "cn";
 import type { AgentView } from "@/lib/agent";
 
@@ -79,10 +80,20 @@ export function AgentMention({
             // 누르는 동안 입력칸이 초점을 잃으면 커서 자리를 알 수 없다.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onPick(agent.code)}
-            className="cursor-pointer rounded-md px-3 py-2 hover:bg-muted aria-selected:bg-muted"
+            // 접근성 이름은 에이전트 이름만 둔다. 소개까지 넣으면 이름으로 고르는 읽기 프로그램과 검사가 흔들린다.
+            aria-label={agent.name}
+            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted aria-selected:bg-muted"
           >
-            <span className="block truncate text-sm font-medium">
-              {agent.name}
+            <AgentBadge agent={agent} size="sm" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">
+                {agent.name}
+              </span>
+              {agent.description ? (
+                <span className="block truncate text-xs text-muted-foreground">
+                  {agent.description}
+                </span>
+              ) : null}
             </span>
           </li>
         ))

@@ -2,6 +2,8 @@
 
 import { useRef, type KeyboardEvent } from "react";
 import type { AgentView } from "@/lib/agent";
+import { capabilitiesLine } from "@/lib/agent-badge";
+import { AgentBadge } from "@/components/agent/agent-badge";
 
 type Props = {
   agents: AgentView[];
@@ -63,14 +65,33 @@ export function AgentPicker({
             disabled={disabled}
             onClick={() => onSelect(agent.code)}
             onKeyDown={(event) => move(event, index)}
-            className={`flex ${AGENT_CARD_HEIGHT} w-44 shrink-0 flex-col items-start gap-1 overflow-hidden rounded-lg border px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-60 ${
+            // 접근성 이름은 에이전트 이름만 둔다. 소개와 할 수 있는 일은 설명으로 읽힌다.
+            aria-label={agent.name}
+            aria-describedby={`agent-card-${agent.code}-about`}
+            className={`flex ${AGENT_CARD_HEIGHT} w-48 shrink-0 flex-col items-start gap-0.5 overflow-hidden rounded-lg border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-60 ${
               checked
                 ? "border-primary bg-primary-soft text-primary-soft-foreground"
                 : "border-border hover:bg-muted disabled:hover:bg-transparent"
             }`}
           >
-            <span className="w-full truncate text-sm font-medium leading-5">
-              {agent.name}
+            <span className="flex w-full min-w-0 items-center gap-1.5">
+              <AgentBadge agent={agent} size="sm" />
+              <span className="truncate text-sm font-medium leading-5">
+                {agent.name}
+              </span>
+            </span>
+            <span
+              id={`agent-card-${agent.code}-about`}
+              className="flex w-full min-w-0 flex-col text-xs leading-4 text-muted-foreground"
+            >
+              {agent.description ? (
+                <span className="truncate">{agent.description}</span>
+              ) : null}
+              {capabilitiesLine(agent.capabilities) ? (
+                <span className="truncate">
+                  {capabilitiesLine(agent.capabilities)}
+                </span>
+              ) : null}
             </span>
           </button>
         );

@@ -11,6 +11,16 @@ export type AdminAgent = {
   enabled: boolean;
   /** 「먼저 살펴보기에 쓰기 도구 허용」. 관리자만 바꾸고 관리자 응답에만 온다(ADR-082) */
   proactiveCheckWritesAllowed: boolean;
+  /** 한 줄 소개, 아이콘, 색. 관리자 영역 상세가 남의 비공개 에이전트의 소개를 이 값으로 그린다 */
+  description?: string | null;
+  icon?: string | null;
+  color?: string | null;
+};
+
+/** 에이전트가 할 수 있는 일이다. 붙어 쓸 수 있는 플러그인 이름과 올린 스킬 이름이다(docs/features/agent-skill.md 「소개와 할 수 있는 일」). */
+export type AgentCapabilities = {
+  connectors: string[];
+  skills: string[];
 };
 
 /** 사용자가 쓸 수 있는 에이전트 한 줄이다. 관리 화면의 `AdminAgent` 보다 정보가 적다. */
@@ -24,6 +34,14 @@ export type AgentView = {
   editable: boolean;
   /** 요청자가 이 에이전트의 주인이다 */
   ownedByMe: boolean;
+  /** 한 줄 소개. 없으면 null 이다 */
+  description?: string | null;
+  /** 아이콘 목록(`agent-badge.ts` 의 `AGENT_ICONS`)의 이모지. 없으면 이름 첫 글자를 그린다 */
+  icon?: string | null;
+  /** 색 이름. 없으면 `code` 로 정한 자동 색이다 */
+  color?: string | null;
+  /** 할 수 있는 일. 옛 응답에는 없을 수 있다 */
+  capabilities?: AgentCapabilities;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */
