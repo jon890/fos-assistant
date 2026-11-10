@@ -7,6 +7,7 @@ import {
   AVAILABLE_TEXT,
   CAPTCHA_SELECTOR,
   EMPTY_TEXT,
+  NOTICE_CLOSE,
   NOTICE_DIALOG,
   NOTICE_HEADING,
   ROW,
@@ -20,8 +21,8 @@ const VISIBLE = `(e) => { const r = e.getBoundingClientRect(); return r.width > 
 
 export const READY_STATE = "document.readyState";
 
-/** 화면 분류에 쓰는 값. 「안내 메시지」 층의 글은 400자까지다. */
-export const PAGE_PROBE = `(() => { const visible = ${VISIBLE}; const notice = [...document.querySelectorAll(${json(NOTICE_DIALOG)})].find((e) => visible(e) && (e.innerText || "").includes(${json(NOTICE_HEADING)})); return { href: location.href, captcha: [...document.querySelectorAll(${json(CAPTCHA_SELECTOR)})].some(visible), notice: notice ? notice.innerText.slice(0, 400) : null }; })()`;
+/** 화면 분류에 쓰는 값. 「안내 메시지」 층의 글은 400자까지다. 「창닫기」 가 있는 공지 층은 닫을 것이라 거절로 보지 않는다. */
+export const PAGE_PROBE = `(() => { const visible = ${VISIBLE}; const notice = [...document.querySelectorAll(${json(NOTICE_DIALOG)})].find((e) => visible(e) && (e.innerText || "").includes(${json(NOTICE_HEADING)}) && !e.querySelector(${json(NOTICE_CLOSE)})); return { href: location.href, captcha: [...document.querySelectorAll(${json(CAPTCHA_SELECTOR)})].some(visible), notice: notice ? notice.innerText.slice(0, 400) : null }; })()`;
 
 /** 「서울·용산 - 수서 함께 보기」 가 이미 골라져 있는지. 없으면 `null` 이다. */
 export const SUSEO_CHECKED = `(() => { const e = document.querySelector(${json(SUSEO_TOGETHER)}); return e ? e.checked === true : null; })()`;

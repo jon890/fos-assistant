@@ -19,12 +19,13 @@ export const STATIONS: ReadonlySet<string> = new Set(
     .split(/\s+/),
 );
 
+/** 표의 이름과 정확히 같은 다른 이름. 짐작이 아니라 같은 역의 짧은 이름이다. */
+const ALIASES: Record<string, string> = { 진부: "진부(오대산)" };
+
 /** 사람이 쓴 역 이름을 표의 이름으로 바꾼다. 끝의 「역」 하나만 떼고, 표에 없으면 `null` 이다. */
 export function stationName(raw: string): string | null {
   const trimmed = raw.trim();
-  const name =
-    trimmed.endsWith("역") && STATIONS.has(trimmed.slice(0, -1))
-      ? trimmed.slice(0, -1)
-      : trimmed;
+  const short = trimmed.endsWith("역") ? trimmed.slice(0, -1) : trimmed;
+  const name = ALIASES[short] ?? (STATIONS.has(short) ? short : trimmed);
   return STATIONS.has(name) ? name : null;
 }

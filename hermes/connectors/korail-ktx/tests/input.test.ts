@@ -22,6 +22,8 @@ test("끝의 「역」 만 떼고 표와 정확히 같은 이름만 받는다", 
   expect(stationName("서울 역")).toBeNull();
   expect(stationName("서울특별시")).toBeNull();
   expect(stationName("수서")).toBe("수서");
+  expect(stationName("진부")).toBe("진부(오대산)");
+  expect(stationName("진부역")).toBe("진부(오대산)");
 });
 
 test("시는 화면이 고르게 하고 분은 결과를 거를 기준으로 남긴다", () => {
