@@ -7,6 +7,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,11 +80,8 @@ public class SessionOwnerResolver {
      * 사람이 없는 쪽으로 본다. 도구 판정이 닫히는 쪽으로 읽게 한다.
      */
     public boolean unattendedTree(AgentExecution execution) {
-        Long rootId = execution.rootExecutionId();
-        if (rootId == null || rootId.equals(execution.id())) {
-            return execution.unattended();
-        }
-        return executions.findById(rootId).map(AgentExecution::unattended).orElse(true);
+        Long rootId = execution.treeRootId();
+        return executions.countUnattendedIn(List.of(rootId)) > 0 || !executions.existsById(rootId);
     }
 
 

@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * 사용량과 비용 보고를 위해 남기는 에이전트 turn 하나다.
@@ -55,12 +56,7 @@ public class AgentExecution {
     @Column(name = "root_execution_id")
     private Long rootExecutionId;
 
-    /**
-     * 막혀서 다음 모델로 넘어갈 때 만든 실행이 가리키는 직전 실행.
-     *
-     * <p>자식이 아니라 같은 turn 을 다시 시도한 것이라 {@code parentExecutionId} 를 쓰지 않는다. 첫
-     * 시도는 비어 있다.
-     */
+    /** 막혀서 다음 모델로 넘어갈 때 만든 직전 실행. 같은 turn 의 재시도라 {@code parentExecutionId} 를 쓰지 않고 첫 시도는 비어 있다. */
     @Column(name = "retry_of_execution_id")
     private Long retryOfExecutionId;
 
@@ -123,11 +119,9 @@ public class AgentExecution {
     @Column(name = "error_code", length = 64)
     private String errorCode;
 
-    /**
-     * 사람이 없는 실행인가. 예약 작업과 먼저 살펴보기 turn, 그 트리의 결과를 전하는 turn 이 참이다. turn 을 열 때 정하고 바꾸지
-     * 않는다. 도구 판정은 트리 루트 줄의 이 값을 본다.
-     */
-    @Column(name = "unattended", nullable = false)
+    /** 사람이 없는 실행인가. 저장소 쿼리로만 쓰고 읽어 엔티티 저장이 덮지 않는다(data-schema 의 「agent_execution」). */
+    @ColumnDefault("false")
+    @Column(name = "unattended", nullable = false, insertable = false, updatable = false)
     private boolean unattended;
 
     @Column(name = "input_tokens")
@@ -149,10 +143,8 @@ public class AgentExecution {
     private Long contextChars;
 
     /**
-     * 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수.
-     *
-     * <p>0 보다 크면 요청자가 볼 수 있는 Memory 를 전부 싣지 못한 실행이다. 이 칸이 생기기 전의
-     * 기록과 문맥을 조립하지 않은 실행은 비어 있다.
+     * 자리가 없어 이 실행의 문맥에서 빠진 Memory 항목 수. 0 보다 크면 요청자가 볼 수 있는 Memory 를 전부 싣지 못한 실행이다.
+     * 이 칸이 생기기 전의 기록과 문맥을 조립하지 않은 실행은 비어 있다.
      */
     @Column(name = "context_omitted_items")
     private Integer contextOmittedItems;
@@ -267,12 +259,6 @@ public class AgentExecution {
      * <p>루트 자신은 {@code rootExecutionId} 가 비어 있으므로 자기 번호를 쓴다. 자식을 열 때와 위임 실행을 물을 때
      * 같은 규칙으로 트리를 정한다.
      */
-    /** 사람이 없는 실행으로 적는다. turn 을 연 쪽이 Hermes 에 보내기 전에 한 번 부른다. */
-    public void markUnattended() {
-        unattended = true;
-    }
-
-
     public Long treeRootId() {
         return rootExecutionId == null ? id : rootExecutionId;
     }

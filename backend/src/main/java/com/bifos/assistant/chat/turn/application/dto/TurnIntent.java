@@ -69,7 +69,8 @@ public sealed interface TurnIntent {
      * 없는 실행이 된다
      */
     record DelegationResults(DeliveryAttemptRef attempt, boolean retry, List<ContextItem> items, boolean fromUnattended)
-        implements TurnIntent {
+        implements
+            TurnIntent {
         public DelegationResults {
             items = items == null ? List.of() : List.copyOf(items);
         }

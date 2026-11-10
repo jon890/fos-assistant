@@ -334,9 +334,9 @@ class ToolPolicyDecisionTest {
             for (ToolPolicyDecision.CheckBoundary boundary : ToolPolicyDecision.CheckBoundary.values()) {
                 assertThat(ToolPolicyDecision.decide(
                     ConnectionStatus.READY, true, 2, Optional.of(policy), true, true, false, 2, boundary, true))
-                    .as("위험도 %s, 경계 %s", policy.risk(), boundary)
-                    .isEqualTo(new ToolPolicyDecision(
-                        ActionDecision.DENIED, ActionDenyReason.ATTENDED_ONLY, policy.risk(), policy.approval()));
+                        .as("위험도 %s, 경계 %s", policy.risk(), boundary)
+                        .isEqualTo(new ToolPolicyDecision(
+                            ActionDecision.DENIED, ActionDenyReason.ATTENDED_ONLY, policy.risk(), policy.approval()));
             }
         }
     }

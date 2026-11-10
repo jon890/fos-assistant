@@ -46,6 +46,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -125,6 +126,9 @@ class DelegationWakeServiceTest {
 
     @Autowired
     AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionRecorder recorder;
 
     @Autowired
     ExecutionEventRepository executionEvents;
@@ -249,14 +253,17 @@ class DelegationWakeServiceTest {
     void deliveryTurnInheritsUnattendedFromResultTreeRoot() {
         finished(delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null));
         awaitIdle(conversation.id());
-        assertThat(deliveryTurn().unattended()).as("사람이 연 트리의 결과를 전한 turn").isFalse();
+        assertThat(unattended(deliveryTurn())).as("사람이 연 트리의 결과를 전한 turn").isFalse();
 
-        AgentExecution scheduledRoot = executions.findById(root.id()).orElseThrow();
-        scheduledRoot.markUnattended();
-        executions.save(scheduledRoot);
+        recorder.markUnattended(root);
         finished(delegated(root, ExecutionStatus.SUCCEEDED, "예약 작업이 맡긴 결과", null));
         awaitIdle(conversation.id());
-        assertThat(deliveryTurn().unattended()).as("예약 작업 트리의 결과를 전한 turn").isTrue();
+        assertThat(unattended(deliveryTurn())).as("예약 작업 트리의 결과를 전한 turn").isTrue();
+    }
+
+
+    private boolean unattended(AgentExecution execution) {
+        return executions.countUnattendedIn(List.of(execution.id())) > 0;
     }
 
 

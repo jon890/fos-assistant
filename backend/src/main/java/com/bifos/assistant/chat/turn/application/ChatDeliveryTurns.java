@@ -123,7 +123,7 @@ class ChatDeliveryTurns {
      */
     private boolean fromUnattended(List<AgentExecution> results) {
         List<Long> roots = results.stream().map(AgentExecution::treeRootId).distinct().toList();
-        return !roots.isEmpty() && executionRepository.existsByIdInAndUnattendedTrue(roots);
+        return !roots.isEmpty() && executionRepository.countUnattendedIn(roots) > 0;
     }
 
 
