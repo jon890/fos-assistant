@@ -1,6 +1,6 @@
 /**
  * 주소 분류 표다. 탭을 여는 것은 `store` 와 `catalog` 뿐이라, 모델이 준 주소로 로그인된 브라우저가 아무 사이트나 열지 않는다.
- * 갈래와 까닭은 docs/features/naver-shopping/design.md 의 「주소 분류」 가 갖는다.
+ * 갈래와 까닭은 docs/features/naver-shopping.md 의 「주소 분류」 가 갖는다.
  */
 export type UrlKind = "store" | "catalog" | "external";
 

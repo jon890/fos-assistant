@@ -28,7 +28,7 @@ TOOL_SUMMARY_MAX_CHARS = 200
 # 검사에서 운영 목록 대신 넣는 자리표시 주소다. 실제 서비스 주소가 아니다.
 PLACEHOLDER_BASE_URL = "https://service.example"
 # Hermes 도구 검색은 등록 이름과 설명을 `[A-Za-z0-9]+` 로 잘라 색인한다. 한국어는 걸리지 않는다
-# (docs/features/naver-shopping/design.md 의 「도구 이름과 설명」). 그래서 이름은 영어 낱말 둘 이상의 snake_case 다.
+# (docs/features/naver-shopping.md 의 「도구와 정책」). 그래서 이름은 영어 낱말 둘 이상의 snake_case 다.
 TOOL_NAME_WORDS_RE = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)+")
 # 설명은 영어 요지 한 문장으로 시작한다. 첫 `.` 까지가 ASCII 이고 세 글자 이상의 낱말이 셋 이상이다.
 ENGLISH_LEAD_RE = re.compile(r"([A-Za-z0-9 ,'()/-]+)\.(\s|$)")
