@@ -10,6 +10,8 @@ export type FakePage = {
   captcha?: boolean;
   /** 상태를 꺼내는 식이 받을 값(JSON 글이나 null). */
   state?: string | null;
+  /** 이동 응답에 실을 망 오류 글. */
+  navigateError?: string;
   /** 이동 뒤 `confirm` 같은 대화상자를 띄운다. */
   dialog?: boolean;
   /** 준비 상태가 `complete` 가 되기 전 `loading` 을 몇 번 답하는지. */
@@ -64,7 +66,10 @@ export function startFakeBrowser(page: FakePage = {}): FakeBrowser {
         };
         if (message.method === "Storage.getCookies") return reply({ cookies });
         if (message.method === "Page.navigate") {
-          reply({ frameId: "f" });
+          reply({
+            frameId: "f",
+            ...(page.navigateError ? { errorText: page.navigateError } : {}),
+          });
           if (page.dialog)
             socket.send(
               JSON.stringify({

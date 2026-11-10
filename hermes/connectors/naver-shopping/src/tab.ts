@@ -58,7 +58,9 @@ export async function readInTab(
         .catch(() => {});
     });
     await page.send("Page.enable", {}, remaining());
-    await page.send("Page.navigate", { url }, remaining());
+    const nav = await page.send("Page.navigate", { url }, remaining());
+    // 이동 자체가 실패하면(망 오류) Chrome 오류 화면도 준비 상태가 된다. 화면 바뀜이 아니라 일시 장애로 답한다.
+    if (nav?.errorText) throw new ToolError("NAVER_SHOPPING_UNAVAILABLE");
     const evaluate = async (source: string) => {
       const { result } = await page.send<{ result?: { value?: unknown } }>(
         "Runtime.evaluate",
@@ -78,7 +80,6 @@ export async function readInTab(
     }
     return await evaluate(expression);
   } catch (error) {
-    // 제한 시간이 지난 뒤에는 명령의 시간 초과가 먼저 나도 시간 초과로 답한다.
     throw keepTab || Date.now() < deadline
       ? error
       : new ToolError("NAVER_SHOPPING_UNAVAILABLE");

@@ -87,3 +87,15 @@ test("제한 시간 안에 준비되지 않으면 실패하고 그 탭을 닫는
   });
   expect(browser.http).toContain("GET /json/close/tab-1");
 });
+
+test("이동이 망 오류로 실패하면 바뀐 화면이 아니라 일시 장애로 끝나고 그 탭을 닫는다", async () => {
+  await expect(
+    read({ navigateError: "net::ERR_NAME_NOT_RESOLVED", state: null }),
+  ).rejects.toMatchObject({
+    code: "NAVER_SHOPPING_UNAVAILABLE",
+  });
+  expect(browser!.http).toContain("GET /json/close/tab-1");
+  expect(
+    browser!.commands.some((command) => command.method === "Runtime.evaluate"),
+  ).toBe(false);
+});
