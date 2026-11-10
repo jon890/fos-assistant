@@ -77,6 +77,11 @@ export async function readInTab(
       throw new ToolError(human);
     }
     return await evaluate(expression);
+  } catch (error) {
+    // 제한 시간이 지난 뒤에는 명령의 시간 초과가 먼저 나도 시간 초과로 답한다.
+    throw keepTab || Date.now() < deadline
+      ? error
+      : new ToolError("NAVER_SHOPPING_UNAVAILABLE");
   } finally {
     session?.close();
     if (!keepTab)

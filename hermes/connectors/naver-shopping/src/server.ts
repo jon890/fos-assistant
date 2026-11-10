@@ -32,12 +32,7 @@ export function createServer(env: Env = process.env, deps?: ToolDeps) {
     "search_products",
     {
       description: manifest.tools.search_products.description,
-      inputSchema: {
-        query: z
-          .string()
-          .min(1)
-          .max(QUERY_MAX * 2),
-      },
+      inputSchema: { query: z.string().max(QUERY_MAX * 2) },
       annotations: { readOnlyHint: true },
     },
     ({ query }) => guard(() => searchProducts(env, query, deps)),
