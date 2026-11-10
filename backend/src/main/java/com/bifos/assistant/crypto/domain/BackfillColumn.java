@@ -36,6 +36,7 @@ public final class BackfillColumn {
 
     private long cursor;
     private Boolean cursorSealing;
+    private boolean warnedDisabled;
 
 
     /**
@@ -63,16 +64,20 @@ public final class BackfillColumn {
      * 한 차례 돈다.
      *
      * @param sealing 참이면 평문을 암호화하고 거짓이면 암호문을 평문으로 되돌린다
-     * @param enabled 암호화 키가 있는가. 없으면 줄을 고치지 않고 남은 줄 수만 경고한다
+     * @param enabled 암호화 키가 있는가. 없으면 줄을 고치지 않고, 처음 한 번만 남은 줄 수를 경고한다
      * @return 이번 차례에 고친 줄 수
      */
     public synchronized int run(boolean sealing, int limit, boolean enabled) {
         String direction = sealing ? "SEAL" : "UNSEAL";
         LongSupplier remainingCount = sealing ? plainCount : sealedCount;
         if (!enabled) {
-            long remaining = remainingCount.getAsLong();
-            if (remaining > 0) {
-                log.warn("KEK 가 없어 옛 줄을 고치지 않는다 column={} direction={} remaining={}", name, direction, remaining);
+            // KEK 없이 평문으로 쓰는 설치에서 매분 같은 경고와 전체 세기를 되풀이하지 않는다. 프로세스를 띄운 뒤 한 번만 남긴다
+            if (!warnedDisabled) {
+                warnedDisabled = true;
+                long remaining = remainingCount.getAsLong();
+                if (remaining > 0) {
+                    log.warn("KEK 가 없어 옛 줄을 고치지 않는다 column={} direction={} remaining={}", name, direction, remaining);
+                }
             }
             return 0;
         }

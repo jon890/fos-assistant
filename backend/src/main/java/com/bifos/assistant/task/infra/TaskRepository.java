@@ -44,7 +44,7 @@ public interface TaskRepository extends JpaRepository<Task, Long>, TaskWrites<Ta
 
 
     /** 평문으로 남은 작업의 번호를 번호 순으로 읽는다(ADR-20261008 / data-encryption). */
-    @Query("select t.id from Task t where t.titleKeyId is null and t.id > :after order by t.id")
+    @Query("select t.id from Task t where t.titleKeyId is null and length(t.storedTitle) > 0 and t.id > :after order by t.id")
     List<Long> findPlainIds(@Param("after") Long after, Pageable pageable);
 
 
@@ -53,7 +53,7 @@ public interface TaskRepository extends JpaRepository<Task, Long>, TaskWrites<Ta
     List<Long> findSealedIds(@Param("after") Long after, Pageable pageable);
 
 
-    @Query("select count(t) from Task t where t.titleKeyId is null")
+    @Query("select count(t) from Task t where t.titleKeyId is null and length(t.storedTitle) > 0")
     long countPlain();
 
 

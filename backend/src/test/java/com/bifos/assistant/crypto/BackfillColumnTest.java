@@ -64,6 +64,20 @@ class BackfillColumnTest {
     }
 
 
+    @Test
+    @DisplayName("키가 없으면 남은 줄 수를 한 번만 세고 그 뒤에는 세지 않는다")
+    void missingKeyCountsOnlyOnce() {
+        AtomicLong counted = new AtomicLong();
+        BackfillColumn column = new BackfillColumn(
+            "t.c", (after, limit) -> List.of(), (after, limit) -> List.of(), counted::incrementAndGet, () -> 0, id -> true, id -> true);
+
+        column.run(true, 10, false);
+        column.run(true, 10, false);
+
+        assertThat(counted.get()).isEqualTo(1);
+    }
+
+
     private static BackfillColumn column(List<Long> plain, List<Long> sealed, LongPredicate eligible) {
         AtomicLong count = new AtomicLong(plain.size());
         return new BackfillColumn(
