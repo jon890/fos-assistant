@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.execution.application.ExecutionQuestions;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
@@ -117,6 +118,10 @@ class ConversationPurgerTest {
     @Autowired
     MediaObservationRepository observations;
 
+    /** 첨부 보관 기한을 고정한 NOW 에서 재도록 시계를 맞춘다. 실제 시각이면 날짜가 지나 첨부가 만료된다. */
+    @Autowired
+    TestClock clock;
+
     private AppUser owner;
     private Agent agent;
     private final List<Filled> created = new ArrayList<>();
@@ -124,6 +129,7 @@ class ConversationPurgerTest {
 
     @BeforeEach
     void setUp() {
+        clock.set(NOW);
         String email = "purge-" + UUID.randomUUID() + "@example.test";
         owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         String code = "purge-" + UUID.randomUUID().toString().substring(0, 8);

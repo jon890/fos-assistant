@@ -69,54 +69,8 @@ public class ConnectorActionService {
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
-    // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
+    // Clock 은 빈으로 받는다. 검사가 시계를 고정해도 이 서비스가 같은 시계를 본다.
     @Autowired
-    public ConnectorActionService(
-        ConnectorActionRepository actions,
-        ConnectorActionExecutionRepository contents,
-        ConnectorToolGrantRepository grants,
-        ConnectorConversationGrantRepository conversationGrants,
-        ConversationRepository conversationRows,
-        AgentRepository agents,
-        ConnectorConnectionRepository connections,
-        ConnectorBindingRepository bindings,
-        AppUserRepository users,
-        ConnectorCatalogCache catalog,
-        HermesConnectorClient connector,
-        LiveProperties<DelegationProperties> delegation,
-        ApplicationEventPublisher events,
-        NotificationService notifications,
-        ConversationNotices conversations,
-        DecisionFeedbackRecorder feedback,
-        ConnectorActionBodies bodies,
-        ConnectorFinancialApproval financialApproval,
-        FinancialLimitChanges limitChanges,
-        PlatformTransactionManager transactionManager) {
-        this(
-            actions,
-            contents,
-            grants,
-            conversationGrants,
-            conversationRows,
-            agents,
-            connections,
-            bindings,
-            users,
-            catalog,
-            connector,
-            delegation,
-            events,
-            notifications,
-            conversations,
-            feedback,
-            bodies,
-            financialApproval,
-            limitChanges,
-            transactionManager,
-            Clock.systemUTC());
-    }
-
-
     public ConnectorActionService(
         ConnectorActionRepository actions,
         ConnectorActionExecutionRepository contents,
