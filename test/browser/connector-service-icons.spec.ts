@@ -43,6 +43,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(icons).toHaveCount(connectors.length);
     for (const [index, connector] of connectors.entries()) {
       const card = page.getByTestId("connector-card").nth(index);
+      await card.getByTestId("connector-details").locator("summary").click();
       await expect(card.getByTestId("connector-link")).toHaveAttribute(
         "href",
         connector.link,

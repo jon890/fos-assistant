@@ -37,6 +37,10 @@ const TEXTS: Record<string, ToolsetText> = {
     description: "집의 기기를 살피고 조작해요",
   },
   spotify: { label: "Spotify", description: "음악을 틀고 멈춰요" },
+  connections: {
+    label: "외부 서비스 연결",
+    description: "연결한 외부 서비스를 써요",
+  },
   discord: { label: "Discord", description: "Discord 에 글을 보내고 읽어요" },
 };
 

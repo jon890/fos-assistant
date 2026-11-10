@@ -11,6 +11,7 @@ import {
   itemHref,
   originText,
   reasonText,
+  showsReason,
   type AttentionCardKey,
   type AttentionItem,
   type ItemAction,
@@ -144,7 +145,9 @@ export function NowItem({
         onControlled={onControlChange}
         onError={setError}
       />
-      <p className="text-sm text-muted-foreground">{reasonText(item.why)}</p>
+      {showsReason(item.why) ? (
+        <p className="text-sm text-muted-foreground">{reasonText(item.why)}</p>
+      ) : null}
       <p className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
         {sources.map((source, index) => (
           <Fragment key={index}>

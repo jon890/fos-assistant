@@ -77,7 +77,7 @@ covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/mai
 | `PROACTIVE_REPORT_TRIGGER` | 없음 | 새 보고가 있어요 |
 
 `signals` 가 여럿이면 표의 위쪽 줄을 쓴다. 표에 없는 조합은 그 `trigger` 의 「없음」 줄을 쓴다.
-모든 `trigger` 에 「없음」 줄이 있다. 관리자 지표 표의 종류 열도 이 「없음」 줄의 문구로 `trigger` 를 그린다.
+모든 `trigger` 에 「없음」 줄이 있다. 「이어서 하기」 카드의 항목(`CONVERSATION_RECENT`)은 이유가 모두 같은 말이라 지금 화면이 이유 줄을 그리지 않는다. 관리자 지표 표의 종류 열도 이 「없음」 줄의 문구로 `trigger` 를 그린다.
 
 ### 동작
 
