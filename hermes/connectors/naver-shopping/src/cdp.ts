@@ -91,7 +91,6 @@ export class CdpSession {
   private nextId = 1;
   private closed = false;
   private readonly pending = new Map<number, Pending>();
-  private readonly waiters = new Map<string, Set<Pending>>();
   private readonly listeners = new Map<string, Set<(params: any) => void>>();
 
   private constructor(private readonly socket: WebSocket) {
@@ -167,30 +166,6 @@ export class CdpSession {
     });
   }
 
-  /** 이름이 같은 이벤트 하나를 기다려 그 `params` 를 돌려준다. */
-  waitEvent<T = any>(
-    method: string,
-    timeoutMs = COMMAND_TIMEOUT_MS,
-  ): Promise<T> {
-    if (this.closed) return Promise.reject(unreachable());
-    return new Promise<T>((resolve, reject) => {
-      const waiters = this.waiters.get(method) ?? new Set<Pending>();
-      this.waiters.set(method, waiters);
-      const waiter: Pending = {
-        resolve,
-        reject,
-        timer: setTimeout(
-          () => {
-            waiters.delete(waiter);
-            reject(unreachable());
-          },
-          Math.max(1, timeoutMs),
-        ),
-      };
-      waiters.add(waiter);
-    });
-  }
-
   /**
    * 이름이 같은 이벤트가 올 때마다 부를 함수를 건다. 돌려준 함수를 부르면 뗀다.
    * 탭에 뜬 대화 상자처럼 언제 올지 모르는 이벤트를 연결 내내 받을 때 쓴다.
@@ -236,17 +211,10 @@ export class CdpSession {
           // 받는 쪽의 실패가 다른 이벤트와 명령 응답을 막지 않게 한다.
         }
       }
-      const waiters = this.waiters.get(message.method);
-      if (!waiters) return;
-      for (const waiter of waiters) {
-        clearTimeout(waiter.timer);
-        waiter.resolve(message.params ?? {});
-      }
-      this.waiters.delete(message.method);
     }
   }
 
-  /** 연결이 끊기면 기다리던 명령과 이벤트를 모두 닿지 않음으로 끝낸다. */
+  /** 연결이 끊기면 기다리던 명령을 모두 닿지 않음으로 끝낸다. */
   private shutdown() {
     if (this.closed) return;
     this.closed = true;
@@ -255,13 +223,6 @@ export class CdpSession {
       pending.reject(unreachable());
     }
     this.pending.clear();
-    for (const waiters of this.waiters.values()) {
-      for (const waiter of waiters) {
-        clearTimeout(waiter.timer);
-        waiter.reject(unreachable());
-      }
-    }
-    this.waiters.clear();
     this.listeners.clear();
   }
 }
