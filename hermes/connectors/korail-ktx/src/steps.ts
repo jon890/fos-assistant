@@ -7,7 +7,14 @@ import * as F from "./fields.ts";
 import type { Query } from "./input.ts";
 
 export type Step =
-  | { name: string; kind: "click"; target: string; optional?: boolean }
+  | {
+      name: string;
+      kind: "click";
+      target: string;
+      optional?: boolean;
+      /** 자리를 찾지 못했을 때 낼 코드. 없으면 화면이 바뀐 것이다. */
+      missing?: "KORAIL_DATE_UNAVAILABLE";
+    }
   | { name: string; kind: "type"; text: string }
   | { name: string; kind: "select_all" };
 
@@ -62,10 +69,12 @@ export function conditionSteps(query: Query): Step[] {
     ...station("departure", F.DEPARTURE_INPUT, query.departure),
     ...station("arrival", F.ARRIVAL_INPUT, query.arrival),
     { name: "date.open", kind: "click", target: F.DATE_INPUT },
+    // 예매 기간 밖의 날은 달력에 칸이 없다. 그 까닭을 날짜 오류로 알린다(spec REQ3).
     {
       name: "date.day",
       kind: "click",
       target: fill(F.CALENDAR_DAY, query.date.replaceAll("-", "")),
+      missing: "KORAIL_DATE_UNAVAILABLE",
     },
     {
       name: "date.hour",
@@ -83,8 +92,11 @@ export function conditionSteps(query: Query): Step[] {
   ];
 }
 
-/** 목록 화면의 단계. 수서 함께 보기는 아직 안 골랐을 때만 누른다(spec DECISION12). */
-export function listSteps(query: Query, suseoChecked: boolean): Step[] {
+/**
+ * 목록 화면의 단계. 수서 함께 보기는 칸이 있고 아직 안 골랐을 때만 누른다(spec DECISION12). 서울권이 아닌 구간은 칸이 없다.
+ * 일반석과 직통은 목록 화면의 기본값이라(본 것: 「일반석」, 「직통」) 누르지 않는다.
+ */
+export function listSteps(query: Query, suseo: boolean | null): Step[] {
   return [
     {
       name: "list.notice",
@@ -92,7 +104,7 @@ export function listSteps(query: Query, suseoChecked: boolean): Step[] {
       target: F.NOTICE_CLOSE,
       optional: true,
     },
-    ...(suseoChecked
+    ...(suseo !== false
       ? []
       : [
           {

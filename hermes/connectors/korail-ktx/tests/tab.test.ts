@@ -1,11 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
 import { EXPRESSIONS } from "../src/expressions.ts";
 import {
+  FIRST_CLASS,
   KTX_TAB,
   LOOKUP_BUTTON,
   NOTICE_CLOSE,
   SUSEO_TOGETHER,
 } from "../src/fields.ts";
+import { conditionSteps, listSteps } from "../src/steps.ts";
 import { checkSearch, type SearchArgs } from "../src/input.ts";
 import { BROWSER_URL_ENV } from "../src/session.ts";
 import { searchInTab } from "../src/tab.ts";
@@ -45,7 +47,7 @@ const LIST = JSON.stringify({
 });
 const BOT =
   "안내 메시지 매크로, 개발자도구 등 미허가 도구 사용 시 이용이 제한될 수 있습니다. CODE : -8003";
-const OPTIONS = { timeoutMs: 3_000, stepMs: 200, pollMs: 1 };
+const OPTIONS = { timeoutMs: 3_000, stepMs: 200, optionalMs: 20, pollMs: 1 };
 
 function run(page: FakePage, args: Partial<SearchArgs> = {}) {
   browser = startFakeBrowser({ list: LIST, ...page });
@@ -94,6 +96,50 @@ test("빈 탭에서 조건을 넣고 조회를 한 번 누른 뒤 목록 고르�
   expectConstantExpressions(fake);
 });
 
+test("찾는 자리는 모두 단계 표의 것이고 특실이면 특실을 누른다", async () => {
+  const query = checkSearch({ ...ARGS, seat_class: "first" }, NOW);
+  await run({}, { seat_class: "first" });
+  const allowed = new Set(
+    [...conditionSteps(query), ...listSteps(query, false)].flatMap((step) =>
+      step.kind === "click" ? [step.target] : [],
+    ),
+  );
+  const queries = searched(browser!);
+  expect(queries.every((q) => allowed.has(q))).toBe(true);
+  expect(queries).toContain(FIRST_CLASS);
+});
+
+test("상자 없는 숨은 사본을 건너뛰고 보이는 자리를 누른다", async () => {
+  expect(await run({ hiddenFirst: true })).toBe(LIST);
+});
+
+test("수서 함께 보기 칸이 없는 구간은 그 단계를 건너뛴다", async () => {
+  expect(await run({ suseoMissing: true })).toBe(LIST);
+  expect(searched(browser!)).not.toContain(SUSEO_TOGETHER);
+});
+
+test("달력에 그날이 없으면 날짜를 예매할 수 없다고 끝난다", async () => {
+  const query = checkSearch(ARGS, NOW);
+  const day = conditionSteps(query).find((step) => step.name === "date.day");
+  await expect(
+    run({ missing: [day!.kind === "click" ? day!.target : ""] }),
+  ).rejects.toMatchObject({ code: "KORAIL_DATE_UNAVAILABLE" });
+  expect(closed(browser!)).toBe(true);
+});
+
+test("전체 제한 시간을 넘기면 일시 장애로 끝나고 탭을 닫는다", async () => {
+  browser = startFakeBrowser({ list: LIST, missing: [KTX_TAB] });
+  await expect(
+    searchInTab(browser.url, checkSearch(ARGS, NOW), {
+      timeoutMs: 300,
+      stepMs: 10_000,
+      optionalMs: 20,
+      pollMs: 5,
+    }),
+  ).rejects.toMatchObject({ code: "KORAIL_UNAVAILABLE" });
+  expect(closed(browser!)).toBe(true);
+});
+
 test("어린이·경로 인원만큼 더하기를 누르고 어른 0명이면 빼기를 누른다", async () => {
   await run({}, { adults: 0, children: 2, seniors: 1 });
   const queries = searched(browser!);
@@ -124,19 +170,30 @@ for (const [name, page, code] of [
     { notice: BOT, noticeAfterLookupOnly: true },
     "KORAIL_BOT_CHECK",
   ],
-  ["보안 문자", { captcha: true }, "KORAIL_CAPTCHA"],
+  ["보안 문자", { captchaAfterLookup: true }, "KORAIL_CAPTCHA"],
 ] as const) {
   test(`${name} 화면이면 그 뒤로 누르지 않고 탭을 남긴 채 그 코드로 끝난다`, async () => {
     await expect(run(page)).rejects.toMatchObject({ code });
     const fake = browser!;
     expect(closed(fake)).toBe(false);
-    const lastInput = fake.commands
-      .map((c) => c.method)
-      .lastIndexOf("Input.dispatchMouseEvent");
-    const lastProbe = fake.commands
-      .map((c) => c.method)
-      .lastIndexOf("Runtime.evaluate");
-    expect(lastInput).toBeLessThan(lastProbe);
+    // 사람이 해야 하는 화면은 「열차 조회」 를 누른 뒤에 뜬다. 그 뒤로는 어떤 Input 명령도 없다.
+    const lookup = fake.commands.findIndex(
+      (c) =>
+        c.method === "DOM.performSearch" && c.params.query === LOOKUP_BUTTON,
+    );
+    const released = fake.commands.findIndex(
+      (c, i) =>
+        i > lookup &&
+        c.method === "Input.dispatchMouseEvent" &&
+        c.params.type === "mouseReleased",
+    );
+    expect(lookup).toBeGreaterThan(-1);
+    expect(released).toBeGreaterThan(lookup);
+    expect(
+      fake.commands
+        .slice(released + 1)
+        .some((c) => c.method.startsWith("Input.")),
+    ).toBe(false);
   });
 }
 

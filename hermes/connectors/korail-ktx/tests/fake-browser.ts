@@ -18,12 +18,18 @@ export type FakePage = {
   /** 「열차 조회」 를 누른 뒤 주소. 기본은 목록 화면이다. */
   afterLookup?: string;
   captcha?: boolean;
+  /** 보안 문자가 「열차 조회」 를 누른 뒤에만 보인다. */
+  captchaAfterLookup?: boolean;
+  /** 자리마다 상자 없는 숨은 사본이 먼저 나온다. */
+  hiddenFirst?: boolean;
   /** 「안내 메시지」 층의 글. `afterLookupOnly` 면 목록 화면에서만 보인다. */
   notice?: string | null;
   noticeAfterLookupOnly?: boolean;
   /** 목록 꺼내기 식이 받을 값(JSON 글이나 null). */
   list?: string | null;
   suseoChecked?: boolean;
+  /** 수서 함께 보기 칸이 없는 구간이다. */
+  suseoMissing?: boolean;
   /** 찾지 못하는 자리. */
   missing?: string[];
   navigateError?: string;
@@ -92,14 +98,28 @@ export function startFakeBrowser(page: FakePage = {}): FakeBrowser {
             searches.set(searchId, p.query);
             return reply({
               searchId,
-              resultCount: (page.missing ?? []).includes(p.query) ? 0 : 1,
+              resultCount: (page.missing ?? []).includes(p.query)
+                ? 0
+                : page.hiddenFirst
+                  ? 2
+                  : 1,
             });
           }
           case "DOM.getSearchResults":
             lastQuery = searches.get(p.searchId) ?? "";
-            return reply({ nodeIds: [7] });
+            return reply({ nodeIds: page.hiddenFirst ? [6, 7] : [7] });
           case "DOM.getBoxModel":
-            return reply({ model: { content: [0, 0, 10, 0, 10, 10, 0, 10] } });
+            // 노드 6 은 상자 없는 숨은 사본이다.
+            return reply({
+              model:
+                p.nodeId === 6
+                  ? { content: [0, 0, 0, 0, 0, 0, 0, 0], width: 0, height: 0 }
+                  : {
+                      content: [0, 0, 10, 0, 10, 10, 0, 10],
+                      width: 10,
+                      height: 10,
+                    },
+            });
           case "Input.dispatchMouseEvent":
             if (p.type === "mouseReleased" && lastQuery === LOOKUP_BUTTON) {
               looked = true;
@@ -134,12 +154,22 @@ export function startFakeBrowser(page: FakePage = {}): FakeBrowser {
                   : (page.notice ?? null);
               return reply({
                 result: {
-                  value: { href, captcha: page.captcha === true, notice },
+                  value: {
+                    href,
+                    captcha:
+                      page.captcha === true ||
+                      (page.captchaAfterLookup === true && looked),
+                    notice,
+                  },
                 },
               });
             }
             if (expression === SUSEO_CHECKED)
-              return reply({ result: { value: page.suseoChecked === true } });
+              return reply({
+                result: {
+                  value: page.suseoMissing ? null : page.suseoChecked === true,
+                },
+              });
             if (expression === LIST_STATE)
               return reply({ result: { value: page.list ?? null } });
             return reply({ result: {} });

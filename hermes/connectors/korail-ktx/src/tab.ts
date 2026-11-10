@@ -4,7 +4,7 @@
  * - 빈 탭을 열고 대화상자 처리기와 `Page.enable` 을 건 뒤 조건 화면으로 이동한다. 우리 탭의 JS 대화상자는 글을 남기고 닫는다
  * - 기다림은 `waitFor` 하나가 맡고, 기다리는 동안 매번 화면을 분류한다. 사람이 해야 하는 화면이면 바로 멈춘다
  * - 자리는 `DOM.performSearch` 로 찾고 누르기와 글 넣기는 `Input.*` 로 한다. 탭에서 돌리는 식은 expressions.ts 의 상수뿐이다
- * - 로그인·탐지·캡차 화면이면 탭을 남기고, 그 밖의 결과는 성공이든 실패든 탭을 닫는다. 다른 탭은 읽지도 닫지도 않는다
+ * - 로그인·탐지·보안 문자 화면이면 탭을 남기고, 그 밖의 결과는 성공이든 실패든 탭을 닫는다. 다른 탭은 읽지도 닫지도 않는다
  * - 자동 재시도는 없다
  */
 import { CdpSession, httpJson, wsUrlFor } from "./cdp.ts";
@@ -23,21 +23,27 @@ import { conditionSteps, listSteps, type Step } from "./steps.ts";
 export type TabOptions = {
   /** 탭 열기부터 꺼내기까지의 전체 제한 시간. */
   timeoutMs?: number;
-  /** 단계 하나가 자리를 기다리는 시간. 넘으면 화면이 바뀐 것으로 본다. */
+  /** 필수 단계 하나가 자리를 기다리는 시간. 넘으면 화면이 바뀐 것으로 본다. */
   stepMs?: number;
+  /** 생략할 수 있는 단계(공지 닫기, 역 고르기)가 자리를 기다리는 시간. 넘으면 건너뛴다. */
+  optionalMs?: number;
   /** 다시 묻는 간격. 사람 속도 간격이 아니라 화면이 바뀌었는지 보는 간격이다. */
   pollMs?: number;
 };
 
 const TOOL = "search_trains";
+/** 같은 자리의 사본 가운데 상자가 있는 첫 것을 고를 때 보는 수. */
+const CANDIDATES = 10;
 
 class Tab {
   dialog: string | null = null;
   keep = false;
+  /** 거절로 보인 화면을 한 번 더 보고 확정한다. 대화상자 뒤 로그인 화면으로 넘어가는 경우를 거절로 끝내지 않는다. */
+  private suspect = false;
   constructor(
     readonly page: CdpSession,
     private readonly deadline: number,
-    private readonly options: Required<TabOptions>,
+    readonly options: Required<TabOptions>,
   ) {}
 
   remaining() {
@@ -58,7 +64,7 @@ class Tab {
     return result?.value;
   }
 
-  /** 화면을 분류해 사람이 해야 하는 화면이나 코레일의 거절이면 그 오류로 멈춘다. */
+  /** 화면을 분류해 사람이 해야 하는 화면이나 코레일의 거절이면 그 오류로 멈춘다. 준비되지 않았으면 거짓이다. */
   async check() {
     if ((await this.evaluate(READY_STATE)) !== "complete") return false;
     const probe = ((await this.evaluate(PAGE_PROBE)) ?? {}) as Record<
@@ -66,10 +72,15 @@ class Tab {
       unknown
     >;
     const error = pageError(classifyPage({ ...probe, dialog: this.dialog }));
+    if (error && !error.human && !this.suspect) {
+      this.suspect = true;
+      return false;
+    }
     if (error) {
       this.keep = error.human;
       throw new ToolError(error.code, error.message ?? null);
     }
+    this.suspect = false;
     return true;
   }
 
@@ -89,7 +100,7 @@ class Tab {
     }
   }
 
-  /** 자리 하나의 가운데 좌표. 없거나 보이지 않으면 `null` 이다. */
+  /** 자리의 사본 가운데 상자가 있는 첫 것의 가운데 좌표. 없으면 `null` 이다. */
   async locate(target: string): Promise<{ x: number; y: number } | null> {
     // 검색은 문서 노드를 받은 뒤에야 돈다. 화면이 바뀌면 노드 번호도 바뀌어 매번 다시 받는다.
     await this.send("DOM.getDocument", { depth: 0 });
@@ -104,21 +115,30 @@ class Tab {
         {
           searchId: search.searchId,
           fromIndex: 0,
-          toIndex: 1,
+          toIndex: Math.min(search.resultCount, CANDIDATES),
         },
       );
-      const nodeId = nodeIds[0];
-      if (!nodeId) return null;
-      await this.send("DOM.scrollIntoViewIfNeeded", { nodeId }).catch(() => {});
-      const box = await this.send<{ model?: { content?: number[] } }>(
-        "DOM.getBoxModel",
-        { nodeId },
-      ).catch(() => null);
-      const quad = box?.model?.content;
-      if (!quad || quad.length < 8) return null;
-      const x = (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4;
-      const y = (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4;
-      return { x, y };
+      for (const nodeId of nodeIds) {
+        const box = await this.send<{
+          model?: { content?: number[]; width?: number; height?: number };
+        }>("DOM.getBoxModel", { nodeId }).catch(() => null);
+        const quad = box?.model?.content;
+        if (!quad || quad.length < 8 || !box?.model?.width) continue;
+        if (!box.model.height) continue;
+        await this.send("DOM.scrollIntoViewIfNeeded", { nodeId }).catch(
+          () => {},
+        );
+        const again = await this.send<{ model?: { content?: number[] } }>(
+          "DOM.getBoxModel",
+          { nodeId },
+        ).catch(() => box);
+        const q = again?.model?.content ?? quad;
+        return {
+          x: (q[0]! + q[2]! + q[4]! + q[6]!) / 4,
+          y: (q[1]! + q[3]! + q[5]! + q[7]!) / 4,
+        };
+      }
+      return null;
     } finally {
       await this.send("DOM.discardSearchResults", {
         searchId: search.searchId,
@@ -130,39 +150,43 @@ class Tab {
     if (step.kind === "type")
       return this.send("Input.insertText", { text: step.text });
     if (step.kind === "select_all") {
-      for (const type of ["keyDown", "keyUp"])
+      for (const type of ["rawKeyDown", "keyUp"])
         await this.send("Input.dispatchKeyEvent", {
           type,
           key: "a",
           code: "KeyA",
           modifiers: 2,
           windowsVirtualKeyCode: 65,
+          commands: type === "rawKeyDown" ? ["selectAll"] : [],
         });
       return;
     }
     const point = await this.waitFor(
       () => this.locate(step.target),
-      step.optional ? 0 : this.options.stepMs,
+      step.optional ? this.options.optionalMs : this.options.stepMs,
     );
     if (point === null) {
       if (step.optional) return;
       logDiagnostic(TOOL, `step.${step.name}`);
-      throw new ToolError("KORAIL_PAGE_CHANGED");
+      throw new ToolError(step.missing ?? "KORAIL_PAGE_CHANGED");
     }
     const base = { x: point.x, y: point.y, button: "left", clickCount: 1 };
-    await this.send("Input.dispatchMouseEvent", {
-      type: "mouseMoved",
-      x: point.x,
-      y: point.y,
-    });
-    await this.send("Input.dispatchMouseEvent", {
-      type: "mousePressed",
-      ...base,
-    });
-    await this.send("Input.dispatchMouseEvent", {
-      type: "mouseReleased",
-      ...base,
-    });
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"])
+      await this.send("Input.dispatchMouseEvent", {
+        type,
+        ...(type === "mouseMoved" ? { x: point.x, y: point.y } : base),
+      });
+  }
+
+  /** 같은 값이 두 번 이어 나올 때까지 읽는다. 누른 뒤 다시 그려지기 전의 낡은 값을 돌려주지 않는다. */
+  async stable(expression: string, limitMs: number) {
+    let last: unknown = undefined;
+    return this.waitFor(async () => {
+      const value = await this.evaluate(expression);
+      const same = value !== null && value !== undefined && value === last;
+      last = value;
+      return same ? value : null;
+    }, limitMs);
   }
 }
 
@@ -175,6 +199,7 @@ export async function searchInTab(
   const settings: Required<TabOptions> = {
     timeoutMs: options.timeoutMs ?? 60_000,
     stepMs: options.stepMs ?? 10_000,
+    optionalMs: options.optionalMs ?? 1_500,
     pollMs: options.pollMs ?? 200,
   };
   const deadline = Date.now() + settings.timeoutMs;
@@ -183,11 +208,11 @@ export async function searchInTab(
     timeoutMs: Math.max(1, deadline - Date.now()),
   })) as { id?: unknown; webSocketDebuggerUrl?: unknown } | null;
   const targetId = typeof target?.id === "string" ? target.id : "";
-  if (!targetId || typeof target?.webSocketDebuggerUrl !== "string")
-    throw new ToolError("KORAIL_BROWSER_UNREACHABLE");
   let tab: Tab | null = null;
   let session: CdpSession | null = null;
   try {
+    if (!targetId || typeof target?.webSocketDebuggerUrl !== "string")
+      throw new ToolError("KORAIL_BROWSER_UNREACHABLE");
     session = await CdpSession.connect(
       wsUrlFor(cdpUrl, target.webSocketDebuggerUrl),
       Math.max(1, deadline - Date.now()),
@@ -218,24 +243,27 @@ export async function searchInTab(
       logDiagnostic(TOOL, "list.open");
       throw new ToolError("KORAIL_PAGE_CHANGED");
     }
-    const suseo = await current.evaluate(SUSEO_CHECKED);
-    for (const step of listSteps(query, suseo === true))
-      await current.run(step);
-    const raw = await current.waitFor(async () => {
-      const value = await current.evaluate(LIST_STATE);
-      return typeof value === "string" ? value : null;
-    }, settings.stepMs);
-    if (raw === null) {
+    // 칸이 그려질 때까지 짧게 기다린다. 끝내 없으면 수서 함께 보기가 없는 구간이다.
+    const suseo = await current.waitFor(async () => {
+      const value = await current.evaluate(SUSEO_CHECKED);
+      return typeof value === "boolean" ? value : null;
+    }, settings.optionalMs);
+    for (const step of listSteps(query, suseo)) await current.run(step);
+    const raw = await current.stable(LIST_STATE, settings.stepMs);
+    if (typeof raw !== "string") {
       logDiagnostic(TOOL, "list.read", ["row"]);
       throw new ToolError("KORAIL_PAGE_CHANGED");
     }
     return raw;
   } catch (error) {
+    // 전체 제한 시간을 넘긴 뒤의 실패는 사람이 해야 하는 화면이 아니면 일시 장애로 알린다.
+    if (!tab?.keep && Date.now() >= deadline)
+      throw new ToolError("KORAIL_UNAVAILABLE");
     if (error instanceof ToolError) throw error;
     throw new ToolError("KORAIL_UNAVAILABLE");
   } finally {
     session?.close();
-    if (!tab?.keep)
+    if (targetId && !tab?.keep)
       await httpJson(
         cdpUrl,
         `/json/close/${encodeURIComponent(targetId)}`,

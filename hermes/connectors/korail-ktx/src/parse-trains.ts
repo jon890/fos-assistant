@@ -21,6 +21,7 @@ export type Train = {
 };
 
 const CLOCK = /(\d{1,2}):(\d{2})/;
+const TRAIN_TYPE = /^(KTX|SRT)/;
 
 function minute(value: Json): number | null {
   const match = typeof value === "string" ? CLOCK.exec(value) : null;
@@ -65,10 +66,11 @@ export function parseTrains(state: Json, query: Query): Train[] {
         : []),
     ];
     if (missing.length) throw new MissingFields(missing);
-    if (departs! < query.fromMinute) continue;
+    // 탭을 누른 뒤에도 KTX 계열과 SRT 가 아닌 줄이 남으면 뺀다(설계 DECISION18).
+    if (departs! < query.fromMinute || !TRAIN_TYPE.test(type!)) continue;
     const overnight = arrives! < departs!;
     const seatText = text(seat!.text, 200) ?? "";
-    const fare = /([\d,]+)\s*원/.exec(seatText)?.[1];
+    const fare = /(\d[\d,]*)\s*원/.exec(seatText)?.[1];
     trains.push({
       train_ref: [
         query.date,
@@ -85,7 +87,7 @@ export function parseTrains(state: Json, query: Query): Train[] {
       duration_min: arrives! - departs! + (overnight ? 1440 : 0),
       seat_status: seat!.bookable === true ? "available" : "sold_out",
       status_text: [...seatText].slice(0, 30).join(""),
-      adult_fare_krw: fare === undefined ? null : won(fare),
+      adult_fare_krw: fare === undefined ? null : won(fare) || null,
     });
   }
   return trains;

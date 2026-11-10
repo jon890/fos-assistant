@@ -30,8 +30,10 @@ description: 사용자가 KTX 열차를 찾아 달라고 할 때 「내 브라�
 | `KORAIL_CAPTCHA` | 「내 브라우저」 의 남은 탭에서 보안 문자를 직접 넣고 다시 요청해 달라고 한다 |
 | `KORAIL_UNKNOWN_STATION` | 역 이름을 다시 묻는다 |
 | `KORAIL_REJECTED` | 오류의 `message` 가 코레일이 보인 까닭이다. 그대로 전한다 |
-| `KORAIL_DATE_UNAVAILABLE` | 지난 날짜라 조회할 수 없다고 알린다 |
+| `KORAIL_DATE_UNAVAILABLE` | 지난 날짜이거나 아직 예매할 수 없는 날짜라고 알린다 |
 | `KORAIL_PAGE_CHANGED` | 코레일 화면이 바뀌어 읽지 못했다고 알린다. 다시 부르지 않는다 |
+| `KORAIL_INVALID_INPUT` | 조건을 다시 묻는다 |
+| `KORAIL_UNAVAILABLE` | 잠시 뒤 다시 요청해 달라고 한다. 바로 다시 부르지 않는다 |
 | `KORAIL_BROWSER_UNREACHABLE` | 브라우저를 켜는 중일 수 있다. 잠시 뒤 다시 요청해 달라고 한다 |
 
 사용자가 「풀었다」 고 하면 멈춘 조회를 한 번 다시 부른다.

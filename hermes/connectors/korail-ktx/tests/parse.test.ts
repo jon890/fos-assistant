@@ -57,6 +57,21 @@ test("줄을 결과로 바꾸고 이른 열차를 빼며 좌석 상태를 둘로
   });
 });
 
+test("KTX 계열과 SRT 가 아닌 줄은 빼고, 숫자 없는 운임은 null 이다", () => {
+  const trains = parseTrains(
+    {
+      rows: [
+        row({ type: "ITX-새마을" }),
+        row({ type: "SRT", general: { text: ",원 예매", bookable: true } }),
+        row({ type: "KTX-산천", general: { text: "0원", bookable: true } }),
+      ],
+    },
+    query,
+  );
+  expect(trains.map((t) => t.train_type)).toEqual(["SRT", "KTX-산천"]);
+  expect(trains.map((t) => t.adult_fare_krw)).toEqual([null, null]);
+});
+
 test("자정을 넘는 열차는 다음 날 도착이다", () => {
   const [train] = parseTrains(
     { rows: [row({ departs: "23:30", arrives: "01:10" })] },
