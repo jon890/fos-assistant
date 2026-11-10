@@ -65,10 +65,19 @@ public sealed interface TurnIntent {
      * @param attempt 이 turn 의 전달 시도. 실행 줄을 만들면 그 번호를 이 시도에 잇는다
      * @param retry 사용자가 다시 전달한 turn 이다. 지시가 {@link #DELIVERY_RETRY_INSTRUCTION} 이 된다
      * @param items 입력에 실은 결과 항목(ADR-071). 실행 기록이 Memory 항목 뒤로 이 참조를 잇는다
+     * @param fromUnattended 전하는 위임 결과 가운데 사람이 없는 트리(예약 작업, 먼저 살펴보기)가 낸 것이 있다. 이 turn 도 사람이
+     * 없는 실행이 된다
      */
-    record DelegationResults(DeliveryAttemptRef attempt, boolean retry, List<ContextItem> items) implements TurnIntent {
+    record DelegationResults(DeliveryAttemptRef attempt, boolean retry, List<ContextItem> items, boolean fromUnattended)
+        implements TurnIntent {
         public DelegationResults {
             items = items == null ? List.of() : List.copyOf(items);
+        }
+
+
+        /** 사람이 연 트리의 결과만 전하는 turn 이다. */
+        public DelegationResults(DeliveryAttemptRef attempt, boolean retry, List<ContextItem> items) {
+            this(attempt, retry, items, false);
         }
     }
 
@@ -88,6 +97,17 @@ public sealed interface TurnIntent {
      * @param check 살펴보기만의 일을 맡는 쪽
      */
     record ProactiveCheck(CheckTurn check) implements TurnIntent {
+    }
+
+
+    /**
+     * 사람이 없는 실행인가. 예약 작업, 먼저 살펴보기, 그 트리의 결과를 전하는 turn 이 참이다. 도구 판정이 사람이 연 대화에서만
+     * 부르라고 선언한 도구를 거절할 때 쓴다.
+     */
+    static boolean unattended(TurnIntent intent) {
+        return intent instanceof Scheduled
+            || intent instanceof ProactiveCheck
+            || intent instanceof DelegationResults results && results.fromUnattended();
     }
 
 

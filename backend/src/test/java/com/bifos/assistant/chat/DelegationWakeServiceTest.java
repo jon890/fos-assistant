@@ -245,6 +245,32 @@ class DelegationWakeServiceTest {
 
 
     @Test
+    @DisplayName("결과를 전하는 turn 은 결과를 낸 트리의 루트가 사람이 없는 실행일 때만 사람이 없는 실행이 된다")
+    void deliveryTurnInheritsUnattendedFromResultTreeRoot() {
+        finished(delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null));
+        awaitIdle(conversation.id());
+        assertThat(deliveryTurn().unattended()).as("사람이 연 트리의 결과를 전한 turn").isFalse();
+
+        AgentExecution scheduledRoot = executions.findById(root.id()).orElseThrow();
+        scheduledRoot.markUnattended();
+        executions.save(scheduledRoot);
+        finished(delegated(root, ExecutionStatus.SUCCEEDED, "예약 작업이 맡긴 결과", null));
+        awaitIdle(conversation.id());
+        assertThat(deliveryTurn().unattended()).as("예약 작업 트리의 결과를 전한 turn").isTrue();
+    }
+
+
+    /** 그 대화에서 가장 나중에 열린, 처음 루트가 아닌 루트 실행이다. 결과를 전한 자동 turn 이다. */
+    private AgentExecution deliveryTurn() {
+        return executions.findAll().stream()
+            .filter(execution -> conversation.id().equals(execution.conversationId()))
+            .filter(execution -> execution.rootExecutionId() == null && !execution.id().equals(root.id()))
+            .reduce((first, second) -> second)
+            .orElseThrow();
+    }
+
+
+    @Test
     @DisplayName("연결용 에이전트의 결과는 외부 데이터 표시로 감싸 전한다")
     void wrapsConnectorAgentResultAsExternalData() {
         AgentExecution done = delegated(root, connectorAgent(), ExecutionStatus.SUCCEEDED, "받은 편지의 글", null);

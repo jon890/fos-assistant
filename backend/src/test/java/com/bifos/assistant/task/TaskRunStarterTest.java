@@ -37,6 +37,7 @@ import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.proactive.check.domain.ProactiveCheck;
@@ -65,6 +66,8 @@ import com.bifos.assistant.testsupport.LongProactiveCheckTimeouts;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.execution.application.TurnSlot;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
+import com.bifos.assistant.usage.execution.domain.AgentExecution;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -175,6 +178,9 @@ class TaskRunStarterTest {
     @Autowired
     AgentExecutionRepository executions;
 
+    @Autowired
+    SessionOwnerResolver owners;
+
     private final List<Long> createdUsers = new ArrayList<>();
     private final List<Long> createdChecks = new ArrayList<>();
     private final List<TurnSlot> heldSlots = new ArrayList<>();
@@ -242,6 +248,31 @@ class TaskRunStarterTest {
             assertThat(notification.targetType()).isEqualTo(NotificationTargetType.CONVERSATION);
             assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
         });
+    }
+
+
+    @Test
+    @DisplayName("예약 작업 turn 은 도는 동안 이미 사람이 없는 실행으로 적혀 있어 도구 판정이 그 트리를 사람이 없는 실행으로 본다")
+    void scheduledTurnIsUnattendedWhileRunning() {
+        Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.NEVER);
+        TaskRun run = queued(fixture, SCHEDULED, NOW);
+        List<Boolean> seen = new ArrayList<>();
+        stub().willAnswer(command -> {
+            // 도구 호출은 Hermes 가 도는 동안 온다. task_run 의 실행 번호는 아직 비어 있다.
+            AgentExecution running = executions.findAll().stream()
+                .filter(execution -> execution.userId().equals(fixture.owner().id()))
+                .filter(execution -> execution.status() == ExecutionStatus.RUNNING)
+                .findFirst()
+                .orElseThrow();
+            seen.add(owners.unattendedTree(running));
+            seen.add(runs.findById(run.id()).orElseThrow().executionId() == null);
+            return HermesRunResult.of("run-task", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty());
+        });
+
+        starter.startQueued(NOW);
+
+        assertThat(awaitFinished(run).status()).isEqualTo(TaskRunStatus.SUCCEEDED);
+        assertThat(seen).as("도는 중의 판정과 task_run 실행 번호가 비었는지").containsExactly(true, true);
     }
 
 

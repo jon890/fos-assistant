@@ -290,6 +290,13 @@ public class ExecutionRecorder {
     }
 
 
+    /** 사람이 없는 실행으로 적는다. Hermes 에 보내기 전에 저장해 도구 판정이 도는 중에 읽게 한다. */
+    public void markUnattended(AgentExecution execution) {
+        execution.markUnattended();
+        executions.save(execution);
+    }
+
+
     /** 제출 직후 run 번호를 붙인다. */
     public void attachRunId(AgentExecution execution, String hermesRunId) {
         execution.attachRunId(hermesRunId);

@@ -66,7 +66,8 @@ final class ConnectorCatalogTools {
                 argLabels(policy),
                 text(policy, "summary"),
                 outbound(policy),
-                conversationGrant(policy)));
+                conversationGrant(policy),
+                attendedOnly(policy)));
         }
         return List.copyOf(tools);
     }
@@ -113,6 +114,21 @@ final class ConnectorCatalogTools {
             return null;
         }
         return value.isBoolean() && value.asBoolean();
+    }
+
+
+    /**
+     * 사람이 연 대화에서만 부를 수 있다는 선언이다. 칸이 없으면 거짓이다.
+     *
+     * <p>boolean 이 아닌 값은 거절하지 않고 참으로 읽는다. 읽을 수 없는 선언이 사람이 없는 실행에 도구를 여는 쪽으로 읽히지 않게
+     * 한다.
+     */
+    private static boolean attendedOnly(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("attended_only");
+        if (value == null) {
+            return false;
+        }
+        return !value.isBoolean() || value.asBoolean();
     }
 
 

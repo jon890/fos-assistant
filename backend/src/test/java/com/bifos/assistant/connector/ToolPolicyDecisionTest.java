@@ -323,4 +323,55 @@ class ToolPolicyDecisionTest {
             .isEqualTo(new ToolPolicyDecision(
                 ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
+
+
+    @Test
+    @DisplayName("사람이 없는 실행이 attended_only 도구를 부르면 읽기 도구여도 ATTENDED_ONLY 로 거절하고 위험도를 남긴다")
+    void unattendedRunDeniesAttendedOnlyToolOfAnyRisk() {
+        for (ToolPolicy policy : new ToolPolicy[] {
+            new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false, Set.of(), false, true),
+            new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true, Set.of(), false, true)}) {
+            for (ToolPolicyDecision.CheckBoundary boundary : ToolPolicyDecision.CheckBoundary.values()) {
+                assertThat(ToolPolicyDecision.decide(
+                    ConnectionStatus.READY, true, 2, Optional.of(policy), true, true, false, 2, boundary, true))
+                    .as("위험도 %s, 경계 %s", policy.risk(), boundary)
+                    .isEqualTo(new ToolPolicyDecision(
+                        ActionDecision.DENIED, ActionDenyReason.ATTENDED_ONLY, policy.risk(), policy.approval()));
+            }
+        }
+    }
+
+
+    @Test
+    @DisplayName("사람이 연 대화의 호출과 선언하지 않은 도구는 attended_only 판정에 걸리지 않는다")
+    void attendedRunAndUndeclaredToolAreNotDeniedAsAttendedOnly() {
+        Optional<ToolPolicy> attended = Optional.of(new ToolPolicy(ToolRisk.READ, ToolApproval.NONE, null, false, Set.of(), false, true));
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, attended, false, false, false, 2, NOT_CHECK, false))
+            .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE));
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, READ, false, false, false, 2, NOT_CHECK, true))
+            .isEqualTo(new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE));
+    }
+
+
+    @Test
+    @DisplayName("attended_only 거절은 NOT_READY, UNDECLARED, RISK_NOT_OPEN 뒤이고 READ_ONLY_RUN 과 인자 상한 앞이다")
+    void attendedOnlyDenialKeepsOrderAroundOtherDenials() {
+        Optional<ToolPolicy> attendedWrite = Optional.of(
+            new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true, Set.of(), false, true));
+        Optional<ToolPolicy> attendedFinancial = Optional.of(
+            new ToolPolicy(ToolRisk.FINANCIAL, ToolApproval.ALWAYS, null, false, Set.of(), false, true));
+        int tooLarge = ToolPolicyDecision.MAX_ARGS_BYTES + 1;
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.PENDING, true, 2, attendedWrite, false, false, false, 2, NOT_CHECK, true)
+            .denyReason()).isEqualTo(ActionDenyReason.NOT_READY);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, false, 2, attendedWrite, false, false, false, 2, NOT_CHECK, true)
+            .denyReason()).isEqualTo(ActionDenyReason.UNDECLARED);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, attendedFinancial, false, false, false, 2, NOT_CHECK, true)
+            .denyReason()).isEqualTo(ActionDenyReason.RISK_NOT_OPEN);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, attendedWrite, false, false, false, 2, READ_ONLY, true)
+            .denyReason()).isEqualTo(ActionDenyReason.ATTENDED_ONLY);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, attendedWrite, false, false, false, tooLarge, NOT_CHECK, true)
+            .denyReason()).isEqualTo(ActionDenyReason.ATTENDED_ONLY);
+    }
 }

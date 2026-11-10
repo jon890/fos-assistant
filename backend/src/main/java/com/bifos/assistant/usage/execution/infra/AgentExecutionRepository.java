@@ -152,6 +152,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      *
      * <p>트랜잭션은 {@code ExecutionDeliveryWriter} 가 연다.
      */
+    /** 그 번호들 가운데 사람이 없는 실행으로 적힌 줄이 있는가. 결과를 전하는 turn 이 그 결과를 낸 트리의 루트를 볼 때 쓴다. */
+    boolean existsByIdInAndUnattendedTrue(Collection<Long> ids);
+
+
     @Modifying
     @Query("update AgentExecution e set e.resultDeliveredAt = :at where e.id = :id and e.resultDeliveredAt is null")
     int markResultDelivered(@Param("id") Long id, @Param("at") Instant at);

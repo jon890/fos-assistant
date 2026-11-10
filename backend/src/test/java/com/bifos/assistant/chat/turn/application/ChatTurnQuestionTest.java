@@ -20,4 +20,18 @@ class ChatTurnQuestionTest {
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.DelegationResults(new DeliveryAttemptRef(1L, 1), false, List.of()), "결과 전달")).isNull();
         assertThat(ChatTurnRunner.questionOf(new TurnIntent.ProactiveCheck(null), "살펴보기")).isNull();
     }
+
+
+    @Test
+    @DisplayName("예약 작업, 먼저 살펴보기, 사람이 없는 트리의 결과를 전하는 turn 만 사람이 없는 실행이다")
+    void marksOnlyUnattendedIntents() {
+        DeliveryAttemptRef attempt = new DeliveryAttemptRef(1L, 1);
+
+        assertThat(TurnIntent.unattended(new TurnIntent.Scheduled("예약 작업"))).isTrue();
+        assertThat(TurnIntent.unattended(new TurnIntent.ProactiveCheck(null))).isTrue();
+        assertThat(TurnIntent.unattended(new TurnIntent.DelegationResults(attempt, false, List.of(), true))).isTrue();
+        assertThat(TurnIntent.unattended(new TurnIntent.DelegationResults(attempt, false, List.of()))).isFalse();
+        assertThat(TurnIntent.unattended(new TurnIntent.Fresh())).isFalse();
+        assertThat(TurnIntent.unattended(new TurnIntent.Regenerate(null, null))).isFalse();
+    }
 }

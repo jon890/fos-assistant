@@ -109,6 +109,10 @@ class ChatTurnLifecycle {
         if (intent instanceof TurnIntent.DelegationResults results) {
             attachDeliveryExecution(results.attempt(), execution.id());
         }
+        // 사람이 없는 실행은 Hermes 에 보내기 전에 적는다. 도구 판정이 도는 중에 이 값을 읽는다.
+        if (TurnIntent.unattended(intent)) {
+            executions.markUnattended(execution);
+        }
         return new PendingTurn(
             user,
             conversation,

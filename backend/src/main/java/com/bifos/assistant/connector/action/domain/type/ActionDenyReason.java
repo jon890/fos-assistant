@@ -14,6 +14,8 @@ public enum ActionDenyReason {
     UNDECLARED,
     /** 위험도가 {@code DESTRUCTIVE} 나 {@code FINANCIAL} 이다. 이 위험도는 아직 열지 않았다 */
     RISK_NOT_OPEN,
+    /** 사람이 연 대화에서만 부르라고 선언한 도구를 사람이 없는 실행(먼저 살펴보기, 예약 작업)이 불렀다 */
+    ATTENDED_ONLY,
     /** 인자 글이 승인 줄에 원문으로 둘 수 있는 상한({@code ToolPolicyDecision.MAX_ARGS_BYTES})을 넘는다 */
     ARGS_TOO_LARGE,
     /** 먼저 살펴보기 트리 안의 호출인데 위험도가 {@code READ} 이고 승인 방식이 {@code none} 인 도구가 아니다(ADR-080) */

@@ -13,6 +13,8 @@ import java.util.Set;
  * @param identifiers 승인 카드가 길이로 가리지 않을 식별자 인자의 이름(ADR-089). 승인을 받는 도구만 가질 수 있다
  * @param conversationGrantable 그 도구를 한 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 선언이 연
  * 도구만 참이다
+ * @param attendedOnly 사람이 연 대화에서만 부를 수 있는가. 먼저 살펴보기와 예약 작업처럼 사람이 없는 실행의 호출은 판정이
+ * 거절한다
  */
 public record ToolPolicy(
     ToolRisk risk,
@@ -20,10 +22,18 @@ public record ToolPolicy(
     String title,
     boolean grantable,
     Set<String> identifiers,
-    boolean conversationGrantable) {
+    boolean conversationGrantable,
+    boolean attendedOnly) {
 
     public ToolPolicy {
         identifiers = identifiers == null ? Set.of() : Set.copyOf(identifiers);
+    }
+
+
+    /** 사람이 없는 실행을 막는 선언이 없는 도구다. */
+    public ToolPolicy(
+        ToolRisk risk, ToolApproval approval, String title, boolean grantable, Set<String> identifiers, boolean conversationGrantable) {
+        this(risk, approval, title, grantable, identifiers, conversationGrantable, false);
     }
 
 

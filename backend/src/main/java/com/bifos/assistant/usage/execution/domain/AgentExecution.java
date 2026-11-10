@@ -123,6 +123,13 @@ public class AgentExecution {
     @Column(name = "error_code", length = 64)
     private String errorCode;
 
+    /**
+     * 사람이 없는 실행인가. 예약 작업과 먼저 살펴보기 turn, 그 트리의 결과를 전하는 turn 이 참이다. turn 을 열 때 정하고 바꾸지
+     * 않는다. 도구 판정은 트리 루트 줄의 이 값을 본다.
+     */
+    @Column(name = "unattended", nullable = false)
+    private boolean unattended;
+
     @Column(name = "input_tokens")
     private Long inputTokens;
 
@@ -260,6 +267,12 @@ public class AgentExecution {
      * <p>루트 자신은 {@code rootExecutionId} 가 비어 있으므로 자기 번호를 쓴다. 자식을 열 때와 위임 실행을 물을 때
      * 같은 규칙으로 트리를 정한다.
      */
+    /** 사람이 없는 실행으로 적는다. turn 을 연 쪽이 Hermes 에 보내기 전에 한 번 부른다. */
+    public void markUnattended() {
+        unattended = true;
+    }
+
+
     public Long treeRootId() {
         return rootExecutionId == null ? id : rootExecutionId;
     }
