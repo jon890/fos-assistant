@@ -10,6 +10,8 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
@@ -47,6 +49,9 @@ class SessionOwnerResolverTest {
 
     @Autowired
     AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionDeliveryWriter executionMarks;
 
     @Autowired
     AppUserRepository users;
@@ -329,5 +334,36 @@ class SessionOwnerResolverTest {
 
     private static String newChild() {
         return "하위-" + UUID.randomUUID();
+    }
+
+
+    @Test
+    @DisplayName("사람이 없는 실행은 트리 루트의 표식으로 정하고, 위임 자식은 루트를 따르며, 루트 줄이 없으면 사람이 없는 쪽이다")
+    void judgesUnattendedTreeByRootMark() {
+        AgentExecution child = child(dadRun.id());
+        assertThat(owners.unattendedTree(dadRun)).as("사람이 연 루트").isFalse();
+        assertThat(owners.unattendedTree(child)).as("사람이 연 루트의 위임 자식").isFalse();
+
+        executionMarks.markUnattended(dadRun.id());
+        assertThat(owners.unattendedTree(dadRun)).as("살펴보기나 예약 작업의 루트").isTrue();
+        assertThat(owners.unattendedTree(child)).as("그 위임 자식").isTrue();
+
+        AgentExecution orphan = child(Long.MAX_VALUE);
+        assertThat(owners.unattendedTree(orphan)).as("루트 줄이 없는 실행").isTrue();
+    }
+
+
+    private AgentExecution child(Long rootId) {
+        return executions.save(AgentExecution.builder()
+            .userId(dad.id())
+            .conversationId(CONVERSATION_ID)
+            .parentExecutionId(rootId)
+            .rootExecutionId(rootId)
+            .profileName(PROFILE)
+            .hermesSessionId("fos-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now())
+            .build());
     }
 }

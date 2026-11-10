@@ -10,6 +10,7 @@ covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/ja
 - 고른 칸은 그 대화에 남고 그 사용자의 기본 칸도 된다. 다음 새 대화는 그 칸에서 시작한다. 따로 정하는 「내 기본값」 설정은 없다.
 - 고르지 않은 대화는 「모델 선택」 의 순서로 정한다. 에이전트는 모델을 갖지 않고 모든 에이전트가 그룹 설정을 따른다. 그룹의 칸 정의와 모델 숨김은 Control Plane DB 가 갖는다([ADR-20261101 / model-setting](../adr/ADR-20261101-model-setting.md), [ADR-054](../../backend/docs/adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md)).
 - 실행 줄마다 고른 단계, 요청한 effort, 실제로 돈 provider 와 모델, 토큰, 금액, 네 시각을 남긴다. native 하위 에이전트의 사용량도 합계에 더한다.
+- 실행 줄은 사람이 없는 실행(예약 작업, 먼저 살펴보기, 그 트리의 결과를 전하는 turn)인지도 남긴다. 사용량 계산에는 쓰지 않고 플러그인 도구 판정이 읽는다. 뜻은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「agent_execution」 이 갖는다.
 - 관리자는 첫 반응 시간을 제품 지표로 본다.
 
 **금액과 모델과 토큰은 관리자 영역에만 그린다.**

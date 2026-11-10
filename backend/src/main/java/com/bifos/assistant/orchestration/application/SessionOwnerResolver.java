@@ -7,6 +7,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +71,16 @@ public class SessionOwnerResolver {
             return parents.resolve(profileName, rootSessionId);
         }
         throw reject(profileName, "등록이 없는 하위 session 이다 SUBAGENT_SESSION_UNREGISTERED");
+    }
+
+
+    /**
+     * 그 실행의 트리 루트가 사람이 없는 실행(예약 작업, 먼저 살펴보기)인가. 위임 자식은 루트로 판정한다. 루트 줄을 찾지 못하면
+     * 사람이 없는 쪽으로 본다. 도구 판정이 닫히는 쪽으로 읽게 한다.
+     */
+    public boolean unattendedTree(AgentExecution execution) {
+        Long rootId = execution.treeRootId();
+        return executions.countUnattendedIn(List.of(rootId)) > 0 || !executions.existsById(rootId);
     }
 
 

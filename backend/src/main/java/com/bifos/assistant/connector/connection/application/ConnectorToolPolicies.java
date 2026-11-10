@@ -177,6 +177,7 @@ public final class ConnectorToolPolicies {
             tool.title(),
             grantable,
             required ? Set.copyOf(tool.identifiers()) : Set.of(),
-            conversationGrantable);
+            conversationGrantable,
+            tool.attendedOnly());
     }
 }

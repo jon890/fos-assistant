@@ -21,16 +21,25 @@ import java.util.Map;
  * 이다. boolean 이 아닌 값은 참으로 읽는다
  * @param conversationGrant 그 도구를 한 대화에서 계속 허용할 수 있다고 선언했는가(ADR-20261012 / conversation-grant). 옛 대시보드
  * plugin 은 이 칸을 내지 않고, 응답에 없으면 null 이다. boolean 이 아닌 값은 거짓으로 읽는다
+ * @param attendedOnly 사람이 연 대화에서만 부를 수 있는 도구라고 선언했는가. 대시보드 plugin 은 참일 때만 내고, 응답에 없으면
+ * 거짓이다. boolean 이 아닌 값은 참으로 읽는다
  */
 public record ConnectorTool(
     String name, String risk, String approval, String title, Boolean grant, List<String> identifiers, String description,
-    Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant) {
+    Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant, boolean attendedOnly) {
 
     public ConnectorTool {
         description = ConnectorToolDescription.read(description);
         summary = ConnectorToolDescription.read(summary);
         identifiers = identifiers == null ? List.of() : List.copyOf(identifiers);
         argLabels = ConnectorArgumentLabels.read(argLabels);
+    }
+
+
+    /** 사람이 없는 실행을 막는 선언이 없는 도구다. */
+    public ConnectorTool(String name, String risk, String approval, String title, Boolean grant, List<String> identifiers,
+        String description, Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant) {
+        this(name, risk, approval, title, grant, identifiers, description, argLabels, summary, outbound, conversationGrant, false);
     }
 
 

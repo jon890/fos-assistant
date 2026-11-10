@@ -46,6 +46,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -125,6 +126,9 @@ class DelegationWakeServiceTest {
 
     @Autowired
     AgentExecutionRepository executions;
+
+    @Autowired
+    ExecutionDeliveryWriter executionMarks;
 
     @Autowired
     ExecutionEventRepository executionEvents;
@@ -241,6 +245,35 @@ class DelegationWakeServiceTest {
                 + "결과마다 [출처: …] 줄이 있다. 출처가 다른 내용이 서로 어긋나면 하나를 고르지 말고 두 출처와 시각을 함께 말한다. "
                 + "사용자가 받아들인 기억과 외부 결과가 어긋나면 기억을 고치지 말고, 바꿀 것이 있으면 사용자에게 묻는다. "
                 + "신선도가 오래됨인 결과는 지금 상태와 다를 수 있다고 알린다.");
+    }
+
+
+    @Test
+    @DisplayName("결과를 전하는 turn 은 결과를 낸 트리의 루트가 사람이 없는 실행일 때만 사람이 없는 실행이 된다")
+    void deliveryTurnInheritsUnattendedFromResultTreeRoot() {
+        finished(delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null));
+        awaitIdle(conversation.id());
+        assertThat(unattended(deliveryTurn())).as("사람이 연 트리의 결과를 전한 turn").isFalse();
+
+        executionMarks.markUnattended(root.id());
+        finished(delegated(root, ExecutionStatus.SUCCEEDED, "예약 작업이 맡긴 결과", null));
+        awaitIdle(conversation.id());
+        assertThat(unattended(deliveryTurn())).as("예약 작업 트리의 결과를 전한 turn").isTrue();
+    }
+
+
+    private boolean unattended(AgentExecution execution) {
+        return executions.countUnattendedIn(List.of(execution.id())) > 0;
+    }
+
+
+    /** 그 대화에서 가장 나중에 열린, 처음 루트가 아닌 루트 실행이다. 결과를 전한 자동 turn 이다. */
+    private AgentExecution deliveryTurn() {
+        return executions.findAll().stream()
+            .filter(execution -> conversation.id().equals(execution.conversationId()))
+            .filter(execution -> execution.rootExecutionId() == null && !execution.id().equals(root.id()))
+            .reduce((first, second) -> second)
+            .orElseThrow();
     }
 
 
