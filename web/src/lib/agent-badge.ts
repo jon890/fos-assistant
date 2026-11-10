@@ -92,7 +92,8 @@ export function badgeColorClass(color: unknown, code: string | null): string {
 
 /** 아이콘이 없을 때 그릴 이름 첫 글자다. 이름이 없으면 「?」 다. */
 export function initialOf(name: string | null): string {
-  const first = name?.trim()[0];
+  // 이모지처럼 두 코드 단위로 된 글자를 반으로 자르지 않게 코드 포인트로 꺼낸다.
+  const first = name ? Array.from(name.trim())[0] : undefined;
   return first ?? "?";
 }
 

@@ -15,6 +15,7 @@ import {
   asAgentColor,
   badgeColorClass,
   capabilitiesLine,
+  initialOf,
   type AgentColor,
 } from "@/lib/agent-badge";
 import type { AgentCapabilities } from "@/lib/agent";
@@ -163,7 +164,7 @@ export function AgentIntroductionSection({
           </label>
           <IntroductionPickers
             code={code}
-            initialLetter={preview.name.trim()[0] ?? "?"}
+            initialLetter={initialOf(preview.name)}
             icon={icon}
             color={color}
             onIcon={(value) => {

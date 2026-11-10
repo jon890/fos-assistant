@@ -48,6 +48,7 @@ test("고른 색이 있으면 그 색을, 모르는 값이면 자동 색을 쓴�
 test("머리글자와 할 수 있는 일 줄", () => {
   assert.equal(initialOf(" 비서"), "비");
   assert.equal(initialOf(null), "?");
+  assert.equal(initialOf("🍳 요리"), "🍳");
   assert.equal(capabilitiesLine({ connectors: ["네이버 쇼핑"], skills: ["장보기"] }), "네이버 쇼핑 · 장보기");
   assert.equal(capabilitiesLine(undefined), "");
 });
