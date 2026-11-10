@@ -1,13 +1,33 @@
 {
   "name": "plan112-data-encryption-columns",
   "description": "메시지 밖의 사용자 본문 칸(위임 답, 대화 제목, 예약 작업)을 같은 데이터 key 로 암호화하고, 이미 있는 평문 줄을 배치로 옮긴다",
-  "status": "pending",
+  "pr_scope": "위임 답 본문(agent_execution.output_text)을 메시지와 같은 데이터 key 로 암호화한다(phase 01 한 PR).",
+  "deferred": [
+    {
+      "what": "대화 제목과 예약 작업의 제목·지시문 암호화(phase 02)",
+      "why": "위임 답 PR 과 관심사가 달라 PR 하나에 담지 않는다. 마이그레이션과 엔티티가 따로다",
+      "after": "phase 01 PR 머지"
+    },
+    {
+      "what": "이미 있는 평문 줄 옮기기와 운영 원격 검증(phase 03)",
+      "why": "새 줄 암호화가 배포된 뒤에야 옛 줄을 옮길 수 있다",
+      "after": "phase 02 PR 머지와 배포"
+    }
+  ],
+  "status": "in_progress",
   "created_at": "2026-10-08",
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
-    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
-    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
-    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" }
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard"
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "deep"
+    }
   ]
 }

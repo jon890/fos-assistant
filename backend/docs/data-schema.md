@@ -81,7 +81,7 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
 | `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `conversation` | `title`, `pending_messages` | 아직 |
-| `agent_execution` | `output_text` | 아직 |
+| `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다 |
 | `execution_event` | `detail` | 아직 |
 | `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
 | `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
@@ -564,6 +564,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 - `retry_of_execution_id` 는 지금 채우는 경로가 없어 늘 비어 있다
 - `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고, 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
 - `delegation_key` 는 `agent_delegate` 로 만든 실행만 채우고 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `output_text` 도 이 실행만 채우고, 대화 답은 `chat_message` 가 갖는다
+- `output_key_id` 가 비어 있으면 `output_text` 는 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `agent_execution:<id>:output:user:<user_id>` 다. 외래 키를 두지 않는다. 읽는 곳은 엔티티의 `outputText()` 가 아니라 `ExecutionOutputs.open` 을 쓰고, 풀지 못하면 null 이 아니라 읽을 수 없다는 글을 받는다. 대화 purge 는 두 칸을 함께 NULL 로 비운다
 - `provider` 와 `model` 은 Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다
 - `reasoning_effort` 가 비면 기본값으로 보낸 것이다. `reasoning_defaults_checked_at` 은 그때 profile 기본값을 정상 응답으로 읽은 시각이고, 조회가 실패하면 비워 다시 시도한다. `reasoning_effort_source` 는 이 칸이 생기기 전의 실행에서 비어 있고 추정해 채우지 않는다
 - `instructions_hash` 는 공통 답변 지침과 Memory 문맥의 지문이다. 본문은 개인 Memory 를 담을 수 있어 저장하지 않는다. `runtime_fingerprint` 는 그 값을 주는 Hermes 경로가 아직 없어 늘 비어 있다

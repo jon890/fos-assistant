@@ -383,6 +383,7 @@ class PurgeCoverageMysqlTest {
                     }
                     case "agent_execution" -> {
                         assertCleared("agent_execution", "output_text");
+                        assertCleared("agent_execution", "output_key_id");
                         assertCleared("agent_execution", "question_message_id");
                     }
                     case "execution_event" -> assertCleared("execution_event", "detail");

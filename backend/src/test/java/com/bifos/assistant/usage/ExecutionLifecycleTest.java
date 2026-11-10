@@ -17,6 +17,7 @@ import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.usage.execution.application.ExecutionOutputs;
 import com.bifos.assistant.usage.execution.application.dto.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -48,6 +49,9 @@ class ExecutionLifecycleTest {
 
     /** 실행 줄 어디에도 남으면 안 되는 개인 기록을 흉내낸 문자열이다. */
     private static final String SECRET_MEMORY = "아빠는 매주 목요일에 병원에 간다";
+
+    @Autowired
+    ExecutionOutputs outputs;
 
     @Autowired
     ExecutionRecorder recorder;
@@ -167,7 +171,7 @@ class ExecutionLifecycleTest {
         assertThat(executions.count()).isOne();
         assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
             assertThat(saved.status()).isEqualTo(status);
-            assertThat(saved.outputText()).isEqualTo("저장할 답");
+            assertThat(outputs.open(saved)).isEqualTo("저장할 답");
             assertThat(saved.hermesRunId()).isEqualTo("run-1");
             assertThat(saved.totalTokens()).isEqualTo(160L);
             assertThat(saved.finishedAt()).isNotNull();
@@ -189,7 +193,7 @@ class ExecutionLifecycleTest {
             assertThat(saved.finishedAt()).isEqualTo(cancelledAt);
             assertThat(saved.status()).isEqualTo(ExecutionStatus.CANCELLED);
             assertThat(saved.totalTokens()).isEqualTo(160L);
-            assertThat(saved.outputText()).isEqualTo("멈춘 답");
+            assertThat(outputs.open(saved)).isEqualTo("멈춘 답");
         });
     }
 
@@ -209,7 +213,7 @@ class ExecutionLifecycleTest {
         assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
             assertThat(saved.status()).isEqualTo(status);
             assertThat(saved.totalTokens()).isEqualTo(160L);
-            assertThat(saved.outputText()).isEqualTo("기존 답");
+            assertThat(outputs.open(saved)).isEqualTo("기존 답");
         });
     }
 
