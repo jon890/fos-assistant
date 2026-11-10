@@ -121,7 +121,7 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 `AgentCapabilitiesReader.read(List<Agent>)` 가 목록 하나에 한 번 돈다.
 
 1. 플러그인: `readyConnectorNames(agentIds)` 가 바인딩과 연결을 한 번 읽고, 플러그인마다 카탈로그 이름을 찾는다. 카탈로그를 읽지 못하면(캐시가 실패를 기억하는 동안 던지는 예외 포함) 그 목록의 플러그인을 모두 빼고 경고 로그를 남긴다. manifest 가 없는 플러그인만 뺀다. 목록 화면과 `agent_list` 가 카탈로그 장애로 실패하지 않게 하려는 것이다
-2. 스킬: 에이전트마다 `uploadedSkillNames(profile)`. 파일을 읽지 못하면 그 에이전트의 스킬을 비우고 경고 로그를 남긴다
+2. 스킬: 에이전트마다 `uploadedNames(profile)`. 파일을 읽지 못하면 그 에이전트의 스킬을 비우고 경고 로그를 남긴다
 
 카탈로그 캐시는 지금 판정 경로가 쓰는 `ConnectorCatalogCache` 를 그대로 쓴다. 보관 시간이 지난 첫 읽기는 대시보드 응답을 기다리고, 대시보드가 답하지 않으면 캐시의 실패 기억 덕에 그 뒤 읽기는 곧바로 빈 이름으로 답한다. 「화면 경로는 쓰지 않는다」 는 그 클래스 주석과 [`code-architecture.md`](../../../backend/docs/code-architecture.md) 의 표 줄을 「연결 화면은 쓰지 않는다. 에이전트 목록의 플러그인 이름만 쓴다」 로 고친다. 연결 화면이 운영자의 목록 변경을 바로 보여야 한다는 까닭은 그대로이고, 이름은 60초 늦어도 위험이 없다.
 
@@ -129,7 +129,7 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 
 | 자리 | 바뀌는 것 |
 | --- | --- |
-| 답 말풍선 `AssistantRow` | 그 대화의 에이전트 `AgentBadge` 와 이름. `MessageBubble` 과 `message-list.tsx` 의 기다림 줄, 모든 호출처에 넘긴다. 값은 `ConversationView` 에 더하는 `agentIcon`, `agentColor` 와 기존 `agentCode`, `agentName` 이다. 지웠지만 정리 전인 에이전트(`deleted_at` 이 있다)도 `agentCode`, `agentName` 을 null 로 내 「지운 에이전트」 로 그린다. 꺼진 에이전트도 대화 줄의 값으로 아이콘과 색을 그린다 |
+| 답 말풍선 `AssistantRow` | 그 대화의 에이전트 `AgentBadge` 와 이름. `MessageBubble` 과 `message-list.tsx` 의 기다림 줄이 context(`AnswerAgentProvider`)로 같은 값을 읽는다. 값은 `ConversationView` 에 더하는 `agentIcon`, `agentColor` 와 기존 `agentCode`, `agentName` 이다. 지웠지만 정리 전인 에이전트(`deleted_at` 이 있다)도 `agentCode`, `agentName` 을 null 로 내 「지운 에이전트」 로 그린다. 꺼진 에이전트도 대화 줄의 값으로 아이콘과 색을 그린다 |
 | 대화 머리 | 이름 앞에 `AgentBadge`. 좁은 화면의 잠긴 대화는 이름을 숨기던 자리에 `AgentBadge` 만 보인다(DECISION15) |
 | 새 대화 화면 카드, 에이전트 목록 `/agents` | `AgentBadge`, 이름, 소개 한 줄과 그 아래 할 수 있는 일 「네이버 쇼핑 · 장보기」. 소개가 없으면 소개 자리를 비우고 할 수 있는 일만 보인다. 카드와 `@` 줄의 접근성 이름은 에이전트 이름만 둔다 |
 | `@` 목록 | `AgentBadge` 와 이름, 소개 한 줄. 좁은 목록이라 할 수 있는 일은 싣지 않는다 |
@@ -164,8 +164,8 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 | DECISION4 | 아이콘 고르기 | 고정 이모지 목록 | 작성자 | 스펙 REQ1 이 「목록 밖 아이콘은 거절」 을 요구한다. 아무 글자를 받으면 서버가 이모지 하나인지 판정하기 어렵다 |
 | DECISION5 | 답마다 에이전트 싣기 | PR1 에서는 싣지 않고 대화의 에이전트로 그린다. PR4 에서 싣는다 | 작성자 | 지금은 답을 쓰는 에이전트가 대화마다 하나다 |
 | DECISION6 | 할 수 있는 일의 모음 자리 | 새 port `AgentConnectorNames`, 기존 port `ProfileSkillFiles` 의 새 메서드, `AgentCapabilitiesReader` | 작성자 | `agent` 가 `skill`, `connector` 보다 아래다. 대시보드를 부를 수 있는 조회는 「부르지 않는다」 가 약속인 `AgentConnectorBindings` 와 섞지 않는다 |
-| DECISION8 | 플러그인 이름의 원본 | 카탈로그 캐시. 바인딩 행에 이름을 적어 두지 않는다 | 작성자 | 이름을 적으면 칸과 이관이 늘고 운영자가 이름을 바꿔도 남는다. 캐시의 실패 기억이 대기 시간을 묶는다 |
 | DECISION7 | 기본 비서를 가리는 법 | 칸을 두지 않고 「주인의 기본 profile 을 가리키는 에이전트」 로 정한다. PR1 은 마이그레이션 조건에만 쓴다 | 작성자 | 첫 에이전트의 profile 이 기본 profile 이다(`FirstAgentCreator`). `agent.hermes_profile` 과 `allowed_person.hermes_profile` 이 둘 다 유일하다 |
+| DECISION8 | 플러그인 이름의 원본 | 카탈로그 캐시. 바인딩 행에 이름을 적어 두지 않는다 | 작성자 | 이름을 적으면 칸과 이관이 늘고 운영자가 이름을 바꿔도 남는다. 캐시의 실패 기억이 대기 시간을 묶는다 |
 
 ## 결정 기록 연결
 
