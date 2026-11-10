@@ -4,7 +4,7 @@ import com.bifos.assistant.crypto.application.dto.BackfillDirection;
 import com.bifos.assistant.crypto.config.DataEncryptionProperties;
 import com.bifos.assistant.crypto.domain.BackfillColumn;
 import com.bifos.assistant.crypto.domain.TextCipher;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ExecutionOutputBackfillRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ExecutionOutputBackfill {
 
-    private final AgentExecutionRepository executions;
+    private final ExecutionOutputBackfillRepository executions;
     private final ExecutionOutputSealer sealer;
     private final TextCipher cipher;
     private final DataEncryptionProperties properties;
