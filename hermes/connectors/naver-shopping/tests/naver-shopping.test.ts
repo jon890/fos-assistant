@@ -4,6 +4,7 @@ import { afterEach, expect, test } from "bun:test";
 import manifest from "../assistant.json";
 import { createServer } from "../src/server.ts";
 import { BROWSER_URL_ENV, checkLogin } from "../src/session.ts";
+import { forgetLeftTabs } from "../src/tab.ts";
 import { startFakeBrowser, type FakeBrowser } from "./fake-browser.ts";
 
 let browser: FakeBrowser | null = null;
@@ -76,6 +77,28 @@ test("도구 오류는 코드만 싣고 중계 주소를 싣지 않는다", asyn
     error: { code: "NAVER_SHOPPING_BROWSER_UNREACHABLE" },
   });
   expect(text).not.toContain("gateway-token");
+});
+
+test("사람이 해야 하는 화면이면 오류에 넘기기 칸(need, 남긴 탭)을 싣는다", async () => {
+  browser = startFakeBrowser({
+    href: "https://nid.naver.com/nidlogin.login",
+    state: "[]",
+  });
+  const client = await connect({ [BROWSER_URL_ENV]: browser.url });
+  const result = await client.callTool({
+    name: "search_products",
+    arguments: { query: "물티슈" },
+  });
+  expect(result.isError).toBe(true);
+  expect(
+    JSON.parse((result.content as { text: string }[])[0]!.text),
+  ).toEqual({
+    error: {
+      code: "NAVER_SHOPPING_LOGIN_REQUIRED",
+      handoff: { need: "login", tab: "tab-1" },
+    },
+  });
+  forgetLeftTabs();
 });
 
 test("선언은 입력 칸이 없고 모든 도구가 사람이 연 대화에서만 돌며 로그인 화면 주소가 네이버다", () => {

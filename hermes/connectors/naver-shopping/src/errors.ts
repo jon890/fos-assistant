@@ -9,9 +9,18 @@ export type ErrorCode =
   | "NAVER_SHOPPING_PAGE_CHANGED"
   | "NAVER_SHOPPING_UNAVAILABLE";
 
-/** 코드만 싣는 오류. 중계 주소, 검색어, 화면의 글, 브라우저가 준 원문을 담지 않는다. */
+/**
+ * 사람에게 넘기는 단계와 남긴 탭이다. fos-ctx hook 이 이 칸을 보고 Control Plane 에 화면 넘기기를 알린다.
+ * 모양은 docs/features/naver-shopping/design.md 의 「플러그인 결과(공통 계약)」 가 갖는다.
+ */
+export type Handoff = { need: "login" | "captcha" | "device_check"; tab: string };
+
+/** 코드만 싣는 오류. 중계 주소, 검색어, 화면의 글, 브라우저가 준 원문을 담지 않는다. 넘기기 칸은 어휘와 탭 id 뿐이다. */
 export class ToolError extends Error {
-  constructor(readonly code: ErrorCode) {
+  constructor(
+    readonly code: ErrorCode,
+    readonly handoff: Handoff | null = null,
+  ) {
     super(code);
   }
 }
@@ -20,9 +29,13 @@ export class ToolError extends Error {
 export function toolFailure(error: unknown) {
   const code =
     error instanceof ToolError ? error.code : "NAVER_SHOPPING_UNAVAILABLE";
+  const handoff = error instanceof ToolError ? error.handoff : null;
   return {
     content: [
-      { type: "text" as const, text: JSON.stringify({ error: { code } }) },
+      {
+        type: "text" as const,
+        text: JSON.stringify({ error: handoff ? { code, handoff } : { code } }),
+      },
     ],
     isError: true,
   };

@@ -30,6 +30,17 @@ export function classifyPage(probe: {
   return "ok";
 }
 
+/** 네이버 화면인가. 이동 뒤 최종 주소가 다른 사이트면 읽지 않는다. */
+export function naverHost(href: unknown) {
+  try {
+    const host =
+      typeof href === "string" ? new URL(href).hostname.toLowerCase() : "";
+    return host === "naver.com" || host.endsWith(".naver.com");
+  } catch {
+    return false;
+  }
+}
+
 /** 사람이 해야 하는 분류의 오류 코드. 정상이면 `null` 이다. */
 export function humanStepError(kind: PageKind): ErrorCode | null {
   if (kind === "login") return "NAVER_SHOPPING_LOGIN_REQUIRED";
