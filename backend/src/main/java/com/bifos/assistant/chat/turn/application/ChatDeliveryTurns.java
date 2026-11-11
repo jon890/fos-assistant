@@ -243,8 +243,10 @@ class ChatDeliveryTurns {
                 requireMarked(delivery.source().markDelivered(delivery.keys(), deliveredAt), expected, delivery.source().source());
             }
             conversationWriter.incrementAutoTurns(conversation.id());
+            // 위임 결과가 있으면 첫 알림 줄이 그 알림이다. 결과 도착 줄이 이 번호로 맡은 에이전트를 찾는다.
+            Long delegationNotice = results.isEmpty() ? null : lines.getFirst().id();
             DeliveryAttemptRef attempt = resultDeliveries.open(
-                conversation.id(), items, lines.getLast().id(), deliveredAt);
+                conversation.id(), items, lines.getLast().id(), delegationNotice, deliveredAt);
             return new Saved(lines, attempt);
         });
         saved.lines()

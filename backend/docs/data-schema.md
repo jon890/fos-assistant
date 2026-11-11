@@ -550,6 +550,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | `last_attempt_notice_message_id` | 마지막 시도가 저장한 마지막 `SYSTEM` 줄. 화면은 이 줄 아래에 상태와 버튼을 그린다 |
 | `last_attempt_error_code` | `FAILED` 의 원인. 실행 줄 없이 내려갔으면 `INTERRUPTED` 다 |
 | `last_attempt_started_at`, `last_attempt_finished_at` | 마지막 시도의 시작과 끝. 도는 중이면 끝이 비어 있다 |
+| `delegation_notice_message_id` | 첫 시도가 저장한 위임 결과 알림 줄. 결과 도착 줄이 이 칸과 `items_json` 의 위임 항목으로 맡은 에이전트를 찾는다. 다시 전달은 바꾸지 않는다. 위임 결과가 없는 묶음과 `V20261105074409` 전에 만든 묶음은 비어 있다([에이전트 팀](../../docs/features/agent-team.md) 의 「대화 안의 협업」) |
 
 `result_key` 는 위임 결과(`DELEGATION`)면 `agent_execution.id`, 승인한 플러그인 호출의 결과(`CONNECTOR_ACTION`)면 `connector_action.public_id` 다.
 **한 결과는 한 묶음에만 든다.** 묶음을 여는 트랜잭션에서 결과를 낸 쪽의 전달 표시(`result_delivered_at`)가 결과마다 아직 전하지 않은 줄 하나를 바꿔야 한다. 바꾼 줄 수가 다르면 알림 줄과 묶음까지 함께 되돌아간다.
