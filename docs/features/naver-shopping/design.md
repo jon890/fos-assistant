@@ -214,7 +214,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 | REQ5 | 계약 검사 | 일부러 틀린 선언 사본(영어 요지 없음, 이름 한 낱말)이 실패하는지 `ContractCatchesViolationsTest` 에 더한다. 이름 중복은 두 플러그인을 임시 루트에 복사해 한쪽 이름을 다른 쪽과 같게 바꾼 뒤 교차 검사가 잡는지 본다 |
 | REQ6 | 대시보드, Control Plane | `connector_policy.py` 의 칸 검증 테스트. `ToolPolicyDecisionTest` 에 사람이 없는 실행 × `attended_only` × 위험도 표와 순서. 표식은 `ChatTurnLifecycle` 테스트에서 의도마다 적히는지 보고, 예약 작업은 `TaskRunStarter` 로 연 turn 이 도는 동안 도구 판정을 불러 거절되는지 통합 테스트으로 본다(fixture 로 표식을 미리 채우지 않는다). 맡긴 일의 결과 turn 이 사람이 없는 트리의 결과면 거절되고, 보통 대화와 그 위임 자식은 허용되는지 |
 | REQ7 | 플러그인, fos-ctx, Control Plane, 웹 | 플러그인: 가짜 CDP 로 사람이 해야 하는 화면의 오류에 `handoff` 가 실리고 남긴 탭 id 가 맞는지, 최종 호스트가 네이버가 아니면 `PAGE_CHANGED` 로 탭을 닫는지. fos-ctx: `test_fos_ctx.py` 에서 결과 모양(글로 싼 `error` 포함)마다 보내는지와 서명, 실패해도 결과가 그대로인지. Control Plane: 서명·판정 줄 대조·한 번만 적기·알림 한 건, 대화의 목록이 주인에게만 보이는지. 웹: 카드 단추와 `/browser?tab=` 링크, 첫 `tabs` 사건에서 탭 옮기기 |
-| REQ8 | Control Plane, 웹 | 새 turn 시작 사건이 그 대화의 열린 넘기기만 닫고 알림을 읽음으로 바꾸는지(`ConnectorHandoffsTest`). 「다 했어요」 가 정해 둔 글을 보내는지. 플러그인이 다음 호출에서 남긴 탭을 먼저 닫는지 |
+| REQ8 | Control Plane, 웹 | 새 turn 시작 사건이 그 대화의 열린 넘기기만 닫고 알림을 읽음으로 바꾸는지(`ConnectorHandoffEndpointTest`). 「다 했어요」 가 정해 둔 글을 보내는지. 플러그인이 다음 호출에서 남긴 탭을 먼저 닫는지 |
 | #702 | Control Plane, 웹 | 가짜 CDP 연결로 `Page.javascriptDialogOpening` 이 `dialog` 사건이 되고, `dialog` 입력이 `Page.handleJavaScriptDialog` 를 보내는지, 탭을 옮기면 창을 거두는지(`BrowserScreenSessionTest`). 입력 검사 표. 웹 화면의 창 단추 |
 
 실제 네이버 화면과 계정은 이 작업에서 쓰지 못한다. 기능 파일의 「실제 계정으로 확인하기」 를 사용자가 배포 뒤 돈다. 그 전까지 REQ2, REQ3 은 가짜 화면에서만 확인된 것으로 PR 본문에 적는다.
@@ -317,7 +317,7 @@ sequenceDiagram
 | 탭 | 처리 |
 | --- | --- |
 | 플러그인이 읽는 탭 | PR1 과 같다. 처리기가 닫기(`accept: false`)로 넘긴다(DECISION7). 사람이 보지 않는 탭이다 |
-| 사람에게 넘긴 탭과 사람이 쓰는 탭 | 화면 세션이 `Page.javascriptDialogOpening` 을 받아 SSE `dialog` 사건(`{type, message}`)으로 보이고, 사람이 「확인」 이나 「취소」 를 고르면 화면 입력 `dialog`(`action` 이 `accept` 나 `dismiss`)가 `Page.handleJavaScriptDialog` 를 보낸다. `Page.javascriptDialogClosed` 와 탭 옮기기는 `dialog` 사건(`{open: false}`)으로 창을 거둔다 |
+| 사람에게 넘긴 탭과 사람이 쓰는 탭 | 화면 세션이 `Page.javascriptDialogOpening` 을 받아 SSE `dialog` 사건(`{open: true, type, message}`)으로 보이고, 사람이 「확인」 이나 「취소」 를 고르면 화면 입력 `dialog`(`action` 이 `accept` 나 `dismiss`)가 `Page.handleJavaScriptDialog` 를 보낸다. `Page.javascriptDialogClosed` 와 탭 옮기기는 `dialog` 사건(`{open: false}`)으로 창을 거둔다 |
 
 `message` 는 사이트가 띄운 글이라 500자에서 자르고 로그와 오류 응답에 싣지 않는다. `prompt` 창은 글을 넣는 칸 없이 기본값으로 수락하거나 취소한다.
 화면이 붙기 전에 이미 떠 있던 창은 Chrome 이 `Page.enable` 때 사건을 다시 보낸다고 기대한다. 실제 Chrome 으로 확인하지 않았고, 보이지 않으면 지금처럼 「끄기」 뒤 「켜기」 로 풀린다.

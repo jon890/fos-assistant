@@ -47,6 +47,7 @@
 - 감당할 것:
   - hook 은 실패해도 닫히지 않는다. 알리지 못하면 카드가 없고 모델의 글 안내만 남는다
   - 카드를 닫는 기준이 「다음 turn」 이라 사람이 마치지 않고 다른 말을 해도 카드가 닫힌다. 다시 부른 도구가 같은 화면을 만나면 새 카드가 뜬다
+  - 남긴 탭은 「다음 호출은 새 turn 에서 온다」 고 보고 닫는다. 모델이 같은 turn 에서 탭을 여는 도구를 다시 부르거나 같은 사용자의 다른 대화가 같은 MCP 서버를 부르면 사람이 열기 전에 그 탭이 닫히고 카드가 하나 더 생긴다. 앞 카드의 「내 브라우저 열기」 는 지금 탭에 머문다
   - 남긴 탭 목록은 프로세스 메모리라 MCP 서버가 다시 뜨면 그 탭은 사람이 닫을 때까지 남는다
   - 화면이 붙기 전에 떠 있던 확인 창을 Chrome 이 다시 알리는지는 실제 Chrome 으로 확인하지 않았다
 - **확인 방법**: `hermes/connectors/naver-shopping/tests/`, `hermes/tests/test_fos_ctx.py` 의 `HandoffReportTest`, `ConnectorHandoffRequestTest`, `ConnectorHandoffEndpointTest`, `BrowserScreenSessionTest`, `test/browser/handoff-card.spec.ts`, `test/browser/user-browser-screen.spec.ts`
