@@ -15,6 +15,8 @@ import type { VersionSlot } from "@/lib/message-versions";
 import { VersionSwitcher } from "./version-switcher";
 import { parseSkillCommand } from "./skill-command";
 import { Button } from "@/components/ui/button";
+import { DelegationLines, ResultArrivalLines } from "./delegation-lines";
+import type { DelegationLine } from "@/lib/delegation";
 export type {
   MessageArtifact,
   MessageAttachment,
@@ -187,6 +189,7 @@ export function MessageBubble({
   memoryUses,
   onRetryDelivery,
   deliveryRetrying = false,
+  delegations = [],
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -215,6 +218,8 @@ export function MessageBubble({
   onRetryDelivery?(deliveryId: number): void;
   /** 다시 전달을 보내는 중이면 단추를 막는다 */
   deliveryRetrying?: boolean;
+  /** 이 답의 turn 이 바로 맡긴 위임이다. 이력의 줄과 사건으로 받은 줄을 합친 값이다 */
+  delegations?: DelegationLine[];
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -233,9 +238,14 @@ export function MessageBubble({
         data-testid="system-message"
         className="flex min-w-0 flex-col items-center gap-1.5 px-4"
       >
-        <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-center text-xs text-muted-foreground">
-          {turn.content}
-        </p>
+        {turn.deliveredResults && turn.deliveredResults.length > 0 ? (
+          // 맡은 에이전트가 보이도록 저장된 글 대신 결과마다 이름표 줄을 그린다.
+          <ResultArrivalLines lines={turn.deliveredResults} />
+        ) : (
+          <p className="min-w-0 max-w-full whitespace-pre-wrap break-words text-center text-xs text-muted-foreground">
+            {turn.content}
+          </p>
+        )}
         {delivery ? (
           <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
             <span data-testid="delivery-status">
@@ -361,6 +371,7 @@ export function MessageBubble({
           onAnswer={streaming ? undefined : onAnswer}
         />
       </div>
+      <DelegationLines lines={delegations} />
       {turn.status === "CANCELLED" ? (
         <p
           data-testid="stopped-mark"

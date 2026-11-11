@@ -1,3 +1,4 @@
+import type { AgentLabel } from "@/lib/delegation";
 import type { ToolRisk } from "@/lib/connection";
 import type { ContentDraftSummary } from "@/lib/content-draft-snapshot";
 import type {
@@ -61,6 +62,8 @@ export type ConnectorAction = {
   financial: FinancialSummary | null;
   /** 주문 상한 변경 줄의 요약이다. 그 줄이 아니면 null 이다. */
   limitChange: LimitChangeSummary | null;
+  /** 대화의 에이전트와 다른 에이전트가 요청한 줄이면 그 이름표다. 승인과 거절 응답과 옛 서버는 싣지 않는다 */
+  requestedBy?: AgentLabel | null;
 };
 
 /** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */

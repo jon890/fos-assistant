@@ -1,3 +1,5 @@
+import type { DelegationLine } from "@/lib/delegation";
+
 /**
  * Control Plane 이 대화 스트림으로 보내는 사건이다.
  *
@@ -5,6 +7,8 @@
  *
  * <p>`user` 는 대기 메시지를 합쳐 사용자 메시지로 저장했다는 사건이고 `system` 과 같은 칸을 쓴다. `pending` 은
  * 대기 줄이 바뀌었다는 사건이다. 바뀐 내용은 싣지 않으므로 받은 쪽이 대기 줄을 다시 읽는다.
+ *
+ * <p>`delegation` 은 대화의 turn 이 바로 맡긴 위임이 시작했거나 끝났다는 사건이다. 맡긴 줄이 `delegation` 에 온다.
  *
  * <p>`approval` 은 승인 줄이 생겼다는 사건이다. 요청 번호만 `detail` 에 오므로 받은 쪽이 승인 줄을 다시 읽는다.
  */
@@ -23,7 +27,8 @@ export type ChatEvent = {
     | "system"
     | "user"
     | "pending"
-    | "approval";
+    | "approval"
+    | "delegation";
   text?: string | null;
   alreadyStreamed?: boolean | null;
   streamedPrefixLength?: number | null;
@@ -43,6 +48,8 @@ export type ChatEvent = {
   model?: string | null;
   inputTokens?: number | null;
   outputTokens?: number | null;
+  /** `delegation` 사건의 맡긴 줄이다 */
+  delegation?: DelegationLine | null;
 };
 
 export type ActivitySummary = {

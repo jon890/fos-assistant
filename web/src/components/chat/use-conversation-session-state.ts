@@ -1,5 +1,6 @@
 "use client";
 
+import type { DelegationLine } from "@/lib/delegation";
 import { useRef, useState, useEffect, useLayoutEffect } from "react";
 import { usePendingQueue } from "@/components/chat/use-pending-queue";
 import { useMemoryCaptures } from "./use-memory-captures";
@@ -39,6 +40,8 @@ export function useConversationSessionState({
   const currentExecutionId = useRef<number | null>(null);
   const [executionId, setExecutionId] = useState<number | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
+  /** `delegation` 사건으로 받은 맡긴 줄이다. 대화가 바뀌면 이 상태째 새로 만든다 */
+  const [liveDelegations, setLiveDelegations] = useState<DelegationLine[]>([]);
   /**
    * 이 창의 스트림 없이 도는 turn 을 보고 있다.
    *
@@ -156,6 +159,8 @@ export function useConversationSessionState({
     setExecutionId,
     stopRequested,
     setStopRequested,
+    liveDelegations,
+    setLiveDelegations,
     observing,
     setObserving,
     observedTurnFilter,

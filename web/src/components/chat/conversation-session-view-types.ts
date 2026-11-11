@@ -40,6 +40,7 @@ export type Props = Pick<
   | "setOutgoing"
   | "setDraft"
   | "executionId"
+  | "liveDelegations"
   | "stopRequested"
   | "setComposerBlocking"
   | "replace"
