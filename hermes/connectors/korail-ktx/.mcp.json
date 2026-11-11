@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "korail-ktx": {
+      "command": "bun",
+      "args": ["--no-env-file", "${CLAUDE_PLUGIN_ROOT}/dist/korail-ktx-mcp.js"],
+      "env": {
+        "KORAIL_KTX_BROWSER_URL": "${KORAIL_KTX_BROWSER_URL}"
+      }
+    }
+  }
+}

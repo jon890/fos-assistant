@@ -3,6 +3,7 @@ ARG SOURCE_COMMIT
 WORKDIR /src
 # 소스보다 의존성 층을 먼저 두어 lockfile이 같으면 설치를 재사용한다.
 COPY gmail/package.json gmail/bun.lock gmail/
+COPY korail-ktx/package.json korail-ktx/bun.lock korail-ktx/
 COPY naver-blog/package.json naver-blog/bun.lock naver-blog/
 COPY naver-shopping/package.json naver-shopping/bun.lock naver-shopping/
 COPY tossinvest/package.json tossinvest/bun.lock tossinvest/

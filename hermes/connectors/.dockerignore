@@ -1,5 +1,6 @@
 **/node_modules
 gmail/dist/gmail-mcp.js
+korail-ktx/dist/korail-ktx-mcp.js
 naver-blog/dist/naver-blog-mcp.js
 naver-shopping/dist/naver-shopping-mcp.js
 tossinvest/dist/tossinvest-mcp.js
