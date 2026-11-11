@@ -40,7 +40,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 새 ADR 의 식별자 칸과 문서 안의 참조는 `[ADR-YYYYMMDD / 슬러그](ADR-YYYYMMDD-슬러그.md)` 로 쓴다.
 날짜만으로 가리키지 않고 파일로 링크하여 같은 날의 결정을 구분한다. 기존 ADR 의 참조 표기는 유지한다.
 
-`test/unit/adr-index.test.ts` 가 파일과 목록, status 와 상태 칸, 둘 곳, 정렬, 제목 머리가 맞는지 확인한다.
+`test/repo/adr-index.test.ts` 가 파일과 목록, status 와 상태 칸, 둘 곳, 정렬, 제목 머리가 맞는지 확인한다.
 
 ## 결정 목록
 
@@ -120,6 +120,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261103 / memory-sensitivity-removal](ADR-20261103-memory-sensitivity-removal.md) | 기억의 민감 구분을 없애고, 같은 글이 같은 값이어야 하는 칸은 주인 key 의 HMAC 으로 둔다 | backend, frontend | Accepted. ADR-052 의 민감도, ADR-053 의 민감 허용 조건, ADR-20261008 / agent-memory-grants-admin 의 민감 허용을 대체하고 ADR-055 의 남은 옛 key 읽기를 거둔다. 옛 칸 여섯 개는 배포를 확인한 뒤 지웠다 |
 | [ADR-20261105 / event-watch](ADR-20261105-event-watch.md) | 사건 감지는 Control Plane 이 실행 밖에서 플러그인의 목록을 식별자와 받은 시각, 라벨만 받아 보고, 새 항목이 있을 때만 읽기 경계의 살펴보기를 연다 | backend, frontend, hermes | Accepted. ADR-080 의 읽기 경계와 ADR-085 의 깨우기 제한 위에 계기 `EVENT` 를 더한다 |
 | [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) | 네이버 쇼핑은 내 브라우저로 화면의 상태 JSON 을 읽고, 쇼핑 도구는 사람이 연 대화에서만 부른다 | backend, hermes | Accepted. ADR-20261007 / user-browser 의 브라우저와 중계를 쓰고, ADR-080 의 살펴보기 읽기 경계 옆에 도구 단위의 `attended_only` 경계를 더한다 |
+| [ADR-20261110 / test-layout](ADR-20261110-test-layout.md) | 테스트는 주인 모듈 안에 두고, 여러 모듈에 걸친 것만 루트 `test/` 에 남긴다 | 공통 | Accepted |
 
 ## 보관
 
