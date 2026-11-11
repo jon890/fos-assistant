@@ -219,6 +219,18 @@ test("새로 보인 낱말은 흐릿했다가 또렷해지고 시간이 지나�
   assert.equal(h.scheduled(), false);
 });
 
+test("닫히지 않은 기호 앞에서 멈춰도 먼저 보인 낱말의 떠오름은 끝난다", () => {
+  const h = harness();
+  h.reveal.receive("문장 **굵게 말");
+  h.advance(48);
+  assert.equal(h.text(), "문장 ");
+  assert.equal(h.reveal.getSnapshot().fades.length, 1);
+  h.advance(400);
+  assert.deepEqual(h.reveal.getSnapshot().fades, []);
+  assert.equal(h.text(), "문장 ");
+  assert.equal(h.scheduled(), false);
+});
+
 test("동작 줄이기가 켜져 있으면 떠오름 없이 낱말 단위로만 보인다", () => {
   const h = harness(true);
   h.reveal.receive(SENTENCE);

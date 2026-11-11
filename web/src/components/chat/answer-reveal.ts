@@ -191,7 +191,8 @@ export class AnswerReveal {
     this.publish(now);
     this.settle();
     const stalled = this.shown >= this.received.length;
-    if (hold === "marker" || (stalled && this.births.length === 0)) {
+    // 기호 앞에서 멈춰도 막 보인 낱말의 떠오름은 끝까지 그린다. 멈춘 채로 두면 흐린 낱말이 다음 글까지 굳는다.
+    if ((hold === "marker" || stalled) && this.births.length === 0) {
       this.credit = 0;
       this.lastTick = null;
       return;
