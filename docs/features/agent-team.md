@@ -41,6 +41,6 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 
 맡긴 자리는 저장되지 않으므로 줄은 늘 답 본문 아래에 둔다. 새로 고치거나 다른 기기에서 열어도 같은 자리다.
 `delegation` 사건은 위임 실행 줄이 생길 때와 끝날 때 대화 단위 SSE 로 그 대화의 모든 구독에 간다(`DelegationLineNotifier`). 화면은 받은 줄을 실행 번호로 들고 있다가 이력의 줄과 합치고, 같은 실행이면 끝난 상태를 고른다.
-결과 도착 줄은 전달 묶음의 `delegation_notice_message_id` 로 결과를 찾는다. 이 칸 전에 만든 알림 줄은 저장된 글만 보인다. 저장된 글(「○○ 에이전트의 결과가 도착했어요」)은 바꾸지 않는다.
+결과 도착 줄은 전달 묶음의 `delegation_notice_message_id` 로 결과를 찾는다. 자동 turn 이 도는 동안은 그 줄의 `system` 사건이 같은 결과(`deliveredResults`)를 싣는다. 이 칸 전에 만든 알림 줄은 저장된 글만 보인다. 저장된 글(「○○ 에이전트의 결과가 도착했어요」)은 바꾸지 않는다.
 승인과 거절 응답은 대화를 몰라 `requestedBy` 를 싣지 않으므로 화면이 카드를 바꿀 때 앞 값을 지킨다.
 이름표의 네 칸(`AgentLabel`)이 모두 비어 있으면 지운 에이전트다. 화면은 「지운 에이전트」 로 그린다.

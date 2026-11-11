@@ -180,7 +180,7 @@ REQ3, REQ4 의 책임이다. 테이블은 늘리지 않고 `result_delivery` 에
 | `chat.turn.presentation.ChatController`, `ChatDtos.MessageView` | `delegations`, `deliveredResults` 칸 |
 | `connector.approval` 의 `ConnectorActionService`, `ConnectorActionController` | 승인 줄 목록에 대화의 에이전트와 다른 요청 에이전트의 이름표(`requestedBy`)를 붙인다 |
 | `web/src/components/chat/delegation-lines.tsx` | 맡긴 줄과 결과 도착 줄의 그림 |
-| `web/src/components/chat/use-live-delegations.ts` | `delegation` 사건으로 받은 줄을 대화 화면이 들고 있다가 이력의 줄과 합친다 |
+| `web/src/lib/delegation.ts`, `use-conversation-session-state.ts` 의 `liveDelegations` | `delegation` 사건으로 받은 줄을 대화 화면이 들고 있다가 이력의 줄과 합친다. 합치기 규칙과 글은 `lib/delegation.ts` 가 갖는다 |
 | `web/src/components/chat/approval-card.tsx` | 카드 위의 「○○이 요청」 줄 |
 
 ### 인터페이스와 데이터
@@ -251,6 +251,8 @@ REQ3, REQ4 의 책임이다. 테이블은 늘리지 않고 `result_delivery` 에
 
 ### 실패와 일관성
 
+- 위임 결과 알림 줄의 `system` 사건에도 `deliveredResults` 를 실어, 자동 turn 이 도는 동안에도 결과 도착 줄을 이름표로 그린다.
+- 맡긴 뒤 turn 이 답 줄 없이 실패하면 맡긴 줄을 붙일 답이 없어 대화에는 남지 않는다. 결과 도착 줄과 실행 트리로 본다.
 - 사건을 놓쳐도 줄은 이력이 갖는다. 대화 단위 SSE 가 다시 붙으면 화면이 이력을 다시 읽는 지금 규칙(`resumeAfterReconnect`)이 상태를 맞춘다.
 - `DelegationStarted` 와 `DelegationFinished` 를 받아 사건을 내다 실패하면 경고 로그만 남긴다. 위임 실행과 결과 전달은 이 사건에 기대지 않는다.
 - 서버가 다시 떠 기동 정리가 끝낸 위임도 `DelegationFinished` 를 내므로 같은 사건이 간다.
