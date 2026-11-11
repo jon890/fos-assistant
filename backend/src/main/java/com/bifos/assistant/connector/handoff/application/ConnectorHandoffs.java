@@ -112,7 +112,7 @@ public class ConnectorHandoffs {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onTurnStarted(ConversationTurnStarted event) {
-        List<ConnectorAction> open = handoffs.findOpen(event.conversationId());
+        List<ConnectorAction> open = handoffs.findOpenInConversation(event.conversationId());
         if (open.isEmpty()) {
             return;
         }

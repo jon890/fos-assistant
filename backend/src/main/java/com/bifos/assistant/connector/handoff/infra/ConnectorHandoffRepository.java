@@ -45,7 +45,7 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
             select a from ConnectorAction a
             where a.conversationId = :conversationId and a.handoff.need is not null and a.handoff.closedAt is null
             """)
-    List<ConnectorAction> findOpen(@Param("conversationId") Long conversationId);
+    List<ConnectorAction> findOpenInConversation(@Param("conversationId") Long conversationId);
 
 
     /** 열린 줄에만 닫은 시각을 적는다. */
