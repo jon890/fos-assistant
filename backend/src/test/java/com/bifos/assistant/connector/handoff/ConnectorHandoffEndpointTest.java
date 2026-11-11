@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.handoff;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -12,12 +13,16 @@ import com.bifos.assistant.connector.action.domain.ConnectorActionKey;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.handoff.application.ConnectorHandoffs;
 import com.bifos.assistant.connector.handoff.application.dto.HandoffView;
+import com.bifos.assistant.connector.handoff.presentation.ConnectorHandoffController;
 import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.application.dto.ConnectorTool;
 import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.application.AgentTokenService;
+import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -41,6 +46,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -79,6 +86,9 @@ class ConnectorHandoffEndpointTest {
     ConnectorHandoffs handoffs;
 
     @Autowired
+    ConnectorHandoffController controller;
+
+    @Autowired
     ApplicationEventPublisher events;
 
     @Autowired
@@ -113,6 +123,7 @@ class ConnectorHandoffEndpointTest {
 
     @AfterEach
     void tearDown() {
+        SecurityContextHolder.clearContext();
         cleanup();
     }
 
@@ -138,6 +149,12 @@ class ConnectorHandoffEndpointTest {
         assertThat(sent.get(0).get("KIND")).isEqualTo("HANDOFF_REQUESTED");
         assertThat(sent.get(0).get("TITLE")).isEqualTo("「내 브라우저」에서 로그인해 주세요");
         assertThat(sent.get(0).get("BODY")).isEqualTo("「네이버 쇼핑」");
+        UUID actionId = handoffs.open(user(), conversation.id()).getFirst().handoffId();
+        assertThat(notifications.findAll()).singleElement().satisfies(notification -> {
+            assertThat(notification.targetType()).isEqualTo(NotificationTargetType.CONVERSATION);
+            assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
+            assertThat(notification.sourcePublicId()).isEqualTo(actionId);
+        });
 
         List<HandoffView> cards = handoffs.open(user(), conversation.id());
         assertThat(cards).singleElement().satisfies(card -> {
@@ -188,6 +205,25 @@ class ConnectorHandoffEndpointTest {
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(jdbc.queryForObject(
             "SELECT COUNT(*) FROM connector_action WHERE handoff_need IS NOT NULL", Long.class)).isZero();
+    }
+
+
+    @Test
+    @DisplayName("대화의 카드 목록은 주인에게만 보이고, 다른 사용자가 부르면 없는 대화와 같은 오류다")
+    void listsCardsOnlyToOwner() throws Exception {
+        insertAction("root-7", "call-7", true, conversation.id());
+        post(McpCallSigner.handoffBody(token, TOOL, "root-7", "root-7", "call-7", CODE, "login", "TAB1"));
+        AppUser stranger = users.save(AppUser.of("handoff-stranger@example.com", "남", 1L, UserRole.MEMBER));
+
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user(), null));
+        assertThat(controller.open(conversation.publicId())).singleElement()
+            .satisfies(card -> assertThat(card.tab()).isEqualTo("TAB1"));
+
+        CurrentUser other = new CurrentUser(stranger.id(), stranger.email(), "남", 1L, UserRole.MEMBER);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(other, null));
+        assertThatThrownBy(() -> controller.open(conversation.publicId()))
+            .isInstanceOfSatisfying(
+                ApiException.class, error -> assertThat(error.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
     }
 
 
@@ -255,6 +291,6 @@ class ConnectorHandoffEndpointTest {
         notifications.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update("DELETE FROM conversation WHERE title IN ('쇼핑 대화', '다른 대화')");
-        jdbc.update("DELETE FROM app_user WHERE email = 'handoff-owner@example.com'");
+        jdbc.update("DELETE FROM app_user WHERE email IN ('handoff-owner@example.com', 'handoff-stranger@example.com')");
     }
 }
