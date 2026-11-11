@@ -21,5 +21,7 @@ public enum NotificationKind {
     /** 사건 감지가 연 살펴보기가 알릴 항목을 골랐다. 조용한 시간에 미룬 것을 아침에 묶어 낸 것도 이 종류다(ADR-20261105 / event-watch). */
     EVENT_CHECK_REPORTED,
     /** 사건 감지의 목록 조회가 연결 문제로 정한 횟수만큼 연달아 실패했다. 다시 연결해야 한다. */
-    EVENT_WATCH_FAILED
+    EVENT_WATCH_FAILED,
+    /** 플러그인이 사람이 해야 하는 화면에서 멈춰 「내 브라우저」 화면을 넘겼다. 그 대화의 다음 turn 이 시작되면 읽음이 된다. */
+    HANDOFF_REQUESTED
 }

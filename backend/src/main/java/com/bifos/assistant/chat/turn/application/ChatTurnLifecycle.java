@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
+import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SequenceCounter;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /** turn 의 명령과 실행 줄을 만들고 답과 종료 상태를 남긴다. */
@@ -58,6 +60,7 @@ class ChatTurnLifecycle {
     private final ArtifactService artifacts;
     private final ArtifactAutoVault autoVault;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ChatRunEvents chatRunEvents;
 
@@ -114,6 +117,13 @@ class ChatTurnLifecycle {
         // 사람이 없는 실행은 Hermes 에 보내기 전에 적는다. 도구 판정이 도는 중에 이 값을 읽는다.
         if (TurnIntent.unattended(intent)) {
             executionMarks.markUnattended(execution.id());
+        }
+        // 화면 넘기기 카드처럼 다음 turn 에 닫는 것이 듣는다. 이 자리에는 트랜잭션이 없어 듣는 쪽이 바로 돌고 예외도 여기로 온다.
+        // 닫지 못하면 카드가 남을 뿐이라 turn 은 잇는다.
+        try {
+            events.publishEvent(new ConversationTurnStarted(conversation.id()));
+        } catch (RuntimeException ex) {
+            log.warn("새 turn 시작을 알리지 못했다 conversationId={}", conversation.id(), ex);
         }
         return new PendingTurn(
             user,

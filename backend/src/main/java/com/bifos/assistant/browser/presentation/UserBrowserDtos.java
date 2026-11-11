@@ -119,6 +119,7 @@ public final class UserBrowserDtos {
                 case TEXT -> require("text", text != null && !text.isEmpty() && text.length() <= MAX_TEXT);
                 case NAVIGATE -> require("url", BrowserScreenInput.webUrl(url));
                 case TAB -> require("id", id != null && TARGET_ID.matcher(id).matches());
+                case DIALOG -> require("action", "accept".equals(action) || "dismiss".equals(action));
                 case RESIZE -> {
                     require("width", width != null && width >= 320 && width <= 1600);
                     require("height", height != null && height >= 320 && height <= 2000);

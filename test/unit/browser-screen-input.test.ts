@@ -9,6 +9,7 @@ import {
   ratio,
   resizeFor,
   screenKey,
+  screenTabId,
   textInputs,
   webUrl,
   wheel,
@@ -210,4 +211,11 @@ test("휠 값은 픽셀이면 그대로, 줄이면 16배, 쪽이면 그림 높�
   assert.equal(wheelDelta(30, 0, 600), 30);
   assert.equal(wheelDelta(3, 1, 600), 48);
   assert.equal(wheelDelta(-1, 2, 600), -600);
+});
+
+test("화면 넘기기가 가리킨 탭 id 는 화면 입력 tab 의 모양만 받는다", () => {
+  assert.equal(screenTabId("ABCDEF0123456789"), "ABCDEF0123456789");
+  assert.equal(screenTabId("../json/close"), null);
+  assert.equal(screenTabId(""), null);
+  assert.equal(screenTabId("A".repeat(129)), null);
 });

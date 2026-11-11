@@ -61,6 +61,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         "/mcp",
         "/internal/hermes/session-bindings/subagent",
         "/internal/hermes/connector-policy",
+        "/internal/hermes/connector-handoff",
         "/internal/hermes/tool-guard",
         "/internal/hermes/attachment-inspect",
         "/internal/hermes/attachment-inspect/validate",

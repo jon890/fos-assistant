@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { EXPRESSIONS, SEARCH_STATE } from "../src/expressions.ts";
-import { readInTab } from "../src/tab.ts";
+import { forgetLeftTabs, readInTab } from "../src/tab.ts";
 import {
   startFakeBrowser,
   type FakeBrowser,
@@ -8,7 +8,10 @@ import {
 } from "./fake-browser.ts";
 
 let browser: FakeBrowser | null = null;
-afterEach(() => browser?.stop());
+afterEach(() => {
+  browser?.stop();
+  forgetLeftTabs();
+});
 
 const TARGET = "https://search.shopping.naver.com/ns/search?query=x";
 
@@ -54,22 +57,25 @@ test("우리 탭에 뜬 대화상자는 닫기로 넘긴다", async () => {
   });
 });
 
-for (const [name, page, code] of [
+for (const [name, page, code, need] of [
   [
     "로그인",
     { href: "https://nid.naver.com/nidlogin.login" },
     "NAVER_SHOPPING_LOGIN_REQUIRED",
+    "login",
   ],
-  ["캡차", { captcha: true }, "NAVER_SHOPPING_CAPTCHA"],
+  ["캡차", { captcha: true }, "NAVER_SHOPPING_CAPTCHA", "captcha"],
   [
     "기기 인증",
     { href: "https://nid.naver.com/login/ext/deviceConfirm" },
     "NAVER_SHOPPING_DEVICE_CHECK",
+    "device_check",
   ],
 ] as const) {
-  test(`${name} 화면이면 아무것도 누르지 않고 탭을 남긴 채 그 코드로 끝난다`, async () => {
+  test(`${name} 화면이면 아무것도 누르지 않고 탭을 남긴 채 그 코드와 넘기기 칸으로 끝난다`, async () => {
     await expect(read({ ...page, state: "[]" })).rejects.toMatchObject({
       code,
+      handoff: { need, tab: "tab-1" },
     });
     expect(browser!.http.some((line) => line.includes("/json/close/"))).toBe(
       false,
@@ -97,5 +103,36 @@ test("이동이 망 오류로 실패하면 바뀐 화면이 아니라 일시 장
   expect(browser!.http).toContain("GET /json/close/tab-1");
   expect(
     browser!.commands.some((command) => command.method === "Runtime.evaluate"),
+  ).toBe(false);
+});
+
+test("다음 탭 열기는 새 탭을 열기 전에 앞서 사람에게 넘긴 탭을 닫는다", async () => {
+  await expect(
+    read({ href: "https://nid.naver.com/nidlogin.login", state: "[]" }),
+  ).rejects.toMatchObject({ code: "NAVER_SHOPPING_LOGIN_REQUIRED" });
+  browser!.stop();
+  browser = startFakeBrowser({ state: "[]" });
+  expect(
+    await readInTab(browser.url, TARGET, SEARCH_STATE, {
+      timeoutMs: 5_000,
+      pollMs: 1,
+    }),
+  ).toBe("[]");
+  expect(browser.http.indexOf("GET /json/close/tab-1")).toBeLessThan(
+    browser.http.indexOf("PUT /json/new?about:blank"),
+  );
+});
+
+test("이동 뒤 최종 주소가 네이버가 아니면 읽지 않고 바뀐 화면으로 끝나며 그 탭을 닫는다", async () => {
+  await expect(
+    read({ href: "https://example.com/landing", state: "[]" }),
+  ).rejects.toMatchObject({ code: "NAVER_SHOPPING_PAGE_CHANGED" });
+  expect(browser!.http).toContain("GET /json/close/tab-1");
+  expect(
+    browser!.commands.some(
+      (command) =>
+        command.method === "Runtime.evaluate" &&
+        command.params.expression === SEARCH_STATE,
+    ),
   ).toBe(false);
 });
