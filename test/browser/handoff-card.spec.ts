@@ -59,7 +59,8 @@ test("넘기기 카드는 할 일과 플러그인 이름, 그 탭을 고른 내 
   await expect(card).toHaveCount(0);
 });
 
-test("계약 밖의 넘기기 줄은 카드로 그리지 않는다", async ({ page }) => {
+test("넘기기가 없는 대화에는 카드를 그리지 않는다", async ({ page }) => {
+  // 계약 밖의 줄을 버리는 것은 웹 서버 라우트다. 브라우저의 요청 대역은 그 뒤라 test/web/handoff-route.test.ts 가 본다.
   const conversationId = await createConversation(page);
   await page.goto(`/chat/${conversationId}`);
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
