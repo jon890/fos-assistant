@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.approval.presentation;
 
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.ConnectorConversationGrantView;
@@ -32,6 +33,8 @@ public final class ConnectorActionDtos {
      * @param contentDraft 원고 저장 job 이 연결된 줄의 요약. 일반 줄은 null
      * @param financial 금융 줄의 승인 카드 요약. 금융 줄이 아니면 null
      * @param limitChange 주문 상한 변경 줄의 카드 요약. 그 줄이 아니면 null
+     * @param requestedBy 대화의 에이전트와 다른 에이전트가 요청한 줄이면 그 에이전트의 이름표. 아니거나 대화를 모르는 응답(승인과
+     * 거절)이면 null
      */
     public record ActionView(
         UUID actionId,
@@ -51,7 +54,8 @@ public final class ConnectorActionDtos {
         boolean conversationGrantAllowed,
         ContentDraftActionSummary contentDraft,
         FinancialActionSummary financial,
-        FinancialLimitChangeSummary limitChange) {
+        FinancialLimitChangeSummary limitChange,
+        AgentLabel requestedBy) {
 
         public static ActionView from(ConnectorActionView action) {
             return from(action, null);
@@ -71,6 +75,12 @@ public final class ConnectorActionDtos {
 
         public static ActionView from(ConnectorActionView action, ContentDraftActionSummary contentDraft,
             FinancialActionSummary financial, FinancialLimitChangeSummary limitChange) {
+            return from(action, contentDraft, financial, limitChange, null);
+        }
+
+
+        public static ActionView from(ConnectorActionView action, ContentDraftActionSummary contentDraft,
+            FinancialActionSummary financial, FinancialLimitChangeSummary limitChange, AgentLabel requestedBy) {
             return new ActionView(
                 action.actionId(),
                 action.connectorId(),
@@ -89,7 +99,8 @@ public final class ConnectorActionDtos {
                 action.conversationGrantAllowed(),
                 contentDraft,
                 financial,
-                limitChange);
+                limitChange,
+                requestedBy);
         }
     }
 
