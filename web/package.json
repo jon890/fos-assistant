@@ -13,9 +13,9 @@
     "lint": "eslint",
     "format:check": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --check; }",
     "format:changed": "files=$(node scripts/changed-files.mjs) && { [ -z \"$files\" ] || printf '%s\\n' \"$files\" | xargs prettier --write; }",
-    "test:browser": "playwright test --config web/test/browser/playwright.config.ts",
+    "test:browser": "playwright test --config test/browser/playwright.config.ts",
     "test:node": "node --test 'test/node/**/*.test.ts' 'test/unit/**/*.test.ts'",
-    "screenshots": "playwright test --config web/test/screenshots/playwright.config.ts",
+    "screenshots": "playwright test --config test/screenshots/playwright.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
