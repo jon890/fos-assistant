@@ -50,6 +50,8 @@ export type ChatEvent = {
   outputTokens?: number | null;
   /** `delegation` 사건의 맡긴 줄이다 */
   delegation?: DelegationLine | null;
+  /** 위임 결과 알림 줄의 `system` 사건이 싣는 그 줄이 전한 결과다 */
+  deliveredResults?: DelegationLine[] | null;
 };
 
 export type ActivitySummary = {

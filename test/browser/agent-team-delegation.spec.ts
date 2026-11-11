@@ -168,6 +168,47 @@ test("답 아래 맡긴 줄이 진행 중으로 보이고 자식이 끝나면 �
   await expect(reloaded.getByTestId("delegation-status")).toHaveText("끝남");
 });
 
+test("자동 turn 이 도는 동안에도 결과 도착 줄은 이름표로 보이고 그 turn 이 맡기면 기다림 줄 아래에 진행 중 줄이 생긴다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(
+    page,
+    "실시간 결과 도착 줄 검사",
+  );
+  await routeEvents(page, conversationId, [
+    {
+      type: "system",
+      conversationId,
+      messageId: SYSTEM_MESSAGE_ID,
+      text: "쇼핑 담당 에이전트의 결과가 도착했어요",
+      deliveredResults: [delegation(1, "SUCCEEDED")],
+    },
+    { type: "started", conversationId, executionId: AUTO_EXECUTION_ID },
+    {
+      type: "delegation",
+      conversationId,
+      executionId: CHILD_EXECUTION_ID + 10,
+      delegation: {
+        ...delegation(AUTO_EXECUTION_ID, "RUNNING"),
+        executionId: CHILD_EXECUTION_ID + 10,
+      },
+    },
+  ]);
+
+  await page.goto(`/chat/${conversationId}`);
+
+  await expect(
+    page.getByTestId("system-message").getByTestId("result-arrival"),
+  ).toHaveText("🛍️쇼핑 담당이 끝냈어요");
+  const waiting = page.getByTestId("pending-assistant");
+  await expect(waiting.getByTestId("delegation-line")).toContainText(
+    "→ 쇼핑 담당에게 맡김",
+  );
+  await expect(
+    waiting.getByTestId("delegation-line").getByTestId("delegation-status"),
+  ).toHaveText("진행 중");
+});
+
 test("결과 도착 줄은 맡은 에이전트의 이름표와 글로 보이고 그 아래 답은 대화 에이전트의 이름표다", async ({
   page,
 }) => {
