@@ -1,10 +1,13 @@
 "use client";
 
 import { AgentBadge, useAnswerAgent } from "@/components/agent/agent-badge";
+import { cn } from "cn";
 import {
   delegationStatusLabel,
   labelIdentity,
+  requestedByText,
   resultArrivalText,
+  type AgentLabel,
   type DelegationLine,
 } from "@/lib/delegation";
 
@@ -57,4 +60,26 @@ export function ResultArrivalLines({ lines }: { lines: DelegationLine[] }) {
       <span className="min-w-0 break-words">{resultArrivalText(line)}</span>
     </p>
   ));
+}
+
+/** 위임 자식처럼 대화의 에이전트가 아닌 에이전트가 요청한 승인 카드 위의 「쇼핑 담당이 요청」 줄이다. */
+export function RequestedBy({
+  label,
+  grouped,
+}: {
+  label: AgentLabel;
+  grouped: boolean;
+}) {
+  return (
+    <p
+      data-testid="approval-requested-by"
+      className={cn(
+        "flex min-w-0 items-center gap-2 text-sm text-muted-foreground",
+        grouped ? null : "-mt-1",
+      )}
+    >
+      <AgentBadge agent={labelIdentity(label)} size="sm" />
+      <span className="min-w-0 break-words">{requestedByText(label)}</span>
+    </p>
+  );
 }

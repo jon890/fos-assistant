@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { cn } from "cn";
-import { AgentBadge } from "@/components/agent/agent-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Notice } from "@/components/ui/notice";
 import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
+import { RequestedBy } from "@/components/chat/delegation-lines";
 import {
   approvalBlocked,
   financialView,
@@ -20,7 +20,6 @@ import {
 } from "@/components/chat/financial-summary";
 import { toolRiskLabel } from "@/lib/connection";
 import { actionDisplayTitle } from "@/lib/connector-action-title";
-import { labelIdentity, requestedByText } from "@/lib/delegation";
 import {
   approvalArgs,
   approvalArgLabel,
@@ -308,19 +307,7 @@ export function ApprovalCard({
         </>
       )}
       {action.requestedBy ? (
-        // 위임 자식처럼 대화의 에이전트가 아닌 에이전트가 요청한 카드에만 붙인다.
-        <p
-          data-testid="approval-requested-by"
-          className={cn(
-            "flex min-w-0 items-center gap-2 text-sm text-muted-foreground",
-            grouped ? null : "-mt-1",
-          )}
-        >
-          <AgentBadge agent={labelIdentity(action.requestedBy)} size="sm" />
-          <span className="min-w-0 break-words">
-            {requestedByText(action.requestedBy)}
-          </span>
-        </p>
+        <RequestedBy label={action.requestedBy} grouped={grouped} />
       ) : null}
       <ApprovalContent action={action} />
       {action.status === "PENDING" ? (
