@@ -439,6 +439,38 @@ class BrowserScreenSessionTest {
     }
 
 
+    @Test
+    @DisplayName("붙은 탭의 확인 창을 dialog 사건으로 알리고 고른 답을 handleJavaScriptDialog 로 넘긴다")
+    void forwardsDialogAndAnswer() {
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+
+        cdp.event("T1", "Page.javascriptDialogOpening", "{\"type\":\"confirm\",\"message\":\"삭제하시겠습니까?\"}");
+        session.input(new BrowserScreenInput(Kind.DIALOG, "dismiss", 0, 0, 0, null, null, null, null, 0, 0));
+        cdp.event("T1", "Page.javascriptDialogClosed", "{\"result\":false}");
+
+        assertThat(sink.data("dialog")).containsExactly(
+            Map.of("open", true, "type", "confirm", "message", "삭제하시겠습니까?"),
+            Map.of("open", false));
+        assertThat(cdp.sent("Page.handleJavaScriptDialog").get(0).params()).containsEntry("accept", false);
+    }
+
+
+    @Test
+    @DisplayName("확인 창 글은 500자에서 자르고, 탭을 옮기면 창을 거두며 옮기기 전 탭의 사건은 버린다")
+    void trimsDialogAndClearsOnTabSwitch() {
+        cdp.pages.add(new CdpTarget("T2", "둘째", "https://example.com/b"));
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+
+        cdp.event("T1", "Page.javascriptDialogOpening", "{\"type\":\"beforeunload\",\"message\":\"" + "가".repeat(600) + "\"}");
+        session.input(input(Kind.TAB, null, null, null, "T2"));
+        cdp.event("T1", "Page.javascriptDialogClosed", "{\"result\":true}");
+
+        assertThat(sink.data("dialog")).containsExactly(
+            Map.of("open", true, "type", "beforeunload", "message", "가".repeat(500)),
+            Map.of("open", false));
+    }
+
+
     /** 붙은 탭을 끊고 다시 붙어 screencast 를 시작하기까지 기다린다. 붙기가 끝나기 전에 다시 끊으면 경합이 된다. */
     private void dropAndAwaitReattach(int screencasts) throws InterruptedException {
         cdp.drop("T1");

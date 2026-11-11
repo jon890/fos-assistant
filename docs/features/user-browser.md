@@ -133,6 +133,8 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 | 붙은 탭의 연결이 끊긴다 | 다시 잇는다. 프레임 없이 연이어 끊기면 `closed`(`stopped`)로 닫는다 |
 | SSE 쓰기가 실패하거나 주석 `ping` 을 쓰지 못한다 | `closed` 없이 닫는다. 말없이 끊긴 화면이 `screen-timeout` 까지 자동 중지를 막지 않는다 |
 | 끄기, 지우기, 사용자 끄기 | 브라우저를 멈추기 전에 화면을 닫는다. `closed` 는 막힌 쓰기를 잠깐만 기다리고 건너뛰어, 읽지 않는 받는 쪽에 붙잡히지 않는다 |
+| 붙은 탭에 확인 창(`alert`, `confirm`, `prompt`, `beforeunload`)이 뜬다 | `dialog` 사건(`{open: true, type, message}`)으로 보인다. 글은 500자에서 자르고 로그와 오류에 싣지 않는다. 사람이 고르면 입력 `dialog`(`action` 이 `accept` 나 `dismiss`)가 `Page.handleJavaScriptDialog` 를 보낸다. `prompt` 는 기본값으로 수락한다 |
+| 확인 창이 닫히거나 다른 탭으로 옮긴다 | `dialog` 사건(`{open: false}`)으로 창을 거둔다. 옮긴 탭에 떠 있던 창은 Chrome 이 `Page.enable` 때 다시 알린다고 기대한다(실제 Chrome 으로 확인하지 않았다) |
 | 입력이 왔는데 화면이 없다 | `BROWSER_SCREEN_CLOSED` |
 | 프레임이 아직 없다 | 좌표 입력을 버린다. 좌표는 프레임 그림 안의 비율이고 서버가 마지막 프레임 크기로 CSS 픽셀로 바꾼다 |
 | Control Plane 이 다시 뜬다 | 화면 등록부는 JVM 메모리에 있어 SSE 도 끊긴다. 웹이 다시 연다 |
@@ -145,6 +147,7 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 - 휴대폰의 탭과 끌기는 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 서버는 `touch` 를 받지 않는다.
 - 한글은 입력기가 조합을 끝낸 글자를 `text` 로 보내고, 입력은 순서가 바뀌지 않게 한 줄로 보낸다.
 - 시작 주소(`/browser?url=`)는 그 페이지에서 처음 연 화면에만 쓴다. 「다시 열기」 는 지금 탭을 그대로 본다.
+- 화면 넘기기 카드가 여는 `/browser?tab=<id>` 는 처음 연 화면의 첫 `tabs` 사건에 그 탭이 있으면 입력 `tab` 을 한 번 보내 옮긴다. 없으면 지금 탭에 머문다.
 - 입력의 서버 라우트는 출처와 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
 
 입력 변환은 `test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `test/browser/user-browser-screen.spec.ts` 가 확인한다.

@@ -46,6 +46,8 @@ public class BrowserScreenSession {
     static final String TIMEOUT = "timeout";
     /** 프레임 없이 연이어 끊긴 연결을 다시 잇는 상한이다. */
     static final int MAX_RECONNECTS = 3;
+    /** 확인 창 글의 상한이다. 사이트가 띄운 글이라 로그와 오류에는 싣지 않는다. */
+    static final int MAX_DIALOG_MESSAGE = 500;
 
     @Getter(AccessLevel.PACKAGE)
     private final Long browserId;
@@ -74,6 +76,8 @@ public class BrowserScreenSession {
     private int reconnects;
     private volatile Map<String, Object> metrics;
     private volatile Viewport viewport;
+    /** 화면에 확인 창을 보이고 있는가. 탭을 옮길 때 거둘지 정한다. */
+    private volatile boolean dialogShown;
     private ScheduledFuture<?> resizeTask;
 
 
@@ -134,6 +138,9 @@ public class BrowserScreenSession {
             case BACK -> back(current);
             case RELOAD -> command(current, "Page.reload", Map.of());
             case RESIZE -> resize(input);
+            // 사람이 고른 답을 그 탭의 확인 창에 넘긴다. 창이 없으면 CDP 가 실패로 답하고 그 실패는 이름만 남긴다.
+            case DIALOG ->
+                command(current, "Page.handleJavaScriptDialog", Map.of("accept", "accept".equals(input.action())));
         }
     }
 
@@ -210,6 +217,11 @@ public class BrowserScreenSession {
         if (previous != null) {
             previous.close();
         }
+        // 앞 탭의 확인 창은 그 탭에 남는다. 화면에서는 거두고, 새 탭에 창이 있으면 Page.enable 뒤 다시 온다.
+        if (dialogShown) {
+            dialogShown = false;
+            sink.trySend("dialog", Map.of("open", false));
+        }
         CdpConnection opened = connector.connect(cdp, id, event -> onEvent(attached, event), () -> onConnectionLost(attached));
         synchronized (lock) {
             if (closed.get() || attached != generation) {
@@ -239,6 +251,11 @@ public class BrowserScreenSession {
 
 
     private void onEvent(long attached, CdpEvent event) {
+        if ("Page.javascriptDialogOpening".equals(event.method())
+            || "Page.javascriptDialogClosed".equals(event.method())) {
+            onDialog(attached, event);
+            return;
+        }
         if (!"Page.screencastFrame".equals(event.method())) {
             return;
         }
@@ -266,6 +283,38 @@ public class BrowserScreenSession {
                 current,
                 "Page.screencastFrameAck",
                 Map.of("sessionId", params.path("sessionId").asInt()));
+        }
+    }
+
+
+    /**
+     * 붙은 탭의 확인 창(alert, confirm, prompt, beforeunload)을 화면에 알린다(#702). 창이 떠 있는 동안 탭은 다른 입력을 받지 않는다.
+     *
+     * <p>글은 {@link #MAX_DIALOG_MESSAGE} 자에서 자른다. 사람이 고른 답은 {@code dialog} 입력으로 온다.
+     */
+    private void onDialog(long attached, CdpEvent event) {
+        synchronized (lock) {
+            if (attached != generation) {
+                return;
+            }
+        }
+        Map<String, Object> view;
+        dialogShown = "Page.javascriptDialogOpening".equals(event.method());
+        if (!dialogShown) {
+            view = Map.of("open", false);
+        } else {
+            JsonNode params = event.params();
+            String message = params.path("message").asString("");
+            view = Map.of(
+                "open",
+                true,
+                "type",
+                params.path("type").asString("alert"),
+                "message",
+                message.length() > MAX_DIALOG_MESSAGE ? message.substring(0, MAX_DIALOG_MESSAGE) : message);
+        }
+        if (!sink.send("dialog", view)) {
+            close(null);
         }
     }
 
