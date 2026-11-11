@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   webServer: {
     // 기본은 빌드한 서버다. `BROWSER_WEB_SERVER=dev` 면 개발 서버를 띄운다. 까닭은 web-server.ts 에 있다.
-    command: `node web/test/browser/web-server.ts ${WEB_PORT}`,
+    command: `node test/browser/web-server.ts ${WEB_PORT}`,
     cwd: join(import.meta.dirname, "../.."),
     url: WEB_BASE_URL,
     reuseExistingServer: false,
