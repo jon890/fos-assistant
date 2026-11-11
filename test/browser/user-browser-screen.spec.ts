@@ -624,8 +624,19 @@ test("화면 넘기기가 가리킨 탭이 처음 목록에 있으면 그리로 
   await expect
     .poll(() => ofType(fake.inputs, "tab"))
     .toEqual([{ type: "tab", id: "B2" }]);
+  // 연결이 끊겨 다시 열면 처음 탭 목록이 다시 온다. 이때는 옮기지 않는다.
+  await fake.end();
+  await expect.poll(fake.opens, { timeout: 10_000 }).toHaveLength(2);
   await fake.push([["tabs", TABS]]);
-  await page.waitForTimeout(100);
+  // 사건은 온 순서대로 처리된다. 뒤따른 확인 창에 답한 입력이 닿은 뒤에 탭 입력을 센다.
+  await fake.push([["dialog", { open: true, type: "alert", message: "" }]]);
+  await page
+    .getByRole("alertdialog", { name: "사이트 확인 창" })
+    .getByRole("button", { name: "확인" })
+    .click();
+  await expect
+    .poll(() => ofType(fake.inputs, "dialog"))
+    .toEqual([{ type: "dialog", action: "accept" }]);
   expect(ofType(fake.inputs, "tab")).toHaveLength(1);
 });
 
