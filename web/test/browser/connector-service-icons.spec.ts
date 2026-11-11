@@ -7,7 +7,7 @@ for (const theme of ["light", "dark"] as const) {
   }, testInfo) => {
     const connectors = await Promise.all(
       ["gmail", "naver-blog"].map(async (id) => {
-        const root = new URL(`../../hermes/connectors/${id}/`, import.meta.url);
+        const root = new URL(`../../../hermes/connectors/${id}/`, import.meta.url);
         const manifest = JSON.parse(
           await readFile(new URL("assistant.json", root), "utf8"),
         );
