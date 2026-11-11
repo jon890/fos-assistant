@@ -6,7 +6,8 @@ export type NotificationKind =
   | "TASK_SKIPPED"
   | "CONNECTOR_REINSTALLED"
   | "EVENT_CHECK_REPORTED"
-  | "EVENT_WATCH_FAILED";
+  | "EVENT_WATCH_FAILED"
+  | "HANDOFF_REQUESTED";
 
 /** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다. `ADMIN_CONNECTIONS` 와 `CONNECTIONS` 는 목록 화면이라 `targetId` 가 없다 */
 export type NotificationTargetType =

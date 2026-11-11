@@ -6,6 +6,7 @@ import { Composer } from "./composer";
 import { StartScreenHeader, StarterPrompts } from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
 import { ApprovalList } from "./approval-list";
+import { HandoffList } from "./handoff-list";
 import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
 import { ActivityPanel } from "./activity/activity-panel";
@@ -247,6 +248,13 @@ export function ConversationSessionView({
               </div>
             </div>
           ) : null}
+          <HandoffList
+            conversationId={conversationId}
+            refreshKey={approvalRefresh}
+            onDone={(text) => {
+              void submit([], text);
+            }}
+          />
           <ApprovalList
             conversationId={conversationId}
             refreshKey={approvalRefresh}
