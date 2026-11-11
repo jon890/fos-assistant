@@ -32,7 +32,6 @@ public record ConnectorHandoffRequest(
     /** 화면 입력 {@code tab} 의 {@code id} 와 같은 모양이다. */
     private static final Pattern TAB = Pattern.compile("^[A-Za-z0-9]{1,128}$");
 
-
     /**
      * 본문을 읽고 서명을 확인한다.
      *

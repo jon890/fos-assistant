@@ -24,8 +24,8 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update ConnectorAction a set a.handoffNeed = :need, a.handoffTab = :tab, a.handoffAt = :now
-            where a.id = :id and a.handoffNeed is null
+            update ConnectorAction a set a.handoff.need = :need, a.handoff.tab = :tab, a.handoff.at = :now
+            where a.id = :id and a.handoff.need is null
             """)
     int record(@Param("id") Long id, @Param("need") HandoffNeed need, @Param("tab") String tab, @Param("now") Instant now);
 
@@ -34,8 +34,8 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
     @Query("""
             select a from ConnectorAction a
             where a.conversationId = :conversationId and a.userId = :userId
-              and a.handoffNeed is not null and a.handoffClosedAt is null
-            order by a.handoffAt desc, a.id desc
+              and a.handoff.need is not null and a.handoff.closedAt is null
+            order by a.handoff.at desc, a.id desc
             """)
     List<ConnectorAction> findOpen(@Param("conversationId") Long conversationId, @Param("userId") Long userId);
 
@@ -43,7 +43,7 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
     /** 그 대화에서 닫히지 않은 넘기기다. 대화의 주인과 상관없이 고른다. */
     @Query("""
             select a from ConnectorAction a
-            where a.conversationId = :conversationId and a.handoffNeed is not null and a.handoffClosedAt is null
+            where a.conversationId = :conversationId and a.handoff.need is not null and a.handoff.closedAt is null
             """)
     List<ConnectorAction> findOpen(@Param("conversationId") Long conversationId);
 
@@ -51,8 +51,8 @@ public interface ConnectorHandoffRepository extends Repository<ConnectorAction, 
     /** 열린 줄에만 닫은 시각을 적는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-            update ConnectorAction a set a.handoffClosedAt = :now
-            where a.id in :ids and a.handoffClosedAt is null
+            update ConnectorAction a set a.handoff.closedAt = :now
+            where a.id in :ids and a.handoff.closedAt is null
             """)
     int close(@Param("ids") Collection<Long> ids, @Param("now") Instant now);
 }

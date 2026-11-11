@@ -98,9 +98,9 @@ public class ConnectorHandoffs {
                 action.publicId(),
                 action.connectorId(),
                 titleOf(action.connectorId()),
-                action.handoffNeed(),
-                action.handoffTab(),
-                action.handoffAt()))
+                action.handoff().need(),
+                action.handoff().tab(),
+                action.handoff().at()))
             .toList();
     }
 
@@ -117,8 +117,7 @@ public class ConnectorHandoffs {
             return;
         }
         handoffs.close(open.stream().map(ConnectorAction::id).toList(), clock.instant());
-        open.forEach(action ->
-            notifications.resolve(action.userId(), NotificationKind.HANDOFF_REQUESTED, action.publicId()));
+        open.forEach(action -> notifications.resolve(action.userId(), NotificationKind.HANDOFF_REQUESTED, action.publicId()));
         open.forEach(this::afterCommit);
     }
 

@@ -4,7 +4,6 @@ import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.action.domain.type.ActionDecision;
 import com.bifos.assistant.connector.action.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
-import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.action.domain.type.GrantScope;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
@@ -217,24 +216,9 @@ public class ConnectorAction {
     @Column(name = "limit_previous", precision = 20, scale = 6, updatable = false)
     private BigDecimal limitPrevious;
 
-    /**
-     * 플러그인이 사람에게 화면을 넘긴 단계다. 넘기지 않은 줄은 null 이다. 넘기기 네 칸은 {@code ConnectorActionRepository} 의
-     * 조건부 갱신으로만 쓴다. 뜻은 {@code backend/docs/data-schema.md} 의 「connector_action」 이 갖는다.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "handoff_need", length = 20)
-    private HandoffNeed handoffNeed;
-
-    /** 플러그인이 남긴 「내 브라우저」 탭의 CDP target id 다. */
-    @Column(name = "handoff_tab", length = 128)
-    private String handoffTab;
-
-    @Column(name = "handoff_at")
-    private Instant handoffAt;
-
-    /** 그 대화의 다음 turn 이 시작돼 카드를 닫은 시각이다. 열려 있으면 null 이다. */
-    @Column(name = "handoff_closed_at")
-    private Instant handoffClosedAt;
+    /** 플러그인이 사람에게 화면을 넘긴 기록이다. 넘기지 않은 줄은 null 이다. */
+    @Embedded
+    private ActionHandoff handoff;
 
     /** 승인하면서 함께 준 허락이다. 허락을 주지 않은 줄은 null 이다(ADR-20261102 / table-reduce-r2). */
     @Embedded
@@ -489,16 +473,13 @@ public class ConnectorAction {
 
     /** 함께 준 대화 허락을 거둔다. 그 실행이 실패했거나 결과를 모를 때 부른다. 상시 허락은 건드리지 않는다. */
     public void revokeConversationGrant(Instant now) {
-        if (grant != null && grant.scope() == GrantScope.CONVERSATION) {
-            grant.revoke(now);
-        }
+        ActionGrant.revokeConversation(grant, now);
     }
 
 
     /** 함께 준 대화 허락이 {@code now} 에 아직 유효하면 끝나는 시각이고 아니면 null 이다. */
     public Instant activeConversationGrantExpiresAt(Instant now) {
-        boolean active = grant != null && grant.scope() == GrantScope.CONVERSATION && grant.activeAt(now);
-        return active ? grant.expiresAt() : null;
+        return ActionGrant.conversationExpiresAt(grant, now);
     }
 
 

@@ -29,6 +29,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -154,10 +155,8 @@ class ConnectorHandoffEndpointTest {
         insertAction("root-2", "call-2", false, conversation.id());
         insertAction("root-3", "call-3", true, conversation.id());
 
-        HttpResponse<String> missing =
-            post(McpCallSigner.handoffBody(token, TOOL, "root-9", "root-9", "call-9", CODE, "login", "TAB1"));
-        HttpResponse<String> denied =
-            post(McpCallSigner.handoffBody(token, TOOL, "root-2", "root-2", "call-2", CODE, "login", "TAB1"));
+        HttpResponse<String> missing = post(McpCallSigner.handoffBody(token, TOOL, "root-9", "root-9", "call-9", CODE, "login", "TAB1"));
+        HttpResponse<String> denied = post(McpCallSigner.handoffBody(token, TOOL, "root-2", "root-2", "call-2", CODE, "login", "TAB1"));
         HttpResponse<String> otherTool = post(McpCallSigner.handoffBody(
             token, "mcp__naver_shopping__get_product_detail", "root-3", "root-3", "call-3", CODE, "login", "TAB1"));
         ObjectNode forged = McpCallSigner.handoffBody(token, TOOL, "root-3", "root-3", "call-3", CODE, "login", "TAB1");
@@ -242,7 +241,7 @@ class ConnectorHandoffEndpointTest {
             conversationId,
             ConnectorActionKey.of(PROFILE, root, root, call).value(),
             "0".repeat(64),
-            java.sql.Timestamp.from(NOW));
+            Timestamp.from(NOW));
     }
 
 
