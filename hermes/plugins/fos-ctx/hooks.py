@@ -18,6 +18,7 @@ from .context import (
     build_context,
     logger,
 )
+from .handoff import report_handoff
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 
 
@@ -150,17 +151,22 @@ def wrap_external_data(body: str) -> str:
     return EXTERNAL_DATA_NOTICE + "\n<external-data>\n" + escaped + "\n</external-data>"
 
 
-def transform_tool_result(tool_name="", result=None, **_):
+def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id="", **_):
     """바인딩 profile 의 플러그인 도구 결과를 `<external-data>` 로 감싼 글로 바꾼다. 그 밖에는 None 이다.
 
     Hermes 는 결과가 문맥에 들어가기 전에 이 hook 을 부르고, 처음 돌려준 글로 결과를 바꾼다.
     판정이 막은 호출은 여기 닿지 않는다. 그래서 여기 닿은 `{"error": ...}` 도 플러그인 서버가 낸 외부 데이터로 감싼다.
+    대응 파일의 서버와 맞는 도구의 결과에 화면 넘기기 칸이 있으면 감싸기 전에 Control Plane 에 알린다(`handoff.py`).
     """
     try:
         if not isinstance(tool_name, str) or not tool_name.startswith(MCP_PREFIX) or not isinstance(result, str):
             return None
         servers, isolated = read_tool_map()
-        if servers is None or isolated or _connector_server(tool_name, servers) is None:
+        if servers is None or _connector_server(tool_name, servers) is None:
+            return None
+        # 사람에게 화면을 넘긴 결과면 Control Plane 에 알린다. 알리지 못해도 결과는 그대로 간다.
+        report_handoff(tool_name, result, session_id, tool_call_id)
+        if isolated:
             return None
         return wrap_external_data(result)
     except Exception as exc:
