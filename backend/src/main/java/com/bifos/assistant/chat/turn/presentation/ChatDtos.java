@@ -157,8 +157,11 @@ public final class ChatDtos {
     /**
      * 대화 한 줄이다. 목록, 이름 바꾸기, 모델 선택이 같은 모양으로 돌려준다.
      * @param id 대화의 공개 식별자
-     * @param agentCode 대화의 에이전트 코드. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
-     * @param agentName 대화의 에이전트 이름. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
+     * @param agentCode 대화의 에이전트 코드. 에이전트 행이 없거나 지웠거나 대화에 에이전트가 없으면 null. 지운 에이전트를 정리 전에도
+     * 「지운 에이전트」 로 그리게 행이 없을 때와 같게 둔다
+     * @param agentName 대화의 에이전트 이름. 에이전트 행이 없거나 지웠거나 대화에 에이전트가 없으면 null
+     * @param agentIcon 대화의 에이전트 아이콘. 정하지 않았거나 {@code agentName} 이 null 이면 null
+     * @param agentColor 대화의 에이전트 색 이름. 정하지 않았거나 {@code agentName} 이 null 이면 null
      * @param purpose 보통 대화인지 먼저 살펴보기의 점검 대화인지. 화면이 점검 대화를 알아보는 데 쓴다
      * @param taskId 이 대화를 만든 예약 작업의 공개 식별자. 작업이 만든 대화가 아니면 null
      * @param taskTitle 그 작업의 이름. 지운 작업도 이름을 싣는다. 작업이 만든 대화가 아니면 null
@@ -168,6 +171,8 @@ public final class ChatDtos {
         String title,
         String agentCode,
         String agentName,
+        String agentIcon,
+        String agentColor,
         Instant updatedAt,
         ModelSelectionMode modelSelectionMode,
         ModelTier modelTier,

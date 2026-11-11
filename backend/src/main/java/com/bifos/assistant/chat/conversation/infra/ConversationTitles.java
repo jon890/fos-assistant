@@ -53,6 +53,34 @@ public class ConversationTitles implements ConversationTitleOpener {
     }
 
 
+    /** 방금 적은 암호문 제목이 그 평문으로 풀리는지 본다. 이미 있는 줄을 암호화하는 배치가 옛 제목을 잃지 않게 한다. */
+    public boolean opensTo(Conversation conversation, String plain) {
+        return cipher.open(
+            conversation.titleKeyId(),
+            conversation.userId(),
+            aad(conversation.id(), conversation.userId()),
+            conversation.storedTitle())
+            .filter(plain::equals)
+            .isPresent();
+    }
+
+
+    /**
+     * 암호문 제목을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다.
+     *
+     * @return 풀지 못하면 거짓이고 줄은 그대로다
+     */
+    public boolean unseal(Conversation conversation) {
+        Optional<String> opened = cipher.open(
+            conversation.titleKeyId(),
+            conversation.userId(),
+            aad(conversation.id(), conversation.userId()),
+            conversation.storedTitle());
+        opened.ifPresent(conversation::unsealTitle);
+        return opened.isPresent();
+    }
+
+
     @Override
     public String open(Conversation conversation) {
         return cipher.open(

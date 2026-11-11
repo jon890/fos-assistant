@@ -50,6 +50,9 @@ public final class AgentAdminDtos {
      *
      * @param proactiveCheckWritesAllowed 「먼저 살펴보기에 쓰기 도구 허용」. 관리자 전용 값이라 사용자 응답
      * {@link AgentView} 에는 싣지 않는다(ADR-063, ADR-082)
+     * @param description 한 줄 소개. 관리자 영역 상세가 남의 비공개 에이전트의 소개를 이 값으로 그린다. 없으면 null
+     * @param icon 아이콘. 없으면 null
+     * @param color 색 이름. 없으면 null
      */
     public record AdminAgentView(
         Long id,
@@ -62,7 +65,10 @@ public final class AgentAdminDtos {
         String visibility,
         Long ownerUserId,
         boolean enabled,
-        boolean proactiveCheckWritesAllowed) {
+        boolean proactiveCheckWritesAllowed,
+        String description,
+        String icon,
+        String color) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(
                 agent.id(),
@@ -75,7 +81,10 @@ public final class AgentAdminDtos {
                 agent.visibility().name(),
                 agent.ownerUserId(),
                 agent.enabled(),
-                agent.proactiveCheckWritesAllowed());
+                agent.proactiveCheckWritesAllowed(),
+                agent.description(),
+                agent.icon(),
+                agent.color() == null ? null : agent.color().name());
         }
     }
 }

@@ -193,7 +193,7 @@ class DataKeyServiceTest {
     void rewrapsKeysWrappedWithOldKek() {
         Long userId = anyUserId();
         FileKeyEncryptionKeys oldKeks = new FileKeyEncryptionKeys(
-            new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10));
+            new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10, null, 0));
         byte[] dataKey = new byte[32];
         Arrays.fill(dataKey, (byte)3);
         UserDataKey row = keys.saveAndFlush(UserDataKey.wrapped(

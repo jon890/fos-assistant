@@ -4,6 +4,7 @@ import { describeError } from "@/components/error-message";
 import { parseSkillCommand } from "./skill-command";
 import { emptyActivity, failActivity } from "./activity/activity-state";
 import { startChatStream } from "@/lib/chat-api";
+import { createPendingAnswer } from "./pending-answer";
 import {
   TurnStreamState,
   ErrorPayload,
@@ -103,6 +104,7 @@ export function useConversationSend({
     let needsCreationRefresh = conversationIdRef.current === null;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
+    const answer = createPendingAnswer(setTurns, assistantPendingId);
     const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
     let handedOff = false;
@@ -308,35 +310,11 @@ export function useConversationSend({
             needsCreationRefresh = false;
             void refresh();
           },
-          onDelta: (textDelta) => {
-            setTurns((previous) => {
-              const current = previous.find(
-                (turn) => turn.id === assistantPendingId,
-              );
-              if (!current)
-                return [
-                  ...previous,
-                  {
-                    id: assistantPendingId,
-                    role: "ASSISTANT",
-                    content: textDelta,
-                    senderName: null,
-                  },
-                ];
-              return previous.map((turn) =>
-                turn.id === assistantPendingId
-                  ? { ...turn, content: turn.content + textDelta }
-                  : turn,
-              );
-            });
-          },
-          onReset: () => {
-            // 막혀서 넘어간 시도의 조각이다. 화면에 남으면 읽는 사람이 그것을 답으로 읽는다.
-            setTurns((previous) =>
-              previous.filter((turn) => turn.id !== assistantPendingId),
-            );
-          },
+          onDelta: answer.onDelta,
+          onReset: answer.onReset,
+          onReplace: answer.onReplace,
           onDone: async (event) => {
+            await answer.finish();
             assignConversationId(event.conversationId!);
             needsCreationRefresh = false;
             await Promise.all([

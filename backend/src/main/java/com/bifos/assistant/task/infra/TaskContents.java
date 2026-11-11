@@ -4,6 +4,7 @@ import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.task.domain.Task;
 import com.bifos.assistant.task.domain.TaskContentOpener;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -52,6 +53,45 @@ public class TaskContents implements TaskContentOpener {
             sealedTitle.keyId(),
             sealedInstruction == null ? null : sealedInstruction.content(),
             sealedInstruction == null ? null : sealedInstruction.keyId());
+    }
+
+
+    /** 방금 적은 암호문이 그 평문으로 풀리는지 본다. 이미 있는 줄을 암호화하는 배치가 옛 글을 잃지 않게 한다. */
+    public boolean opensTo(Task task, String title, String instruction) {
+        boolean titleOk = cipher.open(task.titleKeyId(), task.ownerUserId(), aad(task, "title"), task.storedTitle())
+            .filter(title::equals)
+            .isPresent();
+        if (task.instructionKeyId() == null) {
+            return titleOk && instruction == null && task.storedInstruction() == null;
+        }
+        return titleOk
+            && cipher.open(task.instructionKeyId(), task.ownerUserId(), aad(task, "instruction"), task.storedInstruction())
+                .filter(opened -> opened.equals(instruction))
+                .isPresent();
+    }
+
+
+    /**
+     * 암호문 제목과 지시문을 풀어 평문과 빈 key 칸으로 되돌린다. 옛 버전으로 내리기 전의 풀기 배치만 쓴다.
+     *
+     * @return 하나라도 풀지 못하면 거짓이고 줄은 그대로다
+     */
+    public boolean unseal(Task task) {
+        Optional<String> title = cipher.open(task.titleKeyId(), task.ownerUserId(), aad(task, "title"), task.storedTitle());
+        if (title.isEmpty()) {
+            return false;
+        }
+        String instruction = task.storedInstruction();
+        if (task.instructionKeyId() != null) {
+            Optional<String> opened = cipher.open(
+                task.instructionKeyId(), task.ownerUserId(), aad(task, "instruction"), task.storedInstruction());
+            if (opened.isEmpty()) {
+                return false;
+            }
+            instruction = opened.get();
+        }
+        task.unsealContent(title.get(), instruction);
+        return true;
     }
 
 

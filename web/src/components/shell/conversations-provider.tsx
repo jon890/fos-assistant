@@ -24,6 +24,9 @@ export type Conversation = {
   title: string;
   agentCode: string | null;
   agentName: string | null;
+  /** 대화의 에이전트 아이콘과 색. 지운 에이전트와 고르지 않은 에이전트는 null 이다 */
+  agentIcon?: string | null;
+  agentColor?: string | null;
   updatedAt: string;
   /** 칸을 고른 대화는 `TIER` 다. 고르지 않은 대화는 null 이고 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. */
   modelSelectionMode?: "TIER" | null;
