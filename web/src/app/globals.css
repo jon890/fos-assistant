@@ -44,6 +44,22 @@
   --color-code-function: var(--code-function);
   --color-code-type: var(--code-type);
   --color-code-comment: var(--code-comment);
+  --color-agent-violet: var(--agent-violet);
+  --color-agent-violet-soft: var(--agent-violet-soft);
+  --color-agent-blue: var(--agent-blue);
+  --color-agent-blue-soft: var(--agent-blue-soft);
+  --color-agent-teal: var(--agent-teal);
+  --color-agent-teal-soft: var(--agent-teal-soft);
+  --color-agent-green: var(--agent-green);
+  --color-agent-green-soft: var(--agent-green-soft);
+  --color-agent-amber: var(--agent-amber);
+  --color-agent-amber-soft: var(--agent-amber-soft);
+  --color-agent-orange: var(--agent-orange);
+  --color-agent-orange-soft: var(--agent-orange-soft);
+  --color-agent-rose: var(--agent-rose);
+  --color-agent-rose-soft: var(--agent-rose-soft);
+  --color-agent-slate: var(--agent-slate);
+  --color-agent-slate-soft: var(--agent-slate-soft);
   --radius-sm: 0.25rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -114,6 +130,23 @@
   --code-function: #0369a1;
   --code-type: #9f1239;
   --code-comment: #5f6b7a;
+  /* 에이전트 이름표의 색이다. 이름은 backend 의 AgentColor 와 web/src/lib/agent-badge.ts 가 같이 갖는다 */
+  --agent-violet-soft: #ece6ff;
+  --agent-violet: #4c2fc9;
+  --agent-blue-soft: #e3edfd;
+  --agent-blue: #1d4fa8;
+  --agent-teal-soft: #ddf3f1;
+  --agent-teal: #0f6b64;
+  --agent-green-soft: #e3f4e8;
+  --agent-green: #1c6b3c;
+  --agent-amber-soft: #fdf1d8;
+  --agent-amber: #8a5300;
+  --agent-orange-soft: #fde8dc;
+  --agent-orange: #a2400e;
+  --agent-rose-soft: #fde6ec;
+  --agent-rose: #a51d44;
+  --agent-slate-soft: #eceef2;
+  --agent-slate: #3f4756;
 }
 
 .dark {
@@ -157,6 +190,22 @@
   --code-function: #7dd3fc;
   --code-type: #fda4af;
   --code-comment: #94a3b8;
+  --agent-violet-soft: #2b2350;
+  --agent-violet: #cbbeff;
+  --agent-blue-soft: #172a4a;
+  --agent-blue: #b5cdf7;
+  --agent-teal-soft: #12302d;
+  --agent-teal: #9fe0d8;
+  --agent-green-soft: #15301f;
+  --agent-green: #a9dfb9;
+  --agent-amber-soft: #3a2a0d;
+  --agent-amber: #f5d08a;
+  --agent-orange-soft: #3d2112;
+  --agent-orange: #f7bd9a;
+  --agent-rose-soft: #3d1622;
+  --agent-rose: #f5b3c5;
+  --agent-slate-soft: #242832;
+  --agent-slate: #c9cfdb;
 }
 
 /* 색을 적지 않은 테두리는 글자색이 된다. 기본을 border 토큰으로 두고, 색을 정한 클래스가 그 위에 온다. */

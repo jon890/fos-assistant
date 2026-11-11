@@ -134,6 +134,17 @@ export async function loadAgentDetail(
     : undefined;
   const canManageAccess = listed?.editable === true || adminAgent !== undefined;
   const listHref = admin ? "/admin/agents" : "/agents";
+  // 관리자 목록의 줄이 남의 비공개 에이전트에도 있으므로 먼저 본다. 할 수 있는 일은 일반 목록에만 있다.
+  const introductionSource = adminAgent ?? listed;
+  const introduction = introductionSource
+    ? {
+        name: introductionSource.name,
+        description: introductionSource.description,
+        icon: introductionSource.icon,
+        color: introductionSource.color,
+        capabilities: listed?.capabilities,
+      }
+    : undefined;
   // 일반 화면에서 내가 쓸 수 있는 목록에 든 에이전트만 대화를 연다.
   const chatHref = !admin && listed !== undefined ? `/?agent=${code}` : null;
 
@@ -153,6 +164,7 @@ export async function loadAgentDetail(
           canManageAccess={canManageAccess}
           adminError={null}
           listHref={listHref}
+          introduction={introduction}
         />
       );
     }
@@ -186,6 +198,7 @@ export async function loadAgentDetail(
       adminError={adminError}
       listHref={listHref}
       chatHref={chatHref}
+      introduction={introduction}
     />
   );
 }

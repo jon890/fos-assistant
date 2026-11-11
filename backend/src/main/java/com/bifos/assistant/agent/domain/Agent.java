@@ -1,6 +1,7 @@
 package com.bifos.assistant.agent.domain;
 
 import com.bifos.assistant.shared.domain.AuditedEntity;
+import com.bifos.assistant.agent.domain.type.AgentColor;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -105,6 +106,22 @@ public class Agent extends AuditedEntity {
     @Column(name = "deleted_at")
     @Getter
     private Instant deletedAt;
+
+    /** 한 줄 소개. 비어 있으면 화면이 할 수 있는 일로 대신 보인다({@link AgentIntroduction}). */
+    @Column(length = AgentIntroduction.MAX_DESCRIPTION_CHARS)
+    @Getter
+    private String description;
+
+    /** {@link AgentIntroduction#ICONS} 가운데 하나. 비어 있으면 화면이 이름 첫 글자를 그린다. */
+    @Column(length = 16)
+    @Getter
+    private String icon;
+
+    /** 이름표의 색. 비어 있으면 화면이 {@code code} 로 정한 자동 색을 쓴다. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    @Getter
+    private AgentColor color;
 
     /**
      * 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다.
@@ -230,6 +247,15 @@ public class Agent extends AuditedEntity {
      */
     public void changeProactiveCheckWritesAllowed(boolean allowed) {
         this.proactiveCheckWritesAllowed = allowed;
+    }
+
+
+    /** 이름과 소개, 아이콘, 색을 한 번에 바꾼다. 값 판정은 {@link AgentIntroduction#of} 가 끝냈다. */
+    public void changeIntroduction(AgentIntroduction introduction) {
+        this.name = introduction.name();
+        this.description = introduction.description();
+        this.icon = introduction.icon();
+        this.color = introduction.color();
     }
 
 

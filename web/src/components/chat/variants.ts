@@ -1,10 +1,5 @@
 import { cva } from "class-variance-authority";
 
-/** 비서의 답 앞에 두는 둥근 머리글자다. 답과 답을 기다리는 줄이 같은 모양을 쓴다 */
-export const assistantAvatar = cva(
-  "flex size-8 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground",
-);
-
 /** 마우스를 올리거나 초점이 들어올 때만 보이는 보낸 시각이다 */
 export const revealedTime = cva(
   "invisible text-xs text-muted-foreground group-hover:visible group-focus-within:visible",

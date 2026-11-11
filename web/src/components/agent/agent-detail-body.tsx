@@ -17,6 +17,10 @@ import { AgentSkillsSection } from "./agent-skills-section";
 import { AgentToolsSection } from "./agent-tools-section";
 import { PersonaEditor } from "./persona-editor";
 import {
+  AgentIntroductionSection,
+  type AgentIntroductionValue,
+} from "./agent-introduction-section";
+import {
   GROUP_VISIBILITY,
   type AdminAgent,
   type AgentToolsView,
@@ -52,6 +56,8 @@ type Props = {
   listHref: string;
   /** 이 에이전트와 새 대화를 여는 주소다. 요청자가 대화할 수 있는 에이전트일 때만 있다. */
   chatHref?: string | null;
+  /** 「소개」 절의 처음 값이다. 목록에서 찾지 못하면 없고 절을 그리지 않는다. */
+  introduction?: AgentIntroductionValue;
 };
 
 type ErrorPayload = { code: string; message: string };
@@ -81,7 +87,7 @@ async function readPersona(code: string): Promise<Loaded<PersonaView>> {
  */
 export function AgentDetailBody({
   code,
-  name,
+  name: initialName,
   initialPersona,
   tools,
   skills,
@@ -93,8 +99,11 @@ export function AgentDetailBody({
   adminError,
   listHref,
   chatHref = null,
+  introduction,
 }: Props) {
   const [visibility, setVisibility] = useState(initialVisibility);
+  // 「소개」 절에서 이름을 바꾸면 제목도 함께 바꾼다.
+  const [name, setName] = useState(initialName);
   // 도구 절과 연결 절이 서로의 위험을 알린다. 도구 절이 켜진 도구를, 연결 절이 붙은 연결이 있는지를 알려 준다.
   const [toolState, setToolState] = useState<AgentToolsView | null>(
     tools?.ok ? tools.data.initialTools : null,
@@ -158,6 +167,14 @@ export function AgentDetailBody({
           )}
         </>
       )}
+      {introduction ? (
+        <AgentIntroductionSection
+          code={code}
+          initial={introduction}
+          editable={canManageAccess}
+          onSaved={setName}
+        />
+      ) : null}
       {connections === null ? null : connections.ok ? (
         <AgentConnectionsSection
           code={code}

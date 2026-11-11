@@ -6,6 +6,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
 import type { AgentView } from "@/lib/agent";
+import { capabilitiesLine } from "@/lib/agent-badge";
+import { AgentBadge } from "@/components/agent/agent-badge";
 
 export default async function AgentsPage({
   searchParams,
@@ -40,8 +42,23 @@ export default async function AgentsPage({
                 href={`/agents/${agent.code}`}
                 className="block rounded-lg"
               >
-                <Card className="flex-row items-center px-4 hover:bg-accent">
-                  <span className="text-base font-medium">{agent.name}</span>
+                <Card className="flex-row items-center gap-3 px-4 hover:bg-accent">
+                  <AgentBadge agent={agent} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-base font-medium">
+                      {agent.name}
+                    </span>
+                    {agent.description ? (
+                      <span className="block truncate text-sm text-muted-foreground">
+                        {agent.description}
+                      </span>
+                    ) : null}
+                    {capabilitiesLine(agent.capabilities) ? (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {capabilitiesLine(agent.capabilities)}
+                      </span>
+                    ) : null}
+                  </span>
                 </Card>
               </Link>
             </li>
