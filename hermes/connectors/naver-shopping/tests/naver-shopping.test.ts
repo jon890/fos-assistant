@@ -90,9 +90,7 @@ test("사람이 해야 하는 화면이면 오류에 넘기기 칸(need, 남긴 
     arguments: { query: "물티슈" },
   });
   expect(result.isError).toBe(true);
-  expect(
-    JSON.parse((result.content as { text: string }[])[0]!.text),
-  ).toEqual({
+  expect(JSON.parse((result.content as { text: string }[])[0]!.text)).toEqual({
     error: {
       code: "NAVER_SHOPPING_LOGIN_REQUIRED",
       handoff: { need: "login", tab: "tab-1" },
