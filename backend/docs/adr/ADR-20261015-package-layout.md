@@ -35,7 +35,7 @@
 | 기능 | 하위 기능(아래에서 위로) |
 | --- | --- |
 | `chat` | `conversation`, `delivery`, `modelchoice`, `attachment`, `artifact`, `contentdraft`, `starter`, `turn`, `nextturn`, `recovery`, `purge` |
-| `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval` |
+| `connector` | `connection`, `action`, `financial`, `contentdraft`, `approval`, `handoff` |
 | `proactive` | `check` |
 | `usage` | `pricing`, `execution`, `subagent`, `tree`, `summary` |
 | `skill` | `usage`, `library`, `upload` |
@@ -60,6 +60,7 @@
 | `connector.financial` | 금융 준비, 주문 상한, 실행 보증(claim, ticket, guard) |
 | `connector.contentdraft` | 원고 작업의 시작과 저장 승인 |
 | `connector.approval` | 도구 호출의 판정, 승인 흐름의 조율, 승인 API |
+| `connector.handoff` | 플러그인이 사람에게 화면을 넘긴 호출의 기록, 알림과 대화의 카드, 다음 turn 에서 닫기 |
 | `proactive.check` | 먼저 살펴보기 turn, 결과 계약의 검사, 보고와 되풀이 판정 |
 | `usage.pricing` | 가격표와 비용 환산 |
 | `usage.execution` | 실행 기록, 실행 사건, 실행 질문 연결, 사용자 실행 한도 |

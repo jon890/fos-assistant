@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
+import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SequenceCounter;
@@ -41,6 +42,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /** turn 의 명령과 실행 줄을 만들고 답과 종료 상태를 남긴다. */
@@ -58,6 +60,7 @@ class ChatTurnLifecycle {
     private final ArtifactService artifacts;
     private final ArtifactAutoVault autoVault;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ChatRunEvents chatRunEvents;
 
@@ -115,6 +118,8 @@ class ChatTurnLifecycle {
         if (TurnIntent.unattended(intent)) {
             executionMarks.markUnattended(execution.id());
         }
+        // 화면 넘기기 카드처럼 다음 turn 에 닫는 것이 듣는다. 듣는 쪽은 커밋 뒤에 돈다.
+        events.publishEvent(new ConversationTurnStarted(conversation.id()));
         return new PendingTurn(
             user,
             conversation,
