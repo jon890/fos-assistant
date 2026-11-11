@@ -35,6 +35,7 @@
    문서만 바꾸는 PR 은 CI 의 web 검사를 건너뛴다([ADR-20261012 / ci-path-filter](ADR-20261012-ci-path-filter.md)).
    그래서 문서를 읽는 테스트는 언제나 도는 루트 단위 검사에 있어야 한다.
    웹 함수의 문구를 `docs/features/attention.md` 와 맞춰 보는 `attention.test.ts` 가 그 예다.
+   웹 목록을 backend 의 Java 파일과 대조하는 `agent-badge.test.ts` 도 같다. 웹 함수를 부르지만 backend 파일을 읽으므로 `web/test/unit` 이 아니라 `test/repo` 에 둔다.
 4. **웹 모듈은 그 안의 `test/` 를 운영 코드처럼 다루지 않는다.**
    `web/tsconfig.json` 은 `test` 를 제외해 Next 빌드와 `pnpm typecheck` 에 들어가지 않고,
    `web/eslint.config.mjs` 는 `test/**` 를 무시하고, `web/.prettierignore` 가 `test` 를 뺀다.
