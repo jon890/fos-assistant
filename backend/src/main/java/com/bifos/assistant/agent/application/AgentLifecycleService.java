@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.application.port.ReservedProfileNames;
 import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -43,9 +44,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @RequiredArgsConstructor
 public class AgentLifecycleService {
-
-    /** {@code agent.name} 칸의 길이와 같다. */
-    private static final int MAX_NAME_CHARS = 100;
 
     /** 무작위로 뽑는 글자 수. 소문자 영숫자 36자에서 10자라 겹칠 일이 거의 없다. */
     private static final int RANDOM_CHARS = 10;
@@ -109,7 +107,7 @@ public class AgentLifecycleService {
 
 
     private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility) {
-        String agentName = requireName(name);
+        String agentName = AgentIntroduction.requireName(name);
         AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
 
         String code = CODE_PREFIX + randomChars();
@@ -186,6 +184,22 @@ public class AgentLifecycleService {
         }
         agent.changeAccess(agent.enabled(), visibility, ownerId);
         return agents.save(agent);
+    }
+
+
+    /**
+     * 주인이나 {@code ADMIN} 이 이름과 소개, 아이콘, 색을 바꾼다(docs/features/agent-team/spec.md 의 REQ1).
+     *
+     * <p>행을 잠그고 다시 읽은 뒤 쓴다. {@link Agent} 는 저장할 때 모든 칸을 쓰므로, 잠그지 않고 읽어 둔 값을 저장하면 그 사이
+     * 바뀐 공개 범위와 주인, 지운 시각을 옛 값으로 덮는다. 판정은 공개 범위 바꾸기와 같다.
+     */
+    public Agent changeIntroduction(CurrentUser user, String code, AgentIntroduction introduction) {
+        Long agentId = agents.findIdByCode(code).orElseThrow(AgentLifecycleService::notFound);
+        return transactions.execute(status -> {
+            Agent agent = requireManageable(user, lockById(agentId));
+            agent.changeIntroduction(introduction);
+            return agents.save(agent);
+        });
     }
 
 
@@ -268,16 +282,6 @@ public class AgentLifecycleService {
                 ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF,
                 "turn off shell and file toolsets before changing the owner");
         }
-    }
-
-
-    private static String requireName(String name) {
-        String stripped = name == null ? "" : name.strip();
-        if (stripped.isEmpty() || stripped.length() > MAX_NAME_CHARS) {
-            throw new ApiException(
-                ErrorCode.VALIDATION_FAILED, "an agent name must be 1 to " + MAX_NAME_CHARS + " characters");
-        }
-        return stripped;
     }
 
 

@@ -2,6 +2,8 @@ package com.bifos.assistant.mcp.application;
 
 import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
+import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
+import com.bifos.assistant.agent.application.dto.AgentCapabilities;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -78,6 +80,7 @@ public class McpToolService {
     private final QueryEmbedder queryEmbedder;
     private final ArtifactWriteService artifacts;
     private final AgentDelegationService delegations;
+    private final AgentCapabilitiesReader capabilitiesReader;
     private final ExecutionDeliveryWriter deliveryWriter;
     private final ExecutionOutputs executionOutputs;
     /** {@code memory_read} 로 본문을 낸 항목을 그 실행의 문맥 기록 끝에 덧붙인다. */
@@ -191,10 +194,16 @@ public class McpToolService {
     }
 
 
-    /** 요청자가 쓸 수 있는 에이전트를 {@code code} 와 {@code name} 만 담은 JSON 배열로 돌려준다. profile, 주소, 모델, 공개 범위는 싣지 않는다. */
+    /**
+     * 요청자가 쓸 수 있는 에이전트를 JSON 배열로 돌려준다. {@code code}, {@code name} 에 더해 소개와 할 수 있는 일을 비어 있지 않을 때만
+     * 싣는다(docs/features/agent-team/spec.md 의 REQ2). 매 위임 판단에 실리므로 빈 칸을 빼 글을 줄인다. profile, 주소, 모델, 공개
+     * 범위는 싣지 않는다.
+     */
     public Map<String, Object> listAgents(McpCaller caller) {
-        List<Map<String, Object>> listed = delegations.list(caller.user()).stream()
-            .map(McpToolService::agentSummary)
+        List<Agent> listable = delegations.list(caller.user());
+        Map<Long, AgentCapabilities> capabilities = capabilitiesReader.read(listable);
+        List<Map<String, Object>> listed = listable.stream()
+            .map(agent -> agentSummary(agent, capabilities.getOrDefault(agent.id(), AgentCapabilities.NONE)))
             .toList();
         return result(JSON.writeValueAsString(listed), false);
     }
@@ -337,10 +346,19 @@ public class McpToolService {
     }
 
 
-    private static Map<String, Object> agentSummary(Agent agent) {
+    private static Map<String, Object> agentSummary(Agent agent, AgentCapabilities capabilities) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("code", agent.code());
         summary.put("name", agent.name());
+        if (agent.description() != null) {
+            summary.put("description", agent.description());
+        }
+        if (!capabilities.connectors().isEmpty()) {
+            summary.put("connectors", capabilities.connectors());
+        }
+        if (!capabilities.skills().isEmpty()) {
+            summary.put("skills", capabilities.skills());
+        }
         return summary;
     }
 

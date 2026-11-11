@@ -333,6 +333,8 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
+- `description`, `icon`, `color` 는 화면과 위임 도구 `agent_list` 가 쓰는 한 줄 소개와 이름표다. Hermes 는 읽지 않는다. 비면 화면이 할 수 있는 일, 이름 첫 글자, `code` 로 정한 자동 색으로 대신 그린다. 고를 수 있는 값과 상한은 `AgentIntroduction` 과 `AgentColor` 가 갖는다([에이전트 팀](../../docs/features/agent-team.md))
+- 첫 로그인에 만든 에이전트(기본 비서)는 이름이 「비서」 다. `V20261105074407` 이 이미 있던 첫 에이전트 가운데 이름이 사용자 표시 이름 그대로이고 주인이 그 사람인 줄만 「비서」 로 바꾸고 소개를 채웠다. 사람이 저장한 것이 아니어서 `updated_at` 은 바꾸지 않았다
 - 에이전트는 모델을 갖지 않는다. 옛 기본 모델 세 컬럼(`default_model_provider`, `default_model`, `default_reasoning_effort`)은 `V20261031171510` 이 지웠고 값은 옮기지 않았다
 
 **에이전트는 모델을 정하지 않는다.** 모델은 그룹 설정(`group_setting` 의 `MODEL`)의 칸이 정하고, 대화가 고르지 않으면 사용자 기본 칸, 그룹 기본 칸 차례로 돈다. 둘 다 없으면 요청에 모델을 싣지 않아 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-20261101 / model-setting](../../docs/adr/ADR-20261101-model-setting.md), [ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).

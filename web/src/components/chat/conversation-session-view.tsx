@@ -1,5 +1,6 @@
 "use client";
 
+import { AgentBadge } from "@/components/agent/agent-badge";
 import Link from "next/link";
 import { cn } from "cn";
 import { Composer } from "./composer";
@@ -55,6 +56,7 @@ export function ConversationSessionView({
   currentConversation,
   agents,
   agentCode,
+  answerAgent,
   agentsLoading,
   agentsError,
   onRetryAgents,
@@ -107,12 +109,20 @@ export function ConversationSessionView({
                 "text-xs text-muted-foreground",
               )}
             >
-              <div
-                className={`min-w-0 items-center gap-2 ${agentLocked ? "hidden md:flex" : "flex"}`}
-              >
-                <span className="shrink-0">에이전트</span>
+              {/* 좁은 화면의 잠긴 대화는 글자를 숨기고 이름표만 보인다. 이름은 읽기 프로그램에 남긴다(spec 의 DECISION15) */}
+              <div className="flex min-w-0 items-center gap-2">
+                <AgentBadge agent={answerAgent} size="sm" />
                 <span
-                  className="truncate"
+                  className={
+                    agentLocked ? "shrink-0 max-md:hidden" : "shrink-0"
+                  }
+                >
+                  에이전트
+                </span>
+                <span
+                  className={
+                    agentLocked ? "truncate max-md:sr-only" : "truncate"
+                  }
                   title={agentMissing ? agentLabel(null) : currentAgent?.name}
                 >
                   {agentMissing
