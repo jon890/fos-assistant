@@ -1,0 +1,53 @@
+{
+  "schema": 2,
+  "id": "korail-ktx",
+  "title": "코레일 KTX",
+  "description": "「내 브라우저」 로 코레일 화면에서 KTX 열차를 한 번 조회합니다. 예매하거나 결제하지 않습니다.",
+  "icon": "icon.svg",
+  "link": "https://www.korail.com/ticket/main",
+  "readme_url": "https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/korail-ktx/README.md",
+  "fields": [],
+  "verify": {
+    "tool": "check_korail_login"
+  },
+  "owner_browser_env": "KORAIL_KTX_BROWSER_URL",
+  "owner_browser_login_url": "https://www.korail.com/ticket/login",
+  "default_tool_policy": "deny",
+  "tools": {
+    "check_korail_login": {
+      "risk": "READ",
+      "attended_only": true,
+      "title": "코레일 연결 확인",
+      "summary": "내 브라우저에 연결되는지와 코레일을 연 적이 있는지 확인해요. 새 탭을 열지 않아요.",
+      "description": "Check korail login session in the user browser. 연결된 브라우저에 닿는지와 코레일 쿠키가 있는지 확인합니다. 입력 인자는 없으며 browser와 logged_in을 돌려줍니다. 코레일은 로그인 전에도 쿠키를 두므로 logged_in은 unknown이고, 로그인이 필요한 화면은 다음 도구가 만나 알립니다. 새 탭을 열지 않습니다."
+    },
+    "search_trains": {
+      "risk": "READ",
+      "attended_only": true,
+      "title": "KTX 열차 조회",
+      "summary": "출발역, 도착역, 날짜와 시각, 인원으로 코레일에서 KTX 열차를 한 번 조회해요. 조회하는 동안 내 브라우저에 새 탭이 잠깐 열려요.",
+      "description": "Search korail ktx trains for one route, date and time. departure, arrival(역 이름, 끝의 역은 떼도 됨), date(YYYY-MM-DD), time_from(HH:MM, 이 시각 이후 출발), adults, children, seniors(합 1~9), seat_class(general 일반실, first 특실)로 코레일 화면에서 한 번 조회해 첫 화면의 KTX 계열 열차와 코레일에서 함께 보이는 수서발 SRT 열차를 돌려줍니다. 열차마다 train_ref, train_type, train_no, departs_at, arrives_at, duration_min, seat_status(available 또는 sold_out), status_text, adult_fare_krw(어른 1인 운임)가 있습니다. 사용자가 요청할 때 한 번만 부르고 다음 화면을 읽지 않으며 스스로 조건을 바꿔 다시 부르지 않습니다. 모르는 역 이름이면 KORAIL_UNKNOWN_STATION으로 끝나니 사용자에게 다시 묻습니다. 로그인, 매크로 탐지, 보안 문자 화면을 만나면 아무것도 누르지 않고 탭을 남긴 채 오류로 끝나며, 사용자에게 내 브라우저에서 풀어 달라고 안내합니다. 예매하거나 결제하지 않습니다."
+    }
+  },
+  "errors": {
+    "KORAIL_INVALID_INPUT": "invalid_input",
+    "KORAIL_UNKNOWN_STATION": "invalid_input",
+    "KORAIL_DATE_UNAVAILABLE": "invalid_input",
+    "KORAIL_REJECTED": "invalid_input",
+    "KORAIL_BROWSER_UNREACHABLE": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    },
+    "KORAIL_LOGIN_REQUIRED": {
+      "category": "credential_rejected",
+      "recovery": "reconnect"
+    },
+    "KORAIL_CAPTCHA": "unavailable",
+    "KORAIL_BOT_CHECK": "unavailable",
+    "KORAIL_PAGE_CHANGED": "unavailable",
+    "KORAIL_UNAVAILABLE": {
+      "category": "unavailable",
+      "recovery": "retry_later"
+    }
+  }
+}

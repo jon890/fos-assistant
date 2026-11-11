@@ -84,7 +84,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
             }
         };
         assertThat(new MediaObservationBodies(disabled).open(row, owner.id())).contains(expected);
-        var missingProperties = new DataEncryptionProperties("", "", false, null, 100);
+        var missingProperties = new DataEncryptionProperties("", "", false, null, 100, null, 0);
         var missing = new DataKeyService(
             new FileKeyEncryptionKeys(missingProperties), keyWriter, keys, missingProperties, clock);
         missing.forgetCachedKeys();
