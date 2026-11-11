@@ -20,7 +20,7 @@ export type Handoff = {
 
 /**
  * 단계마다 카드 제목과 「다 했어요」 가 보내는 글이다. 제목은 Control Plane 의 `ConnectorHandoffs.TITLES` 와 같다.
- * 어휘는 `docs/features/naver-shopping/design.md` 의 「넘기기 어휘」 가 갖는다.
+ * 어휘는 `docs/adr/ADR-20261111-connector-handoff.md` 의 「결정」 이 갖는다.
  */
 export const HANDOFF_TEXT: Record<
   HandoffNeed,

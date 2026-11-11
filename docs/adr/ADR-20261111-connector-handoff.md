@@ -4,7 +4,7 @@
 - Date: 2026-11-11
 - **decision-type**: `architecture`
 - **areas**: `security, operations`
-- **현재 규칙의 원본**: 설계 [`docs/features/naver-shopping/design.md`](../features/naver-shopping/design.md) 의 「PR2 화면 넘기기」, 스펙 [`spec.md`](../features/naver-shopping/spec.md) 의 REQ7, REQ8(사용자 확인 2026-11-10)
+- **현재 규칙의 원본**: 설계 [`docs/features/naver-shopping/design.md`](../features/naver-shopping/design.md) 의 「PR2 화면 넘기기(REQ7, REQ8)」, 스펙 [`spec.md`](../features/naver-shopping/spec.md) 의 REQ7, REQ8(사용자 확인 2026-11-10)
 - [ADR-026](ADR-026-에이전트가-물을-것은-답-끝의-태그로-두고-화면이-카드로-그린다.md) 의 묻는 카드처럼 실행은 기다리지 않고, 카드는 다음 메시지를 보내는 단추다. [ADR-070](ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) 의 `notification` 에 종류 하나를 더한다
 
 ### 결정

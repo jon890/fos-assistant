@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 실제 HTTP 경계에서 화면 넘기기 알림의 인증과 판정 줄 대조, 한 번만 적기, 알림, 대화의 카드 목록, 다음 turn 에서 닫기를 본다.
  *
- * <p>계약은 {@code docs/features/naver-shopping/design.md} 의 「PR2 화면 넘기기」 다. 판정 줄은 판정 경로가 남긴 모양으로 직접 넣는다.
+ * <p>계약은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이다. 판정 줄은 판정 경로가 남긴 모양으로 직접 넣는다.
  */
 @BackendIntegrationTest
 class ConnectorHandoffEndpointTest {

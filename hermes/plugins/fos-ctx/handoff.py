@@ -1,6 +1,6 @@
 """플러그인 도구 결과의 화면 넘기기 칸을 Control Plane 에 알린다.
 
-계약의 정본은 fos-assistant `docs/features/naver-shopping/design.md` 의 「PR2 화면 넘기기」 와
+계약의 정본은 fos-assistant `docs/adr/ADR-20261111-connector-handoff.md` 의 「결정」 과
 `hermes/plugins/fos-ctx/README.md` 의 「화면 넘기기를 알린다」 다. 서비스 이름을 모른다. 결과 글이 정해 둔 모양일 때만 보낸다.
 """
 

@@ -13,7 +13,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * fos-ctx 의 {@code transform_tool_result} hook 이 보낸 화면 넘기기 알림에서 서명을 확인한 값이다.
  *
- * <p>계약은 {@code docs/features/naver-shopping/design.md} 의 「fos-ctx 가 알리는 것」 이 갖는다. 서명은
+ * <p>계약은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 서명은
  * {@link McpCallContext} 와 같은 HMAC-SHA256 이고 key 도 같다. 서명할 글은 {@code v1-connector-handoff},
  * {@code hermes_tool}, {@code root_session_id}, {@code session_id}, {@code tool_call_id}, {@code code}, {@code need},
  * {@code tab} 을 이 순서로 {@code \n} 하나로 이은 UTF-8 이다.

@@ -24,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 화면 넘기기의 두 경로다. profile 의 hook 이 알리는 내부 경로와, 화면이 대화의 카드를 읽는 경로다.
  *
- * <p>계약은 {@code docs/features/naver-shopping/design.md} 의 「PR2 화면 넘기기」 가 갖는다. 내부 경로의 인증은
+ * <p>계약은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 내부 경로의 인증은
  * {@code /internal/hermes/connector-policy} 와 같은 profile 토큰이다.
  */
 @RestController

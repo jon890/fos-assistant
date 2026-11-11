@@ -133,8 +133,8 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 | 붙은 탭의 연결이 끊긴다 | 다시 잇는다. 프레임 없이 연이어 끊기면 `closed`(`stopped`)로 닫는다 |
 | SSE 쓰기가 실패하거나 주석 `ping` 을 쓰지 못한다 | `closed` 없이 닫는다. 말없이 끊긴 화면이 `screen-timeout` 까지 자동 중지를 막지 않는다 |
 | 끄기, 지우기, 사용자 끄기 | 브라우저를 멈추기 전에 화면을 닫는다. `closed` 는 막힌 쓰기를 잠깐만 기다리고 건너뛰어, 읽지 않는 받는 쪽에 붙잡히지 않는다 |
-| 붙은 탭에 확인 창(`alert`, `confirm`, `prompt`, `beforeunload`)이 뜬다 | `dialog` 사건(`{open: true, type, message}`)으로 보인다. 글은 500자에서 자르고 로그와 오류에 싣지 않는다. 사람이 고르면 입력 `dialog`(`action` 이 `accept` 나 `dismiss`)가 `Page.handleJavaScriptDialog` 를 보낸다. `prompt` 는 기본값으로 수락한다 |
-| 확인 창이 닫히거나 다른 탭으로 옮긴다 | `dialog` 사건(`{open: false}`)으로 창을 거둔다. 옮긴 탭에 떠 있던 창은 Chrome 이 `Page.enable` 때 다시 알린다고 기대한다(실제 Chrome 으로 확인하지 않았다) |
+| 붙은 탭에 확인 창(`alert`, `confirm`, `prompt`, `beforeunload`)이 뜬다 | `dialog` 사건(`{open: true, type, message}`)으로 보인다. 글은 500자에서 자르고 로그와 오류에 싣지 않는다. 사람이 고르면 입력 `dialog`(`action` 이 `accept` 나 `dismiss`)가 CDP 명령 `handleJavaScriptDialog` 를 보낸다. `prompt` 는 기본값으로 수락한다 |
+| 확인 창이 닫히거나 다른 탭으로 옮긴다 | `dialog` 사건(`{open: false}`)으로 창을 거둔다. 옮긴 탭에 떠 있던 창은 Chrome 이 CDP 의 Page 도메인을 켤 때 다시 알린다고 기대한다(실제 Chrome 으로 확인하지 않았다) |
 | 입력이 왔는데 화면이 없다 | `BROWSER_SCREEN_CLOSED` |
 | 프레임이 아직 없다 | 좌표 입력을 버린다. 좌표는 프레임 그림 안의 비율이고 서버가 마지막 프레임 크기로 CSS 픽셀로 바꾼다 |
 | Control Plane 이 다시 뜬다 | 화면 등록부는 JVM 메모리에 있어 SSE 도 끊긴다. 웹이 다시 연다 |
