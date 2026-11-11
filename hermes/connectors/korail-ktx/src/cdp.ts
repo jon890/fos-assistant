@@ -1,0 +1,216 @@
+import { ToolError } from "./errors.ts";
+
+// 네이버 쇼핑 플러그인의 cdp.ts 와 같은 모양이다. 플러그인마다 배포 단위와 오류 코드가 달라 나누지 않는다.
+
+/** Bun 의 fetch 와 WebSocket 이 읽는 프록시 env. CDP 주소는 사설 주소라 프록시를 거치면 닿지 않는다. */
+export const PROXY_ENVIRONMENT_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+] as const;
+
+const HTTP_TIMEOUT_MS = 5_000;
+const COMMAND_TIMEOUT_MS = 30_000;
+
+/** 테스트처럼 이미 실행 중인 프로세스에서도 다음 요청이 프록시 값을 읽지 않게 한다. */
+export function clearProxyEnvironment() {
+  for (const key of PROXY_ENVIRONMENT_KEYS) delete process.env[key];
+}
+
+const unreachable = () => new ToolError("KORAIL_BROWSER_UNREACHABLE");
+
+/** 끝 `/` 를 뗀 CDP 주소. */
+export function endpoint(cdpUrl: string) {
+  return cdpUrl.replace(/\/+$/, "");
+}
+
+/** Chrome 디버깅 HTTP 창구를 부른다. JSON 이 아닌 답은 글 그대로 주고, 닿지 않거나 2xx 가 아니면 원문 없이 실패한다. */
+export async function httpJson(
+  cdpUrl: string,
+  path: string,
+  {
+    method = "GET",
+    timeoutMs = HTTP_TIMEOUT_MS,
+  }: { method?: string; timeoutMs?: number } = {},
+): Promise<unknown> {
+  clearProxyEnvironment();
+  let text: string;
+  try {
+    const response = await fetch(`${endpoint(cdpUrl)}${path}`, {
+      method,
+      signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
+      redirect: "error",
+    });
+    if (!response.ok) throw unreachable();
+    text = await response.text();
+  } catch {
+    throw unreachable();
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * 브라우저가 준 `webSocketDebuggerUrl` 의 경로만 꺼내 받은 주소의 호스트에 붙인다(중계가 적는 호스트는 다를 수 있다).
+ * 중계의 접근 표식 아래 `devtools/` 만 받는다. 다른 경로는 표식 밖의 창구라 닿지 않음으로 끝낸다.
+ */
+export function wsUrlFor(cdpUrl: string, webSocketDebuggerUrl: string) {
+  let base: URL;
+  let debuggerPath: string;
+  try {
+    base = new URL(endpoint(cdpUrl));
+    debuggerPath = new URL(webSocketDebuggerUrl).pathname;
+  } catch {
+    throw unreachable();
+  }
+  const prefix = base.pathname.replace(/\/+$/, "");
+  if (!debuggerPath.startsWith(`${prefix}/devtools/`)) throw unreachable();
+  const scheme = base.protocol === "https:" ? "wss:" : "ws:";
+  return `${scheme}//${base.host}${debuggerPath}`;
+}
+
+type Pending = {
+  resolve: (value: any) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+/** CDP WebSocket 한 줄. 명령은 응답의 `id` 로 짝을 맞추고, 명령과 이벤트 대기마다 제한 시간을 둔다. */
+export class CdpSession {
+  private nextId = 1;
+  private closed = false;
+  private readonly pending = new Map<number, Pending>();
+  private readonly listeners = new Map<string, Set<(params: any) => void>>();
+
+  private constructor(private readonly socket: WebSocket) {
+    socket.addEventListener("message", (event) => this.receive(event.data));
+    socket.addEventListener("close", () => this.shutdown());
+    socket.addEventListener("error", () => this.shutdown());
+  }
+
+  /** 대상 하나에 붙고 아무것도 켜지 않는다. 중계가 거절하므로 `Origin` 머리를 싣지 않는다. */
+  static connect(wsUrl: string, timeoutMs = COMMAND_TIMEOUT_MS) {
+    clearProxyEnvironment();
+    return new Promise<CdpSession>((resolve, reject) => {
+      let socket: WebSocket;
+      try {
+        socket = new WebSocket(wsUrl);
+      } catch {
+        reject(unreachable());
+        return;
+      }
+      const timer = setTimeout(
+        () => {
+          socket.close();
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
+      const fail = () => {
+        clearTimeout(timer);
+        reject(unreachable());
+      };
+      socket.addEventListener("error", fail, { once: true });
+      socket.addEventListener("close", fail, { once: true });
+      socket.addEventListener(
+        "open",
+        () => {
+          clearTimeout(timer);
+          socket.removeEventListener("error", fail);
+          socket.removeEventListener("close", fail);
+          resolve(new CdpSession(socket));
+        },
+        { once: true },
+      );
+    });
+  }
+
+  /** 명령을 보내고 같은 `id` 의 응답을 기다린다. 브라우저가 준 오류 원문은 버린다. */
+  send<T = any>(
+    method: string,
+    params: Record<string, unknown> = {},
+    timeoutMs = COMMAND_TIMEOUT_MS,
+  ): Promise<T> {
+    if (this.closed) return Promise.reject(unreachable());
+    const id = this.nextId++;
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
+      this.pending.set(id, { resolve, reject, timer });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }));
+      } catch {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(unreachable());
+      }
+    });
+  }
+
+  /** 이름이 같은 이벤트가 올 때마다 부를 함수를 건다(탭의 대화 상자 등). 돌려준 함수를 부르면 뗀다. */
+  onEvent(method: string, listener: (params: any) => void) {
+    const listeners = this.listeners.get(method) ?? new Set();
+    this.listeners.set(method, listeners);
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
+
+  close() {
+    this.shutdown();
+    try {
+      this.socket.close();
+    } catch {
+      // 이미 닫힌 연결은 다시 닫을 것이 없다.
+    }
+  }
+
+  private receive(data: unknown) {
+    let message: any;
+    try {
+      message = JSON.parse(String(data));
+    } catch {
+      return;
+    }
+    if (typeof message?.id === "number") {
+      const pending = this.pending.get(message.id);
+      if (!pending) return;
+      this.pending.delete(message.id);
+      clearTimeout(pending.timer);
+      if (message.error) pending.reject(new ToolError("KORAIL_UNAVAILABLE"));
+      else pending.resolve(message.result ?? {});
+      return;
+    }
+    if (typeof message?.method === "string") {
+      for (const listener of this.listeners.get(message.method) ?? []) {
+        try {
+          listener(message.params ?? {});
+        } catch {
+          // 받는 쪽의 실패가 다른 이벤트와 명령 응답을 막지 않게 한다.
+        }
+      }
+    }
+  }
+
+  /** 연결이 끊기면 기다리던 명령을 모두 닿지 않음으로 끝낸다. */
+  private shutdown() {
+    if (this.closed) return;
+    this.closed = true;
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer);
+      pending.reject(unreachable());
+    }
+    this.pending.clear();
+    this.listeners.clear();
+  }
+}

@@ -39,7 +39,7 @@ class ArtifactMcpValidationTest {
         ArtifactWriteRequest request = new ArtifactWriteRequest(
             UUID.randomUUID(), "a.png", null, "https://private.example/secret.png?token=secret");
         McpToolService service = new McpToolService(
-            null, null, artifacts, null, null, null, null, null, null, null, null, null, null);
+            null, null, artifacts, null, null, null, null, null, null, null, null, null, null, null);
         Logger logger = (Logger)LoggerFactory.getLogger(McpToolService.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();

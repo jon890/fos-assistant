@@ -2,7 +2,10 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.dto.PersonaSnapshot;
 import com.bifos.assistant.agent.application.dto.AgentToolView;
+import com.bifos.assistant.agent.application.dto.AgentCapabilities;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
+import com.bifos.assistant.agent.domain.type.AgentColor;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -61,6 +64,10 @@ public final class AgentDtos {
      * @param editable 요청자가 이 에이전트를 관리할 수 있다. 주인과 {@code ADMIN} 이다. 화면이 공개와 삭제를
      * 보일지 이 값으로 정한다
      * @param ownedByMe 요청자가 이 에이전트의 주인이다
+     * @param description 한 줄 소개. 없으면 null
+     * @param icon {@code AgentIntroduction.ICONS} 의 이모지. 없으면 null
+     * @param color {@code AgentColor} 의 이름. 없으면 null
+     * @param capabilities 할 수 있는 일
      */
     public record AgentView(
         String code,
@@ -68,15 +75,43 @@ public final class AgentDtos {
         String visibility,
         boolean acceptsAttachments,
         boolean editable,
-        boolean ownedByMe) {
-        static AgentView from(Agent agent, boolean editable, boolean ownedByMe) {
+        boolean ownedByMe,
+        String description,
+        String icon,
+        String color,
+        CapabilitiesView capabilities) {
+        static AgentView from(Agent agent, boolean editable, boolean ownedByMe, AgentCapabilities capabilities) {
             return new AgentView(
                 agent.code(),
                 agent.name(),
                 agent.visibility().name(),
                 agent.acceptsAttachments(),
                 editable,
-                ownedByMe);
+                ownedByMe,
+                agent.description(),
+                agent.icon(),
+                agent.color() == null ? null : agent.color().name(),
+                new CapabilitiesView(capabilities.connectors(), capabilities.skills()));
+        }
+    }
+
+    /**
+     * 에이전트가 할 수 있는 일이다. 둘 다 이름순이다.
+     *
+     * @param connectors 연결과 바인딩이 모두 준비된 플러그인의 이름
+     * @param skills 올린 스킬의 이름
+     */
+    public record CapabilitiesView(List<String> connectors, List<String> skills) {
+    }
+
+    /**
+     * 이름과 소개, 아이콘, 색을 바꾸는 요청이다. 네 칸을 모두 보낸다. 이름 밖의 null 이나 빈 글은 비우기다.
+     *
+     * <p>길이와 목록 판정은 {@code AgentIntroduction.of} 가 한다. 앞뒤 공백을 뗀 뒤에 세야 하므로 요청 본문 검증을 걸지 않는다.
+     */
+    public record ChangeIntroductionRequest(String name, String description, String icon, AgentColor color) {
+        AgentIntroduction toIntroduction() {
+            return AgentIntroduction.of(name, description, icon, color);
         }
     }
 

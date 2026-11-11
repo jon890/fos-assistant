@@ -16,6 +16,13 @@ public interface ProfileSkillFiles {
     List<String> uploadedRequestingSecrets(String profile);
 
 
+    /**
+     * 그 profile 에 올린 스킬의 이름이다. 이름순이다. 지금 버전과, 게시가 timeout 으로 끝나 표식 없이 남은 더 새 버전을 함께
+     * 본다. 스킬 본문은 읽지 않는다. 디렉터리를 읽지 못하면 빈 목록이다.
+     */
+    List<String> uploadedNames(String profile);
+
+
     /** 그 profile 에 올린 스킬을 모두 지운다. */
     void deleteAll(String profile);
 }

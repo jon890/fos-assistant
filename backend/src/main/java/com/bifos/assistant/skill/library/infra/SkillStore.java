@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -136,6 +137,32 @@ public class SkillStore {
      */
     public boolean hasUploadedSkills(String profile) {
         return !readCurrent(profile).isEmpty() || !readPending(profile).isEmpty();
+    }
+
+
+    /**
+     * 지금 버전과 표식 없는 더 새 버전에 든 스킬의 이름이다. 이름순이고 겹치지 않는다. 스킬 본문은 읽지 않는다.
+     *
+     * <p>에이전트 목록의 할 수 있는 일이 쓴다. 고르는 버전은 {@link #readCurrent} 와 {@link #readPending} 을 합친 것과 같다.
+     */
+    public List<String> uploadedNames(String profile) {
+        Path profileDir = profileDir(profile);
+        if (!Files.isDirectory(profileDir, LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        String current = currentVersion(profile).orElse("");
+        TreeSet<String> names = new TreeSet<>();
+        try {
+            for (String version : versionNames(profileDir)) {
+                boolean pending = version.compareTo(current) > 0 && !isPublished(profileDir.resolve(version));
+                if (version.equals(current) || pending) {
+                    names.addAll(skillNames(versionDir(profile, version)));
+                }
+            }
+        } catch (IOException ex) {
+            throw storeFailure(ex);
+        }
+        return List.copyOf(names);
     }
 
 

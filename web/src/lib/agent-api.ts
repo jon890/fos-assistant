@@ -59,6 +59,23 @@ export function changeAgentVisibility(
   });
 }
 
+/** 이름과 소개, 아이콘, 색을 한 번에 저장한다. 빈 소개·아이콘·색은 비우기다. */
+export function saveAgentIntroduction(
+  code: string,
+  introduction: {
+    name: string;
+    description: string | null;
+    icon: string | null;
+    color: string | null;
+  },
+): Promise<Response> {
+  return fetch(`/api/agents/${code}/introduction`, {
+    method: "PATCH",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(introduction),
+  });
+}
+
 export function fetchPersona(code: string): Promise<Response> {
   return fetch(`/api/agents/${code}/persona`, { cache: "no-store" });
 }

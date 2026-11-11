@@ -235,13 +235,18 @@ for (const { durationMs, duration } of [
 });
 }
 
-/** 블록의 위쪽이 같은 줄 「비서」 이름의 아래쪽보다 위에 있지 않다. */
+/** 블록의 위쪽이 같은 줄 답 에이전트 이름의 아래쪽보다 위에 있지 않다. */
 async function expectBlockBelowName(row: Locator): Promise<void> {
-  const name = await row.getByText("비서", { exact: true }).boundingBox();
-  const block = await row.locator('[data-testid="activity-block"][data-mode="live"]').boundingBox();
-  expect(name, "비서 이름의 자리").not.toBeNull();
-  expect(block, "진행 중 블록의 자리").not.toBeNull();
-  expect(block!.y, "진행 중 블록의 top 과 이름의 bottom").toBeGreaterThanOrEqual(name!.y + name!.height);
+  // 답이 흘러나오는 동안 대화가 아래로 저절로 내려가므로, 두 자리를 따로 재면 그 사이 스크롤이 끼어 어긋난다. 한 번에 잰다.
+  const places = await row.evaluate((element) => {
+    const name = element.querySelector('[data-testid="answer-agent-name"]');
+    const block = element.querySelector('[data-testid="activity-block"][data-mode="live"]');
+    if (!name || !block) return null;
+    const nameRect = name.getBoundingClientRect();
+    return { nameBottom: nameRect.bottom, blockTop: block.getBoundingClientRect().top };
+  });
+  expect(places, "답 에이전트 이름과 진행 중 블록의 자리").not.toBeNull();
+  expect(places!.blockTop, "진행 중 블록의 top 과 이름의 bottom").toBeGreaterThanOrEqual(places!.nameBottom);
 }
 
 test("진행 중 블록은 답이 없을 때도 답이 흘러나올 때도 비서 이름 아래에 있다", async ({ page, hermes }) => {

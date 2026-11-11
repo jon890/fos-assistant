@@ -1,5 +1,6 @@
 import type { AutoVaultState } from "@/lib/artifact-vault-api";
 import type { ActivitySummary } from "@/lib/chat-event";
+import type { AnswerReveal } from "./answer-reveal";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
 export type MessageAttachment = {
@@ -40,6 +41,8 @@ export type SourceReadSummary = {
 
 export type Turn = {
   id: number | string;
+  /** 아직 저장되지 않은 답이 받은 글을 풀어 보이는 장치다. 저장된 메시지에는 없다 */
+  reveal?: AnswerReveal;
   /** `SYSTEM` 은 대화에 남는 알림 줄이다. 위임 결과가 도착했거나 자동 turn 한도에 닿았을 때 생긴다 */
   role: "USER" | "ASSISTANT" | "SYSTEM";
   content: string;

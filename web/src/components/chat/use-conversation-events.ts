@@ -23,6 +23,7 @@ import {
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationHistory } from "./use-conversation-history";
 import { applyStreamText } from "./turn-stream-text";
+import { createPendingAnswer } from "./pending-answer";
 
 type Context = Pick<
   ConversationSessionState,
@@ -115,10 +116,7 @@ export function useConversationEvents({
       callbacks.onReset?.();
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (event.type === "interim") {
-      if (reclassified) {
-        callbacks.onReset?.();
-        if (state.textState.text) callbacks.onDelta?.(state.textState.text);
-      }
+      if (reclassified) callbacks.onReplace?.(state.textState.text);
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (["tool", "subagent"].includes(event.type)) {
       setActivity((previous) => previous && applyChatEvent(previous, event));
@@ -273,9 +271,11 @@ export function useConversationEvents({
     if (belongsToObservedTurn(observedTurnFilter.current, event)) return;
 
     if (event.type === "started") {
+      const pendingId = `assistant-auto-${Date.now()}`;
       autoTurn.current = {
         state: { started: false, done: false, reportedError: false },
-        pendingId: `assistant-auto-${Date.now()}`,
+        pendingId,
+        answer: createPendingAnswer(setTurns, pendingId),
       };
       setSending(true);
       setTurnError(null);
@@ -306,7 +306,7 @@ export function useConversationEvents({
       }
       return;
     }
-    const { pendingId } = current;
+    const { pendingId, answer } = current;
     const finish = async () => {
       if (autoTurn.current === current) autoTurn.current = null;
       if (conversationIdRef.current !== id) return;
@@ -318,32 +318,13 @@ export function useConversationEvents({
       if (conversationIdRef.current === id) setSending(false);
     };
     await applyTurnEvent(event, current.state, {
-      onDelta: (textDelta) => {
-        setTurns((previous) => {
-          const pending = previous.find((turn) => turn.id === pendingId);
-          if (!pending)
-            return [
-              ...previous,
-              {
-                id: pendingId,
-                role: "ASSISTANT",
-                content: textDelta,
-                senderName: null,
-              },
-            ];
-          return previous.map((turn) =>
-            turn.id === pendingId
-              ? { ...turn, content: turn.content + textDelta }
-              : turn,
-          );
-        });
+      onDelta: answer.onDelta,
+      onReset: answer.onReset,
+      onReplace: answer.onReplace,
+      onDone: async () => {
+        await answer.finish();
+        await finish();
       },
-      onReset: () => {
-        setTurns((previous) =>
-          previous.filter((turn) => turn.id !== pendingId),
-        );
-      },
-      onDone: finish,
       onError: async (failed) => {
         setTurns((previous) =>
           previous.filter((turn) => turn.id !== pendingId),

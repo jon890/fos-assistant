@@ -3,6 +3,7 @@ package com.bifos.assistant.people.application;
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.application.AgentDefaultToolsets;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.config.HermesProperties;
@@ -46,21 +47,25 @@ public class FirstAgentCreator implements FirstSignInListener {
 
 
     /**
-     * 그 사람의 profile 을 가리키는 에이전트를 하나 만든다.
+     * 그 사람의 profile 을 가리키는 에이전트를 하나 만든다. 이 에이전트가 기본 비서이고, 이름 「비서」 와 고정 소개로 만든다
+     * (docs/features/agent-team/spec.md 의 DECISION5).
      *
      * <p>Hermes 를 부르지 않는다. 에이전트는 모델을 갖지 않고, 대화가 모델을 고르지 않으면 그 profile 의
      * 기본값으로 돈다(ADR-030).
      */
     private void createFirstAgent(AppUser owner, AllowedPerson person) {
-        Agent saved = agents.save(Agent.of(
+        Agent first = Agent.of(
             person.hermesProfile(),
-            person.displayName(),
+            AgentIntroduction.PRIMARY_NAME,
             person.hermesProfile(),
             hermesProperties.profileBaseUrl(person.hermesProfile()),
             peopleProperties.defaultCostMode(),
             peopleProperties.defaultCredentialScope(),
             AgentVisibility.PRIVATE,
-            owner.id()));
+            owner.id());
+        first.changeIntroduction(AgentIntroduction.of(
+            AgentIntroduction.PRIMARY_NAME, AgentIntroduction.PRIMARY_DESCRIPTION, null, null));
+        Agent saved = agents.save(first);
         afterCommit(() -> backgroundTasks.start(
             "default-toolsets-" + saved.code(),
             () -> defaultToolsets.apply(saved, peopleProperties.defaultToolsets())));

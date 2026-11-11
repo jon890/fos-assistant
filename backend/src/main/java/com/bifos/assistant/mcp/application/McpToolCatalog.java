@@ -67,7 +67,7 @@ public class McpToolCatalog {
                 "name",
                 "agent_list",
                 "description",
-                "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code 와 이름을 읽는다.",
+                "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code, 이름, 한 줄 소개(description), 붙은 서비스(connectors), 스킬(skills)을 읽는다. 소개와 서비스, 스킬을 보고 맡길 에이전트를 고른다. 비어 있는 칸은 빠진다.",
                 "inputSchema",
                 Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
             Map.of(

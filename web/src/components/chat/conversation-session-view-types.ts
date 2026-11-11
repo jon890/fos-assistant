@@ -1,4 +1,5 @@
 import type { AgentView } from "@/lib/agent";
+import type { AgentIdentity } from "@/components/agent/agent-badge";
 import type { useStarterSuggestions } from "./use-starter-suggestions";
 import type { ConversationSessionProps } from "./conversation-session-types";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -68,6 +69,8 @@ export type Props = Pick<
     agentLocked: boolean;
     agentMissing: boolean;
     currentAgent: AgentView | undefined;
+    /** 답 줄과 대화 머리에 그릴 그 대화의 에이전트 */
+    answerAgent: AgentIdentity;
     startScreen: boolean;
     skillCommandsEnabled: boolean;
     skillNames: string[] | undefined;

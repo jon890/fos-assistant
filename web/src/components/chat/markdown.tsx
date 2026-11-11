@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CopyButton } from "@/components/ui/copy-button";
 import { normalizeMarkdown } from "@/components/chat/normalize-markdown";
+import { rehypeRevealFade, type TailFade } from "./reveal-fade";
 
 type HighlightedToken = {
   content: string;
@@ -192,11 +193,27 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   );
 }
 
-export function Markdown({ children }: { children: string }) {
+/**
+ * 마크다운 글을 그린다. 글이 같고 `fades` 가 없으면 부모가 다시 그려도 다시 읽지 않는다.
+ * `fades` 는 막 보이기 시작한 글 끝의 구간이다. 흐르는 답이 새 낱말을 흐릿하게 그릴 때만 준다.
+ */
+export const Markdown = memo(function Markdown({
+  children,
+  fades,
+}: {
+  children: string;
+  fades?: TailFade[];
+}) {
+  const source = normalizeMarkdown(children);
   return (
     <div className="min-w-0 text-sm leading-6">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={
+          fades && fades.length > 0
+            ? [[rehypeRevealFade, { fades, sourceLength: source.length }]]
+            : []
+        }
         components={{
           a: ({ children: label, ...props }) => (
             <a
@@ -264,8 +281,8 @@ export function Markdown({ children }: { children: string }) {
           },
         }}
       >
-        {normalizeMarkdown(children)}
+        {source}
       </ReactMarkdown>
     </div>
   );
-}
+});

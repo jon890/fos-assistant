@@ -2,11 +2,8 @@
 
 import { FileText } from "lucide-react";
 import { cn } from "cn";
-import {
-  assistantAvatar,
-  attachmentPlaceholder,
-  revealedTime,
-} from "./variants";
+import { attachmentPlaceholder, revealedTime } from "./variants";
+import { AgentBadge, useAnswerAgent } from "@/components/agent/agent-badge";
 import { AnswerBody } from "./answer-body";
 import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
@@ -134,7 +131,7 @@ function ArtifactList({
   );
 }
 
-/** 비서 얼굴과 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
+/** 답을 쓰는 에이전트의 이름표와 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
 export function AssistantRow({
   header,
   children,
@@ -144,6 +141,7 @@ export function AssistantRow({
   /** 이름 옆에 두는 것이다. 보낸 시각이 여기 온다 */
   header?: React.ReactNode;
 }) {
+  const agent = useAnswerAgent();
   return (
     <li
       className={cn(
@@ -152,12 +150,15 @@ export function AssistantRow({
       )}
       {...props}
     >
-      <span aria-hidden="true" className={assistantAvatar()}>
-        비
-      </span>
+      <AgentBadge agent={agent} />
       <div className="min-w-0">
-        <div className="mb-1 flex min-h-8 items-center gap-2">
-          <span className="text-sm font-medium">비서</span>
+        <div className="mb-1 flex min-h-8 min-w-0 items-center gap-2">
+          <span
+            data-testid="answer-agent-name"
+            className="truncate text-sm font-medium"
+          >
+            {agent.name}
+          </span>
           {header}
         </div>
         {children}
@@ -354,6 +355,7 @@ export function MessageBubble({
       >
         <AnswerBody
           content={turn.content}
+          reveal={turn.reveal}
           streaming={streaming}
           nextUserMessage={nextUserMessage}
           onAnswer={streaming ? undefined : onAnswer}

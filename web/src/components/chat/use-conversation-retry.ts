@@ -3,6 +3,7 @@
 import { describeError } from "@/components/error-message";
 import { emptyActivity, failActivity } from "./activity/activity-state";
 import type { Turn } from "./message-bubble";
+import { createPendingAnswer } from "./pending-answer";
 import {
   regenerateLatestAnswer,
   retryDelivery as requestDeliveryRetry,
@@ -79,6 +80,7 @@ export function useConversationRetry({
     const version = selectionVersion.current;
     const regeneratedSlotId = latestSlots()?.answers.at(-1)?.version.slotId;
     const pendingId = `assistant-regenerate-${Date.now()}`;
+    const answer = createPendingAnswer(setTurns, pendingId);
     const stream = { started: false, done: false, reportedError: false };
     const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
@@ -108,31 +110,9 @@ export function useConversationRetry({
       }
       try {
         await consumeTurnStream(response, version, stream, {
-          onDelta: (textDelta) => {
-            setTurns((previous) => {
-              const current = previous.find((turn) => turn.id === pendingId);
-              return current
-                ? previous.map((turn) =>
-                    turn.id === pendingId
-                      ? { ...turn, content: turn.content + textDelta }
-                      : turn,
-                  )
-                : [
-                    ...previous,
-                    {
-                      id: pendingId,
-                      role: "ASSISTANT",
-                      content: textDelta,
-                      senderName: null,
-                    },
-                  ];
-            });
-          },
-          onReset: () => {
-            setTurns((previous) =>
-              previous.filter((turn) => turn.id !== pendingId),
-            );
-          },
+          onDelta: answer.onDelta,
+          onReset: answer.onReset,
+          onReplace: answer.onReplace,
           onError: async (event) => {
             setTurns((previous) =>
               previous.filter((turn) => turn.id !== pendingId),
@@ -147,6 +127,7 @@ export function useConversationRetry({
               await refreshMessages(conversationId, version);
           },
           onDone: async (event) => {
+            await answer.finish();
             setTurns((previous) =>
               previous.filter((turn) => turn.id !== pendingId),
             );
@@ -212,6 +193,7 @@ export function useConversationRetry({
       return;
     const version = selectionVersion.current;
     const pendingId = `assistant-retry-${Date.now()}`;
+    const answer = createPendingAnswer(setTurns, pendingId);
     const stream = { started: false, done: false, reportedError: false };
     const savedBefore = savedIdsOf(turns);
     /** 스트림이 끊겨 보는 창으로 넘어갔다. 보기가 입력창을 풀므로 끝낼 때 풀지 않는다. */
@@ -260,31 +242,9 @@ export function useConversationRetry({
                 : [...previous, line],
             );
           },
-          onDelta: (textDelta) => {
-            setTurns((previous) => {
-              const current = previous.find((turn) => turn.id === pendingId);
-              return current
-                ? previous.map((turn) =>
-                    turn.id === pendingId
-                      ? { ...turn, content: turn.content + textDelta }
-                      : turn,
-                  )
-                : [
-                    ...previous,
-                    {
-                      id: pendingId,
-                      role: "ASSISTANT",
-                      content: textDelta,
-                      senderName: null,
-                    },
-                  ];
-            });
-          },
-          onReset: () => {
-            setTurns((previous) =>
-              previous.filter((turn) => turn.id !== pendingId),
-            );
-          },
+          onDelta: answer.onDelta,
+          onReset: answer.onReset,
+          onReplace: answer.onReplace,
           onError: async (event) => {
             setTurns((previous) =>
               previous.filter((turn) => turn.id !== pendingId),
@@ -298,6 +258,7 @@ export function useConversationRetry({
             await refreshMessages(conversationId, version);
           },
           onDone: async (event) => {
+            await answer.finish();
             setTurns((previous) =>
               previous.filter((turn) => turn.id !== pendingId),
             );

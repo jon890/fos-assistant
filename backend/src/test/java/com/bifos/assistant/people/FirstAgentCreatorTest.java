@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
 import com.bifos.assistant.people.domain.AllowedPerson;
@@ -127,5 +128,17 @@ class FirstAgentCreatorTest {
 
         assertThat(users.findByEmail(EMAIL)).isPresent();
         assertThat(agents.count()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("첫 에이전트는 표시 이름이 아니라 기본 비서의 이름과 소개로 만든다")
+    void createsFirstAgentAsPrimaryAssistant() throws InterruptedException {
+        provisioning.resolve(EMAIL, NAME);
+        backgroundTasks.awaitIdle(Duration.ofSeconds(5));
+
+        Agent first = agents.findByCode(PROFILE).orElseThrow();
+        assertThat(first.name()).isEqualTo(AgentIntroduction.PRIMARY_NAME);
+        assertThat(first.description()).isEqualTo(AgentIntroduction.PRIMARY_DESCRIPTION);
     }
 }

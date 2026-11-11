@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.connection.domain.DueBinding;
 import com.bifos.assistant.connector.connection.domain.EventWatchTarget;
 import com.bifos.assistant.connector.connection.domain.ReadyBinding;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
+import com.bifos.assistant.connector.connection.domain.type.ConnectionStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -50,6 +51,21 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
         + " where b.applyDueAt <= :now and b.restartRequired = false"
         + " order by b.applyDueAt")
     List<DueBinding> findApplyDue(@Param("now") Instant now);
+
+
+    /**
+     * 그 에이전트들에 붙어 바인딩과 연결이 모두 그 상태인 줄이다. 에이전트 목록의 할 수 있는 일이 쓴다. 생성자 식을 문자열로 두는
+     * 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.connection.domain.ReadyBinding(b.id, b.agent.id, b.connection.userId,"
+        + " b.agent.hermesProfile, b.connection.connectorId)"
+        + " from ConnectorBinding b"
+        + " where b.agent.id in :agentIds and b.status = :status and b.connection.status = :connectionStatus"
+        + " order by b.id")
+    List<ReadyBinding> findUsableByAgentIds(
+        @Param("agentIds") Collection<Long> agentIds,
+        @Param("status") BindingStatus status,
+        @Param("connectionStatus") ConnectionStatus connectionStatus);
 
 
     /**
