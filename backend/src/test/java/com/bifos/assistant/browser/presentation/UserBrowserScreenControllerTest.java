@@ -184,6 +184,8 @@ class UserBrowserScreenControllerTest {
             "{\"type\":\"evaluate\",\"text\":\"secret-value\"}",
             "{\"type\":\"scroll\",\"action\":\"secret-value\"}",
             "{\"type\":\"scroll\"}",
+            "{\"type\":\"dialog\",\"action\":\"secret-value\"}",
+            "{\"type\":\"dialog\"}",
             "{\"type\":\"touch\"}",
             "{\"type\":\"text\",\"text\":secret-value}",
             "{\"type\":\"mouse\",\"action\":\"down\",\"x\":\"secret-value\",\"y\":0.5}",

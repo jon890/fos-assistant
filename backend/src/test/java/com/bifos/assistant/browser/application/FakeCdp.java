@@ -89,6 +89,12 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
     }
 
 
+    /** 그 탭이 CDP 사건 하나를 보낸다. {@code params} 는 JSON 글이다. */
+    public void event(String targetId, String method, String params) {
+        connections.get(targetId).events.accept(new CdpEvent(method, JSON.readTree(params)));
+    }
+
+
     /** 그 탭의 연결이 상대 쪽에서 끊긴다. */
     public void drop(String targetId) {
         Connection connection = connections.get(targetId);

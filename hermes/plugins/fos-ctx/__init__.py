@@ -162,6 +162,12 @@ from .hooks import (
     wrap_external_data,
 )
 
+from .handoff import (  # noqa: F401 - 계약 테스트가 plugin 에서 꺼내 쓴다
+    HANDOFF_VERSION,
+    handoff_of,
+    report_handoff,
+    sign_handoff,
+)
 from .tool_guard import (
     GUARD_BLOCK_MESSAGE,
     GUARD_PATH,

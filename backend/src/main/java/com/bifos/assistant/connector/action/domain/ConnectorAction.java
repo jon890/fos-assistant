@@ -216,6 +216,10 @@ public class ConnectorAction {
     @Column(name = "limit_previous", precision = 20, scale = 6, updatable = false)
     private BigDecimal limitPrevious;
 
+    /** 플러그인이 사람에게 화면을 넘긴 기록이다. 넘기지 않은 줄은 null 이다. */
+    @Embedded
+    private ActionHandoff handoff;
+
     /** 승인하면서 함께 준 허락이다. 허락을 주지 않은 줄은 null 이다(ADR-20261102 / table-reduce-r2). */
     @Embedded
     private ActionGrant grant;
@@ -469,16 +473,13 @@ public class ConnectorAction {
 
     /** 함께 준 대화 허락을 거둔다. 그 실행이 실패했거나 결과를 모를 때 부른다. 상시 허락은 건드리지 않는다. */
     public void revokeConversationGrant(Instant now) {
-        if (grant != null && grant.scope() == GrantScope.CONVERSATION) {
-            grant.revoke(now);
-        }
+        ActionGrant.revokeConversation(grant, now);
     }
 
 
     /** 함께 준 대화 허락이 {@code now} 에 아직 유효하면 끝나는 시각이고 아니면 null 이다. */
     public Instant activeConversationGrantExpiresAt(Instant now) {
-        boolean active = grant != null && grant.scope() == GrantScope.CONVERSATION && grant.activeAt(now);
-        return active ? grant.expiresAt() : null;
+        return ActionGrant.conversationExpiresAt(grant, now);
     }
 
 

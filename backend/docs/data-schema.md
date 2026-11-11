@@ -817,6 +817,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+- `handoff_need`, `handoff_tab`, `handoff_at`, `handoff_closed_at` 은 플러그인이 그 호출에서 사람에게 「내 브라우저」 화면을 넘긴 기록이다([ADR-20261111 / connector-handoff](../../docs/adr/ADR-20261111-connector-handoff.md)). fos-ctx 의 알림이 hook 에 통과로 답한 같은 호출의 줄에만, 비어 있을 때 한 번 적는다. `handoff_need` 는 `LOGIN`, `CAPTCHA`, `DEVICE_CHECK` 이고 `handoff_tab` 은 남긴 탭의 CDP target id 다. 그 대화의 다음 turn 이 시작되면 `handoff_closed_at` 을 적어 카드를 닫는다. `connector.handoff` 의 저장소 쿼리로만 쓴다. 넘기지 않은 줄은 넷 다 비어 있다
 - `body_erased_at`은 대화 purge가 본문을 지운 시각이다. `args_json`, `result_text`와 두 key 참조를 NULL로 비운다. 조회는 「본문 삭제됨」을 표시하고 실행 인자를 제공하지 않는다
 - `grant_scope`, `grant_expires_at`, `grant_revoked_at` 은 승인하면서 함께 준 허락이다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 아래 「상시 허락과 대화 허락」 이 뜻을 갖는다
 
@@ -944,7 +945,7 @@ action을 지우면 실행 내용도 지운다.
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
 `target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 와 `CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
-`source_public_id` 는 알림을 만든 원인(승인 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
+`source_public_id` 는 알림을 만든 원인(승인 줄, 화면 넘기기를 적은 판정 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 
 ## 예약 작업 표

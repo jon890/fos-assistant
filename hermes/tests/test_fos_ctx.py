@@ -53,6 +53,9 @@ POLICY_VECTOR_SIG = "e23e297aec4837aeddd50e71dcde79969ad5544e6c93ea7b9ab7657f221
 # 도구 판정 질의의 서명 확인 값이다. 위 정책 확인 값의 key, 루트, session, 호출 id 와 도구 `terminal` 이다.
 # 서버 쪽 `backend/src/test/java/com/bifos/assistant/mcp/ToolGuardEndpointTest.java` 와 같은 값이어야 한다.
 TOOL_GUARD_VECTOR_SIG = "86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2fefe17273"
+# 화면 넘기기 알림의 서명 확인 값이다. 위 정책 확인 값의 key, 등록 이름, 루트, session, 호출 id 와
+# 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 이다. 서버 쪽 `ConnectorHandoffRequestTest` 와 같은 값이어야 한다.
+HANDOFF_VECTOR_SIG = "b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3"
 
 
 def load_ctx(add_cleanup):
@@ -1083,3 +1086,112 @@ class TransformToolResultTest(PluginFixture):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class HandoffReportTest(PluginFixture):
+    """플러그인 도구 결과의 화면 넘기기 칸을 가짜 Control Plane 에 알리는 모양과, 실패해도 결과가 그대로인지 본다."""
+
+    RESULT = json.dumps({"error": {"code": "DEMO_LOGIN_REQUIRED", "handoff": {"need": "login", "tab": "TAB1"}}})
+
+    def setUp(self):
+        super().setUp()
+        (pathlib.Path(self.tmp.name) / ".fos-connector-tools.json").write_text(json.dumps(BIND_MAP), encoding="utf-8")
+        self.requests = []
+        self.status = 200
+        test = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                test.requests.append({"path": self.path, "headers": dict(self.headers), "body": json.loads(raw)})
+                self.send_response(test.status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.saved_env = os.environ.get("FOS_CTX_POLICY_URL")
+        os.environ["FOS_CTX_POLICY_URL"] = (
+            "http://127.0.0.1:%d/internal/hermes/connector-policy" % self.server.server_address[1])
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        if self.saved_env is None:
+            os.environ.pop("FOS_CTX_POLICY_URL", None)
+        else:
+            os.environ["FOS_CTX_POLICY_URL"] = self.saved_env
+        super().tearDown()
+
+    def transform(self, tool, result):
+        return self.plugin.transform_tool_result(
+            tool_name=tool, args={}, result=result, task_id="t", session_id=VECTOR_SESSION,
+            tool_call_id=VECTOR_CALL, turn_id="", api_request_id="", duration_ms=1,
+            status="error", error_type=None, error_message=None)
+
+    @staticmethod
+    def wrapped(body):
+        return EXTERNAL_DATA_NOTICE + "\n<external-data>\n" + body + "\n</external-data>"
+
+    def test_handoff_result_is_reported_once_and_result_is_unchanged(self):
+        """플러그인 글 그대로와 Hermes 가 글로 싼 `error` 둘 다 서명해 한 번 알리고, 결과는 평소처럼 감싼다."""
+        for result in (self.RESULT, json.dumps({"error": self.RESULT})):
+            with self.subTest(result=result):
+                self.requests.clear()
+                self.assertEqual(self.transform("mcp__demo__write_note", result), self.wrapped(result))
+                self.assertEqual(len(self.requests), 1)
+                request = self.requests[0]
+                self.assertEqual(request["path"], "/internal/hermes/connector-handoff")
+                self.assertEqual(request["headers"]["Authorization"], "Bearer " + FAKE_MCP_CREDENTIAL)
+                body = request["body"]
+                self.assertEqual(
+                    {key: body[key] for key in body if key != "sig"},
+                    {"v": 1, "root_session_id": VECTOR_ROOT, "session_id": VECTOR_SESSION,
+                     "tool_call_id": VECTOR_CALL, "hermes_tool": "mcp__demo__write_note",
+                     "code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "TAB1"})
+                self.assertEqual(body["sig"], self.plugin.sign_handoff(
+                    self.plugin.signing_key(FAKE_MCP_CREDENTIAL), "mcp__demo__write_note", VECTOR_ROOT,
+                    VECTOR_SESSION, VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login", "TAB1"))
+
+    def test_other_results_are_not_reported(self):
+        """모양이 다르거나 어휘 밖이거나 다른 서버의 도구면 알리지 않는다."""
+        bad = [
+            '{"error": {"code": "DEMO_LOGIN_REQUIRED"}}',
+            json.dumps({"error": {"code": "DEMO_LOGIN_REQUIRED", "handoff": {"need": "payment", "tab": "TAB1"}}}),
+            json.dumps({"error": {"code": "DEMO_LOGIN_REQUIRED", "handoff": {"need": "login", "tab": "../x"}}}),
+            json.dumps({"error": {"code": "lower", "handoff": {"need": "login", "tab": "TAB1"}}}),
+            json.dumps({"result": {"handoff": {"need": "login", "tab": "TAB1"}}}),
+            "not json",
+        ]
+        for result in bad:
+            with self.subTest(result=result):
+                self.transform("mcp__demo__write_note", result)
+        self.transform("mcp__other__x", self.RESULT)
+        self.assertEqual(self.requests, [])
+
+    def test_failed_report_keeps_result(self):
+        """Control Plane 이 받지 않거나 닿지 않아도 결과는 평소처럼 감싸 간다."""
+        self.status = 500
+        self.assertEqual(self.transform("mcp__demo__write_note", self.RESULT), self.wrapped(self.RESULT))
+        # 닿지 않는 주소다. 이 포트로는 아무것도 듣지 않는다.
+        os.environ["FOS_CTX_POLICY_URL"] = "http://127.0.0.1:9/internal/hermes/connector-policy"
+        self.assertEqual(self.transform("mcp__demo__write_note", self.RESULT), self.wrapped(self.RESULT))
+
+    def test_isolated_profile_reports_without_wrapping(self):
+        """옛 설치 profile 도 알리되 결과는 바꾸지 않는다."""
+        (pathlib.Path(self.tmp.name) / ".fos-connector-tools.json").write_text(json.dumps(TOOL_MAP), encoding="utf-8")
+        self.assertIsNone(self.transform("mcp__demo__write_note", self.RESULT))
+        self.assertEqual(len(self.requests), 1)
+
+    def test_signature_vector(self):
+        """서명 확인 값이다. 서버 쪽 `ConnectorHandoffRequestTest` 의 값과 같아야 한다."""
+        self.assertEqual(
+            self.plugin.sign_handoff(POLICY_VECTOR_KEY, POLICY_VECTOR_HERMES_TOOL, POLICY_VECTOR_ROOT,
+                                     POLICY_VECTOR_SESSION, POLICY_VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login",
+                                     "TAB1"),
+            HANDOFF_VECTOR_SIG)

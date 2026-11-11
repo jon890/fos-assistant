@@ -15,6 +15,7 @@ import { useScreenFullscreen } from "./use-screen-fullscreen";
 import { ScreenScrollControls } from "./screen-scroll-controls";
 import { cn } from "cn";
 import { ScreenFrame } from "./screen-frame";
+import { ScreenDialog } from "./screen-dialog";
 
 /** 조합 중 Enter 와 조합이 끝난 뒤의 Enter 가 같은 누름이라고 보는 간격이다. */
 const ENTER_DEDUP_MS = 100;
@@ -25,10 +26,12 @@ const ENTER_DEDUP_MS = 100;
  */
 export function BrowserScreen({
   startUrl,
+  startTab = null,
   onOpen,
   onClose,
 }: {
   startUrl: string | null;
+  startTab?: string | null;
   onOpen: () => void;
   onClose: () => void;
 }) {
@@ -39,8 +42,15 @@ export function BrowserScreen({
   const addressRef = useRef<HTMLInputElement>(null);
   const { screenRef, dialogRef, triggerRef, expanded, toggle, closeOverlay } =
     useScreenFullscreen();
-  const { frame, tabs, closed, notice, setNotice, send, reopen } =
-    useScreenStream({ startUrl, onOpen, areaRef, addressRef, setAddress });
+  const { frame, tabs, closed, notice, setNotice, send, reopen, dialog } =
+    useScreenStream({
+      startUrl,
+      startTab,
+      onOpen,
+      areaRef,
+      addressRef,
+      setAddress,
+    });
   const pointer = useScreenPointer({
     areaRef,
     imgRef,
@@ -105,6 +115,9 @@ export function BrowserScreen({
           <Notice variant="error" role="alert">
             {notice}
           </Notice>
+        ) : null}
+        {dialog && closed === null ? (
+          <ScreenDialog dialog={dialog} send={send} />
         ) : null}
         <div
           className={cn(

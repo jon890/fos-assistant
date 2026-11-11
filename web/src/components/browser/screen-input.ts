@@ -14,7 +14,13 @@ export type ScreenInput =
   | { type: "back" }
   | { type: "reload" }
   | { type: "tab"; id: string }
-  | { type: "resize"; width: number; height: number };
+  | { type: "resize"; width: number; height: number }
+  | { type: "dialog"; action: "accept" | "dismiss" };
+
+/** 화면 입력 `tab` 의 `id` 모양이다. Control Plane 의 `UserBrowserDtos` 와 같은 식이다. 맞지 않으면 null 이다. */
+export function screenTabId(value: string): string | null {
+  return /^[A-Za-z0-9]{1,128}$/.test(value) ? value : null;
+}
 
 type Box = { left: number; top: number; width: number; height: number };
 type Point = { clientX: number; clientY: number };

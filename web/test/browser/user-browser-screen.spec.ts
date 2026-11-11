@@ -614,3 +614,55 @@ test("한글은 조합이 끝난 뒤 한 번 보내고, 빈 입력칸의 지우�
     .poll(() => ofType(fake.inputs, "key"))
     .toEqual([{ type: "key", key: "Backspace" }]);
 });
+
+test("화면 넘기기가 가리킨 탭이 처음 목록에 있으면 그리로 옮기고 다시 열 때는 옮기지 않는다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  await openScreen(page, fake, "/browser?tab=B2");
+
+  await expect
+    .poll(() => ofType(fake.inputs, "tab"))
+    .toEqual([{ type: "tab", id: "B2" }]);
+  // 연결이 끊겨 다시 열면 처음 탭 목록이 다시 온다. 이때는 옮기지 않는다.
+  await fake.end();
+  await expect.poll(fake.opens, { timeout: 10_000 }).toHaveLength(2);
+  await fake.push([["tabs", TABS]]);
+  // 사건은 온 순서대로 처리된다. 뒤따른 확인 창에 답한 입력이 닿은 뒤에 탭 입력을 센다.
+  await fake.push([["dialog", { open: true, type: "alert", message: "" }]]);
+  await page
+    .getByRole("alertdialog", { name: "사이트 확인 창" })
+    .getByRole("button", { name: "확인" })
+    .click();
+  await expect
+    .poll(() => ofType(fake.inputs, "dialog"))
+    .toEqual([{ type: "dialog", action: "accept" }]);
+  expect(ofType(fake.inputs, "tab")).toHaveLength(1);
+});
+
+test("사이트의 확인 창을 보이고 고른 답을 보내며, 창이 닫히면 거둔다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  await openScreen(page, fake);
+
+  await fake.push([
+    ["dialog", { open: true, type: "confirm", message: "삭제하시겠습니까?" }],
+  ]);
+  const dialog = page.getByRole("alertdialog", { name: "사이트 확인 창" });
+  await expect(dialog).toContainText("사이트가 확인을 묻고 있어요");
+  await expect(dialog).toContainText("삭제하시겠습니까?");
+  await dialog.getByRole("button", { name: "취소" }).click();
+  await expect
+    .poll(() => ofType(fake.inputs, "dialog"))
+    .toEqual([{ type: "dialog", action: "dismiss" }]);
+  await fake.push([["dialog", { open: false }]]);
+  await expect(dialog).toHaveCount(0);
+
+  await fake.push([["dialog", { open: true, type: "alert", message: "" }]]);
+  await expect(dialog.getByRole("button", { name: "취소" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "확인" }).click();
+  await expect
+    .poll(() => ofType(fake.inputs, "dialog").map((input) => input.action))
+    .toEqual(["dismiss", "accept"]);
+});

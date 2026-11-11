@@ -127,6 +127,25 @@ public final class McpCallSigner {
     }
 
 
+    /** 화면 넘기기 알림 본문이다. 서명할 글은 {@code ConnectorHandoffRequest} 의 계약 그대로다. */
+    public static ObjectNode handoffBody(
+        String rawToken, String hermesTool, String rootSessionId, String sessionId, String toolCallId, String code,
+        String need, String tab) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("v", 1);
+        body.put("root_session_id", rootSessionId);
+        body.put("session_id", sessionId);
+        body.put("tool_call_id", toolCallId);
+        body.put("hermes_tool", hermesTool);
+        body.put("code", code);
+        body.put("need", need);
+        body.put("tab", tab);
+        body.put("sig", sign(rawToken, String.join(
+            "\n", "v1-connector-handoff", hermesTool, rootSessionId, sessionId, toolCallId, code, need, tab)));
+        return body;
+    }
+
+
     /**
      * 요청 본문이 {@code tools/call} 이고 인자에 {@code _fos_ctx} 가 없으면 서명한 값을 붙인다.
      *
