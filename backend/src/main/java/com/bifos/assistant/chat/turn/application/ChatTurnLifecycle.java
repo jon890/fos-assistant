@@ -118,8 +118,13 @@ class ChatTurnLifecycle {
         if (TurnIntent.unattended(intent)) {
             executionMarks.markUnattended(execution.id());
         }
-        // 화면 넘기기 카드처럼 다음 turn 에 닫는 것이 듣는다. 듣는 쪽은 커밋 뒤에 돈다.
-        events.publishEvent(new ConversationTurnStarted(conversation.id()));
+        // 화면 넘기기 카드처럼 다음 turn 에 닫는 것이 듣는다. 이 자리에는 트랜잭션이 없어 듣는 쪽이 바로 돌고 예외도 여기로 온다.
+        // 닫지 못하면 카드가 남을 뿐이라 turn 은 잇는다.
+        try {
+            events.publishEvent(new ConversationTurnStarted(conversation.id()));
+        } catch (RuntimeException ex) {
+            log.warn("새 turn 시작을 알리지 못했다 conversationId={}", conversation.id(), ex);
+        }
         return new PendingTurn(
             user,
             conversation,

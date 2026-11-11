@@ -106,8 +106,8 @@ public class ConnectorHandoffs {
 
 
     /**
-     * 그 대화의 새 turn 이 시작되면 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. turn 을 연 트랜잭션이 커밋한 뒤 새 트랜잭션에서
-     * 돈다. 닫지 못해도 turn 은 잇는다. 카드가 남을 뿐이다.
+     * 그 대화의 새 turn 이 시작되면 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 트랜잭션 안에서 났으면 커밋한 뒤, 밖에서 났으면
+     * 바로 새 트랜잭션에서 돈다. 예외는 사건을 낸 쪽이 받아 로그만 남기므로 닫지 못해도 turn 은 잇는다. 카드가 남을 뿐이다.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
