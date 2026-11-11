@@ -5,7 +5,7 @@ import {
   expect,
   test,
 } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { waitForViewTransition } from "./helpers.ts";
 
 const PNG_1X1 = Buffer.from(

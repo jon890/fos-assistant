@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
 
-const SCRIPT = join(import.meta.dirname, "../../web/scripts/changed-files.mjs");
+const SCRIPT = join(import.meta.dirname, "../../scripts/changed-files.mjs");
 
 let repo: string;
 

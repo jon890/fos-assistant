@@ -46,6 +46,9 @@ export const RULES = [
   [/^backend\/src\/test\/(java\/com\/bifos\/assistant\/testsupport\/|resources\/)/, ["backend", "browser", "e2e", "hermes", "quality"]],
   // 그 밖의 backend 테스트 소스만 바꾸면 브라우저 shard 는 건너뛴다.
   [/^backend\/src\/test\//, ["backend", "e2e", "hermes", "quality"]],
+  // 웹 테스트는 주인 모듈 안에 있다. 단위 테스트는 web 검사만, 화면 테스트는 브라우저 검사만 입력으로 본다.
+  [/^web\/test\/(?:node|unit)\//, ["web"]],
+  [/^web\/test\/(?:browser|screenshots)\//, ["browser"]],
   // 브라우저 검사가 Control Plane 을, E2E 가 Control Plane 과 web/src 를 띄운다.
   [/^backend\//, ["backend", "browser", "e2e", "quality"]],
   [/^web\//, ["web", "browser", "e2e", "quality"]],
@@ -54,9 +57,9 @@ export const RULES = [
   // backend 테스트가 커넥터와 plugin 원본을 읽는다. Hermes 만 바꾸면 브라우저 shard 는 건너뛴다.
   [/^hermes\//, ["hermes", "backend", "e2e", "quality"]],
 
-  [/^test\/unit\//, NONE],
-  [/^test\/web\//, ["web"]],
-  [/^test\/browser\//, ["browser"]],
+  // 저장소 규칙 검사와 가짜 Hermes·테스트 부품의 단위 테스트, 스크립트 옆의 테스트는 언제나 도는 unit 에 있다.
+  [/^test\/(?:repo|e2e\/unit)\//, NONE],
+  [/^(?:test\/(?:support|model-eval\/blog)|scripts\/(?:ci|checks|dev|pr))\/[^/]*\.test\.ts$/, NONE],
   // 브라우저 검사가 E2E 의 가짜 Hermes 를, backend 와 hermes 테스트가 E2E 의 Python plugin 을 쓴다.
   [/^test\/e2e\//, ["e2e", "browser", "backend", "hermes"]],
   [/^test\/spotless-jdt\.test\.py$/, ["quality"]],

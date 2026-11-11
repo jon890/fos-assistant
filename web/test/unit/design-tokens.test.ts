@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import test from "node:test";
 
-const WEB_SRC = join(import.meta.dirname, "../../web/src");
+const WEB_SRC = join(import.meta.dirname, "../../src");
 const GLOBALS_CSS = join(WEB_SRC, "app/globals.css");
 
 /**

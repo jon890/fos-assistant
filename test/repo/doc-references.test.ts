@@ -10,13 +10,13 @@ const REPO_ROOT = join(import.meta.dirname, "../../");
 
 /** 문서 경로를 예시 문자열로만 쓰는 시험 파일이다. 그 경로는 실제 문서를 가리키지 않는다. */
 const PATH_FIXTURE_FILES = new Set([
-  "test/unit/doc-references.test.ts",
-  "test/unit/doc-files.test.ts",
-  "test/unit/file-length.test.ts",
-  "test/unit/doc-code-references.test.ts",
-  "test/unit/ci-paths.test.ts",
-  "test/unit/pr-size.test.ts",
-  "test/unit/pr-risk-labels.test.ts",
+  "test/repo/doc-references.test.ts",
+  "test/repo/doc-files.test.ts",
+  "scripts/checks/file-length.test.ts",
+  "test/repo/doc-code-references.test.ts",
+  "scripts/ci/ci-paths.test.ts",
+  "scripts/pr/pr-size.test.ts",
+  "scripts/pr/pr-risk-labels.test.ts",
 ]);
 
 const CODE_EXTENSIONS = [

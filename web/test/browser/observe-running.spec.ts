@@ -6,7 +6,7 @@ import {
   waitForStreamedContentAfterLoad,
   type FakeHermesControl,
 } from "./fixtures.ts";
-import type { BrowserContext, Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { BrowserContext, Locator, Page } from "../../node_modules/@playwright/test/index.js";
 
 /** 보는 창이 도는 turn 을 다시 묻는 주기다. 화면의 값과 같아야 한다. */
 const OBSERVE_INTERVAL_MS = 3_000;

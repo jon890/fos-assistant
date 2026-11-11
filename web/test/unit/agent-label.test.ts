@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agentLabel } from "../../web/src/lib/format.ts";
+import { agentLabel } from "../../src/lib/format.ts";
 
 test("이름이 있으면 그 이름을 그대로 보인다", () => {
   assert.equal(agentLabel("가족 비서"), "가족 비서");

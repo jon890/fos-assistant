@@ -1,4 +1,4 @@
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect } from "./fixtures.ts";
 
 /** 기억 화면 검사들이 함께 쓰는 조작이다. 손으로 만드는 양식은 숨겨져 있으므로 항목은 API 로 만든다. */

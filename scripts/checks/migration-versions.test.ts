@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-const script = resolve(import.meta.dirname, "../../scripts/checks/check-migration-versions.mjs");
+const script = resolve(import.meta.dirname, "./check-migration-versions.mjs");
 const directory = "backend/src/main/resources/db/migration";
 
 function check(added: string[], existing = ["V80__old.sql"]) {
@@ -76,15 +76,15 @@ test("기존 불변 검사도 시각 버전의 체크섬 변경을 잡는다", (
   const root = mkdtempSync(join(tmpdir(), "migration-checksums-"));
   try {
     mkdirSync(join(root, directory), { recursive: true });
-    mkdirSync(join(root, "test/unit"), { recursive: true });
+    mkdirSync(join(root, "test/repo"), { recursive: true });
     const file = "V20261001000000__locked.sql";
     const sql = "SELECT 1;\n";
     writeFileSync(join(root, directory, file), sql);
-    writeFileSync(join(root, "test/unit/migration-checksums.json"), JSON.stringify({
+    writeFileSync(join(root, "test/repo/migration-checksums.json"), JSON.stringify({
       [file]: createHash("sha256").update(sql).digest("hex"),
     }));
-    const immutable = join(root, "test/unit/migration-immutable.test.ts");
-    writeFileSync(immutable, readFileSync(join(import.meta.dirname, "migration-immutable.test.ts")));
+    const immutable = join(root, "test/repo/migration-immutable.test.ts");
+    writeFileSync(immutable, readFileSync(join(import.meta.dirname, "../../test/repo/migration-immutable.test.ts")));
     // 부모의 테스트 IPC 를 물려받지 않고 별도 검사 프로세스의 종료 코드를 읽는다.
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;

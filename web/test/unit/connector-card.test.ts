@@ -6,7 +6,7 @@ import {
   connectorLinkHref,
   connectorAppearanceLinkHref,
   toolRiskCounts,
-} from "../../web/src/lib/connection.ts";
+} from "../../src/lib/connection.ts";
 
 const SVG =
   "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";

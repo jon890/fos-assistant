@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { foldVersions, isLatestView, type VersionedMessage } from "../../web/src/lib/message-versions.ts";
+import { foldVersions, isLatestView, type VersionedMessage } from "../../src/lib/message-versions.ts";
 
 function message(id: number, role: VersionedMessage["role"], replacesMessageId: number | null = null) {
   return { id, role, replacesMessageId };

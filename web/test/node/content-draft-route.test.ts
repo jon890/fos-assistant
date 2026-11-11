@@ -3,12 +3,12 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
-import * as conversationId from "../../web/src/lib/conversation-id.ts";
+import ts from "../../node_modules/typescript/lib/typescript.js";
+import * as conversationId from "../../src/lib/conversation-id.ts";
 
 const ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const OTHER = "1f0e0d0c-0b0a-4908-8706-050403020100";
-const ROUTES = "../../web/src/app/api/chat/conversations/[conversationId]";
+const ROUTES = "../../src/app/api/chat/conversations/[conversationId]";
 
 /** 원고 GET 라우트를 실제로 실행한다. 인증이 필요한 Control Plane 호출만 대역한다. */
 async function callRoute(
@@ -18,7 +18,7 @@ async function callRoute(
   url = "https://example.test/route",
 ) {
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const calls: string[] = [];
   const dependencies: Record<string, unknown> = {
@@ -53,7 +53,7 @@ async function callRoute(
     return module.exports;
   }
   dependencies["@/lib/content-draft-route"] = await load(
-    "../../web/src/lib/content-draft-route.ts",
+    "../../src/lib/content-draft-route.ts",
   );
   const route = (await load(`${ROUTES}/${relative}`)) as {
     GET: (request: Request, context: unknown) => Promise<Response>;

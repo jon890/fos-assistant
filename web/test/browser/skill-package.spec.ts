@@ -1,5 +1,5 @@
 import { crc32 } from "node:zlib";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 

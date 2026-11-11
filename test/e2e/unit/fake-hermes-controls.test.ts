@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../e2e/fake-hermes.ts";
+import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../fake-hermes.ts";
 import { readFileSync } from "node:fs";
-import { MODEL_GUIDE_HEADERS, withoutResponseGuide } from "../e2e/fake-hermes/scenario-fixtures.ts";
+import { MODEL_GUIDE_HEADERS, withoutResponseGuide } from "../fake-hermes/scenario-fixtures.ts";
 
 const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
 const TOOL_CALL_GUIDE = "# 도구 호출\n\n로컬 MCP 도구 단건 호출 안내";
@@ -10,7 +10,7 @@ const APPROVAL_CARD_GUIDE = "# 승인 카드\n\n[승인 대기] 판정 글 안�
 const MEMORY_GUIDE = "# 기억\n\nmemory_remember 안내";
 const MEMORY_BODY = "# 지금 묻는 사람에 대해 아는 것\n\n- Memory 본문";
 const CONTEXT_ASSEMBLER = new URL(
-  "../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
+  "../../../backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java",
   import.meta.url,
 );
 

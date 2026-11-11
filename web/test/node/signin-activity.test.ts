@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { jwtVerify } from "../../web/node_modules/jose/dist/webapi/index.js";
-import { recordSignIn } from "../../web/src/lib/signin-activity.ts";
+import { jwtVerify } from "../../node_modules/jose/dist/webapi/index.js";
+import { recordSignIn } from "../../src/lib/signin-activity.ts";
 
 const originalFetch = globalThis.fetch;
 const originalSecret = process.env.ASSISTANT_JWT_SECRET;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupByTask } from "../../web/src/components/shell/group-by-task.ts";
+import { groupByTask } from "../../src/components/shell/group-by-task.ts";
 
 type Row = Parameters<typeof groupByTask>[0][number];
 

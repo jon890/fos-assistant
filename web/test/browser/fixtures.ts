@@ -10,18 +10,18 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { encode } from "../../web/node_modules/next-auth/jwt.js";
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import { encode } from "../../node_modules/next-auth/jwt.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import playwright, {
   type BrowserContext,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 import {
   DEMO_CONNECTOR,
   DEMO_TOKEN_OK,
   FAKE_DASHBOARD_TOKEN,
   startFakeHermes,
   type FakeHermes,
-} from "../e2e/fake-hermes.ts";
+} from "../../../test/e2e/fake-hermes.ts";
 import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
@@ -35,7 +35,7 @@ import { isolatedUser } from "./helpers.ts";
 
 const { expect, test: base } = playwright;
 
-const ROOT = join(import.meta.dirname, "../..");
+const ROOT = join(import.meta.dirname, "../../..");
 const SESSION_COOKIE = "authjs.session-token";
 const HEALTH_TIMEOUT_MS = 90_000;
 const HERMES_CONTROL_PATH = join(
@@ -692,7 +692,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
  * 링크를 눌러 옮기는 것은 RSC 로 오므로 숨은 조각이 생기지 않는다.
  */
 export function waitForStreamedContentAfterLoad(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   waitForShellReady = true,
 ) {
   const streamedContentPlaced = () =>

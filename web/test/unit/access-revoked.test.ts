@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isAccessRevoked } from "../../web/src/lib/access-revoked.ts";
+import { isAccessRevoked } from "../../src/lib/access-revoked.ts";
 
 test("401 이고 code 가 ACCESS_REVOKED 면 꺼진 사용자다", () => {
   assert.equal(isAccessRevoked(401, JSON.stringify({ code: "ACCESS_REVOKED", message: "x" })), true);

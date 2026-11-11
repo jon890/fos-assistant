@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { coalesce } from "../../web/src/lib/coalesce.ts";
-import { mergeFirstPage, type ConversationPage } from "../../web/src/components/shell/conversation-page.ts";
-import type { Conversation } from "../../web/src/components/shell/conversations-provider.tsx";
+import { coalesce } from "../../src/lib/coalesce.ts";
+import { mergeFirstPage, type ConversationPage } from "../../src/components/shell/conversation-page.ts";
+import type { Conversation } from "../../src/components/shell/conversations-provider.tsx";
 
 function conversation(id: string, updatedAt: string): Conversation {
   return {

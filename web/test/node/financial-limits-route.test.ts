@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
-import * as action from "../../web/src/lib/connector-action.ts";
-import * as connection from "../../web/src/lib/connection.ts";
+import ts from "../../node_modules/typescript/lib/typescript.js";
+import * as action from "../../src/lib/connector-action.ts";
+import * as connection from "../../src/lib/connection.ts";
 
 const LIMITS = {
   available: true,
@@ -33,7 +33,7 @@ async function callRoute(
   body: unknown = { value: "500" },
 ) {
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const calls: { path: string; init: unknown }[] = [];
   const dependencies: Record<string, unknown> = {
@@ -78,22 +78,22 @@ async function callRoute(
     return module.exports;
   }
   dependencies["@/lib/content-draft-snapshot"] = await load(
-    "../../web/src/lib/content-draft-snapshot.ts",
+    "../../src/lib/content-draft-snapshot.ts",
   );
-  dependencies["@/lib/decimal"] = await load("../../web/src/lib/decimal.ts");
+  dependencies["@/lib/decimal"] = await load("../../src/lib/decimal.ts");
   dependencies["@/lib/financial-limits"] = await load(
-    "../../web/src/lib/financial-limits.ts",
+    "../../src/lib/financial-limits.ts",
   );
   dependencies["@/lib/financial-limits-route"] = await load(
-    "../../web/src/lib/financial-limits-route.ts",
+    "../../src/lib/financial-limits-route.ts",
   );
   dependencies["@/lib/connector-action-route"] = await load(
-    "../../web/src/lib/connector-action-route.ts",
+    "../../src/lib/connector-action-route.ts",
   );
   const route = (await load(
     kind === "get"
-      ? "../../web/src/app/api/financial-limits/route.ts"
-      : "../../web/src/app/api/financial-limits/[name]/route.ts",
+      ? "../../src/app/api/financial-limits/route.ts"
+      : "../../src/app/api/financial-limits/[name]/route.ts",
   )) as {
     GET: () => Promise<Response>;
     PUT: (request: Request, context: unknown) => Promise<Response>;

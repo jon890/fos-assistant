@@ -1,6 +1,6 @@
 import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
-import { interimWireEvents } from "../e2e/scenarios/interim.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import { interimWireEvents } from "../../../test/e2e/scenarios/interim.ts";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 async function script(input: string, output: string, events: Record<string, unknown>[]) {
   const response = await fetch((await hermesBaseUrl()) + "/__test/script", {

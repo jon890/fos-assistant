@@ -2,7 +2,7 @@
 
 화면 갱신은 입력 상태와 레이아웃을 불필요하게 다시 만들지 않는다.
 
-검사: [입력 상태 회귀](../../test/browser/composer-send-flow.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [입력 상태 회귀](../../web/test/browser/composer-send-flow.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 
@@ -14,7 +14,7 @@
 
 ## 이 저장소의 사례
 
-[composer-send-flow.spec.ts](../../test/browser/composer-send-flow.spec.ts)에서 확인한다.
+[composer-send-flow.spec.ts](../../web/test/browser/composer-send-flow.spec.ts)에서 확인한다.
 composer-send-flow spec은 메시지 전송 중 입력과 첨부 상태의 흐름을 확인한다.
 
 ## 리뷰가 보는 것

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import type { Page, Route } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Route } from "../../node_modules/@playwright/test/index.js";
 
 type Item = {
   id: string;

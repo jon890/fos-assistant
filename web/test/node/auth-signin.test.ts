@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createRequire } from "node:module";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
+import ts from "../../node_modules/typescript/lib/typescript.js";
 
 const originalGoogleId = process.env.AUTH_GOOGLE_ID;
 const originalGoogleSecret = process.env.AUTH_GOOGLE_SECRET;
@@ -32,7 +32,7 @@ async function loadAuth(
   process.env.AUTH_GOOGLE_ID = "test-google-id";
   process.env.AUTH_GOOGLE_SECRET = "test-google-secret";
   const source = await readFile(
-    new URL("../../web/src/auth.ts", import.meta.url),
+    new URL("../../src/auth.ts", import.meta.url),
     "utf8",
   );
   const compiled = ts.transpileModule(source, {

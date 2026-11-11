@@ -2,7 +2,7 @@
 
 사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고 고치며, 블로그 글을 임시저장하는 범용 플러그인의 개발 문서다.
 
-covers: `hermes/connectors/naver-blog/`, `test/model-eval/blog/`, `test/unit/blog-photo-eval-*.test.ts`
+covers: `hermes/connectors/naver-blog/`, `test/model-eval/blog/`
 
 코드는 [`hermes/connectors/naver-blog/`](../../hermes/connectors/naver-blog) 에 있다.
 이 문서는 도구와 정책, 초안의 모양, 임시저장 글 읽기와 덮어쓰기, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [네이버 블로그 플러그인 README](../../hermes/connectors/naver-blog/README.md) 가 갖는다.
@@ -600,7 +600,7 @@ CI 에서 돌지 않는다. 사진 안내, 블로그 스킬, 사진 입력을 �
 | `photos/photos.json` | 합성 사진마다 그 사진에만 있는 정답 글자와 허용 표기 |
 | `photos/*.jpg` | 합성 사진. `make_photos.py` 가 만든 것을 커밋한다 |
 | `run.ts` | `send` 는 대화를 만들고 메시지를 보낸다. `score` 는 결과를 읽어 판정하고 보고서를 쓴다 |
-| `score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수이고 `test/unit/blog-photo-eval-score.test.ts` 가 검사한다 |
+| `score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수이고 `test/model-eval/blog/blog-photo-eval-score.test.ts` 가 검사한다 |
 
 ### 시나리오
 

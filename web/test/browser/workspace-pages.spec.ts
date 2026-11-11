@@ -3,7 +3,7 @@ import { join } from "node:path";
 import type {
   Page,
   Locator,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 

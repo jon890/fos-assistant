@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { notificationHref, unreadBadge, type NotificationView } from "../../web/src/lib/notification.ts";
+import { notificationHref, unreadBadge, type NotificationView } from "../../src/lib/notification.ts";
 
 const CONVERSATION_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 

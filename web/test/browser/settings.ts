@@ -1,4 +1,4 @@
-import { pickPort } from "../support/pick-port.ts";
+import { pickPort } from "../../../test/support/pick-port.ts";
 
 export const WEB_PORT = pickPort("BROWSER_WEB_PORT", 13_000);
 export const CONTROL_PLANE_PORT = pickPort("BROWSER_CONTROL_PLANE_PORT", 18_081);

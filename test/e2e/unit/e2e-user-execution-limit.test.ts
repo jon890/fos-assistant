@@ -14,7 +14,7 @@ test("다른 사용자 요청의 선행 실패도 러너 catch와 finally에 전
       [
         fileURLToPath(
           new URL(
-            "../support/user-execution-limit-failure.ts",
+            "../../support/user-execution-limit-failure.ts",
             import.meta.url,
           ),
         ),

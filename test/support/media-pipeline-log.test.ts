@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   backendEvidence,
   parseBackendPipelineEvents,
-} from "../support/media-pipeline-log.ts";
+} from "./media-pipeline-log.ts";
 
 const DRAFT = "0b9f6c1e-7d1a-4c2e-9a55-2f3c4d5e6f70";
 const embedded = {

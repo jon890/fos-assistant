@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   mergeUsageExecutionPage,
   type UsageExecutionPage,
-} from "../../web/src/lib/usage-paging.ts";
+} from "../../src/lib/usage-paging.ts";
 
 function page(ids: number[], nextCursor: string | null): UsageExecutionPage {
   return {

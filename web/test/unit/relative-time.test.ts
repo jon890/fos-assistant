@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatFullTime, formatRelative } from "../../web/src/lib/format.ts";
+import { formatFullTime, formatRelative } from "../../src/lib/format.ts";
 
 const NOW = new Date("2026-10-05T12:00:00Z");
 

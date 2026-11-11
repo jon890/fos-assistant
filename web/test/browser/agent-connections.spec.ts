@@ -6,12 +6,12 @@ import {
   test,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
-import type { AgentToolsView } from "../../web/src/lib/agent.ts";
-import type { CatalogToolset } from "../../web/src/lib/toolset-catalog.ts";
+import type { AgentToolsView } from "../../src/lib/agent.ts";
+import type { CatalogToolset } from "../../src/lib/toolset-catalog.ts";
 import type {
   BrowserContext,
   Page,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 /**
  * 에이전트 상세의 「이 에이전트가 쓰는 연결」 에서 연결을 붙이고 떼는 흐름을 본다.

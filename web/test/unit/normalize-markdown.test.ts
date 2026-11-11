@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizeMarkdown } from "../../web/src/components/chat/normalize-markdown.ts";
+import { normalizeMarkdown } from "../../src/components/chat/normalize-markdown.ts";
 
 test("앞뒤 파이프 유무와 관계없이 빠진 구분 줄을 한 번 보완한다", () => {
   for (const edge of ["", "|"]) {

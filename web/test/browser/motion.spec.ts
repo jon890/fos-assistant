@@ -1,6 +1,6 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
 import { cleanupMemories, confirmDelete, createMemory, memoryRow, openRow, reloadMemoryListBySaving } from "./memory-page.ts";
-import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 // 움직임 자체를 검사하므로 공통 fixture의 움직임 줄이기를 여기서는 쓰지 않는다.
 test.use({ reducedMotion: "no-preference" });

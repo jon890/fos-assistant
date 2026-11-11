@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures.ts";
 import type {
   Page,
   Route,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",

@@ -373,7 +373,7 @@ sequenceDiagram
 
 사진 하나를 올리지 못하면 그 사진만 다시 시도하거나 빼고 보낼 수 있고, 메시지 전송이 거절되면 입력창으로 되돌리지 않고 내 메시지에 「다시 보내기」 를 보인다.
 아직 보내지 못한 사진이 있으면 다음 글은 쓸 수 있지만 보내기는 기다리고, 페이지를 떠나기 전에 메시지가 사라진다고 확인한다.
-에이전트가 답하는 중에는 사진을 새로 붙이지 못하고 글은 대기 메시지로 보낸다. 이 분기들은 `test/browser/composer-send-flow.spec.ts` 와 `test/browser/stop.spec.ts` 가 확인한다.
+에이전트가 답하는 중에는 사진을 새로 붙이지 못하고 글은 대기 메시지로 보낸다. 이 분기들은 `web/test/browser/composer-send-flow.spec.ts` 와 `web/test/browser/stop.spec.ts` 가 확인한다.
 
 ## 사진 첨부
 
@@ -703,7 +703,7 @@ CSS 와 이미지는 행을 만들지 않고 HTML 의 상대 경로 요청으로
 - 같은 출처의 주소라 결과물의 `img-src 'self'` 가 허용하고, iframe 의 `allow-same-origin` 으로 로그인 쿠키가 함께 간다. 첨부는 그 대화의 주인만 받으므로 결과물을 여는 사람과 같은 권한이다
 - 첨부는 `Cache-Control: private` 이다. 대화 화면에서 이미 받은 사진은 브라우저가 다시 받지 않는다
 - 첨부를 지웠거나 보관 기간이 지났으면 410 이라 그 자리는 깨진 그림이다. HTML 은 `alt` 에 몇 번째 사진인지 적는다
-- 이 모양에 기대는 쪽은 네이버 블로그 플러그인의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
+- 이 모양에 기대는 쪽은 네이버 블로그 플러그인의 미리보기다([ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md)). 두 주소나 첨부 파일 이름을 바꾸면 그 미리보기도 함께 고친다. `web/test/unit/artifact-attachment-route.test.ts` 가 두 web 라우트가 형제로 있는지 본다
 
 ### 결과물 파일을 볼 때
 

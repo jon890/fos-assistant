@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   activityLabel, activityOutcome, activitySummaryLabel, applyChatEvent, emptyActivity, failActivity, fromTree,
-} from "../../web/src/components/chat/activity/activity-state.ts";
-import { formatSeconds } from "../../web/src/lib/format.ts";
+} from "../../src/components/chat/activity/activity-state.ts";
+import { formatSeconds } from "../../src/lib/format.ts";
 import type {
   ExecutionEventView,
   ExecutionTreeNode,
   ExecutionTreeResponse,
-} from "../../web/src/components/execution/execution-tree.tsx";
+} from "../../src/components/execution/execution-tree.tsx";
 
 function toolStarted(sequence: number, toolName: string): ExecutionEventView {
   return {

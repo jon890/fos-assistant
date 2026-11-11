@@ -3,8 +3,8 @@ import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { renderToStaticMarkup } from "../../web/node_modules/react-dom/server.js";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
+import { renderToStaticMarkup } from "../../node_modules/react-dom/server.js";
+import ts from "../../node_modules/typescript/lib/typescript.js";
 
 type SourceReadSummary = {
   completedCount: number;
@@ -29,7 +29,7 @@ type ActivityReferences = (input: {
 }) => React.ReactNode;
 
 const FILE = new URL(
-  "../../web/src/components/chat/activity/activity-references.tsx",
+  "../../src/components/chat/activity/activity-references.tsx",
   import.meta.url,
 );
 

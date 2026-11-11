@@ -3,10 +3,10 @@ import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { renderToStaticMarkup } from "../../web/node_modules/react-dom/server.js";
-import * as connection from "../../web/src/lib/connection.ts";
-import { toolText } from "../../web/src/lib/connector-tool-text.ts";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
+import { renderToStaticMarkup } from "../../node_modules/react-dom/server.js";
+import * as connection from "../../src/lib/connection.ts";
+import { toolText } from "../../src/lib/connector-tool-text.ts";
+import ts from "../../node_modules/typescript/lib/typescript.js";
 
 type ToolsModule = {
   ConnectorTools: (props: {
@@ -26,7 +26,7 @@ async function render(tools: connection.ConnectorTool[]) {
 async function load(): Promise<ToolsModule> {
   const source = await readFile(
     new URL(
-      "../../web/src/components/connector/connector-tools.tsx",
+      "../../src/components/connector/connector-tools.tsx",
       import.meta.url,
     ),
     "utf8",
@@ -39,7 +39,7 @@ async function load(): Promise<ToolsModule> {
     },
   }).outputText;
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const module = { exports: {} as ToolsModule };
   const dependencies: Record<string, unknown> = {

@@ -2,7 +2,7 @@
 
 plugin은 서비스 이름을 모르고 connector만 서비스별 동작을 갖는다.
 
-검사: [서비스 중립](../../test/unit/connector-neutral.test.ts)
+검사: [서비스 중립](../../test/repo/connector-neutral.test.ts)
 
 ## 까닭
 
@@ -14,5 +14,5 @@ plugin은 서비스 이름을 모르고 connector만 서비스별 동작을 갖�
 
 ## 이 저장소의 사례
 
-[connector-neutral.test.ts](../../test/unit/connector-neutral.test.ts)에서 확인한다.
+[connector-neutral.test.ts](../../test/repo/connector-neutral.test.ts)에서 확인한다.
 connector-neutral 테스트는 범용 plugin에 서비스 이름이 들어가지 않는지 확인한다.

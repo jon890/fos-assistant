@@ -1,8 +1,8 @@
 import { expect, setSession, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 import { TEST_EMAIL } from "./settings.ts";
-import type { CatalogToolset } from "../../web/src/lib/toolset-catalog.ts";
-import type { AgentToolsView } from "../../web/src/lib/agent.ts";
+import type { CatalogToolset } from "../../src/lib/toolset-catalog.ts";
+import type { AgentToolsView } from "../../src/lib/agent.ts";
 
 test("관리자가 활성 도구를 숨겨도 켜짐은 보존하고 관리자 화면에서 끌 수 있다", async ({ page, context, isolatedMember }) => {
   const originalCatalogResponse = await page.request.get("/api/admin/toolsets");

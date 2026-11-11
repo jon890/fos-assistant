@@ -9,7 +9,7 @@ import {
   joinPath,
   parseDelimited,
   previewKind,
-} from "../../web/src/lib/workspace-file.ts";
+} from "../../src/lib/workspace-file.ts";
 
 const MIB = 1024 * 1024;
 

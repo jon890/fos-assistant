@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { toolsetText } from "../../web/src/lib/toolset-label.ts";
+import { toolsetText } from "../../src/lib/toolset-label.ts";
 
 const NAMES = [
   "web", "vision", "todo", "clarify", "session_search", "skills", "tts", "delegation", "terminal", "file",

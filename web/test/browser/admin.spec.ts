@@ -1,5 +1,5 @@
 import { expect, hermesBaseUrl, setSession, test, PERSONA_AGENT_CODE } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 /** 에이전트가 여럿이라 검사가 보는 카드 하나로 좁힌다. */
 function browserCard(page: Page) {

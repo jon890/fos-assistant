@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { executionStatusLabel, executionStatusVariant, isInterruptedByRestart, isRunning } from "../../web/src/lib/execution-status.ts";
+import { executionStatusLabel, executionStatusVariant, isInterruptedByRestart, isRunning } from "../../src/lib/execution-status.ts";
 
 test("도는 중인 실행은 오류 코드가 있어도 info 다", () => {
   assert.equal(executionStatusVariant({ status: "RUNNING", errorCode: null }), "info");

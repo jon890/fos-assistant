@@ -6,17 +6,17 @@ import { after, test } from "node:test";
 import {
   createMediaFixture,
   mediaMetadataCases,
-} from "../support/media-pipeline-fixture.ts";
+} from "./media-pipeline-fixture.ts";
 import {
   PIPELINE_STAGES,
   pipelineLog,
   reducePipelineEvidence,
   validatePipelineEvidence,
-} from "../support/media-pipeline-evidence.ts";
+} from "./media-pipeline-evidence.ts";
 import type {
   PipelineEvidenceV1,
   PipelineStage,
-} from "../support/media-pipeline-evidence.ts";
+} from "./media-pipeline-evidence.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "media-evidence-"));
 const manifest = createMediaFixture(dir, 30);

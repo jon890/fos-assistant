@@ -1,5 +1,5 @@
 import { conversationIdOf, expect, test } from "./fixtures.ts";
-import { TOOL_DETAIL_SECRETS } from "../e2e/fake-hermes.ts";
+import { TOOL_DETAIL_SECRETS } from "../../../test/e2e/fake-hermes.ts";
 
 test("작업 과정과 SSE와 실행 조회에서 비밀값과 UUID 원문을 내보내지 않는다", async ({ page }) => {
   await page.goto("/");

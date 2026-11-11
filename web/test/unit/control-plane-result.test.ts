@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readControlPlaneResult } from "../../web/src/lib/control-plane-result.ts";
+import { readControlPlaneResult } from "../../src/lib/control-plane-result.ts";
 
 const HTML = "<html><body><h1>502 Bad Gateway</h1></body></html>";
 

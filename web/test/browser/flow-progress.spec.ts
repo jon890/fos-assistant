@@ -1,6 +1,6 @@
 import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
-import { LONG_ACTIVITY_PROBE } from "../e2e/fake-hermes.ts";
-import type { Locator } from "../../web/node_modules/@playwright/test/index.js";
+import { LONG_ACTIVITY_PROBE } from "../../../test/e2e/fake-hermes.ts";
+import type { Locator } from "../../node_modules/@playwright/test/index.js";
 
 async function pausedToolScript(input: string) {
   const response = await fetch((await hermesBaseUrl()) + "/__test/script", {

@@ -1,7 +1,7 @@
 # 브라우저 테스트
 
-`test/browser/` 의 Playwright 테스트를 쓰거나 고칠 때 읽는다.
-돌리는 명령과 개발 서버를 띄우는 방법은 [`web/AGENTS.md`](../../web/AGENTS.md) 의 「검사」 가 갖는다.
+`web/test/browser/` 의 Playwright 테스트를 쓰거나 고칠 때 읽는다.
+돌리는 명령과 개발 서버를 띄우는 방법은 [`web/AGENTS.md`](../../AGENTS.md) 의 「검사」 가 갖는다.
 
 ## 개발 서버와 빌드한 서버의 미리 읽기 차이
 

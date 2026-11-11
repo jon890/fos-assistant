@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { subagentLabel } from "../../web/src/lib/format.ts";
+import { subagentLabel } from "../../src/lib/format.ts";
 
 test("80자를 넘는 목표는 경계의 이모지를 보존하고 말줄임표까지 80자로 줄인다", () => {
   const goal = `${"가".repeat(78)}😀나다`;

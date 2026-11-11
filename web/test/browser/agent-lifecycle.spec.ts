@@ -1,5 +1,5 @@
 import { CONVERSATION_URL, expect, setSession, test } from "./fixtures.ts";
-import type { BrowserContext, Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { BrowserContext, Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
  * 사용자가 에이전트를 만들고 공개 범위를 바꾸고 지우는 흐름을 본다.

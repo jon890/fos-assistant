@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
+import ts from "../../node_modules/typescript/lib/typescript.js";
 
 type Call = { path: string; init: { method?: string; body?: unknown } };
 
@@ -14,7 +14,7 @@ async function put(
   status = 204,
 ): Promise<{ response: Response; calls: Call[] }> {
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const calls: Call[] = [];
   const dependencies: Record<string, unknown> = {
@@ -49,10 +49,10 @@ async function put(
     return module.exports;
   }
   dependencies["@/lib/json-body"] = await load(
-    "../../web/src/lib/json-body.ts",
+    "../../src/lib/json-body.ts",
   );
   const route = (await load(
-    "../../web/src/app/api/memory/maintenance-candidates/[id]/review/route.ts",
+    "../../src/app/api/memory/maintenance-candidates/[id]/review/route.ts",
   )) as {
     PUT: (request: Request, context: unknown) => Promise<Response>;
   };

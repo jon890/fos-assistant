@@ -1,4 +1,4 @@
-import { ASK_CARD_PROBE } from "../e2e/fake-hermes.ts";
+import { ASK_CARD_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import { conversationIdOf, expect, test } from "./fixtures.ts";
 
 test("답 끝의 질문을 카드로 그리고 고른 답을 다음 메시지로 보낸다", async ({

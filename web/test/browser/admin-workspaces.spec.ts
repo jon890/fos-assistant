@@ -1,4 +1,4 @@
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 
 /** 응답이 계약 밖의 칸으로 파일 이름을 실어 보내도 화면은 그리지 않아야 한다. */

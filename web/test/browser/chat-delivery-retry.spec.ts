@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import type { Page, Route } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Route } from "../../node_modules/@playwright/test/index.js";
 
 /** 시험이 채워 넣는 메시지 번호다. 실제로 저장된 메시지 번호와 겹치지 않게 크게 둔다. */
 const EARLIER_NOTICE_ID = 91_000_001;

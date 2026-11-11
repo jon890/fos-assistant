@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures.ts";
 import type {
   Page,
   Route,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 type Capture = Record<string, unknown> & { id: number; status: string };
 

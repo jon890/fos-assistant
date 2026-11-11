@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, touchesGuide, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, removesRoute, touchesGuide, withoutSlow } from "./ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -15,7 +15,7 @@ test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", (
     "docs/features/chat/spec.md", "docs/features/chat/design.md", "docs/features/chat/tasks/plan1/phase-01.md", "docs/features/chat/tasks/plan1/index.json", ".claude/skills/other/SKILL.md",
     "AGENTS.md", "README.ko.md", "backend/docs/data-schema.md", "backend/AGENTS.md", "web/docs/code-architecture.md",
     "web/AGENTS.md", ".github/workflows/code-review-prompt.txt", ".github/workflows/pr-size.yml", "scripts/pr/pr-size.mjs",
-    "scripts/dev/check-local.sh", "test/unit/doc-files.test.ts",
+    "scripts/dev/check-local.sh", "test/repo/doc-files.test.ts",
   ];
   assert.deepEqual(running(docs), []);
 });
@@ -31,8 +31,10 @@ test("모듈 코드는 그 모듈과 그것을 띄우는 job 을 돌린다", () 
   assert.deepEqual(running(["hermes/connectors/gmail/server.py"]), ["backend", "e2e", "hermes", "quality"]);
   assert.deepEqual(running(["hermes/connectors/gmail/skills/gmail/SKILL.md"]), ["backend", "e2e", "hermes", "quality"]);
   assert.deepEqual(running(["hermes/docs/hermes-contract.md"]), ["hermes"]);
-  assert.deepEqual(running(["test/web/a.test.ts"]), ["web"]);
-  assert.deepEqual(running(["test/browser/chat.spec.ts"]), ["browser"]);
+  assert.deepEqual(running(["web/test/node/a.test.ts"]), ["web"]);
+  assert.deepEqual(running(["web/test/unit/a.test.ts"]), ["web"]);
+  assert.deepEqual(running(["web/test/screenshots/tour.shots.ts"]), ["browser"]);
+  assert.deepEqual(running(["web/test/browser/chat.spec.ts"]), ["browser"]);
   assert.deepEqual(running(["test/e2e/run.ts"]), ["backend", "browser", "e2e", "hermes"]);
 });
 
@@ -105,7 +107,7 @@ test("필수 검사는 돌려야 했으면 성공만, 건너뛰기로 했으면 
 
 test("gate 명령은 직접 경로와 심볼릭 링크에서 환경값을 같은 종료 코드로 판정한다", () => {
   const dir = mkdtempSync(join(tmpdir(), "ci-path-filter-gate-"));
-  const script = fileURLToPath(new URL("../../scripts/ci/ci-paths.mjs", import.meta.url));
+  const script = fileURLToPath(new URL("./ci-paths.mjs", import.meta.url));
   const link = join(dir, "gate.mjs");
   symlinkSync(script, link);
   const cases = [
@@ -140,7 +142,7 @@ test("gate 명령은 직접 경로와 심볼릭 링크에서 환경값을 같은
 
 test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 기준으로 삭제와 이름 변경을 본다", () => {
   const dir = mkdtempSync(join(tmpdir(), "ci-path-filter-"));
-  const script = fileURLToPath(new URL("../../scripts/ci/ci-paths.mjs", import.meta.url));
+  const script = fileURLToPath(new URL("./ci-paths.mjs", import.meta.url));
   const output = join(dir, "output");
   const summary = join(dir, "summary");
   const run = (event: string, fullLabel = "false") => {

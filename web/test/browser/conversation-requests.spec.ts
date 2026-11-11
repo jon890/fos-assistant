@@ -1,6 +1,6 @@
 // 코드 규칙: rule-61. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import type { Page, Request } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Request } from "../../node_modules/@playwright/test/index.js";
 
 /** 사이드바가 그릴 만큼 대화가 많은 사용자를 흉내 낸다. 한 페이지(기본 30개)를 넘겨야 한다. */
 const CONVERSATION_COUNT = 70;

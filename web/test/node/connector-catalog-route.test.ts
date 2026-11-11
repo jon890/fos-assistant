@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
-import { toolText } from "../../web/src/lib/connector-tool-text.ts";
-import * as connection from "../../web/src/lib/connection.ts";
-import { AGENT_CODE_PATTERN } from "../../web/src/lib/agent.ts";
+import ts from "../../node_modules/typescript/lib/typescript.js";
+import { toolText } from "../../src/lib/connector-tool-text.ts";
+import * as connection from "../../src/lib/connection.ts";
+import { AGENT_CODE_PATTERN } from "../../src/lib/agent.ts";
 
 const SVG =
   "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";
@@ -35,7 +35,7 @@ function summary(change: Record<string, unknown> = {}) {
 /** 실제 GET 라우트와 응답 정제를 실행한다. 세션이 필요한 Control Plane 호출만 바꾼다. */
 async function getCatalog(items: unknown[]): Promise<Response> {
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const dependencies: Record<string, unknown> = {
     "@/lib/control-plane": {
@@ -67,9 +67,9 @@ async function getCatalog(items: unknown[]): Promise<Response> {
     return module.exports;
   }
   dependencies["@/lib/connection-route"] = await load(
-    "../../web/src/lib/connection-route.ts",
+    "../../src/lib/connection-route.ts",
   );
-  const route = (await load("../../web/src/app/api/connectors/route.ts")) as {
+  const route = (await load("../../src/app/api/connectors/route.ts")) as {
     GET: () => Promise<Response>;
   };
   return route.GET();
@@ -253,7 +253,7 @@ test("실제 GET은 도구 제목도 요약과 같은 규칙으로 정제한다"
 test("실제 GET은 공통 경계마다 정책을 보존하고 요약만 정제하며 모델용 설명은 버린다", async () => {
   const vectors = JSON.parse(
     await readFile(
-      new URL("../fixtures/connector-tool-descriptions.json", import.meta.url),
+      new URL("../../../test/fixtures/connector-tool-descriptions.json", import.meta.url),
       "utf8",
     ),
   );

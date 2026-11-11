@@ -16,7 +16,7 @@ import { join } from "node:path";
  * 자리표시자로 빌드하고 실행할 때 값을 받으므로, 빌드 때 값을 읽어 굳히는 코드가 생기면 여기서 드러난다.
  */
 
-const WEB_DIR = join(import.meta.dirname, "../../web");
+const WEB_DIR = join(import.meta.dirname, "../..");
 const STANDALONE_DIR = join(WEB_DIR, ".next/standalone");
 
 const BUILD_PLACEHOLDER_ENV = {

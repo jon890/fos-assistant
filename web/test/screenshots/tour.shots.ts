@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
-import type { DemoScript } from "../e2e/fake-hermes.ts";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
+import type { DemoScript } from "../../../test/e2e/fake-hermes.ts";
 import {
   expect,
   hermesBaseUrl,
@@ -23,7 +23,7 @@ import {
  * 승인 카드와 기억 제안만 브라우저 검사와 같이 응답을 정해 준다.
  */
 
-const IMAGE_DIR = join(import.meta.dirname, "../../docs/images");
+const IMAGE_DIR = join(import.meta.dirname, "../../../docs/images");
 const USER = { email: TEST_EMAIL, name: "Alex" };
 
 /** 브라우저 검사가 심어 둔 에이전트다. 화면에 검사용 이름이 나오지 않게 끈다. */

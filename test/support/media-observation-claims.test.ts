@@ -6,18 +6,18 @@ import test from "node:test";
 import {
   createSpecialMediaCases,
   type SpecialMediaCase,
-} from "../support/media-pipeline-fixture.ts";
+} from "./media-pipeline-fixture.ts";
 import {
   fakeProviderRoutes,
   judgeObservationClaims,
   type AssetTraits,
   type RecordedObservation,
   type VisionRoute,
-} from "../support/media-observation-claims.ts";
+} from "./media-observation-claims.ts";
 import {
   backendEvidence,
   parseBackendPipelineEvents,
-} from "../support/media-pipeline-log.ts";
+} from "./media-pipeline-log.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "media-special-"));
 let cases: SpecialMediaCase[];

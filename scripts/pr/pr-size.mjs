@@ -14,7 +14,7 @@ export function excluded(file) {
     /(^|\/)(dist|build|\.next|coverage|__snapshots__|[^/]+-snapshots)\//.test(file) ||
     /\.(snap|min\.js|bundle\.js|js\.map|css\.map)$/.test(file) ||
     /(^|\/)config\/archunit\/store\//.test(file) ||
-    ["backend/config/checkstyle/baseline.xml", "web/eslint-suppressions.json", "test/unit/migration-checksums.json"].includes(file);
+    ["backend/config/checkstyle/baseline.xml", "web/eslint-suppressions.json", "test/repo/migration-checksums.json"].includes(file);
 }
 
 // 운영 코드로 셀 경로: 에이전트의 도구 사용을 정하는 커넥터 스킬 문서.

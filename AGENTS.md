@@ -19,7 +19,7 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
 새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 새 기능의 기능 폴더 `docs/features/<id>/`(스펙 `spec.md`, 설계 `design.md`, 계획 `tasks/<계획>/`), 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다.
 기능 파일은 지금 동작하는 요구와 흐름을, 스펙은 합의한 변경의 요구사항 ID(`REQ1`)와 인수 조건을, 설계는 그 요구사항을 어떻게 구현할지를 갖는다. 나눔과 ID 꼴은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가 갖는다.
-배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/unit/doc-files.test.ts`가 지킨다.
+배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/repo/doc-files.test.ts`가 지킨다.
 
 ## 용어
 
@@ -195,7 +195,7 @@ verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전�
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
 머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
-CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/unit/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
+CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/repo/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
 필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `gh pr merge <PR> --merge --match-head-commit <해시>` 로 머지하고, 이력을 한 줄로 합치지 않는다. 판정한 뒤 push 가 들어오면 머지가 거절된다.
 머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.

@@ -13,7 +13,7 @@ import {
   webUrl,
   wheel,
   wheelDelta,
-} from "../../web/src/components/browser/screen-input.ts";
+} from "../../src/components/browser/screen-input.ts";
 
 const box = { left: 100, top: 50, width: 400, height: 600 };
 

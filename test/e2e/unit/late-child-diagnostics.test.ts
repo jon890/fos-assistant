@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { startFakeHermes } from "../e2e/fake-hermes.ts";
-import { type ChildUsageObservation } from "../e2e/fake-hermes/state.ts";
-import { childUsageDiagnostic } from "../e2e/scenarios/streaming.ts";
-import { maskBackendLog, backendFailureExcerpt } from "../e2e/backend-log.ts";
+import { startFakeHermes } from "../fake-hermes.ts";
+import { type ChildUsageObservation } from "../fake-hermes/state.ts";
+import { childUsageDiagnostic } from "../scenarios/streaming.ts";
+import { maskBackendLog, backendFailureExcerpt } from "../backend-log.ts";
 
 test("늦은 자식 관찰은 GET을 소비하지 않고 첫 정상 GET 뒤에만 종료를 해제한다", async () => {
   const hermes = await startFakeHermes({ example: "example-key" });

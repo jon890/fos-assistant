@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LARGE_THRESHOLD, MAX_LINES } from "../../scripts/pr/pr-size.mjs";
-import { publishSizeReview, sizeFinding } from "../../scripts/pr/pr-size-review.mjs";
+import { LARGE_THRESHOLD, MAX_LINES } from "./pr-size.mjs";
+import { publishSizeReview, sizeFinding } from "./pr-size-review.mjs";
 
 const candidate = (kind = "area", name = "web", production = 100) => ({ kind, name, counts: { production } });
 const size = (production, split_candidates = []) => ({

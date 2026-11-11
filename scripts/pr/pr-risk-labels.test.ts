@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-const SCRIPT = new URL("../../scripts/pr/pr-risk-labels.sh", import.meta.url).pathname;
+const SCRIPT = new URL("./pr-risk-labels.sh", import.meta.url).pathname;
 
 test("SQL과 Java 마이그레이션 및 COMMENT 리소스에는 마이그레이션 위험 라벨이 붙는다", () => {
   for (const path of [

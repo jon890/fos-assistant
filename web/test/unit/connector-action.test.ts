@@ -9,7 +9,7 @@ import {
   type ConnectorAction,
   hiddenArgKeys,
   readableArgs,
-} from "../../web/src/lib/connector-action.ts";
+} from "../../src/lib/connector-action.ts";
 
 test("인자 이름은 도구별이며 모르는 키와 가린 키는 유지한다", () => {
   assert.equal(approvalArgLabel("body", { body: "본문" }), "본문");

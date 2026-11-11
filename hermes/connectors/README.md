@@ -296,7 +296,7 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 플러그인
 - 위 「갖출 것」 과 공통 검사 통과
 - 도구마다의 분류 까닭이 플러그인 문서에 있다
 - [`hermes/README.md`](../README.md) 의 플러그인 표에 한 줄. `README.md` 와 `README.ko.md` 의 플러그인 소개도 맞는지 본다
-- `test/unit/connector-neutral.test.ts` 의 금지 낱말에 그 서비스의 이름을 더한다. Control Plane 과 웹과 `hermes/plugins` 에 그 이름이 들어오지 않게 한다
+- `test/repo/connector-neutral.test.ts` 의 금지 낱말에 그 서비스의 이름을 더한다. Control Plane 과 웹과 `hermes/plugins` 에 그 이름이 들어오지 않게 한다
 - 실제 계정으로 확인한 결과를 PR 에 적는다. 계정 주소와 토큰은 적지 않는다
 - 저장소의 검사는 [`AGENTS.md`](../../AGENTS.md) 의 「확인」 이 갖는다
 

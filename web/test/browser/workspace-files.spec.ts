@@ -2,7 +2,7 @@ import type {
   Page,
   Route,
   TestInfo,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 
 /** 결과물 패널의 `FRAME_SANDBOX` 와 같은 값이다. HTML 미리보기도 이 값만 쓴다. */

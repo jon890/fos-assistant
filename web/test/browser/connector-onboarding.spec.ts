@@ -6,11 +6,11 @@ import {
   test,
 } from "./fixtures.ts";
 import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
-import { DEMO_TOKEN_OK } from "../e2e/fake-hermes.ts";
+import { DEMO_TOKEN_OK } from "../../../test/e2e/fake-hermes.ts";
 import type {
   Page,
   TestInfo,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 /**
  * 외부 서비스를 연결한 직후 같은 자리에서 쓸 에이전트를 고르고, 붙이고, 그 에이전트와 대화로 잇는 흐름을 본다.

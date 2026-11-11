@@ -1,5 +1,5 @@
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import {
   CONVERSATION_URL,
   conversationIdOf,

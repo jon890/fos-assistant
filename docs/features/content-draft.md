@@ -1,6 +1,6 @@
 # 사진 참조를 고정한 원고와 단계별 검증
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `backend/src/main/java/com/bifos/assistant/connector/**/ContentDraft*`, `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `hermes/connectors/naver-blog/src/content-snapshot*.ts`, `test/support/media-pipeline-evidence.ts`, `test/unit/media-pipeline-evidence.test.ts`
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `backend/src/main/java/com/bifos/assistant/connector/**/ContentDraft*`, `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `hermes/connectors/naver-blog/src/content-snapshot*.ts`, `test/support/media-pipeline-evidence.ts`, `test/support/media-pipeline-evidence.test.ts`
 
 typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으로 변환한다.
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.

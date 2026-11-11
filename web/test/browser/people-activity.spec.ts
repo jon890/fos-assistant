@@ -1,4 +1,4 @@
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
 import { isolatedUser } from "./helpers.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";

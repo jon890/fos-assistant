@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { subagentGapDetail, subagentGapTotal } from "../../web/src/lib/subagent-gap.ts";
+import { subagentGapDetail, subagentGapTotal } from "../../src/lib/subagent-gap.ts";
 
 test("셋 다 0 이면 합계는 0 이고 문구는 비어 있다", () => {
   const gap = { pending: 0, unconfirmed: 0, unpriced: 0 };

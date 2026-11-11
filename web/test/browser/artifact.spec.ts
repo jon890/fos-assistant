@@ -1,6 +1,6 @@
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
-import { ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE } from "../e2e/fake-hermes.ts";
-import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import { ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE } from "../../../test/e2e/fake-hermes.ts";
+import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 /** 새 대화에서 결과물을 만드는 글을 보내고, 답 아래 결과물 줄이 뜰 때까지 기다린다. */
 async function sendProbe(page: Page, text: string = ARTIFACT_PROBE, count = 1) {

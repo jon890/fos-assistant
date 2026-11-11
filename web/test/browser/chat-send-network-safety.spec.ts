@@ -5,7 +5,7 @@ import {
   setSession,
   test,
 } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 type LossMode = "before" | "accepted" | "headers" | "started";
 type Probe = {

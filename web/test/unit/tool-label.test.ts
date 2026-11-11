@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isReadableDetail, toolLabel } from "../../web/src/lib/tool-label.ts";
+import { isReadableDetail, toolLabel } from "../../src/lib/tool-label.ts";
 
 test("terminal 은 도는 중에 「작업하고 있어요」, 끝나면 「작업을 했어요」 다", () => {
   assert.equal(toolLabel("terminal", true), "작업하고 있어요");

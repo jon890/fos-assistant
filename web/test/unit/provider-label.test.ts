@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   knownProviderLabel,
   providerLabel,
-} from "../../web/src/lib/provider-label.ts";
+} from "../../src/lib/provider-label.ts";
 
 test("아는 provider id 는 표시 이름으로 바뀐다", () => {
   assert.equal(providerLabel("openai-codex"), "ChatGPT 구독");

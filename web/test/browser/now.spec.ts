@@ -1,6 +1,6 @@
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
-import type { Page, Route, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
-import { isoToSeoulInput } from "../../web/src/lib/attention.ts";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
+import type { Page, Route, TestInfo } from "../../node_modules/@playwright/test/index.js";
+import { isoToSeoulInput } from "../../src/lib/attention.ts";
 import { expect, setSession, test, type FakeHermesControl } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET } from "./settings.ts";
 

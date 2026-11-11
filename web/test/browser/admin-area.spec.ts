@@ -6,8 +6,8 @@ import {
   setSession,
   test,
 } from "./fixtures.ts";
-import { FAKE_USAGE } from "../e2e/fake-hermes.ts";
-import type { Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import { FAKE_USAGE } from "../../../test/e2e/fake-hermes.ts";
+import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 /** 화면 높이(모바일 844px)를 넘길 만큼의 대화 수다. 사이드바는 첫 쪽으로 30개를 읽는다. */
 const CONVERSATION_COUNT = 30;

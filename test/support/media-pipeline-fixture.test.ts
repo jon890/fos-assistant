@@ -9,7 +9,7 @@ import {
   inspectMediaFixture,
   mediaMetadataCases,
   requireSourceByteLength,
-} from "../support/media-pipeline-fixture.ts";
+} from "./media-pipeline-fixture.ts";
 
 test("원본 길이는 같은 값도 허용하고 불일치·0·음수·비정수는 거부한다", () => {
   const first = Buffer.from([1, 2, 3]);

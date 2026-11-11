@@ -16,5 +16,7 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["e2e/**/*.ts", "model-eval/**/*.ts"]
+  "include": ["e2e/**/*.ts", "model-eval/**/*.ts"],
+  // 단위 테스트는 node --test 가 직접 읽는다. 옛 test/unit 도 이 검사에 들지 않았다
+  "exclude": ["e2e/unit", "model-eval/**/*.test.ts"]
 }

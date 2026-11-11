@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AgentView } from "../../web/src/lib/agent.ts";
+import type { AgentView } from "../../src/lib/agent.ts";
 import {
   agentChoices,
   boundReadiness,
-} from "../../web/src/lib/connector-onboarding.ts";
+} from "../../src/lib/connector-onboarding.ts";
 
 function agent(code: string, overrides: Partial<AgentView> = {}): AgentView {
   return {

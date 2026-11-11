@@ -108,7 +108,7 @@ async function authorize(): Promise<Authorized> {
  * <p>그 오류 클래스는 Next.js 가 내보내지 않는다. 안쪽 경로에서 가져오면 서버 묶음에 든 것과 다른 사본이라
  * `instanceof` 가 맞지 않으므로 문구의 앞부분으로 알아본다.
  *
- * <p>next 를 올릴 때 이 문구가 그대로인지 다시 본다. 달라지면 `test/browser/access-revoked.spec.ts` 의 첫
+ * <p>next 를 올릴 때 이 문구가 그대로인지 다시 본다. 달라지면 `web/test/browser/access-revoked.spec.ts` 의 첫
  * 검사가 실패한다.
  */
 const READONLY_COOKIES_MESSAGE =

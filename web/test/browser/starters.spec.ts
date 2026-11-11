@@ -1,4 +1,4 @@
-import { FAKE_STARTER_PROMPTS } from "../e2e/fake-hermes.ts";
+import { FAKE_STARTER_PROMPTS } from "../../../test/e2e/fake-hermes.ts";
 import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 
 const STARTERS_PATTERN = "**/api/agents/*/starters";

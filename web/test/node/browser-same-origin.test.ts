@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
+import ts from "../../node_modules/typescript/lib/typescript.js";
 
 const HOST = "assistant.example.test";
 const INPUT_URL = `https://${HOST}/api/browser/screen/input`;
@@ -18,7 +18,7 @@ type AdminHandler = (
 async function loadRoutes() {
   const calls: string[] = [];
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const dependencies: Record<string, unknown> = {
     "@/auth": { auth: async () => ({ user: { email: "user@example.test" } }) },
@@ -64,12 +64,12 @@ async function loadRoutes() {
     return module.exports as Record<string, Handler>;
   }
   dependencies["@/lib/api-response"] = await load(
-    "../../web/src/lib/api-response.ts",
+    "../../src/lib/api-response.ts",
   );
   dependencies["@/lib/same-origin"] = await load(
-    "../../web/src/lib/same-origin.ts",
+    "../../src/lib/same-origin.ts",
   );
-  const base = "../../web/src/app/api/browser/";
+  const base = "../../src/app/api/browser/";
   return {
     calls,
     sameOrigin: dependencies["@/lib/same-origin"] as unknown as {
@@ -81,10 +81,10 @@ async function loadRoutes() {
     screen: await load(`${base}screen/route.ts`),
     input: await load(`${base}screen/input/route.ts`),
     adminDelete: await load(
-      "../../web/src/app/api/admin/browsers/[id]/route.ts",
+      "../../src/app/api/admin/browsers/[id]/route.ts",
     ),
     adminStop: await load(
-      "../../web/src/app/api/admin/browsers/[id]/stop/route.ts",
+      "../../src/app/api/admin/browsers/[id]/stop/route.ts",
     ),
   };
 }

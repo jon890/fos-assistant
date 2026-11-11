@@ -5,7 +5,7 @@ import {
   findSkillQuery,
   parseSkillCommand,
   withSkillCommand,
-} from "../../web/src/components/chat/skill-command.ts";
+} from "../../src/components/chat/skill-command.ts";
 
 test("이름 뒤에 공백이나 끝이 오면 스킬 커맨드이고 공백 하나를 뺀 나머지 글을 낸다", () => {
   assert.deepEqual(parseSkillCommand("/weekly-plan 이번 주"), { name: "weekly-plan", rest: "이번 주" });

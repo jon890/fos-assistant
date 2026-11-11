@@ -1,6 +1,6 @@
-import { ASK_CARD_PROBE, LONG_ACTIVITY_PROBE } from "../e2e/fake-hermes.ts";
+import { ASK_CARD_PROBE, LONG_ACTIVITY_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import { expect, test } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 async function sendAndWait(page: Page, text: string, answers: number) {
   await page.getByRole("textbox", { name: "메시지" }).fill(text);

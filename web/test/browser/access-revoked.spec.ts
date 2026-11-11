@@ -3,7 +3,7 @@ import { TEST_EMAIL } from "./settings.ts";
 import type {
   BrowserContext,
   Page,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 const ADMIN = { email: TEST_EMAIL, name: "브라우저 테스트" };
 

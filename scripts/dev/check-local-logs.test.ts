@@ -12,7 +12,7 @@ function runCheck(fail: boolean, failPublicSafe = false) {
   const bin = join(directory, "bin");
   const logs = join(directory, "temporary logs");
   for (const folder of [checks, dev, bin, logs]) mkdirSync(folder, { recursive: true });
-  copyFileSync(new URL("../../scripts/dev/check-local.sh", import.meta.url), join(dev, "check-local.sh"));
+  copyFileSync(new URL("./check-local.sh", import.meta.url), join(dev, "check-local.sh"));
   const stdout = Array.from({ length: 65 }, (_, index) => `output-${index + 1}\n`).join("");
   const output = stdout + "stderr-output\n";
   writeFileSync(join(checks, "check-public-safe.sh"),

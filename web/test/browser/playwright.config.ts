@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import playwright from "../../web/node_modules/@playwright/test/index.js";
+import playwright from "../../node_modules/@playwright/test/index.js";
 import {
   AUTH_SECRET,
   CONTROL_PLANE_BASE_URL,
@@ -42,8 +42,8 @@ export default defineConfig({
   ],
   webServer: {
     // 기본은 빌드한 서버다. `BROWSER_WEB_SERVER=dev` 면 개발 서버를 띄운다. 까닭은 web-server.ts 에 있다.
-    command: `node ../test/browser/web-server.ts ${WEB_PORT}`,
-    cwd: join(import.meta.dirname, "../../web"),
+    command: `node web/test/browser/web-server.ts ${WEB_PORT}`,
+    cwd: join(import.meta.dirname, "../.."),
     url: WEB_BASE_URL,
     reuseExistingServer: false,
     // 빌드한 서버는 이 시간 안에 빌드까지 마친다.

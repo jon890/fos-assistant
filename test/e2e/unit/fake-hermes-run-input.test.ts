@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { submittedImages, submittedText } from "../e2e/fake-hermes/run-input.ts";
+import { submittedImages, submittedText } from "../fake-hermes/run-input.ts";
 
 test("문자열 입력은 그대로 글이고 이미지는 없다", () => {
   assert.equal(submittedText("안녕"), "안녕");

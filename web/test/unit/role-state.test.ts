@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { shellRoleState } from "../../web/src/components/shell/role-state.ts";
+import { shellRoleState } from "../../src/components/shell/role-state.ts";
 
 test("읽은 역할은 다시 읽었는지와 상관없이 그 역할이다", () => {
   assert.equal(shellRoleState("ADMIN", false), "admin");

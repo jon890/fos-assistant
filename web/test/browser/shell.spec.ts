@@ -1,5 +1,5 @@
 import { CONVERSATION_ID, CONVERSATION_URL, conversationIdOf, expect, test } from "./fixtures.ts";
-import type { Page, Request, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Request, TestInfo } from "../../node_modules/@playwright/test/index.js";
 
 const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",

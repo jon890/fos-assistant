@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { BackendPipelineEvent } from "../support/media-pipeline-log.ts";
+import type { BackendPipelineEvent } from "../../support/media-pipeline-log.ts";
 import {
   exitCode,
   normalize,
@@ -10,7 +10,7 @@ import {
   type PhotoAnswer,
   type RunRecord,
   type ScoreInput,
-} from "../model-eval/blog/score.ts";
+} from "./score.ts";
 
 const CONVERSATION = 7;
 const ROOT = 500;

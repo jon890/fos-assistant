@@ -1,7 +1,7 @@
 import { expect, PERSONA_EMPTY_AGENT_CODE, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 import { cleanupMemories, createDocument } from "./memory-page.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 /** 아무도 대화하지 않는 에이전트다. 받는 영역을 바꿔도 다른 검사의 실행에 닿지 않는다. */
 const AGENT_CODE = PERSONA_EMPTY_AGENT_CODE;

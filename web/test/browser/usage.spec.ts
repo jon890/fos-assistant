@@ -1,7 +1,7 @@
 // 코드 규칙: rule-61. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
-import { encode } from "../../web/node_modules/next-auth/jwt.js";
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
+import { encode } from "../../node_modules/next-auth/jwt.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
 import { filledTierProvider, readGroupModelTiers, saveGroupModelTiers } from "./helpers.ts";
 import { AUTH_SECRET, CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL, WEB_BASE_URL } from "./settings.ts";

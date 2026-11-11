@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import type { Page, Route } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Route } from "../../node_modules/@playwright/test/index.js";
 
 // 알림 단위 SSE 가 열려 있으면 networkidle 이 오지 않는다. 빈 응답으로 끝낸다.
 test.beforeEach(async ({ page }) => {

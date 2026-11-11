@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[README.md](../../test/browser/README.md)에서 확인한다.
+[README.md](../../web/test/browser/README.md)에서 확인한다.
 browser README의 로그인 절차는 테스트가 세션을 준비하는 방식을 설명한다.

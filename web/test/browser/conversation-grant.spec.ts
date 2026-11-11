@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures.ts";
 import type {
   Page,
   Route,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 const ACTION_ID = "1f0e0d0c-0b0a-4908-8706-050403020100";
 

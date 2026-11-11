@@ -4,9 +4,9 @@ import { mkdtempSync, writeFileSync, renameSync, rmSync, mkdirSync, readFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded, report } from "../../scripts/pr/pr-size.mjs";
+import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded, report } from "./pr-size.mjs";
 
-const SCRIPT = new URL("../../scripts/pr/pr-size.mjs", import.meta.url).pathname;
+const SCRIPT = new URL("./pr-size.mjs", import.meta.url).pathname;
 // 시험 자식이 CI 작업의 출력과 요약을 바꾸거나 예외 라벨을 물려받지 않게 한다.
 const CLI_ENV = { ...process.env };
 for (const key of ["GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "PR_LABELS"]) delete CLI_ENV[key];
@@ -23,12 +23,12 @@ test("생성 파일만 제외하고 소스와 직접 관리하는 설정은 센�
   const generated = [
     "web/pnpm-lock.yaml", "hermes/connectors/example/bun.lock", "bun.lockb", "package-lock.json",
     "web/dist/app.js", "web/.next/server/app.js", "web/build/report.json", "assets/app.bundle.js",
-    "test/__snapshots__/a.snap", "test/browser/page.spec.ts-snapshots/page.png",
+    "test/__snapshots__/a.snap", "web/test/browser/page.spec.ts-snapshots/page.png",
     "backend/config/archunit/store/stored.rules", "backend/config/checkstyle/baseline.xml",
-    "web/eslint-suppressions.json", "test/unit/migration-checksums.json",
+    "web/eslint-suppressions.json", "test/repo/migration-checksums.json",
   ];
   for (const file of generated) assert.equal(excluded(file), true, file);
-  for (const file of ["src/lock.ts", "backend/config/checkstyle/suppressions.xml", "web/eslint.config.mjs", "src/build.ts", "test/unit/pr-size.test.ts"]) {
+  for (const file of ["src/lock.ts", "backend/config/checkstyle/suppressions.xml", "web/eslint.config.mjs", "src/build.ts", "scripts/pr/pr-size.test.ts"]) {
     assert.equal(excluded(file), false, file);
   }
   assert.deepEqual(countChanges(generated.map(file => `10\t20\t${file}\0`).join("") + "3\t4\tsrc/app.ts\0"), { production: 7, tests: 0, docs: 0, ignored: generated.length * 30 });
@@ -42,7 +42,7 @@ test("시험과 문서는 별도로 표시하고 운영 코드만 상한에 넣�
   for (const file of tests) assert.equal(category(file), "tests", file);
   for (const file of docs) assert.equal(category(file), "docs", file);
   for (const file of production) assert.equal(category(file), "production", file);
-  const counts = countChanges(`${LARGE_THRESHOLD}\t0\tweb/src/app.ts\0` + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/prd.md\0");
+  const counts = countChanges(`${LARGE_THRESHOLD}\t0\tweb/src/app.ts\0` + "6000\t0\ttest/repo/a.test.ts\0" + "7000\t0\tdocs/prd.md\0");
   assert.deepEqual(counts, { production: LARGE_THRESHOLD, tests: 6000, docs: 7000, ignored: 0 });
   assert.deepEqual(classify(counts.production), { large: false, pass: true });
   assert.deepEqual(countChanges("1\t2\t\0scripts/check.sh\0test/check.sh\0"), { production: 3, tests: 0, docs: 0, ignored: 0 });
@@ -163,7 +163,7 @@ test("JSON 계약과 phase·순수 이동·기능 영역 후보를 실제 git di
 });
 
 test("로컬 크기 단계는 main·공통 조상 없음만 건너뛰고 상한 초과를 전파한다", () => {
-  const script = readFileSync(new URL("../../scripts/dev/check-local.sh", import.meta.url), "utf8");
+  const script = readFileSync(new URL("../dev/check-local.sh", import.meta.url), "utf8");
   assert.match(script, /step pr-size\s+check_pr_size/);
   const fn = script.slice(script.indexOf("check_pr_size()"), script.indexOf("build_web()"));
   for (const [branch, ancestor, expected] of [["main", 0, 0], ["topic", 1, 0], ["topic", 0, 1]] as const) {
@@ -180,11 +180,11 @@ test("로컬 크기 단계는 main·공통 조상 없음만 건너뛰고 상한 
 });
 
 test("파일째 지운 운영 코드는 상한에서 빼고 따로 센다", () => {
-  const deleted = new Set(["src/gone.ts", "test/unit/gone.test.ts"]);
+  const deleted = new Set(["src/gone.ts", "test/repo/gone.test.ts"]);
   // 파일째 삭제만 있는 PR 은 상한 안이다.
   assert.deepEqual(countChanges(`0\t${MAX_LINES * 2}\tsrc/gone.ts\0`, deleted), { production: 0, tests: 0, docs: 0, ignored: 0 });
   // 시험 파일의 삭제는 원래 상한 밖이라 시험 칸에 남는다.
-  assert.deepEqual(countChanges("0\t30\ttest/unit/gone.test.ts\0", deleted), { production: 0, tests: 30, docs: 0, ignored: 0 });
+  assert.deepEqual(countChanges("0\t30\ttest/repo/gone.test.ts\0", deleted), { production: 0, tests: 30, docs: 0, ignored: 0 });
   // 집합에 없는 파일은 삭제가 많아도 지금처럼 센다.
   assert.deepEqual(countChanges("0\t900\tsrc/kept.ts\0", deleted), { production: 900, tests: 0, docs: 0, ignored: 0 });
 });

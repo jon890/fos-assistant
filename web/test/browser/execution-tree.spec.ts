@@ -1,6 +1,6 @@
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
-import { NO_TOOL_CALL_PROBE } from "../e2e/fake-hermes.ts";
+import { NO_TOOL_CALL_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
 async function controlPlaneToken(email = TEST_EMAIL): Promise<string> {
@@ -14,7 +14,7 @@ async function controlPlaneToken(email = TEST_EMAIL): Promise<string> {
 
 /** 방금 만든 실행 중 가장 최근 것의 번호를 읽는다. */
 async function lastExecutionId(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   email = TEST_EMAIL,
 ): Promise<number> {
   const token = await controlPlaneToken(email);
@@ -544,7 +544,7 @@ test.describe("MEMBER 역할 사용자의 실행 상세", () => {
     return { email: `tree-member-${projectName}@example.com`, name: "실행 상세 보는 사용자" };
   }
 
-  async function createAgent(page: import("../../web/node_modules/@playwright/test/index.js").Page): Promise<string> {
+  async function createAgent(page: import("../../node_modules/@playwright/test/index.js").Page): Promise<string> {
     const created = await page.request.post("/api/agents", { data: { name: AGENT_NAME } });
     expect(created.status(), `에이전트를 만들지 못했다: ${created.status()}`).toBe(201);
     return ((await created.json()) as { code: string }).code;

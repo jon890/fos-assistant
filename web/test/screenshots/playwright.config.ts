@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import playwright from "../../web/node_modules/@playwright/test/index.js";
+import playwright from "../../node_modules/@playwright/test/index.js";
 import browserConfig from "../browser/playwright.config.ts";
 import { WEB_PORT } from "../browser/settings.ts";
 

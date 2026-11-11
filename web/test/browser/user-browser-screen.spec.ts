@@ -1,7 +1,7 @@
 import type {
   Locator,
   Page,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 import { expect, test } from "./fixtures.ts";
 
 /** 4x6 JPEG 한 장이다. 기본 프레임(400x600)과 비율이 같다. */

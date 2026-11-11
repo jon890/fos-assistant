@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
-const DIR = new URL("../model-eval/blog/", import.meta.url);
+const DIR = new URL("./", import.meta.url);
 
 type Photo = { id: string; file: string; scene: string; answer: string; accept: string[] };
 type Message = { text: string; photos: string[] };

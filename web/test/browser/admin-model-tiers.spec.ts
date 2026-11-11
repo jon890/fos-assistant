@@ -1,5 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
  * 관리자 「모델」 화면의 단계별 모델 칸이 그룹 목록에서만 고르는지 본다.

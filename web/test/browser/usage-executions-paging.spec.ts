@@ -1,4 +1,4 @@
-import { SignJWT } from "../../web/node_modules/jose/dist/webapi/index.js";
+import { SignJWT } from "../../node_modules/jose/dist/webapi/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
 import { isolatedUser } from "./helpers.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
@@ -41,7 +41,7 @@ function seeds(count: number, prefix: string): Seed[] {
 }
 
 async function replaceExecutions(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   email: string,
   values: Seed[],
 ): Promise<void> {
@@ -55,7 +55,7 @@ async function replaceExecutions(
 }
 
 async function createAdminUser(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   user: { email: string; name: string },
 ): Promise<void> {
   const response = await page.request.post(ADMIN_SUPPORT_PATH, {
@@ -66,7 +66,7 @@ async function createAdminUser(
 }
 
 function records(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   project: string,
 ) {
   return project === "mobile"
@@ -75,7 +75,7 @@ function records(
 }
 
 async function expectNoOverflow(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   project: string,
 ) {
   expect(
@@ -84,8 +84,8 @@ async function expectNoOverflow(
 }
 
 async function provision(
-  context: import("../../web/node_modules/@playwright/test/index.js").BrowserContext,
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  context: import("../../node_modules/@playwright/test/index.js").BrowserContext,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   user: { email: string; name: string },
 ) {
   await setSession(context, user);

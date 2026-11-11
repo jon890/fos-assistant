@@ -5,7 +5,7 @@
 #
 # 보는 것: 브랜치 보호의 필수 검사(이름으로 대조), 미해결 리뷰 스레드, Draft 여부, mergeStateStatus,
 # head 가 origin/main 을 포함하는지. 포함하지 않으면 CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치는지,
-# 마이그레이션, 빌드와 의존성 파일, test/unit, 공유 계약을 건드렸는지 보고 다시 합쳐야 하는지 가른다.
+# 마이그레이션, 빌드와 의존성 파일, test/repo, 공유 계약을 건드렸는지 보고 다시 합쳐야 하는지 가른다.
 # 공유 계약으로 볼 경로와 까닭은 scripts/pr/merge-ready.mjs 의 RISK_PATHS 에 있다.
 # 필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 머지할 수 있는 것으로 본다.
 #

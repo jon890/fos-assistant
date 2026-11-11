@@ -1,5 +1,5 @@
 import { expect, setSession, test } from "./fixtures.ts";
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 /**
  * 관리자 「모델」 화면의 숨김 절을 본다. 에이전트는 모델을 갖지 않으므로 에이전트를 고르지 않고 그룹 전체의 후보를

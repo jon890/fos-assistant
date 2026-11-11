@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures.ts";
 import type {
   Page,
   Route,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 /** 대역 응답에 쓰는 UUID 다. 번호마다 다른 값을 만든다. */
 const uuid = (n: number) =>

@@ -1,4 +1,4 @@
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 

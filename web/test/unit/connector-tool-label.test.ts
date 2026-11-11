@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { type ConnectorTool, toolPolicyLabel } from "../../web/src/lib/connection.ts";
+import { type ConnectorTool, toolPolicyLabel } from "../../src/lib/connection.ts";
 
 /** 쓰기 도구 하나다. 검사마다 달라지는 칸만 덮어쓴다. */
 function tool(change: Partial<ConnectorTool>): ConnectorTool {

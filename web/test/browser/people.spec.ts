@@ -3,7 +3,7 @@ import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
 import type {
   Page,
   TestInfo,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 type Newcomer = { email: string; displayName: string; hermesProfile: string };
 

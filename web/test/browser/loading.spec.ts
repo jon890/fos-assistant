@@ -1,5 +1,5 @@
 import { expect, PERSONA_AGENT_CODE, setSession, test } from "./fixtures.ts";
-import type { Page, Request, Route } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Request, Route } from "../../node_modules/@playwright/test/index.js";
 
 /** RSC 요청이면 참이다. 화면을 옮기는 요청과 미리 읽기가 모두 해당하고 정적 자원과 API 호출은 걸러진다. */
 function isRscRequest(request: Request): boolean {

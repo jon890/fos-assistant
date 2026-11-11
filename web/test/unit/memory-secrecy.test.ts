@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-const WEB_SRC = join(import.meta.dirname, "../../web/src");
+const WEB_SRC = join(import.meta.dirname, "../../src");
 
 /** 문서 본문을 다루는 파일이다. 새 파일이 생기면 여기에 더한다. */
 const SECRET_FILES = [

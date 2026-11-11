@@ -2,7 +2,7 @@ import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
 import { clickAndWaitForResponse, waitForViewTransition } from "./helpers.ts";
 
 async function ask(
-  page: import("../../web/node_modules/@playwright/test/index.js").Page,
+  page: import("../../node_modules/@playwright/test/index.js").Page,
   text: string,
 ) {
   await page.getByRole("textbox", { name: "메시지" }).fill(text);

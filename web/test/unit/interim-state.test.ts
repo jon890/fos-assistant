@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyChatEvent, emptyActivity, failActivity } from "../../web/src/components/chat/activity/activity-state.ts";
-import { applyStreamText, type TurnStreamText } from "../../web/src/components/chat/turn-stream-text.ts";
+import { applyChatEvent, emptyActivity, failActivity } from "../../src/components/chat/activity/activity-state.ts";
+import { applyStreamText, type TurnStreamText } from "../../src/components/chat/turn-stream-text.ts";
 
 test("64KiB보다 긴 확인된 안내도 답에서 빼고 나중에 온 답은 보존한다", () => {
   const prefix = "긴 안내 ".repeat(15_000);

@@ -10,7 +10,7 @@ import {
   type AgentMemoryChange,
   type AgentMemoryCollection,
   type AgentMemorySetting,
-} from "../../web/src/lib/agent-memory.ts";
+} from "../../src/lib/agent-memory.ts";
 
 function collection(
   key: string,

@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "웹 테스트 폴더. Playwright 설정과 테스트를 ES module 로 읽게 한다. 설치할 의존성은 web 의 것을 쓴다."
+}

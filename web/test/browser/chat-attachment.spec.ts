@@ -3,7 +3,7 @@ import type {
   Locator,
   Page,
   TestInfo,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
 const PNG_1X1 = Buffer.from(

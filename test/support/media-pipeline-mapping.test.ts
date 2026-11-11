@@ -9,14 +9,14 @@ import {
   createMediaFixture,
   inspectMediaFixture,
   inspectPreparedMediaBatch,
-} from "../support/media-pipeline-fixture.ts";
+} from "./media-pipeline-fixture.ts";
 import {
   inspectSubmittedMediaBatch,
   parseMediaAssetId,
   parsePreparedJpegDataUrl,
   validateMediaMapping,
   type ExpectedMediaMapping,
-} from "../support/media-pipeline-mapping.ts";
+} from "./media-pipeline-mapping.ts";
 
 test("실제 JPEG 8방향과 30장 역순 매핑을 검증하고 잘못된 대응을 거부한다", () => {
   const start = performance.now();
@@ -33,7 +33,7 @@ test("실제 JPEG 8방향과 30장 역순 매핑을 검증하고 잘못된 대�
         "java",
         [
           "-Djava.awt.headless=true",
-          join(import.meta.dirname, "../support/PreparedMediaFixture.java"),
+          join(import.meta.dirname, "./PreparedMediaFixture.java"),
           dir,
         ],
         {

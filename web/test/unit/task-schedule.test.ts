@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { choiceOf, describeSchedule, runReasonText, scheduleRequestOf } from "../../web/src/lib/task.ts";
+import { choiceOf, describeSchedule, runReasonText, scheduleRequestOf } from "../../src/lib/task.ts";
 
 const ZONE = "Asia/Seoul";
 

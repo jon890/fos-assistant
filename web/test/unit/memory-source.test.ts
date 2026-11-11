@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   memorySourceLabel,
   withSubjectParticle,
-} from "../../web/src/lib/memory-source.ts";
+} from "../../src/lib/memory-source.ts";
 
 test("받침에 맞춰 주격 조사를 붙인다", () => {
   assert.equal(withSubjectParticle("집안일 도우미"), "집안일 도우미가");

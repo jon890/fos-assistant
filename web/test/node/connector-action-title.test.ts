@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   actionDisplayTitle,
   UNNAMED_ACTION_TITLE,
-} from "../../web/src/lib/connector-action-title.ts";
+} from "../../src/lib/connector-action-title.ts";
 
 test("승인 카드의 도구 이름은 선언한 제목을 먼저 쓰고, 제목이 없으면 확인된 원래 도구 이름을 쓴다", () => {
   assert.equal(actionDisplayTitle("메모 쓰기", "write_note"), "메모 쓰기");

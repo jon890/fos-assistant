@@ -6,7 +6,7 @@ import {
   indexedDescriptionLength,
   isCountableDescription,
   SKILL_NAME_PATTERN,
-} from "../../web/src/lib/skill.ts";
+} from "../../src/lib/skill.ts";
 
 test("Hermes 이름 규칙은 점과 밑줄이 든 이름을 받는다", () => {
   for (const name of ["hermes-help", "note_taking.v2", "a", "a".repeat(64)]) {

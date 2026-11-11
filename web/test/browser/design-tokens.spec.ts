@@ -1,4 +1,4 @@
-import type { Locator, Page, TestInfo } from "../../web/node_modules/@playwright/test/index.js";
+import type { Locator, Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
 import { contrast, parseRgb } from "./color.ts";
 import { expect, test } from "./fixtures.ts";
 

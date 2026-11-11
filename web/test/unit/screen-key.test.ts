@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { screenKey, viewTransitionEnabled } from "../../web/src/components/shell/screen-key.ts";
+import { screenKey, viewTransitionEnabled } from "../../src/components/shell/screen-key.ts";
 
 test("대화 화면은 주소가 달라도 같은 화면으로 본다", () => {
   assert.equal(screenKey("/"), "chat");

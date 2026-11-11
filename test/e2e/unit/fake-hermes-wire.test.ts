@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { startFakeHermes, FAKE_USAGE } from "../e2e/fake-hermes.ts";
-import { eventEnvelope, HERMES_VERSION, runEventWriter, wireEvents, wireFixture } from "../e2e/fake-hermes/wire.ts";
+import { startFakeHermes, FAKE_USAGE } from "../fake-hermes.ts";
+import { eventEnvelope, HERMES_VERSION, runEventWriter, wireEvents, wireFixture } from "../fake-hermes/wire.ts";
 
 test("기준 버전은 Python 계약에서 읽고 공유 wire의 모든 사건에 봉투를 붙인다", () => {
-  const contract = readFileSync(new URL("../../hermes/tests/hermes_contract.py", import.meta.url), "utf8");
+  const contract = readFileSync(new URL("../../../hermes/tests/hermes_contract.py", import.meta.url), "utf8");
   assert.equal(HERMES_VERSION, /^HERMES_VERSION = "([^"]+)"$/m.exec(contract)?.[1]);
   const samples = wireEvents(wireFixture("events"));
   assert.equal(samples.length, 14);

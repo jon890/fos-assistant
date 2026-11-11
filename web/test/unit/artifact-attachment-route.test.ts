@@ -12,7 +12,7 @@ import test from "node:test";
 
 const CONVERSATION = join(
   import.meta.dirname,
-  "../../web/src/app/api/chat/conversations/[conversationId]",
+  "../../src/app/api/chat/conversations/[conversationId]",
 );
 
 test("결과물 파일 라우트와 첨부 라우트가 같은 대화 주소 아래의 형제로 있다", () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatAnswers, parseAsk, recoverAnswers, splitAnswer } from "../../web/src/lib/ask.ts";
+import { formatAnswers, parseAsk, recoverAnswers, splitAnswer } from "../../src/lib/ask.ts";
 
 const BLOCK = [
   "<ask>",

@@ -1,4 +1,4 @@
-import type { Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page } from "../../node_modules/@playwright/test/index.js";
 import { expect, setSession, test } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
 import {

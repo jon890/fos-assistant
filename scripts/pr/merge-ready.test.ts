@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "../../scripts/pr/merge-ready.mjs";
+import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "./merge-ready.mjs";
 
 const REQUIRED = ["unit", "backend"];
 const ok = (name: string) => ({ name, state: "SUCCESS", startedAt: "2026-10-12T01:00:00Z" });
@@ -85,7 +85,7 @@ test("같은 파일을 고쳤으면 다시 합친다", () => {
   assert.match(reasons[0], /같은 파일.*web\/src\/b\.ts/);
 });
 
-test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어느 쪽이 건드려도 다시 합친다", () => {
+test("마이그레이션, 빌드와 의존성, test/repo, 공유 계약은 어느 쪽이 건드려도 다시 합친다", () => {
   const cases: [string, string][] = [
     ["backend/src/main/resources/db/migration/V20261012000000__a.sql", "마이그레이션"],
     ["backend/build.gradle.kts", "빌드와 의존성"],
@@ -94,7 +94,7 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
     ["backend/gradle/wrapper/gradle-wrapper.properties", "빌드와 의존성"],
     ["hermes/connectors/naver-blog/scripts/test.Dockerfile", "빌드와 의존성"],
     ["hermes/connectors/gmail/package.json", "빌드와 의존성"],
-    ["test/unit/doc-files.test.ts", "test/unit"],
+    ["test/repo/doc-files.test.ts", "test/repo"],
     ["hermes/docs/hermes-contract.md", "공유 계약"],
     ["hermes/connectors/gmail/tests/contracts.test.ts", "공유 계약"],
     ["test/resources/connector-argument-catalog.json", "공유 계약"],
@@ -116,7 +116,7 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
 });
 
 test("비슷하지만 위험 경로가 아닌 파일은 직전 CI 를 쓴다", () => {
-  const negatives = ["test/unit-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md", "test/fixtures-old/a.json"];
+  const negatives = ["test/repo-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md", "test/fixtures-old/a.json"];
   for (const file of negatives) {
     assert.deepEqual(remergeReasons(["web/src/a.ts"], [file]), [], file);
   }

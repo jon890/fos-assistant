@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { connectionErrorMessage } from "../../web/src/lib/connection.ts";
+import { connectionErrorMessage } from "../../src/lib/connection.ts";
 
 test("하나에만 붙는 연결을 이미 붙인 경우 뗀 뒤 붙이라고 알린다", () => {
   assert.equal(

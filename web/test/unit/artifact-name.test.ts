@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { artifactName, artifactNames } from "../../web/src/lib/artifact-name.ts";
+import { artifactName, artifactNames } from "../../src/lib/artifact-name.ts";
 
 test("index.html 이면 폴더 이름이 이름이다", () => {
   assert.equal(artifactName("제주-여행/index.html"), "제주-여행");

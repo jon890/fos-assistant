@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { isConversationId, isPublicId } from "../../web/src/lib/conversation-id.ts";
+import { isConversationId, isPublicId } from "../../src/lib/conversation-id.ts";
 
 test("만든 UUID 는 대화 공개 식별자다", () => {
   const id = randomUUID();

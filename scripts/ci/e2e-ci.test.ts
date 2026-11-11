@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
-import { HANDLING, LABEL, UNKNOWN_SCENARIO, publishFailure, scenarioFrom } from "../../scripts/ci/e2e-ci.mjs";
+import { HANDLING, LABEL, UNKNOWN_SCENARIO, publishFailure, scenarioFrom } from "./e2e-ci.mjs";
 
 test("run.ts 가 남긴 실패 줄에서 시나리오 이름만 읽고 읽지 못하면 기록 없음으로 둔다", () => {
   const line = '실패: {"status":"FAILED","scenario":"채팅 시나리오","elapsedMs":1200}';

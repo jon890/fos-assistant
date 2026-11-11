@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures.ts";
-import type { Page, Route } from "../../web/node_modules/@playwright/test/index.js";
+import type { Page, Route } from "../../node_modules/@playwright/test/index.js";
 
 /** 화면이 대화 단위 SSE 를 다시 열기까지 기다리는 시간이다. 화면의 값과 같아야 한다. */
 const EVENTS_RECONNECT_MS = 5_000;

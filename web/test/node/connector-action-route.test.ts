@@ -3,14 +3,14 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
-import ts from "../../web/node_modules/typescript/lib/typescript.js";
-import * as action from "../../web/src/lib/connector-action.ts";
-import * as connection from "../../web/src/lib/connection.ts";
+import ts from "../../node_modules/typescript/lib/typescript.js";
+import * as action from "../../src/lib/connector-action.ts";
+import * as connection from "../../src/lib/connection.ts";
 
 const ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const catalogs = JSON.parse(
   await readFile(
-    new URL("../resources/connector-argument-catalog.json", import.meta.url),
+    new URL("../../../test/resources/connector-argument-catalog.json", import.meta.url),
     "utf8",
   ),
 );
@@ -47,7 +47,7 @@ async function callRoute(
   approveBody: unknown = { grant: null, argLabels: { to: "요청의 가짜 이름" } },
 ) {
   const webRequire = createRequire(
-    new URL("../../web/package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
   );
   const calls: { path: string; init: unknown }[] = [];
   const dependencies: Record<string, unknown> = {
@@ -92,20 +92,20 @@ async function callRoute(
     return module.exports;
   }
   dependencies["@/lib/content-draft-snapshot"] = await load(
-    "../../web/src/lib/content-draft-snapshot.ts",
+    "../../src/lib/content-draft-snapshot.ts",
   );
-  dependencies["@/lib/decimal"] = await load("../../web/src/lib/decimal.ts");
+  dependencies["@/lib/decimal"] = await load("../../src/lib/decimal.ts");
   dependencies["@/lib/financial-limits"] = await load(
-    "../../web/src/lib/financial-limits.ts",
+    "../../src/lib/financial-limits.ts",
   );
   dependencies["@/lib/financial-limits-route"] = await load(
-    "../../web/src/lib/financial-limits-route.ts",
+    "../../src/lib/financial-limits-route.ts",
   );
   dependencies["@/lib/connector-action-route"] = await load(
-    "../../web/src/lib/connector-action-route.ts",
+    "../../src/lib/connector-action-route.ts",
   );
   const conversationRoutes =
-    "../../web/src/app/api/chat/conversations/[conversationId]";
+    "../../src/app/api/chat/conversations/[conversationId]";
   const relative =
     kind === "list"
       ? `${conversationRoutes}/connector-actions/route.ts`
@@ -113,7 +113,7 @@ async function callRoute(
         ? `${conversationRoutes}/connector-conversation-grants/route.ts`
         : kind === "revokeConversationGrant"
           ? `${conversationRoutes}/connector-conversation-grants/[grantId]/route.ts`
-          : `../../web/src/app/api/connector-actions/[actionId]/${kind}/route.ts`;
+          : `../../src/app/api/connector-actions/[actionId]/${kind}/route.ts`;
   const route = (await load(relative)) as {
     GET: (request: Request, context: unknown) => Promise<Response>;
     POST: (request: Request, context: unknown) => Promise<Response>;
@@ -179,7 +179,7 @@ test("실제 Java DTO와 가림 전 producer metadata 모두에서 숨긴 원래
   const dto = JSON.parse(
     await readFile(
       new URL(
-        "../resources/connector-argument-masked-action.json",
+        "../../../test/resources/connector-argument-masked-action.json",
         import.meta.url,
       ),
       "utf8",
@@ -188,7 +188,7 @@ test("실제 Java DTO와 가림 전 producer metadata 모두에서 숨긴 원래
   const catalog = JSON.parse(
     await readFile(
       new URL(
-        "../resources/connector-argument-masked-catalog.json",
+        "../../../test/resources/connector-argument-masked-catalog.json",
         import.meta.url,
       ),
       "utf8",

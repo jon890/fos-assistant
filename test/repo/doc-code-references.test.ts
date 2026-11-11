@@ -15,7 +15,7 @@ const REPO_ROOT = join(import.meta.dirname, "../../");
  */
 
 /** 이 시험이 자기 예시 문자열로 코드 낱말을 채우지 않게 낱말 집합에서 뺀다. */
-const SELF = "test/unit/doc-code-references.test.ts";
+const SELF = "test/repo/doc-code-references.test.ts";
 
 /** 저장소 최상위 항목이다. 경로의 첫 마디가 이 가운데 하나일 때만 저장소 경로로 본다. 나머지는 Hermes core 같은 바깥 경로다. */
 const TOP_LEVEL = new Set(["backend", "web", "hermes", "scripts", "test", "docs", "tasks", ".github"]);

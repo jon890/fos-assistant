@@ -15,7 +15,7 @@ const NODE_TEST_READ_FILES = [
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "test/**"]),
 
   {
     // rule-55: 라우트의 오류 응답과 본문 파싱을 검사한다.

@@ -3,8 +3,8 @@ import type {
   Locator,
   Page,
   TestInfo,
-} from "../../web/node_modules/@playwright/test/index.js";
-import playwright from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
+import playwright from "../../node_modules/@playwright/test/index.js";
 import { RUN_ID } from "./settings.ts";
 
 const { expect } = playwright;

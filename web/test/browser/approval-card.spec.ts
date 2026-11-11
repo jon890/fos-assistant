@@ -3,20 +3,20 @@ import { readFileSync } from "node:fs";
 import type {
   Page,
   Route,
-} from "../../web/node_modules/@playwright/test/index.js";
+} from "../../node_modules/@playwright/test/index.js";
 
 const ACTION_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const TOOL_NAME = "write_note";
 const PRODUCED_CATALOG = JSON.parse(
   readFileSync(
-    new URL("../resources/connector-argument-catalog.json", import.meta.url),
+    new URL("../../../test/resources/connector-argument-catalog.json", import.meta.url),
     "utf8",
   ),
 );
 const MASKED_DTO = JSON.parse(
   readFileSync(
     new URL(
-      "../resources/connector-argument-masked-action.json",
+      "../../../test/resources/connector-argument-masked-action.json",
       import.meta.url,
     ),
     "utf8",

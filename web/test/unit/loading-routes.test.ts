@@ -3,7 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
 
-const APP_ROOT = join(import.meta.dirname, "../../web/src/app");
+const APP_ROOT = join(import.meta.dirname, "../../src/app");
 
 const SRC_ROOT = join(APP_ROOT, "..");
 

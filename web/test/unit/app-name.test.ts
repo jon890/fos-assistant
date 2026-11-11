@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appName, DEFAULT_APP_NAME } from "../../web/src/lib/app-name.ts";
+import { appName, DEFAULT_APP_NAME } from "../../src/lib/app-name.ts";
 
 test("앱 이름은 실행할 때의 APP_NAME 을 읽고 비었으면 중립 기본값을 쓴다", () => {
   const before = process.env.APP_NAME;

@@ -104,7 +104,7 @@ test("Control Plane이 응답하지 않아도 안내를 열고 서버와 브라�
   const webUrl = `http://127.0.0.1:${webAddress.port}`;
   const server = spawn(
     process.execPath,
-    [join(import.meta.dirname, "../../web/.next/standalone/server.js")],
+    [join(import.meta.dirname, "../../.next/standalone/server.js")],
     {
       env: {
         ...process.env,

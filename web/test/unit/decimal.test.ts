@@ -5,7 +5,7 @@ import {
   decimalExceeds,
   multiplyDecimal,
   parseDecimal,
-} from "../../web/src/lib/decimal.ts";
+} from "../../src/lib/decimal.ts";
 
 test("수량과 가격의 곱이 상한과 딱 같으면 넘지 않는다", () => {
   // 부동소수점으로는 3 * 1.1 = 3.3000000000000003 이라 상한 3.3 을 넘는 것으로 잘못 보인다.

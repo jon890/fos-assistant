@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeAdminError, describeError } from "../../web/src/components/error-message.ts";
+import { describeAdminError, describeError } from "../../src/components/error-message.ts";
 
 test("일반 사용자에게는 내부 원인 없이 할 일만 알린다", () => {
   assert.equal(describeError("HERMES_PROFILE_KEY_MISSING", "원본 오류"),

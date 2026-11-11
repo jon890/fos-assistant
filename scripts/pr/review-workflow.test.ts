@@ -13,7 +13,7 @@ import test from "node:test";
 import {
   readExecution,
   summarizeExecution,
-} from "../../scripts/pr/review-execution-summary.mjs";
+} from "./review-execution-summary.mjs";
 
 test("리뷰 진단과 위험 라벨은 기본 브랜치의 새 경로와 옛 경로를 모두 받는다", () => {
   const workflow = readFileSync(

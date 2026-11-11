@@ -324,7 +324,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `AgentPurgeParticipant` | 지운 에이전트를 정리할 때 바인딩을 지우고, 연결과 승인 줄의 `agent_id` 를 비운다 | `ConnectorAgentPurge` | 지운 에이전트 정리 |
 
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
-특정 서비스 이름이 코드에 들어왔는지는 `test/unit/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
+특정 서비스 이름이 코드에 들어왔는지는 `test/repo/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
 계약은 [플러그인 연결](../../docs/features/connector.md)에 있다.
 
 `connector` 는 플러그인 도구 호출의 판정과 그 기록도 소유한다([ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)).
