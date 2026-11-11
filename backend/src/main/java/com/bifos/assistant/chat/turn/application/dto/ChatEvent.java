@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.turn.application.dto;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.execution.domain.InternalValuePolicy;
 import com.bifos.assistant.usage.execution.domain.ToolDetailPolicy;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,7 @@ import java.util.UUID;
  * @param streamedPrefixLength 파서가 안내로 확인한 직전 delta 구간의 UTF-16 길이
  * @param interimId 실행 안에서 중간 안내의 재수신을 가려낼 식별자
  * @param delegation {@code delegation} 사건의 맡긴 줄. 다른 사건은 null
+ * @param deliveredResults 위임 결과 알림 줄의 {@code system} 사건이 싣는 그 줄이 전한 결과. 다른 사건은 null
  */
 public record ChatEvent(
     String type,
@@ -44,20 +46,21 @@ public record ChatEvent(
     Boolean alreadyStreamed,
     Integer streamedPrefixLength,
     String interimId,
-    DelegationLine delegation) {
+    DelegationLine delegation,
+    List<DelegationLine> deliveredResults) {
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
         Long messageId, Long executionId, String code, String message,
         String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
         Long inputTokens, Long outputTokens) {
-        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null, null);
+        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null, null, null);
     }
 
 
     /** 저장하지 않는 중간 안내와 확인된 직전 delta 구간의 UTF-16 길이다. */
     public static ChatEvent interim(String text, Boolean alreadyStreamed, int streamedPrefixLength, String interimId) {
         return new ChatEvent("interim", text, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId, null);
+            null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId, null, null);
     }
 
 
@@ -168,7 +171,8 @@ public record ChatEvent(
             alreadyStreamed,
             streamedPrefixLength,
             interimId,
-            delegation);
+            delegation,
+            deliveredResults);
     }
 
 
@@ -292,6 +296,17 @@ public record ChatEvent(
      * @param content 알림 줄의 글
      */
     public static ChatEvent system(UUID conversationId, Long messageId, String content) {
+        return system(conversationId, messageId, content, null);
+    }
+
+
+    /**
+     * 위임 결과 알림 줄이 저장됐다. 화면이 이력을 다시 읽기 전에도 결과 도착 줄을 이름표로 그리도록 그 줄이 전한 결과를 싣는다.
+     *
+     * @param deliveredResults 그 줄이 전한 결과. 위임 결과 알림 줄이 아니면 null
+     */
+    public static ChatEvent system(
+        UUID conversationId, Long messageId, String content, List<DelegationLine> deliveredResults) {
         return new ChatEvent(
             "system",
             content,
@@ -309,7 +324,12 @@ public record ChatEvent(
             null,
             null,
             null,
-            null);
+            null,
+            null,
+            null,
+            null,
+            null,
+            deliveredResults);
     }
 
 
@@ -340,7 +360,8 @@ public record ChatEvent(
             null,
             null,
             null,
-            delegation);
+            delegation,
+            null);
     }
 
 

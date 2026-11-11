@@ -192,6 +192,8 @@ class DelegationLinesTest {
     void resultNoticeCarriesDeliveredResults() {
         AgentExecution done = executions.save(execution(root, shopper, ExecutionStatus.SUCCEEDED, "key-1"));
         AgentExecution failed = executions.save(execution(root, chief, ExecutionStatus.FAILED, "key-2"));
+        List<ChatEvent> received = new CopyOnWriteArrayList<>();
+        cleanups.add(hub.subscribe(conversation.id(), received::add));
 
         publisher.publishEvent(new DelegationFinished(conversation.id(), failed.id()));
         awaitIdle();
@@ -209,6 +211,11 @@ class DelegationLinesTest {
             .containsExactly(
                 tuple(done.id(), ExecutionStatus.SUCCEEDED, "쇼핑 담당"),
                 tuple(failed.id(), ExecutionStatus.FAILED, "비서"));
+        assertThat(received)
+            .as("자동 turn 이 도는 동안 그리는 알림 줄 사건도 같은 결과를 싣는다")
+            .filteredOn(event -> "system".equals(event.type()))
+            .singleElement()
+            .satisfies(event -> assertThat(event.deliveredResults()).isEqualTo(results.get(notice.id())));
         assertThat(executions.findById(history.getLast().executionId()).orElseThrow().agentId())
             .as("결과로 다시 쓴 답은 대화의 에이전트가 쓴다")
             .isEqualTo(chief.id());

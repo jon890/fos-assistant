@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
@@ -9,6 +10,7 @@ import com.bifos.assistant.chat.conversation.application.ConversationWriter;
 import com.bifos.assistant.chat.delivery.application.ResultDeliveryRecorder;
 import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnDelivery;
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
@@ -106,7 +108,8 @@ class ChatDeliveryTurns {
             clock.instant(),
             contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
-        DeliveryAttemptRef attempt = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
+        DeliveryAttemptRef attempt = recordDelivery(
+            routed.conversation(), results, resultLines(results, resultAgents), notices, deliveries, onEvent);
         runDeliveryTurn(
             owner,
             routed,
@@ -221,6 +224,7 @@ class ChatDeliveryTurns {
     DeliveryAttemptRef recordDelivery(
         Conversation conversation,
         List<AgentExecution> results,
+        List<DelegationLine> resultLines,
         List<String> notices,
         List<AutoTurnDelivery> deliveries,
         Consumer<ChatEvent> onEvent) {
@@ -249,9 +253,25 @@ class ChatDeliveryTurns {
                 conversation.id(), items, lines.getLast().id(), delegationNotice, deliveredAt);
             return new Saved(lines, attempt);
         });
-        saved.lines()
-            .forEach(line -> onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content())));
+        // 위임 결과 알림 줄(첫 줄)에는 전한 결과를 실어, 화면이 이력을 다시 읽기 전에도 결과 도착 줄을 이름표로 그린다.
+        for (int i = 0; i < saved.lines().size(); i++) {
+            ChatMessage line = saved.lines().get(i);
+            List<DelegationLine> delivered = i == 0 && !resultLines.isEmpty() ? resultLines : null;
+            onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content(), delivered));
+        }
         return saved.attempt();
+    }
+
+
+    /** 결과 도착 줄에 실을 결과다. 이력 API 의 {@code deliveredResults} 와 같은 모양이다. */
+    private static List<DelegationLine> resultLines(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
+        return results.stream()
+            .map(result -> new DelegationLine(
+                result.id(),
+                result.parentExecutionId(),
+                result.status(),
+                AgentLabel.of(resultAgents.get(result.agentId()))))
+            .toList();
     }
 
 
