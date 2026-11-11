@@ -52,7 +52,7 @@ import tools.jackson.databind.node.ObjectNode;
 @BackendIntegrationTest
 class ConnectorHandoffEndpointTest {
     private static final String PATH = "/internal/hermes/connector-handoff";
-    private static final String PROFILE = "connector-handoff-owner";
+    private static final String PROFILE = "connector-handoff-test";
     private static final String TOOL = "mcp__naver_shopping__search_products";
     private static final String CODE = "NAVER_SHOPPING_LOGIN_REQUIRED";
     private static final Instant NOW = Instant.parse("2026-11-10T00:00:00Z");
