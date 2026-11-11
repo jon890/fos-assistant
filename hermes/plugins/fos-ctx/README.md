@@ -183,6 +183,23 @@ hook 은 등록 이름이 대응 파일의 `tools` 에 있는 서버를 먼저 �
 Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버 이름의 `-` 가 `_` 로 바뀐다.
 서명에는 앞부분을 뗀 서버 쪽 이름을 넣는다. 서버 이름을 바꾸면 plugin 의 `TOOL_PREFIX` 도 함께 바꾼다.
 
+### 화면 넘기기를 알린다
+
+플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터다.
+`transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과에서 `{"error": {"code", "handoff": {"need", "tab"}}}` 모양을 찾는다. Hermes 가 MCP 의 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다. 옛 설치 profile 과 바인딩 profile 이 같다.
+
+| 칸 | 값 |
+| --- | --- |
+| 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `connector-handoff` 로 바꾼 것(`/internal/hermes/connector-handoff`). http(s) 가 아니거나 없으면 보내지 않는다 |
+| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
+| 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}` |
+| 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
+| 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다 |
+| 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
+| 실패 | 상태 코드나 예외 종류만 로그에 남기고 결과는 바꾸지 않는다. 카드가 없을 뿐 모델은 오류를 받는다 |
+
+확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다.
+
 ### 도구 판정
 
 사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 도구 판정 계약의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.

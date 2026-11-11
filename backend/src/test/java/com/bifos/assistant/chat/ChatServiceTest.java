@@ -41,6 +41,7 @@ import com.bifos.assistant.connector.connection.infra.ConnectorConnectionReposit
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.infra.HermesRunEventStream;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
+import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.domain.ToolDetailScope;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
@@ -101,10 +102,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @BackendIntegrationTest
+@RecordApplicationEvents
 class ChatServiceTest {
+
+    /** turn 을 열 때 낸 사건을 본다. 화면 넘기기 카드가 이 사건으로 닫힌다. */
+    @Autowired
+    ApplicationEvents recordedEvents;
 
     /** 켜진 스킬 캐시의 보관 시간을 검사가 옮긴다. */
     @Autowired
@@ -366,6 +374,11 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "오늘 저녁 뭐 먹을까?", "dad");
 
         assertThat(executions.count()).isOne();
+        assertThat(recordedEvents.stream(ConversationTurnStarted.class))
+            .as("turn 을 열 때 낸 새 turn 사건")
+            .singleElement()
+            .extracting(ConversationTurnStarted::conversationId)
+            .isNotNull();
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");

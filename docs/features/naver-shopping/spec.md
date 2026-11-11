@@ -104,5 +104,5 @@
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | DECISION6, DECISION7, DECISION13 | 플러그인 정책 | PR1 이 `docs/adr/ADR-20261110-naver-shopping-connector.md` 를 새로 쓴다 | `docs/features/naver-shopping.md` |
-| DECISION11 | 공통 기반 | PR2 가 화면 넘기기 ADR 을 새로 쓴다 | 그 PR 의 기능 파일 절 |
+| DECISION11 | 공통 기반 | [ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md) | `docs/features/naver-shopping.md` 의 「화면 넘기기」 |
 | DECISION8, DECISION9, DECISION10 | 구매 경계 | PR3 가 구매 상한과 주문서 준비 ADR 을 새로 쓴다 | `docs/features/naver-shopping.md` |

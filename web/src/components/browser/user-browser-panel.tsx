@@ -61,9 +61,15 @@ function notReady(view: BrowserView | null, loadError: boolean) {
 
 /**
  * 사용자 한 사람의 브라우저를 만들고, 켜고, 끄고, 지운다. 오류 코드는 그리지 않는다.
- * 켜져 있거나 꺼져 있으면 로그인 화면을 연다. `startUrl` 은 이 페이지에서 처음 연 화면만 간다.
+ * 켜져 있거나 꺼져 있으면 로그인 화면을 연다. `startUrl` 과 `startTab` 은 이 페이지에서 처음 연 화면에만 쓴다.
  */
-export function UserBrowserPanel({ startUrl }: { startUrl: string | null }) {
+export function UserBrowserPanel({
+  startUrl,
+  startTab = null,
+}: {
+  startUrl: string | null;
+  startTab?: string | null;
+}) {
   const [view, setView] = useState<BrowserView | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [pending, setPending] = useState<BrowserAction | null>(null);
@@ -200,6 +206,7 @@ export function UserBrowserPanel({ startUrl }: { startUrl: string | null }) {
       {screen && status !== undefined ? (
         <BrowserScreen
           startUrl={startUsed ? null : startUrl}
+          startTab={startUsed ? null : startTab}
           onOpen={reread}
           onClose={() => {
             setScreen(false);

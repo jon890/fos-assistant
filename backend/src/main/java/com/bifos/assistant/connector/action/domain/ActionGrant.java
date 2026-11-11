@@ -57,4 +57,19 @@ public class ActionGrant {
             this.revokedAt = now;
         }
     }
+
+
+    /** 그 줄의 허락이 대화 허락이면 거둔다. 허락이 없거나 상시 허락이면 그대로 둔다. */
+    static void revokeConversation(ActionGrant grant, Instant now) {
+        if (grant != null && grant.scope == GrantScope.CONVERSATION) {
+            grant.revoke(now);
+        }
+    }
+
+
+    /** 그 줄의 대화 허락이 {@code now} 에 아직 유효하면 끝나는 시각이고 아니면 null 이다. */
+    static Instant conversationExpiresAt(ActionGrant grant, Instant now) {
+        boolean active = grant != null && grant.scope == GrantScope.CONVERSATION && grant.activeAt(now);
+        return active ? grant.expiresAt : null;
+    }
 }

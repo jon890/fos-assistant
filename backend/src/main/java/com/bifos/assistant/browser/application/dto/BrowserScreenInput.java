@@ -56,7 +56,8 @@ public record BrowserScreenInput(
         BACK,
         RELOAD,
         TAB,
-        RESIZE
+        RESIZE,
+        DIALOG
     }
 
 

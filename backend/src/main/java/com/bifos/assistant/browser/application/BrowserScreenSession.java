@@ -17,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -74,6 +73,8 @@ public class BrowserScreenSession {
     private int reconnects;
     private volatile Map<String, Object> metrics;
     private volatile Viewport viewport;
+    /** 화면에 확인 창을 보이고 있는가. 탭을 옮길 때 거둘지 정한다. */
+    private volatile boolean dialogShown;
     private ScheduledFuture<?> resizeTask;
 
 
@@ -131,9 +132,12 @@ public class BrowserScreenSession {
             case KEY -> key(current, input.key());
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
-            case BACK -> back(current);
+            case BACK -> BrowserScreenInputParams.back(current, () -> logFailure("Page.navigateToHistoryEntry"));
             case RELOAD -> command(current, "Page.reload", Map.of());
             case RESIZE -> resize(input);
+            // 사람이 고른 답을 그 탭의 확인 창에 넘긴다. 창이 없으면 CDP 가 실패로 답하고 그 실패는 이름만 남긴다.
+            case DIALOG ->
+                command(current, "Page.handleJavaScriptDialog", Map.of("accept", "accept".equals(input.action())));
         }
     }
 
@@ -210,6 +214,11 @@ public class BrowserScreenSession {
         if (previous != null) {
             previous.close();
         }
+        // 앞 탭의 확인 창은 그 탭에 남는다. 화면에서는 거두고, 새 탭에 창이 있으면 Page.enable 뒤 다시 온다.
+        if (dialogShown) {
+            dialogShown = false;
+            sink.trySend("dialog", BrowserScreenDialog.CLOSED);
+        }
         CdpConnection opened = connector.connect(cdp, id, event -> onEvent(attached, event), () -> onConnectionLost(attached));
         synchronized (lock) {
             if (closed.get() || attached != generation) {
@@ -239,7 +248,9 @@ public class BrowserScreenSession {
 
 
     private void onEvent(long attached, CdpEvent event) {
-        if (!"Page.screencastFrame".equals(event.method())) {
+        // 확인 창은 사람이 고를 때까지 탭을 막는다(#702). 모양은 BrowserScreenDialog 가 갖는다.
+        boolean dialog = BrowserScreenDialog.handles(event);
+        if (!dialog && !"Page.screencastFrame".equals(event.method())) {
             return;
         }
         CdpConnection current;
@@ -248,7 +259,14 @@ public class BrowserScreenSession {
                 return;
             }
             current = connection;
-            reconnects = 0;
+            reconnects = dialog ? reconnects : 0;
+        }
+        if (dialog) {
+            dialogShown = BrowserScreenDialog.opening(event);
+            if (!sink.send("dialog", BrowserScreenDialog.view(event))) {
+                close(null);
+            }
+            return;
         }
         JsonNode params = event.params();
         JsonNode metadata = params.path("metadata");
@@ -448,22 +466,6 @@ public class BrowserScreenSession {
         for (Map<String, Object> params : BrowserScreenInputParams.key(name)) {
             command(current, "Input.dispatchKeyEvent", params);
         }
-    }
-
-
-    private void back(CdpConnection current) {
-        current.send("Page.getNavigationHistory", Map.of())
-            .thenCompose(history -> {
-                int index = history.path("currentIndex").asInt();
-                JsonNode entries = history.path("entries");
-                if (index < 1 || !entries.has(index - 1)) {
-                    return CompletableFuture.completedFuture(null);
-                }
-                return current.send(
-                    "Page.navigateToHistoryEntry",
-                    Map.of("entryId", entries.get(index - 1).path("id").asInt()));
-            })
-            .exceptionally(ex -> logFailure("Page.navigateToHistoryEntry"));
     }
 
 

@@ -121,6 +121,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261105 / event-watch](ADR-20261105-event-watch.md) | 사건 감지는 Control Plane 이 실행 밖에서 플러그인의 목록을 식별자와 받은 시각, 라벨만 받아 보고, 새 항목이 있을 때만 읽기 경계의 살펴보기를 연다 | backend, frontend, hermes | Accepted. ADR-080 의 읽기 경계와 ADR-085 의 깨우기 제한 위에 계기 `EVENT` 를 더한다 |
 | [ADR-20261110 / agent-introduction](ADR-20261110-agent-introduction.md) | 에이전트의 한 줄 소개를 사람이 쓰는 칸으로 다시 두고, 할 수 있는 일은 읽을 때 모은다 | backend, frontend | Accepted. ADR-036 의 소개를 없앤 부분을 대체한다 |
 | [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) | 네이버 쇼핑은 내 브라우저로 화면의 상태 JSON 을 읽고, 쇼핑 도구는 사람이 연 대화에서만 부른다 | backend, hermes | Accepted. ADR-20261007 / user-browser 의 브라우저와 중계를 쓰고, ADR-080 의 살펴보기 읽기 경계 옆에 도구 단위의 `attended_only` 경계를 더한다 |
+| [ADR-20261111 / connector-handoff](ADR-20261111-connector-handoff.md) | 플러그인이 사람에게 화면을 넘기면 fos-ctx 가 결과의 칸을 알리고, 대화의 카드와 「다 했어요」 로 이어 간다 | backend, hermes, web | Accepted. ADR-026 의 묻는 카드처럼 기다리지 않고, ADR-070 의 `notification` 에 종류 하나를 더한다 |
 
 ## 보관
 

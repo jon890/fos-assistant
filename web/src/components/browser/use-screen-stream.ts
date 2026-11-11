@@ -15,6 +15,9 @@ import { resizeFor, type ScreenInput } from "@/components/browser/screen-input";
 
 export type Frame = { data: string; width: number; height: number };
 
+/** 붙은 탭에 뜬 확인 창이다. 사이트가 띄운 글을 그대로 보인다. */
+export type ScreenDialogView = { type: string; message: string };
+
 /** `closed` 없이 끊긴 SSE 를 다시 열기 전에 기다리는 시간이다. 연이어 이만큼 실패하면 닫는다. */
 const RECONNECT_MS = [1_000, 2_000, 4_000];
 
@@ -31,12 +34,15 @@ const LOST = "화면 연결이 끊겼어요. 다시 열어 주세요.";
  */
 export function useScreenStream({
   startUrl,
+  startTab = null,
   onOpen,
   areaRef,
   addressRef,
   setAddress,
 }: {
   startUrl: string | null;
+  /** 첫 연결의 첫 탭 목록에 있으면 그 탭으로 옮긴다. 화면 넘기기 카드가 가리킨 탭이다. */
+  startTab?: string | null;
   onOpen: () => void;
   areaRef: RefObject<HTMLDivElement | null>;
   addressRef: RefObject<HTMLInputElement | null>;
@@ -47,6 +53,7 @@ export function useScreenStream({
   const [tabs, setTabs] = useState<ScreenTab[]>([]);
   const [closed, setClosed] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<ScreenDialogView | null>(null);
   /** 열린 연결이 있을 때만 참이다. 끊긴 동안의 입력은 버린다. */
   const open = useRef(false);
   /** 연결마다 하나씩 늘린다. 앞 연결에 보낸 입력의 오류는 화면을 닫지 않는다. */
@@ -115,11 +122,23 @@ export function useScreenStream({
           { once: true },
         );
       });
+    let wantedTab = attempt === 0 ? startTab : null;
     const onEvent = (data: unknown, name: string) => {
       if (name === "frame") setFrame(data as Frame);
-      else if (name === "tabs") {
+      else if (name === "dialog") {
+        const next = data as { open: boolean } & Partial<ScreenDialogView>;
+        setDialog(
+          next.open
+            ? { type: next.type ?? "alert", message: next.message ?? "" }
+            : null,
+        );
+      } else if (name === "tabs") {
         const next = data as ScreenTab[];
         setTabs(next);
+        // 가리킨 탭은 처음 받은 목록에서 한 번만 찾는다. 없으면(닫혔거나 브라우저를 다시 켬) 지금 탭에 머문다.
+        const wanted = next.find((tab) => tab.id === wantedTab);
+        wantedTab = null;
+        if (wanted && !wanted.active) send({ type: "tab", id: wanted.id });
         const active = next.find((tab) => tab.active);
         if (active && document.activeElement !== addressRef.current)
           setAddress(active.url);
@@ -165,7 +184,17 @@ export function useScreenStream({
       open.current = false;
       controller.abort();
     };
-  }, [attempt, startUrl, onOpen, close, resize, addressRef, setAddress]);
+  }, [
+    attempt,
+    startUrl,
+    startTab,
+    onOpen,
+    close,
+    resize,
+    send,
+    addressRef,
+    setAddress,
+  ]);
 
   useEffect(() => {
     const area = areaRef.current;
@@ -187,8 +216,9 @@ export function useScreenStream({
     setNotice(null);
     setFrame(null);
     setTabs([]);
+    setDialog(null);
     setAttempt((value) => value + 1);
   }, []);
 
-  return { frame, tabs, closed, notice, setNotice, send, reopen };
+  return { frame, tabs, closed, notice, setNotice, send, reopen, dialog };
 }
