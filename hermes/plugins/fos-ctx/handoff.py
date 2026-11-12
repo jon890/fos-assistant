@@ -20,7 +20,7 @@ from .tool_guard import guard_url
 HANDOFF_VERSION = "v1-connector-handoff"
 HANDOFF_PATH = "connector-handoff"
 # 이 PR 이 받는 어휘다. Control Plane 의 `HandoffNeed` 와 같아야 한다. 모르는 값은 보내지 않는다.
-NEEDS = frozenset({"login", "captcha", "device_check"})
+NEEDS = frozenset({"login", "captcha", "device_check", "bot_check", "unexpected_page"})
 CODE_RE = re.compile(r"^[A-Z0-9_]{1,64}$")
 # 화면 입력 `tab` 의 `id` 와 같은 모양이다.
 TAB_RE = re.compile(r"^[A-Za-z0-9]{1,128}$")

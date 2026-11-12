@@ -1179,6 +1179,17 @@ class HandoffReportTest(PluginFixture):
                     self.plugin.signing_key(FAKE_MCP_CREDENTIAL), "mcp__demo__write_note", VECTOR_ROOT,
                     VECTOR_SESSION, VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login", "TAB1"))
 
+    def test_every_need_in_vocabulary_is_reported(self):
+        """어휘의 낱말마다 그대로 알린다. 봇 탐지와 예상 밖 화면도 같은 모양이다."""
+        for need in ("login", "captcha", "device_check", "bot_check", "unexpected_page"):
+            with self.subTest(need=need):
+                self.requests.clear()
+                result = json.dumps({"status": "HUMAN_ACTION_REQUIRED", "message": "m",
+                                     "handoff": {"code": "DEMO_PAGE_CHANGED", "need": need, "tab": "TAB1"}})
+                self.transform("mcp__demo__write_note", json.dumps({"result": result}))
+                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(self.requests[0]["body"]["need"], need)
+
     def test_handoff_result_does_not_count_as_hermes_failure(self):
         """Hermes 의 MCP 연속 실패 집계(`_result_is_error`)는 처리한 결과 글 맨 위의 `error` 칸만 본다.
 
@@ -1197,6 +1208,7 @@ class HandoffReportTest(PluginFixture):
         """오류가 아닌 꼴도 어휘와 모양을 같은 기준으로 거른다."""
         bad = [
             json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "payment", "tab": "TAB1"}}),
+            json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "BOT_CHECK", "tab": "TAB1"}}),
             json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "../x"}}),
             json.dumps({"handoff": {"code": "lower", "need": "login", "tab": "TAB1"}}),
             json.dumps({"handoff": {"need": "login", "tab": "TAB1"}}),

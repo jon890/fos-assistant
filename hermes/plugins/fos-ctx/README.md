@@ -185,7 +185,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 ### 화면 넘기기를 알린다
 
-플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터이고, 1.7.0 부터 오류가 아닌 결과도 받는다.
+플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터이고, 1.7.0 부터 오류가 아닌 결과도 받으며, 1.8.0 부터 `bot_check`, `unexpected_page` 도 보낸다.
 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과에서 두 모양 가운데 하나를 찾는다. 옛 설치 profile 과 바인딩 profile 이 같다.
 
 - 새 모양: 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}`. 플러그인이 낸다. Hermes 는 이 결과를 `{"result": "<플러그인 글>"}` 로 바꾸므로 바깥 `result` 가 글이면 한 번 더 읽는다
@@ -199,7 +199,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
 | 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}` |
 | 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
-| 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다 |
+| 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check`, `bot_check`, `unexpected_page` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다 |
 | 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
 | 실패 | 상태 코드나 예외 종류만 로그에 남기고 결과는 바꾸지 않는다. 카드가 없을 뿐 모델은 결과의 안내 글을 받는다 |
 
