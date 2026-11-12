@@ -276,7 +276,7 @@ Control Plane 과 웹 → fos-ctx 1.8.0 → 플러그인 셋. 순서를 어겨�
 | `web/src/components/chat/use-conversation-todo.tsx`(새) | 승인, 넘기기, 묻는 카드를 모아 「할 일 N건」 줄과 패널을 돌려준다. 승인 알림 진입(`todo=open`), 비면 닫기를 갖는다 |
 | `web/src/components/chat/use-conversation-handoffs.tsx` | 카드 목록 대신 넘기기 카드 묶음과 「내 브라우저」 탭 본문을 돌려주고, 패널 상태를 새 모양으로 다룬다 |
 | `web/src/components/chat/todo-panel.tsx`(새) | 옆 패널 모양(넓으면 `aside`, 좁으면 `Sheet`), 탭 머리, 닫기, 보이는 탭 본문 |
-| `web/src/components/chat/handoff-panel.tsx` | 패널 껍데기를 `todo-panel.tsx` 로 넘기고 「내 브라우저」 탭 본문만 남는다 |
+| `web/src/components/chat/handoff-browser.tsx`(새, 옛 `handoff-panel.tsx`) | PR1 의 `HandoffPanel` 에서 패널 껍데기를 `todo-panel.tsx` 로 넘기고 「내 브라우저」 탭 본문(`HandoffBrowser`)만 남긴다 |
 | `web/src/lib/todo.ts`(새) | `activeAsk` 와 「할 일 N건」 글 |
 | `web/src/lib/notification.ts` | `APPROVAL_REQUESTED` 의 갈 곳에 `?todo=open` |
 | `docs/features/connector-policy.md` | 「화면」 의 40% 규칙을 「할 일」 탭으로 바꾼다 |
@@ -289,6 +289,7 @@ Control Plane 과 웹 → fos-ctx 1.8.0 → 플러그인 셋. 순서를 어겨�
 | --- | --- |
 | 승인 줄을 읽지 못한다 | 지금처럼 앞 목록을 둔다. 새 승인 판정과 알림 진입은 성공한 읽기에서만 한다 |
 | 「모두 승인」 중 패널을 닫는다 | 상태가 대화 화면에 있어 끝까지 돈다. 다시 열면 남은 결과와 오류가 보인다 |
+| 카드 하나의 승인·거절을 보내는 중에 패널을 닫거나 탭을 옮긴다 | 보내는 중인 줄은 훅이 든 목록으로도 막아 다시 연 카드에서 같은 줄을 두 번 보내지 않는다. 그 사이 실패하면 카드 안의 오류 글은 사라지고, 다시 읽은 목록이 지금 상태를 보인다 |
 | 같은 대화를 두 창에서 본다 | 창마다 새 승인에 패널이 열린다. 한쪽에서 승인하면 `approval` 사건으로 다른 쪽도 다시 읽어 카드가 사라지고, 비면 닫힌다 |
 | 묻는 카드에 답하는 중에 새 승인이 온다 | 패널은 「할 일」 탭이고 묻는 카드가 맨 위라 고른 것이 그대로 남는다(같은 탭을 다시 그릴 뿐이다) |
 
