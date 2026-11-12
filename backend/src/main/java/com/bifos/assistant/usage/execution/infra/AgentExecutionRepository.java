@@ -256,6 +256,12 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByRootExecutionIdIn(Collection<Long> rootExecutionIds);
 
 
+    /**
+     * 이 실행들이 바로 맡긴 위임 실행이다. 대화 이력이 답 아래의 맡긴 줄을 그리는 데 쓴다. 위임이 아닌 자식은 빼고 번호순이다.
+     */
+    List<AgentExecution> findByParentExecutionIdInAndDelegationKeyIsNotNullOrderByIdAsc(Collection<Long> parentIds);
+
+
     /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
     @Query("""
             select distinct e.parentExecutionId from AgentExecution e

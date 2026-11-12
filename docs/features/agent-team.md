@@ -2,13 +2,14 @@
 
 사용자가 에이전트를 이름표와 소개로 구분해 보고, 기본 비서와 전문 에이전트가 나눠 일하는 기능이다. 합의한 변경과 단계는 [스펙](agent-team/spec.md)과 [설계](agent-team/design.md)가 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`
+covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`
 
 ## 요구
 
 - 에이전트마다 한 줄 소개, 아이콘, 색이 있다. 답, 대화 머리, 새 대화 카드, 에이전트 목록, `@` 목록이 같은 이름표를 그린다.
 - 위임 도구 `agent_list` 가 소개와 할 수 있는 일을 실어, 맡기는 에이전트가 그것을 보고 고른다([에이전트와 스킬](agent-skill.md) 의 「다른 에이전트에게 맡기기」).
 - 첫 로그인에 만든 에이전트가 그 사용자의 기본 비서이고 이름은 「비서」 다([사용자](users.md) 의 「첫 에이전트의 기본 도구」).
+- 대화의 turn 이 다른 에이전트에게 맡기면 그 답 아래에 맡긴 줄이 보이고, 결과 도착 줄과 위임 자식의 승인 카드에 맡은 에이전트의 이름표가 붙는다. 아래 「대화 안의 협업」.
 
 ## 소개와 할 수 있는 일
 
@@ -27,3 +28,19 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 | `@` 목록 | 이름표와 이름, 소개 한 줄 |
 | 아이콘이나 색을 고르지 않았다 | 이름 첫 글자와 `code` 로 정한 자동 색 |
 
+
+## 대화 안의 협업
+
+**맡긴 줄은 대화의 turn(루트 실행)이 바로 맡긴 위임만 보인다.** 실행 줄의 `delegation_key` 가 있고 부모가 그 트리의 루트인 실행이다. 맡은 에이전트가 다시 맡긴 손자와 실행 전에 거절된 위임은 줄이 없고 실행 트리에서 본다. 판정은 `DelegationLines.isDirectDelegation` 이다.
+
+| 자리 | 무엇을 보이나 | 값이 오는 곳 |
+| --- | --- | --- |
+| 답 본문 아래 | 「(맡은 에이전트 이름표) {대화 에이전트} → {맡은 에이전트}에게 맡김 · 진행 중·끝남·실패·멈춤」. 답 글이 아직 없으면 기다림 줄 아래 | 이력 API 의 `delegations`, 도는 동안은 `delegation` 사건 |
+| 결과 도착 줄 | 결과마다 「(이름표) {맡은 에이전트}이 끝냈어요」, 실패면 「하지 못했어요」. 그 아래 자동 turn 의 답은 대화 에이전트의 이름표다 | 이력 API 의 `deliveredResults` |
+| 승인 카드 | 대화의 에이전트와 다른 에이전트가 요청한 카드에만 「(이름표) {그 에이전트}이 요청」 | 승인 줄 목록의 `requestedBy` |
+
+맡긴 자리는 저장되지 않으므로 줄은 늘 답 본문 아래에 둔다. 새로 고치거나 다른 기기에서 열어도 같은 자리다.
+`delegation` 사건은 위임 실행 줄이 생길 때와 끝날 때 대화 단위 SSE 로 그 대화의 모든 구독에 간다(`DelegationLineNotifier`). 화면은 받은 줄을 실행 번호로 들고 있다가 이력의 줄과 합치고, 같은 실행이면 끝난 상태를 고른다.
+결과 도착 줄은 전달 묶음의 `delegation_notice_message_id` 로 결과를 찾는다. 자동 turn 이 도는 동안은 그 줄의 `system` 사건이 같은 결과(`deliveredResults`)를 싣는다. 이 칸 전에 만든 알림 줄은 저장된 글만 보인다. 저장된 글(「○○ 에이전트의 결과가 도착했어요」)은 바꾸지 않는다.
+승인과 거절 응답은 대화를 몰라 `requestedBy` 를 싣지 않으므로 화면이 카드를 바꿀 때 앞 값을 지킨다.
+이름표의 네 칸(`AgentLabel`)이 모두 비어 있으면 지운 에이전트다. 화면은 「지운 에이전트」 로 그린다.

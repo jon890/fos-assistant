@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -329,6 +330,17 @@ public class ConnectorActionService {
     @Transactional(readOnly = true)
     public List<ConnectorConversationGrantView> conversationGrants(CurrentUser user, Long conversationId) {
         return lifecycle.conversationGrants(user, conversationId);
+    }
+
+
+    /**
+     * 승인 줄마다 대화의 에이전트와 다른 요청 에이전트의 이름표다. 대화의 에이전트가 만든 줄은 빠진다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, AgentLabel> requestersOf(CurrentUser user, Long conversationId, Collection<UUID> actionIds) {
+        return lifecycle.requestersOf(user, conversationId, actionIds);
     }
 
 

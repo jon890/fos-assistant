@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.connector.approval.application.ConnectorActionService;
 import com.bifos.assistant.connector.approval.application.ConnectorFinancialSummaries;
@@ -94,7 +95,8 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].length()").value(18))
+            .andExpect(jsonPath("$[0].length()").value(19))
+            .andExpect(jsonPath("$[0].requestedBy").isEmpty())
             .andExpect(jsonPath("$[0].contentDraft").isEmpty())
             .andExpect(jsonPath("$[0].financial").isEmpty())
             .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
@@ -112,6 +114,23 @@ class ConnectorActionControllerTest {
             .andExpect(jsonPath("$[0].hiddenArgs").value(true))
             .andExpect(jsonPath("$[0].argLabels.text").value("내용"))
             .andExpect(jsonPath("$[0].conversationGrantAllowed").value(false));
+    }
+
+
+    @Test
+    @DisplayName("대화의 에이전트와 다른 에이전트가 요청한 줄에 그 이름표를 붙인다")
+    void attachesRequesterLabel() throws Exception {
+        when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
+        when(service.listForConversation(MEMBER, 42L)).thenReturn(List.of(PENDING));
+        when(service.requestersOf(MEMBER, 42L, List.of(ACTION)))
+            .thenReturn(Map.of(ACTION, new AgentLabel("shopper", "쇼핑 담당", "🛍️", "ROSE")));
+
+        mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].requestedBy.code").value("shopper"))
+            .andExpect(jsonPath("$[0].requestedBy.name").value("쇼핑 담당"))
+            .andExpect(jsonPath("$[0].requestedBy.icon").value("🛍️"))
+            .andExpect(jsonPath("$[0].requestedBy.color").value("ROSE"));
     }
 
 

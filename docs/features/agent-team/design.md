@@ -2,7 +2,7 @@
 
 스펙: [`spec.md`](spec.md).
 
-스펙의 DECISION2 대로 PR 다섯으로 나눈다. 이 문서는 PR1 을 구현할 깊이로 쓰고, 뒤 PR 은 경계와 데이터 자리만 정한다. 뒤 PR 은 시작할 때 이 문서의 해당 절을 고치고 검토를 다시 받는다.
+스펙의 DECISION2 대로 PR 다섯으로 나눈다. 이 문서는 PR1 과 PR2 를 구현할 깊이로 쓰고, 뒤 PR 은 경계와 데이터 자리만 정한다. 뒤 PR 은 시작할 때 이 문서의 해당 절을 고치고 검토를 다시 받는다.
 
 | PR | 요구사항 | 내용 |
 | --- | --- | --- |
@@ -29,8 +29,8 @@
 | --- | --- |
 | REQ1 | `agent` 에 `description`, `icon`, `color` 컬럼을 더한다. 주인과 `ADMIN` 이 `PATCH /api/v1/agents/{code}/introduction` 으로 이름과 셋을 고친다. `ADMIN` 은 지우기처럼 남의 비공개 에이전트에도 닿는다. 아이콘과 색은 Control Plane 의 고정 목록으로 검사한다. 할 수 있는 일은 `AgentCapabilitiesReader` 가 연결과 바인딩이 모두 READY 인 플러그인 이름과 올린 스킬 이름으로 모은다 |
 | REQ2 | `AgentView` 에 소개, 아이콘, 색, 할 수 있는 일을 싣는다. 화면은 부품 `AgentBadge` 하나로 답, 대화 머리, 목록, 새 대화 카드, `@` 목록을 그린다. 답 이름표는 대화 줄(`ConversationView`)의 에이전트 칸으로 그린다. `agent_list` 결과에도 소개와 할 수 있는 일을 싣는다. 첫 에이전트는 이름 「비서」 와 고정 소개로 만들고, 이미 있는 첫 에이전트는 마이그레이션이 바꾼다 |
-| REQ3 | (PR2) 이력 API 의 `ASSISTANT` 줄에 그 실행이 바로 맡긴 위임 자식(`delegation_key` 가 있는 자식 실행)의 에이전트와 상태를 싣는다. 도는 동안은 기존 `subagent` 사건과 대화 단위 SSE 로 상태를 바꾼다 |
-| REQ4 | (PR2) `SYSTEM` 알림 줄에 전달 묶음(`result_delivery`)의 자식 실행 에이전트를 싣는다. 승인 줄(`connector_action.agent_id`)이 대화의 에이전트와 다르면 카드에 그 에이전트를 싣는다 |
+| REQ3 | (PR2) 이력 API 의 `ASSISTANT` 줄에 그 답의 실행이 바로 맡긴 위임 자식(`delegation_key` 가 있고 부모가 그 실행인 실행 줄)의 에이전트와 상태를 싣는다. 도는 동안은 위임이 시작하고 끝날 때 새 사건 `delegation` 을 대화 단위 SSE 로 그 대화의 모든 구독에 보낸다. 아래 「PR2 협업 보이기」 |
+| REQ4 | (PR2) 위임 결과 알림 줄(`SYSTEM`)에 그 줄이 전한 자식 실행의 에이전트와 상태를 싣는다. 줄과 결과는 전달 묶음(`result_delivery`)의 새 칸 `delegation_notice_message_id` 와 `items_json` 으로 잇는다. 승인 줄(`connector_action.agent_id`)이 대화의 에이전트와 다르면 승인 카드 응답에 그 에이전트를 싣는다 |
 | REQ5 | (PR3) 화면이 연결 완료 뒤 제안을 띄우고, Control Plane 의 한 요청이 에이전트 만들기, 소개 저장, 성격 틀 쓰기, 바인딩을 차례로 하고 실패하면 역순으로 거둔다. 순서는 `agent` 위의 패키지(`connector`)가 갖는다 |
 | REQ6 | (PR3) 같은 요청이 「떼기」 칸이면 그 연결이 지금 붙은 에이전트(기본 비서 또는 다른 에이전트)의 바인딩을 뗀다. `single_binding` 은 화면이 칸을 잠그고 서버도 떼기 없이 붙이기를 거절한다. REQ5 의 「그 서비스가 붙은 전문 에이전트」 는 그 연결이 붙은, 기본 비서가 아닌 에이전트다 |
 | REQ7 | (PR4) 보내기 요청에 맡길 에이전트를 싣고 Control Plane 이 위임 실행을 바로 만든다. 위임 입력에는 `@` 메시지와 그 대화의 최근 `USER`·`ASSISTANT` 줄 몇 개를 출처 머리줄과 함께 싣는다. 맡은 에이전트의 답은 그 실행의 에이전트를 가진 `ASSISTANT` 줄로 남기고 `MessageView` 에 답을 쓴 에이전트를 더한다. 비서의 Hermes session 에는 이 주고받음이 없으므로, 비서의 다음 turn 입력 앞에 위임 결과 전달과 같은 머리줄로 「사용자가 `@` 로 맡긴 일과 답」 을 싣는다. 무엇을 할지 Control Plane 이 정하는 예외라 ADR-017 을 고치는 ADR 을 그 PR 에 둔다 |
@@ -154,6 +154,117 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 
 배포 뒤 확인: 운영에서 기본 에이전트의 이름이 「비서」 가 됐는지와 `agent_list` 의 결과 길이. 확인 방법은 `fos-home-infra` 가 갖는다.
 
+## PR2 협업 보이기
+
+REQ3, REQ4 의 책임이다. 테이블은 늘리지 않고 `result_delivery` 에 칸 하나를 더한다.
+
+### 지금 구조
+
+- 위임 자식은 실행 줄만 남기고 대화 이력에는 아무것도 남기지 않는다([에이전트와 스킬](../agent-skill.md) 의 「다른 에이전트에게 맡기기」). 이력 API 는 답 줄마다 작업 과정 요약(`activity`)의 자식 수만 센다.
+- 대화 스트림의 `subagent` 사건은 Hermes 안의 하위 에이전트 사건이다. FOS 위임 자식의 시작과 끝은 화면에 사건으로 가지 않는다. 위임은 turn 의 SSE 와 다른 스레드(`DelegationRuns`)에서 돌고, 끝나면 Spring 사건 `DelegationFinished` 만 낸다.
+- 결과 알림 줄은 「쇼핑 담당 에이전트의 결과가 도착했어요」 글만 가진 `SYSTEM` 줄이다(`ChatDeliveryInput.delegationNotice`). 위임 결과가 여럿이면 「○○ 외 N개」 한 줄이다. 전달 묶음은 마지막 시도의 마지막 알림 줄(`last_attempt_notice_message_id`)만 기억한다. 첫 시도는 위임 알림 줄 다음에 승인 결과마다 알림 줄을 더 남기므로, 위임 알림 줄을 묶음에서 찾을 칸이 없다.
+- 승인 카드는 `GET /api/v1/chat/conversations/{id}/connector-actions` 로 그린다. 승인 줄에 요청한 실행의 에이전트(`agent_id`)가 있다. 대화 허락 목록은 이미 대화의 에이전트와 다른 에이전트의 이름을 싣는다(`ConnectorConversationGrantView.agentName`).
+
+### 책임과 경계
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `agent.application.dto.AgentLabel` | 이름표 한 벌(`code`, `name`, `icon`, `color`). 지운 에이전트와 없는 에이전트는 네 칸이 모두 null 이다. 대화 줄(`ConversationView`)과 같은 규칙이다 |
+| `chat.turn.application.DelegationLines` | 맡긴 줄과 결과 도착 줄의 읽기. 답 줄의 실행 번호로 직접 위임 자식을 한 번에, 대화의 묶음으로 결과 알림 줄의 자식을 한 번에, 실행 번호 하나로 사건용 줄 하나를 읽는다 |
+| `chat.nextturn.application.dto.DelegationStarted` (새 사건) | 위임 실행 줄이 생겼다. `DelegationFinished` 와 짝이다. 내는 쪽은 받는 쪽을 모른다 |
+| `orchestration.application.DelegationRuns` | 실행 줄이 생긴 직후 `DelegationStarted` 를 낸다. 알리다 난 예외는 경고 로그만 남긴다 |
+| `chat.nextturn.application.DelegationLineNotifier` (새 빈) | `DelegationStarted` 와 `DelegationFinished` 를 받아 그 위임이 turn 의 직접 위임이면 `ChatEvent.delegation` 을 `ConversationEventHub` 로 낸다 |
+| `chat.turn.application.dto.ChatEvent` | `delegation` 칸과 생성 함수 `delegation(conversationId, line)` |
+| `chat.delivery` 의 `ResultDelivery`, `ResultDeliveryRecorder` | 새 칸 `delegation_notice_message_id`. 첫 시도가 위임 알림 줄을 저장하면 그 번호를 함께 적고, 다시 전달은 바꾸지 않는다. 알림 줄 번호마다 그 줄이 전한 위임 실행 번호를 돌려준다 |
+| `chat.turn.application.ChatDeliveryTurns` | 위임 알림 줄(첫 알림 줄)의 번호를 묶음에 넘긴다 |
+| `chat.turn.presentation.ChatController`, `ChatDtos.MessageView` | `delegations`, `deliveredResults` 칸 |
+| `connector.approval` 의 `ConnectorActionService`, `ConnectorActionController` | 승인 줄 목록에 대화의 에이전트와 다른 요청 에이전트의 이름표(`requestedBy`)를 붙인다 |
+| `web/src/components/chat/delegation-lines.tsx` | 맡긴 줄과 결과 도착 줄의 그림 |
+| `web/src/lib/delegation.ts`, `use-conversation-session-state.ts` 의 `liveDelegations` | `delegation` 사건으로 받은 줄을 대화 화면이 들고 있다가 이력의 줄과 합친다. 합치기 규칙과 글은 `lib/delegation.ts` 가 갖는다 |
+| `web/src/components/chat/approval-card.tsx` | 카드 위의 「○○이 요청」 줄 |
+
+### 인터페이스와 데이터
+
+#### 맡긴 줄로 보일 위임
+
+실행 줄의 `delegation_key` 가 있고 `parent_execution_id` 가 `root_execution_id` 와 같은 실행이다. 곧 사용자 대화의 turn(루트 실행)이 바로 맡긴 위임이다. 그 turn 안의 Hermes 하위 에이전트가 부른 `agent_delegate` 도 부모가 루트이므로 든다. 맡은 에이전트가 다시 맡긴 손자는 부모가 루트가 아니라 빠진다(spec DECISION18). 실행 전에 거절된 위임은 실행 줄이 없어 빠진다. 줄을 만든 뒤 제출이 실패한 위임은 「실패」 로 보인다.
+
+#### 이력 API
+
+`GET /api/v1/chat/conversations/{id}/messages` 의 메시지에 두 칸을 더한다. 둘 다 해당하지 않는 줄은 빈 목록이다.
+
+| 칸 | 줄 | 뜻 |
+| --- | --- | --- |
+| `delegations` | `ASSISTANT` | 그 답의 실행(`executionId`)이 바로 맡긴 위임. 실행 번호순 |
+| `deliveredResults` | `SYSTEM` | 그 알림 줄이 전한 위임 결과. 묶음의 항목 순서다 |
+
+한 항목은 아래 모양이다. `agent` 의 네 칸이 모두 null 이면 지운 에이전트다.
+
+```json
+{ "executionId": 41, "parentExecutionId": 40, "status": "RUNNING",
+  "agent": { "code": "shopping", "name": "쇼핑 담당", "icon": "🛍️", "color": "ROSE" } }
+```
+
+`status` 는 실행 줄의 `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED` 다. 화면은 차례로 「진행 중」, 「끝남」, 「실패」, 「멈춤」 으로 그린다.
+
+읽기는 대화 하나에 질의가 몇 번으로 고정된다. 답 줄의 실행 번호 목록으로 위임 자식을 한 번, 대화의 묶음을 한 번(지금 `deliveryStates` 가 읽는 것과 같은 줄), 결과 실행을 번호 목록으로 한 번, 에이전트를 번호 목록으로 한 번 읽는다. 결과 실행은 그 사용자와 그 대화의 줄만 쓴다. 남의 실행 번호가 묶음에 들었어도 싣지 않는다.
+
+#### `delegation` 사건
+
+`ChatEvent` 에 `delegation` 칸을 더하고 `type` 이 `delegation` 인 사건을 만든다. 칸의 모양은 이력 API 의 한 항목과 같다.
+위임 실행 줄이 생겼을 때(`RUNNING`)와 끝났을 때(끝난 상태) 한 번씩 그 대화의 대화 단위 SSE 로 간다. turn 의 SSE 에는 싣지 않는다. 대화 화면은 보낸 창이든 다른 창이든 대화 단위 SSE 를 늘 열고 있으므로, 보낸 창, 다른 창, 자동 turn 이 같은 길로 받는다. `approval` 사건과 같이 보낸 turn 이 도는 동안에도 미루지 않는다.
+
+받은 화면은 줄을 실행 번호로 들고 있다가 `parentExecutionId` 가 같은 답 아래에 그린다. 흐르는 답은 `started` 의 실행 번호, 다른 창에서 보는 답은 `/running` 의 실행 번호로 찾는다. 답 글이 아직 없으면 기다림 줄 아래에 그린다. 이력을 다시 읽으면 이력의 줄과 합치고, 같은 실행이면 끝난 상태를 고른다. 끝난 상태는 다시 바뀌지 않으므로 늦게 온 쪽이 끝난 상태를 덮지 않는다.
+
+`forViewer` 는 이 사건을 바꾸지 않는다. 이름표와 상태는 `MEMBER` 역할에게도 보이는 값이다.
+
+#### 결과 도착 줄
+
+`result_delivery` 에 컬럼 하나를 더한다. 마이그레이션 번호는 `orch queue reserve` 로 받는다.
+
+| 컬럼 | 타입 | 뜻 |
+| --- | --- | --- |
+| `delegation_notice_message_id` | `BIGINT NULL` | 첫 시도가 저장한 위임 결과 알림 줄. 묶음에 위임 결과가 없거나 이 칸 전에 만든 묶음이면 NULL |
+
+다시 전달은 새 알림 줄(`ChatService.RETRY_NOTICE`)을 남기고 이 칸은 바꾸지 않는다. 처음 도착한 줄이 이름표를 그대로 가진다.
+이 칸 전의 알림 줄은 `deliveredResults` 가 비어 지금처럼 글만 보인다. 옛 줄을 채우는 DML 은 두지 않는다. 같은 대화의 실행 줄과 알림 줄을 시각으로 맞추는 것 말고는 이을 근거가 없기 때문이다.
+
+화면은 `deliveredResults` 가 있으면 저장된 글 대신 결과마다 한 줄로 「이름표 + {이름}이 끝냈어요」(`SUCCEEDED`) 또는 「이름표 + {이름}이 하지 못했어요」(`FAILED`)를 그린다. 조사는 받침을 보고 정한다(`withParticle`). 저장된 글은 바꾸지 않는다. 옛 화면과 다른 소비자가 그대로 읽는다. 「결과 다시 전달」 단추는 지금 자리(묶음의 마지막 알림 줄 아래)에 그대로 둔다.
+그 아래 자동 turn 의 답은 대화의 에이전트가 쓴 답이라 PR1 의 이름표 그대로다(spec DECISION19).
+
+#### 승인 카드
+
+`GET /api/v1/chat/conversations/{id}/connector-actions` 의 한 줄에 `requestedBy` 를 더한다. 승인 줄의 `agent_id` 가 대화의 `agent_id` 와 다르면 그 에이전트의 `AgentLabel`, 같거나 비었으면 null 이다. 지운 에이전트는 네 칸이 null 인 이름표다.
+승인과 거절 응답(`POST .../approve`, `.../reject`)은 대화를 모르므로 이 칸을 싣지 않는다. 화면은 응답으로 카드를 바꿀 때 앞 값을 지킨다.
+화면은 카드 머리 위에 「이름표 + {이름}이 요청」 을 그린다. 묶음 카드 안의 한 건마다 같다.
+
+### 화면
+
+| 자리 | 그림 |
+| --- | --- |
+| 답 본문 아래 | 맡긴 줄. 「(맡은 에이전트 이름표) {대화 에이전트 이름} → {맡은 에이전트 이름}에게 맡김 · {상태}」. 작은 글자의 한 줄이고 여럿이면 실행 번호순으로 쌓는다 |
+| 기다림 줄 | 답 글이 아직 없는 turn 이 맡겼으면 기다림 점이나 작업 과정 아래에 같은 줄 |
+| 결과 알림 줄 | 결과마다 「(이름표) {이름}이 끝냈어요」. 가운데 정렬은 지금 알림 줄과 같다 |
+| 승인 카드 | 위 「승인 카드」 |
+
+**맡긴 줄은 답 본문 아래에 둔다.** 답 글 안 어디서 맡겼는지는 저장되지 않는다. 흐르는 동안 글 사이에 끼우면 새로 고친 뒤 자리가 달라진다. 흐르는 답(`AnswerReveal`)은 본문 칸 안에서만 자라므로 그 아래 줄은 밀려 내려갈 뿐 다시 그려지지 않는다.
+
+### 실패와 일관성
+
+- 위임 결과 알림 줄의 `system` 사건에도 `deliveredResults` 를 실어, 자동 turn 이 도는 동안에도 결과 도착 줄을 이름표로 그린다.
+- 맡긴 뒤 turn 이 답 줄 없이 실패하면 맡긴 줄을 붙일 답이 없어 대화에는 남지 않는다. 결과 도착 줄과 실행 트리로 본다.
+- 사건을 놓쳐도 줄은 이력이 갖는다. 대화 단위 SSE 가 다시 붙으면 화면이 이력을 다시 읽는 지금 규칙(`resumeAfterReconnect`)이 상태를 맞춘다.
+- `DelegationStarted` 와 `DelegationFinished` 를 받아 사건을 내다 실패하면 경고 로그만 남긴다. 위임 실행과 결과 전달은 이 사건에 기대지 않는다.
+- 서버가 다시 떠 기동 정리가 끝낸 위임도 `DelegationFinished` 를 내므로 같은 사건이 간다.
+- 배포 순서: 마이그레이션이 칸을 더한 뒤 새 이미지가 뜬다. 옛 이미지는 새 칸을 모르고 NULL 로 둔다. 그 사이 만든 묶음의 알림 줄은 글만 보인다.
+
+### 검증 전략
+
+| 요구사항 | 경계와 환경 |
+| --- | --- |
+| REQ3 | backend 통합 테스트: 이력 API 의 `delegations` 가 직접 위임만 싣고(손자, 위임이 아닌 자식 제외) 상태와 이름표, 지운 에이전트를 싣는다. `DelegationStarted`·`DelegationFinished` 가 그 대화의 대화 단위 구독에 `delegation` 사건을 내고 손자는 내지 않는다. 브라우저: 가짜 Hermes 의 위임 시나리오로 보낸 창의 진행 중 줄, 자식이 끝나면 새로 고치지 않고 「끝남」, 새로 고친 뒤 같은 줄 |
+| REQ4 | backend: 첫 시도가 `delegation_notice_message_id` 를 적고 다시 전달은 그대로 둔다. 이력 API 의 `deliveredResults` 가 그 줄에만 붙는다. 승인 줄 목록의 `requestedBy` 가 대화 에이전트와 다를 때만 붙는다. 브라우저: 결과 도착 줄의 이름표와 글, 그 아래 답의 비서 이름표, 승인 카드의 「○○이 요청」. 마이그레이션은 H2 와 CI 의 MySQL job |
+
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
@@ -166,6 +277,11 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 | DECISION6 | 할 수 있는 일의 모음 자리 | 새 port `AgentConnectorNames`, 기존 port `ProfileSkillFiles` 의 새 메서드, `AgentCapabilitiesReader` | 작성자 | `agent` 가 `skill`, `connector` 보다 아래다. 대시보드를 부를 수 있는 조회는 「부르지 않는다」 가 약속인 `AgentConnectorBindings` 와 섞지 않는다 |
 | DECISION7 | 기본 비서를 가리는 법 | 칸을 두지 않고 「주인의 기본 profile 을 가리키는 에이전트」 로 정한다. PR1 은 마이그레이션 조건에만 쓴다 | 작성자 | 첫 에이전트의 profile 이 기본 profile 이다(`FirstAgentCreator`). `agent.hermes_profile` 과 `allowed_person.hermes_profile` 이 둘 다 유일하다 |
 | DECISION8 | 플러그인 이름의 원본 | 카탈로그 캐시. 바인딩 행에 이름을 적어 두지 않는다 | 작성자 | 이름을 적으면 칸과 이관이 늘고 운영자가 이름을 바꿔도 남는다. 캐시의 실패 기억이 대기 시간을 묶는다 |
+| DECISION9 | 맡긴 줄의 실시간 경로 | 새 사건 `delegation` 을 대화 단위 SSE 로만 보낸다 | 작성자 | 위임은 turn 의 SSE 와 다른 스레드에서 돌고 turn 이 끝난 뒤에도 끝난다. 대화 단위 SSE 는 모든 창이 늘 연다. 기존 `subagent` 사건은 Hermes 안의 하위 에이전트라 뜻이 다르다 |
+| DECISION10 | 결과 알림 줄과 결과를 잇는 자리 | `result_delivery.delegation_notice_message_id` 컬럼 | 작성자 | 묶음은 마지막 알림 줄만 기억하고, 첫 시도는 승인 결과마다 알림 줄을 더 남긴다. `chat_message` 의 `SYSTEM` 줄은 `execution_id` 가 비어야 하고(data-schema), `items_json` 은 결과 목록이라 줄 번호를 섞지 않는다 |
+| DECISION11 | 결과 도착 줄의 글 | 저장된 글은 그대로 두고 화면이 이름과 상태로 결과마다 한 줄을 만든다 | 작성자 | 「○○ 외 N개」 한 줄은 여러 이름표를 보이지 못한다. 저장된 글을 바꾸면 이미 남은 줄과 글이 달라진다 |
+| DECISION12 | 옛 알림 줄 | 채우지 않고 글만 보인다 | 작성자 | 줄과 실행을 이을 근거가 시각 일치뿐이다 |
+| DECISION13 | 맡긴 줄의 자리 | 답 본문 아래 | 작성자 | 맡긴 자리가 저장되지 않아 새로 고친 뒤에도 같은 자리여야 한다(spec REQ3 「새로 고치거나 다른 기기에서 열어도 같은 줄」) |
 
 ## 결정 기록 연결
 

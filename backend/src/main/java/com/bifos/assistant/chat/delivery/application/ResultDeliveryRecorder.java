@@ -13,6 +13,7 @@ import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -78,11 +79,28 @@ public class ResultDeliveryRecorder {
     @Transactional
     public DeliveryAttemptRef open(
         Long conversationId, List<DeliveryItemRef> items, Long noticeMessageId, Instant now) {
+        return open(conversationId, items, noticeMessageId, null, now);
+    }
+
+
+    /**
+     * 위임 결과 알림 줄을 함께 적어 묶음을 저장한다. 결과 도착 줄이 맡은 에이전트의 이름표를 이 칸으로 찾는다.
+     *
+     * @param delegationNoticeMessageId 위임 결과 알림 줄. 묶음에 위임 결과가 없으면 null
+     * @throws IllegalArgumentException {@code items} 가 비었을 때
+     */
+    @Transactional
+    public DeliveryAttemptRef open(
+        Long conversationId,
+        List<DeliveryItemRef> items,
+        Long noticeMessageId,
+        Long delegationNoticeMessageId,
+        Instant now) {
         if (items.isEmpty()) {
             throw new IllegalArgumentException("a result delivery needs at least one item");
         }
         ResultDelivery delivery = deliveries.save(
-            ResultDelivery.opened(conversationId, itemsJson(items), noticeMessageId, now));
+            ResultDelivery.opened(conversationId, itemsJson(items), noticeMessageId, delegationNoticeMessageId, now));
         return new DeliveryAttemptRef(delivery.id(), delivery.attemptCount());
     }
 
@@ -146,6 +164,35 @@ public class ResultDeliveryRecorder {
             .forEach(delivery -> states.put(
                 delivery.lastAttemptNoticeMessageId(), new DeliveryState(delivery.id(), delivery.status())));
         return states;
+    }
+
+
+    /**
+     * 그 대화의 위임 결과 알림 줄 번호마다 그 줄이 전한 위임 실행 번호다. 묶음의 항목 순서다. 이력 API 가 결과 도착 줄의 이름표를
+     * 그리는 데 쓴다.
+     *
+     * <p>주인 확인은 부르는 쪽이 마친 번호로 부른다. 실행 번호로 읽지 못하는 항목은 뺀다.
+     */
+    public Map<Long, List<Long>> delegationResultsByNotice(Long conversationId) {
+        Map<Long, List<Long>> results = new HashMap<>();
+        for (ResultDelivery delivery : deliveries.findByConversationId(conversationId)) {
+            if (delivery.delegationNoticeMessageId() == null) {
+                continue;
+            }
+            List<Long> executionIds = new ArrayList<>();
+            for (DeliveryItemRef item : readItems(delivery.id(), delivery.itemsJson())) {
+                if (!DELEGATION_SOURCE.equals(item.source())) {
+                    continue;
+                }
+                try {
+                    executionIds.add(Long.valueOf(item.resultKey()));
+                } catch (NumberFormatException ex) {
+                    log.warn("실행 번호로 읽지 못하는 위임 결과 항목을 뺀다 deliveryId={}", delivery.id());
+                }
+            }
+            results.put(delivery.delegationNoticeMessageId(), executionIds);
+        }
+        return results;
     }
 
 

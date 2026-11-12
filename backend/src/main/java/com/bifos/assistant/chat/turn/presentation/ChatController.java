@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
@@ -334,6 +335,8 @@ public class ChatController {
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
+        Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);
+        Map<Long, List<DelegationLine>> deliveredResults = chat.deliveredResults(user, number);
         return history.stream()
             .map(it -> new MessageView(
                 it.id(),
@@ -357,7 +360,11 @@ public class ChatController {
                     ? null
                     : statuses.get(it.executionId()).name(),
                 deliveryOf(it, deliveries),
-                it.role() == MessageRole.ASSISTANT ? sourceReadByMessage.get(it.id()) : null))
+                it.role() == MessageRole.ASSISTANT ? sourceReadByMessage.get(it.id()) : null,
+                it.role() == MessageRole.ASSISTANT && it.executionId() != null
+                    ? delegations.getOrDefault(it.executionId(), List.of())
+                    : List.of(),
+                it.role() == MessageRole.SYSTEM ? deliveredResults.getOrDefault(it.id(), List.of()) : List.of()))
             .toList();
     }
 

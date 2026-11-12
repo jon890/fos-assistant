@@ -6,6 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
+import { DelegationLines } from "./delegation-lines";
+import { mergeDelegations, type DelegationLine } from "@/lib/delegation";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
@@ -54,6 +56,10 @@ type Props = {
   onMemoryCapturesChanged?(removedId?: number): void;
   /** 이 대화의 답마다 그 실행이 본문을 받은 기억이다. 각 답 아래에 그 답의 실행 것만 접어 보인다 */
   memoryUses?: MemoryUse[];
+  /** `delegation` 사건으로 받은 맡긴 줄이다. 이력의 줄과 합쳐 그 실행의 답 아래에 그린다 */
+  liveDelegations?: DelegationLine[];
+  /** 지금 도는 turn 의 실행 번호다. 아직 저장되지 않은 답과 기다림 줄이 이 번호의 맡긴 줄을 그린다 */
+  liveExecutionId?: number | null;
 };
 export function MessageList({
   turns,
@@ -80,6 +86,8 @@ export function MessageList({
   memoryCaptures = [],
   onMemoryCapturesChanged,
   memoryUses = [],
+  liveDelegations = [],
+  liveExecutionId = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollow = useRef(true);
@@ -161,7 +169,7 @@ export function MessageList({
   const usesVersion = memoryUses
     .map((use) => `${use.executionId}:${use.memoryId}`)
     .join(",");
-  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}`;
+  const contentVersion = `${turns.map((turn) => `${turn.id}:${turn.content.length}`).join("|")}:${sending}:${activity?.items.length}:${turnError}:${capturesVersion}:${usesVersion}:${outgoing?.items.map((item) => `${item.key}:${item.status}`).join("|")}:${liveDelegations.map((line) => `${line.executionId}:${line.status}`).join("|")}`;
   const hasLiveActivity = activity !== null && activity.items.length > 0;
   // 답이 아직 없으면 기다림 점이나 진행 중 블록이 비서 줄 하나에 들어온다. 답이 흘러나오면 그 답의 줄이 블록을 받는다.
   const pendingActivity = !streamedAnswer && hasLiveActivity;
@@ -278,6 +286,17 @@ export function MessageList({
                         memoryUses={memoryUses.filter(
                           (use) => use.executionId === turn.executionId,
                         )}
+                        delegations={
+                          turn.role === "ASSISTANT"
+                            ? mergeDelegations(
+                                turn.delegations,
+                                liveDelegations,
+                                pendingAssistant
+                                  ? liveExecutionId
+                                  : turn.executionId,
+                              )
+                            : undefined
+                        }
                         liveActivity={
                           pendingAssistant && hasLiveActivity
                             ? liveActivityBlock
@@ -324,6 +343,13 @@ export function MessageList({
                   className="animate-message-assistant"
                 >
                   {pendingActivity ? liveActivityBlock : <WaitingIndicator />}
+                  <DelegationLines
+                    lines={mergeDelegations(
+                      [],
+                      liveDelegations,
+                      liveExecutionId,
+                    )}
+                  />
                 </AssistantRow>
               ) : null}
               {turnError ? (

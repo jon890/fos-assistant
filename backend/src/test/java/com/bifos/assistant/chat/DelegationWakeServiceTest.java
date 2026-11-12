@@ -562,8 +562,10 @@ class DelegationWakeServiceTest {
             unsubscribe.run();
         }
 
-        assertThat(received).extracting(ChatEvent::type).containsSubsequence("system", "started", "done");
-        ChatEvent system = received.getFirst();
+        // 맡긴 줄의 상태 사건(delegation)도 같은 구독에 오지만 이 검사는 turn 의 사건만 본다.
+        List<ChatEvent> turnEvents = withoutDelegationLines(received);
+        assertThat(turnEvents).extracting(ChatEvent::type).containsSubsequence("system", "started", "done");
+        ChatEvent system = turnEvents.getFirst();
         assertThat(system.text()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(system.conversationId()).isEqualTo(conversation.publicId());
         assertThat(system.messageId())
@@ -615,7 +617,7 @@ class DelegationWakeServiceTest {
             unsubscribe.run();
         }
 
-        assertThat(received)
+        assertThat(withoutDelegationLines(received))
             .extracting(ChatEvent::type)
             .as("닫을 때와 뒤이은 사건이 다시 열지 않아 실패 알림은 하나다")
             .containsExactly("error");
@@ -623,6 +625,12 @@ class DelegationWakeServiceTest {
             .as("결과는 전하지 않은 채 남는다")
             .isNull();
         assertThat(turns.markOf(conversation.id()).running()).isFalse();
+    }
+
+
+    /** 맡긴 줄의 상태 사건을 뺀 turn 의 사건이다. 위임이 끝날 때마다 하나씩 온다. */
+    private static List<ChatEvent> withoutDelegationLines(List<ChatEvent> received) {
+        return received.stream().filter(event -> !"delegation".equals(event.type())).toList();
     }
 
 

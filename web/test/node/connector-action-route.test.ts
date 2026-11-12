@@ -268,6 +268,27 @@ test("승인 줄의 conversationGrantAllowed 는 참일 때만 참으로 옮긴�
   }
 });
 
+test("요청한 에이전트의 이름표는 네 칸만 옮기고 없으면 null 이다", async () => {
+  const { response } = await callRoute("approve", {
+    ...item({}),
+    requestedBy: {
+      code: "shopper",
+      name: "쇼핑 담당",
+      icon: "🛍️",
+      color: "ROSE",
+      extra: "버린다",
+    },
+  });
+  assert.deepEqual((await response.json()).requestedBy, {
+    code: "shopper",
+    name: "쇼핑 담당",
+    icon: "🛍️",
+    color: "ROSE",
+  });
+  const { response: none } = await callRoute("approve", item({}));
+  assert.equal((await none.json()).requestedBy, null);
+});
+
 test("원고 저장 요약은 계약의 칸만 옮기고 일반 줄은 null 이며 모양이 틀리면 고정 오류로 돌린다", async () => {
   const contentDraft = {
     snapshotId: ID,

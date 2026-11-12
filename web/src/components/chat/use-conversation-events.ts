@@ -245,6 +245,8 @@ export function useConversationEvents({
         role: "SYSTEM",
         content: event.text ?? "",
         senderName: null,
+        // 위임 결과 알림 줄은 전한 결과를 함께 받아, 이력을 다시 읽기 전에도 이름표 줄로 그린다.
+        deliveredResults: event.deliveredResults ?? undefined,
       };
       setTurns((previous) =>
         previous.some((turn) => turn.id === line.id)
