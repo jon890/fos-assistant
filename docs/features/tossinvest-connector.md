@@ -710,7 +710,7 @@ UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 
 | --- | --- | --- | --- |
 | 조건 snapshot 소비 계약 | 일반 주문 검증 이동·삭제와 Python·Spring 분기1310줄 배분; 여유190줄 | 공통 정상/거절 vector의 직접 Python 소비와 실제 Spring validate/capture/open; 일반 금융 회귀 | 기존 snapshot·ticket·claim 정의만 필요 |
 | 조건 SDK 준비와 단일전송 | TS 모듈·client와 guard982줄 배분; 여유518줄 | 실제 SDK→실제 Python loader/_prepare_result→합성 claim→loopback 목적지, 세 method/path/body/response 수신 및 retry 0 | 일반 금융 모듈과 조건 조회 모듈이 main에 존재해야 한다; 실제 DB producer와 운영 허가는 불필요 |
-| 실제 DB producer 통합 | 실측: 금융 관문 `ConnectorFinancialGate.amount` 의 조건주문 금액 규칙만 더했다. producer·승인·claim 은 그대로다 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
+| 실제 DB producer 통합 | 실측: 금융 관문 `ConnectorFinancialGate.amount` 의 조건주문 금액 규칙만 더했다. producer·승인·claim 은 그대로다 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태. MySQL 은 왕복·같은 의도·동시 승인만 다시 돌고 UNKNOWN 분류는 H2 에서 본다 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
 
 각 관심사는 설계·구현·회귀를 함께 담은 독립 PR이며 운영 변경 1500줄 상한과 파일 길이를 지킨다. 계획만 PR로 올리지 않는다.
 모든 관심사는 먼저 실패하는 회귀를 확인하고 같은 커밋에서 구현과 성공 증거를 남긴다. 직접 수신 counter는 auth POST/prepare GET/claim POST/금융 POST/DELETE로 나눈다.
@@ -888,11 +888,23 @@ ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서
 - 준비는 TX 밖에서 한 번 부르고, 사용자 잠금 아래에서 맥락을 다시 본 뒤 PENDING 줄, 암호화한 snapshot, 알림을 같은 TX 로 남긴다. 저장 summary 의 leg 와 단위는 open 한 실행 원문과 같다.
 - 준비 응답이 Spring 의 준비 읽기 제한(2초)을 넘으면 줄·snapshot·알림을 남기지 않고, 늦게 끝난 준비 결과도 저장하지 않는다.
 - 승인은 저장 원문을 그대로 보내고 준비와 UUID 생성을 다시 하지 않는다. 생성·정정은 금융 POST 1회, 취소는 DELETE 1회이고 같은 ticket 의 replay 는 0회다.
-- 같은 의도는 clientOrderId 나 기대 원주문만 달라도 실제 `ConnectorFinancialConflicts` 가 막는다. 다른 종목과 다른 대상 ID 는 막지 않는다. `supersedes_unknown_action_id` 는 NULL 이다. 막힌 새 요청도 읽기 전용 준비는 한 번 지난다.
-- 429·5xx·timeout·끊김·불량 2xx·allowlist 밖 code 는 UNKNOWN 이고 공식 거절은 FAILED 다. UNKNOWN 뒤 ticket 재발급과 추가 전송은 0회다.
-- 손상된 wire(추가 키, 숫자 decimal, SHA, 계좌 범위), 요청 뒤 바뀐 revision, 만료한 ticket, claim 전에 바뀐 현재 원주문(leg 상태, targetProfitRate, triggeredOrderId, expireDate)은 금융 0회다.
+- 같은 의도는 clientOrderId 나 기대 원주문만 달라도 실제 `ConnectorFinancialConflicts` 가 PENDING·EXECUTING·UNKNOWN 으로 막는다. 다른 종목과 다른 대상 ID 는 막지 않는다. `supersedes_unknown_action_id` 는 NULL 이다. 막힌 새 요청도 읽기 전용 준비는 한 번 지난다.
+- 429·5xx·timeout·끊김·불량 2xx·allowlist 밖 code 는 UNKNOWN 이고 공식 거절은 FAILED 다. 생성 응답의 clientOrderId 가 빠지거나 null 이어도 성공이다. UNKNOWN 뒤 ticket 재발급과 추가 전송은 0회다.
+- 손상된 wire(추가 키, 숫자 decimal, SHA, 계좌 범위), 요청 뒤 바뀐 revision, 만료한 ticket 은 claim 소비와 금융 전송이 0회다.
+- 승인 뒤 바뀐 현재 원주문(원주문 상태, leg 상태, targetProfitRate, triggeredOrderId, expireDate)은 claim 을 소비한 뒤 대조에서 걸려 FAILED 이고 금융 0회다.
+- OTO first 완료·second 감시 원주문의 취소와 PROFIT_RATE 원주문의 STOP 정정도 한 번 왕복한다.
+- 승인한 조건 생성은 하루 합계에 들고, 정정은 원주문 금액을 빼지 않고 바뀐 뒤 금액을 더한다.
 - 금융 성공 뒤 결과 저장이 실패하면 EXECUTING 으로 남고, 다시 승인하거나 기동 정리가 돌아도 재전송하지 않는다. 정리는 소비한 claim 을 UNKNOWN 으로 둔다.
 - 금액 규칙은 [커넥터 정책](connector-policy.md)의 `ConnectorFinancialGate` 문단이 갖는다.
+
+이 왕복이 조건주문으로 다시 확인하지 않은 것이다. 앞의 셋은 producer·승인·claim 이 주문 종류를 가리지 않는 같은 코드라 일반 주문 왕복(`FinancialConnectorProducerRoundTripTest`)이 지킨다.
+
+- owner·profile·manifest 변경과 연결 끊기 같은 요청 뒤 권한 변경
+- claim 과 기동 정리의 잠금 경합, 같은 의도의 동시 준비
+- 실행 직전 바뀐 바인딩과 꺼진 에이전트
+- 1 MiB 를 넘는 준비 응답과 cold auth·429 로 늦은 준비
+- KR 종목의 decimal 수량 왕복(대역 목적지가 US 종목만 준다)
+- claim 직전 철회 경쟁과, timeout 뒤 늦게 온 결과가 정산된 줄을 바꾸지 않는지
 ### 국내 종목 통계 계약
 
 통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.
