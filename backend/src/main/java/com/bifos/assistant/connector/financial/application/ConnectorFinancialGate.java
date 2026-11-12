@@ -33,7 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
  * 준비, 승인, claim 이 함께 지나는 금융 실행의 운영 관문이다.
  *
  * <p>keyed hash key, 계좌 허용 목록, 한 건과 하루 상한을 본다. 상한은 {@link FinancialOrderLimits} 가 정한 적용 상한이다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
- * 첫 개방은 일반 주문의 생성과 취소뿐이다. 일반 주문 정정과 조건주문 생성·정정은 금액 상한을 계산하지 않고 거절한다.
+ * 일반 주문은 생성과 취소만 지나고 정정은 금액 상한을 계산하지 않고 거절한다. 조건주문은 leg 의 큰 금액으로 상한을 보고 취소는 금액 없이 지난다.
  */
 @Slf4j
 @Component
@@ -148,9 +148,7 @@ public class ConnectorFinancialGate {
         require(args != null && args.isObject());
         boolean changesMoney = args.has("quantity") || args.has("orderAmount") || args.has("price");
         if (args.has("first") || args.has("conditionalOrderId")) {
-            // 조건주문은 첫 개방 대상이 아니다. 취소만 금액 없이 지나고 생성과 정정은 닫는다.
-            require(!args.has("first") && !changesMoney);
-            return Optional.empty();
+            return conditionalAmount(args, changesMoney);
         }
         if (args.has("orderId")) {
             // 일반 주문 정정은 첫 개방 대상이 아니다.
@@ -168,6 +166,32 @@ public class ConnectorFinancialGate {
             value = decimal(args.get("quantity")).multiply(decimal(args.get("price")));
         }
         return Optional.of(value);
+    }
+
+
+    /**
+     * 조건주문의 한 건 금액이다. leg 마다 수량 × max(주문가, 감시가) 를 보고 두 leg(OCO, OTO)는 큰 값을 쓴다.
+     * 감시가에 닿아 나가는 주문이 어느 leg 든 이 금액을 넘지 않게 하려는 것이다. 정정은 바뀐 뒤 금액이고 원주문 금액을 빼지 않는다.
+     * 주문가가 없는 시장가 조건주문은 금액을 미리 알 수 없어 닫는다. 취소는 금액이 없다.
+     */
+    private static Optional<BigDecimal> conditionalAmount(JsonNode args, boolean changesMoney) {
+        if (!args.has("first")) {
+            require(!changesMoney && !args.has("second"));
+            return Optional.empty();
+        }
+        require(Set.of("KRW", "USD").contains(args.path("currency").asString("")));
+        BigDecimal quantity = decimal(args.get("quantity"));
+        BigDecimal largest = BigDecimal.ZERO;
+        for (String name : List.of("first", "second")) {
+            JsonNode leg = args.get(name);
+            if (leg == null && "second".equals(name)) {
+                continue;
+            }
+            require(leg != null && leg.isObject() && leg.has("orderPrice"));
+            BigDecimal price = decimal(leg.get("orderPrice")).max(decimal(leg.get("triggerPrice")));
+            largest = largest.max(quantity.multiply(price));
+        }
+        return Optional.of(largest);
     }
 
 
