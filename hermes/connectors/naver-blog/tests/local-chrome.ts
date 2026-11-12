@@ -17,6 +17,11 @@ const HTML = `<!doctype html><meta charset="utf-8"><title>네이버 블로그 ·
 <div id="outside">synthetic-private-dom-marker</div>`;
 
 export const CHROME_STARTUP_MS = 30_000;
+/** DevTools HTTP 첫 응답을 기다리는 제한. 시작 대기와 합쳐 `beforeAll` 제한이 이보다 짧으면 안 된다. */
+export const CHROME_VERSION_MS = 30_000;
+/** `localChrome()` 을 부르는 `beforeAll` 의 제한. 최악의 대기(시작 + 첫 응답)에 여유를 더한다. */
+export const LOCAL_CHROME_HOOK_MS =
+  CHROME_STARTUP_MS + CHROME_VERSION_MS + 15_000;
 
 /** 전용 임시 profile과 합성 HTML만 사용한다. 실제 글쓰기 주소는 로컬 fixture로 바꾼다. */
 export async function localChrome({ now = () => performance.now() } = {}) {
@@ -183,7 +188,9 @@ export async function localChrome({ now = () => performance.now() } = {}) {
     const base = `http://127.0.0.1:${server.port}`;
     const url = base + "/synthetic-gateway";
     const version = (
-      (await httpJson(url, "/json/version", { timeoutMs: 30_000 })) as {
+      (await httpJson(url, "/json/version", {
+        timeoutMs: CHROME_VERSION_MS,
+      })) as {
         Browser: string;
       }
     ).Browser;
