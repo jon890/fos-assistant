@@ -33,7 +33,7 @@
 | Control Plane `connector` 모듈의 도구 판정 | 트리 루트의 표식을 읽어 `attended_only` 도구를 거절한다. 판정 함수는 지금처럼 `ToolPolicyDecision.decide` 하나다. `task` 모듈을 읽지 않는다 | PR1 |
 | 사용자 브라우저(`browser` 모듈)와 중계 | 플러그인은 기존 중계 주소로만 닿는다([사용자 브라우저](../user-browser.md)). 화면 세션이 확인 창을 보이고 사람이 고르게 한다 | PR2 |
 | fos-ctx `transform_tool_result` | 플러그인 결과의 `handoff` 칸을 Control Plane 에 알린다. 서비스 이름을 모른다 | PR2 |
-| Control Plane `connector.handoff` | 넘기기를 판정 줄에 적고 알림, 카드 목록, 새 turn 에서 닫기 | PR2 |
+| Control Plane `connector.handoff` | 넘기기를 판정 줄에 적고 알림, 카드 목록, 사람이 보낸 turn 에서 닫기 | PR2 |
 
 새 서비스, 새 테이블, 새 의존성은 없다. 데이터의 원본은 사용자의 네이버 계정과 「내 브라우저」 프로필이고, PR1 이 저장하는 것은 실행 줄의 표식 하나뿐이다.
 
@@ -293,7 +293,7 @@ sequenceDiagram
 
 | 자리 | 하는 일 |
 | --- | --- |
-| `connector.handoff` 하위 기능 | 알림 받기, 대화의 열린 넘기기 읽기, 새 turn 에서 닫기. `connector.action` 의 저장소와 `notification` 을 쓴다 |
+| `connector.handoff` 하위 기능 | 알림 받기, 대화의 열린 넘기기 읽기, 사람이 보낸 turn 에서 닫기. `connector.action` 의 저장소와 `notification` 을 쓴다 |
 | `POST /internal/hermes/connector-handoff` | profile 토큰 인증과 서명 확인. dedupe key(`ConnectorActionKey`)로 판정 줄을 찾고, 그 줄이 hook 에 통과로 답한(`passed`) 같은 등록 이름의 줄이 아니면 거절한다. 이미 넘기기가 적힌 줄은 바꾸지 않고 200 이다(hook 이 다시 보내도 알림은 한 건) |
 | `connector_action` 의 새 칸 | `handoff_need`, `handoff_tab`, `handoff_at`, `handoff_closed_at`. 새 테이블은 없다(spec 「테이블을 늘리지 않는다」) |
 | 알림 | `HANDOFF_REQUESTED`. 제목은 카드 제목, 본문은 플러그인 이름, 갈 곳은 그 대화, 원인은 그 판정 줄의 공개 번호다. 대화가 없는 줄(대화 밖 실행)은 넘기기를 적되 알림과 카드가 없다 |
