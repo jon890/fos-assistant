@@ -2,7 +2,7 @@
 
 엔티티와 Flyway를 같이 바꾸고 적용된 마이그레이션은 수정하지 않는다.
 
-검사: [MySQL 마이그레이션](../../backend/src/test/java/com/bifos/assistant/MysqlMigrationTest.java), [적용 파일 불변](../../test/unit/migration-immutable.test.ts), [마이그레이션 버전](../../scripts/checks/check-migration-versions.mjs), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [MySQL 마이그레이션](../../backend/src/test/java/com/bifos/assistant/MysqlMigrationTest.java), [적용 파일 불변](../../test/repo/migration-immutable.test.ts), [마이그레이션 버전](../../scripts/checks/check-migration-versions.mjs), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

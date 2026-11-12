@@ -2,7 +2,7 @@
 
 기능·ADR·구현 계획은 지정한 자리에 두고 끝난 계획은 지운다.
 
-검사: [문서 배치](../../test/unit/doc-files.test.ts), [ADR 목록](../../test/unit/adr-index.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [문서 배치](../../test/repo/doc-files.test.ts), [ADR 목록](../../test/repo/adr-index.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 
@@ -17,7 +17,7 @@
 
 ## 이 저장소의 사례
 
-[doc-files.test.ts](../../test/unit/doc-files.test.ts)에서 확인한다.
+[doc-files.test.ts](../../test/repo/doc-files.test.ts)에서 확인한다.
 doc-files 테스트는 정해진 문서 경로와 좁은 예외만 허용한다.
 
 ## 리뷰가 보는 것

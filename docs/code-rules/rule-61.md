@@ -2,7 +2,7 @@
 
 수가 정해지지 않은 목록과 비용 큰 탭은 자동 prefetch를 끈다.
 
-검사: [대화 요청 수](../../test/browser/conversation-requests.spec.ts), [사용량 탭](../../test/browser/usage.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [대화 요청 수](../../web/test/browser/conversation-requests.spec.ts), [사용량 탭](../../web/test/browser/usage.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 
@@ -15,7 +15,7 @@
 
 ## 이 저장소의 사례
 
-[conversation-requests.spec.ts](../../test/browser/conversation-requests.spec.ts)에서 확인한다.
+[conversation-requests.spec.ts](../../web/test/browser/conversation-requests.spec.ts)에서 확인한다.
 conversation-requests spec은 대화가 많은 사이드바의 미리 읽기 요청을 센다.
 
 ## 리뷰가 보는 것

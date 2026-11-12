@@ -48,12 +48,20 @@ Control Plane은 안전 판정에 쓰는 값만 구조로 정하고, 나머지�
 
 | 위치 | 확인하는 것 | 띄우는 것 |
 | --- | --- | --- |
-| `test/e2e/` | Control Plane 의 응답과 권한과 기록 | 가짜 Hermes, 백엔드, 데이터베이스 |
-| `test/browser/` | 화면의 배치와 동작 | 위에 더해 웹과 Chromium |
-| `test/unit/` | 화면이 쓰는 순수 함수 | 없음 |
-| `test/model-eval/` | 실제 모델이 운영 흐름에서 지시와 도구를 따르는가. CI 에서 돌지 않는다 | 운영 Control Plane, Hermes, 모델. 판정 규칙은 `test/unit/` 이 따로 검사한다 |
+| `web/test/unit/` | 화면이 쓰는 순수 함수와 소스 파일의 구조 | 없음 |
+| `web/test/node/` | 웹 API 라우트와 화면 함수. 웹의 `node_modules` 를 쓴다 | 없음 |
+| `web/test/browser/` | 화면의 배치와 동작 | 웹, Control Plane, 가짜 Hermes, Chromium |
+| `web/test/screenshots/` | 화면 둘러보기 스크린샷 | 브라우저 테스트와 같다 |
+| `test/e2e/` | Control Plane 의 응답과 권한과 기록 | 가짜 Hermes, 백엔드, 데이터베이스. 웹은 띄우지 않는다 |
+| `test/repo/` | 문서 링크와 파일 배치, 마이그레이션 불변과 버전, ADR 과 코드 규칙 목록처럼 여러 모듈에 걸친 저장소 규칙 | 없음 |
+| `test/model-eval/` | 실제 모델이 운영 흐름에서 지시와 도구를 따르는가. CI 에서 돌지 않는다 | 운영 Control Plane, Hermes, 모델. 판정 규칙은 그 폴더의 `*.test.ts` 가 따로 검사한다 |
+| `scripts/**/*.test.ts` | 그 스크립트의 동작. 스크립트 옆에 둔다 | 없음 |
 
-브라우저 테스트는 `mobile` 과 `desktop` 두 폭에서 돈다. 폭의 값은 `test/browser/playwright.config.ts` 가 갖는다.
+`test/support/`, `test/fixtures/`, `test/resources/` 는 여러 모듈이 함께 쓰는 부품과 자료다.
+부품의 단위 테스트는 부품 옆(`test/support/*.test.ts`, `test/e2e/unit/`)에 둔다.
+어디에 둘지는 [ADR-20261110 / test-layout](adr/ADR-20261110-test-layout.md) 이 정한다.
+
+브라우저 테스트는 `mobile` 과 `desktop` 두 폭에서 돈다. 폭의 값은 `web/test/browser/playwright.config.ts` 가 갖는다.
 
 **운영 코드에 시험용 문을 만들지 않는다.**
 로그인은 테스트가 NextAuth 세션 쿠키를 직접 만들어 넣는다.

@@ -2,7 +2,7 @@
 
 주석·문서·도메인 용어는 저장소 언어 규칙을 따른다.
 
-검사: [문서 참조](../../test/unit/doc-code-references.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [문서 참조](../../test/repo/doc-code-references.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

@@ -41,4 +41,4 @@
 
 - 코레일 화면이 바뀌면 조회가 `KORAIL_PAGE_CHANGED` 로 끝난다. 자리 표의 상당 부분이 확인하지 않은 가설이라, 사용자의 첫 실제 계정 확인에서 고칠 가능성이 높다
 - 플러그인 조회가 탐지에 걸리면 조회가 늘 `KORAIL_BOT_CHECK` 로 끝나 이 기능을 쓸 수 없다. 그때는 이 ADR 을 다시 연다
-- 코레일 이름은 플러그인과 그 검사·문서에만 있다. `test/unit/connector-neutral.test.ts` 가 Control Plane, 웹, 대시보드 plugin 에 들어오는 것을 막는다
+- 코레일 이름은 플러그인과 그 검사·문서에만 있다. `test/repo/connector-neutral.test.ts` 가 Control Plane, 웹, 대시보드 plugin 에 들어오는 것을 막는다

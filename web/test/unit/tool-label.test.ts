@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { isReadableDetail, toolLabel } from "../../src/lib/tool-label.ts";
+
+test("terminal 은 도는 중에 「작업하고 있어요」, 끝나면 「작업을 했어요」 다", () => {
+  assert.equal(toolLabel("terminal", true), "작업하고 있어요");
+  assert.equal(toolLabel("terminal", false), "작업을 했어요");
+});
+
+test("표에 있는 도구는 도는 줄과 끝난 줄의 말이 다르다", () => {
+  assert.equal(toolLabel("vision_analyze", true), "사진을 보고 있어요");
+  assert.equal(toolLabel("vision_analyze", false), "사진을 봤어요");
+  assert.equal(toolLabel("web_search", true), "검색하고 있어요");
+  assert.equal(toolLabel("web_search", false), "검색했어요");
+  assert.equal(toolLabel("skill_view", true), "스킬 안내를 읽고 있어요");
+  assert.equal(toolLabel("skill_view", false), "스킬 안내를 읽었어요");
+  assert.equal(toolLabel("memory_read", true), "기억을 떠올리고 있어요");
+  assert.equal(toolLabel("memory_read", false), "기억을 떠올렸어요");
+});
+
+test("MCP 도구는 마지막 __ 뒤의 이름으로 표를 찾는다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__artifact_write", true),
+    "결과물을 저장하고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__artifact_write", false),
+    "결과물을 저장했어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos__artifact_write", false),
+    "결과물을 저장했어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__follow_up_propose", true),
+    "할 일을 제안하고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__follow_up_propose", false),
+    "할 일을 제안했어요",
+  );
+});
+
+test("표에 없는 이름과 null 은 일반 문장이다", () => {
+  assert.equal(toolLabel("fake-tool", true), "도구를 쓰고 있어요");
+  assert.equal(toolLabel("fake-tool", false), "도구를 썼어요");
+  assert.equal(toolLabel(null, true), "도구를 쓰고 있어요");
+  assert.equal(toolLabel(null, false), "도구를 썼어요");
+});
+
+test("표에 없는 MCP 도구는 이름 원문 대신 연결된 서비스를 썼다고 보인다", () => {
+  assert.equal(
+    toolLabel("mcp__ledger__query", true),
+    "연결된 서비스를 쓰고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__ledger__query", false),
+    "연결된 서비스를 썼어요",
+  );
+  assert.equal(
+    toolLabel("mcp__other__unknown_tool", false),
+    "연결된 서비스를 썼어요",
+  );
+});
+
+test("Object 의 기본 속성 이름은 일반 문장이다", () => {
+  assert.equal(toolLabel("constructor", true), "도구를 쓰고 있어요");
+  assert.equal(
+    toolLabel("mcp__other__constructor", false),
+    "연결된 서비스를 썼어요",
+  );
+});
+
+test("검색어와 사진 질문만 줄에 바로 보여도 되는 detail 이다", () => {
+  assert.equal(isReadableDetail("web_search"), true);
+  assert.equal(isReadableDetail("vision_analyze"), true);
+  assert.equal(isReadableDetail("mcp__search__web_search"), true);
+  assert.equal(isReadableDetail("terminal"), false);
+  assert.equal(isReadableDetail("mcp__ledger__query"), false);
+  assert.equal(isReadableDetail(null), false);
+});
+
+test("memory_remember 는 기억해 두는 말로 보인다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_remember", true),
+    "기억해 두고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_remember", false),
+    "기억해 뒀어요",
+  );
+});
+
+test("memory_link 는 기억을 잇는 말로 보이고 내용을 보이지 않는다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_link", true),
+    "기억을 서로 잇고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_link", false),
+    "기억을 서로 이었어요",
+  );
+  assert.equal(isReadableDetail("mcp__fos_assistant__memory_link"), false);
+});
+
+test("memory_search 는 이름을 보여주지 않고 기억을 찾는 말로 보인다", () => {
+  for (const name of ["memory_search", "mcp__fos_assistant__memory_search"]) {
+    assert.equal(toolLabel(name, true), "기억을 찾고 있어요");
+    assert.equal(toolLabel(name, false), "기억을 찾았어요");
+    assert.equal(isReadableDetail(name), false);
+  }
+});
+
+test("원고 저장 요청 도구는 저장했다고 말하지 않고 승인을 요청했다고 보인다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__content_draft_preview", false),
+    "원고 미리보기를 만들었어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__content_draft_save", false),
+    "임시저장 승인을 요청했어요",
+  );
+  assert.doesNotMatch(
+    toolLabel("mcp__fos_assistant__content_draft_save", false),
+    /저장했어요/,
+  );
+});
+
+test("주문 상한 변경 도구는 바꿨다고 말하지 않고 변경을 요청했다고 보인다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__order_limit_read", false),
+    "주문 상한을 읽었어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__order_limit_change", false),
+    "주문 상한 변경을 요청했어요",
+  );
+  assert.doesNotMatch(
+    toolLabel("mcp__fos_assistant__order_limit_change", false),
+    /바꿨어요/,
+  );
+});

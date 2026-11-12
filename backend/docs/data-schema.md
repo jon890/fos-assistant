@@ -136,7 +136,7 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 두 정렬 규칙의 칸을 `=`, `<>`, `IN`, 조인 조건으로 비교하면 MySQL 이 오류 1267 로 거절한다. 줄이 하나도 없어도 거절한다.
 정렬 규칙을 적지 않고 만든 옛 표는 V58 부터 V65 까지가 맞췄다.
 
-- **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.** 검사는 `test/unit/migration-collation.test.ts` 와 실제 MySQL 의 `MysqlMigrationTest` 가 한다
+- **새 표에는 `ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci` 를 적는다.** 검사는 `test/repo/migration-collation.test.ts` 와 실제 MySQL 의 `MysqlMigrationTest` 가 한다
 - 문자열 비교는 대소문자와 악센트를 구분하지 않고 끝의 공백은 구분한다. 구분해야 하는 식별자 비교는 양쪽을 `CAST(... AS BINARY)` 로 감싼다
 - `COLLATE` 구절로 비교식의 정렬 규칙을 바꾸지 않는다. H2 가 받지 않아 H2 로 도는 검사가 실패한다
 - 숫자 키로 조인할 수 있으면 문자열 비교를 쓰지 않는다
@@ -154,7 +154,7 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 전용 리소스 `backend/src/main/resources/db/comments/V20261016075220.tsv`가 추가한다.
 리소스의 각 줄은 테이블, 컬럼, 설명을 탭으로 구분하고 컬럼이 `*`이면 테이블 설명이다.
 리소스도 Flyway 체크섬에 포함하므로 적용한 뒤 수정하지 않는다.
-운영 배포 뒤 `test/unit/migration-checksums.json`에 `comments/파일명.tsv`와 SHA-256을 등록한다.
+운영 배포 뒤 `test/repo/migration-checksums.json`에 `comments/파일명.tsv`와 SHA-256을 등록한다.
 `migration-immutable.test.ts`가 기존 SQL 파일과 함께 수정과 삭제를 막는다.
 MySQL은 `SHOW CREATE TABLE`의 컬럼 정의를 그대로 사용해 테이블마다 한 번의 `ALTER TABLE`로 묶는다.
 MySQL 8.4에서는 CHECK 제약이 참조하는 컬럼의 COMMENT 변경도 `INPLACE`를 거절할 수 있다.
@@ -183,7 +183,7 @@ Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unic
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `GroupSettingMysqlMigrationTest` 가 본보기다.
 
 **운영에 적용된 지 14일이 지난 마이그레이션의 데이터 검사는 지운다.**
-적용된 파일은 `test/unit/migration-immutable.test.ts` 와 Flyway checksum 이 바뀌지 않게 막는다. 그 파일의 데이터 변환은 운영에서 이미 한 번 돌았고, 새로 설치하는 DB 에는 옮길 줄이 없다. 이 검사가 새로 잡는 것은 H2, MySQL, Flyway 버전을 올렸을 때의 동작 차이뿐이라 오래 둘 값이 작다.
+적용된 파일은 `test/repo/migration-immutable.test.ts` 와 Flyway checksum 이 바뀌지 않게 막는다. 그 파일의 데이터 변환은 운영에서 이미 한 번 돌았고, 새로 설치하는 DB 에는 옮길 줄이 없다. 이 검사가 새로 잡는 것은 H2, MySQL, Flyway 버전을 올렸을 때의 동작 차이뿐이라 오래 둘 값이 작다.
 
 - 지우는 기준은 **운영 적용 뒤 14일**이다. 기준 버전은 운영 저장소의 Flyway 적용 기록에서 읽는다. 적용 시각이 14일 전보다 앞선 마지막 버전이 기준 버전이고, 그 버전 이하 마이그레이션의 `*MigrationTest` 와 `*MysqlMigrationTest` 가 지울 대상이다. 버전 칸은 문자열이라 옛 정수 버전(`V9`, `V54`)과 날짜 버전을 숫자로 비교한다
 - 전체 마이그레이션을 적용한 뒤 스키마를 보는 검사는, 그 검사가 보는 칸이나 제약을 만든 마이그레이션까지 모두 기준 버전 이하일 때만 지운다. 이름의 마이그레이션이 기준 이하여도 뒤 마이그레이션이 만든 칸을 보면 남긴다

@@ -2,7 +2,7 @@
 
 Memory 권한은 Control Plane이 정하고 비밀 원문은 DB에 두지 않는다.
 
-검사: [기억 비밀값 회귀](../../test/unit/memory-secrecy.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [기억 비밀값 회귀](../../web/test/unit/memory-secrecy.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 
@@ -17,7 +17,7 @@ key 원문을 DB에 넣는 것과 사용자 본문의 암호화 저장은 다르
 
 ## 이 저장소의 사례
 
-[memory-secrecy.test.ts](../../test/unit/memory-secrecy.test.ts)에서 확인한다.
+[memory-secrecy.test.ts](../../web/test/unit/memory-secrecy.test.ts)에서 확인한다.
 memory-secrecy 테스트가 비밀 본문이 응답에 남는 경로를 확인한다.
 
 ## 리뷰가 보는 것

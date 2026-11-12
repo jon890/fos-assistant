@@ -31,7 +31,7 @@ ArchRule 상수와 freeze 설명, 기준 파일의 열쇠는 바꾸지 않는다
 
 문서 경로는 루트 `docs/code-rules/INDEX.md`와 양의 정수 번호의 `rule-N.md`만 허용한다.
 모듈별 사본이나 하위 주제 디렉터리는 만들지 않는다.
-`test/unit/doc-files.test.ts`가 이 예외를 좁게 허용하고 `test/unit/rule-index.test.ts`가 파일·번호·문장·검사 연결 및 코드의 역참조를 확인한다.
+`test/repo/doc-files.test.ts`가 이 예외를 좁게 허용하고 `test/repo/rule-index.test.ts`가 파일·번호·문장·검사 연결 및 코드의 역참조를 확인한다.
 
 ### 대안 기각
 

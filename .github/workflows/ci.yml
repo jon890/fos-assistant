@@ -250,7 +250,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: chromium-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
-      # 웹 서버를 띄우기 전에 빌드하고 그 결과를 띄운다(test/browser/web-server.ts). 따로 빌드하지 않는다.
+      # 웹 서버를 띄우기 전에 빌드하고 그 결과를 띄운다(web/test/browser/web-server.ts). 따로 빌드하지 않는다.
       - name: 브라우저 shard 검사
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
@@ -467,7 +467,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: node --test 'test/unit/**/*.test.ts'
+      - run: node --test 'test/**/*.test.ts' 'scripts/**/*.test.ts'
       - name: 로컬 검사 스크립트 회귀 테스트
         run: python3 -I test/e2e/financial/test_local_check.py
       - name: 마이그레이션 버전 검사

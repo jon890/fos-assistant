@@ -13,7 +13,7 @@
 #
 # 사용법: scripts/dev/check-local.sh [--fast | --skip-browser] [브라우저 spec ...]
 # --fast 는 Draft PR 을 열기 전에 쓴다. 몇 분 안에 끝나는 단계만 돈다.
-#   공개 정보, PR 크기, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, test/unit, 품질(컴파일과 구조 규칙, 포맷) 검사다.
+#   공개 정보, PR 크기, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, 루트 test/ 와 scripts/ 의 단위 테스트, 품질(컴파일과 구조 규칙, 포맷) 검사다.
 #   공개 정보 검사는 push 하면 되돌릴 수 없으므로 빼지 않고 맨 앞에 둔다.
 #   이 검사는 추적 파일의 지금 내용만 본다. 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
 #   SQL·Java 마이그레이션이나 purge fixture 가 바뀌면 PurgeClassificationTest 만 추가로 돌린다.
@@ -42,7 +42,7 @@ if [ "${skip_browser}" = true ] && [ "$#" -gt 0 ]; then
   exit 2
 fi
 
-# test/e2e 와 test/unit 은 Node 의 TypeScript 실행을 쓴다.
+# test/e2e 와 루트 단위 테스트(test/**, scripts/**)는 Node 의 TypeScript 실행을 쓴다.
 node_version="$(node -p 'process.versions.node')"
 if ! node -e 'const [a]=process.versions.node.split(".").map(Number); process.exit(a>=24?0:1)'; then
   echo "Node 24 이상이 필요하다. 지금은 ${node_version} 이다." >&2
@@ -150,7 +150,7 @@ if [ "${fast}" = true ]; then
   check_purge_classification
   step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
   step web-test        pnpm --dir "${ROOT}/web" test:node
-  step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
+  step unit            bash -c "cd '${ROOT}' && node --test 'test/**/*.test.ts' 'scripts/**/*.test.ts'"
   step quality         bash -c "cd '${ROOT}' && scripts/checks/quality.sh check"
   echo "빠른 검사를 모두 통과했다. 나머지는 Draft CI 가 확인한다."
   exit 0
@@ -177,7 +177,7 @@ else
   echo "관련 화면 spec 이 없어 브라우저 검사를 생략한다. 전체 검사는 PR CI 가 확인한다."
 fi
 step e2e             bash -c "cd '${ROOT}' && node test/e2e/run.ts"
-step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
+step unit            bash -c "cd '${ROOT}' && node --test 'test/**/*.test.ts' 'scripts/**/*.test.ts'"
 step connectors      bash "${ROOT}/scripts/checks/check-connectors.sh"
 step hermes          check_hermes
 step public-safe     "${ROOT}/scripts/checks/check-public-safe.sh"

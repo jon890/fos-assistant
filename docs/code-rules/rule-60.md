@@ -16,5 +16,5 @@
 
 ## 이 저장소의 사례
 
-[README.md](../../test/browser/README.md)에서 확인한다.
+[README.md](../../web/test/browser/README.md)에서 확인한다.
 browser README는 개발 서버와 빌드 서버의 차이 및 테스트의 독립성을 설명한다.
