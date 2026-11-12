@@ -101,8 +101,10 @@ class Fixture(sdk.ConditionalSdkCase):
                 body = {"result": {}}
             else:
                 sent = json.loads(raw)
-                body = {"result": {"conditionalOrderId": "cond-new",
-                                   **({"clientOrderId": sent["clientOrderId"]} if sent.get("clientOrderId") else {})}}
+                # 공식상 clientOrderId 는 응답에서 빠지거나 null 일 수 있다.
+                echoed = {"no-client-id": {}, "null-client-id": {"clientOrderId": None}}.get(
+                    self.mode, {"clientOrderId": sent["clientOrderId"]} if sent.get("clientOrderId") else {})
+                body = {"result": {"conditionalOrderId": "cond-new", **echoed}}
         reply(handler, status, body)
 
     async def gateway(self, path, method, body=None, token="valid"):

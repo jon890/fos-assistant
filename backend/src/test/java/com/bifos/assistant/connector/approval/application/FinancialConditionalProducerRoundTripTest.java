@@ -10,7 +10,11 @@ import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionTicket;
+import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
+import com.bifos.assistant.connector.approval.application.dto.FinancialPrepareStage;
 import com.bifos.assistant.connector.financial.application.FinancialLimitExceeded;
+import com.bifos.assistant.connector.financial.config.ConnectorFinancialProperties;
+import java.math.BigDecimal;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
@@ -28,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -176,6 +181,18 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
     }
 
 
+    @ParameterizedTest
+    @DisplayName("생성 응답의 clientOrderId 가 빠지거나 null 이어도 성공으로 정산한다")
+    @ValueSource(strings = {"no-client-id", "null-client-id"})
+    void createAnswerWithoutClientOrderIdSucceeds(String mode) {
+        configure(mode);
+        var requested = request(CREATE, model(CREATE));
+        assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(action(requested).resultText()).contains("cond-new");
+        assertThat(counters().path("financial").intValue()).isEqualTo(1);
+    }
+
+
     @Test
     @DisplayName("공식 거절 응답은 재시도 없이 FAILED 로 남는다")
     void officialRejectionIsFailed() {
@@ -204,13 +221,17 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
     @DisplayName("같은 의도는 clientOrderId 나 기대 원주문만 달라도 막고, 다른 종목과 다른 대상은 막지 않는다")
     void sameIntentUsesActualConflicts() {
         // 준비마다 clientOrderId 가 새로 생기지만 같은 의도다.
-        request(CREATE, create("abc"));
-        assertThatThrownBy(() -> request(CREATE, create("ABC"))).isInstanceOf(ApiException.class);
+        var first = request(CREATE, create("abc"));
+        assertConflict(() -> request(CREATE, create("ABC")));
+        // 승인으로 넘어간 EXECUTING 도 같은 의도를 막는다.
+        jdbc.update("update connector_action set status = 'EXECUTING' where id = ?", action(first).id());
+        assertConflict(() -> request(CREATE, create("ABC")));
+        jdbc.update("update connector_action set status = 'PENDING' where id = ?", action(first).id());
         assertThat(action(request(CREATE, create("XYZ"))).status()).isEqualTo(ActionStatus.PENDING);
         request(MODIFY, modify("cond-1"));
         // 기대 원주문만 바뀐 같은 정정이다.
         original(Map.of("status", "WATCHING"));
-        assertThatThrownBy(() -> request(MODIFY, modify("cond-1"))).isInstanceOf(ApiException.class);
+        assertConflict(() -> request(MODIFY, modify("cond-1")));
         original(Map.of("conditionalOrderId", "cond-2"));
         assertThat(action(request(MODIFY, modify("cond-2"))).status()).isEqualTo(ActionStatus.PENDING);
         assertThat(action(request(CANCEL, "{\"conditionalOrderId\":\"cond-2\"}")).status()).isEqualTo(ActionStatus.PENDING);
@@ -220,18 +241,27 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
     }
 
 
+    private void assertConflict(ThrowingCallable call) {
+        // 준비 실패와 같은 의도 차단은 같은 오류 코드를 쓴다. 단계로 실제 conflicts 의 차단인지 가린다.
+        assertThatThrownBy(call).isInstanceOfSatisfying(FinancialPrepareRejected.class, rejected -> assertThat(rejected.stage())
+            .isIn(FinancialPrepareStage.CONFLICT, FinancialPrepareStage.CONFLICT_PENDING, FinancialPrepareStage.CONFLICT_PENDING_ELSEWHERE));
+    }
+
+
     @ParameterizedTest
-    @DisplayName("claim 전에 바뀐 현재 원주문은 금융 요청을 보내지 않는다")
-    @ValueSource(strings = {"status", "targetProfitRate", "triggeredOrderId", "expireDate"})
+    @DisplayName("승인 뒤 바뀐 현재 원주문은 claim 을 소비한 뒤 대조에서 걸려 금융 요청을 보내지 않는다")
+    @ValueSource(strings = {"status", "legStatus", "targetProfitRate", "triggeredOrderId", "expireDate"})
     void changedOriginalSendsNothing(String change) {
         var requested = request(MODIFY, model(MODIFY));
         switch (change) {
             case "status" -> original(Map.of("status", "COMPLETED"));
+            case "legStatus" -> secondLeg("status", "HOLDING");
             case "targetProfitRate" -> secondLeg("targetProfitRate", "1.5");
             case "triggeredOrderId" -> secondLeg("triggeredOrderId", "ord-9");
             default -> original(Map.of("expireDate", expireDate()));
         }
-        assertThat(approval.approve(user, requested.actionId()).status()).isIn(ActionStatus.FAILED, ActionStatus.UNKNOWN);
+        assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(contents.findById(action(requested).id()).orElseThrow().consumedAt()).isNotNull();
         assertThat(counters().path("financial").intValue()).isZero();
     }
 
@@ -257,9 +287,10 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
                     "argsSha256", "sha".equals(change) ? "0".repeat(64) : sent.argsSha256())),
                 properties.dashboardToken());
             assertThat(answer.path("ok").asBoolean(false)).as("plugin 응답=%s", answer).isFalse();
+            // 상태는 이 대역이 돌려준 거절로 정산된다. 증거는 위 plugin 거절과 아래 claim 미소비, 금융 0회다.
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
         }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
-        assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.FAILED);
+        approval.approve(user, requested.actionId());
         assertThat(contents.findById(action(requested).id()).orElseThrow().consumedAt()).isNull();
         assertThat(counters().path("financial").intValue()).isZero();
     }
@@ -341,6 +372,48 @@ class FinancialConditionalProducerRoundTripTest extends FinancialConnectorTestBa
             + expireDate() + "\",\"first\":{\"orderSide\":\"BUY\",\"triggerPrice\":\"95\"}}";
         assertThatThrownBy(() -> request(CREATE, market)).isInstanceOf(ApiException.class);
         assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("승인한 조건 생성이 하루 합계에 들고 정정은 원주문 금액을 빼지 않고 바뀐 뒤 금액을 더한다")
+    void conditionalOrdersCountTowardDailyTotal() {
+        // 생성 220 USD 를 보낸 뒤 하루 상한을 349 로 낮춘다. 정정 130 USD 를 더하면 350 이라 막힌다.
+        assertThat(approval.approve(user, request(CREATE, model(CREATE)).actionId()).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var base = gate.current();
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(owned("7"), base.maxOrderAmountKrw(),
+            base.maxOrderAmountUsd(), base.maxOrderQuantity(), base.maxDailyAmountKrw(), new BigDecimal("349"), TEST_DIGEST_KEY));
+        assertThatThrownBy(() -> request(MODIFY, model(MODIFY))).isInstanceOfSatisfying(FinancialLimitExceeded.class,
+            exceeded -> assertThat(exceeded.kind()).isEqualTo(FinancialLimitKind.DAILY_AMOUNT_USD));
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(owned("7"), base.maxOrderAmountKrw(),
+            base.maxOrderAmountUsd(), base.maxOrderQuantity(), base.maxDailyAmountKrw(), new BigDecimal("350"), TEST_DIGEST_KEY));
+        assertThat(action(request(MODIFY, model(MODIFY))).status()).isEqualTo(ActionStatus.PENDING);
+        // 취소는 금액이 없어 하루 합계가 꽉 차도 지난다.
+        assertThat(action(request(CANCEL, model(CANCEL))).status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(counters().path("financial").intValue()).isEqualTo(1);
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("OTO first 완료·second 감시 원주문의 취소와 PROFIT_RATE 원주문의 STOP 정정도 한 번 왕복한다")
+    @ValueSource(strings = {"oto-cancel", "profit-rate-modify"})
+    void roundTripsOriginalVariants(String variant) {
+        ObjectNode current = (ObjectNode)fixture("current-original", Map.of()).path("original").deepCopy();
+        if ("oto-cancel".equals(variant)) {
+            current.put("status", "ORDERED");
+            ((ObjectNode)current.get("first")).put("status", "COMPLETED");
+            ((ObjectNode)current.get("second")).put("status", "WATCHING");
+        } else {
+            for (String leg : List.of("first", "second")) {
+                ((ObjectNode)current.get(leg)).put("type", "PROFIT_RATE").put("targetProfitRate", "5").putNull("triggerPrice");
+            }
+        }
+        fixture("original", current);
+        String tool = "oto-cancel".equals(variant) ? CANCEL : MODIFY;
+        var requested = request(tool, model(tool));
+        assertThat(snapshot(requested).summaryJson()).contains(variant.equals("oto-cancel") ? "COMPLETED" : "PROFIT_RATE");
+        assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(counters().path("financial").intValue()).isEqualTo(1);
     }
 
 

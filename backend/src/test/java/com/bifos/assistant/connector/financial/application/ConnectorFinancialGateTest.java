@@ -233,6 +233,10 @@ class ConnectorFinancialGateTest {
         // 주문가 없는 시장가 조건주문과 통화 없는 조건 정정은 금액을 정할 수 없다.
         "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"orderSide\":\"BUY\",\"triggerPrice\":\"10\"}}",
         "{\"conditionalOrderId\":\"c\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"}}",
+        // 수량이 없거나 second 만 주문가가 없거나 second 가 null 이면 닫는다.
+        "{\"currency\":\"KRW\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"}}",
+        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"},\"second\":{\"triggerPrice\":\"1\"}}",
+        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"},\"second\":null}",
         // 조건 취소에 수량을 싣지 않는다.
         "{\"conditionalOrderId\":\"c\",\"currency\":\"KRW\",\"quantity\":\"1\"}",
         // 모르는 통화와 숫자 decimal 은 닫는다.
