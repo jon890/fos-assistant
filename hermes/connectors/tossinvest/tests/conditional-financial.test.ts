@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { Tossinvest, clearClientState } from "../src/client.ts";
 import { conditionalResult } from "../src/conditional-result.ts";
+import { checkExpireDate } from "../src/conditional-body.ts";
 import { prepareConditionalTrade } from "../src/prepare-conditional.ts";
 import { observeRateLimit, queueRequest, clock } from "../src/rate-limit.ts";
 import { UNKNOWN } from "../src/trading-body.ts";
@@ -620,5 +621,25 @@ for (const [label, change] of [
     } finally {
       fake.stop();
     }
+  });
+}
+
+for (const [today, value, valid] of [
+  ["2026-11-12T03:00:00Z", "2026-11-12", true],
+  ["2026-11-12T03:00:00Z", "2026-11-11", false],
+  ["2026-11-12T03:00:00Z", "2027-11-12", true],
+  ["2026-11-12T03:00:00Z", "2027-11-13", false],
+  // UTC 15시는 KST 다음 날이다.
+  ["2026-11-12T15:30:00Z", "2026-11-12", false],
+  ["2026-11-12T15:30:00Z", "2027-11-13", true],
+  // 윤년의 2월 29일은 다음 해에 없으므로 말일이 상한이다.
+  ["2028-02-29T03:00:00Z", "2029-02-28", true],
+  ["2028-02-29T03:00:00Z", "2029-03-01", false],
+  ["2026-11-12T03:00:00Z", "2027-02-30", false],
+] as const) {
+  test(`만료일 경계 KST ${today} 기준 ${value}: ${valid ? "통과" : "거절"}`, () => {
+    const check = () => checkExpireDate(value, Date.parse(today));
+    if (valid) expect(check).not.toThrow();
+    else expect(check).toThrow(INVALID);
   });
 }
