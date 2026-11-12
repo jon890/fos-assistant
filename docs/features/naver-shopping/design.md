@@ -14,7 +14,7 @@
 | REQ5 | PR1 | `hermes/tests/test_connectors_contract.py` 에 도구 이름 모양, 설명 첫 문장의 영어 요지, 플러그인 사이 도구 이름 중복 검사를 더한다 |
 | REQ6 | PR1 | 도구 선언에 범용 칸 `attended_only` 를 더한다. turn 을 열 때 실행 줄에 「사람이 없는 실행」 표식을 남기고, Control Plane 의 도구 판정이 그 트리의 호출을 거절한다 |
 | REQ7 | PR2 | 플러그인 오류의 `handoff` 칸을 fos-ctx `transform_tool_result` hook 이 Control Plane 에 알리고, 판정 줄에 적은 넘기기로 웹이 카드를 그린다. 알림은 `HANDOFF_REQUESTED`. 아래 「PR2 화면 넘기기」 |
-| REQ8 | PR2 | 「다 했어요」 가 정해 둔 글을 다음 메시지로 보내고, 새 turn 시작이 열린 넘기기를 닫는다. 플러그인은 다음 호출에서 남긴 탭을 닫는다 |
+| REQ8 | PR2 | 「다 했어요」 가 정해 둔 글을 다음 메시지로 보내고, 사람이 보낸 turn 의 시작이 열린 넘기기를 닫는다. 플러그인은 다음 호출에서 남긴 탭을 닫는다 |
 | REQ9 | PR3 | `app_user` 의 상한 컬럼 둘과 연결 화면. 아래 「PR3 방향」 |
 | REQ10 | PR3 | 금융 준비 틀의 서버 요약 카드. 아래 「PR3 방향」 |
 | REQ11 | PR3 | 승인 뒤 한 번 실행하는 주문서 채우기. 아래 「PR3 방향」 |
@@ -214,7 +214,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 | REQ5 | 계약 검사 | 일부러 틀린 선언 사본(영어 요지 없음, 이름 한 낱말)이 실패하는지 `ContractCatchesViolationsTest` 에 더한다. 이름 중복은 두 플러그인을 임시 루트에 복사해 한쪽 이름을 다른 쪽과 같게 바꾼 뒤 교차 검사가 잡는지 본다 |
 | REQ6 | 대시보드, Control Plane | `connector_policy.py` 의 칸 검증 테스트. `ToolPolicyDecisionTest` 에 사람이 없는 실행 × `attended_only` × 위험도 표와 순서. 표식은 `ChatTurnLifecycle` 테스트에서 의도마다 적히는지 보고, 예약 작업은 `TaskRunStarter` 로 연 turn 이 도는 동안 도구 판정을 불러 거절되는지 통합 테스트으로 본다(fixture 로 표식을 미리 채우지 않는다). 맡긴 일의 결과 turn 이 사람이 없는 트리의 결과면 거절되고, 보통 대화와 그 위임 자식은 허용되는지 |
 | REQ7 | 플러그인, fos-ctx, Control Plane, 웹 | 플러그인: 가짜 CDP 로 사람이 해야 하는 화면의 오류에 `handoff` 가 실리고 남긴 탭 id 가 맞는지, 최종 호스트가 네이버가 아니면 `PAGE_CHANGED` 로 탭을 닫는지. fos-ctx: `test_fos_ctx.py` 에서 결과 모양(글로 싼 `error` 포함)마다 보내는지와 서명, 실패해도 결과가 그대로인지. Control Plane: 서명·판정 줄 대조·한 번만 적기·알림 한 건, 대화의 목록이 주인에게만 보이는지. 웹: 카드 단추와 `/browser?tab=` 링크, 첫 `tabs` 사건에서 탭 옮기기 |
-| REQ8 | Control Plane, 웹 | 새 turn 시작 사건이 그 대화의 열린 넘기기만 닫고 알림을 읽음으로 바꾸는지(`ConnectorHandoffEndpointTest`). 「다 했어요」 가 정해 둔 글을 보내는지. 플러그인이 다음 호출에서 남긴 탭을 먼저 닫는지 |
+| REQ8 | Control Plane, 웹 | 사람이 보낸 turn 의 시작 사건이 그 대화의 열린 넘기기만 닫고 알림을 읽음으로 바꾸는지, 자동 turn 의 시작 사건은 닫지 않는지(`ConnectorHandoffEndpointTest`). 「다 했어요」 가 정해 둔 글을 보내는지. 플러그인이 다음 호출에서 남긴 탭을 먼저 닫는지 |
 | #702 | Control Plane, 웹 | 가짜 CDP 연결로 `Page.javascriptDialogOpening` 이 `dialog` 사건이 되고, `dialog` 입력이 `Page.handleJavaScriptDialog` 를 보내는지, 탭을 옮기면 창을 거두는지(`BrowserScreenSessionTest`). 입력 검사 표. 웹 화면의 창 단추 |
 
 실제 네이버 화면과 계정은 이 작업에서 쓰지 못한다. 기능 파일의 「실제 계정으로 확인하기」 를 사용자가 배포 뒤 돈다. 그 전까지 REQ2, REQ3 은 가짜 화면에서만 확인된 것으로 PR 본문에 적는다.
@@ -243,14 +243,14 @@ sequenceDiagram
   W->>CP: 대화의 넘기기 카드 읽기
   W->>W: 「내 브라우저 열기」 → /browser?tab=<탭>
   W->>CP: 「다 했어요」 → 다음 메시지
-  CP->>CP: 새 turn 시작 → 그 대화의 열린 넘기기를 닫고 알림을 읽음
+  CP->>CP: 사람이 보낸 turn 시작 → 그 대화의 열린 넘기기를 닫고 알림을 읽음
 ```
 
 1. 플러그인이 사람이 해야 하는 화면에서 멈추면 지금처럼 그 탭을 남기고 선언된 오류로 끝난다. 오류 본문에 `handoff: {need, tab}` 을 더한다. `need` 는 아래 어휘 하나, `tab` 은 남긴 탭의 CDP target id 다
 2. 바인딩 profile 의 fos-ctx `transform_tool_result` hook 이 플러그인 서버 도구의 결과에서 그 칸을 찾으면 Control Plane 에 서명해 알린다. 결과 글은 바꾸지 않고 지금처럼 `<external-data>` 로 감싼다
 3. Control Plane 은 같은 호출의 판정 줄을 dedupe key 로 찾아 넘기기를 적고, 대화가 있는 줄이면 알림(`HANDOFF_REQUESTED`) 한 건을 만든다. 실행은 멈추지 않는다. 모델은 오류를 받고 turn 을 마친다(spec DECISION11)
 4. 웹은 대화의 열린 넘기기를 입력창 위의 카드로 그린다. 카드의 종류와 탭은 이 줄에서만 온다. 모델이 쓴 글로 그리지 않는다
-5. 「다 했어요」 는 정해 둔 글을 그 대화의 다음 메시지로 보낸다. 입력창에 직접 답해도 같다(spec DECISION24). 새 turn 이 시작되면 그 대화의 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다
+5. 「다 했어요」 는 정해 둔 글을 그 대화의 다음 메시지로 보낸다. 입력창에 직접 답해도 같다(spec DECISION24). 사람이 보낸 turn 이 시작되면 그 대화의 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 담당의 결과를 전하는 자동 turn 은 닫지 않는다
 6. 에이전트가 멈춘 도구를 다시 부르면 플러그인이 앞서 남긴 탭을 먼저 닫는다. 아직 같은 화면이면 새 탭을 남기고 카드가 다시 뜬다(REQ8)
 
 ### 넘기기 어휘
@@ -297,7 +297,7 @@ sequenceDiagram
 | `POST /internal/hermes/connector-handoff` | profile 토큰 인증과 서명 확인. dedupe key(`ConnectorActionKey`)로 판정 줄을 찾고, 그 줄이 hook 에 통과로 답한(`passed`) 같은 등록 이름의 줄이 아니면 거절한다. 이미 넘기기가 적힌 줄은 바꾸지 않고 200 이다(hook 이 다시 보내도 알림은 한 건) |
 | `connector_action` 의 새 칸 | `handoff_need`, `handoff_tab`, `handoff_at`, `handoff_closed_at`. 새 테이블은 없다(spec 「테이블을 늘리지 않는다」) |
 | 알림 | `HANDOFF_REQUESTED`. 제목은 카드 제목, 본문은 플러그인 이름, 갈 곳은 그 대화, 원인은 그 판정 줄의 공개 번호다. 대화가 없는 줄(대화 밖 실행)은 넘기기를 적되 알림과 카드가 없다 |
-| 닫기 | `chat` 의 turn 시작(`ChatTurnLifecycle.begin`)이 `ConversationTurnStarted` 사건을 낸다. `connector.handoff` 가 커밋 뒤 그 대화의 열린 넘기기에 `handoff_closed_at` 을 적고 그 알림을 `resolve` 한다. `chat` 은 `connector` 를 모른다(지금 `connector` 가 `chat` 을 import 해 반대 방향은 순환이다) |
+| 닫기 | `chat` 의 turn 시작(`ChatTurnLifecycle.begin`)이 `ConversationTurnStarted` 사건을 낸다. 사건은 사람이 보낸 turn 인지(`byUser`)를 싣고, 결과 전달 같은 자동 turn 은 거짓이다. `connector.handoff` 가 `byUser` 일 때만 커밋 뒤 그 대화의 열린 넘기기에 `handoff_closed_at` 을 적고 그 알림을 `resolve` 한다. `chat` 은 `connector` 를 모른다(지금 `connector` 가 `chat` 을 import 해 반대 방향은 순환이다) |
 | `GET /api/v1/chat/conversations/{id}/handoffs` | 주인의 대화의 열린 넘기기. `{handoffId, connectorId, connectorTitle, need, tab, createdAt}` 목록, 최신 것부터 |
 
 사람이 없는 실행(예약 작업, 먼저 살펴보기)도 넘기기를 적을 수 있다. `attended_only` 도구는 그 실행에서 이미 거절되므로 쇼핑에서는 생기지 않는다. 다른 플러그인이 그런 실행에서 넘기면 그 대화에 카드와 알림이 생긴다.
@@ -352,7 +352,7 @@ sequenceDiagram
 | DECISION11 | 화면 넘기기의 결과 전달 경로 | (c) fos-ctx `transform_tool_result` hook 이 플러그인 결과의 `handoff` 칸을 서명해 Control Plane 에 알린다 | 작성자 | 모델과 플러그인에 기대지 않는다. (a) 답 끝 태그는 모델이 빠뜨리면 카드가 뜨지 않아 REQ7 을 보장하지 못한다. (b) 플러그인이 직접 알리려면 중계 밖의 운영 주소와 인증이 플러그인에 들어가 `operator_env` 금지(ADR-064)와 부딪친다. hook 은 이미 같은 토큰과 서명으로 판정을 묻고 있다. hook 이 실패하면 카드가 없지만 모델은 오류를 받아 글로 안내한다 |
 | DECISION12 | 넘기기 칸의 선언 | `assistant.json` 에 선언하지 않고 플러그인 결과에만 싣는다. Control Plane 은 어휘와 모양, 같은 호출의 판정 줄만 본다 | 작성자 | 결과를 만드는 것은 플러그인 소스다. 선언에 두면 대시보드 검증과 카탈로그 전달을 함께 늘려야 한다. 플러그인이 틀린 `need` 를 내면 받지 않아 카드가 없을 뿐이다 |
 | DECISION13 | 넘기기를 둘 자리 | 같은 호출의 판정 줄(`connector_action`)에 칸 넷 | 작성자 | 테이블을 늘리지 않는다. 판정 줄이 이미 사용자, 에이전트, 대화, 실행, 플러그인을 갖고 dedupe key 로 hook 의 호출과 하나로 맞는다 |
-| DECISION14 | 카드를 닫는 때 | 그 대화의 다음 turn 이 시작될 때. 사건으로 알려 `chat` 이 `connector` 를 모르게 한다 | 작성자 | spec DECISION24. `connector` 가 이미 `chat` 을 import 해 직접 부르면 순환이다 |
+| DECISION14 | 카드를 닫는 때 | 그 대화에서 사람이 보낸 다음 turn 이 시작될 때(결과 전달 같은 자동 turn 은 제외, 2026-11-12). 사건으로 알려 `chat` 이 `connector` 를 모르게 한다 | 작성자 | spec DECISION24. `connector` 가 이미 `chat` 을 import 해 직접 부르면 순환이다 |
 | DECISION15 | 남긴 탭을 닫는 때 | 플러그인의 다음 탭 열기 도구가 새 탭을 열기 전에 | 작성자 | 다음 호출은 새 turn 에서 오므로 사람의 일은 끝났다. 탭 id 를 Control Plane 에 묻지 않아 플러그인이 중계 밖에 닿지 않는다 |
 | DECISION16 | 「내 브라우저 열기」 | 새 창으로 `/browser?tab=` 을 열고 웹이 첫 `tabs` 사건에서 그 탭으로 옮긴다 | 작성자 | 대화 화면을 떠나지 않는다. 화면 중계에 탭 고르기 입력이 이미 있어 서버 경로가 늘지 않는다 |
 | DECISION17 | 확인 창(#702) | 플러그인이 읽는 탭은 닫기로 넘기고, 그 밖의 탭은 화면이 창을 보이고 사람이 고른다 | 사용자 2026-11-10(방향), 작성자(나눔) | 읽는 탭은 사람이 보지 않고, 넘긴 탭은 사람의 탭이다. 플러그인이 넘긴 탭의 창을 누르지 않는다 |
