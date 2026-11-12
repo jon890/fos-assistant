@@ -125,3 +125,23 @@ test("대화방의 요약 알림 줄은 첫 줄과 「요약 보기」 로 보�
   await summary.getByText("요약 보기").click();
   await expect(summary.getByText("등산 준비를 이야기했다")).toBeVisible();
 });
+
+test("기본 비서의 상세에는 지우기 단추가 없고 지울 수 없다는 안내가 보인다", async ({
+  page,
+}, testInfo) => {
+  await signInAsNewPerson(page, testInfo);
+  const listed = await page.request.get("/api/agents");
+  expect(listed.ok()).toBeTruthy();
+  const primary = ((await listed.json()) as { code: string; primary?: boolean }[]).filter(
+    (agent) => agent.primary === true,
+  );
+  expect(primary, "기본 비서는 하나다").toHaveLength(1);
+
+  await page.goto(`/agents/${primary[0]!.code}`);
+
+  const section = page.getByRole("region", { name: "공개와 삭제" });
+  await expect(section.getByText("기본 비서는 지울 수 없어요.")).toBeVisible();
+  await expect(section.getByRole("button", { name: "에이전트 지우기" })).toHaveCount(0);
+  // 공개 범위 변경은 그대로 쓸 수 있다.
+  await expect(section.getByRole("button", { name: /변경$/ })).toBeVisible();
+});

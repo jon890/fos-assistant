@@ -133,6 +133,7 @@ export async function loadAgentDetail(
     ? agentsResult.data.find((agent) => agent.code === code)
     : undefined;
   const canManageAccess = listed?.editable === true || adminAgent !== undefined;
+  const primary = listed?.primary === true;
   const listHref = admin ? "/admin/agents" : "/agents";
   // 관리자 목록의 줄이 남의 비공개 에이전트에도 있으므로 먼저 본다. 할 수 있는 일은 일반 목록에만 있다.
   const introductionSource = adminAgent ?? listed;
@@ -162,6 +163,7 @@ export async function loadAgentDetail(
           initialVisibility={visibility}
           adminAgent={adminAgent}
           canManageAccess={canManageAccess}
+          primary={primary}
           adminError={null}
           listHref={listHref}
           introduction={introduction}
@@ -195,6 +197,7 @@ export async function loadAgentDetail(
       initialVisibility={visibility}
       adminAgent={adminAgent}
       canManageAccess={canManageAccess}
+      primary={primary}
       adminError={adminError}
       listHref={listHref}
       chatHref={chatHref}
