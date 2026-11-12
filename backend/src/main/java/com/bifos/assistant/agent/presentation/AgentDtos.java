@@ -64,6 +64,7 @@ public final class AgentDtos {
      * @param editable 요청자가 이 에이전트를 관리할 수 있다. 주인과 {@code ADMIN} 이다. 화면이 공개와 삭제를
      * 보일지 이 값으로 정한다
      * @param ownedByMe 요청자가 이 에이전트의 주인이다
+     * @param primary 이 에이전트가 요청자의 기본 비서다. 기본 비서는 지울 수 없어 화면이 지우기 단추를 감춘다
      * @param description 한 줄 소개. 없으면 null
      * @param icon {@code AgentIntroduction.ICONS} 의 이모지. 없으면 null
      * @param color {@code AgentColor} 의 이름. 없으면 null
@@ -76,11 +77,13 @@ public final class AgentDtos {
         boolean acceptsAttachments,
         boolean editable,
         boolean ownedByMe,
+        boolean primary,
         String description,
         String icon,
         String color,
         CapabilitiesView capabilities) {
-        static AgentView from(Agent agent, boolean editable, boolean ownedByMe, AgentCapabilities capabilities) {
+        static AgentView from(
+            Agent agent, boolean editable, boolean ownedByMe, boolean primary, AgentCapabilities capabilities) {
             return new AgentView(
                 agent.code(),
                 agent.name(),
@@ -88,6 +91,7 @@ public final class AgentDtos {
                 agent.acceptsAttachments(),
                 editable,
                 ownedByMe,
+                primary,
                 agent.description(),
                 agent.icon(),
                 agent.color() == null ? null : agent.color().name(),

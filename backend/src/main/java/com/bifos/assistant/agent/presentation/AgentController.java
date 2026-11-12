@@ -3,6 +3,7 @@ package com.bifos.assistant.agent.presentation;
 import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.application.dto.AgentCapabilities;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
@@ -15,6 +16,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,6 +37,7 @@ public class AgentController {
     private final CurrentUserProvider currentUser;
     private final AgentLifecycleService lifecycle;
     private final AgentCapabilitiesReader capabilitiesReader;
+    private final PrimaryAgents primaryAgents;
 
 
     /** 요청자가 쓸 수 있는 에이전트를 준다. 추천 질문은 에이전트마다 따로 읽는다. */
@@ -43,8 +46,13 @@ public class AgentController {
         CurrentUser user = currentUser.require();
         List<Agent> readable = agents.readableBy(user);
         Map<Long, AgentCapabilities> capabilities = capabilitiesReader.read(readable);
+        Optional<Long> primaryId = primaryAgents.of(user).map(Agent::id);
         return readable.stream()
-            .map(agent -> view(user, agent, capabilities.getOrDefault(agent.id(), AgentCapabilities.NONE)))
+            .map(agent -> view(
+                user,
+                agent,
+                capabilities.getOrDefault(agent.id(), AgentCapabilities.NONE),
+                primaryId.filter(id -> Objects.equals(id, agent.id())).isPresent()))
             .toList();
     }
 
@@ -90,15 +98,17 @@ public class AgentController {
         AgentCapabilities capabilities = agent.isReadableBy(user.id())
             ? capabilitiesReader.read(List.of(agent)).getOrDefault(agent.id(), AgentCapabilities.NONE)
             : AgentCapabilities.NONE;
-        return view(user, agent, capabilities);
+        boolean primary = primaryAgents.of(user).map(Agent::id).filter(id -> Objects.equals(id, agent.id())).isPresent();
+        return view(user, agent, capabilities, primary);
     }
 
 
-    private AgentView view(CurrentUser user, Agent agent, AgentCapabilities capabilities) {
+    private AgentView view(CurrentUser user, Agent agent, AgentCapabilities capabilities, boolean primary) {
         return AgentView.from(
             agent,
             agents.isEditableBy(user, agent),
             Objects.equals(agent.ownerUserId(), user.id()),
+            primary,
             capabilities);
     }
 }

@@ -18,6 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bifos.assistant.agent.application.AgentCapabilitiesReader;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
+import com.bifos.assistant.agent.application.PrimaryAgents;
+import com.bifos.assistant.agent.application.port.ReservedProfileNames;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -31,10 +33,12 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -53,8 +57,14 @@ class AgentControllerLifecycleTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentCapabilitiesReader capabilitiesReader = mock(AgentCapabilitiesReader.class);
+    private final ReservedProfileNames reservedProfileNames = mock(ReservedProfileNames.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new AgentController(new AgentService(agents), currentUser, lifecycle, capabilitiesReader))
+        new AgentController(
+            new AgentService(agents),
+            currentUser,
+            lifecycle,
+            capabilitiesReader,
+            new PrimaryAgents(agents, reservedProfileNames)))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -186,6 +196,26 @@ class AgentControllerLifecycleTest {
             .andExpect(jsonPath("$[1].code").value("a-shared"))
             .andExpect(jsonPath("$[1].editable").value(false))
             .andExpect(jsonPath("$[1].ownedByMe").value(false));
+    }
+
+
+    @Test
+    @DisplayName("목록은 요청자의 기본 비서에만 primary 를 참으로 준다")
+    void marksOnlyRequestersPrimaryAgentInList() throws Exception {
+        Agent primary = agent("a-primary", AgentVisibility.PRIVATE, KID.id());
+        ReflectionTestUtils.setField(primary, "id", 1L);
+        Agent other = agent("a-other", AgentVisibility.PRIVATE, KID.id());
+        ReflectionTestUtils.setField(other, "id", 2L);
+        when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(primary, other));
+        when(reservedProfileNames.profileOf(KID.email())).thenReturn(Optional.of("kid"));
+        when(agents.findByHermesProfileAndDeletedAtIsNull("kid")).thenReturn(Optional.of(primary));
+
+        mvc.perform(get("/api/v1/agents"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].code").value("a-primary"))
+            .andExpect(jsonPath("$[0].primary").value(true))
+            .andExpect(jsonPath("$[1].code").value("a-other"))
+            .andExpect(jsonPath("$[1].primary").value(false));
     }
 
 
