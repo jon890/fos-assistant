@@ -12,6 +12,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
+import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
@@ -66,6 +67,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 /**
  * 맡긴 일의 결과가 끝나면 부모 대화의 turn 이 자동으로 열리는지 본다.
@@ -75,6 +78,7 @@ import org.springframework.context.ApplicationEventPublisher;
  */
 @BackendIntegrationTest
 @DelegationWakeEnabled
+@RecordApplicationEvents
 class DelegationWakeServiceTest {
 
     private static final Duration WAIT_LIMIT = Duration.ofSeconds(10);
@@ -90,6 +94,9 @@ class DelegationWakeServiceTest {
     /** 자동 turn 이 결과를 전하기 전에 실패하는 경우를 만들려고 감싼다. 그 밖의 검사에서는 실제 동작 그대로다. */
     @Autowired
     ChatService chat;
+
+    @Autowired
+    ApplicationEvents recordedEvents;
 
     @Autowired
     DelegationWakeService wake;
@@ -245,6 +252,20 @@ class DelegationWakeServiceTest {
                 + "결과마다 [출처: …] 줄이 있다. 출처가 다른 내용이 서로 어긋나면 하나를 고르지 말고 두 출처와 시각을 함께 말한다. "
                 + "사용자가 받아들인 기억과 외부 결과가 어긋나면 기억을 고치지 말고, 바꿀 것이 있으면 사용자에게 묻는다. "
                 + "신선도가 오래됨인 결과는 지금 상태와 다를 수 있다고 알린다.");
+    }
+
+
+    @Test
+    @DisplayName("결과를 전하는 자동 turn 의 시작 사건은 사람이 보낸 turn 이 아니라고 알린다")
+    void autoTurnStartIsNotByUser() {
+        finished(delegated(root, ExecutionStatus.SUCCEEDED, "조사 결과", null));
+        awaitIdle(conversation.id());
+
+        assertThat(recordedEvents.stream(ConversationTurnStarted.class))
+            .filteredOn(event -> event.conversationId().equals(conversation.id()))
+            .singleElement()
+            .extracting(ConversationTurnStarted::byUser)
+            .isEqualTo(false);
     }
 
 
