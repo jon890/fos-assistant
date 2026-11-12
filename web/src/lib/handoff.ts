@@ -1,10 +1,17 @@
 /** 사람이 해야 하는 단계다. Control Plane 의 `HandoffNeed` 와 같은 목록이다. */
-export type HandoffNeed = "LOGIN" | "CAPTCHA" | "DEVICE_CHECK";
+export type HandoffNeed =
+  | "LOGIN"
+  | "CAPTCHA"
+  | "DEVICE_CHECK"
+  | "BOT_CHECK"
+  | "UNEXPECTED_PAGE";
 
 export const HANDOFF_NEEDS: readonly HandoffNeed[] = [
   "LOGIN",
   "CAPTCHA",
   "DEVICE_CHECK",
+  "BOT_CHECK",
+  "UNEXPECTED_PAGE",
 ];
 
 /** 대화의 화면 넘기기 카드 하나다. 카드는 이 응답으로만 그린다. 모델이 쓴 글은 들어 있지 않다. */
@@ -37,6 +44,14 @@ export const HANDOFF_TEXT: Record<
   DEVICE_CHECK: {
     title: "「내 브라우저」에서 기기 인증을 해 주세요",
     done: "「내 브라우저」에서 기기 인증을 마쳤어요. 멈춘 단계부터 이어서 해 주세요.",
+  },
+  BOT_CHECK: {
+    title: "「내 브라우저」에서 자동 접속 확인을 풀어 주세요",
+    done: "「내 브라우저」에서 자동 접속 확인을 마쳤어요. 멈춘 단계부터 이어서 해 주세요.",
+  },
+  UNEXPECTED_PAGE: {
+    title: "「내 브라우저」에서 화면을 확인해 주세요",
+    done: "「내 브라우저」에서 화면을 확인했어요. 멈춘 단계부터 이어서 해 주세요.",
   },
 };
 
