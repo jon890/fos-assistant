@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
 import manifest from "../assistant.json";
+import { ToolError, toolFailure } from "../src/errors.ts";
 import { createServer } from "../src/server.ts";
 import { BROWSER_URL_ENV, checkLogin } from "../src/session.ts";
 import { startFakeBrowser, type FakeBrowser } from "./fake-browser.ts";
@@ -72,6 +73,24 @@ test("도구 오류는 코드만 싣고 중계 주소를 싣지 않는다", asyn
     error: { code: "KORAIL_BROWSER_UNREACHABLE" },
   });
   expect(text).not.toContain("gateway-token");
+});
+
+test("화면 넘기기는 isError 없는 결과에 status, 안내, 넘기기 칸을 싣고 그 밖의 실패는 isError 다", () => {
+  const handoff = toolFailure(
+    new ToolError("KORAIL_BOT_CHECK", null, { need: "bot_check", tab: "TAB1" }),
+  );
+  expect("isError" in handoff).toBe(false);
+  const body = JSON.parse(handoff.content[0]!.text);
+  expect(body.status).toBe("HUMAN_ACTION_REQUIRED");
+  expect(body.message).toContain("다시 부르지 않는다");
+  expect(body.handoff).toEqual({
+    code: "KORAIL_BOT_CHECK",
+    need: "bot_check",
+    tab: "TAB1",
+  });
+  expect(toolFailure(new ToolError("KORAIL_REJECTED", "거절"))).toMatchObject({
+    isError: true,
+  });
 });
 
 test("선언은 입력 칸이 없고 모든 도구가 사람이 연 대화의 읽기이며 로그인 화면 주소가 코레일이다", () => {

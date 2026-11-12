@@ -20,26 +20,33 @@ export async function searchTrains(
 ) {
   const cdpUrl = browserUrl(env);
   const query = checkSearch(args, deps.now?.() ?? new Date());
-  const raw = await deps.search(cdpUrl, query, deps.tab);
-  try {
-    const trains = parseTrains(parseJson(raw), query);
-    return {
-      query: {
-        departure: query.departure,
-        arrival: query.arrival,
-        date: query.date,
-        time_from: args.time_from,
-        adults: query.adults,
-        children: query.children,
-        seniors: query.seniors,
-        seat_class: query.seat_class,
-      },
-      count: trains.length,
-      trains,
-    };
-  } catch (error) {
-    if (!(error instanceof MissingFields)) throw error;
-    logDiagnostic("search_trains", "parse", error.fields);
-    throw new ToolError("KORAIL_PAGE_CHANGED");
-  }
+  // 목록은 탭 안에서 읽는다. 칸이 비면 탭을 남긴 예상 밖 화면 넘기기가 된다.
+  const trains = await deps.search(
+    cdpUrl,
+    query,
+    (raw) => {
+      try {
+        return parseTrains(parseJson(raw), query);
+      } catch (error) {
+        if (!(error instanceof MissingFields)) throw error;
+        logDiagnostic("search_trains", "parse", error.fields);
+        throw new ToolError("KORAIL_PAGE_CHANGED");
+      }
+    },
+    deps.tab,
+  );
+  return {
+    query: {
+      departure: query.departure,
+      arrival: query.arrival,
+      date: query.date,
+      time_from: args.time_from,
+      adults: query.adults,
+      children: query.children,
+      seniors: query.seniors,
+      seat_class: query.seat_class,
+    },
+    count: trains.length,
+    trains,
+  };
 }

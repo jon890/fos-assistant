@@ -23,7 +23,9 @@ description: 사용자가 KTX 열차를 찾아 달라고 할 때 「내 브라�
 
 ## 막혔을 때
 
-| 오류 | 사용자에게 |
+로그인, 매크로 탐지, 보안 문자, 예상 밖 화면에서 멈추면 오류가 아니라 `status` 가 `HUMAN_ACTION_REQUIRED` 인 결과가 온다. 성공이 아니고 결과가 없다. 코드는 `handoff.code` 에 있고 아래 표의 해당 줄을 따른다. 나머지 실패는 `error.code` 로 온다.
+
+| 코드 | 사용자에게 |
 | --- | --- |
 | `KORAIL_LOGIN_REQUIRED` | 「내 브라우저」 에서 코레일에 로그인해 달라고 한다 |
 | `KORAIL_BOT_CHECK` | 코레일이 매크로로 의심해 막았다. 「내 브라우저」 의 남은 탭에서 안내를 직접 확인하고, 잠시 뒤에 다시 요청해 달라고 한다. 바로 다시 부르지 않는다 |
@@ -31,7 +33,7 @@ description: 사용자가 KTX 열차를 찾아 달라고 할 때 「내 브라�
 | `KORAIL_UNKNOWN_STATION` | 역 이름을 다시 묻는다 |
 | `KORAIL_REJECTED` | 오류의 `message` 가 코레일이 보인 까닭이다. 그대로 전한다 |
 | `KORAIL_DATE_UNAVAILABLE` | 지난 날짜이거나 아직 예매할 수 없는 날짜라고 알린다 |
-| `KORAIL_PAGE_CHANGED` | 코레일 화면이 바뀌어 읽지 못했다고 알린다. 다시 부르지 않는다 |
+| `KORAIL_PAGE_CHANGED` | 코레일 화면이 예상과 달라 읽지 못했다. 「내 브라우저」 에 남은 탭의 화면을 확인해 달라고 하고, 사용자가 확인했다고 하기 전에는 다시 부르지 않는다 |
 | `KORAIL_INVALID_INPUT` | 조건을 다시 묻는다 |
 | `KORAIL_UNAVAILABLE` | 잠시 뒤 다시 요청해 달라고 한다. 바로 다시 부르지 않는다 |
 | `KORAIL_BROWSER_UNREACHABLE` | 브라우저를 켜는 중일 수 있다. 잠시 뒤 다시 요청해 달라고 한다 |

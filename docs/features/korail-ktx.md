@@ -42,13 +42,13 @@ MCP 서버 이름은 `korail-ktx` 다. 두 도구 모두 `READ`, 승인 없음, 
 3. 공지 층을 닫고, 출발역, 도착역, 날짜와 시, 인원을 넣은 뒤 「열차 조회」 를 한 번 누른다
 4. 목록 화면(`/ticket/search/list`)에서 공지 층을 닫고 「서울·용산 - 수서 함께 보기」(칸이 있고 안 골랐을 때만), 「KTX/KTX-산천」 탭, 특실(고른 때만)을 누른다. 「일반석」 과 「직통」 은 기본값이라 누르지 않는다. 누른 뒤에는 같은 목록이 두 번 이어 나올 때까지 읽는다
 5. 고정 식 하나로 목록을 꺼내 플러그인 안에서 결과로 바꾼다
-6. 로그인·매크로 탐지·보안 문자 화면이면 그 탭을 남기고 끝난다. 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. 전체 제한 시간은 60초, 단계 하나가 자리를 기다리는 시간은 10초다
+6. 로그인·매크로 탐지·보안 문자 화면과 예상 밖 화면이면 그 탭을 남기고 넘기기 결과로 끝난다. 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. 전체 제한 시간은 60초, 단계 하나가 자리를 기다리는 시간은 10초다
 
 - 자리는 `src/fields.ts` 의 CSS 선택자나 XPath 로 CDP `DOM.performSearch` 가 찾고, 누르기와 글 넣기는 `Input.*` 로 한다. 단계는 `src/steps.ts` 의 표이고 예매·결제·「다음」 단추의 자리가 없다
 - 탭에서 부르는 식은 `src/expressions.ts` 의 상수뿐이다. `Runtime.enable` 을 부르지 않는다
 - 사람 속도 간격과 조회 간격 제한을 두지 않는다. 자동 재시도도 없다(spec DECISION9)
 - 기다림은 하나의 함수가 맡고 기다리는 동안 매번 화면을 분류한다. 사람이 해야 하는 화면은 시간 초과보다 먼저 잡힌다
-- 자리 표의 상당 부분은 실제 화면으로 확인하지 않은 가설이다. 무엇을 봤고 무엇이 가설인지는 `src/fields.ts` 의 주석과 설계의 「공개 화면 확인 결과」 가 갖는다. 필수 자리가 없거나 목록 칸이 비면 `KORAIL_PAGE_CHANGED` 로 끝나고 표준 오류에 `{"korail_diagnostic":{"tool","stage","missing"}}` 한 줄을 남긴다. 단계 이름과 칸 이름만 싣고 역 이름, 날짜, 화면 글은 싣지 않는다
+- 자리 표의 상당 부분은 실제 화면으로 확인하지 않은 가설이다. 무엇을 봤고 무엇이 가설인지는 `src/fields.ts` 의 주석과 설계의 「공개 화면 확인 결과」 가 갖는다. 필수 자리가 없거나 목록 칸이 비면 그 탭을 남긴 `KORAIL_PAGE_CHANGED` 넘기기(`unexpected_page`)로 끝나고 표준 오류에 `{"korail_diagnostic":{"tool","stage","missing"}}` 한 줄을 남긴다. 단계 이름과 칸 이름만 싣고 역 이름, 날짜, 화면 글은 싣지 않는다
 
 ### 화면 분류
 
@@ -56,15 +56,18 @@ MCP 서버 이름은 `korail-ktx` 다. 두 도구 모두 `READ`, 승인 없음, 
 
 | 분류 | 판정 | 결과 |
 | --- | --- | --- |
-| 로그인 | 주소가 `/ticket/login` 이다 | `KORAIL_LOGIN_REQUIRED`, 탭을 남긴다 |
-| 매크로 탐지 | 「안내 메시지」 층에 「매크로」 와 `CODE : -8xxx` 가 있다 | `KORAIL_BOT_CHECK`, 탭을 남긴다 |
-| 보안 문자 | 보안 문자 요소가 보인다 | `KORAIL_CAPTCHA`, 탭을 남긴다 |
+| 로그인 | 주소가 `/ticket/login` 이다 | `KORAIL_LOGIN_REQUIRED`, 탭을 남기고 `login` 넘기기 |
+| 매크로 탐지 | 「안내 메시지」 층에 「매크로」 와 `CODE : -8xxx` 가 있다 | `KORAIL_BOT_CHECK`, 탭을 남기고 `bot_check` 넘기기 |
+| 보안 문자 | 보안 문자 요소가 보인다 | `KORAIL_CAPTCHA`, 탭을 남기고 `captcha` 넘기기 |
 | 거절 | JS 대화상자가 떴거나 「안내 메시지」 층이 위가 아닌 글을 보인다 | `KORAIL_REJECTED`, 그 글을 200자까지 `message` 로 싣는다 |
 | 정상 | 위가 아니다 | 다음 단계를 잇는다 |
 
 캡차 그림을 읽거나 답을 넣는 코드, 탐지 안내의 「확인」 을 누르는 코드는 없다.
 
-이 플러그인은 아직 화면 넘기기 결과(`handoff`)를 내지 않는다. 위 로그인·보안 문자·매크로 탐지는 지금 `isError` 오류이고 카드와 알림이 뜨지 않으며, 연속 3회면 Hermes 가 이 서버를 60초 막는다. 넘기기를 붙일 때 네이버 쇼핑과 같은 `isError` 없는 결과로 낸다([ADR-20261111](../adr/ADR-20261111-connector-handoff.md)).
+## 화면 넘기기
+
+위 로그인·매크로 탐지·보안 문자와 예상 밖 화면(필수 단계의 자리가 없다, 목록 화면으로 가지 않는다, 목록 칸이 비거나 모양이 틀리다)은 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}` 로 끝난다([ADR-20261111 / connector-handoff](../adr/ADR-20261111-connector-handoff.md)). `code` 는 아래 오류 표의 서버 코드이고 `need` 는 `login`, `bot_check`, `captcha`, `unexpected_page` 가운데 하나, `tab` 은 남긴 탭의 id 다. `isError` 가 아니라 Hermes 의 연속 실패 정지에 걸리지 않는다. fos-ctx 가 알려 대화에 카드와 알림이 뜨고, 사람이 마친 뒤 에이전트가 조회를 다시 부른다.
+남긴 탭의 id 는 MCP 서버 프로세스 메모리에만 있고 다음 조회가 새 탭을 열기 전에 닫는다. 확인 도구(`check_korail_login`)는 탭을 열지 않아 넘기지 않는다. 흐름은 [사람이 도와야 하는 지점 설계](user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 가 갖는다.
 
 ## 오류
 
@@ -75,10 +78,10 @@ MCP 서버 이름은 `korail-ktx` 다. 두 도구 모두 `READ`, 승인 없음, 
 | `KORAIL_DATE_UNAVAILABLE` | `invalid_input` | | 날짜가 오늘(KST)보다 이르거나 코레일 달력에 그날이 없다(예매 기간 밖) |
 | `KORAIL_REJECTED` | `invalid_input` | | 코레일이 대화상자나 안내 층으로 거절했다 |
 | `KORAIL_BROWSER_UNREACHABLE` | `unavailable` | `retry_later` | 중계에 닿지 않거나 비었다 |
-| `KORAIL_LOGIN_REQUIRED` | `credential_rejected` | `reconnect` | 코레일 쿠키가 없거나 로그인 화면으로 넘어갔다 |
-| `KORAIL_CAPTCHA` | `unavailable` | | 보안 문자 화면이다 |
-| `KORAIL_BOT_CHECK` | `unavailable` | | 매크로 탐지 화면이다 |
-| `KORAIL_PAGE_CHANGED` | `unavailable` | | 자리나 목록 칸이 기대한 모양이 아니다 |
+| `KORAIL_LOGIN_REQUIRED` | `credential_rejected` | `reconnect` | 코레일 쿠키가 없거나(`check_korail_login`, 오류) 로그인 화면으로 넘어갔다(조회, 넘기기 결과) |
+| `KORAIL_CAPTCHA` | `unavailable` | | 보안 문자 화면이다(넘기기 결과) |
+| `KORAIL_BOT_CHECK` | `unavailable` | | 매크로 탐지 화면이다(넘기기 결과) |
+| `KORAIL_PAGE_CHANGED` | `unavailable` | | 자리나 목록 칸이 기대한 모양이 아니다(넘기기 결과) |
 | `KORAIL_UNAVAILABLE` | `unavailable` | `retry_later` | 조회의 60초 초과와 그 밖의 실패. 확인 도구의 8초 초과는 `KORAIL_BROWSER_UNREACHABLE` 이다 |
 
 오류 글에 중계 주소, 역 이름, 날짜, 브라우저가 준 원문을 싣지 않는다. 예외는 `KORAIL_REJECTED` 의 `message` 하나다. 읽기 도구라 그 글이 모델에게 가고 에이전트가 사용자에게 까닭을 전한다.
