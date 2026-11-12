@@ -13,7 +13,7 @@
 | REQ4 | PR1 | 모든 탭 열기가 같은 「화면 분류」 를 거친다. 로그인·캡차·기기 인증이면 아무것도 누르지 않고 탭을 남긴 채 그 종류의 오류로 끝난다 |
 | REQ5 | PR1 | `hermes/tests/test_connectors_contract.py` 에 도구 이름 모양, 설명 첫 문장의 영어 요지, 플러그인 사이 도구 이름 중복 검사를 더한다 |
 | REQ6 | PR1 | 도구 선언에 범용 칸 `attended_only` 를 더한다. turn 을 열 때 실행 줄에 「사람이 없는 실행」 표식을 남기고, Control Plane 의 도구 판정이 그 트리의 호출을 거절한다 |
-| REQ7 | PR2 | 플러그인 오류의 `handoff` 칸을 fos-ctx `transform_tool_result` hook 이 Control Plane 에 알리고, 판정 줄에 적은 넘기기로 웹이 카드를 그린다. 알림은 `HANDOFF_REQUESTED`. 아래 「PR2 화면 넘기기」 |
+| REQ7 | PR2 | 플러그인 결과의 `handoff` 칸을 fos-ctx `transform_tool_result` hook 이 Control Plane 에 알리고, 판정 줄에 적은 넘기기로 웹이 카드를 그린다. 알림은 `HANDOFF_REQUESTED`. 아래 「PR2 화면 넘기기」 |
 | REQ8 | PR2 | 「다 했어요」 가 정해 둔 글을 다음 메시지로 보내고, 사람이 보낸 turn 의 시작이 열린 넘기기를 닫는다. 플러그인은 다음 호출에서 남긴 탭을 닫는다 |
 | REQ9 | PR3 | `app_user` 의 상한 컬럼 둘과 연결 화면. 아래 「PR3 방향」 |
 | REQ10 | PR3 | 금융 준비 틀의 서버 요약 카드. 아래 「PR3 방향」 |
@@ -213,7 +213,7 @@ Gmail 과 네이버 블로그는 SHA 문제는 없지만, 설명은 모델이 �
 | REQ4 | 플러그인 | 화면 분류 단위 테스트. 사람이 해야 하는 분류마다 탭을 닫지 않는다. 가짜 CDP 의 명령 기록에 `Input.*` 가 없고, `Runtime.evaluate` 의 식이 모두 상수 집합 안에 있는지 단언한다 |
 | REQ5 | 계약 검사 | 일부러 틀린 선언 사본(영어 요지 없음, 이름 한 낱말)이 실패하는지 `ContractCatchesViolationsTest` 에 더한다. 이름 중복은 두 플러그인을 임시 루트에 복사해 한쪽 이름을 다른 쪽과 같게 바꾼 뒤 교차 검사가 잡는지 본다 |
 | REQ6 | 대시보드, Control Plane | `connector_policy.py` 의 칸 검증 테스트. `ToolPolicyDecisionTest` 에 사람이 없는 실행 × `attended_only` × 위험도 표와 순서. 표식은 `ChatTurnLifecycle` 테스트에서 의도마다 적히는지 보고, 예약 작업은 `TaskRunStarter` 로 연 turn 이 도는 동안 도구 판정을 불러 거절되는지 통합 테스트으로 본다(fixture 로 표식을 미리 채우지 않는다). 맡긴 일의 결과 turn 이 사람이 없는 트리의 결과면 거절되고, 보통 대화와 그 위임 자식은 허용되는지 |
-| REQ7 | 플러그인, fos-ctx, Control Plane, 웹 | 플러그인: 가짜 CDP 로 사람이 해야 하는 화면의 오류에 `handoff` 가 실리고 남긴 탭 id 가 맞는지, 최종 호스트가 네이버가 아니면 `PAGE_CHANGED` 로 탭을 닫는지. fos-ctx: `test_fos_ctx.py` 에서 결과 모양(글로 싼 `error` 포함)마다 보내는지와 서명, 실패해도 결과가 그대로인지. Control Plane: 서명·판정 줄 대조·한 번만 적기·알림 한 건, 대화의 목록이 주인에게만 보이는지. 웹: 카드 단추와 `/browser?tab=` 링크, 첫 `tabs` 사건에서 탭 옮기기 |
+| REQ7 | 플러그인, fos-ctx, Control Plane, 웹 | 플러그인: 가짜 CDP 로 사람이 해야 하는 화면의 오류가 아닌 결과에 `handoff` 가 실리고 남긴 탭 id 가 맞는지, 최종 호스트가 네이버가 아니면 `PAGE_CHANGED` 로 탭을 닫는지. fos-ctx: `test_fos_ctx.py` 에서 결과 모양(글로 싼 `error` 포함)마다 보내는지와 서명, 실패해도 결과가 그대로인지. Control Plane: 서명·판정 줄 대조·한 번만 적기·알림 한 건, 대화의 목록이 주인에게만 보이는지. 웹: 카드 단추와 `/browser?tab=` 링크, 첫 `tabs` 사건에서 탭 옮기기 |
 | REQ8 | Control Plane, 웹 | 사람이 보낸 turn 의 시작 사건이 그 대화의 열린 넘기기만 닫고 알림을 읽음으로 바꾸는지, 자동 turn 의 시작 사건은 닫지 않는지(`ConnectorHandoffEndpointTest`). 「다 했어요」 가 정해 둔 글을 보내는지. 플러그인이 다음 호출에서 남긴 탭을 먼저 닫는지 |
 | #702 | Control Plane, 웹 | 가짜 CDP 연결로 `Page.javascriptDialogOpening` 이 `dialog` 사건이 되고, `dialog` 입력이 `Page.handleJavaScriptDialog` 를 보내는지, 탭을 옮기면 창을 거두는지(`BrowserScreenSessionTest`). 입력 검사 표. 웹 화면의 창 단추 |
 
@@ -235,8 +235,8 @@ sequenceDiagram
   participant H as fos-ctx hook
   participant CP as Control Plane
   participant W as 웹
-  P->>P: 사람이 해야 하는 화면. 탭을 남기고 오류로 끝난다
-  P-->>H: {"error": {"code", "handoff": {"need", "tab"}}}
+  P->>P: 사람이 해야 하는 화면. 탭을 남기고 오류가 아닌 결과로 끝난다
+  P-->>H: {"status", "message", "handoff": {"code", "need", "tab"}}
   H->>CP: POST /internal/hermes/connector-handoff (서명)
   CP->>CP: 판정 줄(connector_action)에 넘기기를 적고 알림 한 건
   H-->>P: 결과는 그대로 모델에게 간다(external-data 감싸기)
@@ -246,9 +246,9 @@ sequenceDiagram
   CP->>CP: 사람이 보낸 turn 시작 → 그 대화의 열린 넘기기를 닫고 알림을 읽음
 ```
 
-1. 플러그인이 사람이 해야 하는 화면에서 멈추면 지금처럼 그 탭을 남기고 선언된 오류로 끝난다. 오류 본문에 `handoff: {need, tab}` 을 더한다. `need` 는 아래 어휘 하나, `tab` 은 남긴 탭의 CDP target id 다
+1. 플러그인이 사람이 해야 하는 화면에서 멈추면 그 탭을 남기고, `isError` 가 없는 결과로 끝난다(2026-11-12 바꿈). 결과에 `handoff: {code, need, tab}` 을 싣는다. `code` 는 그 플러그인의 `errors` 에 선언한 코드, `need` 는 아래 어휘 하나, `tab` 은 남긴 탭의 CDP target id 다. 오류로 돌려주면 Hermes 가 연속 3회 실패로 세어 60초 동안 서버를 막아, 사람이 풀고 돌아와도 다음 호출이 거절된다
 2. 바인딩 profile 의 fos-ctx `transform_tool_result` hook 이 플러그인 서버 도구의 결과에서 그 칸을 찾으면 Control Plane 에 서명해 알린다. 결과 글은 바꾸지 않고 지금처럼 `<external-data>` 로 감싼다
-3. Control Plane 은 같은 호출의 판정 줄을 dedupe key 로 찾아 넘기기를 적고, 대화가 있는 줄이면 알림(`HANDOFF_REQUESTED`) 한 건을 만든다. 실행은 멈추지 않는다. 모델은 오류를 받고 turn 을 마친다(spec DECISION11)
+3. Control Plane 은 같은 호출의 판정 줄을 dedupe key 로 찾아 넘기기를 적고, 대화가 있는 줄이면 알림(`HANDOFF_REQUESTED`) 한 건을 만든다. 실행은 멈추지 않는다. 모델은 사람이 해야 하는 화면에서 멈췄다는 결과를 받고 turn 을 마친다(spec DECISION11)
 4. 웹은 대화의 열린 넘기기를 입력창 위의 카드로 그린다. 카드의 종류와 탭은 이 줄에서만 온다. 모델이 쓴 글로 그리지 않는다
 5. 「다 했어요」 는 정해 둔 글을 그 대화의 다음 메시지로 보낸다. 입력창에 직접 답해도 같다(spec DECISION24). 사람이 보낸 turn 이 시작되면 그 대화의 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 담당의 결과를 전하는 자동 turn 은 닫지 않는다
 6. 에이전트가 멈춘 도구를 다시 부르면 플러그인이 앞서 남긴 탭을 먼저 닫는다. 아직 같은 화면이면 새 탭을 남기고 카드가 다시 뜬다(REQ8)
@@ -267,12 +267,14 @@ sequenceDiagram
 ### 플러그인 결과(공통 계약)
 
 ```json
-{"error": {"code": "NAVER_SHOPPING_LOGIN_REQUIRED", "handoff": {"need": "login", "tab": "<target id>"}}}
+{"status": "HUMAN_ACTION_REQUIRED", "message": "<고정 안내 글>", "handoff": {"code": "NAVER_SHOPPING_LOGIN_REQUIRED", "need": "login", "tab": "<target id>"}}
 ```
+
+`isError` 칸이 없다. `status` 와 `message` 는 모델이 이 결과를 성공으로 읽지 않게 한다. `message` 는 고정 글이고 「사람이 해야 하는 화면에서 멈췄다, 요청한 일은 끝나지 않았고 결과가 없다, 사용자가 「내 브라우저」 에서 마쳤다고 하기 전에는 같은 도구를 다시 부르지 않는다」 를 담는다. 화면 글이나 주소를 싣지 않는다.
 
 | 칸 | 규칙 |
 | --- | --- |
-| `code` | 그 플러그인의 `errors` 에 선언한 코드. 대문자, 숫자, 밑줄 64자까지 |
+| `handoff.code` | 그 플러그인의 `errors` 에 선언한 코드. 대문자, 숫자, 밑줄 64자까지 |
 | `handoff.need` | 위 어휘 하나 |
 | `handoff.tab` | 남긴 탭의 target id. 영문자와 숫자 128자까지(화면 입력 `tab` 의 `id` 와 같은 모양) |
 
@@ -282,12 +284,12 @@ sequenceDiagram
 
 | 칸 | 값 |
 | --- | --- |
-| 언제 | `transform_tool_result` 에서 대응 파일의 서버와 맞는 도구의 결과가 위 모양일 때만. Hermes 는 MCP 의 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다 |
+| 언제 | `transform_tool_result` 에서 대응 파일의 서버와 맞는 도구의 결과가 위 모양일 때만. Hermes 는 MCP 결과를 `{"result": "<플러그인 글>"}` 로 바꾸므로 바깥 `result` 가 글이면 한 번 더 읽는다. 옛 모양 `{"error": {"code", "handoff": {"need", "tab"}}}`(오류로 돌려주던 꼴, 바깥 `error` 가 글인 꼴 포함)도 받는다 |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `connector-handoff` 로 바꾼 것(`/internal/hermes/connector-handoff`) |
 | 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}` |
 | 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
 | 제한 시간 | `POLICY_TIMEOUT`(3초), 한 번만 부른다 |
-| 실패 | 로그에 상태 코드나 예외 종류만 남기고 결과는 그대로 둔다. 카드가 뜨지 않아도 모델은 오류를 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다(스킬과 도구 설명이 이미 그렇게 시킨다) |
+| 실패 | 로그에 상태 코드나 예외 종류만 남기고 결과는 그대로 둔다. 카드가 뜨지 않아도 모델은 결과의 안내 글을 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다(스킬과 도구 설명이 이미 그렇게 시킨다) |
 
 ### Control Plane
 
@@ -349,7 +351,7 @@ sequenceDiagram
 | DECISION9 | 검색 결과를 내려 더 읽는지 | 내리지 않는다. 처음 실린 상태 JSON 만 읽는다 | 작성자 | 내려서 실리는 상품은 상태 JSON 에 들어가지 않는다. 다른 출처(DOM, 응답 가로채기)을 섞으면 칸 위치 가설이 두 벌이 된다. spec DECISION19 를 같이 고쳤다 |
 | DECISION10 | 플러그인이 여는 주소 | 「주소 분류」 의 `store`, `catalog` 만 탭을 연다 | 작성자 | 모델이 준 주소로 로그인된 브라우저가 아무 사이트나 열지 않게 한다 |
 | DECISION8 | 결정 기록 | 루트 `docs/adr/ADR-20261110-naver-shopping-connector.md` 하나. 브라우저 화면을 읽는 쇼핑 플러그인과 `attended_only` 의 선택 이유를 갖는다 | 작성자 | 플러그인(hermes)과 판정(backend)에 걸쳐 루트에 둔다(ADR 배치 규칙) |
-| DECISION11 | 화면 넘기기의 결과 전달 경로 | (c) fos-ctx `transform_tool_result` hook 이 플러그인 결과의 `handoff` 칸을 서명해 Control Plane 에 알린다 | 작성자 | 모델과 플러그인에 기대지 않는다. (a) 답 끝 태그는 모델이 빠뜨리면 카드가 뜨지 않아 REQ7 을 보장하지 못한다. (b) 플러그인이 직접 알리려면 중계 밖의 운영 주소와 인증이 플러그인에 들어가 `operator_env` 금지(ADR-064)와 부딪친다. hook 은 이미 같은 토큰과 서명으로 판정을 묻고 있다. hook 이 실패하면 카드가 없지만 모델은 오류를 받아 글로 안내한다 |
+| DECISION11 | 화면 넘기기의 결과 전달 경로 | (c) fos-ctx `transform_tool_result` hook 이 플러그인 결과의 `handoff` 칸을 서명해 Control Plane 에 알린다 | 작성자 | 모델과 플러그인에 기대지 않는다. (a) 답 끝 태그는 모델이 빠뜨리면 카드가 뜨지 않아 REQ7 을 보장하지 못한다. (b) 플러그인이 직접 알리려면 중계 밖의 운영 주소와 인증이 플러그인에 들어가 `operator_env` 금지(ADR-064)와 부딪친다. hook 은 이미 같은 토큰과 서명으로 판정을 묻고 있다. hook 이 실패하면 카드가 없지만 모델은 결과의 안내 글로 안내한다 |
 | DECISION12 | 넘기기 칸의 선언 | `assistant.json` 에 선언하지 않고 플러그인 결과에만 싣는다. Control Plane 은 어휘와 모양, 같은 호출의 판정 줄만 본다 | 작성자 | 결과를 만드는 것은 플러그인 소스다. 선언에 두면 대시보드 검증과 카탈로그 전달을 함께 늘려야 한다. 플러그인이 틀린 `need` 를 내면 받지 않아 카드가 없을 뿐이다 |
 | DECISION13 | 넘기기를 둘 자리 | 같은 호출의 판정 줄(`connector_action`)에 칸 넷 | 작성자 | 테이블을 늘리지 않는다. 판정 줄이 이미 사용자, 에이전트, 대화, 실행, 플러그인을 갖고 dedupe key 로 hook 의 호출과 하나로 맞는다 |
 | DECISION14 | 카드를 닫는 때 | 그 대화에서 사람이 보낸 다음 turn 이 시작될 때(결과 전달 같은 자동 turn 은 제외, 2026-11-12). 사건으로 알려 `chat` 이 `connector` 를 모르게 한다 | 작성자 | spec DECISION24. `connector` 가 이미 `chat` 을 import 해 직접 부르면 순환이다 |

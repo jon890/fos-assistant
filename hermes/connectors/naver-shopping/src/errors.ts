@@ -28,16 +28,45 @@ export class ToolError extends Error {
   }
 }
 
-/** 알 수 없는 예외는 원문을 버리고 `NAVER_SHOPPING_UNAVAILABLE` 로 바꾼다. */
-export function toolFailure(error: unknown) {
-  const code =
-    error instanceof ToolError ? error.code : "NAVER_SHOPPING_UNAVAILABLE";
-  const handoff = error instanceof ToolError ? error.handoff : null;
+/**
+ * 모델이 화면 넘기기를 성공으로 읽지 않게 하는 안내다. 고정 글이고 화면 글이나 주소를 담지 않는다.
+ * 사람이 푼 뒤에 이어 가는 일은 스킬과 카드의 「다 했어요」 가 맡는다.
+ */
+const HANDOFF_MESSAGE =
+  "사람이 해야 하는 화면에서 멈췄다. 요청한 일은 아직 끝나지 않았고 결과가 없다. " +
+  "사용자에게 「내 브라우저」 에서 그 화면을 직접 마쳐 달라고 안내하고, 사용자가 마쳤다고 하기 전에는 같은 도구를 다시 부르지 않는다.";
+
+/**
+ * 화면 넘기기 결과다. `isError` 를 싣지 않는다.
+ * Hermes 는 같은 서버의 `isError` 결과가 연속 3회면 60초 동안 그 서버의 호출을 막는다. 사람이 풀고 돌아와도 막혀 있으므로,
+ * 사람이 해야 하는 화면은 실패가 아닌 결과로 돌려준다. 성공으로 읽히지 않게 `status` 와 `message` 로 멈췄다고 밝힌다.
+ */
+export function handoffResult(code: ErrorCode, handoff: Handoff) {
   return {
     content: [
       {
         type: "text" as const,
-        text: JSON.stringify({ error: handoff ? { code, handoff } : { code } }),
+        text: JSON.stringify({
+          status: "HUMAN_ACTION_REQUIRED",
+          message: HANDOFF_MESSAGE,
+          handoff: { code, need: handoff.need, tab: handoff.tab },
+        }),
+      },
+    ],
+  };
+}
+
+/** 알 수 없는 예외는 원문을 버리고 `NAVER_SHOPPING_UNAVAILABLE` 로 바꾼다. 화면 넘기기는 오류가 아닌 결과다. */
+export function toolFailure(error: unknown) {
+  if (error instanceof ToolError && error.handoff)
+    return handoffResult(error.code, error.handoff);
+  const code =
+    error instanceof ToolError ? error.code : "NAVER_SHOPPING_UNAVAILABLE";
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({ error: { code } }),
       },
     ],
     isError: true,

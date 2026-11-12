@@ -62,7 +62,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 1. 앞서 사람에게 넘기며 남긴 탭이 있으면 먼저 닫는다. 그다음 중계의 `/json/new?about:blank` 로 빈 탭을 연다. 그 밖의 기존 탭은 읽지도 바꾸지도 않는다
 2. 대화상자 처리기를 걸고 페이지 사건을 켠 뒤 그 탭을 주소로 이동시킨다. 우리 탭의 `alert`, `confirm` 은 닫기로 넘긴다
 3. `document.readyState` 가 `complete` 가 될 때까지 묻는다
-4. 화면을 분류한다. 로그인(로그인 호스트), 기기 인증(로그인 호스트의 기기 경로), 캡차(캡차 요소)면 그 탭을 남기고 오류에 넘기기 칸(`handoff`)을 실어 끝난다. 최종 주소가 네이버(`naver.com` 과 그 하위)가 아니면 읽지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝난다
+4. 화면을 분류한다. 로그인(로그인 호스트), 기기 인증(로그인 호스트의 기기 경로), 캡차(캡차 요소)면 그 탭을 남기고 `isError` 가 없는 결과에 넘기기 칸(`handoff`)을 실어 끝난다. 최종 주소가 네이버(`naver.com` 과 그 하위)가 아니면 읽지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝난다
 5. 고정 식 하나로 상태 JSON 을 꺼내 플러그인 안에서 결과로 바꾼다
 6. 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. 전체 제한 시간은 45초다
 
@@ -75,9 +75,9 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 | --- | --- | --- | --- |
 | `NAVER_SHOPPING_INVALID_INPUT` | `invalid_input` | | 인자 모양이 틀리거나 주소가 거절이다 |
 | `NAVER_SHOPPING_BROWSER_UNREACHABLE` | `unavailable` | `retry_later` | 중계에 닿지 않거나 비었다 |
-| `NAVER_SHOPPING_LOGIN_REQUIRED` | `credential_rejected` | `reconnect` | 로그인 쿠키가 없거나 로그인 화면으로 넘어갔다 |
-| `NAVER_SHOPPING_CAPTCHA` | `unavailable` | | 보안 확인 화면이다 |
-| `NAVER_SHOPPING_DEVICE_CHECK` | `unavailable` | | 새 기기 확인 화면이다 |
+| `NAVER_SHOPPING_LOGIN_REQUIRED` | `credential_rejected` | `reconnect` | 로그인 쿠키가 없거나(`check_shopping_login`, 오류) 로그인 화면으로 넘어갔다(읽기 도구, 넘기기 결과) |
+| `NAVER_SHOPPING_CAPTCHA` | `unavailable` | | 보안 확인 화면이다(넘기기 결과) |
+| `NAVER_SHOPPING_DEVICE_CHECK` | `unavailable` | | 새 기기 확인 화면이다(넘기기 결과) |
 | `NAVER_SHOPPING_NOT_FOUND` | `invalid_input` | | 상품 화면에 상태는 있는데 상품이 없다 |
 | `NAVER_SHOPPING_PAGE_CHANGED` | `unavailable` | | 상태 JSON 이 기대한 모양이 아니다 |
 | `NAVER_SHOPPING_UNAVAILABLE` | `unavailable` | `retry_later` | 시간 초과와 그 밖의 실패 |
@@ -86,7 +86,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 
 ## 화면 넘기기
 
-로그인, 캡차, 기기 인증 오류는 `{"error": {"code", "handoff": {"need", "tab"}}}` 모양이다. `need` 는 `login`, `captcha`, `device_check` 가운데 하나이고 `tab` 은 남긴 탭의 id 다.
+로그인, 캡차, 기기 인증은 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}` 로 끝난다. Hermes 가 같은 서버의 `isError` 결과를 연속 3회 세면 60초 동안 서버를 막아, 사람이 보안 확인을 풀고 돌아와도 다음 호출이 거절되기 때문이다. `code` 는 위 오류 표의 서버 코드이고 `need` 는 `login`, `captcha`, `device_check` 가운데 하나이고 `tab` 은 남긴 탭의 id 다.
 fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기기 카드와 알림이 생긴다. 카드의 「내 브라우저 열기」 가 그 탭을 고른 채 「내 브라우저」 를 열고, 「다 했어요」 가 다음 메시지를 보내 에이전트가 멈춘 도구를 다시 부른다. 카드는 사람이 보낸 turn 이 시작될 때 닫히고, 담당의 결과를 전하는 자동 turn 은 닫지 않는다.
 남긴 탭의 id 는 MCP 서버 프로세스 메모리에만 있고 다음 탭 열기가 닫는다. 결과 모양과 흐름은 [설계](naver-shopping/design.md)의 「PR2 화면 넘기기(REQ7, REQ8)」 가 갖는다.
 
