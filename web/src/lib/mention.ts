@@ -50,14 +50,14 @@ export function labelOf(agent: AgentView): AgentLabel {
 }
 
 /**
- * 아직 저장되지 않은 답과 기다림 줄이 그릴 에이전트다. 마지막 질문이 맡김이면 맡은 에이전트이고, 아니면 null 이라 대화의 에이전트로
- * 그린다.
+ * 아직 저장되지 않은 답과 기다림 줄이 그릴 에이전트다. 답 줄을 빼고 마지막 줄이 맡김 질문이면 맡은 에이전트이고, 아니면 null 이라
+ * 대화의 에이전트로 그린다. 알림 줄 뒤의 자동 turn 은 대화의 에이전트가 쓰므로 맡김 질문을 거슬러 찾지 않는다.
  */
 export function pendingAnswerLabel(
   turns: { role: string; delegatedTo?: MentionDelegation | null }[],
 ): AgentLabel | null {
-  const question = turns.findLast((turn) => turn.role === "USER");
-  return question?.delegatedTo?.agent ?? null;
+  const last = turns.findLast((turn) => turn.role !== "ASSISTANT");
+  return last?.role === "USER" ? (last.delegatedTo?.agent ?? null) : null;
 }
 
 /**

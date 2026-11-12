@@ -15,7 +15,7 @@ import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
-import { mentionTargets } from "@/lib/mention";
+import { useDelegateTarget } from "./use-delegate-target";
 import type { Props } from "./conversation-session-view-types";
 
 export function ConversationSessionView({
@@ -83,6 +83,20 @@ export function ConversationSessionView({
   delegateTo,
   setDelegateTo,
 }: Props) {
+  // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 훅이라 이른 반환보다 앞에 둔다.
+  const { delegateAgents, delegating, delegateAgent } = useDelegateTarget({
+    agents,
+    conversationAgentCode: currentConversation?.agentCode ?? agentCode,
+    enabled:
+      !startScreen &&
+      conversationId !== null &&
+      !sending &&
+      !agentMissing &&
+      !pending.queue.held,
+    delegateTo,
+    setDelegateTo,
+  });
+
   if (notFound) {
     return (
       <section
@@ -99,23 +113,6 @@ export function ConversationSessionView({
       </section>
     );
   }
-
-  // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 답이 도는 동안은 대기 메시지가 글만 받아 띄우지 않는다.
-  const delegateAgents = mentionTargets(
-    agents,
-    currentConversation?.agentCode ?? agentCode,
-  );
-  const delegating =
-    !startScreen &&
-    conversationId !== null &&
-    !sending &&
-    !agentMissing &&
-    !pending.queue.held &&
-    delegateAgents.length > 0;
-  const delegateAgent =
-    delegateTo === null
-      ? undefined
-      : delegateAgents.find((agent) => agent.code === delegateTo);
 
   // 입력창은 첫 메시지 전후로 같은 자리에 하나만 둔다. 앞뒤 형제만 조건부로 그리고, 가운데에서 아래로
   // 옮기는 것은 감싸는 요소의 클래스로만 한다. 부모가 바뀌면 입력창이 새로 만들어져 올린 사진이 지워진다.
@@ -340,7 +337,8 @@ export function ConversationSessionView({
                 ? { agent: delegateAgent, onClear: () => setDelegateTo(null) }
                 : undefined
             }
-            skillNames={skillNames}
+            // 맡길 에이전트를 골랐으면 대화 에이전트의 스킬을 띄우지 않는다. 맡김 글은 커맨드로 판별하지 않는다.
+            skillNames={delegateAgent ? undefined : skillNames}
             onBlockingChange={setComposerBlocking}
             modelChoiceUnknown={
               conversationId !== null && currentConversation === undefined

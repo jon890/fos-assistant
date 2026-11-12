@@ -58,5 +58,15 @@ test("아직 저장되지 않은 답은 마지막 질문이 맡김일 때만 맡
     ]),
     null,
   );
+  assert.equal(
+    pendingAnswerLabel([
+      { role: "USER", delegatedTo: mention },
+      { role: "ASSISTANT" },
+      { role: "SYSTEM" },
+      { role: "ASSISTANT" },
+    ]),
+    null,
+    "알림 줄 뒤의 자동 turn 은 대화의 에이전트로 그린다",
+  );
   assert.equal(pendingAnswerLabel([]), null);
 });

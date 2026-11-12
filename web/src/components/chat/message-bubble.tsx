@@ -208,7 +208,11 @@ export function MessageBubble({
   }
 
   if (user) {
-    const command = skillCommandChip ? parseSkillCommand(turn.content) : null;
+    // 맡김 질문은 글 그대로 맡겼으므로 스킬 칩으로 그리지 않는다.
+    const command =
+      skillCommandChip && !turn.delegatedTo
+        ? parseSkillCommand(turn.content)
+        : null;
     return (
       <li
         className={cn(

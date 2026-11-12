@@ -4,7 +4,7 @@
 - Date: 2026-11-12
 - **decision-type**: `architecture`
 - **areas**: `product, runtime`
-- **현재 규칙의 원본**: [에이전트 팀](../features/agent-team.md) 의 「`@` 로 바로 맡기기」, 스펙 [`docs/features/agent-team/spec.md`](../features/agent-team/spec.md) 의 REQ7 과 DECISION9, DECISION20, DECISION21(사용자 확인 2026-11-10), 설계 [`design.md`](../features/agent-team/design.md) 의 「PR4 @ 멘션」
+- **현재 규칙의 원본**: [에이전트 팀](../features/agent-team.md) 의 「`@` 로 바로 맡기기」, 스펙 [`docs/features/agent-team/spec.md`](../features/agent-team/spec.md) 의 REQ7 과 DECISION9, DECISION20(사용자 확인 2026-11-10), DECISION21(작성자), 설계 [`design.md`](../features/agent-team/design.md) 의 「PR4 @ 멘션」
 - [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) 의 「무엇을 할지는 Hermes 가 정한다」 에 예외 하나를 둔다. 경계와 `agent_*` 도구의 결정은 그대로다.
 
 ### 결정
@@ -33,5 +33,6 @@
 ### 감당할 것
 
 - 맡김의 입력에 대화의 앞 줄이 들어간다. 앞 줄은 같은 사용자의 대화이고, 다른 에이전트의 답에 외부 글이 들 수 있어 `<external-data>` 로 감싼다.
-- 대화의 에이전트가 답 줄 없이 실패한 turn 에 실은 맡김은 다시 싣지 않는다. 그 입력이 session 에 남았는지 알 수 없다.
+- 대화의 에이전트가 답 줄 없이 실패한 turn 에 실은 맡김은 다시 싣지 않는다. 그 입력이 session 에 남았는지 알 수 없다. 질문 줄이 없는 turn(자동 결과 전달, 예약)이 답 없이 실패하면 경계가 없어 한 번 더 실린다.
+- 먼저 살펴보기의 답도 경계가 되어, 그 앞의 맡김은 대화 에이전트에게 실리지 않는다.
 - 맡은 에이전트가 다시 맡긴 일의 결과는 지금처럼 대화의 에이전트가 자동 turn 으로 전한다.

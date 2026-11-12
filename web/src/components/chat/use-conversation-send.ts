@@ -112,7 +112,7 @@ export function useConversationSend({
       delegateTo !== null && conversationIdRef.current !== null
         ? (agents.find((agent) => agent.code === delegateTo) ?? null)
         : null;
-    if (target) setDelegateTo(null);
+    if (delegateTo !== null) setDelegateTo(null);
     let needsCreationRefresh = conversationIdRef.current === null;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
