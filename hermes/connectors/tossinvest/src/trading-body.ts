@@ -34,14 +34,7 @@ export const OPEN_TRADE_TOOLS: readonly [TradeTool, ...TradeTool[]] = [
 export type Args = Record<string, any>;
 export function financialOperation(method: "POST" | "DELETE", path: string) {
   const operation = operationFor(method, path);
-  if (
-    ![
-      "createOrder",
-      "modifyOrder",
-      "cancelOrder",
-      "cancelConditionalOrder",
-    ].includes(operation.id)
-  )
+  if (!["createOrder", "modifyOrder", "cancelOrder"].includes(operation.id))
     reject();
   return operation;
 }
@@ -353,12 +346,6 @@ export function financialResult(operationId: string, response: Exchange): any {
           TERMINAL.has(error.code)));
     throw new TossinvestError(rejected ? "TOSSINVEST_INVALID_INPUT" : UNKNOWN);
   }
-  if (
-    response.status === 204 &&
-    operationId === "cancelConditionalOrder" &&
-    response.empty
-  )
-    return {};
   if (
     response.status !== 200 ||
     typeof data?.result?.orderId !== "string" ||
