@@ -13,7 +13,7 @@
  * 답과 올리던 사진을 잃는다.
  *
  * <ul>
- *   <li>주소가 `/` 로 바뀌었고 대화 식별자를 들고 있다
+ *   <li>주소가 새 대화 화면 `/new` 로 바뀌었고 대화 식별자를 들고 있다
  *   <li>「새 대화」 를 눌렀다
  *   <li>받은 대화 식별자가 다른 대화로 바뀌었다
  * </ul>
@@ -34,6 +34,7 @@ import {
 } from "./shell/conversations-provider";
 import { fetchChatAgents } from "@/lib/chat-api";
 import { agentCodeParam, type AgentView } from "@/lib/agent";
+import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
 export function ChatPanel({
   initialConversationId,
@@ -41,7 +42,7 @@ export function ChatPanel({
   initialConversationId: string | null;
 }) {
   const pathname = usePathname();
-  // 「<에이전트>와 대화하기」 가 `/?agent=<번호>` 로 연다. 목록에 있는 에이전트일 때만 그 에이전트를 고른다.
+  // 「<에이전트>와 대화하기」 가 `/new?agent=<번호>` 로 연다. 목록에 있는 에이전트일 때만 그 에이전트를 고른다.
   // 첫 메시지를 보내면 주소가 바뀌어 쿼리가 사라지므로, 처음 받은 값만 쓰고 목록을 다시 읽지 않는다.
   const requestedAgent = useRef(agentCodeParam(useSearchParams().get("agent")));
   const { newConversationVersion } = useConversations();
@@ -148,7 +149,11 @@ export function ChatPanel({
   if (seenPathname !== pathname) {
     setSeenPathname(pathname);
     // 주소만 `/chat/{id}` 로 바꿔 둔 화면에서 「새 대화」 를 눌렀다.
-    if (seenPathname !== "/" && pathname === "/" && conversationId !== null)
+    if (
+      seenPathname !== NEW_CONVERSATION_PATH &&
+      pathname === NEW_CONVERSATION_PATH &&
+      conversationId !== null
+    )
       startNewConversation();
   }
   if (seenNewVersion !== newConversationVersion) {

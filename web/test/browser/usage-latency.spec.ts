@@ -12,7 +12,7 @@ test("화면에서 보낸 질문이 관리자 사용량의 첫 반응 시간 절
   // Asia/Seoul 에는 일광 절약 시간이 없어 24시간 뒤가 늘 다음 날이다.
   const sentAt = Date.now();
   const dates = [dateInSeoul(sentAt), dateInSeoul(sentAt + ONE_DAY_MS)];
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("첫 반응 시간 검사");
   await page.getByRole("button", { name: "보내기" }).click();

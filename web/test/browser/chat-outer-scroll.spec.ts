@@ -9,7 +9,7 @@ async function sendAndWait(page: Page, text: string, answers: number) {
 }
 
 test("긴 대화에서도 바깥 영역은 스크롤되지 않고 입력창이 화면 안 아래에 있다", async ({ page, hermes }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await sendAndWait(page, ASK_CARD_PROBE, 1);
   for (let index = 2; index <= 9; index += 1) {
     await sendAndWait(page, `긴 대화를 만드는 ${index}번째 물음`, index);

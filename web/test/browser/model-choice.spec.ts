@@ -209,7 +209,7 @@ test("에이전트가 없는 새 대화는 칸을 읽지 않고 모델 단추를
   });
   await page.route("**/api/agents", (route) => route.fulfill({ json: [] }));
 
-  await page.goto("/");
+  await page.goto("/new");
   await expect(trigger(page)).toBeDisabled();
   expect(tierRequests).toEqual([]);
 });
@@ -221,7 +221,7 @@ test("관리자가 칸을 하나도 채우지 않았으면 모델 단추를 그�
   const read = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/chat/model-tiers",
   );
-  await page.goto("/");
+  await page.goto("/new");
   await read;
 
   await expect(composer(page)).toBeVisible();
@@ -232,7 +232,7 @@ test("슬라이더에는 채운 칸의 이름만 보이고 고급 직접 선택�
   page,
 }) => {
   await serveTiers(page, FILLED_TIERS);
-  await page.goto("/");
+  await page.goto("/new");
 
   await expect(trigger(page)).toHaveText("Medium");
   await openSlider(page);
@@ -281,7 +281,7 @@ async function expectChosenTierCarriesOver(page: Page): Promise<void> {
     if (request.method() === "PUT" && isTierSave(new URL(request.url())))
       bodies.push(request.postDataJSON());
   });
-  await page.goto("/");
+  await page.goto("/new");
 
   // 고른 적이 없으면 그룹 기본 칸에서 시작한다.
   await expect(trigger(page)).toHaveText("Medium");
@@ -296,7 +296,7 @@ async function expectChosenTierCarriesOver(page: Page): Promise<void> {
   await expect(trigger(page)).toHaveText(target);
 
   // 고른 칸은 사용자의 기본 칸이 되어 다음 새 대화의 처음 위치다.
-  await page.goto("/");
+  await page.goto("/new");
   await expect(trigger(page)).toHaveText(target);
   await openSlider(page);
   await expect(stop(page, target)).toBeChecked();
@@ -391,7 +391,7 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
           })
         : route.fallback(),
   );
-  await page.goto("/");
+  await page.goto("/new");
 
   await openSlider(page);
   // 저장이 실패하면 고른 칸이 곧바로 이전 칸으로 돌아간다. check() 는 바뀐 상태까지 확인하므로 누르기만 한다.
@@ -418,7 +418,7 @@ test("새 대화에서 칸을 먼저 고르면 에이전트 카드가 잠기고 
     await new Promise((resolve) => setTimeout(resolve, 5_500));
     await route.fulfill({ response });
   });
-  await page.goto("/");
+  await page.goto("/new");
   const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
 
@@ -476,7 +476,7 @@ test("새 대화에서 칸을 먼저 고른 뒤 사진 업로드가 실패하면
       json: { code: "INTERNAL_ERROR", message: "사진을 올리지 못했어요." },
     });
   });
-  await page.goto("/");
+  await page.goto("/new");
   await openSlider(page);
   await chooseAndWait(page, "Instant");
   await page.keyboard.press("Escape");
@@ -520,7 +520,7 @@ test("좁은 폭에서도 슬라이더가 화면 안에 열리고 입력칸 폭�
 }, testInfo) => {
   await serveTiers(page, FILLED_TIERS);
   await fakeTierSaves(page);
-  await page.goto("/");
+  await page.goto("/new");
 
   await openSlider(page);
   // 슬라이더는 모델 단추 바로 위에 열린다. 줄인 움직임 설정도 100ms 동안 자리로 옮겨 가므로 자리를 잡을 때까지 본다.
@@ -643,7 +643,7 @@ test("칸 저장 때문에 버린 대화 목록 응답은 한 번 더 읽는다"
       await route.fallback();
     },
   );
-  await page.goto("/");
+  await page.goto("/new");
 
   await openSlider(page);
   const saved = page.waitForResponse(

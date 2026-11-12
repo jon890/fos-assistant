@@ -3,7 +3,7 @@ import { LONG_ACTIVITY_PROBE } from "../../../test/e2e/fake-hermes.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 async function send(page: Page, text: string) {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();

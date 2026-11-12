@@ -155,7 +155,7 @@ for (const existing of [false, true]) {
         expect(created.ok()).toBeTruthy();
         id = (await created.json()).conversationId;
       }
-      await page.goto(id ? `/chat/${id}` : "/");
+      await page.goto(id ? `/chat/${id}` : "/new");
       await injectLoss(page, mode);
       if (mode !== "before") await hermes.holdNextRun();
       const text = `연결 손실 ${existing}-${mode}`;
@@ -291,7 +291,7 @@ test("같은 화면 사건에서 두 번 보내도 빈 대화와 송신을 한 �
   isolatedMember,
 }) => {
   await setSession(context, isolatedMember);
-  await page.goto("/");
+  await page.goto("/new");
   const counts = { creates: 0, stream: 0, fallback: 0 };
   let requestedId: string | null = null;
   page.on("request", (request) => {
@@ -328,7 +328,7 @@ for (const status of [404, 405, 415, 501, 502]) {
       hermes,
     }) => {
       await setSession(context, isolatedMember);
-      await page.goto("/");
+      await page.goto("/new");
       await injectLoss(page, accepted ? "accepted" : "before", status);
       if (accepted) await hermes.holdNextRun();
       await page
@@ -379,7 +379,7 @@ for (const lostAfterCreation of [false, true]) {
     isolatedMember,
   }) => {
     await setSession(context, isolatedMember);
-    await page.goto("/");
+    await page.goto("/new");
     await page.evaluate((lostAfterCreation) => {
       Object.assign(window, { createProbe: { creates: 0, sends: 0 } });
       const original = window.fetch.bind(window);
@@ -444,7 +444,7 @@ for (const boundary of ["creation", "recovery"] as const) {
     isolatedMember,
   }) => {
     await setSession(context, isolatedMember);
-    await page.goto("/");
+    await page.goto("/new");
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;

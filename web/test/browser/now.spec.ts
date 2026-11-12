@@ -560,7 +560,7 @@ test.describe("지금 화면", () => {
       await route.continue();
     });
     try {
-      await page.goto("/");
+      await page.goto("/new");
       await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
       const composer = page.getByTestId("composer-shell");
       await expect(composer).toBeVisible();
@@ -589,7 +589,7 @@ test.describe("지금 화면", () => {
       const failed = page.waitForResponse(
         (response) => response.url().endsWith("/api/attention/summary") && response.status() === 500,
       );
-      await Promise.all([failed, page.goto("/")]);
+      await Promise.all([failed, page.goto("/new")]);
       await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
       await expect(page.getByTestId("composer-shell")).toBeVisible();
       await expect(page.getByTestId("attention-line")).toHaveCount(0);

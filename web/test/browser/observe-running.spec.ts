@@ -17,7 +17,7 @@ const FAILED_RUNNING_MESSAGE = "도는 turn 을 묻지 못한 응답";
 /** 보낸 창에서 답을 붙잡아 두고 보낸다. 붙잡힌 turn 의 대화 식별자를 돌려준다. */
 async function startHeldTurn(page: Page, hermes: FakeHermesControl, text: string): Promise<string> {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();

@@ -15,7 +15,7 @@ async function openSidebar(page: Page, testInfo: TestInfo): Promise<void> {
 async function newConversation(page: Page, testInfo: TestInfo): Promise<void> {
   await openSidebar(page, testInfo);
   await page.getByTestId("new-conversation-link").click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
 }
 
 async function send(page: Page, text: string): Promise<void> {
@@ -39,7 +39,7 @@ function conversationNav(page: Page) {
 }
 
 test("새 대화에서 보내면 주소와 목록이 바뀌고 다시 열 수 있다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `주소 검사 ${testInfo.project.name} ${Date.now()}`;
   await send(page, title);
   await expect(page).toHaveURL(CONVERSATION_URL);
@@ -66,22 +66,19 @@ test("모바일 머리줄 제목을 누르면 홈으로 가고 새 대화 상태
   expect(bounds?.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByTestId("user-message")).toHaveCount(1);
   await page.getByRole("textbox", { name: "메시지" }).fill("홈으로 가기 전 입력");
+  // 홈은 대화방을 연다. 검사 관리자는 기본 비서가 없어 새 대화 화면으로 간다.
   await home.click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
-  await page.getByRole("textbox", { name: "메시지" }).fill("홈에서 비울 입력");
-  await home.click();
-  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   await page.goto("/usage");
   await expect(home).toHaveText("검사용 비서");
   await home.click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
 });
 
 test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 비고 다음 대화가 생긴다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, `첫 대화 ${testInfo.project.name} ${Date.now()}`);
   await expect(page).toHaveURL(CONVERSATION_URL);
   const firstUrl = page.url();
@@ -95,7 +92,7 @@ test("시작 사건 뒤 새 대화를 누르면 기존 메시지와 입력이 �
 
 test("답을 만드는 중에 새 대화를 누르면 늦게 온 답이 새 대화 화면과 주소를 바꾸지 않는다", async ({ page, hermes }, testInfo) => {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, `늦은 답 ${testInfo.project.name} ${Date.now()}`);
   await hermes.waitForHeldRun();
   await expect(page).toHaveURL(CONVERSATION_URL);
@@ -113,7 +110,7 @@ test("답을 만드는 중에 새 대화를 누르면 늦게 온 답이 새 대�
     const messages = (await response.json()) as { role: string }[];
     return messages.some((message) => message.role === "ASSISTANT");
   }, { timeout: 30_000 }).toBe(true);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page.getByTestId("assistant-message")).toHaveCount(0);
   await expect(page.getByTestId("composer-shell").getByRole("button", { name: "중지" })).toHaveCount(0);
@@ -127,7 +124,7 @@ test("존재하지 않는 주소는 새 대화 링크를 보인다", async ({ pa
   await page.goto("/chat/00000000-0000-4000-8000-000000000000");
   await expect(page.getByTestId("conversation-not-found")).toBeVisible();
   await expect(page.getByTestId("conversation-not-found").getByRole("link", { name: "새 대화" }))
-    .toHaveAttribute("href", "/");
+    .toHaveAttribute("href", "/new");
 });
 
 test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", async ({ page, context }, testInfo) => {
@@ -152,7 +149,7 @@ test("사이드바는 일반 화면에 있고 로그인 화면에는 없다", as
 });
 
 test("사진을 먼저 올려 대화가 생겨도 미리보기가 남고 다른 대화를 고르면 서버에서 지운다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const first = await page.request.post("/api/chat", {
     data: { text: `돌아갈 대화 ${testInfo.project.name} ${Date.now()}`, agentCode: "browser" },
   });
@@ -189,7 +186,7 @@ test("사진을 먼저 올려 대화가 생겨도 미리보기가 남고 다른 
 });
 
 test("사진을 먼저 올리고 보내면 같은 대화에 첫 메시지와 제목이 남는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `사진 첫 메시지 ${testInfo.project.name} ${Date.now()}`;
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "shell.png", mimeType: "image/png", buffer: PNG_1X1 },
@@ -215,7 +212,7 @@ test("사진을 먼저 올리고 보내면 같은 대화에 첫 메시지와 제
 });
 
 test("사진을 올린 뒤 같은 대화 링크를 눌러도 미리보기와 파일이 남는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const uploaded = page.waitForResponse((response) => response.request().method() === "POST"
     && new RegExp(`/api/chat/conversations/${CONVERSATION_ID}/attachments$`).test(response.url()));
   await page.getByTestId("attachment-input").setInputFiles([
@@ -234,7 +231,7 @@ test("사진을 올린 뒤 같은 대화 링크를 눌러도 미리보기와 파
 
 test("서랍은 Esc 한 번에 닫힌다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
   await expect(sidebar).toBeInViewport();
@@ -245,7 +242,7 @@ test("서랍은 Esc 한 번에 닫힌다", async ({ page }, testInfo) => {
 test("답을 만드는 중에 서랍을 Esc 로 닫으면 서랍만 닫히고 답은 멈추지 않는다", async ({ page, hermes }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, `서랍 Esc 격리 ${Date.now()}`);
   await hermes.waitForHeldRun();
   await openSidebar(page, testInfo);
@@ -260,7 +257,7 @@ test("답을 만드는 중에 서랍을 Esc 로 닫으면 서랍만 닫히고 �
 });
 
 test("started 뒤 실패하면 입력은 비고 저장된 질문은 하나다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.route("**/api/chat/stream", async (route) => {
     const response = await route.fetch();
     const raw = await response.text();
@@ -281,7 +278,7 @@ test("started 뒤 실패하면 입력은 비고 저장된 질문은 하나다", 
 });
 
 test("대화 이름을 바꾸고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const original = `이름 변경 전 ${testInfo.project.name} ${Date.now()}`;
   const changed = `이름 변경 후 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, original);
@@ -300,7 +297,7 @@ test("대화 이름을 바꾸고 새로 고쳐도 유지한다", async ({ page }
 
 test("대화 이름의 Esc 와 빈 이름은 원래 이름을 유지한다", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  await page.goto("/");
+  await page.goto("/new");
   const title = `이름 취소 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.reload();
@@ -327,7 +324,7 @@ test("대화 이름의 Esc 와 빈 이름은 원래 이름을 유지한다", asy
 });
 
 test("열어 둔 대화를 지우면 홈으로 가고 다시 열 수 없다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `삭제 성공 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.goto(`/chat/${id}`);
@@ -337,14 +334,14 @@ test("열어 둔 대화를 지우면 홈으로 가고 다시 열 수 없다", as
   const dialog = page.getByRole("alertdialog", { name: "대화 지우기" });
   await expect(dialog).toContainText("사용량 기록은 남아요");
   await dialog.getByRole("button", { name: "지우기" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
   await expect(conversationNav(page).locator(`a[href="/chat/${id}"]`)).toHaveCount(0);
   await page.goto(`/chat/${id}`);
   await expect(page.getByTestId("conversation-not-found")).toBeVisible();
 });
 
 test("지우기가 실패하면 대화가 남고 오류가 보인다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `삭제 실패 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.reload();
@@ -360,7 +357,7 @@ test("지우기가 실패하면 대화가 남고 오류가 보인다", async ({ 
 });
 
 test("지우는 요청이 도는 동안 창을 열어 두고 두 단추를 잠그며 끝나면 창을 닫는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `삭제 대기 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.reload();
@@ -392,7 +389,7 @@ test("지우는 요청이 도는 동안 창을 열어 두고 두 단추를 잠�
 });
 
 test("제목 검색은 맞는 대화만 남기고 날짜 묶음을 유지한다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const unique = Date.now();
   const first = await createConversation(page, `찾을 대화 ${testInfo.project.name} ${unique}`);
   const second = await createConversation(page, `다른 제목 ${testInfo.project.name} ${unique}`);
@@ -408,7 +405,7 @@ test("제목 검색은 맞는 대화만 남기고 날짜 묶음을 유지한다"
 
 test("넓은 화면에서 사이드바를 접고 새로 고쳐도 유지한다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("button", { name: "사이드바 접기" }).click();
   await expect(page.getByRole("button", { name: "사이드바 펴기" })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "사이드바" })).toBeHidden();
@@ -423,11 +420,11 @@ test("넓은 화면에서 사이드바를 접고 새로 고쳐도 유지한다",
 });
 
 test("단축키로 홈으로 가고 검색에 초점을 준다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, `단축키 ${testInfo.project.name} ${Date.now()}`);
   await expect(page).toHaveURL(CONVERSATION_URL);
   await page.keyboard.press("Control+Shift+O");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   await page.keyboard.press("Control+K");
@@ -436,7 +433,7 @@ test("단축키로 홈으로 가고 검색에 초점을 준다", async ({ page }
 
 test("모바일 이름 입력과 지우기 창의 Esc 는 서랍을 닫지 않는다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   const title = `Esc 격리 ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.goto(`/chat/${id}`);
@@ -460,7 +457,7 @@ test("모바일 이름 입력과 지우기 창의 Esc 는 서랍을 닫지 않�
 });
 
 test("대화 메뉴는 Esc 와 바깥 클릭으로 닫히고 서랍은 유지한다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   const title = `메뉴 닫기 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await page.goto(`/chat/${id}`);
@@ -523,7 +520,7 @@ async function expectNextEscapeStopsOrRunContinues(page: Page, hermes: { release
 
 test("답을 만드는 중에 대화 메뉴를 Esc 로 닫으면 메뉴만 닫히고 답은 계속 흐른다", async ({ page, hermes }, testInfo) => {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   const title = `메뉴 Esc 실행 ${testInfo.project.name} ${Date.now()}`;
   await send(page, title);
   await hermes.waitForHeldRun();
@@ -542,7 +539,7 @@ test("답을 만드는 중에 대화 메뉴를 Esc 로 닫으면 메뉴만 닫�
 
 test("답을 만드는 중에 지우기 확인 창을 Esc 로 닫으면 창만 닫히고 답은 계속 흐른다", async ({ page, hermes }, testInfo) => {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   const title = `지우기 Esc 실행 ${testInfo.project.name} ${Date.now()}`;
   await send(page, title);
   await hermes.waitForHeldRun();
@@ -566,7 +563,7 @@ test("답을 만드는 중에 지우기 확인 창을 Esc 로 닫으면 창만 �
 
 test("서랍 안에서 Tab 을 거듭 눌러도 초점이 서랍 밖으로 나가지 않는다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await createConversation(page, `초점 가두기 ${Date.now()}`);
   await page.reload();
   await openSidebar(page, testInfo);
@@ -583,7 +580,7 @@ test("서랍 안에서 Tab 을 거듭 눌러도 초점이 서랍 밖으로 나�
 
 test("사진을 올린 뒤 서랍을 열고 닫아도 미리보기가 남는다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByTestId("attachment-input").setInputFiles([
     { name: "drawer.png", mimeType: "image/png", buffer: PNG_1X1 },
   ]);
@@ -598,7 +595,7 @@ test("사진을 올린 뒤 서랍을 열고 닫아도 미리보기가 남는다"
 
 test("아이콘 단추에 마우스를 올리면 접근성 이름과 같은 풀이가 보인다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop");
-  await page.goto("/");
+  await page.goto("/new");
   const collapse = page.getByRole("button", { name: "사이드바 접기" });
   await expect(collapse).not.toHaveAttribute("title");
   await collapse.hover();
@@ -617,7 +614,7 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
     if (isRscRequest(route.request())) await held;
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/new");
   const sidebar = page.getByRole("complementary", { name: "사이드바" });
 
   // 지금 경로와 같은 「새 대화」 는 경로가 바뀌지 않으므로 누르자마자 닫힌다.
@@ -625,7 +622,7 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
   await expect(sidebar).toBeInViewport();
   await page.getByTestId("new-conversation-link").click();
   await expect(sidebar).toBeHidden();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
 
   // 다른 경로로 옮기는 동안에는 서랍이 남고, 옮긴 화면이 보인 뒤 닫힌다.
   try {
@@ -643,7 +640,7 @@ test("서랍은 옮기는 동안 열려 있다가 옮긴 뒤 닫히고, 지금 �
 
 test("서랍을 연 채 넓혔다가 다시 좁히면 서랍은 닫혀 있다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   await expect(page.getByRole("dialog", { name: "사이드바" })).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 844 });

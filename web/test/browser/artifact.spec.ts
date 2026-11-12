@@ -4,7 +4,7 @@ import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.j
 
 /** 새 대화에서 결과물을 만드는 글을 보내고, 답 아래 결과물 줄이 뜰 때까지 기다린다. */
 async function sendProbe(page: Page, text: string = ARTIFACT_PROBE, count = 1) {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();

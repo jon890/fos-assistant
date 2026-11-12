@@ -53,7 +53,7 @@ test("대화가 많아도 사이드바는 첫 화면과 대화 전환에서 요�
   const ids = await seedConversations(page);
   const counter = countRequests(page);
 
-  await page.goto("/");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   const nav = page.getByRole("navigation", { name: "대화 목록" });
   await expect(nav.locator('a[href^="/chat/"]').first()).toBeVisible();
@@ -75,7 +75,7 @@ test("대화가 많아도 사이드바는 첫 화면과 대화 전환에서 요�
 
   // 새 대화에서 메시지 하나를 보내는 동안 나가는 목록 읽기를 센다.
   counter.reset();
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(`요청 수 검사 ${Date.now()}`);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
@@ -111,7 +111,7 @@ test("목록 끝에 닿으면 다음 쪽을 읽고 검색은 아직 읽지 않�
     if (url.pathname === "/api/chat/conversations" && request.method() === "GET") lists.push(url.search);
   });
 
-  await page.goto("/");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   const nav = page.getByRole("navigation", { name: "대화 목록" });
   const links = nav.locator('a[href^="/chat/"]');

@@ -32,10 +32,10 @@ export type Conversation = {
   modelSelectionMode?: "TIER" | null;
   modelTier?: ModelTierCode | null;
   /**
-   * 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK` 다. 이 provider 가 서버 응답을 읽을 때 없으면 `CHAT` 으로 채운다.
+   * 먼저 살펴보기의 결과가 남는 점검 대화면 `CHECK`, 기본 비서와 이어지는 대화방이면 `ROOM` 이다. 이 provider 가 서버 응답을 읽을 때 없으면 `CHAT` 으로 채운다.
    * `replace` 로 받은 줄은 부른 쪽이 준 그대로라 비어 있을 수 있다.
    */
-  purpose?: "CHAT" | "CHECK";
+  purpose?: "CHAT" | "CHECK" | "ROOM";
   /** 예약 작업이 만든 대화면 그 작업이다. 아니면 null 이다 */
   taskId: string | null;
   taskTitle: string | null;
@@ -265,6 +265,11 @@ export function ConversationsProvider({
   const replace = useCallback(
     (conversation: Conversation) => {
       latestRequest.current += 1;
+      // 대화방은 목록에 끼우지 않는다. 사이드바가 맨 위에 따로 그린다.
+      if (conversation.purpose === "ROOM") {
+        setPinned((now) => new Map(now).set(conversation.id, conversation));
+        return;
+      }
       const current = pageRef.current;
       if (current.items.some((item) => item.id === conversation.id)) {
         commit((now) => ({
@@ -366,16 +371,17 @@ export function useConversations(): ConversationsValue {
 /**
  * 대화 한 줄을 찾는다. 읽어 둔 목록에 없으면 한 줄로 읽어 온다.
  *
- * <p>목록은 첫 쪽만 읽으므로 오래된 대화를 주소로 열면 목록에 없다. 모델 칸과 에이전트 칸이 이 줄을 쓴다.
+ * <p>목록은 첫 쪽만 읽으므로 오래된 대화를 주소로 열면 목록에 없다. 대화방은 목록이 빼므로 늘 없다. 모델 칸과 에이전트 칸이 이
+ * 줄을 쓴다.
  */
 export function useConversation(id: string | null): Conversation | undefined {
-  const { conversations, loading, hasMore, pinned, pin } = useConversations();
+  const { conversations, loading, pinned, pin } = useConversations();
   const listed =
     id === null ? undefined : conversations.find((item) => item.id === id);
   useEffect(() => {
-    // 목록을 다 읽었는데 없으면 방금 만든 대화다. 곧 목록에 들어오므로 따로 읽지 않는다.
-    if (id !== null && !loading && hasMore && listed === undefined)
-      void pin(id);
-  }, [id, loading, hasMore, listed, pin]);
+    // 목록을 다 읽었어도 없으면 한 줄로 읽는다. 대화방은 목록에 들지 않고, 방금 만든 대화는 곧 목록에 들어와 목록 줄이 앞선다.
+    // 한 대화를 한 번만 읽는다(`pin`).
+    if (id !== null && !loading && listed === undefined) void pin(id);
+  }, [id, loading, listed, pin]);
   return listed ?? (id === null ? undefined : pinned.get(id));
 }

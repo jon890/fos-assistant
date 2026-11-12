@@ -115,7 +115,7 @@ test("새로 보낸 줄만 등장 움직임을 갖고 답이 저장된 뒤와 �
   const release = await holdChatStream(page);
   await recordRowAnimationStarts(page);
   try {
-    await page.goto("/");
+    await page.goto("/new");
     await send(page, "등장 움직임 검사");
 
     const bubble = page.getByTestId("user-message");
@@ -170,7 +170,7 @@ test("새로 보낸 줄만 등장 움직임을 갖고 답이 저장된 뒤와 �
 });
 
 test("작업 과정 블록은 높이가 transition 으로 바뀌고 접힌 내용은 보이지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, "작업 과정 펼침 검사");
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
   await expect(block).toBeVisible({ timeout: 30_000 });
@@ -203,7 +203,7 @@ test("작업 과정 블록은 높이가 transition 으로 바뀌고 접힌 내�
 });
 
 test("작업 과정 블록을 펼치는 동안 단추를 화면에 맞춰도 안쪽 내용이 스크롤로 밀리지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await send(page, "펼치는 중 스크롤 검사");
   const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();
   await expect(block).toBeVisible({ timeout: 30_000 });
@@ -238,7 +238,7 @@ test("줄인 움직임에서 말풍선은 이동하지 않고 흐려짐만 한�
   await page.emulateMedia({ reducedMotion: "reduce" });
   const release = await holdChatStream(page);
   try {
-    await page.goto("/");
+    await page.goto("/new");
     await send(page, "줄인 움직임 말풍선 검사");
     const bubble = page.getByTestId("user-message");
     await expect(bubble).toBeVisible();
@@ -253,7 +253,7 @@ test("줄인 움직임에서 말풍선은 이동하지 않고 흐려짐만 한�
 test("줄인 움직임에서 대화상자는 크기 변화를 하지 않는다", async ({ page }, testInfo) => {
   const title = `움직임 대화상자 ${testInfo.project.name} ${Date.now()}`;
   await createConversation(page, title);
-  await page.goto("/");
+  await page.goto("/new");
   await openDeleteDialog(page, testInfo, title);
   const content = page.locator('[data-slot="alert-dialog-content"]');
   expect(Number(await enterVariable(content, "--tw-enter-scale")), "줄이지 않은 대화상자의 시작 크기").toBe(0.96);
@@ -265,7 +265,7 @@ test("줄인 움직임에서 대화상자는 크기 변화를 하지 않는다",
 
 test("줄인 움직임에서 서랍은 밀려 들어오지 않는다", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile");
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   const drawer = page.locator('[data-slot="sheet-content"][data-side="left"]');
   await expect(drawer).toBeVisible();
@@ -281,7 +281,7 @@ test("대화를 지우면 줄이 나가는 움직임을 거쳐 사라진다", as
   const title = `움직임 삭제 ${testInfo.project.name} ${Date.now()}`;
   const id = await createConversation(page, title);
   await recordLeavingRows(page);
-  await page.goto("/");
+  await page.goto("/new");
   const dialog = await openDeleteDialog(page, testInfo, title);
   expect(await leavingSeen(page), "지우기 전에는 나가는 줄이 없다").toEqual([]);
   await dialog.getByRole("button", { name: "지우기" }).click();
@@ -295,7 +295,7 @@ test("줄인 움직임에서는 지운 대화 줄이 기다리지 않고 사라�
   const id = await createConversation(page, title);
   await recordLeavingRows(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/new");
   const dialog = await openDeleteDialog(page, testInfo, title);
   await dialog.getByRole("button", { name: "지우기" }).click();
   await expect(dialog).toBeHidden();
@@ -310,7 +310,7 @@ test("지우기가 실패하면 줄이 나가는 움직임 없이 남는다", as
   await page.route("**/api/chat/conversations/*", (route) => route.request().method() === "DELETE"
     ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL_ERROR", message: "지우기 실패" }) })
     : route.continue());
-  await page.goto("/");
+  await page.goto("/new");
   const dialog = await openDeleteDialog(page, testInfo, title);
   await dialog.getByRole("button", { name: "지우기" }).click();
   await expect(dialog).toBeHidden();
@@ -388,7 +388,7 @@ test("줄인 움직임에서 「새 메시지」 단추는 바로 내려간다",
     } as typeof Element.prototype.scrollTo;
   });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("긴 답 스트림 검사");
   await page.getByRole("button", { name: "보내기" }).click();
@@ -424,7 +424,7 @@ async function goToUsage(page: Page, testInfo: TestInfo) {
 }
 
 test("화면을 옮기면 본문만 바뀌고 화면 틀은 같은 DOM 노드로 남는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   // 좁은 폭의 서랍은 옮기면 닫히므로, 그 폭에서는 늘 남는 머리의 단추를 화면 틀로 본다.
   const shell = testInfo.project.name === "mobile"
     ? page.getByRole("button", { name: "사이드바 열기" })
@@ -438,7 +438,7 @@ test("화면을 옮기면 본문만 바뀌고 화면 틀은 같은 DOM 노드로
 });
 
 test("첫 메시지를 보내 주소가 바뀌어도 대화가 다시 만들어지지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await expect(composer).toBeVisible();
   await composer.evaluate((node) => node.setAttribute("data-probe", "composer"));
@@ -452,7 +452,7 @@ test("첫 메시지를 보내 주소가 바뀌어도 대화가 다시 만들어�
 
 test("줄인 움직임에서 화면을 옮겨도 본문 제목이 보인다", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/new");
   await goToUsage(page, testInfo);
   // 본문 제목이 보이는 것은 goToUsage 가 단언한다.
   const wrapper = page.locator(".animate-screen-in");

@@ -34,7 +34,7 @@ async function putSkill(page: Page, code: string, name: string) {
 
 /** 새 대화 화면을 열고 에이전트 카드를 고른다. */
 async function startWith(page: Page, agentName: string) {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: agentName, exact: true }).click();
   await expect(
     page.getByRole("radio", { name: agentName, exact: true }),
@@ -295,7 +295,7 @@ test("스트림 경로 거절은 비스트림으로 다시 보내지 않고 글�
       }),
     }),
   );
-  await page.goto("/");
+  await page.goto("/new");
   const input = composer(page);
   await input.fill("/nope 해 줘");
   await input.press("Enter");
@@ -320,7 +320,7 @@ test("스트림이 HTTP 오류로 거절해도 없는 이름을 같은 문구로
       }),
     }),
   );
-  await page.goto("/");
+  await page.goto("/new");
   const input = composer(page);
   await input.fill("/nope");
   await input.press("Enter");
@@ -335,7 +335,7 @@ test("스킬 목록이 빈 에이전트에서 / 를 치면 스킬이 없다고 �
   page,
 }) => {
   await routeSkills(page, { skills: [], skillsToolsetEnabled: true });
-  await page.goto("/");
+  await page.goto("/new");
   const input = composer(page);
   await input.fill("/");
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
@@ -357,7 +357,7 @@ test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 스킬이 �
     skills: [{ name: "hermes-help", enabled: true }],
     skillsToolsetEnabled: false,
   });
-  await page.goto("/");
+  await page.goto("/new");
   await composer(page).fill("/");
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
 });

@@ -1,4 +1,4 @@
-import { expect, setSession, test } from "./fixtures.ts";
+import { expect, setSession, test, HOME_URL } from "./fixtures.ts";
 import { clickAndWaitForResponse } from "./helpers.ts";
 import { TEST_EMAIL } from "./settings.ts";
 import type { CatalogToolset } from "../../src/lib/toolset-catalog.ts";
@@ -53,7 +53,7 @@ test("관리자가 활성 도구를 숨겨도 켜짐은 보존하고 관리자 �
     expect((await page.request.get("/api/admin/toolsets")).status()).toBe(403);
     expect((await page.request.put("/api/admin/toolsets", { data: { hidden: [] } })).status()).toBe(403);
     await page.goto("/admin/tools");
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(HOME_URL);
   } finally {
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
     expect((await page.request.put("/api/admin/toolsets", { data: { hidden: originalCatalog.filter((tool) => tool.hidden).map((tool) => tool.name) } })).ok()).toBeTruthy();

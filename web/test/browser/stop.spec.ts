@@ -14,7 +14,7 @@ const PNG_1X1 = Buffer.from(
 );
 
 async function beginHeldTurn(page: Page, text: string) {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
 }
@@ -48,7 +48,7 @@ test("실행 중 보낸 사진은 내 메시지에 남고 다음 사진을 고�
   page,
   hermes,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const uploaded = page.waitForResponse(
     (response) =>
       response.request().method() === "POST" &&
@@ -137,7 +137,7 @@ test("남긴 답이 없으면 사용자 메시지 아래에 안내를 보인다"
 
 test("답과 코드 블록의 원문을 복사한다", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   const answerCopy = page.getByRole("button", { name: "답 복사" }).last();
@@ -164,7 +164,7 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
     stopRequests += 1;
     await route.fallback();
   });
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page
     .getByRole("textbox", { name: "메시지" })

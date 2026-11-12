@@ -190,7 +190,7 @@ function BoundResult({
       </p>
       <div className="flex flex-wrap gap-2">
         <Button asChild>
-          <Link href={`/?agent=${bound.choice.code}`}>
+          <Link href={`/new?agent=${bound.choice.code}`}>
             <MessageSquare aria-hidden="true" />
             {withParticle(bound.choice.name, "과", "와")} 대화하기
           </Link>

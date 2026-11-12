@@ -10,7 +10,7 @@ async function script(input: string, output: string, events: Record<string, unkn
 }
 
 async function send(page: Page, text: string) {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: "브라우저 비서", exact: true }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기", exact: true }).click();

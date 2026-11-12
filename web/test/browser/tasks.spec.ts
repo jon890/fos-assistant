@@ -37,7 +37,7 @@ async function createTaskByApi(page: Page, title: string): Promise<string> {
 }
 
 test("메뉴의 예약 작업으로 가면 빈 목록 문구가 보인다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebarIfNarrow(page, testInfo.project.name);
   await page
     .getByRole("navigation", { name: "주요 화면" })
@@ -177,7 +177,7 @@ test("사이드바는 작업 대화를 작업 이름 아래로 묶고 누르면 
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebarIfNarrow(page, testInfo.project.name);
   const nav = page.getByRole("navigation", { name: "대화 목록" });
   await expect(nav.getByRole("heading", { name: "예약 작업" })).toBeVisible();

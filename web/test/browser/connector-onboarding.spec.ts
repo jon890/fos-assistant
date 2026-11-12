@@ -152,13 +152,13 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
   ).toBe(true);
 
   await page.getByRole("link", { name: `${PRIVATE_NAME}와 대화하기` }).click();
-  await expect(page).toHaveURL(new RegExp(`/\\?agent=${code}$`));
+  await expect(page).toHaveURL(new RegExp(`/new\\?agent=${code}$`));
   await expect(page.getByRole("radio", { name: PRIVATE_NAME })).toHaveAttribute(
     "aria-checked",
     "true",
   );
   // 목록의 첫 에이전트라서 골라진 것이 아니라 주소가 고른 것임을 다른 에이전트로도 본다.
-  await page.goto(`/?agent=${groupCode}`);
+  await page.goto(`/new?agent=${groupCode}`);
   await expect(page.getByRole("radio", { name: GROUP_NAME })).toHaveAttribute(
     "aria-checked",
     "true",

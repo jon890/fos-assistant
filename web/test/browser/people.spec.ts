@@ -1,4 +1,4 @@
-import { expect, setSession, test } from "./fixtures.ts";
+import { expect, setSession, test, HOME_URL } from "./fixtures.ts";
 import { clickAndWaitForResponse, isolatedUser } from "./helpers.ts";
 import type {
   Page,
@@ -126,11 +126,11 @@ test("관리자가 아닌 사람에게는 사람 관리 화면이 보이지 않�
 }, testInfo) => {
   await setSession(context, isolatedUser(testInfo, "member"));
 
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 
   await page.goto("/admin/people");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await expect(page.getByRole("table", { name: "등록된 사용자" })).toHaveCount(
     0,
   );
