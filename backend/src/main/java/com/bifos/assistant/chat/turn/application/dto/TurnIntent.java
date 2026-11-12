@@ -131,6 +131,15 @@ public sealed interface TurnIntent {
     }
 
 
+    /**
+     * 사람이 보낸 turn 인가. 새 질문(대기 메시지 합침 포함), 다시 생성, {@code @} 맡김이 참이다. 결과 전달(사용자가 다시 전달한 것
+     * 포함), 예약 작업, 먼저 살펴보기는 거짓이다. 화면 넘기기 카드는 사람이 보낸 turn 에서만 닫는다.
+     */
+    static boolean byUser(TurnIntent intent) {
+        return intent instanceof Fresh || intent instanceof Regenerate || intent instanceof Mention;
+    }
+
+
     static String instructionFor(TurnIntent intent) {
         if (intent instanceof Regenerate regenerate && regenerate.previousAnswer() != null) {
             return REGENERATE_INSTRUCTION;

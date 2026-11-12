@@ -377,8 +377,10 @@ class ChatServiceTest {
         assertThat(recordedEvents.stream(ConversationTurnStarted.class))
             .as("turn 을 열 때 낸 새 turn 사건")
             .singleElement()
-            .extracting(ConversationTurnStarted::conversationId)
-            .isNotNull();
+            .satisfies(started -> {
+                assertThat(started.conversationId()).isNotNull();
+                assertThat(started.byUser()).as("사용자가 보낸 turn").isTrue();
+            });
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("dad");
