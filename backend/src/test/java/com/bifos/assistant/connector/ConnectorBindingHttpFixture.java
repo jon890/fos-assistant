@@ -44,6 +44,8 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
     final List<Integer> callbackCodes = new CopyOnWriteArrayList<>();
     final AtomicReference<Runnable> observeCommit = new AtomicReference<>();
     final AtomicReference<Throwable> callbackFailure = new AtomicReference<>();
+    /** Python 대역으로 중계하다 난 첫 오류다. 서버가 핸들러 예외를 삼키므로 {@link #assertNoRelayFailure} 가 검사 끝에서 드러낸다. */
+    private final AtomicReference<Throwable> relayFailure = new AtomicReference<>();
     final AtomicInteger supportFailure = new AtomicInteger();
     final AtomicInteger pluginFailure = new AtomicInteger();
     final AtomicInteger heldFailure = new AtomicInteger();
@@ -157,8 +159,18 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
             }
             reply(exchange, signal != null && heldFailure.get() != 0 ? heldFailure.get() : response.statusCode(), response.body());
         } catch (Exception | AssertionError error) {
+            relayFailure.compareAndSet(null, error);
             reply(exchange, 500, "{}");
             throw new IOException(error);
+        }
+    }
+
+
+    /** 중계 중 난 오류가 있으면 원인 그대로 실패시키고 비운다. Spring 쪽의 500 에 원인이 묻히지 않게 한다. */
+    void assertNoRelayFailure() {
+        Throwable failure = relayFailure.getAndSet(null);
+        if (failure != null) {
+            throw new AssertionError("Python 대역 중계 실패: " + failure, failure);
         }
     }
 

@@ -173,6 +173,7 @@ class ConnectorGuardBindingRoundTripTest {
             if (remote != null) {
                 remote.resetObservations();
                 remote.resetPlugin();
+                remote.assertNoRelayFailure();
             }
         } finally {
             // 되돌림 단언이 실패해도 이 검사의 행은 지운다.
