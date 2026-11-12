@@ -330,7 +330,7 @@ UUID 모양이 아닌 `{id}` 는 400 `VALIDATION_FAILED` 다([`backend/docs/code
 
 **turn 이 끝날 때 대화를 통째로 다시 저장하지 않는다.**
 요청 시작에 읽은 `Conversation` 을 끝에서 통째로 저장하면, 그 사이에 사용자가 이름을 바꾸거나 지웠을 때 옛 값으로 덮여 지운 대화가 되살아난다.
-turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 둘만 고치는 질의로 쓴다.
+turn 이 바꾸는 칸은 `hermes_session_id` 와 `updated_at` 뿐이므로 그 둘만 고치는 질의로 쓴다. `@` 맡김 turn 은 `updated_at` 만 바꾼다([에이전트 팀](agent-team.md) 의 「`@` 로 바로 맡기기」).
 새 대화의 첫 turn 은 시작할 때 `hermes_session_id` 와 `hermes_root_session_id` 를 비어 있을 때만 채우고 `updated_at` 은 바꾸지 않는다.
 바꾸면 실패한 turn 도 대화를 목록 맨 위로 올린다.
 
@@ -544,7 +544,7 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/doc
 
 | 실행 | 판정 | 끝났을 때 적는 것 | 아직 돌 때 |
 | --- | --- | --- | --- |
-| 대화 turn | 부모가 없고 대화가 있다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. `RecoveredAnswerGuard` 가 답 대신 알림 줄을 정하면 그 줄만 남긴다. 먼저 살펴보기 turn 이 그렇다([`docs/features/proactive.md`](proactive.md) 의 「끝날 때」). 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
+| 대화 turn | 부모가 없고 대화가 있다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. 에이전트가 대화의 에이전트와 다른 `@` 맡김 turn 은 새 session 으로 돌았으므로 대화의 session 을 적지 않는다. `RecoveredAnswerGuard` 가 답 대신 알림 줄을 정하면 그 줄만 남긴다. 먼저 살펴보기 turn 이 그렇다([`docs/features/proactive.md`](proactive.md) 의 「끝날 때」). 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
 | 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text` 와 끝 사건. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
 | 그 밖의 실행(추천 질문, 과거 Memory 제안) | 위 두 경우가 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
 

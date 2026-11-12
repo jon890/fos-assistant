@@ -236,6 +236,24 @@ class RecoveredRunRecorderTest {
 
 
     @Test
+    @DisplayName("@ 맡김 turn 을 복구하면 답은 맡은 에이전트의 실행으로 남고 대화의 session 은 그대로다")
+    void recoveredMentionTurnKeepsConversationSession() {
+        conversation.assignNewSession("fos-conversation");
+        conversations.save(conversation);
+        AgentExecution row = chatTurn(conversation, worker);
+
+        assertThat(recorder.settle(row.id(), result("completed", "맡은 답"))).isTrue();
+        assertThat(recorder.settle(chatTurn(conversation, worker).id(), result("cancelled", "멈춘 답"))).isTrue();
+
+        assertThat(conversations.findById(conversation.id()).orElseThrow().hermesSessionId())
+            .isEqualTo("fos-conversation");
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+            .extracting(ChatMessage::content, ChatMessage::executionId)
+            .startsWith(tuple("맡은 답", row.id()));
+    }
+
+
+    @Test
     @DisplayName("같은 실행을 한 번 더 적으려 하면 거짓이고 메시지와 사건과 끝난 시각이 그대로다")
     void settlingTwiceWritesOnlyOnce() {
         AgentExecution row = chatTurn(conversation, chief);

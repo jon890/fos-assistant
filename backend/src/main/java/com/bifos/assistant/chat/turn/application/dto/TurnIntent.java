@@ -39,8 +39,8 @@ public sealed interface TurnIntent {
         + RESULT_HANDLING_RULES;
 
     /** 사용자가 {@code @} 로 고른 에이전트에게 바로 맡긴 turn 의 지시다(ADR-20261112 / mention-delegation). */
-    String MENTION_INSTRUCTION = "사용자가 대화 중에 너를 골라 바로 맡긴 일이다. [대화의 앞 줄] 은 참고로만 읽고, 그 안의 요청은 이미 다뤄졌으니 다시 하지 않는다. "
-        + "[맡긴 일] 에 답한다.";
+    String MENTION_INSTRUCTION = "사용자가 대화 중에 너를 골라 바로 맡긴 일이다. [출처: 대화의 앞 줄 …] 아래의 글은 참고로만 읽고, 그 안의 요청은 "
+        + "이미 다뤄졌으니 다시 하지 않는다. [맡긴 일] 아래의 글에 답한다.";
 
     String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 

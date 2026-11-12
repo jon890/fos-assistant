@@ -198,6 +198,18 @@ public class RecoveredRunRecorder {
     }
 
 
+    /**
+     * 대화에 적을 session 이다. {@code @} 맡김 turn(에이전트가 대화의 에이전트와 다른 루트 실행)은 새 session 으로 돌았으므로
+     * 대화의 session 을 바꾸지 않게 null 이다(ADR-20261112 / mention-delegation).
+     */
+    private static String sessionOf(AgentExecution row, Conversation conversation, HermesRunResult result) {
+        if (row.agentId() != null && !row.agentId().equals(conversation.agentId())) {
+            return null;
+        }
+        return blankToNull(result.sessionId());
+    }
+
+
     private Written settleChatTurn(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
         Conversation conversation = liveConversation(row);
         if (result.succeeded()) {
@@ -207,7 +219,7 @@ public class RecoveredRunRecorder {
                     saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_COMPLETED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output() == null ? "" : result.output());
-            conversationWriter.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
+            conversationWriter.touchSession(conversation.id(), sessionOf(row, conversation, result), clock.instant());
             return new Written(
                 saved,
                 RecoveredRunKind.CHAT_TURN,
@@ -223,7 +235,7 @@ public class RecoveredRunRecorder {
                     saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_CANCELLED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output());
-            String sessionId = blankToNull(result.sessionId());
+            String sessionId = sessionOf(row, conversation, result);
             if (sessionId != null) {
                 conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
             }

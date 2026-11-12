@@ -174,14 +174,15 @@ class ChatTurnLifecycle {
 
     ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         Instant now = clock.instant();
+        // 맡김은 새 session 으로 돌았다. 대화의 session 은 두고 바뀐 시각만 올린다.
         boolean mention = pending.intent() instanceof TurnIntent.Mention;
         if (!mention) {
             pending.conversation().rememberSession(result.sessionId(), now);
-            conversationWriter.touchSession(
-                pending.conversation().id(),
-                result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-                now);
         }
+        conversationWriter.touchSession(
+            pending.conversation().id(),
+            mention || result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
+            now);
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         chatRunEvents.append(pending, ExecutionEventType.RUN_COMPLETED, null);

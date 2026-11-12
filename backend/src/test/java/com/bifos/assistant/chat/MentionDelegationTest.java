@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.domain.Agent;
@@ -178,6 +179,35 @@ class MentionDelegationTest {
         assertThat(stub().received().getLast().input())
             .doesNotContain("[사용자가 @ 로 다른 에이전트에게 바로 맡긴 일]")
             .endsWith("고마워");
+    }
+
+
+    @Test
+    @DisplayName("실패한 맡김은 답 없이 실패 상태로 다음 turn 에 실리고 대화의 session 은 그대로다")
+    void failedMentionCarriesStatus() {
+        Long conversationId = chat.send(dad, null, "다음 주에 등산 가", "dad").conversationId();
+        String session = conversations.findById(conversationId).orElseThrow().hermesSessionId();
+        stub().willAnswer(command -> new HermesRunResult(
+            "failed", "fos-other", "failed", "", null, null, "failed", TokenUsage.empty()));
+        assertRejected(
+            () -> chat.send(dad, conversationId, "운동화 찾아줘", null, List.of(), "shopper"), ErrorCode.HERMES_RUN_FAILED);
+        AgentExecution failed = executions.findAll().stream()
+            .filter(execution -> shopper.id().equals(execution.agentId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(chat.mentionMarks(dad, conversationId).questions().values())
+            .extracting(DelegationLine::executionId, DelegationLine::status)
+            .containsExactly(tuple(failed.id(), ExecutionStatus.FAILED));
+        assertThat(conversations.findById(conversationId).orElseThrow().hermesSessionId()).isEqualTo(session);
+
+        stub().willAnswer(command -> HermesRunResult.of(
+            "run-next", command.sessionId(), "completed", "다음 답", "model", "provider", TokenUsage.empty()));
+        chat.send(dad, conversationId, "다시 알려 줘", null);
+
+        assertThat(stub().received().getLast().input())
+            .contains("[출처: @ 로 맡긴 일, 에이전트: 쇼핑 담당, 실행 번호: " + failed.id() + ", 상태: FAILED")
+            .contains("사용자: 운동화 찾아줘")
+            .doesNotContain("<external-data>");
     }
 
 
