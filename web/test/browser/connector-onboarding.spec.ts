@@ -11,6 +11,7 @@ import type {
   Page,
   TestInfo,
 } from "../../node_modules/@playwright/test/index.js";
+import { BINDING_POLL_MS } from "../../src/lib/binding-poll.ts";
 
 /**
  * 외부 서비스를 연결한 직후 같은 자리에서 쓸 에이전트를 고르고, 붙이고, 그 에이전트와 대화로 잇는 흐름을 본다.
@@ -379,4 +380,60 @@ test("에이전트 목록의 「전문 에이전트 만들기」 는 연결한 �
     connections.connections.find((item) => item.connectorId === "demo-notes")
       ?.bound,
   ).toBe(false);
+});
+
+test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙이는 중이 끝난다", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const code = await createAgent(page, PRIVATE_NAME);
+  // 반영 예정 시각이 지나 Control Plane 이 바인딩을 READY 로 바꾼 것을 흉내 낸다. 바꾸기 전에는 실제 응답을 그대로 둔다.
+  let applied = false;
+  let reads = 0;
+  await page.route(`**${CONNECTOR_PATH}`, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads += 1;
+    const response = await route.fetch();
+    if (!applied) return route.fulfill({ response });
+    const connection = await response.json();
+    return route.fulfill({
+      response,
+      json: {
+        ...connection,
+        bindings: connection.bindings.map((binding: object) => ({
+          ...binding,
+          status: "READY",
+        })),
+      },
+    });
+  });
+
+  await page.goto("/connections/demo-notes");
+  await connect(page);
+  await declineOffer(page);
+  await clickAndWaitForResponse(
+    page,
+    choice(page, PRIVATE_NAME).getByRole("button", {
+      name: "이 에이전트에서 쓰기",
+    }),
+    "PUT",
+    new RegExp(`^/api/agents/${code}/connections/demo-notes$`),
+  );
+  const binding = page.getByTestId("connection-binding");
+  await expect(binding).toContainText("붙이는 중");
+  await expect(page.getByTestId("connector-bound-result")).toContainText(
+    "몇 분 안에 쓸 수 있어요.",
+  );
+
+  applied = true;
+  await page.clock.runFor(BINDING_POLL_MS);
+  await expect(binding).not.toContainText("붙이는 중");
+  await expect(page.getByTestId("connector-bound-result")).toContainText(
+    "바로 쓸 수 있어요.",
+  );
+
+  // 끝난 뒤에는 더 읽지 않는다.
+  const settled = reads;
+  await page.clock.runFor(BINDING_POLL_MS * 3);
+  expect(reads).toBe(settled);
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plug } from "lucide-react";
 import {
   AlertDialog,
@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConnectorDetailsFold } from "@/components/connector/connector-identity";
+import { useBindingPoll } from "@/components/connector/use-binding-poll";
 import { Notice } from "@/components/ui/notice";
 import {
   GROUP_VISIBILITY,
@@ -30,6 +31,7 @@ import {
   type AgentConnectionView,
 } from "@/lib/agent-connection";
 
+import { isAwaitingApply } from "@/lib/binding-poll";
 import { boundReadiness } from "@/lib/connector-onboarding";
 
 type Props = {
@@ -226,6 +228,21 @@ export function AgentConnectionsSection({
   const shellOrFile = toolState === null || toolState.shellOrFileEnabled;
   const skillsOff = toolState !== null && !toolState.skillsEnabled;
 
+  // 붙이거나 떼는 요청마다 올린다. 다시 읽는 동안 올랐다면 그 응답은 낡았으므로 버린다.
+  const mutations = useRef(0);
+  // 붙인 바인딩의 반영이 끝나면 서버가 READY 로 바꾼다. 새로 고치지 않아도 보이게 기다리는 동안 다시 읽는다.
+  useBindingPoll(
+    connections.some((item) => item.bound && isAwaitingApply(item)),
+    async () => {
+      if (pending !== null) return;
+      const seen = mutations.current;
+      const reloaded = await listAgentConnections(code);
+      if (!reloaded.ok || mutations.current !== seen) return;
+      setConnections(reloaded.data.connections);
+      onBoundChange(reloaded.data.connections.some((item) => item.bound));
+    },
+  );
+
   function replace(next: AgentConnectionView) {
     const updated = connections.map((item) =>
       item.connectorId === next.connectorId ? next : item,
@@ -235,6 +252,7 @@ export function AgentConnectionsSection({
   }
 
   async function bind(view: AgentConnectionView) {
+    mutations.current += 1;
     setPending(view.connectorId);
     setError(null);
     const result = await bindAgentConnection(code, view.connectorId);
@@ -257,6 +275,7 @@ export function AgentConnectionsSection({
 
   async function unbind(view: AgentConnectionView) {
     if (pending !== null) return;
+    mutations.current += 1;
     setPending(view.connectorId);
     setError(null);
     const result = await unbindAgentConnection(code, view.connectorId);

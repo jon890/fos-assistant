@@ -12,6 +12,7 @@ import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { FinancialLimitsSection } from "@/components/connector/financial-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
+import { useConnectionPoll } from "@/components/connector/use-binding-poll";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -75,6 +76,8 @@ export function ConnectorConnectionPanel({
     // 형식이 틀린 id 로는 서버를 부르지 않는다.
     if (validId) void fetchLoaded(id).then(setLoaded);
   }, [id, validId]);
+
+  useConnectionPoll(id, validId, loaded, busy, setLoaded);
 
   if (!validId || loaded.kind === "notFound") return <NotFound />;
   if (loaded.kind === "loading")
