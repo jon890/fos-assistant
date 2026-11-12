@@ -257,6 +257,37 @@ export function withoutResponseGuide(instructions: string): string {
   return rest;
 }
 
+/**
+ * 대화 turn 의 지시문 끝에 붙는 맡길 수 있는 에이전트 구역의 제목이다. `DelegationTargetsInstructions.HEADER` 와 같아야 한다.
+ * 구역은 제목, 빈 줄, 규칙 단락, 빈 줄, `- [` 로 시작하는 목록 줄과 잘렸을 때의 안내 줄이다.
+ */
+export const DELEGATION_TARGETS_HEADER = "# 맡길 수 있는 에이전트";
+
+/** 잘렸을 때 구역 끝에 붙는 안내 줄이다. `DelegationTargetsInstructions.TRUNCATED` 와 같아야 한다. */
+export const DELEGATION_TARGETS_TRUNCATED = "목록에 없는 에이전트는 agent_list 로 본다.";
+
+/**
+ * 맡길 수 있는 에이전트 구역을 뺀다. 요청자에게 다른 에이전트가 있는 시나리오에서 그 목록이 되돌린 답에 섞이지 않게 한다.
+ * 구역 앞뒤의 다른 글은 그대로 둔다.
+ */
+export function withoutDelegationTargets(instructions: string): string {
+  const start = instructions.indexOf(DELEGATION_TARGETS_HEADER);
+  if (start < 0) return instructions;
+  const ruleStart = start + DELEGATION_TARGETS_HEADER.length + 2;
+  const listStart = instructions.indexOf("\n\n", ruleStart);
+  if (listStart < 0) return instructions.slice(0, start).replace(/\n+$/, "");
+  let end = listStart + 2;
+  while (end < instructions.length) {
+    const lineEnd = instructions.indexOf("\n", end);
+    const line = instructions.slice(end, lineEnd < 0 ? instructions.length : lineEnd);
+    if (!line.startsWith("- [") && line !== DELEGATION_TARGETS_TRUNCATED) break;
+    end = lineEnd < 0 ? instructions.length : lineEnd + 1;
+  }
+  const before = instructions.slice(0, start).replace(/\n+$/, "");
+  const after = instructions.slice(end).replace(/^\n+/, "");
+  return before && after ? `${before}\n\n${after}` : before + after;
+}
+
 /** Control Plane 이 모든 실행 입력 맨 앞에 붙이는 결과물 폴더 단락의 첫 줄이다. `ArtifactService` 와 같아야 한다. */
 export const ARTIFACT_HEADER = "[결과물 폴더]";
 
