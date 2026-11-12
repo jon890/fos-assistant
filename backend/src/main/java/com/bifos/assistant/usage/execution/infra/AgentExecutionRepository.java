@@ -111,6 +111,22 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
 
 
     /**
+     * 그 대화에서 그 session 으로 돈 루트 실행 가운데 가장 이른 시작 시각이다. 없으면 null 이다. 대화방이 날짜를 넘었는지 판정할 때 대화의
+     * 루트 session 으로 부른다. {@code (hermes_session_id, status)} 색인을 탄다.
+     */
+    @Query("""
+            select min(e.startedAt) from AgentExecution e
+             where e.hermesSessionId = :sessionId and e.conversationId = :conversationId and e.parentExecutionId is null
+            """)
+    Instant findFirstRootStartedAt(@Param("conversationId") Long conversationId, @Param("sessionId") String sessionId);
+
+
+    /** 그 대화에서 그 session 으로 그 상태인 실행이 있는지. 대화방이 요약을 입력에 다시 붙일지 정할 때 쓴다. */
+    boolean existsByHermesSessionIdAndConversationIdAndStatus(
+        String hermesSessionId, Long conversationId, ExecutionStatus status);
+
+
+    /**
      * 그 profile 의 실행 줄이 그 Hermes session 을 상태와 무관하게 쓰는지.
      *
      * <p>하위 에이전트 session 을 등록할 때 최상위 session 을 거르려고 쓴다(ADR-037). 최상위 session 에 등록이

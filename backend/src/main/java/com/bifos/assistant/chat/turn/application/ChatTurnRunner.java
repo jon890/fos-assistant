@@ -54,6 +54,7 @@ class ChatTurnRunner {
     private final AgentToolService agentTools;
     private final ChatTurnStopper chatTurnStopper;
     private final MentionInputs mentionInputs;
+    private final RoomContext roomContext;
 
 
     /**
@@ -84,8 +85,10 @@ class ChatTurnRunner {
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
-            // 질문을 저장하기 전에 읽는다. 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문 앞까지다.
-            String lead = mentionInputs.lead(conversation, intent);
+            // 질문을 저장하기 전에 읽는다. 대화방의 요약 알림 줄은 질문 앞에 남고, 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문
+            // 앞까지다.
+            String lead = leadOf(
+                roomContext.lead(user, routed.agent(), conversation, intent), mentionInputs.lead(conversation, intent));
             Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
@@ -207,6 +210,15 @@ class ChatTurnRunner {
                 turns.close(handle);
             }
         }
+    }
+
+
+    /** 대화방 요약 단락 뒤에 맡김 단락을 잇는다. 요약만 있으면 그 뒤에 사용자 메시지 머리를 붙인다. 맡김 단락은 이미 그 머리로 끝난다. */
+    static String leadOf(String roomLead, String mentionLead) {
+        if (roomLead.isEmpty()) {
+            return mentionLead;
+        }
+        return roomLead + (mentionLead.isEmpty() ? MentionInputs.USER_MESSAGE_LABEL : mentionLead);
     }
 
 

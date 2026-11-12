@@ -40,6 +40,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 
 
+    /** 그 대화의 그 역할 줄을 최근 것부터 읽는다. 개수는 {@code pageable} 이 정한다. 대화방이 최근 알림 줄에서 요약을 찾는다. */
+    List<ChatMessage> findByConversationIdAndRoleOrderByIdDesc(Long conversationId, MessageRole role, Pageable pageable);
+
+
     /** 그 시각까지 그 대화에 저장된 메시지 가운데 그 역할이 아닌 가장 최근 메시지를 읽는다. */
     Optional<ChatMessage> findTopByConversationIdAndRoleNotAndCreatedAtLessThanEqualOrderByIdDesc(
         Long conversationId, MessageRole role, Instant createdAt);
