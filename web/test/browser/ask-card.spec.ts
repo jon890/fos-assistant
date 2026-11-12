@@ -195,3 +195,37 @@ test("수락한 카드 답의 응답이 유실되면 저장된 답을 복구하�
   expect(pending.ok()).toBeTruthy();
   expect((await pending.json()).items).toHaveLength(0);
 });
+
+test("마지막 답의 묻는 카드는 「할 일」 탭에도 보이고 거기서 보낸 답이 다음 메시지로 간다", async ({
+  page,
+}) => {
+  await page.goto("/new");
+  await page.getByRole("textbox", { name: "메시지" }).fill(ASK_CARD_PROBE);
+  await page.getByRole("button", { name: "보내기", exact: true }).click();
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toHaveCount(0);
+
+  // 묻는 카드로는 패널을 저절로 열지 않는다. 입력창 위 한 줄로 연다.
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  const summary = page.getByTestId("todo-summary");
+  await expect(summary).toHaveText("할 일 1건");
+  await summary.click();
+  const tab = page.getByTestId("todo-tab-todo");
+  const card = tab.getByTestId("ask-card");
+  await expect(card).toBeVisible();
+  await card.getByRole("radio", { name: "행복담" }).check();
+  await card.getByRole("checkbox", { name: "국밥" }).check();
+  await card.getByTestId("ask-submit").click();
+
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
+    "식당 이름: 행복담\n먹은 메뉴: 국밥",
+  );
+  // 답하면 「할 일」 이 비어 패널이 닫히고, 지난 답의 카드는 탭에 다시 오지 않는다.
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  await expect(page.getByTestId("assistant-message")).toHaveCount(2);
+  await expect(summary).toHaveCount(0);
+  await expect(
+    page.getByTestId("ask-card").first().getByRole("radio", { name: "행복담" }),
+  ).toBeChecked();
+});

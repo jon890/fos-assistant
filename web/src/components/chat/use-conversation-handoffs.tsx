@@ -14,7 +14,7 @@ import { readHandoffs } from "@/lib/handoff-api";
 import { HANDOFF_ENTRY_OPEN, HANDOFF_ENTRY_PARAM } from "@/lib/notification";
 import type { SidePanelTarget } from "./conversation-session-types";
 import { HandoffList } from "./handoff-list";
-import { HandoffPanel } from "./handoff-panel";
+import { HandoffBrowser } from "./handoff-browser";
 
 /** 대화마다 마지막으로 읽은 목록이다. `ok` 는 읽기에 성공했는지다. 실패한 첫 읽기는 빈 목록으로 둔다. */
 type Loaded = { conversationId: string; handoffs: Handoff[]; ok: boolean };
@@ -29,23 +29,25 @@ function idsFor(current: Ids | null, conversationId: string): Set<string> {
 }
 
 /**
- * 대화의 화면 넘기기 카드와 「내 브라우저」 옆 패널을 잇는다. 동작은 `docs/features/user-browser.md` 의 「대화 위 화면」 이 갖는다.
+ * 대화의 화면 넘기기 카드와 옆 패널의 「내 브라우저」 탭을 잇는다. 동작은 `docs/features/user-browser.md` 의 「대화 위 화면」 이 갖는다.
  *
  * <p>카드 목록은 `refreshKey` 가 바뀌면 다시 읽는다. 넘기기를 적거나 닫을 때 오는 대화 사건이 올린다. 처음 성공한 읽기의
- * 번호를 기억해, 그 뒤에 처음 보인 넘기기에서만 패널을 저절로 연다. 주소의 `handoff=open`(알림 진입)은 가장 최근
- * 넘기기로 패널을 열고 주소에서 지운다.
+ * 번호를 기억해, 그 뒤에 처음 보인 넘기기에서만 「내 브라우저」 탭을 저절로 연다. 주소의 `handoff=open`(알림 진입)은
+ * 가장 최근 넘기기로 그 탭을 열고 주소에서 지운다. 카드는 「할 일」 탭에 그린다(`useConversationTodo`).
  */
 export function useConversationHandoffs({
   conversationId,
   refreshKey,
   panelTarget,
   setPanelTarget,
+  closePanel,
   submit,
 }: {
   conversationId: string | null;
   refreshKey: number;
   panelTarget: SidePanelTarget | null;
   setPanelTarget: Dispatch<SetStateAction<SidePanelTarget | null>>;
+  closePanel: () => void;
   submit: (text: string) => void;
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -63,7 +65,8 @@ export function useConversationHandoffs({
   const pathname = usePathname();
 
   const open = useCallback(
-    (handoff: Handoff) => setPanelTarget({ kind: "handoff", handoff }),
+    (handoff: Handoff) =>
+      setPanelTarget({ kind: "todo", tab: "browser", handoff }),
     [setPanelTarget],
   );
 
@@ -96,11 +99,15 @@ export function useConversationHandoffs({
           ...result.data.map((handoff) => handoff.handoffId),
         ]),
       };
-      // 보이던 넘기기가 닫혔으면 패널도 닫는다. 다른 옆 패널은 건드리지 않는다.
+      // 보이던 넘기기가 닫혔으면 「내 브라우저」 탭의 패널을 닫고, 「할 일」 탭이면 기억만 지운다. 다른 옆 패널은 건드리지 않는다.
       const openIds = new Set(shown.map((handoff) => handoff.handoffId));
       setPanelTarget((previous) =>
-        previous?.kind === "handoff" && !openIds.has(previous.handoff.handoffId)
-          ? null
+        previous?.kind === "todo" &&
+        previous.handoff !== null &&
+        !openIds.has(previous.handoff.handoffId)
+          ? previous.tab === "browser"
+            ? null
+            : { ...previous, handoff: null }
           : previous,
       );
       setLoaded({ conversationId, handoffs: result.data, ok: true });
@@ -137,9 +144,9 @@ export function useConversationHandoffs({
         conversationId,
         ids: new Set([...idsFor(previous, conversationId), handoff.handoffId]),
       }));
-      // 사람이 보낸 turn 이 열린 넘기기를 모두 닫으므로 넘기기 패널은 무엇이든 닫는다.
+      // 사람이 보낸 turn 이 열린 넘기기를 모두 닫으므로 패널을 닫고 에이전트의 다음 답을 보인다.
       setPanelTarget((previous) =>
-        previous?.kind === "handoff" ? null : previous,
+        previous?.kind === "todo" ? null : previous,
       );
       submit(HANDOFF_TEXT[handoff.need].done);
     },
@@ -147,24 +154,15 @@ export function useConversationHandoffs({
   );
 
   const panelHandoff =
-    panelTarget?.kind === "handoff" ? panelTarget.handoff : null;
+    panelTarget?.kind === "todo" ? panelTarget.handoff : null;
   return {
-    list: <HandoffList handoffs={shown} onOpen={open} onDone={done} />,
-    panel: panelHandoff ? (
-      <HandoffPanel
+    count: shown.length,
+    cards: <HandoffList handoffs={shown} onOpen={open} onDone={done} />,
+    browser: panelHandoff ? (
+      <HandoffBrowser
         key={panelHandoff.handoffId}
         handoff={panelHandoff}
-        onClose={() => {
-          setPanelTarget(null);
-          // 닫기 단추가 사라지므로 초점을 그 카드의 「내 브라우저 열기」 로 돌려준다.
-          window.requestAnimationFrame(() =>
-            document
-              .querySelector<HTMLElement>(
-                `[data-handoff-open="${panelHandoff.handoffId}"]`,
-              )
-              ?.focus(),
-          );
-        }}
+        onClose={closePanel}
         onDone={() => done(panelHandoff)}
       />
     ) : null,

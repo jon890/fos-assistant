@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { openTodo } from "./helpers.ts";
 import type {
   Page,
   Route,
@@ -64,6 +65,7 @@ async function openWith(
     (route: Route) => route.fulfill({ json: state.grants }),
   );
   await page.goto(`/chat/${conversationId}`);
+  if (state.actions.length > 0) await openTodo(page);
   return { conversationId, state };
 }
 
@@ -101,6 +103,7 @@ test("밖으로 나가는 동작과 가려진 내용이 있는 줄에는 이 대
 
   state.actions = [action({ hiddenArgs: true, grantAllowed: false })];
   await page.reload();
+  await openTodo(page);
   await expect(page.getByTestId("approval-hidden-args")).toBeVisible();
   await expect(page.getByTestId("approval-conversation-grant")).toHaveCount(0);
 });

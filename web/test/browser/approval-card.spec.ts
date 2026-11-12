@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { openTodo } from "./helpers.ts";
 import { readFileSync } from "node:fs";
 import type {
   Page,
@@ -87,6 +88,7 @@ async function openWith(page: Page, label: string, first: Action) {
   await holdEvents(page, conversationId);
   const reads = await routeActions(page, conversationId, () => state.actions);
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
   return { conversationId, state, reads };
 }
 
@@ -236,6 +238,7 @@ test("승인 줄이 없는 대화에는 카드 자리가 없다", async ({ page 
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
   await expect.poll(() => reads.count).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("approval-list")).toHaveCount(0);
+  await expect(page.getByTestId("todo-summary")).toHaveCount(0);
 });
 
 test("기다리는 승인 줄은 제목과 위험도와 인자의 키와 값을 보이고 내부 값은 보이지 않는다", async ({
@@ -648,7 +651,10 @@ test("열린 대화에 승인 사건이 오면 목록을 다시 읽어 카드가
 
   await page.goto(`/chat/${conversationId}`);
 
+  // 대화를 연 뒤에 생긴 승인이라 「할 일」 탭이 저절로 열린다.
+  await expect(page.getByTestId("todo-tab-todo")).toBeVisible();
   await expect(page.getByTestId("approval-card")).toContainText("메모 쓰기");
+  await expect(page.getByTestId("todo-summary")).toHaveText("할 일 1건");
 });
 
 test("390px 폭에서 긴 인자도 가로로 넘치지 않는다", async ({ page }) => {
@@ -733,6 +739,7 @@ async function openWithMany(
   await holdEvents(page, conversationId);
   const reads = await routeActions(page, conversationId, () => state.actions);
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
   return { conversationId, state, reads };
 }
 
@@ -759,7 +766,7 @@ for (const [project, size] of [
   ["desktop", { width: 1040, height: 600 }],
   ["mobile", { width: 390, height: 844 }],
 ] as const) {
-  test(`${size.width}px 에서 승인 줄이 넷 이상이어도 메시지 목록이 보이고 스크롤된다`, async ({
+  test(`${size.width}px 에서 승인 줄이 넷 이상이어도 메시지 목록이 보이고 「할 일」 탭 안에서 스크롤된다`, async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== project, `${project} 에서만 돈다`);
@@ -767,27 +774,45 @@ for (const [project, size] of [
     await openWithMany(
       page,
       "승인 여럿 화면 검사",
-      [
-        ...LABELS.map((name, index) => labelAction(index, name)),
-        action({ title: "메모 쓰기" }),
-      ],
+      // 도구가 서로 달라 묶이지 않는 카드 여덟 장이다.
+      [...LABELS, ...LABELS].map((name, index) =>
+        labelAction(index, name, { toolName: `create_label_${index}` }),
+      ),
       4,
     );
 
-    const dock = page.getByTestId("approval-list");
-    await expect(dock).toBeVisible();
+    // 「할 일」 탭은 패널 높이를 다 쓰고 안에서 스크롤해 마지막 카드까지 닿는다.
+    const panel = page.getByTestId("todo-panel");
+    const body = page.getByTestId("todo-tab-todo").locator("> div");
+    const scroll = await body.evaluate((element) => ({
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }));
+    expect(scroll.scrollHeight).toBeGreaterThan(scroll.clientHeight);
+    const last = page.getByTestId("approval-card").last();
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    if (project === "desktop") {
+      // 넓은 화면은 패널을 연 채 대화와 입력창이 옆에 보인다.
+      await expect(
+        page.getByRole("textbox", { name: "메시지" }),
+      ).toBeInViewport();
+    }
+    await page.getByRole("button", { name: "옆 패널 닫기" }).click();
+    await expect(panel).toHaveCount(0);
+
+    // 입력창 위에는 한 줄만 남아 메시지 목록이 자리를 갖는다.
+    const summary = page.getByTestId("todo-summary");
+    await expect(summary).toHaveText("할 일 8건");
+    expect((await summary.boundingBox())!.height).toBeLessThanOrEqual(48);
     await expect(page.getByTestId("assistant-message")).toHaveCount(5);
     const list = page.getByTestId("message-scroll");
     const measured = await list.evaluate((element) => ({
       scrollHeight: element.scrollHeight,
       clientHeight: element.clientHeight,
     }));
-    // 메시지 목록이 화면 높이의 4분의 1 이상을 갖고, 그 안이 넘쳐 스크롤된다.
     expect(measured.clientHeight).toBeGreaterThanOrEqual(size.height / 4);
     expect(measured.scrollHeight).toBeGreaterThan(measured.clientHeight);
-    const dockBox = await dock.boundingBox();
-    expect(dockBox!.height).toBeLessThanOrEqual(size.height * 0.4 + 1);
-
     await list.evaluate((element) => {
       element.scrollTop = 0;
     });
@@ -1344,6 +1369,44 @@ test("같은 도구의 금융 PENDING 줄 둘은 묶이지 않고 두 장으로 
       .locator(":scope > [data-testid=approval-card]"),
   ).toHaveCount(2);
   await expect(page.getByTestId("approval-financial")).toHaveCount(2);
+});
+
+test("금융 주문 줄을 「할 일」 탭에서 승인하고 거절해도 같은 서버 경로로 한 번씩만 보낸다", async ({
+  page,
+}) => {
+  const { state } = await openWithMany(page, "금융 할 일 경로 검사", [
+    financialAction(0),
+    financialAction(1),
+  ]);
+  const calls = await routeDecisions(page, state);
+  // 화면이 보내는 쓰기 요청을 모두 센다. 승인과 거절 말고 다른 쓰기가 섞이지 않아야 한다.
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() !== "GET" && url.pathname.startsWith("/api/"))
+      writes.push(`${request.method()} ${url.pathname}`);
+  });
+  const [first, second] = [financialAction(0), financialAction(1)].map(
+    (item) => item.actionId as string,
+  );
+  const cards = page.getByTestId("approval-card");
+  await expect(page.getByTestId("todo-summary")).toHaveText("할 일 2건");
+
+  await cards.first().getByTestId("approval-approve").click();
+  await expect(cards).toHaveCount(1);
+  await cards.first().getByTestId("approval-reject").click();
+  // 마지막 카드가 끝나면 빈 패널을 닫는다.
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  await expect(page.getByTestId("todo-summary")).toHaveCount(0);
+
+  expect(calls).toEqual([
+    { actionId: first, kind: "approve", body: { grant: null } },
+    { actionId: second, kind: "reject", body: null },
+  ]);
+  expect(writes).toEqual([
+    `POST /api/connector-actions/${first}/approve`,
+    `POST /api/connector-actions/${second}/reject`,
+  ]);
 });
 
 test("주문 카드는 오늘 남은 한도를 보이고 넘는 주문이면 어느 상한인지 경고한다", async ({
