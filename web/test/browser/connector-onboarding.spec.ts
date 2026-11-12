@@ -382,6 +382,49 @@ test("에이전트 목록의 「전문 에이전트 만들기」 는 연결한 �
   ).toBe(false);
 });
 
+test("에이전트 목록의 만들기 창은 생성 요청이 끝나기 전에는 닫히지 않고, 실패하면 다시 닫힌다", async ({
+  page,
+}, testInfo) => {
+  await connectDemoConnector(ownerOf(testInfo).email);
+  // 생성 응답을 붙잡아 두었다가 거절로 돌려준다. 요청 중 창을 닫고 다시 열어 두 번 만드는 일을 막는지 본다.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requests = 0;
+  await page.route("**/api/connections/demo-notes/specialist", async (route) => {
+    requests += 1;
+    await held;
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "AGENT_LIMIT_REACHED" }),
+    });
+  });
+
+  await page.goto("/agents");
+  await page.getByRole("button", { name: "전문 에이전트 만들기" }).click();
+  const dialog = page.getByRole("dialog", { name: "전문 에이전트 만들기" });
+  await dialog
+    .getByRole("listitem")
+    .filter({ hasText: TITLE })
+    .getByRole("button", { name: "이 서비스로 만들기" })
+    .click();
+  await dialog.getByRole("button", { name: "만들기" }).click();
+  await expect.poll(() => requests).toBe(1);
+
+  await expect(dialog.getByRole("button", { name: "닫기" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.mouse.click(5, 5);
+  await expect(dialog.getByTestId("specialist-agent-form")).toBeVisible();
+
+  release();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  expect(requests).toBe(1);
+});
+
 test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙이는 중이 끝난다", async ({
   page,
 }) => {
