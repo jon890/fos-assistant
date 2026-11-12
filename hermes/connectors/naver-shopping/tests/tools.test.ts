@@ -5,6 +5,7 @@ import {
   SEARCH_STATE,
 } from "../src/expressions.ts";
 import { BROWSER_URL_ENV } from "../src/session.ts";
+import { forgetLeftTabs, readInTab } from "../src/tab.ts";
 import { productDetail, searchProducts, type ToolDeps } from "../src/tools.ts";
 import { startFakeBrowser, type FakeBrowser } from "./fake-browser.ts";
 
@@ -138,7 +139,10 @@ test("빈 검색어, 100자를 넘는 검색어, 제어 문자는 탭을 열지 
 });
 
 let browser: FakeBrowser | null = null;
-afterEach(() => browser?.stop());
+afterEach(() => {
+  forgetLeftTabs();
+  browser?.stop();
+});
 
 test("가짜 브라우저로 검색 도구를 끝까지 부르면 결과를 읽고 연 탭을 닫는다", async () => {
   browser = startFakeBrowser({
@@ -156,7 +160,7 @@ test("가짜 브라우저로 검색 도구를 끝까지 부르면 결과를 읽�
   const result = await searchProducts(
     { [BROWSER_URL_ENV]: browser.url },
     "물티슈",
-    { read: (await import("../src/tab.ts")).readInTab, tab: { pollMs: 1 } },
+    { read: readInTab, tab: { pollMs: 1 } },
   );
   expect(result.count).toBe(1);
   expect(browser.http).toContain("GET /json/close/tab-1");
@@ -168,7 +172,7 @@ test("가짜 브라우저로 상세를 읽다 칸이 없으면 탭을 남긴 예
     productDetail(
       { [BROWSER_URL_ENV]: browser.url },
       "https://smartstore.naver.com/a/products/1",
-      { read: (await import("../src/tab.ts")).readInTab, tab: { pollMs: 1 } },
+      { read: readInTab, tab: { pollMs: 1 } },
     ),
   ).rejects.toMatchObject({
     code: "NAVER_SHOPPING_PAGE_CHANGED",
@@ -177,5 +181,4 @@ test("가짜 브라우저로 상세를 읽다 칸이 없으면 탭을 남긴 예
   expect(browser.http.some((line) => line.includes("/json/close/"))).toBe(
     false,
   );
-  (await import("../src/tab.ts")).forgetLeftTabs();
 });
