@@ -53,6 +53,7 @@ export function SpecialistAgentForm({
   cancelLabel,
   onCancel,
   onCreated,
+  onCreatingChange,
 }: {
   connectorId: string;
   title: string;
@@ -62,6 +63,8 @@ export function SpecialistAgentForm({
   cancelLabel: string;
   onCancel(): void;
   onCreated(result: SpecialistAgentResult): void;
+  /** 요청을 보낼 때 참, 실패해 돌아오면 거짓을 알린다. 감싼 창이 요청 중 닫히지 않게 잠그는 데 쓴다. */
+  onCreatingChange?(creating: boolean): void;
 }) {
   const id = useId();
   const draft = specialistDraft(title);
@@ -85,6 +88,7 @@ export function SpecialistAgentForm({
     event.preventDefault();
     if (invalid || creating) return;
     setCreating(true);
+    onCreatingChange?.(true);
     setError(null);
     const result = await createSpecialistAgent(connectorId, {
       name: trimmedName,
@@ -95,6 +99,7 @@ export function SpecialistAgentForm({
     });
     if (!result.ok) {
       setCreating(false);
+      onCreatingChange?.(false);
       setError(
         REFUSED_BEFORE_CREATING.has(result.code)
           ? result.message

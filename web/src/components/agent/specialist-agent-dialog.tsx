@@ -29,6 +29,8 @@ export function SpecialistAgentDialog() {
   const [open, setOpen] = useState(false);
   const [connectors, setConnectors] = useState<Connectors>({ kind: "loading" });
   const [picked, setPicked] = useState<ConnectorSummary | null>(null);
+  // 생성 요청을 보낸 때부터 잠근다. 요청 중 닫고 다시 열어 한 번 더 만들거나, 닫은 창의 요청이 뒤늦게 화면을 옮기지 않게 한다.
+  // 만든 뒤에는 상세로 옮길 때까지 잠근 채 둔다.
   const [creating, setCreating] = useState(false);
 
   async function load() {
@@ -75,8 +77,8 @@ export function SpecialistAgentDialog() {
               singleBinding={picked.singleBinding === true}
               cancelLabel="다른 서비스 고르기"
               onCancel={() => setPicked(null)}
+              onCreatingChange={setCreating}
               onCreated={(result) => {
-                setCreating(true);
                 router.push(`/agents/${result.agentCode}`);
               }}
             />
