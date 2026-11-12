@@ -708,3 +708,96 @@ test("운영 서버의 prepare_trade는 정정을 받지 않고 HTTP 0회다", a
     fake.stop();
   }
 });
+
+for (const [label, timeoutMs, authorization] of [
+  ["기존 callback 은 요청 제한(timeoutMs)", 300, "callback"],
+  ["ClaimedApproval 은 ticket deadline", 3000, "ticket"],
+] as const) {
+  test(`일반 금융 deadline: ${label} 에 끊고 UNKNOWN·POST 1회`, async () => {
+    const { fake, env } = setup();
+    try {
+      fake.routes.set("POST /api/v1/orders", async () => {
+        await new Promise((done) => setTimeout(done, 2500));
+        return json({ result: { orderId: "late" } });
+      });
+      const client = new Tossinvest({ apiBase: fake.url, env, timeoutMs });
+      await client.token();
+      const { clock } = await import("../src/rate-limit.ts");
+      const started = performance.now();
+      await expect(
+        client.financial(
+          "POST",
+          "/api/v1/orders",
+          {},
+          authorization === "callback"
+            ? () => {}
+            : { beforeSend: () => {}, deadlineMs: clock.now() + 300 },
+        ),
+      ).rejects.toThrow(UNKNOWN);
+      const elapsed = performance.now() - started;
+      expect(elapsed).toBeLessThan(1500);
+      expect(fake.seen("POST", "/api/v1/orders")).toHaveLength(1);
+      console.info(
+        `일반 금융 ${authorization} deadline: ${Math.round(elapsed)}ms`,
+      );
+    } finally {
+      fake.stop();
+    }
+  });
+}
+
+test("일반 금융의 기존 callback 기본 deadline 은 4초다", async () => {
+  const { fake, env } = setup();
+  try {
+    const client = new Tossinvest({ apiBase: fake.url, env });
+    expect(client.timeoutMs).toBe(4000);
+    fake.on("POST", "/api/v1/orders", { result: { orderId: "new" } });
+    expect(
+      (await client.financial("POST", "/api/v1/orders", {}, () => {})).result
+        .orderId,
+    ).toBe("new");
+  } finally {
+    fake.stop();
+  }
+});
+
+test("일반 주문 금융 401 뒤 auth 재발급·재전송 0회", async () => {
+  const { fake, env } = setup();
+  const claims = new ClaimFixture();
+  try {
+    const prepared = await prepareTrade(
+      new Tossinvest({ apiBase: fake.url, env }),
+      "create_order",
+      model("create_order"),
+    );
+    Object.assign(
+      env,
+      claims.authority("create_order", prepared.executionArgs),
+    );
+    fake.on(
+      "POST",
+      "/api/v1/orders",
+      { error: { requestId: "r", code: "expired-token", message: "m" } },
+      401,
+    );
+    const issued = fake.issued;
+    await withMcp(
+      createTradingFixtureServer({ apiBase: fake.url, env }),
+      async (client) => {
+        const result = await tool(
+          client,
+          "create_order",
+          prepared.executionArgs,
+        );
+        expect(result.body).toEqual({
+          error: { code: "TOSSINVEST_INVALID_INPUT" },
+        });
+      },
+    );
+    expect(fake.issued).toBe(issued);
+    expect(fake.seen("POST", "/api/v1/orders")).toHaveLength(1);
+  } finally {
+    claims.stop();
+    fake.stop();
+  }
+});
