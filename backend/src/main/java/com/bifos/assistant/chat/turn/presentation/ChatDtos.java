@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.presentation;
 
+import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUseReaction;
@@ -56,6 +57,8 @@ public final class ChatDtos {
      * @param artifacts 이 답의 turn 이 대화 폴더에 만든 HTML. 지워진 것도 담는다. 사용자 메시지와 결과물이 없는
      * 답은 빈 목록
      * @param delivery 이 알림 줄이 묶음의 마지막 시도의 마지막 알림 줄이면 그 묶음의 번호와 상태. 아니면 null
+     * @param delegations 이 답의 실행이 바로 맡긴 위임. 실행 번호순이다. 답이 아니거나 맡긴 것이 없으면 빈 목록
+     * @param deliveredResults 이 위임 결과 알림 줄이 전한 결과. 묶음의 항목 순서다. 그런 알림 줄이 아니면 빈 목록
      */
     public record MessageView(
         Long id,
@@ -72,7 +75,9 @@ public final class ChatDtos {
         ActivitySummary activity,
         String status,
         DeliveryView delivery,
-        SourceReadSummary sourceReads) {
+        SourceReadSummary sourceReads,
+        List<DelegationLine> delegations,
+        List<DelegationLine> deliveredResults) {
     }
 
     /**

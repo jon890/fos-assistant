@@ -5,6 +5,7 @@ import { escapeOnlyClosedTooltip } from "@/components/ui/tooltip-button";
 import { readEventStream } from "@/lib/stream";
 import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
+import { receiveDelegation } from "@/lib/delegation";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -15,6 +16,7 @@ type Context = Pick<
   ConversationSessionState,
   | "pending"
   | "setApprovalRefresh"
+  | "setLiveDelegations"
   | "panelTarget"
   | "setPanelTarget"
   | "sending"
@@ -31,6 +33,7 @@ type Context = Pick<
 export function useConversationEffects({
   pending,
   setApprovalRefresh,
+  setLiveDelegations,
   panelTarget,
   setPanelTarget,
   sending,
@@ -77,6 +80,15 @@ export function useConversationEffects({
             // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.
             if (event.type === "approval") {
               setApprovalRefresh((count) => count + 1);
+              return;
+            }
+            // 맡긴 줄도 보류하지 않는다. 위임은 보낸 turn 이 도는 중에 시작하고, 끝난 줄은 이력이 아직 모른다.
+            if (event.type === "delegation") {
+              const line = event.delegation;
+              if (line)
+                setLiveDelegations((previous) =>
+                  receiveDelegation(previous, line),
+                );
               return;
             }
             return runConversationTask(() => applyConversationEvent(id, event));
