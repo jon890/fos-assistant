@@ -119,9 +119,20 @@ public class SpecialistAgentCreator {
     private void detachFrom(
         CurrentUser user, String connectorId, List<BoundAgentSummary> others, List<BoundAgentSummary> detached) {
         for (BoundAgentSummary other : others) {
+            // 앞에서 읽은 뒤 사용자가 직접 뗐으면 뗀 것으로 적지 않는다. 적으면 실패했을 때 사용자가 뗀 에이전트에 다시 붙인다.
+            if (!stillBound(user, other.agentCode(), connectorId)) {
+                continue;
+            }
             bindingService.unbind(user, other.agentCode(), connectorId);
             detached.add(other);
         }
+    }
+
+
+    private boolean stillBound(CurrentUser user, String agentCode, String connectorId) {
+        return Boolean.TRUE.equals(transactions.execute(status -> bindings.findByConnectionId(
+            connections.findByUserIdAndConnectorId(user.id(), connectorId).orElseThrow().id()).stream()
+            .anyMatch(binding -> binding.agent().code().equals(agentCode))));
     }
 
 

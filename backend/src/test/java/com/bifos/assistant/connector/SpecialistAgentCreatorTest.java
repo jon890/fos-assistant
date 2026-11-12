@@ -323,6 +323,24 @@ class SpecialistAgentCreatorTest {
 
 
     @Test
+    @DisplayName("붙인 뒤 다른 에이전트에서 떼다 실패하면 새 에이전트를 지우고 그 에이전트의 바인딩은 그대로다")
+    void detachFailureAfterBindDeletesNewAgent() {
+        CurrentUser owner = member();
+        connect(owner, DEMO);
+        Agent assistant = plainAgent(owner, "비서");
+        bindingService.bind(owner, assistant.code(), DEMO);
+        when(connector.unbindConnector(eq(assistant.hermesProfile()), anyString()))
+            .thenThrow(new IllegalStateException("떼지 못했다"));
+
+        assertCode(() -> creator.create(owner, DEMO, INTRODUCTION, true), ErrorCode.CONNECTOR_OPERATION_FAILED);
+
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(owner.id())).as("새 에이전트를 지웠다").isEqualTo(1);
+        assertThat(bindingsOf(assistant)).hasSize(1);
+        assertThat(bindings.findAll()).as("새 에이전트의 바인딩도 없다").hasSize(1);
+    }
+
+
+    @Test
     @DisplayName("상한, 준비 안 된 연결, 목록 밖 플러그인은 아무것도 만들지 않는다")
     void refusalsBeforeCreatingLeaveNothing() {
         CurrentUser owner = member();
