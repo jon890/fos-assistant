@@ -250,6 +250,14 @@ export function useApprovalList({
     setDismissed((current) => [...current, actionId]);
   }
 
+  /**
+   * 「모두 승인」 이 보내는 줄과 카드가 혼자 보내는 중인 줄을 막는다. 카드의 「보내는 중」 은 카드 안의 상태라 패널을 닫거나
+   * 탭을 옮겨 카드가 다시 만들어지면 사라지므로, 이 훅이 든 목록으로도 막아 같은 줄을 두 번 보내지 않게 한다.
+   */
+  function locked(actionId: string) {
+    return bulk.locked(actionId) || sending.includes(actionId);
+  }
+
   function sendingChange(actionId: string, on: boolean) {
     setSending((current) =>
       on
@@ -318,7 +326,7 @@ export function useApprovalList({
           <ApprovalCard
             key={group[0].actionId}
             action={group[0]}
-            locked={bulk.locked(group[0].actionId)}
+            locked={locked(group[0].actionId)}
             onSendingChange={(on) => sendingChange(group[0].actionId, on)}
             onChanged={changed}
             onDismiss={() => dismiss(group[0].actionId)}
@@ -342,7 +350,7 @@ export function useApprovalList({
               group.some((action) => sending.includes(action.actionId))
             }
             onApproveAll={() => void bulk.approveAll(key, group)}
-            locked={bulk.locked}
+            locked={locked}
             onSendingChange={sendingChange}
             onChanged={changed}
             onDismiss={dismiss}
