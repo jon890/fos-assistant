@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConnectorDetailsFold } from "@/components/connector/connector-identity";
+import { useBindingPoll } from "@/components/connector/use-binding-poll";
 import { Notice } from "@/components/ui/notice";
 import {
   GROUP_VISIBILITY,
@@ -30,6 +31,7 @@ import {
   type AgentConnectionView,
 } from "@/lib/agent-connection";
 
+import { isAwaitingApply } from "@/lib/binding-poll";
 import { boundReadiness } from "@/lib/connector-onboarding";
 
 type Props = {
@@ -225,6 +227,19 @@ export function AgentConnectionsSection({
   // 도구 조회가 실패하면 활성 상태를 모르므로 연결 고르기와 같은 위험 안내를 보인다.
   const shellOrFile = toolState === null || toolState.shellOrFileEnabled;
   const skillsOff = toolState !== null && !toolState.skillsEnabled;
+
+  // 붙인 바인딩의 반영이 끝나면 서버가 READY 로 바꾼다. 새로 고치지 않아도 보이게 기다리는 동안 다시 읽는다.
+  // 붙이거나 떼는 요청이 도는 중에는 그 결과와 엇갈리지 않게 읽지 않는다.
+  useBindingPoll(
+    connections.some((item) => item.bound && isAwaitingApply(item)),
+    async () => {
+      if (pending !== null) return;
+      const reloaded = await listAgentConnections(code);
+      if (!reloaded.ok) return;
+      setConnections(reloaded.data.connections);
+      onBoundChange(reloaded.data.connections.some((item) => item.bound));
+    },
+  );
 
   function replace(next: AgentConnectionView) {
     const updated = connections.map((item) =>

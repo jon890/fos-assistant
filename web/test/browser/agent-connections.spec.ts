@@ -6,6 +6,7 @@ import {
   test,
 } from "./fixtures.ts";
 import { TEST_EMAIL } from "./settings.ts";
+import { BINDING_POLL_MS } from "../../src/lib/binding-poll.ts";
 import type { AgentToolsView } from "../../src/lib/agent.ts";
 import type { CatalogToolset } from "../../src/lib/toolset-catalog.ts";
 import type {
@@ -329,4 +330,51 @@ test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 
     ).toBe(204);
     await disconnectDemoConnector(TEST_EMAIL);
   }
+});
+
+test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙음으로 바뀐다", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const code = await createAgent(page);
+  // 반영 예정 시각이 지나 Control Plane 이 바인딩을 READY 로 바꾼 것을 흉내 낸다. 바꾸기 전에는 실제 응답을 그대로 둔다.
+  let applied = false;
+  let reads = 0;
+  await page.route(`**/api/agents/${code}/connections`, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads += 1;
+    const response = await route.fetch();
+    if (!applied) return route.fulfill({ response });
+    const list = await response.json();
+    return route.fulfill({
+      response,
+      json: {
+        ...list,
+        connections: list.connections.map((view: { bound: boolean }) =>
+          view.bound ? { ...view, status: "READY" } : view,
+        ),
+      },
+    });
+  });
+  await page.goto(`/agents/${code}`);
+
+  const row = section(page).getByTestId("agent-connection");
+  await row.getByRole("button", { name: "붙이기" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "붙이기" })
+    .click();
+  await expect(row.getByTestId("agent-connection-state")).toHaveText(
+    "붙이는 중",
+  );
+
+  applied = true;
+  await page.clock.runFor(BINDING_POLL_MS);
+  await expect(row.getByTestId("agent-connection-state")).toHaveText("붙음");
+  await expect(row).toContainText("바로 쓸 수 있어요.");
+
+  // 끝난 뒤에는 더 읽지 않는다.
+  const settled = reads;
+  await page.clock.runFor(BINDING_POLL_MS * 3);
+  expect(reads).toBe(settled);
 });

@@ -12,6 +12,7 @@ import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { FinancialLimitsSection } from "@/components/connector/financial-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
+import { useBindingPoll } from "@/components/connector/use-binding-poll";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -28,6 +29,7 @@ import {
   type ConnectorField,
   type ConnectorOption,
 } from "@/lib/connection";
+import { isAwaitingApply } from "@/lib/binding-poll";
 import { fetchLoaded, formatChecked, type Loaded } from "@/lib/connection-load";
 
 type Pending = "save" | "check" | "disconnect" | `options:${string}` | null;
@@ -75,6 +77,21 @@ export function ConnectorConnectionPanel({
     // 형식이 틀린 id 로는 서버를 부르지 않는다.
     if (validId) void fetchLoaded(id).then(setLoaded);
   }, [id, validId]);
+
+  // 붙인 바인딩의 반영이 끝나면 서버가 READY 로 바꾼다. 새로 고치지 않아도 보이게 기다리는 동안 다시 읽는다.
+  const awaitingApply =
+    loaded.kind === "ready" && loaded.connection.bindings.some(isAwaitingApply);
+  useBindingPoll(awaitingApply, async () => {
+    // 확인이나 해제가 도는 중에는 그 결과와 엇갈리지 않게 읽지 않는다.
+    if (!validId || busy) return;
+    const fresh = await readConnection(id);
+    if (!fresh.ok) return;
+    setLoaded((current) =>
+      current.kind === "ready"
+        ? { ...current, connection: fresh.data }
+        : current,
+    );
+  });
 
   if (!validId || loaded.kind === "notFound") return <NotFound />;
   if (loaded.kind === "loading")
