@@ -34,6 +34,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -229,9 +230,15 @@ class ConnectorFinancialGateTest {
         "{\"currency\":\"KRW\",\"quantity\":\"1\",\"orderType\":\"MARKET\"}",
         // 일반 주문 정정은 첫 개방 대상이 아니다.
         "{\"orderId\":\"o\",\"currency\":\"KRW\",\"quantity\":\"1\",\"price\":\"1\"}",
-        // 조건주문 생성과 정정은 첫 개방 대상이 아니다.
-        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{}}",
-        "{\"conditionalOrderId\":\"c\",\"quantity\":\"1\",\"first\":{}}",
+        // 주문가 없는 시장가 조건주문과 통화 없는 조건 정정은 금액을 정할 수 없다.
+        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"orderSide\":\"BUY\",\"triggerPrice\":\"10\"}}",
+        "{\"conditionalOrderId\":\"c\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"}}",
+        // 수량이 없거나 second 만 주문가가 없거나 second 가 null 이면 닫는다.
+        "{\"currency\":\"KRW\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"}}",
+        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"},\"second\":{\"triggerPrice\":\"1\"}}",
+        "{\"currency\":\"KRW\",\"quantity\":\"1\",\"first\":{\"triggerPrice\":\"1\",\"orderPrice\":\"1\"},\"second\":null}",
+        // 조건 취소에 수량을 싣지 않는다.
+        "{\"conditionalOrderId\":\"c\",\"currency\":\"KRW\",\"quantity\":\"1\"}",
         // 모르는 통화와 숫자 decimal 은 닫는다.
         "{\"currency\":\"JPY\",\"orderAmount\":\"1\"}",
         "{\"currency\":\"KRW\",\"quantity\":1,\"price\":\"1\"}",
@@ -240,6 +247,20 @@ class ConnectorFinancialGateTest {
     void closesUnmeasurableOrders(String args) {
         assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(args)))
             .isInstanceOf(ApiException.class).isNotInstanceOf(FinancialLimitExceeded.class);
+    }
+
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        // SINGLE 은 수량 × max(주문가, 감시가) 다.
+        "{\"currency\":\"KRW\",\"quantity\":\"2\",\"first\":{\"triggerPrice\":\"100\",\"orderPrice\":\"90\"}}|200",
+        // OCO 와 OTO 는 두 leg 중 큰 값이다. 정정도 바뀐 뒤 금액만 본다.
+        "{\"currency\":\"USD\",\"quantity\":\"2\",\"first\":{\"triggerPrice\":\"110\",\"orderPrice\":\"110\"},\"second\":{\"triggerPrice\":\"90\",\"orderPrice\":\"90\"}}|220",
+        "{\"conditionalOrderId\":\"c\",\"currency\":\"USD\",\"quantity\":\"0.5\",\"first\":{\"triggerPrice\":\"95\",\"orderPrice\":\"95\"},\"second\":{\"triggerPrice\":\"130\",\"orderPrice\":\"120\"}}|65"})
+    @DisplayName("조건주문 금액은 leg 마다 수량 × max(주문가, 감시가) 의 큰 값이다")
+    void conditionalAmountIsLargestLeg(String args, String expected) {
+        assertThat(ConnectorFinancialGate.amount(JSON.readTree(args))).hasValueSatisfying(
+            value -> assertThat(value).isEqualByComparingTo(expected));
     }
 
 

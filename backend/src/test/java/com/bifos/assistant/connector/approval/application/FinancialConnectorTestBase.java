@@ -165,7 +165,7 @@ abstract class FinancialConnectorTestBase {
         now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         clock.set(now);
         if (shared == null) {
-            shared = SharedPlugin.start(springPort, properties.dashboardToken());
+            shared = SharedPlugin.start(pluginScript(), springPort, properties.dashboardToken());
         }
         pluginUrl = shared.url();
         client = new HttpHermesConnectorClient(new HermesProperties(properties.profileKeyDir(), pluginUrl,
@@ -215,6 +215,12 @@ abstract class FinancialConnectorTestBase {
         // 앞 검사가 같은 프로세스에 남긴 카운터가 이 검사의 판정에 섞이지 않았는지 매번 확인한다.
         var reset = counters();
         assertThat(reset).as("configure 뒤 대역 카운터").isEqualTo(INITIAL_COUNTERS.deepCopy().put("url", reset.path("url").stringValue()));
+    }
+
+
+    /** 이 클래스가 띄울 {@code test/e2e/financial/} 아래 fixture 다. 조건주문 검사는 조건 SDK 원본을 설치하는 fixture 를 쓴다. */
+    String pluginScript() {
+        return "producer_plugin_http.py";
     }
 
 
@@ -286,8 +292,8 @@ abstract class FinancialConnectorTestBase {
         }
 
 
-        static SharedPlugin start(int springPort, String token) throws Exception {
-            var process = new ProcessBuilder("python3", "../test/e2e/financial/producer_plugin_http.py",
+        static SharedPlugin start(String script, int springPort, String token) throws Exception {
+            var process = new ProcessBuilder("python3", "../test/e2e/financial/" + script,
                 "http://127.0.0.1:" + springPort, token).redirectError(ProcessBuilder.Redirect.INHERIT).start();
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {
