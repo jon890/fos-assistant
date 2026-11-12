@@ -15,10 +15,9 @@ import {
 } from "./constants.ts";
 import { TossinvestError } from "./errors.ts";
 import {
-  financialOperation,
-  financialResult,
-  financialFailure,
-} from "./trading-body.ts";
+  executeFinancial,
+  type FinancialAuthorization,
+} from "./financial-transport.ts";
 import { clearProxyEnvironment, type Env } from "./runtime.ts";
 import {
   operationFor,
@@ -291,43 +290,29 @@ export class Tossinvest {
   }
 
   /** 승인 검증을 제공하지 않는 저수준 내부 transport다. 호출자가 guard와 본문 검증을 맡는다.
-   * 금융 요청은 한 번만 전송하며 GET 재시도와 토큰 재발급 루프에 들어가지 않는다. */
+   * 단일 전송과 deadline 은 financial-transport 가, 토큰 identity 의 확보와 반납은 이 wrapper 가 맡는다. */
   async financial(
     method: "POST" | "DELETE",
     path: string,
     body: unknown,
-    beforeSend: () => void,
+    authorization: FinancialAuthorization,
   ): Promise<any> {
-    const operation = financialOperation(method, path);
     const account = this.accountSeq();
     const state = this.acquire();
-    const deadline = clock.now() + this.timeoutMs;
-    let started = false;
     try {
-      const token = await this.getToken(state, deadline);
-      const response = await this.exchange(
-        operation,
-        path,
+      return await executeFinancial(
         {
-          method,
-          headers: {
-            authorization: `Bearer ${token}`,
-            accept: "application/json",
-            "content-type": "application/json",
-            "x-tossinvest-account": account,
-          },
-          body: method === "DELETE" ? undefined : JSON.stringify(body),
+          timeoutMs: this.timeoutMs,
+          account,
+          getToken: (deadline) => this.getToken(state, deadline),
+          exchange: (operation, target, init, deadline, beforeSend) =>
+            this.exchange(operation, target, init, deadline, state, beforeSend),
         },
-        deadline,
-        state,
-        () => {
-          beforeSend();
-          started = true;
-        },
+        method,
+        path,
+        body,
+        authorization,
       );
-      return financialResult(operation.id, response);
-    } catch (error) {
-      financialFailure(error, started);
     } finally {
       this.release(state);
     }

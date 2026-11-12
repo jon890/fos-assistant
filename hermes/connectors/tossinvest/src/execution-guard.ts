@@ -110,13 +110,19 @@ const canonicalUuid = (value: unknown) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value);
 const now = () => Math.max(Date.now(), clock.now());
 
+/** 검증을 마친 일회 권한이다. deadlineMs 는 clock 기준 절대 시각이며 다른 모듈은 ticket 을 다시 읽지 않는다. */
+export type ClaimedApproval = Readonly<{
+  beforeSend: () => void;
+  deadlineMs: number;
+}>;
+
 /** claim은 인증·DB 소비의 producer다. 이 소비자는 원문·scope·응답·만료를 대조한다. */
 export async function claimApproval(
   authority: Authority,
   env: Env,
   tool: string,
   input: Args,
-) {
+): Promise<ClaimedApproval> {
   if (authority.used) reject();
   authority.used = true;
   const { raw, ticket, url } = authority;
@@ -213,5 +219,7 @@ export async function claimApproval(
   )
     reject();
   beforeSend();
-  return beforeSend;
+  // ticket 과 응답의 expiresAt 을 위에서 한 번 대조했다. 남은 시간을 clock 의 절대 deadline 으로 바꾼다.
+  const deadlineMs = clock.now() + Math.max(0, expires - now());
+  return Object.freeze({ beforeSend, deadlineMs });
 }

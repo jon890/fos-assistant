@@ -34,6 +34,18 @@ export function createToolRegistration(server: McpServer) {
       "준비한 취소의 실행 원문과 일회성 권한, 원주문과 체결 수량을 검증한 뒤 일반 주문을 한 번 취소합니다." +
       units +
       noReplay,
+    // 조건주문 도구는 테스트 entry 만 등록한다. 운영 manifest 에 설명이 없어 여기서 준다.
+    prepare_conditional_trade:
+      "조건주문의 계좌와 종목, 현재 원주문을 조회해 승인할 실행 인자와 표시 값을 준비합니다. 주문을 전송하지 않습니다.",
+    create_conditional_order:
+      "준비한 조건주문의 실행 원문과 일회성 권한을 검증한 뒤 한 번 등록합니다." +
+      noReplay,
+    modify_conditional_order:
+      "준비한 조건주문 전체 재설정의 원문과 일회성 권한, 현재 원주문을 검증한 뒤 한 번 정정합니다." +
+      noReplay,
+    cancel_conditional_order:
+      "준비한 조건주문 취소의 원문과 일회성 권한, 현재 원주문을 검증한 뒤 한 번 취소합니다." +
+      noReplay,
   };
   const register: RegisterTool = (
     name: string,

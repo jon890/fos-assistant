@@ -318,7 +318,7 @@ test("지정가 원주문에 orderAmount 가 채워져 와도 취소 준비→Py
   }
 });
 
-test("생산 금융 transport 호출자는 guarded trading-tools만 사용한다", async () => {
+test("생산 금융 transport 호출자는 guarded trading-tools와 조건주문 도구만 사용한다", async () => {
   const source = resolve(import.meta.dir, "../src");
   const callers: string[] = [];
   for (const file of await readdir(source)) {
@@ -328,14 +328,18 @@ test("생산 금융 transport 호출자는 guarded trading-tools만 사용한다
     )
       callers.push(file);
   }
-  expect(callers).toEqual(["trading-tools.ts"]);
-  const trading = await readFile(join(source, callers[0]!), "utf8");
-  expect(trading.indexOf("await claimApproval(")).toBeGreaterThanOrEqual(0);
-  expect(trading.indexOf("tradingBody(tool, input)")).toBeGreaterThanOrEqual(0);
-  expect(trading.indexOf("await claimApproval(")).toBeLessThan(
-    trading.indexOf("await client.financial("),
-  );
-  expect(trading.indexOf("tradingBody(tool, input)")).toBeLessThan(
-    trading.indexOf("await client.financial("),
-  );
+  expect(callers.sort()).toEqual(["conditional-tools.ts", "trading-tools.ts"]);
+  // claim 과 본문 검증이 금융 전송보다 먼저 오고, 검증된 승인(approval)을 넘긴다.
+  for (const [file, body] of [
+    ["trading-tools.ts", "tradingBody(tool, input)"],
+    ["conditional-tools.ts", "conditionalBody(tool, input)"],
+  ] as const) {
+    const text = await readFile(join(source, file), "utf8");
+    const send = text.indexOf("await client.financial(");
+    expect(text.indexOf("await claimApproval(")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf(body)).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("await claimApproval(")).toBeLessThan(send);
+    expect(text.indexOf(body)).toBeLessThan(send);
+    expect(text.indexOf("approval.beforeSend()")).toBeLessThan(send);
+  }
 });

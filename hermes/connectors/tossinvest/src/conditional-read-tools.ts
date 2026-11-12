@@ -14,8 +14,8 @@ const invalidInput = (): never => {
   throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
 };
 
-/** 불투명 ID를 한 segment로만 보낸다. URL이 정규화하는 점 경로도 거절한다. */
-function orderSegment(id: string): string {
+/** 불투명 ID를 한 segment로만 보낸다. URL이 정규화하는 점 경로도 거절한다. 조건주문 쓰기도 이 검사를 쓴다. */
+export function orderSegment(id: string): string {
   if (
     !id ||
     id === "." ||
