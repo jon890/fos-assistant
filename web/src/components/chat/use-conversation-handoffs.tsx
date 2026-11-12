@@ -154,7 +154,17 @@ export function useConversationHandoffs({
       <HandoffPanel
         key={panelHandoff.handoffId}
         handoff={panelHandoff}
-        onClose={() => setPanelTarget(null)}
+        onClose={() => {
+          setPanelTarget(null);
+          // 닫기 단추가 사라지므로 초점을 그 카드의 「내 브라우저 열기」 로 돌려준다.
+          window.requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>(
+                `[data-handoff-open="${panelHandoff.handoffId}"]`,
+              )
+              ?.focus(),
+          );
+        }}
         onDone={() => done(panelHandoff)}
       />
     ) : null,

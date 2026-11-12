@@ -58,7 +58,12 @@ function HandoffCard({
         주세요.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={onOpen}>
+        <Button
+          size="sm"
+          variant="outline"
+          data-handoff-open={handoff.handoffId}
+          onClick={onOpen}
+        >
           내 브라우저 열기
         </Button>
         <Button size="sm" onClick={onDone}>

@@ -240,6 +240,70 @@ test("보고 있는 대화에 새 넘기기가 생기면 패널이 저절로 열
   await expect(page.getByTestId("handoff-card")).toHaveCount(0);
 });
 
+test("새 넘기기 패널은 작업 과정 패널 자리를 갈아 쓰고, 넘기기가 닫혀도 다른 옆 패널은 닫지 않는다", async ({
+  page,
+}) => {
+  await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  let open: unknown[] = [];
+  await routeHandoffs(page, conversationId, () => open);
+  const events = await routeEvents(page, conversationId);
+  await page.goto(`/chat/${conversationId}`);
+  const block = page
+    .locator('[data-testid="activity-block"][data-mode="saved"]')
+    .last();
+  await block.getByTestId("activity-toggle").click();
+  await block.getByTestId("activity-open-panel").click();
+  const activity = page.getByTestId("activity-panel");
+  await expect(activity).toBeVisible();
+
+  open = [HANDOFF];
+  await events.bump();
+  const panel = page.getByTestId("handoff-panel");
+  await expect(panel).toContainText(LOGIN_TITLE);
+  await expect(activity).toHaveCount(0);
+
+  await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  await block.getByTestId("activity-open-panel").click();
+  await expect(activity).toBeVisible();
+  open = [];
+  await events.bump();
+  await expect(page.getByTestId("handoff-card")).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(activity).toBeVisible();
+});
+
+test("패널의 「새 창으로 열기」 는 그 탭의 내 브라우저를 새 창으로 열고 패널을 닫는다", async ({
+  page,
+}) => {
+  await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  await routeHandoffs(page, conversationId, () => [HANDOFF]);
+  await page.goto(`/chat/${conversationId}`);
+  const card = page.getByTestId("handoff-card");
+  await card.getByRole("button", { name: "내 브라우저 열기" }).click();
+  const panel = page.getByTestId("handoff-panel");
+  await expect(panel).toBeVisible();
+
+  const [popup] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.getByTestId("handoff-open-window").click(),
+  ]);
+  expect(new URL(popup.url()).pathname + new URL(popup.url()).search).toBe(
+    `/browser?tab=${TAB}`,
+  );
+  await popup.close();
+  await expect(panel).toHaveCount(0);
+  await expect(card).toBeVisible();
+  // 닫기로 닫으면 초점이 그 카드의 「내 브라우저 열기」 로 돌아온다.
+  const openButton = card.getByRole("button", { name: "내 브라우저 열기" });
+  await openButton.click();
+  await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(openButton).toBeFocused();
+});
+
 test("알림에서 들어오면 가장 최근 넘기기의 패널을 열고 주소에서 표시를 지운다", async ({
   page,
 }) => {
