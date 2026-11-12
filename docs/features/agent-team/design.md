@@ -644,7 +644,7 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | `agent.application.PrimaryAgents` (새 빈) | 요청자의 기본 비서 찾기와 기본 profile 을 가리키는지 판정 |
 | `agent.application.port.ReservedProfileNames`, `people.application.AllowedPersonProfileNames` | `profileOf(email)` |
 | `agent.application.AgentLifecycleService` | 지우기 거절 |
-| `web/src/app/page.tsx`, `web/src/app/new/page.tsx` | `/` 는 대화방을 열어 넘기고, 새 대화 화면은 `/new` 다 |
+| `web/src/app/(home)/page.tsx`, `web/src/app/new/page.tsx` | `/` 는 대화방을 열어 넘기고, 새 대화 화면은 `/new` 다 |
 | `web/src/components/shell/room-link.tsx` | 사이드바 맨 위의 대화방 줄 |
 | 「새 대화」 와 `?agent=` 링크들 | `/new` 로 바꾼다. 대화를 지운 뒤 이동과 단축키도 `/new` 다. 앱 이름(홈)만 `/` 그대로라 대화방으로 가고, 새 대화로 비우는 동작(`startNew`)을 하지 않는다 |
 | `web/src/components/chat-panel.tsx`, `screen-key.ts`, `use-shortcuts.ts`, `app-shell.tsx`, `sidebar.tsx`, `conversation-nav.tsx`, `conversation-session-view.tsx` | 새 대화 화면을 가리키던 `/` 를 `/new` 로 바꾼다. `ChatPanel` 은 주소가 `/new` 로 바뀌면 대화별 상태를 새로 만든다 |
