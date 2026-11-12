@@ -1,6 +1,6 @@
 # 사람이 도와야 하는 지점 기술 설계
 
-스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1~REQ6)을 구현할 수 있는 깊이로 쓰고, PR2 와 PR3 는 경계와 방향만 정한다.
+스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1~REQ6)과 PR2(REQ7, REQ8)를 구현할 수 있는 깊이로 쓰고, PR3 는 경계와 방향만 정한다.
 뒤 PR 은 착수할 때 그 PR 의 절을 이 파일에서 고치고 독립 검토를 다시 받는다.
 
 ## 요구사항 연결
@@ -13,8 +13,8 @@
 | REQ4 | PR1 | `BrowserScreen` 이 받은 `tabs` 사건을 패널에 넘기고, 순수 함수 `watchHandoffTab` 이 넘긴 탭의 주소 변화를 판정한다. 패널이 확인 줄을 그린다 |
 | REQ5 | PR1 | `notificationHref` 가 `HANDOFF_REQUESTED` 에 `?handoff=open` 을 붙이고, 대화 화면이 그 값을 읽어 첫 목록의 가장 최근 넘기기로 패널을 연 뒤 주소에서 값을 지운다 |
 | REQ6 | PR1 | 훅이 다시 읽은 목록에 패널의 넘기기가 없으면 패널을 닫는다. 카드의 「내 브라우저 열기」 는 패널을 그 카드로 바꾼다 |
-| REQ7 | PR2 | 아래 「PR2 방향」 |
-| REQ8 | PR2 | 아래 「PR2 방향」 |
+| REQ7 | PR2 | Control Plane, fos-ctx, 웹의 어휘에 `bot_check`, `unexpected_page` 를 더하고, 네이버 쇼핑의 `PAGE_CHANGED` 가 탭을 남긴 `unexpected_page` 넘기기를 낸다. 아래 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 |
+| REQ8 | PR2 | 코레일 KTX 와 네이버 블로그가 쇼핑과 같은 넘기기 결과와 남긴 탭 규칙을 갖는다. 같은 절 |
 | REQ9 | PR3 | 아래 「PR3 방향」 |
 | REQ10 | PR3 | 아래 「PR3 방향」 |
 
@@ -134,11 +134,86 @@ state = { phase: "waiting" } | { phase: "watching", base: string } | { phase: "o
 | --- | --- | --- | --- |
 | 넘기기 카드가 대화 위 패널을 연다 | architecture | [ADR-20261112 / handoff-drawer](../../../web/docs/adr/ADR-20261112-handoff-drawer.md). [ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md) 의 카드 행 일부를 대체한다 | 이 설계의 「인터페이스와 데이터」, `docs/features/user-browser.md` 의 「대화 위 화면」 |
 
-## PR2 방향
+## PR2 넘기기 어휘 확장과 KTX·블로그 넘기기(REQ7, REQ8)
 
-- 어휘: Control Plane `HandoffNeed` 와 `ConnectorHandoffs.TITLES`, 웹 `handoff.ts` 의 `HANDOFF_NEEDS`, `HANDOFF_TEXT` 에 `BOT_CHECK`, `UNEXPECTED_PAGE` 를 더한다. 서명할 글과 결과 모양은 그대로이고 `need` 값만 늘어난다. 웹이 먼저 배포돼도 모르는 값은 서버가 받지 않으므로 순서 제약은 「Control Plane 과 웹을 함께」 뿐이다
-- 플러그인: 네이버 쇼핑의 `PAGE_CHANGED` 가 탭을 닫지 않고 `unexpected_page` 넘기기를 낸다. 코레일 KTX 와 네이버 블로그는 쇼핑의 `ToolError(handoff)` 와 같은 결과 모양을 낸다. 서비스 이름은 각 플러그인에만 둔다(rule-65)
-- 함께 도는 「넘기기를 오류가 아닌 결과로」 작업이 결과 모양을 바꾸면 PR2 는 그 모양을 따른다
+결과 모양, 서명할 글, 알리는 주소, 카드와 닫기 규칙([ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md))은 그대로다. `need` 값 둘이 늘고, 플러그인 셋이 그 값을 낸다.
+
+### 어휘
+
+| `need` | Control Plane, 웹 | 카드 제목 | 「다 했어요」 가 보내는 글 |
+| --- | --- | --- | --- |
+| `bot_check` | `BOT_CHECK` | 「내 브라우저」에서 자동 접속 확인을 풀어 주세요 | 「내 브라우저」에서 자동 접속 확인을 마쳤어요. 멈춘 단계부터 이어서 해 주세요. |
+| `unexpected_page` | `UNEXPECTED_PAGE` | 「내 브라우저」에서 화면을 확인해 주세요 | 「내 브라우저」에서 화면을 확인했어요. 멈춘 단계부터 이어서 해 주세요. |
+
+`bot_check` 는 사이트가 사람인지 의심해 막은 화면(KTX 의 매크로 탐지 안내)이고, 보안문자 그림을 푸는 `captcha` 와 나눈다. `unexpected_page` 는 플러그인이 기대한 자리나 칸을 찾지 못했거나 최종 주소가 기대한 사이트가 아닌 화면이다.
+
+| 자리 | 바꾸는 것 |
+| --- | --- |
+| Control Plane `HandoffNeed` | `BOT_CHECK("bot_check")`, `UNEXPECTED_PAGE("unexpected_page")`. `connector_action.handoff_need`(`VARCHAR(20)`)에 그대로 들어가 마이그레이션이 없다 |
+| Control Plane `ConnectorHandoffs.TITLES` | 위 카드 제목. 알림 제목도 같다 |
+| fos-ctx `handoff.py` 의 `NEEDS` | 두 낱말을 더한다. 버전 1.8.0 |
+| 웹 `handoff.ts` | `HANDOFF_NEEDS`, `HANDOFF_TEXT` 에 두 값. 카드, 패널, 「다 했어요」 는 이 표를 읽으므로 화면 코드는 바뀌지 않는다 |
+
+모르는 낱말은 지금처럼 fos-ctx 가 보내지 않고 Control Plane 이 받지 않으며 웹이 버린다.
+
+### 플러그인이 넘기는 때
+
+세 플러그인 모두 넘기기는 `isError` 없는 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}` 이고, 남긴 탭은 MCP 서버 프로세스 메모리에 두었다가 다음에 탭을 여는 도구가 새 탭을 열기 전에 닫는다(쇼핑과 같은 규칙). `code` 는 지금 오류 코드를 그대로 쓰므로 `assistant.json` 의 `errors` 표는 바뀌지 않는다. 결과를 만드는 코드는 플러그인마다 둔다(rule-65).
+
+| 플러그인 | 화면 | `code` | `need` |
+| --- | --- | --- | --- |
+| 네이버 쇼핑 | 로그인, 보안 확인, 기기 인증(지금과 같다) | `NAVER_SHOPPING_LOGIN_REQUIRED` 등 | `login`, `captcha`, `device_check` |
+| 네이버 쇼핑 | 최종 주소가 네이버가 아니다, 상태 JSON 의 필수 칸이 없다 | `NAVER_SHOPPING_PAGE_CHANGED` | `unexpected_page` |
+| 코레일 KTX | 로그인 주소, 매크로 탐지 안내, 보안 문자 | `KORAIL_LOGIN_REQUIRED`, `KORAIL_BOT_CHECK`, `KORAIL_CAPTCHA` | `login`, `bot_check`, `captcha` |
+| 코레일 KTX | 필수 단계의 자리가 없다, 목록 화면으로 가지 않는다, 목록 칸이 비거나 모양이 틀리다 | `KORAIL_PAGE_CHANGED` | `unexpected_page` |
+| 네이버 블로그 | 읽기 도구의 글쓰기 탭이 로그인 화면(캡차, 기기 인증 포함)으로 넘어갔다 | `NAVER_BLOG_LOGIN_REQUIRED` | `login` |
+
+넘기지 않는 것:
+
+- 탭을 열지 않는 확인 도구(`check_shopping_login`, `check_korail_login`, `session_status`)의 로그인 없음. 사람이 볼 탭이 없다. 지금처럼 오류다
+- 입력 오류, 없음(`NOT_FOUND`), 날짜 밖, 코레일의 거절(`KORAIL_REJECTED`), 일시 장애. 사람이 그 화면에서 풀 것이 없다. 탭을 닫는다
+- 전체 제한 시간을 넘긴 실패. 지금처럼 일시 장애다
+- 블로그의 저장 작업(`save_draft`, `overwrite_draft`). 작업 프로세스가 탭을 갖고 결과는 `draft_job` 이 읽으므로 넘길 탭을 서버 프로세스가 모른다. 블로그는 보안 문자와 봇 탐지를 따로 가르지 않는다(로그인 호스트로 넘어간 화면은 모두 로그인이다)
+- 블로그의 편집기 실패(`NAVER_BLOG_EDITOR_CHANGED`)와, 탭을 닫은 뒤 쿠키로 가린 로그인 없음. 블로그 읽기는 글이 실린 편집기를 남기지 않으려고 까닭을 가리기 전에 탭을 닫는다. 편집기 탭을 남기면 네이버 자동저장이 그 탭에서 돌 수 있다
+
+### 플러그인 안의 구조
+
+- 쇼핑: 지금은 `readInTab` 이 탭을 닫은 뒤 도구가 상태 JSON 을 읽어 칸 없음이 탭 밖에서 난다. `readInTab` 이 읽기 함수(`parse`)를 받아 탭 안에서 부르고, 그 함수나 호스트 확인이 `NAVER_SHOPPING_PAGE_CHANGED` 를 내면 탭을 남기고 `unexpected_page` 넘기기로 바꾼다. 없음(`NOT_FOUND`)은 지금처럼 탭을 닫는 오류다
+- KTX: `searchInTab` 도 읽기 함수를 받아 탭 안에서 목록을 읽는다. 탭 안에서 난 `KORAIL_PAGE_CHANGED` 와 사람이 해야 하는 셋은 탭을 남기고 넘기기다. 남긴 탭 목록과 다음 호출의 닫기를 쇼핑과 같이 더한다
+- 블로그: `withWriteTab` 이 편집기의 `login_required` 실패(탭이 로그인 호스트로 넘어감)만 탭을 닫기 전에 잡아 탭을 남기고 넘기기다. 그 밖의 실패는 지금처럼 탭을 닫은 뒤 까닭을 가린다. 남긴 탭은 다음 `withWriteTab` 이 탭을 열기 전에 닫는다
+
+### 배포 순서
+
+Control Plane 과 웹 → fos-ctx 1.8.0 → 플러그인 셋. 순서를 어겨도 끊기지 않는다. 플러그인이 먼저 가면 fos-ctx 1.7.0 이 새 낱말을 보내지 않아 카드만 없고, fos-ctx 가 먼저 가면 Control Plane 이 거절해 카드만 없다. 어느 때나 모델은 결과의 안내 글로 사용자에게 「내 브라우저」 에서 마쳐 달라고 한다. 넘기기는 `isError` 가 아니라 Hermes 의 연속 실패 정지에 걸리지 않는다.
+
+### 구현 순서
+
+1. Control Plane 어휘와 제목, `ConnectorHandoffRequestTest`·`ConnectorHandoffEndpointTest` 에 새 낱말
+2. 웹 `handoff.ts`, `web/test/unit/handoff.test.ts`
+3. fos-ctx `NEEDS`, 버전, `hermes/tests/test_fos_ctx.py`
+4. 쇼핑 `readInTab` 의 읽기 함수와 `unexpected_page`, `tab.test.ts`·`naver-shopping.test.ts`·`tools.test.ts`
+5. KTX 넘기기 결과와 남긴 탭, `tab.test.ts`·`korail-ktx.test.ts`
+6. 블로그 `withWriteTab` 의 넘기기와 남긴 탭, `drafts.test.ts`
+7. 스킬, `assistant.json` 도구 설명, 기능 문서, ADR 의 어휘
+
+### 검증
+
+| ID | 검증 |
+| --- | --- |
+| REQ7 | Control Plane: `bot_check`, `unexpected_page` 서명 알림이 판정 줄에 적히고 카드 목록에 보이며 알림 제목이 정해 둔 글인지, 모르는 낱말은 거절하는지(`ConnectorHandoffEndpointTest`, `ConnectorHandoffRequestTest`). 웹 단위: 새 낱말 줄을 받고 모르는 낱말을 버리는지, 제목과 「다 했어요」 글. fos-ctx: 새 낱말을 보내고 모르는 낱말은 보내지 않는지. 쇼핑: 가짜 CDP 로 네이버 밖 주소와 필수 칸 없음이 탭을 남긴 `unexpected_page` 결과(`isError` 없음)인지, 없음은 탭을 닫는 오류인지, 다음 호출이 남긴 탭을 닫는지 |
+| REQ8 | KTX: 가짜 CDP 로 로그인·매크로 탐지·보안 문자 화면이 탭을 남긴 `login`·`bot_check`·`captcha` 결과인지, 자리 없음과 목록 칸 없음이 `unexpected_page` 인지, 거절과 날짜 밖은 탭을 닫는 오류인지, 다음 호출이 남긴 탭을 닫는지. 블로그: 가짜 CDP 로 로그인 화면이 탭을 남긴 `login` 결과인지, 다음 읽기가 남긴 탭을 닫는지, 쿠키로 가린 로그인 없음은 넘기지 않는지. 카드·알림·패널은 어휘만 다르므로 PR1 의 브라우저 테스트가 그대로 덮는다 |
+
+실제 Chrome 과 코레일·네이버 화면, Hermes 왕복은 배포 뒤 운영 확인으로 남긴다(AGENTS.md 「Hermes 연동을 바꿨으면 배포 뒤 왕복시켜 본다」). 이 PR 은 운영 계정과 사용자 브라우저를 쓰지 않는다.
+
+### 결정
+
+| ID | 결정 | 답 | 누가 | 근거 |
+| --- | --- | --- | --- | --- |
+| DECISION7 | 새 어휘의 카드 글 | 위 「어휘」 표 | 작성자 | 스펙 DECISION7 이 어휘마다 정해 둔 글이다. `unexpected_page` 제목은 스펙 REQ7 의 예와 같다. `bot_check` 는 `captcha` 의 「보안 확인」 과 겹치지 않게 「자동 접속 확인」 으로 쓴다 |
+| DECISION8 | 넘기기 `code` | 지금 오류 코드를 그대로 쓴다 | 작성자 | `errors` 선언과 대시보드 검증을 바꾸지 않는다. 스킬의 코드 표도 그대로 읽힌다 |
+| DECISION9 | 칸 없음을 탭 안에서 판정 | 쇼핑과 KTX 의 탭 함수가 읽기 함수를 받는다 | 작성자 | 지금은 칸 없음이 탭을 닫은 뒤에 나 남길 탭이 없다. 판정을 탭 밖에 두고 닫기를 늦추면 모든 성공도 탭 닫기가 늦는다 |
+| DECISION10 | 확인 도구와 블로그 저장 작업 | 넘기지 않는다 | 작성자 | 확인 도구는 탭을 열지 않고, 저장 작업의 탭은 다른 프로세스가 갖는다. 스펙 REQ8 의 「멈추면」 은 화면을 연 도구가 멈춘 때다 |
+| DECISION11 | 블로그의 편집기 실패 | 넘기지 않는다(로그인 화면만 넘긴다) | 작성자, 코디네이터 확인 대기 | 블로그 읽기는 글이 실린 편집기를 남기지 않으려고 탭을 먼저 닫는다(`drafts.test.ts` 의 「쿠키 실패 진단을 시작하기 전에 읽기 탭을 닫는다」). 편집기 탭을 사람에게 남기면 자동저장이 그 탭에서 돌 수 있다. 로그인 화면은 편집기가 없어 남겨도 된다 |
 
 ## PR3 방향
 
