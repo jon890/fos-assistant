@@ -149,14 +149,14 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
                 reply(exchange, pluginFailure.get(), "{}");
                 return;
             }
-            HttpResponse<String> response = send(pythonBase + exchange.getRequestURI(), exchange.getRequestMethod(), body);
+            HttpResponse<String> response = sendPython(pythonBase + exchange.getRequestURI(), exchange.getRequestMethod(), body);
             CountDownLatch signal = bind ? entered.getAndSet(null) : null;
             if (signal != null) {
                 signal.countDown();
                 assertThat(release.get().await(8, TimeUnit.SECONDS)).as("설치 응답 대기 상한").isTrue();
             }
             reply(exchange, signal != null && heldFailure.get() != 0 ? heldFailure.get() : response.statusCode(), response.body());
-        } catch (Exception error) {
+        } catch (Exception | AssertionError error) {
             reply(exchange, 500, "{}");
             throw new IOException(error);
         }
@@ -168,6 +168,19 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
         return http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10))
             .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
             .method(method, publisher).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+
+    /**
+     * Python 대역에 보내고, 응답이 연결을 닫는다고 알렸는지 확인한다.
+     *
+     * <p>{@code http.server} 는 HTTP/1.0 으로 답하고 연결을 닫으면서도 {@code Connection: close} 를 적지 않는다. JDK HttpClient 는
+     * 그 연결을 풀에 돌려 다음 요청을 이미 닫힌 소켓에 보내고 EOF 로 끝난다. 대역이 헤더를 빠뜨리면 드물게 터지는 대신 바로 실패시킨다.
+     */
+    private HttpResponse<String> sendPython(String url, String method, String body) throws Exception {
+        var response = send(url, method, body);
+        assertThat(response.headers().firstValue("Connection")).as("Python 대역 응답의 Connection 헤더: " + url).hasValue("close");
+        return response;
     }
 
 
@@ -197,19 +210,19 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
      * 같지 않으면 다음 검사가 앞 검사의 상태를 보게 되므로 여기서 실패시킨다.
      */
     void resetPlugin() throws Exception {
-        var response = send(pythonBase + "/fixture/reset", "POST", "{}");
+        var response = sendPython(pythonBase + "/fixture/reset", "POST", "{}");
         assertThat(response.statusCode()).as("Python fixture 되돌리기: " + response.body()).isEqualTo(200);
         assertThat(JSON.readTree(response.body()).path("restored").booleanValue()).as("되돌린 파일이 준비 직후와 같다").isTrue();
     }
 
 
     JsonNode inspect() throws Exception {
-        return JSON.readTree(send(pythonBase + "/fixture/inspect", "GET", "").body());
+        return JSON.readTree(sendPython(pythonBase + "/fixture/inspect", "GET", "").body());
     }
 
 
     void change(String mode) throws Exception {
-        assertThat(send(pythonBase + "/fixture/change", "POST", JSON.createObjectNode().put("mode", mode).toString()).statusCode())
+        assertThat(sendPython(pythonBase + "/fixture/change", "POST", JSON.createObjectNode().put("mode", mode).toString()).statusCode())
             .isEqualTo(200);
     }
 
