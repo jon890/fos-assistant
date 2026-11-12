@@ -421,6 +421,8 @@ abstract class FinancialConnectorTestBase {
             builder.header("Authorization", "Bearer " + token);
         }
         var response = HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        // http.server 의 HTTP/1.0 응답이 Connection: close 를 빠뜨리면 bun fetch 가 닫힌 연결을 재사용해 드물게 EOF 로 끝난다.
+        assertThat(response.headers().firstValue("Connection")).as("Python 대역 응답의 Connection 헤더: " + url).hasValue("close");
         return JSON.readTree(response.body());
     }
 }

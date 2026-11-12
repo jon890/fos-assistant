@@ -145,6 +145,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
+        # 닫는다고 헤더에 적는다. http.server 의 HTTP/1.0 응답은 연결을 닫으면서도 이를 적지 않아 JDK HttpClient 와 bun fetch 가 닫힌 연결을 재사용하다 EOF 로 끝난다.
+        self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(encoded)
 
