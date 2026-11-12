@@ -15,11 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 대화 turn 의 지시문 끝에 맡길 수 있는 다른 에이전트와 그 서비스를 싣는다(docs/features/agent-team.md 「비서에서 뗀 서비스 맡기기」).
+ * 대화 turn 의 지시문 끝에 맡길 수 있는 다른 에이전트와 그 서비스를 넣는다(docs/features/agent-team.md 「비서에서 뗀 서비스 맡기기」).
  *
  * <p>{@code agent_list} 를 부르지 않으면 모델은 다른 에이전트가 무엇을 가졌는지 모른다. 비서에서 뗀 서비스의 일을 받으면 그 서비스 도구가
  * 없으니 {@code web_search} 같은 내장 도구로 대신 찾고 끝낸다. 그래서 {@code agent_list} 와 같은 값(이름, 소개, 서비스, 스킬)을 지시문에
- * 미리 싣고 「내 도구에 없는 서비스의 일은 맡긴다」 를 함께 적는다. 맡길지는 여전히 모델이 정한다(spec DECISION22).
+ * 미리 넣고 「내 도구에 없는 서비스의 일은 맡긴다」 를 함께 적는다. 맡길지는 여전히 모델이 정한다(spec DECISION22).
  *
  * <p>읽기에 실패해도 turn 을 막지 않는다. 구역을 빼고 경고 로그만 남긴다.
  */
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 class DelegationTargetsInstructions {
-    /** 구역에 싣는 에이전트 수의 상한이다. 넘는 에이전트는 {@code agent_list} 로 본다. */
+    /** 구역에 넣는 에이전트 수의 상한이다. 넘는 에이전트는 {@code agent_list} 로 본다. */
     static final int MAX_TARGETS = 20;
 
     static final String HEADER = """

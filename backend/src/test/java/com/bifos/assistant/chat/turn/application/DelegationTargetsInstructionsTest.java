@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * 비서에서 뗀 서비스를 맡기도록 대화 지시문에 맡길 곳을 싣는지 본다(docs/features/agent-team/spec.md 의 REQ6, DECISION22).
+ * 비서에서 뗀 서비스를 맡기도록 대화 지시문에 맡길 곳을 넣는지 본다(docs/features/agent-team/spec.md 의 REQ6, DECISION22).
  *
  * <p>모델이 실제로 맡기는지는 가짜 Hermes 로 보일 수 없다. 여기서는 그 판단의 근거인 지시문의 글을 고정한다.
  */
@@ -51,7 +51,7 @@ class DelegationTargetsInstructionsTest {
 
 
     @Test
-    @DisplayName("지금 에이전트를 뺀 맡길 곳과 그 서비스, 내 도구에 없는 서비스 일은 맡기라는 규칙을 지시문 끝에 싣는다")
+    @DisplayName("지금 에이전트를 뺀 맡길 곳과 그 서비스, 내 도구에 없는 서비스 일은 맡기라는 규칙을 지시문 끝에 넣는다")
     void appendsOtherAgentsWithServicesAndDelegationRule() {
         Agent assistant = agent(10L, "a0000000001", "비서", null);
         Agent shopping = agent(11L, "a0000000002", "네이버 쇼핑 담당", "네이버 쇼핑 일을 맡아요");
@@ -104,7 +104,7 @@ class DelegationTargetsInstructionsTest {
 
 
     @Test
-    @DisplayName("맡길 곳은 상한까지만 싣는다")
+    @DisplayName("맡길 곳은 상한까지만 넣는다")
     void capsTargets() {
         List<Agent> many = IntStream.rangeClosed(1, DelegationTargetsInstructions.MAX_TARGETS + 5)
             .mapToObj(i -> agent(100L + i, "b" + i, "에이전트" + i, null))

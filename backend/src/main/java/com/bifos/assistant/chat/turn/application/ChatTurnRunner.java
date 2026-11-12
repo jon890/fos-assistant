@@ -97,7 +97,7 @@ class ChatTurnRunner {
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-20261007 / memory-remember)
             boolean proactiveCheck = intent instanceof TurnIntent.ProactiveCheck;
             context = contextAssembler.withResponseInstructions(context, !proactiveCheck);
-            // 먼저 살펴보기는 다른 에이전트에 맡기지 않으므로 맡길 곳도 싣지 않는다(ProactiveCheckInstructions)
+            // 먼저 살펴보기는 다른 에이전트에 맡기지 않으므로 맡길 곳도 넣지 않는다(ProactiveCheckInstructions)
             if (!proactiveCheck) {
                 context = delegationTargets.appendTo(context, user, routed.agent().id());
             }

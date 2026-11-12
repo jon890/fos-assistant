@@ -447,7 +447,7 @@ class ChatServiceTest {
 
 
     @Test
-    @DisplayName("대화 turn 의 지시문에 요청자가 맡길 수 있는 다른 에이전트와 맡기는 규칙을 싣고 지금 에이전트는 싣지 않는다")
+    @DisplayName("대화 turn 의 지시문에 요청자가 맡길 수 있는 다른 에이전트와 맡기는 규칙을 넣고 지금 에이전트는 넣지 않는다")
     void sendsDelegationTargetsOtherThanCurrentAgent() {
         CurrentUser dad = member("dad@example.com", "dad");
         Agent shopping = agents.save(Agent.of(
