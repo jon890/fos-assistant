@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
 import { wsUrlFor } from "../src/cdp.ts";
+import { ToolError, toolFailure } from "../src/errors.ts";
 import { createServer } from "../src/server.ts";
 import { sessionStatus, type Env } from "../src/session.ts";
 import { closedPortUrl, FakeCdp, GATEWAY_PATH, upstreamText } from "./fake-cdp.ts";
@@ -230,4 +231,19 @@ test("브라우저가 CDP 오류를 주면 원문 없이 NAVER_BLOG_UNAVAILABLE 
 
   expect(isError).toBe(true);
   expect(body).toEqual({ error: { code: "NAVER_BLOG_UNAVAILABLE" } });
+});
+
+test("화면 넘기기는 isError 없는 결과에 status, 안내, 넘기기 칸을 싣는다", () => {
+  const result = toolFailure(
+    new ToolError("NAVER_BLOG_LOGIN_REQUIRED", { need: "login", tab: "TAB1" }),
+  );
+  expect("isError" in result).toBe(false);
+  const body = JSON.parse(result.content[0]!.text);
+  expect(body.status).toBe("HUMAN_ACTION_REQUIRED");
+  expect(body.message).toContain("다시 부르지 않는다");
+  expect(body.handoff).toEqual({
+    code: "NAVER_BLOG_LOGIN_REQUIRED",
+    need: "login",
+    tab: "TAB1",
+  });
 });

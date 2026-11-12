@@ -3,7 +3,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { draftRevision } from "../src/changes.ts";
-import { autosaveCheck, listDrafts, readDraft } from "../src/drafts.ts";
+import {
+  autosaveCheck,
+  forgetLeftTabs,
+  listDrafts,
+  readDraft,
+} from "../src/drafts.ts";
 import { ToolError } from "../src/errors.ts";
 import { acquireLock, createState, openJobDir } from "../src/jobs.ts";
 import {
@@ -24,6 +29,7 @@ const cleanups: Array<() => Promise<void> | void> = [];
 
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
+  forgetLeftTabs();
 });
 
 const paragraph = (value: string) => ({
@@ -218,14 +224,21 @@ test("목록 화면의 차례가 목록 응답과 다르면 글을 누르지 않
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
 
-test("글쓰기 화면이 로그인 화면으로 넘어가면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
+test("글쓰기 화면이 로그인 화면으로 넘어가면 그 탭을 남긴 채 로그인 넘기기로 끝나고, 다음 읽기가 그 탭을 닫는다", async () => {
   const { cdp, editor, env, otherTab } = await setup();
   editor.host = "nid.naver.com";
 
   const error = await listDrafts(env, TIMES).catch((caught) => caught);
 
   expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
-  expectOnlyOwnTabClosed(cdp, otherTab);
+  const left = cdp.targetIds().find((id) => id !== otherTab)!;
+  expect((error as ToolError).handoff).toEqual({ need: "login", tab: left });
+  expect(cdp.targetIds()).toEqual([otherTab, left]);
+  expect(cdp.violations).toEqual([]);
+
+  editor.host = "blog.naver.com";
+  await listDrafts(env, TIMES);
+  expect(cdp.targetIds()).toEqual([otherTab]);
 });
 
 test("같은 블로그에 돌고 있는 저장 작업이 있으면 탭을 열지 않고 NAVER_BLOG_BUSY 다", async () => {
@@ -444,6 +457,8 @@ test("목록 응답이 실패하고 쿠키가 없으면 NAVER_BLOG_LOGIN_REQUIRE
   );
 
   expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
+  // 탭을 닫은 뒤 쿠키로 판정한 로그인은 넘길 탭이 없어 오류다.
+  expect((error as ToolError).handoff).toBeNull();
   expect(editor.loaded).toBeNull();
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
@@ -471,7 +486,7 @@ test("쿠키 실패 진단을 시작하기 전에 읽기 탭을 닫는다", asyn
   expect(targetsAtCheck).toEqual([otherTab]);
 });
 
-test("불러오는 동안 탭이 로그인 화면으로 넘어가면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
+test("불러오는 동안 탭이 로그인 화면으로 넘어가면 그 탭을 남긴 채 로그인 넘기기로 끝난다", async () => {
   const { cdp, editor, env, otherTab } = await setup();
   editor.loginOnLoad = true;
 
@@ -480,7 +495,9 @@ test("불러오는 동안 탭이 로그인 화면으로 넘어가면 NAVER_BLOG_
   );
 
   expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
-  expectOnlyOwnTabClosed(cdp, otherTab);
+  expect((error as ToolError).handoff?.need).toBe("login");
+  expect(cdp.targetIds()).toHaveLength(2);
+  expect(cdp.violations).toEqual([]);
 });
 
 test("같은 글을 연달아 읽으면 같은 지문을 돌려주고 목록은 그대로다", async () => {

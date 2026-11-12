@@ -108,10 +108,31 @@ export async function assertIdle(dir: string, blogId: string) {
 }
 
 /**
+ * 사람에게 넘기며 남긴 탭이다. 이 MCP 서버 프로세스의 메모리에만 있다.
+ * 다음 읽기가 새 탭을 열기 전에 모두 닫는다. 다음 호출은 「다 했어요」 뒤의 새 turn 에서 오므로 사람의 일은 끝났다고 본다.
+ * 프로세스가 다시 뜨면 목록이 사라지고, 그 탭은 사람이 닫을 때까지 남는다.
+ */
+const leftTabs = new Set<string>();
+
+/** 테스트가 앞 테스트의 남긴 탭을 지운다. */
+export function forgetLeftTabs() {
+  leftTabs.clear();
+}
+
+/** 앞서 남긴 탭을 닫는다. 닫지 못해도 읽기는 잇는다. 사람이 이미 닫은 탭일 수 있다. */
+async function closeLeftTabs(cdpUrl: string) {
+  const tabs = [...leftTabs];
+  leftTabs.clear();
+  for (const id of tabs) await closeTab(cdpUrl, id).catch(() => {});
+}
+
+/**
  * 그 블로그의 글쓰기 화면을 새 탭에 열고 `work` 를 돌린 뒤 탭을 닫는다. `tool` 은 실패 진단 줄에 싣는 도구 이름이다.
  * 같은 블로그에 돌고 있는 저장 작업이 있으면 탭을 열지 않고 `NAVER_BLOG_BUSY` 다.
  * 「작성 중인 글이 있습니다」 알림은 닫지 않고 `notice` 로 알린다. 닫으면 사용자가 쓰던 자동저장본이 버려질 수 있다.
  * 읽기는 잠금을 잡지 않는다. 읽는 동안 시작한 저장 작업은 자기 탭의 화면을 따로 대조한다.
+ * 탭이 로그인 화면으로 넘어가면 그 탭을 남기고 `login` 넘기기로 끝난다. 편집기가 없는 화면이라 남겨도 글이 실린 편집기가 남지 않는다.
+ * 그 밖의 실패는 지금처럼 탭을 먼저 닫은 뒤 까닭을 가린다.
  */
 export async function withWriteTab<T>(
   env: Env,
@@ -125,7 +146,9 @@ export async function withWriteTab<T>(
   const controller = new AbortController();
   const limit = setTimeout(() => controller.abort(), limitMs);
   let tab: Awaited<ReturnType<typeof openWriteTab>> | null = null;
+  let keep = false;
   try {
+    await closeLeftTabs(cdpUrl);
     try {
       tab = await openWriteTab(cdpUrl, blogId, {
         ...times,
@@ -134,11 +157,21 @@ export async function withWriteTab<T>(
       await tab.page.observeAutosaveRequests();
       const opened = await open(tab.page, { keepDraftNotice: true });
       return await work(tab.page, blogId, opened === "draft_notice");
+    } catch (error) {
+      if (tab && error instanceof EditorError && error.code === "login_required") {
+        keep = true;
+        leftTabs.add(tab.targetId);
+        throw new ToolError("NAVER_BLOG_LOGIN_REQUIRED", {
+          need: "login",
+          tab: tab.targetId,
+        });
+      }
+      throw error;
     } finally {
       clearTimeout(limit);
       if (tab) {
         tab.page.close();
-        await closeTab(cdpUrl, tab.targetId).catch(() => {});
+        if (!keep) await closeTab(cdpUrl, tab.targetId).catch(() => {});
       }
     }
   } catch (error) {
