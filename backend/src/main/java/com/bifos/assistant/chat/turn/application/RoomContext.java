@@ -21,7 +21,7 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.infra.ConversationSessionExecutions;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -69,7 +69,7 @@ class RoomContext {
 
     private static final String SUMMARY_FAILED = "ROOM_SUMMARY_FAILED";
 
-    private final AgentExecutionRepository executionRows;
+    private final ConversationSessionExecutions executionRows;
     private final ExecutionRecorder executions;
     private final ChatMessageRepository messages;
     private final ConversationSessions sessions;

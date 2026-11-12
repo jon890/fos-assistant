@@ -640,7 +640,7 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | `chat.turn.application.RoomContext` (새 빈) | 날짜 경계 판정, 요약 실행, 알림 줄, session 교체, 입력 앞 요약 단락 |
 | `chat.turn.application.ChatTurnRunner` | 질문을 저장하기 전에 `RoomContext.lead` 를 부르고 맡김 단락과 잇는다 |
 | `chat.turn.presentation.ChatController` | 대화방 두 경로 |
-| `usage.execution.infra.AgentExecutionRepository` | 대화와 루트 session 의 첫 실행 시각, 성공한 실행이 있는지 |
+| `usage.execution.infra.ConversationSessionExecutions` (새 저장소) | 대화와 루트 session 의 첫 실행 시각, 성공한 실행이 있는지. `AgentExecutionRepository` 가 파일 길이 상한에 닿아 따로 둔다 |
 | `agent.application.PrimaryAgents` (새 빈) | 요청자의 기본 비서 찾기와 기본 profile 을 가리키는지 판정 |
 | `agent.application.port.ReservedProfileNames`, `people.application.AllowedPersonProfileNames` | `profileOf(email)` |
 | `agent.application.AgentLifecycleService` | 지우기 거절 |

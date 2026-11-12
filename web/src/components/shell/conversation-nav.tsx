@@ -31,7 +31,6 @@ import { groupByDate } from "./group-by-date";
 import { groupByTask } from "./group-by-task";
 import { NavPending } from "./nav-pending";
 import { cn } from "cn";
-import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
 export function ConversationNav({
   onNavigate,
@@ -157,7 +156,7 @@ export function ConversationNav({
         setLeavingId(null);
         if (pathname === `/chat/${id}`) {
           startNew();
-          router.push(NEW_CONVERSATION_PATH);
+          router.push("/new");
         }
       });
     } catch (reason) {
