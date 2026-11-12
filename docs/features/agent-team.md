@@ -2,7 +2,7 @@
 
 사용자가 에이전트를 이름표와 소개로 구분해 보고, 기본 비서와 전문 에이전트가 나눠 일하는 기능이다. 합의한 변경과 단계는 [스펙](agent-team/spec.md)과 [설계](agent-team/design.md)가 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`
+covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java`
 
 ## 요구
 
@@ -63,3 +63,11 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 
 성격 틀은 「너는 「{이름}」이다. 「{플러그인}」 일만 맡는 전문 에이전트다」 와 소개, 서비스 밖의 일은 할 수 없다고 짧게 답하라는 한 줄이다. 사용자는 상세의 성격에서 고친다.
 비서는 떼어 낸 서비스를 `agent_list` 의 소개와 할 수 있는 일을 보고 맡긴다. 늘 맡긴다고 보장하지 않는다(spec DECISION22).
+
+### 비서에서 뗀 서비스 맡기기
+
+**대화 turn 의 지시문 끝에 맡길 수 있는 다른 에이전트를 싣는다.** `agent_list` 를 부르지 않은 모델은 다른 에이전트가 무엇을 가졌는지 모른다. 그래서 뗀 서비스의 일을 받으면 그 서비스 도구가 없으니 `web_search` 같은 내장 도구로 대신 찾고 끝냈다(2026-11-12 운영, 자식 실행 0).
+구역 「맡길 수 있는 에이전트」 는 요청자가 맡길 수 있는 에이전트에서 지금 turn 의 에이전트를 뺀 것을 한 줄씩 `[code] 이름: 소개 (서비스: …/ 스킬: …)` 로 적는다. 값은 `agent_list` 와 같다(`AgentCapabilitiesReader`). 맡길 곳이 없으면 구역이 없고, 상한(`DelegationTargetsInstructions.MAX_TARGETS`)을 넘는 에이전트는 `agent_list` 로 본다.
+구역 머리에는 「시킨 일이 아래 에이전트에 붙은 서비스의 일인데 그 서비스 도구가 내 도구에 없으면 다른 도구로 대신 하지 않고 `agent_delegate` 로 맡긴다. 내 도구로 할 수 있거나 사용자가 직접 하라고 하면 맡기지 않는다」 를 적는다. `agent_list` 의 도구 설명도 같은 때 먼저 부르라고 적는다.
+먼저 살펴보기 turn 에는 싣지 않는다. 그 turn 은 자기 지침을 따른다. 맡은 에이전트가 도는 자식 실행(`AgentRunner`)에는 싣지 않는다. 다시 맡기기보다 받은 일을 직접 하게 하려는 것이다.
+읽기에 실패하면 구역을 빼고 turn 을 이어 간다. 구역은 실행 기록의 문맥 길이와 지문에 든다.

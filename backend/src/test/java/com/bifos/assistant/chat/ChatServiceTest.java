@@ -13,6 +13,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.AgentIntroduction;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -442,6 +443,32 @@ class ChatServiceTest {
         // 실행 기록은 공통 지침과 Memory를 세고, turn 전용 지침은 제외한다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
             .isEqualTo((long)(instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
+    }
+
+
+    @Test
+    @DisplayName("대화 turn 의 지시문에 요청자가 맡길 수 있는 다른 에이전트와 맡기는 규칙을 싣고 지금 에이전트는 싣지 않는다")
+    void sendsDelegationTargetsOtherThanCurrentAgent() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        Agent shopping = agents.save(Agent.of(
+            "dad-shop",
+            "쇼핑 담당",
+            "dad-shop",
+            "http://agent-runtime.test/p/dad-shop",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id()));
+        shopping.changeIntroduction(AgentIntroduction.of("쇼핑 담당", "쇼핑 일을 맡아요", null, null));
+        agents.save(shopping);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        chat.send(dad, null, "무선 마우스 찾아 줘", "dad");
+
+        String instructions = stub().received().getFirst().instructions();
+        assertThat(instructions)
+            .contains("# 맡길 수 있는 에이전트", "- [dad-shop] 쇼핑 담당: 쇼핑 일을 맡아요", "mcp__fos_assistant__agent_delegate")
+            .doesNotContain("- [dad] ");
     }
 
 
