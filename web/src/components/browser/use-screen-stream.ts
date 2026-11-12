@@ -36,6 +36,7 @@ export function useScreenStream({
   startUrl,
   startTab = null,
   onOpen,
+  onTabs,
   areaRef,
   addressRef,
   setAddress,
@@ -44,6 +45,8 @@ export function useScreenStream({
   /** 첫 연결의 첫 탭 목록에 있으면 그 탭으로 옮긴다. 화면 넘기기 카드가 가리킨 탭이다. */
   startTab?: string | null;
   onOpen: () => void;
+  /** SSE 의 `tabs` 사건을 받을 때마다 그 목록을 알린다. 초기값과 다시 열 때 비우는 것은 알리지 않는다. */
+  onTabs?: (tabs: ScreenTab[]) => void;
   areaRef: RefObject<HTMLDivElement | null>;
   addressRef: RefObject<HTMLInputElement | null>;
   setAddress: (url: string) => void;
@@ -61,6 +64,11 @@ export function useScreenStream({
   const stream = useRef<AbortController | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const sentSize = useRef("");
+  // 렌더마다 바뀌는 함수를 연결 effect 의 의존 목록에 넣지 않으려고 ref 로 읽는다.
+  const onTabsRef = useRef(onTabs);
+  useEffect(() => {
+    onTabsRef.current = onTabs;
+  }, [onTabs]);
 
   const close = useCallback((message: string) => {
     open.current = false;
@@ -135,6 +143,7 @@ export function useScreenStream({
       } else if (name === "tabs") {
         const next = data as ScreenTab[];
         setTabs(next);
+        onTabsRef.current?.(next);
         // 가리킨 탭은 처음 받은 목록에서 한 번만 찾는다. 없으면(닫혔거나 브라우저를 다시 켬) 지금 탭에 머문다.
         const wanted = next.find((tab) => tab.id === wantedTab);
         wantedTab = null;

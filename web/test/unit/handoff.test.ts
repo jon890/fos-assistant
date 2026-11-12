@@ -4,7 +4,11 @@ import {
   HANDOFF_NEEDS,
   HANDOFF_TEXT,
   handoffBrowserHref,
+  newHandoffs,
+  rebaseHandoffWatch,
   safeHandoff,
+  watchHandoffTab,
+  type Handoff,
 } from "../../src/lib/handoff.ts";
 
 const row = {
@@ -37,4 +41,53 @@ test("단계마다 카드 제목과 「다 했어요」 글이 있고 글은 이
       HANDOFF_TEXT[need].done.endsWith("멈춘 단계부터 이어서 해 주세요."),
     );
   }
+});
+
+const TAB = "ABCDEF0123456789";
+const tabs = (url: string) => [
+  { id: "OTHER", url: "https://example.com/other" },
+  { id: TAB, url },
+];
+
+test("첫 탭 목록에 넘긴 탭이 있으면 그 주소를 기준으로 삼고, 없으면 더 묻지 않는다", () => {
+  assert.deepEqual(watchHandoffTab({ phase: "waiting" }, TAB, tabs("https://nid.example/login#top")), {
+    state: { phase: "watching", base: "https://nid.example/login" },
+    changed: false,
+  });
+  assert.deepEqual(watchHandoffTab({ phase: "waiting" }, TAB, [{ id: "OTHER", url: "https://example.com" }]), {
+    state: { phase: "off" },
+    changed: false,
+  });
+});
+
+test("넘긴 탭의 주소가 기준과 다르거나 탭이 닫히면 묻고, # 뒤만 다르면 묻지 않는다", () => {
+  const watching = { phase: "watching", base: "https://nid.example/login" } as const;
+  assert.equal(watchHandoffTab(watching, TAB, tabs("https://nid.example/login")).changed, false);
+  assert.equal(watchHandoffTab(watching, TAB, tabs("https://nid.example/login#step2")).changed, false);
+  assert.equal(watchHandoffTab(watching, TAB, tabs("https://shop.example/list")).changed, true);
+  assert.equal(watchHandoffTab(watching, TAB, [{ id: "OTHER", url: "https://nid.example/login" }]).changed, true);
+  assert.deepEqual(watchHandoffTab(watching, TAB, tabs("https://shop.example/list")).state, watching);
+});
+
+test("묻지 않기로 한 상태는 무엇을 받아도 그대로다", () => {
+  assert.deepEqual(watchHandoffTab({ phase: "off" }, TAB, tabs("https://shop.example")), {
+    state: { phase: "off" },
+    changed: false,
+  });
+});
+
+test("「아직이에요」 는 지금 주소를 새 기준으로 삼고, 넘긴 탭이 없으면 더 묻지 않는다", () => {
+  assert.deepEqual(rebaseHandoffWatch(TAB, tabs("https://nid.example/otp#a")), {
+    phase: "watching",
+    base: "https://nid.example/otp",
+  });
+  assert.deepEqual(rebaseHandoffWatch(TAB, []), { phase: "off" });
+});
+
+test("처음 읽은 번호에 없는 넘기기만 새 넘기기로 보고 받은 순서를 지킨다", () => {
+  const first = { ...row, handoffId: "a" } as Handoff;
+  const second = { ...row, handoffId: "b" } as Handoff;
+  const third = { ...row, handoffId: "c" } as Handoff;
+  assert.deepEqual(newHandoffs(new Set(["b"]), [third, second, first]), [third, first]);
+  assert.deepEqual(newHandoffs(new Set(["a"]), [first]), []);
 });

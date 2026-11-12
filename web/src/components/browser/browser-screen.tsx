@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { BrowserScreenToolbar } from "@/components/browser/browser-screen-toolbar";
+import {
+  BrowserScreenToolbar,
+  type ScreenTab,
+} from "@/components/browser/browser-screen-toolbar";
 import {
   screenKey,
   textInputs,
@@ -29,11 +32,17 @@ export function BrowserScreen({
   startTab = null,
   onOpen,
   onClose,
+  onTabs,
+  onReopen,
 }: {
   startUrl: string | null;
   startTab?: string | null;
   onOpen: () => void;
   onClose: () => void;
+  /** 받은 탭 목록을 밖에 알린다. 화면 넘기기 패널이 넘긴 탭의 주소를 본다. */
+  onTabs?: (tabs: ScreenTab[]) => void;
+  /** 있으면 「다시 열기」 가 안에서 다시 잇지 않고 이것을 부른다. 화면 넘기기 패널이 화면을 새로 만든다. */
+  onReopen?: () => void;
 }) {
   const [address, setAddress] = useState(startUrl ?? "");
   const areaRef = useRef<HTMLDivElement>(null);
@@ -47,6 +56,7 @@ export function BrowserScreen({
       startUrl,
       startTab,
       onOpen,
+      onTabs,
       areaRef,
       addressRef,
       setAddress,
@@ -95,7 +105,7 @@ export function BrowserScreen({
         {closed ? (
           <Notice variant="info" role="status">
             <span>{closed}</span>
-            <Button size="sm" className="ml-2" onClick={reopen}>
+            <Button size="sm" className="ml-2" onClick={onReopen ?? reopen}>
               다시 열기
             </Button>
           </Notice>

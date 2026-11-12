@@ -79,3 +79,59 @@ export function safeHandoff(value: unknown): Handoff | null {
     createdAt,
   };
 }
+
+/**
+ * 패널이 넘긴 탭의 주소를 보는 상태다. `waiting` 은 첫 탭 목록을 기다리고, `watching` 은 기준 주소와 비교하며, `off` 는
+ * 넘긴 탭이 처음부터 없어 묻지 않는다. 동작은 `docs/features/user-browser/design.md` 의 「주소 변화 판정」 이 갖는다.
+ */
+export type HandoffWatch =
+  { phase: "waiting" } | { phase: "watching"; base: string } | { phase: "off" };
+
+type TabUrl = { id: string; url: string };
+
+/** `#` 뒤 조각만 다른 주소는 같은 화면으로 본다. */
+function withoutHash(url: string): string {
+  const index = url.indexOf("#");
+  return index === -1 ? url : url.slice(0, index);
+}
+
+/** SSE 의 탭 목록 하나를 받아 다음 상태와, 끝났는지 물어야 하는지를 돌려준다. */
+export function watchHandoffTab(
+  state: HandoffWatch,
+  tab: string,
+  tabs: readonly TabUrl[],
+): { state: HandoffWatch; changed: boolean } {
+  const target = tabs.find((candidate) => candidate.id === tab);
+  if (state.phase === "off") return { state, changed: false };
+  if (state.phase === "waiting") {
+    return target
+      ? {
+          state: { phase: "watching", base: withoutHash(target.url) },
+          changed: false,
+        }
+      : { state: { phase: "off" }, changed: false };
+  }
+  return {
+    state,
+    changed: !target || withoutHash(target.url) !== state.base,
+  };
+}
+
+/** 「아직이에요」 다. 지금 주소를 새 기준으로 삼고, 넘긴 탭이 이미 없으면 더 묻지 않는다. */
+export function rebaseHandoffWatch(
+  tab: string,
+  tabs: readonly TabUrl[],
+): HandoffWatch {
+  const target = tabs.find((candidate) => candidate.id === tab);
+  return target
+    ? { phase: "watching", base: withoutHash(target.url) }
+    : { phase: "off" };
+}
+
+/** 처음 읽은 뒤에 생긴 넘기기다. 받은 순서(최신 먼저)를 그대로 둔다. */
+export function newHandoffs(
+  seen: ReadonlySet<string>,
+  handoffs: readonly Handoff[],
+): Handoff[] {
+  return handoffs.filter((handoff) => !seen.has(handoff.handoffId));
+}
