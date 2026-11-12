@@ -107,9 +107,9 @@ public class Conversation extends CreatedAtEntity {
     private ConversationTitleOpener opener;
 
     /**
-     * 보통 대화인지 먼저 살펴보기의 점검 대화인지다. 만들 때 정하고 바뀌지 않는다.
+     * 보통 대화인지, 먼저 살펴보기의 점검 대화인지, 기본 비서와 이어지는 대화방인지다. 만들 때 정하고 바뀌지 않는다.
      *
-     * <p>사용자와 에이전트마다 지우지 않은 점검 대화 가운데 {@code id} 가 가장 큰 것을 쓴다(ADR-080).
+     * <p>사용자와 에이전트마다 지우지 않은 점검 대화 가운데 {@code id} 가 가장 큰 것을 쓴다(ADR-080). 대화방은 사용자마다 그렇게 쓴다.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "purpose", nullable = false, updatable = false, length = 16)
@@ -192,6 +192,12 @@ public class Conversation extends CreatedAtEntity {
     /** 먼저 살펴보기의 결과가 남는 점검 대화를 만든다. */
     public static Conversation startedForCheck(Long userId, String title, Long agentId, Instant now) {
         return new Conversation(userId, title, agentId, ConversationPurpose.CHECK, now);
+    }
+
+
+    /** 기본 비서와 늘 이어지는 대화방을 만든다. 제목은 고정 글이고 화면은 제목 대신 에이전트 이름표를 그린다. */
+    public static Conversation startedForRoom(Long userId, String title, Long agentId, Instant now) {
+        return new Conversation(userId, title, agentId, ConversationPurpose.ROOM, now);
     }
 
 

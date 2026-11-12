@@ -397,7 +397,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 - `purged_at` 은 정리 작업이 본문을 실제로 지운 시각이다. 이때 `title` 과 `title_key_id`, 두 session 칸을 비우고, 그 뒤로는 메시지를 저장하지 않는다
 - `hidden_at` 은 목록에서만 뺀 시각이다. 예약 작업이 「보고할 것 없음」 으로 끝난 `NEW_PER_RUN` 대화에 적고, 사용자가 질문을 보내면 비운다([`docs/features/schedule.md`](../../docs/features/schedule.md)). 목록 색인에 이 칸이 없어 읽은 뒤 거른다. 이런 대화는 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않았고, 다른 경로가 대화를 숨기게 되면 더한다
 - `title_key_id` 가 비어 있으면 `title` 은 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `conversation:<id>:title:user:<user_id>` 다. 외래 키를 두지 않는다. 칸은 암호문이 들어가도록 `VARCHAR(1024)` 이고 글자 수 상한(200자)은 평문에 대해 요청 검사가 지킨다. 읽는 곳은 `Conversation.title()` 이고 풀지 못하면 읽을 수 없다는 글을 받는다. 제목을 질의로 직접 쓰는 곳(`fillTitleIfBlank`, `renameIfActive`, `markPurged`)은 암호문과 key 번호를 함께 적는다. 사이드바의 대화 검색은 브라우저가 받은 평문 제목으로 목록을 좁히므로 서버가 이 칸을 비교하지 않는다
-- `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다
+- `purpose` 의 `CHECK` 는 먼저 살펴보기의 점검 대화다. 사용자와 에이전트마다 지우지 않은 점검 대화 가운데 `id` 가 가장 큰 것을 쓴다. `ROOM` 은 기본 비서와 늘 이어지는 대화방이고 사용자마다 그렇게 하나를 쓴다. 목록 질의가 `ROOM` 을 뺀다([`docs/features/agent-team.md`](../../docs/features/agent-team.md) 의 「대화방」). 칸에 값 제약이 없어 새 값에 마이그레이션이 들지 않았다
 - `pending_messages` 는 응답 중에 보내 아직 다음 turn 으로 보내지 않은 대기 줄의 JSON 이다. 모양과 멈춤, 동시성은 [ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) 의 「저장 자리 개정」 이 갖는다. 비면 대기 글이 없다. 빈 줄은 저장하지 않는다. 엔티티는 이 칸을 쓰지 않고 `PendingMessageStore` 가 대화 줄을 잠근 뒤 전용 질의로만 읽고 바꾼다. 모르는 버전이거나 깨진 JSON 은 빈 줄로 보지 않고 오류로 올린다. 빈 줄로 보면 멈춰 둔 글이 다음 저장에서 사라진다. 대화를 지우거나 정리할 때 비운다. 옛 `chat_pending_message` 테이블은 지웠다. `V20261102074315` 가 그 행을 이 칸으로 옮기고 옮긴 행을 지웠으며, 배포를 확인한 뒤 `V20261102074329` 가 직전 이미지가 옛 테이블에만 쓴 행을 이미 있는 대기 줄 뒤에 이어 붙인 다음 `V20261102074333` 이 테이블을 지웠다([ADR-20261102 / table-reduce-r2](adr/ADR-20261102-table-reduce-r2.md)). 이어 붙일 때 번호가 겹치면 가장 큰 번호 다음 번호를 받고, 옛 행 하나라도 멈췄으면 줄이 멈춘다. 대화 줄이 없는 옛 행은 보낼 곳이 없어 버렸다
 - `task_id` 는 이 대화를 만든 예약 작업이다([ADR-078](../../docs/adr/ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md)). `agent_id` 와 같은 까닭으로 외래 키를 두지 않는다
 
@@ -407,7 +407,7 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 
 ### chat_message
 
-- `role` 의 `SYSTEM` 은 위임 결과가 도착했다는 알림 줄이다. 자식의 답 전문은 넣지 않고, 다시 생성의 대상이 아니다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md))
+- `role` 의 `SYSTEM` 은 위임 결과가 도착했다는 알림 줄과 대화에 끼우는 다른 알림 줄이다. 대화방의 요약 줄은 첫 줄 뒤에 요약 전문을 담는다. 자식의 답 전문은 넣지 않고, 다시 생성의 대상이 아니다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md))
 - `content_key_id` 가 비어 있으면 `content` 는 평문이다. 외래 키를 두지 않는다
 - `sender_user_id` 는 `ASSISTANT` 와 `SYSTEM` 에서, `execution_id` 는 `USER` 와 `SYSTEM` 에서 비어 있다
 - `content` 를 `LONGTEXT` 로 못 박는다. 길이를 주지 않은 `@Lob` 문자열을 Hibernate 가 MySQL 에서 `tinytext` 로 기대해 기동이 실패한다
