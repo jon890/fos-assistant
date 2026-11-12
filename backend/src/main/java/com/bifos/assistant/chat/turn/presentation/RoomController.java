@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.turn.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.chat.conversation.application.RoomConversations;
+import com.bifos.assistant.chat.room.application.RoomConversations;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.turn.presentation.ChatDtos.ConversationView;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;

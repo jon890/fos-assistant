@@ -633,12 +633,12 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | --- | --- |
 | `chat.conversation.domain.type.ConversationPurpose` | `ROOM` |
 | `chat.conversation.domain.Conversation` | `startedForRoom` |
-| `chat.conversation.application.RoomConversations` (새 빈) | 대화방 찾기와 만들기. `CheckConversations` 와 같은 사용자별 메모리 잠금 |
+| `chat.room.application.RoomConversations` (새 빈) | 대화방 찾기와 만들기. `CheckConversations` 와 같은 사용자별 메모리 잠금 |
 | `chat.conversation.infra.ConversationRepository` | 목록 두 질의가 `ROOM` 을 뺀다. 대화방 찾기 |
 | `chat.turn.application.ChatConversationManagement` | 이름 바꾸기와 지우기가 대화방을 거절한다 |
 | `web/src/components/shell/conversations-provider.tsx` | 대화방 줄을 목록에 끼우지 않는다(`replace`). 지금 대화가 대화방이면 목록 끝과 상관없이 한 줄을 읽어 둔다 |
-| `chat.turn.application.RoomContext` (새 빈) | 날짜 경계 판정, 요약 실행, 알림 줄, session 교체, 입력 앞 요약 단락 |
-| `chat.turn.application.ChatTurnRunner` | 질문을 저장하기 전에 `RoomContext.lead` 를 부르고 맡김 단락과 잇는다 |
+| `chat.room.application.RoomContext` (새 빈) | 날짜 경계 판정, 요약 실행, session 교체, 입력 앞 요약 단락. 알림 줄은 `chat.turn` 의 `ConversationNotices` 가 남기므로 부르는 쪽이 넘긴 함수로 남긴다 |
+| `chat.turn.application.ChatTurnRunner` | 질문을 저장하기 전에 사용자가 보낸 turn 이면 `RoomContext.rollIfNewDay`, 그 turn 과 다시 만들기면 `RoomContext.carriedLead` 를 부르고 맡김 단락과 잇는다 |
 | `chat.turn.presentation.ChatController` | 대화방 두 경로 |
 | `usage.execution.infra.ConversationSessionExecutions` (새 저장소) | 대화와 루트 session 의 첫 실행 시각, 성공한 실행이 있는지. `AgentExecutionRepository` 가 파일 길이 상한에 닿아 따로 둔다 |
 | `agent.application.PrimaryAgents` (새 빈) | 요청자의 기본 비서 찾기와 기본 profile 을 가리키는지 판정 |
@@ -650,7 +650,7 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | `web/src/components/chat-panel.tsx`, `screen-key.ts`, `use-shortcuts.ts`, `app-shell.tsx`, `sidebar.tsx`, `conversation-nav.tsx`, `conversation-session-view.tsx` | 새 대화 화면을 가리키던 `/` 를 `/new` 로 바꾼다. `ChatPanel` 은 주소가 `/new` 로 바뀌면 대화별 상태를 새로 만든다 |
 | `web/src/components/chat/system-message.tsx`, `web/src/lib/room.ts` | 요약 줄 |
 
-`chat` 은 `agent`, `usage` 보다 위라 두 빈을 그대로 부른다. `people` 은 `agent` 보다 위라 port 로 잇는다(지금 `ReservedProfileNames` 와 같은 모양).
+대화방의 두 빈은 새 하위 기능 `chat.room`(`starter` 와 `turn` 사이)에 둔다. `chat.turn.application` 이 직하 클래스 상한(25개, rule-75)에 닿았고, 요약이 `modelchoice` 를 써서 `conversation` 에 둘 수 없기 때문이다. 하위 기능 표는 [ADR-20261015 / package-layout](../../../backend/docs/adr/ADR-20261015-package-layout.md) 이 갖는다. `chat` 은 `agent`, `usage` 보다 위라 두 빈을 그대로 부른다. `people` 은 `agent` 보다 위라 port 로 잇는다(지금 `ReservedProfileNames` 와 같은 모양).
 
 ### 화면
 

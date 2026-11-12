@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.turn.application;
+package com.bifos.assistant.chat.room.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.ConversationSessions;
@@ -9,7 +9,6 @@ import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
-import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -27,6 +26,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -42,10 +42,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class RoomContext {
+public class RoomContext {
 
     /** 요약 알림 줄의 첫 줄이다. 화면의 {@code web/src/lib/room.ts} 가 같은 글로 요약 줄을 가린다. */
-    static final String NOTICE_TITLE = "어제까지 이야기를 요약해 이어요";
+    public static final String NOTICE_TITLE = "어제까지 이야기를 요약해 이어요";
 
     /** 요약 실행의 입력 첫 줄이다. 가짜 Hermes 가 이 표지를 보고 답을 고른다. */
     static final String SUMMARY_MARK = "[대화 요약 요청]";
@@ -73,7 +73,6 @@ class RoomContext {
     private final ExecutionRecorder executions;
     private final ChatMessageRepository messages;
     private final ConversationSessions sessions;
-    private final ConversationNotices notices;
     private final ModelTierService modelTiers;
     private final HermesRunsClient hermes;
     private final UserExecutionLimiter limiter;
@@ -81,19 +80,37 @@ class RoomContext {
 
 
     /**
-     * 이번 turn 의 입력 앞에 붙일 요약 단락이다. 붙일 것이 없으면 빈 글이다. 질문을 저장하기 전에 부른다.
+     * 대화방이 날짜를 넘었으면 옛 session 을 요약해 알림 줄로 남기고 두 session 칸을 새 값으로 바꾼다. 질문을 저장하기 전에 사용자가 보낸
+     * turn 만 부른다. 다시 만들기는 앞 turn 의 session 으로 돌아야 해 부르지 않는다.
      *
-     * <p>대화방의 사용자가 보낸 turn 과 다시 만들기만 본다. 사용자가 보낸 turn 은 날짜를 넘었으면 먼저 요약하고 session 을 바꾼다.
-     * 다시 만들기는 앞 turn 의 session 으로 돌아야 해 판정하지 않는다. 요약은 새 루트 session 에 성공한 실행이 생길 때까지 붙인다. 요약을
-     * 붙인 turn 이 실패해도 다음 turn 이나 「다시 시도」(다시 만들기)가 다시 붙인다.
+     * <p>알림 줄을 먼저 남긴다. session 을 바꾸다 실패하면 루트가 그대로라 다음 메시지가 다시 요약하고 알림 줄이 하나 더 남는다. 요약이
+     * 실패하면 아무것도 바꾸지 않는다.
+     *
+     * @param postNotice 알림 줄을 대화에 남기고 열린 화면에 알린다. 그 일은 {@code chat.turn} 이 갖는다
      */
-    String lead(CurrentUser user, Agent agent, Conversation conversation, TurnIntent intent) {
-        boolean fresh = intent instanceof TurnIntent.Fresh;
-        if (conversation.purpose() != ConversationPurpose.ROOM || !(fresh || intent instanceof TurnIntent.Regenerate)) {
-            return "";
+    public void rollIfNewDay(CurrentUser user, Agent agent, Conversation conversation, Consumer<String> postNotice) {
+        if (conversation.purpose() != ConversationPurpose.ROOM || !crossedDay(conversation)) {
+            return;
         }
-        if (fresh && crossedDay(conversation)) {
-            roll(user, agent, conversation);
+        // 옛 루트에 성공한 실행이 없으면 앞 요약이 아직 Hermes session 에 닿지 않았다. 요청에 함께 넣어 잃지 않게 한다.
+        Optional<String> summary = summarize(user, agent, conversation, carried(conversation));
+        if (summary.isEmpty()) {
+            return;
+        }
+        postNotice.accept(NOTICE_TITLE + "\n\n" + summary.get());
+        sessions.renew(conversation);
+    }
+
+
+    /**
+     * 이번 turn 의 입력 앞에 붙일 요약 단락이다. 붙일 것이 없으면 빈 글이다. 사용자가 보낸 turn 과 다시 만들기가 부른다.
+     *
+     * <p>요약은 새 루트 session 에 성공한 실행이 생길 때까지 붙인다. 요약을 붙인 turn 이 실패해도 다음 turn 이나 「다시 시도」(다시
+     * 만들기)가 다시 붙인다.
+     */
+    public String carriedLead(Conversation conversation) {
+        if (conversation.purpose() != ConversationPurpose.ROOM) {
+            return "";
         }
         return carried(conversation).map(RoomContext::render).orElse("");
     }
@@ -112,22 +129,6 @@ class RoomContext {
 
     private static LocalDate dateOf(Instant at) {
         return at.atZone(HOUSEHOLD_ZONE).toLocalDate();
-    }
-
-
-    /**
-     * 옛 session 을 요약해 알림 줄로 남기고 두 session 칸을 새 값으로 바꾼다. 요약이 실패하면 아무것도 바꾸지 않는다.
-     *
-     * <p>알림 줄을 먼저 남긴다. session 을 바꾸다 실패하면 루트가 그대로라 다음 메시지가 다시 요약하고 알림 줄이 하나 더 남는다.
-     */
-    private void roll(CurrentUser user, Agent agent, Conversation conversation) {
-        // 옛 루트에 성공한 실행이 없으면 앞 요약이 아직 Hermes session 에 닿지 않았다. 요청에 함께 넣어 잃지 않게 한다.
-        Optional<String> summary = summarize(user, agent, conversation, carried(conversation));
-        if (summary.isEmpty()) {
-            return;
-        }
-        notices.post(conversation.id(), NOTICE_TITLE + "\n\n" + summary.get());
-        sessions.renew(conversation);
     }
 
 
@@ -173,7 +174,7 @@ class RoomContext {
             if (!result.succeeded() || output.isEmpty()) {
                 executions.fail(
                     execution, agent, result, choice,
-                    result.succeeded() ? SUMMARY_FAILED : ChatTurnRunner.hermesStatus(result));
+                    result.succeeded() ? SUMMARY_FAILED : statusOf(result));
                 log.warn("대화방을 요약하지 못해 앞 맥락을 잇는다 conversationId={} status={}", conversation.id(), result.status());
                 return Optional.empty();
             }
@@ -220,6 +221,11 @@ class RoomContext {
             .filter(content -> content.startsWith(head))
             .findFirst()
             .map(content -> content.substring(head.length()));
+    }
+
+
+    private static String statusOf(HermesRunResult result) {
+        return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
     }
 
 

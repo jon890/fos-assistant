@@ -6,7 +6,7 @@ import { ROOM_SUMMARY_TITLE, roomSummaryOf } from "../../web/src/lib/room.ts";
 
 const ROOM_CONTEXT = join(
   import.meta.dirname,
-  "../../backend/src/main/java/com/bifos/assistant/chat/turn/application/RoomContext.java",
+  "../../backend/src/main/java/com/bifos/assistant/chat/room/application/RoomContext.java",
 );
 
 test("대화방 요약 줄의 첫 줄은 backend 의 RoomContext.NOTICE_TITLE 과 같다", async () => {

@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.conversation.application;
+package com.bifos.assistant.chat.room.application;
 
 import com.bifos.assistant.agent.application.PrimaryAgents;
 import com.bifos.assistant.agent.domain.Agent;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * 기본 비서와 늘 이어지는 대화방을 찾고 만든다(docs/features/agent-team/spec.md 의 REQ8). 규칙은 {@code docs/features/agent-team.md}
  * 의 「대화방」 이 갖는다.
  *
- * <p>대화방은 사용자마다 지우지 않은 것 가운데 {@code id} 가 가장 큰 것 하나를 이어 쓴다. 점검 대화({@link CheckConversations})와
+ * <p>대화방은 사용자마다 지우지 않은 것 가운데 {@code id} 가 가장 큰 것 하나를 이어 쓴다. 점검 대화({@code CheckConversations})와
  * 같은 규칙이고 에이전트가 아니라 사용자로만 찾는다.
  */
 @Component
