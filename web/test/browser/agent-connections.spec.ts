@@ -378,3 +378,46 @@ test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙음
   await page.clock.runFor(BINDING_POLL_MS * 3);
   expect(reads).toBe(settled);
 });
+
+test("다시 읽는 사이 뗀 연결을 늦게 온 낡은 목록이 되살리지 않는다", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const code = await createAgent(page);
+  // 다시 읽기 응답을 붙들어 두고, 그 사이 뗀 뒤에 풀어 준다. 붙들린 응답은 떼기 전의 낡은 목록이다.
+  let release: () => void = () => {};
+  let hold = false;
+  let held: Promise<void> | null = null;
+  await page.route(`**/api/agents/${code}/connections`, async (route) => {
+    if (route.request().method() !== "GET" || !hold) return route.fallback();
+    hold = false;
+    const response = await route.fetch();
+    held = new Promise<void>((resolve) => (release = resolve));
+    await held;
+    return route.fulfill({ response });
+  });
+  await page.goto(`/agents/${code}`);
+
+  const row = section(page).getByTestId("agent-connection");
+  await row.getByRole("button", { name: "붙이기" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "붙이기" })
+    .click();
+  await expect(row.getByTestId("agent-connection-state")).toHaveText(
+    "붙이는 중",
+  );
+
+  hold = true;
+  await page.clock.runFor(BINDING_POLL_MS);
+  await expect.poll(() => held !== null).toBe(true);
+  await row.getByRole("button", { name: "떼기" }).click();
+  await expect(row.getByTestId("agent-connection-state")).toHaveText(
+    "붙지 않음",
+  );
+  release();
+  await page.clock.runFor(BINDING_POLL_MS);
+  await expect(row.getByTestId("agent-connection-state")).toHaveText(
+    "붙지 않음",
+  );
+});

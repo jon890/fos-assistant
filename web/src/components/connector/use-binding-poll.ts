@@ -44,7 +44,7 @@ export function useBindingPoll(waiting: boolean, refresh: () => Promise<void>) {
  * 연결 하나의 화면이 읽은 상태에 기다리는 바인딩이 있으면 그 연결을 다시 읽어 바꾼다.
  *
  * <p>서버는 붙인 바인딩을 `PENDING` 으로 두었다가 반영이 끝나면 스스로 `READY` 로 바꾼다. 확인이나 해제가 도는 중(`busy`)에는
- * 그 결과와 엇갈리지 않게 읽지 않는다.
+ * 그 결과와 엇갈리지 않게 읽지 않고, 읽는 사이 화면 상태가 바뀌었으면 응답을 버린다.
  */
 export function useConnectionPoll(
   id: string,
@@ -57,10 +57,13 @@ export function useConnectionPoll(
     loaded.kind === "ready" && loaded.connection.bindings.some(isAwaitingApply);
   useBindingPoll(waiting, async () => {
     if (!validId || busy) return;
+    const started = loaded;
     const fresh = await readConnection(id);
     if (!fresh.ok) return;
+    // 읽는 사이 다른 갱신(붙이기 뒤 다시 읽기, 확인, 해제)이 화면 상태를 바꿨으면 이 응답은 낡았으므로 버린다.
     // 바뀐 것이 없으면 그대로 둔다. 연결 객체가 바뀌면 허락 목록이 다시 읽힌다.
     setLoaded((current) =>
+      current === started &&
       current.kind === "ready" &&
       JSON.stringify(current.connection) !== JSON.stringify(fresh.data)
         ? { ...current, connection: fresh.data }
