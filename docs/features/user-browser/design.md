@@ -122,7 +122,7 @@ state = { phase: "waiting" } | { phase: "watching", base: string } | { phase: "o
 | ID | 결정 | 답 | 누가 | 근거 |
 | --- | --- | --- | --- | --- |
 | DECISION1 | 패널을 둘 자리 | 대화 화면의 옆 패널 상태(`SidePanelTarget`)에 종류 하나를 더한다 | 작성자 | 스펙 DECISION1 이 「작업 과정·결과물 옆 패널과 같은 자리와 규칙」 이다. 상태를 하나로 두면 갈아 쓰기(REQ2)와 Esc 닫기를 새로 만들지 않는다 |
-| DECISION2 | 화면 부품 | `BrowserScreen` 을 그대로 쓰고 `onTabs` 만 더한다 | 작성자 | 스펙 DECISION20 이 `/browser` 와 같은 도구 줄이다. 입력 변환, 확인 창, 다시 열기를 두 벌로 두지 않는다 |
+| DECISION2 | 화면 부품 | `BrowserScreen` 을 그대로 쓰고 선택 속성 `onTabs` 와 `onReopen` 만 더한다 | 작성자 | 스펙 DECISION20 이 `/browser` 와 같은 도구 줄이다. 입력 변환, 확인 창, 다시 열기를 두 벌로 두지 않는다 |
 | DECISION3 | 새 카드 판정 | 처음 성공한 읽기의 번호 집합에 없는 번호 | 작성자 | 서버 시각(`createdAt`)과 브라우저 시계를 비교하면 시계가 어긋난 기기에서 열리지 않거나 이미 있던 것이 열린다. 번호 집합은 같은 뜻을 시계 없이 판정한다 |
 | DECISION4 | 알림 진입의 표시 | 주소 검색어 `?handoff=open` | 작성자 | 알림 응답에 넘기기 번호가 없고(스펙 DECISION14) Control Plane 을 바꾸지 않는다. 검색어는 같은 대화에서 다시 눌러도 바뀌어 받을 수 있다 |
 | DECISION5 | ADR | 새 ADR [ADR-20261112 / handoff-drawer](../../../web/docs/adr/ADR-20261112-handoff-drawer.md) 를 웹 모듈에 두고, [ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md) 의 카드 행 가운데 「새 창을 열고」 를 대체된 부분으로 적는다 | 작성자 | 받아들인 결정의 일부(카드가 새 창을 연다)를 바꾸므로 덮어쓰지 않고 대체로 남긴다. 결정을 지키는 코드가 웹에만 있다 |
