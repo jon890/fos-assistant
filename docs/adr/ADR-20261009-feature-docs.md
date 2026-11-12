@@ -27,7 +27,7 @@
 그 파일은 그 커넥터의 등록 칸, 도구와 정책, 인자와 결과, 오류, 권한, 보안, 실제 계정 확인을 갖는다.
 커넥터 공통 계약은 `connector.md` 와 `connector-policy.md` 에 남긴다.
 커넥터 README 는 연결 카드가 여는 사용자 안내라 개발 내용을 둘 수 없고, 서비스마다 수백 줄인 개발 내용을 `connector.md` 의 절로 쌓으면 공통 계약을 읽기 어렵기 때문이다.
-`test/unit/doc-files.test.ts` 가 `-connector.md` 로 끝나는 기능 파일마다 같은 이름의 커넥터 디렉터리가 있는지 본다.
+`test/repo/doc-files.test.ts` 가 `-connector.md` 로 끝나는 기능 파일마다 같은 이름의 커넥터 디렉터리가 있는지 본다.
 
 `docs/features/` 는 루트에만 둔다. 모듈 아래 `features/` 는 만들지 않는다. 기능은 여러 모듈을 가로지르기 때문이다.
 기능 파일 이름은 소문자 영문과 숫자, 하이픈이다(`agent-skill.md`). `features/` 아래에 하위 디렉터리를 두지 않는다.
@@ -35,10 +35,10 @@
 
 다섯 검사가 이 자리를 지킨다.
 
-- `test/unit/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 와, 같은 이름의 기능 파일이 있는 기능 폴더의 허락한 파일만 통과한다.
-- `test/unit/doc-code-references.test.ts`: 기능 파일도 백틱으로 적은 코드 이름이 코드에 있는지 본다.
+- `test/repo/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 와, 같은 이름의 기능 파일이 있는 기능 폴더의 허락한 파일만 통과한다.
+- `test/repo/doc-code-references.test.ts`: 기능 파일도 백틱으로 적은 코드 이름이 코드에 있는지 본다.
 - `scripts/ci/check-feature-covers.mjs`: covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 경고만 낸다.
-- `test/unit/feature-covers.test.ts`: 모든 기능 파일에 covers 가 있고 각 경로가 추적 파일과 맞는지 본다.
+- `scripts/ci/feature-covers.test.ts`: 모든 기능 파일에 covers 가 있고 각 경로가 추적 파일과 맞는지 본다.
 - `scripts/checks/check-file-length.mjs`: 기능 파일이 500줄을 넘으면 `알림:` 을 낸다.
 
 ### 맥락

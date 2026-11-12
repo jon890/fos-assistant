@@ -2,7 +2,7 @@
 
 색·간격·움직임은 테마 토큰을 쓰고 예외 inline에는 이유를 단다.
 
-검사: [테마 토큰](../../test/unit/design-tokens.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [테마 토큰](../../web/test/unit/design-tokens.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

@@ -31,7 +31,7 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
    - 여러 job 이 함께 읽는 `test/support`, `test/fixtures`, `test/resources` 는 모든 job 을 돌린다.
      예외로 커넥터 인자 catalog 는 backend 와 hermes 계약 검사의 입력이므로 그 두 검사만 돌린다.
    - 바뀐 파일을 하나도 찾지 못하면 모든 job 을 돌린다.
-   - 브라우저 shard 는 웹 코드와 설정, `test/browser`, Control Plane 코드와 빌드 설정, 공유 E2E 대역, 브라우저 실행 스크립트를 바꾸면 돌린다.
+   - 브라우저 shard 는 웹 코드와 설정, `web/test/browser`, Control Plane 코드와 빌드 설정, 공유 E2E 대역, 브라우저 실행 스크립트를 바꾸면 돌린다.
      backend 테스트 소스만 바꾸면 건너뛰되, 브라우저가 쓰는 `testsupport` 와 테스트 리소스는 브라우저도 돌린다.
      Hermes 코드만 바꾸면 브라우저는 건너뛰되, 커넥터 카드 검사가 읽는 manifest 와 아이콘은 브라우저도 돌린다.
      workflow 와 경로 판정 자체를 바꾸면 전체 검사를 돌린다.
@@ -48,7 +48,7 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
 6. merge queue 는 쓰지 않는다. main 이 움직였을 때는 `scripts/pr/merge-ready.sh` 가 판정하는 규칙(AGENTS.md 「머지는 PR 로 한다」)을 쓴다. 처음에는 `pr-merge` 스킬(2026-10-12 삭제)에 있던 규칙이다.
    뒤에 들어온 main 커밋이 PR 과 겹치지 않고, 빌드 설정·공유 계약·마이그레이션·저장소 전체 검사도 바꾸지 않았을 때만 직전 CI 를 쓴다.
 
-`test/unit/ci-paths.test.ts` 가 규칙의 대표 경우와 판정의 모든 조합을 확인한다.
+`scripts/ci/ci-paths.test.ts` 가 규칙의 대표 경우와 판정의 모든 조합을 확인한다.
 `ci.yml` 의 job 이 부르는 스크립트가 그 job 을 돌리는 규칙에 있는지도 같은 파일이 확인한다.
 실제 Git merge 를 만든 테스트로 첫 부모 기준 비교와 이름 변경을 확인하고, PR 밖 실행이 모든 검사를 고르는지도 확인한다.
 

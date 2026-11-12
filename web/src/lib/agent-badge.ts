@@ -2,7 +2,7 @@
  * 에이전트 이름표의 값이다(docs/features/agent-team/spec.md 의 REQ1, DECISION3).
  *
  * 색 이름과 아이콘 목록은 backend 의 `AgentColor` 와 `AgentIntroduction.ICONS` 와 같아야 한다. 어긋나면 서버가 저장을 거절한다.
- * `test/unit/agent-badge.test.ts` 가 두 쪽의 글자를 대조한다.
+ * `test/repo/agent-badge.test.ts` 가 두 쪽의 글자를 대조한다.
  */
 
 export const AGENT_COLORS = [

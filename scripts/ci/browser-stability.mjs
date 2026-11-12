@@ -10,11 +10,11 @@ const REGRESSION_SPECS = [
   "fixture-isolation.spec.ts",
 ];
 const SHARED_FILES = new Set([
-  "test/browser/fixtures.ts",
-  "test/browser/helpers.ts",
-  "test/browser/settings.ts",
-  "test/browser/playwright.config.ts",
-  "test/browser/web-server.ts",
+  "web/test/browser/fixtures.ts",
+  "web/test/browser/helpers.ts",
+  "web/test/browser/settings.ts",
+  "web/test/browser/playwright.config.ts",
+  "web/test/browser/web-server.ts",
   "test/e2e/fake-hermes.ts",
   "web/package.json",
   "web/pnpm-lock.yaml",
@@ -32,8 +32,8 @@ export function selectSpecs(files, daily = false) {
       : [],
   );
   for (const file of files) {
-    if (/^test\/browser\/[^/]+\.spec\.ts$/.test(file))
-      selected.add(file.slice("test/browser/".length));
+    if (/^web\/test\/browser\/[^/]+\.spec\.ts$/.test(file))
+      selected.add(file.slice("web/test/browser/".length));
   }
   return [...selected].sort();
 }
@@ -52,7 +52,7 @@ function main() {
   const specs = selectSpecs(
     files,
     process.env.GITHUB_EVENT_NAME === "schedule",
-  ).filter((spec) => existsSync(resolve("test/browser", spec)));
+  ).filter((spec) => existsSync(resolve("web/test/browser", spec)));
   if (specs.length === 0) {
     console.log("반복할 브라우저 spec이 없다.");
     return;

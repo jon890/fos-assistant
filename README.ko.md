@@ -52,7 +52,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 </details>
 
-다시 찍으려면 `web/` 에서 `pnpm screenshots` 를 돌린다. 스크립트는 `test/screenshots/tour.shots.ts` 다.
+다시 찍으려면 `web/` 에서 `pnpm screenshots` 를 돌린다. 스크립트는 `web/test/screenshots/tour.shots.ts` 다.
 지금 화면(`/now`), 외부 서비스 연결 화면, 예약 작업 화면은 아직 이 둘러보기에 찍지 않았다.
 
 ## 만드는 까닭

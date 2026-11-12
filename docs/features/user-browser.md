@@ -101,7 +101,7 @@ Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작
 세션 쿠키의 SameSite 기본값에만 기대지 않으려는 것이고, 판정은 `web/src/lib/same-origin.ts` 가 갖는다.
 `Origin` 이 있으면 그 host 가 `x-forwarded-host` 의 첫 값이나 `Host` 중 하나와 같아야 하고(Next.js 의 Server Action 과 같은 비교), 다르면 403 `FORBIDDEN` 이다.
 `Origin` 이 없으면 Next.js 의 Server Action 처럼 넘기되, `Sec-Fetch-Site` 가 `cross-site` 나 `same-site` 면 막는다.
-화면 열기는 GET 이라 같은 출처에서도 `Origin` 이 없으므로 이 값으로 가린다. `test/web/browser-same-origin.test.ts` 가 확인한다.
+화면 열기는 GET 이라 같은 출처에서도 `Origin` 이 없으므로 이 값으로 가린다. `web/test/node/browser-same-origin.test.ts` 가 확인한다.
 
 ### 로그인 유지
 
@@ -150,7 +150,7 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 - 화면 넘기기 카드가 여는 `/browser?tab=<id>` 는 처음 연 화면의 첫 `tabs` 사건에 그 탭이 있으면 입력 `tab` 을 한 번 보내 옮긴다. 없으면 지금 탭에 머문다.
 - 입력의 서버 라우트는 출처와 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
 
-입력 변환은 `test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `test/browser/user-browser-screen.spec.ts` 가 확인한다.
+입력 변환은 `web/test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `web/test/browser/user-browser-screen.spec.ts` 가 확인한다.
 
 ### CDP 연결
 

@@ -51,7 +51,7 @@ Everything shown is made-up demo data: the pictures are taken by a script agains
 
 </details>
 
-To take the pictures again, run `pnpm screenshots` in `web/`. The script is `test/screenshots/tour.shots.ts`.
+To take the pictures again, run `pnpm screenshots` in `web/`. The script is `web/test/screenshots/tour.shots.ts`.
 The Now screen (`/now`), the external service connections screen, and the scheduled tasks screen are not in this tour yet.
 
 ## Why this exists

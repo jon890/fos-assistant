@@ -96,7 +96,7 @@ sequenceDiagram
 미리보기 종류는 화면이 확장자와 목록의 `size` 로 정하고, 상한과 형식은 [`backend/docs/code-architecture.md`](../../backend/docs/code-architecture.md) 의 「본문 머리글」 표와 같다.
 글은 고정폭 글꼴로, CSV 와 TSV 는 표로, 사진은 `<img>` 로, HTML 은 결과물 패널과 같은 `sandbox` 의 iframe 으로 그린다. 그 밖과 상한을 넘는 것은 「미리보기가 없어요」 와 내려받기다.
 받은 글에 NUL 이 있으면 글 파일이 아니라고 보이고, 본문을 받지 못하면 내려받아 열라고 안내한다.
-CSV 와 TSV 의 줄 상한과 따옴표 처리는 `web/src/components/workspace/csv-table.tsx` 가 갖는다. 미리보기와 지우기의 분기는 `test/browser/workspace-files.spec.ts` 가 확인한다.
+CSV 와 TSV 의 줄 상한과 따옴표 처리는 `web/src/components/workspace/csv-table.tsx` 가 갖는다. 미리보기와 지우기의 분기는 `web/test/browser/workspace-files.spec.ts` 가 확인한다.
 
 | 상태 | 보이는 것 |
 | --- | --- |

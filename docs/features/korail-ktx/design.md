@@ -56,7 +56,7 @@ CDP 연결 부분(`cdp.ts`)은 쇼핑과 블로그처럼 같은 모양으로 새
 | `icon.svg`, `ICON-SOURCE.md` | SVG 이름공간을 가진 아이콘과 그 출처. 코레일 상표를 쓰지 않고 직접 그린 열차 모양으로 둔다 |
 | `skills/korail-ktx/SKILL.md` | 아래 「스킬」 |
 | `tests/korail-ktx.test.ts` | 계약 검사가 찾는 이름의 도구 층 테스트 |
-| `test/unit/connector-neutral.test.ts` | 금지 낱말에 `korail`, `KORAIL_`, `코레일` 을 더한다. 코레일 이름이 대시보드 plugin, Control Plane, 웹에 들어가면 잡는다(rule-65) |
+| `test/repo/connector-neutral.test.ts` | 금지 낱말에 `korail`, `KORAIL_`, `코레일` 을 더한다. 코레일 이름이 대시보드 plugin, Control Plane, 웹에 들어가면 잡는다(rule-65) |
 | 계약 검사의 `--no-env-file` 허용 | 쇼핑 PR1 이 넓힌 방식을 따른다. 이름 목록이면 `korail-ktx` 를 더하고, 「`owner_browser_env` 를 선언한 플러그인」 규칙이면 고칠 것이 없다 |
 
 쇼핑 PR1 머지 뒤 등록 자리가 바뀌었으면 머지된 쇼핑 플러그인을 기준으로 맞춘다.
@@ -265,4 +265,4 @@ PR1 의 표에 드는 것은 공지 닫기, 출발역, 도착역, 날짜와 시,
 | DECISION5 | 열차 식별값 | 날짜, 출발 시각, 열차 종류, 열차 번호, 역 이름을 이은 서명 없는 문자열. 서버에 저장하지 않는다 | 작성자 | PR2 가 코레일 화면에서 값을 다시 얻으므로 서명으로 막을 것이 없다. 저장하지 않아 테이블이 늘지 않는다 |
 | DECISION6 | 대화상자 글 | 나누지 않고 `KORAIL_REJECTED` 의 세부로 200자까지 돌려준다 | 작성자 | 글 모양 분류는 화면이 바뀌면 조용히 틀린다. 읽기 도구라 모델이 글을 읽고 사용자에게 전한다 |
 | DECISION7 | 화면 구조의 확인 | 공개 조회 화면을 에이전트 브라우저로 로그인 없이 한 번 봤다(2026-11-10). 탐지 안내가 떠 더 조회하지 않았다. 본 자리와 가설을 `fields.ts` 한 표에 나눠 적는다 | 작성자 | 지시서가 공개 페이지는 허락한다. 사용자 브라우저와 코레일 계정은 쓰지 않는다. 더 조회하면 탐지를 더 부른다 |
-| DECISION8 | 결정 기록 | PR1 은 `hermes/docs/adr/ADR-20261110-korail-ktx-connector.md` 하나. 브라우저 화면 조작으로 코레일을 조회하는 선택과 약관 위험의 감수, 조작 방식을 갖는다. PR2 는 backend 승인 틀에 걸쳐 루트 `docs/adr/` 에 좌석 확보 ADR 을 따로 쓴다 | 작성자 | PR1 은 hermes 한 층만 바꾸고 ADR 색인 검사(`test/unit/adr-index.test.ts`)가 한 층의 결정을 그 모듈의 `docs/adr/` 에 두게 한다. 처음 쓴 「루트 하나」 를 이 검사에 맞춰 고쳤다 |
+| DECISION8 | 결정 기록 | PR1 은 `hermes/docs/adr/ADR-20261110-korail-ktx-connector.md` 하나. 브라우저 화면 조작으로 코레일을 조회하는 선택과 약관 위험의 감수, 조작 방식을 갖는다. PR2 는 backend 승인 틀에 걸쳐 루트 `docs/adr/` 에 좌석 확보 ADR 을 따로 쓴다 | 작성자 | PR1 은 hermes 한 층만 바꾸고 ADR 색인 검사(`test/repo/adr-index.test.ts`)가 한 층의 결정을 그 모듈의 `docs/adr/` 에 두게 한다. 처음 쓴 「루트 하나」 를 이 검사에 맞춰 고쳤다 |

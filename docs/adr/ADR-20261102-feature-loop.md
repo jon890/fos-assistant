@@ -33,7 +33,7 @@
 - 기능 아래 계획도 최상위 `tasks/` 와 같다. 구현 문서만 담고, 구현이 끝난 계획서는 그 구현 PR 에서 지운다(`AGENTS.md` 「tasks 는 구현 문서만 담는다」). 오래 남을 것은 지우기 전에 기능 파일이나 ADR 로 옮긴다.
 - 기능 폴더에는 계획이 사라진 뒤에도 `spec.md` 와 `design.md` 가 남는다. 그래서 지우는 대상은 `tasks/<계획>/` 폴더뿐이다.
 
-`test/unit/doc-files.test.ts` 가 이 자리를 지킨다. 계획 경로를 가정한 `scripts/pr/pr-size.mjs`(phase 후보)와 `scripts/pr/pr-risk-labels.sh`(위험 라벨)도 기능 아래 계획을 최상위 `tasks/` 와 같게 본다.
+`test/repo/doc-files.test.ts` 가 이 자리를 지킨다. 계획 경로를 가정한 `scripts/pr/pr-size.mjs`(phase 후보)와 `scripts/pr/pr-risk-labels.sh`(위험 라벨)도 기능 아래 계획을 최상위 `tasks/` 와 같게 본다.
 
 **2. 기능 파일과 스펙은 갖는 것이 다르다.** 같은 내용을 두 곳에 쓰지 않는다.
 

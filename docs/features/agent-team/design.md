@@ -85,7 +85,7 @@ DML 은 이미 있는 첫 에이전트를 바꾼다. 아래 조건을 모두 만
 
 ### 값의 목록
 
-아이콘 목록과 상한은 `AgentIntroduction`, 색 이름은 enum `AgentColor` 가 원본이고 화면의 `agent-badge.ts` 가 같은 값을 갖는다. 둘이 어긋나면 서버가 거절하므로, 단위 테스트 `test/unit/agent-badge.test.ts` 가 두 Java 파일과 화면 목록의 글자를 대조한다.
+아이콘 목록과 상한은 `AgentIntroduction`, 색 이름은 enum `AgentColor` 가 원본이고 화면의 `agent-badge.ts` 가 같은 값을 갖는다. 둘이 어긋나면 서버가 거절하므로, 단위 테스트 `test/repo/agent-badge.test.ts` 가 두 Java 파일과 화면 목록의 글자를 대조한다.
 
 - 색: `VIOLET`, `BLUE`, `TEAL`, `GREEN`, `AMBER`, `ORANGE`, `ROSE`, `SLATE`. 테마의 밝은 화면과 어두운 화면 모두에서 글자 대비가 맞는 class 를 `agent-badge.ts` 가 고른다([rule-56](../../code-rules/rule-56.md))
 - 아이콘: 쇼핑, 기차, 메일, 일정, 돈, 글쓰기, 책, 집, 요리, 건강, 여행, 음악, 사진, 코드, 별, 비서 같은 뜻의 이모지 24개 안쪽. 코드에 목록 하나로 둔다
