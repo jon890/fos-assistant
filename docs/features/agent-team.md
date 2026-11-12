@@ -2,7 +2,7 @@
 
 사용자가 에이전트를 이름표와 소개로 구분해 보고, 기본 비서와 전문 에이전트가 나눠 일하는 기능이다. 합의한 변경과 단계는 [스펙](agent-team/spec.md)과 [설계](agent-team/design.md)가 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`
+covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionLines.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionInputs.java`, `web/src/lib/mention.ts`, `web/src/components/chat/delegate-chip.tsx`
 
 ## 요구
 
@@ -11,6 +11,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 - 첫 로그인에 만든 에이전트가 그 사용자의 기본 비서이고 이름은 「비서」 다([사용자](users.md) 의 「첫 에이전트의 기본 도구」).
 - 서비스를 처음 연결하면 그 연결 하나만 맡는 전문 에이전트를 만들자고 제안하고, 받으면 한 번에 만든다. 에이전트 목록의 「전문 에이전트 만들기」 로도 만든다. 아래 「전문 에이전트 만들기」.
 - 대화의 turn 이 다른 에이전트에게 맡기면 그 답 아래에 맡긴 줄이 보이고, 결과 도착 줄과 위임 자식의 승인 카드에 맡은 에이전트의 이름표가 붙는다. 아래 「대화 안의 협업」.
+- 메시지가 있는 대화에서 입력창의 `@` 로 고른 에이전트에게 바로 맡기고, 그 답이 맡은 에이전트 이름표로 대화에 남는다. 대화의 에이전트는 다음 turn 에 그 주고받음을 받는다. 아래 「`@` 로 바로 맡기기」.
 
 ## 소개와 할 수 있는 일
 
@@ -45,6 +46,21 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 결과 도착 줄은 전달 묶음의 `delegation_notice_message_id` 로 결과를 찾는다. 자동 turn 이 도는 동안은 그 줄의 `system` 사건이 같은 결과(`deliveredResults`)를 싣는다. 이 칸 전에 만든 알림 줄은 저장된 글만 보인다. 저장된 글(「○○ 에이전트의 결과가 도착했어요」)은 바꾸지 않는다.
 승인과 거절 응답은 대화를 몰라 `requestedBy` 를 싣지 않으므로 화면이 카드를 바꿀 때 앞 값을 지킨다.
 이름표의 네 칸(`AgentLabel`)이 모두 비어 있으면 지운 에이전트다. 화면은 「지운 에이전트」 로 그린다.
+
+## `@` 로 바로 맡기기
+
+메시지가 하나라도 있는 대화에서 입력창에 `@` 를 치면 요청자가 쓸 수 있고 켜진 에이전트 가운데 대화의 에이전트를 뺀 목록이 뜬다. 고르면 친 글자가 지워지고 입력창 위에 「{이름}에게 맡기기」 칩이 놓인다. 보내면 Control Plane 이 모델 판단 없이 그 에이전트로 turn 하나를 돌린다([ADR-20261112 / mention-delegation](../adr/ADR-20261112-mention-delegation.md)).
+
+| 자리 | 무엇을 하나 |
+| --- | --- |
+| 보내기 요청 | `delegateTo` 에 에이전트 코드를 싣는다. 새 대화, 메시지가 없는 대화, 사진을 함께 보낸 요청, 대화의 에이전트 자신은 `VALIDATION_FAILED` 다. 쓸 수 없는 에이전트는 `AGENT_NOT_FOUND`, 꺼진 에이전트는 `AGENT_DISABLED` 다 |
+| 맡은 에이전트의 run | 새 Hermes session 이다. 대화의 session 은 읽지도 바꾸지도 않는다. 입력은 출처 머리줄 아래 `<external-data>` 로 감싼 대화의 최근 6줄과 「[맡긴 일]」 아래 사용자 글이다 |
+| 질문 아래 | 「(이름표) 나 → {이름}에게 맡김 · 진행 중·끝남·실패·멈춤」. 이력의 `delegatedTo` 로 그린다 |
+| 답 | 맡은 에이전트의 이름표다. 이력의 `answeredBy` 로 그리고, 다시 생성 단추가 없다 |
+| 대화 에이전트의 다음 turn | 지난 자기 turn 뒤의 맡김을 「@ 로 맡긴 일」 머리줄(`ResultHeader`)과 질문, 감싼 답으로 입력 앞에 싣는다. 사용자가 보낸 turn, 자동 결과 전달 turn, 예약 turn 이 싣고 한 번 실은 것은 다시 싣지 않는다 |
+
+**맡김 실행은 대화의 실행 가운데 부모가 없고 에이전트가 대화의 에이전트와 다른 실행이다.** 칸을 두지 않는다. `delegation_key` 가 없어 자동 결과 전달을 타지 않으므로 대화의 에이전트는 그사이 답하지 않는다. 판정과 읽기는 `MentionLines`, 입력 단락은 `MentionInputs` 가 갖는다.
+답이 도는 동안에는 `@` 목록을 띄우지 않는다. 대기 메시지는 글만 받아 대화의 에이전트에게 간다.
 
 ## 전문 에이전트 만들기
 

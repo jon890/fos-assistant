@@ -15,6 +15,7 @@ import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
+import { mentionTargets } from "@/lib/mention";
 import type { Props } from "./conversation-session-view-types";
 
 export function ConversationSessionView({
@@ -79,6 +80,8 @@ export function ConversationSessionView({
   skillCommandsEnabled,
   skillNames,
   starters,
+  delegateTo,
+  setDelegateTo,
 }: Props) {
   if (notFound) {
     return (
@@ -96,6 +99,23 @@ export function ConversationSessionView({
       </section>
     );
   }
+
+  // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 답이 도는 동안은 대기 메시지가 글만 받아 띄우지 않는다.
+  const delegateAgents = mentionTargets(
+    agents,
+    currentConversation?.agentCode ?? agentCode,
+  );
+  const delegating =
+    !startScreen &&
+    conversationId !== null &&
+    !sending &&
+    !agentMissing &&
+    !pending.queue.held &&
+    delegateAgents.length > 0;
+  const delegateAgent =
+    delegateTo === null
+      ? undefined
+      : delegateAgents.find((agent) => agent.code === delegateTo);
 
   // 입력창은 첫 메시지 전후로 같은 자리에 하나만 둔다. 앞뒤 형제만 조건부로 그리고, 가운데에서 아래로
   // 옮기는 것은 감싸는 요소의 클래스로만 한다. 부모가 바뀌면 입력창이 새로 만들어져 올린 사진이 지워진다.
@@ -296,7 +316,10 @@ export function ConversationSessionView({
             disabled={conversationId === null && agents.length === 0}
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
-            acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
+            // 맡김은 사진을 함께 보내지 않는다(design.md 의 DECISION22).
+            acceptsAttachments={
+              (currentAgent?.acceptsAttachments ?? false) && !delegateAgent
+            }
             ensureConversation={ensureConversation}
             running={sending}
             // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
@@ -308,6 +331,13 @@ export function ConversationSessionView({
             mention={
               startScreen && !agentLocked && agents.length > 0
                 ? { agents, onPick: onAgentCodeChange }
+                : delegating
+                  ? { agents: delegateAgents, onPick: setDelegateTo }
+                  : undefined
+            }
+            delegateTarget={
+              delegateAgent
+                ? { agent: delegateAgent, onClear: () => setDelegateTo(null) }
                 : undefined
             }
             skillNames={skillNames}

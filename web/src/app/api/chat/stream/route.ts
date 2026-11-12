@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     text?: string;
     agentCode?: string;
     attachmentIds?: number[];
+    delegateTo?: string | null;
   };
   if (!body.text || body.text.trim().length === 0) {
     return errorResponse(
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       text: body.text,
       agentCode: body.agentCode ?? null,
       attachmentIds: body.attachmentIds ?? [],
+      delegateTo: body.delegateTo ?? null,
     },
   });
   if (!opened.ok) {
