@@ -905,6 +905,8 @@ ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서
 - 1 MiB 를 넘는 준비 응답과 cold auth·429 로 늦은 준비
 - KR 종목의 decimal 수량 왕복(대역 목적지가 US 종목만 준다)
 - claim 직전 철회 경쟁과, timeout 뒤 늦게 온 결과가 정산된 줄을 바꾸지 않는지
+
+마지막 셋은 조건주문 고유 항목이다. 이 PR 범위 밖으로 두고(사용자 결정 2026-11-12), 운영에 조건주문 도구를 열 때 다시 본다.
 ### 국내 종목 통계 계약
 
 통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.
