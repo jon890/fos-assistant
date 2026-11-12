@@ -22,8 +22,23 @@ import {
 import { AgentBadge } from "./agent-badge";
 import { IntroductionPickers } from "./agent-introduction-section";
 
-/** 실패 까닭 뒤에 붙인다. 서버가 만든 것을 거둔 뒤 오류를 돌려준다. 상한은 아무것도 만들기 전에 거절한다. */
-const WITHDRAWN = " 만든 것은 거뒀어요.";
+/**
+ * 실패 까닭 뒤에 붙인다. 서버는 만들기 뒤 단계가 실패하면 새 에이전트를 지우고 오류를 돌려준다. 지우기마저 실패하면
+ * 에이전트가 남을 수 있어 목록을 보라고 함께 적는다.
+ */
+const WITHDRAWN =
+  " 만들던 에이전트를 거뒀어요. 에이전트 목록에 남아 있으면 지워 주세요.";
+
+/** 아무것도 만들기 전에 거절되는 코드다. 이 코드에는 거뒀다는 글을 붙이지 않는다(design 「PR3 마법사」 의 거절 표). */
+const REFUSED_BEFORE_CREATING = new Set([
+  "AGENT_LIMIT_REACHED",
+  "VALIDATION_FAILED",
+  "CONNECTOR_NOT_CONNECTED",
+  "CONNECTOR_NOT_FOUND",
+  "CONNECTOR_SINGLE_BINDING",
+  "UNAUTHENTICATED",
+  "CONNECTOR_UNAVAILABLE",
+]);
 
 /**
  * 연결 하나만 맡는 전문 에이전트를 만드는 화면이다(docs/features/agent-team/design.md 의 「PR3 마법사」).
@@ -81,9 +96,7 @@ export function SpecialistAgentForm({
     if (!result.ok) {
       setCreating(false);
       setError(
-        result.code === "AGENT_LIMIT_REACHED" ||
-          result.code === "VALIDATION_FAILED" ||
-          result.code === "CONNECTOR_NOT_CONNECTED"
+        REFUSED_BEFORE_CREATING.has(result.code)
           ? result.message
           : result.message + WITHDRAWN,
       );
