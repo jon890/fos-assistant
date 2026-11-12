@@ -1,10 +1,6 @@
 /** 사람이 해야 하는 단계다. Control Plane 의 `HandoffNeed` 와 같은 목록이다. */
 export type HandoffNeed =
-  | "LOGIN"
-  | "CAPTCHA"
-  | "DEVICE_CHECK"
-  | "BOT_CHECK"
-  | "UNEXPECTED_PAGE";
+  "LOGIN" | "CAPTCHA" | "DEVICE_CHECK" | "BOT_CHECK" | "UNEXPECTED_PAGE";
 
 export const HANDOFF_NEEDS: readonly HandoffNeed[] = [
   "LOGIN",

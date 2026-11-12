@@ -158,7 +158,11 @@ export async function withWriteTab<T>(
       const opened = await open(tab.page, { keepDraftNotice: true });
       return await work(tab.page, blogId, opened === "draft_notice");
     } catch (error) {
-      if (tab && error instanceof EditorError && error.code === "login_required") {
+      if (
+        tab &&
+        error instanceof EditorError &&
+        error.code === "login_required"
+      ) {
         keep = true;
         leftTabs.add(tab.targetId);
         throw new ToolError("NAVER_BLOG_LOGIN_REQUIRED", {

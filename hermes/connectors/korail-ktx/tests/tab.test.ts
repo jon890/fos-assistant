@@ -282,9 +282,9 @@ test("읽기 함수가 바뀐 화면을 내면 탭을 남겨 넘기고, 다음 �
 });
 
 test("거절과 날짜 밖은 넘기지 않는다", async () => {
-  const error = await run({ dialogOnLookup: "예매 가능 기간이 아닙니다." }).catch(
-    (caught) => caught,
-  );
+  const error = await run({
+    dialogOnLookup: "예매 가능 기간이 아닙니다.",
+  }).catch((caught) => caught);
   expect(error).toBeInstanceOf(ToolError);
   expect(error.handoff).toBeNull();
 });
