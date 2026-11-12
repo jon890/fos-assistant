@@ -5,13 +5,15 @@ import type { ChatEvent } from "@/lib/chat-event";
 import type { AgentView } from "@/lib/agent";
 import type { TurnStreamText } from "./turn-stream-text";
 import type { PendingAnswer } from "./pending-answer";
+import type { Handoff } from "@/lib/handoff";
 
 export type ErrorPayload = { code: string; message: string };
 
-/** 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나다 */
+/** 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나거나, 화면 넘기기의 「내 브라우저」 다 */
 export type SidePanelTarget =
   | { kind: "activity"; target: ActivityPanelTarget }
-  | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string };
+  | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string }
+  | { kind: "handoff"; handoff: Handoff };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
 export type RunningTurn = {
   running: boolean;

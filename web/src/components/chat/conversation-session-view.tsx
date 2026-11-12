@@ -7,7 +7,6 @@ import { Composer } from "./composer";
 import { StartScreenHeader, StarterPrompts } from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
 import { ApprovalList } from "./approval-list";
-import { HandoffList } from "./handoff-list";
 import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
 import { ActivityPanel } from "./activity/activity-panel";
@@ -17,6 +16,7 @@ import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
 import { useDelegateTarget } from "./use-delegate-target";
+import { useConversationHandoffs } from "./use-conversation-handoffs";
 import type { Props } from "./conversation-session-view-types";
 
 export function ConversationSessionView({
@@ -96,6 +96,13 @@ export function ConversationSessionView({
       !pending.queue.held,
     delegateTo,
     setDelegateTo,
+  });
+  const handoffs = useConversationHandoffs({
+    conversationId,
+    refreshKey: approvalRefresh,
+    panelTarget,
+    setPanelTarget,
+    submit: (text) => void submit([], text),
   });
 
   if (notFound) {
@@ -279,13 +286,7 @@ export function ConversationSessionView({
               </div>
             </div>
           ) : null}
-          <HandoffList
-            conversationId={conversationId}
-            refreshKey={approvalRefresh}
-            onDone={(text) => {
-              void submit([], text);
-            }}
-          />
+          {handoffs.list}
           <ApprovalList
             conversationId={conversationId}
             refreshKey={approvalRefresh}
@@ -390,6 +391,7 @@ export function ConversationSessionView({
           onClose={() => setPanelTarget(null)}
         />
       ) : null}
+      {handoffs.panel}
     </section>
   );
 }

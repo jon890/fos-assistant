@@ -2,7 +2,7 @@
 
 사용자마다 하나씩 두는 브라우저를 띄우고 로그인 화면과 중계를 제공하는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/browser/`, `web/src/components/browser/`, `web/src/app/browser/`, `web/src/app/admin/browsers/`, `web/src/lib/browser-api.ts`
+covers: `backend/src/main/java/com/bifos/assistant/browser/`, `web/src/components/browser/`, `web/src/app/browser/`, `web/src/app/admin/browsers/`, `web/src/lib/browser-api.ts`, `web/src/components/chat/handoff-panel.tsx`, `web/src/components/chat/use-conversation-handoffs.tsx`
 
 ## 요구
 
@@ -147,10 +147,28 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 - 휴대폰의 탭과 끌기는 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 서버는 `touch` 를 받지 않는다.
 - 한글은 입력기가 조합을 끝낸 글자를 `text` 로 보내고, 입력은 순서가 바뀌지 않게 한 줄로 보낸다.
 - 시작 주소(`/browser?url=`)는 그 페이지에서 처음 연 화면에만 쓴다. 「다시 열기」 는 지금 탭을 그대로 본다.
-- 화면 넘기기 카드가 여는 `/browser?tab=<id>` 는 처음 연 화면의 첫 `tabs` 사건에 그 탭이 있으면 입력 `tab` 을 한 번 보내 옮긴다. 없으면 지금 탭에 머문다.
+- 화면 넘기기 패널과 그 「새 창으로 열기」 가 여는 `/browser?tab=<id>` 는 처음 연 화면의 첫 `tabs` 사건에 그 탭이 있으면 입력 `tab` 을 한 번 보내 옮긴다. 없으면 지금 탭에 머문다. 패널의 「다시 열기」 는 화면을 새로 만들어 다시 옮긴다(아래 「대화 위 화면」)
 - 입력의 서버 라우트는 출처와 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
 
 입력 변환은 `web/test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `web/test/browser/user-browser-screen.spec.ts` 가 확인한다.
+
+### 대화 위 화면
+
+플러그인이 사람이 해야 하는 화면에서 멈춰 대화에 화면 넘기기 카드가 생기면([ADR-20261111 / connector-handoff](../adr/ADR-20261111-connector-handoff.md)), 사람은 대화를 떠나지 않고 옆 패널에서 그 탭을 다룬다.
+결정은 [ADR-20261112 / handoff-drawer](../../web/docs/adr/ADR-20261112-handoff-drawer.md), 요구와 결정 표는 [스펙](user-browser/spec.md), 구조는 [설계](user-browser/design.md)가 갖는다.
+
+| 경우 | 화면 |
+| --- | --- |
+| 카드의 「내 브라우저 열기」 | 작업 과정·결과물과 같은 옆 패널에 그 카드의 탭을 띄운다. 1024px 이상은 대화 옆에 붙어 입력창을 함께 쓰고, 좁으면 전체 폭 시트로 덮는다. 화면 안의 입력과 도구 줄은 `/browser` 와 같다 |
+| 보고 있는 대화에 새 넘기기가 생긴다 | 패널이 저절로 열린다. 대화를 처음 열거나 새로 고쳤을 때 이미 있던 카드는 열지 않는다. 처음 성공한 목록 읽기의 번호를 기준으로 판정해 서버와 기기의 시계를 비교하지 않는다 |
+| 화면 넘기기 알림을 누른다 | `/chat/<id>?handoff=open` 으로 가서 가장 최근 넘기기의 패널을 열고 주소에서 표시를 지운다. 열린 넘기기가 없으면 대화만 연다 |
+| 패널의 「다 했어요」 | 패널을 닫고 카드의 「다 했어요」 와 같은 글을 보낸다 |
+| 넘긴 탭의 주소가 바뀐다(`#` 뒤만 다른 것은 제외), 넘긴 탭이 닫힌다 | 패널 아래에 「화면이 바뀌었어요. 다 마치셨나요?」 를 보인다. 저절로 보내지 않는다. 「아직이에요」 는 그때 주소를 새 기준으로 삼는다. 기준은 패널을 열고 받은 첫 탭 목록의 주소이고, 넘긴 탭이 처음부터 없으면 묻지 않는다 |
+| 보이던 넘기기가 닫힌다(사람이 보낸 turn) | 카드와 함께 패널도 닫힌다. 다른 옆 패널은 건드리지 않는다 |
+| 닫기, Esc, 「새 창으로 열기」 | 패널만 닫고 카드는 남는다. 「새 창으로 열기」 는 `/browser?tab=<id>` 를 새 창으로 연다. 화면 글자 칸이나 크게 보기에서 누른 Esc 는 원격 페이지나 크게 보기가 받는다 |
+| 다른 창이 화면을 가져간다 | 한 브라우저에 화면은 하나라 지금처럼 「다른 창에서 화면을 열었어요」 와 「다시 열기」 를 보인다 |
+
+`web/test/browser/handoff-card.spec.ts` 와 `web/test/unit/handoff.test.ts` 가 확인한다.
 
 ### CDP 연결
 

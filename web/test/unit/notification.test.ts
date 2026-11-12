@@ -22,6 +22,11 @@ test("대화가 대상인 알림은 그 대화 주소로 간다", () => {
   assert.equal(notificationHref(view()), `/chat/${CONVERSATION_ID}`);
 });
 
+test("화면 넘기기 알림은 그 대화의 「내 브라우저」 패널을 여는 주소로 간다", () => {
+  assert.equal(notificationHref(view({ kind: "HANDOFF_REQUESTED" })), `/chat/${CONVERSATION_ID}?handoff=open`);
+  assert.equal(notificationHref(view({ kind: "HANDOFF_REQUESTED", targetId: null })), null);
+});
+
 test("작업이 대상인 알림은 그 작업 주소로 간다", () => {
   const taskId = "99999999-8888-4777-8666-555555555555";
   assert.equal(notificationHref(view({ kind: "TASK_FAILED", targetType: "TASK", targetId: taskId })), `/tasks/${taskId}`);
