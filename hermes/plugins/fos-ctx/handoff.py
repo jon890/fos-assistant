@@ -36,19 +36,32 @@ def sign_handoff(key: str, hermes_tool: str, root_session_id: str, session_id: s
 def handoff_of(result: str):
     """결과 글에서 `(code, need, tab)` 을 꺼낸다. 정해 둔 모양이 아니면 None 이다.
 
-    Hermes 는 MCP 의 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다.
+    받는 모양은 둘이다. 새 모양은 오류가 아닌 결과 `{"handoff": {"code", "need", "tab"}}` 이고, 옛 모양은 오류
+    `{"error": {"code", "handoff": {"need", "tab"}}}` 다. 옛 모양은 Hermes 의 연속 실패 집계에 들어가므로 플러그인은
+    새 모양을 낸다. 먼저 배포된 플러그인이 옛 모양을 내는 동안 받으려고 남긴다.
+    Hermes 는 MCP 결과를 `{"result": "<플러그인 글>"}`, `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로
+    바깥 칸이 글이면 한 번 더 읽는다.
     """
     try:
         parsed = json.loads(result)
-        error = parsed.get("error") if isinstance(parsed, dict) else None
-        if isinstance(error, str):
-            inner = json.loads(error)
-            error = inner.get("error") if isinstance(inner, dict) else None
+        if isinstance(parsed, dict):
+            for key in ("result", "error"):
+                if isinstance(parsed.get(key), str):
+                    parsed = json.loads(parsed[key])
+                    break
     except ValueError:
         return None
-    if not isinstance(error, dict) or not isinstance(error.get("handoff"), dict):
+    if not isinstance(parsed, dict):
         return None
-    code, need, tab = error.get("code"), error["handoff"].get("need"), error["handoff"].get("tab")
+    if isinstance(parsed.get("handoff"), dict):
+        found = parsed["handoff"]
+        code = found.get("code")
+    elif isinstance(parsed.get("error"), dict) and isinstance(parsed["error"].get("handoff"), dict):
+        found = parsed["error"]["handoff"]
+        code = parsed["error"].get("code")
+    else:
+        return None
+    need, tab = found.get("need"), found.get("tab")
     if not (isinstance(code, str) and CODE_RE.fullmatch(code) and need in NEEDS
             and isinstance(tab, str) and TAB_RE.fullmatch(tab)):
         return None
@@ -64,7 +77,7 @@ def handoff_url() -> str:
 def report_handoff(tool_name: str, result, session_id, tool_call_id) -> bool:
     """결과에 넘기기 칸이 있으면 한 번 알린다. 알렸으면 참이다. 실패는 로그만 남기고 결과를 바꾸지 않는다.
 
-    카드가 뜨지 않아도 모델은 오류를 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다.
+    카드가 뜨지 않아도 모델은 결과의 안내 글을 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다.
     """
     try:
         found = handoff_of(result) if isinstance(result, str) else None
