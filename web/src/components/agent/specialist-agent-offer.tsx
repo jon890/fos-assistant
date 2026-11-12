@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CircleCheck, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { BoundAgent } from "@/lib/connection";
 import { boundReadiness } from "@/lib/connector-onboarding";
 import { withParticle } from "@/lib/korean-particle";
 import {
@@ -19,12 +20,15 @@ import { SpecialistAgentForm } from "./specialist-agent-form";
 export function SpecialistAgentOffer({
   connectorId,
   title,
+  bindings,
   onDecline,
   onCreated,
   onClose,
 }: {
   connectorId: string;
   title: string;
+  /** 그 연결이 붙은 에이전트들이다. 외부 서비스 연결 화면이 반영을 기다리며 다시 읽은 상태다. */
+  bindings: readonly BoundAgent[];
   /** 「고른 에이전트에 붙이기」 를 눌렀다. */
   onDecline(): void;
   /** 만들었다. 외부 서비스 연결 화면이 붙인 에이전트 목록을 다시 읽는다. */
@@ -66,7 +70,12 @@ export function SpecialistAgentOffer({
             />
             <span>
               {createdMessage(created.agentName, title)}{" "}
-              {boundReadiness(created.connection)}
+              {boundReadiness(
+                // 만든 응답은 그때의 상태다. 서버가 반영을 마쳐 목록이 READY 로 바뀌면 그 상태를 따른다.
+                bindings.find(
+                  (binding) => binding.agentCode === created.agentCode,
+                ) ?? created.connection,
+              )}
             </span>
           </p>
           <div className="flex flex-wrap gap-2">

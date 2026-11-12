@@ -31,6 +31,7 @@ export function ConnectorOnboarding({
     <SpecialistAgentOffer
       connectorId={chooser.connectorId}
       title={chooser.title}
+      bindings={chooser.bindings}
       onDecline={() => setOffer("declined")}
       onCreated={() => {
         setOffer("created");
