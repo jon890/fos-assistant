@@ -97,11 +97,13 @@ test("관리자는 로그인과 마지막 대화 시각을 목록과 상세에�
     );
     await expect(page.locator('[id^="person-detail-"]')).toBeVisible();
   } finally {
+    // 기본 비서는 지울 수 없다(docs/features/agent-team/spec.md 의 REQ8). 사람마다 이메일과 profile 이 달라 남겨도 다른 검사와 섞이지 않는다.
     await setSession(context, user);
     const deleted = await page.request.delete(`/api/agents/${agent!.code}`);
-    expect(deleted.status(), "검사가 만든 기본 에이전트를 지우지 못했다").toBe(
-      204,
-    );
+    expect(deleted.status(), "기본 비서 지우기가 거절되지 않았다").toBe(409);
+    expect(await deleted.json()).toMatchObject({
+      code: "PRIMARY_AGENT_PROTECTED",
+    });
   }
 });
 
