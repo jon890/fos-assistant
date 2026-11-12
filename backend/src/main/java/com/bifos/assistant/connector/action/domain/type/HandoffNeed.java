@@ -7,7 +7,7 @@ import java.util.Optional;
  * 플러그인이 사람에게 화면을 넘긴 단계다. 플러그인 결과와 fos-ctx 의 알림에서는 소문자 {@link #wire} 로 온다.
  *
  * <p>어휘는 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 웹의 {@code handoff.ts} 와 fos-ctx 의
- * {@code handoff.py} 가 같은 목록을 쓴다. 결제와 탭 확인은 네이버 쇼핑의 구매 단계가 더한다.
+ * {@code handoff.py} 가 같은 목록을 쓴다. 결제와 탭 확인은 구매 단계가 더한다.
  */
 public enum HandoffNeed {
     LOGIN("login"),

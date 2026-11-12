@@ -174,10 +174,10 @@ class ConnectorHandoffEndpointTest {
 
         assertThat(post(McpCallSigner.handoffBody(
             token, TOOL, "root-10", "root-10", "call-10", "DEMO_BOT_CHECK", "bot_check", "TAB1")).statusCode())
-            .isEqualTo(200);
+                .isEqualTo(200);
         assertThat(post(McpCallSigner.handoffBody(
             token, TOOL, "root-11", "root-11", "call-11", "DEMO_PAGE_CHANGED", "unexpected_page", "TAB2")).statusCode())
-            .isEqualTo(200);
+                .isEqualTo(200);
 
         assertThat(jdbc.queryForList("SELECT handoff_need FROM connector_action ORDER BY id", String.class))
             .containsExactly("BOT_CHECK", "UNEXPECTED_PAGE");
