@@ -53,7 +53,7 @@ export function registerTradingTools(
         idempotentHint: false,
       },
       async (input) => {
-        const beforeSend = await claimApproval(
+        const approval = await claimApproval(
           authority,
           client.env,
           tool,
@@ -66,8 +66,9 @@ export function registerTradingTools(
           if (!isDeepStrictEqual(current, input.expected_order)) reject();
           path = `${orderPath(input.orderId)}/${tool === "modify_order" ? "modify" : "cancel"}`;
         }
-        beforeSend();
-        const response = await client.financial("POST", path, body, beforeSend);
+        approval.beforeSend();
+        // 일반 주문도 ticket 남은 시간을 금융 deadline 으로 넘긴다.
+        const response = await client.financial("POST", path, body, approval);
         // 정정·취소는 새 ID를 요구한다. 계약 위반 2xx도 재전송 없이 UNKNOWN이다.
         if (
           tool !== "create_order" &&

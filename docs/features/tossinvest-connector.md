@@ -548,7 +548,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 
 ### 조건주문 REST 쓰기의 구현 보완안
 
-이 절은 구현 제안이다. 조건주문 쓰기 도구는 운영에 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+이 절의 SDK 준비와 단일 전송은 테스트 entry 에 구현돼 있다(아래 「조건주문 SDK 와 단일 전송」). 실제 DB producer 왕복은 테스트에서 연결했다(아래 「실제 DB producer 왕복」). 조건주문 쓰기 도구는 운영에 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
 SDK와 실제 Python 소비자를 loopback에서 검증하는 구현은 실제 DB producer 연결 및 운영 금융 허가와 별개로 완료할 수 있다.
 일반 주문과 조건주문은 같은 ticket·claim을 쓰되 본문과 표시 값을 각각의 엄격한 계약으로 검증한다. 공개 hook·approve를 열거나 새 grant·permit flag를 만들지 않는다.
 
@@ -710,7 +710,7 @@ UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 
 | --- | --- | --- | --- |
 | 조건 snapshot 소비 계약 | 일반 주문 검증 이동·삭제와 Python·Spring 분기1310줄 배분; 여유190줄 | 공통 정상/거절 vector의 직접 Python 소비와 실제 Spring validate/capture/open; 일반 금융 회귀 | 기존 snapshot·ticket·claim 정의만 필요 |
 | 조건 SDK 준비와 단일전송 | TS 모듈·client와 guard982줄 배분; 여유518줄 | 실제 SDK→실제 Python loader/_prepare_result→합성 claim→loopback 목적지, 세 method/path/body/response 수신 및 retry 0 | 일반 금융 모듈과 조건 조회 모듈이 main에 존재해야 한다; 실제 DB producer와 운영 허가는 불필요 |
-| 실제 DB producer 통합 | 기존 업무 구현으로 추가 운영0줄 가정; actual main에서 재검증 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
+| 실제 DB producer 통합 | 실측: 금융 관문 `ConnectorFinancialGate.amount` 의 조건주문 금액 규칙만 더했다. producer·승인·claim 은 그대로다 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태. MySQL 은 왕복·같은 의도·동시 승인만 다시 돌고 UNKNOWN 분류는 H2 에서 본다 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
 
 각 관심사는 설계·구현·회귀를 함께 담은 독립 PR이며 운영 변경 1500줄 상한과 파일 길이를 지킨다. 계획만 PR로 올리지 않는다.
 모든 관심사는 먼저 실패하는 회귀를 확인하고 같은 커밋에서 구현과 성공 증거를 남긴다. 직접 수신 counter는 auth POST/prepare GET/claim POST/금융 POST/DELETE로 나눈다.
@@ -726,7 +726,7 @@ manifest `execution_guard.kinds` 가 도구를 `CONDITIONAL` 로 선언한 경�
 Spring 은 producer 와 승인·claim 재검증(`ConnectorExecutionCurrent`) 두 곳에서, Python 은 `_prepare_result` 에서 같은 대조를 한다.
 일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
 이 구현은 조건주문 도구에 금융 권한을 발급하지 않는다. noGrant와 `confirmHighValueOrder=false`를 유지한다.
-조건주문 도구의 실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)이 열었다.
+SDK 금융 전송과 claim 뒤 원주문 조회는 테스트 entry 에서 연결했다(아래 「조건주문 SDK 와 단일 전송」). 조건주문 도구의 실제 producer, 운영 등록과 개방은 아직 연결하지 않았다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)이 열었다.
 
 조건 summary는 정확히 다음 15개 키를 갖는다.
 `orderKind account operation conditionalOrderId symbol market currency type quantity orderType expireDate first second original normalization`.
@@ -751,7 +751,7 @@ expireDate는 실제 YYYY-MM-DD인지 검증한다. 저장 원문은 지난 날�
 모든 공식 group/leg 상태와 STOP/PROFIT_RATE를 수용한다. OTO 첫 leg가 ORDERED/COMPLETED이고 둘째가 WATCHING인 CANCEL과 PROFIT_RATE 원주문에서 STOP으로 전체 재설정하는 MODIFY도 수용한다.
 PROFIT_RATE의 targetProfitRate는 퍼센트 원문을 그대로 둔다. 신규 쓰기에 PROFIT_RATE 필드를 만들지 않는다.
 부재와 null을 구분하고 createdAt/expireDate, leg 타입·상태·가격·발동 주문 ID까지 expected와 대조한다.
-이 대조는 새 prepare의 소비 검증이며 claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 후속 연결의 책임이다.
+이 대조는 새 prepare의 소비 검증이다. claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 SDK 쓰기 도구가 한다(아래 「조건주문 SDK 와 단일 전송」).
 불투명 ID는 점 경로·공백·슬래시·역슬래시·query/hash/percent/colon·C0/C1·잘못된 surrogate를 거절한다.
 
 normalization은 symbol/quantity/first.triggerPrice/first.orderPrice/second.triggerPrice/second.orderPrice 순서의 실제 표기 변경만 `{field,before,after}`로 기록한다.
@@ -836,8 +836,9 @@ POST·DELETE는 GET 재시도 루프를 공유하지 않는다. 전송 전 실�
 MODIFY·CANCEL도 UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지 않는다.
 공식 해당 operation의 명백한 거절 401은 FAILED, 미지·해석 불가 401은 UNKNOWN이다.
 두 경우 모두 토큰 재발급과 금융 재전송은 없다.
-client의 financial은 승인 검증을 제공하지 않는 저수준 내부 transport다.
-생산 금융 호출자는 trading-tools이며 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
+client의 financial은 승인 검증을 제공하지 않는 저수준 내부 transport다. 단일 전송과 deadline 은 `financial-transport.ts` 가, 토큰 identity 의 확보와 반납은 client wrapper 가 맡는다.
+`claimApproval` 은 `ClaimedApproval={beforeSend, deadlineMs}` 를 돌려주고 일반 주문도 이것을 넘겨 ticket 남은 시간을 금융 deadline 으로 쓴다. 기존 callback 인자도 받으며 그때 deadline 은 요청 제한(기본 4초)이다.
+생산 금융 호출자는 trading-tools와 테스트 entry 만 등록하는 conditional-tools이며 둘 다 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
 
 테스트 원본의 단일 생산자는 `tests/fixtures/trading-entry.ts --generate`다.
 운영 manifest·plugin·MCP 정의를 복사한 고유 임시 디렉터리의 사본에만 금융 선언과 실제 SDK bundle을 넣는다.
@@ -850,6 +851,62 @@ auth POST, 준비 GET, claim HTTP와 금융 POST·DELETE는 별도로 센다. �
 ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서명 인증·DB 일회 소비는 검증하지 않는다.
 실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 [금융 snapshot producer 와 금융 승인](connector-policy.md#금융-snapshot-producer-와-금융-승인)가 검증한다.
 일반 주문 DELETE는 0회다. DELETE transport의 합성 204 검사는 조건주문 등록의 근거가 아니다.
+
+### 조건주문 SDK 와 단일 전송
+
+`conditional-tools.ts` 의 `registerConditionalTradingTools` 가 `prepare_conditional_trade` 와 `create_conditional_order`, `modify_conditional_order`, `cancel_conditional_order` 를 등록한다.
+테스트 entry `tests/fixtures/conditional-entry.ts` 만 이 함수를 부른다. 운영 `createTossinvestServer` 와 `assistant.json` 의 금융 도구 목록은 바꾸지 않았다.
+테스트 원본의 단일 생산자는 `conditional-entry.ts --generate` 이고, 그 사본만 준비 도구를 READ, 세 쓰기를 FINANCIAL/always 로, `execution_guard.kinds` 를 `CONDITIONAL` 로 선언한다.
+
+| 파일 | 맡는 일 |
+| --- | --- |
+| `conditional-body.ts` | 모델·실행 schema, 쓰기 분기와 가격·날짜 검사, 공식 본문 고르기(`conditionalBody`) |
+| `prepare-conditional.ts` | 현재 원주문 투영(`readExpectedConditionalOrder`)과 준비(`prepareConditionalTrade`) |
+| `conditional-result.ts` | 조건 세 경로의 operation 과 거절 allowlist, 성공 응답 판정 |
+| `financial-transport.ts` | 단일 전송, deadline, 조건과 일반 분기 나누기 |
+
+실행은 claim 1회 → 정정·취소의 원주문 재조회와 키·값·타입 대조 → OCO 현재가 재조회 → 금융 전송 1회 순서다. 원주문이 하나라도 바뀌었거나 현재가 관계가 깨지면 금융 전송은 0회다.
+취소는 본문 없는 DELETE 와 빈 204 만 성공이며 결과는 `{conditionalOrderId, canceled: true}` 다. 공식 JSON 응답이 있었다고 표시하지 않는다.
+전송 뒤 실패는 위 allowlist 의 operation+status+code 와 유효한 ErrorResponse 만 FAILED 이고 나머지는 UNKNOWN 이다.
+
+이 증거는 실제 SDK bundle, 실제 Python 준비·실행 처리기, 합성 claim 대역과 loopback 목적지의 왕복이다(`hermes/tests/test_connector_conditional_sdk.py`).
+합성 ticket 은 실제 서명 인증·DB 일회 소비를 검증하지 않는다. 그 몫은 아래 「실제 DB producer 왕복」 이 갖는다.
+
+### 실제 DB producer 왕복
+
+실제 `ConnectorFinancialProducer.request` 와 `ConnectorFinancialApproval.approve`, Spring claim HTTP 의 서명 인증과 `consumeTicket`, 실제 Python 준비·실행 처리기, 조건 SDK bundle 을 잇고 금융 목적지만 loopback 대역으로 둔다.
+승인 caller 는 테스트가 producer 를 직접 부른다. 공개 hook·approve API 를 지나는 E2E 가 아니고, 운영 `assistant.json` 에는 조건주문 쓰기 도구가 없다.
+
+| 파일 | 맡는 일 |
+| --- | --- |
+| `backend/src/test/.../connector/approval/application/FinancialConditionalProducerRoundTripTest.java` | H2 에서 저장·승인·claim·전송과 실패 주입을 본다 |
+| `FinancialConditionalProducerMysqlRoundTripTest.java` (같은 패키지) | 위 검사 가운데 `@MysqlCase` 를 단 claim 소비, 같은 의도 차단, 동시 승인을 실제 MySQL 에서 다시 돈다 |
+| `test/e2e/financial/conditional_plugin_http.py` | `conditional-entry.ts --generate` 의 설치 원본을 실제 plugin 으로 띄우고, support·claim 은 Spring 으로 보낸다. 금융 목적지와 현재 원주문을 바꾸는 대역도 맡는다 |
+
+검사가 지키는 결론이다.
+
+- 준비는 TX 밖에서 한 번 부르고, 사용자 잠금 아래에서 맥락을 다시 본 뒤 PENDING 줄, 암호화한 snapshot, 알림을 같은 TX 로 남긴다. 저장 summary 의 leg 와 단위는 open 한 실행 원문과 같다.
+- 준비 응답이 Spring 의 준비 읽기 제한(2초)을 넘으면 줄·snapshot·알림을 남기지 않고, 늦게 끝난 준비 결과도 저장하지 않는다.
+- 승인은 저장 원문을 그대로 보내고 준비와 UUID 생성을 다시 하지 않는다. 생성·정정은 금융 POST 1회, 취소는 DELETE 1회이고 같은 ticket 의 replay 는 0회다.
+- 같은 의도는 clientOrderId 나 기대 원주문만 달라도 실제 `ConnectorFinancialConflicts` 가 PENDING·EXECUTING·UNKNOWN 으로 막는다. 다른 종목과 다른 대상 ID 는 막지 않는다. `supersedes_unknown_action_id` 는 NULL 이다. 막힌 새 요청도 읽기 전용 준비는 한 번 지난다.
+- 429·5xx·timeout·끊김·불량 2xx·allowlist 밖 code 는 UNKNOWN 이고 공식 거절은 FAILED 다. 생성 응답의 clientOrderId 가 빠지거나 null 이어도 성공이다. UNKNOWN 뒤 ticket 재발급과 추가 전송은 0회다.
+- 손상된 wire(추가 키, 숫자 decimal, SHA, 계좌 범위), 요청 뒤 바뀐 revision, 만료한 ticket 은 claim 소비와 금융 전송이 0회다.
+- 승인 뒤 바뀐 현재 원주문(원주문 상태, leg 상태, targetProfitRate, triggeredOrderId, expireDate)은 claim 을 소비한 뒤 대조에서 걸려 FAILED 이고 금융 0회다.
+- OTO first 완료·second 감시 원주문의 취소와 PROFIT_RATE 원주문의 STOP 정정도 한 번 왕복한다.
+- 승인한 조건 생성은 하루 합계에 들고, 정정은 원주문 금액을 빼지 않고 바뀐 뒤 금액을 더한다.
+- 금융 성공 뒤 결과 저장이 실패하면 EXECUTING 으로 남고, 다시 승인하거나 기동 정리가 돌아도 재전송하지 않는다. 정리는 소비한 claim 을 UNKNOWN 으로 둔다.
+- 금액 규칙은 [커넥터 정책](connector-policy.md)의 `ConnectorFinancialGate` 문단이 갖는다.
+
+이 왕복이 조건주문으로 다시 확인하지 않은 것이다. 앞의 셋은 producer·승인·claim 이 주문 종류를 가리지 않는 같은 코드라 일반 주문 왕복(`FinancialConnectorProducerRoundTripTest`)이 지킨다.
+
+- owner·profile·manifest 변경과 연결 끊기 같은 요청 뒤 권한 변경
+- claim 과 기동 정리의 잠금 경합, 같은 의도의 동시 준비
+- 실행 직전 바뀐 바인딩과 꺼진 에이전트
+- 1 MiB 를 넘는 준비 응답과 cold auth·429 로 늦은 준비
+- KR 종목의 decimal 수량 왕복(대역 목적지가 US 종목만 준다)
+- claim 직전 철회 경쟁과, timeout 뒤 늦게 온 결과가 정산된 줄을 바꾸지 않는지
+
+마지막 셋은 조건주문 고유 항목이다. 이 PR 범위 밖으로 두고(사용자 결정 2026-11-12), 운영에 조건주문 도구를 열 때 다시 본다.
 ### 국내 종목 통계 계약
 
 통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.

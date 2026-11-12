@@ -11,6 +11,7 @@ import type {
   Page,
   TestInfo,
 } from "../../node_modules/@playwright/test/index.js";
+import { BINDING_POLL_MS } from "../../src/lib/binding-poll.ts";
 
 /**
  * 외부 서비스를 연결한 직후 같은 자리에서 쓸 에이전트를 고르고, 붙이고, 그 에이전트와 대화로 잇는 흐름을 본다.
@@ -52,6 +53,18 @@ async function connect(page: Page) {
     "POST",
     new RegExp(`^${CONNECTOR_PATH}$`),
   );
+}
+
+function offer(page: Page) {
+  return page.getByTestId("specialist-agent-offer");
+}
+
+/** 처음 연결을 마치면 뜨는 전문 에이전트 제안을 거절하고 지금의 고르기로 간다. */
+async function declineOffer(page: Page) {
+  await offer(page)
+    .getByRole("button", { name: "고른 에이전트에 붙이기" })
+    .click();
+  await expect(offer(page)).toHaveCount(0);
 }
 
 function chooser(page: Page) {
@@ -102,6 +115,8 @@ test("연결을 마치면 같은 자리에서 고른 에이전트에 붙이고 �
   const heading = page.getByRole("heading", {
     name: `${TITLE} 연결이 끝났어요`,
   });
+  await expect(heading).toBeFocused();
+  await declineOffer(page);
   await expect(heading).toBeFocused();
   await expect(chooser(page)).toContainText("어느 에이전트에서 쓸까요?");
   // 붙일 수 있는 에이전트가 먼저이고, 그룹에 공개한 에이전트는 단추 대신 까닭을 보인다.
@@ -223,6 +238,7 @@ for (const toolState of ["켜짐", "숨김", "조회 실패"] as const) {
 
     await page.goto("/connections/demo-notes");
     await connect(page);
+    await declineOffer(page);
     await choice(page, PRIVATE_NAME)
       .getByRole("button", { name: "이 에이전트에서 쓰기" })
       .click();
@@ -276,4 +292,191 @@ test("붙일 수 있는 에이전트가 없으면 연결된 카드와 고르기 
   await expect(page.getByRole("dialog", { name: "새 에이전트" })).toBeVisible();
   // 창을 연 뒤 주소에서 new=1 을 지워 뒤로 가기나 새로 고침에 창이 다시 열리지 않는다.
   await expect(page).toHaveURL(/\/agents$/);
+});
+
+test("처음 연결을 마치면 전문 에이전트를 제안하고, 받으면 미리 채운 값으로 만들어 그 연결을 붙인다", async ({
+  page,
+}) => {
+  await page.goto("/connections/demo-notes");
+  await connect(page);
+
+  await expect(
+    page.getByRole("heading", { name: `${TITLE} 연결이 끝났어요` }),
+  ).toBeFocused();
+  await expect(offer(page)).toContainText(
+    "이 서비스만 맡는 전문 에이전트를 만들까요?",
+  );
+  await expect(chooser(page)).toHaveCount(0);
+  await offer(page).getByRole("button", { name: "만들기" }).click();
+
+  const form = page.getByTestId("specialist-agent-form");
+  await expect(form.getByRole("textbox", { name: "이름" })).toHaveValue(`${TITLE} 담당`);
+  await expect(form.getByRole("textbox", { name: "한 줄 소개" })).toHaveValue(
+    `${TITLE} 일을 맡아요`,
+  );
+  await expect(form.getByRole("button", { name: "🤖" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  // 붙은 에이전트가 없으니 뗄 것도 없다.
+  await expect(form.getByRole("checkbox")).toHaveCount(0);
+  await clickAndWaitForResponse(
+    page,
+    form.getByRole("button", { name: "만들기" }),
+    "POST",
+    new RegExp(`^${CONNECTOR_PATH}/specialist$`),
+  );
+
+  await expect(
+    page.getByRole("heading", { name: "전문 에이전트를 만들었어요" }),
+  ).toBeVisible();
+  await expect(offer(page)).toContainText(
+    `「${TITLE} 담당」을 만들고 「${TITLE}」를 붙였어요.`,
+  );
+  await expect(page.getByTestId("connection-binding")).toContainText(
+    `${TITLE} 담당`,
+  );
+  const agents = (await (await page.request.get("/api/agents")).json()) as {
+    name: string;
+    description: string | null;
+    visibility: string;
+  }[];
+  expect(agents.find((agent) => agent.name === `${TITLE} 담당`)).toMatchObject(
+    { description: `${TITLE} 일을 맡아요`, visibility: "PRIVATE" },
+  );
+});
+
+test("에이전트 목록의 「전문 에이전트 만들기」 는 연결한 서비스를 골라 만들고 켜 둔 떼기 칸이 다른 에이전트에서 뗀다", async ({
+  page,
+}, testInfo) => {
+  await connectDemoConnector(ownerOf(testInfo).email);
+  const assistant = await createAgent(page, "비서");
+  expect(
+    (
+      await page.request.put(`/api/agents/${assistant}/connections/demo-notes`)
+    ).ok(),
+  ).toBeTruthy();
+
+  await page.goto("/agents");
+  await page.getByRole("button", { name: "전문 에이전트 만들기" }).click();
+  const dialog = page.getByRole("dialog", { name: "전문 에이전트 만들기" });
+  await dialog
+    .getByRole("listitem")
+    .filter({ hasText: TITLE })
+    .getByRole("button", { name: "이 서비스로 만들기" })
+    .click();
+  const detach = dialog.getByRole("checkbox", {
+    name: "「비서」에서는 떼고 맡기기만",
+  });
+  await expect(detach).toBeChecked();
+  await expect(detach).toBeEnabled();
+  await dialog.getByRole("button", { name: "만들기" }).click();
+
+  await expect(page).toHaveURL(/\/agents\/a[a-z0-9]{10}$/);
+  const connections = (await (
+    await page.request.get(`/api/agents/${assistant}/connections`)
+  ).json()) as { connections: { connectorId: string; bound: boolean }[] };
+  expect(
+    connections.connections.find((item) => item.connectorId === "demo-notes")
+      ?.bound,
+  ).toBe(false);
+});
+
+test("에이전트 목록의 만들기 창은 생성 요청이 끝나기 전에는 닫히지 않고, 실패하면 다시 닫힌다", async ({
+  page,
+}, testInfo) => {
+  await connectDemoConnector(ownerOf(testInfo).email);
+  // 생성 응답을 붙잡아 두었다가 거절로 돌려준다. 요청 중 창을 닫고 다시 열어 두 번 만드는 일을 막는지 본다.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let requests = 0;
+  await page.route("**/api/connections/demo-notes/specialist", async (route) => {
+    requests += 1;
+    await held;
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "AGENT_LIMIT_REACHED" }),
+    });
+  });
+
+  await page.goto("/agents");
+  await page.getByRole("button", { name: "전문 에이전트 만들기" }).click();
+  const dialog = page.getByRole("dialog", { name: "전문 에이전트 만들기" });
+  await dialog
+    .getByRole("listitem")
+    .filter({ hasText: TITLE })
+    .getByRole("button", { name: "이 서비스로 만들기" })
+    .click();
+  await dialog.getByRole("button", { name: "만들기" }).click();
+  await expect.poll(() => requests).toBe(1);
+
+  await expect(dialog.getByRole("button", { name: "닫기" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.mouse.click(5, 5);
+  await expect(dialog.getByTestId("specialist-agent-form")).toBeVisible();
+
+  release();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  expect(requests).toBe(1);
+});
+
+test("붙인 뒤 서버가 반영을 마치면 새로 고치지 않아도 붙이는 중이 끝난다", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const code = await createAgent(page, PRIVATE_NAME);
+  // 반영 예정 시각이 지나 Control Plane 이 바인딩을 READY 로 바꾼 것을 흉내 낸다. 바꾸기 전에는 실제 응답을 그대로 둔다.
+  let applied = false;
+  let reads = 0;
+  await page.route(`**${CONNECTOR_PATH}`, async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    reads += 1;
+    const response = await route.fetch();
+    if (!applied) return route.fulfill({ response });
+    const connection = await response.json();
+    return route.fulfill({
+      response,
+      json: {
+        ...connection,
+        bindings: connection.bindings.map((binding: object) => ({
+          ...binding,
+          status: "READY",
+        })),
+      },
+    });
+  });
+
+  await page.goto("/connections/demo-notes");
+  await connect(page);
+  await declineOffer(page);
+  await clickAndWaitForResponse(
+    page,
+    choice(page, PRIVATE_NAME).getByRole("button", {
+      name: "이 에이전트에서 쓰기",
+    }),
+    "PUT",
+    new RegExp(`^/api/agents/${code}/connections/demo-notes$`),
+  );
+  const binding = page.getByTestId("connection-binding");
+  await expect(binding).toContainText("붙이는 중");
+  await expect(page.getByTestId("connector-bound-result")).toContainText(
+    "몇 분 안에 쓸 수 있어요.",
+  );
+
+  applied = true;
+  await page.clock.runFor(BINDING_POLL_MS);
+  await expect(binding).not.toContainText("붙이는 중");
+  await expect(page.getByTestId("connector-bound-result")).toContainText(
+    "바로 쓸 수 있어요.",
+  );
+
+  // 끝난 뒤에는 더 읽지 않는다.
+  const settled = reads;
+  await page.clock.runFor(BINDING_POLL_MS * 3);
+  expect(reads).toBe(settled);
 });

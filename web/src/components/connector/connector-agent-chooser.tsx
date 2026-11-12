@@ -167,10 +167,12 @@ function ChoiceList({
 /** 붙인 뒤의 안내다. 그 에이전트와 대화를 바로 시작할 수 있게 한다. */
 function BoundResult({
   bound,
+  readiness,
   title,
   onClose,
 }: {
   bound: Bound;
+  readiness: string;
   title: string;
   onClose(): void;
 }) {
@@ -183,7 +185,7 @@ function BoundResult({
         />
         <span>
           이제 「{bound.choice.name}」 대화에서 「{title}」 도구를 써요.{" "}
-          {boundReadiness(bound.view)}
+          {readiness}
         </span>
       </p>
       <div className="flex flex-wrap gap-2">
@@ -302,7 +304,17 @@ export function ConnectorAgentChooser({
       </h2>
       {bound ? (
         <div className="mt-3">
-          <BoundResult bound={bound} title={title} onClose={onClose} />
+          <BoundResult
+            bound={bound}
+            readiness={boundReadiness(
+              // 붙인 응답은 그때의 상태다. 서버가 반영을 마쳐 목록이 READY 로 바뀌면 그 상태를 따른다.
+              bindings.find(
+                (binding) => binding.agentCode === bound.choice.code,
+              ) ?? bound.view,
+            )}
+            title={title}
+            onClose={onClose}
+          />
         </div>
       ) : (
         <>

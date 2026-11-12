@@ -102,12 +102,28 @@ public class AgentLifecycleService {
         if (!user.isAdmin()) {
             requireBelowLimit(user);
         }
-        return provisionAgent(user, name, visibility);
+        String agentName = AgentIntroduction.requireName(name);
+        return provisionAgent(user, new AgentIntroduction(agentName, null, null, null), visibility);
     }
 
 
-    private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility) {
-        String agentName = AgentIntroduction.requireName(name);
+    /**
+     * 소개까지 채운 에이전트를 만든다. 잠금과 상한, profile 을 거두는 규칙은 {@link #create(CurrentUser, String, AgentVisibility)}
+     * 와 같다. 행을 저장하기 전에 소개를 적으므로 소개 저장이 따로 실패하지 않는다(전문 에이전트 만들기,
+     * docs/features/agent-team/design.md 의 「PR3 마법사」).
+     *
+     * @param introduction {@link AgentIntroduction#of} 로 판정한 값
+     */
+    @Transactional
+    public Agent create(CurrentUser user, AgentIntroduction introduction, AgentVisibility visibility) {
+        if (!user.isAdmin()) {
+            requireBelowLimit(user);
+        }
+        return provisionAgent(user, introduction, visibility);
+    }
+
+
+    private Agent provisionAgent(CurrentUser user, AgentIntroduction introduction, AgentVisibility visibility) {
         AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
 
         String code = CODE_PREFIX + randomChars();
@@ -130,13 +146,14 @@ public class AgentLifecycleService {
             }
             Agent agent = Agent.of(
                 code,
-                agentName,
+                introduction.name(),
                 profileName,
                 apiBaseUrl,
                 peopleProperties.defaultCostMode(),
                 CredentialScope.SHARED_HOUSEHOLD,
                 effectiveVisibility,
                 user.id());
+            agent.changeIntroduction(introduction);
             agent.markManagedProfile();
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);

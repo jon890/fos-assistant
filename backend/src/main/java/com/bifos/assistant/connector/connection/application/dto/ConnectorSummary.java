@@ -15,6 +15,8 @@ import java.util.List;
  * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 곳. 선언하지 않았거나 카탈로그에서 빠진 커넥터는 null
  * @param standardPlugin {@code assistant.json} 이 없는 표준 플러그인({@code schema: 3})인가. 그 도구는 모두 첫 호출에 승인을 받는다
  * (ADR-20261101 / plugin-without-assistant-json). 카탈로그에서 빠진 커넥터는 거짓
+ * @param singleBinding 연결 하나를 에이전트 하나에만 붙인다고 선언했는가. 전문 에이전트 만들기 화면이 떼기 칸을 잠근다.
+ * 카탈로그에서 빠진 커넥터는 거짓
  */
 public record ConnectorSummary(
     String id,
@@ -27,10 +29,29 @@ public record ConnectorSummary(
     boolean available,
     List<BoundAgentSummary> bindings,
     String ownerBrowserLoginUrl,
-    boolean standardPlugin) {
+    boolean standardPlugin,
+    boolean singleBinding) {
 
     public ConnectorSummary {
         bindings = List.copyOf(bindings);
+    }
+
+
+    /** 연결 하나를 여러 에이전트에 붙일 수 있는 커넥터의 항목이다. */
+    public ConnectorSummary(
+        String id,
+        String title,
+        String description,
+        ConnectorAppearance appearance,
+        List<ConnectorFieldSummary> fields,
+        List<ConnectorToolSummary> tools,
+        ConnectionStatus myStatus,
+        boolean available,
+        List<BoundAgentSummary> bindings,
+        String ownerBrowserLoginUrl,
+        boolean standardPlugin) {
+        this(id, title, description, appearance, fields, tools, myStatus, available, bindings, ownerBrowserLoginUrl,
+            standardPlugin, false);
     }
 
 

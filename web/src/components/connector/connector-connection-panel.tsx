@@ -6,12 +6,13 @@ import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
-import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
+import { ConnectorOnboarding } from "@/components/agent/connector-onboarding";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { FinancialLimitsSection } from "@/components/connector/financial-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
+import { useConnectionPoll } from "@/components/connector/use-binding-poll";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -75,6 +76,8 @@ export function ConnectorConnectionPanel({
     // 형식이 틀린 id 로는 서버를 부르지 않는다.
     if (validId) void fetchLoaded(id).then(setLoaded);
   }, [id, validId]);
+
+  useConnectionPoll(id, validId, loaded, busy, setLoaded);
 
   if (!validId || loaded.kind === "notFound") return <NotFound />;
   if (loaded.kind === "loading")
@@ -270,13 +273,14 @@ export function ConnectorConnectionPanel({
   return (
     <div className="mx-auto w-full max-w-2xl">
       {chooserShown ? (
-        <ConnectorAgentChooser
+        <ConnectorOnboarding
           connectorId={id}
           title={title}
           bindings={connection.bindings}
           justConnected={justConnected}
           preferredAgent={preferredAgent}
           onBindingsChanged={() => void refreshBindings()}
+          onCreated={() => setChooser("open")}
           onClose={() => {
             setChooser("closed");
             setJustConnected(false);
