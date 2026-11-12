@@ -160,3 +160,139 @@ test("기다리는 일이 없는 대화에 승인 알림으로 들어오면 대�
   await expect(page.getByTestId("todo-panel")).toHaveCount(0);
   await expect(page.getByTestId("todo-summary")).toHaveCount(0);
 });
+
+/** 같은 도구로 기다리는 줄이다. 묶음 하나가 되고 상시 허락을 줄 수 있어 「모두 승인」 이 있다. */
+function sameTool(index: number) {
+  return { ...action(index, "메모 쓰기"), toolName: "write_note" };
+}
+
+/** 승인 요청을 붙잡아 두었다가 `release` 로 하나씩 끝낸다. 끝낸 줄은 목록에서 빠진다. */
+async function holdApprovals(
+  page: Page,
+  state: { actions: { actionId: string }[] },
+) {
+  const posts: string[] = [];
+  const waiting: (() => void)[] = [];
+  await page.route("**/api/connector-actions/*/approve", async (route) => {
+    const actionId = new URL(route.request().url()).pathname.split("/").at(-2)!;
+    posts.push(actionId);
+    await new Promise<void>((resolve) => waiting.push(resolve));
+    const done = state.actions.find((item) => item.actionId === actionId);
+    state.actions = state.actions.filter((item) => item.actionId !== actionId);
+    await route.fulfill({ json: { ...done, status: "SUCCEEDED" } });
+  });
+  return {
+    posts,
+    release: async () => {
+      await expect.poll(() => waiting.length).toBeGreaterThan(0);
+      waiting.shift()!();
+    },
+  };
+}
+
+test("승인을 보내는 중에 패널을 닫았다 다시 열어도 같은 줄을 다시 보낼 수 없고 끝나면 카드가 사라진다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(page);
+  const state = { handoffs: [], actions: [action(0), action(1, "일정 넣기")] };
+  await routeTodo(page, conversationId, state);
+  const approvals = await holdApprovals(page, state);
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+
+  const first = page
+    .getByTestId("approval-card")
+    .filter({ hasText: "메모 쓰기" });
+  await first.getByTestId("approval-approve").click();
+  await expect.poll(() => approvals.posts.length).toBe(1);
+  await page.getByRole("button", { name: "옆 패널 닫기" }).click();
+  await openTodo(page);
+  // 카드가 다시 만들어져도 보내는 중인 줄의 단추는 막혀 있다.
+  await expect(first.getByTestId("approval-approve")).toBeDisabled();
+
+  await approvals.release();
+  await expect(first).toHaveCount(0);
+  await expect(page.getByTestId("todo-summary")).toHaveText("할 일 1건");
+  expect(approvals.posts).toEqual([action(0).actionId]);
+});
+
+test("「모두 승인」 중에 패널을 닫아도 끝까지 보내고, 다시 열면 펼친 묶음과 남은 결과가 그대로다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(page);
+  const state = {
+    handoffs: [],
+    actions: [sameTool(0), sameTool(1), sameTool(2)] as { actionId: string }[],
+  };
+  await routeTodo(page, conversationId, state);
+  const approvals = await holdApprovals(page, state);
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+  const group = page.getByTestId("approval-group");
+  await group.getByTestId("approval-group-toggle").click();
+  await group.getByTestId("approval-approve-all").click();
+  await expect.poll(() => approvals.posts.length).toBe(1);
+
+  await page.getByRole("button", { name: "옆 패널 닫기" }).click();
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  await approvals.release();
+  await approvals.release();
+  await expect.poll(() => approvals.posts.length).toBe(3);
+  await openTodo(page);
+  // 패널이 닫힌 동안에도 차례로 보냈고, 남은 한 건은 막힌 채 보인다.
+  await expect(page.getByTestId("approval-card")).toHaveCount(1);
+  await expect(
+    page.getByTestId("approval-card").getByTestId("approval-approve"),
+  ).toBeDisabled();
+  await approvals.release();
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  expect(approvals.posts).toEqual([0, 1, 2].map((i) => sameTool(i).actionId));
+});
+
+test("「할 일」 탭의 넘기기 카드 「다 했어요」 는 패널을 닫고 정해 둔 글을 보낸다", async ({
+  page,
+}) => {
+  await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  const state = { handoffs: [HANDOFF] as unknown[], actions: [action(0)] };
+  await routeTodo(page, conversationId, state);
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+  state.handoffs = [];
+  await page
+    .getByTestId("handoff-card")
+    .getByRole("button", { name: "다 했어요" })
+    .click();
+
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
+    "「내 브라우저」에서 로그인을 마쳤어요. 멈춘 단계부터 이어서 해 주세요.",
+  );
+});
+
+test("「할 일」 탭을 보는 중에 기억한 넘기기가 닫히면 패널은 남고 「내 브라우저」 탭만 막힌다", async ({
+  page,
+}) => {
+  await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  const state = { handoffs: [HANDOFF] as unknown[], actions: [action(0)] };
+  await routeTodo(page, conversationId, state);
+  const events = await routeEvents(page, conversationId);
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+  await page
+    .getByTestId("handoff-card")
+    .getByRole("button", { name: "내 브라우저 열기" })
+    .click();
+  await page.getByRole("tab", { name: "할 일" }).click();
+  await expect(page.getByRole("tab", { name: "내 브라우저" })).toBeEnabled();
+
+  state.handoffs = [];
+  await events.bump();
+  await expect(page.getByTestId("handoff-card")).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("todo-tab-todo")).toBeVisible();
+  await expect(page.getByTestId("approval-card")).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "내 브라우저" })).toBeDisabled();
+});
