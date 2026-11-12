@@ -1,12 +1,28 @@
 {
   "name": "plan208-toss-conditional-financial",
   "description": "토스 일반 주문을 안전장치 뒤에서 열고, 조건주문 REST 세 쓰기를 엄격한 snapshot과 단일 금융 전송으로 구현한다",
+  "pr_scope": "조건주문 CREATE/MODIFY/CANCEL 세 쓰기를 실제 SDK 테스트 entry 와 실제 Python 준비 소비자에 잇고, loopback 목적지에서 단일 금융 전송을 증명한다(phase 05 한 PR). 운영 server 와 assistant.json 의 금융 도구 목록은 바꾸지 않는다.",
+  "deferred": [
+    {
+      "what": "실제 Spring DB producer 와 H2/MySQL 저장·승인·실제 claim HTTP 왕복(phase 06)",
+      "why": "SDK 준비와 단일 전송을 먼저 머지해야 producer 가 그 계약을 소비할 수 있다. 관심사와 모듈이 달라 PR 하나에 담지 않는다",
+      "after": "phase 05 PR 머지"
+    },
+    {
+      "what": "조건주문 쓰기 도구의 운영 등록·허가·공개 승인·실계좌 거래",
+      "why": "운영 금융 개방은 별도 사용자 결정이다. 이 계획의 범위 밖이다",
+      "after": "phase 06 머지 뒤 사용자 결정"
+    }
+  ],
   "status": "in_progress",
   "created_at": "2026-10-11",
   "total_phases": 6,
-  "current_phase": 5,
+  "current_phase": 6,
   "phases": [
-    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" },
-    { "number": 6, "file": "phase-06.md", "execution_profile": "deep" }
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "deep"
+    }
   ]
 }
