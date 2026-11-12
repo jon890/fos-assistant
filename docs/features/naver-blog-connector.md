@@ -109,12 +109,17 @@ MCP 서버 이름은 `naver-blog` 다.
 1. 목록 응답에서 그 `draft_id` 의 차례를 찾는다. 없으면 `NAVER_BLOG_DRAFT_NOT_FOUND` 다. 이 응답의 전체 수와 그 글의 고친 시각을 읽기 전 값으로 둔다
 2. 편집기 문서(`getDocumentData()`)를 읽어 편집기가 비었는지 본다. 편집기 객체를 읽지 못하거나 구성요소·문단·글 조각의 모양이 달라지면 글을 누르기 전에 멈춘다. 코드는 아래 까닭을 구분하지 못한 실패의 규칙을 따른다. 불러온 뒤에야 모양이 바뀐 것을 알면 그 사이 자동저장이 돌 수 있어서다
 3. 「임시저장된 글 보기」 단추로 목록 레이어를 열고, 응답의 제목이 그 차례의 글 단추 제목으로 시작하는지 본 뒤 누른다(화면은 긴 제목을 `…` 로 줄인다). 다르면 누르지 않고 실패한다
-4. 편집기 문서의 문서 번호가 그 `draft_id` 가 될 때까지 기다린다. 그 사이 탭이 로그인 화면으로 넘어가면 `NAVER_BLOG_LOGIN_REQUIRED` 다
+4. 편집기 문서의 문서 번호가 그 `draft_id` 가 될 때까지 기다린다. 그 사이 탭이 로그인 화면으로 넘어가면 그 탭을 남긴 `NAVER_BLOG_LOGIN_REQUIRED` 넘기기다(아래 「화면 넘기기」)
 5. 편집기 문서에서 제목과 본문을, 발행 설정에서 카테고리와 태그를 읽는다. 저장 단추는 누르지 않는다
 6. 목록 응답을 다시 받아 `autosave_check` 를 만든다
 
 까닭을 구분하지 못한 실패 뒤에는 브라우저의 네이버 로그인 쿠키를 한 번 더 본다. 쿠키가 없으면 `NAVER_BLOG_UNAVAILABLE` 대신 `NAVER_BLOG_LOGIN_REQUIRED` 다. 읽는 도중 세션이 끝나면 목록 응답이 로그인 화면으로 넘어가 모양 오류로만 보이기 때문이다.
 쿠키는 남았는데 서버 쪽 세션만 끝난 경우는 구분하지 못한다. 발행 설정이나 카테고리 목록을 열지 못해 화면 진단을 읽은 실패는 `NAVER_BLOG_EDITOR_CHANGED` 고, 그 밖의 실패는 `NAVER_BLOG_UNAVAILABLE` 이다.
+
+### 화면 넘기기
+
+읽기 도구(`list_drafts`, `list_categories`, `read_draft`)의 글쓰기 탭이 로그인 화면(캡차, 기기 인증 포함)으로 넘어가면 그 탭을 남기고 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code": "NAVER_BLOG_LOGIN_REQUIRED", "need": "login", "tab"}}` 로 끝난다([ADR-20261111 / connector-handoff](../adr/ADR-20261111-connector-handoff.md)). fos-ctx 가 알려 대화에 카드와 알림이 뜬다. 남긴 탭의 id 는 MCP 서버 프로세스 메모리에만 있고 다음 읽기가 새 탭을 열기 전에 닫는다.
+넘기지 않는 것은 탭을 연 적 없는 `session_status`, 탭을 닫은 뒤 쿠키로 가린 로그인 없음, 글이 실린 편집기를 남기게 되는 편집기 실패(`NAVER_BLOG_EDITOR_CHANGED`), 작업 프로세스가 탭을 갖는 저장 작업이다. 흐름과 까닭은 [사람이 도와야 하는 지점 설계](user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 가 갖는다.
 
 `autosave_check` 는 읽기 앞뒤 목록을 견준 관측값이다. 뒤 목록을 읽지 못하면 `null` 이다.
 

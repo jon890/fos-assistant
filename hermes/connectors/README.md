@@ -133,7 +133,7 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - 중계가 준 WebSocket 주소는 경로만 꺼내 받은 주소의 호스트에 붙인다. 두 주소의 호스트가 다를 수 있다
 - 주소와 표식을 결과와 로그와 오류 글에 싣지 않는다
 - 사용자가 먼저 로그인할 곳이 있으면 `owner_browser_login_url` 에 `https://` 주소로 적는다. 화면이 안내에 쓴다
-- 로그인, 캡차, 기기 인증처럼 사람이 해야 하는 화면을 만나면 아무것도 누르지 않고 그 탭을 남긴 채 `isError` 없는 결과로 끝내고, 결과에 `status: "HUMAN_ACTION_REQUIRED"`, 끝나지 않았다는 안내 `message`, `handoff: {code, need, tab}` 을 싣는다. 오류로 돌려주면 Hermes 가 연속 3회 실패로 세어 그 서버를 60초 막는다. fos-ctx 가 그 칸을 Control Plane 에 알려 대화에 화면 넘기기 카드가 뜬다. `code` 는 `errors` 에 선언한 코드다. 어휘와 모양은 [네이버 쇼핑 설계](../../docs/features/naver-shopping/design.md)의 「플러그인 결과(공통 계약)」 가 갖는다. 다음 호출에서 남긴 탭을 닫는다
+- 로그인, 캡차, 기기 인증, 봇 탐지, 예상 밖 화면처럼 사람이 해야 하는 화면을 만나면 아무것도 누르지 않고 그 탭을 남긴 채 `isError` 없는 결과로 끝내고, 결과에 `status: "HUMAN_ACTION_REQUIRED"`, 끝나지 않았다는 안내 `message`, `handoff: {code, need, tab}` 을 싣는다. 오류로 돌려주면 Hermes 가 연속 3회 실패로 세어 그 서버를 60초 막는다. fos-ctx 가 그 칸을 Control Plane 에 알려 대화에 화면 넘기기 카드가 뜬다. `code` 는 `errors` 에 선언한 코드다. 모양은 [네이버 쇼핑 설계](../../docs/features/naver-shopping/design.md)의 「플러그인 결과(공통 계약)」, 어휘는 [ADR-20261111 / connector-handoff](../../docs/adr/ADR-20261111-connector-handoff.md) 의 「결정」 이 갖는다. 다음 호출에서 남긴 탭을 닫는다
 
 ### MCP 서버
 

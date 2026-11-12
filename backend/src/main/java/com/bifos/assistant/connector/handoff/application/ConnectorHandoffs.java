@@ -44,7 +44,9 @@ public class ConnectorHandoffs {
     public static final Map<HandoffNeed, String> TITLES = Map.of(
         HandoffNeed.LOGIN, "「내 브라우저」에서 로그인해 주세요",
         HandoffNeed.CAPTCHA, "「내 브라우저」에서 보안 확인을 풀어 주세요",
-        HandoffNeed.DEVICE_CHECK, "「내 브라우저」에서 기기 인증을 해 주세요");
+        HandoffNeed.DEVICE_CHECK, "「내 브라우저」에서 기기 인증을 해 주세요",
+        HandoffNeed.BOT_CHECK, "「내 브라우저」에서 자동 접속 확인을 풀어 주세요",
+        HandoffNeed.UNEXPECTED_PAGE, "「내 브라우저」에서 화면을 확인해 주세요");
 
     private final ConnectorHandoffRepository handoffs;
     private final NotificationService notifications;

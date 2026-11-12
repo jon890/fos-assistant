@@ -4,12 +4,13 @@
  * - 빈 탭을 열고 대화상자 처리기와 `Page.enable` 을 건 뒤 조건 화면으로 이동한다. 우리 탭의 JS 대화상자는 글을 남기고 닫는다
  * - 기다림은 `waitFor` 하나가 맡고, 기다리는 동안 매번 화면을 분류한다. 사람이 해야 하는 화면이면 바로 멈춘다
  * - 자리는 `DOM.performSearch` 로 찾고 누르기와 글 넣기는 `Input.*` 로 한다. 탭에서 돌리는 식은 expressions.ts 의 상수뿐이다
- * - 로그인·탐지·보안 문자 화면이면 탭을 남기고, 그 밖의 결과는 성공이든 실패든 탭을 닫는다. 다른 탭은 읽지도 닫지도 않는다
+ * - 로그인·탐지·보안 문자 화면과 예상 밖 화면(`KORAIL_PAGE_CHANGED`)이면 탭을 남기고 넘기기 칸을 싣는다
+ * - 그 밖의 결과는 성공이든 실패든 탭을 닫는다. 다른 탭은 읽지 않고, 앞서 사람에게 넘기며 남긴 탭만 먼저 닫는다
  * - 자동 재시도는 없다
  */
 import { CdpSession, httpJson, wsUrlFor } from "./cdp.ts";
 import { classifyPage, pageError } from "./classify.ts";
-import { logDiagnostic, ToolError } from "./errors.ts";
+import { type Handoff, logDiagnostic, ToolError } from "./errors.ts";
 import {
   LIST_STATE,
   PAGE_PROBE,
@@ -36,6 +37,28 @@ const TOOL = "search_trains";
 const CANDIDATES = 10;
 type Box = { content?: number[]; width?: number; height?: number };
 
+/**
+ * 사람에게 넘기며 남긴 탭이다. 이 MCP 서버 프로세스의 메모리에만 있다.
+ * 다음 조회가 새 탭을 열기 전에 모두 닫는다. 다음 호출은 「다 했어요」 뒤의 새 turn 에서 오므로 사람의 일은 끝났다고 본다.
+ * 프로세스가 다시 뜨면 목록이 사라지고, 그 탭은 사람이 닫을 때까지 남는다.
+ */
+const leftTabs = new Set<string>();
+
+/** 테스트가 앞 테스트의 남긴 탭을 지운다. */
+export function forgetLeftTabs() {
+  leftTabs.clear();
+}
+
+/** 앞서 남긴 탭을 닫는다. 닫지 못해도 조회는 잇는다. 사람이 이미 닫은 탭일 수 있다. */
+async function closeLeftTabs(cdpUrl: string, timeoutMs: number) {
+  const tabs = [...leftTabs];
+  leftTabs.clear();
+  for (const id of tabs)
+    await httpJson(cdpUrl, `/json/close/${encodeURIComponent(id)}`, {
+      timeoutMs,
+    }).catch(() => {});
+}
+
 class Tab {
   dialog: string | null = null;
   keep = false;
@@ -45,6 +68,7 @@ class Tab {
     readonly page: CdpSession,
     private readonly deadline: number,
     readonly options: Required<TabOptions>,
+    private readonly targetId: string,
   ) {}
 
   remaining() {
@@ -72,14 +96,19 @@ class Tab {
       string,
       unknown
     >;
-    const error = pageError(classifyPage({ ...probe, dialog: this.dialog }));
+    const page = classifyPage({ ...probe, dialog: this.dialog });
+    const error = pageError(page);
     if (error && !error.human && !this.suspect) {
       this.suspect = true;
       return false;
     }
     if (error) {
       this.keep = error.human;
-      throw new ToolError(error.code, error.message ?? null);
+      // 사람이 해야 하는 분류(login, bot_check, captcha)는 넘기기 어휘와 같은 낱말이다.
+      const handoff: Handoff | null = error.human
+        ? { need: page.kind as Handoff["need"], tab: this.targetId }
+        : null;
+      throw new ToolError(error.code, error.message ?? null, handoff);
     }
     this.suspect = false;
     return true;
@@ -185,12 +214,16 @@ class Tab {
   }
 }
 
-/** 조건을 넣고 「열차 조회」 를 한 번 누른 뒤 목록 화면의 고르기를 하고 목록 JSON 글을 꺼낸다. */
-export async function searchInTab(
+/**
+ * 조건을 넣고 「열차 조회」 를 한 번 누른 뒤 목록 화면의 고르기를 하고 목록 JSON 글을 꺼내 `parse` 로 읽는다.
+ * `parse` 는 탭을 닫기 전에 불러, 목록 칸이 기대한 모양이 아니면(`KORAIL_PAGE_CHANGED`) 그 탭을 남겨 넘긴다.
+ */
+export async function searchInTab<T>(
   cdpUrl: string,
   query: Query,
+  parse: (raw: string) => T,
   options: TabOptions = {},
-) {
+): Promise<T> {
   const settings: Required<TabOptions> = {
     timeoutMs: options.timeoutMs ?? 60_000,
     stepMs: options.stepMs ?? 10_000,
@@ -198,12 +231,14 @@ export async function searchInTab(
     pollMs: options.pollMs ?? 200,
   };
   const deadline = Date.now() + settings.timeoutMs;
+  await closeLeftTabs(cdpUrl, Math.max(1, deadline - Date.now()));
   const target = (await httpJson(cdpUrl, "/json/new?about:blank", {
     method: "PUT",
     timeoutMs: Math.max(1, deadline - Date.now()),
   })) as { id?: unknown; webSocketDebuggerUrl?: unknown } | null;
   const targetId = typeof target?.id === "string" ? target.id : "";
   let tab: Tab | null = null;
+  let keep = false;
   let session: CdpSession | null = null;
   try {
     if (!targetId || typeof target?.webSocketDebuggerUrl !== "string")
@@ -212,7 +247,7 @@ export async function searchInTab(
       wsUrlFor(cdpUrl, target.webSocketDebuggerUrl),
       Math.max(1, deadline - Date.now()),
     );
-    const current = new Tab(session, deadline, settings);
+    const current = new Tab(session, deadline, settings, targetId);
     tab = current;
     session.onEvent("Page.javascriptDialogOpening", (params) => {
       current.dialog =
@@ -249,16 +284,33 @@ export async function searchInTab(
       logDiagnostic(TOOL, "list.read", ["row"]);
       throw new ToolError("KORAIL_PAGE_CHANGED");
     }
-    return raw;
+    return parse(raw);
   } catch (error) {
+    keep = tab?.keep ?? false;
+    if (keep) {
+      leftTabs.add(targetId);
+      throw error;
+    }
     // 전체 제한 시간을 넘긴 뒤의 실패는 사람이 해야 하는 화면이 아니면 일시 장애로 알린다.
-    if (!tab?.keep && Date.now() >= deadline)
-      throw new ToolError("KORAIL_UNAVAILABLE");
+    if (Date.now() >= deadline) throw new ToolError("KORAIL_UNAVAILABLE");
+    if (
+      error instanceof ToolError &&
+      error.code === "KORAIL_PAGE_CHANGED" &&
+      targetId
+    ) {
+      // 예상 밖 화면이다. 사람이 그 화면을 보고 판단하도록 탭을 남긴다.
+      keep = true;
+      leftTabs.add(targetId);
+      throw new ToolError(error.code, null, {
+        need: "unexpected_page",
+        tab: targetId,
+      });
+    }
     if (error instanceof ToolError) throw error;
     throw new ToolError("KORAIL_UNAVAILABLE");
   } finally {
     session?.close();
-    if (targetId && !tab?.keep)
+    if (targetId && !keep)
       await httpJson(
         cdpUrl,
         `/json/close/${encodeURIComponent(targetId)}`,

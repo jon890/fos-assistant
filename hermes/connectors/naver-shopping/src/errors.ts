@@ -14,7 +14,7 @@ export type ErrorCode =
  * 모양은 docs/features/naver-shopping/design.md 의 「플러그인 결과(공통 계약)」 가 갖는다.
  */
 export type Handoff = {
-  need: "login" | "captcha" | "device_check";
+  need: "login" | "captcha" | "device_check" | "unexpected_page";
   tab: string;
 };
 

@@ -261,6 +261,8 @@ sequenceDiagram
 | `captcha` | 「내 브라우저」 에서 보안 확인을 풀어 주세요 | 「내 브라우저」 에서 보안 확인을 마쳤어요. 멈춘 단계부터 이어서 해 주세요. |
 | `device_check` | 「내 브라우저」 에서 기기 인증을 해 주세요 | 「내 브라우저」 에서 기기 인증을 마쳤어요. 멈춘 단계부터 이어서 해 주세요. |
 
+봇 탐지(`bot_check`)와 예상 밖 화면(`unexpected_page`)은 [사람이 도와야 하는 지점 설계](../user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 가 더했다. 이 플러그인은 `NAVER_SHOPPING_PAGE_CHANGED` 를 `unexpected_page` 로 넘긴다.
+
 결제(`payment`)와 탭 확인(spec DECISION33)은 금액과 승인 줄이 함께 보여야 해서 PR3 가 어휘와 카드 칸을 더한다. 어휘 표는 Control Plane 의 `HandoffNeed` 와 웹의 `handoff.ts` 가 같이 갖고, 모르는 값은 Control Plane 이 받지 않는다.
 카드에는 플러그인 이름(카탈로그의 `title`)을 함께 보인다.
 
@@ -312,7 +314,7 @@ sequenceDiagram
 ### 남긴 탭 정리와 최종 호스트
 
 - 플러그인은 사람에게 넘기며 남긴 탭의 id 를 MCP 서버 프로세스 메모리에 둔다. 다음에 탭을 여는 도구가 돌면 새 탭을 열기 전에 남긴 탭을 모두 닫고 목록을 비운다. 다음 호출은 「다 했어요」 뒤의 새 turn 에서 오므로 사람이 그 탭에서 하던 일은 끝났다고 본다. 프로세스가 다시 뜨면 목록이 사라지고 그 탭은 사람이 닫을 때까지 남는다(PR1 과 같은 감수)
-- 탭이 준비된 뒤 화면 분류 전에 최종 주소의 호스트가 네이버(`naver.com` 과 그 하위)가 아니면 읽지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝내고 그 탭을 닫는다
+- 탭이 준비된 뒤 화면 분류 전에 최종 주소의 호스트가 네이버(`naver.com` 과 그 하위)가 아니면 읽지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다. 처음에는 그 탭을 닫았고, 지금은 그 탭을 남긴 `unexpected_page` 넘기기다([사람이 도와야 하는 지점 설계](../user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」)
 
 ### 확인 창(#702)
 

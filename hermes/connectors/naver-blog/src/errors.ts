@@ -14,15 +14,43 @@ export type ErrorCode =
   | "NAVER_BLOG_START_UNKNOWN"
   | "NAVER_BLOG_UNAVAILABLE";
 
-/** 코드만 싣는 오류. CDP 주소, 파일 경로, 브라우저가 준 원문을 담지 않는다. */
+/**
+ * 사람에게 넘기는 단계와 남긴 탭이다. fos-ctx hook 이 이 칸을 보고 Control Plane 에 화면 넘기기를 알린다.
+ * 어휘는 fos-assistant `docs/adr/ADR-20261111-connector-handoff.md` 의 「결정」 이 갖는다.
+ */
+export type Handoff = { need: "login"; tab: string };
+
+/** 코드만 싣는 오류. CDP 주소, 파일 경로, 브라우저가 준 원문을 담지 않는다. 넘기기 칸은 어휘와 탭 id 뿐이다. */
 export class ToolError extends Error {
-  constructor(readonly code: ErrorCode) {
+  constructor(
+    readonly code: ErrorCode,
+    readonly handoff: Handoff | null = null,
+  ) {
     super(code);
   }
 }
 
-/** 알 수 없는 예외는 원문을 버리고 `NAVER_BLOG_UNAVAILABLE` 로 바꾼다. */
+/** 모델이 화면 넘기기를 성공으로 읽지 않게 하는 고정 안내다. 화면 글이나 주소를 담지 않는다. */
+const HANDOFF_MESSAGE =
+  "사람이 해야 하는 화면에서 멈췄다. 요청한 일은 아직 끝나지 않았고 결과가 없다. " +
+  "사용자에게 「내 브라우저」 에서 그 화면을 직접 마쳐 달라고 안내하고, 사용자가 마쳤다고 하기 전에는 같은 도구를 다시 부르지 않는다.";
+
+/**
+ * 화면 넘기기 결과다. `isError` 를 싣지 않는다.
+ * Hermes 는 같은 서버의 `isError` 결과가 연속 3회면 60초 동안 그 서버의 호출을 막아, 사람이 풀고 돌아와도 막혀 있다.
+ */
+export function handoffResult(code: ErrorCode, handoff: Handoff) {
+  return toolSuccess({
+    status: "HUMAN_ACTION_REQUIRED",
+    message: HANDOFF_MESSAGE,
+    handoff: { code, need: handoff.need, tab: handoff.tab },
+  });
+}
+
+/** 알 수 없는 예외는 원문을 버리고 `NAVER_BLOG_UNAVAILABLE` 로 바꾼다. 화면 넘기기는 오류가 아닌 결과다. */
 export function toolFailure(error: unknown) {
+  if (error instanceof ToolError && error.handoff)
+    return handoffResult(error.code, error.handoff);
   const code =
     error instanceof ToolError ? error.code : "NAVER_BLOG_UNAVAILABLE";
   return {

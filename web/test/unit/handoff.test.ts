@@ -29,6 +29,23 @@ test("계약대로 온 줄만 카드로 읽고, 단계 밖이나 탭 모양 밖�
   assert.equal(safeHandoff([row]), null);
 });
 
+test("봇 탐지와 예상 밖 화면 줄도 카드로 읽고 정해 둔 제목을 쓴다", () => {
+  assert.equal(safeHandoff({ ...row, need: "BOT_CHECK" })?.need, "BOT_CHECK");
+  assert.equal(
+    safeHandoff({ ...row, need: "UNEXPECTED_PAGE" })?.need,
+    "UNEXPECTED_PAGE",
+  );
+  assert.equal(safeHandoff({ ...row, need: "bot_check" }), null);
+  assert.equal(
+    HANDOFF_TEXT.BOT_CHECK.title,
+    "「내 브라우저」에서 자동 접속 확인을 풀어 주세요",
+  );
+  assert.equal(
+    HANDOFF_TEXT.UNEXPECTED_PAGE.title,
+    "「내 브라우저」에서 화면을 확인해 주세요",
+  );
+});
+
 test("「내 브라우저 열기」 는 그 탭을 고른 채 내 브라우저 화면으로 간다", () => {
   const handoff = safeHandoff(row)!;
   assert.equal(handoffBrowserHref(handoff), "/browser?tab=ABCDEF0123456789");

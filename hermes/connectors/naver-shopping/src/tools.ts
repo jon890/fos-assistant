@@ -36,18 +36,26 @@ export async function searchProducts(
 ) {
   const cdpUrl = browserUrl(env);
   const checked = checkQuery(query);
-  const state = parseJson(
-    await deps.read(cdpUrl, searchUrl(checked), SEARCH_STATE, deps.tab),
+  // 읽기는 탭 안에서 한다. 칸이 없으면 탭을 남긴 예상 밖 화면 넘기기가 된다.
+  const products = await deps.read(
+    cdpUrl,
+    searchUrl(checked),
+    SEARCH_STATE,
+    (raw) => {
+      const state = parseJson(raw);
+      const found = parseSearch(state);
+      if (found === null || searchLooksChanged(state, found)) {
+        logDiagnostic(
+          "search_products",
+          "parse",
+          found === null ? ["products.list"] : ["item"],
+        );
+        throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
+      }
+      return found;
+    },
+    deps.tab,
   );
-  const products = parseSearch(state);
-  if (products === null || searchLooksChanged(state, products)) {
-    logDiagnostic(
-      "search_products",
-      "parse",
-      products === null ? ["products.list"] : ["item"],
-    );
-    throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
-  }
   return { query: checked, count: products.length, products };
 }
 
@@ -64,29 +72,34 @@ export async function productDetail(
   if (target.kind === "external")
     return { kind: "external" as const, url: target.url, buyable: false };
   const cdpUrl = browserUrl(env);
-  const raw = await deps.read(
+  const tool = "get_product_detail";
+  const read = (raw: unknown) => {
+    try {
+      if (target.kind === "catalog") {
+        const state = parseJson(raw);
+        if (state === undefined || state === null)
+          throw new MissingFields(["catalog"]);
+        return parseCatalog(state, target.url);
+      }
+      const wrapped = parseJson(raw) as
+        { present?: unknown; value?: unknown } | undefined;
+      if (wrapped?.present !== true)
+        throw new MissingFields(["preloaded_state"]);
+      const product = parseStoreProduct(wrapped.value, target.url);
+      if (product === null) throw new ToolError("NAVER_SHOPPING_NOT_FOUND");
+      return product;
+    } catch (error) {
+      if (!(error instanceof MissingFields)) throw error;
+      logDiagnostic(tool, `parse.${target.kind}`, error.fields);
+      throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
+    }
+  };
+  // 읽기는 탭 안에서 한다. 칸이 없으면 탭을 남긴 예상 밖 화면 넘기기가 되고, 없는 상품은 탭을 닫는 오류다.
+  return deps.read(
     cdpUrl,
     target.url,
     target.kind === "store" ? PRODUCT_STATE : CATALOG_STATE,
+    read,
     deps.tab,
   );
-  const tool = "get_product_detail";
-  try {
-    if (target.kind === "catalog") {
-      const state = parseJson(raw);
-      if (state === undefined || state === null)
-        throw new MissingFields(["catalog"]);
-      return parseCatalog(state, target.url);
-    }
-    const wrapped = parseJson(raw) as
-      { present?: unknown; value?: unknown } | undefined;
-    if (wrapped?.present !== true) throw new MissingFields(["preloaded_state"]);
-    const product = parseStoreProduct(wrapped.value, target.url);
-    if (product === null) throw new ToolError("NAVER_SHOPPING_NOT_FOUND");
-    return product;
-  } catch (error) {
-    if (!(error instanceof MissingFields)) throw error;
-    logDiagnostic(tool, `parse.${target.kind}`, error.fields);
-    throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
-  }
 }

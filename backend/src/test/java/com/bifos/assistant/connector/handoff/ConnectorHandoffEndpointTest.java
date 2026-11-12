@@ -167,6 +167,29 @@ class ConnectorHandoffEndpointTest {
 
 
     @Test
+    @DisplayName("봇 탐지와 예상 밖 화면 넘기기도 적고, 알림 제목은 어휘마다 정해 둔 글이다")
+    void recordsBotCheckAndUnexpectedPage() throws Exception {
+        insertAction("root-10", "call-10", true, conversation.id());
+        insertAction("root-11", "call-11", true, conversation.id());
+
+        assertThat(post(McpCallSigner.handoffBody(
+            token, TOOL, "root-10", "root-10", "call-10", "DEMO_BOT_CHECK", "bot_check", "TAB1")).statusCode())
+                .isEqualTo(200);
+        assertThat(post(McpCallSigner.handoffBody(
+            token, TOOL, "root-11", "root-11", "call-11", "DEMO_PAGE_CHANGED", "unexpected_page", "TAB2")).statusCode())
+                .isEqualTo(200);
+
+        assertThat(jdbc.queryForList("SELECT handoff_need FROM connector_action ORDER BY id", String.class))
+            .containsExactly("BOT_CHECK", "UNEXPECTED_PAGE");
+        assertThat(jdbc.queryForList("SELECT title FROM notification ORDER BY id", String.class))
+            .containsExactly("「내 브라우저」에서 자동 접속 확인을 풀어 주세요", "「내 브라우저」에서 화면을 확인해 주세요");
+        assertThat(handoffs.open(user(), conversation.id()))
+            .extracting(HandoffView::need)
+            .containsExactlyInAnyOrder(HandoffNeed.BOT_CHECK, HandoffNeed.UNEXPECTED_PAGE);
+    }
+
+
+    @Test
     @DisplayName("판정 줄이 없거나, 통과하지 않았거나, 등록 이름이 다르거나, 서명이 틀리면 거절하고 아무것도 적지 않는다")
     void rejectsUnmatchedCalls() throws Exception {
         insertAction("root-2", "call-2", false, conversation.id());
