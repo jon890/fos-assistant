@@ -25,7 +25,9 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 
 ## 막혔을 때
 
-| 오류 | 사용자에게 |
+로그인, 보안 확인, 새 기기 확인에서 멈추면 오류가 아니라 `status` 가 `HUMAN_ACTION_REQUIRED` 인 결과가 온다. 성공이 아니고 결과가 없다. 코드는 `handoff.code` 에 있고 아래 표의 해당 줄을 따른다. 나머지 실패는 `error.code` 로 온다.
+
+| 코드 | 사용자에게 |
 | --- | --- |
 | `NAVER_SHOPPING_LOGIN_REQUIRED` | 「내 브라우저」 에서 네이버에 다시 로그인해 달라고 한다 |
 | `NAVER_SHOPPING_CAPTCHA` | 「내 브라우저」 를 열면 보안 확인 화면의 탭이 남아 있다. 직접 풀고 다시 요청해 달라고 한다 |
