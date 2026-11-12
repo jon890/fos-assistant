@@ -235,8 +235,8 @@ sequenceDiagram
   participant H as fos-ctx hook
   participant CP as Control Plane
   participant W as 웹
-  P->>P: 사람이 해야 하는 화면. 탭을 남기고 오류로 끝난다
-  P-->>H: {"error": {"code", "handoff": {"need", "tab"}}}
+  P->>P: 사람이 해야 하는 화면. 탭을 남기고 오류가 아닌 결과로 끝난다
+  P-->>H: {"status", "message", "handoff": {"code", "need", "tab"}}
   H->>CP: POST /internal/hermes/connector-handoff (서명)
   CP->>CP: 판정 줄(connector_action)에 넘기기를 적고 알림 한 건
   H-->>P: 결과는 그대로 모델에게 간다(external-data 감싸기)
@@ -246,9 +246,9 @@ sequenceDiagram
   CP->>CP: 사람이 보낸 turn 시작 → 그 대화의 열린 넘기기를 닫고 알림을 읽음
 ```
 
-1. 플러그인이 사람이 해야 하는 화면에서 멈추면 지금처럼 그 탭을 남기고 선언된 오류로 끝난다. 오류 본문에 `handoff: {need, tab}` 을 더한다. `need` 는 아래 어휘 하나, `tab` 은 남긴 탭의 CDP target id 다
+1. 플러그인이 사람이 해야 하는 화면에서 멈추면 그 탭을 남기고, `isError` 가 없는 결과로 끝난다(2026-11-12 바꿈). 결과에 `handoff: {code, need, tab}` 을 싣는다. `code` 는 그 플러그인의 `errors` 에 선언한 코드, `need` 는 아래 어휘 하나, `tab` 은 남긴 탭의 CDP target id 다. 오류로 돌려주면 Hermes 가 연속 3회 실패로 세어 60초 동안 서버를 막아, 사람이 풀고 돌아와도 다음 호출이 거절된다
 2. 바인딩 profile 의 fos-ctx `transform_tool_result` hook 이 플러그인 서버 도구의 결과에서 그 칸을 찾으면 Control Plane 에 서명해 알린다. 결과 글은 바꾸지 않고 지금처럼 `<external-data>` 로 감싼다
-3. Control Plane 은 같은 호출의 판정 줄을 dedupe key 로 찾아 넘기기를 적고, 대화가 있는 줄이면 알림(`HANDOFF_REQUESTED`) 한 건을 만든다. 실행은 멈추지 않는다. 모델은 오류를 받고 turn 을 마친다(spec DECISION11)
+3. Control Plane 은 같은 호출의 판정 줄을 dedupe key 로 찾아 넘기기를 적고, 대화가 있는 줄이면 알림(`HANDOFF_REQUESTED`) 한 건을 만든다. 실행은 멈추지 않는다. 모델은 사람이 해야 하는 화면에서 멈췄다는 결과를 받고 turn 을 마친다(spec DECISION11)
 4. 웹은 대화의 열린 넘기기를 입력창 위의 카드로 그린다. 카드의 종류와 탭은 이 줄에서만 온다. 모델이 쓴 글로 그리지 않는다
 5. 「다 했어요」 는 정해 둔 글을 그 대화의 다음 메시지로 보낸다. 입력창에 직접 답해도 같다(spec DECISION24). 사람이 보낸 turn 이 시작되면 그 대화의 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 담당의 결과를 전하는 자동 turn 은 닫지 않는다
 6. 에이전트가 멈춘 도구를 다시 부르면 플러그인이 앞서 남긴 탭을 먼저 닫는다. 아직 같은 화면이면 새 탭을 남기고 카드가 다시 뜬다(REQ8)
@@ -267,12 +267,14 @@ sequenceDiagram
 ### 플러그인 결과(공통 계약)
 
 ```json
-{"error": {"code": "NAVER_SHOPPING_LOGIN_REQUIRED", "handoff": {"need": "login", "tab": "<target id>"}}}
+{"status": "HUMAN_ACTION_REQUIRED", "message": "<고정 안내 글>", "handoff": {"code": "NAVER_SHOPPING_LOGIN_REQUIRED", "need": "login", "tab": "<target id>"}}
 ```
+
+`isError` 칸이 없다. `status` 와 `message` 는 모델이 이 결과를 성공으로 읽지 않게 한다. `message` 는 고정 글이고 「사람이 해야 하는 화면에서 멈췄다, 요청한 일은 끝나지 않았고 결과가 없다, 사용자가 「내 브라우저」 에서 마쳤다고 하기 전에는 같은 도구를 다시 부르지 않는다」 를 담는다. 화면 글이나 주소를 싣지 않는다.
 
 | 칸 | 규칙 |
 | --- | --- |
-| `code` | 그 플러그인의 `errors` 에 선언한 코드. 대문자, 숫자, 밑줄 64자까지 |
+| `handoff.code` | 그 플러그인의 `errors` 에 선언한 코드. 대문자, 숫자, 밑줄 64자까지 |
 | `handoff.need` | 위 어휘 하나 |
 | `handoff.tab` | 남긴 탭의 target id. 영문자와 숫자 128자까지(화면 입력 `tab` 의 `id` 와 같은 모양) |
 
@@ -282,12 +284,12 @@ sequenceDiagram
 
 | 칸 | 값 |
 | --- | --- |
-| 언제 | `transform_tool_result` 에서 대응 파일의 서버와 맞는 도구의 결과가 위 모양일 때만. Hermes 는 MCP 의 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다 |
+| 언제 | `transform_tool_result` 에서 대응 파일의 서버와 맞는 도구의 결과가 위 모양일 때만. Hermes 는 MCP 결과를 `{"result": "<플러그인 글>"}` 로 바꾸므로 바깥 `result` 가 글이면 한 번 더 읽는다. 옛 모양 `{"error": {"code", "handoff": {"need", "tab"}}}`(오류로 돌려주던 꼴, 바깥 `error` 가 글인 꼴 포함)도 받는다 |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `connector-handoff` 로 바꾼 것(`/internal/hermes/connector-handoff`) |
 | 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}` |
 | 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
 | 제한 시간 | `POLICY_TIMEOUT`(3초), 한 번만 부른다 |
-| 실패 | 로그에 상태 코드나 예외 종류만 남기고 결과는 그대로 둔다. 카드가 뜨지 않아도 모델은 오류를 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다(스킬과 도구 설명이 이미 그렇게 시킨다) |
+| 실패 | 로그에 상태 코드나 예외 종류만 남기고 결과는 그대로 둔다. 카드가 뜨지 않아도 모델은 결과의 안내 글을 받아 사람에게 「내 브라우저」 에서 풀어 달라고 안내한다(스킬과 도구 설명이 이미 그렇게 시킨다) |
 
 ### Control Plane
 

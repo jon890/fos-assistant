@@ -1706,6 +1706,7 @@ Control Plane MCP 도구는 모두 `{content: [{type: "text", text}], isError}` 
 | --- | --- |
 | 정지 조건 | 같은 서버 연결의 도구 호출이 연속 3회 실패하면 그 뒤 호출을 막는다. 도구 하나의 실패 횟수가 아니다 |
 | 도구가 반환한 오류 | `isError: true`를 Hermes가 JSON `error` 결과로 바꾸며, `_record_call_outcome`이 이를 `application=True`인 실패 1회로 센다. `source_url` 검사의 `VALIDATION_FAILED`와 없는 대화 등의 오류가 이 경로를 따른다 |
+| 오류가 아닌 결과 | `isError` 가 없는 결과는 Hermes 가 `{"result": "<플러그인 글>"}` 로 바꾼다. 집계는 이 글의 맨 위에 `error` 칸이 있는지만 보므로(`_result_is_error`) 플러그인 글 안에 `error` 가 있어도 실패로 세지 않고, 성공으로 보아 횟수와 정지 시각을 초기화한다. 플러그인이 사람에게 화면을 넘길 때 `isError` 로 돌려주지 않는 근거다([ADR-20261111](../../docs/adr/ADR-20261111-connector-handoff.md)). 2026-11-12 운영 로그에서 보안문자 오류가 연속 3회 뒤 `rejected the last 3 calls` 를 낸 것을 확인했고, 위 소스 줄은 `v0.21.6` 에서 읽었다. 오류가 아닌 결과로 바꾼 뒤의 실제 서버 실행은 확인하지 않음 |
 | JSON-RPC 인자 오류 | Control Plane의 도구 인자·확장자·본문 크기·경로 형식·URL 문법 오류는 `-32602`로 돌아온다. 이는 `_dispatch`의 예외 경로와 `_on_failure`를 거쳐 `application=False`인 실패로 세어지므로, 연속되면 `is unreachable after …` 문구가 나온다 |
 | 전송 오류와 시간 초과 | 연결을 얻지 못한 호출과 복구하지 못한 호출 예외도 실패로 센다. timeout도 예외 경로를 따른다. 복구 후 재시도 결과는 성공·오류에 따라 다시 집계한다. 사용자 새 메시지로 생긴 `InterruptedError`는 이 집계에서 제외한다 |
 | 기간과 설정 | 임계값 `3`, 정지 시간 `60.0`초는 모듈 상수다. 이 판정 경로는 설정을 읽지 않는다. 임계값 이상인 실패 때마다 `time.monotonic()` 시각을 기록한다 |
@@ -1726,7 +1727,7 @@ Control Plane MCP 도구는 모두 `{content: [{type: "text", text}], isError}` 
 
 Control Plane이 반환한 `isError` 결과와 JSON-RPC `-32602` 인자 오류는 서로 다른 경로로 이 횟수에 들어간다.
 각 오류의 응답 모양은 [결과물을 MCP로 쓸 때](../../docs/features/attachment.md#결과물을-mcp-로-쓸-때)의 표가 갖는다.
-따라서 스킬은 같은 서버의 도구를 연달아 실패시키지 않게 해야 한다.
+따라서 스킬은 같은 서버의 도구를 연달아 실패시키지 않게 해야 한다. 사람이 해야 하는 화면에서 멈춘 플러그인은 실패가 아닌 결과로 돌려줘 이 횟수에 넣지 않는다.
 `artifact_write`가 반복 실패하면 같은 `fos-assistant` 연결의 미리보기 HTML 저장도 막히므로,
 필수 결과물을 먼저 저장하고 선택 항목이 실패하면 나머지 호출을 멈춘다.
 
