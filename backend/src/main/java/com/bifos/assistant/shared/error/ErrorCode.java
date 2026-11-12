@@ -44,6 +44,8 @@ public enum ErrorCode {
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),
+    /** 기본 비서는 지울 수 없다(docs/features/agent-team/spec.md 의 DECISION24). */
+    PRIMARY_AGENT_PROTECTED(HttpStatus.CONFLICT),
     /** 셸이나 파일, 다른 사람의 대화에 닿는 toolset은 그룹 에이전트에 둘 수 없다. */
     AGENT_TOOLS_REQUIRE_PRIVATE(HttpStatus.CONFLICT),
     /** 연결은 비공개 에이전트에만 붙인다. 남이 주인의 계정으로 외부 서비스를 쓰지 못하게 한다(ADR-083). */

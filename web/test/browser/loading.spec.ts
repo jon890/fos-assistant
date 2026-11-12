@@ -175,7 +175,7 @@ test("지금 열린 대화 줄을 다시 누르면 옮기지 않는다", async (
 });
 
 test("사이드바 링크의 이름이 그대로 맞는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
 
   // 회전 표시는 aria-hidden 이라 링크 이름에 들어가지 않는다. 지금 검사들이 쓰는 이름이 그대로 맞아야 한다.

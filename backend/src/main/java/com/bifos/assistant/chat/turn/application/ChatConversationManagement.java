@@ -6,6 +6,7 @@ import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
@@ -41,7 +42,7 @@ class ChatConversationManagement {
 
     Conversation rename(CurrentUser user, Long conversationId, String title) {
         String normalized = Conversation.normalizedTitle(title);
-        access.requireOwn(user, conversationId);
+        requireNotRoom(access.requireOwn(user, conversationId));
         if (conversationWriter.renameIfActive(conversationId, user.id(), normalized, clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
@@ -84,7 +85,7 @@ class ChatConversationManagement {
 
 
     void delete(CurrentUser user, Long conversationId) {
-        access.requireOwn(user, conversationId);
+        requireNotRoom(access.requireOwn(user, conversationId));
         if (conversationWriter.deleteIfActive(conversationId, user.id(), clock.instant()) == 0) {
             throw new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
         }
@@ -115,5 +116,13 @@ class ChatConversationManagement {
      */
     Conversation startForTask(Long ownerUserId, Long agentId, String title, Long taskId) {
         return conversations.save(Conversation.startedForTask(ownerUserId, title, agentId, taskId, clock.instant()));
+    }
+
+
+    /** 대화방은 이름을 바꾸거나 지울 수 없다(docs/features/agent-team/spec.md 의 REQ8). 화면은 그 메뉴를 그리지 않는다. */
+    private static void requireNotRoom(Conversation conversation) {
+        if (conversation.purpose() == ConversationPurpose.ROOM) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "the room cannot be renamed or deleted");
+        }
     }
 }

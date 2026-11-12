@@ -290,25 +290,8 @@ public class ChatController {
     }
 
 
-    /**
-     * 에이전트 행이 없거나({@code found} 가 null) 지운 에이전트면 에이전트 칸만 비운 줄을 돌려준다. 작업이 만든 대화가 아니거나 작업 행이
-     * 없으면({@code label} 이 null) 작업 칸을 비운다.
-     */
-    private ConversationView viewOf(Conversation conversation, Agent found, TaskLabel label) {
-        Agent agent = found == null || found.isDeleted() ? null : found;
-        return new ConversationView(
-            conversation.publicId(),
-            conversation.title(),
-            agent == null ? null : agent.code(),
-            agent == null ? null : agent.name(),
-            agent == null ? null : agent.icon(),
-            agent == null || agent.color() == null ? null : agent.color().name(),
-            conversation.updatedAt(),
-            conversation.modelSelectionMode(),
-            conversation.modelTier(),
-            conversation.purpose(),
-            label == null ? null : label.taskId(),
-            label == null ? null : label.title());
+    private static ConversationView viewOf(Conversation conversation, Agent found, TaskLabel label) {
+        return ConversationView.of(conversation, found, label);
     }
 
 

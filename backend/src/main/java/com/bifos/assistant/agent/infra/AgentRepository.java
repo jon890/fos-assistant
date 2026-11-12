@@ -66,6 +66,10 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     boolean existsByHermesProfile(String hermesProfile);
 
 
+    /** 그 profile 을 가리키는 지우지 않은 에이전트다. profile 은 에이전트마다 유일하다. */
+    Optional<Agent> findByHermesProfileAndDeletedAtIsNull(String hermesProfile);
+
+
     /**
      * 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다.
      */

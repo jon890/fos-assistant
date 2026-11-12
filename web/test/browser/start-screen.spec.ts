@@ -42,7 +42,7 @@ async function expectImageLoaded(locator: Locator): Promise<void> {
 }
 
 test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이 보인다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await expect(page.getByRole("heading", { level: 1, name: /님, 무엇을 도와드릴까요\?$/ })).toBeVisible();
   const picker = page.getByRole("radiogroup", { name: "에이전트" });
@@ -53,7 +53,7 @@ test("새 대화 화면에 인사와 첫 에이전트 카드와 추천 질문이
 });
 
 test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은 그대로 둔다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await composer(page).fill("쓰던 글");
 
   await page.getByRole("button", { name: PROMPT, exact: true }).click({ timeout: 15_000 });
@@ -73,7 +73,7 @@ test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문�
     const own = route.request().url().includes(`/agents/${PERSONA_AGENT_CODE}/`) ? "성격 추천이다" : "브라우저 추천이다";
     await route.fulfill({ json: { prompts: [own], status: "READY" } });
   });
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toBeVisible();
 
   await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
@@ -85,7 +85,7 @@ test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문�
 });
 
 test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르고 보내지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
@@ -97,11 +97,11 @@ test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르�
   await expect(page.getByRole("radio", { name: "빈 성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(composer(page)).toHaveValue("");
   await expect(page.getByTestId("user-message")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
 });
 
 test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
@@ -115,7 +115,7 @@ test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼�
 });
 
 test("@ 목록은 Esc 로 닫고 입력한 글은 남긴다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await composer(page).fill("@");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
@@ -127,7 +127,7 @@ test("@ 목록은 Esc 로 닫고 입력한 글은 남긴다", async ({ page }) =
 });
 
 test("@ 뒤 글자에 맞는 에이전트가 없으면 목록에 알린다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await composer(page).fill("@없는이름");
 
@@ -135,7 +135,7 @@ test("@ 뒤 글자에 맞는 에이전트가 없으면 목록에 알린다", asy
 });
 
 test("공백 없이 글자에 붙은 @ 에서는 목록이 뜨지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   await composer(page).fill("me@example.com");
 
@@ -147,7 +147,7 @@ test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전�
   await page.route("**/api/agents", async (route) => {
     await route.fulfill({ json: [] });
   });
-  await page.goto("/");
+  await page.goto("/new");
 
   await expect(page.getByText("아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수 있어요.")).toBeVisible();
   await expect(composer(page)).toBeDisabled();
@@ -169,7 +169,7 @@ for (const failure of ["HTTP", "fetch", "JSON", "객체 응답", "null 응답"] 
       else if (failure === "null 응답") await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
       else await route.fulfill({ status: 500, json: {} });
     });
-    await page.goto("/");
+    await page.goto("/new");
     await expect(page.getByRole("main").getByRole("alert")).toContainText("에이전트 목록을 읽지 못했어요");
     await expect(composer(page)).toBeDisabled();
     await expect(page.getByRole("link", { name: "에이전트 만들기" })).toHaveCount(0);
@@ -192,7 +192,7 @@ test("재시도 연속 누름은 한 요청이며 실패하면 다시 읽을 수
   let release!: () => void;
   const released = new Promise<void>((resolve) => { release = resolve; });
   await page.route("**/api/agents", (route) => route.fulfill({ status: 500, json: {} }));
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
   await page.unroute("**/api/agents");
   await page.route("**/api/agents", async (route) => {
@@ -266,7 +266,7 @@ test("unmount 뒤 도착한 목록 응답은 새 화면의 선택을 덮어쓰�
       return original(input, init);
     };
   });
-  await page.goto("/");
+  await page.goto("/new");
   await expect.poll(() => page.evaluate(() => (window as unknown as { agentReads: unknown[] }).agentReads.length)).toBeGreaterThan(0);
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   await page.locator('a[href="/agents"]').first().click();
@@ -296,7 +296,7 @@ test("Strict Mode의 이전 요청과 finally는 다음 요청의 읽는 중 상
       return original(input, init);
     };
   });
-  await page.goto("/");
+  await page.goto("/new");
   const reads = () => page.evaluate(() => (window as unknown as { agentReads: unknown[] }).agentReads.length);
   await expect.poll(reads).toBe(2);
   // 이전 응답은 성공이어도 선택과 loading을 바꾸지 못한다.
@@ -325,7 +325,7 @@ test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보
   await page.route(STARTERS_PATTERN, async (route) => {
     await route.fulfill({ json: { prompts: ["하나뿐인 질문이다"], status: "READY" } });
   });
-  await page.goto("/");
+  await page.goto("/new");
 
   const main = page.getByRole("main");
   await expect(main.getByText("하나뿐인 비서", { exact: true })).toBeVisible();
@@ -335,7 +335,7 @@ test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보
 });
 
 test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
 
@@ -360,7 +360,7 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
 });
 
 test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 가도 사진이 메시지에 남는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("radiogroup", { name: "에이전트" })).toBeVisible();
 
   await page.getByTestId("attachment-input").setInputFiles([
@@ -384,7 +384,7 @@ test("새 대화 화면에서 사진과 글을 보내면 입력창이 아래로 
 });
 
 test("사진을 올려 두고 추천 질문으로 새 대화 화면을 벗어나도 사진이 입력창에 남는다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
 
   await page.getByTestId("attachment-input").setInputFiles([
@@ -429,7 +429,7 @@ test("사진 때문에 빈 대화를 만드는 동안에는 추천 질문을 누
     createdIds.push(body.conversationId);
     await route.fulfill({ response, json: body });
   });
-  await page.goto("/");
+  await page.goto("/new");
   const promptButton = page.getByRole("button", { name: PROMPT, exact: true });
   await expect(promptButton).toBeEnabled({ timeout: 15_000 });
 

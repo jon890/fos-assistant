@@ -70,7 +70,7 @@ test("주인이 소개, 아이콘, 색을 저장하면 목록과 대화의 이�
   await expect(card.getByTestId("agent-badge")).toHaveText("🛍️");
 
   // 그 에이전트와 대화하면 답 줄에 그 이름표가 보인다. 좁은 화면에서도 보인다.
-  await page.goto(`/?agent=${code}`);
+  await page.goto(`/new?agent=${code}`);
   await page.getByRole("textbox", { name: "메시지" }).fill("운동화 찾아줘");
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);

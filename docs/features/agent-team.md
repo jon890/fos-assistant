@@ -2,7 +2,7 @@
 
 사용자가 에이전트를 이름표와 소개로 구분해 보고, 기본 비서와 전문 에이전트가 나눠 일하는 기능이다. 합의한 변경과 단계는 [스펙](agent-team/spec.md)과 [설계](agent-team/design.md)가 갖고, 이 파일은 지금 동작하는 것만 적는다.
 
-covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionLines.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionInputs.java`, `web/src/lib/mention.ts`, `web/src/components/chat/delegate-chip.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java`
+covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroduction.java`, `backend/src/main/java/com/bifos/assistant/agent/domain/type/AgentColor.java`, `backend/src/main/java/com/bifos/assistant/agent/application/AgentCapabilitiesReader.java`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/ConnectorNameLookup.java`, `web/src/components/agent/agent-badge.tsx`, `web/src/components/agent/agent-introduction-section.tsx`, `web/src/lib/agent-badge.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationLines.java`, `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/DelegationLineNotifier.java`, `web/src/components/chat/delegation-lines.tsx`, `web/src/lib/delegation.ts`, `backend/src/main/java/com/bifos/assistant/connector/connection/application/SpecialistAgentCreator.java`, `web/src/lib/specialist-agent.ts`, `web/src/components/agent/specialist-agent-form.tsx`, `web/src/components/agent/specialist-agent-offer.tsx`, `web/src/components/agent/specialist-agent-dialog.tsx`, `web/src/components/agent/connector-onboarding.tsx`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionLines.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/MentionInputs.java`, `web/src/lib/mention.ts`, `web/src/components/chat/delegate-chip.tsx`, `backend/src/main/java/com/bifos/assistant/agent/application/PrimaryAgents.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomConversations.java`, `backend/src/main/java/com/bifos/assistant/chat/room/application/RoomContext.java`, `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/RoomController.java`, `web/src/app/(home)/page.tsx`, `web/src/components/shell/room-link.tsx`, `web/src/lib/room.ts`, `backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java`
 
 ## 요구
 
@@ -13,6 +13,7 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 - 서비스를 처음 연결하면 그 연결 하나만 맡는 전문 에이전트를 만들자고 제안하고, 받으면 한 번에 만든다. 에이전트 목록의 「전문 에이전트 만들기」 로도 만든다. 아래 「전문 에이전트 만들기」.
 - 대화의 turn 이 다른 에이전트에게 맡기면 그 답 아래에 맡긴 줄이 보이고, 결과 도착 줄과 위임 자식의 승인 카드에 맡은 에이전트의 이름표가 붙는다. 아래 「대화 안의 협업」.
 - 메시지가 있는 대화에서 입력창의 `@` 로 고른 에이전트에게 바로 맡기고, 그 답이 맡은 에이전트 이름표로 대화에 남는다. 대화의 에이전트는 다음 turn 에 그 주고받음을 받는다. 아래 「`@` 로 바로 맡기기」.
+- 사용자마다 기본 비서와 늘 이어지는 대화방이 하나 있고 `/` 가 그 방을 연다. 날이 바뀐 첫 메시지에서 앞 맥락을 요약해 새 session 으로 잇는다. 기본 비서는 지울 수 없다. 아래 「대화방」.
 
 ## 소개와 할 수 있는 일
 
@@ -64,6 +65,33 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 답이 도는 동안에는 `@` 목록을 띄우지 않는다. 대기 메시지는 글만 받아 대화의 에이전트에게 간다.
 맡은 에이전트가 승인을 요청하면 위 「대화 안의 협업」 의 승인 카드 줄(`requestedBy`)이 그 카드에 붙는다. 대화의 에이전트와 다른 에이전트가 요청한 카드이기 때문이다.
 서버가 다시 떠 기동 정리가 맡김을 마무리할 때도 대화의 session 은 적지 않는다.
+
+## 대화방
+
+**대화방은 `conversation.purpose = ROOM` 인 대화이고 사용자마다 지우지 않은 것 가운데 `id` 가 가장 큰 것 하나를 쓴다.** `RoomConversations` 가 사용자별 잠금 안에서 찾고 만든다.
+
+| 자리 | 무엇을 하나 |
+| --- | --- |
+| `/` | 서버가 `POST /api/v1/chat/conversations/room` 으로 대화방을 열고 `/chat/{id}` 로 넘긴다. 처음 열면 기본 비서의 빈 방을 만들고, 지난 대화를 옮기지 않는다. 기본 비서가 없으면(`AGENT_NOT_FOUND`) 새 대화 화면 `/new` 로 간다 |
+| 새 대화 화면 | `/new` 다. 「새 대화」 단추, 단축키, 「<에이전트>와 대화하기」(`/new?agent=<code>`)가 이리 온다. 앱 이름(홈)은 `/` 로 간다 |
+| 사이드바 | 「새 대화」 위에 대화방 줄(`room-link`)이 고정이다. 이름표와 에이전트 이름을 `GET /api/v1/chat/conversations/room` 으로 읽고, 아직 열지 않았으면 「비서」 로 보인다. 대화 목록 API 는 대화방을 빼므로 목록 줄의 이름 바꾸기·지우기 메뉴가 없다 |
+| 이름 바꾸기, 지우기 | 서버도 대화방이면 `VALIDATION_FAILED` 로 거절한다 |
+| 제목 | 고정 글 「대화방」. 첫 메시지가 제목을 채우지 않는다 |
+
+**기본 비서는 주인이 요청자이고 profile 이 요청자의 기본 profile(`allowed_person.hermes_profile`)인 에이전트다.** 칸을 두지 않는다(`PrimaryAgents`).
+에이전트 지우기는 profile 이 허용 목록의 누군가의 기본 profile 인 에이전트를 주인도 `ADMIN` 도 지우지 못하게 `PRIMARY_AGENT_PROTECTED` 로 거절한다. 그런 에이전트는 첫 로그인이 만든 것뿐이다. 끄기는 관리자 경로에만 있다. 사람을 허용 목록에서 지울 때의 정리는 이 판정을 타지 않는다.
+
+### 날이 바뀐 첫 메시지
+
+대화방에서 사용자가 보낸 turn 이 질문을 저장하기 전에 `RoomContext` 가 판정한다. 다시 만들기, `@` 맡김, 자동 결과 전달, 예약 turn 은 판정하지 않는다.
+
+1. 대화의 지금 루트 session 으로 돈 루트 실행 가운데 가장 이른 `started_at` 의 Asia/Seoul 날짜가 오늘보다 앞이면 날을 넘었다. 실행이 없으면 넘지 않았다
+2. 넘었으면 대화의 에이전트와 대화가 고른 모델로 옛 보낼 session 에 요약 요청(첫 줄 `[대화 요약 요청]`)을 보낸다. 대화 밖 실행으로 남겨 그 대화의 `memory_remember` 바로 저장 판정([기억](memory.md) 의 「바로 저장 판정」 5)에 걸리지 않는다. 옛 루트에 성공한 실행이 없으면 앞 요약도 요청에 함께 넣는다
+3. 성공하면 알림 줄 「어제까지 이야기를 요약해 이어요」(빈 줄 뒤에 요약, 4,000자까지)을 질문 앞에 남기고 두 session 칸을 새 `fos-<uuid>` 로 바꾼다(`ConversationSessions.renew`). 화면은 첫 줄과 「요약 보기」 펼치기로 그린다
+4. 실패하면 아무것도 바꾸지 않고 옛 session 으로 turn 을 잇는다. 루트가 그대로라 다음 메시지가 다시 요약한다
+
+요약은 새 루트 session 에 성공한 실행이 생길 때까지 사용자가 보낸 turn 과 다시 만들기의 입력 앞에 「[어제까지의 대화 요약]」 머리와 `<external-data>` 로 감싸 붙인다. 지난 메시지는 지우지 않는다.
+요약 실행은 turn 잠금을 쥔 채 돌고 중지 단추로 멈추지 못한다. 도구를 부르면 부모 실행을 찾지 못해 거절된다.
 
 ## 전문 에이전트 만들기
 

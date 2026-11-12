@@ -19,7 +19,7 @@ final class SubFeatureOrder {
     static final Map<String, List<String>> ORDER = Map.of(
         "chat", List.of(
             "conversation", "delivery", "modelchoice", "attachment", "artifact", "contentdraft",
-            "starter", "turn", "nextturn", "recovery", "purge"),
+            "starter", "room", "turn", "nextturn", "recovery", "purge"),
         "connector", List.of("connection", "action", "financial", "contentdraft", "approval", "handoff"),
         "proactive", List.of("check"),
         "usage", List.of("pricing", "execution", "subagent", "tree", "summary"),

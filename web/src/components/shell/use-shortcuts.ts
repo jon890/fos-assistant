@@ -2,18 +2,29 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
-export function useShortcuts(enabled: boolean, onNew: () => void, onToggleSidebar: () => void, onSearch: () => void) {
+export function useShortcuts(
+  enabled: boolean,
+  onNew: () => void,
+  onToggleSidebar: () => void,
+  onSearch: () => void,
+) {
   const router = useRouter();
   useEffect(() => {
     if (!enabled) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.isComposing || event.defaultPrevented || !(event.ctrlKey || event.metaKey)) return;
+      if (
+        event.isComposing ||
+        event.defaultPrevented ||
+        !(event.ctrlKey || event.metaKey)
+      )
+        return;
       const key = event.key.toLowerCase();
       if (event.shiftKey && key === "o") {
         event.preventDefault();
         onNew();
-        router.push("/");
+        router.push(NEW_CONVERSATION_PATH);
       } else if (event.shiftKey && key === "s") {
         event.preventDefault();
         onToggleSidebar();

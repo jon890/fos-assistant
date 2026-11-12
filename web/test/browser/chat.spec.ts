@@ -11,7 +11,7 @@ test("mobile에서 입력창을 유지하고 대화 목록을 서랍으로 쓴�
   expect(created.status()).toBe(201);
   const agent = await created.json() as { code: string };
   try {
-    await page.goto("/");
+    await page.goto("/new");
 
     for (let index = 1; index <= 10; index += 1) {
       const response = await page.request.post("/api/chat", {
@@ -52,7 +52,7 @@ test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop");
-  await page.goto("/");
+  await page.goto("/new");
 
   const drawer = page.getByRole("complementary", { name: "사이드바" });
   await expect(drawer).toBeVisible();
@@ -67,7 +67,7 @@ test("desktop에서 대화 목록을 고정 칸으로 보인다", async ({
 test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을 알약 하나로 보인다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   const send = page.getByRole("button", { name: "보내기" });
   await expect(send).toBeDisabled();
@@ -145,7 +145,7 @@ test("내 말과 비서 답을 서로 다른 폭으로 배치하고 입력창을
 });
 
 test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("마크다운 보안 검사");
   await page.getByRole("button", { name: "보내기" }).click();
@@ -164,7 +164,7 @@ test("에이전트 답의 표를 그리고 HTML은 실행하지 않는다", asyn
 });
 
 test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("구분 줄 없는 표 검사");
@@ -197,7 +197,7 @@ test("구분 줄 없는 에이전트 답을 표로 그린다", async ({ page }) 
 });
 
 test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("코드 블록 검사");
   await page.getByRole("button", { name: "보내기" }).click();
@@ -245,7 +245,7 @@ test("코드 블록의 역할별 색을 밝음과 어두움에서 구분한다",
 test("위로 올려 읽는 동안 다음 답이 와도 읽던 자리를 지킨다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill("긴 답 스트림 검사");
   await page.getByRole("button", { name: "보내기" }).click();

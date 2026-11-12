@@ -156,7 +156,7 @@ export function ConversationNav({
         setLeavingId(null);
         if (pathname === `/chat/${id}`) {
           startNew();
-          router.push("/");
+          router.push("/new");
         }
       });
     } catch (reason) {

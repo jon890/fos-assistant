@@ -65,7 +65,7 @@ async function openSidebar(page: Page, testInfo: TestInfo): Promise<void> {
 }
 
 test("두 밝기 모드에서 새 색 토큰이 모두 값을 갖고 옛 이름은 남지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const values = await readVariables(page, [...TOKENS, ...RETIRED_TOKENS]);
 
   for (const theme of ["light", "dark"] as const) {
@@ -78,7 +78,7 @@ test("두 밝기 모드에서 새 색 토큰이 모두 값을 갖고 옛 이름�
 
 test("흐린 바탕은 muted, 흐린 글자는 muted-foreground 로 그린다", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
 
   const sidebar = page.getByTestId("new-conversation-link").locator("xpath=..");
@@ -101,7 +101,7 @@ test("흐린 바탕은 muted, 흐린 글자는 muted-foreground 로 그린다", 
 });
 
 test("두 밝기 모드에서 destructive 가 그 위 글자와 화면 바탕 모두와 대비 4.5 이상이다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const values = await readVariables(page, ["--destructive", "--destructive-foreground", "--background"]);
 
   for (const theme of ["light", "dark"] as const) {
@@ -130,7 +130,7 @@ const CONTRAST_PAIRS: { foregrounds: string[]; backgrounds: string[]; minimum: n
 ];
 
 test("두 밝기 모드에서 글자와 선이 제 바탕과 기준 대비를 넘는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const values = await readVariables(page, TOKENS);
 
   for (const theme of ["light", "dark"] as const) {
@@ -148,7 +148,7 @@ test("두 밝기 모드에서 글자와 선이 제 바탕과 기준 대비를 �
 
 test("밝음에서 사이드바 메뉴 글자가 사이드바 바탕과 대비 4.5 이상이다", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
 
   // 좁은 폭은 서랍, 넓은 폭은 aside 가 사이드바다.
@@ -172,7 +172,7 @@ test("밝음에서 사이드바 메뉴 글자가 사이드바 바탕과 대비 4
 });
 
 test("두 밝기 모드에서 대화 입력창의 테두리는 input 색이다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const shell = page.getByTestId("composer-shell");
   await expect(shell).toBeVisible();
 
@@ -207,7 +207,7 @@ test("대화 지우기 확인 창의 지우기 단추는 destructive 바탕에 d
   const title = `색 토큰 지우기 ${testInfo.project.name} ${Date.now()}`;
   const created = await page.request.post("/api/chat", { data: { text: title, agentCode: "browser" } });
   expect(created.ok()).toBeTruthy();
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   const nav = page.getByRole("navigation", { name: "대화 목록" });
   await nav.getByRole("button", { name: `${title} 메뉴` }).click();
@@ -246,7 +246,7 @@ test("대화 지우기 확인 창의 지우기 단추는 destructive 바탕에 d
 
 test("보내기 단추에 마우스를 올리면 바탕이 primary-strong 이다", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
-  await page.goto("/");
+  await page.goto("/new");
   // 빈 입력이면 보내기가 잠겨 마우스 올림 모양이 그려지지 않는다.
   await page.getByRole("textbox", { name: "메시지" }).fill("마우스 올림 확인");
   const send = page.getByRole("button", { name: "보내기" });
@@ -266,7 +266,7 @@ test("보내기 단추에 마우스를 올리면 바탕이 primary-strong 이다
 });
 
 test("두 밝기 모드에서 비활성 보내기 단추는 muted 바탕에 muted-foreground 글자이고 투명도를 쓰지 않는다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("textbox", { name: "메시지" })).toHaveValue("");
   const send = page.getByRole("button", { name: "보내기" });
   await expect(send).toBeDisabled();
@@ -308,7 +308,7 @@ test("두 밝기 모드에서 비활성 보내기 단추는 muted 바탕에 mute
 
 test("어두움 모드의 outline 단추는 테두리가 border 색이고 바탕이 비어 있다", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "dark"));
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
   const attach = page.getByRole("button", { name: "사진 첨부" });
   await expect(attach).toHaveAttribute("data-variant", "outline");
@@ -366,7 +366,7 @@ function expectBorderToken(colors: Awaited<ReturnType<typeof readBorder>>, name:
 }
 
 test("두 밝기 모드에서 사이드바와 작업 과정 패널의 테두리는 border 색이다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill("테두리 색 검사");
   await page.getByRole("button", { name: "보내기" }).click();
@@ -427,7 +427,7 @@ test("실행 기록의 성공 배지는 글자가 success 색이고 바탕이 su
 
 test("실패한 turn 의 알림 상자는 destructive 색이고 아이콘을 하나 갖는다", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "light"));
-  await page.goto("/");
+  await page.goto("/new");
   // 시작 사건 뒤에 실패 사건을 넣어 그 turn 을 실패로 끝낸다.
   await page.route("**/api/chat/stream", async (route) => {
     const response = await route.fetch();

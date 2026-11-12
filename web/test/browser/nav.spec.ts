@@ -2,7 +2,7 @@ import { parseRgb } from "./color.ts";
 import { expect, setSession, test } from "./fixtures.ts";
 
 test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", async ({ context, page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
@@ -18,7 +18,7 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
     displayName: "가족 사용자",
     role: "MEMBER",
   });
-  await page.goto("/");
+  await page.goto("/new");
   if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
   await expect(page.getByRole("link", { name: "에이전트", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "에이전트 관리" })).toHaveCount(0);
@@ -27,7 +27,7 @@ test("역할에 맞는 메뉴와 로그인한 사람의 이름을 보인다", as
 });
 
 test("머리의 이름을 한 번만 읽고 좁은 화면에서도 한 줄을 유지한다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   // 모바일 머리줄과 넓은 화면의 사이드바에서 홈 이름을 한 번만 읽는다.
   const home = page.getByRole("link", { name: "검사용 비서 홈", exact: true });

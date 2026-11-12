@@ -12,6 +12,8 @@ import { ConversationNav } from "./conversation-nav";
 import { MainNav } from "./main-nav";
 import { NavPending, NAV_PENDING_EVENT } from "./nav-pending";
 import { NowLink } from "./now-link";
+import { RoomLink } from "./room-link";
+import { NEW_CONVERSATION_PATH } from "@/lib/room";
 import { useAppName, useShellAccount } from "./shell-account";
 import { useConversations } from "./conversations-provider";
 
@@ -57,10 +59,7 @@ export function Sidebar({
         <Link
           href="/"
           aria-label={`${appName} 홈`}
-          onClick={() => {
-            startNew();
-            onNavigate("/");
-          }}
+          onClick={() => onNavigate("/")}
           className="truncate text-base font-semibold"
         >
           {appName}
@@ -73,17 +72,19 @@ export function Sidebar({
           <PanelLeftClose aria-hidden="true" />
         </TooltipButton>
       </div>
+      {/* 기본 비서와 이어지는 대화방이다. 대화 목록과 따로 맨 위에 고정한다(docs/features/agent-team.md 의 「대화방」). */}
+      <RoomLink onNavigate={onNavigate} />
       <Button
         asChild
         variant="outline"
         className="mb-2 shrink-0 justify-start gap-2 bg-background px-3 hover:bg-accent"
       >
         <Link
-          href="/"
+          href={NEW_CONVERSATION_PATH}
           data-testid="new-conversation-link"
           onClick={() => {
             startNew();
-            onNavigate("/");
+            onNavigate(NEW_CONVERSATION_PATH);
           }}
         >
           <SquarePen aria-hidden="true" />새 대화

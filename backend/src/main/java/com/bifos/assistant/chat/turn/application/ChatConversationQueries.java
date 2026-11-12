@@ -266,7 +266,7 @@ class ChatConversationQueries {
 
 
     /**
-     * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
+     * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다. 대화방은 사이드바가 따로 읽어 맨 위에 그리므로 뺀다.
      *
      * @param cursor 앞 쪽이 돌려준 {@code nextCursor}. 처음이면 null
      * @param limit 한 쪽의 최대 개수. {@link ChatService#MAX_CONVERSATION_PAGE} 를 넘으면 그 값으로 줄인다
@@ -277,11 +277,11 @@ class ChatConversationQueries {
         PageRequest window = PageRequest.ofSize(size + 1);
         List<Conversation> rows;
         if (cursor == null) {
-            rows = conversations.findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
-                user.id(), window);
+            rows = conversations.findByUserIdAndPurposeNotAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
+                user.id(), ConversationPurpose.ROOM, window);
         } else {
             ConversationCursor from = ConversationCursor.decode(cursor);
-            rows = conversations.findPageAfter(user.id(), from.updatedAt(), from.id(), window);
+            rows = conversations.findPageAfter(user.id(), ConversationPurpose.ROOM, from.updatedAt(), from.id(), window);
         }
         if (rows.size() <= size) {
             return new ConversationPage(rows, null);

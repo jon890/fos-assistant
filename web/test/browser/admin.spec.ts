@@ -1,4 +1,4 @@
-import { expect, hermesBaseUrl, setSession, test, PERSONA_AGENT_CODE } from "./fixtures.ts";
+import { expect, hermesBaseUrl, setSession, test, PERSONA_AGENT_CODE, HOME_URL } from "./fixtures.ts";
 import type { Page } from "../../node_modules/@playwright/test/index.js";
 
 /** 에이전트가 여럿이라 검사가 보는 카드 하나로 좁힌다. */
@@ -88,7 +88,7 @@ test("MEMBER는 관리 목록과 옛 관리 주소를 쓰지 못한다", async (
 
   // 관리자 영역의 주소는 MEMBER 역할에게 열리지 않고 홈으로 넘어간다.
   await page.goto("/admin/agents");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
 });
 

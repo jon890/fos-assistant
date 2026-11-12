@@ -20,7 +20,7 @@ test("사진 네 장을 천천히 올려도 보내자마자 입력창이 비고 
   page,
   hermes,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const uploads: Route[] = [];
   await page.route(UPLOAD_ROUTE, async (route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -92,7 +92,7 @@ test("사진 네 장을 천천히 올려도 보내자마자 입력창이 비고 
 test("업로드 실패는 내 메시지에서 그 사진만 다시 시도한다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   let attempts = 0;
   await page.route(UPLOAD_ROUTE, (route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -130,7 +130,7 @@ test("업로드 실패는 내 메시지에서 그 사진만 다시 시도한다"
 });
 
 test("실패한 사진을 빼고 보내면 성공한 사진만 전송한다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.route(UPLOAD_ROUTE, (route) => {
     if (route.request().method() !== "POST") return route.continue();
     if (
@@ -171,7 +171,7 @@ test("실패한 사진을 빼고 보내면 성공한 사진만 전송한다", as
 test("전송을 거절하면 말풍선에서 다시 보내고 새로 쓴 글을 보존한다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   let attempts = 0;
   await page.route("**/api/chat/stream", (route) => {
     attempts++;
@@ -211,7 +211,7 @@ test("전송을 거절하면 말풍선에서 다시 보내고 새로 쓴 글을 
 test("올리는 중 페이지를 떠나려 하면 경고하고 취소하면 사진을 보존한다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   let upload: Route | undefined;
   await page.route(UPLOAD_ROUTE, (route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -251,7 +251,7 @@ test("올리는 중 뒤로 가기를 취소하면 주소와 메시지가 그대�
   page,
 }) => {
   await page.goto("/agents");
-  await page.goto("/");
+  await page.goto("/new");
   let upload: Route | undefined;
   await page.route(UPLOAD_ROUTE, (route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -276,7 +276,7 @@ test("올리는 중 뒤로 가기를 취소하면 주소와 메시지가 그대�
 test("떠나기를 확인하면 아직 묶이지 않은 사진과 늦게 끝난 업로드를 정리한다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   let upload: Route | undefined;
   let deleted = 0;
   page.on("response", (response) => {
@@ -314,7 +314,7 @@ test("떠나기를 확인하면 아직 묶이지 않은 사진과 늦게 끝난 
   const click = leave.click();
   await (await dialog).accept();
   await click;
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/new$/);
   await expect(page.getByTestId("outgoing-attachment")).toHaveCount(0);
   await expect.poll(() => deleted).toBe(1);
   await upload!.continue();

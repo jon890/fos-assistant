@@ -240,6 +240,11 @@ public class AgentLifecycleService {
     public void delete(CurrentUser user, String code) {
         Agent found = agents.findByCode(code).orElseThrow(AgentLifecycleService::notFound);
         requireDeletable(user, found);
+        // 기본 비서는 지울 수 없다(docs/features/agent-team/spec.md 의 DECISION24). 기본 profile 을 가리키는 에이전트는 첫 로그인이
+        // 만든 것뿐이다. 사람을 허용 목록에서 지울 때의 정리는 이 경로를 타지 않는다.
+        if (reservedProfileNames.reservedByPerson(found.hermesProfile())) {
+            throw new ApiException(ErrorCode.PRIMARY_AGENT_PROTECTED, "the primary assistant cannot be deleted");
+        }
         Long ownerId = found.ownerUserId();
         transactions.executeWithoutResult(status -> deleteLocked(user, found.id(), ownerId));
     }

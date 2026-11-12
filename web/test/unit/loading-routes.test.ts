@@ -29,6 +29,8 @@ const ROUTE_FRAMES: Record<string, string> = {
   "admin/people": "app/admin/people/people-admin-panel.tsx",
   "chat/[conversationId]": "components/chat/message-list.tsx",
   "c/[conversationId]": "components/chat/message-list.tsx",
+  // `/` 는 대화방을 열어 대화 주소로 넘긴다. 뼈대가 다른 경로를 덮지 않게 경로 묶음 안에 둔다.
+  "(home)": "components/chat/message-list.tsx",
 };
 
 /** 화면 파일에서 처음 나오는 바깥 틀의 폭을 읽는다. 틀이 없으면 `undefined` 다. */

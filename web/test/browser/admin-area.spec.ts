@@ -5,6 +5,7 @@ import {
   expect,
   setSession,
   test,
+  HOME_URL,
 } from "./fixtures.ts";
 import { FAKE_USAGE } from "../../../test/e2e/fake-hermes.ts";
 import type { Page, TestInfo } from "../../node_modules/@playwright/test/index.js";
@@ -35,7 +36,7 @@ test("대화가 화면 높이보다 많아도 관리자 입구는 뷰포트 안�
   test.setTimeout(60_000);
   for (let index = 0; index < CONVERSATION_COUNT; index += 1) await createConversation(page);
 
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   const list = page.getByRole("navigation", { name: "대화 목록" });
   await expect(list.locator('a[href^="/chat/"]').first()).toBeVisible();
@@ -48,7 +49,7 @@ test("대화가 화면 높이보다 많아도 관리자 입구는 뷰포트 안�
 
 test("화면 높이가 360px 여도 관리자 입구는 뷰포트 안에 있고 메뉴는 그 안에서 스크롤한다", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: page.viewportSize()?.width ?? 390, height: 360 });
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
 
   await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
@@ -63,19 +64,19 @@ test("화면 높이가 360px 여도 관리자 입구는 뷰포트 안에 있고 
 test("MEMBER 역할에는 관리자 입구가 없고 관리자 영역의 주소는 홈으로 넘어간다", async ({ context, page }, testInfo) => {
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
 
-  await page.goto("/");
+  await page.goto("/new");
   await openSidebar(page, testInfo);
   // 맨 아래 줄이 그려진 뒤에 입구가 없는지 본다.
   await expect(page.getByText("가족 사용자", { exact: true })).toBeVisible();
   await expect(page.getByTestId("admin-entry")).toHaveCount(0);
 
   await page.goto("/admin/people");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await expect(page.getByRole("navigation", { name: "관리자 메뉴" })).toHaveCount(0);
 });
 
 test("관리자 입구를 누르면 사이드바 없는 관리자 영역이 열린다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await enterAdminArea(page, testInfo);
 
   await expect(page.getByRole("complementary", { name: "사이드바" })).toHaveCount(0);
@@ -110,11 +111,11 @@ test("사용 화면으로 돌아가기는 마지막으로 보던 대화로 간�
 });
 
 test("대화를 연 적이 없으면 사용 화면으로 돌아가기는 홈으로 간다", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/new");
   await enterAdminArea(page, testInfo);
 
   await page.getByRole("link", { name: "사용 화면으로 돌아가기" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await expect(page.getByRole("textbox", { name: "메시지" })).toBeVisible();
 });
 
@@ -232,9 +233,9 @@ test("관리자 연결 목록은 붙인 에이전트마다 한 줄이고 재시�
 test("MEMBER 역할이 관리자 영역의 에이전트 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   await page.goto("/admin/agents");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await page.goto("/admin/agents/browser");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
 });
 
 test("ADMIN 역할도 일반 사용량 화면에서는 금액과 설정별 사용량 탭과 사용량 내역을 보지 않고 실행 건수를 본다", async ({ page }) => {
@@ -295,9 +296,9 @@ test("ADMIN 역할도 일반 실행 상세에서는 모델과 토큰과 원본 �
 test("MEMBER 역할이 관리자 영역의 사용량 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   await page.goto("/admin/usage");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
   await page.goto("/admin/executions/980");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
 });
 
 test("ADMIN 역할의 대화 화면 모델 단계 창에는 그룹 모델 설정 단추가 없다", async ({ page }) => {
@@ -320,7 +321,7 @@ test("ADMIN 역할의 대화 화면 모델 단계 창에는 그룹 모델 설정
       });
     },
   );
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByTestId("model-tier-picker").click();
   const slider = page.getByTestId("model-tier-slider");
   await expect(slider.getByRole("radio", { name: "High" })).toBeVisible();
@@ -368,7 +369,7 @@ test("모델 화면에는 숨길 모델의 목록을 읽을 에이전트를 고�
 test("MEMBER 역할이 관리자 영역의 모델 주소를 열면 홈으로 넘어간다", async ({ context, page }) => {
   await setSession(context, { email: "member@example.com", name: "가족 사용자" });
   await page.goto("/admin/models");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
 });
 
 /** `terminal` 도구를 쓴 실행 하나짜리 응답이다. 모델과 토큰과 도구 결과의 원본이 실려 있다. */

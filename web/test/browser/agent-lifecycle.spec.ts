@@ -95,7 +95,7 @@ test("이름만 넣어 에이전트를 만들면 상세로 가고 그 에이전�
   const code = new URL(page.url()).pathname.split("/").at(-1);
   const question = "받아쓰기 연습을 도와줘";
   await page.getByRole("link", { name: "대화하기", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/\\?agent=${code}$`));
+  await expect(page).toHaveURL(new RegExp(`/new\\?agent=${code}$`));
   await expect(page.getByRole("main").getByText(NAME, { exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "메시지" }).fill(question);
   await page.getByRole("button", { name: "보내기" }).click();

@@ -1545,14 +1545,14 @@ v0.21.5 의 중단·미완료 응답 차이는 [「Runs 응답과 사건의 버�
 | `GET /v1/runs/{run_id}` 의 `status` | `cancelled` |
 | 그 응답의 `output` | 비어 있다 |
 | 그 응답의 `usage` | 비어 있다. 그래서 중지한 실행의 토큰 기록도 빈다 |
-| 그 응답의 `session_id` | 그 대화의 session 이다. 중지해도 바뀌지 않는다 |
+| 그 응답의 `session_id` | 그 turn 에 보낸 session 이다. 보통 turn 은 대화의 session 이고 `@` 맡김 turn 은 맡김마다 새로 정한 session 이다. 중지해도 바뀌지 않는다 |
 | 사건 스트림 | 중지를 보낸 뒤 10초 안에 닫혔다 |
 
 **멈춘 자리까지의 답은 조회 응답에서 얻을 수 없다.** 스트림으로 받은 조각을 모아 둔 것만이 그 답이다.
 [ADR-021](../../backend/docs/adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md) 이 뒤받침으로 둔 경로가 실제로 쓰이는 경로다.
 
 **새 대화의 session 은 Control Plane 이 첫 turn 전에 정한 `fos-<uuid>` 다.**
-뒤의 turn 은 같은 값을 이어 쓰고, 첫 turn 을 중지해도 그 값이 그대로다([ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
+뒤의 turn 은 같은 값을 이어 쓰고, 첫 turn 을 중지해도 그 값이 그대로다. 예외는 둘이다. `@` 맡김 turn 은 새 `fos-<uuid>` 로 돌고 대화의 값을 바꾸지 않는다. 대화방은 날이 바뀐 첫 메시지에서 옛 session 을 요약한 뒤 두 값을 새 `fos-<uuid>` 로 바꾼다([에이전트 팀](../../docs/features/agent-team.md) 의 「대화방」)([ADR-031](../../backend/docs/adr/ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md)).
 중지한 turn 뒤에도 session 이 같아서 다음 turn 은 중지 전의 맥락을 이어 받는다.
 
 중지한 실행은 그 session 으로 실제로 돈 모델을 읽지 못했다. Control Plane 은 그때 요청에 보낸 모델을 적는다.

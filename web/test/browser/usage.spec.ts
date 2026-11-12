@@ -443,7 +443,7 @@ test.describe("MEMBER 역할 사용자의 사용량 화면", () => {
     expect(withChild.ok()).toBeTruthy();
 
     // 대화에서 보내야 도구 사건이 실린 실행이 생긴다.
-    await page.goto("/");
+    await page.goto("/new");
     await page.getByRole("textbox", { name: "메시지" }).fill("사용량 가림 검사");
     await page.getByRole("button", { name: "보내기" }).click();
     const block = page.locator('[data-testid="activity-block"][data-mode="saved"]').last();

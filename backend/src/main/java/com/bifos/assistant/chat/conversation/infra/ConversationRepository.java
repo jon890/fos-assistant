@@ -136,20 +136,24 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     Optional<Conversation> findByPublicIdAndUserIdAndDeletedAtIsNull(UUID publicId, Long userId);
 
 
-    /** 그 사용자의 지우지 않았고 목록에서 숨기지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. 개수는 {@code pageable} 이 정한다. */
-    List<Conversation> findByUserIdAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
-        Long userId, Pageable pageable);
+    /**
+     * 그 사용자의 지우지 않았고 목록에서 숨기지 않은 대화를 최근 것부터 첫 쪽만큼 읽는다. {@code excluded} 목적의 대화는 뺀다. 대화방을
+     * 빼는 데 쓴다. 개수는 {@code pageable} 이 정한다.
+     */
+    List<Conversation> findByUserIdAndPurposeNotAndDeletedAtIsNullAndHiddenAtIsNullOrderByUpdatedAtDescIdDesc(
+        Long userId, ConversationPurpose excluded, Pageable pageable);
 
 
-    /** {@code (updatedAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬과 숨긴 대화를 빼는 것은 첫 쪽과 같다. */
+    /** {@code (updatedAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬과 숨긴 대화, 뺄 목적을 빼는 것은 첫 쪽과 같다. */
     @Query("""
             select c from Conversation c
-             where c.userId = :userId and c.deletedAt is null and c.hiddenAt is null
+             where c.userId = :userId and c.purpose <> :excluded and c.deletedAt is null and c.hiddenAt is null
                and (c.updatedAt < :updatedAt or (c.updatedAt = :updatedAt and c.id < :id))
              order by c.updatedAt desc, c.id desc
             """)
     List<Conversation> findPageAfter(
         @Param("userId") Long userId,
+        @Param("excluded") ConversationPurpose excluded,
         @Param("updatedAt") Instant updatedAt,
         @Param("id") Long id,
         Pageable pageable);
@@ -163,6 +167,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     /** 그 사용자가 그 에이전트와 그 목적으로 연 지우지 않은 대화 가운데 가장 나중에 만든 것. 점검 대화를 찾는다. */
     Optional<Conversation> findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
         Long userId, Long agentId, ConversationPurpose purpose);
+
+
+    /** 그 사용자가 그 목적으로 연 지우지 않은 대화 가운데 가장 나중에 만든 것. 대화방을 찾는다. */
+    Optional<Conversation> findFirstByUserIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(Long userId, ConversationPurpose purpose);
 
 
     /** 어느 대화가 그 값을 보낼 session 이나 루트 session 으로 쓰는지. 지운 대화도 센다. */

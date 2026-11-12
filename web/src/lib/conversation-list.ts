@@ -16,3 +16,8 @@ export function requestConversationPage(
 export function requestConversation(id: string): Promise<Response> {
   return fetch(`/api/chat/conversations/${id}`, { cache: "no-store" });
 }
+
+/** 요청자의 대화방 한 줄을 읽는다. 목록이 대화방을 빼므로 사이드바가 따로 읽는다. 아직 열지 않았으면 404 다. */
+export function requestRoom(): Promise<Response> {
+  return fetch("/api/chat/room", { cache: "no-store" });
+}

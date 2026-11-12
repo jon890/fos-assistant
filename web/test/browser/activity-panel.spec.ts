@@ -7,7 +7,7 @@ const PNG_1X1 = Buffer.from(
 );
 
 async function send(page: Page, text: string, agent = "브라우저 비서") {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("radio", { name: agent }).click();
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();

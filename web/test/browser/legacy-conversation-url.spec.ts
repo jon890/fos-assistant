@@ -8,6 +8,7 @@ import {
   setAgentVisibility,
   setSession,
   test,
+  HOME_URL,
 } from "./fixtures.ts";
 import { CONTROL_PLANE_BASE_URL, JWT_SECRET, TEST_EMAIL } from "./settings.ts";
 
@@ -33,7 +34,7 @@ async function conversationNumber(conversationId: string): Promise<number> {
 }
 
 async function sendFirstMessage(page: Page, text: string): Promise<void> {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(text);
   await page.getByRole("button", { name: "보내기" }).click();
   await expect(page).toHaveURL(CONVERSATION_URL);
@@ -73,7 +74,7 @@ test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", asy
 
     await setSession(context, { email: TEST_EMAIL, name: "브라우저 테스트" });
     await page.goto(`/c/${number}`);
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(HOME_URL);
   } finally {
     await setAgentVisibility(PERSONA_GROUP_AGENT_CODE, "PRIVATE", TEST_EMAIL);
   }
@@ -81,12 +82,12 @@ test("남의 대화 번호로 옛 주소를 열면 첫 화면으로 간다", asy
 
 test("Long 범위를 넘는 옛 번호 주소는 오류 화면 없이 첫 화면으로 간다", async ({ page }) => {
   await page.goto("/c/12345678901234567890");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
 });
 
 test("공개 식별자 모양이 아닌 대화 주소는 첫 화면으로 간다", async ({ page }) => {
   await page.goto("/chat/abc");
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(HOME_URL);
 });
 
 test("대문자 공개 식별자로 대화를 열면 소문자 주소로 옮겨진다", async ({ page }, testInfo) => {

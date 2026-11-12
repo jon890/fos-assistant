@@ -40,7 +40,7 @@ async function beginHeldTurn(
   text: string,
 ): Promise<string> {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   await messageBox(page).fill(text);
   await sendButton(page).click();
   await hermes.waitForHeldRun();

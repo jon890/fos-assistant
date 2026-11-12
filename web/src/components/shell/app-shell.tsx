@@ -37,6 +37,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useMediaQuery } from "@/components/ui/use-media-query";
 import { fetchMe, type ClientMe } from "@/lib/me-client";
+import { NEW_CONVERSATION_PATH } from "@/lib/room";
 
 /** 좁은 화면 위 막대의 제목이다. 화면이 정하지 않았으면 `null` 이고 앱 이름을 보인다 */
 const TitleContext = createContext<Dispatch<
@@ -238,7 +239,7 @@ function ShellBody({
                 <PanelLeft aria-hidden="true" />
               </TooltipButton>
               <Link
-                href="/"
+                href={NEW_CONVERSATION_PATH}
                 onClick={startNew}
                 className="rounded-md px-2 py-1.5 text-sm hover:bg-muted"
               >
@@ -263,14 +264,13 @@ function ShellBody({
             <Link
               href="/"
               aria-label={`${appName} 홈`}
-              onClick={startNew}
               className="flex h-full min-w-0 flex-1 items-center justify-center rounded-md px-2 text-sm font-medium hover:bg-muted active:bg-accent"
             >
               <span className="min-w-0 truncate">{title ?? appName}</span>
             </Link>
             <NotificationBell size="icon" />
             <TooltipButton label="새 대화" size="icon" asChild>
-              <Link href="/" onClick={startNew}>
+              <Link href={NEW_CONVERSATION_PATH} onClick={startNew}>
                 <SquarePen aria-hidden="true" className="size-5" />
               </Link>
             </TooltipButton>

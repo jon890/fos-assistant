@@ -78,6 +78,12 @@ export const CONVERSATION_ID =
 /** 대화 화면의 주소다. 첫째 묶음이 공개 식별자다. */
 export const CONVERSATION_URL = new RegExp(`/chat/(${CONVERSATION_ID})$`);
 
+/**
+ * `/` 로 넘어간 뒤의 주소다. `/` 는 대화방을 열고, 기본 비서가 없는 사용자(검사 관리자와 허용 목록 밖의 검사 사용자)는 새 대화 화면
+ * `/new` 로 간다.
+ */
+export const HOME_URL = new RegExp(`/(new|chat/${CONVERSATION_ID})$`);
+
 /** 대화 화면 주소에서 공개 식별자를 꺼낸다. 대화 화면이 아니면 실패한다. */
 export function conversationIdOf(url: string): string {
   const id = new URL(url).pathname.match(CONVERSATION_URL)?.[1];

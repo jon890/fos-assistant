@@ -1,5 +1,7 @@
 package com.bifos.assistant.agent.application.port;
 
+import java.util.Optional;
+
 /**
  * 에이전트 표 밖에서 이미 쥐고 있는 profile 이름을 알려 준다. 허용 목록을 가진 {@code people} 이 구현한다.
  *
@@ -9,4 +11,8 @@ public interface ReservedProfileNames {
 
     /** 허용 목록의 누군가가 그 profile 이름을 쓰고 있는가. */
     boolean reservedByPerson(String profileName);
+
+
+    /** 그 메일의 사람이 허용 목록에서 쥔 기본 profile 이다. 허용 목록에 없거나 꺼진 사람이면 비어 있다. */
+    Optional<String> profileOf(String email);
 }

@@ -41,7 +41,7 @@ class StoredEnumNamesTest {
         Map.entry(CredentialScope.class, List.of("SHARED_HOUSEHOLD", "DEDICATED")),
         Map.entry(AgentVisibility.class, List.of("PRIVATE", "GROUP")),
         Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
-        Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK")),
+        Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK", "ROOM")),
         Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
         Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
         Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),

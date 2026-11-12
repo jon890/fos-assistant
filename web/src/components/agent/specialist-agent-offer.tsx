@@ -80,7 +80,7 @@ export function SpecialistAgentOffer({
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link href={`/?agent=${created.agentCode}`}>
+              <Link href={`/new?agent=${created.agentCode}`}>
                 <MessageSquare aria-hidden="true" />
                 {withParticle(created.agentName, "과", "와")} 대화하기
               </Link>

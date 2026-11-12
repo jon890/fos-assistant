@@ -9,7 +9,7 @@ function startersBody(status: "READY" | "GENERATING" | "NONE", prompts: string[]
 }
 
 test("가로채지 않고 열면 가짜 Hermes 가 만든 네 추천이 칩으로 보이고 누르면 그 글로 보낸다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
 
   // 추천을 처음 만드는 경우라도 다시 읽기가 끝나면 채워진다.
   for (const prompt of FAKE_STARTER_PROMPTS) {
@@ -31,7 +31,7 @@ test("만드는 중이면 자리를 비워 두었다가 다시 읽어 칩을 채
       json: requests === 1 ? startersBody("GENERATING", []) : startersBody("READY", ["채워진 추천이다"]),
     });
   });
-  await page.goto("/");
+  await page.goto("/new");
 
   await expect.poll(() => requests).toBeGreaterThanOrEqual(1);
   await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
@@ -56,7 +56,7 @@ test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다
     expect(box, "입력창의 위치").not.toBeNull();
     return box!.y;
   };
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
 
   // 읽는 중일 때의 자리 표시가 보이는 동안의 위치를 기준으로 삼는다.
@@ -79,7 +79,7 @@ test("세 번 다시 읽어도 만드는 중이면 자리를 비워 두고 더 �
     requests += 1;
     await route.fulfill({ json: startersBody("GENERATING", []) });
   });
-  await page.goto("/");
+  await page.goto("/new");
 
   // 첫 읽기 하나와 2초 간격의 다시 읽기 셋이다.
   await expect.poll(() => requests, { timeout: 15_000 }).toBe(4);
@@ -107,7 +107,7 @@ test("에이전트를 바꾸면 늦게 온 이전 에이전트의 추천은 그�
     await route.fulfill({ json: startersBody("READY", ["늦게 온 추천이다"]) });
     firstFulfilled();
   });
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
 
   await page.getByRole("radio", { name: "성격 비서", exact: true }).click();

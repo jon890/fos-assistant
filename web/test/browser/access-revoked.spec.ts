@@ -40,7 +40,7 @@ async function revokedPerson(
 
   // 켜져 있는 동안 한 번 들어와 그 사람의 사용자가 생기게 한다.
   await setSession(context, person);
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page).not.toHaveURL(/\/signin$/);
 
   await setSession(context, ADMIN);
@@ -89,7 +89,7 @@ test("꺼진 사용자의 API 요청은 401 이고 세션이 지워진다", asyn
   expect(response.status()).toBe(401);
   expect(await response.json()).toMatchObject({ code: "ACCESS_REVOKED" });
 
-  await page.goto("/");
+  await page.goto("/new");
   await expect(page).toHaveURL(/\/signin$/);
 });
 
@@ -99,7 +99,8 @@ test("켜져 있는 사용자는 /signout/revoked 를 열어도 로그아웃되�
 }) => {
   await page.goto("/signout/revoked");
 
-  await expect(page).toHaveURL(/\/$/);
+  // `/` 는 대화방을 열고, 기본 비서가 없는 검사 관리자는 새 대화 화면으로 간다.
+  await expect(page).toHaveURL(/\/(new|chat\/[0-9a-f-]+)$/);
   await expect(page).not.toHaveURL(/\/signin$/);
   expect(await sessionCookieNames(context)).not.toEqual([]);
 });

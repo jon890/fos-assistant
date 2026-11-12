@@ -1,7 +1,9 @@
 package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.agent.application.port.ReservedProfileNames;
+import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,5 +22,11 @@ public class AllowedPersonProfileNames implements ReservedProfileNames {
     @Override
     public boolean reservedByPerson(String profileName) {
         return allowedPeople.existsByHermesProfile(profileName);
+    }
+
+
+    @Override
+    public Optional<String> profileOf(String email) {
+        return allowedPeople.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email)).map(AllowedPerson::hermesProfile);
     }
 }

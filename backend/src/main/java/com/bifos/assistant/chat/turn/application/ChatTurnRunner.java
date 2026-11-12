@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.room.application.RoomContext;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.ContextAssembler;
@@ -55,6 +56,8 @@ class ChatTurnRunner {
     private final ChatTurnStopper chatTurnStopper;
     private final DelegationTargetsInstructions delegationTargets;
     private final MentionInputs mentionInputs;
+    private final RoomContext roomContext;
+    private final ConversationNotices notices;
 
 
     /**
@@ -85,8 +88,9 @@ class ChatTurnRunner {
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
-            // 질문을 저장하기 전에 읽는다. 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문 앞까지다.
-            String lead = mentionInputs.lead(conversation, intent);
+            // 질문을 저장하기 전에 읽는다. 대화방의 요약 알림 줄은 질문 앞에 남고, 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문
+            // 앞까지다.
+            String lead = leadOf(roomLead(user, routed, intent), mentionInputs.lead(conversation, intent));
             Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
@@ -212,6 +216,32 @@ class ChatTurnRunner {
                 turns.close(handle);
             }
         }
+    }
+
+
+    /**
+     * 대화방의 요약 단락이다. 사용자가 보낸 turn 은 날짜를 넘었으면 먼저 요약하고 새 session 으로 바꾼다. 다시 만들기는 판정하지 않고
+     * 요약만 붙인다. 그 밖의 turn 과 대화방이 아닌 대화는 빈 글이다.
+     */
+    private String roomLead(CurrentUser user, Routed routed, TurnIntent intent) {
+        Conversation conversation = routed.conversation();
+        if (!(intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Regenerate)) {
+            return "";
+        }
+        if (intent instanceof TurnIntent.Fresh) {
+            roomContext.rollIfNewDay(
+                user, routed.agent(), conversation, text -> notices.post(conversation.id(), text));
+        }
+        return roomContext.carriedLead(conversation);
+    }
+
+
+    /** 대화방 요약 단락 뒤에 맡김 단락을 잇는다. 요약만 있으면 그 뒤에 사용자 메시지 머리를 붙인다. 맡김 단락은 이미 그 머리로 끝난다. */
+    static String leadOf(String roomLead, String mentionLead) {
+        if (roomLead.isEmpty()) {
+            return mentionLead;
+        }
+        return roomLead + (mentionLead.isEmpty() ? MentionInputs.USER_MESSAGE_LABEL : mentionLead);
     }
 
 

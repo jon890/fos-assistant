@@ -15,6 +15,7 @@ import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
+import { NEW_CONVERSATION_PATH } from "@/lib/room";
 import { useDelegateTarget } from "./use-delegate-target";
 import type { Props } from "./conversation-session-view-types";
 
@@ -105,7 +106,7 @@ export function ConversationSessionView({
       >
         <h1 className="text-lg font-semibold">대화를 찾을 수 없어요</h1>
         <Link
-          href="/"
+          href={NEW_CONVERSATION_PATH}
           className="mt-4 inline-block rounded-md bg-muted px-3 py-2 text-sm"
         >
           새 대화

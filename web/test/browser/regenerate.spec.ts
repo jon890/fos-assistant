@@ -17,7 +17,7 @@ async function ask(
 }
 
 test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "다시 생성 아이콘 검사");
   const answer = page.getByTestId("assistant-message").last();
   const regenerate = answer.getByRole("button", {
@@ -58,7 +58,7 @@ test("다시 생성 아이콘 단추에 접근성 이름과 풀이가 있다", a
 });
 
 test("마지막 답을 다시 생성하고 이전 판을 볼 수 있다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "다시 생성 화면 검사");
   const answer = page
     .getByTestId("assistant-message")
@@ -95,7 +95,7 @@ test("마지막 답을 다시 생성하고 이전 판을 볼 수 있다", async 
 test("다시 생성 중 오류가 나면 임시 답을 버리고 이전 답을 보인다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "다시 생성 실패 검사");
   await page.route("**/api/chat/conversations/*/regenerate", (route) =>
     route.fulfill({
@@ -119,7 +119,7 @@ test("다시 생성 중 오류가 나면 임시 답을 버리고 이전 답을 �
 });
 
 test("다시 생성도 실행 중지로 끝낼 수 있다", async ({ page, hermes }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "재생성 중지 검사");
   const answer = page.getByTestId("assistant-message").last();
   await expect(
@@ -141,7 +141,7 @@ test("다시 생성도 실행 중지로 끝낼 수 있다", async ({ page, herme
 });
 
 test("사용자 메시지에는 수정 단추가 없다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "첫 질문");
   await ask(page, "둘째 질문");
   await expect(
@@ -153,7 +153,7 @@ test("새 질문을 보내는 동안 이전 turn 을 계속 보인다", async ({
   page,
   hermes,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await ask(page, "이전 turn 유지 검사");
   await hermes.holdNextRun();
   await page.getByRole("textbox", { name: "메시지" }).fill("새 질문 대기 검사");
@@ -174,7 +174,7 @@ test("답 없는 질문을 다시 시도해 같은 질문에 답을 붙인다", 
   hermes,
 }) => {
   await hermes.holdNextRun();
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill("중지 조각 전 검사");
   await page.getByRole("button", { name: "보내기" }).click();
   await hermes.waitForHeldRun();

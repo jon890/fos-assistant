@@ -20,7 +20,7 @@ async function openNewConversation(
   page: Page,
   testInfo: TestInfo,
 ): Promise<void> {
-  await page.goto("/");
+  await page.goto("/new");
 }
 
 async function openConversationListDrawer(page: Page): Promise<void> {

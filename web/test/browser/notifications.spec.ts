@@ -79,7 +79,7 @@ test("사건이 알린 수가 단추에 보이고 누르면 알림 화면에서 
     return route.fulfill({ json: { ...state.items[0], readAt: "2026-10-01T12:05:00Z" } });
   });
 
-  await page.goto("/");
+  await page.goto("/new");
   const scope =
     testInfo.project.name === "mobile" ? page.getByRole("banner") : page.getByRole("complementary", { name: "사이드바" });
   await expect(scope.getByTestId("notification-count")).toHaveText("3");

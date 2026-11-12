@@ -4,7 +4,7 @@ import { conversationIdOf, expect, test } from "./fixtures.ts";
 test("답 끝의 질문을 카드로 그리고 고른 답을 다음 메시지로 보낸다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
 
@@ -50,7 +50,7 @@ test("답 끝의 질문을 카드로 그리고 고른 답을 다음 메시지로
 });
 
 test("카드 대신 입력창으로 답해도 된다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   const composer = page.getByRole("textbox", { name: "메시지" });
   await composer.fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
@@ -73,7 +73,7 @@ test("카드 대신 입력창으로 답해도 된다", async ({ page }) => {
 });
 
 test("보낸 답이 전송에 실패하면 카드를 다시 누를 수 있다", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
   const card = page.getByTestId("ask-card");
@@ -136,7 +136,7 @@ test("보낸 답이 전송에 실패하면 카드를 다시 누를 수 있다", 
 test("수락한 카드 답의 응답이 유실되면 저장된 답을 복구하고 다시 보내지 않는다", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/new");
   await page.getByRole("textbox", { name: "메시지" }).fill(ASK_CARD_PROBE);
   await page.getByRole("button", { name: "보내기", exact: true }).click();
   const card = page.getByTestId("ask-card");
