@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
+import com.bifos.assistant.connector.handoff.application.ConnectorHandoffs;
 import com.bifos.assistant.connector.handoff.application.dto.ConnectorHandoffRequest;
 import com.bifos.assistant.shared.error.ApiException;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,16 @@ class ConnectorHandoffRequestTest {
         assertThat(request.code()).isEqualTo("DEMO_LOGIN_REQUIRED");
         assertThat(request.need()).isEqualTo(HandoffNeed.LOGIN);
         assertThat(request.tab()).isEqualTo("TAB1");
+    }
+
+
+    @Test
+    @DisplayName("어휘의 모든 낱말을 받고, 모든 낱말에 카드 제목이 있다")
+    void acceptsEveryNeed() {
+        assertThat(HandoffNeed.fromWire("bot_check")).contains(HandoffNeed.BOT_CHECK);
+        assertThat(HandoffNeed.fromWire("unexpected_page")).contains(HandoffNeed.UNEXPECTED_PAGE);
+        assertThat(HandoffNeed.fromWire("BOT_CHECK")).isEmpty();
+        assertThat(ConnectorHandoffs.TITLES).containsOnlyKeys(HandoffNeed.values());
     }
 
 
