@@ -160,12 +160,21 @@ export function useApprovalList({
     if (conversationId === null) return;
     let stale = false;
     void readConnectorActions(conversationId).then((result) => {
-      if (stale) return;
+      const known =
+        seenIds.current?.conversationId === conversationId
+          ? seenIds.current.ids
+          : null;
+      if (stale) {
+        // 다음 읽기가 앞질러 버려진 첫 읽기도 그때 이미 있던 줄을 알려 준다. 새 승인 판정의 기준이 아직 없을 때만 쓴다.
+        // 그러지 않으면 첫 읽기 중에 온 승인 사건이 다음 읽기를 첫 읽기로 만들어 새 승인을 이미 있던 것으로 본다.
+        if (result.ok && known === null)
+          seenIds.current = {
+            conversationId,
+            ids: new Set(result.data.map((action) => action.actionId)),
+          };
+        return;
+      }
       if (result.ok) {
-        const known =
-          seenIds.current?.conversationId === conversationId
-            ? seenIds.current.ids
-            : null;
         if (
           known &&
           result.data.some(
