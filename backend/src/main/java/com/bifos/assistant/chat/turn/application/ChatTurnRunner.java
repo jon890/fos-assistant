@@ -123,6 +123,8 @@ class ChatTurnRunner {
                     requestReceivedAt,
                     onEvent);
                 String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
+                // 실패한 실행에도 질문을 잇는다. 맡김이면 이 연결로 맡김 질문을 가리고 다음 turn 에 실패로 싣는다.
+                chatTurnLifecycle.recordQuestion(failed.execution().id(), questionId);
                 executions.fail(failed.execution(), code);
                 chatRunEvents.append(failed, ExecutionEventType.RUN_FAILED, code);
                 throw ex;

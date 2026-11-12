@@ -3,6 +3,9 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.domain.Agent;
@@ -20,15 +23,25 @@ import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.domain.TokenUsage;
+import com.bifos.assistant.hermes.infra.HermesModelClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.chat.modelchoice.application.ModelSettingStore;
+import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
+import com.bifos.assistant.model.domain.ModelChoice;
+import com.bifos.assistant.model.domain.type.ModelTier;
+import com.bifos.assistant.testsupport.ConversationTierChoice;
+import com.bifos.assistant.user.infra.GroupSettingRepository;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
@@ -36,6 +49,7 @@ import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +88,24 @@ class MentionDelegationTest {
 
     @Autowired
     HermesRunsClient hermes;
+
+    @Autowired
+    ModelSettingStore settings;
+
+    @Autowired
+    ModelVisibilityService visibility;
+
+    @Autowired
+    GroupSettingRepository groupSettings;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
+    HermesModelClient modelClient;
+
+    /** 모델 숨김을 걸 그룹이다. 다른 검사가 쓰는 그룹의 설정을 건드리지 않게 따로 둔다. */
+    private static final Long HIDDEN_GROUP_ID = 9_000_000_723L;
 
     private CurrentUser dad;
     private Agent chief;
@@ -208,6 +240,60 @@ class MentionDelegationTest {
             .contains("[출처: @ 로 맡긴 일, 에이전트: 쇼핑 담당, 실행 번호: " + failed.id() + ", 상태: FAILED")
             .contains("사용자: 운동화 찾아줘")
             .doesNotContain("<external-data>");
+    }
+
+
+    @Test
+    @DisplayName("모델 설정 해석이 실패한 맡김도 질문에 이어져 맡김으로 보이고 다음 turn 에 실리며 다시 만들지 못한다")
+    void modelResolveFailureStillMarksMention() {
+        AppUser kidRow = users.save(AppUser.of("kid@example.com", "kid", HIDDEN_GROUP_ID, UserRole.MEMBER));
+        CurrentUser kid = new CurrentUser(
+            kidRow.id(), kidRow.email(), kidRow.displayName(), kidRow.groupId(), kidRow.role());
+        agents.save(agent("kid", "아이 비서", kid.id()));
+        Agent kidShopper = agents.save(agent("kid-shop", "아이 쇼핑", kid.id()));
+        Long conversationId = chat.send(kid, null, "안녕", "kid").conversationId();
+        HermesModelCatalog catalog = new HermesModelCatalog(
+            "provider-b",
+            "model-old",
+            List.of(new HermesModelCatalog.Provider("provider-b", "provider-b", List.of("model-old"), Map.of())));
+        when(modelClient.readCatalog(anyString(), anyString())).thenReturn(catalog);
+        when(modelClient.readCatalog(anyString(), anyString(), anyBoolean())).thenReturn(catalog);
+        try {
+            ConversationTierChoice.defineAndChoose(
+                settings,
+                conversations,
+                transactions,
+                HIDDEN_GROUP_ID,
+                kid.id(),
+                conversationId,
+                ModelTier.values()[0],
+                ModelChoice.of("provider-b", "model-old", null));
+            visibility.save(
+                new CurrentUser(kid.id(), kid.email(), kid.displayName(), HIDDEN_GROUP_ID, UserRole.ADMIN),
+                List.of(new HiddenModels.Entry("provider-b", "model-old")));
+
+            assertRejected(
+                () -> chat.send(kid, conversationId, "운동화 찾아줘", null, List.of(), "kid-shop"), ErrorCode.MODEL_HIDDEN);
+
+            AgentExecution failed = executions.findAll().stream()
+                .filter(execution -> kidShopper.id().equals(execution.agentId()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(chat.mentionMarks(kid, conversationId).questions().values())
+                .extracting(DelegationLine::executionId, DelegationLine::status)
+                .containsExactly(tuple(failed.id(), ExecutionStatus.FAILED));
+            assertRejected(() -> chat.regenerate(kid, conversationId, event -> {
+            }), ErrorCode.VALIDATION_FAILED);
+        } finally {
+            ConversationTierChoice.clear(groupSettings, transactions, HIDDEN_GROUP_ID);
+        }
+
+        chat.send(kid, conversationId, "다시 알려 줘", null);
+
+        assertThat(stub().received().getLast().input())
+            .contains("에이전트: 아이 쇼핑")
+            .contains("상태: FAILED, 오류: MODEL_HIDDEN")
+            .contains("사용자: 운동화 찾아줘");
     }
 
 
