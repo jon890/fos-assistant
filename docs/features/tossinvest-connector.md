@@ -751,7 +751,7 @@ expireDate는 실제 YYYY-MM-DD인지 검증한다. 저장 원문은 지난 날�
 모든 공식 group/leg 상태와 STOP/PROFIT_RATE를 수용한다. OTO 첫 leg가 ORDERED/COMPLETED이고 둘째가 WATCHING인 CANCEL과 PROFIT_RATE 원주문에서 STOP으로 전체 재설정하는 MODIFY도 수용한다.
 PROFIT_RATE의 targetProfitRate는 퍼센트 원문을 그대로 둔다. 신규 쓰기에 PROFIT_RATE 필드를 만들지 않는다.
 부재와 null을 구분하고 createdAt/expireDate, leg 타입·상태·가격·발동 주문 ID까지 expected와 대조한다.
-이 대조는 새 prepare의 소비 검증이며 claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 후속 연결의 책임이다.
+이 대조는 새 prepare의 소비 검증이다. claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 SDK 쓰기 도구가 한다(아래 「조건주문 SDK 와 단일 전송」).
 불투명 ID는 점 경로·공백·슬래시·역슬래시·query/hash/percent/colon·C0/C1·잘못된 surrogate를 거절한다.
 
 normalization은 symbol/quantity/first.triggerPrice/first.orderPrice/second.triggerPrice/second.orderPrice 순서의 실제 표기 변경만 `{field,before,after}`로 기록한다.
@@ -838,7 +838,7 @@ MODIFY·CANCEL도 UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지 
 두 경우 모두 토큰 재발급과 금융 재전송은 없다.
 client의 financial은 승인 검증을 제공하지 않는 저수준 내부 transport다. 단일 전송과 deadline 은 `financial-transport.ts` 가, 토큰 identity 의 확보와 반납은 client wrapper 가 맡는다.
 `claimApproval` 은 `ClaimedApproval={beforeSend, deadlineMs}` 를 돌려주고 일반 주문도 이것을 넘겨 ticket 남은 시간을 금융 deadline 으로 쓴다. 기존 callback 인자도 받으며 그때 deadline 은 요청 제한(기본 4초)이다.
-생산 금융 호출자는 trading-tools이며 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
+생산 금융 호출자는 trading-tools와 테스트 entry 만 등록하는 conditional-tools이며 둘 다 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
 
 테스트 원본의 단일 생산자는 `tests/fixtures/trading-entry.ts --generate`다.
 운영 manifest·plugin·MCP 정의를 복사한 고유 임시 디렉터리의 사본에만 금융 선언과 실제 SDK bundle을 넣는다.
