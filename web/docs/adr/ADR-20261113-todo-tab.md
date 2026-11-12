@@ -3,7 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-11-13
 - **decision-type**: `architecture`
-- **현재 규칙의 원본**: 설계 [`docs/features/user-browser/design.md`](../../../docs/features/user-browser/design.md) 의 「PR3 「할 일」 탭」, 스펙 [`spec.md`](../../../docs/features/user-browser/spec.md) 의 REQ9, REQ10(사용자 확인 2026-11-12), 기능 파일 [`docs/features/user-browser.md`](../../../docs/features/user-browser.md) 의 「대화 위 화면」 과 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「화면」
+- **현재 규칙의 원본**: 설계 [`docs/features/user-browser/design.md`](../../../docs/features/user-browser/design.md) 의 「PR3 할 일 탭」, 스펙 [`spec.md`](../../../docs/features/user-browser/spec.md) 의 REQ9, REQ10(사용자 확인 2026-11-12), 기능 파일 [`docs/features/user-browser.md`](../../../docs/features/user-browser.md) 의 「대화 위 화면」 과 [`docs/features/connector-policy.md`](../../../docs/features/connector-policy.md) 의 「화면」
 - **결정**: [ADR-20261112 / handoff-drawer](ADR-20261112-handoff-drawer.md) 의 옆 패널을 「할 일」 과 「내 브라우저」 두 탭으로 나눈다. 승인 카드와 화면 넘기기 카드는 입력창 위가 아니라 「할 일」 탭에만 그리고, 묻는 카드는 답 안에 둔 채 지금 누를 수 있는 것을 「할 일」 탭에도 그린다. 입력창 위에는 「할 일 N건」 한 줄만 남긴다. 새 승인 줄이나 승인 알림은 「할 일」 탭을 연다. 승인 상태는 화면 훅(`useApprovalList`)이 들어 패널을 닫아도 「모두 승인」 이 끝까지 돈다.
 - **대체하는 것**: `connector-policy.md` 의 「승인 영역은 화면 높이의 40% 까지만 차지하고 안에서 스크롤한다」 를 대체한다. 묶음 승인 조건([ADR-087](ADR-087-같은-도구의-승인-줄은-묶음으로-보이고-상시-허락을-줄-수-있는-줄만-한꺼번에-승인한다.md))과 승인·거절의 서버 경로([ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))는 그대로다.
 - **맥락**: 사람이 도와야 하는 일이 입력창 위 승인 카드, 입력창 위 넘기기 카드, 답 안의 묻는 카드 세 자리에 흩어져 있었다. 승인 카드가 많으면 입력창 위가 화면의 40% 를 차지해 대화를 읽기 어려웠다(사용자 2026-11-12, 스펙 DECISION6).

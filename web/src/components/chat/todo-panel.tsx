@@ -29,7 +29,7 @@ function escapeBelongsToScreen(target: EventTarget | null): boolean {
 /**
  * 대화 위 옆 패널이다. 「할 일」 과 「내 브라우저」 두 탭을 두고 보이는 탭의 본문만 그린다.
  * 넓으면 대화 옆에 붙고 좁으면 전체 폭 시트로 덮는다. 동작은 `docs/features/user-browser/design.md` 의
- * 「PR3 「할 일」 탭」 이 갖는다.
+ * 「PR3 할 일 탭」 이 갖는다.
  *
  * <p>「내 브라우저」 탭은 보일 넘기기가 없으면(`browserEnabled` 가 거짓) 누를 수 없다.
  */

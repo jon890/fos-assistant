@@ -20,7 +20,7 @@ import { useConversationHandoffs } from "./use-conversation-handoffs";
 
 /**
  * 사람이 할 일(묻는 카드, 화면 넘기기, 승인)을 옆 패널의 「할 일」 탭에 모으고 입력창 위에 「할 일 N건」 한 줄을 둔다.
- * 동작은 `docs/features/user-browser/design.md` 의 「PR3 「할 일」 탭」 이 갖는다.
+ * 동작은 `docs/features/user-browser/design.md` 의 「PR3 할 일 탭」 이 갖는다.
  *
  * <p>새 승인 줄이 보이거나 주소의 `todo=open`(승인 알림 진입)이 오면 「할 일」 탭을 연다. 「할 일」 탭을 보는 중에
  * 카드가 모두 사라지면 패널을 닫는다. 넘기기와 「내 브라우저」 탭은 `useConversationHandoffs` 가 갖는다.
