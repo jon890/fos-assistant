@@ -48,7 +48,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | --- | --- | --- | --- |
 | [ADR-001](ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) | Hermes 를 런타임으로 두고 core 를 고치지 않는다 | 공통 | Accepted |
 | [ADR-005](ADR-005-기존-개인-저장소의-스택을-그대로-쓴다.md) | 기존 개인 저장소의 스택을 그대로 쓴다 | 공통 | Accepted. Checkstyle 을 뺀 부분은 ADR-042 가 대체한다 |
-| [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | 공통 | Accepted. 결과를 모델이 다시 묻는다는 부분은 ADR-040 이, 요청자를 MCP 토큰이 정한다는 부분은 ADR-032 가 대체한다 |
+| [ADR-017](ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md) | 무엇을 할지는 Hermes 가 정하고 Control Plane 은 경계만 갖는다 | 공통 | Accepted. 결과를 모델이 다시 묻는다는 부분은 ADR-040 이, 요청자를 MCP 토큰이 정한다는 부분은 ADR-032 가 대체한다. 사용자가 `@` 로 고른 맡김은 ADR-20261112 / mention-delegation 이 예외로 둔다 |
 | [ADR-022](ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) | 다시 생성과 수정은 같은 session 에 판으로 쌓는다 | backend, frontend | Accepted. 수정은 ADR-024 가 대체 |
 | [ADR-024](ADR-024-메시지-수정을-없애고-중지한-뒤-다시-보낸다.md) | 메시지 수정을 없애고 중지한 뒤 다시 보낸다 | backend, frontend | Accepted. ADR-022 의 수정을 대체 |
 | [ADR-025](ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md) | 대화는 주소에 공개 식별자를 쓰고 번호는 안에만 둔다 | backend, frontend | Accepted |
@@ -123,6 +123,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261110 / naver-shopping-connector](ADR-20261110-naver-shopping-connector.md) | 네이버 쇼핑은 내 브라우저로 화면의 상태 JSON 을 읽고, 쇼핑 도구는 사람이 연 대화에서만 부른다 | backend, hermes | Accepted. ADR-20261007 / user-browser 의 브라우저와 중계를 쓰고, ADR-080 의 살펴보기 읽기 경계 옆에 도구 단위의 `attended_only` 경계를 더한다 |
 | [ADR-20261110 / test-layout](ADR-20261110-test-layout.md) | 테스트는 주인 모듈 안에 두고, 여러 모듈에 걸친 것만 루트 `test/` 에 남긴다 | 공통 | Accepted |
 | [ADR-20261111 / connector-handoff](ADR-20261111-connector-handoff.md) | 플러그인이 사람에게 화면을 넘기면 fos-ctx 가 결과의 칸을 알리고, 대화의 카드와 「다 했어요」 로 이어 간다 | backend, hermes, web | Accepted. ADR-026 의 묻는 카드처럼 기다리지 않고, ADR-070 의 `notification` 에 종류 하나를 더한다 |
+| [ADR-20261112 / mention-delegation](ADR-20261112-mention-delegation.md) | 사용자가 `@` 로 고른 에이전트에게는 Control Plane 이 바로 맡기고, 그 주고받음을 대화 에이전트의 다음 turn 에 싣는다 | backend, frontend | Accepted. ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 |
 
 ## 보관
 

@@ -2,7 +2,7 @@
 
 스펙: [`spec.md`](spec.md).
 
-스펙의 DECISION2 대로 PR 다섯으로 나눈다. 이 문서는 PR1 부터 PR3 까지를 구현할 깊이로 쓰고, 뒤 PR 은 경계와 데이터 자리만 정한다. 뒤 PR 은 시작할 때 이 문서의 해당 절을 고치고 검토를 다시 받는다.
+스펙의 DECISION2 대로 PR 다섯으로 나눈다. 이 문서는 PR1 부터 PR4 까지를 구현할 깊이로 쓰고, 뒤 PR 은 경계와 데이터 자리만 정한다. 뒤 PR 은 시작할 때 이 문서의 해당 절을 고치고 검토를 다시 받는다.
 
 | PR | 요구사항 | 내용 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@
 | REQ4 | (PR2) 위임 결과 알림 줄(`SYSTEM`)에 그 줄이 전한 자식 실행의 에이전트와 상태를 싣는다. 줄과 결과는 전달 묶음(`result_delivery`)의 새 칸 `delegation_notice_message_id` 와 `items_json` 으로 잇는다. 승인 줄(`connector_action.agent_id`)이 대화의 에이전트와 다르면 승인 카드 응답에 그 에이전트를 싣는다 |
 | REQ5 | (PR3) 화면이 연결 완료 뒤 제안을 띄우고, Control Plane 의 한 요청이 에이전트 만들기(소개 포함), 성격 틀 쓰기, 바인딩을 차례로 하고 실패하면 역순으로 거둔다. 순서는 `agent` 위의 패키지(`connector`)가 갖는다. 아래 「PR3 마법사」 |
 | REQ6 | (PR3) 같은 요청이 「떼기」 칸이면 그 연결이 지금 붙은 다른 에이전트(기본 비서 또는 다른 에이전트)의 바인딩을 모두 뗀다. `single_binding` 은 화면이 칸을 잠그고 서버도 떼기 없이 붙이기를 거절한다. 제안은 연결에 바인딩이 하나도 없을 때만 뜨므로 「그 서비스가 붙은 전문 에이전트」 가 있으면 뜨지 않는다 |
-| REQ7 | (PR4) 보내기 요청에 맡길 에이전트를 싣고 Control Plane 이 위임 실행을 바로 만든다. 위임 입력에는 `@` 메시지와 그 대화의 최근 `USER`·`ASSISTANT` 줄 몇 개를 출처 머리줄과 함께 싣는다. 맡은 에이전트의 답은 그 실행의 에이전트를 가진 `ASSISTANT` 줄로 남기고 `MessageView` 에 답을 쓴 에이전트를 더한다. 비서의 Hermes session 에는 이 주고받음이 없으므로, 비서의 다음 turn 입력 앞에 위임 결과 전달과 같은 머리줄로 「사용자가 `@` 로 맡긴 일과 답」 을 싣는다. 무엇을 할지 Control Plane 이 정하는 예외라 ADR-017 을 고치는 ADR 을 그 PR 에 둔다 |
+| REQ7 | (PR4) 보내기 요청의 `delegateTo` 로 Control Plane 이 고른 에이전트의 turn 을 새 session 으로 바로 돌린다. 그 실행은 대화의 루트 실행이고 `delegation_key` 가 없어 자동 결과 전달을 타지 않는다. 맡은 에이전트의 입력에는 그 대화의 최근 `USER`·`ASSISTANT` 줄을 출처 머리줄과 함께 싣는다. 답은 그 실행 번호의 `ASSISTANT` 줄이고 이력 API 가 질문 줄에 `delegatedTo`, 답 줄에 `answeredBy` 를 싣는다. 대화 에이전트의 다음 turn 입력 앞에 위임 결과 전달과 같은 머리줄로 그 주고받음을 싣는다. 무엇을 할지 Control Plane 이 정하는 예외라 ADR-017 을 고치는 ADR 을 둔다. 아래 「PR4 @ 멘션」 |
 | REQ8 | (PR5) 대화방은 `conversation.purpose` 의 새 값이다. 기본 비서는 「주인의 기본 profile 을 가리키는 에이전트」 로 정하고 새 칸을 두지 않는다. 지우기 경로가 기본 비서를 거절한다 |
 | REQ9 | (PR5) 날이 바뀐 첫 메시지의 turn 을 시작하기 전에 직전 session 의 요약 실행을 돌리고, 요약을 `SYSTEM` 줄로 남긴 뒤 `hermes_session_id` 와 `hermes_root_session_id` 를 비워 새 session 으로 turn 을 연다. 새 루트 session 은 첫 turn 이 채우는 지금 규칙을 따른다. 요약 글은 그 session 의 첫 turn 입력 앞에 실어 Hermes session 이력에 남긴다. instructions 는 실행마다 조립하므로 거기에 두지 않는다. 요약이 실패하면 두 칸을 그대로 두고 다음 메시지에서 다시 한다 |
 
@@ -372,6 +372,166 @@ REQ5, REQ6 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 지금 
 | REQ5 | backend 통합 테스트: 만들면 소개가 채워진 비공개 에이전트와 그 연결의 바인딩이 생기고 성격 틀을 쓴다. 상한, 준비 안 된 연결, 목록 밖 값은 아무것도 만들지 않는다. 성격 쓰기와 붙이기가 실패하면 새 에이전트가 지워지고 profile 을 거둔다. 브라우저: 연결을 마친 화면의 제안, 미리 채운 값, 만든 뒤 안내, 에이전트 목록의 「전문 에이전트 만들기」 |
 | REQ6 | backend: `detach` 면 다른 에이전트의 바인딩이 없어지고 `agent_list` 에 새 에이전트와 그 서비스가 보인다. `single_binding` 은 먼저 떼고 붙이며, `detach` 없이는 거절한다. 붙이기가 실패하면 뗀 에이전트에 다시 붙인다. 화면 단위 테스트: 떼기 칸의 글과 잠금. 실제 대화에서 맡긴 줄이 생기는지는 배포 뒤 확인한다 |
 
+## PR4 @ 멘션
+
+REQ7 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 지금 있는 대화 turn 을 고른 에이전트로 한 번 돌리고, 맡김인지는 실행 줄의 값으로 판정한다.
+
+### 지금 구조
+
+- 입력창의 `@` 목록은 새 대화 화면에서만 뜨고 대화의 에이전트를 고른다(`Composer` 의 `mention`). 첫 메시지 뒤에는 잠긴다.
+- 보내기 요청(`SendMessageRequest`)은 대화, 글, 에이전트 코드, 첨부다. 이어 쓰는 대화는 에이전트 코드를 무시하고 대화의 에이전트로 돈다.
+- 대화의 turn 은 `ChatTurnRunner` 가 대화의 Hermes session 으로 돌리고 답을 그 실행 번호의 `ASSISTANT` 줄로 남긴다. 사람이 보낸 turn 의 실행 줄은 `question_message_id` 로 질문 줄을 잇는다.
+- `agent_delegate` 의 위임은 부모 실행 아래 새 session 으로 돌고 답은 실행 줄의 `output_text` 에만 남는다. 끝난 결과는 `delegation_key` 가 있는 실행만 골라 자동 turn 이 대화의 에이전트에게 전한다(ADR-040).
+- 이력 API 의 답 줄에는 답을 쓴 에이전트 칸이 없다. 한 대화의 답은 모두 그 대화의 에이전트가 썼기 때문이다(DECISION5).
+
+### 맡김 turn
+
+**보내기 요청에 `delegateTo`(에이전트 코드)가 있으면 Control Plane 이 그 에이전트로 turn 하나를 돌린다.** 모델은 맡길지를 정하지 않는다(spec DECISION9).
+대화의 turn 잠금, 질문 저장, 실행 기록, 중지, 대기 메시지, 결과물은 보통 turn 과 같다. 다른 점은 넷이다.
+
+| 무엇 | 보통 turn | 맡김 turn |
+| --- | --- | --- |
+| 실행할 에이전트 | 대화의 에이전트 | `delegateTo`. 요청자가 쓸 수 있고 켜진 에이전트만(`AgentService.requireStartable`) |
+| Hermes session | 대화의 session. 끝나면 대화에 적는다 | 새 `fos-<uuid>`. 대화의 `hermes_session_id` 를 읽지도 바꾸지도 않는다 |
+| 입력 | 사용자 글 | 대화의 최근 줄과 출처 머리줄, 그 아래 사용자 글. 아래 「맡은 에이전트의 입력」 |
+| 지시 끝 | 없음 | `TurnIntent.MENTION_INSTRUCTION` |
+
+실행 줄은 부모가 없는 루트 실행이고, 대화는 그 대화, 에이전트는 맡은 에이전트다. `delegation_key` 는 두지 않는다. 두면 자동 결과 전달이 끝난 맡김을 위임 결과로 읽어 대화의 에이전트를 깨운다. spec DECISION20 의 「비서는 끼지 않는다」 를 어긴다.
+**맡김 실행은 「대화의 실행 가운데 부모가 없고 에이전트가 대화의 에이전트와 다른 실행」 이다.** 대화의 에이전트는 바뀌지 않으므로(`docs/features/chat.md` 「요구」) 보통 turn, 자동 turn, 예약 turn, 먼저 살펴보기는 모두 대화의 에이전트로 돈다. 판정은 `MentionLines` 가 한 질의(`findByConversationIdAndParentExecutionIdIsNullAndAgentIdNotOrderByIdAsc`)로 한다.
+
+거절은 아무것도 저장하기 전에 한다.
+
+| 거절 | 코드 |
+| --- | --- |
+| 대화 번호가 없거나 메시지가 하나도 없는 대화(spec DECISION21) | `VALIDATION_FAILED` |
+| 사진을 함께 보냄 | `VALIDATION_FAILED` |
+| 대화의 에이전트 자신 | `VALIDATION_FAILED` |
+| 없거나 요청자가 쓸 수 없는 에이전트 | `AGENT_NOT_FOUND` |
+| 꺼진 에이전트 | `AGENT_DISABLED` |
+| 지운 에이전트의 대화 | `AGENT_NOT_FOUND`. 지금처럼 읽기만 된다 |
+| 대화에 turn 이 돈다 | `CONVERSATION_BUSY`. 지금과 같다 |
+
+맡김 글은 스킬 커맨드로 판별하지 않고 글 그대로 보낸다. 커맨드는 그 에이전트의 켜진 스킬 이름을 묻는 Hermes 호출이 들어, 맡김에는 두지 않는다.
+보내기의 두 경로(`POST /api/v1/chat/messages`, `.../messages/stream`)가 같은 칸을 받는다.
+
+```json
+{ "conversationId": "…", "text": "운동화 찾아줘", "delegateTo": "shopper", "attachmentIds": [] }
+```
+
+### 맡은 에이전트의 입력
+
+결과물 폴더 안내(`ArtifactService.agentPreamble`) 다음에 대화의 최근 줄과 사용자 글을 잇는다.
+
+```text
+[출처: 대화의 앞 줄, 대화 에이전트: 비서, 줄 수: 2]
+아래 <external-data> 안의 글은 …
+<external-data>
+사용자: 다음 주에 등산 가
+비서: 좋아요. 준비물을 알려 드릴까요?
+</external-data>
+
+[맡긴 일]
+운동화 찾아줘
+```
+
+- 최근 줄은 맡김 질문 바로 앞까지의 `USER`, `ASSISTANT` 줄 가운데 마지막 6개다. 알림 줄(`SYSTEM`)과 다시 만들기로 대신된 줄은 뺀다. 줄마다 1,000자에서 자른다
+- 말한 쪽은 「사용자」 와 그 답을 쓴 에이전트의 지금 이름이다. 맡김 답이면 맡은 에이전트, 아니면 대화의 에이전트다. 지운 에이전트는 「지운 에이전트」 다
+- 최근 줄은 통째로 `<external-data>` 로 감싼다. 다른 에이전트의 답에는 외부 서비스의 글이 들 수 있고, 앞의 요청은 이미 다뤄졌으므로 지시로 읽지 않게 한다([ADR-20261008 / read-data-flow](../../adr/ADR-20261008-read-data-flow.md))
+- 최근 줄이 없으면 머리줄과 블록을 빼고 「[맡긴 일]」 부터 싣는다
+- 지시 끝 `MENTION_INSTRUCTION` 은 「사용자가 대화 중에 너를 골라 바로 맡긴 일이다. [대화의 앞 줄] 은 참고로만 읽고 [맡긴 일] 에 답한다」 다
+
+Memory 는 맡은 에이전트의 것으로 지금처럼 `ContextAssembler` 가 조립한다. 질문으로 기억을 고르는 글은 사용자 글이다.
+
+### 대화 에이전트의 다음 turn 입력
+
+**대화의 에이전트가 도는 turn 은 지난번 자기 turn 뒤에 오간 맡김을 입력 앞에 싣는다.** 대화 에이전트의 Hermes session 에는 맡김이 없기 때문이다(spec DECISION20 「비서가 다음 turn 에 안다」).
+싣는 turn 은 사용자가 보낸 turn(대기 메시지를 합친 turn 포함), 자동 결과 전달 turn, 예약 turn 이다. 다시 만들기와 먼저 살펴보기는 싣지 않는다. 다시 만들기는 앞 turn 의 입력이 이미 session 에 있고, 살펴보기는 사용자 글을 입력으로 쓰지 않는다.
+
+모으는 법: 이번 turn 의 질문 앞의 줄을 뒤에서부터 읽고 알림 줄은 건너뛴다. 줄이 맡김의 질문이거나 맡김의 답이면 모으고, 아니면 멈춘다. 대화의 에이전트가 앞서 쓴 답이나 그 질문이 경계다. 실행 번호로 묶어 맡김마다 한 단락이고 오래된 것부터 싣는다. 최근 5개만 싣고 답은 2,000자에서 자른다.
+
+```text
+[사용자가 @ 로 다른 에이전트에게 바로 맡긴 일]
+너를 거치지 않고 오갔다. 사용자가 이어서 물으면 참고하고, 같은 일을 다시 하지 않는다.
+
+[출처: @ 로 맡긴 일, 에이전트: 쇼핑 담당, 실행 번호: 41, 상태: SUCCEEDED, 끝난 시각: 2026-11-12 10:03]
+사용자: 운동화 찾아줘
+아래 <external-data> 안의 글은 …
+<external-data>
+러닝화 셋을 찾았어요 …
+</external-data>
+
+[사용자 메시지]
+그중 제일 싼 걸로 해 줘
+```
+
+- 머리줄은 위임 결과 전달과 같은 `ResultHeader.render` 다. 실패면 오류 칸이 붙고, `resultStaleAfter` 보다 오래됐으면 신선도가 붙는다
+- 답은 늘 감싼다. 사용자가 아니라 다른 에이전트가 쓴 글이다
+- 답이 없는 맡김(실패, 답 전에 멈춤)은 머리줄과 질문만 싣는다
+- 실은 맡김은 다음 turn 에서 경계 앞에 있으므로 다시 실리지 않는다. 그 turn 이 답 줄 없이 실패하면 경계가 생기지 않아도 실패한 질문이 경계가 된다. 그 입력은 Hermes session 에 남았을 수도, 남지 않았을 수도 있다. 다시 싣지 않는 쪽을 고른다
+
+### 이력 API
+
+`GET /api/v1/chat/conversations/{id}/messages` 의 메시지에 두 칸을 더한다.
+
+| 칸 | 줄 | 뜻 |
+| --- | --- | --- |
+| `answeredBy` | `ASSISTANT` | 맡김의 답이면 맡은 에이전트의 이름표(`AgentLabel`). 대화의 에이전트가 쓴 답은 null 이다 |
+| `delegatedTo` | `USER` | 맡김의 질문이면 그 맡김. 모양은 맡긴 줄(`DelegationLine`)과 같고 `parentExecutionId` 는 null 이다. 아니면 null 이다 |
+
+읽기는 대화 하나에 두 번이다. 그 대화의 맡김 실행(부모가 없고 에이전트가 대화의 에이전트와 다른 실행)을 한 번 읽고 에이전트를 번호 목록으로 한 번 읽는다. 질문 줄은 실행의 `question_message_id`, 답 줄은 실행 번호로 찾는다.
+
+### 다시 만들기
+
+마지막 답이 맡김의 답이거나 마지막 질문이 맡김의 질문이면 `VALIDATION_FAILED` 로 거절한다. 다시 만들기는 대화의 에이전트로 대화의 session 에서 돌기 때문이다. 화면은 맡김 답에 「답 다시 만들기」 를 그리지 않는다.
+
+### 책임과 경계
+
+| 자리 | 맡는 것 |
+| --- | --- |
+| `chat.turn.presentation.ChatDtos` | `SendMessageRequest.delegateTo`, `MessageView` 의 `answeredBy`, `delegatedTo` |
+| `chat.turn.application.ChatService` | `send`, `stream` 이 `delegateTo` 를 받아 맡김이면 `ChatTurnRouting.routeMention` 과 `TurnIntent.Mention` 으로 돌린다 |
+| `chat.turn.application.ChatTurnRouting` | `routeMention`. 위 거절 표. 질문 저장은 사용자가 보낸 turn 과 같다 |
+| `chat.turn.application.dto.TurnIntent` | `Mention` 과 `MENTION_INSTRUCTION` |
+| `chat.turn.application.ChatTurnRunner` | 맡김이면 입력을 `MentionInputs.forMention` 으로, 대화 에이전트의 turn 이면 `MentionInputs.carryOver` 를 앞에 붙인다 |
+| `chat.turn.application.ChatTurnLifecycle` | 맡김이면 새 session 으로 명령과 실행 줄을 만들고, 끝나거나 멈춰도 대화의 session 을 적지 않는다. 추천 질문을 다시 만들지 않는다 |
+| `chat.turn.application.MentionLines` (새 빈) | 맡김 실행의 판정과 읽기. 대화의 맡김 실행을 한 번 읽어 질문 줄과 답 줄에 붙일 값을 만든다 |
+| `chat.turn.application.MentionInputs` (새 빈) | 맡은 에이전트의 입력과 대화 에이전트의 다음 turn 머리 단락 |
+| `usage.execution.infra.AgentExecutionRepository` | 대화의 맡김 실행을 읽는 메서드 |
+| `web/src/app/api/chat/stream/route.ts`, `web/src/lib/chat-api.ts` | `delegateTo` 를 넘긴다 |
+| `web/src/lib/mention.ts` | `@` 목록에 넣을 에이전트, 맡김 질문과 답의 화면 값 |
+| `web/src/components/chat/delegation-lines.tsx` | 질문 아래의 「나 → 쇼핑 담당에게 맡김 · 상태」 줄(`MentionLine`) |
+| `web/src/components/chat/composer.tsx` 와 입력 훅 | 메시지가 있는 대화의 `@` 목록과 「{이름}에게 맡기기」 칩 |
+| `web/src/components/chat/message-bubble.tsx`, `message-list.tsx` | 답 줄과 기다림 줄의 이름표를 `answeredBy` 로 바꾼다. 맡김 답의 다시 만들기를 감춘다 |
+
+### 화면
+
+| 자리 | 그림 |
+| --- | --- |
+| `@` 목록 | 메시지가 하나라도 있는 대화에서 답이 돌지 않을 때 뜬다. 목록은 에이전트 목록(`GET /api/v1/agents`, 요청자가 쓸 수 있고 켜진 것)에서 대화의 에이전트를 뺀 것이다(spec DECISION21). 뺀 뒤 비면 뜨지 않는다 |
+| 고른 뒤 | `@` 와 친 글자를 지우고 입력창 위에 「(이름표) {이름}에게 맡기기」 칩과 지우기 단추를 둔다. 칩이 있는 동안 사진 단추를 감춘다. 보내면 칩이 비워진다 |
+| 보낸 질문 아래 | 「(맡은 에이전트 이름표) 나 → {이름}에게 맡김 · 진행 중·끝남·실패·멈춤」. 맡긴 줄과 같은 글자 크기다 |
+| 답 | 기다림 줄과 답의 이름표가 맡은 에이전트다. 그 답의 맡긴 줄(맡은 에이전트가 다시 맡긴 일)도 「{맡은 에이전트} → …」 로 보인다 |
+| 맡김 답의 버튼 | 「답 다시 만들기」 가 없다 |
+| 다른 창 | 맡김도 turn 잠금을 쥐므로 지금처럼 답이 오는 중으로 보이고 끝나면 이력을 다시 읽는다. 이력의 마지막 질문이 도는 맡김이면 기다림 줄이 맡은 에이전트 이름표다 |
+
+**답이 도는 동안에는 `@` 목록을 띄우지 않는다.** 그동안 보낸 글은 대기 메시지가 되고, 대기 메시지는 글만 받는다(ADR-048).
+**사진과 맡김을 함께 보내지 않는다.** 사진은 대화에 올리고 대화의 에이전트가 사진을 받는지로 판정한다. 맡은 에이전트까지 판정을 넓히지 않는다.
+
+### 실패와 일관성
+
+- 맡은 실행이 실패하면 질문 아래 줄이 「실패」 이고 답 줄이 없다. turn 실패 안내는 지금과 같다. 대화 에이전트의 다음 turn 에는 실패로 실린다
+- 멈추면 지금의 중지와 같다. 그때까지의 답이 맡은 에이전트 이름표로 남는다
+- 맡은 에이전트가 `agent_delegate` 로 다시 맡기면 그 위임은 부모가 맡김 실행(루트)이라 PR2 의 맡긴 줄로 맡김 답 아래에 보인다. 끝난 결과는 지금처럼 대화의 에이전트가 자동 turn 으로 전한다. 자동 결과 전달은 대화 단위다
+- 배포: 마이그레이션이 없다. 옛 화면은 `delegateTo` 를 보내지 않고 새 칸을 무시한다. 새 화면이 옛 서버에 `delegateTo` 를 보내면 옛 서버가 칸을 무시하고 대화의 에이전트로 돈다. 배포는 서버가 먼저다
+
+### 검증 전략
+
+| 요구사항 | 경계와 환경 |
+| --- | --- |
+| REQ7 | backend 통합 테스트: 맡김 보내기가 고른 에이전트의 루트 실행을 새 session 으로 만들고, 답이 그 실행의 `ASSISTANT` 줄로 남고, 대화의 에이전트와 session 이 그대로다. 맡은 에이전트의 입력에 출처 머리줄과 최근 줄, 사용자 글이 실린다. 이력 API 의 `delegatedTo`, `answeredBy`. 거절 표. 대화 에이전트의 다음 turn 입력에 맡김이 실리고, 그다음 turn 에는 다시 실리지 않는다. 다시 만들기 거절. 화면 단위 테스트: `@` 목록의 후보(대화의 에이전트 제외). 브라우저: 메시지가 있는 대화에서 `@` 로 골라 보내면 「나 → 쇼핑 담당에게 맡김」 줄과 맡은 에이전트 이름표의 답이 보이고, 새로 고쳐도 같다. 화면 흐름이 바뀌므로 PR 에 `검사:전체` 라벨 |
+
+배포 뒤 확인: 실제 Hermes 로 맡김 한 번과 그다음 비서 turn 이 맡김을 아는지 왕복한다. 확인 방법은 `fos-home-infra` 가 갖는다.
+
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
@@ -393,11 +553,16 @@ REQ5, REQ6 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 지금 
 | DECISION15 | 떼기의 차례 | `single_binding` 은 붙이기 전, 나머지는 붙인 뒤 | 작성자 | 붙인 뒤에 떼야 붙이기가 실패해도 쓰던 에이전트가 그대로다. `single_binding` 은 떼지 않으면 붙일 수 없다 |
 | DECISION16 | 제안을 띄우는 판정 | 방금 연결을 마쳤고 바인딩이 하나도 없고 `?agent=` 로 오지 않았을 때 | 작성자 | 「처음 준비된 화면」 이 곧 아직 붙지 않은 때다. 기본 비서를 가리는 칸을 새로 두지 않아도 「전문 에이전트가 이미 있으면 띄우지 않는다」 가 지켜진다 |
 | DECISION17 | 떼기 칸의 글 | 지금 붙은 에이전트의 이름으로 「「{이름}」에서는 떼고 맡기기만」. 붙은 곳이 없으면 칸이 없다 | 작성자 | 기본 비서는 이름이 「비서」 라 스펙의 「비서에서는 떼고 맡기기만」 과 뜻이 같고, 다른 에이전트면 「「○○」에서는 떼고 맡기기만」 으로 스펙 REQ6 의 「○○에서 떼기」 를 보인다. 기본 비서 판정 없이 된다. 기본 비서의 이름을 바꿨으면 바꾼 이름으로 보인다 |
+| DECISION18 | `@` 맡김을 돌리는 길 | 대화 turn 을 고른 에이전트와 새 session 으로 한 번 돌린다. `agent_delegate` 의 자식 실행(`ChildExecutionRunner`)을 쓰지 않는다 | 작성자 | 사용자가 보낸 일이라 질문 저장, 흐르는 답, 중지, 대기 메시지, 결과물을 보통 turn 과 같게 받아야 한다. 자식 실행은 답을 대화에 남기지 않고 부모가 있어야 한다 |
+| DECISION19 | 맡김 실행을 가리는 법 | 칸을 두지 않고 「대화의 실행 가운데 부모가 없고 에이전트가 대화의 에이전트와 다른 실행」 으로 정한다. `delegation_key` 는 두지 않는다 | 작성자 | 대화의 에이전트는 바뀌지 않아 다른 루트 실행이 생기지 않는다. `delegation_key` 가 있으면 자동 결과 전달이 비서를 깨운다(spec DECISION20) |
+| DECISION20 | 맡은 에이전트가 받는 앞 대화 | 최근 `USER`·`ASSISTANT` 6줄, 줄마다 1,000자, 출처 머리줄과 `<external-data>` | 작성자 | spec DECISION20 「바로 앞 대화 몇 줄」. 다른 에이전트의 답에 외부 글이 들 수 있고 앞 요청을 다시 하지 않게 한다 |
+| DECISION21 | 비서가 맡김을 아는 길 | 대화 에이전트의 다음 turn 입력 앞에 지난 자기 turn 뒤의 맡김을 머리줄과 함께 싣는다. 최근 5개, 답 2,000자 | 작성자 | 대화 에이전트의 Hermes session 에 맡김이 없다. instructions 는 매 실행 조립이라 기록이 session 에 남지 않는다. 위임 결과 전달과 같은 머리줄이라 모델이 같은 규칙으로 읽는다 |
+| DECISION22 | 응답 중과 사진이 있을 때의 `@` | 응답 중에는 목록을 띄우지 않고, 사진과 함께 맡기지 않는다 | 작성자 | 대기 메시지는 글만 받는다(ADR-048). 사진 판정은 대화의 에이전트로 한다 |
+| DECISION23 | 맡김 답의 다시 만들기 | 막는다 | 작성자 | 다시 만들기는 대화의 에이전트와 session 으로 돈다. 맡김을 다시 하려면 다시 `@` 로 보낸다 |
 
 ## 결정 기록 연결
 
 | 결정 | 종류 | ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | DECISION1 과 할 수 있는 일을 읽을 때 모으기 | architecture | [ADR-20261110 / agent-introduction](../../adr/ADR-20261110-agent-introduction.md). ADR-036 의 소개를 없앤 부분을 대체한다 | [에이전트 팀](../agent-team.md) 의 「소개와 할 수 있는 일」 |
-
-PR4 의 ADR-017 예외는 그 PR 에서 ADR 로 남긴다.
+| DECISION18, DECISION19, DECISION21 | architecture | [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md). ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 | [에이전트 팀](../agent-team.md) 의 「`@` 로 바로 맡기기」 |

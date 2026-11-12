@@ -6,6 +6,7 @@
   경계에 대한 결정은 그대로 둔다.
 - **대체된 부분**: 결과를 모델이 `agent_status` 로 다시 묻는다는 부분은 [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 이 대체했다. 끝난 결과는 Control Plane 이 부모 대화의 다음 turn 을 열어 전한다.
 - **대체된 부분**: 「도구 넷과 한도」 의 「요청자는 MCP 토큰이」 는 [ADR-032](../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 대체했다. 요청자는 서명한 루트 session 으로 찾은 부모 실행의 사용자다.
+- **예외**: 사용자가 대화 중 입력창의 `@` 로 고른 에이전트에게는 Control Plane 이 모델 판단 없이 바로 맡긴다. [ADR-20261112 / mention-delegation](ADR-20261112-mention-delegation.md) 이 갖는다.
 - 2026-09-20 에 실측으로 이 문서의 `agent_delegate` 모양을 고쳤다.
   기다리는 도구에서 번호를 돌려주는 도구로 바꾼 것이다.
   같은 측정에서 ADR-016 의 사실 둘이 이 버전에서 틀린 것도 드러났다.
