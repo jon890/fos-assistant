@@ -80,6 +80,9 @@ covers: `backend/src/main/java/com/bifos/assistant/agent/domain/AgentIntroductio
 
 **기본 비서는 주인이 요청자이고 profile 이 요청자의 기본 profile(`allowed_person.hermes_profile`)인 에이전트다.** 칸을 두지 않는다(`PrimaryAgents`).
 에이전트 지우기는 profile 이 허용 목록의 누군가의 기본 profile 인 에이전트를 주인도 `ADMIN` 도 지우지 못하게 `PRIMARY_AGENT_PROTECTED` 로 거절한다. 그런 에이전트는 첫 로그인이 만든 것뿐이다. 끄기는 관리자 경로에만 있다. 사람을 허용 목록에서 지울 때의 정리는 이 판정을 타지 않는다.
+에이전트 목록 응답(`GET /api/v1/agents`)의 `primary` 가 그 에이전트가 요청자의 기본 비서인지 알려 주고, 상세 화면은 이 값이 참이면 「에이전트 지우기」 단추를 그리지 않고 「기본 비서는 지울 수 없어요.」 를 보인다.
+
+대화방은 지우지 않고 이어 쓰는 대화다. 그 대화에서 바깥 글을 읽는 도구나 맡기기, 사람이 묻지 않은 turn 이 한 번이라도 돌면 그 뒤의 기억은 바로 저장되지 않고 제안으로 남는다. [Memory](memory.md) 의 「바로 저장 판정」 조건 4·5 가 대화 전체를 보기 때문이다. 이 동작은 그대로 두기로 했다.
 
 ### 날이 바뀐 첫 메시지
 

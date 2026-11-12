@@ -29,6 +29,8 @@ type Props = {
   code: string;
   name: string;
   visibility: Visibility;
+  /** 요청자의 기본 비서이면 참이다. 기본 비서는 지울 수 없어 지우기 단추를 그리지 않는다. */
+  primary: boolean;
   /** 에이전트를 지운 뒤 돌아갈 목록 주소다. 일반 화면과 관리자 영역의 목록이 다르다. */
   listHref: string;
   /** 공개 범위를 바꾼 요청이 성공하면 바뀐 값으로 부른다. 그 범위에 따라 달라지는 이웃 절이 받는다. */
@@ -117,6 +119,7 @@ export function AgentAccessSection({
   code,
   name,
   visibility,
+  primary,
   listHref,
   onVisibilityChange,
 }: Props) {
@@ -185,7 +188,9 @@ export function AgentAccessSection({
         <div>
           <h2 className="font-semibold">공개와 삭제</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            그룹에 공개하거나 에이전트를 지울 수 있어요.
+            {primary
+              ? "그룹에 공개할 수 있어요."
+              : "그룹에 공개하거나 에이전트를 지울 수 있어요."}
           </p>
         </div>
         <Badge variant="outline">
@@ -214,15 +219,22 @@ export function AgentAccessSection({
             ? "그룹 공개로 변경"
             : "나만으로 변경"}
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => setConfirming("delete")}
-        >
-          에이전트 지우기
-        </Button>
+        {primary ? null : (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => setConfirming("delete")}
+          >
+            에이전트 지우기
+          </Button>
+        )}
       </div>
+      {primary ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          기본 비서는 지울 수 없어요.
+        </p>
+      ) : null}
       {confirming === "group" ? (
         <VisibilityConfirm
           name={name}

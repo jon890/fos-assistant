@@ -34,6 +34,8 @@ export type AgentView = {
   editable: boolean;
   /** 요청자가 이 에이전트의 주인이다 */
   ownedByMe: boolean;
+  /** 이 에이전트가 요청자의 기본 비서다. 기본 비서는 지울 수 없다. 옛 응답에는 없을 수 있다 */
+  primary?: boolean;
   /** 한 줄 소개. 없으면 null 이다 */
   description?: string | null;
   /** 아이콘 목록(`agent-badge.ts` 의 `AGENT_ICONS`)의 이모지. 없으면 이름 첫 글자를 그린다 */

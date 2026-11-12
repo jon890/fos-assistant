@@ -51,6 +51,8 @@ type Props = {
   adminAgent?: AdminAgent;
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
   canManageAccess: boolean;
+  /** 이 에이전트가 요청자의 기본 비서이면 참이다. 「공개와 삭제」 절이 지우기 단추를 감춘다. */
+  primary?: boolean;
   adminError: string | null;
   /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
   listHref: string;
@@ -96,6 +98,7 @@ export function AgentDetailBody({
   initialVisibility,
   adminAgent,
   canManageAccess,
+  primary = false,
   adminError,
   listHref,
   chatHref = null,
@@ -255,6 +258,7 @@ export function AgentDetailBody({
           code={code}
           name={name}
           visibility={visibility}
+          primary={primary}
           listHref={listHref}
           onVisibilityChange={(next) => void changeVisibility(next)}
         />
