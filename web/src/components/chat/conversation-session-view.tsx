@@ -15,6 +15,7 @@ import { ArtifactPanel } from "./artifact/artifact-panel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
+import { useDelegateTarget } from "./use-delegate-target";
 import type { Props } from "./conversation-session-view-types";
 
 export function ConversationSessionView({
@@ -79,7 +80,23 @@ export function ConversationSessionView({
   skillCommandsEnabled,
   skillNames,
   starters,
+  delegateTo,
+  setDelegateTo,
 }: Props) {
+  // 메시지가 있는 대화의 `@` 는 다음 보내기를 맡을 에이전트를 고른다. 훅이라 이른 반환보다 앞에 둔다.
+  const { delegateAgents, delegating, delegateAgent } = useDelegateTarget({
+    agents,
+    conversationAgentCode: currentConversation?.agentCode ?? agentCode,
+    enabled:
+      !startScreen &&
+      conversationId !== null &&
+      !sending &&
+      !agentMissing &&
+      !pending.queue.held,
+    delegateTo,
+    setDelegateTo,
+  });
+
   if (notFound) {
     return (
       <section
@@ -296,7 +313,10 @@ export function ConversationSessionView({
             disabled={conversationId === null && agents.length === 0}
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
-            acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
+            // 맡김은 사진을 함께 보내지 않는다(design.md 의 DECISION22).
+            acceptsAttachments={
+              (currentAgent?.acceptsAttachments ?? false) && !delegateAgent
+            }
             ensureConversation={ensureConversation}
             running={sending}
             // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
@@ -308,9 +328,17 @@ export function ConversationSessionView({
             mention={
               startScreen && !agentLocked && agents.length > 0
                 ? { agents, onPick: onAgentCodeChange }
+                : delegating
+                  ? { agents: delegateAgents, onPick: setDelegateTo }
+                  : undefined
+            }
+            delegateTarget={
+              delegateAgent
+                ? { agent: delegateAgent, onClear: () => setDelegateTo(null) }
                 : undefined
             }
-            skillNames={skillNames}
+            // 맡길 에이전트를 골랐으면 대화 에이전트의 스킬을 띄우지 않는다. 맡김 글은 커맨드로 판별하지 않는다.
+            skillNames={delegateAgent ? undefined : skillNames}
             onBlockingChange={setComposerBlocking}
             modelChoiceUnknown={
               conversationId !== null && currentConversation === undefined

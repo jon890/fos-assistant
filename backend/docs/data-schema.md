@@ -567,7 +567,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 - `conversation_id` 가 비면 대화 밖에서 돈 실행이다. 추천 질문을 만드는 실행과 옛 시스템 판단 실행이 그렇다. 옛 시스템 판단 실행은 시스템 profile 로 돌아 `agent_id` 도 비어 있다. 시작하는 코드는 지웠고 옛 줄만 남았다
 - `retry_of_execution_id` 는 지금 채우는 경로가 없어 늘 비어 있다
-- `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고, 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
+- `hermes_session_id` 는 대화 turn 이면 그 대화의 루트 session 이고(`@` 맡김 turn 은 새 `fos-<uuid>`), 흐름의 하위 실행과 위임한 자식이면 Control Plane 이 정한 `fos-<uuid>` 다. 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다
 - `delegation_key` 는 `agent_delegate` 로 만든 실행만 채우고 유일하다. 같은 호출이 다시 와도 실행을 하나만 만든다. `output_text` 도 이 실행만 채우고, 대화 답은 `chat_message` 가 갖는다
 - `output_key_id` 가 비어 있으면 `output_text` 는 평문이다. 있으면 그 데이터 key 의 암호문이고 AAD 는 `agent_execution:<id>:output:user:<user_id>` 다. 외래 키를 두지 않는다. 읽는 곳은 엔티티의 `outputText()` 가 아니라 `ExecutionOutputs.open` 을 쓰고, 풀지 못하면 null 이 아니라 읽을 수 없다는 글을 받는다. 대화 purge 는 두 칸을 함께 NULL 로 비운다
 - `provider` 와 `model` 은 Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다

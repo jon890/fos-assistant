@@ -16,6 +16,7 @@ type Context = Pick<
   | "sending"
   | "draft"
   | "setPendingBusy"
+  | "delegateTo"
 > &
   Pick<ConversationSend, "send">;
 
@@ -29,6 +30,7 @@ export function useConversationQueue({
   sending,
   draft,
   setPendingBusy,
+  delegateTo,
   send,
 }: Context) {
   /**
@@ -98,6 +100,11 @@ export function useConversationQueue({
   ): Promise<boolean> {
     if (!sending && !pending.queue.held)
       return send(attachmentIds, replacementText, attachments);
+    if (delegateTo !== null) {
+      // 대기 메시지는 대화의 에이전트에게 가고 글만 받는다. 맡김을 그 줄에 넣지 않는다.
+      setError("답이 끝나고 대기 메시지를 보낸 뒤에 맡길 수 있어요.");
+      return false;
+    }
     if (attachmentIds.length > 0) {
       // 답이 오는 동안은 사진 첨부가 잠겨 있다. 여기 오는 것은 멈춰 둔 대기 줄이 있을 때 사진을 붙인 경우다.
       if (!sending)

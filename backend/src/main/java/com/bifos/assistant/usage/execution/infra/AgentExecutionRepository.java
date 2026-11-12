@@ -262,6 +262,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     List<AgentExecution> findByParentExecutionIdInAndDelegationKeyIsNotNullOrderByIdAsc(Collection<Long> parentIds);
 
 
+    /** 대화의 {@code @} 맡김 실행이다. 부모가 없고 에이전트가 대화의 에이전트와 다르다(ADR-20261112 / mention-delegation). */
+    List<AgentExecution> findByConversationIdAndParentExecutionIdIsNullAndAgentIdNotOrderByIdAsc(Long conversationId, Long agentId);
+
+
     /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
     @Query("""
             select distinct e.parentExecutionId from AgentExecution e

@@ -53,6 +53,7 @@ class ChatTurnRunner {
     private final ChatRunEvents chatRunEvents;
     private final AgentToolService agentTools;
     private final ChatTurnStopper chatTurnStopper;
+    private final MentionInputs mentionInputs;
 
 
     /**
@@ -83,6 +84,8 @@ class ChatTurnRunner {
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
+            // 질문을 저장하기 전에 읽는다. 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문 앞까지다.
+            String lead = mentionInputs.lead(conversation, intent);
             Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
@@ -90,7 +93,7 @@ class ChatTurnRunner {
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
             AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked);
-            String input = artifacts.agentPreamble(conversation) + agentInput.text();
+            String input = artifacts.agentPreamble(conversation) + lead + agentInput.text();
             // 사용자가 보낸 글만 질문으로 넘긴다. 자동 turn 의 글은 Control Plane 이 정한 것이라 기억을 고르는 데 쓰지 않는다
             AssembledContext context = contextAssembler.assemble(user, routed.agent().id(), questionOf(intent, text));
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-20261007 / memory-remember)
@@ -120,6 +123,8 @@ class ChatTurnRunner {
                     requestReceivedAt,
                     onEvent);
                 String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
+                // 실패한 실행에도 질문을 잇는다. 맡김이면 이 연결로 맡김 질문을 가리고 다음 turn 에 실패로 싣는다.
+                chatTurnLifecycle.recordQuestion(failed.execution().id(), questionId);
                 executions.fail(failed.execution(), code);
                 chatRunEvents.append(failed, ExecutionEventType.RUN_FAILED, code);
                 throw ex;
@@ -157,7 +162,9 @@ class ChatTurnRunner {
             String runId = null;
             HermesRunResult result;
             try {
-                if (attachments.allOf(conversation.id()).stream().anyMatch(photo -> photo.messageId() != null)) {
+                // 맡김은 사진을 싣지 않는다. 맡은 에이전트에 사진 도구를 붙이지 않는다.
+                if (!(intent instanceof TurnIntent.Mention)
+                    && attachments.allOf(conversation.id()).stream().anyMatch(photo -> photo.messageId() != null)) {
                     try {
                         agentTools.ensureAttachmentInspection(routed.agent());
                     } catch (RuntimeException ex) {
@@ -203,9 +210,11 @@ class ChatTurnRunner {
     }
 
 
-    /** 질문과 관련된 기억을 고를 글이다. 사용자가 보낸 turn 과 그 다시 생성만 글을 넘긴다. */
+    /** 질문과 관련된 기억을 고를 글이다. 사용자가 보낸 turn, 그 다시 생성, {@code @} 맡김만 글을 넘긴다. */
     static String questionOf(TurnIntent intent, String text) {
-        return intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Regenerate ? text : null;
+        return intent instanceof TurnIntent.Fresh
+            || intent instanceof TurnIntent.Regenerate
+            || intent instanceof TurnIntent.Mention ? text : null;
     }
 
 

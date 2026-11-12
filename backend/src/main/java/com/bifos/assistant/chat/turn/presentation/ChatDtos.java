@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.presentation;
 
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
@@ -31,11 +32,24 @@ public final class ChatDtos {
      * @param attachmentIds 이 메시지와 함께 보낼 첨부 번호들. 화면이 비워 보내든 빼고 보내든 같게 다루려고
      * null 을 빈 목록으로 바꾼다
      */
+    /**
+     * @param delegateTo 대화 중 {@code @} 로 고른 에이전트의 코드. 있으면 대화의 에이전트 대신 그 에이전트에게 바로 맡긴다
+     * (ADR-20261112 / mention-delegation). 비었으면 보통 보내기다
+     */
     public record SendMessageRequest(
-        UUID conversationId, @NotBlank @Size(max = 8000) String text, String agentCode, List<Long> attachmentIds) {
+        UUID conversationId,
+        @NotBlank @Size(max = 8000) String text,
+        String agentCode,
+        List<Long> attachmentIds,
+        @Size(max = 64) String delegateTo) {
 
         public SendMessageRequest {
             attachmentIds = attachmentIds == null ? List.of() : attachmentIds;
+        }
+
+
+        public SendMessageRequest(UUID conversationId, String text, String agentCode, List<Long> attachmentIds) {
+            this(conversationId, text, agentCode, attachmentIds, null);
         }
     }
 
@@ -59,6 +73,8 @@ public final class ChatDtos {
      * @param delivery 이 알림 줄이 묶음의 마지막 시도의 마지막 알림 줄이면 그 묶음의 번호와 상태. 아니면 null
      * @param delegations 이 답의 실행이 바로 맡긴 위임. 실행 번호순이다. 답이 아니거나 맡긴 것이 없으면 빈 목록
      * @param deliveredResults 이 위임 결과 알림 줄이 전한 결과. 묶음의 항목 순서다. 그런 알림 줄이 아니면 빈 목록
+     * @param answeredBy {@code @} 로 맡긴 일의 답이면 맡은 에이전트의 이름표. 대화의 에이전트가 쓴 답과 답이 아닌 줄은 null
+     * @param delegatedTo {@code @} 로 맡긴 질문이면 그 맡김. 부모 실행 번호는 비어 있다. 아니면 null
      */
     public record MessageView(
         Long id,
@@ -77,7 +93,9 @@ public final class ChatDtos {
         DeliveryView delivery,
         SourceReadSummary sourceReads,
         List<DelegationLine> delegations,
-        List<DelegationLine> deliveredResults) {
+        List<DelegationLine> deliveredResults,
+        AgentLabel answeredBy,
+        DelegationLine delegatedTo) {
     }
 
     /**
