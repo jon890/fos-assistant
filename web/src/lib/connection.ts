@@ -67,6 +67,8 @@ export type ConnectorSummary = {
   ownerBrowserLoginUrl: string | null;
   /** `assistant.json` 이 없는 표준 플러그인인가. 그 도구는 모두 쓸 때마다 확인한다. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
   standardPlugin: boolean;
+  /** 연결 하나를 에이전트 하나에만 붙이는가. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
+  singleBinding?: boolean;
 };
 
 export type ConnectorOption = { value: string; label: string };
@@ -138,6 +140,9 @@ export const CONNECTION_ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: "이 작업을 관리할 수 없어요.",
   UNAUTHENTICATED: "로그인이 필요해요.",
   VALIDATION_FAILED: "입력 형식을 확인해 주세요.",
+  AGENT_LIMIT_REACHED: "에이전트는 5개까지 만들 수 있어요",
+  HERMES_PROVISION_FAILED: "에이전트를 만들지 못했어요. 다시 시도해 주세요.",
+  HERMES_UNAVAILABLE: "에이전트 서버에 닿지 못했어요. 잠시 뒤 다시 해 주세요.",
 };
 
 const FALLBACK_MESSAGE = "요청을 처리하지 못했어요.";
