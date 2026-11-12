@@ -41,16 +41,20 @@ export type NotificationEvent = {
 /** 알림에서 들어와 화면 넘기기 패널을 열라는 주소 검색어다. */
 export const HANDOFF_ENTRY_PARAM = "handoff";
 export const HANDOFF_ENTRY_OPEN = "open";
+/** 승인 알림에서 들어와 「할 일」 탭을 열라는 주소 검색어다. 값은 `HANDOFF_ENTRY_OPEN` 과 같은 `open` 이다. */
+export const TODO_ENTRY_PARAM = "todo";
 
 /** 알림을 누르면 갈 주소다. 갈 곳이 없으면 null 이다 */
 export function notificationHref(view: NotificationView): string | null {
   if (view.targetType === "ADMIN_CONNECTIONS") return "/admin/connections";
   if (view.targetType === "CONNECTIONS") return "/connections";
   if (view.targetType === "CONVERSATION" && view.targetId) {
-    // 화면 넘기기 알림은 그 대화의 「내 브라우저」 패널을 연다. 대화 화면이 읽고 주소에서 지운다.
-    return view.kind === "HANDOFF_REQUESTED"
-      ? `/chat/${view.targetId}?${HANDOFF_ENTRY_PARAM}=${HANDOFF_ENTRY_OPEN}`
-      : `/chat/${view.targetId}`;
+    // 화면 넘기기 알림은 그 대화의 「내 브라우저」 탭을, 승인 알림은 「할 일」 탭을 연다. 대화 화면이 읽고 주소에서 지운다.
+    if (view.kind === "HANDOFF_REQUESTED")
+      return `/chat/${view.targetId}?${HANDOFF_ENTRY_PARAM}=${HANDOFF_ENTRY_OPEN}`;
+    if (view.kind === "APPROVAL_REQUESTED")
+      return `/chat/${view.targetId}?${TODO_ENTRY_PARAM}=${HANDOFF_ENTRY_OPEN}`;
+    return `/chat/${view.targetId}`;
   }
   if (view.targetType === "TASK" && view.targetId) {
     return `/tasks/${view.targetId}`;
