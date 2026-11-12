@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
+import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.conversation.application.dto.ConversationPage;
@@ -111,7 +112,8 @@ public class ChatController {
             numberOf(user, request.conversationId()),
             request.text(),
             request.agentCode(),
-            request.attachmentIds());
+            request.attachmentIds(),
+            request.delegateTo());
         return new SendMessageResponse(turn.conversationPublicId(), turn.executionId(), turn.assistantText());
     }
 
@@ -135,6 +137,7 @@ public class ChatController {
             request.text(),
             request.agentCode(),
             request.attachmentIds(),
+            request.delegateTo(),
             event -> event.forViewer(user).ifPresent(send)));
     }
 
@@ -337,6 +340,7 @@ public class ChatController {
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);
         Map<Long, List<DelegationLine>> deliveredResults = chat.deliveredResults(user, number);
+        MentionMarks mentions = chat.mentionMarks(user, number);
         return history.stream()
             .map(it -> new MessageView(
                 it.id(),
@@ -364,7 +368,11 @@ public class ChatController {
                 it.role() == MessageRole.ASSISTANT && it.executionId() != null
                     ? delegations.getOrDefault(it.executionId(), List.of())
                     : List.of(),
-                it.role() == MessageRole.SYSTEM ? deliveredResults.getOrDefault(it.id(), List.of()) : List.of()))
+                it.role() == MessageRole.SYSTEM ? deliveredResults.getOrDefault(it.id(), List.of()) : List.of(),
+                it.role() == MessageRole.ASSISTANT && it.executionId() != null
+                    ? mentions.answers().get(it.executionId())
+                    : null,
+                it.role() == MessageRole.USER ? mentions.questions().get(it.id()) : null))
             .toList();
     }
 

@@ -100,6 +100,57 @@ class ChatTurnRouting {
     }
 
 
+    /** 보내기 요청의 대화와 에이전트다. 맡길 에이전트가 있으면 {@link #routeMention}, 없으면 {@link #route} 다. */
+    Routed routeSend(
+        CurrentUser user,
+        Long conversationId,
+        String text,
+        String agentCode,
+        List<Long> attachmentIds,
+        String delegateTo) {
+        if (delegateTo == null || delegateTo.isBlank()) {
+            return route(user, conversationId, text, agentCode, attachmentIds);
+        }
+        return routeMention(user, conversationId, delegateTo, attachmentIds);
+    }
+
+
+    /**
+     * 사용자가 {@code @} 로 고른 에이전트에게 바로 맡길 turn 의 대화와 에이전트를 정한다(ADR-20261112 / mention-delegation).
+     *
+     * <p>맡김은 메시지가 하나라도 있는 대화에서만 받는다(spec DECISION21). 맡을 에이전트는 요청자가 쓸 수 있고 켜진 에이전트만
+     * 받는다. 요청 본문이 고르지만 새 대화의 {@code agentCode} 와 같은 판정이다. 사진은 함께 받지 않고, 글은 스킬 커맨드로
+     * 판별하지 않는다. 거절은 모두 아무것도 저장하기 전에 한다.
+     *
+     * @throws ApiException {@code VALIDATION_FAILED}(대화가 없거나 비었다, 사진이 있다, 대화의 에이전트 자신이다),
+     * {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_NOT_FOUND}
+     */
+    Routed routeMention(
+        CurrentUser user, Long conversationId, String delegateTo, List<Long> attachmentIds) {
+        Instant requestReceivedAt = clock.instant();
+        if (conversationId == null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs an existing conversation");
+        }
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation does not take attachments");
+        }
+        Conversation conversation = access.requireOwn(user, conversationId);
+        Agent own = agents.requireById(conversation.agentId());
+        // 지운 에이전트의 대화는 읽기만 된다. 보통 보내기와 같은 오류다.
+        if (own.isDeleted()) {
+            throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
+        }
+        if (!messages.existsByConversationId(conversation.id())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs a conversation with messages");
+        }
+        Agent target = agents.requireStartable(user, delegateTo);
+        if (Objects.equals(target.id(), conversation.agentId())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "a delegation needs another agent");
+        }
+        return new Routed(conversation, target, List.of(), null, requestReceivedAt, false);
+    }
+
+
     /**
      * 그 대화의 turn 잠금과 사용자 자리를 얻는다.
      *
@@ -234,10 +285,11 @@ class ChatTurnRouting {
         if (intent instanceof TurnIntent.Regenerate regenerate) {
             return regenerate.question() == null ? null : regenerate.question().id();
         }
-        if (!(intent instanceof TurnIntent.Fresh fresh)) {
+        if (!(intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Mention)) {
             return null;
         }
-        List<Long> pendingIds = fresh.pendingIds();
+        // 맡김 질문은 사용자가 바로 보낸 질문과 같게 저장한다. 대기 줄에서 꺼내지 않는다.
+        List<Long> pendingIds = intent instanceof TurnIntent.Fresh fresh ? fresh.pendingIds() : List.of();
         ChatMessage question = transactions.execute(status -> {
             fillBlankTitle(conversation, text);
             ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));

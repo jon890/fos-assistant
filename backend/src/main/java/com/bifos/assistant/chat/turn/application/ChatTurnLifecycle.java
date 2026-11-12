@@ -87,7 +87,8 @@ class ChatTurnLifecycle {
         Consumer<ChatEvent> onEvent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
-        RunSession session = sessions.ensure(conversation);
+        // 맡김은 대화의 session 을 잇지 않는다. 대화 에이전트의 session 에 다른 에이전트의 turn 이 섞이지 않게 한다.
+        RunSession session = intent instanceof TurnIntent.Mention ? RunSession.fresh() : sessions.ensure(conversation);
         HermesRunCommand command = new HermesRunCommand(
             agent.hermesProfile(),
             agent.apiBaseUrl(),
@@ -173,11 +174,14 @@ class ChatTurnLifecycle {
 
     ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         Instant now = clock.instant();
-        pending.conversation().rememberSession(result.sessionId(), now);
-        conversationWriter.touchSession(
-            pending.conversation().id(),
-            result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-            now);
+        boolean mention = pending.intent() instanceof TurnIntent.Mention;
+        if (!mention) {
+            pending.conversation().rememberSession(result.sessionId(), now);
+            conversationWriter.touchSession(
+                pending.conversation().id(),
+                result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
+                now);
+        }
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         chatRunEvents.append(pending, ExecutionEventType.RUN_COMPLETED, null);
@@ -186,7 +190,10 @@ class ChatTurnLifecycle {
             return finishCheck(pending, proactive.check(), execution.id(), answer);
         }
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
-        starterSuggestions.refreshIfStale(pending.user(), pending.agent());
+        // 추천 질문은 대화 에이전트와의 이력으로 만든다. 맡김으로는 다시 만들지 않는다.
+        if (!mention) {
+            starterSuggestions.refreshIfStale(pending.user(), pending.agent());
+        }
         return new ChatTurn(
             pending.conversation().id(),
             pending.conversation().publicId(),
@@ -241,7 +248,10 @@ class ChatTurnLifecycle {
                 .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
-        if (result != null && result.sessionId() != null && !result.sessionId().isBlank()) {
+        if (result != null
+            && result.sessionId() != null
+            && !result.sessionId().isBlank()
+            && !(pending.intent() instanceof TurnIntent.Mention)) {
             Instant now = clock.instant();
             pending.conversation().rememberSession(result.sessionId(), now);
             conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), now);

@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
+import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
@@ -78,6 +79,7 @@ public class ChatService {
     private final ChatConversationQueries chatConversationQueries;
     private final ChatConversationManagement chatConversationManagement;
     private final DelegationLines delegationLines;
+    private final MentionLines mentionLines;
 
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
@@ -92,31 +94,41 @@ public class ChatService {
      */
     public ChatTurn send(
         CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
-        Routed routed = chatTurnRouting.route(user, conversationId, text, agentCode, attachmentIds);
-        return chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {
+        return send(user, conversationId, text, agentCode, attachmentIds, null);
+    }
+
+
+    /** {@code delegateTo} 가 있으면 그 에이전트에게 바로 맡긴다(ADR-20261112 / mention-delegation). */
+    public ChatTurn send(
+        CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds, String delegateTo) {
+        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo);
+        return chatTurnRunner.runTurn(user, routed, text, TurnIntent.forSend(delegateTo), event -> {
         }, false, null);
     }
 
 
     public void stream(
         CurrentUser user, Long conversationId, String text, String agentCode, Consumer<ChatEvent> onEvent) {
-        stream(user, conversationId, text, agentCode, List.of(), onEvent);
+        stream(user, conversationId, text, agentCode, List.of(), null, onEvent);
     }
 
 
+    /** {@link #send(CurrentUser, Long, String, String, List, String)} 의 흐르는 경로다. */
     public void stream(
         CurrentUser user,
         Long conversationId,
         String text,
         String agentCode,
         List<Long> attachmentIds,
+        String delegateTo,
         Consumer<ChatEvent> onEvent) {
-        Routed routed = chatTurnRouting.route(user, conversationId, text, agentCode, attachmentIds);
+        Routed routed = chatTurnRouting.routeSend(user, conversationId, text, agentCode, attachmentIds, delegateTo);
+        TurnIntent intent = TurnIntent.forSend(delegateTo);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
         TurnHandle handle = chatTurnRouting.openTurn(user, routed);
         try {
-            ChatTurn turn = chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
+            ChatTurn turn = chatTurnRunner.runTurn(user, routed, text, intent, onEvent, true, handle);
             onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
             turns.close(handle);
@@ -285,6 +297,7 @@ public class ChatService {
             if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
+            mentionLines.requireRegenerable(conversation, previousAnswer, question);
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
                 .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
                 .toList();
@@ -334,6 +347,13 @@ public class ChatService {
      */
     public Map<Long, List<DelegationLine>> deliveredResults(CurrentUser user, Long conversationId) {
         return delegationLines.byResultNotice(user, conversationId);
+    }
+
+
+    /** 이력의 질문 줄과 답 줄에 붙일 {@code @} 맡김 값이다. 주인을 확인한 대화 번호로 부른다. */
+    @Transactional(readOnly = true)
+    public MentionMarks mentionMarks(CurrentUser user, Long conversationId) {
+        return mentionLines.marks(access.requireOwn(user, conversationId));
     }
 
 

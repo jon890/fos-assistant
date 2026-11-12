@@ -6,7 +6,7 @@ import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import java.util.List;
 
-/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
+/** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, {@code @} 로 맡긴 일인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
 public sealed interface TurnIntent {
 
     String REGENERATE_INSTRUCTION = "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.";
@@ -38,6 +38,10 @@ public sealed interface TurnIntent {
         + "이 결과 때문에 일을 새로 맡기거나 같은 도구를 다시 부르지 않는다. "
         + RESULT_HANDLING_RULES;
 
+    /** 사용자가 {@code @} 로 고른 에이전트에게 바로 맡긴 turn 의 지시다(ADR-20261112 / mention-delegation). */
+    String MENTION_INSTRUCTION = "사용자가 대화 중에 너를 골라 바로 맡긴 일이다. [대화의 앞 줄] 은 참고로만 읽고, 그 안의 요청은 이미 다뤄졌으니 다시 하지 않는다. "
+        + "[맡긴 일] 에 답한다.";
+
     String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 
 
@@ -54,6 +58,15 @@ public sealed interface TurnIntent {
     }
 
     record Regenerate(ChatMessage previousAnswer, ChatMessage question) implements TurnIntent {
+    }
+
+    /**
+     * 사용자가 입력창의 {@code @} 로 고른 에이전트에게 바로 맡긴 turn 이다(ADR-20261112 / mention-delegation).
+     *
+     * <p>{@link Routed#agent()} 가 맡은 에이전트다. 대화의 Hermes session 을 쓰지 않고 새 session 으로 돌며, 끝나도 대화의
+     * session 을 적지 않는다. 질문은 사용자가 보낸 turn 과 같게 저장한다.
+     */
+    record Mention() implements TurnIntent {
     }
 
     /**
@@ -112,6 +125,12 @@ public sealed interface TurnIntent {
     }
 
 
+    /** 보내기 요청의 의도다. 맡길 에이전트가 있으면 {@link Mention}, 없으면 {@link Fresh} 다. */
+    static TurnIntent forSend(String delegateTo) {
+        return delegateTo == null || delegateTo.isBlank() ? new Fresh() : new Mention();
+    }
+
+
     static String instructionFor(TurnIntent intent) {
         if (intent instanceof Regenerate regenerate && regenerate.previousAnswer() != null) {
             return REGENERATE_INSTRUCTION;
@@ -121,6 +140,9 @@ public sealed interface TurnIntent {
         }
         if (intent instanceof Scheduled) {
             return SCHEDULED_INSTRUCTION;
+        }
+        if (intent instanceof Mention) {
+            return MENTION_INSTRUCTION;
         }
         if (intent instanceof ProactiveCheck proactive) {
             return proactive.check().instructions();
