@@ -79,6 +79,10 @@ public class ResultDelivery extends CreatedAtEntity {
     @Column(name = "last_attempt_finished_at")
     private Instant lastAttemptFinishedAt;
 
+    /** 첫 시도가 저장한 위임 결과 알림 줄이다. 위임 결과가 없는 묶음이나 이 칸 전에 만든 묶음은 비어 있다. 다시 전달은 바꾸지 않는다. */
+    @Column(name = "delegation_notice_message_id")
+    private Long delegationNoticeMessageId;
+
 
     private ResultDelivery(Long conversationId, String itemsJson, Long noticeMessageId, Instant now) {
         this.conversationId = conversationId;
@@ -100,5 +104,18 @@ public class ResultDelivery extends CreatedAtEntity {
      */
     public static ResultDelivery opened(Long conversationId, String itemsJson, Long noticeMessageId, Instant now) {
         return new ResultDelivery(conversationId, itemsJson, noticeMessageId, now);
+    }
+
+
+    /**
+     * 위임 결과 알림 줄을 함께 적은 첫 시도의 묶음이다.
+     *
+     * @param delegationNoticeMessageId 첫 시도가 저장한 위임 결과 알림 줄. 위임 결과가 없으면 null
+     */
+    public static ResultDelivery opened(
+        Long conversationId, String itemsJson, Long noticeMessageId, Long delegationNoticeMessageId, Instant now) {
+        ResultDelivery delivery = new ResultDelivery(conversationId, itemsJson, noticeMessageId, now);
+        delivery.delegationNoticeMessageId = delegationNoticeMessageId;
+        return delivery;
     }
 }

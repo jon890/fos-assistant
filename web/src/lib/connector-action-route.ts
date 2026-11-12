@@ -1,3 +1,4 @@
+import type { AgentLabel } from "@/lib/delegation";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api-response";
 import { callControlPlane } from "@/lib/control-plane";
@@ -160,6 +161,19 @@ function safeAction(value: unknown): ConnectorAction {
     financial: item.financial == null ? null : safeFinancial(item.financial),
     limitChange:
       item.limitChange == null ? null : safeLimitChange(item.limitChange),
+    requestedBy:
+      item.requestedBy == null ? null : safeAgentLabel(item.requestedBy),
+  };
+}
+
+/** 요청한 에이전트의 이름표다. 네 칸이 모두 비면 지운 에이전트다. */
+function safeAgentLabel(value: unknown): AgentLabel {
+  const label = record(value);
+  return {
+    code: nullableText(label.code),
+    name: nullableText(label.name),
+    icon: nullableText(label.icon),
+    color: nullableText(label.color),
   };
 }
 

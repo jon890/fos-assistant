@@ -47,6 +47,7 @@ export function ConversationSessionView({
   setOutgoing,
   setDraft,
   executionId,
+  liveDelegations,
   stopRequested,
   setComposerBlocking,
   replace,
@@ -156,6 +157,8 @@ export function ConversationSessionView({
         {startScreen ? null : (
           <MessageList
             turns={turns}
+            liveDelegations={liveDelegations}
+            liveExecutionId={executionId}
             outgoing={outgoing}
             loading={messagesLoading}
             sending={sending}

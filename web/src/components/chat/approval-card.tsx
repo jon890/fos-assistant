@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Notice } from "@/components/ui/notice";
 import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
+import { RequestedBy } from "@/components/chat/delegation-lines";
 import {
   approvalBlocked,
   financialView,
@@ -305,6 +306,9 @@ export function ApprovalCard({
           </p>
         </>
       )}
+      {action.requestedBy ? (
+        <RequestedBy label={action.requestedBy} grouped={grouped} />
+      ) : null}
       <ApprovalContent action={action} />
       {action.status === "PENDING" ? (
         <div className="flex flex-wrap items-center gap-2">
