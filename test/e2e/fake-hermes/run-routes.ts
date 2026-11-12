@@ -31,6 +31,7 @@ import {
   FOLLOW_UP_PROPOSE_PROBE,
   CONNECTOR_TOOL_PROBE,
   withoutAskGuide,
+  withoutDelegationTargets,
   withoutResponseGuide,
   PROACTIVE_CHECK_CALL,
   defaultProactiveOutput,
@@ -165,7 +166,7 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           });
           return send(response, 200, { run_id: runId, status: "queued" });
         }
-        const echoed = withoutAskGuide(withoutResponseGuide(submitted.instructions ?? ""));
+        const echoed = withoutDelegationTargets(withoutAskGuide(withoutResponseGuide(submitted.instructions ?? "")));
         const instructionsEcho = echoed.length > 0 ? ` [instructions: ${echoed}]` : "";
         // 살펴보기 실행은 넣어 둔 각본 하나를 가져간다. 각본이 없으면 기본 답을 준다.
         const proactiveRun = !starterRun && input.includes(PROACTIVE_CHECK_CALL);

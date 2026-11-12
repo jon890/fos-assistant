@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FAKE_DASHBOARD_TOKEN, startFakeHermes } from "../fake-hermes.ts";
 import { readFileSync } from "node:fs";
-import { MODEL_GUIDE_HEADERS, withoutResponseGuide } from "../fake-hermes/scenario-fixtures.ts";
+import {
+  DELEGATION_TARGETS_HEADER,
+  DELEGATION_TARGETS_TRUNCATED,
+  MODEL_GUIDE_HEADERS,
+  withoutDelegationTargets,
+  withoutResponseGuide,
+} from "../fake-hermes/scenario-fixtures.ts";
 
 const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
 const TOOL_CALL_GUIDE = "# 도구 호출\n\n로컬 MCP 도구 단건 호출 안내";
@@ -30,6 +36,32 @@ test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상�
   });
 
   assert.deepEqual(headers, [...MODEL_GUIDE_HEADERS]);
+});
+
+const DELEGATION_TARGETS = new URL(
+  "../../../backend/src/main/java/com/bifos/assistant/chat/turn/application/DelegationTargetsInstructions.java",
+  import.meta.url,
+);
+
+test("맡길 수 있는 에이전트 구역만 빼고 앞뒤 글은 보존한다", () => {
+  const section = [
+    `${DELEGATION_TARGETS_HEADER}\n\n규칙 첫 줄\n규칙 둘째 줄`,
+    `- [a1] 쇼핑 담당: 쇼핑 일을 맡아요 (서비스: 쇼핑)\n- [a2] 메모\n${DELEGATION_TARGETS_TRUNCATED}`,
+  ].join("\n\n");
+
+  assert.equal(withoutDelegationTargets([MEMORY_BODY, section, "다시 생성 지시"].join("\n\n")), `${MEMORY_BODY}\n\n다시 생성 지시`);
+  assert.equal(withoutDelegationTargets([MEMORY_BODY, section].join("\n\n")), MEMORY_BODY);
+  assert.equal(withoutDelegationTargets(section), "");
+  assert.equal(withoutDelegationTargets(MEMORY_BODY), MEMORY_BODY);
+});
+
+test("대역이 빼는 맡길 곳 구역의 제목과 안내 줄은 Control Plane 의 상수와 같다", () => {
+  const source = readFileSync(DELEGATION_TARGETS, "utf8");
+  const header = /HEADER = """\s*(# \S.*)$/m.exec(source);
+  const truncated = /TRUNCATED = "([^"]+)"/.exec(source);
+
+  assert.equal(header?.[1]?.trim(), DELEGATION_TARGETS_HEADER);
+  assert.equal(truncated?.[1], DELEGATION_TARGETS_TRUNCATED);
 });
 
 test("도구 호출 또는 기억 지침이 없는 답변 형식도 Memory 본문을 보존한다", () => {

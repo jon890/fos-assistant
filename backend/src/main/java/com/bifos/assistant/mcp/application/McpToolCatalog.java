@@ -67,14 +67,14 @@ public class McpToolCatalog {
                 "name",
                 "agent_list",
                 "description",
-                "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code, 이름, 한 줄 소개(description), 붙은 서비스(connectors), 스킬(skills)을 읽는다. 소개와 서비스, 스킬을 보고 맡길 에이전트를 고른다. 비어 있는 칸은 빠진다.",
+                "지금 묻는 사람이 일을 맡길 수 있는 에이전트의 code, 이름, 한 줄 소개(description), 붙은 서비스(connectors), 스킬(skills)을 읽는다. 소개와 서비스, 스킬을 보고 맡길 에이전트를 고른다. 시킨 일의 서비스 도구가 내 도구에 없으면 다른 도구로 대신 하기 전에 이것을 불러 그 서비스가 붙은 에이전트가 있는지 본다. 비어 있는 칸은 빠진다.",
                 "inputSchema",
                 Map.of("type", "object", "additionalProperties", false, "properties", Map.of())),
             Map.of(
                 "name",
                 "agent_delegate",
                 "description",
-                "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 로 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
+                "다른 에이전트에게 일을 맡기고 실행 번호를 바로 돌려받는다. 끝날 때까지 기다리지 않는다. agent_code 에는 agent_list 나 지시문의 「맡길 수 있는 에이전트」 구역에서 받은 code 를, task 에는 그 에이전트에게 줄 지시를 넣는다. 맡긴 뒤 남은 일을 계속하고, 할 일이 끝나면 맡긴 일을 알리고 답을 마친다. 맡긴 일이 끝나면 그 결과가 이 대화의 다음 차례에 자동으로 전달된다.",
                 "inputSchema",
                 Map.of(
                     "type",
