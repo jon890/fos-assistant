@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 플러그인이 사람에게 화면을 넘긴 호출을 판정 줄에 적고, 알림과 대화의 카드를 내고, 다음 turn 이 시작되면 닫는다.
+ * 플러그인이 사람에게 화면을 넘긴 호출을 판정 줄에 적고, 알림과 대화의 카드를 내고, 사람이 다음 turn 을 시작하면 닫는다.
  *
  * <p>흐름은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 서비스 이름을 모른다.
  */
@@ -106,12 +106,15 @@ public class ConnectorHandoffs {
 
 
     /**
-     * 그 대화의 새 turn 이 시작되면 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 트랜잭션 안에서 났으면 커밋한 뒤, 밖에서 났으면
-     * 바로 새 트랜잭션에서 돈다. 예외는 사건을 낸 쪽이 받아 로그만 남기므로 닫지 못해도 turn 은 잇는다. 카드가 남을 뿐이다.
+     * 그 대화에서 사람이 보낸 turn 이 시작되면 열린 넘기기를 닫고 그 알림을 읽음으로 바꾼다. 결과 전달 같은 자동 turn 은
+     * 사용자가 보기 전이라 닫지 않는다. 트랜잭션 안에서 났으면 커밋한 뒤, 밖에서 났으면 바로 새 트랜잭션에서 돈다. 예외는 사건을 낸 쪽이 받아 로그만 남기므로 닫지 못해도 turn 은 잇는다. 카드가 남을 뿐이다.
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onTurnStarted(ConversationTurnStarted event) {
+        if (!event.byUser()) {
+            return;
+        }
         List<ConnectorAction> open = handoffs.findOpenInConversation(event.conversationId());
         if (open.isEmpty()) {
             return;
