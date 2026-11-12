@@ -10,6 +10,7 @@ import {
   type AgentLabel,
   type DelegationLine,
 } from "@/lib/delegation";
+import type { MentionDelegation } from "@/lib/mention";
 
 /**
  * 답 본문 아래의 맡긴 줄이다. 「(이름표) 비서 → 쇼핑 담당에게 맡김 · 진행 중」. 맡긴 자리는 저장되지 않으므로 늘 본문 아래에
@@ -44,6 +45,28 @@ export function DelegationLines({ lines }: { lines: DelegationLine[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * `@` 로 맡긴 질문 아래의 줄이다. 「(이름표) 나 → 쇼핑 담당에게 맡김 · 진행 중」. 맡긴 줄과 같은 크기다
+ * (docs/features/agent-team/design.md 의 「PR4 @ 멘션」).
+ */
+export function MentionLine({ line }: { line: MentionDelegation }) {
+  const agent = labelIdentity(line.agent);
+  return (
+    <p
+      data-testid="mention-line"
+      data-status={line.status}
+      className="mt-1 flex min-w-0 max-w-full items-center gap-2 text-xs text-muted-foreground"
+    >
+      <AgentBadge agent={agent} size="sm" />
+      <span className="min-w-0 truncate">나 → {agent.name}에게 맡김</span>
+      <span aria-hidden="true">·</span>
+      <span data-testid="mention-status" className="shrink-0 font-medium">
+        {delegationStatusLabel(line.status)}
+      </span>
+    </p>
   );
 }
 

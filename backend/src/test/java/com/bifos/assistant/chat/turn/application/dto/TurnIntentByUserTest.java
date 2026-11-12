@@ -10,11 +10,12 @@ import org.junit.jupiter.api.Test;
 class TurnIntentByUserTest {
 
     @Test
-    @DisplayName("새 질문과 대기 메시지 합침과 다시 생성은 사람이 보낸 turn 이다")
+    @DisplayName("새 질문과 대기 메시지 합침과 다시 생성과 @ 맡김은 사람이 보낸 turn 이다")
     void userSentTurns() {
         assertThat(TurnIntent.byUser(new TurnIntent.Fresh())).isTrue();
         assertThat(TurnIntent.byUser(new TurnIntent.Fresh(List.of(1L, 2L)))).isTrue();
         assertThat(TurnIntent.byUser(new TurnIntent.Regenerate(null, null))).isTrue();
+        assertThat(TurnIntent.byUser(new TurnIntent.Mention())).isTrue();
     }
 
 

@@ -6,6 +6,7 @@ import { TooltipButton } from "@/components/ui/tooltip-button";
 import { cn } from "cn";
 import { attachmentPlaceholder } from "./variants";
 import { AgentMention, mentionOptionId } from "./agent-mention";
+import { DelegateChip } from "./delegate-chip";
 import { SkillCommandMenu } from "./skill-command-menu";
 import { skillOptionId } from "./skill-command";
 import { ModelTierPicker } from "./model-picker";
@@ -36,6 +37,7 @@ export function Composer(props: Props) {
     modelSelectionMode,
     modelTier,
     modelChoiceUnknown,
+    delegateTarget,
   } = props;
   const {
     blocking,
@@ -143,6 +145,14 @@ export function Composer(props: Props) {
             </div>
           ))}
         </div>
+      ) : null}
+
+      {delegateTarget ? (
+        <DelegateChip
+          agent={delegateTarget.agent}
+          onClear={delegateTarget.onClear}
+          disabled={disabled || outgoing !== null}
+        />
       ) : null}
 
       {pickNotice ? (

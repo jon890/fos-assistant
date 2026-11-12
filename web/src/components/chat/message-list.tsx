@@ -8,6 +8,7 @@ import { Notice } from "@/components/ui/notice";
 import { AssistantRow, MessageBubble, type Turn } from "./message-bubble";
 import { DelegationLines } from "./delegation-lines";
 import { mergeDelegations, type DelegationLine } from "@/lib/delegation";
+import { answerAgentOf, pendingAnswerLabel } from "@/lib/mention";
 import { ActivityBlock } from "./activity/activity-block";
 import type { ActivityState } from "./activity/activity-state";
 import { WaitingIndicator } from "./waiting-indicator";
@@ -159,6 +160,7 @@ export function MessageList({
     ];
   });
   const visible = [...foldedVisible, ...pendingVisible];
+  const pendingLabel = pendingAnswerLabel(visible.map(({ turn }) => turn));
   const lastVisible = visible.at(-1)?.turn;
   const hasNoAnswer =
     lastVisible?.role === "USER" && latestView && !sending && !outgoing;
@@ -258,9 +260,14 @@ export function MessageList({
                         userVersion={userVersion}
                         answerVersion={answerVersion}
                         onVersionChange={onVersionChange}
+                        answerAgent={answerAgentOf(
+                          turn,
+                          pendingAssistant ? pendingLabel : null,
+                        )}
                         canRegenerate={
                           isLast &&
                           turn.role === "ASSISTANT" &&
+                          !turn.answeredBy &&
                           !afterSystem &&
                           latestView &&
                           !sending
@@ -320,7 +327,7 @@ export function MessageList({
                           className="-mt-4 flex animate-fade-in items-center justify-end gap-2 text-xs text-muted-foreground"
                         >
                           <span>답을 받지 못했어요</span>
-                          {onRetry ? (
+                          {onRetry && !turn.delegatedTo ? (
                             <Button
                               type="button"
                               variant="link"
@@ -340,6 +347,7 @@ export function MessageList({
               {pendingActivity || waiting ? (
                 <AssistantRow
                   data-testid="pending-assistant"
+                  agent={answerAgentOf({}, pendingLabel)}
                   className="animate-message-assistant"
                 >
                   {pendingActivity ? liveActivityBlock : <WaitingIndicator />}

@@ -3,7 +3,10 @@
 import { FileText } from "lucide-react";
 import { cn } from "cn";
 import { attachmentPlaceholder, revealedTime } from "./variants";
-import { AgentBadge, useAnswerAgent } from "@/components/agent/agent-badge";
+import type { AgentIdentity } from "@/components/agent/agent-badge";
+import { AssistantRow } from "./assistant-row";
+
+export { AssistantRow };
 import { AnswerBody } from "./answer-body";
 import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
@@ -14,7 +17,7 @@ import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
 import { VersionSwitcher } from "./version-switcher";
 import { parseSkillCommand } from "./skill-command";
-import { DelegationLines } from "./delegation-lines";
+import { DelegationLines, MentionLine } from "./delegation-lines";
 import { SystemMessage } from "./system-message";
 import type { DelegationLine } from "@/lib/delegation";
 export type {
@@ -133,42 +136,6 @@ function ArtifactList({
   );
 }
 
-/** 답을 쓰는 에이전트의 이름표와 이름을 먼저 그리고, 그 아래 칸에 기다림 점이나 작업 과정이나 답을 받는다. */
-export function AssistantRow({
-  header,
-  children,
-  className,
-  ...props
-}: React.ComponentProps<"li"> & {
-  /** 이름 옆에 두는 것이다. 보낸 시각이 여기 온다 */
-  header?: React.ReactNode;
-}) {
-  const agent = useAnswerAgent();
-  return (
-    <li
-      className={cn(
-        "group grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-2",
-        className,
-      )}
-      {...props}
-    >
-      <AgentBadge agent={agent} />
-      <div className="min-w-0">
-        <div className="mb-1 flex min-h-8 min-w-0 items-center gap-2">
-          <span
-            data-testid="answer-agent-name"
-            className="truncate text-sm font-medium"
-          >
-            {agent.name}
-          </span>
-          {header}
-        </div>
-        {children}
-      </div>
-    </li>
-  );
-}
-
 export function MessageBubble({
   turn,
   conversationId,
@@ -190,6 +157,7 @@ export function MessageBubble({
   onRetryDelivery,
   deliveryRetrying = false,
   delegations = [],
+  answerAgent,
 }: {
   turn: Turn;
   conversationId: string | null;
@@ -220,6 +188,8 @@ export function MessageBubble({
   deliveryRetrying?: boolean;
   /** 이 답의 turn 이 바로 맡긴 위임이다. 이력의 줄과 사건으로 받은 줄을 합친 값이다 */
   delegations?: DelegationLine[];
+  /** 이 답을 쓴 에이전트가 대화의 에이전트가 아니면 그 에이전트다. `@` 로 맡긴 답이 그렇다 */
+  answerAgent?: AgentIdentity;
 }) {
   const user = turn.role === "USER";
   const sentAt = turn.createdAt ? formatWhen(turn.createdAt) : null;
@@ -238,10 +208,18 @@ export function MessageBubble({
   }
 
   if (user) {
-    const command = skillCommandChip ? parseSkillCommand(turn.content) : null;
+    // 맡김 질문은 글 그대로 맡겼으므로 스킬 칩으로 그리지 않는다.
+    const command =
+      skillCommandChip && !turn.delegatedTo
+        ? parseSkillCommand(turn.content)
+        : null;
     return (
       <li
-        className="group flex min-w-0 justify-end focus-visible:outline-none"
+        className={cn(
+          "group flex min-w-0 justify-end focus-visible:outline-none",
+          // 맡김 질문은 말풍선 아래에 맡긴 줄을 둔다. 오른쪽 정렬은 그대로다.
+          turn.delegatedTo && "flex-col items-end",
+        )}
         tabIndex={0}
       >
         <div
@@ -292,6 +270,7 @@ export function MessageBubble({
             </time>
           ) : null}
         </div>
+        {turn.delegatedTo ? <MentionLine line={turn.delegatedTo} /> : null}
       </li>
     );
   }
@@ -299,6 +278,7 @@ export function MessageBubble({
   return (
     <AssistantRow
       data-testid="assistant-message"
+      agent={answerAgent}
       className="focus-visible:outline-2 focus-visible:outline-ring"
       tabIndex={0}
       header={

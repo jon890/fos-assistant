@@ -47,6 +47,8 @@ export type Props = Pick<
   | "unknownSkill"
   | "composerBlocking"
   | "panelTarget"
+  | "delegateTo"
+  | "setDelegateTo"
 > &
   Pick<
     ConversationSessionProps,

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.chat.turn.application.ChatService;
+import com.bifos.assistant.chat.turn.application.dto.MentionMarks;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
@@ -71,6 +72,7 @@ class SourceReadMessagesTest {
         when(chat.attachmentsByMessage(user, 4L)).thenReturn(Map.of());
         when(chat.artifactsByMessage(any())).thenReturn(Map.of());
         when(chat.deliveryStates(4L)).thenReturn(Map.of());
+        when(chat.mentionMarks(user, 4L)).thenReturn(MentionMarks.NONE);
         SourceReadSummary missing = new SourceReadSummary(0, List.of(), 0, false, List.of());
         when(sourceReads.of(List.of(userMessage, assistant, system))).thenReturn(Map.of(11L, missing));
 
