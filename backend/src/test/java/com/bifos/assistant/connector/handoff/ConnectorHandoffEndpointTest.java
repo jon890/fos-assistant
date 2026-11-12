@@ -228,14 +228,14 @@ class ConnectorHandoffEndpointTest {
 
 
     @Test
-    @DisplayName("그 대화의 새 turn 이 시작되면 그 대화의 열린 넘기기만 닫고 그 알림을 읽음으로 바꾼다")
+    @DisplayName("그 대화에서 사람이 보낸 turn 이 시작되면 그 대화의 열린 넘기기만 닫고 그 알림을 읽음으로 바꾼다")
     void closesOnNextTurn() throws Exception {
         insertAction("root-5", "call-5", true, conversation.id());
         insertAction("root-6", "call-6", true, other.id());
         post(McpCallSigner.handoffBody(token, TOOL, "root-5", "root-5", "call-5", CODE, "login", "TAB1"));
         post(McpCallSigner.handoffBody(token, TOOL, "root-6", "root-6", "call-6", CODE, "device_check", "TAB2"));
 
-        events.publishEvent(new ConversationTurnStarted(conversation.id()));
+        events.publishEvent(new ConversationTurnStarted(conversation.id(), true));
 
         assertThat(handoffs.open(user(), conversation.id())).isEmpty();
         assertThat(handoffs.open(user(), other.id())).singleElement()
@@ -243,6 +243,29 @@ class ConnectorHandoffEndpointTest {
         assertThat(jdbc.queryForList("SELECT title, read_at FROM notification ORDER BY id"))
             .extracting(row -> row.get("READ_AT") != null)
             .containsExactly(true, false);
+    }
+
+
+    @Test
+    @DisplayName("결과 전달 같은 자동 turn 이 시작돼도 카드와 안 읽은 알림이 남고, 뒤이은 사람의 turn 에서 닫힌다")
+    void keepsCardOnAutoTurnAndClosesOnUserTurn() throws Exception {
+        insertAction("root-8", "call-8", true, conversation.id());
+        post(McpCallSigner.handoffBody(token, TOOL, "root-8", "root-8", "call-8", CODE, "captcha", "TAB1"));
+
+        events.publishEvent(new ConversationTurnStarted(conversation.id(), false));
+
+        assertThat(handoffs.open(user(), conversation.id())).singleElement()
+            .satisfies(card -> assertThat(card.need()).isEqualTo(HandoffNeed.CAPTCHA));
+        assertThat(jdbc.queryForList("SELECT read_at FROM notification"))
+            .extracting(row -> row.get("READ_AT") != null)
+            .containsExactly(false);
+
+        events.publishEvent(new ConversationTurnStarted(conversation.id(), true));
+
+        assertThat(handoffs.open(user(), conversation.id())).isEmpty();
+        assertThat(jdbc.queryForList("SELECT read_at FROM notification"))
+            .extracting(row -> row.get("READ_AT") != null)
+            .containsExactly(true);
     }
 
 
