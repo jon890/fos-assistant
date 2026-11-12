@@ -5,13 +5,13 @@ import { filterOpenDiagnostics } from "../src/editor/open-diagnostics.ts";
 import { closeTab, type EditorPage } from "../src/editor/page.ts";
 import { runDraft } from "../src/editor/run.ts";
 import { fill } from "../src/editor/text.ts";
-import { localChrome } from "./local-chrome.ts";
+import { LOCAL_CHROME_HOOK_MS, localChrome } from "./local-chrome.ts";
 
 let browser: Awaited<ReturnType<typeof localChrome>>;
 const cleanups: Array<() => Promise<unknown>> = [];
 beforeAll(async () => {
   browser = await localChrome();
-}, 15_000);
+}, LOCAL_CHROME_HOOK_MS);
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
 });
