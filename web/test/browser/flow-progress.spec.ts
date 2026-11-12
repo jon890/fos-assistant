@@ -346,6 +346,10 @@ test("기다림 점이 있던 자리에 답이 들어와 얼굴과 첫 줄이 �
     const answer = page.getByTestId("assistant-message");
     await expect(answer).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByTestId("pending-assistant")).toHaveCount(0);
+    // 흐르던 답은 임시 turn 으로 먼저 보이고, 끝나면 이력을 다시 읽어 저장된 turn 으로 바뀐다. 둘은 React key 가
+    // 달라 요소가 통째로 새로 만들어진다. 바뀌는 동안 재면 떨어져 나가는 요소의 좌표(0)를 읽거나 이력 조회가
+    // 끝나기 전에 검사가 끝난다. 시각(`time`)은 저장된 turn 에만 있으므로 그것이 뜬 뒤에 잰다.
+    await expect(answer.locator("time")).toHaveCount(1);
     await expect(answer.getByTestId("activity-block")).toHaveCount(0);
     // 한 화면에 들어오는 짧은 대화라 스크롤이 움직이지 않는다.
     expect(await page.getByTestId("message-scroll")
