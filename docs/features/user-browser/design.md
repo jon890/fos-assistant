@@ -134,7 +134,7 @@ state = { phase: "waiting" } | { phase: "watching", base: string } | { phase: "o
 | --- | --- | --- | --- |
 | 넘기기 카드가 대화 위 패널을 연다 | architecture | [ADR-20261112 / handoff-drawer](../../../web/docs/adr/ADR-20261112-handoff-drawer.md). [ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md) 의 카드 행 일부를 대체한다 | 이 설계의 「인터페이스와 데이터」, `docs/features/user-browser.md` 의 「대화 위 화면」 |
 
-## PR2 넘기기 어휘 확장과 KTX·블로그 넘기기(REQ7, REQ8)
+## PR2 넘기기 어휘 확장과 KTX·블로그 넘기기
 
 결과 모양, 서명할 글, 알리는 주소, 카드와 닫기 규칙([ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md))은 그대로다. `need` 값 둘이 늘고, 플러그인 셋이 그 값을 낸다.
 
