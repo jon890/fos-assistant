@@ -164,8 +164,11 @@ export function ApprovalList({
       (current) =>
         current && {
           ...current,
+          // 승인과 거절 응답은 대화를 몰라 요청한 에이전트를 싣지 않는다. 앞 값을 지킨다.
           actions: current.actions.map((action) =>
-            action.actionId === next.actionId ? next : action,
+            action.actionId === next.actionId
+              ? { ...next, requestedBy: next.requestedBy ?? action.requestedBy }
+              : action,
           ),
         },
     );

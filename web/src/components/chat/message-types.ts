@@ -1,3 +1,4 @@
+import type { DelegationLine } from "@/lib/delegation";
 import type { AutoVaultState } from "@/lib/artifact-vault-api";
 import type { ActivitySummary } from "@/lib/chat-event";
 import type { AnswerReveal } from "./answer-reveal";
@@ -63,4 +64,8 @@ export type Turn = {
   /** 이 알림 줄이 결과 묶음의 마지막 알림 줄이면 그 묶음의 상태 */
   delivery?: MessageDelivery | null;
   sourceReads?: SourceReadSummary | null;
+  /** 이 답의 실행이 바로 맡긴 위임이다. 옛 서버 응답에는 없다 */
+  delegations?: DelegationLine[];
+  /** 이 위임 결과 알림 줄이 전한 결과다. 있으면 저장된 글 대신 결과마다 이름표 줄을 그린다 */
+  deliveredResults?: DelegationLine[];
 };

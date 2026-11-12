@@ -65,9 +65,11 @@ public class ConnectorActionController {
         // 주문 상한 변경 줄은 요청한 값과 지금 최대치를 붙인다.
         var limitChange = limitChanges.summaries(user,
             views.stream().filter(view -> FinancialLimitChanges.TOOL.equals(view.toolName())).map(view -> view.actionId()).toList());
+        // 위임 자식처럼 대화의 에이전트와 다른 에이전트가 요청한 줄은 그 이름표를 붙인다.
+        var requesters = actions.requestersOf(user, id, actionIds);
         return views.stream()
             .map(view -> ActionView.from(view, summaries.get(view.actionId()), financial.get(view.actionId()),
-                limitChange.get(view.actionId())))
+                limitChange.get(view.actionId()), requesters.get(view.actionId())))
             .toList();
     }
 

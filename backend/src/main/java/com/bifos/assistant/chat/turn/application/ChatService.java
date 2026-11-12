@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
+import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
@@ -76,6 +77,7 @@ public class ChatService {
     private final ChatDeliveryTurns chatDeliveryTurns;
     private final ChatConversationQueries chatConversationQueries;
     private final ChatConversationManagement chatConversationManagement;
+    private final DelegationLines delegationLines;
 
 
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
@@ -316,6 +318,22 @@ public class ChatService {
     /** 답 메시지의 실행 상태를 한 번에 읽는다. */
     public Map<Long, ExecutionStatus> statuses(List<ChatMessage> history) {
         return chatConversationQueries.statuses(history);
+    }
+
+
+    /** 답 줄의 실행 번호마다 그 실행이 바로 맡긴 위임이다. 이력 API 가 답 아래의 맡긴 줄로 그린다. */
+    public Map<Long, List<DelegationLine>> delegationsByAnswer(List<ChatMessage> history) {
+        return delegationLines.byAnswer(history);
+    }
+
+
+    /**
+     * 위임 결과 알림 줄의 메시지 번호마다 그 줄이 전한 결과다. 이력 API 가 결과 도착 줄의 이름표로 그린다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     */
+    public Map<Long, List<DelegationLine>> deliveredResults(CurrentUser user, Long conversationId) {
+        return delegationLines.byResultNotice(user, conversationId);
     }
 
 

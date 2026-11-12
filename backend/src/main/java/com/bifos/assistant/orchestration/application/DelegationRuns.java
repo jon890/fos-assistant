@@ -2,6 +2,7 @@ package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
+import com.bifos.assistant.chat.nextturn.application.dto.DelegationStarted;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
@@ -119,6 +120,7 @@ final class DelegationRuns {
                     delegation.bindExecution(execution.id());
                     running.put(execution.id(), delegation);
                     handoff.onRowCreated(execution);
+                    publishStarted(conversation, execution.id());
                 },
                 (execution, runId) -> {
                     handoff.markSubmitted();
@@ -169,6 +171,19 @@ final class DelegationRuns {
             events.publishEvent(new DelegationFinished(conversation.id(), executionId));
         } catch (RuntimeException ex) {
             log.warn("위임 실행이 끝났다고 알리지 못했다 executionId={}", executionId, ex);
+        }
+    }
+
+
+    /**
+     * 위임 실행 줄이 생겼다고 알린다. 받는 쪽이 대화 화면에 맡긴 줄을 보인다. 요청 스레드를 깨운 뒤 부르므로 받는 쪽이 늦어도
+     * {@code agent_delegate} 의 응답을 늦추지 않는다. 알리다 난 예외는 경고 로그만 남긴다.
+     */
+    private void publishStarted(Conversation conversation, Long executionId) {
+        try {
+            events.publishEvent(new DelegationStarted(conversation.id(), executionId));
+        } catch (RuntimeException ex) {
+            log.warn("위임 실행이 시작했다고 알리지 못했다 executionId={}", executionId, ex);
         }
     }
 

@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
+import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -27,11 +28,14 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -201,6 +205,36 @@ class ConnectorActionLifecycle {
                 grant, declared.map(ToolPolicy::title).orElse(null), otherAgents.get(grant.agentId())));
         }
         return views;
+    }
+
+
+    /**
+     * 승인 줄마다 대화의 에이전트와 다른 요청 에이전트의 이름표다. 위임 자식이 만든 승인 카드에 「○○이 요청」 을 붙인다
+     * (docs/features/agent-team/design.md 의 「승인 카드」). 대화의 에이전트가 만든 줄과 에이전트가 없는 줄은 빠진다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     * @param actionIds 이름표를 붙일 승인 줄. 그 대화와 그 사용자의 줄만 본다
+     */
+    Map<UUID, AgentLabel> requestersOf(CurrentUser user, Long conversationId, Collection<UUID> actionIds) {
+        if (actionIds.isEmpty()) {
+            return Map.of();
+        }
+        Long conversationAgent = conversations.findById(conversationId).map(Conversation::agentId).orElse(null);
+        List<ConnectorAction> others = actions
+            .findByConversationIdAndUserIdAndPublicIdIn(conversationId, user.id(), actionIds).stream()
+            .filter(action -> action.agentId() != null && !action.agentId().equals(conversationAgent))
+            .toList();
+        if (others.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Agent> found = agents
+            .findAllById(others.stream().map(ConnectorAction::agentId).collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Agent::id, Function.identity()));
+        return others.stream()
+            .collect(Collectors.toMap(
+                ConnectorAction::publicId,
+                action -> AgentLabel.of(found.get(action.agentId()))));
     }
 
 
