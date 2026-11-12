@@ -49,7 +49,7 @@ export function SpecialistAgentForm({
   onCreated(result: SpecialistAgentResult): void;
 }) {
   const id = useId();
-  const draft = specialistDraft(connectorId, title);
+  const draft = specialistDraft(title);
   const [name, setName] = useState(draft.name);
   const [description, setDescription] = useState(draft.description);
   const [icon, setIcon] = useState<string | null>(draft.icon);

@@ -8,15 +8,10 @@ import { withParticle } from "./korean-particle.ts";
  * 제안을 띄울지, 미리 채울 값, 떼기 칸의 글과 잠금을 여기서 정한다.
  */
 
-/** 플러그인마다 미리 고를 아이콘이다. `AgentIntroduction.ICONS` 안의 값만 쓴다. 없으면 {@link DEFAULT_ICON} 이다. */
-const CONNECTOR_ICONS: Record<string, string> = {
-  "naver-shopping": "🛍️",
-  "korail-ktx": "🚆",
-  gmail: "✉️",
-  "naver-blog": "✍️",
-  tossinvest: "💰",
-};
-
+/**
+ * 미리 고를 아이콘이다. `AgentIntroduction.ICONS` 안의 값이다. 운영 코드는 특정 플러그인을 모르므로 플러그인과 상관없이
+ * 같은 값을 고르고, 사용자가 만들기 화면에서 바꾼다.
+ */
 const DEFAULT_ICON = "🤖";
 
 /** 미리 채운 값이다. 사용자가 고친 뒤 보낸다. */
@@ -26,14 +21,11 @@ export type SpecialistDraft = {
   icon: string;
 };
 
-export function specialistDraft(
-  connectorId: string,
-  title: string,
-): SpecialistDraft {
+export function specialistDraft(title: string): SpecialistDraft {
   return {
     name: `${title} 담당`,
     description: `${title} 일을 맡아요`,
-    icon: CONNECTOR_ICONS[connectorId] ?? DEFAULT_ICON,
+    icon: DEFAULT_ICON,
   };
 }
 

@@ -39,29 +39,15 @@ test("방금 연결을 마쳤고 붙은 곳이 없을 때만 제안한다", () =
   );
 });
 
-test("미리 채운 이름과 소개는 플러그인 이름으로, 아이콘은 플러그인마다 정한 값이나 기본값이다", () => {
-  assert.deepEqual(specialistDraft("naver-shopping", "네이버 쇼핑"), {
+test("미리 채운 이름과 소개는 플러그인 이름으로, 아이콘은 서버가 받는 목록 안의 기본값이다", () => {
+  assert.deepEqual(specialistDraft("네이버 쇼핑"), {
     name: "네이버 쇼핑 담당",
     description: "네이버 쇼핑 일을 맡아요",
-    icon: "🛍️",
+    icon: "🤖",
   });
-  assert.equal(specialistDraft("unknown-plugin", "새 서비스").icon, "🤖");
-});
-
-test("미리 고른 아이콘은 서버가 받는 아이콘 목록 안에 있다", () => {
-  for (const id of [
-    "naver-shopping",
-    "korail-ktx",
-    "gmail",
-    "naver-blog",
-    "tossinvest",
-    "unknown-plugin",
-  ]) {
-    assert.ok(
-      (AGENT_ICONS as readonly string[]).includes(specialistDraft(id, id).icon),
-      id,
-    );
-  }
+  assert.ok(
+    (AGENT_ICONS as readonly string[]).includes(specialistDraft("x").icon),
+  );
 });
 
 test("떼기 칸은 붙은 에이전트가 있을 때만 있고 기본 비서는 「비서」 로 보인다", () => {
