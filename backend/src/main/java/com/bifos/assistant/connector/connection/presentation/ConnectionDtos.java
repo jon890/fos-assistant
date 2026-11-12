@@ -1,5 +1,7 @@
 package com.bifos.assistant.connector.connection.presentation;
 
+import com.bifos.assistant.agent.domain.AgentIntroduction;
+import com.bifos.assistant.agent.domain.type.AgentColor;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionView;
 import com.bifos.assistant.connector.connection.application.dto.AgentConnectionsView;
 import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummary;
@@ -9,6 +11,7 @@ import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorToolSummary;
+import com.bifos.assistant.connector.connection.application.dto.SpecialistAgent;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
@@ -92,6 +95,7 @@ public final class ConnectionDtos {
      * @param link 검증을 통과한 {@code https://} 링크. 없거나 틀렸으면 null
      * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 {@code https://} 주소. 선언하지 않았으면 null
      * @param standardPlugin {@code assistant.json} 이 없는 표준 플러그인인가. 화면이 「모든 도구를 쓸 때마다 확인」 안내를 보인다
+     * @param singleBinding 연결 하나를 에이전트 하나에만 붙이는가. 전문 에이전트 만들기 화면이 떼기 칸을 켠 채 잠근다
      */
     public record ConnectorView(
         String id,
@@ -107,7 +111,8 @@ public final class ConnectionDtos {
         String ownerBrowserLoginUrl,
         String readmeUrl,
         String linkKind,
-        boolean standardPlugin) {
+        boolean standardPlugin,
+        boolean singleBinding) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -123,7 +128,8 @@ public final class ConnectionDtos {
                 value.ownerBrowserLoginUrl(),
                 value.appearance().readmeUrl(),
                 value.appearance().linkKind(),
-                value.standardPlugin());
+                value.standardPlugin(),
+                value.singleBinding());
         }
     }
 
@@ -222,6 +228,43 @@ public final class ConnectionDtos {
                     .map(AgentConnectionResponse::from)
                     .toList(),
                 value.blockedReason());
+        }
+    }
+
+    /**
+     * 전문 에이전트를 만드는 요청이다. 소개 네 칸은 에이전트 소개 고치기와 같은 판정이다.
+     *
+     * @param detach 그 연결이 지금 붙은 다른 에이전트에서 모두 뗀다
+     */
+    public record SpecialistAgentRequest(String name, String description, String icon, AgentColor color, boolean detach) {
+        AgentIntroduction toIntroduction() {
+            return AgentIntroduction.of(name, description, icon, color);
+        }
+    }
+
+    /** 연결을 뗀 에이전트 하나다. */
+    public record DetachedAgentResponse(String agentCode, String agentName) {
+    }
+
+    /**
+     * 전문 에이전트를 만든 결과다.
+     *
+     * @param connection 새 에이전트에서 본 그 연결
+     * @param detachedFrom 그 연결을 뗀 다른 에이전트들
+     */
+    public record SpecialistAgentResponse(
+        String agentCode,
+        String agentName,
+        AgentConnectionResponse connection,
+        List<DetachedAgentResponse> detachedFrom) {
+        static SpecialistAgentResponse from(SpecialistAgent value) {
+            return new SpecialistAgentResponse(
+                value.agentCode(),
+                value.agentName(),
+                AgentConnectionResponse.from(value.connection()),
+                value.detachedFrom().stream()
+                    .map(agent -> new DetachedAgentResponse(agent.agentCode(), agent.agentName()))
+                    .toList());
         }
     }
 }

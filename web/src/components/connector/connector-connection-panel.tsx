@@ -6,7 +6,7 @@ import { ConnectionBadge } from "@/components/connector/connection-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
-import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
+import { ConnectorOnboarding } from "@/components/agent/connector-onboarding";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { FinancialLimitsSection } from "@/components/connector/financial-limits";
@@ -273,13 +273,14 @@ export function ConnectorConnectionPanel({
   return (
     <div className="mx-auto w-full max-w-2xl">
       {chooserShown ? (
-        <ConnectorAgentChooser
+        <ConnectorOnboarding
           connectorId={id}
           title={title}
           bindings={connection.bindings}
           justConnected={justConnected}
           preferredAgent={preferredAgent}
           onBindingsChanged={() => void refreshBindings()}
+          onCreated={() => setChooser("open")}
           onClose={() => {
             setChooser("closed");
             setJustConnected(false);

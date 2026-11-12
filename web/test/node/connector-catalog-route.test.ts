@@ -28,6 +28,7 @@ function summary(change: Record<string, unknown> = {}) {
     readmeUrl: null,
     linkKind: "service",
     standardPlugin: false,
+    singleBinding: false,
     ...change,
   };
 }
@@ -296,6 +297,21 @@ test("웹 카탈로그 라우트는 표준 플러그인 표시를 참일 때만 
   assert.deepEqual(
     (await response.json()).map(
       (item: { standardPlugin: boolean }) => item.standardPlugin,
+    ),
+    [true, false, false],
+  );
+});
+
+test("웹 카탈로그 라우트는 single_binding 표시를 참일 때만 옮기고 다른 값은 거짓으로 읽는다", async () => {
+  const response = await getCatalog([
+    summary({ singleBinding: true }),
+    summary({ singleBinding: "true" }),
+    summary({ singleBinding: undefined }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    (await response.json()).map(
+      (item: { singleBinding: boolean }) => item.singleBinding,
     ),
     [true, false, false],
   );

@@ -70,6 +70,7 @@ type Kind =
   | "admin"
   | "agentConnections"
   | "agentConnection"
+  | "specialist"
   | "none";
 
 /** 비정상 응답 본문 때문에 Control Plane 호출 자체가 던져도 고정 오류로 돌린다. */
@@ -106,6 +107,8 @@ function safeData(kind: Kind, value: unknown) {
       return safeAgentConnections(value);
     case "agentConnection":
       return safeAgentConnection(value);
+    case "specialist":
+      return safeSpecialist(value);
     case "none":
       // 본문 없는 성공(204)이다. 원격이 무엇을 실어 보내도 옮기지 않는다.
       return null;
@@ -213,6 +216,7 @@ function safeSummary(value: unknown) {
     available: bool(item.available),
     bindings: safeBindings(item.bindings),
     standardPlugin: item.standardPlugin === true,
+    singleBinding: item.singleBinding === true,
   };
 }
 
@@ -346,5 +350,22 @@ function safeAgentConnection(value: unknown) {
     restartRequired: bool(item.restartRequired),
     toolCount: count(item.toolCount),
     skills: list(item.skills ?? []).map(text),
+  };
+}
+
+/** 전문 에이전트를 만든 결과다. 새 에이전트에서 본 연결과 연결을 뗀 에이전트들만 옮긴다. */
+function safeSpecialist(value: unknown) {
+  const item = record(value);
+  return {
+    agentCode: agentCode(item.agentCode),
+    agentName: text(item.agentName),
+    connection: safeAgentConnection(item.connection),
+    detachedFrom: list(item.detachedFrom ?? []).map((entry) => {
+      const detached = record(entry);
+      return {
+        agentCode: agentCode(detached.agentCode),
+        agentName: text(detached.agentName),
+      };
+    }),
   };
 }

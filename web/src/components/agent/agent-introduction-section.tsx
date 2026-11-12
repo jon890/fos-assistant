@@ -198,8 +198,8 @@ export function AgentIntroductionSection({
   );
 }
 
-/** 아이콘과 색 고르기다. 고르지 않으면 이름 첫 글자와 자동 색으로 그린다 */
-function IntroductionPickers({
+/** 아이콘과 색 고르기다. 고르지 않으면 이름 첫 글자와 자동 색으로 그린다. 전문 에이전트 만들기 화면도 쓴다 */
+export function IntroductionPickers({
   code,
   initialLetter,
   icon,

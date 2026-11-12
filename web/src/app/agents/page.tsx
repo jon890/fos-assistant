@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { callControlPlane } from "@/lib/control-plane";
 import { CreateAgentDialog } from "@/components/agent/create-agent-dialog";
+import { SpecialistAgentDialog } from "@/components/agent/specialist-agent-dialog";
 import type { AgentView } from "@/lib/agent";
 import { capabilitiesLine } from "@/lib/agent-badge";
 import { AgentBadge } from "@/components/agent/agent-badge";
@@ -26,7 +27,10 @@ export default async function AgentsPage({
     <div className="mx-auto w-full max-w-2xl">
       <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">에이전트</h1>
-        <CreateAgentDialog defaultOpen={openNew === "1"} />
+        <div className="flex flex-wrap justify-end gap-2">
+          <SpecialistAgentDialog />
+          <CreateAgentDialog defaultOpen={openNew === "1"} />
+        </div>
       </div>
       {result.data.length === 0 ? (
         <EmptyState
