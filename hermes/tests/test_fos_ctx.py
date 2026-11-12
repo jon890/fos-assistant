@@ -1092,6 +1092,10 @@ class HandoffReportTest(PluginFixture):
     """플러그인 도구 결과의 화면 넘기기 칸을 가짜 Control Plane 에 알리는 모양과, 실패해도 결과가 그대로인지 본다."""
 
     RESULT = json.dumps({"error": {"code": "DEMO_LOGIN_REQUIRED", "handoff": {"need": "login", "tab": "TAB1"}}})
+    # 오류가 아닌 결과(`isError` 없음)다. Hermes 의 연속 실패 집계에 들어가지 않는다.
+    HANDOFF_RESULT = json.dumps({
+        "status": "HUMAN_ACTION_REQUIRED", "message": "사람이 해야 하는 화면에서 멈췄다.",
+        "handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "TAB1"}})
 
     def setUp(self):
         super().setUp()
@@ -1157,6 +1161,52 @@ class HandoffReportTest(PluginFixture):
                 self.assertEqual(body["sig"], self.plugin.sign_handoff(
                     self.plugin.signing_key(FAKE_MCP_CREDENTIAL), "mcp__demo__write_note", VECTOR_ROOT,
                     VECTOR_SESSION, VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login", "TAB1"))
+
+    def test_non_error_handoff_result_is_reported_once_and_result_is_unchanged(self):
+        """오류가 아닌 결과(`handoff` 가 맨 위, `code` 는 그 안)도 플러그인 글 그대로와 Hermes 가 `result` 글로 싼 꼴 둘 다 알린다."""
+        for result in (self.HANDOFF_RESULT, json.dumps({"result": self.HANDOFF_RESULT})):
+            with self.subTest(result=result):
+                self.requests.clear()
+                self.assertEqual(self.transform("mcp__demo__write_note", result), self.wrapped(result))
+                self.assertEqual(len(self.requests), 1)
+                body = self.requests[0]["body"]
+                self.assertEqual(
+                    {key: body[key] for key in body if key != "sig"},
+                    {"v": 1, "root_session_id": VECTOR_ROOT, "session_id": VECTOR_SESSION,
+                     "tool_call_id": VECTOR_CALL, "hermes_tool": "mcp__demo__write_note",
+                     "code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "TAB1"})
+                self.assertEqual(body["sig"], self.plugin.sign_handoff(
+                    self.plugin.signing_key(FAKE_MCP_CREDENTIAL), "mcp__demo__write_note", VECTOR_ROOT,
+                    VECTOR_SESSION, VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login", "TAB1"))
+
+    def test_handoff_result_does_not_count_as_hermes_failure(self):
+        """Hermes 의 MCP 연속 실패 집계(`_result_is_error`)는 처리한 결과 글 맨 위의 `error` 칸만 본다.
+
+        `isError` 가 없는 결과는 `{"result": "<플러그인 글>"}` 로 오므로 세지 않고, 옛 모양(`isError`)은
+        `{"error": ...}` 로 오므로 센다. 같은 서버가 3번 연속 세어지면 Hermes 가 60초 동안 호출을 막는다.
+        """
+        def hermes_counts_as_failure(handler_result: str) -> bool:
+            return "error" in json.loads(handler_result)
+
+        for _ in range(5):
+            self.assertFalse(hermes_counts_as_failure(json.dumps({"result": self.HANDOFF_RESULT})))
+        # 옛 모양은 센다. 이 대비가 위 확인이 아무것도 안 보고 통과하는 것을 막는다.
+        self.assertTrue(hermes_counts_as_failure(json.dumps({"error": self.RESULT})))
+
+    def test_non_error_result_with_bad_handoff_is_not_reported(self):
+        """오류가 아닌 꼴도 어휘와 모양을 같은 기준으로 거른다."""
+        bad = [
+            json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "payment", "tab": "TAB1"}}),
+            json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "../x"}}),
+            json.dumps({"handoff": {"code": "lower", "need": "login", "tab": "TAB1"}}),
+            json.dumps({"handoff": {"need": "login", "tab": "TAB1"}}),
+            json.dumps({"handoff": "login"}),
+            json.dumps({"result": json.dumps({"items": [{"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "login", "tab": "TAB1"}}]})}),
+        ]
+        for result in bad:
+            with self.subTest(result=result):
+                self.transform("mcp__demo__write_note", result)
+        self.assertEqual(self.requests, [])
 
     def test_other_results_are_not_reported(self):
         """모양이 다르거나 어휘 밖이거나 다른 서버의 도구면 알리지 않는다."""

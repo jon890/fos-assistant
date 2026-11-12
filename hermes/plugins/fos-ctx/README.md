@@ -185,8 +185,13 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 ### 화면 넘기기를 알린다
 
-플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터다.
-`transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과에서 `{"error": {"code", "handoff": {"need", "tab"}}}` 모양을 찾는다. Hermes 가 MCP 의 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다. 옛 설치 profile 과 바인딩 profile 이 같다.
+플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터이고, 1.7.0 부터 오류가 아닌 결과도 받는다.
+`transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과에서 두 모양 가운데 하나를 찾는다. 옛 설치 profile 과 바인딩 profile 이 같다.
+
+- 새 모양: 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}`. 플러그인이 낸다. Hermes 는 이 결과를 `{"result": "<플러그인 글>"}` 로 바꾸므로 바깥 `result` 가 글이면 한 번 더 읽는다
+- 옛 모양: 오류 `{"error": {"code", "handoff": {"need", "tab"}}}`. 새 모양을 내기 전에 배포된 플러그인이 내므로 받기를 남긴다. Hermes 는 `isError` 결과를 `{"error": "<플러그인 글>"}` 로 바꾸므로 바깥 `error` 가 글이면 한 번 더 읽는다
+
+새 모양은 `isError` 가 없어 Hermes 의 MCP 서버 연속 실패 집계(3회, 60초 정지)에 들어가지 않는다. 사람이 풀고 돌아와도 그 서버의 호출이 막히지 않는다. 배포는 fos-ctx 를 먼저 올리고 플러그인을 나중에 올린다. 순서가 바뀌면 그 사이에 카드가 뜨지 않는다.
 
 | 칸 | 값 |
 | --- | --- |
@@ -196,7 +201,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 | 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
 | 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다 |
 | 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
-| 실패 | 상태 코드나 예외 종류만 로그에 남기고 결과는 바꾸지 않는다. 카드가 없을 뿐 모델은 오류를 받는다 |
+| 실패 | 상태 코드나 예외 종류만 로그에 남기고 결과는 바꾸지 않는다. 카드가 없을 뿐 모델은 결과의 안내 글을 받는다 |
 
 확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다.
 
