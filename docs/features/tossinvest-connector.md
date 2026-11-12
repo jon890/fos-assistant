@@ -548,7 +548,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 
 ### 조건주문 REST 쓰기의 구현 보완안
 
-이 절의 SDK 준비와 단일 전송은 테스트 entry 에 구현돼 있다(아래 「조건주문 SDK 와 단일 전송」). 실제 DB producer 연결은 아직 제안이다. 조건주문 쓰기 도구는 운영에 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+이 절의 SDK 준비와 단일 전송은 테스트 entry 에 구현돼 있다(아래 「조건주문 SDK 와 단일 전송」). 실제 DB producer 왕복은 테스트에서 연결했다(아래 「실제 DB producer 왕복」). 조건주문 쓰기 도구는 운영에 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
 SDK와 실제 Python 소비자를 loopback에서 검증하는 구현은 실제 DB producer 연결 및 운영 금융 허가와 별개로 완료할 수 있다.
 일반 주문과 조건주문은 같은 ticket·claim을 쓰되 본문과 표시 값을 각각의 엄격한 계약으로 검증한다. 공개 hook·approve를 열거나 새 grant·permit flag를 만들지 않는다.
 
@@ -710,7 +710,7 @@ UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 
 | --- | --- | --- | --- |
 | 조건 snapshot 소비 계약 | 일반 주문 검증 이동·삭제와 Python·Spring 분기1310줄 배분; 여유190줄 | 공통 정상/거절 vector의 직접 Python 소비와 실제 Spring validate/capture/open; 일반 금융 회귀 | 기존 snapshot·ticket·claim 정의만 필요 |
 | 조건 SDK 준비와 단일전송 | TS 모듈·client와 guard982줄 배분; 여유518줄 | 실제 SDK→실제 Python loader/_prepare_result→합성 claim→loopback 목적지, 세 method/path/body/response 수신 및 retry 0 | 일반 금융 모듈과 조건 조회 모듈이 main에 존재해야 한다; 실제 DB producer와 운영 허가는 불필요 |
-| 실제 DB producer 통합 | 기존 업무 구현으로 추가 운영0줄 가정; actual main에서 재검증 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
+| 실제 DB producer 통합 | 실측: 금융 관문 `ConnectorFinancialGate.amount` 의 조건주문 금액 규칙만 더했다. producer·승인·claim 은 그대로다 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
 
 각 관심사는 설계·구현·회귀를 함께 담은 독립 PR이며 운영 변경 1500줄 상한과 파일 길이를 지킨다. 계획만 PR로 올리지 않는다.
 모든 관심사는 먼저 실패하는 회귀를 확인하고 같은 커밋에서 구현과 성공 증거를 남긴다. 직접 수신 counter는 auth POST/prepare GET/claim POST/금융 POST/DELETE로 나눈다.
@@ -870,7 +870,29 @@ ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서
 전송 뒤 실패는 위 allowlist 의 operation+status+code 와 유효한 ErrorResponse 만 FAILED 이고 나머지는 UNKNOWN 이다.
 
 이 증거는 실제 SDK bundle, 실제 Python 준비·실행 처리기, 합성 claim 대역과 loopback 목적지의 왕복이다(`hermes/tests/test_connector_conditional_sdk.py`).
-합성 ticket 은 실제 서명 인증·DB 일회 소비를 검증하지 않는다. 실제 DB producer 왕복은 후속 통합의 책임이다.
+합성 ticket 은 실제 서명 인증·DB 일회 소비를 검증하지 않는다. 그 몫은 아래 「실제 DB producer 왕복」 이 갖는다.
+
+### 실제 DB producer 왕복
+
+실제 `ConnectorFinancialProducer.request` 와 `ConnectorFinancialApproval.approve`, Spring claim HTTP 의 서명 인증과 `consumeTicket`, 실제 Python 준비·실행 처리기, 조건 SDK bundle 을 잇고 금융 목적지만 loopback 대역으로 둔다.
+승인 caller 는 테스트가 producer 를 직접 부른다. 공개 hook·approve API 를 지나는 E2E 가 아니고, 운영 `assistant.json` 에는 조건주문 쓰기 도구가 없다.
+
+| 파일 | 맡는 일 |
+| --- | --- |
+| `backend/src/test/.../connector/approval/application/FinancialConditionalProducerRoundTripTest.java` | H2 에서 저장·승인·claim·전송과 실패 주입을 본다 |
+| `FinancialConditionalProducerMysqlRoundTripTest.java` (같은 패키지) | 위 검사 가운데 `@MysqlCase` 를 단 claim 소비, 같은 의도 차단, 동시 승인을 실제 MySQL 에서 다시 돈다 |
+| `test/e2e/financial/conditional_plugin_http.py` | `conditional-entry.ts --generate` 의 설치 원본을 실제 plugin 으로 띄우고, support·claim 은 Spring 으로 보낸다. 금융 목적지와 현재 원주문을 바꾸는 대역도 맡는다 |
+
+검사가 지키는 결론이다.
+
+- 준비는 TX 밖에서 한 번 부르고, 사용자 잠금 아래에서 맥락을 다시 본 뒤 PENDING 줄, 암호화한 snapshot, 알림을 같은 TX 로 남긴다. 저장 summary 의 leg 와 단위는 open 한 실행 원문과 같다.
+- 준비 응답이 Spring 의 준비 읽기 제한(2초)을 넘으면 줄·snapshot·알림을 남기지 않고, 늦게 끝난 준비 결과도 저장하지 않는다.
+- 승인은 저장 원문을 그대로 보내고 준비와 UUID 생성을 다시 하지 않는다. 생성·정정은 금융 POST 1회, 취소는 DELETE 1회이고 같은 ticket 의 replay 는 0회다.
+- 같은 의도는 clientOrderId 나 기대 원주문만 달라도 실제 `ConnectorFinancialConflicts` 가 막는다. 다른 종목과 다른 대상 ID 는 막지 않는다. `supersedes_unknown_action_id` 는 NULL 이다. 막힌 새 요청도 읽기 전용 준비는 한 번 지난다.
+- 429·5xx·timeout·끊김·불량 2xx·allowlist 밖 code 는 UNKNOWN 이고 공식 거절은 FAILED 다. UNKNOWN 뒤 ticket 재발급과 추가 전송은 0회다.
+- 손상된 wire(추가 키, 숫자 decimal, SHA, 계좌 범위), 요청 뒤 바뀐 revision, 만료한 ticket, claim 전에 바뀐 현재 원주문(leg 상태, targetProfitRate, triggeredOrderId, expireDate)은 금융 0회다.
+- 금융 성공 뒤 결과 저장이 실패하면 EXECUTING 으로 남고, 다시 승인하거나 기동 정리가 돌아도 재전송하지 않는다. 정리는 소비한 claim 을 UNKNOWN 으로 둔다.
+- 금액 규칙은 [커넥터 정책](connector-policy.md)의 `ConnectorFinancialGate` 문단이 갖는다.
 ### 국내 종목 통계 계약
 
 통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.
