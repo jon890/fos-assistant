@@ -36,20 +36,23 @@ async function closeLeftTabs(cdpUrl: string) {
 }
 
 /**
- * 새 탭 하나에서 주소를 열고 고정 식 하나로 상태 JSON 글을 꺼낸다.
+ * 새 탭 하나에서 주소를 열고 고정 식 하나로 상태 JSON 글을 꺼내 `parse` 로 읽는다.
  *
  * 순서는 빈 탭 열기, 붙기, 대화상자 처리기와 `Page.enable`, `Page.navigate`, 준비 상태, 화면 분류, 꺼내기다.
  * 처리기를 이동 전에 걸어 이동 중에 뜬 `alert`, `confirm` 도 닫기로 넘긴다. 이 탭은 사람이 쓰는 탭이 아니다.
  * 로그인·캡차·기기 인증 화면이면 아무것도 누르지 않고 그 탭을 남긴 채 그 종류의 넘기기 결과(`isError` 없음)로 끝난다. 사람이 그 탭에서 푼다.
+ * 최종 주소가 네이버가 아니거나 `parse` 가 `NAVER_SHOPPING_PAGE_CHANGED` 를 내면(예상 밖 화면) 읽기를 멈추고 그 탭을 남긴 채
+ * `unexpected_page` 넘기기로 끝난다. 사람이 그 화면을 보고 판단한다. 그래서 `parse` 는 탭을 닫기 전에 부른다.
  * 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. 다른 탭은 읽지 않고, 앞서 사람에게 넘기며 남긴 탭만 먼저 닫는다.
- * 남긴 탭은 결과의 `handoff` 칸에 싣는다. 최종 주소가 네이버가 아니면 읽지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 다.
+ * 남긴 탭은 결과의 `handoff` 칸에 싣는다. 전체 제한 시간을 넘긴 실패는 탭을 닫고 일시 장애다.
  */
-export async function readInTab(
+export async function readInTab<T>(
   cdpUrl: string,
   url: string,
   expression: string,
+  parse: (raw: unknown) => T,
   options: TabOptions = {},
-) {
+): Promise<T> {
   const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const remaining = () => {
     const left = deadline - Date.now();
@@ -107,11 +110,24 @@ export async function readInTab(
     }
     if (!naverHost(probe.href))
       throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
-    return await evaluate(expression);
+    return parse(await evaluate(expression));
   } catch (error) {
-    throw keepTab || Date.now() < deadline
-      ? error
-      : new ToolError("NAVER_SHOPPING_UNAVAILABLE");
+    if (keepTab) throw error;
+    if (Date.now() >= deadline)
+      throw new ToolError("NAVER_SHOPPING_UNAVAILABLE");
+    if (
+      error instanceof ToolError &&
+      error.code === "NAVER_SHOPPING_PAGE_CHANGED" &&
+      !error.handoff
+    ) {
+      keepTab = true;
+      leftTabs.add(targetId);
+      throw new ToolError(error.code, {
+        need: "unexpected_page",
+        tab: targetId,
+      });
+    }
+    throw error;
   } finally {
     session?.close();
     if (!keepTab)

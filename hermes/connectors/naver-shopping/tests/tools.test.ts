@@ -16,9 +16,9 @@ const ENV = {
 function reader(answer: string | null) {
   const opened: { url: string; expression: string }[] = [];
   const deps: ToolDeps = {
-    read: async (_cdp, url, expression) => {
+    read: async (_cdp, url, expression, parse) => {
       opened.push({ url, expression });
-      return answer;
+      return parse(answer);
     },
   };
   return { opened, deps };
@@ -160,4 +160,22 @@ test("가짜 브라우저로 검색 도구를 끝까지 부르면 결과를 읽�
   );
   expect(result.count).toBe(1);
   expect(browser.http).toContain("GET /json/close/tab-1");
+});
+
+test("가짜 브라우저로 상세를 읽다 칸이 없으면 탭을 남긴 예상 밖 화면 넘기기로 끝난다", async () => {
+  browser = startFakeBrowser({ state: JSON.stringify({ present: false }) });
+  await expect(
+    productDetail(
+      { [BROWSER_URL_ENV]: browser.url },
+      "https://smartstore.naver.com/a/products/1",
+      { read: (await import("../src/tab.ts")).readInTab, tab: { pollMs: 1 } },
+    ),
+  ).rejects.toMatchObject({
+    code: "NAVER_SHOPPING_PAGE_CHANGED",
+    handoff: { need: "unexpected_page", tab: "tab-1" },
+  });
+  expect(browser.http.some((line) => line.includes("/json/close/"))).toBe(
+    false,
+  );
+  (await import("../src/tab.ts")).forgetLeftTabs();
 });

@@ -25,14 +25,14 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 
 ## 막혔을 때
 
-로그인, 보안 확인, 새 기기 확인에서 멈추면 오류가 아니라 `status` 가 `HUMAN_ACTION_REQUIRED` 인 결과가 온다. 성공이 아니고 결과가 없다. 코드는 `handoff.code` 에 있고 아래 표의 해당 줄을 따른다. 나머지 실패는 `error.code` 로 온다.
+로그인, 보안 확인, 새 기기 확인, 예상 밖 화면에서 멈추면 오류가 아니라 `status` 가 `HUMAN_ACTION_REQUIRED` 인 결과가 온다. 성공이 아니고 결과가 없다. 코드는 `handoff.code` 에 있고 아래 표의 해당 줄을 따른다. 나머지 실패는 `error.code` 로 온다.
 
 | 코드 | 사용자에게 |
 | --- | --- |
 | `NAVER_SHOPPING_LOGIN_REQUIRED` | 「내 브라우저」 에서 네이버에 다시 로그인해 달라고 한다 |
 | `NAVER_SHOPPING_CAPTCHA` | 「내 브라우저」 를 열면 보안 확인 화면의 탭이 남아 있다. 직접 풀고 다시 요청해 달라고 한다 |
 | `NAVER_SHOPPING_DEVICE_CHECK` | 「내 브라우저」 의 새 기기 확인 화면을 직접 마치고 다시 요청해 달라고 한다 |
-| `NAVER_SHOPPING_PAGE_CHANGED` | 네이버 화면이 바뀌어 읽지 못했다고 알린다. 다시 부르지 않는다 |
+| `NAVER_SHOPPING_PAGE_CHANGED` | 네이버 화면이 예상과 달라 읽지 못했다. 「내 브라우저」 에 남은 탭의 화면을 확인해 달라고 하고, 사용자가 확인했다고 하기 전에는 다시 부르지 않는다 |
 | `NAVER_SHOPPING_BROWSER_UNREACHABLE` | 브라우저를 켜는 중일 수 있다. 잠시 뒤 다시 요청해 달라고 한다 |
 | `NAVER_SHOPPING_NOT_FOUND` | 상품이 없거나 판매가 끝났다고 알린다 |
 
