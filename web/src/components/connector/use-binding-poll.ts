@@ -59,8 +59,10 @@ export function useConnectionPoll(
     if (!validId || busy) return;
     const fresh = await readConnection(id);
     if (!fresh.ok) return;
+    // 바뀐 것이 없으면 그대로 둔다. 연결 객체가 바뀌면 허락 목록이 다시 읽힌다.
     setLoaded((current) =>
-      current.kind === "ready"
+      current.kind === "ready" &&
+      JSON.stringify(current.connection) !== JSON.stringify(fresh.data)
         ? { ...current, connection: fresh.data }
         : current,
     );
