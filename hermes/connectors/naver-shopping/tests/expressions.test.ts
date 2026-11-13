@@ -12,12 +12,15 @@ function run(
   page: {
     nextData?: unknown;
     preloaded?: unknown;
+    /** `document.scripts` 의 글. 없으면 스크립트가 없는 화면이다. */
+    scripts?: string[];
     href?: string;
     /** 캡차 선택자에 걸리는 요소. 크기와 visibility 만 흉내 낸다. */
     captchaElements?: { width: number; height: number; hidden?: boolean }[];
   },
 ) {
   const document = {
+    scripts: (page.scripts ?? []).map((textContent) => ({ textContent })),
     getElementById: (id: string) =>
       id === "__NEXT_DATA__" && page.nextData !== undefined
         ? { textContent: JSON.stringify(page.nextData) }
@@ -44,19 +47,105 @@ function run(
   )(document, window, location, getComputedStyle);
 }
 
-test("검색 식은 __NEXT_DATA__ 의 상품 목록만 JSON 글로 꺼내고, 없으면 null 이다", () => {
-  const list = [{ item: { productTitle: "a" } }];
-  expect(
-    JSON.parse(
-      run(SEARCH_STATE, {
-        nextData: {
-          props: { pageProps: { initialState: { products: { list } } } },
-        },
-      }),
-    ),
-  ).toEqual(list);
+/** 합성 RSC 조각 스크립트. 실제 네이버 화면을 옮긴 것이 아니다. */
+function chunk(piece: string) {
+  return `self.__next_f.push(${JSON.stringify([1, piece])})`;
+}
+
+/** 합성 상품 객체 글. `extra` 는 그대로 덧붙는다. */
+function productJson(
+  id: string,
+  extra: Record<string, unknown> = {},
+  name = `합성 상품 ${id}`,
+) {
+  return JSON.stringify({
+    productName: name,
+    salePrice: 5000,
+    discountedSalePrice: 4500,
+    mallName: `합성몰 ${id}`,
+    productUrl: {
+      pcUrl: `https://smartstore.naver.com/shop${id}/products/${id}`,
+      mobileUrl: `https://m.smartstore.naver.com/shop${id}/products/${id}`,
+    },
+    nvMid: `mid${id}`,
+    channelProductId: `ch${id}`,
+    averageReviewScore: 4.5,
+    totalReviewCount: 12,
+    clickUrl: "https://ader.naver.com/x",
+    ...extra,
+  });
+}
+
+function searchResult(scripts: string[]) {
+  const raw = run(SEARCH_STATE, { scripts });
+  return raw === null ? null : JSON.parse(raw);
+}
+
+test("검색 식은 조각 스크립트를 이어 productName 객체의 필요한 칸만 JSON 글로 꺼낸다", () => {
+  const row = `1a:["$","div",null,{"children":[${productJson("1", { cardType: "AD", adId: "ad1" })},${productJson("2")}]}]\n`;
+  expect(searchResult([chunk(row)])).toEqual([
+    {
+      productName: "합성 상품 1",
+      salePrice: 5000,
+      discountedSalePrice: 4500,
+      mallName: "합성몰 1",
+      productUrl: { pcUrl: "https://smartstore.naver.com/shop1/products/1" },
+      nvMid: "mid1",
+      adId: "ad1",
+      cardType: "AD",
+    },
+    {
+      productName: "합성 상품 2",
+      salePrice: 5000,
+      discountedSalePrice: 4500,
+      mallName: "합성몰 2",
+      productUrl: { pcUrl: "https://smartstore.naver.com/shop2/products/2" },
+      nvMid: "mid2",
+    },
+  ]);
+});
+
+test("검색 식은 조각 경계에서 객체가 나뉘어도 이은 뒤에 한 번만 꺼낸다", () => {
+  const row = `1a:[${productJson("1")},${productJson("2")}]\n`;
+  // 문자열 값 한가운데와 객체 한가운데에서 자른다.
+  const first = row.indexOf("합성몰 1") + 2;
+  const second = row.indexOf('"nvMid":"mid2"');
+  const result = searchResult([
+    chunk(row.slice(0, first)),
+    "self.__next_f.push([0])",
+    chunk(row.slice(first, second)),
+    chunk(row.slice(second)),
+  ]);
+  expect(result.map((p: { nvMid: string }) => p.nvMid)).toEqual([
+    "mid1",
+    "mid2",
+  ]);
+});
+
+test("검색 식은 문자열 안의 중괄호와 따옴표, 조각이 아닌 줄과 다른 스크립트에 흔들리지 않는다", () => {
+  const rows = [
+    `2b:T10,따옴표 " 와 { 가 섞인 글\n`,
+    `1a:[${productJson("1", {}, '합성 {상품} "인용"')}]\n`,
+    `3c:["$","p",null,{"productNameLabel":"상품 이름"}]\n`,
+  ].join("");
+  const result = searchResult([
+    "window.dataLayer = [];",
+    chunk(rows),
+    "self.__next_f.push(",
+  ]);
+  expect(result).toHaveLength(1);
+  expect(result[0].productName).toBe('합성 {상품} "인용"');
+});
+
+test("검색 식은 상품 객체를 200개까지만 준다", () => {
+  const row = `1a:[${Array.from({ length: 250 }, (_, i) => productJson(String(i))).join(",")}]\n`;
+  expect(searchResult([chunk(row)])).toHaveLength(200);
+});
+
+test("검색 식은 조각 스크립트가 없으면 null, 상품이 없으면 빈 배열이다", () => {
   expect(run(SEARCH_STATE, {})).toBeNull();
-  expect(run(SEARCH_STATE, { nextData: { props: {} } })).toBeNull();
+  expect(run(SEARCH_STATE, { scripts: ["var a = 1;"] })).toBeNull();
+  expect(searchResult([chunk('1a:["$","div",null,{}]\n')])).toEqual([]);
 });
 
 test("묶음 식은 묶음 상태를 꺼낸다", () => {

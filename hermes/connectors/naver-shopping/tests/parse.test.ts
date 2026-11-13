@@ -6,24 +6,28 @@ import {
 } from "../src/parse-product.ts";
 import { parseSearch, searchLooksChanged } from "../src/parse-search.ts";
 
-/** 합성 검색 항목. 실제 네이버 화면을 옮긴 것이 아니다. */
+/** 합성 검색 항목(고정 식이 주는 평평한 모양). 실제 네이버 화면을 옮긴 것이 아니다. */
 function item(index: number, extra: Record<string, unknown> = {}) {
   return {
-    item: {
-      productTitle: `상품 ${index}`,
-      price: String(1000 + index),
-      mallName: `가게 ${index}`,
-      mallProductUrl: `https://smartstore.naver.com/shop${index}/products/${index}`,
-      ...extra,
+    productName: `상품 ${index}`,
+    salePrice: 2000 + index,
+    discountedSalePrice: 1000 + index,
+    mallName: `가게 ${index}`,
+    productUrl: {
+      pcUrl: `https://smartstore.naver.com/shop${index}/products/${index}`,
     },
+    nvMid: `mid${index}`,
+    ...extra,
   };
 }
 
 test("검색 결과는 40개까지, 화면 차례 그대로, 광고와 네이버페이 표시를 싣는다", () => {
   const list = [
-    { ...item(0), adcrUrl: "https://cr.shopping.naver.com/adcr" },
-    item(1, { npayYn: "Y" }),
-    ...Array.from({ length: 43 }, (_, i) => item(i + 2)),
+    item(0, { cardType: "AD", adId: "ad0" }),
+    item(1, { cardType: "SUPER_POINT" }),
+    item(2, { cardType: "AD" }),
+    item(3, { adId: "ad3" }),
+    ...Array.from({ length: 43 }, (_, i) => item(i + 4)),
   ];
   const products = parseSearch(list)!;
   expect(products).toHaveLength(40);
@@ -31,18 +35,60 @@ test("검색 결과는 40개까지, 화면 차례 그대로, 광고와 네이버
     rank: 1,
     title: "상품 0",
     price_krw: 1000,
+    store: "가게 0",
+    url: "https://smartstore.naver.com/shop0/products/0",
     ad: true,
     naver_pay: "unknown",
     kind: "store",
   });
-  expect(products[1]).toMatchObject({ rank: 2, ad: false, naver_pay: "yes" });
+  expect(products.slice(1, 4).map((product) => product.ad)).toEqual([
+    false,
+    true,
+    true,
+  ]);
+  expect(products.map((product) => product.rank)).toEqual(
+    Array.from({ length: 40 }, (_, i) => i + 1),
+  );
+});
+
+test("가격은 할인가가 있으면 할인가, 없거나 0 이면 정가다", () => {
+  const products = parseSearch([
+    item(1),
+    item(2, { discountedSalePrice: undefined }),
+    item(3, { discountedSalePrice: 0 }),
+    item(4, { discountedSalePrice: undefined, salePrice: undefined }),
+  ])!;
+  expect(products.map((product) => product.price_krw)).toEqual([
+    1001, 2002, 2003,
+  ]);
+});
+
+test("같은 nvMid 는 화면에서 처음 나온 한 번만 내고, nvMid 가 없는 항목은 모두 낸다", () => {
+  const products = parseSearch([
+    item(1, { cardType: "AD", adId: "ad1" }),
+    item(2),
+    item(1, { productName: "겹친 상품" }),
+    item(3, { nvMid: undefined }),
+    item(4, { nvMid: undefined }),
+  ])!;
+  expect(products.map((product) => [product.rank, product.title])).toEqual([
+    [1, "상품 1"],
+    [2, "상품 2"],
+    [3, "상품 3"],
+    [4, "상품 4"],
+  ]);
+  expect(products[0]!.ad).toBe(true);
 });
 
 test("거절 주소와 칸이 빠진 항목은 빼고, 바깥 쇼핑몰은 external 로 둔다", () => {
   const products = parseSearch([
-    item(1, { mallProductUrl: "http://smartstore.naver.com/a/products/1" }),
-    item(2, { price: undefined, lowPrice: undefined }),
-    item(3, { mallProductUrl: "https://www.example-mall.com/p/3" }),
+    item(1, {
+      productUrl: { pcUrl: "http://smartstore.naver.com/a/products/1" },
+    }),
+    item(2, { salePrice: undefined, discountedSalePrice: undefined }),
+    item(3, { productUrl: { pcUrl: "https://www.example-mall.com/p/3" } }),
+    item(4, { productUrl: undefined }),
+    item(5, { productName: undefined }),
   ])!;
   expect(products.map((product) => [product.title, product.kind])).toEqual([
     ["상품 3", "external"],
@@ -51,7 +97,8 @@ test("거절 주소와 칸이 빠진 항목은 빼고, 바깥 쇼핑몰은 exter
 
 test("목록이 배열이 아니면 null, 항목이 있는데 하나도 못 읽으면 바뀐 화면이다", () => {
   expect(parseSearch({ list: [] })).toBeNull();
-  const unreadable = [{ item: { name: "다른 모양" } }];
+  expect(parseSearch(null)).toBeNull();
+  const unreadable = [{ name: "다른 모양" }];
   expect(searchLooksChanged(unreadable, parseSearch(unreadable)!)).toBe(true);
   expect(searchLooksChanged([], parseSearch([])!)).toBe(false);
 });

@@ -148,12 +148,10 @@ test("가짜 브라우저로 검색 도구를 끝까지 부르면 결과를 읽�
   browser = startFakeBrowser({
     state: JSON.stringify([
       {
-        item: {
-          productTitle: "물티슈",
-          price: 9900,
-          mallName: "가게",
-          mallProductUrl: "https://smartstore.naver.com/a/products/1",
-        },
+        productName: "물티슈",
+        salePrice: 9900,
+        mallName: "가게",
+        productUrl: { pcUrl: "https://smartstore.naver.com/a/products/1" },
       },
     ]),
   });
