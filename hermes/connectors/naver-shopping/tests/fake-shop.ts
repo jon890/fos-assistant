@@ -37,6 +37,12 @@ export type ShopConfig = {
   landing?: "product" | "login";
   /** 「구매하기」 뒤. 기본은 층이다. */
   buy?: "layer" | "sheet-same" | "sheet-new" | "nothing";
+  /** 층의 옵션 드롭다운을 열려고 하면 새 탭에 주문서가 열린다(층을 잘못 알아본 경우). */
+  sheetOnLayerOption?: boolean;
+  /** 누르기 전부터 상품 화면에 「바로구매」 단추가 보인다. */
+  buyNowOnProduct?: boolean;
+  /** 주문서 금액 식에 CDP 오류로 답한다. */
+  amountError?: boolean;
   /** 「바로구매」 뒤. 기본은 같은 탭이 주문서로 넘어간다. */
   buyNow?: "same" | "new" | "nothing";
   /** 층 안의 옵션 드롭다운 수와 고를 수 있는 값. */
@@ -104,8 +110,12 @@ export function startFakeShop(config: ShopConfig = {}) {
         });
       }
       const rest = url.pathname.replace(`/${TOKEN}`, "");
-      log.push({ kind: "http", line: `${request.method} ${rest}${url.search}` });
-      const ws = (id: string) => `ws://${url.host}/${TOKEN}/devtools/page/${id}`;
+      log.push({
+        kind: "http",
+        line: `${request.method} ${rest}${url.search}`,
+      });
+      const ws = (id: string) =>
+        `ws://${url.host}/${TOKEN}/devtools/page/${id}`;
       if (rest.startsWith("/devtools/page/")) {
         const id = rest.slice("/devtools/page/".length);
         return srv.upgrade(request, { data: { tab: id } })
@@ -173,12 +183,15 @@ export function startFakeShop(config: ShopConfig = {}) {
         }
         if (message.method === "Runtime.callFunctionOn") {
           if (!FILL_FUNCTIONS.has(source)) return fail();
-          const [value] = params.arguments.map((a: { value: unknown }) => a.value);
+          const [value] = params.arguments.map(
+            (a: { value: unknown }) => a.value,
+          );
           const inLayer = tab.screen === "layer";
           let out: unknown = false;
-          if (source === OPEN_LAYER_OPTION)
+          if (source === OPEN_LAYER_OPTION) {
+            if (config.sheetOnLayerOption) newTab("sheet", SHEET_URL);
             out = inLayer && (value as number) < (config.layerOptions ?? 0);
-          else if (source === CHOOSE_OPTION)
+          } else if (source === CHOOSE_OPTION)
             out =
               inLayer && (config.layerValues ?? []).includes(value as string)
                 ? "ok"
@@ -223,7 +236,11 @@ export function startFakeShop(config: ShopConfig = {}) {
           } else if (buy === "sheet-new") newTab("sheet", SHEET_URL);
           return value(true);
         }
-        if (source === LAYER_OPEN) return value(tab.screen === "layer");
+        if (source === LAYER_OPEN)
+          return value(
+            tab.screen === "layer" ||
+              (tab.screen === "product" && config.buyNowOnProduct === true),
+          );
         if (source === PRESS_BUY_NOW) {
           if (tab.screen !== "layer") return value(false);
           const buyNow = config.buyNow ?? "same";
@@ -233,6 +250,7 @@ export function startFakeShop(config: ShopConfig = {}) {
           } else if (buyNow === "new") newTab("sheet", SHEET_URL);
           return value(true);
         }
+        if (source === ORDER_SHEET_AMOUNT && config.amountError) return fail();
         if (source === ORDER_SHEET_AMOUNT)
           return value(
             tab.screen === "sheet"
@@ -244,7 +262,9 @@ export function startFakeShop(config: ShopConfig = {}) {
     },
   });
   const cdpLines = () =>
-    log.filter((line): line is Extract<LogLine, { kind: "cdp" }> => line.kind === "cdp");
+    log.filter(
+      (line): line is Extract<LogLine, { kind: "cdp" }> => line.kind === "cdp",
+    );
   return {
     url: `http://127.0.0.1:${server.port}/${TOKEN}`,
     claimUrl: `http://127.0.0.1:${server.port}/internal/connector-executions/claim`,

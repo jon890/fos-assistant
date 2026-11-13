@@ -1,6 +1,8 @@
 import { logDiagnostic, ToolError } from "./errors.ts";
 import { PRODUCT_STATE } from "./expressions.ts";
+import { FREE_DELIVERY, PRODUCT } from "./fields.ts";
 import { chooseOption, MissingFields } from "./parse-product.ts";
+import { pick, won } from "./values.ts";
 import { readStore, type StoreRead } from "./product-read.ts";
 import { browserUrl, type Env } from "./session.ts";
 import { workInTab, type Page, type TabOptions } from "./tab.ts";
@@ -13,7 +15,11 @@ export const QUANTITY_MAX = 99;
 /** 원 단위 금액의 상한(10억 미만). Control Plane 과 대시보드의 주문서 검증과 같다. */
 const AMOUNT_BOUND = 1_000_000_000;
 
-export type CheckoutInput = { url: string; options: string[]; quantity: number };
+export type CheckoutInput = {
+  url: string;
+  options: string[];
+  quantity: number;
+};
 
 export type CheckoutDeps = {
   work: typeof workInTab;
@@ -47,7 +53,7 @@ export function checkInput(args: CheckoutInput) {
         typeof option !== "string" ||
         !option.trim() ||
         [...option].length > 100 ||
-        /[\u0000-\u001f\u007f]/.test(option),
+        /[\u0000-\u001f\u007f-\u009f]/.test(option),
     ) ||
     !Number.isSafeInteger(args.quantity) ||
     args.quantity < 1 ||
@@ -69,6 +75,13 @@ export function priceCheckout(
 ): PricedCheckout {
   const { product } = read;
   if (product.store === null) throw new MissingFields(["store"]);
+  // 유료 배송인데 기본 배송비 칸이 비면 0 으로 지어내지 않는다. 카드의 배송비가 틀려진다.
+  const delivery = pick(read.value, PRODUCT.delivery);
+  if (
+    pick(delivery, PRODUCT.feeType) !== FREE_DELIVERY &&
+    won(pick(delivery, PRODUCT.baseFee)) === null
+  )
+    throw new MissingFields(["delivery_fee"]);
   if (!product.naver_pay_buy) throw new ToolError("NAVER_SHOPPING_NOT_BUYABLE");
   const chosen = chooseOption(read.value, product, options);
   if (product.price_krw === null || product.title === null)

@@ -144,9 +144,9 @@ test("선언은 입력 칸이 없고 모든 도구가 사람이 연 대화에서
     string,
     { attended_only?: boolean; risk: string; approval?: string }
   >;
-  expect(Object.values(tools).every((tool) => tool.attended_only === true)).toBe(
-    true,
-  );
+  expect(
+    Object.values(tools).every((tool) => tool.attended_only === true),
+  ).toBe(true);
   for (const [name, tool] of Object.entries(tools))
     expect(tool.risk).toBe(name === "fill_checkout" ? "PURCHASE" : "READ");
   expect(tools.fill_checkout!.approval).toBe("always");

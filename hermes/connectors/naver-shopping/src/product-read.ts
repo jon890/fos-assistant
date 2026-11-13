@@ -10,8 +10,7 @@ const OPTION_POLL_MS = 250;
 /** 상품 식이 준 글에서 상품 칸을 꺼낸다. 상태가 없으면 바뀐 화면, 상품이 없으면 `null` 이다. */
 function productValue(raw: unknown): Json {
   const wrapped = parseJson(raw) as
-    | { present?: unknown; value?: unknown }
-    | undefined;
+    { present?: unknown; value?: unknown } | undefined;
   if (wrapped?.present !== true) throw new MissingFields(["preloaded_state"]);
   return wrapped.value;
 }

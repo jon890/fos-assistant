@@ -99,6 +99,8 @@ export const PURCHASE_LAYER = {
   layer:
     '[role="dialog"], [aria-modal="true"], [class*="layer" i], [class*="modal" i], [class*="sheet" i]',
   optionButton: 'button[aria-haspopup="listbox"]',
+  /** 펼쳐진 옵션 드롭다운 단추. `aria-controls` 가 값 목록을 가리킨다. */
+  openedOptionButton: 'button[aria-haspopup="listbox"][aria-expanded="true"]',
   optionItem: '[role="option"]',
   quantityInput: 'input[type="number"], input[inputmode="numeric"]',
 };
@@ -112,8 +114,7 @@ export const ORDER_SHEET = {
   host: "orders.pay.naver.com",
   pathPrefix: "/ordersheet/",
   /** 「총 주문금액」 줄의 금액. */
-  total:
-    'dl[class*="ProductPrice_total"] dd[class*="ProductPrice_desc-total"]',
+  total: 'dl[class*="ProductPrice_total"] dd[class*="ProductPrice_desc-total"]',
   /** 결제수단 절 머리의 같은 금액. */
   methodSummary: '#PAYMENT_WRAP [class*="ContentSection_summary"] em',
 };

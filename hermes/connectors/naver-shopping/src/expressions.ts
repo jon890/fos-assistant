@@ -194,10 +194,11 @@ export const ORDER_SHEET_AMOUNT = `(() => { try { if (location.hostname !== ${JS
 export const OPEN_LAYER_OPTION = `function (index) { try { ${ON_STORE} ${HELPERS} const b = [...layerScope().querySelectorAll(${JSON.stringify(PURCHASE_LAYER.optionButton)})].filter(visible)[index]; if (!b) return false; b.click(); return true; } catch { return false; } }`;
 
 /**
- * 열린 목록에서 글이 `label` 과 같은 값 하나를 고른다. 같은 것이 없으면 `label` 뒤에 빈칸이나 「(」 가 이어지는 것(추가 금액 표시)을 본다.
- * `ok`, `missing`, `ambiguous`, `disabled` 가운데 하나를 준다.
+ * 열린 목록에서 글이 `label` 과 같은 값 하나를 고른다. 같은 것이 없으면 `label` 뒤에 「 (」 나 「(」 가 이어지는 것(추가 금액 표시)만 본다.
+ * 목록은 층 안에서 펼친 드롭다운 단추의 `aria-controls` 가 가리키는 요소 안에서 찾고, 그 단추가 없을 때만 문서 전체를 본다.
+ * 층 밖 상품 화면의 드롭다운 값을 고르지 않게 하려는 것이다. `ok`, `missing`, `ambiguous`, `disabled` 가운데 하나를 준다.
  */
-export const CHOOSE_OPTION = `function (label) { try { ${ON_STORE} const visible = ${VISIBLE}; const items = [...document.querySelectorAll(${JSON.stringify(PURCHASE_LAYER.optionItem)})].filter(visible); const norm = (e) => (e.textContent ?? "").replace(/\\s+/g, " ").trim(); let hits = items.filter((e) => norm(e) === label); if (hits.length === 0) hits = items.filter((e) => norm(e).startsWith(label + " ") || norm(e).startsWith(label + "(")); if (hits.length === 0) return "missing"; if (hits.length > 1) return "ambiguous"; if (hits[0].getAttribute("aria-disabled") === "true") return "disabled"; hits[0].click(); return "ok"; } catch { return "missing"; } }`;
+export const CHOOSE_OPTION = `function (label) { try { ${ON_STORE} ${HELPERS} const opened = layerScope().querySelector(${JSON.stringify(PURCHASE_LAYER.openedOptionButton)}); const listId = opened?.getAttribute("aria-controls"); const root = listId ? document.getElementById(listId) : null; if (opened && !root) return "missing"; const items = [...(root ?? document).querySelectorAll(${JSON.stringify(PURCHASE_LAYER.optionItem)})].filter(visible); const norm = (e) => (e.textContent ?? "").replace(/\\s+/g, " ").trim(); let hits = items.filter((e) => norm(e) === label); if (hits.length === 0) hits = items.filter((e) => norm(e).startsWith(label + " (") || norm(e).startsWith(label + "(")); if (hits.length === 0) return "missing"; if (hits.length > 1) return "ambiguous"; if (hits[0].getAttribute("aria-disabled") === "true") return "disabled"; hits[0].click(); return "ok"; } catch { return "missing"; } }`;
 
 /**
  * 층 안의 수량 칸 하나에 `quantity` 를 넣고 지금 값을 준다. 같으면 넣지 않고 읽기만 한다.

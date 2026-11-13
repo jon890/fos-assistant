@@ -59,7 +59,9 @@ const DEFAULT_STEP_MS = 250;
 const DEFAULT_WAIT_MS = 15_000;
 
 /** claim 뒤 「바로구매」 전에 실패하면 이 코드들만 그대로 내고, 그 밖의 실패는 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 바꾼다. */
-const PASSED_AFTER_CLAIM = new Set<ErrorCode>(["NAVER_SHOPPING_CHECKOUT_FAILED"]);
+const PASSED_AFTER_CLAIM = new Set<ErrorCode>([
+  "NAVER_SHOPPING_CHECKOUT_FAILED",
+]);
 
 const failed = () => new ToolError("NAVER_SHOPPING_CHECKOUT_FAILED");
 
@@ -142,8 +144,13 @@ async function fillOnPage(
     sheet?.page.close();
     return { status: "UNKNOWN" as const, tab };
   };
+  // 누르기 전에 없던 탭만 주문서 후보다. 층 단계의 실패도 이 목록으로 주문서가 열렸는지 다시 본다.
+  let beforeBuy = new Set<string>();
   try {
-    let known = await tabIds(cdpUrl, page);
+    beforeBuy = await tabIds(cdpUrl, page);
+    let known = beforeBuy;
+    // 누르기 전부터 「바로구매」 가 보이면 누른 뒤 층을 알아볼 수 없다. 아무것도 누르지 않고 실패로 끝낸다.
+    if ((await page.evaluate(LAYER_OPEN)) === true) throw failed();
     phase = "buy";
     if ((await page.evaluate(PRESS_BUY)) !== true) {
       phase = "claimed";
@@ -173,9 +180,23 @@ async function fillOnPage(
       // 승인보다 크면 결과 판정이 넘기지 않으므로 주문서 탭을 닫는다. 상품 탭은 `workInTab` 이 닫는다.
       if (!sheet.own) await closeTab(cdpUrl, tab);
     } else if (sheet.own) page.keep();
-    return { status: "ORDER_SHEET_READY" as const, finalAmountKrw: finalAmount, tab };
+    return {
+      status: "ORDER_SHEET_READY" as const,
+      finalAmountKrw: finalAmount,
+      tab,
+    };
   } catch (error) {
     if (phase === "buy" || phase === "sent") return unknown();
+    if (phase === "layer") {
+      // 층으로 알아봤어도 그사이 주문서가 열렸을 수 있다. 열렸거나 확인하지 못하면 결과를 모르는 것이다.
+      const opened = await findSheet(cdpUrl, page, beforeBuy).catch(
+        () => "unchecked" as const,
+      );
+      if (opened !== null) {
+        if (opened !== "unchecked") sheet = opened;
+        return unknown();
+      }
+    }
     sheet?.page.close();
     if (error instanceof ToolError && PASSED_AFTER_CLAIM.has(error.code))
       throw error;
@@ -264,11 +285,9 @@ async function chooseInLayer(
   // 수량 칸이 없으면 층의 기본값 1 만 받는다.
   const matches = (value: unknown) =>
     value === input.quantity || (value === null && input.quantity === 1);
-  if (!matches(await page.call(SET_QUANTITY, [input.quantity])))
-    throw failed();
+  if (!matches(await page.call(SET_QUANTITY, [input.quantity]))) throw failed();
   await Bun.sleep(stepMs);
-  if (!matches(await page.call(SET_QUANTITY, [input.quantity])))
-    throw failed();
+  if (!matches(await page.call(SET_QUANTITY, [input.quantity]))) throw failed();
 }
 
 /** 주문서 탭에서 화면 분류를 하고 두 자리의 금액이 같아질 때까지 읽는다. 사람이 해야 하는 화면이거나 읽지 못하면 `null` 이다. */

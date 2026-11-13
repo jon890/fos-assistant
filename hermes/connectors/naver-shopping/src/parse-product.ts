@@ -184,7 +184,8 @@ export function chooseOption(
   product: NonNullable<ReturnType<typeof parseStoreProduct>>,
   wanted: string[],
 ): ChosenOption {
-  if (product.options_unknown) throw new ToolError("NAVER_SHOPPING_OPTIONS_UNKNOWN");
+  if (product.options_unknown)
+    throw new ToolError("NAVER_SHOPPING_OPTIONS_UNKNOWN");
   const labels = wanted.map((label) => text(label, OPTION_LABEL_MAX));
   if (labels.some((label) => label === null))
     throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");

@@ -97,8 +97,7 @@ export function createServer(env: Env = process.env, deps?: ServerDeps) {
         idempotentHint: false,
       },
     },
-    (input) =>
-      guard(() => fillCheckout(env, authority, input, deps?.fill)),
+    (input) => guard(() => fillCheckout(env, authority, input, deps?.fill)),
   );
   return server;
 }

@@ -36,7 +36,11 @@ export function strictJson(
     while (position < raw.length) {
       const char = raw[position++];
       if (char === "\\") position++;
-      else if (char === '"') return JSON.parse(raw.slice(start, position));
+      else if (char === '"') {
+        const value = JSON.parse(raw.slice(start, position));
+        if (!value.isWellFormed()) reject();
+        return value;
+      }
     }
     return reject();
   };
@@ -86,6 +90,7 @@ export function strictJson(
       !/^[1-9][0-9]*$/.test(token[0])
     )
       reject();
+    if (typeof value === "number" && !Number.isFinite(value)) reject();
     return value;
   };
   try {
@@ -93,6 +98,35 @@ export function strictJson(
     whitespace();
     if (position !== raw.length) reject();
     return parsed;
+  } catch {
+    return reject();
+  }
+}
+
+/** 응답 본문을 상한까지만 읽는다. 넘으면 읽기를 멈추고 거절한다. */
+async function bounded(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > RESPONSE_MAX) {
+        await reader.cancel().catch(() => {});
+        return reject();
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return reject();
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      Buffer.concat(chunks),
+    );
   } catch {
     return reject();
   }
@@ -161,7 +195,9 @@ export function verifyApproval(
   }
   const digest = sha256(raw);
   const expires =
-    typeof payload?.expiresAt === "string" ? Date.parse(payload.expiresAt) : NaN;
+    typeof payload?.expiresAt === "string"
+      ? Date.parse(payload.expiresAt)
+      : NaN;
   const issued =
     typeof payload?.issuedAt === "string" ? Date.parse(payload.issuedAt) : NaN;
   if (
@@ -205,7 +241,12 @@ export function verifyApproval(
           "content-type": "application/json",
           accept: "application/json",
         },
-        body: JSON.stringify({ ticket, tool, argsSha256: digest, scope: SCOPE }),
+        body: JSON.stringify({
+          ticket,
+          tool,
+          argsSha256: digest,
+          scope: SCOPE,
+        }),
         signal: AbortSignal.timeout(
           Math.max(1, Math.ceil(Math.min(10000, expires - now()))),
         ),
@@ -217,8 +258,7 @@ export function verifyApproval(
       await response.body?.cancel().catch(() => {});
       return reject();
     }
-    const text = await response.text().catch(() => "");
-    if (Buffer.byteLength(text) > RESPONSE_MAX) reject();
+    const text = await bounded(response);
     const result = strictJson(text, RESPONSE_MAX, true);
     if (
       !isDeepStrictEqual(Object.keys(result ?? {}).sort(), [
@@ -233,5 +273,7 @@ export function verifyApproval(
       result.expiresAt !== payload.expiresAt
     )
       reject();
+    // 응답을 기다리는 사이 만료됐으면 소비했어도 누르지 않는다.
+    if (now() >= expires) reject();
   };
 }

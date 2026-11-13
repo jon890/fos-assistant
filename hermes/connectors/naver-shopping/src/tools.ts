@@ -1,10 +1,6 @@
 import { logDiagnostic, ToolError } from "./errors.ts";
 import { CATALOG_STATE, PRODUCT_STATE, SEARCH_STATE } from "./expressions.ts";
-import {
-  MissingFields,
-  parseCatalog,
-  selectCatalog,
-} from "./parse-product.ts";
+import { MissingFields, parseCatalog, selectCatalog } from "./parse-product.ts";
 import { readStore } from "./product-read.ts";
 import { parseSearch, searchLooksChanged } from "./parse-search.ts";
 import { browserUrl, type Env } from "./session.ts";
