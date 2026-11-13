@@ -4,11 +4,11 @@ import {
   MissingFields,
   parseCatalog,
   selectCatalog,
-  parseStoreProduct,
 } from "./parse-product.ts";
+import { readStore } from "./product-read.ts";
 import { parseSearch, searchLooksChanged } from "./parse-search.ts";
 import { browserUrl, type Env } from "./session.ts";
-import { readInTab, type TabOptions } from "./tab.ts";
+import { readInTab, type Page, type TabOptions } from "./tab.ts";
 import { classifyUrl, searchUrl } from "./urls.ts";
 import { parseJson } from "./values.ts";
 
@@ -74,7 +74,7 @@ export async function productDetail(
     return { kind: "external" as const, url: target.url, buyable: false };
   const cdpUrl = browserUrl(env);
   const tool = "get_product_detail";
-  const read = (raw: unknown) => {
+  const read = async (raw: unknown, page?: Page) => {
     try {
       if (target.kind === "catalog") {
         const state = parseJson(raw);
@@ -82,13 +82,7 @@ export async function productDetail(
           throw new MissingFields(["catalog"]);
         return parseCatalog(selectCatalog(state, target.url), target.url);
       }
-      const wrapped = parseJson(raw) as
-        { present?: unknown; value?: unknown } | undefined;
-      if (wrapped?.present !== true)
-        throw new MissingFields(["preloaded_state"]);
-      const product = parseStoreProduct(wrapped.value, target.url);
-      if (product === null) throw new ToolError("NAVER_SHOPPING_NOT_FOUND");
-      return product;
+      return (await readStore(raw, target.url, page)).product;
     } catch (error) {
       if (!(error instanceof MissingFields)) throw error;
       logDiagnostic(tool, `parse.${target.kind}`, error.fields);

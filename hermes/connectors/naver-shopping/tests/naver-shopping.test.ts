@@ -49,14 +49,15 @@ test("중계 주소가 비면 닿지 않음, 모양이 틀리면 입력 오류�
   });
 });
 
-test("서버의 도구는 선언과 같고 모두 읽기 전용이며 설명은 선언 그대로다", async () => {
+test("서버의 도구는 선언과 같고 채우기 말고는 읽기 전용이며 설명은 선언 그대로다", async () => {
   const client = await connect({});
   const { tools } = await client.listTools();
   expect(tools.map((tool) => tool.name).sort()).toEqual(
     Object.keys(manifest.tools).sort(),
   );
   for (const tool of tools) {
-    expect(tool.annotations?.readOnlyHint).toBe(true);
+    // 대시보드는 준비 도구가 읽기 전용일 때만 부른다. 채우기만 계정 상태를 바꾸는 도구다.
+    expect(tool.annotations?.readOnlyHint).toBe(tool.name !== "fill_checkout");
     expect(tool.description).toBe(
       manifest.tools[tool.name as keyof typeof manifest.tools].description,
     );
@@ -137,13 +138,25 @@ test("화면 넘기기가 아닌 실패는 그대로 isError 결과다", async (
   });
 });
 
-test("선언은 입력 칸이 없고 모든 도구가 사람이 연 대화에서만 돌며 로그인 화면 주소가 네이버다", () => {
+test("선언은 입력 칸이 없고 모든 도구가 사람이 연 대화에서만 돌며 채우기만 구매 위험도다", () => {
   expect(manifest.fields).toEqual([]);
-  expect(
-    Object.values(manifest.tools).every(
-      (tool) => tool.attended_only === true && tool.risk === "READ",
-    ),
-  ).toBe(true);
+  const tools = manifest.tools as Record<
+    string,
+    { attended_only?: boolean; risk: string; approval?: string }
+  >;
+  expect(Object.values(tools).every((tool) => tool.attended_only === true)).toBe(
+    true,
+  );
+  for (const [name, tool] of Object.entries(tools))
+    expect(tool.risk).toBe(name === "fill_checkout" ? "PURCHASE" : "READ");
+  expect(tools.fill_checkout!.approval).toBe("always");
+  expect(manifest.execution_guard).toEqual({
+    protocol: "approval-claim-v2",
+    prepare_tool: "prepare_checkout",
+    scope_fields: [],
+    operations: { fill_checkout: "CREATE" },
+    kinds: { fill_checkout: "CHECKOUT" },
+  });
   expect(new URL(manifest.owner_browser_login_url).hostname).toBe(
     "nid.naver.com",
   );
