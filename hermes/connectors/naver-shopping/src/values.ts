@@ -50,11 +50,6 @@ export function text(value: Json, max: number): string | null {
   return cleaned ? [...cleaned].slice(0, max).join("") : null;
 }
 
-/** `true`, `"Y"`, `"true"` 를 참으로 읽는다. */
-export function yes(value: Json) {
-  return value === true || value === "Y" || value === "true";
-}
-
 export function list(value: Json): Json[] {
   return Array.isArray(value) ? value : [];
 }

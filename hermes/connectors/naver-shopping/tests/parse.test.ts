@@ -271,45 +271,56 @@ test("상품이 없으면 null, 이름이나 가격이나 배송 칸이 없으�
   }
 });
 
-test("가격비교 묶음은 네이버페이로 바로 사는 스토어 판매처만 싣는다", () => {
+test("가격비교 묶음은 이름, 최저가, 배송비를 읽고 판매처 목록은 읽지 못했다고 싣는다", () => {
   const parsed = parseCatalog(
     {
-      info: { productName: "물티슈 묶음" },
-      products: [
-        {
-          mallName: "가게 A",
-          price: 9900,
-          deliveryFee: 0,
-          pcProductUrl: "https://smartstore.naver.com/a/products/1",
-          isNaverPay: true,
-        },
-        {
-          mallName: "가게 B",
-          price: 9800,
-          pcProductUrl: "https://www.example-mall.com/p/2",
-          isNaverPay: true,
-        },
-        {
-          mallName: "가게 C",
-          price: 9700,
-          pcProductUrl: "https://smartstore.naver.com/c/products/3",
-          npayYn: "N",
-        },
-      ],
+      nCatalogId: "1000",
+      productName: "합성 묶음",
+      lowestPrice: 9900,
+      deliveryFee: 2500,
+      lowestPriceWithFee: 12400,
+      differentialDeliveryFeeContent: "제주 추가 3,000원",
+      categoryId: "50000001",
     },
-    "https://search.shopping.naver.com/catalog/1",
+    "https://search.shopping.naver.com/catalog/1000",
   );
-  expect(parsed.title).toBe("물티슈 묶음");
-  expect(parsed.sellers).toEqual([
-    {
-      store: "가게 A",
-      price_krw: 9900,
-      shipping_fee_krw: 0,
-      url: "https://smartstore.naver.com/a/products/1",
-    },
-  ]);
+  expect(parsed).toEqual({
+    kind: "catalog",
+    url: "https://search.shopping.naver.com/catalog/1000",
+    title: "합성 묶음",
+    lowest_price_krw: 9900,
+    delivery_fee_krw: 2500,
+    lowest_price_with_fee_krw: 12400,
+    regional_extra: true,
+    sellers: [],
+    offers_unknown: true,
+  });
 });
 
-test("묶음 화면에 이름이나 판매처 목록이 없으면 빠진 칸을 알린다", () => {
-  expect(() => parseCatalog({ info: {} }, "u")).toThrow(MissingFields);
+test("묶음의 배송비 칸이 비면 지어내지 않고 null 이고, 지역 추가 배송비 안내가 없으면 거짓이다", () => {
+  expect(
+    parseCatalog({ productName: "합성 묶음", lowestPrice: 9900 }, "u"),
+  ).toMatchObject({
+    lowest_price_krw: 9900,
+    delivery_fee_krw: null,
+    lowest_price_with_fee_krw: null,
+    regional_extra: false,
+  });
+  // 무료 배송은 0 이다.
+  expect(
+    parseCatalog(
+      { productName: "합성 묶음", lowestPrice: 9900, deliveryFee: 0 },
+      "u",
+    ),
+  ).toMatchObject({ delivery_fee_krw: 0 });
+});
+
+test("묶음 화면에 이름이나 최저가가 없으면 빠진 칸을 알린다", () => {
+  expect(() => parseCatalog({ lowestPrice: 1 }, "u")).toThrow(MissingFields);
+  try {
+    parseCatalog({}, "u");
+  } catch (error) {
+    expect((error as MissingFields).fields).toEqual(["title", "lowest_price"]);
+  }
+  expect(() => parseCatalog(null, "u")).toThrow(MissingFields);
 });

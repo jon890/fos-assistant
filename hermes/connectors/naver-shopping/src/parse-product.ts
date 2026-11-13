@@ -1,7 +1,6 @@
 import { CATALOG, FREE_DELIVERY, PRODUCT, SALE_STATUS } from "./fields.ts";
 import { STORE_MAX, TITLE_MAX } from "./parse-search.ts";
-import { classifyUrl } from "./urls.ts";
-import { list, pick, text, won, yes, type Json } from "./values.ts";
+import { list, pick, text, won, type Json } from "./values.ts";
 
 export const OPTION_GROUPS_MAX = 20;
 export const OPTION_VALUES_MAX = 100;
@@ -112,41 +111,30 @@ export function parseStoreProduct(product: Json, url: string) {
   };
 }
 
-/** 가격비교 묶음. 네이버페이로 바로 사는 판매처만 싣는다. */
+/**
+ * 가격비교 묶음. 이름, 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽는 칸을 가려내지 못해 지어내지 않고 빈 `sellers` 에
+ * `offers_unknown: true` 를 실어, 담당이 판매처별 가격을 사용자의 「내 브라우저」 에서 확인하게 한다.
+ */
 export function parseCatalog(state: Json, url: string) {
   if (state === null || typeof state !== "object")
     throw new MissingFields(["catalog"]);
   const title = text(pick(state, CATALOG.title), TITLE_MAX);
-  const sellers = pick(state, CATALOG.sellers);
-  if (title === null || !Array.isArray(sellers)) {
+  const lowest = won(pick(state, CATALOG.lowestPrice));
+  if (title === null || lowest === null) {
     throw new MissingFields([
       ...(title === null ? ["title"] : []),
-      ...(Array.isArray(sellers) ? [] : ["sellers"]),
+      ...(lowest === null ? ["lowest_price"] : []),
     ]);
   }
   return {
     kind: "catalog" as const,
     url,
     title,
-    sellers: sellers
-      .flatMap((seller) => {
-        const target = classifyUrl(pick(seller, CATALOG.url));
-        const price = won(pick(seller, CATALOG.price));
-        if (
-          !yes(pick(seller, CATALOG.naverPay)) ||
-          target?.kind !== "store" ||
-          price === null
-        )
-          return [];
-        return [
-          {
-            store: text(pick(seller, CATALOG.store), STORE_MAX),
-            price_krw: price,
-            shipping_fee_krw: won(pick(seller, CATALOG.shippingFee)),
-            url: target.url,
-          },
-        ];
-      })
-      .slice(0, OPTION_VALUES_MAX),
+    lowest_price_krw: lowest,
+    delivery_fee_krw: won(pick(state, CATALOG.deliveryFee)),
+    lowest_price_with_fee_krw: won(pick(state, CATALOG.lowestPriceWithFee)),
+    regional_extra: text(pick(state, CATALOG.regionalNote), 200) !== null,
+    sellers: [] as never[],
+    offers_unknown: true as const,
   };
 }

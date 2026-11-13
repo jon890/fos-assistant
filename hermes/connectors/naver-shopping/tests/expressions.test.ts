@@ -165,15 +165,88 @@ test("검색 식은 조각 스크립트가 없으면 null, 상품이 없으면 �
   expect(searchResult([chunk('1a:["$","div",null,{}]\n')])).toEqual([]);
 });
 
-test("묶음 식은 묶음 상태를 꺼낸다", () => {
-  const catalog = { info: { productName: "묶음" } };
+/** 합성 묶음 객체 글. 실제 상품 이름과 값이 아니다. */
+function catalogJson(extra: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    nCatalogId: "1000",
+    productName: "합성 묶음",
+    lowestPrice: 9900,
+    deliveryFee: 2500,
+    lowestPriceWithFee: 12400,
+    differentialDeliveryFeeContent: "제주 추가 3,000원",
+    categoryId: "50000001",
+    reviewCount: 7,
+    ...extra,
+  });
+}
+
+/** 같은 조각에 실리는 광고·추천 상품 객체. 묶음 키(`nCatalogId`, `lowestPrice`)가 없다. */
+function adJson(id: string) {
+  return JSON.stringify({
+    productName: `합성 광고 ${id}`,
+    price: 7000,
+    mallName: `합성몰 ${id}`,
+    deliveryFee: 3000,
+    isAd: true,
+    recInfo: '{"area":"CATALOG"}',
+  });
+}
+
+function catalogResult(scripts: string[]) {
+  const raw = run(CATALOG_STATE, { scripts });
+  return raw === null ? null : JSON.parse(raw);
+}
+
+const CATALOG_EXPECTED = {
+  nCatalogId: "1000",
+  productName: "합성 묶음",
+  lowestPrice: 9900,
+  deliveryFee: 2500,
+  lowestPriceWithFee: 12400,
+  differentialDeliveryFeeContent: "제주 추가 3,000원",
+  categoryId: "50000001",
+};
+
+test("묶음 식은 조각을 이어 nCatalogId 와 lowestPrice 를 가진 객체 하나의 필요한 칸만 꺼낸다", () => {
+  const row = `1a:["$","div",null,{"children":[${adJson("1")},${catalogJson()},${adJson("2")}]}]\n`;
+  expect(catalogResult([chunk(row)])).toEqual(CATALOG_EXPECTED);
+});
+
+test("묶음 식은 조각 경계에서 객체가 나뉘어도 이은 뒤에 꺼낸다", () => {
+  const row = `1a:[${adJson("1")},${catalogJson()}]\n`;
+  const first = row.indexOf("합성 묶음") + 2;
+  const second = row.indexOf('"deliveryFee":2500');
   expect(
-    JSON.parse(
-      run(CATALOG_STATE, {
-        nextData: { props: { pageProps: { initialState: { catalog } } } },
-      }),
-    ),
-  ).toEqual(catalog);
+    catalogResult([
+      chunk(row.slice(0, first)),
+      "self.__next_f.push([0])",
+      chunk(row.slice(first, second)),
+      chunk(row.slice(second)),
+    ]),
+  ).toEqual(CATALOG_EXPECTED);
+});
+
+test("묶음 식은 앞의 텍스트 행에 짝 없는 따옴표와 괄호가 있어도 뒤 묶음 행을 읽는다", () => {
+  const body = `짝 없는 " 따옴표 { 괄호 한글`;
+  const textRow = `2b:T${Buffer.byteLength(body).toString(16)},${body}`;
+  expect(
+    catalogResult([chunk(`${textRow}1a:[${adJson("1")},${catalogJson()}]\n`)]),
+  ).toEqual(CATALOG_EXPECTED);
+});
+
+test("묶음 식은 두 키 가운데 하나만 가진 객체를 묶음으로 보지 않고, 없으면 null 이다", () => {
+  const onlyPrice = JSON.stringify({ productName: "합성", lowestPrice: 1 });
+  const onlyId = JSON.stringify({ nCatalogId: "1", productName: "합성" });
+  expect(
+    catalogResult([chunk(`1a:[${adJson("1")},${onlyPrice},${onlyId}]\n`)]),
+  ).toBeNull();
+  expect(run(CATALOG_STATE, {})).toBeNull();
+  expect(run(CATALOG_STATE, { scripts: ["var a = 1;"] })).toBeNull();
+});
+
+test("묶음 식은 묶음 객체가 값이 비어 있어도 칸만 있으면 꺼내 parse 가 거르게 한다", () => {
+  const row = `1a:[${catalogJson({ lowestPrice: null, productName: "합성" })}]\n`;
+  expect(catalogResult([chunk(row)])).toMatchObject({ lowestPrice: null });
 });
 
 test("상품 식은 상태가 있는지와 상품을 함께 주고, 상태가 없으면 null 이다", () => {

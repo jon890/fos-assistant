@@ -3,19 +3,13 @@
  *
  * **검색 화면은 2026-11-13 실제 화면으로 쟀다.** App Router 의 조각(`self.__next_f.push`)을 이은 글에서 `productName` 을 가진
  * 객체를 꺼내고, 그 칸 이름이 아래 `SEARCH_ITEM` 이다. **상품 화면(`PRODUCT_STATE_PATH`, `PRODUCT`)도 2026-11-13 실제 화면으로
- * 쟀다**(옵션 칸 제외: 잰 상품이 모두 `optionUsable: false` 라 옵션 칸 이름은 가설이다). 가격비교 묶음 화면
- * (`CATALOG_STATE_PATH`, `CATALOG`)은 **아직 실제 화면으로 확인하지 않은 가설이다.**
+ * 쟀다**(옵션 칸 제외: 잰 상품이 모두 `optionUsable: false` 라 옵션 칸 이름은 가설이다). **가격비교 묶음 화면(`CATALOG`)은
+ * 2026-11-13 실측(판매처 목록 제외)이다.** 검색 화면처럼 조각에서 `nCatalogId` 와 `lowestPrice` 를 가진 객체를 꺼내고, 판매처별
+ * 가격 목록은 어느 객체인지 가려내지 못해 읽지 않는다.
  * 칸마다 후보 이름을 차례로 보고, 필수 칸이 비면 결과를 지어내지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다.
  * 사용자가 실제 계정으로 확인한 뒤 이 표만 고친다(docs/features/naver-shopping.md 의 「실제 계정으로 확인하기」).
  */
 
-/** 가격비교 묶음 화면(Next.js)의 `__NEXT_DATA__` 에서 묶음 상태까지의 경로. */
-export const CATALOG_STATE_PATH = [
-  "props",
-  "pageProps",
-  "initialState",
-  "catalog",
-];
 /**
  * 스마트스토어·브랜드스토어 상품 화면의 `window.__PRELOADED_STATE__` 에서 상품까지의 경로(2026-11-13 실측).
  * 같은 상태의 `product` 는 칸만 있고 값이 비어 있다(`name` 없음, `salePrice` 0). 옛 후보 `product.A` 를 남기면 그 빈 객체를
@@ -71,13 +65,16 @@ export const FREE_DELIVERY = "FREE";
 /** 바로 살 수 있는 상품 상태 값. */
 export const SALE_STATUS = "SALE";
 
-/** 가격비교 묶음 화면. */
+/**
+ * 가격비교 묶음 화면(2026-11-13 실측, 판매처 목록 제외). 고정 식이 `nCatalogId` 와 `lowestPrice` 를 함께 가진 객체에서 아래 칸만
+ * 골라 준다. `lowestPrice` 는 숫자, `lowestPriceWithFee` 는 배송비를 포함한 최저가, `differentialDeliveryFeeContent` 는 지역 추가
+ * 배송비 안내 글이다. 판매처별 가격 목록 칸은 확인하지 못해 두지 않는다.
+ */
 export const CATALOG = {
-  title: [["info", "productName"], ["productName"], ["info", "name"]],
-  sellers: [["products"], ["mallList"], ["malls"]],
-  store: ["mallName", "mallNm"],
-  price: ["price", "lowPrice"],
-  shippingFee: ["deliveryFee", "deliveryFeeContent"],
-  url: ["pcProductUrl", "productUrl", "mallProductUrl"],
-  naverPay: ["isNaverPay", "npayYn", "naverPayYn"],
+  title: ["productName"],
+  lowestPrice: ["lowestPrice"],
+  deliveryFee: ["deliveryFee"],
+  lowestPriceWithFee: ["lowestPriceWithFee"],
+  /** 글이 있으면 지역 추가 배송비 안내가 있는 것으로 본다. */
+  regionalNote: ["differentialDeliveryFeeContent"],
 };
