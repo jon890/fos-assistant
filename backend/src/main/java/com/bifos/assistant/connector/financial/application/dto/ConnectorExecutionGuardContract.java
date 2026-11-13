@@ -28,6 +28,12 @@ public record ConnectorExecutionGuardContract(
     }
 
 
+    /** 주문서 준비 선언인가. 그 선언의 실행 도구는 모두 위험도 {@code PURCHASE} 이고 scope 가 없다(ADR-20261113 / purchase-checkout). */
+    public boolean checkout() {
+        return kinds.containsValue(ConnectorExecutionSnapshot.CHECKOUT);
+    }
+
+
     public record ScopeField(String arg, String field) {
     }
 }

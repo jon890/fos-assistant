@@ -147,8 +147,9 @@ public class ConnectorExecutionClaimCodec {
     }
 
 
+    /** 주문서 준비는 계좌 같은 공개 칸이 없어 빈 object 다(ADR-20261113 / purchase-checkout). 저장 scope 와 같은지는 claim 이 본다. */
     private static Map<String, String> scope(JsonNode node) {
-        require(node != null && node.isObject() && !node.isEmpty() && node.size() <= 8);
+        require(node != null && node.isObject() && node.size() <= 8);
         var values = new LinkedHashMap<String, String>();
         for (var entry : node.properties()) {
             require(entry.getKey().matches("[A-Za-z][A-Za-z0-9_]{0,63}"));

@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 class ConnectorConversationActionPurge implements ConversationActionPurge {
     private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+    /** 하루 합계가 본문을 읽는 위험도다. 금융 주문과 주문서 준비다(ADR-20261113 / purchase-checkout). */
+    private static final Set<ToolRisk> SPENDING = Set.of(ToolRisk.FINANCIAL, ToolRisk.PURCHASE);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
@@ -31,7 +33,7 @@ class ConnectorConversationActionPurge implements ConversationActionPurge {
     @Transactional(propagation = Propagation.MANDATORY)
     public int eraseBodies(Long conversationId, Instant now) {
         mutations.requireParticipant(conversationId);
-        List<Long> ids = actions.findErasableBodyIds(conversationId, OPEN, ToolRisk.FINANCIAL, ActionStatus.SUCCEEDED, dayStart(now));
+        List<Long> ids = actions.findErasableBodyIds(conversationId, OPEN, SPENDING, ActionStatus.SUCCEEDED, dayStart(now));
         if (ids.isEmpty()) {
             return 0;
         }
@@ -44,7 +46,7 @@ class ConnectorConversationActionPurge implements ConversationActionPurge {
     @Override
     @Transactional(readOnly = true)
     public List<Long> findPurgedCandidates(List<Long> skipped, int limit, Instant now) {
-        return actions.findPurgedConversationsWithBodies(skipped, OPEN, ToolRisk.FINANCIAL, ActionStatus.SUCCEEDED, dayStart(now),
+        return actions.findPurgedConversationsWithBodies(skipped, OPEN, SPENDING, ActionStatus.SUCCEEDED, dayStart(now),
             PageRequest.of(0, limit));
     }
 

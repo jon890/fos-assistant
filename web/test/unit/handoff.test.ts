@@ -18,11 +18,13 @@ const row = {
   need: "LOGIN",
   tab: "ABCDEF0123456789",
   createdAt: "2026-11-10T00:00:00Z",
+  finalAmountKrw: null,
+  expectedTotalKrw: null,
 };
 
 test("계약대로 온 줄만 카드로 읽고, 단계 밖이나 탭 모양 밖이면 버린다", () => {
   assert.deepEqual(safeHandoff(row), row);
-  assert.equal(safeHandoff({ ...row, need: "PAYMENT" }), null);
+  assert.equal(safeHandoff({ ...row, need: "payment" }), null);
   assert.equal(safeHandoff({ ...row, tab: "../json/close" }), null);
   assert.equal(safeHandoff({ ...row, connectorTitle: 3 }), null);
   assert.equal(safeHandoff(null), null);
@@ -46,14 +48,33 @@ test("봇 탐지와 예상 밖 화면 줄도 카드로 읽고 정해 둔 제목�
   );
 });
 
+test("결제 넘기기는 두 금액을 읽고, 탭 확인만 탭 없이 오며 탭 없는 화면으로 간다", () => {
+  const payment = safeHandoff({ ...row, need: "PAYMENT", finalAmountKrw: 23000, expectedTotalKrw: 23000 });
+  assert.equal(payment?.finalAmountKrw, 23000);
+  assert.equal(payment?.expectedTotalKrw, 23000);
+  assert.equal(safeHandoff({ ...row, need: "PAYMENT", finalAmountKrw: "23000" })?.finalAmountKrw, null);
+  assert.equal(HANDOFF_TEXT.PAYMENT.title, "「내 브라우저」에서 결제해 주세요");
+  assert.equal(HANDOFF_TEXT.PAYMENT.done, "「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요.");
+  assert.equal(HANDOFF_TEXT.TAB_CHECK.title, "「내 브라우저」에 열린 탭을 확인해 주세요");
+  const lost = safeHandoff({ ...row, need: "TAB_CHECK", tab: null });
+  assert.equal(lost?.tab, null);
+  assert.equal(handoffBrowserHref(lost!), "/browser");
+  assert.equal(safeHandoff({ ...row, need: "LOGIN", tab: null }), null);
+  assert.deepEqual(watchHandoffTab({ phase: "waiting" }, null, [{ id: "A", url: "https://example.com" }]), {
+    state: { phase: "off" },
+    changed: false,
+  });
+});
+
 test("「내 브라우저 열기」 는 그 탭을 고른 채 내 브라우저 화면으로 간다", () => {
   const handoff = safeHandoff(row)!;
   assert.equal(handoffBrowserHref(handoff), "/browser?tab=ABCDEF0123456789");
 });
 
-test("단계마다 카드 제목과 「다 했어요」 글이 있고 글은 이어 가 달라는 말로 끝난다", () => {
+test("단계마다 카드 제목과 「다 했어요」 글이 있고 사람 화면의 글은 이어 가 달라는 말로 끝난다", () => {
   for (const need of HANDOFF_NEEDS) {
-    assert.ok(HANDOFF_TEXT[need].title.startsWith("「내 브라우저」에서"));
+    assert.ok(HANDOFF_TEXT[need].title.startsWith("「내 브라우저」"));
+    if (need === "PAYMENT" || need === "TAB_CHECK") continue;
     assert.ok(
       HANDOFF_TEXT[need].done.endsWith("멈춘 단계부터 이어서 해 주세요."),
     );

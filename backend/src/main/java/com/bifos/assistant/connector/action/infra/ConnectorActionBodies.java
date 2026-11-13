@@ -67,7 +67,8 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
         if (action.id() == null || plain == null) {
             throw new IllegalStateException("connector action body requires an id and content");
         }
-        if (!cipher.enabled() && action.risk() != ToolRisk.FINANCIAL) {
+        // 금융 줄과 구매 줄은 암호화가 꺼져 있으면 평문으로 남기지 않고 막는다(ADR-20261113 / purchase-checkout).
+        if (!cipher.enabled() && action.risk() != ToolRisk.FINANCIAL && action.risk() != ToolRisk.PURCHASE) {
             return new SealedText(plain, null);
         }
         var sealed = cipher.seal(action.userId(), aad(action, column), plain)

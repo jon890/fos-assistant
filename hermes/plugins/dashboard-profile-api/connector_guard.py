@@ -67,21 +67,29 @@ def _guard_manifest(manifest, declared):
         raise ValueError("prepare_tool 은 READ/none 도구다")
     operations = guard["operations"]
     if (not isinstance(operations, dict) or not 1 <= len(operations) <= 8
-            or any(not isinstance(name, str) or policies.get(name, {}).get("risk") != "FINANCIAL"
-                   or policies[name]["approval"] != "always" or operation not in {"CREATE", "MODIFY", "CANCEL"}
+            or any(not isinstance(name, str) or operation not in {"CREATE", "MODIFY", "CANCEL"}
                    for name, operation in operations.items())):
-        raise ValueError("operations 는 FINANCIAL/always 도구의 동작이다")
+        raise ValueError("operations 는 실행 도구의 동작이다")
     # 도구가 받는 summary 종류다. 선언하지 않은 도구는 일반 주문이다
     kinds = guard.get("kinds")
     if "kinds" in guard and (not isinstance(kinds, dict) or not kinds
-                             or any(name not in operations or kind not in {"ORDER", "CONDITIONAL"}
+                             or any(name not in operations or kind not in {"ORDER", "CONDITIONAL", "CHECKOUT"}
                                     for name, kind in kinds.items())):
         raise ValueError("kinds 는 operations 도구의 summary 종류다")
+    # 주문서 준비(CHECKOUT) 도구는 PURCHASE/always 로 만들기만, 나머지는 FINANCIAL/always 다. 한 선언에 섞지 않는다(ADR-20261113 / purchase-checkout).
+    checkout = _guard_checkout(guard)
+    for name, operation in operations.items():
+        purchase = (kinds or {}).get(name) == "CHECKOUT"
+        if (purchase != checkout or (purchase and operation != "CREATE")
+                or policies.get(name, {}).get("risk") != ("PURCHASE" if purchase else "FINANCIAL")
+                or policies[name]["approval"] != "always"):
+            raise ValueError("operations 는 FINANCIAL/always 도구나 주문서 준비의 PURCHASE/always 도구다")
     fields = guard["scope_fields"]
     public = {field["key"] for field in manifest["fields"] if not field.get("secret", False)}
     args, names = set(), set()
-    if not isinstance(fields, list) or not 1 <= len(fields) <= 8:
-        raise ValueError("scope_fields 는 1~8개다")
+    # 쇼핑 연결에는 계좌 같은 공개 칸이 없어 주문서 준비의 scope 는 비어 있다.
+    if not isinstance(fields, list) or len(fields) > 8 or (len(fields) == 0) != checkout:
+        raise ValueError("scope_fields 는 1~8개다. 주문서 준비는 빈 배열이다")
     for field in fields:
         if (not isinstance(field, dict) or set(field) != {"arg", "field"}
                 or any(not isinstance(value, str) or not IDENTIFIER.fullmatch(value) for value in field.values())
@@ -93,6 +101,12 @@ def _guard_manifest(manifest, declared):
     manifest["execution_guard_manifest_sha256"] = hashlib.sha256(
         json.dumps(declared, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")).hexdigest()
     return manifest
+
+
+def _guard_checkout(guard):
+    """주문서 준비 선언인가. 그 선언의 실행 도구는 모두 PURCHASE 이고 scope 가 없다."""
+    kinds = guard.get("kinds")
+    return isinstance(kinds, dict) and "CHECKOUT" in kinds.values()
 
 
 def _binding_guard(guard):

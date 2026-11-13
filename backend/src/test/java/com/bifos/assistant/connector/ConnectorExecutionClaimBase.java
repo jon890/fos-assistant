@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.connection.application.ConnectorConnectionS
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.financial.config.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionClaimCodec;
@@ -84,6 +85,8 @@ abstract class ConnectorExecutionClaimBase extends ConnectorExecutionClaimTestSu
 
     @Autowired
     ConnectorFinancialGate financialGate;
+    @Autowired
+    PurchaseLimits purchaseLimits;
 
     @Autowired
     FinancialDigest digest;

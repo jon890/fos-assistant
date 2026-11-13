@@ -178,7 +178,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimBase {
             }
         };
         var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, expiring, clock);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, purchaseLimits, expiring, clock);
         assertThatThrownBy(() -> {
             if (consume) {
                 consuming.claim(input(raw));
@@ -521,7 +521,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimBase {
             }
         };
         var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, failing, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, failing, clock);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, purchaseLimits, failing, clock);
         assertThatThrownBy(() -> {
             if (consume) {
                 consuming.claim(input(raw));
@@ -599,7 +599,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimBase {
         var freshCodec = new ConnectorExecutionClaimCodec();
         var freshTickets = new ConnectorExecutionTicket(current, freshCodec, actions, contents, users, manager, clock, properties);
         var freshClaims = new ConnectorExecutionClaims(
-            freshTickets, freshCodec, current, users, actions, contents, conflicts, financialGate, manager, clock);
+            freshTickets, freshCodec, current, users, actions, contents, conflicts, financialGate, purchaseLimits, manager, clock);
         assertThatThrownBy(() -> freshTickets.issue(f.action())).isInstanceOf(ApiException.class);
         assertThat(freshClaims.claim(input(raw)).allowed()).isTrue();
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);

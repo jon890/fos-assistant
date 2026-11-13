@@ -393,18 +393,19 @@ PR3 는 운영 코드 줄 상한(`scripts/pr/pr-size.mjs`)을 넘어 세 PR 로 
 
 검증하는 자리는 Control Plane 의 `ConnectorExecutionGuard` 와 대시보드의 `connector_guard_validation.py` 둘이고 같은 규칙을 갖는다. ticket, claim 인증, 지원 확인(`bind.guard`), manifest SHA 대조는 바꾸지 않는다.
 
-PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실행 거절만 더했다. PR3b 가 `PURCHASE` 승인 줄을 만들기 시작하면 지금 `FINANCIAL` 만 보는 아래 분기를 함께 넓힌다. 빠뜨리면 구매 줄이 일반 승인 경로(허락 가능)를 타거나 암호화가 꺼진 상태에서 평문으로 저장된다.
+PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실행 거절만 더했다. PR3b 가 `PURCHASE` 승인 줄을 만들기 시작하며 `FINANCIAL` 만 보던 아래 분기를 함께 넓혔다. 빠뜨리면 구매 줄이 일반 승인 경로(허락 가능)를 타거나 암호화가 꺼진 상태에서 평문으로 저장된다.
 
-| 자리 | 지금 `FINANCIAL` 만 보는 것 |
+| 자리 | PR3b 뒤 |
 | --- | --- |
-| `ConnectorActionBodies` | 암호화가 꺼지면 금융 줄만 막는다 |
-| `ConnectorActionService` | 금융 승인으로 보내고 허락을 거절한다 |
-| `ConnectorFinancialIntake.owns` | 같은 키의 줄을 금융 준비가 맡는다 |
-| `ConnectorExecutionGuard`, 대시보드 `connector_guard.py`, `connector_prepare.py` | 보호 선언 `operations` 의 위험도 |
-| `ConnectorExecutionSnapshot`, `ConnectorExecutionCurrent` | 승인 줄과 선언의 위험도 대조 |
-| `ConnectorConversationActionPurge` | 대화 삭제 때 하루 합계에 필요한 본문을 남긴다 |
-| `ConnectorActionController`, `ConnectorFinancialSummaries` | 금융 요약을 붙이는 줄 |
-| 웹 `financial-summary.tsx` | 금융 카드로 그리는 줄 |
+| `ConnectorActionBodies` | 암호화가 꺼지면 금융 줄과 구매 줄을 막는다 |
+| `ConnectorActionService` | 구매 줄도 금융 승인으로 보내고 허락을 거절한다 |
+| `ConnectorFinancialIntake.owns` | 같은 키의 구매 줄도 금융 준비가 맡는다 |
+| `ConnectorExecutionGuard`, 대시보드 `connector_guard.py`, `connector_prepare.py` | `CHECKOUT` 선언이면 `operations` 도구가 `PURCHASE` 다 |
+| `ConnectorExecutionSnapshot`, `ConnectorExecutionCurrent` | 선언이 `CHECKOUT` 이면 승인 줄과 도구가 `PURCHASE` 여야 한다 |
+| `ConnectorConversationActionPurge` | 대화 삭제 때 구매 하루 합계에 필요한 본문도 남긴다 |
+| `ConnectorActionController`, `ConnectorFinancialSummaries` | 구매 줄에는 금융 요약 대신 주문서 요약(`checkout`)을 붙인다. 오늘 남은 구매 한도를 읽을 때 계산한다 |
+| `ConnectorExecutionClaimCodec` | claim 의 `scope` 가 빈 object 여도 받는다. 저장 scope 와 같은지는 claim 이 그대로 본다 |
+| 웹 `financial-summary.tsx` | PR3c 가 주문서 카드를 그린다. PR3b 의 화면은 아직 구매 줄을 일반 카드로 한 장씩 그린다(그 종류를 내는 플러그인이 없다) |
 
 ### 도구(PR3c)
 
@@ -443,7 +444,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 - 운영 최대치는 없다(spec DECISION31). 값은 0 이상 1조 미만 정수다. 0 이면 그 사용자의 주문서 준비가 「상한을 정해 주세요」 로 거절된다
 - 읽기와 쓰기는 토스 주문 상한과 같은 원칙이다. 엔티티는 두 컬럼을 넣기와 고치기에서 빼고 전용 쿼리로만 쓴다. 쓰는 쪽은 먼저 사용자 행을 잠근다. 그래서 판정과 상한 변경이 차례로 일어난다
 - 화면 API 는 `GET /api/v1/purchase-limits` 와 `PUT /api/v1/purchase-limits/{order|daily}` 다. 누구의 상한인지는 로그인에서만 정하고 에이전트의 MCP 토큰으로는 부를 수 없다. 에이전트가 상한을 바꾸는 도구는 없다(spec DECISION15)
-- 응답은 두 상한과 오늘 승인한 합계, 오늘 남은 한도다. 하루 합계는 PR3b 가 채우고 PR3a 에서는 0 이다
+- 응답은 두 상한과 오늘 승인한 합계, 오늘 남은 한도다. 하루 합계는 아래 규칙으로 센다
 - 「외부 서비스 연결」 화면은 `PURCHASE` 도구를 선언한 플러그인의 연결 칸에 구매 상한 두 칸을 보인다. 토스의 주문 상한 칸(`FINANCIAL`)과 같은 모양이고 따로 그린다
 
 하루 합계는 그 사용자가 KST 그날 승인한 `PURCHASE` 승인 줄의 `expectedTotalKrw` 합이다. `EXECUTING`, `SUCCEEDED`, `UNKNOWN` 을 세고 `FAILED`, `REJECTED`, `EXPIRED`, `PENDING` 은 세지 않는다(spec DECISION17, DECISION30). 결제 화면을 넘긴 줄이 `SUCCEEDED` 이고, 결제 화면을 넘기지 못한 줄이 `FAILED` 다. 날짜는 토스의 하루 합계와 같은 칸(`decided_at`)으로 가른다.
@@ -500,7 +501,19 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 최종 금액 > 예상 합계(1원이라도) | `FAILED`(`PURCHASE_AMOUNT_CHANGED`) | 없음 | 승인보다 커서 넘기지 않았다. 두 금액 |
 | 지금 상한에 걸림 | `FAILED`(`PURCHASE_LIMIT`) | 없음 | 걸린 상한과 최종 금액 |
 
-결과 글은 Control Plane 이 정한 JSON(`{status, finalAmountKrw, expectedTotalKrw}`)으로 저장하고 플러그인의 글을 싣지 않는다.
+결과 글은 Control Plane 이 정한 JSON(`{status: "PAYMENT_HANDOFF", message, finalAmountKrw, expectedTotalKrw}`)으로 저장하고 플러그인의 글을 싣지 않는다. `message` 는 결제 단추를 누르지 않았고 결제를 사람에게 넘겼다는 고정 글이다.
+멈춘 줄의 `error_code` 는 `purchase_limit`, `purchase_amount_changed` 이고 결과 글은 오류 계약(ADR-092) 꼴로 금액과 상한을 정수 세부로 싣는다. 모델은 이 세부를 결과로 받는다.
+
+채우기 결과 표의 나머지 경우도 같은 잠금 안에서 판정한다.
+
+| 플러그인 결과 | claim | 승인 줄 | 넘기기 |
+| --- | --- | --- | --- |
+| `HUMAN_ACTION_REQUIRED` 와 `handoff`(결제와 탭 확인이 아닌 단계) | 소비 전 | `FAILED`(`human_action_required`) | 그 단계와 탭 |
+| `ORDER_SHEET_READY` 가 아니거나 모양이 틀림 | 소비 뒤 | `UNKNOWN` | `tab_check`, 결과에 탭이 있으면 그 탭 |
+| 그 밖의 성공 | 소비 전 | `UNKNOWN`(금융 줄과 같은 「claim 없는 성공」) | `tab_check` |
+| 실패나 응답 잃음 | 지금 규칙(`ConnectorFinancialOutcome`) | `FAILED` 나 `UNKNOWN` | `UNKNOWN` 이면 탭 없는 `tab_check` |
+
+승인 순간의 상한에 걸린 줄은 `EXECUTING` 으로 옮긴 뒤 같은 트랜잭션에서 `FAILED`(`purchase_limit`)로 끝내고 ticket 을 발급하지 않는다. 판정 함수 `PurchaseLimits.requireWithin` 은 트랜잭션 표시를 두지 않는다. 거절을 받은 쪽이 같은 트랜잭션에서 줄을 끝내야 하는데, 표시가 있으면 거절이 그 트랜잭션을 롤백 전용으로 만든다.
 금액이 커서 멈춘 경우 플러그인이 예상 합계를 원문으로 알고 있으므로 주문서 탭을 닫는다. 상한에만 걸린 경우는 플러그인이 지금 상한을 몰라 탭이 남는다. 사람이 승인 뒤 상한을 낮춘 드문 경우라 감수한다.
 
 ### 넘기기 어휘 더하기(PR3b)
@@ -514,6 +527,8 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 - `handoff_tab` 은 응답을 잃은 `tab_check` 에서 비어 있다. 웹은 탭 없이 「내 브라우저」 패널을 연다
 - 금액은 새 칸 없이 그 승인 줄의 결과 글에서 읽는다. 넘기기 목록 API 가 `payment` 줄에만 `{finalAmountKrw, expectedTotalKrw}` 를 더한다
 - 알림(`HANDOFF_REQUESTED`)과 카드를 닫는 때는 PR2 와 같다. 승인 결과를 전하는 자동 turn 은 카드를 닫지 않는다
+- 결과 판정은 `connector.approval` 에 있고 `connector.handoff` 는 그 위 하위 기능이라 부르지 못한다. 그래서 잠근 승인 줄 엔티티(`ConnectorAction.handOff`)에 적고 알림도 금융 승인이 낸다. 카드 제목은 `HandoffNeed` 가 갖는다
+- 결제 카드의 두 금액은 이 PR 의 웹 넘기기 카드(`handoff-list.tsx`)가 보인다. 주문서 승인 카드는 PR3c 다
 
 ### 옵션 드롭다운 열기(PR3c)
 

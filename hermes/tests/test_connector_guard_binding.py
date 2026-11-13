@@ -185,6 +185,28 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
         self.assertEqual(server["tools"]["exclude"], ["list_scopes", "place_order"])
         self.assertEqual(self.claims + self.trades, [])
 
+    def test_checkout_guard_takes_purchase_create_tool_without_scope(self):
+        original = json.loads((self.connector_root / "connector.json").read_text())
+        accepted = copy.deepcopy(original)
+        accepted["tools"]["place_order"] = {"risk": "PURCHASE"}
+        accepted["execution_guard"].update(kinds={"place_order": "CHECKOUT"}, scope_fields=[])
+        (self.connector_root / "connector.json").write_text(json.dumps(accepted))
+        self.assertEqual(self.plugin._connector_manifest(base.DEMO)["execution_guard"]["kinds"], {"place_order": "CHECKOUT"})
+        for change in (lambda value: value["execution_guard"].update(scope_fields=original["execution_guard"]["scope_fields"]),
+                       lambda value: value["tools"].update(place_order={"risk": "FINANCIAL"}),
+                       lambda value: value["execution_guard"]["operations"].update(place_order="CANCEL"),
+                       lambda value: value["execution_guard"].update(kinds={"place_order": "ORDER"})):
+            modified = copy.deepcopy(accepted)
+            change(modified)
+            (self.connector_root / "connector.json").write_text(json.dumps(modified))
+            self.assertIsNone(self.plugin._connector_manifest(base.DEMO))
+        # 금융 선언은 빈 scope 를 받지 않는다.
+        modified = copy.deepcopy(original)
+        modified["execution_guard"]["scope_fields"] = []
+        (self.connector_root / "connector.json").write_text(json.dumps(modified))
+        self.assertIsNone(self.plugin._connector_manifest(base.DEMO))
+        (self.connector_root / "connector.json").write_text(json.dumps(original))
+
     def test_manifest_guard_is_strict_and_execution_env_cannot_be_installed(self):
         original = json.loads((self.connector_root / "connector.json").read_text())
         for change in (lambda value: value["execution_guard"].update(extra=True),

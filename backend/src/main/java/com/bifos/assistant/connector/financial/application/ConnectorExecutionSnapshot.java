@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -37,6 +38,8 @@ public final class ConnectorExecutionSnapshot {
     public static final String LEGACY_PROTOCOL = "approval-claim-v1";
     public static final String ORDER = "ORDER";
     public static final String CONDITIONAL = "CONDITIONAL";
+    /** 주문서 준비다(ADR-20261113 / purchase-checkout). 위험도 {@code PURCHASE} 도구가 받는다. */
+    public static final String CHECKOUT = ConnectorCheckoutSnapshot.KIND;
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(
@@ -80,6 +83,11 @@ public final class ConnectorExecutionSnapshot {
         JsonNode args = object(executionArgsJson, 16 * 1024);
         JsonNode summary = object(summaryJson, 8 * 1024);
         JsonNode scope = object(scopeJson, 2 * 1024);
+        if (ConnectorCheckoutSnapshot.is(summary)) {
+            ConnectorCheckoutSnapshot.validate(input, args, summary, scope, operation);
+            return new ConnectorExecutionSnapshot(
+                executionArgsJson, summaryJson, scopeJson, Sha256.hex(executionArgsJson), Sha256.hex(scopeJson), args);
+        }
         require(!scope.isEmpty() && scope.size() <= 8);
         for (var entry : scope.properties()) {
             require(entry.getKey().matches("[A-Za-z][A-Za-z0-9_]{0,63}"));
@@ -114,7 +122,25 @@ public final class ConnectorExecutionSnapshot {
 
     /** summary 가 보이는 종류다. 호출자가 manifest 의 도구 종류와 대조한다. */
     public String kind() {
-        return conditional(object(summaryJson, 8 * 1024)) ? CONDITIONAL : ORDER;
+        JsonNode summary = object(summaryJson, 8 * 1024);
+        if (ConnectorCheckoutSnapshot.is(summary)) {
+            return CHECKOUT;
+        }
+        return conditional(summary) ? CONDITIONAL : ORDER;
+    }
+
+
+    /** summary 가 보이는 동작이다. 주문서 준비는 summary 에 동작 칸이 없고 만들기 하나다. */
+    public String operation() {
+        JsonNode summary = object(summaryJson, 8 * 1024);
+        return ConnectorCheckoutSnapshot.is(summary) ? "CREATE" : text(summary.get("operation"), 1, 6);
+    }
+
+
+    /** 주문서 준비의 예상 합계다. 주문서 준비가 아니면 빈 값이다. */
+    public OptionalLong expectedTotalKrw() {
+        return CHECKOUT.equals(kind()) ? OptionalLong.of(ConnectorCheckoutSnapshot.expectedTotal(execution))
+            : OptionalLong.empty();
     }
 
 
@@ -131,7 +157,7 @@ public final class ConnectorExecutionSnapshot {
         Instant now,
         FinancialDigest digest) {
         require(action != null && binding != null && action.id() != null && binding.id() != null);
-        require(action.risk() == ToolRisk.FINANCIAL
+        require((action.risk() == ToolRisk.FINANCIAL || action.risk() == ToolRisk.PURCHASE)
             && action.approvalMode() == ToolApproval.ALWAYS
             && action.decision() == ActionDecision.NEEDS_APPROVAL
             && action.status() == ActionStatus.PENDING);
@@ -195,9 +221,8 @@ public final class ConnectorExecutionSnapshot {
         require(digest.of("execution_args_json", args).equals(row.executionArgsSha256())
             && digest.of("scope_json", scope).equals(row.scopeSha256()));
         JsonNode shown = object(summary, 8 * 1024);
-        text(shown.get("operation"), 1, 6);
-        ConnectorExecutionSnapshot snapshot = validate(
-            modelArgs, args, summary, scope, shown.get("operation").stringValue());
+        String operation = ConnectorCheckoutSnapshot.is(shown) ? "CREATE" : text(shown.get("operation"), 1, 6);
+        ConnectorExecutionSnapshot snapshot = validate(modelArgs, args, summary, scope, operation);
         require(snapshot.storedRequestKey(digest, action.userId(), action.connectorId(), action.toolName())
             .equals(row.requestKey()));
         return snapshot;
@@ -244,6 +269,9 @@ public final class ConnectorExecutionSnapshot {
             && tool != null
             && !tool.isBlank());
         JsonNode summary = object(summaryJson, 8 * 1024);
+        if (ConnectorCheckoutSnapshot.is(summary)) {
+            return ConnectorCheckoutSnapshot.requestKey(execution, userId, connectorId, tool);
+        }
         if (conditional(summary)) {
             return ConnectorConditionalSnapshot.requestKey(execution, userId, connectorId, tool, summary.get("operation").stringValue());
         }
@@ -261,6 +289,11 @@ public final class ConnectorExecutionSnapshot {
     public void validateDeclaredScope(String raw, Map<String, String> publicFields) {
         JsonNode scope = object(scopeJson, 2 * 1024);
         JsonNode fields = parse(raw, 2 * 1024);
+        if (ConnectorCheckoutSnapshot.is(object(summaryJson, 8 * 1024))) {
+            // 주문서 준비는 공개 칸을 실행에 싣지 않는다. 선언과 저장 scope 가 모두 비어야 한다.
+            require(fields.isArray() && fields.isEmpty() && scope.isEmpty());
+            return;
+        }
         require(fields.isArray() && !fields.isEmpty() && fields.size() <= 8);
         if (conditional(object(summaryJson, 8 * 1024))) {
             require(fields.size() == 1 && "account_seq".equals(text(fields.get(0).get("arg"), 1, 64))

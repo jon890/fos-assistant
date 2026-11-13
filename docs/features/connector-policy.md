@@ -589,10 +589,11 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
 정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v2`이다.
-prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
+prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다. 주문서 준비 선언만 예외로 `PURCHASE/ALWAYS` 다(아래).
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
-kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
-scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
+kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL/CHECKOUT` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
+주문서 준비(`CHECKOUT`)를 선언한 보호 선언은 모든 operations 도구가 `CHECKOUT` 이고 `PURCHASE/ALWAYS` 의 `CREATE` 이며 scope_fields 가 빈 배열이다. 한 선언에 `FINANCIAL` 과 `PURCHASE` 를 섞지 않는다([ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md)).
+scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다. 주문서 준비가 아니면 1~8개다.
 카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
 이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.
 
@@ -628,7 +629,7 @@ scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나
 | 전체 본문 | UTF-8 8 KiB, Content-Length 없는 chunked도 실제 바이트로 제한 |
 | ticket | ASCII 4096자 |
 | decoded payload | UTF-8 3 KiB |
-| 수신 scope JSON | UTF-8 2 KiB, 1~8개 키, 값마다 UTF-8 128바이트 |
+| 수신 scope JSON | UTF-8 2 KiB, 0~8개 키, 값마다 UTF-8 128바이트. 빈 object 는 저장 scope 가 빈 주문서 준비만 맞는다 |
 | JSON 깊이 | 5 |
 
 원문과 strict 타입 오류는 400, ticket 부재나 서명 실패는 401이다.
@@ -649,7 +650,7 @@ scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나
 
 대시보드 plugin의 `POST /api/connectors/{id}/prepare`는 서비스 인증과 설치한 profile 검사 뒤
 manifest가 선언한 READ/none 준비 도구만 호출한다. 일반 확인·선택지 호출은 계속 빈 인자를 사용한다.
-대상 도구는 선언과 실제 MCP 목록에서 하나의 FINANCIAL/always 도구로 대조한다.
+대상 도구는 선언과 실제 MCP 목록에서 하나의 FINANCIAL/always 도구(주문서 준비 선언이면 PURCHASE/always 도구)로 대조한다.
 준비 결과의 키·타입·scope·표시 값·정규화와 크기를 검사하며 읽기 전용 결과는 실행 권한이 아니다.
 
 `executeApproved`는 저장 원문과 해시 및 ticket을 실행 본문에 추가한다.
@@ -699,7 +700,7 @@ DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 �
 실행 도구의 직접 호출은 `RISK_NOT_OPEN`이고 plugin의 금융 도구 exclude는 유지하며 별도 허용 정책, featureflag, 상시 허락은 만들지 않는다.
 
 요청자의 session 실행과 에이전트 바인딩에서 연결을 고른다. 소유자와 profile, 활성 사용자,
-READ_ONLY 실행 금지, READY와 desiredEnabled, guard의 FINANCIAL/always 선언을 검증한다.
+READ_ONLY 실행 금지, READY와 desiredEnabled, guard의 FINANCIAL/always 선언(주문서 준비는 PURCHASE/always)을 검증한다.
 prepare는 DB 트랜잭션 밖에서 한 번만 실행하며 전후 fresh catalog의 manifest SHA와
 현재 상태의 verified guard를 대조한다. scope는 선언한 공개 연결 칸에서 만들고 snapshot 검증기를 재사용한다.
 사용자 행을 먼저 잠근 저장 트랜잭션에서 현재 맥락과 두 revision을 다시 대조하고 PENDING action,
@@ -717,6 +718,7 @@ key 파일이 운영에서 금융을 여는 마지막 잠금이다. key를 쓰�
 준비는 prepare 전에 key 파일과 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
 허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 플러그인](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
 승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌와 그 주인을 본다.
+주문서 준비(`CHECKOUT`)는 계좌가 없어 허용 목록과 금융 상한 대신 사용자의 구매 상한을 준비, 승인, claim, 결과 판정에서 본다. key 파일 검사는 같다. 판정하는 때와 결과는 [네이버 쇼핑 설계](naver-shopping/design.md)의 「상한을 보는 때(REQ10, REQ12, PR3b)」 가 갖는다.
 하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 key 파일과 계좌 허용 목록만 본다. 하루 합계에는 금액이 있는 주문만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정은 거절한다.
 조건주문은 leg 마다 수량 × max(주문가, 감시가) 를 한 건 금액으로 보고, 두 leg(OCO, OTO)는 큰 값을 쓴다. 생성은 그 금액을, 정정은 바뀐 뒤 금액을 하루 합계에 그대로 더하고 원주문 금액을 빼지 않는다(사용자 결정 2026-11-12). 주문가가 없는 시장가 조건주문은 거절하고 조건 취소는 금액이 없다.
 

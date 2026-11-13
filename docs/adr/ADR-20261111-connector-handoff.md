@@ -15,7 +15,7 @@
 
 | 항목 | 정한 것 |
 | --- | --- |
-| 결과 모양 | `isError` 없는 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}`. `need` 는 `login`, `captcha`, `device_check`, `bot_check`(봇 탐지), `unexpected_page`(예상 밖 화면, 2026-11-12 더함, [사람이 도와야 하는 지점 설계](../features/user-browser/design.md) 의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」). 결제와 탭 확인은 구매 단계가 더한다. `status` 와 `message`(끝나지 않았고 결과가 없다, 사람이 풀 때까지 다시 부르지 않는다)가 모델이 성공으로 읽지 않게 한다. 옛 모양 `{"error": {"code", "handoff": {"need", "tab"}}}` 는 fos-ctx 가 받기만 하고 플러그인은 내지 않는다 |
+| 결과 모양 | `isError` 없는 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}`. `need` 는 `login`, `captcha`, `device_check`, `bot_check`(봇 탐지), `unexpected_page`(예상 밖 화면, 2026-11-12 더함, [사람이 도와야 하는 지점 설계](../features/user-browser/design.md) 의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」). 결제(`payment`)와 탭 확인(`tab_check`)은 플러그인 결과로 받지 않고 주문서 채우기의 결과 판정이 직접 적는다([ADR-20261113 / purchase-checkout](ADR-20261113-purchase-checkout.md), 2026-11-13 더함). `status` 와 `message`(끝나지 않았고 결과가 없다, 사람이 풀 때까지 다시 부르지 않는다)가 모델이 성공으로 읽지 않게 한다. 옛 모양 `{"error": {"code", "handoff": {"need", "tab"}}}` 는 fos-ctx 가 받기만 하고 플러그인은 내지 않는다 |
 | 알리는 곳 | `/internal/hermes/connector-handoff`. 판정 경로와 같은 profile 토큰과 서명 key. 서명할 글은 `v1-connector-handoff` 와 호출 네 칸(`hermes_tool`, `root_session_id`, `session_id`, `tool_call_id`), `code`, `need`, `tab` |
 | 받는 쪽 | 같은 호출의 판정 줄(`connector_action`)을 dedupe key 로 찾아, hook 에 통과로 답한 같은 등록 이름의 줄에만 넘기기 칸 넷을 비어 있을 때 한 번 적는다. 처음 적을 때 알림 `HANDOFF_REQUESTED` 한 건 |
 | 카드 | 웹이 그 대화의 열린 넘기기를 입력창 위에 그린다. 종류와 탭은 판정 줄에서만 온다. 「내 브라우저 열기」 는 그 탭을 고른 채 새 창을 열고, 「다 했어요」 는 정해 둔 글을 다음 메시지로 보낸다 |

@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.contentdraft.application.dto.ContentDraftActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.approval.application.dto.ConnectorGrantView;
+import com.bifos.assistant.connector.approval.application.dto.CheckoutActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialLimitChangeSummary;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -33,6 +34,7 @@ public final class ConnectorActionDtos {
      * @param contentDraft 원고 저장 job 이 연결된 줄의 요약. 일반 줄은 null
      * @param financial 금융 줄의 승인 카드 요약. 금융 줄이 아니면 null
      * @param limitChange 주문 상한 변경 줄의 카드 요약. 그 줄이 아니면 null
+     * @param checkout 주문서 준비 줄의 카드 요약. 그 줄이 아니면 null
      * @param requestedBy 대화의 에이전트와 다른 에이전트가 요청한 줄이면 그 에이전트의 이름표. 아니거나 대화를 모르는 응답(승인과
      * 거절)이면 null
      */
@@ -55,7 +57,8 @@ public final class ConnectorActionDtos {
         ContentDraftActionSummary contentDraft,
         FinancialActionSummary financial,
         FinancialLimitChangeSummary limitChange,
-        AgentLabel requestedBy) {
+        AgentLabel requestedBy,
+        CheckoutActionSummary checkout) {
 
         public static ActionView from(ConnectorActionView action) {
             return from(action, null);
@@ -100,7 +103,16 @@ public final class ConnectorActionDtos {
                 contentDraft,
                 financial,
                 limitChange,
-                requestedBy);
+                requestedBy,
+                null);
+        }
+
+
+        /** 주문서 준비 줄의 카드 요약을 붙인다. 없으면 null 이다. */
+        public ActionView withCheckout(CheckoutActionSummary summary) {
+            return new ActionView(actionId, connectorId, toolName, title, risk, status, argsJson, resultText, errorCode, createdAt,
+                expiresAt, grantAllowed, hiddenArgs, argLabels, conversationGrantAllowed, contentDraft, financial, limitChange,
+                requestedBy, summary);
         }
     }
 

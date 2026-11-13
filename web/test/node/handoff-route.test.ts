@@ -75,7 +75,7 @@ test("넘기기 라우트는 계약 안의 줄만 돌려주고 틀린 단계와 
     {
       ...ROW,
       handoffId: "0190f5b4-0000-7000-8000-0000000000ab",
-      need: "PAYMENT",
+      need: "payment",
     },
     {
       ...ROW,
@@ -86,7 +86,9 @@ test("넘기기 라우트는 계약 안의 줄만 돌려주고 틀린 단계와 
   ]);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), [ROW]);
+  assert.deepEqual(await response.json(), [
+    { ...ROW, finalAmountKrw: null, expectedTotalKrw: null },
+  ]);
 });
 
 test("넘기기 라우트는 목록이 아닌 응답을 빈 목록으로 돌려준다", async () => {

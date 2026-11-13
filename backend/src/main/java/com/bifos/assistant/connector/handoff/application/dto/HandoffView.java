@@ -9,8 +9,11 @@ import java.util.UUID;
  *
  * @param handoffId 그 호출의 판정 줄의 공개 번호
  * @param connectorTitle 카탈로그의 플러그인 이름. 읽지 못하면 플러그인 번호
- * @param tab 플러그인이 남긴 「내 브라우저」 탭의 CDP target id
+ * @param tab 플러그인이 남긴 「내 브라우저」 탭의 CDP target id. 응답을 잃은 탭 확인이면 null
+ * @param finalAmountKrw 결제 넘기기({@code PAYMENT})에서 확인한 최종 결제 금액. 다른 단계면 null
+ * @param expectedTotalKrw 결제 넘기기에서 승인한 예상 합계. 다른 단계면 null
  */
 public record HandoffView(
-    UUID handoffId, String connectorId, String connectorTitle, HandoffNeed need, String tab, Instant createdAt) {
+    UUID handoffId, String connectorId, String connectorTitle, HandoffNeed need, String tab, Instant createdAt,
+    Long finalAmountKrw, Long expectedTotalKrw) {
 }

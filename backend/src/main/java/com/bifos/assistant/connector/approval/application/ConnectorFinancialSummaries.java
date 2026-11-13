@@ -3,6 +3,8 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.financial.application.FinancialOrderLimits;
+import com.bifos.assistant.connector.financial.application.PurchaseLimits;
+import com.bifos.assistant.connector.approval.application.dto.CheckoutActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialActionSummary;
 import com.bifos.assistant.connector.approval.application.dto.FinancialActionSummary.Normalization;
 import com.bifos.assistant.connector.financial.application.dto.FinancialLimitStatus;
@@ -30,7 +32,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 금융 승인 카드에 붙일 요약이다(ADR-20261013 / financial-order-opening). 주인의 위험도 {@code FINANCIAL} 줄만 다룬다.
+ * 금융 승인 카드에 붙일 요약이다(ADR-20261013 / financial-order-opening). 주인의 위험도 {@code FINANCIAL} 줄과, 주문서 준비의
+ * {@code PURCHASE} 줄({@link #checkouts}, ADR-20261113 / purchase-checkout)을 다룬다.
  *
  * <p>저장한 snapshot 을 승인과 같은 검증으로 연다. 열지 못하면 승인 단추를 그리지 않도록 {@code available=false} 를 낸다. 외부를 부르지 않는다.
  */
@@ -44,6 +47,7 @@ public class ConnectorFinancialSummaries {
     private final TextCipher cipher;
     private final FinancialDigest digest;
     private final FinancialOrderLimits limits;
+    private final PurchaseLimits purchases;
     private final Clock clock;
 
 
@@ -64,6 +68,70 @@ public class ConnectorFinancialSummaries {
     @Transactional(readOnly = true)
     public Optional<FinancialActionSummary> summaryOf(CurrentUser user, UUID actionId) {
         return owned(user, actionId).map(action -> summary(action, new Usage(user.id())));
+    }
+
+
+    /** 주문서 준비 줄마다의 카드 요약이다(ADR-20261113 / purchase-checkout). 없거나 남의 줄이거나 구매 줄이 아니면 빠진다. */
+    @Transactional(readOnly = true)
+    public Map<UUID, CheckoutActionSummary> checkouts(CurrentUser user, List<UUID> actionIds) {
+        var found = new LinkedHashMap<UUID, CheckoutActionSummary>();
+        Long remaining = null;
+        boolean read = false;
+        for (UUID actionId : actionIds) {
+            var action = actions.findByPublicId(actionId)
+                .filter(row -> user.id().equals(row.userId()) && row.risk() == ToolRisk.PURCHASE).orElse(null);
+            if (action == null) {
+                continue;
+            }
+            // 오늘 남은 한도는 사용자마다 한 번만 읽는다. 읽지 못하면 그 칸만 비운다. 판정은 승인할 때 서버가 다시 한다.
+            if (!read) {
+                read = true;
+                remaining = remainingToday(user.id());
+            }
+            found.put(actionId, checkout(action, remaining));
+        }
+        return found;
+    }
+
+
+    /** 그 줄의 주문서 카드 요약이다. 없거나 남의 줄이거나 구매 줄이 아니면 빈 값이다. */
+    @Transactional(readOnly = true)
+    public Optional<CheckoutActionSummary> checkoutOf(CurrentUser user, UUID actionId) {
+        return Optional.ofNullable(checkouts(user, List.of(actionId)).get(actionId));
+    }
+
+
+    private Long remainingToday(Long userId) {
+        try {
+            long daily = purchases.limitOf(userId).dailyKrw();
+            return Math.max(0, daily - purchases.spentToday(userId, null, clock.instant()));
+        } catch (RuntimeException ex) {
+            log.warn("주문서 카드의 남은 한도를 읽지 못했다 kind={}", ex.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+
+    private CheckoutActionSummary checkout(ConnectorAction action, Long remaining) {
+        try {
+            var row = action.bodyErasedAt() == null ? contents.findById(action.id()).orElse(null) : null;
+            if (row == null) {
+                return CheckoutActionSummary.unavailable();
+            }
+            var snapshot = ConnectorExecutionSnapshot.open(action, row, cipher, digest);
+            if (!ConnectorExecutionSnapshot.CHECKOUT.equals(snapshot.kind())) {
+                return CheckoutActionSummary.unavailable();
+            }
+            JsonNode shown = JSON.readTree(snapshot.summaryJson());
+            var options = new ArrayList<CheckoutActionSummary.Option>();
+            shown.get("options").forEach(option -> options.add(new CheckoutActionSummary.Option(text(option, "name"), text(option, "value"))));
+            return new CheckoutActionSummary(true, text(shown, "title"), text(shown, "store"), options, shown.get("quantity").intValue(),
+                shown.get("itemAmountKrw").longValue(), shown.get("shippingFeeKrw").longValue(), shown.get("expectedTotalKrw").longValue(),
+                shown.get("regionalExtraFee").booleanValue(), text(shown, "url"), remaining);
+        } catch (RuntimeException ex) {
+            log.warn("주문서 카드 요약을 열지 못했다 actionId={} kind={}", action.publicId(), ex.getClass().getSimpleName());
+            return CheckoutActionSummary.unavailable();
+        }
     }
 
 

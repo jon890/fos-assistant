@@ -172,6 +172,10 @@ def _prepare_result(payload, original_args, manifest, tool, env):
                  and value == env.get(fields[field["field"]]["env"]))
     # 검증 분기는 prepare 가 낸 summary 가 아니라 manifest 가 도구에 선언한 종류가 정한다
     kind = manifest["execution_guard"].get("kinds", {}).get(tool, "ORDER")
+    _require((summary.get("kind") == "CHECKOUT") == (kind == "CHECKOUT"))
+    if kind == "CHECKOUT":
+        _require(not scopes)
+        return _checkout(payload, original_args, operation)
     _require((summary.get("orderKind") == "CONDITIONAL") == (kind == "CONDITIONAL"))
     if kind == "CONDITIONAL":
         from .connector_conditional_validation import validate_conditional_prepare
@@ -249,4 +253,46 @@ def _prepare_result(payload, original_args, manifest, tool, env):
     _require("confirmHighValueOrder" not in original_args or original_args["confirmHighValueOrder"] is False)
     for field in {"orderId", "side", "orderType"} & set(original_args):
         _require(_same_json(original_args[field], args.get(field)))
+    return payload
+
+
+CHECKOUT_INPUT = {"url", "options", "quantity"}
+CHECKOUT_ARGS = {"checkout", "url", "optionLabels", "quantity", "expectedTotalKrw"}
+CHECKOUT_SUMMARY = set("kind title store options quantity itemAmountKrw shippingFeeKrw expectedTotalKrw regionalExtraFee url".split())
+CHECKOUT_URL = re.compile(r"https://[a-z0-9.-]{1,253}/[A-Za-z0-9_-]{1,100}/products/[0-9]{1,20}")
+
+
+def _won(value):
+    """원 단위 금액이다. JSON 정수이고 0 이상 10억 미만이다. bool 은 정수가 아니다."""
+    _require(type(value) is int and 0 <= value < 1_000_000_000)
+    return value
+
+
+def _checkout(payload, original_args, operation):
+    """주문서 준비 결과다(ADR-20261113 / purchase-checkout). Control Plane 의 `ConnectorCheckoutSnapshot` 과 같은 규칙이다."""
+    args, summary = payload["executionArgs"], payload["summary"]
+    _require(operation == "CREATE" and isinstance(original_args, dict) and set(original_args) == CHECKOUT_INPUT
+             and set(args) == CHECKOUT_ARGS and set(summary) == CHECKOUT_SUMMARY and summary["kind"] == "CHECKOUT")
+    _require(type(args["checkout"]) is int and args["checkout"] == 1)
+    _display_text(original_args["url"], 2048)
+    _display_text(args["url"], 400)
+    _require(CHECKOUT_URL.fullmatch(args["url"]) is not None and summary["url"] == args["url"])
+    quantity = args["quantity"]
+    _require(type(quantity) is int and 1 <= quantity <= 99
+             and type(original_args["quantity"]) is int and original_args["quantity"] == quantity
+             and type(summary["quantity"]) is int and summary["quantity"] == quantity)
+    _display_text(summary["title"], 200)
+    _display_text(summary["store"], 50)
+    _require(type(summary["regionalExtraFee"]) is bool)
+    wanted, labels, shown = original_args["options"], args["optionLabels"], summary["options"]
+    _require(isinstance(wanted, list) and isinstance(labels, list) and isinstance(shown, list)
+             and len(labels) <= 3 and len(wanted) == len(labels) == len(shown))
+    for want, label, option in zip(wanted, labels, shown):
+        _display_text(want, 100)
+        _display_text(label, 100)
+        _require(isinstance(option, dict) and set(option) == {"name", "value"})
+        _display_text(option["name"], 100)
+        _require(option["value"] == label)
+    item, shipping, total = (_won(summary[key]) for key in ("itemAmountKrw", "shippingFeeKrw", "expectedTotalKrw"))
+    _require(item > 0 and item + shipping == total and _won(args["expectedTotalKrw"]) == total)
     return payload
