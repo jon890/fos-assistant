@@ -6,6 +6,7 @@ import type {
   FinancialSummary,
   LimitChangeSummary,
 } from "@/lib/financial-summary";
+import type { CheckoutSummary } from "@/lib/checkout-summary";
 
 export {
   CONNECTOR_ACTION_ERROR_MESSAGES,
@@ -68,6 +69,8 @@ export type ConnectorAction = {
   financial: FinancialSummary | null;
   /** 주문 상한 변경 줄의 요약이다. 그 줄이 아니면 null 이다. */
   limitChange: LimitChangeSummary | null;
+  /** 주문서 준비 줄(구매)의 카드 요약이다. 그 줄이 아니거나 옛 서버면 없거나 null 이다. */
+  checkout?: CheckoutSummary | null;
   /** 대화의 에이전트와 다른 에이전트가 요청한 줄이면 그 이름표다. 승인과 거절 응답과 옛 서버는 싣지 않는다 */
   requestedBy?: AgentLabel | null;
 };

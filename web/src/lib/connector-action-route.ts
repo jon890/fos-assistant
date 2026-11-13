@@ -26,6 +26,7 @@ import {
   safeLimitStatusOrNull,
 } from "@/lib/financial-limits-route";
 import { isPublicId } from "@/lib/conversation-id";
+import { safeCheckout } from "@/lib/checkout-summary-route";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
 const PASSED_CODES = new Set([
@@ -168,6 +169,7 @@ function safeAction(value: unknown): ConnectorAction {
     financial: item.financial == null ? null : safeFinancial(item.financial),
     limitChange:
       item.limitChange == null ? null : safeLimitChange(item.limitChange),
+    checkout: item.checkout == null ? null : safeCheckout(item.checkout),
     requestedBy:
       item.requestedBy == null ? null : safeAgentLabel(item.requestedBy),
   };
