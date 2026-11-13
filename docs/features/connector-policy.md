@@ -591,8 +591,9 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v2`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
-kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
-scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
+kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL/CHECKOUT` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
+주문서 준비(`CHECKOUT`)를 선언한 보호 선언은 모든 operations 도구가 `CHECKOUT` 이고 `PURCHASE/ALWAYS` 의 `CREATE` 이며 scope_fields 가 빈 배열이다. 한 선언에 `FINANCIAL` 과 `PURCHASE` 를 섞지 않는다([ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md)).
+scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다. 주문서 준비가 아니면 1~8개다.
 카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
 이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.
 
@@ -628,7 +629,7 @@ scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나
 | 전체 본문 | UTF-8 8 KiB, Content-Length 없는 chunked도 실제 바이트로 제한 |
 | ticket | ASCII 4096자 |
 | decoded payload | UTF-8 3 KiB |
-| 수신 scope JSON | UTF-8 2 KiB, 1~8개 키, 값마다 UTF-8 128바이트 |
+| 수신 scope JSON | UTF-8 2 KiB, 0~8개 키, 값마다 UTF-8 128바이트. 빈 object 는 저장 scope 가 빈 주문서 준비만 맞는다 |
 | JSON 깊이 | 5 |
 
 원문과 strict 타입 오류는 400, ticket 부재나 서명 실패는 401이다.
