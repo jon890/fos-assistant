@@ -27,7 +27,7 @@ export type ConnectorField = {
 };
 
 export type ToolRisk =
-  "READ" | "SENSITIVE" | "WRITE" | "DESTRUCTIVE" | "FINANCIAL";
+  "READ" | "SENSITIVE" | "WRITE" | "DESTRUCTIVE" | "FINANCIAL" | "PURCHASE";
 export type ToolApproval = "NONE" | "REQUIRED" | "ALWAYS";
 
 /**
@@ -267,6 +267,7 @@ const TOOL_RISK_LABELS: Record<ToolRisk, string> = {
   WRITE: "쓰기",
   DESTRUCTIVE: "되돌리기 어려운 쓰기",
   FINANCIAL: "결제",
+  PURCHASE: "구매",
 };
 
 export function toolRiskLabel(risk: ToolRisk): string {
@@ -280,6 +281,7 @@ export function toolBlocked(tool: ConnectorTool): boolean {
   return (
     tool.risk === "DESTRUCTIVE" ||
     tool.risk === "FINANCIAL" ||
+    tool.risk === "PURCHASE" ||
     tool.approval === "ALWAYS"
   );
 }
@@ -337,6 +339,7 @@ const TOOL_RISK_ORDER: ToolRisk[] = [
   "WRITE",
   "DESTRUCTIVE",
   "FINANCIAL",
+  "PURCHASE",
 ];
 
 /** 위험도별 도구 수다. 위험도 순서로 늘어놓고 0개인 것은 뺀다. */

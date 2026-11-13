@@ -35,7 +35,14 @@ const PASSED_CODES = new Set([
   "FORBIDDEN",
 ]);
 
-const TOOL_RISKS = ["READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL"];
+const TOOL_RISKS = [
+  "READ",
+  "SENSITIVE",
+  "WRITE",
+  "DESTRUCTIVE",
+  "FINANCIAL",
+  "PURCHASE",
+];
 
 export function isActionId(value: string): boolean {
   return ACTION_ID_PATTERN.test(value);

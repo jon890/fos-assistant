@@ -10,6 +10,7 @@ import { ConnectorOnboarding } from "@/components/agent/connector-onboarding";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
 import { FinancialLimitsSection } from "@/components/connector/financial-limits";
+import { PurchaseLimitsSection } from "@/components/connector/purchase-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
 import { useConnectionPoll } from "@/components/connector/use-binding-poll";
@@ -416,6 +417,9 @@ export function ConnectorConnectionPanel({
           <ConnectorGrants connectorId={id} refreshKey={connection} />
           {connector?.tools?.some((tool) => tool.risk === "FINANCIAL") ? (
             <FinancialLimitsSection />
+          ) : null}
+          {connector?.tools?.some((tool) => tool.risk === "PURCHASE") ? (
+            <PurchaseLimitsSection />
           ) : null}
           {status !== "DISCONNECTED" ? (
             <Button
