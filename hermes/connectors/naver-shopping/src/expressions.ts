@@ -24,7 +24,14 @@ function nextData(path: string[]) {
 
 export const READY_STATE = "document.readyState";
 
-export const PAGE_PROBE = `(() => ({ href: location.href, captcha: document.querySelector(${JSON.stringify(CAPTCHA_SELECTOR)}) !== null }))()`;
+/**
+ * 그려진 요소만 센다. 크기 0(`script`, `style`, `display:none` 포함)과 `visibility:hidden` 은 보이지 않는다.
+ * 보안 확인이 아닌 정상 화면에도 숨은 captcha 스크립트나 틀이 있어 요소의 존재만으로는 오판한다.
+ * korail-ktx 의 `VISIBLE` 과 같은 규칙이다. 플러그인은 서로 코드를 나누지 못해 옮겨 썼다.
+ */
+const VISIBLE = `(e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden"; }`;
+
+export const PAGE_PROBE = `(() => { const visible = ${VISIBLE}; return { href: location.href, captcha: [...document.querySelectorAll(${JSON.stringify(CAPTCHA_SELECTOR)})].some(visible) }; })()`;
 
 export const SEARCH_STATE = nextData(SEARCH_LIST_PATH);
 
