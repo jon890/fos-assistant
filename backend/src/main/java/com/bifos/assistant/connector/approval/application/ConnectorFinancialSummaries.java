@@ -32,7 +32,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 금융 승인 카드에 붙일 요약이다(ADR-20261013 / financial-order-opening). 주인의 위험도 {@code FINANCIAL} 줄만 다룬다.
+ * 금융 승인 카드에 붙일 요약이다(ADR-20261013 / financial-order-opening). 주인의 위험도 {@code FINANCIAL} 줄과, 주문서 준비의
+ * {@code PURCHASE} 줄({@link #checkouts}, ADR-20261113 / purchase-checkout)을 다룬다.
  *
  * <p>저장한 snapshot 을 승인과 같은 검증으로 연다. 열지 못하면 승인 단추를 그리지 않도록 {@code available=false} 를 낸다. 외부를 부르지 않는다.
  */

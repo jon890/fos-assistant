@@ -143,6 +143,38 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("승인 순간, claim 직전, 결과 판정 모두 예상 합계가 한 건과 하루 상한과 같으면 지나 결제를 넘긴다")
+    void equalLimitPassesEveryCheck() {
+        var answer = prepare(UUID.randomUUID().toString());
+        limits(expected, expected);
+        fill = claimThen(sheet(expected));
+        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.PAYMENT);
+        assertThat(purchaseLimits.view(user).remainingTodayKrw()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("결과 판정에서 하루 합계를 읽지 못하면 결제를 넘기지 않고 UNKNOWN 과 그 탭의 탭 확인으로 끝낸다")
+    void unreadableSpentEndsUnknown() {
+        var first = prepare(UUID.randomUUID().toString());
+        fill = claimThen(sheet(expected));
+        assertThat(publicApproval.approve(user, first.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var second = prepareOther();
+        fill = execution -> {
+            claim(execution);
+            // 같은 날 앞 줄의 실행 원문을 열 수 없게 만든다. 키를 바꾸거나 본문이 지워진 경우와 같다.
+            jdbc.update("update connector_action_execution set execution_args_json = 'x' where action_id = ?", action(first).id());
+            return sheet(expected).apply(execution);
+        };
+        assertThat(publicApproval.approve(user, second.actionId(), null, false).status()).isEqualTo(ActionStatus.UNKNOWN);
+        var card = onlyHandoff(second);
+        assertThat(card.need()).isEqualTo(HandoffNeed.TAB_CHECK);
+        assertThat(card.tab()).isEqualTo(TAB);
+    }
+
+
+    @Test
     @DisplayName("승인 순간에 상한이 낮아졌으면 채우기를 부르지 않고 승인 줄을 FAILED(purchase_limit)로 끝내며 하루 합계에 세지 않는다")
     void approvalMomentLimit() {
         var answer = prepare(UUID.randomUUID().toString());

@@ -99,6 +99,11 @@ final class ConnectorCheckoutOutcome {
         } catch (PurchaseLimitExceeded ex) {
             bodies.fail(action, LIMIT, limitDetail(ex, "final_amount_krw", finalAmount).toStored(), now);
             return Optional.empty();
+        } catch (RuntimeException ex) {
+            // 하루 합계가 다른 줄의 원문을 열지 못하면 판정할 수 없다. 결과 저장을 롤백하면 줄이 EXECUTING 으로 남고 넘기기도 없으므로,
+            // 결제를 넘기지 않고 결과를 모르는 것으로 끝내 사람이 남은 주문서 탭을 보게 한다.
+            action.unknown(now);
+            return handOff(action, HandoffNeed.TAB_CHECK, body.get("tab").stringValue(), now);
         }
         bodies.succeed(action, new PaymentHandoffResult(finalAmount, expectedTotalKrw).toStored(), now);
         return handOff(action, HandoffNeed.PAYMENT, body.get("tab").stringValue(), now);
