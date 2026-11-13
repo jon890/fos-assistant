@@ -111,17 +111,17 @@ public class ConnectorExecutionCurrent {
                 && catalog.guard().protocol().equals(row.protocol())
                 && HermesToolName.of(catalog.mcpServer(), action.toolName()).equals(action.hermesTool()));
             ToolPolicy policy = catalog.toolPolicies().get(action.toolName());
+            // 주문서 준비 선언의 도구는 PURCHASE 다. 승인 줄과 선언이 같은 위험도여야 한다(ADR-20261113 / purchase-checkout).
+            ToolRisk risk = catalog.guard().checkout() ? ToolRisk.PURCHASE : ToolRisk.FINANCIAL;
             require(policy != null
-                && policy.risk() == ToolRisk.FINANCIAL
+                && policy.risk() == risk
                 && policy.approval() == ToolApproval.ALWAYS
-                && action.risk() == ToolRisk.FINANCIAL
+                && action.risk() == risk
                 && action.approvalMode() == ToolApproval.ALWAYS);
             var snapshot = ConnectorExecutionSnapshot.open(action, row, cipher, digest);
             String operation = catalog.guard().operations().get(action.toolName());
             require(operation != null
-                && operation.equals(JSON.readTree(snapshot.summaryJson())
-                    .get("operation")
-                    .stringValue())
+                && operation.equals(snapshot.operation())
                 && catalog.guard().kind(action.toolName()).equals(snapshot.kind()));
             require(catalog.guard().scopeFields().stream()
                 .allMatch(f -> catalog.publicFieldNames().contains(f.field())));

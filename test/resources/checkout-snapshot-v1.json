@@ -1,0 +1,1580 @@
+{
+  "v": 1,
+  "about": "주문서 준비(CHECKOUT) 준비 결과 사례. Java ConnectorCheckoutSnapshot 과 Python connector_guard_validation 이 같은 판정을 낸다.",
+  "cases": [
+    {
+      "name": "BASE",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "NO-OPTIONS",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "FREE-SHIPPING",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 20000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 0,
+        "expectedTotalKrw": 20000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "MAX-QUANTITY",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 99
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 99,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 99,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "MAX-AMOUNT",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 999999999
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 999996999,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 999999999,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "THREE-OPTIONS",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "a",
+          "b",
+          "c"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "a",
+          "b",
+          "c"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "n1",
+            "value": "a"
+          },
+          {
+            "name": "n2",
+            "value": "b"
+          },
+          {
+            "name": "n3",
+            "value": "c"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "BRAND-HOST",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://brand.naver.com/brand1/products/9",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://brand.naver.com/brand1/products/9"
+      }
+    },
+    {
+      "name": "SUM-MISMATCH",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3001,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "TOTAL-MISMATCH",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 22999
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "QUANTITY-ZERO",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 0
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 0,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 0,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "QUANTITY-100",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 100
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 100,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 100,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "QUANTITY-MODEL-DIFFERS",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 3
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "QUANTITY-SUMMARY-DIFFERS",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 3,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "QUANTITY-STRING",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": "2"
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": "2",
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": "2",
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "URL-MISMATCH",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/12345678"
+      }
+    },
+    {
+      "name": "URL-HTTP",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "http://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "http://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "URL-NOT-PRODUCT",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop"
+      }
+    },
+    {
+      "name": "URL-QUERY",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?a=1",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?a=1"
+      }
+    },
+    {
+      "name": "OPTION-COUNT",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "OPTION-VALUE",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "파랑"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "FOUR-OPTIONS",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "n",
+            "value": "a"
+          },
+          {
+            "name": "n",
+            "value": "b"
+          },
+          {
+            "name": "n",
+            "value": "c"
+          },
+          {
+            "name": "n",
+            "value": "d"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "OPTION-EXTRA-KEY",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강",
+            "price": 0
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "OPTION-EMPTY-NAME",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "TITLE-200",
+      "valid": true,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "TITLE-201",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "TITLE-CONTROL",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말\n세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "STORE-51",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "AMOUNT-NEGATIVE",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": -1
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": -3001,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": -1,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "AMOUNT-BILLION",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 1000000000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 999997000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 1000000000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "AMOUNT-FLOAT",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000.5
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000.5,
+        "expectedTotalKrw": 23000.5,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "AMOUNT-STRING",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": "23000"
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": "23000",
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "ITEM-ZERO",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 3000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 0,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 3000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "REGIONAL-STRING",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": "true",
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "CHECKOUT-TWO",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 2,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "CHECKOUT-BOOL",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "EXECUTION-EXTRA-ACCOUNT",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000,
+        "account": "1234"
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "EXECUTION-MISSING-TOTAL",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "SUMMARY-ADDRESS",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "address": "서울"
+      }
+    },
+    {
+      "name": "SUMMARY-PAYMENT",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "paymentMethod": "card"
+      }
+    },
+    {
+      "name": "SUMMARY-KIND-ORDER",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "ORDER",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "MODEL-EXTRA-KEY",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "options": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "confirm": true
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    },
+    {
+      "name": "MODEL-MISSING-OPTIONS",
+      "valid": false,
+      "modelArgs": {
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567?NaPm=ct",
+        "quantity": 2
+      },
+      "executionArgs": {
+        "checkout": 1,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567",
+        "optionLabels": [
+          "빨강"
+        ],
+        "quantity": 2,
+        "expectedTotalKrw": 23000
+      },
+      "summary": {
+        "kind": "CHECKOUT",
+        "title": "양말 세트",
+        "store": "샘플 가게",
+        "options": [
+          {
+            "name": "색상",
+            "value": "빨강"
+          }
+        ],
+        "quantity": 2,
+        "itemAmountKrw": 20000,
+        "shippingFeeKrw": 3000,
+        "expectedTotalKrw": 23000,
+        "regionalExtraFee": true,
+        "url": "https://smartstore.naver.com/sample-shop/products/1234567"
+      }
+    }
+  ]
+}

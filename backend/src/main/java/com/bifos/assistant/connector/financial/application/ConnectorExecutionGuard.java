@@ -34,13 +34,22 @@ public class ConnectorExecutionGuard {
         for (var entry : operations.properties()) {
             String operation = text(entry.getValue());
             require(Set.of("CREATE", "MODIFY", "CANCEL").contains(operation) && !prepare.equals(entry.getKey()));
-            require(ConnectorToolPolicies.find(manifest, entry.getKey())
-                .filter(p -> p.risk() == ToolRisk.FINANCIAL && p.approval() == ToolApproval.ALWAYS)
-                .isPresent());
             declared.put(entry.getKey(), operation);
         }
+        var kinds = kinds(node, declared);
+        // 주문서 준비 도구는 PURCHASE, 나머지는 FINANCIAL 이다. 한 선언에 두 위험도를 섞지 않는다(ADR-20261113 / purchase-checkout).
+        boolean checkout = kinds.containsValue(ConnectorExecutionSnapshot.CHECKOUT);
+        for (var entry : declared.entrySet()) {
+            boolean purchase = ConnectorExecutionSnapshot.CHECKOUT.equals(kinds.get(entry.getKey()));
+            require(purchase == checkout && (!purchase || "CREATE".equals(entry.getValue())));
+            ToolRisk risk = purchase ? ToolRisk.PURCHASE : ToolRisk.FINANCIAL;
+            require(ConnectorToolPolicies.find(manifest, entry.getKey())
+                .filter(p -> p.risk() == risk && p.approval() == ToolApproval.ALWAYS)
+                .isPresent());
+        }
         JsonNode fields = node.get("scope_fields");
-        require(fields.isArray() && !fields.isEmpty() && fields.size() <= 8);
+        // 쇼핑 연결에는 계좌 같은 공개 칸이 없어 주문서 준비의 scope 는 비어 있다.
+        require(fields.isArray() && fields.isEmpty() == checkout && fields.size() <= 8);
         var scopes = new ArrayList<ScopeField>();
         var args = new HashSet<String>();
         var names = new HashSet<String>();
@@ -55,18 +64,23 @@ public class ConnectorExecutionGuard {
             require(manifest.fields().stream().anyMatch(f -> name.equals(f.key()) && !f.secret()));
             scopes.add(new ScopeField(arg, name));
         }
+        return new ConnectorExecutionGuardContract(protocol, prepare, scopes, declared, kinds);
+    }
+
+
+    private static LinkedHashMap<String, String> kinds(JsonNode node, LinkedHashMap<String, String> declared) {
         var kinds = new LinkedHashMap<String, String>();
         if (node.has("kinds")) {
             JsonNode declaredKinds = node.get("kinds");
             require(declaredKinds.isObject() && !declaredKinds.isEmpty());
             for (var entry : declaredKinds.properties()) {
                 String kind = text(entry.getValue());
-                require(declared.containsKey(entry.getKey())
-                    && Set.of(ConnectorExecutionSnapshot.ORDER, ConnectorExecutionSnapshot.CONDITIONAL).contains(kind));
+                require(declared.containsKey(entry.getKey()) && Set.of(ConnectorExecutionSnapshot.ORDER,
+                    ConnectorExecutionSnapshot.CONDITIONAL, ConnectorExecutionSnapshot.CHECKOUT).contains(kind));
                 kinds.put(entry.getKey(), kind);
             }
         }
-        return new ConnectorExecutionGuardContract(protocol, prepare, scopes, declared, kinds);
+        return kinds;
     }
 
 
