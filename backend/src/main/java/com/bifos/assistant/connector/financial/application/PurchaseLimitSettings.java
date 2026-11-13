@@ -8,6 +8,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
@@ -28,16 +29,18 @@ public class PurchaseLimitSettings {
     static final long MAX_VALUE = 999_999_999_999L;
     private final PurchaseLimitRepository limits;
     private final AppUserRepository users;
+    private final PurchaseLimits purchases;
+    private final Clock clock;
 
 
     /**
-     * 그 사용자의 상한과 오늘 합계다. 하루 합계는 {@code PURCHASE} 승인 줄에서 세는데, 그 줄을 만드는 주문서 준비가 아직 없어 0 이다.
+     * 그 사용자의 상한과 오늘 합계다. 하루 합계는 {@code PURCHASE} 승인 줄에서 센다({@link PurchaseLimits#spentToday}).
      * 세는 규칙은 {@code backend/docs/data-schema.md} 의 「구매 상한 컬럼」 이 갖는다.
      */
     @Transactional(readOnly = true)
     public PurchaseLimitsView view(CurrentUser user) {
         PurchaseLimit stored = limits.findByUserId(user.id()).orElseThrow(() -> new ApiException(ErrorCode.FORBIDDEN, "no user"));
-        long spent = 0L;
+        long spent = purchases.spentToday(user.id(), null, clock.instant());
         return new PurchaseLimitsView(stored.orderKrw(), stored.dailyKrw(), spent, Math.max(0, stored.dailyKrw() - spent));
     }
 

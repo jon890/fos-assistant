@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.action.application.dto.ConnectorActionChang
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.ConnectorActionKey;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
+import com.bifos.assistant.connector.approval.application.dto.PaymentHandoffResult;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.handoff.application.dto.ConnectorHandoffRequest;
 import com.bifos.assistant.connector.handoff.application.dto.HandoffView;
@@ -18,7 +19,7 @@ import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,14 +40,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class ConnectorHandoffs {
-
-    /** 알림과 카드의 제목이다. 웹의 {@code handoff.ts} 와 같은 글이다. */
-    public static final Map<HandoffNeed, String> TITLES = Map.of(
-        HandoffNeed.LOGIN, "「내 브라우저」에서 로그인해 주세요",
-        HandoffNeed.CAPTCHA, "「내 브라우저」에서 보안 확인을 풀어 주세요",
-        HandoffNeed.DEVICE_CHECK, "「내 브라우저」에서 기기 인증을 해 주세요",
-        HandoffNeed.BOT_CHECK, "「내 브라우저」에서 자동 접속 확인을 풀어 주세요",
-        HandoffNeed.UNEXPECTED_PAGE, "「내 브라우저」에서 화면을 확인해 주세요");
 
     private final ConnectorHandoffRepository handoffs;
     private final NotificationService notifications;
@@ -84,7 +77,7 @@ public class ConnectorHandoffs {
             .ifPresent(conversation -> notifications.notify(
                 action.userId(),
                 NotificationKind.HANDOFF_REQUESTED,
-                TITLES.get(request.need()),
+                request.need().title(),
                 "「" + titleOf(action.connectorId()) + "」",
                 new NotificationTarget(NotificationTargetType.CONVERSATION, conversation),
                 action.publicId()));
@@ -96,14 +89,24 @@ public class ConnectorHandoffs {
     @Transactional(readOnly = true)
     public List<HandoffView> open(CurrentUser user, Long conversationId) {
         return handoffs.findOpen(conversationId, user.id()).stream()
-            .map(action -> new HandoffView(
-                action.publicId(),
-                action.connectorId(),
-                titleOf(action.connectorId()),
-                action.handoff().need(),
-                action.handoff().tab(),
-                action.handoff().at()))
+            .map(this::view)
             .toList();
+    }
+
+
+    /** 결제 넘기기는 금액을 새 칸 없이 그 승인 줄의 결과 글에서 읽어 붙인다(spec DECISION25). 읽지 못하면 금액 없이 낸다. */
+    private HandoffView view(ConnectorAction action) {
+        var amounts = action.handoff().need() == HandoffNeed.PAYMENT
+            ? PaymentHandoffResult.fromStored(action.resultText()) : Optional.<PaymentHandoffResult>empty();
+        return new HandoffView(
+            action.publicId(),
+            action.connectorId(),
+            titleOf(action.connectorId()),
+            action.handoff().need(),
+            action.handoff().tab(),
+            action.handoff().at(),
+            amounts.map(PaymentHandoffResult::finalAmountKrw).orElse(null),
+            amounts.map(PaymentHandoffResult::expectedTotalKrw).orElse(null));
     }
 
 

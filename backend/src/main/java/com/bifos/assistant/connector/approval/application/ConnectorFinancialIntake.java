@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.approval.application;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.FinancialLimitExceeded;
 import com.bifos.assistant.connector.financial.application.FinancialOrderLimits;
+import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.financial.application.dto.ConnectorExecutionGuardContract;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
@@ -70,7 +71,7 @@ class ConnectorFinancialIntake {
      * 다시 금융 준비로 넘기면 금융 준비가 같은 키의 줄을 찾아 같은 승인 번호로 답한다.
      */
     static boolean owns(ConnectorAction recorded) {
-        return recorded.risk() == ToolRisk.FINANCIAL;
+        return recorded.risk() == ToolRisk.FINANCIAL || recorded.risk() == ToolRisk.PURCHASE;
     }
 
 
@@ -132,8 +133,9 @@ class ConnectorFinancialIntake {
             String tool = shaped ? input.get("tool").stringValue() : null;
             // 선언하지 않은 도구는 동작이 없다. Set.of 의 contains 는 null 에 예외를 던지므로 먼저 거른다.
             String operation = tool == null ? null : contract.operations().get(tool);
+            // 일반 주문과 주문서 준비(ADR-20261113 / purchase-checkout)만 연다. 조건주문은 열지 않는다.
             if (operation == null || !OPEN_OPERATIONS.contains(operation)
-                || !ConnectorExecutionSnapshot.ORDER.equals(contract.kind(tool))) {
+                || !Set.of(ConnectorExecutionSnapshot.ORDER, ConnectorExecutionSnapshot.CHECKOUT).contains(contract.kind(tool))) {
                 log.warn("금융 준비를 거절했다 stage=input kind=-");
                 return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
             }
@@ -142,6 +144,9 @@ class ConnectorFinancialIntake {
         } catch (FinancialLimitExceeded ex) {
             log.info("금융 준비가 상한에 걸렸다 limit={}", ex.kind());
             return new ConnectorPolicyAnswer(false, limitMessage(ex), null);
+        } catch (PurchaseLimitExceeded ex) {
+            log.info("주문서 준비가 구매 상한에 걸렸다 limit={} unset={}", ex.kind(), ex.unset());
+            return new ConnectorPolicyAnswer(false, purchaseLimitMessage(ex), null);
         } catch (RuntimeException ex) {
             // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 단계 코드와 종류만 남긴다.
             log.warn("금융 준비를 거절했다 stage={} kind={}", stageOf(ex), ex.getClass().getSimpleName());
@@ -185,5 +190,20 @@ class ConnectorFinancialIntake {
         }
         return message.append(" 사용자에게 알린다. 상한을 바꾸려면 order_limit_change 로 요청한다. 올리기는 사용자의 승인이 있어야 반영된다.")
             .toString();
+    }
+
+
+    /**
+     * 구매 상한에 걸린 주문서 준비의 답이다. 카드를 만들지 않았다. 상한이 0 이면 사용자가 아직 정하지 않은 것이다.
+     * 에이전트가 상한을 바꾸는 길은 없고 사용자가 「외부 서비스 연결」 화면에서 정한다(spec DECISION15).
+     */
+    static String purchaseLimitMessage(PurchaseLimitExceeded ex) {
+        if (ex.unset()) {
+            return "구매 상한이 0 이라 주문서를 준비하지 않았다. 승인 카드를 만들지 않았다. "
+                + "사용자에게 「외부 서비스 연결」 화면에서 한 건과 하루 구매 상한을 정해 달라고 알린다. 상한을 정해 주세요.";
+        }
+        return "주문서가 구매 상한에 걸려 준비하지 않았다. 승인 카드를 만들지 않았다. 걸린 상한: " + ex.kind().label() + " "
+            + ex.limit() + " KRW. 오늘 남은 한도: " + ex.remainingToday() + " KRW. 사용자에게 알린다. "
+            + "상한은 사용자가 「외부 서비스 연결」 화면에서 바꾼다.";
     }
 }

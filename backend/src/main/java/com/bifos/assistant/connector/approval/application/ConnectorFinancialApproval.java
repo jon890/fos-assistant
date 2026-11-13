@@ -5,6 +5,8 @@ import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.financial.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
+import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import static com.bifos.assistant.connector.approval.application.ConnectorFinancialProducer.require;
 
@@ -15,7 +17,9 @@ import com.bifos.assistant.connector.financial.application.ConnectorExecutionTic
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionView;
 import com.bifos.assistant.connector.financial.application.dto.ConnectorExecutionReadContext;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
+import com.bifos.assistant.connector.action.domain.ConnectorActionExecution;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
+import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
@@ -29,6 +33,9 @@ import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.application.dto.ConnectorCallError;
 import com.bifos.assistant.notification.application.NotificationService;
+import com.bifos.assistant.notification.domain.NotificationTarget;
+import com.bifos.assistant.notification.domain.type.NotificationKind;
+import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.config.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
@@ -46,7 +53,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 공개 승인 API 가 위험도 FINANCIAL 줄을 넘기는 금융 승인이다. grant 입력과 자동 재실행을 받지 않는다. */
+/** 공개 승인 API 가 위험도 FINANCIAL 과 PURCHASE 줄을 넘기는 금융 승인이다. grant 입력과 자동 재실행을 받지 않는다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -56,6 +63,7 @@ class ConnectorFinancialApproval {
     private final ConnectorExecutionTicket tickets;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
+    private final PurchaseLimits purchases;
     private final AppUserRepository users;
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
@@ -95,12 +103,20 @@ class ConnectorFinancialApproval {
             // 준비와 승인 사이의 재기동으로 key 파일 설정을 비우거나 목록과 상한을 줄였으면 여기서 막는다.
             // key 는 기동 뒤 처음 읽은 값을 쓰므로 실행 중에 파일만 지워서는 닫히지 않는다.
             gate.requireOpen();
-            gate.requireScope(user.id(), checked.scopeJson());
-            gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());
+            var expected = checked.expectedTotalKrw();
+            if (expected.isEmpty()) {
+                gate.requireScope(user.id(), checked.scopeJson());
+                gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());
+            }
             action.beginExecution(clock.instant());
             feedback.record(entry(action, FeedbackEventType.APPROVED, FeedbackActor.USER));
-            return checked;
+            return expected.isPresent() && limitedAtApproval(action, expected.getAsLong()) ? null : checked;
         });
+        if (snapshot == null) {
+            var settled = actions.findByPublicId(actionId).orElseThrow(ConnectorActionDetails::notFound);
+            return ConnectorActionDetails.view(settled, Optional.of(manifest));
+        }
+        var expectedTotal = snapshot.expectedTotalKrw();
         CallResult result = null;
         String ticket = null;
         try {
@@ -125,7 +141,9 @@ class ConnectorFinancialApproval {
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             if (action.status() == ActionStatus.EXECUTING) {
                 var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorFinancialProducer::rejected);
-                if (executed != null && executed.ok() && row.consumedAt() == null) {
+                if (expectedTotal.isPresent()) {
+                    settleCheckout(action, row, executed, expectedTotal.getAsLong(), manifest.title());
+                } else if (executed != null && executed.ok() && row.consumedAt() == null) {
                     // claim 없이 온 성공은 「claim 성공 없이 금융 POST 를 보내지 않는다」 는 계약과 어긋난다. 보냈는지 가릴 수 없으므로
                     // 성공과 실패 어느 쪽으로도 확정하지 않고 UNKNOWN 으로 남긴다(ADR-20261012 / financial-unsent-proof 개정).
                     // 응답 본문은 주문의 증거가 아니라 저장하지 않고, 진단에는 승인 번호만 남긴다.
@@ -145,6 +163,47 @@ class ConnectorFinancialApproval {
             return action;
         });
         return ConnectorActionDetails.view(finished, Optional.of(manifest));
+    }
+
+
+    /**
+     * 주문서 준비를 승인 순간의 구매 상한으로 다시 본다(spec DECISION30). 걸리면 {@code EXECUTING} 으로 옮긴 그 줄을 채우지 않고
+     * {@code FAILED} 로 끝내고 참이다. 부르는 쪽은 사용자와 승인 줄을 잠근 트랜잭션 안에 있다.
+     */
+    private boolean limitedAtApproval(ConnectorAction action, long expectedTotalKrw) {
+        try {
+            purchases.requireWithin(action.userId(), action.id(), expectedTotalKrw, clock.instant());
+            return false;
+        } catch (PurchaseLimitExceeded ex) {
+            ConnectorCheckoutOutcome.limited(action, ex, expectedTotalKrw, bodies, clock.instant());
+            feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
+            new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
+            return true;
+        }
+    }
+
+
+    /** 주문서 채우기는 결과 판정이 끝내고 결제나 탭 확인을 넘긴다(ADR-20261113 / purchase-checkout). 잠근 줄만 받는다. */
+    private void settleCheckout(ConnectorAction action, ConnectorActionExecution row, CallResult executed, long expectedTotalKrw,
+        String connectorTitle) {
+        ConnectorCheckoutOutcome.settle(action, row, executed, expectedTotalKrw, purchases, bodies, clock.instant())
+            .ifPresent(need -> notifyHandoff(action, need, connectorTitle));
+        if (action.status() == ActionStatus.SUCCEEDED) {
+            feedback.record(entry(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
+        } else if (action.status() == ActionStatus.FAILED) {
+            feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
+        }
+    }
+
+
+    /** 결과 판정이 넘긴 화면의 알림이다. 플러그인 알림이 낸 넘기기와 같은 종류와 갈 곳이다. 대화 밖 실행이면 알리지 않는다. */
+    private void notifyHandoff(ConnectorAction action, HandoffNeed need, String connectorTitle) {
+        if (action.conversationId() == null) {
+            return;
+        }
+        conversations.publicIdOf(action.conversationId()).ifPresent(conversation -> notifications.notify(action.userId(),
+            NotificationKind.HANDOFF_REQUESTED, need.title(), "「" + connectorTitle + "」",
+            new NotificationTarget(NotificationTargetType.CONVERSATION, conversation), action.publicId()));
     }
 
 

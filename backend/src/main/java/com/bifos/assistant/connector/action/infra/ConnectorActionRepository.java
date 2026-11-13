@@ -181,12 +181,12 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             select a.id from ConnectorAction a
             where a.conversationId = :conversationId and a.bodyErasedAt is null
                 and (a.status is null or a.status not in :open)
-                and (a.risk is null or a.risk <> :financial or a.status is null or a.status <> :succeeded
+                and (a.risk is null or a.risk not in :spending or a.status is null or a.status <> :succeeded
                     or a.decidedAt is null or a.decidedAt < :dayStart)
             order by a.id
             """)
     List<Long> findErasableBodyIds(@Param("conversationId") Long conversationId,
-        @Param("open") Collection<ActionStatus> open, @Param("financial") ToolRisk financial,
+        @Param("open") Collection<ActionStatus> open, @Param("spending") Collection<ToolRisk> spending,
         @Param("succeeded") ActionStatus succeeded, @Param("dayStart") Instant dayStart);
 
 
@@ -196,12 +196,12 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             where a.conversationId = c.id and c.deletedAt is not null and c.purgedAt is not null
                 and a.bodyErasedAt is null and a.conversationId not in :skipped
                 and (a.status is null or a.status not in :open)
-                and (a.risk is null or a.risk <> :financial or a.status is null or a.status <> :succeeded
+                and (a.risk is null or a.risk not in :spending or a.status is null or a.status <> :succeeded
                     or a.decidedAt is null or a.decidedAt < :dayStart)
             order by a.conversationId
             """)
     List<Long> findPurgedConversationsWithBodies(@Param("skipped") List<Long> skipped,
-        @Param("open") Collection<ActionStatus> open, @Param("financial") ToolRisk financial,
+        @Param("open") Collection<ActionStatus> open, @Param("spending") Collection<ToolRisk> spending,
         @Param("succeeded") ActionStatus succeeded, @Param("dayStart") Instant dayStart, Pageable pageable);
 
 

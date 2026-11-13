@@ -6,6 +6,8 @@ import com.bifos.assistant.connector.financial.application.ConnectorFinancialCon
 import com.bifos.assistant.connector.financial.application.ConnectorFinancialGate;
 import com.bifos.assistant.connector.financial.application.FinancialDigest;
 import com.bifos.assistant.connector.financial.application.FinancialLimitExceeded;
+import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
+import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.connection.config.ConnectorPolicyProperties;
@@ -99,6 +101,7 @@ class ConnectorFinancialProducer {
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
+    private final PurchaseLimits purchases;
     private final FinancialDigest digest;
     private final TextCipher cipher;
     private final ConnectorActionBodies bodies;
@@ -138,8 +141,10 @@ class ConnectorFinancialProducer {
         verified(hermes, manifest, before.profile(), before.binding(), before.connection(), before.connectionRevision());
         Map<String, String> scope = new LinkedHashMap<>();
         contract.scopeFields().forEach(field -> scope.put(field.arg(), before.fields().get(field.field())));
-        // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다.
-        at(FinancialPrepareStage.ACCOUNTS, () -> gate.requireAccounts(before.user(), scope.values()));
+        // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다. 주문서 준비는 계좌가 없고 구매 상한이 대신한다(ADR-20261113 / purchase-checkout).
+        if (!contract.checkout()) {
+            at(FinancialPrepareStage.ACCOUNTS, () -> gate.requireAccounts(before.user(), scope.values()));
+        }
         // prepare는 재호출하지 않는다. DB 잠금과 연결을 놓은 뒤 읽기 전용 HTTP를 한 번 보낸다.
         var prepared = at(FinancialPrepareStage.PREPARE_HTTP, () -> hermes.prepare(profileName, before.connector(), hermesTool, argsJson));
         require(prepared != null && prepared.ok(), FinancialPrepareStage.PREPARE_HTTP);
@@ -173,11 +178,12 @@ class ConnectorFinancialProducer {
                 throw new FinancialPrepareRejected(conflictStage(blocking.get(), origin.conversationId()));
             }
             at(FinancialPrepareStage.GATE, gate::requireOpen);
-            at(FinancialPrepareStage.LIMITS, () -> gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant()));
+            at(FinancialPrepareStage.LIMITS, () -> requireWithinLimits(before.user(), snapshot, executionArgs));
             var binding = bindings.findById(before.binding()).orElseThrow(() -> new FinancialPrepareRejected(FinancialPrepareStage.BINDING));
             Instant now = clock.instant();
             var action = ConnectorAction.decided(binding.connection(), before.agent(), origin, hermesTool, toolName,
-                new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
+                new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null,
+                    contract.checkout() ? ToolRisk.PURCHASE : ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
                 false, key, hash, now);
             action.awaitApproval(now.plus(properties.current().approvalTtl()));
             actions.saveAndFlush(action);
@@ -200,6 +206,17 @@ class ConnectorFinancialProducer {
             return action;
         });
         return answer(saved);
+    }
+
+
+    /** 주문서 준비는 구매 상한으로, 금융 주문은 금융 상한으로 카드를 만들 때 본다. 부르는 쪽이 사용자 행을 잠갔다. */
+    private void requireWithinLimits(Long userId, ConnectorExecutionSnapshot snapshot, String executionArgs) {
+        var expected = snapshot.expectedTotalKrw();
+        if (expected.isPresent()) {
+            purchases.requireWithin(userId, null, expected.getAsLong(), clock.instant());
+        } else {
+            gate.requireWithinLimits(userId, null, executionArgs, clock.instant());
+        }
     }
 
 
@@ -282,7 +299,7 @@ class ConnectorFinancialProducer {
     private static <T> T at(FinancialPrepareStage stage, Supplier<T> step) {
         try {
             return step.get();
-        } catch (FinancialLimitExceeded | FinancialPrepareRejected ex) {
+        } catch (FinancialLimitExceeded | PurchaseLimitExceeded | FinancialPrepareRejected ex) {
             throw ex;
         } catch (RuntimeException ex) {
             // 원래 예외의 메시지에는 원격 응답과 인자가 섞일 수 있어 cause 로도 싣지 않는다.

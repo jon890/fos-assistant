@@ -15,7 +15,6 @@ import com.bifos.assistant.connector.action.application.dto.PendingApproval;
 import com.bifos.assistant.connector.connection.domain.ConnectorConnection;
 import com.bifos.assistant.connector.connection.domain.ListedTools;
 import com.bifos.assistant.connector.action.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.connector.action.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
@@ -246,7 +245,7 @@ public class ConnectorActionService {
      * 승인하고, 고르면 그 도구를 그 대화에서 계속 허용한다(ADR-20261012 / conversation-grant). 나머지는
      * {@link #approve(CurrentUser, UUID, GrantPeriod)} 와 같다.
      *
-     * <p>저장 위험도가 {@code FINANCIAL} 인 줄은 금융 승인으로 보낸다(ADR-20261013 / financial-order-opening). 남의 줄은 입력을 보기 전에
+     * <p>저장 위험도가 {@code FINANCIAL} 이나 {@code PURCHASE} 인 줄은 금융 승인으로 보낸다(ADR-20261013 / financial-order-opening). 남의 줄은 입력을 보기 전에
      * 없는 줄과 같은 응답이다. 입력 오류를 먼저 내면 그 줄이 있다는 단서가 된다. 금융 줄은 상시 허락도 대화 허락도 받지 않는다.
      *
      * @param conversationGrant 그 대화에서 계속 허용하는가. {@code grant} 와 함께 줄 수 없다
@@ -263,7 +262,8 @@ public class ConnectorActionService {
             }
             return limitChanges.approve(user, actionId);
         }
-        if (stored.isPresent() && stored.get().risk() == ToolRisk.FINANCIAL) {
+        // 구매 줄(PURCHASE)도 같은 금융 승인으로 보낸다(ADR-20261113 / purchase-checkout). 허락을 받지 않는다.
+        if (stored.isPresent() && ConnectorFinancialIntake.owns(stored.get())) {
             if (!user.id().equals(stored.get().userId())) {
                 throw ConnectorActionDetails.notFound();
             }
