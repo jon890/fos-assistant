@@ -172,7 +172,9 @@ test("상태의 product 칸이 비어 있어도 simpleProductForDetailPage 가 �
   const found = PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], state);
   expect(parseStoreProduct(found, url)!.title).toBe("물티슈 100매");
   expect(
-    PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], { product: { salePrice: 0 } }) ?? null,
+    PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], {
+      product: { salePrice: 0 },
+    }) ?? null,
   ).toBeNull();
 });
 
@@ -193,9 +195,24 @@ test("조합형 옵션은 첫 묶음 값의 추가 금액과 품절을 싣는다
       optionUsable: true,
       options: [{ groupName: "수량" }, { groupName: "향" }],
       optionCombinations: [
-        { optionName1: "10팩", optionName2: "무향", price: 0, stockQuantity: 3 },
-        { optionName1: "10팩", optionName2: "레몬", price: 500, stockQuantity: 0 },
-        { optionName1: "20팩", optionName2: "무향", price: 9000, stockQuantity: 0 },
+        {
+          optionName1: "10팩",
+          optionName2: "무향",
+          price: 0,
+          stockQuantity: 3,
+        },
+        {
+          optionName1: "10팩",
+          optionName2: "레몬",
+          price: 500,
+          stockQuantity: 0,
+        },
+        {
+          optionName1: "20팩",
+          optionName2: "무향",
+          price: 9000,
+          stockQuantity: 0,
+        },
       ],
     },
     url,
