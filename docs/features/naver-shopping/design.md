@@ -88,6 +88,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 옵션은 20개 묶음, 묶음마다 값 100개까지 싣는다. 넘으면 자른 수를 `options_truncated` 로 알린다.
+옵션이 있는 상품(`optionUsable: true`)인데 옵션 묶음을 하나도 읽지 못하면 `options_unknown: true` 를 더한다. 옵션 목록을 얻으려면 드롭다운을 눌러야 해 PR3 설계가 정한다.
 조합형 옵션처럼 값마다 재고가 따로인 경우는 첫 단계의 값과 품절만 싣는다. 주문서 준비(PR3)가 고른 조합을 다시 읽는다.
 
 ### 주소 분류(PR1)
@@ -151,7 +152,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `productDeliveryInfo.baseFee` | 기본 배송비(숫자) | 배송비 |
 | `productDeliveryInfo.area2ExtraFee` | 제주 등 지역 추가 배송비. 있을 때만 | 0 보다 크면 지역 추가 배송비 있음 |
 
-실측하지 못한 것은 후보 이름으로만 두고 없으면 지어내지 않는다. 옵션이 있는 상품(`optionUsable: true`)의 옵션 묶음과 조합 칸 이름(`options`, `optionCombinations` 등), 무료 배송 조건 금액(`freeConditionalAmount`), 그 밖의 지역 추가 배송비 이름(`area3ExtraFee`)이 그렇다. 지역 추가 배송비는 후보마다 보고 하나라도 0 보다 크면 있다고 본다. `optionUsable` 이 `true` 인데 옵션 칸을 못 찾으면 옵션은 빈 목록이다.
+실측하지 못한 것은 후보 이름으로만 두고 없으면 지어내지 않는다. 옵션이 있는 상품(`optionUsable: true`)의 옵션 묶음과 조합 칸 이름(`options`, `optionCombinations` 등), 무료 배송 조건 금액(`freeConditionalAmount`), 그 밖의 지역 추가 배송비 이름(`area3ExtraFee`)이 그렇다. 지역 추가 배송비는 후보마다 보고 하나라도 0 보다 크면 있다고 본다. `optionUsable` 이 `true` 인데 옵션 칸을 못 찾으면 옵션은 빈 목록이고 `options_unknown: true` 가 붙는다.
 
 ### 화면 분류(PR1, PR2 가 다시 씀)
 
