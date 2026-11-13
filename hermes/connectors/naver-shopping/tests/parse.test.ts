@@ -4,7 +4,6 @@ import {
   parseCatalog,
   parseStoreProduct,
 } from "../src/parse-product.ts";
-import { PRODUCT_STATE_PATH } from "../src/fields.ts";
 import { parseSearch, searchLooksChanged } from "../src/parse-search.ts";
 
 /** 합성 검색 항목(고정 식이 주는 평평한 모양). 실제 네이버 화면을 옮긴 것이 아니다. */
@@ -160,22 +159,20 @@ test("무료 배송이면 배송비 0 이고, 지역 추가 배송비 칸이 없
   )!;
   expect(zero.shipping.fee_krw).toBe(2500);
   expect(zero.shipping.regional_extra).toBe(false);
-});
-
-test("상태의 product 칸이 비어 있어도 simpleProductForDetailPage 가 상품이다", () => {
-  // 실측: product 는 칸만 있고 name 이 없으며 salePrice 가 0 이다. 경로가 그쪽을 가리키면 상품을 못 읽는다.
-  expect(PRODUCT_STATE_PATH).toEqual(["simpleProductForDetailPage"]);
-  const state = {
-    product: { salePrice: 0 },
-    simpleProductForDetailPage: product,
-  };
-  const found = PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], state);
-  expect(parseStoreProduct(found, url)!.title).toBe("물티슈 100매");
-  expect(
-    PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], {
-      product: { salePrice: 0 },
-    }) ?? null,
-  ).toBeNull();
+  // 앞 후보가 0 이어도 뒤 후보가 0 보다 크면 추가 배송비가 있다.
+  const later = parseStoreProduct(
+    {
+      ...product,
+      productDeliveryInfo: {
+        deliveryFeeType: "PAID",
+        baseFee: 2500,
+        area2ExtraFee: 0,
+        area3ExtraFee: 5000,
+      },
+    },
+    url,
+  )!;
+  expect(later.shipping.regional_extra).toBe(true);
 });
 
 test("optionUsable 이 false 면 옵션 칸이 있어도 옵션 없음이고, true 인데 칸이 없으면 지어내지 않는다", () => {

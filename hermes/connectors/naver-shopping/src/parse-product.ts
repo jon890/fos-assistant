@@ -99,7 +99,9 @@ export function parseStoreProduct(product: Json, url: string) {
     shipping: {
       fee_krw: free ? 0 : (won(pick(delivery, PRODUCT.baseFee)) ?? 0),
       free_over_krw: free ? null : won(pick(delivery, PRODUCT.freeOver)),
-      regional_extra: (won(pick(delivery, PRODUCT.regional)) ?? 0) > 0,
+      regional_extra: PRODUCT.regional.some(
+        (key) => (won(pick(delivery, [key])) ?? 0) > 0,
+      ),
     },
     naver_pay_buy: pick(product, PRODUCT.status) === SALE_STATUS,
   };

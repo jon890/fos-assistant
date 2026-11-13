@@ -142,7 +142,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 | 칸 | 실측 | 쓰임 |
 | --- | --- | --- |
-| `name` | 이름 | 제목 |
+| `name`, `dispName` | 이름(둘 다 실측, `name` 을 먼저 본다) | 제목 |
 | `channel.channelName` | 판매처 | 판매처 |
 | `salePrice`, `benefitsView.discountedSalePrice` | 정가, 할인가(숫자) | 할인가가 있으면 할인가, 없으면 정가 |
 | `productStatusType` | `SALE` 이면 바로 살 수 있다 | `naver_pay_buy` |
@@ -151,7 +151,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `productDeliveryInfo.baseFee` | 기본 배송비(숫자) | 배송비 |
 | `productDeliveryInfo.area2ExtraFee` | 제주 등 지역 추가 배송비. 있을 때만 | 0 보다 크면 지역 추가 배송비 있음 |
 
-실측하지 못한 것은 후보 이름으로만 두고 없으면 지어내지 않는다. 옵션이 있는 상품(`optionUsable: true`)의 옵션 묶음과 조합 칸 이름(`options`, `optionCombinations` 등), 무료 배송 조건 금액(`freeConditionalAmount`), 그 밖의 지역 추가 배송비 이름(`area3ExtraFee`)이 그렇다. `optionUsable` 이 `true` 인데 옵션 칸을 못 찾으면 옵션은 빈 목록이다.
+실측하지 못한 것은 후보 이름으로만 두고 없으면 지어내지 않는다. 옵션이 있는 상품(`optionUsable: true`)의 옵션 묶음과 조합 칸 이름(`options`, `optionCombinations` 등), 무료 배송 조건 금액(`freeConditionalAmount`), 그 밖의 지역 추가 배송비 이름(`area3ExtraFee`)이 그렇다. 지역 추가 배송비는 후보마다 보고 하나라도 0 보다 크면 있다고 본다. `optionUsable` 이 `true` 인데 옵션 칸을 못 찾으면 옵션은 빈 목록이다.
 
 ### 화면 분류(PR1, PR2 가 다시 씀)
 

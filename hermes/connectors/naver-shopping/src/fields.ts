@@ -41,7 +41,7 @@ export const SEARCH_ITEM = {
 export const AD_CARD_TYPE = "AD";
 
 /**
- * 상품 화면의 상품. 실측한 칸: `name`, `channel.channelName`, `salePrice`, `benefitsView.discountedSalePrice`,
+ * 상품 화면의 상품. 실측한 칸: `name`(표시용 `dispName` 도 같은 값으로 실측했다), `channel.channelName`, `salePrice`, `benefitsView.discountedSalePrice`,
  * `productStatusType`, `optionUsable`, `productDeliveryInfo.{deliveryFeeType, baseFee, area2ExtraFee}`.
  * 실측하지 못한 칸(옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
  */
