@@ -120,10 +120,15 @@ export function parseCatalog(state: Json, url: string) {
     throw new MissingFields(["catalog"]);
   const title = text(pick(state, CATALOG.title), TITLE_MAX);
   const lowest = won(pick(state, CATALOG.lowestPrice));
-  if (title === null || lowest === null) {
+  // 같은 조각에 비교·추천 묶음이 앞서 실릴 수 있어, 연 주소의 번호와 다른 묶음이면 다른 상품의 값을 내지 않는다.
+  const catalogId = String(pick(state, CATALOG.catalogId) ?? "");
+  const urlId = /\/catalog\/([0-9]+)$/.exec(url)?.[1];
+  const idMatches = catalogId !== "" && catalogId === urlId;
+  if (title === null || lowest === null || !idMatches) {
     throw new MissingFields([
       ...(title === null ? ["title"] : []),
       ...(lowest === null ? ["lowest_price"] : []),
+      ...(idMatches ? [] : ["catalog_id"]),
     ]);
   }
   return {

@@ -297,9 +297,14 @@ test("가격비교 묶음은 이름, 최저가, 배송비를 읽고 판매처 �
   });
 });
 
+const CATALOG_URL = "https://search.shopping.naver.com/catalog/1000";
+
 test("묶음의 배송비 칸이 비면 지어내지 않고 null 이고, 지역 추가 배송비 안내가 없으면 거짓이다", () => {
   expect(
-    parseCatalog({ productName: "합성 묶음", lowestPrice: 9900 }, "u"),
+    parseCatalog(
+      { nCatalogId: "1000", productName: "합성 묶음", lowestPrice: 9900 },
+      CATALOG_URL,
+    ),
   ).toMatchObject({
     lowest_price_krw: 9900,
     delivery_fee_krw: null,
@@ -309,18 +314,36 @@ test("묶음의 배송비 칸이 비면 지어내지 않고 null 이고, 지역 
   // 무료 배송은 0 이다.
   expect(
     parseCatalog(
-      { productName: "합성 묶음", lowestPrice: 9900, deliveryFee: 0 },
-      "u",
+      {
+        nCatalogId: 1000,
+        productName: "합성 묶음",
+        lowestPrice: 9900,
+        deliveryFee: 0,
+      },
+      CATALOG_URL,
     ),
   ).toMatchObject({ delivery_fee_krw: 0 });
 });
 
-test("묶음 화면에 이름이나 최저가가 없으면 빠진 칸을 알린다", () => {
-  expect(() => parseCatalog({ lowestPrice: 1 }, "u")).toThrow(MissingFields);
+/** 던진 MissingFields 의 칸 목록. 던지지 않으면 테스트가 실패한다. */
+function missingOf(state: unknown, url = CATALOG_URL) {
+  expect(() => parseCatalog(state, url)).toThrow(MissingFields);
   try {
-    parseCatalog({}, "u");
+    parseCatalog(state, url);
   } catch (error) {
-    expect((error as MissingFields).fields).toEqual(["title", "lowest_price"]);
+    return (error as MissingFields).fields;
   }
-  expect(() => parseCatalog(null, "u")).toThrow(MissingFields);
+  return [];
+}
+
+test("묶음 화면에 이름이나 최저가가 없으면 빠진 칸을 알린다", () => {
+  expect(missingOf({ nCatalogId: "1000" })).toEqual(["title", "lowest_price"]);
+  expect(missingOf({ nCatalogId: "1000", lowestPrice: 1 })).toEqual(["title"]);
+  expect(missingOf(null)).toEqual(["catalog"]);
+});
+
+test("묶음의 번호가 연 주소의 번호와 다르거나 없으면 다른 상품의 값을 내지 않는다", () => {
+  const body = { productName: "합성 묶음", lowestPrice: 9900 };
+  expect(missingOf({ ...body, nCatalogId: "2000" })).toEqual(["catalog_id"]);
+  expect(missingOf(body)).toEqual(["catalog_id"]);
 });

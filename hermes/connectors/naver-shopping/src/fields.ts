@@ -71,6 +71,8 @@ export const SALE_STATUS = "SALE";
  * 배송비 안내 글이다. 판매처별 가격 목록 칸은 확인하지 못해 두지 않는다.
  */
 export const CATALOG = {
+  /** 연 주소의 `/catalog/<번호>` 와 같아야 그 묶음이다. */
+  catalogId: ["nCatalogId"],
   title: ["productName"],
   lowestPrice: ["lowestPrice"],
   deliveryFee: ["deliveryFee"],
