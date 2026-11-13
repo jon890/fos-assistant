@@ -1,5 +1,6 @@
 import { CATALOG, FREE_DELIVERY, PRODUCT, SALE_STATUS } from "./fields.ts";
 import { STORE_MAX, TITLE_MAX } from "./parse-search.ts";
+import { ToolError } from "./errors.ts";
 import { list, pick, text, won, type Json } from "./values.ts";
 
 export const OPTION_GROUPS_MAX = 20;
@@ -160,5 +161,71 @@ export function parseCatalog(state: Json, url: string) {
     regional_extra: text(pick(state, CATALOG.regionalNote), 200) !== null,
     sellers: [] as never[],
     offers_unknown: true as const,
+  };
+}
+
+/** 고른 옵션 조합. `extra_krw` 는 그 조합의 추가 금액, `sold_out` 은 재고가 0 인지(재고 칸이 없으면 거짓)다. */
+export type ChosenOption = {
+  /** 화면의 옵션 값 글(옵션 단계 순서). 채우기가 층에서 이 글로 고른다. */
+  labels: string[];
+  /** 카드에 보일 `{name, value}`. 이름은 옵션 묶음 이름이다. */
+  shown: { name: string; value: string }[];
+  extra_krw: number;
+  sold_out: boolean;
+};
+
+/**
+ * 옵션 글을 상품 상태의 조합 하나로 맞춘다(design.md 「도구(PR3c)」). 옵션 없는 상품은 빈 글만 받는다.
+ * 맞는 조합이 없거나 둘 이상이면 `NAVER_SHOPPING_OPTION_MISMATCH`, 옵션 목록을 읽지 못했으면 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이다.
+ * 조합의 추가 금액 칸이 비면 지어내지 않고 바뀐 화면으로 본다. 단계는 `combinationNames` 의 수(셋)까지다.
+ */
+export function chooseOption(
+  value: Json,
+  product: NonNullable<ReturnType<typeof parseStoreProduct>>,
+  wanted: string[],
+): ChosenOption {
+  if (product.options_unknown)
+    throw new ToolError("NAVER_SHOPPING_OPTIONS_UNKNOWN");
+  const labels = wanted.map((label) => text(label, OPTION_LABEL_MAX));
+  if (labels.some((label) => label === null))
+    throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+  const groups = product.options;
+  if (groups.length === 0) {
+    if (labels.length) throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+    return { labels: [], shown: [], extra_krw: 0, sold_out: false };
+  }
+  if (
+    groups.length > PRODUCT.combinationNames.length ||
+    labels.length !== groups.length
+  )
+    throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+  const matches = list(pick(value, PRODUCT.combinations)).filter(
+    (combination) =>
+      labels.every(
+        (label, index) =>
+          text(
+            pick(combination, [PRODUCT.combinationNames[index]!]),
+            OPTION_LABEL_MAX,
+          ) === label,
+      ),
+  );
+  if (matches.length !== 1)
+    throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+  // 조합의 추가 금액은 음수(더 싼 옵션)일 수 있다.
+  const rawExtra = pick(matches[0], PRODUCT.combinationPrice);
+  const extra =
+    typeof rawExtra === "number" && Number.isSafeInteger(rawExtra)
+      ? rawExtra
+      : null;
+  if (extra === null) throw new MissingFields(["option_price"]);
+  const stock = won(pick(matches[0], PRODUCT.combinationStock));
+  return {
+    labels: labels as string[],
+    shown: groups.map((group, index) => ({
+      name: group.name,
+      value: labels[index]!,
+    })),
+    extra_krw: extra,
+    sold_out: stock === 0,
   };
 }

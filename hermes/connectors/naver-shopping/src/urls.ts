@@ -5,7 +5,7 @@
 export type UrlKind = "store" | "catalog" | "external";
 
 export const URL_MAX = 2_048;
-const STORE_HOSTS = new Set([
+export const STORE_HOSTS = new Set([
   "smartstore.naver.com",
   "m.smartstore.naver.com",
   "brand.naver.com",

@@ -1508,3 +1508,84 @@ test("모양이 틀린 상한 변경 요약은 승인할 수 없고 거절만 �
   await expect(page.getByTestId("approval-approve")).toHaveCount(0);
   await expect(page.getByTestId("approval-reject")).toBeEnabled();
 });
+
+/** 주문서 준비 줄(구매)의 카드 요약. 합성 값이다. */
+function checkout(overrides: Record<string, unknown> = {}) {
+  return {
+    available: true,
+    title: "합성 상품",
+    store: "합성몰",
+    options: [{ name: "색", value: "검정" }],
+    quantity: 2,
+    itemAmountKrw: 22000,
+    shippingFeeKrw: 3000,
+    expectedTotalKrw: 25000,
+    regionalExtraFee: false,
+    url: "https://smartstore.naver.com/shop/products/1",
+    remainingTodayKrw: 50000,
+    ...overrides,
+  };
+}
+
+function checkoutAction(overrides: Record<string, unknown> = {}): Action {
+  return action({
+    actionId: "0f0e0d0c-0b0a-4908-8706-050403020399",
+    connectorId: "naver-shopping",
+    toolName: "fill_checkout",
+    title: "주문서 채우기",
+    risk: "PURCHASE",
+    grantAllowed: false,
+    conversationGrantAllowed: false,
+    argsJson: JSON.stringify({ checkout: 1 }),
+    checkout: checkout(),
+    ...overrides,
+  });
+}
+
+test("주문서 승인 카드는 상품, 판매처, 옵션, 수량, 금액, 지역 추가 배송비 별도, 남은 한도를 보이고 배송지와 결제 수단 칸이 없다", async ({
+  page,
+}) => {
+  await openWith(page, "주문서 카드 검사", checkoutAction());
+
+  const card = page.getByTestId("approval-card");
+  const summary = card.getByTestId("approval-checkout");
+  await expect(summary).toContainText("합성 상품");
+  await expect(summary).toContainText("합성몰");
+  await expect(summary).toContainText("옵션 · 색");
+  await expect(summary).toContainText("검정");
+  await expect(summary).toContainText("2개");
+  await expect(summary).toContainText("22,000원");
+  await expect(card.getByTestId("approval-checkout-shipping")).toContainText(
+    "3,000원 (지역 추가 배송비 별도)",
+  );
+  await expect(card.getByTestId("approval-checkout-total")).toContainText(
+    "25,000원",
+  );
+  await expect(card.getByTestId("approval-checkout-remaining")).toContainText(
+    "50,000원",
+  );
+  await expect(summary).not.toContainText("배송지");
+  await expect(summary).not.toContainText("결제 수단");
+  await expect(card.getByTestId("approval-args")).toHaveCount(0);
+  await expect(card.getByTestId("approval-approve")).toBeEnabled();
+  await expect(card.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(card.getByTestId("approval-conversation-grant")).toHaveCount(0);
+});
+
+test("요약을 열지 못한 주문서 줄은 승인 단추 없이 거절만 남긴다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "주문서 요약 없음 검사",
+    checkoutAction({ checkout: checkout({ available: false }) }),
+  );
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByTestId("approval-financial-unavailable")).toHaveText(
+    "주문서 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.",
+  );
+  await expect(card.getByTestId("approval-checkout")).toHaveCount(0);
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeEnabled();
+});

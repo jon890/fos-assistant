@@ -1,5 +1,6 @@
 import { Notice } from "@/components/ui/notice";
 import { LimitChangeSummaryView } from "@/components/chat/limit-change-summary";
+import { CheckoutSummaryView } from "@/components/chat/checkout-summary";
 import type { ConnectorAction } from "@/lib/connector-action";
 import {
   compareDecimal,
@@ -27,34 +28,44 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * 금융 줄과 주문 상한 변경 줄은 모델 인자가 아니라 Control Plane 이 만든 요약을 보고 승인한다. 요약이 없거나 열지
- * 못했으면 인자만 보고 승인하지 못하게 한다. `closed` 는 기다리는 그런 줄이 요약 없이 남은 경우다.
+ * 금융 줄, 주문 상한 변경 줄, 주문서 준비 줄(구매)은 모델 인자가 아니라 Control Plane 이 만든 요약을 보고 승인한다. 요약이 없거나
+ * 열지 못했으면 인자만 보고 승인하지 못하게 한다. `closed` 는 기다리는 그런 줄이 요약 없이 남은 경우다.
  */
 export function financialView(action: ConnectorAction) {
   const change = action.limitChange ?? null;
+  const purchase = action.checkout != null || action.risk === "PURCHASE";
   const line =
-    action.financial != null || action.risk === "FINANCIAL" || change != null;
+    action.financial != null ||
+    action.risk === "FINANCIAL" ||
+    change != null ||
+    purchase;
   const summary = action.financial?.available ? action.financial : null;
   const limitChange = change?.available ? change : null;
+  const checkout = action.checkout?.available ? action.checkout : null;
   return {
     line,
     summary,
     limitChange,
+    checkout,
+    purchase,
     closed:
       action.status === "PENDING" &&
       line &&
       summary === null &&
-      limitChange === null,
+      limitChange === null &&
+      checkout === null,
   };
 }
 
 /** 금융 줄과 상한 변경 줄의 본문이다. 요약을 열지 못한 줄은 거절만 할 수 있다고 알린다. */
 export function FinancialLineView({ action }: { action: ConnectorAction }) {
-  const { summary, limitChange, closed } = financialView(action);
+  const { summary, limitChange, checkout, purchase, closed } =
+    financialView(action);
   return (
     <>
       {summary ? <FinancialSummaryView summary={summary} /> : null}
       {limitChange ? <LimitChangeSummaryView summary={limitChange} /> : null}
+      {checkout ? <CheckoutSummaryView summary={checkout} /> : null}
       {closed ? (
         <Notice
           variant="warning"
@@ -63,7 +74,9 @@ export function FinancialLineView({ action }: { action: ConnectorAction }) {
         >
           {action.limitChange
             ? "상한 변경 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요."
-            : "주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요."}
+            : purchase
+              ? "주문서 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요."
+              : "주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요."}
         </Notice>
       ) : null}
     </>

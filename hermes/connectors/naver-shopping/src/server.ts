@@ -12,9 +12,26 @@ import {
   type ToolDeps,
 } from "./tools.ts";
 import { URL_MAX } from "./urls.ts";
+import { takeApproval } from "./approval.ts";
+import {
+  CHECKOUT_TOOL,
+  OPTIONS_MAX,
+  prepareCheckout,
+  QUANTITY_MAX,
+  type CheckoutDeps,
+} from "./checkout.ts";
+import { fillCheckout, type FillDeps } from "./fill.ts";
+
+/** 테스트가 바꿔 끼우는 탭 동작. 운영은 기본값이다. */
+export type ServerDeps = ToolDeps & {
+  checkout?: CheckoutDeps;
+  fill?: FillDeps;
+};
 
 /** 도구를 등록한 서버. 테스트는 이 서버를 InMemoryTransport 로 부른다. */
-export function createServer(env: Env = process.env, deps?: ToolDeps) {
+export function createServer(env: Env = process.env, deps?: ServerDeps) {
+  // 승인한 실행의 권한 env 는 서버를 만들 때 꺼내고 지운다. 도구가 불리지 않아도 env 에 남기지 않는다.
+  const authority = takeApproval(env);
   const server = new McpServer({
     name: "fos-naver-shopping",
     version: "1.0.0",
@@ -45,6 +62,42 @@ export function createServer(env: Env = process.env, deps?: ToolDeps) {
       annotations: { readOnlyHint: true },
     },
     ({ url }) => guard(() => productDetail(env, url, deps)),
+  );
+  server.registerTool(
+    "prepare_checkout",
+    {
+      description: manifest.tools.prepare_checkout.description,
+      inputSchema: {
+        v: z.literal(1),
+        tool: z.literal(CHECKOUT_TOOL),
+        args: z.object({
+          url: z.string().min(1).max(URL_MAX),
+          options: z.array(z.string().max(200)).max(OPTIONS_MAX),
+          quantity: z.number().int().min(1).max(QUANTITY_MAX),
+        }),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (request) => guard(() => prepareCheckout(env, request, deps?.checkout)),
+  );
+  server.registerTool(
+    CHECKOUT_TOOL,
+    {
+      description: manifest.tools.fill_checkout.description,
+      inputSchema: {
+        checkout: z.literal(1),
+        url: z.string().min(1).max(400),
+        optionLabels: z.array(z.string().max(100)).max(OPTIONS_MAX),
+        quantity: z.number().int().min(1).max(QUANTITY_MAX),
+        expectedTotalKrw: z.number().int().min(0).max(999_999_999),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      },
+    },
+    (input) => guard(() => fillCheckout(env, authority, input, deps?.fill)),
   );
   return server;
 }

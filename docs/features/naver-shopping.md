@@ -1,6 +1,6 @@
 # 네이버 쇼핑 플러그인
 
-사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정으로 네이버 쇼핑 상품을 찾고 상품 정보를 읽는 범용 플러그인의 개발 문서다.
+사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정으로 네이버 쇼핑 상품을 찾고 상품 정보를 읽으며, 승인한 상품 하나를 네이버 주문서까지 채우는 범용 플러그인의 개발 문서다.
 
 covers: `hermes/connectors/naver-shopping/`
 
@@ -8,7 +8,8 @@ covers: `hermes/connectors/naver-shopping/`
 요구와 결정은 스펙 [`naver-shopping/spec.md`](naver-shopping/spec.md), 구조는 설계 [`naver-shopping/design.md`](naver-shopping/design.md), 결정의 근거는 [ADR-20261110 / naver-shopping-connector](../adr/ADR-20261110-naver-shopping-connector.md) 가 갖는다.
 플러그인 공통 계약은 [플러그인 연결](connector.md) 과 [플러그인 도구 정책](connector-policy.md), 브라우저와 중계는 [사용자 브라우저](user-browser.md) 가 갖는다.
 
-**장바구니에 담거나 주문하지 않는다.** 지금은 찾기와 읽기뿐이다. 주문서 채우기와 결제 화면 넘기기는 스펙의 뒤 PR 이 더한다.
+**결제 단추를 누르지 않는다.** 주문서까지 채우고 결제 화면을 사람에게 넘긴다. 장바구니에 담지 않는다. 주문 확인(REQ14)은 스펙의 뒤 PR 이 더한다.
+구매 경계(승인 카드, 구매 상한, 결제 직전 금액 재확인)의 근거는 [ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md) 가 갖는다.
 
 ## 등록 칸
 
@@ -22,13 +23,15 @@ covers: `hermes/connectors/naver-shopping/`
 
 ## 도구와 정책
 
-MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 없음, `attended_only` 다.
+MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` 다. 채우기만 `PURCHASE`(승인 `always`)이고 나머지는 `READ`, 승인 없음이다.
 
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
 | `check_shopping_login` | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED`. 탭을 열지 않는다 |
 | `search_products` | `query`(한 줄 1자에서 100자) | `{query, count, products: [{rank, title, price_krw, store, url, kind, naver_pay, ad}]}`. 처음 실린 상품을 40개까지 |
 | `get_product_detail` | `url`(2,048자까지) | 아래 「상품 정보」 |
+| `prepare_checkout` | `{v: 1, tool: "fill_checkout", args: {url, options, quantity}}` | `{v: 1, executionArgs, summary}`. 모델이 아니라 대시보드의 준비 경로가 받는다. 아래 「주문서 준비와 채우기」 |
+| `fill_checkout` | 준비가 만든 `executionArgs` | `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 이나 `{status: "UNKNOWN", tab}`. 모델 목록에 없고 승인한 실행만 부른다 |
 
 - **`attended_only`**: 먼저 살펴보기, 매일 깨우기, 사건 감지, 예약 작업과 그 트리가 맡긴 일의 결과 turn 은 이 도구를 부르지 못한다(`ATTENDED_ONLY`). 판정은 [플러그인 도구 정책](connector-policy.md)의 「도구 호출 판정」 이 갖는다. 연결 확인은 대시보드가 판정 없이 부르므로 막히지 않는다
 - **`READ` 로 둔 까닭**: 사용자가 만든 내용(글, 장바구니, 주문)을 바꾸지 않는다. 로그인한 브라우저로 검색하고 상품을 열면 네이버의 최근 검색어와 최근 본 상품에 남는다. 사람이 직접 검색할 때와 같은 기록이라 감수한다
@@ -46,6 +49,18 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 - `catalog` 의 `lowest_price_krw` 는 묶음의 최저가이고 `lowest_price_with_fee_krw` 는 배송비를 포함한 최저가다. `regional_extra` 는 지역 추가 배송비 안내 글이 있으면 참이다. 이 결과가 오면 담당은 최저가와 배송비만 읽었다고 알리고 판매처별 가격은 「내 브라우저」 에서 확인해 달라고 안내한다(스킬이 지시한다). 이전 결과의 `sellers` 항목(`store`, `price_krw`, `shipping_fee_krw`, `url`)은 읽는 칸을 가려내지 못해 지금은 싣지 않는다
 - 옵션은 20 묶음, 묶음마다 값 100개까지다. 첫 묶음 값만 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의 재고가 0)을 싣고, 둘째 묶음부터는 이름만 싣는다
 - `naver_pay_buy` 는 상품 상태가 판매 중일 때 참이다
+- 옵션이 있는데(`optionUsable`) 처음 상태에 옵션이 없으면 옵션 자리의 드롭다운 단추 하나만 한 번 누르고(`OPEN_OPTION_LISTS`) 상태를 다시 묻는다. 값을 고르거나 다른 단추를 누르지 않는다(사용자 결정 2026-11-13). 그래도 없으면 `options_unknown` 이다
+
+## 주문서 준비와 채우기
+
+`execution_guard` 는 `{protocol: "approval-claim-v2", prepare_tool: "prepare_checkout", scope_fields: [], operations: {fill_checkout: "CREATE"}, kinds: {fill_checkout: "CHECKOUT"}}` 다. 준비·승인·ticket·claim 은 금융 승인의 틀을 그대로 쓰고, 카드와 상한 판정, 결과 판정은 Control Plane 이 한다. 칸과 판정 표는 [설계](naver-shopping/design.md)의 「PR3 구매 상한과 주문서(REQ9~REQ13)」 가 갖는다.
+
+- **준비**: 상품 화면을 새로 읽어 옵션 글을 상태의 조합 하나로 맞추고 상품 금액((판매가 + 옵션 추가 금액) × 수량), 무료 조건을 반영한 기본 배송비, 예상 합계를 계산한다. 쿠폰과 포인트는 넣지 않는다. 사람이 해야 하는 화면은 넘기기가 아니라 그 코드의 오류로 끝내고 탭을 남긴다. 대시보드의 준비 경로가 넘기기 결과를 받지 않기 때문이다
+- **채우기**: 원문·ticket 대조 → 상품 탭 → 가격 다시 계산(승인보다 크면 claim 없이 거절) → claim → 「구매하기」 → 상품 구매 층에서 옵션·수량 → 「바로구매」 → 주문서(같은 탭이나 새 탭)에서 최종 결제 금액을 읽는다. 주문서 탭을 남기고 금액과 탭을 낸다
+- **결제 단추를 누르는 코드 경로가 없다.** 누르는 식은 스마트스토어·브랜드스토어 주소에서만 누른다. 주문서 탭에서는 준비 상태, 화면 분류, 금액 읽기만 부른다. 결제 단추 선택자는 소스에 없고 검사(`tests/checkout-guard.test.ts`)의 금지 목록에만 있다
+- **금액**: 주문서의 「총 주문금액」 과 결제수단 절 머리의 금액이 같을 때만 최종 금액이다. 이름, 주소, 전화번호 같은 화면 글은 결과와 로그에 싣지 않는다
+- **결과를 모를 때**: 「바로구매」 를 보낸 뒤(층이 확인되기 전의 「구매하기」 뒤 포함) 주문서나 금액을 확인하지 못하면 오류가 아니라 `{status: "UNKNOWN", tab}` 이다. 다시 보내지 않는다. Control Plane 이 그 승인을 `UNKNOWN` 으로 끝내고 탭 확인 카드를 띄운다
+- 주문서 화면은 2026-11-13 실측이고, 상품 구매 층의 옵션·수량 칸은 아직 재지 않았다. 칸 위치는 `src/fields.ts` 에 있다
 
 ## 주소 분류
 
@@ -86,6 +101,13 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 | `NAVER_SHOPPING_NOT_FOUND` | `invalid_input` | | 상품 화면에 상태는 있는데 상품이 없다 |
 | `NAVER_SHOPPING_PAGE_CHANGED` | `unavailable` | | 상태 JSON 이 기대한 모양이 아니거나 최종 주소가 네이버가 아니다(넘기기 결과) |
 | `NAVER_SHOPPING_UNAVAILABLE` | `unavailable` | `retry_later` | 시간 초과와 그 밖의 실패 |
+| `NAVER_SHOPPING_OPTION_MISMATCH` | `invalid_input` | `fix_input` | 준비의 옵션 글이 조합 하나로 맞지 않는다 |
+| `NAVER_SHOPPING_OPTIONS_UNKNOWN` | `unavailable` | | 옵션이 있는데 드롭다운을 열어도 조합 목록을 읽지 못했다 |
+| `NAVER_SHOPPING_SOLD_OUT` | `invalid_input` | `recheck` | 고른 조합이 품절이다 |
+| `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 판매 중이 아니다 |
+| `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인보다 크다 |
+| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조나 claim 이 거절됐다 |
+| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다(구매하기 단추 없음, 층의 옵션이나 수량을 못 맞춤) |
 
 오류 글에 중계 주소, 검색어, 화면 글, 브라우저가 준 원문을 싣지 않는다.
 
@@ -98,7 +120,7 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 ## 보안
 
 - 모델이 준 주소로 탭을 여는 것은 `store` 와 `catalog` 갈래뿐이다
-- 캡차 그림을 읽거나 답을 넣는 코드, 누르기와 입력 CDP 명령이 없다. 테스트가 가짜 브라우저의 명령 기록으로 본다
+- 캡차 그림을 읽거나 답을 넣는 코드, 누르기와 입력 CDP 명령(`Input.*`)이 없다. 누르기는 요소의 `click()` 이고 그 식은 `src/expressions.ts` 의 `CLICKING` 에 모여 있다. 읽기 도구는 그 가운데 옵션 드롭다운 열기만 부른다. 테스트가 가짜 브라우저의 명령 기록으로 본다
 - 검색 결과와 상품 정보는 대화에만 남고 플러그인은 아무것도 저장하지 않는다
 - 상품 이름과 판매처 글은 외부 데이터다. 스킬이 지시로 따르지 않게 한다
 
@@ -112,3 +134,14 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 4. `NAVER_SHOPPING_PAGE_CHANGED` 가 나오면 그 profile 의 MCP 표준 오류 기록에서 `naver_shopping_diagnostic` 줄에 적힌 `missing` 목록을 보고 `src/fields.ts` 의 칸 위치를 고친다. 기록을 읽는 방법은 `fos-home-infra` 가 갖는다
 5. 예약 작업 하나에 상품을 찾으라고 지시해 돌려 보고, 도구가 `ATTENDED_ONLY` 로 거절되는지 본다
 6. 「내 브라우저」 에서 네이버를 로그아웃한 뒤 상품을 찾아 달라고 한다. 대화에 「로그인해 주세요」 카드와 알림이 뜨는지, 「내 브라우저 열기」 가 로그인 화면 탭을 고른 채 여는지 본다. 로그인한 뒤 「다 했어요」 를 누르면 검색이 이어지고 카드가 사라지며 남긴 탭이 닫히는지 본다
+
+### 주문서까지 가 보기
+
+결제는 사람이 하거나 하지 않는다. 플러그인은 결제 단추를 누르지 않는다.
+
+1. **상한 정하기**: 상한이 0 인 채로 싼 상품 하나를 사 달라고 해 「상한을 정해 주세요」 로 거절되는지 본다. 그다음 「외부 서비스 연결」 의 네이버 쇼핑 연결에서 한 건 상한과 하루 상한을 그 상품의 예상 합계보다 조금 크게 정한다
+2. **준비**: 옵션 없는 싼 상품 하나를 사 달라고 한다. 승인 카드가 상품, 판매처, 수량, 상품 금액, 배송비, 예상 합계, 「지역 추가 배송비 별도」, 오늘 남은 구매 한도를 보이고 배송지와 결제 수단 칸이 없는지, 「승인하고 묻지 않기」 와 「이 대화에서 계속 허용」 이 없는지 본다
+3. **카드 승인**: 승인하면 「내 브라우저」 에 상품 탭이 열리고 「구매하기」, 상품 구매 층의 「바로구매」 를 거쳐 주문서 탭이 남는지 본다. 장바구니에 담기지 않았는지 본다. 대화에 결제 넘기기 카드가 최종 결제 금액과 승인한 예상 합계를 보이는지 본다
+4. **주문서 탭에서 결제하거나 닫기**: 카드의 「내 브라우저 열기」 로 주문서 탭을 열어 금액이 카드와 같은지 본다. 사람이 직접 결제하거나, 사지 않으려면 탭을 닫는다. 「다 했어요」 를 누르면 카드가 닫힌다
+5. 옵션이 있는 상품으로 2~4 를 한 번 더 돈다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다
+6. 하루 상한을 오늘 승인한 합계보다 작게 낮춘 뒤 다시 사 달라고 해, 카드 없이 걸린 상한과 남은 한도를 알리는지 본다

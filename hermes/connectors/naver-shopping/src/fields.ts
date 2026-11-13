@@ -80,3 +80,41 @@ export const CATALOG = {
   /** 글이 있으면 지역 추가 배송비 안내가 있는 것으로 본다. */
   regionalNote: ["differentialDeliveryFeeContent"],
 };
+
+/**
+ * 상품 화면의 옵션 자리(가설). 이 안의 `aria-haspopup="listbox"` 첫 단추만 누른다(`OPEN_OPTION_LISTS`).
+ * 옵션이 있는 상품의 화면은 재지 않았다. 사용자가 실제 계정으로 확인한 뒤 고친다.
+ */
+export const PRODUCT_OPTION_BUTTON =
+  '[class*="option" i] button[aria-haspopup="listbox"]';
+
+/**
+ * 상품 구매 층. 상품 화면의 「구매하기」 를 누르면 같은 화면에 뜨고 옵션·수량과 「장바구니」, 「바로구매」, 「닫기」 가 있다(2026-11-13 실측).
+ * 단추 글은 실측이고, 층과 층 안의 옵션·수량 칸은 잰 상품에 옵션이 없어 가설이다. 단추는 글이 정확히 같은 보이는 것만 고른다.
+ */
+export const PURCHASE_LAYER = {
+  buyLabel: "구매하기",
+  buyNowLabel: "바로구매",
+  /** 「바로구매」 단추에서 가장 가까운 층. 없으면 문서 전체를 본다. */
+  layer:
+    '[role="dialog"], [aria-modal="true"], [class*="layer" i], [class*="modal" i], [class*="sheet" i]',
+  optionButton: 'button[aria-haspopup="listbox"]',
+  /** 펼쳐진 옵션 드롭다운 단추. `aria-controls` 가 값 목록을 가리킨다. */
+  openedOptionButton: 'button[aria-haspopup="listbox"][aria-expanded="true"]',
+  optionItem: '[role="option"]',
+  quantityInput: 'input[type="number"], input[inputmode="numeric"]',
+};
+
+/**
+ * 주문서 화면(2026-11-13 실측). Next.js pages router 이고 금액이 든 상태 전역이 없어 화면 요소에서 읽는다.
+ * CSS module 클래스라 뒤에 해시가 붙어 접두로 고른다. 두 자리의 금액이 같을 때만 최종 결제 금액으로 본다.
+ * 결제 단추의 선택자는 여기에 두지 않는다. 금지 목록은 검사(`tests/checkout-guard.test.ts`)에만 있다.
+ */
+export const ORDER_SHEET = {
+  host: "orders.pay.naver.com",
+  pathPrefix: "/ordersheet/",
+  /** 「총 주문금액」 줄의 금액. */
+  total: 'dl[class*="ProductPrice_total"] dd[class*="ProductPrice_desc-total"]',
+  /** 결제수단 절 머리의 같은 금액. */
+  methodSummary: '#PAYMENT_WRAP [class*="ContentSection_summary"] em',
+};
