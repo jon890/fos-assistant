@@ -21,6 +21,7 @@
 #   비교 기준이 없으면 분류 검사를 돌린다. 바뀐 것이 없으면 건너뛴다.
 #   나머지 backend 테스트, MySQL, 웹 빌드, 브라우저, e2e, 커넥터, Hermes 는 Draft CI 가 확인한다.
 #   금융 대역을 실행하지 않는 --fast 에서는 tossinvest 의존성을 설치하지 않는다.
+# 전체 검사는 tossinvest 의존성을 설치하기 전에 로컬 bun 버전을 CI 의 `bun-version` 과 비교해 다르면 알린다(멈추지 않는다).
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
 # 화면을 고쳤는데 --fast 를 쓰지 않을 때는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다.
 # CI 가 돌지 못하면 머지 전에 인자 없이 전체를 돌린다.
@@ -164,6 +165,7 @@ step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
 if [ "${skip_browser}" = false ]; then
   step playwright    pnpm --dir "${ROOT}/web" exec playwright install chromium
 fi
+step bun-version     python3 "${ROOT}/scripts/dev/check-bun-version.py"
 step tossinvest-install bun install --frozen-lockfile --cwd "${ROOT}/hermes/connectors/tossinvest"
 step backend         bash -c "cd '${ROOT}/backend' && ./gradlew test"
 step migration-versions bash -c "cd '${ROOT}' && node scripts/checks/check-migration-versions.mjs"
