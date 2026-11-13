@@ -36,7 +36,8 @@ export const SEARCH_RAW_MAX = 200;
  * 검색 화면(Next.js App Router)의 상품을 꺼낸다(2026-11-13 실측). `__NEXT_DATA__` 는 없고 상품은
  * `self.__next_f.push([1,"<조각>"])` 로 시작하는 스크립트들의 둘째 값(문자열)에 흩어져 있다. `window.__next_f` 는
  * hydration 뒤 일부만 남아 쓰지 않는다. 조각을 이어야 객체가 완성되는 경우가 있어 이은 글 하나를 훑는다.
- * 이은 글은 줄마다 JSON 한 값이라 줄이 바뀌면 문자열과 괄호 상태를 버린다(조각이 아닌 글이 한 줄을 넘어 망가뜨리지 못하게).
+ * 이은 글은 줄마다 JSON 한 값이라 줄이 바뀌면 문자열과 괄호 상태를 버린다. 텍스트 행(`<id>:T<16진 길이>,<글>`)은 줄바꿈 없이
+ * 길이(UTF-8 바이트)로 끝나므로, 행 첫머리에서 그 머리를 알아보면 그 길이만큼 통째로 건너뛴다(글 안의 짝 없는 따옴표와 괄호가 뒤 행을 망가뜨리지 못하게).
  * `"productName"` 칸을 직접 가진 가장 안쪽 객체를 상품으로 보고 필요한 칸만 담아 JSON 글로 준다.
  * 조각 스크립트가 하나도 없으면 `null`, 있는데 상품이 없으면 `[]` 다. 읽기만 하고 화면을 바꾸지 않는다.
  */
@@ -55,10 +56,30 @@ export const SEARCH_STATE = `(() => { try {
   }
   if (!text) return null;
   const found = [];
+  const TEXT_ROW = /[0-9a-f]+:T([0-9a-f]+),/y;
   let stack = [];
+  let rowStart = true;
   for (let i = 0; i < text.length && found.length < ${SEARCH_RAW_MAX}; i++) {
+    if (rowStart) {
+      rowStart = false;
+      TEXT_ROW.lastIndex = i;
+      const head = TEXT_ROW.exec(text);
+      if (head) {
+        let bytes = parseInt(head[1], 16);
+        let k = i + head[0].length;
+        while (bytes > 0 && k < text.length) {
+          const cp = text.codePointAt(k);
+          bytes -= cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+          k += cp > 0xffff ? 2 : 1;
+        }
+        stack = [];
+        rowStart = true;
+        i = k - 1;
+        continue;
+      }
+    }
     const c = text[i];
-    if (c === "\\n") { stack = []; continue; }
+    if (c === "\\n") { stack = []; rowStart = true; continue; }
     if (c === '"') {
       let j = i + 1;
       while (j < text.length && text[j] !== '"' && text[j] !== "\\n") j += text[j] === "\\\\" ? 2 : 1;

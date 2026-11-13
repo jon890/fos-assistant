@@ -137,6 +137,23 @@ test("검색 식은 문자열 안의 중괄호와 따옴표, 조각이 아닌 �
   expect(result[0].productName).toBe('합성 {상품} "인용"');
 });
 
+test("검색 식은 줄바꿈 없이 길이로 끝나는 텍스트 행의 짝 없는 따옴표와 괄호가 바로 뒤 상품 행을 망가뜨리지 않는다", () => {
+  // T 행의 길이는 글자 수가 아니라 UTF-8 바이트 수다. 한글이 섞인 글로 본다.
+  const body = `짝 없는 " 따옴표 { 괄호 한글`;
+  const textRow = `2b:T${Buffer.byteLength(body).toString(16)},${body}`;
+  const row = `${textRow}1a:[${productJson("1")},${productJson("2")}]\n`;
+  const result = searchResult([chunk(row)]);
+  expect(result.map((p: { nvMid: string }) => p.nvMid)).toEqual([
+    "mid1",
+    "mid2",
+  ]);
+  // 글이 상품 행 한가운데에서 이어지는 조각이어도 같다.
+  const cut = row.indexOf("합성몰 1");
+  expect(
+    searchResult([chunk(row.slice(0, cut)), chunk(row.slice(cut))]),
+  ).toHaveLength(2);
+});
+
 test("검색 식은 상품 객체를 200개까지만 준다", () => {
   const row = `1a:[${Array.from({ length: 250 }, (_, i) => productJson(String(i))).join(",")}]\n`;
   expect(searchResult([chunk(row)])).toHaveLength(200);
