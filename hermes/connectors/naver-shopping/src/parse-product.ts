@@ -72,7 +72,8 @@ function options(product: Json) {
   if (list(pick(product, PRODUCT.optionGroups)).length > OPTION_GROUPS_MAX)
     truncated = true;
   const unknown =
-    result.length === 0 && pick(product, PRODUCT.optionUsable) === true;
+    pick(product, PRODUCT.optionUsable) === true &&
+    result.every((group) => group.values.length === 0);
   return { options: result, truncated, unknown };
 }
 

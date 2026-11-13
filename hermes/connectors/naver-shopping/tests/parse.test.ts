@@ -187,6 +187,14 @@ test("optionUsable 이 false 면 옵션 칸이 있어도 옵션 없음이고, tr
   expect(unknown.options_unknown).toBe(true);
 });
 
+test("옵션 묶음은 읽었지만 값이 하나도 없으면 options_unknown 을 싣는다", () => {
+  const parsed = parseStoreProduct(
+    { ...product, optionUsable: true, options: [{ groupName: "수량" }] },
+    url,
+  )!;
+  expect(parsed.options_unknown).toBe(true);
+});
+
 test("조합형 옵션은 첫 묶음 값의 추가 금액과 품절을 싣는다(옵션 칸 이름은 가설)", () => {
   const parsed = parseStoreProduct(
     {
