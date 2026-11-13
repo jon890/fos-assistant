@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from .connector_guard import EXECUTION_ENV, _guard_endpoint, _guard_support, _strict_json, _guard_hide_financial
+from .connector_guard import EXECUTION_ENV, _guard_checkout, _guard_endpoint, _guard_support, _strict_json, _guard_hide_financial
 from .connector_guard_validation import GuardRejected, _bounded, _execution_env, _prepare_result, _require, _stage
 from .connector_policy import _hermes_tool_name
 
@@ -28,7 +28,8 @@ async def _guard_operation(profile, manifest, entry, body, env, prepare=False):
         _require(policy["risk"] not in {"FINANCIAL", "DESTRUCTIVE", "PURCHASE"}, "risk")
         return None
     guard = manifest.get("execution_guard")
-    _require(guard is not None and tool in guard["operations"] and policy["risk"] == "FINANCIAL"
+    _require(guard is not None and tool in guard["operations"]
+             and policy["risk"] == ("PURCHASE" if _guard_checkout(guard) else "FINANCIAL")
              and policy["approval"] == "always" and entry.get("mode") == "bind", "declaration")
     with _stage("args_size"):
         _bounded(body["args"], 16384)
