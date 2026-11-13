@@ -32,7 +32,7 @@ public class PurchaseLimitSettings {
 
     /**
      * 그 사용자의 상한과 오늘 합계다. 하루 합계는 {@code PURCHASE} 승인 줄에서 세는데, 그 줄을 만드는 주문서 준비가 아직 없어 0 이다.
-     * 세는 규칙은 {@code docs/features/naver-shopping/design.md} 의 「구매 상한」 이 갖는다.
+     * 세는 규칙은 {@code backend/docs/data-schema.md} 의 「구매 상한 컬럼」 이 갖는다.
      */
     @Transactional(readOnly = true)
     public PurchaseLimitsView view(CurrentUser user) {
