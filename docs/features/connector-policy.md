@@ -151,6 +151,7 @@ sequenceDiagram
 | `WRITE` | 되돌릴 수 있는 쓰기 | `required` | `required` |
 | `DESTRUCTIVE` | 되돌리기 어려운 쓰기 | `always` | `always` |
 | `FINANCIAL` | 돈이 움직인다 | `always` | `always` |
+| `PURCHASE` | 결제 직전까지 가는 구매 단계다. 결제는 사람이 한다([ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md)) | `always` | `always` |
 
 | `approval` | 뜻 |
 | --- | --- |
@@ -236,6 +237,8 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 - 상시 허락은 그 사용자가 그 플러그인의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 지운 에이전트를 정리해 승인 줄의 에이전트가 빈 허락은 어느 실행에도 통하지 않고 목록에도 없다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
 - 플러그인의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고, 상한 거절과 같은 의도 차단을 빼면 거절은 어느 검사에 걸렸는지 밝히지 않는다(답의 종류는 [토스증권 플러그인](tossinvest-connector.md)이 갖는다). 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
+- `PURCHASE` 도구는 `FINANCIAL` 과 같이 직접 호출을 `RISK_NOT_OPEN` 으로 거절하고 상시 허락과 대화 허락을 만들지 않는다. 금융 보호 선언의 `operations` 에 든 도구만 연다(선언 검사가 본다). 구매 상한은 금융 주문 상한과 따로 `app_user` 의 구매 상한 컬럼이 갖는다
+- 금융 준비 도구가 `attended_only` 이고 호출한 실행이 사람이 없는 실행이면 금융 준비로 넘기지 않고 아래 판정이 `ATTENDED_ONLY` 로 거절한다. 같은 키의 금융 줄이 이미 있는 다시 오기는 지금처럼 금융 준비가 맡는다([ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md))
 - `attended_only` 를 선언한 도구를 사람이 없는 실행이 부르면 위험도와 상관없이 `ATTENDED_ONLY` 로 거절하고 승인 줄을 만들지 않는다. 사람이 없는 실행은 호출한 실행의 트리 루트 줄의 `agent_execution.unattended` 가 참인 것이다. 예약 작업 turn, 먼저 살펴보기 turn(매일 깨우기와 사건 감지 포함), 그 트리가 맡긴 일의 결과를 전하는 turn 이 참이다. 순서는 `RISK_NOT_OPEN` 뒤, 아래 살펴보기 읽기 경계 앞이다. Control Plane 은 boolean 이 아닌 값을 참으로 읽는다([ADR-20261110 / naver-shopping-connector](../adr/ADR-20261110-naver-shopping-connector.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다

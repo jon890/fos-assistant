@@ -73,9 +73,9 @@ class ToolPolicyDecisionTest {
 
 
     @Test
-    @DisplayName("위험도가 DESTRUCTIVE 나 FINANCIAL 이면 RISK_NOT_OPEN 으로 거절하고 위험도와 승인 방식을 남긴다")
+    @DisplayName("위험도가 DESTRUCTIVE, FINANCIAL, PURCHASE 이면 상시 허락이 있어도 RISK_NOT_OPEN 으로 거절하고 위험도와 승인 방식을 남긴다")
     void destructiveAndFinancialRiskAreDenied() {
-        for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL}) {
+        for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL, ToolRisk.PURCHASE}) {
             Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null, false));
 
             assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2, NOT_CHECK))
@@ -266,9 +266,9 @@ class ToolPolicyDecisionTest {
 
 
     @Test
-    @DisplayName("쓰기를 허용한 살펴보기에서도 DESTRUCTIVE 와 FINANCIAL 은 RISK_NOT_OPEN 이고 큰 인자는 ARGS_TOO_LARGE 다")
+    @DisplayName("쓰기를 허용한 살펴보기에서도 DESTRUCTIVE, FINANCIAL, PURCHASE 는 RISK_NOT_OPEN 이고 큰 인자는 ARGS_TOO_LARGE 다")
     void approvalOnlyKeepsRiskAndArgsDenials() {
-        for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL}) {
+        for (ToolRisk risk : new ToolRisk[] {ToolRisk.DESTRUCTIVE, ToolRisk.FINANCIAL, ToolRisk.PURCHASE}) {
             Optional<ToolPolicy> declared = Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null, false));
 
             assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, declared, true, 2, APPROVAL_ONLY)

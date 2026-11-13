@@ -137,7 +137,7 @@ public record ToolPolicyDecision(
         boolean grantable = schema == LEGACY_SCHEMA || (schema == STANDARD_SCHEMA && readOnlyMarked);
         ToolPolicy policy = declared.orElseGet(
             () -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, grantable));
-        if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
+        if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL || policy.risk() == ToolRisk.PURCHASE) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
         }
         // 사람이 연 대화에서만 부르라고 선언한 도구는 사람이 없는 실행에서 승인 줄도 만들지 않는다. 선언으로만 알 수 있어

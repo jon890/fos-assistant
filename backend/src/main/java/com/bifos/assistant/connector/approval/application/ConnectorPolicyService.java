@@ -244,14 +244,20 @@ public class ConnectorPolicyService {
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
             .orElse(null);
-        // 금융 준비 도구의 호출과 같은 키의 금융 줄은 금융 준비가 맡는다(ADR-20261013 / financial-order-opening).
-        Optional<ConnectorPolicyAnswer> financialAnswer = financial.intercept(recorded, manifest, confirmedTool, binding, origin,
-            profileName, rootSessionId, sessionId, toolCallId, argsJson);
-        if (financialAnswer.isPresent()) {
-            return financialAnswer.get();
-        }
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
+        boolean unattended = owners.unattendedTree(origin);
+        // 금융 준비 도구의 호출과 같은 키의 금융 줄은 금융 준비가 맡는다(ADR-20261013 / financial-order-opening).
+        // 사람이 연 대화에서만 부르라고 선언한 준비 도구를 사람이 없는 실행이 부르면 넘기지 않고 아래 판정이 ATTENDED_ONLY 로
+        // 거절한다(ADR-20261113 / purchase-checkout). 같은 키의 금융 줄이 이미 있는 다시 오기는 지금처럼 금융 준비가 맡는다.
+        boolean attendedOnlyDenied = recorded.isEmpty() && unattended && declared.map(ToolPolicy::attendedOnly).orElse(false);
+        if (!attendedOnlyDenied) {
+            Optional<ConnectorPolicyAnswer> financialAnswer = financial.intercept(recorded, manifest, confirmedTool, binding, origin,
+                profileName, rootSessionId, sessionId, toolCallId, argsJson);
+            if (financialAnswer.isPresent()) {
+                return financialAnswer.get();
+            }
+        }
         // 직접 부른 호출도 위임 자식의 호출도 같은 트리 루트로 경계가 정해진다. 살펴보기 turn 의 트리면 루트가 그 turn 이다
         // (ADR-080). 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
         CheckBoundary boundary = checkBoundary(origin);
@@ -268,7 +274,7 @@ public class ConnectorPolicyService {
             connection.readOnlyMarked(confirmedTool),
             argsJson.getBytes(StandardCharsets.UTF_8).length,
             boundary,
-            owners.unattendedTree(origin)))
+            unattended))
             .orElseGet(ToolPolicyDecision::policyUnavailable);
         // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
         boolean passed = decision.decision() == ActionDecision.ALLOWED;
