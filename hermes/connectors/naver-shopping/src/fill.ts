@@ -158,8 +158,14 @@ async function fillOnPage(
     }
     const seen = await waitLayerOrSheet(cdpUrl, page, known, stepMs, waitMs);
     if (seen === null) return unknown();
-    if (seen !== "layer") sheet = seen;
-    else {
+    if (seen !== "layer") {
+      // 층 없이 주문서가 바로 열렸으면 옵션과 수량을 고르지 못했다. 기본 옵션·수량 1 과 같을 때만 읽는다.
+      sheet = seen;
+      if (input.optionLabels.length > 0 || input.quantity !== 1) {
+        phase = "sent";
+        return unknown();
+      }
+    } else {
       phase = "layer";
       await chooseInLayer(page, input, stepMs, waitMs);
       known = await tabIds(cdpUrl, page);

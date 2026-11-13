@@ -597,3 +597,14 @@ test("새 탭 주문서의 최종 금액이 승인보다 크면 그 주문서 �
   expect(shop!.tabs.has("TAB2")).toBe(false);
   expect(shop!.tabs.has("USER0")).toBe(true);
 });
+
+test("층 없이 주문서가 바로 열렸는데 옵션이나 수량 2 이상을 승인했으면 금액을 읽지 않고 UNKNOWN 이다", async () => {
+  const { isError, body } = await fill(
+    { product: PLAIN_PRODUCT, buy: "sheet-same" },
+    { ...PLAIN_ARGS, quantity: 2, expectedTotalKrw: 3900 },
+  );
+  expect(isError).toBe(false);
+  expect(body).toEqual({ status: "UNKNOWN", tab: "TAB1" });
+  expect(shop!.count(ORDER_SHEET_AMOUNT)).toBe(0);
+  expect(shop!.tabs.has("TAB1")).toBe(true);
+});
