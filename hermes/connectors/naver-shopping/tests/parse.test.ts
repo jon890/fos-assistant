@@ -343,12 +343,6 @@ test("묶음 화면에 이름이나 최저가가 없으면 빠진 칸을 알린�
   expect(missingOf(null)).toEqual(["catalog"]);
 });
 
-test("묶음의 번호가 연 주소의 번호와 다르거나 없으면 다른 상품의 값을 내지 않는다", () => {
-  const body = { productName: "합성 묶음", lowestPrice: 9900 };
-  expect(missingOf({ ...body, nCatalogId: "2000" })).toEqual(["catalog_id"]);
-  expect(missingOf(body)).toEqual(["catalog_id"]);
-});
-
 test("묶음 후보에서 연 주소의 번호와 같은 묶음을 고르고, 없거나 비면 빠진 칸을 알린다", () => {
   const first = {
     nCatalogId: "2000",
@@ -378,4 +372,19 @@ test("묶음 후보에서 연 주소의 번호와 같은 묶음을 고르고, �
   expect(() => selectCatalog(null, CATALOG_URL)).toThrow(MissingFields);
   // 주소가 묶음 주소 꼴이 아니면 어느 것도 고르지 않는다.
   expect(() => selectCatalog([right], "u")).toThrow(MissingFields);
+});
+
+test("번호가 같은 후보 가운데 값이 빈 사본이 앞서도 이름과 최저가가 읽히는 묶음을 고른다", () => {
+  const empty = { nCatalogId: "1000", productName: "합성 묶음" };
+  const full = {
+    nCatalogId: "1000",
+    productName: "합성 묶음",
+    lowestPrice: 9900,
+  };
+  expect(selectCatalog([empty, full], CATALOG_URL)).toBe(full);
+  // 모두 비었으면 첫 것을 넘기고 parse 가 빠진 칸을 알린다.
+  expect(selectCatalog([empty], CATALOG_URL)).toBe(empty);
+  expect(missingOf(selectCatalog([empty], CATALOG_URL))).toEqual([
+    "lowest_price",
+  ]);
 });

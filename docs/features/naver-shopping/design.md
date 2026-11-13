@@ -84,7 +84,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `kind` | 결과 |
 | --- | --- |
 | `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21) |
-| `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽고, 판매처별 가격 목록은 읽는 칸을 가려내지 못해 `sellers` 는 빈 목록이다(2026-11-13 실측) |
+| `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽고, 판매처별 가격 목록은 읽는 칸을 가려내지 못해 `sellers` 는 빈 목록이다(2026-11-13 실측). spec 의 REQ3·DECISION28 이 말하는 판매처 목록 돌려주기는 판매처 목록을 가려낼 때까지 미룬다(2026-11-13 사용자 결정) |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 옵션은 20개 묶음, 묶음마다 값 100개까지 싣는다. 넘으면 자른 수를 `options_truncated` 로 알린다.

@@ -119,17 +119,24 @@ export function selectCatalog(candidates: Json, url: string): Json {
   if (!Array.isArray(candidates) || candidates.length === 0)
     throw new MissingFields(["catalog"]);
   const urlId = /\/catalog\/([0-9]+)$/.exec(url)?.[1];
-  const found = candidates.find(
+  const same = candidates.filter(
     (candidate) =>
       urlId !== undefined &&
       String(pick(candidate, CATALOG.catalogId) ?? "") === urlId,
   );
-  if (found === undefined) throw new MissingFields(["catalog_id"]);
-  return found;
+  if (same.length === 0) throw new MissingFields(["catalog_id"]);
+  // 같은 번호의 값이 빈 사본이 앞서 실려도 이름과 최저가가 읽히는 묶음을 고른다. 모두 비었으면 첫 것을 넘겨 parse 가 빠진 칸을 알린다.
+  return (
+    same.find(
+      (candidate) =>
+        text(pick(candidate, CATALOG.title), TITLE_MAX) !== null &&
+        won(pick(candidate, CATALOG.lowestPrice)) !== null,
+    ) ?? same[0]
+  );
 }
 
 /**
- * 가격비교 묶음. 이름, 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽는 칸을 가려내지 못해 지어내지 않고 빈 `sellers` 에
+ * 가격비교 묶음(주소 번호와 같은 묶음은 `selectCatalog` 가 이미 골랐다). 이름, 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽는 칸을 가려내지 못해 지어내지 않고 빈 `sellers` 에
  * `offers_unknown: true` 를 실어, 담당이 판매처별 가격을 사용자의 「내 브라우저」 에서 확인하게 한다.
  */
 export function parseCatalog(state: Json, url: string) {
@@ -137,15 +144,10 @@ export function parseCatalog(state: Json, url: string) {
     throw new MissingFields(["catalog"]);
   const title = text(pick(state, CATALOG.title), TITLE_MAX);
   const lowest = won(pick(state, CATALOG.lowestPrice));
-  // 같은 조각에 비교·추천 묶음이 앞서 실릴 수 있어, 연 주소의 번호와 다른 묶음이면 다른 상품의 값을 내지 않는다.
-  const catalogId = String(pick(state, CATALOG.catalogId) ?? "");
-  const urlId = /\/catalog\/([0-9]+)$/.exec(url)?.[1];
-  const idMatches = catalogId !== "" && catalogId === urlId;
-  if (title === null || lowest === null || !idMatches) {
+  if (title === null || lowest === null) {
     throw new MissingFields([
       ...(title === null ? ["title"] : []),
       ...(lowest === null ? ["lowest_price"] : []),
-      ...(idMatches ? [] : ["catalog_id"]),
     ]);
   }
   return {
