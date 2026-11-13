@@ -13,7 +13,8 @@ function run(
     nextData?: unknown;
     preloaded?: unknown;
     href?: string;
-    captcha?: boolean;
+    /** 캡차 선택자에 걸리는 요소. 크기와 visibility 만 흉내 낸다. */
+    captchaElements?: { width: number; height: number; hidden?: boolean }[];
   },
 ) {
   const document = {
@@ -21,8 +22,15 @@ function run(
       id === "__NEXT_DATA__" && page.nextData !== undefined
         ? { textContent: JSON.stringify(page.nextData) }
         : null,
-    querySelector: () => (page.captcha ? {} : null),
+    querySelectorAll: () =>
+      (page.captchaElements ?? []).map((e) => ({
+        getBoundingClientRect: () => ({ width: e.width, height: e.height }),
+        hidden: e.hidden === true,
+      })),
   };
+  const getComputedStyle = (e: { hidden: boolean }) => ({
+    visibility: e.hidden ? "hidden" : "visible",
+  });
   const window = { __PRELOADED_STATE__: page.preloaded };
   const location = {
     href: page.href ?? "https://search.shopping.naver.com/ns/search",
@@ -31,8 +39,9 @@ function run(
     "document",
     "window",
     "location",
+    "getComputedStyle",
     `return ${expression};`,
-  )(document, window, location);
+  )(document, window, location, getComputedStyle);
 }
 
 test("검색 식은 __NEXT_DATA__ 의 상품 목록만 JSON 글로 꺼내고, 없으면 null 이다", () => {
@@ -73,14 +82,25 @@ test("상품 식은 상태가 있는지와 상품을 함께 주고, 상태가 �
   expect(run(PRODUCT_STATE, {})).toBeNull();
 });
 
-test("화면 확인 식은 주소와 캡차 요소의 있고 없음만 준다", () => {
+test("화면 확인 식은 주소와 보이는 캡차 요소의 있고 없음을 준다", () => {
+  const href = "https://nid.naver.com/nidlogin.login";
+  expect(
+    run(PAGE_PROBE, { href, captchaElements: [{ width: 300, height: 200 }] }),
+  ).toEqual({ href, captcha: true });
+});
+
+test("숨은 script#ncaptcha-script 와 숨은 captcha 틀만 있는 정상 화면은 캡차가 아니다", () => {
+  const hiddenOnly = [
+    { width: 0, height: 0 },
+    { width: 300, height: 0 },
+    { width: 300, height: 200, hidden: true },
+  ];
+  expect(run(PAGE_PROBE, { captchaElements: hiddenOnly }).captcha).toBe(false);
+  expect(run(PAGE_PROBE, {}).captcha).toBe(false);
+  // 숨은 것 옆에 보이는 #captcha_wrap 이 하나라도 있으면 캡차다.
   expect(
     run(PAGE_PROBE, {
-      href: "https://nid.naver.com/nidlogin.login",
-      captcha: true,
-    }),
-  ).toEqual({
-    href: "https://nid.naver.com/nidlogin.login",
-    captcha: true,
-  });
+      captchaElements: [...hiddenOnly, { width: 400, height: 300 }],
+    }).captcha,
+  ).toBe(true);
 });
