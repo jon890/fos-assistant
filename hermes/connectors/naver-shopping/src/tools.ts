@@ -48,7 +48,7 @@ export async function searchProducts(
         logDiagnostic(
           "search_products",
           "parse",
-          found === null ? ["products.list"] : ["item"],
+          found === null ? ["products"] : ["item"],
         );
         throw new ToolError("NAVER_SHOPPING_PAGE_CHANGED");
       }
