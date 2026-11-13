@@ -112,6 +112,23 @@ export function parseStoreProduct(product: Json, url: string) {
 }
 
 /**
+ * 고정 식이 준 묶음 객체들에서 연 주소의 `/catalog/<번호>` 와 `nCatalogId` 가 같은 것을 고른다. 비교·추천 묶음이 앞서 실려도
+ * 맞는 묶음을 찾고, 없으면 다른 상품의 값을 내지 않고 `catalog_id` 가 빠졌다고 알린다.
+ */
+export function selectCatalog(candidates: Json, url: string): Json {
+  if (!Array.isArray(candidates) || candidates.length === 0)
+    throw new MissingFields(["catalog"]);
+  const urlId = /\/catalog\/([0-9]+)$/.exec(url)?.[1];
+  const found = candidates.find(
+    (candidate) =>
+      urlId !== undefined &&
+      String(pick(candidate, CATALOG.catalogId) ?? "") === urlId,
+  );
+  if (found === undefined) throw new MissingFields(["catalog_id"]);
+  return found;
+}
+
+/**
  * 가격비교 묶음. 이름, 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽는 칸을 가려내지 못해 지어내지 않고 빈 `sellers` 에
  * `offers_unknown: true` 를 실어, 담당이 판매처별 가격을 사용자의 「내 브라우저」 에서 확인하게 한다.
  */

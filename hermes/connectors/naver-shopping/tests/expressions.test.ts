@@ -192,6 +192,7 @@ function adJson(id: string) {
   });
 }
 
+/** 묶음 식이 준 배열. 조각 스크립트가 없으면 null 이다. */
 function catalogResult(scripts: string[]) {
   const raw = run(CATALOG_STATE, { scripts });
   return raw === null ? null : JSON.parse(raw);
@@ -209,7 +210,7 @@ const CATALOG_EXPECTED = {
 
 test("묶음 식은 조각을 이어 nCatalogId 와 lowestPrice 를 가진 객체 하나의 필요한 칸만 꺼낸다", () => {
   const row = `1a:["$","div",null,{"children":[${adJson("1")},${catalogJson()},${adJson("2")}]}]\n`;
-  expect(catalogResult([chunk(row)])).toEqual(CATALOG_EXPECTED);
+  expect(catalogResult([chunk(row)])).toEqual([CATALOG_EXPECTED]);
 });
 
 test("묶음 식은 조각 경계에서 객체가 나뉘어도 이은 뒤에 꺼낸다", () => {
@@ -223,7 +224,7 @@ test("묶음 식은 조각 경계에서 객체가 나뉘어도 이은 뒤에 꺼
       chunk(row.slice(first, second)),
       chunk(row.slice(second)),
     ]),
-  ).toEqual(CATALOG_EXPECTED);
+  ).toEqual([CATALOG_EXPECTED]);
 });
 
 test("묶음 식은 앞의 텍스트 행에 짝 없는 따옴표와 괄호가 있어도 뒤 묶음 행을 읽는다", () => {
@@ -231,7 +232,7 @@ test("묶음 식은 앞의 텍스트 행에 짝 없는 따옴표와 괄호가 �
   const textRow = `2b:T${Buffer.byteLength(body).toString(16)},${body}`;
   expect(
     catalogResult([chunk(`${textRow}1a:[${adJson("1")},${catalogJson()}]\n`)]),
-  ).toEqual(CATALOG_EXPECTED);
+  ).toEqual([CATALOG_EXPECTED]);
 });
 
 test("묶음 식은 두 키 가운데 하나만 가진 객체를 묶음으로 보지 않고, 없으면 null 이다", () => {
@@ -239,14 +240,27 @@ test("묶음 식은 두 키 가운데 하나만 가진 객체를 묶음으로 �
   const onlyId = JSON.stringify({ nCatalogId: "1", productName: "합성" });
   expect(
     catalogResult([chunk(`1a:[${adJson("1")},${onlyPrice},${onlyId}]\n`)]),
-  ).toBeNull();
+  ).toEqual([]);
   expect(run(CATALOG_STATE, {})).toBeNull();
   expect(run(CATALOG_STATE, { scripts: ["var a = 1;"] })).toBeNull();
 });
 
 test("묶음 식은 묶음 객체가 값이 비어 있어도 칸만 있으면 꺼내 parse 가 거르게 한다", () => {
   const row = `1a:[${catalogJson({ lowestPrice: null, productName: "합성" })}]\n`;
-  expect(catalogResult([chunk(row)])).toMatchObject({ lowestPrice: null });
+  expect(catalogResult([chunk(row)])).toMatchObject([{ lowestPrice: null }]);
+});
+
+test("묶음 식은 비교·추천 묶음이 앞서 실려도 차례대로 모두 주고 20개까지만 준다", () => {
+  const other = (id: string) =>
+    catalogJson({ nCatalogId: id, productName: `합성 추천 ${id}` });
+  const row = `1a:[${other("2000")},${other("3000")},${catalogJson()}]\n`;
+  expect(
+    catalogResult([chunk(row)]).map(
+      (c: { nCatalogId: string }) => c.nCatalogId,
+    ),
+  ).toEqual(["2000", "3000", "1000"]);
+  const many = `1a:[${Array.from({ length: 30 }, (_, i) => other(String(i))).join(",")}]\n`;
+  expect(catalogResult([chunk(many)])).toHaveLength(20);
 });
 
 test("상품 식은 상태가 있는지와 상품을 함께 주고, 상태가 없으면 null 이다", () => {

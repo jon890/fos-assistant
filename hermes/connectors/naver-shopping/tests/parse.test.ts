@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
   MissingFields,
   parseCatalog,
+  selectCatalog,
   parseStoreProduct,
 } from "../src/parse-product.ts";
 import { parseSearch, searchLooksChanged } from "../src/parse-search.ts";
@@ -346,4 +347,35 @@ test("묶음의 번호가 연 주소의 번호와 다르거나 없으면 다른 
   const body = { productName: "합성 묶음", lowestPrice: 9900 };
   expect(missingOf({ ...body, nCatalogId: "2000" })).toEqual(["catalog_id"]);
   expect(missingOf(body)).toEqual(["catalog_id"]);
+});
+
+test("묶음 후보에서 연 주소의 번호와 같은 묶음을 고르고, 없거나 비면 빠진 칸을 알린다", () => {
+  const first = {
+    nCatalogId: "2000",
+    productName: "합성 추천",
+    lowestPrice: 1,
+  };
+  const right = {
+    nCatalogId: 1000,
+    productName: "합성 묶음",
+    lowestPrice: 9900,
+  };
+  // 맞는 묶음이 뒤에 있어도 고른다.
+  expect(selectCatalog([first, right], CATALOG_URL)).toBe(right);
+  const parsed = parseCatalog(
+    selectCatalog([first, right], CATALOG_URL),
+    CATALOG_URL,
+  );
+  expect(parsed.title).toBe("합성 묶음");
+  expect(parsed.lowest_price_krw).toBe(9900);
+  expect(() => selectCatalog([first], CATALOG_URL)).toThrow(MissingFields);
+  try {
+    selectCatalog([first], CATALOG_URL);
+  } catch (error) {
+    expect((error as MissingFields).fields).toEqual(["catalog_id"]);
+  }
+  expect(() => selectCatalog([], CATALOG_URL)).toThrow(MissingFields);
+  expect(() => selectCatalog(null, CATALOG_URL)).toThrow(MissingFields);
+  // 주소가 묶음 주소 꼴이 아니면 어느 것도 고르지 않는다.
+  expect(() => selectCatalog([right], "u")).toThrow(MissingFields);
 });

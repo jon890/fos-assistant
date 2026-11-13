@@ -124,12 +124,15 @@ export const SEARCH_STATE = `(() => { const r = ${fragmentScan(
 
 /**
  * 가격비교 화면의 묶음 정보를 꺼낸다(2026-11-13 실측, 판매처 목록 제외). `"nCatalogId"` 와 `"lowestPrice"` 를 함께 직접 가진
- * 가장 안쪽 객체 하나에서 필요한 칸만 담아 JSON 글로 준다. 같은 조각의 광고·추천 상품 객체는 이 두 칸이 없어 걸리지 않는다.
- * 조각 스크립트가 없거나 묶음 객체가 없으면 `null` 이다.
+ * 가장 안쪽 객체들에서 필요한 칸만 담아 JSON 배열 글로 준다. 같은 조각의 광고·추천 상품 객체는 이 두 칸이 없어 걸리지 않는다.
+ * 비교·추천 묶음이 앞서 실릴 수 있고 고정 식은 연 주소를 모르므로, 연 주소의 번호와 같은 묶음을 고르는 일은 `parse-product.ts` 가 한다.
+ * 조각 스크립트가 없으면 `null`, 있는데 묶음 객체가 없으면 `[]` 다.
  */
+export const CATALOG_RAW_MAX = 20;
+
 export const CATALOG_STATE = `(() => { const r = ${fragmentScan(
   ["nCatalogId", "lowestPrice"],
-  1,
+  CATALOG_RAW_MAX,
   `found.push({
           nCatalogId: o.nCatalogId,
           productName: o.productName,
@@ -139,7 +142,7 @@ export const CATALOG_STATE = `(() => { const r = ${fragmentScan(
           differentialDeliveryFeeContent: o.differentialDeliveryFeeContent,
           categoryId: o.categoryId,
         });`,
-)}; return r === null || r.length === 0 ? null : JSON.stringify(r[0]); })()`;
+)}; return r === null ? null : JSON.stringify(r); })()`;
 
 /** 상품 화면은 상태가 있는지(`present`)와 상품 칸(`value`)을 함께 준다. 상태는 있는데 상품이 없으면 없는 상품이다. */
 export const PRODUCT_STATE = `(() => { try { const s = window.__PRELOADED_STATE__; if (!s || typeof s !== "object") return null; const v = ${walk("s", PRODUCT_STATE_PATH)}; return JSON.stringify({ present: true, value: v ?? null }); } catch { return null; } })()`;

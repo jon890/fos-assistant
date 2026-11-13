@@ -77,12 +77,15 @@ test("스토어 상품은 상품 식으로, 묶음은 묶음 식으로 정리한
   });
 
   const catalog = reader(
-    JSON.stringify({
-      nCatalogId: "7",
-      productName: "묶음",
-      lowestPrice: 9900,
-      deliveryFee: 0,
-    }),
+    JSON.stringify([
+      { nCatalogId: "70", productName: "추천", lowestPrice: 100 },
+      {
+        nCatalogId: "7",
+        productName: "묶음",
+        lowestPrice: 9900,
+        deliveryFee: 0,
+      },
+    ]),
   );
   expect(
     await productDetail(

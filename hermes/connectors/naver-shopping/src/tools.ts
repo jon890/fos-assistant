@@ -3,6 +3,7 @@ import { CATALOG_STATE, PRODUCT_STATE, SEARCH_STATE } from "./expressions.ts";
 import {
   MissingFields,
   parseCatalog,
+  selectCatalog,
   parseStoreProduct,
 } from "./parse-product.ts";
 import { parseSearch, searchLooksChanged } from "./parse-search.ts";
@@ -79,7 +80,7 @@ export async function productDetail(
         const state = parseJson(raw);
         if (state === undefined || state === null)
           throw new MissingFields(["catalog"]);
-        return parseCatalog(state, target.url);
+        return parseCatalog(selectCatalog(state, target.url), target.url);
       }
       const wrapped = parseJson(raw) as
         { present?: unknown; value?: unknown } | undefined;
