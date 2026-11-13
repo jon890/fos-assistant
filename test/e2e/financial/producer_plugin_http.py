@@ -22,6 +22,18 @@ sys.path.insert(0, str(REPO / "hermes/tests"))
 from test_connector_execute import ConnectorExecuteTest
 
 
+def real_bun():
+    """PATH 의 bun 이 mise 같은 shim 이면 HOME 없는 제한 env 에서 「No version is set」 으로 끝난다.
+    bun 이 스스로 알리는 실행 파일 경로로 한 번 풀고, 풀지 못하면 PATH 의 bun 을 그대로 쓴다."""
+    found = shutil.which("bun")
+    try:
+        resolved = subprocess.run([found or "bun", "-e", "console.log(process.execPath)"],
+                                  capture_output=True, text=True, check=True, timeout=30).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return found
+    return resolved if resolved and os.path.isabs(resolved) and os.access(resolved, os.X_OK) else found
+
+
 class Fixture(ConnectorExecuteTest):
     def setUp(self):
         if not (REPO / "hermes/connectors/tossinvest/node_modules").is_dir():
@@ -38,7 +50,7 @@ class Fixture(ConnectorExecuteTest):
                                     "--generate", self.destination], capture_output=True, text=True, check=True)
         self.connector_root = pathlib.Path(generated.stdout.strip()).resolve()
         self.addCleanup(shutil.rmtree, self.connector_root)
-        self.operator_list({"tossinvest": {"root": str(self.connector_root), "command": shutil.which("bun")}})
+        self.operator_list({"tossinvest": {"root": str(self.connector_root), "command": real_bun()}})
         type(self).profile_root = self.base / "profiles"
         self.profile_root.mkdir()
         self.guard_module = importlib.import_module(self.plugin.__name__ + ".connector_guard")
