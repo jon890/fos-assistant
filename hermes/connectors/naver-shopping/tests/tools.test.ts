@@ -77,7 +77,15 @@ test("스토어 상품은 상품 식으로, 묶음은 묶음 식으로 정리한
   });
 
   const catalog = reader(
-    JSON.stringify({ info: { productName: "묶음" }, products: [] }),
+    JSON.stringify([
+      { nCatalogId: "70", productName: "추천", lowestPrice: 100 },
+      {
+        nCatalogId: "7",
+        productName: "묶음",
+        lowestPrice: 9900,
+        deliveryFee: 0,
+      },
+    ]),
   );
   expect(
     await productDetail(
@@ -87,7 +95,11 @@ test("스토어 상품은 상품 식으로, 묶음은 묶음 식으로 정리한
     ),
   ).toMatchObject({
     kind: "catalog",
+    title: "묶음",
+    lowest_price_krw: 9900,
+    delivery_fee_krw: 0,
     sellers: [],
+    offers_unknown: true,
   });
   expect(catalog.opened).toEqual([
     {

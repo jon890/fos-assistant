@@ -1,7 +1,6 @@
 import { CATALOG, FREE_DELIVERY, PRODUCT, SALE_STATUS } from "./fields.ts";
 import { STORE_MAX, TITLE_MAX } from "./parse-search.ts";
-import { classifyUrl } from "./urls.ts";
-import { list, pick, text, won, yes, type Json } from "./values.ts";
+import { list, pick, text, won, type Json } from "./values.ts";
 
 export const OPTION_GROUPS_MAX = 20;
 export const OPTION_VALUES_MAX = 100;
@@ -112,41 +111,54 @@ export function parseStoreProduct(product: Json, url: string) {
   };
 }
 
-/** 가격비교 묶음. 네이버페이로 바로 사는 판매처만 싣는다. */
+/**
+ * 고정 식이 준 묶음 객체들에서 연 주소의 `/catalog/<번호>` 와 `nCatalogId` 가 같은 것을 고른다. 비교·추천 묶음이 앞서 실려도
+ * 맞는 묶음을 찾고, 없으면 다른 상품의 값을 내지 않고 `catalog_id` 가 빠졌다고 알린다.
+ */
+export function selectCatalog(candidates: Json, url: string): Json {
+  if (!Array.isArray(candidates) || candidates.length === 0)
+    throw new MissingFields(["catalog"]);
+  const urlId = /\/catalog\/([0-9]+)$/.exec(url)?.[1];
+  const same = candidates.filter(
+    (candidate) =>
+      urlId !== undefined &&
+      String(pick(candidate, CATALOG.catalogId) ?? "") === urlId,
+  );
+  if (same.length === 0) throw new MissingFields(["catalog_id"]);
+  // 같은 번호의 값이 빈 사본이 앞서 실려도 이름과 최저가가 읽히는 묶음을 고른다. 모두 비었으면 첫 것을 넘겨 parse 가 빠진 칸을 알린다.
+  return (
+    same.find(
+      (candidate) =>
+        text(pick(candidate, CATALOG.title), TITLE_MAX) !== null &&
+        won(pick(candidate, CATALOG.lowestPrice)) !== null,
+    ) ?? same[0]
+  );
+}
+
+/**
+ * 가격비교 묶음(주소 번호와 같은 묶음은 `selectCatalog` 가 이미 골랐다). 이름, 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽는 칸을 가려내지 못해 지어내지 않고 빈 `sellers` 에
+ * `offers_unknown: true` 를 실어, 담당이 판매처별 가격을 사용자의 「내 브라우저」 에서 확인하게 한다.
+ */
 export function parseCatalog(state: Json, url: string) {
   if (state === null || typeof state !== "object")
     throw new MissingFields(["catalog"]);
   const title = text(pick(state, CATALOG.title), TITLE_MAX);
-  const sellers = pick(state, CATALOG.sellers);
-  if (title === null || !Array.isArray(sellers)) {
+  const lowest = won(pick(state, CATALOG.lowestPrice));
+  if (title === null || lowest === null) {
     throw new MissingFields([
       ...(title === null ? ["title"] : []),
-      ...(Array.isArray(sellers) ? [] : ["sellers"]),
+      ...(lowest === null ? ["lowest_price"] : []),
     ]);
   }
   return {
     kind: "catalog" as const,
     url,
     title,
-    sellers: sellers
-      .flatMap((seller) => {
-        const target = classifyUrl(pick(seller, CATALOG.url));
-        const price = won(pick(seller, CATALOG.price));
-        if (
-          !yes(pick(seller, CATALOG.naverPay)) ||
-          target?.kind !== "store" ||
-          price === null
-        )
-          return [];
-        return [
-          {
-            store: text(pick(seller, CATALOG.store), STORE_MAX),
-            price_krw: price,
-            shipping_fee_krw: won(pick(seller, CATALOG.shippingFee)),
-            url: target.url,
-          },
-        ];
-      })
-      .slice(0, OPTION_VALUES_MAX),
+    lowest_price_krw: lowest,
+    delivery_fee_krw: won(pick(state, CATALOG.deliveryFee)),
+    lowest_price_with_fee_krw: won(pick(state, CATALOG.lowestPriceWithFee)),
+    regional_extra: text(pick(state, CATALOG.regionalNote), 200) !== null,
+    sellers: [] as never[],
+    offers_unknown: true as const,
   };
 }

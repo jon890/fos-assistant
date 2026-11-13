@@ -39,10 +39,11 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 | `kind` | 결과 |
 | --- | --- |
 | `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true` |
-| `catalog` | `{kind, url, title, sellers: [{store, price_krw, shipping_fee_krw, url}]}`. 네이버페이로 바로 사는 판매처만이다 |
+| `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽지 못해 `sellers` 는 항상 빈 목록이고 `offers_unknown` 이 참이다. 배송비 칸이 비면 `delivery_fee_krw` 와 `lowest_price_with_fee_krw` 는 `null` 이다 |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 - `price_krw` 는 즉시할인을 반영한 판매가다. 쿠폰, 포인트, 지역 추가 배송비는 넣지 않는다
+- `catalog` 의 `lowest_price_krw` 는 묶음의 최저가이고 `lowest_price_with_fee_krw` 는 배송비를 포함한 최저가다. `regional_extra` 는 지역 추가 배송비 안내 글이 있으면 참이다. 이 결과가 오면 담당은 최저가와 배송비만 읽었다고 알리고 판매처별 가격은 「내 브라우저」 에서 확인해 달라고 안내한다(스킬이 지시한다). 이전 결과의 `sellers` 항목(`store`, `price_krw`, `shipping_fee_krw`, `url`)은 읽는 칸을 가려내지 못해 지금은 싣지 않는다
 - 옵션은 20 묶음, 묶음마다 값 100개까지다. 첫 묶음 값만 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의 재고가 0)을 싣고, 둘째 묶음부터는 이름만 싣는다
 - `naver_pay_buy` 는 상품 상태가 판매 중일 때 참이다
 
@@ -70,7 +71,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 
 검색 화면은 실제 화면으로 쟀다(2026-11-13). 검색 화면은 Next.js App Router 라 `__NEXT_DATA__` 가 없고, 상품이 `self.__next_f.push([1,"<조각>"])` 로 시작하는 스크립트들의 둘째 값에 흩어져 있다. 고정 식이 그 조각을 이어 `productName` 칸을 직접 가진 가장 안쪽 객체를 상품으로 꺼내 필요한 칸(이름, 정가, 할인가, 판매처, 상품 주소, `nvMid`, 광고 표지)만 담아 준다. 한 번에 200개까지이고, 실측한 한 화면에는 48개가 실렸으며 그 가운데 `nvMid` 가 겹치는 것이 있었다. 플러그인이 가격(할인가가 있으면 할인가, 없으면 정가)과 광고(`adId` 가 있거나 `cardType` 이 `AD`)를 가려 같은 `nvMid` 를 한 번만 내고 화면 차례 그대로 40개까지 자른다. 검색 화면에서 네이버페이 여부를 가리는 칸은 확인하지 못해 `naver_pay` 는 항상 `unknown` 이다. 조각 스크립트가 하나도 없으면 바뀐 화면이고, 있는데 상품이 없으면 빈 결과다.
 상품 화면도 실제 화면으로 쟀다(2026-11-13, 옵션 칸 제외). 상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 같은 상태의 `product` 는 칸만 있고 값이 비어 있어 경로 후보에 두지 않는다. 읽는 칸은 이름(`name`), 판매처(`channel.channelName`), 정가(`salePrice`), 할인가(`benefitsView.discountedSalePrice`), 상태(`productStatusType`), 옵션 사용 여부(`optionUsable`), 배송(`productDeliveryInfo` 의 `deliveryFeeType`, `baseFee`, 지역 추가 배송비 `area2ExtraFee`)다. `optionUsable` 이 `false` 면 옵션 없음으로 낸다. 옵션이 있는 상품을 운영 「내 브라우저」 에서 읽기 전용으로 쟀다(2026-11-13). 처음 실리는 상태(`__PRELOADED_STATE__`, `__QUERY_STATE__`, `__CLIENT_RTK_RTS_STATE__`) 어디에도 옵션 목록이 없고 `selectedOptions.*` 는 null, `optionStandards` 는 빈 배열이다. 옵션 목록은 사람이 드롭다운 단추를 눌러야 실린다. 그래서 `optionUsable` 이 `true` 인데 옵션 묶음을 읽지 못하면 옵션은 지어내지 않고 빈 목록에 `options_unknown: true` 를 더해, 담당이 「옵션 없음」 이라고 말하지 않고 사용자에게 상품 화면에서 확인해 달라고 하게 한다.
-가격비교 묶음 화면의 칸 위치는 아직 실제 화면으로 확인하지 않은 가설이다.
+가격비교 묶음 화면도 실제 화면으로 쟀다(2026-11-13, 판매처 목록 제외). 상품 화면과 달리 `__PRELOADED_STATE__` 와 `__NEXT_DATA__` 가 아니라 검색 화면과 같은 조각(`self.__next_f.push`)에 데이터가 있다. 고정 식이 같은 조각 잇기와 텍스트 행 건너뛰기로 이은 글에서 `nCatalogId` 와 `lowestPrice` 를 함께 직접 가진 가장 안쪽 객체를 20개까지 꺼내고, 플러그인이 그 가운데 `nCatalogId` 가 연 주소의 `/catalog/<번호>` 와 같은 묶음을 골라 묶음 이름(`productName`), 최저가(`lowestPrice`), 배송비(`deliveryFee`), 배송비 포함 최저가(`lowestPriceWithFee`), 지역 추가 배송비 안내(`differentialDeliveryFeeContent`)와 `nCatalogId`, `categoryId` 만 담아 준다. 같은 조각에는 `productName`·`price`·`mallName` 을 가진 광고·추천 상품 객체가 여럿 있지만 묶음 키가 없어 걸리지 않고, 잰 것이 그 상품들이어서 판매처별 가격 목록이 어느 객체인지는 가려내지 못했다. 그래서 판매처 목록은 읽지 않고 빈 목록과 `offers_unknown` 으로 낸다. 비교·추천 묶음이 앞서 실려도 주소 번호와 같은 묶음을 고르고, 같은 것이 없으면 다른 상품의 값을 내지 않고, 이름이나 최저가를 읽지 못할 때와 같이 바뀐 화면이다.
 그때 표준 오류에 `{"naver_shopping_diagnostic":{"tool","stage","missing"}}` 한 줄을 남긴다. 칸 이름과 단계만 싣고 주소, 검색어, 화면 글은 싣지 않는다.
 
 ## 오류
@@ -107,7 +108,7 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 
 1. 「외부 서비스 연결」 에서 네이버 쇼핑을 연결하고 쓸 에이전트에 붙인다. 연결 확인이 통과하는지 본다
 2. 대화에서 흔한 상품 하나를 찾아 달라고 한다. 결과가 화면의 첫 페이지와 같은 차례, 가격, 판매처인지 본다
-3. 결과의 스마트스토어 상품 하나와 가격비교 상품 하나의 정보를 읽어 달라고 한다. 옵션, 배송비, 판매처가 화면과 같은지 본다
+3. 결과의 스마트스토어 상품 하나와 가격비교 상품 하나의 정보를 읽어 달라고 한다. 스마트스토어 상품은 옵션과 배송비가, 가격비교 상품은 묶음 이름과 최저가, 배송비가 화면과 같은지 본다(판매처별 가격은 아직 읽지 않는다)
 4. `NAVER_SHOPPING_PAGE_CHANGED` 가 나오면 그 profile 의 MCP 표준 오류 기록에서 `naver_shopping_diagnostic` 줄에 적힌 `missing` 목록을 보고 `src/fields.ts` 의 칸 위치를 고친다. 기록을 읽는 방법은 `fos-home-infra` 가 갖는다
 5. 예약 작업 하나에 상품을 찾으라고 지시해 돌려 보고, 도구가 `ATTENDED_ONLY` 로 거절되는지 본다
 6. 「내 브라우저」 에서 네이버를 로그아웃한 뒤 상품을 찾아 달라고 한다. 대화에 「로그인해 주세요」 카드와 알림이 뜨는지, 「내 브라우저 열기」 가 로그인 화면 탭을 고른 채 여는지 본다. 로그인한 뒤 「다 했어요」 를 누르면 검색이 이어지고 카드가 사라지며 남긴 탭이 닫히는지 본다

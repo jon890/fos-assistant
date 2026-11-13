@@ -84,7 +84,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `kind` | 결과 |
 | --- | --- |
 | `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. `price_krw` 는 즉시할인을 반영한 판매가다(spec DECISION21) |
-| `catalog` | `{kind, url, title, sellers: [{store, price_krw, shipping_fee_krw, url}]}`. 네이버페이로 바로 사는 판매처만 싣고, 그 `url` 은 `store` 종류다(spec DECISION28). 판매처가 없으면 빈 목록이다 |
+| `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽고, 판매처별 가격 목록은 읽는 칸을 가려내지 못해 `sellers` 는 빈 목록이다(2026-11-13 실측). spec 의 REQ3·DECISION28 이 말하는 판매처 목록 돌려주기는 판매처 목록을 가려낼 때까지 미룬다(2026-11-13 사용자 결정) |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 옵션은 20개 묶음, 묶음마다 값 100개까지 싣는다. 넘으면 자른 수를 `options_truncated` 로 알린다.
@@ -97,7 +97,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | --- | --- | --- |
 | 거절 | `https` 가 아니거나, 주소로 읽히지 않거나, 2,048자를 넘거나, 사용자 정보·포트가 있다 | `NAVER_SHOPPING_INVALID_INPUT`. 검색 결과에서는 그 항목을 뺀다 |
 | `store` | 호스트가 `smartstore.naver.com`, `brand.naver.com`(앞에 `m.` 을 붙인 것 포함)이고 경로가 `/<스토어>/products/<숫자>` 다 | 탭을 열어 상품을 읽는다 |
-| `catalog` | 호스트가 `search.shopping.naver.com`(앞에 `m.` 포함)이고 경로가 `/catalog/<숫자>` 다 | 탭을 열어 판매처 목록을 읽는다 |
+| `catalog` | 호스트가 `search.shopping.naver.com`(앞에 `m.` 포함)이고 경로가 `/catalog/<숫자>` 다 | 탭을 열어 묶음 이름과 최저가, 배송비를 읽는다 |
 | `external` | 그 밖의 `https` 주소. 네이버 쇼핑의 바깥 이동 주소도 여기다 | 탭을 열지 않고 `{kind: "external", buyable: false, url}` |
 
 표는 `urls.ts` 의 상수다. 탭을 여는 것은 `store` 와 `catalog` 뿐이라, 모델이 준 주소로 아무 사이트나 「내 브라우저」 에서 열 수 없다.
@@ -107,7 +107,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 1. 중계의 `/json/new?about:blank` 로 빈 탭을 연다. 기존 탭은 읽지도 바꾸지도 않는다
 2. 그 탭에 붙어 `Page.enable` 과 `Page.javascriptDialogOpening` 처리기를 건 뒤 `Page.navigate` 로 주소를 연다. 처리기를 먼저 걸어 이동 중에 뜬 대화상자도 받는다. 우리 탭에 뜬 `alert`, `confirm` 은 닫기(`accept: false`)로 넘긴다. 읽기 탭은 사람이 쓰는 탭이 아니라서다
 3. `document.readyState` 가 `complete` 가 될 때까지 고정 식으로 묻는다(블로그 `editor/open.ts` 와 같은 방식). 그다음 「화면 분류」 를 한다
-4. 분류가 정상이면 고정 식 하나로 페이지의 상태 JSON(검색은 Next.js App Router 의 조각을 이은 글에서 꺼낸 상품 객체들, 묶음은 `__NEXT_DATA__`, 상품은 미리 실은 상태)을 꺼낸다. 식은 플러그인 소스의 상수이고 모델이나 인자가 식을 정하지 못한다
+4. 분류가 정상이면 고정 식 하나로 페이지의 상태 JSON(검색은 Next.js App Router 의 조각을 이은 글에서 꺼낸 상품 객체들, 묶음도 같은 조각에서 꺼낸 묶음 객체, 상품은 미리 실은 상태)을 꺼낸다. 식은 플러그인 소스의 상수이고 모델이나 인자가 식을 정하지 못한다
 5. 꺼낸 JSON 을 순수 함수(`parse-search.ts`, `parse-product.ts`)가 결과로 바꾼다. 필요한 칸이 없으면 `NAVER_SHOPPING_PAGE_CHANGED` 다
 6. 정상으로 끝나면 그 탭을 `/json/close/<id>` 로 닫는다(spec DECISION20)
 
@@ -115,7 +115,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 집합(준비 상태 묻기, 화면 분류, 상태 JSON 꺼내기)뿐이다. 누르기, 입력, 이동하는 식은 이 집합에 없다.
 
-**검색 화면과 상품 화면은 2026-11-13 실제 화면으로 쟀다**(상품 화면의 옵션 칸 제외). 가격비교 묶음 화면의 칸 위치는 아직 실제 네이버 화면으로 확인하지 않은 가설이다. PR1 은 실제 계정과 사용자 브라우저를 쓰지 못했다.
+**검색 화면과 상품 화면은 2026-11-13 실제 화면으로 쟀다**(상품 화면의 옵션 칸 제외). 가격비교 묶음 화면도 2026-11-13 실제 화면으로 쟀다(판매처 목록 제외). PR1 은 실제 계정과 사용자 브라우저를 쓰지 못했다.
 그래서 칸 위치를 파서의 표 하나(`fields.ts`)에 모으고, 표의 칸이 하나라도 비면 결과를 지어내지 않고 `PAGE_CHANGED` 로 끝낸다.
 실패하면 표준 오류에 칸 이름과 단계만 남는 진단 줄을 쓴다(블로그의 진단 줄과 같은 제한: 주소, 검색어, 화면 글을 싣지 않는다).
 사용자가 기능 파일의 「실제 계정으로 확인하기」 를 돌아 표를 맞춘다. 첫 확인에서 표가 틀릴 가능성이 높았고, 검색 화면은 실제로 틀려 아래대로 고쳤다.
@@ -135,7 +135,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 | `adId`, `cardType` | 광고 12개는 모두 `adId` 와 `clickUrl` 이 있고 `cardType` 이 `AD` 다. 그 밖의 `cardType` 은 `SUPER_POINT`, `SME_SLOT`, 없음이고 `adId` 가 없다 | `adId` 가 있거나 `cardType` 이 `AD` 면 광고 |
 
 네이버페이 여부는 이 화면에서 확실한 칸을 찾지 못해 `unknown` 으로 둔다. 정상 화면에도 `window.__ncaptcha` 가 있어 캡차 판정은 보이는 요소만 본다.
-옛 `__NEXT_DATA__` 의 `props.pageProps.initialState.products.list` 경로는 실측 전 가설이었고 실제 화면에는 없어 지웠다. 가격비교 묶음 화면은 아직 `__NEXT_DATA__` 를 읽는다.
+옛 `__NEXT_DATA__` 의 `props.pageProps.initialState.products.list` 경로는 실측 전 가설이었고 실제 화면에는 없어 지웠다. 가격비교 묶음 화면도 `__NEXT_DATA__` 가 없어 검색 화면과 같은 조각에서 읽는다.
 
 #### 상품 화면 읽기(2026-11-13 실측)
 
