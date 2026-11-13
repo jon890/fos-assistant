@@ -19,7 +19,7 @@ function itemLabel(action: ConnectorAction, index: number): string {
  * <p>접혀 있으면 도구 이름과 건수, 건마다 위에 보이는 첫 인자의 값만 보인다. 펼치면 건마다 인자와 승인, 거절
  * 단추가 있다. 「모두 승인」 은 펼친 뒤에만 보이고 `bulk` 가 참일 때만 둔다.
  *
- * <p>펼친 상태와 「모두 승인」 의 진행은 `ApprovalList` 가 갖는다. 앞 건을 처리해 묶음이 다시 그려지거나 한 장으로
+ * <p>펼친 상태와 「모두 승인」 의 진행은 `useApprovalList` 가 갖는다. 앞 건을 처리해 묶음이 다시 그려지거나 한 장으로
  * 바뀌어도 그 상태가 남는다.
  */
 export function ApprovalGroup({

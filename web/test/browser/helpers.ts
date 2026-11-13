@@ -113,3 +113,14 @@ export async function filledTierProvider(page: Page, tier: string): Promise<stri
   expect(provider, `${tier} 칸이 비어 있다`).toBeTruthy();
   return provider!;
 }
+
+/**
+ * 입력창 위 「할 일 N건」 줄을 눌러 옆 패널의 「할 일」 탭을 연다. 승인 카드와 넘기기 카드는 그 탭에만 있다.
+ * 이미 열려 있으면 그대로 둔다(새 승인이 저절로 연 경우).
+ */
+export async function openTodo(page: Page) {
+  const tab = page.getByTestId("todo-tab-todo");
+  await expect(page.getByTestId("todo-summary").or(tab).first()).toBeVisible();
+  if (!(await tab.isVisible())) await page.getByTestId("todo-summary").click();
+  await expect(tab).toBeVisible();
+}

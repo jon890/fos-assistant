@@ -300,6 +300,8 @@ test("플러그인 쓰기 승인 카드", async ({ page }) => {
   );
   await page.goto(`/chat/${conversationId}`);
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
+  // 승인 카드는 옆 패널의 「할 일」 탭에 있다.
+  await page.getByTestId("todo-summary").click();
   await expect(page.getByTestId("approval-card")).toBeVisible();
   await shot(page, "tour-04-approval");
   await page.unrouteAll({ behavior: "ignoreErrors" });

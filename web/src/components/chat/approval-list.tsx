@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApprovalCard } from "@/components/chat/approval-card";
 import { ApprovalGroup } from "@/components/chat/approval-group";
 import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
@@ -24,7 +24,12 @@ const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
 /** 「모두 승인」 이 다음 건으로 넘어가는 결과다. 그 밖의 결과(실패, 모름, 실행하지 않음)를 만나면 멈춘다. */
 const CONTINUE = ["SUCCEEDED", "EXECUTING"];
 
-type Loaded = { conversationId: string; actions: ConnectorAction[] };
+/** `ok` 는 이 대화의 읽기에 한 번이라도 성공했는지다. 실패한 첫 읽기는 빈 목록으로 둔다. */
+type Loaded = {
+  conversationId: string;
+  actions: ConnectorAction[];
+  ok: boolean;
+};
 
 /**
  * 기다리는 줄은 같은 플러그인의 같은 도구끼리 묶는다. 묶음의 자리는 그 도구가 처음 나온 자리다.
@@ -109,21 +114,24 @@ function useBulkApproval(
 }
 
 /**
- * 입력창 위에 그 대화의 승인 카드를 모아 보인다.
+ * 그 대화의 승인 카드를 읽고 옆 패널의 「할 일」 탭에 그릴 영역을 만든다.
  *
- * <p>승인을 기다리는 동안에도 대화를 읽을 수 있게 이 영역은 화면 높이의 40% 까지만 차지하고 안에서 스크롤한다.
- * 같은 도구로 기다리는 줄이 여럿이면 `ApprovalGroup` 한 묶음으로 보인다.
+ * <p>상태(읽은 줄, 펼친 묶음, 「모두 승인」 진행, 닫은 카드, 원고 저장)는 대화 화면이 이 훅으로 든다. 패널을 닫거나
+ * 탭을 옮겨도 「모두 승인」 이 끝까지 돌고 펼친 묶음이 남는다. 같은 도구로 기다리는 줄이 여럿이면 `ApprovalGroup`
+ * 한 묶음으로 보인다. 동작은 `docs/features/connector-policy.md` 의 「화면」 이 갖는다.
  *
- * <p>대화나 `refreshKey` 가 바뀌면 다시 읽는다. 보일 줄이 없으면 아무것도 그리지 않는다. 읽지 못해도 대화를
- * 막지 않게 조용히 비운다.
+ * <p>대화나 `refreshKey` 가 바뀌면 다시 읽는다. 처음 성공한 읽기의 번호에 없는 `PENDING` 줄이 보이면 `onFresh` 를
+ * 부른다. 보일 줄이 없으면 `view` 가 null 이다. 읽지 못해도 대화를 막지 않게 앞 목록을 둔다.
  */
-export function ApprovalList({
+export function useApprovalList({
   conversationId,
   refreshKey,
+  onFresh,
 }: {
   conversationId: string | null;
   refreshKey: number;
-}) {
+  onFresh: () => void;
+}): { view: ReactNode; count: number; ready: boolean } {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   /** 이미 처리된 요청을 만난 카드가 다시 읽기를 청한 횟수다 */
   const [reloads, setReloads] = useState(0);
@@ -139,19 +147,57 @@ export function ApprovalList({
   const [openedFor, setOpenedFor] = useState<string | null>(null);
   const jobs = useContentDraftJobs(conversationId, refreshKey + reloads);
   const bulk = useBulkApproval(replace, () => setReloads((count) => count + 1));
+  /** 처음 성공한 읽기부터 본 줄 번호다. 여기에 없는 `PENDING` 줄이 새 승인이다. */
+  const seenIds = useRef<{ conversationId: string; ids: Set<string> } | null>(
+    null,
+  );
+  const onFreshRef = useRef(onFresh);
+  useEffect(() => {
+    onFreshRef.current = onFresh;
+  }, [onFresh]);
 
   useEffect(() => {
     if (conversationId === null) return;
     let stale = false;
     void readConnectorActions(conversationId).then((result) => {
-      if (stale) return;
+      const known =
+        seenIds.current?.conversationId === conversationId
+          ? seenIds.current.ids
+          : null;
+      if (stale) {
+        // 다음 읽기가 앞질러 버려진 첫 읽기도 그때 이미 있던 줄을 알려 준다. 새 승인 판정의 기준이 아직 없을 때만 쓴다.
+        // 그러지 않으면 첫 읽기 중에 온 승인 사건이 다음 읽기를 첫 읽기로 만들어 새 승인을 이미 있던 것으로 본다.
+        if (result.ok && known === null)
+          seenIds.current = {
+            conversationId,
+            ids: new Set(result.data.map((action) => action.actionId)),
+          };
+        return;
+      }
+      if (result.ok) {
+        if (
+          known &&
+          result.data.some(
+            (action) =>
+              action.status === "PENDING" && !known.has(action.actionId),
+          )
+        )
+          onFreshRef.current();
+        seenIds.current = {
+          conversationId,
+          ids: new Set([
+            ...(known ?? []),
+            ...result.data.map((action) => action.actionId),
+          ]),
+        };
+      }
       // 한 번 못 읽었다고 떠 있던 카드를 치우지 않는다. 같은 대화의 앞선 목록을 그대로 둔다.
       setLoaded((current) =>
         result.ok
-          ? { conversationId, actions: result.data }
+          ? { conversationId, actions: result.data, ok: true }
           : current?.conversationId === conversationId
             ? current
-            : { conversationId, actions: [] },
+            : { conversationId, actions: [], ok: false },
       );
     });
     return () => {
@@ -204,6 +250,14 @@ export function ApprovalList({
     setDismissed((current) => [...current, actionId]);
   }
 
+  /**
+   * 「모두 승인」 이 보내는 줄과 카드가 혼자 보내는 중인 줄을 막는다. 카드의 「보내는 중」 은 카드 안의 상태라 패널을 닫거나
+   * 탭을 옮겨 카드가 다시 만들어지면 사라지므로, 이 훅이 든 목록으로도 막아 같은 줄을 두 번 보내지 않게 한다.
+   */
+  function locked(actionId: string) {
+    return bulk.locked(actionId) || sending.includes(actionId);
+  }
+
   function sendingChange(actionId: string, on: boolean) {
     setSending((current) =>
       on
@@ -246,17 +300,21 @@ export function ApprovalList({
   const shownJobs = finishedOpen
     ? jobOnly
     : jobOnly.filter((job) => !finishedJobs.includes(job));
-  if (conversationId === null) return null;
-  if (actions.length === 0 && jobOnly.length === 0 && jobs.next === null)
-    return null;
+  const ready =
+    loaded !== null && loaded.conversationId === conversationId && loaded.ok;
+  const count = shownActions.length + shownJobs.length;
+  if (
+    conversationId === null ||
+    (actions.length === 0 && jobOnly.length === 0 && jobs.next === null)
+  )
+    return { view: null, count: 0, ready };
 
-  return (
+  const view = (
     <div
       data-testid="approval-list"
       role="region"
       aria-label="승인을 기다리는 동작"
-      // 카드가 많아도 메시지 목록의 자리를 남긴다. 높이는 화면에 따라 이어지는 값이라 임의 값으로 둔다.
-      className="mx-auto mb-2 flex max-h-[40dvh] w-full max-w-3xl flex-col gap-3 overflow-y-auto px-1"
+      className="flex flex-col gap-3"
     >
       {bulk.error ? (
         <Notice variant="error" role="alert" data-testid="approval-bulk-error">
@@ -268,7 +326,7 @@ export function ApprovalList({
           <ApprovalCard
             key={group[0].actionId}
             action={group[0]}
-            locked={bulk.locked(group[0].actionId)}
+            locked={locked(group[0].actionId)}
             onSendingChange={(on) => sendingChange(group[0].actionId, on)}
             onChanged={changed}
             onDismiss={() => dismiss(group[0].actionId)}
@@ -292,7 +350,7 @@ export function ApprovalList({
               group.some((action) => sending.includes(action.actionId))
             }
             onApproveAll={() => void bulk.approveAll(key, group)}
-            locked={bulk.locked}
+            locked={locked}
             onSendingChange={sendingChange}
             onChanged={changed}
             onDismiss={dismiss}
@@ -337,4 +395,5 @@ export function ApprovalList({
       ) : null}
     </div>
   );
+  return { view, count, ready };
 }

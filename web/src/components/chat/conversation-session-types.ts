@@ -9,11 +9,18 @@ import type { Handoff } from "@/lib/handoff";
 
 export type ErrorPayload = { code: string; message: string };
 
-/** 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나거나, 화면 넘기기의 「내 브라우저」 다 */
+/**
+ * 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나거나, 「할 일」 과 「내 브라우저」 탭의 패널이다.
+ * `todo` 의 `handoff` 는 「내 브라우저」 탭이 보일 넘기기다. `tab` 이 `browser` 면 늘 있다.
+ */
 export type SidePanelTarget =
   | { kind: "activity"; target: ActivityPanelTarget }
   | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string }
-  | { kind: "handoff"; handoff: Handoff };
+  | TodoPanelTarget;
+
+export type TodoPanelTarget =
+  | { kind: "todo"; tab: "todo"; handoff: Handoff | null }
+  | { kind: "todo"; tab: "browser"; handoff: Handoff };
 /** 대화에 지금 도는 turn 이다. 실행 번호가 아직 붙지 않았으면 `running` 이 참이어도 나머지가 null 이다. */
 export type RunningTurn = {
   running: boolean;

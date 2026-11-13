@@ -6,7 +6,6 @@ import { cn } from "cn";
 import { Composer } from "./composer";
 import { StartScreenHeader, StarterPrompts } from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
-import { ApprovalList } from "./approval-list";
 import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
 import { ActivityPanel } from "./activity/activity-panel";
@@ -16,7 +15,7 @@ import { Notice } from "@/components/ui/notice";
 import { agentLabel } from "@/lib/format";
 import { NEW_CONVERSATION_PATH } from "@/lib/room";
 import { useDelegateTarget } from "./use-delegate-target";
-import { useConversationHandoffs } from "./use-conversation-handoffs";
+import { useConversationTodo } from "./use-conversation-todo";
 import type { Props } from "./conversation-session-view-types";
 
 export function ConversationSessionView({
@@ -97,12 +96,15 @@ export function ConversationSessionView({
     delegateTo,
     setDelegateTo,
   });
-  const handoffs = useConversationHandoffs({
+  const todo = useConversationTodo({
     conversationId,
     refreshKey: approvalRefresh,
     panelTarget,
     setPanelTarget,
     submit: (text) => void submit([], text),
+    turns,
+    selectedVersions,
+    sending,
   });
 
   if (notFound) {
@@ -286,11 +288,7 @@ export function ConversationSessionView({
               </div>
             </div>
           ) : null}
-          {handoffs.list}
-          <ApprovalList
-            conversationId={conversationId}
-            refreshKey={approvalRefresh}
-          />
+          {todo.summary}
           <ConversationGrantList
             conversationId={conversationId}
             refreshKey={approvalRefresh}
@@ -391,7 +389,7 @@ export function ConversationSessionView({
           onClose={() => setPanelTarget(null)}
         />
       ) : null}
-      {handoffs.panel}
+      {todo.panel}
     </section>
   );
 }

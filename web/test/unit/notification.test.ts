@@ -19,7 +19,12 @@ function view(overrides: Partial<NotificationView> = {}): NotificationView {
 }
 
 test("대화가 대상인 알림은 그 대화 주소로 간다", () => {
-  assert.equal(notificationHref(view()), `/chat/${CONVERSATION_ID}`);
+  assert.equal(notificationHref(view({ kind: "APPROVAL_EXPIRED" })), `/chat/${CONVERSATION_ID}`);
+});
+
+test("승인 알림은 그 대화의 「할 일」 탭을 여는 주소로 간다", () => {
+  assert.equal(notificationHref(view()), `/chat/${CONVERSATION_ID}?todo=open`);
+  assert.equal(notificationHref(view({ targetId: null })), null);
 });
 
 test("화면 넘기기 알림은 그 대화의 「내 브라우저」 패널을 여는 주소로 간다", () => {

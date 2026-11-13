@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { openTodo } from "./helpers.ts";
 import type {
   Page,
   Route,
@@ -206,6 +207,7 @@ test("승인 전 원고는 버전과 넣는 사진, 넣지 않는 사진을 보�
     },
   );
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const card = page.getByTestId("content-draft-card");
   await expect(card.getByTestId("content-draft-revision")).toHaveText(
@@ -262,6 +264,7 @@ for (const [name, status, code] of [
       snapshot: { status, json: { code } },
     });
     await page.goto(`/chat/${conversationId}`);
+    await openTodo(page);
 
     const card = page.getByTestId("content-draft-card");
     await expect(card).toHaveAttribute("data-status", "STALE");
@@ -288,6 +291,7 @@ for (const [status, text] of [
       actions: [draftAction(conversationId, status, status)],
     });
     await page.goto(`/chat/${conversationId}`);
+    await openTodo(page);
 
     // 처음부터 끝나 있던 원고 카드는 접혀 있다가 펼치면 보인다.
     const card = page.getByTestId("content-draft-card");
@@ -326,6 +330,7 @@ test("시작 지원이 없어 실행 없이 거절되면 저장할 수 없다는
     },
   );
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const card = page.getByTestId("content-draft-card");
   await card.getByTestId("content-draft-approve").click();
@@ -359,6 +364,7 @@ test("사용자가 거절하면 새 미리보기 안내 대신 거절했다는 �
     },
   );
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const card = page.getByTestId("content-draft-card");
   await card.getByTestId("content-draft-reject").click();
@@ -379,10 +385,12 @@ test("재접속과 중복 승인 사건에서는 GET 만 보내고 끝난 카드
     events: event + event,
   });
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const card = page.getByTestId("content-draft-card");
   await expect(card).toHaveAttribute("data-status", "SUCCEEDED");
   await page.reload();
+  await openTodo(page);
   await expect(card).toHaveAttribute("data-status", "SUCCEEDED");
   expect(counts.job).toBeGreaterThan(0);
   expect(counts.snapshot).toBe(0);
@@ -414,6 +422,7 @@ test("일반 승인 줄에 밀린 끝난 원고도 job 목록에서 다시 찾�
     pages: { "": { items: [job(1)], next: null } },
   });
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const group = page.getByTestId("approval-group");
   await expect(group).toHaveAttribute("data-count", "20");
@@ -460,6 +469,7 @@ test("원고 job 이 21개면 이전 저장 더 보기로 오래된 원고를 �
     },
   });
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const cards = page.getByTestId("content-draft-card");
   await expect(cards).toHaveCount(0);
@@ -482,7 +492,6 @@ test("원고 job 목록이 비면 원고 카드와 더 보기 단추가 없다",
   const conversationId = await createConversation(page, "원고 빈 목록");
   const counts = await routeDraft(page, conversationId, { actions: [] });
   await page.goto(`/chat/${conversationId}`);
-
   await expect.poll(() => counts.cursors.length).toBeGreaterThan(0);
   await expect(page.getByTestId("approval-list")).toHaveCount(0);
   await expect(page.getByTestId("content-draft-more")).toHaveCount(0);

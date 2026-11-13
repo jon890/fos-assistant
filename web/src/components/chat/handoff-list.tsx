@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { HANDOFF_TEXT, type Handoff } from "@/lib/handoff";
 
 /**
- * 입력창 위에 그 대화의 화면 넘기기 카드를 보인다. 플러그인이 사람이 해야 하는 화면에서 멈추면 생긴다.
+ * 옆 패널의 「할 일」 탭에 그 대화의 화면 넘기기 카드를 보인다. 플러그인이 사람이 해야 하는 화면에서 멈추면 생긴다.
  *
- * <p>「내 브라우저 열기」 는 남긴 탭을 대화 위 옆 패널에 띄운다. 「다 했어요」 는 정해 둔 글을 다음 메시지로 보낸다.
+ * <p>「내 브라우저 열기」 는 남긴 탭을 같은 패널의 「내 브라우저」 탭에 띄운다. 「다 했어요」 는 정해 둔 글을 다음 메시지로 보낸다.
  * 새 turn 이 시작되면 서버가 카드를 닫는다. 입력창에 직접 답해도 같다. 읽기와 상태는 `useConversationHandoffs` 가 갖는다.
  */
 export function HandoffList({
@@ -20,17 +20,15 @@ export function HandoffList({
 }) {
   if (handoffs.length === 0) return null;
   return (
-    <div className="px-1">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 pb-2">
-        {handoffs.map((handoff) => (
-          <HandoffCard
-            key={handoff.handoffId}
-            handoff={handoff}
-            onOpen={() => onOpen(handoff)}
-            onDone={() => onDone(handoff)}
-          />
-        ))}
-      </div>
+    <div className="flex flex-col gap-2">
+      {handoffs.map((handoff) => (
+        <HandoffCard
+          key={handoff.handoffId}
+          handoff={handoff}
+          onOpen={() => onOpen(handoff)}
+          onDone={() => onDone(handoff)}
+        />
+      ))}
     </div>
   );
 }

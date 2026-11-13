@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { openTodo } from "./helpers.ts";
 import type {
   Page,
   Route,
@@ -301,6 +302,7 @@ test("위임 자식이 만든 승인 카드에 「쇼핑 담당이 요청」 이
   );
 
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   const requested = page
     .getByTestId("approval-card")
@@ -348,6 +350,7 @@ test("대화 에이전트가 만든 승인 카드에는 요청 에이전트를 �
   );
 
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
 
   await expect(page.getByTestId("approval-card")).toHaveCount(1);
   await expect(page.getByTestId("approval-requested-by")).toHaveCount(0);

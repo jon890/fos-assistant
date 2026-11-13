@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures.ts";
 import { FRAME, fakeScreen, type Input } from "./fake-screen.ts";
+import { openTodo } from "./helpers.ts";
 import type {
   Page,
   Route,
@@ -105,12 +106,15 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
   await routeHandoffs(page, conversationId, () => open);
   await page.goto(`/chat/${conversationId}`);
 
+  // 처음 연 대화에 이미 있던 카드는 패널을 저절로 열지 않고 입력창 위 한 줄만 보인다.
+  const summary = page.getByTestId("todo-summary");
+  await expect(summary).toHaveText("할 일 1건");
+  const panel = page.getByTestId("handoff-panel");
+  await expect(page.getByTestId("todo-panel")).toHaveCount(0);
+  await openTodo(page);
   const card = page.getByTestId("handoff-card");
   await expect(card).toContainText(LOGIN_TITLE);
   await expect(card).toContainText("「네이버 쇼핑」");
-  // 처음 연 대화에 이미 있던 카드는 패널을 저절로 열지 않는다.
-  const panel = page.getByTestId("handoff-panel");
-  await expect(panel).toHaveCount(0);
   await expect(card.getByRole("link")).toHaveCount(0);
 
   await card.getByRole("button", { name: "내 브라우저 열기" }).click();
@@ -140,7 +144,7 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
     await composer.fill("패널을 연 채 쓰는 글");
   } else {
     // 좁은 화면은 전체 폭 시트로 대화를 덮는다.
-    const box = await panel.boundingBox();
+    const box = await page.getByTestId("todo-panel").boundingBox();
     expect(box?.width).toBe(page.viewportSize()?.width);
     // 화면 글자 칸의 Esc 는 원격 페이지로 가고 시트를 닫지 않는다.
     await page.getByLabel("화면에 글자 넣기").focus();
@@ -153,10 +157,11 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
   // 다시 그려져도 화면 연결을 다시 열지 않는다.
   expect(await fake.opens()).toHaveLength(1);
 
-  await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  await page.getByRole("button", { name: "옆 패널 닫기" }).click();
   await expect(panel).toHaveCount(0);
-  await expect(card).toBeVisible();
+  await expect(summary).toBeVisible();
 
+  await openTodo(page);
   await card.getByRole("button", { name: "내 브라우저 열기" }).click();
   await expect(panel).toBeVisible();
   open = [];
@@ -165,7 +170,7 @@ test("카드의 「내 브라우저 열기」 는 새 창 없이 대화 위 패�
   await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
     LOGIN_DONE,
   );
-  await expect(card).toHaveCount(0);
+  await expect(summary).toHaveCount(0);
 });
 
 test("넘긴 탭의 주소가 바뀌면 끝났는지 묻고, 「아직이에요」 뒤에는 다시 바뀔 때만 묻는다", async ({
@@ -175,6 +180,7 @@ test("넘긴 탭의 주소가 바뀌면 끝났는지 묻고, 「아직이에요�
   const conversationId = await createConversation(page);
   await routeHandoffs(page, conversationId, () => [HANDOFF]);
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
   await page
     .getByTestId("handoff-card")
     .getByRole("button", { name: "내 브라우저 열기" })
@@ -203,14 +209,14 @@ test("넘긴 탭의 주소가 바뀌면 끝났는지 묻고, 「아직이에요�
 
 test("보고 있는 대화에 새 넘기기가 생기면 패널이 저절로 열리고, 다른 카드로 바꾸면 확인 줄 없이 그 탭을 보이며, 넘기기가 닫히면 패널도 닫힌다", async ({
   page,
-}, testInfo) => {
+}) => {
   const fake = await fakeScreen(page);
   const conversationId = await createConversation(page);
   let open: unknown[] = [HANDOFF];
   await routeHandoffs(page, conversationId, () => open);
   const events = await routeEvents(page, conversationId);
   await page.goto(`/chat/${conversationId}`);
-  await expect(page.getByTestId("handoff-card")).toHaveCount(1);
+  await expect(page.getByTestId("todo-summary")).toHaveText("할 일 1건");
   const panel = page.getByTestId("handoff-panel");
   await expect(panel).toHaveCount(0);
 
@@ -221,10 +227,9 @@ test("보고 있는 대화에 새 넘기기가 생기면 패널이 저절로 열
   await fake.push([["tabs", tabs("https://shop.example.com", OTHER_TAB)]]);
   await expect(page.getByTestId("handoff-changed")).toBeVisible();
 
-  // 카드의 「내 브라우저 열기」 는 패널을 그 카드로 바꾸고, 앞 넘기기의 판정은 남지 않는다.
-  // 좁은 화면은 시트가 대화를 덮으므로 시트를 닫고 카드를 누른다.
-  if (testInfo.project.name === "mobile")
-    await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  // 「할 일」 탭의 다른 카드의 「내 브라우저 열기」 는 「내 브라우저」 탭을 그 카드로 바꾸고, 앞 넘기기의 판정은 남지 않는다.
+  await page.getByRole("tab", { name: "할 일" }).click();
+  await expect(page.getByTestId("handoff-card")).toHaveCount(2);
   await page
     .getByTestId("handoff-card")
     .filter({ hasText: LOGIN_TITLE })
@@ -237,7 +242,7 @@ test("보고 있는 대화에 새 넘기기가 생기면 패널이 저절로 열
   open = [];
   await events.bump();
   await expect(panel).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.getByTestId("handoff-card")).toHaveCount(0);
+  await expect(page.getByTestId("todo-summary")).toHaveCount(0);
 });
 
 test("새 넘기기 패널은 작업 과정 패널 자리를 갈아 쓰고, 넘기기가 닫혀도 다른 옆 패널은 닫지 않는다", async ({
@@ -263,12 +268,12 @@ test("새 넘기기 패널은 작업 과정 패널 자리를 갈아 쓰고, 넘�
   await expect(panel).toContainText(LOGIN_TITLE);
   await expect(activity).toHaveCount(0);
 
-  await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  await page.getByRole("button", { name: "옆 패널 닫기" }).click();
   await block.getByTestId("activity-open-panel").click();
   await expect(activity).toBeVisible();
   open = [];
   await events.bump();
-  await expect(page.getByTestId("handoff-card")).toHaveCount(0, {
+  await expect(page.getByTestId("todo-summary")).toHaveCount(0, {
     timeout: 15_000,
   });
   await expect(activity).toBeVisible();
@@ -281,6 +286,7 @@ test("패널의 「새 창으로 열기」 는 그 탭의 내 브라우저를 �
   const conversationId = await createConversation(page);
   await routeHandoffs(page, conversationId, () => [HANDOFF]);
   await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
   const card = page.getByTestId("handoff-card");
   await card.getByRole("button", { name: "내 브라우저 열기" }).click();
   const panel = page.getByTestId("handoff-panel");
@@ -295,13 +301,12 @@ test("패널의 「새 창으로 열기」 는 그 탭의 내 브라우저를 �
   );
   await popup.close();
   await expect(panel).toHaveCount(0);
-  await expect(card).toBeVisible();
-  // 닫기로 닫으면 초점이 그 카드의 「내 브라우저 열기」 로 돌아온다.
-  const openButton = card.getByRole("button", { name: "내 브라우저 열기" });
-  await openButton.click();
-  await page.getByRole("button", { name: "내 브라우저 닫기" }).click();
+  // 닫기로 닫으면 초점이 입력창 위 「할 일」 줄로 돌아온다.
+  await openTodo(page);
+  await card.getByRole("button", { name: "내 브라우저 열기" }).click();
+  await page.getByRole("button", { name: "옆 패널 닫기" }).click();
   await expect(panel).toHaveCount(0);
-  await expect(openButton).toBeFocused();
+  await expect(page.getByTestId("todo-summary")).toBeFocused();
 });
 
 test("알림에서 들어오면 가장 최근 넘기기의 패널을 열고 주소에서 표시를 지운다", async ({
