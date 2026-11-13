@@ -38,7 +38,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true` |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true` |
 | `catalog` | `{kind, url, title, sellers: [{store, price_krw, shipping_fee_krw, url}]}`. 네이버페이로 바로 사는 판매처만이다 |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
@@ -69,7 +69,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 세 도구 모두 `READ`, 승인 �
 탭에서 부르는 식은 `src/expressions.ts` 의 상수뿐이다. 칸 위치는 `src/fields.ts` 한 곳에 있다. 필수 칸이 비면 `NAVER_SHOPPING_PAGE_CHANGED` 넘기기로 끝난다.
 
 검색 화면은 실제 화면으로 쟀다(2026-11-13). 검색 화면은 Next.js App Router 라 `__NEXT_DATA__` 가 없고, 상품이 `self.__next_f.push([1,"<조각>"])` 로 시작하는 스크립트들의 둘째 값에 흩어져 있다. 고정 식이 그 조각을 이어 `productName` 칸을 직접 가진 가장 안쪽 객체를 상품으로 꺼내 필요한 칸(이름, 정가, 할인가, 판매처, 상품 주소, `nvMid`, 광고 표지)만 담아 준다. 한 번에 200개까지이고, 실측한 한 화면에는 48개가 실렸으며 그 가운데 `nvMid` 가 겹치는 것이 있었다. 플러그인이 가격(할인가가 있으면 할인가, 없으면 정가)과 광고(`adId` 가 있거나 `cardType` 이 `AD`)를 가려 같은 `nvMid` 를 한 번만 내고 화면 차례 그대로 40개까지 자른다. 검색 화면에서 네이버페이 여부를 가리는 칸은 확인하지 못해 `naver_pay` 는 항상 `unknown` 이다. 조각 스크립트가 하나도 없으면 바뀐 화면이고, 있는데 상품이 없으면 빈 결과다.
-상품 화면도 실제 화면으로 쟀다(2026-11-13, 옵션 칸 제외). 상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 같은 상태의 `product` 는 칸만 있고 값이 비어 있어 경로 후보에 두지 않는다. 읽는 칸은 이름(`name`), 판매처(`channel.channelName`), 정가(`salePrice`), 할인가(`benefitsView.discountedSalePrice`), 상태(`productStatusType`), 옵션 사용 여부(`optionUsable`), 배송(`productDeliveryInfo` 의 `deliveryFeeType`, `baseFee`, 지역 추가 배송비 `area2ExtraFee`)다. `optionUsable` 이 `false` 면 옵션 없음으로 낸다. 잰 상품이 모두 옵션을 쓰지 않아 옵션이 있는 상품의 칸 이름은 아직 가설이다. 그 칸을 찾지 못하면 옵션은 지어내지 않고 빈 목록으로 둔다.
+상품 화면도 실제 화면으로 쟀다(2026-11-13, 옵션 칸 제외). 상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 같은 상태의 `product` 는 칸만 있고 값이 비어 있어 경로 후보에 두지 않는다. 읽는 칸은 이름(`name`), 판매처(`channel.channelName`), 정가(`salePrice`), 할인가(`benefitsView.discountedSalePrice`), 상태(`productStatusType`), 옵션 사용 여부(`optionUsable`), 배송(`productDeliveryInfo` 의 `deliveryFeeType`, `baseFee`, 지역 추가 배송비 `area2ExtraFee`)다. `optionUsable` 이 `false` 면 옵션 없음으로 낸다. 옵션이 있는 상품을 운영 「내 브라우저」 에서 읽기 전용으로 쟀다(2026-11-13). 처음 실리는 상태(`__PRELOADED_STATE__`, `__QUERY_STATE__`, `__CLIENT_RTK_RTS_STATE__`) 어디에도 옵션 목록이 없고 `selectedOptions.*` 는 null, `optionStandards` 는 빈 배열이다. 옵션 목록은 사람이 드롭다운 단추를 눌러야 실린다. 그래서 `optionUsable` 이 `true` 인데 옵션 묶음을 읽지 못하면 옵션은 지어내지 않고 빈 목록에 `options_unknown: true` 를 더해, 담당이 「옵션 없음」 이라고 말하지 않고 사용자에게 상품 화면에서 확인해 달라고 하게 한다.
 가격비교 묶음 화면의 칸 위치는 아직 실제 화면으로 확인하지 않은 가설이다.
 그때 표준 오류에 `{"naver_shopping_diagnostic":{"tool","stage","missing"}}` 한 줄을 남긴다. 칸 이름과 단계만 싣고 주소, 검색어, 화면 글은 싣지 않는다.
 
