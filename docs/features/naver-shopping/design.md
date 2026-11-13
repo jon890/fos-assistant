@@ -416,6 +416,20 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 
 - `url` 은 「주소 분류」 의 `store` 갈래만 받는다. `options` 는 고를 옵션 값의 글 배열(옵션 단계 순서, 0~3개), `quantity` 는 1~99 정수다
 - 준비는 상품 화면을 새로 읽어 옵션 글을 화면의 조합 하나로 맞춘다. 맞는 조합이 없거나 둘 이상이거나, 품절이거나, 네이버페이로 바로 살 수 없거나, 옵션 목록을 못 읽었으면(`options_unknown`) 선언된 오류로 거절한다. 카드는 만들지 않는다
+- 준비는 모델에게 결과를 직접 주지 않고 대시보드의 준비 경로가 받는다. 그 경로는 화면 넘기기 결과를 받지 않으므로, 준비가 사람이 해야 하는 화면을 만나면 넘기기가 아니라 그 코드의 오류(`isError`)로 끝내고 그 탭을 남긴다. 담당은 스킬대로 「내 브라우저」 에서 풀어 달라고 안내한다
+- 판매처 이름을 읽지 못하면 카드의 판매처가 비므로 `NAVER_SHOPPING_PAGE_CHANGED` 로 거절한다
+
+준비와 채우기가 더하는 오류다. 선언된 코드라 승인한 실행의 실패에서 코드가 에이전트까지 가고, 객체 항목은 복구 어휘도 간다(ADR-092). claim 뒤에도 선언된 코드는 결과 판정이 `FAILED` 로 끝내므로, 「바로구매」 를 보낸 뒤에는 이 코드를 쓰지 않는다.
+
+| 서버 코드 | 공통 어휘 | 복구 | 언제 |
+| --- | --- | --- | --- |
+| `NAVER_SHOPPING_OPTION_MISMATCH` | `invalid_input` | `fix_input` | 옵션 글이 화면의 조합 하나로 맞지 않는다(없음, 둘 이상, 옵션 없는 상품에 옵션) |
+| `NAVER_SHOPPING_OPTIONS_UNKNOWN` | `unavailable` | | 옵션이 있는데 드롭다운을 열어도 조합 목록을 읽지 못했다 |
+| `NAVER_SHOPPING_SOLD_OUT` | `invalid_input` | `recheck` | 고른 조합이 품절이다 |
+| `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 상품 상태가 판매 중이 아니다(네이버페이로 바로 살 수 없다) |
+| `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인한 금액보다 크다 |
+| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | claim 이 거절됐다(만료, 이미 소비, 채우기 직전 상한) |
+| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | 구매하기 뒤 층에서 옵션이나 수량을 맞추지 못해 바로구매를 누르지 않았다 |
 
 `executionArgs` 는 정확히 아래 키다. 금액은 원 단위 JSON 정수다.
 
@@ -466,17 +480,35 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 승인하면 금융 승인이 지금처럼 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 다시 보내지 않는다. 플러그인의 `fill_checkout` 은 이 순서로 돈다.
 
 1. 실행 원문과 ticket 의 인자 해시를 대조한다(토스 플러그인의 `execution-guard.ts` 와 같은 검사. 코드는 나누지 않는다)
-2. 앞서 남긴 탭을 닫고 빈 탭을 열어 상품 주소로 간다. 화면 분류가 사람이 해야 하는 화면이면 탭을 남기고 그 넘기기 결과로 끝난다
-3. 상품 상태를 다시 읽어 판매가와 배송비로 다시 계산한 예상 합계가 원문의 `expectedTotalKrw` 보다 크면 claim 없이 `NAVER_SHOPPING_PRICE_CHANGED` 로 끝내고 탭을 닫는다
-4. claim 으로 ticket 을 한 번 소비한다. 거절되면 `NAVER_SHOPPING_CLAIM_REJECTED` 로 끝내고 탭을 닫는다
-5. 옵션 드롭다운을 열어 원문의 `optionLabels` 와 같은 글의 값을 고르고, 수량을 맞춘 뒤 「구매하기」 를 누른다. 장바구니 단추는 누르지 않는다
-6. 주문서 화면으로 넘어가면 화면 분류를 하고 주문서의 최종 결제 금액을 읽는다. 결제 단추는 누르지 않는다
-7. 주문서 탭을 남기고 `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 로 끝난다
+2. 빈 탭을 열어 상품 주소로 간다. 화면 분류가 사람이 해야 하는 화면이면 탭을 남기고 그 넘기기 결과로 끝난다
+3. 상품 상태를 다시 읽어(옵션이 있으면 드롭다운을 한 번 연다) 판매가와 배송비로 다시 계산한 예상 합계가 원문의 `expectedTotalKrw` 보다 크거나 고른 조합이 품절이면 claim 없이 `NAVER_SHOPPING_PRICE_CHANGED` 나 `NAVER_SHOPPING_SOLD_OUT` 으로 끝내고 탭을 닫는다
+4. claim 으로 ticket 을 한 번 소비한다. 거절되면 `NAVER_SHOPPING_CLAIM_REJECTED` 로 끝내고 탭을 닫는다. 구매하기를 누르지 않는다
+5. 상품 화면의 「구매하기」 를 누른다. 주문서로 바로 가지 않고 같은 화면에 「상품 구매」 층(옵션·수량, 총 금액, 「장바구니」, 「바로구매」, 「닫기」)이 뜬다(2026-11-13 실측). 층 안에서 원문의 `optionLabels` 와 같은 글의 값을 단계마다 고르고 수량을 맞춘 뒤 읽어 확인한다. 맞추지 못하면 「바로구매」 를 누르지 않고 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝내고 탭을 닫는다. 「장바구니」 는 누르지 않는다
+6. 층의 「바로구매」 를 누른다. 몇 초 안에 주문서(`orders.pay.naver.com` 의 `/ordersheet/`)가 열린다. 같은 탭이 넘어갈 수도, 새 탭이 열릴 수도 있어 둘 다 본다. 새 탭은 누르기 직전의 탭 목록에 없던 탭만 본다. 주문서 탭에서 화면 분류를 하고 최종 결제 금액을 읽는다. 결제 단추는 누르지 않는다
+7. 주문서 탭을 남기고 `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 로 끝난다. 새 탭이 주문서면 상품 탭은 닫는다. 최종 금액이 원문의 예상 합계보다 크면 결과 판정이 넘기지 않으므로 주문서 탭도 닫는다(아래 「결과 판정」)
 
-`Runtime.evaluate` 의 식은 지금처럼 `expressions.ts` 의 상수뿐이다. 채우기만 쓰는 식(옵션 값 고르기, 수량 맞추기, 구매하기 누르기)은 따로 묶는다. 누르기는 `Input.*` 명령 없이 요소의 `click()` 으로 한다.
-**결제 단추를 누르는 코드 경로가 없다.** 주문서 화면에서 부르는 식은 화면 분류와 최종 금액 읽기뿐이다. 검사는 모든 식 상수에 「결제」 글과 주문서의 결제 단추 선택자가 없는지, 가짜 CDP 의 채우기 기록에서 주문서 화면 뒤의 식이 그 두 식뿐인지 본다.
+「바로구매」 를 보내는 순간부터는 주문서가 열렸을 수 있다. 그 뒤의 실패(시간 초과, 연결 끊김, 주문서를 찾지 못함, 금액을 읽지 못함)는 오류가 아니라 `{status: "UNKNOWN", tab}` 결과다. 오류로 돌려주면 선언된 코드라 승인 줄이 `FAILED` 가 되어 하루 합계에서 빠진다.
+「구매하기」 는 층을 여는 단추라 그 뒤에도 층이 떴는지 확인할 수 있다. 층도 주문서도 보이지 않으면 결과를 모르는 것(`UNKNOWN`)으로 본다.
 
-주문서 화면의 칸은 아직 재지 않았다. 상품 화면처럼 칸 위치를 `fields.ts` 에 모으고 비면 지어내지 않는다. 주문서의 최종 금액을 읽지 못하면 결과를 모르는 것으로 본다.
+`Runtime.evaluate` 의 식은 지금처럼 `expressions.ts` 의 상수뿐이다. 채우기만 쓰는 식(구매하기·바로구매 누르기, 층 확인, 주문서 금액 읽기)과 값을 받는 함수 선언(층의 옵션 열기와 값 고르기, 수량 맞추기)은 따로 묶는다. 함수 선언은 `Runtime.callFunctionOn` 에 상수 그대로 싣고 옵션 글과 수량은 인자 값으로만 넘겨, 인자가 식을 정하지 못한다. 누르기는 `Input.*` 명령 없이 요소의 `click()` 으로 한다. 누르는 식은 모두 지금 주소가 스마트스토어·브랜드스토어 호스트가 아니면 누르지 않는다.
+**결제 단추를 누르는 코드 경로가 없다.** 주문서 화면에서 부르는 식은 준비 상태, 화면 분류, 최종 금액 읽기뿐이다. 검사는 모든 식 상수에 「결제」 글과 아래 금지 선택자가 없는지, 가짜 CDP 의 채우기 기록에서 주문서 화면 뒤의 식이 그 셋뿐인지 본다.
+
+#### 주문서 화면(2026-11-13 실측)
+
+옵션 없는 500원 상품 하나로 쟀고 결제는 하지 않았다. 칸 위치는 상품 화면처럼 `fields.ts` 에 모으고 비면 지어내지 않는다.
+
+| 무엇 | 실측 | 쓰임 |
+| --- | --- | --- |
+| 주소 | `https://orders.pay.naver.com/ordersheet/seller/<UUID>`, 제목 「주문/결제」 | 호스트와 `/ordersheet/` 경로로 주문서인지 가린다 |
+| 화면 틀 | Next.js pages router. `__NEXT_DATA__` 는 261자뿐이고 금액이 든 상태 전역이 없다. CSS module 클래스라 뒤에 해시가 붙는다 | 금액은 화면 요소에서 읽는다. 선택자는 접두(`[class*="ProductPrice_total"]`)로 쓰고 해시를 적지 않는다 |
+| 최종 결제 금액 | `dl[class*="ProductPrice_total"]` 안의 `dd[class*="ProductPrice_desc-total"]`(「3,300원」) | 첫째 금액 |
+| 결제수단 절 머리 | `#PAYMENT_WRAP` 안 `[class*="ContentSection_summary"] em` 에 같은 금액 | 둘째 금액. 두 값이 같을 때만 최종 금액으로 본다. 다르거나 비면 결과를 모르는 것이다 |
+| 금액의 구성 | 상품 500 → 400원(쿠폰 자동 적용), 배송비 2,900원, 총 주문금액 3,300원. 상품 상태의 `salePrice` 는 500 | 예상 합계를 판매가로 잡으면 최종 금액이 작거나 같아 결과 판정을 지난다. 할인이 상품 상태의 어느 칸에 있는지는 재지 않았다 |
+
+**금지 선택자**: 결제 단추 `div[class*="SubmitButton_area-button"] > button[class*="SubmitButton_button-pay"]`(굴러가는 숫자 묶음 `Counter_*` 가 들어 있어 글을 금액으로도 읽지 않는다)와 결제수단 절의 `button[class*="NpayMoneyPromotionBanner"]`(결제로 이어질 수 있다). 이 선택자의 이름 조각(`SubmitButton`, `NpayMoneyPromotionBanner`)은 플러그인 소스에 없고 검사의 금지 목록에만 있다.
+주문서에는 이름, 주소, 전화번호가 있다. 금액 식은 두 금액 정수만 돌려주고, 도구 결과와 로그에 화면 글을 싣지 않는다.
+
+상품 구매 층과 층 안의 옵션·수량 칸은 아직 재지 않았다(잰 상품은 옵션이 없었고 두 단추는 요소의 `click()` 으로 넘어갔다). 단추는 보이는 `button` 가운데 글이 정확히 「구매하기」, 「바로구매」 인 것을 고르고, 층은 「바로구매」 단추를 가진 가장 가까운 대화상자나 층 요소로 본다. 옵션은 층 안의 `aria-haspopup="listbox"` 단추를 단계 차례로 열어 `role="option"` 가운데 글이 옵션 글과 같거나 옵션 글과 「 (」·공백으로 이어지는 것 하나를 고른다. 수량은 층 안의 숫자 입력 칸에 값을 넣고 다시 읽는다. 수량 칸을 찾지 못하면 수량 1 만 받는다(층의 기본값이 1 이다).
 
 #### 채우기 결과
 
@@ -485,8 +517,8 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 주문서까지 갔다 | `ORDER_SHEET_READY`, 최종 금액, 탭 | 아래 「결과 판정」 | 아래 「결과 판정」 |
 | claim 전에 사람이 해야 하는 화면 | `HUMAN_ACTION_REQUIRED` 와 `handoff`(PR2 계약) | `FAILED` | 그 종류(`login` 등) |
 | claim 전 실패(가격 오름, 품절, claim 거절) | 선언된 오류 | `FAILED` | 없음. 탭을 닫는다 |
-| claim 뒤 옵션이나 수량을 못 맞춤(구매하기 전) | 선언된 오류와 세부 | `FAILED` | 없음. 탭을 닫는다 |
-| 구매하기를 누른 뒤 주문서를 확인하지 못함, 시간 초과 | `{status: "UNKNOWN", tab}` | `UNKNOWN` | `tab_check` |
+| claim 뒤 층의 옵션이나 수량을 못 맞춤(바로구매 전) | 선언된 오류(`NAVER_SHOPPING_CHECKOUT_FAILED`) | `FAILED` | 없음. 탭을 닫는다 |
+| 구매하기 뒤 층도 주문서도 보이지 않음, 바로구매를 보낸 뒤 주문서나 금액을 확인하지 못함, 시간 초과 | `{status: "UNKNOWN", tab}` | `UNKNOWN` | `tab_check` |
 | 응답을 잃음 | 없음 | claim 을 소비했으면 `UNKNOWN`, 아니면 `FAILED`(지금 규칙) | `UNKNOWN` 이면 `tab_check`. 탭은 비어 있다 |
 
 `UNKNOWN` 은 다시 보내지 않는다. 같은 의도의 `UNKNOWN` 은 지금 규칙대로 새 준비를 막고, 모델에게는 「내 브라우저」 의 탭을 확인해 달라고 안내하라고 준다(spec DECISION33).
@@ -559,7 +591,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | --- | --- | --- |
 | REQ9 | Control Plane, 웹 | 상한 API 의 주인 한정, 0 이상 정수 검사, 잠금 뒤 쓰기. 기본 0 에서 준비가 「상한을 정해 주세요」 로 거절(PR3b). 연결 화면이 `PURCHASE` 도구가 있는 연결에만 두 칸을 보이는지 |
 | REQ10 | Control Plane, 대시보드, 플러그인, 웹 | `CHECKOUT` 준비 결과의 정확한 키·합계·대조 검증(Java 와 Python 이 같은 사례 표). 카드를 만들 때와 승인 순간의 상한. 상시 허락과 대화 허락이 없는지. 카드가 배송지·결제 수단 칸 없이 요약과 남은 한도, 「지역 추가 배송비 별도」 를 보이는지 |
-| REQ11 | 플러그인, Control Plane | 가짜 CDP 와 가짜 상품·주문서 화면으로 채우기 순서(가격 확인 → claim → 옵션 → 구매하기 → 주문서 금액). claim 거절이면 구매하기를 누르지 않는지. 식 상수와 명령 기록에 결제 단추 경로가 없는지. 결과 불명이 `UNKNOWN` 과 `tab_check` 가 되고 다시 부르지 않는지 |
+| REQ11 | 플러그인, Control Plane | 가짜 CDP 와 가짜 상품·층·주문서 화면으로 채우기 순서(가격 확인 → claim → 구매하기 → 층의 옵션·수량 → 바로구매 → 주문서 금액). 같은 탭과 새 탭. claim 거절이면 구매하기를 누르지 않는지. 식 상수와 명령 기록에 결제 단추 경로가 없는지. 결과 불명이 `UNKNOWN` 과 `tab_check` 가 되고 다시 부르지 않는지 |
 | REQ12 | Control Plane, 웹 | 결과 판정 표의 세 경우(같거나 작음, 1원 큼, 상한 낮춤). `payment` 카드가 두 금액을 보이는지 |
 | REQ13 | Control Plane | 사람이 없는 트리에서 준비 도구가 `ATTENDED_ONLY` 거절 줄을 남기고 금융 준비를 부르지 않는지. 사람이 연 대화의 흐름(DECISION32)은 넘어가는지 |
 
