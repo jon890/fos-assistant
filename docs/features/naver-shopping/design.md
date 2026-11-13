@@ -369,7 +369,7 @@ PR3 는 운영 코드 줄 상한(`scripts/pr/pr-size.mjs`)을 넘어 세 PR 로 
 
 | PR | 담는 것 | 요구사항 | 이 PR 만 머지됐을 때 |
 | --- | --- | --- | --- |
-| PR3a | 이 절과 ADR, 위험도 `PURCHASE`, 구매 상한 컬럼 둘과 화면 API·화면, 사람이 없는 실행의 거절을 금융 준비 가로채기 앞으로 | REQ9, REQ13 | `PURCHASE` 도구를 선언한 플러그인이 없어 상한 칸이 보이지 않는다. 바뀐 동작은 사람이 없는 실행이 준비 도구를 부를 때 줄 없는 막힘 대신 `ATTENDED_ONLY` 거절 줄이 남는 것뿐이다 |
+| PR3a | 이 절과 ADR, 위험도 `PURCHASE`, 구매 상한 컬럼 둘과 화면 API·화면, 사람이 없는 실행의 거절을 금융 준비 가로채기 앞으로 | REQ9, REQ13 | `PURCHASE` 도구를 선언한 플러그인이 없어 상한 칸이 보이지 않는다. `attended_only` 준비 도구를 선언한 플러그인도 아직 없어(토스는 아니다) 운영 동작은 바뀌지 않는다 |
 | PR3b | Control Plane 과 대시보드의 주문서 종류(`CHECKOUT`). 준비 결과 검증, 상한 판정 넷, 결과 판정, `payment` 와 `tab_check` 넘기기 | REQ10~REQ12 의 서버 쪽 | 그 종류를 내는 플러그인이 없어 운영 동작이 같다 |
 | PR3c | 플러그인의 준비·채우기 도구와 옵션 드롭다운 열기, 웹의 주문서 승인 카드와 결제 넘기기 카드, 기능 파일의 실제 계정 확인 절차 | REQ10~REQ12 의 플러그인과 화면 | 기능이 열린다. 사용자가 상한을 0 보다 크게 정해야 카드가 뜬다 |
 
@@ -392,6 +392,19 @@ PR3 는 운영 코드 줄 상한(`scripts/pr/pr-size.mjs`)을 넘어 세 PR 로 
 | 금융 관문 | keyed hash key 와 같은 의도 검사는 그대로 지난다. 계좌 허용 목록과 주문 상한은 보지 않고 아래 「구매 상한」 이 대신한다 |
 
 검증하는 자리는 Control Plane 의 `ConnectorExecutionGuard` 와 대시보드의 `connector_guard_validation.py` 둘이고 같은 규칙을 갖는다. ticket, claim 인증, 지원 확인(`bind.guard`), manifest SHA 대조는 바꾸지 않는다.
+
+PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실행 거절만 더했다. PR3b 가 `PURCHASE` 승인 줄을 만들기 시작하면 지금 `FINANCIAL` 만 보는 아래 분기를 함께 넓힌다. 빠뜨리면 구매 줄이 일반 승인 경로(허락 가능)를 타거나 암호화가 꺼진 상태에서 평문으로 저장된다.
+
+| 자리 | 지금 `FINANCIAL` 만 보는 것 |
+| --- | --- |
+| `ConnectorActionBodies` | 암호화가 꺼지면 금융 줄만 막는다 |
+| `ConnectorActionService` | 금융 승인으로 보내고 허락을 거절한다 |
+| `ConnectorFinancialIntake.owns` | 같은 키의 줄을 금융 준비가 맡는다 |
+| `ConnectorExecutionGuard`, 대시보드 `connector_guard.py`, `connector_prepare.py` | 보호 선언 `operations` 의 위험도 |
+| `ConnectorExecutionSnapshot`, `ConnectorExecutionCurrent` | 승인 줄과 선언의 위험도 대조 |
+| `ConnectorConversationActionPurge` | 대화 삭제 때 하루 합계에 필요한 본문을 남긴다 |
+| `ConnectorActionController`, `ConnectorFinancialSummaries` | 금융 요약을 붙이는 줄 |
+| 웹 `financial-summary.tsx` | 금융 카드로 그리는 줄 |
 
 ### 도구(PR3c)
 
@@ -550,9 +563,9 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | DECISION5 | 사람이 없는 실행을 막는 방법 | 범용 도구 칸 `attended_only` 와 Control Plane 판정. 표식은 turn 을 열 때 실행 줄에 적는다 | 작성자 | 판정은 Control Plane 이 한다(ADR-049). 플러그인과 plugin 은 서비스와 실행 종류를 모른다(rule-65). `task_run` 은 도는 중에 실행 번호가 없고 connector 가 읽으면 순환이 생긴다 |
 | DECISION6 | 영어 요지 검사의 대상 | 새 플러그인만. 기존 세 플러그인은 늘리지 않는 예외 목록 | 작성자 | 토스는 manifest SHA 가 바뀌어 금융 승인이 무효가 되고, Gmail 과 블로그는 설명이 모델 지시문이라 따로 확인해야 한다 |
 | DECISION7 | 읽기 탭의 대화상자 | 우리가 연 탭에서만 닫기로 넘긴다. 사람이 쓰는 탭은 건드리지 않는다 | 작성자 | 읽기 탭은 사람이 보지 않는다. 사람 탭의 확인 창은 PR2 가 화면에 보인다 |
+| DECISION8 | 결정 기록 | 루트 `docs/adr/ADR-20261110-naver-shopping-connector.md` 하나. 브라우저 화면을 읽는 쇼핑 플러그인과 `attended_only` 의 선택 이유를 갖는다 | 작성자 | 플러그인(hermes)과 판정(backend)에 걸쳐 루트에 둔다(ADR 배치 규칙) |
 | DECISION9 | 검색 결과를 내려 더 읽는지 | 내리지 않는다. 처음 실린 상태 JSON 만 읽는다 | 작성자 | 내려서 실리는 상품은 상태 JSON 에 들어가지 않는다. 다른 출처(DOM, 응답 가로채기)을 섞으면 칸 위치 가설이 두 벌이 된다. spec DECISION19 를 같이 고쳤다 |
 | DECISION10 | 플러그인이 여는 주소 | 「주소 분류」 의 `store`, `catalog` 만 탭을 연다 | 작성자 | 모델이 준 주소로 로그인된 브라우저가 아무 사이트나 열지 않게 한다 |
-| DECISION8 | 결정 기록 | 루트 `docs/adr/ADR-20261110-naver-shopping-connector.md` 하나. 브라우저 화면을 읽는 쇼핑 플러그인과 `attended_only` 의 선택 이유를 갖는다 | 작성자 | 플러그인(hermes)과 판정(backend)에 걸쳐 루트에 둔다(ADR 배치 규칙) |
 | DECISION11 | 화면 넘기기의 결과 전달 경로 | (c) fos-ctx `transform_tool_result` hook 이 플러그인 결과의 `handoff` 칸을 서명해 Control Plane 에 알린다 | 작성자 | 모델과 플러그인에 기대지 않는다. (a) 답 끝 태그는 모델이 빠뜨리면 카드가 뜨지 않아 REQ7 을 보장하지 못한다. (b) 플러그인이 직접 알리려면 중계 밖의 운영 주소와 인증이 플러그인에 들어가 `operator_env` 금지(ADR-064)와 부딪친다. hook 은 이미 같은 토큰과 서명으로 판정을 묻고 있다. hook 이 실패하면 카드가 없지만 모델은 결과의 안내 글로 안내한다 |
 | DECISION12 | 넘기기 칸의 선언 | `assistant.json` 에 선언하지 않고 플러그인 결과에만 싣는다. Control Plane 은 어휘와 모양, 같은 호출의 판정 줄만 본다 | 작성자 | 결과를 만드는 것은 플러그인 소스다. 선언에 두면 대시보드 검증과 카탈로그 전달을 함께 늘려야 한다. 플러그인이 틀린 `need` 를 내면 받지 않아 카드가 없을 뿐이다 |
 | DECISION13 | 넘기기를 둘 자리 | 같은 호출의 판정 줄(`connector_action`)에 칸 넷 | 작성자 | 테이블을 늘리지 않는다. 판정 줄이 이미 사용자, 에이전트, 대화, 실행, 플러그인을 갖고 dedupe key 로 hook 의 호출과 하나로 맞는다 |
@@ -562,7 +575,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | DECISION17 | 확인 창(#702) | 플러그인이 읽는 탭은 닫기로 넘기고, 그 밖의 탭은 화면이 창을 보이고 사람이 고른다 | 사용자 2026-11-10(방향), 작성자(나눔) | 읽는 탭은 사람이 보지 않고, 넘긴 탭은 사람의 탭이다. 플러그인이 넘긴 탭의 창을 누르지 않는다 |
 | DECISION18 | 주문서 승인의 틀 | 금융 보호 선언(`execution_guard`)과 준비·승인·ticket·claim 을 그대로 쓰고 종류 `CHECKOUT` 을 더한다 | 작성자 | 서버가 만든 요약 카드, 승인 때와 실행 직전의 다시 판정, 한 번 실행, 결과 불명의 `UNKNOWN` 이 이미 그 틀에 있다. 새 길을 두면 같은 보호를 두 벌 만든다 |
 | DECISION19 | 채우기 도구의 위험도 | 새 위험도 `PURCHASE` | 사용자 2026-11-13 | 하루 합계와 연결 화면의 상한 칸이 위험도로 줄을 고른다. `FINANCIAL` 을 쓰면 토스 합계와 칸에 섞인다 |
-| DECISION22 | 주문서 준비의 개방 조건 | 사용자 두 상한이 0 보다 크고 금융 관문의 keyed hash key 를 읽을 수 있으면 열린다. 계좌 허용 목록과 운영 스위치는 없다 | 사용자 2026-11-13 | 결제는 사람이 하고 기본 0 이 이미 닫힌 상태다(spec DECISION31 과 같은 근거) |
-| DECISION23 | 결정 기록 | 루트 `docs/adr/ADR-20261113-purchase-checkout.md` 하나. 구매 경계(spec DECISION8~10), 위험도 `PURCHASE`, 개방 조건, 옵션 드롭다운 열기 예외를 갖는다 | 작성자 | backend, hermes, 웹에 걸쳐 루트에 둔다 |
 | DECISION20 | 결제 직전 다시 판정의 자리 | 플러그인이 최종 금액을 결과로 내고 Control Plane 의 결과 판정이 예상 합계와 지금 상한에 견준다 | 작성자 | 지금 상한과 오늘 합계는 Control Plane 만 안다. claim 응답 모양을 바꾸지 않는다 |
 | DECISION21 | 옵션 드롭다운을 닫는 식 | 두지 않는다. 읽기 탭은 정상으로 끝나면 탭째 닫는다 | 작성자 | 닫기 식을 더하면 누르기 식이 둘이 된다. 연 상태는 탭과 함께 사라진다 |
+| DECISION22 | 주문서 준비의 개방 조건 | 사용자 두 상한이 0 보다 크고 금융 관문의 keyed hash key 를 읽을 수 있으면 열린다. 계좌 허용 목록과 운영 스위치는 없다 | 사용자 2026-11-13 | 결제는 사람이 하고 기본 0 이 이미 닫힌 상태다(spec DECISION31 과 같은 근거) |
+| DECISION23 | 결정 기록 | 루트 `docs/adr/ADR-20261113-purchase-checkout.md` 하나. 구매 경계(spec DECISION8~10), 위험도 `PURCHASE`, 개방 조건, 옵션 드롭다운 열기 예외를 갖는다 | 작성자 | backend, hermes, 웹에 걸쳐 루트에 둔다 |
