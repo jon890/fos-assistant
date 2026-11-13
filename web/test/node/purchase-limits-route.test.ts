@@ -83,6 +83,9 @@ async function callRoute(
   dependencies["@/lib/purchase-limits-route"] = await load(
     "../../src/lib/purchase-limits-route.ts",
   );
+  dependencies["@/lib/checkout-summary-route"] = await load(
+    "../../src/lib/checkout-summary-route.ts",
+  );
   dependencies["@/lib/connector-action-route"] = await load(
     "../../src/lib/connector-action-route.ts",
   );

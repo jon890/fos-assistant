@@ -1,7 +1,19 @@
-import {
-  UNAVAILABLE_CHECKOUT,
-  type CheckoutSummary,
-} from "./checkout-summary.ts";
+import type { CheckoutSummary } from "@/lib/checkout-summary";
+
+/** 열지 못한 줄. 나머지 칸이 비고 카드는 승인 단추를 그리지 않는다. Node 테스트가 이 파일만 읽어 값은 여기에 둔다. */
+const UNAVAILABLE_CHECKOUT: CheckoutSummary = {
+  available: false,
+  title: null,
+  store: null,
+  options: [],
+  quantity: null,
+  itemAmountKrw: null,
+  shippingFeeKrw: null,
+  expectedTotalKrw: null,
+  regionalExtraFee: null,
+  url: null,
+  remainingTodayKrw: null,
+};
 
 /** 원 단위 금액이다. 0 이상 10억 미만 정수만 받는다. Control Plane 의 주문서 검증과 같은 범위다. */
 function won(value: unknown): number {

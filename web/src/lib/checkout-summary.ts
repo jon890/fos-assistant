@@ -19,17 +19,3 @@ export type CheckoutSummary = {
   url: string | null;
   remainingTodayKrw: number | null;
 };
-
-export const UNAVAILABLE_CHECKOUT: CheckoutSummary = {
-  available: false,
-  title: null,
-  store: null,
-  options: [],
-  quantity: null,
-  itemAmountKrw: null,
-  shippingFeeKrw: null,
-  expectedTotalKrw: null,
-  regionalExtraFee: null,
-  url: null,
-  remainingTodayKrw: null,
-};

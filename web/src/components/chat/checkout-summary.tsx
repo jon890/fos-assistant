@@ -78,9 +78,9 @@ export function CheckoutSummaryView({ summary }: { summary: CheckoutSummary }) {
         </a>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        승인하면 「내 브라우저」 에서 네이버 주문서까지 채워요. 결제는 주문서
-        탭에서 직접 해 주세요. 주문서의 금액이 예상 합계보다 크면 넘기지 않고
-        알려 드려요.
+        승인하면 「내 브라우저」 에서 주문서까지 채워요. 결제는 주문서 탭에서
+        직접 해 주세요. 주문서의 금액이 예상 합계보다 크면 넘기지 않고 알려
+        드려요.
       </p>
       {over ? (
         <Notice variant="warning" role="status">
