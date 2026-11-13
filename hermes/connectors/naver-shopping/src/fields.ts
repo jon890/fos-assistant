@@ -2,7 +2,8 @@
  * 네이버 화면의 상태 JSON 에서 칸을 찾는 위치다.
  *
  * **검색 화면은 2026-11-13 실제 화면으로 쟀다.** App Router 의 조각(`self.__next_f.push`)을 이은 글에서 `productName` 을 가진
- * 객체를 꺼내고, 그 칸 이름이 아래 `SEARCH_ITEM` 이다. 상품 화면(`PRODUCT_STATE_PATH`, `PRODUCT`)과 가격비교 묶음 화면
+ * 객체를 꺼내고, 그 칸 이름이 아래 `SEARCH_ITEM` 이다. **상품 화면(`PRODUCT_STATE_PATH`, `PRODUCT`)도 2026-11-13 실제 화면으로
+ * 쟀다**(옵션 칸 제외: 잰 상품이 모두 `optionUsable: false` 라 옵션 칸 이름은 가설이다). 가격비교 묶음 화면
  * (`CATALOG_STATE_PATH`, `CATALOG`)은 **아직 실제 화면으로 확인하지 않은 가설이다.**
  * 칸마다 후보 이름을 차례로 보고, 필수 칸이 비면 결과를 지어내지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다.
  * 사용자가 실제 계정으로 확인한 뒤 이 표만 고친다(docs/features/naver-shopping.md 의 「실제 계정으로 확인하기」).
@@ -15,8 +16,12 @@ export const CATALOG_STATE_PATH = [
   "initialState",
   "catalog",
 ];
-/** 스마트스토어·브랜드스토어 상품 화면의 `window.__PRELOADED_STATE__` 에서 상품까지의 경로. */
-export const PRODUCT_STATE_PATH = ["product", "A"];
+/**
+ * 스마트스토어·브랜드스토어 상품 화면의 `window.__PRELOADED_STATE__` 에서 상품까지의 경로(2026-11-13 실측).
+ * 같은 상태의 `product` 는 칸만 있고 값이 비어 있다(`name` 없음, `salePrice` 0). 옛 후보 `product.A` 를 남기면 그 빈 객체를
+ * 상품으로 오인할 수 있어 후보에 두지 않는다.
+ */
+export const PRODUCT_STATE_PATH = ["simpleProductForDetailPage"];
 
 /**
  * 검색 결과 항목 하나(2026-11-13 실측). 고정 식이 상품 객체에서 이 칸들만 골라 평평한 배열로 준다.
@@ -35,16 +40,19 @@ export const SEARCH_ITEM = {
 /** 광고 카드의 `cardType` 값. */
 export const AD_CARD_TYPE = "AD";
 
-/** 상품 화면의 상품. */
+/**
+ * 상품 화면의 상품. 실측한 칸: `name`(표시용 `dispName` 도 같은 값으로 실측했다), `channel.channelName`, `salePrice`, `benefitsView.discountedSalePrice`,
+ * `productStatusType`, `optionUsable`, `productDeliveryInfo.{deliveryFeeType, baseFee, area2ExtraFee}`.
+ * 실측하지 못한 칸(옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
+ */
 export const PRODUCT = {
-  title: ["name", "productName"],
-  store: [["channel", "channelName"], ["channelName"]],
+  title: ["name", "dispName"],
+  store: [["channel", "channelName"]],
   salePrice: ["salePrice"],
-  discountedPrice: [
-    ["benefitsView", "discountedSalePrice"],
-    ["discountedSalePrice"],
-  ],
-  status: ["statusType", "productStatusType"],
+  discountedPrice: [["benefitsView", "discountedSalePrice"]],
+  status: ["productStatusType"],
+  /** false 면 옵션이 없는 상품이다. */
+  optionUsable: ["optionUsable"],
   optionGroups: ["options"],
   groupName: ["groupName", "optionName"],
   combinations: ["optionCombinations"],
@@ -52,10 +60,14 @@ export const PRODUCT = {
   combinationPrice: ["price"],
   combinationStock: ["stockQuantity"],
   delivery: ["productDeliveryInfo"],
-  baseFee: ["baseFee", "deliveryFee"],
+  feeType: ["deliveryFeeType"],
+  baseFee: ["baseFee"],
   freeOver: ["freeConditionalAmount"],
-  regional: ["deliveryFeeByArea", "areaFee", "differentialFeeByArea"],
+  /** 지역 추가 배송비. 0 보다 커야 추가 배송비가 있는 것으로 본다. */
+  regional: ["area2ExtraFee", "area3ExtraFee"],
 };
+/** `deliveryFeeType` 의 무료 값. */
+export const FREE_DELIVERY = "FREE";
 /** 바로 살 수 있는 상품 상태 값. */
 export const SALE_STATUS = "SALE";
 

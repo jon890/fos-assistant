@@ -114,7 +114,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 집합(준비 상태 묻기, 화면 분류, 상태 JSON 꺼내기)뿐이다. 누르기, 입력, 이동하는 식은 이 집합에 없다.
 
-**검색 화면은 2026-11-13 실제 화면으로 쟀다.** 상품 화면과 가격비교 묶음 화면의 칸 위치는 아직 실제 네이버 화면으로 확인하지 않은 가설이다. PR1 은 실제 계정과 사용자 브라우저를 쓰지 못했다.
+**검색 화면과 상품 화면은 2026-11-13 실제 화면으로 쟀다**(상품 화면의 옵션 칸 제외). 가격비교 묶음 화면의 칸 위치는 아직 실제 네이버 화면으로 확인하지 않은 가설이다. PR1 은 실제 계정과 사용자 브라우저를 쓰지 못했다.
 그래서 칸 위치를 파서의 표 하나(`fields.ts`)에 모으고, 표의 칸이 하나라도 비면 결과를 지어내지 않고 `PAGE_CHANGED` 로 끝낸다.
 실패하면 표준 오류에 칸 이름과 단계만 남는 진단 줄을 쓴다(블로그의 진단 줄과 같은 제한: 주소, 검색어, 화면 글을 싣지 않는다).
 사용자가 기능 파일의 「실제 계정으로 확인하기」 를 돌아 표를 맞춘다. 첫 확인에서 표가 틀릴 가능성이 높았고, 검색 화면은 실제로 틀려 아래대로 고쳤다.
@@ -135,6 +135,23 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 네이버페이 여부는 이 화면에서 확실한 칸을 찾지 못해 `unknown` 으로 둔다. 정상 화면에도 `window.__ncaptcha` 가 있어 캡차 판정은 보이는 요소만 본다.
 옛 `__NEXT_DATA__` 의 `props.pageProps.initialState.products.list` 경로는 실측 전 가설이었고 실제 화면에는 없어 지웠다. 가격비교 묶음 화면은 아직 `__NEXT_DATA__` 를 읽는다.
+
+#### 상품 화면 읽기(2026-11-13 실측)
+
+상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 검색 결과의 `/main/products/<번호>` 주소는 열면 실제 스토어 주소(`/<스토어>/products/<번호>`)로 넘어가고, 로그인하지 않은 브라우저는 네이버 로그인 화면으로 간다(그 경우는 로그인 넘기기다). 같은 상태의 `product` 는 칸만 있고 값이 비어 있다(`name` 없음, `salePrice` 0). 옛 가설 `product.A` 는 그 빈 객체를 상품으로 오인할 수 있어 후보로 남기지 않았다.
+
+| 칸 | 실측 | 쓰임 |
+| --- | --- | --- |
+| `name`, `dispName` | 이름(둘 다 실측, `name` 을 먼저 본다) | 제목 |
+| `channel.channelName` | 판매처 | 판매처 |
+| `salePrice`, `benefitsView.discountedSalePrice` | 정가, 할인가(숫자) | 할인가가 있으면 할인가, 없으면 정가 |
+| `productStatusType` | `SALE` 이면 바로 살 수 있다 | `naver_pay_buy` |
+| `optionUsable` | 불린. `false` 면 옵션 칸이 없다 | `false` 면 옵션 없음 |
+| `productDeliveryInfo.deliveryFeeType` | `PAID` 또는 `FREE` | `FREE` 면 배송비 0 |
+| `productDeliveryInfo.baseFee` | 기본 배송비(숫자) | 배송비 |
+| `productDeliveryInfo.area2ExtraFee` | 제주 등 지역 추가 배송비. 있을 때만 | 0 보다 크면 지역 추가 배송비 있음 |
+
+실측하지 못한 것은 후보 이름으로만 두고 없으면 지어내지 않는다. 옵션이 있는 상품(`optionUsable: true`)의 옵션 묶음과 조합 칸 이름(`options`, `optionCombinations` 등), 무료 배송 조건 금액(`freeConditionalAmount`), 그 밖의 지역 추가 배송비 이름(`area3ExtraFee`)이 그렇다. 지역 추가 배송비는 후보마다 보고 하나라도 0 보다 크면 있다고 본다. `optionUsable` 이 `true` 인데 옵션 칸을 못 찾으면 옵션은 빈 목록이다.
 
 ### 화면 분류(PR1, PR2 가 다시 씀)
 

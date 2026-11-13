@@ -1,4 +1,4 @@
-import { CATALOG, PRODUCT, SALE_STATUS } from "./fields.ts";
+import { CATALOG, FREE_DELIVERY, PRODUCT, SALE_STATUS } from "./fields.ts";
 import { STORE_MAX, TITLE_MAX } from "./parse-search.ts";
 import { classifyUrl } from "./urls.ts";
 import { list, pick, text, won, yes, type Json } from "./values.ts";
@@ -25,6 +25,9 @@ export class MissingFields extends Error {
  * 재고가 0)을 싣는다. 둘째 묶음부터는 값의 이름만 싣는다. 고른 조합의 금액과 재고는 주문서 준비가 다시 읽는다.
  */
 function options(product: Json) {
+  // 옵션을 쓰지 않는 상품(실측)은 옵션 칸이 아예 없다. true 인데 칸을 못 찾으면 지어내지 않고 빈 목록으로 둔다.
+  if (pick(product, PRODUCT.optionUsable) === false)
+    return { options: [], truncated: false };
   const groups = list(pick(product, PRODUCT.optionGroups)).slice(
     0,
     OPTION_GROUPS_MAX,
@@ -84,6 +87,7 @@ export function parseStoreProduct(product: Json, url: string) {
   ];
   if (missing.length) throw new MissingFields(missing);
   const { options: groups, truncated } = options(product);
+  const free = pick(delivery, PRODUCT.feeType) === FREE_DELIVERY;
   return {
     kind: "store" as const,
     url,
@@ -93,9 +97,11 @@ export function parseStoreProduct(product: Json, url: string) {
     options: groups,
     ...(truncated ? { options_truncated: true } : {}),
     shipping: {
-      fee_krw: won(pick(delivery, PRODUCT.baseFee)) ?? 0,
-      free_over_krw: won(pick(delivery, PRODUCT.freeOver)),
-      regional_extra: pick(delivery, PRODUCT.regional) !== undefined,
+      fee_krw: free ? 0 : (won(pick(delivery, PRODUCT.baseFee)) ?? 0),
+      free_over_krw: free ? null : won(pick(delivery, PRODUCT.freeOver)),
+      regional_extra: PRODUCT.regional.some(
+        (key) => (won(pick(delivery, [key])) ?? 0) > 0,
+      ),
     },
     naver_pay_buy: pick(product, PRODUCT.status) === SALE_STATUS,
   };

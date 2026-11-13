@@ -54,7 +54,7 @@ test("스토어 상품은 상품 식으로, 묶음은 묶음 식으로 정리한
       value: {
         name: "물티슈",
         salePrice: 1000,
-        statusType: "SALE",
+        productStatusType: "SALE",
         productDeliveryInfo: { baseFee: 0 },
       },
     }),

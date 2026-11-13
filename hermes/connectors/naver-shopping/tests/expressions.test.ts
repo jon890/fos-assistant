@@ -179,11 +179,19 @@ test("묶음 식은 묶음 상태를 꺼낸다", () => {
 test("상품 식은 상태가 있는지와 상품을 함께 주고, 상태가 없으면 null 이다", () => {
   expect(
     JSON.parse(
-      run(PRODUCT_STATE, { preloaded: { product: { A: { name: "x" } } } }),
+      run(PRODUCT_STATE, {
+        preloaded: {
+          product: { salePrice: 0 },
+          simpleProductForDetailPage: { name: "x" },
+        },
+      }),
     ),
   ).toEqual({ present: true, value: { name: "x" } });
+  // 비어 있는 product 칸만 있으면 상품이 없는 것이다.
   expect(
-    JSON.parse(run(PRODUCT_STATE, { preloaded: { product: {} } })),
+    JSON.parse(
+      run(PRODUCT_STATE, { preloaded: { product: { salePrice: 0 } } }),
+    ),
   ).toEqual({ present: true, value: null });
   expect(run(PRODUCT_STATE, {})).toBeNull();
 });
