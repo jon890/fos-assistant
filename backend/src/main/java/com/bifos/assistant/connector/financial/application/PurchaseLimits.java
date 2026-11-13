@@ -19,8 +19,8 @@ import org.springframework.stereotype.Component;
 /**
  * 구매 상한 판정과 오늘 승인한 합계를 계산하는 한 곳이다(ADR-20261113 / purchase-checkout).
  *
- * <p>판정하는 때(카드를 만들 때, 승인 순간, 채우기 직전, 결과 판정)는 {@code docs/features/naver-shopping/design.md} 의
- * 「상한을 보는 때」 가 갖는다. 부르는 쪽은 같은 트랜잭션에서 그 사용자의 {@code app_user} 행을 먼저 잠근다. 상한을 바꾸는 쪽도
+ * <p>판정하는 때(카드를 만들 때, 승인 순간, 채우기 직전, 결과 판정)는 {@code docs/adr/ADR-20261113-purchase-checkout.md} 가 가리키는
+ * 기능 설계가 갖는다. 부르는 쪽은 같은 트랜잭션에서 그 사용자의 {@code app_user} 행을 먼저 잠근다. 상한을 바꾸는 쪽도
  * 같은 행을 잠그므로 판정은 그 순간에 커밋된 상한을 본다. 트랜잭션 표시를 두지 않는다. 승인과 결과 판정이 거절을 받아
  * 같은 트랜잭션에서 줄을 {@code FAILED} 로 끝내야 하는데, 표시가 있으면 거절이 그 트랜잭션을 롤백 전용으로 만든다. 토스 주문 상한({@link FinancialOrderLimits})과 줄도 합계도 섞지 않는다.
  */

@@ -1,6 +1,6 @@
 /**
  * 사람이 해야 하는 단계다. Control Plane 의 `HandoffNeed` 와 같은 목록이다. `PAYMENT` 와 `TAB_CHECK` 는 플러그인이 아니라 주문서 채우기의
- * 결과 판정이 적는다(`docs/features/naver-shopping/design.md` 의 「넘기기 어휘 더하기」).
+ * 결과 판정이 적는다(`docs/adr/ADR-20261113-purchase-checkout.md`).
  */
 export type HandoffNeed =
   | "LOGIN"

@@ -8,7 +8,7 @@ import java.util.Optional;
  *
  * <p>어휘는 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 웹의 {@code handoff.ts} 가 같은 목록과 제목을
  * 쓰고, fos-ctx 의 {@code handoff.py} 는 플러그인이 낼 수 있는 단계만 쓴다. 결제와 탭 확인은 금융 승인의 결과 판정이 직접 적는다
- * ({@code docs/features/naver-shopping/design.md} 의 「넘기기 어휘 더하기」). 플러그인 알림으로는 받지 않는다.
+ * ({@code docs/adr/ADR-20261113-purchase-checkout.md}). 플러그인 알림으로는 받지 않는다.
  */
 public enum HandoffNeed {
     LOGIN("login", "「내 브라우저」에서 로그인해 주세요", true),

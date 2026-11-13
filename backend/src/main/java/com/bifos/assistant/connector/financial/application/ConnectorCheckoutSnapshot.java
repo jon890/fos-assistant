@@ -15,7 +15,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * 주문서 준비({@code CHECKOUT})의 표시와 모델·실행 인자를 검증한다(ADR-20261113 / purchase-checkout). 저장과 암호화는 snapshot 이 맡는다.
  *
- * <p>칸과 범위는 {@code docs/features/naver-shopping/design.md} 의 「도구(PR3c)」 가 갖는다. 대시보드의
+ * <p>칸과 범위는 {@code docs/adr/ADR-20261113-purchase-checkout.md} 가 가리키는 기능 설계가 갖는다. 대시보드의
  * {@code connector_guard_validation.py} 가 같은 규칙으로 먼저 본다. 서비스 이름을 모르므로 주소는 모양만 본다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

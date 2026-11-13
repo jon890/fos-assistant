@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * 주문서 채우기({@code CHECKOUT})의 결과를 판정해 {@code EXECUTING} 승인 줄을 끝내고 사람에게 넘길 화면을 적는다(ADR-20261113 / purchase-checkout).
  *
- * <p>표는 {@code docs/features/naver-shopping/design.md} 의 「결과 판정」 과 「채우기 결과」 가 갖는다. 부르는 쪽은 사용자, 승인 줄,
+ * <p>판정 표는 {@code docs/adr/ADR-20261113-purchase-checkout.md} 가 가리키는 기능 설계가 갖는다. 부르는 쪽은 사용자, 승인 줄,
  * 실행 줄 순서로 이미 잠갔어야 한다. 플러그인 결과는 정확한 키와 타입으로 읽고 어긋나면 결과를 모르는 것으로 본다. 저장하는 글은
  * Control Plane 이 정한 JSON 이고 플러그인의 글을 싣지 않는다. 결과를 모르면 다시 보내지 않고 탭 확인을 넘긴다(spec DECISION33).
  */
