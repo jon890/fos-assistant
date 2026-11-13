@@ -113,7 +113,7 @@ connector 가 `task` 의 저장소를 읽지 않는 까닭은 `task` 가 이미 
 
 상태 JSON 은 서버가 처음 그린 데이터라 아래로 내려 더 실리는 상품은 들어 있지 않다. 그래서 내리지 않고 처음 실린 상품만 40개까지 돌려준다(spec DECISION19 를 이렇게 고쳤다). 40개보다 적을 수 있다. 다음 페이지 주소로 가지 않는다.
 
-탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 집합(준비 상태 묻기, 화면 분류, 상태 JSON 꺼내기)뿐이다. 누르기, 입력, 이동하는 식은 이 집합에 없다.
+탭에서 부르는 `Runtime.evaluate` 의 식은 `expressions.ts` 의 상수 집합뿐이다. 읽기 도구가 부르는 것은 준비 상태 묻기, 화면 분류, 상태 JSON 꺼내기와 옵션 드롭다운 열기(`OPEN_OPTION_LISTS`, 아래 「옵션 드롭다운 열기(PR3c)」) 하나다. 이동하는 식은 없고, 채우기만 쓰는 누르기 식은 따로 묶는다(아래 「채우기(REQ11, PR3c)」).
 
 **검색 화면과 상품 화면은 2026-11-13 실제 화면으로 쟀다**(상품 화면의 옵션 칸 제외). 가격비교 묶음 화면도 2026-11-13 실제 화면으로 쟀다(판매처 목록 제외). PR1 은 실제 계정과 사용자 브라우저를 쓰지 못했다.
 그래서 칸 위치를 파서의 표 하나(`fields.ts`)에 모으고, 표의 칸이 하나라도 비면 결과를 지어내지 않고 `PAGE_CHANGED` 로 끝낸다.
@@ -405,7 +405,7 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 | `ConnectorConversationActionPurge` | 대화 삭제 때 구매 하루 합계에 필요한 본문도 남긴다 |
 | `ConnectorActionController`, `ConnectorFinancialSummaries` | 구매 줄에는 금융 요약 대신 주문서 요약(`checkout`)을 붙인다. 오늘 남은 구매 한도를 읽을 때 계산한다 |
 | `ConnectorExecutionClaimCodec` | claim 의 `scope` 가 빈 object 여도 받는다. 저장 scope 와 같은지는 claim 이 그대로 본다 |
-| 웹 `financial-summary.tsx` | PR3c 가 주문서 카드를 그린다. PR3b 의 화면은 아직 구매 줄을 일반 카드로 한 장씩 그린다(그 종류를 내는 플러그인이 없다) |
+| 웹 `financial-summary.tsx` | 구매 줄은 PR3c 가 더한 `checkout-summary.tsx` 의 주문서 카드로 그린다. 배송지·결제 수단 칸이 없고, 요약을 열지 못한 줄은 거절만 남긴다 |
 
 ### 도구(PR3c)
 
@@ -428,8 +428,8 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 | `NAVER_SHOPPING_SOLD_OUT` | `invalid_input` | `recheck` | 고른 조합이 품절이다 |
 | `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 상품 상태가 판매 중이 아니다(네이버페이로 바로 살 수 없다) |
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인한 금액보다 크다 |
-| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | claim 이 거절됐다(만료, 이미 소비, 채우기 직전 상한) |
-| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | 구매하기 뒤 층에서 옵션이나 수량을 맞추지 못해 바로구매를 누르지 않았다 |
+| `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조가 어긋나거나 claim 이 거절됐다(만료, 이미 소비, 채우기 직전 상한) |
+| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다. 「구매하기」 단추를 찾지 못했거나, 누르기 전부터 「바로구매」 가 보이거나, 층에서 옵션이나 수량을 맞추지 못했다 |
 
 `executionArgs` 는 정확히 아래 키다. 금액은 원 단위 JSON 정수다.
 
@@ -483,7 +483,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 2. 빈 탭을 열어 상품 주소로 간다. 화면 분류가 사람이 해야 하는 화면이면 탭을 남기고 그 넘기기 결과로 끝난다
 3. 상품 상태를 다시 읽어(옵션이 있으면 드롭다운을 한 번 연다) 판매가와 배송비로 다시 계산한 예상 합계가 원문의 `expectedTotalKrw` 보다 크거나 고른 조합이 품절이면 claim 없이 `NAVER_SHOPPING_PRICE_CHANGED` 나 `NAVER_SHOPPING_SOLD_OUT` 으로 끝내고 탭을 닫는다
 4. claim 으로 ticket 을 한 번 소비한다. 거절되면 `NAVER_SHOPPING_CLAIM_REJECTED` 로 끝내고 탭을 닫는다. 구매하기를 누르지 않는다
-5. 상품 화면의 「구매하기」 를 누른다. 주문서로 바로 가지 않고 같은 화면에 「상품 구매」 층(옵션·수량, 총 금액, 「장바구니」, 「바로구매」, 「닫기」)이 뜬다(2026-11-13 실측). 층 안에서 원문의 `optionLabels` 와 같은 글의 값을 단계마다 고르고 수량을 맞춘 뒤 읽어 확인한다. 맞추지 못하면 「바로구매」 를 누르지 않고 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝내고 탭을 닫는다. 「장바구니」 는 누르지 않는다
+5. 누르기 전에 「바로구매」 단추가 이미 보이면 누른 뒤 층을 알아볼 수 없으므로 아무것도 누르지 않고 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝낸다. 그다음 상품 화면의 「구매하기」 를 누른다. 주문서로 바로 가지 않고 같은 화면에 「상품 구매」 층(옵션·수량, 총 금액, 「장바구니」, 「바로구매」, 「닫기」)이 뜬다(2026-11-13 실측). 층 안에서 원문의 `optionLabels` 와 같은 글의 값을 단계마다 고르고 수량을 맞춘 뒤 읽어 확인한다. 맞추지 못하면 「바로구매」 를 누르지 않는다. 그때 「구매하기」 앞에 없던 새 탭에 주문서가 열려 있거나 그것을 확인하지 못하면 층을 잘못 알아본 것이라 `UNKNOWN` 으로 끝내고, 아니면 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝내고 탭을 닫는다. 「장바구니」 는 누르지 않는다
 6. 층의 「바로구매」 를 누른다. 몇 초 안에 주문서(`orders.pay.naver.com` 의 `/ordersheet/`)가 열린다. 같은 탭이 넘어갈 수도, 새 탭이 열릴 수도 있어 둘 다 본다. 새 탭은 누르기 직전의 탭 목록에 없던 탭만 본다. 주문서 탭에서 화면 분류를 하고 최종 결제 금액을 읽는다. 결제 단추는 누르지 않는다
 7. 주문서 탭을 남기고 `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 로 끝난다. 새 탭이 주문서면 상품 탭은 닫는다. 최종 금액이 원문의 예상 합계보다 크면 결과 판정이 넘기지 않으므로 주문서 탭도 닫는다(아래 「결과 판정」)
 
@@ -508,7 +508,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 **금지 선택자**: 결제 단추 `div[class*="SubmitButton_area-button"] > button[class*="SubmitButton_button-pay"]`(굴러가는 숫자 묶음 `Counter_*` 가 들어 있어 글을 금액으로도 읽지 않는다)와 결제수단 절의 `button[class*="NpayMoneyPromotionBanner"]`(결제로 이어질 수 있다). 이 선택자의 이름 조각(`SubmitButton`, `NpayMoneyPromotionBanner`)은 플러그인 소스에 없고 검사의 금지 목록에만 있다.
 주문서에는 이름, 주소, 전화번호가 있다. 금액 식은 두 금액 정수만 돌려주고, 도구 결과와 로그에 화면 글을 싣지 않는다.
 
-상품 구매 층과 층 안의 옵션·수량 칸은 아직 재지 않았다(잰 상품은 옵션이 없었고 두 단추는 요소의 `click()` 으로 넘어갔다). 단추는 보이는 `button` 가운데 글이 정확히 「구매하기」, 「바로구매」 인 것을 고르고, 층은 「바로구매」 단추를 가진 가장 가까운 대화상자나 층 요소로 본다. 옵션은 층 안의 `aria-haspopup="listbox"` 단추를 단계 차례로 열어 `role="option"` 가운데 글이 옵션 글과 같거나 옵션 글과 「 (」·공백으로 이어지는 것 하나를 고른다. 수량은 층 안의 숫자 입력 칸에 값을 넣고 다시 읽는다. 수량 칸을 찾지 못하면 수량 1 만 받는다(층의 기본값이 1 이다).
+상품 구매 층과 층 안의 옵션·수량 칸은 아직 재지 않았다(잰 상품은 옵션이 없었고 두 단추는 요소의 `click()` 으로 넘어갔다). 단추는 보이는 `button` 가운데 글이 정확히 「구매하기」, 「바로구매」 인 것을 고르고, 층은 「바로구매」 단추를 가진 가장 가까운 대화상자나 층 요소로 본다. 옵션은 층 안의 `aria-haspopup="listbox"` 단추를 단계 차례로 열고, 펼쳐진 단추의 `aria-controls` 가 가리키는 목록 안의 `role="option"` 가운데 글이 옵션 글과 같은 것 하나를 고른다(같은 것이 없으면 옵션 글 뒤에 「 (」 나 「(」 로 추가 금액 표시가 이어지는 것). 층 밖 상품 화면의 드롭다운 값이나 「검정 라지」 같은 다른 변형을 고르지 않게 하려는 것이다. 수량은 층 안의 숫자 입력 칸에 값을 넣고 다시 읽는다. 수량 칸을 찾지 못하면 수량 1 만 받는다(층의 기본값이 1 이다).
 
 #### 채우기 결과
 
@@ -517,7 +517,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 주문서까지 갔다 | `ORDER_SHEET_READY`, 최종 금액, 탭 | 아래 「결과 판정」 | 아래 「결과 판정」 |
 | claim 전에 사람이 해야 하는 화면 | `HUMAN_ACTION_REQUIRED` 와 `handoff`(PR2 계약) | `FAILED` | 그 종류(`login` 등) |
 | claim 전 실패(가격 오름, 품절, claim 거절) | 선언된 오류 | `FAILED` | 없음. 탭을 닫는다 |
-| claim 뒤 층의 옵션이나 수량을 못 맞춤(바로구매 전) | 선언된 오류(`NAVER_SHOPPING_CHECKOUT_FAILED`) | `FAILED` | 없음. 탭을 닫는다 |
+| claim 뒤 바로구매 전에 멈춤(구매하기 단추 없음, 층의 옵션이나 수량을 못 맞춤) | 선언된 오류(`NAVER_SHOPPING_CHECKOUT_FAILED`. 전체 제한 시간을 넘겼으면 `NAVER_SHOPPING_UNAVAILABLE`) | `FAILED` | 없음. 탭을 닫는다 |
 | 구매하기 뒤 층도 주문서도 보이지 않음, 바로구매를 보낸 뒤 주문서나 금액을 확인하지 못함, 시간 초과 | `{status: "UNKNOWN", tab}` | `UNKNOWN` | `tab_check` |
 | 응답을 잃음 | 없음 | claim 을 소비했으면 `UNKNOWN`, 아니면 `FAILED`(지금 규칙) | `UNKNOWN` 이면 `tab_check`. 탭은 비어 있다 |
 
@@ -560,7 +560,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 - 금액은 새 칸 없이 그 승인 줄의 결과 글에서 읽는다. 넘기기 목록 API 가 `payment` 줄에만 `{finalAmountKrw, expectedTotalKrw}` 를 더한다
 - 알림(`HANDOFF_REQUESTED`)과 카드를 닫는 때는 PR2 와 같다. 승인 결과를 전하는 자동 turn 은 카드를 닫지 않는다
 - 결과 판정은 `connector.approval` 에 있고 `connector.handoff` 는 그 위 하위 기능이라 부르지 못한다. 그래서 잠근 승인 줄 엔티티(`ConnectorAction.handOff`)에 적고 알림도 금융 승인이 낸다. 카드 제목은 `HandoffNeed` 가 갖는다
-- 결제 카드의 두 금액은 이 PR 의 웹 넘기기 카드(`handoff-list.tsx`)가 보인다. 주문서 승인 카드는 PR3c 다
+- 결제 카드의 두 금액은 웹 넘기기 카드(`handoff-list.tsx`)가 보인다. 주문서 승인 카드는 PR3c 가 더한 `checkout-summary.tsx` 다
 
 ### 옵션 드롭다운 열기(PR3c)
 

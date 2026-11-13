@@ -47,6 +47,7 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 | `NAVER_SHOPPING_NOT_BUYABLE` | 지금 네이버페이로 바로 살 수 없는 상품이다 |
 | `NAVER_SHOPPING_PRICE_CHANGED` | 승인한 뒤 가격이 올라 주문서를 열지 않았다. 다시 살지 묻는다 |
 | `NAVER_SHOPPING_CLAIM_REJECTED`, `NAVER_SHOPPING_CHECKOUT_FAILED` | 주문서를 열지 못했고 결제 화면도 넘기지 않았다. 다시 살지 묻는다 |
+| `NAVER_SHOPPING_PAGE_CHANGED` | 상품 화면이 예상과 달라 카드를 만들지 못했다. 「내 브라우저」 의 상품 화면을 확인해 달라고 한다 |
 | 상한을 정해 달라는 거절 | 「외부 서비스 연결」 의 네이버 쇼핑 연결에서 구매 상한 두 칸을 정해 달라고 한다 |
 
 ## 막혔을 때

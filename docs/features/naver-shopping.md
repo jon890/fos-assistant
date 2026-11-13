@@ -107,7 +107,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 | `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 판매 중이 아니다 |
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인보다 크다 |
 | `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조나 claim 이 거절됐다 |
-| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | 층에서 옵션이나 수량을 맞추지 못해 「바로구매」 를 누르지 않았다 |
+| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다(구매하기 단추 없음, 층의 옵션이나 수량을 못 맞춤) |
 
 오류 글에 중계 주소, 검색어, 화면 글, 브라우저가 준 원문을 싣지 않는다.
 
