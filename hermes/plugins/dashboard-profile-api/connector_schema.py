@@ -119,7 +119,8 @@ RETRY_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 # `assistant.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
 # 표는 `docs/features/connector-policy.md` 의 「도구 정책」 과 같다.
-TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
+# `PURCHASE` 는 결제 직전까지 가는 구매 도구다(ADR-20261113 / purchase-checkout). `FINANCIAL` 처럼 모델 목록에서 빼고 일반 실행을 받지 않는다.
+TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL", "PURCHASE")
 
 
 # 느슨한 것에서 엄격한 것의 순서다. 하한 비교가 이 순서의 자리를 쓴다.
@@ -134,7 +135,7 @@ DEFAULT_TOOL_POLICIES = ("deny", "ask")
 # 위험도마다 (`approval` 이 없을 때의 기본값, 선언이 내려갈 수 없는 하한) 이다.
 TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "required"),
                       "WRITE": ("required", "required"), "DESTRUCTIVE": ("always", "always"),
-                      "FINANCIAL": ("always", "always")}
+                      "FINANCIAL": ("always", "always"), "PURCHASE": ("always", "always")}
 
 
 TOOL_TITLE_MAX_CHARS = 80

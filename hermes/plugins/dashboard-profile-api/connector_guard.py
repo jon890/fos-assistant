@@ -143,7 +143,8 @@ def _guard_hide_financial(profile_dir, state):
         server = servers.get(entry.get("mcp_server"))
         if not isinstance(server, dict) or server != entry["server"]:
             continue
-        required = {name for name, policy in manifest["tools"].items() if policy["risk"] == "FINANCIAL"}
+        # 사람이 승인한 준비로만 실행하는 도구는 모델 목록에서 뺀다. 구매 도구도 같다(ADR-20261113 / purchase-checkout).
+        required = {name for name, policy in manifest["tools"].items() if policy["risk"] in {"FINANCIAL", "PURCHASE"}}
         excluded = server.get("tools", {}).get("exclude", [])
         if required - set(excluded):
             server["tools"] = {"exclude": sorted(set(excluded) | required)}

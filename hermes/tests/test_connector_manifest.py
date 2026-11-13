@@ -881,9 +881,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
         self.assertEqual(self.catalog(), [])
 
     def test_default_approval_of_every_risk(self):
-        """위험도 다섯의 기본 `approval` 은 계약의 표와 같다."""
+        """위험도마다의 기본 `approval` 은 계약의 표와 같다."""
         expected = {"READ": "none", "SENSITIVE": "required", "WRITE": "required",
-                    "DESTRUCTIVE": "always", "FINANCIAL": "always"}
+                    "DESTRUCTIVE": "always", "FINANCIAL": "always", "PURCHASE": "always"}
         for risk, approval in expected.items():
             with self.subTest(risk):
                 self.declare(lambda tools: tools.update(probe={"risk": risk, "outbound": False}))
@@ -1052,6 +1052,8 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
                 lambda tools: tools.update(env_view={"risk": "SENSITIVE", "approval": "none", "outbound": False}))),
             ("financial below the floor", lambda: self.declare(
                 lambda tools: tools.update(pay={"risk": "FINANCIAL", "approval": "required"}))),
+            ("purchase below the floor", lambda: self.declare(
+                lambda tools: tools.update(checkout={"risk": "PURCHASE", "approval": "required"}))),
             ("verify tool is not READ", lambda: self.declare(
                 lambda tools: tools.update(list_scopes={"risk": "WRITE", "outbound": False}))),
             ("verify tool needs approval", lambda: self.declare(
