@@ -1,6 +1,15 @@
-/** 사람이 해야 하는 단계다. Control Plane 의 `HandoffNeed` 와 같은 목록이다. */
+/**
+ * 사람이 해야 하는 단계다. Control Plane 의 `HandoffNeed` 와 같은 목록이다. `PAYMENT` 와 `TAB_CHECK` 는 플러그인이 아니라 주문서 채우기의
+ * 결과 판정이 적는다(`docs/features/naver-shopping/design.md` 의 「넘기기 어휘 더하기」).
+ */
 export type HandoffNeed =
-  "LOGIN" | "CAPTCHA" | "DEVICE_CHECK" | "BOT_CHECK" | "UNEXPECTED_PAGE";
+  | "LOGIN"
+  | "CAPTCHA"
+  | "DEVICE_CHECK"
+  | "BOT_CHECK"
+  | "UNEXPECTED_PAGE"
+  | "PAYMENT"
+  | "TAB_CHECK";
 
 export const HANDOFF_NEEDS: readonly HandoffNeed[] = [
   "LOGIN",
@@ -8,6 +17,8 @@ export const HANDOFF_NEEDS: readonly HandoffNeed[] = [
   "DEVICE_CHECK",
   "BOT_CHECK",
   "UNEXPECTED_PAGE",
+  "PAYMENT",
+  "TAB_CHECK",
 ];
 
 /** 대화의 화면 넘기기 카드 하나다. 카드는 이 응답으로만 그린다. 모델이 쓴 글은 들어 있지 않다. */
@@ -16,13 +27,17 @@ export type Handoff = {
   connectorId: string;
   connectorTitle: string;
   need: HandoffNeed;
-  /** 플러그인이 남긴 「내 브라우저」 탭의 id 다. */
-  tab: string;
+  /** 플러그인이 남긴 「내 브라우저」 탭의 id 다. 응답을 잃은 탭 확인(`TAB_CHECK`)에서만 null 이다. */
+  tab: string | null;
   createdAt: string;
+  /** 결제 넘기기에서 확인한 최종 결제 금액(원)이다. 다른 단계이거나 읽지 못했으면 null 이다. */
+  finalAmountKrw: number | null;
+  /** 결제 넘기기에서 승인한 예상 합계(원)다. 다른 단계이거나 읽지 못했으면 null 이다. */
+  expectedTotalKrw: number | null;
 };
 
 /**
- * 단계마다 카드 제목과 「다 했어요」 가 보내는 글이다. 제목은 Control Plane 의 `ConnectorHandoffs.TITLES` 와 같다.
+ * 단계마다 카드 제목과 「다 했어요」 가 보내는 글이다. 제목은 Control Plane 의 `HandoffNeed.title()` 과 같다.
  * 어휘는 `docs/adr/ADR-20261111-connector-handoff.md` 의 「결정」 이 갖는다.
  */
 export const HANDOFF_TEXT: Record<
@@ -49,6 +64,14 @@ export const HANDOFF_TEXT: Record<
     title: "「내 브라우저」에서 화면을 확인해 주세요",
     done: "「내 브라우저」에서 화면을 확인했어요. 멈춘 단계부터 이어서 해 주세요.",
   },
+  PAYMENT: {
+    title: "「내 브라우저」에서 결제해 주세요",
+    done: "「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요.",
+  },
+  TAB_CHECK: {
+    title: "「내 브라우저」에 열린 탭을 확인해 주세요",
+    done: "「내 브라우저」에서 탭을 확인했어요.",
+  },
 };
 
 /** 화면 입력 `tab` 의 `id` 와 같은 모양이다. */
@@ -56,7 +79,9 @@ export const HANDOFF_TAB_PATTERN = /^[A-Za-z0-9]{1,128}$/;
 
 /** 「내 브라우저 열기」 가 갈 주소다. 그 탭을 고른 채 화면을 연다. */
 export function handoffBrowserHref(handoff: Handoff): string {
-  return `/browser?tab=${encodeURIComponent(handoff.tab)}`;
+  return handoff.tab === null
+    ? "/browser"
+    : `/browser?tab=${encodeURIComponent(handoff.tab)}`;
 }
 
 /** 응답 한 줄을 계약대로 읽는다. 모양이 틀린 줄은 버린다. */
@@ -69,7 +94,7 @@ export function safeHandoff(value: unknown): Handoff | null {
   const connectorId = text("connectorId");
   const connectorTitle = text("connectorTitle");
   const need = text("need");
-  const tab = text("tab");
+  const tab = row.tab === null ? null : text("tab");
   const createdAt = text("createdAt");
   if (
     !handoffId ||
@@ -77,8 +102,9 @@ export function safeHandoff(value: unknown): Handoff | null {
     !connectorTitle ||
     !createdAt ||
     !HANDOFF_NEEDS.includes(need as HandoffNeed) ||
-    !tab ||
-    !HANDOFF_TAB_PATTERN.test(tab)
+    (tab === null
+      ? row.tab !== null || need !== "TAB_CHECK"
+      : !HANDOFF_TAB_PATTERN.test(tab))
   )
     return null;
   return {
@@ -88,7 +114,16 @@ export function safeHandoff(value: unknown): Handoff | null {
     need: need as HandoffNeed,
     tab,
     createdAt,
+    finalAmountKrw: won(row.finalAmountKrw),
+    expectedTotalKrw: won(row.expectedTotalKrw),
   };
+}
+
+/** 원 단위 금액 칸이다. 0 이상 정수가 아니면 없는 것으로 본다. */
+function won(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
 }
 
 /**
@@ -109,7 +144,7 @@ function withoutHash(url: string): string {
 /** SSE 의 탭 목록 하나를 받아 다음 상태와, 끝났는지 물어야 하는지를 돌려준다. */
 export function watchHandoffTab(
   state: HandoffWatch,
-  tab: string,
+  tab: string | null,
   tabs: readonly TabUrl[],
 ): { state: HandoffWatch; changed: boolean } {
   const target = tabs.find((candidate) => candidate.id === tab);
@@ -130,7 +165,7 @@ export function watchHandoffTab(
 
 /** 「아직이에요」 다. 지금 주소를 새 기준으로 삼고, 넘긴 탭이 이미 없으면 더 묻지 않는다. */
 export function rebaseHandoffWatch(
-  tab: string,
+  tab: string | null,
   tabs: readonly TabUrl[],
 ): HandoffWatch {
   const target = tabs.find((candidate) => candidate.id === tab);
