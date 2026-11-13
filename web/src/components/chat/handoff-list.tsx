@@ -56,7 +56,10 @@ function HandoffCard({
       {handoff.need === "PAYMENT" &&
       handoff.finalAmountKrw !== null &&
       handoff.expectedTotalKrw !== null ? (
-        <dl data-testid="handoff-amounts" className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dl
+          data-testid="handoff-amounts"
+          className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1"
+        >
           <dt className="text-muted-foreground">확인한 최종 결제 금액</dt>
           <dd className="font-medium">{won(handoff.finalAmountKrw)}</dd>
           <dt className="text-muted-foreground">승인한 예상 합계</dt>
