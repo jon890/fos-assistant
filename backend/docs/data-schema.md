@@ -308,6 +308,18 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
 전용 금융 UPDATE는 `limit_updated_at`과 일반 감사 `updated_at`을 함께 적는다. 두 칸의 의미를 합치지 않는다.
 
+#### 구매 상한 컬럼
+
+`purchase_limit_` 로 시작하는 컬럼은 사용자가 정한 구매 상한이다. 근거는 [ADR-20261113 / purchase-checkout](../../docs/adr/ADR-20261113-purchase-checkout.md)가 갖는다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `purchase_limit_order_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 한 건 상한. 상품 금액과 기본 배송비를 더한 예상 합계와 견준다 |
+| `purchase_limit_daily_krw` | BIGINT NOT NULL DEFAULT 0. 원 단위 KST 하루 상한. 그날 승인한 `PURCHASE` 승인 줄의 예상 합계 합과 견준다 |
+
+운영 최대치가 없어 이 값이 곧 적용 상한이다. 0 이면 주문서 준비를 받지 않으며, 칸을 더할 때 모든 사용자가 0 으로 채워져 닫힌 채 시작한다. 화면 API 는 0 이상 1조 미만의 정수만 받는다.
+주문 상한 컬럼처럼 엔티티의 넣기와 고치기에서 빼고 `PurchaseLimitRepository` 의 전용 쿼리로만 읽고 쓴다. 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 쓸 때 일반 감사 `updated_at` 을 함께 적는다.
+
 #### 결과물 자동 보관 컬럼
 
 `artifact_auto_vault` 는 BOOLEAN NULL DEFAULT TRUE 다(2026-11-01 사용자 결정). 칸을 더할 때 이미 있는 사용자도 켜짐으로 채웠고 새 사용자도 켜짐으로 들어온다. 비어 있으면 `ArtifactAutoVaultSetting.DEFAULT_ENABLED`(켜짐)를 따른다. 두 값은 같아야 한다.
