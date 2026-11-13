@@ -181,8 +181,10 @@ test("optionUsable 이 false 면 옵션 칸이 있어도 옵션 없음이고, tr
     url,
   )!;
   expect(stray.options).toEqual([]);
+  expect("options_unknown" in stray).toBe(false);
   const unknown = parseStoreProduct({ ...product, optionUsable: true }, url)!;
   expect(unknown.options).toEqual([]);
+  expect(unknown.options_unknown).toBe(true);
 });
 
 test("조합형 옵션은 첫 묶음 값의 추가 금액과 품절을 싣는다(옵션 칸 이름은 가설)", () => {
@@ -248,6 +250,7 @@ test("판매 중이 아니면 바로 살 수 없고, 옵션 값이 100개를 넘
   expect(parsed.naver_pay_buy).toBe(false);
   expect(parsed.options[0]!.values).toHaveLength(100);
   expect(parsed.options_truncated).toBe(true);
+  expect("options_unknown" in parsed).toBe(false);
 });
 
 test("상품이 없으면 null, 이름이나 가격이나 배송 칸이 없으면 빠진 칸을 알린다", () => {

@@ -25,9 +25,10 @@ export class MissingFields extends Error {
  * 재고가 0)을 싣는다. 둘째 묶음부터는 값의 이름만 싣는다. 고른 조합의 금액과 재고는 주문서 준비가 다시 읽는다.
  */
 function options(product: Json) {
-  // 옵션을 쓰지 않는 상품(실측)은 옵션 칸이 아예 없다. true 인데 칸을 못 찾으면 지어내지 않고 빈 목록으로 둔다.
+  // 옵션을 쓰지 않는 상품(실측)은 옵션 칸이 아예 없다. true 인데 칸을 못 찾으면 지어내지 않고 빈 목록과 `unknown` 으로 둔다.
+  // 옵션 목록은 사람이 드롭다운을 눌러야 실려 처음 상태에 없다(2026-11-13 실측).
   if (pick(product, PRODUCT.optionUsable) === false)
-    return { options: [], truncated: false };
+    return { options: [], truncated: false, unknown: false };
   const groups = list(pick(product, PRODUCT.optionGroups)).slice(
     0,
     OPTION_GROUPS_MAX,
@@ -70,7 +71,9 @@ function options(product: Json) {
   });
   if (list(pick(product, PRODUCT.optionGroups)).length > OPTION_GROUPS_MAX)
     truncated = true;
-  return { options: result, truncated };
+  const unknown =
+    result.length === 0 && pick(product, PRODUCT.optionUsable) === true;
+  return { options: result, truncated, unknown };
 }
 
 /** 스마트스토어·브랜드스토어 상품. 상태는 있는데 상품이 없으면 `null` 이고 부르는 쪽이 `NOT_FOUND` 로 끝낸다. */
@@ -86,7 +89,7 @@ export function parseStoreProduct(product: Json, url: string) {
     ...(delivery === undefined ? ["delivery"] : []),
   ];
   if (missing.length) throw new MissingFields(missing);
-  const { options: groups, truncated } = options(product);
+  const { options: groups, truncated, unknown } = options(product);
   const free = pick(delivery, PRODUCT.feeType) === FREE_DELIVERY;
   return {
     kind: "store" as const,
@@ -96,6 +99,7 @@ export function parseStoreProduct(product: Json, url: string) {
     price_krw: discounted ?? salePrice,
     options: groups,
     ...(truncated ? { options_truncated: true } : {}),
+    ...(unknown ? { options_unknown: true } : {}),
     shipping: {
       fee_krw: free ? 0 : (won(pick(delivery, PRODUCT.baseFee)) ?? 0),
       free_over_krw: free ? null : won(pick(delivery, PRODUCT.freeOver)),
