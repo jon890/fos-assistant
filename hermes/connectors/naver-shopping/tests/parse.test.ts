@@ -4,6 +4,7 @@ import {
   parseCatalog,
   parseStoreProduct,
 } from "../src/parse-product.ts";
+import { PRODUCT_STATE_PATH } from "../src/fields.ts";
 import { parseSearch, searchLooksChanged } from "../src/parse-search.ts";
 
 /** 합성 검색 항목(고정 식이 주는 평평한 모양). 실제 네이버 화면을 옮긴 것이 아니다. */
@@ -103,32 +104,102 @@ test("목록이 배열이 아니면 null, 항목이 있는데 하나도 못 읽�
   expect(searchLooksChanged([], parseSearch([])!)).toBe(false);
 });
 
+/** 2026-11-13 실측 모양을 줄인 합성 상품. 옵션 칸이 없고 유료 배송이다. */
 const product = {
   name: "물티슈 100매",
   channel: { channelName: "좋은가게" },
   salePrice: 12000,
   benefitsView: { discountedSalePrice: 10900 },
-  statusType: "SALE",
-  options: [{ groupName: "수량" }, { groupName: "향" }],
-  optionCombinations: [
-    { optionName1: "10팩", optionName2: "무향", price: 0, stockQuantity: 3 },
-    { optionName1: "10팩", optionName2: "레몬", price: 500, stockQuantity: 0 },
-    { optionName1: "20팩", optionName2: "무향", price: 9000, stockQuantity: 0 },
-  ],
+  productStatusType: "SALE",
+  optionUsable: false,
   productDeliveryInfo: {
+    deliveryFeeType: "PAID",
     baseFee: 3000,
-    freeConditionalAmount: 30000,
-    deliveryFeeByArea: { jeju: 3000 },
+    area2ExtraFee: 3000,
   },
 };
+const url = "https://smartstore.naver.com/a/products/1";
 
-test("상품은 즉시할인 판매가, 첫 묶음 값의 추가 금액과 품절, 배송비를 싣는다", () => {
-  const parsed = parseStoreProduct(
-    product,
-    "https://smartstore.naver.com/a/products/1",
-  )!;
+test("옵션 없는 상품은 할인가, 판매처, 유료 배송비와 지역 추가 배송비를 싣는다", () => {
+  const parsed = parseStoreProduct(product, url)!;
   expect(parsed.price_krw).toBe(10900);
   expect(parsed.store).toBe("좋은가게");
+  expect(parsed.options).toEqual([]);
+  expect(parsed.shipping).toEqual({
+    fee_krw: 3000,
+    free_over_krw: null,
+    regional_extra: true,
+  });
+  expect(parsed.naver_pay_buy).toBe(true);
+  expect("options_truncated" in parsed).toBe(false);
+});
+
+test("무료 배송이면 배송비 0 이고, 지역 추가 배송비 칸이 없거나 0 이면 없다고 본다", () => {
+  const free = parseStoreProduct(
+    {
+      ...product,
+      productDeliveryInfo: { deliveryFeeType: "FREE", baseFee: 0 },
+    },
+    url,
+  )!;
+  expect(free.shipping).toEqual({
+    fee_krw: 0,
+    free_over_krw: null,
+    regional_extra: false,
+  });
+  const zero = parseStoreProduct(
+    {
+      ...product,
+      productDeliveryInfo: {
+        deliveryFeeType: "PAID",
+        baseFee: 2500,
+        area2ExtraFee: 0,
+      },
+    },
+    url,
+  )!;
+  expect(zero.shipping.fee_krw).toBe(2500);
+  expect(zero.shipping.regional_extra).toBe(false);
+});
+
+test("상태의 product 칸이 비어 있어도 simpleProductForDetailPage 가 상품이다", () => {
+  // 실측: product 는 칸만 있고 name 이 없으며 salePrice 가 0 이다. 경로가 그쪽을 가리키면 상품을 못 읽는다.
+  expect(PRODUCT_STATE_PATH).toEqual(["simpleProductForDetailPage"]);
+  const state = {
+    product: { salePrice: 0 },
+    simpleProductForDetailPage: product,
+  };
+  const found = PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], state);
+  expect(parseStoreProduct(found, url)!.title).toBe("물티슈 100매");
+  expect(
+    PRODUCT_STATE_PATH.reduce<any>((v, k) => v?.[k], { product: { salePrice: 0 } }) ?? null,
+  ).toBeNull();
+});
+
+test("optionUsable 이 false 면 옵션 칸이 있어도 옵션 없음이고, true 인데 칸이 없으면 지어내지 않는다", () => {
+  const stray = parseStoreProduct(
+    { ...product, options: [{ groupName: "수량" }] },
+    url,
+  )!;
+  expect(stray.options).toEqual([]);
+  const unknown = parseStoreProduct({ ...product, optionUsable: true }, url)!;
+  expect(unknown.options).toEqual([]);
+});
+
+test("조합형 옵션은 첫 묶음 값의 추가 금액과 품절을 싣는다(옵션 칸 이름은 가설)", () => {
+  const parsed = parseStoreProduct(
+    {
+      ...product,
+      optionUsable: true,
+      options: [{ groupName: "수량" }, { groupName: "향" }],
+      optionCombinations: [
+        { optionName1: "10팩", optionName2: "무향", price: 0, stockQuantity: 3 },
+        { optionName1: "10팩", optionName2: "레몬", price: 500, stockQuantity: 0 },
+        { optionName1: "20팩", optionName2: "무향", price: 9000, stockQuantity: 0 },
+      ],
+    },
+    url,
+  )!;
   expect(parsed.options[0]).toEqual({
     name: "수량",
     values: [
@@ -142,13 +213,6 @@ test("상품은 즉시할인 판매가, 첫 묶음 값의 추가 금액과 품�
     ["무향", null],
     ["레몬", null],
   ]);
-  expect(parsed.shipping).toEqual({
-    fee_krw: 3000,
-    free_over_krw: 30000,
-    regional_extra: true,
-  });
-  expect(parsed.naver_pay_buy).toBe(true);
-  expect("options_truncated" in parsed).toBe(false);
 });
 
 test("판매 중이 아니면 바로 살 수 없고, 옵션 값이 100개를 넘으면 잘랐다고 알린다", () => {
@@ -160,7 +224,8 @@ test("판매 중이 아니면 바로 살 수 없고, 옵션 값이 100개를 넘
   const parsed = parseStoreProduct(
     {
       ...product,
-      statusType: "OUTOFSTOCK",
+      productStatusType: "OUTOFSTOCK",
+      optionUsable: true,
       options: [{ groupName: "색" }],
       optionCombinations: many,
     },
