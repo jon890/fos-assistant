@@ -150,7 +150,7 @@ state = { phase: "waiting" } | { phase: "watching", base: string } | { phase: "o
 | 자리 | 바꾸는 것 |
 | --- | --- |
 | Control Plane `HandoffNeed` | `BOT_CHECK("bot_check")`, `UNEXPECTED_PAGE("unexpected_page")`. `connector_action.handoff_need`(`VARCHAR(20)`)에 그대로 들어가 마이그레이션이 없다 |
-| Control Plane `ConnectorHandoffs.TITLES` | 위 카드 제목. 알림 제목도 같다 |
+| Control Plane `HandoffNeed.title()` | 위 카드 제목. 알림 제목도 같다 |
 | fos-ctx `handoff.py` 의 `NEEDS` | 두 낱말을 더한다. 버전 1.8.0 |
 | 웹 `handoff.ts` | `HANDOFF_NEEDS`, `HANDOFF_TEXT` 에 두 값. 카드, 패널, 「다 했어요」 는 이 표를 읽으므로 화면 코드는 바뀌지 않는다 |
 
