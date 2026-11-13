@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -18,10 +18,14 @@ function run(workflow: string, localBun: string | null) {
   const file = join(directory, "ci.yml");
   writeFileSync(file, workflow);
   const python = spawnSync("sh", ["-c", "command -v python3"], { encoding: "utf8" }).stdout.trim();
-  return spawnSync(python, ["-I", script, file], {
-    env: { PATH: `${bin}:/usr/bin:/bin` },
-    encoding: "utf8",
-  });
+  try {
+    return spawnSync(python, ["-I", script, file], {
+      env: { PATH: `${bin}:/usr/bin:/bin` },
+      encoding: "utf8",
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 const pinned = "steps:\n  - with:\n      bun-version: '1.3.14'\n";
