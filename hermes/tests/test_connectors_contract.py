@@ -114,8 +114,8 @@ def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names:
 def closed_risk_problems(declared: dict) -> list[str]:
     """닫힌 위험도 선언의 위반이다. `DESTRUCTIVE` 는 늘 닫는다.
 
-    `FINANCIAL` 은 그 플러그인의 `execution_guard.operations` 에 든 도구만 연다(ADR-20261013 / financial-order-opening).
-    보호 선언 밖의 금융 도구는 승인과 claim 을 거치지 않으므로 위반이다.
+    `FINANCIAL` 과 `PURCHASE` 는 그 플러그인의 `execution_guard.operations` 에 든 도구만 연다(ADR-20261013 / financial-order-opening,
+    ADR-20261113 / purchase-checkout). 보호 선언 밖의 금융·구매 도구는 승인과 claim 을 거치지 않으므로 위반이다.
     """
     guard = declared.get("execution_guard")
     operations = guard.get("operations") if isinstance(guard, dict) else None
@@ -123,7 +123,7 @@ def closed_risk_problems(declared: dict) -> list[str]:
     problems = []
     for tool, spec in declared.get("tools", {}).items():
         risk = spec.get("risk")
-        if risk == "DESTRUCTIVE" or (risk == "FINANCIAL" and tool not in guarded):
+        if risk == "DESTRUCTIVE" or (risk in {"FINANCIAL", "PURCHASE"} and tool not in guarded):
             problems.append("닫힌 위험도 %s 선언: %s" % (risk, tool))
     return problems
 
@@ -349,6 +349,8 @@ class ClosedRiskTest(unittest.TestCase):
         self.assertEqual(closed_risk_problems(declared), ["닫힌 위험도 FINANCIAL 선언: amend"])
         self.assertEqual(closed_risk_problems(self.declared(None, place="FINANCIAL")),
                          ["닫힌 위험도 FINANCIAL 선언: place"])
+        self.assertEqual(closed_risk_problems(self.declared(None, checkout="PURCHASE")),
+                         ["닫힌 위험도 PURCHASE 선언: checkout"])
 
     def test_destructive_tool_is_reported_even_in_guard_operations(self):
         declared = self.declared({"wipe": "CANCEL"}, wipe="DESTRUCTIVE")

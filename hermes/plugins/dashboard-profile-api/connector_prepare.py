@@ -18,14 +18,14 @@ async def _guard_operation(profile, manifest, entry, body, env, prepare=False):
     _require(len(names) == 1, "tool")
     tool = names[0]
     policy = manifest["tools"][tool]
-    if prepare or policy["risk"] == "FINANCIAL":
+    if prepare or policy["risk"] in {"FINANCIAL", "PURCHASE"}:
         from .routes import PROFILE_WRITE_LOCK
         from hermes_cli.profiles import get_profile_dir
         with _stage("hide"):
             async with PROFILE_WRITE_LOCK:
                 await asyncio.to_thread(_guard_hide_financial, get_profile_dir(profile), {manifest["id"]: entry})
     if not prepare and "execution" not in body:
-        _require(policy["risk"] not in {"FINANCIAL", "DESTRUCTIVE"}, "risk")
+        _require(policy["risk"] not in {"FINANCIAL", "DESTRUCTIVE", "PURCHASE"}, "risk")
         return None
     guard = manifest.get("execution_guard")
     _require(guard is not None and tool in guard["operations"] and policy["risk"] == "FINANCIAL"

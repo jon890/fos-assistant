@@ -12,7 +12,7 @@ public enum ActionDenyReason {
     NOT_READY,
     /** 그 커넥터의 MCP 서버가 낸 도구가 아니거나, 도구를 선언하는 manifest 에 그 도구의 선언이 없다 */
     UNDECLARED,
-    /** 위험도가 {@code DESTRUCTIVE} 나 {@code FINANCIAL} 이다. 이 위험도는 아직 열지 않았다 */
+    /** 위험도가 {@code DESTRUCTIVE}, {@code FINANCIAL}, {@code PURCHASE} 가운데 하나다. 직접 호출로는 열지 않는다 */
     RISK_NOT_OPEN,
     /** 사람이 연 대화에서만 부르라고 선언한 도구를 사람이 없는 실행(먼저 살펴보기, 예약 작업)이 불렀다 */
     ATTENDED_ONLY,

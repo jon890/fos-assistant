@@ -220,7 +220,14 @@ function safeSummary(value: unknown) {
   };
 }
 
-const TOOL_RISKS = ["READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL"];
+const TOOL_RISKS = [
+  "READ",
+  "SENSITIVE",
+  "WRITE",
+  "DESTRUCTIVE",
+  "FINANCIAL",
+  "PURCHASE",
+];
 const TOOL_APPROVALS = ["NONE", "REQUIRED", "ALWAYS"];
 
 /** 도구 목록이 없거나 모양이 틀리면 빈 목록으로 두고, 값이 틀린 항목만 뺀다. */
