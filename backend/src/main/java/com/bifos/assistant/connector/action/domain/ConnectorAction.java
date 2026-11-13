@@ -6,7 +6,6 @@ import com.bifos.assistant.connector.action.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.action.domain.type.GrantScope;
-import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.connection.domain.type.ToolApproval;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import com.bifos.assistant.shared.util.Sha256;
@@ -78,10 +77,7 @@ public class ConnectorAction {
     private Long id;
 
     /**
-     * 화면과 모델에 보이는 승인 요청 번호다. 대화의 공개 식별자와 같은 방식이다(ADR-025).
-     *
-     * <p>넣을 때 Hibernate 가 v7 을 채운다. {@code BINARY} 로 못 박아 테스트의 H2 와 운영의 MySQL 이 같은 바이트
-     * 16개로 저장한다.
+     * 화면과 모델에 보이는 승인 요청 번호다(ADR-025). 넣을 때 Hibernate 가 v7 을 채우고 {@code BINARY} 로 못 박아 H2 와 MySQL 이 같은 16바이트로 저장한다.
      */
     @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
     @JdbcTypeCode(SqlTypes.BINARY)
@@ -92,9 +88,7 @@ public class ConnectorAction {
     private Long userId;
 
     /**
-     * 판정한 실행의 에이전트다. 승인한 호출은 이 에이전트의 profile 에서 실행한다. 옛 줄은 옛 커넥터 에이전트를 가리킨다.
-     *
-     * <p>지운 에이전트를 정리하면 비어 있다(ADR-20261009 / agent-purge).
+     * 판정한 실행의 에이전트다. 승인한 호출은 그 profile 에서 실행하고, 옛 줄은 옛 커넥터 에이전트를, 정리한 줄은 빈 값이다(ADR-20261009 / agent-purge).
      */
     @Column(name = "agent_id")
     private Long agentId;
@@ -344,18 +338,9 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * 결과 판정이 사람에게 화면을 넘긴다(ADR-20261113 / purchase-checkout). 이미 넘긴 줄이면 바꾸지 않는다. 알림은 부르는 쪽이 낸다.
-     *
-     * @param tab 플러그인이 남긴 탭. 응답을 잃은 탭 확인이면 null
-     * @return 이번에 적었는가
-     */
-    public boolean handOff(HandoffNeed need, String tab, Instant now) {
-        if (handoff != null && handoff.need() != null) {
-            return false;
-        }
-        this.handoff = new ActionHandoff(need, tab, now);
-        return true;
+    /** 결과 판정이 사람에게 화면을 넘긴다(ADR-20261113 / purchase-checkout). 이미 넘긴 줄은 그대로 둔다. 알림은 부르는 쪽이 낸다. */
+    public void handOff(ActionHandoff next) {
+        handoff = handoff == null || handoff.need() == null ? next : handoff;
     }
 
 

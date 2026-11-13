@@ -41,9 +41,15 @@ public class ActionHandoff {
     private Instant closedAt;
 
 
-    ActionHandoff(HandoffNeed need, String tab, Instant at) {
+    private ActionHandoff(HandoffNeed need, String tab, Instant at) {
         this.need = need;
         this.tab = tab;
         this.at = at;
+    }
+
+
+    /** 결과 판정이 적는 열린 넘기기다. 탭은 응답을 잃은 탭 확인이면 null 이다. */
+    public static ActionHandoff open(HandoffNeed need, String tab, Instant at) {
+        return new ActionHandoff(need, tab, at);
     }
 }

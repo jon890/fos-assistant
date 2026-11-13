@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.approval.application;
 
+import com.bifos.assistant.connector.action.domain.ActionHandoff;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.ConnectorActionExecution;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -105,7 +106,7 @@ final class ConnectorCheckoutOutcome {
 
 
     private static Optional<HandoffNeed> handOff(ConnectorAction action, HandoffNeed need, String tab, Instant now) {
-        action.handOff(need, tab, now);
+        action.handOff(ActionHandoff.open(need, tab, now));
         return Optional.of(need);
     }
 
