@@ -77,9 +77,11 @@ async function toolErrorOf(
   try {
     await sessionStatus(env, { timeoutMs: LOGIN_CHECK_MS });
   } catch (checked) {
+    // 편집기 오류로 감싸여도 사람이 브라우저를 넘겨받아 멈췄으면 중계가 다시 거절하므로 여기서 찾는다
     if (
       checked instanceof ToolError &&
-      checked.code === "NAVER_BLOG_LOGIN_REQUIRED"
+      (checked.code === "NAVER_BLOG_LOGIN_REQUIRED" ||
+        checked.handoff?.need === "human_browser")
     )
       return checked;
   }
@@ -167,6 +169,19 @@ export async function withWriteTab<T>(
         leftTabs.add(tab.targetId);
         throw new ToolError("NAVER_BLOG_LOGIN_REQUIRED", {
           need: "login",
+          tab: tab.targetId,
+        });
+      }
+      // 사람이 브라우저를 넘겨받았다. 그 탭은 사람의 것이라 닫지 않고 남긴다(닫기도 거절된다)
+      if (
+        tab &&
+        error instanceof ToolError &&
+        error.handoff?.need === "human_browser"
+      ) {
+        keep = true;
+        leftTabs.add(tab.targetId);
+        throw new ToolError(error.code, {
+          need: "human_browser",
           tab: tab.targetId,
         });
       }

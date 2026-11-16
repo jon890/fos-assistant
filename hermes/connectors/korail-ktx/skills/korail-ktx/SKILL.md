@@ -30,6 +30,7 @@ description: 사용자가 KTX 열차를 찾아 달라고 할 때 「내 브라�
 | `KORAIL_LOGIN_REQUIRED` | 「내 브라우저」 에서 코레일에 로그인해 달라고 한다 |
 | `KORAIL_BOT_CHECK` | 코레일이 매크로로 의심해 막았다. 「내 브라우저」 의 남은 탭에서 안내를 직접 확인하고, 잠시 뒤에 다시 요청해 달라고 한다. 바로 다시 부르지 않는다 |
 | `KORAIL_CAPTCHA` | 「내 브라우저」 의 남은 탭에서 보안 문자를 직접 넣고 다시 요청해 달라고 한다 |
+| `KORAIL_BROWSER_IN_USE` | 사용자가 「내 브라우저」 를 직접 쓰고 있어 멈췄다. 다 쓰면 「돌려주기」 를 눌러 달라고 하고, 돌려줬다고 하기 전에는 다시 부르지 않는다 |
 | `KORAIL_UNKNOWN_STATION` | 역 이름을 다시 묻는다 |
 | `KORAIL_REJECTED` | 오류의 `message` 가 코레일이 보인 까닭이다. 그대로 전한다 |
 | `KORAIL_DATE_UNAVAILABLE` | 지난 날짜이거나 아직 예매할 수 없는 날짜라고 알린다 |

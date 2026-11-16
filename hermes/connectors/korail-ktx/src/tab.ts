@@ -291,6 +291,15 @@ export async function searchInTab<T>(
       leftTabs.add(targetId);
       throw error;
     }
+    // 사람이 브라우저를 넘겨받아 중계가 닫았다. 그 탭은 사람의 것이라 닫지 않고 남긴다(닫기도 거절된다)
+    if (error instanceof ToolError && error.handoff?.need === "human_browser") {
+      keep = true;
+      leftTabs.add(targetId);
+      throw new ToolError(error.code, null, {
+        need: "human_browser",
+        tab: targetId,
+      });
+    }
     // 전체 제한 시간을 넘긴 뒤의 실패는 사람이 해야 하는 화면이 아니면 일시 장애로 알린다.
     if (Date.now() >= deadline) throw new ToolError("KORAIL_UNAVAILABLE");
     if (

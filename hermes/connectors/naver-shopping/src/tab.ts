@@ -195,6 +195,12 @@ export async function workInTab<T>(
     return await work(page);
   } catch (error) {
     if (handedOff) throw error;
+    // 사람이 브라우저를 넘겨받아 중계가 닫았다. 그 탭은 사람의 것이라 닫지 않고 남긴다(닫기도 거절된다)
+    if (error instanceof ToolError && error.handoff?.need === "human_browser") {
+      handedOff = true;
+      leftTabs.add(targetId);
+      throw new ToolError(error.code, { need: "human_browser", tab: targetId });
+    }
     if (Date.now() >= deadline) {
       keepTab = false;
       throw new ToolError("NAVER_SHOPPING_UNAVAILABLE");
