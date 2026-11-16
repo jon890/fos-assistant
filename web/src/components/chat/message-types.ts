@@ -1,7 +1,7 @@
 import type { AgentLabel, DelegationLine } from "@/lib/delegation";
 import type { MentionDelegation } from "@/lib/mention";
 import type { AutoVaultState } from "@/lib/artifact-vault-api";
-import type { ActivitySummary } from "@/lib/chat-event";
+import type { ActivitySummary, SteerInfo } from "@/lib/chat-event";
 import type { AnswerReveal } from "./answer-reveal";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
@@ -73,4 +73,6 @@ export type Turn = {
   answeredBy?: AgentLabel | null;
   /** `@` 로 맡긴 질문이면 그 맡김이다. 질문 아래에 「나 → 쇼핑 담당에게 맡김」 줄을 그린다 */
   delegatedTo?: MentionDelegation | null;
+  /** 도는 실행에 끼워 넣은 사용자 글이면 그 말풍선의 상태다. 보통 질문은 없다(ADR-20261116 / run-steer) */
+  steer?: SteerInfo | null;
 };

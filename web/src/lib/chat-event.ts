@@ -11,6 +11,10 @@ import type { DelegationLine } from "@/lib/delegation";
  * <p>`delegation` 은 대화의 turn 이 바로 맡긴 위임이 시작했거나 끝났다는 사건이다. 맡긴 줄이 `delegation` 에 온다.
  *
  * <p>`approval` 은 승인 줄이 생겼다는 사건이다. 요청 번호만 `detail` 에 오므로 받은 쪽이 승인 줄을 다시 읽는다.
+ *
+ * <p>`steer` 는 도는 실행에 끼워 넣은 사용자 글의 말풍선이 생겼거나 상태가 바뀌었다는 사건이다. 말풍선 번호는
+ * `messageId`, 글은 `text`, 끼운 turn 의 루트 실행은 `executionId`, 상태와 자식 종류는 `steer` 에 온다
+ * (ADR-20261116 / run-steer).
  */
 export type ChatEvent = {
   type:
@@ -28,7 +32,8 @@ export type ChatEvent = {
     | "user"
     | "pending"
     | "approval"
-    | "delegation";
+    | "delegation"
+    | "steer";
   text?: string | null;
   alreadyStreamed?: boolean | null;
   streamedPrefixLength?: number | null;
@@ -52,6 +57,14 @@ export type ChatEvent = {
   delegation?: DelegationLine | null;
   /** 위임 결과 알림 줄의 `system` 사건이 싣는 그 줄이 전한 결과다 */
   deliveredResults?: DelegationLine[] | null;
+  /** `steer` 사건의 말풍선 상태와 받은 순간 돈 자식의 종류다 */
+  steer?: SteerInfo | null;
+};
+
+/** steer 말풍선의 상태다. `ChatDtos.MessageView.steer` 와 `steer` 사건이 같은 꼴로 싣는다 */
+export type SteerInfo = {
+  state: "DELIVERED" | "CARRIED_OVER" | "UNCONFIRMED";
+  child: "SUBAGENT" | "DELEGATION" | null;
 };
 
 export type ActivitySummary = {

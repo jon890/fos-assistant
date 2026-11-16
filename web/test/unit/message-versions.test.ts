@@ -102,3 +102,24 @@ test("알림 줄이 둘 이어져도 각자 turn 을 열고 답이 없는 알림
   ], {});
   assert.deepEqual(folded.map((turn) => [turn.user.id, turn.answers.length]), [[1, 1], [3, 0], [4, 0]]);
 });
+
+test("steer 말풍선은 turn 을 열지 않고 질문과 답 사이에 남는다", () => {
+  const steer = { state: "DELIVERED", child: null };
+  const folded = foldVersions([
+    message(1, "USER"), { ...message(2, "USER"), steer }, message(3, "ASSISTANT"),
+    message(4, "USER"), message(5, "ASSISTANT"),
+  ], {});
+  assert.equal(folded.length, 2);
+  assert.equal(folded[0].user.id, 1);
+  assert.deepEqual(folded[0].steers.map((line) => line.id), [2]);
+  assert.deepEqual(folded[0].answers.map(({ message: answer, latestId }) => [answer.id, latestId]), [[3, 3]]);
+  assert.deepEqual(folded[1].steers, []);
+});
+
+test("다시 생성한 답 사슬의 latestId 는 마지막 판의 번호다", () => {
+  const folded = foldVersions([
+    message(1, "USER"), message(2, "ASSISTANT"), message(4, "ASSISTANT", 2),
+  ], { 2: 0 });
+  assert.equal(folded[0].answers[0].message.id, 2);
+  assert.equal(folded[0].answers[0].latestId, 4);
+});
