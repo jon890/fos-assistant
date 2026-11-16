@@ -6,12 +6,15 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import {
+  BUY_NOW_ENABLED,
+  CHOOSE_LAYER_RADIO,
   CHOOSE_OPTION,
   EXPRESSIONS,
   FILL_FUNCTIONS,
   GLOBAL_OBJECT,
   BUY_VISIBLE,
   LAYER_OPEN,
+  LAYER_OPTION_FORM,
   OPEN_LAYER_OPTION,
   OPEN_OPTION_LISTS,
   ORDER_SHEET_AMOUNT,
@@ -55,6 +58,12 @@ export type ShopConfig = {
   /** 층 안의 옵션 드롭다운 수와 고를 수 있는 값. */
   layerOptions?: number;
   layerValues?: string[];
+  /** 층 안의 옵션 묶음(radio 칩)마다 칩의 값. 있으면 묶음을 모두 고르기 전까지 「바로구매」 가 막혀 있다. */
+  layerRadios?: string[][];
+  /** 칩을 눌러도 골라지지 않는다. */
+  radioStaysUnchecked?: boolean;
+  /** 「바로구매」 가 끝내 막혀 있다. */
+  buyNowDisabled?: boolean;
   /** 층 안의 수량 칸이 있는가. 기본은 있다. */
   quantityInput?: boolean;
   /** 주문서의 두 금액. */
@@ -89,6 +98,13 @@ export function startFakeShop(config: ShopConfig = {}) {
   let next = 1;
   let optionsOpened = false;
   let buyChecks = 0;
+  /** 묶음마다 고른 칩의 값. */
+  const checked: (string | undefined)[] = [];
+  /** 실제로 누른 칩의 묶음 차례. */
+  const radioPresses: number[] = [];
+  const buyNowBlocked = () =>
+    config.buyNowDisabled === true ||
+    (config.layerRadios ?? []).some((_, index) => checked[index] === undefined);
   const userTab: Tab = {
     id: "USER0",
     screen: "blank",
@@ -199,12 +215,27 @@ export function startFakeShop(config: ShopConfig = {}) {
         }
         if (message.method === "Runtime.callFunctionOn") {
           if (!FILL_FUNCTIONS.has(source)) return fail();
-          const [value] = params.arguments.map(
+          const [value, label, press] = params.arguments.map(
             (a: { value: unknown }) => a.value,
           );
           const inLayer = tab.screen === "layer";
           let out: unknown = false;
-          if (source === OPEN_LAYER_OPTION) {
+          if (source === CHOOSE_LAYER_RADIO) {
+            const group = inLayer
+              ? config.layerRadios?.[value as number]
+              : undefined;
+            const hits = (group ?? []).filter((chip) => chip === label).length;
+            if (hits === 0) out = "missing";
+            else if (hits > 1) out = "ambiguous";
+            else if (checked[value as number] === label) out = "checked";
+            else if (press !== true) out = "unchecked";
+            else {
+              radioPresses.push(value as number);
+              if (!config.radioStaysUnchecked)
+                checked[value as number] = label as string;
+              out = "pressed";
+            }
+          } else if (source === OPEN_LAYER_OPTION) {
             if (config.sheetOnLayerOption) newTab("sheet", SHEET_URL);
             out = inLayer && (value as number) < (config.layerOptions ?? 0);
           } else if (source === CHOOSE_OPTION)
@@ -264,8 +295,19 @@ export function startFakeShop(config: ShopConfig = {}) {
             tab.screen === "layer" ||
               (tab.screen === "product" && config.buyNowOnProduct === true),
           );
+        if (source === LAYER_OPTION_FORM)
+          return value(
+            tab.screen === "layer"
+              ? {
+                  radios: config.layerRadios?.length ?? 0,
+                  lists: config.layerOptions ?? 0,
+                }
+              : null,
+          );
+        if (source === BUY_NOW_ENABLED)
+          return value(tab.screen === "layer" && !buyNowBlocked());
         if (source === PRESS_BUY_NOW) {
-          if (tab.screen !== "layer") return value(false);
+          if (tab.screen !== "layer" || buyNowBlocked()) return value(false);
           const buyNow = config.buyNow ?? "same";
           if (buyNow === "same") {
             tab.screen = "sheet";
@@ -294,6 +336,8 @@ export function startFakeShop(config: ShopConfig = {}) {
     log,
     tabs,
     cdpLines,
+    /** 실제로 누른 칩의 묶음 차례. */
+    radioPresses,
     /** 그 식이나 함수 선언을 부른 횟수. */
     count: (source: string) =>
       cdpLines().filter((line) => line.source === source).length,

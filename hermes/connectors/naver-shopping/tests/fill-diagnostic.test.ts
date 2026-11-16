@@ -216,6 +216,13 @@ for (const [name, config, args, approvalArgs, expected] of [
     ["layer.failed", "naver_shopping_checkout_failed"],
   ],
   [
+    "옵션을 고른 뒤에도 바로구매가 막혀 있음",
+    { product: PLAIN_PRODUCT, buyNowDisabled: true },
+    PLAIN_ARGS,
+    PLAIN_ARGS,
+    ["layer.failed", "naver_shopping_checkout_failed"],
+  ],
+  [
     "바로구매 뒤 주문서가 열리지 않음",
     { product: PLAIN_PRODUCT, buyNow: "nothing" },
     PLAIN_ARGS,

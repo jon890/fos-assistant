@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
 import {
   BUY_VISIBLE,
+  CHOOSE_LAYER_RADIO,
   CHOOSE_OPTION,
   CLICKING,
   EXPRESSIONS,
@@ -516,6 +517,97 @@ test("표준옵션 상품의 채우기는 층에서 색상과 사이즈를 차�
   expectSafe(shop!);
 });
 
+/** 2026-11-17 실측 꼴의 층: 색상 묶음과 사이즈 묶음의 radio 칩. 드롭다운과 수량 칸이 없다. */
+const RADIO_LAYER: ShopConfig = {
+  product: STANDARD_PRODUCT,
+  layerRadios: [
+    ["검정", "흰색"],
+    ["M", "L"],
+  ],
+  quantityInput: false,
+  buyNow: "new",
+  amounts: { total: 13000, summary: 13000 },
+};
+const RADIO_ARGS = {
+  ...PLAIN_ARGS,
+  optionLabels: ["흰색", "L"],
+  quantity: 1,
+  expectedTotalKrw: 13000,
+};
+const radioCalls = (fake: FakeShop) =>
+  fake
+    .cdpLines()
+    .filter((line) => line.source === CHOOSE_LAYER_RADIO)
+    .map((line) => line.args);
+
+test("층의 옵션이 radio 칩이면 묶음 차례로 같은 값의 칩을 한 번씩 누르고, 골라졌는지 다시 읽은 뒤 바로구매한다", async () => {
+  const { isError, body } = await fill(RADIO_LAYER, RADIO_ARGS);
+  expect(isError).toBe(false);
+  expect(body).toEqual({
+    status: "ORDER_SHEET_READY",
+    finalAmountKrw: 13000,
+    tab: "TAB2",
+  });
+  const calls = radioCalls(shop!);
+  // 누르기는 묶음마다 한 번이다. 나머지는 누르지 않고 읽기만 한다.
+  expect(shop!.radioPresses).toEqual([0, 1]);
+  expect(calls.slice(0, 2)).toEqual([
+    [0, "흰색", true],
+    [0, "흰색", false],
+  ]);
+  expect(calls.at(-2)).toEqual([0, "흰색", false]);
+  expect(calls.at(-1)).toEqual([1, "L", false]);
+  expect(shop!.count(OPEN_LAYER_OPTION)).toBe(0);
+  expect(shop!.count(CHOOSE_OPTION)).toBe(0);
+  expect(shop!.count(PRESS_BUY_NOW)).toBe(1);
+  expectSafe(shop!);
+});
+
+for (const [name, config, expectedPresses] of [
+  [
+    "값이 같은 칩이 없으면",
+    { ...RADIO_LAYER, layerRadios: [["검정"], ["M", "L"]] },
+    [],
+  ],
+  [
+    "값이 같은 칩이 둘이면",
+    {
+      ...RADIO_LAYER,
+      layerRadios: [
+        ["흰색", "흰색"],
+        ["M", "L"],
+      ],
+    },
+    [],
+  ],
+  [
+    "묶음 수가 옵션 글 수와 다르면",
+    { ...RADIO_LAYER, layerRadios: [["흰색"], ["L"], ["추가"]] },
+    [],
+  ],
+  [
+    "칩을 눌러도 골라지지 않으면",
+    { ...RADIO_LAYER, radioStaysUnchecked: true },
+    [0],
+  ],
+  [
+    "고른 뒤에도 바로구매가 막혀 있으면",
+    { ...RADIO_LAYER, buyNowDisabled: true },
+    [0, 1],
+  ],
+] as const) {
+  test(`층의 radio 칩: ${name} 바로구매를 누르지 않고 실패로 끝내며 탭을 닫는다`, async () => {
+    const { isError, body } = await fill(config as ShopConfig, RADIO_ARGS);
+    expect(isError).toBe(true);
+    expect(body).toEqual({ error: { code: "NAVER_SHOPPING_CHECKOUT_FAILED" } });
+    expect(shop!.count(PRESS_BUY_NOW)).toBe(0);
+    // 칩은 묶음마다 많아야 한 번 누르고, 값이 없거나 둘이거나 묶음 수가 다르면 누르지 않는다.
+    expect(shop!.radioPresses).toEqual([...expectedPresses]);
+    expect(shop!.tabs.has("TAB1")).toBe(false);
+    expectSafe(shop!);
+  });
+}
+
 test("「구매하기」 단추를 늦게 그리면 claim 전에 그릴 때까지 기다렸다가 누른다", async () => {
   const { isError, body } = await fill(
     { product: PLAIN_PRODUCT, buyButtonAfter: 5 },
@@ -699,7 +791,8 @@ test("층에서 실패했어도 그사이 새 탭에 주문서가 열렸으면 U
       product: OPTION_PRODUCT,
       productAfterOpen: OPENED_PRODUCT,
       sheetOnLayerOption: true,
-      layerOptions: 0,
+      // 드롭다운 하나를 열려고 하면 새 탭에 주문서가 열리고, 고를 값은 없다.
+      layerOptions: 1,
     },
     {
       ...PLAIN_ARGS,
