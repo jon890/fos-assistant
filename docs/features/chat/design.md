@@ -23,18 +23,19 @@
 
 | 자리 | 맡는 것 |
 | --- | --- |
-| `chat/nextturn/application/SteerService`(새) | 끼울지 판정, Hermes `steer` 호출, 말풍선 상태와 대기 줄의 모든 steer 변경(받음, 거절, 모름, `settle`, 다음 turn 에서 `CARRIED_OVER`, 기동 정리). steer 상태 규칙의 주인은 여기 하나다. 다음 turn 을 여는 것은 여전히 `NextTurnDispatcher.tryNext` 하나다 |
+| `chat/nextturn/application/SteerService`(새) | 끼울지 판정과 Hermes `steer` 호출 |
+| `chat/nextturn/application/SteerLedger`(새) | 말풍선 상태와 대기 줄의 모든 steer 변경(받음, 거절, 모름, `settle`, 다음 turn 에서 `CARRIED_OVER`, 기동 정리, 정리 못 한 대화 다시 정리). steer 상태 규칙의 주인은 여기 하나다. `NextTurnDispatcher` 를 주입하지 않아 `ChatTurnRunner` 가 포트로 주입해도 빈 순환이 없다. 다음 turn 을 여는 것은 여전히 `NextTurnDispatcher.tryNext` 하나다 |
 | `PendingMessageService.enqueue` | 지금처럼 저장한 뒤, `tryNext` 전에 `SteerService.trySteer` 를 부른다 |
 | `PendingMessageStore`·`PendingMessages` | 대기 글에 두 칸을 더한다. 「끼우는 중」 표시와 이미 보인 말풍선 번호. 바꾸기는 지금처럼 대화 줄을 잠근 `change` 하나로 한다 |
 | `TurnCancellation`·`TurnHandle` | 루트 run(`apiBaseUrl`, profile, run 번호), turn 종류, 도는 하위 에이전트 수, 「정리됨」 표시를 더한다. steer 호출과 turn 의 `settle` 이 같은 handle 의 잠금을 잡아 차례로 돈다. `rekey` 가 비우는 `runs` 와 따로 둔다 |
 | `ChatTurnRunner` | `runTurn` 의 바깥 `finally` 에서 잠금을 풀기 전에 포트의 `settle` 을 부르고 끝난 방식과 결과를 넘긴다. `ChatTurnStopper` 는 바꾸지 않는다 |
-| `RestartReconciler` | 기동 때 끝난 run 을 물어 얻은 결과를 같은 `settle` 에 넘긴다. 그 앞에서 남은 「끼우는 중」 을 정리한다 |
+| `RestartReconciler` | 기동 때 끝난 run 을 물어 얻은 결과를 같은 `settle` 에 넘긴다. 남은 「끼우는 중」 과 끝난 실행의 말풍선은 `SteerLedger` 의 기동 리스너가 그보다 먼저 정리한다 |
 | `ChatTurnRouting.saveQuestion` | 대기 글로 여는 turn 에서 말풍선 번호가 붙은 글은 새 행을 만들지 않고 같은 트랜잭션에서 포트로 그 행을 `CARRIED_OVER` 로 바꾼다 |
 | `HermesRunsClient`·`HttpHermesRunsClient` | `steer(apiBaseUrl, profile, runId, text)` 와 결과의 `pendingSteer`. steer 는 읽기 제한 시간이 짧은 요청 factory 를 따로 둔 `RestClient` 로 보낸다(지금 클라이언트는 `readTimeout` 하나를 쓴다) |
 | 화면 `use-conversation-queue.ts`·`use-conversation-events.ts`·`message-bubble.tsx` | `steer: true` 싣기, `steer` 사건으로 말풍선 넣기와 상태 바꾸기, 답 위 자리, 안내 줄, 다시 생성 단추 숨기기 |
 
 의존 방향은 `SubFeatureOrder`(`turn` < `nextturn` < `recovery`)를 따른다. `nextturn` 과 `recovery` 는 `turn` 을 부를 수 있고 `turn` 은 그 둘을 부르지 못한다.
-`turn` 쪽 `ChatTurnRunner` 와 `ChatTurnRouting` 이 steer 상태를 바꿔야 하므로 `turn/application/port` 에 `TurnSteerLedger` 포트를 두고 `nextturn` 의 `SteerService` 가 구현한다. `RestartReconciler` 는 `nextturn` 을 직접 부른다.
+`turn` 쪽 `ChatTurnRunner` 와 `ChatTurnRouting` 이 steer 상태를 바꿔야 하므로 `turn/application/port` 에 `TurnSteerLedger` 포트를 두고 `nextturn` 의 `SteerLedger` 가 구현한다. `RestartReconciler` 는 `nextturn` 을 직접 부른다. steer 의 기동 정리는 재시작 정리 설정에 묶지 않고 `SteerLedger` 의 기동 리스너가 돈다.
 
 ## 인터페이스와 데이터
 
@@ -111,7 +112,7 @@ enqueue(steer=true)
 `trySteer` 는 handle 의 steer 잠금 안에서 「정리됨」 표시를 본다. 이미 정리된 turn 이면 Hermes 를 부르지 않고 거절로 처리한다. 그래서 `settle` 뒤 잠금을 풀기 전에 들어온 글이 정리되지 않은 말풍선이 되지 않는다.
 
 `steering` 이 찬 글이 있는 줄에서 `NextTurnDispatcher.tryPending` 은 「이 대화의 다음 차례를 차지했다」(참)로 답하고 아무것도 열지 않는다. 그래서 그 사이 turn 이 닫혀도 위임 결과 자동 turn 이 사용자 글을 앞지르지 않는다(ADR-048 의 「사용자의 말이 먼저」). 응답 뒤 `trySteer` 가 `tryNext` 를 부르므로 보낼 계기가 남는다. `steering` 글의 취소는 `CONVERSATION_BUSY` 로 거절한다(스펙 DECISION17).
-서버가 그 사이 죽으면 `steering` 이 남는다. `RestartReconciler` 의 기동 정리(`@Order(0)`) 안에서, 잠금을 다시 잡기 전에 남은 `steering` 을 모름과 같이 처리한다. 받았는지 알 수 없고, 정리 전에 닫기 리스너가 먼저 돌면 위 판정이 그 줄을 붙잡아 둔다.
+서버가 그 사이 죽으면 `steering` 이 남는다. `SteerLedger` 의 기동 리스너(`RestartReconciler` 의 `@Order(0)` 보다 앞)가 남은 `steering` 을 모름과 같이 처리한다. 받았는지 알 수 없고, 정리 전에 닫기 리스너가 먼저 돌면 위 판정이 그 줄을 붙잡아 둔다.
 
 ### turn 이 끝날 때(`settle`)
 
