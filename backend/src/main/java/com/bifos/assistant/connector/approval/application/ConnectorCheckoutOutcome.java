@@ -13,6 +13,7 @@ import com.bifos.assistant.connector.financial.domain.type.PurchaseLimitKind;
 import com.bifos.assistant.hermes.application.dto.CallResult;
 import com.bifos.assistant.hermes.application.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.application.dto.ConnectorRecovery;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,7 +38,12 @@ final class ConnectorCheckoutOutcome {
     static final String AMOUNT_CHANGED = "purchase_amount_changed";
     /** 구매하기 전에 사람이 해야 하는 화면을 만났다. 넘기기는 그 단계다. */
     static final String HUMAN_ACTION = "human_action_required";
+    /** 사람 기다림이 수명이나 브라우저 꺼짐으로 끝났거나 이어 가기 전에 연결이 바뀌었다. 이어 가지 않았다. */
+    static final String RESUME_ENDED = "resume_ended";
+    /** 이어 가기 표식의 수명이다. 처음 멈춘 때부터 센다(browser-cowork spec DECISION11). */
+    static final Duration WAITING_LIFE = Duration.ofMinutes(30);
     private static final String TAB = "[A-Za-z0-9]{1,128}";
+    private static final String STEP = "[a-z][a-z0-9_]{0,31}";
     private static final String CODE = "[A-Z][A-Z0-9_]{0,63}";
     private static final long AMOUNT_BOUND = 1_000_000_000L;
 
@@ -75,6 +81,13 @@ final class ConnectorCheckoutOutcome {
                 // claim 없이 온 그 밖의 성공은 계약과 어긋나 보냈는지 가릴 수 없다. 금융 줄과 같이 결과를 모르는 것으로 둔다.
                 action.unknown(now);
                 return handOff(action, HandoffNeed.TAB_CHECK, tabOf(body), now);
+            }
+            Optional<String> step = resumeStep(body);
+            if (step.isPresent()) {
+                // 구매하기 전에 멈췄다. 승인을 끝내지 않고 사람을 기다린다(browser-cowork spec REQ8). 쓰지 않은 권한은 거두고 이어 갈 때 새로 낸다.
+                row.releaseTicket();
+                action.awaitHuman(step.get(), WAITING_LIFE, now);
+                return handOff(action, need.get(), handoff.get("tab").stringValue(), now);
             }
             bodies.fail(action, HUMAN_ACTION, new ConnectorErrorDetail(handoff.get("code").stringValue(), Map.of(), null).toStored(), now);
             return handOff(action, need.get(), handoff.get("tab").stringValue(), now);
@@ -139,6 +152,23 @@ final class ConnectorCheckoutOutcome {
             return Optional.empty();
         }
         return HandoffNeed.fromWire(handoff.get("need").stringValue());
+    }
+
+
+    /** 플러그인이 넘기기와 함께 낸 이어 갈 단계 {@code resume: {step}} 이다. 정확히 이 모양이 아니면 이어 가지 않는다. */
+    private static Optional<String> resumeStep(JsonNode body) {
+        JsonNode resume = body.get("resume");
+        if (resume == null || !resume.isObject() || !resume.propertyNames().equals(Set.of("step")) || !resume.get("step").isString()
+            || !resume.get("step").stringValue().matches(STEP)) {
+            return Optional.empty();
+        }
+        return Optional.of(resume.get("step").stringValue());
+    }
+
+
+    /** 사람 기다림을 이어 가지 않고 끝낸다. 결제 화면까지 가지 못했으므로 하루 합계에서 빠진다(spec DECISION20). */
+    static void endWaiting(ConnectorAction action, ConnectorActionBodies bodies, Instant now) {
+        bodies.fail(action, RESUME_ENDED, new ConnectorErrorDetail("RESUME_ENDED", Map.of(), null).toStored(), now);
     }
 
 

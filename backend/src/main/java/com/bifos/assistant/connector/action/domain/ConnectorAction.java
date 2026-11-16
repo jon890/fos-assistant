@@ -22,6 +22,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,10 +41,8 @@ import org.hibernate.type.SqlTypes;
 /**
  * 커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다(ADR-049, ADR-050).
  *
- * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「connector_action」 이 갖는다. 허용과 거절도 한 줄씩 남긴다. 사용자와
- * 에이전트는 번호로만 둔다. 실행과 대화는 지워져도 이 줄을 남기므로 외래 키를 걸지 않는다.
- *
- * <p>승인하면서 준 허락도 이 줄의 {@code grant_*} 칸이 갖는다(ADR-20261102 / table-reduce-r2). 허락은 다른 트랜잭션이 허락 칸만
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「connector_action」 이 갖는다. 사용자와 에이전트는 번호로만 두고 외래 키를 걸지 않는다.
+ * 승인하면서 준 허락도 이 줄의 {@code grant_*} 칸이 갖는다(ADR-20261102 / table-reduce-r2). 허락은 다른 트랜잭션이 허락 칸만
  * 바꾸는 갱신으로 거두므로, 바꾼 칸만 쓰는 {@code @DynamicUpdate} 로 그 사이 읽어 둔 엔티티의 저장이 거둔 시각을 지우지 않게 한다.
  */
 @Entity
@@ -195,10 +194,7 @@ public class ConnectorAction {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    /**
-     * 주문 상한 변경 승인 줄만 채운다(ADR-20261015 / financial-user-limits). 서버가 줄을 만들 때 적고 바꾸지 않는다.
-     * 공개 승인 API 는 이 컬럼이 있는 줄만 상한 변경 승인으로 보낸다.
-     */
+    /** 주문 상한 변경 승인 줄만 채우고 바꾸지 않는다(ADR-20261015 / financial-user-limits). 승인 API 는 이 칸으로 그 줄을 가른다. */
     @Enumerated(EnumType.STRING)
     @Column(name = "limit_kind", length = 32, updatable = false)
     private FinancialLimitKind limitKind;
@@ -214,6 +210,10 @@ public class ConnectorAction {
     /** 플러그인이 사람에게 화면을 넘긴 기록이다. 넘기지 않은 줄은 null 이다. */
     @Embedded
     private ActionHandoff handoff;
+
+    /** 승인한 실행이 사람 화면에서 멈춰 이어 갈 표식이다. 멈춘 적 없는 줄은 null 이다. */
+    @Embedded
+    private ActionWaiting waiting;
 
     /** 승인하면서 함께 준 허락이다. 허락을 주지 않은 줄은 null 이다(ADR-20261102 / table-reduce-r2). */
     @Embedded
@@ -275,11 +275,7 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * 판정 줄을 승인 줄로 만든다. 저장하기 전에만 부른다.
-     *
-     * <p>인자는 번호를 받은 뒤 같은 트랜잭션에서 암호화해 적는다. INSERT에는 인자 원문을 싣지 않는다.
-     */
+    /** 판정 줄을 승인 줄로 만든다. 저장하기 전에만 부른다. 인자는 번호를 받은 뒤 같은 트랜잭션에서 암호화해 적는다. */
     public void awaitApproval(Instant expiresAt) {
         if (decision != ActionDecision.NEEDS_APPROVAL || passed || status != null) {
             throw new IllegalStateException("only a blocked NEEDS_APPROVAL action can await approval");
@@ -306,12 +302,9 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * @param errorCode 공통 오류 어휘의 글자
-     * @param storedResult 저장할 오류 계약의 본문. 암호화가 켜져 있으면 이미 봉인한 글이다. 없으면 null
-     */
+    /** 실행이나 사람 기다림을 실패로 끝낸다. {@code storedResult} 는 봉인한 오류 계약이고 없으면 null 이다. */
     public void fail(String errorCode, String storedResult, Long keyId, Instant now) {
-        require(ActionStatus.EXECUTING);
+        require(status == ActionStatus.WAITING ? ActionStatus.WAITING : ActionStatus.EXECUTING);
         this.status = ActionStatus.FAILED;
         this.errorCode = errorCode;
         sealResult(storedResult, keyId);
@@ -327,20 +320,34 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * 결과를 모르는 줄에 커넥터가 선언한 코드와 재시도 식별자를 함께 남긴다(ADR-20261013 unknown-retry-key).
-     *
-     * @param storedResult 저장할 글. 암호화가 켜져 있으면 이미 봉인한 글이다
-     */
+    /** 결과를 모르는 줄에 커넥터가 선언한 코드와 재시도 식별자를 함께 남긴다(ADR-20261013 unknown-retry-key). 글은 봉인한 것이다. */
     public void unknown(String storedResult, Long keyId, Instant now) {
         unknown(now);
         sealResult(storedResult, keyId);
     }
 
 
-    /** 결과 판정이 사람에게 화면을 넘긴다(ADR-20261113 / purchase-checkout). 이미 넘긴 줄은 그대로 둔다. 알림은 부르는 쪽이 낸다. */
+    /** 결과 판정이 사람에게 화면을 넘긴다(ADR-20261113 / purchase-checkout). 열린 넘기기는 그대로 두고 닫힌 것은 바꾼다. 알림은 부르는 쪽이 낸다. */
     public void handOff(ActionHandoff next) {
-        handoff = handoff == null || handoff.need() == null ? next : handoff;
+        handoff = handoff == null || handoff.need() == null || handoff.closedAt() != null ? next : handoff;
+    }
+
+
+    /** 사람 화면에서 멈췄다. 승인을 끝내지 않고 기다린다. {@code expiresAt} 은 처음 멈춘 때부터 {@code life} 뒤로 표식이 끝나는 시각이다. */
+    public void awaitHuman(String step, Duration life, Instant now) {
+        require(ActionStatus.EXECUTING);
+        this.status = ActionStatus.WAITING;
+        this.waiting = ActionWaiting.stopped(waiting, step, now);
+        this.expiresAt = waiting.since().plus(life);
+        this.executedAt = now;
+    }
+
+
+    /** 같은 승인으로 한 번 더 실행한다. 멈출 때마다 한 번이다(spec REQ9). */
+    public void resume(Instant now) {
+        require(ActionStatus.WAITING);
+        this.status = ActionStatus.EXECUTING;
+        this.waiting = waiting.resumed(now);
     }
 
 
@@ -351,11 +358,7 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭을 {@code errorCode} 에 남긴다.
-     *
-     * @param reason {@link #NOT_EXECUTABLE}, {@link #CONNECTION_CHANGED}, {@link #HIDDEN_ARGS} 가운데 하나
-     */
+    /** 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭({@link #NOT_EXECUTABLE} 등)을 {@code errorCode} 에 남긴다. */
     public void refuse(String reason, Instant now) {
         reject(now);
         this.errorCode = reason;
@@ -451,10 +454,7 @@ public class ConnectorAction {
     }
 
 
-    /**
-     * 이 도구를 이 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 상시 허락과 같은 조건에 더해, 허락이 묶일
-     * 대화와 에이전트가 있어야 한다. 먼저 살펴보기 트리의 줄은 그 트리의 호출이 허락을 보지 않으므로 줄 수 없다.
-     */
+    /** 이 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 상시 허락 조건에 대화와 에이전트가 있고 살펴보기 줄이 아니어야 한다. */
     public boolean conversationGrantAllowed() {
         return grantAllowed() && conversationId != null && agentId != null && !checkTree;
     }

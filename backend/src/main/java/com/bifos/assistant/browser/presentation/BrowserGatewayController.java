@@ -109,11 +109,22 @@ public class BrowserGatewayController {
     }
 
 
-    /** 탭을 닫는다. 번호가 영문자와 숫자가 아니면 404 다. Chrome 의 글을 그대로 준다. */
+    /**
+     * 탭을 닫는다. 번호가 영문자와 숫자가 아니면 404 다. Chrome 의 글을 그대로 준다. 사람이 풀고 있거나 이어 가기를 기다리는 탭이면 Chrome 에
+     * 넘기지 않고 409 다(docs/features/browser-cowork/spec.md 의 REQ11). 플러그인은 남긴 탭 닫기의 실패를 무시한다.
+     */
     @GetMapping("/json/close/{id}")
     public ResponseEntity<byte[]> close(
         @PathVariable String token, @PathVariable String id, HttpServletRequest request) {
-        return tabCommand(token, "/json/close/", id, request);
+        if (fromPage(request)) {
+            return empty(HttpStatus.FORBIDDEN);
+        }
+        if (!TAB_ID.matcher(id).matches()) {
+            return empty(HttpStatus.NOT_FOUND);
+        }
+        return forward(token, target -> gateway.keeps(target, id)
+            ? empty(HttpStatus.CONFLICT)
+            : passThrough(cdp.get(target.cdp(), "/json/close/" + id)));
     }
 
 

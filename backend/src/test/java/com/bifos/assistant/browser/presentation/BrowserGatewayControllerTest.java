@@ -261,6 +261,21 @@ class BrowserGatewayControllerTest {
 
 
     @Test
+    @DisplayName("사람이 풀고 있거나 이어 가기를 기다리는 탭의 json/close 는 Chrome 에 넘기지 않고 빈 본문의 409 다")
+    void keepsTabsPeopleAreUsing() throws Exception {
+        when(gateway.keeps(TARGET, "KEPT1")).thenReturn(true);
+        chrome.answer("GET /json/close/OTHER1", 200, "Target is closing");
+
+        mvc.perform(get(BASE + "/json/close/KEPT1"))
+            .andExpect(status().isConflict())
+            .andExpect(content().bytes(new byte[0]));
+        mvc.perform(get(BASE + "/json/close/OTHER1")).andExpect(status().isOk());
+
+        assertThat(chrome.calls).containsExactly(CDP + " GET /json/close/OTHER1");
+    }
+
+
+    @Test
     @DisplayName("받기로 하지 않은 경로와 메서드는 빈 본문의 404 이다")
     void answersNotFoundForOtherPaths() throws Exception {
         mvc.perform(get(BASE + "/json/protocol"))

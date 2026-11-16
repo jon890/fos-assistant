@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.financial.application.ConnectorFinancialGat
 import com.bifos.assistant.connector.financial.domain.PurchaseLimitExceeded;
 import com.bifos.assistant.connector.financial.application.PurchaseLimits;
 import com.bifos.assistant.connector.connection.application.ConnectorManifests;
+import com.bifos.assistant.hermes.application.dto.ConnectorManifest;
 import static com.bifos.assistant.connector.approval.application.ConnectorFinancialProducer.require;
 
 import com.bifos.assistant.chat.turn.application.ConversationNotices;
@@ -116,6 +117,19 @@ class ConnectorFinancialApproval {
             var settled = actions.findByPublicId(actionId).orElseThrow(ConnectorActionDetails::notFound);
             return ConnectorActionDetails.view(settled, Optional.of(manifest));
         }
+        return ConnectorActionDetails.view(run(user, actionId, context, manifest, snapshot, null), Optional.of(manifest));
+    }
+
+
+    /**
+     * 승인 트랜잭션이 {@code EXECUTING} 으로 옮긴 줄의 실행을 한 번 보내고 결과를 판정한다. 처음 승인과 이어 가기(browser-cowork spec
+     * REQ8)가 같이 쓴다. ticket 은 실행마다 새로 낸다. 이어 간 결과는 그 도구의 결과로 모델에게 가므로 자동 turn 으로 다시 전하지 않는다.
+     *
+     * @param resume 이어 갈 탭과 단계. 처음 승인이면 null
+     */
+    ConnectorAction run(CurrentUser user, UUID actionId, ConnectorExecutionReadContext context, ConnectorManifest manifest,
+        ConnectorExecutionSnapshot snapshot, ConnectorApprovedExecution.Resume resume) {
+        var tx = new TransactionTemplate(transactionManager);
         var expectedTotal = snapshot.expectedTotalKrw();
         CallResult result = null;
         String ticket = null;
@@ -129,14 +143,14 @@ class ConnectorFinancialApproval {
         if (ticket != null) {
             try {
                 result = hermes.executeApproved(context.profile(), context.connectorId(), context.hermesTool(),
-                    new ConnectorApprovedExecution(ticket, snapshot.executionArgsJson(), snapshot.executionArgsSha256()));
+                    new ConnectorApprovedExecution(ticket, snapshot.executionArgsJson(), snapshot.executionArgsSha256(), resume));
             } catch (RuntimeException failure) {
                 // 전송 응답을 잃으면 UNKNOWN으로 남기고 다시 실행하지 않는다.
                 log.warn("금융 실행 결과 불명 actionId={} kind={}", actionId, failure.getClass().getSimpleName());
             }
         }
         CallResult executed = result;
-        ConnectorAction finished = tx.execute(status -> {
+        return tx.execute(status -> {
             users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             if (action.status() == ActionStatus.EXECUTING) {
@@ -158,11 +172,13 @@ class ConnectorFinancialApproval {
                         feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
                     }
                 }
+                if (resume != null && action.resultDeliveredAt() == null) {
+                    action.markDelivered(clock.instant());
+                }
                 new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
             }
             return action;
         });
-        return ConnectorActionDetails.view(finished, Optional.of(manifest));
     }
 
 

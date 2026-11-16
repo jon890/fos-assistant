@@ -1,11 +1,17 @@
 package com.bifos.assistant.connector.approval.application;
 
+import java.sql.Timestamp;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
+import com.bifos.assistant.browser.application.UserBrowserService;
+import com.bifos.assistant.browser.domain.UserBrowser;
+import com.bifos.assistant.browser.infra.UserBrowserRepository;
+import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
+import com.bifos.assistant.connector.action.application.ConnectorBrowserKeptTabs;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
 import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
@@ -28,6 +34,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,6 +74,14 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
     ConnectorHandoffs handoffs;
     @Autowired
     ConnectorFinancialSummaries summaries;
+    @Autowired
+    ConnectorApprovalResume resumes;
+    @Autowired
+    ConnectorActionResultSource results;
+    @Autowired
+    ConnectorBrowserKeptTabs keptTabs;
+    @Autowired
+    UserBrowserRepository browserRows;
     JsonNode base;
     long expected;
     /** 채우기 대역이 할 일이다. 실행 원문을 받아 결과를 돌려준다. */
@@ -324,6 +339,154 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("구매하기 전에 이어 갈 단계와 함께 멈추면 승인을 끝내지 않고 사람 기다림이고, 하루 합계에 세며 쓰지 않은 ticket 을 거둔다")
+    void resumableStopWaits() {
+        Instant started = browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.WAITING);
+        var action = action(answer);
+        assertThat(action.waiting().since()).isEqualTo(clock.instant());
+        assertThat(action.waiting().step()).isEqualTo("product");
+        assertThat(action.expiresAt()).isEqualTo(clock.instant().plus(ConnectorCheckoutOutcome.WAITING_LIFE));
+        assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.LOGIN);
+        assertThat(jdbc.queryForObject("select count(*) from connector_action_execution where action_id = ? and ticket_id is null",
+            Long.class, action.id())).isEqualTo(1L);
+        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
+        assertThat(keptTabs.kept(user.id(), TAB, started)).as("살아 있는 표식의 탭은 닫지 않는다").isTrue();
+        // 멈춤은 자동 turn 으로 모델에게 가고, 이어 가기 도구를 부르라는 안내가 붙는다
+        var delivered = results.undelivered(action.conversationId());
+        assertThat(delivered).singleElement().satisfies(result -> assertThat(result.input())
+            .contains("상태: WAITING").contains("approval_resume"));
+        // 같은 상품의 새 준비는 기다리는 동안 막는다
+        assertThat(prepare(UUID.randomUUID().toString()).actionId()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("사람이 그 대화에 메시지를 보낸 뒤의 이어 가기는 새 ticket 과 남긴 탭으로 한 번 더 실행해 주문서까지 가고 claim 은 한 번이다")
+    void resumeAfterHumanTurnFillsOnce() {
+        browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, answer.actionId(), null, false);
+        String firstTicket = sent.ticket();
+        Long conversation = action(answer).conversationId();
+        assertThat(resumes.resume(user, conversation)).as("사람이 아직 메시지를 보내지 않았다").isEqualTo(ConnectorApprovalResume.NOT_YET);
+        assertThat(fills.get()).isEqualTo(1);
+
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        assertThat(resumes.resume(user, conversation + 1_000_000)).as("다른 대화는 고르지 않는다").isEqualTo(ConnectorApprovalResume.NONE);
+        fill = claimThen(sheet(expected));
+        String text = resumes.resume(user, conversation);
+
+        assertThat(fills.get()).isEqualTo(2);
+        assertThat(sent.resume()).isEqualTo(new ConnectorApprovedExecution.Resume(TAB, "product"));
+        assertThat(sent.ticket()).isNotEqualTo(firstTicket);
+        var done = action(answer);
+        assertThat(done.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(done.waiting().resumedAt()).isNotNull();
+        assertThat(done.resultDeliveredAt()).as("결과는 도구의 답으로 가고 자동 turn 으로 다시 전하지 않는다").isNotNull();
+        assertThat(text).contains("상태: SUCCEEDED");
+        assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.PAYMENT);
+        assertThat(claims()).isEqualTo(1L);
+        assertThat(purchaseLimits.view(user).spentTodayKrw()).isEqualTo(expected);
+        assertThat(resumes.resume(user, conversation)).as("멈출 때마다 한 번이다").isEqualTo(ConnectorApprovalResume.NONE);
+    }
+
+
+    @Test
+    @DisplayName("이어 가다 다시 멈추면 다시 사람 기다림이고 처음 멈춘 때부터의 수명은 늘지 않는다")
+    void stopAgainKeepsLifetime() {
+        browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, answer.actionId(), null, false);
+        Instant first = action(answer).waiting().since();
+        Instant end = action(answer).expiresAt();
+        Long conversation = action(answer).conversationId();
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        clock.set(clock.instant().plusSeconds(600));
+        fill = execution -> CallResult.success(resumable("captcha"));
+
+        resumes.resume(user, conversation);
+
+        var again = action(answer);
+        assertThat(again.status()).isEqualTo(ActionStatus.WAITING);
+        assertThat(again.waiting().since()).isEqualTo(first);
+        assertThat(again.expiresAt()).isEqualTo(end);
+        assertThat(onlyHandoff(answer).need()).isEqualTo(HandoffNeed.CAPTCHA);
+        assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.NOT_YET);
+    }
+
+
+    @Test
+    @DisplayName("기다리는 사이 상한을 낮췄으면 이어 가지 않고 FAILED(purchase_limit)로 끝내며 하루 합계에서 뺀다")
+    void resumeRechecksLimit() {
+        browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, answer.actionId(), null, false);
+        Long conversation = action(answer).conversationId();
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        limits(expected - 1, 200_000);
+
+        String text = resumes.resume(user, conversation);
+
+        assertThat(fills.get()).isEqualTo(1);
+        assertThat(action(answer).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(action(answer).errorCode()).isEqualTo(ConnectorCheckoutOutcome.LIMIT);
+        assertThat(text).startsWith(ConnectorApprovalResume.ENDED);
+        assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("30분이 지났거나 브라우저가 다시 켜졌으면 이어 가지 않고 끝내며, 일정도 같은 줄을 끝내 탭 지키기를 푼다")
+    void lifetimeAndBrowserEndWaiting() {
+        Instant started = browserRunning();
+        var expired = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, expired.actionId(), null, false);
+        Long conversation = action(expired).conversationId();
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        clock.set(clock.instant().plus(ConnectorCheckoutOutcome.WAITING_LIFE));
+
+        assertThat(resumes.resume(user, conversation)).startsWith(ConnectorApprovalResume.ENDED);
+        assertThat(action(expired).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(action(expired).errorCode()).isEqualTo(ConnectorCheckoutOutcome.RESUME_ENDED);
+        assertThat(keptTabs.kept(user.id(), TAB, started)).isFalse();
+        assertThat(fills.get()).isEqualTo(1);
+
+        var restarted = prepareOther();
+        publicApproval.approve(user, restarted.actionId(), null, false);
+        assertThat(action(restarted).status()).isEqualTo(ActionStatus.WAITING);
+        jdbc.update("update user_browser set started_at = ? where user_id = ?", Timestamp.from(clock.instant().plusSeconds(1)),
+            user.id());
+        assertThat(resumes.endStale(clock.instant())).isEqualTo(1);
+        assertThat(action(restarted).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(purchaseLimits.view(user).spentTodayKrw()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("사람이 브라우저를 쥐고 있으면 이어 가지 않고 기다림을 그대로 둔다")
+    void heldBrowserDoesNotResume() {
+        browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, answer.actionId(), null, false);
+        Long conversation = action(answer).conversationId();
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        jdbc.update("update user_browser set human_held_at = ? where user_id = ?", Timestamp.from(clock.instant()), user.id());
+
+        assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.HELD);
+        assertThat(action(answer).status()).isEqualTo(ActionStatus.WAITING);
+        assertThat(fills.get()).isEqualTo(1);
+    }
+
+
+    @Test
     @DisplayName("구매 줄은 상시 허락과 대화 허락을 받지 않는다")
     void purchaseTakesNoGrant() {
         var answer = prepare(UUID.randomUUID().toString());
@@ -420,6 +583,25 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         ObjectNode body = JSON.createObjectNode().put("status", "HUMAN_ACTION_REQUIRED").put("message", "멈췄다");
         body.putObject("handoff").put("code", "NAVER_SHOPPING_LOGIN_REQUIRED").put("need", need).put("tab", TAB);
         return body;
+    }
+
+
+    /** 이어 갈 단계를 함께 낸 사람이 해야 함 결과다. */
+    private static ObjectNode resumable(String need) {
+        ObjectNode body = human(need);
+        body.putObject("resume").put("step", "product");
+        return body;
+    }
+
+
+    /** 그 사용자의 브라우저가 지금 켜져 있다. 켠 시각을 돌려준다. */
+    private Instant browserRunning() {
+        Instant started = clock.instant().minusSeconds(60);
+        var browser = UserBrowser.create(user.id(), UserBrowserService.profileKey(user.id()), started);
+        browser.beginStart(started);
+        browser.markRunning("container-" + user.id(), started);
+        browserRows.saveAndFlush(browser);
+        return started;
     }
 
 

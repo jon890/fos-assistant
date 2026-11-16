@@ -77,7 +77,7 @@ class ConnectorFinancialGateTest {
         assertThatThrownBy(gate(noKey)::requireOpen).isInstanceOf(ApiException.class);
         assertThatCode(gate(open("1", "1", "1"))::requireOpen).doesNotThrowAnyException();
         when(contents.existsOpenOutside(eq(ConnectorExecutionSnapshot.PROTOCOL), eq(DIGEST.currentPrefix()),
-            eq(Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN)))).thenReturn(true);
+            eq(Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN, ActionStatus.WAITING)))).thenReturn(true);
         assertThatThrownBy(gate(open("1", "1", "1"))::requireOpen).isInstanceOf(ApiException.class);
     }
 

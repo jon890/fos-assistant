@@ -40,7 +40,8 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class ConnectorFinancialGate {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+    private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN,
+        ActionStatus.WAITING);
     private final LiveProperties<ConnectorFinancialProperties> properties;
     private final ConnectorActionExecutionRepository contents;
     private final FinancialDigest digest;

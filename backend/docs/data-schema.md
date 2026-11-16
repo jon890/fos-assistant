@@ -270,7 +270,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 `connector_action`과 `connector_action_execution`은 대화에 묶인 `SCRUB` 대상이다.
 두 줄의 본문과 key 참조만 지우고 상태·시각·도구·위험도·해시·ticket과 중복 방지 식별자는 남긴다.
 검사는 삭제 전 본문과 key가 모두 있었는지 확인하고 나머지 모든 칸과 다른 사용자의 줄을 비교한다.
-`PENDING`, `EXECUTING`, `UNKNOWN`과 KST 당일 승인된 금융 `SUCCEEDED` 줄은 본문을 보존한다.
+`PENDING`, `EXECUTING`, `UNKNOWN`, `WAITING`과 KST 당일 승인된 금융 `SUCCEEDED` 줄은 본문을 보존한다.
 지연한 본문과 기존 purge의 남은 본문은 다음 주기에 같은 사용자·대화 잠금과 트랜잭션으로 다시 검사한다.
 상태와 KST 날짜 경계, 롤백도 실제 MySQL 검사가 확인한다.
 자세한 지연 조건은 [플러그인 도구 정책과 승인](../../docs/features/connector-policy.md#대화-삭제-뒤-승인-본문-정리)이 갖는다.
@@ -827,7 +827,8 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `result_text` 의 `FAILED` 줄은 플러그인이 선언한 오류 계약이 있을 때만 `{"kind": "connector_error", "code", "details", "recovery"}` 를 담고 없으면 null 이다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
 - `result_text` 의 `UNKNOWN` 줄은 플러그인이 `outcome_unknown` 코드로 답했을 때만 `{"kind": "connector_unknown", "code", "retry"}` 를 담고 없으면 null 이다. `retry` 는 선언한 재시도 식별자 하나이고 없을 수 있다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md))
 - 위험도 `PURCHASE` 줄(주문서 채우기)은 결과 판정이 끝낸다. 결제 화면을 넘긴 `SUCCEEDED` 줄의 `result_text` 는 Control Plane 이 정한 `{"status": "PAYMENT_HANDOFF", "message", "finalAmountKrw", "expectedTotalKrw"}` 이고 플러그인 글을 싣지 않는다. 넘기지 못한 `FAILED` 줄의 `error_code` 는 `purchase_limit`(승인 순간이나 결제 직전의 구매 상한), `purchase_amount_changed`(최종 금액이 예상 합계보다 큼), `human_action_required`(구매하기 전에 사람이 해야 하는 화면) 가운데 하나이고, `result_text` 는 위 오류 계약 꼴로 금액과 상한을 정수 세부로 싣는다. 판정 표는 `docs/features/naver-shopping/design.md` 의 「결과 판정」 이 갖는다
-- 하루 구매 합계는 그 사용자가 KST 그날(`decided_at`) 승인한 `PURCHASE` 줄 가운데 `EXECUTING`, `SUCCEEDED`, `UNKNOWN` 인 줄의 실행 원문 `expectedTotalKrw` 합이다. `FAILED` 는 세지 않는다
+- 하루 구매 합계는 그 사용자가 KST 그날(`decided_at`) 승인한 `PURCHASE` 줄 가운데 `EXECUTING`, `SUCCEEDED`, `UNKNOWN`, `WAITING` 인 줄의 실행 원문 `expectedTotalKrw` 합이다. `FAILED` 는 세지 않는다
+- `status` 가 `WAITING` 이면 승인한 주문서 채우기가 「구매하기」 전에 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고, 이어 가면 `EXECUTING`, 표식이 끝나면 `FAILED`(`resume_ended` 나 `purchase_limit`)다. `waiting_since` 는 처음 멈춘 시각이고 다시 멈춰도 바꾸지 않는다. `resume_step` 은 플러그인이 낸 이어 갈 단계이고 Control Plane 은 뜻을 모른다. `resumed_at` 은 마지막으로 이어 간 시각이고, 오래 남은 `EXECUTING` 줄의 정리는 이 칸이 있으면 `decided_at` 대신 이 칸으로 본다. `WAITING` 동안 `expires_at` 은 `waiting_since` 뒤 30분, 표식이 끝나는 시각이고 이어 갈 탭은 `handoff_tab` 이다. 멈춘 적 없는 줄은 세 칸이 비어 있다([browser-cowork 설계](../../docs/features/browser-cowork/design.md) 「PR4 이어 가기」)
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - `limit_kind`, `limit_requested`, `limit_previous` 는 대화로 올리기를 요청한 주문 상한 변경 승인 줄만 채운다([ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)). 종류(`ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD`)와 요청 값, 요청할 때 적용하던 상한이다. 값은 DECIMAL(20,6) 이고 0 이상이다. `order_limit_change` 가 PENDING 줄을 넣을 때 서버가 적고 그 뒤로 바꾸지 않는다. 엔티티도 이 컬럼을 고치기에서 뺀다. 공개 승인 API 는 도구 이름이 맞고 `limit_kind` 가 있는 줄만 상한 변경 승인으로 보낸다. 승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 낮추기와 같은 값, 최대치를 넘는 값은 줄을 만들지 않는다
