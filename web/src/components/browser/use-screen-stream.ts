@@ -35,6 +35,7 @@ const LOST = "화면 연결이 끊겼어요. 다시 열어 주세요.";
 export function useScreenStream({
   startUrl,
   startTab = null,
+  followAgent = false,
   onOpen,
   onTabs,
   areaRef,
@@ -44,6 +45,8 @@ export function useScreenStream({
   startUrl: string | null;
   /** 첫 연결의 첫 탭 목록에 있으면 그 탭으로 옮긴다. 화면 넘기기 카드가 가리킨 탭이다. */
   startTab?: string | null;
+  /** 첫 연결에서 에이전트가 쥔 첫 탭으로 한 번 옮긴다. 쥔 탭이 아직 없으면 처음 보일 때 옮긴다. 「에이전트 화면 보기」 가 쓴다. */
+  followAgent?: boolean;
   onOpen: () => void;
   /** SSE 의 `tabs` 사건을 받을 때마다 그 목록을 알린다. 초기값과 다시 열 때 비우는 것은 알리지 않는다. */
   onTabs?: (tabs: ScreenTab[]) => void;
@@ -131,6 +134,7 @@ export function useScreenStream({
         );
       });
     let wantedTab = attempt === 0 ? startTab : null;
+    let wantAgent = attempt === 0 && followAgent;
     const onEvent = (data: unknown, name: string) => {
       if (name === "frame") setFrame(data as Frame);
       else if (name === "dialog") {
@@ -148,6 +152,12 @@ export function useScreenStream({
         const wanted = next.find((tab) => tab.id === wantedTab);
         wantedTab = null;
         if (wanted && !wanted.active) send({ type: "tab", id: wanted.id });
+        // `/json/list` 는 마지막으로 활동한 탭부터 오므로 쥔 첫 탭이 에이전트가 지금 일하는 탭이다.
+        const agentTab = wantAgent ? next.find((tab) => tab.agent) : undefined;
+        if (agentTab) {
+          wantAgent = false;
+          if (!agentTab.active) send({ type: "tab", id: agentTab.id });
+        }
         const active = next.find((tab) => tab.active);
         if (active && document.activeElement !== addressRef.current)
           setAddress(active.url);
@@ -197,6 +207,7 @@ export function useScreenStream({
     attempt,
     startUrl,
     startTab,
+    followAgent,
     onOpen,
     close,
     resize,
