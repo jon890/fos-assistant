@@ -1,5 +1,5 @@
 /**
- * 결제 내역의 항목을 주문 확인 결과로 바꾸는 순수 함수다. 규칙은 docs/features/naver-shopping/design.md 의 「PR4 주문 확인」 이 갖는다.
+ * 결제 내역의 항목을 주문 확인 결과로 바꾸는 순수 함수다. 규칙은 docs/features/naver-shopping/design.md 의 「PR4 주문 확인(REQ14)」 이 갖는다.
  * 결과에는 상태 낱말, 금액 정수, 주문 시각만 싣는다. 이름, 주소, 상품명, 판매처, 주문 번호는 싣지 않는다.
  */
 import { ORDER_SERVICE_TYPE } from "./fields.ts";
@@ -7,10 +7,10 @@ import { storeProductNo } from "./urls.ts";
 import { list, won, type Json } from "./values.ts";
 
 /**
- * 넘긴 시각에서 이만큼 앞선 주문까지 넘긴 뒤의 주문으로 본다(가설). `date` 가 결제 시각이 아니라 넘기기 전에 연 주문서의 시각일 수 있어서다.
- * 사람이 실제로 결제한 뒤 진단 줄로 맞춘다.
+ * 넘긴 시각에서 이만큼 앞선 주문까지 넘긴 뒤의 주문으로 본다. 0 이라 넘긴 시각 이후의 주문만 본다(spec DECISION27).
+ * `date` 는 결제 시각이라고 본 가설이다. 넘기기 전에 연 주문서의 시각이면 진단 줄의 까닭이 `time` 으로 남고, 이 값을 앞당기려면 스펙을 함께 고친다.
  */
-export const ORDER_TIME_GRACE_MS = 10 * 60_000;
+export const ORDER_TIME_GRACE_MS = 0;
 
 /** fos-ctx 가 넣는 결제 넘기기 맥락(`_fos_payment`). Control Plane 이 그 대화의 마지막 결제 넘기기 줄에서 만든다. */
 export type PaymentContext = {
@@ -153,7 +153,7 @@ export type OrderCheck =
   | { status: "NO_PAYMENT_HANDOFF"; message: string };
 
 /**
- * 넘긴 시각(여유 포함) 뒤의 같은 상품 주문을 고른다. 금액 후보 하나가 최종 결제 금액과 같은 것이 있으면 `CONFIRMED`,
+ * 넘긴 시각 이후의 같은 상품 주문을 고른다. 금액 후보 하나가 최종 결제 금액과 같은 것이 있으면 `CONFIRMED`,
  * 상품과 시각만 맞으면 `AMOUNT_MISMATCH`, 없으면 `NOT_FOUND` 다. 여럿이면 시각이 늦은 것이다.
  */
 export function matchOrder(

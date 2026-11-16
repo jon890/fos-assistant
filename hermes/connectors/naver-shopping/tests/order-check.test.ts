@@ -3,10 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { EXPRESSIONS, ORDER_HISTORY_STATE } from "../src/expressions.ts";
 import { checkOrder, type OrderCheckDeps } from "../src/order-check.ts";
-import {
-  ORDER_TIME_GRACE_MS,
-  parsePaymentContext,
-} from "../src/parse-orders.ts";
+import { parsePaymentContext } from "../src/parse-orders.ts";
 import { createServer } from "../src/server.ts";
 import { BROWSER_URL_ENV } from "../src/session.ts";
 import { ORDER_HISTORY_URL } from "../src/urls.ts";
@@ -180,12 +177,12 @@ test("주문이 없으면 결제가 확인되지 않았다고 답한다", async 
   ).toMatchObject({ status: "NOT_FOUND", final_amount_krw: 3300 });
 });
 
-test("넘긴 시각보다 여유 시간 넘게 앞선 같은 상품 주문은 보지 않는다", async () => {
-  const old = item({ date: HANDED_OFF - ORDER_TIME_GRACE_MS - 1 });
+test("넘긴 시각보다 1밀리초라도 앞선 같은 상품 주문은 보지 않고, 넘긴 시각의 주문은 본다", async () => {
+  const old = item({ date: HANDED_OFF - 1 });
   expect(
     await checkOrder(ENV, payment(), history(nextData([old])).deps),
   ).toMatchObject({ status: "NOT_FOUND" });
-  const nearly = item({ date: HANDED_OFF - ORDER_TIME_GRACE_MS });
+  const nearly = item({ date: HANDED_OFF });
   expect(
     await checkOrder(ENV, payment(), history(nextData([nearly])).deps),
   ).toMatchObject({ status: "CONFIRMED" });
@@ -336,11 +333,7 @@ test("확인되지 않으면 진단 줄에 결과 낱말과 까닭 낱말(produc
   stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
   const cases: [unknown[], string, string][] = [
     [[], "match.not_found", "product"],
-    [
-      [item({ date: HANDED_OFF - ORDER_TIME_GRACE_MS - 1 })],
-      "match.not_found",
-      "time",
-    ],
+    [[item({ date: HANDED_OFF - 1 })], "match.not_found", "time"],
     [
       [
         item({
