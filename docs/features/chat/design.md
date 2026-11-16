@@ -9,7 +9,7 @@
 | REQ1 | `POST .../pending` 이 대기 줄에 글을 더한 뒤 `SteerService` 가 끼워 넣을 수 있는지 보고 Hermes `steer` 를 부른다. 받으면 대기 글을 빼고 `chat_message` 의 `USER` 행(steer 칸이 찬 행)을 한 트랜잭션에 저장하고 대화 단위 SSE 로 `steer` 사건을 낸다 |
 | REQ2 | Hermes 가 409·400·500 으로 답하면 대기 글의 「끼우는 중」 표시만 지우고 `tryNext` 를 부른다. 시간 초과·연결 실패면 `UNCONFIRMED` 말풍선을 만들고 그 글을 말풍선 번호가 붙은 대기 글로 바꿔 줄을 멈춘다 |
 | REQ3 | `HermesRunResult` 가 `pending_steer` 를 읽는다. turn 이 끝나는 자리(`ChatTurnRunner.runTurn` 의 바깥 `finally`, 예외 경로 포함)가 잠금을 풀기 전에 `TurnSteerLedger.settle` 을 불러 돌아온 글을 `CARRIED_OVER` 로 바꾸고, 말풍선 번호가 붙은 대기 글로 줄 앞에 되돌린다. 닫기 리스너의 `tryNext` 가 바로 보낸다 |
-| REQ4 | 중지, 결과 조회 실패(Hermes 404, 시간 초과, 연결 실패), 그 밖의 예외로 끝나면 `settle` 이 그 실행의 `DELIVERED` 말풍선을 모두 `UNCONFIRMED` 로 바꾸고 대기 줄 앞에 되돌린 뒤 멈춘다. 상태 변경, 되돌리기, 멈춤은 한 트랜잭션이다 |
+| REQ4 | 중지, 결과 조회 실패(Hermes 404, 시간 초과, 연결 실패), 그 밖의 예외로 끝나면 `settle` 이 그 실행의 `DELIVERED` 말풍선을 모두 대기 줄 앞에 되돌린 뒤 멈춘다. 중지한 결과에 `pending_steer` 가 있으면 그 글과 맞는 뒤쪽 묶음은 `NOT_DELIVERED`, 나머지는 `UNCONFIRMED` 로 바꾼다. 상태 변경, 되돌리기, 멈춤은 한 트랜잭션이다 |
 | REQ5 | 받은 순간 그 turn 에 Hermes 안 하위 에이전트가 돌면(`subagent.start` 뒤 `subagent.complete` 전) `SUBAGENT`, 그렇지 않고 그 대화에 `agent_delegate` 로 맡긴 실행이 돌면 `DELEGATION` 을 말풍선 행에 적는다. 화면이 종류에 맞는 안내 줄을 그린다 |
 | REQ6 | 화면은 입력창에 쓴 글만 보낼 때 `steer: true` 를 싣는다(대기 경로 두 곳 모두). 서버는 그 표시가 있고, 설정이 켜져 있고, 스킬 커맨드가 아니고, 대기 줄이 비어 있고, 그 대화의 turn 이 끼울 수 있는 종류이고 루트 run 이 있을 때만 끼운다. run 과 turn 종류는 대화 번호로 `TurnCancellation` 의 handle 에서 찾는다 |
 | REQ7 | 다시 생성이 고른 질문 행에 steer 칸이 차 있으면 `MESSAGE_NOT_LATEST` 로 거절한다. 이력 응답이 말풍선에 steer 칸을 실어 화면이 그 답의 다시 생성 단추를 숨긴다 |
@@ -45,7 +45,7 @@
 대기 줄 응답의 글에 `messageId`(말풍선 번호가 붙은 글이면 그 번호, 아니면 없음)와 `steering`(끼우는 중)을 더한다.
 화면은 `held` 가 거짓일 때 `messageId` 가 있는 글을 대기 칸에 그리지 않는다. 이미 말풍선으로 보이고 곧 다음 turn 으로 가기 때문이다. 멈춘 줄이면 그린다(스펙 REQ4).
 
-이력의 메시지에 `steer` 칸을 더한다. `{ "state": "DELIVERED|CARRIED_OVER|UNCONFIRMED", "child": "SUBAGENT|DELEGATION"|null }` 이고 보통 질문이면 없다.
+이력의 메시지에 `steer` 칸을 더한다. `{ "state": "DELIVERED|CARRIED_OVER|UNCONFIRMED|NOT_DELIVERED", "child": "SUBAGENT|DELEGATION"|null }` 이고 보통 질문이면 없다.
 새 SSE 사건 `steer` 는 `{ conversationId, messageId, text, state, child, executionId }` 이다. 말풍선이 생길 때와 상태가 바뀔 때 낸다.
 
 | `child` | 안내 줄 |
@@ -58,6 +58,7 @@
 | `DELIVERED` | 전달됨 |
 | `CARRIED_OVER` | 다음 차례로 넘어감 |
 | `UNCONFIRMED` | 전달됐는지 확인 못 함 |
+| `NOT_DELIVERED` | 전달 안 됨 |
 
 ### 끼울 수 있는 turn
 
@@ -122,7 +123,8 @@ enqueue(steer=true)
 | --- | --- |
 | 완료·실패, `pendingSteer` 없음 | 그대로 |
 | 완료·실패, `pendingSteer` 있음 | 받은 순서로 이은 글(줄바꿈)의 뒤쪽이 `pendingSteer` 와 같은 묶음만 `CARRIED_OVER`. 맞는 묶음이 없으면 모두. 그 글들을 말풍선 번호를 붙여 대기 줄 앞에 넣는다 |
-| 중지, 결과 조회 실패(Hermes 404, 시간 초과, 연결 실패), 그 밖의 예외 | 모두 `UNCONFIRMED`. 대기 줄 앞에 넣고 멈춘다 |
+| 중지, `pendingSteer` 있음 | 완료와 같은 방법으로 맞춘 뒤쪽 묶음만 `NOT_DELIVERED`, 나머지는 `UNCONFIRMED`. 맞는 묶음이 없으면 모두 `UNCONFIRMED`. 모두 대기 줄 앞에 넣고 멈춘다 |
+| 중지(`pendingSteer` 없음), 결과 조회 실패(Hermes 404, 시간 초과, 연결 실패), 그 밖의 예외 | 모두 `UNCONFIRMED`. 대기 줄 앞에 넣고 멈춘다 |
 
 `settle` 의 말풍선 상태 변경, 대기 줄 앞에 넣기, 멈춤은 `SteerLedger` 의 한 트랜잭션이다. 말풍선이 없는 turn 은 아무것도 하지 않는다. 실패하면 삼키지 않고 경고를 남긴 뒤 그 실행 번호와 끝난 방식을 메모리에 적어 둔다. 그 대화의 다음 `tryNext` 가 그 실행만 같은 방식으로 다시 정리한다. 「전달됨」 말풍선만 보고 다시 정리하지 않는다. 완료로 정리해 「전달됨」 으로 남긴 말풍선과 구분할 수 없어, 되돌리면 이미 따른 지시가 다시 실행될 수 있다. 서버가 다시 뜨면 이 기억은 사라지고 그 말풍선은 「전달됨」 으로 남는다.
 재시작 정리가 끝난 run 을 물어 얻은 결과를 적는 `RecoveredRunRecorder.settle`·`failWithout` 이 그 결과를 그대로 넘긴다. 그 호출이 줄을 적었을 때만 넘긴다. 다른 쪽이 이미 적은 줄은 그쪽이 정리했다. 기동 리스너는 남은 「끼우는 중」 만 정리하고 「전달됨」 말풍선은 훑지 않는다. `pending_steer` 가 있으면 REQ3 대로, 결과가 없거나 run 이 없으면 「결과 모름」 이다.
@@ -130,7 +132,7 @@ enqueue(steer=true)
 ### 대기 글로 여는 turn
 
 `ChatTurnRouting.saveQuestion` 이 대기 줄에서 글을 빼는 트랜잭션에서, 말풍선 번호가 붙은 글은 그 행을 `CARRIED_OVER` 로 바꾸고 `steer` 사건을 낸다. 나머지 글만 지금처럼 합쳐 새 `USER` 행이 된다. Hermes 입력은 모든 글을 줄 순서대로 빈 줄로 잇는다.
-멈춘 줄에서 사용자가 말풍선 번호가 붙은 글을 취소하면 그 글만 빠지고 말풍선은 `UNCONFIRMED` 로 남는다(지금 취소 경로 그대로).
+멈춘 줄에서 사용자가 말풍선 번호가 붙은 글을 취소하면 그 글만 빠지고 말풍선은 그 상태(`NOT_DELIVERED` 나 `UNCONFIRMED`)로 남는다(지금 취소 경로 그대로).
 
 ### 화면
 
