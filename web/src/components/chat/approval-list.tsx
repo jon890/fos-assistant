@@ -115,14 +115,10 @@ function useBulkApproval(
 }
 
 /**
- * 그 대화의 승인 카드를 읽고 옆 패널의 「할 일」 탭에 그릴 영역을 만든다.
+ * 그 대화의 승인 카드를 읽고 옆 패널의 「할 일」 탭에 그릴 영역을 만든다. 동작은 `docs/features/connector-policy.md` 의 「화면」 이 갖는다.
  *
- * <p>상태(읽은 줄, 펼친 묶음, 「모두 승인」 진행, 닫은 카드, 원고 저장)는 대화 화면이 이 훅으로 든다. 패널을 닫거나
- * 탭을 옮겨도 「모두 승인」 이 끝까지 돌고 펼친 묶음이 남는다. 같은 도구로 기다리는 줄이 여럿이면 `ApprovalGroup`
- * 한 묶음으로 보인다. 동작은 `docs/features/connector-policy.md` 의 「화면」 이 갖는다.
- *
- * <p>대화나 `refreshKey` 가 바뀌면 다시 읽는다. 처음 성공한 읽기의 번호에 없는 `PENDING` 줄이 보이면 `onFresh` 를
- * 부른다. 보일 줄이 없으면 `view` 가 null 이다. 읽지 못해도 대화를 막지 않게 앞 목록을 둔다.
+ * <p>상태(읽은 줄, 펼친 묶음, 「모두 승인」 진행, 닫은 카드, 원고 저장)는 대화 화면이 이 훅으로 든다. 패널을 닫거나 탭을 옮겨도 「모두 승인」 이 끝까지 돌고 펼친 묶음이 남는다. 같은 도구로 기다리는 줄이 여럿이면 `ApprovalGroup` 한 묶음으로 보인다.
+ * <p>대화나 `refreshKey` 가 바뀌면 다시 읽는다. 처음 성공한 읽기의 번호에 없는 `PENDING` 줄이 보이면 `onFresh` 를 부른다. 보일 줄이 없으면 `view` 가 null 이고, `executing` 은 실행 중인 줄의 플러그인이다. 읽지 못해도 대화를 막지 않게 앞 목록을 둔다.
  */
 export function useApprovalList({
   conversationId,
@@ -132,7 +128,7 @@ export function useApprovalList({
   conversationId: string | null;
   refreshKey: number;
   onFresh: () => void;
-}): { view: ReactNode; count: number; ready: boolean } {
+}): { view: ReactNode; count: number; ready: boolean; executing: string[] } {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   /** 이미 처리된 요청을 만난 카드가 다시 읽기를 청한 횟수다 */
   const [reloads, setReloads] = useState(0);
@@ -304,11 +300,14 @@ export function useApprovalList({
   const ready =
     loaded !== null && loaded.conversationId === conversationId && loaded.ok;
   const count = shownActions.length + shownJobs.length;
+  const executing = actions.flatMap((a) =>
+    a.status === "EXECUTING" ? [a.connectorId] : [],
+  );
   if (
     conversationId === null ||
     (actions.length === 0 && jobOnly.length === 0 && jobs.next === null)
   )
-    return { view: null, count: 0, ready };
+    return { view: null, count: 0, ready, executing };
 
   const view = (
     <div
@@ -396,5 +395,5 @@ export function useApprovalList({
       ) : null}
     </div>
   );
-  return { view, count, ready };
+  return { view, count, ready, executing };
 }

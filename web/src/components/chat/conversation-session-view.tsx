@@ -105,6 +105,7 @@ export function ConversationSessionView({
     turns,
     selectedVersions,
     sending,
+    activity,
   });
 
   if (notFound) {

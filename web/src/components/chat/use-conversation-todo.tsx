@@ -17,6 +17,8 @@ import type { SidePanelTarget } from "./conversation-session-types";
 import type { Turn } from "./message-types";
 import { TodoPanel, type TodoTab } from "./todo-panel";
 import { useConversationHandoffs } from "./use-conversation-handoffs";
+import { AgentBrowser, useAgentBrowserButton } from "./agent-browser";
+import type { ActivityState } from "./activity/activity-state";
 
 /**
  * 사람이 할 일(묻는 카드, 화면 넘기기, 승인)을 옆 패널의 「할 일」 탭에 모으고 입력창 위에 「할 일 N건」 한 줄을 둔다.
@@ -34,6 +36,7 @@ export function useConversationTodo({
   turns,
   selectedVersions,
   sending,
+  activity,
 }: {
   conversationId: string | null;
   refreshKey: number;
@@ -43,6 +46,7 @@ export function useConversationTodo({
   turns: Turn[];
   selectedVersions: Record<number, number>;
   sending: boolean;
+  activity: ActivityState | null;
 }) {
   const searchParams = useSearchParams();
   const entry = searchParams.get(TODO_ENTRY_PARAM) === HANDOFF_ENTRY_OPEN;
@@ -82,6 +86,11 @@ export function useConversationTodo({
     closePanel,
     submit,
   });
+  const agentButton = useAgentBrowserButton({
+    activity,
+    executing: approvals.executing,
+    setPanelTarget,
+  });
   const ask = activeAsk(turns, selectedVersions, sending);
   const count = approvals.count + handoffs.count + (ask ? 1 : 0);
   const hasContent =
@@ -119,6 +128,10 @@ export function useConversationTodo({
 
   function changeTab(tab: TodoTab) {
     setPanelTarget((previous) => {
+      if (previous?.kind === "agent-browser")
+        return tab === "todo"
+          ? { kind: "todo", tab: "todo", handoff: null }
+          : previous;
       if (previous?.kind !== "todo") return previous;
       if (tab === "browser")
         return previous.handoff
@@ -151,20 +164,24 @@ export function useConversationTodo({
   );
 
   return {
-    summary: hasContent ? (
-      <div className="px-1">
-        <div className="mx-auto mb-2 w-full max-w-3xl">
-          <Button
-            size="sm"
-            variant="outline"
-            data-testid="todo-summary"
-            onClick={openTodo}
-          >
-            {todoLabel(count)}
-          </Button>
+    summary:
+      hasContent || agentButton ? (
+        <div className="px-1">
+          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap gap-2">
+            {hasContent ? (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="todo-summary"
+                onClick={openTodo}
+              >
+                {todoLabel(count)}
+              </Button>
+            ) : null}
+            {agentButton}
+          </div>
         </div>
-      </div>
-    ) : null,
+      ) : null,
     panel:
       panelTarget?.kind === "todo" ? (
         <TodoPanel
@@ -174,6 +191,15 @@ export function useConversationTodo({
           onClose={closePanel}
         >
           {panelTarget.tab === "todo" ? todo : handoffs.browser}
+        </TodoPanel>
+      ) : panelTarget?.kind === "agent-browser" ? (
+        <TodoPanel
+          tab="browser"
+          browserEnabled
+          onTabChange={changeTab}
+          onClose={closePanel}
+        >
+          <AgentBrowser nonce={panelTarget.nonce} onClose={closePanel} />
         </TodoPanel>
       ) : null,
   };
