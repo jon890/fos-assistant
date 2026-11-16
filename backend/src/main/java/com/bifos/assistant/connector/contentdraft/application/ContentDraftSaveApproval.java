@@ -109,7 +109,7 @@ public class ContentDraftSaveApproval {
         if (grant != null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted standing approval");
         }
-        // 네이버 블로그 원고 저장은 「내 브라우저」 를 쓴다. 승인 트랜잭션 전에 켠다.
+        // 원고 저장 플러그인이 「내 브라우저」 를 쓰면 승인 트랜잭션 전에 켠다.
         approvalBrowser.require(user, actionId);
         ConnectorAction finished = approvePrepared(user, prepare(user, actionId));
         feedback.record(FeedbackEntry.of(finished.userId(), FeedbackSubjectType.CONNECTOR_ACTION, finished.publicId(),
