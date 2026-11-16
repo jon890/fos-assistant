@@ -8,6 +8,7 @@ export type HandoffNeed =
   | "DEVICE_CHECK"
   | "BOT_CHECK"
   | "UNEXPECTED_PAGE"
+  | "HUMAN_BROWSER"
   | "PAYMENT"
   | "TAB_CHECK";
 
@@ -17,6 +18,7 @@ export const HANDOFF_NEEDS: readonly HandoffNeed[] = [
   "DEVICE_CHECK",
   "BOT_CHECK",
   "UNEXPECTED_PAGE",
+  "HUMAN_BROWSER",
   "PAYMENT",
   "TAB_CHECK",
 ];
@@ -27,7 +29,7 @@ export type Handoff = {
   connectorId: string;
   connectorTitle: string;
   need: HandoffNeed;
-  /** 플러그인이 남긴 「내 브라우저」 탭의 id 다. 응답을 잃은 탭 확인(`TAB_CHECK`)에서만 null 이다. */
+  /** 플러그인이 남긴 「내 브라우저」 탭의 id 다. 응답을 잃은 탭 확인(`TAB_CHECK`)과 탭을 만들기 전에 멈춘 `HUMAN_BROWSER` 에서만 null 이다. */
   tab: string | null;
   createdAt: string;
   /** 결제 넘기기에서 확인한 최종 결제 금액(원)이다. 다른 단계이거나 읽지 못했으면 null 이다. */
@@ -35,6 +37,13 @@ export type Handoff = {
   /** 결제 넘기기에서 승인한 예상 합계(원)다. 다른 단계이거나 읽지 못했으면 null 이다. */
   expectedTotalKrw: number | null;
 };
+
+/**
+ * 「돌려주기」 가 그 대화의 열린 넘기기가 있을 때 보내는 글이다. `HUMAN_BROWSER` 카드의 「다 했어요」 와 같다.
+ * 동작은 `docs/features/browser-cowork/design.md` 의 「PR3 사람 잠금」 이 갖는다.
+ */
+export const HUMAN_BROWSER_DONE =
+  "「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.";
 
 /**
  * 단계마다 카드 제목과 「다 했어요」 가 보내는 글이다. 제목은 Control Plane 의 `HandoffNeed.title()` 과 같다.
@@ -63,6 +72,10 @@ export const HANDOFF_TEXT: Record<
   UNEXPECTED_PAGE: {
     title: "「내 브라우저」에서 화면을 확인해 주세요",
     done: "「내 브라우저」에서 화면을 확인했어요. 멈춘 단계부터 이어서 해 주세요.",
+  },
+  HUMAN_BROWSER: {
+    title: "「내 브라우저」를 직접 쓰는 동안 멈췄어요",
+    done: HUMAN_BROWSER_DONE,
   },
   PAYMENT: {
     title: "「내 브라우저」에서 결제해 주세요",
@@ -129,7 +142,7 @@ export function safeHandoff(value: unknown): Handoff | null {
     !createdAt ||
     !HANDOFF_NEEDS.includes(need as HandoffNeed) ||
     (tab === null
-      ? row.tab !== null || need !== "TAB_CHECK"
+      ? row.tab !== null || (need !== "TAB_CHECK" && need !== "HUMAN_BROWSER")
       : !HANDOFF_TAB_PATTERN.test(tab))
   )
     return null;
@@ -206,4 +219,12 @@ export function newHandoffs(
   handoffs: readonly Handoff[],
 ): Handoff[] {
   return handoffs.filter((handoff) => !seen.has(handoff.handoffId));
+}
+
+/**
+ * 「돌려주기」 가 글을 보낼지다. 결제 밖의 열린 넘기기가 하나라도 있을 때만 보낸다. 결제는 「결제했어요」 와 「사지 않을래요」 가운데
+ * 사람이 고르는 일이라 이어 가라는 글이 맞지 않다(설계의 「PR3 사람 잠금」).
+ */
+export function giveBackSends(handoffs: readonly Handoff[]): boolean {
+  return handoffs.some((handoff) => handoff.need !== "PAYMENT");
 }

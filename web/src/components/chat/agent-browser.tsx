@@ -24,9 +24,14 @@ const NOOP = () => {};
 export function AgentBrowser({
   nonce,
   onClose,
+  conversationId,
+  onGivenBack,
 }: {
   nonce: number;
   onClose(): void;
+  conversationId: string | null;
+  /** 화면의 「돌려주기」 가 성공한 뒤 부른다. 그 대화에 열린 넘기기가 있으면 글을 보낸다. */
+  onGivenBack(): void;
 }) {
   // 다시 열 때마다 화면을 새로 만들어 에이전트 탭으로 다시 옮긴다.
   const [screenKey, setScreenKey] = useState(0);
@@ -45,6 +50,8 @@ export function AgentBrowser({
           key={`${nonce}:${screenKey}`}
           startUrl={null}
           followAgent
+          conversationId={conversationId}
+          onGivenBack={onGivenBack}
           onOpen={NOOP}
           onClose={onClose}
           onReopen={() => setScreenKey((value) => value + 1)}

@@ -6,6 +6,8 @@ import {
   handoffActions,
   handoffBrowserHref,
   handoffDoneHint,
+  giveBackSends,
+  HUMAN_BROWSER_DONE,
   newHandoffs,
   rebaseHandoffWatch,
   safeHandoff,
@@ -142,4 +144,21 @@ test("결제 카드만 「결제했어요」 와 「사지 않을래요」 두 �
     assert.equal(handoffDoneHint(need), "마친 뒤 「다 했어요」를 눌러 주세요.");
   }
   assert.ok(handoffDoneHint("PAYMENT").includes("「사지 않을래요」"));
+});
+
+test("사람이 브라우저를 쓰는 중 넘기기는 탭 없이도 카드로 읽고, 다른 사람 화면은 탭 없이 오면 버린다", () => {
+  const held = safeHandoff({ ...row, need: "HUMAN_BROWSER", tab: null });
+  assert.equal(held?.tab, null);
+  assert.equal(held?.need, "HUMAN_BROWSER");
+  assert.equal(safeHandoff({ ...row, need: "LOGIN", tab: null }), null);
+  assert.equal(HANDOFF_TEXT.HUMAN_BROWSER.done, HUMAN_BROWSER_DONE);
+  assert.equal(handoffBrowserHref(held!), "/browser");
+});
+
+test("돌려주기는 결제 밖의 열린 넘기기가 있을 때만 글을 보낸다", () => {
+  const card = (need: string) => safeHandoff({ ...row, need })!;
+  assert.equal(giveBackSends([]), false);
+  assert.equal(giveBackSends([card("PAYMENT")]), false);
+  assert.equal(giveBackSends([card("PAYMENT"), card("HUMAN_BROWSER")]), true);
+  assert.equal(giveBackSends([card("LOGIN")]), true);
 });

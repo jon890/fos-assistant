@@ -29,10 +29,15 @@ export function HandoffBrowser({
   handoff,
   onClose,
   onDone,
+  conversationId,
+  onGivenBack,
 }: {
   handoff: Handoff;
   onClose(): void;
   onDone(text: string): void;
+  conversationId: string | null;
+  /** 화면의 「돌려주기」 가 성공한 뒤 부른다. 열린 넘기기가 있으면 글을 보낸다. */
+  onGivenBack(): void;
 }) {
   const watch = useRef<HandoffWatch>({ phase: "waiting" });
   const lastTabs = useRef<ScreenTab[]>([]);
@@ -76,6 +81,8 @@ export function HandoffBrowser({
           key={screenKey}
           startUrl={null}
           startTab={handoff.tab}
+          conversationId={conversationId}
+          onGivenBack={onGivenBack}
           onOpen={NOOP}
           onClose={onClose}
           onTabs={onTabs}

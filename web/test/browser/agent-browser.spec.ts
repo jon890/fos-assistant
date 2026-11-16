@@ -132,13 +132,14 @@ test("브라우저 도구가 도는 동안 「에이전트 화면 보기」 가 
         ],
       ],
     ]);
-    await expect(panel.getByTestId("agent-band")).toHaveText(
-      "에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요.",
+    await expect(panel.getByTestId("agent-band")).toContainText(
+      "에이전트가 쓰는 중이에요.",
     );
     await expect(panel.getByRole("button", { name: "새로고침" })).toBeDisabled();
 
-    // 보기 전용 화면을 눌러도 입력을 보내지 않는다. 뒤이어 보낸 탭 옮기기가 먼저 온 입력이 없음을 보인다.
+    // 보기 전용 화면을 눌러도 입력을 보내지 않고 「직접 하시겠어요?」 만 묻는다. 뒤이어 보낸 탭 옮기기가 먼저 온 입력이 없음을 보인다.
     await panel.getByAltText("내 브라우저 화면").click();
+    await expect(panel.getByTestId("takeover-confirm")).toBeVisible();
     await panel.getByRole("combobox", { name: "탭" }).selectOption(HUMAN_TAB);
     await expect
       .poll(() => ofType(fake.inputs, "tab").map((sent) => sent.id))

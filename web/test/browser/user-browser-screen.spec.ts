@@ -537,3 +537,54 @@ test("사이트의 확인 창을 보이고 고른 답을 보내며, 창이 닫�
     .poll(() => ofType(fake.inputs, "dialog").map((input) => input.action))
     .toEqual(["dismiss", "accept"]);
 });
+
+test("에이전트가 쓰는 탭은 띠의 「직접 할게요」 로 넘겨받고, 화면 누르기와 Esc 는 확인 띠만 띄우며, 「돌려주기」 는 잠금만 푼다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  const calls: { path: string; body: string | null }[] = [];
+  for (const path of ["takeover", "give-back"])
+    await page.route(`**/api/browser/${path}`, (route) => {
+      calls.push({ path, body: route.request().postData() });
+      return route.fulfill({ status: 204 });
+    });
+  const screen = await openScreen(page, fake);
+  const agentTabs = [{ ...TABS[0], agent: true }, { ...TABS[1], agent: false }];
+  await fake.push([
+    ["tabs", agentTabs],
+    ["hold", { human: false, approved: true }],
+  ]);
+  // 승인한 실행 중이면 단추가 없고 눌러도 묻지 않는다.
+  await expect(page.getByTestId("agent-band")).toHaveText(
+    "승인한 작업을 마무리하는 중이에요.",
+  );
+  await screen.click();
+  await expect(page.getByTestId("takeover-confirm")).toHaveCount(0);
+
+  await fake.push([["hold", { human: false, approved: false }]]);
+  const band = page.getByTestId("agent-band");
+  await expect(band).toContainText("에이전트가 쓰는 중이에요.");
+  await screen.click();
+  const confirm = page.getByTestId("takeover-confirm");
+  await expect(confirm).toContainText("직접 하시겠어요?");
+  await confirm.getByRole("button", { name: "계속 볼게요" }).click();
+  await expect(confirm).toHaveCount(0);
+  await page.getByRole("dialog", { name: "내 브라우저 크게 보기" }).press("Escape");
+  await expect(confirm).toBeVisible();
+  expect(ofType(fake.inputs, "mouse")).toEqual([]);
+  expect(calls).toEqual([]);
+
+  await confirm.getByRole("button", { name: "직접 할게요" }).click();
+  await expect(page.getByTestId("human-band")).toContainText("직접 하는 중이에요.");
+  // /browser 에는 대화가 없어 대화 번호를 싣지 않는다.
+  expect(calls).toEqual([{ path: "takeover", body: "{}" }]);
+  const box = await drawnBox(screen);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => ofType(fake.inputs, "mouse").length).toBeGreaterThan(0);
+
+  await fake.push([["tabs", TABS]]);
+  await page.getByRole("button", { name: "돌려주기" }).click();
+  await expect(page.getByTestId("human-band")).toHaveCount(0);
+  expect(calls.map((call) => call.path)).toEqual(["takeover", "give-back"]);
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+});
