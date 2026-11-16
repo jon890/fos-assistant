@@ -8,7 +8,7 @@ covers: `hermes/connectors/naver-shopping/`
 요구와 결정은 스펙 [`naver-shopping/spec.md`](naver-shopping/spec.md), 구조는 설계 [`naver-shopping/design.md`](naver-shopping/design.md), 결정의 근거는 [ADR-20261110 / naver-shopping-connector](../adr/ADR-20261110-naver-shopping-connector.md) 가 갖는다.
 플러그인 공통 계약은 [플러그인 연결](connector.md) 과 [플러그인 도구 정책](connector-policy.md), 브라우저와 중계는 [사용자 브라우저](user-browser.md) 가 갖는다.
 
-**결제 단추를 누르지 않는다.** 주문서까지 채우고 결제 화면을 사람에게 넘긴다. 장바구니에 담지 않는다. 주문 확인(REQ14)은 스펙의 뒤 PR 이 더한다.
+**결제 단추를 누르지 않는다.** 주문서까지 채우고 결제 화면을 사람에게 넘긴다. 장바구니에 담지 않는다. 사람이 결제했다고 하면 네이버페이 결제 내역에서 주문을 확인만 한다(REQ14). 취소·반품 도구는 없다.
 구매 경계(승인 카드, 구매 상한, 결제 직전 금액 재확인)의 근거는 [ADR-20261113 / purchase-checkout](../adr/ADR-20261113-purchase-checkout.md) 가 갖는다.
 
 ## 등록 칸
@@ -23,13 +23,14 @@ covers: `hermes/connectors/naver-shopping/`
 
 ## 도구와 정책
 
-MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` 다. 채우기만 `PURCHASE`(승인 `always`)이고 나머지는 `READ`, 승인 없음이다.
+MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` 다. 채우기만 `PURCHASE`(승인 `always`)이고 나머지는 `READ`, 승인 없음이다. 주문 확인만 `payment_context` 를 선언한다.
 
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
 | `check_shopping_login` | 없음 | `{browser: "connected", logged_in: true}`. 쿠키가 없으면 `NAVER_SHOPPING_LOGIN_REQUIRED`. 탭을 열지 않는다 |
 | `search_products` | `query`(한 줄 1자에서 100자) | `{query, count, products: [{rank, title, price_krw, store, url, kind, naver_pay, ad}]}`. 처음 실린 상품을 40개까지 |
 | `get_product_detail` | `url`(2,048자까지) | 아래 「상품 정보」 |
+| `check_shopping_order` | 모델이 넣는 인자는 없다. fos-ctx 가 `_fos_payment` 를 넣는다 | `{status, message, final_amount_krw?, order?: {status, paid_amount_krw, ordered_at}}`. 아래 「주문 확인」 |
 | `prepare_checkout` | `{v: 1, tool: "fill_checkout", args: {url, options, quantity}}` | `{v: 1, executionArgs, summary}`. 모델이 아니라 대시보드의 준비 경로가 받는다. 아래 「주문서 준비와 채우기」 |
 | `fill_checkout` | 준비가 만든 `executionArgs` | `{status: "ORDER_SHEET_READY", finalAmountKrw, tab}` 이나 `{status: "UNKNOWN", tab}`. 모델 목록에 없고 승인한 실행만 부른다 |
 
@@ -61,6 +62,15 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 - **금액**: 주문서의 「총 주문금액」 과 결제수단 절 머리의 금액이 같을 때만 최종 금액이다. 이름, 주소, 전화번호 같은 화면 글은 결과와 로그에 싣지 않는다
 - **결과를 모를 때**: 「바로구매」 를 보낸 뒤(층이 확인되기 전의 「구매하기」 뒤 포함) 주문서나 금액을 확인하지 못하면 오류가 아니라 `{status: "UNKNOWN", tab}` 이다. 다시 보내지 않는다. Control Plane 이 그 승인을 `UNKNOWN` 으로 끝내고 탭 확인 카드를 띄운다
 - 주문서 화면은 2026-11-13 실측이고, 상품 구매 층의 옵션·수량 칸은 아직 재지 않았다. 칸 위치는 `src/fields.ts` 에 있다
+
+## 주문 확인
+
+결제 넘기기 카드의 「결제했어요」 뒤에 에이전트가 `check_shopping_order` 를 부른다. 「사지 않을래요」 면 부르지 않는다. 규칙과 가설은 [설계](naver-shopping/design.md)의 「PR4 주문 확인(REQ14)」 이 갖는다.
+
+- **넘긴 시각과 금액은 모델이 주지 않는다**: 선언 `payment_context` 를 보고 Control Plane 이 판정 응답에 그 대화의 마지막 결제 넘기기 맥락(넘긴 시각, 최종 결제 금액, 승인한 예상 합계, 상품 주소)을 싣고, fos-ctx 가 인자 `_fos_payment` 로 넣는다. 모델이 같은 인자를 보내면 지운다. 맥락이 없으면 화면을 열지 않고 `NO_PAYMENT_HANDOFF` 다
+- **여는 주소**: 상수 `https://pay.naver.com/pc/history` 하나의 첫 페이지다. 상태 JSON(`__NEXT_DATA__` 의 `PAYMENT_LIST`)에서 고정 식이 종류, 상품 번호, 시각, 상태 낱말, 금액 칸만 꺼낸다
+- **맞추기**: `ORDER` 항목 가운데 상품 번호가 같고 넘긴 시각 10분 전 이후인 주문에서 금액 후보 하나가 최종 결제 금액과 같으면 `CONFIRMED`, 상품과 시각만 맞으면 `AMOUNT_MISMATCH`, 없으면 `NOT_FOUND` 다. 금액 칸과 시각 칸의 뜻은 실제 결제 전이라 가설이다
+- **결과에 싣는 것**: 상태 낱말, 금액 정수, 주문 시각, 고정 안내 글뿐이다. 이름, 주소, 상품명, 판매처, 주문 번호는 탭 밖으로 꺼내지 않는다
 
 ## 주소 분류
 
@@ -142,6 +152,7 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 1. **상한 정하기**: 상한이 0 인 채로 싼 상품 하나를 사 달라고 해 「상한을 정해 주세요」 로 거절되는지 본다. 그다음 「외부 서비스 연결」 의 네이버 쇼핑 연결에서 한 건 상한과 하루 상한을 그 상품의 예상 합계보다 조금 크게 정한다
 2. **준비**: 옵션 없는 싼 상품 하나를 사 달라고 한다. 승인 카드가 상품, 판매처, 수량, 상품 금액, 배송비, 예상 합계, 「지역 추가 배송비 별도」, 오늘 남은 구매 한도를 보이고 배송지와 결제 수단 칸이 없는지, 「승인하고 묻지 않기」 와 「이 대화에서 계속 허용」 이 없는지 본다
 3. **카드 승인**: 승인하면 「내 브라우저」 에 상품 탭이 열리고 「구매하기」, 상품 구매 층의 「바로구매」 를 거쳐 주문서 탭이 남는지 본다. 장바구니에 담기지 않았는지 본다. 대화에 결제 넘기기 카드가 최종 결제 금액과 승인한 예상 합계를 보이는지 본다
-4. **주문서 탭에서 결제하거나 닫기**: 카드의 「내 브라우저 열기」 로 주문서 탭을 열어 금액이 카드와 같은지 본다. 사람이 직접 결제하거나, 사지 않으려면 탭을 닫는다. 「다 했어요」 를 누르면 카드가 닫힌다
-5. 옵션이 있는 상품으로 2~4 를 한 번 더 돈다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다. 채우기가 어느 단계에서 멈췄는지는 그 profile 의 MCP 표준 오류 기록의 `fill_checkout` 진단 줄로 본다(설계의 「채우기 진단」)
-6. 하루 상한을 오늘 승인한 합계보다 작게 낮춘 뒤 다시 사 달라고 해, 카드 없이 걸린 상한과 남은 한도를 알리는지 본다
+4. **주문서 탭에서 결제하거나 닫기**: 카드의 「내 브라우저 열기」 로 주문서 탭을 열어 금액이 카드와 같은지 본다. 카드에 「결제했어요」 와 「사지 않을래요」 두 단추가 있는지 본다. 사지 않으려면 탭을 닫고 「사지 않을래요」 를 누른다. 에이전트가 주문 확인을 부르지 않고 마치는지 본다
+5. **주문 확인**: 사람이 직접 결제한 뒤 「결제했어요」 를 누른다. 에이전트가 주문 확인을 불러 그 주문을 확인했다고 결제 금액과 함께 알리는지 본다. `AMOUNT_MISMATCH` 나 `NOT_FOUND` 가 나오면 그 profile 의 MCP 표준 오류 기록의 `check_shopping_order` 진단 줄과 「내 브라우저」 의 결제 내역을 보고 `src/fields.ts` 의 `ORDER_HISTORY` 금액 칸과 `src/parse-orders.ts` 의 `ORDER_TIME_GRACE_MS` 를 맞춘다. 결제하지 않고 「결제했어요」 를 눌렀을 때는 결제가 확인되지 않았다고 알리는지 본다
+6. 옵션이 있는 상품으로 2~4 를 한 번 더 돈다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다. 채우기가 어느 단계에서 멈췄는지는 그 profile 의 MCP 표준 오류 기록의 `fill_checkout` 진단 줄로 본다(설계의 「채우기 진단」)
+7. 하루 상한을 오늘 승인한 합계보다 작게 낮춘 뒤 다시 사 달라고 해, 카드 없이 걸린 상한과 남은 한도를 알리는지 본다
