@@ -1735,6 +1735,7 @@ Control Plane이 반환한 `isError` 결과와 JSON-RPC `-32602` 인자 오류�
 
 Hermes 는 stdio MCP 서버(플러그인)의 표준 오류를 그 profile 의 `logs/mcp-stderr.log`(순환본 `.1`)에 모은다. 운영의 기동 확인이 이 파일의 `starting MCP server '<이름>'` 줄을 읽는 것으로 확인했다. 소스로는 읽지 않았다.
 플러그인이 진단을 남기는 자리가 이 파일이다. 줄에는 주소, 블로그 아이디, 글을 싣지 않는다. 대시보드 plugin 의 연결 확인과 선택지 호출은 자식의 표준 오류를 버리므로 그 경로의 진단은 남지 않는다.
+대시보드 plugin 이 승인한 실행(`execute`)과 금융 준비(`prepare`)로 띄운 자식은 Hermes 를 거치지 않는다. 그 표준 오류에서 진단 줄 모양만 골라 이 plugin 이 같은 파일에 더한다. 모양과 규칙은 [대시보드 plugin](../plugins/dashboard-profile-api/README.md) 의 `execute` 절이 갖는다. 파일의 순환은 Hermes 가 하므로 이 plugin 은 끝에 더하기만 한다.
 네이버 블로그 플러그인의 진단 줄 모양은 [네이버 블로그 플러그인](../../docs/features/naver-blog-connector.md) 의 「진단 줄」 이 갖는다.
 
 ### 도구를 모델에게서 빼는 설정

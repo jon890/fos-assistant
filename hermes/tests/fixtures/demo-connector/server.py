@@ -5,6 +5,7 @@
 
 import json
 import os
+import sys
 
 import anyio
 from mcp.server.mcpserver import MCPServer
@@ -14,6 +15,15 @@ server = MCPServer("demo")
 
 # 시간 제한 검사가 쓴다. 대시보드의 제한보다 훨씬 길어야 한다.
 SLOW_SECONDS = 60
+
+# 진단 줄 검사가 쓰는 표준 오류 줄. 앞의 둘만 진단 줄 모양이고 나머지는 대시보드가 버려야 한다.
+DIAGNOSE_LINES = [
+    json.dumps({"demo_diagnostic": {"tool": "write_note", "stage": "fill.failed", "missing": [], "code": "typeerror"}}),
+    "connector-launcher: exec_failed",
+    json.dumps({"demo_diagnostic": {"stage": "https://secret.example.test/a"}}),
+    json.dumps({"demo_diagnostic": {"stage": "ok"}, "extra": "secret-extra"}),
+    "Traceback (most recent call last): secret-traceback",
+]
 
 
 def failure(code: str) -> CallToolResult:
@@ -61,7 +71,13 @@ async def write_note(text: str = "") -> dict:
     """쓰는 도구다. 대시보드의 `call` 이 이 도구를 부르면 안 된다.
 
     받은 인자와 토큰의 앞 4자를 그대로 돌려준다. 실행 경로의 검사가 인자와 env 가 닿았는지 본다.
+    `text` 가 `diagnose` 로 시작하면 표준 오류에 진단 줄과 옮기면 안 되는 줄을 섞어 쓴다. `diagnose-slow` 는 쓴 뒤 오래 기다린다.
     """
+    if text.startswith("diagnose"):
+        sys.stderr.write("\n".join(DIAGNOSE_LINES + ["DEMO_TOKEN=" + os.environ.get("DEMO_TOKEN", "")]) + "\n")
+        sys.stderr.flush()
+        if text == "diagnose-slow":
+            await anyio.sleep(SLOW_SECONDS)
     return {"written": True, "text": text, "token": os.environ.get("DEMO_TOKEN", "")[:4]}
 
 
