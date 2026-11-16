@@ -172,6 +172,7 @@ class BrowserGatewayTest {
             Duration.ofMinutes(10),
             Duration.ofSeconds(30),
             Duration.ofMinutes(30),
+            Duration.ofMinutes(30),
             baseUrl,
             secret);
         return new BrowserGatewayTokens(

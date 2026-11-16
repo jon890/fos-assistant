@@ -334,6 +334,8 @@ assistant:
     max-running: ${ASSISTANT_BROWSER_MAX_RUNNING:2}
     # 화면도 중계 연결도 없이 이만큼 지나면 자동으로 멈춘다
     idle-timeout: ${ASSISTANT_BROWSER_IDLE_TIMEOUT:10m}
+    # 사람을 기다리는 일(열린 화면 넘기기, 브라우저 플러그인의 기다리는 승인)이 있을 때 자동 중지까지의 유휴 시간. idle-timeout 보다 짧으면 idle-timeout 으로 끌어올린다
+    wait-hold-timeout: ${ASSISTANT_BROWSER_WAIT_HOLD_TIMEOUT:30m}
     # 켠 뒤 CDP 가 답하기를 기다리는 시간. 넘으면 컨테이너를 지우고 FAILED 로 둔다
     start-timeout: 30s
     # 자동 중지와 상태 맞추기를 도는 간격. 기동 때도 한 번 돈다

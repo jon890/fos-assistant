@@ -1,5 +1,7 @@
 package com.bifos.assistant.browser.application;
 
+import com.bifos.assistant.browser.application.port.BrowserWaitDemand;
+import com.bifos.assistant.browser.config.BrowserProperties;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.RuntimeContainer;
 import com.bifos.assistant.browser.domain.UserBrowser;
@@ -7,6 +9,7 @@ import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
 import com.bifos.assistant.browser.infra.UserBrowserRepository;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
+import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +50,8 @@ public class UserBrowserSweeper {
     private final BrowserRuntime runtime;
     private final BrowserUsage usage;
     private final UserAccessPolicy access;
+    private final BrowserWaitDemand waits;
+    private final LiveProperties<BrowserProperties> properties;
     private final Clock clock;
 
 
@@ -110,21 +115,39 @@ public class UserBrowserSweeper {
     }
 
 
-    /** 유휴 시간이 지났고 화면도 중계 연결도 없는 {@code RUNNING} 을 멈춘다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다. */
+    /**
+     * 유휴 시간이 지났고 화면도 중계 연결도 없는 {@code RUNNING} 을 멈춘다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다.
+     *
+     * <p>그 사용자가 사람을 기다리면({@link BrowserWaitDemand}) 유휴 기준을 {@code wait-hold-timeout} 으로 늘린다. 넘긴 탭과 승인할
+     * 주문서 탭이 사람이 돌아오기 전에 사라지지 않게 한다. 기다림을 묻다 실패하면 그 줄은 끄지 않고 다음 점검에서 다시 본다.
+     */
     void stopIdle() {
-        Instant cutoff = clock.instant().minus(service.idleTimeout());
+        Instant now = clock.instant();
+        Instant cutoff = now.minus(service.idleTimeout());
+        Instant holdCutoff = now.minus(properties.current().waitHoldTimeout());
         for (UserBrowser browser : browsers.findByStatusAndLastActiveAtBefore(UserBrowserStatus.RUNNING, cutoff)) {
             if (usage.inUse(browser.id())) {
                 continue;
             }
             try {
-                if (service.stopIfIdle(browser.id(), cutoff)) {
+                Instant limit = waiting(browser) ? holdCutoff : cutoff;
+                if (browser.lastActiveAt() != null && !browser.lastActiveAt().isBefore(limit)) {
+                    continue;
+                }
+                if (service.stopIfIdle(browser.id(), limit)) {
                     log.info("user browser stopped after idle id={}", browser.id());
                 }
             } catch (RuntimeException ex) {
                 log.warn("user browser idle stop failed id={} error={}", browser.id(), name(ex));
             }
         }
+    }
+
+
+    /** 그 사용자가 사람을 기다리는가. 이번에 켜진 시각을 모르면 처음부터 본다. */
+    private boolean waiting(UserBrowser browser) {
+        Instant since = browser.startedAt() != null ? browser.startedAt() : Instant.EPOCH;
+        return waits.waiting(browser.userId(), since);
     }
 
 

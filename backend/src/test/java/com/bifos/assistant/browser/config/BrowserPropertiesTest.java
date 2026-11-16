@@ -20,6 +20,17 @@ class BrowserPropertiesTest {
 
 
     @Test
+    @DisplayName("사람을 기다릴 때의 유휴 시간이 기본 유휴 시간보다 짧으면 기본 유휴 시간으로 끌어올린다")
+    void raisesWaitHoldToIdle() {
+        BrowserProperties properties = new BrowserProperties(
+            false, null, null, null, null, null, null, null, 1024, null, null, null, 2,
+            Duration.ofMinutes(40), Duration.ofSeconds(30), Duration.ofMinutes(30), Duration.ofMinutes(30), null, null);
+
+        assertThat(properties.waitHoldTimeout()).isEqualTo(Duration.ofMinutes(40));
+    }
+
+
+    @Test
     @DisplayName("중계 두 값이 모두 있으면 중계가 켜진다")
     void enablesGatewayWithBothValues() {
         assertThat(properties(BASE, SECRET).gatewayEnabled()).isTrue();
@@ -101,6 +112,7 @@ class BrowserPropertiesTest {
             2,
             Duration.ofMinutes(10),
             Duration.ofSeconds(30),
+            Duration.ofMinutes(30),
             Duration.ofMinutes(30),
             gatewayBaseUrl,
             gatewaySecret);

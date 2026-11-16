@@ -47,6 +47,30 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
 
     /**
+     * 그 사용자의 열린 화면 넘기기가 {@code since} 뒤에 생긴 것이 있는가. 브라우저 자동 중지가 사람을 기다리는지 볼 때 쓴다.
+     *
+     * <p>대화가 없는 넘기기는 닫을 사람 turn 이 없어 영영 열려 있으므로 세지 않는다. 조건은 {@code ConnectorHandoffRepository} 의
+     * 열린 넘기기와 같다.
+     */
+    @Query("""
+            select case when count(a) > 0 then true else false end
+            from ConnectorAction a
+            where a.userId = :userId and a.conversationId is not null
+                and a.handoff.need is not null and a.handoff.closedAt is null and a.handoff.at >= :since
+            """)
+    boolean existsOpenHandoffSince(@Param("userId") Long userId, @Param("since") Instant since);
+
+
+    /** 그 사용자의 기다리는 승인 줄이 가리키는 플러그인이다. 기다리는 시간이 지난 줄은 뺀다. */
+    @Query("""
+            select distinct a.connectorId from ConnectorAction a
+            where a.userId = :userId and a.status = :status and a.expiresAt > :now
+            """)
+    List<String> findUnexpiredConnectorIdsByStatus(
+        @Param("userId") Long userId, @Param("status") ActionStatus status, @Param("now") Instant now);
+
+
+    /**
      * 승인 줄의 상태를 바꾸기 전에 그 줄을 잠그고 읽는다.
      *
      * <p>같은 줄의 승인과 거절과 만료와 연결 해제가 순서대로 처리된다. 뒤에 온 쪽은 앞선 쪽이 커밋한 상태를 읽는다.
