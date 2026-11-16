@@ -301,7 +301,7 @@ export function useApprovalList({
     loaded !== null && loaded.conversationId === conversationId && loaded.ok;
   const count = shownActions.length + shownJobs.length;
   const executing = actions.flatMap((a) =>
-    a.status === "EXECUTING" ? [a.connectorId] : [],
+    a.status === "EXECUTING" && !a.contentDraft ? [a.connectorId] : [],
   );
   if (
     conversationId === null ||
