@@ -30,6 +30,7 @@ public class BrowserScreens implements AutoCloseable {
     private final CdpTargets targets;
     private final CdpConnector connector;
     private final BrowserUsage usage;
+    private final BrowserAgentTabs agentTabs;
     // 화면을 열 때마다 읽는다. 운영 설정을 바꾸면 다음 화면부터 적용된다
     private final Supplier<Duration> timeout;
     private final Duration tabInterval;
@@ -42,8 +43,9 @@ public class BrowserScreens implements AutoCloseable {
         CdpTargets targets,
         CdpConnector connector,
         BrowserUsage usage,
+        BrowserAgentTabs agentTabs,
         LiveProperties<BrowserProperties> properties) {
-        this(targets, connector, usage, () -> properties.current().screenTimeout(), TAB_INTERVAL);
+        this(targets, connector, usage, agentTabs, () -> properties.current().screenTimeout(), TAB_INTERVAL);
     }
 
 
@@ -51,11 +53,13 @@ public class BrowserScreens implements AutoCloseable {
         CdpTargets targets,
         CdpConnector connector,
         BrowserUsage usage,
+        BrowserAgentTabs agentTabs,
         Supplier<Duration> timeout,
         Duration tabInterval) {
         this.targets = targets;
         this.connector = connector;
         this.usage = usage;
+        this.agentTabs = agentTabs;
         this.timeout = timeout;
         this.tabInterval = tabInterval;
         this.scheduler = new ScheduledThreadPoolExecutor(
@@ -67,7 +71,7 @@ public class BrowserScreens implements AutoCloseable {
     /** 지금 탭에 화면을 열고 앞의 화면은 닫는다. 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. */
     public void open(Long browserId, Long userId, URI cdp, String url, BrowserScreenSink sink) {
         BrowserScreenSession session = new BrowserScreenSession(
-            browserId, userId, cdp, targets, connector, usage.open(browserId), sink, scheduler, this::forget);
+            browserId, userId, cdp, targets, connector, usage.open(browserId), sink, agentTabs, scheduler, this::forget);
         BrowserScreenSession previous = screens.put(browserId, session);
         if (previous != null) {
             previous.close(BrowserScreenSession.REPLACED);

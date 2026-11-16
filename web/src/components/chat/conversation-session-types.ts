@@ -12,11 +12,13 @@ export type ErrorPayload = { code: string; message: string };
 /**
  * 옆 패널에 띄운 것이다. 작업 과정이거나, 답이 만든 결과물 파일 하나거나, 「할 일」 과 「내 브라우저」 탭의 패널이다.
  * `todo` 의 `handoff` 는 「내 브라우저」 탭이 보일 넘기기다. `tab` 이 `browser` 면 늘 있다.
+ * `agent-browser` 는 「에이전트 화면 보기」 로 연 「내 브라우저」 탭이다. `nonce` 가 바뀌면 화면을 새로 만든다.
  */
 export type SidePanelTarget =
   | { kind: "activity"; target: ActivityPanelTarget }
   | { kind: "artifact"; messageId: Turn["id"]; path: string; name: string }
-  | TodoPanelTarget;
+  | TodoPanelTarget
+  | { kind: "agent-browser"; nonce: number };
 
 export type TodoPanelTarget =
   | { kind: "todo"; tab: "todo"; handoff: Handoff | null }

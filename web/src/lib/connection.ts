@@ -69,6 +69,8 @@ export type ConnectorSummary = {
   standardPlugin: boolean;
   /** 연결 하나를 에이전트 하나에만 붙이는가. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
   singleBinding?: boolean;
+  /** 사용자 브라우저를 쓰는 플러그인인가. 대화의 「에이전트 화면 보기」 단추가 쓴다. 옛 Control Plane 은 내지 않고 거짓으로 읽는다. */
+  ownerBrowser?: boolean;
 };
 
 export type ConnectorOption = { value: string; label: string };

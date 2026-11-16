@@ -44,6 +44,7 @@ class BrowserGatewayTest {
     private final Map<Long, Long> bindingOwners = Map.of(BINDING_ID, OWNER);
     private UserBrowserService browsers;
     private BrowserUsage usage;
+    private final BrowserAgentTabs agentTabs = new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC());
 
 
     @BeforeEach
@@ -148,9 +149,28 @@ class BrowserGatewayTest {
     }
 
 
+    @Test
+    @DisplayName("탭 연결(page)은 열린 동안 그 탭을 쥐고, 브라우저 수준 연결은 쥐지 않으며, 중계로 만든 탭은 바로 쥔다")
+    void holdsOnlyPageConnectionsAndCreatedTabs() {
+        BrowserGateway gateway = gateway(tokens(BASE, SECRET));
+        GatewayTarget target = new GatewayTarget(OWNER, BROWSER_ID, CDP);
+
+        BrowserUsageHandle page = gateway.holdTab(target, "page", "PAGE1");
+        BrowserUsageHandle browser = gateway.holdTab(target, "browser", "PAGE2");
+        gateway.created(target, "NEW1");
+
+        assertThat(agentTabs.held(BROWSER_ID, "PAGE1")).isTrue();
+        assertThat(agentTabs.held(BROWSER_ID, "PAGE2")).isFalse();
+        assertThat(agentTabs.held(BROWSER_ID, "NEW1")).isTrue();
+        page.close();
+        browser.close();
+        assertThat(agentTabs.held(BROWSER_ID, "PAGE1")).isFalse();
+    }
+
+
     private BrowserGateway gateway(BrowserGatewayTokens tokens) {
         BrowserGrantOwners owners = bindingId -> Optional.ofNullable(bindingOwners.get(bindingId));
-        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage);
+        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage, agentTabs);
     }
 
 

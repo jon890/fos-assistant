@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -218,6 +219,21 @@ class BrowserGatewayControllerTest {
             .containsExactly(
                 CDP + " PUT /json/new?https%3A%2F%2Fexample.com%2Fa%3Fb%3D1",
                 CDP + " PUT /json/new?about:blank");
+    }
+
+
+    @Test
+    @DisplayName("json/new 로 만든 탭은 에이전트가 쥔 탭으로 알리고 Chrome 이 실패하면 알리지 않는다")
+    void marksCreatedTabsAsAgentTabs() throws Exception {
+        chrome.answer("PUT /json/new?about:blank", 200, """
+                {"id":"NEW2","type":"page","webSocketDebuggerUrl":"ws://192.0.2.10:9999/devtools/page/NEW2"}""");
+        chrome.answer("PUT /json/new?https%3A%2F%2Fexample.com%2F", 500, "boom");
+
+        mvc.perform(put(URI.create(BASE + "/json/new?about:blank"))).andExpect(status().isOk());
+        mvc.perform(put(URI.create(BASE + "/json/new?https%3A%2F%2Fexample.com%2F"))).andExpect(status().isBadGateway());
+
+        verify(gateway).created(TARGET, "NEW2");
+        verify(gateway, times(1)).created(any(), any());
     }
 
 

@@ -3,13 +3,19 @@ package com.bifos.assistant.browser.infra;
 import com.bifos.assistant.browser.domain.CdpConnection;
 import com.bifos.assistant.browser.domain.CdpConnector;
 import com.bifos.assistant.browser.domain.CdpEvent;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -52,6 +59,10 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
     private static final int BUFFER_KEEP_CHARS = 1024 * 1024;
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /** 탭 번호의 모양이다. */
+    private static final Pattern TARGET_ID = Pattern.compile("^[A-Za-z0-9]+$");
+    /** 브라우저 수준 WebSocket 경로의 모양이다. */
+    private static final Pattern BROWSER_PATH = Pattern.compile("^/devtools/browser/[A-Za-z0-9-]{1,128}$");
 
     private final HttpClient client;
     private final Duration commandTimeout;
@@ -78,7 +89,73 @@ public class WebSocketCdpConnector implements CdpConnector, AutoCloseable {
         if (cdp == null || !"http".equals(cdp.getScheme()) || cdp.getHost() == null) {
             throw new IllegalArgumentException("cdp address is not valid");
         }
-        URI address = URI.create("ws://" + cdp.getRawAuthority() + "/devtools/page/" + targetId);
+        return open(URI.create("ws://" + cdp.getRawAuthority() + "/devtools/page/" + targetId), events, closed);
+    }
+
+
+    /**
+     * {@code /json/version} 이 알려 준 브라우저 수준 주소의 경로만 받아 {@code cdp} 의 host 와 port 에 붙고, {@code Target.getTargets}
+     * 한 번을 읽고 닫는다.
+     */
+    @Override
+    public Map<String, String> openers(URI cdp) {
+        if (cdp == null || !"http".equals(cdp.getScheme()) || cdp.getHost() == null) {
+            throw new IllegalArgumentException("cdp address is not valid");
+        }
+        String path = browserPath(cdp);
+        Map<String, String> openers = new HashMap<>();
+        try (CdpConnection connection = open(URI.create("ws://" + cdp.getRawAuthority() + path), event -> {
+        }, () -> {
+        })) {
+            JsonNode result = connection.send("Target.getTargets", Map.of()).join();
+            for (JsonNode info : result.path("targetInfos")) {
+                String id = info.path("targetId").asString("");
+                String opener = info.path("openerId").asString("");
+                if ("page".equals(info.path("type").asString("")) && TARGET_ID.matcher(id).matches()
+                    && TARGET_ID.matcher(opener).matches()) {
+                    openers.put(id, opener);
+                }
+            }
+        } catch (CompletionException ex) {
+            throw new IllegalStateException("cdp target list failed", ex);
+        }
+        return openers;
+    }
+
+
+    /** 브라우저 수준 WebSocket 의 경로다. 모양이 다르면 붙지 않는다. */
+    private String browserPath(URI cdp) {
+        HttpResponse<String> response;
+        try {
+            response = client.send(
+                HttpRequest.newBuilder(URI.create("http://" + cdp.getRawAuthority() + "/json/version"))
+                    .timeout(CONNECT_TIMEOUT)
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new IllegalStateException("cdp version failed", ex);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("cdp version interrupted", ex);
+        }
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("cdp version returned status " + response.statusCode());
+        }
+        String path;
+        try {
+            path = URI.create(JSON.readTree(response.body()).path("webSocketDebuggerUrl").asString("")).getRawPath();
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException("cdp version returned malformed json", ex);
+        }
+        if (path == null || !BROWSER_PATH.matcher(path).matches()) {
+            throw new IllegalStateException("cdp version returned no browser address");
+        }
+        return path;
+    }
+
+
+    private CdpConnection open(URI address, Consumer<CdpEvent> events, Runnable closed) {
         Session session = new Session(events, closed);
         CompletableFuture<WebSocket> opening = client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, session);
         try {

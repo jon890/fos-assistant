@@ -114,7 +114,8 @@ public final class ConnectionDtos {
         String readmeUrl,
         String linkKind,
         boolean standardPlugin,
-        boolean singleBinding) {
+        boolean singleBinding,
+        boolean ownerBrowser) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                 value.id(),
@@ -131,7 +132,8 @@ public final class ConnectionDtos {
                 value.appearance().readmeUrl(),
                 value.appearance().linkKind(),
                 value.standardPlugin(),
-                value.singleBinding());
+                value.singleBinding(),
+                value.ownerBrowser());
         }
     }
 

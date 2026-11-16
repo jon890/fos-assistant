@@ -646,6 +646,23 @@ class ConnectorConnectionServiceTest {
 
 
     @Test
+    @DisplayName("카탈로그 항목은 사용자 브라우저를 쓰는 플러그인인지 싣는다")
+    void catalogCarriesOwnerBrowser() {
+        CurrentUser user = user(UserRole.MEMBER, 1L);
+        ConnectorManifest base = PIN_MANIFEST;
+        ConnectorManifest browser = new ConnectorManifest(DEMO, DEMO, "", List.of(), base.verifyTool(), "demo",
+            base.schema(), base.tools(), base.skills(), base.appearance(), base.singleBinding(), true,
+            "https://login.example.test/", base.executionGuard(), base.executionGuardManifestSha256(), base.snapshot(),
+            base.unknownErrors(), base.defaultToolPolicy(), base.eventWatch());
+        when(connector.readCatalog()).thenReturn(List.of(PIN_MANIFEST, browser));
+
+        assertThat(service.catalog(user))
+            .extracting(ConnectorSummary::id, ConnectorSummary::ownerBrowser)
+            .containsExactly(tuple(PIN, false), tuple(DEMO, true));
+    }
+
+
+    @Test
     @DisplayName("카탈로그 항목은 커넥터 선언의 아이콘과 링크를 그대로 싣는다")
     void catalogCarriesManifestAppearance() {
         CurrentUser user = user(UserRole.MEMBER, 1L);

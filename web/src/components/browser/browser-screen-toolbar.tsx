@@ -11,6 +11,8 @@ export type ScreenTab = {
   title: string;
   url: string;
   active: boolean;
+  /** 에이전트가 쥔 탭인가. 그 탭은 보기 전용이다. 옛 Control Plane 은 내지 않는다. */
+  agent?: boolean;
 };
 
 /** 로그인 화면의 주소 칸, 이동, 뒤로, 새로고침, 키보드, 닫기, 탭 고르기다. */
@@ -20,6 +22,7 @@ export function BrowserScreenToolbar({
   addressRef,
   tabs,
   disabled,
+  viewOnly = false,
   send,
   onNotice,
   onKeyboard,
@@ -30,6 +33,8 @@ export function BrowserScreenToolbar({
   addressRef: RefObject<HTMLInputElement | null>;
   tabs: ScreenTab[];
   disabled: boolean;
+  /** 지금 탭이 에이전트가 쥔 탭이다. 탭 고르기만 남기고 막는다. */
+  viewOnly?: boolean;
   send: (input: ScreenInput) => void;
   onNotice: (message: string | null) => void;
   onKeyboard: () => void;
@@ -47,6 +52,7 @@ export function BrowserScreenToolbar({
   }
 
   const active = tabs.find((tab) => tab.active);
+  const off = disabled || viewOnly;
 
   return (
     <>
@@ -58,9 +64,9 @@ export function BrowserScreenToolbar({
           autoCapitalize="off"
           value={address}
           onChange={(event) => onAddress(event.target.value)}
-          disabled={disabled}
+          disabled={off}
         />
-        <Button type="submit" size="sm" disabled={disabled}>
+        <Button type="submit" size="sm" disabled={off}>
           이동
         </Button>
       </form>
@@ -68,7 +74,7 @@ export function BrowserScreenToolbar({
         <Button
           variant="outline"
           size="sm"
-          disabled={disabled}
+          disabled={off}
           onClick={() => send({ type: "back" })}
         >
           뒤로
@@ -76,17 +82,12 @@ export function BrowserScreenToolbar({
         <Button
           variant="outline"
           size="sm"
-          disabled={disabled}
+          disabled={off}
           onClick={() => send({ type: "reload" })}
         >
           새로고침
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={disabled}
-          onClick={onKeyboard}
-        >
+        <Button variant="outline" size="sm" disabled={off} onClick={onKeyboard}>
           키보드
         </Button>
         <Button variant="ghost" size="sm" onClick={onClose}>

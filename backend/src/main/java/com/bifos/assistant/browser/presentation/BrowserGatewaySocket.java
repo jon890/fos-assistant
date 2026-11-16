@@ -95,7 +95,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 link.close(CloseStatus.SERVER_ERROR, "connect_failed");
                 return;
             }
-            link.attach(relay);
+            link.attach(relay, gateway.holdTab(target, kind, id));
         } catch (RuntimeException ex) {
             log.warn(
                 "browser gateway socket setup failed error={}",
@@ -194,15 +194,21 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private volatile CdpRelay relay;
+        /** 에이전트가 그 탭을 쥔 핸들이다. Chrome 쪽에 붙은 뒤에 생긴다. */
+        private volatile BrowserUsageHandle tabHold;
         /** 지금 받고 있는 메시지의 지난 조각 길이의 합이다. Tomcat 이 한 세션의 메시지를 차례로 넘기므로 한 스레드만 쓴다. */
         private long pending;
 
 
-        /** 붙은 Chrome 쪽 연결을 둔다. 그 사이 닫혔으면 그 연결도 닫는다. */
-        void attach(CdpRelay opened) {
+        /** 붙은 Chrome 쪽 연결과 탭을 쥔 핸들을 둔다. 그 사이 닫혔으면 둘 다 닫는다. */
+        void attach(CdpRelay opened, BrowserUsageHandle tab) {
             relay = opened;
+            tabHold = tab;
             if (closed.get()) {
                 opened.close();
+                if (tab != null) {
+                    tab.close();
+                }
             }
         }
 
@@ -282,6 +288,10 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 }
             }
             handle.close();
+            BrowserUsageHandle tab = tabHold;
+            if (tab != null) {
+                tab.close();
+            }
             if (status != null) {
                 closeQuietly(session, status);
             }

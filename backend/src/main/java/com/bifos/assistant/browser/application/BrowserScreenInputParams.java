@@ -76,4 +76,12 @@ final class BrowserScreenInputParams {
         }
         return List.of(down, up);
     }
+
+
+    /** 페이지 처음({@code top})이나 끝으로 옮기는 고정 식이다. */
+    static Map<String, Object> scroll(String action) {
+        return Map.of(
+            "expression",
+            "window.scrollTo(0, " + ("top".equals(action) ? "0" : "document.documentElement.scrollHeight") + ")");
+    }
 }

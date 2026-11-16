@@ -95,6 +95,26 @@ class WebSocketCdpConnectorTest {
 
 
     @Test
+    @DisplayName("연 탭은 json/version 의 브라우저 경로로 붙어 Target.getTargets 의 openerId 가 있는 page 만 돌려준다")
+    void readsOpenersFromBrowserTarget() throws Exception {
+        server.acceptVersionThenSocket(
+            "{\"webSocketDebuggerUrl\":\"ws://chrome.internal:9222/devtools/browser/0a1b-2c3d\"}");
+
+        CompletableFuture<Map<String, String>> openers = CompletableFuture.supplyAsync(
+            () -> connector.openers(server.address()));
+        JsonNode sent = server.nextMessage();
+        server.sendText("{\"id\":" + sent.path("id").asLong() + ",\"result\":{\"targetInfos\":["
+            + "{\"targetId\":\"T2\",\"type\":\"page\",\"openerId\":\"T1\"},"
+            + "{\"targetId\":\"T1\",\"type\":\"page\"},"
+            + "{\"targetId\":\"W1\",\"type\":\"service_worker\",\"openerId\":\"T1\"}]}}");
+
+        assertThat(openers.get(2, TimeUnit.SECONDS)).containsExactly(Map.entry("T2", "T1"));
+        assertThat(sent.path("method").asString()).isEqualTo("Target.getTargets");
+        assertThat(server.headers()).contains("GET /devtools/browser/0a1b-2c3d HTTP/1.1");
+    }
+
+
+    @Test
     @DisplayName("CDP 가 오류로 답하면 그 명령만 실패한다")
     void failsCommandOnErrorResponse() throws Exception {
         try (CdpConnection connection = connect(event -> {
@@ -459,6 +479,38 @@ class WebSocketCdpConnectorTest {
             thread.start();
             reader = thread;
             return accepted;
+        }
+
+
+        /** 첫 연결에는 {@code /json/version} 응답을 주고 닫은 뒤, 다음 연결을 WebSocket 으로 받는다. */
+        void acceptVersionThenSocket(String version) {
+            Thread thread = new Thread(() -> {
+                try {
+                    try (Socket http = server.accept()) {
+                        InputStream in = http.getInputStream();
+                        for (String line = readLine(in); !line.isEmpty(); line = readLine(in)) {
+                            headers.add(line);
+                        }
+                        byte[] body = version.getBytes(StandardCharsets.UTF_8);
+                        OutputStream out = http.getOutputStream();
+                        out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + body.length
+                            + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                        out.write(body);
+                        out.flush();
+                    }
+                    socket = server.accept();
+                    connected.countDown();
+                    handshake();
+                    readFrames();
+                } catch (IOException | RuntimeException ex) {
+                    // 검사가 받은 메시지로 판정한다
+                } finally {
+                    disconnected.countDown();
+                }
+            });
+            thread.setDaemon(true);
+            thread.start();
+            reader = thread;
         }
 
 

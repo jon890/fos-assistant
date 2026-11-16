@@ -111,6 +111,7 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[0].readme_url").doesNotExist())
             .andExpect(jsonPath("$[0].myStatus").value("PENDING"))
             .andExpect(jsonPath("$[0].available").value(true))
+            .andExpect(jsonPath("$[0].ownerBrowser").value(false))
             .andExpect(jsonPath("$[0].fields[0].key").value("token"))
             .andExpect(jsonPath("$[0].fields[0].secret").value(true))
             .andExpect(jsonPath("$[0].fields[0].pattern").value("^demo_.+$"))
