@@ -74,6 +74,13 @@ public class UserBrowser extends CreatedAtEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * 사람이 「직접 할게요」 로 쥔 시각이다. {@code RUNNING} 일 때만 뜻이 있다. 엔티티는 읽기만 하고 {@code UserBrowserRepository} 의 조건부
+     * 갱신만 쓴다. 활동 기록과 자동 중지가 오래된 엔티티를 저장해도 잠금이 되돌아가지 않는다(rule-68).
+     */
+    @Column(name = "human_held_at", insertable = false, updatable = false)
+    private Instant humanHeldAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -176,6 +183,16 @@ public class UserBrowser extends CreatedAtEntity {
         this.lastActiveAt = now;
         this.updatedAt = now;
         return true;
+    }
+
+
+    /**
+     * 사람이 지금 이 브라우저를 쥐고 있는가. 켜져 있고, 쥔 시각이 이번 켜기 뒤일 때만 참이다. 끄기가 실패해 칸이 남은 채 다시 켜도 지난
+     * 잠금이 새 브라우저를 막지 않는다.
+     */
+    public boolean heldByHuman() {
+        return status == UserBrowserStatus.RUNNING && humanHeldAt != null
+            && (startedAt == null || !humanHeldAt.isBefore(startedAt));
     }
 
 

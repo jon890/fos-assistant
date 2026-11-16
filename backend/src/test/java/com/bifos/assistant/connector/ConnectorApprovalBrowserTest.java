@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -41,7 +42,8 @@ class ConnectorApprovalBrowserTest {
     private final ConnectorActionRepository actions = mock(ConnectorActionRepository.class);
     private final ConnectorCatalogCache catalog = mock(ConnectorCatalogCache.class);
     private final UserBrowserService browsers = mock(UserBrowserService.class);
-    private final ConnectorApprovalBrowser approvalBrowser = new ConnectorApprovalBrowser(actions, catalog, browsers, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
+    private final ConnectorApprovalBrowser approvalBrowser = new ConnectorApprovalBrowser(actions, catalog, browsers, holds, Clock.fixed(NOW, ZoneOffset.UTC));
 
 
     @BeforeEach
@@ -73,6 +75,20 @@ class ConnectorApprovalBrowserTest {
 
         assertCode(ErrorCode.CONNECTOR_BROWSER_UNAVAILABLE);
         verify(browsers, never()).touch(anyLong());
+    }
+
+
+    @Test
+    @DisplayName("사람이 브라우저를 쥐고 있으면 켜지 않고 CONNECTOR_BROWSER_HELD 로 거절한다. 브라우저를 쓰지 않는 플러그인은 그대로 지난다")
+    void refusesWhileHeldByPerson() {
+        when(holds.held(7L)).thenReturn(true);
+        row(7L, "naver-shopping", ActionStatus.PENDING, NOW.plus(Duration.ofMinutes(5)));
+
+        assertCode(ErrorCode.CONNECTOR_BROWSER_HELD);
+        verify(browsers, never()).ensureRunning(anyLong());
+
+        row(7L, "gmail", ActionStatus.PENDING, NOW.plus(Duration.ofMinutes(5)));
+        assertThatCode(() -> approvalBrowser.require(USER, ACTION)).doesNotThrowAnyException();
     }
 
 

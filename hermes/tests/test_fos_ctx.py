@@ -56,6 +56,8 @@ TOOL_GUARD_VECTOR_SIG = "86882b9f368c2edc9d538289b80f0568599e145642f89b357d5e1d2
 # 화면 넘기기 알림의 서명 확인 값이다. 위 정책 확인 값의 key, 등록 이름, 루트, session, 호출 id 와
 # 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 이다. 서버 쪽 `ConnectorHandoffRequestTest` 와 같은 값이어야 한다.
 HANDOFF_VECTOR_SIG = "b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3"
+# 탭 없는 human_browser 의 확인 값이다. 서버 쪽 `ConnectorHandoffRequestTest` 의 `TABLESS_SIG` 와 같다.
+HANDOFF_TABLESS_SIG = "19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1"
 
 
 def load_ctx(add_cleanup):
@@ -1201,7 +1203,7 @@ class HandoffReportTest(PluginFixture):
 
     def test_every_need_in_vocabulary_is_reported(self):
         """어휘의 낱말마다 그대로 알린다. 봇 탐지와 예상 밖 화면도 같은 모양이다."""
-        for need in ("login", "captcha", "device_check", "bot_check", "unexpected_page"):
+        for need in ("login", "captcha", "device_check", "bot_check", "unexpected_page", "human_browser"):
             with self.subTest(need=need):
                 self.requests.clear()
                 result = json.dumps({"status": "HUMAN_ACTION_REQUIRED", "message": "m",
@@ -1209,6 +1211,25 @@ class HandoffReportTest(PluginFixture):
                 self.transform("mcp__demo__write_note", json.dumps({"result": result}))
                 self.assertEqual(len(self.requests), 1)
                 self.assertEqual(self.requests[0]["body"]["need"], need)
+
+    def test_tabless_human_browser_is_reported_without_tab(self):
+        """사람이 브라우저를 쥐어 탭 없이 끝난 넘기기는 `tab` 칸을 빼고, 서명할 글의 그 자리를 빈 글로 둔다."""
+        result = json.dumps({"status": "HUMAN_ACTION_REQUIRED", "message": "m",
+                             "handoff": {"code": "DEMO_BROWSER_IN_USE", "need": "human_browser"}})
+        self.transform("mcp__demo__write_note", json.dumps({"result": result}))
+        self.assertEqual(len(self.requests), 1)
+        body = self.requests[0]["body"]
+        self.assertNotIn("tab", body)
+        self.assertEqual(body["need"], "human_browser")
+        self.assertEqual(body["sig"], self.plugin.sign_handoff(
+            self.plugin.signing_key(FAKE_MCP_CREDENTIAL), "mcp__demo__write_note", VECTOR_ROOT,
+            VECTOR_SESSION, VECTOR_CALL, "DEMO_BROWSER_IN_USE", "human_browser", None))
+
+    def test_tabless_other_needs_are_not_reported(self):
+        """탭 없는 넘기기는 human_browser 만 보낸다."""
+        result = json.dumps({"handoff": {"code": "DEMO_LOGIN_REQUIRED", "need": "login"}})
+        self.transform("mcp__demo__write_note", json.dumps({"result": result}))
+        self.assertEqual(self.requests, [])
 
     def test_handoff_result_does_not_count_as_hermes_failure(self):
         """Hermes 의 MCP 연속 실패 집계(`_result_is_error`)는 처리한 결과 글 맨 위의 `error` 칸만 본다.
@@ -1277,3 +1298,8 @@ class HandoffReportTest(PluginFixture):
                                      POLICY_VECTOR_SESSION, POLICY_VECTOR_CALL, "DEMO_LOGIN_REQUIRED", "login",
                                      "TAB1"),
             HANDOFF_VECTOR_SIG)
+        self.assertEqual(
+            self.plugin.sign_handoff(POLICY_VECTOR_KEY, POLICY_VECTOR_HERMES_TOOL, POLICY_VECTOR_ROOT,
+                                     POLICY_VECTOR_SESSION, POLICY_VECTOR_CALL, "DEMO_BROWSER_IN_USE",
+                                     "human_browser", None),
+            HANDOFF_TABLESS_SIG)

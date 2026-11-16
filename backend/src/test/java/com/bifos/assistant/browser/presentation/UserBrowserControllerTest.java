@@ -1,5 +1,10 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.shared.error.ApiException;
+import org.springframework.http.MediaType;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import com.bifos.assistant.admin.browser.presentation.UserBrowserAdminController;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -120,6 +125,30 @@ class UserBrowserControllerTest {
 
 
     @Test
+    @DisplayName("직접 할게요는 대화 번호를 넘겨 잠그고, 돌려주기는 잠금을 푼다. 승인한 실행 중이면 409, 대화 번호 모양이 틀리면 400 이다")
+    void takesOverAndGivesBack() throws Exception {
+        MockMvc mvc = mvc(true);
+
+        mvc.perform(post("/api/v1/browser/takeover").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"conv-1\"}")).andExpect(status().isNoContent());
+        verify(holds).takeOver(MEMBER.id(), "conv-1");
+        mvc.perform(post("/api/v1/browser/takeover")).andExpect(status().isNoContent());
+        verify(holds).takeOver(MEMBER.id(), null);
+        mvc.perform(post("/api/v1/browser/give-back")).andExpect(status().isNoContent());
+        verify(holds).giveBack(MEMBER.id());
+
+        mvc.perform(post("/api/v1/browser/takeover").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"../x\"}")).andExpect(status().isBadRequest());
+        doThrow(new ApiException(ErrorCode.BROWSER_APPROVAL_RUNNING, "running")).when(holds).takeOver(MEMBER.id(), "conv-2");
+        mvc.perform(post("/api/v1/browser/takeover").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"conversationId\":\"conv-2\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("BROWSER_APPROVAL_RUNNING"));
+        mvc(false).perform(post("/api/v1/browser/give-back")).andExpect(status().isServiceUnavailable());
+    }
+
+
+    @Test
     @DisplayName("기능이 꺼져 있으면 GET 은 200 으로 enabled 만 주고 쓰기는 503 이다")
     void answersDisabledFeature() throws Exception {
         MockMvc mvc = mvc(false);
@@ -176,6 +205,9 @@ class UserBrowserControllerTest {
     }
 
 
+    private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
+
+
     private MockMvc mvc(boolean enabled) {
         UserBrowserService service = UserBrowserServiceTestFactory.create(
             repository,
@@ -188,13 +220,13 @@ class UserBrowserControllerTest {
                 new FakeCdp(),
                 new FakeCdp(),
                 new BrowserUsage(),
-                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()),
+                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), mock(BrowserHumanHold.class),
                 LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);
         when(names.find(MEMBER.id())).thenReturn("아이");
         return MockMvcBuilders.standaloneSetup(
-            new UserBrowserController(service, currentUser),
+            new UserBrowserController(service, currentUser, holds),
             new UserBrowserAdminController(service, names, currentUser))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();

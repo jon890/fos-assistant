@@ -16,7 +16,8 @@ import tools.jackson.databind.JsonNode;
  * <p>계약은 {@code docs/adr/ADR-20261111-connector-handoff.md} 의 「결정」 이 갖는다. 서명은
  * {@link McpCallContext} 와 같은 HMAC-SHA256 이고 key 도 같다. 서명할 글은 {@code v1-connector-handoff},
  * {@code hermes_tool}, {@code root_session_id}, {@code session_id}, {@code tool_call_id}, {@code code}, {@code need},
- * {@code tab} 을 이 순서로 {@code \n} 하나로 이은 UTF-8 이다.
+ * {@code tab} 을 이 순서로 {@code \n} 하나로 이은 UTF-8 이다. 탭이 없는 넘기기({@code tab} 이 없거나 {@code null})는 그 자리에 빈 글을
+ * 넣는다(ADR-20261116 / browser-lock).
  *
  * <p>어떤 이유로 거절하든 밖에는 {@link ErrorCode#CONNECTOR_POLICY_REJECTED} 하나만 보인다. 이유는 서버 로그에만 남긴다.
  */
@@ -51,14 +52,24 @@ public record ConnectorHandoffRequest(
         String hermesTool = require(body, "hermes_tool", ID);
         String code = require(body, "code", CODE);
         String needWord = require(body, "need", ID);
-        String tab = require(body, "tab", TAB);
+        String tab = optionalTab(body);
         HandoffNeed need = HandoffNeed.fromWire(needWord).orElseThrow(() -> reject("need 가 어휘 밖이다"));
+        if (tab == null && need != HandoffNeed.HUMAN_BROWSER) {
+            throw reject("탭 없는 넘기기는 human_browser 만 받는다");
+        }
         String signature = require(body, "sig", McpCallContext.SIGNATURE);
-        String signed = String.join("\n", VERSION_LINE, hermesTool, root, session, call, code, needWord, tab);
+        String signed = String.join("\n", VERSION_LINE, hermesTool, root, session, call, code, needWord, tab == null ? "" : tab);
         if (!MessageDigest.isEqual(McpCallContext.hmac(tokenHash, signed), HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");
         }
         return new ConnectorHandoffRequest(root, session, call, hermesTool, code, need, tab);
+    }
+
+
+    /** 탭이 없거나 {@code null} 이면 {@code null} 이다. 있으면 모양을 본다. */
+    private static String optionalTab(JsonNode body) {
+        JsonNode value = body.get("tab");
+        return value == null || value.isNull() ? null : require(body, "tab", TAB);
     }
 
 

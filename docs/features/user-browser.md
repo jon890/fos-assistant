@@ -53,6 +53,7 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 | 지우기 | `STOPPED`, `RUNNING`, `FAILED` | 줄 없음. 끈 줄을 그 버전으로 지운 뒤 프로필을 지운다. 그 사이 다른 전이가 줄을 바꿨으면 `BROWSER_BUSY` 이고 줄과 프로필이 남는다 |
 | 자동 중지 | `RUNNING` | `STOPPED`. 유휴 시간이 지났고 쓰는 중인 핸들(`BrowserUsage`)이 없을 때다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다. 그 사용자가 사람을 기다리면(이번 켜기 뒤에 생긴 대화의 열린 화면 넘기기, 「내 브라우저」 를 쓰는 플러그인의 기다리는 승인) 유휴 시간을 `idle-timeout` 대신 `wait-hold-timeout` 으로 본다. 기다림은 `connector` 가 포트 `BrowserWaitDemand` 로 답하고, 묻다 실패하면 그 줄을 끄지 않는다([browser-cowork 스펙](browser-cowork/spec.md) 의 REQ1) |
 | 사용자 끄기 | `RUNNING`, `FAILED` | `STOPPED`. 관리자가 허용 목록에서 사용자를 끈 것이 커밋된 뒤 돈다. 프로필과 줄은 남긴다 |
+| 직접 할게요(사람 잠금) | `RUNNING` | 그대로 `RUNNING` 이고 `human_held_at` 을 적는다. 브라우저를 쓰는 금융·구매 승인 줄이 실행 중이면 `BROWSER_APPROVAL_RUNNING`(409)이다. 「돌려주기」, 끄기, 상태 맞추기, 그 사용자의 화면이 모두 닫힌 뒤 `idle-timeout` 이 지나면 비운다. 잠긴 동안 자동 중지는 사람을 기다리는 것으로 본다. 아래 「사람 잠금」 |
 
 - 동시 수는 `STARTING`, `RUNNING` 과 끄다 실패해 `container_id` 가 남은 `FAILED` 를 센다. 남은 컨테이너도 돌고 있을 수 있기 때문이다. 셀 때 켜기를 한 번에 하나만 하도록 잠근다.
 - 이미 `RUNNING` 인 것을 켜거나 `STOPPED` 인 것을 끄면 지금 상태를 그대로 돌려준다.
@@ -97,7 +98,9 @@ Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작
 경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 와 `UserBrowserAdminDtos` 가, 오류 코드는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
 응답에는 컨테이너 번호와 프로필 키를 싣지 않는다.
 
-웹에서 브라우저 상태를 바꾸는 라우트(`/api/browser` 아래의 만들기, 지우기, 켜기, 끄기, 화면 열기, 입력과 관리자의 끄기, 지우기)는 Control Plane 을 부르기 전에 출처를 본다.
+「직접 할게요」 는 `POST /api/v1/browser/takeover`(본문 `{conversationId?}`, 204), 「돌려주기」 는 `POST /api/v1/browser/give-back`(204)이다. 둘 다 이미 그 상태면 그대로 204 다.
+
+웹에서 브라우저 상태를 바꾸는 라우트(`/api/browser` 아래의 만들기, 지우기, 켜기, 끄기, 화면 열기, 입력, 직접 할게요, 돌려주기와 관리자의 끄기, 지우기)는 Control Plane 을 부르기 전에 출처를 본다.
 세션 쿠키의 SameSite 기본값에만 기대지 않으려는 것이고, 판정은 `web/src/lib/same-origin.ts` 가 갖는다.
 `Origin` 이 있으면 그 host 가 `x-forwarded-host` 의 첫 값이나 `Host` 중 하나와 같아야 하고(Next.js 의 Server Action 과 같은 비교), 다르면 403 `FORBIDDEN` 이다.
 `Origin` 이 없으면 Next.js 의 Server Action 처럼 넘기되, `Sec-Fetch-Site` 가 `cross-site` 나 `same-site` 면 막는다.
@@ -118,7 +121,7 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 ### 로그인 화면
 
 `GET /api/v1/browser/screen` 의 `url` 은 `http`, `https` 만 받는다. 켜기 실패, 기능 꺼짐, 틀린 주소는 SSE 를 열기 전에 JSON 오류다. 탭에 붙지 못하면 `BROWSER_START_FAILED` 다.
-사건(`frame`, `tabs`, `closed`)의 본문은 `BrowserScreenSession` 이, 입력의 칸과 범위, 크기 상한은 `UserBrowserDtos` 가, 입력마다 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다.
+사건(`frame`, `tabs`, `hold`, `closed`)의 본문은 `BrowserScreenSession` 이, 입력의 칸과 범위, 크기 상한은 `UserBrowserDtos` 가, 입력마다 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다.
 그 밖의 CDP 명령은 어느 경로로도 보낼 수 없다. `scroll` 은 `Runtime.evaluate` 로 고정 식만 실행하고 요청자가 식을 정하지 못한다.
 입력 본문(글자, 좌표, 주소)과 시작 주소는 로그와 오류 응답에 싣지 않는다.
 화면에 친 글자는 웹의 `/api/browser/screen/input` 이 받은 바이트 그대로 Control Plane 에 넘기고, Control Plane 이 CDP 의 글자 넣기 명령(insertText)으로 브라우저에 보낸다. 이 길에서 글자를 읽는 곳은 입력 검사와 CDP 명령 인자뿐이다.
@@ -142,12 +145,22 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 | Control Plane 이 다시 뜬다 | 화면 등록부는 JVM 메모리에 있어 SSE 도 끊긴다. 웹이 다시 연다 |
 
 `tabs` 사건의 탭마다 `agent` 는 에이전트가 쥔 탭인지다. 탭 확인(2초)마다 쥔 쪽이 바뀌었으면 목록을 다시 보낸다.
+`hold` 사건(`{human, approved}`)은 처음 붙을 때와, 탭 확인에서 값이 바뀌었을 때 보낸다. `human` 은 사람이 브라우저를 쥐었는지, `approved` 는 지금 탭들에 쥔 탭이 있고 브라우저를 쓰는 승인한 실행이 도는지다. 쥔 탭이 없으면 승인한 실행을 묻지 않는다.
 
 #### 에이전트가 쥔 탭
 
 중계로 열린 탭 연결(`devtools/page/<탭>`)이 붙은 탭, 중계의 `/json/new` 가 만든 지 30초 안이고 아직 연결이 붙지 않은 탭, 그런 탭이 연 탭(`openerId`)을 에이전트가 쥔 탭으로 본다. 브라우저 수준 연결(쿠키 읽기)은 탭을 쥐지 않는다. 화면 넘기기로 남긴 탭은 연결이 닫혀 쥐지 않는다.
 상태는 `BrowserAgentTabs` 가 JVM 메모리에 둔다. 연 탭은 화면이 처음 보는 탭이 있고 쥔 탭이 있을 때만 브라우저 수준 CDP 의 탭 목록 명령(getTargets)으로 읽는다.
-판정과 값의 근거는 [browser-cowork 설계](browser-cowork/design.md) 의 「PR2 에이전트가 쥔 탭」 이 갖는다.
+판정과 값의 근거는 [browser-cowork 설계](browser-cowork/design.md) 의 「PR2 에이전트가 쥔 탭」 이 갖는다. 사람이 브라우저를 넘겨받으면 그 브라우저의 쥔 탭 기록을 지운다.
+
+#### 사람 잠금
+
+사람이 「직접 할게요」 로 브라우저를 쥔 동안 중계는 에이전트의 모든 요청을 거절한다(아래 「받는 것」). 결정은 [ADR-20261116 / browser-lock](../adr/ADR-20261116-browser-lock.md), 상세는 [browser-cowork 설계](browser-cowork/design.md) 의 「PR3 사람 잠금」 이 갖는다.
+
+- 잠금은 `user_browser.human_held_at` 이고 `BrowserHumanHold` 가 조건부 갱신으로만 쓴다. 넘겨받는 순간 열린 중계 연결을 close code 4423 으로 닫는다.
+- 잠긴 동안 「내 브라우저」 를 쓰는 플러그인의 승인은 쓰지 않고 `CONNECTOR_BROWSER_HELD`(409)로 거절한다. 줄은 기다림 그대로다.
+- 플러그인은 거절을 `<플러그인>_BROWSER_IN_USE` 와 넘기기 `human_browser` 로 바꾼다. 탭을 만들기 전에 거절됐으면 탭 없는 넘기기다. 대화 패널에서 넘겨받았으면 그 대화의 넘기기는 알림 없이 카드만 낸다.
+- 화면이 모두 닫힌 뒤 `idle-timeout` 이 지나면 점검이 푼다. 점검 간격만큼 늦을 수 있다.
 
 화면마다 도는 탭 확인과 시간 초과, `ping` 은 스케줄러 하나로 돈다. 한 브라우저가 느리면 다른 화면이 늦어지지만, 동시에 켜는 브라우저가 몇 개뿐이라 받아들인다.
 
@@ -159,7 +172,8 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 - 시작 주소(`/browser?url=`)는 그 페이지에서 처음 연 화면에만 쓴다. 「다시 열기」 는 지금 탭을 그대로 본다.
 - 화면 넘기기 패널과 그 「새 창으로 열기」 가 여는 `/browser?tab=<id>` 는 처음 연 화면의 첫 `tabs` 사건에 그 탭이 있으면 입력 `tab` 을 한 번 보내 옮긴다. 없으면 지금 탭에 머문다. 패널의 「다시 열기」 는 화면을 새로 만들어 다시 옮긴다(아래 「대화 위 화면」)
 - 입력의 서버 라우트는 출처와 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
-- 지금 탭의 `agent` 가 참이면 화면 위에 「에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요.」 띠를 보이고 주소 칸, 이동, 뒤로, 새로고침, 키보드, 화면 누르기, 처음·끝 스크롤, 확인 창을 막는다. 탭 고르기는 된다. `/browser` 와 대화 패널이 같은 부품이다
+- 지금 탭의 `agent` 가 참이면 화면 위에 「에이전트가 쓰는 중이에요」 띠와 「직접 할게요」 를 보이고 주소 칸, 이동, 뒤로, 새로고침, 키보드, 화면 누르기, 처음·끝 스크롤, 확인 창을 막는다. 탭 고르기는 된다. 화면을 누르거나 Esc 를 누르면 입력은 보내지 않고 「직접 하시겠어요?」 확인 띠를 띄운다. `hold` 의 `approved` 가 참이면 띠는 「승인한 작업을 마무리하는 중이에요」 이고 단추와 확인 띠가 없다. `/browser` 와 대화 패널이 같은 부품이다
+- `hold` 의 `human` 이 참이면 어느 탭을 보든 「직접 하는 중이에요」 띠와 「돌려주기」 를 보이고 모든 탭이 조작된다. 대화 패널의 「돌려주기」 는 성공한 뒤 그 대화에 결제 밖의 열린 넘기기가 있으면 정해 둔 글(「「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.」)을 다음 메시지로 보낸다. `/browser` 의 「돌려주기」 는 잠금만 푼다
 
 입력 변환은 `web/test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `web/test/browser/user-browser-screen.spec.ts` 가 확인한다.
 
@@ -220,9 +234,10 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 2. 중계가 꺼졌거나 기능이 꺼졌으면 503 이다
 3. 표식의 모양, 서명, 바인딩, 호출 표식의 만료 가운데 하나라도 틀리면 404 다. 어느 까닭인지 응답으로 구분하지 않는다
 4. 주인이 허용 목록에서 꺼져 있으면 404 다
-5. 주인의 브라우저가 없으면 만들고 꺼져 있으면 켠다. 다른 전이가 진행 중이면 `start-timeout` 까지 다시 본다
-6. 동시 수가 찼으면 503, 켜지 못했으면 502, 기다려도 `RUNNING` 이 되지 않으면 503 이다
-7. 활동을 기록하고 Chrome 에 넘긴다. Chrome 이 닿지 않거나 200 이 아닌 답을 주면 502 다
+5. 사람이 브라우저를 쥐고 있으면 브라우저를 켜지 않고 423 이다(WebSocket 은 아래)
+6. 주인의 브라우저가 없으면 만들고 꺼져 있으면 켠다. 다른 전이가 진행 중이면 `start-timeout` 까지 다시 본다
+7. 동시 수가 찼으면 503, 켜지 못했으면 502, 기다려도 `RUNNING` 이 되지 않으면 503 이다
+8. 활동을 기록하고 Chrome 에 넘긴다. Chrome 이 닿지 않거나 200 이 아닌 답을 주면 502 다
 
 오류 응답의 본문은 비운다. 플러그인은 상태 코드만 본다.
 Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 보낸다. `Host` 가 IP 라 Chrome 의 `Host` 검사를 지난다.
@@ -231,6 +246,7 @@ Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 �
 
 - 받은 연결 하나에 Chrome 쪽 연결 하나를 열고, 한쪽이 닫히면 다른 쪽도 닫는다
 - handshake 는 브라우저를 켜기 전에 형식을 보고, 틀리면 빈 400 이다
+- 사람이 브라우저를 쥐고 있으면 연결을 받은 뒤 close code 4423(`human_held`)으로 바로 닫는다. Bun 의 `WebSocket` 은 handshake 실패의 상태 코드를 주지 않기 때문이다. 열린 연결은 사람 잠금에 등록되고, 넘겨받는 순간 같은 code 로 닫힌다
 - 연결이 열려 있는 동안 `BrowserUsage` 핸들을 쥐어 자동 중지하지 않는다. 받은 세션은 `idle-timeout` 동안 오가는 것이 없으면 닫혀, 반쯤 끊긴 연결이 핸들을 계속 쥐지 않는다
 - 글 메시지는 조각째 그대로 넘긴다. 모으지 않으므로 사진 바이트가 든 큰 CDP 메시지도 세션마다 큰 버퍼를 잡지 않는다. 메시지 크기 상한은 `BrowserGatewaySocket` 이 갖고, 넘거나 바이너리 메시지가 오면 양쪽을 닫는다
 - Chrome 쪽 보내기가 시간 안에 끝나지 않으면 양쪽을 닫는다. 멈춘 Chrome 이 요청 스레드를 붙잡지 않게 한다

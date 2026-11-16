@@ -3,7 +3,9 @@ package com.bifos.assistant.browser.application;
 import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,6 +47,7 @@ class BrowserGatewayTest {
     private final Map<Long, Long> bindingOwners = Map.of(BINDING_ID, OWNER);
     private UserBrowserService browsers;
     private BrowserUsage usage;
+    private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
     private final BrowserAgentTabs agentTabs = new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC());
 
 
@@ -84,6 +88,49 @@ class BrowserGatewayTest {
         assertThat(usage.inUse(BROWSER_ID)).isTrue();
         handle.close();
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("사람이 브라우저를 쥐고 있으면 BROWSER_HUMAN_HELD 이고 브라우저를 켜지 않는다")
+    void rejectsWhileHeldByPerson() {
+        BrowserGatewayTokens tokens = tokens(BASE, SECRET);
+        when(holds.held(OWNER)).thenReturn(true);
+
+        assertCode(
+            () -> gateway(tokens).open(token(tokens.callAddress(OWNER).orElseThrow())),
+            ErrorCode.BROWSER_HUMAN_HELD);
+        verify(browsers, never()).ensureRunning(anyLong());
+    }
+
+
+    @Test
+    @DisplayName("판정 뒤 사람이 넘겨받았으면 중계로 만든 탭을 에이전트가 쥔 탭으로 두지 않는다")
+    void createdIsIgnoredWhileHeld() {
+        BrowserGateway gateway = gateway(tokens(BASE, SECRET));
+        GatewayTarget target = new GatewayTarget(OWNER, BROWSER_ID, CDP);
+        when(holds.held(OWNER)).thenReturn(true);
+
+        gateway.created(target, "T1");
+
+        assertThat(agentTabs.held(BROWSER_ID, "T1")).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("등록한 뒤 이미 사람이 쥐었으면 그 연결을 바로 닫고 등록을 뺀다")
+    void watchClosesAtOnceWhenAlreadyHeld() {
+        BrowserGateway gateway = gateway(tokens(BASE, SECRET));
+        GatewayTarget target = new GatewayTarget(OWNER, BROWSER_ID, CDP);
+        BrowserUsageHandle handle = mock(BrowserUsageHandle.class);
+        when(holds.watch(eq(BROWSER_ID), any())).thenReturn(handle);
+        when(holds.held(OWNER)).thenReturn(true);
+        AtomicInteger closed = new AtomicInteger();
+
+        gateway.watchHuman(target, closed::incrementAndGet);
+
+        assertThat(closed.get()).isEqualTo(1);
+        verify(handle).close();
     }
 
 
@@ -170,7 +217,7 @@ class BrowserGatewayTest {
 
     private BrowserGateway gateway(BrowserGatewayTokens tokens) {
         BrowserGrantOwners owners = bindingId -> Optional.ofNullable(bindingOwners.get(bindingId));
-        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage, agentTabs);
+        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage, agentTabs, holds);
     }
 
 

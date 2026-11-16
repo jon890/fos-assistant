@@ -199,7 +199,12 @@ export function useConversationTodo({
           onTabChange={changeTab}
           onClose={closePanel}
         >
-          <AgentBrowser nonce={panelTarget.nonce} onClose={closePanel} />
+          <AgentBrowser
+            nonce={panelTarget.nonce}
+            onClose={closePanel}
+            conversationId={conversationId}
+            onGivenBack={handoffs.givenBack}
+          />
         </TodoPanel>
       ) : null,
   };

@@ -71,6 +71,15 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
         @Param("userId") Long userId, @Param("status") ActionStatus status, @Param("now") Instant now);
 
 
+    /** 그 사용자의 그 상태이고 위험도가 주어진 것 가운데 하나인 승인 줄이 가리키는 플러그인이다. 사람의 브라우저 회수가 묻는다. */
+    @Query("""
+            select distinct a.connectorId from ConnectorAction a
+            where a.userId = :userId and a.status = :status and a.risk in :risks
+            """)
+    List<String> findConnectorIdsByStatusAndRiskIn(
+        @Param("userId") Long userId, @Param("status") ActionStatus status, @Param("risks") Collection<ToolRisk> risks);
+
+
     /**
      * 승인 줄의 상태를 바꾸기 전에 그 줄을 잠그고 읽는다.
      *

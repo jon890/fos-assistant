@@ -1,5 +1,7 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
+import static org.mockito.Mockito.mock;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -293,9 +295,12 @@ class UserBrowserScreenControllerTest {
     }
 
 
+    private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
+
+
     private MockMvc mvc(boolean enabled) {
         screens = new BrowserScreens(
-            cdp, cdp, new BrowserUsage(), new BrowserAgentTabs(cdp, Clock.systemUTC()), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
+            cdp, cdp, new BrowserUsage(), new BrowserAgentTabs(cdp, Clock.systemUTC()), mock(BrowserHumanHold.class), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
         UserBrowserService service = UserBrowserServiceTestFactory.create(
             repository,
             runtime(),
@@ -304,7 +309,7 @@ class UserBrowserScreenControllerTest {
             LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
             Clock.systemUTC(),
             screens);
-        return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider()))
+        return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider(), holds))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }

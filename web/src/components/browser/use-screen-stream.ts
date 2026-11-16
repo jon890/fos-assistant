@@ -15,6 +15,14 @@ import { resizeFor, type ScreenInput } from "@/components/browser/screen-input";
 
 export type Frame = { data: string; width: number; height: number };
 
+/**
+ * 브라우저의 잠금 상태다. `human` 은 사람이 「직접 할게요」 로 쥐었는가, `approved` 는 쥔 탭을 보는 동안 승인한 실행이 도는가다.
+ * 뜻은 `docs/features/browser-cowork/design.md` 의 「PR3 사람 잠금」 이 갖는다.
+ */
+export type ScreenHold = { human: boolean; approved: boolean };
+
+const NO_HOLD: ScreenHold = { human: false, approved: false };
+
 /** 붙은 탭에 뜬 확인 창이다. 사이트가 띄운 글을 그대로 보인다. */
 export type ScreenDialogView = { type: string; message: string };
 
@@ -60,6 +68,7 @@ export function useScreenStream({
   const [closed, setClosed] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<ScreenDialogView | null>(null);
+  const [hold, setHold] = useState<ScreenHold>(NO_HOLD);
   /** 열린 연결이 있을 때만 참이다. 끊긴 동안의 입력은 버린다. */
   const open = useRef(false);
   /** 연결마다 하나씩 늘린다. 앞 연결에 보낸 입력의 오류는 화면을 닫지 않는다. */
@@ -137,7 +146,13 @@ export function useScreenStream({
     let wantAgent = attempt === 0 && followAgent;
     const onEvent = (data: unknown, name: string) => {
       if (name === "frame") setFrame(data as Frame);
-      else if (name === "dialog") {
+      else if (name === "hold") {
+        const next = data as Partial<ScreenHold>;
+        setHold({
+          human: next.human === true,
+          approved: next.approved === true,
+        });
+      } else if (name === "dialog") {
         const next = data as { open: boolean } & Partial<ScreenDialogView>;
         setDialog(
           next.open
@@ -237,8 +252,20 @@ export function useScreenStream({
     setFrame(null);
     setTabs([]);
     setDialog(null);
+    setHold(NO_HOLD);
     setAttempt((value) => value + 1);
   }, []);
 
-  return { frame, tabs, closed, notice, setNotice, send, reopen, dialog };
+  return {
+    frame,
+    tabs,
+    closed,
+    notice,
+    setNotice,
+    send,
+    reopen,
+    dialog,
+    hold,
+    setHold,
+  };
 }

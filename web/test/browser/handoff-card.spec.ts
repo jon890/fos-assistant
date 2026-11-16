@@ -340,3 +340,41 @@ test("넘기기가 없는 대화에는 카드를 그리지 않는다", async ({ 
   await expect(page.getByTestId("assistant-message")).toHaveCount(1);
   await expect(page.getByTestId("handoff-card")).toHaveCount(0);
 });
+
+test("사람이 브라우저를 쓰는 중 카드는 탭 없이 패널을 열고, 패널에서 넘겨받으면 대화 번호를 싣고, 「돌려주기」 가 정해 둔 글을 보낸다", async ({
+  page,
+}) => {
+  const fake = await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  let open: unknown[] = [{ ...HANDOFF, need: "HUMAN_BROWSER", tab: null }];
+  await routeHandoffs(page, conversationId, () => open);
+  const bodies: (string | null)[] = [];
+  await page.route("**/api/browser/takeover", (route) => {
+    bodies.push(route.request().postData());
+    return route.fulfill({ status: 204 });
+  });
+  await page.route("**/api/browser/give-back", (route) =>
+    route.fulfill({ status: 204 }),
+  );
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+  const card = page.getByTestId("handoff-card");
+  await expect(card).toContainText("「내 브라우저」를 직접 쓰는 동안 멈췄어요");
+  await card.getByRole("button", { name: "내 브라우저 열기" }).click();
+  const panel = page.getByTestId("handoff-panel");
+  await expect(panel).toBeVisible();
+  await fake.push([
+    ["frame", { data: FRAME, width: 400, height: 600 }],
+    ["tabs", [{ id: TAB, title: "에이전트 탭", url: "https://shop.example.com", active: true, agent: true }]],
+    ["hold", { human: false, approved: false }],
+  ]);
+  await panel.getByRole("button", { name: "직접 할게요" }).click();
+  await expect(panel.getByTestId("human-band")).toBeVisible();
+  expect(bodies).toEqual([JSON.stringify({ conversationId })]);
+
+  open = [];
+  await panel.getByRole("button", { name: "돌려주기" }).click();
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
+    "「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.",
+  );
+});

@@ -31,13 +31,14 @@ public class BrowserGateway {
     private final UserBrowserService browsers;
     private final BrowserUsage usage;
     private final BrowserAgentTabs agentTabs;
+    private final BrowserHumanHold holds;
 
 
     /**
      * 표식을 확인하고 주인의 브라우저를 켠 뒤 활동을 기록한다.
      *
      * @throws ApiException 중계나 기능이 꺼졌으면 {@code BROWSER_DISABLED}, 표식이 틀렸거나 주인이 없거나 허용 목록에서 꺼졌으면
-     * {@code BROWSER_NOT_FOUND}. 켜기의 실패는 {@link UserBrowserService#ensureRunning} 의 것을 그대로 던진다
+     * {@code BROWSER_NOT_FOUND}, 사람이 브라우저를 쥐고 있으면 브라우저를 켜지 않고 {@code BROWSER_HUMAN_HELD}. 켜기의 실패는 {@link UserBrowserService#ensureRunning} 의 것을 그대로 던진다
      */
     public GatewayTarget open(String token) {
         if (!tokens.enabled() || !browsers.enabled()) {
@@ -48,6 +49,10 @@ public class BrowserGateway {
         Long userId = owner.orElseThrow(() -> reject("owner_missing"));
         if (!access.allowed(userId)) {
             throw reject("revoked");
+        }
+        // 사람이 쥔 동안 에이전트는 브라우저에 아무것도 하지 못한다(ADR-20261116 / browser-lock)
+        if (holds.held(userId)) {
+            throw new ApiException(ErrorCode.BROWSER_HUMAN_HELD, "user browser is held by a person");
         }
         BrowserEndpoint endpoint = browsers.ensureRunning(userId);
         browsers.touch(userId);
@@ -77,8 +82,26 @@ public class BrowserGateway {
     }
 
 
-    /** 중계로 그 탭을 만들었다. 연결이 붙기 전에도 에이전트가 쥔 탭으로 둔다. */
+    /**
+     * 열린 중계 연결을 사람 잠금에 등록한다. 사람이 넘겨받으면 {@code close} 가 불린다. 등록한 뒤 이미 잠겼으면 바로 부른다. 판정과 등록
+     * 사이에 회수가 끼어도 연결이 남지 않게 한다.
+     */
+    public BrowserUsageHandle watchHuman(GatewayTarget target, Runnable close) {
+        BrowserUsageHandle handle = holds.watch(target.browserId(), close);
+        if (holds.held(target.userId())) {
+            handle.close();
+            close.run();
+        }
+        return handle;
+    }
+
+
+    /** 중계로 그 탭을 만들었다. 연결이 붙기 전에도 에이전트가 쥔 탭으로 둔다. 사람이 쥐고 있으면 두지 않는다. */
     public void created(GatewayTarget target, String targetId) {
+        // 판정을 지난 뒤 사람이 넘겨받았으면 그 탭은 사람의 것이다. 회수가 지운 쥔 탭 기록을 다시 적지 않는다
+        if (holds.held(target.userId())) {
+            return;
+        }
         agentTabs.created(target.browserId(), targetId);
     }
 

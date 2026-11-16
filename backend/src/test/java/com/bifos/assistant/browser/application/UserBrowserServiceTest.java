@@ -935,7 +935,7 @@ class UserBrowserServiceTest {
                 new FakeCdp(),
                 new FakeCdp(),
                 new BrowserUsage(),
-                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()),
+                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), mock(BrowserHumanHold.class),
                 () -> Duration.ofMinutes(30),
                 Duration.ofSeconds(2)));
     }

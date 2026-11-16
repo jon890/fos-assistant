@@ -2,6 +2,7 @@ package com.bifos.assistant.browser.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -26,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
@@ -102,6 +104,37 @@ class BrowserGatewaySocketTest {
             .containsExactly("{\"id\":1, false", "\"result\":{}} true");
         assertThat(handleCloses).hasValue(0);
         assertThat(socket.supportsPartialMessages()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("사람이 브라우저를 쥐었다고 handshake 가 표시한 연결은 Chrome 에 붙지 않고 4423 으로 닫는다")
+    void closesHeldConnectionWith4423() throws Exception {
+        session.getAttributes().clear();
+        session.getAttributes().put(BrowserGatewayHandshake.HUMAN_HELD, true);
+
+        socket.afterConnectionEstablished(session);
+
+        assertThat(sessionClosed.get().getCode()).isEqualTo(4423);
+        assertThat(relays.opened).isNull();
+        verify(gateway, never()).hold(any());
+    }
+
+
+    @Test
+    @DisplayName("열린 연결은 사람 잠금에 등록되고, 사람이 넘겨받으면 Chrome 쪽과 함께 4423 으로 닫힌다")
+    void closesOpenConnectionWhenPersonTakesOver() throws Exception {
+        AtomicInteger watchCloses = new AtomicInteger();
+        ArgumentCaptor<Runnable> kick = ArgumentCaptor.forClass(Runnable.class);
+        when(gateway.watchHuman(eq(TARGET), kick.capture())).thenReturn(watchCloses::incrementAndGet);
+
+        socket.afterConnectionEstablished(session);
+        kick.getValue().run();
+
+        assertThat(sessionClosed.get().getCode()).isEqualTo(4423);
+        assertThat(relays.closes).hasValue(1);
+        assertThat(handleCloses).hasValue(1);
+        assertThat(watchCloses).hasValue(1);
     }
 
 

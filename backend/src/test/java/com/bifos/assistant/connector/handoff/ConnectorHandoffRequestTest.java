@@ -16,6 +16,8 @@ class ConnectorHandoffRequestTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String KEY = "2ce07fe9da9032a6ba2d14ea44adf290f530110a4b5d2ed67bb72384342abf8b";
     private static final String SIG = "b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3";
+    /** 탭 없는 {@code human_browser} 의 확인 값이다. {@code hermes/tests/test_fos_ctx.py} 의 {@code HANDOFF_TABLESS_SIG} 와 같다. */
+    private static final String TABLESS_SIG = "19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1";
 
 
     @Test
@@ -36,10 +38,37 @@ class ConnectorHandoffRequestTest {
     void acceptsEveryNeed() {
         assertThat(HandoffNeed.fromWire("bot_check")).contains(HandoffNeed.BOT_CHECK);
         assertThat(HandoffNeed.fromWire("unexpected_page")).contains(HandoffNeed.UNEXPECTED_PAGE);
+        assertThat(HandoffNeed.fromWire("human_browser")).contains(HandoffNeed.HUMAN_BROWSER);
         assertThat(HandoffNeed.fromWire("BOT_CHECK")).isEmpty();
         assertThat(HandoffNeed.fromWire("payment")).isEmpty();
         assertThat(HandoffNeed.fromWire("tab_check")).isEmpty();
         assertThat(HandoffNeed.values()).allSatisfy(need -> assertThat(need.title()).startsWith("「내 브라우저」"));
+    }
+
+
+    @Test
+    @DisplayName("탭 없는 human_browser 는 빈 글로 서명을 확인하고 탭 없이 돌려준다. 탭 칸이 null 이어도 같다")
+    void acceptsTablessHumanBrowser() {
+        ObjectNode tabless = tabless();
+        ObjectNode nullTab = tabless().putNull("tab");
+
+        for (ObjectNode body : new ObjectNode[] {tabless, nullTab}) {
+            ConnectorHandoffRequest request = ConnectorHandoffRequest.verify(body, KEY);
+            assertThat(request.need()).isEqualTo(HandoffNeed.HUMAN_BROWSER);
+            assertThat(request.tab()).isNull();
+        }
+    }
+
+
+    @Test
+    @DisplayName("탭 없는 넘기기는 human_browser 만 받고, 탭 없는 서명으로 탭을 붙이면 거절한다")
+    void rejectsTablessOtherNeedsAndAddedTab() {
+        ObjectNode login = body();
+        login.remove("tab");
+        ObjectNode addedTab = tabless().put("tab", "TAB1");
+        for (ObjectNode bad : new ObjectNode[] {login, addedTab}) {
+            assertThatThrownBy(() -> ConnectorHandoffRequest.verify(bad, KEY)).isInstanceOf(ApiException.class);
+        }
     }
 
 
@@ -73,6 +102,16 @@ class ConnectorHandoffRequestTest {
         body.put("need", "login");
         body.put("tab", "TAB1");
         body.put("sig", SIG);
+        return body;
+    }
+
+
+    private static ObjectNode tabless() {
+        ObjectNode body = body();
+        body.remove("tab");
+        body.put("code", "DEMO_BROWSER_IN_USE");
+        body.put("need", "human_browser");
+        body.put("sig", TABLESS_SIG);
         return body;
     }
 }

@@ -106,6 +106,7 @@
     "NAVER_BLOG_PHOTO_INVALID": "invalid_input",
     "NAVER_BLOG_LOGIN_REQUIRED": { "category": "credential_rejected", "recovery": "reconnect" },
     "NAVER_BLOG_BROWSER_UNREACHABLE": "unavailable",
+    "NAVER_BLOG_BROWSER_IN_USE": "unavailable",
     "NAVER_BLOG_BUSY": { "category": "unavailable", "recovery": "retry_later" },
     "NAVER_BLOG_JOB_NOT_FOUND": "invalid_input",
     "NAVER_BLOG_DRAFT_NOT_FOUND": { "category": "invalid_input", "recovery": "recheck" },

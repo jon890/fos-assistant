@@ -162,7 +162,8 @@ class BrowserGatewayControllerTest {
             ErrorCode.BROWSER_CAPACITY, 503,
             ErrorCode.BROWSER_BUSY, 503,
             ErrorCode.BROWSER_START_FAILED, 502,
-            ErrorCode.BROWSER_STOP_FAILED, 502);
+            ErrorCode.BROWSER_STOP_FAILED, 502,
+            ErrorCode.BROWSER_HUMAN_HELD, 423);
 
         for (Map.Entry<ErrorCode, Integer> entry : expected.entrySet()) {
             doThrow(new ApiException(entry.getKey(), "refused")).when(gateway).open(TOKEN);

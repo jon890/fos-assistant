@@ -75,6 +75,15 @@ public class BrowserAgentTabs {
     }
 
 
+    /**
+     * 사람이 브라우저를 넘겨받았다. 그 브라우저의 쥔 탭 기록을 모두 지운다. 연결은 회수가 닫고, 만든 지 30초 안의 탭 기록이 사람 입력을 막지
+     * 않게 한다. 남은 연결의 핸들이 늦게 닫혀도 지운 상태에 다시 내려가지 않는다.
+     */
+    public void forget(Long browserId) {
+        browsers.remove(browserId);
+    }
+
+
     /** 그 탭을 에이전트가 쥐었는가. 연 탭은 {@link #agentTabs} 가 읽어 둔 것만 본다. */
     public boolean held(Long browserId, String targetId) {
         Tabs tabs = browsers.get(browserId);

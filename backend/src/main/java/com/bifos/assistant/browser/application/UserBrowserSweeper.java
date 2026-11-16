@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -51,8 +52,13 @@ public class UserBrowserSweeper {
     private final BrowserUsage usage;
     private final UserAccessPolicy access;
     private final BrowserWaitDemand waits;
+    private final BrowserHumanHold holds;
     private final LiveProperties<BrowserProperties> properties;
     private final Clock clock;
+    /** 브라우저마다 점검이 화면이 열려 있는 것을 마지막으로 본 시각이다. 사람 잠금의 10분 풀림이 쓴다. */
+    private final Map<Long, Instant> screenSeen = new ConcurrentHashMap<>();
+    /** 이 점검이 처음 돈 시각이다. 다시 뜬 뒤 화면을 본 적 없는 잠금은 이 시각부터 센다. */
+    private volatile Instant firstSweep;
 
 
     @Scheduled(
@@ -76,6 +82,7 @@ public class UserBrowserSweeper {
             return;
         }
         try {
+            releaseStaleHolds();
             stopIdle();
             stopRevoked();
             retryFailedStops();
@@ -144,8 +151,50 @@ public class UserBrowserSweeper {
     }
 
 
-    /** 그 사용자가 사람을 기다리는가. 이번에 켜진 시각을 모르면 처음부터 본다. */
+    /**
+     * 사람이 쥔 브라우저의 화면이 모두 닫힌 뒤 {@code idle-timeout} 이 지나면 잠금을 푼다(spec DECISION7). 기준은 잠근 시각과 화면이 열려
+     * 있는 것을 마지막으로 본 시각 가운데 늦은 것이다. 점검 간격만큼 늦게 풀릴 수 있다.
+     */
+    void releaseStaleHolds() {
+        Instant now = clock.instant();
+        if (firstSweep == null) {
+            firstSweep = now;
+        }
+        List<UserBrowser> held = browsers.findByStatusAndHumanHeldAtIsNotNull(UserBrowserStatus.RUNNING);
+        screenSeen.keySet().retainAll(held.stream().map(UserBrowser::id).collect(Collectors.toSet()));
+        for (UserBrowser browser : held) {
+            try {
+                if (!browser.heldByHuman()) {
+                    // 끄기가 실패해 남은 지난 잠금이다. 이번 켜기에는 쥔 사람이 없다
+                    holds.release(browser.id(), browser.userId());
+                    continue;
+                }
+                if (screens.isOpen(browser.id())) {
+                    screenSeen.put(browser.id(), now);
+                    continue;
+                }
+                Instant since = later(browser.humanHeldAt(), screenSeen.getOrDefault(browser.id(), firstSweep));
+                if (!since.plus(service.idleTimeout()).isAfter(now)) {
+                    holds.release(browser.id(), browser.userId());
+                    screenSeen.remove(browser.id());
+                }
+            } catch (RuntimeException ex) {
+                log.warn("user browser hold release failed id={} error={}", browser.id(), name(ex));
+            }
+        }
+    }
+
+
+    private static Instant later(Instant one, Instant other) {
+        return one.isAfter(other) ? one : other;
+    }
+
+
+    /** 그 사용자가 사람을 기다리는가. 사람이 쥐고 있으면 기다린다(spec REQ1). 이번에 켜진 시각을 모르면 처음부터 본다. */
     private boolean waiting(UserBrowser browser) {
+        if (browser.heldByHuman()) {
+            return true;
+        }
         Instant since = browser.startedAt() != null ? browser.startedAt() : Instant.EPOCH;
         return waits.waiting(browser.userId(), since);
     }
@@ -242,6 +291,7 @@ public class UserBrowserSweeper {
         browser.resetStopped(clock.instant());
         try {
             browsers.saveAndFlush(browser);
+            holds.release(browser.id(), browser.userId());
             log.info("user browser reset to stopped id={} reason={}", browser.id(), reason);
         } catch (OptimisticLockingFailureException ex) {
             log.debug("user browser reconcile skipped id={}: changed concurrently", browser.id());

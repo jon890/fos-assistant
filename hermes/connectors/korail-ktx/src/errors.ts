@@ -5,6 +5,7 @@ export type ErrorCode =
   | "KORAIL_DATE_UNAVAILABLE"
   | "KORAIL_REJECTED"
   | "KORAIL_BROWSER_UNREACHABLE"
+  | "KORAIL_BROWSER_IN_USE"
   | "KORAIL_LOGIN_REQUIRED"
   | "KORAIL_CAPTCHA"
   | "KORAIL_BOT_CHECK"
@@ -15,10 +16,10 @@ export type ErrorCode =
  * 사람에게 넘기는 단계와 남긴 탭이다. fos-ctx hook 이 이 칸을 보고 Control Plane 에 화면 넘기기를 알린다.
  * 어휘는 fos-assistant `docs/adr/ADR-20261111-connector-handoff.md` 의 「결정」 이 갖는다.
  */
-export type Handoff = {
-  need: "login" | "bot_check" | "captcha" | "unexpected_page";
-  tab: string;
-};
+export type Handoff =
+  | { need: "login" | "bot_check" | "captcha" | "unexpected_page"; tab: string }
+  /** 사람이 브라우저를 쥐어 중계가 거절했다. 탭을 만들기 전이면 탭이 없다(fos-assistant ADR-20261116 / browser-lock). */
+  | { need: "human_browser"; tab?: string };
 
 /**
  * 코드와, 코레일이 거절한 때만 그 글(200자까지)을 싣는 오류. 중계 주소, 역 이름, 날짜를 담지 않는다.
@@ -33,6 +34,11 @@ export class ToolError extends Error {
     super(code);
   }
 }
+
+/** 사람이 브라우저를 넘겨받아 멈췄을 때의 고정 안내다. 사용자가 돌려줄 때까지 다시 부르지 않게 한다. */
+const HUMAN_BROWSER_MESSAGE =
+  "사용자가 「내 브라우저」를 직접 쓰고 있어 멈췄다. 요청한 일은 아직 끝나지 않았고 결과가 없다. " +
+  "사용자에게 다 쓰면 「돌려주기」를 눌러 달라고 안내하고, 사용자가 돌려줬다고 하기 전에는 같은 도구를 다시 부르지 않는다.";
 
 /** 모델이 화면 넘기기를 성공으로 읽지 않게 하는 고정 안내다. 화면 글이나 주소를 담지 않는다. */
 const HANDOFF_MESSAGE =
@@ -50,8 +56,15 @@ export function handoffResult(code: ErrorCode, handoff: Handoff) {
         type: "text" as const,
         text: JSON.stringify({
           status: "HUMAN_ACTION_REQUIRED",
-          message: HANDOFF_MESSAGE,
-          handoff: { code, need: handoff.need, tab: handoff.tab },
+          message:
+            handoff.need === "human_browser"
+              ? HUMAN_BROWSER_MESSAGE
+              : HANDOFF_MESSAGE,
+          handoff: {
+            code,
+            need: handoff.need,
+            ...(handoff.tab ? { tab: handoff.tab } : {}),
+          },
         }),
       },
     ],

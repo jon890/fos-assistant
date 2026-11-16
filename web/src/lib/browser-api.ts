@@ -107,3 +107,19 @@ export function sendScreenInput(body: object): Promise<Response> {
     body: JSON.stringify(body),
   });
 }
+
+/** 「직접 할게요」 다. 대화 패널에서 누르면 그 대화의 공개 번호를 싣는다. */
+export function takeOverBrowser(
+  conversationId: string | null,
+): Promise<Response> {
+  return fetch("/api/browser/takeover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(conversationId ? { conversationId } : {}),
+  });
+}
+
+/** 「돌려주기」 다. 잠금만 푼다. 글을 보낼지는 부르는 쪽이 정한다. */
+export function giveBackBrowser(): Promise<Response> {
+  return fetch("/api/browser/give-back", { method: "POST" });
+}

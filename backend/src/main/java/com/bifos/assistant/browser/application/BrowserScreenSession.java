@@ -58,6 +58,7 @@ public class BrowserScreenSession {
     private final BrowserAgentTabs agentTabs;
     private final ScheduledExecutorService scheduler;
     private final Consumer<BrowserScreenSession> ended;
+    private final BrowserScreenHold hold;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final List<ScheduledFuture<?>> tasks = new ArrayList<>();
     private final Object lock = new Object();
@@ -104,6 +105,9 @@ public class BrowserScreenSession {
         attach(first, url);
         sink.onClose(() -> close(null));
         sendTabs();
+        if (!hold.send(sink, !held.isEmpty())) {
+            close(null);
+        }
         long interval = tabInterval.toMillis();
         schedule(scheduler.schedule(() -> close(TIMEOUT), timeout.toMillis(), TimeUnit.MILLISECONDS));
         schedule(scheduler.scheduleWithFixedDelay(this::pollTabs, interval, interval, TimeUnit.MILLISECONDS));
@@ -137,7 +141,8 @@ public class BrowserScreenSession {
             case WHEEL -> wheel(current, input);
             // 사용자가 스크립트를 정하지 못한다. 페이지 처음과 끝에 쓰는 고정 식만 실행한다.
             case SCROLL -> command(current, "Runtime.evaluate", BrowserScreenInputParams.scroll(input.action()));
-            case KEY -> key(current, input.key());
+            // 특수 키를 누르고 뗀다. 글자를 만드는 Enter 와 Space 는 text 를 싣는다
+            case KEY -> BrowserScreenInputParams.key(input.key()).forEach(params -> command(current, "Input.dispatchKeyEvent", params));
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
             case BACK -> BrowserScreenInputParams.back(current, () -> logFailure("Page.navigateToHistoryEntry"));
@@ -357,6 +362,9 @@ public class BrowserScreenSession {
             if (next != null || !pages.equals(before) || !held.equals(heldBefore)) {
                 sendTabs();
             }
+            if (!hold.send(sink, !held.isEmpty())) {
+                close(null);
+            }
         });
     }
 
@@ -460,14 +468,6 @@ public class BrowserScreenSession {
             return null;
         }
         return BrowserScreenInputParams.point(input, size.width(), size.height());
-    }
-
-
-    /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 와 Space 는 {@code text} 를 싣는다. */
-    private void key(CdpConnection current, String name) {
-        for (Map<String, Object> params : BrowserScreenInputParams.key(name)) {
-            command(current, "Input.dispatchKeyEvent", params);
-        }
     }
 
 

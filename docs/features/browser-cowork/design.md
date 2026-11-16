@@ -1,7 +1,7 @@
 # 실행 중 브라우저 함께 보기·넘겨받기와 이어 가기 기술 설계
 
-스펙은 [spec.md](spec.md)(사용자 확인 2026-11-16)다. 이 문서는 기능 전체의 경계와 PR1, PR2 의 상세를 갖는다.
-PR3 부터 PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고, 그 PR 을 시작할 때 이 문서에 그 PR 의 절을 더해 상세를 닫는다.
+스펙은 [spec.md](spec.md)(사용자 확인 2026-11-16)다. 이 문서는 기능 전체의 경계와 PR1, PR2, PR3 의 상세를 갖는다.
+PR4 와 PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고, 그 PR 을 시작할 때 이 문서에 그 PR 의 절을 더해 상세를 닫는다.
 
 ## 요구사항 연결
 
@@ -11,9 +11,9 @@ PR3 부터 PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고
 | REQ2 | `connector` 의 새 부품 `ConnectorApprovalBrowser` 가 승인 트랜잭션보다 먼저 브라우저를 쓰는 플러그인의 줄이면 `UserBrowserService.ensureRunning` 으로 켠다. 켜지 못하면 줄을 건드리지 않고 `CONNECTOR_BROWSER_UNAVAILABLE` 로 거절하고, 웹이 그 코드에 정해 둔 문구를 카드에 보인다 |
 | REQ3 | PR2. 웹이 그 대화의 도는 도구 단계와 `EXECUTING` 승인 줄을 카탈로그의 `ownerBrowser` 로 걸러 단추를 보이고, 누르면 옆 패널의 「내 브라우저」 탭이 에이전트 탭을 연다. 아래 「PR2 에이전트 화면 보기」 |
 | REQ4 | PR2. `browser` 의 새 부품 `BrowserAgentTabs` 가 중계의 탭 연결과 `/json/new`, 그 탭이 연 새 탭으로 에이전트가 쥔 탭을 메모리에 두고, 화면이 그 탭의 입력을 버리며 `tabs` 사건에 쥔 쪽을 싣는다. 아래 「PR2 에이전트가 쥔 탭」 |
-| REQ5 | PR3. 같은 절의 「사람 잠금」 의 잠금 상태와 에이전트 도구를 멈추는 자리, 넘기기 어휘 |
-| REQ6 | PR3. 같은 절의 승인 중 회수 막기 |
-| REQ7 | PR3. 같은 절의 잠금 상태(돌려주기와 10분 풀림) |
+| REQ5 | PR3. `browser` 의 새 부품 `BrowserHumanHold` 가 `user_browser.human_held_at` 을 조건부 갱신으로 쓰고, 중계가 잠긴 동안 HTTP 423 과 WebSocket close code 4423 으로 거절하며, 플러그인이 그 신호를 `human_browser` 넘기기로 바꾼다. 아래 「PR3 사람 잠금」 |
+| REQ6 | PR3. 회수할 때 새 포트 `BrowserApprovedRuns` 로 브라우저를 쓰는 금융·구매 승인 줄이 실행 중인지 묻고, 실행 중이면 `BROWSER_APPROVAL_RUNNING` 으로 거절한다 |
+| REQ7 | PR3. 「돌려주기」 는 잠금 칸을 비우고, 글을 보낼지는 웹이 그 대화의 열린 넘기기로 정한다. 점검이 화면이 닫힌 지 10분 지난 잠금을 푼다 |
 | REQ8 | PR4. 같은 절의 「이어 가기 표식」 의 플러그인 계약과 이어 가기 |
 | REQ9 | PR4. 같은 절의 표식 자리 |
 | REQ11 | PR4. 같은 절의 열린 넘기기의 탭 지키기 |
@@ -46,7 +46,7 @@ UserBrowserSweeper.stopIdle
 - **기다림의 뜻**(REQ1 의 넷 가운데 PR1 이 보는 둘):
   - 열린 넘기기: 그 사용자의 판정 줄 가운데 `handoff_need` 가 있고 `handoff_closed_at` 이 비었으며, 대화(`conversation_id`)가 있고 `handoff_at` 이 `since` 이후인 줄. 넘기기를 닫는 길은 그 대화의 사람 turn 뿐이라, 대화 밖 실행의 넘기기나 버려진 대화의 카드는 끝없이 열려 있다. 브라우저가 다시 켜졌으면 그 탭도 이미 없다. 이 둘을 빼야 기다림이 영구히 참이 되지 않는다. 넘기기는 「내 브라우저」 를 쓰는 플러그인만 낸다. 결제(`payment`)와 탭 확인 넘기기도 들어간다. 사람이 그 탭에서 결제해야 하기 때문이다
   - 기다리는 승인: 그 사용자의 `PENDING` 이고 `expires_at` 이 지나지 않은 승인 줄 가운데, 그 플러그인의 manifest 가 `owner_browser_env` 를 선언한 줄(`ConnectorManifest#ownerBrowser`). 카탈로그를 읽지 못하면 기다리는 것으로 본다. 잘못 보아도 30분 뒤 꺼지므로 켜 두는 쪽이 안전하다
-  - 사람 기다림 승인은 PR4, 사람 잠금은 PR3 이 같은 포트에 더한다
+  - 사람 기다림 승인은 PR4 가 같은 포트에 더한다. 사람 잠금(PR3)은 `browser` 가 갖는 칸이라 포트를 거치지 않고 점검이 줄에서 직접 본다
 - **설정** `assistant.browser.wait-hold-timeout`, 기본 `30m`, `BrowserProperties` 에 더하고 `idle-timeout` 보다 짧으면 `idle-timeout` 으로 끌어올린다. 운영이 `idle-timeout` 만 늘려도 기동이 멈추지 않는다. 값은 사용자 결정(spec DECISION10)이다. 점검은 `LiveProperties<BrowserProperties>` 에서 직접 읽는다. `UserBrowserService` 는 파일 길이 상한(rule-44)에 닿아 메서드를 더하지 않는다.
 - **사람이 끄기·지우기, 관리자 끄기, 사용자 끄기**는 자동 중지를 거치지 않으므로 그대로 바로 끈다.
 - 데이터는 바꾸지 않는다. 기존 칸(`connector_action` 의 `status`, `expires_at`, `handoff_at`, `handoff_closed_at`, `user_browser.last_active_at`)만 읽는다.
@@ -113,6 +113,52 @@ held(탭) = 열린 연결 수 > 0
 - **패널**: 옆 패널 목표에 에이전트 보기(`{ kind: "agent-browser" }`)를 더한다. 「할 일」·「내 브라우저」 탭 머리는 그대로이고 「내 브라우저」 탭이 화면을 그린다. 넘기기 카드가 패널을 여는 규칙은 지금과 같아 새 넘기기가 생기면 그 넘기기의 화면으로 바뀐다. 단추를 다시 누르면 화면을 새로 만들어 다시 에이전트 탭으로 옮긴다. 도구가 끝나도 패널은 남는다(spec DECISION16). 휴대폰은 지금 패널 규칙대로 전체 폭 시트다(spec DECISION17).
 - **띠**: 화면은 `tabs` 의 지금 탭이 `agent` 면 화면 위에 「에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요」 띠를 보이고 주소 칸, 뒤로, 새로 고침, 키보드, 화면 누르기를 막는다. 서버도 버리므로 웹의 막기는 보이는 모양이다. `/browser` 와 대화 패널이 같은 부품이라 어디서 열든 같다.
 
+### PR3 사람 잠금
+
+```text
+POST /api/v1/browser/takeover {conversationId?}
+  BrowserHumanHold.takeOver(userId, 회수한 자리)
+    브라우저 줄이 없으면 BROWSER_NOT_FOUND, RUNNING 이 아니면 BROWSER_BUSY
+    BrowserApprovedRuns.running(userId) 이면 BROWSER_APPROVAL_RUNNING(409)
+    update user_browser set human_held_at = now where user_id = ? and status = 'RUNNING' and human_held_at is null
+      0 줄이고 이미 잠겨 있으면 그대로 성공(두 번 누르기), 아니면 BROWSER_BUSY
+    다시 BrowserApprovedRuns.running 이면 잠금을 풀고 BROWSER_APPROVAL_RUNNING
+    회수한 자리를 메모리에 두고, 그 브라우저의 쥔 탭 기록을 지우고, 열린 중계 연결을 4423 으로 닫는다
+POST /api/v1/browser/give-back
+  BrowserHumanHold.giveBack(userId): update ... set human_held_at = null where user_id = ? and human_held_at is not null
+```
+
+- **잠금 칸** `user_browser.human_held_at`(`DATETIME(6)`, 비어 있으면 잠기지 않았다). 엔티티는 이 칸을 `insertable = false, updatable = false` 로 읽기만 한다. 활동 기록, 자동 중지, 켜기와 끄기가 엔티티를 저장해도 이 칸을 되돌리지 않고, 회수와 돌려주기는 저장소의 조건부 갱신으로만 쓴다(rule-68). 잠금은 줄이 `RUNNING` 이고 쥔 시각이 이번 켜기(`started_at`) 뒤일 때만 뜻이 있다. 끄기(`halt`)와 상태 맞추기(`resetStopped`)가 끈 뒤 같은 갱신으로 비우고, 끄기가 실패해 칸이 남은 채 다시 켜면 지난 잠금으로 보아 점검과 다음 회수가 비운다.
+- **회수한 자리**: 대화 패널에서 회수하면 웹이 그 대화의 공개 번호를 보낸다. `BrowserHumanHold` 가 사용자마다 메모리에 두고 풀릴 때 지운다. 넘기기 알림을 낼지 고를 때만 쓴다(spec DECISION18). Control Plane 이 다시 뜨면 잃고, 그때는 알림을 낸다. 알림이 하나 더 생기는 쪽이 안전하다.
+- **중계 HTTP**(`BrowserGateway.open`): 표식에서 주인을 찾고 허용 목록을 본 뒤, 브라우저를 켜기 전에 잠금을 읽는다. 잠겼으면 `BROWSER_HUMAN_HELD` 이고 `BrowserGatewayStatus` 가 423 으로 바꾼다. 쿠키 읽기(`/json/version`)와 남긴 탭 닫기(`/json/close`)도 같다. 잠근 동안 에이전트는 브라우저에 아무것도 하지 못한다(spec DECISION5).
+- **중계 WebSocket**: Bun 의 `WebSocket` 은 handshake 실패의 상태 코드를 주지 않는다. 그래서 handshake 판정이 `BROWSER_HUMAN_HELD` 를 받으면 연결을 받아들이고 표시만 남기며, 처리기가 열린 직후 close code 4423(`human_held`)으로 닫는다. 열린 연결은 `BrowserHumanHold.watch(browserId, 닫기)` 로 등록하고, 회수가 그 브라우저의 등록을 모두 불러 4423 으로 닫는다. 등록한 뒤 잠금을 한 번 더 읽어, 판정과 등록 사이에 회수가 끼어도 연결이 남지 않게 한다.
+- **쥔 탭**: 회수가 `BrowserAgentTabs.forget(browserId)` 로 그 브라우저의 기록을 지운다. 연결은 위에서 닫히지만 만든 지 30초 안의 탭 기록이 남아 사람 입력을 막지 않게 한다. 잠근 동안에는 새 연결과 새 탭이 없어 쥔 탭이 생기지 않는다.
+- **화면의 `hold` 사건**: 화면은 탭 확인(2초)마다 `{"human": 잠겼는가, "approved": 승인한 실행이 도는가}` 를 만들고 바뀌었을 때와 처음 붙었을 때 보낸다. `approved` 는 지금 탭들에 쥔 탭이 있을 때만 포트로 묻는다. 에이전트가 쓰지 않을 때 사람 화면에 조회가 없다. 웹은 회수와 돌려주기가 성공하면 다음 사건을 기다리지 않고 그 값으로 띠를 바꾼다.
+- **띠**(웹, `/browser` 와 대화 패널이 같은 부품):
+
+  | 상태 | 띠 | 화면 누르기·Esc |
+  | --- | --- | --- |
+  | `human` | 「직접 하는 중이에요」 와 「돌려주기」. 모든 탭이 조작된다 | 그대로 원격으로 간다 |
+  | 지금 탭이 쥔 탭이고 `approved` | 「승인한 작업을 마무리하는 중이에요」. 단추 없음 | 버린다. 확인 띠도 없다 |
+  | 지금 탭이 쥔 탭 | 「에이전트가 쓰는 중이에요」 와 「직접 할게요」 | 버리고 「직접 하시겠어요?」 확인 띠(「직접 할게요」, 「계속 볼게요」)를 띄운다 |
+  | 그 밖 | 없음 | 그대로 원격으로 간다 |
+
+- **돌려주기의 글**(spec DECISION12, DECISION24): 대화 패널의 화면은 돌려주기가 성공하면 그 대화의 열린 넘기기를 본다. 결제(`PAYMENT`) 밖의 넘기기가 하나라도 있으면 `human_browser` 의 정해 둔 글을 다음 메시지로 보낸다. 결제 카드만 남았으면 보내지 않는다. 결제는 「결제했어요」 와 「사지 않을래요」 가운데 사람이 고르는 일이라 이어 가라는 글이 맞지 않다. `/browser` 의 화면은 넘기기를 모르므로 잠금만 푼다.
+- **10분 풀림**(spec DECISION7): `UserBrowserSweeper` 가 점검마다 잠긴 `RUNNING` 줄을 본다. 화면이 열려 있으면 그 시각을 기억하고, 닫혀 있으면 잠근 시각과 마지막으로 열린 것을 본 시각 가운데 늦은 것에서 `idle-timeout` 이 지났을 때 푼다. 열린 것을 본 적이 없으면(다시 뜬 뒤) 점검이 처음 돈 시각을 쓴다. 점검 간격(1분)만큼 늦게 풀릴 수 있다. 잠긴 브라우저는 REQ1 의 기다림으로 보아 30분 규칙을 따르므로, 10분 풀림이 끄기보다 먼저 온다.
+
+### PR3 회수 중 에이전트 도구와 넘기기
+
+- **플러그인**: 세 플러그인(네이버 쇼핑, 코레일 KTX, 네이버 블로그)의 `cdp.ts` 가 중계의 423 과 close code 4423 을 닿지 않음과 나눠 `<플러그인>_BROWSER_IN_USE` 오류에 넘기기 `{need: "human_browser", tab?}` 를 싣는다. 탭은 그 연결이 붙은 탭(`devtools/page/<탭>`)이고, 탭을 만들기 전에 거절됐으면 없다. 쇼핑과 KTX 의 탭 열기는 그 탭을 남긴 탭으로 두고 닫지 않는다(닫기도 423 이다). 블로그는 편집기 오류로 감싸여도 오류를 고르는 마지막 단계가 중계를 한 번 더 불러 그 신호를 찾는다. 결과는 지금 넘기기와 같이 `isError` 없는 `HUMAN_ACTION_REQUIRED` 이고 안내 글만 「사람이 직접 쓰는 중이라 돌려줄 때까지 다시 부르지 않는다」 로 다르다.
+- **어휘** `HandoffNeed.HUMAN_BROWSER`(`human_browser`). 제목은 「「내 브라우저」를 직접 쓰는 동안 멈췄어요」, 웹의 「다 했어요」 글과 돌려주기의 글은 「「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.」 다. 카드와 닫기는 다른 넘기기와 같다.
+- **탭 없는 넘기기**: fos-ctx 1.10.0 이 `tab` 이 없는 넘기기를 보낸다. 본문에서 `tab` 칸을 빼고 서명할 글의 `tab` 자리에 빈 글을 넣는다. Control Plane 은 `tab` 이 없거나 `null` 이면 빈 글로 서명을 확인하고 탭 없이 적는다. 웹은 탭 없는 `HUMAN_BROWSER` 카드를 받는다(지금은 `TAB_CHECK` 만 받는다).
+- **전환 배포**(rule-66): 운영은 plugin 을 먼저, Control Plane 을 다음에 올린다. 그 사이 새 fos-ctx 가 보낸 `human_browser` 는 옛 Control Plane 이 어휘 밖이라 거절해 카드만 뜨지 않고, 모델은 결과의 안내 글을 받는다. 옛 Control Plane 은 423 과 4423 을 내지 않으므로 플러그인이 `human_browser` 를 내는 일은 새 Control Plane 뒤에만 생긴다. 탭 있는 넘기기의 본문과 서명은 바뀌지 않아 옛 fos-ctx 와 새 Control Plane 도 그대로 돈다. 다음 배포에서 걷을 옛 경로는 없다.
+- **알림**(spec DECISION18): `ConnectorHandoffs.record` 가 `HUMAN_BROWSER` 이고 회수한 자리가 그 대화이면 알림을 만들지 않는다. 카드는 그대로 낸다.
+
+### PR3 승인과 회수
+
+- **포트** `browser.application.port.BrowserApprovedRuns`: `boolean running(long userId)`. 구현은 `connector` 의 `action` 하위 기능의 `ConnectorBrowserApprovedRuns` 다. 그 사용자의 `EXECUTING` 이고 위험도가 `FINANCIAL` 이나 `PURCHASE` 인 줄의 플러그인 가운데 manifest 가 `owner_browser_env` 를 선언한 것이 있으면 참이다. 카탈로그를 읽지 못하면 참으로 본다. 잘못 막아도 실행이 끝나면(최대 60초, `ConnectorActionExpirer`) 풀린다. 원고 저장 승인은 위험도가 `WRITE` 라 들지 않는다.
+- **회수 중 승인**(spec DECISION26): `ConnectorApprovalBrowser.require` 가 브라우저를 켜기 전에 `BrowserHumanHold.held(userId)` 를 본다. 잠겼으면 `CONNECTOR_BROWSER_HELD`(409)로 거절하고 줄을 건드리지 않는다. 웹은 그 코드에 「직접 쓰고 계신 브라우저를 돌려준 뒤 승인해 주세요.」 를 보인다. 금융·구매, 일반 쓰기, 원고 저장이 모두 이 자리를 지난다.
+
 ### 뒤 PR 의 경계
 
 PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 그 PR 에서 이 절을 고치고 독립 검토를 다시 받는다.
@@ -123,11 +169,7 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 
 #### 사람 잠금(PR3)
 
-- **잠금 상태**: `user_browser` 줄의 칸 하나(사람이 회수한 시각)에 둔다. 테이블을 늘리지 않는다. 그 줄은 `@Version` 낙관적 잠금을 쓰고 활동 기록과 자동 중지가 그 버전에 기대므로, 회수와 돌려주기는 엔티티 저장이 아니라 조건부 갱신(rule-68)으로 쓰고, 끄기(`halt`, `resetStopped`)가 그 칸도 비운다. 화면이 모두 닫힌 시각은 화면 등록부가 알고, 점검이 10분을 넘긴 잠금을 푼다.
-- **에이전트 도구를 멈추는 자리**: 중계가 사람 잠금 동안 HTTP 창구(`/json/new`, `/json/version` 등)를 정해 둔 상태 코드로 거절한다. WebSocket 은 Node 의 `WebSocket` 이 handshake 실패의 상태 코드를 주지 않으므로, 연결을 받은 뒤 정해 둔 4000번대 close code 로 닫는다. 회수하는 순간 열린 연결도 같은 close code 로 닫는다. 플러그인은 그 신호를 「사람이 브라우저를 쓰는 중」 넘기기 결과로 바꾼다. 판정 hook 의 막기는 오류 글이라 넘기기 결과(spec DECISION3)가 되지 않아 쓰지 않는다.
-- **승인 중 회수 막기**: 금융·구매 승인(`ConnectorFinancialApproval`)을 지나 실행 중인 그 사용자의 줄(주문서 채우기, 좌석 확보, 이어 가기)이 있으면 회수를 거절한다. 원고 저장 승인 줄은 저장 확인까지 최대 15분 `EXECUTING` 으로 남으므로(`ContentDraftJobExpirer`) 넣지 않는다. 스펙 REQ6 의 대상과 같다.
-- **회수 중 승인**: PR1 의 `ConnectorApprovalBrowser` 가 사람 잠금을 보고 같은 방식으로 거절한다(spec DECISION26).
-- **넘기기 어휘**: `HandoffNeed` 에 회수 어휘 하나를 더하고, 알림 여부는 회수한 자리로 가른다(spec DECISION18). 회수 중 새 탭 열기가 거절된 호출에는 탭이 없는데 지금 넘기기 알림은 `tab` 이 필수이고 서명 글에 들어간다(`ConnectorHandoffRequest`). 그래서 fos-ctx hook 과 서명 형식을 탭 없는 넘기기를 받게 바꾸고, 전환 배포 호환(rule-66)을 그 PR 이 정한다.
+위 「PR3 사람 잠금」, 「PR3 회수 중 에이전트 도구와 넘기기」, 「PR3 승인과 회수」 가 상세다.
 
 #### 이어 가기 표식(PR4, PR5)
 
@@ -144,6 +186,9 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 - **두 번 누르기**: 두 요청이 함께 와도 `ensureRunning` 은 켜기를 하나로 모으고, 승인 트랜잭션의 줄 잠금이 실행을 하나로 만든다(지금 그대로).
 - **PR2 의 쥔 탭과 띠의 어긋남**: 입력 차단은 입력마다 `BrowserAgentTabs` 를 보므로 어긋나지 않는다. 띠는 탭 확인(2초) 간격만큼 늦게 바뀐다. 그 사이 웹이 막지 않은 입력은 서버가 버리고, 놓인 뒤 막힌 입력은 다음 목록에서 풀린다.
 - **연 탭 읽기 실패**: 그 새 탭을 사람 탭으로 본다. 플러그인이 곧 붙으면 연결 수로 쥔 탭이 되고, 화면은 지금 탭이 사람 탭이면 그 탭으로 옮기지 않았으므로 잃는 것이 없다. 지금 탭이 에이전트 탭이었으면 지금처럼 옮긴다.
+- **회수와 승인의 경쟁(PR3)**: 승인이 잠금을 본 뒤 실행 줄을 `EXECUTING` 으로 커밋하기 전에 회수가 잠금을 쓰면, 회수의 두 번째 확인도 실행 줄을 보지 못해 둘 다 지나간다. 그 실행은 중계에서 423 을 받아 넘기기로 끝나고 돈이나 좌석은 움직이지 않는다. 두 요청이 수 밀리초 안에 겹쳐야 생기고 결과가 안전한 쪽이라 잠금을 하나로 묶지 않는다.
+- **회수와 도는 도구(PR3)**: 회수가 연결을 닫는 순간 플러그인이 보내던 명령은 4423 으로 끝난다. 승인 없는 도구는 그 탭을 남기고 넘기기로 끝난다(spec REQ5). 회수 뒤에도 Control Plane 이 메모리에 둔 연결 등록이 남는 일은 없다. 연결이 닫히면 등록도 닫는다.
+- **잠금 칸과 엔티티 저장(PR3)**: 엔티티가 그 칸을 쓰지 않으므로 오래된 엔티티 저장이 잠금을 되돌리지 않는다. 끄기가 잠금을 비우는 갱신은 끄기를 마친 뒤에 하므로, 그 사이 회수가 들어와도 `RUNNING` 이 아니라 조건에 걸리지 않는다.
 - **배포 순서**: PR1 은 backend 와 웹이 한 이미지로 함께 나간다. 웹의 문구가 없을 때도 기존 대체 문구가 보이므로 순서가 어긋나도 깨지지 않는다.
 
 ## 검증 전략
@@ -161,9 +206,19 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 | REQ4 | `BrowserScreenSession` 단위 | 쥔 탭에는 누르기·글자·휠·주소·뒤로·새로 고침·확인 창 입력을 보내지 않고 탭 옮기기는 된다, 사람 탭은 조작된다, `tabs` 에 `agent` 가 실리고 놓이면 다시 알린다, 사람 탭을 보는 중 쥔 새 탭으로 옮기지 않고 사람 팝업은 따라간다, 주소를 주고 열 때 첫 탭이 쥔 탭이면 새 탭을 연다, 쥔 탭에 크기 덮어쓰기를 보내지 않는다 |
 | REQ3 | 웹 단위 | 단추 판정(도는 브라우저 도구, 끝난 도구, 브라우저가 아닌 도구, `EXECUTING` 줄, 카탈로그 없음) |
 | REQ3, REQ4 | 웹 브라우저 검사 | 도구가 도는 동안 단추가 보이고 누르면 패널이 에이전트 탭을 열며, 쥔 탭이면 띠가 보이고 화면 누르기가 입력을 보내지 않는다. 도구가 끝나면 단추가 사라지고 패널은 남는다 |
+| REQ5 | `BrowserHumanHold` 와 저장소 통합(H2) | 회수는 `RUNNING` 에만 잠그고 두 번 눌러도 성공, 승인한 실행 중이면 거절하고 잠그지 않는다, 돌려주기와 끄기가 잠금을 비운다, 엔티티 저장이 잠금을 되돌리지 않는다, 회수가 열린 연결을 닫는다 |
+| REQ5 | 중계 컨트롤러·handshake·WebSocket 단위 | 잠긴 동안 HTTP 창구가 423 이고 브라우저를 켜지 않는다, WebSocket 이 4423 으로 닫힌다, 회수하면 열린 연결이 4423 으로 닫힌다 |
+| REQ5 | `ConnectorApprovalBrowser` 단위와 승인 통합 | 잠긴 동안 승인이 `CONNECTOR_BROWSER_HELD` 이고 줄이 `PENDING` 그대로, 하루 합계에 들지 않는다 |
+| REQ5 | `ConnectorHandoffRequest`, `ConnectorHandoffs` 단위 | 탭 없는 `human_browser` 의 서명이 맞으면 받고 탭 없이 적는다, 회수한 대화의 넘기기는 알림이 없고 다른 대화는 알림이 있다 |
+| REQ5 | 플러그인 테스트(쇼핑, KTX, 블로그) | 423 과 4423 이 `human_browser` 넘기기 결과가 되고 쇼핑·KTX 는 탭을 남긴다 |
+| REQ5 | fos-ctx 테스트 | 탭 없는 `human_browser` 를 빈 글로 서명해 보낸다, 탭 있는 넘기기의 서명은 그대로다 |
+| REQ5, REQ7 | 화면과 웹 단위, 웹 브라우저 검사 | `hold` 사건이 바뀔 때 오고 쥔 탭이 없으면 승인 실행을 묻지 않는다, 띠 네 상태, 화면 누르기와 Esc 가 확인 띠를 띄운다, 회수와 돌려주기, 패널의 돌려주기는 열린 넘기기가 있을 때만 글을 보내고 `/browser` 는 보내지 않는다 |
+| REQ6 | `ConnectorBrowserApprovedRuns` 저장소 통합(H2) | 실행 중인 브라우저 금융·구매 줄만 참, 끝난 줄과 브라우저가 아닌 플러그인과 남의 줄은 거짓 |
+| REQ7 | `UserBrowserSweeper` 단위 | 화면이 닫힌 뒤 10분이 지나면 풀고 열려 있거나 안 지났으면 두고, 잠긴 브라우저는 10분 유휴에 끄지 않는다 |
 
 운영 왕복은 PR1 에 없다. Hermes 와 주고받는 것을 바꾸지 않는다.
 PR2 도 Hermes 와 주고받는 것을 바꾸지 않는다. 배포 뒤 실계정으로 쇼핑 검색을 시켜 단추와 띠, 끝난 뒤 조작을 한 번 본다(PR 본문의 후속 검증).
+PR3 은 플러그인 결과와 fos-ctx 알림을 바꾼다. 배포 뒤 실계정으로 쇼핑 검색 중 「직접 할게요」 를 눌러 에이전트 도구가 넘기기로 끝나고, 「돌려주기」 뒤 이어 가는지 본다(PR 본문의 후속 검증).
 
 ## 결정
 
@@ -186,6 +241,13 @@ PR2 도 Hermes 와 주고받는 것을 바꾸지 않는다. 배포 뒤 실계정
 | DECISION15 | 쥔 탭의 크기 덮어쓰기(PR2) | 보내지 않는다 | 작성자 | 휴대폰 폭의 덮어쓰기가 에이전트가 읽는 페이지 배치를 바꾸면 플러그인의 화면 판정이 흔들린다. 프레임은 웹이 칸에 맞춰 줄여 그린다 |
 | DECISION16 | 보기 단추가 플러그인 도구를 아는 방법(PR2) | 도구 이름의 끝 이름과 카탈로그 `ownerBrowser` 플러그인의 도구 이름, 승인 줄의 `connectorId` | 작성자 | 실행 사건과 Hermes 를 바꾸지 않는다. 카탈로그는 필요할 때 한 번만 읽는다 |
 | DECISION17 | 막힌 입력의 응답(PR2) | 지금과 같은 성공으로 두고 버린다 | 작성자 | 웹은 `tabs` 의 `agent` 로 띠를 그린다. 회수 안내(PR3)는 웹이 같은 값으로 띄운다 |
+| DECISION18 | 잠금 칸을 쓰는 방법(PR3) | 엔티티는 읽기만 하고 조건부 갱신으로만 쓴다 | 작성자 | 활동 기록과 자동 중지가 오래된 엔티티를 저장한다. 버전을 올리는 갱신으로 하면 그 저장들이 `BROWSER_BUSY` 로 실패해 끄기와 켜기가 흔들린다(rule-68) |
+| DECISION19 | 중계의 거절 신호(PR3) | HTTP 423, WebSocket close code 4423 | 작성자 | 423 Locked 가 「사람이 잠갔다」 를 닿지 않음(502, 503)과 나눈다. close code 는 응용이 쓰는 4000번대에 같은 수를 붙여 찾기 쉽게 한다 |
+| DECISION20 | 회수한 자리를 두는 곳(PR3) | JVM 메모리 | 작성자 | 알림 하나를 낼지 고르는 데만 쓴다. 잃으면 알림이 하나 더 생길 뿐이라 칸을 늘리지 않는다 |
+| DECISION21 | 돌려주기의 글을 정하는 쪽(PR3) | 웹이 그 대화의 열린 넘기기로 정한다 | 작성자 | 화면 자리(대화 패널, `/browser`)는 웹만 안다. Control Plane 은 잠금만 푼다 |
+| DECISION22 | 결제 카드만 남았을 때 돌려주기(PR3) | 글을 보내지 않는다 | 사용자 2026-11-16 | 결제는 「결제했어요」 와 「사지 않을래요」 가운데 사람이 고른다. 「이어서 해 주세요」 는 그 고름을 대신한다 |
+| DECISION23 | 승인 실행을 묻는 때(PR3) | 회수할 때와, 화면에 쥔 탭이 있을 때의 탭 확인 | 작성자 | 띠의 「승인한 작업을 마무리하는 중」 은 쥔 탭을 볼 때만 보인다. 에이전트가 쓰지 않을 때 사람 화면에 조회를 두지 않는다 |
+| DECISION24 | 10분 풀림의 기준(PR3) | 잠근 시각과 화면이 마지막으로 열려 있던 시각 가운데 늦은 것, 값은 `idle-timeout` | 작성자 | spec DECISION7 이 자동 중지와 같은 기준이다. 점검이 화면 등록부를 보므로 화면 쪽을 고치지 않는다 |
 
 ## 결정 기록 연결
 
@@ -193,5 +255,6 @@ PR2 도 Hermes 와 주고받는 것을 바꾸지 않는다. 배포 뒤 실계정
 | --- | --- | --- | --- |
 | spec DECISION10, 이 설계의 DECISION1~DECISION4 | operations | PR1 에서 [ADR-20261007 / user-browser](../../adr/ADR-20261007-user-browser.md) 결정 표의 「자동 중지」 행을 고친다 | `docs/features/user-browser.md` 의 「상태 전이」, `application.yml` 의 `assistant.browser` |
 | 이 설계의 DECISION5~DECISION7 | architecture | 필요 없음. 기존 승인 오류 코드 관례를 따르는 내부 선택이다 | `ConnectorApprovalBrowser`, `connector-action-error.ts` |
-| 이 설계의 DECISION8~DECISION10 | architecture | PR3 이 루트 `docs/adr/` 에 브라우저 잠금 ADR 을 쓸 때 함께 남긴다(spec 의 결정 기록 연결). PR2 는 사람 잠금이 없어 잠금의 한쪽만 들어가므로, 두 쪽이 함께 들어가는 PR3 에서 한 번에 쓴다 | 이 문서의 「PR2 에이전트가 쥔 탭」, 「뒤 PR 의 경계」 |
+| 이 설계의 DECISION8~DECISION10, DECISION18, DECISION19 | architecture | [ADR-20261116 / browser-lock](../../adr/ADR-20261116-browser-lock.md) | 이 문서의 「PR2 에이전트가 쥔 탭」, 「PR3 사람 잠금」, 「PR3 회수 중 에이전트 도구와 넘기기」 |
+| 이 설계의 DECISION20~DECISION24 | architecture | 필요 없음. 잠금 ADR 안의 값과 화면 자리의 선택이다 | 이 문서의 「PR3 사람 잠금」 |
 | 이 설계의 DECISION13~DECISION17 | architecture | 필요 없음. 쥔 탭 판정 안의 값과 방법이고, 같은 ADR 이 PR3 에서 쥔 탭의 정의를 함께 남긴다 | 이 문서의 「PR2 에이전트가 쥔 탭」, 「PR2 에이전트 화면 보기」 |

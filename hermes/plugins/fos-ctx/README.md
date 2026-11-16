@@ -185,7 +185,7 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 ### 화면 넘기기를 알린다
 
-플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터이고, 1.7.0 부터 오류가 아닌 결과도 받으며, 1.8.0 부터 `bot_check`, `unexpected_page` 도 보낸다.
+플러그인이 사람에게 「내 브라우저」 화면을 넘기면 대화에 카드를 띄우도록 Control Plane 에 알린다. 1.6.0 부터이고, 1.7.0 부터 오류가 아닌 결과도 받으며, 1.8.0 부터 `bot_check`, `unexpected_page` 도 보낸다. 1.10.0 부터 사람이 브라우저를 쥐어 멈춘 `human_browser` 를 보내고, 그 단계는 탭이 없어도 보낸다(fos-assistant [ADR-20261116 / browser-lock](../../../docs/adr/ADR-20261116-browser-lock.md)).
 `transform_tool_result` hook 이 대응 파일의 서버와 맞는 도구의 결과에서 두 모양 가운데 하나를 찾는다. 옛 설치 profile 과 바인딩 profile 이 같다.
 
 - 새 모양: 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}`. 플러그인이 낸다. Hermes 는 이 결과를 `{"result": "<플러그인 글>"}` 로 바꾸므로 바깥 `result` 가 글이면 한 번 더 읽는다
@@ -197,13 +197,13 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 | --- | --- |
 | 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `connector-handoff` 로 바꾼 것(`/internal/hermes/connector-handoff`). http(s) 가 아니거나 없으면 보내지 않는다 |
 | 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
-| 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}` |
-| 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. key 는 `_fos_ctx` 와 같다 |
-| 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check`, `bot_check`, `unexpected_page` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다 |
+| 본문 | `{"v": 1, "root_session_id", "session_id", "tool_call_id", "hermes_tool", "code", "need", "tab", "sig"}`. 탭 없는 `human_browser` 는 `tab` 칸을 뺀다 |
+| 서명할 글 | `v1-connector-handoff`, `hermes_tool`, 루트 session, session, `tool_call_id`, `code`, `need`, `tab` 을 `\n` 하나로 이은 UTF-8. 탭이 없으면 그 자리는 빈 글이다. key 는 `_fos_ctx` 와 같다 |
+| 보내지 않는 것 | `need` 가 `login`, `captcha`, `device_check`, `bot_check`, `unexpected_page`, `human_browser` 밖이거나, `code` 가 대문자·숫자·밑줄 64자 밖이거나, `tab` 이 영문자·숫자 128자 밖이다. 탭이 없으면 `human_browser` 만 보낸다 |
 | 제한 시간 | `POLICY_TIMEOUT`. 한 번만 부른다 |
 | 실패 | 상태 코드나 예외 종류만 로그에 남기고 결과는 바꾸지 않는다. 카드가 없을 뿐 모델은 결과의 안내 글을 받는다 |
 
-확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다.
+확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다. 같은 칸에 코드 `DEMO_BROWSER_IN_USE`, `human_browser`, 탭 없음의 서명은 `19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1` 이다.
 
 ### 도구 판정
 

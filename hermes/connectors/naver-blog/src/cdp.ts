@@ -20,6 +20,24 @@ export function clearProxyEnvironment() {
 
 const unreachable = () => new ToolError("NAVER_BLOG_BROWSER_UNREACHABLE");
 
+/** 중계가 사람이 브라우저를 쥔 동안 HTTP 창구에 주는 상태다(fos-assistant ADR-20261116 / browser-lock). */
+const HUMAN_HELD_STATUS = 423;
+/** 중계가 사람이 브라우저를 쥐어 WebSocket 을 닫을 때의 close code 다. */
+export const HUMAN_HELD_CLOSE = 4423;
+
+/** 사람이 브라우저를 쓰는 중이라 멈췄다. 탭에 붙어 있었으면 그 탭을 싣는다. */
+export const humanHeld = (tab?: string) =>
+  new ToolError("NAVER_BLOG_BROWSER_IN_USE", {
+    need: "human_browser",
+    ...(tab ? { tab } : {}),
+  });
+
+/** `devtools/page/<탭>` 연결의 탭이다. 브라우저 수준 연결이면 없다. */
+function pageOf(wsUrl: string) {
+  const match = /\/devtools\/page\/([A-Za-z0-9]+)$/.exec(wsUrl);
+  return match ? match[1] : undefined;
+}
+
 /** 끝 `/` 를 뗀 CDP 주소. */
 export function endpoint(cdpUrl: string) {
   return cdpUrl.replace(/\/+$/, "");
@@ -45,9 +63,11 @@ export async function httpJson(
       signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
       redirect: "error",
     });
+    if (response.status === HUMAN_HELD_STATUS) throw humanHeld();
     if (!response.ok) throw unreachable();
     text = await response.text();
-  } catch {
+  } catch (error) {
+    if (error instanceof ToolError) throw error;
     throw unreachable();
   }
   try {
@@ -92,9 +112,19 @@ export class CdpSession {
   private readonly waiters = new Map<string, Set<Pending>>();
   private readonly listeners = new Map<string, Set<(params: any) => void>>();
 
-  private constructor(private readonly socket: WebSocket) {
+  /** 연결이 끊긴 뒤 명령을 끝낼 오류다. 사람이 브라우저를 쥐어 닫혔으면 넘기기 오류다. */
+  private failure: () => ToolError = unreachable;
+
+  private constructor(
+    private readonly socket: WebSocket,
+    private readonly tab?: string,
+  ) {
     socket.addEventListener("message", (event) => this.receive(event.data));
-    socket.addEventListener("close", () => this.shutdown());
+    socket.addEventListener("close", (event) => {
+      if (event.code === HUMAN_HELD_CLOSE)
+        this.failure = () => humanHeld(this.tab);
+      this.shutdown();
+    });
     socket.addEventListener("error", () => this.shutdown());
   }
 
@@ -112,13 +142,20 @@ export class CdpSession {
         reject(unreachable());
         return;
       }
-      const timer = setTimeout(() => {
-        socket.close();
-        reject(unreachable());
-      }, Math.max(1, timeoutMs));
-      const fail = () => {
+      const timer = setTimeout(
+        () => {
+          socket.close();
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
+      const fail = (event: Event) => {
         clearTimeout(timer);
-        reject(unreachable());
+        reject(
+          (event as CloseEvent).code === HUMAN_HELD_CLOSE
+            ? humanHeld(pageOf(wsUrl))
+            : unreachable(),
+        );
       };
       socket.addEventListener("error", fail, { once: true });
       socket.addEventListener("close", fail, { once: true });
@@ -128,7 +165,7 @@ export class CdpSession {
           clearTimeout(timer);
           socket.removeEventListener("error", fail);
           socket.removeEventListener("close", fail);
-          resolve(new CdpSession(socket));
+          resolve(new CdpSession(socket, pageOf(wsUrl)));
         },
         { once: true },
       );
@@ -141,13 +178,16 @@ export class CdpSession {
     params: Record<string, unknown> = {},
     timeoutMs = COMMAND_TIMEOUT_MS,
   ): Promise<T> {
-    if (this.closed) return Promise.reject(unreachable());
+    if (this.closed) return Promise.reject(this.failure());
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(unreachable());
-      }, Math.max(1, timeoutMs));
+      const timer = setTimeout(
+        () => {
+          this.pending.delete(id);
+          reject(unreachable());
+        },
+        Math.max(1, timeoutMs),
+      );
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.socket.send(JSON.stringify({ id, method, params }));
@@ -160,18 +200,24 @@ export class CdpSession {
   }
 
   /** 이름이 같은 이벤트 하나를 기다려 그 `params` 를 돌려준다. */
-  waitEvent<T = any>(method: string, timeoutMs = COMMAND_TIMEOUT_MS): Promise<T> {
-    if (this.closed) return Promise.reject(unreachable());
+  waitEvent<T = any>(
+    method: string,
+    timeoutMs = COMMAND_TIMEOUT_MS,
+  ): Promise<T> {
+    if (this.closed) return Promise.reject(this.failure());
     return new Promise<T>((resolve, reject) => {
       const waiters = this.waiters.get(method) ?? new Set<Pending>();
       this.waiters.set(method, waiters);
       const waiter: Pending = {
         resolve,
         reject,
-        timer: setTimeout(() => {
-          waiters.delete(waiter);
-          reject(unreachable());
-        }, Math.max(1, timeoutMs)),
+        timer: setTimeout(
+          () => {
+            waiters.delete(waiter);
+            reject(unreachable());
+          },
+          Math.max(1, timeoutMs),
+        ),
       };
       waiters.add(waiter);
     });
@@ -209,7 +255,8 @@ export class CdpSession {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error) pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
+      if (message.error)
+        pending.reject(new ToolError("NAVER_BLOG_UNAVAILABLE"));
       else pending.resolve(message.result ?? {});
       return;
     }
@@ -237,13 +284,13 @@ export class CdpSession {
     this.closed = true;
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);
-      pending.reject(unreachable());
+      pending.reject(this.failure());
     }
     this.pending.clear();
     for (const waiters of this.waiters.values()) {
       for (const waiter of waiters) {
         clearTimeout(waiter.timer);
-        waiter.reject(unreachable());
+        waiter.reject(this.failure());
       }
     }
     this.waiters.clear();

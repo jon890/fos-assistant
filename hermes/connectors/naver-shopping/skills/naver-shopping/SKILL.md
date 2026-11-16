@@ -77,6 +77,7 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
 | `NAVER_SHOPPING_CAPTCHA` | 「내 브라우저」 를 열면 보안 확인 화면의 탭이 남아 있다. 직접 풀고 다시 요청해 달라고 한다 |
 | `NAVER_SHOPPING_DEVICE_CHECK` | 「내 브라우저」 의 새 기기 확인 화면을 직접 마치고 다시 요청해 달라고 한다 |
 | `NAVER_SHOPPING_PAGE_CHANGED` | 네이버 화면이 예상과 달라 읽지 못했다. 「내 브라우저」 에 남은 탭의 화면을 확인해 달라고 하고, 사용자가 확인했다고 하기 전에는 다시 부르지 않는다 |
+| `NAVER_SHOPPING_BROWSER_IN_USE` | 사용자가 「내 브라우저」 를 직접 쓰고 있어 멈췄다. 다 쓰면 「돌려주기」 를 눌러 달라고 하고, 돌려줬다고 하기 전에는 다시 부르지 않는다 |
 | `NAVER_SHOPPING_BROWSER_UNREACHABLE` | 브라우저를 켜는 중일 수 있다. 잠시 뒤 다시 요청해 달라고 한다 |
 | `NAVER_SHOPPING_NOT_FOUND` | 상품이 없거나 판매가 끝났다고 알린다 |
 

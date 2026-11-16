@@ -1,9 +1,11 @@
 package com.bifos.assistant.browser.presentation;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.browser.application.dto.BrowserScreenInput;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.BrowserView;
 import com.bifos.assistant.browser.presentation.UserBrowserDtos.ScreenInputRequest;
+import com.bifos.assistant.browser.presentation.UserBrowserDtos.TakeoverRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -30,6 +32,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class UserBrowserController {
     private final UserBrowserService browsers;
     private final CurrentUserProvider currentUser;
+    private final BrowserHumanHold holds;
 
 
     /** 기능이 꺼져 있어도 200 이다. 화면이 「준비 중」 을 그릴 수 있게 한다. */
@@ -89,5 +92,35 @@ public class UserBrowserController {
         Long userId = currentUser.require().id();
         browsers.screenInput(userId, ScreenInputRequest.parse(body));
         return ResponseEntity.noContent().build();
+    }
+
+
+    /**
+     * 「직접 할게요」 다. 사람이 브라우저를 쥐고, 쥔 동안 에이전트의 요청은 「사람이 브라우저를 쓰는 중」 넘기기로 끝난다. 이미 쥐었으면 그대로
+     * 204 다. 브라우저를 쓰는 승인한 실행이 도는 중이면 {@code BROWSER_APPROVAL_RUNNING} 이다.
+     */
+    @PostMapping("/takeover")
+    public ResponseEntity<Void> takeOver(@RequestBody(required = false) TakeoverRequest body) {
+        Long userId = currentUser.require().id();
+        requireEnabled();
+        holds.takeOver(userId, TakeoverRequest.origin(body));
+        return ResponseEntity.noContent().build();
+    }
+
+
+    /** 「돌려주기」 다. 잠금만 푼다. 글을 보낼지는 화면이 정한다. 쥐지 않았어도 204 다. */
+    @PostMapping("/give-back")
+    public ResponseEntity<Void> giveBack() {
+        Long userId = currentUser.require().id();
+        requireEnabled();
+        holds.giveBack(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    private void requireEnabled() {
+        if (!browsers.enabled()) {
+            throw new ApiException(ErrorCode.BROWSER_DISABLED, "user browser is disabled");
+        }
     }
 }

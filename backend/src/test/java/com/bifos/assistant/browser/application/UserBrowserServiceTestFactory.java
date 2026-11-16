@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.application;
 
+import static org.mockito.Mockito.mock;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.CdpProbe;
@@ -22,7 +23,21 @@ public final class UserBrowserServiceTestFactory {
         LiveProperties<BrowserProperties> properties,
         Clock clock,
         BrowserScreens screens) {
+        return create(browsers, runtime, profiles, cdp, properties, clock, screens, mock(BrowserHumanHold.class));
+    }
+
+
+    /** 끄기가 사람 잠금을 비우는 것을 볼 때 실제 잠금을 넘긴다. */
+    public static UserBrowserService create(
+        UserBrowserRepository browsers,
+        BrowserRuntime runtime,
+        BrowserProfileStore profiles,
+        CdpProbe cdp,
+        LiveProperties<BrowserProperties> properties,
+        Clock clock,
+        BrowserScreens screens,
+        BrowserHumanHold holds) {
         return new UserBrowserService(
-            browsers, runtime, profiles, cdp, properties, clock, screens, new BrowserActivityTracker(browsers, clock));
+            browsers, runtime, profiles, cdp, properties, clock, screens, new BrowserActivityTracker(browsers, clock), holds);
     }
 }

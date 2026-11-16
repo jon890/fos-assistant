@@ -9,7 +9,13 @@ import {
   type SetStateAction,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { HANDOFF_TEXT, newHandoffs, type Handoff } from "@/lib/handoff";
+import {
+  giveBackSends,
+  HANDOFF_TEXT,
+  HUMAN_BROWSER_DONE,
+  newHandoffs,
+  type Handoff,
+} from "@/lib/handoff";
 import { readHandoffs } from "@/lib/handoff-api";
 import { HANDOFF_ENTRY_OPEN, HANDOFF_ENTRY_PARAM } from "@/lib/notification";
 import type { SidePanelTarget } from "./conversation-session-types";
@@ -153,6 +159,12 @@ export function useConversationHandoffs({
     [conversationId, setPanelTarget, submit],
   );
 
+  // 패널의 「돌려주기」 다. 결제 밖의 열린 넘기기가 있을 때만 정해 둔 글을 보낸다(spec DECISION12, DECISION24).
+  const givenBack = useCallback(() => {
+    const target = shown.find((handoff) => handoff.need !== "PAYMENT");
+    if (target && giveBackSends(shown)) done(target, HUMAN_BROWSER_DONE);
+  }, [shown, done]);
+
   const panelHandoff =
     panelTarget?.kind === "todo" ? panelTarget.handoff : null;
   return {
@@ -164,7 +176,10 @@ export function useConversationHandoffs({
         handoff={panelHandoff}
         onClose={closePanel}
         onDone={(text) => done(panelHandoff, text)}
+        conversationId={conversationId}
+        onGivenBack={givenBack}
       />
     ) : null,
+    givenBack,
   };
 }

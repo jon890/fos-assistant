@@ -20,21 +20,23 @@ from .tool_guard import guard_url
 HANDOFF_VERSION = "v1-connector-handoff"
 HANDOFF_PATH = "connector-handoff"
 # 이 PR 이 받는 어휘다. Control Plane 의 `HandoffNeed` 와 같아야 한다. 모르는 값은 보내지 않는다.
-NEEDS = frozenset({"login", "captcha", "device_check", "bot_check", "unexpected_page"})
+NEEDS = frozenset({"login", "captcha", "device_check", "bot_check", "unexpected_page", "human_browser"})
+# 탭 없이 보낼 수 있는 단계다. 사람이 브라우저를 쥐어 탭을 만들기 전에 거절된 호출이다(ADR-20261116 / browser-lock).
+TABLESS_NEEDS = frozenset({"human_browser"})
 CODE_RE = re.compile(r"^[A-Z0-9_]{1,64}$")
 # 화면 입력 `tab` 의 `id` 와 같은 모양이다.
 TAB_RE = re.compile(r"^[A-Za-z0-9]{1,128}$")
 
 
 def sign_handoff(key: str, hermes_tool: str, root_session_id: str, session_id: str, tool_call_id: str,
-                 code: str, need: str, tab: str) -> str:
-    """화면 넘기기 알림의 서명을 소문자 16진수로 돌려준다. key 는 `_fos_ctx` 와 같다."""
-    message = "\n".join([HANDOFF_VERSION, hermes_tool, root_session_id, session_id, tool_call_id, code, need, tab])
+                 code: str, need: str, tab) -> str:
+    """화면 넘기기 알림의 서명을 소문자 16진수로 돌려준다. key 는 `_fos_ctx` 와 같다. 탭이 없으면 그 자리에 빈 글을 넣는다."""
+    message = "\n".join([HANDOFF_VERSION, hermes_tool, root_session_id, session_id, tool_call_id, code, need, tab or ""])
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def handoff_of(result: str):
-    """결과 글에서 `(code, need, tab)` 을 꺼낸다. 정해 둔 모양이 아니면 None 이다.
+    """결과 글에서 `(code, need, tab)` 을 꺼낸다. 정해 둔 모양이 아니면 None 이다. `human_browser` 는 탭이 없을 수 있고 그때 tab 은 None 이다.
 
     받는 모양은 둘이다. 새 모양은 오류가 아닌 결과 `{"handoff": {"code", "need", "tab"}}` 이고, 옛 모양은 오류
     `{"error": {"code", "handoff": {"need", "tab"}}}` 다. 옛 모양은 Hermes 의 연속 실패 집계에 들어가므로 플러그인은
@@ -62,8 +64,8 @@ def handoff_of(result: str):
     else:
         return None
     need, tab = found.get("need"), found.get("tab")
-    if not (isinstance(code, str) and CODE_RE.fullmatch(code) and need in NEEDS
-            and isinstance(tab, str) and TAB_RE.fullmatch(tab)):
+    tab_ok = (isinstance(tab, str) and TAB_RE.fullmatch(tab)) or (tab is None and need in TABLESS_NEEDS)
+    if not (isinstance(code, str) and CODE_RE.fullmatch(code) and need in NEEDS and tab_ok):
         return None
     return code, need, tab
 
@@ -95,9 +97,12 @@ def report_handoff(tool_name: str, result, session_id, tool_call_id) -> bool:
         code, need, tab = found
         body = {
             "v": CTX_VERSION, "root_session_id": root, "session_id": session_id, "tool_call_id": tool_call_id,
-            "hermes_tool": tool_name, "code": code, "need": need, "tab": tab,
+            "hermes_tool": tool_name, "code": code, "need": need,
             "sig": sign_handoff(signing_key(token), tool_name, root, session_id, tool_call_id, code, need, tab),
         }
+        # 탭 없는 넘기기는 칸을 뺀다. 옛 Control Plane 은 이 알림을 거절하고 카드만 뜨지 않는다(전환 배포, rule-66).
+        if tab is not None:
+            body["tab"] = tab
         status, _ = _post_json(url, body, token, POLICY_TIMEOUT)
         if status != 200:
             logger.warning("fos-ctx: 화면 넘기기 알림이 받아지지 않았다: HTTP %d", status)

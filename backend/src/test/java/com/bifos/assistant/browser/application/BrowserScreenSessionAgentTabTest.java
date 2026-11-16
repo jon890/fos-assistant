@@ -1,5 +1,7 @@
 package com.bifos.assistant.browser.application;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static com.bifos.assistant.browser.application.RecordingScreenSink.await;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +37,7 @@ class BrowserScreenSessionAgentTabTest {
     private BrowserAgentTabs agentTabs;
     private RecordingScreenSink sink;
     private ScheduledExecutorService scheduler;
+    private BrowserHumanHold holds;
 
 
     @BeforeEach
@@ -44,6 +47,7 @@ class BrowserScreenSessionAgentTabTest {
         agentTabs = new BrowserAgentTabs(cdp, Clock.systemUTC());
         sink = new RecordingScreenSink();
         scheduler = Executors.newSingleThreadScheduledExecutor();
+        holds = mock(BrowserHumanHold.class);
     }
 
 
@@ -109,6 +113,25 @@ class BrowserScreenSessionAgentTabTest {
             .isEqualTo(List.of(Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", true, "agent", false)));
         session.input(input(Kind.RELOAD, null, null, null, null));
         assertThat(cdp.methods()).contains("Page.reload");
+    }
+
+
+    @Test
+    @DisplayName("잠금 상태를 처음 붙을 때 보내고, 바뀔 때만 다시 보내며, 쥔 탭이 있는지를 함께 묻는다")
+    void sendsHoldOnStartAndOnChange() throws InterruptedException {
+        Map<String, Object> agent = Map.of("human", false, "approved", true);
+        Map<String, Object> human = Map.of("human", true, "approved", false);
+        when(holds.view(201L, true)).thenReturn(agent);
+        BrowserUsageHandle relay = agentTabs.hold(BROWSER_ID, "T1");
+        open(FAST, null);
+        assertThat(sink.data("hold")).containsExactly(agent);
+
+        when(holds.view(201L, false)).thenReturn(human);
+        relay.close();
+        await(() -> sink.data("hold").size() >= 2);
+        Thread.sleep(100);
+
+        assertThat(sink.data("hold")).containsExactly(agent, human);
     }
 
 
@@ -190,7 +213,7 @@ class BrowserScreenSessionAgentTabTest {
     private BrowserScreenSession open(Duration tabInterval, String url) {
         BrowserScreenSession session = new BrowserScreenSession(
             BROWSER_ID, 201L, CDP, cdp, cdp, new BrowserUsage().open(BROWSER_ID), sink, agentTabs, scheduler, closed -> {
-            });
+            }, new BrowserScreenHold(holds, 201L));
         session.start(url, Duration.ofMinutes(30), tabInterval, SLOW);
         return session;
     }

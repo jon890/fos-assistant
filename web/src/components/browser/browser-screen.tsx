@@ -19,6 +19,8 @@ import { ScreenScrollControls } from "./screen-scroll-controls";
 import { cn } from "cn";
 import { ScreenFrame } from "./screen-frame";
 import { ScreenDialog } from "./screen-dialog";
+import { ScreenHoldBand, useScreenHold } from "./screen-hold-band";
+import { holdBand } from "@/lib/screen-hold";
 
 /** 조합 중 Enter 와 조합이 끝난 뒤의 Enter 가 같은 누름이라고 보는 간격이다. */
 const ENTER_DEDUP_MS = 100;
@@ -35,6 +37,8 @@ export function BrowserScreen({
   onClose,
   onTabs,
   onReopen,
+  conversationId = null,
+  onGivenBack,
 }: {
   startUrl: string | null;
   startTab?: string | null;
@@ -46,6 +50,10 @@ export function BrowserScreen({
   onTabs?: (tabs: ScreenTab[]) => void;
   /** 있으면 「다시 열기」 가 안에서 다시 잇지 않고 이것을 부른다. 화면 넘기기 패널이 화면을 새로 만든다. */
   onReopen?: () => void;
+  /** 대화 패널의 화면이면 그 대화의 공개 번호다. 「직접 할게요」 가 실어 보내 그 대화의 넘기기 알림을 줄인다. */
+  conversationId?: string | null;
+  /** 「돌려주기」 가 성공한 뒤 부른다. 대화 패널이 열린 넘기기가 있으면 글을 보낸다. `/browser` 는 넘기지 않는다. */
+  onGivenBack?: () => void;
 }) {
   const [address, setAddress] = useState(startUrl ?? "");
   const areaRef = useRef<HTMLDivElement>(null);
@@ -54,17 +62,18 @@ export function BrowserScreen({
   const addressRef = useRef<HTMLInputElement>(null);
   const { screenRef, dialogRef, triggerRef, expanded, toggle, closeOverlay } =
     useScreenFullscreen();
+  const stream = useScreenStream({
+    startUrl,
+    startTab,
+    followAgent,
+    onOpen,
+    onTabs,
+    areaRef,
+    addressRef,
+    setAddress,
+  });
   const { frame, tabs, closed, notice, setNotice, send, reopen, dialog } =
-    useScreenStream({
-      startUrl,
-      startTab,
-      followAgent,
-      onOpen,
-      onTabs,
-      areaRef,
-      addressRef,
-      setAddress,
-    });
+    stream;
   const pointer = useScreenPointer({
     areaRef,
     imgRef,
@@ -73,14 +82,27 @@ export function BrowserScreen({
     frameHeight: frame?.height ?? 0,
   });
   // 에이전트가 쥔 탭은 보기 전용이다. 서버도 입력을 버리므로 여기서 막는 것은 보이는 모양이다.
-  const viewOnly = tabs.some((tab) => tab.active && tab.agent);
+  const viewOnly =
+    !stream.hold.human && tabs.some((tab) => tab.active && tab.agent);
   const inputOff = closed !== null || viewOnly;
-
+  const holds = useScreenHold({
+    hold: stream.hold,
+    setHold: stream.setHold,
+    band: closed === null ? holdBand(stream.hold, viewOnly) : null,
+    conversationId,
+    onGivenBack,
+    setNotice,
+  });
+  const band = holds.band;
   return (
     <dialog
       ref={dialogRef}
       open
       aria-label="내 브라우저 크게 보기"
+      onKeyDown={(event) => {
+        // Esc 도 화면 누르기처럼 묻기만 한다. 넘겨받으려면 띠의 「직접 할게요」 를 눌러야 한다
+        if (event.key === "Escape" && band === "agent") holds.ask();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         closeOverlay();
@@ -134,15 +156,7 @@ export function BrowserScreen({
             {notice}
           </Notice>
         ) : null}
-        {viewOnly && closed === null ? (
-          <p
-            role="status"
-            data-testid="agent-band"
-            className="rounded-md border border-border bg-muted px-3 py-2 text-sm"
-          >
-            에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요.
-          </p>
-        ) : null}
+        <ScreenHoldBand {...holds} />
         {dialog && !inputOff ? (
           <ScreenDialog dialog={dialog} send={send} />
         ) : null}
@@ -158,7 +172,7 @@ export function BrowserScreen({
             expanded={expanded}
             frame={frame}
             closed={closed !== null}
-            pointer={viewOnly ? {} : pointer}
+            pointer={viewOnly ? holds.viewOnlyPointer : pointer}
           >
             <ScreenKeyboard keysRef={keysRef} send={send} off={inputOff} />
           </ScreenFrame>

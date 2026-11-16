@@ -58,7 +58,7 @@ class UserBrowserSweeperTest {
         waiting.clear();
         waitFails = false;
         sweeper = new UserBrowserSweeper(
-            service, screens(), repository, runtime, usage, userId -> !revoked.contains(userId), this::waiting,
+            service, screens(), repository, runtime, usage, userId -> !revoked.contains(userId), this::waiting, mock(BrowserHumanHold.class),
             LiveProperties.fixed(BrowserProperties.class, properties(true)), Clock.systemUTC());
     }
 
@@ -285,7 +285,7 @@ class UserBrowserSweeperTest {
         UserBrowserRepository broken = mock(UserBrowserRepository.class);
         when(broken.findByStatusAndLastActiveAtBefore(any(), any()))
             .thenThrow(new DataAccessResourceFailureException("db down"));
-        UserBrowserSweeper failing = new UserBrowserSweeper(service, screens(), broken, runtime, usage, userId -> true, this::waiting,
+        UserBrowserSweeper failing = new UserBrowserSweeper(service, screens(), broken, runtime, usage, userId -> true, this::waiting, mock(BrowserHumanHold.class),
             LiveProperties.fixed(BrowserProperties.class, properties(true)), Clock.systemUTC());
 
         failing.onReady();
@@ -300,7 +300,7 @@ class UserBrowserSweeperTest {
     void doesNothingWhenDisabled() {
         runtime.plant("stranger", "f".repeat(64), true);
         UserBrowserSweeper disabled = new UserBrowserSweeper(
-            service(false), screens(), repository, runtime, usage, userId -> false, this::waiting,
+            service(false), screens(), repository, runtime, usage, userId -> false, this::waiting, mock(BrowserHumanHold.class),
             LiveProperties.fixed(BrowserProperties.class, properties(false)), Clock.systemUTC());
 
         disabled.sweep();
@@ -348,7 +348,7 @@ class UserBrowserSweeperTest {
 
     private BrowserScreens screens() {
         return new BrowserScreens(
-            new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), () -> Duration.ofMinutes(30), Duration.ofSeconds(2));
+            new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), mock(BrowserHumanHold.class), () -> Duration.ofMinutes(30), Duration.ofSeconds(2));
     }
 
 
@@ -361,7 +361,7 @@ class UserBrowserSweeperTest {
             LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
             Clock.systemUTC(),
             new BrowserScreens(
-                new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), () -> Duration.ofMinutes(30), Duration.ofSeconds(2)));
+                new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), mock(BrowserHumanHold.class), () -> Duration.ofMinutes(30), Duration.ofSeconds(2)));
     }
 
 

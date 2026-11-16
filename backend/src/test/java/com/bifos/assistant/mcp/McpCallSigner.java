@@ -139,9 +139,12 @@ public final class McpCallSigner {
         body.put("hermes_tool", hermesTool);
         body.put("code", code);
         body.put("need", need);
-        body.put("tab", tab);
+        // 탭 없는 넘기기는 칸을 빼고 서명할 글의 그 자리를 빈 글로 둔다(ADR-20261116 / browser-lock)
+        if (tab != null) {
+            body.put("tab", tab);
+        }
         body.put("sig", sign(rawToken, String.join(
-            "\n", "v1-connector-handoff", hermesTool, rootSessionId, sessionId, toolCallId, code, need, tab)));
+            "\n", "v1-connector-handoff", hermesTool, rootSessionId, sessionId, toolCallId, code, need, tab == null ? "" : tab)));
         return body;
     }
 
