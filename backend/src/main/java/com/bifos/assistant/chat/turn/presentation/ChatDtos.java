@@ -123,14 +123,28 @@ public final class ChatDtos {
         }
     }
 
-    /** 응답 중에 보내는 메시지다. 글만 받는다. */
+    /**
+     * 응답 중에 보내는 메시지다. 글만 받는다.
+     *
+     * @param steer 입력창에 쓴 글이다. 참이면 도는 실행에 끼워 넣어 본다(ADR-20261116 / run-steer). 카드 답은 싣지 않는다
+     */
     public record PendingMessageRequest(
-        @NotBlank @Size(max = 8000) String text) {
+        @NotBlank @Size(max = 8000) String text,
+        Boolean steer) {
+
+        public PendingMessageRequest(String text) {
+            this(text, null);
+        }
     }
 
-    public record PendingMessageView(Long id, String text, Instant createdAt) {
+    /**
+     * @param messageId 이미 대화에 보인 steer 말풍선의 번호. 화면은 멈추지 않은 줄에서 이 글을 그리지 않는다. 보통 글은 null
+     * @param steering 끼우기 답을 기다리는 중이다. 취소할 수 없다
+     */
+    public record PendingMessageView(Long id, String text, Instant createdAt, Long messageId, boolean steering) {
         static PendingMessageView from(PendingMessage message) {
-            return new PendingMessageView(message.id(), message.content(), message.createdAt());
+            return new PendingMessageView(
+                message.id(), message.content(), message.createdAt(), message.messageId(), message.steering());
         }
     }
 

@@ -156,6 +156,7 @@ class ChatTurnRunner {
             }
             chatTurnLifecycle.recordQuestion(pending.execution().id(), questionId);
             turns.rekey(handle, pending.execution().id());
+            turns.markIntent(handle, intent);
             if (intent instanceof TurnIntent.ProactiveCheck proactive) {
                 chatTurnLifecycle.startCheck(proactive.check(), pending);
             }

@@ -34,7 +34,7 @@
 ### 1. `TurnHandle`·`TurnCancellation`·`ChatRunEvents`·`ChatTurnRunner`
 
 - `TurnHandle` 에 `volatile TurnRunRef rootRun`, `volatile TurnIntent intent`, `AtomicInteger openSubagents`, `AtomicBoolean steerSettled`, `final Object steerLock` 을 더한다. `rekey` 는 이 칸들을 비우지 않는다.
-- `TurnCancellation`: `trackRootRun(executionId, apiBaseUrl, profile, runId)`(안에서 `trackRun` 도 부름), `markIntent(handle, intent)`, `subagentStarted(executionId)`, `subagentCompleted(executionId)`(0 아래로 내려가지 않음), `Optional<SteerTarget> steerTarget(conversationId)`. `SteerTarget` 은 `chat/turn/application/dto` 의 record(handle, 루트 실행 번호, 루트 run, intent, 하위 에이전트 수)다.
+- `TurnCancellation`: `trackRootRun(executionId, apiBaseUrl, profile, runId)`(안에서 `trackRun` 도 부름), `markIntent(handle, intent)`, `subagentStarted(executionId)`, `subagentCompleted(executionId)`(0 아래로 내려가지 않음), `Optional<TurnHandle> findByConversation(conversationId)`. `SteerService` 는 handle 의 getter(루트 run, intent, 하위 에이전트 수, 실행 번호)로 판정한다. dto 가 `TurnHandle` 에 기대지 않게 따로 record 를 두지 않는다.
 - `ChatRunEvents.submit` 이 `trackRun` 대신 `trackRootRun` 을 부르고, `relay` 의 사건 처리에서 `subagent.start`·`subagent.complete` 로 수를 바꾼다.
 - `ChatTurnRunner.runTurn` 이 `turns.rekey` 바로 뒤에 `turns.markIntent(handle, intent)` 를 부른다.
 
@@ -56,8 +56,8 @@
 
 ### 6. `chat/nextturn/application/SteerService.java`(신규)
 
-- `boolean eligible(CurrentUser user, Conversation conversation, String text, boolean requested)`: 설정, `requested`, 스킬 커맨드 아님, `steerTarget` 있음, intent 가 `TurnIntent.Fresh`·`Regenerate`·`DelegationResults`, 루트 run 있음, `steerSettled` 거짓. 잠금 밖의 빠른 판정이다.
-- `void steer(Conversation conversation, Long pendingId, String text, Long userId)`: `steerTarget` 을 다시 얻고 `steerLock` 안에서 `steerSettled` 를 본다. 정리됐으면 `ledger.reject`. 아니면 `hermes.steer`. `ACCEPTED` → child 를 정해(하위 에이전트 수 > 0 이면 `SUBAGENT`, 아니면 `existsRunningDelegation` 이면 `DELEGATION`, 아니면 null) `ledger.accept`. `REJECTED` → `ledger.reject`. `UNKNOWN` → `ledger.unknown`.
+- `boolean eligible(CurrentUser user, Conversation conversation, String text, boolean requested)`: 설정, `requested`, 스킬 커맨드 아님, 그 대화의 handle 있음, intent 가 `TurnIntent.Fresh`·`Regenerate`·`DelegationResults`, 루트 run 있음, `steerSettled` 거짓. 잠금 밖의 빠른 판정이다.
+- `void steer(Conversation conversation, Long pendingId, String text, Long userId)`: handle 을 다시 얻고 `steerLock` 안에서 `steerSettled` 를 본다. 정리됐으면 `ledger.reject`. 아니면 `hermes.steer`. `ACCEPTED` → child 를 정해(하위 에이전트 수 > 0 이면 `SUBAGENT`, 아니면 `existsRunningDelegation` 이면 `DELEGATION`, 아니면 null) `ledger.accept`. `REJECTED` → `ledger.reject`. `UNKNOWN` → `ledger.unknown`.
 
 ### 7. `PendingMessageService`·컨트롤러·`NextTurnDispatcher`
 
@@ -71,7 +71,7 @@
 
 - `backend/src/test/java/com/bifos/assistant/chat/SteerServiceTest.java`(신규, `StubHermesRunsClient`): 받음 → 대기 글 빠짐·`DELIVERED` 행·`steer` 사건, 409 → 대기 글 남음·steering 해제 → turn 을 끝내면 그 글로 다음 turn, 모름 → `UNCONFIRMED` 행·말풍선 번호 글·held, 설정 꺼짐 → steer 호출 없음, 줄에 다른 글 있음 → 호출 없음, 스킬 커맨드 → 호출 없음, `Mention` intent → 호출 없음, 하위 에이전트 돌 때 `SUBAGENT`, 도는 맡긴 실행만 있을 때 `DELEGATION`, `steerSettled` 뒤 → 호출 없음, 두 글을 잇달아 보냄 → 둘째는 대기 칸.
 - `PendingMessageControllerTest`: `steer` 없으면 호출 없음, 남의 대화 404.
-- `PendingMessageServiceTest`: steering 글 취소 → `CONVERSATION_BUSY`. steering 줄에서 `tryNext` 가 위임 깨우기를 부르지 않는다.
+- `SteerServiceTest` 안에서: steering 글 취소 → `CONVERSATION_BUSY`. steering 줄에서 `tryNext` 가 turn 을 열지 않는다.
 
 ## 검증
 
@@ -87,7 +87,8 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*SteerSer
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/TurnCancellation.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatRunEvents.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatTurnRunner.java` | 수정(intent 표시) |
-| `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/SteerTarget.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/SteerView.java` | 신규 |
+| `backend/src/test/resources/application-test.yml` | 수정(steer 켬) |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/ChatEvent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/config/SteerProperties.java` | 신규 |
@@ -99,5 +100,4 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*SteerSer
 | `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatDtos.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/SteerServiceTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/chat/PendingMessageServiceTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/presentation/PendingMessageControllerTest.java` | 수정 |

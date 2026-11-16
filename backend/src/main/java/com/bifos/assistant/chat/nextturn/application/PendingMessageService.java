@@ -7,6 +7,8 @@ import com.bifos.assistant.chat.conversation.application.ConversationAccess;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
+import com.bifos.assistant.chat.conversation.domain.PendingMessage;
+import com.bifos.assistant.chat.conversation.domain.PendingMessages;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -14,6 +16,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +39,7 @@ public class PendingMessageService {
     private final PendingMessageStore pendingMessages;
     private final ConversationEventHub hub;
     private final NextTurnDispatcher dispatcher;
+    private final SteerService steer;
 
     private final Clock clock = Clock.systemUTC();
 
@@ -56,15 +60,40 @@ public class PendingMessageService {
      * 멈춘 채로 들어간다.
      */
     public PendingQueue enqueue(CurrentUser user, Long conversationId, String text) {
+        return enqueue(user, conversationId, text, false);
+    }
+
+
+    /**
+     * 대기 메시지를 더하고, 입력창 글이면 도는 실행에 끼워 넣어 본다(ADR-20261116 / run-steer).
+     *
+     * <p>끼우기는 줄이 비어 있고 멈추지 않았을 때만 한다. 그렇지 않으면 나중 글이 먼저 들어가 순서가 뒤집힌다. 「끼우는 중」 표시는 글을
+     * 더하는 같은 잠금 안에서 건다. 따로 걸면 그 사이 다른 turn 이 그 글을 꺼내 간다. 상한은 말풍선이 이미 있는 글을 세지 않는다.
+     *
+     * @param steerRequested 화면이 입력창에 쓴 글이라고 표시했다
+     */
+    public PendingQueue enqueue(CurrentUser user, Long conversationId, String text, boolean steerRequested) {
         Conversation conversation = access.requireOwn(user, conversationId);
         requireQueueable(conversation);
+        boolean wantsSteer = steer.eligible(conversation, text, steerRequested);
+        AtomicReference<Long> steeringId = new AtomicReference<>();
         pendingMessages.change(conversation.id(), queue -> {
-            if (queue.items().size() >= MAX_ITEMS || queue.mergedLength(text) > MAX_MERGED_CHARS) {
+            if (queue.countable() >= MAX_ITEMS || queue.mergedLength(text) > MAX_MERGED_CHARS) {
                 throw new ApiException(ErrorCode.PENDING_QUEUE_FULL, "the pending queue is full");
             }
-            return queue.append(text, Instant.now(clock));
+            PendingMessages appended = queue.append(text, Instant.now(clock));
+            steeringId.set(null);
+            if (wantsSteer && queue.isEmpty()) {
+                Long added = appended.items().getLast().id();
+                steeringId.set(added);
+                return appended.withSteering(added, true);
+            }
+            return appended;
         });
         hub.publish(conversation.id(), ChatEvent.pending(conversation.publicId()));
+        if (steeringId.get() != null) {
+            steer.steer(conversation, steeringId.get(), text, user.id());
+        }
         dispatcher.tryNext(conversation.id());
         return queueOf(conversation.id());
     }
@@ -76,6 +105,10 @@ public class PendingMessageService {
         pendingMessages.change(conversation.id(), queue -> {
             if (!queue.containsAll(List.of(pendingId))) {
                 throw new ApiException(ErrorCode.PENDING_MESSAGE_NOT_FOUND, "no such pending message");
+            }
+            if (queue.find(pendingId).map(PendingMessage::steering).orElse(false)) {
+                // 끼우기 답을 기다리는 글이다. 취소를 받으면 입력창으로 돌아간 글과 모델에 들어간 글이 함께 생긴다.
+                throw new ApiException(ErrorCode.CONVERSATION_BUSY, "the message is being steered into the running turn");
             }
             return queue.without(List.of(pendingId));
         });

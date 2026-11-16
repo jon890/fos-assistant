@@ -460,6 +460,20 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
         @Param("conversationIds") Collection<Long> conversationIds);
 
 
+    /**
+     * 그 대화에서 {@code agent_delegate} 로 맡긴 실행이 돌고 있는가. 대화 turn 의 루트는 {@code delegation_key} 가 없어 세지
+     * 않는다. steer 말풍선에 맡긴 도우미 안내를 붙일지 정할 때 쓴다(ADR-20261116 / run-steer).
+     */
+    @Query("""
+            select count(e) > 0
+            from AgentExecution e
+            where e.conversationId = :conversationId
+                and e.delegationKey is not null
+                and e.status = com.bifos.assistant.usage.execution.domain.type.ExecutionStatus.RUNNING
+            """)
+    boolean existsRunningDelegation(@Param("conversationId") Long conversationId);
+
+
     /** 그 대화에 그 상태의 실행이 있는가. 지운 대화의 정리가 도는 실행을 기다릴 때 쓴다. */
     boolean existsByConversationIdAndStatus(Long conversationId, ExecutionStatus status);
 
