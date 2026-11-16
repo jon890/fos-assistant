@@ -76,7 +76,10 @@ public class ConnectorApprovalBrowser {
     }
 
 
-    /** 그 플러그인이 「내 브라우저」 를 쓰는가. 읽지 못하면 켜지 않는다. 뒤의 승인 판정이 실행하지 않고 끝낸다. */
+    /**
+     * 그 플러그인이 「내 브라우저」 를 쓰는가. 읽지 못하면 켜지 않고 지나간다. 그때는 이 판정이 없던 때처럼 실행이 중계에 닿을 때
+     * 브라우저가 켜진다.
+     */
     private boolean usesBrowser(String connectorId) {
         try {
             return catalog.find(connectorId).map(manifest -> manifest.ownerBrowser()).orElse(false);

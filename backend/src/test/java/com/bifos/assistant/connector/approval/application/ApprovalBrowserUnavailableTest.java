@@ -164,7 +164,7 @@ class ApprovalBrowserUnavailableTest {
         } catch (ApiException ex) {
             assertThat(ex.code()).isNotEqualTo(ErrorCode.CONNECTOR_BROWSER_UNAVAILABLE);
         } catch (RuntimeException ex) {
-            // 대역 줄이라 그 뒤 판정이 실패할 수 있다. 이 테스트는 브라우저를 켜지 않았는지만 본다
+            // 상한 값을 채우지 않은 대역 줄이라 상한 변경 판정이 실패할 수 있다. 이 테스트는 그 판정까지 가며 브라우저를 켜지 않았는지만 본다
         }
 
         assertThat(browsers.findByUserId(owner.id())).isEmpty();
@@ -176,14 +176,10 @@ class ApprovalBrowserUnavailableTest {
     void skipsPluginWithoutBrowser() {
         UUID action = pending("gmail", "WRITE", "send_mail", "mcp__gmail__send_mail", null);
 
-        try {
-            service.approve(user(), action, null, false);
-        } catch (ApiException ex) {
-            assertThat(ex.code()).isNotEqualTo(ErrorCode.CONNECTOR_BROWSER_UNAVAILABLE);
-        } catch (RuntimeException ex) {
-            // 대역 줄이라 그 뒤 판정이 실패할 수 있다. 이 테스트는 브라우저를 켜지 않았는지만 본다
-        }
+        service.approve(user(), action, null, false);
 
+        // 바인딩이 없는 대역 줄이라 실행하지 않고 끝나지만, 켜기 실패 대역에 걸리지 않고 승인 판정까지 갔다
+        assertThat(status(action)).isNotEqualTo("PENDING");
         assertThat(browsers.findByUserId(owner.id())).isEmpty();
     }
 

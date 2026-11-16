@@ -15,7 +15,7 @@ covers: `backend/src/main/java/com/bifos/assistant/browser/application/port/Brow
 | 기다림 | 세는 조건 |
 | --- | --- |
 | 열린 화면 넘기기 | 대화가 있고, 닫히지 않았고, 그 브라우저가 이번에 켜진 뒤에 생겼다. 결제와 탭 확인 넘기기도 센다 |
-| 기다리는 승인 | `PENDING` 이고 기다리는 시간이 남았으며, 그 플러그인이 `owner_browser_env` 를 선언했다. 카탈로그를 읽지 못하면 기다림으로 센다 |
+| 기다리는 승인 | `PENDING` 이고 기다리는 시간이 남았으며, 그 플러그인이 `owner_browser_env` 를 선언했다. 카탈로그를 읽지 못했거나 카탈로그에 없는 플러그인의 줄은 기다림으로 센다 |
 
 기다림은 `browser` 의 포트 `BrowserWaitDemand` 를 `connector` 의 `ConnectorBrowserWaitDemand` 가 구현해 답한다. 묻다 실패하면 그 브라우저는 그 점검에서 끄지 않는다.
 `UserBrowserSweeperTest` 와 `ConnectorBrowserWaitDemandTest` 가 확인한다.
