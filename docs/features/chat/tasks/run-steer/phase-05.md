@@ -45,3 +45,5 @@ node /Users/kbt/personal/fos-skills/skills/plan/scripts/adr-docs.ts check --chan
 |---|---|
 | `hermes/docs/hermes-contract.md` | 수정 |
 | `docs/features/chat.md` | 수정 |
+| `docs/features/chat/spec.md` | 수정(ADR 링크) |
+| `docs/features/chat/design.md` | 수정(ADR 링크) |

@@ -448,11 +448,11 @@ Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 
 | `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다. 언제까지 답하는지는 아래 「실행 조회가 답하는 기간」 을 본다 |
 | `GET /v1/runs/{run_id}/events` | SSE. `tool.started`, `tool.completed`, `subagent.start`, `subagent.complete` 와 종료 사건 |
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
-| `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 우리는 아직 부르지 않는다 |
+| `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 설정이 켜져 있을 때 답이 도는 중 입력창 글을 보낸다 |
 
-**실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단만 쓴다.
+**실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단을 쓰고, 설정(`assistant.chat.steer.enabled`)이 켜져 있으면 `steer` 도 쓴다.
 끝난 위임 결과는 같은 session 에 새 실행을 제출해 전한다([ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
-응답 중에 사용자가 보낸 메시지도 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)).
+응답 중에 사용자가 보낸 메시지는 그 turn 이 끝난 뒤 새 실행으로 보낸다([ADR-048](../../docs/adr/ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md)). 설정이 켜져 있고 대기 줄이 비어 있으면 입력창 글을 먼저 `steer` 로 도는 실행에 넣어 본다([ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md)).
 실행 Graph 는 SSE 를 그대로 받아 그리면 되고, 이를 위해 Hermes 를 고칠 일은 없다.
 
 `instructions` 는 에이전트의 기본 프롬프트를 지우지 않고 그 위에 얹힌다.
@@ -460,29 +460,29 @@ Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
 ### 도는 실행에 지시를 더하는 `steer`
 
-v0.21.5 의 `gateway/platforms/api_server_runs.py` 에 `_handle_steer_run` 이 있다.
+v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_handle_steer_run` 과 agent 쪽 처리를 소스로 읽었다. 운영 Hermes 에서의 왕복은 배포 뒤 확인한다. 확인할 항목은 [`docs/features/chat/spec.md`](../../docs/features/chat/spec.md) 의 「운영 확인 항목」 이 갖는다.
 
 | 항목 | 계약 |
 | --- | --- |
 | 경로 | `POST /v1/runs/{run_id}/steer` |
-| 소유자 판정 | 조회, 중단과 같다([`hermes/docs/hermes-contract.md`](hermes-contract.md)) |
-| 본문 | `input`, `message`, `text` 중 처음으로 찬 칸의 글을 읽는다 |
-| 받는 때 | 그 run 의 `status` 가 `running` 일 때만. 아니면 409 `run_not_accepting_steer` 다. 중단을 보낸 run 도 이 판정으로 거절한다 |
+| 소유자 판정 | 조회, 중단과 같다. 남의 profile 이나 key 면 404 다 |
+| 본문 | `input`, `message`, `text` 중 처음으로 찬 칸의 글을 읽는다. 글이 아닌 부분은 버린다. 사진은 받지 않는다. Control Plane 은 `input` 에 싣는다 |
+| 받는 때 | 그 run 의 `status` 가 `running` 이고 agent 에 `steer` 가 있을 때만. 아니면 409 `run_not_accepting_steer` 다. 중단 중(`stopping`)과 Hermes 내장 승인 대기(`waiting_for_approval`)도 이 판정으로 거절한다 |
 | 빈 글 | 400 `invalid_steer_input` |
 | agent 가 받지 않았다 | 409 `steer_not_accepted` |
 | agent 가 예외를 던졌다 | 500 `steer_failed` |
-| 성공 | `{ "object": "hermes.run.steer", "run_id", "accepted": true }` 와 `run.steered` 사건 |
-| 넣지 못하고 끝났다 | 종료 사건과 조회 응답에 `pending_steer` 로 그 글이 실려 온다. 클라이언트가 다시 보내라는 뜻이다 |
+| 성공 | `{ "object": "hermes.run.steer", "run_id", "accepted": true }` 와 `run.steered` 사건. 슬롯에 넣었다는 뜻이지 모델이 읽었다는 뜻이 아니다. 읽었다는 사건은 없다 |
+| 슬롯 | agent 의 슬롯 하나에 받은 순서대로 줄바꿈으로 이어 붙인다 |
+| 모델에 들어가는 때 | 둘이다. 도구 한 묶음이 끝난 직후, 그리고 다음 API 호출 직전(가장 최근 `tool` 행 바로 뒤). 도구를 부르는 중이면 그 도구가 끝날 때까지 기다린다 |
+| 모양 | 별도 `role: user` 행, `display_kind: "steer"`, 본문은 `[OUT-OF-BAND USER MESSAGE …]` 표식이다. 시스템 프롬프트가 이 표식을 원래 요청과 같은 사용자 권한으로 따르라고 지시한다. session 에 저장된다 |
+| 넣지 못하고 끝났다 | 마지막 답을 쓰는 중에 받은 글처럼 슬롯에 남은 글은 모든 종료 사건과 `GET /v1/runs/{run_id}` 의 `pending_steer` 로 이어진 하나로 돌아온다. 다시 보내라는 뜻이다 |
+| 중단 | hard interrupt 가 슬롯을 비운다. 넣지 못한 글은 `pending_steer` 로도 오지 않고 버려진다. 넣었는지도 알리지 않는다 |
+| 위임 자식 | 부모의 `steer` 는 자식에게 가지 않는다. 자식이 도는 동안 받은 글은 자식이 끝난 뒤 부모에 들어간다. 자식에 넣는 경로는 Hermes 자체 화면 전용이다 |
 
-조사에서 소스로 읽은 것이 둘 더 있다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
-
-- 받은 글은 곧바로 들어가지 않는다. 다음 도구 묶음이 끝난 뒤 user 행으로 들어간다.
-- 중단(hard interrupt)으로 끝나면 넣지 못한 글은 버려진다.
-
-**Control Plane 은 아직 `steer` 를 부르지 않는다.**
-넣지 못한 글과 버려진 글을 받아 둘 자리가 먼저 있어야 해서 대기열을 먼저 만들었다(ADR-048).
-`steer` 를 쓰기 전에 운영 Hermes 에서 `steer` 와 `pending_steer` 의 왕복을 확인한다.
-가짜 Hermes 에는 이 경로가 없다.
+**Control Plane 은 설정이 켜져 있을 때 답이 도는 중 대화 주인이 입력창에 쓴 글만 그 대화의 루트 run 에 `steer` 로 보낸다.**
+`steer` 글이 원래 요청과 같은 사용자 권한으로 들어가므로 위임 결과, 도구 결과, 알림 줄, 카드 답은 보내지 않는다.
+200 이면 받음, 4xx·5xx 면 거절, 응답이 없으면 받았는지 모르는 것으로 본다. 글은 넣기 전부터 Control Plane 의 대기 줄에 있고, 거절, `pending_steer`, 중단, 모름을 모두 대기 줄로 되돌린다. 흐름은 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「도는 실행에 끼워 넣기」, 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다.
+Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes 에는 아직 이 경로가 없다.
 
 ### 실행 조회가 답하는 기간
 

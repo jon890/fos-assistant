@@ -66,7 +66,7 @@
 | `Fresh`(사람이 보낸 질문, 대기 글로 연 turn) | 끼운다 |
 | `Regenerate` | 끼운다 |
 | `DelegationResults`(위임 결과 자동 turn, 다시 전하기) | 끼운다 |
-| `Mention`(`@` 맡김) | 끼우지 않는다. 맡은 에이전트가 새 session 에서 돈다(ADR-20261112 / mention-delegation) |
+| `Mention`(`@` 맡김) | 끼우지 않는다. 맡은 에이전트가 새 session 에서 돈다([ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md)) |
 | `Scheduled`, `ProactiveCheck` | 끼우지 않는다. 사람이 보낸 turn 이 아니고, 살펴보기는 결과 블록 계약이 있다 |
 
 ### Hermes
