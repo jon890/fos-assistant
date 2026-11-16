@@ -32,6 +32,10 @@ CONTEXT_BLOCK_MESSAGE = "fos-ctx: 이 도구 호출의 실행 맥락이 없어 �
 UNKNOWN_SERVER_MESSAGE = "fos-ctx: 이 연결에 등록되지 않은 도구라 막았다. 다시 부르지 않는다."
 ARGS_TOO_LARGE_MESSAGE = "fos-ctx: 인자가 너무 커서 실행하지 않았다. 나눠서 요청한다."
 CODE_EXECUTION_MESSAGE = "fos-ctx: 이 연결에서는 코드 실행으로 도구를 부를 수 없다."
+# Control Plane 이 판정 응답에 싣는 결제 넘기기 맥락을 넣는 인자 이름이다. 모델이 정하지 못하게 늘 덮어쓴다.
+PAYMENT_ARG = "_fos_payment"
+PAYMENT_CONTEXT_KEYS = {"v", "handed_off_at_ms", "final_amount_krw", "expected_total_krw", "url"}
+PAYMENT_URL_MAX = 400
 
 
 def read_tool_map(home=None):
@@ -144,8 +148,37 @@ def connector_policy(tool_name: str, args, session_id: str, tool_call_id: str, s
         return _block(POLICY_BLOCK_MESSAGE)
     decision = answer.get("decision")
     if decision == "allow":
-        return None
+        return _payment_args(args, answer.get("payment_context"))
     message = answer.get("message")
     if decision == "block" and isinstance(message, str) and message.strip():
         return _block(message)
     return _block(POLICY_BLOCK_MESSAGE)
+
+
+def _payment_context(value):
+    """판정 응답의 결제 넘기기 맥락을 정확한 키와 타입으로 읽는다. 모양이 틀리면 None 이다."""
+    if not isinstance(value, dict) or set(value) != PAYMENT_CONTEXT_KEYS:
+        return None
+    numbers = ("handed_off_at_ms", "final_amount_krw", "expected_total_krw")
+    # `True` 는 int 의 하위 형이라 boolean 을 따로 뺀다.
+    if value["v"] != 1 or type(value["v"]) is not int:
+        return None
+    if any(type(value[key]) is not int or value[key] < 0 for key in numbers):
+        return None
+    url = value["url"]
+    if not isinstance(url, str) or not url or len(url) > PAYMENT_URL_MAX:
+        return None
+    return {key: value[key] for key in sorted(PAYMENT_CONTEXT_KEYS)}
+
+
+def _payment_args(args: dict, value):
+    """허용한 호출에 결제 넘기기 맥락을 넣는다. 맥락이 없는데 모델이 그 인자를 보냈으면 None 으로 덮는다. 둘 다 아니면 통과(None)다.
+
+    Hermes 의 `action=modify` 는 `args` 를 모델 인자에 덮어 합친다(`_fos_ctx` 와 같다). 모델이 지어 보낸 맥락이 플러그인에 가지 않게 한다.
+    """
+    context = _payment_context(value)
+    if context is not None:
+        return {"action": "modify", "args": {PAYMENT_ARG: context}}
+    if PAYMENT_ARG in args:
+        return {"action": "modify", "args": {PAYMENT_ARG: None}}
+    return None
