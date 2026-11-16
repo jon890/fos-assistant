@@ -32,7 +32,7 @@ public class ConnectorBrowserWaitDemand implements BrowserWaitDemand {
         if (actions.existsOpenHandoffSince(userId, since)) {
             return true;
         }
-        return actions.findConnectorIdsByStatusSince(userId, ActionStatus.PENDING, clock.instant()).stream()
+        return actions.findUnexpiredConnectorIdsByStatus(userId, ActionStatus.PENDING, clock.instant()).stream()
             .anyMatch(this::usesBrowserOrUnknown);
     }
 

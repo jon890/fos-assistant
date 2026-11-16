@@ -20,13 +20,13 @@ class BrowserPropertiesTest {
 
 
     @Test
-    @DisplayName("사람을 기다릴 때의 유휴 시간이 기본 유휴 시간보다 짧으면 기동을 멈춘다")
-    void rejectsWaitHoldShorterThanIdle() {
-        assertThatThrownBy(() -> new BrowserProperties(
+    @DisplayName("사람을 기다릴 때의 유휴 시간이 기본 유휴 시간보다 짧으면 기본 유휴 시간으로 끌어올린다")
+    void raisesWaitHoldToIdle() {
+        BrowserProperties properties = new BrowserProperties(
             false, null, null, null, null, null, null, null, 1024, null, null, null, 2,
-            Duration.ofMinutes(10), Duration.ofSeconds(30), Duration.ofMinutes(30), Duration.ofMinutes(5), null, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("wait-hold-timeout");
+            Duration.ofMinutes(40), Duration.ofSeconds(30), Duration.ofMinutes(30), Duration.ofMinutes(30), null, null);
+
+        assertThat(properties.waitHoldTimeout()).isEqualTo(Duration.ofMinutes(40));
     }
 
 

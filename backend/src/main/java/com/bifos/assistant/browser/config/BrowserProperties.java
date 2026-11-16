@@ -28,7 +28,7 @@ import org.springframework.validation.annotation.Validated;
  * @param startTimeout 켠 뒤 CDP 가 답하기를 기다리는 시간
  * @param screenTimeout 로그인 화면 하나가 열려 있을 수 있는 시간. 넘으면 화면을 닫는다
  * @param waitHoldTimeout 사람을 기다리는 일(열린 화면 넘기기, 기다리는 승인)이 있을 때 자동 중지까지의 유휴 시간. {@code idleTimeout}
- * 이상이다
+ * 보다 짧으면 {@code idleTimeout} 으로 끌어올린다
  * @param gatewayBaseUrl Hermes 가 중계에 닿는 주소. {@code http} 나 {@code https} 이고 끝이 {@code /internal/browser-gateway} 다.
  * 비어 있으면 중계가 꺼진다
  * @param gatewaySecret 중계의 접근 표식을 서명하는 비밀값. 32자 이상이다. 비어 있으면 중계가 꺼진다
@@ -82,8 +82,10 @@ public record BrowserProperties(
         requirePositive("start-timeout", startTimeout);
         requirePositive("screen-timeout", screenTimeout);
         requirePositive("wait-hold-timeout", waitHoldTimeout);
+        // 기다릴 때가 기다리지 않을 때보다 먼저 끄면 뜻이 뒤집힌다. 운영이 idle-timeout 만 늘리고 이 값을 두지 않아도 기동이 멈추지
+        // 않게, 짧으면 idle-timeout 으로 끌어올린다
         if (waitHoldTimeout.compareTo(idleTimeout) < 0) {
-            throw new IllegalStateException(PREFIX + "wait-hold-timeout must not be shorter than idle-timeout");
+            waitHoldTimeout = idleTimeout;
         }
         if (hasText(gatewayBaseUrl)
             && !((gatewayBaseUrl.startsWith("http://") || gatewayBaseUrl.startsWith("https://"))

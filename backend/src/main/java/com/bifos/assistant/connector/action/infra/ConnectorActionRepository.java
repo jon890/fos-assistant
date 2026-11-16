@@ -66,7 +66,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             select distinct a.connectorId from ConnectorAction a
             where a.userId = :userId and a.status = :status and a.expiresAt > :now
             """)
-    List<String> findConnectorIdsByStatusSince(
+    List<String> findUnexpiredConnectorIdsByStatus(
         @Param("userId") Long userId, @Param("status") ActionStatus status, @Param("now") Instant now);
 
 

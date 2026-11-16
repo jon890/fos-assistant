@@ -47,7 +47,7 @@ UserBrowserSweeper.stopIdle
   - 열린 넘기기: 그 사용자의 판정 줄 가운데 `handoff_need` 가 있고 `handoff_closed_at` 이 비었으며, 대화(`conversation_id`)가 있고 `handoff_at` 이 `since` 이후인 줄. 넘기기를 닫는 길은 그 대화의 사람 turn 뿐이라, 대화 밖 실행의 넘기기나 버려진 대화의 카드는 끝없이 열려 있다. 브라우저가 다시 켜졌으면 그 탭도 이미 없다. 이 둘을 빼야 기다림이 영구히 참이 되지 않는다. 넘기기는 「내 브라우저」 를 쓰는 플러그인만 낸다. 결제(`payment`)와 탭 확인 넘기기도 들어간다. 사람이 그 탭에서 결제해야 하기 때문이다
   - 기다리는 승인: 그 사용자의 `PENDING` 이고 `expires_at` 이 지나지 않은 승인 줄 가운데, 그 플러그인의 manifest 가 `owner_browser_env` 를 선언한 줄(`ConnectorManifest#ownerBrowser`). 카탈로그를 읽지 못하면 기다리는 것으로 본다. 잘못 보아도 30분 뒤 꺼지므로 켜 두는 쪽이 안전하다
   - 사람 기다림 승인은 PR4, 사람 잠금은 PR3 이 같은 포트에 더한다
-- **설정** `assistant.browser.wait-hold-timeout`, 기본 `30m`, `BrowserProperties` 에 더하고 `idle-timeout` 이상이어야 한다(작으면 기동을 멈춘다). 값은 사용자 결정(spec DECISION10)이다. 점검은 `LiveProperties<BrowserProperties>` 에서 직접 읽는다. `UserBrowserService` 는 파일 길이 상한(rule-44)에 닿아 메서드를 더하지 않는다.
+- **설정** `assistant.browser.wait-hold-timeout`, 기본 `30m`, `BrowserProperties` 에 더하고 `idle-timeout` 보다 짧으면 `idle-timeout` 으로 끌어올린다. 운영이 `idle-timeout` 만 늘려도 기동이 멈추지 않는다. 값은 사용자 결정(spec DECISION10)이다. 점검은 `LiveProperties<BrowserProperties>` 에서 직접 읽는다. `UserBrowserService` 는 파일 길이 상한(rule-44)에 닿아 메서드를 더하지 않는다.
 - **사람이 끄기·지우기, 관리자 끄기, 사용자 끄기**는 자동 중지를 거치지 않으므로 그대로 바로 끈다.
 - 데이터는 바꾸지 않는다. 기존 칸(`connector_action` 의 `status`, `expires_at`, `handoff_at`, `handoff_closed_at`, `user_browser.last_active_at`)만 읽는다.
 
