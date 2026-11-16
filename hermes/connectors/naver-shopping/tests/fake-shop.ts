@@ -184,7 +184,8 @@ export function startFakeShop(config: ShopConfig = {}) {
           socket.send(
             JSON.stringify({
               id: message.id,
-              result: message.method === "Storage.getCookies" ? { cookies } : {},
+              result:
+                message.method === "Storage.getCookies" ? { cookies } : {},
             }),
           );
           return;
@@ -217,7 +218,10 @@ export function startFakeShop(config: ShopConfig = {}) {
             : {}),
         });
         if (message.method === "Page.navigate") {
-          if (config.landing === "login" || String(params.url).startsWith("https://nid.naver.com/")) {
+          if (
+            config.landing === "login" ||
+            String(params.url).startsWith("https://nid.naver.com/")
+          ) {
             tab.screen = "login";
             tab.href = "https://nid.naver.com/nidlogin.login";
           } else {

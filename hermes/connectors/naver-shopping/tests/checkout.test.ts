@@ -587,10 +587,7 @@ test("claim 전에 로그인 화면이면 claim 없이 탭을 남긴 넘기기 �
 });
 
 /** 같은 가짜 상점에서 채우기를 한 번 더 부른다. 이어 가기면 Control Plane 이 넘기는 탭과 단계 env 를 더한다. */
-async function fillAgain(
-  args: Record<string, unknown>,
-  resume?: string,
-) {
+async function fillAgain(args: Record<string, unknown>, resume?: string) {
   const env: Record<string, string | undefined> = {
     [BROWSER_URL_ENV]: shop!.url,
     ...approvalEnv(args, shop!.claimUrl),
@@ -619,7 +616,11 @@ test("로그아웃 상태면 claim 전에 그 탭을 로그인 화면으로 옮�
   expect(first.isError).toBe(false);
   expect(first.body).toMatchObject({
     status: "HUMAN_ACTION_REQUIRED",
-    handoff: { code: "NAVER_SHOPPING_LOGIN_REQUIRED", need: "login", tab: "TAB1" },
+    handoff: {
+      code: "NAVER_SHOPPING_LOGIN_REQUIRED",
+      need: "login",
+      tab: "TAB1",
+    },
     resume: { step: "product" },
   });
   expect(shop!.log.some((line) => line.kind === "claim")).toBe(false);
@@ -641,7 +642,11 @@ test("로그아웃 상태면 claim 전에 그 탭을 로그인 화면으로 옮�
   });
   const later = shop!.log.slice(before);
   // 새 탭을 열지 않고 남긴 탭에 붙는다. claim 은 한 번이다.
-  expect(later.some((line) => line.kind === "http" && line.line.startsWith("PUT /json/new"))).toBe(false);
+  expect(
+    later.some(
+      (line) => line.kind === "http" && line.line.startsWith("PUT /json/new"),
+    ),
+  ).toBe(false);
   expect(later.filter((line) => line.kind === "claim")).toHaveLength(1);
   expect(shop!.log.filter((line) => line.kind === "claim")).toHaveLength(1);
 });
