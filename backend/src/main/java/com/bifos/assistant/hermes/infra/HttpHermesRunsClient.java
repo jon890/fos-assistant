@@ -7,20 +7,24 @@ import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import com.bifos.assistant.hermes.domain.TokenUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
@@ -41,21 +45,27 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private static final Set<String> TERMINAL = Set.of("completed", "failed", "cancelled", "error", "interrupted");
 
     private final RestClient restClient;
+    /** steer 전용이다. 읽기 제한 시간이 짧아 끼우기를 기다리는 동안 turn 의 끝이 오래 밀리지 않는다. */
+    private final RestClient steerClient;
     private final HermesProfileKeyStore keyStore;
     private final HermesProperties properties;
 
 
-    public HttpHermesRunsClient(HermesProfileKeyStore keyStore, HermesProperties properties) {
-        this.restClient = RestClient.builder().requestFactory(requestFactory(properties)).build();
+    public HttpHermesRunsClient(
+        HermesProfileKeyStore keyStore,
+        HermesProperties properties,
+        @Value("${assistant.chat.steer.timeout:5s}") Duration steerTimeout) {
+        this.restClient = RestClient.builder().requestFactory(requestFactory(properties, properties.readTimeout())).build();
+        this.steerClient = RestClient.builder().requestFactory(requestFactory(properties, steerTimeout)).build();
         this.keyStore = keyStore;
         this.properties = properties;
     }
 
 
-    private static SimpleClientHttpRequestFactory requestFactory(HermesProperties properties) {
+    private static SimpleClientHttpRequestFactory requestFactory(HermesProperties properties, Duration readTimeout) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
-        factory.setReadTimeout(properties.readTimeout());
+        factory.setReadTimeout(readTimeout);
         return factory;
     }
 
@@ -92,6 +102,37 @@ public class HttpHermesRunsClient implements HermesRunsClient {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");
+        }
+    }
+
+
+    /**
+     * 도는 실행에 글을 끼워 넣으라고 보낸다. 판정은 {@link SteerOutcome} 이 갖는다.
+     *
+     * <p>사용자가 쓴 글이라 본문을 로그에 싣지 않는다.
+     */
+    @Override
+    public SteerOutcome steer(String apiBaseUrl, String profileName, String runId, String text) {
+        try {
+            JsonNode body = steerClient
+                .post()
+                .uri(apiBaseUrl + "/v1/runs/{runId}/steer", runId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("input", text))
+                .retrieve()
+                .body(JsonNode.class);
+            if (body != null && body.path("accepted").asBoolean(false)) {
+                return SteerOutcome.ACCEPTED;
+            }
+            log.info("Hermes 가 끼우기에 받았다고 답하지 않았다 profile={} runId={}", profileName, runId);
+            return SteerOutcome.REJECTED;
+        } catch (HttpStatusCodeException ex) {
+            log.info("Hermes 가 끼우기를 거절했다 profile={} runId={} status={}", profileName, runId, ex.getStatusCode().value());
+            return SteerOutcome.REJECTED;
+        } catch (RestClientException ex) {
+            log.warn("Hermes 가 끼우기를 받았는지 알 수 없다 profile={} runId={}", profileName, runId, ex);
+            return SteerOutcome.UNKNOWN;
         }
     }
 
@@ -342,7 +383,8 @@ public class HttpHermesRunsClient implements HermesRunsClient {
             text(run, "provider"),
             text(run, "error"),
             readUsage(run.path("usage")),
-            servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider));
+            servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider),
+            blankToNull(text(run, "pending_steer")));
     }
 
 
@@ -400,6 +442,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
 

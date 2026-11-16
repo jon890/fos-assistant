@@ -1,6 +1,8 @@
 package com.bifos.assistant.chat.conversation.domain;
 
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.domain.type.SteerChild;
+import com.bifos.assistant.chat.conversation.domain.type.SteerState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -78,6 +80,23 @@ public class ChatMessage {
     @Column(name = "created_at", nullable = false)
     @Getter
     private Instant createdAt;
+
+    /** 도는 실행에 끼워 넣은 사용자 글이면 그 상태다. 보통 메시지는 비어 있다(ADR-20261116 / run-steer). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "steer_state", length = 20)
+    @Getter
+    private SteerState steerState;
+
+    /** 끼워 넣은 turn 의 루트 실행이다. {@code execution_id} 는 사용자 메시지에서 비어 있다는 규칙을 지키려고 따로 둔다. */
+    @Column(name = "steer_execution_id")
+    @Getter
+    private Long steerExecutionId;
+
+    /** 받은 순간 돈 자식의 종류다. 없으면 비어 있다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "steer_child", length = 20)
+    @Getter
+    private SteerChild steerChild;
 
 
     protected ChatMessage() {}
@@ -157,6 +176,35 @@ public class ChatMessage {
 
     public static ChatMessage fromUser(Long conversationId, Long senderUserId, String content, Instant now) {
         return new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
+    }
+
+
+    /**
+     * 도는 실행에 끼워 넣은 사용자 글이다. 본문과 보낸 사람은 사용자 메시지와 같고 steer 칸을 채운다.
+     *
+     * @param steerExecutionId 끼워 넣은 turn 의 루트 실행
+     */
+    public static ChatMessage fromSteer(
+        Long conversationId,
+        Long senderUserId,
+        String content,
+        Long steerExecutionId,
+        SteerState state,
+        SteerChild child,
+        Instant now) {
+        ChatMessage message = new ChatMessage(conversationId, MessageRole.USER, content, senderUserId, null, null, now);
+        message.steerState = state;
+        message.steerExecutionId = steerExecutionId;
+        message.steerChild = child;
+        return message;
+    }
+
+
+    /** steer 말풍선의 상태를 바꾼다. steer 말풍선이 아니면 바꾸지 않는다. */
+    public void changeSteerState(SteerState state) {
+        if (steerState != null) {
+            this.steerState = state;
+        }
     }
 
 

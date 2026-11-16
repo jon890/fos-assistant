@@ -65,6 +65,7 @@ public class NextTurnDispatcher {
     private final ChatService chat;
     private final ConversationEventHub hub;
     private final BackgroundTasks backgroundTasks;
+    private final SteerLedger steerLedger;
 
     private final Clock clock = Clock.systemUTC();
 
@@ -150,10 +151,21 @@ public class NextTurnDispatcher {
 
 
     public void tryNext(Long conversationId) {
+        resettleSteer(conversationId);
         if (tryPendingOrSkipUnreadable(conversationId)) {
             return;
         }
         wake.tryWake(conversationId);
+    }
+
+
+    /** 정리하다 실패한 steer 말풍선이 있으면 다음 turn 을 정하기 전에 다시 정리한다(ADR-20261116 / run-steer). */
+    private void resettleSteer(Long conversationId) {
+        try {
+            steerLedger.resettleIfMarked(conversationId);
+        } catch (RuntimeException ex) {
+            log.warn("steer 말풍선을 다시 정리하지 못했다 conversationId={}", conversationId, ex);
+        }
     }
 
 
@@ -183,6 +195,11 @@ public class NextTurnDispatcher {
      */
     private boolean tryPending(Long conversationId) {
         PendingMessages queue = pendingMessages.read(conversationId);
+        if (queue.blockedBySteering()) {
+            // 끼우기 답을 기다리는 사용자 글이 있다. 위임 결과 turn 이 그 글을 앞지르지 않게 차례를 붙잡는다.
+            // 답을 받은 쪽이 다시 이 자리를 부른다(ADR-20261116 / run-steer).
+            return true;
+        }
         if (!queue.sendable()) {
             return false;
         }

@@ -45,10 +45,21 @@ public sealed interface TurnIntent {
     String SCHEDULED_INSTRUCTION = "예약 작업으로 연 turn 이다. 사용자는 지금 화면에 없을 수 있다. " + "사용자의 승인이 필요한 도구는 승인 요청을 남기고 답을 마친다.";
 
 
-    /** @param pendingIds 이 turn 이 합쳐 보내는 대기 메시지들. 사용자가 바로 보낸 turn 은 비어 있다 */
-    record Fresh(List<Long> pendingIds) implements TurnIntent {
+    /**
+     * @param pendingIds 이 turn 이 합쳐 보내는 대기 메시지들. 사용자가 바로 보낸 turn 은 비어 있다
+     * @param carriedMessageIds 그 가운데 이미 대화에 보인 steer 말풍선의 메시지 번호. 새 사용자 메시지를 만들지 않고 그 말풍선을 「다음 차례로
+     * 넘어감」 으로 바꾼다(ADR-20261116 / run-steer)
+     * @param questionText 새 사용자 메시지로 남길 글. null 이면 Hermes 에 보내는 글 그대로다. 빈 글이면 새 메시지를 만들지 않는다
+     */
+    record Fresh(List<Long> pendingIds, List<Long> carriedMessageIds, String questionText) implements TurnIntent {
         public Fresh {
             pendingIds = List.copyOf(pendingIds);
+            carriedMessageIds = List.copyOf(carriedMessageIds);
+        }
+
+
+        public Fresh(List<Long> pendingIds) {
+            this(pendingIds, List.of(), null);
         }
 
 

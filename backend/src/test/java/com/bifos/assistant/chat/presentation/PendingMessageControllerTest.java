@@ -143,6 +143,24 @@ class PendingMessageControllerTest {
 
 
     @Test
+    @DisplayName("steer 표시를 실어도 끼울 루트 run 이 없으면 대기 줄에 남고 글에 steering 과 messageId 칸이 있다")
+    void steerRequestWithoutRootRunStaysQueued() throws Exception {
+        MockHttpServletResponse added = mvc.perform(post(path(), conversation.publicId())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(new ChatDtos.PendingMessageRequest("끼울 글", true))))
+            .andReturn()
+            .getResponse();
+
+        assertThat(added.getStatus()).isEqualTo(201);
+        JsonNode item = bodyOf(added).path("items").get(0);
+        assertThat(item.path("text").asString()).isEqualTo("끼울 글");
+        assertThat(item.path("steering").asBoolean()).isFalse();
+        assertThat(item.has("messageId")).as("받은 줄: %s", item).isTrue();
+        assertThat(item.path("messageId").isNull()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("대기 줄이 비어 있으면 held 가 거짓이고 items 가 빈 목록이다")
     void returnsEmptyQueueWhenNothingQueued() throws Exception {
         MockHttpServletResponse read = mvc.perform(get(path(), conversation.publicId())).andReturn().getResponse();

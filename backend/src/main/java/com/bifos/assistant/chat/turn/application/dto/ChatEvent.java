@@ -24,6 +24,7 @@ import java.util.UUID;
  * @param interimId 실행 안에서 중간 안내의 재수신을 가려낼 식별자
  * @param delegation {@code delegation} 사건의 맡긴 줄. 다른 사건은 null
  * @param deliveredResults 위임 결과 알림 줄의 {@code system} 사건이 싣는 그 줄이 전한 결과. 다른 사건은 null
+ * @param steer {@code steer} 사건이 싣는 말풍선의 상태와 자식 종류. 다른 사건은 null
  */
 public record ChatEvent(
     String type,
@@ -47,7 +48,19 @@ public record ChatEvent(
     Integer streamedPrefixLength,
     String interimId,
     DelegationLine delegation,
-    List<DelegationLine> deliveredResults) {
+    List<DelegationLine> deliveredResults,
+    SteerView steer) {
+
+    public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
+        Long messageId, Long executionId, String code, String message,
+        String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
+        Long inputTokens, Long outputTokens, Boolean alreadyStreamed, Integer streamedPrefixLength, String interimId,
+        DelegationLine delegation, List<DelegationLine> deliveredResults) {
+        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs,
+            failed, subagentId, goal, model, inputTokens, outputTokens, alreadyStreamed, streamedPrefixLength, interimId,
+            delegation, deliveredResults, null);
+    }
+
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
         Long messageId, Long executionId, String code, String message,
@@ -172,7 +185,8 @@ public record ChatEvent(
             streamedPrefixLength,
             interimId,
             delegation,
-            deliveredResults);
+            deliveredResults,
+            steer);
     }
 
 
@@ -419,6 +433,19 @@ public record ChatEvent(
             null,
             null,
             null);
+    }
+
+
+    /**
+     * steer 말풍선이 생겼거나 상태가 바뀌었다. 화면이 그 번호의 말풍선을 넣거나 상태를 바꾼다(ADR-20261116 / run-steer).
+     *
+     * @param messageId 말풍선 메시지의 번호
+     * @param executionId 끼워 넣은 turn 의 루트 실행. 화면이 그 답 바로 위에 말풍선을 놓는다
+     */
+    public static ChatEvent steer(UUID conversationId, Long messageId, String text, Long executionId, SteerView steer) {
+        return new ChatEvent(
+            "steer", text, null, null, conversationId, messageId, executionId, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, steer);
     }
 
 

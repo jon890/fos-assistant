@@ -261,7 +261,8 @@ public class ChatService {
             Routed routed = chatTurnRouting.route(owner, conversationId, text, null, List.of());
             List<Long> ids = queue.ids();
             try {
-                ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
+                TurnIntent.Fresh intent = new TurnIntent.Fresh(ids, queue.carriedMessageIds(), queue.questionText());
+                ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, intent, onEvent, true, handle);
                 onEvent.accept(ChatTurnCompletion.eventOf(turn));
                 return;
             } catch (PendingQueueChangedException ex) {
@@ -296,6 +297,9 @@ public class ChatService {
             ChatMessage question = previousAnswer == null ? last : ChatTurnRouting.previousQuestion(active, previousAnswer);
             if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
+            }
+            if (question.steerState() != null) { // steer 말풍선이 낀 답은 다시 만들지 않는다(ADR-20261116 / run-steer)
+                throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest answer has a steered message");
             }
             mentionLines.requireRegenerable(conversation, previousAnswer, question);
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()

@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.turn.application.dto.SteerView;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
@@ -355,7 +356,8 @@ public class ChatController {
                 it.role() == MessageRole.ASSISTANT && it.executionId() != null
                     ? mentions.answers().get(it.executionId())
                     : null,
-                it.role() == MessageRole.USER ? mentions.questions().get(it.id()) : null))
+                it.role() == MessageRole.USER ? mentions.questions().get(it.id()) : null,
+                SteerView.of(it)))
             .toList();
     }
 

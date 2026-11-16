@@ -5,6 +5,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 import com.bifos.assistant.shared.error.ApiException;
 import java.time.Duration;
@@ -65,6 +66,15 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final List<SessionLookup> deletedSessions = new CopyOnWriteArrayList<>();
 
     private volatile RuntimeException sessionDeleteFailure;
+
+    /** 끼우기에 차례로 돌려줄 결과다. 비면 받음으로 답한다. */
+    private final Deque<SteerOutcome> steerOutcomes = new ArrayDeque<>();
+
+    /** 끼우라고 받은 run 번호와 글을 받은 순서대로 담는다. */
+    private final List<SteerRequest> steered = new CopyOnWriteArrayList<>();
+
+    private volatile Runnable beforeSteer = () -> {
+    };
 
 
     public void willReturn(HermesRunResult result) {
@@ -181,6 +191,26 @@ public class StubHermesRunsClient implements HermesRunsClient {
     }
 
 
+    /** 끼우기에 이 결과들을 차례로 돌려준다. 다 쓰면 받음으로 답한다. */
+    public void willSteer(SteerOutcome... outcomes) {
+        synchronized (steerOutcomes) {
+            steerOutcomes.clear();
+            steerOutcomes.addAll(List.of(outcomes));
+        }
+    }
+
+
+    /** 끼우기 요청을 받은 뒤 답하기 전에 돌린다. 응답을 기다리는 동안 turn 이 끝나는 경쟁을 흉내 낸다. */
+    public void beforeSteer(Runnable action) {
+        this.beforeSteer = action;
+    }
+
+
+    public List<SteerRequest> steered() {
+        return steered;
+    }
+
+
     public void onStop(Consumer<String> action) {
         this.onStop = action;
     }
@@ -214,6 +244,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
         lookupAnswers.clear();
         lookupFailures.clear();
         lookups.clear();
+        synchronized (steerOutcomes) {
+            steerOutcomes.clear();
+        }
+        steered.clear();
+        beforeSteer = () -> {
+        };
         releaseSubmits();
     }
 
@@ -248,6 +284,17 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public void stop(String apiBaseUrl, String profileName, String runId) {
         stopped.add(runId);
         onStop.accept(runId);
+    }
+
+
+    @Override
+    public SteerOutcome steer(String apiBaseUrl, String profileName, String runId, String text) {
+        steered.add(new SteerRequest(runId, text));
+        beforeSteer.run();
+        synchronized (steerOutcomes) {
+            SteerOutcome next = steerOutcomes.pollFirst();
+            return next == null ? SteerOutcome.ACCEPTED : next;
+        }
     }
 
 
@@ -338,6 +385,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
     }
 
     /** session 을 물은 한 번이다. 어느 Hermes 의 어느 profile 에 물었는지 함께 담는다. */
+    public record SteerRequest(String runId, String text) {
+    }
+
     public record SessionLookup(String apiBaseUrl, String profileName, String sessionId) {
     }
 }

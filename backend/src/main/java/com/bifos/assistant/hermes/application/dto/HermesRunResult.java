@@ -9,6 +9,7 @@ import com.bifos.assistant.hermes.domain.TokenUsage;
  * 끝난 뒤에 다시 쓰지 않는다. 실제로 돈 모델은 {@link SessionRuntime} 이 갖는다.
  *
  * @param error 실패했을 때 Hermes 가 적은 글. 성공하면 비어 있다
+ * @param pendingSteer 끼워 넣었지만 모델에 넣지 못하고 끝나 돌아온 글. 여러 글은 줄바꿈으로 이어져 온다. 없으면 null 이다
  */
 public record HermesRunResult(
     String runId,
@@ -19,7 +20,23 @@ public record HermesRunResult(
     String provider,
     String error,
     TokenUsage usage,
-    SessionRuntime runtime) {
+    SessionRuntime runtime,
+    String pendingSteer) {
+
+    /** 돌아온 글 없이 만든다. {@code pending_steer} 를 읽지 않는 자리와 테스트가 쓴다. */
+    public HermesRunResult(
+        String runId,
+        String sessionId,
+        String status,
+        String output,
+        String model,
+        String provider,
+        String error,
+        TokenUsage usage,
+        SessionRuntime runtime) {
+        this(runId, sessionId, status, output, model, provider, error, usage, runtime, null);
+    }
+
 
     /**
      * {@code runtime} 없이 만든다. v0.21.5 의 {@code runtime} 을 읽지 않는 자리와 테스트가 쓴다.

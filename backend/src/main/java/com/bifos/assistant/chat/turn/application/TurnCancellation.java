@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.TurnClosed;
+import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.chat.turn.application.dto.TurnMark;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
@@ -179,6 +180,40 @@ public class TurnCancellation {
 
     public Optional<TurnHandle> find(Long executionId) {
         return Optional.ofNullable(byExecution.get(executionId));
+    }
+
+
+    /** 대화 번호로 도는 turn 의 표시를 꺼낸다. steer 가 끼울 루트 run 과 turn 종류를 읽는다(ADR-20261116 / run-steer). */
+    public Optional<TurnHandle> findByConversation(Long conversationId) {
+        return Optional.ofNullable(byConversation.get(conversationId));
+    }
+
+
+    /** 이 turn 의 루트 run 을 적는다. 중지 대상으로도 적는다. */
+    public boolean trackRootRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
+        TurnHandle handle = byExecution.get(executionId);
+        if (handle != null) {
+            handle.rootRun = new TurnRunRef(apiBaseUrl, profileName, runId);
+        }
+        return trackRun(executionId, apiBaseUrl, profileName, runId);
+    }
+
+
+    /** 이 turn 의 종류를 적는다. */
+    public void markIntent(TurnHandle handle, TurnIntent intent) {
+        handle.intent = intent;
+    }
+
+
+    /** Hermes 안 하위 에이전트가 시작했다. */
+    public void subagentStarted(TurnHandle handle) {
+        handle.openSubagents.incrementAndGet();
+    }
+
+
+    /** Hermes 안 하위 에이전트가 끝났다. 짝 없는 완료 사건에도 0 아래로 내려가지 않는다. */
+    public void subagentCompleted(TurnHandle handle) {
+        handle.openSubagents.getAndUpdate(n -> n > 0 ? n - 1 : 0);
     }
 
 

@@ -14,6 +14,8 @@ import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.turn.application.dto.SteerSettlement;
+import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
 import com.bifos.assistant.chat.room.application.RoomContext;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.context.application.dto.AssembledContext;
@@ -34,9 +36,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /** 대화가 고른 경로에서 turn 을 실행한다. */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class ChatTurnRunner {
@@ -58,6 +62,7 @@ class ChatTurnRunner {
     private final MentionInputs mentionInputs;
     private final RoomContext roomContext;
     private final ConversationNotices notices;
+    private final TurnSteerLedger steerLedger;
 
 
     /**
@@ -87,6 +92,8 @@ class ChatTurnRunner {
         List<Long> attachmentIds = routed.attached().stream().map(ChatAttachment::id).toList();
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
+        // 끝난 방식에 따라 이 turn 의 steer 말풍선을 정리하려고 실행 번호와 결과를 들고 있는다(ADR-20261116 / run-steer).
+        SteerEnd steerEnd = new SteerEnd();
         try {
             // 질문을 저장하기 전에 읽는다. 대화방의 요약 알림 줄은 질문 앞에 남고, 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문
             // 앞까지다.
@@ -156,6 +163,8 @@ class ChatTurnRunner {
             }
             chatTurnLifecycle.recordQuestion(pending.execution().id(), questionId);
             turns.rekey(handle, pending.execution().id());
+            steerEnd.executionId = pending.execution().id();
+            turns.markIntent(handle, intent);
             if (intent instanceof TurnIntent.ProactiveCheck proactive) {
                 chatTurnLifecycle.startCheck(proactive.check(), pending);
             }
@@ -187,6 +196,7 @@ class ChatTurnRunner {
                 // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-090).
                 chatRunEvents.relay(pending, runId, handle, streaming ? onEvent : null);
                 result = chatRunEvents.awaitCompletion(pending, runId);
+                steerEnd.result = result;
             } catch (RuntimeException ex) {
                 chatTurnStopper.cancelAndHoldIfStopConfirmed(handle, pending, choice);
                 throw ex;
@@ -212,10 +222,43 @@ class ChatTurnRunner {
             chatRunEvents.append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
         } finally {
+            settleSteer(handle, routed.conversation().id(), steerEnd);
             if (closesHandle) {
                 turns.close(handle);
             }
         }
+    }
+
+
+    /**
+     * 이 turn 의 steer 말풍선을 끝난 방식대로 정리한다. 잠금을 풀기 전이다. 결과를 읽었으면 그 상태로, 중지면 중지로, 결과 없이 끝났으면
+     * 모르는 것으로 본다. 실행 줄을 만들기 전에 끝난 turn 은 끼운 글이 없다. 정리의 실패가 원래 예외를 가리지 않게 삼킨다.
+     */
+    private void settleSteer(TurnHandle handle, Long conversationId, SteerEnd end) {
+        if (end.executionId == null) {
+            return;
+        }
+        HermesRunResult result = end.result;
+        SteerSettlement settlement;
+        if (turns.isStopConfirmed(handle) || result != null && "cancelled".equalsIgnoreCase(result.status())) {
+            settlement = SteerSettlement.stopped();
+        } else if (result != null) {
+            settlement = SteerSettlement.completed(result.pendingSteer());
+        } else {
+            settlement = SteerSettlement.unknown();
+        }
+        try {
+            steerLedger.settle(end.executionId, conversationId, settlement);
+        } catch (RuntimeException ex) {
+            log.warn("steer 말풍선을 정리하지 못했다 conversationId={}", conversationId, ex);
+        }
+    }
+
+
+    /** turn 이 끝날 때까지 채우는 실행 번호와 결과다. */
+    private static final class SteerEnd {
+        Long executionId;
+        HermesRunResult result;
     }
 
 

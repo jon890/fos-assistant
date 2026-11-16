@@ -59,7 +59,7 @@ class ChatRunEvents {
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
-            turns.trackRun(
+            turns.trackRootRun(
                 pending.execution().id(),
                 pending.command().apiBaseUrl(),
                 pending.command().profileName(),
@@ -99,6 +99,7 @@ class ChatRunEvents {
                                 if (TERMINAL_EVENTS.contains(event.type())) {
                                     terminalSeen.set(true);
                                 }
+                                countSubagent(handle, event);
                                 if (onEvent == null) {
                                     append(pending, event);
                                 } else {
@@ -225,6 +226,17 @@ class ChatRunEvents {
                 event.outputTokens(),
                 event.durationMs(),
                 event.failed()));
+        }
+    }
+
+
+    /** 도는 하위 에이전트의 수를 센다. steer 말풍선이 자식 안내를 붙일지 정하는 데 쓴다(ADR-20261116 / run-steer). */
+    private void countSubagent(TurnHandle handle, RunEvent event) {
+        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
+        if ("subagent.start".equals(type)) {
+            turns.subagentStarted(handle);
+        } else if ("subagent.complete".equals(type)) {
+            turns.subagentCompleted(handle);
         }
     }
 

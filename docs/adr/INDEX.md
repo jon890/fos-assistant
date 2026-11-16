@@ -126,6 +126,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261112 / mention-delegation](ADR-20261112-mention-delegation.md) | 사용자가 `@` 로 고른 에이전트에게는 Control Plane 이 바로 맡기고, 그 주고받음을 대화 에이전트의 다음 turn 에 싣는다 | backend, frontend | Accepted. ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 |
 | [ADR-20261113 / purchase-checkout](ADR-20261113-purchase-checkout.md) | 구매는 사용자 상한 안에서 매번 승인한 주문서까지만 채우고, 금융 승인 틀에 위험도 `PURCHASE` 로 얹는다 | backend, frontend, hermes | Accepted. ADR-20261010 / financial-execution-guard 의 틀에 주문서 종류를 더하고, ADR-20261110 / naver-shopping-connector 의 「읽기 도구는 누르지 않는다」 에 옵션 드롭다운 열기 예외를 둔다 |
 | [ADR-20261116 / browser-lock](ADR-20261116-browser-lock.md) | 「내 브라우저」 는 에이전트와 사람 가운데 하나가 쥐고, 사람이 쥔 동안 중계가 에이전트를 거절해 넘기기로 끝낸다 | backend, frontend, hermes | Accepted. ADR-20261007 / user-browser 의 중계 위에 잠금을 더하고, ADR-20261111 / connector-handoff 의 넘기기 어휘에 `human_browser` 와 탭 없는 넘기기를 더한다 |
+| [ADR-20261116 / run-steer](ADR-20261116-run-steer.md) | 답이 도는 중 입력창 글은 대기 줄에 먼저 두고 루트 실행에 steer 하며, 넣지 못한 글은 말풍선을 붙인 채 대기 줄로 되돌린다 | backend, frontend | Accepted. ADR-048 의 「적용 범위」 가 미룬 steer 를 그 대기열 위에 얹는다 |
 
 ## 보관
 

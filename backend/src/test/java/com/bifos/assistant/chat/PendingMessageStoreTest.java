@@ -244,4 +244,42 @@ class PendingMessageStoreTest {
     private String storedOf(Long conversationId) {
         return jdbc.queryForObject("SELECT pending_messages FROM conversation WHERE id = ?", String.class, conversationId);
     }
+
+
+    @Test
+    @DisplayName("steer 칸이 빈 줄은 버전 1 로 쓰고 새 칸 이름도 쓰지 않는다")
+    void writesVersionOneWithoutSteerFields() {
+        PendingMessages queue = PendingMessages.EMPTY.append("글", NOW);
+
+        String stored = PendingMessageStore.encode(queue);
+
+        assertThat(stored).contains("\"version\":1").doesNotContain("messageId").doesNotContain("steering");
+    }
+
+
+    @Test
+    @DisplayName("말풍선 번호나 끼우는 중 표시가 있으면 버전 2 로 쓰고 그대로 다시 읽는다")
+    void roundTripsVersionTwoWithSteerFields() {
+        PendingMessages queue = PendingMessages.EMPTY.append("새 글", NOW)
+            .prependCarried(List.of(new PendingMessages.Carried(31L, "돌아온 글")), NOW)
+            .withHeld(true);
+        queue = queue.withSteering(queue.items().getLast().id(), true);
+
+        String stored = PendingMessageStore.encode(queue);
+        PendingMessages read = PendingMessageStore.decode(stored);
+
+        assertThat(stored).contains("\"version\":2");
+        assertThat(read).isEqualTo(queue);
+        assertThat(read.items().getFirst().messageId()).isEqualTo(31L);
+        assertThat(read.items().getLast().steering()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("모르는 버전은 빈 줄로 보지 않고 오류로 올린다")
+    void rejectsUnknownVersion() {
+        String stored = "{\"version\":3,\"held\":false,\"items\":[{\"id\":1,\"content\":\"글\",\"createdAt\":\"2026-09-30T00:00:00Z\"}]}";
+
+        assertThatThrownBy(() -> PendingMessageStore.decode(stored)).isInstanceOf(UnreadablePendingMessagesException.class);
+    }
 }
