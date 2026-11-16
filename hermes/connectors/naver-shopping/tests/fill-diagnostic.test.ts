@@ -127,6 +127,7 @@ test("끝까지 가면 단계마다 한 줄을 남기고 done 으로 끝난다",
   expect(stages()).toEqual([
     ["approval"],
     ["tab"],
+    ["login"],
     ["price"],
     ["buy_ready"],
     ["claim"],

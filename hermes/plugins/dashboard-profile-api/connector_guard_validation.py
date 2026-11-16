@@ -76,8 +76,21 @@ def _same_json(left, right):
     return left == right
 
 
+RESUME_TAB = re.compile(r"[A-Za-z0-9]{1,128}")
+RESUME_STEP = re.compile(r"[a-z][a-z0-9_]{0,31}")
+
+
+def _resume_env(resume):
+    """사람 화면에서 멈춘 승인을 이어 갈 탭과 단계를 플러그인 env 로 넘긴다(fos-assistant browser-cowork spec REQ8)."""
+    _require(isinstance(resume, dict) and set(resume) == {"tab", "step"}
+             and isinstance(resume["tab"], str) and RESUME_TAB.fullmatch(resume["tab"])
+             and isinstance(resume["step"], str) and RESUME_STEP.fullmatch(resume["step"]))
+    return json.dumps({"tab": resume["tab"], "step": resume["step"]}, separators=(",", ":"))
+
+
 def _execution_env(execution, args, context=None):
-    _require(isinstance(execution, dict) and set(execution) == {"v", "protocol", "ticket", "argsJson", "argsSha256"})
+    keys = {"v", "protocol", "ticket", "argsJson", "argsSha256"}
+    _require(isinstance(execution, dict) and set(execution) in (keys, keys | {"resume"}))
     _require(type(execution["v"]) is int and execution["v"] == 1 and execution["protocol"] == PROTOCOL)
     raw, digest, ticket = execution["argsJson"], execution["argsSha256"], execution["ticket"]
     _require(isinstance(raw, str) and len(raw.encode("utf-8")) <= 16384
@@ -114,7 +127,10 @@ def _execution_env(execution, args, context=None):
     if context is not None:
         _require(all(_same_json(claims.get(key), value) for key, value in context.items()))
     # 인증·만료·현재 권한의 최종 판정은 실제 claim producer가 맡는다.
-    return {"FOS_APPROVAL_TICKET": ticket, "FOS_APPROVAL_ARGS_JSON": raw}
+    env = {"FOS_APPROVAL_TICKET": ticket, "FOS_APPROVAL_ARGS_JSON": raw}
+    if "resume" in execution:
+        env["FOS_APPROVAL_RESUME_JSON"] = _resume_env(execution["resume"])
+    return env
 
 
 SUMMARY = set("account symbol market currency side quantity orderAmount price orderType timeInForce operation orderId original normalization".split())

@@ -61,6 +61,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 - **채우기**: 원문·ticket 대조 → 상품 탭 → 가격 다시 계산(승인보다 크면 claim 없이 거절) → 「구매하기」 단추가 보일 때까지 대기(안 보이면 claim 없이 거절) → claim → 「구매하기」 → 상품 구매 층에서 옵션·수량 → 「바로구매」 → 주문서(같은 탭이나 새 탭)에서 최종 결제 금액을 읽는다. 주문서 탭을 남기고 금액과 탭을 낸다
 - **결제 단추를 누르는 코드 경로가 없다.** 누르는 식은 스마트스토어·브랜드스토어 주소에서만 누른다. 주문서 탭에서는 준비 상태, 화면 분류, 금액 읽기만 부른다. 결제 단추 선택자는 소스에 없고 검사(`tests/checkout-guard.test.ts`)의 금지 목록에만 있다
 - **금액**: 주문서의 「총 주문금액」 과 결제수단 절 머리의 금액이 같을 때만 최종 금액이다. 이름, 주소, 전화번호 같은 화면 글은 결과와 로그에 싣지 않는다
+- **사람 화면에서 멈출 때**: claim 전에 로그인, 보안 확인, 기기 인증, 예상 밖 화면을 만나거나 로그인 쿠키가 없으면(그 탭을 로그인 화면으로 옮긴다) 탭을 남기고 넘기기 결과에 `resume: {step: "product"}` 를 더한다. Control Plane 은 승인을 끝내지 않고 사람을 기다리며, 사람이 풀고 메시지를 보낸 뒤 에이전트가 `approval_resume` 을 부르면 같은 승인으로 그 탭에서 상품 화면부터 한 번 더 채운다. 탭이 없으면 `NAVER_SHOPPING_TAB_GONE` 이다([browser-cowork 설계](browser-cowork/design.md) 「PR4 이어 가기」)
 - **결과를 모를 때**: 「바로구매」 를 보낸 뒤(층이 확인되기 전의 「구매하기」 뒤 포함) 주문서나 금액을 확인하지 못하면 오류가 아니라 `{status: "UNKNOWN", tab}` 이다. 다시 보내지 않는다. Control Plane 이 그 승인을 `UNKNOWN` 으로 끝내고 탭 확인 카드를 띄운다
 - 주문서 화면은 2026-11-13 실측이고, 상품 구매 층의 옵션·수량 칸은 아직 재지 않았다. 칸 위치는 `src/fields.ts` 에 있다
 
@@ -119,6 +120,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인보다 크다 |
 | `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조나 claim 이 거절됐다 |
 | `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | 「구매하기」 단추가 그려지지 않아 claim 전에 끝났거나, claim 뒤 「바로구매」 전에 멈췄다(층의 옵션이나 수량을 못 맞춤) |
+| `NAVER_SHOPPING_TAB_GONE` | `unavailable` | | 이어 가는 채우기의 남긴 탭이 없다 |
 
 오류 글에 중계 주소, 검색어, 화면 글, 브라우저가 준 원문을 싣지 않는다.
 
@@ -126,7 +128,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 
 로그인, 캡차, 기기 인증, 예상 밖 화면은 오류가 아닌 결과 `{"status": "HUMAN_ACTION_REQUIRED", "message", "handoff": {"code", "need", "tab"}}` 로 끝난다. Hermes 가 같은 서버의 `isError` 결과를 연속 3회 세면 60초 동안 서버를 막아, 사람이 보안 확인을 풀고 돌아와도 다음 호출이 거절되기 때문이다. `code` 는 위 오류 표의 서버 코드이고 `need` 는 `login`, `captcha`, `device_check`, `unexpected_page` 가운데 하나이고 `tab` 은 남긴 탭의 id 다.
 fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기기 카드와 알림이 생긴다. 카드의 「내 브라우저 열기」 가 그 탭을 대화 위 옆 패널에 띄우고([사용자 브라우저](user-browser.md) 의 「대화 위 화면」), 「다 했어요」 가 다음 메시지를 보내 에이전트가 멈춘 도구를 다시 부른다. 카드는 사람이 보낸 turn 이 시작될 때 닫히고, 담당의 결과를 전하는 자동 turn 은 닫지 않는다.
-남긴 탭의 id 는 MCP 서버 프로세스 메모리에만 있고 다음 탭 열기가 닫는다. 결과 모양과 흐름은 [설계](naver-shopping/design.md)의 「PR2 화면 넘기기(REQ7, REQ8)」, 예상 밖 화면은 [사람이 도와야 하는 지점 설계](user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 가 갖는다.
+남긴 탭의 id 는 MCP 서버 프로세스 메모리에만 있고 다음 탭 열기가 닫는다. 카드가 열려 있거나 그 탭에서 이어 가기를 기다리는 동안은 중계가 닫기를 거절하고, 플러그인은 그 실패를 무시한다. 결과 모양과 흐름은 [설계](naver-shopping/design.md)의 「PR2 화면 넘기기(REQ7, REQ8)」, 예상 밖 화면은 [사람이 도와야 하는 지점 설계](user-browser/design.md)의 「PR2 넘기기 어휘 확장과 KTX·블로그 넘기기」 가 갖는다.
 
 ## 보안
 
@@ -157,3 +159,4 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 5. **주문 확인**: 사람이 직접 결제한 뒤 「결제했어요」 를 누른다. 에이전트가 주문 확인을 불러 그 주문을 확인했다고 결제 금액과 함께 알리는지 본다. `AMOUNT_MISMATCH` 나 `NOT_FOUND` 가 나오면 그 profile 의 MCP 표준 오류 기록의 `check_shopping_order` 진단 줄과 「내 브라우저」 의 결제 내역을 보고 `src/fields.ts` 의 `ORDER_HISTORY` 금액 칸과 `src/parse-orders.ts` 의 `ORDER_TIME_GRACE_MS` 를 맞춘다. 결제하지 않고 「결제했어요」 를 눌렀을 때는 결제가 확인되지 않았다고 알리는지 본다
 6. 옵션이 있는 상품(색상·사이즈 표준옵션 상품 포함)으로 2~4 를 한 번 더 돈다. 표준옵션 상품의 카드는 옵션 추가 금액을 0 으로 계산한 예상 합계를 보인다. 실제 추가 금액이 있으면 주문서 금액이 커서 결제 넘기기 없이 「승인보다 커서 넘기지 않았다」 로 끝나는지 본다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다. 채우기가 어느 단계에서 멈췄는지는 그 profile 의 MCP 표준 오류 기록의 `fill_checkout` 진단 줄로 본다(설계의 「채우기 진단」)
 7. 하루 상한을 오늘 승인한 합계보다 작게 낮춘 뒤 다시 사 달라고 해, 카드 없이 걸린 상한과 남은 한도를 알리는지 본다
+8. **로그인에서 멈춘 뒤 이어 가기**: 「내 브라우저」 에서 네이버를 로그아웃한 채 싼 상품의 주문서 채우기를 승인한다. 승인 카드가 「「내 브라우저」에서 멈췄어요」 로 바뀌고 로그인 카드와 알림이 뜨는지 본다. 그 탭에서 로그인한 뒤 「다 했어요」 를 누르면 새 승인 카드 없이 주문서까지 가고 결제 넘기기 카드가 뜨는지 본다. 결제는 하지 않는다. 30분을 넘겨 「다 했어요」 를 누르면 이어 가지 않고 새로 준비하는지 본다

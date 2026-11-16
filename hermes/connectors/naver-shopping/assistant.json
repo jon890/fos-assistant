@@ -108,6 +108,7 @@
     "NAVER_SHOPPING_CHECKOUT_FAILED": {
       "category": "unavailable",
       "recovery": "retry_later"
-    }
+    },
+    "NAVER_SHOPPING_TAB_GONE": "unavailable"
   }
 }
