@@ -22,6 +22,7 @@ import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.nextturn.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.nextturn.application.PendingMessageService;
 import com.bifos.assistant.chat.nextturn.application.SteerLedger;
+import com.bifos.assistant.chat.recovery.application.RecoveredRunRecorder;
 import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
@@ -80,6 +81,9 @@ class SteerSettleTest {
 
     @Autowired
     SteerLedger ledger;
+
+    @Autowired
+    RecoveredRunRecorder recorder;
 
     @Autowired
     TurnCancellation turns;
@@ -342,7 +346,7 @@ class SteerSettleTest {
         ChatMessage left = messages.save(ChatMessage.fromSteer(
             conversation.id(), dad.id(), "돌아올 글", executionId, SteerState.DELIVERED, null, Instant.now()));
 
-        ledger.settle(executionId, conversation.id(), SteerSettlement.completed("돌아올 글"));
+        recorder.settle(executionId, result("completed", "돌아올 글"));
 
         assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.CARRIED_OVER);
         assertThat(pendingRows.read(conversation.id()).carriedMessageIds()).containsExactly(left.id());

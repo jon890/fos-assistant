@@ -10,7 +10,8 @@ import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.infra.RunningDelegationQueries;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ public class SteerService {
     private final TurnCancellation turns;
     private final HermesRunsClient hermes;
     private final SteerLedger ledger;
-    private final AgentExecutionRepository executions;
+    private final RunningDelegationQueries delegations;
 
 
     /**
@@ -99,6 +100,6 @@ public class SteerService {
         if (handle.getOpenSubagents().get() > 0) {
             return SteerChild.SUBAGENT;
         }
-        return executions.existsRunningDelegation(conversation.id()) ? SteerChild.DELEGATION : null;
+        return delegations.existsByConversationIdAndStatusAndDelegationKeyIsNotNull(conversation.id(), ExecutionStatus.RUNNING) ? SteerChild.DELEGATION : null;
     }
 }

@@ -298,8 +298,7 @@ public class ChatService {
             if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
-            if (question.steerState() != null) {
-                // steer 말풍선이 낀 답은 다시 만들지 않는다(ADR-20261116 / run-steer). 다시 생성을 없애면 이 제약도 사라진다.
+            if (question.steerState() != null) { // steer 말풍선이 낀 답은 다시 만들지 않는다(ADR-20261116 / run-steer)
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest answer has a steered message");
             }
             mentionLines.requireRegenerable(conversation, previousAnswer, question);

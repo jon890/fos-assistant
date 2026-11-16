@@ -46,9 +46,9 @@
 
 `ChatEvent.steer(UUID conversationId, Long messageId, String text, SteerState state, SteerChild child, Long executionId)` 와 직렬화 칸. 기존 `user` 사건 생성자를 본보기로 한다.
 
-### 4. `AgentExecutionRepository.existsRunningDelegation(Long conversationId)`
+### 4. `RunningDelegationQueries.existsByConversationIdAndStatusAndDelegationKeyIsNotNull`
 
-`select count(e) > 0 from AgentExecution e where e.conversationId = :conversationId and e.status = RUNNING and e.delegationKey is not null`.
+`usage/execution/infra` 의 새 저장소 인터페이스다. `AgentExecutionRepository` 는 파일 길이 상한(500줄)에 닿아 따로 둔다.
 
 ### 5. `chat/nextturn/application/SteerLedger.java`(신규)
 
@@ -57,7 +57,7 @@
 ### 6. `chat/nextturn/application/SteerService.java`(신규)
 
 - `boolean eligible(CurrentUser user, Conversation conversation, String text, boolean requested)`: 설정, `requested`, 스킬 커맨드 아님, 그 대화의 handle 있음, intent 가 `TurnIntent.Fresh`·`Regenerate`·`DelegationResults`, 루트 run 있음, `steerSettled` 거짓. 잠금 밖의 빠른 판정이다.
-- `void steer(Conversation conversation, Long pendingId, String text, Long userId)`: handle 을 다시 얻고 `steerLock` 안에서 `steerSettled` 를 본다. 정리됐으면 `ledger.reject`. 아니면 `hermes.steer`. `ACCEPTED` → child 를 정해(하위 에이전트 수 > 0 이면 `SUBAGENT`, 아니면 `existsRunningDelegation` 이면 `DELEGATION`, 아니면 null) `ledger.accept`. `REJECTED` → `ledger.reject`. `UNKNOWN` → `ledger.unknown`.
+- `void steer(Conversation conversation, Long pendingId, String text, Long userId)`: handle 을 다시 얻고 `steerLock` 안에서 `steerSettled` 를 본다. 정리됐으면 `ledger.reject`. 아니면 `hermes.steer`. `ACCEPTED` → child 를 정해(하위 에이전트 수 > 0 이면 `SUBAGENT`, 아니면 그 대화에 도는 맡긴 실행이 있으면 `DELEGATION`, 아니면 null) `ledger.accept`. `REJECTED` → `ledger.reject`. `UNKNOWN` → `ledger.unknown`.
 
 ### 7. `PendingMessageService`·컨트롤러·`NextTurnDispatcher`
 
@@ -90,7 +90,7 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*SteerSer
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/SteerView.java` | 신규 |
 | `backend/src/test/resources/application-test.yml` | 수정(steer 켬) |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/ChatEvent.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/AgentExecutionRepository.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/execution/infra/RunningDelegationQueries.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/config/SteerProperties.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/SteerLedger.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/chat/nextturn/application/SteerService.java` | 신규 |

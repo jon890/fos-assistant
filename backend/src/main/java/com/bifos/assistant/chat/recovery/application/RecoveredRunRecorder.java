@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.recovery.application;
 
+import com.bifos.assistant.chat.nextturn.application.SteerLedger;
+import com.bifos.assistant.chat.turn.application.dto.SteerSettlement;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
 import com.bifos.assistant.chat.nextturn.application.port.DelegationOutputClip;
 import com.bifos.assistant.chat.recovery.application.port.RecoveredAnswerGuard;
@@ -84,6 +86,7 @@ public class RecoveredRunRecorder {
     private final ConversationEventHub hub;
     private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
+    private final SteerLedger steerLedger;
     /** 답을 그대로 남기면 안 되는 turn 을 가린다. 구현이 없으면 모든 답을 남긴다. */
     private final List<RecoveredAnswerGuard> answerGuards;
 
@@ -100,17 +103,34 @@ public class RecoveredRunRecorder {
      * {@code RUNNING} 으로 남으므로 부르는 쪽이 다시 적을 수 있다.
      */
     public boolean settle(Long executionId, HermesRunResult result) {
-        return finishOnce(
+        boolean finished = finishOnce(
             executionId,
             row -> agents.findById(row.agentId())
                 .map(agent -> settleLocked(row, agent, result))
                 .orElseGet(() -> failLocked(row, ORPHANED)));
+        settleSteer(executionId, result == null ? SteerSettlement.unknown()
+            : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped()
+                : SteerSettlement.completed(result.pendingSteer()));
+        return finished;
     }
 
 
     /** Hermes 의 결과 없이 FAILED 로 적는다. 이미 끝난 줄이면 거짓이다. 끝 사건의 detail 은 그 오류 코드다. */
     public boolean failWithout(Long executionId, String errorCode) {
-        return finishOnce(executionId, row -> failLocked(row, errorCode));
+        boolean finished = finishOnce(executionId, row -> failLocked(row, errorCode));
+        settleSteer(executionId, SteerSettlement.unknown());
+        return finished;
+    }
+
+
+    /**
+     * 정한 줄이 대화 turn 의 루트면 그 turn 의 steer 말풍선을 끝난 방식대로 정리한다(ADR-20261116 / run-steer). 자식 줄은 말풍선이
+     * 없다. 정리는 실패해도 예외를 올리지 않는다.
+     */
+    private void settleSteer(Long executionId, SteerSettlement settlement) {
+        executionRepository.findById(executionId)
+            .filter(row -> row.id().equals(row.treeRootId()) && row.conversationId() != null)
+            .ifPresent(row -> steerLedger.settle(row.id(), row.conversationId(), settlement));
     }
 
 

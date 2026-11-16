@@ -72,7 +72,7 @@ void announce(Conversation conversation, List<Long> messageIds);  // 트랜잭�
 
 ### 7. 기동 정리와 재시작 정리
 
-`RestartReconciler.settleByAsking` 이 루트 줄(`row.id().equals(row.treeRootId())`)을 정하면 `FINISHED` 는 결과 상태로(`cancelled` 면 `STOPPED`, 아니면 `COMPLETED(pendingSteer)`), `NOT_FOUND`·상한 초과는 `UNKNOWN` 으로 `steerLedger.settle(rootExecutionId, conversationId, ...)` 를 부른다.
+`RestartReconciler` 는 파일 길이 기준에 닿아 고치지 않는다. 재시작 정리가 줄을 적는 `RecoveredRunRecorder.settle`·`failWithout` 이 루트 줄(`row.id().equals(row.treeRootId())`)을 정하면 `FINISHED` 는 결과 상태로(`cancelled` 면 `STOPPED`, 아니면 `COMPLETED(pendingSteer)`), `NOT_FOUND`·상한 초과는 `UNKNOWN` 으로 `steerLedger.settle(rootExecutionId, conversationId, ...)` 를 부른다.
 
 ### 8. 이력
 
@@ -112,6 +112,6 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*SteerSet
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/TurnIntent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatDtos.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatController.java` | 수정(이력의 steer 칸) |
-| `backend/src/main/java/com/bifos/assistant/chat/recovery/application/RestartReconciler.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/recovery/application/RecoveredRunRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageRepository.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/SteerSettleTest.java` | 신규 |

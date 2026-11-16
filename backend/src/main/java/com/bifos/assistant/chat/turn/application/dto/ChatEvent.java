@@ -61,6 +61,7 @@ public record ChatEvent(
             delegation, deliveredResults, null);
     }
 
+
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
         Long messageId, Long executionId, String code, String message,
         String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,

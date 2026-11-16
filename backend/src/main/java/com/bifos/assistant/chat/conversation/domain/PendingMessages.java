@@ -53,7 +53,7 @@ public record PendingMessages(boolean held, List<PendingMessage> items) {
 
     /** 상한을 세는 글의 수다. 말풍선이 이미 있는 글은 세지 않는다(ADR-20261116 / run-steer). */
     public int countable() {
-        return (int) items.stream().filter(item -> !item.carried()).count();
+        return (int)items.stream().filter(item -> !item.carried()).count();
     }
 
 

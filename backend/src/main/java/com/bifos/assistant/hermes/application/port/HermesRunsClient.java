@@ -1,7 +1,5 @@
 package com.bifos.assistant.hermes.application.port;
 
-import com.bifos.assistant.hermes.application.dto.SteerOutcome;
-
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;

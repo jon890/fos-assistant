@@ -82,8 +82,7 @@ public class SteerLedger implements TurnSteerLedger {
     private void settleRows(Long rootExecutionId, Long conversationId, SteerSettlement settlement) {
         try {
             List<ChatMessage> changed = transactions.execute(status -> {
-                List<ChatMessage> delivered =
-                    messages.findBySteerExecutionIdAndSteerStateOrderByIdAsc(rootExecutionId, SteerState.DELIVERED);
+                List<ChatMessage> delivered = messages.findBySteerExecutionIdAndSteerStateOrderByIdAsc(rootExecutionId, SteerState.DELIVERED);
                 if (delivered.isEmpty()
                     || settlement.kind() == SteerSettlement.Kind.COMPLETED && settlement.pendingSteer() == null) {
                     return List.<ChatMessage>of();

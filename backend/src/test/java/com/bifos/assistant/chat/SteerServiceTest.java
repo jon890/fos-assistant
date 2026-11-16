@@ -326,7 +326,7 @@ class SteerServiceTest {
     @Test
     @DisplayName("설정이 꺼져 있으면 끼울 수 없다고 본다")
     void disabledSettingNeverSteers() {
-        SteerService disabled = new SteerService(new SteerProperties(false), turns, hermes, null, executions);
+        SteerService disabled = new SteerService(new SteerProperties(false), turns, hermes, null, null);
 
         assertThat(disabled.eligible(conversation, "글", true)).isFalse();
     }
