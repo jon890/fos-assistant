@@ -25,8 +25,8 @@ class BrowserPropertiesTest {
         assertThatThrownBy(() -> new BrowserProperties(
             false, null, null, null, null, null, null, null, 1024, null, null, null, 2,
             Duration.ofMinutes(10), Duration.ofSeconds(30), Duration.ofMinutes(30), Duration.ofMinutes(5), null, null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("wait-hold-timeout");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("wait-hold-timeout");
     }
 
 

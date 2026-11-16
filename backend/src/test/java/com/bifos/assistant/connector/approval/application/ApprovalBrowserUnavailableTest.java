@@ -191,7 +191,7 @@ class ApprovalBrowserUnavailableTest {
     private static void assertUnavailable(Runnable approve) {
         assertThatThrownBy(approve::run)
             .isInstanceOf(ApiException.class)
-            .extracting(ex -> ((ApiException) ex).code())
+            .extracting(ex -> ((ApiException)ex).code())
             .isEqualTo(ErrorCode.CONNECTOR_BROWSER_UNAVAILABLE);
     }
 

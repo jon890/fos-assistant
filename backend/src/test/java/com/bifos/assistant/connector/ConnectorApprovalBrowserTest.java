@@ -41,8 +41,7 @@ class ConnectorApprovalBrowserTest {
     private final ConnectorActionRepository actions = mock(ConnectorActionRepository.class);
     private final ConnectorCatalogCache catalog = mock(ConnectorCatalogCache.class);
     private final UserBrowserService browsers = mock(UserBrowserService.class);
-    private final ConnectorApprovalBrowser approvalBrowser =
-        new ConnectorApprovalBrowser(actions, catalog, browsers, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final ConnectorApprovalBrowser approvalBrowser = new ConnectorApprovalBrowser(actions, catalog, browsers, Clock.fixed(NOW, ZoneOffset.UTC));
 
 
     @BeforeEach
@@ -116,7 +115,7 @@ class ConnectorApprovalBrowserTest {
     private void assertCode(ErrorCode code) {
         assertThatThrownBy(() -> approvalBrowser.require(USER, ACTION))
             .isInstanceOf(ApiException.class)
-            .extracting(ex -> ((ApiException) ex).code())
+            .extracting(ex -> ((ApiException)ex).code())
             .isEqualTo(code);
     }
 
