@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import os
 
 from .connector_guard import EXECUTION_ENV, _guard_checkout, _guard_endpoint, _guard_support, _strict_json, _guard_hide_financial
 from .connector_guard_validation import GuardRejected, _bounded, _execution_env, _prepare_result, _require, _stage
+from .connector_child_log import child_errlog
 from .connector_policy import _hermes_tool_name
 
 
@@ -66,11 +66,12 @@ async def _guard_operation(profile, manifest, entry, body, env, prepare=False):
     return tool
 
 
-async def _run_connector_prepare(manifest, tool, args, env):
+async def _run_connector_prepare(manifest, tool, args, env, diagnostics=None):
+    """준비 도구를 부른다. `diagnostics` 는 자식의 진단 줄을 더할 profile 디렉터리다(`child_errlog`)."""
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
     server = manifest["server"]
-    with open(os.devnull, "w", encoding="utf-8") as sink:
+    with child_errlog(diagnostics) as sink:
         async with stdio_client(StdioServerParameters(command=server["command"], args=list(server["args"]), env=env), errlog=sink) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()

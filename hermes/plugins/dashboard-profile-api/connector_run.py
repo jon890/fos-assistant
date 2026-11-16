@@ -357,8 +357,9 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
     try:
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스나 원격 연결을 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(
-            _run_connector_prepare(manifest, guarded_tool, body["args"], env) if prepare else
-            _run_connector_execute(manifest, hermes_tool, body["args"], env, progress, CONNECTOR_EXECUTE_TIMEOUT_SECONDS),
+            _run_connector_prepare(manifest, guarded_tool, body["args"], env, profile_dir) if prepare else
+            _run_connector_execute(manifest, hermes_tool, body["args"], env, progress, CONNECTOR_EXECUTE_TIMEOUT_SECONDS,
+                                   profile_dir),
             2 if prepare else CONNECTOR_EXECUTE_TIMEOUT_SECONDS)
         answer = (_prepare_answer(result, body["args"], manifest, guarded_tool, env) if prepare else
                   None if result is None else _connector_execute_answer(manifest, result))
