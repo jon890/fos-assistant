@@ -22,7 +22,10 @@ export type ErrorCode =
  * 모양은 docs/features/naver-shopping/design.md 의 「플러그인 결과(공통 계약)」 가 갖는다.
  */
 export type Handoff =
-  | { need: "login" | "captcha" | "device_check" | "unexpected_page"; tab: string }
+  | {
+      need: "login" | "captcha" | "device_check" | "unexpected_page";
+      tab: string;
+    }
   /** 사람이 브라우저를 쥐어 중계가 거절했다. 탭을 만들기 전이면 탭이 없다(fos-assistant ADR-20261116 / browser-lock). */
   | { need: "human_browser"; tab?: string };
 

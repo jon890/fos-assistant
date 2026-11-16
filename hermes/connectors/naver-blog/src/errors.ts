@@ -52,14 +52,14 @@ export function handoffResult(code: ErrorCode, handoff: Handoff) {
   return toolSuccess({
     status: "HUMAN_ACTION_REQUIRED",
     message:
-            handoff.need === "human_browser"
-              ? HUMAN_BROWSER_MESSAGE
-              : HANDOFF_MESSAGE,
+      handoff.need === "human_browser"
+        ? HUMAN_BROWSER_MESSAGE
+        : HANDOFF_MESSAGE,
     handoff: {
-            code,
-            need: handoff.need,
-            ...(handoff.tab ? { tab: handoff.tab } : {}),
-          },
+      code,
+      need: handoff.need,
+      ...(handoff.tab ? { tab: handoff.tab } : {}),
+    },
   });
 }
 
