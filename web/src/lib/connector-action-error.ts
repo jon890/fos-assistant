@@ -2,6 +2,8 @@
 export const CONNECTOR_ACTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_ACTION_NOT_PENDING: "이미 처리된 요청이에요.",
   CONNECTOR_ACTION_NOT_FOUND: "요청을 찾지 못했어요.",
+  CONNECTOR_BROWSER_UNAVAILABLE:
+    "브라우저를 켤 수 없어요. 잠시 뒤 다시 승인해 주세요.",
   FINANCIAL_LIMIT_EXCEEDED:
     "주문 상한에 걸려 승인하지 못했어요. 카드에서 남은 한도를 확인해 주세요.",
   FINANCIAL_LIMIT_ABOVE_MAXIMUM: "최대치보다 큰 값은 정할 수 없어요.",

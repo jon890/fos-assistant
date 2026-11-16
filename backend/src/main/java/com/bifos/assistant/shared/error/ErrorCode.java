@@ -248,6 +248,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 승인 줄은 이미 승인, 거절, 만료 가운데 하나로 끝났다. 같은 승인을 두 번 눌러도 실행은 한 번이다. */
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
+    /** 「내 브라우저」 를 쓰는 플러그인의 승인 줄인데 그 사용자의 브라우저를 켜지 못했다. 줄은 기다림 그대로라 다시 승인할 수 있다. */
+    CONNECTOR_BROWSER_UNAVAILABLE(HttpStatus.CONFLICT),
     /** 금융 주문이 적용 상한에 걸렸다. 다른 금융 거절과 달리 걸린 상한을 감추지 않는다(ADR-20261015 / financial-user-limits). */
     FINANCIAL_LIMIT_EXCEEDED(HttpStatus.CONFLICT),
     /** 바꾸려는 주문 상한이 운영 최대치보다 크다. 저장하지 않는다(ADR-20261015 / financial-user-limits). */
