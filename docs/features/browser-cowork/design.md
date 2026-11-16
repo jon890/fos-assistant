@@ -47,14 +47,14 @@ UserBrowserSweeper.stopIdle
   - 열린 넘기기: 그 사용자의 판정 줄 가운데 `handoff_need` 가 있고 `handoff_closed_at` 이 비었으며, 대화(`conversation_id`)가 있고 `handoff_at` 이 `since` 이후인 줄. 넘기기를 닫는 길은 그 대화의 사람 turn 뿐이라, 대화 밖 실행의 넘기기나 버려진 대화의 카드는 끝없이 열려 있다. 브라우저가 다시 켜졌으면 그 탭도 이미 없다. 이 둘을 빼야 기다림이 영구히 참이 되지 않는다. 넘기기는 「내 브라우저」 를 쓰는 플러그인만 낸다. 결제(`payment`)와 탭 확인 넘기기도 들어간다. 사람이 그 탭에서 결제해야 하기 때문이다
   - 기다리는 승인: 그 사용자의 `PENDING` 이고 `expires_at` 이 지나지 않은 승인 줄 가운데, 그 플러그인의 manifest 가 `owner_browser_env` 를 선언한 줄(`ConnectorManifest#ownerBrowser`). 카탈로그를 읽지 못하면 기다리는 것으로 본다. 잘못 보아도 30분 뒤 꺼지므로 켜 두는 쪽이 안전하다
   - 사람 기다림 승인은 PR4, 사람 잠금은 PR3 이 같은 포트에 더한다
-- **설정** `assistant.browser.wait-hold-timeout`, 기본 `30m`, `BrowserProperties` 에 더하고 `idle-timeout` 이상이어야 한다(작으면 기동을 멈춘다). 값은 사용자 결정(spec DECISION10)이다.
+- **설정** `assistant.browser.wait-hold-timeout`, 기본 `30m`, `BrowserProperties` 에 더하고 `idle-timeout` 이상이어야 한다(작으면 기동을 멈춘다). 값은 사용자 결정(spec DECISION10)이다. 점검은 `LiveProperties<BrowserProperties>` 에서 직접 읽는다. `UserBrowserService` 는 파일 길이 상한(rule-44)에 닿아 메서드를 더하지 않는다.
 - **사람이 끄기·지우기, 관리자 끄기, 사용자 끄기**는 자동 중지를 거치지 않으므로 그대로 바로 끈다.
 - 데이터는 바꾸지 않는다. 기존 칸(`connector_action` 의 `status`, `expires_at`, `handoff_at`, `handoff_closed_at`, `user_browser.last_active_at`)만 읽는다.
 
 ### PR1 승인할 때 브라우저를 켜지 못하면(REQ2)
 
 ```text
-ConnectorActionController.approve(원고 저장 승인과 일반 승인으로 가르기 전)
+ConnectorActionService.approve(상한 변경 줄을 가른 뒤) / ContentDraftSaveApproval.approve(처음)
   ConnectorApprovalBrowser.require(user, actionId)
     줄이 없거나 남의 것이거나 PENDING 이 아니거나 기다리는 시간이 지났으면 아무것도 하지 않는다(뒤의 기존 판정이 답한다)
     그 플러그인 manifest 가 owner_browser_env 를 선언하지 않았으면 아무것도 하지 않는다
@@ -62,11 +62,13 @@ ConnectorActionController.approve(원고 저장 승인과 일반 승인으로 �
       성공: UserBrowserService.touch(userId) 로 활동을 기록하고 지나간다(ensureRunning 은 활동을 기록하지 않는다)
       ApiException(BROWSER_CAPACITY | BROWSER_START_FAILED | BROWSER_BUSY | BROWSER_STOP_FAILED | BROWSER_NOT_FOUND):
         CONNECTOR_BROWSER_UNAVAILABLE 로 던진다
+      그 밖의 RuntimeException(프로필 디렉터리 준비 실패 등): CONNECTOR_BROWSER_UNAVAILABLE 로 던진다. 로그에는 예외 종류만 남긴다
       ApiException(BROWSER_DISABLED): 바꾸지 않고 그대로 던진다. 기능이 꺼진 것이라 「잠시 뒤 다시」 가 맞지 않는다
   (기존) 승인 트랜잭션, 실행
 ```
 
-- 승인 진입점은 `ConnectorActionController.approve` 하나다. 그 안에서 원고 저장 승인(네이버 블로그가 브라우저를 쓴다)과 일반 승인(그 아래 상한 변경, 금융·구매)으로 갈리므로, 가르기 전에 한 번 부르면 브라우저 플러그인 승인을 빠짐없이 덮는다. 상한 변경 줄은 브라우저 플러그인의 줄이 아니라 manifest 판정에서 지나간다.
+- 승인 진입점은 `ConnectorActionController.approve` 하나이고, 그 안에서 원고 저장 승인(네이버 블로그가 브라우저를 쓴다)과 일반 승인(`ConnectorActionService.approve`)으로 갈린다. 일반 승인은 다시 상한 변경, 금융·구매, 일반 쓰기로 갈린다.
+- 상한 변경 줄은 빼야 한다. 그 줄의 `connectorId` 는 금융 보호를 선언한 플러그인이라 쇼핑이면 manifest 가 `owner_browser_env` 도 선언하지만, 승인은 DB 의 상한만 바꾸고 브라우저를 쓰지 않는다. 그래서 `ConnectorActionService.approve` 에서 상한 변경 줄을 가른 뒤, 금융·구매와 일반 쓰기로 가르기 전에 부르고, `ContentDraftSaveApproval.approve` 의 처음에서도 부른다.
 - 부품은 `connector` 의 `action` 하위 기능(`action/application`)에 둔다. 하위 기능 순서(rule-76, `SubFeatureOrder`)에서 `approval` 과 `contentdraft` 보다 아래라 어느 쪽에서도 쓸 수 있고, 줄 저장소와 manifest 읽기가 같은 하위 기능에 있다. `approval/application` 은 파일 수 상한(rule-75)에 가깝다.
 - 새 오류 코드 `CONNECTOR_BROWSER_UNAVAILABLE` 은 409 다. 줄이 기다림 그대로라 다시 누를 수 있다는 뜻이다. 오류 본문의 글은 웹이 쓰지 않는다.
 - 웹은 `web/src/lib/connector-action-error.ts` 의 문구 표에 그 코드와 「브라우저를 켤 수 없어요. 잠시 뒤 다시 승인해 주세요.」 를 더한다. 승인 카드는 이미 실패한 `message` 를 보이고 줄을 다시 읽는다.
@@ -128,7 +130,7 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 | DECISION2 | 30분의 기준 | 브라우저의 마지막 활동(`last_active_at`) | 작성자 | 스펙 REQ1 이 「마지막 활동에서 30분」 이다. 새 칸이 필요 없다 |
 | DECISION3 | 30분 값을 두는 곳 | 설정 `assistant.browser.wait-hold-timeout`, 기본 30분 | 작성자 | 10분 값과 같은 자리라 운영에서 함께 본다. 값은 사용자 결정(spec DECISION10) |
 | DECISION4 | 카탈로그를 읽지 못할 때 | 기다리는 승인은 기다림으로 센다 | 작성자 | 잘못 세어도 30분 상한이 있고, 반대로 틀리면 승인 직전 꺼지는 2026-11-16 의 문제가 돌아온다 |
-| DECISION5 | 승인 때 켜는 자리 | 승인 트랜잭션보다 먼저, `ConnectorActionController.approve` 가 원고 저장과 일반 승인으로 가르기 전. 부품은 `connector/action/application` | 작성자 | 켜기가 30초까지 걸려 잠금을 쥔 채 기다리지 않는다. 진입점 하나에서 금융·구매와 일반 승인, 원고 저장이 같은 판정을 받는다. `action` 은 하위 기능 순서(rule-76)에서 두 승인보다 아래다 |
+| DECISION5 | 승인 때 켜는 자리 | 승인 트랜잭션보다 먼저, `ConnectorActionService.approve` 의 상한 변경 분기 뒤와 `ContentDraftSaveApproval.approve` 의 처음. 부품은 `connector/action/application` | 작성자 | 켜기가 30초까지 걸려 잠금을 쥔 채 기다리지 않는다. 브라우저를 쓰는 승인(금융·구매, 일반 쓰기, 원고 저장)만 판정받고, 브라우저를 쓰지 않는 상한 변경은 빠진다. `action` 은 하위 기능 순서(rule-76)에서 `approval`, `contentdraft` 보다 아래라 두 곳에서 쓸 수 있다 |
 | DECISION6 | 켜지 못할 때의 응답 | 409 `CONNECTOR_BROWSER_UNAVAILABLE`. 웹이 정해 둔 문구를 보인다 | 작성자 | 기존 승인 오류처럼 웹이 코드로 문구를 고르고 원문을 보이지 않는다(`connector-action-error.ts`). 409 는 다시 시도할 수 있는 상태 충돌이라는 뜻이다 |
 | DECISION7 | PR1 의 웹 변경 | 오류 문구 표 한 줄을 더한다 | 작성자 | 스펙의 PR1 은 「backend 만」 이지만 REQ2 의 인수 조건(카드에 그 문구)을 지키려면 문구 표 한 줄이 필요하다. 화면 구조는 바꾸지 않는다 |
 | DECISION8 | 에이전트 탭을 아는 방법(PR2) | 중계에서 열린 `devtools/page` 연결 | 작성자 | 플러그인이 일하는 동안만 열고 끝나면 닫는다. 플러그인과 Hermes 를 바꾸지 않고 안다 |
