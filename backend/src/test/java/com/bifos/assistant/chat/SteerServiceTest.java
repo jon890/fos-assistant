@@ -235,6 +235,37 @@ class SteerServiceTest {
 
 
     @Test
+    @DisplayName("받은 뒤 저장이 실패해도 끼우는 중이 남지 않고 다음 turn 을 정할 때 확인 못 함으로 정리한다")
+    void saveFailureAfterSteerDoesNotLeaveSteering() throws InterruptedException {
+        Thread running = startRunningTurn("질문");
+        String[] saved = new String[1];
+        stub().beforeSteer(() -> {
+            // 받은 응답을 저장하는 순간 대기 줄을 읽지 못하게 깨 둔다.
+            saved[0] = jdbc.queryForObject(
+                "SELECT pending_messages FROM conversation WHERE id = ?", String.class, conversation.id());
+            jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", "{\"version\":9}", conversation.id());
+        });
+
+        try {
+            pending.enqueue(dad, conversation.id(), "저장 실패할 글", true);
+        } catch (RuntimeException ignored) {
+            // 깨진 대기 줄을 응답으로 읽다 실패한다. 단언은 아래에서 한다.
+        }
+        assertThat(steerBubbles()).as("받은 응답의 말풍선은 저장되지 않았다").isEmpty();
+
+        jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", saved[0], conversation.id());
+        assertThat(pendingRows.read(conversation.id()).blockedBySteering()).isTrue();
+        dispatcher.tryNext(conversation.id());
+
+        assertThat(steerBubbles()).extracting(ChatMessage::steerState).containsExactly(SteerState.UNCONFIRMED);
+        PendingMessages queue = pendingRows.read(conversation.id());
+        assertThat(queue.blockedBySteering()).isFalse();
+        assertThat(queue.held()).isTrue();
+        finish(running);
+    }
+
+
+    @Test
     @DisplayName("대기 줄에 글이 있으면 새 글은 끼우지 않고 뒤에 더한다")
     void doesNotSteerWhenQueueIsNotEmpty() throws InterruptedException {
         Thread running = startRunningTurn("질문");

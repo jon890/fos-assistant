@@ -19,6 +19,7 @@ import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,9 @@ public class SteerLedger implements TurnSteerLedger {
      * 메모리에만 둔다. 서버가 다시 뜨면 잊고, 그 말풍선은 「전달됨」 으로 남는다.
      */
     private final Map<Long, Map<Long, SteerSettlement>> unsettled = new ConcurrentHashMap<>();
+
+    /** 끼우기 결과를 저장하지 못해 「끼우는 중」 글이 남았을 수 있는 대화다. 다음 {@code tryNext} 가 받았는지 모르는 글로 정리한다. */
+    private final Set<Long> staleSteering = ConcurrentHashMap.newKeySet();
 
 
     /**
@@ -144,6 +148,20 @@ public class SteerLedger implements TurnSteerLedger {
         if (failed != null) {
             failed.forEach((executionId, settlement) -> settle(executionId, conversationId, settlement));
         }
+        if (staleSteering.remove(conversationId)) {
+            try {
+                resolveStaleSteering(conversationId);
+            } catch (RuntimeException ex) {
+                staleSteering.add(conversationId);
+                throw ex;
+            }
+        }
+    }
+
+
+    /** 끼우기 결과를 저장하지 못한 대화를 적어 둔다. 다음 {@code tryNext} 가 남은 「끼우는 중」 글을 정리한다. */
+    public void markStaleSteering(Long conversationId) {
+        staleSteering.add(conversationId);
     }
 
 

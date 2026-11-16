@@ -77,11 +77,38 @@ public class SteerService {
                 ledger.reject(conversation, pendingId);
                 return;
             }
-            switch (outcome) {
-                case ACCEPTED -> ledger.accept(conversation, pendingId, text, userId, executionId, childOf(handle, conversation));
-                case REJECTED -> ledger.reject(conversation, pendingId);
-                case UNKNOWN -> ledger.unknown(conversation, pendingId, text, userId, executionId);
+            try {
+                switch (outcome) {
+                    case ACCEPTED -> ledger.accept(conversation, pendingId, text, userId, executionId, childOf(handle, conversation));
+                    case REJECTED -> ledger.reject(conversation, pendingId);
+                    case UNKNOWN -> ledger.unknown(conversation, pendingId, text, userId, executionId);
+                }
+            } catch (RuntimeException ex) {
+                // 저장이 실패하면 「끼우는 중」 이 남아 그 대화의 다음 turn 이 막힌다. 받았는지 모르는 글로 정리를 다시 해 보고,
+                // 그마저 실패하면 다음 tryNext 가 정리하게 적어 둔다.
+                log.warn("끼우기 결과를 저장하지 못했다 conversationId={} outcome={}", conversation.id(), outcome, ex);
+                recoverAfterSaveFailure(conversation, pendingId, text, userId, executionId, outcome);
             }
+        }
+    }
+
+
+    /**
+     * 끼우기 결과를 저장하지 못했을 때 「끼우는 중」 을 남기지 않는다. 거절이면 표시만 다시 지워 보고, 받음과 모름이면 받았는지 모르는 글로
+     * 정리한다(같은 지시를 두 번 보내지 않는다). 그마저 실패하면 {@link SteerLedger#markStaleSteering} 로 적어 다음 turn 을 정할 때
+     * 정리한다.
+     */
+    private void recoverAfterSaveFailure(
+        Conversation conversation, Long pendingId, String text, Long userId, Long executionId, SteerOutcome outcome) {
+        try {
+            if (outcome == SteerOutcome.REJECTED) {
+                ledger.reject(conversation, pendingId);
+            } else {
+                ledger.unknown(conversation, pendingId, text, userId, executionId);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("끼우기 결과 정리도 실패해 다음 차례에 다시 정리한다 conversationId={}", conversation.id(), ex);
+            ledger.markStaleSteering(conversation.id());
         }
     }
 
