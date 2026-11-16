@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.hermes.application.dto.SessionRuntime;
+import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.domain.SubagentSessionUsage;
 
 /**
@@ -22,6 +23,17 @@ public interface HermesRunsClient {
 
     /** 그 실행을 멈추라고 보낸다. */
     void stop(String apiBaseUrl, String profileName, String runId);
+
+
+    /**
+     * 도는 실행에 글 하나를 끼워 넣으라고 보낸다({@code POST /v1/runs/{run_id}/steer}).
+     *
+     * <p>받음은 슬롯에 넣었다는 뜻이지 모델이 읽었다는 뜻이 아니다. 넣지 못하고 끝나면 끝난 결과의
+     * {@link HermesRunResult#pendingSteer()} 로 돌아온다. steer 를 모르는 구현은 끼우지 않는다.
+     */
+    default SteerOutcome steer(String apiBaseUrl, String profileName, String runId, String text) {
+        return SteerOutcome.REJECTED;
+    }
 
 
     /**

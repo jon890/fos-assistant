@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.turn.application;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.SkillCommand;
+import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.chat.attachment.application.AttachmentService;
 import com.bifos.assistant.chat.conversation.application.ConversationAccess;
@@ -54,6 +55,7 @@ class ChatTurnRouting {
     private final PendingMessageStore pendingMessages;
     private final UserExecutionLimiter limiter;
     private final ChatConversationQueries chatConversationQueries;
+    private final TurnSteerLedger steerLedger;
 
 
     /**
@@ -290,10 +292,22 @@ class ChatTurnRouting {
         }
         // 맡김 질문은 사용자가 바로 보낸 질문과 같게 저장한다. 대기 줄에서 꺼내지 않는다.
         List<Long> pendingIds = intent instanceof TurnIntent.Fresh fresh ? fresh.pendingIds() : List.of();
+        // 이미 대화에 보인 steer 말풍선은 새 메시지로 다시 남기지 않고 「다음 차례로 넘어감」 으로 바꾼다(ADR-20261116 / run-steer).
+        List<Long> carriedIds = intent instanceof TurnIntent.Fresh fresh ? fresh.carriedMessageIds() : List.of();
+        String questionText = intent instanceof TurnIntent.Fresh fresh && fresh.questionText() != null
+            ? fresh.questionText()
+            : text;
+        boolean newQuestion = !questionText.isEmpty();
         ChatMessage question = transactions.execute(status -> {
-            fillBlankTitle(conversation, text);
-            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
-            attachments.attach(saved.id(), conversation.id(), attachmentIds);
+            ChatMessage saved = null;
+            if (newQuestion) {
+                fillBlankTitle(conversation, questionText);
+                saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), questionText, clock.instant()));
+                attachments.attach(saved.id(), conversation.id(), attachmentIds);
+            }
+            if (!carriedIds.isEmpty()) {
+                steerLedger.carryForward(conversation.id(), carriedIds);
+            }
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());
             // 사람이 질문했으니 「보고할 것 없음」 으로 숨긴 대화를 다시 목록에 보인다.
@@ -310,14 +324,20 @@ class ChatTurnRouting {
             }
             return saved;
         });
+        if (!carriedIds.isEmpty()) {
+            steerLedger.announce(conversation, carriedIds);
+        }
         if (!pendingIds.isEmpty()) {
-            onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), text));
+            if (question != null) {
+                onEvent.accept(ChatEvent.user(conversation.publicId(), question.id(), questionText));
+            }
             onEvent.accept(ChatEvent.pending(conversation.publicId()));
         } else {
             // 대기 줄에서 꺼낸 질문은 앞 turn 이 끝난 뒤에 저장된다. 그 사이 만든 보고를 사용자가 본 것으로 적지 않는다.
             chatConversationQueries.markCheckReportsRead(user, conversation);
         }
-        return question.id();
+        // 새 메시지 없이 말풍선만 보낸 turn 은 첫 말풍선이 질문이다.
+        return question != null ? question.id() : carriedIds.getFirst();
     }
 
 

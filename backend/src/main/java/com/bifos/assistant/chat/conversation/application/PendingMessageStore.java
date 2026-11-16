@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.conversation.domain.PendingMessage;
 import com.bifos.assistant.chat.conversation.domain.PendingMessages;
 import com.bifos.assistant.chat.conversation.domain.UnreadablePendingMessagesException;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Collection;
@@ -20,7 +21,8 @@ import tools.jackson.databind.json.JsonMapper;
  * 대화의 대기 줄({@code conversation.pending_messages})을 읽고 바꾼다(ADR-048).
  *
  * <p>JSON 은 {@code {"version":1,"held":false,"items":[{"id":1,"content":"글","createdAt":"ISO-8601"}]}} 이다. 빈 줄은 칸을
- * 비워 저장한다. 바꾸는 일은 모두 {@link #change} 를 지나고, 대화 줄을 잠근 뒤 읽고 쓴다. 그래서 더하기, 취소, 멈춤, 보낸 글
+ * 비워 저장한다. 글에 steer 칸({@code messageId}, {@code steering})이 하나라도 차면 {@code version} 2 로 그 칸을 함께 쓰고,
+ * 없으면 버전 1 그대로 쓴다. 그래서 steer 설정을 끈 동안 저장한 값은 앞 이미지도 읽는다(ADR-20261116 / run-steer). 바꾸는 일은 모두 {@link #change} 를 지나고, 대화 줄을 잠근 뒤 읽고 쓴다. 그래서 더하기, 취소, 멈춤, 보낸 글
  * 빼기가 같은 대화에서 차례로 돌고 서버가 여럿이어도 서로의 변경을 덮지 않는다.
  *
  * <p>부르는 쪽의 트랜잭션이 있으면 그 안에서 바꾼다. 보낸 글을 빼는 것과 사용자 메시지 저장이 함께 남거나 함께 빠진다.
@@ -31,6 +33,9 @@ import tools.jackson.databind.json.JsonMapper;
 public class PendingMessageStore {
 
     static final int VERSION = 1;
+
+    /** 글에 steer 칸이 찬 줄의 버전이다. */
+    static final int STEER_VERSION = 2;
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -114,10 +119,18 @@ public class PendingMessageStore {
         if (queue.isEmpty()) {
             return null;
         }
-        List<StoredItem> items = queue.items().stream()
-            .map(item -> new StoredItem(item.id(), item.content(), item.createdAt().toString()))
+        boolean steer = queue.items().stream().anyMatch(item -> item.carried() || item.steering());
+        if (!steer) {
+            List<StoredItem> items = queue.items().stream()
+                .map(item -> new StoredItem(item.id(), item.content(), item.createdAt().toString()))
+                .toList();
+            return JSON.writeValueAsString(new Stored(VERSION, queue.held(), items));
+        }
+        List<StoredSteerItem> items = queue.items().stream()
+            .map(item -> new StoredSteerItem(
+                item.id(), item.content(), item.createdAt().toString(), item.messageId(), item.steering() ? true : null))
             .toList();
-        return JSON.writeValueAsString(new Stored(VERSION, queue.held(), items));
+        return JSON.writeValueAsString(new StoredSteer(STEER_VERSION, queue.held(), items));
     }
 
 
@@ -129,25 +142,30 @@ public class PendingMessageStore {
      * @throws UnreadablePendingMessagesException 모르는 버전이거나 형식이 깨졌을 때
      */
     public static PendingMessages decode(String value) {
-        Stored stored;
+        StoredSteer stored;
         try {
-            stored = JSON.readValue(value, Stored.class);
+            stored = JSON.readValue(value, StoredSteer.class);
         } catch (JacksonException ex) {
             throw new UnreadablePendingMessagesException("stored pending messages are not readable", ex);
         }
         if (stored == null) {
             throw new UnreadablePendingMessagesException("stored pending messages are empty");
         }
-        if (stored.version() == null || stored.version() != VERSION) {
+        if (stored.version() == null || stored.version() != VERSION && stored.version() != STEER_VERSION) {
             throw new UnreadablePendingMessagesException("stored pending messages have an unknown version");
         }
         if (stored.held() == null || stored.items() == null || stored.items().isEmpty()
-            || stored.items().stream().anyMatch(StoredItem::incomplete)) {
+            || stored.items().stream().anyMatch(StoredSteerItem::incomplete)) {
             throw new UnreadablePendingMessagesException("stored pending messages are incomplete");
         }
         try {
             List<PendingMessage> items = stored.items().stream()
-                .map(item -> new PendingMessage(item.id(), item.content(), Instant.parse(item.createdAt())))
+                .map(item -> new PendingMessage(
+                    item.id(),
+                    item.content(),
+                    Instant.parse(item.createdAt()),
+                    stored.version() == STEER_VERSION ? item.messageId() : null,
+                    stored.version() == STEER_VERSION && Boolean.TRUE.equals(item.steering())))
                 .toList();
             return new PendingMessages(stored.held(), items);
         } catch (DateTimeParseException ex) {
@@ -161,6 +179,15 @@ public class PendingMessageStore {
     }
 
     private record StoredItem(Long id, String content, String createdAt) {
+    }
+
+    /** 버전 2 의 모양이다. 버전 1 도 이 모양으로 읽고 새 칸은 버린다. 비어 있는 칸은 쓰지 않는다. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record StoredSteer(Integer version, Boolean held, List<StoredSteerItem> items) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record StoredSteerItem(Long id, String content, String createdAt, Long messageId, Boolean steering) {
 
         boolean incomplete() {
             return id == null || content == null || createdAt == null;

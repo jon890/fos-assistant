@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.TurnTiming;
 import com.bifos.assistant.chat.conversation.domain.UserLastMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.domain.type.SteerState;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -19,6 +20,10 @@ import org.springframework.data.repository.query.Param;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>, ChatMessageWrites<ChatMessage> {
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
+
+
+    /** 그 turn 에 끼워 넣은 말풍선 가운데 그 상태인 것을 받은 순서로 읽는다(ADR-20261116 / run-steer). */
+    List<ChatMessage> findBySteerExecutionIdAndSteerStateOrderByIdAsc(Long steerExecutionId, SteerState steerState);
 
 
     /**
