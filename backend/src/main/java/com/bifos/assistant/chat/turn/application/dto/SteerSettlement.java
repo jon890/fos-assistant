@@ -10,7 +10,10 @@ public record SteerSettlement(Kind kind, String pendingSteer) {
     public enum Kind {
         /** 완료나 실패로 끝났고 결과를 읽었다. {@code pendingSteer} 가 있으면 그 글만 다음 차례로 간다. */
         COMPLETED,
-        /** 중지로 끝났다. Hermes 는 넣지 못한 글을 말없이 버린다. */
+        /**
+         * 중지로 끝났다. Hermes 가 넣지 못한 글을 {@code pendingSteer} 로 돌려주면 그 글은 들어가지 않은 것이고, 나머지는 들어갔는지 모른다.
+         * 어느 쪽이든 멈춘 대기 줄로 되돌린다.
+         */
         STOPPED,
         /** 결과를 읽지 못하고 끝났다. 들어갔는지 알 수 없다. */
         UNKNOWN
@@ -22,8 +25,8 @@ public record SteerSettlement(Kind kind, String pendingSteer) {
     }
 
 
-    public static SteerSettlement stopped() {
-        return new SteerSettlement(Kind.STOPPED, null);
+    public static SteerSettlement stopped(String pendingSteer) {
+        return new SteerSettlement(Kind.STOPPED, pendingSteer);
     }
 
 
