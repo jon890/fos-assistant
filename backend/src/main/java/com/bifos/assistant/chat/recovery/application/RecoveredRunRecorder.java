@@ -108,9 +108,11 @@ public class RecoveredRunRecorder {
             row -> agents.findById(row.agentId())
                 .map(agent -> settleLocked(row, agent, result))
                 .orElseGet(() -> failLocked(row, ORPHANED)));
-        settleSteer(executionId, result == null ? SteerSettlement.unknown()
-            : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped()
-                : SteerSettlement.completed(result.pendingSteer()));
+        if (finished) {
+            settleSteer(executionId, result == null ? SteerSettlement.unknown()
+                : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped()
+                    : SteerSettlement.completed(result.pendingSteer()));
+        }
         return finished;
     }
 
