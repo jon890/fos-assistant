@@ -110,7 +110,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 | --- | --- | --- |
 | 계획 | 범위와 검증 기준을 정해 `docs/` 와 계획서 자리(`tasks/` 나 `docs/features/<id>/tasks/`)에 남긴다 | 구현자가 이 대화 없이 읽고 실행할 수 있다 |
 | 구현 | 워크트리 하나에서 브랜치 하나로 만들고 PR 로 머지한다 | 「머지는 PR 로 한다」 의 순서로 PR 이 머지됐다 |
-| 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다. `orch` 로 돌린 작업은 `orch queue finish <PR>` 의 `FINISH-DONE` 과 상주 루프의 `cleanup-sweep` 이 `finish-task.sh` 를 갈음한다 |
+| 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다. 저장소 밖 도구 `orch`(fos-skills 플러그인의 orch 스킬)로 돌린 작업은 그 `orch queue finish <PR>` 의 `FINISH-DONE` 과 상주 루프의 `cleanup-sweep` 이 `finish-task.sh` 를 갈음한다. 절차는 그 스킬이 갖는다 |
 
 - 한 작업은 PR 하나로 끝나는 크기로 자른다. 구현이 여러 PR 로 나뉘면 PR 마다 작업 하나로 보고 각각 정리한다.
 - 정리는 머지 직후에 한다. 다음 작업을 시작하기 전에 끝낸다.
