@@ -6,7 +6,7 @@ Hermes 가 띄운 MCP 서버의 표준 오류는 그 profile 의 `logs/mcp-stder
 
 - `{"<이름>_diagnostic": {...}}` 한 칸짜리 JSON. 안쪽 값은 null, 낱말(`DIAGNOSTIC_WORD_RE`), 낱말 목록뿐이다
 - 실행기(`connector_launcher.py`)의 `connector-launcher: <이유 낱말>` 줄
-- 대문자 코드 한 낱말 줄(예: 서버가 뜨지 못했다는 고정 코드)
+- `_` 로 이은 대문자 코드 한 낱말 줄(예: 서버가 뜨지 못했다는 고정 코드). `_` 없는 대문자 낱말은 key 일 수 있어 받지 않는다
 
 연결 확인과 선택지 호출(`call`)은 바인딩 주인의 profile 이 없어 지금처럼 버린다.
 """
@@ -29,7 +29,7 @@ CHILD_LOG = pathlib.Path("logs") / "mcp-stderr.log"
 DIAGNOSTIC_KEY_RE = re.compile(r"[a-z][a-z0-9_]{0,40}_diagnostic")
 DIAGNOSTIC_WORD_RE = re.compile(r"[a-z0-9_.]{1,60}")
 LAUNCHER_LINE_RE = re.compile(r"connector-launcher: [A-Za-z_]{1,64}")
-CODE_LINE_RE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+CODE_LINE_RE = re.compile(r"(?=.{1,64}$)[A-Z][A-Z0-9]*(_[A-Z0-9]+)+")
 
 # 한 실행에서 읽는 표준 오류의 바이트, 옮기는 줄 수, 줄 하나의 길이 상한이다.
 READ_MAX = 65536

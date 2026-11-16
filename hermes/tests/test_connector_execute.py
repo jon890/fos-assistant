@@ -498,6 +498,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             ("key without suffix", json.dumps({"x": {"stage": "a"}})),
             ("launcher with path", "connector-launcher: /tmp/a"),
             ("code with space", "SOME CODE"),
+            ("upper case word without underscore", "AKIAABCDEFGHIJKLMNOP"),
         ):
             with self.subTest(label):
                 self.assertEqual(lines((line + "\n").encode()), [])

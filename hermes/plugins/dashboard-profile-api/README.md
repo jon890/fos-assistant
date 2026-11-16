@@ -182,7 +182,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 - 그 profile 에 관리 표식이나 플러그인 표식과 그 플러그인의 소유 기록이 있어야 한다. 플러그인 표식만 있는 profile 은 소유 기록의 그 항목이 바인딩 설치여야 한다. 자식의 env 는 그 바인딩의 칸 값과 운영 목록의 `env` 다. 칸 값은 실행기 정의면 소유 기록의 보관 파일에서, 옛 정의와 원격 정의면 그 profile `.env` 에서 읽는다. 보관 파일을 풀지 못하면 자식을 띄우지 않고 `{ok: false}` 다. `owner_attachments_env` 를 선언한 플러그인은 설치한 서버 정의의 그 값을 더한다. `owner_output_env` 는 빈 값이다. `owner_browser_env` 를 선언한 플러그인은 설치한 서버 정의의 중계 주소를 더하고, 그 값이 중계 주소 모양이 아니면 빈 값이다
 - 인자와 결과를 로그에 싣지 않는다
-- 자식의 표준 오류는 원문을 옮기지 않는다. 진단 줄 모양(`{"<이름>_diagnostic": {...}}` 한 칸짜리 JSON 으로 값이 낱말뿐인 것, 실행기의 `connector-launcher: <이유>`, 대문자 코드 한 낱말)만 골라 그 profile 의 MCP 표준 오류 로그(`logs/mcp-stderr.log`)에 더한다. 시간 초과로 끊겨도 그때까지 나온 줄을 남긴다. 로그 디렉터리가 없거나 링크면 남기지 않는다. 금융 준비(`prepare`)도 같다. 고르는 규칙은 `connector_child_log.py` 가 갖는다
+- 자식의 표준 오류는 원문을 옮기지 않는다. 진단 줄 모양(`{"<이름>_diagnostic": {...}}` 한 칸짜리 JSON 으로 값이 낱말뿐인 것, 실행기의 `connector-launcher: <이유>`, `_` 로 이은 대문자 코드 한 낱말)만 골라 그 profile 의 MCP 표준 오류 로그(`logs/mcp-stderr.log`)에 더한다. 시간 초과로 끊겨도 그때까지 나온 줄을 남긴다. 로그 디렉터리가 없거나 링크면 남기지 않는다. 금융 준비(`prepare`)도 같다. 고르는 규칙은 `connector_child_log.py` 가 갖는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. 본문은 `{detail, code}` 이고, 그 코드가 `retry_key` 를 선언했으면 `retry: {<retry_key>: <값>}` 을 더한다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)). `call` 에서는 그 코드를 `unavailable` 로 돌려준다
 - 요청과 응답은 [플러그인 연결](../../../docs/features/connector-policy.md) 의 「플러그인 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
