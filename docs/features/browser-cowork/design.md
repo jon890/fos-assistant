@@ -42,7 +42,7 @@ UserBrowserSweeper.stopIdle
   기준보다 앞서면 stopIfIdle(id, 그 기준) 으로 끈다. 아니면 건너뛴다
 ```
 
-- **포트** `browser.application.port.BrowserWaitDemand`: `boolean waiting(long userId, Instant since)`. `since` 는 그 브라우저가 이번에 켜진 시각(`user_browser.started_at`)이다. 구현은 `connector` 의 `action` 하위 기능에 두는 `ConnectorBrowserWaitDemand` 다. 판정 줄 저장소와 manifest 읽기(`ConnectorActionDetails`)가 같은 하위 기능에 있다.
+- **포트** `browser.application.port.BrowserWaitDemand`: `boolean waiting(long userId, Instant since)`. `since` 는 그 브라우저가 이번에 켜진 시각(`user_browser.started_at`)이다. 구현은 `connector` 의 `action` 하위 기능에 두는 `ConnectorBrowserWaitDemand` 다. 판정 줄 저장소가 같은 하위 기능에 있고, manifest 는 아래 하위 기능 `connection` 의 `ConnectorCatalogCache` 로 읽는다.
 - **기다림의 뜻**(REQ1 의 넷 가운데 PR1 이 보는 둘):
   - 열린 넘기기: 그 사용자의 판정 줄 가운데 `handoff_need` 가 있고 `handoff_closed_at` 이 비었으며, 대화(`conversation_id`)가 있고 `handoff_at` 이 `since` 이후인 줄. 넘기기를 닫는 길은 그 대화의 사람 turn 뿐이라, 대화 밖 실행의 넘기기나 버려진 대화의 카드는 끝없이 열려 있다. 브라우저가 다시 켜졌으면 그 탭도 이미 없다. 이 둘을 빼야 기다림이 영구히 참이 되지 않는다. 넘기기는 「내 브라우저」 를 쓰는 플러그인만 낸다. 결제(`payment`)와 탭 확인 넘기기도 들어간다. 사람이 그 탭에서 결제해야 하기 때문이다
   - 기다리는 승인: 그 사용자의 `PENDING` 이고 `expires_at` 이 지나지 않은 승인 줄 가운데, 그 플러그인의 manifest 가 `owner_browser_env` 를 선언한 줄(`ConnectorManifest#ownerBrowser`). 카탈로그를 읽지 못하면 기다리는 것으로 본다. 잘못 보아도 30분 뒤 꺼지므로 켜 두는 쪽이 안전하다

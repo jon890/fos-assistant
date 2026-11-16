@@ -36,7 +36,7 @@
 ### 2. `connector/action/application/ConnectorApprovalBrowser.java`(신규)
 
 `@Component`. `void require(CurrentUser user, UUID actionId)`.
-`ConnectorActionRepository.findByPublicId` 로 줄을 읽고, 주인이 그 사용자이고 `PENDING` 이고 `expiresAt` 이 지금보다 뒤일 때만 본다. `ConnectorActionDetails#readManifest(connectorId)` 가 있고 `ownerBrowser()` 가 참이면 `ensureRunning` 뒤 `touch`. 위 코드 목록의 `ApiException` 과 그 밖의 `RuntimeException` 은 `CONNECTOR_BROWSER_UNAVAILABLE` 로 바꿔 던지고 경고 로그에 원래 코드나 예외 종류만 남긴다. `BROWSER_DISABLED` 는 그대로 다시 던진다. manifest 를 읽지 못하면 켜지 않는다(뒤의 승인 판정이 실행하지 않고 끝낸다).
+`ConnectorActionRepository.findByPublicId` 로 줄을 읽고, 주인이 그 사용자이고 `PENDING` 이고 `expiresAt` 이 지금보다 뒤일 때만 본다. `ConnectorCatalogCache#find(connectorId)` 가 있고(`ConnectorActionDetails` 는 빈이 아니다. 예외는 읽지 못한 것으로 본다) `ownerBrowser()` 가 참이면 `ensureRunning` 뒤 `touch`. 위 코드 목록의 `ApiException` 과 그 밖의 `RuntimeException` 은 `CONNECTOR_BROWSER_UNAVAILABLE` 로 바꿔 던지고 경고 로그에 원래 코드나 예외 종류만 남긴다. `BROWSER_DISABLED` 는 그대로 다시 던진다. manifest 를 읽지 못하면 켜지 않는다(뒤의 승인 판정이 실행하지 않고 끝낸다).
 
 ### 3. 두 승인 서비스에서 부르기
 
