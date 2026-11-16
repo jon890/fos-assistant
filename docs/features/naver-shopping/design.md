@@ -1,6 +1,6 @@
 # 네이버 쇼핑 기술 설계
 
-스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1 부터 REQ6), PR2(REQ7, REQ8), PR3(REQ9 부터 REQ13)를 구현할 수 있는 깊이로 쓰고, PR4 는 경계와 방향만 정한다.
+스펙: [`spec.md`](spec.md). 이 설계는 PR1(REQ1 부터 REQ6), PR2(REQ7, REQ8), PR3(REQ9 부터 REQ13), PR4(REQ14)를 구현할 수 있는 깊이로 쓴다.
 뒤 PR 은 착수할 때 그 PR 의 절을 이 파일에서 고치고 독립 검토를 다시 받는다.
 
 ## 요구사항 연결
@@ -20,7 +20,7 @@
 | REQ11 | PR3c | 승인 뒤 ticket 을 한 번 소비하고 주문서까지 가는 `fill_checkout`. 결제 단추 경로가 없다 |
 | REQ12 | PR3b, PR3c | 주문서 최종 금액을 결과 판정이 예상 합계와 지금 상한에 견주고 `payment` 넘기기를 적는다 |
 | REQ13 | PR3a | REQ6 의 표식 검사를 금융 준비 가로채기보다 앞에 두고, 주문서 준비 도구에 `attended_only` 를 둔다 |
-| REQ14 | PR4 | 아래 「PR4 방향」 |
+| REQ14 | PR4 | 주문 확인 도구 `check_shopping_order` 가 결제 내역 화면의 상태 JSON 을 읽는다. 넘긴 시각과 금액은 Control Plane 이 판정 응답에 싣고 fos-ctx 가 인자로 넣는다. 아래 「PR4 주문 확인」 |
 
 ## 책임과 경계
 
@@ -579,7 +579,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 
 | `need` | 카드 제목 | 「다 했어요」 가 보내는 글 | 카드에 더 보이는 것 |
 | --- | --- | --- | --- |
-| `payment` | 「내 브라우저」 에서 결제해 주세요 | 「내 브라우저」 에서 결제를 마쳤어요. 주문을 확인해 주세요. | 확인한 최종 결제 금액과 승인한 예상 합계(spec DECISION25) |
+| `payment` | 「내 브라우저」 에서 결제해 주세요 | 「결제했어요」 는 「내 브라우저」 에서 결제를 마쳤어요. 주문을 확인해 주세요. 「사지 않을래요」 는 PR4 의 「결제 카드의 두 단추」 | 확인한 최종 결제 금액과 승인한 예상 합계(spec DECISION25) |
 | `tab_check` | 「내 브라우저」 에 열린 탭을 확인해 주세요 | 「내 브라우저」 에서 탭을 확인했어요. | 없음 |
 
 - 이 두 넘기기는 fos-ctx 알림이 아니라 금융 승인의 결과 판정이 같은 승인 줄의 `handoff_*` 칸에 직접 적는다. 그래서 fos-ctx 의 `handoff.py` 어휘에는 더하지 않는다. 플러그인 결과의 `handoff.need` 가 이 둘이면 Control Plane 이 받지 않는다
@@ -622,9 +622,166 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | REQ12 | Control Plane, 웹 | 결과 판정 표의 세 경우(같거나 작음, 1원 큼, 상한 낮춤). `payment` 카드가 두 금액을 보이는지 |
 | REQ13 | Control Plane | 사람이 없는 트리에서 준비 도구가 `ATTENDED_ONLY` 거절 줄을 남기고 금융 준비를 부르지 않는지. 사람이 연 대화의 흐름(DECISION32)은 넘어가는지 |
 
-## PR4 방향(주문 확인)
+## PR4 주문 확인(REQ14)
 
-- 주문 내역 읽기 도구 하나(`READ`, `attended_only`). 결제 화면을 넘긴 시각 뒤의 주문만 보고 상품과 금액이 맞는지 본다(spec DECISION27). 넘긴 시각과 승인 금액은 PR3 의 승인 줄이 갖는다
+결제 넘기기 카드의 「결제했어요」 뒤에 에이전트가 주문 확인 도구 하나를 부른다. 도구는 「내 브라우저」 의 네이버페이 결제 내역 화면을 읽어, 결제 화면을 넘긴 시각 뒤의 주문 가운데 상품과 결제 금액이 맞는 것이 있는지만 알린다(spec DECISION27).
+취소·반품 도구는 없다(spec DECISION14).
+
+### 흐름
+
+```mermaid
+---
+config:
+  look: handDrawn
+---
+sequenceDiagram
+  participant M as 모델
+  participant H as fos-ctx hook
+  participant CP as Control Plane
+  participant P as 플러그인
+  M->>H: check_shopping_order({})
+  H->>CP: 도구 호출 판정(지금과 같은 요청)
+  CP->>CP: 허용. 선언이 payment_context 면 그 대화의 마지막 결제 넘기기 줄을 찾는다
+  CP-->>H: {"decision": "allow", "payment_context": {...}}
+  H->>P: 인자에 _fos_payment 를 넣어(action=modify) 부른다
+  P->>P: 결제 내역 화면을 새 탭에서 읽고 맞춘다. 탭을 닫는다
+  P-->>M: {status, order?, message}
+```
+
+1. 사람이 결제 카드의 「결제했어요」 를 누르면 정해 둔 글이 다음 메시지로 가고 에이전트가 `check_shopping_order` 를 부른다. 「사지 않을래요」 면 부르지 않는다(아래 「결제 카드의 두 단추」)
+2. 도구 호출 판정은 지금과 같다. 허용으로 답할 때 그 도구의 선언이 `payment_context` 면 Control Plane 이 결제 넘기기 맥락을 응답에 싣는다
+3. fos-ctx 가 그 맥락을 도구 인자 `_fos_payment` 로 넣는다. 모델이 같은 이름의 인자를 보냈어도 덮어쓰거나 지운다
+4. 플러그인은 `_fos_payment` 의 넘긴 시각, 최종 결제 금액, 상품 주소로 결제 내역의 주문을 맞춘다
+
+### 넘긴 시각과 금액을 넘기는 길
+
+**모델 인자로 받지 않는다.** 모델이 시각을 지어내거나 앞선 주문의 시각을 넣으면 예전에 산 같은 상품을 「확인됐다」 고 알린다. spec DECISION27 이 막으려는 일이다.
+넘긴 시각과 금액, 상품 주소는 Control Plane 의 승인 줄이 갖고 있으므로 판정 응답에 실어 fos-ctx 가 넣는다. 플러그인은 Control Plane 에 닿지 않는다(ADR-064 의 `operator_env` 금지).
+
+| 층 | 바뀌는 것 |
+| --- | --- |
+| `assistant.json` | 도구마다 선택 칸 `payment_context: true`. 참이 아니면 적지 않는다. `READ` 도구에만 둔다 |
+| 대시보드 `connector_policy.py` | 허용 키에 더하고 boolean 이 아니거나 `READ` 가 아닌 도구에 참이면 거절한다. 참일 때만 정책에 싣고 카탈로그가 그대로 낸다 |
+| Control Plane `ConnectorCatalogTools`, `ConnectorTool`, `ToolPolicy` | 칸을 읽는다. 없거나 boolean 이 아니면 거짓이다. 거짓이면 맥락을 싣지 않을 뿐이라 닫히는 쪽이다 |
+| Control Plane `ConnectorPolicyService` | 허용으로 답하는 첫 판정에서 선언이 `payment_context` 면 `ConnectorPaymentContexts` 로 맥락을 찾아 답에 싣는다 |
+| 판정 응답 `ConnectorPolicyResponse` | 선택 칸 `payment_context`. 맥락이 없으면 칸이 없다 |
+| fos-ctx `connector_policy.py` | `allow` 답에 `payment_context` 가 모양대로 있으면 `{"action": "modify", "args": {"_fos_payment": <맥락>}}` 를 돌려준다. 칸이 없거나 모양이 틀렸는데 모델 인자에 `_fos_payment` 가 있으면 `null` 로 덮는다. 둘 다 아니면 지금처럼 통과(None)다 |
+| 플러그인 | `_fos_payment` 를 정확한 키와 타입으로 읽는다. 없거나 틀리면 화면을 열지 않고 `NO_PAYMENT_HANDOFF` 결과다 |
+
+`action=modify` 의 `args` 는 모델 인자에 덮어 합쳐진다. `_fos_ctx` 를 넣는 지금의 hook 과 같은 동작이다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md)).
+
+맥락 `payment_context` 의 모양이다. 금액은 원 단위 JSON 정수다.
+
+| 키 | 값 |
+| --- | --- |
+| `v` | 정수 1 |
+| `handed_off_at_ms` | 그 승인 줄에 결제 넘기기를 적은 시각(`handoff_at`)의 밀리초 epoch |
+| `final_amount_krw` | 주문서에서 읽은 최종 결제 금액. 결과 글 `PaymentHandoffResult` 에서 읽는다 |
+| `expected_total_krw` | 승인한 예상 합계. 같은 결과 글에서 읽는다 |
+| `url` | 승인한 상품 주소. 주문서 준비 snapshot 의 `summary.url` 이다. Control Plane 은 주소 모양을 해석하지 않는다(rule-65) |
+
+맥락을 고르는 규칙(`ConnectorPaymentContexts.of`)이다.
+
+- 호출한 실행의 대화(`origin.conversationId`)와 사용자, 판정한 연결의 플러그인이 같은 승인 줄 가운데 넘기기가 `payment` 이고 상태가 `SUCCEEDED` 인 줄을 넘긴 시각이 늦은 것부터 하나 고른다. 카드를 닫았는지는 보지 않는다. 「결제했어요」 를 누르면 사람이 보낸 turn 이 카드를 닫은 뒤 도구가 불린다
+- 대화가 없는 실행, 줄이 없음, 결과 글이나 snapshot 을 열지 못함이면 맥락이 없다. 판정은 그대로 허용이고, 플러그인이 `NO_PAYMENT_HANDOFF` 로 답한다. 판정 줄의 통과 여부와 hook 의 답을 어긋나게 두지 않으려는 것이다
+- 같은 호출이 다시 와 처음 판정을 돌려줄 때(`replayed`)는 맥락을 다시 찾지 않는다. 그 호출은 `NO_PAYMENT_HANDOFF` 가 된다. hook 은 한 호출에 한 번만 묻으므로 드문 경우다
+- 승인 줄 저장소는 `connector.action` 의 것을 쓴다. `connector.approval` 은 `connector.handoff` 를 부르지 못한다(PR3b 와 같은 까닭)
+
+### 도구
+
+| 도구 | 위험도 | `attended_only` | `payment_context` | 인자 | 결과 |
+| --- | --- | --- | --- | --- | --- |
+| `check_shopping_order` | `READ` | 참 | 참 | 모델이 넣는 인자는 없다. `_fos_payment` 는 hook 이 넣는다 | 아래 「결과」 |
+
+- 입력 스키마는 `_fos_payment` 하나를 선택 칸(`unknown`)으로 둔다. MCP SDK 가 선언하지 않은 키를 지우기 때문이다. 칸 설명에 「시스템이 채운다, 비워 둔다」 를 적는다
+- 결제 내역 주소는 상수 `ORDER_HISTORY_URL`(`https://pay.naver.com/pc/history`) 하나다. 모델이나 맥락의 `url` 이 여는 주소를 정하지 못한다. 맥락의 `url` 은 「주소 분류」 의 `store` 갈래만 받고, 상품 번호(`/products/<번호>`)를 꺼내는 데만 쓴다
+- 탭은 `readInTab` 으로 연다. 로그인·캡차·기기 인증과 예상 밖 화면은 지금처럼 탭을 남긴 넘기기 결과이고, 정상으로 끝나면 탭을 닫는다
+- 첫 페이지(2026-11-16 실측 15건)만 읽는다. 결제 내역은 최신 것부터라 넘긴 뒤의 주문은 첫 페이지에 있다. 다음 페이지를 읽지 않는다
+
+### 결제 내역 화면(2026-11-16 실측)
+
+코디네이터가 사용자 허락을 받아 「내 브라우저」 에서 구조만 쟀다. 화면 글(이름, 주소, 상품명, 금액 값)은 읽어 내거나 남기지 않았다.
+
+| 무엇 | 실측 | 쓰임 |
+| --- | --- | --- |
+| 주소 | `https://pay.naver.com/pc/history`. `orders.pay.naver.com/order/history` 는 404 였다 | 연 탭의 주소 |
+| 화면 틀 | Next.js pages router. `__NEXT_DATA__` 의 `props.pageProps.dehydratedState.queries[]` 가운데 `queryKey[0]` 이 `PAYMENT_LIST` 인 줄의 `state.data.pages[].items[]` | 결제 목록 |
+| 항목의 종류 | `serviceType`(관찰 값 `ORDER`, `SIMPLE_PAYMENT`, `LOCALPAY`) | `ORDER` 만 본다 |
+| 상품 번호 | 스마트스토어 `ORDER` 의 `product.no`(10~11자리). `product.infoUrl` 도 `/products/<번호>` 로 그 번호를 담는다 | 상품 맞추기. `product.no` 가 없으면 `infoUrl` 의 번호 |
+| 시각 | `date`(13자리 ms epoch) | 넘긴 시각과 견준다 |
+| 상태 | `status.name`(관찰 값 `PAYMENT_COMPLETED`, `PURCHASE_CONFIRMED`) | 결과의 상태 낱말 |
+| 금액 | `product.price`, `additionalData.orderAmount`. 관찰한 `ORDER` 5건 가운데 4건은 두 값이 같았다 | 결제 금액 맞추기(아래 가설) |
+
+**가설로 둔 것**: 실제 결제가 없어 아래는 재지 못했다. 칸 위치와 함께 `fields.ts` 의 `ORDER_HISTORY` 에 모으고, 사람이 실제로 결제한 뒤 진단 줄로 맞춘다.
+
+- **결제 금액 칸**: 배송비가 어느 칸에 드는지 모른다. 그래서 금액 후보(`additionalData.orderAmount`, `product.price`) 가운데 하나라도 맥락의 `final_amount_krw` 와 같으면 금액이 맞다고 본다. 둘 다 다르면 「주문은 있으나 금액이 다르다」(`AMOUNT_MISMATCH`)로 알리고 맞다고 하지 않는다
+- **`date` 의 뜻**: 결제 시각인지 주문서를 만든 시각인지 모른다. 주문서는 넘기기 전에 열렸으므로 주문서 시각이면 넘긴 시각보다 조금 이르다. 그래서 넘긴 시각에서 `ORDER_TIME_GRACE_MS`(10분)를 뺀 시각 이후의 주문을 넘긴 뒤의 주문으로 본다. 그 10분 안에 같은 상품을 같은 금액으로 따로 산 경우만 잘못 맞춘다
+- **브랜드스토어 상품의 `product.no`**: 스마트스토어처럼 상품 번호라고 본다
+
+### 화면을 읽는 식
+
+고정 식 `ORDER_HISTORY_STATE` 하나가 `__NEXT_DATA__` 글을 읽어 `PAYMENT_LIST` 줄의 항목마다 `fields.ts` 의 칸만 골라 JSON 글로 준다. 이름, 주소, 상품명, 판매처 같은 칸은 탭 밖으로 나오지 않는다.
+`__NEXT_DATA__` 가 없거나 `PAYMENT_LIST` 줄이 없거나 `pages` 가 배열이 아니면 `null` 을 준다.
+
+순수 함수 `parse-orders.ts` 가 그 글을 결과로 바꾼다.
+
+| 경우 | 처리 |
+| --- | --- |
+| 식이 `null` 을 줬다 | `NAVER_SHOPPING_PAGE_CHANGED`. 진단 줄에 `orders` 를 남긴다. `workInTab` 이 탭을 남긴 `unexpected_page` 넘기기로 바꾼다 |
+| `ORDER` 항목이 있는데 하나도 상품 번호와 시각을 읽지 못했다 | 같다. 진단 줄에 `order_item` 을 남긴다 |
+| 상품 번호나 시각을 읽지 못한 항목 | 그 항목만 뺀다 |
+| 상품 번호가 같고 시각이 경계 뒤이고 금액 후보 하나가 최종 금액과 같은 항목이 있다 | `CONFIRMED`. 그런 항목이 여럿이면 시각이 늦은 것 |
+| 위는 없고 상품 번호와 시각만 맞는 항목이 있다 | `AMOUNT_MISMATCH`. 시각이 늦은 것 |
+| 둘 다 없다 | `NOT_FOUND` |
+
+### 결과
+
+결과는 상태 낱말, 금액 정수, 주문 시각, 고정 안내 글뿐이다. 이름, 주소, 상품명, 판매처, 주문 번호를 싣지 않는다.
+
+```json
+{"status": "CONFIRMED", "message": "<고정 안내 글>", "final_amount_krw": 3300,
+ "order": {"status": "PAYMENT_COMPLETED", "paid_amount_krw": 3300, "ordered_at": "2026-11-16T05:12:30.000Z"}}
+```
+
+| `status` | `order` | `message` 의 뜻 |
+| --- | --- | --- |
+| `CONFIRMED` | 맞은 주문 | 결제 내역에서 그 상품의 주문을 확인했다. 결제 금액을 알린다 |
+| `AMOUNT_MISMATCH` | 상품과 시각만 맞은 주문. `paid_amount_krw` 는 첫 금액 후보 | 그 상품의 주문은 있으나 결제 금액이 주문서의 최종 금액과 다르다. 사용자에게 「내 브라우저」 의 결제 내역에서 확인해 달라고 한다 |
+| `NOT_FOUND` | 없음 | 넘긴 뒤의 주문을 찾지 못했다. 결제가 확인되지 않았다고 알리고 결제했다면 「내 브라우저」 의 결제 내역을 확인해 달라고 한다. 다시 주문서를 준비하지 않는다 |
+| `NO_PAYMENT_HANDOFF` | 없음 | 이 대화에서 결제 화면을 넘긴 주문이 없어 확인하지 않았다. 화면을 열지 않는다 |
+
+- `order.status` 는 `status.name` 이 `^[A-Z_]{1,40}$` 일 때만 싣고 아니면 `null` 이다
+- `order.ordered_at` 은 `date` 를 ISO 8601 UTC 글로 바꾼 것이다
+- `final_amount_krw` 는 맥락의 값을 그대로 돌려준다. `NO_PAYMENT_HANDOFF` 에는 없다
+- 화면을 읽은 호출은 표준 오류에 진단 줄(`naver_shopping_diagnostic`)을 하나 남긴다. `stage` 는 `match.<결과 소문자>` 이고 확인되지 않았으면 `missing` 에 까닭 낱말 하나(`product`: 같은 상품 주문 없음, `time`: 같은 상품 주문이 모두 시각 경계 앞, `amount`: 금액 후보가 모두 다름)를 싣는다. 금액, 시각, 상품 번호는 싣지 않는다. 사람이 결제한 뒤 가설을 맞출 때 본다
+
+### 결제 카드의 두 단추
+
+결제 넘기기 카드(`payment`)의 「다 했어요」 는 사람이 결제하지 않고 탭만 닫아도 「결제를 마쳤어요」 를 보냈다(2026-11-16 실계정 확인). 결제 카드에만 단추 둘을 둔다(사용자 결정 2026-11-16). 다른 넘기기 카드는 그대로다.
+
+| 단추 | 보내는 글 |
+| --- | --- |
+| 「결제했어요」 | 「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요. |
+| 「사지 않을래요」 | 결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요. |
+
+- 옆 패널의 「내 브라우저」 탭(`handoff-browser.tsx`)도 결제 카드면 같은 두 단추를 보인다. 탭 주소가 바뀌어 끝났는지 묻는 줄도 「결제했어요」, 「사지 않을래요」, 「아직이에요」 다
+- 단추 글과 보내는 글은 웹 `handoff.ts` 가 갖는다. Control Plane 은 바뀌지 않는다. 어느 단추든 사람이 보낸 turn 이라 카드를 닫는다
+- 「사지 않을래요」 뒤에도 그 승인은 하루 합계에 남는다(spec DECISION17). 결제했는지 Control Plane 이 알 수 없어서다
+
+### 실패와 일관성
+
+- 읽기뿐이라 다시 불러도 계정 상태가 바뀌지 않는다. 결제 내역을 열면 네이버의 최근 기록에 남을 수 있으나 PR1 의 읽기 도구와 같은 감수다
+- 배포 순서: Hermes 묶음(대시보드 plugin 의 `payment_context` 검증, fos-ctx 의 인자 넣기, 플러그인)을 먼저 올린다. 옛 Control Plane 은 칸을 몰라 맥락 없이 허용하고, fos-ctx 가 모델의 `_fos_payment` 를 지우므로 플러그인은 `NO_PAYMENT_HANDOFF` 로 답한다. 닫히는 쪽이다. 옛 대시보드 plugin 은 모르는 키를 거절해 이 플러그인을 카탈로그에 올리지 않는다
+- 옛 fos-ctx 는 `payment_context` 를 몰라 넣지 않는다. 모델이 지어 보낸 `_fos_payment` 가 그대로 갈 수 있으나 Hermes 묶음을 함께 올리므로 그 사이가 없다
+
+### 검증 전략(PR4)
+
+| ID | 경계 | 방법 |
+| --- | --- | --- |
+| REQ14 | 플러그인 | 가짜 결제 내역 화면(`__NEXT_DATA__` 꼴)의 파서 단위 테스트: 맞음, 없음, 넘긴 시각 전 주문 무시, 금액 다름, 다른 상품, `ORDER` 아닌 항목 무시, 칸 없음 → `PAGE_CHANGED`, 결과 글에 이름·주소·상품명 같은 화면 글이 없음. 도구 층(가짜 CDP): 맥락 없음이면 탭을 열지 않음, 연 주소가 상수 하나, 식이 상수 집합 안, 정상이면 탭을 닫음. 로컬 Chrome 테스트로 고정 식이 가짜 HTML 에서 고른 칸만 꺼내는지 |
+| REQ14 | 대시보드, fos-ctx | `payment_context` 칸 검증(boolean, `READ` 만). fos-ctx 가 맥락을 `_fos_payment` 로 넣고, 맥락이 없을 때 모델의 `_fos_payment` 를 `null` 로 덮는지 |
+| REQ14 | Control Plane | 판정 응답에 맥락이 실리는 경우와 없는 경우(선언 없음, 대화의 결제 넘기기 줄 없음, 다른 대화의 줄, `SUCCEEDED` 가 아닌 줄), 고른 줄이 넘긴 시각이 가장 늦은 것인지 |
+| 결제 카드 | 웹 | 결제 카드가 두 단추를 보이고 각각 정해 둔 글을 보내는지, 다른 카드는 「다 했어요」 하나인지 |
 
 ## 결정
 
@@ -653,3 +810,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | DECISION21 | 옵션 드롭다운을 닫는 식 | 두지 않는다. 읽기 탭은 정상으로 끝나면 탭째 닫는다 | 작성자 | 닫기 식을 더하면 누르기 식이 둘이 된다. 연 상태는 탭과 함께 사라진다 |
 | DECISION22 | 주문서 준비의 개방 조건 | 사용자 두 상한이 0 보다 크고 금융 관문의 keyed hash key 를 읽을 수 있으면 열린다. 계좌 허용 목록과 운영 스위치는 없다 | 사용자 2026-11-13 | 결제는 사람이 하고 기본 0 이 이미 닫힌 상태다(spec DECISION31 과 같은 근거) |
 | DECISION23 | 결정 기록 | 루트 `docs/adr/ADR-20261113-purchase-checkout.md` 하나. 구매 경계(spec DECISION8~10), 위험도 `PURCHASE`, 개방 조건, 옵션 드롭다운 열기 예외를 갖는다 | 작성자 | backend, hermes, 웹에 걸쳐 루트에 둔다 |
+| DECISION24 | 주문 확인에 넘긴 시각과 금액을 주는 길 | 도구 선언 `payment_context` 를 보고 Control Plane 이 판정 응답에 그 대화의 마지막 결제 넘기기 맥락을 싣고, fos-ctx 가 `action=modify` 로 인자 `_fos_payment` 에 넣는다 | 작성자 | 모델 인자로 받으면 지어낸 시각으로 예전 주문을 맞출 수 있다(spec DECISION27). 플러그인은 Control Plane 에 닿지 못한다(ADR-064). 판정과 hook 은 이미 같은 호출마다 오가므로 새 경로가 없다 |
+| DECISION25 | 맥락을 찾지 못했을 때 | 판정은 허용 그대로이고 플러그인이 `NO_PAYMENT_HANDOFF` 로 답한다 | 작성자 | 판정 줄의 통과 여부와 hook 의 답을 어긋나게 두지 않는다. 화면을 열지 않으므로 잃는 것이 없다 |
+| DECISION26 | 결제 금액과 주문 시각 칸 | 금액 후보 둘 가운데 하나가 최종 금액과 같으면 맞다고 보고, 넘긴 시각 10분 전부터의 주문을 본다. 둘 다 가설이다 | 작성자 | 실제 결제가 없어 재지 못했다(2026-11-16). 둘 다 다르면 맞다고 하지 않고 금액이 다르다고 알려 거짓 확인은 없다. 사람이 결제한 뒤 진단 줄로 맞춘다 |
+| DECISION27 | 결제 카드의 단추 | 결제 카드에만 「결제했어요」 와 「사지 않을래요」 두 단추 | 사용자 2026-11-16 | 탭만 닫아도 「결제를 마쳤어요」 를 보내던 문제. 에이전트가 사람의 뜻을 받고, 결제했다고 해도 주문 확인이 결제 내역과 대조한다 |
