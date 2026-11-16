@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.action.application;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
@@ -41,6 +42,7 @@ public class ConnectorApprovalBrowser {
     private final ConnectorActionRepository actions;
     private final ConnectorCatalogCache catalog;
     private final UserBrowserService browsers;
+    private final BrowserHumanHold holds;
     private final Clock clock;
 
 
@@ -50,7 +52,8 @@ public class ConnectorApprovalBrowser {
      * <p>줄이 없거나 남의 것이거나 기다림이 아니거나 시간이 지났으면 아무것도 하지 않는다. 뒤의 승인 판정이 지금 응답을 그대로 낸다.
      * 남의 줄로 브라우저를 켜지 않는다.
      *
-     * @throws ApiException 켜지 못했으면 {@code CONNECTOR_BROWSER_UNAVAILABLE}, 기능이 꺼졌으면 {@code BROWSER_DISABLED}
+     * @throws ApiException 사람이 그 브라우저를 쥐고 있으면 {@code CONNECTOR_BROWSER_HELD}(spec DECISION26), 켜지 못했으면
+     * {@code CONNECTOR_BROWSER_UNAVAILABLE}, 기능이 꺼졌으면 {@code BROWSER_DISABLED}
      */
     public void require(CurrentUser user, UUID actionId) {
         Optional<ConnectorAction> waiting = actions.findByPublicId(actionId)
@@ -59,6 +62,11 @@ public class ConnectorApprovalBrowser {
             .filter(action -> action.expiresAt() != null && action.expiresAt().isAfter(clock.instant()));
         if (waiting.isEmpty() || !usesBrowser(waiting.get().connectorId())) {
             return;
+        }
+        // 돈이 걸린 승인이 사람의 조작과 엉키지 않게 승인을 쓰지 않는다. 줄은 기다림 그대로라 돌려준 뒤 다시 승인한다
+        if (holds.held(user.id())) {
+            throw new ApiException(
+                ErrorCode.CONNECTOR_BROWSER_HELD, "the user browser is held by the person for this approval");
         }
         try {
             browsers.ensureRunning(user.id());

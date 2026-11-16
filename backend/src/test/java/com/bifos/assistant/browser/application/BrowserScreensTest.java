@@ -59,10 +59,10 @@ class BrowserScreensTest {
         cdp = new FakeCdp();
         cdp.pages.add(new CdpTarget("T1", "첫 탭", "https://example.com/"));
         usage = new BrowserUsage();
-        screens = new BrowserScreens(cdp, cdp, usage, new BrowserAgentTabs(cdp, Clock.systemUTC()), () -> Duration.ofMinutes(30), Duration.ofHours(1));
+        screens = new BrowserScreens(cdp, cdp, usage, new BrowserAgentTabs(cdp, Clock.systemUTC()), mock(BrowserHumanHold.class), () -> Duration.ofMinutes(30), Duration.ofHours(1));
         runtime = new FakeBrowserRuntime();
         service = service(repository);
-        sweeper = new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, (userId, since) -> false,
+        sweeper = new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, (userId, since) -> false, mock(BrowserHumanHold.class),
             LiveProperties.fixed(BrowserProperties.class, properties()), Clock.systemUTC());
     }
 

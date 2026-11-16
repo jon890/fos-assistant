@@ -250,6 +250,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
     /** 「내 브라우저」 를 쓰는 플러그인의 승인 줄인데 그 사용자의 브라우저를 켜지 못했다. 줄은 기다림 그대로라 다시 승인할 수 있다. */
     CONNECTOR_BROWSER_UNAVAILABLE(HttpStatus.CONFLICT),
+    /** 「내 브라우저」 를 쓰는 플러그인의 승인 줄인데 사람이 그 브라우저를 쥐고 있다. 줄은 기다림 그대로라 돌려준 뒤 다시 승인할 수 있다. */
+    CONNECTOR_BROWSER_HELD(HttpStatus.CONFLICT),
     /** 금융 주문이 적용 상한에 걸렸다. 다른 금융 거절과 달리 걸린 상한을 감추지 않는다(ADR-20261015 / financial-user-limits). */
     FINANCIAL_LIMIT_EXCEEDED(HttpStatus.CONFLICT),
     /** 바꾸려는 주문 상한이 운영 최대치보다 크다. 저장하지 않는다(ADR-20261015 / financial-user-limits). */
@@ -313,6 +315,10 @@ public enum ErrorCode {
     BROWSER_STOP_FAILED(HttpStatus.BAD_GATEWAY),
     /** 요청자의 브라우저에 열린 로그인 화면이 없다. 입력을 보내기 전에 화면을 연다. */
     BROWSER_SCREEN_CLOSED(HttpStatus.CONFLICT),
+    /** 사람이 「직접 할게요」 로 그 브라우저를 쥐고 있다. 중계가 에이전트의 요청을 거절할 때만 쓴다(ADR-20261116 / browser-lock). */
+    BROWSER_HUMAN_HELD(HttpStatus.LOCKED),
+    /** 브라우저를 쓰는 승인한 실행이 도는 중이라 사람이 넘겨받지 못한다. 실행이 끝나면 다시 할 수 있다. */
+    BROWSER_APPROVAL_RUNNING(HttpStatus.CONFLICT),
     /** 실행 공간 루트가 설정되지 않았거나 디렉터리가 아니다. 상태 조회 말고 모든 파일 공간 경로가 이 코드다. */
     WORKSPACE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /** 없는 경로, 링크를 지나는 경로, 본문을 줄 수 없는 종류를 같은 응답으로 숨긴다. 남의 공간은 경로로 닿을 수 없다. */

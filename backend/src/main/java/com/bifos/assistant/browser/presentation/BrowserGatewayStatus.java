@@ -12,6 +12,8 @@ final class BrowserGatewayStatus {
     static HttpStatus of(ErrorCode code) {
         return switch (code) {
             case BROWSER_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            // 플러그인이 닿지 않음과 나눠 「사람이 브라우저를 쓰는 중」 넘기기로 바꾼다(ADR-20261116 / browser-lock)
+            case BROWSER_HUMAN_HELD -> HttpStatus.LOCKED;
             case BROWSER_DISABLED, BROWSER_CAPACITY, BROWSER_BUSY -> HttpStatus.SERVICE_UNAVAILABLE;
             // BROWSER_START_FAILED, BROWSER_STOP_FAILED 와 그 밖의 코드는 브라우저 쪽 실패다
             default -> HttpStatus.BAD_GATEWAY;

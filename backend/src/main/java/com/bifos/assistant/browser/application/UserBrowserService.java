@@ -66,6 +66,7 @@ public class UserBrowserService {
     private final BrowserScreens screens;
     private final ReentrantLock startLock = new ReentrantLock();
     private final BrowserActivityTracker activity;
+    private final BrowserHumanHold holds;
     /** 중계가 다른 전이를 기다리는 동안 쉬는 함수다. 시험이 바꿔 끼워 그 사이에 줄을 바꾼다. */
     Consumer<Duration> sleeper = UserBrowserService::sleep;
 
@@ -324,10 +325,7 @@ public class UserBrowserService {
             }
             log.warn("user browser start failed id={} code={}", browser.id(), ex.code());
         } catch (RuntimeException ex) {
-            log.warn(
-                "user browser start failed id={} error={}",
-                browser.id(),
-                ex.getClass().getSimpleName());
+            log.warn("user browser start failed id={} error={}", browser.id(), ex.getClass().getSimpleName());
         }
         removeQuietly(containerId);
         browser.markFailed(failure, clock.instant());
@@ -392,16 +390,16 @@ public class UserBrowserService {
                 runtime.remove(stopping.containerId());
             }
         } catch (RuntimeException ex) {
-            log.warn(
-                "user browser stop failed id={} error={}",
-                stopping.id(),
-                ex.getClass().getSimpleName());
+            log.warn("user browser stop failed id={} error={}", stopping.id(), ex.getClass().getSimpleName());
             stopping.markFailed(STOP_FAILED, clock.instant());
             save(stopping);
             throw new ApiException(ErrorCode.BROWSER_STOP_FAILED, "user browser did not stop", ex);
         }
         stopping.markStopped(clock.instant());
-        return save(stopping);
+        UserBrowser stopped = save(stopping);
+        // 끈 브라우저에는 쥘 것이 없다. 끈 뒤에 비워 그 사이 회수가 들어와도 RUNNING 이 아니라 걸리지 않는다
+        holds.release(stopped.id(), stopped.userId());
+        return stopped;
     }
 
 

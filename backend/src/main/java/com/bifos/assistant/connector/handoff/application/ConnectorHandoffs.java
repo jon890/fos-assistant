@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.handoff.application;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.chat.turn.application.dto.ConversationTurnStarted;
 import com.bifos.assistant.connector.action.application.dto.ConnectorActionChanged;
@@ -20,6 +21,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -45,6 +47,7 @@ public class ConnectorHandoffs {
     private final NotificationService notifications;
     private final ConversationNotices conversations;
     private final ConnectorCatalogCache catalog;
+    private final BrowserHumanHold holds;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -74,6 +77,7 @@ public class ConnectorHandoffs {
             return;
         }
         conversations.publicIdOf(action.conversationId())
+            .filter(conversation -> !watchingHold(action.userId(), request.need(), conversation))
             .ifPresent(conversation -> notifications.notify(
                 action.userId(),
                 NotificationKind.HANDOFF_REQUESTED,
@@ -82,6 +86,15 @@ public class ConnectorHandoffs {
                 new NotificationTarget(NotificationTargetType.CONVERSATION, conversation),
                 action.publicId()));
         afterCommit(action);
+    }
+
+
+    /**
+     * 사람이 그 대화의 패널에서 브라우저를 넘겨받아 생긴 넘기기인가. 보고 있는 대화의 카드라 알림은 소음이다(spec DECISION18). 카드는 그대로
+     * 낸다. 다른 대화나 「내 브라우저」 에서 넘겨받았으면 알린다.
+     */
+    private boolean watchingHold(Long userId, HandoffNeed need, UUID conversation) {
+        return need == HandoffNeed.HUMAN_BROWSER && holds.heldFrom(userId).filter(conversation.toString()::equals).isPresent();
     }
 
 

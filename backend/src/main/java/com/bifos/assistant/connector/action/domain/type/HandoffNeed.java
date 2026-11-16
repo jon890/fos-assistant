@@ -18,6 +18,11 @@ public enum HandoffNeed {
     BOT_CHECK("bot_check", "「내 브라우저」에서 자동 접속 확인을 풀어 주세요", true),
     /** 플러그인이 기대한 자리나 칸을 찾지 못했거나 기대한 사이트가 아닌 화면이다. */
     UNEXPECTED_PAGE("unexpected_page", "「내 브라우저」에서 화면을 확인해 주세요", true),
+    /**
+     * 사람이 「직접 할게요」 로 브라우저를 쥐어 중계가 플러그인을 거절했다(ADR-20261116 / browser-lock). 탭을 만들기 전에 거절됐으면 탭이
+     * 없다.
+     */
+    HUMAN_BROWSER("human_browser", "「내 브라우저」를 직접 쓰는 동안 멈췄어요", true),
     /** 주문서까지 채웠고 최종 금액이 승인한 예상 합계 안이다. 결제는 사람이 한다(ADR-20261113 / purchase-checkout). */
     PAYMENT("payment", "「내 브라우저」에서 결제해 주세요", false),
     /** 주문서를 채운 결과를 모른다. 다시 보내지 않고 사람이 열린 탭을 본다(spec DECISION33). 탭이 없을 수 있다. */

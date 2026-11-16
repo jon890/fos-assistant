@@ -74,6 +74,13 @@ public class UserBrowser extends CreatedAtEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * 사람이 「직접 할게요」 로 쥔 시각이다. {@code RUNNING} 일 때만 뜻이 있다. 엔티티는 읽기만 하고 {@code UserBrowserRepository} 의 조건부
+     * 갱신만 쓴다. 활동 기록과 자동 중지가 오래된 엔티티를 저장해도 잠금이 되돌아가지 않는다(rule-68).
+     */
+    @Column(name = "human_held_at", insertable = false, updatable = false)
+    private Instant humanHeldAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

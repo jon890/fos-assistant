@@ -1,5 +1,6 @@
 package com.bifos.assistant.browser.application;
 
+import static org.mockito.Mockito.mock;
 import static com.bifos.assistant.browser.application.RecordingScreenSink.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -488,7 +489,8 @@ class BrowserScreenSessionTest {
 
     private BrowserScreenSession open(Duration timeout, Duration tabInterval, Duration heartbeat, String url) {
         BrowserScreenSession session = new BrowserScreenSession(
-            BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, agentTabs, scheduler, closed -> ended.set(true));
+            BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, agentTabs, scheduler, closed -> ended.set(true),
+            new BrowserScreenHold(mock(BrowserHumanHold.class), 201L));
         session.start(url, timeout, tabInterval, heartbeat);
         return session;
     }

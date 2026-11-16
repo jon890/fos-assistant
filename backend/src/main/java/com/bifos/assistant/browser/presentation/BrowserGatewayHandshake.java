@@ -3,6 +3,7 @@ package com.bifos.assistant.browser.presentation;
 import com.bifos.assistant.browser.application.BrowserGateway;
 import com.bifos.assistant.browser.application.dto.GatewayTarget;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +39,12 @@ public class BrowserGatewayHandshake implements HandshakeInterceptor {
     /** Chrome 쪽 대상의 번호를 두는 세션 속성이다. */
     static final String TARGET_ID = BrowserGatewayHandshake.class.getName() + ".targetId";
 
+    /**
+     * 사람이 브라우저를 쥐고 있어 받기만 하고 바로 닫을 연결이다. Bun 의 {@code WebSocket} 은 handshake 실패의 상태 코드를 주지 않아,
+     * 열린 뒤 close code 로 알린다.
+     */
+    static final String HUMAN_HELD = BrowserGatewayHandshake.class.getName() + ".humanHeld";
+
     /** 경로는 풀지 않은 원문으로 본다. 표식은 {@code /} 를 담지 않는다. */
     private static final Pattern PATH = Pattern.compile("^/internal/browser-gateway/([^/]+)/devtools/(page|browser)/([A-Za-z0-9-]{1,128})$");
 
@@ -66,6 +73,11 @@ public class BrowserGatewayHandshake implements HandshakeInterceptor {
         try {
             target = gateway.open(path.group(1));
         } catch (ApiException ex) {
+            if (ex.code() == ErrorCode.BROWSER_HUMAN_HELD) {
+                log.info("browser gateway socket held by human");
+                attributes.put(HUMAN_HELD, true);
+                return true;
+            }
             log.warn("browser gateway socket refused code={}", ex.code());
             return refuse(response, BrowserGatewayStatus.of(ex.code()));
         } catch (RuntimeException ex) {

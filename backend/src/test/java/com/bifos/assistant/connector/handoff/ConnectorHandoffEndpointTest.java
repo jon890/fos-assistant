@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.handoff;
 
+import com.bifos.assistant.browser.application.BrowserHumanHold;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
@@ -95,6 +96,9 @@ class ConnectorHandoffEndpointTest {
     JdbcTemplate jdbc;
 
     @Autowired
+    BrowserHumanHold holds;
+
+    @Autowired
     HermesConnectorClient connector;
 
     private final HttpClient client = HttpClient.newHttpClient();
@@ -186,6 +190,33 @@ class ConnectorHandoffEndpointTest {
         assertThat(handoffs.open(user(), conversation.id()))
             .extracting(HandoffView::need)
             .containsExactlyInAnyOrder(HandoffNeed.BOT_CHECK, HandoffNeed.UNEXPECTED_PAGE);
+    }
+
+
+    @Test
+    @DisplayName("탭 없는 human_browser 를 적고, 그 대화의 패널에서 넘겨받았으면 알림 없이 카드만 내고 다른 대화면 알린다")
+    void recordsTablessHumanBrowserAndSkipsNoticeForWatchedConversation() throws Exception {
+        jdbc.update("INSERT INTO user_browser (user_id, status, profile_key, last_active_at, started_at, created_at, updated_at, version)"
+            + " VALUES (?, 'RUNNING', ?, ?, ?, ?, ?, 0)", owner.id(), "a".repeat(64), Timestamp.from(NOW), Timestamp.from(NOW),
+            Timestamp.from(NOW), Timestamp.from(NOW));
+        holds.takeOver(owner.id(), conversation.publicId().toString());
+        insertAction("root-20", "call-20", true, conversation.id());
+        insertAction("root-21", "call-21", true, other.id());
+
+        assertThat(post(McpCallSigner.handoffBody(
+            token, TOOL, "root-20", "root-20", "call-20", "DEMO_BROWSER_IN_USE", "human_browser", null)).statusCode())
+                .isEqualTo(200);
+        assertThat(post(McpCallSigner.handoffBody(
+            token, TOOL, "root-21", "root-21", "call-21", "DEMO_BROWSER_IN_USE", "human_browser", null)).statusCode())
+                .isEqualTo(200);
+
+        assertThat(handoffs.open(user(), conversation.id())).singleElement().satisfies(card -> {
+            assertThat(card.need()).isEqualTo(HandoffNeed.HUMAN_BROWSER);
+            assertThat(card.tab()).isNull();
+        });
+        assertThat(notifications.findAll()).singleElement()
+            .satisfies(notification -> assertThat(notification.targetPublicId()).isEqualTo(other.publicId()));
+        holds.giveBack(owner.id());
     }
 
 
@@ -334,6 +365,7 @@ class ConnectorHandoffEndpointTest {
 
     private void cleanup() {
         jdbc.update("DELETE FROM connector_action");
+        jdbc.update("DELETE FROM user_browser");
         notifications.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update("DELETE FROM conversation WHERE title IN ('쇼핑 대화', '다른 대화')");

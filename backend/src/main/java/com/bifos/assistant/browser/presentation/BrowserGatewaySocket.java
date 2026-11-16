@@ -39,6 +39,9 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
     /** 받은 메시지 하나(조각의 합)의 상한이다. 끝없는 메시지를 막는다. */
     static final long MAX_MESSAGE_CHARS = 64L * 1024 * 1024;
 
+    /** 사람이 브라우저를 쥐어 닫는 연결의 close code 다. 플러그인이 「사람이 브라우저를 쓰는 중」 넘기기로 바꾼다(ADR-20261116 / browser-lock). */
+    static final CloseStatus HUMAN_HELD = new CloseStatus(4423, "human_held");
+
     /** 연결 하나의 {@link Link} 를 두는 세션 속성이다. */
     private static final String LINK = BrowserGatewaySocket.class.getName() + ".link";
 
@@ -74,6 +77,10 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         Link link = null;
         try {
+            if (Boolean.TRUE.equals(session.getAttributes().get(BrowserGatewayHandshake.HUMAN_HELD))) {
+                closeQuietly(session, HUMAN_HELD);
+                return;
+            }
             GatewayTarget target = (GatewayTarget)session.getAttributes().get(BrowserGatewayHandshake.TARGET);
             String kind = (String)session.getAttributes().get(BrowserGatewayHandshake.KIND);
             String id = (String)session.getAttributes().get(BrowserGatewayHandshake.TARGET_ID);
@@ -84,6 +91,8 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
             }
             link = new Link(session, target, gateway.hold(target));
             session.getAttributes().put(LINK, link);
+            Link opened = link;
+            link.human = gateway.watchHuman(target, () -> opened.close(HUMAN_HELD, "human_held"));
             limitIdle(session);
             CdpRelay relay;
             try {
@@ -194,6 +203,8 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         private final AtomicBoolean closed = new AtomicBoolean();
 
         private volatile CdpRelay relay;
+        /** 사람 잠금에 등록한 핸들이다. 회수하면 이 연결을 닫는다. */
+        private volatile BrowserUsageHandle human;
         /** 에이전트가 그 탭을 쥔 핸들이다. Chrome 쪽에 붙은 뒤에 생긴다. */
         private volatile BrowserUsageHandle tabHold;
         /** 지금 받고 있는 메시지의 지난 조각 길이의 합이다. Tomcat 이 한 세션의 메시지를 차례로 넘기므로 한 스레드만 쓴다. */
@@ -288,6 +299,10 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 }
             }
             handle.close();
+            BrowserUsageHandle watched = human;
+            if (watched != null) {
+                watched.close();
+            }
             BrowserUsageHandle tab = tabHold;
             if (tab != null) {
                 tab.close();
