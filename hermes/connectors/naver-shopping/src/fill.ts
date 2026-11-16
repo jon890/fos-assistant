@@ -5,6 +5,7 @@
  * **결제 단추를 누르는 코드 경로가 없다.** 주문서 탭에서는 준비 상태, 화면 분류, 최종 금액 읽기만 부른다.
  * 「바로구매」(또는 층이 확인되기 전의 「구매하기」)를 보낸 뒤의 실패는 오류가 아니라 `{status: "UNKNOWN", tab}` 이다.
  * 선언된 오류로 돌려주면 승인 줄이 `FAILED` 가 되어 주문서가 열렸을 수 있는 승인이 하루 합계에서 빠진다.
+ * 단계마다 진단 줄을 남긴다(design.md 「채우기 진단」). 단계 이름과 오류 이름만 싣고 주소, 화면 글, ticket 은 싣지 않는다.
  */
 import { verifyApproval, type Authority } from "./approval.ts";
 import {
@@ -14,7 +15,12 @@ import {
   QUANTITY_MAX,
 } from "./checkout.ts";
 import { classifyPage } from "./classify.ts";
-import { ToolError, type ErrorCode } from "./errors.ts";
+import {
+  diagnosticCode,
+  logDiagnostic,
+  ToolError,
+  type ErrorCode,
+} from "./errors.ts";
 import {
   CHOOSE_OPTION,
   LAYER_OPEN,
@@ -65,6 +71,49 @@ const PASSED_AFTER_CLAIM = new Set<ErrorCode>([
 
 const failed = () => new ToolError("NAVER_SHOPPING_CHECKOUT_FAILED");
 
+/** 채우기의 단계. 진단 줄의 `stage` 다. 순서는 design.md 「채우기 진단」 이 갖는다. */
+export type FillStage =
+  | "approval"
+  | "tab"
+  | "price"
+  | "claim"
+  | "pre_buy"
+  | "buy"
+  | "layer"
+  | "buy_now"
+  | "sheet";
+
+/**
+ * 지금 단계와 끝 줄을 남겼는지. 단계에 들어갈 때 `<단계>` 줄을, 끝날 때 `<단계>.failed`·`<단계>.unknown`·`done` 줄 하나를 남긴다.
+ * 안쪽에서 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 바꾸기 전의 오류 이름을 남기려고 끝 줄은 바꾸는 자리에서 먼저 쓴다.
+ */
+class FillTrace {
+  stage: FillStage = "approval";
+  private ended = false;
+
+  enter(stage: FillStage) {
+    this.stage = stage;
+    logDiagnostic(CHECKOUT_TOOL, stage);
+  }
+
+  /** `reason` 은 오류 없이 끝난 까닭의 고정 낱말이다. 오류가 있으면 오류 이름을 싣는다. */
+  end(
+    outcome: "failed" | "unknown" | "done",
+    error?: unknown,
+    reason?: string,
+  ) {
+    if (this.ended) return;
+    this.ended = true;
+    const stage = outcome === "done" ? "done" : `${this.stage}.${outcome}`;
+    logDiagnostic(
+      CHECKOUT_TOOL,
+      stage,
+      [],
+      error === undefined ? reason : diagnosticCode(error),
+    );
+  }
+}
+
 /** 주문서 주소인가. 호스트와 `/ordersheet/` 경로로 가린다. */
 export function isOrderSheet(href: unknown) {
   try {
@@ -103,15 +152,23 @@ export async function fillCheckout(
   input: FillInput,
   deps: FillDeps = DEFAULT_DEPS,
 ) {
-  const claim = verifyApproval(authority, CHECKOUT_TOOL, input);
-  checkFill(input);
-  const cdpUrl = browserUrl(env);
-  return deps.work(
-    cdpUrl,
-    input.url,
-    (page) => fillOnPage(cdpUrl, page, input, claim, deps),
-    deps.tab,
-  );
+  const trace = new FillTrace();
+  try {
+    trace.enter("approval");
+    const claim = verifyApproval(authority, CHECKOUT_TOOL, input);
+    checkFill(input);
+    const cdpUrl = browserUrl(env);
+    trace.enter("tab");
+    return await deps.work(
+      cdpUrl,
+      input.url,
+      (page) => fillOnPage(cdpUrl, page, input, claim, deps, trace),
+      deps.tab,
+    );
+  } catch (error) {
+    trace.end("failed", error);
+    throw error;
+  }
 }
 
 type Sheet = { page: Page; own: boolean };
@@ -122,9 +179,11 @@ async function fillOnPage(
   input: FillInput,
   claim: () => Promise<void>,
   deps: FillDeps,
+  trace: FillTrace,
 ) {
   const stepMs = deps.stepMs ?? DEFAULT_STEP_MS;
   const waitMs = deps.waitMs ?? DEFAULT_WAIT_MS;
+  trace.enter("price");
   const priced = await priceOnPage(page, CHECKOUT_TOOL, {
     url: input.url,
     options: input.optionLabels,
@@ -133,12 +192,14 @@ async function fillOnPage(
   if (priced.soldOut) throw new ToolError("NAVER_SHOPPING_SOLD_OUT");
   if (priced.expectedTotalKrw > input.expectedTotalKrw)
     throw new ToolError("NAVER_SHOPPING_PRICE_CHANGED");
+  trace.enter("claim");
   await claim();
 
   // claim 뒤의 단계. `buy` 와 `sent` 에서 난 실패는 결과를 모르는 것이다.
   let phase: "claimed" | "buy" | "layer" | "sent" = "claimed";
   let sheet: Sheet | null = null;
-  const unknown = () => {
+  const unknown = (error?: unknown, reason?: string) => {
+    trace.end("unknown", error, reason);
     const tab = sheet?.page.id ?? page.id;
     if (tab === page.id) page.keep();
     sheet?.page.close();
@@ -147,52 +208,58 @@ async function fillOnPage(
   // 누르기 전에 없던 탭만 주문서 후보다. 층 단계의 실패도 이 목록으로 주문서가 열렸는지 다시 본다.
   let beforeBuy = new Set<string>();
   try {
+    trace.enter("pre_buy");
     beforeBuy = await tabIds(cdpUrl, page);
     let known = beforeBuy;
     // 누르기 전부터 「바로구매」 가 보이면 누른 뒤 층을 알아볼 수 없다. 아무것도 누르지 않고 실패로 끝낸다.
     if ((await page.evaluate(LAYER_OPEN)) === true) throw failed();
+    trace.enter("buy");
     phase = "buy";
     if ((await page.evaluate(PRESS_BUY)) !== true) {
       phase = "claimed";
       throw failed();
     }
     const seen = await waitLayerOrSheet(cdpUrl, page, known, stepMs, waitMs);
-    if (seen === null) return unknown();
+    if (seen === null) return unknown(undefined, "not_seen");
     if (seen !== "layer") {
       // 층 없이 주문서가 바로 열렸으면 옵션과 수량을 고르지 못했다. 기본 옵션·수량 1 과 같을 때만 읽는다.
       sheet = seen;
       if (input.optionLabels.length > 0 || input.quantity !== 1) {
         phase = "sent";
-        return unknown();
+        return unknown(undefined, "sheet_without_layer");
       }
     } else {
+      trace.enter("layer");
       phase = "layer";
       await chooseInLayer(page, input, stepMs, waitMs);
       known = await tabIds(cdpUrl, page);
+      trace.enter("buy_now");
       phase = "sent";
       if ((await page.evaluate(PRESS_BUY_NOW)) !== true) {
         phase = "layer";
         throw failed();
       }
       sheet = await waitSheet(cdpUrl, page, known, stepMs, waitMs);
-      if (sheet === null) return unknown();
+      if (sheet === null) return unknown(undefined, "sheet_not_seen");
     }
+    trace.enter("sheet");
     phase = "sent";
     const finalAmount = await readSheet(sheet.page, stepMs, waitMs);
-    if (finalAmount === null) return unknown();
+    if (finalAmount === null) return unknown(undefined, "amount_unread");
     const tab = sheet.page.id;
     sheet.page.close();
     if (finalAmount > input.expectedTotalKrw) {
       // 승인보다 크면 결과 판정이 넘기지 않으므로 주문서 탭을 닫는다. 상품 탭은 `workInTab` 이 닫는다.
       if (!sheet.own) await closeTab(cdpUrl, tab);
     } else if (sheet.own) page.keep();
+    trace.end("done");
     return {
       status: "ORDER_SHEET_READY" as const,
       finalAmountKrw: finalAmount,
       tab,
     };
   } catch (error) {
-    if (phase === "buy" || phase === "sent") return unknown();
+    if (phase === "buy" || phase === "sent") return unknown(error);
     if (phase === "layer") {
       // 층으로 알아봤어도 그사이 주문서가 열렸을 수 있다. 열렸거나 확인하지 못하면 결과를 모르는 것이다.
       const opened = await findSheet(cdpUrl, page, beforeBuy).catch(
@@ -200,9 +267,11 @@ async function fillOnPage(
       );
       if (opened !== null) {
         if (opened !== "unchecked") sheet = opened;
-        return unknown();
+        return unknown(error);
       }
     }
+    // 바꾸기 전의 오류 이름을 남긴다. 바깥 `fillCheckout` 은 이미 끝 줄이 있으면 다시 쓰지 않는다.
+    trace.end("failed", error);
     sheet?.page.close();
     if (error instanceof ToolError && PASSED_AFTER_CLAIM.has(error.code))
       throw error;

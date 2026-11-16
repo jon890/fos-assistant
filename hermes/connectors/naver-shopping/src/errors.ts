@@ -91,23 +91,35 @@ export async function guard(work: () => Promise<unknown>) {
   }
 }
 
-/** 진단 줄의 칸 이름과 단계. 영문 소문자, 숫자, `_`, `.` 만 받는다. 주소와 화면 글이 섞이지 않게 하는 마지막 관문이다. */
+/** 진단 줄의 칸 이름, 단계, 오류 이름. 영문 소문자, 숫자, `_`, `.` 만 받는다. 주소와 화면 글이 섞이지 않게 하는 마지막 관문이다. */
 const DIAGNOSTIC_WORD = /^[a-z0-9_.]{1,60}$/;
 
 /**
- * 화면을 읽지 못했을 때 표준 오류에 한 줄 JSON 을 남긴다. 모델에게 가는 오류는 코드만 싣는다.
- * 도구 이름, 단계, 찾지 못한 칸 이름만 싣고 주소, 검색어, 화면 글은 싣지 않는다.
+ * 진단 줄에 실을 오류 이름. 선언한 오류는 코드를, 알 수 없는 예외는 예외 종류 이름만 소문자로 바꿔 준다.
+ * 예외 메시지, 주소, 화면 글은 싣지 않는다. 관문(`DIAGNOSTIC_WORD`)에 맞지 않는 이름은 `logDiagnostic` 이 버린다.
+ */
+export function diagnosticCode(error: unknown) {
+  if (error instanceof ToolError) return error.code.toLowerCase();
+  if (error instanceof Error) return error.constructor.name.toLowerCase();
+  return "non_error";
+}
+
+/**
+ * 표준 오류에 한 줄 JSON 을 남긴다. 모델에게 가는 오류는 코드만 싣는다.
+ * 도구 이름, 단계, 찾지 못한 칸 이름, 오류 이름(`diagnosticCode`)만 싣고 주소, 검색어, 화면 글, ticket 은 싣지 않는다.
  */
 export function logDiagnostic(
   tool: string,
   stage: string,
   missing: string[] = [],
+  code?: string,
 ) {
   const safe = (value: string) => (DIAGNOSTIC_WORD.test(value) ? value : null);
   const entry = {
     tool: safe(tool),
     stage: safe(stage),
     missing: missing.map(safe).filter(Boolean).slice(0, 10),
+    ...(code === undefined ? {} : { code: safe(code) }),
   };
   try {
     process.stderr.write(
