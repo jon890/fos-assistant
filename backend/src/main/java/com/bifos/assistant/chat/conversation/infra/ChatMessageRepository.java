@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.TurnTiming;
 import com.bifos.assistant.chat.conversation.domain.UserLastMessage;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
+import com.bifos.assistant.chat.conversation.domain.type.SteerState;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -19,6 +20,19 @@ import org.springframework.data.repository.query.Param;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>, ChatMessageWrites<ChatMessage> {
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
+
+
+    /** 그 turn 에 끼워 넣은 말풍선 가운데 그 상태인 것을 받은 순서로 읽는다(ADR-20261116 / run-steer). */
+    List<ChatMessage> findBySteerExecutionIdAndSteerStateOrderByIdAsc(Long steerExecutionId, SteerState steerState);
+
+
+    /** 그 상태의 말풍선이 남은 대화다. 기동 정리가 끝난 turn 에 남은 「전달됨」 말풍선을 찾을 때 쓴다. */
+    @Query("select distinct m.conversationId from ChatMessage m where m.steerState = :steerState")
+    List<Long> findConversationIdsWithSteerState(@Param("steerState") SteerState steerState);
+
+
+    /** 그 대화에서 그 상태인 말풍선이다. 받은 순서다. */
+    List<ChatMessage> findByConversationIdAndSteerStateOrderByIdAsc(Long conversationId, SteerState steerState);
 
 
     /**

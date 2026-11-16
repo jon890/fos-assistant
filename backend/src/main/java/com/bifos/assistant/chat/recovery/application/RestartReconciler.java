@@ -1,7 +1,9 @@
 package com.bifos.assistant.chat.recovery.application;
 
 import com.bifos.assistant.chat.recovery.config.RestartReconcileProperties;
+import com.bifos.assistant.chat.nextturn.application.SteerLedger;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
+import com.bifos.assistant.chat.turn.application.dto.SteerSettlement;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -9,6 +11,7 @@ import com.bifos.assistant.chat.conversation.application.PendingMessageStore;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
+import com.bifos.assistant.hermes.application.dto.HermesRunResult;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
@@ -80,6 +83,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final Clock clock;
     private final UserExecutionLimiter limiter;
     private final BackgroundTasks backgroundTasks;
+    private final SteerLedger steerLedger;
 
     /** 잡았지만 아직 묻기 시작하지 않은 줄이다. 실행 번호가 열쇠다. {@code this} 로 지킨다. */
     private final Map<Long, Claimed> pending = new LinkedHashMap<>();
@@ -415,11 +419,13 @@ public class RestartReconciler implements SmartLifecycle {
                     turns.untrackRun(markedExecutionId, runId);
                     // 거짓이면 다른 쪽이 이미 적었다. 어느 쪽이든 이 줄은 정해졌다.
                     recorder.settle(row.id(), lookup.result());
+                    settleSteer(item, markedExecutionId, settlementOf(lookup.result()));
                     return;
                 }
                 if (lookup.state() == HermesRunLookup.State.NOT_FOUND) {
                     turns.untrackRun(markedExecutionId, runId);
                     recorder.failWithout(row.id(), REMOTE_RUN_LOST);
+                    settleSteer(item, markedExecutionId, SteerSettlement.unknown());
                     return;
                 }
                 interval = pollInterval;
@@ -437,6 +443,7 @@ public class RestartReconciler implements SmartLifecycle {
                     return;
                 }
                 giveUp(agent, row, reached, finished);
+                settleSteer(item, markedExecutionId, SteerSettlement.unknown());
                 return;
             }
             try {
@@ -446,6 +453,30 @@ public class RestartReconciler implements SmartLifecycle {
                 return;
             }
         }
+    }
+
+
+    /**
+     * 정한 줄이 대화 turn 의 루트면 그 turn 의 steer 말풍선을 끝난 방식대로 정리한다(ADR-20261116 / run-steer). 자식 줄은 말풍선이
+     * 없다.
+     */
+    private void settleSteer(Claimed item, Long rootExecutionId, SteerSettlement settlement) {
+        AgentExecution row = item.row();
+        if (!row.id().equals(row.treeRootId()) || row.conversationId() == null) {
+            return;
+        }
+        steerLedger.settle(rootExecutionId, row.conversationId(), settlement);
+    }
+
+
+    private static SteerSettlement settlementOf(HermesRunResult result) {
+        if (result == null) {
+            return SteerSettlement.unknown();
+        }
+        if ("cancelled".equalsIgnoreCase(result.status())) {
+            return SteerSettlement.stopped();
+        }
+        return SteerSettlement.completed(result.pendingSteer());
     }
 
 

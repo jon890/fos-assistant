@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.application.dto.AgentLabel;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.conversation.application.dto.TaskLabel;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.turn.application.dto.SteerView;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
 import com.bifos.assistant.chat.turn.application.dto.ActivitySummary;
 import com.bifos.assistant.chat.conversation.application.dto.MemoryUse;
@@ -78,6 +79,7 @@ public final class ChatDtos {
      * @param deliveredResults 이 위임 결과 알림 줄이 전한 결과. 묶음의 항목 순서다. 그런 알림 줄이 아니면 빈 목록
      * @param answeredBy {@code @} 로 맡긴 일의 답이면 맡은 에이전트의 이름표. 대화의 에이전트가 쓴 답과 답이 아닌 줄은 null
      * @param delegatedTo {@code @} 로 맡긴 질문이면 그 맡김. 부모 실행 번호는 비어 있다. 아니면 null
+     * @param steer 도는 실행에 끼워 넣은 사용자 글이면 그 상태와 자식 종류(ADR-20261116 / run-steer). 아니면 null
      */
     public record MessageView(
         Long id,
@@ -98,7 +100,8 @@ public final class ChatDtos {
         List<DelegationLine> delegations,
         List<DelegationLine> deliveredResults,
         AgentLabel answeredBy,
-        DelegationLine delegatedTo) {
+        DelegationLine delegatedTo,
+        SteerView steer) {
     }
 
     /**

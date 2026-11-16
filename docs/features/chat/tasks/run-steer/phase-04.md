@@ -32,15 +32,16 @@ turn 이 어떻게 끝나든 그 turn 의 말풍선을 정리해 돌아온 글�
 ### 1. 포트 `chat/turn/application/port/TurnSteerLedger.java`(신규)와 `SteerSettlement`
 
 ```java
-void settle(TurnHandle handle, Long rootExecutionId, Long conversationId, SteerSettlement settlement);
-void carryForward(Long conversationId, List<Long> messageIds, Long executionId);  // saveQuestion 트랜잭션 안
+void settle(Long rootExecutionId, Long conversationId, SteerSettlement settlement);  // handle 은 구현이 실행 번호로 찾는다(포트가 application 클래스를 받지 않는다)
+void carryForward(Long conversationId, List<Long> messageIds);  // saveQuestion 트랜잭션 안
+void announce(Conversation conversation, List<Long> messageIds);  // 트랜잭션 뒤 사건
 ```
 
 `chat/turn/application/dto/SteerSettlement`: `record (Kind kind, String pendingSteer)`, `Kind { COMPLETED, STOPPED, UNKNOWN }`.
 
 ### 2. `SteerLedger` 가 포트를 구현
 
-- `settle`: handle 이 있으면 `steerLock` 안에서 `steerSettled=true` 를 세운다. 그 실행의 `DELIVERED` 행을 번호 순서로 읽고 없으면 끝.
+- `settle`: `turns.find(rootExecutionId)` 로 handle 이 있으면 `steerLock` 안에서 `steerSettled=true` 를 세운다. 그 실행의 `DELIVERED` 행을 번호 순서로 읽고 없으면 끝.
   - `COMPLETED` + `pendingSteer` null: 그대로.
   - `COMPLETED` + `pendingSteer`: 행 글을 `\n` 으로 이은 것의 뒤쪽 묶음(마지막 k 개, k 가 큰 것부터) 가운데 이은 글이 `pendingSteer` 와 같은 것을 고르고, 없으면 모두. 고른 행을 `CARRIED_OVER` 로 바꾸고 `prependCarried`. 멈춤은 그대로.
   - `STOPPED`·`UNKNOWN`: 모두 `UNCONFIRMED`, `prependCarried`, `held=true`.
@@ -53,7 +54,7 @@ void carryForward(Long conversationId, List<Long> messageIds, Long executionId);
 
 ### 3. `ChatTurnRunner`
 
-`runTurn` 바깥 `finally` 맨 앞에서 `steerLedger.settle(handle, executionId, conversationId, settlement)` 를 부른다. 결과가 있으면 완료·실패는 `COMPLETED(result.pendingSteer())`, 취소·중지 확인은 `STOPPED`. 결과 없이 예외면 `UNKNOWN`. 실행 줄을 만들기 전에 끝났으면 부르지 않는다. 정리의 예외를 삼켜 원래 예외를 가리지 않는다.
+`runTurn` 바깥 `finally` 맨 앞에서 `steerLedger.settle(executionId, conversationId, settlement)` 를 부른다. 결과가 있으면 완료·실패는 `COMPLETED(result.pendingSteer())`, 취소·중지 확인은 `STOPPED`. 결과 없이 예외면 `UNKNOWN`. 실행 줄을 만들기 전에 끝났으면 부르지 않는다. 정리의 예외를 삼켜 원래 예외를 가리지 않는다.
 
 ### 4. 다음 turn
 
@@ -71,7 +72,7 @@ void carryForward(Long conversationId, List<Long> messageIds, Long executionId);
 
 ### 7. 기동 정리와 재시작 정리
 
-`RestartReconciler.settleByAsking` 이 루트 줄(`row.id().equals(row.treeRootId())`)을 정하면 `FINISHED` 는 결과 상태로(`cancelled` 면 `STOPPED`, 아니면 `COMPLETED(pendingSteer)`), `NOT_FOUND`·상한 초과는 `UNKNOWN` 으로 `steerLedger.settle(handle 또는 null, ...)` 를 부른다. handle 은 `item.lock()` 이다.
+`RestartReconciler.settleByAsking` 이 루트 줄(`row.id().equals(row.treeRootId())`)을 정하면 `FINISHED` 는 결과 상태로(`cancelled` 면 `STOPPED`, 아니면 `COMPLETED(pendingSteer)`), `NOT_FOUND`·상한 초과는 `UNKNOWN` 으로 `steerLedger.settle(rootExecutionId, conversationId, ...)` 를 부른다.
 
 ### 8. 이력
 
@@ -110,6 +111,7 @@ cd backend && HEAVY_SLOTS=2 orch slot heavy -- ./gradlew test --tests '*SteerSet
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/ChatService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/application/dto/TurnIntent.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatDtos.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/chat/turn/presentation/ChatController.java` | 수정(이력의 steer 칸) |
 | `backend/src/main/java/com/bifos/assistant/chat/recovery/application/RestartReconciler.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/conversation/infra/ChatMessageRepository.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/SteerSettleTest.java` | 신규 |
