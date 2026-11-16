@@ -262,6 +262,68 @@ test("판매 중이 아니면 바로 살 수 없고, 옵션 값이 100개를 넘
   expect("options_unknown" in parsed).toBe(false);
 });
 
+/** 2026-11-16 실측 모양(구조만)을 줄인 표준옵션 항목. 가격·재고 칸이 없고 `optionCombinations` 도 없다. */
+const standard = (group: string, name: string) => ({
+  optionGroupName: group,
+  optionName: name,
+  imageInfo: null,
+});
+
+test("표준옵션은 그룹 이름별 값 목록으로 읽고, 추가 금액과 품절은 지어내지 않는다", () => {
+  const parsed = parseStoreProduct(
+    {
+      ...product,
+      optionUsable: true,
+      stockQuantity: 40,
+      optionStandards: [
+        standard("색상", "검정"),
+        standard("색상", "흰색"),
+        standard("사이즈", "M"),
+        standard("색상", "검정"),
+        standard("사이즈", "L"),
+        standard("", "빈 그룹"),
+        { optionGroupName: "사이즈" },
+      ],
+    },
+    url,
+  )!;
+  expect(parsed.options).toEqual([
+    {
+      name: "색상",
+      values: [
+        { label: "검정", extra_krw: null, sold_out: null },
+        { label: "흰색", extra_krw: null, sold_out: null },
+      ],
+    },
+    {
+      name: "사이즈",
+      values: [
+        { label: "M", extra_krw: null, sold_out: null },
+        { label: "L", extra_krw: null, sold_out: null },
+      ],
+    },
+  ]);
+  expect("options_unknown" in parsed).toBe(false);
+  expect("options_truncated" in parsed).toBe(false);
+});
+
+test("표준옵션도 값이 100개를 넘으면 잘랐다고 알리고, 항목이 비면 options_unknown 이다", () => {
+  const many = Array.from({ length: 120 }, (_, i) =>
+    standard("색상", `색 ${i}`),
+  );
+  const parsed = parseStoreProduct(
+    { ...product, optionUsable: true, optionStandards: many },
+    url,
+  )!;
+  expect(parsed.options[0]!.values).toHaveLength(100);
+  expect(parsed.options_truncated).toBe(true);
+  const empty = parseStoreProduct(
+    { ...product, optionUsable: true, optionStandards: [] },
+    url,
+  )!;
+  expect(empty.options_unknown).toBe(true);
+});
+
 test("상품이 없으면 null, 이름이나 가격이나 배송 칸이 없으면 빠진 칸을 알린다", () => {
   expect(parseStoreProduct(null, "u")).toBeNull();
   expect(() => parseStoreProduct({ name: "x" }, "u")).toThrow(MissingFields);

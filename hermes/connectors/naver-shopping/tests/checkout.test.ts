@@ -135,6 +135,21 @@ const OPENED_PRODUCT = {
   ],
 };
 
+/**
+ * 표준옵션(색상·사이즈) 상품. 2026-11-16 실측 모양(구조만): 처음 상태에 `optionStandards` 가 있고 항목에 가격·재고 칸이 없으며
+ * `optionCombinations` 가 없다. 상품 칸에 전체 재고(`stockQuantity`)가 있다.
+ */
+const STANDARD_PRODUCT = {
+  ...OPTION_PRODUCT,
+  stockQuantity: 40,
+  optionStandards: [
+    { optionGroupName: "색상", optionName: "검정", imageInfo: null },
+    { optionGroupName: "색상", optionName: "흰색", imageInfo: null },
+    { optionGroupName: "사이즈", optionName: "M", imageInfo: null },
+    { optionGroupName: "사이즈", optionName: "L", imageInfo: null },
+  ],
+};
+
 test("옵션 없는 상품의 준비는 카드 요약과 실행 원문을 만들고 누르지 않으며 탭을 닫는다", async () => {
   const { isError, body } = await prepare(
     { product: PLAIN_PRODUCT },
@@ -287,6 +302,61 @@ test("상품 정보 읽기의 누르기는 옵션이 있는데 비었을 때만 
   expect(clicks.map((line) => line.source)).toEqual([OPEN_OPTION_LISTS]);
 });
 
+test("표준옵션 상품의 준비는 드롭다운을 누르지 않고 묶음마다 값 하나로 맞추며 추가 금액을 0 으로 계산한다", async () => {
+  const { isError, body } = await prepare(
+    { product: STANDARD_PRODUCT },
+    { url: PRODUCT_URL, options: ["흰색", "L"], quantity: 2 },
+  );
+  expect(isError).toBe(false);
+  expect(body.summary).toMatchObject({
+    options: [
+      { name: "색상", value: "흰색" },
+      { name: "사이즈", value: "L" },
+    ],
+    itemAmountKrw: 20000,
+    shippingFeeKrw: 3000,
+    expectedTotalKrw: 23000,
+  });
+  expect(body.executionArgs.optionLabels).toEqual(["흰색", "L"]);
+  for (const source of CLICKING) expect(shop!.count(source)).toBe(0);
+});
+
+for (const [name, config, options, code] of [
+  ["묶음 차례가 다름", {}, ["L", "흰색"], "NAVER_SHOPPING_OPTION_MISMATCH"],
+  ["없는 값", {}, ["빨강", "L"], "NAVER_SHOPPING_OPTION_MISMATCH"],
+  ["단계 수가 다름", {}, ["흰색"], "NAVER_SHOPPING_OPTION_MISMATCH"],
+  [
+    "상품 전체 재고가 0",
+    { stockQuantity: 0 },
+    ["흰색", "L"],
+    "NAVER_SHOPPING_SOLD_OUT",
+  ],
+] as const) {
+  test(`표준옵션 상품의 준비는 ${name}이면 카드 없이 ${code} 로 거절한다`, async () => {
+    const { isError, body } = await prepare(
+      { product: { ...STANDARD_PRODUCT, ...config } },
+      { url: PRODUCT_URL, options, quantity: 1 },
+    );
+    expect(isError).toBe(true);
+    expect(body).toEqual({ error: { code } });
+  });
+}
+
+test("표준옵션 상품의 정보 읽기는 누르지 않고 묶음을 낸다", async () => {
+  const result = await call(
+    { product: STANDARD_PRODUCT },
+    "get_product_detail",
+    {
+      url: PRODUCT_URL,
+    },
+  );
+  expect(
+    result.body.options.map((group: { name: string }) => group.name),
+  ).toEqual(["색상", "사이즈"]);
+  expect(result.body.options_unknown).toBeUndefined();
+  for (const source of CLICKING) expect(shop!.count(source)).toBe(0);
+});
+
 /** 채우기 기록의 주요 단계를 차례대로 낸다. */
 function steps(fake: FakeShop) {
   const names = new Map<string, string>([
@@ -398,6 +468,51 @@ test("채우기는 층에서 옵션을 단계마다 고르고 수량을 맞춘 �
   // 사용자가 쓰던 탭은 읽지도 닫지도 않는다.
   expect(shop!.tabs.has("USER0")).toBe(true);
   expect(shop!.cdpLines().some((line) => line.tab === "USER0")).toBe(false);
+  expectSafe(shop!);
+});
+
+test("표준옵션 상품의 채우기는 층에서 색상과 사이즈를 차례로 고르고, 주문서 금액이 승인보다 크면 그 금액을 내고 새 주문서 탭을 닫는다", async () => {
+  const args = {
+    ...PLAIN_ARGS,
+    optionLabels: ["흰색", "L"],
+    quantity: 1,
+    expectedTotalKrw: 13000,
+  };
+  const config: ShopConfig = {
+    product: STANDARD_PRODUCT,
+    layerOptions: 2,
+    layerValues: ["흰색", "L"],
+    buyNow: "new",
+  };
+  let result = await fill(
+    { ...config, amounts: { total: 13000, summary: 13000 } },
+    args,
+  );
+  expect(result.body).toEqual({
+    status: "ORDER_SHEET_READY",
+    finalAmountKrw: 13000,
+    tab: "TAB2",
+  });
+  expect(
+    shop!
+      .cdpLines()
+      .filter((line) => line.source === CHOOSE_OPTION)
+      .map((line) => line.args),
+  ).toEqual([["흰색"], ["L"]]);
+  expect(shop!.count(OPEN_OPTION_LISTS)).toBe(0);
+  expectSafe(shop!);
+  shop!.stop();
+  // 실제로는 추가 금액이 있던 경우. 결과 판정이 승인보다 큰 금액을 넘기지 않도록 플러그인은 주문서 탭을 닫는다.
+  result = await fill(
+    { ...config, amounts: { total: 14000, summary: 14000 } },
+    args,
+  );
+  expect(result.body).toEqual({
+    status: "ORDER_SHEET_READY",
+    finalAmountKrw: 14000,
+    tab: "TAB2",
+  });
+  expect(shop!.tabs.has("TAB2")).toBe(false);
   expectSafe(shop!);
 });
 

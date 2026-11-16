@@ -21,7 +21,7 @@ export class MissingFields extends Error {
 }
 
 /**
- * 조합형 옵션을 묶음별 값 목록으로 바꾼다. 첫 묶음은 값마다 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의
+ * 조합형 옵션을 묶음별 값 목록으로 바꾼다. 조합형으로 읽은 값이 없으면 표준옵션(`standardGroups`)을 본다. 첫 묶음은 값마다 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의
  * 재고가 0)을 싣는다. 둘째 묶음부터는 값의 이름만 싣는다. 고른 조합의 금액과 재고는 주문서 준비가 다시 읽는다.
  */
 function options(product: Json) {
@@ -71,10 +71,58 @@ function options(product: Json) {
   });
   if (list(pick(product, PRODUCT.optionGroups)).length > OPTION_GROUPS_MAX)
     truncated = true;
+  // 조합형 칸으로 읽은 값이 없을 때만 표준옵션을 본다. 조합형은 조합별 추가 금액과 재고가 있어 그쪽을 먼저 믿는다.
+  if (result.every((group) => group.values.length === 0)) {
+    const standard = standardGroups(product);
+    if (standard.groups.length)
+      return {
+        options: standard.groups,
+        truncated: standard.truncated,
+        unknown: false,
+      };
+  }
   const unknown =
     pick(product, PRODUCT.optionUsable) === true &&
     result.every((group) => group.values.length === 0);
   return { options: result, truncated, unknown };
+}
+
+/**
+ * 표준옵션(`optionStandards`, 2026-11-16 실측)을 그룹 이름별 값 목록으로 묶는다. 그룹과 값은 처음 나온 차례를 지킨다.
+ * 항목에 가격·재고 칸이 없어 값마다 추가 금액과 품절은 지어내지 않고 `null` 로 둔다. 같은 그룹의 같은 값은 한 번만 싣는다.
+ * 그룹 이름이나 값 글이 빈 항목은 건너뛴다.
+ */
+function standardGroups(product: Json) {
+  const byGroup = new Map<string, string[]>();
+  for (const item of list(pick(product, PRODUCT.standards))) {
+    const group = text(pick(item, PRODUCT.standardGroup), OPTION_LABEL_MAX);
+    const label = text(pick(item, PRODUCT.standardValue), OPTION_LABEL_MAX);
+    if (group === null || label === null) continue;
+    const labels = byGroup.get(group) ?? [];
+    if (!labels.includes(label)) labels.push(label);
+    byGroup.set(group, labels);
+  }
+  const entries = [...byGroup];
+  const truncated =
+    entries.length > OPTION_GROUPS_MAX ||
+    entries.some(([, labels]) => labels.length > OPTION_VALUES_MAX);
+  const groups = entries.slice(0, OPTION_GROUPS_MAX).map(([name, labels]) => ({
+    name,
+    values: labels.slice(0, OPTION_VALUES_MAX).map((label): OptionValue => ({
+      label,
+      extra_krw: null,
+      sold_out: null,
+    })),
+  }));
+  return { groups, truncated };
+}
+
+/** 조합형 칸이 비고 표준옵션으로 옵션을 읽은 상품인가. 준비가 조합 대신 묶음별 값으로 맞춘다. */
+function usesStandards(value: Json) {
+  return (
+    list(pick(value, PRODUCT.combinations)).length === 0 &&
+    standardGroups(value).groups.length > 0
+  );
 }
 
 /** 스마트스토어·브랜드스토어 상품. 상태는 있는데 상품이 없으면 `null` 이고 부르는 쪽이 `NOT_FOUND` 로 끝낸다. */
@@ -178,6 +226,7 @@ export type ChosenOption = {
  * 옵션 글을 상품 상태의 조합 하나로 맞춘다(design.md 「도구(PR3c)」). 옵션 없는 상품은 빈 글만 받는다.
  * 맞는 조합이 없거나 둘 이상이면 `NAVER_SHOPPING_OPTION_MISMATCH`, 옵션 목록을 읽지 못했으면 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이다.
  * 조합의 추가 금액 칸이 비면 지어내지 않고 바뀐 화면으로 본다. 단계는 `combinationNames` 의 수(셋)까지다.
+ * 조합형 칸이 없고 표준옵션으로 읽은 상품은 `chooseStandard` 가 묶음마다 값 하나로 맞춘다.
  */
 export function chooseOption(
   value: Json,
@@ -199,6 +248,8 @@ export function chooseOption(
     labels.length !== groups.length
   )
     throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+  if (usesStandards(value))
+    return chooseStandard(value, groups, labels as string[]);
   const matches = list(pick(value, PRODUCT.combinations)).filter(
     (combination) =>
       labels.every(
@@ -227,5 +278,34 @@ export function chooseOption(
     })),
     extra_krw: extra,
     sold_out: stock === 0,
+  };
+}
+
+/**
+ * 표준옵션 상품의 옵션 글을 묶음마다 값 하나로 맞춘다(design.md 「표준옵션(색상·사이즈)」). 묶음 차례대로 글이 그 묶음의 값과
+ * 같아야 한다. 잘린 묶음에 든 값은 확인하지 못했으므로 맞지 않는 것으로 본다.
+ * 항목에 가격 칸이 없어 추가 금액은 0 으로 계산한다. 실제 추가 금액이 있으면 채우기가 읽은 주문서 금액이 승인한 예상 합계보다 커지고,
+ * 결과 판정이 결제를 넘기지 않는다(`PURCHASE_AMOUNT_CHANGED`). 조합별 재고 칸도 없어 상품 전체 재고가 0 일 때만 품절이다.
+ * 고른 조합만 품절이면 층의 값이 막혀 있어(`aria-disabled`) 채우기가 「바로구매」 전에 멈춘다.
+ */
+function chooseStandard(
+  value: Json,
+  groups: { name: string; values: OptionValue[] }[],
+  labels: string[],
+): ChosenOption {
+  const fits = labels.every(
+    (label, index) =>
+      groups[index]!.values.filter((entry) => entry.label === label).length ===
+      1,
+  );
+  if (!fits) throw new ToolError("NAVER_SHOPPING_OPTION_MISMATCH");
+  return {
+    labels,
+    shown: groups.map((group, index) => ({
+      name: group.name,
+      value: labels[index]!,
+    })),
+    extra_krw: 0,
+    sold_out: won(pick(value, PRODUCT.stock)) === 0,
   };
 }

@@ -3,7 +3,7 @@
  *
  * **검색 화면은 2026-11-13 실제 화면으로 쟀다.** App Router 의 조각(`self.__next_f.push`)을 이은 글에서 `productName` 을 가진
  * 객체를 꺼내고, 그 칸 이름이 아래 `SEARCH_ITEM` 이다. **상품 화면(`PRODUCT_STATE_PATH`, `PRODUCT`)도 2026-11-13 실제 화면으로
- * 쟀다**(옵션 칸 제외: 잰 상품이 모두 `optionUsable: false` 라 옵션 칸 이름은 가설이다). **가격비교 묶음 화면(`CATALOG`)은
+ * 쟀다**(옵션 칸 제외: 그때 잰 상품이 모두 `optionUsable: false` 였다. 표준옵션 칸은 2026-11-16 에 쟀고, 조합형 옵션 칸 이름은 아직 가설이다). **가격비교 묶음 화면(`CATALOG`)은
  * 2026-11-13 실측(판매처 목록 제외)이다.** 검색 화면처럼 조각에서 `nCatalogId` 와 `lowestPrice` 를 가진 객체를 꺼내고, 판매처별
  * 가격 목록은 어느 객체인지 가려내지 못해 읽지 않는다.
  * 칸마다 후보 이름을 차례로 보고, 필수 칸이 비면 결과를 지어내지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다.
@@ -37,7 +37,8 @@ export const AD_CARD_TYPE = "AD";
 /**
  * 상품 화면의 상품. 실측한 칸: `name`(표시용 `dispName` 도 같은 값으로 실측했다), `channel.channelName`, `salePrice`, `benefitsView.discountedSalePrice`,
  * `productStatusType`, `optionUsable`, `productDeliveryInfo.{deliveryFeeType, baseFee, area2ExtraFee}`.
- * 실측하지 못한 칸(옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
+ * 표준옵션 칸(`optionStandards`)과 상품 재고(`stockQuantity`)는 2026-11-16 옵션 있는 상품으로 쟀다.
+ * 실측하지 못한 칸(조합형 옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
  */
 export const PRODUCT = {
   title: ["name", "dispName"],
@@ -53,6 +54,15 @@ export const PRODUCT = {
   combinationNames: ["optionName1", "optionName2", "optionName3"],
   combinationPrice: ["price"],
   combinationStock: ["stockQuantity"],
+  /**
+   * 표준옵션(색상·사이즈) 항목 배열(2026-11-16 실측, 구조만). 항목 칸은 `optionGroupName`, `optionName`, `imageInfo` 뿐이고
+   * 가격·재고 칸이 없다. 그룹 이름별로 묶어 옵션 묶음으로 읽는다. 이 상품에는 `optionCombinations` 가 없었다.
+   */
+  standards: ["optionStandards"],
+  standardGroup: ["optionGroupName"],
+  standardValue: ["optionName"],
+  /** 상품 전체 재고(2026-11-16 실측). 표준옵션 상품에서 0 이면 품절로 본다. */
+  stock: ["stockQuantity"],
   delivery: ["productDeliveryInfo"],
   feeType: ["deliveryFeeType"],
   baseFee: ["baseFee"],
@@ -82,11 +92,15 @@ export const CATALOG = {
 };
 
 /**
- * 상품 화면의 옵션 자리(가설). 이 안의 `aria-haspopup="listbox"` 첫 단추만 누른다(`OPEN_OPTION_LISTS`).
- * 옵션이 있는 상품의 화면은 재지 않았다. 사용자가 실제 계정으로 확인한 뒤 고친다.
+ * 상품 화면의 옵션 드롭다운 단추(2026-11-16 실측, 구조만). 색상·사이즈 표준옵션 상품에서 `aria-haspopup="listbox"` 단추가
+ * 문서에 하나 보였고, 그 단추와 조상의 class 는 빌드마다 바뀌는 해시(`H4ArHznl5E` 꼴)라 class 로 고르지 않는다.
+ * 상품 화면의 다른 드롭다운(리뷰 정렬 같은 것)을 누르지 않게 `OPEN_OPTION_LISTS` 가 범위를 좁힌다.
+ * 보이는 단추가 하나면 그것을 누른다. 둘 이상이면 「구매하기」 단추(`PURCHASE_LAYER.buyLabel`)의 조상을 안쪽부터 올라가며 처음
+ * 단추가 든 조상을 찾고, 그 안의 보이는 단추가 정확히 하나일 때만 누른다. 옵션 단추는 구매 단추와 같은 구매 상자에 있기 때문이다.
+ * 그 조상에 단추가 둘 이상이면(페이지 래퍼까지 올라가 다른 드롭다운이 섞인 경우 포함) 어느 것인지 모르므로 누르지 않는다.
+ * `body` 까지 가도 없거나 「구매하기」 가 없어도 누르지 않는다. 누르지 못하면 읽기는 `options_unknown` 으로 끝난다.
  */
-export const PRODUCT_OPTION_BUTTON =
-  '[class*="option" i] button[aria-haspopup="listbox"]';
+export const PRODUCT_OPTION_BUTTON = 'button[aria-haspopup="listbox"]';
 
 /**
  * 상품 구매 층. 상품 화면의 「구매하기」 를 누르면 같은 화면에 뜨고 옵션·수량과 「장바구니」, 「바로구매」, 「닫기」 가 있다(2026-11-13 실측).
