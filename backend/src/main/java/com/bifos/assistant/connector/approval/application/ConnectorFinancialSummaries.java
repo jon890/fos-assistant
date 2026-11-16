@@ -101,6 +101,19 @@ public class ConnectorFinancialSummaries {
     }
 
 
+    /**
+     * 주문서 준비 줄이 승인한 상품 주소다. 저장한 snapshot 을 카드와 같은 검증으로 연다. 열지 못하면 빈 값이다. 주문 확인 도구에 줄
+     * 결제 넘기기 맥락이 쓴다(ConnectorPaymentContexts). 부르는 쪽이 이미 그 사용자의 구매 줄을 골랐다.
+     */
+    Optional<String> checkoutUrlOf(ConnectorAction action) {
+        if (action.risk() != ToolRisk.PURCHASE) {
+            return Optional.empty();
+        }
+        var summary = checkout(action, null);
+        return summary.available() ? Optional.ofNullable(summary.url()) : Optional.empty();
+    }
+
+
     private Long remainingToday(Long userId) {
         try {
             long daily = purchases.limitOf(userId).dailyKrw();

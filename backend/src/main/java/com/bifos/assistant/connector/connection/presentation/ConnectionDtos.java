@@ -8,10 +8,12 @@ import com.bifos.assistant.connector.connection.application.dto.BoundAgentSummar
 import com.bifos.assistant.connector.connection.application.dto.ConnectionSnapshot;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorFieldSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorOption;
+import com.bifos.assistant.connector.connection.application.dto.ConnectorPaymentContext;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorSummary;
 import com.bifos.assistant.connector.connection.application.dto.ConnectorToolSummary;
 import com.bifos.assistant.connector.connection.application.dto.SpecialistAgent;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
@@ -175,16 +177,37 @@ public final class ConnectionDtos {
      * @param decision {@code allow} 나 {@code block}
      * @param message {@code block} 일 때 모델에게 보일 글. {@code allow} 이면 빈 글이다
      * @param actionId 승인 요청 번호. 승인 요청을 만들지 않았으면 null
+     * @param paymentContext 허용한 호출에 hook 이 도구 인자 {@code _fos_payment} 로 넣을 결제 넘기기 맥락. 없으면 칸이 없다
      */
     public record ConnectorPolicyResponse(
         String decision,
         String message,
-        @JsonProperty("action_id") String actionId) {
+        @JsonProperty("action_id") String actionId,
+        @JsonProperty("payment_context") @JsonInclude(JsonInclude.Include.NON_NULL) PaymentContextBody paymentContext) {
         public static ConnectorPolicyResponse from(ConnectorPolicyAnswer value) {
             return new ConnectorPolicyResponse(
                 value.allowed() ? "allow" : "block",
                 value.message(),
-                value.actionId() == null ? null : value.actionId().toString());
+                value.actionId() == null ? null : value.actionId().toString(),
+                value.paymentContext() == null ? null : PaymentContextBody.from(value.paymentContext()));
+        }
+    }
+
+    /**
+     * 결제 넘기기 맥락의 응답 모양이다. fos-ctx 가 정확한 키와 타입으로 읽어 그대로 인자에 넣는다. 금액은 원 단위 정수다.
+     *
+     * @param v 모양의 버전. 1
+     * @param handedOffAtMs 결제 넘기기를 적은 시각의 밀리초 epoch
+     */
+    public record PaymentContextBody(
+        int v,
+        @JsonProperty("handed_off_at_ms") long handedOffAtMs,
+        @JsonProperty("final_amount_krw") long finalAmountKrw,
+        @JsonProperty("expected_total_krw") long expectedTotalKrw,
+        String url) {
+        static PaymentContextBody from(ConnectorPaymentContext value) {
+            return new PaymentContextBody(1, value.handedOffAt().toEpochMilli(), value.finalAmountKrw(), value.expectedTotalKrw(),
+                value.url());
         }
     }
 

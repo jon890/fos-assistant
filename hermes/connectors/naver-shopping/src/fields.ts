@@ -118,3 +118,32 @@ export const ORDER_SHEET = {
   /** 결제수단 절 머리의 같은 금액. */
   methodSummary: '#PAYMENT_WRAP [class*="ContentSection_summary"] em',
 };
+
+/**
+ * 네이버페이 결제 내역 화면(2026-11-16 실측, 구조만). Next.js pages router 의 `__NEXT_DATA__` 에서
+ * `props.pageProps.dehydratedState.queries[]` 가운데 `queryKey[0]` 이 `PAYMENT_LIST` 인 줄의 `state.data.pages[].items[]` 가 결제 목록이다.
+ * 고정 식(`ORDER_HISTORY_STATE`)이 항목마다 `item` 의 칸만 골라 준다. 이름, 주소, 상품명, 판매처 칸은 탭 밖으로 꺼내지 않는다.
+ * 금액 칸(`amounts`)과 `date` 의 뜻은 실제 결제가 없어 재지 못한 가설이다(design.md 의 「PR4 주문 확인(REQ14)」). 사람이 결제한 뒤 이 표만 고친다.
+ */
+export const ORDER_HISTORY = {
+  queriesPath: ["props", "pageProps", "dehydratedState", "queries"],
+  queryName: "PAYMENT_LIST",
+  pagesPath: ["state", "data", "pages"],
+  /** 항목 하나에서 고르는 칸. 값은 후보 경로 목록이고 `amounts` 만 후보마다 따로 꺼낸다. */
+  item: {
+    serviceType: [["serviceType"]],
+    productNo: [["product", "no"]],
+    productUrl: [["product", "infoUrl"], ["productDetailUrl"]],
+    date: [["date"]],
+    status: [["status", "name"]],
+    /** 결제 금액 후보(가설). 하나라도 주문서의 최종 결제 금액과 같으면 맞다고 본다. 앞의 것이 결과에 싣는 금액이다. */
+    amounts: [
+      ["additionalData", "orderAmount"],
+      ["product", "price"],
+    ],
+  },
+};
+/** 주문 확인이 보는 항목의 종류. 스마트스토어·브랜드스토어 주문이다. */
+export const ORDER_SERVICE_TYPE = "ORDER";
+/** 고정 식이 한 번에 돌려주는 항목의 상한. 첫 페이지는 15건이었다. */
+export const ORDER_RAW_MAX = 100;

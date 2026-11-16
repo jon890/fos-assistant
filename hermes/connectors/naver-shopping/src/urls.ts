@@ -50,3 +50,13 @@ export function classifyUrl(
 export function searchUrl(query: string) {
   return `https://search.shopping.naver.com/ns/search?query=${encodeURIComponent(query)}`;
 }
+
+/** 네이버페이 결제 내역(2026-11-16 실측). 주문 확인이 여는 유일한 주소이고 모델이나 인자가 정하지 못한다. 첫 페이지만 연다. */
+export const ORDER_HISTORY_URL = "https://pay.naver.com/pc/history";
+
+/** 상품 주소에서 상품 번호를 꺼낸다. 「주소 분류」 의 `store` 갈래가 아니면 `null` 이다. */
+export function storeProductNo(raw: unknown): string | null {
+  const target = classifyUrl(raw);
+  if (target?.kind !== "store") return null;
+  return /\/products\/([0-9]{1,20})$/.exec(target.url)?.[1] ?? null;
+}

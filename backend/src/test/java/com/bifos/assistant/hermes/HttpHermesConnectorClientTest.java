@@ -554,6 +554,31 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("도구의 payment_context 는 boolean 참일 때만 참이고, 칸이 없거나 그 밖의 모양은 거짓으로 읽는다")
+    @Test
+    void readsPaymentContextOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String read = "{\"risk\":\"READ\",\"approval\":\"none\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog?include=standard"))
+            .andRespond(withSuccess(
+                CATALOG.replace(
+                    tail,
+                    tail + ",\"schema\":2,\"tools\":{"
+                        + "\"absent\":" + read + "},"
+                        + "\"open\":" + read + ",\"payment_context\":true},"
+                        + "\"word\":" + read + ",\"payment_context\":\"true\"}}"),
+                MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+            .extracting(ConnectorTool::name, ConnectorTool::paymentContext)
+            // 읽을 수 없는 선언은 맥락을 싣지 않는 쪽으로 읽는다.
+            .containsExactly(tuple("absent", false), tuple("open", true), tuple("word", false));
+        server.verify();
+    }
+
+
     @DisplayName("도구의 identifiers 는 문자열 배열이면 그 순서대로 읽고, 칸이 없거나 그 밖의 모양이면 빈 목록으로 읽는다")
     @Test
     void readsIdentifiersOfToolPolicies() {

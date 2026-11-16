@@ -51,6 +51,8 @@ import tools.jackson.databind.node.ObjectNode;
 class CheckoutApprovalTest extends FinancialConnectorTestBase {
     static final String PREPARE_TOOL = "mcp__tossinvest__prepare_trade";
     static final String TAB = "TAB0123456789";
+    /** 결제 넘기기 맥락을 받는다고 바꿔 선언하는 읽기 도구다. */
+    static final String ORDER_CHECK = "list_orders";
     @Autowired
     ConnectorPolicyService publicPolicy;
     @Autowired
@@ -331,6 +333,48 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
     }
 
 
+    @Test
+    @DisplayName("결제 넘기기 맥락을 선언한 읽기 도구는 허용할 때 그 대화의 가장 늦은 결제 넘기기의 시각, 금액, 상품 주소를 받는다")
+    void orderCheckReceivesLatestPaymentContext() {
+        assertThat(orderCheck(ORDER_CHECK)).as("넘기기 전에는 맥락 없이 허용한다")
+            .satisfies(answer -> assertThat(answer.allowed()).isTrue())
+            .satisfies(answer -> assertThat(answer.paymentContext()).isNull());
+        var first = prepare(UUID.randomUUID().toString());
+        fill = claimThen(sheet(expected - 100));
+        assertThat(publicApproval.approve(user, first.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var context = orderCheck(ORDER_CHECK).paymentContext();
+        assertThat(context).isNotNull();
+        assertThat(context.finalAmountKrw()).isEqualTo(expected - 100);
+        assertThat(context.expectedTotalKrw()).isEqualTo(expected);
+        assertThat(context.url()).isEqualTo(base.get("summary").get("url").stringValue());
+        assertThat(context.handedOffAt()).isEqualTo(action(first).handoff().at());
+
+        var second = prepareOther();
+        fill = claimThen(sheet(expected));
+        assertThat(publicApproval.approve(user, second.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(orderCheck(ORDER_CHECK).paymentContext().expectedTotalKrw()).as("가장 늦게 넘긴 줄").isEqualTo(13000L);
+        assertThat(orderCheck("get_order").paymentContext()).as("선언하지 않은 도구").isNull();
+    }
+
+
+    @Test
+    @DisplayName("결제를 넘기지 못한 줄(금액이 커서 FAILED)은 맥락이 되지 않는다")
+    void failedCheckoutIsNoPaymentContext() {
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = claimThen(sheet(expected + 1));
+        assertThat(publicApproval.approve(user, answer.actionId(), null, false).status()).isEqualTo(ActionStatus.FAILED);
+        var checked = orderCheck(ORDER_CHECK);
+        assertThat(checked.allowed()).isTrue();
+        assertThat(checked.paymentContext()).isNull();
+    }
+
+
+    private ConnectorPolicyAnswer orderCheck(String tool) {
+        resetCache();
+        return publicPolicy.decide(profile, session, session, UUID.randomUUID().toString(), "mcp__tossinvest__" + tool, tool, "{}");
+    }
+
+
     private ConnectorPolicyAnswer prepare(String toolCallId) {
         return publicPolicy.decide(profile, session, session, toolCallId, PREPARE_TOOL, "prepare_trade",
             "{\"v\":1,\"tool\":\"create_order\",\"args\":" + JSON.writeValueAsString(base.get("modelArgs")) + "}");
@@ -406,9 +450,15 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
 
     /** 대역 토스의 선언을 주문서 준비 선언으로 바꾼다. 보호 해시는 연결 상태와 맞도록 그대로 둔다. */
     private static ConnectorManifest checkout(ConnectorManifest manifest) {
-        var tools = manifest.tools().stream().map(tool -> !"create_order".equals(tool.name()) ? tool
-            : new ConnectorTool(tool.name(), "PURCHASE", "always", tool.title(), tool.grant(), List.of(), tool.description(),
-                tool.argLabels(), tool.summary(), tool.outbound(), tool.conversationGrant(), tool.attendedOnly()))
+        var tools = manifest.tools().stream().map(tool -> switch (tool.name()) {
+            case "create_order" -> new ConnectorTool(tool.name(), "PURCHASE", "always", tool.title(), tool.grant(), List.of(),
+                tool.description(), tool.argLabels(), tool.summary(), tool.outbound(), tool.conversationGrant(), tool.attendedOnly());
+            // 주문 확인 도구 자리다. 결제 넘기기 맥락을 받는다고 선언한다.
+            case ORDER_CHECK -> new ConnectorTool(tool.name(), tool.risk(), tool.approval(), tool.title(), tool.grant(),
+                tool.identifiers(), tool.description(), tool.argLabels(), tool.summary(), tool.outbound(), tool.conversationGrant(),
+                tool.attendedOnly(), true);
+            default -> tool;
+        })
             .toList();
         ObjectNode guard = JSON.createObjectNode().put("protocol", "approval-claim-v2").put("prepare_tool", "prepare_trade");
         guard.putArray("scope_fields");

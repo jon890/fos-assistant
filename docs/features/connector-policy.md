@@ -142,6 +142,7 @@ sequenceDiagram
 | `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. `READ` 가 아니고 `approval` 이 `required` 인 도구가 빠뜨리면 manifest 를 거절한다. 그 밖의 도구는 거짓으로 채운다 |
 | `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
+| `tools.<이름>.payment_context` | 참이면 판정이 허용할 때 그 대화의 마지막 결제 넘기기 맥락을 응답에 싣고 hook 이 인자 `_fos_payment` 로 넣는다. 없으면 거짓이다. `READ` 도구에만 선언한다(아래 「도구 호출 판정」) |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny`(없을 때의 기본값)나 `ask` 만 받는다. 아래 「일부 도구만 선언하기」 |
 
 | 위험도 | 뜻 | 기본 `approval` | 하한 |
@@ -244,6 +245,7 @@ hook 은 `prefix` 로 그 호출이 어느 플러그인 서버의 것인지만 �
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
 - 허용한 호출이 다시 왔을 때 그 연결과 바인딩이 이제 `READY` 가 아니면 막는다. 해제하거나 뗀 연결에 앞의 허용이 나가지 않게 한다
+- `payment_context` 를 선언한 도구를 허용할 때는 응답에 `payment_context`(`{v: 1, handed_off_at_ms, final_amount_krw, expected_total_krw, url}`)를 싣는다. 호출한 실행의 대화와 사용자, 그 플러그인이 같은 승인 줄 가운데 결제 넘기기(`payment`)를 적은 `SUCCEEDED` 줄을 넘긴 시각이 늦은 것부터 하나 고른다(`ConnectorPaymentContexts`). 찾지 못하면 칸 없이 허용한다. 같은 호출의 다시 오기는 맥락을 다시 찾지 않는다. hook 은 그 맥락을 도구 인자 `_fos_payment` 로 덮어 넣고, 칸이 없는데 모델이 그 인자를 보냈으면 `null` 로 덮는다. 모양과 까닭은 [네이버 쇼핑 설계](naver-shopping/design.md)의 「PR4 주문 확인(REQ14)」 이 갖는다
 
 `NOT_READY` 로 막을 때 모델에게 주는 글은 바인딩마다 다르다.
 

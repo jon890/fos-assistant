@@ -103,6 +103,7 @@ public class ConnectorPolicyService {
     private final Clock clock;
     private final ConnectorActionBodies bodies;
     private final ConnectorFinancialIntake financial;
+    private final ConnectorPaymentContexts paymentContexts;
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -123,6 +124,7 @@ public class ConnectorPolicyService {
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
         ConnectorFinancialIntake financial,
+        ConnectorPaymentContexts paymentContexts,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -139,6 +141,7 @@ public class ConnectorPolicyService {
             feedback,
             bodies,
             financial,
+            paymentContexts,
             transactionManager,
             Clock.systemUTC());
     }
@@ -159,6 +162,7 @@ public class ConnectorPolicyService {
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
         ConnectorFinancialIntake financial,
+        ConnectorPaymentContexts paymentContexts,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
@@ -174,6 +178,7 @@ public class ConnectorPolicyService {
         this.feedback = feedback;
         this.bodies = bodies;
         this.financial = financial;
+        this.paymentContexts = paymentContexts;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -326,7 +331,8 @@ public class ConnectorPolicyService {
             if (bindingPending && saved.denyReason() == ActionDenyReason.NOT_READY) {
                 return new ConnectorPolicyAnswer(false, bindingPendingMessage(binding), null);
             }
-            return answer(saved);
+            // 결제 넘기기 맥락을 선언한 도구는 허용할 때 그 대화의 마지막 결제 넘기기를 싣는다. 다시 오기(replayed)는 싣지 않는다.
+            return paymentContexts.attach(answer(saved), declared, origin, connection.connectorId());
         } catch (DataIntegrityViolationException ex) {
             // 같은 호출이 동시에 와 유니크 제약에 걸렸다. 먼저 저장된 줄의 판정을 그대로 돌려준다.
             return actions.findByDedupeKey(dedupeKey)
