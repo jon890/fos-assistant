@@ -935,6 +935,7 @@ class UserBrowserServiceTest {
                 new FakeCdp(),
                 new FakeCdp(),
                 new BrowserUsage(),
+                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()),
                 () -> Duration.ofMinutes(30),
                 Duration.ofSeconds(2)));
     }

@@ -17,6 +17,8 @@ import java.util.List;
  * (ADR-20261101 / plugin-without-assistant-json). 카탈로그에서 빠진 커넥터는 거짓
  * @param singleBinding 연결 하나를 에이전트 하나에만 붙인다고 선언했는가. 전문 에이전트 만들기 화면이 떼기 칸을 잠근다.
  * 카탈로그에서 빠진 커넥터는 거짓
+ * @param ownerBrowser 사용자 브라우저를 쓰는 플러그인인가({@code owner_browser_env} 선언). 대화의 「에이전트 화면 보기」 단추가 쓴다.
+ * 카탈로그에서 빠진 커넥터는 거짓
  */
 public record ConnectorSummary(
     String id,
@@ -30,10 +32,30 @@ public record ConnectorSummary(
     List<BoundAgentSummary> bindings,
     String ownerBrowserLoginUrl,
     boolean standardPlugin,
-    boolean singleBinding) {
+    boolean singleBinding,
+    boolean ownerBrowser) {
 
     public ConnectorSummary {
         bindings = List.copyOf(bindings);
+    }
+
+
+    /** 사용자 브라우저를 쓰지 않는 커넥터의 항목이다. */
+    public ConnectorSummary(
+        String id,
+        String title,
+        String description,
+        ConnectorAppearance appearance,
+        List<ConnectorFieldSummary> fields,
+        List<ConnectorToolSummary> tools,
+        ConnectionStatus myStatus,
+        boolean available,
+        List<BoundAgentSummary> bindings,
+        String ownerBrowserLoginUrl,
+        boolean standardPlugin,
+        boolean singleBinding) {
+        this(id, title, description, appearance, fields, tools, myStatus, available, bindings, ownerBrowserLoginUrl,
+            standardPlugin, singleBinding, false);
     }
 
 

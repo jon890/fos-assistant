@@ -30,6 +30,7 @@ const ENTER_DEDUP_MS = 100;
 export function BrowserScreen({
   startUrl,
   startTab = null,
+  followAgent = false,
   onOpen,
   onClose,
   onTabs,
@@ -37,6 +38,8 @@ export function BrowserScreen({
 }: {
   startUrl: string | null;
   startTab?: string | null;
+  /** 처음 연 화면을 에이전트가 쥔 탭으로 옮긴다. 「에이전트 화면 보기」 패널이 쓴다. */
+  followAgent?: boolean;
   onOpen: () => void;
   onClose: () => void;
   /** 받은 탭 목록을 밖에 알린다. 화면 넘기기 패널이 넘긴 탭의 주소를 본다. */
@@ -55,6 +58,7 @@ export function BrowserScreen({
     useScreenStream({
       startUrl,
       startTab,
+      followAgent,
       onOpen,
       onTabs,
       areaRef,
@@ -68,6 +72,9 @@ export function BrowserScreen({
     send,
     frameHeight: frame?.height ?? 0,
   });
+  // 에이전트가 쥔 탭은 보기 전용이다. 서버도 입력을 버리므로 여기서 막는 것은 보이는 모양이다.
+  const viewOnly = tabs.some((tab) => tab.active && tab.agent);
+  const inputOff = closed !== null || viewOnly;
 
   return (
     <dialog
@@ -116,6 +123,7 @@ export function BrowserScreen({
           addressRef={addressRef}
           tabs={tabs}
           disabled={closed !== null}
+          viewOnly={viewOnly}
           send={send}
           onNotice={setNotice}
           onKeyboard={() => keysRef.current?.focus()}
@@ -126,7 +134,16 @@ export function BrowserScreen({
             {notice}
           </Notice>
         ) : null}
-        {dialog && closed === null ? (
+        {viewOnly && closed === null ? (
+          <p
+            role="status"
+            data-testid="agent-band"
+            className="rounded-md border border-border bg-muted px-3 py-2 text-sm"
+          >
+            에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요.
+          </p>
+        ) : null}
+        {dialog && !inputOff ? (
           <ScreenDialog dialog={dialog} send={send} />
         ) : null}
         <div
@@ -141,14 +158,14 @@ export function BrowserScreen({
             expanded={expanded}
             frame={frame}
             closed={closed !== null}
-            pointer={pointer}
+            pointer={viewOnly ? {} : pointer}
           >
-            <ScreenKeyboard keysRef={keysRef} send={send} closed={closed} />
+            <ScreenKeyboard keysRef={keysRef} send={send} off={inputOff} />
           </ScreenFrame>
           <ScreenScrollControls
             send={send}
             height={frame?.height ?? 0}
-            disabled={!frame || closed !== null}
+            disabled={!frame || inputOff}
           />
         </div>
       </section>
@@ -160,11 +177,12 @@ export function BrowserScreen({
 function ScreenKeyboard({
   keysRef,
   send,
-  closed,
+  off,
 }: {
   keysRef: React.RefObject<HTMLInputElement | null>;
   send: (input: ScreenInput) => void;
-  closed: string | null;
+  /** 화면이 닫혔거나 보기 전용이면 키를 보내지 않는다. */
+  off: boolean;
 }) {
   const composing = useRef(false);
   const pendingEnter = useRef(false);
@@ -172,7 +190,7 @@ function ScreenKeyboard({
   // 휴대폰의 Backspace 는 keydown 에 키 이름이 오지 않아 beforeinput 으로 잡는다.
   useEffect(() => {
     const keys = keysRef.current;
-    if (!keys || closed !== null) return;
+    if (!keys || off) return;
     const onBeforeInput = (event: InputEvent) => {
       if (event.inputType !== "deleteContentBackward" || event.isComposing)
         return;
@@ -182,12 +200,16 @@ function ScreenKeyboard({
     };
     keys.addEventListener("beforeinput", onBeforeInput);
     return () => keys.removeEventListener("beforeinput", onBeforeInput);
-  }, [closed, send, keysRef]);
+  }, [off, send, keysRef]);
 
   // 조합을 마친 글자만 보내고 입력칸을 비운다. 조합 중인 한글은 조합이 끝난 뒤 보낸다.
   function flushText() {
     const keys = keysRef.current;
     if (composing.current || !keys?.value) return;
+    if (off) {
+      keys.value = "";
+      return;
+    }
     textInputs(keys.value).forEach(send);
     keys.value = "";
   }
@@ -199,7 +221,7 @@ function ScreenKeyboard({
   }
 
   function keyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (closed !== null) return;
+    if (off) return;
     // 조합 중 Enter 는 조합한 글자 뒤에 한 번 보낸다.
     if (event.nativeEvent.isComposing) {
       if (event.key === "Enter") pendingEnter.current = true;

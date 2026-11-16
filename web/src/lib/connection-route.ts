@@ -217,6 +217,7 @@ function safeSummary(value: unknown) {
     bindings: safeBindings(item.bindings),
     standardPlugin: item.standardPlugin === true,
     singleBinding: item.singleBinding === true,
+    ownerBrowser: item.ownerBrowser === true,
   };
 }
 

@@ -30,6 +30,7 @@ public class BrowserGateway {
     private final UserAccessPolicy access;
     private final UserBrowserService browsers;
     private final BrowserUsage usage;
+    private final BrowserAgentTabs agentTabs;
 
 
     /**
@@ -63,6 +64,22 @@ public class BrowserGateway {
     /** 중계 연결이 열려 있는 동안 쥐는 핸들이다. 쥐고 있는 동안 자동 중지하지 않는다. WebSocket 이 쓴다. */
     public BrowserUsageHandle hold(GatewayTarget target) {
         return usage.open(target.browserId());
+    }
+
+
+    /**
+     * 중계 연결이 그 탭에 붙어 있는 동안 에이전트가 그 탭을 쥔다. 브라우저 수준 연결({@code browser})은 탭을 쥐지 않아 아무것도 하지 않는
+     * 핸들이다.
+     */
+    public BrowserUsageHandle holdTab(GatewayTarget target, String kind, String targetId) {
+        return "page".equals(kind) ? agentTabs.hold(target.browserId(), targetId) : () -> {
+        };
+    }
+
+
+    /** 중계로 그 탭을 만들었다. 연결이 붙기 전에도 에이전트가 쥔 탭으로 둔다. */
+    public void created(GatewayTarget target, String targetId) {
+        agentTabs.created(target.browserId(), targetId);
     }
 
 

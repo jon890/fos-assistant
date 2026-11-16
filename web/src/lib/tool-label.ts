@@ -72,7 +72,7 @@ const UNKNOWN: Label = { running: "도구를 쓰고 있어요", done: "도구를
 const MCP_PREFIX = "mcp__";
 
 /** MCP 도구는 `mcp__{서버}__{도구}` 로 온다. 마지막 `__` 뒤의 이름을 낸다. */
-function bareName(toolName: string | null): string | null {
+export function bareName(toolName: string | null): string | null {
   return toolName !== null && toolName.startsWith(MCP_PREFIX)
     ? toolName.slice(toolName.lastIndexOf("__") + 2)
     : toolName;

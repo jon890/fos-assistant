@@ -20,7 +20,8 @@ export function ScreenFrame({
   expanded: boolean;
   frame: Frame | null;
   closed: boolean;
-  pointer: ReturnType<typeof useScreenPointer>;
+  /** 보기 전용이면 빈 묶음이다. */
+  pointer: Partial<ReturnType<typeof useScreenPointer>>;
   children: ReactNode;
 }) {
   return (

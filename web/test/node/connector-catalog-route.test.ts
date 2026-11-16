@@ -29,6 +29,7 @@ function summary(change: Record<string, unknown> = {}) {
     linkKind: "service",
     standardPlugin: false,
     singleBinding: false,
+    ownerBrowser: false,
     ...change,
   };
 }
@@ -312,6 +313,21 @@ test("웹 카탈로그 라우트는 single_binding 표시를 참일 때만 옮�
   assert.deepEqual(
     (await response.json()).map(
       (item: { singleBinding: boolean }) => item.singleBinding,
+    ),
+    [true, false, false],
+  );
+});
+
+test("웹 카탈로그 라우트는 ownerBrowser 표시를 참일 때만 옮기고 다른 값은 거짓으로 읽는다", async () => {
+  const response = await getCatalog([
+    summary({ ownerBrowser: true }),
+    summary({ ownerBrowser: "true" }),
+    summary({ ownerBrowser: undefined }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    (await response.json()).map(
+      (item: { ownerBrowser: boolean }) => item.ownerBrowser,
     ),
     [true, false, false],
   );
