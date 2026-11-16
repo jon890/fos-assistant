@@ -14,7 +14,6 @@ import {
   priceOnPage,
   QUANTITY_MAX,
 } from "./checkout.ts";
-import { classifyPage } from "./classify.ts";
 import {
   diagnosticCode,
   logDiagnostic,
@@ -23,27 +22,29 @@ import {
 } from "./errors.ts";
 import {
   BUY_VISIBLE,
-  CHOOSE_OPTION,
   LAYER_OPEN,
-  OPEN_LAYER_OPTION,
-  ORDER_SHEET_AMOUNT,
   PAGE_PROBE,
   PRESS_BUY,
   PRESS_BUY_NOW,
-  SET_QUANTITY,
 } from "./expressions.ts";
-import { ORDER_SHEET } from "./fields.ts";
+import {
+  chooseInLayer,
+  failed,
+  isOrderSheet,
+  readSheet,
+} from "./fill-sheet.ts";
 import { browserUrl, type Env } from "./session.ts";
 import {
   attachPage,
   closeTab,
   listTabs,
-  waitReady,
   workInTab,
   type Page,
   type TabOptions,
 } from "./tab.ts";
 import { classifyUrl } from "./urls.ts";
+
+export { isOrderSheet };
 
 export type FillInput = {
   checkout: 1;
@@ -69,8 +70,6 @@ const DEFAULT_WAIT_MS = 15_000;
 const PASSED_AFTER_CLAIM = new Set<ErrorCode>([
   "NAVER_SHOPPING_CHECKOUT_FAILED",
 ]);
-
-const failed = () => new ToolError("NAVER_SHOPPING_CHECKOUT_FAILED");
 
 /** 채우기의 단계. 진단 줄의 `stage` 다. 순서는 design.md 「채우기 진단」 이 갖는다. */
 export type FillStage =
@@ -113,20 +112,6 @@ class FillTrace {
       [],
       error === undefined ? reason : diagnosticCode(error),
     );
-  }
-}
-
-/** 주문서 주소인가. 호스트와 `/ordersheet/` 경로로 가린다. */
-export function isOrderSheet(href: unknown) {
-  try {
-    const url = new URL(typeof href === "string" ? href : "");
-    return (
-      url.protocol === "https:" &&
-      url.hostname === ORDER_SHEET.host &&
-      url.pathname.startsWith(ORDER_SHEET.pathPrefix)
-    );
-  } catch {
-    return false;
   }
 }
 
@@ -361,55 +346,3 @@ async function waitSheet(
   return null;
 }
 
-/** 층 안에서 옵션 값을 단계마다 고르고 수량을 맞춘 뒤 다시 읽어 확인한다. 못 맞추면 「바로구매」 를 누르지 않고 실패다. */
-async function chooseInLayer(
-  page: Page,
-  input: FillInput,
-  stepMs: number,
-  waitMs: number,
-) {
-  for (const [index, label] of input.optionLabels.entries()) {
-    if ((await page.call(OPEN_LAYER_OPTION, [index])) !== true) throw failed();
-    const until = Date.now() + Math.min(waitMs, page.remaining());
-    while (true) {
-      const chosen = await page.call(CHOOSE_OPTION, [label]);
-      if (chosen === "ok") break;
-      if (chosen !== "missing" || Date.now() >= until) throw failed();
-      await Bun.sleep(stepMs);
-    }
-    await Bun.sleep(stepMs);
-  }
-  // 수량 칸이 없으면 층의 기본값 1 만 받는다.
-  const matches = (value: unknown) =>
-    value === input.quantity || (value === null && input.quantity === 1);
-  if (!matches(await page.call(SET_QUANTITY, [input.quantity]))) throw failed();
-  await Bun.sleep(stepMs);
-  if (!matches(await page.call(SET_QUANTITY, [input.quantity]))) throw failed();
-}
-
-/** 주문서 탭에서 화면 분류를 하고 두 자리의 금액이 같아질 때까지 읽는다. 사람이 해야 하는 화면이거나 읽지 못하면 `null` 이다. */
-async function readSheet(page: Page, stepMs: number, waitMs: number) {
-  await waitReady(page, stepMs);
-  const probe = ((await page.evaluate(PAGE_PROBE)) ?? {}) as {
-    href?: unknown;
-  };
-  if (classifyPage(probe) !== "ok" || !isOrderSheet(probe.href)) return null;
-  const until = Date.now() + Math.min(waitMs, page.remaining());
-  while (true) {
-    const amount = (await page.evaluate(ORDER_SHEET_AMOUNT)) as {
-      total?: unknown;
-      summary?: unknown;
-    } | null;
-    const total = amount?.total;
-    if (
-      typeof total === "number" &&
-      Number.isSafeInteger(total) &&
-      total >= 0 &&
-      total < 1_000_000_000 &&
-      total === amount?.summary
-    )
-      return total;
-    if (Date.now() >= until) return null;
-    await Bun.sleep(stepMs);
-  }
-}
