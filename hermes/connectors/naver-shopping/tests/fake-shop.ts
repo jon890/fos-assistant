@@ -44,6 +44,8 @@ export type ShopConfig = {
   noBuyButton?: boolean;
   /** 「구매하기」 단추를 이만큼 평가한 뒤에 그린다(`Infinity` 면 끝내 그리지 않는다). 없으면 처음부터 보인다. */
   buyButtonAfter?: number;
+  /** 「구매하기」 단추는 보이는데 누르면 눌리지 않는다(claim 뒤 사라진 경우). */
+  pressBuyFails?: boolean;
   /** 누르기 전부터 상품 화면에 「바로구매」 단추가 보인다. */
   buyNowOnProduct?: boolean;
   /** 주문서 금액 식에 CDP 오류로 답한다. */
@@ -247,7 +249,8 @@ export function startFakeShop(config: ShopConfig = {}) {
           return value(tab.screen === "product" && buyDrawn());
         }
         if (source === PRESS_BUY) {
-          if (tab.screen !== "product" || !buyDrawn()) return value(false);
+          if (tab.screen !== "product" || !buyDrawn() || config.pressBuyFails)
+            return value(false);
           const buy = config.buy ?? "layer";
           if (buy === "layer") tab.screen = "layer";
           else if (buy === "sheet-same") {

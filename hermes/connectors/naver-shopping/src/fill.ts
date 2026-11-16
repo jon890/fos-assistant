@@ -279,8 +279,8 @@ async function fillOnPage(
 async function waitBuyButton(page: Page, stepMs: number, waitMs: number) {
   const until = Date.now() + Math.min(waitMs, page.remaining());
   while (true) {
-    if ((await page.evaluate(BUY_VISIBLE).catch(() => false)) === true)
-      return true;
+    // 연결 오류는 삼키지 않는다. 식은 스스로 예외를 거짓으로 바꾸므로 던져지는 것은 연결 문제뿐이다.
+    if ((await page.evaluate(BUY_VISIBLE)) === true) return true;
     if (Date.now() >= until) return false;
     await Bun.sleep(stepMs);
   }
