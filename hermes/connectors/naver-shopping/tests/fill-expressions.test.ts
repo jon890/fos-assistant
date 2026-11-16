@@ -190,6 +190,23 @@ test("보이는 드롭다운이 둘 이상이면 「구매하기」 와 같은 �
   expect([sort.clicked, option.clicked]).toEqual([0, 1]);
 });
 
+test("「구매하기」 에서 가장 가까운, 단추가 든 조상에 단추가 둘 이상이면 어느 것도 누르지 않는다", () => {
+  // 구매 상자에 옵션 단추가 없어 페이지 래퍼까지 올라간 경우. 래퍼 안에는 다른 드롭다운 둘이 있다.
+  const sort = el({ matches: [PRODUCT_OPTION_BUTTON] });
+  const filter = el({ matches: [PRODUCT_OPTION_BUTTON] });
+  const buy = el({ matches: [BUTTONS], text: "구매하기" });
+  const box = el({ matches: [], children: [buy] });
+  const wrapper = el({ matches: [], children: [sort, filter, box] });
+  buy.parent = box;
+  box.parent = wrapper;
+  sort.parent = wrapper;
+  filter.parent = wrapper;
+  expect(
+    run(OPEN_OPTION_LISTS, { host: STORE, elements: [sort, filter, buy] }),
+  ).toBe(false);
+  expect([sort.clicked, filter.clicked]).toEqual([0, 0]);
+});
+
 test("층의 옵션은 층 안의 n 번째 단추를 열고, 같은 글을 먼저 고르며 추가 금액 표시가 붙은 글도 고른다", () => {
   const optionA = el({ matches: [PURCHASE_LAYER.optionButton] });
   const optionB = el({ matches: [PURCHASE_LAYER.optionButton] });
