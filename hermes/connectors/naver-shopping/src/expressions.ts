@@ -178,6 +178,9 @@ export const OPEN_OPTION_LISTS = `(() => { try { ${ON_STORE} const visible = ${V
 /** 상품 화면의 「구매하기」 를 누른다. 같은 화면에 상품 구매 층이 뜬다(2026-11-13 실측). 장바구니는 누르지 않는다. */
 export const PRESS_BUY = `(() => { try { ${ON_STORE} ${HELPERS} const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}); if (!b) return false; b.click(); return true; } catch { return false; } })()`;
 
+/** 상품 화면에 보이는 「구매하기」 단추가 있는가. 누르지 않는다. 화면이 단추를 그리기를 기다릴 때 쓴다(2026-11-16 실측: 준비 상태 뒤 1초쯤 늦게 그린다). */
+export const BUY_VISIBLE = `(() => { try { ${ON_STORE} ${HELPERS} return byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}) !== null; } catch { return false; } })()`;
+
 /** 상품 구매 층이 떴는가(보이는 「바로구매」 단추가 있는가). 누르지 않는다. */
 export const LAYER_OPEN = `(() => { try { ${HELPERS} return byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}) !== null; } catch { return false; } })()`;
 
@@ -208,6 +211,7 @@ export const SET_QUANTITY = `function (quantity) { try { ${ON_STORE} ${HELPERS} 
 
 /** 채우기만 부르는 식. */
 export const FILL_EXPRESSIONS = new Set([
+  BUY_VISIBLE,
   PRESS_BUY,
   LAYER_OPEN,
   PRESS_BUY_NOW,

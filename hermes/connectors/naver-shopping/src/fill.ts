@@ -22,6 +22,7 @@ import {
   type ErrorCode,
 } from "./errors.ts";
 import {
+  BUY_VISIBLE,
   CHOOSE_OPTION,
   LAYER_OPEN,
   OPEN_LAYER_OPTION,
@@ -76,6 +77,7 @@ export type FillStage =
   | "approval"
   | "tab"
   | "price"
+  | "buy_ready"
   | "claim"
   | "pre_buy"
   | "buy"
@@ -193,6 +195,9 @@ async function fillOnPage(
     if (priced.soldOut) throw new ToolError("NAVER_SHOPPING_SOLD_OUT");
     if (priced.expectedTotalKrw > input.expectedTotalKrw)
       throw new ToolError("NAVER_SHOPPING_PRICE_CHANGED");
+    // 화면이 「구매하기」 를 그리기 전에 claim 하면 ticket 만 쓰고 누르지 못한다. 보일 때까지 기다린 뒤 claim 한다.
+    trace.enter("buy_ready");
+    if (!(await waitBuyButton(page, stepMs, waitMs))) throw failed();
     trace.enter("claim");
     await claim();
   } catch (error) {
@@ -282,6 +287,17 @@ async function fillOnPage(
     if (error instanceof ToolError && PASSED_AFTER_CLAIM.has(error.code))
       throw error;
     throw failed();
+  }
+}
+
+/** 상품 화면의 「구매하기」 단추가 보이기를 기다린다. 시간 안에 보이면 참이다. */
+async function waitBuyButton(page: Page, stepMs: number, waitMs: number) {
+  const until = Date.now() + Math.min(waitMs, page.remaining());
+  while (true) {
+    if ((await page.evaluate(BUY_VISIBLE).catch(() => false)) === true)
+      return true;
+    if (Date.now() >= until) return false;
+    await Bun.sleep(stepMs);
   }
 }
 
