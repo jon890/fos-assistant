@@ -15,5 +15,5 @@
 | REQ9 | 없음 | 계약 문서 steer 절을 읽고 `HermesSteerRequestTest`·`StubHermesRunsClientTest` 를 돌린다 | 문서가 v2026.9.24 기준 동작과 「부른다」 를 적음, 시험 통과 | 문서 검토와 Java 가짜 Hermes 시험. E2E 가짜는 PR2 | worker | 없음 | PR 전 |
 | REQ1 | 같은 대화 두 창 | 두 요청으로 잇달아 글을 보낸다 | 첫 글만 끼우고 둘째는 대기 칸에 남아 순서대로 다음 turn 으로 감 | 백엔드 통합 시험 | worker | 없음 | PR 전 |
 | REQ3 | steer 응답을 기다리는 동안 turn 이 끝나게 한 가짜 | 글을 보낸다 | 받은 말풍선도 그 turn 의 정리에 들어가고, 정리 뒤 온 글은 호출 없이 대기 칸 | 백엔드 통합 시험 | worker | 없음 | PR 전 |
-| REQ4 | `steering` 글과 끝난 실행의 `DELIVERED` 행이 남은 DB | 서버 기동 정리를 돌린다 | 둘 다 `UNCONFIRMED` 와 멈춘 줄, 글 유실 없음 | 백엔드 통합 시험 | worker | 없음 | PR 전 |
+| REQ4 | `steering` 글과 끝난 실행의 `DELIVERED` 행이 남은 DB | 서버 기동 정리를 돌린다 | `steering` 글은 `UNCONFIRMED` 와 멈춘 줄, 끝난 실행의 `DELIVERED` 는 그대로(이미 따른 지시를 다시 보내지 않음) | 백엔드 통합 시험 | worker | 없음 | PR 전 |
 | REQ8 | 설정 끔 | 대기 줄을 저장해 JSON 을 읽는다. 버전 2 값을 decode 하고, 버전 3 을 넣어 본다 | 꺼짐 동안 버전 1, 버전 2 왕복, 모르는 버전은 오류(보내지 않음) | `PendingMessageStoreTest` | worker | 없음 | PR 전 |

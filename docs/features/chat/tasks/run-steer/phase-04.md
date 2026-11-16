@@ -23,7 +23,7 @@ turn 이 어떻게 끝나든 그 turn 의 말풍선을 정리해 돌아온 글�
 ## 의도 메모
 
 - 포트 `chat/turn/application/port/TurnSteerLedger` 를 이 phase 에서 만들고 phase 3 의 `SteerLedger` 가 구현한다. `SteerLedger` 는 `NextTurnDispatcher` 를 주입하지 않으므로 빈 순환이 없다.
-- 정리의 상태 변경·되돌리기·멈춤은 한 트랜잭션이다. 실패하면 경고를 남기고 그 대화 번호를 `SteerLedger` 의 메모리 집합 「정리 못 함」 에 넣는다. `NextTurnDispatcher.tryNext` 가 맨 앞에서 `ledger.resettleIfMarked(conversationId)` 를 부르고, 기동 정리도 같은 일을 한다. 행이 `DELIVERED` 로 남아 다시 찾을 수 있다.
+- 정리의 상태 변경·되돌리기·멈춤은 한 트랜잭션이다. 실패하면 경고를 남기고 그 실행 번호와 끝난 방식을 `SteerLedger` 의 메모리에 적는다. `NextTurnDispatcher.tryNext` 가 맨 앞에서 `ledger.resettleIfMarked(conversationId)` 를 불러 그 실행만 같은 방식으로 다시 정리한다. 「전달됨」 말풍선을 훑어 다시 정리하지 않는다(완료로 남긴 것과 구분할 수 없다).
 - steer 의 기동 정리는 재시작 정리 설정(`RestartReconciler` 의 `enabled`)에 묶지 않는다. 설정이 꺼져 있어도 남은 글을 잃지 않게 `SteerLedger` 자신의 기동 리스너로 돈다.
 - 상한으로 멈춘 살펴보기 turn 은 steer 대상이 아니라 말풍선이 없다.
 
@@ -45,12 +45,11 @@ void announce(Conversation conversation, List<Long> messageIds);  // 트랜잭�
   - `COMPLETED` + `pendingSteer` null: 그대로.
   - `COMPLETED` + `pendingSteer`: 행 글을 `\n` 으로 이은 것의 뒤쪽 묶음(마지막 k 개, k 가 큰 것부터) 가운데 이은 글이 `pendingSteer` 와 같은 것을 고르고, 없으면 모두. 고른 행을 `CARRIED_OVER` 로 바꾸고 `prependCarried`. 멈춤은 그대로.
   - `STOPPED`·`UNKNOWN`: 모두 `UNCONFIRMED`, `prependCarried`, `held=true`.
-  - 바뀐 행마다 `steer` 사건, 끝에 `pending` 사건. 실패하면 「정리 못 함」 집합.
+  - 바뀐 행마다 `steer` 사건, 끝에 `pending` 사건. 실패하면 실행 번호와 끝난 방식을 기억한다.
 - `carryForward`: 그 행들을 `CARRIED_OVER` 로 바꾸고 `steer` 사건.
-- `resettleIfMarked(conversationId)`: 집합에 있으면 `resettleFinished(conversationId)`.
-- `resettleFinished(conversationId)`: 그 대화에서 실행이 이미 끝났는데(실행 줄 상태가 `RUNNING` 이 아님) `DELIVERED` 로 남은 행을 실행마다 `UNKNOWN` 으로 정리한다.
+- `resettleIfMarked(conversationId)`: 기억한 실행마다 같은 끝난 방식으로 `settle`.
 - `resolveStaleSteering(conversationId)`: 남은 `steering` 글을 phase 3 의 `unknown` 과 같이 처리한다(실행 번호는 그 대화의 마지막 루트 실행).
-- `@EventListener(ApplicationReadyEvent.class) @Order(-1) onStartup()`: 대기 줄에 `steering` 글이 있는 대화와 `DELIVERED` 행이 있는 대화를 찾아 위 둘을 부른다. 한 대화가 실패해도 다음 대화를 이어 간다.
+- `@EventListener(ApplicationReadyEvent.class) @Order(-1) onStartup()`: 대기 줄에 `steering` 글이 있는 대화를 찾아 `resolveStaleSteering` 을 부른다. `DELIVERED` 행은 훑지 않는다. 한 대화가 실패해도 다음 대화를 이어 간다.
 
 ### 3. `ChatTurnRunner`
 
@@ -87,7 +86,7 @@ void announce(Conversation conversation, List<Long> messageIds);  // 트랜잭�
 - 중지 → `UNCONFIRMED`, 멈춘 줄에 말풍선 번호 글. 「보내기」(release) → `CARRIED_OVER`, 새 행 없음. 취소 → 행은 `UNCONFIRMED` 그대로.
 - 결과 조회가 404·시간 초과로 던짐 → `UNCONFIRMED`·held.
 - steer 응답을 기다리는 중 turn 이 끝남(`beforeSteer` 로 끝냄) → 받은 행도 정리. 정리 뒤 온 steer → 호출 없이 대기 칸.
-- 기동 정리: 남은 `steering` 글 → `UNCONFIRMED`·held. 끝난 실행의 `DELIVERED` 행 → `UNCONFIRMED`. 재시작 정리가 `FINISHED` + `pending_steer` → `CARRIED_OVER`.
+- 기동 정리: 남은 `steering` 글 → `UNCONFIRMED`·held. 끝난 실행의 `DELIVERED` 행은 그대로. 재시작 정리가 `FINISHED` + `pending_steer` → `CARRIED_OVER`.
 - 정리 실패를 흉내 냄 → 다음 `tryNext` 가 다시 정리.
 - 다시 생성 거절.
 - 기존 대기열·중지 시험이 그대로 통과(REQ8).

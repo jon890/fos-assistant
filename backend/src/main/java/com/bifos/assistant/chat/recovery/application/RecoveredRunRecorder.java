@@ -118,14 +118,16 @@ public class RecoveredRunRecorder {
     /** Hermes 의 결과 없이 FAILED 로 적는다. 이미 끝난 줄이면 거짓이다. 끝 사건의 detail 은 그 오류 코드다. */
     public boolean failWithout(Long executionId, String errorCode) {
         boolean finished = finishOnce(executionId, row -> failLocked(row, errorCode));
-        settleSteer(executionId, SteerSettlement.unknown());
+        if (finished) {
+            settleSteer(executionId, SteerSettlement.unknown());
+        }
         return finished;
     }
 
 
     /**
-     * 정한 줄이 대화 turn 의 루트면 그 turn 의 steer 말풍선을 끝난 방식대로 정리한다(ADR-20261116 / run-steer). 자식 줄은 말풍선이
-     * 없다. 정리는 실패해도 예외를 올리지 않는다.
+     * 이 호출이 적은 줄이 대화 turn 의 루트면 그 turn 의 steer 말풍선을 끝난 방식대로 정리한다(ADR-20261116 / run-steer). 다른 쪽이 이미
+     * 적은 줄은 그쪽이 정리했다. 자식 줄은 말풍선이 없다. 정리는 실패해도 예외를 올리지 않는다.
      */
     private void settleSteer(Long executionId, SteerSettlement settlement) {
         executionRepository.findById(executionId)

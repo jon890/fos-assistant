@@ -26,15 +26,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
     List<ChatMessage> findBySteerExecutionIdAndSteerStateOrderByIdAsc(Long steerExecutionId, SteerState steerState);
 
 
-    /** 그 상태의 말풍선이 남은 대화다. 기동 정리가 끝난 turn 에 남은 「전달됨」 말풍선을 찾을 때 쓴다. */
-    @Query("select distinct m.conversationId from ChatMessage m where m.steerState = :steerState")
-    List<Long> findConversationIdsWithSteerState(@Param("steerState") SteerState steerState);
-
-
-    /** 그 대화에서 그 상태인 말풍선이다. 받은 순서다. */
-    List<ChatMessage> findByConversationIdAndSteerStateOrderByIdAsc(Long conversationId, SteerState steerState);
-
-
     /**
      * 대화의 답 메시지가 가리키는 실행 번호를 번호 순으로 읽는다. 메시지 본문은 읽지 않는다.
      *

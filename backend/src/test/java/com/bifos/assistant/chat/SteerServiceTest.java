@@ -250,6 +250,28 @@ class SteerServiceTest {
 
 
     @Test
+    @DisplayName("두 창이 잇달아 끼우면 첫 글이 답을 기다리는 동안 둘째 글은 대기 칸에 들어가 순서대로 간다")
+    void secondWindowQueuesWhileFirstIsSteering() throws InterruptedException {
+        Thread running = startRunningTurn("질문");
+        stub().beforeSteer(() -> {
+            stub().beforeSteer(() -> {
+            });
+            pending.enqueue(dad, conversation.id(), "둘째 창 글", true);
+        });
+
+        pending.enqueue(dad, conversation.id(), "첫째 창 글", true);
+
+        assertThat(stub().steered()).extracting(StubHermesRunsClient.SteerRequest::text).containsExactly("첫째 창 글");
+        assertThat(steerBubbles()).extracting(ChatMessage::content).containsExactly("첫째 창 글");
+        assertThat(pendingRows.read(conversation.id()).items()).extracting(PendingMessage::content)
+            .containsExactly("둘째 창 글");
+        finish(running);
+        awaitUntil("둘째 글의 다음 turn", () -> stub().received().size() == 2);
+        assertThat(stub().received().get(1).input()).endsWith("둘째 창 글");
+    }
+
+
+    @Test
     @DisplayName("입력창 표시가 없거나 스킬 커맨드면 끼우지 않는다")
     void doesNotSteerWithoutRequestOrForSkillCommand() throws InterruptedException {
         Thread running = startRunningTurn("질문");

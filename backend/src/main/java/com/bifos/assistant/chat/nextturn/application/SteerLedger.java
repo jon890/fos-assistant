@@ -16,12 +16,9 @@ import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.SteerSettlement;
 import com.bifos.assistant.chat.turn.application.dto.SteerView;
 import com.bifos.assistant.chat.turn.application.port.TurnSteerLedger;
-import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -46,14 +43,18 @@ public class SteerLedger implements TurnSteerLedger {
     private final PendingMessageStore pendingMessages;
     private final ChatMessageRepository messages;
     private final ConversationRepository conversations;
-    private final AgentExecutionRepository executions;
     private final TurnCancellation turns;
     private final ConversationEventHub hub;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
-    /** 정리하다 실패한 대화다. 메모리에만 둔다. 다음 {@code tryNext} 와 기동 정리가 다시 정리한다. */
-    private final Set<Long> unsettled = ConcurrentHashMap.newKeySet();
+    /**
+     * 정리하다 실패한 실행과 그 끝난 방식이다. 대화 번호마다 둔다. 다음 {@code tryNext} 가 그 실행만 같은 방식으로 다시 정리한다.
+     *
+     * <p>「전달됨」 말풍선만 보고 다시 정리하면 완료로 정리해 「전달됨」 으로 남긴 말풍선까지 되돌려, 이미 따른 지시가 다시 실행될 수 있다.
+     * 메모리에만 둔다. 서버가 다시 뜨면 잊고, 그 말풍선은 「전달됨」 으로 남는다.
+     */
+    private final Map<Long, Map<Long, SteerSettlement>> unsettled = new ConcurrentHashMap<>();
 
 
     /**
@@ -103,7 +104,7 @@ public class SteerLedger implements TurnSteerLedger {
             announceRows(conversationId, changed);
         } catch (RuntimeException ex) {
             log.warn("steer 말풍선을 정리하지 못했다 conversationId={} executionId={}", conversationId, rootExecutionId, ex);
-            unsettled.add(conversationId);
+            unsettled.computeIfAbsent(conversationId, key -> new ConcurrentHashMap<>()).put(rootExecutionId, settlement);
         }
     }
 
@@ -137,32 +138,11 @@ public class SteerLedger implements TurnSteerLedger {
     }
 
 
-    /** 정리하다 실패한 대화면 다시 정리한다. {@code NextTurnDispatcher.tryNext} 가 맨 앞에서 부른다. */
+    /** 정리하다 실패한 실행이 있으면 그 실행만 처음 끝난 방식대로 다시 정리한다. {@code NextTurnDispatcher.tryNext} 가 맨 앞에서 부른다. */
     public void resettleIfMarked(Long conversationId) {
-        if (unsettled.remove(conversationId)) {
-            resettleFinished(conversationId);
-        }
-    }
-
-
-    /**
-     * 그 대화에서 이미 끝난 turn 에 남은 「전달됨」 말풍선을 들어갔는지 모르는 것으로 정리한다. 이 프로세스에서 도는 turn 과 아직
-     * {@code RUNNING} 인 실행(기동 정리가 정할 것)의 말풍선은 건드리지 않는다.
-     */
-    public void resettleFinished(Long conversationId) {
-        Set<Long> executionIds = new LinkedHashSet<>();
-        messages.findByConversationIdAndSteerStateOrderByIdAsc(conversationId, SteerState.DELIVERED)
-            .forEach(message -> executionIds.add(message.steerExecutionId()));
-        for (Long executionId : executionIds) {
-            if (executionId == null || turns.find(executionId).isPresent()) {
-                continue;
-            }
-            boolean running = executions.findById(executionId)
-                .map(execution -> execution.status() == ExecutionStatus.RUNNING)
-                .orElse(false);
-            if (!running) {
-                settle(executionId, conversationId, SteerSettlement.unknown());
-            }
+        Map<Long, SteerSettlement> failed = unsettled.remove(conversationId);
+        if (failed != null) {
+            failed.forEach((executionId, settlement) -> settle(executionId, conversationId, settlement));
         }
     }
 
@@ -180,8 +160,11 @@ public class SteerLedger implements TurnSteerLedger {
 
 
     /**
-     * 기동할 때 남은 「끼우는 중」 글과 끝난 turn 의 「전달됨」 말풍선을 정리한다. 재시작 정리({@code RestartReconciler}, {@code @Order(0)})와
-     * 다음 turn 깨우기보다 먼저 돈다. 재시작 정리 설정과 상관없이 돌아 글을 잃지 않는다. 한 대화가 실패해도 다음 대화를 이어 간다.
+     * 기동할 때 남은 「끼우는 중」 글을 정리한다. 재시작 정리({@code RestartReconciler}, {@code @Order(0)})와 다음 turn 깨우기보다 먼저
+     * 돈다. 재시작 정리 설정과 상관없이 돈다. 한 대화가 실패해도 다음 대화를 이어 간다.
+     *
+     * <p>「전달됨」 말풍선은 훑지 않는다. 도는 중에 서버가 멈춘 turn 은 재시작 정리가 줄을 적으며 정리하고, 끝난 turn 의 「전달됨」 은 완료로
+     * 정리해 남긴 것이라 되돌리면 이미 따른 지시가 다시 실행될 수 있다.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Order(-1)
@@ -193,13 +176,6 @@ public class SteerLedger implements TurnSteerLedger {
                 }
             } catch (RuntimeException ex) {
                 log.warn("남은 끼우는 중 글을 정리하지 못했다 conversationId={}", conversationId, ex);
-            }
-        }
-        for (Long conversationId : messages.findConversationIdsWithSteerState(SteerState.DELIVERED)) {
-            try {
-                resettleFinished(conversationId);
-            } catch (RuntimeException ex) {
-                log.warn("남은 steer 말풍선을 정리하지 못했다 conversationId={}", conversationId, ex);
             }
         }
     }

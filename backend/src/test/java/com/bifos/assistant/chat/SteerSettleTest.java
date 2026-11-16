@@ -314,13 +314,13 @@ class SteerSettleTest {
 
 
     @Test
-    @DisplayName("기동 정리는 남은 끼우는 중 글과 끝난 turn 의 전달됨 말풍선을 확인 못 함으로 바꿔 멈춘 대기 줄에 둔다")
-    void startupResolvesLeftovers() throws InterruptedException {
+    @DisplayName("기동 정리는 남은 끼우는 중 글을 확인 못 함으로 바꿔 멈춘 대기 줄에 두고 끝난 turn 의 전달됨 말풍선은 그대로 둔다")
+    void startupResolvesStaleSteeringOnly() throws InterruptedException {
         Thread running = startRunningTurn();
         Long executionId = handle().getExecutionId();
         finish(running);
-        ChatMessage left = messages.save(ChatMessage.fromSteer(
-            conversation.id(), dad.id(), "남은 말풍선", executionId, SteerState.DELIVERED, null, Instant.now()));
+        ChatMessage delivered = messages.save(ChatMessage.fromSteer(
+            conversation.id(), dad.id(), "따른 지시", executionId, SteerState.DELIVERED, null, Instant.now()));
         pendingRows.change(conversation.id(), queue -> {
             PendingMessages appended = queue.append("남은 끼우는 중", Instant.now());
             return appended.withSteering(appended.items().getLast().id(), true);
@@ -328,12 +328,15 @@ class SteerSettleTest {
 
         ledger.onStartup();
 
-        assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.UNCONFIRMED);
-        assertThat(bubbles()).extracting(ChatMessage::content).contains("남은 끼우는 중");
+        assertThat(messages.findById(delivered.id()).orElseThrow().steerState())
+            .as("완료로 정리한 말풍선을 되돌리면 따른 지시가 다시 실행될 수 있다")
+            .isEqualTo(SteerState.DELIVERED);
+        assertThat(bubbles()).filteredOn(message -> message.content().equals("남은 끼우는 중"))
+            .extracting(ChatMessage::steerState).containsExactly(SteerState.UNCONFIRMED);
         PendingMessages queue = pendingRows.read(conversation.id());
         assertThat(queue.held()).isTrue();
         assertThat(queue.blockedBySteering()).isFalse();
-        assertThat(queue.items()).extracting(PendingMessage::content).containsExactlyInAnyOrder("남은 말풍선", "남은 끼우는 중");
+        assertThat(queue.items()).extracting(PendingMessage::content).containsExactly("남은 끼우는 중");
     }
 
 
@@ -345,6 +348,8 @@ class SteerSettleTest {
         finish(running);
         ChatMessage left = messages.save(ChatMessage.fromSteer(
             conversation.id(), dad.id(), "돌아올 글", executionId, SteerState.DELIVERED, null, Instant.now()));
+        // 서버가 그 turn 이 도는 중에 멈춰 실행 줄이 RUNNING 으로 남은 것처럼 만든다.
+        jdbc.update("UPDATE agent_execution SET status = 'RUNNING', finished_at = NULL WHERE id = ?", executionId);
 
         recorder.settle(executionId, result("completed", "돌아올 글"));
 
@@ -361,6 +366,8 @@ class SteerSettleTest {
         finish(running);
         ChatMessage left = messages.save(ChatMessage.fromSteer(
             conversation.id(), dad.id(), "다시 정리할 글", executionId, SteerState.DELIVERED, null, Instant.now()));
+        ChatMessage settledEarlier = messages.save(ChatMessage.fromSteer(
+            conversation.id(), dad.id(), "앞서 완료로 정리한 글", executionId + 1000, SteerState.DELIVERED, null, Instant.now()));
         jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", "{\"version\":9}", conversation.id());
 
         ledger.settle(executionId, conversation.id(), SteerSettlement.stopped());
@@ -371,6 +378,8 @@ class SteerSettleTest {
 
         assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.UNCONFIRMED);
         assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+        assertThat(messages.findById(settledEarlier.id()).orElseThrow().steerState())
+            .as("실패한 실행만 다시 정리한다").isEqualTo(SteerState.DELIVERED);
     }
 
 

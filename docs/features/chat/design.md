@@ -24,12 +24,12 @@
 | 자리 | 맡는 것 |
 | --- | --- |
 | `chat/nextturn/application/SteerService`(새) | 끼울지 판정과 Hermes `steer` 호출 |
-| `chat/nextturn/application/SteerLedger`(새) | 말풍선 상태와 대기 줄의 모든 steer 변경(받음, 거절, 모름, `settle`, 다음 turn 에서 `CARRIED_OVER`, 기동 정리, 정리 못 한 대화 다시 정리). steer 상태 규칙의 주인은 여기 하나다. `NextTurnDispatcher` 를 주입하지 않아 `ChatTurnRunner` 가 포트로 주입해도 빈 순환이 없다. 다음 turn 을 여는 것은 여전히 `NextTurnDispatcher.tryNext` 하나다 |
+| `chat/nextturn/application/SteerLedger`(새) | 말풍선 상태와 대기 줄의 모든 steer 변경(받음, 거절, 모름, `settle`, 다음 turn 에서 `CARRIED_OVER`, 남은 「끼우는 중」 기동 정리, 정리 못 한 실행 다시 정리). steer 상태 규칙의 주인은 여기 하나다. `NextTurnDispatcher` 를 주입하지 않아 `ChatTurnRunner` 가 포트로 주입해도 빈 순환이 없다. 다음 turn 을 여는 것은 여전히 `NextTurnDispatcher.tryNext` 하나다 |
 | `PendingMessageService.enqueue` | 지금처럼 저장한 뒤, `tryNext` 전에 `SteerService.trySteer` 를 부른다 |
 | `PendingMessageStore`·`PendingMessages` | 대기 글에 두 칸을 더한다. 「끼우는 중」 표시와 이미 보인 말풍선 번호. 바꾸기는 지금처럼 대화 줄을 잠근 `change` 하나로 한다 |
 | `TurnCancellation`·`TurnHandle` | 루트 run(`apiBaseUrl`, profile, run 번호), turn 종류, 도는 하위 에이전트 수, 「정리됨」 표시를 더한다. steer 호출과 turn 의 `settle` 이 같은 handle 의 잠금을 잡아 차례로 돈다. `rekey` 가 비우는 `runs` 와 따로 둔다 |
 | `ChatTurnRunner` | `runTurn` 의 바깥 `finally` 에서 잠금을 풀기 전에 포트의 `settle` 을 부르고 끝난 방식과 결과를 넘긴다. `ChatTurnStopper` 는 바꾸지 않는다 |
-| `RecoveredRunRecorder` | 재시작 정리(`RestartReconciler`)가 끝낸 루트 실행의 결과를 같은 `settle` 에 넘긴다. 남은 「끼우는 중」 과 끝난 실행의 말풍선은 `SteerLedger` 의 기동 리스너가 그보다 먼저 정리한다 |
+| `RecoveredRunRecorder` | 재시작 정리(`RestartReconciler`)가 끝낸 루트 실행의 결과를 같은 `settle` 에 넘긴다. 남은 「끼우는 중」 은 `SteerLedger` 의 기동 리스너가 그보다 먼저 정리한다 |
 | `ChatTurnRouting.saveQuestion` | 대기 글로 여는 turn 에서 말풍선 번호가 붙은 글은 새 행을 만들지 않고 같은 트랜잭션에서 포트로 그 행을 `CARRIED_OVER` 로 바꾼다 |
 | `HermesRunsClient`·`HttpHermesRunsClient` | `steer(apiBaseUrl, profile, runId, text)` 와 결과의 `pendingSteer`. steer 는 읽기 제한 시간이 짧은 요청 factory 를 따로 둔 `RestClient` 로 보낸다(지금 클라이언트는 `readTimeout` 하나를 쓴다) |
 | 화면 `use-conversation-queue.ts`·`use-conversation-events.ts`·`message-bubble.tsx` | `steer: true` 싣기, `steer` 사건으로 말풍선 넣기와 상태 바꾸기, 답 위 자리, 안내 줄, 다시 생성 단추 숨기기 |
@@ -124,8 +124,8 @@ enqueue(steer=true)
 | 완료·실패, `pendingSteer` 있음 | 받은 순서로 이은 글(줄바꿈)의 뒤쪽이 `pendingSteer` 와 같은 묶음만 `CARRIED_OVER`. 맞는 묶음이 없으면 모두. 그 글들을 말풍선 번호를 붙여 대기 줄 앞에 넣는다 |
 | 중지, 결과 조회 실패(Hermes 404, 시간 초과, 연결 실패), 그 밖의 예외 | 모두 `UNCONFIRMED`. 대기 줄 앞에 넣고 멈춘다 |
 
-`settle` 의 말풍선 상태 변경, 대기 줄 앞에 넣기, 멈춤은 `SteerService` 의 한 트랜잭션이다. 말풍선이 없는 turn 은 아무것도 하지 않는다. 실패하면 삼키지 않고 경고를 남긴 뒤 그 대화를 「정리 못 함」 으로 적어 둔다. 기동 정리와 그 대화의 다음 `tryNext` 가 남은 `DELIVERED` 말풍선(이미 끝난 실행의 것)을 찾아 「결과 모름」 으로 다시 정리한다. 말풍선 행이 남아 있어 다시 찾을 수 있다.
-재시작 정리가 끝난 run 을 물어 얻은 결과를 적는 `RecoveredRunRecorder.settle`·`failWithout` 이 그 결과를 그대로 넘긴다. `pending_steer` 가 있으면 REQ3 대로, 결과가 없거나 run 이 없으면 「결과 모름」 이다.
+`settle` 의 말풍선 상태 변경, 대기 줄 앞에 넣기, 멈춤은 `SteerLedger` 의 한 트랜잭션이다. 말풍선이 없는 turn 은 아무것도 하지 않는다. 실패하면 삼키지 않고 경고를 남긴 뒤 그 실행 번호와 끝난 방식을 메모리에 적어 둔다. 그 대화의 다음 `tryNext` 가 그 실행만 같은 방식으로 다시 정리한다. 「전달됨」 말풍선만 보고 다시 정리하지 않는다. 완료로 정리해 「전달됨」 으로 남긴 말풍선과 구분할 수 없어, 되돌리면 이미 따른 지시가 다시 실행될 수 있다. 서버가 다시 뜨면 이 기억은 사라지고 그 말풍선은 「전달됨」 으로 남는다.
+재시작 정리가 끝난 run 을 물어 얻은 결과를 적는 `RecoveredRunRecorder.settle`·`failWithout` 이 그 결과를 그대로 넘긴다. 그 호출이 줄을 적었을 때만 넘긴다. 다른 쪽이 이미 적은 줄은 그쪽이 정리했다. 기동 리스너는 남은 「끼우는 중」 만 정리하고 「전달됨」 말풍선은 훑지 않는다. `pending_steer` 가 있으면 REQ3 대로, 결과가 없거나 run 이 없으면 「결과 모름」 이다.
 
 ### 대기 글로 여는 turn
 
@@ -142,7 +142,7 @@ enqueue(steer=true)
 
 - **글을 잃지 않는다.** 대기 줄에 먼저 저장하고, 대기 글을 빼는 것과 말풍선 저장은 한 트랜잭션이다. Hermes 호출은 트랜잭션 밖이다(ADR-048 의 「저장한 뒤 다음을 정한다」).
 - **steer 와 turn 끝의 경쟁**은 handle 의 steer 잠금과 「정리됨」 표시로 줄 세운다. `settle` 은 도는 steer 요청이 끝난 뒤 돌아 방금 받은 말풍선도 맞추고, 그 뒤의 steer 는 거절로 처리한다. steer 요청은 제한 시간이 있어 turn 끝이 그 이상 늦지 않는다.
-- **`settle` 실패**는 말풍선이 `DELIVERED` 로 남는 것으로 드러난다. 끝난 실행의 `DELIVERED` 말풍선을 다시 찾아 정리하므로 글이 사라지지 않는다.
+- **`settle` 실패**는 그 실행과 끝난 방식을 기억해 다음 `tryNext` 가 같은 방식으로 다시 정리한다. 서버가 그 사이 다시 뜨면 말풍선은 「전달됨」 으로 남는다(드문 경우이고, 같은 지시를 두 번 실행하는 것보다 낫다).
 - **run 이 끝난 뒤 온 steer** 는 Hermes 가 409 로 거절해 대기열로 간다. Hermes 가 마지막 정리에서 슬롯을 비운 뒤 상태를 바꾸기 전 짧은 틈에 받은 글은 `pending_steer` 에도 없어 사라질 수 있다. 소스로 본 틈이며 운영 확인 3·4 로 본다.
 - **두 창**은 대화 줄 잠금으로 더하기를 줄 세운다. 줄이 비어 있을 때만 끼우므로 두 번째 글은 첫 글이 `steering` 인 동안 대기 칸에 들어가 순서를 지킨다.
 - **설정을 끄면** `trySteer` 가 곧바로 돌아온다. 이미 남은 `steering`, 말풍선 번호가 붙은 글은 지금 경로로 마저 간다.
