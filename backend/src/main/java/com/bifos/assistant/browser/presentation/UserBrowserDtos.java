@@ -56,7 +56,6 @@ public final class UserBrowserDtos {
         }
     }
 
-    /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
     /**
      * 「직접 할게요」 의 본문이다. 대화 패널에서 누르면 그 대화의 공개 번호를 싣는다. 넘기기 알림을 낼지 고를 때만 쓴다(spec DECISION18).
      */
@@ -77,6 +76,7 @@ public final class UserBrowserDtos {
         }
     }
 
+    /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
     public record ScreenInputRequest(
         String type,
         String action,

@@ -110,6 +110,22 @@ class BrowserHumanHoldTest {
 
 
     @Test
+    @DisplayName("잠그는 사이 승인한 실행이 시작됐으면 잠금을 되돌리고 거절한다")
+    void releasesWhenApprovedRunStartsWhileTakingOver() {
+        running();
+        AtomicInteger calls = new AtomicInteger();
+        holds = new BrowserHumanHold(
+            repository, userId -> calls.incrementAndGet() > 1, agentTabs, Clock.systemUTC(), transactions);
+
+        assertThatThrownBy(() -> holds.takeOver(USER, "conv-1"))
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_APPROVAL_RUNNING));
+        assertThat(holds.held(USER)).isFalse();
+        assertThat(holds.heldFrom(USER)).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("돌려주기와 끄기가 잠금을 비운다")
     void giveBackAndStopRelease() {
         running();

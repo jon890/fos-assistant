@@ -96,8 +96,12 @@ public class BrowserGateway {
     }
 
 
-    /** 중계로 그 탭을 만들었다. 연결이 붙기 전에도 에이전트가 쥔 탭으로 둔다. */
+    /** 중계로 그 탭을 만들었다. 연결이 붙기 전에도 에이전트가 쥔 탭으로 둔다. 사람이 쥐고 있으면 두지 않는다. */
     public void created(GatewayTarget target, String targetId) {
+        // 판정을 지난 뒤 사람이 넘겨받았으면 그 탭은 사람의 것이다. 회수가 지운 쥔 탭 기록을 다시 적지 않는다
+        if (holds.held(target.userId())) {
+            return;
+        }
         agentTabs.created(target.browserId(), targetId);
     }
 

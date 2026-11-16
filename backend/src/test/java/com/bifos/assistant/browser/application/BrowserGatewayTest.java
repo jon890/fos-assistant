@@ -105,6 +105,19 @@ class BrowserGatewayTest {
 
 
     @Test
+    @DisplayName("판정 뒤 사람이 넘겨받았으면 중계로 만든 탭을 에이전트가 쥔 탭으로 두지 않는다")
+    void createdIsIgnoredWhileHeld() {
+        BrowserGateway gateway = gateway(tokens(BASE, SECRET));
+        GatewayTarget target = new GatewayTarget(OWNER, BROWSER_ID, CDP);
+        when(holds.held(OWNER)).thenReturn(true);
+
+        gateway.created(target, "T1");
+
+        assertThat(agentTabs.held(BROWSER_ID, "T1")).isFalse();
+    }
+
+
+    @Test
     @DisplayName("등록한 뒤 이미 사람이 쥐었으면 그 연결을 바로 닫고 등록을 뺀다")
     void watchClosesAtOnceWhenAlreadyHeld() {
         BrowserGateway gateway = gateway(tokens(BASE, SECRET));
