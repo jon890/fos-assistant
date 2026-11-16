@@ -63,7 +63,7 @@ export type ChatEvent = {
 
 /** steer 말풍선의 상태다. `ChatDtos.MessageView.steer` 와 `steer` 사건이 같은 꼴로 싣는다 */
 export type SteerInfo = {
-  state: "DELIVERED" | "CARRIED_OVER" | "UNCONFIRMED";
+  state: "DELIVERED" | "CARRIED_OVER" | "UNCONFIRMED" | "NOT_DELIVERED";
   child: "SUBAGENT" | "DELEGATION" | null;
 };
 
