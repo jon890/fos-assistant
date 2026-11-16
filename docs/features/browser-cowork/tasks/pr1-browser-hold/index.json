@@ -24,7 +24,7 @@
       "after": "PR4 머지와 KTX 좌석 확보 구현 머지"
     }
   ],
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-11-16",
   "spec": "docs/features/browser-cowork/spec.md",
   "design": "docs/features/browser-cowork/design.md",
@@ -34,7 +34,7 @@
     "REQ2"
   ],
   "total_phases": 2,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "number": 1,

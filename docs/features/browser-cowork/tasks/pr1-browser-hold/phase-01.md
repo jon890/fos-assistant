@@ -17,7 +17,7 @@
 - 자동 중지는 `backend/src/main/java/com/bifos/assistant/browser/application/UserBrowserSweeper.java` 의 `stopIdle` 이다. 후보는 `UserBrowserRepository.findByStatusAndLastActiveAtBefore(RUNNING, cutoff)` 이고, `BrowserUsage.inUse` 면 건너뛰며 `UserBrowserService.stopIfIdle(id, cutoff)` 가 다시 읽고 끈다.
 - `browser` 는 `connector` 보다 아래다. 기존 포트 `browser/application/port/BrowserGrantOwners.java` 와 그 구현 `connector/connection/application/ConnectorBrowserGrantOwners.java` 의 모양을 따른다.
 - 판정 줄은 `connector/action/domain/ConnectorAction.java`(칸 `userId`, `conversationId`, `connectorId`, `status`, `expiresAt`, 내장 `handoff` 의 `need`, `at`, `closedAt`)다. 열린 넘기기 조건은 `connector/handoff/infra/ConnectorHandoffRepository.java` 의 `handoff.need is not null and handoff.closedAt is null` 과 같게 쓴다.
-- manifest 읽기는 `connector/action/application/ConnectorActionDetails#readManifest`, 브라우저 플러그인 여부는 `ConnectorManifest#ownerBrowser()` 다.
+- manifest 읽기는 `connector/connection/application/ConnectorCatalogCache#find`(빈 값과 예외는 읽지 못한 것으로 본다), 브라우저 플러그인 여부는 `ConnectorManifest#ownerBrowser()` 다.
 - 하위 기능 순서(rule-76)에서 `action` 은 `approval`, `contentdraft`, `handoff` 보다 아래다. 구현은 `connector/action/application` 에 둔다.
 
 ## 의도 메모
@@ -51,7 +51,7 @@
 
 ### 5. `connector/action/application/ConnectorBrowserWaitDemand.java`(신규)
 
-`BrowserWaitDemand` 구현 `@Component`. 열린 넘기기가 있으면 참. 아니면 기다리는 승인의 플러그인마다 `ConnectorActionDetails#readManifest` 로 보고, 비었거나 `ownerBrowser()` 가 참이면 참. 시각은 주입한 `Clock`.
+`BrowserWaitDemand` 구현 `@Component`. 열린 넘기기가 있으면 참. 아니면 기다리는 승인의 플러그인마다 `ConnectorCatalogCache#find` 로 보고, 비었거나 `ownerBrowser()` 가 참이면 참. 시각은 주입한 `Clock`.
 
 ### 6. 문서
 

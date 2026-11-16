@@ -124,6 +124,7 @@ class GatewayRewriterTest {
             Duration.ofMinutes(10),
             Duration.ofSeconds(30),
             Duration.ofMinutes(30),
+            Duration.ofMinutes(30),
             gatewayBaseUrl,
             "0123456789abcdef0123456789abcdef");
         return new BrowserGatewayTokens(LiveProperties.fixed(BrowserProperties.class, properties), Clock.systemUTC())
