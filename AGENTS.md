@@ -16,10 +16,8 @@ Hermes Agent 를 Agent Runtime 으로 두고 이 저장소는 Control Plane 과 
 | [`web/AGENTS.md`](web/AGENTS.md) | 화면을 고칠 때 |
 | [`hermes/AGENTS.md`](hermes/AGENTS.md) | Hermes 에 설치하는 plugin 과 profile 틀, 플러그인 선언을 고칠 때 |
 
-기능 파일은 `docs/features/` 에 두고, 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md`, hermes 의 `hermes-contract.md` 만 둔다.
-새 주제는 새 파일 대신 기능 파일의 절로 더한다. 예외는 플러그인마다 하나인 `docs/features/<id>-connector.md`와 새 기능의 기능 폴더 `docs/features/<id>/`(스펙 `spec.md`, 설계 `design.md`, 계획 `tasks/<계획>/`), 코드 규칙의 `docs/code-rules/INDEX.md`, `rule-N.md`다.
-기능 파일은 지금 동작하는 요구와 흐름을, 스펙은 합의한 변경의 요구사항 ID(`REQ1`)와 인수 조건을, 설계는 그 요구사항을 어떻게 구현할지를 갖는다. 나눔과 ID 꼴은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가 갖는다.
-배치는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md), 정해진 파일 밖의 예외와 까닭은 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)이 갖고, `test/repo/doc-files.test.ts`가 지킨다.
+새 주제는 새 파일 대신 `docs/features/` 기능 파일의 절로 더한다. 새 기능은 기능 폴더 `docs/features/<id>/` 에 스펙, 설계, 계획을 둔다.
+기능 파일, 스펙, 설계가 각각 무엇을 갖는지는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md)가, 어느 파일을 어디에 두는지와 예외는 [ADR-20261009 / feature-docs](docs/adr/ADR-20261009-feature-docs.md)와 [ADR-20261009 / docs-per-module](docs/adr/ADR-20261009-docs-per-module.md)가 갖는다. `test/repo/doc-files.test.ts`가 지킨다.
 
 ## 용어
 
@@ -87,7 +85,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 
 - 무엇을 확인해야 하는지만 적고, 실행 방법은 `fos-home-infra` 를 가리킨다
 - 측정한 **결과 수치**는 적어도 된다. 그것을 얻은 명령을 적지 않는 것이다
-- 조사 기록은 저장소 밖에 둔다. `.omc/` 는 `.gitignore` 에 있으므로 그 아래도 괜찮다
+- 조사 기록은 저장소 밖 세션 임시 폴더에 둔다
 
 ### 주제가 아니라 내용으로 나눈다
 
@@ -112,11 +110,11 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 | --- | --- | --- |
 | 계획 | 범위와 검증 기준을 정해 `docs/` 와 계획서 자리(`tasks/` 나 `docs/features/<id>/tasks/`)에 남긴다 | 구현자가 이 대화 없이 읽고 실행할 수 있다 |
 | 구현 | 워크트리 하나에서 브랜치 하나로 만들고 PR 로 머지한다 | 「머지는 PR 로 한다」 의 순서로 PR 이 머지됐다 |
-| 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 |
+| 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다. `orch` 로 돌린 작업은 `orch queue finish <PR>` 의 `FINISH-DONE` 과 상주 루프의 `cleanup-sweep` 이 `finish-task.sh` 를 갈음한다 |
 
 - 한 작업은 PR 하나로 끝나는 크기로 자른다. 구현이 여러 PR 로 나뉘면 PR 마다 작업 하나로 보고 각각 정리한다.
 - 정리는 머지 직후에 한다. 다음 작업을 시작하기 전에 끝낸다.
-- 지우는 것은 워크트리, 로컬과 원격 브랜치, 로컬 검사가 남긴 임시 컨테이너다. 무엇을 어떤 순서로 지우는지는 `scripts/dev/finish-task.sh` 의 머리말이 갖는다.
+- 무엇을 어떤 순서로 지우는지는 `scripts/dev/finish-task.sh` 의 머리말이 갖는다.
 - 워크트리의 `.omc/` 에 남길 조사 기록이 있으면 정리 전에 옮긴다. 스크립트는 `.omc/` 가 비어 있지 않으면 멈춘다.
 - 위임한 에이전트 세션은 스크립트가 끝낼 수 없다. 띄운 쪽이 회신을 받은 뒤 끝낸다.
 - 머지하지 않고 접는 작업은 PR 을 닫고 까닭을 남긴 뒤 워크트리와 브랜치를 직접 지운다. 스크립트는 머지된 PR 만 정리한다.
@@ -142,7 +140,7 @@ scripts/dev/finish-task.sh "$BRANCH"
 조사 절차를 phase 에 적으면 구현 문서에 홈서버 접근 명령이 섞이고,
 그 phase 가 끝나도 결론이 어디에 남는지 정해지지 않는다.
 
-다른 저장소를 고치는 조사는 워커에 맡기고, 조회와 로그 확인은 현재 세션에서 한다. 그 결과를 ADR 이나 `docs/` 에 남긴다.
+조사 결과는 ADR 이나 `docs/` 에 남긴다.
 그 결론이 나온 뒤에 구현 계획을 세운다.
 
 `docs/` 와 코드는 계획서를 번호로 가리키지 않는다. 계획서는 지워지고 지난 계획은 git 이력에서 찾는다.
@@ -153,17 +151,14 @@ scripts/dev/finish-task.sh "$BRANCH"
 
 새 마이그레이션의 버전 형식과 합칠 때의 규칙은 [`backend/docs/data-schema.md`](backend/docs/data-schema.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
 
-새 ADR 은 그 결정을 지키는 코드가 있는 모듈의 `docs/adr/ADR-<YYYYMMDD>-<슬러그>.md` 로 만든다.
-backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `hermes/docs/adr/` 이고, 여러 모듈에 걸치면 루트 `docs/adr/` 다.
-기존 숫자 ADR 은 그대로 두며, 같은 날의 새 ADR 은 슬러그로 구분한다.
-둘 곳과 제목, 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 규칙을 따른다.
+새 ADR 은 그 결정을 지키는 코드가 있는 모듈의 `docs/adr/` 에 만든다(여러 모듈에 걸치면 루트).
+둘 곳과 이름, 제목, 링크, 목록 정렬은 [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 의 규칙을 따른다.
 
 ### 로컬 검사와 PR
 
 push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft PR 을 연다.
 무거운 검사는 Draft CI 가 돌리므로 로컬에서 기다리지 않는다.
-공개 정보 검사는 `--fast` 에도 들어 있다. push 하면 되돌릴 수 없어서다.
-그 검사는 추적 파일의 지금 내용만 보므로, 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
+공개 정보 검사는 추적 파일의 지금 내용만 보므로, 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
 어느 단계를 돌리고 무엇을 CI 에 넘기는지는 그 스크립트의 머리말이 갖는다.
 
 ```bash
@@ -171,14 +166,14 @@ push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 D
 scripts/dev/check-local.sh --fast
 ```
 
-PR CI 에서 브라우저 shard 와 E2E 는 기본으로 건너뛴다. 그 둘은 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. API 컨트롤러나 웹 `api`·`page.tsx`·`components` 파일을 지우거나 이름을 바꾼 PR 은 라벨 없이도 돈다. 모델 지시문을 만드는 `ContextAssembler.java` 와 가짜 Hermes 의 `scenario-fixtures.ts` 를 바꾼 PR 은 E2E 가 라벨 없이 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
+PR CI 는 느린 검사(브라우저 shard 와 E2E)를 기본으로 건너뛰고 하루 한 번 정기 실행이 돌린다. 경로가 정한 PR 은 라벨 없이도 돌고, 그 목록은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 와 `ci-paths.mjs` 가 갖는다. 목록에 없어도 화면 흐름을 크게 바꾸는 등 빈틈이면 작성자가 `검사:전체` 라벨을 붙인다. 다음 push 부터 PR 에서도 돈다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
 ## 머지는 PR 로 한다
 
 한 PR은 관심사 하나만 담는다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
-운영 코드의 변경 줄 상한은 `scripts/pr/pr-size.mjs` 가 정한다. 파일째 지운 파일의 줄은 상한에서 빼고 따로 보인다(계산은 같은 스크립트가 갖는다). 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다. 스크립트가 나눌 경계 후보를 보이며, push 전 `scripts/dev/check-local.sh --fast`에서도 크기를 잰다.
+운영 코드의 변경 줄 상한과 계산은 `scripts/pr/pr-size.mjs` 가 갖는다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다. 스크립트가 경계 후보를 보이고, `check-local.sh --fast` 도 크기를 잰다.
 `규모:예외` 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 붙이지 않는다.
 
 Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는다.
@@ -186,7 +181,7 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
 Draft CI 가 통과하고 최신 main 을 merge 한 뒤 검증을 받고, 통과해야 Ready 로 올린다. 별도 리뷰 에이전트는 띄우지 않는다.
-독립 verify(대화를 모르는 하위 에이전트)는 기능 루프를 쓴 PR(확인받은 스펙이 있는 PR)과 위험 라벨이 하나라도 붙은 PR 만 받는다. 그 밖의 PR 은 구현한 세션이 verify 절차(인수 조건 대조, 검사 재실행, diff 읽기)를 스스로 하고 PR 본문에 「같은 세션 검증」 이라고 적는다.
+독립 verify(대화를 모르는 하위 에이전트)는 기능 루프를 쓴 PR(확인받은 스펙이 있는 PR)과 위험 라벨이 하나라도 붙은 PR 만 받는다. 위험 라벨은 `scripts/pr/pr-risk-labels.sh` 가 달고 머지 규칙은 바꾸지 않는다. 근거와 버린 대안은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 의 4절이 갖는다(사용자 결정 2026-11-02, 2026-11-03). 그 밖의 PR 은 구현한 세션이 verify 절차(인수 조건 대조, 검사 재실행, diff 읽기)를 스스로 하고 PR 본문에 「같은 세션 검증」 이라고 적는다.
 인수 조건이 없는 PR(저장소 규칙만 바꾸는 PR 등)은 사람이나 코디네이터가 Draft 에서 diff 를 읽는다.
 Ready 뒤에는 GitHub 의 Claude 리뷰(`claude-review`)가 한 번 더 본다. 순서와 근거는 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 가 갖는다.
 **리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
@@ -196,11 +191,9 @@ verify 뒤 리뷰 반영이나 main 합치기로 코드가 바뀌면 verify 전�
 
 머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
 CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/repo/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
-필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `gh pr merge <PR> --merge --match-head-commit <해시>` 로 머지하고, 이력을 한 줄로 합치지 않는다. 판정한 뒤 push 가 들어오면 머지가 거절된다.
-머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
+필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `--match-head-commit` 으로 머지하고, 이력을 한 줄로 합치지 않는다.
+머지한 뒤에는 위 「작업 단위」 의 정리를 한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.
-
-`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 라벨은 머지 규칙을 바꾸지 않고, 독립 verify 를 받을 PR 을 가르는 데 쓴다(사용자 결정 2026-11-02, 2026-11-03). 근거와 버린 대안은 [ADR-20261102 / feature-loop](docs/adr/ADR-20261102-feature-loop.md) 의 4절이 갖는다.
 
 ## 커밋
 
