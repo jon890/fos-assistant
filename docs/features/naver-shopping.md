@@ -56,7 +56,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 `execution_guard` 는 `{protocol: "approval-claim-v2", prepare_tool: "prepare_checkout", scope_fields: [], operations: {fill_checkout: "CREATE"}, kinds: {fill_checkout: "CHECKOUT"}}` 다. 준비·승인·ticket·claim 은 금융 승인의 틀을 그대로 쓰고, 카드와 상한 판정, 결과 판정은 Control Plane 이 한다. 칸과 판정 표는 [설계](naver-shopping/design.md)의 「PR3 구매 상한과 주문서(REQ9~REQ13)」 가 갖는다.
 
 - **준비**: 상품 화면을 새로 읽어 옵션 글을 상태의 조합 하나로 맞추고 상품 금액((판매가 + 옵션 추가 금액) × 수량), 무료 조건을 반영한 기본 배송비, 예상 합계를 계산한다. 쿠폰과 포인트는 넣지 않는다. 사람이 해야 하는 화면은 넘기기가 아니라 그 코드의 오류로 끝내고 탭을 남긴다. 대시보드의 준비 경로가 넘기기 결과를 받지 않기 때문이다
-- **채우기**: 원문·ticket 대조 → 상품 탭 → 가격 다시 계산(승인보다 크면 claim 없이 거절) → claim → 「구매하기」 → 상품 구매 층에서 옵션·수량 → 「바로구매」 → 주문서(같은 탭이나 새 탭)에서 최종 결제 금액을 읽는다. 주문서 탭을 남기고 금액과 탭을 낸다
+- **채우기**: 원문·ticket 대조 → 상품 탭 → 가격 다시 계산(승인보다 크면 claim 없이 거절) → 「구매하기」 단추가 보일 때까지 대기(안 보이면 claim 없이 거절) → claim → 「구매하기」 → 상품 구매 층에서 옵션·수량 → 「바로구매」 → 주문서(같은 탭이나 새 탭)에서 최종 결제 금액을 읽는다. 주문서 탭을 남기고 금액과 탭을 낸다
 - **결제 단추를 누르는 코드 경로가 없다.** 누르는 식은 스마트스토어·브랜드스토어 주소에서만 누른다. 주문서 탭에서는 준비 상태, 화면 분류, 금액 읽기만 부른다. 결제 단추 선택자는 소스에 없고 검사(`tests/checkout-guard.test.ts`)의 금지 목록에만 있다
 - **금액**: 주문서의 「총 주문금액」 과 결제수단 절 머리의 금액이 같을 때만 최종 금액이다. 이름, 주소, 전화번호 같은 화면 글은 결과와 로그에 싣지 않는다
 - **결과를 모를 때**: 「바로구매」 를 보낸 뒤(층이 확인되기 전의 「구매하기」 뒤 포함) 주문서나 금액을 확인하지 못하면 오류가 아니라 `{status: "UNKNOWN", tab}` 이다. 다시 보내지 않는다. Control Plane 이 그 승인을 `UNKNOWN` 으로 끝내고 탭 확인 카드를 띄운다
@@ -107,7 +107,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 | `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 판매 중이 아니다 |
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인보다 크다 |
 | `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조나 claim 이 거절됐다 |
-| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다(구매하기 단추 없음, 층의 옵션이나 수량을 못 맞춤) |
+| `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | 「구매하기」 단추가 그려지지 않아 claim 전에 끝났거나, claim 뒤 「바로구매」 전에 멈췄다(층의 옵션이나 수량을 못 맞춤) |
 
 오류 글에 중계 주소, 검색어, 화면 글, 브라우저가 준 원문을 싣지 않는다.
 

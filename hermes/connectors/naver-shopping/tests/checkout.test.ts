@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, expect, test } from "bun:test";
 import {
+  BUY_VISIBLE,
   CHOOSE_OPTION,
   CLICKING,
   EXPRESSIONS,
@@ -398,6 +399,36 @@ test("채우기는 층에서 옵션을 단계마다 고르고 수량을 맞춘 �
   expect(shop!.tabs.has("USER0")).toBe(true);
   expect(shop!.cdpLines().some((line) => line.tab === "USER0")).toBe(false);
   expectSafe(shop!);
+});
+
+test("「구매하기」 단추를 늦게 그리면 claim 전에 그릴 때까지 기다렸다가 누른다", async () => {
+  const { isError, body } = await fill(
+    { product: PLAIN_PRODUCT, buyButtonAfter: 5 },
+    PLAIN_ARGS,
+  );
+  expect(isError).toBe(false);
+  expect(body.status).toBe("ORDER_SHEET_READY");
+  expect(shop!.count(BUY_VISIBLE)).toBe(6);
+  expect(steps(shop!).slice(0, 3)).toEqual(["price", "claim", "buy"]);
+  // 단추 확인은 모두 claim 앞에서 끝난다.
+  const claimAt = shop!.log.findIndex((line) => line.kind === "claim");
+  const lastCheck = shop!.log.findLastIndex(
+    (line) => line.kind === "cdp" && line.source === BUY_VISIBLE,
+  );
+  expect(lastCheck).toBeLessThan(claimAt);
+  expect(shop!.log.filter((line) => line.kind === "claim")).toHaveLength(1);
+});
+
+test("「구매하기」 단추가 끝내 그려지지 않으면 claim 없이 CHECKOUT_FAILED 로 끝내고 탭을 닫는다", async () => {
+  const { isError, body } = await fill(
+    { product: PLAIN_PRODUCT, buyButtonAfter: Infinity },
+    PLAIN_ARGS,
+  );
+  expect(isError).toBe(true);
+  expect(body).toEqual({ error: { code: "NAVER_SHOPPING_CHECKOUT_FAILED" } });
+  expect(shop!.log.filter((line) => line.kind === "claim")).toHaveLength(0);
+  for (const source of CLICKING) expect(shop!.count(source)).toBe(0);
+  expect(shop!.tabs.has("TAB1")).toBe(false);
 });
 
 test("claim 이 거절되면 구매하기를 누르지 않고 CLAIM_REJECTED 로 끝내며 탭을 닫는다", async () => {
