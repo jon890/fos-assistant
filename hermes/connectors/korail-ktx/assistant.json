@@ -35,10 +35,10 @@
     "KORAIL_DATE_UNAVAILABLE": "invalid_input",
     "KORAIL_REJECTED": "invalid_input",
     "KORAIL_BROWSER_UNREACHABLE": {
-    "KORAIL_BROWSER_IN_USE": "unavailable",
       "category": "unavailable",
       "recovery": "retry_later"
     },
+    "KORAIL_BROWSER_IN_USE": "unavailable",
     "KORAIL_LOGIN_REQUIRED": {
       "category": "credential_rejected",
       "recovery": "reconnect"

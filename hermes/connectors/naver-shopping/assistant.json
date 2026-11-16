@@ -74,10 +74,10 @@
   "errors": {
     "NAVER_SHOPPING_INVALID_INPUT": "invalid_input",
     "NAVER_SHOPPING_BROWSER_UNREACHABLE": {
-    "NAVER_SHOPPING_BROWSER_IN_USE": "unavailable",
       "category": "unavailable",
       "recovery": "retry_later"
     },
+    "NAVER_SHOPPING_BROWSER_IN_USE": "unavailable",
     "NAVER_SHOPPING_LOGIN_REQUIRED": {
       "category": "credential_rejected",
       "recovery": "reconnect"
