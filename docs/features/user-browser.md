@@ -51,7 +51,7 @@ proxy 의 정책과 이미지, 망, 프로필 디렉터리의 위치는 운영 �
 | 켜기 | `STOPPED`, `FAILED` | `RUNNING`. 실패하면 컨테이너를 지우고 `FAILED`. `FAILED` 줄에 번호가 남은 컨테이너를 지우지 못하면 `BROWSER_STOP_FAILED` 로 거절하고 `FAILED` 그대로다 |
 | 끄기 | `RUNNING`, `FAILED` | `STOPPED`. proxy 호출이 실패하면 `FAILED` 와 `stop_failed` |
 | 지우기 | `STOPPED`, `RUNNING`, `FAILED` | 줄 없음. 끈 줄을 그 버전으로 지운 뒤 프로필을 지운다. 그 사이 다른 전이가 줄을 바꿨으면 `BROWSER_BUSY` 이고 줄과 프로필이 남는다 |
-| 자동 중지 | `RUNNING` | `STOPPED`. 유휴 시간이 지났고 쓰는 중인 핸들(`BrowserUsage`)이 없을 때다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다 |
+| 자동 중지 | `RUNNING` | `STOPPED`. 유휴 시간이 지났고 쓰는 중인 핸들(`BrowserUsage`)이 없을 때다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다. 그 사용자가 사람을 기다리면(이번 켜기 뒤에 생긴 대화의 열린 화면 넘기기, 「내 브라우저」 를 쓰는 플러그인의 기다리는 승인) 유휴 시간을 `idle-timeout` 대신 `wait-hold-timeout` 으로 본다. 기다림은 `connector` 가 포트 `BrowserWaitDemand` 로 답하고, 묻다 실패하면 그 줄을 끄지 않는다([browser-cowork 스펙](browser-cowork/spec.md) 의 REQ1) |
 | 사용자 끄기 | `RUNNING`, `FAILED` | `STOPPED`. 관리자가 허용 목록에서 사용자를 끈 것이 커밋된 뒤 돈다. 프로필과 줄은 남긴다 |
 
 - 동시 수는 `STARTING`, `RUNNING` 과 끄다 실패해 `container_id` 가 남은 `FAILED` 를 센다. 남은 컨테이너도 돌고 있을 수 있기 때문이다. 셀 때 켜기를 한 번에 하나만 하도록 잠근다.

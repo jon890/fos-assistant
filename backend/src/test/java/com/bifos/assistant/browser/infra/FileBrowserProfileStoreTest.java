@@ -55,6 +55,7 @@ class FileBrowserProfileStoreTest {
                 Duration.ofMinutes(10),
                 Duration.ofSeconds(30),
                 Duration.ofMinutes(30),
+                Duration.ofMinutes(30),
                 null,
                 null)));
     }

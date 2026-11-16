@@ -44,6 +44,8 @@ class UserBrowserSweeperTest {
     private UserBrowserService service;
     private UserBrowserSweeper sweeper;
     private final Set<Long> revoked = new HashSet<>();
+    private final Set<Long> waiting = new HashSet<>();
+    private boolean waitFails;
 
 
     @BeforeEach
@@ -53,8 +55,11 @@ class UserBrowserSweeperTest {
         usage = new BrowserUsage();
         service = service(true);
         revoked.clear();
+        waiting.clear();
+        waitFails = false;
         sweeper = new UserBrowserSweeper(
-            service, screens(), repository, runtime, usage, userId -> !revoked.contains(userId), Clock.systemUTC());
+            service, screens(), repository, runtime, usage, userId -> !revoked.contains(userId), this::waiting,
+            LiveProperties.fixed(BrowserProperties.class, properties(true)), Clock.systemUTC());
     }
 
 
@@ -191,6 +196,36 @@ class UserBrowserSweeperTest {
 
 
     @Test
+    @DisplayName("사람을 기다리면 10분이 지나도 끄지 않고 30분이 지나면 끈다")
+    void holdsBrowserWhileWaitingForPerson() {
+        Long held = running(201L);
+        Long expired = running(202L);
+        waiting.add(201L);
+        waiting.add(202L);
+        ageActivity(held, Duration.ofMinutes(15));
+        ageActivity(expired, Duration.ofMinutes(31));
+
+        sweeper.sweep();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(status(202L)).isEqualTo(UserBrowserStatus.STOPPED);
+    }
+
+
+    @Test
+    @DisplayName("기다림을 묻다 실패하면 그 브라우저를 끄지 않는다")
+    void keepsBrowserWhenWaitLookupFails() {
+        Long id = running(201L);
+        ageActivity(id, Duration.ofMinutes(11));
+        waitFails = true;
+
+        sweeper.sweep();
+
+        assertThat(status(201L)).isEqualTo(UserBrowserStatus.RUNNING);
+    }
+
+
+    @Test
     @DisplayName("사용자를 끄면 그 사용자의 브라우저를 멈추고 프로필과 줄은 남긴다")
     void stopsBrowserOfRevokedUser() {
         running(201L);
@@ -250,7 +285,8 @@ class UserBrowserSweeperTest {
         UserBrowserRepository broken = mock(UserBrowserRepository.class);
         when(broken.findByStatusAndLastActiveAtBefore(any(), any()))
             .thenThrow(new DataAccessResourceFailureException("db down"));
-        UserBrowserSweeper failing = new UserBrowserSweeper(service, screens(), broken, runtime, usage, userId -> true, Clock.systemUTC());
+        UserBrowserSweeper failing = new UserBrowserSweeper(service, screens(), broken, runtime, usage, userId -> true, this::waiting,
+            LiveProperties.fixed(BrowserProperties.class, properties(true)), Clock.systemUTC());
 
         failing.onReady();
         failing.sweep();
@@ -264,12 +300,21 @@ class UserBrowserSweeperTest {
     void doesNothingWhenDisabled() {
         runtime.plant("stranger", "f".repeat(64), true);
         UserBrowserSweeper disabled = new UserBrowserSweeper(
-            service(false), screens(), repository, runtime, usage, userId -> false, Clock.systemUTC());
+            service(false), screens(), repository, runtime, usage, userId -> false, this::waiting,
+            LiveProperties.fixed(BrowserProperties.class, properties(false)), Clock.systemUTC());
 
         disabled.sweep();
         disabled.onAccessRevoked(new UserAccessRevoked(201L));
 
         assertThat(runtime.removed()).isEmpty();
+    }
+
+
+    private boolean waiting(long userId, Instant since) {
+        if (waitFails) {
+            throw new IllegalStateException("wait lookup failed");
+        }
+        return waiting.contains(userId);
     }
 
 
@@ -337,6 +382,7 @@ class UserBrowserSweeperTest {
             5,
             Duration.ofMinutes(10),
             Duration.ofMillis(100),
+            Duration.ofMinutes(30),
             Duration.ofMinutes(30),
             null,
             null);

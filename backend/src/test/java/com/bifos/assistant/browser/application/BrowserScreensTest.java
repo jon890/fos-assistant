@@ -62,7 +62,8 @@ class BrowserScreensTest {
         screens = new BrowserScreens(cdp, cdp, usage, () -> Duration.ofMinutes(30), Duration.ofHours(1));
         runtime = new FakeBrowserRuntime();
         service = service(repository);
-        sweeper = new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, Clock.systemUTC());
+        sweeper = new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, (userId, since) -> false,
+            LiveProperties.fixed(BrowserProperties.class, properties()), Clock.systemUTC());
     }
 
 
@@ -237,6 +238,7 @@ class BrowserScreensTest {
             5,
             Duration.ofMinutes(10),
             Duration.ofMillis(100),
+            Duration.ofMinutes(30),
             Duration.ofMinutes(30),
             null,
             null);
