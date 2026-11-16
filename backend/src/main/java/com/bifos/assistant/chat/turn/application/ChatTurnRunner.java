@@ -241,7 +241,7 @@ class ChatTurnRunner {
         HermesRunResult result = end.result;
         SteerSettlement settlement;
         if (turns.isStopConfirmed(handle) || result != null && "cancelled".equalsIgnoreCase(result.status())) {
-            settlement = SteerSettlement.stopped();
+            settlement = SteerSettlement.stopped(result == null ? null : result.pendingSteer());
         } else if (result != null) {
             settlement = SteerSettlement.completed(result.pendingSteer());
         } else {

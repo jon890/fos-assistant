@@ -3,6 +3,7 @@
 - **status**: `accepted`
 - Date: 2026-10-01
 - [ADR-040](../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md) 의 「turn 이 닫힐 때 다음 turn 을 연다」 자리를 함께 쓴다. ADR-040 의 결정은 그대로 둔다.
+- 2026-11-17 개정: 「맥락」 과 「대안 기각」 의 「중지하면 버려진다」 는 소스 조사에 따른 것이었다. 운영 확인에서 중지한 실행도 넣지 못한 글을 `pending_steer` 로 돌려줬다([ADR-20261116 / run-steer](ADR-20261116-run-steer.md)). 결정은 그대로다.
 - 2026-11-16 개정: 「적용 범위」 가 미룬 steer 를 [ADR-20261116 / run-steer](ADR-20261116-run-steer.md) 가 이 대기열 위에 얹었다. 결정 표의 「흐름이 붙은 에이전트」 줄은 흐름 칸이 지워져(`V20261015151000__drop_agent_flow.sql`) 뺐다.
 - 2026-11-02 개정: 저장하는 자리를 `chat_pending_message` 테이블에서 대화 줄의 `conversation.pending_messages` JSON 칸으로 옮겼다([ADR-20261102 / table-reduce-r2](../../backend/docs/adr/ADR-20261102-table-reduce-r2.md)). 아래 「저장 자리 개정」 을 본다.
 

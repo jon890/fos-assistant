@@ -460,7 +460,7 @@ Control Plane 이 Memory 를 주입하는 자리가 여기다.
 
 ### 도는 실행에 지시를 더하는 `steer`
 
-v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_handle_steer_run` 과 agent 쪽 처리를 소스로 읽었다. 운영 Hermes 에서의 왕복은 배포 뒤 확인한다. 확인할 항목은 [`docs/features/chat/spec.md`](../../docs/features/chat/spec.md) 의 「운영 확인 항목」 이 갖는다.
+v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 의 `_handle_steer_run` 과 agent 쪽 처리를 소스로 읽었다. 운영 Hermes 왕복은 2026-11-17 에 일부 확인했고, 소스와 달랐던 것은 아래 표의 「중단」 행에 적었다. 확인할 항목과 남은 항목은 [`docs/features/chat/spec.md`](../../docs/features/chat/spec.md) 의 「운영 확인 항목」 이 갖는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -476,13 +476,13 @@ v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousR
 | 모델에 들어가는 때 | 둘이다. 도구 한 묶음이 끝난 직후, 그리고 다음 API 호출 직전(가장 최근 `tool` 행 바로 뒤). 도구를 부르는 중이면 그 도구가 끝날 때까지 기다린다 |
 | 모양 | 별도 `role: user` 행, `display_kind: "steer"`, 본문은 `[OUT-OF-BAND USER MESSAGE …]` 표식이다. 시스템 프롬프트가 이 표식을 원래 요청과 같은 사용자 권한으로 따르라고 지시한다. session 에 저장된다 |
 | 넣지 못하고 끝났다 | 마지막 답을 쓰는 중에 받은 글처럼 슬롯에 남은 글은 모든 종료 사건과 `GET /v1/runs/{run_id}` 의 `pending_steer` 로 이어진 하나로 돌아온다. 다시 보내라는 뜻이다 |
-| 중단 | hard interrupt 가 슬롯을 비운다. 넣지 못한 글은 `pending_steer` 로도 오지 않고 버려진다. 넣었는지도 알리지 않는다 |
+| 중단 | 운영 확인(2026-11-17): steer 직후 중지한 실행의 `GET /v1/runs/{run_id}` 가 `status: cancelled` 와 함께 넣지 못한 그 글을 `pending_steer` 로 돌려줬다. 소스만 읽었을 때는 hard interrupt 가 슬롯을 비워 버린다고 봤다. 넣은 글은 알리지 않는다. 중지의 종료 사건(`run.cancelled`)에 실리는지는 확인하지 못했다. Control Plane 은 실행 조회로 읽는다 |
 | 위임 자식 | 부모의 `steer` 는 자식에게 가지 않는다. 자식이 도는 동안 받은 글은 자식이 끝난 뒤 부모에 들어간다. 자식에 넣는 경로는 Hermes 자체 화면 전용이다 |
 
 **Control Plane 은 설정이 켜져 있을 때 답이 도는 중 대화 주인이 입력창에 쓴 글만 그 대화의 루트 run 에 `steer` 로 보낸다.**
 `steer` 글이 원래 요청과 같은 사용자 권한으로 들어가므로 위임 결과, 도구 결과, 알림 줄, 카드 답은 보내지 않는다.
-200 이면 받음, 4xx·5xx 면 거절, 응답이 없으면 받았는지 모르는 것으로 본다. 글은 넣기 전부터 Control Plane 의 대기 줄에 있고, 거절, `pending_steer`, 중단, 모름을 모두 대기 줄로 되돌린다. 흐름은 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「도는 실행에 끼워 넣기」, 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다.
-Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)도 steer 경로, `run.steered`, 실행 조회와 종료 사건의 `pending_steer`, 중단 때 슬롯 비우기를 낸다. 지금 대기열 검사가 흔들리지 않게 steer 검사 입력으로 연 실행만 받고 나머지는 409 `run_not_accepting_steer` 로 거절한다. 실제 Hermes 는 도는 실행이면 모두 받는다.
+200 이면 받음, 4xx·5xx 면 거절, 응답이 없으면 받았는지 모르는 것으로 본다. 글은 넣기 전부터 Control Plane 의 대기 줄에 있고, 거절, `pending_steer`, 중단, 모름을 모두 대기 줄로 되돌린다. 중단한 결과에 `pending_steer` 가 있으면 그 글은 들어가지 않은 것으로 본다. 흐름은 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「도는 실행에 끼워 넣기」, 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다.
+Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)도 steer 경로, `run.steered`, 실행 조회와 완료·중지 종료 사건의 `pending_steer` 를 낸다. 중지 때도 슬롯에 남은 글을 `pending_steer` 로 돌려준다. 지금 대기열 검사가 흔들리지 않게 steer 검사 입력으로 연 실행만 받고 나머지는 409 `run_not_accepting_steer` 로 거절한다. 실제 Hermes 는 도는 실행이면 모두 받는다.
 
 ### 실행 조회가 답하는 기간
 

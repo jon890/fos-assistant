@@ -34,6 +34,7 @@ test("상태 글과 안내 줄은 스펙의 글 그대로다", () => {
     DELIVERED: "전달됨",
     CARRIED_OVER: "다음 차례로 넘어감",
     UNCONFIRMED: "전달됐는지 확인 못 함",
+    NOT_DELIVERED: "전달 안 됨",
   });
   assert.equal(
     STEER_CHILD_NOTICE.SUBAGENT,

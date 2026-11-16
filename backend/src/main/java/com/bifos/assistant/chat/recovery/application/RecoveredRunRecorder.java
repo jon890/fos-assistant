@@ -110,7 +110,7 @@ public class RecoveredRunRecorder {
                 .orElseGet(() -> failLocked(row, ORPHANED)));
         if (finished) {
             settleSteer(executionId, result == null ? SteerSettlement.unknown()
-                : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped()
+                : "cancelled".equalsIgnoreCase(result.status()) ? SteerSettlement.stopped(result.pendingSteer())
                     : SteerSettlement.completed(result.pendingSteer()));
         }
         return finished;

@@ -277,6 +277,65 @@ class SteerSettleTest {
 
 
     @Test
+    @DisplayName("중지했는데 돌려준 글과 맞는 말풍선은 전달 안 됨으로, 앞 말풍선은 확인 못 함으로 바뀌어 모두 멈춘 대기 줄에 들어간다")
+    void stopWithReturnedTextMarksNotDelivered() throws InterruptedException {
+        stub().willReturn(result("cancelled", "둘째"));
+        Thread running = startRunningTurn();
+        pending.enqueue(dad, conversation.id(), "첫째", true);
+        pending.enqueue(dad, conversation.id(), "둘째", true);
+        chat.stop(dad, handle().getExecutionId());
+
+        finish(running);
+
+        assertThat(bubbles()).extracting(ChatMessage::steerState)
+            .containsExactly(SteerState.UNCONFIRMED, SteerState.NOT_DELIVERED);
+        PendingMessages queue = pendingRows.read(conversation.id());
+        assertThat(queue.held()).isTrue();
+        assertThat(queue.items()).extracting(PendingMessage::messageId)
+            .containsExactlyElementsOf(bubbles().stream().map(ChatMessage::id).toList());
+        assertThat(stub().received()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("중지했는데 돌려준 글이 어느 묶음과도 맞지 않으면 모두 확인 못 함으로 둔다")
+    void stopWithMismatchedReturnStaysUnconfirmed() throws InterruptedException {
+        stub().willReturn(result("cancelled", "모르는 글"));
+        Thread running = startRunningTurn();
+        pending.enqueue(dad, conversation.id(), "첫째", true);
+        chat.stop(dad, handle().getExecutionId());
+
+        finish(running);
+
+        assertThat(bubbles()).extracting(ChatMessage::steerState).containsExactly(SteerState.UNCONFIRMED);
+        assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("전달 안 됨 글을 보내면 다음 차례로 넘어가고, 취소하면 말풍선은 전달 안 됨으로 남는다")
+    void notDeliveredReleaseCarriesOverAndCancelKeeps() throws InterruptedException {
+        stub().willReturn(result("cancelled", "보낼 글\n취소할 글"));
+        Thread running = startRunningTurn();
+        pending.enqueue(dad, conversation.id(), "보낼 글", true);
+        pending.enqueue(dad, conversation.id(), "취소할 글", true);
+        chat.stop(dad, handle().getExecutionId());
+        finish(running);
+        List<ChatMessage> stopped = bubbles();
+
+        pending.cancel(dad, conversation.id(), pendingRows.read(conversation.id()).items().get(1).id());
+        stub().willReturn(result("completed", null));
+        pending.release(dad, conversation.id());
+        awaitUntil("보낸 turn", () -> stub().received().size() == 2);
+        awaitIdle();
+
+        assertThat(messages.findById(stopped.get(0).id()).orElseThrow().steerState()).isEqualTo(SteerState.CARRIED_OVER);
+        assertThat(messages.findById(stopped.get(1).id()).orElseThrow().steerState()).isEqualTo(SteerState.NOT_DELIVERED);
+        assertThat(stub().received().get(1).input()).endsWith("보낼 글");
+    }
+
+
+    @Test
     @DisplayName("결과를 읽지 못하고 끝나면 들어갔는지 모르는 것으로 보고 멈춘 대기 줄에 둔다")
     void unreadResultHolds() throws InterruptedException {
         CountDownLatch gate = release;
@@ -370,7 +429,7 @@ class SteerSettleTest {
             conversation.id(), dad.id(), "앞서 완료로 정리한 글", executionId + 1000, SteerState.DELIVERED, null, Instant.now()));
         jdbc.update("UPDATE conversation SET pending_messages = ? WHERE id = ?", "{\"version\":9}", conversation.id());
 
-        ledger.settle(executionId, conversation.id(), SteerSettlement.stopped());
+        ledger.settle(executionId, conversation.id(), SteerSettlement.stopped(null));
         assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.DELIVERED);
 
         jdbc.update("UPDATE conversation SET pending_messages = NULL WHERE id = ?", conversation.id());

@@ -101,8 +101,10 @@ export async function steerFlow(context: Context): Promise<void> {
     expect(carried.filter((message) => message.content === "반말로").length === 1, "돌아온 글의 사용자 말풍선이 둘이다");
     expect(context.hermes.lastSubmittedInput()?.endsWith("반말로") === true, "다음 turn 의 Hermes 입력이 돌아온 글이 아니다");
 
-    step("끼운 뒤 중지하면 말풍선은 「전달됐는지 확인 못 함」 이 되고 같은 글이 멈춘 대기 줄로 돌아온다");
-    const third = await holdTurn(context, STEER_PROBE, "dad", conversationId);
+    // 넣기 전에 중지해 Hermes 가 그 글을 `pending_steer` 로 돌려주는 경우다. 넣은 뒤 중지해 돌려준 글이 없는 경우(「전달됐는지 확인 못 함」)는
+    // 가짜 Hermes 가 글을 넣는 때와 중지가 겨뤄 흔들리므로 `SteerSettleTest` 가 본다.
+    step("넣기 전에 중지하면 돌려준 글의 말풍선은 「전달 안 됨」 이 되고 같은 글이 멈춘 대기 줄로 돌아온다");
+    const third = await holdTurn(context, STEER_UNREAD_PROBE, "dad", conversationId);
     await send(context, conversationId, "그거 말고 위 것", true);
     expectStatus(
       await call(context, `/chat/executions/${third.started.executionId}/stop`, { method: "POST", token: context.tokens.dad }),
@@ -117,7 +119,7 @@ export async function steerFlow(context: Context): Promise<void> {
       held = await pendingOf(context, conversationId) as PendingQueue;
     }
     const stopped = bubbleOf(await steeredMessages(context, conversationId), "그거 말고 위 것");
-    expect(stopped.steer?.state === "UNCONFIRMED", `중지 뒤 말풍선 상태가 다르다: ${stopped.steer?.state}`);
+    expect(stopped.steer?.state === "NOT_DELIVERED", `중지 뒤 말풍선 상태가 다르다: ${stopped.steer?.state}`);
     expect(
       held.held && held.items.length === 1 && held.items[0]!.messageId === stopped.id,
       `멈춘 대기 줄에 말풍선 번호가 붙은 글이 없다: ${JSON.stringify(held)}`,
@@ -131,7 +133,7 @@ export async function steerFlow(context: Context): Promise<void> {
       "되돌린 글 취소",
     );
     const cancelled = bubbleOf(await steeredMessages(context, conversationId), "그거 말고 위 것");
-    expect(cancelled.steer?.state === "UNCONFIRMED", "취소한 뒤 말풍선이 「전달됐는지 확인 못 함」 으로 남지 않았다");
+    expect(cancelled.steer?.state === "NOT_DELIVERED", "취소한 뒤 말풍선이 「전달 안 됨」 으로 남지 않았다");
   } finally {
     context.hermes.releaseHeldRun();
   }

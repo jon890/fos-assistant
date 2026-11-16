@@ -13,6 +13,7 @@ export const STEER_STATE_TEXT: Record<SteerInfo["state"], string> = {
   DELIVERED: "전달됨",
   CARRIED_OVER: "다음 차례로 넘어감",
   UNCONFIRMED: "전달됐는지 확인 못 함",
+  NOT_DELIVERED: "전달 안 됨",
 };
 
 /** 받은 순간 돈 자식의 종류마다 말풍선 아래에 붙는 안내 한 줄이다 */

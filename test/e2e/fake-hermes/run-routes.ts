@@ -55,7 +55,8 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           const run = state.runs.get(runId!);
           if (!run) return send(response, 404, runNotFound(runId!));
           run.status = "cancelled";
-          // 실제 Hermes 의 hard interrupt 는 넣지 못한 steer 글을 `pending_steer` 로도 돌려주지 않고 버린다.
+          // 운영 Hermes(2026-11-17 실측)는 중지한 실행에도 넣지 못한 steer 글을 `pending_steer` 로 돌려준다.
+          if (run.steerSlot !== undefined && run.steerSlot.length > 0) run.pending_steer = run.steerSlot.join("\n");
           run.steerSlot = [];
           if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
           state.emptyUntilStopped.get(runId!)?.end();

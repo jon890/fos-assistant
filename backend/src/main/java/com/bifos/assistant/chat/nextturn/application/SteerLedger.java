@@ -94,8 +94,11 @@ public class SteerLedger implements TurnSteerLedger {
                 }
                 boolean completed = settlement.kind() == SteerSettlement.Kind.COMPLETED;
                 List<ChatMessage> chosen = completed ? returned(delivered, settlement.pendingSteer()) : delivered;
-                SteerState next = completed ? SteerState.CARRIED_OVER : SteerState.UNCONFIRMED;
-                chosen.forEach(message -> message.changeSteerState(next));
+                if (completed) {
+                    chosen.forEach(message -> message.changeSteerState(SteerState.CARRIED_OVER));
+                } else {
+                    markStopped(delivered, settlement);
+                }
                 List<PendingMessages.Carried> carried = chosen.stream()
                     .map(message -> new PendingMessages.Carried(message.id(), message.content()))
                     .toList();
@@ -114,10 +117,34 @@ public class SteerLedger implements TurnSteerLedger {
 
 
     /**
+     * 중지나 결과 모름으로 끝난 turn 의 말풍선 상태를 정한다. 모두 멈춘 대기 줄로 되돌리는 것은 같다.
+     *
+     * <p>중지했는데 Hermes 가 돌려준 글({@code pending_steer})과 뒤쪽 묶음이 글자로 맞으면 그 글들은 들어가지 않은 것이라 「전달 안 됨」 이고,
+     * 앞 글은 들어갔는지 모른다. 맞는 묶음이 없거나 돌려준 글이 없으면 모두 「전달됐는지 확인 못 함」 이다. 완료와 달리 맞지 않을 때 모두
+     * 「전달 안 됨」 으로 보내지 않는다. 들어갔을 수 있는 글을 들어가지 않았다고 보이면 사람이 같은 지시를 다시 보낼 수 있다(스펙 DECISION2).
+     */
+    private static void markStopped(List<ChatMessage> delivered, SteerSettlement settlement) {
+        List<ChatMessage> notDelivered = settlement.kind() == SteerSettlement.Kind.STOPPED
+            && settlement.pendingSteer() != null
+                ? matchedTail(delivered, settlement.pendingSteer())
+                : List.of();
+        delivered.forEach(message -> message.changeSteerState(
+            notDelivered.contains(message) ? SteerState.NOT_DELIVERED : SteerState.UNCONFIRMED));
+    }
+
+
+    /**
      * 돌아온 글과 맞는 말풍선이다. Hermes 는 넣지 못한 글을 받은 순서대로 줄바꿈으로 이어 돌려준다. 앞 글은 이미 들어갔을 수 있어
      * 뒤쪽 묶음 가운데 이은 글이 같은 가장 긴 것을 고른다. 맞는 묶음이 없으면 글을 잃지 않게 모두 고른다(스펙 DECISION18).
      */
     static List<ChatMessage> returned(List<ChatMessage> delivered, String pendingSteer) {
+        List<ChatMessage> matched = matchedTail(delivered, pendingSteer);
+        return matched.isEmpty() ? delivered : matched;
+    }
+
+
+    /** 이은 글이 돌려준 글과 같은 가장 긴 뒤쪽 묶음이다. 없으면 빈 목록이다. */
+    static List<ChatMessage> matchedTail(List<ChatMessage> delivered, String pendingSteer) {
         String target = pendingSteer.strip();
         for (int from = 0; from < delivered.size(); from++) {
             List<ChatMessage> tail = delivered.subList(from, delivered.size());
@@ -126,7 +153,7 @@ public class SteerLedger implements TurnSteerLedger {
                 return List.copyOf(tail);
             }
         }
-        return delivered;
+        return List.of();
     }
 
 
