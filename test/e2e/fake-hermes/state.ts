@@ -68,6 +68,8 @@ export function createFakeHermesState(
   let heldRunId: string | undefined;
   let heldRunWaiter: (() => void) | undefined;
   let heldRunReady: Promise<void> | undefined;
+  /** steer 로 받은 글을 받은 순서대로 남긴다. 검사가 요청 본문을 본다. */
+  const steerInputs: { runId: string; input: string }[] = [];
   /** 사건 스트림이 한 번이라도 열린 run 과, 열리기를 기다리는 쪽이다. */
   const eventsOpened = new Set<string>();
   const eventsWaiters = new Map<string, (() => void)[]>();
@@ -139,6 +141,7 @@ export function createFakeHermesState(
     heldRunReady: heldRunReady as Promise<void> | undefined,
     eventsOpened,
     eventsWaiters,
+    steerInputs,
     longActivityGate: longActivityGate as (() => void) | undefined,
     holdNextSoul,
     heldSoul: heldSoul as { response: ServerResponse; payload: unknown } | undefined,
@@ -248,6 +251,10 @@ export type Run = {
   connectorCalls?: ConnectorCall[];
   /** 바깥 도구를 쓰는 run 이다. 사건 스트림이 `web_search` 도구 사건을 흘린 뒤 끝난다. */
   outsideTool?: boolean;
+  /** steer 로 받아 아직 모델에 넣지 않은 글이다. 받은 순서대로 쌓는다 */
+  steerSlot?: string[];
+  /** 끝날 때 슬롯에 남은 글을 줄바꿈으로 이은 것이다. 실제 Hermes 와 같이 실행 조회가 이 칸으로 돌려준다 */
+  pending_steer?: string;
 };
 
 /** 허용된 플러그인 도구 호출 하나다. `hermesTool` 은 등록 이름이다. */
@@ -380,6 +387,8 @@ export type FakeHermes = {
   runConcurrency(): { maxTotal: number; maxByProfile: Record<string, number> };
   resetRunConcurrency(): void;
   waitForHeldRun(): Promise<void>;
+  /** steer 로 받은 글이다. 받은 순서대로다 */
+  steerInputs(): readonly { runId: string; input: string }[];
   releaseHeldRun(): void;
   /** 지금 붙잡아 둔 실행의 번호와 session 이다. 붙잡은 것이 없으면 `undefined` 다. 플러그인처럼 `_fos_ctx` 를 서명할 때 쓴다. */
   heldRun(): { runId: string; sessionId: string } | undefined;

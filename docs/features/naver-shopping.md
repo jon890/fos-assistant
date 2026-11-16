@@ -47,7 +47,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 - `price_krw` 는 즉시할인을 반영한 판매가다. 쿠폰, 포인트, 지역 추가 배송비는 넣지 않는다
-- `catalog` 의 `lowest_price_krw` 는 묶음의 최저가이고 `lowest_price_with_fee_krw` 는 배송비를 포함한 최저가다. `regional_extra` 는 지역 추가 배송비 안내 글이 있으면 참이다. 이 결과가 오면 담당은 최저가와 배송비만 읽었다고 알리고 판매처별 가격은 「내 브라우저」 에서 확인해 달라고 안내한다(스킬이 지시한다). 이전 결과의 `sellers` 항목(`store`, `price_krw`, `shipping_fee_krw`, `url`)은 읽는 칸을 가려내지 못해 지금은 싣지 않는다
+- `catalog` 의 `lowest_price_krw` 는 묶음의 최저가이고 `lowest_price_with_fee_krw` 는 배송비를 포함한 최저가다. `regional_extra` 는 지역 추가 배송비 안내 글이 있으면 참이다. 이 결과가 오면 담당은 최저가와 배송비만 읽었다고 알리고 판매처별 가격은 「내 브라우저」 에서 확인해 달라고 안내한다(`get_product_detail` 의 도구 설명이 지시한다). 이전 결과의 `sellers` 항목(`store`, `price_krw`, `shipping_fee_krw`, `url`)은 읽는 칸을 가려내지 못해 지금은 싣지 않는다
 - 옵션은 20 묶음, 묶음마다 값 100개까지다. 조합형 옵션은 첫 묶음 값만 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의 재고가 0)을 싣고, 둘째 묶음부터는 이름만 싣는다
 - 표준옵션(색상·사이즈) 상품은 `optionStandards` 를 그룹 이름별 값 목록으로 읽는다. 항목에 가격·재고 칸이 없어 모든 값의 추가 금액과 품절이 `null` 이다(2026-11-16 실측)
 - `naver_pay_buy` 는 상품 상태가 판매 중일 때 참이다

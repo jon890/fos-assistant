@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipButton } from "@/components/ui/tooltip-button";
-import type { PendingQueue } from "@/lib/pending-messages";
+import { visiblePendingItems, type PendingQueue } from "@/lib/pending-messages";
 
 type Props = {
   queue: PendingQueue;
@@ -17,10 +17,12 @@ type Props = {
  * 입력창 위의 대기 줄이다. 답이 오는 동안 보낸 글을 쌓인 순서대로 보인다.
  *
  * <p>줄마다 취소 단추가 있다. 중지해서 멈춰 둔 대기 줄에는 「보내기」 를 함께 보인다. 쌓인 글이 없으면 아무것도
- * 그리지 않는다.
+ * 그리지 않는다. 이미 steer 말풍선으로 보인 글은 멈춘 줄에서만 그린다. 도는 실행에 끼워 넣는 중인 글은
+ * 「끼우는 중」 으로 보이고 취소를 막는다(ADR-20261116 / run-steer).
  */
 export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
-  if (queue.items.length === 0) return null;
+  const items = visiblePendingItems(queue);
+  if (items.length === 0) return null;
   return (
     <div
       data-testid="pending-queue"
@@ -43,16 +45,24 @@ export function PendingQueueView({ queue, onCancel, onRelease, busy }: Props) {
         ) : null}
       </div>
       <ul className="mt-1 flex flex-col gap-1">
-        {queue.items.map((item) => (
+        {items.map((item) => (
           <li
             key={item.id}
             data-testid="pending-item"
             className="flex min-w-0 items-center gap-2 rounded-full bg-muted pl-3 pr-1"
           >
             <span className="min-w-0 flex-1 truncate text-sm">{item.text}</span>
+            {item.steering ? (
+              <span
+                data-testid="pending-steering"
+                className="shrink-0 text-xs text-muted-foreground"
+              >
+                끼우는 중
+              </span>
+            ) : null}
             <TooltipButton
               label="대기 메시지 취소"
-              disabled={busy}
+              disabled={busy || item.steering === true}
               onClick={() => onCancel(item.id)}
               className="shrink-0"
             >

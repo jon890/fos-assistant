@@ -99,6 +99,9 @@ export const RUN_EVENTS_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/
 
 export const RUN_STOP_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/stop$/;
 
+/** 도는 실행에 지시를 더하는 경로다. v2026.9.24 `gateway/platforms/api_server_runs.py` 의 `_handle_steer_run` 이다. */
+export const RUN_STEER_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/steer$/;
+
 export const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 
 export const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
