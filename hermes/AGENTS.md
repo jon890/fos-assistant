@@ -20,5 +20,3 @@ Hermes 에 설치하는 plugin 과 profile 틀, 범용 플러그인이다. Herme
 | 서비스별 플러그인과 범용 plugin | [rule-65](../docs/code-rules/rule-65.md) |
 | 전환 배포의 호환성 | [rule-66](../docs/code-rules/rule-66.md) |
 | 묶음과 환경 값 입력 | [rule-46](../docs/code-rules/rule-46.md), [rule-67](../docs/code-rules/rule-67.md) |
-
-배포 순서는 [`code-architecture.md`](docs/code-architecture.md)의 「디렉터리 배치와 배포 순서」가 갖는다.
