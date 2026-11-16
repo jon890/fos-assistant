@@ -132,4 +132,4 @@ PR4 는 운영에 연결하지 않은 addon 만 고치므로 v0.23.2 에서만 �
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | DECISION9 | 재기동 정리 정책 | ADR-061 을 고친다 | ADR-061 |
-| DECISION8 | 승인 경계 | ADR-20261008 / execute-code-unattended 를 고친다 | `hermes/docs/hermes-contract.md` 의 「`execute_code` 의 승인 판정」 |
+| DECISION8 | 승인 경계 | [ADR-20261008 / execute-code-unattended](../../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md) 를 고친다 | `hermes/docs/hermes-contract.md` 의 「`execute_code` 의 승인 판정」 |
