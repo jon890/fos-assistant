@@ -151,7 +151,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
 | 직렬화한 인자 글이 UTF-8 로 60KB 를 넘는다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
 | 대응 파일에 없는 도구 | `tool` 을 `null` 로 묻는다 | 같다. manifest 를 읽지 못해 `tools` 가 빈 서버의 도구도 여기 온다 |
-| 답이 200 의 `allow` | 통과한다 | 같다 |
+| 답이 200 의 `allow` | 통과한다. 답에 결제 넘기기 맥락 `payment_context` 가 모양대로 있으면 `{"action": "modify", "args": {"_fos_payment": <맥락>}}` 로 넣고, 없거나 모양이 틀린데 모델 인자에 `_fos_payment` 가 있으면 `null` 로 덮는다(1.9.0 부터) | 같다 |
 | 답이 200 의 `block` 이고 글이 있다 | 그 글로 막는다 | 같다 |
 | 주소나 토큰이 없다, 제한 시간 안에 답이 없다, 200 이 아니다, 답을 읽지 못한다, 예외가 났다 | 정해 둔 글로 막는다 | 같다 |
 

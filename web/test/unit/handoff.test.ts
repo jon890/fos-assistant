@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
   HANDOFF_NEEDS,
   HANDOFF_TEXT,
+  handoffActions,
   handoffBrowserHref,
+  handoffDoneHint,
   newHandoffs,
   rebaseHandoffWatch,
   safeHandoff,
@@ -128,4 +130,16 @@ test("처음 읽은 번호에 없는 넘기기만 새 넘기기로 보고 받은
   const third = { ...row, handoffId: "c" } as Handoff;
   assert.deepEqual(newHandoffs(new Set(["b"]), [third, second, first]), [third, first]);
   assert.deepEqual(newHandoffs(new Set(["a"]), [first]), []);
+});
+
+test("결제 카드만 「결제했어요」 와 「사지 않을래요」 두 단추이고 다른 카드는 「다 했어요」 하나다", () => {
+  assert.deepEqual(handoffActions("PAYMENT"), [
+    { label: "결제했어요", text: "「내 브라우저」에서 결제를 마쳤어요. 주문을 확인해 주세요." },
+    { label: "사지 않을래요", text: "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요." },
+  ]);
+  for (const need of HANDOFF_NEEDS.filter((value) => value !== "PAYMENT")) {
+    assert.deepEqual(handoffActions(need), [{ label: "다 했어요", text: HANDOFF_TEXT[need].done }]);
+    assert.equal(handoffDoneHint(need), "마친 뒤 「다 했어요」를 눌러 주세요.");
+  }
+  assert.ok(handoffDoneHint("PAYMENT").includes("「사지 않을래요」"));
 });

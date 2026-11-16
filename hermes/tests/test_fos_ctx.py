@@ -533,6 +533,26 @@ class ConnectorPolicyTest(PluginFixture):
                                            VECTOR_CALL, args_json),
         })
 
+    def test_allow_with_payment_context_puts_it_into_args(self):
+        """allow 답에 결제 넘기기 맥락이 모양대로 있으면 `_fos_payment` 로 덮어 넣는다. 모델이 보낸 값은 쓰지 않는다."""
+        context = {"v": 1, "handed_off_at_ms": 1763269200000, "final_amount_krw": 3300,
+                   "expected_total_krw": 3300, "url": "https://smartstore.naver.com/s/products/1"}
+        self.answer_json({"decision": "allow", "message": "", "action_id": None, "payment_context": context})
+        self.assertEqual(self.call("mcp__demo__write_note", args={"_fos_payment": {"v": 1, "url": "지어냄"}}),
+                         {"action": "modify", "args": {"_fos_payment": context}})
+
+    def test_allow_without_usable_payment_context_clears_model_value(self):
+        """맥락이 없거나 모양이 틀리면 모델이 보낸 `_fos_payment` 를 None 으로 덮고, 보내지 않았으면 그대로 통과한다."""
+        good = {"v": 1, "handed_off_at_ms": 1, "final_amount_krw": 1, "expected_total_krw": 1, "url": "https://a"}
+        bad = [None, "x", {**good, "extra": 1}, {**good, "v": True}, {**good, "final_amount_krw": -1},
+               {**good, "handed_off_at_ms": "1"}, {**good, "url": ""}, {**good, "url": "a" * 401}]
+        for value in bad:
+            with self.subTest(value=value):
+                self.answer_json({"decision": "allow", "payment_context": value})
+                self.assertEqual(self.call("mcp__demo__write_note", args={"_fos_payment": good}),
+                                 {"action": "modify", "args": {"_fos_payment": None}})
+                self.assertIsNone(self.call("mcp__demo__write_note", args={"text": "x"}))
+
     def test_block_with_message_is_passed_on(self):
         """서버가 글이 든 block 으로 답하면 그 글로 막는다."""
         self.answer_json({"decision": "block", "message": "막음"})

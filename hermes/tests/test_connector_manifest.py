@@ -989,6 +989,25 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
                 self.declare(lambda tools: tools.update(read_note={"risk": "READ", "attended_only": value}))
                 self.assertEqual(self.catalog(), [])
 
+    def test_declared_payment_context_reaches_the_catalog_only_on_read_when_true(self):
+        """`"payment_context": true` 는 READ 도구에서만 받아 카탈로그에 싣고, 거짓이나 없으면 칸을 내지 않는다."""
+        self.declare(lambda tools: tools.update(
+            check_note={"risk": "READ", "payment_context": True},
+            list_note={"risk": "READ", "payment_context": False}))
+        tools = self.catalog()[0]["tools"]
+        self.assertIs(tools["check_note"]["payment_context"], True)
+        self.assertNotIn("payment_context", tools["list_note"])
+        self.assertNotIn("payment_context", tools["env_view"])
+
+    def test_invalid_payment_context_leaves_the_connector_out(self):
+        """boolean 이 아니거나 READ 가 아닌 도구의 `payment_context` 는 그 플러그인을 카탈로그에서 뺀다."""
+        for declared in ({"risk": "READ", "payment_context": "true"},
+                         {"risk": "READ", "payment_context": 1},
+                         {"risk": "WRITE", "outbound": False, "payment_context": True}):
+            with self.subTest(declared=declared):
+                self.declare(lambda tools: tools.update(check_note=declared))
+                self.assertEqual(self.catalog(), [])
+
     def test_identifiers_reach_the_catalog_in_declared_order(self):
         """`identifiers` 는 승인을 받는 도구에서 받고 선언한 순서 그대로 나온다(ADR-089)."""
         self.declare(lambda tools: tools.update(

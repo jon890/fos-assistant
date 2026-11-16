@@ -67,7 +67,8 @@ final class ConnectorCatalogTools {
                 text(policy, "summary"),
                 outbound(policy),
                 conversationGrant(policy),
-                attendedOnly(policy)));
+                attendedOnly(policy),
+                paymentContext(policy)));
         }
         return List.copyOf(tools);
     }
@@ -129,6 +130,17 @@ final class ConnectorCatalogTools {
             return false;
         }
         return !value.isBoolean() || value.asBoolean();
+    }
+
+
+    /**
+     * 판정 응답에 결제 넘기기 맥락을 실어 달라는 선언이다. 칸이 없으면 거짓이다.
+     *
+     * <p>boolean 이 아닌 값은 거짓으로 읽는다. 거짓이면 맥락을 싣지 않을 뿐이라 닫히는 쪽이다.
+     */
+    private static boolean paymentContext(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("payment_context");
+        return value != null && value.isBoolean() && value.asBoolean();
     }
 
 

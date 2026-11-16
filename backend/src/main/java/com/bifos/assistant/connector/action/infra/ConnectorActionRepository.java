@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.action.infra;
 import com.bifos.assistant.connector.action.domain.ActionDelivery;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
 import com.bifos.assistant.connector.action.domain.type.ActionStatus;
+import com.bifos.assistant.connector.action.domain.type.HandoffNeed;
 import com.bifos.assistant.connector.connection.domain.type.ToolRisk;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -248,6 +249,25 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ActionDelivery> findLastDeliveredByConversation(
         @Param("conversationIds") Collection<Long> conversationIds,
         @Param("statuses") Collection<ActionStatus> statuses);
+
+
+    /**
+     * 그 사용자의 그 대화에서 그 플러그인이 그 단계로 넘긴 그 상태의 줄이다. 넘긴 시각이 늦은 것부터다. 주문 확인 도구에 줄 결제 넘기기
+     * 맥락을 고를 때 쓴다({@code docs/features/connector-policy.md} 의 「도구 호출 판정」). 카드를 닫았는지는 보지 않는다.
+     */
+    @Query("""
+            select a from ConnectorAction a
+            where a.conversationId = :conversationId and a.userId = :userId and a.connectorId = :connectorId
+              and a.handoff.need = :need and a.status = :status
+            order by a.handoff.at desc, a.id desc
+            """)
+    List<ConnectorAction> findHandedOff(
+        @Param("conversationId") Long conversationId,
+        @Param("userId") Long userId,
+        @Param("connectorId") String connectorId,
+        @Param("need") HandoffNeed need,
+        @Param("status") ActionStatus status,
+        Pageable page);
 
 
     /** 금융 하루 상한이 KST 하루 안에 승인으로 넘어간 금융 줄을 읽는다. 호출자가 상태로 다시 거른다. */

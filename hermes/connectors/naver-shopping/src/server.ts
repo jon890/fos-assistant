@@ -21,11 +21,17 @@ import {
   type CheckoutDeps,
 } from "./checkout.ts";
 import { fillCheckout, type FillDeps } from "./fill.ts";
+import {
+  checkOrder,
+  ORDER_CHECK_TOOL,
+  type OrderCheckDeps,
+} from "./order-check.ts";
 
 /** 테스트가 바꿔 끼우는 탭 동작. 운영은 기본값이다. */
 export type ServerDeps = ToolDeps & {
   checkout?: CheckoutDeps;
   fill?: FillDeps;
+  orders?: OrderCheckDeps;
 };
 
 /** 도구를 등록한 서버. 테스트는 이 서버를 InMemoryTransport 로 부른다. */
@@ -79,6 +85,23 @@ export function createServer(env: Env = process.env, deps?: ServerDeps) {
       annotations: { readOnlyHint: true },
     },
     (request) => guard(() => prepareCheckout(env, request, deps?.checkout)),
+  );
+  server.registerTool(
+    ORDER_CHECK_TOOL,
+    {
+      description: manifest.tools.check_shopping_order.description,
+      // 모델이 넣는 인자는 없다. `_fos_payment` 는 fos-ctx 가 Control Plane 의 판정 응답으로 넣는다.
+      // 선언하지 않은 키는 MCP SDK 가 지우므로 선택 칸으로 둔다. 모양은 `parsePaymentContext` 가 본다.
+      inputSchema: {
+        _fos_payment: z
+          .unknown()
+          .optional()
+          .describe("시스템이 채우는 칸이다. 비워 둔다."),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    ({ _fos_payment }) =>
+      guard(() => checkOrder(env, _fos_payment, deps?.orders)),
   );
   server.registerTool(
     CHECKOUT_TOOL,
