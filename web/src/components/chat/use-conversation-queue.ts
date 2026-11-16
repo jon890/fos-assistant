@@ -4,6 +4,7 @@ import { describePendingFailure } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationSend } from "./use-conversation-send";
 import type { MessageAttachment } from "./message-types";
+import { queueSourceOf, type QueueSource } from "@/lib/pending-messages";
 
 type Context = Pick<
   ConversationSessionState,
@@ -40,10 +41,12 @@ export function useConversationQueue({
    * 그대로 두고 까닭을 알린다.
    *
    * @param fromDraft 입력창의 글을 보냈다. 더한 뒤 입력창을 비운다. 질문 카드의 답은 입력창과 무관하다.
+   * @param source 글의 출처. 입력창 글만 서버에 끼워 넣기를 청한다
    */
   async function queueMessage(
     text: string,
     fromDraft: boolean,
+    source: QueueSource,
   ): Promise<boolean> {
     // 첫 송신 전에 빈 대화 식별자를 확보한다. 아직 확보하지 못했으면 대기 메시지를 받지 않는다.
     if (
@@ -57,7 +60,7 @@ export function useConversationQueue({
     enqueueing.current = true;
     setError(null);
     try {
-      const result = await pending.enqueue(text);
+      const result = await pending.enqueue(text, source === "composer");
       if (selectionVersion.current !== version) return result.ok;
       if (!result.ok) {
         setError(
@@ -116,6 +119,7 @@ export function useConversationQueue({
     return queueMessage(
       (replacementText ?? draft).trim(),
       replacementText === undefined,
+      queueSourceOf(replacementText),
     );
   }
 
