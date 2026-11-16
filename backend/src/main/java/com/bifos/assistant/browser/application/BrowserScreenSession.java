@@ -84,19 +84,19 @@ public class BrowserScreenSession {
     }
 
 
-    /** 지금 탭(없으면 새 빈 탭)에 붙어 screencast 를 시작한다. {@code url} 이 없으면 지금 주소에 머문다. 붙지 못하면 런타임 예외다. */
+    /** 지금 탭(없으면 새 빈 탭)에 붙어 screencast 를 시작한다. 주소를 주는데 첫 탭이 에이전트가 쥔 탭이면 새 탭에서 연다. 붙지 못하면 런타임 예외다. */
     void start(String url, Duration timeout, Duration tabInterval, Duration heartbeat) {
         List<CdpTarget> pages = targets.list(cdp);
         if (pages.isEmpty()) {
             pages = List.of(targets.create(cdp, "about:blank"));
         }
         String first = pages.get(0).id();
-        // 주소를 주고 여는 화면은 에이전트가 일하는 탭을 다른 곳으로 보내지 않고 새 탭에서 연다
-        if (url != null && agentTabs.held(browserId, first)) {
+        Set<String> held = agentTabs.agentTabs(browserId, cdp, pages);
+        if (url != null && held.contains(first)) {
             first = targets.create(cdp, "about:blank").id();
             pages = targets.list(cdp);
+            held = agentTabs.agentTabs(browserId, cdp, pages);
         }
-        Set<String> held = agentTabs.agentTabs(browserId, cdp, pages);
         synchronized (lock) {
             tabs = pages;
             agent = held;

@@ -157,6 +157,21 @@ class BrowserScreenSessionAgentTabTest {
 
 
     @Test
+    @DisplayName("주소를 주고 열 때 첫 탭이 쥔 탭이 연 팝업이면 연결이 붙기 전이어도 새 탭에서 연다")
+    void opensUrlInNewTabWhenFirstTabIsAgentPopup() {
+        BrowserUsageHandle relay = agentTabs.hold(BROWSER_ID, "T1");
+        cdp.pages.add(0, new CdpTarget("POPUP", "바로구매", "https://example.com/order"));
+        cdp.openers.put("POPUP", "T1");
+
+        open(SLOW, "https://example.com/login");
+
+        assertThat(cdp.attached).containsExactly("NEW2");
+        assertThat(cdp.sent("Page.navigate")).extracting(FakeCdp.Sent::targetId).containsExactly("NEW2");
+        relay.close();
+    }
+
+
+    @Test
     @DisplayName("쥔 탭에는 화면 크기 덮어쓰기를 보내지 않고, 놓이면 기억한 크기를 보낸다")
     void withholdsResizeOnAgentTab() throws InterruptedException {
         BrowserUsageHandle relay = agentTabs.hold(BROWSER_ID, "T1");
