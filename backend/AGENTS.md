@@ -20,7 +20,7 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 | 데이터 클래스와 저장 타입 | [rule-15](../docs/code-rules/rule-15.md), [rule-25](../docs/code-rules/rule-25.md), [rule-26](../docs/code-rules/rule-26.md), [rule-27](../docs/code-rules/rule-27.md), [rule-30](../docs/code-rules/rule-30.md), [rule-31](../docs/code-rules/rule-31.md), [rule-87](../docs/code-rules/rule-87.md) |
 | 설정과 검증 | [rule-23](../docs/code-rules/rule-23.md), [rule-24](../docs/code-rules/rule-24.md), [rule-28](../docs/code-rules/rule-28.md), [rule-29](../docs/code-rules/rule-29.md), [rule-86](../docs/code-rules/rule-86.md) |
 | auditing과 시각 | [rule-1](../docs/code-rules/rule-1.md), [rule-19](../docs/code-rules/rule-19.md) |
-| 트랜잭션과 백그라운드 작업 | [rule-18](../docs/code-rules/rule-18.md), [rule-20](../docs/code-rules/rule-20.md), [rule-21](../docs/code-rules/rule-21.md), [rule-22](../docs/code-rules/rule-22.md) |
+| 트랜잭션과 백그라운드 작업 | [rule-18](../docs/code-rules/rule-18.md), [rule-20](../docs/code-rules/rule-20.md), [rule-21](../docs/code-rules/rule-21.md), [rule-22](../docs/code-rules/rule-22.md), [rule-68](../docs/code-rules/rule-68.md) |
 | Jackson과 HTTP 및 테스트 설정 | [rule-14](../docs/code-rules/rule-14.md), [rule-54](../docs/code-rules/rule-54.md) |
 | 코드 모양과 경고 | [rule-32](../docs/code-rules/rule-32.md), [rule-33](../docs/code-rules/rule-33.md), [rule-34](../docs/code-rules/rule-34.md), [rule-35](../docs/code-rules/rule-35.md), [rule-36](../docs/code-rules/rule-36.md), [rule-37](../docs/code-rules/rule-37.md), [rule-38](../docs/code-rules/rule-38.md), [rule-39](../docs/code-rules/rule-39.md), [rule-40](../docs/code-rules/rule-40.md), [rule-41](../docs/code-rules/rule-41.md), [rule-42](../docs/code-rules/rule-42.md) |
 | 마이그레이션과 MySQL 쿼리 | [rule-50](../docs/code-rules/rule-50.md), [rule-51](../docs/code-rules/rule-51.md), [rule-85](../docs/code-rules/rule-85.md) |
@@ -29,16 +29,10 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 
 ## 패키지 배치
 
-기능은 `<기능>[.<하위 기능>].<역할>` 로 나누고 관리자 전용 화면은 `admin` 으로 모은다. 이동은 끝났고, 규칙이 얼린 남은 위반은 후속 작업으로 줄여 간다.
+기능은 `<기능>[.<하위 기능>].<역할>` 로 나누고 관리자 전용 화면은 `admin` 으로 모은다.
 
-- 새 클래스는 목표 구조로 둔다. 인터페이스는 `application.port`, 서비스가 주고받는 값은 `application.dto`, 설정 값은 `config` 다. `application` 직하에는 빈만 둔다.
-- 기능은 `admin` 을 모르고, `admin` 은 기능의 `application` 과 `application.dto` 만 부른다. `CurrentUserProvider.requireAdmin` 은 `admin` 안에서만 부른다.
 - 결정과 근거는 [ADR-20261015 / package-layout](docs/adr/ADR-20261015-package-layout.md), 층 방향과 하위 기능의 순서는 [`code-architecture.md`](docs/code-architecture.md) 의 「패키지 배치 규칙」 이 갖는다.
 - 하위 기능의 경계와 한 서비스의 일이 관리자 전용인지는 규칙이 판정하지 못한다. 리뷰가 본다([rule-84](../docs/code-rules/rule-84.md)).
-
-## 로컬 검사
-
-로컬 검사에서 무엇을 언제 실행하고 어떤 의존성을 준비하는지는 [`scripts/dev/check-local.sh`](../scripts/dev/check-local.sh)의 머리말이 갖는다.
 
 ## 품질 검사
 
@@ -81,7 +75,6 @@ daemon 이 `rewriteRun` 도중 멈추면 범위 밖 파일을 되돌리는 단�
 ## 포맷
 
 Java 포맷은 Spotless의 Eclipse JDT 통합과 `config/spotless/eclipse-formatter.xml`이 정한다.
-버전은 Gradle version catalog로 고정한다. IntelliJ 설치나 환경 변수는 필요하지 않다.
 
 ```bash
 # cwd: backend/
@@ -91,10 +84,7 @@ Java 포맷은 Spotless의 Eclipse JDT 통합과 `config/spotless/eclipse-format
 
 기본은 `origin/main`과의 공통 조상 뒤 바뀐 파일만 검사하고 포맷한다. `git fetch origin` 뒤에 돌린다.
 main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-PformatAll=true`를 더한다.
-자동 import 최적화와 멤버 재정렬은 하지 않는다. 명시 import와 순서를 유지하고 wildcard는 Checkstyle이 금지한다.
-`spotlessCheck`는 원본을 바꾸지 않는다.
 설정 대응과 IntelliJ 차이, IDE에서 실행하는 방법은 [`backend/docs/code-architecture.md`](docs/code-architecture.md)의 「Eclipse JDT와 Spotless의 Java 포맷」이 갖는다.
-실제 포맷 회귀는 저장소 루트에서 `python3 test/spotless-jdt.test.py`로 검사한다.
 
 전체 포맷 커밋을 `git blame`에서 제외하려면 저장소 루트에서 `git config blame.ignoreRevsFile .git-blame-ignore-revs`를 실행한다.
 
@@ -121,5 +111,4 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 
 ## 테스트와 주석
 
-`gradlew`는 `backend/` 안에 있다.
 테스트 이름은 [rule-16](../docs/code-rules/rule-16.md), 주석의 언어와 기존 영어 주석 정리는 [rule-52](../docs/code-rules/rule-52.md)를 따른다.
