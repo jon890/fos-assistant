@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 주문 확인 도구({@code payment_context} 를 선언한 도구)에 줄 결제 넘기기 맥락을 고른다.
@@ -32,7 +31,6 @@ public class ConnectorPaymentContexts {
 
 
     /** 허용한 답이고 도구가 {@code payment_context} 를 선언했으면 맥락을 싣는다. 찾지 못하면 맥락 없이 그대로 허용한다. */
-    @Transactional(readOnly = true)
     public ConnectorPolicyAnswer attach(
         ConnectorPolicyAnswer answered, Optional<ToolPolicy> declared, AgentExecution origin, String connectorId) {
         if (!answered.allowed() || !declared.map(ToolPolicy::paymentContext).orElse(false)) {
@@ -42,8 +40,12 @@ public class ConnectorPaymentContexts {
     }
 
 
-    /** 대화가 없는 실행, 줄이 없음, 결과 글이나 snapshot 을 열지 못함이면 빈 값이다. 예외는 밖으로 내지 않는다. 판정은 그대로 허용이다. */
-    @Transactional(readOnly = true)
+    /**
+     * 대화가 없는 실행, 줄이 없음, 결과 글이나 snapshot 을 열지 못함이면 빈 값이다. 예외는 밖으로 내지 않는다. 판정은 그대로 허용이다.
+     *
+     * <p>트랜잭션 표시를 두지 않는다. 저장소 호출이 던진 예외를 여기서 잡아도 감싼 트랜잭션이 롤백 전용이 되어 커밋에서 다시 터지면,
+     * 판정 줄은 허용인데 hook 은 막는 어긋남이 생긴다. 저장소 호출마다 자기 읽기 트랜잭션으로 돈다.
+     */
     public Optional<ConnectorPaymentContext> of(AgentExecution origin, String connectorId) {
         if (origin.conversationId() == null || origin.userId() == null) {
             return Optional.empty();
