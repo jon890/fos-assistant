@@ -6,7 +6,9 @@ import { BrowserScreen } from "@/components/browser/browser-screen";
 import type { ScreenTab } from "@/components/browser/browser-screen-toolbar";
 import {
   HANDOFF_TEXT,
+  handoffActions,
   handoffBrowserHref,
+  handoffDoneHint,
   rebaseHandoffWatch,
   watchHandoffTab,
   type Handoff,
@@ -30,7 +32,7 @@ export function HandoffBrowser({
 }: {
   handoff: Handoff;
   onClose(): void;
-  onDone(): void;
+  onDone(text: string): void;
 }) {
   const watch = useRef<HandoffWatch>({ phase: "waiting" });
   const lastTabs = useRef<ScreenTab[]>([]);
@@ -38,6 +40,7 @@ export function HandoffBrowser({
   // 다시 열 때마다 화면을 새로 만들어 첫 탭 목록에서 넘긴 탭으로 다시 옮긴다.
   const [screenKey, setScreenKey] = useState(0);
   const text = HANDOFF_TEXT[handoff.need];
+  const actions = handoffActions(handoff.need);
 
   function onTabs(tabs: ScreenTab[]) {
     lastTabs.current = tabs;
@@ -88,9 +91,21 @@ export function HandoffBrowser({
           >
             <p>화면이 바뀌었어요. 다 마치셨나요?</p>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={onDone}>
-                다 했어요, 이어서 해 주세요
-              </Button>
+              {handoff.need === "PAYMENT" ? (
+                actions.map((action) => (
+                  <Button
+                    key={action.label}
+                    size="sm"
+                    onClick={() => onDone(action.text)}
+                  >
+                    {action.label}
+                  </Button>
+                ))
+              ) : (
+                <Button size="sm" onClick={() => onDone(text.done)}>
+                  다 했어요, 이어서 해 주세요
+                </Button>
+              )}
               <Button size="sm" variant="outline" onClick={notYet}>
                 아직이에요
               </Button>
@@ -99,11 +114,21 @@ export function HandoffBrowser({
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground">
-            마친 뒤 「다 했어요」를 누르면 이어서 해요.
+            {handoff.need === "PAYMENT"
+              ? handoffDoneHint(handoff.need)
+              : "마친 뒤 「다 했어요」를 누르면 이어서 해요."}
           </p>
-          <Button size="sm" onClick={onDone}>
-            다 했어요
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <Button
+                key={action.label}
+                size="sm"
+                onClick={() => onDone(action.text)}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </footer>
     </div>

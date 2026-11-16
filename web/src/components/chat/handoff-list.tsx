@@ -1,12 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { HANDOFF_TEXT, type Handoff } from "@/lib/handoff";
+import {
+  HANDOFF_TEXT,
+  handoffActions,
+  handoffDoneHint,
+  type Handoff,
+} from "@/lib/handoff";
 
 /**
  * 옆 패널의 「할 일」 탭에 그 대화의 화면 넘기기 카드를 보인다. 플러그인이 사람이 해야 하는 화면에서 멈추면 생긴다.
  *
  * <p>「내 브라우저 열기」 는 남긴 탭을 같은 패널의 「내 브라우저」 탭에 띄운다. 「다 했어요」 는 정해 둔 글을 다음 메시지로 보낸다.
+ * 결제 카드는 「결제했어요」 와 「사지 않을래요」 둘이다(`handoffActions`).
  * 새 turn 이 시작되면 서버가 카드를 닫는다. 입력창에 직접 답해도 같다. 읽기와 상태는 `useConversationHandoffs` 가 갖는다.
  */
 export function HandoffList({
@@ -16,7 +22,7 @@ export function HandoffList({
 }: {
   handoffs: Handoff[];
   onOpen: (handoff: Handoff) => void;
-  onDone: (handoff: Handoff) => void;
+  onDone: (handoff: Handoff, text: string) => void;
 }) {
   if (handoffs.length === 0) return null;
   return (
@@ -26,7 +32,7 @@ export function HandoffList({
           key={handoff.handoffId}
           handoff={handoff}
           onOpen={() => onOpen(handoff)}
-          onDone={() => onDone(handoff)}
+          onDone={(text) => onDone(handoff, text)}
         />
       ))}
     </div>
@@ -40,7 +46,7 @@ function HandoffCard({
 }: {
   handoff: Handoff;
   onOpen: () => void;
-  onDone: () => void;
+  onDone: (text: string) => void;
 }) {
   const text = HANDOFF_TEXT[handoff.need];
   return (
@@ -51,7 +57,7 @@ function HandoffCard({
     >
       <p className="font-medium">{text.title}</p>
       <p className="mt-1 text-muted-foreground">
-        {handoffLead(handoff)} 마친 뒤 「다 했어요」를 눌러 주세요.
+        {handoffLead(handoff)} {handoffDoneHint(handoff.need)}
       </p>
       {handoff.need === "PAYMENT" &&
       handoff.finalAmountKrw !== null &&
@@ -75,9 +81,16 @@ function HandoffCard({
         >
           내 브라우저 열기
         </Button>
-        <Button size="sm" onClick={onDone}>
-          다 했어요
-        </Button>
+        {handoffActions(handoff.need).map((action) => (
+          <Button
+            key={action.label}
+            size="sm"
+            variant={action.text === text.done ? "default" : "outline"}
+            onClick={() => onDone(action.text)}
+          >
+            {action.label}
+          </Button>
+        ))}
       </div>
     </section>
   );
