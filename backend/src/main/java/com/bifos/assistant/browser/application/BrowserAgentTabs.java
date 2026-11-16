@@ -43,11 +43,15 @@ public class BrowserAgentTabs {
 
     /** 중계 연결이 그 탭에 붙었다. 돌려받은 핸들을 닫으면 그 연결 몫을 놓는다. 두 번 닫아도 한 번만 놓는다. */
     public BrowserUsageHandle hold(Long browserId, String targetId) {
-        Tabs tabs = browsers.computeIfAbsent(browserId, id -> new Tabs());
-        synchronized (tabs) {
-            tabs.connections.merge(targetId, 1, Integer::sum);
-            tabs.created.remove(targetId);
-        }
+        // 맵의 잠금 안에서 올린다. 밖에서 올리면 그 사이 release 가 지운 상태에 올려 쥔 탭을 잃는다
+        browsers.compute(browserId, (id, current) -> {
+            Tabs tabs = current == null ? new Tabs() : current;
+            synchronized (tabs) {
+                tabs.connections.merge(targetId, 1, Integer::sum);
+                tabs.created.remove(targetId);
+            }
+            return tabs;
+        });
         AtomicBoolean closed = new AtomicBoolean();
         return () -> {
             if (closed.compareAndSet(false, true)) {
@@ -59,12 +63,15 @@ public class BrowserAgentTabs {
 
     /** 중계가 그 탭을 만들었다. 연결이 붙기 전에도 {@link #CREATED_HOLD} 동안 쥔다. */
     public void created(Long browserId, String targetId) {
-        Tabs tabs = browsers.computeIfAbsent(browserId, id -> new Tabs());
-        synchronized (tabs) {
-            if (!tabs.connections.containsKey(targetId)) {
-                tabs.created.put(targetId, clock.instant());
+        browsers.compute(browserId, (id, current) -> {
+            Tabs tabs = current == null ? new Tabs() : current;
+            synchronized (tabs) {
+                if (!tabs.connections.containsKey(targetId)) {
+                    tabs.created.put(targetId, clock.instant());
+                }
             }
-        }
+            return tabs;
+        });
     }
 
 
