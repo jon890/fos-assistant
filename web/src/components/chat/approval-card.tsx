@@ -360,6 +360,12 @@ export function ApprovalCard({
           실행하는 중이에요
         </Notice>
       ) : null}
+      {action.status === "WAITING" ? (
+        <Notice variant="info" role="status">
+          「내 브라우저」에서 멈췄어요. 로그인 같은 화면을 마치고 알려 주시면 이
+          승인으로 이어서 해요.
+        </Notice>
+      ) : null}
       {action.status === "UNKNOWN" ? (
         <>
           <Notice variant="warning" role="status">

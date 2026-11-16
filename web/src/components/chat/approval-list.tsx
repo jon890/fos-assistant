@@ -19,7 +19,7 @@ import {
 } from "@/lib/content-draft-snapshot";
 
 /** 카드로 보이는 상태다. 끝난 줄의 결과는 알림 줄과 답으로 이미 대화에 있다. 원고 저장 줄은 끝나도 보이되 처음부터 끝나 있던 줄은 접어 둔다. */
-const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
+const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN", "WAITING"];
 
 /** 「모두 승인」 이 다음 건으로 넘어가는 결과다. 그 밖의 결과(실패, 모름, 실행하지 않음)를 만나면 멈춘다. */
 const CONTINUE = ["SUCCEEDED", "EXECUTING"];
