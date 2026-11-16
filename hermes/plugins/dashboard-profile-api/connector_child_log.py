@@ -31,7 +31,7 @@ DIAGNOSTIC_WORD_RE = re.compile(r"[a-z0-9_.]{1,60}")
 LAUNCHER_LINE_RE = re.compile(r"connector-launcher: [A-Za-z_]{1,64}")
 CODE_LINE_RE = re.compile(r"(?=.{1,64}$)[A-Z][A-Z0-9]*(_[A-Z0-9]+)+")
 
-# 한 실행에서 읽는 표준 오류의 바이트, 옮기는 줄 수, 줄 하나의 길이 상한이다.
+# 한 실행에서 읽는 표준 오류 끝의 바이트, 옮기는 줄 수, 줄 하나의 길이 상한이다. 끝 줄이 가장 필요해 뒤에서 읽고 뒤의 줄을 남긴다.
 READ_MAX = 65536
 LINES_MAX = 50
 LINE_MAX = 1024
@@ -70,16 +70,14 @@ def _diagnostic_line(line: str) -> bool:
 
 
 def diagnostic_lines(raw: bytes) -> list:
-    """표준 오류 바이트에서 옮길 줄을 앞에서부터 `LINES_MAX` 개까지 고른다. 읽는 양은 부르는 쪽이 자른다."""
+    """표준 오류 바이트에서 옮길 줄을 고르고 뒤의 `LINES_MAX` 개를 남긴다. 읽는 양은 부르는 쪽이 자른다."""
     text = raw.decode("utf-8", errors="replace")
     picked = []
     for line in text.splitlines():
         line = line.strip()
         if line and _diagnostic_line(line):
             picked.append(line)
-            if len(picked) >= LINES_MAX:
-                break
-    return picked
+    return picked[-LINES_MAX:]
 
 
 def _append(profile_dir: pathlib.Path, lines: list) -> None:
@@ -109,7 +107,9 @@ def child_errlog(profile_dir: Optional[pathlib.Path]):
         yield capture
     finally:
         try:
-            capture.seek(0)
+            # 앞에 쌓인 다른 출력에 끝 줄이 밀려나지 않게 끝에서 읽는다. 잘린 첫 줄은 모양 검사에서 버려진다.
+            size = capture.seek(0, os.SEEK_END)
+            capture.seek(max(0, size - READ_MAX))
             lines = diagnostic_lines(capture.read(READ_MAX))
             if lines:
                 _append(profile_dir, lines)

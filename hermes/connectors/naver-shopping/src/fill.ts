@@ -157,8 +157,8 @@ export async function fillCheckout(
     trace.enter("approval");
     const claim = verifyApproval(authority, CHECKOUT_TOOL, input);
     checkFill(input);
-    const cdpUrl = browserUrl(env);
     trace.enter("tab");
+    const cdpUrl = browserUrl(env);
     return await deps.work(
       cdpUrl,
       input.url,
@@ -183,17 +183,23 @@ async function fillOnPage(
 ) {
   const stepMs = deps.stepMs ?? DEFAULT_STEP_MS;
   const waitMs = deps.waitMs ?? DEFAULT_WAIT_MS;
-  trace.enter("price");
-  const priced = await priceOnPage(page, CHECKOUT_TOOL, {
-    url: input.url,
-    options: input.optionLabels,
-    quantity: input.quantity,
-  });
-  if (priced.soldOut) throw new ToolError("NAVER_SHOPPING_SOLD_OUT");
-  if (priced.expectedTotalKrw > input.expectedTotalKrw)
-    throw new ToolError("NAVER_SHOPPING_PRICE_CHANGED");
-  trace.enter("claim");
-  await claim();
+  try {
+    trace.enter("price");
+    const priced = await priceOnPage(page, CHECKOUT_TOOL, {
+      url: input.url,
+      options: input.optionLabels,
+      quantity: input.quantity,
+    });
+    if (priced.soldOut) throw new ToolError("NAVER_SHOPPING_SOLD_OUT");
+    if (priced.expectedTotalKrw > input.expectedTotalKrw)
+      throw new ToolError("NAVER_SHOPPING_PRICE_CHANGED");
+    trace.enter("claim");
+    await claim();
+  } catch (error) {
+    // `workInTab` 이 시간 초과나 화면 넘기기로 코드를 바꾸기 전에 원래 이름을 남긴다.
+    trace.end("failed", error);
+    throw error;
+  }
 
   // claim 뒤의 단계. `buy` 와 `sent` 에서 난 실패는 결과를 모르는 것이다.
   let phase: "claimed" | "buy" | "layer" | "sent" = "claimed";

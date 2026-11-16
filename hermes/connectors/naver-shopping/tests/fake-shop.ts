@@ -39,6 +39,8 @@ export type ShopConfig = {
   buy?: "layer" | "sheet-same" | "sheet-new" | "nothing";
   /** 층의 옵션 드롭다운을 열려고 하면 새 탭에 주문서가 열린다(층을 잘못 알아본 경우). */
   sheetOnLayerOption?: boolean;
+  /** 상품 화면에 「구매하기」 단추가 없다. */
+  noBuyButton?: boolean;
   /** 누르기 전부터 상품 화면에 「바로구매」 단추가 보인다. */
   buyNowOnProduct?: boolean;
   /** 주문서 금액 식에 CDP 오류로 답한다. */
@@ -235,7 +237,8 @@ export function startFakeShop(config: ShopConfig = {}) {
           return value(tab.screen === "product");
         }
         if (source === PRESS_BUY) {
-          if (tab.screen !== "product") return value(false);
+          if (tab.screen !== "product" || config.noBuyButton)
+            return value(false);
           const buy = config.buy ?? "layer";
           if (buy === "layer") tab.screen = "layer";
           else if (buy === "sheet-same") {

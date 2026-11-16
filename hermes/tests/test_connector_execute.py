@@ -503,7 +503,8 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             with self.subTest(label):
                 self.assertEqual(lines((line + "\n").encode()), [])
         self.assertEqual(lines((good + "\nSERVER_START_FAILED\n").encode()), [good, "SERVER_START_FAILED"])
-        self.assertEqual(len(lines(("A_B\n" * 80).encode())), 50)
+        many = "".join("A_%d\n" % index for index in range(80)).encode()
+        self.assertEqual(lines(many), ["A_%d" % index for index in range(30, 80)])
 
     def test_failure_after_the_tool_was_called_answers_504(self):
         """도구 호출을 보낸 뒤의 예외는 실행됐는지 모르므로 504 이고 자식 프로세스가 남지 않는다."""

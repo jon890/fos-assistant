@@ -182,6 +182,13 @@ for (const [name, config, args, approvalArgs, expected] of [
     ["pre_buy.failed", "naver_shopping_checkout_failed"],
   ],
   [
+    "구매하기 단추를 찾지 못함",
+    { product: PLAIN_PRODUCT, noBuyButton: true },
+    PLAIN_ARGS,
+    PLAIN_ARGS,
+    ["buy.failed", "naver_shopping_checkout_failed"],
+  ],
+  [
     "구매하기 뒤 층도 주문서도 없음",
     { product: PLAIN_PRODUCT, buy: "nothing" },
     PLAIN_ARGS,
