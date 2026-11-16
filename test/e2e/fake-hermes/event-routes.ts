@@ -98,6 +98,8 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
             return;
           }
           // steer 를 받는 실행이다. 도구 한 묶음 뒤에 끼운 글을 넣고(`run.steered`), 붙잡은 실행이 풀릴 때까지 스트림을 연다.
+          // 실제 Hermes 는 받는 순간 `run.steered` 를 내지만 대역은 넣을 때 낸다. Control Plane 은 이 사건을 읽지 않고
+          // steer 요청의 200 으로 말풍선을 만들므로 검사 결과는 같다.
           // 넣지 못하는 실행은 도구 없이 끝까지 기다리고, 슬롯에 남은 글은 끝날 때 `pending_steer` 로 돌아간다.
           if (run.input === STEER_PROBE || run.input === STEER_UNREAD_PROBE) {
             const open = () => !response.destroyed && run.status === "running";
