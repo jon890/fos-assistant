@@ -15,6 +15,15 @@ export function createLifecycle(state: FakeHermesState) {
     if (run !== undefined && run.status === "running") run.status = "completed";
   };
 
+  /** 붙잡았던 실행을 끝낸다. 모델에 넣지 못한 steer 글은 실제 Hermes 와 같이 `pending_steer` 로 돌려준다. */
+  const completeRun = (runId: string | undefined) => {
+    const run = runId === undefined ? undefined : state.runs.get(runId);
+    if (run === undefined) return;
+    run.status = "completed";
+    if (run.steerSlot !== undefined && run.steerSlot.length > 0) run.pending_steer = run.steerSlot.join("\n");
+    run.steerSlot = [];
+  };
+
   const authorized = (request: IncomingMessage, profile: string): boolean => {
     const expected = state.keys[profile];
     return expected !== undefined && request.headers.authorization === `Bearer ${expected}`;
@@ -47,7 +56,7 @@ export function createLifecycle(state: FakeHermesState) {
     state.longActivityGate = undefined;
     gate?.();
   };
-  return { runNotFound, finishSlowRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity };
+  return { runNotFound, finishSlowRun, completeRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity };
 }
 
 export function wait(milliseconds: number): Promise<void> {
