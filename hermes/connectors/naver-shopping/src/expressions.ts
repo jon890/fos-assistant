@@ -6,6 +6,8 @@
  */
 import { CAPTCHA_SELECTOR } from "./classify.ts";
 import {
+  ORDER_HISTORY,
+  ORDER_RAW_MAX,
   ORDER_SHEET,
   PRODUCT_OPTION_BUTTON,
   PRODUCT_STATE_PATH,
@@ -155,6 +157,35 @@ export const CATALOG_STATE = `(() => { const r = ${fragmentScan(
 /** 상품 화면은 상태가 있는지(`present`)와 상품 칸(`value`)을 함께 준다. 상태는 있는데 상품이 없으면 없는 상품이다. */
 export const PRODUCT_STATE = `(() => { try { const s = window.__PRELOADED_STATE__; if (!s || typeof s !== "object") return null; const v = ${walk("s", PRODUCT_STATE_PATH)}; return JSON.stringify({ present: true, value: v ?? null }); } catch { return null; } })()`;
 
+/**
+ * 결제 내역 화면의 결제 목록에서 항목마다 `ORDER_HISTORY.item` 의 칸만 골라 JSON 배열 글로 준다(2026-11-16 실측).
+ * `amounts` 는 후보마다 값을 배열로, 나머지는 후보 가운데 처음 있는 값을 준다. 이름, 주소, 상품명 같은 칸은 꺼내지 않는다.
+ * `__NEXT_DATA__` 가 없거나 `PAYMENT_LIST` 줄이 없거나 `pages` 가 배열이 아니면 `null` 이다. 읽기만 하고 화면을 바꾸지 않는다.
+ */
+export const ORDER_HISTORY_STATE = `(() => { try {
+  const node = document.getElementById("__NEXT_DATA__");
+  if (!node) return null;
+  const data = JSON.parse(node.textContent ?? "");
+  const at = (value, path) => path.reduce((o, k) => (o && typeof o === "object" ? o[k] : undefined), value);
+  const queries = at(data, ${JSON.stringify(ORDER_HISTORY.queriesPath)});
+  if (!Array.isArray(queries)) return null;
+  const query = queries.find((q) => Array.isArray(q?.queryKey) && q.queryKey[0] === ${JSON.stringify(ORDER_HISTORY.queryName)});
+  const pages = query ? at(query, ${JSON.stringify(ORDER_HISTORY.pagesPath)}) : undefined;
+  if (!Array.isArray(pages)) return null;
+  const FIELDS = ${JSON.stringify(ORDER_HISTORY.item)};
+  const first = (item, paths) => { for (const p of paths) { const v = at(item, p); if (v !== undefined && v !== null && v !== "") return v; } return null; };
+  const found = [];
+  for (const page of pages) {
+    for (const item of Array.isArray(page?.items) ? page.items : []) {
+      if (found.length >= ${ORDER_RAW_MAX}) break;
+      const picked = {};
+      for (const [key, paths] of Object.entries(FIELDS)) picked[key] = key === "amounts" ? paths.map((p) => at(item, p) ?? null) : first(item, paths);
+      found.push(picked);
+    }
+  }
+  return JSON.stringify(found);
+} catch { return null; } })()`;
+
 /** 함수 선언을 부를 대상(페이지의 전역 객체)의 id 를 받는 식. 값을 읽지 않는다. */
 export const GLOBAL_OBJECT = "globalThis";
 
@@ -177,6 +208,9 @@ export const OPEN_OPTION_LISTS = `(() => { try { ${ON_STORE} const visible = ${V
 
 /** 상품 화면의 「구매하기」 를 누른다. 같은 화면에 상품 구매 층이 뜬다(2026-11-13 실측). 장바구니는 누르지 않는다. */
 export const PRESS_BUY = `(() => { try { ${ON_STORE} ${HELPERS} const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}); if (!b) return false; b.click(); return true; } catch { return false; } })()`;
+
+/** 상품 화면에 보이는 「구매하기」 단추가 있는가. 누르지 않는다. 화면이 단추를 그리기를 기다릴 때 쓴다(2026-11-16 실측: 준비 상태 뒤 1초쯤 늦게 그린다). */
+export const BUY_VISIBLE = `(() => { try { ${ON_STORE} ${HELPERS} return byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}) !== null; } catch { return false; } })()`;
 
 /** 상품 구매 층이 떴는가(보이는 「바로구매」 단추가 있는가). 누르지 않는다. */
 export const LAYER_OPEN = `(() => { try { ${HELPERS} return byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}) !== null; } catch { return false; } })()`;
@@ -208,6 +242,7 @@ export const SET_QUANTITY = `function (quantity) { try { ${ON_STORE} ${HELPERS} 
 
 /** 채우기만 부르는 식. */
 export const FILL_EXPRESSIONS = new Set([
+  BUY_VISIBLE,
   PRESS_BUY,
   LAYER_OPEN,
   PRESS_BUY_NOW,
@@ -228,6 +263,7 @@ export const EXPRESSIONS = new Set([
   SEARCH_STATE,
   CATALOG_STATE,
   PRODUCT_STATE,
+  ORDER_HISTORY_STATE,
   GLOBAL_OBJECT,
   OPEN_OPTION_LISTS,
   ...FILL_EXPRESSIONS,

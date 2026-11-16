@@ -140,6 +140,8 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
     `attended_only` 는 사람이 연 대화에서만 부를 수 있는 도구라는 선언이다. 참이라고 선언한 도구의 정책에만 싣는다.
     먼저 살펴보기와 예약 작업처럼 사람이 없는 실행의 호출은 Control Plane 이 거절한다.
+    `payment_context` 는 Control Plane 이 그 대화의 마지막 결제 넘기기 맥락을 판정 응답에 실어 hook 이 인자로 넣으라는
+    선언이다. `READ` 도구에만 둔다. 참이라고 선언한 도구의 정책에만 싣는다.
     """
     call_tools = {verify_tool} | set(option_tools)
     if declared["schema"] == 1:
@@ -161,9 +163,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
             raise ValueError("tools 의 키는 도구 이름이다")
         if not isinstance(declared_tool, dict) or set(declared_tool) - {
                 "risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers", "description",
-                "summary", "arg_labels", "attended_only"}:
+                "summary", "arg_labels", "attended_only", "payment_context"}:
             raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, conversation_grant, identifiers, description,"
-                             " summary, arg_labels, attended_only 만 갖는 객체다")
+                             " summary, arg_labels, attended_only, payment_context 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -209,6 +211,14 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
             # 옛 Control Plane 과 옛 정책 비교가 칸 하나로 달라지지 않게 참일 때만 싣는다.
             if declared_tool["attended_only"]:
                 policies[name]["attended_only"] = True
+        if "payment_context" in declared_tool:
+            if type(declared_tool["payment_context"]) is not bool:
+                raise ValueError("payment_context 는 true 나 false 다")
+            # 결제 넘기기 맥락은 결제 내역을 읽는 조회에만 준다. 쓰기 도구의 인자에 넣지 않는다.
+            if declared_tool["payment_context"] and risk != "READ":
+                raise ValueError("payment_context 는 READ 도구에만 선언한다")
+            if declared_tool["payment_context"]:
+                policies[name]["payment_context"] = True
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":

@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.approval.application;
 
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
+import com.bifos.assistant.connector.action.application.ConnectorApprovalBrowser;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.agent.application.dto.AgentLabel;
@@ -66,6 +67,7 @@ public class ConnectorActionService {
     private final ConnectorFinancialApproval financialApproval;
     private final FinancialLimitChanges limitChanges;
     private final ConnectorActionSignals signals;
+    private final ConnectorApprovalBrowser approvalBrowser;
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -91,9 +93,11 @@ public class ConnectorActionService {
         ConnectorActionBodies bodies,
         ConnectorFinancialApproval financialApproval,
         FinancialLimitChanges limitChanges,
+        ConnectorApprovalBrowser approvalBrowser,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
+        this.approvalBrowser = approvalBrowser;
         this.financialApproval = financialApproval;
         this.limitChanges = limitChanges;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
@@ -262,6 +266,8 @@ public class ConnectorActionService {
             }
             return limitChanges.approve(user, actionId);
         }
+        // 「내 브라우저」 를 쓰는 줄이면 승인 트랜잭션 전에 켠다. 상한 변경은 브라우저를 쓰지 않아 위에서 먼저 갈랐다.
+        approvalBrowser.require(user, actionId);
         // 구매 줄(PURCHASE)도 같은 금융 승인으로 보낸다(ADR-20261113 / purchase-checkout). 허락을 받지 않는다.
         if (stored.isPresent() && ConnectorFinancialIntake.owns(stored.get())) {
             if (!user.id().equals(stored.get().userId())) {

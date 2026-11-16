@@ -23,16 +23,28 @@ import java.util.Map;
  * plugin 은 이 칸을 내지 않고, 응답에 없으면 null 이다. boolean 이 아닌 값은 거짓으로 읽는다
  * @param attendedOnly 사람이 연 대화에서만 부를 수 있는 도구라고 선언했는가. 대시보드 plugin 은 참일 때만 내고, 응답에 없으면
  * 거짓이다. boolean 이 아닌 값은 참으로 읽는다
+ * @param paymentContext 도구 판정이 허용할 때 그 대화의 결제 넘기기 맥락을 실어 달라고 선언했는가. 대시보드 plugin 은 참일 때만
+ * 내고, 응답에 없거나 boolean 이 아니면 거짓이다. 거짓이면 맥락을 싣지 않을 뿐이다
  */
 public record ConnectorTool(
     String name, String risk, String approval, String title, Boolean grant, List<String> identifiers, String description,
-    Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant, boolean attendedOnly) {
+    Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant, boolean attendedOnly,
+    boolean paymentContext) {
 
     public ConnectorTool {
         description = ConnectorToolDescription.read(description);
         summary = ConnectorToolDescription.read(summary);
         identifiers = identifiers == null ? List.of() : List.copyOf(identifiers);
         argLabels = ConnectorArgumentLabels.read(argLabels);
+    }
+
+
+    /** 결제 넘기기 맥락을 받지 않는 도구다. */
+    public ConnectorTool(String name, String risk, String approval, String title, Boolean grant, List<String> identifiers,
+        String description, Map<String, String> argLabels, String summary, Boolean outbound, Boolean conversationGrant,
+        boolean attendedOnly) {
+        this(name, risk, approval, title, grant, identifiers, description, argLabels, summary, outbound, conversationGrant,
+            attendedOnly, false);
     }
 
 

@@ -138,7 +138,7 @@ export function useConversationHandoffs({
   }, [entry, ready, latest, open, router, pathname, searchParams]);
 
   const done = useCallback(
-    (handoff: Handoff) => {
+    (handoff: Handoff, text: string = HANDOFF_TEXT[handoff.need].done) => {
       if (conversationId === null) return;
       setHidden((previous) => ({
         conversationId,
@@ -148,7 +148,7 @@ export function useConversationHandoffs({
       setPanelTarget((previous) =>
         previous?.kind === "todo" ? null : previous,
       );
-      submit(HANDOFF_TEXT[handoff.need].done);
+      submit(text);
     },
     [conversationId, setPanelTarget, submit],
   );
@@ -163,7 +163,7 @@ export function useConversationHandoffs({
         key={panelHandoff.handoffId}
         handoff={panelHandoff}
         onClose={closePanel}
-        onDone={() => done(panelHandoff)}
+        onDone={(text) => done(panelHandoff, text)}
       />
     ) : null,
   };

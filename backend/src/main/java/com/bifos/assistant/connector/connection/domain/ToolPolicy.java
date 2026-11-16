@@ -15,6 +15,7 @@ import java.util.Set;
  * 도구만 참이다
  * @param attendedOnly 사람이 연 대화에서만 부를 수 있는가. 먼저 살펴보기와 예약 작업처럼 사람이 없는 실행의 호출은 판정이
  * 거절한다
+ * @param paymentContext 판정이 허용할 때 그 대화의 결제 넘기기 맥락을 답에 싣는가
  */
 public record ToolPolicy(
     ToolRisk risk,
@@ -23,10 +24,18 @@ public record ToolPolicy(
     boolean grantable,
     Set<String> identifiers,
     boolean conversationGrantable,
-    boolean attendedOnly) {
+    boolean attendedOnly,
+    boolean paymentContext) {
 
     public ToolPolicy {
         identifiers = identifiers == null ? Set.of() : Set.copyOf(identifiers);
+    }
+
+
+    /** 결제 넘기기 맥락을 받지 않는 도구다. */
+    public ToolPolicy(ToolRisk risk, ToolApproval approval, String title, boolean grantable, Set<String> identifiers,
+        boolean conversationGrantable, boolean attendedOnly) {
+        this(risk, approval, title, grantable, identifiers, conversationGrantable, attendedOnly, false);
     }
 
 

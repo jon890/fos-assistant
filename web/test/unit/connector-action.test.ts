@@ -10,6 +10,7 @@ import {
   hiddenArgKeys,
   readableArgs,
 } from "../../src/lib/connector-action.ts";
+import { connectorActionErrorMessage } from "../../src/lib/connector-action-error.ts";
 
 test("인자 이름은 도구별이며 모르는 키와 가린 키는 유지한다", () => {
   assert.equal(approvalArgLabel("body", { body: "본문" }), "본문");
@@ -307,4 +308,11 @@ test("가려진 글이 든 맨 위 인자의 키만 원래 순서로 낸다", ()
   );
   assert.deepEqual(hiddenArgKeys("[가림]"), []);
   assert.deepEqual(hiddenArgKeys(null), []);
+});
+
+test("승인할 때 브라우저를 켜지 못하면 다시 승인하라는 정해 둔 문구를 낸다", () => {
+  assert.equal(
+    connectorActionErrorMessage("CONNECTOR_BROWSER_UNAVAILABLE"),
+    "브라우저를 켤 수 없어요. 잠시 뒤 다시 승인해 주세요.",
+  );
 });

@@ -270,6 +270,32 @@ test("「할 일」 탭의 넘기기 카드 「다 했어요」 는 패널을 �
   );
 });
 
+test("결제 카드는 「다 했어요」 대신 「결제했어요」 와 「사지 않을래요」 를 보이고, 「사지 않을래요」 는 결제하지 않았다는 글을 보낸다", async ({
+  page,
+}) => {
+  await fakeScreen(page);
+  const conversationId = await createConversation(page);
+  const payment = {
+    ...HANDOFF,
+    need: "PAYMENT",
+    finalAmountKrw: 3300,
+    expectedTotalKrw: 3300,
+  };
+  const state = { handoffs: [payment] as unknown[], actions: [action(0)] };
+  await routeTodo(page, conversationId, state);
+  await page.goto(`/chat/${conversationId}`);
+  await openTodo(page);
+  const card = page.getByTestId("handoff-card");
+  await expect(card.getByRole("button", { name: "결제했어요" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "다 했어요" })).toHaveCount(0);
+  state.handoffs = [];
+  await card.getByRole("button", { name: "사지 않을래요" }).click();
+
+  await expect(page.getByTestId("user-message").last().locator("p")).toHaveText(
+    "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요.",
+  );
+});
+
 test("「할 일」 탭을 보는 중에 기억한 넘기기가 닫히면 패널은 남고 「내 브라우저」 탭만 막힌다", async ({
   page,
 }) => {

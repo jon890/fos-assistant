@@ -10,6 +10,7 @@ import {
   EXPRESSIONS,
   FILL_FUNCTIONS,
   GLOBAL_OBJECT,
+  BUY_VISIBLE,
   LAYER_OPEN,
   OPEN_LAYER_OPTION,
   OPEN_OPTION_LISTS,
@@ -41,6 +42,10 @@ export type ShopConfig = {
   sheetOnLayerOption?: boolean;
   /** 상품 화면에 「구매하기」 단추가 없다. */
   noBuyButton?: boolean;
+  /** 「구매하기」 단추를 이만큼 평가한 뒤에 그린다(`Infinity` 면 끝내 그리지 않는다). 없으면 처음부터 보인다. */
+  buyButtonAfter?: number;
+  /** 「구매하기」 단추는 보이는데 누르면 눌리지 않는다(claim 뒤 사라진 경우). */
+  pressBuyFails?: boolean;
   /** 누르기 전부터 상품 화면에 「바로구매」 단추가 보인다. */
   buyNowOnProduct?: boolean;
   /** 주문서 금액 식에 CDP 오류로 답한다. */
@@ -83,6 +88,7 @@ export function startFakeShop(config: ShopConfig = {}) {
   const tabs = new Map<string, Tab>();
   let next = 1;
   let optionsOpened = false;
+  let buyChecks = 0;
   const userTab: Tab = {
     id: "USER0",
     screen: "blank",
@@ -236,8 +242,14 @@ export function startFakeShop(config: ShopConfig = {}) {
           optionsOpened = true;
           return value(tab.screen === "product");
         }
+        const buyDrawn = () =>
+          !config.noBuyButton && buyChecks > (config.buyButtonAfter ?? -1);
+        if (source === BUY_VISIBLE) {
+          buyChecks++;
+          return value(tab.screen === "product" && buyDrawn());
+        }
         if (source === PRESS_BUY) {
-          if (tab.screen !== "product" || config.noBuyButton)
+          if (tab.screen !== "product" || !buyDrawn() || config.pressBuyFails)
             return value(false);
           const buy = config.buy ?? "layer";
           if (buy === "layer") tab.screen = "layer";

@@ -74,6 +74,32 @@ export const HANDOFF_TEXT: Record<
   },
 };
 
+/** 카드의 단추 하나다. 누르면 `text` 를 다음 메시지로 보낸다. */
+export type HandoffAction = { label: string; text: string };
+
+/**
+ * 카드와 옆 패널이 보일 단추다. 결제 카드만 「결제했어요」 와 「사지 않을래요」 둘이고(사용자 결정 2026-11-16), 다른 카드는 「다 했어요」 하나다.
+ * 결제하지 않고 탭만 닫아도 「결제를 마쳤어요」 를 보내던 것을 막는다. 동작은 `docs/features/user-browser.md` 의 「대화 위 화면」 이 갖는다.
+ */
+export function handoffActions(need: HandoffNeed): HandoffAction[] {
+  if (need === "PAYMENT")
+    return [
+      { label: "결제했어요", text: HANDOFF_TEXT.PAYMENT.done },
+      {
+        label: "사지 않을래요",
+        text: "결제하지 않고 그만둘게요. 주문 확인은 하지 않아도 돼요.",
+      },
+    ];
+  return [{ label: "다 했어요", text: HANDOFF_TEXT[need].done }];
+}
+
+/** 카드 본문 끝의 안내다. 단추 이름을 그대로 쓴다. */
+export function handoffDoneHint(need: HandoffNeed): string {
+  return need === "PAYMENT"
+    ? "결제했으면 「결제했어요」를, 사지 않을 거면 「사지 않을래요」를 눌러 주세요."
+    : "마친 뒤 「다 했어요」를 눌러 주세요.";
+}
+
 /** 화면 입력 `tab` 의 `id` 와 같은 모양이다. */
 export const HANDOFF_TAB_PATTERN = /^[A-Za-z0-9]{1,128}$/;
 

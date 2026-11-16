@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.contentdraft.application;
 
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
+import com.bifos.assistant.connector.action.application.ConnectorApprovalBrowser;
 import com.bifos.assistant.connector.contentdraft.application.port.ContentDraftJobStarter;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.connection.application.ConnectorToolPolicies;
@@ -83,6 +84,7 @@ public class ContentDraftSaveApproval {
     private final NotificationService notifications;
     private final ConversationNotices conversations;
     private final PlatformTransactionManager transactionManager;
+    private final ConnectorApprovalBrowser approvalBrowser;
     private final Clock clock;
 
 
@@ -107,6 +109,8 @@ public class ContentDraftSaveApproval {
         if (grant != null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted standing approval");
         }
+        // 원고 저장 플러그인이 「내 브라우저」 를 쓰면 승인 트랜잭션 전에 켠다.
+        approvalBrowser.require(user, actionId);
         ConnectorAction finished = approvePrepared(user, prepare(user, actionId));
         feedback.record(FeedbackEntry.of(finished.userId(), FeedbackSubjectType.CONNECTOR_ACTION, finished.publicId(),
             FeedbackEventType.APPROVED, FeedbackActor.USER, now()).conversation(finished.conversationId())
