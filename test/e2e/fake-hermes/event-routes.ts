@@ -11,6 +11,8 @@ import {
   TOOL_DETAIL_SAMPLE,
   SKILL_VIEW_CALL,
   SUBAGENT_PROVIDER_PROBE,
+  STEER_PROBE,
+  STEER_UNREAD_PROBE,
 } from "./scenario-fixtures.ts";
 /** 실행의 사건 스트림을 실제 Hermes 응답 모양으로 흘린다. */
 export function createEventRoutes(state: FakeHermesState, { authorized, runNotFound }: ReturnType<typeof createLifecycle>) {
@@ -92,6 +94,34 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
               });
             }
             event({ event: run.status === "cancelled" ? "run.cancelled" : "run.completed" });
+            response.end();
+            return;
+          }
+          // steer 를 받는 실행이다. 도구 한 묶음 뒤에 끼운 글을 넣고(`run.steered`), 붙잡은 실행이 풀릴 때까지 스트림을 연다.
+          // 실제 Hermes 는 받는 순간 `run.steered` 를 내지만 대역은 넣을 때 낸다. Control Plane 은 이 사건을 읽지 않고
+          // steer 요청의 200 으로 말풍선을 만들므로 검사 결과는 같다.
+          // 넣지 못하는 실행은 도구 없이 끝까지 기다리고, 슬롯에 남은 글은 끝날 때 `pending_steer` 로 돌아간다.
+          if (run.input === STEER_PROBE || run.input === STEER_UNREAD_PROBE) {
+            const open = () => !response.destroyed && run.status === "running";
+            if (run.input === STEER_PROBE) {
+              event({ event: "tool.started", tool: "fake-tool", preview: "started" });
+              event({ event: "tool.completed", tool: "fake-tool", duration: 0.1, preview: "", error: false });
+              while (open() && (run.steerSlot ?? []).length === 0) await wait(20);
+              if ((run.steerSlot ?? []).length > 0) {
+                event({ event: "run.steered" });
+                run.steerSlot = [];
+                event({ event: "tool.started", tool: "fake-reader", preview: "started" });
+                event({ event: "tool.completed", tool: "fake-reader", duration: 0.25, error: false });
+              }
+            }
+            while (open()) await wait(20);
+            if (response.destroyed) return;
+            if (run.status === "cancelled") {
+              event({ event: "run.cancelled" });
+            } else {
+              event({ event: "message.delta", delta: run.output });
+              event({ event: "run.completed" });
+            }
             response.end();
             return;
           }

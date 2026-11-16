@@ -22,7 +22,7 @@ import {
   TEST_RELEASE_HELD_SOUL_PATH,
 } from "./runtime-fixtures.ts";
 /** 다른 프로세스에서 시험 상태를 바꾸는 제어 경로다. */
-export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, releaseHeldSoul, releaseLongActivity }: ReturnType<typeof createLifecycle>) {
+export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun }: ReturnType<typeof createLifecycle>) {
   return async (request: IncomingMessage, response: ServerResponse, path: string): Promise<void> => {
       // 검사가 실패해 finally까지 가지 못해도 다음 검사에 장애나 보류 설정을 넘기지 않는다.
       // profile, 실행과 session 기록은 지우지 않는다. 그것들은 DB와 함께 각 검사가 소유한다.
@@ -31,9 +31,7 @@ export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, re
         state.readinessOutage = undefined;
         state.blockedProviders.clear();
         state.holdNextRun = false;
-        const releasedRunId = releaseHeldRun();
-        const releasedRun = releasedRunId === undefined ? undefined : state.runs.get(releasedRunId);
-        if (releasedRun !== undefined) releasedRun.status = "completed";
+        completeRun(releaseHeldRun());
         releaseHeldSoul();
         releaseLongActivity();
         state.holdNextConfig = false;
@@ -117,10 +115,7 @@ export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, re
 
       if (request.method === "POST" && path === TEST_RELEASE_HELD_RUN_PATH) {
         state.holdNextRun = false;
-        const releasedRunId = releaseHeldRun();
-        if (releasedRunId === undefined) return send(response, 204, null);
-        const run = state.runs.get(releasedRunId);
-        if (run !== undefined) run.status = "completed";
+        completeRun(releaseHeldRun());
         return send(response, 204, null);
       }
 

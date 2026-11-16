@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: RouteContext) {
   );
 }
 
-/** 답이 오는 동안 보낸 글을 대기 메시지로 더한다. 글만 넘긴다. */
+/** 답이 오는 동안 보낸 글을 대기 메시지로 더한다. 글과 입력창 글인지(`steer`)만 넘긴다. */
 export async function POST(request: Request, context: RouteContext) {
   const { conversationId } = await context.params;
   if (!isConversationId(conversationId)) return invalidPendingRequest();
@@ -24,6 +24,9 @@ export async function POST(request: Request, context: RouteContext) {
   if (!parsed.ok) return parsed.response;
   return forwardPending(
     `/api/v1/chat/conversations/${conversationId}/pending`,
-    { method: "POST", body: { text: parsed.body.text } },
+    {
+      method: "POST",
+      body: { text: parsed.body.text, steer: parsed.body.steer === true },
+    },
   );
 }

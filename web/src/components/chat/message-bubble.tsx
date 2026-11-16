@@ -19,6 +19,7 @@ import { VersionSwitcher } from "./version-switcher";
 import { parseSkillCommand } from "./skill-command";
 import { DelegationLines, MentionLine } from "./delegation-lines";
 import { SystemMessage } from "./system-message";
+import { SteerStatus } from "./steer-status";
 import type { DelegationLine } from "@/lib/delegation";
 export type {
   MessageArtifact,
@@ -217,8 +218,8 @@ export function MessageBubble({
       <li
         className={cn(
           "group flex min-w-0 justify-end focus-visible:outline-none",
-          // 맡김 질문은 말풍선 아래에 맡긴 줄을 둔다. 오른쪽 정렬은 그대로다.
-          turn.delegatedTo && "flex-col items-end",
+          // 맡김 질문은 말풍선 아래에 맡긴 줄을, steer 말풍선은 상태 글을 둔다. 오른쪽 정렬은 그대로다.
+          (turn.delegatedTo || turn.steer) && "flex-col items-end",
         )}
         tabIndex={0}
       >
@@ -271,6 +272,7 @@ export function MessageBubble({
           ) : null}
         </div>
         {turn.delegatedTo ? <MentionLine line={turn.delegatedTo} /> : null}
+        {turn.steer ? <SteerStatus steer={turn.steer} /> : null}
       </li>
     );
   }
