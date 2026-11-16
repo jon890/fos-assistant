@@ -113,7 +113,7 @@ held(탭) = 열린 연결 수 > 0
 - **패널**: 옆 패널 목표에 에이전트 보기(`{ kind: "agent-browser" }`)를 더한다. 「할 일」·「내 브라우저」 탭 머리는 그대로이고 「내 브라우저」 탭이 화면을 그린다. 넘기기 카드가 패널을 여는 규칙은 지금과 같아 새 넘기기가 생기면 그 넘기기의 화면으로 바뀐다. 단추를 다시 누르면 화면을 새로 만들어 다시 에이전트 탭으로 옮긴다. 도구가 끝나도 패널은 남는다(spec DECISION16). 휴대폰은 지금 패널 규칙대로 전체 폭 시트다(spec DECISION17).
 - **띠**: 화면은 `tabs` 의 지금 탭이 `agent` 면 화면 위에 「에이전트가 쓰는 중이에요. 끝나면 조작할 수 있어요」 띠를 보이고 주소 칸, 뒤로, 새로 고침, 키보드, 화면 누르기를 막는다. 서버도 버리므로 웹의 막기는 보이는 모양이다. `/browser` 와 대화 패널이 같은 부품이라 어디서 열든 같다.
 
-### PR3 사람 잠금(REQ5, REQ7)
+### PR3 사람 잠금
 
 ```text
 POST /api/v1/browser/takeover {conversationId?}
@@ -146,7 +146,7 @@ POST /api/v1/browser/give-back
 - **돌려주기의 글**(spec DECISION12, DECISION24): 대화 패널의 화면은 돌려주기가 성공하면 그 대화의 열린 넘기기를 본다. 결제(`PAYMENT`) 밖의 넘기기가 하나라도 있으면 `human_browser` 의 정해 둔 글을 다음 메시지로 보낸다. 결제 카드만 남았으면 보내지 않는다. 결제는 「결제했어요」 와 「사지 않을래요」 가운데 사람이 고르는 일이라 이어 가라는 글이 맞지 않다. `/browser` 의 화면은 넘기기를 모르므로 잠금만 푼다.
 - **10분 풀림**(spec DECISION7): `UserBrowserSweeper` 가 점검마다 잠긴 `RUNNING` 줄을 본다. 화면이 열려 있으면 그 시각을 기억하고, 닫혀 있으면 잠근 시각과 마지막으로 열린 것을 본 시각 가운데 늦은 것에서 `idle-timeout` 이 지났을 때 푼다. 열린 것을 본 적이 없으면(다시 뜬 뒤) 점검이 처음 돈 시각을 쓴다. 점검 간격(1분)만큼 늦게 풀릴 수 있다. 잠긴 브라우저는 REQ1 의 기다림으로 보아 30분 규칙을 따르므로, 10분 풀림이 끄기보다 먼저 온다.
 
-### PR3 회수 중 에이전트 도구와 넘기기(REQ5)
+### PR3 회수 중 에이전트 도구와 넘기기
 
 - **플러그인**: 세 플러그인(네이버 쇼핑, 코레일 KTX, 네이버 블로그)의 `cdp.ts` 가 중계의 423 과 close code 4423 을 닿지 않음과 나눠 `<플러그인>_BROWSER_IN_USE` 오류에 넘기기 `{need: "human_browser", tab?}` 를 싣는다. 탭은 그 연결이 붙은 탭(`devtools/page/<탭>`)이고, 탭을 만들기 전에 거절됐으면 없다. 쇼핑과 KTX 의 탭 열기는 그 탭을 남긴 탭으로 두고 닫지 않는다(닫기도 423 이다). 블로그는 편집기 오류로 감싸여도 오류를 고르는 마지막 단계가 중계를 한 번 더 불러 그 신호를 찾는다. 결과는 지금 넘기기와 같이 `isError` 없는 `HUMAN_ACTION_REQUIRED` 이고 안내 글만 「사람이 직접 쓰는 중이라 돌려줄 때까지 다시 부르지 않는다」 로 다르다.
 - **어휘** `HandoffNeed.HUMAN_BROWSER`(`human_browser`). 제목은 「「내 브라우저」를 직접 쓰는 동안 멈췄어요」, 웹의 「다 했어요」 글과 돌려주기의 글은 「「내 브라우저」를 돌려줬어요. 멈춘 단계부터 이어서 해 주세요.」 다. 카드와 닫기는 다른 넘기기와 같다.
@@ -154,7 +154,7 @@ POST /api/v1/browser/give-back
 - **전환 배포**(rule-66): 운영은 plugin 을 먼저, Control Plane 을 다음에 올린다. 그 사이 새 fos-ctx 가 보낸 `human_browser` 는 옛 Control Plane 이 어휘 밖이라 거절해 카드만 뜨지 않고, 모델은 결과의 안내 글을 받는다. 옛 Control Plane 은 423 과 4423 을 내지 않으므로 플러그인이 `human_browser` 를 내는 일은 새 Control Plane 뒤에만 생긴다. 탭 있는 넘기기의 본문과 서명은 바뀌지 않아 옛 fos-ctx 와 새 Control Plane 도 그대로 돈다. 다음 배포에서 걷을 옛 경로는 없다.
 - **알림**(spec DECISION18): `ConnectorHandoffs.record` 가 `HUMAN_BROWSER` 이고 회수한 자리가 그 대화이면 알림을 만들지 않는다. 카드는 그대로 낸다.
 
-### PR3 승인과 회수(REQ5, REQ6)
+### PR3 승인과 회수
 
 - **포트** `browser.application.port.BrowserApprovedRuns`: `boolean running(long userId)`. 구현은 `connector` 의 `action` 하위 기능의 `ConnectorBrowserApprovedRuns` 다. 그 사용자의 `EXECUTING` 이고 위험도가 `FINANCIAL` 이나 `PURCHASE` 인 줄의 플러그인 가운데 manifest 가 `owner_browser_env` 를 선언한 것이 있으면 참이다. 카탈로그를 읽지 못하면 참으로 본다. 잘못 막아도 실행이 끝나면(최대 60초, `ConnectorActionExpirer`) 풀린다. 원고 저장 승인은 위험도가 `WRITE` 라 들지 않는다.
 - **회수 중 승인**(spec DECISION26): `ConnectorApprovalBrowser.require` 가 브라우저를 켜기 전에 `BrowserHumanHold.held(userId)` 를 본다. 잠겼으면 `CONNECTOR_BROWSER_HELD`(409)로 거절하고 줄을 건드리지 않는다. 웹은 그 코드에 「직접 쓰고 계신 브라우저를 돌려준 뒤 승인해 주세요.」 를 보인다. 금융·구매, 일반 쓰기, 원고 저장이 모두 이 자리를 지난다.
