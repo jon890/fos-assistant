@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
+import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.concurrent.CompletableFuture;
@@ -14,6 +15,23 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class StubHermesRunsClientTest {
+
+    @Test
+    @DisplayName("끼우기는 정한 결과를 차례로 내고 다 쓰면 받음으로 답하며 받은 글을 남긴다")
+    void steerAnswersQueuedOutcomesThenAccepts() {
+        StubHermesRunsClient stub = new StubHermesRunsClient();
+        stub.willSteer(SteerOutcome.REJECTED, SteerOutcome.UNKNOWN);
+
+        assertThat(stub.steer("unused", "profile", "run", "첫 글")).isEqualTo(SteerOutcome.REJECTED);
+        assertThat(stub.steer("unused", "profile", "run", "둘째 글")).isEqualTo(SteerOutcome.UNKNOWN);
+        assertThat(stub.steer("unused", "profile", "run", "셋째 글")).isEqualTo(SteerOutcome.ACCEPTED);
+        assertThat(stub.steered()).extracting(StubHermesRunsClient.SteerRequest::text)
+            .containsExactly("첫 글", "둘째 글", "셋째 글");
+
+        stub.reset();
+        assertThat(stub.steered()).isEmpty();
+    }
+
 
     @Test
     @DisplayName("응답을 순서대로 내고 마지막 응답은 교체할 때까지 되풀이한다")

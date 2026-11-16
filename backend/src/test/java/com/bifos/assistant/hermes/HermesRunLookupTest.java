@@ -60,7 +60,8 @@ class HermesRunLookupTest {
                 Duration.ofMillis(10),
                 Duration.ofSeconds(1),
                 Duration.ofSeconds(2),
-                Duration.ofSeconds(2)));
+                Duration.ofSeconds(2)),
+            Duration.ofSeconds(1));
     }
 
 

@@ -48,7 +48,8 @@ class HermesRunRequestTest {
             Duration.ofMillis(10),
             Duration.ofSeconds(1),
             Duration.ofSeconds(1),
-            Duration.ofSeconds(1)));
+            Duration.ofSeconds(1)),
+        Duration.ofSeconds(1));
 
     private HttpServer server;
     private String baseUrl;
