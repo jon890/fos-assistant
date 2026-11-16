@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -29,7 +30,13 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
     /** 앞으로 가져온 탭 번호다. */
     public final List<String> activated = new CopyOnWriteArrayList<>();
 
+    /** 연 탭 표다. {@link #openers(URI)} 가 돌려준다. */
+    public final Map<String, String> openers = new ConcurrentHashMap<>();
+    /** 연 탭을 읽은 횟수다. */
+    public final AtomicInteger openerLookups = new AtomicInteger();
+
     public volatile boolean failConnect;
+    public volatile boolean failOpeners;
     public volatile boolean failList;
     /** 이 메서드의 명령은 인자를 메시지에 담은 예외로 실패한다. 예외 메시지가 로그로 새는지 보는 검사가 쓴다. */
     public volatile String failMethod;
@@ -78,6 +85,16 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
         connections.put(targetId, connection);
         attached.add(targetId);
         return connection;
+    }
+
+
+    @Override
+    public Map<String, String> openers(URI cdp) {
+        openerLookups.incrementAndGet();
+        if (failOpeners) {
+            throw new IllegalStateException("cdp openers failed");
+        }
+        return Map.copyOf(openers);
     }
 
 

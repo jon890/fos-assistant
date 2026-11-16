@@ -82,7 +82,7 @@ public class BrowserGatewayController {
 
 
     /**
-     * 새 탭을 연다. 쿼리를 푼 주소가 {@code http}, {@code https}, {@code about:blank} 일 때만 넘기고, 넘길 때는 받은 원문 쿼리를 그대로
+     * 새 탭을 연다. 만든 탭은 에이전트가 쥔 탭으로 둔다. 쿼리를 푼 주소가 {@code http}, {@code https}, {@code about:blank} 일 때만 넘기고, 넘길 때는 받은 원문 쿼리를 그대로
      * 붙인다. 아니면 400 이다.
      */
     @PutMapping("/json/new")
@@ -94,7 +94,18 @@ public class BrowserGatewayController {
         if (!allowedAddress(query)) {
             return empty(HttpStatus.BAD_REQUEST);
         }
-        return forward(token, target -> rewritten(cdp.put(target.cdp(), "/json/new?" + query), token));
+        return forward(token, target -> {
+            CdpReply reply = cdp.put(target.cdp(), "/json/new?" + query);
+            ResponseEntity<byte[]> response = rewritten(reply, token);
+            // 플러그인이 만든 탭은 연결이 붙기 전에도 에이전트가 쥔다(docs/features/browser-cowork/design.md)
+            if (response.getStatusCode().is2xxSuccessful()) {
+                String id = JSON.readTree(reply.body()).path("id").asString("");
+                if (TAB_ID.matcher(id).matches()) {
+                    gateway.created(target, id);
+                }
+            }
+            return response;
+        });
     }
 
 

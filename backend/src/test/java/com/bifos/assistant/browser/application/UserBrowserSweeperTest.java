@@ -348,7 +348,7 @@ class UserBrowserSweeperTest {
 
     private BrowserScreens screens() {
         return new BrowserScreens(
-            new FakeCdp(), new FakeCdp(), usage, () -> Duration.ofMinutes(30), Duration.ofSeconds(2));
+            new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), () -> Duration.ofMinutes(30), Duration.ofSeconds(2));
     }
 
 
@@ -361,7 +361,7 @@ class UserBrowserSweeperTest {
             LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
             Clock.systemUTC(),
             new BrowserScreens(
-                new FakeCdp(), new FakeCdp(), usage, () -> Duration.ofMinutes(30), Duration.ofSeconds(2)));
+                new FakeCdp(), new FakeCdp(), usage, new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()), () -> Duration.ofMinutes(30), Duration.ofSeconds(2)));
     }
 
 

@@ -106,6 +106,24 @@ class BrowserGatewaySocketTest {
 
 
     @Test
+    @DisplayName("Chrome 쪽에 붙으면 그 대상의 탭을 쥐고, 연결이 닫히면 탭 핸들을 한 번만 놓는다")
+    void holdsTabWhileRelayIsOpen() throws Exception {
+        AtomicInteger tabCloses = new AtomicInteger();
+        session.getAttributes().put(BrowserGatewayHandshake.KIND, "page");
+        session.getAttributes().put(BrowserGatewayHandshake.TARGET_ID, "PAGE1");
+        when(gateway.holdTab(TARGET, "page", "PAGE1")).thenReturn(tabCloses::incrementAndGet);
+
+        socket.afterConnectionEstablished(session);
+        assertThat(tabCloses).hasValue(0);
+        socket.afterConnectionClosed(session, CloseStatus.NORMAL);
+        socket.handleTransportError(session, new IllegalStateException("late"));
+
+        verify(gateway).holdTab(TARGET, "page", "PAGE1");
+        assertThat(tabCloses).hasValue(1);
+    }
+
+
+    @Test
     @DisplayName("받은 쪽이 닫힌 뒤 전송 오류가 또 와도 Chrome 쪽과 핸들은 한 번만 닫고, 이미 닫힌 세션은 다시 닫지 않는다")
     void closesRelayAndHandleOnceWhenSessionClosesFirst() throws Exception {
         socket.afterConnectionEstablished(session);

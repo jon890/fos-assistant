@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
+import com.bifos.assistant.browser.application.BrowserAgentTabs;
 import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
@@ -294,7 +295,7 @@ class UserBrowserScreenControllerTest {
 
     private MockMvc mvc(boolean enabled) {
         screens = new BrowserScreens(
-            cdp, cdp, new BrowserUsage(), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
+            cdp, cdp, new BrowserUsage(), new BrowserAgentTabs(cdp, Clock.systemUTC()), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
         UserBrowserService service = UserBrowserServiceTestFactory.create(
             repository,
             runtime(),

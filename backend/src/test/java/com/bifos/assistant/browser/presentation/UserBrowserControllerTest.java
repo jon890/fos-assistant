@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bifos.assistant.browser.application.BrowserAgentTabs;
 import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
@@ -187,6 +188,7 @@ class UserBrowserControllerTest {
                 new FakeCdp(),
                 new FakeCdp(),
                 new BrowserUsage(),
+                new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC()),
                 LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);

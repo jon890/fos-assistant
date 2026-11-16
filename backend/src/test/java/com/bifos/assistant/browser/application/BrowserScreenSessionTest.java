@@ -10,6 +10,7 @@ import com.bifos.assistant.browser.domain.CdpTarget;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ class BrowserScreenSessionTest {
 
     private FakeCdp cdp;
     private BrowserUsage usage;
+    private BrowserAgentTabs agentTabs;
     private RecordingScreenSink sink;
     private ScheduledExecutorService scheduler;
     private final AtomicBoolean ended = new AtomicBoolean();
@@ -40,6 +42,7 @@ class BrowserScreenSessionTest {
         cdp = new FakeCdp();
         cdp.pages.add(new CdpTarget("T1", "첫 탭", "https://example.com/"));
         usage = new BrowserUsage();
+        agentTabs = new BrowserAgentTabs(cdp, Clock.systemUTC());
         sink = new RecordingScreenSink();
         scheduler = Executors.newSingleThreadScheduledExecutor();
         ended.set(false);
@@ -67,7 +70,7 @@ class BrowserScreenSessionTest {
             .containsEntry("maxHeight", 2000);
         assertThat(sink.data("tabs"))
             .containsExactly(
-                List.of(Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", true)));
+                List.of(Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", true, "agent", false)));
         assertThat(usage.inUse(BROWSER_ID)).isTrue();
     }
 
@@ -194,8 +197,8 @@ class BrowserScreenSessionTest {
             .containsExactly("T1", "T2");
         assertThat(sink.data("tabs").get(1))
             .isEqualTo(List.of(
-                Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", false),
-                Map.of("id", "T2", "title", "로그인", "url", "https://example.com/popup", "active", true)));
+                Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", false, "agent", false),
+                Map.of("id", "T2", "title", "로그인", "url", "https://example.com/popup", "active", true, "agent", false)));
     }
 
 
@@ -211,7 +214,7 @@ class BrowserScreenSessionTest {
 
         assertThat(cdp.attached).containsExactly("T1", "T2");
         List<Object> tabs = sink.data("tabs");
-        Object expected = Map.of("id", "T2", "title", "둘째", "url", "https://example.com/b", "active", true);
+        Object expected = Map.of("id", "T2", "title", "둘째", "url", "https://example.com/b", "active", true, "agent", false);
         assertThat((List<Object>)tabs.get(tabs.size() - 1)).contains(expected);
     }
 
@@ -485,7 +488,7 @@ class BrowserScreenSessionTest {
 
     private BrowserScreenSession open(Duration timeout, Duration tabInterval, Duration heartbeat, String url) {
         BrowserScreenSession session = new BrowserScreenSession(
-            BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, scheduler, closed -> ended.set(true));
+            BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, agentTabs, scheduler, closed -> ended.set(true));
         session.start(url, timeout, tabInterval, heartbeat);
         return session;
     }

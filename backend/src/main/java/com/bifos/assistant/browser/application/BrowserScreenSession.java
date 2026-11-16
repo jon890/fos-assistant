@@ -13,7 +13,6 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +22,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +55,7 @@ public class BrowserScreenSession {
     private final CdpConnector connector;
     private final BrowserUsageHandle usage;
     private final BrowserScreenSink sink;
+    private final BrowserAgentTabs agentTabs;
     private final ScheduledExecutorService scheduler;
     private final Consumer<BrowserScreenSession> ended;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -69,6 +68,8 @@ public class BrowserScreenSession {
     private long generation;
     private boolean mouseDown;
     private List<CdpTarget> tabs = List.of();
+    /** 마지막 탭 확인에서 에이전트가 쥔 탭이다. 입력 차단은 이 값이 아니라 입력마다 {@link BrowserAgentTabs} 를 본다. */
+    private Set<String> agent = Set.of();
     // 프레임 없이 연이어 다시 이은 횟수, 마지막 resize 인자, 마지막 프레임의 화면 크기(CSS 픽셀)다
     private int reconnects;
     private volatile Map<String, Object> metrics;
@@ -89,10 +90,18 @@ public class BrowserScreenSession {
         if (pages.isEmpty()) {
             pages = List.of(targets.create(cdp, "about:blank"));
         }
+        String first = pages.get(0).id();
+        // 주소를 주고 여는 화면은 에이전트가 일하는 탭을 다른 곳으로 보내지 않고 새 탭에서 연다
+        if (url != null && agentTabs.held(browserId, first)) {
+            first = targets.create(cdp, "about:blank").id();
+            pages = targets.list(cdp);
+        }
+        Set<String> held = agentTabs.agentTabs(browserId, cdp, pages);
         synchronized (lock) {
             tabs = pages;
+            agent = held;
         }
-        attach(pages.get(0).id(), url);
+        attach(first, url);
         sink.onClose(() -> close(null));
         sendTabs();
         long interval = tabInterval.toMillis();
@@ -109,10 +118,17 @@ public class BrowserScreenSession {
             throw new ApiException(ErrorCode.BROWSER_SCREEN_CLOSED, "browser screen is closed");
         }
         CdpConnection current;
+        String target;
         synchronized (lock) {
             current = connection;
+            target = targetId;
         }
         if (input.kind() != BrowserScreenInput.Kind.TAB && current == null) {
+            return;
+        }
+        // 에이전트가 쥔 탭은 보기 전용이다. 탭 옮기기와 화면 크기만 받고 나머지는 원격 페이지로 보내지 않는다
+        boolean viewOnly = input.kind() != BrowserScreenInput.Kind.TAB && input.kind() != BrowserScreenInput.Kind.RESIZE;
+        if (viewOnly && agentTabs.held(browserId, target)) {
             return;
         }
         switch (input.kind()) {
@@ -120,15 +136,7 @@ public class BrowserScreenSession {
             case MOUSE -> mouse(current, input);
             case WHEEL -> wheel(current, input);
             // 사용자가 스크립트를 정하지 못한다. 페이지 처음과 끝에 쓰는 고정 식만 실행한다.
-            case SCROLL ->
-                command(
-                    current,
-                    "Runtime.evaluate",
-                    Map.of(
-                        "expression",
-                        "window.scrollTo(0, "
-                            + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight")
-                            + ")"));
+            case SCROLL -> command(current, "Runtime.evaluate", BrowserScreenInputParams.scroll(input.action()));
             case KEY -> key(current, input.key());
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
@@ -183,7 +191,7 @@ public class BrowserScreenSession {
             resizeTask = scheduler.schedule(
                 () -> {
                     synchronized (lock) {
-                        if (!closed.get() && connection != null) {
+                        if (!closed.get() && connection != null && !agentTabs.held(browserId, targetId)) {
                             command(connection, "Emulation.setDeviceMetricsOverride", metrics);
                         }
                         resizeTask = null;
@@ -230,7 +238,8 @@ public class BrowserScreenSession {
         try {
             opened.send("Page.enable", Map.of());
             Map<String, Object> resized = metrics;
-            if (resized != null) {
+            // 사람 화면의 폭이 에이전트가 읽는 페이지 배치를 바꾸지 않게 쥔 탭에는 보내지 않는다
+            if (resized != null && !agentTabs.held(browserId, id)) {
                 command(opened, "Emulation.setDeviceMetricsOverride", resized);
             }
             if (url != null) {
@@ -319,33 +328,33 @@ public class BrowserScreenSession {
     }
 
 
-    /** 탭 목록을 본다. 바뀌면 알리고, 새 탭이 생겼으면 그리로 옮기고, 붙은 탭이 사라졌으면 남은 탭으로 옮긴다. */
+    /** 탭 목록을 본다. 바뀌면 알리고, 따라갈 새 탭이나 붙은 탭이 사라졌으면 옮기고, 쥔 탭을 놓았으면 화면 크기를 다시 보낸다. */
     private void pollTabs() {
         guard("tab check", () -> {
             List<CdpTarget> pages = listTabs();
             if (pages == null) {
                 return;
             }
+            Set<String> held = agentTabs.agentTabs(browserId, cdp, pages);
             List<CdpTarget> before;
+            Set<String> heldBefore;
             String current;
+            CdpConnection attached;
             synchronized (lock) {
                 before = tabs;
+                heldBefore = agent;
                 current = targetId;
+                attached = connection;
                 tabs = pages;
+                agent = held;
             }
-            Set<String> known = before.stream().map(CdpTarget::id).collect(Collectors.toSet());
-            String next = pages.stream()
-                .map(CdpTarget::id)
-                .filter(id -> !known.contains(id))
-                .findFirst()
-                .orElse(null);
-            if (next == null && pages.stream().noneMatch(page -> page.id().equals(current))) {
-                next = pages.get(0).id();
-            }
+            String next = BrowserScreenTabs.next(before, pages, current, held);
             if (next != null) {
                 moveTo(next);
+            } else if (attached != null && metrics != null && heldBefore.contains(current) && !held.contains(current)) {
+                command(attached, "Emulation.setDeviceMetricsOverride", metrics);
             }
-            if (next != null || !pages.equals(before)) {
+            if (next != null || !pages.equals(before) || !held.equals(heldBefore)) {
                 sendTabs();
             }
         });
@@ -396,16 +405,9 @@ public class BrowserScreenSession {
 
     /** 탭 목록을 알린다. 받는 쪽이 끊겼으면 화면을 닫는다. */
     private void sendTabs() {
-        List<Map<String, Object>> views = new ArrayList<>();
+        List<Map<String, Object>> views;
         synchronized (lock) {
-            for (CdpTarget tab : tabs) {
-                Map<String, Object> view = new LinkedHashMap<>();
-                view.put("id", tab.id());
-                view.put("title", tab.title());
-                view.put("url", tab.url());
-                view.put("active", tab.id().equals(targetId));
-                views.add(view);
-            }
+            views = BrowserScreenTabs.views(tabs, targetId, agent);
         }
         if (!sink.send("tabs", views)) {
             close(null);

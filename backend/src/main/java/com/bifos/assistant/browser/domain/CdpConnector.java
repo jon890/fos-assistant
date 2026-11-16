@@ -1,9 +1,10 @@
 package com.bifos.assistant.browser.domain;
 
 import java.net.URI;
+import java.util.Map;
 import java.util.function.Consumer;
 
-/** 탭 하나에 CDP WebSocket 으로 붙는다. */
+/** 탭 하나에 CDP WebSocket 으로 붙는다. 탭을 연 탭은 브라우저 수준 연결로 읽는다. */
 public interface CdpConnector {
 
     /**
@@ -19,4 +20,14 @@ public interface CdpConnector {
      * {@link CdpConnection#close()} 로 닫았으면 부르지 않는다
      */
     CdpConnection connect(URI cdp, String targetId, Consumer<CdpEvent> events, Runnable closed);
+
+
+    /**
+     * 다른 탭이 연 탭과 그 연 탭이다. 브라우저 수준 CDP 의 {@code Target.getTargets} 가운데 {@code openerId} 가 있는 {@code page} 만
+     * 담는다. 닿지 못하거나 답이 틀리면 런타임 예외다.
+     *
+     * @param cdp {@link BrowserRuntime#cdpAddress(String)} 가 준 주소
+     * @return 탭 번호에서 그 탭을 연 탭 번호로 가는 표
+     */
+    Map<String, String> openers(URI cdp);
 }
