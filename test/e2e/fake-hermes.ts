@@ -37,7 +37,7 @@ export function startFakeHermes(
   const mcp = createMcp(state);
   const lifecycle = createLifecycle(state);
   const { judgeConnectorCalls, readMemoryViaMcp } = mcp;
-  const { releaseHeldRun, releaseHeldSoul, releaseLongActivity } = lifecycle;
+  const { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun } = lifecycle;
   const handleDashboard = createDashboard(state, bindings, lifecycle, skillRoot);
   const handleControls = createControlRoutes(state, lifecycle);
   const handleRuntime = createRuntimeRoutes(state, lifecycle);
@@ -144,11 +144,9 @@ export function startFakeHermes(
         waitForHeldRun: () => state.heldRunReady ?? Promise.reject(new Error("유지할 실행을 먼저 지정해야 한다")),
         releaseHeldRun: () => {
           state.holdNextRun = false;
-          const releasedRunId = releaseHeldRun();
-          if (releasedRunId === undefined) return;
-          const run = state.runs.get(releasedRunId);
-          if (run !== undefined) run.status = "completed";
+          completeRun(releaseHeldRun());
         },
+        steerInputs: () => state.steerInputs.map((entry) => ({ ...entry })),
         forgetRun: (runId: string) => {
           state.runs.delete(runId);
         },
@@ -241,7 +239,7 @@ export function startFakeHermes(
   });
 }
 
-export { TOOL_DETAIL_SECRETS, TOOL_DETAIL_SAMPLE, ASK_GUIDE_HEADER, ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE, ARTIFACT_WRITE_PROBE, MEMORY_READ_PROBE, FOLLOW_UP_PROPOSE_PROBE, SUBAGENT_MEMORY_PROBE, SUBAGENT_PROVIDER_PROBE, CONNECTOR_TOOL_PROBE, NO_TOOL_CALL_PROBE, CONNECTOR_RESULT_SAMPLE, CONNECTOR_ARGUMENT_SAMPLE, LONG_ACTIVITY_PROBE, PROACTIVE_DEFAULT_FINDING, proactiveOutput, ASK_CARD_PROBE, FAKE_STARTER_PROMPTS } from "./fake-hermes/scenario-fixtures.ts";
+export { TOOL_DETAIL_SECRETS, TOOL_DETAIL_SAMPLE, ASK_GUIDE_HEADER, ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE, ARTIFACT_WRITE_PROBE, MEMORY_READ_PROBE, FOLLOW_UP_PROPOSE_PROBE, SUBAGENT_MEMORY_PROBE, SUBAGENT_PROVIDER_PROBE, CONNECTOR_TOOL_PROBE, NO_TOOL_CALL_PROBE, STEER_PROBE, STEER_UNREAD_PROBE, CONNECTOR_RESULT_SAMPLE, CONNECTOR_ARGUMENT_SAMPLE, LONG_ACTIVITY_PROBE, PROACTIVE_DEFAULT_FINDING, proactiveOutput, ASK_CARD_PROBE, FAKE_STARTER_PROMPTS } from "./fake-hermes/scenario-fixtures.ts";
 export { DEMO_CONNECTOR, DEMO_TOKEN_OK, DEMO_TOKEN_BAD, AGENDA_CONNECTOR, SNAPSHOT_CONNECTOR } from "./fake-hermes/connectors.ts";
 export { FAKE_DASHBOARD_TOKEN, FAKE_USAGE } from "./fake-hermes/runtime-fixtures.ts";
 export { type DemoScript, type ConnectorToolCall, type ProactiveScript, type FakeHermes, type SnapshotJobOutcome } from "./fake-hermes/state.ts";

@@ -97,6 +97,23 @@ export const CONNECTOR_TOOL_PROBE = "플러그인 도구 검사";
 export const NO_TOOL_CALL_PROBE = "도구 없는 실행 검사";
 
 /**
+ * steer 를 받는 실행이다. 도구를 하나 부른 뒤 끼운 글을 기다리고, 받으면 `run.steered` 를 내고 그 글을 모델에 넣은 것으로
+ * 슬롯을 비운 뒤 도구를 하나 더 부른다. 붙잡아 두면 풀 때까지 `running` 이다.
+ *
+ * <p>설정을 켠 E2E 와 브라우저 검사에서 지금 대기열 검사가 흔들리지 않게, 이 두 입력으로 연 실행만 steer 를 받는다.
+ * 실제 Hermes 는 도는 실행이면 모두 받는다.
+ */
+export const STEER_PROBE = "끼우기 검사";
+
+/** 도구 없이 답만 쓰는 실행이다. 끼운 글을 모델에 넣지 못하고, 끝날 때 `pending_steer` 로 돌려준다. */
+export const STEER_UNREAD_PROBE = "끼우기 못 넣음 검사";
+
+/** 이 입력으로 연 실행만 steer 를 받는다. */
+export function acceptsSteer(input: string): boolean {
+  return input === STEER_PROBE || input === STEER_UNREAD_PROBE;
+}
+
+/**
  * 허용된 플러그인 도구 호출의 완료 사건이 싣는 결과 미리보기다. 외부 서비스가 돌려준 글을 뜻하는 가짜 값이고, 실행 기록과 화면에는
  * 어디에도 남지 않아야 한다.
  */

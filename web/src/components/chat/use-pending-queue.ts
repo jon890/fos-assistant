@@ -16,7 +16,8 @@ export type PendingQueueControl = {
   queue: PendingQueue;
   /** 저장된 대기 줄을 다시 읽는다. 읽지 못하면 보이던 것을 그대로 둔다 */
   reload(): Promise<void>;
-  enqueue(text: string): Promise<PendingResult<PendingQueue>>;
+  /** `steer` 가 참이면 입력창에 쓴 글이라 서버가 도는 실행에 끼워 넣어 본다 */
+  enqueue(text: string, steer: boolean): Promise<PendingResult<PendingQueue>>;
   /** 성공하면 취소한 글을 돌려준다. 입력창에 되돌릴 글이다. 화면이 그 줄을 모르면 빈 글이다 */
   cancel(pendingId: number): Promise<PendingResult<string>>;
   release(): Promise<PendingResult<PendingQueue>>;
@@ -115,7 +116,8 @@ export function usePendingQueue(
   return {
     queue,
     reload,
-    enqueue: (text) => replaceWith((id) => enqueuePending(id, text)),
+    enqueue: (text, steer) =>
+      replaceWith((id) => enqueuePending(id, text, steer)),
     cancel,
     release: () => replaceWith(sendPending),
   };

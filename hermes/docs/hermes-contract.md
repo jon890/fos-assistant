@@ -482,7 +482,7 @@ v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousR
 **Control Plane 은 설정이 켜져 있을 때 답이 도는 중 대화 주인이 입력창에 쓴 글만 그 대화의 루트 run 에 `steer` 로 보낸다.**
 `steer` 글이 원래 요청과 같은 사용자 권한으로 들어가므로 위임 결과, 도구 결과, 알림 줄, 카드 답은 보내지 않는다.
 200 이면 받음, 4xx·5xx 면 거절, 응답이 없으면 받았는지 모르는 것으로 본다. 글은 넣기 전부터 Control Plane 의 대기 줄에 있고, 거절, `pending_steer`, 중단, 모름을 모두 대기 줄로 되돌린다. 흐름은 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「도는 실행에 끼워 넣기」, 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다.
-Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes 에는 아직 이 경로가 없다.
+Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)도 steer 경로, `run.steered`, 실행 조회와 종료 사건의 `pending_steer`, 중단 때 슬롯 비우기를 낸다. 지금 대기열 검사가 흔들리지 않게 steer 검사 입력으로 연 실행만 받고 나머지는 409 `run_not_accepting_steer` 로 거절한다. 실제 Hermes 는 도는 실행이면 모두 받는다.
 
 ### 실행 조회가 답하는 기간
 

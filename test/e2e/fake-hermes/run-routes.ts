@@ -5,6 +5,7 @@ import { type SubmittedInput, submittedImages, submittedText } from "./run-input
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import {
   RUN_STOP_PATH,
+  RUN_STEER_PATH,
   RUN_PATH,
   RATE_LIMITED,
   FAKE_USAGE,
@@ -39,6 +40,7 @@ import {
   DEFAULT_PROACTIVE_TOOLS,
   actualModelFor,
   SESSION_MODEL_PROBE,
+  acceptsSteer,
 } from "./scenario-fixtures.ts";
 /** 실행 제출, 중지와 상태 조회를 처리한다. */
 export function createRunRoutes(state: FakeHermesState, { authorized, runNotFound, releaseHeldRun, finishSlowRun }: ReturnType<typeof createLifecycle>, { writeArtifactViaMcp, registerSubagent, readMemoryViaMcp, callControlPlaneToolViaMcp, judgeConnectorCalls }: ReturnType<typeof createMcp>) {
@@ -53,6 +55,8 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           const run = state.runs.get(runId!);
           if (!run) return send(response, 404, runNotFound(runId!));
           run.status = "cancelled";
+          // 실제 Hermes 의 hard interrupt 는 넣지 못한 steer 글을 `pending_steer` 로도 돌려주지 않고 버린다.
+          run.steerSlot = [];
           if (run.input === "중지 빈 답 검사" || run.input === "중지 조각 전 검사") run.output = "";
           state.emptyUntilStopped.get(runId!)?.end();
           state.emptyUntilStopped.delete(runId!);
@@ -60,6 +64,32 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           if (state.heldRunId === runId) releaseHeldRun();
           state.slowActive.delete(runId!);
           return send(response, 200, { status: "stopping" });
+        }
+        const steerMatch = RUN_STEER_PATH.exec(path);
+        if (steerMatch) {
+          const [, profile, runId] = steerMatch;
+          if (!authorized(request, profile!)) {
+            return send(response, 401, { error: "bad key for this profile" });
+          }
+          const run = state.runs.get(runId!);
+          if (!run) return send(response, 404, runNotFound(runId!));
+          const raw = await readBody(request);
+          const body = (raw.length > 0 ? JSON.parse(raw) : {}) as Record<string, unknown>;
+          // 실제 Hermes 는 `input`, `message`, `text` 중 처음으로 찬 글을 읽는다.
+          const text = [body.input, body.message, body.text].find(
+            (value): value is string => typeof value === "string" && value.trim().length > 0,
+          );
+          if (text === undefined) {
+            return send(response, 400, { error: { message: "steer input is empty", code: "invalid_steer_input" } });
+          }
+          if (run.status !== "running" || !acceptsSteer(run.input)) {
+            return send(response, 409, {
+              error: { message: `Run ${runId} is not accepting steer`, code: "run_not_accepting_steer" },
+            });
+          }
+          run.steerSlot = [...(run.steerSlot ?? []), text];
+          state.steerInputs.push({ runId: runId!, input: text });
+          return send(response, 200, { object: "hermes.run.steer", run_id: runId, accepted: true });
         }
         const match = RUN_PATH.exec(path);
         if (!match) return send(response, 404, { error: "not found" });

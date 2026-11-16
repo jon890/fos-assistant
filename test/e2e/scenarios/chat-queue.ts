@@ -5,6 +5,7 @@
  * 연결하기 전에 지나간 사건을 놓치지 않기 때문이다.
  */
 import { call, expect, expectStatus, fail, step, type Context, type Scenario } from "../harness.ts";
+import { steerFlow } from "./chat-steer.ts";
 import { awaitStatus, callTool, contextFor, openStream, parsed, tree, within, type ChatEvent, type Status } from "../delegation-support.ts";
 
 export const CHAT_QUEUE_PROFILE = "chat-queue-group";
@@ -232,6 +233,7 @@ export const chatQueueScenario: Scenario = {
     }
 
     await orderWithDelegation(context);
+    await steerFlow(context);
   },
 };
 

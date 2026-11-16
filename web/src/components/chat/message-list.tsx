@@ -17,11 +17,8 @@ import type { OutgoingMessage } from "./composer-attachment-utils";
 import { MemoryCaptureList } from "./memory-capture-list";
 import type { MemoryCapture } from "@/lib/memory-capture-api";
 import type { MemoryUse } from "@/lib/memory-use-api";
-import {
-  foldVersions,
-  isLatestView,
-  type VersionSlot,
-} from "@/lib/message-versions";
+import { visibleTurns } from "./visible-turns";
+import { isSteerTurn } from "./steer";
 
 type Props = {
   turns: Turn[];
@@ -105,65 +102,16 @@ export function MessageList({
       turn.id.startsWith("assistant-") &&
       turn.content,
   );
-  const persisted = turns
-    .filter(
-      (turn): turn is Turn & { id: number } => typeof turn.id === "number",
-    )
-    .map((turn) => ({
-      ...turn,
-      replacesMessageId: turn.replacesMessageId ?? null,
-    }));
-  const folded = foldVersions(persisted, selectedVersions);
-  const latestView = isLatestView(folded);
-  const pendingVisible: {
-    turn: Turn;
-    userVersion?: VersionSlot;
-    answerVersion?: VersionSlot;
-    afterSystem?: boolean;
-  }[] = turns
-    .filter(
-      (turn): turn is Turn & { id: string } => typeof turn.id === "string",
-    )
-    .map((turn) => ({
-      turn,
-      userVersion: undefined as VersionSlot | undefined,
-      answerVersion: undefined as VersionSlot | undefined,
-    }));
-  const regenerating = pendingVisible.some(({ turn }) =>
-    String(turn.id).startsWith("assistant-regenerate-"),
-  );
-  // `afterSystem` 은 알림 줄이 연 turn 의 답이다. 다시 만들 질문이 없어 다시 생성 단추를 두지 않는다.
-  const foldedVisible: {
-    turn: Turn;
-    userVersion?: VersionSlot;
-    answerVersion?: VersionSlot;
-    afterSystem?: boolean;
-  }[] = folded.flatMap((fold, turnIndex) => {
-    return [
-      {
-        turn: fold.user,
-        userVersion: fold.user.role === "SYSTEM" ? undefined : fold.userVersion,
-      },
-      ...fold.answers.flatMap((answer, answerIndex) =>
-        regenerating &&
-        turnIndex === folded.length - 1 &&
-        answerIndex === fold.answers.length - 1
-          ? []
-          : [
-              {
-                turn: answer.message,
-                answerVersion: answer.version,
-                afterSystem: fold.user.role === "SYSTEM",
-              },
-            ],
-      ),
-    ];
-  });
-  const visible = [...foldedVisible, ...pendingVisible];
+  const { visible, latestView } = visibleTurns(turns, selectedVersions);
   const pendingLabel = pendingAnswerLabel(visible.map(({ turn }) => turn));
   const lastVisible = visible.at(-1)?.turn;
+  // 마지막 줄이 steer 말풍선이면 다시 시도할 질문이 아니다. 다시 보내면 같은 글이 질문으로 한 번 더 간다.
   const hasNoAnswer =
-    lastVisible?.role === "USER" && latestView && !sending && !outgoing;
+    lastVisible?.role === "USER" &&
+    !isSteerTurn(lastVisible) &&
+    latestView &&
+    !sending &&
+    !outgoing;
   // 기억 기록은 turn 이 끝난 뒤 따로 읽혀 답 아래에 들어오므로 맨 아래 따라가기도 그 줄을 본다. 참고한 기억은 작업 과정 안에 있지만, 진행 중 블록을 펼친 채 끝난 답은 펼친 채로 저장되어 높이가 늘 수 있으므로 같이 본다. 펼침 상태는 넣지 않는다.
   const capturesVersion = memoryCaptures
     .map((capture) => `${capture.id}:${capture.status}`)
@@ -239,7 +187,10 @@ export function MessageList({
           ) : (
             <ol className="flex flex-col gap-6">
               {visible.map(
-                ({ turn, userVersion, answerVersion, afterSystem }, index) => {
+                (
+                  { turn, userVersion, answerVersion, afterSystem, afterSteer },
+                  index,
+                ) => {
                   const pendingAssistant =
                     typeof turn.id === "string" &&
                     turn.id.startsWith("assistant-");
@@ -269,6 +220,7 @@ export function MessageList({
                           turn.role === "ASSISTANT" &&
                           !turn.answeredBy &&
                           !afterSystem &&
+                          !afterSteer &&
                           latestView &&
                           !sending
                         }
@@ -282,7 +234,9 @@ export function MessageList({
                             : undefined
                         }
                         nextUserMessage={
-                          turn.role === "ASSISTANT" && nextTurn?.role === "USER"
+                          turn.role === "ASSISTANT" &&
+                          nextTurn?.role === "USER" &&
+                          !isSteerTurn(nextTurn)
                             ? nextTurn.content
                             : undefined
                         }

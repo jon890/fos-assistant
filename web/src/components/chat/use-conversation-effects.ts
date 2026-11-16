@@ -6,6 +6,7 @@ import { readEventStream } from "@/lib/stream";
 import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { receiveDelegation } from "@/lib/delegation";
+import { applySteerEvent } from "./steer";
 import { ConversationSessionProps } from "./conversation-session-types";
 import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
@@ -22,6 +23,7 @@ type Context = Pick<
   | "sending"
   | "currentExecutionId"
   | "stopRequested"
+  | "setTurns"
 > &
   Pick<ConversationSessionProps, "conversationId"> &
   Pick<
@@ -39,6 +41,7 @@ export function useConversationEffects({
   sending,
   currentExecutionId,
   stopRequested,
+  setTurns,
   conversationId,
   runConversationTask,
   resumeAfterReconnect,
@@ -75,6 +78,11 @@ export function useConversationEffects({
             // 메시지가 그 turn 이 끝날 때까지 보이지 않는다. 대기 줄은 turn 의 그림과 겹치지 않는다.
             if (event.type === "pending") {
               void pending.reload();
+              return;
+            }
+            // steer 말풍선도 보류하지 않는다. 이 창이 보낸 turn 이 도는 중에 끼운 글이라 그 답 위에 바로 보여야 한다.
+            if (event.type === "steer") {
+              setTurns((previous) => applySteerEvent(previous, event));
               return;
             }
             // 승인 줄 사건도 보류하지 않는다. 승인 요청은 보낸 turn 이 도는 중에 생긴다.

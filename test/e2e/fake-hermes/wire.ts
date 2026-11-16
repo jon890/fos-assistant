@@ -23,7 +23,7 @@ const templates = new Map([...wireEvents(wireFixture("unknown")), ...wireEvents(
 const sequenced = wireEvents(wireFixture("events")).some((payload) => "seq" in payload);
 
 /** 버전별 칸은 공유 표본에서 가져오고 실행 식별자와 종료 결과는 실제 대역 상태에서 붙인다. */
-export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>, sequence = 0): Record<string, unknown> {
+export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime" | "pending_steer">, fields: Record<string, unknown>, sequence = 0): Record<string, unknown> {
   const template = templates.get(fields.event);
   if (template === undefined) throw new Error(`${HERMES_VERSION}의 사건 표본이 없다: ${fields.event}`);
   const fixedFields: Record<string, string[]> = {
@@ -48,13 +48,15 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
     payload.output = fields.output ?? run.output;
     payload.usage = fields.usage ?? run.usage;
     payload.runtime = fields.runtime ?? run.runtime;
+    // 넣지 못한 steer 글은 실행 조회와 같이 종료 사건에도 실린다.
+    if (run.pending_steer !== undefined) payload.pending_steer = run.pending_steer;
   }
   // 기준 버전이 callback 뒤의 SSE transport에서 seq를 덧붙이는지는 공유 표본이 갖는다.
   if (sequenced && fields.event !== "replay.truncated") payload.seq = sequence;
   return payload;
 }
 
-export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage" | "runtime">) {
+export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage" | "runtime" | "pending_steer">) {
   let sequence = 0;
   return (fields: Record<string, unknown>): Record<string, unknown> => {
     const payload = eventEnvelope(run, fields, sequence);

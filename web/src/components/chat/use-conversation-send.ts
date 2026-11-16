@@ -6,6 +6,7 @@ import { emptyActivity, failActivity } from "./activity/activity-state";
 import { startChatStream } from "@/lib/chat-api";
 import { createPendingAnswer } from "./pending-answer";
 import { pendingMention } from "@/lib/mention";
+import { queueSourceOf } from "@/lib/pending-messages";
 import {
   TurnStreamState,
   ErrorPayload,
@@ -265,7 +266,8 @@ export function useConversationSend({
             (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,
           ),
         );
-        if (await queueMessage(text, false)) {
+        // 입력창이 이미 비었으므로 비우지 않는다. 출처는 처음 보낸 글 그대로 넘긴다.
+        if (await queueMessage(text, false, queueSourceOf(replacementText))) {
           queuedInstead = true;
           return true;
         }
