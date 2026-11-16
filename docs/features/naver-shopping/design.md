@@ -523,6 +523,31 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 
 `UNKNOWN` 은 다시 보내지 않는다. 같은 의도의 `UNKNOWN` 은 지금 규칙대로 새 준비를 막고, 모델에게는 「내 브라우저」 의 탭을 확인해 달라고 안내하라고 준다(spec DECISION33).
 
+#### 채우기 진단
+
+승인 줄의 오류 어휘는 여러 코드를 `unavailable` 하나로 묶는다(`NAVER_SHOPPING_UNAVAILABLE`, `NAVER_SHOPPING_CHECKOUT_FAILED`, `NAVER_SHOPPING_BROWSER_UNREACHABLE`, `NAVER_SHOPPING_PAGE_CHANGED`). claim 뒤의 실패는 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 바꿔 돌려주므로 원래 코드도 결과에 남지 않는다. 그래서 `fill_checkout` 은 단계마다 표준 오류에 진단 줄(`naver_shopping_diagnostic`)을 남긴다.
+
+| 단계(`stage`) | 하는 일 |
+| --- | --- |
+| `approval` | 실행 원문, ticket, claim 주소 대조와 원문 모양 검사 |
+| `tab` | 브라우저 중계 주소 확인, 남긴 탭 정리, 새 탭 열기, 상품 주소로 이동, 화면 분류 |
+| `price` | 상품 상태를 다시 읽어 예상 합계와 품절 확인 |
+| `claim` | ticket 소비 |
+| `pre_buy` | 누르기 전 탭 목록 읽기와 「바로구매」 가 이미 보이는지 확인 |
+| `buy` | 「구매하기」 누르기와 층이나 주문서 기다리기 |
+| `layer` | 층에서 옵션과 수량 맞추기 |
+| `buy_now` | 「바로구매」 누르기와 주문서 기다리기 |
+| `sheet` | 주문서 화면 분류와 최종 금액 읽기 |
+
+단계에 들어갈 때 `stage` 만 있는 줄을 남기고, 끝날 때 한 줄을 더 남긴다. 끝 줄의 `stage` 는 `<단계>.failed`(오류로 끝남), `<단계>.unknown`(`UNKNOWN` 결과), `done`(주문서까지 감) 가운데 하나다.
+끝 줄의 `code` 는 돌려주기 전의 원래 오류 코드를 소문자로 바꾼 것(`naver_shopping_browser_unreachable`)이다. 선언하지 않은 예외는 예외 종류 이름만 소문자로 싣는다(`typeerror`). 오류 없이 `UNKNOWN` 으로 끝나면 까닭 낱말(`not_seen`, `sheet_without_layer`, `sheet_not_seen`, `amount_unread`)이다. `sheet_without_layer` 는 주문서가 열렸어도 금액을 읽지 않고 끝나므로 `buy.unknown` 에 붙는다.
+`tab` 단계에서 전체 제한 시간을 넘기면 `workInTab` 이 바꾼 `naver_shopping_unavailable` 이 남는다. 사람이 해야 하는 화면에서 멈춘 넘기기도 결과는 오류가 아니지만 진단 줄은 `<단계>.failed` 와 그 코드(`naver_shopping_login_required` 등)로 남는다.
+예외 메시지, 주소, 화면 글, 옵션 글, ticket 은 싣지 않는다. 마지막 관문은 다른 진단 줄과 같은 낱말 검사(`DIAGNOSTIC_WORD`)다.
+
+승인한 채우기는 Hermes 가 아니라 대시보드 plugin 의 실행 경로가 띄운 자식에서 돈다. 그 경로는 자식의 표준 오류에서 진단 줄 모양만 골라 그 profile 의 MCP 표준 오류 기록에 더한다([대시보드 plugin](../../../hermes/plugins/dashboard-profile-api/README.md) 의 `execute` 절). 모델이 부르는 도구의 진단 줄과 같은 기록이다. 기록을 읽는 방법은 `fos-home-infra` 가 갖는다.
+
+진단 줄이 하나도 없으면 플러그인의 도구 처리기까지 오지 않은 것이다(그 profile 의 로그 디렉터리가 없으면 대시보드가 남기지 않으므로 예외다). 이때는 승인 줄과 함께 본다. 도구가 낸 오류는 모두 선언한 코드라 승인 줄의 `result_text` 에 그 코드가 봉인돼 남는다. 오류 어휘가 `unavailable` 인데 `result_text` 가 비었으면 코드 없는 답이다. 대시보드가 400·401·404·409 로 거절했거나, 도구를 부르기 전에 멈췄거나, MCP SDK 가 입력 검증으로 거절한 경우다. claim 을 소비한 뒤의 코드 없는 `unavailable` 은 `UNKNOWN` 으로 끝나므로, 이 모양이면 claim 도 소비하지 않았다.
+
 ### 결과 판정(REQ12, PR3b)
 
 금융 승인이 결과를 저장하는 잠금 안에서 `CHECKOUT` 결과를 판정한다. `ConnectorCheckoutOutcome` 이 갖는다. 플러그인 결과는 정확한 키와 타입으로 읽고 어긋나면 `UNKNOWN` 이다.

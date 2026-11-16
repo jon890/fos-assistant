@@ -417,7 +417,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
              UNAVAILABLE),
         ):
             with self.subTest(label):
-                async def fixed(manifest, hermes_tool, args, env, progress, timeout, result=result):
+                async def fixed(manifest, hermes_tool, args, env, progress, timeout, diagnostics=None, result=result):
                     return result
 
                 with patch_plugin(self.plugin, "_run_connector_execute", fixed):
@@ -442,6 +442,69 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         # 도구는 60초를 기다린다. 그보다 훨씬 먼저 돌아와야 제한이 실제로 끊은 것이다.
         self.assertLess(time.monotonic() - started, 20)
         self.assert_no_child_left()
+
+    def child_log(self, profile=PROFILE):
+        """그 profile 의 MCP 표준 오류 로그. 없으면 None 이다."""
+        log = self.profile_root / profile / "logs" / "mcp-stderr.log"
+        return log.read_text(encoding="utf-8") if log.exists() else None
+
+    def test_child_diagnostic_lines_reach_the_profile_log_and_nothing_else(self):
+        """승인한 실행의 자식 표준 오류에서 진단 줄 모양만 그 profile 의 로그에 더하고 칸 값과 원문은 버린다."""
+        logs = self.profile_root / PROFILE / "logs"
+        logs.mkdir()
+        (logs / "mcp-stderr.log").write_text("hermes line\n", encoding="utf-8")
+        status, body = self.execute(args={"text": "diagnose"})
+        self.assertEqual(status, 200, body)
+        expected = [
+            json.dumps({"demo_diagnostic": {"tool": "write_note", "stage": "fill.failed", "missing": [],
+                                            "code": "typeerror"}}),
+            "connector-launcher: exec_failed",
+        ]
+        # Hermes 가 쓴 앞 줄은 그대로 두고 뒤에 더한다.
+        self.assertEqual(self.child_log(), "hermes line\n" + "".join(line + "\n" for line in expected))
+        for secret in (call_base.OK_TOKEN, "secret", "DEMO_TOKEN", "Traceback"):
+            self.assertNotIn(secret, self.child_log())
+        self.assert_no_child_left()
+
+    def test_child_diagnostic_lines_survive_a_timeout(self):
+        """시간 제한으로 끊긴 실행도 그때까지 나온 진단 줄을 남긴다. 실패를 찾을 때 가장 필요한 경우다."""
+        (self.profile_root / PROFILE / "logs").mkdir()
+        with patch_plugin(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
+            status, body = self.execute(args={"text": "diagnose-slow"})
+        self.assertEqual(status, 504, body)
+        self.assertIn("connector-launcher: exec_failed\n", self.child_log())
+        self.assertNotIn(call_base.OK_TOKEN, self.child_log())
+        self.assert_no_child_left()
+
+    def test_child_diagnostics_need_an_existing_log_directory(self):
+        """로그 디렉터리가 없거나 링크면 만들지도 따라가지도 않고, 실행 결과는 그대로다."""
+        self.assertEqual(self.execute(args={"text": "diagnose"})[0], 200)
+        self.assertFalse((self.profile_root / PROFILE / "logs").exists())
+        elsewhere = self.base / "elsewhere"
+        elsewhere.mkdir()
+        (self.profile_root / PROFILE / "logs").symlink_to(elsewhere)
+        self.assertEqual(self.execute(args={"text": "diagnose"})[0], 200)
+        self.assertEqual(list(elsewhere.iterdir()), [])
+
+    def test_child_diagnostic_line_shape(self):
+        """옮기는 줄의 모양. 낱말 밖의 값, 칸이 둘인 JSON, 긴 목록, 상한을 넘는 줄 수는 옮기지 않는다."""
+        lines = sys.modules[self.plugin.__name__ + ".connector_child_log"].diagnostic_lines
+        good = json.dumps({"x_diagnostic": {"stage": "a.b", "code": None, "missing": ["c"]}})
+        for label, line in (
+            ("upper case word", json.dumps({"x_diagnostic": {"stage": "A"}})),
+            ("number value", json.dumps({"x_diagnostic": {"stage": 1}})),
+            ("nested object", json.dumps({"x_diagnostic": {"stage": {"a": "b"}}})),
+            ("long list", json.dumps({"x_diagnostic": {"missing": ["a"] * 11}})),
+            ("key without suffix", json.dumps({"x": {"stage": "a"}})),
+            ("launcher with path", "connector-launcher: /tmp/a"),
+            ("code with space", "SOME CODE"),
+            ("upper case word without underscore", "AKIAABCDEFGHIJKLMNOP"),
+        ):
+            with self.subTest(label):
+                self.assertEqual(lines((line + "\n").encode()), [])
+        self.assertEqual(lines((good + "\nSERVER_START_FAILED\n").encode()), [good, "SERVER_START_FAILED"])
+        many = "".join("A_%d\n" % index for index in range(80)).encode()
+        self.assertEqual(lines(many), ["A_%d" % index for index in range(30, 80)])
 
     def test_failure_after_the_tool_was_called_answers_504(self):
         """도구 호출을 보낸 뒤의 예외는 실행됐는지 모르므로 504 이고 자식 프로세스가 남지 않는다."""
@@ -513,7 +576,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         """도구가 `payload` 를 오류 결과로 돌려준 것처럼 실행 경로를 한 번 지난다."""
         result = call_base.tool_result(is_error=True, content=[call_base.text_content(json.dumps(payload))])
 
-        async def fixed(manifest, hermes_tool, args, env, progress, timeout):
+        async def fixed(manifest, hermes_tool, args, env, progress, timeout, diagnostics=None):
             progress["sent"] = True
             return result
 

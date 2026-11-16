@@ -168,7 +168,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
 
         ran = []
 
-        async def runner(manifest, hermes_tool, args, env, progress, timeout):
+        async def runner(manifest, hermes_tool, args, env, progress, timeout, diagnostics=None):
             ran.append(manifest["id"])
             return None
 
@@ -594,7 +594,7 @@ class ProfileApiConnectorBindingBrowserTest(support.ProfileApiRouteTest):
 
         ran = []
 
-        async def execute_runner(manifest, hermes_tool, args, values, progress, timeout):
+        async def execute_runner(manifest, hermes_tool, args, values, progress, timeout, diagnostics=None):
             ran.append((manifest["id"], sorted(values)))
             return None
 

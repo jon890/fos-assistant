@@ -6,10 +6,13 @@ import contextlib
 import importlib.metadata
 import inspect
 import json
-import os
 
 from typing import (
     Optional,
+)
+
+from .connector_child_log import (
+    child_errlog,
 )
 
 from .connector_policy import (
@@ -37,13 +40,15 @@ _mcp_sdk_version_cache: Optional[str] = None
 
 
 @contextlib.asynccontextmanager
-async def _open_connector_session(manifest: dict, values: dict, timeout: float, seen: Optional[dict] = None):
+async def _open_connector_session(manifest: dict, values: dict, timeout: float, seen: Optional[dict] = None,
+                                  diagnostics=None):
     """플러그인 MCP 서버에 붙어 `initialize` 를 마친 `ClientSession` 을 내준다.
 
     로컬 서버(`stdio`)는 자식 프로세스로 띄우고 `values` 를 그 env 로 준다.
     원격 서버(`http`)는 Streamable HTTP 로 붙고 `values` 는 선언한 헤더의 `${이름}` 자리에만 들어간다.
     `timeout` 은 원격 요청 하나의 시간 제한이다. 호출 전체의 제한은 부르는 쪽이 건다.
     `seen` 은 원격 서버가 칸 값을 거절했는지 적을 자리다(`_remote_streams`). 로컬 서버에는 쓰지 않는다.
+    `diagnostics` 는 로컬 자식의 진단 줄을 더할 profile 디렉터리다(`child_errlog`). None 이면 표준 오류를 버린다.
     `mcp` 는 여기서 import 한다. SDK 가 없는 환경에서도 plugin 이 올라오고 이 경로만 실패한다.
     """
     from mcp import ClientSession
@@ -59,8 +64,8 @@ async def _open_connector_session(manifest: dict, values: dict, timeout: float, 
 
     server = manifest["server"]
     params = StdioServerParameters(command=server["command"], args=list(server["args"]), env=values)
-    # 자식의 stderr 에 무엇이 찍힐지 모른다. 칸 값과 인자가 대시보드 로그로 가지 않게 버린다.
-    with open(os.devnull, "w", encoding="utf-8") as sink:
+    # 자식의 stderr 에 무엇이 찍힐지 모른다. 칸 값과 인자가 로그로 가지 않게 버리고, 진단 줄 모양만 그 profile 의 로그에 더한다.
+    with child_errlog(diagnostics) as sink:
         async with stdio_client(params, errlog=sink) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -229,16 +234,16 @@ def _retry_value(payload, error: dict, key: str):
 
 
 async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, values: dict, progress: dict,
-                                 timeout: float):
+                                 timeout: float, diagnostics=None):
     """플러그인 MCP 서버에 한 번 붙어 등록 이름이 `hermes_tool` 인 도구를 `args` 로 부르고 닫는다.
 
     등록 이름이 같은 도구가 정확히 하나가 아니거나, `schema: 2` 인데 그 도구가 선언에 없으면 부르지 않고 None 이다.
     선언에 없어도 `default_tool_policy: ask` 이면 부른다. Control Plane 이 승인 필요로 판정한 호출만 여기 온다.
     도구를 부르기 직전에 `progress["read_only"]` 에 그 도구의 읽기 표시를 두고 `progress["sent"]` 를 참으로 둔다.
     `sent` 뒤의 실패는 도구가 실행됐는지 알 수 없다.
-    `timeout` 은 원격 요청 하나의 시간 제한이다.
+    `timeout` 은 원격 요청 하나의 시간 제한이다. `diagnostics` 는 진단 줄을 더할 profile 디렉터리다.
     """
-    async with _open_connector_session(manifest, values, timeout) as session:
+    async with _open_connector_session(manifest, values, timeout, diagnostics=diagnostics) as session:
         listed = await session.list_tools()
         names = [item.name for item in listed.tools
                  if _hermes_tool_name(manifest["mcp_server"], item.name) == hermes_tool]
