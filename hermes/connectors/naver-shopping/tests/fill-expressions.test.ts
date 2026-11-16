@@ -30,6 +30,8 @@ type El = {
   /** `aria-controls` 값. 이 id 로 `getElementById` 가 찾는다. */
   controls?: string;
   id?: string;
+  /** 부모 요소. `parentElement` 로 올라간다. */
+  parent?: El;
 };
 
 function el(spec: Partial<El> & { matches: string[] }): El {
@@ -62,6 +64,9 @@ function run(
     },
     click: () => {
       e.clicked = (e.clicked ?? 0) + 1;
+    },
+    get parentElement() {
+      return e.parent ? wrap(e.parent) : null;
     },
     closest: (selector: string) =>
       e.layer && selector === PURCHASE_LAYER.layer ? wrap(e.layer) : null,
@@ -146,20 +151,43 @@ test("구매하기와 바로구매는 글이 정확히 같은 보이는 단추 �
   expect(cart.clicked).toBe(0);
 });
 
-test("옵션 드롭다운 열기는 옵션 자리의 첫 보이는 단추 하나만 누른다", () => {
-  const first = el({ matches: [PRODUCT_OPTION_BUTTON], hidden: true });
-  const second = el({ matches: [PRODUCT_OPTION_BUTTON] });
-  const third = el({ matches: [PRODUCT_OPTION_BUTTON] });
+test("옵션 드롭다운 열기는 class 와 상관없이 보이는 단추가 하나면 그것만 누르고, 스토어가 아닌 화면에서는 누르지 않는다", () => {
+  // 2026-11-16 실측: 해시 class 단추 하나. 선택자에 class 조건이 없어야 맞는다.
+  expect(PRODUCT_OPTION_BUTTON).not.toContain("class");
+  const hidden = el({ matches: [PRODUCT_OPTION_BUTTON], hidden: true });
+  const only = el({ matches: [PRODUCT_OPTION_BUTTON] });
   expect(
-    run(OPEN_OPTION_LISTS, { host: STORE, elements: [first, second, third] }),
+    run(OPEN_OPTION_LISTS, { host: STORE, elements: [hidden, only] }),
   ).toBe(true);
-  expect([first.clicked, second.clicked, third.clicked]).toEqual([0, 1, 0]);
+  expect([hidden.clicked, only.clicked]).toEqual([0, 1]);
   expect(
     run(OPEN_OPTION_LISTS, {
       host: "search.shopping.naver.com",
-      elements: [second],
+      elements: [only],
     }),
   ).toBe(false);
+  expect(only.clicked).toBe(1);
+});
+
+test("보이는 드롭다운이 둘 이상이면 「구매하기」 와 같은 구매 상자 안의 것만 누르고, 「구매하기」 가 없으면 누르지 않는다", () => {
+  const sort = el({ matches: [PRODUCT_OPTION_BUTTON] });
+  const option = el({ matches: [PRODUCT_OPTION_BUTTON] });
+  const buy = el({ matches: [BUTTONS], text: "구매하기" });
+  const box = el({ matches: [], children: [option, buy] });
+  const page = el({ matches: [], children: [sort, box] });
+  option.parent = box;
+  buy.parent = box;
+  box.parent = page;
+  sort.parent = page;
+  // 문서 차례로는 정렬 단추가 먼저다.
+  expect(
+    run(OPEN_OPTION_LISTS, { host: STORE, elements: [sort, option, buy] }),
+  ).toBe(true);
+  expect([sort.clicked, option.clicked]).toEqual([0, 1]);
+  expect(
+    run(OPEN_OPTION_LISTS, { host: STORE, elements: [sort, option] }),
+  ).toBe(false);
+  expect([sort.clicked, option.clicked]).toEqual([0, 1]);
 });
 
 test("층의 옵션은 층 안의 n 번째 단추를 열고, 같은 글을 먼저 고르며 추가 금액 표시가 붙은 글도 고른다", () => {

@@ -82,11 +82,14 @@ export const CATALOG = {
 };
 
 /**
- * 상품 화면의 옵션 자리(가설). 이 안의 `aria-haspopup="listbox"` 첫 단추만 누른다(`OPEN_OPTION_LISTS`).
- * 옵션이 있는 상품의 화면은 재지 않았다. 사용자가 실제 계정으로 확인한 뒤 고친다.
+ * 상품 화면의 옵션 드롭다운 단추(2026-11-16 실측, 구조만). 색상·사이즈 표준옵션 상품에서 `aria-haspopup="listbox"` 단추가
+ * 문서에 하나 보였고, 그 단추와 조상의 class 는 빌드마다 바뀌는 해시(`H4ArHznl5E` 꼴)라 class 로 고르지 않는다.
+ * 상품 화면의 다른 드롭다운(리뷰 정렬 같은 것)을 누르지 않게 `OPEN_OPTION_LISTS` 가 범위를 좁힌다.
+ * 보이는 단추가 하나면 그것을, 둘 이상이면 「구매하기」 단추(`PURCHASE_LAYER.buyLabel`)의 조상을 안쪽부터 올라가며 처음 단추가 든
+ * 조상 안의 첫 단추를 누른다. 옵션 단추는 구매 단추와 같은 구매 상자에 있기 때문이다. `body` 까지 가도 없거나 「구매하기」 가 없으면
+ * 누르지 않는다.
  */
-export const PRODUCT_OPTION_BUTTON =
-  '[class*="option" i] button[aria-haspopup="listbox"]';
+export const PRODUCT_OPTION_BUTTON = 'button[aria-haspopup="listbox"]';
 
 /**
  * 상품 구매 층. 상품 화면의 「구매하기」 를 누르면 같은 화면에 뜨고 옵션·수량과 「장바구니」, 「바로구매」, 「닫기」 가 있다(2026-11-13 실측).

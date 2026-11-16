@@ -201,10 +201,11 @@ const LAYER_SCOPE = `() => { const b = byLabel(${JSON.stringify(PURCHASE_LAYER.b
 const HELPERS = `const visible = ${VISIBLE}; const byLabel = ${BUTTON_BY_LABEL}; const layerScope = ${LAYER_SCOPE};`;
 
 /**
- * 상품 화면의 옵션 자리 안의 첫 드롭다운 단추 하나만 누른다(사용자 결정 2026-11-13). 값을 고르거나 구매하기·장바구니를 누르지 않는다.
+ * 상품 화면의 옵션 드롭다운 단추 하나만 누른다(사용자 결정 2026-11-13). 값을 고르거나 구매하기·장바구니를 누르지 않는다.
+ * 고르는 범위는 `PRODUCT_OPTION_BUTTON` 의 설명이 갖는다(보이는 단추가 하나면 그것, 아니면 「구매하기」 의 가장 가까운 조상 안).
  * 읽기 도구(`get_product_detail`, `prepare_checkout`)가 부르는 유일한 누르기다. 누르면 참이다.
  */
-export const OPEN_OPTION_LISTS = `(() => { try { ${ON_STORE} const visible = ${VISIBLE}; const b = [...document.querySelectorAll(${JSON.stringify(PRODUCT_OPTION_BUTTON)})].find(visible); if (!b) return false; b.click(); return true; } catch { return false; } })()`;
+export const OPEN_OPTION_LISTS = `(() => { try { ${ON_STORE} ${HELPERS} const selector = ${JSON.stringify(PRODUCT_OPTION_BUTTON)}; const all = [...document.querySelectorAll(selector)].filter(visible); let b = all.length === 1 ? all[0] : null; if (!b && all.length > 1) { const buy = byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}); for (let a = buy?.parentElement; a && a !== document.body && !b; a = a.parentElement) b = [...a.querySelectorAll(selector)].find(visible) ?? null; } if (!b) return false; b.click(); return true; } catch { return false; } })()`;
 
 /** 상품 화면의 「구매하기」 를 누른다. 같은 화면에 상품 구매 층이 뜬다(2026-11-13 실측). 장바구니는 누르지 않는다. */
 export const PRESS_BUY = `(() => { try { ${ON_STORE} ${HELPERS} const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyLabel)}); if (!b) return false; b.click(); return true; } catch { return false; } })()`;
