@@ -128,7 +128,7 @@ POST /api/v1/browser/give-back
   BrowserHumanHold.giveBack(userId): update ... set human_held_at = null where user_id = ? and human_held_at is not null
 ```
 
-- **잠금 칸** `user_browser.human_held_at`(`DATETIME(6)`, 비어 있으면 잠기지 않았다). 엔티티는 이 칸을 `insertable = false, updatable = false` 로 읽기만 한다. 활동 기록, 자동 중지, 켜기와 끄기가 엔티티를 저장해도 이 칸을 되돌리지 않고, 회수와 돌려주기는 저장소의 조건부 갱신으로만 쓴다(rule-68). 잠금은 줄이 `RUNNING` 일 때만 뜻이 있고, 끄기(`halt`)와 상태 맞추기(`resetStopped`)가 끈 뒤 같은 갱신으로 비운다.
+- **잠금 칸** `user_browser.human_held_at`(`DATETIME(6)`, 비어 있으면 잠기지 않았다). 엔티티는 이 칸을 `insertable = false, updatable = false` 로 읽기만 한다. 활동 기록, 자동 중지, 켜기와 끄기가 엔티티를 저장해도 이 칸을 되돌리지 않고, 회수와 돌려주기는 저장소의 조건부 갱신으로만 쓴다(rule-68). 잠금은 줄이 `RUNNING` 이고 쥔 시각이 이번 켜기(`started_at`) 뒤일 때만 뜻이 있다. 끄기(`halt`)와 상태 맞추기(`resetStopped`)가 끈 뒤 같은 갱신으로 비우고, 끄기가 실패해 칸이 남은 채 다시 켜면 지난 잠금으로 보아 점검과 다음 회수가 비운다.
 - **회수한 자리**: 대화 패널에서 회수하면 웹이 그 대화의 공개 번호를 보낸다. `BrowserHumanHold` 가 사용자마다 메모리에 두고 풀릴 때 지운다. 넘기기 알림을 낼지 고를 때만 쓴다(spec DECISION18). Control Plane 이 다시 뜨면 잃고, 그때는 알림을 낸다. 알림이 하나 더 생기는 쪽이 안전하다.
 - **중계 HTTP**(`BrowserGateway.open`): 표식에서 주인을 찾고 허용 목록을 본 뒤, 브라우저를 켜기 전에 잠금을 읽는다. 잠겼으면 `BROWSER_HUMAN_HELD` 이고 `BrowserGatewayStatus` 가 423 으로 바꾼다. 쿠키 읽기(`/json/version`)와 남긴 탭 닫기(`/json/close`)도 같다. 잠근 동안 에이전트는 브라우저에 아무것도 하지 못한다(spec DECISION5).
 - **중계 WebSocket**: Bun 의 `WebSocket` 은 handshake 실패의 상태 코드를 주지 않는다. 그래서 handshake 판정이 `BROWSER_HUMAN_HELD` 를 받으면 연결을 받아들이고 표시만 남기며, 처리기가 열린 직후 close code 4423(`human_held`)으로 닫는다. 열린 연결은 `BrowserHumanHold.watch(browserId, 닫기)` 로 등록하고, 회수가 그 브라우저의 등록을 모두 불러 4423 으로 닫는다. 등록한 뒤 잠금을 한 번 더 읽어, 판정과 등록 사이에 회수가 끼어도 연결이 남지 않게 한다.

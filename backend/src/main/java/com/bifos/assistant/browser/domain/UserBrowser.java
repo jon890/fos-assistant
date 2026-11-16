@@ -186,6 +186,16 @@ public class UserBrowser extends CreatedAtEntity {
     }
 
 
+    /**
+     * 사람이 지금 이 브라우저를 쥐고 있는가. 켜져 있고, 쥔 시각이 이번 켜기 뒤일 때만 참이다. 끄기가 실패해 칸이 남은 채 다시 켜도 지난
+     * 잠금이 새 브라우저를 막지 않는다.
+     */
+    public boolean heldByHuman() {
+        return status == UserBrowserStatus.RUNNING && humanHeldAt != null
+            && (startedAt == null || !humanHeldAt.isBefore(startedAt));
+    }
+
+
     private void require(UserBrowserStatus... expected) {
         if (!Arrays.asList(expected).contains(status)) {
             throw new ApiException(

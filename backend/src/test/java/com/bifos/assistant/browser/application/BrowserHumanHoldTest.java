@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.FakeBrowserRuntime;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HashSet;
@@ -138,6 +139,19 @@ class BrowserHumanHoldTest {
         holds.takeOver(USER, null);
         service.stop(USER);
         assertThat(repository.findByUserId(USER).orElseThrow().humanHeldAt()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("끄기가 실패해 잠금 칸이 남은 채 다시 켜면 지난 잠금은 쥔 것으로 보지 않고 다시 넘겨받을 수 있다")
+    void staleHoldFromBeforeRestartIsIgnored() {
+        Long id = running();
+        jdbc.update("UPDATE user_browser SET human_held_at = ? WHERE id = ?",
+            Timestamp.from(repository.findById(id).orElseThrow().startedAt().minusSeconds(60)), id);
+
+        assertThat(holds.held(USER)).isFalse();
+        holds.takeOver(USER, null);
+        assertThat(holds.held(USER)).isTrue();
     }
 
 

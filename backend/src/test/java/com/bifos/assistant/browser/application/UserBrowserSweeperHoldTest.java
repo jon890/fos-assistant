@@ -138,7 +138,9 @@ class UserBrowserSweeperHoldTest {
 
 
     private void ageHold(Long id, Duration age) {
-        jdbc.update("UPDATE user_browser SET human_held_at = ? WHERE id = ?", Timestamp.from(Instant.now().minus(age)), id);
+        // 켠 시각도 함께 옮겨 이번 켜기 뒤의 잠금으로 둔다
+        Timestamp at = Timestamp.from(Instant.now().minus(age));
+        jdbc.update("UPDATE user_browser SET human_held_at = ?, started_at = ? WHERE id = ?", at, at, id);
     }
 
 

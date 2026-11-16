@@ -164,6 +164,11 @@ public class UserBrowserSweeper {
         screenSeen.keySet().retainAll(held.stream().map(UserBrowser::id).collect(Collectors.toSet()));
         for (UserBrowser browser : held) {
             try {
+                if (!browser.heldByHuman()) {
+                    // 끄기가 실패해 남은 지난 잠금이다. 이번 켜기에는 쥔 사람이 없다
+                    holds.release(browser.id(), browser.userId());
+                    continue;
+                }
                 if (screens.isOpen(browser.id())) {
                     screenSeen.put(browser.id(), now);
                     continue;
@@ -187,7 +192,7 @@ public class UserBrowserSweeper {
 
     /** 그 사용자가 사람을 기다리는가. 사람이 쥐고 있으면 기다린다(spec REQ1). 이번에 켜진 시각을 모르면 처음부터 본다. */
     private boolean waiting(UserBrowser browser) {
-        if (browser.humanHeldAt() != null) {
+        if (browser.heldByHuman()) {
             return true;
         }
         Instant since = browser.startedAt() != null ? browser.startedAt() : Instant.EPOCH;

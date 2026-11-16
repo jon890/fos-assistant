@@ -58,6 +58,10 @@ public class BrowserHumanHold {
             return;
         }
         requireNoApprovedRun(userId);
+        if (browser.humanHeldAt() != null) {
+            // 끄기가 실패해 남은 지난 잠금이다. 비운 뒤 새로 쥔다
+            write(() -> browsers.releaseHumanHold(browser.id()));
+        }
         if (write(() -> browsers.holdByHuman(userId, UserBrowserStatus.RUNNING, clock.instant())) == 0) {
             if (heldNow(owned(userId))) {
                 return;
@@ -173,7 +177,7 @@ public class BrowserHumanHold {
 
 
     private static boolean heldNow(UserBrowser browser) {
-        return browser.status() == UserBrowserStatus.RUNNING && browser.humanHeldAt() != null;
+        return browser.heldByHuman();
     }
 
 
