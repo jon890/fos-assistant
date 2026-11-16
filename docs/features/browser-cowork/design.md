@@ -143,6 +143,6 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 
 | 결정 | 종류 | ADR 또는 필요 없음의 이유 | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
-| spec DECISION10, 이 설계의 DECISION1~DECISION4 | operations | PR1 에서 [ADR-20261007 / user-browser](../../adr/ADR-20261007-user-browser.md) 의 「자동 중지」 행을 고친다 | `docs/features/user-browser.md` 의 「상태 전이」, `application.yml` 의 `assistant.browser` |
+| spec DECISION10, 이 설계의 DECISION1~DECISION4 | operations | PR1 에서 [ADR-20261007 / user-browser](../../adr/ADR-20261007-user-browser.md) 결정 표의 「자동 중지」 행을 고친다 | `docs/features/user-browser.md` 의 「상태 전이」, `application.yml` 의 `assistant.browser` |
 | 이 설계의 DECISION5~DECISION7 | architecture | 필요 없음. 기존 승인 오류 코드 관례를 따르는 내부 선택이다 | `ConnectorApprovalBrowser`, `connector-action-error.ts` |
 | 이 설계의 DECISION8~DECISION10 | architecture | PR2, PR3 이 루트 `docs/adr/` 에 브라우저 잠금 ADR 을 쓸 때 함께 남긴다(spec 의 결정 기록 연결) | 이 문서의 「뒤 PR 의 경계」 |
