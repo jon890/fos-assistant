@@ -3,7 +3,7 @@
  *
  * **검색 화면은 2026-11-13 실제 화면으로 쟀다.** App Router 의 조각(`self.__next_f.push`)을 이은 글에서 `productName` 을 가진
  * 객체를 꺼내고, 그 칸 이름이 아래 `SEARCH_ITEM` 이다. **상품 화면(`PRODUCT_STATE_PATH`, `PRODUCT`)도 2026-11-13 실제 화면으로
- * 쟀다**(옵션 칸 제외: 잰 상품이 모두 `optionUsable: false` 라 옵션 칸 이름은 가설이다). **가격비교 묶음 화면(`CATALOG`)은
+ * 쟀다**(옵션 칸 제외: 그때 잰 상품이 모두 `optionUsable: false` 였다. 표준옵션 칸은 2026-11-16 에 쟀고, 조합형 옵션 칸 이름은 아직 가설이다). **가격비교 묶음 화면(`CATALOG`)은
  * 2026-11-13 실측(판매처 목록 제외)이다.** 검색 화면처럼 조각에서 `nCatalogId` 와 `lowestPrice` 를 가진 객체를 꺼내고, 판매처별
  * 가격 목록은 어느 객체인지 가려내지 못해 읽지 않는다.
  * 칸마다 후보 이름을 차례로 보고, 필수 칸이 비면 결과를 지어내지 않고 `NAVER_SHOPPING_PAGE_CHANGED` 로 끝낸다.
@@ -37,7 +37,8 @@ export const AD_CARD_TYPE = "AD";
 /**
  * 상품 화면의 상품. 실측한 칸: `name`(표시용 `dispName` 도 같은 값으로 실측했다), `channel.channelName`, `salePrice`, `benefitsView.discountedSalePrice`,
  * `productStatusType`, `optionUsable`, `productDeliveryInfo.{deliveryFeeType, baseFee, area2ExtraFee}`.
- * 실측하지 못한 칸(옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
+ * 표준옵션 칸(`optionStandards`)과 상품 재고(`stockQuantity`)는 2026-11-16 옵션 있는 상품으로 쟀다.
+ * 실측하지 못한 칸(조합형 옵션 묶음과 조합, `freeConditionalAmount`, `area3ExtraFee`)은 후보 이름일 뿐이고, 없으면 지어내지 않는다.
  */
 export const PRODUCT = {
   title: ["name", "dispName"],
@@ -53,6 +54,15 @@ export const PRODUCT = {
   combinationNames: ["optionName1", "optionName2", "optionName3"],
   combinationPrice: ["price"],
   combinationStock: ["stockQuantity"],
+  /**
+   * 표준옵션(색상·사이즈) 항목 배열(2026-11-16 실측, 구조만). 항목 칸은 `optionGroupName`, `optionName`, `imageInfo` 뿐이고
+   * 가격·재고 칸이 없다. 그룹 이름별로 묶어 옵션 묶음으로 읽는다. 이 상품에는 `optionCombinations` 가 없었다.
+   */
+  standards: ["optionStandards"],
+  standardGroup: ["optionGroupName"],
+  standardValue: ["optionName"],
+  /** 상품 전체 재고(2026-11-16 실측). 표준옵션 상품에서 0 이면 품절로 본다. */
+  stock: ["stockQuantity"],
   delivery: ["productDeliveryInfo"],
   feeType: ["deliveryFeeType"],
   baseFee: ["baseFee"],

@@ -42,21 +42,22 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 
 | `kind` | 결과 |
 | --- | --- |
-| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true` |
+| `store` | `{kind, url, title, store, price_krw, options: [{name, values: [{label, extra_krw, sold_out}]}], shipping: {fee_krw, free_over_krw, regional_extra}, naver_pay_buy}`. 옵션이 넘치면 `options_truncated: true`. 옵션이 있는데 목록을 읽지 못하면 `options_unknown: true`. `extra_krw`, `sold_out` 이 `null` 이면 읽지 못한 것이다 |
 | `catalog` | `{kind, url, title, lowest_price_krw, delivery_fee_krw, lowest_price_with_fee_krw, regional_extra, sellers: [], offers_unknown: true}`. 묶음 이름과 최저가, 배송비만 읽는다. 판매처별 가격 목록은 읽지 못해 `sellers` 는 항상 빈 목록이고 `offers_unknown` 이 참이다. 배송비 칸이 비면 `delivery_fee_krw` 와 `lowest_price_with_fee_krw` 는 `null` 이다 |
 | `external` | `{kind, url, buyable: false}`. 탭을 열지 않는다 |
 
 - `price_krw` 는 즉시할인을 반영한 판매가다. 쿠폰, 포인트, 지역 추가 배송비는 넣지 않는다
 - `catalog` 의 `lowest_price_krw` 는 묶음의 최저가이고 `lowest_price_with_fee_krw` 는 배송비를 포함한 최저가다. `regional_extra` 는 지역 추가 배송비 안내 글이 있으면 참이다. 이 결과가 오면 담당은 최저가와 배송비만 읽었다고 알리고 판매처별 가격은 「내 브라우저」 에서 확인해 달라고 안내한다(스킬이 지시한다). 이전 결과의 `sellers` 항목(`store`, `price_krw`, `shipping_fee_krw`, `url`)은 읽는 칸을 가려내지 못해 지금은 싣지 않는다
-- 옵션은 20 묶음, 묶음마다 값 100개까지다. 첫 묶음 값만 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의 재고가 0)을 싣고, 둘째 묶음부터는 이름만 싣는다
+- 옵션은 20 묶음, 묶음마다 값 100개까지다. 조합형 옵션은 첫 묶음 값만 추가 금액(그 값 조합의 가장 작은 추가 금액)과 품절(모든 조합의 재고가 0)을 싣고, 둘째 묶음부터는 이름만 싣는다
+- 표준옵션(색상·사이즈) 상품은 `optionStandards` 를 그룹 이름별 값 목록으로 읽는다. 항목에 가격·재고 칸이 없어 모든 값의 추가 금액과 품절이 `null` 이다(2026-11-16 실측)
 - `naver_pay_buy` 는 상품 상태가 판매 중일 때 참이다
-- 옵션이 있는데(`optionUsable`) 처음 상태에 옵션이 없으면 옵션 자리의 드롭다운 단추 하나만 한 번 누르고(`OPEN_OPTION_LISTS`) 상태를 다시 묻는다. 값을 고르거나 다른 단추를 누르지 않는다(사용자 결정 2026-11-13). 그래도 없으면 `options_unknown` 이다
+- 옵션이 있는데(`optionUsable`) 처음 상태에 옵션이 없으면 옵션 드롭다운 단추 하나만 한 번 누르고(`OPEN_OPTION_LISTS`) 상태를 다시 묻는다. 값을 고르거나 다른 단추를 누르지 않는다(사용자 결정 2026-11-13). 그래도 없으면 `options_unknown` 이다
 
 ## 주문서 준비와 채우기
 
 `execution_guard` 는 `{protocol: "approval-claim-v2", prepare_tool: "prepare_checkout", scope_fields: [], operations: {fill_checkout: "CREATE"}, kinds: {fill_checkout: "CHECKOUT"}}` 다. 준비·승인·ticket·claim 은 금융 승인의 틀을 그대로 쓰고, 카드와 상한 판정, 결과 판정은 Control Plane 이 한다. 칸과 판정 표는 [설계](naver-shopping/design.md)의 「PR3 구매 상한과 주문서(REQ9~REQ13)」 가 갖는다.
 
-- **준비**: 상품 화면을 새로 읽어 옵션 글을 상태의 조합 하나로 맞추고 상품 금액((판매가 + 옵션 추가 금액) × 수량), 무료 조건을 반영한 기본 배송비, 예상 합계를 계산한다. 쿠폰과 포인트는 넣지 않는다. 사람이 해야 하는 화면은 넘기기가 아니라 그 코드의 오류로 끝내고 탭을 남긴다. 대시보드의 준비 경로가 넘기기 결과를 받지 않기 때문이다
+- **준비**: 상품 화면을 새로 읽어 옵션 글을 상태의 조합 하나로 맞추고 상품 금액((판매가 + 옵션 추가 금액) × 수량), 무료 조건을 반영한 기본 배송비, 예상 합계를 계산한다. 표준옵션 상품은 묶음마다 값 하나로 맞추고 추가 금액을 0 으로 본다(승인보다 큰 주문서 금액은 결과 판정이 넘기지 않는다). 쿠폰과 포인트는 넣지 않는다. 사람이 해야 하는 화면은 넘기기가 아니라 그 코드의 오류로 끝내고 탭을 남긴다. 대시보드의 준비 경로가 넘기기 결과를 받지 않기 때문이다
 - **채우기**: 원문·ticket 대조 → 상품 탭 → 가격 다시 계산(승인보다 크면 claim 없이 거절) → 「구매하기」 단추가 보일 때까지 대기(안 보이면 claim 없이 거절) → claim → 「구매하기」 → 상품 구매 층에서 옵션·수량 → 「바로구매」 → 주문서(같은 탭이나 새 탭)에서 최종 결제 금액을 읽는다. 주문서 탭을 남기고 금액과 탭을 낸다
 - **결제 단추를 누르는 코드 경로가 없다.** 누르는 식은 스마트스토어·브랜드스토어 주소에서만 누른다. 주문서 탭에서는 준비 상태, 화면 분류, 금액 읽기만 부른다. 결제 단추 선택자는 소스에 없고 검사(`tests/checkout-guard.test.ts`)의 금지 목록에만 있다
 - **금액**: 주문서의 「총 주문금액」 과 결제수단 절 머리의 금액이 같을 때만 최종 금액이다. 이름, 주소, 전화번호 같은 화면 글은 결과와 로그에 싣지 않는다
@@ -95,7 +96,7 @@ MCP 서버 이름은 `naver-shopping` 이다. 모든 도구가 `attended_only` �
 탭에서 부르는 식은 `src/expressions.ts` 의 상수뿐이다. 칸 위치는 `src/fields.ts` 한 곳에 있다. 필수 칸이 비면 `NAVER_SHOPPING_PAGE_CHANGED` 넘기기로 끝난다.
 
 검색 화면은 실제 화면으로 쟀다(2026-11-13). 검색 화면은 Next.js App Router 라 `__NEXT_DATA__` 가 없고, 상품이 `self.__next_f.push([1,"<조각>"])` 로 시작하는 스크립트들의 둘째 값에 흩어져 있다. 고정 식이 그 조각을 이어 `productName` 칸을 직접 가진 가장 안쪽 객체를 상품으로 꺼내 필요한 칸(이름, 정가, 할인가, 판매처, 상품 주소, `nvMid`, 광고 표지)만 담아 준다. 한 번에 200개까지이고, 실측한 한 화면에는 48개가 실렸으며 그 가운데 `nvMid` 가 겹치는 것이 있었다. 플러그인이 가격(할인가가 있으면 할인가, 없으면 정가)과 광고(`adId` 가 있거나 `cardType` 이 `AD`)를 가려 같은 `nvMid` 를 한 번만 내고 화면 차례 그대로 40개까지 자른다. 검색 화면에서 네이버페이 여부를 가리는 칸은 확인하지 못해 `naver_pay` 는 항상 `unknown` 이다. 조각 스크립트가 하나도 없으면 바뀐 화면이고, 있는데 상품이 없으면 빈 결과다.
-상품 화면도 실제 화면으로 쟀다(2026-11-13, 옵션 칸 제외). 상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 같은 상태의 `product` 는 칸만 있고 값이 비어 있어 경로 후보에 두지 않는다. 읽는 칸은 이름(`name`), 판매처(`channel.channelName`), 정가(`salePrice`), 할인가(`benefitsView.discountedSalePrice`), 상태(`productStatusType`), 옵션 사용 여부(`optionUsable`), 배송(`productDeliveryInfo` 의 `deliveryFeeType`, `baseFee`, 지역 추가 배송비 `area2ExtraFee`)다. `optionUsable` 이 `false` 면 옵션 없음으로 낸다. 옵션이 있는 상품을 운영 「내 브라우저」 에서 읽기 전용으로 쟀다(2026-11-13). 처음 실리는 상태(`__PRELOADED_STATE__`, `__QUERY_STATE__`, `__CLIENT_RTK_RTS_STATE__`) 어디에도 옵션 목록이 없고 `selectedOptions.*` 는 null, `optionStandards` 는 빈 배열이다. 옵션 목록은 사람이 드롭다운 단추를 눌러야 실린다. 그래서 `optionUsable` 이 `true` 인데 옵션 묶음을 읽지 못하면 옵션은 지어내지 않고 빈 목록에 `options_unknown: true` 를 더해, 담당이 「옵션 없음」 이라고 말하지 않고 사용자에게 상품 화면에서 확인해 달라고 하게 한다.
+상품 화면도 실제 화면으로 쟀다(2026-11-13, 옵션 칸 제외). 상품은 `window.__PRELOADED_STATE__.simpleProductForDetailPage` 에 있다. 같은 상태의 `product` 는 칸만 있고 값이 비어 있어 경로 후보에 두지 않는다. 읽는 칸은 이름(`name`), 판매처(`channel.channelName`), 정가(`salePrice`), 할인가(`benefitsView.discountedSalePrice`), 상태(`productStatusType`), 옵션 사용 여부(`optionUsable`), 배송(`productDeliveryInfo` 의 `deliveryFeeType`, `baseFee`, 지역 추가 배송비 `area2ExtraFee`)다. `optionUsable` 이 `false` 면 옵션 없음으로 낸다. 옵션이 있는 상품을 운영 「내 브라우저」 에서 읽기 전용으로 쟀다(2026-11-13). 처음 실리는 상태(`__PRELOADED_STATE__`, `__QUERY_STATE__`, `__CLIENT_RTK_RTS_STATE__`) 어디에도 옵션 목록이 없고 `selectedOptions.*` 는 null, `optionStandards` 는 빈 배열이다. 옵션 목록은 사람이 드롭다운 단추를 눌러야 실린다. 2026-11-16 에 잰 색상·사이즈 상품은 처음 상태의 `optionStandards` 에 옵션이 있었다(가격·재고 칸 없음). 그 상품은 표준옵션으로 읽는다. 그래서 `optionUsable` 이 `true` 인데 옵션 묶음을 읽지 못하면 옵션은 지어내지 않고 빈 목록에 `options_unknown: true` 를 더해, 담당이 「옵션 없음」 이라고 말하지 않고 사용자에게 상품 화면에서 확인해 달라고 하게 한다.
 가격비교 묶음 화면도 실제 화면으로 쟀다(2026-11-13, 판매처 목록 제외). 상품 화면과 달리 `__PRELOADED_STATE__` 와 `__NEXT_DATA__` 가 아니라 검색 화면과 같은 조각(`self.__next_f.push`)에 데이터가 있다. 고정 식이 같은 조각 잇기와 텍스트 행 건너뛰기로 이은 글에서 `nCatalogId` 와 `lowestPrice` 를 함께 직접 가진 가장 안쪽 객체를 20개까지 꺼내고, 플러그인이 그 가운데 `nCatalogId` 가 연 주소의 `/catalog/<번호>` 와 같은 묶음을 골라 묶음 이름(`productName`), 최저가(`lowestPrice`), 배송비(`deliveryFee`), 배송비 포함 최저가(`lowestPriceWithFee`), 지역 추가 배송비 안내(`differentialDeliveryFeeContent`)와 `nCatalogId`, `categoryId` 만 담아 준다. 같은 조각에는 `productName`·`price`·`mallName` 을 가진 광고·추천 상품 객체가 여럿 있지만 묶음 키가 없어 걸리지 않고, 잰 것이 그 상품들이어서 판매처별 가격 목록이 어느 객체인지는 가려내지 못했다. 그래서 판매처 목록은 읽지 않고 빈 목록과 `offers_unknown` 으로 낸다. 비교·추천 묶음이 앞서 실려도 주소 번호와 같은 묶음을 고르고, 같은 것이 없으면 다른 상품의 값을 내지 않고, 이름이나 최저가를 읽지 못할 때와 같이 바뀐 화면이다.
 그때 표준 오류에 `{"naver_shopping_diagnostic":{"tool","stage","missing"}}` 한 줄을 남긴다. 칸 이름과 단계만 싣고 주소, 검색어, 화면 글은 싣지 않는다.
 
@@ -154,5 +155,5 @@ fos-ctx 가 이 칸을 Control Plane 에 알리면 그 대화에 화면 넘기�
 3. **카드 승인**: 승인하면 「내 브라우저」 에 상품 탭이 열리고 「구매하기」, 상품 구매 층의 「바로구매」 를 거쳐 주문서 탭이 남는지 본다. 장바구니에 담기지 않았는지 본다. 대화에 결제 넘기기 카드가 최종 결제 금액과 승인한 예상 합계를 보이는지 본다
 4. **주문서 탭에서 결제하거나 닫기**: 카드의 「내 브라우저 열기」 로 주문서 탭을 열어 금액이 카드와 같은지 본다. 카드에 「결제했어요」 와 「사지 않을래요」 두 단추가 있는지 본다. 사지 않으려면 탭을 닫고 「사지 않을래요」 를 누른다. 에이전트가 주문 확인을 부르지 않고 마치는지 본다
 5. **주문 확인**: 사람이 직접 결제한 뒤 「결제했어요」 를 누른다. 에이전트가 주문 확인을 불러 그 주문을 확인했다고 결제 금액과 함께 알리는지 본다. `AMOUNT_MISMATCH` 나 `NOT_FOUND` 가 나오면 그 profile 의 MCP 표준 오류 기록의 `check_shopping_order` 진단 줄과 「내 브라우저」 의 결제 내역을 보고 `src/fields.ts` 의 `ORDER_HISTORY` 금액 칸과 `src/parse-orders.ts` 의 `ORDER_TIME_GRACE_MS` 를 맞춘다. 결제하지 않고 「결제했어요」 를 눌렀을 때는 결제가 확인되지 않았다고 알리는지 본다
-6. 옵션이 있는 상품으로 2~4 를 한 번 더 돈다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다. 채우기가 어느 단계에서 멈췄는지는 그 profile 의 MCP 표준 오류 기록의 `fill_checkout` 진단 줄로 본다(설계의 「채우기 진단」)
+6. 옵션이 있는 상품(색상·사이즈 표준옵션 상품 포함)으로 2~4 를 한 번 더 돈다. 표준옵션 상품의 카드는 옵션 추가 금액을 0 으로 계산한 예상 합계를 보인다. 실제 추가 금액이 있으면 주문서 금액이 커서 결제 넘기기 없이 「승인보다 커서 넘기지 않았다」 로 끝나는지 본다. 준비가 `NAVER_SHOPPING_OPTIONS_UNKNOWN` 이나 채우기가 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝나면 옵션 칸이나 층의 칸이 실제와 다른 것이다. 진단 줄과 화면을 보고 `src/fields.ts` 의 `PRODUCT_OPTION_BUTTON`, `PURCHASE_LAYER` 를 고친다. 채우기가 어느 단계에서 멈췄는지는 그 profile 의 MCP 표준 오류 기록의 `fill_checkout` 진단 줄로 본다(설계의 「채우기 진단」)
 7. 하루 상한을 오늘 승인한 합계보다 작게 낮춘 뒤 다시 사 달라고 해, 카드 없이 걸린 상한과 남은 한도를 알리는지 본다
