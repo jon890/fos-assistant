@@ -146,7 +146,8 @@ public class ConnectorConnectionService {
                 connection == null ? List.of() : bindingService.boundAgents(connection),
                 manifest.ownerBrowserLoginUrl(),
                 manifest.schema() == ConnectorToolPolicies.STANDARD_SCHEMA,
-                manifest.singleBinding()));
+                manifest.singleBinding(),
+                manifest.ownerBrowser()));
         }
         mine.values().stream()
             .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
