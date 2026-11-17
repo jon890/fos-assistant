@@ -45,6 +45,18 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
+# 「개발 문서」 화면이 읽는 문서다(web/docs/adr/ADR-20261117-dev-docs-image.md).
+# 추가 빌드 문맥 repo(배포 커밋의 저장소 root)가 있어야 한다. 없으면 Docker 가 repo 이미지를 받으려다
+# 「pull access denied」 로 끝난다. 로컬에서는 web/ 에서 docker buildx build --build-context repo=.. . 로 만든다.
+COPY --from=repo docs /app/dev-docs/docs
+COPY --from=repo backend/docs /app/dev-docs/backend/docs
+COPY --from=repo web/docs /app/dev-docs/web/docs
+COPY --from=repo hermes/docs /app/dev-docs/hermes/docs
+ENV DEV_DOCS_ROOT=/app/dev-docs
+# 화면 위에 보일 배포 커밋이다. 40자리 소문자 16진수가 아니면 화면이 「커밋 정보 없음」 을 보인다.
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=${SOURCE_COMMIT}
+
 USER nextjs:nodejs
 
 EXPOSE 3000

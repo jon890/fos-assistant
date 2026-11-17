@@ -17,6 +17,13 @@ const PATH_FIXTURE_FILES = new Set([
   "scripts/ci/ci-paths.test.ts",
   "scripts/pr/pr-size.test.ts",
   "scripts/pr/pr-risk-labels.test.ts",
+  "web/test/unit/dev-docs-tree.ts",
+  "web/test/unit/dev-docs-catalog.test.ts",
+  "web/test/unit/dev-docs-links.test.ts",
+  "web/test/unit/dev-docs-read.test.ts",
+  "web/test/unit/dev-docs-source.test.ts",
+  "web/test/browser/dev-docs-fixture.ts",
+  "web/test/browser/dev-docs.spec.ts",
 ]);
 
 const CODE_EXTENSIONS = [
