@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -26,7 +27,8 @@ class ModelTierRequestValidationTest {
     private final ChatService chat = mock(ChatService.class);
     private final ModelTierService tiers = mock(ModelTierService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ChatController(
-        chat, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class)))
+        chat, null, null, null, null, null, tiers, List.of(), mock(SourceReadSummaries.class),
+        new AutoTurnNoticeStatuses(List.of())))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 

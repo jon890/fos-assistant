@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.purge.application;
 
 import com.bifos.assistant.chat.purge.application.port.ConversationActionPurge;
+import com.bifos.assistant.chat.purge.application.port.ConversationNativeResultPurge;
 import com.bifos.assistant.chat.purge.application.port.ConversationSuggestionPurge;
 import com.bifos.assistant.chat.attachment.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
@@ -38,6 +39,7 @@ class ConversationPurgeWriter {
     private final ConversationExecutionPurge executions;
     private final ConversationActionPurge actions;
     private final ConversationSuggestionPurge suggestions;
+    private final ConversationNativeResultPurge nativeResults;
     private final ChatContentMutationCoordinator mutations;
     private final ContentDraftRepository drafts;
     private final ContentDraftCreationRequestRepository creationRequests;
@@ -66,6 +68,7 @@ class ConversationPurgeWriter {
         messages.clearReplacesOf(conversationId);
         messages.deleteAllOf(conversationId);
         executions.eraseBodies(conversationId);
+        nativeResults.eraseBodies(conversationId);
         actions.eraseBodies(conversationId, now);
         suggestions.eraseSuggestions(conversationId);
         return conversations.markPurged(conversationId, now) == 1;

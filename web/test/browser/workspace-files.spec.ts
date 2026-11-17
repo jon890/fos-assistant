@@ -209,6 +209,7 @@ test("사이드바의 「고급」 묶음에서 파일 공간을 열면 함께 �
   await expect(advanced.getByRole("link")).toHaveText([
     /^파일 공간/,
     /^내 브라우저/,
+    /^개발 문서/,
   ]);
   await advanced.getByRole("link", { name: "파일 공간" }).click();
 

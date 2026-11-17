@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.delivery.application.port;
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 위임 결과 말고 자동 turn 으로 대화에 전할 결과를 내는 쪽이다(ADR-040, ADR-050).
@@ -50,4 +51,15 @@ public interface AutoTurnResultSource {
 
     /** 전하지 않은 결과가 있는 대화들이다. 기동할 때 훑는다. */
     List<Long> conversationsWithUndelivered();
+
+
+    /**
+     * 첫 시도의 알림 줄을 저장한 같은 트랜잭션에서 결과 key 마다 그 결과의 알림 줄 번호로 부른다. 다시 전달에서는 부르지 않는다.
+     *
+     * <p>결과 도착 줄과 출처를 이어 두어야 하는 구현만 쓴다(ADR-20261117 / native-delegation-wake). 기본은 아무것도 하지 않는다.
+     *
+     * @param messageIdByKey {@link AutoTurnResult#key()} 마다 저장한 알림 줄의 번호
+     */
+    default void noticesSaved(Map<String, Long> messageIdByKey) {
+    }
 }

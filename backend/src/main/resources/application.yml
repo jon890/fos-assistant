@@ -202,6 +202,9 @@ assistant:
     enabled: true
     # 사용자의 질문 없이 이어서 여는 turn 의 수. 닿으면 알림 줄만 남긴다
     max-auto-turns: 10
+  native-delegation:
+    # Hermes 내장 위임의 1시간 기한 알림과 중지한 답의 알림 줄을 찾는 주기(ADR-20261117 / native-delegation-wake)
+    sweep-delay: 60s
   starters:
     # 새 대화 화면의 추천 질문을 모델로 만든다. 결과는 메모리에만 둔다(ADR-036)
     enabled: true

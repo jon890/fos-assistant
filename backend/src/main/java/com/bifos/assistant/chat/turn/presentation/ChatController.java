@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.turn.presentation;
 
+import com.bifos.assistant.chat.turn.application.dto.NativeResultView;
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.turn.application.dto.SteerView;
@@ -80,6 +82,7 @@ public class ChatController {
     private final ModelTierService modelTiers;
     private final List<ConversationTaskLabels> taskLabels;
     private final SourceReadSummaries sourceReads;
+    private final AutoTurnNoticeStatuses noticeStatuses;
 
 
     @Autowired
@@ -92,7 +95,8 @@ public class ChatController {
         ChatEventStreams streams,
         ModelTierService modelTiers,
         List<ConversationTaskLabels> taskLabels,
-        SourceReadSummaries sourceReads) {
+        SourceReadSummaries sourceReads,
+        AutoTurnNoticeStatuses noticeStatuses) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -102,6 +106,7 @@ public class ChatController {
         this.modelTiers = modelTiers;
         this.taskLabels = taskLabels;
         this.sourceReads = sourceReads;
+        this.noticeStatuses = noticeStatuses;
     }
 
 
@@ -325,6 +330,7 @@ public class ChatController {
         Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);
         Map<Long, List<DelegationLine>> deliveredResults = chat.deliveredResults(user, number);
         MentionMarks mentions = chat.mentionMarks(user, number);
+        Map<Long, String> nativeStatuses = noticeStatuses.byNotice(number);
         return history.stream()
             .map(it -> new MessageView(
                 it.id(),
@@ -357,7 +363,8 @@ public class ChatController {
                     ? mentions.answers().get(it.executionId())
                     : null,
                 it.role() == MessageRole.USER ? mentions.questions().get(it.id()) : null,
-                SteerView.of(it)))
+                SteerView.of(it),
+                it.role() == MessageRole.SYSTEM ? NativeResultView.of(nativeStatuses.get(it.id())) : null))
             .toList();
     }
 

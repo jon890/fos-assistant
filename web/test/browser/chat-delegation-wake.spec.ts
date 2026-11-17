@@ -342,3 +342,61 @@ test("자동 turn 을 받던 중 대화 단위 SSE 가 끊겨 끝 사건을 놓�
   await expect(answers.last()).toContainText(AUTO_ANSWER);
   await expect(page.getByTestId("system-message")).toHaveCount(1);
 });
+
+/** 저장된 메시지 끝에 Hermes 내장 위임 결과 알림 줄 하나와 보통 알림 줄 하나를 덧붙인다. */
+async function routeMessagesWithNativeResult(page: Page, conversationId: string, notice: string) {
+  await page.route(`**/api/chat/conversations/${conversationId}/messages`, async (route: Route) => {
+    const response = await route.fetch();
+    const turns = (await response.json()) as Record<string, unknown>[];
+    const createdAt = new Date().toISOString();
+    const base = { senderName: null, executionId: null, hasChildren: false, switchedTo: null, replacesMessageId: null,
+      createdAt, attachments: [], artifacts: [], activity: null, status: null };
+    turns.push(
+      { ...base, id: SYSTEM_MESSAGE_ID, role: "SYSTEM", content: notice, nativeResult: { status: "SUCCEEDED" } },
+      { ...base, id: AUTO_ANSWER_ID, role: "SYSTEM", content: NOTICE, nativeResult: null },
+    );
+    await route.fulfill({ response, json: turns });
+  });
+}
+
+test("내장 위임 결과 알림 줄은 대화 에이전트의 이름표와 저장된 글로 보이고 보통 알림 줄은 글만 보인다", async ({ page }) => {
+  const conversationId = await createConversation(page, "내장 위임 결과 줄 검사");
+  const notice = "하위 작업이 끝났어요 · 장보기 목록 정리";
+  await routeMessagesWithNativeResult(page, conversationId, notice);
+  await routeEvents(page, conversationId, []);
+
+  await page.goto(`/chat/${conversationId}`);
+
+  const line = page.getByTestId("native-result-line");
+  await expect(line).toHaveCount(1);
+  await expect(line).toHaveAttribute("data-status", "SUCCEEDED");
+  await expect(line).toContainText(notice);
+  await expect(line.getByTestId("agent-badge")).toHaveCount(1);
+  const plain = page.getByTestId("system-message").filter({ hasText: NOTICE });
+  await expect(plain.getByTestId("agent-badge")).toHaveCount(0);
+});
+
+test("대화 단위 SSE 의 내장 위임 결과 알림 줄은 이력을 다시 읽기 전에도 상태와 이름표로 보인다", async ({ page }) => {
+  const conversationId = await createConversation(page, "내장 위임 결과 사건 검사");
+  const notice = "하위 작업을 하지 못했어요 · 메일 정리";
+  let firstMessagesServed!: () => void;
+  const messagesServed = new Promise<void>((resolve) => {
+    firstMessagesServed = resolve;
+  });
+  await page.route(`**/api/chat/conversations/${conversationId}/messages`, async (route: Route) => {
+    await route.continue();
+    firstMessagesServed();
+  });
+  await routeEvents(page, conversationId, [
+    { type: "system", conversationId, messageId: SYSTEM_MESSAGE_ID, text: notice, nativeResult: { status: "FAILED" } },
+  ], async () => {
+    await messagesServed;
+  });
+
+  await page.goto(`/chat/${conversationId}`);
+
+  const line = page.getByTestId("native-result-line");
+  await expect(line).toHaveAttribute("data-status", "FAILED");
+  await expect(line).toContainText(notice);
+  await expect(line.getByTestId("agent-badge")).toHaveCount(1);
+});

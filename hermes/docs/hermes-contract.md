@@ -1423,6 +1423,21 @@ finite single-query 요청은 동기로 돌아갈 수 있다.
 [API 위임 계약 테스트](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/tests/gateway/test_api_delegation_delivery_contract.py) 다.
 조사에서 upstream 테스트를 읽었지만 실행하지는 않았다.
 
+#### 하위 에이전트의 끝 hook 은 결과 줄보다 먼저 온다
+
+v0.21.6(commit `818c13be`)의 소스로 확인했다. 실행으로는 확인하지 않았다.
+Control Plane 이 내장 위임의 결과로 자동 turn 을 여는 근거다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)).
+
+| 확인한 것 | 근거 |
+| --- | --- |
+| `subagent_stop` 은 자식마다 한 번 `parent_session_id`, `parent_turn_id`, `child_session_id`, `child_role`, `child_summary`, `child_status`, `tool_call_history`, `duration_ms` 로 불린다. 맡긴 일의 글(`child_goal`)과 호출 번호는 없다. 맡긴 일의 글은 `subagent_start` 의 `child_goal` 에 있다 | [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_results.py) 의 `_fire_subagent_stop_hooks` |
+| 한 완료 단위의 자식이 모두 끝난 뒤 그 단위의 hook 이 잇달아 불린다. 단위는 기본으로 `delegate_task` 호출 하나이고, `delegation.independent_completions` 를 켜면 `group` 마다다 | [`tools/delegate_tool_dispatch.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_dispatch.py) 의 `_execute_and_aggregate`, `_units_of` |
+| hook 은 부모 session 에 결과 줄(`async_delegation_complete`)을 남기기 전에 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 남는다 | 같은 파일과 [`gateway/wake.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/wake.py) 의 `persist_delegation_delivery` |
+| `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다. `completed` 만 쓸 만한 답이 있다는 뜻이다 | [`tools/delegate_tool_child_run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_child_run.py) |
+| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남긴다 | `gateway/wake.py` 의 `persist_delegation_delivery` |
+
+**Hermes 를 올릴 때 이 표를 다시 확인한다.** hook 이름이나 인자가 바뀌면 내장 위임의 결과로 답이 열리지 않고, 자식은 1시간 뒤 알림 줄로 끝난다.
+
 #### 자식 session 으로 결과와 토큰을 보완한다
 
 v0.21.0 배포본에서 원인을 조사하고 v0.21.3 과 v0.21.5 의 조회 형식도 확인했다.

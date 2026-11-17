@@ -63,6 +63,9 @@ assistant:
     # 자동 turn 이 다른 스레드에서 대역 Hermes 와 메시지를 함께 써 위임을 끝까지 돌리는 검사의 단언을 흔든다.
     # 깨우기를 보는 검사만 켠다
     enabled: false
+  native-delegation:
+    # 훑기가 검사 도중 스스로 돌아 다른 검사의 대화에 알림 줄을 남기지 않게 한다. 검사는 sweepOnce 를 직접 부른다
+    sweep-delay: 1h
   restart-reconcile:
     # 다른 검사가 남긴 RUNNING 줄에 백그라운드 스레드가 붙어 그 검사의 단언을 흔든다.
     # 검사는 잡기와 묻기를 직접 부른다

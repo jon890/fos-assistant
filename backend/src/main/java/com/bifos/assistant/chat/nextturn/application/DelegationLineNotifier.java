@@ -36,7 +36,10 @@ public class DelegationLineNotifier {
     }
 
 
-    /** 끝난 줄을 위임 결과 자동 turn 의 사건보다 먼저 보내려고 다음 turn 을 정하는 리스너보다 앞에 둔다. */
+    /**
+     * 끝난 줄을 위임 결과 자동 turn 의 사건보다 먼저 보내려고 다음 turn 을 정하는 리스너보다 앞에 둔다. 실행 번호가 빈 사건(Hermes 내장 위임의
+     * 끝)은 맡긴 줄이 없어 보내지 않는다.
+     */
     @EventListener
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public void onFinished(DelegationFinished event) {

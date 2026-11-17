@@ -399,6 +399,11 @@ class PurgeCoverageMysqlTest {
                         bodies.forEach(column -> assertCleared(table.table(), column));
                         assertPreservedExcept(table, bodies);
                     }
+                    case "hermes_session_binding" -> {
+                        List<String> bodies = List.of("goal_preview", "result_text", "result_key_id");
+                        bodies.forEach(column -> assertCleared(table.table(), column));
+                        assertPreservedExcept(table, bodies);
+                    }
                     default -> throw new AssertionError(table.table() + "의 SCRUB 대상 칸을 검사에 더한다");
                 }
             }
