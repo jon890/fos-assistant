@@ -53,6 +53,14 @@ const DECISION_INDEXES = [
   { label: "hermes", path: "hermes/docs/adr/INDEX.md" },
 ];
 
+/**
+ * 문서 폴더 안의 파일 경로다. 경로는 실행 중 환경 변수에서 오므로 Next.js 파일 추적이 따라가지 않게 한다.
+ * 따라가면 web 폴더 전체를 standalone 결과에 담는다(design.md 의 「문서를 담는 자리」).
+ */
+export function docPath(root: string, ...parts: string[]): string {
+  return join(/* turbopackIgnore: true */ root, ...parts);
+}
+
 async function exists(file: string): Promise<boolean> {
   try {
     return (await stat(file)).isFile();
@@ -91,7 +99,7 @@ export function titleOf(markdown: string, fallback: string): string {
 }
 
 async function entryOf(root: string, repoPath: string): Promise<DocEntry> {
-  const markdown = await readFile(join(root, repoPath), "utf8");
+  const markdown = await readFile(docPath(root, repoPath), "utf8");
   return {
     path: repoPath,
     title: titleOf(markdown, stemOf(repoPath)),
@@ -102,14 +110,14 @@ async function entryOf(root: string, repoPath: string): Promise<DocEntry> {
 async function productSection(root: string): Promise<DocSection> {
   const entries: DocEntry[] = [];
   for (const repoPath of PRODUCT_PATHS) {
-    if (await exists(join(root, repoPath)))
+    if (await exists(docPath(root, repoPath)))
       entries.push(await entryOf(root, repoPath));
   }
   return { label: "제품", entries };
 }
 
 async function featureSection(root: string): Promise<DocSection> {
-  const dir = join(root, "docs/features");
+  const dir = docPath(root, "docs/features");
   let names: string[] = [];
   try {
     names = (await readdir(dir)).filter((name) => name.endsWith(".md")).sort();
@@ -122,7 +130,7 @@ async function featureSection(root: string): Promise<DocSection> {
     const children: DocEntry[] = [];
     for (const child of ["spec.md", "design.md"]) {
       const childPath = `docs/features/${stemOf(name)}/${child}`;
-      if (await exists(join(root, childPath)))
+      if (await exists(docPath(root, childPath)))
         children.push(await entryOf(root, childPath));
     }
     entries.push(children.length > 0 ? { ...entry, children } : entry);
@@ -157,7 +165,7 @@ export async function readDecisionIndex(
   root: string,
   indexPath: string,
 ): Promise<{ entries: DocEntry[]; archived: DocEntry[] }> {
-  const markdown = await readFile(join(root, indexPath), "utf8");
+  const markdown = await readFile(docPath(root, indexPath), "utf8");
   const base = posix.dirname(indexPath);
   const entries: DocEntry[] = [];
   const archived: DocEntry[] = [];
@@ -172,7 +180,7 @@ export async function readDecisionIndex(
     const target = decodeURIComponent(link[2]);
     if (!/^ADR-.*\.md$/.test(posix.basename(target))) continue;
     const repoPath = posix.normalize(posix.join(base, target));
-    if (!(await exists(join(root, repoPath)))) {
+    if (!(await exists(docPath(root, repoPath)))) {
       console.warn(
         `개발 문서 목록: ${indexPath} 의 링크 대상이 없다: ${repoPath}`,
       );
@@ -192,7 +200,7 @@ export async function readDecisionIndex(
 async function decisionSections(root: string): Promise<DocSection[]> {
   const sections: DocSection[] = [];
   for (const { label, path: indexPath } of DECISION_INDEXES) {
-    if (!(await exists(join(root, indexPath)))) continue;
+    if (!(await exists(docPath(root, indexPath)))) continue;
     const { entries, archived } = await readDecisionIndex(root, indexPath);
     sections.push({
       label,
@@ -204,9 +212,9 @@ async function decisionSections(root: string): Promise<DocSection[]> {
 }
 
 async function ruleSection(root: string): Promise<DocSection> {
-  const dir = join(root, "docs/code-rules");
+  const dir = docPath(root, "docs/code-rules");
   const entries: DocEntry[] = [];
-  if (await exists(join(dir, "INDEX.md")))
+  if (await exists(docPath(dir, "INDEX.md")))
     entries.push(await entryOf(root, "docs/code-rules/INDEX.md"));
   let names: string[] = [];
   try {
@@ -254,7 +262,7 @@ export async function getCatalog(): Promise<Catalog | null> {
   const root = devDocsRoot();
   if (!root) return null;
   try {
-    if (!(await stat(join(root, "docs"))).isDirectory()) return null;
+    if (!(await stat(docPath(root, "docs"))).isDirectory()) return null;
   } catch {
     return null;
   }

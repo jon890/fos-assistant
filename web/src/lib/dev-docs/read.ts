@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { join, posix } from "node:path";
-import { getCatalog } from "./catalog.ts";
+import { posix } from "node:path";
+import { docPath, getCatalog } from "./catalog.ts";
 import { devDocsRoot } from "./source.ts";
 
 /**
@@ -31,7 +31,7 @@ export async function readDoc(
   if (!repoPath || !root || !catalog?.paths.has(repoPath)) return null;
   return {
     path: repoPath,
-    markdown: await readFile(join(root, repoPath), "utf8"),
+    markdown: await readFile(docPath(root, repoPath), "utf8"),
   };
 }
 

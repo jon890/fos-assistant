@@ -79,7 +79,7 @@ cd web && pnpm format:check
 cd web && node --test test/unit/dev-docs-headings.test.ts
 cd web && pnpm test:node
 cd web && AUTH_SECRET=build-time-placeholder ASSISTANT_JWT_SECRET=build-time-placeholder CONTROL_PLANE_BASE_URL=http://build-time-placeholder AUTH_GOOGLE_ID=build-time-placeholder AUTH_GOOGLE_SECRET=build-time-placeholder pnpm build 2>&1 | tee "$TMPDIR/dev-docs-build.log"
-cd web && ! grep -qi "whole project was traced" "$TMPDIR/dev-docs-build.log"
+cd web && ! grep -qi "tracing of the whole project" "$TMPDIR/dev-docs-build.log"
 cd web && du -sk .next/standalone
 ```
 
@@ -95,6 +95,9 @@ cd web && du -sk .next/standalone
 | `web/src/app/dev-docs/[...path]/page.tsx` | 신규 |
 | `web/src/components/dev-docs/catalog.tsx` | 신규 |
 | `web/src/components/dev-docs/markdown.tsx` | 신규 |
+| `web/src/components/dev-docs/shell.tsx` | 신규 (머리의 커밋과 목록, 본문 자리) |
+| `web/src/lib/dev-docs/catalog.ts` | 수정 (문서 경로에 `turbopackIgnore`, 빌드 결과가 web 폴더 전체를 담지 않게) |
+| `web/src/lib/dev-docs/read.ts` | 수정 (같은 경로 함수) |
 | `web/src/components/shell/main-nav.tsx` | 수정 (「개발 문서」 링크, 「고급」 주석) |
 | `web/src/lib/dev-docs/headings.ts` | 신규 |
 | `web/test/unit/dev-docs-headings.test.ts` | 신규 |

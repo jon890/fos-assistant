@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import {
+  BookOpen,
   Bot,
   Brain,
   CalendarClock,
@@ -23,10 +24,11 @@ const LINKS = [
   { href: "/usage", label: "사용량", icon: ChartColumn },
 ] as const;
 
-/** 「고급」 묶음의 링크다. 매일 쓰는 화면이 아니라 에이전트가 쓰는 자리를 들여다보는 화면이라 위 메뉴와 나눈다. */
+/** 「고급」 묶음의 링크다. 매일 쓰지 않는 일반 화면이라 위 메뉴와 나눈다(에이전트가 쓰는 자리를 들여다보는 화면과 개발 문서). */
 const ADVANCED_LINKS = [
   { href: "/files", label: "파일 공간", icon: FolderOpen },
   { href: "/browser", label: "내 브라우저", icon: Globe },
+  { href: "/dev-docs", label: "개발 문서", icon: BookOpen },
 ] as const;
 
 function isCurrent(pathname: string, href: string): boolean {
