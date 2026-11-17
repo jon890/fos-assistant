@@ -41,7 +41,7 @@ Control Plane은 `/v1/runs`의 `_make_run_event_callback`을 사용한다. 별�
 `_tool_progress`는 kwargs를 버리므로 그 경로에서는 같은 실패 사건을 보장하지 않는다.
 이 성공 envelope와 detail이 실제 provider에서 수용되는지는 배포 뒤 왕복으로 검증해야 한다.
 
-고정 core의 `pyproject.toml`은 Pillow 12.3.0을 이미 의존성으로 고정한다. GIF/WebP 변환 helper는
+고정 core의 `pyproject.toml`은 Pillow를 이미 의존성으로 고정한다(v0.21.6은 12.3.0, v0.23.2는 13.0.0). GIF/WebP 변환 helper는
 이 Pillow와 공개 Image·ImageOps API를 쓰며 WebP codec 가용성도 따로 확인한다.
 PNG 원본·crop과 명시적 축소 개요는 같은 native dict 계약을 쓰되 text와 fallback에서 서로 구분한다.
 GIF/WebP는 첫 표시 프레임만 확인하며 움직임과 뒤 프레임은 확인하지 않았다고 안내한다.
