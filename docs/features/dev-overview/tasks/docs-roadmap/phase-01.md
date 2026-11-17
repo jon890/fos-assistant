@@ -100,6 +100,7 @@ cd web && node --test test/unit/dev-docs-catalog.test.ts test/unit/dev-docs-read
 | `web/src/lib/dev-docs/filter.ts` | 신규 |
 | `web/src/lib/dev-docs/read.ts` | 신규 |
 | `web/src/lib/dev-docs/links.ts` | 신규 |
+| `web/test/unit/dev-docs-tree.ts` | 신규 (단위 테스트의 가짜 문서 트리) |
 | `web/test/unit/dev-docs-catalog.test.ts` | 신규 |
 | `web/test/unit/dev-docs-read.test.ts` | 신규 |
 | `web/test/unit/dev-docs-links.test.ts` | 신규 |
