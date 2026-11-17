@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
+import org.hibernate.annotations.ColumnDefault;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
@@ -69,7 +70,8 @@ public class HermesSessionBinding extends CreatedAtEntity {
     @Getter
     private String parentSessionId;
 
-    /** 끝 소식으로 부모 대화를 깨울 최상위 자식인가. 등록할 때 한 번 정한다. */
+    /** 끝 소식으로 부모 대화를 깨울 최상위 자식인가. 등록할 때 한 번 정한다. 칸을 적지 않은 옛 INSERT 는 거짓이다. */
+    @ColumnDefault("false")
     @Column(name = "wake_eligible", nullable = false, updatable = false)
     @Getter
     private boolean wakeEligible;
