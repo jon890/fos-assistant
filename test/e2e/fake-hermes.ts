@@ -37,7 +37,7 @@ export function startFakeHermes(
   const mcp = createMcp(state);
   const lifecycle = createLifecycle(state);
   const { judgeConnectorCalls, readMemoryViaMcp } = mcp;
-  const { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun } = lifecycle;
+  const { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun, restartHermes } = lifecycle;
   const handleDashboard = createDashboard(state, bindings, lifecycle, skillRoot);
   const handleControls = createControlRoutes(state, lifecycle);
   const handleRuntime = createRuntimeRoutes(state, lifecycle);
@@ -124,6 +124,11 @@ export function startFakeHermes(
           return judgeConnectorCalls(profile, token, sessionId, lines, `connector-direct-${state.directConnectorCalls}`);
         },
         boundConnectorsOf: (profile: string) => [...(state.boundConnectors.get(profile)?.keys() ?? [])],
+        useHermesShape: (shape: "v0.21" | "v0.23") => {
+          state.hermesShape = shape;
+        },
+        restartHermes: () => restartHermes(),
+        resolvedRuns: () => [...state.resolvedRuns],
         holdNextRun: () => {
           state.holdNextRun = true;
           state.heldRunReady = new Promise<void>((done) => {

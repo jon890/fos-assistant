@@ -1,4 +1,4 @@
-import { type FakeHermesState, type ConnectorCall } from "./state.ts";
+import { type FakeHermesState, type ConnectorCall, type Run } from "./state.ts";
 import { createLifecycle, send, readBody, shortId, wait } from "./lifecycle.ts";
 import { createMcp } from "./mcp.ts";
 import { type SubmittedInput, submittedImages, submittedText } from "./run-input.ts";
@@ -6,6 +6,7 @@ import { type IncomingMessage, type ServerResponse } from "node:http";
 import {
   RUN_STOP_PATH,
   RUN_STEER_PATH,
+  RUN_RESOLVE_UNKNOWN_PATH,
   RUN_PATH,
   RATE_LIMITED,
   FAKE_USAGE,
@@ -54,6 +55,10 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           }
           const run = state.runs.get(runId!);
           if (!run) return send(response, 404, runNotFound(runId!));
+          // v0.23 은 잃은 실행을 멈추지 못하고 409 로 답한다(`api_server_authority_runs.py` 의 `stop_run`).
+          if (run.status === "unknown") {
+            return send(response, 409, { error: { message: "unknown_execution", code: "unknown_execution" } });
+          }
           run.status = "cancelled";
           // 운영 Hermes(2026-11-17 실측)는 중지한 실행에도 넣지 못한 steer 글을 `pending_steer` 로 돌려준다.
           if (run.steerSlot !== undefined && run.steerSlot.length > 0) run.pending_steer = run.steerSlot.join("\n");
@@ -65,6 +70,21 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           if (state.heldRunId === runId) releaseHeldRun();
           state.slowActive.delete(runId!);
           return send(response, 200, { status: "stopping" });
+        }
+        const resolveMatch = RUN_RESOLVE_UNKNOWN_PATH.exec(path);
+        if (resolveMatch) {
+          const [, profile, runId] = resolveMatch;
+          if (!authorized(request, profile!)) return send(response, 401, { error: "bad key for this profile" });
+          const run = state.runs.get(runId!);
+          if (!run) return send(response, 404, runNotFound(runId!));
+          const body = JSON.parse(await readBody(request)) as { admission_id?: unknown; execution_generation?: unknown };
+          if (body.admission_id !== admissionOf(run.run_id) || body.execution_generation !== 1) {
+            return send(response, 400, { error: { message: "invalid_params", code: "invalid_params" } });
+          }
+          // 이미 해제한 같은 실행을 다시 보내도 200 이다. 해제한 실행은 결과가 interrupted 라 조회에서 cancelled 로 보인다.
+          if (run.status === "unknown") run.status = "cancelled";
+          state.resolvedRuns.push(run.run_id);
+          return send(response, 200, { run_id: run.run_id, admission_id: admissionOf(run.run_id) });
         }
         const steerMatch = RUN_STEER_PATH.exec(path);
         if (steerMatch) {
@@ -270,7 +290,7 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
       }
       const run = state.runs.get(runId);
       if (!run) return send(response, 404, runNotFound(runId!));
-      return send(response, 200, run);
+      return send(response, 200, state.hermesShape === "v0.23" ? sessionProjection(state, run) : run);
 
   };
 }
@@ -363,5 +383,29 @@ export function createRuntimeRoutes(state: FakeHermesState, { authorized }: Retu
           return send(response, 200, { model: "example-model", tools: [] });
         }
 
+  };
+}
+
+/** v0.23 의 실행 기록 번호다. 실행마다 하나이고 세대는 늘 1 이다. */
+function admissionOf(runId: string): string {
+  return `adm-${runId}`;
+}
+
+
+/**
+ * v0.23.2 의 실행 조회 모양이다(`api_server_authority_runs.py` 의 `run_projection`). `error` 와 `pending_steer` 를 주지 않고
+ * 기록 번호를 싣는다. 같은 session 에 잃은 실행이 있으면 뒤 실행은 `queued` 로 머문다.
+ */
+function sessionProjection(state: FakeHermesState, run: Run): Record<string, unknown> {
+  const { error: _error, pending_steer: _pending, ...rest } = run;
+  const blocked = run.status !== "unknown" && !["completed", "failed", "cancelled"].includes(run.status)
+    && [...state.runs.values()].some((other) => other !== run && other.session_id === run.session_id && other.status === "unknown");
+  return {
+    ...rest,
+    object: "hermes.run",
+    status: blocked ? "queued" : run.status,
+    admission_id: admissionOf(run.run_id),
+    execution_generation: 1,
+    pending_controls: [],
   };
 }

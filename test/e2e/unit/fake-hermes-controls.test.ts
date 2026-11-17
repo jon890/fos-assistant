@@ -191,3 +191,67 @@ test("대역 제어 초기화는 장애와 미사용 보류를 걷고 profile �
     await hermes.close();
   }
 });
+
+test("v0.23 모양은 재기동한 실행을 unknown 으로 두고, 해제 전까지 같은 session 의 뒤 실행을 queued 로 막고, 해제하면 cancelled 로 답한다", async () => {
+  const hermes = await startFakeHermes({ browser: "example-key" });
+  const headers = { Authorization: "Bearer example-key" };
+  const submit = async (input: string): Promise<string> => {
+    const response = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers, body: JSON.stringify({ input, session_id: "fos-same" }),
+    });
+    return ((await response.json()) as { run_id: string }).run_id;
+  };
+  const read = async (runId: string) =>
+    (await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}`, { headers })).json()) as Record<string, unknown>;
+  try {
+    assert.equal((await fetch(`${hermes.baseUrl}/__test/hermes-shape`, {
+      method: "POST", body: JSON.stringify({ shape: "v0.23" }),
+    })).status, 204);
+    hermes.holdNextRun();
+    const lost = await submit("재기동 전 질문");
+    hermes.restartHermes();
+    hermes.holdNextRun();
+    const behind = await submit("다음 질문");
+    assert.equal((await read(behind)).status, "queued");
+
+    const lostRun = await read(lost);
+    assert.equal(lostRun.status, "unknown");
+    assert.equal(lostRun.admission_id, `adm-${lost}`);
+    assert.equal(lostRun.execution_generation, 1);
+    assert.equal("error" in lostRun || "pending_steer" in lostRun, false);
+    const stop = await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${lost}/stop`, { method: "POST", headers });
+    assert.equal(stop.status, 409);
+    assert.equal(((await stop.json()) as { error: { code: string } }).error.code, "unknown_execution");
+
+    const resolve = (body: unknown) => fetch(`${hermes.baseUrl}/p/browser/v1/runs/${lost}/resolve-unknown`, {
+      method: "POST", headers, body: JSON.stringify(body),
+    });
+    assert.equal((await resolve({ admission_id: "other", execution_generation: 1 })).status, 400);
+    assert.equal((await resolve({ admission_id: `adm-${lost}`, execution_generation: 1 })).status, 200);
+    assert.equal((await resolve({ admission_id: `adm-${lost}`, execution_generation: 1 })).status, 200);
+    assert.equal((await read(lost)).status, "cancelled");
+    assert.deepEqual(hermes.resolvedRuns(), [lost, lost]);
+    assert.equal((await read(behind)).status, "running");
+
+    assert.equal((await fetch(`${hermes.baseUrl}/__test/reset-controls`, { method: "POST" })).status, 204);
+    assert.equal("admission_id" in (await read(behind)), false);
+  } finally {
+    await hermes.close();
+  }
+});
+
+test("v0.21 모양의 재기동은 도는 실행의 기록을 지워 404 로 답한다", async () => {
+  const hermes = await startFakeHermes({ browser: "example-key" });
+  const headers = { Authorization: "Bearer example-key" };
+  try {
+    hermes.holdNextRun();
+    const response = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers, body: JSON.stringify({ input: "재기동 전 질문" }),
+    });
+    const runId = ((await response.json()) as { run_id: string }).run_id;
+    assert.equal((await fetch(`${hermes.baseUrl}/__test/restart-hermes`, { method: "POST" })).status, 204);
+    assert.equal((await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}`, { headers })).status, 404);
+  } finally {
+    await hermes.close();
+  }
+});
