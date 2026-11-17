@@ -317,6 +317,7 @@ class NativeDelegationDeliveryTest {
             .contains("[중지한 답이 맡긴 하위 작업의 결과]")
             .contains("<external-data>\n장보기 목록을 정리했다\n</external-data>")
             .endsWith("[사용자 메시지]\n이어서 해 줘");
+        assertThat(stub().received().getFirst().input().split("장보기 목록을 정리했다", -1)).as("결과 글은 한 번만 든다").hasSize(2);
         assertThat(column(binding, "result_delivered_at")).isNotNull();
 
         PendingQueueFixtures.queue(pendingRows, conversation.id(), "다음 질문", false, Instant.parse("2026-09-30T00:00:00Z"));

@@ -859,6 +859,8 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | 자리 | `chat` 은 `AutoTurnResultSource.carriedIntoUserTurn` 으로 받는다. 기본은 빈 목록이고 내장 위임 구현만 낸다. `chat.turn` 의 `ChatDeliveryInput.carriedInput` 이 모아 `ChatTurnRunner` 가 입력 앞에 두고, Hermes 에 보낸 뒤 `markCarried` 로 적는다 |
 
 중지 알림 줄은 결과를 전한 것이 아니라서 `result_delivered_at` 대신 `stop_noticed_at` 을 적는다. 한 칸으로 두 뜻을 적으면 알림 줄을 남긴 결과와 사용자 turn 에 넣은 결과를 구분하지 못한다.
+Hermes 가 입력을 받은 뒤의 실패, 중지, 다시 만들기는 결과를 다시 넣지 않는다. 입력은 이미 그 session 에 들어갔고, 다시 넣으면 성공한 turn 에서도 겹칠 수 있다.
+마이그레이션(`stop_noticed_at`) 전에 중지 알림으로 끝난 줄은 `result_delivered_at` 이 차 있어 넣지 않는다.
 알림 줄과 메시지가 엇갈리면(훑기가 칸을 적는 사이 메시지 turn 이 결과를 읽으면) 알림 줄이 「메시지를 보내 주세요」 라고 남아도 결과는 그 메시지에 이미 들었다. 드물고 결과를 놓치지 않는다.
 
 #### 설정을 끈 동안

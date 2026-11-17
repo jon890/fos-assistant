@@ -32,7 +32,7 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
      * 깨울 자식의 끝 소식을 적는다. 아직 소식이 없고 origin 대화가 지워지지 않은 줄만 바꾼다. 다시 보낸 소식과 동시 요청은 하나만 적힌다.
      * 대화를 지운 뒤에 온 소식은 적지 않는다. 대화 정리가 이미 끝났으면 그 글을 비울 길이 없기 때문이다.
      *
-     * @param deliveredAt 설정이 꺼져 전하지 않기로 했으면 받은 시각, 아니면 null. 이미 적힌 전달 시각(중지 알림으로 끝냄)은 덮지 않는다
+     * @param deliveredAt 설정이 꺼져 전하지 않기로 했으면 받은 시각, 아니면 null. 이미 적힌 전달 시각(사용자 turn 으로 전했거나 2026-11-17 전에 중지 알림으로 끝냄)은 덮지 않는다
      * @return 바꾼 줄 수
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
