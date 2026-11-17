@@ -1,0 +1,75 @@
+{
+  "name": "docs-roadmap",
+  "description": "웹에서 배포 커밋의 개발 문서와 로드맵을 읽기 전용으로 보인다(dev-overview PR1)",
+  "pr_scope": "일반 화면 「개발 문서」(/dev-docs)에서 문서 목록과 찾기, 본문, mermaid 그림, 커밋 해시, docs/prd.md 의 「로드맵」 절을 보이고, 문서를 웹 이미지에 담는다.",
+  "deferred": [
+    {
+      "what": "PR2 진행 보드: Control Plane 의 관리자 전용 보드 받기 API 와 저장, 관리자 영역 「진행 보드」 화면(REQ7, REQ8, REQ10, REQ9 의 보드 쪽)",
+      "why": "스펙 DECISION7 이 새 API 와 외부 보내기가 걸린 보드를 따로 검토하기로 했다",
+      "after": "이 PR 의 머지. 코디네이터 맥북의 보내기(fos-skills 의 orch)는 저장소 밖 작업이다"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-17",
+  "spec": "docs/features/dev-overview/spec.md",
+  "design": "docs/features/dev-overview/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3",
+    "REQ4",
+    "REQ5",
+    "REQ6",
+    "REQ9"
+  ],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ2",
+        "REQ3",
+        "REQ4",
+        "REQ6",
+        "REQ9"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ3",
+        "REQ4",
+        "REQ6"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ5"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "deep",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ4",
+        "REQ5",
+        "REQ6",
+        "REQ9"
+      ]
+    }
+  ]
+}
