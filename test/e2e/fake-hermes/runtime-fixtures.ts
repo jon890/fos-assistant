@@ -102,6 +102,9 @@ export const RUN_STOP_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/st
 /** 도는 실행에 지시를 더하는 경로다. v2026.9.24 `gateway/platforms/api_server_runs.py` 의 `_handle_steer_run` 이다. */
 export const RUN_STEER_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/steer$/;
 
+/** Hermes v0.22 부터 재기동으로 잃은 실행을 해제하는 경로다. v0.23.2 `gateway/platforms/api_server_runs.py` 의 `_handle_resolve_unknown_run` 이다. */
+export const RUN_RESOLVE_UNKNOWN_PATH = /^\/p\/([a-z0-9-]+)\/v1\/runs\/([A-Za-z0-9_-]+)\/resolve-unknown$/;
+
 export const MODEL_OPTIONS_PATH = /^\/p\/([a-z0-9-]+)\/api\/model\/options$/;
 
 export const SESSION_PATH = /^\/p\/([a-z0-9-]+)\/api\/sessions\/([A-Za-z0-9_-]+)$/;
@@ -164,6 +167,10 @@ export const TEST_BLOCK_PROVIDER_PATH = /^\/__test\/block-provider\/([a-z0-9-]+)
 export const TEST_CLEAR_BLOCKED_PATH = "/__test/clear-blocked-providers";
 
 export const TEST_HOLD_NEXT_RUN_PATH = "/__test/hold-next-run";
+/** 실행 조회의 모양을 고른다. 본문은 `{"shape": "v0.21" | "v0.23"}` 이다. `/__test/reset-controls` 가 v0.21 로 되돌린다. */
+export const TEST_HERMES_SHAPE_PATH = "/__test/hermes-shape";
+/** Hermes 가 다시 뜬 것을 흉내 낸다. v0.23 모양이면 도는 실행이 `unknown` 이 되고, v0.21 모양이면 실행 기록이 사라진다. */
+export const TEST_RESTART_HERMES_PATH = "/__test/restart-hermes";
 
 export const TEST_WAIT_HELD_RUN_PATH = "/__test/wait-held-run";
 

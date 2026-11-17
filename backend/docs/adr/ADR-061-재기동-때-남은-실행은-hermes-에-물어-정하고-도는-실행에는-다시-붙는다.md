@@ -7,8 +7,9 @@
   | Hermes 의 답 | 실행 줄 |
   | --- | --- |
   | 끝났다(`completed`, `failed`, `cancelled`, `error`, `interrupted`) | 그 상태와 답과 사용량을 보통 turn 과 같은 기록 경로로 적는다 |
-  | 아직 돈다 | `RUNNING` 으로 두고 끝날 때까지 다시 묻는다. 끝나면 위와 같이 적는다 |
+  | 아직 돈다(v0.22 부터의 `queued` 포함) | `RUNNING` 으로 두고 끝날 때까지 다시 묻는다. 끝나면 위와 같이 적는다 |
   | 404 | `FAILED`, `error_code` 는 `REMOTE_RUN_LOST` |
+  | `unknown`(v0.22 부터. Hermes 가 다시 떠 잃은 실행) | 그 응답의 기록 번호로 `resolve-unknown` 을 보내 해제한 뒤 404 와 같이 `FAILED`, `REMOTE_RUN_LOST` |
   | 닿지 못했다(연결 실패, 5xx, 429) | `RUNNING` 으로 두고 다시 묻는다 |
   | `hermes_run_id` 가 없다 | 묻지 않고 `FAILED`, `error_code` 는 `ORPHANED` |
 
@@ -47,4 +48,9 @@
     - 상한은 기동마다 새로 센다. 상한 안에 여러 번 다시 뜨면 한 실행을 상한보다 오래 기다린다.
     - 다시 붙은 위임 실행은 서버 전체 동시 위임 한도의 자리를 차지하지 않는다. 루트당 한도는 실행 줄로 세므로 그대로다.
     - Control Plane 이 한 대라는 전제를 그대로 쓴다. 여러 대면 다른 인스턴스가 돌리는 실행에 붙는다.
-- **적용 범위**: 기동할 때 한 번 시작한다. 도는 Control Plane 이 Hermes 와 끊겼을 때의 처리는 바꾸지 않는다.
+- **Hermes v0.23.2 에서 더한 것(2026-11-17)**: 잃은 실행을 해제하지 않으면 Hermes 가 같은 session 의 뒤 실행을 대기에 둔다.
+  그래서 위 표의 `unknown` 줄을 두고, 도는 turn 이 `unknown` 을 만나도 해제한 뒤 `REMOTE_RUN_LOST` 로 실패한다.
+  그 run 을 다시 묻는 쪽이 모두 그만둔 경우를 위해 새 실행을 보내기 전에 같은 profile 의 최근 연결 실패·시간 초과 실행을 해제한다.
+  v0.23.2 의 `cancelled` 는 사용자 중지와 Hermes 정상 종료로 끊긴 실행을 함께 담으므로, 끝 사건과 중지 기록으로 나누고 근거가 없으면 실패(`interrupted`)로 적는다.
+  Hermes 쪽 번역은 `hermes/infra` 가 갖고, 흐름은 [`docs/features/hermes-upgrade/design.md`](../../../docs/features/hermes-upgrade/design.md) 가 갖는다. 결정의 뜻(Hermes 에 물어 정한다)은 바꾸지 않는다.
+- **적용 범위**: 기동할 때 한 번 시작한다. 도는 Control Plane 이 Hermes 와 끊겼을 때의 처리는 바꾸지 않는다. 다만 Hermes v0.22 부터의 `unknown` 해제는 기동 때만이 아니라 도는 turn 의 조회, 남은 원격 실행 기다리기, 새 실행을 보내기 직전에도 일어난다.

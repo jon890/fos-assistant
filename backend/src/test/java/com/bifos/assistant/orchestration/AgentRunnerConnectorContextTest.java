@@ -43,6 +43,7 @@ import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -92,6 +93,7 @@ class AgentRunnerConnectorContextTest {
         runner = new AgentRunner(
             contextAssembler,
             hermes,
+            mock(LostRunRelease.class),
             executions,
             mock(ExecutionEventRecorder.class),
             mock(ExecutionEventRepository.class),

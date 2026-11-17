@@ -69,6 +69,16 @@ public interface HermesRunsClient {
     }
 
 
+    /**
+     * Hermes 가 그 run 을 재기동으로 잃은 것으로 알고 있으면 해제한다. 아니면 아무것도 하지 않는다.
+     *
+     * <p>잃은 run 은 해제하기 전까지 같은 session 의 뒤 실행을 막는다. 그 run 을 다시 묻는 쪽이 없을 때를 위해 새 실행을 보내기 전에
+     * 부른다. 닿지 못했거나 해제하지 못했으면 ApiException 을 던진다. 잃는 run 이 없는 구현은 아무것도 하지 않는다.
+     */
+    default void releaseIfLost(String apiBaseUrl, String profileName, String runId) {
+    }
+
+
     /** 읽지 못한 session은 null이며 미완료 사용량을 최종값으로 쓰지 않는다. */
     default SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
         return null;

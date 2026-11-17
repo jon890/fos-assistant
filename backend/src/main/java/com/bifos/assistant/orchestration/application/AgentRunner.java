@@ -27,6 +27,7 @@ import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.function.BiConsumer;
@@ -62,6 +63,7 @@ public class AgentRunner {
 
     private final ContextAssembler contextAssembler;
     private final HermesRunsClient hermes;
+    private final LostRunRelease lostRunRelease;
     private final ExecutionRecorder executions;
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
@@ -160,6 +162,7 @@ public class AgentRunner {
         String runId = null;
         try {
             executions.markSubmitted(execution);
+            lostRunRelease.beforeSubmit(command);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             onSubmitted.accept(execution, runId);

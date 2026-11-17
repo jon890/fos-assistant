@@ -240,7 +240,10 @@ class ChatTurnRunner {
         }
         HermesRunResult result = end.result;
         SteerSettlement settlement;
-        if (turns.isStopConfirmed(handle) || result != null && "cancelled".equalsIgnoreCase(result.status())) {
+        if (result != null && !result.pendingSteerKnown()) {
+            // 넘어간 글이 있었는지 모르면 중지 여부와 관계없이 「전달됐는지 확인 못 함」 이다(docs/features/hermes-upgrade/spec.md DECISION16).
+            settlement = SteerSettlement.unknown();
+        } else if (turns.isStopConfirmed(handle) || result != null && "cancelled".equalsIgnoreCase(result.status())) {
             settlement = SteerSettlement.stopped(result == null ? null : result.pendingSteer());
         } else if (result != null) {
             settlement = SteerSettlement.completed(result.pendingSteer());

@@ -17,6 +17,22 @@ import org.junit.jupiter.api.Test;
 class StubHermesRunsClientTest {
 
     @Test
+    @DisplayName("잃은 실행 풀기는 받은 run 번호를 남기고 정한 실패를 던지며 초기화로 비운다")
+    void releaseIfLostRecordsRunsAndThrowsConfiguredFailure() {
+        StubHermesRunsClient stub = new StubHermesRunsClient();
+        stub.releaseIfLost("unused", "profile", "run-1");
+        stub.failReleases(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        assertThatThrownBy(() -> stub.releaseIfLost("unused", "profile", "run-2")).isInstanceOf(ApiException.class);
+        assertThat(stub.releasedRuns()).containsExactly("run-1", "run-2");
+
+        stub.reset();
+        stub.releaseIfLost("unused", "profile", "run-3");
+        assertThat(stub.releasedRuns()).containsExactly("run-3");
+    }
+
+
+    @Test
     @DisplayName("끼우기는 정한 결과를 차례로 내고 다 쓰면 받음으로 답하며 받은 글을 남긴다")
     void steerAnswersQueuedOutcomesThenAccepts() {
         StubHermesRunsClient stub = new StubHermesRunsClient();

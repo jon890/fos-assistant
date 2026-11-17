@@ -10,6 +10,8 @@ import com.bifos.assistant.hermes.domain.TokenUsage;
  *
  * @param error 실패했을 때 Hermes 가 적은 글. 성공하면 비어 있다
  * @param pendingSteer 끼워 넣었지만 모델에 넣지 못하고 끝나 돌아온 글. 여러 글은 줄바꿈으로 이어져 온다. 없으면 null 이다
+ * @param pendingSteerKnown {@code pendingSteer} 를 아는가. 거짓이면 넣지 못한 글이 있었는지 모른다. Hermes 가 끝 사건을 주지 않고
+ * 조회 응답에도 그 값이 없을 때다(v0.23.2). 부르는 쪽은 끼운 글을 「전달됐는지 확인 못 함」 으로 다룬다
  */
 public record HermesRunResult(
     String runId,
@@ -21,7 +23,24 @@ public record HermesRunResult(
     String error,
     TokenUsage usage,
     SessionRuntime runtime,
-    String pendingSteer) {
+    String pendingSteer,
+    boolean pendingSteerKnown) {
+
+    /** {@code pending_steer} 를 아는 결과로 만든다. 지금까지의 모든 자리가 쓴다. */
+    public HermesRunResult(
+        String runId,
+        String sessionId,
+        String status,
+        String output,
+        String model,
+        String provider,
+        String error,
+        TokenUsage usage,
+        SessionRuntime runtime,
+        String pendingSteer) {
+        this(runId, sessionId, status, output, model, provider, error, usage, runtime, pendingSteer, true);
+    }
+
 
     /** 돌아온 글 없이 만든다. {@code pending_steer} 를 읽지 않는 자리와 테스트가 쓴다. */
     public HermesRunResult(

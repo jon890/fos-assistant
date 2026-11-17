@@ -21,6 +21,7 @@ import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.ConversationSessionExecutions;
+import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -75,6 +76,7 @@ public class RoomContext {
     private final ConversationSessions sessions;
     private final ModelTierService modelTiers;
     private final HermesRunsClient hermes;
+    private final LostRunRelease lostRunRelease;
     private final UserExecutionLimiter limiter;
     private final Clock clock;
 
@@ -166,6 +168,7 @@ public class RoomContext {
                 choice.provider(),
                 choice.model(),
                 choice.reasoningEffort());
+            lostRunRelease.beforeSubmit(command);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);

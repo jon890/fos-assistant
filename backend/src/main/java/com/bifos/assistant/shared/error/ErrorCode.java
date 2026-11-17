@@ -96,6 +96,8 @@ public enum ErrorCode {
     HERMES_RUN_FAILED(HttpStatus.BAD_GATEWAY),
     HERMES_RUN_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT),
     HERMES_UNAVAILABLE(HttpStatus.BAD_GATEWAY),
+    /** Hermes 가 다시 뜨며 도는 run 을 잃었다. Control Plane 이 그 run 을 해제하고 실패로 적는다. 화면 문구는 연결 실패와 같다. */
+    REMOTE_RUN_LOST(HttpStatus.BAD_GATEWAY),
     /**
      * Hermes 가 동시 실행 한도에 닿아 429 로 거절했다.
      *
