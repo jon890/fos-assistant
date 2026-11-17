@@ -530,7 +530,7 @@ Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다
 
 해제는 `POST /v1/runs/{run_id}/resolve-unknown` 에 `{"admission_id", "execution_generation"}` 두 칸을 조회 응답의 값 그대로 보낸다. 이미 해제한 같은 실행을 다시 보내도 200 이다. 409 는 값이 어긋났거나(`stale_generation`) 기록이 없는 경우다.
 
-**Control Plane 은 이 차이를 `hermes/infra` 안에서 옮긴다.** `queued` 는 도는 것으로 읽고, `unknown` 은 해제한 뒤 조회 경로에는 모르는 run 으로, 도는 turn 에는 `REMOTE_RUN_LOST` 로 알린다. 해제한 실행을 다시 읽으면 `cancelled` 라 사용자 중지로 읽히므로 다시 읽지 않는다.
+**Control Plane 은 이 차이를 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 안에서 옮긴다.** `queued` 는 도는 것으로 읽고, `unknown` 은 해제한 뒤 조회 경로에는 모르는 run 으로, 도는 turn 에는 `REMOTE_RUN_LOST` 로 알린다. 해제한 실행을 다시 읽으면 `cancelled` 라 사용자 중지로 읽히므로 다시 읽지 않는다.
 `cancelled` 는 끝 사건(`run.cancelled`, `run.interrupted`)과 그 프로세스가 중지를 보냈는지로 나누고, 근거가 없으면 `interrupted`(실패)로 적는다.
 조회에 없는 `error`, `pending_steer`, `runtime` 은 사건 스트림이 받은 끝 사건으로 채우고, 없으면 끝난 실행의 사건 보관분(끝나고 5분)을 한 번 다시 읽는다. 얻지 못하면 넘어간 steer 글을 모르는 것으로 보고 끼운 글을 「전달됐는지 확인 못 함」 으로 둔다.
 그 run 을 다시 묻는 쪽이 없어도 대화가 막히지 않게, 새 실행을 보내기 전에 같은 profile 에서 최근 연결 실패·시간 초과로 끝난 실행을 해제한다.

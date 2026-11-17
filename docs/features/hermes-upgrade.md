@@ -12,7 +12,7 @@ v0.23.2 로 올리는 변경의 요구와 결정은 스펙 [`hermes-upgrade/spec
 
 ## 두 버전의 실행 조회
 
-Hermes 의 상태와 사건 이름은 `hermes/infra` 가 옮긴다. application 은 Hermes 문자열을 보지 않는다.
+Hermes 의 상태와 사건 이름은 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 가 옮긴다. application 은 Hermes 문자열을 보지 않는다.
 
 - v0.23.2 의 `queued` 는 도는 것으로, `unknown` 은 해제한 뒤 잃은 실행으로 읽는다. 잃은 turn 은 `REMOTE_RUN_LOST` 로 실패하고 화면 문구는 연결 실패와 같다
 - 조회에 없는 `error`, `pending_steer`, `runtime` 은 끝 사건으로 채우고, 얻지 못하면 끼운 글을 「전달됐는지 확인 못 함」 으로 둔다
