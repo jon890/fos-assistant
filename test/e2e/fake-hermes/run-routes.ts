@@ -79,7 +79,8 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
           if (!run) return send(response, 404, runNotFound(runId!));
           const body = JSON.parse(await readBody(request)) as { admission_id?: unknown; execution_generation?: unknown };
           if (body.admission_id !== admissionOf(run.run_id) || body.execution_generation !== 1) {
-            return send(response, 400, { error: { message: "invalid_params", code: "invalid_params" } });
+            // 실제 Hermes 는 기록 번호나 세대가 어긋나면 409 를 준다(`api_server_authority_runs.py` 의 `_STORE_ERROR_STATUS`).
+            return send(response, 409, { error: { message: "stale_generation", code: "stale_generation" } });
           }
           // 이미 해제한 같은 실행을 다시 보내도 200 이다. 해제한 실행은 결과가 interrupted 라 조회에서 cancelled 로 보인다.
           if (run.status === "unknown") run.status = "cancelled";

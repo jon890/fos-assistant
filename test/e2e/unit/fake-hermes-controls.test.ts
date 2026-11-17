@@ -226,7 +226,7 @@ test("v0.23 모양은 재기동한 실행을 unknown 으로 두고, 해제 전�
     const resolve = (body: unknown) => fetch(`${hermes.baseUrl}/p/browser/v1/runs/${lost}/resolve-unknown`, {
       method: "POST", headers, body: JSON.stringify(body),
     });
-    assert.equal((await resolve({ admission_id: "other", execution_generation: 1 })).status, 400);
+    assert.equal((await resolve({ admission_id: "other", execution_generation: 1 })).status, 409);
     assert.equal((await resolve({ admission_id: `adm-${lost}`, execution_generation: 1 })).status, 200);
     assert.equal((await resolve({ admission_id: `adm-${lost}`, execution_generation: 1 })).status, 200);
     assert.equal((await read(lost)).status, "cancelled");
