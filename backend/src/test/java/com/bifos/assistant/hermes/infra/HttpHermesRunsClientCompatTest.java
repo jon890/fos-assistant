@@ -242,8 +242,8 @@ class HttpHermesRunsClientCompatTest {
     }
 
 
-    private static HermesRunTerminals.Terminal terminal(String event, String error, boolean withPending) {
-        return new HermesRunTerminals.Terminal(event, error, withPending ? "넘어간 글" : null, withPending, null, null);
+    private static HermesRunTerminal terminal(String event, String error, boolean withPending) {
+        return new HermesRunTerminal(event, error, withPending ? "넘어간 글" : null, withPending, null, null);
     }
 
 

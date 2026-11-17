@@ -1,6 +1,5 @@
 package com.bifos.assistant.hermes.infra;
 
-import com.bifos.assistant.hermes.application.dto.SessionRuntime;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -143,47 +142,27 @@ final class HermesSessionRuns {
      * <p>끝 사건은 사건 스트림이 남긴 것을 먼저 쓰고, 없으면 보관분을 한 번 다시 읽는다. {@code cancelled} 는 끝 사건과 이 프로세스의 중지
      * 기록으로 사용자 중지와 정상 종료로 끊긴 실행을 나눈다. 조회 응답에 있는 값은 그대로 둔다.
      */
-    Ending complete(String apiBaseUrl, String profileName, String runId, Ending read) {
-        Optional<HermesRunTerminals.Terminal> terminal = terminals.take(profileName, runId);
+    HermesRunEnding complete(String apiBaseUrl, String profileName, String runId, HermesRunEnding read) {
+        Optional<HermesRunTerminal> terminal = terminals.take(profileName, runId);
         if (terminal.isEmpty() && replay != null) {
             terminal = replay.readTerminal(apiBaseUrl, profileName, runId);
         }
         String status = read.status();
         if (CANCELLED.equalsIgnoreCase(status)) {
-            boolean stoppedByUs = terminal.map(HermesRunTerminals.Terminal::cancelled)
+            boolean stoppedByUs = terminal.map(HermesRunTerminal::cancelled)
                 .orElseGet(() -> terminals.stopped(profileName, runId));
             status = stoppedByUs ? CANCELLED : INTERRUPTED;
         }
         if (terminal.isEmpty()) {
-            return new Ending(status, read.error(), read.pendingSteer(), false, read.servedModel(), read.servedProvider());
+            return new HermesRunEnding(status, read.error(), read.pendingSteer(), false, read.servedModel(), read.servedProvider());
         }
-        HermesRunTerminals.Terminal found = terminal.get();
-        return new Ending(
+        HermesRunTerminal found = terminal.get();
+        return new HermesRunEnding(
             status,
             read.error() == null ? found.error() : read.error(),
             read.pendingSteer() == null ? found.pendingSteer() : read.pendingSteer(),
             !found.interrupted(),
             read.servedModel() == null ? found.servedModel() : read.servedModel(),
             read.servedProvider() == null ? found.servedProvider() : read.servedProvider());
-    }
-
-
-    /**
-     * 끝난 실행의 상태와 결과 값이다.
-     *
-     * @param pendingSteerKnown 넘어간 steer 글이 있었는지 아는가. 끝 사건을 얻지 못했거나 정상 종료로 끊긴 실행이면 거짓이다
-     */
-    record Ending(
-        String status,
-        String error,
-        String pendingSteer,
-        boolean pendingSteerKnown,
-        String servedModel,
-        String servedProvider) {
-
-        /** 실제로 돈 provider 와 모델이다. 둘 다 모르면 null 이다. */
-        SessionRuntime runtime() {
-            return servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider);
-        }
     }
 }

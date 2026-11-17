@@ -407,7 +407,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         JsonNode runtime = run.path("runtime");
         String servedModel = text(runtime, "model");
         String servedProvider = text(runtime, "provider");
-        HermesSessionRuns.Ending ending = new HermesSessionRuns.Ending(status, text(run, "error"),
+        HermesRunEnding ending = new HermesRunEnding(status, text(run, "error"),
             blankToNull(text(run, "pending_steer")), true, servedModel, servedProvider);
         if (HermesSessionRuns.queuedBySession(run)) {
             ending = sessionRuns.complete(apiBaseUrl, profileName, runId, ending);

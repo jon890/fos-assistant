@@ -51,7 +51,7 @@ public class HermesRunReplay {
 
 
     /** 끝 사건을 찾으면 그것이고, 닿지 못했거나 보관분이 없거나 끝 사건이 없으면 빈 값이다. 예외를 올리지 않는다. */
-    public Optional<HermesRunTerminals.Terminal> readTerminal(String apiBaseUrl, String profileName, String runId) {
+    public Optional<HermesRunTerminal> readTerminal(String apiBaseUrl, String profileName, String runId) {
         try (InputStream body = restClient
             .get()
             .uri(apiBaseUrl + "/v1/runs/{runId}/events", runId)
@@ -67,7 +67,7 @@ public class HermesRunReplay {
     }
 
 
-    private Optional<HermesRunTerminals.Terminal> firstTerminal(InputStream body) throws IOException {
+    private Optional<HermesRunTerminal> firstTerminal(InputStream body) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
@@ -75,7 +75,7 @@ public class HermesRunReplay {
                 if (line.startsWith("data:")) {
                     data.append(data.isEmpty() ? "" : "\n").append(line.substring(5).stripLeading());
                 } else if (line.isEmpty() && !data.isEmpty()) {
-                    Optional<HermesRunTerminals.Terminal> found = terminalOf(data.toString());
+                    Optional<HermesRunTerminal> found = terminalOf(data.toString());
                     data.setLength(0);
                     if (found.isPresent()) {
                         return found;
@@ -87,12 +87,12 @@ public class HermesRunReplay {
     }
 
 
-    private Optional<HermesRunTerminals.Terminal> terminalOf(String raw) {
+    private Optional<HermesRunTerminal> terminalOf(String raw) {
         try {
             JsonNode root = objectMapper.readTree(raw);
             JsonNode type = root.has("event") ? root.get("event") : root.path("type");
             return type.isTextual()
-                ? HermesRunTerminals.Terminal.ofTerminalEvent(type.asText().toLowerCase(Locale.ROOT), root)
+                ? HermesRunTerminal.ofTerminalEvent(type.asText().toLowerCase(Locale.ROOT), root)
                 : Optional.empty();
         } catch (JacksonException ex) {
             return Optional.empty();

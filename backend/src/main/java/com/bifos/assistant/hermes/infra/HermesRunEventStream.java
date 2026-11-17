@@ -143,7 +143,7 @@ public class HermesRunEventStream {
 
 
     private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope,
-        Consumer<HermesRunTerminals.Terminal> onTerminal) throws IOException {
+        Consumer<HermesRunTerminal> onTerminal) throws IOException {
         DetailState state = new DetailState(clock);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
@@ -169,7 +169,7 @@ public class HermesRunEventStream {
 
 
     private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state,
-        Consumer<HermesRunTerminals.Terminal> onTerminal) throws IOException {
+        Consumer<HermesRunTerminal> onTerminal) throws IOException {
         if (data.isEmpty()) {
             return;
         }
@@ -179,7 +179,7 @@ public class HermesRunEventStream {
             JsonNode root = objectMapper.readTree(raw);
             String type = firstText(root, root.path("data"), "event", "type");
             if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
-                HermesRunTerminals.Terminal.ofTerminalEvent(type.toLowerCase(Locale.ROOT), root).ifPresent(onTerminal);
+                HermesRunTerminal.ofTerminalEvent(type.toLowerCase(Locale.ROOT), root).ifPresent(onTerminal);
                 onEvent.accept(toRunEvent(root, scope, state));
             } else {
                 // 본문은 로그에도 남기지 않는다. 새 사건 이름만 버전 올리기 때 확인한다.

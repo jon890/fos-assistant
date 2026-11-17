@@ -65,7 +65,7 @@ class HermesRunTerminalStreamTest {
 
         assertThat(events).extracting(RunEvent::type).containsExactly("tool.started", "tool.completed", "run.completed");
         assertThat(events.get(1).durationMs()).isNull();
-        HermesRunTerminals.Terminal terminal = terminals.take("test-profile", "run-one").orElseThrow();
+        HermesRunTerminal terminal = terminals.take("test-profile", "run-one").orElseThrow();
         assertThat(terminal.event()).isEqualTo("run.completed");
         assertThat(terminal.pendingSteer()).isEqualTo("넣지 못한 글");
         assertThat(terminal.pendingSteerPresent()).isTrue();
@@ -79,7 +79,7 @@ class HermesRunTerminalStreamTest {
     @DisplayName("끝난 실행의 보관분을 다시 읽으면 끝 사건만 꺼낸다")
     void readTerminalTakesOnlyTheTerminalEvent() throws IOException {
         server = serve(INTERRUPTED_EVENTS);
-        Optional<HermesRunTerminals.Terminal> terminal = replay().readTerminal(baseUrl(), "test-profile", "run-one");
+        Optional<HermesRunTerminal> terminal = replay().readTerminal(baseUrl(), "test-profile", "run-one");
 
         assertThat(terminal).hasValueSatisfying(found -> {
             assertThat(found.interrupted()).isTrue();

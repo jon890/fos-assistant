@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class HermesRunTerminalsTest {
 
-    private static final HermesRunTerminals.Terminal COMPLETED = new HermesRunTerminals.Terminal("run.completed", null, null, true, null, null);
+    private static final HermesRunTerminal COMPLETED = new HermesRunTerminal("run.completed", null, null, true, null, null);
 
 
     @Test
