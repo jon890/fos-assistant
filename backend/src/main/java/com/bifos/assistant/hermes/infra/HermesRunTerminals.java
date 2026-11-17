@@ -5,9 +5,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * 실행 하나의 끝 사건과, 이 프로세스가 그 실행에 한 일을 메모리에 짧게 둔다.
@@ -24,6 +26,9 @@ public class HermesRunTerminals {
 
     /** 끝 상태를 확인한 run 을 다시 묻지 않을 시간이다. 잃은 실행 미리 풀기가 고르는 기간(24시간)과 같다. */
     static final Duration SETTLED_RETENTION = Duration.ofHours(24);
+
+    /** Hermes 의 끝 사건 이름이다. */
+    static final Set<String> TERMINAL_EVENTS = Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     private final Map<String, Stamped<Terminal>> terminals = new ConcurrentHashMap<>();
     private final Map<String, Instant> stops = new ConcurrentHashMap<>();
@@ -56,6 +61,35 @@ public class HermesRunTerminals {
         boolean pendingSteerPresent,
         String servedModel,
         String servedProvider) {
+
+        /** 끝 사건이면 {@link #of} 로 옮기고, 아니면 빈 값이다. 사건 스트림이 받은 사건마다 부른다. */
+        static Optional<Terminal> ofTerminalEvent(String event, JsonNode root) {
+            return TERMINAL_EVENTS.contains(event) ? Optional.of(of(event, root)) : Optional.empty();
+        }
+
+
+        /** 끝 사건 JSON 에서 실행 조회가 v0.23.2 에서 주지 않는 값을 꺼낸다. 칸은 최상위나 {@code data} 아래에 온다. */
+        static Terminal of(String event, JsonNode root) {
+            JsonNode payload = root.path("data");
+            JsonNode pending = root.has("pending_steer") ? root.get("pending_steer") : payload.get("pending_steer");
+            JsonNode runtime = root.has("runtime") ? root.path("runtime") : payload.path("runtime");
+            String error = text(root, "error");
+            String pendingText = pending == null || pending.isNull() ? null : pending.asText();
+            return new Terminal(
+                event,
+                error == null ? text(payload, "error") : error,
+                pendingText == null || pendingText.isBlank() ? null : pendingText,
+                pending != null,
+                text(runtime, "model"),
+                text(runtime, "provider"));
+        }
+
+
+        private static String text(JsonNode node, String field) {
+            JsonNode value = node.path(field);
+            return value.isTextual() && !value.asText().isBlank() ? value.asText() : null;
+        }
+
 
         public boolean interrupted() {
             return "run.interrupted".equals(event);

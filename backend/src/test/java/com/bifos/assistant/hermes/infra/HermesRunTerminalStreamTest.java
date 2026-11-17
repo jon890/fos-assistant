@@ -76,19 +76,16 @@ class HermesRunTerminalStreamTest {
 
 
     @Test
-    @DisplayName("끝난 실행의 보관분을 다시 읽으면 끝 사건만 꺼내고 보관소에는 남기지 않는다")
+    @DisplayName("끝난 실행의 보관분을 다시 읽으면 끝 사건만 꺼낸다")
     void readTerminalTakesOnlyTheTerminalEvent() throws IOException {
         server = serve(INTERRUPTED_EVENTS);
-        HermesRunTerminals terminals = new HermesRunTerminals();
-
-        Optional<HermesRunTerminals.Terminal> terminal = stream(terminals).readTerminal(baseUrl(), "test-profile", "run-one", Duration.ofSeconds(5));
+        Optional<HermesRunTerminals.Terminal> terminal = replay().readTerminal(baseUrl(), "test-profile", "run-one");
 
         assertThat(terminal).hasValueSatisfying(found -> {
             assertThat(found.interrupted()).isTrue();
             assertThat(found.error()).isEqualTo("Gateway shutdown interrupted the run.");
             assertThat(found.pendingSteerPresent()).isFalse();
         });
-        assertThat(terminals.take("test-profile", "run-one")).isEmpty();
     }
 
 
@@ -102,8 +99,7 @@ class HermesRunTerminalStreamTest {
         });
         server.start();
 
-        assertThat(stream(new HermesRunTerminals())
-            .readTerminal(baseUrl(), "test-profile", "run-one", Duration.ofSeconds(5))).isEmpty();
+        assertThat(replay().readTerminal(baseUrl(), "test-profile", "run-one")).isEmpty();
     }
 
 
@@ -112,6 +108,17 @@ class HermesRunTerminalStreamTest {
         when(keys.resolve("test-profile")).thenReturn("test-key");
         HermesProperties properties = new HermesProperties(null, null, null, null, null, null, null, null);
         return new HermesRunEventStream(keys, properties, JsonMapper.builder().build(), Clock.systemUTC(), terminals);
+    }
+
+
+    private static HermesRunReplay replay() {
+        HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
+        when(keys.resolve("test-profile")).thenReturn("test-key");
+        return new HermesRunReplay(
+            keys,
+            new HermesProperties(null, null, null, null, null, null, null, null),
+            JsonMapper.builder().build(),
+            Duration.ofSeconds(5));
     }
 
 

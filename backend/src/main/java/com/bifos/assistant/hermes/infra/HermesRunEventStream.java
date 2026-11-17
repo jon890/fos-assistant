@@ -14,16 +14,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -73,36 +70,22 @@ public class HermesRunEventStream {
     /** 기억을 남기는 Control Plane MCP 도구 이름의 끝이다. 인자에 사람에 관한 사실이 실린다(ADR-20261007 / memory-remember). */
     private static final String MEMORY_REMEMBER_TOOL_SUFFIX = "memory_remember";
 
-    /** 끝 사건이다. 받으면 실행 조회가 읽도록 {@link HermesRunTerminals} 에 남긴다. */
-    private static final Set<String> TERMINAL_EVENTS = Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
-
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final HermesRunTerminals terminals;
-    private final Duration connectTimeout;
 
 
     public HermesRunEventStream(
         HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
-        this(keyStore, properties, objectMapper, Clock.systemUTC());
-    }
-
-
-    public HermesRunEventStream(
-        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
-        this(keyStore, properties, objectMapper, clock, new HermesRunTerminals());
+        this(keyStore, properties, objectMapper, Clock.systemUTC(), new HermesRunTerminals());
     }
 
 
     @Autowired
-    public HermesRunEventStream(
-        HermesProfileKeyStore keyStore,
-        HermesProperties properties,
-        ObjectMapper objectMapper,
-        Clock clock,
-        HermesRunTerminals terminals) {
+    public HermesRunEventStream(HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper,
+        Clock clock, HermesRunTerminals terminals) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.runTimeout());
@@ -111,7 +94,6 @@ public class HermesRunEventStream {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.terminals = terminals;
-        this.connectTimeout = properties.connectTimeout();
     }
 
 
@@ -160,42 +142,7 @@ public class HermesRunEventStream {
     }
 
 
-    /**
-     * 끝난 실행의 사건 보관분을 한 번 읽어 끝 사건만 꺼낸다.
-     *
-     * <p>Hermes 는 끝난 run 에 처음 연결하면 보관한 사건을 보내고 스트림을 닫는다(끝나고 5분 동안). 사건 스트림을 열지 않은 호출자도
-     * {@code error} 와 {@code pending_steer} 를 얻으려고 쓴다. 사건을 소비자에게 넘기지 않고 보관소에도 남기지 않는다. 닿지 못했거나
-     * 끝 사건이 없으면 빈 값이며 예외를 올리지 않는다.
-     */
-    public Optional<HermesRunTerminals.Terminal> readTerminal(
-        String apiBaseUrl, String profileName, String runId, Duration readTimeout) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(connectTimeout);
-        factory.setReadTimeout(readTimeout);
-        RestClient client = RestClient.builder().requestFactory(factory).build();
-        AtomicReference<HermesRunTerminals.Terminal> found = new AtomicReference<>();
-        try (InputStream body = client
-            .get()
-            .uri(apiBaseUrl + "/v1/runs/{runId}/events", runId)
-            .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-            .accept(MediaType.TEXT_EVENT_STREAM)
-            .retrieve()
-            .body(InputStream.class)) {
-            if (body != null) {
-                readEvents(body, event -> {
-                }, ToolDetailScope.NONE, found::set);
-            }
-        } catch (RestClientException | IOException ex) {
-            log.info("끝난 실행의 사건 보관분을 읽지 못했다 profile={} runId={}", profileName, runId);
-        }
-        return Optional.ofNullable(found.get());
-    }
-
-
-    private void readEvents(
-        InputStream body,
-        Consumer<RunEvent> onEvent,
-        ToolDetailScope scope,
+    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope,
         Consumer<HermesRunTerminals.Terminal> onTerminal) throws IOException {
         DetailState state = new DetailState(clock);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
@@ -221,11 +168,7 @@ public class HermesRunEventStream {
     }
 
 
-    private void emit(
-        StringBuilder data,
-        Consumer<RunEvent> onEvent,
-        ToolDetailScope scope,
-        DetailState state,
+    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state,
         Consumer<HermesRunTerminals.Terminal> onTerminal) throws IOException {
         if (data.isEmpty()) {
             return;
@@ -236,9 +179,7 @@ public class HermesRunEventStream {
             JsonNode root = objectMapper.readTree(raw);
             String type = firstText(root, root.path("data"), "event", "type");
             if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
-                if (TERMINAL_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
-                    onTerminal.accept(terminalOf(type.toLowerCase(Locale.ROOT), root));
-                }
+                HermesRunTerminals.Terminal.ofTerminalEvent(type.toLowerCase(Locale.ROOT), root).ifPresent(onTerminal);
                 onEvent.accept(toRunEvent(root, scope, state));
             } else {
                 // 본문은 로그에도 남기지 않는다. 새 사건 이름만 버전 올리기 때 확인한다.
@@ -480,33 +421,7 @@ public class HermesRunEventStream {
     }
 
 
-    /** 끝 사건에서 실행 조회가 v0.23.2 에서 주지 않는 값을 꺼낸다. */
-    static HermesRunTerminals.Terminal terminalOf(String event, JsonNode root) {
-        JsonNode payload = root.path("data");
-        JsonNode pending = root.has("pending_steer") ? root.get("pending_steer") : payload.get("pending_steer");
-        JsonNode runtime = root.has("runtime") ? root.path("runtime") : payload.path("runtime");
-        String pendingText = pending == null || pending.isNull() ? null : pending.asText();
-        return new HermesRunTerminals.Terminal(
-            event,
-            firstText(root, payload, "error"),
-            pendingText == null || pendingText.isBlank() ? null : pendingText,
-            pending != null,
-            textOrNull(runtime, "model"),
-            textOrNull(runtime, "provider"));
-    }
-
-
-    private static String textOrNull(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isTextual() && !value.asText().isBlank() ? value.asText() : null;
-    }
-
-
-    /**
-     * Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다.
-     *
-     * <p>0 은 걸린 시간을 모르는 것으로 본다. v0.23.2 는 session 대기열 경로에서 늘 0 을 보낸다.
-     */
+    /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 밀리초 정수로 옮기고 0 은 모름으로 비운다(v0.23.2 는 늘 0 을 보낸다). */
     private static Long durationMs(JsonNode root, JsonNode payload) {
         JsonNode value = number(root, "duration");
         if (value == null) {
