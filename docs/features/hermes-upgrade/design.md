@@ -183,7 +183,7 @@ E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)에 v0.23.2 모양을 켜는 설정
 
 E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도는 장면 하나를 더한다. 실제 Hermes 와의 차이는 REQ11 이 본다.
 
-사진 원본을 native 이미지로 넘기는 계약(`test_attachment_native_contract.py`)은 처음에 `check-hermes-contract.sh` 밖이었고, v0.23.2 소스에서는 세 곳이 달라 실패했다. 우리 첨부 코드가 깨진 것이 아니라 테스트의 기대가 낡은 것이다. 이미지 변환 함수(`codex_responses_adapter.py` 의 `_tool_output_items` 등)는 두 버전이 타입 표기만 다르고 동작이 같다. 달라진 것은 이렇다.
+사진 원본을 native 이미지로 넘기는 계약(`test_attachment_native_contract.py`)은 처음에 `check-hermes-contract.sh` 밖이었고, v0.23.2 소스에서는 네 곳이 달라 실패했다. 우리 첨부 코드가 깨진 것이 아니라 테스트의 기대가 낡은 것이다. 이미지 변환 함수(`codex_responses_adapter.py` 의 `_tool_output_items` 등)는 두 버전이 타입 표기만 다르고 동작이 같다. 달라진 것은 이렇다.
 
 | 달라진 것 | v0.23.2 | 계열별 기대값 |
 | --- | --- | --- |
