@@ -896,7 +896,7 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 
 ### 지금 구조
 
-- `hermes/plugins/fos-ctx/subagent.py` 의 `subagent_start` 가 `FOS_CTX_SUBAGENT_URL` 로 등록 본문을 보낸다. 제한 시간 `REGISTER_TIMEOUT` 초, 연결 실패와 5xx 에만 한 번 더 보낸다. 받은 `child_goal` 은 버린다.
+- `hermes/plugins/fos-ctx/subagent.py` 의 `subagent_start` 가 `FOS_CTX_SUBAGENT_URL` 로 등록 본문을 보낸다. 제한 시간 `REGISTER_TIMEOUT` 초, 연결 실패와 5xx 에만 한 번 더 보낸다. PR7 전에는 받은 `child_goal` 을 보내지 않았다.
 - `plugin.yaml` 의 `hooks` 와 `register` 는 `pre_tool_call`, `subagent_start`, `transform_tool_result` 셋이다.
 - 끝 소식 계약(경로, 칸, 서명, 응답)은 PR6 이 `hermes/plugins/fos-ctx/README.md` 의 「하위 에이전트 끝 소식 계약」 에 적었다. 서버는 그 모양으로 받는다(`SubagentStop.verify`).
 
