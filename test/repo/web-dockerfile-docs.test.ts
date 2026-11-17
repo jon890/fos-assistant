@@ -12,7 +12,7 @@ import test from "node:test";
 const DOCKERFILE = readFileSync(join(import.meta.dirname, "../../web/Dockerfile"), "utf8");
 
 test("web Dockerfile 은 repo 문맥에서 네 docs 폴더만 같은 상대 경로로 복사한다", () => {
-  const copies = [...DOCKERFILE.matchAll(/^COPY\s+--from=repo\s+--chmod=a\+rX\s+(\S+)\s+(\S+)\s*$/gm)].map((m) => [m[1], m[2]]);
+  const copies = [...DOCKERFILE.matchAll(/^COPY\s+--from=repo\s+--chmod=755\s+(\S+)\s+(\S+)\s*$/gm)].map((m) => [m[1], m[2]]);
   assert.deepEqual(copies, [
     ["docs", "/app/dev-docs/docs"],
     ["backend/docs", "/app/dev-docs/backend/docs"],
@@ -32,9 +32,9 @@ test("web Dockerfile 은 문서 위치와 배포 커밋을 실행 환경에 둔�
  * 운영 배포의 소스 checkout 은 디렉터리 700, 파일 600 이라 COPY 가 그 권한을 가져오면 nextjs 가 읽지 못한다.
  * Dockerfile 이 쓰는 COPY 옵션을 그대로 뽑아 좁은 권한의 문맥으로 작은 이미지를 만들어 nextjs 로 읽어 본다.
  */
-const dockerReady = spawnSync("docker", ["buildx", "version"], { stdio: "ignore" }).status === 0;
+const dockerReady = spawnSync("docker", ["info"], { stdio: "ignore" }).status === 0 && spawnSync("docker", ["buildx", "version"], { stdio: "ignore" }).status === 0;
 
-test("좁은 권한의 repo 문맥을 복사해도 nextjs 가 문서를 읽는다", { skip: dockerReady ? false : "docker buildx 가 없다" }, () => {
+test("좁은 권한의 repo 문맥을 복사해도 nextjs 가 문서를 읽는다", { skip: dockerReady ? false : "docker daemon 이나 buildx 가 없다" }, () => {
   const option = DOCKERFILE.match(/^COPY\s+--from=repo\s+(--chmod=\S+)\s+docs\s/m)?.[1];
   assert.ok(option, "docs COPY 에 --chmod 옵션이 있어야 한다");
   const root = mkdtempSync(join(tmpdir(), "dev-docs-perm-"));
