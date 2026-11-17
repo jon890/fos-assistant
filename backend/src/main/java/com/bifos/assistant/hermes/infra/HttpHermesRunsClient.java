@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -33,7 +34,7 @@ import tools.jackson.databind.JsonNode;
  * profile 별 경로로 Hermes Runs API 와 이야기한다.
  *
  * <p>실행은 Hermes 가 갖는다. 우리는 실행을 제출하고 끝날 때까지 물으며, 답과 토큰 수를 읽어 온다.
- * 여기 있는 어느 것도 Hermes 안을 고치지 않는다.
+ * 여기 있는 어느 것도 Hermes 안을 고치지 않는다. v0.22 부터의 session 대기열 실행은 {@link HermesSessionRuns} 가 옮긴다.
  */
 @Component
 @Slf4j
@@ -49,12 +50,23 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private final RestClient steerClient;
     private final HermesProfileKeyStore keyStore;
     private final HermesProperties properties;
+    private final HermesSessionRuns sessionRuns;
 
 
+    /** 끝 사건을 다시 읽지 않는 짧은 생성자다. 테스트가 쓴다. */
+    public HttpHermesRunsClient(HermesProfileKeyStore keyStore, HermesProperties properties, Duration steerTimeout) {
+        this(keyStore, properties, steerTimeout, new HermesRunTerminals(), null);
+    }
+
+
+    @Autowired
     public HttpHermesRunsClient(
         HermesProfileKeyStore keyStore,
         HermesProperties properties,
-        @Value("${assistant.chat.steer.timeout:5s}") Duration steerTimeout) {
+        @Value("${assistant.chat.steer.timeout:5s}") Duration steerTimeout,
+        HermesRunTerminals terminals,
+        HermesRunReplay replay) {
+        this.sessionRuns = new HermesSessionRuns(properties, terminals, replay);
         this.restClient = RestClient.builder().requestFactory(requestFactory(properties, properties.readTimeout())).build();
         this.steerClient = RestClient.builder().requestFactory(requestFactory(properties, steerTimeout)).build();
         this.keyStore = keyStore;
@@ -98,8 +110,15 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                 .header("Authorization", "Bearer " + keyStore.resolve(profileName))
                 .retrieve()
                 .toBodilessEntity();
+            sessionRuns.terminals().markStopped(profileName, runId);
         } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
+        } catch (HttpClientErrorException.Conflict ex) {
+            if (!HermesSessionRuns.lostOnStop(ex)) { // 재기동으로 잃은 실행은 멈출 수 없다. 해제하면 멈춘 것과 같다
+                throw HermesCallFailure.of(ex, "could not stop the Hermes run");
+            }
+            releaseIfLost(apiBaseUrl, profileName, runId);
+            sessionRuns.terminals().markStopped(profileName, runId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not stop the Hermes run");
         }
@@ -173,11 +192,21 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the run status");
         }
+        if (HermesSessionRuns.lost(run)) {
+            sessionRuns.resolve(apiBaseUrl, keyStore.resolve(profileName), profileName, runId, run);
+            return HermesRunLookup.notFound();
+        }
         String status = text(run, "status");
         if (status != null && TERMINAL.contains(status.toLowerCase())) {
-            return HermesRunLookup.finished(toResult(runId, status, run));
+            return HermesRunLookup.finished(toResult(apiBaseUrl, profileName, runId, status, run));
         }
         return HermesRunLookup.running();
+    }
+
+
+    @Override
+    public void releaseIfLost(String apiBaseUrl, String profileName, String runId) {
+        sessionRuns.releaseIfLost(apiBaseUrl, keyStore.resolve(profileName), profileName, runId, TERMINAL);
     }
 
 
@@ -338,9 +367,13 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         long deadline = System.nanoTime() + properties.runTimeout().toNanos();
         while (true) {
             JsonNode run = fetch(command.apiBaseUrl(), runId, apiKey);
+            if (HermesSessionRuns.lost(run)) {
+                sessionRuns.resolve(command.apiBaseUrl(), apiKey, command.profileName(), runId, run);
+                throw new ApiException(ErrorCode.REMOTE_RUN_LOST, "Hermes lost the run across a restart");
+            }
             String status = text(run, "status");
             if (status != null && TERMINAL.contains(status.toLowerCase())) {
-                return toResult(runId, status, run);
+                return toResult(command.apiBaseUrl(), command.profileName(), runId, status, run);
             }
             if (System.nanoTime() > deadline) {
                 throw new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time");
@@ -370,21 +403,27 @@ public class HttpHermesRunsClient implements HermesRunsClient {
      * <p>v0.21.5 는 실제로 돈 provider 와 모델을 {@code runtime} 에 싣는다. fallback 으로 넘어간 경우도 그 값이다.
      * 그 값을 {@code runtime} 칸에 따로 둔다. 실행 조회의 {@code model}, {@code provider} 는 요청을 되돌려 줄 뿐이다.
      */
-    private HermesRunResult toResult(String runId, String status, JsonNode run) {
+    private HermesRunResult toResult(String apiBaseUrl, String profileName, String runId, String status, JsonNode run) {
         JsonNode runtime = run.path("runtime");
         String servedModel = text(runtime, "model");
         String servedProvider = text(runtime, "provider");
+        HermesSessionRuns.Ending ending = new HermesSessionRuns.Ending(status, text(run, "error"),
+            blankToNull(text(run, "pending_steer")), true, servedModel, servedProvider);
+        if (HermesSessionRuns.queuedBySession(run)) {
+            ending = sessionRuns.complete(apiBaseUrl, profileName, runId, ending);
+        }
         return new HermesRunResult(
             runId,
             text(run, "session_id"),
-            status,
+            ending.status(),
             text(run, "output"),
             text(run, "model"),
             text(run, "provider"),
-            text(run, "error"),
+            ending.error(),
             readUsage(run.path("usage")),
-            servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider),
-            blankToNull(text(run, "pending_steer")));
+            ending.runtime(),
+            ending.pendingSteer(),
+            ending.pendingSteerKnown());
     }
 
 
