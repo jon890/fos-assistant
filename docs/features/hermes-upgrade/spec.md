@@ -12,7 +12,7 @@ v0.22 부터 Hermes 는 `/v1/runs` 실행을 session 마다 디스크의 대기�
 이 스펙은 fos-assistant 쪽 호환(Control Plane 의 실행 클라이언트와 재기동 정리, 가짜 Hermes, fos-ctx, 대시보드 plugin, 계약 테스트와 계약 문서)을 정한다.
 이미지 빌드, 리허설, 운영 적용과 되돌리기는 `fos-home-infra` 가 갖는다. 이 스펙은 적용 전에 무엇이 확인돼야 하는지만 적는다.
 
-## 상류 소스로 확인한 사실
+## upstream 소스로 확인한 사실
 
 2026-11-17 에 v0.23.2 와 v0.21.6 의 tag 소스를 대조했다. 운영 왕복으로는 확인하지 않았다. 계약 문서로 옮길 내용이며 여기서는 요구사항의 근거로만 둔다.
 
@@ -28,6 +28,7 @@ v0.22 부터 Hermes 는 `/v1/runs` 실행을 session 마다 디스크의 대기�
 | 승인 판정 | `/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 셸 위험 명령도 `approvals.unattended_mode` 로 바로 정한다. docker 실행 공간 profile 은 이 값이 `approve` 다. session authority 의 turn 실행기는 turn 마다 알림 경로를 등록하지만, 그 session key 가 닿지 않는 스레드가 어디인지는 확인하지 못했다 | `tools/approval.py` 의 `_presence`, `gateway/run_turn_runner.py` |
 | 코드 실행 안 도구 호출 | `execute_code` 안의 호출이 `session_id` 를 달고 hook 에 온다. `tool_call_id` 는 없다 | `tools/code_execution_rpc.py`, `model_tools.py` 의 `handle_function_call` |
 | 내장 도구 | `browser_vault`, `set_theme`, `setup_beat` 가 새로 생겼다 | `toolsets.py` |
+| 내장 위임(`delegate_task`) 결과 | v0.21.6 과 같다. 최상위 위임은 늘 백그라운드로 돌고, API 실행에는 완료가 새 run 이나 사건으로 오지 않는다(`supports_async_delivery` 거짓). 부모 session 에 `display_kind=async_delegation_complete` 메시지 한 줄로만 남고, 압축으로 session 이 바뀌었으면 이어진 session 에 남는다. 새로 생긴 것은 profile 설정 `delegation.gateway_mode` 다. `inline` 이면 최상위 위임을 그 turn 안에서 기다려 같은 답에 결과가 든다. 기본 `auto` 는 API 실행에서 백그라운드다. plugin hook `subagent_start`, `subagent_stop` 은 두 버전 모두 있다 | `gateway/wake.py` 의 `persist_delegation_delivery`, `hermes_state_detached_results.py`, `tools/delegate_tool_config.py` 의 `gateway_delegation_inline`, `gateway/session_execution.py` |
 | 의존성과 저장 | MCP SDK 2.3.0, `cryptography` 50.0.2(Python 3.14 조건). session DB schema 31 → 33. 이미지만 되돌려서는 저장 상태가 돌아오지 않는다 | `pyproject.toml`, `hermes_state_common.py` |
 
 Control Plane 은 Hermes 의 승인 카드(`POST /v1/runs/{id}/approval`)에 답하지 않는다. 그래서 v0.21.6 에서도 셸 위험 명령은 승인 시간(기본 300초)을 기다린 뒤 거절된다.

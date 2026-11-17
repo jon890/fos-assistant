@@ -1,6 +1,6 @@
 # Hermes v0.23.2 호환 기술 설계
 
-스펙: [`spec.md`](spec.md). 상류 동작의 근거는 스펙의 「상류 소스로 확인한 사실」 표가 갖는다.
+스펙: [`spec.md`](spec.md). upstream 동작의 근거는 스펙의 「upstream 소스로 확인한 사실」 표가 갖는다.
 
 ## 요구사항 연결
 
@@ -135,7 +135,7 @@ import 나 판정이 예외를 던지면 막는다(닫힌 쪽). `command_allowli
 
 ### 계약 테스트
 
-`hermes_contract.py` 는 기준 버전의 선언을 그대로 두고, 버전마다 다른 기대값만 `HERMES_VARIANTS` 에 계열(`0.21`, `0.23`)별로 둔다. 상류 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 쓸 수 없다. 테스트는 계열마다 선언한 표지 파일(`0.23` 은 `gateway/platforms/api_server_authority_runs.py`)이 `HERMES_SOURCE` 에 있는지로 계열을 고른다. 그래서 새 패치 tag(v0.23.x)는 계열이 같으면 코드를 고치지 않고 돌릴 수 있다(REQ12). 모르는 계열이면 기준 버전의 기대값으로 실패를 보인다.
+`hermes_contract.py` 는 기준 버전의 선언을 그대로 두고, 버전마다 다른 기대값만 `HERMES_VARIANTS` 에 계열(`0.21`, `0.23`)별로 둔다. upstream 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 쓸 수 없다. 테스트는 계열마다 선언한 표지 파일(`0.23` 은 `gateway/platforms/api_server_authority_runs.py`)이 `HERMES_SOURCE` 에 있는지로 계열을 고른다. 그래서 새 패치 tag(v0.23.x)는 계열이 같으면 코드를 고치지 않고 돌릴 수 있다(REQ12). 모르는 계열이면 기준 버전의 기대값으로 실패를 보인다.
 v0.23.2 에서 고칠 것은 이렇다.
 
 | 실패 | 고칠 것 |
