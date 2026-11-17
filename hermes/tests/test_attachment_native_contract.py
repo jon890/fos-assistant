@@ -25,7 +25,7 @@ class NativeImageContractTest(unittest.TestCase):
         self.inspect = importlib.import_module(self.plugin.__name__ + ".attachment_inspect")
 
     def test_actual_profile_loader_names_and_reload_preserve_shared_runtime(self):
-        relative, namespace, evict = contract.NATIVE_IMAGE_PLUGIN_LOADER
+        relative, namespace, evict = contract.expected("NATIVE_IMAGE_PLUGIN_LOADER", os.environ["HERMES_SOURCE"])
         tree = ast.parse((pathlib.Path(os.environ["HERMES_SOURCE"]) / relative).read_text())
         selected = [copy.deepcopy(next(node for node in ast.walk(tree)
             if isinstance(node, ast.FunctionDef) and node.name == name)) for name in (namespace, evict)]
@@ -50,13 +50,14 @@ class NativeImageContractTest(unittest.TestCase):
     def test_pillow_is_already_pinned_in_runtime_core(self):
         import tomllib
         project = tomllib.loads((pathlib.Path(os.environ["HERMES_SOURCE"]) / "pyproject.toml").read_text())
-        # v0.21.6은 Python 3.14부터 core 의존성을 설치한다. pin과 지원 Python을 함께 확인한다.
-        self.assertIn("Pillow==" + contract.NATIVE_IMAGE_PILLOW_VERSION + "; python_version >= '3.14'",
+        # v0.21.6 이후는 Python 3.14부터 core 의존성을 설치한다. pin과 지원 Python을 함께 확인한다.
+        version = contract.expected("NATIVE_IMAGE_PILLOW_VERSION", os.environ["HERMES_SOURCE"])
+        self.assertIn("Pillow==" + version + "; python_version >= '3.14'",
                       project["project"]["dependencies"])
 
     def test_plugin_result_reaches_responses_as_native_image(self):
         source = pathlib.Path(os.environ["HERMES_SOURCE"])
-        relative, name, call = contract.NATIVE_ATTACHMENT_REGISTRATION
+        relative, name, call = contract.expected("NATIVE_ATTACHMENT_REGISTRATION", source)
         registration = next(node for node in ast.walk(ast.parse((source / relative).read_text()))
             if isinstance(node, ast.FunctionDef) and node.name == name)
         self.assertIsNone(_accepts(registration, call, method=True))
@@ -77,6 +78,16 @@ class NativeImageContractTest(unittest.TestCase):
             module = ast.Module(body=[ast.ImportFrom(module="__future__", level=0,
                 names=[ast.alias(name="annotations")]), *selected], type_ignores=[])
             exec(compile(ast.fix_missing_locations(module), relative, "exec"), env)
+        shape = contract.expected("NATIVE_FAILURE_SHAPE", source)
+        if shape is not None:
+            relative, function, constant = shape
+            tree = ast.parse((source / relative).read_text())
+            assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
+                and any(isinstance(target, ast.Name) and target.id == constant for target in node.targets))
+            node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == function)
+            module = ast.Module(body=[ast.ImportFrom(module="__future__", level=0,
+                names=[ast.alias(name="annotations")]), assignment, node], type_ignores=[])
+            exec(compile(ast.fix_missing_locations(module), relative, "exec"), env)
         env.update(_IMAGE_PART_TYPES={"image_url", "input_image"},
                    _TEXT_PART_TYPES={"text", "input_text", "output_text"},
                    _VIDEO_PART_TYPES={"video", "video_url", "input_video"}, _MAX_RESPONSES_ITEM_ID_LENGTH=64)
@@ -94,11 +105,15 @@ class NativeImageContractTest(unittest.TestCase):
             self.assertEqual(persisted["content"][1], envelope["content"][1])
             self.assertFalse(env["_detect_tool_failure"]("attachment_inspect", envelope)[0])
             self.assertTrue(env["_detect_tool_failure"]("attachment_inspect", self.inspect.failure())[0])
-            relative, name = contract.NATIVE_TOOL_EVENT_FIELDS
+            relative, name, *helpers = contract.expected("NATIVE_TOOL_EVENT_FIELDS", source)
             tree = ast.parse((source / relative).read_text())
             assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
                 and any(isinstance(target, ast.Name) and target.id == name for target in node.targets))
-            exec(compile(ast.Module(body=[assignment], type_ignores=[]), relative, "exec"), env)
+            functions = [next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == helper)
+                         for helper in (helpers[0] if helpers else ())]
+            module = ast.Module(body=[ast.ImportFrom(module="__future__", level=0,
+                names=[ast.alias(name="annotations")]), *functions, assignment], type_ignores=[])
+            exec(compile(ast.fix_missing_locations(module), relative, "exec"), env)
             fields = env[name]["tool.completed"]("attachment_inspect", None, {"is_error": True, "duration": 0.5})
             self.assertIs(fields["error"], True)
             model = types.SimpleNamespace(provider="openai-codex", model="gpt-6.1-sol",

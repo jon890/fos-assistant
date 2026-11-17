@@ -183,7 +183,16 @@ E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)에 v0.23.2 모양을 켜는 설정
 
 E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도는 장면 하나를 더한다. 실제 Hermes 와의 차이는 REQ11 이 본다.
 
-사진 원본을 native 이미지로 넘기는 계약(`test_attachment_native_contract.py`)은 `check-hermes-contract.sh` 에 들어 있지 않아 REQ7 밖이다. v0.23.2 소스에서는 Pillow 고정 버전(13.0.0)과 이미지 반환 경로의 함수 구성이 바뀌어 실패한다. 그 계약을 업그레이드 확인 범위에 넣을지는 PR2 밖에서 정한다.
+사진 원본을 native 이미지로 넘기는 계약(`test_attachment_native_contract.py`)은 처음에 `check-hermes-contract.sh` 밖이었고, v0.23.2 소스에서는 네 곳이 달라 실패했다. 우리 첨부 코드가 깨진 것이 아니라 테스트의 기대가 낡은 것이다. 이미지 변환 함수(`codex_responses_adapter.py` 의 `_tool_output_items` 등)는 두 버전이 타입 표기만 다르고 동작이 같다. 달라진 것은 이렇다.
+
+| 달라진 것 | v0.23.2 | 계열별 기대값 |
+| --- | --- | --- |
+| core 의 Pillow 고정 | 13.0.0 | `NATIVE_IMAGE_PILLOW_VERSION` |
+| 도구 등록 `register_tool` | `plugins_context.py` 로 이동, 인자 모양은 같다 | `NATIVE_ATTACHMENT_REGISTRATION` |
+| 실패 판정 `_detect_tool_failure` | 결과 객체의 `status`, `results` 모양도 본다(`shape_failure_error`). 우리 이미지 결과는 실패로 세지 않는다 | `NATIVE_FAILURE_SHAPE` |
+| 도구 사건 필드 | `_call_id` 가 `tool_call_id` 칸을 덧붙인다 | `NATIVE_TOOL_EVENT_FIELDS` 의 셋째 칸 |
+
+그래서 이 테스트도 소스의 버전 계열로 기대값을 고르고(`expected`), `check-hermes-contract.sh` 가 두 버전에서 돌린다.
 
 ## PR4
 
