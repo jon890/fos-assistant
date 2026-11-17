@@ -73,3 +73,4 @@ node --test test/repo/doc-files.test.ts test/repo/doc-links.test.ts test/repo/do
 | `web/src/components/chat/system-message.tsx` | 수정 |
 | `web/test/browser/chat-delegation-wake.spec.ts` | 수정 |
 | `docs/features/agent-team.md` | 수정 |
+| `docs/features/agent-team/tasks/native-delegation-wake/remote-verification.md` | 삭제 (기능 폴더에는 이 이름을 둘 수 없어 운영 확인 행을 인수 검증 계획으로 옮긴다, `test/repo/doc-files.test.ts`) |

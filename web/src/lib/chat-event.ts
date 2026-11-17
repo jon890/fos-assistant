@@ -57,11 +57,16 @@ export type ChatEvent = {
   delegation?: DelegationLine | null;
   /** 위임 결과 알림 줄의 `system` 사건이 싣는 그 줄이 전한 결과다 */
   deliveredResults?: DelegationLine[] | null;
+  /** Hermes 내장 위임 결과 알림 줄의 `system` 사건이 싣는 결과 상태다 */
+  nativeResult?: NativeResult | null;
   /** `steer` 사건의 말풍선 상태와 받은 순간 돈 자식의 종류다 */
   steer?: SteerInfo | null;
 };
 
 /** steer 말풍선의 상태다. `ChatDtos.MessageView.steer` 와 `steer` 사건이 같은 꼴로 싣는다 */
+/** Hermes 내장 위임 결과 알림 줄의 상태다(ADR-20261117 / native-delegation-wake) */
+export type NativeResult = { status: "SUCCEEDED" | "FAILED" };
+
 export type SteerInfo = {
   state: "DELIVERED" | "CARRIED_OVER" | "UNCONFIRMED" | "NOT_DELIVERED";
   child: "SUBAGENT" | "DELEGATION" | null;

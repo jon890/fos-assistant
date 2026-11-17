@@ -1,7 +1,11 @@
 import type { AgentLabel, DelegationLine } from "@/lib/delegation";
 import type { MentionDelegation } from "@/lib/mention";
 import type { AutoVaultState } from "@/lib/artifact-vault-api";
-import type { ActivitySummary, SteerInfo } from "@/lib/chat-event";
+import type {
+  ActivitySummary,
+  NativeResult,
+  SteerInfo,
+} from "@/lib/chat-event";
 import type { AnswerReveal } from "./answer-reveal";
 
 /** 대화에 붙은 사진 한 장이다. `ChatDtos.AttachmentView` 를 그대로 받는다 */
@@ -69,6 +73,8 @@ export type Turn = {
   delegations?: DelegationLine[];
   /** 이 위임 결과 알림 줄이 전한 결과다. 있으면 저장된 글 대신 결과마다 이름표 줄을 그린다 */
   deliveredResults?: DelegationLine[];
+  /** Hermes 내장 위임 결과 알림 줄이면 그 상태다. 있으면 대화 에이전트의 이름표를 앞에 붙인다 */
+  nativeResult?: NativeResult | null;
   /** `@` 로 맡긴 일의 답이면 맡은 에이전트의 이름표다. 대화의 에이전트가 쓴 답은 null 이다 */
   answeredBy?: AgentLabel | null;
   /** `@` 로 맡긴 질문이면 그 맡김이다. 질문 아래에 「나 → 쇼핑 담당에게 맡김」 줄을 그린다 */
