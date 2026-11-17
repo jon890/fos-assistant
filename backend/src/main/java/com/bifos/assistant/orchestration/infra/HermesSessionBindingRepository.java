@@ -55,8 +55,7 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
 
     /**
      * 그 대화 실행을 origin 으로 둔 깨울 자식 가운데 끝 소식이 {@code stoppedAfter} 와 {@code settledBefore} 사이에 왔고 아직 전하지
-     * 않았으며 origin 이 중지되지 않은 줄이다. 끝난 순서다. 이미 읽었는지는 부르는 쪽이 따로 본다. 이미 읽은 줄은 칸을 적지 않으므로
-     * 기간으로 묶어 대화가 길어져도 조회가 늘지 않게 한다.
+     * 않았으며 origin 이 중지되지 않은 줄이다. 끝난 순서다. 기간으로 묶어 오래 전하지 못한 줄이 쌓여도 조회가 늘지 않게 한다.
      */
     @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
         + " where e.conversation_id = :conversationId and b.wake_eligible = true and b.stopped_at is not null"
