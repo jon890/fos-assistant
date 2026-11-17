@@ -190,9 +190,9 @@ E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도
 | core 의 Pillow 고정 | 13.0.0 | `NATIVE_IMAGE_PILLOW_VERSION` |
 | 도구 등록 `register_tool` | `plugins_context.py` 로 이동, 인자 모양은 같다 | `NATIVE_ATTACHMENT_REGISTRATION` |
 | 실패 판정 `_detect_tool_failure` | 결과 객체의 `status`, `results` 모양도 본다(`shape_failure_error`). 우리 이미지 결과는 실패로 세지 않는다 | `NATIVE_FAILURE_SHAPE` |
-| 도구 사건 필드 | `tool_call_id` 를 `_call_id` 로 덧붙인다 | `NATIVE_TOOL_EVENT_FIELDS` 의 셋째 칸 |
+| 도구 사건 필드 | `_call_id` 가 `tool_call_id` 칸을 덧붙인다 | `NATIVE_TOOL_EVENT_FIELDS` 의 셋째 칸 |
 
-그래서 이 테스트도 계열 표지로 기대값을 고르고(`expected`), `check-hermes-contract.sh` 가 두 버전에서 돌린다.
+그래서 이 테스트도 소스의 버전 계열로 기대값을 고르고(`expected`), `check-hermes-contract.sh` 가 두 버전에서 돌린다.
 
 ## PR4
 

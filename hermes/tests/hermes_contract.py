@@ -593,7 +593,7 @@ HERMES_VARIANTS = {
         "TOOL_GUARD_CODE_CALLS_HAVE_SESSION": True,
         # `_detect_tool_failure` 가 결과 객체의 모양까지 보도록 바뀌었다. 같은 파일의 함수와 상수를 분리 실행한다.
         "NATIVE_FAILURE_SHAPE": ("agent/tool_result_classification.py", "shape_failure_error", "_FAILED_STATUSES"),
-        # 사건 필드가 `tool_call_id` 를 `_call_id` 로 덧붙인다. 이 시험의 호출에는 그 칸이 없어 결과가 같다.
+        # 사건 필드에 `_call_id` 가 `tool_call_id` 칸을 덧붙인다. 이 테스트의 호출에는 그 칸이 없어 결과가 같다.
         "NATIVE_TOOL_EVENT_FIELDS": ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS", ("_call_id",)),
         # core 의존성의 Pillow 가 13.0.0 으로 올랐다. 우리 helper 는 설치된 Pillow 를 쓰므로 코드 변경은 없다.
         "NATIVE_IMAGE_PILLOW_VERSION": "13.0.0",
