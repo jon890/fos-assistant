@@ -42,7 +42,7 @@
 | REQ10 | (PR6, PR7) fos-ctx 의 `subagent_stop` 끝 소식을 Control Plane 이 하위 에이전트 등록 줄에 적고, 새 `AutoTurnResultSource` 가 ADR-040 의 자동 turn 에 넣는다. 아래 「PR6 내장 위임 결과」 |
 | REQ11 | (PR6) 끝 소식 뒤 5초 기다렸다 깨워 한 호출의 자식을 한 turn 에 모은다. 도는 turn 과 상한은 `DelegationWakeService` 그대로다 |
 | REQ12 | (PR6) 실패는 실패 결과로 깨운다. 1시간 기한과 중지한 turn 은 1분마다 도는 훑기가 알림 줄로 남긴다 |
-| REQ13 | (PR6) 대기 줄과 steer 는 `NextTurnDispatcher.tryNext` 그대로다. 결과 뒤 시작한 루트 실행이 있으면 질의 조건으로 뺀다 |
+| REQ13 | (PR6) 대기 줄과 steer 는 `NextTurnDispatcher.tryNext` 그대로다. 끝 소식 뒤에 돈 사용자 turn 이 있어도 결과를 빼지 않는다(2026-11-17 고침) |
 | REQ14 | (PR6) 이력 API 의 `SYSTEM` 줄에 `nativeResult` 를 실어 화면이 대화 에이전트의 이름표로 그린다. 등록 본문의 `reports_stop` 이 참인 자식만 다뤄 PR7 전에는 아무 일도 없다 |
 
 ## 책임과 경계
@@ -706,7 +706,7 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | 한 완료 단위의 자식이 모두 끝난 뒤 `_finalize_child_results` 가 그 단위의 hook 을 잇달아 부른다. 단위는 기본으로 호출 하나이고 `delegation.independent_completions` 를 켜면 `group` 마다다 | `tools/delegate_tool_dispatch.py` 의 `_execute_and_aggregate`, `_units_of` |
 | hook 은 부모 session 에 결과 줄을 남기기 **전에** 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 비동기 감시가 남긴다 | 같은 파일의 `_execute_and_aggregate` 와 `gateway/wake.py` 의 `persist_delegation_delivery` |
 | `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다 | `tools/delegate_tool_child_run.py` |
-| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남는다 | `gateway/wake.py` 의 머리 주석과 `resolve_resume_session_id` |
+| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남는다. 이름을 붙인 profile 은 이 줄을 남기지 않는다(운영 확인 2026-11-17) | `gateway/wake.py` 의 머리 주석과 `resolve_resume_session_id` |
 
 ### 요구사항 연결
 
@@ -876,7 +876,7 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 - 결과를 전했다는 표시는 `markDelivered` 가 `result_delivered_at` 이 빈 줄만 바꾼다. 바꾼 줄 수가 다르면 묶음까지 되돌아간다(ADR-075). 훑기의 중지 알림과 겹쳐도 한쪽만 이긴다.
 - 끝 소식을 적은 뒤 5초 사건 예약이 실패해도 다음 turn 닫기와 기동 훑기(`conversationsWithUndelivered`)가 다시 깨운다.
 - Control Plane 이 다시 떠도 결과는 등록 줄에 남는다. 5초 사이에 내려가도 기동 훑기가 전한다.
-- 플러그인이 보내기에 실패하면 그 자식은 기한 알림으로 끝난다. 결과는 Hermes 이력에 남아 다음 메시지에서 쓰인다.
+- 플러그인이 보내기에 실패하면 그 자식은 기한 알림으로 끝난다. 결과 줄을 남기는 `default` profile 이면 다음 메시지가 Hermes 이력으로 쓰고, 이름을 붙인 profile 이면 대화에 전해지지 않는다.
 - 기한·중지 알림의 칸과 알림 줄은 한 트랜잭션이라, 서버가 그 사이 내려가면 둘 다 남지 않고 다음 훑기가 다시 한다.
 
 ### 검증 전략
@@ -886,7 +886,7 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 | REQ10 | Control Plane 통합 테스트 | 등록(`reports_stop`)과 끝 소식을 보낸 뒤 자동 turn 이 열리고 입력에 결과 글이 들며 `nativeResult` 줄이 남는다. `@` 맡김, 맡은 에이전트, `CHECK` 대화의 자식은 열지 않는다 |
 | REQ11 | 같은 통합 테스트 | 같은 origin 의 자식 둘이 잇달아 끝나면 turn 하나다. 도는 turn 뒤에 모인다 |
 | REQ12 | 훑기 단위 테스트(고정 시계) | 1시간 뒤 알림 줄 하나, 다시 돌아도 하나, 그 뒤 끝 소식이 오면 자동 turn. 중지한 turn 은 알림 줄 하나이고 깨우지 않는다 |
-| REQ13 | 통합 테스트 | 끝난 뒤 시작한 사용자 turn 이 있으면 자동 turn 과 알림 줄이 없다. 대기 글이 먼저 간다 |
+| REQ13 | 통합 테스트 | 끝난 뒤 시작한 사용자 turn 이 있어도 자동 turn 하나와 알림 줄이 생기고, 다시 깨워도 더 열리지 않는다. 대기 글이 먼저 간다 |
 | REQ14 | 웹 단위 테스트와 Control Plane 테스트 | `nativeResult` 줄이 이름표와 함께 그려진다. 옛 본문의 등록은 `wake_eligible=false` 이고 기한 알림이 없다. 설정을 끄면 결과가 전해지지 않는다 |
 | 계약 | fos-ctx 계약 테스트(PR7), 배포 뒤 왕복 | 서명 기대값, 끝 소식 본문. 스펙의 「배포 뒤 왕복 확인」 |
 
@@ -926,7 +926,7 @@ v0.21.6(`818c13be`)과 v0.23.2(`ae2a81cc`)의 tag 소스로 확인한 사실이�
 - 제한 시간과 다시 보내기는 등록과 같다. 연결 실패와 5xx 에만 한 번 더 보내고, 4xx(404 포함)는 로그만 남긴다. 어떤 예외도 hook 밖으로 내지 않는다.
 - 로그에는 시도 횟수와 상태 코드, 예외 종류만 남긴다. 토큰, 서명, 맡긴 일, 결과 글은 남기지 않는다.
 
-hook 은 부모의 마무리 잠금 안에서 동기로 돈다. 보내기가 늦으면 그만큼 부모 session 의 결과 줄이 늦게 남는다. 자식 하나에 최악 `REGISTER_TIMEOUT` 의 두 배다. 결과 줄은 다음 turn 이 읽는 것이고, 자동 turn 은 끝 소식 뒤 5초를 기다리므로(「깨우는 때」) 이 지연이 결과를 놓치게 하지 않는다.
+hook 은 부모의 마무리 잠금 안에서 동기로 돈다. 보내기가 늦으면 그만큼 부모 session 의 결과 줄이 늦게 남는다. 자식 하나에 최악 `REGISTER_TIMEOUT` 의 두 배다. 결과 줄은 다음 turn 이 읽는 것이고(이름을 붙인 profile 은 남기지 않는다), 자동 turn 은 끝 소식 뒤 5초를 기다리므로(「깨우는 때」) 이 지연이 결과를 놓치게 하지 않는다.
 
 ### 배포와 되돌리기
 
