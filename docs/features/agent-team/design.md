@@ -773,7 +773,7 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | 칸 | 타입 | 뜻 |
 | --- | --- | --- |
 | `wake_eligible` | `BOOLEAN NOT NULL DEFAULT FALSE` | 위 「깨울 자식」 |
-| `goal_preview` | `VARCHAR(512) NULL` | 등록 본문의 새 칸 `child_goal` 의 앞 40자. 암호문이 들어가는 길이다 |
+| `goal_preview` | `VARCHAR(512) NULL` | 등록 본문의 새 칸 `child_goal` 의 앞 40자. 깨울 자식에만 적는다. 암호문이 들어가는 길이다 |
 | `stopped_at` | `DATETIME(6) NULL` | 끝 소식을 받은 시각 |
 | `result_status` | `VARCHAR(16) NULL` | `SUCCEEDED`, `FAILED` |
 | `result_text` | `LONGTEXT NULL` | 자른 `child_summary` |
@@ -782,9 +782,9 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | `timeout_noticed_at` | `DATETIME(6) NULL` | 기한 알림 줄을 남겼거나 같은 turn 의 앞 알림 줄에 든 시각 |
 | `notice_message_id` | `BIGINT NULL` | 이 결과를 전한 첫 시도의 알림 줄. 다시 전달은 바꾸지 않는다 |
 
-색인은 `origin_execution_id` 와, 훑기와 기동 훑기용 `(wake_eligible, result_delivered_at, created_at)` 를 더한다. 칸과 색인의 한국어 설명은 `db/comments` 에도 적는다.
+색인은 `origin_execution_id` 와, 훑기와 기동 훑기용 `(wake_eligible, result_delivered_at, created_at)` 를 더한다. 칸마다 한국어 `COMMENT` 를 마이그레이션에 단다(data-schema 「마이그레이션 작성 규칙」).
 
-등록 줄은 「한 번 적은 줄은 바꾸지 않는다」 였다(data-schema). 그 약속은 origin 과 사용자 칸의 것이고, 새 칸은 조건부 update 로만 바꾼다. 엔티티 저장에서는 빠진다(`updatable = false`). 대화를 정리하면 그 대화 실행의 등록 줄에서 두 글 칸과 key 칸을 비운다. `ConversationPurgeWriter` 가 위 「책임과 경계」 의 정리 port 를 부른다.
+등록 줄은 「한 번 적은 줄은 바꾸지 않는다」 였다(data-schema). 그 약속은 origin 과 사용자 칸의 것이고, 새 칸은 조건부 update 로만 바꾼다. 엔티티 저장에서는 빠진다(`updatable = false`). 대화를 정리하면 그 대화 실행의 등록 줄에서 두 글 칸과 key 칸을 비운다. `ConversationPurgeWriter` 가 위 「책임과 경계」 의 정리 port 를 부른다. 글 칸은 깨울 자식에만 차고 깨울 자식은 대화가 있으므로, 사용자 정리도 대화 정리를 거쳐 같은 칸을 비운다.
 
 등록 본문에 선택 칸 `reports_stop`(불리언)과 `child_goal`(글)을 더한다. 서명하지 않는다. 없으면 `false` 와 `null` 이다. 옛 플러그인은 지금처럼 등록된다.
 
