@@ -483,6 +483,11 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.HELD);
         assertThat(action(answer).status()).isEqualTo(ActionStatus.WAITING);
         assertThat(fills.get()).isEqualTo(1);
+
+        // 다른 호출이 이미 이어 가는 중이면 새로 준비하지 말라고 답한다
+        jdbc.update("update connector_action set status = 'EXECUTING', resumed_at = ? where id = ?", Timestamp.from(clock.instant()),
+            action(answer).id());
+        assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.RUNNING);
     }
 
 

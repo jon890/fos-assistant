@@ -60,6 +60,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
     static final String NOT_YET = "사용자가 아직 「내 브라우저」에서 마쳤다고 하지 않았다. 사용자가 마치고 이 대화에 다음 메시지를 보낸 뒤 다시 부른다.";
     static final String HELD = "사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.";
     static final String ENDED = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
+    static final String RUNNING = "이미 이어 가는 중이다. 새로 준비하지 말고 그 결과를 기다린다.";
 
     private final ConnectorFinancialApproval approval;
     private final ConnectorExecutionCurrent current;
@@ -87,7 +88,9 @@ class ConnectorApprovalResume implements ApprovalResumes {
         Optional<ConnectorAction> found = conversationId == null ? Optional.empty()
             : actions.findFirstByUserIdAndConversationIdAndStatusOrderByIdDesc(user.id(), conversationId, ActionStatus.WAITING);
         if (found.isEmpty()) {
-            return NONE;
+            // 같은 대화에서 이어 가는 중인 줄이 있으면 다시 부른 것이다. 새로 준비하지 않게 알린다.
+            return conversationId != null && actions.findFirstByUserIdAndConversationIdAndStatusOrderByIdDesc(user.id(), conversationId,
+                ActionStatus.EXECUTING).filter(action -> action.waiting() != null).isPresent() ? RUNNING : NONE;
         }
         ConnectorAction waiting = found.get();
         UUID actionId = waiting.publicId();
@@ -125,7 +128,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
             return ended(user, conversationId, actionId);
         }
         if (started.isEmpty()) {
-            return render(user, conversationId, actionId, NONE);
+            return render(user, conversationId, actionId, RUNNING);
         }
         if (started.get().snapshot() == null) {
             return render(user, conversationId, actionId, ENDED);
@@ -137,7 +140,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
 
     /**
      * 잠근 줄을 다시 보고 이어 간다. 줄이 바뀌었으면 빈 값, 그 순간의 상한에 걸려 끝냈으면 snapshot 이 없는 값이다(spec DECISION19).
-     * 자기 줄을 뺀 승인 날짜의 합계로 본다. 뒤의 claim 이 같은 날짜로 다시 보므로 판정이 어긋나지 않는다.
+     * 자기 줄을 뺀 오늘 합계로 본다. 뒤의 claim 이 승인 날짜의 합계로 한 번 더 보므로 둘 다 지나야 「구매하기」 를 누른다.
      */
     private Optional<Started> begin(CurrentUser user, Long conversationId, UUID actionId, Prepared prepared) {
         users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
@@ -154,7 +157,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
         gate.requireOpen();
         long expected = checked.expectedTotalKrw().orElseThrow(ConnectorFinancialProducer::rejected);
         try {
-            purchases.requireWithin(action.userId(), action.id(), expected, action.decidedAt());
+            purchases.requireWithin(action.userId(), action.id(), expected, now);
         } catch (PurchaseLimitExceeded ex) {
             ConnectorCheckoutOutcome.limited(action, ex, expected, bodies, now);
             settled(action, now);
@@ -168,7 +171,7 @@ class ConnectorApprovalResume implements ApprovalResumes {
 
     /**
      * 수명이 다했거나 남긴 탭이 있던 브라우저가 꺼진 사람 기다림을 끝낸다(spec REQ9). 일정이 1분마다 부른다. 끝낸 줄은 하루 합계에서
-     * 빠진다. 모델은 이미 멈춤을 전해 받았으므로 다시 깨우지 않고, 다음 이어 가기가 끝났다는 결과를 받는다.
+     * 빠진다. 모델은 이미 멈춤을 전해 받았으므로 다시 깨우지 않는다. 다음 이어 가기는 이어 갈 승인이 없다는 답을 받아 새로 준비한다.
      *
      * @return 끝낸 줄 수
      */
