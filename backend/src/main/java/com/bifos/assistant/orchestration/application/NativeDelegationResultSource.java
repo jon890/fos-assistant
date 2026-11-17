@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>origin 실행이 중지되지 않았다. 중지한 turn 의 자식은 {@code NativeDelegationSweep} 이 알림 줄로 끝낸다
  * </ul>
  *
- * <p>끝 소식 뒤에 사용자 turn 이 돌았어도 뺀다고 보지 않는다. 이름을 붙인 Hermes profile 은 부모 session 에 결과 줄을 남기지 않아
+ * <p>끝 소식 뒤에 사용자 turn 이 돌았어도 결과를 빼지 않는다. 이름을 붙인 Hermes profile 은 부모 session 에 결과 줄을 남기지 않아
  * 그 turn 이 결과를 읽을 길이 없다(hermes/docs/hermes-contract.md 「API 위임 결과는 delivery 기록으로 남는다」). 결과 줄이 남는
  * profile 에서는 같은 결과를 한 번 더 정리할 수 있다. 결과를 놓치는 것보다 낫다.
  *
