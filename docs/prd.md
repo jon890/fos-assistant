@@ -111,7 +111,6 @@
 
 | 단계 | 무엇 | 문서 |
 | --- | --- | --- |
-| 지금 | 개발 문서와 로드맵을 웹에서 보기 | [개발 현황](features/dev-overview.md) |
 | 지금 | Hermes v0.23.2 로 올리기 위한 Control Plane 과 플러그인 호환 | |
 | 지금 | Hermes 내장 위임이 끝나면 부모 대화의 다음 답을 자동으로 열기 | |
 | 지금 | 네이버 쇼핑 구매 에이전트 개선 | [네이버 쇼핑](features/naver-shopping.md) |
