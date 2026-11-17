@@ -3,6 +3,7 @@
 스펙: [`spec.md`](spec.md).
 
 스펙의 DECISION2 대로 PR 다섯으로 나눈다. 이 문서는 PR1 부터 PR5 까지를 구현할 깊이로 쓴다. 뒤 PR 은 시작할 때 이 문서의 해당 절을 고치고 검토를 다시 받았다.
+스펙 범위 6(내장 위임 결과)은 스펙 DECISION36 대로 PR 둘이고, 이 문서에서는 PR6 과 PR7 로 부른다.
 
 | PR | 요구사항 | 내용 |
 | --- | --- | --- |
@@ -11,6 +12,8 @@
 | PR3 | REQ5, REQ6 | 전문 에이전트 만들기 마법사 |
 | PR4 | REQ7 | 대화 중 `@` 로 바로 맡기기 |
 | PR5 | REQ8, REQ9 | 기본 비서와 이어지는 대화방과 날짜별 요약 |
+| PR6 | REQ10~REQ14 | 내장 위임의 끝 소식 받는 경로, 자동 답, 기한·중지 알림, 결과 도착 줄 |
+| PR7 | REQ10 | fos-ctx 의 `subagent_stop` hook 이 끝 소식을 보내고 등록에 `reports_stop`, `child_goal` 을 싣는다 |
 
 ## 지금 구조
 
@@ -36,6 +39,11 @@
 | REQ7 | (PR4) 보내기 요청의 `delegateTo` 로 Control Plane 이 고른 에이전트의 turn 을 새 session 으로 바로 돌린다. 그 실행은 대화의 루트 실행이고 `delegation_key` 가 없어 자동 결과 전달을 타지 않는다. 맡은 에이전트의 입력에는 그 대화의 최근 `USER`·`ASSISTANT` 줄을 출처 머리줄과 함께 싣는다. 답은 그 실행 번호의 `ASSISTANT` 줄이고 이력 API 가 질문 줄에 `delegatedTo`, 답 줄에 `answeredBy` 를 싣는다. 대화 에이전트의 다음 turn 입력 앞에 위임 결과 전달과 같은 머리줄로 그 주고받음을 싣는다. 무엇을 할지 Control Plane 이 정하는 예외라 ADR-017 을 고치는 ADR 을 둔다. 스펙의 「위임 실행」 은 사용자 쪽에서 본 말이고 구현은 `agent_delegate` 의 자식이 아닌 루트 실행이다(DECISION18). 아래 「PR4 @ 멘션」 |
 | REQ8 | (PR5) 대화방은 `conversation.purpose` 의 새 값 `ROOM` 이고 사용자마다 하나다. `/` 가 그 방을 열어(없으면 만들어) `/chat/{id}` 로 넘기고, 새 대화 화면은 `/new` 로 옮긴다. 목록 API 는 대화방을 빼고 사이드바가 맨 위에 따로 그린다. 기본 비서는 「주인이 요청자이고 profile 이 요청자의 기본 profile 인 에이전트」 로 정하고 새 칸을 두지 않는다. 지우기 경로가 기본 profile 을 가리키는 에이전트를 거절한다. 아래 「PR5 대화방」 |
 | REQ9 | (PR5) 대화방에서 사용자가 보낸 turn 이 질문을 저장하기 전에, 대화의 지금 루트 session 으로 돈 첫 실행의 Asia/Seoul 날짜가 오늘보다 앞이면 옛 session 에 요약 실행(대화 밖 실행)을 돌린다. 요약을 알림 줄(`SYSTEM`)로 남기고 두 session 칸을 새 `fos-<uuid>` 로 바꾼다(`ConversationSessions.renew`). 요약은 새 루트 session 에 성공한 실행이 생길 때까지 turn 입력 앞에 싣는다. instructions 는 실행마다 조립하므로 거기에 두지 않는다. 요약이 실패하면 두 칸을 그대로 두고 다음 메시지에서 다시 한다. 아래 「PR5 대화방」 |
+| REQ10 | (PR6, PR7) fos-ctx 의 `subagent_stop` 끝 소식을 Control Plane 이 하위 에이전트 등록 줄에 적고, 새 `AutoTurnResultSource` 가 ADR-040 의 자동 turn 에 넣는다. 아래 「PR6 내장 위임 결과」 |
+| REQ11 | (PR6) 끝 소식 뒤 5초 기다렸다 깨워 한 호출의 자식을 한 turn 에 모은다. 도는 turn 과 상한은 `DelegationWakeService` 그대로다 |
+| REQ12 | (PR6) 실패는 실패 결과로 깨운다. 1시간 기한과 중지한 turn 은 1분마다 도는 훑기가 알림 줄로 남긴다 |
+| REQ13 | (PR6) 대기 줄과 steer 는 `NextTurnDispatcher.tryNext` 그대로다. 결과 뒤 시작한 루트 실행이 있으면 질의 조건으로 뺀다 |
+| REQ14 | (PR6) 이력 API 의 `SYSTEM` 줄에 `nativeResult` 를 실어 화면이 대화 에이전트의 이름표로 그린다. 등록 본문의 `reports_stop` 이 참인 자식만 다뤄 PR7 전에는 아무 일도 없다 |
 
 ## 책임과 경계
 
@@ -680,6 +688,208 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 
 배포 뒤 확인: 실제 Hermes 로 대화방에 하루를 넘겨 한 번 보내 요약이 붙고 답이 앞 이야기를 잇는지 본다. 확인 방법은 `fos-home-infra` 가 갖는다.
 
+## PR6 내장 위임 결과
+
+스펙 범위 6(REQ10~REQ14)이다. 스펙 DECISION36 의 「PR1」 이 이 절의 PR6(Control Plane 과 화면, 이 설계), 「PR2」 가 PR7(fos-ctx 의 `subagent_stop` hook)이다. PR6 을 먼저 배포한다.
+
+### 지금 구조
+
+- 모델이 부른 최상위 `delegate_task` 는 늘 background 로 떨어져 나가 부모 run 보다 오래 돈다. 끝나면 Hermes 가 부모 session 에 `display_kind=async_delegation_complete` 줄을 한 번 남길 뿐 새 run 이나 사건을 만들지 않는다(`hermes/docs/hermes-contract.md` 「API 위임 결과는 delivery 기록으로 남는다」). 다음 run 이 그 줄을 이력으로 읽는다.
+- fos-ctx 는 `subagent_start` 에서 자식 session 을 `hermes_session_binding` 에 등록한다(ADR-037). 끝을 알리는 hook 은 쓰지 않는다.
+- ADR-040 의 자동 turn 은 `DelegationWakeService` 가 열고, 위임 결과 말고 다른 결과는 `AutoTurnResultSource` 의 구현이 같은 turn 에 넣는다. 지금 구현은 승인한 플러그인 호출의 결과(`ConnectorActionResultSource`) 하나다. 다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다(ADR-048).
+
+v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에 함께 적는다.
+
+| 사실 | 근거 |
+| --- | --- |
+| `subagent_stop` 은 자식마다 한 번 `parent_session_id`, `parent_turn_id`, `child_session_id`, `child_role`, `child_summary`, `child_status`, `tool_call_history`, `duration_ms` 로 불린다. `child_goal` 은 없다 | `tools/delegate_tool_results.py` 의 `_fire_subagent_stop_hooks` |
+| 한 완료 단위의 자식이 모두 끝난 뒤 `_finalize_child_results` 가 그 단위의 hook 을 잇달아 부른다. 단위는 기본으로 호출 하나이고 `delegation.independent_completions` 를 켜면 `group` 마다다 | `tools/delegate_tool_dispatch.py` 의 `_execute_and_aggregate`, `_units_of` |
+| hook 은 부모 session 에 결과 줄을 남기기 **전에** 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 비동기 감시가 남긴다 | 같은 파일의 `_execute_and_aggregate` 와 `gateway/wake.py` 의 `persist_delegation_delivery` |
+| `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다 | `tools/delegate_tool_child_run.py` |
+| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남는다 | `gateway/wake.py` 의 머리 주석과 `resolve_resume_session_id` |
+
+### 요구사항 연결
+
+| ID | 해결 방법 |
+| --- | --- |
+| REQ10 | PR7 의 fos-ctx 가 `subagent_stop` 에서 Control Plane 에 끝 소식을 보낸다. Control Plane 은 등록 줄에 상태와 결과 글을 적고 새 `AutoTurnResultSource` 구현 `NativeDelegationResultSource`(출처 이름 `NATIVE_DELEGATION`)가 그 결과를 ADR-040 의 자동 turn 에 넣는다. 깨울 자식은 등록할 때 정한다(아래 「깨울 자식」) |
+| REQ11 | 끝 소식을 받으면 바로 깨우지 않고 5초 뒤 사건을 낸다. 한 단위의 hook 은 잇달아 오므로 그 사이 같은 대화의 끝난 결과가 모두 모여 자동 turn 하나에 든다. 도는 turn 과 상한은 `DelegationWakeService` 그대로다 |
+| REQ12 | `completed` 는 성공, 나머지는 실패로 적는다. 1시간 기한과 중지한 turn 은 매분 도는 훑기 작업이 알림 줄로 남긴다. 늦게 온 끝 소식은 기한 알림과 상관없이 결과로 받는다 |
+| REQ13 | 대기 줄과 steer 는 `tryNext` 그대로다. 이미 읽은 결과는 저장하지 않고 질의 조건으로 뺀다(아래 「이미 읽은 결과」) |
+| REQ14 | 알림 줄은 결과마다 `SYSTEM` 줄이고, 이력 API 가 그 줄에 `nativeResult` 를 실어 화면이 대화 에이전트의 이름표로 그린다. 설정은 `assistant.delegation-wake.enabled` 하나다. PR6 만 배포됐을 때는 끝 소식도 기한 대상도 생기지 않는다(아래 「배포 순서와 안전」) |
+
+### 책임과 경계
+
+| 무엇 | 소유 | 까닭 |
+| --- | --- | --- |
+| 끝 소식 경로의 컨트롤러, 본문, 서명 확인 | `mcp`(`SubagentSessionController`, `SubagentRegistration` 옆). 새 경로를 `AgentTokenAuthenticationFilter.AGENT_TOKEN_PATHS` 와 `ControlPlaneJwtFilter` 의 제외 목록에 함께 더한다 | 등록 경로의 컨트롤러와 서명 확인이 여기 있다 |
+| 등록 줄의 결과 칸, 깨울 자식 판정, 끝 소식 저장 | `orchestration`(`SubagentSessionRegistrar` 와 새 `SubagentStopRecorder`) | 등록 줄과 origin 판정이 여기 있다(ADR-037) |
+| 자동 turn 에 넣을 결과 | `orchestration` 의 `NativeDelegationResultSource`. `chat.delivery.application.port.AutoTurnResultSource` 를 구현한다 | `ConnectorActionResultSource` 와 같은 모양이다 |
+| 깨우기, 묶음, 상한, 다시 전달 | `chat` 그대로 | ADR-040, ADR-075 |
+| 결과 도착 줄의 상태를 이력 API 에 주기 | `chat` 의 새 port `AutoTurnNoticeLabels`. `orchestration` 이 구현한다 | `chat` 은 출처 이름도 등록 줄도 모른다 |
+| 대화 정리 때 결과 글 비우기 | `chat.purge.application.port` 의 새 port. `orchestration` 이 구현한다. `ConversationExecutionPurge` 와 같은 모양이다 | `chat` 이 `orchestration` 의 저장소를 쓰지 않는다 |
+| 기한과 중지 알림 훑기 | `orchestration` 의 `NativeDelegationSweep`. 알림 줄 저장과 사건은 `chat` 의 기존 공개 메서드로 한다 | 판정에 쓰는 값이 등록 줄에 있다 |
+| hook 과 보내기 | `hermes/plugins/fos-ctx` 의 `subagent.py`(PR7) | 등록 hook 이 같은 파일에 있다 |
+
+`chat` 이 `orchestration` 보다 아래다(`TopLevelPackageOrder.ORDER`). `chat` 은 port 만 갖고 `orchestration`, `mcp` 가 구현하거나 부른다. 새 최상위 패키지는 없다.
+
+### 깨울 자식
+
+등록할 때 한 번 정해 새 칸 `wake_eligible` 에 적고 바꾸지 않는다. 모두 맞아야 참이다.
+
+- 요청 본문의 `reports_stop` 이 `true` 다(PR7 이 보낸다)
+- 부모 등록이 아니라 루트 session 으로 origin 을 찾았고 hook 의 `parent_subagent_id` 가 비었다. 최상위 자식이다(fos-ctx README 의 판정 2). 부모 등록이 실패한 손자가 루트로 풀려도 `parent_subagent_id` 가 있어 빠진다
+- origin 실행이 부모 없는 루트이고 대화가 있다. 대화의 `purpose` 가 `CHECK` 가 아니다(먼저 살펴보기). 에이전트가 대화의 에이전트와 같다(`@` 맡김 실행이 아니다, 이 문서 DECISION19)
+
+`agent_delegate` 로 맡은 에이전트의 실행은 부모가 있어 빠진다. 예약 작업 turn 은 대화의 루트 실행이라 든다. 거짓인 자식의 끝 소식은 받아서 버린다(200).
+
+### 인터페이스와 데이터
+
+#### 끝 소식 경로
+
+`POST /internal/hermes/session-bindings/subagent/stop`. 인증과 서명 key 는 등록 경로와 같다. 정확한 칸과 응답은 PR6 이 fos-ctx README 의 「하위 에이전트 끝 소식 계약」 에 적는다.
+
+| 칸 | 값 |
+| --- | --- |
+| `v` | `1` |
+| `parent_session_id`, `parent_root_session_id`, `child_session_id` | 등록과 같다 |
+| `child_status` | hook 이 받은 값. 모르는 값은 실패로 본다 |
+| `child_summary` | hook 이 받은 글. 없으면 `null` |
+| `sig` | 서명할 글의 첫 줄을 `v1-subagent-stop` 으로 바꾼 것 말고 등록과 같다. 글은 서명하지 않는다. 토큰이 profile 을 증명한다 |
+
+| 응답 | 뜻 |
+| --- | --- |
+| `200` `{"result": "recorded"}` | 결과를 적었다 |
+| `200` `{"result": "ignored"}` | 깨울 자식이 아니거나 이미 적었다. 같은 소식을 다시 보낸 것도 여기다 |
+| `401`, `403` | 등록 경로와 같다. 서명한 루트가 등록 줄의 루트와 다르면 `403`. 부모가 다른 것은 받는다. 등록 뒤 부모 session 이 압축으로 바뀔 수 있어서다. 서버 로그에만 남긴다 |
+| `404` `{"code": "SESSION_BINDING_NOT_FOUND"}` | 등록 줄이 없다. 플러그인은 로그만 남긴다 |
+
+`child_summary` 는 위임 실행의 답과 같은 상한(`assistant.delegation.output-max-chars`)으로 자른다(`DelegationOutput`).
+
+#### 등록 줄의 새 칸
+
+`hermes_session_binding` 에 칸을 더한다. 테이블은 늘리지 않는다(스펙 DECISION38). 마이그레이션 번호는 `orch queue reserve` 로 받는다.
+
+| 칸 | 타입 | 뜻 |
+| --- | --- | --- |
+| `wake_eligible` | `BOOLEAN NOT NULL DEFAULT FALSE` | 위 「깨울 자식」 |
+| `goal_preview` | `VARCHAR(512) NULL` | 등록 본문의 새 칸 `child_goal` 의 앞 40자. 암호문이 들어가는 길이다 |
+| `stopped_at` | `DATETIME(6) NULL` | 끝 소식을 받은 시각 |
+| `result_status` | `VARCHAR(16) NULL` | `SUCCEEDED`, `FAILED` |
+| `result_text` | `LONGTEXT NULL` | 자른 `child_summary` |
+| `result_key_id` | `BIGINT NULL` | 두 글 칸의 데이터 key. AAD 는 `hermes_session_binding:<id>:<칸>:user:<user_id>` |
+| `result_delivered_at` | `DATETIME(6) NULL` | 자동 turn 이 전했거나, 중지 알림으로 끝냈거나, 설정이 꺼져 버린 시각 |
+| `timeout_noticed_at` | `DATETIME(6) NULL` | 기한 알림 줄을 남겼거나 같은 turn 의 앞 알림 줄에 든 시각 |
+| `notice_message_id` | `BIGINT NULL` | 이 결과를 전한 첫 시도의 알림 줄. 다시 전달은 바꾸지 않는다 |
+
+색인은 `origin_execution_id` 와, 훑기와 기동 훑기용 `(wake_eligible, result_delivered_at, created_at)` 를 더한다. 칸과 색인의 한국어 설명은 `db/comments` 에도 적는다.
+
+등록 줄은 「한 번 적은 줄은 바꾸지 않는다」 였다(data-schema). 그 약속은 origin 과 사용자 칸의 것이고, 새 칸은 조건부 update 로만 바꾼다. 엔티티 저장에서는 빠진다(`updatable = false`). 대화를 정리하면 그 대화 실행의 등록 줄에서 두 글 칸과 key 칸을 비운다. `ConversationPurgeWriter` 가 위 「책임과 경계」 의 정리 port 를 부른다.
+
+등록 본문에 선택 칸 `reports_stop`(불리언)과 `child_goal`(글)을 더한다. 서명하지 않는다. 없으면 `false` 와 `null` 이다. 옛 플러그인은 지금처럼 등록된다.
+
+#### 자동 turn 에 넣는 결과
+
+`NativeDelegationResultSource` 가 낸다. `undelivered(conversationId)` 의 대상은 그 대화 실행의 등록 줄 가운데 아래를 모두 맞는 줄이다. 끝난 순서다. `conversationsWithUndelivered` 도 같은 조건이다.
+
+- `wake_eligible` 이고 `stopped_at` 이 있고 `result_delivered_at` 이 없다
+- `stopped_at` 이 5초보다 오래됐다(아래 「깨우는 때」)
+- origin 루트가 `CANCELLED` 가 아니다
+- 아래 「이미 읽은 결과」 에 들지 않는다
+
+| 칸 | 값 |
+| --- | --- |
+| `key` | 등록 줄 번호 |
+| `notice` | 「하위 작업이 끝났어요 · {goal 40자}」 또는 「하위 작업을 하지 못했어요 · {goal 40자}」. goal 이 없으면 「 · 」 뒤를 뺀다 |
+| `input` | 위임 결과와 같은 머리줄 모양으로 「Hermes 하위 작업 결과」 와 상태, 결과 글을 `<external-data>` 로 감싼다. 같은 결과가 Hermes 이력에도 있다고 적는다 |
+
+`markDelivered`, `resultsFor` 는 `ConnectorActionResultSource` 와 같은 뜻이다. `resultsFor` 는 저장된 결과 글로 다시 전달한다(ADR-075).
+`AutoTurnResult` 에 두 칸을 더한다. 승인 결과는 둘 다 기본값이다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `unattended` | 결과가 사람이 없는 실행(예약 작업 turn)에서 나왔다. 참이면 `ChatDeliveryTurns.fromUnattended` 가 그 자동 turn 을 사람이 없는 실행으로 적는다 |
+| `noticeStatus` | 결과 도착 줄에 그릴 상태(`SUCCEEDED`, `FAILED`). 비면 지금처럼 글만 그린다. 자동 turn 이 도는 동안 `system` 사건이 이 값을 싣는다 |
+
+`AutoTurnResultSource` 에 기본 구현이 빈 메서드 `noticesSaved(Map<String, Long> messageIdByKey)` 를 더한다. `ChatDeliveryTurns` 가 첫 시도의 알림 줄을 저장한 같은 트랜잭션에서 결과 key 마다 그 줄 번호로 부른다. 내장 위임 구현은 `notice_message_id` 를 비어 있을 때만 적는다.
+
+#### 이미 읽은 결과
+
+스펙 DECISION32 를 질의 조건으로 한다. **그 대화의 실행 가운데 아래를 모두 맞는 것이 있으면 읽은 것이다.** 그런 결과는 `undelivered` 와 기동 훑기에서 빠지고 칸을 쓰지 않는다. 알림 줄도 없다.
+
+- 부모가 없고 에이전트가 대화의 에이전트와 같다. `@` 맡김 turn 은 다른 session 이라 결과 줄을 읽지 않는다
+- Hermes 에 제출됐다(`hermes_run_id` 가 있다). 제출 전에 실패한 실행은 아무것도 읽지 않았다
+- `started_at` 이 결과의 `stopped_at` 보다 30초 넘게 늦다
+
+끝 소식은 Hermes 가 결과 줄을 남기기 전에 온다. 30초는 그 줄이 남을 시간이다. 스펙의 「결과가 기록된 뒤 시작한 turn」 을 Control Plane 이 볼 수 있는 값으로 옮긴 것이다. 30초 안에 시작한 turn 은 읽지 않은 것으로 보아 그 turn 뒤에 결과를 전한다. 그 turn 이 결과 줄을 이미 읽었으면 같은 결과를 한 번 더 정리할 수 있다. 결과를 놓치는 것보다 낫다.
+
+#### 깨우는 때
+
+끝 소식을 적은 트랜잭션이 커밋되면 6초 뒤 `DelegationFinished(conversationId, null)` 사건을 예약한다(`TaskScheduler`). 때가 되면 `DelegationWakeService.dueAfterUserBusy` 처럼 `BackgroundTasks` 의 새 가상 스레드에서 사건을 낸다. 스케줄러 스레드에서 DB 를 읽지 않는다. `NextTurnDispatcher.onDelegationFinished` 와 `DelegationLineNotifier` 는 이미 실행 번호가 빈 사건을 받는다. Javadoc 만 고친다.
+기다리는 5초는 한 단위의 hook 이 모두 닿을 시간이다. 그동안은 위 「자동 turn 에 넣는 결과」 의 조건이 그 결과를 빼므로 turn 닫기, 다른 위임 결과, 재시도, 기동 훑기가 먼저 깨워도 한 단위가 나뉘지 않는다. 서로 다른 호출이 그 안에 함께 끝나면 한 turn 에 든다. ADR-040 이 도는 turn 뒤에 결과를 모으는 것과 같은 결과다.
+
+#### 기한과 중지 알림
+
+`NativeDelegationSweep` 이 1분마다 돈다. 설정이 꺼져 있으면 돌지 않는다.
+
+| 대상 | 판정 | 하는 일 |
+| --- | --- | --- |
+| 기한 | `wake_eligible`, `stopped_at` 과 `timeout_noticed_at` 이 없고, 등록한 지 1시간이 지났고 24시간이 지나지 않았고, origin 루트가 `CANCELLED` 가 아니다 | origin 실행마다 알림 줄 하나(스펙 DECISION40, DECISION42 의 글)를 남기고, 그 origin 의 소식 없는 깨울 자식 모두에 `timeout_noticed_at` 을 적는다. 뒤에 1시간을 넘는 같은 origin 의 자식은 알림 줄 없이 칸만 적는다 |
+| 중지 | `wake_eligible` 이고 `result_delivered_at` 이 없고, 등록한 지 24시간이 지나지 않았고, origin 루트가 `CANCELLED` 다. 그 origin 의 깨울 자식이 모두 끝났거나 가장 먼저 등록한 자식이 1시간을 넘었다 | origin 실행마다 스펙 DECISION34 의 알림 줄 하나를 남기고 그 origin 의 깨울 자식 모두에 `result_delivered_at` 을 적는다 |
+
+두 대상 모두 `wake_eligible` 이 참인 줄만 본다. PR6 배포 전의 등록 줄과 옛 플러그인의 등록 줄은 거짓이라 대상이 없다.
+
+칸의 조건부 update 와 알림 줄 저장을 한 트랜잭션에 둔다. 바꾼 줄이 있을 때만 알림 줄을 남기므로 같은 알림이 두 번 남지 않고, 하나만 커밋되는 일도 없다. 커밋한 뒤 대화 단위 SSE 로 `system` 사건을 보낸다. 대화의 turn 잠금은 잡지 않는다. `DelegationWakeService.noticeLimitReached` 와 같다.
+알림 줄은 호출이 아니라 origin 실행(turn)마다다. Control Plane 은 어느 자식이 같은 호출인지 모른다. 한 turn 에서 따로 부른 호출이 모두 사라지면 한 줄로 합쳐 보인다.
+스펙 DECISION31 의 「한 호출의 자식 가운데 일부만 소식이 없다」 는 기본 설정에서 일어나지 않는다. Hermes 가 한 단위의 자식이 모두 끝난 뒤에야 hook 을 부르므로, 한 자식이 사라지면 같은 단위의 끝 소식이 모두 오지 않는다. `delegation.independent_completions` 를 켜면 단위가 `group` 마다라, 끝난 단위는 그대로 깨우고 사라진 단위만 기한 알림이 된다. 스펙이 정한 결과와 같다.
+기한 뒤에 끝 소식이 오면 보통 결과처럼 깨운다(스펙 DECISION42).
+
+#### 설정을 끈 동안
+
+끝 소식 경로는 결과를 적되 `result_delivered_at` 을 함께 적는다. 켠 뒤에도 그 결과로 깨우지 않는다(스펙 DECISION39). 훑기는 돌지 않는다.
+기한 대상은 등록한 지 1시간이 지나고 24시간이 지나지 않은 줄로 좁힌다. 오래 꺼 두었다 켜거나 서버가 오래 내려갔다 떠도, 그동안 쌓인 옛 자식들이 한꺼번에 알림 줄을 남기지 않는다.
+
+#### 이력 API
+
+`SYSTEM` 줄에 `nativeResult` 를 더한다. 내장 위임 결과의 알림 줄이면 `{ "status": "SUCCEEDED" | "FAILED" }`, 아니면 없다. 화면은 이 칸이 있는 줄을 대화 에이전트의 이름표(`AgentBadge`)와 저장된 글로 그린다. 기한과 중지 알림 줄은 지금 알림 줄처럼 글만 보인다.
+값은 `chat` 의 port `AutoTurnNoticeLabels.statusesByNotice(conversationId)` 가 준다. 구현은 등록 줄의 `notice_message_id` 와 `result_status` 를 읽는다. 다시 전달해도 첫 줄 번호는 그대로라 새로 고쳐도 같다.
+자동 turn 이 도는 동안은 `system` 사건에 `AutoTurnResult.noticeStatus` 를 같은 칸으로 싣는다.
+
+### 화면
+
+`web/src/components/chat/` 의 알림 줄 부품이 `nativeResult` 가 있으면 대화 에이전트의 이름표를 앞에 붙인다. 글은 서버가 저장한 것을 그대로 쓴다. 「결과 다시 전달」 은 지금 자리 그대로다.
+
+### 배포 순서와 안전
+
+| 상태 | 결과 |
+| --- | --- |
+| PR6 만 배포 | 옛 fos-ctx 는 `reports_stop` 을 보내지 않아 모든 새 등록이 `wake_eligible=false` 다. 끝 소식도 오지 않는다. 기한과 중지 훑기의 대상이 없다. 자동 답과 알림 줄이 생기지 않는다(스펙 DECISION35) |
+| PR7 까지 배포 | 그 뒤 등록한 최상위 자식부터 깨운다. 배포 전에 등록한 자식은 끝나도 버린다 |
+| PR7 을 되돌림 | 새 등록이 다시 거짓이다. 이미 참인 줄은 끝 소식이 오지 않아 1시간 뒤 기한 알림이 한 번 남는다 |
+
+rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 서버는 옛 본문을 그대로 받는다.
+
+### 실패와 일관성
+
+- 끝 소식 저장은 `stopped_at` 이 비어 있을 때만 바꾸는 조건부 update 다. 다시 보낸 소식과 동시 요청은 하나만 적힌다.
+- 결과를 전했다는 표시는 `markDelivered` 가 `result_delivered_at` 이 빈 줄만 바꾼다. 바꾼 줄 수가 다르면 묶음까지 되돌아간다(ADR-075). 훑기의 중지 알림과 겹쳐도 한쪽만 이긴다.
+- 끝 소식을 적은 뒤 5초 사건 예약이 실패해도 다음 turn 닫기와 기동 훑기(`conversationsWithUndelivered`)가 다시 깨운다.
+- Control Plane 이 다시 떠도 결과는 등록 줄에 남는다. 5초 사이에 내려가도 기동 훑기가 전한다.
+- 플러그인이 보내기에 실패하면 그 자식은 기한 알림으로 끝난다. 결과는 Hermes 이력에 남아 다음 메시지에서 쓰인다.
+- 기한·중지 알림의 칸과 알림 줄은 한 트랜잭션이라, 서버가 그 사이 내려가면 둘 다 남지 않고 다음 훑기가 다시 한다.
+
+### 검증 전략
+
+| 요구사항 | 경계 | 확인 |
+| --- | --- | --- |
+| REQ10 | Control Plane 통합 테스트 | 등록(`reports_stop`)과 끝 소식을 보낸 뒤 자동 turn 이 열리고 입력에 결과 글이 들며 `nativeResult` 줄이 남는다. `@` 맡김, 맡은 에이전트, `CHECK` 대화의 자식은 열지 않는다 |
+| REQ11 | 같은 통합 테스트 | 같은 origin 의 자식 둘이 잇달아 끝나면 turn 하나다. 도는 turn 뒤에 모인다 |
+| REQ12 | 훑기 단위 테스트(고정 시계) | 1시간 뒤 알림 줄 하나, 다시 돌아도 하나, 그 뒤 끝 소식이 오면 자동 turn. 중지한 turn 은 알림 줄 하나이고 깨우지 않는다 |
+| REQ13 | 통합 테스트 | 끝난 뒤 시작한 사용자 turn 이 있으면 자동 turn 과 알림 줄이 없다. 대기 글이 먼저 간다 |
+| REQ14 | 웹 단위 테스트와 Control Plane 테스트 | `nativeResult` 줄이 이름표와 함께 그려진다. 옛 본문의 등록은 `wake_eligible=false` 이고 기한 알림이 없다. 설정을 끄면 결과가 전해지지 않는다 |
+| 계약 | fos-ctx 계약 테스트(PR7), 배포 뒤 왕복 | 서명 기대값, 끝 소식 본문. 스펙의 「배포 뒤 왕복 확인」 |
+
+
 ## 결정
 
 | ID | 결정 | 답 | 누가 | 근거 |
@@ -715,6 +925,16 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | DECISION29 | 요약 실행의 실행 줄 | 대화 밖 실행(`startDetached`). 대화의 에이전트와 모델로 옛 session 에 보낸다 | 작성자 | 대화의 질문 없는 루트 실행은 그 대화의 `memory_remember` 바로 저장을 늘 제안으로 내린다. 요약이 매일 그 조건을 걸지 않게 한다. 대화방은 끝나지 않아 바깥 도구나 결과 전달이 한 번 들면 그 뒤로 제안으로만 남는 것은 지금 판정 그대로이고, 판정 범위를 루트 session 으로 좁히는 것은 기억 정책 변경이라 이 PR 범위 밖이다. 비용과 실패는 실행 기록에 그대로 남는다 |
 | DECISION30 | session 을 바꾸는 법 | 두 칸을 새 `fos-<uuid>` 로 함께 바꾼다(`ConversationSessions.renew`) | 작성자 | 비운 뒤 첫 turn 이 채우는 것과 결과가 같고, 한 번의 갱신이라 비운 채 남는 때가 없다. 먼저 살펴보기가 같은 길을 쓴다 |
 | DECISION31 | 요약을 두는 자리 | 알림 줄 본문(첫 줄 고정 글과 요약). 새 루트 session 에 성공한 실행이 생길 때까지 입력 앞에 붙인다 | 작성자 | 칸을 늘리지 않고, 요약을 붙인 첫 turn 이 실패해도 요약을 잃지 않는다. 사용자는 무엇을 이어 받았는지 펼쳐 본다 |
+| DECISION32 | 끝을 알아채는 길 | fos-ctx 의 `subagent_stop` hook 이 Control Plane 에 알린다 | 작성자 | 두 Hermes 버전 모두 API run 에 완료 사건이 없고 hook 은 있다(docs/features/hermes-upgrade/spec.md). session 메시지 조회는 대화마다 폴링이 든다 |
+| DECISION33 | 결과를 두는 자리 | `hermes_session_binding` 의 새 칸 | 작성자 | 자식 하나가 등록 줄 하나다. 테이블을 늘리지 않는다(spec DECISION38) |
+| DECISION34 | 깨울 자식을 정하는 때 | 등록할 때 `wake_eligible` 로 한 번 정한다 | 작성자 | 판정에 쓰는 origin 실행과 대화가 등록 때 이미 풀린다. 끝 소식 때 다시 풀면 압축이나 지운 대화로 답이 바뀐다 |
+| DECISION35 | PR7 전의 안전 | 등록 본문의 `reports_stop` 이 참인 자식만 깨우고 기한을 센다 | 작성자 | 사용자가 기존 설정 하나로 켜기로 해 PR6 이 배포 즉시 동작한다(spec DECISION35). `subagent_start` 만으로 기한을 세면 PR7 전의 모든 위임이 1시간 뒤 알림을 남긴다 |
+| DECISION36 | 한 호출의 자식을 모으는 법 | 끝 소식 뒤 5초 기다렸다 깨운다. 호출 번호를 저장하지 않는다 | 작성자 | Hermes 가 한 단위의 hook 을 잇달아 부른다(`_finalize_child_results`). `subagent_start` 에 호출 번호가 없어 Control Plane 이 호출을 구분할 수 없다. spec DECISION30 의 「도착하는 대로」 는 같은 5초 안에 끝난 다른 호출을 함께 전해도 지켜진다 |
+| DECISION37 | 이미 읽은 결과 | 칸을 쓰지 않고 질의 조건(DECISION41)으로 뺀다 | 작성자 | turn 시작 경로에 쓰기를 더하지 않는다. 판정 값이 실행 줄에 이미 있다 |
+| DECISION38 | 자동 turn 입력의 결과 글 | Control Plane 이 저장한 결과 글을 입력에 넣는다. Hermes 이력의 결과 줄에 기대지 않는다 | 작성자 | hook 이 결과 줄보다 먼저 와 turn 을 열 때 그 줄이 없을 수 있다. 다시 전달(ADR-075)도 저장된 글이 있어야 한다. 모델이 같은 결과를 두 번 볼 수 있는 것을 감당한다 |
+| DECISION39 | 기한·중지 알림 줄의 단위 | origin 실행(turn)마다 한 줄 | 작성자 | 같은 호출의 자식을 알 수 없다(DECISION36). spec DECISION40 이 답마다 한 줄로 정했다(사용자 2026-11-17) |
+| DECISION40 | 결과 도착 줄과 출처를 잇는 법 | 등록 줄의 `notice_message_id` 에 첫 시도의 알림 줄을 적고, `chat` 의 port 로 상태를 읽는다 | 작성자 | 묶음의 줄 번호 칸은 위임 결과가 있을 때만 차거나 다시 전달로 덮인다(`result_delivery`). 줄 번호 순서와 시각으로 잇는 것은 DECISION12 가 기각했다. 같은 표의 칸 하나라 테이블이 늘지 않는다 |
+| DECISION41 | 이미 읽은 결과의 판정 | 대화의 에이전트로 Hermes 에 제출된 루트 실행이 끝 소식 30초 뒤에 시작했으면 읽은 것이다 | 작성자 | 스펙 DECISION32 의 「결과가 기록된 뒤」 를 Control Plane 이 아는 값으로 옮긴다. hook 은 결과 줄보다 먼저 온다. 모자라게 잡아 결과를 놓치기보다 한 번 더 정리하는 쪽을 고른다 |
 
 ## 결정 기록 연결
 
@@ -723,3 +943,4 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 | DECISION1 과 할 수 있는 일을 읽을 때 모으기 | architecture | [ADR-20261110 / agent-introduction](../../adr/ADR-20261110-agent-introduction.md). ADR-036 의 소개를 없앤 부분을 대체한다 | [에이전트 팀](../agent-team.md) 의 「소개와 할 수 있는 일」 |
 | DECISION18, DECISION19, DECISION21 | architecture | [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md). ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 | [에이전트 팀](../agent-team.md) 의 「`@` 로 바로 맡기기」 |
 | DECISION24 부터 DECISION31 | feature | 필요 없음. 대화 목적의 새 값과 실행 줄로 판정하는 규칙이라 기능 파일이 원본이고, 코드 한 곳(`RoomConversations`, `RoomContext`)을 바꾸면 되돌린다 | [에이전트 팀](../agent-team.md) 의 「대화방」 |
+| DECISION32 부터 DECISION40 | architecture | [ADR-20261117 / native-delegation-wake](../../adr/ADR-20261117-native-delegation-wake.md). ADR-040 의 깨우기를 Hermes 내장 위임으로 넓힌다 | 이 문서의 「PR6 내장 위임 결과」. 구현 PR 이 [에이전트 팀](../agent-team.md) 에 절을 더한다 |
