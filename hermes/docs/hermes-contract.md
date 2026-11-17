@@ -1435,7 +1435,6 @@ Control Plane 이 내장 위임의 결과로 자동 turn 을 여는 근거다([A
 | hook 은 부모 session 에 결과 줄(`async_delegation_complete`)을 남기기 전에 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 남는다 | 같은 파일과 [`gateway/wake.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/wake.py) 의 `persist_delegation_delivery` |
 | `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다. `completed` 만 쓸 만한 답이 있다는 뜻이다 | [`tools/delegate_tool_child_run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_child_run.py) |
 | 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남긴다 | `gateway/wake.py` 의 `persist_delegation_delivery` |
-
 | v0.23.2 는 `child_summary` 의 비밀값을 가린 뒤 넘긴다. 플러그인은 프로세스 밖으로 보내므로 Hermes 가 늘 가린다 | v0.23.2 [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/ae2a81ccc00e9b7c06301523e5bb09608397149c/tools/delegate_tool_results.py) 의 `redact_child_value` 호출 |
 | `subagent_stop` 은 제한 시간 worker 로 옮기지 않고 부모의 마무리 잠금 안에서 부르는 스레드가 돈다. 그래서 fos-ctx 가 보내는 동안 결과 줄이 남지 않는다 | `hermes_cli/plugins_dispatch.py` 의 `_HOOK_CALLER_THREAD_HOOKS`, `tools/delegate_tool_results.py` 의 `_finalize_child_results` |
 
