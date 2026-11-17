@@ -120,3 +120,4 @@ node scripts/checks/check-file-length.mjs
 | `backend/src/test/java/com/bifos/assistant/chat/AutoTurnResultTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/NativeDelegationResultSourceTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/chat/NativeDelegationDeliveryTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/testsupport/NativeResultFixtures.java` | 신규 (등록 줄을 끝 소식 칸까지 넣는 검사 도우미. phase 4, 5 도 쓴다) |

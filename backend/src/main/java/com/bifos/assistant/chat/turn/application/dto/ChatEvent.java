@@ -25,6 +25,7 @@ import java.util.UUID;
  * @param delegation {@code delegation} 사건의 맡긴 줄. 다른 사건은 null
  * @param deliveredResults 위임 결과 알림 줄의 {@code system} 사건이 싣는 그 줄이 전한 결과. 다른 사건은 null
  * @param steer {@code steer} 사건이 싣는 말풍선의 상태와 자식 종류. 다른 사건은 null
+ * @param nativeResult Hermes 내장 위임 결과 알림 줄의 {@code system} 사건이 싣는 결과 상태. 다른 사건은 null
  */
 public record ChatEvent(
     String type,
@@ -49,7 +50,8 @@ public record ChatEvent(
     String interimId,
     DelegationLine delegation,
     List<DelegationLine> deliveredResults,
-    SteerView steer) {
+    SteerView steer,
+    NativeResultView nativeResult) {
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
         Long messageId, Long executionId, String code, String message,
@@ -58,7 +60,7 @@ public record ChatEvent(
         DelegationLine delegation, List<DelegationLine> deliveredResults) {
         this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs,
             failed, subagentId, goal, model, inputTokens, outputTokens, alreadyStreamed, streamedPrefixLength, interimId,
-            delegation, deliveredResults, null);
+            delegation, deliveredResults, null, null);
     }
 
 
@@ -186,7 +188,8 @@ public record ChatEvent(
             interimId,
             delegation,
             deliveredResults,
-            steer);
+            steer,
+            nativeResult);
     }
 
 
@@ -310,7 +313,7 @@ public record ChatEvent(
      * @param content 알림 줄의 글
      */
     public static ChatEvent system(UUID conversationId, Long messageId, String content) {
-        return system(conversationId, messageId, content, null);
+        return system(conversationId, messageId, content, null, null);
     }
 
 
@@ -318,9 +321,14 @@ public record ChatEvent(
      * 위임 결과 알림 줄이 저장됐다. 화면이 이력을 다시 읽기 전에도 결과 도착 줄을 이름표로 그리도록 그 줄이 전한 결과를 싣는다.
      *
      * @param deliveredResults 그 줄이 전한 결과. 위임 결과 알림 줄이 아니면 null
+     * @param nativeResult Hermes 내장 위임 결과 알림 줄이면 그 상태. 아니면 null
      */
     public static ChatEvent system(
-        UUID conversationId, Long messageId, String content, List<DelegationLine> deliveredResults) {
+        UUID conversationId,
+        Long messageId,
+        String content,
+        List<DelegationLine> deliveredResults,
+        NativeResultView nativeResult) {
         return new ChatEvent(
             "system",
             content,
@@ -343,7 +351,9 @@ public record ChatEvent(
             null,
             null,
             null,
-            deliveredResults);
+            deliveredResults,
+            null,
+            nativeResult);
     }
 
 
@@ -445,7 +455,7 @@ public record ChatEvent(
     public static ChatEvent steer(UUID conversationId, Long messageId, String text, Long executionId, SteerView steer) {
         return new ChatEvent(
             "steer", text, null, null, conversationId, messageId, executionId, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, steer);
+            null, null, null, null, null, null, null, null, steer, null);
     }
 
 

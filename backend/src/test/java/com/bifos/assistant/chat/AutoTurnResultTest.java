@@ -44,7 +44,7 @@ class AutoTurnResultTest {
 
         assertThat(text)
             .isEqualTo("AutoTurnResult[key=result-key, noticeChars=" + NOTICE.length() + ", inputChars="
-                + INPUT.length() + ", item=CONNECTOR_RESULT:connector_action:41]")
+                + INPUT.length() + ", item=CONNECTOR_RESULT:connector_action:41, unattended=false, noticeStatus=null]")
             .doesNotContain(NOTICE)
             .doesNotContain(INPUT);
     }
@@ -56,5 +56,17 @@ class AutoTurnResultTest {
         String text = new AutoTurnResult("result-key", NOTICE, INPUT).toString();
 
         assertThat(text).contains("item=null").doesNotContain(NOTICE).doesNotContain(INPUT);
+    }
+
+
+    @Test
+    @DisplayName("사람 없는 실행과 상태를 밝힌 결과는 두 칸을 내고 본문은 내지 않는다")
+    void unattendedAndNoticeStatusAppearWithoutBody() {
+        AutoTurnResult result = new AutoTurnResult("result-key", NOTICE, INPUT, null, true, "FAILED");
+
+        assertThat(result.unattended()).isTrue();
+        assertThat(result.noticeStatus()).isEqualTo("FAILED");
+        assertThat(result.toString()).contains("unattended=true, noticeStatus=FAILED").doesNotContain(NOTICE).doesNotContain(INPUT);
+        assertThat(new AutoTurnResult("k", NOTICE, INPUT).unattended()).as("기본값").isFalse();
     }
 }
