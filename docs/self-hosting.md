@@ -9,7 +9,7 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 
 | 대상 | 선택 |
 | --- | --- |
-| Backend | Spring Boot 4.0.6, Java 21, Gradle Kotlin DSL |
+| Backend | Spring Boot 4.0, Java 21, Gradle Kotlin DSL |
 | DB | MySQL 8.4 (운영), H2 (테스트) |
 | Migration | Flyway |
 | Web | Next.js 16, React 19, TypeScript, Tailwind v4 |
