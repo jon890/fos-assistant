@@ -296,7 +296,8 @@ class HermesSourceTest(unittest.TestCase):
     def test_shared_wire_matches_upstream_event_callback(self):
         """공유 사건 표본의 칸을 기준 버전 callback의 실제 출력과 대조한다."""
         source = self.root / "gateway/platforms/api_server_runs.py"
-        wanted = {"_run_event", "_tool_completed_preview", "_make_run_event_callback",
+        # `_call_id` 는 v0.23 이 도구 사건에 `tool_call_id` 를 붙이는 helper 다. 기준 계열에는 없다.
+        wanted = {"_run_event", "_tool_completed_preview", "_make_run_event_callback", "_call_id",
                   "_FIXED_EVENT_FIELDS", "_TOOL_COMPLETED_PREVIEW_MAX_CHARS",
                   "_SUBAGENT_EVENT_KEYS", "_SUBAGENT_TEXT_KEYS"}
         nodes = [node for node in self.tree(source).body
@@ -372,19 +373,28 @@ class HermesSourceTest(unittest.TestCase):
             self.assertTrue(keys <= samples["approval.request"].keys())
 
     def test_plugin_dependencies_warn_without_installing_during_discovery(self):
-        """v0.21.6의 실제 loader로 plugin 의존성 경고를 확인한다. 설치 호출은 제공하지 않는다."""
+        """실제 loader로 plugin 의존성 경고를 확인한다. 설치 호출은 제공하지 않는다.
+
+        v0.23 은 누락 의존성을 모듈 함수(`PLUGIN_DEPENDENCY_HELPERS`)로 고른다. 그 함수도 함께 분리 실행한다.
+        """
         loader = self.tree(self.root / "hermes_cli/plugins_loader.py")
         manager = next(node for node in loader.body if isinstance(node, ast.ClassDef) and node.name == "PluginLoaderMixin")
         function = next(node for node in manager.body if isinstance(node, ast.FunctionDef)
                         and node.name == "_warn_python_dependencies")
+        helper_names = contract.expected("PLUGIN_DEPENDENCY_HELPERS", self.root)
+        helpers = [node for node in loader.body if isinstance(node, ast.FunctionDef) and node.name in helper_names]
+        self.assertEqual(set(helper_names), {node.name for node in helpers}, "의존성 경고 helper 가 옮겨졌다")
         warnings = []
-        namespace = {"PluginManifest": object, "manifest_key": lambda manifest: "dashboard-profile-api",
-                     "_dist_installed": lambda requirement: False,
+        namespace = {"PluginManifest": object, "Any": typing.Any, "Path": pathlib.Path,
+                     "manifest_key": lambda manifest: "dashboard-profile-api",
+                     "_dist_installed": lambda requirement: False, "_applies_here": lambda requirement: True,
+                     "installed_in_selected_environment": lambda missing: False,
                      "logger": SimpleNamespace(warning=lambda *args: warnings.append(args))}
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "upstream_dependency_warning", "exec"), namespace)
+        exec(compile(ast.Module(body=[*helpers, function], type_ignores=[]), "upstream_dependency_warning", "exec"),
+             namespace)
         manifest = yaml.safe_load((PLUGIN_DIR / "plugin.yaml").read_text())
         namespace["_warn_python_dependencies"](None, SimpleNamespace(
-            python_dependencies=manifest["python_dependencies"]))
+            python_dependencies=manifest["python_dependencies"], path=None))
         self.assertEqual(1, len(warnings))
         self.assertIn("Discovery does not install dependencies", warnings[0][0])
         self.assertEqual("PyYAML==6.0.3", warnings[0][2])
@@ -433,7 +443,7 @@ class HermesSourceTest(unittest.TestCase):
         return node
 
     def test_symbols(self):
-        for (module, name), shape in contract.SYMBOLS.items():
+        for (module, name), shape in contract.expected("SYMBOLS", self.root).items():
             with self.subTest(symbol="%s.%s" % (module, name)):
                 node = self.definition(module, name)
                 if isinstance(shape, contract.Value):
@@ -627,7 +637,8 @@ class HermesSourceTest(unittest.TestCase):
                     visit(self.tree(source), "<함수 밖>")
             return found
 
-        relative, starter, variable = contract.UNATTENDED_APPROVAL["exec_ask"]
+        points = contract.expected("UNATTENDED_APPROVAL", self.root)
+        relative, starter, variable = points["exec_ask"]
         node = function(self.tree(self.root / relative), starter)
         exports = [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
                    and any(isinstance(target, ast.Subscript)
@@ -637,7 +648,7 @@ class HermesSourceTest(unittest.TestCase):
                    and isinstance(statement.value, ast.Constant) and statement.value.value == "1"]
         self.assertTrue(exports, "%s 에 os.environ[%r] = \"1\" 할당이 없다. %s" % (starter, variable, revisit))
 
-        relative, deciders, gate, flag = contract.UNATTENDED_APPROVAL["ask_first"]
+        relative, deciders, gate, flag = points["ask_first"]
         tree = self.tree(self.root / relative)
         for decider in deciders:
             node = function(tree, decider)
@@ -654,16 +665,16 @@ class HermesSourceTest(unittest.TestCase):
                                 and source.value.func.id == "_presence",
                                 "%s 의 %s 가 _presence 에서 오지 않는다(%d 행). %s" % (decider, flag, source.lineno, revisit))
 
-        relative, presence, flag, variable = contract.UNATTENDED_APPROVAL["ask_source"]
+        relative, presence, flag, variable = points["ask_source"]
         node = function(self.tree(self.root / relative), presence)
         self.assertTrue([statement for statement in assigns(node, flag) if variable in strings(statement.value)],
                         "%s 가 %s 를 %s 에서 계산하지 않는다. %s" % (presence, flag, variable, revisit))
 
-        _, name, expected = contract.UNATTENDED_APPROVAL["callers"]
+        _, name, expected = points["callers"]
         self.assertEqual(expected, callers_of(name),
                          "%s 를 부르는 함수가 선언과 다르다. 새 호출이 ask 문맥을 먼저 보는지 확인한다. %s" % (name, revisit))
 
-        relative, guard, first, second = contract.UNATTENDED_APPROVAL["execute_code"]
+        relative, guard, first, second = points["execute_code"]
         node = function(self.tree(self.root / relative), guard)
         skips, unattended = calls(node, first), calls(node, second)
         self.assertTrue(skips, "%s 가 %s 를 부르지 않는다. %s" % (guard, first, revisit))
@@ -671,11 +682,11 @@ class HermesSourceTest(unittest.TestCase):
         self.assertLess(min(call.lineno for call in skips), min(call.lineno for call in unattended),
                         "%s 가 %s 를 %s 보다 먼저 보지 않는다. %s" % (guard, first, second, revisit))
 
-        relative, getter, key = contract.UNATTENDED_APPROVAL["mode_key"]
+        relative, getter, key = points["mode_key"]
         node = function(self.tree(self.root / relative), getter)
         self.assertIn(key, strings(node), "%s 가 %r 를 읽지 않는다. %s" % (getter, key, revisit))
 
-        relative, constant, platform = contract.UNATTENDED_APPROVAL["platform"]
+        relative, constant, platform = points["platform"]
         values = [statement.value for statement in self.tree(self.root / relative).body
                   if isinstance(statement, ast.Assign) and any(
                       isinstance(target, ast.Name) and target.id == constant for target in statement.targets)]
@@ -683,9 +694,60 @@ class HermesSourceTest(unittest.TestCase):
         self.assertTrue(any(platform in strings(value) for value in values),
                         "%s 에 %r 가 없다. %s" % (constant, platform, revisit))
 
-        _, name, expected = contract.UNATTENDED_APPROVAL["getter_callers"]
+        _, name, expected = points["getter_callers"]
         self.assertEqual(expected, callers_of(name),
                          "%s 를 직접 부르는 함수가 생겼다. 그 호출이 ask 문맥을 먼저 보는지 확인한다. %s" % (name, revisit))
+
+    def test_approval_guard_points(self):
+        """fos-ctx 가 Hermes 승인 관문이 여는 동작을 먼저 막는 데 기대는 지점이 그대로인지 본다(스펙 hermes-upgrade REQ5).
+
+        관문을 부르는 함수가 늘면 fos-ctx 가 막지 않는 동작이 `unattended_mode: approve` 로 사람 없이 열릴 수 있다.
+        """
+        revisit = "fos-ctx 의 approval_guard 가 그 동작을 막는지 보고 hermes_contract.APPROVAL_GUARD 를 고친다"
+
+        def top_function(relative, name):
+            found = [node for node in self.tree(self.root / relative).body
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name]
+            self.assertTrue(found, "%s 에 %s 가 없다. %s" % (relative, name, revisit))
+            return found[0]
+
+        def calls(node, name):
+            return [call for call in ast.walk(node) if isinstance(call, ast.Call) and (
+                (isinstance(call.func, ast.Name) and call.func.id == name)
+                or (isinstance(call.func, ast.Attribute) and call.func.attr == name))]
+
+        relative, name, shape = contract.APPROVAL_GUARD["dangerous"]
+        self.assertIsNone(_accepts(top_function(relative, name), shape))
+        relative, name = contract.APPROVAL_GUARD["dangerous_user"]
+        self.assertTrue(calls(self.tree(self.root / relative), name),
+                        "%s 가 %s 로 위험 명령을 고르지 않는다. %s" % (relative, name, revisit))
+
+        relative, gate = contract.APPROVAL_GUARD["gate"]
+        callers = set()
+        for top in ("tools", "agent", "gateway", "hermes_cli"):
+            for source in sorted((self.root / top).rglob("*.py")):
+                if "tests" in source.relative_to(self.root).parts or gate not in source.read_text(encoding="utf-8"):
+                    continue
+                tree = self.tree(source)
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name != gate and any(
+                            calls(statement, gate) for statement in node.body):
+                        callers.add(node.name)
+        self.assertEqual(set(contract.APPROVAL_GUARD["gate_callers"]), callers,
+                         "%s 를 부르는 함수가 선언과 다르다. %s" % (gate, revisit))
+
+        points = contract.expected("APPROVAL_WRITE_POINTS", self.root)
+        if points is None:
+            self.assertIsNone(self.resolve("agent.file_safety", "write_approval_key"),
+                              "이 계열에 write_approval_key 가 생겼다. APPROVAL_WRITE_POINTS 를 계열에 더한다")
+            return
+        for key, (relative, name, shape) in points.items():
+            with self.subTest(point=key):
+                self.assertIsNone(_accepts(top_function(relative, name), shape))
+        writer = top_function("tools/file_tools_write_guards.py", "_check_approval_required_write")
+        for key in ("key", "resolve"):
+            self.assertTrue(calls(writer, points[key][1]),
+                            "Hermes 의 승인 파일 쓰기 판정이 %s 를 쓰지 않는다. %s" % (points[key][1], revisit))
 
     def test_session_store(self):
         paths = [node for node in ast.walk(self.tree(self.root / contract.SESSION_DB_MODULE))
