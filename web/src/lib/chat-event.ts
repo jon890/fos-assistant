@@ -63,10 +63,10 @@ export type ChatEvent = {
   steer?: SteerInfo | null;
 };
 
-/** steer 말풍선의 상태다. `ChatDtos.MessageView.steer` 와 `steer` 사건이 같은 꼴로 싣는다 */
 /** Hermes 내장 위임 결과 알림 줄의 상태다(ADR-20261117 / native-delegation-wake) */
 export type NativeResult = { status: "SUCCEEDED" | "FAILED" };
 
+/** steer 말풍선의 상태다. `ChatDtos.MessageView.steer` 와 `steer` 사건이 같은 꼴로 싣는다 */
 export type SteerInfo = {
   state: "DELIVERED" | "CARRIED_OVER" | "UNCONFIRMED" | "NOT_DELIVERED";
   child: "SUBAGENT" | "DELEGATION" | null;
