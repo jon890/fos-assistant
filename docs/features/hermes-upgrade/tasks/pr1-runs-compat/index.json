@@ -1,0 +1,80 @@
+{
+  "name": "pr1-runs-compat",
+  "description": "Control Plane 의 Hermes 실행 클라이언트를 v0.21.6 과 v0.23.2 에서 함께 동작하게 고친다",
+  "pr_scope": "HttpHermesRunsClient 와 사건 스트림이 v0.23.2 의 queued, unknown, cancelled, 빠진 조회 칸을 어댑터 안에서 번역하고, 잃은 실행을 해제하며, 가짜 Hermes 와 ADR-061, 계약 문서의 Runs 절을 고친다.",
+  "deferred": [
+    {
+      "what": "PR2: fos-ctx 의 위험 명령·민감 파일 쓰기·computer_use 거절과 코드 실행 안 호출 판정, 대시보드 plugin, 계열별 계약 테스트, ADR-20261008 / execute-code-unattended 와 계약 문서 승인 절(REQ5, REQ6, REQ7, REQ8, REQ9 의 승인 부분)",
+      "why": "hermes 모듈의 관심사라 backend 호환과 나눈다(스펙 DECISION1)",
+      "after": "없음. PR1 과 나란히 진행"
+    },
+    {
+      "what": "PR4: 본문 없는 요청 진단 addon 과 계약을 v0.23.2 scope 경계로 다시 설계(REQ13)",
+      "why": "운영에 연결하지 않은 addon 이라 관심사가 다르다(스펙 DECISION14)",
+      "after": "없음. PR3 전에 머지"
+    },
+    {
+      "what": "fos-home-infra 운영 적용(REQ10)",
+      "why": "이미지와 적용은 fos-home-infra 가 소유한다",
+      "after": "PR1, PR2 배포"
+    },
+    {
+      "what": "PR3: 기준 버전 v0.23.2, 계약 문서 갱신, v0.21.6 호환 걷어 내기(REQ9 나머지, REQ11)",
+      "why": "기준 버전은 운영 버전과 같아야 한다",
+      "after": "운영 적용과 왕복 확인, PR4 머지"
+    }
+  ],
+  "status": "pending",
+  "created_at": "2026-11-17",
+  "spec": "docs/features/hermes-upgrade/spec.md",
+  "design": "docs/features/hermes-upgrade/design.md",
+  "verification_plan": "verification-plan.md",
+  "requirements": [
+    "REQ1",
+    "REQ2",
+    "REQ3",
+    "REQ4",
+    "REQ9"
+  ],
+  "total_phases": 4,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ3",
+        "REQ4"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ1",
+        "REQ2",
+        "REQ3"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ2",
+        "REQ3"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ2",
+        "REQ9"
+      ]
+    }
+  ]
+}

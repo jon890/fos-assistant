@@ -34,7 +34,7 @@ application 이 새로 보는 것은 포트 DTO 의 boolean 하나(`HermesRunRes
 | `hermes/application/port/HermesRunsClient` | `releaseIfLost(apiBaseUrl, profileName, runId)` 를 더한다. 그 run 이 잃은 실행이면 해제하고, 아니면 아무것도 하지 않는다. 기본 구현은 아무것도 하지 않는다 |
 | `hermes/application/dto/HermesRunResult` | `pendingSteerKnown` 필드를 더한다. 기존 생성자는 `true` 로 채워 지금 호출자를 바꾸지 않는다 |
 | `chat/turn/ChatTurnRunner`, `chat/recovery/RecoveredRunRecorder` | steer 정리에서 `pendingSteerKnown()` 이 거짓이면 중지 판정보다 먼저 `SteerSettlement.unknown()` 을 고른다 |
-| 새 실행을 보내는 자리(`ChatRunEvents.submit`, `AgentRunner`, `RoomContext`, `StarterSuggestionService`) | 보내기 전에 같은 Hermes session 의 지난 실패 실행을 `releaseIfLost` 로 넘긴다. 고르는 쿼리는 `usage/execution` 의 저장소 하나가 갖는다 |
+| 새 실행을 보내는 자리(`ChatRunEvents.submit`, `AgentRunner`, `RoomContext`) | 보내기 전에 같은 profile 의 잃었을 수 있는 지난 실행을 `releaseIfLost` 로 넘긴다. 고르는 쿼리는 `usage/execution` 의 저장소가 갖는다 |
 | `shared/error/ErrorCode` | `REMOTE_RUN_LOST(BAD_GATEWAY)` 를 더한다. 재기동 정리의 같은 이름 문자열 상수와 뜻이 같다 |
 | `web/src/components/error-message.ts` | `REMOTE_RUN_LOST` 의 문구를 v0.21.6 에서 같은 상황이 보이던 `HERMES_UNAVAILABLE` 문구와 같게 둔다 |
 | `hermes/plugins/fos-ctx` | REQ5, REQ6 |
@@ -81,9 +81,11 @@ v0.23.2 의 `cancelled` 는 사용자 중지, Hermes 의 정상 종료로 끊긴
 ### 잃은 실행 미리 풀기
 
 잃은 run 은 누군가 그 run 을 다시 물을 때만 해제된다. Hermes 가 `hermes.run-timeout` 보다 오래 내려가 있으면 turn 조회, 남은 원격 실행 기다리기, 재기동 정리가 모두 포기해, 그 session 의 새 실행이 계속 `queued` 에 머문다.
-그래서 새 실행을 기존 Hermes session 에 보내기 전에, 그 session 에서 마지막 `COMPLETED` 실행 뒤의 `FAILED` 실행 가운데 `hermes_run_id` 가 있는 것을 최근 순으로 최대 3개 고른다. 각각 `releaseIfLost` 로 넘긴다.
-어댑터는 조회해 `unknown` 이면 해제하고, 아니면 아무것도 하지 않는다. 이 단계의 실패는 로그만 남기고 제출을 막지 않는다.
-고르는 조건은 우리 실행 줄의 상태뿐이라 application 에 Hermes 상태 문자열이 생기지 않는다. 새 session(`fos-<uuid>` 를 처음 쓰는 turn, `@` 맡김)은 고를 것이 없어 조회하지 않는다.
+그래서 새 실행을 보내기 전에 같은 profile 의 지난 실행 가운데 잃었을 수 있는 것을 어댑터에 넘긴다(`releaseIfLost`).
+고르는 열쇠는 Hermes session 이 아니라 profile 이다. 실행 줄의 `hermes_session_id` 는 대화의 루트 session 이고 Hermes 에 보낸 session 은 압축 뒤 바뀔 수 있으며(`RunSession`), 방 요약 줄은 session 과 대화가 비어 있다(`ExecutionRecorder.startDetached`). profile 은 모든 줄에 있다.
+고르는 조건: 그 profile 의 `FAILED` 실행 가운데 `hermes_run_id` 가 있고, 최근 24시간 안에 끝났으며, `error_code` 가 Hermes 와 닿지 못했거나 기다리다 그만둔 코드(`HERMES_UNAVAILABLE`, `HERMES_RUN_TIMEOUT`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE`)인 것을 최근 순으로 최대 10개. 우리 오류 코드만 보므로 application 에 Hermes 상태 문자열이 생기지 않는다.
+어댑터는 조회해 `unknown` 이면 해제하고, 끝 상태면 그 run 을 「확인 끝」 으로 메모리에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다. 이 단계의 실패는 로그만 남기고 제출을 막지 않는다.
+부르는 자리는 대화 turn(`ChatRunEvents.submit`), 위임과 흐름(`AgentRunner`), 방 요약(`RoomContext`) 셋이다. 추천 질문은 늘 새 session 으로 보내 막힐 대기열이 없으므로 부르지 않는다.
 
 ### 결과 칸 채우기
 
@@ -96,7 +98,7 @@ v0.23.2 의 `cancelled` 는 사용자 중지, Hermes 의 정상 종료로 끊긴
 | `runtime` | 그 값 | `run.completed` 의 `runtime` | `null`. 지금처럼 session 행에서 읽는다 |
 
 v0.21.6 응답에서는 지금처럼 조회 응답만 읽는다.
-종료 사건은 두 곳에서 얻는다. 대화 turn 은 이미 연 사건 스트림이 `HermesRunTerminals` 에 남긴 것을 쓴다. 남은 것이 없으면(스트림을 열지 않은 호출자, 스트림이 먼저 끊긴 turn, Control Plane 이 다시 뜬 뒤) 어댑터가 `GET /v1/runs/{id}/events` 를 한 번 열어 보관분을 읽는다. 끝난 실행은 보관분을 보내고 스트림을 닫으므로 기다림이 짧다. 연결 제한 시간은 `hermes.terminal-event-read-timeout`(기본 5초)이다.
+종료 사건은 두 곳에서 얻는다. 대화 turn 은 이미 연 사건 스트림이 `HermesRunTerminals` 에 남긴 것을 쓴다. 남은 것이 없으면(스트림을 열지 않은 호출자, 스트림이 먼저 끊긴 turn, Control Plane 이 다시 뜬 뒤) 어댑터가 `GET /v1/runs/{id}/events` 를 한 번 열어 보관분을 읽는다. 끝난 실행은 보관분을 보내고 스트림을 닫으므로 기다림이 짧다. 연결 제한 시간은 `assistant.hermes.terminal-event-read-timeout`(기본 5초)이다.
 보관분은 실행이 끝나고 5분(`_RUN_STREAM_TTL`) 뒤 사라진다. 그 뒤에 읽는 결과는 위 표의 「둘 다 없으면」 이다. 그래서 provider 계정이 막힌 실패(`PROVIDER_BLOCKED`)는 5분이 지나 재기동 정리로 적는 실행에서만 일반 실패로 적힌다.
 
 `HermesRunTerminals` 는 profile 과 run 번호를 키로 종료 사건 하나를 둔다. 읽으면 지우고, 읽히지 않으면 `hermes.run-timeout` 뒤 지운다. 중지를 보낸 run 번호도 같은 시간 동안 둔다. 테이블은 늘리지 않는다.
@@ -184,7 +186,7 @@ E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도
 | DECISION4 | 위험 명령과 민감 파일 판정 함수 | Hermes 의 `detect_dangerous_command`, `write_approval_key` 를 부른다 | 작성자 | 패턴을 우리가 복제하면 Hermes 를 올릴 때마다 어긋난다. 계약 테스트가 위치와 시그니처를 지킨다 |
 | DECISION5 | 계약 테스트의 두 버전 처리 | 기준 선언과 계열별 차이. 계열은 표지 파일로 고른다 | 작성자 | 기준 버전 하나만 보던 지금 구조를 유지하고 차이만 더한다. commit 으로 고르면 새 패치마다 코드를 고쳐야 해 REQ12 가 성립하지 않는다. PR3 이 v0.21.6 차이를 지운다 |
 | DECISION7 | v0.23.2 의 `cancelled` | 종료 사건과 이 프로세스의 중지 기록으로 `cancelled` 와 `interrupted` 를 나눈다. 근거가 없으면 `interrupted` | 작성자 | 정상 종료로 끊긴 실행이 「중지됨」 으로 적히면 REQ11 의 「재기동하면 실패」 가 깨진다. 어긋나는 쪽은 Control Plane 재기동을 넘긴 사용자 중지뿐이다 |
-| DECISION8 | 아무도 다시 묻지 않는 잃은 run | 새 실행을 같은 session 에 보내기 전에 지난 실패 실행을 `releaseIfLost` 로 푼다 | 작성자 | 해제를 조회에만 기대면 Hermes 가 오래 내려간 뒤 대화가 영구히 `queued` 에 머문다. 제출 직전이 그 대화를 다시 쓰는 첫 순간이다 |
+| DECISION8 | 아무도 다시 묻지 않는 잃은 run | 새 실행을 보내기 전에 같은 profile 의 최근 연결 실패·시간 초과 실행을 `releaseIfLost` 로 푼다 | 작성자 | 해제를 조회에만 기대면 Hermes 가 오래 내려간 뒤 대화가 영구히 `queued` 에 머문다. 실행 줄의 session 은 Hermes 에 보낸 session 과 다를 수 있고 방 요약 줄에는 없어 profile 을 열쇠로 쓴다. 잃은 run 은 그 run 을 기다리다 그만둔 실패로만 남으므로 그 오류 코드로 좁힌다 |
 | DECISION9 | 종료 사건을 얻는 경로 | 열어 둔 사건 스트림의 기록, 없으면 끝난 실행의 사건 보관분을 한 번 다시 읽는다 | 작성자 | 위임, 흐름, 방 요약, 추천 질문은 스트림을 열지 않아 `error` 를 받을 길이 없고 `PROVIDER_BLOCKED` 가 사라진다. 보관분은 끝난 뒤 5분 남는다 |
 | DECISION10 | `REMOTE_RUN_LOST` 의 화면 문구 | `HERMES_UNAVAILABLE` 과 같은 문구 | 작성자 | 스펙 REQ2 의 「지금 실패한 turn 과 같게 보인다」. v0.21.6 에서 같은 상황은 연결 실패로 보였다 |
 | DECISION6 | `duration` 0 | 걸린 시간 없음으로 읽는다(두 버전 모두) | 작성자 | v0.23.2 는 늘 0 을 보낸다. v0.21.6 의 실제 0초 도구는 드물고 잃는 것이 표시 한 칸이다 |
