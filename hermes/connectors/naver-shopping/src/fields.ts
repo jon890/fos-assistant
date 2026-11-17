@@ -104,14 +104,24 @@ export const PRODUCT_OPTION_BUTTON = 'button[aria-haspopup="listbox"]';
 
 /**
  * 상품 구매 층. 상품 화면의 「구매하기」 를 누르면 같은 화면에 뜨고 옵션·수량과 「장바구니」, 「바로구매」, 「닫기」 가 있다(2026-11-13 실측).
- * 단추 글은 실측이고, 층과 층 안의 옵션·수량 칸은 잰 상품에 옵션이 없어 가설이다. 단추는 글이 정확히 같은 보이는 것만 고른다.
+ * 단추는 글이 정확히 같은 보이는 것만 고른다.
+ *
+ * 표준옵션 상품의 층(2026-11-17 실측, 구조만): 층은 `div[role=dialog]` 이고 옵션은 묶음마다 `[role=radiogroup]` 안의
+ * `button[role=radio]` 칩이다. 처음엔 모두 `aria-checked="false"` 다. 색상 칩은 글이 없고 안의 `img` 의 `alt` 가 「<값>false」 꼴이며,
+ * 사이즈 칩은 글이 값이다. 고르기 전에는 「바로구매」 가 `disabled` 다. 드롭다운(`optionButton`)·`role=option`·수량 칸은 이 층에 없었다.
+ * 드롭다운 경로와 수량 칸은 아직 재지 않은 조합형 옵션 층을 위한 가설로 남긴다.
  */
 export const PURCHASE_LAYER = {
   buyLabel: "구매하기",
   buyNowLabel: "바로구매",
-  /** 「바로구매」 단추에서 가장 가까운 층. 없으면 문서 전체를 본다. */
+  /** 「바로구매」 단추에서 가장 가까운 층. 없으면 문서 전체를 본다. 칩 경로는 층을 찾지 못하면 고르지 않는다. */
   layer:
     '[role="dialog"], [aria-modal="true"], [class*="layer" i], [class*="modal" i], [class*="sheet" i]',
+  /** 옵션 묶음 하나. 층 안의 보이는 묶음 차례가 옵션 글의 차례다. */
+  radioGroup: '[role="radiogroup"]',
+  /** 묶음 안의 값 칩. 글이 값이고, 글이 없으면 안의 `img` 의 `alt` 에서 끝의 `true`·`false` 를 뗀 것이 값이다. */
+  radio: '[role="radio"]',
+  radioImage: "img",
   optionButton: 'button[aria-haspopup="listbox"]',
   /** 펼쳐진 옵션 드롭다운 단추. `aria-controls` 가 값 목록을 가리킨다. */
   openedOptionButton: 'button[aria-haspopup="listbox"][aria-expanded="true"]',
