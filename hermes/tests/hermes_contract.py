@@ -463,9 +463,11 @@ APPROVAL_GUARD = {
     "dangerous_user": ("tools/approval.py", "detect_dangerous_command"),
     # 관문을 부르는 함수와 그 동작을 fos-ctx 의 어느 막기가 맡는지다. 함수가 늘면 fos-ctx 가 그 동작을 막는지 보고 더한다.
     # `request_tool_approval` 은 plugin 의 `approve` 답에서만 불린다. fos-ctx 는 `approve` 를 돌려주지 않는다.
+    # 운영의 `terminal` 은 이 관문이 아니라 `check_all_command_guards` 가 사람 없는 실행을 스스로 정한다. 그 경로는
+    # `UNATTENDED_APPROVAL["callers"]` 가 고정한다. `check_dangerous_command` 를 부르는 운영 코드는 없다(평가와 테스트만).
     "gate": ("tools/approval.py", "_run_approval_gate"),
     "gate_callers": {
-        "check_dangerous_command": "terminal",
+        "check_dangerous_command": "terminal (운영 경로 밖)",
         "request_tool_approval": "plugin approve",
         "_check_approval_required_write": "file write",
         "_request_approval": "computer_use",

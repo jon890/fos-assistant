@@ -154,7 +154,7 @@ v0.23.2 에서 고칠 것은 이렇다.
 | 코드 실행 안 호출의 session | v0.23.2 기대값을 「`session_id` 가 있고 `tool_call_id` 가 없다」 로 둔다 |
 | 본문 없는 요청 진단 | `BODYLESS_SUPPORTED_LINES` 밖의 계열이면 두 묶음을 건너뛴다. PR4 가 `0.23` 을 더한다 |
 | 끝난 실행의 사건 보관분 | 새 기대: 끝난 run 에 처음 연결하면 보관분을 보내고 닫는다(`_handle_run_events`). 어댑터의 다시 읽기가 이 동작에 기댄다. 스트림 계약 테스트가 이 장면을 두 버전에서 돌린다. 대역은 v0.23.2 의 인증 함수 `_check_run_auth` 도 넘긴다 |
-| 승인 관문을 부르는 함수 | 새 계약 `APPROVAL_GUARD`: `_run_approval_gate` 를 부르는 함수 목록이 셸 위험 명령, plugin 승인, 승인 파일 쓰기, `computer_use` 넷과 같은지 본다. 늘면 fos-ctx 가 그 동작을 막는지 보고 선언을 고친다. `detect_dangerous_command` 의 위치와 시그니처, v0.23.2 의 `APPROVAL_WRITE_POINTS` 셋도 같은 테스트가 본다 |
+| 승인 관문을 부르는 함수 | 새 계약 `APPROVAL_GUARD`: `_run_approval_gate` 를 부르는 함수 목록이 선언한 넷(plugin 승인, 승인 파일 쓰기, `computer_use`, 운영 경로 밖의 `check_dangerous_command`)과 같은지 본다. 운영의 `terminal` 은 `check_all_command_guards` 가 스스로 정하고 기존 `UNATTENDED_APPROVAL` 이 그 경로를 고정한다. 늘면 fos-ctx 가 그 동작을 막는지 보고 선언을 고친다. `detect_dangerous_command` 의 위치와 시그니처, v0.23.2 의 `APPROVAL_WRITE_POINTS` 셋도 같은 테스트가 본다 |
 
 ### 가짜 Hermes
 

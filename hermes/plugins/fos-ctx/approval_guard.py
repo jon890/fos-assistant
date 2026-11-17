@@ -1,7 +1,7 @@
 """Hermes 승인 관문이 여는 동작을 hook 에서 바로 막는다(스펙 hermes-upgrade REQ5, DECISION8).
 
-Hermes v0.23 은 `/v1/runs` 실행에 승인 알림 경로가 없으면 승인 관문(`tools.approval._run_approval_gate`)을
-profile 의 `approvals.unattended_mode` 로 바로 정한다. docker 실행 공간 profile 은 그 값이 `approve` 라
+Hermes v0.23 은 `/v1/runs` 실행에 승인 알림 경로가 없으면 셸 판정(`check_all_command_guards`)과 승인 관문
+(`_run_approval_gate`)을 profile 의 `approvals.unattended_mode` 로 바로 정한다. docker 실행 공간 profile 은 그 값이 `approve` 라
 셸 위험 명령, 승인이 필요한 파일 쓰기, `computer_use` 가 사람 없이 열린다. Control Plane 은 Hermes 승인 카드에
 답하지 않으므로 v0.21 에서도 이 동작들은 승인 시간을 기다린 뒤 거절된다. 그래서 두 버전 모두 hook 에서 먼저 막는다.
 

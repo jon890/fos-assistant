@@ -2209,7 +2209,7 @@ Control Plane 은 Hermes 승인 카드에 답하지 않으므로 승인 시간(�
 
 **v0.23.2 에서는 닿는다.**
 표식을 켜는 자리는 `gateway/run_bootstrap.py` 의 `_start_gateway_runtime` 으로 옮겼다. 그런데 `_presence` 는 `api_server` 실행에 승인 알림 경로(`_gateway_notify_cb`)가 없으면 ask 문맥을 끈다.
-그러면 셸 위험 명령, 승인이 필요한 경로의 파일 쓰기(`~/.ssh/config`, 셸 시작 파일), `computer_use` 가 모두 `_run_approval_gate` 에서 `unattended_mode` 로 바로 정해져, docker profile 에서는 사람 없이 열린다.
+그러면 셸 위험 명령은 `check_all_command_guards` 가, 승인이 필요한 경로의 파일 쓰기(`~/.ssh/config`, 셸 시작 파일)와 `computer_use` 는 `_run_approval_gate` 가 `unattended_mode` 로 바로 정해, docker profile 에서는 사람 없이 열린다.
 session 대기열의 turn 실행기는 turn 마다 알림 경로를 등록하지만, 그 session key 가 닿지 않는 스레드가 어디인지는 확인하지 못했다.
 
 **그래서 fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다**(`docs/features/hermes-upgrade/spec.md` 의 REQ5).
@@ -2222,8 +2222,8 @@ session 대기열의 turn 실행기는 turn 마다 알림 경로를 등록하지
 
 판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다.
 docker profile 의 `execute_code` 는 `unattended_mode: approve` 로 지금처럼 승인 없이 돈다.
-관문을 부르는 함수 목록과 위 함수의 위치, 시그니처는 계약 시험(`test_hermes_contract.py` 의 `test_unattended_approval_points`, `test_approval_guard_points`)이 두 버전에서 확인한다.
-관문을 부르는 함수가 늘면 시험이 실패하고, fos-ctx 가 그 동작을 막는지 본 뒤 선언을 고친다.
+사람 없는 문맥의 모드를 보는 함수 목록(`check_all_command_guards` 포함)은 `test_unattended_approval_points` 가, `_run_approval_gate` 를 부르는 함수 목록과 위 함수의 위치, 시그니처는 `test_approval_guard_points` 가 두 버전에서 확인한다.
+어느 목록이든 함수가 늘면 시험이 실패하고, fos-ctx 가 그 동작을 막는지 본 뒤 선언을 고친다.
 
 모드는 판정할 때마다 그 실행의 profile 설정에서 읽는다(`tools/approval_context.py` 의 `_binary_approval_mode`).
 값을 바꾸면 gateway 를 다시 띄우지 않아도 다음 호출부터 반영된다.

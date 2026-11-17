@@ -64,7 +64,7 @@ ADR-086 의 실행 공간은 `/workspace` 부터 호스트 경로라서 격리�
 
 ### v0.23.2 에서 바뀐 기대 (2026-11-17)
 
-v0.23.2 는 `/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 ask 문맥을 끄고, 승인 관문(`_run_approval_gate`)을 `unattended_mode` 로 바로 정한다.
+v0.23.2 는 `/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 ask 문맥을 끈다. 그러면 셸 판정(`check_all_command_guards`)과 승인 관문(`_run_approval_gate`)이 `unattended_mode` 로 바로 정한다.
 그러면 이 결정이 쓰는 `approve` 가 셸 위험 명령, 승인이 필요한 경로의 파일 쓰기, `computer_use` 까지 사람 없이 연다.
 결정은 그대로 두고(`execute_code` 는 계속 연다), fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다(`docs/features/hermes-upgrade/spec.md` 의 REQ5, DECISION8).
 
