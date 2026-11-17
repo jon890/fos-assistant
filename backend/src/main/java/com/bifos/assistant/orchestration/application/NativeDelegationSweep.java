@@ -119,7 +119,12 @@ public class NativeDelegationSweep {
     }
 
 
-    /** 그 origin 의 깨울 자식이 모두 끝났거나 가장 먼저 등록한 자식이 기한을 넘었으면 모두 전했다고 적고 알림 줄 하나를 남긴다. */
+    /**
+     * 그 origin 의 깨울 자식이 모두 끝났거나 가장 먼저 등록한 자식이 기한을 넘었으면 중지 알림 표시를 적고 알림 줄 하나를 남긴다.
+     *
+     * <p>결과는 전한 것으로 적지 않는다. 사용자가 다음 메시지를 보내면 그 turn 입력에 든다({@link NativeDelegationResultSource}). 그
+     * 전에 사용자 메시지가 결과를 모두 가져갔으면 표시할 줄이 없어 알림 줄도 남기지 않는다.
+     */
     private Optional<Saved> noticeStopped(Long origin, Instant until, Instant now) {
         List<HermesSessionBinding> children = bindings.findEligibleByOrigin(origin);
         boolean allStopped = children.stream().allMatch(child -> child.stoppedAt() != null);
@@ -133,7 +138,7 @@ public class NativeDelegationSweep {
             return Optional.empty();
         }
         return Optional.ofNullable(transactions.execute(status -> {
-            if (bindings.markStopDelivered(origin, now) == 0) {
+            if (bindings.markStopNoticed(origin, now) == 0) {
                 return null;
             }
             return notices.save(conversationId.get(), STOPPED).map(message -> new Saved(conversationId.get(), message)).orElse(null);

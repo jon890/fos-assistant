@@ -105,6 +105,10 @@ public class HermesSessionBinding extends CreatedAtEntity {
     @Getter
     private Instant timeoutNoticedAt;
 
+    @Column(name = "stop_noticed_at", insertable = false, updatable = false)
+    @Getter
+    private Instant stopNoticedAt;
+
     @Column(name = "notice_message_id", insertable = false, updatable = false)
     @Getter
     private Long noticeMessageId;

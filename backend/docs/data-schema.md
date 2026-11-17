@@ -665,7 +665,7 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 
 Hermes `delegate_task` 가 만든 하위 에이전트 session 이 어느 FOS 실행에서 시작됐는지 적는다. profile 플러그인이 `subagent_start` hook 에서 등록한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
 **origin 과 사용자 칸은 바꾸지 않는다.** 같은 대화의 다음 turn 이 시작돼도 그 하위 에이전트는 처음 origin 실행에 속한다. 최상위 session 은 `agent_execution.hermes_session_id` 로 찾는다.
-끝 소식과 결과 칸(`wake_eligible` 부터 `notice_message_id` 까지)은 Hermes 내장 위임의 결과로 부모 대화를 깨우는 데 쓴다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)). `wake_eligible` 은 등록할 때 한 번 정하고, 나머지는 조건부 update 로만 바꾼다. 칸의 뜻과 판정은 [에이전트 팀 설계](../../docs/features/agent-team/design.md) 의 「PR6 내장 위임 결과」 가 갖는다.
+끝 소식과 결과 칸(`wake_eligible` 부터 `notice_message_id` 까지와 `stop_noticed_at`)은 Hermes 내장 위임의 결과로 부모 대화를 깨우는 데 쓴다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)). `wake_eligible` 은 등록할 때 한 번 정하고, 나머지는 조건부 update 로만 바꾼다. 칸의 뜻과 판정은 [에이전트 팀 설계](../../docs/features/agent-team/design.md) 의 「PR6 내장 위임 결과」 가 갖는다.
 
 - `goal_preview` 와 `result_text` 는 사용자 데이터 key 로 암호화하고 key 칸 `result_key_id` 하나를 함께 쓴다. AAD 는 `hermes_session_binding:<id>:<칸>:user:<user_id>` 다. 깨울 자식에만 차고, 깨울 자식은 늘 대화가 있다
 

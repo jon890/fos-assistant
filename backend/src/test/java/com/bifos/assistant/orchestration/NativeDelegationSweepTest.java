@@ -161,7 +161,7 @@ class NativeDelegationSweepTest {
 
 
     @Test
-    @DisplayName("중지한 답의 자식이 모두 끝나면 중지 알림 줄 하나를 남기고 전했다고 적으며 자동 turn 대상과 기한 알림이 없다")
+    @DisplayName("중지한 답의 자식이 모두 끝나면 중지 알림 줄 하나를 남기고 결과는 전하지 않은 채 사용자 turn 에 넣을 결과로 남는다")
     void stoppedTurnWithAllChildrenDoneLeavesStopNotice() {
         AgentExecution stopped = Fixture.root(executions, dad, conversation, ExecutionStatus.CANCELLED, NOW.minusSeconds(7_200));
         long child = NativeResultFixtures.binding(
@@ -171,9 +171,28 @@ class NativeDelegationSweepTest {
         sweep.sweepOnce(NOW.plusSeconds(3_600));
 
         assertThat(contents()).containsExactly(STOPPED);
-        assertThat(jdbc.queryForObject("SELECT result_delivered_at FROM hermes_session_binding WHERE id = ?", Timestamp.class, child))
+        assertThat(jdbc.queryForObject("SELECT stop_noticed_at FROM hermes_session_binding WHERE id = ?", Timestamp.class, child))
             .isNotNull();
+        assertThat(jdbc.queryForObject("SELECT result_delivered_at FROM hermes_session_binding WHERE id = ?", Timestamp.class, child))
+            .isNull();
         assertThat(source.undelivered(conversation.id())).isEmpty();
+        assertThat(source.carriedIntoUserTurn(conversation.id())).singleElement()
+            .satisfies(result -> assertThat(result.key()).isEqualTo(String.valueOf(child)));
+    }
+
+
+    @Test
+    @DisplayName("사용자 메시지가 중지한 답의 결과를 모두 가져간 뒤에는 중지 알림 줄을 남기지 않는다")
+    void carriedBeforeSweepLeavesNoStopNotice() {
+        AgentExecution stopped = Fixture.root(executions, dad, conversation, ExecutionStatus.CANCELLED, NOW.minusSeconds(7_200));
+        long child = NativeResultFixtures.binding(
+            jdbc, PROFILE, dad.id(), stopped.id(), true, NOW.minusSeconds(600), NOW.minusSeconds(60), "SUCCEEDED", "결과", "일");
+        assertThat(source.markDelivered(List.of(String.valueOf(child)), NOW)).isEqualTo(1);
+
+        sweep.sweepOnce(NOW.plusSeconds(60));
+
+        assertThat(contents()).isEmpty();
+        assertThat(source.carriedIntoUserTurn(conversation.id())).isEmpty();
     }
 
 
@@ -192,7 +211,7 @@ class NativeDelegationSweepTest {
 
 
     @Test
-    @DisplayName("중지 알림으로 끝낸 자식의 끝 소식이 늦게 와도 전달 표시가 남아 중지 알림 줄이 늘지 않는다")
+    @DisplayName("중지 알림 뒤 끝 소식이 늦게 와도 중지 알림 줄이 늘지 않고 그 결과는 사용자 turn 에 넣을 결과가 된다")
     void lateStopAfterStopNoticeDoesNotRepeatNotice() {
         AgentExecution stopped = Fixture.root(executions, dad, conversation, ExecutionStatus.CANCELLED, NOW.minusSeconds(7_200));
         long child = NativeResultFixtures.binding(
@@ -204,8 +223,9 @@ class NativeDelegationSweepTest {
         sweep.sweepOnce(NOW.plusSeconds(120));
 
         assertThat(contents()).containsExactly(STOPPED);
-        assertThat(jdbc.queryForObject("SELECT result_delivered_at FROM hermes_session_binding WHERE id = ?", Timestamp.class, child))
-            .isNotNull();
+        assertThat(source.undelivered(conversation.id())).isEmpty();
+        assertThat(source.carriedIntoUserTurn(conversation.id())).singleElement()
+            .satisfies(result -> assertThat(result.input()).contains("늦은 결과"));
     }
 
 

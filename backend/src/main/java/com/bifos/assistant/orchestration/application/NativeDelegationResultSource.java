@@ -2,12 +2,14 @@ package com.bifos.assistant.orchestration.application;
 
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import com.bifos.assistant.chat.delivery.application.port.AutoTurnResultSource;
+import com.bifos.assistant.chat.nextturn.config.DelegationWakeProperties;
 import com.bifos.assistant.context.application.ResultHeader;
 import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.domain.type.NativeResultStatus;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
 import com.bifos.assistant.orchestration.infra.SubagentResultTexts;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.util.ExternalData;
 import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
@@ -33,7 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>깨울 자식이고 끝 소식이 왔고 아직 전하지 않았다
  * <li>끝 소식이 {@link #SETTLE} 보다 오래됐다. Hermes 가 한 완료 단위의 hook 을 잇달아 부르므로 그 사이 다른 계기가 깨워도 한 단위가
  * 두 답으로 나뉘지 않는다
- * <li>origin 실행이 중지되지 않았다. 중지한 turn 의 자식은 {@code NativeDelegationSweep} 이 알림 줄로 끝낸다
+ * <li>origin 실행이 중지되지 않았다. 중지한 turn 의 자식은 {@code NativeDelegationSweep} 이 알림 줄을 남기고, 결과는
+ * {@link #carriedIntoUserTurn} 이 사용자의 다음 메시지 turn 입력에 넣는다(스펙 DECISION34)
  * </ul>
  *
  * <p>끝 소식 뒤에 사용자 turn 이 돌았어도 결과를 빼지 않는다. 이름을 붙인 Hermes profile 은 부모 session 에 결과 줄을 남기지 않아
@@ -62,6 +65,7 @@ public class NativeDelegationResultSource implements AutoTurnResultSource {
     private final AgentExecutionRepository executions;
     private final SubagentResultTexts texts;
     private final ContextProperties contextProperties;
+    private final LiveProperties<DelegationWakeProperties> wakeProperties;
     private final Clock clock;
 
 
@@ -97,6 +101,23 @@ public class NativeDelegationResultSource implements AutoTurnResultSource {
             .collect(Collectors.toMap(HermesSessionBinding::id, Function.identity()));
         List<HermesSessionBinding> ordered = ids.stream().map(found::get).filter(binding -> binding != null).toList();
         return results(ordered, clock.instant());
+    }
+
+
+    /**
+     * 사용자가 중지한 답이 맡긴 깨울 자식 가운데 끝 소식이 {@link #HORIZON} 안에 왔고 아직 전하지 않은 결과다. 중지 알림 줄을 남기기
+     * 전이어도 낸다. 자동 turn 과 같은 모양이다.
+     *
+     * <p>설정이 꺼져 있으면 내지 않는다. 끈 동안은 이 기능 전과 같아야 한다(스펙 DECISION39). 끈 동안 끝난 결과는 끝 소식을 적을 때
+     * 이미 전한 것으로 적혀 켠 뒤에도 들지 않는다.
+     */
+    @Override
+    public List<AutoTurnResult> carriedIntoUserTurn(Long conversationId) {
+        if (!wakeProperties.current().enabled()) {
+            return List.of();
+        }
+        Instant now = clock.instant();
+        return results(bindings.findCarriedIntoUserTurn(conversationId, now.minus(HORIZON)), now);
     }
 
 

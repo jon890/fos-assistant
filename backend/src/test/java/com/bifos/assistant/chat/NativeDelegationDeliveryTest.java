@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.chat.nextturn.application.dto.DelegationFinished;
+import com.bifos.assistant.chat.turn.application.ChatService;
 import com.bifos.assistant.chat.turn.application.ConversationEventHub;
 import com.bifos.assistant.chat.turn.application.TurnCancellation;
 import com.bifos.assistant.chat.turn.application.TurnHandle;
@@ -89,6 +90,9 @@ class NativeDelegationDeliveryTest {
 
     @Autowired
     PendingMessageStore pendingRows;
+
+    @Autowired
+    ChatService chatService;
 
     @Autowired
     JdbcTemplate jdbc;
@@ -292,6 +296,54 @@ class NativeDelegationDeliveryTest {
 
         Long autoTurn = history().getLast().executionId();
         assertThat(jdbc.queryForObject("SELECT unattended FROM agent_execution WHERE id = ?", Boolean.class, autoTurn)).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("중지한 답의 결과는 자동 turn 없이 다음 사용자 메시지 turn 입력에 한 번 들고 그다음 대기 글 turn 에는 다시 들지 않는다")
+    void stoppedTurnResultGoesIntoNextUserTurnOnce() {
+        jdbc.update("UPDATE agent_execution SET status = 'CANCELLED' WHERE id = ?", origin.id());
+        long binding = stopped("SUCCEEDED", "장보기 목록을 정리했다", "장보기 목록 정리");
+
+        finished();
+        awaitIdle();
+        assertThat(stub().received()).as("중지한 답의 결과로는 자동 turn 을 열지 않는다").isEmpty();
+
+        chatService.send(dad, conversation.id(), "이어서 해 줘", null);
+        awaitIdle();
+
+        assertThat(stub().received()).hasSize(1);
+        assertThat(stub().received().getFirst().input())
+            .contains("[중지한 답이 맡긴 하위 작업의 결과]")
+            .contains("<external-data>\n장보기 목록을 정리했다\n</external-data>")
+            .endsWith("[사용자 메시지]\n이어서 해 줘");
+        assertThat(stub().received().getFirst().input().split("장보기 목록을 정리했다", -1)).as("결과 글은 한 번만 든다").hasSize(2);
+        assertThat(column(binding, "result_delivered_at")).isNotNull();
+
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "다음 질문", false, Instant.parse("2026-09-30T00:00:00Z"));
+        finished();
+        awaitReceived(2);
+        awaitIdle();
+
+        assertThat(stub().received().get(1).input()).doesNotContain("장보기 목록을 정리했다").endsWith("다음 질문");
+        assertThat(history()).extracting(ChatMessage::content).doesNotContain("하위 작업이 끝났어요 · 장보기 목록 정리");
+    }
+
+
+    @Test
+    @DisplayName("대기 글로 여는 turn 도 중지한 답의 결과를 입력에 넣는다")
+    void queuedTurnCarriesStoppedResult() {
+        jdbc.update("UPDATE agent_execution SET status = 'CANCELLED' WHERE id = ?", origin.id());
+        long binding = stopped("FAILED", "권한이 없다", "메일 정리");
+        PendingQueueFixtures.queue(pendingRows, conversation.id(), "대기 글", false, Instant.parse("2026-09-30T00:00:00Z"));
+
+        finished();
+        awaitReceived(1);
+        awaitIdle();
+
+        assertThat(stub().received()).hasSize(1);
+        assertThat(stub().received().getFirst().input()).contains("상태: FAILED").contains("권한이 없다").endsWith("대기 글");
+        assertThat(column(binding, "result_delivered_at")).isNotNull();
     }
 
 
