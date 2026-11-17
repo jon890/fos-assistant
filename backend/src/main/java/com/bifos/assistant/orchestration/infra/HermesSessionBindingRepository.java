@@ -39,7 +39,8 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
     @Query(value = "update hermes_session_binding set stopped_at = :stoppedAt, result_status = :status,"
         + " result_text = :text, result_key_id = :keyId, goal_preview = :goal, result_delivered_at = :deliveredAt"
         + " where id = :id and wake_eligible = true and stopped_at is null and exists (select 1 from agent_execution e"
-        + " join conversation c on c.id = e.conversation_id where e.id = origin_execution_id and c.deleted_at is null)",
+        + " join conversation c on c.id = e.conversation_id"
+        + " where e.id = hermes_session_binding.origin_execution_id and c.deleted_at is null)",
         nativeQuery = true)
     int recordStop(
         @Param("id") Long id,
