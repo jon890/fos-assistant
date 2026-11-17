@@ -13,6 +13,7 @@ import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.orchestration.application.NativeDelegationResultSource;
 import com.bifos.assistant.orchestration.application.NativeDelegationSweep;
+import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
@@ -31,6 +32,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 1시간 기한과 중지한 답의 알림 줄을 본다(스펙 REQ12, DECISION31, DECISION34, DECISION40~DECISION42). */
 @BackendIntegrationTest
@@ -68,6 +71,12 @@ class NativeDelegationSweepTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    HermesSessionBindingRepository bindings;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private AppUser dad;
     private Conversation conversation;
@@ -179,6 +188,24 @@ class NativeDelegationSweepTest {
 
         sweep.sweepOnce(NOW.plusSeconds(31 * 60));
         assertThat(contents()).containsExactly(STOPPED);
+    }
+
+
+    @Test
+    @DisplayName("중지 알림으로 끝낸 자식의 끝 소식이 늦게 와도 전달 표시가 남아 중지 알림 줄이 늘지 않는다")
+    void lateStopAfterStopNoticeDoesNotRepeatNotice() {
+        AgentExecution stopped = Fixture.root(executions, dad, conversation, ExecutionStatus.CANCELLED, NOW.minusSeconds(7_200));
+        long child = NativeResultFixtures.binding(
+            jdbc, PROFILE, dad.id(), stopped.id(), true, NOW.minusSeconds(61 * 60), null, null, null, null);
+        sweep.sweepOnce(NOW);
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> bindings.recordStop(
+            child, NOW.plusSeconds(60), "SUCCEEDED", "늦은 결과", null, null, null));
+        sweep.sweepOnce(NOW.plusSeconds(120));
+
+        assertThat(contents()).containsExactly(STOPPED);
+        assertThat(jdbc.queryForObject("SELECT result_delivered_at FROM hermes_session_binding WHERE id = ?", Timestamp.class, child))
+            .isNotNull();
     }
 
 
