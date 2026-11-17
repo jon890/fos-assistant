@@ -240,6 +240,24 @@ test("v0.23 모양은 재기동한 실행을 unknown 으로 두고, 해제 전�
   }
 });
 
+test("v0.23 모양은 끝난 run 에 다시 연결하면 끝 사건 하나를 보내고 닫는다", async () => {
+  const hermes = await startFakeHermes({ browser: "example-key" });
+  const headers = { Authorization: "Bearer example-key" };
+  try {
+    hermes.useHermesShape("v0.23");
+    const response = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers, body: JSON.stringify({ input: "보관분 검사" }),
+    });
+    const runId = ((await response.json()) as { run_id: string }).run_id;
+    await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}/events`, { headers })).text();
+    const replay = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}/events`, { headers })).text();
+    const events = replay.split("\n").filter((line) => line.startsWith("data:")).map((line) => JSON.parse(line.slice(5)).event);
+    assert.deepEqual(events, ["run.completed"]);
+  } finally {
+    await hermes.close();
+  }
+});
+
 test("v0.21 모양의 재기동은 도는 실행의 기록을 지워 404 로 답한다", async () => {
   const hermes = await startFakeHermes({ browser: "example-key" });
   const headers = { Authorization: "Bearer example-key" };

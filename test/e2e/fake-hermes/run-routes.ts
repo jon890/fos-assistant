@@ -399,8 +399,10 @@ function admissionOf(runId: string): string {
  */
 function sessionProjection(state: FakeHermesState, run: Run): Record<string, unknown> {
   const { error: _error, pending_steer: _pending, ...rest } = run;
-  const blocked = run.status !== "unknown" && !["completed", "failed", "cancelled"].includes(run.status)
-    && [...state.runs.values()].some((other) => other !== run && other.session_id === run.session_id && other.status === "unknown");
+  // 해제 전까지 뒤 실행은 끝나지 않는다. 대역의 사건 스트림이 상태를 completed 로 바꿨어도 대기로 답해, 해제가 빠지면 turn 이 끝나지 않게 한다.
+  const runs = [...state.runs.values()];
+  const blocked = run.status !== "cancelled"
+    && runs.slice(0, runs.indexOf(run)).some((other) => other.session_id === run.session_id && other.status === "unknown");
   return {
     ...rest,
     object: "hermes.run",
