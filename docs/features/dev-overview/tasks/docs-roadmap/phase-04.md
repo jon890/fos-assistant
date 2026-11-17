@@ -97,3 +97,5 @@ scripts/dev/check-local.sh --fast
 | `docs/prd.md` | 수정 (로드맵 절, 범위 표 한 줄) |
 | `web/docs/code-architecture.md` | 수정 (화면 목록, 사이드바, 아이콘, 「고급」) |
 | `docs/features/dev-overview.md` | 수정 (지금 동작) |
+| `docs/features/dev-overview/spec.md` | 수정 (DECISION8 근거의 mermaid 버전 표기를 뺌. 설치된 mermaid 는 12) |
+| `test/repo/doc-references.test.ts` | 수정 (가짜 문서 경로를 쓰는 dev-docs 테스트 파일을 예시 파일 목록에 더함) |

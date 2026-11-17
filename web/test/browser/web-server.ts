@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { cp } from "node:fs/promises";
 import { join } from "node:path";
+import { DEV_DOCS_COMMIT, writeDevDocsFixture } from "./dev-docs-fixture.ts";
 
 /**
  * 브라우저 검사가 띄우는 웹 서버다. `playwright.config.ts` 의 `webServer` 가 부른다.
@@ -34,9 +35,15 @@ const mode = process.env.BROWSER_WEB_SERVER ?? "build";
 const port = process.argv[2];
 if (!port) throw new Error("포트를 첫째 인자로 주어야 한다.");
 
+// 「개발 문서」 화면이 읽을 가짜 문서 트리와 커밋이다. 두 모드 모두 같은 값을 받는다.
+const DEV_DOCS_ENV = {
+  DEV_DOCS_ROOT: await writeDevDocsFixture(),
+  SOURCE_COMMIT: DEV_DOCS_COMMIT,
+};
+
 console.error(`브라우저 검사의 웹 서버: ${mode === "dev" ? "개발 서버" : "빌드한 서버"}`);
 if (mode === "dev") {
-  run("pnpm", ["dev", "--hostname", "127.0.0.1", "--port", port], {});
+  run("pnpm", ["dev", "--hostname", "127.0.0.1", "--port", port], DEV_DOCS_ENV);
 } else if (mode === "build") {
   build();
   // standalone 결과는 정적 파일을 담지 않는다. `Dockerfile` 이 옮기는 것과 같은 두 디렉터리를 옮긴다.
@@ -48,6 +55,7 @@ if (mode === "dev") {
     // macOS 셸은 HOSTNAME 에 기계 이름을 넣어 둔다. 여기서 정하지 않으면 standalone 서버가 그 이름의 주소로 듣는다.
     HOSTNAME: "127.0.0.1",
     PORT: port,
+    ...DEV_DOCS_ENV,
   });
 } else {
   throw new Error(`BROWSER_WEB_SERVER 는 build 나 dev 여야 한다: ${mode}`);
