@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createHeadingIds, headingText } from "@/lib/dev-docs/headings";
 import { resolveDocLink } from "@/lib/dev-docs/links";
+import { MermaidBlock } from "./mermaid-block";
 
 type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
@@ -147,6 +148,7 @@ export function DevDocMarkdown({
             const source = String(children);
             if (language || source.endsWith("\n")) {
               const text = source.replace(/\n$/, "");
+              if (language === "mermaid") return <MermaidBlock source={text} />;
               return (
                 <pre className="my-3 overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs leading-5">
                   <code>{text}</code>
