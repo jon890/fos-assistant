@@ -39,6 +39,7 @@ import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -91,6 +92,7 @@ class AgentRunnerSubmitFailureTest {
         runner = new AgentRunner(
             contextAssembler,
             hermes,
+            mock(LostRunRelease.class),
             executions,
             mock(ExecutionEventRecorder.class),
             mock(ExecutionEventRepository.class),

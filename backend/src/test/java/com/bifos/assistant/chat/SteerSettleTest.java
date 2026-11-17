@@ -336,6 +336,38 @@ class SteerSettleTest {
 
 
     @Test
+    @DisplayName("넘어간 글이 있었는지 모르는 결과로 끝나면 중지한 turn 이어도 확인 못 함으로 멈춘 대기 줄에 둔다")
+    void unknownPendingSteerHoldsEvenWhenStopped() throws InterruptedException {
+        stub().willReturn(unknownPending("cancelled"));
+        Thread running = startRunningTurn();
+        pending.enqueue(dad, conversation.id(), "끝 사건을 못 받은 글", true);
+        chat.stop(dad, handle().getExecutionId());
+
+        finish(running);
+
+        assertThat(bubbles()).extracting(ChatMessage::steerState).containsExactly(SteerState.UNCONFIRMED);
+        assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("기동 정리가 받은 결과가 넘어간 글을 모르면 그 말풍선을 확인 못 함으로 둔다")
+    void recoveredUnknownPendingHolds() throws InterruptedException {
+        Thread running = startRunningTurn();
+        Long executionId = handle().getExecutionId();
+        finish(running);
+        ChatMessage left = messages.save(ChatMessage.fromSteer(
+            conversation.id(), dad.id(), "모르는 글", executionId, SteerState.DELIVERED, null, Instant.now()));
+        jdbc.update("UPDATE agent_execution SET status = 'RUNNING', finished_at = NULL WHERE id = ?", executionId);
+
+        recorder.settle(executionId, unknownPending("interrupted"));
+
+        assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.UNCONFIRMED);
+        assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("결과를 읽지 못하고 끝나면 들어갔는지 모르는 것으로 보고 멈춘 대기 줄에 둔다")
     void unreadResultHolds() throws InterruptedException {
         CountDownLatch gate = release;
@@ -533,6 +565,13 @@ class SteerSettleTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             ownerId);
+    }
+
+
+    /** Hermes v0.23.2 에서 끝 사건을 얻지 못한 결과다. 넘어간 글이 있었는지 모른다. */
+    private static HermesRunResult unknownPending(String status) {
+        return new HermesRunResult(
+            "run", "session", status, "답", "model", "provider", null, TokenUsage.empty(), null, null, false);
     }
 
 
