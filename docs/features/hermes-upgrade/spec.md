@@ -55,6 +55,7 @@ PR4 는 운영에 연결하지 않은 addon 만 고치므로 v0.23.2 에서만 �
 - Hermes 승인 카드에 Control Plane 이 답하는 경로
 - steer 계약 표의 「중단」 줄. `steer-cancel-pending` 작업이 고친다
 - v0.23.2 의 새 기능(Bot Chat, Desktop, room 등)을 쓰는 일
+- Hermes 내장 위임(`delegate_task`) 결과로 부모 대화의 다음 답을 자동으로 여는 일. 두 버전 모두 완료가 새 run 으로 오지 않아 업그레이드로 고쳐지지 않는다. 별도 기능으로 만든다(DECISION19). 이 스펙은 사실 표에 두 버전의 차이만 남긴다
 - `Idempotency-Key` 를 보내는 일([ADR-061](../../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 기각한 그대로다)
 
 ## 요구사항과 인수 조건
@@ -122,6 +123,7 @@ PR4 는 운영에 연결하지 않은 addon 만 고치므로 v0.23.2 에서만 �
 | DECISION16 | 해제한 turn 과 `pending_steer` 없는 `run.interrupted` 로 끝난 turn 에 끼운 steer 글 | DECISION3 처럼 「전달됐는지 확인 못 함」 으로 두고 멈춘 대기 줄로 되돌린다. 사용자가 중지를 누른 turn 이 해제로 끝나면 결과는 지금 중지와 같게 「중지됨」 으로 보인다 | 작성자 | 끊긴 실행은 글이 들어갔는지 알 수 없다. [steer 스펙](../chat/spec.md)의 DECISION14(404 로 실행을 잃었을 때)와 같은 규칙이다. 중지는 사용자가 이미 고른 결과다 |
 | DECISION17 | 해제 대상 | Control Plane 이 보낸 모든 실행(대화 turn, 위임, 흐름, 방 요약, 추천 질문 같은 부가 실행) | 작성자 | DECISION9 가 Control Plane 의 자동 해제를 정했다. 방 요약은 대화와 같은 session 을 쓰므로(`RoomContext`) 빼면 그 대화가 멈춘다 |
 | DECISION18 | REQ5 의 위험 명령 범위 | Hermes 의 위험 패턴 분류에 걸리는 명령은 모두 막는다. `command_allowlist` 의 영구 허용은 보지 않는다 | 작성자 | 우리 profile 은 허용 목록을 쓰지 않는다. 그 값은 프로세스 전역이고 import 때 한 번 읽어 profile 별로 맞지 않는다(계약 문서 「같은 부류의 계약 둘」). Control Plane 이 승인 카드에 답하지 않아 「항상 허용」 으로 쌓인 항목도 없다 |
+| DECISION19 | 내장 위임 결과로 다음 답을 자동으로 여는 기능의 자리 | 업그레이드 스펙에 넣지 않고 별도 기능으로 만든다. v0.23.2 의 `delegation.gateway_mode: inline` 으로 대신하지도 않는다 | 사용자 2026-11-17 | 지금 운영(v0.21.6)에서 재현되는 문제라 업그레이드를 기다릴 까닭이 없고, 자식 완료를 알아채는 길(`subagent_stop` hook)이 두 버전에 같다 |
 | DECISION13 | 새 내장 도구 세 개의 판정 | 안전 목록 밖에 둔다 | 작성자 | 안전 목록은 읽기 전용 도구만 담는다([사건 실행 설계](../proactive/design.md)) |
 
 ## 도메인 규칙 변경
