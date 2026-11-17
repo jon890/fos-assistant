@@ -42,7 +42,10 @@ export function DevDocsShell({
         <aside className="lg:w-72 lg:shrink-0">
           <DevDocsCatalog groups={catalog.groups} currentPath={currentPath} />
         </aside>
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* 화면 틀(app-shell)이 이미 main 이라 본문은 이름 붙인 section 으로 둔다. */}
+        <section aria-label="문서 본문" className="min-w-0 flex-1">
+          {children}
+        </section>
       </div>
     </div>
   );
