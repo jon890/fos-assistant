@@ -723,16 +723,17 @@ class HermesSourceTest(unittest.TestCase):
                         "%s 가 %s 로 위험 명령을 고르지 않는다. %s" % (relative, name, revisit))
 
         relative, gate = contract.APPROVAL_GUARD["gate"]
+        # 소스 root 아래 모든 Python 파일을 훑는다. 새 호출자는 어느 패키지에 생겨도 잡혀야 한다. 시험 디렉터리만 뺀다.
         callers = set()
-        for top in ("tools", "agent", "gateway", "hermes_cli"):
-            for source in sorted((self.root / top).rglob("*.py")):
-                if "tests" in source.relative_to(self.root).parts or gate not in source.read_text(encoding="utf-8"):
-                    continue
-                tree = self.tree(source)
-                for node in ast.walk(tree):
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name != gate and any(
-                            calls(statement, gate) for statement in node.body):
-                        callers.add(node.name)
+        for source in sorted(self.root.rglob("*.py")):
+            parts = source.relative_to(self.root).parts
+            if "tests" in parts or gate not in source.read_text(encoding="utf-8", errors="replace"):
+                continue
+            tree = self.tree(source)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name != gate and any(
+                        calls(statement, gate) for statement in node.body):
+                    callers.add(node.name)
         self.assertEqual(set(contract.APPROVAL_GUARD["gate_callers"]), callers,
                          "%s 를 부르는 함수가 선언과 다르다. %s" % (gate, revisit))
 
