@@ -420,7 +420,9 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 | `parent_root_session_id` | `parent_session_id` 사슬의 처음 session. `pre_tool_call` 이 계산하는 루트와 같다 |
 | `child_session_id` | hook 이 받은 `child_session_id` |
 | `child_subagent_id` | hook 이 받은 값. 없으면 `null`. 서명하지 않고 로그에만 쓴다 |
-| `parent_subagent_id` | hook 이 받은 값. 최상위 자식이면 `null`. 서명하지 않고 로그에만 쓴다 |
+| `parent_subagent_id` | hook 이 받은 값. 최상위 자식이면 `null`. 서명하지 않는다. 최상위 자식인지 정하는 데 쓴다 |
+| `reports_stop` | 선택. 이 플러그인이 그 자식의 끝 소식(아래 「하위 에이전트 끝 소식 계약」)을 보내면 `true`. 없거나 `null` 이면 거짓이다. 서명하지 않는다 |
+| `child_goal` | 선택. hook 이 받은 맡긴 일(`goal`). 없으면 `null`. 서명하지 않는다. 서버는 깨울 자식일 때만 앞 40자를 저장한다 |
 | `sig` | 아래 서명의 소문자 16진수 64자 |
 
 서명은 `_fos_ctx` 와 같은 HMAC-SHA256 이고 key 도 같다. 서명할 글만 다르다.
@@ -445,6 +447,8 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 1. `(토큰의 profile, parent_session_id)` 등록이 있으면 그 origin 을 잇는다. 하위 에이전트의 하위 에이전트다
 2. 없으면 `(토큰의 profile, parent_root_session_id)` 로 도는 실행 하나가 origin 이다. 최상위 session 이 만든 자식이고, 압축 교체된 최상위 session 이 만든 자식도 루트가 같아 여기 온다
 3. 둘 다 없으면 거절한다
+
+새로 저장할 때 끝 소식으로 부모 대화를 깨울 자식인지 한 번 정한다. `reports_stop` 이 참이고, 2 로 풀렸고 `parent_subagent_id` 가 비었고, origin 이 대화 에이전트의 대화 turn(먼저 살펴보기 대화와 `@` 맡김 turn 이 아님)일 때만 깨운다. 판정의 근거는 [에이전트 팀 설계](../../../docs/features/agent-team/design.md) 의 「깨울 자식」 이다. 옛 플러그인의 등록은 깨우지 않는다.
 
 | 응답 | 뜻 |
 | --- | --- |

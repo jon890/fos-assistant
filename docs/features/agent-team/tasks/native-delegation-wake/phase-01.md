@@ -110,6 +110,7 @@ node --test test/repo/migration-collation.test.ts test/repo/migration-immutable.
 | `backend/src/test/java/com/bifos/assistant/architecture/StoredEnumNamesTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/dto/SubagentRegistration.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/presentation/SubagentSessionController.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/orchestration/application/dto/SubagentRegistrationOptions.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/orchestration/application/SubagentSessionRegistrar.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/mcp/application/SubagentRegistrationTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/orchestration/SubagentSessionRegistrarTest.java` | 수정 |

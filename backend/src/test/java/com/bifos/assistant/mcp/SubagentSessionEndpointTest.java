@@ -1,5 +1,8 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.agent.domain.Agent;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -81,6 +84,9 @@ class SubagentSessionEndpointTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ConversationRepository conversations;
+
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
     private AppUser dad;
@@ -96,6 +102,7 @@ class SubagentSessionEndpointTest {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE_A, PROFILE_B));
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
+        jdbc.update("DELETE FROM conversation WHERE user_id IN (SELECT id FROM app_user WHERE email LIKE 'subagent-%@example.com')");
         users.deleteAll();
         dad = users.save(AppUser.of("subagent-dad@example.com", "아빠", 1L, UserRole.ADMIN));
         kid = users.save(AppUser.of("subagent-kid@example.com", "아이", 1L, UserRole.MEMBER));
@@ -133,6 +140,38 @@ class SubagentSessionEndpointTest {
             assertThat(response.statusCode()).isEqualTo(400);
             assertThat(response.body()).contains("VALIDATION_FAILED");
         }
+    }
+
+
+    @Test
+    @DisplayName("옛 본문(끝 소식 칸 없음)의 대화 turn 자식 등록은 201 이고 깨울 자식이 아니다")
+    void oldBodyRegistrationIsCreatedAndNotWakeEligible() throws Exception {
+        String turnRoot = McpCallSigner.newRoot();
+        conversationTurn(turnRoot);
+        String child = newChild();
+
+        HttpResponse<String> response = register(
+            tokenA, McpCallSigner.subagentBody(tokenA, turnRoot, turnRoot, child).toString());
+
+        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(201);
+        assertThat(wakeEligible(PROFILE_A, child)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("끝 소식을 보낸다고 밝힌 대화 turn 의 최상위 자식은 깨울 자식으로 등록된다")
+    void reportsStopRegistrationIsWakeEligible() throws Exception {
+        String turnRoot = McpCallSigner.newRoot();
+        conversationTurn(turnRoot);
+        String child = newChild();
+        ObjectNode body = McpCallSigner.subagentBody(tokenA, turnRoot, turnRoot, child);
+        body.put("reports_stop", true);
+        body.put("child_goal", "장보기 목록 정리");
+
+        HttpResponse<String> response = register(tokenA, body.toString());
+
+        assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(201);
+        assertThat(wakeEligible(PROFILE_A, child)).isTrue();
     }
 
 
@@ -342,6 +381,23 @@ class SubagentSessionEndpointTest {
             Long.class,
             profileName,
             sessionId);
+    }
+
+
+    /** 대화와 그 대화 에이전트로 루트 session 에서 도는 대화 turn 을 만든다. */
+    private AgentExecution conversationTurn(String turnRoot) {
+        Agent agent = McpCallSigner.agentFor(agents, PROFILE_A);
+        Conversation conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
+        return McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE_A, turnRoot);
+    }
+
+
+    private boolean wakeEligible(String profileName, String sessionId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+            "SELECT wake_eligible FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
+            Boolean.class,
+            profileName,
+            sessionId));
     }
 
 

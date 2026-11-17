@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp.presentation;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.dto.SubagentRegistration;
 import com.bifos.assistant.mcp.presentation.McpDtos.SubagentRegistrationResponse;
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationOptions;
 import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.shared.error.ApiException;
@@ -46,7 +47,9 @@ public class SubagentSessionController {
             mcp.profileName(),
             registration.parentRootSessionId(),
             registration.parentSessionId(),
-            registration.childSessionId());
+            registration.childSessionId(),
+            new SubagentRegistrationOptions(
+                registration.parentSubagentId(), registration.reportsStop(), registration.childGoal()));
         return switch (result) {
             case CREATED -> ResponseEntity.status(HttpStatus.CREATED).body(new SubagentRegistrationResponse("created"));
             case EXISTS -> ResponseEntity.ok(new SubagentRegistrationResponse("exists"));

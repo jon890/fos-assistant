@@ -6,7 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationOptions;
 import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
+import com.bifos.assistant.orchestration.infra.SubagentResultTexts;
 import com.bifos.assistant.orchestration.application.SubagentSessionRegistrar;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
@@ -64,6 +68,12 @@ class SubagentSessionRegistrarTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    AgentRepository agents;
+
+    @Autowired
+    SubagentResultTexts texts;
 
     private AppUser dad;
     private AppUser kid;
@@ -341,6 +351,106 @@ class SubagentSessionRegistrarTest {
 
         assertThat(registrar.register(PROFILE_A, root, root, longest)).isEqualTo(SubagentRegistrationResult.CREATED);
         assertThat(binding(PROFILE_A, longest).sessionId()).isEqualTo(longest);
+    }
+
+
+    @Test
+    @DisplayName("끝 소식을 보낸다고 밝힌 대화 turn 의 최상위 자식은 깨울 자식이고 맡긴 일 앞 40자를 봉해 적는다")
+    void topLevelChildOfConversationTurnThatReportsStopIsWakeEligibleWithSealedGoal() {
+        String turnRoot = newRoot();
+        AgentExecution turn = conversationTurn(Conversation.startedBy(dad.id(), "대화", null, Instant.now()), turnRoot);
+        String child = newChild();
+        String goal = "가".repeat(30) + "나다라마바사아자차카타파하";
+
+        registrar.register(PROFILE_A, turnRoot, turnRoot, child, new SubagentRegistrationOptions(null, true, goal));
+
+        HermesSessionBinding row = binding(PROFILE_A, child);
+        assertThat(row.originExecutionId()).isEqualTo(turn.id());
+        assertThat(row.wakeEligible()).as("깨울 자식").isTrue();
+        assertThat(row.resultKeyId()).as("봉한 key").isNotNull();
+        assertThat(row.goalPreview()).as("암호문").isNotEqualTo(goal.substring(0, 40));
+        assertThat(texts.open(row.id(), row.userId(), SubagentResultTexts.GOAL_PREVIEW, row.resultKeyId(), row.goalPreview()))
+            .contains(goal.substring(0, 40));
+    }
+
+
+    @Test
+    @DisplayName("선택 칸이 없거나 끝 소식을 보내지 않는 등록은 깨울 자식이 아니고 맡긴 일도 적지 않는다")
+    void registrationWithoutReportsStopIsNotWakeEligible() {
+        String turnRoot = newRoot();
+        conversationTurn(Conversation.startedBy(dad.id(), "대화", null, Instant.now()), turnRoot);
+        String old = newChild();
+        String notReporting = newChild();
+
+        registrar.register(PROFILE_A, turnRoot, turnRoot, old);
+        registrar.register(PROFILE_A, turnRoot, turnRoot, notReporting, new SubagentRegistrationOptions(null, false, "목표"));
+
+        assertThat(binding(PROFILE_A, old).wakeEligible()).isFalse();
+        assertThat(binding(PROFILE_A, notReporting).wakeEligible()).isFalse();
+        assertThat(binding(PROFILE_A, notReporting).goalPreview()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("손자 자식, 부모 등록으로 풀린 자식, 맡긴 에이전트의 실행, 먼저 살펴보기 대화, @ 맡김 turn 의 자식은 깨우지 않는다")
+    void nonTopLevelOrNonConversationTurnChildrenAreNotWakeEligible() {
+        SubagentRegistrationOptions reports = new SubagentRegistrationOptions(null, true, "목표");
+        String turnRoot = newRoot();
+        conversationTurn(Conversation.startedBy(dad.id(), "대화", null, Instant.now()), turnRoot);
+        String parentChild = newChild();
+        registrar.register(PROFILE_A, turnRoot, turnRoot, parentChild, reports);
+        String grandchild = newChild();
+        registrar.register(PROFILE_A, turnRoot, parentChild, grandchild, reports);
+        String orphanGrandchild = newChild();
+        registrar.register(PROFILE_A, turnRoot, turnRoot, orphanGrandchild, new SubagentRegistrationOptions("sa-1", true, "목표"));
+
+        String checkRoot = newRoot();
+        conversationTurn(Conversation.startedForCheck(dad.id(), "점검", null, Instant.now()), checkRoot);
+        String checkChild = newChild();
+        registrar.register(PROFILE_A, checkRoot, checkRoot, checkChild, reports);
+
+        String mentionRoot = newRoot();
+        AgentExecution mention = conversationTurn(Conversation.startedBy(dad.id(), "맡김", null, Instant.now()), mentionRoot);
+        Agent other = McpCallSigner.agentFor(agents, PROFILE_B);
+        jdbc.update("UPDATE agent_execution SET agent_id = ? WHERE id = ?", other.id(), mention.id());
+        String mentionChild = newChild();
+        registrar.register(PROFILE_A, mentionRoot, mentionRoot, mentionChild, reports);
+
+        String delegatedRoot = newRoot();
+        AgentExecution delegated = conversationTurn(Conversation.startedBy(dad.id(), "맡긴 일", null, Instant.now()), delegatedRoot);
+        jdbc.update("UPDATE agent_execution SET parent_execution_id = ? WHERE id = ?", dadRun.id(), delegated.id());
+        String delegatedChild = newChild();
+        registrar.register(PROFILE_A, delegatedRoot, delegatedRoot, delegatedChild, reports);
+
+        assertThat(binding(PROFILE_A, parentChild).wakeEligible()).as("최상위 자식").isTrue();
+        assertThat(binding(PROFILE_A, grandchild).wakeEligible()).as("부모 등록으로 풀린 손자").isFalse();
+        assertThat(binding(PROFILE_A, orphanGrandchild).wakeEligible()).as("부모 번호가 있는 손자").isFalse();
+        assertThat(binding(PROFILE_A, checkChild).wakeEligible()).as("먼저 살펴보기").isFalse();
+        assertThat(binding(PROFILE_A, mentionChild).wakeEligible()).as("@ 맡김").isFalse();
+        assertThat(binding(PROFILE_A, delegatedChild).wakeEligible()).as("맡긴 에이전트의 실행").isFalse();
+    }
+
+
+    @Test
+    @DisplayName("같은 자식을 다시 등록해도 처음 정한 깨울 자식 여부는 바뀌지 않는다")
+    void reRegistrationDoesNotChangeWakeEligibility() {
+        String turnRoot = newRoot();
+        conversationTurn(Conversation.startedBy(dad.id(), "대화", null, Instant.now()), turnRoot);
+        String child = newChild();
+        registrar.register(PROFILE_A, turnRoot, turnRoot, child);
+
+        registrar.register(PROFILE_A, turnRoot, turnRoot, child, new SubagentRegistrationOptions(null, true, "목표"));
+
+        assertThat(binding(PROFILE_A, child).wakeEligible()).isFalse();
+    }
+
+
+    /** 대화 에이전트로 그 루트 session 에서 도는 대화 turn 실행을 만든다. 대화의 에이전트를 그 실행의 에이전트로 맞춘다. */
+    private AgentExecution conversationTurn(Conversation conversation, String turnRoot) {
+        Agent agent = McpCallSigner.agentFor(agents, PROFILE_A);
+        Conversation saved = conversations.save(conversation);
+        jdbc.update("UPDATE conversation SET agent_id = ? WHERE id = ?", agent.id(), saved.id());
+        return McpCallSigner.running(executions, agents, dad.id(), saved.id(), PROFILE_A, turnRoot);
     }
 
 

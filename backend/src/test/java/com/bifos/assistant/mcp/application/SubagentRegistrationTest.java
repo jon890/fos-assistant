@@ -48,7 +48,7 @@ class SubagentRegistrationTest {
     void passesTopLevelChildTestVectorAndReturnsThreeSessions() {
         SubagentRegistration registration = SubagentRegistration.verify(topChild(), TOKEN_HASH);
 
-        assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, ROOT, TOP_CHILD));
+        assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, ROOT, TOP_CHILD, null, false, null));
     }
 
 
@@ -60,7 +60,36 @@ class SubagentRegistrationTest {
 
         SubagentRegistration registration = SubagentRegistration.verify(body, TOKEN_HASH);
 
-        assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, TOP_CHILD, NESTED_CHILD));
+        assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, TOP_CHILD, NESTED_CHILD, "sa-1", false, null));
+    }
+
+
+    @Test
+    @DisplayName("끝 소식 칸과 맡긴 일은 서명하지 않고 읽는다")
+    void readsUnsignedReportsStopAndChildGoal() {
+        ObjectNode body = topChild();
+        body.put("reports_stop", true);
+        body.put("child_goal", "장보기 목록 정리");
+
+        SubagentRegistration registration = SubagentRegistration.verify(body, TOKEN_HASH);
+
+        assertThat(registration.reportsStop()).isTrue();
+        assertThat(registration.childGoal()).isEqualTo("장보기 목록 정리");
+    }
+
+
+    @Test
+    @DisplayName("끝 소식 칸이 불리언이 아니거나 맡긴 일이 글이 아니면 거절한다")
+    void rejectsNonBooleanReportsStopOrNonTextChildGoal() {
+        ObjectNode textFlag = topChild();
+        textFlag.put("reports_stop", "true");
+        ObjectNode numberGoal = topChild();
+        numberGoal.put("child_goal", 3);
+
+        assertThatThrownBy(() -> SubagentRegistration.verify(textFlag, TOKEN_HASH))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+        assertThatThrownBy(() -> SubagentRegistration.verify(numberGoal, TOKEN_HASH))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
 
 

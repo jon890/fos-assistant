@@ -1,9 +1,14 @@
 package com.bifos.assistant.orchestration.application;
 
+import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationOptions;
 import com.bifos.assistant.orchestration.application.dto.SubagentRegistrationResult;
+import com.bifos.assistant.chat.conversation.domain.Conversation;
+import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.orchestration.domain.HermesSessionBinding;
 import com.bifos.assistant.orchestration.infra.HermesSessionBindingRepository;
+import com.bifos.assistant.orchestration.infra.SubagentResultTexts;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
@@ -37,6 +42,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 같은 규칙으로 판정한다. 다시 읽어도 줄이 없으면 거절한다. 등록은 요청마다 저장소를 읽고 쓰며 JVM 메모리에
  * 두지 않는다.
  *
+ * <p>새로 저장하는 줄에는 끝 소식으로 깨울 자식인지({@code wake_eligible})도 한 번 정해 적는다. 플러그인이 끝 소식을 보낸다고 밝혔고,
+ * 부모 등록 없이 루트로 풀린 최상위 자식이고, origin 이 대화 에이전트의 대화 turn(먼저 살펴보기 대화가 아님)일 때만 참이다.
+ * 참이면 맡긴 일의 앞 40자를 봉해 함께 적는다(ADR-20261117 / native-delegation-wake).
+ *
  * <p>실패 이유는 로그에만 남기고 session 값은 적지 않는다.
  */
 @Service
@@ -47,11 +56,22 @@ public class SubagentSessionRegistrar {
     /** {@code hermes_session_binding} 의 session 칸 길이다. 넘는 값은 저장 오류가 되기 전에 거절한다. */
     private static final int SESSION_ID_MAX_LENGTH = 128;
 
+    /** 등록 줄에 적는 맡긴 일의 길이(code point)다. 알림 줄에 그대로 쓴다. */
+    static final int GOAL_PREVIEW_CODE_POINTS = 40;
+
     private final HermesSessionBindingRepository bindings;
     private final AgentExecutionRepository executions;
     private final ConversationRepository conversations;
     private final DelegationParentResolver parents;
     private final TransactionTemplate transactions;
+    private final SubagentResultTexts texts;
+
+
+    /** 선택 칸 없이 온 등록이다. 깨우지 않는다. */
+    public SubagentRegistrationResult register(
+        String profileName, String parentRootSessionId, String parentSessionId, String childSessionId) {
+        return register(profileName, parentRootSessionId, parentSessionId, childSessionId, SubagentRegistrationOptions.NONE);
+    }
 
 
     /**
@@ -59,11 +79,16 @@ public class SubagentSessionRegistrar {
      * @param parentRootSessionId 서명을 확인한 루트 session
      * @param parentSessionId 이 하위 에이전트를 만든 session. 최상위 session 이거나 다른 하위 에이전트 session 이다
      * @param childSessionId 등록할 하위 에이전트 session
+     * @param options 서명하지 않는 선택 칸. 깨울 자식인지 정하는 데만 쓴다
      * @throws ApiException {@link ErrorCode#SESSION_BINDING_REJECTED}. 값이 틀렸거나 부모를 풀지 못했거나, 저장에 실패했는데 다시 읽은 줄도 없을 때.
      * {@link ErrorCode#SESSION_BINDING_CONFLICT}. 다른 origin 으로 이미 등록돼 있을 때
      */
     public SubagentRegistrationResult register(
-        String profileName, String parentRootSessionId, String parentSessionId, String childSessionId) {
+        String profileName,
+        String parentRootSessionId,
+        String parentSessionId,
+        String childSessionId,
+        SubagentRegistrationOptions options) {
         if (isBlank(profileName)) {
             throw reject(profileName, "profile 이 비었다");
         }
@@ -87,14 +112,21 @@ public class SubagentSessionRegistrar {
             return accepted(profileName, existing.get().originExecutionId(), SubagentRegistrationResult.EXISTS);
         }
 
-        AgentExecution origin = resolveOrigin(profileName, parentRootSessionId, parentSessionId);
+        ResolvedOrigin resolved = resolveOrigin(profileName, parentRootSessionId, parentSessionId);
+        AgentExecution origin = resolved.execution();
         if (existing.isPresent()) {
             return judge(profileName, existing.get(), origin);
         }
 
+        boolean wakeEligible = wakeEligible(resolved, options);
         try {
-            transactions.executeWithoutResult(status -> bindings.saveAndFlush(HermesSessionBinding.of(
-                profileName, childSessionId, origin, parentRootSessionId, parentSessionId)));
+            transactions.executeWithoutResult(status -> {
+                HermesSessionBinding saved = bindings.saveAndFlush(HermesSessionBinding.of(
+                    profileName, childSessionId, origin, parentRootSessionId, parentSessionId, wakeEligible));
+                if (wakeEligible) {
+                    sealGoal(saved, options.childGoal());
+                }
+            });
         } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
             // 동시에 온 다른 요청이 먼저 저장했거나 잠금에서 밀렸다. 그 줄을 다시 읽어 같은 규칙으로 판정한다.
             HermesSessionBinding raced = bindings.findByProfileNameAndSessionId(profileName, childSessionId)
@@ -113,22 +145,75 @@ public class SubagentSessionRegistrar {
 
 
     /**
+     * 끝 소식으로 깨울 자식인가. 모두 맞아야 참이다.
+     *
+     * <ul>
+     * <li>플러그인이 끝 소식을 보낸다고 밝혔다
+     * <li>부모 등록이 아니라 루트로 풀었고 부모 하위 에이전트 번호가 없다. 부모 등록이 실패한 손자가 루트로 풀려도 번호가 있어 빠진다
+     * <li>origin 이 부모 없는 실행이고 대화가 있다. 맡긴 에이전트의 실행({@code agent_delegate})은 부모가 있어 빠진다
+     * <li>그 대화가 먼저 살펴보기 대화가 아니고, origin 의 에이전트가 대화의 에이전트다. {@code @} 맡김 turn 은 빠진다
+     * </ul>
+     */
+    private boolean wakeEligible(ResolvedOrigin resolved, SubagentRegistrationOptions options) {
+        if (!options.reportsStop() || resolved.viaParentBinding() || !isBlank(options.parentSubagentId())) {
+            return false;
+        }
+        AgentExecution origin = resolved.execution();
+        if (origin.parentExecutionId() != null || origin.conversationId() == null) {
+            return false;
+        }
+        Optional<Conversation> conversation = conversations.findById(origin.conversationId());
+        return conversation.isPresent()
+            && conversation.get().purpose() != ConversationPurpose.CHECK
+            && conversation.get().agentId() != null
+            && conversation.get().agentId().equals(origin.agentId());
+    }
+
+
+    /** 맡긴 일의 앞 40 code point 를 봉해 적는다. 암호화가 꺼져 있으면 평문이다. 맡긴 일이 비었으면 적지 않는다. */
+    private void sealGoal(HermesSessionBinding saved, String childGoal) {
+        if (isBlank(childGoal)) {
+            return;
+        }
+        String preview = preview(childGoal.strip());
+        Optional<SealedText> sealed = texts.seal(saved.id(), saved.userId(), SubagentResultTexts.GOAL_PREVIEW, preview);
+        bindings.sealGoal(
+            saved.id(),
+            sealed.map(SealedText::content).orElse(preview),
+            sealed.map(SealedText::keyId).orElse(null));
+    }
+
+
+    static String preview(String goal) {
+        int end = goal.offsetByCodePoints(0, Math.min(GOAL_PREVIEW_CODE_POINTS, goal.codePointCount(0, goal.length())));
+        return goal.substring(0, end);
+    }
+
+
+    /** 풀린 origin 실행과, 부모 session 의 등록으로 풀었는지다. */
+    private record ResolvedOrigin(AgentExecution execution, boolean viaParentBinding) {
+    }
+
+
+    /**
      * 부모 session 의 등록이 있으면 그 origin 을, 없으면 루트에서 도는 실행 하나를 origin 으로 한다.
      *
      * <p>압축 교체된 최상위 session 이 만든 자식은 부모 등록이 없지만 루트가 같아 뒤쪽에서 풀린다.
      */
-    private AgentExecution resolveOrigin(String profileName, String parentRootSessionId, String parentSessionId) {
+    private ResolvedOrigin resolveOrigin(String profileName, String parentRootSessionId, String parentSessionId) {
         Optional<HermesSessionBinding> parent = bindings.findByProfileNameAndSessionId(profileName, parentSessionId);
         if (parent.isPresent()) {
             if (!parent.get().rootSessionId().equals(parentRootSessionId)) {
                 throw reject(profileName, "부모 등록의 루트가 서명한 루트와 다르다");
             }
-            return executions
-                .findById(parent.get().originExecutionId())
-                .orElseThrow(() -> reject(profileName, "부모 등록의 origin 실행이 없다"));
+            return new ResolvedOrigin(
+                executions
+                    .findById(parent.get().originExecutionId())
+                    .orElseThrow(() -> reject(profileName, "부모 등록의 origin 실행이 없다")),
+                true);
         }
         try {
-            return parents.resolve(profileName, parentRootSessionId);
+            return new ResolvedOrigin(parents.resolve(profileName, parentRootSessionId), false);
         } catch (ApiException ex) {
             if (ex.code() != ErrorCode.MCP_CALL_CONTEXT_INVALID) {
                 throw ex;

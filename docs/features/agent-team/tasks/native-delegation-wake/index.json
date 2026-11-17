@@ -9,20 +9,72 @@
       "after": "이 PR 이 머지되고 배포된 뒤"
     }
   ],
-  "status": "pending",
+  "status": "in_progress",
   "created_at": "2026-11-17",
   "spec": "docs/features/agent-team/spec.md",
   "design": "docs/features/agent-team/design.md",
   "verification_plan": "verification-plan.md",
-  "requirements": ["REQ10", "REQ11", "REQ12", "REQ13", "REQ14"],
+  "requirements": [
+    "REQ10",
+    "REQ11",
+    "REQ12",
+    "REQ13",
+    "REQ14"
+  ],
   "total_phases": 6,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
-    {"number": 1, "file": "phase-01.md", "execution_profile": "standard", "requirements": ["REQ14"]},
-    {"number": 2, "file": "phase-02.md", "execution_profile": "standard", "requirements": ["REQ10", "REQ14"]},
-    {"number": 3, "file": "phase-03.md", "execution_profile": "standard", "requirements": ["REQ10", "REQ11", "REQ13"]},
-    {"number": 4, "file": "phase-04.md", "execution_profile": "standard", "requirements": ["REQ12", "REQ14"]},
-    {"number": 5, "file": "phase-05.md", "execution_profile": "standard", "requirements": ["REQ14"]},
-    {"number": 6, "file": "phase-06.md", "execution_profile": "standard", "requirements": ["REQ14"]}
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ14"
+      ]
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ10",
+        "REQ14"
+      ]
+    },
+    {
+      "number": 3,
+      "file": "phase-03.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ10",
+        "REQ11",
+        "REQ13"
+      ]
+    },
+    {
+      "number": 4,
+      "file": "phase-04.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ12",
+        "REQ14"
+      ]
+    },
+    {
+      "number": 5,
+      "file": "phase-05.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ14"
+      ]
+    },
+    {
+      "number": 6,
+      "file": "phase-06.md",
+      "execution_profile": "standard",
+      "requirements": [
+        "REQ14"
+      ]
+    }
   ]
 }

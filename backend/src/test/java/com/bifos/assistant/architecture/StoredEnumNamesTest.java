@@ -6,6 +6,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.conversation.domain.type.ConversationPurpose;
+import com.bifos.assistant.orchestration.domain.type.NativeResultStatus;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.connector.connection.domain.type.BindingStatus;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
@@ -42,6 +43,7 @@ class StoredEnumNamesTest {
         Map.entry(AgentVisibility.class, List.of("PRIVATE", "GROUP")),
         Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
         Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK", "ROOM")),
+        Map.entry(NativeResultStatus.class, List.of("SUCCEEDED", "FAILED")),
         Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
         Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
         Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
