@@ -84,8 +84,8 @@ snapshot 은 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 | `conversation` | `pending_messages` | 아직 |
 | `agent_execution` | `output_text` | 함. 옆 칸 `output_key_id`. 이 결정 앞의 줄과 KEK 가 없는 설치의 줄은 평문이다. 앞의 것은 옛 줄 배치가 암호화한다. 주인(`user_id`)이 없는 실행의 답은 배치 대상이 아니라 평문으로 남는다 |
 | `execution_event` | `detail` | 아직 |
-| `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id` |
-| `hermes_session_binding` | `result_text` | 함. 옆 칸 `result_key_id` |
+| `hermes_session_binding` | `goal_preview` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
+| `hermes_session_binding` | `result_text` | 함. 옆 칸 `result_key_id`. KEK 가 없는 설치의 줄은 평문이다 |
 | `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
 | `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
 | `notification` | `title`, `body` | 아직 |
