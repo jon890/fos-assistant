@@ -1,6 +1,6 @@
-# 개발 문서와 로드맵, 진행 보드 기술 설계
+# 개발 문서와 로드맵 기술 설계
 
-스펙은 [`spec.md`](spec.md)다. 이 설계는 PR1(REQ1~REQ6, REQ9 의 문서 쪽)을 다룬다. PR2(진행 보드, REQ7, REQ8, REQ10)는 그 PR 을 시작할 때 이 문서에 절을 더한다.
+스펙은 [`spec.md`](spec.md)다. 이 설계는 PR1(REQ1~REQ6, REQ9)을 다룬다. 진행 보드(REQ7, REQ8, REQ10)는 스펙 DECISION18 로 취소해 설계하지 않는다.
 
 ## 요구사항 연결
 
@@ -12,9 +12,9 @@
 | REQ4 | 채팅의 `Markdown` 과 같은 react-markdown 기본값(HTML 을 그리지 않음)으로 그린다. 링크 부품이 상대 경로를 저장소 경로로 풀어 목록에 있으면 화면 안, 없으면 같은 커밋의 GitHub 로 보낸다. 제목에 GitHub 와 같은 규칙의 id 를 붙여 `#절` 이 맞게 한다 |
 | REQ5 | ` ```mermaid ` 블록만 브라우저에서 `mermaid` 를 늦게 불러 그린다. 기본 설정에 `look: handDrawn` 을 주고 블록 머리의 설정이 그 위를 덮는다. mermaid 가 손그림을 지원하지 않는 그림 종류(sequence 등)는 기본 모양으로 그린다. 실패하면 원문과 「그림을 그리지 못했어요」 |
 | REQ6 | `docs/prd.md` 에 「로드맵」 절(지금, 다음, 나중 표)을 더하고, `/dev-docs` 첫 화면이 그 절만 잘라 같은 Markdown 부품으로 그린다 |
-| REQ10 | PR2. 관리자 영역 메뉴와 관리자 문(`web/src/app/admin/layout.tsx`)을 그대로 쓴다 |
-| REQ7 | PR2. Control Plane 이 관리자 전용 API 로 보드 전체를 받아 마지막 한 벌만 기존 테이블의 JSON 칸이나 파일에 두고, 관리자 영역 「진행 보드」 가 읽는다. 세부는 PR2 를 시작할 때 이 문서에 절로 더한다 |
-| REQ8 | PR2. 받을 때 모양을 검사해 틀리면 거절하고, 화면은 받은 시각과 24시간 기준으로 「오래됨」 을 붙인다. 세부는 REQ7 과 같이 PR2 에서 더한다 |
+| REQ10 | 취소(스펙 DECISION18) |
+| REQ7 | 취소(스펙 DECISION18). 로드맵 갱신은 코디네이터가 `docs/prd.md` 를 PR 로 고친다 |
+| REQ8 | 취소(스펙 DECISION18) |
 | REQ9 | 이미지에 담는 것은 루트 `docs/` 와 `backend/docs/`, `web/docs/`, `hermes/docs/` 뿐이다. 화면은 그 목록에 든 파일만 연다 |
 
 ## 책임과 경계
