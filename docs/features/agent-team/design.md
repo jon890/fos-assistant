@@ -42,7 +42,7 @@
 | REQ10 | (PR6, PR7) fos-ctx 의 `subagent_stop` 끝 소식을 Control Plane 이 하위 에이전트 등록 줄에 적고, 새 `AutoTurnResultSource` 가 ADR-040 의 자동 turn 에 넣는다. 아래 「PR6 내장 위임 결과」 |
 | REQ11 | (PR6) 끝 소식 뒤 5초 기다렸다 깨워 한 호출의 자식을 한 turn 에 모은다. 도는 turn 과 상한은 `DelegationWakeService` 그대로다 |
 | REQ12 | (PR6) 실패는 실패 결과로 깨운다. 1시간 기한과 중지한 turn 은 1분마다 도는 훑기가 알림 줄로 남긴다 |
-| REQ13 | (PR6) 대기 줄과 steer 는 `NextTurnDispatcher.tryNext` 그대로다. 결과 뒤 시작한 루트 실행이 있으면 질의 조건으로 뺀다 |
+| REQ13 | (PR6) 대기 줄과 steer 는 `NextTurnDispatcher.tryNext` 그대로다. 끝 소식 뒤에 돈 사용자 turn 이 있어도 결과를 빼지 않는다(2026-11-17 고침) |
 | REQ14 | (PR6) 이력 API 의 `SYSTEM` 줄에 `nativeResult` 를 실어 화면이 대화 에이전트의 이름표로 그린다. 등록 본문의 `reports_stop` 이 참인 자식만 다뤄 PR7 전에는 아무 일도 없다 |
 
 ## 책임과 경계
@@ -694,7 +694,7 @@ REQ8, REQ9 의 책임이다. 테이블과 컬럼을 늘리지 않는다. 대화�
 
 ### 지금 구조
 
-- 모델이 부른 최상위 `delegate_task` 는 늘 background 로 떨어져 나가 부모 run 보다 오래 돈다. 끝나면 Hermes 가 부모 session 에 `display_kind=async_delegation_complete` 줄을 한 번 남길 뿐 새 run 이나 사건을 만들지 않는다(`hermes/docs/hermes-contract.md` 「API 위임 결과는 delivery 기록으로 남는다」). 다음 run 이 그 줄을 이력으로 읽는다.
+- 모델이 부른 최상위 `delegate_task` 는 늘 background 로 떨어져 나가 부모 run 보다 오래 돈다. 끝나면 Hermes 는 새 run 이나 사건을 만들지 않는다. `default` profile 은 부모 session 에 `display_kind=async_delegation_complete` 줄을 한 번 남겨 다음 run 이 이력으로 읽지만, 이름을 붙인 profile 은 그 줄도 남기지 않는다(`hermes/docs/hermes-contract.md` 「API 위임 결과는 delivery 기록으로 남는다」).
 - fos-ctx 는 `subagent_start` 에서 자식 session 을 `hermes_session_binding` 에 등록한다(ADR-037). 끝을 알리는 hook 은 쓰지 않는다.
 - ADR-040 의 자동 turn 은 `DelegationWakeService` 가 열고, 위임 결과 말고 다른 결과는 `AutoTurnResultSource` 의 구현이 같은 turn 에 넣는다. 지금 구현은 승인한 플러그인 호출의 결과(`ConnectorActionResultSource`) 하나다. 다음 turn 을 정하는 자리는 `NextTurnDispatcher.tryNext` 하나다(ADR-048).
 
@@ -706,7 +706,7 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | 한 완료 단위의 자식이 모두 끝난 뒤 `_finalize_child_results` 가 그 단위의 hook 을 잇달아 부른다. 단위는 기본으로 호출 하나이고 `delegation.independent_completions` 를 켜면 `group` 마다다 | `tools/delegate_tool_dispatch.py` 의 `_execute_and_aggregate`, `_units_of` |
 | hook 은 부모 session 에 결과 줄을 남기기 **전에** 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 비동기 감시가 남긴다 | 같은 파일의 `_execute_and_aggregate` 와 `gateway/wake.py` 의 `persist_delegation_delivery` |
 | `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다 | `tools/delegate_tool_child_run.py` |
-| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남는다 | `gateway/wake.py` 의 머리 주석과 `resolve_resume_session_id` |
+| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남는다. 이름을 붙인 profile 은 이 줄을 남기지 않는다(운영 확인 2026-11-17) | `gateway/wake.py` 의 머리 주석과 `resolve_resume_session_id` |
 
 ### 요구사항 연결
 
@@ -715,7 +715,7 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 | REQ10 | PR7 의 fos-ctx 가 `subagent_stop` 에서 Control Plane 에 끝 소식을 보낸다. Control Plane 은 등록 줄에 상태와 결과 글을 적고 새 `AutoTurnResultSource` 구현 `NativeDelegationResultSource`(출처 이름 `NATIVE_DELEGATION`)가 그 결과를 ADR-040 의 자동 turn 에 넣는다. 깨울 자식은 등록할 때 정한다(아래 「깨울 자식」) |
 | REQ11 | 끝 소식을 받으면 바로 깨우지 않고 5초 뒤 사건을 낸다. 한 단위의 hook 은 잇달아 오므로 그 사이 같은 대화의 끝난 결과가 모두 모여 자동 turn 하나에 든다. 도는 turn 과 상한은 `DelegationWakeService` 그대로다 |
 | REQ12 | `completed` 는 성공, 나머지는 실패로 적는다. 1시간 기한과 중지한 turn 은 매분 도는 훑기 작업이 알림 줄로 남긴다. 늦게 온 끝 소식은 기한 알림과 상관없이 결과로 받는다 |
-| REQ13 | 대기 줄과 steer 는 `tryNext` 그대로다. 이미 읽은 결과는 저장하지 않고 질의 조건으로 뺀다(아래 「이미 읽은 결과」) |
+| REQ13 | 대기 줄과 steer 는 `tryNext` 그대로다. 끝 소식 뒤에 돈 사용자 turn 이 있어도 결과를 빼지 않는다(아래 「끝 소식 뒤에 돈 사용자 turn」) |
 | REQ14 | 알림 줄은 결과마다 `SYSTEM` 줄이고, 이력 API 가 그 줄에 `nativeResult` 를 실어 화면이 대화 에이전트의 이름표로 그린다. 설정은 `assistant.delegation-wake.enabled` 하나다. PR6 만 배포됐을 때는 끝 소식도 기한 대상도 생기지 않는다(아래 「배포 순서와 안전」) |
 
 ### 책임과 경계
@@ -793,15 +793,14 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 `NativeDelegationResultSource` 가 낸다. `undelivered(conversationId)` 의 대상은 그 대화 실행의 등록 줄 가운데 아래를 모두 맞는 줄이다. 끝난 순서다. `conversationsWithUndelivered` 도 같은 조건이다.
 
 - `wake_eligible` 이고 `stopped_at` 이 있고 `result_delivered_at` 이 없다
-- `stopped_at` 이 5초보다 오래됐고 24시간 안이다(아래 「깨우는 때」). 이미 읽은 결과는 칸을 적지 않으므로 기간으로 묶어 대화가 길어져도 조회가 늘지 않게 한다
+- `stopped_at` 이 5초보다 오래됐고 24시간 안이다(아래 「깨우는 때」). 기간으로 묶어 오래 전하지 못한 줄이 쌓여도 조회가 늘지 않게 한다
 - origin 루트가 `CANCELLED` 가 아니다
-- 아래 「이미 읽은 결과」 에 들지 않는다
 
 | 칸 | 값 |
 | --- | --- |
 | `key` | 등록 줄 번호 |
 | `notice` | 「하위 작업이 끝났어요 · {goal 40자}」 또는 「하위 작업을 하지 못했어요 · {goal 40자}」. goal 이 없으면 「 · 」 뒤를 뺀다 |
-| `input` | 위임 결과와 같은 머리줄 모양으로 「Hermes 하위 작업 결과」 와 상태, 결과 글을 `<external-data>` 로 감싼다. 같은 결과가 Hermes 이력에도 있다고 적는다 |
+| `input` | 위임 결과와 같은 머리줄 모양으로 「Hermes 하위 작업 결과」 와 상태, 결과 글을 `<external-data>` 로 감싼다. 그 결과가 Hermes 이력에 없을 수 있고, 이미 답했으면 길게 다시 정리하지 말라고 적는다 |
 
 `markDelivered`, `resultsFor` 는 `ConnectorActionResultSource` 와 같은 뜻이다. `resultsFor` 는 저장된 결과 글로 다시 전달한다(ADR-075).
 `AutoTurnResult` 에 두 칸을 더한다. 승인 결과는 둘 다 기본값이다.
@@ -813,15 +812,16 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 
 `AutoTurnResultSource` 에 기본 구현이 빈 메서드 `noticesSaved(Map<String, Long> messageIdByKey)` 를 더한다. `ChatDeliveryTurns` 가 첫 시도의 알림 줄을 저장한 같은 트랜잭션에서 결과 key 마다 그 줄 번호로 부른다. 내장 위임 구현은 `notice_message_id` 를 비어 있을 때만 적는다.
 
-#### 이미 읽은 결과
+#### 끝 소식 뒤에 돈 사용자 turn
 
-스펙 DECISION32 를 질의 조건으로 한다. **그 대화의 실행 가운데 아래를 모두 맞는 것이 있으면 읽은 것이다.** 그런 결과는 `undelivered` 와 기동 훑기에서 빠지고 칸을 쓰지 않는다. 알림 줄도 없다.
+스펙 DECISION32(2026-11-17 고침)대로 **결과를 읽었는지 판정하지 않는다.** 끝 소식 뒤에 사용자 turn 이 돌았어도 결과는 위 조건대로 자동 turn 에 든다. 그 turn 이 돌고 있으면 `DelegationWakeService` 가 turn 이 닫힌 뒤 연다. 결과마다 `result_delivered_at` 을 조건부로 적으므로 다시 깨워도 자동 답은 한 번이다.
 
-- 부모가 없고 에이전트가 대화의 에이전트와 같다. `@` 맡김 turn 은 다른 session 이라 결과 줄을 읽지 않는다
-- Hermes 에 제출됐다(`hermes_run_id` 가 있다). 제출 전에 실패한 실행은 아무것도 읽지 않았다
-- `started_at` 이 결과의 `stopped_at` 보다 30초 넘게 늦다
+처음에는 「대화 에이전트로 제출된 루트 실행이 끝 소식 30초 뒤에 시작했으면 Hermes 이력의 결과 줄을 읽었다」 로 뺐다. 운영(2026-11-17)에서 전제가 틀렸다.
 
-끝 소식은 Hermes 가 결과 줄을 남기기 전에 온다. 30초는 그 줄이 남을 시간이다. 스펙의 「결과가 기록된 뒤 시작한 turn」 을 Control Plane 이 볼 수 있는 값으로 옮긴 것이다. 30초 안에 시작한 turn 은 읽지 않은 것으로 보아 그 turn 뒤에 결과를 전한다. 그 turn 이 결과 줄을 이미 읽었으면 같은 결과를 한 번 더 정리할 수 있다. 결과를 놓치는 것보다 낫다.
+- 이름을 붙인 Hermes profile 은 부모 session 에 결과 줄을 남기지 않았다. 그 판정으로 빼면 결과가 자동 답으로도 Hermes 이력으로도 전해지지 않는다. 예를 들어 도는 turn 때문에 자동 답이 밀린 사이 사용자가 끝 소식 30초 뒤 메시지를 보내면 그 turn 이 먼저 돌고 결과가 빠진다.
+- 결과 전에 시작한 사용자 turn 이 맡긴 일의 글만 보고 같은 값을 스스로 낼 수 있다. Control Plane 이 볼 수 있는 값(시각, Hermes 이력)으로는 그런 답과 결과를 읽은 답을 구분하지 못한다. 글을 비교해 빼면 결과를 놓치는 쪽으로 틀린다.
+
+`default` profile 처럼 결과 줄이 남는 경우에도 판정하지 않는다. 같은 결과를 한 번 더 정리할 수 있지만 결과를 놓치는 것보다 낫다. 자동 turn 입력은 이미 그 결과로 답했으면 길게 다시 정리하지 말라고 적어 겹침을 줄인다.
 
 #### 깨우는 때
 
@@ -876,7 +876,7 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 - 결과를 전했다는 표시는 `markDelivered` 가 `result_delivered_at` 이 빈 줄만 바꾼다. 바꾼 줄 수가 다르면 묶음까지 되돌아간다(ADR-075). 훑기의 중지 알림과 겹쳐도 한쪽만 이긴다.
 - 끝 소식을 적은 뒤 5초 사건 예약이 실패해도 다음 turn 닫기와 기동 훑기(`conversationsWithUndelivered`)가 다시 깨운다.
 - Control Plane 이 다시 떠도 결과는 등록 줄에 남는다. 5초 사이에 내려가도 기동 훑기가 전한다.
-- 플러그인이 보내기에 실패하면 그 자식은 기한 알림으로 끝난다. 결과는 Hermes 이력에 남아 다음 메시지에서 쓰인다.
+- 플러그인이 보내기에 실패하면 그 자식은 기한 알림으로 끝난다. 결과 줄을 남기는 `default` profile 이면 다음 메시지가 Hermes 이력으로 쓰고, 이름을 붙인 profile 이면 대화에 전해지지 않는다.
 - 기한·중지 알림의 칸과 알림 줄은 한 트랜잭션이라, 서버가 그 사이 내려가면 둘 다 남지 않고 다음 훑기가 다시 한다.
 
 ### 검증 전략
@@ -886,7 +886,7 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 | REQ10 | Control Plane 통합 테스트 | 등록(`reports_stop`)과 끝 소식을 보낸 뒤 자동 turn 이 열리고 입력에 결과 글이 들며 `nativeResult` 줄이 남는다. `@` 맡김, 맡은 에이전트, `CHECK` 대화의 자식은 열지 않는다 |
 | REQ11 | 같은 통합 테스트 | 같은 origin 의 자식 둘이 잇달아 끝나면 turn 하나다. 도는 turn 뒤에 모인다 |
 | REQ12 | 훑기 단위 테스트(고정 시계) | 1시간 뒤 알림 줄 하나, 다시 돌아도 하나, 그 뒤 끝 소식이 오면 자동 turn. 중지한 turn 은 알림 줄 하나이고 깨우지 않는다 |
-| REQ13 | 통합 테스트 | 끝난 뒤 시작한 사용자 turn 이 있으면 자동 turn 과 알림 줄이 없다. 대기 글이 먼저 간다 |
+| REQ13 | 통합 테스트 | 끝난 뒤 시작한 사용자 turn 이 있어도 자동 turn 하나와 알림 줄이 생기고, 다시 깨워도 더 열리지 않는다. 대기 글이 먼저 간다 |
 | REQ14 | 웹 단위 테스트와 Control Plane 테스트 | `nativeResult` 줄이 이름표와 함께 그려진다. 옛 본문의 등록은 `wake_eligible=false` 이고 기한 알림이 없다. 설정을 끄면 결과가 전해지지 않는다 |
 | 계약 | fos-ctx 계약 테스트(PR7), 배포 뒤 왕복 | 서명 기대값, 끝 소식 본문. 스펙의 「배포 뒤 왕복 확인」 |
 
@@ -926,7 +926,7 @@ v0.21.6(`818c13be`)과 v0.23.2(`ae2a81cc`)의 tag 소스로 확인한 사실이�
 - 제한 시간과 다시 보내기는 등록과 같다. 연결 실패와 5xx 에만 한 번 더 보내고, 4xx(404 포함)는 로그만 남긴다. 어떤 예외도 hook 밖으로 내지 않는다.
 - 로그에는 시도 횟수와 상태 코드, 예외 종류만 남긴다. 토큰, 서명, 맡긴 일, 결과 글은 남기지 않는다.
 
-hook 은 부모의 마무리 잠금 안에서 동기로 돈다. 보내기가 늦으면 그만큼 부모 session 의 결과 줄이 늦게 남는다. 자식 하나에 최악 `REGISTER_TIMEOUT` 의 두 배다. 결과 줄은 다음 turn 이 읽는 것이고, 자동 turn 은 끝 소식 뒤 5초를 기다리므로(「깨우는 때」) 이 지연이 결과를 놓치게 하지 않는다.
+hook 은 부모의 마무리 잠금 안에서 동기로 돈다. 보내기가 늦으면 그만큼 부모 session 의 결과 줄이 늦게 남는다. 자식 하나에 최악 `REGISTER_TIMEOUT` 의 두 배다. 결과 줄은 다음 turn 이 읽는 것이고(이름을 붙인 profile 은 남기지 않는다), 자동 turn 은 끝 소식 뒤 5초를 기다리므로(「깨우는 때」) 이 지연이 결과를 놓치게 하지 않는다.
 
 ### 배포와 되돌리기
 
@@ -984,11 +984,11 @@ PR6 이 운영에 있어야 한다. PR6 전의 서버는 `/stop` 경로가 없�
 | DECISION34 | 깨울 자식을 정하는 때 | 등록할 때 `wake_eligible` 로 한 번 정한다 | 작성자 | 판정에 쓰는 origin 실행과 대화가 등록 때 이미 풀린다. 끝 소식 때 다시 풀면 압축이나 지운 대화로 답이 바뀐다 |
 | DECISION35 | PR7 전의 안전 | 등록 본문의 `reports_stop` 이 참인 자식만 깨우고 기한을 센다 | 작성자 | 사용자가 기존 설정 하나로 켜기로 해 PR6 이 배포 즉시 동작한다(spec DECISION35). `subagent_start` 만으로 기한을 세면 PR7 전의 모든 위임이 1시간 뒤 알림을 남긴다 |
 | DECISION36 | 한 호출의 자식을 모으는 법 | 끝 소식 뒤 5초 기다렸다 깨운다. 호출 번호를 저장하지 않는다 | 작성자 | Hermes 가 한 단위의 hook 을 잇달아 부른다(`_finalize_child_results`). `subagent_start` 에 호출 번호가 없어 Control Plane 이 호출을 구분할 수 없다. spec DECISION30 의 「도착하는 대로」 는 같은 5초 안에 끝난 다른 호출을 함께 전해도 지켜진다 |
-| DECISION37 | 이미 읽은 결과 | 칸을 쓰지 않고 질의 조건(DECISION41)으로 뺀다 | 작성자 | turn 시작 경로에 쓰기를 더하지 않는다. 판정 값이 실행 줄에 이미 있다 |
+| DECISION37 | 이미 읽은 결과 | 칸도 질의 조건도 두지 않는다(DECISION41, 2026-11-17 고침) | 작성자 | 읽었는지 판정하지 않으므로 둘 것이 없다 |
 | DECISION38 | 자동 turn 입력의 결과 글 | Control Plane 이 저장한 결과 글을 입력에 넣는다. Hermes 이력의 결과 줄에 기대지 않는다 | 작성자 | hook 이 결과 줄보다 먼저 와 turn 을 열 때 그 줄이 없을 수 있다. 다시 전달(ADR-075)도 저장된 글이 있어야 한다. 모델이 같은 결과를 두 번 볼 수 있는 것을 감당한다 |
 | DECISION39 | 기한·중지 알림 줄의 단위 | origin 실행(turn)마다 한 줄 | 작성자 | 같은 호출의 자식을 알 수 없다(DECISION36). spec DECISION40 이 답마다 한 줄로 정했다(사용자 2026-11-17) |
 | DECISION40 | 결과 도착 줄과 출처를 잇는 법 | 등록 줄의 `notice_message_id` 에 첫 시도의 알림 줄을 적고, `chat` 의 port 로 상태를 읽는다 | 작성자 | 묶음의 줄 번호 칸은 위임 결과가 있을 때만 차거나 다시 전달로 덮인다(`result_delivery`). 줄 번호 순서와 시각으로 잇는 것은 DECISION12 가 기각했다. 같은 표의 칸 하나라 테이블이 늘지 않는다 |
-| DECISION41 | 이미 읽은 결과의 판정 | 대화의 에이전트로 Hermes 에 제출된 루트 실행이 끝 소식 30초 뒤에 시작했으면 읽은 것이다 | 작성자 | 스펙 DECISION32 의 「결과가 기록된 뒤」 를 Control Plane 이 아는 값으로 옮긴다. hook 은 결과 줄보다 먼저 온다. 모자라게 잡아 결과를 놓치기보다 한 번 더 정리하는 쪽을 고른다 |
+| DECISION41 | 이미 읽은 결과의 판정 | 판정하지 않는다. 끝 소식 뒤에 돈 사용자 turn 이 있어도 자동 답을 한 번 연다(2026-11-17 고침. 처음에는 「끝 소식 30초 뒤에 시작한 제출된 루트 실행이 있으면 읽은 것」 이었다) | 사용자 2026-11-17 | 이름을 붙인 profile 은 결과 줄을 남기지 않아 처음 판정이 결과를 잃는다. 스스로 셈한 답은 Control Plane 이 구분하지 못한다(위 「끝 소식 뒤에 돈 사용자 turn」) |
 | DECISION42 | 끝 소식 주소 | 등록 주소 끝에 `/stop` 을 붙인다. 새 환경 변수를 두지 않는다 | 작성자 | 두 경로가 같은 Control Plane 의 형제 경로다. 운영 값이 늘면 운영 저장소와 배포 순서가 함께 늘고, 하나만 넣으면 끝 소식만 빠진다 |
 | DECISION43 | `reports_stop` 을 보내는 조건 | 이 플러그인은 등록마다 `true` | 작성자 | `subagent_stop` 을 늘 등록하므로 등록한 자식은 모두 끝 소식을 받는다. 보내기에 실패한 자식은 서버의 기한 알림이 맡는다 |
 | DECISION44 | 깨울 자식이 아닌 끝 소식 | 플러그인이 가리지 않고 보낸다 | 작성자 | `subagent_stop` 에 `parent_subagent_id` 가 없다. 등록 때의 판정을 플러그인 메모리에 두면 gateway 를 다시 띄울 때 잃고, 판정의 주인은 서버다(DECISION34) |

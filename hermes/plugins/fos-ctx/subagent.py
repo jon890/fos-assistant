@@ -148,7 +148,7 @@ def subagent_stop(parent_session_id="", child_session_id="", child_status=None, 
     """자식이 끝난 소식을 Control Plane 에 보낸다. 무엇이 잘못돼도 로그만 남기고 돌아간다.
 
     Hermes 는 부모의 마무리 잠금 안에서 자식마다 이 hook 을 잇달아 부르고, 반환값은 버린다.
-    보내지 못한 자식은 Control Plane 의 기한 알림이 맡고 결과는 Hermes 이력에 남는다.
+    보내지 못한 자식은 Control Plane 의 기한 알림이 맡는다. 결과는 결과 줄을 남기는 default profile 에서만 Hermes 이력에 남는다.
     """
     try:
         url = stop_url()

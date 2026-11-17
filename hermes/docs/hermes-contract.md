@@ -1408,6 +1408,9 @@ v0.21.0 배포본과 v0.21.3, v0.21.5 소스를 대조했다.
 
 다음 클라이언트 turn 이 server history 를 읽을 때 이 결과를 문맥으로 사용한다.
 일반 백그라운드 작업 알림의 `_self_post_chat_completion` 과 다른 분기다.
+
+**이름을 붙인 profile 에서는 이 결과 줄이 남지 않는다.** 2026-11-17 운영에서 이름을 붙인 profile 의 부모 session 에 `async_delegation_complete` 줄이 없었고(모든 줄의 `display_kind` 가 비었다), 격리한 리허설에서도 v0.21.6 과 v0.23.2 모두 이름을 붙인 profile 은 남기지 않고 `default` profile 은 남겼다.
+그래서 Control Plane 은 이 줄이 다음 turn 의 문맥에 들어간다고 기대지 않는다. 내장 위임의 결과는 `subagent_stop` 끝 소식으로 받은 글을 자동 turn 에 넣어 전한다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)).
 제품에서 부모의 이어 답을 원하면 Control Plane 이 새 run 을 명시적으로 제출하고 추적해야 한다.
 upstream 이슈에서 자동 후속 답을 관찰했다는 기록만으로 API 경로도 그렇다고 판정하지 않는다.
 
@@ -1434,7 +1437,7 @@ Control Plane 이 내장 위임의 결과로 자동 turn 을 여는 근거다([A
 | 한 완료 단위의 자식이 모두 끝난 뒤 그 단위의 hook 이 잇달아 불린다. 단위는 기본으로 `delegate_task` 호출 하나이고, `delegation.independent_completions` 를 켜면 `group` 마다다 | [`tools/delegate_tool_dispatch.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_dispatch.py) 의 `_execute_and_aggregate`, `_units_of` |
 | hook 은 부모 session 에 결과 줄(`async_delegation_complete`)을 남기기 전에 불린다. 결과 줄은 단위의 runner 가 돌아온 뒤 남는다 | 같은 파일과 [`gateway/wake.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/wake.py) 의 `persist_delegation_delivery` |
 | `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다. `completed` 만 쓸 만한 답이 있다는 뜻이다 | [`tools/delegate_tool_child_run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_child_run.py) |
-| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남긴다 | `gateway/wake.py` 의 `persist_delegation_delivery` |
+| 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남긴다. 이름을 붙인 profile 은 이 줄을 남기지 않는다(위 「API 위임 결과는 delivery 기록으로 남는다」, 운영 확인) | `gateway/wake.py` 의 `persist_delegation_delivery` |
 | v0.23.2 는 `child_summary` 의 비밀값을 가린 뒤 넘긴다. 플러그인은 프로세스 밖으로 보내므로 Hermes 가 늘 가린다 | v0.23.2 [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/ae2a81ccc00e9b7c06301523e5bb09608397149c/tools/delegate_tool_results.py) 의 `redact_child_value` 호출 |
 | `subagent_stop` 은 제한 시간 worker 로 옮기지 않고 부모의 마무리 잠금 안에서 부르는 스레드가 돈다. 그래서 fos-ctx 가 보내는 동안 결과 줄이 남지 않는다 | `hermes_cli/plugins_dispatch.py` 의 `_HOOK_CALLER_THREAD_HOOKS`, `tools/delegate_tool_results.py` 의 `_finalize_child_results` |
 
