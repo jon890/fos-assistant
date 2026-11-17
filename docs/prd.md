@@ -113,13 +113,13 @@
 | 지금 | 개발 문서와 로드맵을 웹에서 보기 | [개발 현황](features/dev-overview.md) |
 | 지금 | Hermes v0.23.2 로 올리기 위한 Control Plane 과 플러그인 호환 | |
 | 지금 | Hermes 내장 위임이 끝나면 부모 대화의 다음 답을 자동으로 열기 | |
-| 지금 | 네이버 쇼핑 구매와 KTX 좌석 확보 에이전트 개선 | [네이버 쇼핑](features/naver-shopping.md), [코레일 KTX](features/korail-ktx.md) |
+| 지금 | 네이버 쇼핑 구매 에이전트 개선 | [네이버 쇼핑](features/naver-shopping.md) |
 | 다음 | 관리자가 진행 보드를 웹에서 보기 | [개발 현황](features/dev-overview.md) |
 | 다음 | 실행 중 브라우저 함께 보기와 넘겨받기, 멈춘 단계부터 이어 가기의 남은 PR | [브라우저 함께 보기](features/browser-cowork.md) |
-| 다음 | 실행 중 보낸 메시지를 도는 실행에 넣기(steer) | |
 | 다음 | Agent Runtime 추상화(Hermes 업그레이드 뒤) | |
 | 나중 | 알림을 웹 밖으로 보내는 채널(웹 푸시) | [먼저 알리기](features/attention.md) |
 | 나중 | 예약 작업의 실패 다시 하기와 일시 정지 같은 다음 단계 | [예약 작업](features/schedule.md) |
+| 나중 | 코레일 KTX 좌석 확보(보류) | [코레일 KTX](features/korail-ktx.md) |
 
 ## 범위 밖
 
