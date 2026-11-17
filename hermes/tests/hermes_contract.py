@@ -11,7 +11,7 @@ Hermes 를 올리면 이 지점이 조용히 바뀔 수 있다. v0.21.5 로 올�
 
 본문 없는 writer와 관리 bootstrap의 별도 source 계약은 `test_bodyless_*_contract.py`가 확인한다.
 
-Hermes 를 올리기 전에 `scripts/checks/check-hermes-contract.sh <tag>` 로 새 판의 소스를 확인한다.
+Hermes 를 올리기 전에 `scripts/checks/check-hermes-contract.sh <tag>` 로 새 버전의 소스를 확인한다.
 plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한다.
 """
 
@@ -146,166 +146,240 @@ BODYLESS_REQUEST_FILES = (
     *BODYLESS_REQUEST_CALLS,
 )
 
+# 본문 없는 요청 진단 계약을 맞춘 Hermes 계열과, 그 계열의 소스에만 있는 표지 파일이다(스펙 REQ7, REQ13).
+# 표지가 없는 소스(기준 버전 v0.21.6)에서는 `test_bodyless_*_contract.py` 의 source 검사를 건너뛴다.
+# addon 은 운영에 연결하지 않아 기준 버전을 올리는 PR 이 표지 검사를 지울 때까지 v0.23 계열에서만 맞춘다.
+BODYLESS_SOURCE_LINE = ("0.23", "agent/runtime_scope.py")
+
 # 관리 bootstrap의 추가 의존이다. writer 설치 API와 다섯 파일 지문에 합치지 않는다.
-# 공식 고정 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
+# v0.23.2 공식 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
 # AST hash는 행 번호·공백·주석을 제외하고 함수 전체(시그니처·decorator·본문)를 제한한다.
 # 큰 함수도 선언한 함수만 검사한다. 상류 변경 때 이 계약과 private owner를 함께 검토한다.
+# profile 문맥은 `hermes_scope` 의 scope 상태 하나가 갖고, 묶는 진입점은 `bind_profile_scope` 다.
+# 옛 setter(`set_secret_scope`, `set_hermes_home_override`)는 scope 가 묶여 있으면 scope 를 옮기거나 거절하므로 기대하지 않는다.
 BODYLESS_MANAGED_FUNCTIONS = {
     'agent/agent_init.py': {
         'init_agent': (
-            ('agent, base_url: str=None, api_key: str=None, provider: str=None, api_mode: str=None, acp_command: '
-             'str=None, acp_args: list[str] | None=None, command: str=None, args: list[str] | None=None, model: '
-             "str='', max_iterations: int=sys.maxsize, enabled_toolsets: List[str]=None, disabled_toolsets: "
-             'List[str]=None, save_trajectories: bool=False, verbose_logging: bool=False, quiet_mode: bool=False, '
-             "tool_progress_mode: str='all', ephemeral_system_prompt: str=None, log_prefix_chars: int=100, "
-             "log_prefix: str='', providers_allowed: List[str]=None, providers_ignored: List[str]=None, "
-             'providers_order: List[str]=None, provider_sort: str=None, provider_require_parameters: bool=False, '
-             'provider_data_collection: str=None, openrouter_min_coding_score: Optional[float]=None, session_id: '
-             'str=None, tool_progress_callback: callable=None, tool_start_callback: callable=None, '
-             'tool_complete_callback: callable=None, thinking_callback: callable=None, reasoning_callback: '
-             'callable=None, clarify_callback: callable=None, read_terminal_callback: callable=None, '
-             'read_preview_callback: callable=None, drive_preview_callback: callable=None, '
-             'read_window_below_callback: callable=None, connection_callback: callable=None, tour_callback: '
-             'callable=None, setup_choose_callback: callable=None, step_callback: callable=None, '
-             'stream_delta_callback: callable=None, '
-             'interim_assistant_callback: callable=None, tool_gen_callback: callable=None, status_callback: '
-             'callable=None, notice_callback: callable=None, notice_clear_callback: callable=None, event_callback:'
-             ' Optional[Callable[[str, dict], None]]=None, reaction_callback: Optional[Callable[[str], '
-             'None]]=None, max_tokens: int=None, reasoning_config: Dict[str, Any]=None, service_tier: str=None, '
-             'request_overrides: Dict[str, Any]=None, prefill_messages: List[Dict[str, Any]]=None, platform: '
-             'str=None, user_id: str=None, user_id_alt: str=None, user_name: str=None, chat_id: str=None, '
-             'chat_name: str=None, chat_type: str=None, thread_id: str=None, gateway_session_key: str=None, '
-             'skip_context_files: bool=False, load_soul_identity: bool=False, skip_memory: bool=False, '
-             'skip_background_review: bool=False, session_db=None, parent_session_id: str=None, iteration_budget: '
-             "'IterationBudget'=None, run_budget_seconds: Optional[float]=None, fallback_model: Dict[str, "
-             'Any]=None, credential_pool=None, checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, '
+            ('agent, base_url: str | None=None, api_key: str | None=None, provider: str | None=None, api_mode: str'
+             ' | None=None, acp_command: str | None=None, acp_args: list[str] | None=None, command: str | '
+             "None=None, args: list[str] | None=None, model: str='', max_iterations: int=sys.maxsize, "
+             'enabled_toolsets: list[str] | None=None, disabled_toolsets: list[str] | None=None, '
+             'save_trajectories: bool=False, verbose_logging: bool=False, quiet_mode: bool=False, '
+             "tool_progress_mode: str='all', ephemeral_system_prompt: str | None=None, log_prefix_chars: int=100, "
+             "log_prefix: str='', providers_allowed: list[str] | None=None, providers_ignored: list[str] | "
+             'None=None, providers_order: list[str] | None=None, provider_sort: str | None=None, '
+             'provider_require_parameters: bool=False, provider_data_collection: str | None=None, '
+             'openrouter_min_coding_score: Optional[float]=None, session_id: str | None=None, '
+             'tool_progress_callback: Callable[..., Any] | None=None, tool_start_callback: Callable[..., Any] | '
+             'None=None, tool_complete_callback: Callable[..., Any] | None=None, thinking_callback: Callable[..., '
+             'Any] | None=None, reasoning_callback: Callable[..., Any] | None=None, clarify_callback: '
+             'Callable[..., Any] | None=None, read_terminal_callback: Callable[..., Any] | None=None, '
+             'read_preview_callback: Callable[..., Any] | None=None, drive_preview_callback: Callable[..., Any] | '
+             'None=None, read_window_below_callback: Callable[..., Any] | None=None, connection_callback: '
+             'Callable[..., Any] | None=None, tour_callback: Callable[..., Any] | None=None, theme_callback: '
+             'Callable[..., Any] | None=None, setup_beat_callback: Callable[..., Any] | None=None, step_callback: '
+             'Callable[..., Any] | None=None, stream_delta_callback: Callable[..., Any] | None=None, '
+             'interim_assistant_callback: Callable[..., Any] | None=None, tool_gen_callback: Callable[..., Any] | '
+             'None=None, status_callback: Callable[..., Any] | None=None, notice_callback: Callable[..., Any] | '
+             'None=None, notice_clear_callback: Callable[..., Any] | None=None, event_callback: '
+             'Optional[Callable[[str, dict], None]]=None, reaction_callback: Optional[Callable[[str], None]]=None,'
+             ' max_tokens: int | None=None, reasoning_config: dict[str, Any] | None=None, service_tier: str | '
+             'None=None, request_overrides: dict[str, Any] | None=None, prefill_messages: list[dict[str, Any]] | '
+             'None=None, platform: str | None=None, user_id: str | None=None, user_id_alt: str | None=None, '
+             'user_name: str | None=None, chat_id: str | None=None, chat_name: str | None=None, chat_type: str | '
+             'None=None, thread_id: str | None=None, gateway_session_key: str | None=None, skip_context_files: '
+             'bool=False, load_soul_identity: bool=False, skip_memory: bool=False, skip_background_review: '
+             'bool=False, session_db=None, parent_session_id: str | None=None, iteration_budget: '
+             'IterationBudget=None, run_budget_seconds: Optional[float]=None, fallback_model: dict[str, Any] | '
+             'None=None, credential_pool=None, checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, '
              'checkpoint_max_total_size_mb: int=500, checkpoint_max_file_size_mb: int=10, pass_session_id: '
-             'bool=False, requested_provider: str=None, capabilities: Optional[Dict[str, bool]]=None, cwd: '
-             'Optional[str]=None, side_agent: bool=False, memory_manager=None, tool_result_metadata_callback: '
-             'Optional[Callable[..., dict]]=None'),
+             'bool=False, requested_provider: str | None=None, capabilities: Optional[dict[str, bool]]=None, cwd: '
+             'Optional[str]=None, side_agent: bool=False, memory_manager=None, memory_agent_context: str | '
+             'None=None, tool_result_metadata_callback: Optional[Callable[..., dict]]=None'),
             None,
-            'ee793abc8771756a84cbbd28bf70ff787a14ae31c65bdc1af69dd3ed93a7c6c6'),
+            '63d5c3efe5481128c5a9b7e060324c0a5b1c2a914f081761afdf732f2736755c'),
     },
     'run_agent.py': {
         'AIAgent.__init__': (
-            ('self, base_url: str=None, api_key: str=None, provider: str=None, api_mode: str=None, acp_command: '
-             'str=None, acp_args: list[str] | None=None, command: str=None, args: list[str] | None=None, model: '
-             "str='', max_iterations: int=sys.maxsize, tool_delay: float=None, enabled_toolsets: List[str]=None, "
-             'disabled_toolsets: List[str]=None, save_trajectories: bool=False, verbose_logging: bool=False, '
-             "quiet_mode: bool=False, tool_progress_mode: str='all', ephemeral_system_prompt: str=None, "
-             "log_prefix_chars: int=100, log_prefix: str='', providers_allowed: List[str]=None, providers_ignored:"
-             ' List[str]=None, providers_order: List[str]=None, provider_sort: str=None, '
-             'provider_require_parameters: bool=False, provider_data_collection: str=None, '
-             'openrouter_min_coding_score: Optional[float]=None, session_id: str=None, tool_progress_callback: '
-             'callable=None, tool_start_callback: callable=None, tool_complete_callback: callable=None, '
-             'thinking_callback: callable=None, reasoning_callback: callable=None, clarify_callback: '
-             'callable=None, read_terminal_callback: callable=None, read_preview_callback: callable=None, '
-             'drive_preview_callback: callable=None, read_window_below_callback: callable=None, '
-             'connection_callback: callable=None, tour_callback: callable=None, '
-             'setup_choose_callback: callable=None, step_callback: callable=None, '
-             'stream_delta_callback: callable=None, interim_assistant_callback: callable=None, tool_gen_callback: '
-             'callable=None, status_callback: callable=None, notice_callback: callable=None, '
-             'notice_clear_callback: callable=None, event_callback: Optional[Callable[[str, dict], None]]=None, '
-             'reaction_callback: Optional[Callable[[str], None]]=None, max_tokens: int=None, reasoning_config: '
-             'Dict[str, Any]=None, service_tier: str=None, request_overrides: Dict[str, Any]=None, '
-             'prefill_messages: List[Dict[str, Any]]=None, platform: str=None, user_id: str=None, user_id_alt: '
-             'str=None, user_name: str=None, chat_id: str=None, chat_name: str=None, chat_type: str=None, '
-             'thread_id: str=None, gateway_session_key: str=None, skip_context_files: bool=False, '
-             'load_soul_identity: bool=False, skip_memory: bool=False, skip_background_review: bool=False, '
-             "session_db=None, parent_session_id: str=None, iteration_budget: 'IterationBudget'=None, "
-             'run_budget_seconds: Optional[float]=None, fallback_model: Dict[str, Any]=None, credential_pool=None,'
-             ' checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, checkpoint_max_total_size_mb: '
-             'int=500, checkpoint_max_file_size_mb: int=10, pass_session_id: bool=False, requested_provider: '
-             'str=None, capabilities: Dict[str, bool] | None=None, cwd: str | None=None, side_agent: bool=False, '
-             'memory_manager=None, tool_result_metadata_callback: Optional[Callable[..., dict]]=None'),
+            ('self, base_url: str | None=None, api_key: str | None=None, provider: str | None=None, api_mode: str '
+             '| None=None, acp_command: str | None=None, acp_args: list[str] | None=None, command: str | '
+             "None=None, args: list[str] | None=None, model: str='', max_iterations: int=sys.maxsize, tool_delay: "
+             'float | None=None, enabled_toolsets: list[str] | None=None, disabled_toolsets: list[str] | '
+             'None=None, save_trajectories: bool=False, verbose_logging: bool=False, quiet_mode: bool=False, '
+             "tool_progress_mode: str='all', ephemeral_system_prompt: str | None=None, log_prefix_chars: int=100, "
+             "log_prefix: str='', providers_allowed: list[str] | None=None, providers_ignored: list[str] | "
+             'None=None, providers_order: list[str] | None=None, provider_sort: str | None=None, '
+             'provider_require_parameters: bool=False, provider_data_collection: str | None=None, '
+             'openrouter_min_coding_score: Optional[float]=None, session_id: str | None=None, '
+             'tool_progress_callback: Callable[..., Any] | None=None, tool_start_callback: Callable[..., Any] | '
+             'None=None, tool_complete_callback: Callable[..., Any] | None=None, thinking_callback: Callable[..., '
+             'Any] | None=None, reasoning_callback: Callable[..., Any] | None=None, clarify_callback: '
+             'Callable[..., Any] | None=None, read_terminal_callback: Callable[..., Any] | None=None, '
+             'read_preview_callback: Callable[..., Any] | None=None, drive_preview_callback: Callable[..., Any] | '
+             'None=None, read_window_below_callback: Callable[..., Any] | None=None, connection_callback: '
+             'Callable[..., Any] | None=None, tour_callback: Callable[..., Any] | None=None, theme_callback: '
+             'Callable[..., Any] | None=None, setup_beat_callback: Callable[..., Any] | None=None, step_callback: '
+             'Callable[..., Any] | None=None, stream_delta_callback: Callable[..., Any] | None=None, '
+             'interim_assistant_callback: Callable[..., Any] | None=None, tool_gen_callback: Callable[..., Any] | '
+             'None=None, status_callback: Callable[..., Any] | None=None, notice_callback: Callable[..., Any] | '
+             'None=None, notice_clear_callback: Callable[..., Any] | None=None, event_callback: '
+             'Optional[Callable[[str, dict], None]]=None, reaction_callback: Optional[Callable[[str], None]]=None,'
+             ' max_tokens: int | None=None, reasoning_config: dict[str, Any] | None=None, service_tier: str | '
+             'None=None, request_overrides: dict[str, Any] | None=None, prefill_messages: list[dict[str, Any]] | '
+             'None=None, platform: str | None=None, user_id: str | None=None, user_id_alt: str | None=None, '
+             'user_name: str | None=None, chat_id: str | None=None, chat_name: str | None=None, chat_type: str | '
+             'None=None, thread_id: str | None=None, gateway_session_key: str | None=None, skip_context_files: '
+             'bool=False, load_soul_identity: bool=False, skip_memory: bool=False, skip_background_review: '
+             'bool=False, session_db=None, parent_session_id: str | None=None, iteration_budget: '
+             'IterationBudget=None, run_budget_seconds: Optional[float]=None, fallback_model: dict[str, Any] | '
+             'None=None, credential_pool=None, checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, '
+             'checkpoint_max_total_size_mb: int=500, checkpoint_max_file_size_mb: int=10, pass_session_id: '
+             'bool=False, requested_provider: str | None=None, capabilities: dict[str, bool] | None=None, cwd: str'
+             ' | None=None, side_agent: bool=False, memory_manager=None, memory_agent_context: str | None=None, '
+             'tool_result_metadata_callback: Optional[Callable[..., dict]]=None'),
             None,
-            '81effa5c4102f83a66acbc2cbb5ef578eef27ae689c1c38208fa9cf881f3929f'),
+            'd173d4ca40b265e5139e5e44651fdbb57848bc6bdd06f2a9fceec32a66754334'),
         'AIAgent.close': (
-            ('self'),
+            'self',
             'None',
-            'd30df6ba79ed730261abc8973319dddcfdb442ecd07c7033ba80a30a0df249c5'),
+            'ea964a0addfed3fef204bfb587b50ae45627500249707d8cf2abd71729e22015'),
     },
     'tools/delegate_tool.py': {
         '_build_child_agent': (
-            ('task_index: int, goal: str, context: Optional[str], toolsets: Optional[List[str]], model: '
+            ('task_index: int, goal: str, context: Optional[str], toolsets: Optional[list[str]], model: '
              'Optional[str], max_iterations: int, task_count: int, parent_agent, override_provider: '
              'Optional[str]=None, override_base_url: Optional[str]=None, override_api_key: Optional[str]=None, '
-             'override_api_mode: Optional[str]=None, override_request_overrides: Optional[Dict[str, Any]]=None, '
-             'override_acp_command: Optional[str]=None, override_acp_args: Optional[List[str]]=None, routing_cfg: '
-             "Optional[Dict[str, Any]]=None, role: str='leaf'"),
+             'override_api_mode: Optional[str]=None, override_request_overrides: Optional[dict[str, Any]]=None, '
+             'override_acp_command: Optional[str]=None, override_acp_args: Optional[list[str]]=None, routing_cfg: '
+             "Optional[dict[str, Any]]=None, role: str='leaf', override_reasoning_effort: Any=None, profile_home: "
+             'Optional[Path]=None, override_service_tier: Optional[str]=None, subagent_id: Optional[str]=None, '
+             'session_id: Optional[str]=None, expect_endpoint: Optional[tuple]=None'),
             None,
-            'b32c188da5f322e03285711ffa18520d65278f0edb636bb69aada9571ebf9ae5'),
+            '89c56e59b7bf7eda630709bfb289dca84bc4d964c10c3a877f6816637b5afaa8'),
+    },
+    'hermes_scope.py': {
+        'current_state': (
+            '',
+            'ScopeState',
+            'b256cb0623c09e3289db1e5edb396eef61ec7137f086a6e248f06ad7cad297ae'),
+        'current_scope': (
+            '',
+            'Scope | None',
+            'cc68b08a70295d8e5ba9627bc114096491f870f7270291839905a1cf18c6165a'),
+        '_fold': (
+            'node: _Node | None',
+            '_Node | None',
+            'f0bc4fd4c213be83e43c002f7a23213341dcbe56c96c23cd263b865c0ab08033'),
+        'push_state': (
+            '**fields: Any',
+            'StateToken',
+            '9096fac161e23bd1c0577130bd0612b7168925257826aa3fac9de4f499bd7495'),
+        'pop_state': (
+            'token: StateToken',
+            'None',
+            '7de1b4a15f0380a648a29338f4fd10b94c278e09b5819d6f2a4ae66745956f9a'),
+    },
+    'agent/runtime_scope.py': {
+        'scope_for_profile': (
+            'home: str | Path',
+            'Scope',
+            '391ff9ab0c9f95d84f3ef60e3a7495fb3b20207565db696b9c06d24a32fd1d8e'),
+        'bind_state': (
+            ('scope: Scope, *, secrets: Optional[Mapping[str, str]]=None, hydrate_secrets: bool=True, stamp_home: '
+             'bool=True, env_overlay: Optional[dict[str, str]]=None, home_override: bool=True, terminal: '
+             'bool=True, terminal_policy: Any=None, defer_terminal: bool=False'),
+            'StateToken',
+            '3aebbb6c05e27f96604ecb8290ebc80052a3c4c1fcb7633c7ddbb2da15e8cfae'),
+        '_bind_whole_profile': (
+            ('scope: Scope, *, secrets: Optional[Mapping[str, str]]=None, hydrate_secrets: bool=True, env_overlay:'
+             ' Optional[dict[str, str]]=None, defer_terminal: bool=False'),
+            'StateToken',
+            '70f8e072c193df6d9ec3e4afe4e50f9884ac6bf73393838934a98a56c9d95c24'),
+        'bind_profile_scope': (
+            'home: str | Path, *, hydrate_secrets: bool=True',
+            'Iterator[Scope]',
+            'aa43cac83b10fdacbb403e25c1566b818e0e88400b7561f903c7e31afcfb7af8'),
+        # 위임의 `profile_home` 경로가 옛 setter 로 scope 를 옮길 때 지나는 함수다.
+        'legacy_switch': (
+            ('home: str | Path | None, *, secrets: Optional[Mapping[str, str]]=None, env_overlay: '
+             'Optional[dict[str, str]]=None'),
+            'StateToken | None',
+            'a986ba0425fab53094dbcb56bb2e5631e14d719afb92fa1014e85f65056a829d'),
+    },
+    # `_build_child_agent` 가 자식을 다른 profile 의 scope 안에서 만드는 진입점이다.
+    'tools/delegate_tool_routes.py': {
+        'delegated_profile_scope': (
+            'home: Any',
+            'Iterator[None]',
+            'fa4ce2a0318de46a08a3eb5ad3296d01f0feb33643e07cf7e7c61612c7a779d5'),
+    },
+    'tui_gateway/launch_profile_policy.py': {
+        'owner_secret_scope': (
+            'home: str | Path',
+            'dict[str, str]',
+            '0b8b7a370447854199f06d58cd1d561d62abb8b61357f7955add4f1c15adc658'),
+        'launch_secret_scope': (
+            'launch_home: str | Path',
+            'dict[str, str]',
+            'bd7aa19628e0c2119c2a64d0231021e4ad3c24490e8e4e85e3b90e52c3f1f1b0'),
     },
     'agent/secret_scope.py': {
         'load_env_file': (
-            ('env_path: Path'),
-            'Dict[str, str]',
-            'b3512b6c0ddf893b8b895bcc518efb8bf7e0a85f326e0a6702a83b61c5988bec'),
-        'current_secret_scope_home': (
-            (''),
-            'Optional[str]',
-            '1e9bb7e35c02dcac823465bc5683cec951a9caf0d0a9de8d9c3f42b5240c8bd5'),
+            'env_path: Path',
+            'dict[str, str]',
+            'e7cf0e213d15921fb3a9444d1d3fed8cd3b5c3e256a1aa47dd3fcc9e558f2019'),
         'build_profile_secret_scope': (
-            ('hermes_home: Path'),
-            'Dict[str, str]',
-            '8a1580b149d71982c2a2c86133703f820c8c9b02d3d06d8fe20a82cdf0d8d59c'),
-        'set_secret_scope': (
-            ('secrets: Optional[Mapping[str, str]], *, profile_home: Optional[str]=None'),
-            'Token',
-            'b03ae1c99d79c007893d6cac6cefe35225d47abec486d7949ae9c6df4146c0e0'),
-        'reset_secret_scope': (
-            ('token: Token'),
-            'None',
-            'b9fca45295012a6a357c2798774479f293d9d0aa0ad815eabb4912b3a4b4a35a'),
-    },
-    'hermes_constants.py': {
-        'set_hermes_home_override': (
-            ('path: str | Path | None'),
-            'Token',
-            'b79f4b1af9d55ff229bffbd6ae1ef92f8dd84a41f5efd8df9f47e9b2111a16d0'),
-        'get_hermes_home_override': (
-            (''),
-            'str | None',
-            '08a5940033cc96d04c96b6c8f1131f1ab5cb4c224f04603a550f839530ee8cc2'),
-        'reset_hermes_home_override': (
-            ('token: Token'),
-            'None',
-            'cf9bfcd238776707dda832877e43e06204b016ad44143361e87f9f832731549b'),
+            'hermes_home: Path',
+            'dict[str, str]',
+            '359085233254ee21d4b9854713254b857aec8cd95913b6bba6ff95496042dcd7'),
+        '_is_process_home': (
+            'hermes_home: Path',
+            'bool',
+            '5835fec20843d529a8c83c8c685f50d6c46bb2bbd0c16033b559b37442b6fccd'),
     },
     'cron/scheduler.py': {
         'run_one_job': (
-            ('job: dict, *, adapters=None, loop=None, verbose: bool=False, '
-             'extra_prompt: Optional[str]=None, cancel_event: Optional[_CancelEventLike]=None'),
+            ('job: dict, *, adapters=None, loop=None, verbose: bool=False, extra_prompt: Optional[str]=None, '
+             'cancel_event: Optional[_CancelEventLike]=None'),
             'bool',
             'c5be4bef1178f3434502499fd1df641b3a4ea4f0a5d5621eb652b875bb194146'),
         '_launch_external_cron_worker': (
-            ('job: dict'),
+            'job: dict',
             'bool',
-            '94c831733d9faa0424f95425be317c79e8598c06f3005ccb91796eb743100287'),
+            'f7595587b1bf070dfddd8b3abe00fc64cc80a747bfe5631a77b411f3e38a7c35'),
         '_run_external_worker_payload': (
-            ('payload_path: Path, ack_path: Path'),
+            'payload_path: Path, ack_path: Path',
             'bool',
             '828ffebd9fef767b23221af8b873b732179b84f3bca04bd8ac9eb40a0ff07461'),
     },
+    'cron/worker_bootstrap.py': {
+        'finish_worker_boot': (
+            '',
+            'None',
+            '667c99116f5f113004c1e3bb3323dae1f290dba153e8b27e9704d00d1a53b8bd'),
+    },
 }
 
-# context-local 저장소와 cron의 module-global sys 조회, child 진입점도 함수 밖 계약이다.
+# 문맥 저장소(scope 상태 하나와 그 값 타입)와 cron의 module-global sys 조회, child 진입점도 함수 밖 계약이다.
 BODYLESS_MANAGED_MODULE_NODES = {
-    'agent/secret_scope.py': {
-        'from contextvars': '4d0b69a21e07c09772f472c6b0411bc712725d65289d6dbe78af988bf4f22819',
-        '_SECRET_SCOPE': 'e1d8ad0021ac4a95106cc9ca4eebf23585a9ed588e615423ecc9d03eb47924e8',
-        '_BoundScope': '77f0d9930ea6754d082810686e2be8e15c76712533f7767d07ca758f18c4d910',
-    },
-    'hermes_constants.py': {
-        'from contextvars': '4d0b69a21e07c09772f472c6b0411bc712725d65289d6dbe78af988bf4f22819',
-        '_HERMES_HOME_OVERRIDE': '98eaa1371fae960a502aed95e91d5d64b69e64a1d94702c00db8b5fcc309fd7c',
-        '_UNSET': '6eaf8669f559cd824f5088f162c8ea4f1edab6686f51f7fcea9fbaa6ad635ccb',
+    'hermes_scope.py': {
+        'from contextvars': '6588e8300f9de11fc19a7338e73f5cba5e5264abe31bdc98aaca6ec078376a63',
+        '_STATE': '01aef359d7e1f1315dc2ec6c8c68f506550ffaea937234e9f6f697e76baa6613',
+        '_EMPTY': '1b7be11cb89aa46dd1ee35bd87802cb4591a435c55b2afde01cbd38e47be699e',
+        'Scope': '821d8a38747c0d8ec705299dbd698d5acfa77a4a2c9d62b6b4a81632d0b5cfce',
+        'BoundSecrets': 'ea3d4bec133621ab0bb3d0ca253b2c4d27ce8c8be7d9e83bea10c43e112e6323',
+        'ScopeState': '9f0750d901d033e66001171a543703ae2a7c238fbb58c3121431e535dd9688f5',
+        '_Change': '2272ebbac221cc288d433bbcdc04a650982dce76a4be9cbf53a4ca0f0a68378a',
+        '_Node': 'fe8a357f61c7c87868091965ea02047a9c1f9ea543352ad6fc9bf4cf923e2221',
+        'StateToken': 'cbe9cbb74db33c731685206249fa034e3297c462b60131272917b608686f4d31',
     },
     'cron/scheduler.py': {
         'import sys': 'f7252e3c1dbe1d5edf1f34c020a58a05b55f706b2c1d9479eae91f9a9d4be275',
-        '__main__': 'a17f73ab00b24c1f21e1ba7dcd46af2cf598ddea7e0cb9356846919b3b0b842a',
+        '__main__': 'c50530c9fa1ed94f5f61a73de16ef9d1e72aff3114e48536b77d0b10696293bb',
     },
 }
+# 문맥 저장소를 가진 module 과 그 module 에서 한 번만 bind 해야 하는 import 이름이다.
+BODYLESS_CONTEXT_MODULES = {"hermes_scope.py": ("ContextVar",)}
 
 # 대시보드가 요청마다 이 import 를 다시 해야 바꿔 끼운 함수가 쓰인다.
 # 모듈 머리에서 한 번만 import 하게 바뀌면 plugin 이 감싼 것이 쓰이지 않고 토큰 경로가 모두 닫힌다.

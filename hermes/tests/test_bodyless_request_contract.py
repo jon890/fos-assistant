@@ -17,6 +17,7 @@ import unittest
 from unittest.mock import patch
 
 import hermes_contract as contract
+from bodyless_source import SKIP_REASON, bodyless_source
 import test_bodyless_requests as fixtures
 from test_bodyless_requests import CANARY, IMAGE
 from runtime import bodyless_install as install
@@ -47,7 +48,7 @@ class BodylessDeclarationTest(unittest.TestCase):
             compile(file.read_bytes(), str(file), "exec")
 
 
-@unittest.skipUnless(os.environ.get("HERMES_SOURCE"), "HERMES_SOURCE가 없어 공식 source 실행 검사를 건너뛴다")
+@unittest.skipUnless(bodyless_source(), SKIP_REASON)
 class BodylessSourceTest(unittest.TestCase):
     def setUp(self):
         fixtures.InstallTest.setUp(self)
@@ -144,17 +145,30 @@ class BodylessSourceTest(unittest.TestCase):
         loop = types.ModuleType("agent.conversation_loop")
         loop._redecorate_prompt_cache_for_provider = lambda agent, messages, **kwargs: (messages, None, [])
         loop._moa_client_consumes_prepared_request = lambda client: False
-        for name in ("_billing_failure_result", "_content_policy_blocked_result", "_billing_block_dict",
+        for name in ("_billing_failure_result", "_content_policy_blocked_result", "_usage_window_refusal", "_billing_block_dict",
                 "_billing_or_entitlement_message", "_billing_terminal_label", "_print_billing_or_entitlement_guidance"):
             setattr(loop, name, lambda *args, **kwargs: None)
         anonymous = types.ModuleType("hermes_cli.anon_auth")
         anonymous.is_anonymous_agent = lambda agent: False
         classifier = types.ModuleType("_bodyless_actual_error_classifier")
+        # 요청 middleware 와 prompt cache 시계는 writer 경계 밖이다. payload 객체를 그대로 넘기는 대역을 둔다.
+        middleware = types.ModuleType("hermes_cli.middleware")
+        middleware.apply_llm_request_middleware = lambda request, **kwargs: types.SimpleNamespace(
+            payload=request, original_payload=dict(request), trace=[])
+        cache_clock = types.ModuleType("agent.prompt_cache_clock")
+        cache_clock.record_attempt_sent = lambda agent, request: None
+        # v0.23 의 실패 안내 helper 다. 안내 문구는 writer 경계 밖이라 그대로 넘기거나 비운다.
+        warnings = types.ModuleType("gateway.warning_notifications")
+        warnings.TerminalFailureText = str
+        migration = types.ModuleType("hermes_cli.left_core_migration")
+        migration.host_install_hint = lambda base_url: None
         logging_sink = logging.StreamHandler(outputs)
         logger = logging.getLogger("bodyless-contract")
         logger.addHandler(logging_sink)
         self.addCleanup(logger.removeHandler, logging_sink)
-        with patch.dict(sys.modules, {loop.__name__: loop, anonymous.__name__: anonymous, classifier.__name__: classifier}), \
+        with patch.dict(sys.modules, {loop.__name__: loop, anonymous.__name__: anonymous, classifier.__name__: classifier,
+                    middleware.__name__: middleware, cache_clock.__name__: cache_clock,
+                    warnings.__name__: warnings, migration.__name__: migration}), \
                 patch.object(socket.socket, "connect", side_effect=AssertionError("network forbidden")), \
                 redirect_stdout(outputs), redirect_stderr(outputs):
             error_file = "agent/error_classifier.py"
@@ -175,11 +189,16 @@ class BodylessSourceTest(unittest.TestCase):
                 "_welcome_outage_copy": lambda *args, **kwargs: None, "is_thinking_timeout": lambda *args: False,
                 "_STREAM_DROP_MARKERS": ("connection lost",),
                 # v0.21.6의 집계 호출은 요청 writer 경계 밖이다. provider 인자 보존은 아래에서 확인한다.
-                "observe_request_tools": lambda agent, tools: None}
+                "observe_request_tools": lambda agent, tools: None,
+                "_guardrail_matched_patterns": lambda error: None, "_print_nonretryable_auth_guidance": lambda *args, **kwargs: None,
+                "CONTENT_POLICY_NEXT_STEPS": "synthetic"}
             relative = "agent/turn_api_request.py"
             tree = _tree(self.source, relative)
             definition = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "ApiRequestBuild")
-            _execute_nodes(self.source, relative, [definition, _function(tree, "build_api_request")], environment)
+            # v0.23 은 provider payload 조립을 `build_request_payload` 로 나눴다. 그 helper 도 실제 source 에서 실행한다.
+            _execute_nodes(self.source, relative, [definition, *(_function(tree, name) for name in (
+                "_set_extra_header", "_apply_user_turn_request_headers", "build_request_payload",
+                "build_api_request"))], environment)
             relative = "agent/turn_recovery.py"
             tree = _tree(self.source, relative)
             _execute_nodes(self.source, relative, [_function(tree, name) for name in
