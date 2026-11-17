@@ -42,6 +42,9 @@ test("root 밖은 저장소 첫 화면, 바깥 주소는 그대로, 다른 schem
   assert.deepEqual(resolveDocLink("../../../x.md", from, known, COMMIT), { kind: "github", href: repo });
   assert.deepEqual(resolveDocLink("https://example.com/a", from, known, COMMIT), { kind: "external", href: "https://example.com/a" });
   assert.deepEqual(resolveDocLink("javascript:alert(1)", from, known, COMMIT), { kind: "blocked" });
+  // react-markdown 이 안전하지 않은 주소를 빈 글자로 바꿔 넘긴다.
+  assert.deepEqual(resolveDocLink("", from, known, COMMIT), { kind: "blocked" });
+  assert.deepEqual(resolveDocLink("  ", from, known, COMMIT), { kind: "blocked" });
   assert.deepEqual(resolveDocLink("#절", from, known, COMMIT), { kind: "anchor", hash: "절" });
 });
 

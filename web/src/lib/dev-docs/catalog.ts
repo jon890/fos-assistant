@@ -148,13 +148,17 @@ function cellsOf(line: string): string[] {
     .map((cell) => cell.trim());
 }
 
-/** 링크와 백틱을 벗긴 뒤 첫 마침표 앞 글자다. */
-export function statusOf(cell: string): string {
-  const plain = cell
+/** 표 칸의 Markdown 링크와 백틱을 벗긴 글자다. */
+export function plainCell(cell: string): string {
+  return cell
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/`/g, "")
     .trim();
-  return plain.split(".")[0].trim();
+}
+
+/** 상태 칸의 첫 마침표 앞 글자다. */
+export function statusOf(cell: string): string {
+  return plainCell(cell).split(".")[0].trim();
 }
 
 /**
@@ -177,7 +181,15 @@ export async function readDecisionIndex(
     const cells = cellsOf(line);
     const link = /\[([^\]]*)\]\(([^)#\s]+)\)/.exec(cells[0] ?? "");
     if (!link) continue;
-    const target = decodeURIComponent(link[2]);
+    let target: string;
+    try {
+      target = decodeURIComponent(link[2]);
+    } catch {
+      console.warn(
+        `개발 문서 목록: ${indexPath} 의 링크를 풀지 못했다: ${link[2]}`,
+      );
+      continue;
+    }
     if (!/^ADR-.*\.md$/.test(posix.basename(target))) continue;
     const repoPath = posix.normalize(posix.join(base, target));
     if (!(await exists(docPath(root, repoPath)))) {
@@ -188,7 +200,7 @@ export async function readDecisionIndex(
     }
     const entry: DocEntry = {
       path: repoPath,
-      title: cells[1] || link[1],
+      title: plainCell(cells[1] ?? "") || link[1],
       fileStem: stemOf(repoPath),
       status: cells.length > 2 ? statusOf(cells[cells.length - 1]) : undefined,
     };

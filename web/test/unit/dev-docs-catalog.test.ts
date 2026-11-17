@@ -35,7 +35,7 @@ test("기능은 펜스 밖 첫 제목을 쓰고 폴더의 스펙과 설계만 �
   assert.equal(catalog.paths.has("docs/features/sample/tasks/plan-a/phase-01.md"), false);
 });
 
-test("결정은 나눔마다 INDEX 를 첫 줄로 두고 표 순서, 상태 첫 문장, 보관, 한글 파일 이름을 따른다", async () => {
+test("결정은 나눔마다 INDEX 를 첫 줄로 두고 표 순서, 상태 첫 문장, 보관, 한글 파일 이름, 칸의 Markdown 벗기기를 따른다", async () => {
   const catalog = await buildCatalog(await makeDocsTree());
   const [common, backend] = group(catalog.groups, "decisions").sections;
   assert.equal(common.label, "공통");
@@ -44,6 +44,8 @@ test("결정은 나눔마다 INDEX 를 첫 줄로 두고 표 순서, 상태 첫 
     [
       ["docs/adr/INDEX.md", "ADR 목록", undefined],
       ["docs/adr/ADR-001-runtime.md", "런타임을 둔다", "Accepted"],
+      // 제목 칸의 백틱과 링크를 벗긴다. 풀지 못하는 링크의 줄은 목록 전체를 깨지 않고 빠진다.
+      ["docs/adr/ADR-011-code.md", "hermes/connectors/ 에 둔다", "Accepted"],
     ],
   );
   assert.deepEqual(common.archived?.map((e) => [e.path, e.status]), [

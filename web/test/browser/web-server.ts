@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { join } from "node:path";
 import { DEV_DOCS_COMMIT, writeDevDocsFixture } from "./dev-docs-fixture.ts";
@@ -36,10 +37,10 @@ const port = process.argv[2];
 if (!port) throw new Error("포트를 첫째 인자로 주어야 한다.");
 
 // 「개발 문서」 화면이 읽을 가짜 문서 트리와 커밋이다. 두 모드 모두 같은 값을 받는다.
-const DEV_DOCS_ENV = {
-  DEV_DOCS_ROOT: await writeDevDocsFixture(),
-  SOURCE_COMMIT: DEV_DOCS_COMMIT,
-};
+const DEV_DOCS_ROOT = await writeDevDocsFixture();
+// 서버가 끝나면 임시 문서 트리를 지운다.
+process.on("exit", () => rmSync(DEV_DOCS_ROOT, { recursive: true, force: true }));
+const DEV_DOCS_ENV = { DEV_DOCS_ROOT, SOURCE_COMMIT: DEV_DOCS_COMMIT };
 
 console.error(`브라우저 검사의 웹 서버: ${mode === "dev" ? "개발 서버" : "빌드한 서버"}`);
 if (mode === "dev") {

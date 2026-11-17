@@ -22,7 +22,7 @@ export default async function DevDocsPage() {
     );
   }
   const commit = sourceCommit();
-  const roadmap = await readRoadmap();
+  const roadmap = await readRoadmap(catalog);
   return (
     <DevDocsShell catalog={catalog} commit={commit}>
       {roadmap ? (

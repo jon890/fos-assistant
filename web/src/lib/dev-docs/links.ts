@@ -47,6 +47,8 @@ export function resolveDocLink(
   known: ReadonlySet<string>,
   commit: string | null,
 ): ResolvedLink {
+  // react-markdown 은 안전하지 않은 주소(javascript: 등)를 빈 글자로 바꿔 넘긴다. 빈 주소는 링크로 두지 않는다.
+  if (href.trim() === "") return { kind: "blocked" };
   if (href.startsWith("#")) return { kind: "anchor", hash: href.slice(1) };
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href)?.[1]?.toLowerCase();
   if (scheme) {

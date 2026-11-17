@@ -32,7 +32,7 @@ export default async function DevDocPage({
 
   let doc: Awaited<ReturnType<typeof readDoc>>;
   try {
-    doc = await readDoc(repoPath);
+    doc = await readDoc(repoPath, catalog);
   } catch {
     return (
       <DevDocsShell catalog={catalog} commit={commit} currentPath={repoPath}>

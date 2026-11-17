@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { posix } from "node:path";
-import { docPath, getCatalog } from "./catalog.ts";
+import { docPath, getCatalog, type Catalog } from "./catalog.ts";
 import { devDocsRoot } from "./source.ts";
 
 /**
@@ -21,13 +21,17 @@ export function normalizeRepoPath(raw: string | string[]): string | null {
   return normalized;
 }
 
-/** 목록에 든 문서만 읽는다. 목록 밖이면 `null`. 읽기 실패는 던진다. */
+/**
+ * 목록에 든 문서만 읽는다. 목록 밖이면 `null`. 읽기 실패는 던진다.
+ * 페이지가 이미 받은 목록을 주면 다시 만들지 않는다(개발 서버는 요청마다 목록을 새로 만든다).
+ */
 export async function readDoc(
   raw: string | string[],
+  known?: Catalog | null,
 ): Promise<{ path: string; markdown: string } | null> {
   const repoPath = normalizeRepoPath(raw);
   const root = devDocsRoot();
-  const catalog = await getCatalog();
+  const catalog = known ?? (await getCatalog());
   if (!repoPath || !root || !catalog?.paths.has(repoPath)) return null;
   return {
     path: repoPath,
@@ -59,7 +63,9 @@ export function extractRoadmap(markdown: string): string | null {
   return start >= 0 ? lines.slice(start).join("\n").trimEnd() : null;
 }
 
-export async function readRoadmap(): Promise<string | null> {
-  const prd = await readDoc("docs/prd.md");
+export async function readRoadmap(
+  known?: Catalog | null,
+): Promise<string | null> {
+  const prd = await readDoc("docs/prd.md", known);
   return prd ? extractRoadmap(prd.markdown) : null;
 }

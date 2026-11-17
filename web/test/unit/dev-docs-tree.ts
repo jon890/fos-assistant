@@ -43,6 +43,8 @@ const FILES: Record<string, string> = {
     "| --- | --- | --- | --- |",
     "| [ADR-001](ADR-001-runtime.md) | 런타임을 둔다 | 공통 | Accepted. 일부는 [ADR-002](ADR-002-x.md) 가 대체한다 |",
     "| [ADR-009](ADR-009-missing.md) | 없는 파일 | 공통 | Accepted |",
+    "| [ADR-010](ADR-010-%E0%A4%A.md) | 풀지 못하는 링크 | 공통 | Accepted |",
+    "| [ADR-011](ADR-011-code.md) | `hermes/connectors/` 에 [둔다](x.md) | 공통 | Accepted |",
     "",
     "## 보관",
     "",
@@ -52,6 +54,7 @@ const FILES: Record<string, string> = {
   ].join("\n"),
   "docs/adr/ADR-001-runtime.md": "## ADR-001: 런타임을 둔다\n",
   "docs/adr/archive/ADR-005-old.md": "## ADR-005: 옛 결정\n",
+  "docs/adr/ADR-011-code.md": "## ADR-011: 코드\n",
   "backend/docs/adr/INDEX.md": [
     "# backend ADR",
     "",

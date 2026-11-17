@@ -53,7 +53,7 @@ COPY --from=repo backend/docs /app/dev-docs/backend/docs
 COPY --from=repo web/docs /app/dev-docs/web/docs
 COPY --from=repo hermes/docs /app/dev-docs/hermes/docs
 ENV DEV_DOCS_ROOT=/app/dev-docs
-# 화면 위에 보일 배포 커밋이다. 40자리 16진수가 아니면 화면이 「커밋 정보 없음」 을 보인다.
+# 화면 위에 보일 배포 커밋이다. 40자리 소문자 16진수가 아니면 화면이 「커밋 정보 없음」 을 보인다.
 ARG SOURCE_COMMIT
 ENV SOURCE_COMMIT=${SOURCE_COMMIT}
 

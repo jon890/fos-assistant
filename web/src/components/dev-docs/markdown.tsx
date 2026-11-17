@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { createHeadingIds, headingText } from "@/lib/dev-docs/headings";
+import { rehypeHeadingIds } from "@/lib/dev-docs/headings";
 import { resolveDocLink } from "@/lib/dev-docs/links";
 import { MermaidBlock } from "./mermaid-block";
 
@@ -18,6 +18,124 @@ const HEADING_CLASS: Record<HeadingTag, string> = {
   h5: "mt-4 mb-2 text-sm font-semibold",
   h6: "mt-4 mb-2 text-sm text-muted-foreground",
 };
+
+/** 제목 id 는 rehypeHeadingIds 가 붙인 값을 그대로 쓴다. */
+function heading(Tag: HeadingTag, id: string | undefined, children: ReactNode) {
+  return (
+    <Tag id={id} className={HEADING_CLASS[Tag]}>
+      {children}
+    </Tag>
+  );
+}
+
+function docComponents(
+  fromPath: string,
+  knownSet: ReadonlySet<string>,
+  commit: string | null,
+): Components {
+  return {
+    h1: ({ id, children }) => heading("h1", id, children),
+    h2: ({ id, children }) => heading("h2", id, children),
+    h3: ({ id, children }) => heading("h3", id, children),
+    h4: ({ id, children }) => heading("h4", id, children),
+    h5: ({ id, children }) => heading("h5", id, children),
+    h6: ({ id, children }) => heading("h6", id, children),
+    a: ({ href, children }) => {
+      const link = resolveDocLink(href ?? "", fromPath, knownSet, commit);
+      const className = "underline underline-offset-2";
+      if (link.kind === "blocked") return <span>{children}</span>;
+      if (link.kind === "anchor")
+        return (
+          <a href={`#${link.hash}`} className={className}>
+            {children}
+          </a>
+        );
+      if (link.kind === "internal")
+        return (
+          <Link href={link.href} prefetch={false} className={className}>
+            {children}
+          </Link>
+        );
+      return (
+        <a
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={className}
+        >
+          {children}
+        </a>
+      );
+    },
+    img: ({ src, alt }) => {
+      const link =
+        typeof src === "string"
+          ? resolveDocLink(src, fromPath, knownSet, commit)
+          : ({ kind: "blocked" } as const);
+      const label = `그림: ${alt || "이름 없음"}`;
+      if (link.kind === "blocked" || link.kind === "anchor")
+        return <span>{label}</span>;
+      return (
+        <a
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2"
+        >
+          {label}
+        </a>
+      );
+    },
+    table: ({ children }) => (
+      <div className="my-3 max-w-full overflow-x-auto">
+        <table className="w-max min-w-full border-collapse text-left">
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ children }) => (
+      <th className="border border-border bg-muted px-3 py-2 font-semibold">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-border px-3 py-2">{children}</td>
+    ),
+    ul: ({ children }) => (
+      <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>
+    ),
+    ol: ({ children }) => (
+      <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>
+    ),
+    p: ({ children }) => (
+      <p className="my-2 first:mt-0 last:mb-0">{children}</p>
+    ),
+    blockquote: ({ children }) => (
+      <blockquote className="my-2 border-l-2 border-border pl-3 text-muted-foreground">
+        {children}
+      </blockquote>
+    ),
+    pre: ({ children }) => children,
+    code: ({ className, children }) => {
+      const language = /language-([^ ]+)/.exec(className ?? "")?.[1];
+      const source = String(children);
+      if (language || source.endsWith("\n")) {
+        const text = source.replace(/\n$/, "");
+        if (language === "mermaid") return <MermaidBlock source={text} />;
+        return (
+          <pre className="my-3 overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs leading-5">
+            <code>{text}</code>
+          </pre>
+        );
+      }
+      return (
+        <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]">
+          {children}
+        </code>
+      );
+    },
+  };
+}
 
 /**
  * 개발 문서 본문이다. react-markdown 의 기본값(HTML 을 그리지 않음, 기본 주소 검사)을 바꾸지 않는다(rule-57).
@@ -36,8 +154,11 @@ export function DevDocMarkdown({
   commit: string | null;
 }) {
   const knownSet = useMemo(() => new Set(known), [known]);
-  // 문서가 바뀔 때만 새로 시작한다. 같은 문서를 다시 그릴 때 -1 이 늘지 않게 그릴 때마다 새로 만든다.
-  const headingId = createHeadingIds();
+  // 부모가 다시 그려도 제목과 그림 블록이 다시 마운트되지 않게 부품 묶음을 고정한다.
+  const components = useMemo(
+    () => docComponents(fromPath, knownSet, commit),
+    [fromPath, knownSet, commit],
+  );
 
   useEffect(() => {
     if (!location.hash) return;
@@ -50,118 +171,12 @@ export function DevDocMarkdown({
     document.getElementById(id)?.scrollIntoView();
   }, [markdown]);
 
-  const heading = (Tag: HeadingTag, children: ReactNode) => (
-    <Tag id={headingId(headingText(children))} className={HEADING_CLASS[Tag]}>
-      {children}
-    </Tag>
-  );
-
   return (
     <article className="min-w-0 text-sm leading-6">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ children }) => heading("h1", children),
-          h2: ({ children }) => heading("h2", children),
-          h3: ({ children }) => heading("h3", children),
-          h4: ({ children }) => heading("h4", children),
-          h5: ({ children }) => heading("h5", children),
-          h6: ({ children }) => heading("h6", children),
-          a: ({ href, children }) => {
-            const link = resolveDocLink(href ?? "", fromPath, knownSet, commit);
-            const className = "underline underline-offset-2";
-            if (link.kind === "blocked") return <span>{children}</span>;
-            if (link.kind === "anchor")
-              return (
-                <a href={`#${link.hash}`} className={className}>
-                  {children}
-                </a>
-              );
-            if (link.kind === "internal")
-              return (
-                <Link href={link.href} prefetch={false} className={className}>
-                  {children}
-                </Link>
-              );
-            return (
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={className}
-              >
-                {children}
-              </a>
-            );
-          },
-          img: ({ src, alt }) => {
-            const link =
-              typeof src === "string"
-                ? resolveDocLink(src, fromPath, knownSet, commit)
-                : ({ kind: "blocked" } as const);
-            const label = `그림: ${alt || "이름 없음"}`;
-            if (link.kind === "blocked" || link.kind === "anchor")
-              return <span>{label}</span>;
-            return (
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2"
-              >
-                {label}
-              </a>
-            );
-          },
-          table: ({ children }) => (
-            <div className="my-3 max-w-full overflow-x-auto">
-              <table className="w-max min-w-full border-collapse text-left">
-                {children}
-              </table>
-            </div>
-          ),
-          th: ({ children }) => (
-            <th className="border border-border bg-muted px-3 py-2 font-semibold">
-              {children}
-            </th>
-          ),
-          td: ({ children }) => (
-            <td className="border border-border px-3 py-2">{children}</td>
-          ),
-          ul: ({ children }) => (
-            <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>
-          ),
-          ol: ({ children }) => (
-            <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>
-          ),
-          p: ({ children }) => (
-            <p className="my-2 first:mt-0 last:mb-0">{children}</p>
-          ),
-          blockquote: ({ children }) => (
-            <blockquote className="my-2 border-l-2 border-border pl-3 text-muted-foreground">
-              {children}
-            </blockquote>
-          ),
-          pre: ({ children }) => children,
-          code: ({ className, children }) => {
-            const language = /language-([^ ]+)/.exec(className ?? "")?.[1];
-            const source = String(children);
-            if (language || source.endsWith("\n")) {
-              const text = source.replace(/\n$/, "");
-              if (language === "mermaid") return <MermaidBlock source={text} />;
-              return (
-                <pre className="my-3 overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs leading-5">
-                  <code>{text}</code>
-                </pre>
-              );
-            }
-            return (
-              <code className="rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]">
-                {children}
-              </code>
-            );
-          },
-        }}
+        rehypePlugins={[rehypeHeadingIds]}
+        components={components}
       >
         {markdown}
       </ReactMarkdown>

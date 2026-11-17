@@ -9,6 +9,13 @@ const NODE_TEST_READ_FILES = [
   "src/components/chat/activity/activity-state.ts",
   "src/components/chat/skill-command.ts",
   "src/components/chat/visible-turns.ts",
+  "src/lib/dev-docs/catalog.ts",
+  "src/lib/dev-docs/filter.ts",
+  "src/lib/dev-docs/headings.ts",
+  "src/lib/dev-docs/links.ts",
+  "src/lib/dev-docs/mermaid.ts",
+  "src/lib/dev-docs/read.ts",
+  "src/lib/dev-docs/source.ts",
   "src/lib/usage-paging.ts",
   "src/lib/workspace-file.ts",
 ];

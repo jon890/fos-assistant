@@ -88,6 +88,10 @@ test("본문의 HTML 은 돌지 않고 링크는 화면 안, 같은 커밋 GitHu
   await page.goto("/dev-docs/docs/features/other.md");
   await expect(article(page).getByRole("heading", { name: OTHER_TITLE, level: 1 })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __devDocsXss?: number }).__devDocsXss)).toBeUndefined();
+  // 본문의 HTML 은 요소로 만들어지지 않는다. 이벤트 속성 탐침도 돌지 않는다.
+  await expect(article(page).locator("script, img")).toHaveCount(0);
+  await expect(article(page).getByRole("link", { name: "막힌 링크" })).toHaveCount(0);
+  await expect(article(page).getByText("막힌 링크")).toBeVisible();
 
   const code = article(page).getByRole("link", { name: "코드 파일" });
   await expect(code).toHaveAttribute("href", `${REPO}/blob/${DEV_DOCS_COMMIT}/web/src/app/layout.tsx`);

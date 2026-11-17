@@ -80,10 +80,13 @@ function EntryRow({
 function SectionList({
   section,
   showLabel,
+  searching,
   currentPath,
 }: {
   section: FilteredSection;
   showLabel: boolean;
+  /** 찾는 중이면 맞은 보관 줄이 바로 보이게 「보관」 을 펼친다. */
+  searching: boolean;
   currentPath?: string;
 }) {
   return (
@@ -99,7 +102,13 @@ function SectionList({
         ))}
       </ul>
       {section.archived ? (
-        <details className="ml-2">
+        <details
+          open={
+            searching ||
+            section.archived.some((entry) => entry.path === currentPath)
+          }
+          className="ml-2"
+        >
           <summary className="cursor-pointer px-2 text-xs text-muted-foreground">
             보관
           </summary>
@@ -149,6 +158,7 @@ export function DevDocsCatalog({
                 key={section.label}
                 section={section}
                 showLabel={group.sections.length > 1}
+                searching={query.trim() !== ""}
                 currentPath={currentPath}
               />
             ))}
