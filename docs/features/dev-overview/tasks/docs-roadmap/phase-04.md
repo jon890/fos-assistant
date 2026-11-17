@@ -38,7 +38,7 @@
 
 ### 3. `web/test/browser/dev-docs-fixture.ts` 와 `web/test/browser/web-server.ts`
 
-- fixture: `writeDevDocsFixture(dir)` 가 가짜 트리를 쓴다. flowchart mermaid 에는 `classDef warm fill:#fdecea,stroke:#c62828` 와 `class A warm` 을 넣는다. `docs/prd.md`(「로드맵」 표와 기능 링크), `docs/features/sample.md` 와 `docs/features/sample/spec.md`(한글 제목 둘, 같은 이름 제목 둘), `docs/features/other.md`(`sample.md#한글-절` 링크, 코드 파일 링크, 그림 `![구조](../images/x.png)`, 코드 펜스 밖 `<script>window.__devDocsXss = 1</script>`, flowchart mermaid, sequence mermaid, 틀린 mermaid), `docs/adr/INDEX.md` 와 한글 이름 ADR 하나, `backend/docs/adr/INDEX.md`, `docs/code-rules/INDEX.md` 와 `rule-1.md`. 테스트가 쓰는 제목과 경로를 상수로 export 한다.
+- fixture: `writeDevDocsFixture(dir)` 가 가짜 트리를 쓴다. flowchart mermaid 에는 `classDef warm fill:#fdecea,stroke:#c62828` 와 `class A warm` 을 넣는다. `docs/prd.md`(「로드맵」 표와 기능 링크), `docs/features/sample.md` 와 `docs/features/sample/spec.md`(한글 제목 둘, 같은 이름 제목 둘), `docs/features/other.md`(`sample.md#한글-절` 링크, 코드 파일 링크, 그림 `![구조](../images/x.png)`, 코드 펜스 밖 `<script>window.__devDocsXss = 1</script>` 와 `<img src="x" onerror="window.__devDocsXss = 2">`, `[막힌 링크](javascript:alert(1))`, flowchart mermaid, sequence mermaid, 틀린 mermaid), `docs/adr/INDEX.md` 와 한글 이름 ADR 하나, `backend/docs/adr/INDEX.md`, `docs/code-rules/INDEX.md` 와 `rule-1.md`. 테스트가 쓰는 제목과 경로를 상수로 export 한다.
 - web-server.ts: 서버를 띄우기 전에 `mkdtemp` 로 임시 폴더를 만들어 fixture 를 쓰고, 두 모드 모두 `DEV_DOCS_ROOT=<그 폴더>`, `SOURCE_COMMIT=<고정 40자리 상수>` 를 넘긴다. 상수는 fixture 에서 export 한다.
 
 ### 4. `web/test/browser/dev-docs.spec.ts`
@@ -46,7 +46,7 @@
 - REQ1: 기본 `page`(첫 사용자라 `ADMIN`)로 사이드바 「고급」 의 「개발 문서」 를 눌러 `/dev-docs` 에 간다. `web/test/browser/fixtures.ts` 의 `isolatedMember` fixture 와 `setSession(context, isolatedMember)`(`admin-area.spec.ts` 의 사용 예)로 `MEMBER` 세션을 만들어 `/dev-docs` 가 열리는 것도 본다. `context.clearCookies()` 뒤 `/dev-docs` 는 `/signin` 으로 간다.
 - REQ2: 머리에 고정 커밋의 앞 7자리가 GitHub 커밋 링크로 보이고, 문서에 「GitHub 에서 보기」 가 같은 커밋 주소다. 「고치기」, 「편집」 단추가 없다.
 - REQ3: 찾기 칸에 기능 제목 일부를 넣으면 그 줄만 남는다. 스펙 제목만 맞는 글자를 넣으면 기능 줄이 펼쳐진 채 남는다. 맞는 것이 없으면 「맞는 문서가 없어요」.
-- REQ4: `other.md` 의 `<script>` 가 돌지 않는다(`window.__devDocsXss` 가 없다). `sample.md#한글-절` 링크를 누르면 화면 안 그 문서로 가고 그 제목이 화면에 들어온다. 코드 파일 링크와 그림 링크는 `target="_blank"` 이고 GitHub 주소다. 목록 밖 주소 `/dev-docs/docs/nope.md` 는 404 다.
+- REQ4: `other.md` 의 `<script>` 와 이벤트 속성이 돌지 않는다(`window.__devDocsXss` 가 없고 본문에 `script`, `img` 요소가 없다). 「막힌 링크」 는 링크가 아니라 글자다. `sample.md#한글-절` 링크를 누르면 화면 안 그 문서로 가고 그 제목이 화면에 들어온다. 코드 파일 링크와 그림 링크는 `target="_blank"` 이고 GitHub 주소다. 목록 밖 주소 `/dev-docs/docs/nope.md` 는 404 다.
 - REQ5: flowchart 블록은 `mermaid-diagram` 안에 SVG 가 있고 손그림 표식(mermaid 의 handDrawn 출력이 남기는 rough 경로, 실제 출력을 보고 고른 선택자)이 있다. flowchart 의 `A` 노드 도형의 fill 이 `#fdecea`(또는 `rgb(253, 236, 234)`)다. sequence 블록도 SVG 다. `localStorage.theme = "dark"`(`theme.spec.ts` 의 방식)로 열어도 그림 상자의 배경색이 흰색(`rgb(255, 255, 255)`)이다. 틀린 블록 자리에 「그림을 그리지 못했어요」 와 원문이 있고 다른 두 그림은 그려져 있다.
 - REQ6: `/dev-docs` 첫 화면에 fixture 로드맵 표가 보이고, 표 안 기능 링크를 누르면 그 문서로 간다.
 

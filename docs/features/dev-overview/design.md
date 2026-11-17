@@ -23,7 +23,8 @@
 
 | 자리 | 맡는 것 |
 | --- | --- |
-| `web/src/lib/dev-docs/` (서버 전용) | 문서 폴더 위치와 커밋 값 읽기, 묶음 넷의 목록 만들기, 경로를 목록에 대조해 파일 읽기, `prd.md` 의 「로드맵」 절 자르기, 링크 풀기 규칙 |
+| `web/src/lib/dev-docs/` 의 `catalog.ts`, `read.ts` (서버 전용, `node:fs`) | 묶음 넷의 목록 만들기, 경로를 목록에 대조해 파일 읽기, `prd.md` 의 「로드맵」 절 자르기 |
+| `web/src/lib/dev-docs/` 의 `source.ts`, `links.ts`, `filter.ts`, `headings.ts`, `mermaid.ts` (브라우저 부품도 import, `fs` 없음) | 문서 폴더 위치와 커밋 값, GitHub 주소, 링크 풀기, 찾기, 제목 id(rehype 플러그인), mermaid 요소 id |
 | `web/src/app/dev-docs/` | 로그인 확인 뒤 서버 컴포넌트로 목록과 본문을 읽어 넘긴다. 첫 화면은 로드맵, `/dev-docs/<저장소 경로>` 는 그 문서 |
 | `web/src/components/dev-docs/` | 목록과 찾기 칸(브라우저), 문서 본문 Markdown, mermaid 블록 |
 | `web/Dockerfile` | 추가 빌드 문맥에서 문서 폴더를 runner 단계로 복사하고 `SOURCE_COMMIT` 을 받는다 |
@@ -45,7 +46,7 @@
 
 - 운영 이미지: runner 단계의 `/app/dev-docs/` 아래에 저장소와 같은 상대 경로로 둔다(`/app/dev-docs/docs/prd.md`, `/app/dev-docs/backend/docs/...`). 환경 변수 `DEV_DOCS_ROOT=/app/dev-docs`.
 - 로컬 개발과 브라우저 테스트: `DEV_DOCS_ROOT` 로만 정한다. `process.cwd()` 나 번들 위치로 짐작하지 않는다. standalone 서버는 시작할 때 작업 폴더를 자기 폴더로 바꾸기 때문이다. 브라우저 테스트 서버(`web/test/browser/web-server.ts`)가 저장소 root 를 넘기고, `pnpm dev` 는 개발자가 넘긴다. 값이 없으면 「개발 문서를 담지 않고 띄운 서버예요」 를 보인다.
-- 커밋: `SOURCE_COMMIT` 환경 변수. 40자리 16진수가 아니면 없는 것으로 본다. 없으면(로컬, CI 의 `pnpm build`) 화면 위에 「커밋 정보 없음」 을 보이고 GitHub 링크는 `main` 을 가리킨다.
+- 커밋: `SOURCE_COMMIT` 환경 변수. 40자리 소문자 16진수(git 이 내는 꼴)가 아니면 없는 것으로 본다. 없으면(로컬, CI 의 `pnpm build`) 화면 위에 「커밋 정보 없음」 을 보이고 GitHub 링크는 `main` 을 가리킨다.
 - 저장소 주소는 `https://github.com/jon890/fos-assistant` 상수다. 공개 저장소의 주소라 운영 정보가 아니다.
 
 Next.js `standalone` 출력은 코드가 import 하지 않는 파일을 담지 않으므로, 문서는 빌드 결과에 넣지 않고 runner 단계에 따로 복사해 실행 중에 `fs` 로 읽는다. 문서 Markdown 은 지금 약 4MB 이고 메모리에는 목록(경로, 제목, 상태)만 둔다. 본문은 요청마다 읽는다. 파일 경로는 환경 변수에서만 만들고, Next.js 파일 추적이 동적 경로 때문에 web 폴더 전체를 standalone 결과에 넣지 않게 한다(필요하면 `turbopackIgnore` 주석). 빌드 뒤 standalone 크기가 늘지 않았는지 확인한다.
@@ -85,7 +86,7 @@ Next.js `standalone` 출력은 코드가 import 하지 않는 파일을 담지 �
 
 ## 실패와 일관성
 
-- 문서 폴더가 없거나 비었으면 화면은 「개발 문서를 담지 않고 띄운 서버예요」 를 보이고 다른 화면에는 영향이 없다. 운영 이미지에서는 `COPY --from=repo` 가 빌드에서 먼저 실패한다. 이때 Docker 는 `repo` 를 이미지 이름으로 보고 「pull access denied」 로 끝나므로 원인을 알기 어렵다. Dockerfile 의 그 줄 위 주석에 필요한 빌드 문맥을 적는다.
+- `DEV_DOCS_ROOT` 가 없거나 그 아래 `docs/` 폴더가 없으면 화면은 「개발 문서를 담지 않고 띄운 서버예요」 를 보이고 다른 화면에는 영향이 없다. 운영 이미지에서는 `COPY --from=repo` 가 빌드에서 먼저 실패한다. 이때 Docker 는 `repo` 를 이미지 이름으로 보고 「pull access denied」 로 끝나므로 원인을 알기 어렵다. Dockerfile 의 그 줄 위 주석에 필요한 빌드 문맥을 적는다.
 - 추가 빌드 문맥은 BuildKit(buildx, compose 의 `additional_contexts`)에서만 된다.
 - 한 문서를 읽다 실패하면 그 문서 자리에 「불러오지 못했어요」 를 보이고 목록은 그대로 둔다.
 - INDEX 표를 읽지 못한 줄은 목록에서 빠지고 서버 로그에 남는다.
