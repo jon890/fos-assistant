@@ -127,7 +127,11 @@ NATIVE_ATTACHMENT_FUNCTIONS = {
     "agent/display.py": ("_detect_tool_failure",),
     "agent/tool_executor.py": ("_persist_multimodal_text_parts",),
 }
+# 셋째 칸이 있으면 그 상수의 lambda 가 부르는 같은 파일의 함수 이름이다.
 NATIVE_TOOL_EVENT_FIELDS = ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS")
+# 실패 판정이 JSON 객체의 모양(`status`, `results`)까지 보는 함수와 그 상수다. 기준 계열에는 없다.
+# 이 판정이 first-frame envelope 를 실패로 잘못 세지 않는지 실제 함수로 확인한다.
+NATIVE_FAILURE_SHAPE = None
 
 # 관리 bootstrap이 교체하는 내부 writer다. 공식 upstream 확장 API가 아니다.
 BODYLESS_REQUEST_WRITER = ("agent/agent_runtime_helpers.py", "dump_api_request_debug",
@@ -587,6 +591,15 @@ HERMES_VARIANTS = {
             "yb_query_group_info", "yb_query_group_members", "yb_search_sticker", "yb_send_dm", "yb_send_sticker"},
         # 코드 실행 안의 호출이 session 을 달고 온다. `tool_call_id` 는 없다. fos-ctx 가 판정 요청용 번호를 만든다(REQ6).
         "TOOL_GUARD_CODE_CALLS_HAVE_SESSION": True,
+        # `_detect_tool_failure` 가 결과 객체의 모양까지 보도록 바뀌었다. 같은 파일의 함수와 상수를 분리 실행한다.
+        "NATIVE_FAILURE_SHAPE": ("agent/tool_result_classification.py", "shape_failure_error", "_FAILED_STATUSES"),
+        # 사건 필드에 `_call_id` 가 `tool_call_id` 칸을 덧붙인다. 이 테스트의 호출에는 그 칸이 없어 결과가 같다.
+        "NATIVE_TOOL_EVENT_FIELDS": ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS", ("_call_id",)),
+        # core 의존성의 Pillow 가 13.0.0 으로 올랐다. 우리 helper 는 설치된 Pillow 를 쓰므로 코드 변경은 없다.
+        "NATIVE_IMAGE_PILLOW_VERSION": "13.0.0",
+        # `register_tool` 이 `PluginContext` 와 함께 `plugins_context.py` 로 옮겨졌다. 인자 모양은 같다.
+        "NATIVE_ATTACHMENT_REGISTRATION": ("hermes_cli/plugins_context.py", "register_tool",
+                                           Call(keywords=("name", "toolset", "schema", "handler"))),
     },
 }
 
