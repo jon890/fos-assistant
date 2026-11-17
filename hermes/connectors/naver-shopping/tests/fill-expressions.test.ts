@@ -342,19 +342,20 @@ function radioLayer() {
   const black = chip({ alt: "블랙false" });
   const blackLarge = chip({ alt: "블랙 라지false" });
   const white = chip({ alt: "화이트true" });
+  const gray = chip({ alt: "그레이 false" });
   const colors = el({
     matches: [PURCHASE_LAYER.radioGroup],
-    children: [black, blackLarge, white],
+    children: [black, blackLarge, white, gray],
   });
   const sizes = ["S", "M", "L", "XL"].map((text) => chip({ text }));
   const size = el({ matches: [PURCHASE_LAYER.radioGroup], children: sizes });
   const layer = el({ matches: [], children: [colors, size] });
   const buyNow = el({ matches: [BUTTONS], text: "바로구매", layer });
-  return { black, blackLarge, white, sizes, layer, buyNow };
+  return { black, blackLarge, white, gray, sizes, layer, buyNow };
 }
 
 test("층의 radio 칩은 묶음 차례로 값이 정확히 같은 칩 하나만 누르고, 누르지 않고 골라졌는지 다시 읽는다", () => {
-  const { black, blackLarge, white, sizes, buyNow } = radioLayer();
+  const { black, blackLarge, white, gray, sizes, buyNow } = radioLayer();
   const page = { host: STORE, elements: [buyNow] };
   expect(run(LAYER_OPTION_FORM, page)).toEqual({ radios: 2, lists: 0 });
   // 읽기만 하면 누르지 않는다.
@@ -369,6 +370,9 @@ test("층의 radio 칩은 묶음 차례로 값이 정확히 같은 칩 하나만
   // alt 끝의 true 도 뗀다.
   expect(run(CHOOSE_LAYER_RADIO, page, [0, "화이트", true])).toBe("pressed");
   expect(white.clicked).toBe(1);
+  // 값과 끝 글자 사이의 빈칸도 뗀다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "그레이", true])).toBe("pressed");
+  expect(gray.clicked).toBe(1);
   // 사이즈는 글이 값이다. 「L」 이 「XL」 을 고르지 않는다.
   expect(run(CHOOSE_LAYER_RADIO, page, [1, "L", true])).toBe("pressed");
   expect(sizes.map((s) => s.clicked)).toEqual([0, 0, 1, 0]);
