@@ -15,4 +15,5 @@
 - **결과**:
   - 얻는 것: 보이는 문서가 배포한 코드와 같은 커밋이다. 바깥 호출과 토큰이 없다. 고치기는 지금처럼 PR 이다
   - 감당할 것: 운영 빌드가 `repo` 문맥을 주지 않으면 새 Dockerfile 이 빌드에서 실패하므로 운영 쪽 변경을 먼저 배포해야 한다. `docker build web` 만으로는 이미지가 만들어지지 않고 BuildKit 의 `--build-context repo=<저장소 root>` 가 필요하다. 빠뜨리면 Docker 가 `repo` 를 이미지 이름으로 보고 「pull access denied」 로 끝나 원인이 바로 보이지 않는다. CI 는 web 이미지를 만들지 않으므로 Dockerfile 의 복사 원본은 저장소 테스트로 지킨다. 문서를 고쳐도 웹을 다시 배포해야 화면에 보인다
-- **확인 방법**: `web/test/unit/dev-docs-*.test.ts`(목록, 경로 대조, 링크 풀기), Dockerfile 복사 원본을 보는 저장소 테스트, `web/test/browser/dev-docs.spec.ts`, 배포 뒤 화면 위 커밋 해시가 배포 커밋과 같은지
+  - 권한: `repo` 문맥의 checkout 권한이 좁아도(디렉터리 700, 파일 600) 화면 서버 사용자가 읽도록 네 `COPY` 에 `--chmod=a+rX` 를 준다. 소유자는 root 로 두어 화면 서버가 문서를 고치지 못한다
+- **확인 방법**: `web/test/unit/dev-docs-*.test.ts`(목록, 경로 대조, 링크 풀기), Dockerfile 복사 원본과, 좁은 권한의 문맥을 복사해도 nextjs 가 읽는지 docker 로 보는 저장소 테스트, `web/test/browser/dev-docs.spec.ts`, 배포 뒤 화면 위 커밋 해시가 배포 커밋과 같은지
