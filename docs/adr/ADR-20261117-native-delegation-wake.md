@@ -22,7 +22,7 @@
 ### 맥락
 
 운영(2026-11-17)에서 비서가 `delegate_task` 를 쓰면 루트 실행이 먼저 끝나고, 자식이 끝나도 대화에 답이 오지 않았다.
-Hermes 는 API run 의 비동기 위임 완료로 새 run 이나 사건을 만들지 않고 부모 session 에 결과 줄 하나만 남긴다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「API 위임 결과는 delivery 기록으로 남는다」). v0.23.2 도 같다.
+Hermes 는 API run 의 비동기 위임 완료로 새 run 이나 사건을 만들지 않는다. `default` profile 은 부모 session 에 결과 줄 하나만 남기고, 이름을 붙인 profile 은 그 줄도 남기지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「API 위임 결과는 delivery 기록으로 남는다」). v0.23.2 도 같다.
 자식의 끝을 알 수 있는 길은 profile 플러그인의 `subagent_stop` hook 과 session 메시지 조회다. hook 은 결과 줄을 남기기 전에, 한 호출의 자식이 모두 끝난 뒤 잇달아 불린다. hook 에는 호출 번호도 맡긴 일의 글도 없다.
 Control Plane 에는 다른 결과를 자동 turn 에 넣는 자리(`AutoTurnResultSource`)와 하위 에이전트 등록 경로(ADR-037)가 이미 있다.
 

@@ -242,7 +242,7 @@ class NativeDelegationDeliveryTest {
     void laterTurnDoesNotSwallowResult() {
         Instant stoppedAt = Instant.now().minusSeconds(120);
         NativeResultFixtures.binding(
-            jdbc, PROFILE, dad.id(), origin.id(), true, stoppedAt.minusSeconds(60), stoppedAt, "SUCCEEDED", "결과", "일");
+            jdbc, PROFILE, dad.id(), origin.id(), true, stoppedAt.minusSeconds(60), stoppedAt, "SUCCEEDED", "늦은 결과", "일");
         executions.save(AgentExecution.builder()
             .userId(dad.id())
             .conversationId(conversation.id())
@@ -261,7 +261,7 @@ class NativeDelegationDeliveryTest {
         awaitIdle();
 
         assertThat(stub().received()).as("이름을 붙인 profile 은 결과 줄을 남기지 않아 그 turn 이 결과를 읽지 못했다").hasSize(1);
-        assertThat(stub().received().getFirst().input()).contains("결과");
+        assertThat(stub().received().getFirst().input()).contains("<external-data>\n늦은 결과\n</external-data>");
         assertThat(history()).extracting(ChatMessage::content).first().isEqualTo("하위 작업이 끝났어요 · 일");
     }
 
