@@ -206,6 +206,9 @@ class ManagedSourceTest(unittest.TestCase):
                         self.assertEqual((str(home_b), str(home_b), str(home_b), "owner:profile-B",
                                           {"TERMINAL_HOME": str(home_b)}), actual.snapshot())
                     self.assertEqual(expected_a, actual.snapshot())
+                    # 되돌리지 않은 묶기도 복사 문맥 안에만 남는다.
+                    actual.runtime.bind_state(actual.runtime.scope_for_profile(home_b))
+                    self.assertEqual("owner:profile-B", actual.snapshot()[3])
                 copy_context().run(child)
                 self.assertEqual(expected_a, actual.snapshot())
                 with bind(home_b):

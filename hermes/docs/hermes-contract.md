@@ -923,7 +923,7 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 `BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
 v0.23 계열의 runtime scope 경계로 선언하며, `BODYLESS_SOURCE_LINE`의 표지 파일이 없는 소스(기준 버전 v0.21.6)에서는 source 검사를 건너뛴다.
 운영에 연결하지 않아 기준 버전을 올리기 전까지 v0.23 계열에서만 맞춘다. 설계는 [Hermes 업그레이드 설계](../../docs/features/hermes-upgrade/design.md)의 「PR4」 가 갖는다.
-`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 고정 공식 commit의 정확한
+`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 v0.23.2 공식 commit의 정확한
 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
 `BODYLESS_MANAGED_MODULE_NODES`는 scope 상태의 저장소와 값 타입, `contextvars` import,
 cron module의 `sys` import·child 진입점을 선언한다.
@@ -943,7 +943,7 @@ loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환
 | --- | --- |
 | `agent.agent_init.init_agent` | 실제 초기화 경계다. owner는 정확한 agent class와 객체 identity를 확인해 먼저 등록하고, 초기화 실패 때 해제한다 |
 | `run_agent.AIAgent.__init__`·`close` | constructor는 호출 안에서 initializer를 import한다. close wrapper는 원래 함수를 부르며 성공·실패 모두에서 등록을 해제한다 |
-| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다. `profile_home` 경로는 자식을 다른 profile의 scope 안에서 만들므로, 그때 묶인 scope가 부모 profile과 다르면 부모 capability를 넘기지 않고 생성 전에 거절한다 |
+| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다. `profile_home` 경로는 `tools.delegate_tool_routes.delegated_profile_scope`가 옛 setter를 거쳐 `legacy_switch`로 scope를 옮겨 자식을 다른 profile의 scope 안에서 만들므로(두 함수도 지문을 둔다), 그때 묶인 scope가 부모 profile과 다르면 부모 capability를 넘기지 않고 생성 전에 거절한다 |
 | `agent.runtime_scope.bind_profile_scope` | 관리 owner가 profile 문맥을 묶는 진입점이다. home override, secret, terminal 정책을 한 변경으로 묶고 빠져나올 때 그 변경만 뺀다. 같은 profile을 다시 묶으면 묶인 scope를 그대로 쓴다 |
 | `hermes_scope` | scope 상태 하나가 context-local로 scope·home·secret·terminal 정책을 갖는다. `current_scope()`가 묶인 scope를 주고, local scope의 `scope.home()`이 그 profile home이다. token reset은 그 변경과 그 scope 안에서 한 변경을 함께 뺀다 |
 | `agent.secret_scope`·`tui_gateway.launch_profile_policy` | 묶기가 secret을 만드는 경로다. 실행 profile은 launch 값으로 stamp 없이, 다른 profile은 그 home의 파일로 만든다. 옛 setter(`set_secret_scope`, `set_hermes_home_override`)는 scope가 묶여 있으면 scope를 옮기거나 거절하므로 기대하지 않는다 |

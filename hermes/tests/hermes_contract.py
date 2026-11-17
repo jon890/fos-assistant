@@ -152,7 +152,7 @@ BODYLESS_REQUEST_FILES = (
 BODYLESS_SOURCE_LINE = ("0.23", "agent/runtime_scope.py")
 
 # 관리 bootstrap의 추가 의존이다. writer 설치 API와 다섯 파일 지문에 합치지 않는다.
-# 공식 고정 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
+# v0.23.2 공식 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
 # AST hash는 행 번호·공백·주석을 제외하고 함수 전체(시그니처·decorator·본문)를 제한한다.
 # 큰 함수도 선언한 함수만 검사한다. 상류 변경 때 이 계약과 private owner를 함께 검토한다.
 # profile 문맥은 `hermes_scope` 의 scope 상태 하나가 갖고, 묶는 진입점은 `bind_profile_scope` 다.
@@ -299,6 +299,19 @@ BODYLESS_MANAGED_FUNCTIONS = {
             'home: str | Path, *, hydrate_secrets: bool=True',
             'Iterator[Scope]',
             'aa43cac83b10fdacbb403e25c1566b818e0e88400b7561f903c7e31afcfb7af8'),
+        # 위임의 `profile_home` 경로가 옛 setter 로 scope 를 옮길 때 지나는 함수다.
+        'legacy_switch': (
+            ('home: str | Path | None, *, secrets: Optional[Mapping[str, str]]=None, env_overlay: '
+             'Optional[dict[str, str]]=None'),
+            'StateToken | None',
+            'a986ba0425fab53094dbcb56bb2e5631e14d719afb92fa1014e85f65056a829d'),
+    },
+    # `_build_child_agent` 가 자식을 다른 profile 의 scope 안에서 만드는 진입점이다.
+    'tools/delegate_tool_routes.py': {
+        'delegated_profile_scope': (
+            'home: Any',
+            'Iterator[None]',
+            'fa4ce2a0318de46a08a3eb5ad3296d01f0feb33643e07cf7e7c61612c7a779d5'),
     },
     'tui_gateway/launch_profile_policy.py': {
         'owner_secret_scope': (

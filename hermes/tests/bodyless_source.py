@@ -16,7 +16,12 @@ def bodyless_source() -> Path | None:
     if not configured:
         return None
     root = Path(configured)
-    return root if (root / contract.BODYLESS_SOURCE_LINE[1]).is_file() else None
+    if (root / contract.BODYLESS_SOURCE_LINE[1]).is_file():
+        return root
+    # 확인 스크립트가 준 경로가 없으면 건너뛰지 않고 실패하게 그 경로를 돌려준다.
+    if os.environ.get("HERMES_CONTRACT_REQUIRED") and not root.is_dir():
+        return root
+    return None
 
 
 SKIP_REASON = ("HERMES_SOURCE 가 없거나 v" + contract.BODYLESS_SOURCE_LINE[0]
