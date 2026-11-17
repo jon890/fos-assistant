@@ -992,10 +992,9 @@ class ToolGuardTest(GuardServerFixture):
         self.assertIsNone(self.call("terminal"))
 
     def test_missing_material_blocks_without_request(self):
-        """토큰이나 tool_call_id 가 없거나, 주소가 http(s) 가 아니면 묻지 않고 막는다."""
+        """토큰이 없거나 주소가 http(s) 가 아니면 묻지 않고 막는다."""
         cases = {
             "no token": lambda: setattr(self, "token", None),
-            "no tool_call_id": lambda: None,
             "bad url": lambda: os.environ.__setitem__("FOS_CTX_POLICY_URL", "file:///etc/passwd"),
         }
         for label, prepare in cases.items():
@@ -1003,12 +1002,37 @@ class ToolGuardTest(GuardServerFixture):
                 saved_url = os.environ["FOS_CTX_POLICY_URL"]
                 self.requests.clear()
                 prepare()
-                call_id = "" if label == "no tool_call_id" else VECTOR_CALL
-                self.assertEqual(self.call("terminal", call_id=call_id),
+                self.assertEqual(self.call("terminal"),
                                  {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
                 self.assertEqual(self.requests, [])
                 self.token = FAKE_MCP_CREDENTIAL
                 os.environ["FOS_CTX_POLICY_URL"] = saved_url
+
+    def test_code_execution_call_without_id_asks_with_generated_id(self):
+        """v0.23 의 코드 실행 안 호출(session 은 있고 tool_call_id 가 없음)은 만든 번호로 서명해 묻는다.
+
+        보통 대화에서는 Control Plane 이 allow 로 답해 통과하고, 사건 실행 트리에서는 block 으로 막힌다.
+        """
+        for call_id in ("", None):
+            with self.subTest(call_id=call_id):
+                self.requests.clear()
+                self.answer = (200, b'{"decision": "allow"}')
+                self.assertIsNone(self.call("read_file", call_id=call_id))
+                self.answer = (200, json.dumps({"decision": "block", "message": "사건 실행에서는 못 쓴다"}).encode())
+                self.assertEqual(self.call("read_file", call_id=call_id),
+                                 {"action": "block", "message": "사건 실행에서는 못 쓴다"})
+                self.assertEqual(len(self.requests), 2)
+                ids = [request["body"]["tool_call_id"] for request in self.requests]
+                self.assertNotEqual(ids[0], ids[1])
+                for request, generated in zip(self.requests, ids):
+                    self.assertRegex(generated, r"^code-exec:[0-9a-f]{32}$")
+                    self.assertEqual(request["body"]["sig"], self.plugin.sign_tool_guard(
+                        VECTOR_KEY, "read_file", VECTOR_ROOT, VECTOR_SESSION, generated))
+
+    def test_code_execution_call_without_session_still_passes(self):
+        """v0.21 의 코드 실행 안 호출(session 없음)은 지금처럼 묻지 않고 통과한다."""
+        self.assertIsNone(self.call("read_file", session="", call_id=""))
+        self.assertEqual(self.requests, [])
 
     def test_exceptions_inside_hook_block(self):
         """hook 안의 예외는 잡아 막는다. Hermes 의 dispatcher 바깥 예외는 판정 없이 나가기 때문이다."""
