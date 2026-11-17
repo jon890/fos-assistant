@@ -461,6 +461,44 @@ profile 플러그인이 `subagent_start` hook 에서 부른다. 모델 도구가
 플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 등록이 없는 하위 에이전트의 호출은 서버가 거절하므로 안전한 쪽으로 실패한다.
 플러그인과 서버 모두 토큰, `sig`, 본문을 로그에 남기지 않는다.
 
+##### 하위 에이전트 끝 소식 계약
+
+profile 플러그인이 `subagent_stop` hook 에서 부른다. 등록 때 `reports_stop` 을 `true` 로 보낸 플러그인만 보낸다. Control Plane 은 이 소식으로 부모 대화의 다음 답을 연다([ADR-20261117 / native-delegation-wake](../../../docs/adr/ADR-20261117-native-delegation-wake.md)).
+hook 은 결과 줄이 부모 session 에 남기 전에 불린다([`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 「하위 에이전트의 끝 hook 은 결과 줄보다 먼저 온다」).
+
+| 항목 | 값 |
+| --- | --- |
+| 경로 | `POST /internal/hermes/session-bindings/subagent/stop` |
+| 인증 | 등록과 같다 |
+| 본문 | JSON 객체. 아래 칸 |
+| 제한 시간 | 등록과 같다 |
+
+| 칸 | 값 |
+| --- | --- |
+| `v` | JSON 정수 `1` |
+| `parent_session_id`, `parent_root_session_id`, `child_session_id` | 등록과 같은 값 |
+| `child_status` | hook 이 받은 `child_status`. 없으면 `null`. `completed` 가 아니면 서버가 실패로 본다 |
+| `child_summary` | hook 이 받은 결과 글. 없으면 `null`. 서버가 위임 답과 같은 상한으로 자른다 |
+| `sig` | 서명할 글의 첫 줄이 `v1-subagent-stop` 인 것 말고 등록과 같은 서명. 상태와 결과 글은 서명하지 않는다 |
+
+| 항목 | 값 |
+| --- | --- |
+| 토큰 원문 | `test-mcp-token-0001` |
+| `parent_root_session_id`, `parent_session_id` | `fos-00000000-0000-4000-8000-000000000001` |
+| `child_session_id` | `하위-세션-1` |
+| 기대 `sig` | `d59b3af5d4d924b380684c14de9f3736bfb5f5a04ed18982404e2a3f2568ebd0` |
+
+| 응답 | 뜻 |
+| --- | --- |
+| `200` `{"result": "recorded"}` | 결과를 적었다 |
+| `200` `{"result": "ignored"}` | 깨울 자식이 아니거나 이미 적었다. 같은 소식을 다시 보낸 것도 여기다 |
+| `401` | 등록과 같다 |
+| `403` `{"code": "SESSION_BINDING_REJECTED"}` | 모양이나 서명이 틀렸거나, 서명한 루트가 등록 줄의 루트와 다르다. 부모가 다른 것은 받는다. 등록 뒤 부모 session 이 압축으로 바뀔 수 있어서다 |
+| `404` `{"code": "SESSION_BINDING_NOT_FOUND"}` | 그 자식의 등록 줄이 없다 |
+
+플러그인은 2xx 가 아니거나 연결하지 못하면 로그만 남기고 hook 을 돌려준다. 그 자식은 1시간 뒤 기한 알림으로 끝나고 결과는 Hermes 이력에 남는다.
+플러그인과 서버 모두 토큰, `sig`, 본문을 로그에 남기지 않는다.
+
 ##### 모든 토큰이 profile 에 묶여 있다
 
 등록과 origin 판정, [위임](../../docs/hermes-contract.md#취소가-아래로-내려가지-않는다) 의 「취소가 아래로 내려가지 않는다」 가 적은 취소 차단은 토큰이 profile 을 증명하는 것을 전제로 한다.

@@ -196,6 +196,8 @@ public enum ErrorCode {
     TOOL_GUARD_REJECTED(HttpStatus.FORBIDDEN),
     /** 그 하위 에이전트 session 이 다른 origin 실행으로 이미 등록돼 있다. 덮어쓰지 않는다. */
     SESSION_BINDING_CONFLICT(HttpStatus.CONFLICT),
+    /** 끝 소식을 보낸 하위 에이전트 session 의 등록이 없다. 플러그인은 로그만 남긴다(ADR-20261117 / native-delegation-wake). */
+    SESSION_BINDING_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 에이전트의 지금 버전 디렉터리에 그 이름의 올린 스킬이 없다. */
     SKILL_NOT_FOUND(HttpStatus.NOT_FOUND),
     /**

@@ -110,6 +110,7 @@ public class NextTurnDispatcher {
     }
 
 
+    /** 위임이 끝났으면 다음 turn 을 정한다. 실행 번호가 빈 사건(Hermes 내장 위임의 끝)도 대화 번호만 보고 같게 다룬다. */
     @EventListener
     public void onDelegationFinished(DelegationFinished event) {
         if (event.conversationId() != null) {

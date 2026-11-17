@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -172,6 +173,56 @@ class SubagentSessionEndpointTest {
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(201);
         assertThat(wakeEligible(PROFILE_A, child)).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("깨울 자식의 끝 소식은 200 recorded 이고 결과를 봉해 적으며 다시 보내면 ignored 이고 바뀌지 않는다")
+    void stopOfWakeEligibleChildIsRecordedOnce() throws Exception {
+        String turnRoot = McpCallSigner.newRoot();
+        conversationTurn(turnRoot);
+        String child = registerReporting(turnRoot);
+
+        HttpResponse<String> first = stop(McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, child, "completed", "목록을 정리했다"));
+        Map<String, Object> afterFirst = resultRow(child);
+        HttpResponse<String> again = stop(McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, child, "failed", "다른 글"));
+
+        assertThat(first.statusCode()).as("응답: %s", first.body()).isEqualTo(200);
+        assertThat(json.readTree(first.body())).isEqualTo(json.readTree("{\"result\":\"recorded\"}"));
+        assertThat(afterFirst.get("RESULT_STATUS")).isEqualTo("SUCCEEDED");
+        assertThat(afterFirst.get("STOPPED_AT")).isNotNull();
+        assertThat(afterFirst.get("RESULT_KEY_ID")).as("봉한 key").isNotNull();
+        assertThat((String)afterFirst.get("RESULT_TEXT")).as("암호문").isNotEqualTo("목록을 정리했다");
+        assertThat(again.statusCode()).isEqualTo(200);
+        assertThat(json.readTree(again.body())).isEqualTo(json.readTree("{\"result\":\"ignored\"}"));
+        assertThat(resultRow(child)).isEqualTo(afterFirst);
+    }
+
+
+    @Test
+    @DisplayName("깨울 자식이 아니면 ignored, 등록이 없으면 404, 토큰이 없으면 401, 루트가 다르면 403 이다")
+    void stopOfNonEligibleMissingUnauthenticatedOrOtherRoot() throws Exception {
+        String turnRoot = McpCallSigner.newRoot();
+        conversationTurn(turnRoot);
+        String plain = newChild();
+        register(tokenA, McpCallSigner.subagentBody(tokenA, turnRoot, turnRoot, plain).toString());
+        String reporting = registerReporting(turnRoot);
+        String otherRoot = McpCallSigner.newRoot();
+
+        HttpResponse<String> ignored = stop(McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, plain, "completed", "글"));
+        HttpResponse<String> missing = stop(McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, newChild(), "completed", "글"));
+        HttpResponse<String> anonymous = send(
+            PATH + "/stop", null, McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, reporting, "completed", "글").toString(), false);
+        HttpResponse<String> wrongRoot = stop(McpCallSigner.subagentStopBody(tokenA, otherRoot, turnRoot, reporting, "completed", "글"));
+
+        assertThat(json.readTree(ignored.body())).isEqualTo(json.readTree("{\"result\":\"ignored\"}"));
+        assertThat(resultRow(plain).get("STOPPED_AT")).as("깨울 자식이 아닌 줄은 적지 않는다").isNull();
+        assertThat(missing.statusCode()).isEqualTo(404);
+        assertThat(json.readTree(missing.body()).path("code").asString()).isEqualTo("SESSION_BINDING_NOT_FOUND");
+        assertThat(anonymous.statusCode()).isEqualTo(401);
+        assertThat(wrongRoot.statusCode()).isEqualTo(403);
+        assertThat(json.readTree(wrongRoot.body()).path("code").asString()).isEqualTo("SESSION_BINDING_REJECTED");
+        assertThat(resultRow(reporting).get("STOPPED_AT")).isNull();
     }
 
 
@@ -381,6 +432,31 @@ class SubagentSessionEndpointTest {
             Long.class,
             profileName,
             sessionId);
+    }
+
+
+    /** 끝 소식을 보낸다고 밝혀 그 루트의 최상위 자식을 등록한다. */
+    private String registerReporting(String turnRoot) throws Exception {
+        String child = newChild();
+        ObjectNode body = McpCallSigner.subagentBody(tokenA, turnRoot, turnRoot, child);
+        body.put("reports_stop", true);
+        body.put("child_goal", "장보기 목록 정리");
+        assertThat(register(tokenA, body.toString()).statusCode()).isEqualTo(201);
+        return child;
+    }
+
+
+    private HttpResponse<String> stop(ObjectNode body) throws Exception {
+        return send(PATH + "/stop", tokenA, body.toString(), false);
+    }
+
+
+    private Map<String, Object> resultRow(String child) {
+        return jdbc.queryForMap(
+            "SELECT stopped_at, result_status, result_text, result_key_id, result_delivered_at FROM hermes_session_binding"
+                + " WHERE profile_name = ? AND session_id = ?",
+            PROFILE_A,
+            child);
     }
 
 

@@ -35,6 +35,7 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
     private static final Set<String> AGENT_TOKEN_PATHS = Set.of(
         "/mcp",
         "/internal/hermes/session-bindings/subagent",
+        "/internal/hermes/session-bindings/subagent/stop",
         "/internal/hermes/connector-policy",
         "/internal/hermes/connector-handoff",
         "/internal/hermes/tool-guard",
