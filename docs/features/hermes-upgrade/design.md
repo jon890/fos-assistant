@@ -12,13 +12,13 @@
 | REQ4 | 사건 파서(`HermesRunEventStream`)가 `tool_call_id` 를 무시하고, `tool.completed` 의 `duration` 0 을 걸린 시간 없음(`null`)으로 읽는다. `run.queued` 는 아는 사건 목록 밖이라 지금처럼 버린다. 오지 않는 사건은 고칠 것이 없다(DECISION2) |
 | REQ5 | fos-ctx `pre_tool_call` 이 `terminal` 의 위험 명령(`detect_dangerous_command`), 승인이 필요한 파일 쓰기(`write_approval_key`), `computer_use` 호출을 막는다 |
 | REQ6 | fos-ctx `tool_guard` 가 `session_id` 는 있고 `tool_call_id` 가 없는 호출에 판정 요청용 번호를 만들어 Control Plane 에 묻는다 |
-| REQ7 | `hermes_contract.py` 의 선언을 버전별 기대값으로 나누고, 테스트가 소스의 `pyproject.toml` 버전 계열(major.minor)로 기대값을 고른다. 본문 없는 요청 진단 두 묶음은 지원 commit 목록 밖이면 건너뛴다 |
+| REQ7 | `hermes_contract.py` 의 선언을 버전별 기대값으로 나누고, 테스트가 소스의 `pyproject.toml` 버전 계열(major.minor)로 기대값을 고른다. 본문 없는 요청 진단 두 묶음은 PR4 의 표지 파일로 v0.23 계열에서만 돈다 |
 | REQ8 | 대시보드 plugin 코드는 바꾸지 않는다. 계약의 지점 선언이 두 버전의 annotation 표기와 의존성 경고 함수 이름을 함께 받는다 |
 | REQ9 | PR1 이 ADR-061 과 계약 문서의 Runs 절을, PR2 가 [ADR-20261008 / execute-code-unattended](../../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md) 와 승인 절을, PR3 이 버전 기준 절을 고친다 |
 | REQ10 | 코드 변경 없음. 스펙의 「적용 조건」 을 `fos-home-infra` 가 쓴다 |
 | REQ11 | 코드 변경 없음. 스펙의 「배포 뒤 왕복 확인」 을 코디네이터가 운영에서 본다 |
 | REQ12 | 코드 변경 없음. `check-hermes-contract.sh <tag>` 를 그대로 쓴다 |
-| REQ13 | PR4 의 설계에서 정한다. 아래 「PR4」 절이 범위만 적는다 |
+| REQ13 | 관리 bootstrap 의 내부 경계를 `hermes_scope` 의 scope 상태와 `bind_profile_scope` 로 다시 선언한다. 아래 「PR4」 절 |
 
 ## 책임과 경계
 
@@ -152,7 +152,7 @@ v0.23.2 에서 고칠 것은 이렇다.
 | 공유 wire 와 스트림 handler 의 분리 실행 | 테스트 쪽 대역이 새 helper(`_call_id`, `_check_run_auth`)를 함께 넘긴다 |
 | 새 내장 도구 | 도구 목록에 `browser_vault`, `set_theme`, `setup_beat` 를 안전 목록 밖으로 더한다(스펙 DECISION13) |
 | 코드 실행 안 호출의 session | v0.23.2 기대값을 「`session_id` 가 있고 `tool_call_id` 가 없다」 로 둔다 |
-| 본문 없는 요청 진단 | `BODYLESS_SUPPORTED_LINES` 밖의 계열이면 두 묶음을 건너뛴다. PR4 가 `0.23` 을 더한다 |
+| 본문 없는 요청 진단 | PR4 가 선언을 v0.23 계열로 바꾸고 `BODYLESS_SOURCE_LINE` 의 표지가 없는 소스에서는 건너뛴다. PR2 는 따로 건너뛰기를 두지 않는다 |
 | 끝난 실행의 사건 보관분 | 새 기대: 끝난 run 에 처음 연결하면 보관분을 보내고 닫는다(`_handle_run_events`). 어댑터의 다시 읽기가 이 동작에 기댄다. 스트림 계약 테스트가 이 장면을 두 버전에서 돌린다. 대역은 v0.23.2 의 인증 함수 `_check_run_auth` 도 넘긴다 |
 | 승인 관문을 부르는 함수 | 새 계약 `APPROVAL_GUARD`: `_run_approval_gate` 를 부르는 함수 목록이 선언한 넷(plugin 승인, 승인 파일 쓰기, `computer_use`, 운영 경로 밖의 `check_dangerous_command`)과 같은지 본다. 운영의 `terminal` 은 `check_all_command_guards` 가 스스로 정하고 기존 `UNATTENDED_APPROVAL` 이 그 경로를 고정한다. 늘면 fos-ctx 가 그 동작을 막는지 보고 선언을 고친다. `detect_dangerous_command` 의 위치와 시그니처, v0.23.2 의 `APPROVAL_WRITE_POINTS` 셋도 같은 테스트가 본다 |
 
@@ -187,8 +187,39 @@ E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도
 
 ## PR4
 
-본문 없는 요청 진단의 경계 재설계는 PR4 를 시작할 때 이 문서의 이 절을 고쳐 정한다. 정할 것은 관리 bootstrap 이 profile 문맥을 묶는 진입점(`agent.runtime_scope.bind_profile_scope` 또는 `hermes_scope.push_state`), writer 가 현재 profile 을 확인하는 방법, 새로 지문을 둘 함수 목록이다.
-호환 PR(PR1, PR2)과 공유하는 코드가 없어 지금 정하지 않아도 그 PR 들의 설계가 바뀌지 않는다.
+REQ13 을 맡는다. addon 은 운영에 연결하지 않았으므로 v0.23 계열 소스에서만 맞춘다(스펙 「범위」).
+v0.23.2 소스(commit `ae2a81cc`)와 v0.21.6 소스를 대조해 정했다.
+
+### 바뀐 upstream 경계
+
+| 지점 | v0.21.6 | v0.23.2 |
+| --- | --- | --- |
+| profile 문맥 저장 | `agent/secret_scope.py` 와 `hermes_constants.py` 가 각자의 `ContextVar` 를 가진다 | `hermes_scope._STATE` 하나가 scope, home override, secret, terminal 정책을 한 값(`ScopeState`)으로 가진다. `current_secret_scope_home` 과 `get_hermes_home_override` 는 그 값을 읽기만 한다 |
+| 묶기 | `set_secret_scope` 와 `set_hermes_home_override` 를 따로 부른다 | `agent.runtime_scope.bind_profile_scope(home)` 이 셋을 한 변경으로 묶는다. 옛 setter 는 scope 가 묶여 있으면 그 profile 로 scope 전체를 옮기거나(local) 거절한다 |
+| 되돌리기 | `ContextVar.reset(token)` | `StateToken.reset()` 이 그 변경만 빼고 뒤 변경을 다시 쌓는다. 빠진 scope 안에서 한 변경은 함께 빠져, 순서가 어긋난 reset 도 두 profile 의 조각이 섞인 상태를 남기지 않는다 |
+| cron child | payload 를 바로 읽는다 | `__main__` 이 payload 를 읽기 전에 `finish_worker_boot()` 로 `hermes_bootstrap` 을 부른다. 끝나지 않은 source update 가 있으면 다른 interpreter 로 `execv` 한다 |
+| 위임 | 자식은 부모 profile 에서 만든다 | `_build_child_agent` 의 `profile_home` 경로가 자식을 다른 profile 의 scope 안에서 만들 수 있다 |
+
+writer 설치 경계(helper 시그니처와 code, lazy forward, 세 호출부, 다섯 파일 지문)는 v0.23.2 에서도 그대로다. 호출부의 분리 실행만 새 helper(`build_request_payload`)를 함께 실행하게 고친다.
+
+### 정한 것
+
+- **묶는 진입점은 `bind_profile_scope` 다.** Hermes 가 다른 profile 의 상태가 필요할 때 쓰라고 정한 진입점이고 home, secret, terminal 정책을 한 변경으로 묶어 갈라지지 않는다. `push_state` 를 직접 부르면 terminal 정책이 빠지고 `ScopeState` 칸 이름에 묶인다.
+- **resolver 는 `hermes_scope.current_scope()` 로 현재 profile 을 확인한다.** 묶인 scope 가 local 이고 `scope.home()` 이 등록된 agent 의 profile home 과 같을 때만 목적지를 준다. 그 밖(scope 없음, 다른 profile, hosted scope)은 `None` 이고 writer 는 아무것도 쓰지 않는다. secret 의 stamp(`current_secret_scope_home`)는 실행 profile 을 묶을 때 비어 있어(`stamp_home=False`) 확인에 쓰지 않는다.
+- **지문을 둘 함수는 `BODYLESS_MANAGED_FUNCTIONS` 가 갖는다.** 묶기 경로(`bind_profile_scope`, `scope_for_profile`, `_bind_whole_profile`, `bind_state`, `owner_secret_scope`, `launch_secret_scope`, `_is_process_home`), scope 상태(`current_state`, `current_scope`, `push_state`, `pop_state`, `_fold`), 위임의 profile 경로(`delegated_profile_scope`, `legacy_switch`), 기존 lifecycle 과 cron 함수, 새 `finish_worker_boot` 다. scope 상태의 저장소와 값 타입은 `BODYLESS_MANAGED_MODULE_NODES` 에 둔다. 옛 setter 는 선언에서 뺀다.
+- **위임 자식의 capability 규칙은 그대로다.** 자식을 만들 때 묶인 scope 가 부모 profile 과 다르면 부모 capability 를 넘기지 않고 생성 전에 거절한다. 그래서 관리 interpreter 에서는 owner 가 그 profile 의 바인딩을 갖기 전까지 profile 경로 위임이 막힌다. 운영에 연결하지 않아 지금 영향은 없다.
+- **cron relaunch 는 private 활성화 수락 조건으로 넘긴다.** relaunch 된 interpreter 는 관리 bootstrap 을 거치지 않을 수 있다. 이미지에 끝나지 않은 source update 가 없어 relaunch 가 일어나지 않는지는 `fos-home-infra` 의 활성화 수락에서 본다.
+- **계약 테스트는 표지 파일로 계열을 고른다.** `BODYLESS_SOURCE_LINE` 의 표지(`agent/runtime_scope.py`)가 없는 소스(v0.21.6)에서는 세 source 묶음을 건너뛴다. 기준 버전을 올리는 PR3 이 표지 검사를 지운다. PR2 의 계열 선택이 먼저 들어오면 그 표지로 바꾼다.
+- 공개 addon 코드(`hermes/runtime/`)와 설치 API 는 바꾸지 않는다.
+
+### 검증
+
+| 대상 | 방법 |
+| --- | --- |
+| 선언한 지점 | `check-hermes-contract.sh` 의 세 본문 없는 묶음을 v0.23.2 소스로 돌린다. v0.21.6 에서는 건너뛰고 0 으로 끝난다 |
+| profile 문맥 | 실제 `hermes_scope.py` 와 `agent/runtime_scope.py` 를 실행한다. 복사 문맥과 중첩 묶기에서 profile 마다 home, secret, terminal 정책이 섞이지 않고 빠져나오면 이전 문맥이 돌아오는지, 순서가 어긋난 token reset 이 섞인 상태를 남기지 않는지 본다. secret 파일 읽기와 terminal 정책 만들기는 대역이다 |
+| writer 거절 | 위 resolver 꼴과 실제 writer 로 다른 profile 의 scope, scope 없음, 등록되지 않은 agent 에서 파일이 생기지 않는지 본다 |
+| 반례 | 전역 home 대체, 진입점의 키워드 전용 인자 변경, decorator 추가, 저장소 재대입을 선언이 거절하는지 본다 |
 
 ## 결정
 

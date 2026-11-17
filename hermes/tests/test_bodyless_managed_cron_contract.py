@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import hermes_contract as contract
+from bodyless_source import SKIP_REASON, bodyless_source
 from test_bodyless_managed_contract import check_function, definition
 
 
@@ -68,9 +69,7 @@ def check_job_binding(tree: ast.Module):
     assert len(bindings) == 1 and isinstance(bindings[0], ast.FunctionDef), "cron job의 module binding 변경"
 
 
-@unittest.skipUnless(os.environ.get("HERMES_SOURCE"), "HERMES_SOURCE가 없어 cron source 검사를 건너뛴다")
-@unittest.skipUnless(contract.bodyless_supported(os.environ.get("HERMES_SOURCE")),
-                     "본문 없는 요청 진단은 이 Hermes 계열을 아직 지원하지 않는다(BODYLESS_SUPPORTED_LINES, 스펙 hermes-upgrade REQ13)")
+@unittest.skipUnless(bodyless_source(), SKIP_REASON)
 class ManagedCronSourceTest(unittest.TestCase):
     def tree(self):
         return ast.parse((Path(os.environ["HERMES_SOURCE"]) / "cron/scheduler.py").read_bytes())

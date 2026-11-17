@@ -182,3 +182,4 @@ scripts/checks/check-hermes-contract.sh <tag 또는 디렉터리>
 ```
 
 소스는 import 하지 않고 구문만 읽으므로 Hermes 의 의존성이 필요 없다. 실패한 항목이 Hermes 를 올리면 깨질 곳이다.
+본문 없는 요청 진단의 세 묶음은 `BODYLESS_SOURCE_LINE` 의 표지 파일이 있는 v0.23 계열 소스에서만 돌고, 기준 버전 v0.21.6 검사에서는 건너뛴다.

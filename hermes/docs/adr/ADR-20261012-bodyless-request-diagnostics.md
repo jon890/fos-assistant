@@ -15,6 +15,12 @@
 - **조건이 생기면**: 그 설정을 운영 profile 에 적용하고, 이 ADR 의 상태를 갱신하고, `hermes/runtime/bodyless_*` 를 지울지 정한다.
 - 이 보류 상태에서 운영 보호가 설치됐다고 보고하지 않는다. 아래 설계와 계약 테스트는 addon 이 준비된 상태로 그대로 둔다.
 
+### v0.23 scope 경계로 다시 선언 (2026-11-17)
+
+- **결정**: Hermes v0.23 에서 profile 문맥이 `hermes_scope` 의 scope 상태 하나로 합쳐졌다. 관리 owner 가 기대는 내부 경계를 `agent.runtime_scope.bind_profile_scope`(묶기)와 `hermes_scope.current_scope()`(확인)로 다시 선언하고, 옛 setter(`set_secret_scope`, `set_hermes_home_override`)는 기대하지 않는다(사용자 2026-11-17, Hermes 업그레이드 스펙 REQ13).
+- **까닭**: 옛 setter 는 scope 가 묶여 있으면 그 profile 로 scope 전체를 옮기거나 거절해, 따로 묶고 되돌린다는 기존 계약이 성립하지 않는다.
+- 공개 설치 API, writer 인자, 다섯 파일 지문은 그대로다. 운영 연결 보류도 그대로다. 근거와 검증은 [Hermes 업그레이드 설계](../../../docs/features/hermes-upgrade/design.md)의 「PR4」 와 [본문 없는 요청 진단](../hermes-contract.md#관리-bootstrap의-추가-내부-의존)이 갖는다.
+
 ### 맥락
 
 고정 Hermes의 preflight와 두 terminal 오류 경로는 요청 전체를 dump한다.
