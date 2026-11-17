@@ -216,14 +216,34 @@ export const BUY_VISIBLE = `(() => { try { ${ON_STORE} ${HELPERS} return byLabel
 /** 상품 구매 층이 떴는가(보이는 「바로구매」 단추가 있는가). 누르지 않는다. */
 export const LAYER_OPEN = `(() => { try { ${HELPERS} return byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}) !== null; } catch { return false; } })()`;
 
-/** 층의 「바로구매」 를 누른다. 이 뒤로는 주문서가 열렸을 수 있다. */
-export const PRESS_BUY_NOW = `(() => { try { ${ON_STORE} ${HELPERS} const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}); if (!b) return false; b.click(); return true; } catch { return false; } })()`;
+/** 단추가 막혀 있는가(`disabled` 나 `aria-disabled="true"`). */
+const BLOCKED = `(e) => e.disabled === true || e.getAttribute("aria-disabled") === "true"`;
+
+/** 층의 「바로구매」 가 보이고 막혀 있지 않은가. 누르지 않는다. 옵션을 고르기 전에는 막혀 있다(2026-11-17 실측). */
+export const BUY_NOW_ENABLED = `(() => { try { ${ON_STORE} ${HELPERS} const blocked = ${BLOCKED}; const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}); return b !== null && !blocked(b); } catch { return false; } })()`;
+
+/** 층의 「바로구매」 를 누른다. 막혀 있으면 누르지 않는다. 이 뒤로는 주문서가 열렸을 수 있다. */
+export const PRESS_BUY_NOW = `(() => { try { ${ON_STORE} ${HELPERS} const blocked = ${BLOCKED}; const b = byLabel(${JSON.stringify(PURCHASE_LAYER.buyNowLabel)}); if (!b || blocked(b)) return false; b.click(); return true; } catch { return false; } })()`;
 
 /**
  * 주문서의 최종 결제 금액을 두 자리에서 읽는다(2026-11-13 실측). 주문서 주소가 아니면 `null` 이다.
  * 글에서 첫 금액 숫자만 정수로 바꿔 `{total, summary}` 로 준다. 이름, 주소, 전화번호 같은 화면 글은 돌려주지 않는다.
  */
 export const ORDER_SHEET_AMOUNT = `(() => { try { if (location.hostname !== ${JSON.stringify(ORDER_SHEET.host)} || !location.pathname.startsWith(${JSON.stringify(ORDER_SHEET.pathPrefix)})) return null; const amount = (selector) => { const e = document.querySelector(selector); const m = /[0-9][0-9,]*/.exec(e?.textContent ?? ""); if (!m) return null; const n = Number(m[0].replace(/,/g, "")); return Number.isSafeInteger(n) ? n : null; }; return { total: amount(${JSON.stringify(ORDER_SHEET.total)}), summary: amount(${JSON.stringify(ORDER_SHEET.methodSummary)}) }; } catch { return null; } })()`;
+
+/**
+ * 층의 옵션 꼴. 층 안의 보이는 옵션 묶음(`radioGroup`) 수와 드롭다운 단추(`optionButton`) 수를 준다. 누르지 않는다.
+ * 묶음은 「바로구매」 가 든 층을 찾았을 때만 센다. 상품 화면에 같은 꼴의 칩이 있어도 층 밖의 것을 고르지 않게 하려는 것이다.
+ */
+export const LAYER_OPTION_FORM = `(() => { try { ${ON_STORE} ${HELPERS} const scope = layerScope(); const count = (selector) => [...scope.querySelectorAll(selector)].filter(visible).length; return { radios: scope === document ? 0 : count(${JSON.stringify(PURCHASE_LAYER.radioGroup)}), lists: count(${JSON.stringify(PURCHASE_LAYER.optionButton)}) }; } catch { return null; } })()`;
+
+/**
+ * 층 안의 `index` 번째 옵션 묶음에서 값이 `label` 과 정확히 같은 칩 하나를 본다. 칩의 값은 글(빈칸을 하나로 줄인 것)이고,
+ * 글이 없으면 안의 `img` 의 `alt` 에서 끝의 `true`·`false` 를 뗀 것이다(2026-11-17 실측 「블랙false」. 그 뜻은 재지 않았다).
+ * 이미 골라져 있으면(`aria-checked="true"`) `checked`, 아니면 `press` 가 참일 때만 눌러 `pressed`, 거짓이면 `unchecked` 를 준다.
+ * 같은 값이 없거나 묶음이나 층이 없으면 `missing`, 둘 이상이면 `ambiguous`, 막혀 있으면 `disabled` 이고 누르지 않는다.
+ */
+export const CHOOSE_LAYER_RADIO = `function (index, label, press) { try { ${ON_STORE} ${HELPERS} const blocked = ${BLOCKED}; const scope = layerScope(); if (scope === document) return "missing"; const group = [...scope.querySelectorAll(${JSON.stringify(PURCHASE_LAYER.radioGroup)})].filter(visible)[index]; if (!group) return "missing"; const norm = (s) => (s ?? "").replace(/\\s+/g, " ").trim(); const name = (e) => { const text = norm(e.textContent); if (text) return text; const img = e.querySelector(${JSON.stringify(PURCHASE_LAYER.radioImage)}); return norm(norm(img?.getAttribute("alt")).replace(/(true|false)$/, "")); }; const hits = [...group.querySelectorAll(${JSON.stringify(PURCHASE_LAYER.radio)})].filter(visible).filter((e) => name(e) === label); if (hits.length === 0) return "missing"; if (hits.length > 1) return "ambiguous"; const chip = hits[0]; if (chip.getAttribute("aria-checked") === "true") return "checked"; if (blocked(chip)) return "disabled"; if (press !== true) return "unchecked"; chip.click(); return "pressed"; } catch { return "missing"; } }`;
 
 /** 층 안의 `index` 번째 옵션 드롭다운을 연다. 열면 참이다. */
 export const OPEN_LAYER_OPTION = `function (index) { try { ${ON_STORE} ${HELPERS} const b = [...layerScope().querySelectorAll(${JSON.stringify(PURCHASE_LAYER.optionButton)})].filter(visible)[index]; if (!b) return false; b.click(); return true; } catch { return false; } }`;
@@ -246,12 +266,15 @@ export const FILL_EXPRESSIONS = new Set([
   BUY_VISIBLE,
   PRESS_BUY,
   LAYER_OPEN,
+  LAYER_OPTION_FORM,
+  BUY_NOW_ENABLED,
   PRESS_BUY_NOW,
   ORDER_SHEET_AMOUNT,
 ]);
 
 /** 채우기만 부르는 함수 선언. `Runtime.callFunctionOn` 에 이 글 그대로 싣는다. */
 export const FILL_FUNCTIONS = new Set([
+  CHOOSE_LAYER_RADIO,
   OPEN_LAYER_OPTION,
   CHOOSE_OPTION,
   SET_QUANTITY,
@@ -275,6 +298,7 @@ export const CLICKING = new Set([
   OPEN_OPTION_LISTS,
   PRESS_BUY,
   PRESS_BUY_NOW,
+  CHOOSE_LAYER_RADIO,
   OPEN_LAYER_OPTION,
   CHOOSE_OPTION,
 ]);

@@ -10,6 +10,8 @@ export type TabOptions = {
   pollMs?: number;
   /** 옵션 드롭다운을 연 뒤 옵션이 실리기를 기다리는 시간. */
   optionWaitMs?: number;
+  /** 새 탭 대신 붙을, 앞서 사람에게 넘기며 남긴 탭이다. 승인한 채우기를 이어 갈 때만 준다. 없으면 `NAVER_SHOPPING_TAB_GONE` 이다. */
+  tab?: string;
 };
 
 const DEFAULT_TIMEOUT_MS = 45_000;
@@ -138,6 +140,7 @@ export async function waitReady(page: Page, pollMs: number) {
  * 그 밖의 결과는 성공이든 실패든 그 탭을 닫는다. `work` 가 `page.keep()` 을 불렀으면 정상으로 끝나도 남긴다.
  * 다른 탭은 읽지 않고, 앞서 사람에게 넘기며 남긴 탭만 먼저 닫는다.
  * 남긴 탭은 결과의 `handoff` 칸에 싣는다. 전체 제한 시간을 넘긴 실패는 탭을 닫고 일시 장애다.
+ * `options.tab` 을 주면 빈 탭 대신 그 남긴 탭에 붙어 같은 순서로 돈다. 승인한 채우기를 이어 갈 때다. 탭의 규칙은 새 탭과 같다.
  */
 export async function workInTab<T>(
   cdpUrl: string,
@@ -152,14 +155,18 @@ export async function workInTab<T>(
     return left;
   };
   const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
+  // 이어 갈 탭은 앞서 남긴 탭이지만 닫지 않는다. 그 밖의 남긴 탭만 닫는다.
+  if (options.tab) leftTabs.delete(options.tab);
   await closeLeftTabs(cdpUrl);
-  const target = (await httpJson(cdpUrl, "/json/new?about:blank", {
-    method: "PUT",
-    timeoutMs: remaining(),
-  })) as {
-    id?: unknown;
-    webSocketDebuggerUrl?: unknown;
-  } | null;
+  const target = options.tab
+    ? await keptTab(cdpUrl, options.tab, remaining())
+    : ((await httpJson(cdpUrl, "/json/new?about:blank", {
+        method: "PUT",
+        timeoutMs: remaining(),
+      })) as {
+        id?: unknown;
+        webSocketDebuggerUrl?: unknown;
+      } | null);
   const targetId = typeof target?.id === "string" ? target.id : "";
   if (!targetId || typeof target?.webSocketDebuggerUrl !== "string")
     throw new ToolError("NAVER_SHOPPING_BROWSER_UNREACHABLE");
@@ -195,6 +202,12 @@ export async function workInTab<T>(
     return await work(page);
   } catch (error) {
     if (handedOff) throw error;
+    // `work` 가 이 탭을 사람에게 넘겼다(채우기의 로그인 확인). 그 탭을 남긴다
+    if (error instanceof ToolError && error.handoff?.tab === targetId) {
+      handedOff = true;
+      leftTabs.add(targetId);
+      throw error;
+    }
     // 사람이 브라우저를 넘겨받아 중계가 닫았다. 그 탭은 사람의 것이라 닫지 않고 남긴다(닫기도 거절된다)
     if (error instanceof ToolError && error.handoff?.need === "human_browser") {
       handedOff = true;
@@ -227,6 +240,15 @@ export async function workInTab<T>(
         `/json/close/${encodeURIComponent(targetId)}`,
       ).catch(() => {});
   }
+}
+
+/** 앞서 남긴 탭을 목록에서 찾는다. 사람이 닫았거나 브라우저가 다시 켜져 없으면 `NAVER_SHOPPING_TAB_GONE` 이다. */
+async function keptTab(cdpUrl: string, id: string, timeoutMs: number) {
+  const found = (await listTabs(cdpUrl, timeoutMs)).find(
+    (tab) => tab.id === id,
+  );
+  if (!found) throw new ToolError("NAVER_SHOPPING_TAB_GONE");
+  return found;
 }
 
 /**

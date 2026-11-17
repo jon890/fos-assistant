@@ -29,7 +29,8 @@ public class ConnectorBrowserWaitDemand implements BrowserWaitDemand {
 
     @Override
     public boolean waiting(long userId, Instant since) {
-        if (actions.existsOpenHandoffSince(userId, since)) {
+        if (actions.existsOpenHandoffSince(userId, since)
+            || actions.existsWaitingSince(userId, since, clock.instant(), ActionStatus.WAITING)) {
             return true;
         }
         return actions.findUnexpiredConnectorIdsByStatus(userId, ActionStatus.PENDING, clock.instant()).stream()

@@ -127,6 +127,7 @@ test("끝까지 가면 단계마다 한 줄을 남기고 done 으로 끝난다",
   expect(stages()).toEqual([
     ["approval"],
     ["tab"],
+    ["login"],
     ["price"],
     ["buy_ready"],
     ["claim"],
@@ -213,6 +214,13 @@ for (const [name, config, args, approvalArgs, expected] of [
     },
     OPTION_ARGS,
     OPTION_ARGS,
+    ["layer.failed", "naver_shopping_checkout_failed"],
+  ],
+  [
+    "옵션을 고른 뒤에도 바로구매가 막혀 있음",
+    { product: PLAIN_PRODUCT, buyNowDisabled: true },
+    PLAIN_ARGS,
+    PLAIN_ARGS,
     ["layer.failed", "naver_shopping_checkout_failed"],
   ],
   [

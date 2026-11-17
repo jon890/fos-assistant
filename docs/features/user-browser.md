@@ -237,7 +237,7 @@ Control Plane 은 브라우저의 CDP 에 컨테이너 IP 로 닿고 `Origin` �
 5. 사람이 브라우저를 쥐고 있으면 브라우저를 켜지 않고 423 이다(WebSocket 은 아래)
 6. 주인의 브라우저가 없으면 만들고 꺼져 있으면 켠다. 다른 전이가 진행 중이면 `start-timeout` 까지 다시 본다
 7. 동시 수가 찼으면 503, 켜지 못했으면 502, 기다려도 `RUNNING` 이 되지 않으면 503 이다
-8. 활동을 기록하고 Chrome 에 넘긴다. Chrome 이 닿지 않거나 200 이 아닌 답을 주면 502 다
+8. 활동을 기록하고 Chrome 에 넘긴다. Chrome 이 닿지 않거나 200 이 아닌 답을 주면 502 다. 단 `json/close/<탭>` 은 그 탭을 가리키는 열린 넘기기 카드나 살아 있는 이어 가기 표식이 있으면 넘기지 않고 409 다(판정하지 못해도 409). 사람이 풀고 있는 탭을 다른 호출이 닫지 않게 한다([browser-cowork 설계](browser-cowork/design.md) 「PR4 열린 넘기기의 탭 지키기」)
 
 오류 응답의 본문은 비운다. 플러그인은 상태 코드만 본다.
 Chrome 에는 `BrowserRuntime#cdpAddress` 가 준 IP 주소로 `Origin` 없이 보낸다. `Host` 가 IP 라 Chrome 의 `Host` 검사를 지난다.

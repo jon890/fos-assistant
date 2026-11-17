@@ -66,6 +66,16 @@ public final class McpDtos {
         }
     }
 
+    /** 이어 가기는 인자가 없다. 모르는 키는 거절한다. */
+    public record ApprovalResumeArguments() {
+        static ApprovalResumeArguments from(JsonNode node) {
+            if (node == null || !node.isObject() || !node.propertyNames().isEmpty()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid approval resume arguments");
+            }
+            return new ApprovalResumeArguments();
+        }
+    }
+
     /** 인자가 없다. 모르는 키는 거절한다. */
     public record OrderLimitReadArguments() {
         static OrderLimitReadArguments from(JsonNode node) {

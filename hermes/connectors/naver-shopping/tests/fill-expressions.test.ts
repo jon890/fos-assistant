@@ -1,9 +1,12 @@
 import { expect, test } from "bun:test";
 import {
+  BUY_NOW_ENABLED,
+  CHOOSE_LAYER_RADIO,
   CHOOSE_OPTION,
   EXPRESSIONS,
   FILL_FUNCTIONS,
   LAYER_OPEN,
+  LAYER_OPTION_FORM,
   OPEN_LAYER_OPTION,
   OPEN_OPTION_LISTS,
   ORDER_SHEET_AMOUNT,
@@ -32,6 +35,12 @@ type El = {
   id?: string;
   /** 부모 요소. `parentElement` 로 올라간다. */
   parent?: El;
+  /** 그 밖의 속성(`alt`, `aria-checked`). */
+  attrs?: Record<string, string>;
+  /** `disabled` 속성. */
+  blocked?: boolean;
+  /** 누르면 `aria-checked="true"` 가 된다(radio 칩). */
+  checkOnClick?: boolean;
 };
 
 function el(spec: Partial<El> & { matches: string[] }): El {
@@ -50,12 +59,17 @@ function run(
       width: e.hidden ? 0 : 10,
       height: e.hidden ? 0 : 10,
     }),
+    get disabled() {
+      return e.blocked === true;
+    },
     getAttribute: (name: string) =>
-      name === "aria-disabled" && e.disabled
-        ? "true"
-        : name === "aria-controls"
-          ? (e.controls ?? null)
-          : null,
+      e.attrs?.[name] !== undefined
+        ? e.attrs[name]
+        : name === "aria-disabled" && e.disabled
+          ? "true"
+          : name === "aria-controls"
+            ? (e.controls ?? null)
+            : null,
     querySelector: (selector: string) => {
       const found = (e.children ?? []).find((c) =>
         c.matches.includes(selector),
@@ -64,6 +78,7 @@ function run(
     },
     click: () => {
       e.clicked = (e.clicked ?? 0) + 1;
+      if (e.checkOnClick) e.attrs = { ...e.attrs, "aria-checked": "true" };
     },
     get parentElement() {
       return e.parent ? wrap(e.parent) : null;
@@ -302,6 +317,135 @@ test("층 안에서 펼친 드롭다운이 있으면 그 단추가 가리키는 
     ]),
   ).toBe("missing");
   expect(outside.clicked).toBe(0);
+});
+
+/** 2026-11-17 실측 꼴의 칩. 색상은 글 없이 `img alt` 가 「<값>false」, 사이즈는 글이 값이다. */
+function chip(value: { text?: string; alt?: string; blocked?: boolean }) {
+  return el({
+    matches: [PURCHASE_LAYER.radio],
+    text: value.text,
+    blocked: value.blocked,
+    attrs: { "aria-checked": "false" },
+    checkOnClick: true,
+    children: value.alt
+      ? [
+          el({
+            matches: [PURCHASE_LAYER.radioImage],
+            attrs: { alt: value.alt },
+          }),
+        ]
+      : [],
+  });
+}
+
+function radioLayer() {
+  const black = chip({ alt: "블랙false" });
+  const blackLarge = chip({ alt: "블랙 라지false" });
+  const white = chip({ alt: "화이트true" });
+  const gray = chip({ alt: "그레이 false" });
+  const colors = el({
+    matches: [PURCHASE_LAYER.radioGroup],
+    children: [black, blackLarge, white, gray],
+  });
+  const sizes = ["S", "M", "L", "XL"].map((text) => chip({ text }));
+  const size = el({ matches: [PURCHASE_LAYER.radioGroup], children: sizes });
+  const layer = el({ matches: [], children: [colors, size] });
+  const buyNow = el({ matches: [BUTTONS], text: "바로구매", layer });
+  return { black, blackLarge, white, gray, sizes, layer, buyNow };
+}
+
+test("층의 radio 칩은 묶음 차례로 값이 정확히 같은 칩 하나만 누르고, 누르지 않고 골라졌는지 다시 읽는다", () => {
+  const { black, blackLarge, white, gray, sizes, buyNow } = radioLayer();
+  const page = { host: STORE, elements: [buyNow] };
+  expect(run(LAYER_OPTION_FORM, page)).toEqual({ radios: 2, lists: 0 });
+  // 읽기만 하면 누르지 않는다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "블랙", false])).toBe("unchecked");
+  expect(black.clicked).toBe(0);
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "블랙", true])).toBe("pressed");
+  expect([black.clicked, blackLarge.clicked]).toEqual([1, 0]);
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "블랙", false])).toBe("checked");
+  // 이미 골라져 있으면 다시 누르지 않는다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "블랙", true])).toBe("checked");
+  expect(black.clicked).toBe(1);
+  // alt 끝의 true 도 뗀다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "화이트", true])).toBe("pressed");
+  expect(white.clicked).toBe(1);
+  // 값과 끝 글자 사이의 빈칸도 뗀다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "그레이", true])).toBe("pressed");
+  expect(gray.clicked).toBe(1);
+  // 사이즈는 글이 값이다. 「L」 이 「XL」 을 고르지 않는다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [1, "L", true])).toBe("pressed");
+  expect(sizes.map((s) => s.clicked)).toEqual([0, 0, 1, 0]);
+  // 값을 다른 묶음에서 찾지 않는다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [1, "블랙", true])).toBe("missing");
+  expect(run(CHOOSE_LAYER_RADIO, page, [2, "L", true])).toBe("missing");
+  expect(run(CHOOSE_LAYER_RADIO, page, [1, "XXL", true])).toBe("missing");
+  // 스토어가 아닌 화면에서는 누르지 않는다.
+  expect(
+    run(CHOOSE_LAYER_RADIO, { ...page, host: ORDER_SHEET.host }, [
+      1,
+      "M",
+      true,
+    ]),
+  ).toBe(false);
+  expect(sizes[1]!.clicked).toBe(0);
+});
+
+test("층의 radio 칩이 둘 이상 같거나 막혀 있으면 누르지 않고, 층을 찾지 못하면 고르지 않는다", () => {
+  const twins = [chip({ text: "M" }), chip({ text: "M" })];
+  const blocked = chip({ text: "L", blocked: true });
+  const ariaBlocked = el({
+    matches: [PURCHASE_LAYER.radio],
+    text: "XL",
+    disabled: true,
+  });
+  const group = el({
+    matches: [PURCHASE_LAYER.radioGroup],
+    children: [...twins, blocked, ariaBlocked],
+  });
+  const layer = el({ matches: [], children: [group] });
+  const page = {
+    host: STORE,
+    elements: [el({ matches: [BUTTONS], text: "바로구매", layer })],
+  };
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "M", true])).toBe("ambiguous");
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "L", true])).toBe("disabled");
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "XL", true])).toBe("disabled");
+  expect([...twins, blocked, ariaBlocked].map((c) => c.clicked)).toEqual([
+    0, 0, 0, 0,
+  ]);
+  // 「바로구매」 가 층 안에 없으면 문서의 칩 묶음을 세지도 고르지도 않는다.
+  const loose = chip({ text: "M" });
+  const looseGroup = el({
+    matches: [PURCHASE_LAYER.radioGroup],
+    children: [loose],
+  });
+  const noLayer = {
+    host: STORE,
+    elements: [el({ matches: [BUTTONS], text: "바로구매" }), looseGroup],
+  };
+  expect(run(LAYER_OPTION_FORM, noLayer)).toEqual({ radios: 0, lists: 0 });
+  expect(run(CHOOSE_LAYER_RADIO, noLayer, [0, "M", true])).toBe("missing");
+  expect(loose.clicked).toBe(0);
+});
+
+test("「바로구매」 가 막혀 있으면 열림 확인이 거짓이고 누르지 않는다", () => {
+  const blocked = el({ matches: [BUTTONS], text: "바로구매", blocked: true });
+  expect(run(BUY_NOW_ENABLED, { host: STORE, elements: [blocked] })).toBe(
+    false,
+  );
+  expect(run(PRESS_BUY_NOW, { host: STORE, elements: [blocked] })).toBe(false);
+  const ariaBlocked = el({
+    matches: [BUTTONS],
+    text: "바로구매",
+    disabled: true,
+  });
+  expect(run(PRESS_BUY_NOW, { host: STORE, elements: [ariaBlocked] })).toBe(
+    false,
+  );
+  expect([blocked.clicked, ariaBlocked.clicked]).toEqual([0, 0]);
+  const open = el({ matches: [BUTTONS], text: "바로구매" });
+  expect(run(BUY_NOW_ENABLED, { host: STORE, elements: [open] })).toBe(true);
 });
 
 test("수량은 층 안의 숫자 칸 하나에 넣고 지금 값을 준다. 칸이 없으면 null, 둘이면 -1 이다", () => {

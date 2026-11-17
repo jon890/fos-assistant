@@ -148,7 +148,20 @@ public class ConnectorActionExecution extends CreatedAtEntity implements Persist
     }
 
 
-    /** 한 번 발급한 권한은 만료되거나 응답이 유실돼도 다시 발급하지 않는다. */
+    /**
+     * 사람 화면에서 claim 전에 멈춰 사람을 기다린다. 쓰지 않은 권한을 거둬, 기다리는 동안 어떤 권한도 claim 되지 않고 이어 갈 때 새로
+     * 발급한다(ADR-20261113 / purchase-checkout). 소비한 권한은 거두지 않는다. 그래서 claim 소비는 승인 하나에 한 번 그대로다.
+     */
+    public void releaseTicket() {
+        if (ticketId == null || consumedAt != null) {
+            throw new IllegalStateException("financial execution unavailable");
+        }
+        ticketId = null;
+        ticketExpiresAt = null;
+    }
+
+
+    /** 한 번 발급한 권한은 만료되거나 응답이 유실돼도 다시 발급하지 않는다. {@link #releaseTicket} 으로 거둔 뒤에만 새로 발급한다. */
     public void issueTicket(UUID id, Instant expiry) {
         if (ticketId != null || ticketExpiresAt != null || consumedAt != null) {
             throw new IllegalStateException("financial execution unavailable");

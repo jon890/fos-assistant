@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ConnectorActionExpirer {
     private final ConnectorActionService actions;
+    private final ConnectorApprovalResume resumes;
     /** 실행의 시간 제한(60초)보다 넉넉히 길다. 이보다 오래 {@code EXECUTING} 이면 결과를 적지 못한 것으로 본다. */
     private static final Duration STALE_EXECUTION = Duration.ofMinutes(5);
 
@@ -27,6 +28,7 @@ public class ConnectorActionExpirer {
         Instant now = Instant.now(clock);
         actions.expire(now);
         actions.markStale(now.minus(STALE_EXECUTION), now);
+        resumes.endStale(now);
         actions.revokeClosedGrants(now);
         actions.revokeClosedConversationGrants(now);
     }

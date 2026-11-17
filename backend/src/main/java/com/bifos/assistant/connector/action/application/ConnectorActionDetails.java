@@ -40,7 +40,8 @@ public class ConnectorActionDetails {
     private static final String NOT_FOUND_MESSAGE = "this connector action does not exist";
 
     /** 실행을 보낸 뒤 끝난 상태들이다. 자동 turn 으로 모델에게 전한다. */
-    private static final Set<ActionStatus> EXECUTED = Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN);
+    /** 실행을 보낸 뒤 결과를 받은 줄이다. 사람 화면에서 멈춘 WAITING 도 그 멈춤을 모델에게 전한다. */
+    private static final Set<ActionStatus> EXECUTED = Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN, ActionStatus.WAITING);
 
     /** 실행하지 않고 끝난 상태들이다. 대화에 알림 줄만 남긴다. */
     private static final Set<ActionStatus> CLOSED_WITHOUT_EXECUTION = Set.of(ActionStatus.REJECTED, ActionStatus.EXPIRED);

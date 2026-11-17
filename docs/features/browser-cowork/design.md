@@ -1,7 +1,7 @@
 # 실행 중 브라우저 함께 보기·넘겨받기와 이어 가기 기술 설계
 
-스펙은 [spec.md](spec.md)(사용자 확인 2026-11-16)다. 이 문서는 기능 전체의 경계와 PR1, PR2, PR3 의 상세를 갖는다.
-PR4 와 PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고, 그 PR 을 시작할 때 이 문서에 그 PR 의 절을 더해 상세를 닫는다.
+스펙은 [spec.md](spec.md)(사용자 확인 2026-11-16)다. 이 문서는 기능 전체의 경계와 PR1, PR2, PR3, PR4 의 상세를 갖는다.
+PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고, 그 PR 을 시작할 때 이 문서에 그 PR 의 절을 더해 상세를 닫는다.
 
 ## 요구사항 연결
 
@@ -14,9 +14,9 @@ PR4 와 PR5 는 아래 「뒤 PR 의 경계」 가 정한 경계를 따르고, �
 | REQ5 | PR3. `browser` 의 새 부품 `BrowserHumanHold` 가 `user_browser.human_held_at` 을 조건부 갱신으로 쓰고, 중계가 잠긴 동안 HTTP 423 과 WebSocket close code 4423 으로 거절하며, 플러그인이 그 신호를 `human_browser` 넘기기로 바꾼다. 아래 「PR3 사람 잠금」 |
 | REQ6 | PR3. 회수할 때 새 포트 `BrowserApprovedRuns` 로 브라우저를 쓰는 금융·구매 승인 줄이 실행 중인지 묻고, 실행 중이면 `BROWSER_APPROVAL_RUNNING` 으로 거절한다 |
 | REQ7 | PR3. 「돌려주기」 는 잠금 칸을 비우고, 글을 보낼지는 웹이 그 대화의 열린 넘기기로 정한다. 점검이 화면이 닫힌 지 10분 지난 잠금을 푼다 |
-| REQ8 | PR4. 같은 절의 「이어 가기 표식」 의 플러그인 계약과 이어 가기 |
-| REQ9 | PR4. 같은 절의 표식 자리 |
-| REQ11 | PR4. 같은 절의 열린 넘기기의 탭 지키기 |
+| REQ8 | PR4. 승인 줄의 새 상태 `WAITING`(사람 기다림)과 이어 가기 도구 `approval_resume`. 아래 「PR4 이어 가기」 |
+| REQ9 | PR4. 표식은 그 승인 줄의 칸이고 수명은 처음 멈춘 때부터 30분이다. 아래 「PR4 이어 가기」 |
+| REQ11 | PR4. 중계가 새 포트 `BrowserKeptTabs` 로 묻고 `/json/close` 를 409 로 거절한다. 아래 「PR4 열린 넘기기의 탭 지키기」 |
 | REQ10 | PR5. PR4 의 표식을 KTX 좌석 확보에 붙인다. 지금 KTX 플러그인에는 조회 도구만 있어(`hermes/connectors/korail-ktx/assistant.json`) PR5 는 KTX 스펙의 좌석 확보 PR 이 들어온 뒤에 연다 |
 
 ## 책임과 경계
@@ -159,6 +159,63 @@ POST /api/v1/browser/give-back
 - **포트** `browser.application.port.BrowserApprovedRuns`: `boolean running(long userId)`. 구현은 `connector` 의 `action` 하위 기능의 `ConnectorBrowserApprovedRuns` 다. 그 사용자의 `EXECUTING` 이고 위험도가 `FINANCIAL` 이나 `PURCHASE` 인 줄의 플러그인 가운데 manifest 가 `owner_browser_env` 를 선언한 것이 있으면 참이다. 카탈로그를 읽지 못하면 참으로 본다. 잘못 막아도 실행이 끝나면(최대 60초, `ConnectorActionExpirer`) 풀린다. 원고 저장 승인은 위험도가 `WRITE` 라 들지 않는다.
 - **회수 중 승인**(spec DECISION26): `ConnectorApprovalBrowser.require` 가 브라우저를 켜기 전에 `BrowserHumanHold.held(userId)` 를 본다. 잠겼으면 `CONNECTOR_BROWSER_HELD`(409)로 거절하고 줄을 건드리지 않는다. 웹은 그 코드에 「직접 쓰고 계신 브라우저를 돌려준 뒤 승인해 주세요.」 를 보인다. 금융·구매, 일반 쓰기, 원고 저장이 모두 이 자리를 지난다.
 
+### PR4 이어 가기
+
+```text
+채우기(승인한 실행)가 claim 전에 사람이 해야 하는 화면에서 멈춘다
+  플러그인 결과: HUMAN_ACTION_REQUIRED, handoff {code, need, tab}, resume {step}
+  결과 판정(ConnectorCheckoutOutcome): 쓰지 않은 ticket 을 거두고 EXECUTING → WAITING, 넘기기 카드와 알림
+  자동 turn: 「사람이 마치고 다음 메시지를 보내면 approval_resume 를 한 번 부른다」
+사람이 그 대화에 메시지를 보낸다 → 넘기기 카드가 닫힌다(지금 규칙)
+에이전트가 approval_resume 을 부른다(Control Plane MCP 도구, 인자 없음)
+  ConnectorApprovalResume: 그 대화의 WAITING 줄 → 수명, 같은 브라우저, 카드 닫힘, 사람 잠금 확인
+    잠근 줄에서 snapshot, 같은 의도, 관문, 그 순간의 구매 상한 → WAITING → EXECUTING
+  ConnectorFinancialApproval.run: 새 ticket → 대시보드 execute 에 resume {tab, step} → 같은 결과 판정
+  도구의 결과: 그 줄의 결과 글(자동 turn 과 같은 글). 자동 turn 으로 다시 전하지 않는다
+```
+
+**상태 `WAITING`**(`connector_action.status`): 「승인은 끝나지 않았고 사람을 기다린다」 다. `EXECUTING` 으로만 가고(이어 가기), 수명이 다하면 `FAILED` 다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `waiting_since` | 처음 멈춘 시각. 다시 멈춰도 바꾸지 않는다 |
+| `resume_step` | 플러그인이 낸 이어 갈 단계. Control Plane 은 뜻을 모르고 돌려준다 |
+| `resumed_at` | 마지막으로 이어 간 시각. 오래 남은 `EXECUTING` 정리(`markStale`)가 `decided_at` 대신 이 시각을 본다 |
+| `expires_at` | `WAITING` 동안은 `waiting_since` + 30분, 표식이 끝나는 시각이다. 이어 간 실행의 ticket 만료도 이 시각을 넘지 않는다 |
+| `handoff_*` | 이어 갈 탭은 `handoff_tab` 이다. 다시 멈추면 닫힌 넘기기를 새 넘기기로 바꾼다. 열린 넘기기는 그대로 둔다 |
+
+- **어디서 멈추면 이어 가는가**: claim 전뿐이다. claim 뒤(「구매하기」 를 누른 뒤)의 사람 화면은 지금처럼 결과를 모르는 것(`UNKNOWN`)이다(spec REQ8 의 「결과를 모를 때의 처리는 그대로」). 그래서 이어 갈 수 있는 줄은 claim 을 소비하지 않은 줄이다.
+- **ticket**: 멈출 때 쓰지 않은 ticket 을 거둔다(`ConnectorActionExecution.releaseTicket`). 기다리는 동안 어떤 ticket 도 claim 되지 않는다. 이어 갈 때 새 ticket 을 낸다. claim 소비는 승인 하나에 한 번 그대로다. 「멈출 때마다 한 번」 은 `WAITING` 에서 `EXECUTING` 으로 가는 전이가 행 잠금 아래에서 한 번만 일어나 지킨다.
+- **플러그인 계약**: 결과의 `resume` 은 정확히 `{step}` 이고 `step` 은 `[a-z][a-z0-9_]{0,31}` 이다. 없거나 모양이 틀리면 지금처럼 `FAILED`(`human_action_required`)다. 이어 갈 때 Control Plane 은 대시보드 execute 본문의 `execution.resume` 에 `{tab, step}` 을 싣고, 대시보드가 같은 모양을 다시 보고 플러그인에 env `FOS_APPROVAL_RESUME_JSON` 으로 넘긴다. 플러그인은 새 탭 대신 그 탭에 붙어 상품 화면부터 다시 간다. 탭이 없으면 `NAVER_SHOPPING_TAB_GONE`(claim 전 실패라 `FAILED`)이다.
+- **claim 전 로그인 확인(쇼핑)**: 채우기는 화면 분류 뒤 로그인 쿠키를 본다. 없으면 그 탭을 로그인 화면(`owner_browser_login_url`)으로 옮기고 `login` 으로 멈춘다. 로그아웃 상태의 「구매하기」 는 로그인 화면으로 가 claim 만 쓰고 결과를 모르게 되기 때문이다. 주소 이동만 하고 누르지 않는다.
+- **이어 가기 도구** `approval_resume`: 인자가 없다. 호출한 실행의 대화에서 그 사용자의 가장 늦은 `WAITING` 줄 하나를 고른다. 다른 대화의 줄은 고르지 않는다(spec REQ9). 먼저 살펴보기 트리에서는 다른 쓰기 도구처럼 거절한다. 결과는 늘 오류가 아닌 글이다. Hermes 의 연속 오류 정지가 Control Plane MCP 서버를 막지 않게 한다.
+
+| 경우 | 줄 | 도구의 답 |
+| --- | --- | --- |
+| 그 대화에 `WAITING` 줄이 없다 | 그대로 | 이어 갈 승인이 없다. 원하면 새로 준비한다. 그 대화에서 이어 가는 중(`EXECUTING` 이고 멈춘 적 있음)이면 이어 가는 중이니 기다리라고 답한다 |
+| 수명이 지났거나, 브라우저가 꺼졌거나 그 뒤 다시 켜졌다(`started_at` > `waiting_since`) | `FAILED`(`resume_ended`) | 끝냈다는 안내와 그 줄의 결과 |
+| 넘기기 카드가 아직 열려 있다(그 뒤 사람이 메시지를 보내지 않았다) | 그대로 | 사용자가 마치고 메시지를 보낸 뒤 다시 부른다 |
+| 사람이 브라우저를 쥐고 있다(PR3) | 그대로 | 돌려준 뒤 다시 부른다 |
+| 연결이나 선언이 바뀌어 같은 승인으로 실행할 수 없다 | `FAILED`(`resume_ended`) | 끝냈다는 안내와 그 줄의 결과 |
+| 대시보드에 닿지 못해 플러그인 상태를 읽지 못했다 | 그대로 | 잠시 뒤 다시 한다. 새로 준비하지 않는다. 수명이 끝내므로 남겨도 안전하다 |
+| 실행을 보냈는데 결과 글을 읽지 못했다 | 결과 판정대로 | 보냈다는 안내. 새로 준비하지 말고 카드와 「내 브라우저」 를 확인하게 한다 |
+| 그 순간의 구매 상한에 걸린다(spec DECISION19) | `FAILED`(`purchase_limit`) | 끝냈다는 안내와 걸린 상한 |
+| 실행했다 | 결과 판정대로(`SUCCEEDED`, `FAILED`, `UNKNOWN`, 다시 `WAITING`) | 그 줄의 결과 글 |
+
+- **상한 재판정**: 잠근 줄에서 `PurchaseLimits.requireWithin(user, 자기 줄, 예상 합계, 지금)` 이다. 오늘 합계로 보고, 뒤의 claim 이 승인 날짜의 합계로 한 번 더 본다. 둘 다 지나야 「구매하기」 를 누른다.
+- **하루 합계**(spec DECISION20): `WAITING` 줄을 `EXECUTING`, `SUCCEEDED`, `UNKNOWN` 과 함께 센다. 결제 화면까지 가지 못하고 끝나면 `FAILED` 라 빠진다. 같은 의도의 새 준비도 `WAITING` 이 막는다. 수명이 지난 `WAITING` 은 끝내는 일정이 돌기 전에도 막지 않는다.
+- **결과 전달**: 처음 멈춘 결과는 자동 turn 으로 간다. 모델 입력에는 정해 둔 안내만 싣고 플러그인 글은 싣지 않는다. 이어 간 결과와 이어 가기에서 끝낸 줄은 도구의 답으로 가므로 전했다고 적는다.
+- **끝내는 일정**: `ConnectorActionExpirer` 가 1분마다 `WAITING` 줄 가운데 수명이 지났거나 브라우저가 그 뒤 다시 켜진 줄을 `FAILED`(`resume_ended`)로 끝낸다. 하루 합계와 탭 지키기, 브라우저 유지가 바로 풀린다. 사람이 탭을 닫은 것은 다음 이어 가기가 플러그인의 `NAVER_SHOPPING_TAB_GONE` 으로 안다.
+- **브라우저 유지**(REQ1): `BrowserWaitDemand` 가 이번 켜기 뒤에 처음 멈춘 살아 있는 `WAITING` 줄을 기다림으로 센다.
+- **보기와 잠금**: 이어 간 실행도 `EXECUTING` 이라 PR2 의 보기 단추와 PR3 의 회수 막기가 그대로 걸린다. `WAITING` 동안은 쥔 탭이 없어 사람이 그 탭에서 로그인한다.
+- **웹**: 승인 카드가 `WAITING` 에 「「내 브라우저」에서 멈췄어요. 로그인 같은 화면을 마치고 알려 주시면 이 승인으로 이어서 해요.」 를 보이고 단추는 없다. 넘기기 카드와 「다 했어요」 는 지금 그대로다.
+
+### PR4 열린 넘기기의 탭 지키기
+
+- **포트** `browser.application.port.BrowserKeptTabs`: `boolean kept(long userId, String tab, Instant since)`. 구현은 `connector` 의 `ConnectorBrowserKeptTabs` 다. 그 탭을 가리키는 열린 넘기기(대화가 있고 `handoff_at` 이 `since` 이후)나 살아 있는 `WAITING` 줄(`waiting_since` 이 `since` 이후)이 있으면 참이다. `since` 는 그 브라우저의 `started_at` 이다.
+- **중계** `GET /json/close/<탭>`: 판정을 지난 뒤 `BrowserGateway.keeps` 가 참이면 Chrome 에 넘기지 않고 빈 409 다. 판정하지 못하면 닫지 않는 쪽으로 답한다. 세 플러그인은 남긴 탭 닫기의 실패를 이미 무시하고 목록에서 잊으므로 플러그인을 고치지 않는다. 잊은 탭은 브라우저가 꺼질 때 사라진다.
+- 카드가 닫히고 표식도 끝나면 지금처럼 다음 탭 열기가 닫는다. 이어 가는 실행 자신은 `EXECUTING` 이라 그 탭을 닫을 수 있다.
+
 ### 뒤 PR 의 경계
 
 PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 그 PR 에서 이 절을 고치고 독립 검토를 다시 받는다.
@@ -172,6 +229,8 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 위 「PR3 사람 잠금」, 「PR3 회수 중 에이전트 도구와 넘기기」, 「PR3 승인과 회수」 가 상세다.
 
 #### 이어 가기 표식(PR4, PR5)
+
+PR4 는 위 「PR4 이어 가기」 와 「PR4 열린 넘기기의 탭 지키기」 가 상세다. PR5 는 아래 경계와 PR4 의 계약(`resume {step}`, `WAITING`, `approval_resume`)을 KTX 좌석 확보에 붙인다.
 
 - **표식 자리**: 그 승인 줄(`connector_action`)이다. 기존 넘기기 칸에 더해 사람 기다림 상태, 처음 멈춘 시각, 플러그인이 낸 단계 표식을 둔다. 새 테이블을 만들지 않는다.
 - **플러그인 계약**: 승인한 실행의 결과가 넘기기와 함께 이어 갈 단계와 탭을 낸다. Control Plane 은 단계의 뜻을 모르고 그대로 돌려준다.
@@ -215,9 +274,16 @@ PR 마다 이 경계 안에서 상세를 닫는다. 경계를 바꿔야 하면 �
 | REQ5, REQ7 | 화면과 웹 단위, 웹 브라우저 검사 | `hold` 사건이 바뀔 때 오고 쥔 탭이 없으면 승인 실행을 묻지 않는다, 띠 네 상태, 화면 누르기와 Esc 가 확인 띠를 띄운다, 회수와 돌려주기, 패널의 돌려주기는 열린 넘기기가 있을 때만 글을 보내고 `/browser` 는 보내지 않는다 |
 | REQ6 | `ConnectorBrowserApprovedRuns` 저장소 통합(H2) | 실행 중인 브라우저 금융·구매 줄만 참, 끝난 줄과 브라우저가 아닌 플러그인과 남의 줄은 거짓 |
 | REQ7 | `UserBrowserSweeper` 단위 | 화면이 닫힌 뒤 10분이 지나면 풀고 열려 있거나 안 지났으면 두고, 잠긴 브라우저는 10분 유휴에 끄지 않는다 |
+| REQ8, REQ9 | `CheckoutApprovalTest`(금융 틀 통합) | claim 전 멈춤이 `WAITING` 과 넘기기, 하루 합계, ticket 거두기가 되고 같은 의도를 막는다. 카드가 닫히기 전과 다른 대화의 이어 가기는 거절, 사람 turn 뒤 이어 가기는 새 ticket 과 남긴 탭으로 주문서까지 가고 claim 은 한 번이다. 다시 멈추면 수명이 늘지 않는다. 상한을 낮췄으면 `purchase_limit`, 30분과 다시 켠 브라우저는 `resume_ended` 로 끝나 합계에서 빠진다. 사람이 쥔 동안은 그대로 둔다 |
+| REQ1, REQ9, REQ11 | `ConnectorBrowserWaitDemandTest`(H2) | 살아 있는 `WAITING` 이 브라우저 유지를 붙잡고 지난 것과 켜기 전의 것은 아니다. 닫지 않을 탭은 열린 넘기기와 살아 있는 표식의 탭뿐이다 |
+| REQ11 | `BrowserGatewayTest`, `BrowserGatewayControllerTest` | 지킬 탭의 `json/close` 는 Chrome 에 넘기지 않고 409, 판정 실패는 닫지 않는다 |
+| REQ8 | 플러그인 `checkout.test.ts`, `fill-diagnostic.test.ts` | 로그아웃이면 claim 전에 로그인 화면으로 옮겨 `resume` 을 낸다, 이어 가기 env 로 남긴 탭에서 새 탭 없이 주문서까지 가고 claim 은 한 번이다, 다시 로그인 화면이면 다시 넘긴다, 탭이 없으면 `TAB_GONE`, 모양이 틀린 env 는 거절 |
+| REQ8 | 대시보드 `test_connector_guard_transport.py` | execute 의 `resume` 이 정확한 모양일 때만 env 로 가고 틀리면 409 |
+| REQ8 | 웹 브라우저 검사 `approval-card.spec.ts` | `WAITING` 카드는 단추 없이 안내만 보인다 |
 
 운영 왕복은 PR1 에 없다. Hermes 와 주고받는 것을 바꾸지 않는다.
 PR2 도 Hermes 와 주고받는 것을 바꾸지 않는다. 배포 뒤 실계정으로 쇼핑 검색을 시켜 단추와 띠, 끝난 뒤 조작을 한 번 본다(PR 본문의 후속 검증).
+PR4 는 대시보드 execute 본문과 플러그인 결과를 바꾼다. 배포 뒤 실계정으로 네이버에서 로그아웃한 채 주문서 채우기를 승인해 로그인 카드가 뜨고, 사람이 로그인한 뒤 「다 했어요」 를 누르면 새 카드 없이 주문서까지 가는지 본다. 결제는 하지 않는다(PR 본문의 후속 검증).
 PR3 은 플러그인 결과와 fos-ctx 알림을 바꾼다. 배포 뒤 실계정으로 쇼핑 검색 중 「직접 할게요」 를 눌러 에이전트 도구가 넘기기로 끝나고, 「돌려주기」 뒤 이어 가는지 본다(PR 본문의 후속 검증).
 
 ## 결정
@@ -248,6 +314,14 @@ PR3 은 플러그인 결과와 fos-ctx 알림을 바꾼다. 배포 뒤 실계정
 | DECISION22 | 결제 카드만 남았을 때 돌려주기(PR3) | 글을 보내지 않는다 | 사용자 2026-11-16 | 결제는 「결제했어요」 와 「사지 않을래요」 가운데 사람이 고른다. 「이어서 해 주세요」 는 그 고름을 대신한다 |
 | DECISION23 | 승인 실행을 묻는 때(PR3) | 회수할 때와, 화면에 쥔 탭이 있을 때의 탭 확인 | 작성자 | 띠의 「승인한 작업을 마무리하는 중」 은 쥔 탭을 볼 때만 보인다. 에이전트가 쓰지 않을 때 사람 화면에 조회를 두지 않는다 |
 | DECISION24 | 10분 풀림의 기준(PR3) | 잠근 시각과 화면이 마지막으로 열려 있던 시각 가운데 늦은 것, 값은 `idle-timeout` | 작성자 | spec DECISION7 이 자동 중지와 같은 기준이다. 점검이 화면 등록부를 보므로 화면 쪽을 고치지 않는다 |
+| DECISION25 | 사람 기다림을 두는 곳(PR4) | 승인 줄의 새 상태 `WAITING` 과 칸 셋(`waiting_since`, `resume_step`, `resumed_at`). 탭은 `handoff_tab`, 수명은 `expires_at` | 작성자 | `FAILED` 에 표식을 덧붙이면 끝난 줄이 다시 실행되고 하루 합계와 같은 의도 막기가 상태마다 예외를 갖는다. 새 상태면 기존 상태 집합에 하나를 더하는 것으로 끝난다. 테이블을 늘리지 않는다 |
+| DECISION26 | ticket 을 「멈출 때마다 한 번」 으로 넓히는 방식(PR4) | 멈출 때 쓰지 않은 ticket 을 거두고 이어 갈 때 새로 낸다. claim 소비는 승인 하나에 한 번 그대로. 이어 갈 수 있는 멈춤은 claim 전뿐이다 | 작성자 | 「구매하기」 를 누르는 권한이 승인 하나에 한 번인 것을 그대로 둔다. 기다리는 동안 claim 할 수 있는 ticket 이 없다. claim 뒤의 멈춤은 결과를 모르는 것이라 지금 규칙(spec REQ8)이 그대로 맡는다 |
+| DECISION27 | 이어 가기 도구를 두는 곳(PR4) | Control Plane MCP 의 `approval_resume`. 인자 없이 호출한 대화의 줄을 고른다 | 작성자 | ticket 을 내고 실행을 보내는 것은 Control Plane 이다. 대화를 이끄는 에이전트가 플러그인을 붙이지 않았어도 부를 수 있다. 모델이 줄 번호를 고르지 않아 다른 대화의 승인을 잇지 못한다 |
+| DECISION28 | 이어 가기를 받는 때(PR4) | 넘기기 카드가 닫힌 뒤, 즉 멈춘 뒤 사람이 그 대화에 메시지를 보낸 뒤 | 작성자 | spec DECISION27 의 「다음 사람 메시지」 를 서버가 확인한다. 멈춤을 전하는 자동 turn 에서 모델이 곧바로 이어 가며 같은 화면을 되풀이하지 않는다 |
+| DECISION29 | 탭과 단계를 플러그인에 건네는 길(PR4) | 대시보드 execute 본문의 `execution.resume` 과 env `FOS_APPROVAL_RESUME_JSON` | 작성자 | 실행 원문과 ticket 의 해시는 바꾸지 않는다. 대시보드가 모양을 다시 보고 다른 권한 env 와 같이 서버를 만들 때 지운다 |
+| DECISION30 | 쇼핑 채우기의 claim 전 로그인 확인(PR4) | 로그인 쿠키가 없으면 그 탭을 로그인 화면으로 옮기고 `login` 으로 멈춘다 | 작성자 | 로그아웃 상태의 「구매하기」 는 로그인 화면으로 가 claim 만 쓰고 결과를 모른다. 이어 갈 수 있는 자리(claim 전)에서 멈추게 한다. 쿠키가 있는데 만료된 경우는 지금처럼 결과를 모르는 것이다 |
+| DECISION31 | 이어 가기 직전 상한의 날짜(PR4) | 오늘(이어 가는 순간)의 합계. claim 은 지금처럼 승인 날짜의 합계로 다시 본다 | 작성자 | spec DECISION19 의 「그 순간의 상한과 오늘 합계」 그대로다. 자정을 넘겨 이어 가도 두 날짜를 모두 보므로 느슨해지지 않는다 |
+| DECISION32 | 지킬 탭 닫기의 응답(PR4) | 빈 409. 판정하지 못하면 닫지 않는다 | 작성자 | 플러그인은 닫기 실패를 무시한다. 남은 탭은 브라우저가 꺼질 때 사라지고, 사람이 풀던 화면이 사라지는 쪽보다 낫다 |
 
 ## 결정 기록 연결
 
@@ -257,4 +331,5 @@ PR3 은 플러그인 결과와 fos-ctx 알림을 바꾼다. 배포 뒤 실계정
 | 이 설계의 DECISION5~DECISION7 | architecture | 필요 없음. 기존 승인 오류 코드 관례를 따르는 내부 선택이다 | `ConnectorApprovalBrowser`, `connector-action-error.ts` |
 | 이 설계의 DECISION8~DECISION10, DECISION18, DECISION19 | architecture | [ADR-20261116 / browser-lock](../../adr/ADR-20261116-browser-lock.md) | 이 문서의 「PR2 에이전트가 쥔 탭」, 「PR3 사람 잠금」, 「PR3 회수 중 에이전트 도구와 넘기기」 |
 | 이 설계의 DECISION20~DECISION24 | architecture | 필요 없음. 잠금 ADR 안의 값과 화면 자리의 선택이다 | 이 문서의 「PR3 사람 잠금」 |
+| 이 설계의 DECISION25~DECISION32 | domain-policy, architecture | [ADR-20261113 / purchase-checkout](../../adr/ADR-20261113-purchase-checkout.md) 결정 표의 사람 기다림, 결과 불명, 하루 합계 행과 [ADR-20261111 / connector-handoff](../../adr/ADR-20261111-connector-handoff.md) 결정 표의 남긴 탭 행 | 이 문서의 「PR4 이어 가기」, 「PR4 열린 넘기기의 탭 지키기」 |
 | 이 설계의 DECISION13~DECISION17 | architecture | 필요 없음. 쥔 탭 판정 안의 값과 방법이고, 같은 ADR 이 PR3 에서 쥔 탭의 정의를 함께 남긴다 | 이 문서의 「PR2 에이전트가 쥔 탭」, 「PR2 에이전트 화면 보기」 |

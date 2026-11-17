@@ -269,6 +269,25 @@ class ConnectorGuardTransportTest(ConnectorGuardCase):
                 self.assertEqual(self.request(EXECUTE, "POST", changed)[0], 409)
         self.assertEqual(self.claims + self.trades, [])
 
+    def test_resume_tab_and_step_reach_the_child_env_only_in_the_exact_shape(self):
+        # 사람 화면에서 멈춘 승인을 이어 갈 때 Control Plane 이 탭과 단계를 함께 보낸다(browser-cowork spec REQ8).
+        body = self.body(execution=True)
+        body["execution"]["resume"] = {"tab": "TAB1", "step": "product"}
+        status, answer = self.request(EXECUTE, "POST", body)
+        self.assertEqual(status, 200, answer)
+        self.assertEqual(len(self.claims), 1)
+        validation = importlib.import_module(self.plugin.__name__ + ".connector_guard_validation")
+        env = validation._execution_env(body["execution"], body["args"])
+        self.assertEqual(json.loads(env["FOS_APPROVAL_RESUME_JSON"]), {"tab": "TAB1", "step": "product"})
+        self.assertNotIn("FOS_APPROVAL_RESUME_JSON", validation._execution_env(self.body(execution=True)["execution"], body["args"]))
+        for label, resume in (("extra", {"tab": "TAB1", "step": "product", "x": 1}), ("tab", {"tab": "../a", "step": "product"}),
+                              ("step", {"tab": "TAB1", "step": "Product"}), ("type", ["TAB1", "product"])):
+            with self.subTest(label=label):
+                changed = copy.deepcopy(body)
+                changed["execution"]["resume"] = resume
+                self.assertEqual(self.request(EXECUTE, "POST", changed)[0], 409)
+        self.assertEqual(len(self.claims), 1)
+
     def test_shared_ticket_vector_and_independent_transport_hash(self):
         vector = self.ticket_vector
         key = hmac.digest(vector["token"].encode(), b"fos-approval-signing-key-v1", "sha256")

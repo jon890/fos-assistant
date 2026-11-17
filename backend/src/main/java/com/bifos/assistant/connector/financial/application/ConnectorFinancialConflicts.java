@@ -19,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class ConnectorFinancialConflicts {
-    private static final Set<ActionStatus> BLOCKING = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+    private static final Set<ActionStatus> BLOCKING = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN,
+        ActionStatus.WAITING);
     private final ConnectorActionExecutionRepository contents;
     private final ConnectorActionRepository actions;
     private final Clock clock;
@@ -48,7 +49,9 @@ public class ConnectorFinancialConflicts {
         for (var row : contents.findByRequestKeyOrderByActionIdAsc(requestKey)) {
             if (!Objects.equals(row.actionId(), ownActionId)) {
                 var action = actions.findById(row.actionId()).orElseThrow(ConnectorFinancialConflicts::rejected);
-                boolean expired = action.status() == ActionStatus.PENDING && action.expiresAt() != null && !action.expiresAt().isAfter(now);
+                // 수명이 다한 사람 기다림도 끝내는 작업이 돌기 전이라도 막지 않는다. 이어 갈 수 없는 줄이다.
+                boolean timed = action.status() == ActionStatus.PENDING || action.status() == ActionStatus.WAITING;
+                boolean expired = timed && action.expiresAt() != null && !action.expiresAt().isAfter(now);
                 if (BLOCKING.contains(action.status()) && !expired) {
                     return Optional.of(action);
                 }

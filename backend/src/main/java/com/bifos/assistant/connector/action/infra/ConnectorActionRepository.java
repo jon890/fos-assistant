@@ -62,6 +62,44 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     boolean existsOpenHandoffSince(@Param("userId") Long userId, @Param("since") Instant since);
 
 
+    /**
+     * 그 사용자의 살아 있는 사람 기다림 승인이 {@code since} 뒤에 처음 멈춘 것이 있는가. 브라우저 자동 중지가 사람을 기다리는지 볼 때
+     * 쓴다(browser-cowork spec REQ1). 그 전에 멈춘 줄의 탭은 다시 켜진 브라우저에 없다.
+     */
+    @Query("""
+            select case when count(a) > 0 then true else false end
+            from ConnectorAction a
+            where a.userId = :userId and a.status = :waiting and a.expiresAt > :now and a.waiting.since >= :since
+            """)
+    boolean existsWaitingSince(@Param("userId") Long userId, @Param("since") Instant since, @Param("now") Instant now,
+        @Param("waiting") ActionStatus waiting);
+
+
+    /**
+     * 그 탭을 가리키는 열린 넘기기나 살아 있는 사람 기다림이 {@code since} 뒤에 생긴 것이 있는가. 중계가 그 탭 닫기를 거절할 때 쓴다
+     * (browser-cowork spec REQ9, REQ11). 열린 넘기기의 조건은 {@link #existsOpenHandoffSince} 와 같다.
+     */
+    @Query("""
+            select case when count(a) > 0 then true else false end
+            from ConnectorAction a
+            where a.userId = :userId and a.handoff.tab = :tab
+                and ((a.conversationId is not null and a.handoff.need is not null and a.handoff.closedAt is null
+                        and a.handoff.at >= :since)
+                    or (a.status = :waiting and a.expiresAt > :now and a.waiting.since >= :since))
+            """)
+    boolean existsKeptTab(@Param("userId") Long userId, @Param("tab") String tab, @Param("since") Instant since,
+        @Param("now") Instant now, @Param("waiting") ActionStatus waiting);
+
+
+    /** 그 대화에서 그 사용자의 그 상태인 가장 늦은 승인 줄이다. 이어 가기가 사람 기다림 줄을 고른다. */
+    Optional<ConnectorAction> findFirstByUserIdAndConversationIdAndStatusOrderByIdDesc(
+        Long userId, Long conversationId, ActionStatus status);
+
+
+    /** 그 상태의 승인 줄이다. 사람 기다림을 끝낼 줄을 고른다. 기다리는 줄은 사용자마다 몇 줄뿐이다. */
+    List<ConnectorAction> findByStatus(ActionStatus status);
+
+
     /** 그 사용자의 기다리는 승인 줄이 가리키는 플러그인이다. 기다리는 시간이 지난 줄은 뺀다. */
     @Query("""
             select distinct a.connectorId from ConnectorAction a
@@ -151,11 +189,11 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ConnectorAction> findByStatusWithoutContentJob(@Param("status") ActionStatus status);
 
 
-    /** {@link #findByStatusWithoutContentJob(ActionStatus)} 가운데 이 시각보다 먼저 승인한 줄이다. */
+    /** {@link #findByStatusWithoutContentJob(ActionStatus)} 가운데 이 시각보다 먼저 승인했거나 이어 간 줄이다. 이어 갔으면 그 시각으로 본다. */
     @Query("""
             select a from ConnectorAction a
             where a.status = :status
-              and a.decidedAt < :before
+              and coalesce(a.waiting.resumedAt, a.decidedAt) < :before
               and not exists (select s.id from ContentDraftSnapshot s where s.job.actionId = a.id)
             """)
     List<ConnectorAction> findByStatusWithoutContentJobDecidedBefore(

@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp;
 
+import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -78,7 +79,8 @@ class McpContentDraftSnapshotsTest {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
         controller = new McpController(tools, callers, mock(McpMediaObservationTools.class), drafts, tool,
-            mock(McpFinancialLimitTools.class), checks, mock(BuildProperties.class));
+            mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), checks,
+            mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);
         when(origin.id()).thenReturn(31L);
         when(origin.conversationId()).thenReturn(41L);

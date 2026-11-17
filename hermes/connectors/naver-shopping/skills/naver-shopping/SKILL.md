@@ -39,6 +39,8 @@ description: 사용자가 네이버 쇼핑에서 상품을 찾아 달라고 할 
    - 품절이다(`NAVER_SHOPPING_SOLD_OUT`)면 고른 옵션이 승인 뒤 품절됐다고 알린다
    - `NAVER_SHOPPING_CLAIM_REJECTED`, `NAVER_SHOPPING_CHECKOUT_FAILED` 면 주문서를 열지 못했고 결제 화면도 넘기지 않았다고 알리고 다시 살지 묻는다
    - 결과를 모른다는 결과면 다시 부르지 않는다. 「내 브라우저」 에 열린 탭을 확인해 달라고 한다
+   - 상태가 `WAITING`(로그인 같은 화면에서 멈춤)이면 승인은 끝나지 않았다. 「내 브라우저」 에서 그 화면을 마치고 알려 달라고 한다. 사용자가 그 뒤 메시지를 보내면 주문서 준비를 다시 부르지 말고 `approval_resume` 을 한 번 부른다. 그 답이 결과다. 사용자가 그만두면 부르지 않는다
+   - `approval_resume` 이 이어 갈 승인이 없다거나 끝냈다고 하면 사용자가 원할 때 3번부터 다시 한다. `NAVER_SHOPPING_TAB_GONE` 도 같다
 
 ### 주문서 준비가 거절되면
 

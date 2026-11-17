@@ -28,8 +28,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PurchaseLimits {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    // 결과를 모르는 UNKNOWN 도 센다. 결제 화면을 넘기지 못한 FAILED 는 세지 않는다(spec DECISION17, DECISION30).
-    private static final Set<ActionStatus> SPENT = Set.of(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN);
+    // 결과를 모르는 UNKNOWN 과 사람을 기다리는 WAITING 도 센다. 결제 화면을 넘기지 못한 FAILED 는 세지 않는다
+    // (spec DECISION17, DECISION30, browser-cowork spec DECISION20).
+    private static final Set<ActionStatus> SPENT = Set.of(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN, ActionStatus.WAITING);
     private final PurchaseLimitRepository limits;
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;

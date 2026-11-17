@@ -138,6 +138,7 @@ export function takeApproval(env: Env) {
     raw: env.FOS_APPROVAL_ARGS_JSON,
     ticket: env.FOS_APPROVAL_TICKET,
     url: env.FOS_APPROVAL_CLAIM_URL,
+    resume: env.FOS_APPROVAL_RESUME_JSON,
     used: false,
   };
   for (const name of Object.keys(env))
@@ -145,6 +146,26 @@ export function takeApproval(env: Env) {
   return authority;
 }
 export type Authority = ReturnType<typeof takeApproval>;
+
+/**
+ * 이어 가기면 Control Plane 이 돌려준 남긴 탭과 단계다. 처음 실행이면 `null` 이다. 모양이 틀리면 거절이다.
+ * 대시보드가 같은 모양을 이미 봤다. 탭은 사람에게 넘기며 이 플러그인이 남긴 탭이고 단계는 이 플러그인이 낸 값이다.
+ */
+export function readResume(authority: Authority) {
+  const raw = authority.resume;
+  authority.resume = undefined;
+  if (raw === undefined) return null;
+  if (typeof raw !== "string") return reject();
+  const value = strictJson(raw, 512);
+  if (
+    !isDeepStrictEqual(Object.keys(value ?? {}).sort(), ["step", "tab"]) ||
+    typeof value.tab !== "string" ||
+    !/^[A-Za-z0-9]{1,128}$/.test(value.tab) ||
+    value.step !== "product"
+  )
+    return reject();
+  return { tab: value.tab as string, step: "product" as const };
+}
 
 const canonicalUuid = (value: unknown) =>
   typeof value === "string" &&
