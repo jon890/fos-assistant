@@ -1,11 +1,12 @@
 # 개발 현황
 
-사용자가 assistant 웹에서 이 저장소의 개발 문서와 로드맵을 보고, 관리자는 진행 보드까지 보며 큰 그림을 점검하는 기능이다.
+사용자가 assistant 웹에서 이 저장소의 개발 문서와 로드맵을 보며 큰 그림을 점검하는 기능이다.
 
 covers: `web/src/lib/dev-docs/catalog.ts`, `web/src/lib/dev-docs/links.ts`, `web/Dockerfile`
 
 요구와 결정은 스펙 [`dev-overview/spec.md`](dev-overview/spec.md), 구조는 설계 [`dev-overview/design.md`](dev-overview/design.md)가 갖는다.
-이 파일은 지금 동작하는 것만 적는다. 진행 보드(관리자 영역)는 아직 없다.
+이 파일은 지금 동작하는 것만 적는다. 진행 보드는 웹에 연결하지 않는다(스펙 DECISION18).
+로드맵(`docs/prd.md` 의 「로드맵」 절)은 코디네이터가 큰 작업이 끝나거나 새로 생길 때 PR 로 갱신한다.
 
 ## 개발 문서 화면
 
