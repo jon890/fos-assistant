@@ -40,6 +40,9 @@ VECTOR_TOP_CHILD = "하위-세션-1"
 VECTOR_TOP_SUBAGENT_SIG = "ba540b481d830453accd812c8610be8d9467a532d5ff3db891514dcfe3d0726b"
 VECTOR_CHILD = "하위-세션-2"
 VECTOR_SUBAGENT_SIG = "5479a21f26ddeb337754d4fd86dd3a0e36e0ef1f6ff2cc879c0fd07da5d84485"
+# 하위 에이전트 끝 소식 계약의 확인 값이다. 루트와 부모가 같은 최상위 자식이다.
+# 서버 쪽 `SubagentStop` 검사도 같은 값이어야 한다. 한쪽을 바꾸면 두 쪽을 함께 고친다.
+VECTOR_STOP_SIG = "d59b3af5d4d924b380684c14de9f3736bfb5f5a04ed18982404e2a3f2568ebd0"
 # 플러그인 정책 질의의 서명 확인 값이다. 계약은 `docs/features/connector-policy.md` 의 「도구 호출 판정」 이다.
 # 서버 쪽 `backend/src/test/java/com/bifos/assistant/connector/ConnectorPolicyRequestTest.java` 의
 # `VECTOR_*` 와 같은 값이어야 한다. 한쪽을 바꾸면 두 쪽을 함께 고친다.
@@ -69,7 +72,7 @@ class ManifestTest(unittest.TestCase):
         """manifest 가 정해진 모양을 갖는다."""
         manifest = yaml.safe_load((PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8"))
         self.assertEqual(manifest["name"], PLUGIN_DIR.name)
-        self.assertEqual(manifest["hooks"], ["pre_tool_call", "subagent_start", "transform_tool_result"])
+        self.assertEqual(manifest["hooks"], ["pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result"])
         for key in ("version", "description", "author"):
             self.assertIsInstance(manifest.get(key), str)
             self.assertTrue(manifest[key].strip())
@@ -98,6 +101,12 @@ class SignatureContractTest(unittest.TestCase):
                          VECTOR_TOP_SUBAGENT_SIG)
         self.assertEqual(self.plugin.sign_subagent(VECTOR_KEY, VECTOR_ROOT, VECTOR_SESSION, VECTOR_CHILD),
                          VECTOR_SUBAGENT_SIG)
+
+    def test_subagent_stop_signature_matches_contract_vector(self):
+        """하위 에이전트 끝 소식의 서명이 계약 문서의 기대값과 같고 등록 서명과 다르다."""
+        actual = self.plugin.sign_subagent_stop(VECTOR_KEY, VECTOR_ROOT, VECTOR_ROOT, VECTOR_TOP_CHILD)
+        self.assertEqual(actual, VECTOR_STOP_SIG)
+        self.assertNotEqual(actual, VECTOR_TOP_SUBAGENT_SIG)
 
     def test_policy_signature_matches_contract_vector(self):
         """플러그인 정책 질의의 서명이 서버 쪽 검사와 같은 기대값을 낸다."""
@@ -327,8 +336,8 @@ class HookTest(PluginFixture):
         self.assertEqual(result["args"]["_fos_ctx"]["root_session_id"], VECTOR_SESSION)
 
 
-class SubagentRegistrationTest(PluginFixture):
-    """subagent_start 가 Control Plane 가짜 서버에 등록하는 모양과 실패 분기를 본다."""
+class SubagentServerFixture(PluginFixture):
+    """자식 session 등록 주소에 가짜 Control Plane 을 띄운다. 검사는 두지 않는다."""
 
     def setUp(self):
         super().setUp()
@@ -364,6 +373,10 @@ class SubagentRegistrationTest(PluginFixture):
             os.environ["FOS_CTX_SUBAGENT_URL"] = self.saved_env
         super().tearDown()
 
+
+class SubagentRegistrationTest(SubagentServerFixture):
+    """subagent_start 가 Control Plane 가짜 서버에 등록하는 모양과 실패 분기를 본다."""
+
     def start(self, **overrides):
         kwargs = dict(parent_session_id=VECTOR_SESSION, parent_turn_id="turn-1", parent_subagent_id=None,
                       child_session_id=VECTOR_CHILD, child_subagent_id="sa-1", child_role="leaf",
@@ -387,11 +400,22 @@ class SubagentRegistrationTest(PluginFixture):
             "child_session_id": VECTOR_CHILD,
             "child_subagent_id": "sa-1",
             "parent_subagent_id": None,
+            "reports_stop": True,
+            "child_goal": "goal text",
             "sig": VECTOR_SUBAGENT_SIG,
         })
         # 목표 글과 토큰과 서명은 로그에 남기지 않는다.
         for secret in (FAKE_MCP_CREDENTIAL, VECTOR_SUBAGENT_SIG, "goal text"):
             self.assertNotIn(secret, log)
+
+    def test_goal_that_is_not_text_is_sent_as_null(self):
+        """맡긴 일이 없거나 글이 아니거나 비었으면 null 로 보내고 끝 소식 표시는 그대로다."""
+        for goal in (None, "", "   ", 3, ["x"]):
+            with self.subTest(goal=goal):
+                self.requests.clear()
+                self.start(child_goal=goal)
+                self.assertIsNone(self.requests[0]["body"]["child_goal"])
+                self.assertIs(self.requests[0]["body"]["reports_stop"], True)
 
     def test_retries_once_on_server_error(self):
         """서버 오류면 한 번 다시 시도한다."""
@@ -434,6 +458,121 @@ class SubagentRegistrationTest(PluginFixture):
                 os.environ["FOS_CTX_SUBAGENT_URL"] = self.url
                 self.token = FAKE_MCP_CREDENTIAL
         self.start(child_session_id=None)
+        self.assertEqual(self.requests, [])
+
+
+class SubagentStopTest(SubagentServerFixture):
+    """subagent_stop 이 가짜 Control Plane 에 끝 소식을 보내는 모양과 실패 분기를 본다."""
+
+    # Hermes 가 `_fire_subagent_stop_hooks` 에서 넘기는 키워드 인자다. 두 버전이 같다.
+    HOOK_KWARGS = dict(parent_session_id=VECTOR_ROOT, parent_turn_id="turn-1", child_session_id=VECTOR_TOP_CHILD,
+                       child_role="leaf", child_summary="결과 글 비밀", child_status="completed",
+                       tool_call_history=[{"tool": "terminal"}], duration_ms=1200)
+
+    def setUp(self):
+        super().setUp()
+        self.stop_url_path = "/internal/hermes/session-bindings/subagent/stop"
+
+    def stop(self, **overrides):
+        kwargs = dict(self.HOOK_KWARGS)
+        kwargs.update(overrides)
+        with self.assertLogs(self.plugin.logger, level="INFO") as logs:
+            self.assertIsNone(self.plugin.subagent_stop(**kwargs))
+        log = "\n".join(logs.output)
+        for secret in (FAKE_MCP_CREDENTIAL, VECTOR_STOP_SIG, "결과 글 비밀"):
+            self.assertNotIn(secret, log)
+        return log
+
+    def test_sends_signed_stop_to_stop_path(self):
+        """끝 소식을 등록 주소의 /stop 으로 계약의 서명과 함께 보낸다."""
+        self.assertIn("시도 1", self.stop())
+        self.assertEqual(len(self.requests), 1)
+        request = self.requests[0]
+        self.assertEqual(request["path"], self.stop_url_path)
+        self.assertEqual(request["headers"]["Authorization"], "Bearer " + FAKE_MCP_CREDENTIAL)
+        self.assertEqual(request["body"], {
+            "v": 1,
+            "parent_session_id": VECTOR_ROOT,
+            "parent_root_session_id": VECTOR_ROOT,
+            "child_session_id": VECTOR_TOP_CHILD,
+            "child_status": "completed",
+            "child_summary": "결과 글 비밀",
+            "sig": VECTOR_STOP_SIG,
+        })
+
+    def test_root_follows_parent_chain(self):
+        """압축으로 바뀐 부모 session 이어도 루트는 사슬의 처음 session 이다."""
+        self.stop(parent_session_id="compressed-1")
+        body = self.requests[0]["body"]
+        self.assertEqual(body["parent_root_session_id"], VECTOR_ROOT)
+        self.assertEqual(body["sig"], self.plugin.sign_subagent_stop(VECTOR_KEY, VECTOR_ROOT, "compressed-1",
+                                                                     VECTOR_TOP_CHILD))
+
+    def test_unreadable_state_db_uses_parent_as_root(self):
+        """state.db 를 읽지 못하면 부모 session 을 루트로 보낸다. 등록과 같다."""
+        self.db.unlink()
+        self.stop(parent_session_id="compressed-1")
+        self.assertEqual(self.requests[0]["body"]["parent_root_session_id"], "compressed-1")
+
+    def test_trailing_slash_in_register_url(self):
+        """등록 주소 끝에 / 가 있어도 끝 소식 경로는 하나다."""
+        os.environ["FOS_CTX_SUBAGENT_URL"] = self.url + "/"
+        self.stop()
+        self.assertEqual(self.requests[0]["path"], self.stop_url_path)
+
+    def test_failed_status_and_missing_summary(self):
+        """실패 상태와 결과 글 없음은 그대로, 글이 아닌 값은 null 로 보낸다."""
+        cases = [({"child_status": "timeout", "child_summary": None}, ("timeout", None)),
+                 ({"child_status": None, "child_summary": {"x": 1}}, (None, None)),
+                 ({"child_status": 7, "child_summary": ""}, (None, ""))]
+        for overrides, (status, summary) in cases:
+            with self.subTest(overrides=overrides):
+                self.requests.clear()
+                self.stop(**overrides)
+                body = self.requests[0]["body"]
+                self.assertEqual((body["child_status"], body["child_summary"]), (status, summary))
+
+    def test_retries_once_on_server_error_and_connection(self):
+        """5xx 면 한 번 다시 보내고 두 번째도 실패하면 로그만 남긴다."""
+        self.statuses = [502, 200]
+        self.assertIn("시도 2", self.stop())
+        self.requests.clear()
+        self.statuses = [503, 503]
+        self.assertIn("HTTP 503", self.stop())
+        self.assertEqual(len(self.requests), 2)
+
+    def test_client_errors_are_not_retried(self):
+        """4xx 는 다시 보내지 않는다. 등록 줄이 없는 404 도 같다."""
+        for status in (401, 403, 404):
+            with self.subTest(status=status):
+                self.requests.clear()
+                self.statuses = [status]
+                self.assertIn("HTTP %d" % status, self.stop())
+                self.assertEqual(len(self.requests), 1)
+
+    def test_connection_failure_only_logs(self):
+        """연결하지 못하면 로그만 남기고 돌아간다."""
+        self.server.shutdown()
+        self.server.server_close()
+        os.environ["FOS_CTX_SUBAGENT_URL"] = "http://127.0.0.1:1/unreachable"
+        self.assertIn("보내지 못했다", self.stop())
+
+    def test_skips_without_url_token_or_sessions(self):
+        """주소, 토큰, 부모나 자식 session 이 없으면 보내지 않는다."""
+        os.environ.pop("FOS_CTX_SUBAGENT_URL", None)
+        self.assertIn("FOS_CTX_SUBAGENT_URL", self.stop())
+        os.environ["FOS_CTX_SUBAGENT_URL"] = self.url
+        self.token = None
+        self.stop()
+        self.token = FAKE_MCP_CREDENTIAL
+        self.stop(child_session_id=None)
+        self.stop(parent_session_id=None)
+        self.assertEqual(self.requests, [])
+
+    def test_unexpected_error_never_escapes(self):
+        """비밀값을 읽다 예외가 나도 hook 밖으로 내지 않는다. Hermes 의 결과 마무리를 막지 않는다."""
+        self.secret_error = RuntimeError("비밀값 저장소 오류")
+        self.assertIn("RuntimeError", self.stop())
         self.assertEqual(self.requests, [])
 
 # 대시보드 plugin 이 설치 때 쓰는 이름 대응과 같은 모양이다.
@@ -1286,7 +1425,7 @@ class TransformToolResultTest(PluginFixture):
                 self.assertNotIn("결과-본문-비밀", "\n".join(logs.output))
 
     def test_register_adds_the_hook(self):
-        """plugin 을 올리면 세 hook 을 등록한다."""
+        """plugin 을 올리면 manifest 의 hook 을 모두 등록한다."""
         registered = {}
 
         class Context:
@@ -1296,7 +1435,8 @@ class TransformToolResultTest(PluginFixture):
                 registered[name] = callback
 
         self.plugin.register(Context())
-        self.assertEqual(set(registered), {"pre_tool_call", "subagent_start", "transform_tool_result"})
+        self.assertEqual(set(registered), {"pre_tool_call", "subagent_start", "subagent_stop", "transform_tool_result"})
+        self.assertIs(registered["subagent_stop"], self.plugin.subagent_stop)
         self.assertIs(registered["transform_tool_result"], self.plugin.transform_tool_result)
 
 

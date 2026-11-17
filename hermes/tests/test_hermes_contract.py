@@ -782,6 +782,36 @@ class HermesSourceTest(unittest.TestCase):
                         connection.close()
                     self.assertEqual(set(), set(columns) - found)
 
+    def _string_set(self, relative, name):
+        """모듈 맨 위에서 `name` 에 담은 집합 글자 값이다. 타입 표기가 있는 대입도 읽는다."""
+        for node in self.tree(self.root / relative).body:
+            targets = node.targets if isinstance(node, ast.Assign) else (
+                [node.target] if isinstance(node, ast.AnnAssign) else [])
+            if any(isinstance(target, ast.Name) and target.id == name for target in targets) and node.value:
+                return {item.value for item in ast.walk(node.value)
+                        if isinstance(item, ast.Constant) and isinstance(item.value, str)}
+        self.fail("%s 에 %s 가 없다" % (relative, name))
+
+    def test_subagent_hooks(self):
+        """fos-ctx 의 hook 이 Hermes 의 hook 이름에 있고, 하위 에이전트 hook 을 부르는 자리가 fos-ctx 가 읽는 인자를 넘긴다."""
+        names = self._string_set(*contract.HOOK_NAMES)
+        manifest = yaml.safe_load((PLUGIN_DIR.parent / "fos-ctx" / "plugin.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(set(), set(manifest["hooks"]) - names, "fos-ctx 가 다는 hook 이 Hermes 에 없다")
+        for hook, (relative, keywords) in contract.SUBAGENT_HOOKS.items():
+            with self.subTest(hook=hook):
+                self.assertIn(hook, names)
+                calls = [node for node in ast.walk(self.tree(self.root / relative))
+                         if isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant)
+                         and node.args[0].value == hook
+                         and (getattr(node.func, "id", None) or getattr(node.func, "attr", "")).endswith("invoke_hook")]
+                self.assertTrue(calls, "%s 에서 %s hook 을 부르는 자리가 없다" % (relative, hook))
+                for call in calls:
+                    self.assertEqual(set(), set(keywords) - {keyword.arg for keyword in call.keywords},
+                                     "%s hook 이 fos-ctx 가 읽는 인자를 넘기지 않는다" % hook)
+        relative, name, expected = contract.CALLER_THREAD_HOOKS
+        self.assertTrue(expected <= self._string_set(relative, name),
+                        "subagent_stop 이 부르는 스레드에서 돌지 않는다. 설계의 「깨우는 때」 를 다시 본다")
+
     def handlers(self):
         """`hermes_cli` 의 경로 decorator 를 모아 `{(메서드, 경로): (처리기, 모듈)}` 로 돌려준다."""
         found = {}

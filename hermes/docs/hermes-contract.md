@@ -1425,7 +1425,7 @@ finite single-query 요청은 동기로 돌아갈 수 있다.
 
 #### 하위 에이전트의 끝 hook 은 결과 줄보다 먼저 온다
 
-v0.21.6(commit `818c13be`)의 소스로 확인했다. 실행으로는 확인하지 않았다.
+v0.21.6(commit `818c13be`)의 소스로 확인했고, v0.23.2(commit `ae2a81cc`)도 같은 인자와 순서로 부르는 것을 소스로 확인했다. 실행으로는 확인하지 않았다.
 Control Plane 이 내장 위임의 결과로 자동 turn 을 여는 근거다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)).
 
 | 확인한 것 | 근거 |
@@ -1436,7 +1436,11 @@ Control Plane 이 내장 위임의 결과로 자동 turn 을 여는 근거다([A
 | `child_status` 는 `completed`, `failed`, `error`, `timeout`, `interrupted` 가운데 하나다. `completed` 만 쓸 만한 답이 있다는 뜻이다 | [`tools/delegate_tool_child_run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/tools/delegate_tool_child_run.py) |
 | 결과 줄은 다음 클라이언트 run 이 문맥으로 접어 넣는다. 압축으로 session 이 바뀌었으면 이어진 session 에 남긴다 | `gateway/wake.py` 의 `persist_delegation_delivery` |
 
+| v0.23.2 는 `child_summary` 의 비밀값을 가린 뒤 넘긴다. 플러그인은 프로세스 밖으로 보내므로 Hermes 가 늘 가린다 | v0.23.2 [`tools/delegate_tool_results.py`](https://github.com/NousResearch/hermes-agent/blob/ae2a81ccc00e9b7c06301523e5bb09608397149c/tools/delegate_tool_results.py) 의 `redact_child_value` 호출 |
+| `subagent_stop` 은 제한 시간 worker 로 옮기지 않고 부모의 마무리 잠금 안에서 부르는 스레드가 돈다. 그래서 fos-ctx 가 보내는 동안 결과 줄이 남지 않는다 | `hermes_cli/plugins_dispatch.py` 의 `_HOOK_CALLER_THREAD_HOOKS`, `tools/delegate_tool_results.py` 의 `_finalize_child_results` |
+
 **Hermes 를 올릴 때 이 표를 다시 확인한다.** hook 이름이나 인자가 바뀌면 내장 위임의 결과로 답이 열리지 않고, 자식은 1시간 뒤 알림 줄로 끝난다.
+hook 이름, 인자, 부르는 스레드는 `hermes/tests/test_hermes_contract.py` 의 `test_subagent_hooks` 가 소스로 본다(선언은 `hermes_contract.py` 의 `SUBAGENT_HOOKS`).
 
 #### 자식 session 으로 결과와 토큰을 보완한다
 

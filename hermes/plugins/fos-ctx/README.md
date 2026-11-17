@@ -125,6 +125,20 @@ Hermes 는 자식을 만드는 자리에서 부모 스레드로 이 hook 을 동
 일회용 컨테이너에서 부모 run 이 0.25초에 끝나고 등록이 0.12초에 도착했다.
 등록 로그는 `fos-ctx: 자식 session 을 등록했다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다.
 
+등록 본문에는 `reports_stop: true` 와 hook 이 받은 `child_goal` 을 넣는다(1.12.0 부터).
+자식이 끝나면 `subagent_stop` hook 이 끝 소식을 보내고, Control Plane 은 그 결과로 부모 대화의 다음 답을 연다.
+경로, 본문, 서명, 응답은 아래 「하위 에이전트 끝 소식 계약」 이 소유한다.
+
+| 항목 | 값 |
+| --- | --- |
+| 주소 | 자식 session 등록 주소 끝에 `/stop` 을 붙인 것. 운영 값을 따로 두지 않는다 |
+| 인증, 제한 시간, 다시 보내기 | 등록과 같다. 4xx(등록 줄이 없는 404 포함)는 다시 보내지 않는다 |
+| 실패 | 로그만 남긴다. 그 자식은 Control Plane 의 기한 알림으로 끝나고 결과는 Hermes 이력에 남는다 |
+| 깨울 자식이 아닌 자식 | 손자 자식도 보낸다. `subagent_stop` 에는 `parent_subagent_id` 가 없어 플러그인이 가리지 못하고, 서버가 `ignored` 로 답한다 |
+
+Hermes 는 부모의 마무리 잠금 안에서 자식마다 이 hook 을 잇달아 부른다. 보내기가 늦으면 부모 session 의 결과 줄도 그만큼 늦게 남는다.
+로그는 `fos-ctx: 하위 에이전트 끝 소식을 보냈다 (시도 N)` 이고, 실패하면 상태 코드나 예외 종류만 남는다. 결과 글과 맡긴 일은 남기지 않는다.
+
 ### 플러그인 도구 호출을 묻는다
 
 profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있으면 fos-ctx 는 그 profile 의 플러그인 MCP 도구 호출마다 Control Plane 에 묻고 답대로 한다.
@@ -539,8 +553,9 @@ hook 은 결과 줄이 부모 session 에 남기 전에 불린다([`hermes/docs/
 | 5 | `compression.in_place: false` 로 교체된 최상위 session 에서 자식을 만든다 | 등록 본문의 `parent_root_session_id` 가 원래 루트다 |
 | 6 | 플러그인의 등록을 끈 채 자식이 `memory_read` 를 부른다 | 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
 | 7 | 자식이 도는 동안 사용자가 부모 turn 을 중지하고, 그 뒤 자식이 `memory_read` 를 부른다 | origin 실행이 `CANCELLED` 이고 「호출 맥락을 확인할 수 없습니다」 로 끝난다 |
+| 8 | 자식이 끝날 때 플러그인 로그를 본다 | `subagent_stop` 이 불리고 「하위 에이전트 끝 소식을 보냈다」 가 남는다. 결과 줄보다 먼저다 |
 
-Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사라지거나 인자 이름이 바뀌면 하위 에이전트의 MCP 호출이 모두 거절된다.
+Hermes 를 올릴 때도 이 표를 다시 돌린다. `subagent_start` 가 사라지거나 인자 이름이 바뀌면 하위 에이전트의 MCP 호출이 모두 거절되고, `subagent_stop` 이 바뀌면 결과로 답이 열리지 않는다. 소스로 보는 검사는 `hermes/tests/test_hermes_contract.py` 의 `test_subagent_hooks` 다.
 
 ### 바인딩 profile 의 판정
 

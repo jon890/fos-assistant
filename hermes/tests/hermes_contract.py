@@ -403,6 +403,21 @@ SESSION_COLUMNS = {
 # 위임 도구가 자식 에이전트를 만들 때 `platform=` 으로 넘기고, 그 값이 자식 session 의 `source` 가 된다.
 SUBAGENT_SOURCE = ("subagent", "tools/delegate_tool.py")
 
+# fos-ctx 가 하위 에이전트 등록과 끝 소식에 기대는 lifecycle hook 이다(fos-assistant ADR-037, ADR-20261117 / native-delegation-wake).
+# hook 이름마다 부르는 파일과, 그 호출이 넘겨야 하는 키워드 인자 가운데 fos-ctx 가 읽는 것이다.
+# 이름이나 인자가 바뀌면 등록이 빠져 하위 에이전트의 호출이 거절되거나, 끝 소식이 빠져 결과로 답이 열리지 않는다.
+SUBAGENT_HOOKS = {
+    "subagent_start": ("tools/delegate_tool.py",
+                       ("parent_session_id", "parent_subagent_id", "child_session_id", "child_subagent_id",
+                        "child_goal")),
+    "subagent_stop": ("tools/delegate_tool_results.py",
+                      ("parent_session_id", "child_session_id", "child_status", "child_summary")),
+}
+# hook 이름 목록과, 제한 시간 worker 로 옮기지 않고 부르는 스레드에서 도는 hook 의 목록이다.
+# `subagent_stop` 이 worker 로 옮겨지면 끝 소식과 부모 session 의 결과 줄 순서가 바뀔 수 있다. 설계의 「깨우는 때」 를 다시 본다.
+HOOK_NAMES = ("hermes_cli/plugins.py", "VALID_HOOKS")
+CALLER_THREAD_HOOKS = ("hermes_cli/plugins_dispatch.py", "_HOOK_CALLER_THREAD_HOOKS", frozenset({"subagent_stop"}))
+
 # plugin 이 감싸 Hermes 처리기로 넘기는 대시보드 경로다. Hermes 가 이 경로를 없애거나 옮기면 감싼 검사가 헛돈다.
 HERMES_ROUTES = frozenset({
     ("GET", "/api/profiles"),
