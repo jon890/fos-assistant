@@ -53,4 +53,4 @@
   그 run 을 다시 묻는 쪽이 모두 그만둔 경우를 위해 새 실행을 보내기 전에 같은 profile 의 최근 연결 실패·시간 초과 실행을 해제한다.
   v0.23.2 의 `cancelled` 는 사용자 중지와 Hermes 정상 종료로 끊긴 실행을 함께 담으므로, 끝 사건과 중지 기록으로 나누고 근거가 없으면 실패(`interrupted`)로 적는다.
   Hermes 쪽 번역은 `hermes/infra` 가 갖고, 흐름은 [`docs/features/hermes-upgrade/design.md`](../../../docs/features/hermes-upgrade/design.md) 가 갖는다. 결정의 뜻(Hermes 에 물어 정한다)은 바꾸지 않는다.
-- **적용 범위**: 기동할 때 한 번 시작한다. 도는 Control Plane 이 Hermes 와 끊겼을 때의 처리는 바꾸지 않는다.
+- **적용 범위**: 기동할 때 한 번 시작한다. 도는 Control Plane 이 Hermes 와 끊겼을 때의 처리는 바꾸지 않는다. 다만 Hermes v0.22 부터의 `unknown` 해제는 기동 때만이 아니라 도는 turn 의 조회, 남은 원격 실행 기다리기, 새 실행을 보내기 직전에도 일어난다.

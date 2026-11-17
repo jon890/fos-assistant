@@ -536,7 +536,7 @@ Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다
 그 run 을 다시 묻는 쪽이 없어도 대화가 막히지 않게, 새 실행을 보내기 전에 같은 profile 에서 최근 연결 실패·시간 초과로 끝난 실행을 해제한다.
 흐름과 결정은 [`docs/features/hermes-upgrade/design.md`](../../docs/features/hermes-upgrade/design.md) 와 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 갖는다.
 
-**가짜 Hermes 는 `/__test/hermes-shape` 로 v0.23 모양을 켤 수 있다.** 켜면 조회에서 `error`, `pending_steer` 를 빼고 기록 번호를 싣고, `/__test/restart-hermes` 가 도는 실행을 `unknown` 으로 바꾼다. `/__test/reset-controls` 가 v0.21 모양으로 되돌린다.
+**가짜 Hermes 는 `/__test/hermes-shape` 로 v0.23 모양을 켤 수 있다.** 켜면 조회에서 `error`, `pending_steer` 를 빼고 기록 번호를 넣고, `/__test/restart-hermes` 가 도는 실행을 `unknown` 으로 바꾼다. `/__test/reset-controls` 가 v0.21 모양으로 되돌린다.
 
 ### `/v1/runs` 에 사진을 싣는 법
 
@@ -803,7 +803,7 @@ v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 소스로 보면 아�
 - `message.interim`, `reasoning.available`, `subagent.start`, `subagent.complete` 가 오지 않는다. `_execute_run` 이 답 조각과 도구 시작·완료 sink 만 등록한다(`gateway/session_api_turn.py` 의 `wire_api_observers`). Control Plane 은 오는 사건만 그린다(스펙 DECISION2)
 - `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 을 걸린 시간 모름으로 읽는다
 - 대기 중 gateway 가 물러나면 끝이 아닌 `run.queued` 가 온다. 아는 사건 목록 밖이라 건너뛴다
-- gateway 가 정상 종료로 내려가면 도는 실행에 `run.interrupted` 가 오고 `pending_steer` 와 `runtime` 은 실리지 않는다
+- gateway 가 정상 종료로 내려가면 도는 실행에 `run.interrupted` 가 오고 `pending_steer` 와 `runtime` 은 빠진다
 
 `data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
 10초마다 `: keepalive` 주석이 온다.

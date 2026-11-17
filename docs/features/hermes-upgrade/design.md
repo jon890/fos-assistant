@@ -30,7 +30,7 @@ application 이 새로 보는 것은 포트 DTO 의 boolean 하나(`HermesRunRes
 | --- | --- |
 | `hermes/infra/HttpHermesRunsClient` | `queued`, `unknown`, v0.23.2 의 `cancelled` 번역, `resolve-unknown` 호출, 중지의 409 `unknown_execution` 처리, 조회 응답에 빠진 칸 채우기, 끝난 실행의 사건 보관분 다시 읽기, 잃은 실행 미리 풀기 |
 | `hermes/infra/HermesRunEventStream` | 종료 사건을 `HermesRunTerminals` 에 넘기기, `duration` 0 처리, 끝난 실행의 보관분에서 종료 사건만 읽는 진입점 |
-| `hermes/infra/HermesRunTerminals`(새 class) | profile 과 run 번호마다 받은 종료 사건 하나와 이 프로세스가 중지를 보낸 run 을 메모리에 짧게 둔다 |
+| `hermes/infra/HermesRunTerminals`(새 class) | profile 과 run 번호마다 받은 종료 사건 하나, 이 프로세스가 중지를 보낸 run, 끝 상태를 확인한 run 을 메모리에 짧게 둔다 |
 | `hermes/application/port/HermesRunsClient` | `releaseIfLost(apiBaseUrl, profileName, runId)` 를 더한다. 그 run 이 잃은 실행이면 해제하고, 아니면 아무것도 하지 않는다. 기본 구현은 아무것도 하지 않는다 |
 | `hermes/application/dto/HermesRunResult` | `pendingSteerKnown` 필드를 더한다. 기존 생성자는 `true` 로 채워 지금 호출자를 바꾸지 않는다 |
 | `chat/turn/ChatTurnRunner`, `chat/recovery/RecoveredRunRecorder` | steer 정리에서 `pendingSteerKnown()` 이 거짓이면 중지 판정보다 먼저 `SteerSettlement.unknown()` 을 고른다 |
@@ -101,7 +101,7 @@ v0.21.6 응답에서는 지금처럼 조회 응답만 읽는다.
 종료 사건은 두 곳에서 얻는다. 대화 turn 은 이미 연 사건 스트림이 `HermesRunTerminals` 에 남긴 것을 쓴다. 남은 것이 없으면(스트림을 열지 않은 호출자, 스트림이 먼저 끊긴 turn, Control Plane 이 다시 뜬 뒤) 어댑터가 `GET /v1/runs/{id}/events` 를 한 번 열어 보관분을 읽는다. 끝난 실행은 보관분을 보내고 스트림을 닫으므로 기다림이 짧다. 연결 제한 시간은 `assistant.hermes.terminal-event-read-timeout`(기본 5초)이다.
 보관분은 실행이 끝나고 5분(`_RUN_STREAM_TTL`) 뒤 사라진다. 그 뒤에 읽는 결과는 위 표의 「둘 다 없으면」 이다. 그래서 provider 계정이 막힌 실패(`PROVIDER_BLOCKED`)는 5분이 지나 재기동 정리로 적는 실행에서만 일반 실패로 적힌다.
 
-`HermesRunTerminals` 는 profile 과 run 번호를 키로 종료 사건 하나를 둔다. 읽으면 지우고, 읽히지 않으면 `hermes.run-timeout` 뒤 지운다. 중지를 보낸 run 번호도 같은 시간 동안 둔다. 테이블은 늘리지 않는다.
+`HermesRunTerminals` 는 profile 과 run 번호를 키로 종료 사건 하나를 둔다. 읽으면 지우고, 읽히지 않으면 30분 뒤 지운다. 중지를 보낸 run 번호도 30분 둔다. 끝 상태를 확인한 run 번호는 미리 풀기가 다시 묻지 않게 24시간(미리 풀기가 고르는 기간) 둔다. 보관 시간을 `hermes.run-timeout` 대신 고정값으로 둔 것은 그 설정을 `LiveProperties` 밖에서 새로 읽지 못하게 하는 구조 규칙 때문이다. 테이블은 늘리지 않는다.
 
 ### 중지
 
