@@ -130,7 +130,8 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 
 **hook 이 막는 경우.** Control Plane 이 `allow` 로 답하지 않았다(404 만 예외, 아래 「실패와 일관성」 의 배포 순서), 주소나 토큰이 없다, tool_call_id 가 없다, 무엇이든 예외가 났다. 예외는 hook 안에서 잡아 정해 둔 글로 막는다. callback 예외도 Hermes 가 막지만 그때는 예외 본문 일부가 모델에게 간다. 새 Control Plane 은 이 경로에서 404 를 내지 않는다. 판정 중의 어떤 예외든 200 의 `block` 으로 답하고, 본문을 읽지 못하거나 서명이 틀리면 다른 거절과 같은 `TOOL_GUARD_REJECTED`(403)다.
 
-**session 이 없는 호출은 통과시킨다.** 코드 실행 안의 도구 호출(`execute_code` 의 RPC 와 상주 kernel)은 hook 에 `task_id` 만 넘긴다(계약 테스트가 고정). 그 코드를 연 `execute_code` 는 session 을 들고 와 판정을 받았고, 사건 실행 트리에서는 그 `execute_code` 가 막힌다. 보통 대화의 kernel 안 스레드가 cell 이 끝난 뒤에도 부를 수 있지만 그 kernel 은 사건 실행 트리에서 열리지 않는다. session 이 없는 호출을 막으면 보통 대화의 코드 실행이 깨진다.
+**v0.21.6 에서 session 이 없는 호출은 통과시킨다.** 코드 실행 안의 도구 호출(`execute_code` 의 RPC 와 상주 kernel)은 v0.21.6 에서 hook 에 `task_id` 만 넘긴다(계약 테스트가 고정). 그 코드를 연 `execute_code` 는 session 을 들고 와 판정을 받았고, 사건 실행 트리에서는 그 `execute_code` 가 막힌다. 보통 대화의 kernel 안 스레드가 cell 이 끝난 뒤에도 부를 수 있지만 그 kernel 은 사건 실행 트리에서 열리지 않는다. session 이 없는 호출을 막으면 보통 대화의 코드 실행이 깨진다.
+v0.23 은 그 호출에 `session_id` 를 함께 넘기고 `tool_call_id` 는 비운다. fos-ctx 가 `code-exec:` 번호를 만들어 일반 호출처럼 Control Plane 에 묻고, 아래 판정이 그 session 으로 사건 실행 트리의 호출을 막는다. 보통 대화는 통과한다. 버전별 차이는 [fos-ctx README](../../../hermes/plugins/fos-ctx/README.md) 의 표가 갖는다.
 
 **Control Plane 의 판정(`EventToolGuard.decide`).** 서명을 확인한 profile, 루트 session, session 으로 이 순서로 본다.
 
@@ -145,7 +146,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 
 **판정 plugin 이 있는지 깨울 때마다 본다.** 바인딩 줄의 `READY` 는 마지막 연결 확인 때의 것이라 배포 뒤 옛 `fos-ctx` 를 놓칠 수 있다. 그래서 `EventWatchPoller` 는 깨우기 직전에, `EventWatchService` 는 조회와 켜기 때 `HermesConnectorClient.readConnector` 로 그 바인딩의 설치 상태를 읽고 `tool_guard`, `policy_hook`, 켜짐, 설정됨을 요구하고, 그 에이전트의 바인딩 줄 가운데 재시작을 기다리는 것(`restart_required`)이 없어야 한다. 설치 상태의 응답에는 재시작 칸이 없고, 같은 profile 의 다른 바인딩 설치가 `fos-ctx` 를 바꿔도 gateway 가 옛 코드를 쥘 수 있어서다(독립 verify). 아니면 깨우지 않고 `BLOCKED`, 켜기는 `TOOL_GUARD_MISSING` 이다. Hermes 를 읽지 못하면 깨우지 않고 `BLOCKED`, 조회는 `READINESS_UNKNOWN` 이다. `fos-ctx` 파일을 바꾼 설치는 그 바인딩을 재시작 대기로 두므로(`plugin_updated`) 관리자 반영 완료 전에는 같은 에이전트의 사건 실행이 열리지 않는다.
 
-**도구 목록을 버전마다 고정한다.** `hermes/tests/hermes_contract.py` 에 Hermes 내장 도구 이름 전체와 안전 목록이 든 toolset 을 적고, `test_tool_guard_contract.py` 가 지정한 Hermes 소스의 `toolsets.py` 와 견준다. Hermes 를 올려 도구가 생기거나 안전 목록 도구의 toolset 이 바뀌면 실패한다. 코드 실행 안의 호출이 `handle_function_call` 에 session 없이 들어가는 두 지점(`code_execution_rpc`, `code_kernel`)과 중계 도구 이름도 같은 테스트가 본다.
+**도구 목록을 버전마다 고정한다.** `hermes/tests/hermes_contract.py` 에 Hermes 내장 도구 이름 전체와 안전 목록이 든 toolset 을 적고, `test_tool_guard_contract.py` 가 지정한 Hermes 소스의 `toolsets.py` 와 비교한다. Hermes 를 올려 도구가 생기거나 안전 목록 도구의 toolset 이 바뀌면 실패한다. 코드 실행 안의 호출이 `handle_function_call` 에 넘기는 식별 칸(v0.21.6 은 `task_id` 만, v0.23 은 `session_id` 도 있고 `tool_call_id` 는 둘 다 없다)을 두 지점(`code_execution_rpc`, `code_kernel`)에서 계열별로 같은 테스트가 본다. 중계 도구 이름도 본다.
 
 ### Control Plane API(PR2)
 
