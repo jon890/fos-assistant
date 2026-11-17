@@ -921,28 +921,33 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 
 아래 계약은 private 관리 owner가 사용하는 일반 내부 경계다. 공개 writer 설치 API의 인자와
 `BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
-`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 고정 공식 commit의 정확한
+v0.23 계열의 runtime scope 경계로 선언하며, `BODYLESS_SOURCE_LINE`의 표지 파일이 없는 소스(기준 버전 v0.21.6)에서는 source 검사를 건너뛴다.
+운영에 연결하지 않아 기준 버전을 올리기 전까지 v0.23 계열에서만 맞춘다. 설계는 [Hermes 업그레이드 설계](../../docs/features/hermes-upgrade/design.md)의 「PR4」 가 갖는다.
+`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 v0.23.2 공식 commit의 정확한
 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
-`BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 `contextvars` import,
+`BODYLESS_MANAGED_MODULE_NODES`는 scope 상태의 저장소와 값 타입, `contextvars` import,
 cron module의 `sys` import·child 진입점을 선언한다.
-두 문맥 module의 `ContextVar`·`Token`과 선언된 저장소·함수 이름은 module scope에서 한 번만
+문맥 module(`BODYLESS_CONTEXT_MODULES`)의 `ContextVar`와 선언된 저장소·함수 이름은 module scope에서 한 번만
 bind되는지 검사한다. 대입·삭제·import·정의 외에 exception target과 match capture도 센다.
 함수·class 안의 로컬 이름은 module binding으로 세지 않는다.
 명시 home의 직접 helper인 `load_env_file`도 함수 AST를 별도로 선언한다.
 AST 지문은 행 번호·공백·주석을 제외하며 함수 본문의 변경도 재검토 대상으로 삼는다.
-실제 source에서 선택한 get·set·reset을 실행해 복사 문맥의 격리와 token 복원을 확인한다.
+실제 `hermes_scope.py`와 `agent/runtime_scope.py`를 실행해 복사 문맥과 중첩 묶기의 profile 격리, 빠져나올 때의 복원,
+순서가 어긋난 token reset 뒤에도 두 profile의 조각이 섞이지 않는지 확인한다. secret 파일 읽기·외부 secret 채우기·terminal 정책은 대역이다.
+같은 실행에서 아래 resolver 꼴과 실제 writer가 다른 profile의 scope, scope 없음, 등록되지 않은 agent에서 파일을 만들지 않는지 확인한다.
 loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환 dict가 섞이지 않고,
 프로세스 환경을 읽어 대체하거나 변경하지 않는지 확인한다.
-이 분리 실행에 필요한 parser·cache·stat helper는 실행하되 전이 의존 전체의 지문을 선언하지 않는다.
+이 분리 실행에 필요한 parser·cache helper는 실행하되 전이 의존 전체의 지문을 선언하지 않는다.
 
 | 내부 경계 | 관리 owner가 기대는 동작 |
 | --- | --- |
 | `agent.agent_init.init_agent` | 실제 초기화 경계다. owner는 정확한 agent class와 객체 identity를 확인해 먼저 등록하고, 초기화 실패 때 해제한다 |
 | `run_agent.AIAgent.__init__`·`close` | constructor는 호출 안에서 initializer를 import한다. close wrapper는 원래 함수를 부르며 성공·실패 모두에서 등록을 해제한다 |
-| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다 |
-| `agent.secret_scope` | `build_profile_secret_scope`에 명시 home을 주고 `set_secret_scope`에 그 home을 함께 기록한다. `current_secret_scope_home`으로 확인하고 token을 `reset_secret_scope`로 복원한다 |
-| `hermes_constants` | home override의 get·set·reset은 context-local이다. set이 준 token으로 이전 문맥을 복원한다 |
-| `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
+| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다. `profile_home` 경로는 `tools.delegate_tool_routes.delegated_profile_scope`가 옛 setter를 거쳐 `legacy_switch`로 scope를 옮겨 자식을 다른 profile의 scope 안에서 만들므로(두 함수도 지문을 둔다), 그때 묶인 scope가 부모 profile과 다르면 부모 capability를 넘기지 않고 생성 전에 거절한다 |
+| `agent.runtime_scope.bind_profile_scope` | 관리 owner가 profile 문맥을 묶는 진입점이다. home override, secret, terminal 정책을 한 변경으로 묶고 빠져나올 때 그 변경만 뺀다. 같은 profile을 다시 묶으면 묶인 scope를 그대로 쓴다 |
+| `hermes_scope` | scope 상태 하나가 context-local로 scope·home·secret·terminal 정책을 갖는다. `current_scope()`가 묶인 scope를 주고, local scope의 `scope.home()`이 그 profile home이다. token reset은 그 변경과 그 scope 안에서 한 변경을 함께 뺀다 |
+| `agent.secret_scope`·`tui_gateway.launch_profile_policy` | 묶기가 secret을 만드는 경로다. 실행 profile은 launch 값으로 stamp 없이, 다른 profile은 그 home의 파일로 만든다. 옛 setter(`set_secret_scope`, `set_hermes_home_override`)는 scope가 묶여 있으면 scope를 옮기거나 거절하므로 기대하지 않는다 |
+| `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽기 전에 `cron.worker_bootstrap.finish_worker_boot`로 `hermes_bootstrap`을 부르고, payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
 
 `cron.scheduler.run_one_job`의 정확한 signature와 함수 AST도 별도로 선언한다.
 이 정의가 module의 같은 이름을 한 번만 bind하는지 확인해 후속 대입·삭제·재import·중복 정의와
@@ -956,13 +961,16 @@ ack 뒤 job이 `False`를 반환하면 ack를 보존하며 그 실패를 그대�
 저장소와 secret/profile 적재는 대역이며 실제 `run_one_job` 전체 실행이나 운영 저장을 검증하지 않는다.
 
 resolver는 약한 registry에 등록된 실제 agent identity만 읽는다. 등록되지 않은 부모와 다른 profile의
-capability, 현재 secret/home 문맥과 맞지 않는 capability는 생성 전에 거절한다.
+capability, 현재 scope와 맞지 않는 capability는 생성 전에 거절한다.
+writer 호출 때도 `hermes_scope.current_scope()`가 local이고 그 `home()`이 등록된 profile home과 같을 때만 목적지를 주고,
+그 밖은 `None`이다. secret의 stamp는 실행 profile에서 비어 있으므로 profile 확인에 쓰지 않는다.
 owner는 생성·close 실패와 순환 객체 수거 때 등록을 해제하고, profile plugin reload/unload와
 bootstrap 재import 뒤에도 같은 process owner identity를 유지해야 한다.
 thread로 문맥을 전달할 때는 명시적으로 복사하며 전역 home을 대체 값으로 쓰지 않는다.
 
 cron adapter는 scheduler module의 executable 조회만 proxy로 제한한다. 이 proxy는 공식 Hermes API가 아니다.
 프로세스 전체 `sys.executable`과 subprocess 전역을 교체하지 않는다.
+v0.23의 cron child는 끝나지 않은 source update가 있으면 `hermes_bootstrap`이 다른 interpreter로 relaunch하며, 그 interpreter는 관리 bootstrap을 거치지 않을 수 있다. 이미지에서 relaunch가 일어나지 않는지는 private 활성화 수락 조건이다.
 release 봉인과 런타임 callable·signature·code 대조, 관리 진입점 연결은 private owner의 책임이다.
 공개 source 계약 시험은 전체 `AIAgent`·실제 parent·provider 네트워크를 실행하지 않는다.
 private prototype의 합성 검증과 실제 image 시험·활성화 수락도 이 source 검사로 대체하지 않는다.
@@ -1637,7 +1645,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 | `tool_search`, `tool_describe` | 그 이름 그대로. MCP `tools/call` 은 일어나지 않는다 | 소스 |
 | native `delegate_task` 의 자식 | 자식도 같은 executor 를 쓴다. `session_id` 는 자식의 것이다 | 소스 |
 | 공유 gateway 의 `/v1/runs` | 요청 profile 의 plugin manager 를 고른다 | 소스, profile 둘의 hook 문맥 실행 |
-| `execute_code` 안의 도구 호출 | hook 을 거친다. 넘어오는 식별자는 `task_id` 뿐이다. v0.21.6 의 상주 kernel(`tools/code_kernel.py`)도 같다. fos-ctx 의 도구 판정은 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. `test_tool_guard_contract.py` 가 두 자리를 고정한다 | 소스 |
+| `execute_code` 안의 도구 호출 | hook 을 거친다. v0.21.6 은 넘어오는 식별자가 `task_id` 뿐이고, 상주 kernel(`tools/code_kernel.py`)도 같다. fos-ctx 의 도구 판정은 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. v0.23.2 는 `session_id` 를 함께 넘기고 `tool_call_id` 는 비운다. fos-ctx 는 그 호출에 `code-exec:` 번호를 만들어 묻는다. `test_tool_guard_contract.py` 가 두 자리와 버전별 식별 칸을 고정한다 | 소스 |
 | plugin 의 `PluginContext.call_mcp` | **hook 을 거치지 않는다.** 서버 정의의 `mcp_allowlist` 만 본다 | 소스 |
 
 중계 한 건에 hook 이 두 번 걸리지 않는다. executor 가 중계를 먼저 풀고 hook 을 적용한 뒤 dispatcher 에는 hook 을 건너뛰라고 넘긴다.
@@ -1818,6 +1826,10 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 
 그래서 내장 승인으로는 「승인한 인자 그대로 한 번만 실행한다」 를 보장하지 못한다.
 
+**v0.23.2 에서는 사람이 없는 실행에서 이 승인이 profile 설정으로 바로 정해진다.**
+`/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 `_presence` 가 ask 문맥을 끄고, 관문(`_run_approval_gate`)이 `approvals.unattended_mode` 로 정한다. docker profile 은 그 값이 `approve` 라 사람 없이 통과한다.
+fos-ctx 는 `approve` 를 돌려주지 않는다. 같은 관문을 쓰는 셸 위험 명령, 승인 경로 쓰기, `computer_use` 는 아래 「`execute_code` 의 승인 판정」 대로 fos-ctx 가 먼저 막는다.
+
 근거: [approve directive](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py#L1934),
 [임의 도구 승인 함수](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval.py#L1095),
 [승인 우회와 저장된 승인](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval.py#L951)
@@ -1835,7 +1847,8 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
 - `fos-ctx` 1.5.0 을 올린 profile 에서 안전 목록 밖의 도구가 `tool-guard` 를 묻는지. gateway 로그의 `fos-ctx:` 줄과 Control Plane 의 「도구 호출을 막았다」 로그로 본다. Hermes 가 plugin 을 불러오지 못하면 판정 없이 나가고 설치 상태의 `tool_guard` 는 이것을 알지 못한다
 - 사건 실행에서 막는 판정이 실제로 한 번 나오는지(Control Plane 의 「도구 호출을 막았다」 로그)와 gateway 에 `FOS_CTX_POLICY_URL` 이 있는지. Hermes 와 Control Plane 사이가 새 경로를 열지 않아 404 를 내면 hook 이 옛 Control Plane 으로 읽고 통과시킨다
-- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지
+- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지. v0.23.2 에서는 그 호출이 `code-exec:` 번호로 `tool-guard` 를 묻고 보통 대화에서 통과하는지
+- `fos-ctx` 1.11.0 을 올린 profile 에서 셸 위험 명령이 승인 시간을 기다리지 않고 「위험 명령으로 분류돼」 글로 바로 거절되는지
 - `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
 
 ### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
@@ -2212,10 +2225,28 @@ plugin 이 쓰는 `/workspace` 부터 호스트 경로다.
 3번이 4번보다 앞이라, API 서버의 승인 다리(`/v1/runs/{id}/approval`)가 있어도 `execute_code` 는 승인 카드로 가지 않는다.
 그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](adr/ADR-20261008-execute-code-unattended.md)).
 
-**같은 모드가 셸 위험 명령과 plugin 승인 요청에는 닿지 않는다.**
+**v0.21.6 에서는 같은 모드가 셸 위험 명령과 plugin 승인 요청에 닿지 않는다.**
 `check_all_command_guards` 와 `_run_approval_gate` 는 CLI, gateway, ask 문맥이 모두 아닐 때만 사람이 없는 문맥의 모드를 본다.
 gateway 의 `start_gateway()` 가 `HERMES_EXEC_ASK=1` 을 프로세스 환경에 넣으므로 API 서버 실행은 ask 문맥이고, 두 판정은 승인 카드로 간다.
-이 두 지점은 계약 시험(`hermes/tests/test_hermes_contract.py`)이 확인한다.
+Control Plane 은 Hermes 승인 카드에 답하지 않으므로 승인 시간(기본 300초)을 기다린 뒤 거절된다.
+
+**v0.23.2 에서는 닿는다.**
+표식을 켜는 자리는 `gateway/run_bootstrap.py` 의 `_start_gateway_runtime` 으로 옮겼다. 그런데 `_presence` 는 `api_server` 실행에 승인 알림 경로(`_gateway_notify_cb`)가 없으면 ask 문맥을 끈다.
+그러면 셸 위험 명령은 `check_all_command_guards` 가, 승인이 필요한 경로의 파일 쓰기(`~/.ssh/config`, 셸 시작 파일)와 `computer_use` 는 `_run_approval_gate` 가 `unattended_mode` 로 바로 정해, docker profile 에서는 사람 없이 열린다.
+session 대기열의 turn 실행기는 turn 마다 알림 경로를 등록하지만, 그 session key 가 닿지 않는 스레드가 어디인지는 확인하지 못했다.
+
+**그래서 fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다**(`docs/features/hermes-upgrade/spec.md` 의 REQ5).
+
+| 도구 | 막는 조건 | 쓰는 Hermes 함수 |
+| --- | --- | --- |
+| `terminal` | `detect_dangerous_command(command)` 의 첫 값이 참이다. `command_allowlist` 는 보지 않는다 | `tools/approval_detection.py` |
+| `write_file`, `patch` | 대상 경로 가운데 하나라도 `write_approval_key` 가 값을 준다. V4A 머리줄의 경로도 보고, 상대 경로는 hook 이 받은 `task_id` 로 푼다. 이 함수가 없는 v0.21.6 은 건너뛴다 | `agent/file_safety.py`, `tools/file_tools.py` 의 `_collect_v4a_header_paths`, `tools/file_tools_write_guards.py` 의 `_resolved_or_raw` |
+| `computer_use` | 모든 호출 | 없음 |
+
+판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다.
+docker profile 의 `execute_code` 는 `unattended_mode: approve` 로 지금처럼 승인 없이 돈다.
+사람 없는 문맥의 모드를 보는 함수 목록(`check_all_command_guards` 포함)은 `test_unattended_approval_points` 가, `_run_approval_gate` 를 부르는 함수 목록과 위 함수의 위치, 시그니처는 `test_approval_guard_points` 가 두 버전에서 확인한다.
+어느 목록이든 함수가 늘면 시험이 실패하고, fos-ctx 가 그 동작을 막는지 본 뒤 선언을 고친다.
 
 모드는 판정할 때마다 그 실행의 profile 설정에서 읽는다(`tools/approval_context.py` 의 `_binary_approval_mode`).
 값을 바꾸면 gateway 를 다시 띄우지 않아도 다음 호출부터 반영된다.

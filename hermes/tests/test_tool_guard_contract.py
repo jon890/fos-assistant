@@ -1,9 +1,10 @@
 # 코드 규칙: rule-64. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 """사건 실행의 도구 판정이 기대는 Hermes 의 도구 목록과 호출 지점이 그대로인지 본다.
 
-fos-ctx 의 `pre_tool_call` 은 안전 목록(`SAFE_TOOLS`) 밖의 도구를 Control Plane 에 묻고, session 없는 호출은
-코드 실행 안의 호출로 보고 묻지 않는다(fos-assistant ADR-20261105 / event-watch). 그래서 Hermes 를 올릴 때
-도구가 생기거나 안전 목록 도구의 toolset 이 바뀌거나 코드 실행 안의 호출에 session 이 생기면 다시 봐야 한다.
+fos-ctx 의 `pre_tool_call` 은 안전 목록(`SAFE_TOOLS`) 밖의 도구를 Control Plane 에 묻는다(fos-assistant
+ADR-20261105 / event-watch). 코드 실행 안의 호출은 v0.21 에서 session 없이 와 묻지 않고, v0.23 에서는 session 을 달고
+`tool_call_id` 없이 와 fos-ctx 가 판정 요청용 번호를 만들어 묻는다(스펙 hermes-upgrade REQ6). 그래서 Hermes 를 올릴 때
+도구가 생기거나 안전 목록 도구의 toolset 이 바뀌거나 코드 실행 안의 호출 모양이 바뀌면 다시 봐야 한다.
 
 Hermes 없이 도는 검사는 안전 목록이 계약의 표와 같은지만 본다.
 Hermes 소스 검사는 `HERMES_SOURCE` 를 줄 때만 돈다. `scripts/checks/check-hermes-contract.sh` 가 이 값을 준다.
@@ -53,8 +54,9 @@ class HermesToolSourceTest(unittest.TestCase):
         names = set(self.toolsets["_HERMES_CORE_TOOLS"])
         for toolset in self.toolsets["TOOLSETS"].values():
             names |= set(toolset["tools"])
-        self.assertEqual(sorted(names - contract.HERMES_BUILTIN_TOOLS), [], "계약에 없는 새 도구")
-        self.assertEqual(sorted(contract.HERMES_BUILTIN_TOOLS - names), [], "Hermes 에서 빠진 도구")
+        expected = contract.expected("HERMES_BUILTIN_TOOLS", self.root)
+        self.assertEqual(sorted(names - expected), [], "계약에 없는 새 도구")
+        self.assertEqual(sorted(expected - names), [], "Hermes 에서 빠진 도구")
 
     def test_safe_tools_stay_in_read_toolsets(self):
         """안전 목록의 도구는 지금의 읽기 경계 toolset 에 든다. 도구 묶음이 바뀌면 안전한지 다시 본다."""
@@ -80,19 +82,30 @@ class HermesToolSourceTest(unittest.TestCase):
                     return
         self.fail("%s 에 %s 가 없다" % (path, name))
 
-    def test_code_execution_calls_have_no_session(self):
-        """코드 실행 안의 도구 호출은 `handle_function_call` 에 session 없이 `task_id` 만 넘긴다."""
-        for path in contract.TOOL_GUARD_SESSIONLESS_CALLS:
+    def test_code_execution_call_identity(self):
+        """코드 실행 안의 도구 호출이 `handle_function_call` 에 넘기는 식별 칸이 계열의 기대와 같다.
+
+        기준 계열은 session 없이 `task_id` 만 넘긴다. v0.23 은 session 을 함께 넘긴다(키워드나 `**` 로 푼 dict 의
+        `"session_id"` 키). 두 계열 모두 `tool_call_id` 는 넘기지 않는다.
+        """
+        with_session = contract.expected("TOOL_GUARD_CODE_CALLS_HAVE_SESSION", self.root)
+        for path in contract.TOOL_GUARD_CODE_CALLS:
             with self.subTest(path=path):
                 tree = ast.parse((self.root / path).read_text(encoding="utf-8"))
                 calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                          and getattr(node.func, "id", getattr(node.func, "attr", None)) == "handle_function_call"]
                 self.assertTrue(calls, "%s 에 handle_function_call 호출이 없다" % path)
+                # `**identity` 로 푼 dict 에 넣는 키다. `identity["session_id"] = ...` 꼴을 모은다.
+                unpacked = {target.slice.value for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                            for target in node.targets if isinstance(target, ast.Subscript)
+                            and isinstance(target.slice, ast.Constant)}
                 for call in calls:
                     keywords = {keyword.arg for keyword in call.keywords}
+                    if None in keywords:
+                        keywords |= unpacked
                     self.assertIn("task_id", keywords)
-                    self.assertNotIn("session_id", keywords)
-
+                    self.assertNotIn("tool_call_id", keywords)
+                    self.assertEqual(with_session, "session_id" in keywords)
 
 if __name__ == "__main__":
     unittest.main()

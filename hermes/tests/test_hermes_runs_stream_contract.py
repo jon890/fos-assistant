@@ -1,4 +1,8 @@
-"""v0.21.6의 실제 SSE transport를 실행해 공유 합성 fixture와 대조한다."""
+"""실제 SSE transport를 실행해 공유 합성 fixture와 대조한다.
+
+끝난 실행에 처음 연결하면 보관분을 모두 보내고 스트림을 닫는다. Control Plane 이 끝난 실행의 종료 사건을
+다시 읽는 경로가 이 동작에 기댄다(hermes-upgrade 설계 「결과 칸 채우기」). `render` 가 그 장면을 만든다.
+"""
 
 import ast
 import asyncio
@@ -56,7 +60,9 @@ class RunsStreamContractTest(unittest.IsolatedAsyncioTestCase):
                 frames.append(frame.decode())
 
         self.namespace["web"] = SimpleNamespace(StreamResponse=Response)
+        # v0.23 은 인증을 `_check_run_auth` 로 한다. 기준 계열은 `_check_auth` 를 부른다.
         owner = SimpleNamespace(_check_auth=lambda request: None,
+            _check_run_auth=lambda request, **kwargs: None,
             _request_owns_run=lambda request, run_id: True,
             _run_streams={"fixture-run": stream}, _sse_headers=lambda request: {},
             _release_run_owner_if_forgotten=lambda run_id: None)

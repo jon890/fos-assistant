@@ -145,7 +145,7 @@ profile 디렉터리에 이름 대응 파일 `.fos-connector-tools.json` 이 있
 | 대응 파일을 읽지 못한다. `isolated` 가 boolean 이 아닌 것도 같다 | `mcp__` 도구와 `execute_code` 를 모두 막는다. Control Plane MCP 의 도구도 막는다. 옛 설치 profile 일 수 있고, 그 profile 에는 Control Plane MCP 가 없기 때문이다. 그 밖의 도구는 건드리지 않는다 | 같다 |
 | 대응 파일의 서버와 맞는 도구 | 등록 이름이 Control Plane MCP 의 접두사로 시작해도 Control Plane 에 묻는다. `_fos_ctx` 를 붙이지 않는다 | 같다 |
 | 대응 파일의 어느 서버와도 맞지 않는 Control Plane MCP 의 도구 | 위와 같이 `_fos_ctx` 를 붙인다 | 같다 |
-| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 플러그인 도구는 session 이 없어 아래 규칙으로 막힌다 |
+| `execute_code` | 막는다. 실행 맥락 없이 도구를 부르는 경로다 | 건드리지 않는다. 그 안에서 부른 플러그인 도구는 session(v0.21.6)이나 `tool_call_id`(v0.23.2)가 없어 아래 규칙으로 막힌다 |
 | `mcp__` 로 시작하지 않는 도구 | 건드리지 않는다 | 같다 |
 | `prefix` 가 맞는 서버가 없는 `mcp__` 도구 | 막는다. Control Plane 에 묻지 않는다 | 건드리지 않는다. 운영자가 넣은 다른 MCP 서버의 도구다 |
 | `session_id` 나 `tool_call_id` 가 없거나 인자가 객체가 아니다 | 막는다. Control Plane 에 묻지 않는다 | 같다 |
@@ -205,13 +205,33 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다. 같은 칸에 코드 `DEMO_BROWSER_IN_USE`, `human_browser`, 탭 없음의 서명은 `19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1` 이다.
 
+### 승인 관문으로 가는 동작을 막는다
+
+Hermes 가 위험하다고 분류한 `terminal` 명령, Hermes 가 승인을 요구하는 경로(`~/.ssh/config`, 셸 시작 파일)의 `write_file` 과 `patch`, 모든 `computer_use` 호출을 맨 먼저 막는다(1.11.0 부터, fos-assistant [Hermes 업그레이드 스펙](../../../docs/features/hermes-upgrade/spec.md) 의 REQ5).
+profile 의 방식과 session 에 상관없이 걸리고, 판정에 묻기 전이라 Control Plane 을 부르지 않는다.
+까닭과 Hermes 쪽 판정은 [`hermes-contract.md`](../../docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
+
+| 도구 | 막는 조건 | 모델이 받는 글 |
+| --- | --- | --- |
+| `terminal` | Hermes 의 `detect_dangerous_command` 가 위험하다고 답한다. `command_allowlist` 는 보지 않는다 | `DANGEROUS_COMMAND_MESSAGE` |
+| `write_file`, `patch` | 대상 경로 가운데 하나가 Hermes 의 `write_approval_key` 에 걸린다. 그 함수가 없는 Hermes(v0.21.6)는 건너뛴다 | `APPROVAL_WRITE_MESSAGE` |
+| `computer_use` | 모든 호출 | `COMPUTER_USE_MESSAGE` |
+
+판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다. 예외 본문에 명령이나 경로가 섞일 수 있어 로그에는 종류만 남긴다.
+판정은 `approval_guard.py` 가 갖는다.
+
 ### 도구 판정
 
 사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 도구 판정 계약의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
 
 **묻지 않는 도구.** 플러그인 도구(플러그인 정책이 판정), Control Plane MCP 도구(서명), 첨부 원본 도구, `skill_manage`(늘 막음), 그리고 안전 목록 `SAFE_TOOLS` 다. 안전 목록은 `web_search`, `web_extract`, `vision_analyze`, `skills_list`, `skill_view`, `todo_list`, `tool_search`, `tool_describe` 이고, `vision_analyze` 는 `image_url` 이 HTTP(S) 나 이미지 data URL 일 때만 든다. 그 밖은 내장 도구, 붙지 않은 MCP 서버의 도구, 다른 plugin 의 도구를 가리지 않고 묻는다.
 
-**session 이 없는 호출은 묻지 않고 통과한다.** 코드 실행(`execute_code` 의 RPC, 상주 kernel) 안의 호출만 session 이 없다. 그 코드를 연 `execute_code` 가 판정을 받는다. `hermes/tests/test_tool_guard_contract.py` 가 이 두 지점을 고정한다.
+**코드 실행 안의 호출은 Hermes 버전마다 다르게 다룬다.** `hermes/tests/test_tool_guard_contract.py` 가 두 호출 지점(`execute_code` 의 RPC, 상주 kernel)과 버전별 식별 칸을 고정한다.
+
+| Hermes | hook 이 받는 것 | fos-ctx |
+| --- | --- | --- |
+| v0.21.6 | `task_id` 만. session 이 없다 | 묻지 않고 통과한다. 그 코드를 연 `execute_code` 가 판정을 받았고 사건 실행 트리에서는 막힌다 |
+| v0.23.2 | `session_id` 는 있고 `tool_call_id` 가 없다 | `code-exec:` 뒤에 무작위 16진수 32자를 붙인 번호를 `tool_call_id` 자리에 넣어 묻는다. 보통 대화에서는 통과하고 사건 실행 트리에서는 막힌다. Control Plane 은 이 번호를 서명 확인에만 쓴다 |
 
 | 칸 | 값 |
 | --- | --- |
