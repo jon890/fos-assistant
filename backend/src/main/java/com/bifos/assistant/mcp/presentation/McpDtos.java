@@ -297,4 +297,8 @@ public final class McpDtos {
     /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
     public record SubagentRegistrationResponse(String result) {
     }
+
+    /** 하위 에이전트 끝 소식의 응답이다. {@code recorded} 나 {@code ignored} 다. */
+    public record SubagentStopResponse(String result) {
+    }
 }

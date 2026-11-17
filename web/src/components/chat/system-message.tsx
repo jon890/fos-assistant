@@ -1,5 +1,6 @@
 "use client";
 
+import { AgentBadge, useAnswerAgent } from "@/components/agent/agent-badge";
 import { Button } from "@/components/ui/button";
 import { ResultArrivalLines } from "./delegation-lines";
 import type { Turn } from "./message-types";
@@ -10,6 +11,7 @@ import { ROOM_SUMMARY_TITLE, roomSummaryOf } from "@/lib/room";
  *
  * <p>위임 결과 알림 줄은 저장된 글 대신 결과마다 맡은 에이전트의 이름표 줄을 그린다. 결과 전달이 끝나지 않은 묶음의 마지막 알림
  * 줄에는 상태와 「결과 다시 전달」 을 둔다. 대화방의 요약 줄은 첫 줄만 보이고 요약은 펼쳐 본다.
+ * Hermes 내장 위임 결과 줄(`nativeResult`)은 대화 에이전트의 이름표를 앞에 붙이고 저장된 글을 그대로 쓴다.
  */
 export function SystemMessage({
   turn,
@@ -20,6 +22,7 @@ export function SystemMessage({
   onRetryDelivery?(deliveryId: number): void;
   deliveryRetrying: boolean;
 }) {
+  const agent = useAnswerAgent();
   const summary = roomSummaryOf(turn.content);
   const delivery =
     turn.delivery?.status === "FAILED" || turn.delivery?.status === "STOPPED"
@@ -32,6 +35,15 @@ export function SystemMessage({
     >
       {turn.deliveredResults && turn.deliveredResults.length > 0 ? (
         <ResultArrivalLines lines={turn.deliveredResults} />
+      ) : turn.nativeResult ? (
+        <p
+          data-testid="native-result-line"
+          data-status={turn.nativeResult.status}
+          className="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <AgentBadge agent={agent} size="sm" />
+          <span className="min-w-0 break-words">{turn.content}</span>
+        </p>
       ) : summary !== null ? (
         <details
           data-testid="room-summary"

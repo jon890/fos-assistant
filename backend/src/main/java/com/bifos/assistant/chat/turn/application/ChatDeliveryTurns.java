@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.turn.application;
 
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.DelegationLine;
+import com.bifos.assistant.chat.turn.application.dto.NativeResultView;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.Routed;
 import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
@@ -33,6 +34,7 @@ import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -109,12 +111,12 @@ class ChatDeliveryTurns {
             contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
         DeliveryAttemptRef attempt = recordDelivery(
-            routed.conversation(), results, resultLines(results, resultAgents), notices, deliveries, onEvent);
+            routed.conversation(), results, resultLines(results, resultAgents), notices, deliveries, extras, onEvent);
         runDeliveryTurn(
             owner,
             routed,
             delivery.input(),
-            new TurnIntent.DelegationResults(attempt, false, delivery.items(), fromUnattended(results)),
+            new TurnIntent.DelegationResults(attempt, false, delivery.items(), fromUnattended(results, extras)),
             handle,
             onEvent);
     }
@@ -122,9 +124,13 @@ class ChatDeliveryTurns {
 
     /**
      * 전할 위임 결과 가운데 사람이 없는 트리(예약 작업, 먼저 살펴보기)가 낸 것이 있는가. 있으면 결과를 전하는 turn 도 사람이 없는
-     * 실행이다. 승인한 동작의 결과는 사람이 승인한 뒤라 보지 않는다.
+     * 실행이다. 다른 출처의 결과는 그 결과가 사람이 없는 실행에서 나왔다고 밝힌 것만 센다. 승인한 동작의 결과는 사람이 승인한 뒤라
+     * 밝히지 않는다.
      */
-    private boolean fromUnattended(List<AgentExecution> results) {
+    private boolean fromUnattended(List<AgentExecution> results, List<AutoTurnResult> extras) {
+        if (extras.stream().anyMatch(AutoTurnResult::unattended)) {
+            return true;
+        }
         List<Long> roots = results.stream().map(AgentExecution::treeRootId).distinct().toList();
         return !roots.isEmpty() && executionRepository.countUnattendedIn(roots) > 0;
     }
@@ -220,6 +226,11 @@ class ChatDeliveryTurns {
      *
      * <p><b>한 결과는 한 묶음에만 든다.</b> 결과마다 전했다는 표시가 아직 전하지 않은 그 결과의 줄 하나를 바꿔야 한다. 바꾼 줄
      * 수가 다르면 그 사이 다른 쪽이 먼저 전한 것이라 {@link ResultAlreadyDeliveredException} 으로 알림 줄까지 함께 되돌린다(ADR-075).
+     *
+     * <p>다른 출처의 결과마다 그 결과의 알림 줄 번호를 같은 트랜잭션에서 출처에 알린다({@link AutoTurnResultSource#noticesSaved}). 알림 줄은
+     * 위임 결과 줄(있으면 첫 줄) 뒤로 {@code deliveries} 의 출처 순서, 결과 순서로 쌓였다. {@code extras} 도 같은 순서다.
+     *
+     * @param extras 다른 출처의 결과. {@code deliveries} 의 출처 순서와 결과 순서대로다
      */
     DeliveryAttemptRef recordDelivery(
         Conversation conversation,
@@ -227,6 +238,7 @@ class ChatDeliveryTurns {
         List<DelegationLine> resultLines,
         List<String> notices,
         List<AutoTurnDelivery> deliveries,
+        List<AutoTurnResult> extras,
         Consumer<ChatEvent> onEvent) {
         List<DeliveryItemRef> items = new ArrayList<>();
         results.forEach(result -> items.add(new DeliveryItemRef(ResultDeliveryRecorder.DELEGATION_SOURCE, String.valueOf(result.id()))));
@@ -246,6 +258,7 @@ class ChatDeliveryTurns {
                 int expected = (int)delivery.keys().stream().distinct().count();
                 requireMarked(delivery.source().markDelivered(delivery.keys(), deliveredAt), expected, delivery.source().source());
             }
+            reportNotices(lines, results.isEmpty() ? 0 : 1, deliveries);
             conversationWriter.incrementAutoTurns(conversation.id());
             // 위임 결과가 있으면 첫 알림 줄이 그 알림이다. 결과 도착 줄이 이 번호로 맡은 에이전트를 찾는다.
             Long delegationNotice = results.isEmpty() ? null : lines.getFirst().id();
@@ -254,12 +267,28 @@ class ChatDeliveryTurns {
             return new Saved(lines, attempt);
         });
         // 위임 결과 알림 줄(첫 줄)에는 전한 결과를 실어, 화면이 이력을 다시 읽기 전에도 결과 도착 줄을 이름표로 그린다.
+        int firstExtra = results.isEmpty() ? 0 : 1;
         for (int i = 0; i < saved.lines().size(); i++) {
             ChatMessage line = saved.lines().get(i);
             List<DelegationLine> delivered = i == 0 && !resultLines.isEmpty() ? resultLines : null;
-            onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content(), delivered));
+            NativeResultView status = i >= firstExtra ? NativeResultView.of(extras.get(i - firstExtra).noticeStatus()) : null;
+            onEvent.accept(ChatEvent.system(conversation.publicId(), line.id(), line.content(), delivered, status));
         }
         return saved.attempt();
+    }
+
+
+    /** 출처마다 결과 key 와 그 결과의 알림 줄 번호를 알린다. {@code first} 는 첫 다른 출처 결과의 알림 줄 자리다. */
+    private static void reportNotices(List<ChatMessage> lines, int first, List<AutoTurnDelivery> deliveries) {
+        int index = first;
+        for (AutoTurnDelivery delivery : deliveries) {
+            Map<String, Long> messageIdByKey = new LinkedHashMap<>();
+            for (String key : delivery.keys()) {
+                messageIdByKey.putIfAbsent(key, lines.get(index).id());
+                index++;
+            }
+            delivery.source().noticesSaved(messageIdByKey);
+        }
     }
 
 

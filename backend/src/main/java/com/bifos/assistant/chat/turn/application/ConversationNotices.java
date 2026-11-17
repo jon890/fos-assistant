@@ -28,13 +28,28 @@ public class ConversationNotices {
 
     /** 알림 줄을 저장하고 열린 화면에 알린다. 대화가 없거나 지워졌으면 아무것도 하지 않는다. */
     public void post(Long conversationId, String text) {
-        conversations
+        save(conversationId, text).ifPresent(saved -> publish(conversationId, saved));
+    }
+
+
+    /**
+     * 알림 줄만 저장한다. 부르는 쪽의 트랜잭션이 있으면 그 안에서 저장해, 다른 쓰기와 함께 남거나 함께 빠진다. 알리기는 커밋한 뒤
+     * {@link #publish} 로 한다.
+     *
+     * @return 저장한 줄. 대화가 없거나 지워졌으면 비어 있다
+     */
+    public Optional<ChatMessage> save(Long conversationId, String text) {
+        return conversations
             .findById(conversationId)
             .filter(conversation -> conversation.deletedAt() == null)
-            .ifPresent(conversation -> {
-                ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), text, clock.instant()));
-                hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), saved.id(), text));
-            });
+            .map(conversation -> messages.save(ChatMessage.fromSystem(conversation.id(), text, clock.instant())));
+    }
+
+
+    /** 저장한 알림 줄을 열린 화면에 알린다. 대화가 없거나 지워졌으면 아무것도 하지 않는다. */
+    public void publish(Long conversationId, ChatMessage saved) {
+        publicIdOf(conversationId)
+            .ifPresent(publicId -> hub.publish(conversationId, ChatEvent.system(publicId, saved.id(), saved.content())));
     }
 
 

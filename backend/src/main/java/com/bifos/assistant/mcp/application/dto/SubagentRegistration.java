@@ -16,7 +16,11 @@ import tools.jackson.databind.JsonNode;
  * 하나로 이은 UTF-8 이다. 첫 줄이 {@code _fos_ctx} 의 도구 이름 자리와 달라 두 서명은 서로 쓰이지 않는다.
  *
  * <p>{@code child_subagent_id}, {@code parent_subagent_id} 는 서명하지 않고 저장하지도 않는다. 문자열이나
- * {@code null} 인지만 본다. 모르는 키는 무시해 플러그인이 칸을 먼저 더해도 깨지지 않는다.
+ * {@code null} 인지만 본다. {@code parent_subagent_id} 는 최상위 자식인지 정하는 데만 쓴다. 모르는 키는 무시해 플러그인이 칸을
+ * 먼저 더해도 깨지지 않는다.
+ *
+ * <p>선택 칸 {@code reports_stop}(불리언)과 {@code child_goal}(글)도 서명하지 않는다. 플러그인이 끝 소식을 보낼 수 있다고
+ * 밝히는 칸과 맡긴 일이다(ADR-20261117 / native-delegation-wake). 없으면 거짓과 {@code null} 이다.
  *
  * <p>어떤 이유로 거절하든 밖에는 {@link ErrorCode#SESSION_BINDING_REJECTED} 하나만 보인다. 이유는 서버 로그에만
  * 남기고 토큰 해시와 서명 값과 본문은 로그에 적지 않는다.
@@ -24,9 +28,18 @@ import tools.jackson.databind.JsonNode;
  * @param parentRootSessionId 부모 session 의 {@code parent_session_id} 사슬에서 처음 session
  * @param parentSessionId 하위 에이전트를 만든 session
  * @param childSessionId 등록할 하위 에이전트 session
+ * @param parentSubagentId 부모가 하위 에이전트면 그 번호. 최상위 자식이면 {@code null}
+ * @param reportsStop 플러그인이 이 자식의 끝 소식을 보내는가
+ * @param childGoal 맡긴 일. 없으면 {@code null}
  */
 @Slf4j
-public record SubagentRegistration(String parentRootSessionId, String parentSessionId, String childSessionId) {
+public record SubagentRegistration(
+    String parentRootSessionId,
+    String parentSessionId,
+    String childSessionId,
+    String parentSubagentId,
+    boolean reportsStop,
+    String childGoal) {
 
 
     private static final String VERSION_LINE = "v1-subagent";
@@ -56,14 +69,17 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
             throw reject("서명이 소문자 16진수 64자가 아니다");
         }
         requireTextOrNull(body, "child_subagent_id");
-        requireTextOrNull(body, "parent_subagent_id");
+        String parentSubagentId = requireTextOrNull(body, "parent_subagent_id");
+        String childGoal = requireTextOrNull(body, "child_goal");
+        boolean reportsStop = booleanOrFalse(body, "reports_stop");
 
         String signed = String.join("\n", VERSION_LINE, parentRootSessionId, parentSessionId, childSessionId);
         byte[] expected = McpCallContext.hmac(tokenHash, signed);
         if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");
         }
-        return new SubagentRegistration(parentRootSessionId, parentSessionId, childSessionId);
+        return new SubagentRegistration(
+            parentRootSessionId, parentSessionId, childSessionId, parentSubagentId, reportsStop, childGoal);
     }
 
 
@@ -76,12 +92,29 @@ public record SubagentRegistration(String parentRootSessionId, String parentSess
     }
 
 
-    /** 없거나 {@code null} 이거나 문자열이면 받는다. */
-    private static void requireTextOrNull(JsonNode body, String key) {
+    /** 없거나 {@code null} 이거나 문자열이면 받는다. 문자열이 아니면 {@code null} 을 돌려준다. */
+    private static String requireTextOrNull(JsonNode body, String key) {
         JsonNode value = body.get(key);
-        if (value != null && !value.isNull() && !value.isTextual()) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        if (!value.isTextual()) {
             throw reject(key + " 가 문자열이나 null 이 아니다");
         }
+        return value.asString();
+    }
+
+
+    /** 없거나 {@code null} 이면 거짓, 불리언이면 그 값이다. 다른 타입이면 거절한다. */
+    private static boolean booleanOrFalse(JsonNode body, String key) {
+        JsonNode value = body.get(key);
+        if (value == null || value.isNull()) {
+            return false;
+        }
+        if (!value.isBoolean()) {
+            throw reject(key + " 가 불리언이나 null 이 아니다");
+        }
+        return value.booleanValue();
     }
 
 

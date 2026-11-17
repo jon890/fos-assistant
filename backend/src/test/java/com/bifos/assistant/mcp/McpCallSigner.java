@@ -84,6 +84,28 @@ public final class McpCallSigner {
     }
 
 
+    /** 플러그인이 {@code subagent_stop} hook 에서 보내는 끝 소식 본문이다. 서명할 글의 첫 줄은 {@code v1-subagent-stop} 이다. */
+    static ObjectNode subagentStopBody(
+        String rawToken,
+        String parentRootSessionId,
+        String parentSessionId,
+        String childSessionId,
+        String childStatus,
+        String childSummary) {
+        ObjectNode body = JSON.createObjectNode();
+        body.put("v", 1);
+        body.put("parent_session_id", parentSessionId);
+        body.put("parent_root_session_id", parentRootSessionId);
+        body.put("child_session_id", childSessionId);
+        body.put("child_status", childStatus);
+        body.put("child_summary", childSummary);
+        body.put(
+            "sig",
+            sign(rawToken, String.join("\n", "v1-subagent-stop", parentRootSessionId, parentSessionId, childSessionId)));
+        return body;
+    }
+
+
     /**
      * 플러그인이 커넥터 도구 호출 전에 보내는 판정 요청 본문이다.
      *

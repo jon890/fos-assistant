@@ -189,6 +189,16 @@ class ControlPlaneJwtFilterTest {
 
 
     @Test
+    @DisplayName("하위 에이전트 끝 소식 요청은 Control Plane JWT 필터를 건너뛴다")
+    void subagentStopRequestSkipsControlPlaneJwtFilter() {
+        ControlPlaneJwtFilter filter = filter(mock(TokenUserResolver.class));
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/hermes/session-bindings/subagent/stop");
+
+        assertThat(filter.shouldNotFilter(request)).isTrue();
+    }
+
+
+    @Test
     @DisplayName("폐기한 서비스 문서와 토큰 관리 경로도 웹 JWT 필터를 거친다")
     void filtersRetiredServiceAndTokenManagementPaths() {
         ControlPlaneJwtFilter filter = filter(mock(TokenUserResolver.class));

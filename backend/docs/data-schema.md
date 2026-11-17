@@ -217,7 +217,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지운 뒤 정리 작업이 지운다.
 결과물(`chat_artifact`)도 같다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
-하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
+하위 에이전트 session 등록(`hermes_session_binding`)도 줄은 지우지 않는다. 실행 기록과 함께 남고, 내장 위임 결과의 맡긴 일과 결과 글과 그 key(`goal_preview`, `result_text`, `result_key_id`)만 비운다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
 그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.
@@ -662,7 +662,10 @@ native 자식 한 명의 사용량 원장 줄이자, 그 사용량을 session �
 ### hermes_session_binding
 
 Hermes `delegate_task` 가 만든 하위 에이전트 session 이 어느 FOS 실행에서 시작됐는지 적는다. profile 플러그인이 `subagent_start` hook 에서 등록한다([ADR-037](adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
-**한 번 적은 줄은 바꾸지 않는다.** 같은 대화의 다음 turn 이 시작돼도 그 하위 에이전트는 처음 origin 실행에 속한다. 최상위 session 은 `agent_execution.hermes_session_id` 로 찾는다.
+**origin 과 사용자 칸은 바꾸지 않는다.** 같은 대화의 다음 turn 이 시작돼도 그 하위 에이전트는 처음 origin 실행에 속한다. 최상위 session 은 `agent_execution.hermes_session_id` 로 찾는다.
+끝 소식과 결과 칸(`wake_eligible` 부터 `notice_message_id` 까지)은 Hermes 내장 위임의 결과로 부모 대화를 깨우는 데 쓴다([ADR-20261117 / native-delegation-wake](../../docs/adr/ADR-20261117-native-delegation-wake.md)). `wake_eligible` 은 등록할 때 한 번 정하고, 나머지는 조건부 update 로만 바꾼다. 칸의 뜻과 판정은 [에이전트 팀 설계](../../docs/features/agent-team/design.md) 의 「PR6 내장 위임 결과」 가 갖는다.
+
+- `goal_preview` 와 `result_text` 는 사용자 데이터 key 로 암호화하고 key 칸 `result_key_id` 하나를 함께 쓴다. AAD 는 `hermes_session_binding:<id>:<칸>:user:<user_id>` 다. 깨울 자식에만 차고, 깨울 자식은 늘 대화가 있다
 
 - `user_id` 는 origin 실행의 `user_id` 이고 MCP 호출의 요청자다. `origin_execution_id` 는 끝난 실행이어도 된다. 이 실행이나 그 루트 실행이 `CANCELLED` 면 MCP 호출을 거절한다. `root_session_id` 가 MCP 호출의 서명한 루트와 달라도 거절한다
 - `(profile_name, session_id)` 가 유일하다. session id 가 profile 사이에서 유일하다고 보장하지 않기 때문이다
