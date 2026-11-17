@@ -83,10 +83,25 @@ function run(
     get parentElement() {
       return e.parent ? wrap(e.parent) : null;
     },
-    closest: (selector: string) =>
-      e.layer && selector === PURCHASE_LAYER.layer ? wrap(e.layer) : null,
-    querySelectorAll: (selector: string) =>
-      (e.children ?? []).filter((c) => c.matches.includes(selector)).map(wrap),
+    closest: (selector: string) => {
+      if (e.layer && selector === PURCHASE_LAYER.layer) return wrap(e.layer);
+      // 자기와 조상 가운데 선택자에 맞는 가장 가까운 것.
+      for (let a: El | undefined = e; a; a = a.parent)
+        if (a.matches.includes(selector)) return wrap(a);
+      return null;
+    },
+    // 후손 전체에서 찾는다(실제 DOM 과 같다).
+    querySelectorAll: (selector: string) => {
+      const out: El[] = [];
+      const walk = (n: El) => {
+        for (const c of n.children ?? []) {
+          if (c.matches.includes(selector)) out.push(c);
+          walk(c);
+        }
+      };
+      walk(e);
+      return out.map(wrap);
+    },
     get value() {
       return e.value ?? "";
     },
@@ -492,4 +507,43 @@ test("주문서 금액 식은 주문서 주소에서만 두 자리의 금액 정
   });
   expect(run(ORDER_SHEET_AMOUNT, { ...sheet, path: "/other" })).toBeNull();
   expect(run(ORDER_SHEET_AMOUNT, { ...sheet, host: STORE })).toBeNull();
+});
+
+/** 2026-11-17 실측 모양: 옵션마다 바깥 묶음 안에 같은 크기의 안쪽 묶음(슬라이드용)이 또 있고 칩은 안쪽에 있다. */
+function nestedRadioLayer() {
+  const black = chip({ alt: "블랙false" });
+  const white = chip({ alt: "화이트false" });
+  const sizes = ["S", "M", "L", "XL"].map((text) => chip({ text }));
+  const nest = (chips: El[]) => {
+    const inner = el({
+      matches: [PURCHASE_LAYER.radioGroup],
+      children: chips,
+    });
+    const outer = el({
+      matches: [PURCHASE_LAYER.radioGroup],
+      children: [inner],
+    });
+    inner.parent = outer;
+    return outer;
+  };
+  const layer = el({
+    matches: [],
+    children: [nest([black, white]), nest(sizes)],
+  });
+  const buyNow = el({ matches: [BUTTONS], text: "바로구매", layer });
+  return { black, white, sizes, buyNow };
+}
+
+test("겹친 옵션 묶음은 가장 바깥 묶음만 옵션 하나로 세고, 안쪽 묶음의 칩을 골라 누른다", () => {
+  const { black, white, sizes, buyNow } = nestedRadioLayer();
+  const page = { host: STORE, elements: [buyNow] };
+  // 바깥 둘, 안쪽 둘 = 4 가 아니라 2 다.
+  expect(run(LAYER_OPTION_FORM, page)).toEqual({ radios: 2, lists: 0 });
+  expect(run(CHOOSE_LAYER_RADIO, page, [0, "블랙", true])).toBe("pressed");
+  expect([black.clicked, white.clicked]).toEqual([1, 0]);
+  expect(run(CHOOSE_LAYER_RADIO, page, [1, "L", true])).toBe("pressed");
+  expect(sizes.map((s) => s.clicked)).toEqual([0, 0, 1, 0]);
+  // 안쪽 묶음은 따로 번호가 없다.
+  expect(run(CHOOSE_LAYER_RADIO, page, [2, "L", true])).toBe("missing");
+  expect(run(CHOOSE_LAYER_RADIO, page, [1, "블랙", true])).toBe("missing");
 });
