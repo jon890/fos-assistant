@@ -36,7 +36,7 @@
 ### 2. `usage/execution/application/LostRunRelease.java`(신규)
 
 - 상수: 고를 오류 코드 `HERMES_UNAVAILABLE`, `HERMES_RUN_TIMEOUT`(`ErrorCode` 의 이름)과 `RestartReconciler` 의 `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE` 문자열. 기간 24시간, 최대 10개.
-- `void beforeSubmit(HermesRunCommand command)`: 그 profile 의 `FAILED` 실행 가운데 `hermesRunId` 가 있고 `finishedAt` 이 24시간 안이며 `errorCode` 가 위 넷인 것을 `finishedAt` 내림차순 최대 10개 읽는다. 각각 `hermes.releaseIfLost(command.apiBaseUrl(), command.profileName(), runId)`. 예외는 run 마다 `log.warn` 만 남기고 다음으로 간다(session 값과 사용자 글은 로그에 넣지 않는다).
+- `void beforeSubmit(HermesRunCommand command)`: 그 profile 의 `FAILED` 실행 가운데 `hermesRunId` 가 있고 `finishedAt` 이 24시간 안이며 `errorCode` 가 위 넷인 것을 `finishedAt` 내림차순 최대 10개 읽는다. 각각 `hermes.releaseIfLost(command.apiBaseUrl(), command.profileName(), runId)`. `releaseIfLost` 가 예외를 던지면 Hermes 가 닿지 않는 것으로 보고 `log.warn` 한 줄을 남긴 뒤 남은 후보를 건너뛴다(제출 전 지연을 조회 한 번으로 묶는다. session 값과 사용자 글은 로그에 넣지 않는다).
 - 저장소에 쿼리 하나를 더한다: `findLostCandidates(profileName, status, errorCodes, since, Pageable)`. JPQL 로 쓴다([rule-51](../../../../code-rules/rule-51.md)). 인덱스가 필요한지 `backend/docs/data-schema.md` 의 실행 테이블 인덱스와 대조하고, 필요하면 만들지 말고 계획 결함으로 보고한다.
 - `RECONCILE_*` 상수가 `chat.recovery` 에 있으면 `usage` 가 `chat` 을 참조하게 된다. 의존 방향을 지키려고 같은 문자열을 `LostRunRelease` 에 따로 두고 주석으로 원본을 가리킨다. 패키지 배치는 `backend/docs/code-architecture.md` 를 따른다.
 
@@ -46,7 +46,7 @@
 
 ### 4. 테스트
 
-- `backend/src/test/java/com/bifos/assistant/usage/execution/LostRunReleaseTest.java`(신규, H2 저장소): 고를 오류 코드 넷만 넘기고, 다른 오류 코드·24시간 지난 줄·`hermesRunId` 없는 줄·다른 profile 은 넘기지 않으며, 11개 이상이면 10개만 넘긴다. 한 run 의 예외가 나머지를 막지 않는다. `StubHermesRunsClient.releasedRuns()` 로 본다.
+- `backend/src/test/java/com/bifos/assistant/usage/execution/LostRunReleaseTest.java`(신규, H2 저장소): 고를 오류 코드 넷만 넘기고, 다른 오류 코드·24시간 지난 줄·`hermesRunId` 없는 줄·다른 profile 은 넘기지 않으며, 11개 이상이면 10개만 넘긴다. 첫 `releaseIfLost` 가 예외를 던지면 남은 후보를 부르지 않고 제출은 계속된다. `StubHermesRunsClient.releasedRuns()` 로 본다.
 - `SteerSettleTest`: `pendingSteerKnown=false` 결과로 끝난 turn(중지 확인된 turn 포함)과 재기동 정리가 「확인 못 함」 으로 정리되는 경우를 더한다.
 
 ## 검증

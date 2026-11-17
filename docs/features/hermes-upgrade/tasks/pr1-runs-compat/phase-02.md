@@ -40,7 +40,7 @@
 ### 2. 해제와 `releaseIfLost`
 
 - `private void resolveUnknown(apiBaseUrl, profileName, runId, JsonNode run)`: 위 본문으로 POST. 200 이면 끝. 409·404 면 한 번 다시 조회해 `unknown` 이 아니면 끝, 여전히 `unknown` 이면 `ApiException(HERMES_UNAVAILABLE)`. 그 밖의 실패는 `HermesCallFailure.of`.
-- `releaseIfLost`: 조회해서 `unknown` 이면 `resolveUnknown`, 아니면 아무것도 하지 않는다. 404 도 아무것도 하지 않는다. 끝 상태이거나 해제를 마친 run 은 `HermesRunTerminals` 의 「확인 끝」 집합(같은 보존 시간이 아니라 24시간)에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다.
+- `releaseIfLost`: 조회 응답의 상태만 읽는다. `toResult` 와 `readTerminal` 은 부르지 않는다(끝 상태마다 다시 읽기가 붙고 보관소의 종료 사건이 지워진다). `unknown` 이면 `resolveUnknown`, 아니면 아무것도 하지 않는다. 404 도 아무것도 하지 않는다. 끝 상태이거나 해제를 마친 run 은 `HermesRunTerminals` 의 「확인 끝」 집합(같은 보존 시간이 아니라 24시간)에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다.
 
 ### 3. 중지
 

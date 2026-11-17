@@ -7,7 +7,7 @@
 | ID | 해결 방법 |
 | --- | --- |
 | REQ1 | `HttpHermesRunsClient` 가 `queued` 를 지금처럼 「아직 돈다」 로 읽고, `unknown` 은 REQ2 의 해제로 넘긴다. 상태 문자열은 어댑터 밖으로 새로 나가지 않는다 |
-| REQ2 | 어댑터가 `unknown` 을 보면 같은 조회 응답의 `admission_id`, `execution_generation` 으로 `resolve-unknown` 을 보낸다. 그 뒤 `lookupRun` 은 기존 `NOT_FOUND`(재기동 정리가 `REMOTE_RUN_LOST` 로 적는 신호)를 돌려주고, `awaitCompletion` 은 새 `ErrorCode.REMOTE_RUN_LOST` 로 실패한다. 중지가 409 `unknown_execution` 을 받으면 같은 해제를 하고 중지를 끝낸 것으로 본다. 아무도 그 run 을 다시 묻지 않는 경우를 막으려고, 새 실행을 같은 Hermes session 에 보내기 전에 그 session 의 지난 실패 실행을 어댑터에 넘겨 잃은 것이면 해제한다(「잃은 실행 미리 풀기」). Hermes 가 정상 종료로 끊은 실행은 조회에서 `cancelled` 로 와도 어댑터가 `interrupted` 로 옮겨 실패로 적히게 한다 |
+| REQ2 | 어댑터가 `unknown` 을 보면 같은 조회 응답의 `admission_id`, `execution_generation` 으로 `resolve-unknown` 을 보낸다. 그 뒤 `lookupRun` 은 기존 `NOT_FOUND`(재기동 정리가 `REMOTE_RUN_LOST` 로 적는 신호)를 돌려주고, `awaitCompletion` 은 새 `ErrorCode.REMOTE_RUN_LOST` 로 실패한다. 중지가 409 `unknown_execution` 을 받으면 같은 해제를 하고 중지를 끝낸 것으로 본다. 아무도 그 run 을 다시 묻지 않는 경우를 막으려고, 새 실행을 보내기 전에 같은 profile 의 최근 연결 실패·시간 초과 실행을 어댑터에 넘겨 잃은 것이면 해제한다(「잃은 실행 미리 풀기」). Hermes 가 정상 종료로 끊은 실행은 조회에서 `cancelled` 로 와도 어댑터가 `interrupted` 로 옮겨 실패로 적히게 한다 |
 | REQ3 | `HermesRunEventStream` 이 받은 종료 사건을 infra 안의 `HermesRunTerminals` 에 남기고, `toResult` 가 조회 응답에 빠진 칸을 거기서 채운다. 사건 스트림을 열지 않은 호출자(위임, 흐름, 방 요약, 추천 질문, 재기동 정리)는 어댑터가 끝난 실행의 사건 스트림을 한 번 다시 읽어 보관분에서 종료 사건을 얻는다. 받지 못했으면 결과에 「`pending_steer` 를 모른다」 를 표시하고, `ChatTurnRunner`·`RecoveredRunRecorder` 가 그 표시로 `SteerSettlement.unknown()` 을 고른다 |
 | REQ4 | 사건 파서(`HermesRunEventStream`)가 `tool_call_id` 를 무시하고, `tool.completed` 의 `duration` 0 을 걸린 시간 없음(`null`)으로 읽는다. `run.queued` 는 아는 사건 목록 밖이라 지금처럼 버린다. 오지 않는 사건은 고칠 것이 없다(DECISION2) |
 | REQ5 | fos-ctx `pre_tool_call` 이 `terminal` 의 위험 명령(`detect_dangerous_command`), 승인이 필요한 파일 쓰기(`write_approval_key`), `computer_use` 호출을 막는다 |
@@ -84,7 +84,7 @@ v0.23.2 의 `cancelled` 는 사용자 중지, Hermes 의 정상 종료로 끊긴
 그래서 새 실행을 보내기 전에 같은 profile 의 지난 실행 가운데 잃었을 수 있는 것을 어댑터에 넘긴다(`releaseIfLost`).
 고르는 열쇠는 Hermes session 이 아니라 profile 이다. 실행 줄의 `hermes_session_id` 는 대화의 루트 session 이고 Hermes 에 보낸 session 은 압축 뒤 바뀔 수 있으며(`RunSession`), 방 요약 줄은 session 과 대화가 비어 있다(`ExecutionRecorder.startDetached`). profile 은 모든 줄에 있다.
 고르는 조건: 그 profile 의 `FAILED` 실행 가운데 `hermes_run_id` 가 있고, 최근 24시간 안에 끝났으며, `error_code` 가 Hermes 와 닿지 못했거나 기다리다 그만둔 코드(`HERMES_UNAVAILABLE`, `HERMES_RUN_TIMEOUT`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE`)인 것을 최근 순으로 최대 10개. 우리 오류 코드만 보므로 application 에 Hermes 상태 문자열이 생기지 않는다.
-어댑터는 조회해 `unknown` 이면 해제하고, 끝 상태면 그 run 을 「확인 끝」 으로 메모리에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다. 이 단계의 실패는 로그만 남기고 제출을 막지 않는다.
+어댑터는 조회해 `unknown` 이면 해제하고, 끝 상태면 그 run 을 「확인 끝」 으로 메모리에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다. 이 단계의 실패는 로그만 남기고 제출을 막지 않는다. 조회가 처음 실패하면 Hermes 가 닿지 않는 것이므로 남은 후보를 건너뛴다. 그래서 제출 전 지연은 조회 한 번의 제한 시간을 넘지 않는다.
 부르는 자리는 대화 turn(`ChatRunEvents.submit`), 위임과 흐름(`AgentRunner`), 방 요약(`RoomContext`) 셋이다. 추천 질문은 늘 새 session 으로 보내 막힐 대기열이 없으므로 부르지 않는다.
 
 ### 결과 칸 채우기
