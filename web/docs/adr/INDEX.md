@@ -14,3 +14,4 @@
 | [ADR-087](ADR-087-같은-도구의-승인-줄은-묶음으로-보이고-상시-허락을-줄-수-있는-줄만-한꺼번에-승인한다.md) | 같은 도구의 승인 줄은 묶음으로 보이고 상시 허락을 줄 수 있는 줄만 한꺼번에 승인한다 | Accepted. ADR-050 의 승인 카드에 화면 쪽 조건을 더한다 |
 | [ADR-20261112 / handoff-drawer](ADR-20261112-handoff-drawer.md) | 화면 넘기기 카드는 새 창 대신 대화 위 옆 패널에 「내 브라우저」 를 띄운다 | Accepted. [ADR-20261111 / connector-handoff](../../../docs/adr/ADR-20261111-connector-handoff.md) 의 카드가 새 창을 여는 부분을 대체한다 |
 | [ADR-20261113 / todo-tab](ADR-20261113-todo-tab.md) | 승인 카드와 넘기기 카드는 입력창 위에서 옆 패널의 「할 일」 탭으로 옮기고 입력창 위에는 한 줄만 남긴다 | Accepted. `connector-policy.md` 의 승인 영역 40% 규칙을 대체한다 |
+| [ADR-20261117 / dev-docs-image](ADR-20261117-dev-docs-image.md) | 개발 문서는 배포 커밋의 문서 폴더를 웹 이미지에 복사해 읽기 전용으로 보인다 | Accepted |
