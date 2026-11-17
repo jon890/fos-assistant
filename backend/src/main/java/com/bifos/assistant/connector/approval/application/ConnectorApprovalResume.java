@@ -5,6 +5,7 @@ import static com.bifos.assistant.connector.approval.application.ConnectorFinanc
 import com.bifos.assistant.chat.delivery.application.dto.AutoTurnResult;
 import com.bifos.assistant.chat.turn.application.ConversationNotices;
 import com.bifos.assistant.connector.action.application.ConnectorActionDetails;
+import com.bifos.assistant.connector.approval.application.dto.FinancialPrepareStage;
 import com.bifos.assistant.connector.action.application.ConnectorActionSignals;
 import com.bifos.assistant.connector.action.application.ConnectorApprovalBrowser;
 import com.bifos.assistant.connector.action.domain.ConnectorAction;
@@ -28,6 +29,7 @@ import com.bifos.assistant.hermes.application.port.HermesConnectorClient;
 import com.bifos.assistant.mcp.application.port.ApprovalResumes;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -61,6 +63,8 @@ class ConnectorApprovalResume implements ApprovalResumes {
     static final String HELD = "사용자가 「내 브라우저」를 직접 쓰고 있어 이어 가지 않았다. 사용자가 「돌려주기」를 누른 뒤 다시 부른다.";
     static final String ENDED = "이어 가지 못하고 승인을 끝냈다. 다시 하려면 처음처럼 준비해 새 승인을 받는다.";
     static final String RUNNING = "이미 이어 가는 중이다. 새로 준비하지 말고 그 결과를 기다린다.";
+    static final String RETRY = "지금은 플러그인 상태를 확인하지 못해 이어 가지 않았다. 승인은 그대로다. 사용자에게 잠시 뒤 다시 하겠다고 알리고 새로 준비하지 않는다.";
+    static final String SENT = "같은 승인으로 이어 가기를 보냈지만 결과를 읽지 못했다. 새로 준비하지 말고 사용자에게 승인 카드와 「내 브라우저」 를 확인해 달라고 한다.";
 
     private final ConnectorFinancialApproval approval;
     private final ConnectorExecutionCurrent current;
@@ -115,8 +119,12 @@ class ConnectorApprovalResume implements ApprovalResumes {
                 context.connectionUpdatedAt());
             prepared = new Prepared(context, catalog, manifest);
         } catch (RuntimeException ex) {
-            // 연결이나 선언이 바뀌어 같은 승인으로 실행할 수 없다. 기다림을 끝내 새로 준비하게 한다.
             log.warn("이어 가기 맥락 확인 실패 actionId={} kind={}", actionId, ex.getClass().getSimpleName());
+            if (temporary(ex)) {
+                // 대시보드에 닿지 못했을 수 있다. 기다림을 두면 수명과 일정이 결국 끝낸다. 다시 승인하게 만들지 않는다.
+                return RETRY;
+            }
+            // 연결이나 선언이 바뀌어 같은 승인으로 실행할 수 없다. 기다림을 끝내 새로 준비하게 한다.
             return ended(user, conversationId, actionId);
         }
         Optional<Started> started;
@@ -134,7 +142,19 @@ class ConnectorApprovalResume implements ApprovalResumes {
             return render(user, conversationId, actionId, ENDED);
         }
         approval.run(user, actionId, prepared.context(), prepared.manifest(), started.get().snapshot(), started.get().resume());
-        return render(user, conversationId, actionId, NONE);
+        return render(user, conversationId, actionId, SENT);
+    }
+
+
+    /**
+     * 플러그인 상태를 읽지 못한 일시 장애인가. 대시보드 호출이 던진 예외와, 그 호출을 감싼 연결 상태 단계의 거절이다. 연결 상태 단계는 상태가
+     * 꺼졌을 때도 같은 거절이라 가르지 못한다. 그때도 기다림을 두면 수명이 끝낸다.
+     */
+    private static boolean temporary(RuntimeException ex) {
+        if (ex instanceof FinancialPrepareRejected rejected) {
+            return rejected.stage() == FinancialPrepareStage.CONNECTOR_STATE;
+        }
+        return !(ex instanceof ApiException);
     }
 
 

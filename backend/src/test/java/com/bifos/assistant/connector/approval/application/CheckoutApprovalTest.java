@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 
 import com.bifos.assistant.browser.application.UserBrowserService;
 import com.bifos.assistant.browser.domain.UserBrowser;
@@ -488,6 +489,23 @@ class CheckoutApprovalTest extends FinancialConnectorTestBase {
         jdbc.update("update connector_action set status = 'EXECUTING', resumed_at = ? where id = ?", Timestamp.from(clock.instant()),
             action(answer).id());
         assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.RUNNING);
+    }
+
+
+    @Test
+    @DisplayName("플러그인 상태를 읽지 못하면 이어 가지 않고 기다림을 그대로 두어 다시 승인하지 않게 한다")
+    void unreadableConnectorStateKeepsWaiting() {
+        browserRunning();
+        var answer = prepare(UUID.randomUUID().toString());
+        fill = execution -> CallResult.success(resumable("login"));
+        publicApproval.approve(user, answer.actionId(), null, false);
+        Long conversation = action(answer).conversationId();
+        handoffs.onTurnStarted(new ConversationTurnStarted(conversation, true));
+        doThrow(new IllegalStateException("대시보드에 닿지 않는다")).when(hermes).readConnector(anyString(), anyString());
+
+        assertThat(resumes.resume(user, conversation)).isEqualTo(ConnectorApprovalResume.RETRY);
+        assertThat(action(answer).status()).isEqualTo(ActionStatus.WAITING);
+        assertThat(fills.get()).isEqualTo(1);
     }
 
 
