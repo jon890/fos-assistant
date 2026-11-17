@@ -49,6 +49,17 @@ public interface AutoTurnResultSource {
     List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys);
 
 
+    /**
+     * 자동 turn 을 열지 않고 사용자가 다음 메시지를 보낼 때 그 turn 입력에 넣을 결과다. 생긴 순서다.
+     *
+     * <p>{@link #undelivered} 와 겹치지 않는다. 넣은 결과는 {@link #markDelivered} 로 전했다고 적어 두 번 넣지 않는다. 사용자가 중지한
+     * 답이 맡긴 하위 작업의 결과가 여기 든다(ADR-20261117 / native-delegation-wake). 기본은 없다.
+     */
+    default List<AutoTurnResult> carriedIntoUserTurn(Long conversationId) {
+        return List.of();
+    }
+
+
     /** 전하지 않은 결과가 있는 대화들이다. 기동할 때 훑는다. */
     List<Long> conversationsWithUndelivered();
 

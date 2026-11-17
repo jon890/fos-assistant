@@ -128,9 +128,13 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
         @Param("now") Instant now);
 
 
-    /** 중지 알림의 대상이다. 깨울 자식이고 아직 전하지 않았고 {@code after} 보다 뒤 등록했고 origin 이 중지된 줄이다. */
+    /**
+     * 중지 알림의 대상이다. 깨울 자식이고 아직 전하지도 중지 알림을 남기지도 않았고 {@code after} 보다 뒤 등록했고 origin 이 중지된
+     * 줄이다.
+     */
     @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
-        + " where b.wake_eligible = true and b.result_delivered_at is null and b.created_at > :after"
+        + " where b.wake_eligible = true and b.result_delivered_at is null and b.stop_noticed_at is null"
+        + " and b.created_at > :after"
         + " and e.status = 'CANCELLED' order by b.origin_execution_id, b.id", nativeQuery = true)
     List<HermesSessionBinding> findStopCandidates(@Param("after") Instant after);
 
@@ -141,11 +145,28 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
     List<HermesSessionBinding> findEligibleByOrigin(@Param("origin") Long originExecutionId);
 
 
-    /** 그 origin 의 아직 전하지 않은 깨울 자식 모두를 전했다고 적는다. 중지 알림으로 끝낸다. */
+    /**
+     * 그 origin 의 아직 전하지도 중지 알림을 남기지도 않은 깨울 자식 모두에 중지 알림 표시를 적는다. 결과는 전한 것으로 적지 않는다.
+     * 사용자가 다음 메시지를 보내면 그 turn 입력에 든다({@link #findCarriedIntoUserTurn}).
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = "update hermes_session_binding set result_delivered_at = :now"
-        + " where origin_execution_id = :origin and wake_eligible = true and result_delivered_at is null", nativeQuery = true)
-    int markStopDelivered(@Param("origin") Long originExecutionId, @Param("now") Instant now);
+    @Query(value = "update hermes_session_binding set stop_noticed_at = :now"
+        + " where origin_execution_id = :origin and wake_eligible = true and result_delivered_at is null"
+        + " and stop_noticed_at is null", nativeQuery = true)
+    int markStopNoticed(@Param("origin") Long originExecutionId, @Param("now") Instant now);
+
+
+    /**
+     * 그 대화에서 사용자가 중지한 답(origin 이 {@code CANCELLED})의 깨울 자식 가운데 끝 소식이 {@code stoppedAfter} 뒤에 왔고 아직
+     * 전하지 않은 줄이다. 끝난 순서다. 사용자 메시지로 여는 turn 의 입력에 넣는다(스펙 DECISION34). 중지 알림을 남기기 전의 줄도 든다.
+     */
+    @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
+        + " where e.conversation_id = :conversationId and b.wake_eligible = true and b.stopped_at is not null"
+        + " and b.stopped_at > :stoppedAfter and b.result_delivered_at is null and e.status = 'CANCELLED'"
+        + " order by b.stopped_at, b.id", nativeQuery = true)
+    List<HermesSessionBinding> findCarriedIntoUserTurn(
+        @Param("conversationId") Long conversationId,
+        @Param("stoppedAfter") Instant stoppedAfter);
 
 
     /** 그 대화 실행을 origin 으로 두고 처음 전한 알림 줄이 있는 줄이다. 이력 API 가 결과 도착 줄의 상태를 그릴 때 읽는다. */

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.turn.application;
 
+import com.bifos.assistant.chat.turn.application.dto.CarriedResults;
 import com.bifos.assistant.chat.turn.application.dto.ChatEvent;
 import com.bifos.assistant.chat.turn.application.dto.ChatTurn;
 import com.bifos.assistant.chat.turn.application.dto.PendingTurn;
@@ -63,6 +64,7 @@ class ChatTurnRunner {
     private final RoomContext roomContext;
     private final ConversationNotices notices;
     private final TurnSteerLedger steerLedger;
+    private final ChatDeliveryInput deliveryInput;
 
 
     /**
@@ -98,6 +100,9 @@ class ChatTurnRunner {
             // 질문을 저장하기 전에 읽는다. 대화방의 요약 알림 줄은 질문 앞에 남고, 맡김의 최근 줄과 대화 에이전트가 받을 맡김은 이번 질문
             // 앞까지다.
             String lead = leadOf(roomLead(user, routed, intent), mentionInputs.lead(conversation, intent));
+            // 중지한 답이 맡긴 하위 작업처럼 자동 turn 을 열지 않은 결과를 사용자가 보낸 turn 입력 앞에 넣는다(스펙 agent-team DECISION34)
+            CarriedResults carried = deliveryInput.carriedInput(conversation.id(), intent);
+            lead = carried.prependTo(lead);
             Long questionId = chatTurnRouting.saveQuestion(user, conversation, text, attachmentIds, intent, onEvent);
             // 폴더를 만들기 전에 잡는다. 이 시각 뒤에 바뀐 HTML 이 이 turn 의 결과물이다.
             Instant startedAt = clock.instant();
@@ -193,6 +198,8 @@ class ChatTurnRunner {
                     }
                 }
                 runId = chatRunEvents.submit(pending);
+                // Hermes 가 입력을 받은 뒤에 전했다고 적는다. 보내기 전에 멈추거나 실패하면 다음 메시지에 다시 넣는다
+                deliveryInput.markCarried(conversation.id(), carried);
                 // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-090).
                 chatRunEvents.relay(pending, runId, handle, streaming ? onEvent : null);
                 result = chatRunEvents.awaitCompletion(pending, runId);
