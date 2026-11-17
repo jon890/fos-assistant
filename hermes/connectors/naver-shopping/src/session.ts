@@ -33,7 +33,13 @@ export async function checkLogin(
   env: Env,
   { timeoutMs = 8_000 }: { timeoutMs?: number } = {},
 ) {
-  const cdpUrl = browserUrl(env);
+  if (!(await hasLoginCookies(browserUrl(env), timeoutMs)))
+    throw new ToolError("NAVER_SHOPPING_LOGIN_REQUIRED");
+  return { browser: "connected", logged_in: true };
+}
+
+/** 로그인 쿠키 둘이 있는가. 연결 확인과, 승인한 채우기가 claim 전에 로그인을 볼 때 쓴다. 쿠키 값은 읽어 이름만 본다. */
+export async function hasLoginCookies(cdpUrl: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   // 중계는 꺼진 브라우저를 켜느라 이 요청을 붙잡을 수 있어 남은 시간을 모두 쓴다.
@@ -59,9 +65,7 @@ export async function checkLogin(
         .filter((cookie) => NAVER_DOMAINS.has(cookie?.domain))
         .map((cookie) => cookie?.name),
     );
-    if (!LOGIN_COOKIES.every((name) => names.has(name)))
-      throw new ToolError("NAVER_SHOPPING_LOGIN_REQUIRED");
-    return { browser: "connected", logged_in: true };
+    return LOGIN_COOKIES.every((name) => names.has(name));
   } finally {
     session.close();
   }

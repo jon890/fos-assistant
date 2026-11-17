@@ -74,6 +74,8 @@ export type ShopConfig = {
   newTabStatus?: number;
   /** 탭 목록(`/json/list`)에 이 상태로 답한다. 없으면 정상이다. */
   listStatus?: number;
+  /** 네이버 로그인 쿠키가 있는가. 기본은 있다. 테스트가 실행 사이에 바꿀 수 있다(사람이 로그인했다). */
+  loggedIn?: boolean;
 };
 
 export type LogLine =
@@ -91,6 +93,8 @@ export type LogLine =
 type Tab = { id: string; screen: Screen; href: string; quantity: number };
 
 const TOKEN = "gateway-token-0123456789";
+/** 브라우저 수준 연결의 표시. 탭 id 와 겹치지 않는다. */
+const BROWSER = "__browser";
 
 export function startFakeShop(config: ShopConfig = {}) {
   const log: LogLine[] = [];
@@ -144,6 +148,14 @@ export function startFakeShop(config: ShopConfig = {}) {
       });
       const ws = (id: string) =>
         `ws://${url.host}/${TOKEN}/devtools/page/${id}`;
+      if (rest === "/json/version")
+        return Response.json({
+          webSocketDebuggerUrl: `ws://${url.host}/${TOKEN}/devtools/browser/b`,
+        });
+      if (rest.startsWith("/devtools/browser/"))
+        return srv.upgrade(request, { data: { tab: BROWSER } })
+          ? undefined
+          : new Response("", { status: 400 });
       if (rest.startsWith("/devtools/page/")) {
         const id = rest.slice("/devtools/page/".length);
         return srv.upgrade(request, { data: { tab: id } })
@@ -176,6 +188,24 @@ export function startFakeShop(config: ShopConfig = {}) {
     websocket: {
       message(socket, raw): void {
         const message = JSON.parse(String(raw));
+        if (socket.data.tab === BROWSER) {
+          // 브라우저 수준 연결은 로그인 쿠키 읽기만 받는다. 쿠키 값은 싣지 않는다.
+          const cookies =
+            config.loggedIn === false
+              ? []
+              : [
+                  { name: "NID_AUT", domain: ".naver.com" },
+                  { name: "NID_SES", domain: ".naver.com" },
+                ];
+          socket.send(
+            JSON.stringify({
+              id: message.id,
+              result:
+                message.method === "Storage.getCookies" ? { cookies } : {},
+            }),
+          );
+          return;
+        }
         const tab = tabs.get(socket.data.tab);
         const reply = (result: unknown): void => {
           socket.send(JSON.stringify({ id: message.id, result }));
@@ -204,7 +234,10 @@ export function startFakeShop(config: ShopConfig = {}) {
             : {}),
         });
         if (message.method === "Page.navigate") {
-          if (config.landing === "login") {
+          if (
+            config.landing === "login" ||
+            String(params.url).startsWith("https://nid.naver.com/")
+          ) {
             tab.screen = "login";
             tab.href = "https://nid.naver.com/nidlogin.login";
           } else {

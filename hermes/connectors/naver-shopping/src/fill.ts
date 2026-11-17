@@ -7,7 +7,8 @@
  * 선언된 오류로 돌려주면 승인 줄이 `FAILED` 가 되어 주문서가 열렸을 수 있는 승인이 하루 합계에서 빠진다.
  * 단계마다 진단 줄을 남긴다(design.md 「채우기 진단」). 단계 이름과 오류 이름만 싣고 주소, 화면 글, ticket 은 싣지 않는다.
  */
-import { verifyApproval, type Authority } from "./approval.ts";
+import manifest from "../assistant.json";
+import { readResume, verifyApproval, type Authority } from "./approval.ts";
 import {
   CHECKOUT_TOOL,
   OPTIONS_MAX,
@@ -33,7 +34,7 @@ import {
   isOrderSheet,
   readSheet,
 } from "./fill-sheet.ts";
-import { browserUrl, type Env } from "./session.ts";
+import { browserUrl, hasLoginCookies, type Env } from "./session.ts";
 import {
   attachPage,
   closeTab,
@@ -75,6 +76,7 @@ const PASSED_AFTER_CLAIM = new Set<ErrorCode>([
 export type FillStage =
   | "approval"
   | "tab"
+  | "login"
   | "price"
   | "buy_ready"
   | "claim"
@@ -140,20 +142,30 @@ export async function fillCheckout(
   deps: FillDeps = DEFAULT_DEPS,
 ) {
   const trace = new FillTrace();
+  let claimed = false;
   try {
     trace.enter("approval");
-    const claim = verifyApproval(authority, CHECKOUT_TOOL, input);
+    const verified = verifyApproval(authority, CHECKOUT_TOOL, input);
+    const resume = readResume(authority);
     checkFill(input);
+    const claim = async () => {
+      claimed = true;
+      await verified();
+    };
     trace.enter("tab");
     const cdpUrl = browserUrl(env);
     return await deps.work(
       cdpUrl,
       input.url,
       (page) => fillOnPage(cdpUrl, page, input, claim, deps, trace),
-      deps.tab,
+      resume ? { ...deps.tab, tab: resume.tab } : deps.tab,
     );
   } catch (error) {
     trace.end("failed", error);
+    // claim 전에 사람이 해야 하는 화면에서 멈췄다. 남긴 탭에서 상품 화면부터 다시 가면 되므로 이어 갈 단계를 함께 낸다.
+    // Control Plane 은 승인을 끝내지 않고 사람을 기다리고, 사람이 풀면 같은 승인으로 이 도구를 그 탭에서 한 번 더 부른다.
+    if (error instanceof ToolError && error.handoff?.tab && !claimed)
+      throw new ToolError(error.code, error.handoff, { step: "product" });
     throw error;
   }
 }
@@ -171,6 +183,16 @@ async function fillOnPage(
   const stepMs = deps.stepMs ?? DEFAULT_STEP_MS;
   const waitMs = deps.waitMs ?? DEFAULT_WAIT_MS;
   try {
+    // 로그아웃 상태면 구매하기가 로그인 화면으로 가 claim 만 쓰고 결과를 모르게 된다. claim 전에 로그인 화면을 사람에게 넘긴다.
+    // 주소 이동만 하고 아무것도 누르지 않는다. 쿠키가 있어도 만료됐을 수 있고, 그때는 지금처럼 결과를 모르는 것으로 끝난다.
+    trace.enter("login");
+    if (!(await hasLoginCookies(cdpUrl, page.remaining()))) {
+      await page.navigate(manifest.owner_browser_login_url);
+      throw new ToolError("NAVER_SHOPPING_LOGIN_REQUIRED", {
+        need: "login",
+        tab: page.id,
+      });
+    }
     trace.enter("price");
     const priced = await priceOnPage(page, CHECKOUT_TOOL, {
       url: input.url,

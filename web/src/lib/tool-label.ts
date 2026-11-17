@@ -59,6 +59,10 @@ const LABELS: Record<string, Label> = {
     running: "주문 상한 변경을 요청하고 있어요",
     done: "주문 상한 변경을 요청했어요",
   },
+  approval_resume: {
+    running: "승인한 작업을 이어 가고 있어요",
+    done: "승인한 작업을 이어 갔어요",
+  },
 };
 
 /** 표에 없는 MCP 도구다. 도구 이름 원문을 보이지 않고 연결된 서비스를 썼다고만 알린다. */

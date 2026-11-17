@@ -1,6 +1,7 @@
 package com.bifos.assistant.browser.application;
 
 import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
+import com.bifos.assistant.browser.application.port.BrowserKeptTabs;
 import com.bifos.assistant.browser.application.dto.BrowserEndpoint;
 import com.bifos.assistant.browser.application.dto.BrowserGrant;
 import com.bifos.assistant.browser.application.port.BrowserUsageHandle;
@@ -32,6 +33,7 @@ public class BrowserGateway {
     private final BrowserUsage usage;
     private final BrowserAgentTabs agentTabs;
     private final BrowserHumanHold holds;
+    private final BrowserKeptTabs keptTabs;
 
 
     /**
@@ -103,6 +105,22 @@ public class BrowserGateway {
             return;
         }
         agentTabs.created(target.browserId(), targetId);
+    }
+
+
+    /**
+     * 그 탭을 닫지 말아야 하는가. 열린 넘기기 카드나 살아 있는 이어 가기 표식이 가리키는 탭이다(browser-cowork spec REQ9, REQ11).
+     * 판정하지 못하면 닫지 않는 쪽으로 답한다. 남은 탭은 브라우저가 꺼질 때 사라진다.
+     */
+    public boolean keeps(GatewayTarget target, String tab) {
+        try {
+            return browsers.get(target.userId())
+                .map(browser -> browser.startedAt() == null || keptTabs.kept(target.userId(), tab, browser.startedAt()))
+                .orElse(true);
+        } catch (RuntimeException ex) {
+            log.warn("browser kept tab check failed kind={}", ex.getClass().getSimpleName());
+            return true;
+        }
     }
 
 

@@ -17,9 +17,12 @@
 | 구매 상한 | 한 건(예상 합계)과 KST 하루(그날 승인한 예상 합계의 합) 둘, 원 단위, 기본 0. 0 이면 주문서를 채우지 않는다. 운영 최대치는 없다. `app_user` 의 컬럼 둘이고 사용자가 「외부 서비스 연결」 화면에서만 바꾼다(spec DECISION9, DECISION15, DECISION31) |
 | 상한을 보는 때 | 카드를 만들 때, 승인하는 순간, 채우기 직전(claim), 결제 직전(주문서의 최종 결제 금액). 판정과 상한 변경은 같은 사용자 행 잠금으로 차례가 정해진다 |
 | 결제 직전 | 최종 결제 금액이 승인한 예상 합계보다 1원이라도 크거나 그 순간의 상한을 넘으면 결제 화면을 넘기지 않는다. 같거나 작으면 넘긴다(spec DECISION10) |
-| 하루 합계 | 결제 화면까지 간 승인과 결과를 모르는 승인을 센다. 결제 화면을 넘기지 못한 승인은 뺀다(spec DECISION17, DECISION30) |
-| 결과 불명 | 다시 보내지 않고 그 승인을 끝낸 뒤 「내 브라우저」 의 탭을 확인해 달라는 넘기기를 띄운다(spec DECISION33) |
+| 하루 합계 | 결제 화면까지 간 승인, 결과를 모르는 승인, 사람을 기다리는 승인을 센다. 결제 화면을 넘기지 못하고 끝난 승인은 뺀다(spec DECISION17, DECISION30, [browser-cowork spec](../features/browser-cowork/spec.md) DECISION20, 2026-11-17 고침) |
+| 결과 불명 | 「구매하기」 를 누른 뒤 결과를 모르면 다시 보내지 않고 그 승인을 끝낸 뒤 「내 브라우저」 의 탭을 확인해 달라는 넘기기를 띄운다(spec DECISION33). 누르기 전에 사람이 해야 하는 화면에서 멈춘 것은 결과 불명이 아니라 아래 「사람 기다림」 이다(2026-11-17 고침) |
+| 사람 기다림 | 「구매하기」 를 누르기 전(claim 전)에 로그인 같은 사람 화면에서 멈추면 승인을 끝내지 않고 `WAITING` 으로 둔다. 사람이 풀고 그 대화에 메시지를 보낸 뒤 에이전트가 이어 가기 도구를 부르면 새 승인 카드 없이 같은 승인으로 남긴 탭에서 한 번 더 실행한다. 이어 가기 직전에 그 순간의 상한을 다시 보고, 수명은 처음 멈춘 때부터 30분이다([browser-cowork spec](../features/browser-cowork/spec.md) REQ8, REQ9, DECISION4, DECISION19, 2026-11-17 더함) |
 | 시작하는 실행 | 사람이 연 대화의 흐름만. 사람이 없는 실행이 준비 도구를 부르면 금융 준비로 넘기지 않고 `ATTENDED_ONLY` 로 거절한다 |
+
+**ticket 은 실행마다 새로 내고 claim 소비는 승인 하나에 한 번이다(2026-11-17 더함).** 사람 기다림으로 멈출 때 쓰지 않은 ticket 을 거두고, 이어 갈 때 새 ticket 을 낸다. 이어 갈 수 있는 멈춤은 claim 전뿐이라 「구매하기」 를 누르는 권한은 지금처럼 한 번이다. 「멈출 때마다 한 번」 은 `WAITING` 에서 `EXECUTING` 으로 가는 전이를 행 잠금 아래에서 한 번만 해 지킨다. 상세는 [browser-cowork 설계](../features/browser-cowork/design.md) 의 「PR4 이어 가기」 가 갖는다.
 
 **승인과 실행은 금융 승인 틀(`execution_guard`, 준비, 승인, ticket, claim)에 주문서 종류 `CHECKOUT` 을 더해 쓰고, 채우기 도구는 새 위험도 `PURCHASE` 로 둔다.**
 
@@ -53,8 +56,9 @@
   - 토스 매매의 합계와 상한 칸, 코드 경로가 바뀌지 않는다
   - 뒤의 구매·예매 플러그인(KTX 등)이 같은 위험도와 종류로 얹힌다
 - 감당할 것:
+  - 사람을 기다리는 승인은 최대 30분 하루 합계에 들어간다. 그사이 다른 구매가 한도에 걸릴 수 있다. 결제 화면까지 가지 못하고 끝나면 빠진다
   - 결과를 모르는 승인은 하루 합계에 들어가 실제로 안 산 금액만큼 한도가 줄 수 있다
   - 승인 뒤 상한을 낮춘 드문 경우 결제 직전에 멈춰도 주문서 탭이 「내 브라우저」 에 남는다
   - 주문서 화면의 칸 위치는 아직 재지 않았다. 읽지 못하면 결과 불명으로 끝난다
   - 옵션 드롭다운 열기는 네이버 계정에 남는 기록이 아니지만 읽기 도구의 첫 누르기다. 상수 식 하나와 검사로 범위를 묶는다
-- **확인 방법**: `ToolPolicyDecisionTest`, `AttendedOnlyPrepareTest`, `PurchaseLimitSettingsTest`, `PurchaseLimitControllerTest`, 대시보드 선언 검사(`hermes/tests/test_connector_manifest.py`, `hermes/tests/test_connectors_contract.py`), 웹 `test/node/purchase-limits-route.test.ts`. 주문서 종류와 상한 판정, 결과 판정은 `CheckoutApprovalTest`, `ConnectorCheckoutSnapshotTest`, `hermes/tests/test_connector_checkout_validation.py`(Java 와 같은 사례 표 `test/resources/checkout-snapshot-v1.json`)가 본다. 플러그인 도구의 검사는 그 구현 PR 이 더한다
+- **확인 방법**: 사람 기다림과 이어 가기는 `CheckoutApprovalTest` 와 플러그인 `checkout.test.ts` 가 본다. `ToolPolicyDecisionTest`, `AttendedOnlyPrepareTest`, `PurchaseLimitSettingsTest`, `PurchaseLimitControllerTest`, 대시보드 선언 검사(`hermes/tests/test_connector_manifest.py`, `hermes/tests/test_connectors_contract.py`), 웹 `test/node/purchase-limits-route.test.ts`. 주문서 종류와 상한 판정, 결과 판정은 `CheckoutApprovalTest`, `ConnectorCheckoutSnapshotTest`, `hermes/tests/test_connector_checkout_validation.py`(Java 와 같은 사례 표 `test/resources/checkout-snapshot-v1.json`)가 본다. 플러그인 도구의 검사는 그 구현 PR 이 더한다

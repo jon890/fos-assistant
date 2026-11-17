@@ -430,6 +430,7 @@ PR3a 는 위험도 값과 직접 호출 거절, 모델 목록 숨김, 일반 실
 | `NAVER_SHOPPING_NOT_BUYABLE` | `invalid_input` | | 상품 상태가 판매 중이 아니다(네이버페이로 바로 살 수 없다) |
 | `NAVER_SHOPPING_PRICE_CHANGED` | `invalid_input` | `recheck` | 채우기에서 다시 계산한 예상 합계가 승인한 금액보다 크다 |
 | `NAVER_SHOPPING_CLAIM_REJECTED` | `forbidden` | | 실행 원문·ticket 대조가 어긋나거나 claim 이 거절됐다(만료, 이미 소비, 채우기 직전 상한) |
+| `NAVER_SHOPPING_TAB_GONE` | `unavailable` | | 이어 갈 남긴 탭이 없다(사람이 닫았거나 브라우저가 다시 켜졌다). claim 전이다 |
 | `NAVER_SHOPPING_CHECKOUT_FAILED` | `unavailable` | `retry_later` | claim 뒤 「바로구매」 전에 멈췄다. 「구매하기」 단추를 찾지 못했거나, 누르기 전부터 「바로구매」 가 보이거나, 층에서 옵션이나 수량을 맞추지 못했거나, 고른 뒤에도 「바로구매」 가 막혀 있다 |
 
 `executionArgs` 는 정확히 아래 키다. 금액은 원 단위 JSON 정수다.
@@ -481,7 +482,7 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 승인하면 금융 승인이 지금처럼 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 다시 보내지 않는다. 플러그인의 `fill_checkout` 은 이 순서로 돈다.
 
 1. 실행 원문과 ticket 의 인자 해시를 대조한다(토스 플러그인의 `execution-guard.ts` 와 같은 검사. 코드는 나누지 않는다)
-2. 빈 탭을 열어 상품 주소로 간다. 화면 분류가 사람이 해야 하는 화면이면 탭을 남기고 그 넘기기 결과로 끝난다
+2. 빈 탭을 열어 상품 주소로 간다. 이어 가기면(env `FOS_APPROVAL_RESUME_JSON`) 빈 탭 대신 앞서 남긴 탭에 붙어 상품 주소로 간다. 화면 분류가 사람이 해야 하는 화면이면 탭을 남기고 그 넘기기 결과에 `resume: {step: "product"}` 를 더해 끝난다. 로그인 쿠키가 없으면 그 탭을 로그인 화면으로 옮겨 같은 결과로 끝난다(2026-11-17 더함, [browser-cowork 설계](../browser-cowork/design.md) 「PR4 이어 가기」)
 3. 상품 상태를 다시 읽어(옵션이 있으면 드롭다운을 한 번 연다) 판매가와 배송비로 다시 계산한 예상 합계가 원문의 `expectedTotalKrw` 보다 크거나 고른 조합이 품절이면 claim 없이 `NAVER_SHOPPING_PRICE_CHANGED` 나 `NAVER_SHOPPING_SOLD_OUT` 으로 끝내고 탭을 닫는다
 4. 상품 화면의 「구매하기」 단추가 보일 때까지 기다린다(2026-11-16 실측: 준비 상태가 된 뒤 1초쯤 늦게 그린다. 가격 읽기와 claim 은 그 전에 끝나 claim 만 쓰고 누르지 못했다). 제한 시간 안에 보이지 않으면 claim 없이 `NAVER_SHOPPING_CHECKOUT_FAILED` 로 끝내고 탭을 닫는다. ticket 을 쓰지 않으려는 것이다
 5. claim 으로 ticket 을 한 번 소비한다. 거절되면 `NAVER_SHOPPING_CLAIM_REJECTED` 로 끝내고 탭을 닫는다. 구매하기를 누르지 않는다
@@ -526,7 +527,8 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 경우 | 플러그인 결과 | 승인 줄 | 넘기기 |
 | --- | --- | --- | --- |
 | 주문서까지 갔다 | `ORDER_SHEET_READY`, 최종 금액, 탭 | 아래 「결과 판정」 | 아래 「결과 판정」 |
-| claim 전에 사람이 해야 하는 화면 | `HUMAN_ACTION_REQUIRED` 와 `handoff`(PR2 계약) | `FAILED` | 그 종류(`login` 등) |
+| claim 전에 사람이 해야 하는 화면 | `HUMAN_ACTION_REQUIRED` 와 `handoff`(PR2 계약), `resume: {step: "product"}` | `WAITING`(사람 기다림, [browser-cowork 설계](../browser-cowork/design.md) 「PR4 이어 가기」) | 그 종류(`login` 등) |
+| 이어 갈 탭이 없다 | 선언된 오류 `NAVER_SHOPPING_TAB_GONE` | `FAILED` | 없음 |
 | claim 전 실패(가격 오름, 품절, 구매하기 단추가 안 그려짐, claim 거절) | 선언된 오류 | `FAILED` | 없음. 탭을 닫는다 |
 | claim 뒤 바로구매 전에 멈춤(구매하기 단추가 사라짐, 층의 옵션이나 수량을 못 맞춤) | 선언된 오류(`NAVER_SHOPPING_CHECKOUT_FAILED`. 전체 제한 시간을 넘겼으면 `NAVER_SHOPPING_UNAVAILABLE`) | `FAILED` | 없음. 탭을 닫는다 |
 | 구매하기 뒤 층도 주문서도 보이지 않음, 바로구매를 보낸 뒤 주문서나 금액을 확인하지 못함, 시간 초과 | `{status: "UNKNOWN", tab}` | `UNKNOWN` | `tab_check` |
@@ -541,7 +543,8 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 | 단계(`stage`) | 하는 일 |
 | --- | --- |
 | `approval` | 실행 원문, ticket, claim 주소 대조와 원문 모양 검사 |
-| `tab` | 브라우저 중계 주소 확인, 남긴 탭 정리, 새 탭 열기, 상품 주소로 이동, 화면 분류 |
+| `tab` | 브라우저 중계 주소 확인, 남긴 탭 정리, 새 탭 열기(이어 가기면 남긴 탭에 붙기), 상품 주소로 이동, 화면 분류 |
+| `login` | 로그인 쿠키 확인. 없으면 그 탭을 로그인 화면으로 옮기고 `login` 으로 멈춘다. claim 전이라 이어 갈 수 있다 |
 | `price` | 상품 상태를 다시 읽어 예상 합계와 품절 확인 |
 | `buy_ready` | 상품 화면의 「구매하기」 단추가 보이기를 기다림. 보이지 않으면 claim 전에 끝난다 |
 | `claim` | ticket 소비 |
@@ -577,7 +580,8 @@ Control Plane 은 `itemAmountKrw + shippingFeeKrw == expectedTotalKrw`, 두 원�
 
 | 플러그인 결과 | claim | 승인 줄 | 넘기기 |
 | --- | --- | --- | --- |
-| `HUMAN_ACTION_REQUIRED` 와 `handoff`(결제와 탭 확인이 아닌 단계) | 소비 전 | `FAILED`(`human_action_required`) | 그 단계와 탭 |
+| `HUMAN_ACTION_REQUIRED` 와 `handoff`(결제와 탭 확인이 아닌 단계), `resume` 있음 | 소비 전 | `WAITING`. 쓰지 않은 ticket 을 거둔다 | 그 단계와 탭 |
+| `HUMAN_ACTION_REQUIRED` 와 `handoff`(결제와 탭 확인이 아닌 단계), `resume` 없음 | 소비 전 | `FAILED`(`human_action_required`) | 그 단계와 탭 |
 | `ORDER_SHEET_READY` 가 아니거나 모양이 틀림 | 소비 뒤 | `UNKNOWN` | `tab_check`, 결과에 탭이 있으면 그 탭 |
 | 그 밖의 성공 | 소비 전 | `UNKNOWN`(금융 줄과 같은 「claim 없는 성공」) | `tab_check` |
 | 실패나 응답 잃음 | 지금 규칙(`ConnectorFinancialOutcome`) | `FAILED` 나 `UNKNOWN` | `UNKNOWN` 이면 탭 없는 `tab_check` |

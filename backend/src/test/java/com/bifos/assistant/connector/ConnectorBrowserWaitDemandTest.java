@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.infra.ConversationRepository;
+import com.bifos.assistant.connector.action.application.ConnectorBrowserKeptTabs;
 import com.bifos.assistant.connector.action.application.ConnectorBrowserWaitDemand;
 import com.bifos.assistant.connector.action.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.connection.application.ConnectorCatalogCache;
@@ -127,6 +128,48 @@ class ConnectorBrowserWaitDemandTest {
         pending(stranger, "naver-shopping", NOW.plus(Duration.ofMinutes(10)));
 
         assertThat(demand.waiting(owner.id(), STARTED)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("이번 켜기 뒤에 처음 멈춘 살아 있는 사람 기다림 승인은 기다림이고, 수명이 지났거나 켜기 전에 멈춘 것은 아니다")
+    void waitsForWaitingApproval() {
+        waiting(owner, NOW.minus(Duration.ofMinutes(5)), NOW.plus(Duration.ofMinutes(25)));
+        assertThat(demand.waiting(owner.id(), STARTED)).isTrue();
+        assertThat(demand.waiting(stranger.id(), STARTED)).isFalse();
+
+        cleanupActions();
+        waiting(owner, NOW.minus(Duration.ofMinutes(31)), NOW.minus(Duration.ofMinutes(1)));
+        waiting(owner, STARTED.minus(Duration.ofMinutes(1)), NOW.plus(Duration.ofMinutes(5)));
+        assertThat(demand.waiting(owner.id(), STARTED)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("중계가 닫지 않을 탭은 이번 켜기 뒤의 열린 넘기기와 살아 있는 사람 기다림의 탭뿐이다")
+    void keptTabsAreOpenHandoffsAndLiveWaits() {
+        var kept = new ConnectorBrowserKeptTabs(actions, Clock.fixed(NOW, ZoneOffset.UTC));
+        handoff(owner, conversation.id(), NOW.minus(Duration.ofMinutes(5)), null);
+        assertThat(kept.kept(owner.id(), "TAB1", STARTED)).isTrue();
+        assertThat(kept.kept(owner.id(), "TAB2", STARTED)).isFalse();
+        assertThat(kept.kept(stranger.id(), "TAB1", STARTED)).isFalse();
+        assertThat(kept.kept(owner.id(), "TAB1", NOW)).as("다시 켠 브라우저에는 그 탭이 없다").isFalse();
+
+        cleanupActions();
+        handoff(owner, conversation.id(), NOW.minus(Duration.ofMinutes(5)), NOW.minus(Duration.ofMinutes(1)));
+        assertThat(kept.kept(owner.id(), "TAB1", STARTED)).as("닫힌 카드의 탭은 다음 탭 열기가 닫는다").isFalse();
+
+        cleanupActions();
+        waiting(owner, NOW.minus(Duration.ofMinutes(5)), NOW.plus(Duration.ofMinutes(25)));
+        assertThat(kept.kept(owner.id(), "TAB1", STARTED)).as("카드가 닫혀도 이어 가기를 기다리는 탭은 지킨다").isTrue();
+    }
+
+
+    /** 사람 기다림 승인이다. 사람이 이미 메시지를 보내 카드는 닫혔다. */
+    private void waiting(AppUser user, Instant since, Instant expiresAt) {
+        insert(user, "naver-shopping", "WAITING", expiresAt, conversation.id(), since, NOW.minus(Duration.ofMinutes(1)));
+        jdbc.update("UPDATE connector_action SET waiting_since = ?, resume_step = 'product' WHERE handoff_at = ? AND user_id = ?",
+            Timestamp.from(since), Timestamp.from(since), user.id());
     }
 
 

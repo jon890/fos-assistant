@@ -1,5 +1,10 @@
 package com.bifos.assistant.browser.application;
 
+import java.util.List;
+import java.util.ArrayList;
+import com.bifos.assistant.browser.domain.type.UserBrowserStatus;
+import com.bifos.assistant.browser.application.dto.UserBrowserSnapshot;
+
 import com.bifos.assistant.browser.application.port.BrowserGrantOwners;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,6 +54,8 @@ class BrowserGatewayTest {
     private BrowserUsage usage;
     private final BrowserHumanHold holds = mock(BrowserHumanHold.class);
     private final BrowserAgentTabs agentTabs = new BrowserAgentTabs(new FakeCdp(), Clock.systemUTC());
+    private final Set<String> keptTabs = new HashSet<>();
+    private final List<Instant> keptSince = new ArrayList<>();
 
 
     @BeforeEach
@@ -215,9 +222,33 @@ class BrowserGatewayTest {
     }
 
 
+    @Test
+    @DisplayName("열린 넘기기나 이어 가기 표식의 탭은 이번 켜기 시각으로 물어 닫지 않고, 판정하지 못하면 닫지 않는 쪽이다")
+    void keepsTabsOfOpenHandoffsAndWaitingApprovals() {
+        BrowserGateway gateway = gateway(tokens(BASE, SECRET));
+        Instant started = Instant.parse("2026-11-17T00:00:00Z");
+        when(browsers.get(OWNER)).thenReturn(Optional.of(new UserBrowserSnapshot(BROWSER_ID, OWNER,
+            UserBrowserStatus.RUNNING, null, started, started)));
+        GatewayTarget target = new GatewayTarget(OWNER, BROWSER_ID, CDP);
+        keptTabs.add("KEPT1");
+
+        assertThat(gateway.keeps(target, "KEPT1")).isTrue();
+        assertThat(gateway.keeps(target, "OTHER1")).isFalse();
+        assertThat(gateway.keeps(target, "FAIL")).isTrue();
+        assertThat(keptSince).containsOnly(started);
+    }
+
+
     private BrowserGateway gateway(BrowserGatewayTokens tokens) {
         BrowserGrantOwners owners = bindingId -> Optional.ofNullable(bindingOwners.get(bindingId));
-        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage, agentTabs, holds);
+        return new BrowserGateway(tokens, owners, userId -> !revoked.contains(userId), browsers, usage, agentTabs, holds,
+            (userId, tab, since) -> {
+                keptSince.add(since);
+                if ("FAIL".equals(tab)) {
+                    throw new IllegalStateException("db");
+                }
+                return keptTabs.contains(tab);
+            });
     }
 
 

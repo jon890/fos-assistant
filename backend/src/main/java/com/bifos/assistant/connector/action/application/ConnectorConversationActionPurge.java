@@ -20,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 class ConnectorConversationActionPurge implements ConversationActionPurge {
-    private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+    private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN,
+        ActionStatus.WAITING);
     /** 하루 합계가 본문을 읽는 위험도다. 금융 주문과 주문서 준비다(ADR-20261113 / purchase-checkout). */
     private static final Set<ToolRisk> SPENDING = Set.of(ToolRisk.FINANCIAL, ToolRisk.PURCHASE);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");

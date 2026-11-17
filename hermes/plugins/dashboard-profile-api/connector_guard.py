@@ -11,7 +11,7 @@ import urllib.error
 import uuid
 
 PROTOCOL = "approval-claim-v2"
-EXECUTION_ENV = frozenset({"FOS_APPROVAL_TICKET", "FOS_APPROVAL_ARGS_JSON", "FOS_APPROVAL_CLAIM_URL"})
+EXECUTION_ENV = frozenset({"FOS_APPROVAL_TICKET", "FOS_APPROVAL_ARGS_JSON", "FOS_APPROVAL_CLAIM_URL", "FOS_APPROVAL_RESUME_JSON"})
 GUARD_KEYS = {"v", "protocol", "bindingId", "connectionId", "connectionUpdatedAt", "manifestSha256"}
 RESERVED = set("orderId symbol market currency side quantity orderAmount price orderType timeInForce status "
                "filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool".split())

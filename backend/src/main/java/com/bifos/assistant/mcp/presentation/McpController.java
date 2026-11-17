@@ -6,6 +6,7 @@ import com.bifos.assistant.mcp.application.dto.McpCallContext;
 import com.bifos.assistant.mcp.application.dto.McpCaller;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
+import com.bifos.assistant.mcp.application.McpApprovalResumeTool;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
@@ -82,6 +83,7 @@ public class McpController {
     private final McpContentDraftTools contentDrafts;
     private final McpContentDraftSnapshots contentSnapshots;
     private final McpFinancialLimitTools financialLimits;
+    private final McpApprovalResumeTool approvalResume;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -114,7 +116,9 @@ public class McpController {
             Map.entry(McpFinancialLimitTools.READ, (caller, id, args) -> validated(id, args,
                 McpDtos.OrderLimitReadArguments::from, value -> this.financialLimits.read(caller))),
             Map.entry(McpFinancialLimitTools.CHANGE, (caller, id, args) -> validated(id, args,
-                McpDtos.OrderLimitChangeArguments::from, value -> this.financialLimits.change(caller, value.name(), value.value()))));
+                McpDtos.OrderLimitChangeArguments::from, value -> this.financialLimits.change(caller, value.name(), value.value()))),
+            Map.entry(McpApprovalResumeTool.NAME, (caller, id, args) -> validated(id, args,
+                McpDtos.ApprovalResumeArguments::from, value -> this.approvalResume.resume(caller))));
     }
 
 
@@ -282,8 +286,7 @@ public class McpController {
 
 
     /**
-     * 인자는 정수 {@code execution_id} 하나와 선택 {@code wait_seconds} 다. {@code wait_seconds} 는 0 이상 정수이고, 상한을
-     * 넘는 값은 위임 쪽이 줄인다. 다른 키가 오면 인자 오류다.
+     * 인자는 정수 {@code execution_id} 와 0 이상 정수인 선택 {@code wait_seconds} 다. 상한은 위임 쪽이 줄이고 다른 키는 인자 오류다.
      */
     private Map<String, Object> agentStatus(McpCaller caller, JsonNode id, JsonNode arguments) {
         JsonNode waitSeconds = arguments.get(WAIT_SECONDS);
@@ -326,8 +329,7 @@ public class McpController {
 
     /**
      * 인자는 {@code agent_code} 와 {@code task} 둘뿐이다. 다른 키가 오면 인자 오류다.
-     *
-     * <p>profile, 사용자, 부모를 인자로 받지 않는다. 모델이 준 값으로 그것을 정하지 않는다(ADR-017).
+     * profile, 사용자, 부모를 인자로 받지 않는다. 모델이 준 값으로 그것을 정하지 않는다(ADR-017).
      */
     private Map<String, Object> agentDelegate(McpCaller caller, JsonNode id, JsonNode arguments) {
         if (arguments.size() != 2 || !text(arguments, "agent_code") || !text(arguments, "task")) {

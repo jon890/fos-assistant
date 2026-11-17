@@ -67,6 +67,12 @@ final class HttpHermesConnectorGuard {
             guard.put("ticket", execution.ticket());
             guard.put("argsJson", raw);
             guard.put("argsSha256", execution.argsSha256());
+            if (execution.resume() != null) {
+                // 사람 화면에서 멈춘 승인을 이어 간다. 대시보드가 같은 모양을 다시 보고 플러그인에 env 로 넘긴다.
+                ObjectNode resume = guard.putObject("resume");
+                resume.put("tab", execution.resume().tab());
+                resume.put("step", execution.resume().step());
+            }
             return body;
         } catch (Exception ignored) {
             return null;

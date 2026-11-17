@@ -10,6 +10,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -81,6 +82,21 @@ public class ConnectorApprovalBrowser {
             throw unavailable(ex);
         }
         browsers.touch(user.id());
+    }
+
+
+    /**
+     * 그 사용자의 브라우저가 {@code since} 전부터 지금까지 켜져 있는가. 이어 가기는 그때 남긴 탭이 있어야 하므로 켜지 않고 묻기만 한다
+     * (browser-cowork spec REQ9). 다시 켜진 브라우저에는 그 탭이 없다.
+     */
+    public boolean runningSince(Long userId, Instant since) {
+        return browsers.get(userId).filter(browser -> browser.runningSince(since)).isPresent();
+    }
+
+
+    /** 사람이 「직접 할게요」 로 그 사용자의 브라우저를 쥐고 있는가. */
+    public boolean held(Long userId) {
+        return holds.held(userId);
     }
 
 

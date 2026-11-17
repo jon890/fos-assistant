@@ -11,6 +11,11 @@ public enum ActionStatus {
     SUCCEEDED,
     FAILED,
     UNKNOWN,
+    /**
+     * 승인한 실행이 사람이 해야 하는 화면에서 멈춰 사람을 기다린다. 승인은 끝나지 않았고 같은 승인으로 이어 갈 수 있다. 이어 가면
+     * {@code EXECUTING}, 수명이 다하면 {@code FAILED} 다(docs/features/browser-cowork/spec.md 의 REQ8, REQ9).
+     */
+    WAITING,
     REJECTED,
     EXPIRED
 }

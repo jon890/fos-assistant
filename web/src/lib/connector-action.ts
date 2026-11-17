@@ -19,6 +19,7 @@ export type ConnectorActionStatus =
   | "SUCCEEDED"
   | "FAILED"
   | "UNKNOWN"
+  | "WAITING"
   | "REJECTED"
   | "EXPIRED";
 
@@ -30,6 +31,7 @@ export const CONNECTOR_ACTION_STATUSES: readonly ConnectorActionStatus[] = [
   "SUCCEEDED",
   "FAILED",
   "UNKNOWN",
+  "WAITING",
   "REJECTED",
   "EXPIRED",
 ];

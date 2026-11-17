@@ -15,7 +15,8 @@ export type ErrorCode =
   | "NAVER_SHOPPING_NOT_BUYABLE"
   | "NAVER_SHOPPING_PRICE_CHANGED"
   | "NAVER_SHOPPING_CLAIM_REJECTED"
-  | "NAVER_SHOPPING_CHECKOUT_FAILED";
+  | "NAVER_SHOPPING_CHECKOUT_FAILED"
+  | "NAVER_SHOPPING_TAB_GONE";
 
 /**
  * 사람에게 넘기는 단계와 남긴 탭이다. fos-ctx hook 이 이 칸을 보고 Control Plane 에 화면 넘기기를 알린다.
@@ -29,11 +30,18 @@ export type Handoff =
   /** 사람이 브라우저를 쥐어 중계가 거절했다. 탭을 만들기 전이면 탭이 없다(fos-assistant ADR-20261116 / browser-lock). */
   | { need: "human_browser"; tab?: string };
 
+/**
+ * 승인한 채우기가 사람이 해야 하는 화면에서 claim 전에 멈췄을 때 이어 갈 단계다. Control Plane 은 뜻을 모르고 이어 갈 때 그대로 돌려준다.
+ * `product` 는 남긴 탭에서 상품 화면부터 다시 가는 것이다(fos-assistant browser-cowork 설계 「PR4 이어 가기」).
+ */
+export type Resume = { step: "product" };
+
 /** 코드만 싣는 오류. 중계 주소, 검색어, 화면의 글, 브라우저가 준 원문을 담지 않는다. 넘기기 칸은 어휘와 탭 id 뿐이다. */
 export class ToolError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly handoff: Handoff | null = null,
+    readonly resume: Resume | null = null,
   ) {
     super(code);
   }
@@ -57,7 +65,11 @@ const HANDOFF_MESSAGE =
  * Hermes 는 같은 서버의 `isError` 결과가 연속 3회면 60초 동안 그 서버의 호출을 막는다. 사람이 풀고 돌아와도 막혀 있으므로,
  * 사람이 해야 하는 화면은 실패가 아닌 결과로 돌려준다. 성공으로 읽히지 않게 `status` 와 `message` 로 멈췄다고 밝힌다.
  */
-export function handoffResult(code: ErrorCode, handoff: Handoff) {
+export function handoffResult(
+  code: ErrorCode,
+  handoff: Handoff,
+  resume: Resume | null = null,
+) {
   return {
     content: [
       {
@@ -73,6 +85,7 @@ export function handoffResult(code: ErrorCode, handoff: Handoff) {
             need: handoff.need,
             ...(handoff.tab ? { tab: handoff.tab } : {}),
           },
+          ...(resume && handoff.tab ? { resume } : {}),
         }),
       },
     ],
@@ -82,7 +95,7 @@ export function handoffResult(code: ErrorCode, handoff: Handoff) {
 /** 알 수 없는 예외는 원문을 버리고 `NAVER_SHOPPING_UNAVAILABLE` 로 바꾼다. 화면 넘기기는 오류가 아닌 결과다. */
 export function toolFailure(error: unknown) {
   if (error instanceof ToolError && error.handoff)
-    return handoffResult(error.code, error.handoff);
+    return handoffResult(error.code, error.handoff, error.resume);
   const code =
     error instanceof ToolError ? error.code : "NAVER_SHOPPING_UNAVAILABLE";
   return {

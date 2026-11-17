@@ -45,6 +45,14 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
     static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
 
     /**
+     * 승인한 실행이 사람 화면에서 멈춰 기다리는 줄의 안내다(browser-cowork spec REQ8, DECISION27). 이어 가기 도구 이름은
+     * {@code McpApprovalResumeTool.NAME} 과 같다.
+     */
+    static final String WAITING_INPUT = "사람이 해야 하는 화면(로그인 등)에서 멈췄고 승인은 끝나지 않았다. 사용자에게 「내 브라우저」 에서 그 화면을"
+        + " 마친 뒤 알려 달라고 안내한다. 사용자가 그 뒤 이 대화에 메시지를 보내면 새로 준비하지 말고 approval_resume 도구를 한 번 부른다."
+        + " 사용자가 그만두거나 다른 것을 원하면 부르지 않는다. 처음 멈춘 때부터 30분이 지나면 이어 갈 수 없다.";
+
+    /**
      * 결과를 모르는 줄에 커넥터가 재시도 식별자를 남겼을 때 더하는 줄이다(ADR-20261013 unknown-retry-key). Control Plane 은 자동으로
      * 다시 보내지 않는다. 커넥터 스킬이 그 식별자로 확인하는 절차를 정해 둔 경우에만 에이전트가 새 호출을 한다.
      */
@@ -134,7 +142,8 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
             ContextTrust.EXTERNAL,
             result.executedAt(),
             ResultHeader.freshnessOf(result.executedAt(), now, staleAfter),
-            result.status() == ActionStatus.UNKNOWN ? ContextBodyMode.OMITTED : ContextBodyMode.INLINE,
+            result.status() == ActionStatus.UNKNOWN || result.status() == ActionStatus.WAITING
+                ? ContextBodyMode.OMITTED : ContextBodyMode.INLINE,
             List.of(),
             null,
             null);
@@ -177,6 +186,7 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
         return switch (result.status()) {
             case SUCCEEDED -> "승인한 「" + result.title() + "」 실행이 끝났어요";
             case FAILED -> "승인한 「" + result.title() + "」 실행이 실패했어요";
+            case WAITING -> "승인한 「" + result.title() + "」 실행이 「내 브라우저」 에서 멈췄어요. 마치면 이어서 해요";
             default -> "승인한 「" + result.title() + "」 실행 결과를 알 수 없어요. 그 서비스에서 확인해 주세요";
         };
     }
@@ -223,6 +233,10 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
         if (result.conversationGranted()) {
             input.append('\n')
                 .append(CONVERSATION_GRANT_INPUT.formatted(GRANT_UNTIL.format(result.conversationGrantExpiresAt())));
+        }
+        if (result.status() == ActionStatus.WAITING) {
+            // 멈춘 줄의 결과 글은 비어 있다. 플러그인의 글을 옮기지 않고 정해 둔 안내만 잇는다.
+            return input.append('\n').append(WAITING_INPUT).toString();
         }
         if (result.status() == ActionStatus.UNKNOWN) {
             input.append('\n').append(UNKNOWN_INPUT);

@@ -17,4 +17,10 @@ public record UserBrowserSnapshot(
             browser.startedAt(),
             browser.lastActiveAt());
     }
+
+
+    /** {@code since} 전부터 지금까지 켜져 있는가. 그 사이 다시 켜진 브라우저에는 그때의 탭이 없다. */
+    public boolean runningSince(Instant since) {
+        return status == UserBrowserStatus.RUNNING && startedAt != null && !startedAt.isAfter(since);
+    }
 }

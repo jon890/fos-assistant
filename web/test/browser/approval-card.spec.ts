@@ -595,6 +595,19 @@ test("실행하는 중인 줄은 단추 없이 상태만 보인다", async ({ pa
   await expect(card.getByRole("button")).toHaveCount(0);
 });
 
+test("사람 화면에서 멈춰 기다리는 줄은 승인 단추 없이 마치고 알려 달라는 안내만 보인다", async ({
+  page,
+}) => {
+  await openWith(page, "사람 기다림 검사", action({ status: "WAITING" }));
+
+  const card = page.getByTestId("approval-card");
+  await expect(card.getByRole("status")).toContainText(
+    "「내 브라우저」에서 멈췄어요",
+  );
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toHaveCount(0);
+});
+
 test("실행했는지 모르는 줄은 승인 단추 없이 안내를 보이고 닫을 수 있다", async ({
   page,
 }) => {

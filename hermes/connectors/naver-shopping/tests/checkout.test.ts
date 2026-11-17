@@ -673,7 +673,113 @@ test("claim 전에 로그인 화면이면 claim 없이 탭을 남긴 넘기기 �
       need: "login",
       tab: "TAB1",
     },
+    resume: { step: "product" },
   });
+  expect(shop!.log.some((line) => line.kind === "claim")).toBe(false);
+});
+
+/** 같은 가짜 상점에서 채우기를 한 번 더 부른다. 이어 가기면 Control Plane 이 넘기는 탭과 단계 env 를 더한다. */
+async function fillAgain(args: Record<string, unknown>, resume?: string) {
+  const env: Record<string, string | undefined> = {
+    [BROWSER_URL_ENV]: shop!.url,
+    ...approvalEnv(args, shop!.claimUrl),
+    ...(resume === undefined ? {} : { FOS_APPROVAL_RESUME_JSON: resume }),
+  };
+  const client = new Client({ name: "checkout-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
+  await createServer(env, { read: readInTab, fill: FAST }).connect(
+    serverTransport,
+  );
+  await client.connect(clientTransport);
+  const result = await client.callTool({
+    name: "fill_checkout",
+    arguments: args,
+  });
+  return {
+    isError: result.isError === true,
+    body: JSON.parse((result.content as { text: string }[])[0]!.text),
+  };
+}
+
+test("로그아웃 상태면 claim 전에 그 탭을 로그인 화면으로 옮겨 넘기고, 이어 가기는 그 탭에서 주문서까지 간다", async () => {
+  const config: ShopConfig = { product: PLAIN_PRODUCT, loggedIn: false };
+  const first = await fill(config, PLAIN_ARGS);
+  expect(first.isError).toBe(false);
+  expect(first.body).toMatchObject({
+    status: "HUMAN_ACTION_REQUIRED",
+    handoff: {
+      code: "NAVER_SHOPPING_LOGIN_REQUIRED",
+      need: "login",
+      tab: "TAB1",
+    },
+    resume: { step: "product" },
+  });
+  expect(shop!.log.some((line) => line.kind === "claim")).toBe(false);
+  expect(shop!.count(PRESS_BUY)).toBe(0);
+  expect(shop!.tabs.get("TAB1")?.screen).toBe("login");
+
+  // 사람이 로그인했다. 같은 승인의 새 ticket 과 남긴 탭으로 다시 부른다.
+  config.loggedIn = true;
+  const before = shop!.log.length;
+  const resumed = await fillAgain(
+    PLAIN_ARGS,
+    JSON.stringify({ tab: "TAB1", step: "product" }),
+  );
+  expect(resumed.isError).toBe(false);
+  expect(resumed.body).toEqual({
+    status: "ORDER_SHEET_READY",
+    finalAmountKrw: 3300,
+    tab: "TAB1",
+  });
+  const later = shop!.log.slice(before);
+  // 새 탭을 열지 않고 남긴 탭에 붙는다. claim 은 한 번이다.
+  expect(
+    later.some(
+      (line) => line.kind === "http" && line.line.startsWith("PUT /json/new"),
+    ),
+  ).toBe(false);
+  expect(later.filter((line) => line.kind === "claim")).toHaveLength(1);
+  expect(shop!.log.filter((line) => line.kind === "claim")).toHaveLength(1);
+});
+
+test("이어 가다 다시 로그인 화면이면 같은 탭으로 다시 넘기고 claim 하지 않는다", async () => {
+  const config: ShopConfig = { product: PLAIN_PRODUCT, loggedIn: false };
+  await fill(config, PLAIN_ARGS);
+  const again = await fillAgain(
+    PLAIN_ARGS,
+    JSON.stringify({ tab: "TAB1", step: "product" }),
+  );
+  expect(again.body).toMatchObject({
+    status: "HUMAN_ACTION_REQUIRED",
+    handoff: { need: "login", tab: "TAB1" },
+    resume: { step: "product" },
+  });
+  expect(shop!.log.some((line) => line.kind === "claim")).toBe(false);
+});
+
+test("이어 갈 탭이 사라졌으면 claim 없이 TAB_GONE 이고, 모양이 틀린 이어 가기는 거절한다", async () => {
+  await fill({ product: PLAIN_PRODUCT, loggedIn: false }, PLAIN_ARGS);
+  shop!.tabs.delete("TAB1");
+  const gone = await fillAgain(
+    PLAIN_ARGS,
+    JSON.stringify({ tab: "TAB1", step: "product" }),
+  );
+  expect(gone).toEqual({
+    isError: true,
+    body: { error: { code: "NAVER_SHOPPING_TAB_GONE" } },
+  });
+  for (const raw of [
+    JSON.stringify({ tab: "TAB1", step: "sheet" }),
+    JSON.stringify({ tab: "../x", step: "product" }),
+    JSON.stringify({ tab: "TAB1", step: "product", extra: 1 }),
+    "not json",
+  ]) {
+    const rejected = await fillAgain(PLAIN_ARGS, raw);
+    expect(rejected.body).toEqual({
+      error: { code: "NAVER_SHOPPING_CLAIM_REJECTED" },
+    });
+  }
   expect(shop!.log.some((line) => line.kind === "claim")).toBe(false);
 });
 

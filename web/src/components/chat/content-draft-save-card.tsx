@@ -32,6 +32,8 @@ const FROM_ACTION: Record<ConnectorActionStatus, ContentDraftJobStatus> = {
   SUCCEEDED: "SUCCEEDED",
   FAILED: "FAILED",
   UNKNOWN: "UNKNOWN",
+  // 원고 저장은 사람 기다림이 되지 않는다. 생기면 결과를 모르는 것으로 둔다.
+  WAITING: "UNKNOWN",
   REJECTED: "STALE",
   EXPIRED: "STALE",
 };
