@@ -89,4 +89,53 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
     @Query(value = "update hermes_session_binding set notice_message_id = :messageId"
         + " where id = :id and notice_message_id is null", nativeQuery = true)
     int markNoticed(@Param("id") Long id, @Param("messageId") Long messageId);
+
+
+    /**
+     * 1시간 기한 알림의 대상이다. 깨울 자식이고 끝 소식도 기한 표시도 없고, {@code after} 보다 뒤 {@code until} 까지 등록했고, origin 이
+     * 중지되지 않은 줄이다.
+     */
+    @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
+        + " where b.wake_eligible = true and b.stopped_at is null and b.timeout_noticed_at is null"
+        + " and b.created_at > :after and b.created_at <= :until and e.status <> 'CANCELLED'"
+        + " order by b.origin_execution_id, b.id", nativeQuery = true)
+    List<HermesSessionBinding> findTimeoutCandidates(@Param("after") Instant after, @Param("until") Instant until);
+
+
+    /** 그 origin 의 깨울 자식에 기한 표시가 이미 있는가. 앞서 알림 줄을 남겼다는 뜻이다. */
+    @Query(value = "select count(*) > 0 from hermes_session_binding"
+        + " where origin_execution_id = :origin and wake_eligible = true and timeout_noticed_at is not null", nativeQuery = true)
+    boolean existsTimeoutNoticed(@Param("origin") Long originExecutionId);
+
+
+    /** 그 origin 의 기한 대상 줄에 기한 표시를 적는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "update hermes_session_binding set timeout_noticed_at = :now"
+        + " where origin_execution_id = :origin and wake_eligible = true and stopped_at is null"
+        + " and timeout_noticed_at is null and created_at > :after and created_at <= :until", nativeQuery = true)
+    int markTimeoutNoticed(
+        @Param("origin") Long originExecutionId,
+        @Param("after") Instant after,
+        @Param("until") Instant until,
+        @Param("now") Instant now);
+
+
+    /** 중지 알림의 대상이다. 깨울 자식이고 아직 전하지 않았고 {@code after} 보다 뒤 등록했고 origin 이 중지된 줄이다. */
+    @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
+        + " where b.wake_eligible = true and b.result_delivered_at is null and b.created_at > :after"
+        + " and e.status = 'CANCELLED' order by b.origin_execution_id, b.id", nativeQuery = true)
+    List<HermesSessionBinding> findStopCandidates(@Param("after") Instant after);
+
+
+    /** 그 origin 의 깨울 자식 모두다. */
+    @Query(value = "select * from hermes_session_binding where origin_execution_id = :origin and wake_eligible = true"
+        + " order by id", nativeQuery = true)
+    List<HermesSessionBinding> findEligibleByOrigin(@Param("origin") Long originExecutionId);
+
+
+    /** 그 origin 의 아직 전하지 않은 깨울 자식 모두를 전했다고 적는다. 중지 알림으로 끝낸다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "update hermes_session_binding set result_delivered_at = :now"
+        + " where origin_execution_id = :origin and wake_eligible = true and result_delivered_at is null", nativeQuery = true)
+    int markStopDelivered(@Param("origin") Long originExecutionId, @Param("now") Instant now);
 }
