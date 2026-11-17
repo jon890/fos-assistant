@@ -34,6 +34,8 @@ public class HermesRunReplay {
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
+    /** 읽기 전체의 상한이다. 끝 사건 없이 keepalive 만 오는 열린 스트림에서 오래 막히지 않게 한다. */
+    private final Duration readTimeout;
 
 
     public HermesRunReplay(
@@ -47,6 +49,7 @@ public class HermesRunReplay {
         this.restClient = RestClient.builder().requestFactory(factory).build();
         this.keyStore = keyStore;
         this.objectMapper = objectMapper;
+        this.readTimeout = readTimeout;
     }
 
 
@@ -59,7 +62,7 @@ public class HermesRunReplay {
             .accept(MediaType.TEXT_EVENT_STREAM)
             .retrieve()
             .body(InputStream.class)) {
-            return body == null ? Optional.empty() : firstTerminal(body);
+            return body == null ? Optional.empty() : firstTerminal(body, System.nanoTime() + readTimeout.toNanos());
         } catch (RestClientException | IOException ex) {
             log.info("끝난 실행의 사건 보관분을 읽지 못했다 profile={} runId={}", profileName, runId);
             return Optional.empty();
@@ -67,11 +70,11 @@ public class HermesRunReplay {
     }
 
 
-    private Optional<HermesRunTerminal> firstTerminal(InputStream body) throws IOException {
+    private Optional<HermesRunTerminal> firstTerminal(InputStream body, long deadline) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
-            while ((line = reader.readLine()) != null) {
+            while ((line = reader.readLine()) != null && System.nanoTime() - deadline < 0) {
                 if (line.startsWith("data:")) {
                     data.append(data.isEmpty() ? "" : "\n").append(line.substring(5).stripLeading());
                 } else if (line.isEmpty() && !data.isEmpty()) {

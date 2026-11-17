@@ -117,9 +117,12 @@ final class HermesSessionRuns {
             return;
         }
         JsonNode run = fetch(apiBaseUrl, apiKey, runId).orElse(null);
-        if (lost(run)) {
+        if (run == null) {
+            // Hermes 가 모르는 run 은 대기열을 막지 않는다. 다시 묻지 않는다.
+            terminals.markSettled(profileName, runId);
+        } else if (lost(run)) {
             resolve(apiBaseUrl, apiKey, profileName, runId, run);
-        } else if (run != null && terminalStatuses.contains(run.path("status").asText("").toLowerCase(Locale.ROOT))) {
+        } else if (terminalStatuses.contains(run.path("status").asText("").toLowerCase(Locale.ROOT))) {
             terminals.markSettled(profileName, runId);
         }
     }

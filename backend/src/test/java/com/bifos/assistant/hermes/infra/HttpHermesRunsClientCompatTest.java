@@ -27,6 +27,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -91,6 +92,26 @@ class HttpHermesRunsClientCompatTest {
 
 
     @Test
+    @DisplayName("v0.21.6 모양의 completed 와 cancelled 는 그대로 읽고, 404 는 모르는 실행이다")
+    void readsOtherV021ShapesAsBefore() {
+        on("GET /v1/runs/run-1", 200, "{\"status\":\"completed\",\"output\":\"답\",\"pending_steer\":\"남은 글\"}");
+        on("GET /v1/runs/run-2", 200, "{\"status\":\"cancelled\",\"output\":\"\"}");
+        on("GET /v1/runs/run-3", 404, "{\"error\":{\"code\":\"run_not_found\"}}");
+
+        HermesRunResult completed = client.lookupRun(baseUrl, "dad", "run-1").result();
+        HermesRunResult cancelled = client.lookupRun(baseUrl, "dad", "run-2").result();
+
+        assertThat(completed.succeeded()).isTrue();
+        assertThat(completed.pendingSteer()).isEqualTo("남은 글");
+        assertThat(completed.pendingSteerKnown()).isTrue();
+        assertThat(cancelled.status()).isEqualTo("cancelled");
+        assertThat(cancelled.pendingSteerKnown()).isTrue();
+        assertThat(client.lookupRun(baseUrl, "dad", "run-3").state()).isEqualTo(HermesRunLookup.State.NOT_FOUND);
+        assertThat(requests).noneMatch(request -> request.contains("/events") || request.contains("resolve-unknown"));
+    }
+
+
+    @Test
     @DisplayName("v0.23.2 의 queued 는 도는 것으로 보고 다시 물어 끝난 결과를 받는다")
     void queuedKeepsPolling() {
         on("GET /v1/runs/run-1", 200,
@@ -130,6 +151,24 @@ class HttpHermesRunsClientCompatTest {
 
         assertThatThrownBy(() -> client.awaitCompletion(command(), "run-1"))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.REMOTE_RUN_LOST));
+        assertThat(requests).contains(
+            "POST /v1/runs/run-1/resolve-unknown {\"admission_id\":\"adm-1\",\"execution_generation\":3}");
+    }
+
+
+    @Test
+    @DisplayName("해제 요청이 닿지 않으면 실패로 올리고 해제한 것으로 기억하지 않는다")
+    void connectionFailureIsNotTreatedAsReleased() {
+        HermesSessionRuns unreachable = new HermesSessionRuns(
+            new HermesProperties("keys", "https://d.example.com", "t", "https://l.example.com",
+                Duration.ofMillis(10), Duration.ofMillis(200), Duration.ofMillis(200), Duration.ofSeconds(1)),
+            terminals,
+            null);
+        JsonNode lost = JsonMapper.builder().build().readTree(LOST);
+
+        assertThatThrownBy(() -> unreachable.resolve("http://127.0.0.1:1", "dad-key", "dad", "run-1", lost))
+            .isInstanceOf(ApiException.class);
+        assertThat(terminals.settled("dad", "run-1")).isFalse();
     }
 
 
@@ -232,6 +271,7 @@ class HttpHermesRunsClientCompatTest {
         client.releaseIfLost(baseUrl, "dad", "run-1");
         client.releaseIfLost(baseUrl, "dad", "run-2");
         client.releaseIfLost(baseUrl, "dad", "run-2");
+        client.releaseIfLost(baseUrl, "dad", "run-3");
         client.releaseIfLost(baseUrl, "dad", "run-3");
 
         assertThat(requests).containsExactly(

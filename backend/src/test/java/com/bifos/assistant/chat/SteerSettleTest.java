@@ -57,6 +57,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import java.sql.Timestamp;
 
 /**
  * turn 이 끝날 때 steer 말풍선을 정리하고 돌아온 글을 다음 차례로, 모르는 글을 멈춘 대기 줄로 보내는지 본다(ADR-20261116 / run-steer).
@@ -332,6 +334,29 @@ class SteerSettleTest {
         assertThat(messages.findById(stopped.get(0).id()).orElseThrow().steerState()).isEqualTo(SteerState.CARRIED_OVER);
         assertThat(messages.findById(stopped.get(1).id()).orElseThrow().steerState()).isEqualTo(SteerState.NOT_DELIVERED);
         assertThat(stub().received().get(1).input()).endsWith("보낼 글");
+    }
+
+
+    @Test
+    @DisplayName("대화 turn 은 보내기 전에 같은 profile 에서 연결 실패로 끝난 지난 실행을 잃은 실행 풀기로 넘긴다")
+    void chatTurnReleasesLostRunsBeforeSubmit() throws InterruptedException {
+        Agent chief = agents.findByCode("dad").orElseThrow();
+        AgentExecution lost = executions.save(AgentExecution.builder()
+            .userId(dad.id())
+            .agentId(chief.id())
+            .profileName(chief.hermesProfile())
+            .hermesRunId("run-lost")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.FAILED)
+            .errorCode("HERMES_UNAVAILABLE")
+            .startedAt(Instant.now().minusSeconds(60))
+            .build());
+        jdbc.update("UPDATE agent_execution SET finished_at = ? WHERE id = ?", Timestamp.from(Instant.now()), lost.id());
+
+        Thread running = startRunningTurn();
+        finish(running);
+
+        assertThat(stub().releasedRuns()).contains("run-lost");
     }
 
 

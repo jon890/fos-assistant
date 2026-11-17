@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +42,7 @@ import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
+import org.mockito.InOrder;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +65,7 @@ class AgentRunnerSubmitFailureTest {
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final ModelTierService modelTiers = mock(ModelTierService.class);
     private final UserExecutionLimiter limiter = mock(UserExecutionLimiter.class);
+    private final LostRunRelease lostRunRelease = mock(LostRunRelease.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
         "runner",
@@ -92,7 +95,7 @@ class AgentRunnerSubmitFailureTest {
         runner = new AgentRunner(
             contextAssembler,
             hermes,
-            mock(LostRunRelease.class),
+            lostRunRelease,
             executions,
             mock(ExecutionEventRecorder.class),
             mock(ExecutionEventRepository.class),
@@ -121,6 +124,20 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.result().succeeded()).isFalse();
         assertThat(run.result().errorCode()).isEqualTo("ORCHESTRATION_STEP_FAILED");
         verify(hermes, never()).awaitCompletion(any(), any());
+    }
+
+
+    @Test
+    @DisplayName("위임과 흐름의 실행도 보내기 전에 같은 profile 의 잃었을 수 있는 실행을 먼저 푼다")
+    void releasesLostRunsBeforeSubmit() {
+        when(hermes.submit(any())).thenReturn(RUN_ID);
+        doThrow(new IllegalStateException("저장 실패")).when(executions).attachRunId(started, RUN_ID);
+
+        run();
+
+        InOrder order = inOrder(lostRunRelease, hermes);
+        order.verify(lostRunRelease).beforeSubmit(any());
+        order.verify(hermes).submit(any());
     }
 
 
