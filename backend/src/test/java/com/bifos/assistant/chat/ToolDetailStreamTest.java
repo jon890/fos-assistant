@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -246,7 +247,8 @@ class ToolDetailStreamTest {
             new ChatEventStreams(Duration.ofSeconds(20)),
             mock(ModelTierService.class),
             List.of(),
-            mock(SourceReadSummaries.class)))
+            mock(SourceReadSummaries.class),
+            new AutoTurnNoticeStatuses(List.of())))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         hermesStreams(

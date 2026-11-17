@@ -138,4 +138,19 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
     @Query(value = "update hermes_session_binding set result_delivered_at = :now"
         + " where origin_execution_id = :origin and wake_eligible = true and result_delivered_at is null", nativeQuery = true)
     int markStopDelivered(@Param("origin") Long originExecutionId, @Param("now") Instant now);
+
+
+    /** 그 대화 실행을 origin 으로 두고 처음 전한 알림 줄이 있는 줄이다. 이력 API 가 결과 도착 줄의 상태를 그릴 때 읽는다. */
+    @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
+        + " where e.conversation_id = :conversationId and b.notice_message_id is not null and b.result_status is not null",
+        nativeQuery = true)
+    List<HermesSessionBinding> findNoticedInConversation(@Param("conversationId") Long conversationId);
+
+
+    /** 그 대화 실행을 origin 으로 둔 줄의 맡긴 일과 결과 글과 key 를 비운다. 대화를 정리할 때 부른다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "update hermes_session_binding set goal_preview = null, result_text = null, result_key_id = null"
+        + " where origin_execution_id in (select id from agent_execution where conversation_id = :conversationId)",
+        nativeQuery = true)
+    int clearTextsOfConversation(@Param("conversationId") Long conversationId);
 }

@@ -217,7 +217,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 첨부는 보관 기간이 지나면 파일만 지우고 `deleted_at` 을 적는다. 행은 대화를 지운 뒤 정리 작업이 지운다.
 결과물(`chat_artifact`)도 같다.
 그 자리에 사진이 있었다는 것이 남아야 지난 대화를 읽을 수 있다.
-하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
+하위 에이전트 session 등록(`hermes_session_binding`)도 줄은 지우지 않는다. 실행 기록과 함께 남고, 내장 위임 결과의 맡긴 일과 결과 글과 그 key(`goal_preview`, `result_text`, `result_key_id`)만 비운다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. KEK 가 있는 설치는 암호문이다.
 그 항목의 벡터는 줄의 `embedding_*` 컬럼이라 줄과 함께 지워진다. 대신한 새 항목을 지우면 그 항목이 대신한 옛 항목의 `superseded_by_memory_id` 를 비워 옛 항목이 다시 실린다.

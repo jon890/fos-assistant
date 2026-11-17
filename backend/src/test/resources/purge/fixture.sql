@@ -43,8 +43,8 @@ VALUES (900000001, 900000001, 1, 'TOOL_STARTED', '지워야 할 사건 본문', 
 INSERT INTO execution_skill_use (id, execution_id, skill_name, source, occurred_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO hermes_session_binding (id, profile_name, session_id, user_id, origin_execution_id, root_session_id, parent_session_id, created_at)
-VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
+INSERT INTO hermes_session_binding (id, profile_name, session_id, user_id, origin_execution_id, root_session_id, parent_session_id, created_at, wake_eligible, goal_preview, stopped_at, result_status, result_text, result_key_id, result_delivered_at, notice_message_id)
+VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', TRUE, 'coverage-goal', '2020-01-01 00:01:00', 'SUCCEEDED', 'coverage-result', 900000001, '2020-01-01 00:02:00', 900000001);
 
 INSERT INTO memory (id, scope, owner_user_id, group_id, title, content, always_inject, status, proposed_by_execution_id, accepted_by_user_id, accepted_at, created_at, updated_at, collection, entry_type, retrieval, revision)
 VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'ACCEPTED', 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'MEMORY', 'ALWAYS', 1);

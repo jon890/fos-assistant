@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,7 +50,8 @@ class SourceReadMessagesTest {
         new ChatEventStreams(Duration.ofSeconds(1)),
         mock(ModelTierService.class),
         List.of(),
-        sourceReads);
+        sourceReads,
+        new AutoTurnNoticeStatuses(List.of()));
 
 
     @Test

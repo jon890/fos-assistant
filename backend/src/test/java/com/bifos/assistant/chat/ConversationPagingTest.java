@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -247,7 +248,8 @@ class ConversationPagingTest {
             new ChatEventStreams(Duration.ofSeconds(20)),
             mock(ModelTierService.class),
             List.of(),
-            mock(SourceReadSummaries.class));
+            mock(SourceReadSummaries.class),
+            new AutoTurnNoticeStatuses(List.of()));
 
         ConversationPageView page = controller.conversations(null, 10);
 

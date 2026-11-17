@@ -1,5 +1,6 @@
 package com.bifos.assistant.task;
 
+import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -116,7 +117,8 @@ class ConversationTaskLabelTest {
             new ChatEventStreams(Duration.ofSeconds(20)),
             mock(ModelTierService.class),
             taskLabels,
-            mock(SourceReadSummaries.class));
+            mock(SourceReadSummaries.class),
+            new AutoTurnNoticeStatuses(List.of()));
     }
 
 
