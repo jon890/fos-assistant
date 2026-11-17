@@ -28,13 +28,15 @@ application 이 새로 보는 것은 포트 DTO 의 boolean 하나(`HermesRunRes
 
 | 모듈 | 이번에 맡는 것 |
 | --- | --- |
-| `hermes/infra/HttpHermesRunsClient` | `queued`, `unknown`, v0.23.2 의 `cancelled` 번역, `resolve-unknown` 호출, 중지의 409 `unknown_execution` 처리, 조회 응답에 빠진 칸 채우기, 끝난 실행의 사건 보관분 다시 읽기, 잃은 실행 미리 풀기 |
-| `hermes/infra/HermesRunEventStream` | 종료 사건을 `HermesRunTerminals` 에 넘기기, `duration` 0 처리, 끝난 실행의 보관분에서 종료 사건만 읽는 진입점 |
+| `hermes/infra/HttpHermesRunsClient` | 포트 구현. v0.23.2 응답이면 아래 `HermesSessionRuns` 에 맡긴다. 파일 길이 상한 때문에 번역을 나눴다 |
+| `hermes/infra/HermesSessionRuns`(새 class) | `queued`, `unknown`, v0.23.2 의 `cancelled` 번역, `resolve-unknown` 호출, 중지의 409 `unknown_execution` 판정, 조회 응답에 빠진 칸 채우기(`HermesRunEnding`), `releaseIfLost` |
+| `hermes/infra/HermesRunReplay`(새 class) | 끝난 실행의 사건 보관분에서 끝 사건만 읽는다. 읽기 전체에 `assistant.hermes.terminal-event-read-timeout` 상한을 둔다 |
+| `hermes/infra/HermesRunEventStream` | 받은 끝 사건(`HermesRunTerminal`)을 `HermesRunTerminals` 에 넘기기, `duration` 0 처리 |
 | `hermes/infra/HermesRunTerminals`(새 class) | profile 과 run 번호마다 받은 종료 사건 하나, 이 프로세스가 중지를 보낸 run, 끝 상태를 확인한 run 을 메모리에 짧게 둔다 |
 | `hermes/application/port/HermesRunsClient` | `releaseIfLost(apiBaseUrl, profileName, runId)` 를 더한다. 그 run 이 잃은 실행이면 해제하고, 아니면 아무것도 하지 않는다. 기본 구현은 아무것도 하지 않는다 |
 | `hermes/application/dto/HermesRunResult` | `pendingSteerKnown` 필드를 더한다. 기존 생성자는 `true` 로 채워 지금 호출자를 바꾸지 않는다 |
 | `chat/turn/ChatTurnRunner`, `chat/recovery/RecoveredRunRecorder` | steer 정리에서 `pendingSteerKnown()` 이 거짓이면 중지 판정보다 먼저 `SteerSettlement.unknown()` 을 고른다 |
-| 새 실행을 보내는 자리(`ChatRunEvents.submit`, `AgentRunner`, `RoomContext`) | 보내기 전에 같은 profile 의 잃었을 수 있는 지난 실행을 `releaseIfLost` 로 넘긴다. 고르는 쿼리는 `usage/execution` 의 저장소가 갖는다 |
+| 새 실행을 보내는 자리(`ChatRunEvents.submit`, `AgentRunner`, `RoomContext`) | 보내기 전에 `LostRunRelease` 로 같은 profile 의 잃었을 수 있는 지난 실행을 `releaseIfLost` 로 넘긴다. 고르는 쿼리는 `usage/execution/infra/LostRunCandidateRepository` 가 갖는다(실행 저장소가 길이 상한에 닿아 나눴다) |
 | `shared/error/ErrorCode` | `REMOTE_RUN_LOST(BAD_GATEWAY)` 를 더한다. 재기동 정리의 같은 이름 문자열 상수와 뜻이 같다 |
 | `web/src/components/error-message.ts` | `REMOTE_RUN_LOST` 의 문구를 v0.21.6 에서 같은 상황이 보이던 `HERMES_UNAVAILABLE` 문구와 같게 둔다 |
 | `hermes/plugins/fos-ctx` | REQ5, REQ6 |
@@ -62,6 +64,8 @@ v0.23.2 응답인지는 조회 응답에 `admission_id` 가 있는지로 안다.
 v0.23.2 의 `cancelled` 는 사용자 중지, Hermes 의 정상 종료로 끊긴 실행, 해제된 실행을 모두 담는다.
 어댑터는 종료 사건과 자기 기록으로 나눈다. 정상 종료로 끊긴 실행은 v0.21.6 처럼 `interrupted`(실패)로 적혀야 REQ11 의 「재기동하면 실패」 가 성립한다.
 
+「중지를 보냈다」 는 이 Control Plane 프로세스가 보낸 모든 중지다. 사용자 중지 말고도 남은 원격 실행 기다리기, 위임의 제출 뒤 정리, 재기동 정리의 상한 중지가 들어간다. 그 줄들은 이미 실패로 적힌 뒤라 결과가 바뀌지 않는다.
+
 | 근거 | 넘기는 상태 |
 | --- | --- |
 | 종료 사건이 `run.cancelled` | `cancelled` |
@@ -84,7 +88,8 @@ v0.23.2 의 `cancelled` 는 사용자 중지, Hermes 의 정상 종료로 끊긴
 그래서 새 실행을 보내기 전에 같은 profile 의 지난 실행 가운데 잃었을 수 있는 것을 어댑터에 넘긴다(`releaseIfLost`).
 고르는 열쇠는 Hermes session 이 아니라 profile 이다. 실행 줄의 `hermes_session_id` 는 대화의 루트 session 이고 Hermes 에 보낸 session 은 압축 뒤 바뀔 수 있으며(`RunSession`), 방 요약 줄은 session 과 대화가 비어 있다(`ExecutionRecorder.startDetached`). profile 은 모든 줄에 있다.
 고르는 조건: 그 profile 의 `FAILED` 실행 가운데 `hermes_run_id` 가 있고, 최근 24시간 안에 끝났으며, `error_code` 가 Hermes 와 닿지 못했거나 기다리다 그만둔 코드(`HERMES_UNAVAILABLE`, `HERMES_RUN_TIMEOUT`, `RECONCILE_TIMEOUT`, `RECONCILE_UNREACHABLE`)인 것을 최근 순으로 최대 10개. 우리 오류 코드만 보므로 application 에 Hermes 상태 문자열이 생기지 않는다.
-어댑터는 조회해 `unknown` 이면 해제하고, 끝 상태면 그 run 을 「확인 끝」 으로 메모리에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다. 이 단계의 실패는 로그만 남기고 제출을 막지 않는다. 조회가 처음 실패하면 Hermes 가 닿지 않는 것이므로 남은 후보를 건너뛴다. 그래서 제출 전 지연은 조회 한 번의 제한 시간을 넘지 않는다.
+어댑터는 조회해 `unknown` 이면 해제하고, 끝 상태이거나 Hermes 가 모르는 run(404)이면 「확인 끝」 으로 메모리에 남겨 다시 묻지 않는다. 도는 중이거나 묻지 못했으면 남기지 않는다.
+`CANCELLED` 줄은 고르지 않는다. 사용자 중지는 흔해서 10개 상한을 채워 실제로 잃은 실행을 밀어낸다. 중지한 run 이 잃은 것이면 중지의 409 처리나 남은 원격 실행 기다리기가 해제한다. 둘 다 Hermes 가 오래 내려가 그만둔 뒤 그 session 을 다시 쓰는 경우는 풀리지 않고 남는다. 사용자 중지와 Hermes 재기동이 겹치고 그 뒤 Hermes 가 상한보다 오래 내려가 있어야 생겨 드물므로 받아들인다. 남으면 운영 왕복 확인에서 보이고 그때 다시 정한다. 저장소 조회를 포함해 이 단계의 실패는 로그만 남기고 제출을 막지 않는다. 조회가 처음 실패하면 Hermes 가 닿지 않는 것이므로 남은 후보를 건너뛴다. 그래서 제출 전 지연은 조회 한 번의 제한 시간을 넘지 않는다.
 부르는 자리는 대화 turn(`ChatRunEvents.submit`), 위임과 흐름(`AgentRunner`), 방 요약(`RoomContext`) 셋이다. 추천 질문은 늘 새 session 으로 보내 막힐 대기열이 없으므로 부르지 않는다.
 
 ### 결과 칸 채우기
