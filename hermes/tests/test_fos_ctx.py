@@ -142,8 +142,24 @@ class PluginFixture(unittest.TestCase):
         agent.secret_scope = secret_scope
         constants = types.ModuleType("hermes_constants")
         constants.get_hermes_home = lambda: pathlib.Path(self.tmp.name)
-        self.saved = {name: sys.modules.get(name) for name in ("agent", "agent.secret_scope", "hermes_constants")}
-        sys.modules.update({"agent": agent, "agent.secret_scope": secret_scope, "hermes_constants": constants})
+        # Hermes 의 위험 명령 분류 대역이다. `rm -rf` 가 든 명령만 위험하다고 답한다. v0.21 모양이라 승인 파일 판정은 없다.
+        self.dangerous_calls = []
+        detection = types.ModuleType("tools.approval_detection")
+
+        def detect_dangerous_command(command):
+            self.dangerous_calls.append(command)
+            return ("rm -rf" in command, "recursive delete" if "rm -rf" in command else None, None)
+
+        detection.detect_dangerous_command = detect_dangerous_command
+        tools = types.ModuleType("tools")
+        tools.approval_detection = detection
+        names = ("agent", "agent.secret_scope", "agent.file_safety", "hermes_constants", "tools",
+                 "tools.approval_detection", "tools.file_tools", "tools.file_tools_write_guards")
+        self.saved = {name: sys.modules.get(name) for name in names}
+        for name in names:
+            sys.modules.pop(name, None)
+        sys.modules.update({"agent": agent, "agent.secret_scope": secret_scope, "hermes_constants": constants,
+                            "tools": tools, "tools.approval_detection": detection})
         self.plugin = load_ctx(self.addCleanup)
 
     def tearDown(self):
@@ -865,17 +881,8 @@ class ConnectorPolicyTest(PluginFixture):
             self.assertNotIn(secret, log)
 
 
-class ToolGuardTest(PluginFixture):
-    """안전 목록 밖의 도구 호출을 가짜 Control Plane 의 `tool-guard` 에 묻는 모양과 막는 분기를 본다.
-
-    사건 실행 트리에서 막을 도구마다 실제 `pre_tool_call` 을 지난다. 판정 자체는 Control Plane 이 하고,
-    여기서는 답대로 막거나 통과시키는지, 답을 받지 못하면 막는지를 본다.
-    """
-
-    # 사건 실행에서 막혀야 하는 도구다. 위임, 셸·프로세스, 파일 넷, 코드 실행, 원격 연결, 브라우저, 다른 MCP 서버다.
-    GUARDED = ("delegate_task", "terminal", "process_manage", "read_file", "write_file", "patch", "search_files",
-               "execute_code", "manage_connections", "browser_navigate", "cronjob_manage", "session_search",
-               "mcp__other__send")
+class GuardServerFixture(PluginFixture):
+    """가짜 Control Plane 의 판정 경로를 띄운다. 받은 요청은 `requests` 에, 줄 답은 `answer` 에 둔다. 검사는 두지 않는다."""
 
     def setUp(self):
         super().setUp()
@@ -912,13 +919,25 @@ class ToolGuardTest(PluginFixture):
             os.environ["FOS_CTX_POLICY_URL"] = self.saved_env
         super().tearDown()
 
+class ToolGuardTest(GuardServerFixture):
+    """안전 목록 밖의 도구 호출을 가짜 Control Plane 의 `tool-guard` 에 묻는 모양과 막는 분기를 본다.
+
+    사건 실행 트리에서 막을 도구마다 실제 `pre_tool_call` 을 지난다. 판정 자체는 Control Plane 이 하고,
+    여기서는 답대로 막거나 통과시키는지, 답을 받지 못하면 막는지를 본다.
+    """
+
+    # 사건 실행에서 막혀야 하는 도구다. 위임, 셸·프로세스, 파일 넷, 코드 실행, 원격 연결, 브라우저, 다른 MCP 서버다.
+    GUARDED = ("delegate_task", "terminal", "process_manage", "read_file", "write_file", "patch", "search_files",
+               "execute_code", "manage_connections", "browser_navigate", "cronjob_manage", "session_search",
+               "mcp__other__send")
+
     def test_guarded_tools_send_signed_request_and_follow_block(self):
         """막을 도구마다 서명한 질의를 보내고, Control Plane 의 block 글로 막는다."""
         self.answer = (200, json.dumps({"decision": "block", "message": "사건 실행에서는 못 쓴다"}).encode("utf-8"))
         for tool in self.GUARDED:
             with self.subTest(tool=tool):
                 self.requests.clear()
-                self.assertEqual(self.call(tool, args={"command": "rm -rf /"}),
+                self.assertEqual(self.call(tool, args={"command": "ls"}),
                                  {"action": "block", "message": "사건 실행에서는 못 쓴다"})
                 self.assertEqual(len(self.requests), 1)
                 request = self.requests[0]
@@ -1020,6 +1039,157 @@ class ToolGuardTest(PluginFixture):
             self.plugin.sign_tool_guard(POLICY_VECTOR_KEY, "terminal", POLICY_VECTOR_ROOT, POLICY_VECTOR_SESSION,
                                         POLICY_VECTOR_CALL),
             TOOL_GUARD_VECTOR_SIG)
+
+
+class ApprovalGuardTest(GuardServerFixture):
+    """Hermes 승인 관문으로 갈 호출을 판정에 묻기 전에 막는지 본다(스펙 hermes-upgrade REQ5).
+
+    Hermes 판정 함수는 `PluginFixture` 와 여기서 넣는 대역이다. 실제 함수의 위치와 시그니처는
+    `test_hermes_contract.py` 의 `test_approval_guard_points` 가 두 버전 소스에서 본다.
+    """
+
+    def install(self, name, **attributes):
+        module = types.ModuleType(name)
+        for key, value in attributes.items():
+            setattr(module, key, value)
+        sys.modules[name] = module
+        parent, _, child = name.rpartition(".")
+        if parent in sys.modules:
+            setattr(sys.modules[parent], child, module)
+        return module
+
+    def install_write_points(self, approval_key=None):
+        """v0.23 모양의 승인 파일 판정 대역이다. `~/.ssh/config` 와 `.bashrc` 로 끝나는 경로를 승인 대상으로 본다."""
+        self.resolved = []
+
+        def write_approval_key(path):
+            if path.endswith(".ssh/config"):
+                return "ssh_config_write"
+            return "shell_rc_write" if path.endswith(".bashrc") else None
+
+        def resolved_or_raw(path, task_id):
+            self.resolved.append((path, task_id))
+            return path if path.startswith("/") else "/work/%s/%s" % (task_id, path)
+
+        def collect_v4a_header_paths(patch):
+            if ".." in patch:
+                return '{"error": "traversal"}'
+            paths = [line.split(":", 1)[1].strip() for line in patch.splitlines() if line.startswith("*** ")]
+            return paths, paths, []
+
+        self.install("agent.file_safety", write_approval_key=approval_key or write_approval_key)
+        self.install("tools.file_tools", _collect_v4a_header_paths=collect_v4a_header_paths)
+        self.install("tools.file_tools_write_guards", _resolved_or_raw=resolved_or_raw)
+
+    def blocked(self, message):
+        return {"action": "block", "message": message}
+
+    def test_dangerous_terminal_command_is_blocked_before_asking(self):
+        """위험 명령은 session 과 profile 에 상관없이 판정에 묻지 않고 바로 막는다. 코드 실행 안의 호출도 같다."""
+        for session, call_id in ((VECTOR_SESSION, VECTOR_CALL), (VECTOR_SESSION, ""), ("", "")):
+            with self.subTest(session=session, call_id=call_id):
+                self.assertEqual(self.call("terminal", session=session, call_id=call_id,
+                                           args={"command": "rm -rf /workspace/tmp"}),
+                                 self.blocked(self.plugin.DANGEROUS_COMMAND_MESSAGE))
+        self.assertEqual(self.requests, [])
+        self.assertEqual(self.dangerous_calls[-1], "rm -rf /workspace/tmp")
+
+    def test_dangerous_command_is_blocked_on_every_profile_kind(self):
+        """플러그인을 설치한 profile 과 대응 파일을 읽지 못한 profile 에서도 먼저 막는다."""
+        map_path = pathlib.Path(self.tmp.name) / ".fos-connector-tools.json"
+        for label, text in {"binding": json.dumps({"v": 1, "isolated": False, "servers": {}}),
+                            "isolated": json.dumps({"v": 1, "servers": {}}), "broken": "{"}.items():
+            with self.subTest(profile=label):
+                map_path.write_text(text, encoding="utf-8")
+                self.assertEqual(self.call("terminal", args={"command": "rm -rf ~"}),
+                                 self.blocked(self.plugin.DANGEROUS_COMMAND_MESSAGE))
+        self.assertEqual(self.requests, [])
+
+    def test_safe_terminal_command_goes_on_to_tool_guard(self):
+        """위험하지 않은 명령과 명령이 없는 호출은 지금처럼 도구 판정으로 간다."""
+        for args in ({"command": "ls -al"}, {}, {"command": 1}, None):
+            with self.subTest(args=args):
+                self.requests.clear()
+                self.assertIsNone(self.plugin.pre_tool_call(
+                    tool_name="terminal", args=args, session_id=VECTOR_SESSION, tool_call_id=VECTOR_CALL))
+                self.assertEqual(len(self.requests), 1)
+
+    def test_classifier_failure_blocks(self):
+        """분류 함수를 불러오지 못하거나 예외가 나면 막고, 명령은 로그에 남기지 않는다."""
+        sys.modules.pop("tools.approval_detection")
+        sys.modules["tools"].approval_detection = None
+        with self.assertLogs(self.plugin.logger, level="WARNING") as logs:
+            self.assertEqual(self.call("terminal", args={"command": "echo 비밀-명령"}),
+                             self.blocked(self.plugin.DANGEROUS_COMMAND_MESSAGE))
+        self.assertNotIn("비밀-명령", "\n".join(logs.output))
+
+        def broken(command):
+            raise RuntimeError(command)
+
+        self.install("tools.approval_detection", detect_dangerous_command=broken)
+        self.assertEqual(self.call("terminal", args={"command": "ls"}),
+                         self.blocked(self.plugin.DANGEROUS_COMMAND_MESSAGE))
+        self.assertEqual(self.requests, [])
+
+    def test_computer_use_is_always_blocked(self):
+        for session in (VECTOR_SESSION, ""):
+            with self.subTest(session=session):
+                self.assertEqual(self.call("computer_use", session=session, args={"action": "click"}),
+                                 self.blocked(self.plugin.COMPUTER_USE_MESSAGE))
+        self.assertEqual(self.requests, [])
+
+    def test_writes_without_approval_point_go_on_to_tool_guard(self):
+        """v0.21 처럼 `write_approval_key` 가 없는 Hermes 에서는 파일 판정을 건너뛴다. Hermes 가 승인 카드로 보낸다."""
+        self.install("agent.file_safety")
+        for tool, args in (("write_file", {"path": "~/.ssh/config", "content": "x"}),
+                           ("patch", {"path": "~/.bashrc", "old_string": "a", "new_string": "b"})):
+            with self.subTest(tool=tool):
+                self.requests.clear()
+                self.assertIsNone(self.call(tool, args=args))
+                self.assertEqual(len(self.requests), 1)
+
+    def test_writes_to_approval_paths_are_blocked(self):
+        """승인이 필요한 경로에 쓰는 `write_file` 과 `patch` 는 묻지 않고 막는다. V4A 머리줄의 경로도 본다."""
+        self.install_write_points()
+        cases = {
+            "write_file": ("write_file", {"path": "/home/u/.ssh/config", "content": "Host x"}),
+            "patch replace": ("patch", {"path": "/home/u/.bashrc", "old_string": "a", "new_string": "b"}),
+            "patch v4a": ("patch", {"mode": "patch", "patch": "*** Update File: notes.md\n*** Add File: /home/u/.bashrc"}),
+        }
+        for label, (tool, args) in cases.items():
+            with self.subTest(case=label):
+                self.assertEqual(self.call(tool, args=args), self.blocked(self.plugin.APPROVAL_WRITE_MESSAGE))
+        self.assertEqual(self.requests, [])
+
+    def test_relative_paths_resolve_with_task_id(self):
+        """상대 경로는 hook 이 받은 `task_id` 로 Hermes 가 푼다. 비면 Hermes 처리기와 같이 `default` 를 쓴다."""
+        self.install_write_points()
+        self.plugin.pre_tool_call(tool_name="write_file", args={"path": "a.md", "content": "x"},
+                                  session_id=VECTOR_SESSION, tool_call_id=VECTOR_CALL, task_id="task-7")
+        self.plugin.pre_tool_call(tool_name="write_file", args={"path": "b.md", "content": "x"},
+                                  session_id=VECTOR_SESSION, tool_call_id=VECTOR_CALL)
+        self.assertEqual(self.resolved, [("a.md", "task-7"), ("b.md", "default")])
+
+    def test_ordinary_writes_go_on_to_tool_guard(self):
+        """승인 대상이 아닌 쓰기, 경로 없는 호출, 머리줄이 거절될 V4A 는 지금처럼 도구 판정으로 간다."""
+        self.install_write_points()
+        for tool, args in (("write_file", {"path": "/workspace/a.md", "content": "x"}),
+                           ("write_file", {"content": "x"}),
+                           ("patch", {"mode": "patch", "patch": "*** Update File: ../.bashrc"}),
+                           ("patch", {"mode": "replace", "patch": "*** Update File: /home/u/.bashrc"})):
+            with self.subTest(tool=tool, args=args):
+                self.requests.clear()
+                self.assertIsNone(self.call(tool, args=args))
+                self.assertEqual(len(self.requests), 1)
+
+    def test_write_judgement_failure_blocks(self):
+        def broken(path):
+            raise OSError(path)
+
+        self.install_write_points(approval_key=broken)
+        self.assertEqual(self.call("write_file", args={"path": "/workspace/a.md", "content": "x"}),
+                         self.blocked(self.plugin.APPROVAL_WRITE_MESSAGE))
+        self.assertEqual(self.requests, [])
 
 
 class TransformToolResultTest(PluginFixture):

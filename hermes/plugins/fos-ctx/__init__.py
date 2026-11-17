@@ -94,6 +94,13 @@ Control Plane 의 `tool-guard` 경로에 그 session 이 사건 실행 트리인
 - session 이 없으면 묻지 않고 통과한다. 코드 실행 안의 호출이고 그 코드를 연 `execute_code` 가 이미 판정을 받았다
 - 200 의 `allow` 만 통과한다. 404 는 그 경로가 없는 옛 Control Plane 이라 통과한다. 그 밖과 모든 예외는 막는다
 
+## 승인 관문으로 가는 동작
+
+Hermes 가 위험하다고 분류한 `terminal` 명령, Hermes 가 승인을 요구하는 경로의 `write_file`, `patch`, 모든 `computer_use`
+호출은 profile 과 session 에 상관없이 맨 먼저 막는다(fos-assistant `docs/features/hermes-upgrade/spec.md` 의 REQ5).
+Hermes v0.23 은 승인 알림 경로가 없는 실행에서 이 동작들을 `approvals.unattended_mode` 로 바로 정하고, docker
+profile 은 그 값이 `approve` 라 사람 없이 열린다. 판정은 Hermes 의 함수를 그대로 부르고 `approval_guard.py` 가 갖는다.
+
 `skill_manage` 는 막는다. 올린 스킬은 Control Plane 이 쓰고 Hermes 는 읽기만 하는데,
 모델이 같은 이름의 로컬 스킬을 만들면 로컬이 먼저 선택되어 올린 스킬이 가려진다.
 읽기 전용 마운트로는 이것을 막지 못한다. 근거는 fos-assistant ADR-034 가 갖는다.
@@ -167,6 +174,12 @@ from .handoff import (  # noqa: F401 - 계약 테스트가 plugin 에서 꺼내 
     handoff_of,
     report_handoff,
     sign_handoff,
+)
+from .approval_guard import (
+    APPROVAL_WRITE_MESSAGE,
+    COMPUTER_USE_MESSAGE,
+    DANGEROUS_COMMAND_MESSAGE,
+    approval_guard,
 )
 from .tool_guard import (
     GUARD_BLOCK_MESSAGE,

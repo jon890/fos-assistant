@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import urllib.request
+from .approval_guard import approval_guard
 from .attachment_inspect import TOOL as INSPECT_TOOL, authorize as authorize_inspect
 from .connector_policy import (
     CODE_EXECUTION_MESSAGE,
@@ -82,11 +83,15 @@ def _delegate_images_allowed(args):
     return all(isinstance(task, dict) and _remote_images_only(task.get("images")) for task in tasks)
 
 
-def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
+def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", task_id="", **_):
     if tool_name == SKILL_MANAGE_TOOL:
         return {"action": "block", "message": SKILL_MANAGE_MESSAGE}
     if not isinstance(tool_name, str):
         return None
+    # Hermes 승인 관문으로 갈 호출은 profile 과 session 에 상관없이 먼저 막는다. 코드 실행 안의 호출도 같다.
+    gated = approval_guard(tool_name, args, task_id if isinstance(task_id, str) else "")
+    if gated is not None:
+        return gated
     if tool_name == "delegate_task" and not _delegate_images_allowed(args):
         return _block(DELEGATE_IMAGE_MESSAGE)
     control_plane = tool_name.startswith(TOOL_PREFIX)

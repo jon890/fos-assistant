@@ -205,6 +205,21 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다. 같은 칸에 코드 `DEMO_BROWSER_IN_USE`, `human_browser`, 탭 없음의 서명은 `19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1` 이다.
 
+### 승인 관문으로 가는 동작을 막는다
+
+Hermes 가 위험하다고 분류한 `terminal` 명령, Hermes 가 승인을 요구하는 경로(`~/.ssh/config`, 셸 시작 파일)의 `write_file` 과 `patch`, 모든 `computer_use` 호출을 맨 먼저 막는다(1.11.0 부터, fos-assistant [Hermes 업그레이드 스펙](../../../docs/features/hermes-upgrade/spec.md) 의 REQ5).
+profile 의 방식과 session 에 상관없이 걸리고, 판정에 묻기 전이라 Control Plane 을 부르지 않는다.
+까닭과 Hermes 쪽 판정은 [`hermes-contract.md`](../../docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
+
+| 도구 | 막는 조건 | 모델이 받는 글 |
+| --- | --- | --- |
+| `terminal` | Hermes 의 `detect_dangerous_command` 가 위험하다고 답한다. `command_allowlist` 는 보지 않는다 | `DANGEROUS_COMMAND_MESSAGE` |
+| `write_file`, `patch` | 대상 경로 가운데 하나가 Hermes 의 `write_approval_key` 에 걸린다. 그 함수가 없는 Hermes(v0.21.6)는 건너뛴다 | `APPROVAL_WRITE_MESSAGE` |
+| `computer_use` | 모든 호출 | `COMPUTER_USE_MESSAGE` |
+
+판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다. 예외 본문에 명령이나 경로가 섞일 수 있어 로그에는 종류만 남긴다.
+판정은 `approval_guard.py` 가 갖는다.
+
 ### 도구 판정
 
 사건 실행 트리의 위험한 도구 호출을 막는다(fos-assistant [ADR-20261105 / event-watch](../../../docs/adr/ADR-20261105-event-watch.md)). Hermes 는 실행마다 toolset 을 줄이지 못해서 호출마다 묻는다. 이 절이 도구 판정 계약의 정본이다. 판정 순서는 [사건 감지 설계](../../../docs/features/proactive/design.md) 의 「사건 실행의 도구 판정」 이 갖는다.
