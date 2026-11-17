@@ -16,6 +16,7 @@ plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한�
 """
 
 from dataclasses import dataclass
+import pathlib
 
 
 # 연동 기준 Hermes 버전이다. 상류 저장소의 tag 이름이다. CI 가 이 버전의 소스로 계약을 확인한다.
@@ -522,6 +523,91 @@ TOOL_GUARD_SAFE_TOOLSETS = {
 }
 # 도구 찾기 중계 이름이다. `tool_call` 은 hook 에 안쪽 이름이 가므로 안전 목록에 넣지 않는다.
 TOOL_GUARD_BRIDGE = ("tools/tool_search_catalog.py", "BRIDGE_TOOL_NAMES", frozenset({"tool_search", "tool_describe", "tool_call"}))
-# 코드 실행 안의 도구 호출이 `handle_function_call` 에 session 없이 `task_id` 만 넘기는 자리다.
-# fos-ctx 는 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. 이 자리에 session 이 생기면 다시 본다.
-TOOL_GUARD_SESSIONLESS_CALLS = ("tools/code_execution_rpc.py", "tools/code_kernel.py")
+# 코드 실행 안의 도구 호출이 `handle_function_call` 을 부르는 자리다. 기준 계열은 session 없이 `task_id` 만 넘기고,
+# fos-ctx 는 session 없는 호출을 묻지 않는다. 넘기는 칸의 계열 차이는 `TOOL_GUARD_CODE_CALLS_HAVE_SESSION` 이 갖는다.
+TOOL_GUARD_CODE_CALLS = ("tools/code_execution_rpc.py", "tools/code_kernel.py")
+
+
+# fos-ctx 가 Hermes 승인 관문(`_run_approval_gate`)이 여는 동작을 hook 에서 먼저 막는 데 기대는 지점이다(스펙 hermes-upgrade REQ5).
+# v0.23 은 `/v1/runs` 실행에 승인 알림 경로가 없으면 이 관문을 `approvals.unattended_mode` 로 바로 정하고,
+# docker profile 은 그 값이 `approve` 라 사람 없이 열린다. 그래서 fos-ctx 가 관문을 부르는 동작마다 막는다.
+APPROVAL_GUARD = {
+    # 셸 위험 명령 분류. fos-ctx 가 부르는 함수와, 같은 함수로 관문 대상을 고르는 Hermes 판정 함수다.
+    "dangerous": ("tools/approval_detection.py", "detect_dangerous_command", Call(positional=1)),
+    "dangerous_user": ("tools/approval.py", "detect_dangerous_command"),
+    # 관문을 부르는 함수와 그 동작을 fos-ctx 의 어느 막기가 맡는지다. 함수가 늘면 fos-ctx 가 그 동작을 막는지 보고 더한다.
+    # `request_tool_approval` 은 plugin 의 `approve` 답에서만 불린다. fos-ctx 는 `approve` 를 돌려주지 않는다.
+    # 운영의 `terminal` 은 이 관문이 아니라 `check_all_command_guards` 가 사람 없는 실행을 스스로 정한다. 그 경로는
+    # `UNATTENDED_APPROVAL["callers"]` 가 고정한다. `check_dangerous_command` 를 부르는 운영 코드는 없다(평가와 테스트만).
+    "gate": ("tools/approval.py", "_run_approval_gate"),
+    "gate_callers": {
+        "check_dangerous_command": "terminal (운영 경로 밖)",
+        "request_tool_approval": "plugin approve",
+        "_check_approval_required_write": "file write",
+        "_request_approval": "computer_use",
+    },
+}
+# 승인이 필요한 파일 쓰기 판정이다. 기준 계열(v0.21)에는 `write_approval_key` 가 없어 fos-ctx 가 판정을 건너뛰고,
+# Hermes 가 승인 카드로 보내 시간 초과로 거절한다. 그 계열의 값은 `None` 이고 v0.23 의 값은 `HERMES_VARIANTS` 에 있다.
+APPROVAL_WRITE_POINTS = None
+# 플러그인 의존성 경고가 클래스 메서드 밖에서 부르는 모듈 함수다. 기준 계열은 메서드 안에서 끝난다.
+PLUGIN_DEPENDENCY_HELPERS = ()
+# 코드 실행 안의 도구 호출이 session 을 달고 오는가. 기준 계열은 `task_id` 만 넘긴다.
+TOOL_GUARD_CODE_CALLS_HAVE_SESSION = False
+
+# Hermes 버전 계열(major.minor)마다 기준 선언과 다른 기대값이다(스펙 hermes-upgrade REQ7, REQ12).
+# upstream 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 계열을 알 수 없다. 계열마다 그 계열에만 있는 표지 파일로 고른다.
+# 표지가 없는 소스는 기준 계열(`HERMES_BASE_LINE`)로 본다. 모르는 계열이면 기준 기대값으로 실패를 보인다.
+# 값이 dict 이면 기준 dict 에 덮어 합치고, 아니면 통째로 바꾼다. PR3 이 기준 버전을 올리며 옛 계열을 지운다.
+HERMES_BASE_LINE = "0.21"
+HERMES_LINE_MARKERS = {"0.23": "gateway/platforms/api_server_authority_runs.py"}
+HERMES_VARIANTS = {
+    "0.23": {
+        "SYMBOLS": {
+            ("hermes_cli.dashboard_auth.token_auth", "authenticate_token"): Call(
+                positional=1, returns="tuple[Optional[TokenPrincipal], Optional[str]]"),
+            ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="set[str]"),
+        },
+        # gateway 의 ask 표식을 켜는 자리가 옮겨졌다. v0.23 에서는 승인 알림 경로가 없으면 이 표식이 판정을 정하지
+        # 않으므로, 셸 위험 명령과 승인 파일 쓰기, computer_use 는 fos-ctx 가 먼저 막는다(APPROVAL_GUARD).
+        "UNATTENDED_APPROVAL": {"exec_ask": ("gateway/run_bootstrap.py", "_start_gateway_runtime", "HERMES_EXEC_ASK")},
+        "APPROVAL_WRITE_POINTS": {
+            "key": ("agent/file_safety.py", "write_approval_key", Call(positional=1)),
+            "v4a": ("tools/file_tools.py", "_collect_v4a_header_paths", Call(positional=1)),
+            "resolve": ("tools/file_tools_write_guards.py", "_resolved_or_raw", Call(positional=2)),
+        },
+        # 의존성 경고가 모듈 함수로 누락 의존성을 고른다.
+        "PLUGIN_DEPENDENCY_HELPERS": ("missing_python_dependencies", "_declared_requirements"),
+        "HERMES_BUILTIN_TOOLS": (HERMES_BUILTIN_TOOLS | {"browser_vault", "set_theme", "setup_beat"}) - {
+            "browser_back", "browser_click", "browser_console", "browser_get_images", "browser_navigate",
+            "browser_press", "browser_scroll", "browser_snapshot", "browser_type", "browser_vault_enter_code",
+            "browser_vault_fill", "browser_vault_list", "browser_vault_save_login", "browser_vault_unlock",
+            "browser_vision", "setup_choose", "spotify_albums", "spotify_devices", "spotify_library",
+            "spotify_playback", "spotify_playlists", "spotify_queue", "spotify_search", "start_chat",
+            "yb_query_group_info", "yb_query_group_members", "yb_search_sticker", "yb_send_dm", "yb_send_sticker"},
+        # 코드 실행 안의 호출이 session 을 달고 온다. `tool_call_id` 는 없다. fos-ctx 가 판정 요청용 번호를 만든다(REQ6).
+        "TOOL_GUARD_CODE_CALLS_HAVE_SESSION": True,
+    },
+}
+
+
+def hermes_line(root) -> str:
+    """Hermes 소스 디렉터리의 버전 계열이다. 표지 파일이 있는 계열, 없으면 기준 계열이다."""
+    base = pathlib.Path(root)
+    for line, marker in HERMES_LINE_MARKERS.items():
+        if (base / marker).is_file():
+            return line
+    return HERMES_BASE_LINE
+
+
+def expected(name: str, root):
+    """그 소스의 계열에서 기대하는 `name` 의 값이다. 계열 차이가 없으면 기준 선언을 그대로 준다."""
+    value = globals()[name]
+    variant = HERMES_VARIANTS.get(hermes_line(root), {})
+    if name not in variant:
+        return value
+    override = variant[name]
+    if isinstance(value, dict) and isinstance(override, dict):
+        return {**value, **override}
+    return override
+

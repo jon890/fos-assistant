@@ -13,7 +13,7 @@
 | 쓰는 때 | 셸 계열 도구 저장과 사진 도구 옛 설치가 docker `terminal:` 을 쓰는 같은 설정 쓰기 안에서 |
 | 지우는 때 | 같은 두 경로가 `backend: local` 을 쓸 때. 운영자가 직접 넣은 값도 지운다 |
 | 그대로 두는 것 | `approvals` 의 다른 키(`mode`, `deny`, `timeout`, `cron_mode` 등)와 셸 계열 도구를 건드리지 않는 저장 |
-| 기대는 Hermes 동작 | gateway 가 `HERMES_EXEC_ASK` 를 켜서, API 경로의 셸 위험 명령과 plugin 승인 요청이 `unattended_mode` 와 무관하게 승인 카드로 간다. 계약 시험이 이 동작을 확인한다 |
+| 기대는 Hermes 동작 | v0.21.6 은 gateway 가 `HERMES_EXEC_ASK` 를 켜서, API 경로의 셸 위험 명령과 plugin 승인 요청이 `unattended_mode` 와 무관하게 승인 카드로 간다. v0.23.2 는 승인 알림 경로가 없는 실행에서 이 값이 그것들까지 연다. 그래서 fos-ctx 가 셸 위험 명령, 승인 경로 쓰기, `computer_use` 를 두 버전 모두 먼저 막는다(2026-11-17 갱신). 계약 시험이 두 버전의 지점을 확인한다 |
 
 Hermes 가 이 판정을 어떻게 하는지는 [실행 공간](../hermes-contract.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
 
@@ -59,7 +59,25 @@ ADR-086 의 실행 공간은 `/workspace` 부터 호스트 경로라서 격리�
   - **스크립트 안의 `subprocess` 는 셸 위험 명령 판정을 거치지 않는다.** `/workspace` 를 지우는 스크립트가 카드 없이 돈다. 같은 일은 셸의 `python3 <파일>` 로도 지금 승인 없이 된다. 닿는 범위는 그 사용자의 `/workspace`, 읽기 전용으로 붙인 경로, 인터넷과 실행 공간 망으로 셸과 같다.
   - 스크립트가 RPC 로 부르는 도구는 Hermes 로 돌아와 원래 판정을 다시 받는다.
   - 스크립트가 읽은 글을 인터넷으로 보내는 길은 [커넥터 READ 데이터의 흐름](../../../docs/features/connector-policy.md) 의 RF-08 과 같은 통제 없음이다. 스크립트 안에서 커넥터 도구를 부르는 길(RF-08a)은 그대로 거절된다.
-  - **Hermes 가 API 경로에서 `HERMES_EXEC_ASK` 를 켜지 않게 바뀌면 이 값이 셸 위험 명령과 커넥터 승인까지 연다.** 계약 시험이 그 지점을 본다. 실패하면 Hermes 를 올리기 전에 이 결정을 다시 본다.
+  - **Hermes 가 API 경로에서 ask 문맥을 끄면 이 값이 셸 위험 명령과 커넥터 승인까지 연다.** v0.23.2 가 그렇게 바뀌었다. 아래 「v0.23.2 에서 바뀐 기대」 를 본다.
   - 이미 docker 인 profile 은 셸 계열 도구를 다시 저장해야 값이 들어간다. 반영은 운영이 한다.
 
-- **적용 범위**: 대시보드 plugin 의 셸 계열 도구 저장과 사진 도구 옛 설치, Hermes 계약 시험. 설정 모양은 [`hermes/README.md`](../../README.md) 의 「셸 실행 공간」 이 갖는다.
+### v0.23.2 에서 바뀐 기대 (2026-11-17)
+
+v0.23.2 는 `/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 ask 문맥을 끈다. 그러면 셸 판정(`check_all_command_guards`)과 승인 관문(`_run_approval_gate`)이 `unattended_mode` 로 바로 정한다.
+그러면 이 결정이 쓰는 `approve` 가 셸 위험 명령, 승인이 필요한 경로의 파일 쓰기, `computer_use` 까지 사람 없이 연다.
+결정은 그대로 두고(`execute_code` 는 계속 연다), fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다(`docs/features/hermes-upgrade/spec.md` 의 REQ5, DECISION8).
+
+| 조건 | `execute_code` | 셸 위험 명령 | 승인 경로 쓰기 | `computer_use` |
+| --- | --- | --- | --- | --- |
+| v0.21.6, `approve` | 승인 | fos-ctx 가 바로 거절 | 승인 대기 뒤 시간 초과로 거절 | fos-ctx 가 바로 거절 |
+| v0.23.2, `approve`, 알림 경로 없음 | 승인 | fos-ctx 가 바로 거절 | fos-ctx 가 바로 거절 | fos-ctx 가 바로 거절 |
+
+Control Plane 은 Hermes 승인 카드에 답하지 않으므로 v0.21.6 에서도 셋은 결국 거절됐다. 사용자에게 보이는 차이는 승인 시간을 기다리지 않는 것뿐이다.
+
+기각한 대안:
+
+- **`unattended_mode: deny` 로 바꾼다**: docker 실행 공간의 `execute_code` 까지 닫혀 이 결정의 목적이 사라진다.
+- **위험 명령 패턴을 fos-ctx 에 복제한다**: Hermes 를 올릴 때마다 어긋난다. Hermes 의 판정 함수를 부르고 위치와 시그니처를 계약 시험이 지킨다.
+
+- **적용 범위**: 대시보드 plugin 의 셸 계열 도구 저장과 사진 도구 옛 설치, fos-ctx 의 승인 관문 막기, Hermes 계약 시험. 설정 모양은 [`hermes/README.md`](../../README.md) 의 「셸 실행 공간」 이 갖는다.

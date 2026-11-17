@@ -130,12 +130,18 @@ import 나 판정이 예외를 던지면 막는다(닫힌 쪽). `command_allowli
 함수가 있는데 경로 추출이나 판정이 예외를 던지면 막는다.
 새 내부 지점 넷(`detect_dangerous_command` 포함)은 `hermes_contract.py` 에 계열별 위치와 시그니처로 선언한다.
 
+막기는 새 모듈 `approval_guard.py` 가 갖고, `pre_tool_call` 이 스킬 관리 차단 바로 뒤에 부른다. profile 의 방식(대응 파일 없음, 옛 설치, 바인딩, 대응 파일을 읽지 못함)과 session 에 상관없이 Control Plane 에 묻기 전에 막는다. 그래서 v0.21.6 의 session 없는 코드 실행 안 호출도 막힌다.
+Hermes 함수는 `importlib.import_module` 로 부를 때마다 불러온다. hook 이 Hermes 프로세스 안에서 돌므로 plugin 을 불러올 때 Hermes 모듈을 미리 묶지 않는다. 테스트는 같은 이름의 대역 모듈을 넣는다.
+명령이 문자열이 아니거나 쓰기 경로가 없으면 막지 않는다. Hermes 의 처리기가 거절한다. V4A 머리줄 추출이 오류 글을 돌려주면(경로에 `..`) 역시 처리기가 쓰기 전에 거절하므로 막지 않는다.
+`task_id` 가 비면 Hermes 처리기와 같이 `default` 로 경로를 푼다.
+
 `tool_guard` 는 `session_id` 가 있고 `tool_call_id` 가 비면 `code-exec:` 뒤에 무작위 16진수 32자를 붙인 번호를 만든다. 서명과 요청은 지금과 같다. Control Plane 의 판정(`EventToolGuard`)은 이 번호를 서명 확인에만 쓰므로 바꾸지 않는다.
 `session_id` 가 없는 호출(v0.21.6)은 지금처럼 통과한다.
+플러그인 정책(`connector_policy`)에는 번호를 만들지 않는다. 코드 실행 안의 플러그인 도구 호출은 v0.23.2 에서도 `tool_call_id` 가 없어 지금처럼 막힌다. 플러그인 정책의 경계를 바꾸지 않는다.
 
 ### 계약 테스트
 
-`hermes_contract.py` 는 기준 버전의 선언을 그대로 두고, 버전마다 다른 기대값만 `HERMES_VARIANTS` 에 계열(`0.21`, `0.23`)별로 둔다. upstream 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 쓸 수 없다. 테스트는 계열마다 선언한 표지 파일(`0.23` 은 `gateway/platforms/api_server_authority_runs.py`)이 `HERMES_SOURCE` 에 있는지로 계열을 고른다. 그래서 새 패치 tag(v0.23.x)는 계열이 같으면 코드를 고치지 않고 돌릴 수 있다(REQ12). 모르는 계열이면 기준 버전의 기대값으로 실패를 보인다.
+`hermes_contract.py` 는 기준 버전의 선언을 그대로 두고, 버전마다 다른 기대값만 `HERMES_VARIANTS` 에 계열별로 둔다. 기준 계열은 `0.21` 이라 `HERMES_VARIANTS` 에는 `0.23` 만 있다. 테스트는 `expected(이름, 소스)` 로 값을 읽는다. 값이 dict 이면 기준에 덮어 합치고 아니면 바꾼다. 계열 차이가 있는 값은 기준 쪽에도 같은 이름으로 둔다(없는 계열은 `None` 이나 빈 값). upstream 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 쓸 수 없다. 테스트는 계열마다 선언한 표지 파일(`0.23` 은 `gateway/platforms/api_server_authority_runs.py`)이 `HERMES_SOURCE` 에 있는지로 계열을 고른다. 그래서 새 패치 tag(v0.23.x)는 계열이 같으면 코드를 고치지 않고 돌릴 수 있다(REQ12). 모르는 계열이면 기준 버전의 기대값으로 실패를 보인다.
 v0.23.2 에서 고칠 것은 이렇다.
 
 | 실패 | 고칠 것 |
@@ -147,7 +153,8 @@ v0.23.2 에서 고칠 것은 이렇다.
 | 새 내장 도구 | 도구 목록에 `browser_vault`, `set_theme`, `setup_beat` 를 안전 목록 밖으로 더한다(스펙 DECISION13) |
 | 코드 실행 안 호출의 session | v0.23.2 기대값을 「`session_id` 가 있고 `tool_call_id` 가 없다」 로 둔다 |
 | 본문 없는 요청 진단 | PR4 가 선언을 v0.23 계열로 바꾸고 `BODYLESS_SOURCE_LINE` 의 표지가 없는 소스에서는 건너뛴다. PR2 는 따로 건너뛰기를 두지 않는다 |
-| 끝난 실행의 사건 보관분 | 새 기대: 끝난 run 에 처음 연결하면 보관분을 보내고 닫는다(`_handle_run_events`). 어댑터의 다시 읽기가 이 동작에 기댄다 |
+| 끝난 실행의 사건 보관분 | 새 기대: 끝난 run 에 처음 연결하면 보관분을 보내고 닫는다(`_handle_run_events`). 어댑터의 다시 읽기가 이 동작에 기댄다. 스트림 계약 테스트가 이 장면을 두 버전에서 돌린다. 대역은 v0.23.2 의 인증 함수 `_check_run_auth` 도 넘긴다 |
+| 승인 관문을 부르는 함수 | 새 계약 `APPROVAL_GUARD`: `_run_approval_gate` 를 부르는 함수 목록이 선언한 넷(plugin 승인, 승인 파일 쓰기, `computer_use`, 운영 경로 밖의 `check_dangerous_command`)과 같은지 본다. 운영의 `terminal` 은 `check_all_command_guards` 가 스스로 정하고 기존 `UNATTENDED_APPROVAL` 이 그 경로를 고정한다. 늘면 fos-ctx 가 그 동작을 막는지 보고 선언을 고친다. `detect_dangerous_command` 의 위치와 시그니처, v0.23.2 의 `APPROVAL_WRITE_POINTS` 셋도 같은 테스트가 본다 |
 
 ### 가짜 Hermes
 
@@ -175,6 +182,8 @@ E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)에 v0.23.2 모양을 켜는 설정
 | REQ11 | 운영 왕복. 코드 테스트로 대신하지 않는다 |
 
 E2E 는 가짜 Hermes 의 v0.23.2 모양으로 재기동 뒤 다음 turn 이 도는 장면 하나를 더한다. 실제 Hermes 와의 차이는 REQ11 이 본다.
+
+사진 원본을 native 이미지로 넘기는 계약(`test_attachment_native_contract.py`)은 `check-hermes-contract.sh` 에 들어 있지 않아 REQ7 밖이다. v0.23.2 소스에서는 Pillow 고정 버전(13.0.0)과 이미지 반환 경로의 함수 구성이 바뀌어 실패한다. 그 계약을 업그레이드 확인 범위에 넣을지는 PR2 밖에서 정한다.
 
 ## PR4
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import urllib.parse
 
@@ -27,6 +28,8 @@ SAFE_TOOLS = frozenset({
 VISION_TOOL = "vision_analyze"
 # 판정 경로의 마지막 조각이다. `FOS_CTX_POLICY_URL` 의 마지막 조각을 이것으로 바꿔 같은 Control Plane 에 묻는다.
 GUARD_PATH = "tool-guard"
+# 코드 실행 안의 호출에 만드는 판정 요청용 번호의 접두사다. Control Plane 은 이 번호를 서명 확인에만 쓴다.
+CODE_EXEC_CALL_PREFIX = "code-exec:"
 GUARD_BLOCK_MESSAGE = ("fos-ctx: 이 도구를 지금 쓸 수 있는지 확인하지 못해 막았다. "
                        "잠시 뒤 다시 시도하라고 사용자에게 알린다.")
 
@@ -54,16 +57,19 @@ def is_safe(tool_name: str, args, remote_only) -> bool:
 def tool_guard(tool_name: str, args, session_id: str, tool_call_id: str, remote_only):
     """안전 목록 밖의 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다.
 
-    session 이 없는 호출은 코드 실행(`execute_code`, 상주 kernel) 안의 호출이다. Hermes 가 그 호출에는 `task_id` 만
-    넘긴다. 그 코드를 연 `execute_code` 호출이 session 을 들고 판정을 받았고 사건 실행 트리에서는 막히므로,
-    여기서는 묻지 않고 통과시킨다. 예외는 부르는 쪽(`hooks.event_guard`)이 잡는다.
+    코드 실행(`execute_code`, 상주 kernel) 안의 호출은 Hermes 버전마다 모양이 다르다.
+    v0.21 은 `task_id` 만 넘겨 session 이 없다. 그 코드를 연 `execute_code` 호출이 session 을 들고 판정을 받았고
+    사건 실행 트리에서는 막히므로 묻지 않고 통과시킨다. v0.23 은 session 을 넘기고 `tool_call_id` 는 비운다.
+    그 호출은 `code-exec:` 번호를 만들어 묻는다(스펙 hermes-upgrade REQ6). 예외는 부르는 쪽(`hooks.event_guard`)이 잡는다.
     """
     if is_safe(tool_name, args, remote_only) or not session_id:
         return None
     url = guard_url()
     token = _read_token()
-    if not url or not token or not tool_call_id:
+    if not url or not token:
         return _block(GUARD_BLOCK_MESSAGE)
+    if not tool_call_id:
+        tool_call_id = CODE_EXEC_CALL_PREFIX + secrets.token_hex(16)
     try:
         root = root_session(session_id)
     except sqlite3.Error as exc:
