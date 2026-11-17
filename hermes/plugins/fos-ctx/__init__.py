@@ -31,6 +31,14 @@ hook 이 예외를 던지면 호출이 막힌다.
 - 제한 시간 `REGISTER_TIMEOUT` 초로 부르고, 연결 실패와 5xx 에만 한 번 더 부른다
 - 실패하면 로그만 남긴다. 예외를 내지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다
 - 토큰, 서명, 본문은 로그에 남기지 않는다
+- 등록 본문에 `reports_stop: true` 와 hook 이 받은 `child_goal` 을 넣는다. 아래 끝 소식을 보낸다는 표시다
+
+자식이 끝나면 `subagent_stop` hook 이 같은 Control Plane 에 끝 소식(상태와 결과 글)을 보낸다.
+Control Plane 은 그 결과로 부모 대화의 다음 답을 연다(fos-assistant ADR-20261117 / native-delegation-wake).
+
+- 주소는 `FOS_CTX_SUBAGENT_URL` 끝에 `/stop` 을 붙인 것이다
+- 서명할 글의 첫 줄이 `v1-subagent-stop` 인 것 말고 등록과 같다. 상태와 결과 글은 서명하지 않는다
+- 제한 시간과 다시 보내기, 실패 처리, 로그는 등록과 같다. Hermes 는 부모의 마무리 잠금 안에서 이 hook 을 부른다
 
 ## 플러그인 정책
 
@@ -139,6 +147,7 @@ from .context import (
     GUARD_VERSION,
     POLICY_VERSION,
     REGISTER_VERSION,
+    STOP_VERSION,
     _read_token,
     _state_db_path,
     build_context,
@@ -147,6 +156,7 @@ from .context import (
     sign,
     sign_policy,
     sign_subagent,
+    sign_subagent_stop,
     sign_tool_guard,
     signing_key,
 )
@@ -196,9 +206,14 @@ from .tool_guard import (
 from .subagent import (
     REGISTER_TIMEOUT,
     REGISTER_URL_ENV,
+    STOP_PATH,
+    _deliver,
     _post,
     build_registration,
+    build_stop,
+    stop_url,
     subagent_start,
+    subagent_stop,
 )
 
 
@@ -212,6 +227,7 @@ def register(ctx):
                       handler=inspect_attachment)
     ctx.register_hook("pre_tool_call", pre_tool_call)
     ctx.register_hook("subagent_start", subagent_start)
+    ctx.register_hook("subagent_stop", subagent_stop)
     ctx.register_hook("transform_tool_result", transform_tool_result)
-    logger.info("fos-ctx: Control Plane MCP 호출에 _fos_ctx 를 서명해 붙이고 skill_manage 를 막고 자식 session 을 등록하고 "
+    logger.info("fos-ctx: Control Plane MCP 호출에 _fos_ctx 를 서명해 붙이고 skill_manage 를 막고 자식 session 을 등록하고 끝 소식을 보내고 "
                 "플러그인 도구와 안전 목록 밖의 도구 호출을 Control Plane 에 묻고 바인딩 profile 의 플러그인 도구 결과를 감싼다")

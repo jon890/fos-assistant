@@ -13,6 +13,8 @@ CTX_VERSION = 1
 # parent_session_id 사슬을 따라가는 한도다. 하위 에이전트와 압축 교체가 겹쳐도 이만큼 깊지 않다.
 MAX_DEPTH = 16
 REGISTER_VERSION = "v1-subagent"
+# 하위 에이전트 끝 소식의 서명 첫 줄이다. 등록 서명을 끝 소식에 쓰지 못하게 첫 줄만 다르다.
+STOP_VERSION = "v1-subagent-stop"
 POLICY_VERSION = "v1-connector-policy"
 GUARD_VERSION = "v1-tool-guard"
 
@@ -32,6 +34,13 @@ def sign_subagent(key: str, parent_root_session_id: str, parent_session_id: str,
                   child_session_id: str) -> str:
     """자식 session 등록의 서명을 소문자 16진수로 돌려준다. key 는 `sign` 과 같다."""
     message = "\n".join([REGISTER_VERSION, parent_root_session_id, parent_session_id, child_session_id])
+    return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def sign_subagent_stop(key: str, parent_root_session_id: str, parent_session_id: str,
+                       child_session_id: str) -> str:
+    """하위 에이전트 끝 소식의 서명을 소문자 16진수로 돌려준다. 첫 줄 말고는 등록 서명과 같다."""
+    message = "\n".join([STOP_VERSION, parent_root_session_id, parent_session_id, child_session_id])
     return hmac.new(key.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

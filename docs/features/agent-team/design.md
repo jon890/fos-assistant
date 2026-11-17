@@ -890,6 +890,59 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 | REQ14 | 웹 단위 테스트와 Control Plane 테스트 | `nativeResult` 줄이 이름표와 함께 그려진다. 옛 본문의 등록은 `wake_eligible=false` 이고 기한 알림이 없다. 설정을 끄면 결과가 전해지지 않는다 |
 | 계약 | fos-ctx 계약 테스트(PR7), 배포 뒤 왕복 | 서명 기대값, 끝 소식 본문. 스펙의 「배포 뒤 왕복 확인」 |
 
+## PR7 fos-ctx 끝 소식
+
+스펙 범위 6 의 REQ10 가운데 Hermes 쪽이다. PR6 이 연 끝 소식 경로에 fos-ctx 가 소식을 보내고, 등록 본문에 `reports_stop`, `child_goal` 을 넣는다. Control Plane 과 화면은 바꾸지 않는다.
+
+### 지금 구조
+
+- `hermes/plugins/fos-ctx/subagent.py` 의 `subagent_start` 가 `FOS_CTX_SUBAGENT_URL` 로 등록 본문을 보낸다. 제한 시간 `REGISTER_TIMEOUT` 초, 연결 실패와 5xx 에만 한 번 더 보낸다. PR7 전에는 받은 `child_goal` 을 보내지 않았다.
+- `plugin.yaml` 의 `hooks` 와 `register` 는 `pre_tool_call`, `subagent_start`, `transform_tool_result` 셋이다.
+- 끝 소식 계약(경로, 칸, 서명, 응답)은 PR6 이 `hermes/plugins/fos-ctx/README.md` 의 「하위 에이전트 끝 소식 계약」 에 적었다. 서버는 그 모양으로 받는다(`SubagentStop.verify`).
+
+v0.21.6(`818c13be`)과 v0.23.2(`ae2a81cc`)의 tag 소스로 확인한 사실이다.
+
+| 사실 | 근거 |
+| --- | --- |
+| 두 버전 모두 `subagent_stop` 을 같은 키워드 인자로 부른다. v0.23.2 는 `child_summary` 의 비밀값을 가린 뒤 넘긴다(`redact_child_value`) | `tools/delegate_tool_results.py` 의 `_fire_subagent_stop_hooks` |
+| `subagent_stop` 은 부모의 마무리 잠금(`_parent_finalization_lock`) 안에서 부르는 스레드가 자식마다 잇달아 부른다. 제한 시간 worker 로 옮기지 않는다 | 같은 파일의 `_finalize_child_results`, `hermes_cli/plugins_dispatch.py` 의 `_HOOK_CALLER_THREAD_HOOKS` |
+| 두 버전 모두 `subagent_start` 에 `child_goal` 을 넘긴다 | `tools/delegate_tool.py` 의 `_build_child_agent` 끝 |
+
+### 책임과 경계
+
+| 무엇 | 소유 | 까닭 |
+| --- | --- | --- |
+| 끝 소식 본문, 서명, 보내기 | `fos-ctx` 의 `subagent.py` 의 새 `build_stop`, `subagent_stop` | 등록 본문과 보내기가 같은 파일에 있다 |
+| 끝 소식 서명 | `context.py` 의 새 `sign_subagent_stop`(첫 줄 `v1-subagent-stop`) | 서명 함수가 모두 여기 있다 |
+| hook 이름과 인자가 두 Hermes 버전에 있는지 | `hermes/tests/hermes_contract.py` 의 새 선언 `SUBAGENT_HOOKS` 와 `test_hermes_contract.py` 의 소스 검사 | Hermes 소스 계약의 선언이 모두 여기 있다. CI 는 기준 버전을 보고, 다른 버전은 같은 검사를 그 소스로 돌린다 |
+
+### 보내는 것
+
+- 주소는 `FOS_CTX_SUBAGENT_URL` 끝에 `/stop` 을 붙인 것이다. 끝의 `/` 는 떼고 붙인다. 운영 값을 하나도 늘리지 않는다. 주소가 없으면 등록도 끝 소식도 보내지 않는다.
+- 등록 본문의 `reports_stop` 은 늘 `true` 다. 이 버전의 플러그인은 등록하는 자식마다 `subagent_stop` 을 받아 끝 소식을 보내기 때문이다. `child_goal` 은 hook 이 받은 글을 그대로 넣고, 글이 아니거나 비었으면 `null` 이다.
+- 끝 소식의 `parent_root_session_id` 는 등록과 같은 `root_session(parent_session_id)` 다. 압축으로 부모 session 이 바뀌어도 루트는 같다. state.db 를 읽지 못하면 부모 session 을 루트로 쓴다. 등록과 같다.
+- `child_status`, `child_summary` 는 글이 아니면 `null` 이다. 결과 글을 자르지 않는다. 서버가 자른다.
+- 손자 자식처럼 깨울 자식이 아닌 것도 보낸다. `subagent_stop` 에는 `parent_subagent_id` 가 없어 플러그인이 가리지 못하고, 서버가 `ignored` 로 답한다.
+- 제한 시간과 다시 보내기는 등록과 같다. 연결 실패와 5xx 에만 한 번 더 보내고, 4xx(404 포함)는 로그만 남긴다. 어떤 예외도 hook 밖으로 내지 않는다.
+- 로그에는 시도 횟수와 상태 코드, 예외 종류만 남긴다. 토큰, 서명, 맡긴 일, 결과 글은 남기지 않는다.
+
+hook 은 부모의 마무리 잠금 안에서 동기로 돈다. 보내기가 늦으면 그만큼 부모 session 의 결과 줄이 늦게 남는다. 자식 하나에 최악 `REGISTER_TIMEOUT` 의 두 배다. 결과 줄은 다음 turn 이 읽는 것이고, 자동 turn 은 끝 소식 뒤 5초를 기다리므로(「깨우는 때」) 이 지연이 결과를 놓치게 하지 않는다.
+
+### 배포와 되돌리기
+
+PR6 이 운영에 있어야 한다. PR6 전의 서버는 `/stop` 경로가 없어 2xx 가 아닌 답을 주고 플러그인은 로그만 남긴다. 등록 본문의 새 칸은 PR6 서버가 받고 옛 서버는 모르는 키라 버린다. 그래서 어느 순서로 배포돼도 등록은 끊기지 않는다(rule-66). 되돌리기는 「배포 순서와 안전」 의 「PR7 을 되돌림」 이다.
+
+### 검증 전략
+
+| 무엇 | 경계 | 확인 |
+| --- | --- | --- |
+| 끝 소식 본문과 서명 | `test_fos_ctx.py` 의 가짜 Control Plane | README 확인 값과 같은 `sig`, `/stop` 경로, 칸, 상태와 글이 글이 아니면 `null` |
+| 등록 본문의 새 칸 | 같은 테스트 | `reports_stop: true`, `child_goal` 이 hook 의 글 |
+| 실패 분기 | 같은 테스트 | 5xx 한 번 더, 4xx 그대로, 연결 실패, 주소·토큰·session 없음, 예외. 모두 로그만 남기고 None. 로그에 비밀과 글이 없다 |
+| hook 선언 | 같은 테스트의 manifest·`register` 검사 | 네 hook |
+| Hermes 계약 | `test_hermes_contract.py` 를 v0.21.6, v0.23.2 소스로 | 두 hook 이 `VALID_HOOKS` 에 있고, 부르는 자리가 플러그인이 읽는 키워드 인자를 넘기며 `subagent_stop` 이 부르는 스레드에서 돈다 |
+| 운영 왕복 | 스펙의 「배포 뒤 왕복 확인」 1~5 | 코디네이터가 배포 뒤 돌린다 |
+
 
 ## 결정
 
@@ -936,6 +989,9 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 | DECISION39 | 기한·중지 알림 줄의 단위 | origin 실행(turn)마다 한 줄 | 작성자 | 같은 호출의 자식을 알 수 없다(DECISION36). spec DECISION40 이 답마다 한 줄로 정했다(사용자 2026-11-17) |
 | DECISION40 | 결과 도착 줄과 출처를 잇는 법 | 등록 줄의 `notice_message_id` 에 첫 시도의 알림 줄을 적고, `chat` 의 port 로 상태를 읽는다 | 작성자 | 묶음의 줄 번호 칸은 위임 결과가 있을 때만 차거나 다시 전달로 덮인다(`result_delivery`). 줄 번호 순서와 시각으로 잇는 것은 DECISION12 가 기각했다. 같은 표의 칸 하나라 테이블이 늘지 않는다 |
 | DECISION41 | 이미 읽은 결과의 판정 | 대화의 에이전트로 Hermes 에 제출된 루트 실행이 끝 소식 30초 뒤에 시작했으면 읽은 것이다 | 작성자 | 스펙 DECISION32 의 「결과가 기록된 뒤」 를 Control Plane 이 아는 값으로 옮긴다. hook 은 결과 줄보다 먼저 온다. 모자라게 잡아 결과를 놓치기보다 한 번 더 정리하는 쪽을 고른다 |
+| DECISION42 | 끝 소식 주소 | 등록 주소 끝에 `/stop` 을 붙인다. 새 환경 변수를 두지 않는다 | 작성자 | 두 경로가 같은 Control Plane 의 형제 경로다. 운영 값이 늘면 운영 저장소와 배포 순서가 함께 늘고, 하나만 넣으면 끝 소식만 빠진다 |
+| DECISION43 | `reports_stop` 을 보내는 조건 | 이 플러그인은 등록마다 `true` | 작성자 | `subagent_stop` 을 늘 등록하므로 등록한 자식은 모두 끝 소식을 받는다. 보내기에 실패한 자식은 서버의 기한 알림이 맡는다 |
+| DECISION44 | 깨울 자식이 아닌 끝 소식 | 플러그인이 가리지 않고 보낸다 | 작성자 | `subagent_stop` 에 `parent_subagent_id` 가 없다. 등록 때의 판정을 플러그인 메모리에 두면 gateway 를 다시 띄울 때 잃고, 판정의 주인은 서버다(DECISION34) |
 
 ## 결정 기록 연결
 
@@ -945,3 +1001,4 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 | DECISION18, DECISION19, DECISION21 | architecture | [ADR-20261112 / mention-delegation](../../adr/ADR-20261112-mention-delegation.md). ADR-017 의 「무엇을 할지는 Hermes 가 정한다」 에 예외를 둔다 | [에이전트 팀](../agent-team.md) 의 「`@` 로 바로 맡기기」 |
 | DECISION24 부터 DECISION31 | feature | 필요 없음. 대화 목적의 새 값과 실행 줄로 판정하는 규칙이라 기능 파일이 원본이고, 코드 한 곳(`RoomConversations`, `RoomContext`)을 바꾸면 되돌린다 | [에이전트 팀](../agent-team.md) 의 「대화방」 |
 | DECISION32 부터 DECISION40 | architecture | [ADR-20261117 / native-delegation-wake](../../adr/ADR-20261117-native-delegation-wake.md). ADR-040 의 깨우기를 Hermes 내장 위임으로 넓힌다 | 이 문서의 「PR6 내장 위임 결과」. 구현 PR 이 [에이전트 팀](../agent-team.md) 에 절을 더한다 |
+| DECISION42 부터 DECISION44 | feature | 필요 없음. 플러그인 한 파일(`subagent.py`)의 보내는 방식이고 그 파일을 되돌리면 된다. 끝 소식 계약은 ADR-20261117 / native-delegation-wake 가 갖는다 | fos-ctx [README](../../../hermes/plugins/fos-ctx/README.md) 의 「하위 에이전트 끝 소식 계약」 |
