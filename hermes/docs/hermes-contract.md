@@ -1622,7 +1622,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 | `tool_search`, `tool_describe` | 그 이름 그대로. MCP `tools/call` 은 일어나지 않는다 | 소스 |
 | native `delegate_task` 의 자식 | 자식도 같은 executor 를 쓴다. `session_id` 는 자식의 것이다 | 소스 |
 | 공유 gateway 의 `/v1/runs` | 요청 profile 의 plugin manager 를 고른다 | 소스, profile 둘의 hook 문맥 실행 |
-| `execute_code` 안의 도구 호출 | hook 을 거친다. 넘어오는 식별자는 `task_id` 뿐이다. v0.21.6 의 상주 kernel(`tools/code_kernel.py`)도 같다. fos-ctx 의 도구 판정은 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. `test_tool_guard_contract.py` 가 두 자리를 고정한다 | 소스 |
+| `execute_code` 안의 도구 호출 | hook 을 거친다. v0.21.6 은 넘어오는 식별자가 `task_id` 뿐이고, 상주 kernel(`tools/code_kernel.py`)도 같다. fos-ctx 의 도구 판정은 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. v0.23.2 는 `session_id` 를 함께 넘기고 `tool_call_id` 는 비운다. fos-ctx 는 그 호출에 `code-exec:` 번호를 만들어 묻는다. `test_tool_guard_contract.py` 가 두 자리와 버전별 식별 칸을 고정한다 | 소스 |
 | plugin 의 `PluginContext.call_mcp` | **hook 을 거치지 않는다.** 서버 정의의 `mcp_allowlist` 만 본다 | 소스 |
 
 중계 한 건에 hook 이 두 번 걸리지 않는다. executor 가 중계를 먼저 풀고 hook 을 적용한 뒤 dispatcher 에는 hook 을 건너뛰라고 넘긴다.
@@ -1803,6 +1803,10 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 
 그래서 내장 승인으로는 「승인한 인자 그대로 한 번만 실행한다」 를 보장하지 못한다.
 
+**v0.23.2 에서는 사람이 없는 실행에서 이 승인이 profile 설정으로 바로 정해진다.**
+`/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 `_presence` 가 ask 문맥을 끄고, 관문(`_run_approval_gate`)이 `approvals.unattended_mode` 로 정한다. docker profile 은 그 값이 `approve` 라 사람 없이 통과한다.
+fos-ctx 는 `approve` 를 돌려주지 않는다. 같은 관문을 쓰는 셸 위험 명령, 승인 경로 쓰기, `computer_use` 는 아래 「`execute_code` 의 승인 판정」 대로 fos-ctx 가 먼저 막는다.
+
 근거: [approve directive](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py#L1934),
 [임의 도구 승인 함수](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval.py#L1095),
 [승인 우회와 저장된 승인](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/approval.py#L951)
@@ -1820,7 +1824,8 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
 - `fos-ctx` 1.5.0 을 올린 profile 에서 안전 목록 밖의 도구가 `tool-guard` 를 묻는지. gateway 로그의 `fos-ctx:` 줄과 Control Plane 의 「도구 호출을 막았다」 로그로 본다. Hermes 가 plugin 을 불러오지 못하면 판정 없이 나가고 설치 상태의 `tool_guard` 는 이것을 알지 못한다
 - 사건 실행에서 막는 판정이 실제로 한 번 나오는지(Control Plane 의 「도구 호출을 막았다」 로그)와 gateway 에 `FOS_CTX_POLICY_URL` 이 있는지. Hermes 와 Control Plane 사이가 새 경로를 열지 않아 404 를 내면 hook 이 옛 Control Plane 으로 읽고 통과시킨다
-- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지
+- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지. v0.23.2 에서는 그 호출이 `code-exec:` 번호로 `tool-guard` 를 묻고 보통 대화에서 통과하는지
+- `fos-ctx` 1.11.0 을 올린 profile 에서 셸 위험 명령이 승인 시간을 기다리지 않고 「위험 명령으로 분류돼」 글로 바로 거절되는지
 - `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
 
 ### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
@@ -2197,10 +2202,28 @@ plugin 이 쓰는 `/workspace` 부터 호스트 경로다.
 3번이 4번보다 앞이라, API 서버의 승인 다리(`/v1/runs/{id}/approval`)가 있어도 `execute_code` 는 승인 카드로 가지 않는다.
 그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](adr/ADR-20261008-execute-code-unattended.md)).
 
-**같은 모드가 셸 위험 명령과 plugin 승인 요청에는 닿지 않는다.**
+**v0.21.6 에서는 같은 모드가 셸 위험 명령과 plugin 승인 요청에 닿지 않는다.**
 `check_all_command_guards` 와 `_run_approval_gate` 는 CLI, gateway, ask 문맥이 모두 아닐 때만 사람이 없는 문맥의 모드를 본다.
 gateway 의 `start_gateway()` 가 `HERMES_EXEC_ASK=1` 을 프로세스 환경에 넣으므로 API 서버 실행은 ask 문맥이고, 두 판정은 승인 카드로 간다.
-이 두 지점은 계약 시험(`hermes/tests/test_hermes_contract.py`)이 확인한다.
+Control Plane 은 Hermes 승인 카드에 답하지 않으므로 승인 시간(기본 300초)을 기다린 뒤 거절된다.
+
+**v0.23.2 에서는 닿는다.**
+표식을 켜는 자리는 `gateway/run_bootstrap.py` 의 `_start_gateway_runtime` 으로 옮겼다. 그런데 `_presence` 는 `api_server` 실행에 승인 알림 경로(`_gateway_notify_cb`)가 없으면 ask 문맥을 끈다.
+그러면 셸 위험 명령, 승인이 필요한 경로의 파일 쓰기(`~/.ssh/config`, 셸 시작 파일), `computer_use` 가 모두 `_run_approval_gate` 에서 `unattended_mode` 로 바로 정해져, docker profile 에서는 사람 없이 열린다.
+session 대기열의 turn 실행기는 turn 마다 알림 경로를 등록하지만, 그 session key 가 닿지 않는 스레드가 어디인지는 확인하지 못했다.
+
+**그래서 fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다**(`docs/features/hermes-upgrade/spec.md` 의 REQ5).
+
+| 도구 | 막는 조건 | 쓰는 Hermes 함수 |
+| --- | --- | --- |
+| `terminal` | `detect_dangerous_command(command)` 의 첫 값이 참이다. `command_allowlist` 는 보지 않는다 | `tools/approval_detection.py` |
+| `write_file`, `patch` | 대상 경로 가운데 하나라도 `write_approval_key` 가 값을 준다. V4A 머리줄의 경로도 보고, 상대 경로는 hook 이 받은 `task_id` 로 푼다. 이 함수가 없는 v0.21.6 은 건너뛴다 | `agent/file_safety.py`, `tools/file_tools.py` 의 `_collect_v4a_header_paths`, `tools/file_tools_write_guards.py` 의 `_resolved_or_raw` |
+| `computer_use` | 모든 호출 | 없음 |
+
+판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다.
+docker profile 의 `execute_code` 는 `unattended_mode: approve` 로 지금처럼 승인 없이 돈다.
+관문을 부르는 함수 목록과 위 함수의 위치, 시그니처는 계약 시험(`test_hermes_contract.py` 의 `test_unattended_approval_points`, `test_approval_guard_points`)이 두 버전에서 확인한다.
+관문을 부르는 함수가 늘면 시험이 실패하고, fos-ctx 가 그 동작을 막는지 본 뒤 선언을 고친다.
 
 모드는 판정할 때마다 그 실행의 profile 설정에서 읽는다(`tools/approval_context.py` 의 `_binary_approval_mode`).
 값을 바꾸면 gateway 를 다시 띄우지 않아도 다음 호출부터 반영된다.
