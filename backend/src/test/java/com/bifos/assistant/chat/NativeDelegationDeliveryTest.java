@@ -215,8 +215,10 @@ class NativeDelegationDeliveryTest {
         turns.close(running);
         awaitReceived(1);
         awaitIdle();
+        finished();
+        awaitIdle();
 
-        assertThat(stub().received()).hasSize(1);
+        assertThat(stub().received()).as("도는 turn 이 닫힌 뒤 자동 turn 하나, 다시 깨워도 더 열지 않는다").hasSize(1);
     }
 
 
@@ -236,8 +238,8 @@ class NativeDelegationDeliveryTest {
 
 
     @Test
-    @DisplayName("끝 소식 30초 넘게 뒤 대화 에이전트로 제출된 turn 이 있으면 자동 turn 과 알림 줄이 없다")
-    void resultAlreadyReadDoesNotWake() {
+    @DisplayName("끝 소식 뒤 대화 에이전트로 제출된 turn 이 있어도 결과를 자동 turn 하나로 한 번만 전한다")
+    void laterTurnDoesNotSwallowResult() {
         Instant stoppedAt = Instant.now().minusSeconds(120);
         NativeResultFixtures.binding(
             jdbc, PROFILE, dad.id(), origin.id(), true, stoppedAt.minusSeconds(60), stoppedAt, "SUCCEEDED", "결과", "일");
@@ -253,10 +255,14 @@ class NativeDelegationDeliveryTest {
             .build());
 
         finished();
+        awaitReceived(1);
+        awaitIdle();
+        finished();
         awaitIdle();
 
-        assertThat(stub().received()).isEmpty();
-        assertThat(history()).isEmpty();
+        assertThat(stub().received()).as("이름을 붙인 profile 은 결과 줄을 남기지 않아 그 turn 이 결과를 읽지 못했다").hasSize(1);
+        assertThat(stub().received().getFirst().input()).contains("결과");
+        assertThat(history()).extracting(ChatMessage::content).first().isEqualTo("하위 작업이 끝났어요 · 일");
     }
 
 

@@ -100,20 +100,15 @@ class NativeDelegationResultSourceTest {
 
 
     @Test
-    @DisplayName("대화 에이전트로 제출된 루트 실행이 끝 소식 30초 넘게 뒤 시작했으면 읽은 것으로 보고 뺀다")
-    void resultReadByLaterSubmittedTurnIsExcluded() {
+    @DisplayName("끝 소식 전후에 대화 에이전트로 제출된 루트 실행이 있어도 결과를 뺀다고 보지 않는다")
+    void submittedTurnsDoNotMarkResultRead() {
         Instant stoppedAt = NOW.minusSeconds(120);
         long result = stopped(stoppedAt, "SUCCEEDED", "결과", "장보기");
-        root(chief.id(), stoppedAt.plusSeconds(10), "run-early", ExecutionStatus.SUCCEEDED);
-        assertThat(keys(source.undelivered(conversation.id()))).as("10초 뒤 시작한 turn").containsExactly(String.valueOf(result));
-
-        Agent other = agents.save(agent("native-other", dad.id()));
-        root(other.id(), stoppedAt.plusSeconds(31), "run-mention", ExecutionStatus.SUCCEEDED);
-        root(chief.id(), stoppedAt.plusSeconds(31), null, ExecutionStatus.FAILED);
-        assertThat(keys(source.undelivered(conversation.id()))).as("@ 맡김 turn, 제출 전 실패").containsExactly(String.valueOf(result));
-
+        root(chief.id(), stoppedAt.minusSeconds(25), "run-running", ExecutionStatus.SUCCEEDED);
         root(chief.id(), stoppedAt.plusSeconds(31), "run-late", ExecutionStatus.SUCCEEDED);
-        assertThat(source.undelivered(conversation.id())).as("31초 뒤 제출된 turn").isEmpty();
+
+        assertThat(keys(source.undelivered(conversation.id()))).containsExactly(String.valueOf(result));
+        assertThat(source.conversationsWithUndelivered()).contains(conversation.id());
     }
 
 
@@ -144,6 +139,7 @@ class NativeDelegationResultSourceTest {
         assertThat(results).extracting(AutoTurnResult::noticeStatus).containsExactly("FAILED", "SUCCEEDED");
         assertThat(results.getFirst().input())
             .startsWith("Hermes 하위 작업의 결과가 도착했다.\n[출처: Hermes 하위 작업, 맡긴 일: 장보기 목록 정리, 상태: FAILED, 끝난 시각: ")
+            .contains("이 결과는 Hermes 대화 이력에 없을 수 있다.")
             .contains("<external-data>\n권한이 없어 실패했다\n</external-data>");
         assertThat(results.get(1).input()).doesNotContain("<external-data>");
         assertThat(results).extracting(AutoTurnResult::unattended).containsOnly(false);
