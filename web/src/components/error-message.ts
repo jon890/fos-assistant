@@ -17,6 +17,8 @@ const MESSAGES: Record<string, string> = {
   HERMES_RUN_TIMEOUT:
     "응답이 제한 시간 안에 끝나지 않았어요. 잠시 뒤 다시 보내 주세요.",
   HERMES_UNAVAILABLE: "연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.",
+  // Hermes 가 다시 뜨며 잃은 실행이다. v0.21.6 에서 같은 상황이 연결 실패로 보였으므로 같은 문구를 쓴다.
+  REMOTE_RUN_LOST: "연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.",
   HERMES_BUSY: "지금 요청이 많아요. 잠시 뒤 다시 보내 주세요.",
   HERMES_RUN_FAILED:
     "실행을 마치지 못했어요. 사용량 화면에서 기록을 확인해 주세요.",

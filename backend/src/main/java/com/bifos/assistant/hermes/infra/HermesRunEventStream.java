@@ -74,17 +74,18 @@ public class HermesRunEventStream {
     private final HermesProfileKeyStore keyStore;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final HermesRunTerminals terminals;
 
 
     public HermesRunEventStream(
         HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
-        this(keyStore, properties, objectMapper, Clock.systemUTC());
+        this(keyStore, properties, objectMapper, Clock.systemUTC(), new HermesRunTerminals());
     }
 
 
     @Autowired
-    public HermesRunEventStream(
-        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
+    public HermesRunEventStream(HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper,
+        Clock clock, HermesRunTerminals terminals) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.runTimeout());
@@ -92,6 +93,7 @@ public class HermesRunEventStream {
         this.keyStore = keyStore;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.terminals = terminals;
     }
 
 
@@ -131,7 +133,7 @@ public class HermesRunEventStream {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
             onOpened.accept(body);
-            readEvents(body, onEvent, scope);
+            readEvents(body, onEvent, scope, terminal -> terminals.record(profileName, runId, terminal));
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the Hermes event stream");
         } catch (IOException ex) {
@@ -140,14 +142,15 @@ public class HermesRunEventStream {
     }
 
 
-    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope) throws IOException {
+    private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope,
+        Consumer<HermesRunTerminal> onTerminal) throws IOException {
         DetailState state = new DetailState(clock);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(body, StandardCharsets.UTF_8))) {
             StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
-                    emit(data, onEvent, scope, state);
+                    emit(data, onEvent, scope, state, onTerminal);
                     continue;
                 }
                 if (line.startsWith(":")) {
@@ -160,13 +163,13 @@ public class HermesRunEventStream {
                     data.append(line.substring(5).stripLeading());
                 }
             }
-            emit(data, onEvent, scope, state);
+            emit(data, onEvent, scope, state, onTerminal);
         }
     }
 
 
-    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state)
-        throws IOException {
+    private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state,
+        Consumer<HermesRunTerminal> onTerminal) throws IOException {
         if (data.isEmpty()) {
             return;
         }
@@ -176,6 +179,7 @@ public class HermesRunEventStream {
             JsonNode root = objectMapper.readTree(raw);
             String type = firstText(root, root.path("data"), "event", "type");
             if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
+                HermesRunTerminal.ofTerminalEvent(type.toLowerCase(Locale.ROOT), root).ifPresent(onTerminal);
                 onEvent.accept(toRunEvent(root, scope, state));
             } else {
                 // 본문은 로그에도 남기지 않는다. 새 사건 이름만 버전 올리기 때 확인한다.
@@ -417,7 +421,7 @@ public class HermesRunEventStream {
     }
 
 
-    /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
+    /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 밀리초 정수로 옮기고 0 은 모름으로 비운다(v0.23.2 는 늘 0 을 보낸다). */
     private static Long durationMs(JsonNode root, JsonNode payload) {
         JsonNode value = number(root, "duration");
         if (value == null) {
@@ -429,7 +433,7 @@ public class HermesRunEventStream {
         if (value == null) {
             value = number(payload, "duration_seconds");
         }
-        return value == null ? null : Math.round(value.asDouble() * 1000);
+        return value == null || value.asDouble() == 0 ? null : Math.round(value.asDouble() * 1000);
     }
 
 

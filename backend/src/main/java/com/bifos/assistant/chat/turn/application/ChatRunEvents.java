@@ -22,6 +22,7 @@ import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
+import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.util.Set;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
@@ -42,6 +43,7 @@ class ChatRunEvents {
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
     private final HermesRunsClient hermes;
+    private final LostRunRelease lostRunRelease;
     private final HermesRunEventStream eventStream;
     private final LiveProperties<HermesProperties> hermesProperties;
     private final ExecutionRecorder executions;
@@ -56,6 +58,7 @@ class ChatRunEvents {
         try {
             executions.markSubmitted(pending.execution());
             executions.beginEventObservation(pending.execution());
+            lostRunRelease.beforeSubmit(pending.command());
             String runId = hermes.submit(pending.command());
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);

@@ -69,6 +69,10 @@ assistant:
     model-options-ttl: 10m
     # 지운 대화의 본문을 실제로 지우는 시각. 실패한 대화는 다음 차례에 다시 본다
     purge-cron: "20 * * * * *"
+  hermes:
+    # 끝난 실행의 사건 보관분을 다시 읽어 끝 사건을 얻는 읽기 상한이다. Hermes v0.23.2 의 실행 조회가 error 와
+    # pending_steer 를 주지 않아 쓴다(docs/features/hermes-upgrade/design.md 의 「결과 칸 채우기」)
+    terminal-event-read-timeout: 5s
   context:
     max-chars: 8000
     index-budget-ratio: 4

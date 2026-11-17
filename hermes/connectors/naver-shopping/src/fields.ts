@@ -117,7 +117,7 @@ export const PURCHASE_LAYER = {
   /** 「바로구매」 단추에서 가장 가까운 층. 없으면 문서 전체를 본다. 칩 경로는 층을 찾지 못하면 고르지 않는다. */
   layer:
     '[role="dialog"], [aria-modal="true"], [class*="layer" i], [class*="modal" i], [class*="sheet" i]',
-  /** 옵션 묶음 하나. 층 안의 보이는 묶음 차례가 옵션 글의 차례다. */
+  /** 옵션 묶음 하나. 층 안의 보이는 가장 바깥 묶음 차례가 옵션 글의 차례다(안쪽에 겹친 슬라이드용 묶음은 세지 않는다. 2026-11-17 실측). */
   radioGroup: '[role="radiogroup"]',
   /** 묶음 안의 값 칩. 글이 값이고, 글이 없으면 안의 `img` 의 `alt` 에서 끝의 `true`·`false` 를 뗀 것이 값이다. */
   radio: '[role="radio"]',

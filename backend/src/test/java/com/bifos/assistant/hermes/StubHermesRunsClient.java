@@ -42,6 +42,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private volatile Runnable beforeAwait = () -> {
     };
     private final List<String> stopped = new CopyOnWriteArrayList<>();
+    /** {@link #releaseIfLost} 로 받은 run 번호. 잃은 실행 미리 풀기가 무엇을 넘겼는지 본다. */
+    private final List<String> released = new CopyOnWriteArrayList<>();
+    private RuntimeException releaseFailure;
     private volatile Consumer<String> onStop = runId -> {
     };
 
@@ -239,6 +242,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         deletedSessions.clear();
         sessionDeleteFailure = null;
         stopped.clear();
+        released.clear();
+        releaseFailure = null;
         onStop = runId -> {
         };
         lookupAnswers.clear();
@@ -316,6 +321,27 @@ public class StubHermesRunsClient implements HermesRunsClient {
             HermesRunLookup last = queue.peekFirst();
             return last == null ? HermesRunLookup.notFound() : last;
         }
+    }
+
+
+    @Override
+    public void releaseIfLost(String apiBaseUrl, String profileName, String runId) {
+        released.add(runId);
+        if (releaseFailure != null) {
+            throw releaseFailure;
+        }
+    }
+
+
+    /** {@link #releaseIfLost} 로 받은 run 번호를 받은 순서대로 준다. */
+    public List<String> releasedRuns() {
+        return List.copyOf(released);
+    }
+
+
+    /** 다음 {@link #releaseIfLost} 부터 이 예외를 던진다. Hermes 에 닿지 못하는 것을 흉내 낸다. */
+    public void failReleases(RuntimeException failure) {
+        this.releaseFailure = failure;
     }
 
 

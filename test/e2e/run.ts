@@ -71,6 +71,7 @@ import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { scheduledTaskScenario } from "./scenarios/scheduled-task.ts";
 import { proactiveCheckScenario } from "./scenarios/proactive-check.ts";
 import { CHAT_QUEUE_PROFILE, chatQueueRestartScenario, chatQueueScenario } from "./scenarios/chat-queue.ts";
+import { hermesV023RestartScenario } from "./scenarios/hermes-v023-restart.ts";
 import { restartReconcileScenario } from "./scenarios/restart-reconcile.ts";
 import { userExecutionLimitScenario } from "./scenarios/user-execution-limit.ts";
 import { pickPort } from "../support/pick-port.ts";
@@ -153,6 +154,8 @@ const SCENARIOS: readonly Scenario[] = [
   chatQueueScenario,
   // 사용량 합계를 세는 시나리오 뒤에 둔다. 실패한 실행을 하나 더 남기기 때문이다.
   busyScenario,
+  // 실패한 turn 을 하나 남기고 가짜 Hermes 의 모양을 v0.23 으로 바꿨다 되돌린다. 사용량 합계를 세는 시나리오 뒤에 둔다.
+  hermesV023RestartScenario,
   // 실패한 turn 을 하나 더 남기므로 사용량 합계를 세는 시나리오 뒤에 둔다.
   attentionScenario,
   // snapshot 플러그인을 붙인 에이전트를 만들고 지우며 끝에 Control Plane 을 다시 띄운다. turn 을 돌리므로 막힌 provider 보다 앞에 둔다.

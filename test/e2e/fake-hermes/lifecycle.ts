@@ -56,7 +56,20 @@ export function createLifecycle(state: FakeHermesState) {
     state.longActivityGate = undefined;
     gate?.();
   };
-  return { runNotFound, finishSlowRun, completeRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity };
+  /**
+   * Hermes 가 다시 뜬 것을 흉내 낸다. v0.23 모양이면 도는 실행이 `unknown` 이 되어 같은 session 의 뒤 실행을 막고,
+   * v0.21 모양이면 메모리에 있던 실행 기록이 사라진다. 붙잡은 실행은 상태를 바꾸지 않고 푼다.
+   */
+  const restartHermes = () => {
+    for (const run of [...state.runs.values()]) {
+      if (run.status !== "running") continue;
+      if (state.hermesShape === "v0.23") run.status = "unknown";
+      else state.runs.delete(run.run_id);
+    }
+    releaseHeldRun();
+    state.slowActive.clear();
+  };
+  return { runNotFound, finishSlowRun, completeRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity, restartHermes };
 }
 
 export function wait(milliseconds: number): Promise<void> {

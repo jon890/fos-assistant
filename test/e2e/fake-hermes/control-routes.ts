@@ -20,9 +20,11 @@ import {
   TEST_LAST_SUBMITTED_RUNTIME_PATH,
   TEST_HOLD_NEXT_SOUL_PATH,
   TEST_RELEASE_HELD_SOUL_PATH,
+  TEST_HERMES_SHAPE_PATH,
+  TEST_RESTART_HERMES_PATH,
 } from "./runtime-fixtures.ts";
 /** 다른 프로세스에서 시험 상태를 바꾸는 제어 경로다. */
-export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun }: ReturnType<typeof createLifecycle>) {
+export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, releaseHeldSoul, releaseLongActivity, completeRun, restartHermes }: ReturnType<typeof createLifecycle>) {
   return async (request: IncomingMessage, response: ServerResponse, path: string): Promise<void> => {
       // 검사가 실패해 finally까지 가지 못해도 다음 검사에 장애나 보류 설정을 넘기지 않는다.
       // profile, 실행과 session 기록은 지우지 않는다. 그것들은 DB와 함께 각 검사가 소유한다.
@@ -47,6 +49,20 @@ export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, re
         state.proactiveGate = undefined;
         state.openProactiveGate = undefined;
         state.lastSubmittedRuntime = {};
+        state.hermesShape = "v0.21";
+        state.resolvedRuns.length = 0;
+        return send(response, 204, null);
+      }
+
+      if (request.method === "POST" && path === TEST_HERMES_SHAPE_PATH) {
+        const body = JSON.parse(await readBody(request)) as { shape?: string };
+        state.hermesShape = body.shape === "v0.23" ? "v0.23" : "v0.21";
+        return send(response, 204, null);
+      }
+
+      // Hermes 가 다시 떴다. 도는 실행의 사건 스트림은 끊기고, v0.23 은 그 실행을 `unknown` 으로 남겨 같은 session 의 뒤 실행을 막는다.
+      if (request.method === "POST" && path === TEST_RESTART_HERMES_PATH) {
+        restartHermes();
         return send(response, 204, null);
       }
 

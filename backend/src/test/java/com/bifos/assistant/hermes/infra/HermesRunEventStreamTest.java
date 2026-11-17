@@ -189,10 +189,10 @@ class HermesRunEventStreamTest {
 
 
     @Test
-    @DisplayName("걸린 시간이 0이면 0밀리초가 된다")
-    void zeroElapsedBecomesZeroMillis() {
+    @DisplayName("걸린 시간이 0이면 모르는 것으로 비운다. v0.23.2 는 늘 0 을 보낸다")
+    void zeroElapsedBecomesUnknown() {
         assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs())
-            .isZero();
+            .isNull();
     }
 
 

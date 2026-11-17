@@ -23,12 +23,20 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
           if (!authorized(request, profile)) {
             return send(response, 401, { error: "bad key for this profile" });
           }
+          const reopened = state.eventsOpened.has(runId!);
           state.eventsOpened.add(runId!);
           for (const done of state.eventsWaiters.get(runId!) ?? []) done();
           state.eventsWaiters.delete(runId!);
           const run = state.runs.get(runId);
           if (!run) return send(response, 404, runNotFound(runId!));
           const event = runEventWriter(response, run);
+          // v0.23 은 끝난 run 에 다시 연결하면 보관한 사건을 보내고 닫는다(`_handle_run_events`). 대역은 끝 사건 하나만 다시 보낸다.
+          if (state.hermesShape === "v0.23" && reopened && ["completed", "failed", "cancelled"].includes(run.status)) {
+            response.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" });
+            event(run.status === "failed" ? { event: "run.failed", error: run.error ?? "agent run failed" } : { event: `run.${run.status}` });
+            response.end();
+            return;
+          }
           if (run.input === "사건 스트림 실패 검사") {
             return send(response, 503, { error: "event stream unavailable" });
           }

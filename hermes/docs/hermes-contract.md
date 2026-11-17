@@ -448,6 +448,7 @@ Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 
 | `GET /v1/runs/{run_id}` | `status`, `session_id`, `model`, `output`, `usage` 를 준다. 언제까지 답하는지는 아래 「실행 조회가 답하는 기간」 을 본다 |
 | `GET /v1/runs/{run_id}/events` | SSE. `tool.started`, `tool.completed`, `subagent.start`, `subagent.complete` 와 종료 사건 |
 | `POST /v1/runs/{run_id}/stop` | 실행 중단 |
+| `POST /v1/runs/{run_id}/resolve-unknown` | v0.22 부터. 재기동으로 잃은 실행(`unknown`)을 해제한다. 아래 「v0.23.2 의 session 대기열」 을 본다 |
 | `POST /v1/runs/{run_id}/steer` | 도는 실행에 지시를 더한다. 아래 「도는 실행에 지시를 더하는 `steer`」 를 본다. 설정이 켜져 있을 때 답이 도는 중 입력창 글을 보낸다 |
 
 **실행을 시작한 뒤 바꿀 수 있는 것은 중단과 `steer` 둘이다.** Control Plane 은 중단을 쓰고, 설정(`assistant.chat.steer.enabled`)이 켜져 있으면 `steer` 도 쓴다.
@@ -511,6 +512,31 @@ gateway 가 내려가며 끊은 실행은 `interrupted` 로 적힌다. 그 상�
 Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
 
 **가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
+
+#### v0.23.2 의 session 대기열
+
+2026-11-17 에 v0.23.2(commit `ae2a81cc`)의 소스를 읽었다. 운영 왕복으로는 확인하지 않았다. 확인할 항목은 [`docs/features/hermes-upgrade/spec.md`](../../docs/features/hermes-upgrade/spec.md) 의 「배포 뒤 왕복 확인」 이 갖는다.
+
+**v0.22 부터 `/v1/runs` 실행은 profile 마다 디스크의 session 대기열(session authority)에 들어가고, 실행 조회는 그 기록으로 답한다.** 근거는 `gateway/platforms/api_server_authority_runs.py` 의 `run_projection` 과 `api_server_runs.py` 의 `_durable_run_status` 다.
+
+| 무엇 | v0.21.6 | v0.23.2 |
+| --- | --- | --- |
+| 상태 값 | `running`, `stopping`, `waiting_for_approval` 과 끝 상태 | `queued`, `running`, `waiting_for_approval`, `unknown` 과 끝 상태. `unknown` 은 끝 상태가 아니다 |
+| gateway 가 다시 떴다 | 404 | 도는 중이던 사람 turn 은 `unknown`. 같은 session 의 뒤 실행은 해제될 때까지 `queued`. 끝난 실행은 상태, `output`, `usage` 로 계속 답한다 |
+| 기록의 수명 | 끝나고 1시간 | session 을 지울 때까지 |
+| 조회 응답의 칸 | `error`, `pending_steer`, `runtime`, `model` 을 준다 | `error`, `pending_steer` 가 없다. `runtime`, `model` 은 같은 gateway 프로세스 메모리에 남아 있을 때만 붙는다. `admission_id`, `execution_generation`, `pending_controls` 를 더 준다 |
+| `cancelled` | 사용자 중지 | 사용자 중지, gateway 의 정상 종료로 끊긴 실행, 해제한 실행을 모두 담는다 |
+| 잃은 실행의 중지 | 해당 없음 | 409, `error.code` 가 `unknown_execution` |
+
+해제는 `POST /v1/runs/{run_id}/resolve-unknown` 에 `{"admission_id", "execution_generation"}` 두 칸을 조회 응답의 값 그대로 보낸다. 이미 해제한 같은 실행을 다시 보내도 200 이다. 409 는 값이 어긋났거나(`stale_generation`) 기록이 없는 경우다.
+
+**Control Plane 은 이 차이를 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 안에서 옮긴다.** `queued` 는 도는 것으로 읽고, `unknown` 은 해제한 뒤 조회 경로에는 모르는 run 으로, 도는 turn 에는 `REMOTE_RUN_LOST` 로 알린다. 해제한 실행을 다시 읽으면 `cancelled` 라 사용자 중지로 읽히므로 다시 읽지 않는다.
+`cancelled` 는 끝 사건(`run.cancelled`, `run.interrupted`)과 그 프로세스가 중지를 보냈는지로 나누고, 근거가 없으면 `interrupted`(실패)로 적는다.
+조회에 없는 `error`, `pending_steer`, `runtime` 은 사건 스트림이 받은 끝 사건으로 채우고, 없으면 끝난 실행의 사건 보관분(끝나고 5분)을 한 번 다시 읽는다. 얻지 못하면 넘어간 steer 글을 모르는 것으로 보고 끼운 글을 「전달됐는지 확인 못 함」 으로 둔다.
+그 run 을 다시 묻는 쪽이 없어도 대화가 막히지 않게, 새 실행을 보내기 전에 같은 profile 에서 최근 연결 실패·시간 초과로 끝난 실행을 해제한다.
+흐름과 결정은 [`docs/features/hermes-upgrade/design.md`](../../docs/features/hermes-upgrade/design.md) 와 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 갖는다.
+
+**가짜 Hermes 는 `/__test/hermes-shape` 로 v0.23 모양을 켤 수 있다.** 켜면 조회에서 `error`, `pending_steer` 를 빼고 기록 번호를 넣고, `/__test/restart-hermes` 가 도는 실행을 `unknown` 으로 바꾼다. `/__test/reset-controls` 가 v0.21 모양으로 되돌린다.
 
 ### `/v1/runs` 에 사진을 싣는 법
 
@@ -771,6 +797,13 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 | `run.completed` | `output`, `usage`, `runtime`, `completed`, `partial`, `interrupted` |
 | `run.failed`, `run.cancelled` | 끝 |
 | `run.interrupted` | `error`. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
+
+v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 소스로 보면 아래가 다르다. 운영 왕복으로는 확인하지 않았다.
+
+- `message.interim`, `reasoning.available`, `subagent.start`, `subagent.complete` 가 오지 않는다. `_execute_run` 이 답 조각과 도구 시작·완료 sink 만 등록한다(`gateway/session_api_turn.py` 의 `wire_api_observers`). Control Plane 은 오는 사건만 그린다(스펙 DECISION2)
+- `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 을 걸린 시간 모름으로 읽는다
+- 대기 중 gateway 가 물러나면 끝이 아닌 `run.queued` 가 온다. 아는 사건 목록 밖이라 건너뛴다
+- gateway 가 정상 종료로 내려가면 도는 실행에 `run.interrupted` 가 오고 `pending_steer` 와 `runtime` 은 빠진다
 
 `data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
 10초마다 `: keepalive` 주석이 온다.

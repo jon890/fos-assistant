@@ -57,6 +57,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import java.sql.Timestamp;
 
 /**
  * turn 이 끝날 때 steer 말풍선을 정리하고 돌아온 글을 다음 차례로, 모르는 글을 멈춘 대기 줄로 보내는지 본다(ADR-20261116 / run-steer).
@@ -336,6 +338,61 @@ class SteerSettleTest {
 
 
     @Test
+    @DisplayName("대화 turn 은 보내기 전에 같은 profile 에서 연결 실패로 끝난 지난 실행을 잃은 실행 풀기로 넘긴다")
+    void chatTurnReleasesLostRunsBeforeSubmit() throws InterruptedException {
+        Agent chief = agents.findByCode("dad").orElseThrow();
+        AgentExecution lost = executions.save(AgentExecution.builder()
+            .userId(dad.id())
+            .agentId(chief.id())
+            .profileName(chief.hermesProfile())
+            .hermesRunId("run-lost")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.FAILED)
+            .errorCode("HERMES_UNAVAILABLE")
+            .startedAt(Instant.now().minusSeconds(60))
+            .build());
+        jdbc.update("UPDATE agent_execution SET finished_at = ? WHERE id = ?", Timestamp.from(Instant.now()), lost.id());
+
+        Thread running = startRunningTurn();
+        finish(running);
+
+        assertThat(stub().releasedRuns()).contains("run-lost");
+    }
+
+
+    @Test
+    @DisplayName("넘어간 글이 있었는지 모르는 결과로 끝나면 중지한 turn 이어도 확인 못 함으로 멈춘 대기 줄에 둔다")
+    void unknownPendingSteerHoldsEvenWhenStopped() throws InterruptedException {
+        stub().willReturn(unknownPending("cancelled"));
+        Thread running = startRunningTurn();
+        pending.enqueue(dad, conversation.id(), "끝 사건을 못 받은 글", true);
+        chat.stop(dad, handle().getExecutionId());
+
+        finish(running);
+
+        assertThat(bubbles()).extracting(ChatMessage::steerState).containsExactly(SteerState.UNCONFIRMED);
+        assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+    }
+
+
+    @Test
+    @DisplayName("기동 정리가 받은 결과가 넘어간 글을 모르면 그 말풍선을 확인 못 함으로 둔다")
+    void recoveredUnknownPendingHolds() throws InterruptedException {
+        Thread running = startRunningTurn();
+        Long executionId = handle().getExecutionId();
+        finish(running);
+        ChatMessage left = messages.save(ChatMessage.fromSteer(
+            conversation.id(), dad.id(), "모르는 글", executionId, SteerState.DELIVERED, null, Instant.now()));
+        jdbc.update("UPDATE agent_execution SET status = 'RUNNING', finished_at = NULL WHERE id = ?", executionId);
+
+        recorder.settle(executionId, unknownPending("interrupted"));
+
+        assertThat(messages.findById(left.id()).orElseThrow().steerState()).isEqualTo(SteerState.UNCONFIRMED);
+        assertThat(pendingRows.read(conversation.id()).held()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("결과를 읽지 못하고 끝나면 들어갔는지 모르는 것으로 보고 멈춘 대기 줄에 둔다")
     void unreadResultHolds() throws InterruptedException {
         CountDownLatch gate = release;
@@ -533,6 +590,13 @@ class SteerSettleTest {
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
             ownerId);
+    }
+
+
+    /** Hermes v0.23.2 에서 끝 사건을 얻지 못한 결과다. 넘어간 글이 있었는지 모른다. */
+    private static HermesRunResult unknownPending(String status) {
+        return new HermesRunResult(
+            "run", "session", status, "답", "model", "provider", null, TokenUsage.empty(), null, null, false);
     }
 
 
