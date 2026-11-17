@@ -226,6 +226,22 @@ class SubagentSessionEndpointTest {
     }
 
 
+    @Test
+    @DisplayName("대화를 지운 뒤 온 끝 소식은 ignored 이고 결과 글을 적지 않는다")
+    void stopAfterConversationDeletedIsIgnored() throws Exception {
+        String turnRoot = McpCallSigner.newRoot();
+        AgentExecution turn = conversationTurn(turnRoot);
+        String child = registerReporting(turnRoot);
+        jdbc.update("UPDATE conversation SET deleted_at = CURRENT_TIMESTAMP(6) WHERE id = ?", turn.conversationId());
+
+        HttpResponse<String> response = stop(McpCallSigner.subagentStopBody(tokenA, turnRoot, turnRoot, child, "completed", "늦은 결과"));
+
+        assertThat(json.readTree(response.body())).isEqualTo(json.readTree("{\"result\":\"ignored\"}"));
+        assertThat(resultRow(child).get("STOPPED_AT")).isNull();
+        assertThat(resultRow(child).get("RESULT_TEXT")).isNull();
+    }
+
+
     @Test // 9
     @DisplayName("같은 본문을 다시 보내면 200 이고 줄은 하나다")
     void resendingSameBodyIs200AndKeepsOneRow() throws Exception {

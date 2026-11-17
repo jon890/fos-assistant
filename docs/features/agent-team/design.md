@@ -793,7 +793,7 @@ v0.21.6(commit `818c13be`)의 소스로 확인한 사실이다. 계약 문서에
 `NativeDelegationResultSource` 가 낸다. `undelivered(conversationId)` 의 대상은 그 대화 실행의 등록 줄 가운데 아래를 모두 맞는 줄이다. 끝난 순서다. `conversationsWithUndelivered` 도 같은 조건이다.
 
 - `wake_eligible` 이고 `stopped_at` 이 있고 `result_delivered_at` 이 없다
-- `stopped_at` 이 5초보다 오래됐다(아래 「깨우는 때」)
+- `stopped_at` 이 5초보다 오래됐고 24시간 안이다(아래 「깨우는 때」). 이미 읽은 결과는 칸을 적지 않으므로 기간으로 묶어 대화가 길어져도 조회가 늘지 않게 한다
 - origin 루트가 `CANCELLED` 가 아니다
 - 아래 「이미 읽은 결과」 에 들지 않는다
 
@@ -871,7 +871,8 @@ rule-66 의 전환 배포를 따른다. 새 칸은 모두 선택이고, PR6 의 
 
 ### 실패와 일관성
 
-- 끝 소식 저장은 `stopped_at` 이 비어 있을 때만 바꾸는 조건부 update 다. 다시 보낸 소식과 동시 요청은 하나만 적힌다.
+- 끝 소식 저장은 `stopped_at` 이 비어 있고 origin 대화가 지워지지 않았을 때만 바꾸는 조건부 update 다. 다시 보낸 소식과 동시 요청은 하나만 적힌다. 대화를 지운 뒤 온 소식은 `ignored` 다. 대화 정리가 이미 끝났으면 그 글을 비울 길이 없기 때문이다.
+- 등록 뒤 암호화가 꺼져 결과 글을 봉하지 못하면 key 칸을 비우고 맡긴 일도 평문으로 다시 적는다. 두 글 칸이 key 칸 하나를 쓴다.
 - 결과를 전했다는 표시는 `markDelivered` 가 `result_delivered_at` 이 빈 줄만 바꾼다. 바꾼 줄 수가 다르면 묶음까지 되돌아간다(ADR-075). 훑기의 중지 알림과 겹쳐도 한쪽만 이긴다.
 - 끝 소식을 적은 뒤 5초 사건 예약이 실패해도 다음 turn 닫기와 기동 훑기(`conversationsWithUndelivered`)가 다시 깨운다.
 - Control Plane 이 다시 떠도 결과는 등록 줄에 남는다. 5초 사이에 내려가도 기동 훑기가 전한다.

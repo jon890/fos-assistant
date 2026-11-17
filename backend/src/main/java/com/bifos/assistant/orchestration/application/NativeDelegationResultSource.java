@@ -56,6 +56,9 @@ public class NativeDelegationResultSource implements AutoTurnResultSource {
     /** 끝 소식 뒤 Hermes 가 부모 session 에 결과 줄을 남길 시간이다. 이보다 늦게 시작한 turn 은 결과를 읽었다고 본다. */
     static final Duration READ_MARGIN = Duration.ofSeconds(30);
 
+    /** 이보다 오래전에 끝난 결과는 내지 않는다. 그동안 전하지 못한 결과는 다음 사용자 메시지가 Hermes 이력으로 읽는다. */
+    static final Duration HORIZON = Duration.ofHours(24);
+
     static final String SUCCEEDED_NOTICE = "하위 작업이 끝났어요";
     static final String FAILED_NOTICE = "하위 작업을 하지 못했어요";
 
@@ -77,7 +80,7 @@ public class NativeDelegationResultSource implements AutoTurnResultSource {
     @Override
     public List<AutoTurnResult> undelivered(Long conversationId) {
         Instant now = clock.instant();
-        List<HermesSessionBinding> settled = bindings.findSettledUndelivered(conversationId, now.minus(SETTLE));
+        List<HermesSessionBinding> settled = bindings.findSettledUndelivered(conversationId, now.minus(HORIZON), now.minus(SETTLE));
         if (settled.isEmpty()) {
             return List.of();
         }
@@ -115,7 +118,8 @@ public class NativeDelegationResultSource implements AutoTurnResultSource {
     /** 기동 훑기용이다. 이미 읽은 결과만 남은 대화는 빼야 깨운 뒤 아무것도 하지 않는 일이 줄어 대화마다 다시 확인한다. */
     @Override
     public List<Long> conversationsWithUndelivered() {
-        return bindings.findConversationsWithSettledUndelivered(clock.instant().minus(SETTLE)).stream()
+        Instant now = clock.instant();
+        return bindings.findConversationsWithSettledUndelivered(now.minus(HORIZON), now.minus(SETTLE)).stream()
             .filter(conversationId -> !undelivered(conversationId).isEmpty())
             .toList();
     }

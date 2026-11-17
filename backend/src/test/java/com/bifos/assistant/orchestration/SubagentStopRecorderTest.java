@@ -111,6 +111,22 @@ class SubagentStopRecorderTest {
 
 
     @Test
+    @DisplayName("등록 뒤 암호화가 꺼져 결과 글을 봉하지 못하면 key 를 비우고 맡긴 일도 평문으로 다시 적는다")
+    void unsealedResultClearsKeyAndRewritesGoalAsPlain() {
+        HermesSessionBinding binding = binding(true);
+        ReflectionTestUtils.setField(binding, "goalPreview", "봉한 맡긴 일");
+        ReflectionTestUtils.setField(binding, "resultKeyId", 5L);
+        given(binding, 1);
+        when(outputs.clip("결과")).thenReturn("결과");
+        when(texts.open(10L, 7L, SubagentResultTexts.GOAL_PREVIEW, 5L, "봉한 맡긴 일")).thenReturn(Optional.of("장보기"));
+
+        recorder(true).record(PROFILE, ROOT, ROOT, CHILD, "completed", "결과");
+
+        verify(bindings).recordStop(eq(10L), eq(NOW), eq("SUCCEEDED"), eq("결과"), isNull(), eq("장보기"), isNull());
+    }
+
+
+    @Test
     @DisplayName("등록 줄이 없으면 NOT_FOUND 다")
     void missingBindingIsNotFound() {
         when(bindings.findByProfileNameAndSessionId(PROFILE, CHILD)).thenReturn(Optional.empty());

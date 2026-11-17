@@ -90,6 +90,16 @@ class NativeDelegationResultSourceTest {
 
 
     @Test
+    @DisplayName("24시간보다 오래전에 끝난 결과는 내지 않는다")
+    void resultOlderThanHorizonIsNotReturned() {
+        stopped(NOW.minusSeconds(25 * 3_600), "SUCCEEDED", "옛 결과", "일");
+
+        assertThat(source.undelivered(conversation.id())).isEmpty();
+        assertThat(source.conversationsWithUndelivered()).doesNotContain(conversation.id());
+    }
+
+
+    @Test
     @DisplayName("대화 에이전트로 제출된 루트 실행이 끝 소식 30초 넘게 뒤 시작했으면 읽은 것으로 보고 뺀다")
     void resultReadByLaterSubmittedTurnIsExcluded() {
         Instant stoppedAt = NOW.minusSeconds(120);

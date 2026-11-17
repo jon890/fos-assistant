@@ -29,7 +29,8 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
 
 
     /**
-     * 깨울 자식의 끝 소식을 적는다. 아직 소식이 없는 줄만 바꾼다. 다시 보낸 소식과 동시 요청은 하나만 적힌다.
+     * 깨울 자식의 끝 소식을 적는다. 아직 소식이 없고 origin 대화가 지워지지 않은 줄만 바꾼다. 다시 보낸 소식과 동시 요청은 하나만 적힌다.
+     * 대화를 지운 뒤에 온 소식은 적지 않는다. 대화 정리가 이미 끝났으면 그 글을 비울 길이 없기 때문이다.
      *
      * @param deliveredAt 설정이 꺼져 전하지 않기로 했으면 받은 시각, 아니면 null
      * @return 바꾼 줄 수
@@ -37,7 +38,9 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = "update hermes_session_binding set stopped_at = :stoppedAt, result_status = :status,"
         + " result_text = :text, result_key_id = :keyId, goal_preview = :goal, result_delivered_at = :deliveredAt"
-        + " where id = :id and wake_eligible = true and stopped_at is null", nativeQuery = true)
+        + " where id = :id and wake_eligible = true and stopped_at is null and exists (select 1 from agent_execution e"
+        + " join conversation c on c.id = e.conversation_id where e.id = origin_execution_id and c.deleted_at is null)",
+        nativeQuery = true)
     int recordStop(
         @Param("id") Long id,
         @Param("stoppedAt") Instant stoppedAt,
@@ -49,24 +52,28 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
 
 
     /**
-     * 그 대화 실행을 origin 으로 둔 깨울 자식 가운데 끝 소식이 {@code settledBefore} 이전에 왔고 아직 전하지 않았으며 origin 이 중지되지
-     * 않은 줄이다. 끝난 순서다. 이미 읽었는지는 부르는 쪽이 따로 본다.
+     * 그 대화 실행을 origin 으로 둔 깨울 자식 가운데 끝 소식이 {@code stoppedAfter} 와 {@code settledBefore} 사이에 왔고 아직 전하지
+     * 않았으며 origin 이 중지되지 않은 줄이다. 끝난 순서다. 이미 읽었는지는 부르는 쪽이 따로 본다. 이미 읽은 줄은 칸을 적지 않으므로
+     * 기간으로 묶어 대화가 길어져도 조회가 늘지 않게 한다.
      */
     @Query(value = "select b.* from hermes_session_binding b join agent_execution e on e.id = b.origin_execution_id"
         + " where e.conversation_id = :conversationId and b.wake_eligible = true and b.stopped_at is not null"
-        + " and b.result_delivered_at is null and b.stopped_at <= :settledBefore and e.status <> 'CANCELLED'"
-        + " order by b.stopped_at, b.id", nativeQuery = true)
+        + " and b.result_delivered_at is null and b.stopped_at <= :settledBefore and b.stopped_at > :stoppedAfter"
+        + " and e.status <> 'CANCELLED' order by b.stopped_at, b.id", nativeQuery = true)
     List<HermesSessionBinding> findSettledUndelivered(
-        @Param("conversationId") Long conversationId, @Param("settledBefore") Instant settledBefore);
+        @Param("conversationId") Long conversationId,
+        @Param("stoppedAfter") Instant stoppedAfter,
+        @Param("settledBefore") Instant settledBefore);
 
 
     /** {@link #findSettledUndelivered} 와 같은 조건의 줄이 있는 대화들이다. 기동할 때 훑는다. */
     @Query(value = "select distinct e.conversation_id from hermes_session_binding b"
         + " join agent_execution e on e.id = b.origin_execution_id"
         + " where e.conversation_id is not null and b.wake_eligible = true and b.stopped_at is not null"
-        + " and b.result_delivered_at is null and b.stopped_at <= :settledBefore and e.status <> 'CANCELLED'",
-        nativeQuery = true)
-    List<Long> findConversationsWithSettledUndelivered(@Param("settledBefore") Instant settledBefore);
+        + " and b.result_delivered_at is null and b.stopped_at <= :settledBefore and b.stopped_at > :stoppedAfter"
+        + " and e.status <> 'CANCELLED'", nativeQuery = true)
+    List<Long> findConversationsWithSettledUndelivered(
+        @Param("stoppedAfter") Instant stoppedAfter, @Param("settledBefore") Instant settledBefore);
 
 
     /** 그 대화와 그 사용자의 끝 소식이 있는 깨울 자식 줄이다. 다시 전달할 때 읽는다. */
@@ -103,9 +110,9 @@ public interface HermesSessionBindingRepository extends JpaRepository<HermesSess
 
 
     /** 그 origin 의 깨울 자식에 기한 표시가 이미 있는가. 앞서 알림 줄을 남겼다는 뜻이다. */
-    @Query(value = "select count(*) > 0 from hermes_session_binding"
+    @Query(value = "select count(*) from hermes_session_binding"
         + " where origin_execution_id = :origin and wake_eligible = true and timeout_noticed_at is not null", nativeQuery = true)
-    boolean existsTimeoutNoticed(@Param("origin") Long originExecutionId);
+    long countTimeoutNoticed(@Param("origin") Long originExecutionId);
 
 
     /** 그 origin 의 기한 대상 줄에 기한 표시를 적는다. */

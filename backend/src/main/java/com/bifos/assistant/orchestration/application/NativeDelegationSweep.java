@@ -108,7 +108,7 @@ public class NativeDelegationSweep {
             return Optional.empty();
         }
         return Optional.ofNullable(transactions.execute(status -> {
-            boolean noticed = bindings.existsTimeoutNoticed(origin);
+            boolean noticed = bindings.countTimeoutNoticed(origin) > 0;
             int changed = bindings.markTimeoutNoticed(origin, after, until, now);
             if (changed == 0 || noticed) {
                 return null;

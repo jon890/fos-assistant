@@ -118,7 +118,8 @@ public class SubagentStopRecorder {
         Optional<SealedText> sealedText = clipped == null
             ? Optional.empty()
             : texts.seal(binding.id(), binding.userId(), SubagentResultTexts.RESULT_TEXT, clipped);
-        Long keyId = sealedText.map(SealedText::keyId).orElse(binding.resultKeyId());
+        // 결과 글을 봉하지 못했으면(암호화가 꺼졌다) 평문이라 key 를 비운다. 맡긴 일도 같은 key 로 맞춰 다시 적는다.
+        Long keyId = clipped == null ? binding.resultKeyId() : sealedText.map(SealedText::keyId).orElse(null);
         String goal = binding.goalPreview();
         if (goal != null && !Objects.equals(keyId, binding.resultKeyId())) {
             goal = resealGoal(binding, keyId);
@@ -134,12 +135,15 @@ public class SubagentStopRecorder {
     }
 
 
-    /** 맡긴 일을 옛 key 로 열어 새 key 로 다시 봉한다. 열지 못하거나 새로 봉하지 못하면 맡긴 일을 비운다. 알림 줄은 맡긴 일 없이 남는다. */
+    /**
+     * 맡긴 일을 옛 key 로 열어 새 key 로 다시 봉한다. 새 key 가 비었으면 평문으로 적는다. 열지 못하거나 새로 봉하지 못하면 맡긴 일을 비운다.
+     * 알림 줄은 맡긴 일 없이 남는다.
+     */
     private String resealGoal(HermesSessionBinding binding, Long keyId) {
         Optional<String> plain = texts.open(
             binding.id(), binding.userId(), SubagentResultTexts.GOAL_PREVIEW, binding.resultKeyId(), binding.goalPreview());
-        if (plain.isEmpty()) {
-            return null;
+        if (plain.isEmpty() || keyId == null) {
+            return plain.orElse(null);
         }
         return texts.seal(binding.id(), binding.userId(), SubagentResultTexts.GOAL_PREVIEW, plain.get())
             .filter(sealed -> Objects.equals(sealed.keyId(), keyId))

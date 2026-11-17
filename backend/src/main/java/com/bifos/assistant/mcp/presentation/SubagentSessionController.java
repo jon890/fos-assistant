@@ -69,7 +69,7 @@ public class SubagentSessionController {
     public ResponseEntity<SubagentStopResponse> stop(
         @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
         if (!(principal instanceof McpPrincipal mcp)) {
-            throw reject("MCP 토큰으로 인증한 요청이 아니다");
+            throw rejectStop("MCP 토큰으로 인증한 요청이 아니다");
         }
         SubagentStop stop = SubagentStop.verify(read(body), mcp.tokenHash());
         SubagentStopResult result = stops.record(
@@ -102,6 +102,13 @@ public class SubagentSessionController {
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String reason) {
         log.warn("하위 에이전트 session 등록을 거절했다 reason={}", reason);
+        return new ApiException(ErrorCode.SESSION_BINDING_REJECTED, "session binding is rejected");
+    }
+
+
+    /** 끝 소식 경로의 거절이다. 로그에서 등록과 구분한다. */
+    private static ApiException rejectStop(String reason) {
+        log.warn("하위 에이전트 끝 소식을 거절했다 reason={}", reason);
         return new ApiException(ErrorCode.SESSION_BINDING_REJECTED, "session binding is rejected");
     }
 }
