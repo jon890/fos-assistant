@@ -18,6 +18,29 @@ class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
         saved = yaml.safe_load((self.root / "owner/config.yaml").read_text(encoding="utf-8"))
         self.assertIn("fos-attachments", fake_platform_tools(saved, "api_server"))
 
+    def test_profile_plugin_toolsets_are_checked_in_the_target_profile(self):
+        """대상 profile 에만 등록한 toolset 은 받고 모르는 이름은 쓰지 않는다."""
+        body = self.toolset_body()
+        allowed = body["config"]["platform_toolsets"]["api_server"]
+        allowed.append("fos-attachments")
+        seen = []
+
+        def profile_plugins():
+            profile = self.scope["profile"]
+            seen.append(profile)
+            return {"fos-attachments"} if profile == "owner" else set()
+
+        with patch.object(self.tools, "_get_plugin_toolset_keys", side_effect=profile_plugins):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+            path = self.root / "owner/config.yaml"
+            saved = path.read_bytes()
+            self.assertIn("fos-attachments", yaml.safe_load(saved)["platform_toolsets"]["api_server"])
+            allowed.append("unknown-plugin")
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+            self.assertEqual(path.read_bytes(), saved)
+        self.assertEqual(seen, ["owner", "owner"])
+        self.assertIsNone(self.scope["profile"])
+
     def test_toolset_update_saves_only_checked_lists(self):
         """toolset 갱신은 검사를 통과한 목록만 저장한다."""
         body = self.toolset_body()

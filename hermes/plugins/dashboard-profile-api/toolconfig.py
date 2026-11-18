@@ -249,7 +249,9 @@ async def _check_config_update(request):
         updated = dict(saved)
         if platform is not None:
             allowed = platform["api_server"]
-            known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP}
+            # profile 에만 설치한 plugin 의 toolset 도 그 profile 범위에서 읽는다.
+            with _config_profile_scope(profile):
+                known = builtins | _get_plugin_toolset_keys() | mcp_names | {CONTROL_PLANE_MCP}
             if set(allowed) - known:
                 return _rejected("모르는 도구 이름이 있다")
             if set(_bound_servers(get_profile_dir(profile))) - set(allowed):
