@@ -8,6 +8,7 @@ import {
   MODEL_GUIDE_HEADERS,
   withoutDelegationTargets,
   withoutResponseGuide,
+  withoutTurnDate,
 } from "../fake-hermes/scenario-fixtures.ts";
 
 const RESPONSE_GUIDE = "# 답변 형식\n\n표 형식 안내";
@@ -27,9 +28,9 @@ test("답변 형식 뒤의 도구 호출과 승인 카드, 기억 지침을 빼�
 });
 
 test("대역이 빼는 지침 제목은 Control Plane 이 붙이는 지침 상수의 제목과 순서가 같다", () => {
-  // ContextAssembler 는 답변 형식, 도구 호출, 기억 상수를 이 순서로 잇는다. 상수 안의 절 제목을 모두 모은다.
+  // ContextAssembler 는 답변 형식, 도구 호출, 최신 정보와 출처, 기억 상수를 이 순서로 잇는다. 상수 안의 절 제목을 모두 모은다.
   const source = readFileSync(CONTEXT_ASSEMBLER, "utf8");
-  const headers = ["RESPONSE_INSTRUCTIONS", "TOOL_CALL_INSTRUCTIONS", "MEMORY_INSTRUCTIONS"].flatMap((name) => {
+  const headers = ["RESPONSE_INSTRUCTIONS", "TOOL_CALL_INSTRUCTIONS", "SEARCH_INSTRUCTIONS", "MEMORY_INSTRUCTIONS"].flatMap((name) => {
     const block = new RegExp(`${name} = """([\\s\\S]*?)"""`).exec(source);
     assert.ok(block, `${name} 상수를 찾지 못했다`);
     return [...block[1]!.matchAll(/^\s*(# \S.*)$/gm)].map((match) => match[1]!.trim());
@@ -62,6 +63,16 @@ test("대역이 빼는 맡길 곳 구역의 제목과 안내 줄은 Control Plan
 
   assert.equal(header?.[1]?.trim(), DELEGATION_TARGETS_HEADER);
   assert.equal(truncated?.[1], DELEGATION_TARGETS_TRUNCATED);
+});
+
+test("대화 실행의 최신 정보와 출처 절과 오늘 날짜 줄을 빼고 그 사이의 글은 보존한다", () => {
+  const search = "# 최신 정보와 출처\n\nweb_search 도구가 있으면 검색한다\n둘째 줄";
+  const date = "오늘은 2026년 11월 18일 수요일이다(한국 시간).";
+  const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, APPROVAL_CARD_GUIDE, search, MEMORY_GUIDE, MEMORY_BODY, "다시 생성 지시", date].join("\n\n");
+
+  assert.equal(withoutResponseGuide(withoutTurnDate(instructions)), `${MEMORY_BODY}\n\n다시 생성 지시`);
+  assert.equal(withoutTurnDate(date), "");
+  assert.equal(withoutTurnDate("오늘은 날씨가 좋다."), "오늘은 날씨가 좋다.");
 });
 
 test("도구 호출 또는 기억 지침이 없는 답변 형식도 Memory 본문을 보존한다", () => {
