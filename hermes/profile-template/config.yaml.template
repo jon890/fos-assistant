@@ -69,7 +69,7 @@ agent:
     enabled: false
 
 # Web search and page extraction backends for the `web` toolset. Left unset on purpose: Hermes then
-# picks a keyed backend if one is configured and a keyless one otherwise. The value is chosen after
+# picks a keyed backend if one is configured and a keyless one otherwise. The value was chosen by
 # the answer-quality evaluation (docs/features/answer-quality.md in the fos-assistant repository).
 # Measured 2026-11-18: openai-native produced 0 of 17 answers with source links versus 13 of 17
 # for the automatic choice, so the value stays unset.
