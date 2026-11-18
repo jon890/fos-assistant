@@ -2,7 +2,6 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
@@ -21,7 +20,9 @@ import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
@@ -42,9 +43,11 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
+import java.util.List;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -68,6 +71,8 @@ class AgentRunnerConnectorContextTest {
     private final ExecutionRecorder executions = mock(ExecutionRecorder.class);
     private final ModelTierService modelTiers = mock(ModelTierService.class);
     private final ProactiveCheckRepository proactiveChecks = mock(ProactiveCheckRepository.class);
+    private final AgentExecutionRepository executionRepository = mock(AgentExecutionRepository.class);
+    private static final String DATE_LINE = "오늘은 2026년 10월 1일 목요일이다(한국 시간).";
     private static final Instant REQUEST_RECEIVED_AT = Instant.parse("2026-10-01T00:00:00Z");
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution started = mock(AgentExecution.class);
@@ -78,7 +83,7 @@ class AgentRunnerConnectorContextTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
-        when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
+        when(contextAssembler.withResponseInstructions(any(), any(InstructionScope.class))).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
@@ -103,7 +108,9 @@ class AgentRunnerConnectorContextTest {
             modelTiers,
             Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
             mock(UserExecutionLimiter.class),
-            proactiveChecks);
+            proactiveChecks,
+            executionRepository,
+            new TurnDate(Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC)));
     }
 
 
@@ -148,8 +155,9 @@ class AgentRunnerConnectorContextTest {
 
         verify(contextAssembler).assemble(eq(user), any(), eq("일"));
         String instructions = submitted().instructions();
-        assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
-        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
+        String turnOnly = "\n\n" + ADDITION + "\n\n" + DATE_LINE;
+        assertThat(instructions).contains("GFM", MEMORY, "# 최신 정보와 출처").endsWith(turnOnly);
+        assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - turnOnly.length());
     }
 
 
@@ -174,9 +182,63 @@ class AgentRunnerConnectorContextTest {
             null,
             null);
 
-        assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
+        assertThat(submitted().instructions())
+            .contains("GFM", MEMORY)
+            .doesNotContain("memory_remember", "# 최신 정보와 출처", "오늘은 ");
         verify(contextAssembler).assemble(eq(user), any(), isNull());
-        verify(contextAssembler).withResponseInstructions(any(), eq(false));
+        verify(contextAssembler).withResponseInstructions(any(), eq(InstructionScope.PROACTIVE));
+    }
+
+
+    @Test
+    @DisplayName("예약 작업 트리의 자식은 기억 지침만 받고 최신 정보와 출처 절과 날짜 줄은 받지 않는다")
+    void excludesSearchInstructionsFromScheduledChild() {
+        when(executionRepository.countUnattendedIn(List.of(10L))).thenReturn(1L);
+
+        runner.run(
+            user,
+            Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+            agent(),
+            "일",
+            10L,
+            10L,
+            RunSession.fresh(),
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false,
+            null,
+            null);
+
+        assertThat(submitted().instructions())
+            .contains("GFM", "memory_remember")
+            .doesNotContain("# 최신 정보와 출처", "오늘은 ");
+        verify(contextAssembler).withResponseInstructions(any(), eq(InstructionScope.SCHEDULED));
+    }
+
+
+    @Test
+    @DisplayName("대화 트리의 자식은 덧붙인 지시가 없어도 최신 정보와 출처 절과 날짜 줄을 받는다")
+    void addsSearchInstructionsAndDateToConversationChild() {
+        runner.run(
+            user,
+            Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+            agent(),
+            "일",
+            10L,
+            10L,
+            RunSession.fresh(),
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false,
+            null,
+            null);
+
+        assertThat(submitted().instructions()).contains("# 최신 정보와 출처", "memory_remember").endsWith("\n\n" + DATE_LINE);
+        verify(contextAssembler).withResponseInstructions(any(), eq(InstructionScope.CONVERSATION));
     }
 
 

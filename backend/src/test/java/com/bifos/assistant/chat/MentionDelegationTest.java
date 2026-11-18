@@ -159,7 +159,7 @@ class MentionDelegationTest {
             .contains("비서: dad 의 답 1")
             .contains("<external-data>")
             .endsWith("[맡긴 일]\n운동화 찾아줘");
-        assertThat(command.instructions()).endsWith(TurnIntent.MENTION_INSTRUCTION);
+        assertThat(command.instructions()).contains(TurnIntent.MENTION_INSTRUCTION + "\n\n오늘은 ");
 
         Conversation after = conversations.findById(conversationId).orElseThrow();
         assertThat(after.agentId()).isEqualTo(chief.id());

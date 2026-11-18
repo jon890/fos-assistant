@@ -415,6 +415,19 @@ class ProactiveCheckTurnTest {
 
 
     @Test
+    @DisplayName("살펴보기 turn 은 최신 정보와 출처 절과 날짜 줄을 받지 않는다")
+    void excludesSearchInstructionsAndDateFromCheckTurn() {
+        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
+
+        runCheck();
+
+        assertThat(stub().received().getLast().instructions())
+            .contains("GFM")
+            .doesNotContain("# 최신 정보와 출처", "오늘은 ", "memory_remember");
+    }
+
+
+    @Test
     @DisplayName("쓰기 허용 에이전트의 살펴보기는 읽기 줄 대신 쓰기 허용 줄을 싣고 그 값을 살펴보기 줄에 옮겨 적는다")
     void sendsWritesRuleInsteadOfReadOnlyRuleWhenWritesAllowed() {
         allowWrites(true);

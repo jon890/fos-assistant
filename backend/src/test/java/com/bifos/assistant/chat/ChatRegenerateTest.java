@@ -166,7 +166,7 @@ class ChatRegenerateTest {
             conversations.findById(conversationId).orElseThrow()) + "원래 질문";
         assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(expected, expected);
         assertThat(stub().received().getLast().instructions())
-            .endsWith("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.");
+            .contains("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.\n\n오늘은 ");
         assertThat(events.getLast().type()).isEqualTo("done");
     }
 
@@ -212,7 +212,7 @@ class ChatRegenerateTest {
         assertThat(history.getLast().replacesMessageId()).isNull();
         assertThat(stub().received().getLast().instructions())
             .contains("GFM", "| --- | --- |")
-            .endsWith(AskFormat.GUIDE);
+            .contains(AskFormat.GUIDE + "\n\n오늘은 ");
     }
 
 

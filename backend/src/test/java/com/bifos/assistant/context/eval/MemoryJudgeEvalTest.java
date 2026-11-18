@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
@@ -90,7 +91,7 @@ class MemoryJudgeEvalTest {
         fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock, migration);
         Map<String, Long> agentIds = fixture.createAgents();
         ContextAssembler assembler = TestContextAssemblers.of(memoryService, properties, clock);
-        String withoutMemory = assembler.withResponseInstructions(AssembledContext.empty()).instructions();
+        String withoutMemory = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.PROACTIVE).instructions();
         List<JudgeInput> inputs = new ArrayList<>();
         for (Case each : DATASET.cases()) {
             if (each.judge().isEmpty()) {
@@ -101,7 +102,7 @@ class MemoryJudgeEvalTest {
             inputs.add(new JudgeInput(
                 each.id(),
                 each.question(),
-                assembler.withResponseInstructions(context).instructions(),
+                assembler.withResponseInstructions(context, InstructionScope.PROACTIVE).instructions(),
                 withoutMemory,
                 each.judge()));
         }

@@ -238,8 +238,8 @@ class ResultDeliveryRetryTest {
         assertThat(received.get(1).input())
             .as("다시 전달의 입력")
             .isEqualTo(received.get(0).input());
-        assertThat(received.get(0).instructions()).endsWith(TurnIntent.DELEGATION_RESULTS_INSTRUCTION);
-        assertThat(received.get(1).instructions()).endsWith(TurnIntent.DELIVERY_RETRY_INSTRUCTION);
+        assertThat(received.get(0).instructions()).contains(TurnIntent.DELEGATION_RESULTS_INSTRUCTION + "\n\n오늘은 ");
+        assertThat(received.get(1).instructions()).contains(TurnIntent.DELIVERY_RETRY_INSTRUCTION + "\n\n오늘은 ");
         assertThat(received).extracting(HermesRunCommand::profileName).containsOnly("dad");
 
         AgentExecution resultAfter = executions.findById(done.id()).orElseThrow();

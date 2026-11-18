@@ -5,6 +5,7 @@ import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.NO_RECENT_SUGGESTIONS;
 import static com.bifos.assistant.proactive.check.application.ProactiveCheckRun.OPENING;
 
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.chat.conversation.domain.type.MessageRole;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
@@ -138,7 +139,7 @@ class ProactiveCheckInput {
             .map(AgentExecution::instructionsHash)
             .orElse(null);
         String current = deps.contextAssembler()
-            .withResponseInstructions(deps.contextAssembler().assemble(owner, agentId))
+            .withResponseInstructions(deps.contextAssembler().assemble(owner, agentId), InstructionScope.PROACTIVE)
             .instructionsHash();
         if (before == null || current == null) {
             return UNKNOWN;

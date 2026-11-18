@@ -21,7 +21,9 @@ import com.bifos.assistant.chat.modelchoice.application.dto.ResolvedModelTier;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.orchestration.application.dto.AgentRun;
@@ -39,6 +41,7 @@ import com.bifos.assistant.usage.execution.application.ExecutionRecorder;
 import com.bifos.assistant.usage.execution.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
@@ -84,7 +87,7 @@ class AgentRunnerSubmitFailureTest {
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(null, 0));
-        when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
+        when(contextAssembler.withResponseInstructions(any(), any(InstructionScope.class))).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
@@ -105,7 +108,9 @@ class AgentRunnerSubmitFailureTest {
             modelTiers,
             Clock.systemUTC(),
             limiter,
-            mock(ProactiveCheckRepository.class));
+            mock(ProactiveCheckRepository.class),
+            mock(AgentExecutionRepository.class),
+            new TurnDate(Clock.systemUTC()));
     }
 
 

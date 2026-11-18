@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.turn.application.port.CheckTurn;
 import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryAttemptRef;
 import com.bifos.assistant.context.application.dto.ContextItem;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import java.util.List;
 
 /** 이 turn 이 새 질문인지, 마지막 답의 다시 생성인지, {@code @} 로 맡긴 일인지, 맡긴 일의 결과를 전하는 turn 인지, 예약 작업이 연 turn 인지, 먼저 살펴보기 turn 인지. */
@@ -133,6 +134,18 @@ public sealed interface TurnIntent {
         return intent instanceof Scheduled
             || intent instanceof ProactiveCheck
             || intent instanceof DelegationResults results && results.fromUnattended();
+    }
+
+
+    /**
+     * 이 turn 에 넣을 공통 답변 지침의 범위다. 먼저 살펴보기는 {@code PROACTIVE}, 예약 작업과 사람이 없는 트리의 결과를 전하는 turn 은
+     * {@code SCHEDULED}, 나머지는 {@code CONVERSATION} 이다.
+     */
+    static InstructionScope scope(TurnIntent intent) {
+        if (intent instanceof ProactiveCheck) {
+            return InstructionScope.PROACTIVE;
+        }
+        return unattended(intent) ? InstructionScope.SCHEDULED : InstructionScope.CONVERSATION;
     }
 
 
