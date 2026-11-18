@@ -5,7 +5,7 @@
 covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java`, `backend/src/main/java/com/bifos/assistant/context/application/TurnDate.java`, `backend/src/main/java/com/bifos/assistant/context/application/dto/InstructionScope.java`, `test/model-eval/answer/`, `test/model-eval/control-plane.ts`
 
 요구와 결정은 스펙 [`answer-quality/spec.md`](answer-quality/spec.md), 구조는 설계 [`answer-quality/design.md`](answer-quality/design.md)가 갖는다.
-지금은 지침과 평가까지 들어갔다. 검색 서비스 값은 아직 정하지 않았고, 「깊이 조사」 와 조사 진행 표시, 맥락과 기억은 뒤 PR 이 한다.
+지금은 지침과 평가까지 들어갔다. 검색 서비스는 값을 정하지 않고 Hermes 자동 선택을 유지하기로 했다. 출처 문항이 기준에 아직 모자라 PR1 은 끝나지 않았고, 「깊이 조사」 와 조사 진행 표시, 맥락과 기억은 뒤 PR 이 한다.
 
 ## 요구
 
@@ -49,7 +49,9 @@ Control Plane 이 실행마다 넣는 공통 답변 지침에 「최신 정보�
 | Hermes 가 스스로 고르는 key 없는 서비스(지금) | 검색이 Hermes 의 도구로 돌아 검색어와 횟수가 실행 사건에 남고 작업 과정에 검색어가 보인다 |
 | OpenAI 내장 검색 | 검색이 OpenAI 서버에서 돌아 검색어와 횟수가 실행 사건에 남지 않고 화면에도 보이지 않는다. ChatGPT 구독 경로의 모델에서만 된다. 본문 읽기는 여전히 다른 서비스가 맡는다 |
 
-**값은 아직 정하지 않았다.** 아래 평가를 두 서비스로 각각 돌려 통과 기준에서 앞서는 쪽을 쓰고, 비슷하면 지금 서비스를 쓴다(스펙 DECISION2). 고른 값과 숫자는 그때 이 파일과 ADR 에 적는다.
+**값을 정하지 않고 Hermes 자동 선택(지금은 key 없는 Exa)을 유지한다**(2026-11-18, [ADR-20261118 / web-search-backend](../../hermes/docs/adr/ADR-20261118-web-search-backend.md)).
+OpenAI 내장 검색(`web.search_backend: openai-native`)으로 같은 평가를 돌렸더니 20문항 모두 답에 출처 링크가 없었고, 실행 사건에도 검색이 남지 않았다. 스펙 DECISION2 의 규칙대로 지금 서비스(출처 13문항)보다 낮아(0문항) 되돌렸다.
+링크가 없는 까닭(서버 검색이 돌지 않았는지, 인용이 응답의 annotation 으로만 오고 본문에 쓰이지 않았는지)은 확인하지 않았다. 유료 검색 API 는 스펙 범위 밖이다.
 
 ## 답변 품질 평가
 
@@ -120,7 +122,12 @@ node test/model-eval/answer/run.ts score --out <결과 디렉터리> [--compare 
 
 | 날짜 | 이름표 | 모델 칸 | 출처가 붙은 문항 | 열린 링크 | 날짜 문항 | 「비슷하다」 | 결과 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| (아직 없음) | | | | | | | |
+| 2026-11-18 | baseline-v0216(Hermes v0.21.6, PR1 전) | 대화 기본 칸 | 8/17 | 9/10 | 통과 | 아직 | 기준값 |
+| 2026-11-18 | pr1-v0216-free(v0.21.6, PR1) | 대화 기본 칸 | 12/17 | 32/33 | 통과 | 아직 | 자동 선택(Exa keyless) |
+| 2026-11-18 | pr1-v0232-free(v0.23.2, PR1) | 대화 기본 칸 | 13/17 | 29/31(확인 못 함 1 제외) | 통과 | 아직 | 자동 선택 유지. 기준 15 에 2문항 모자람 |
+| 2026-11-18 | pr1-v0232-native(v0.23.2, PR1) | 대화 기본 칸 | 0/17 | 0/0 | 통과 | 아직 | 기각, 되돌림 |
+
+출처가 없던 4문항(pr1-v0232-free): 쇼핑 비교 3문항(검색 0번)과 강릉 여행 1문항(검색 1번, 출처 0). 본문 읽기 실패는 0이었다. 다음 수는 추천·비교 질문에서 검색을 빠뜨리는 지침을 고치는 것이다.
 
 ## 배포 뒤 확인
 
@@ -130,5 +137,5 @@ node test/model-eval/answer/run.ts score --out <결과 디렉터리> [--compare 
 2. 검색 한 번을 왕복시켜 답의 문장 옆에 링크가, 끝에 「출처」 목록이 붙는다
 3. `web` 이 꺼진 에이전트에 시세를 물으면 답 첫머리에 확인하지 못했다는 것과 기준 시점이 있다
 4. 플러그인이 붙은 에이전트에서 그 플러그인으로 조회하는 가격을 물으면 답 첫머리에 「확인하지 못했다」 가 붙지 않는다
-5. 평가 세트를 두 검색 서비스로 각각 돌려 숫자를 위 표에 적고 앞서는 쪽을 운영 값으로 둔다. 평가 실행에서 `web_extract` 의 실패가 0 이다
+5. 평가 세트를 두 검색 서비스로 각각 돌려 숫자를 위 표에 적었다(2026-11-18, 자동 선택 유지). 지침을 고친 뒤 다시 돌린다. 평가 실행에서 `web_extract` 의 실패가 0 이다
 6. 사용자가 사람 비교 문항을 ChatGPT 와 나란히 보고 결과를 적는다
