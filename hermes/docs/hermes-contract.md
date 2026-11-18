@@ -47,6 +47,7 @@ PNG 원본·crop과 명시적 축소 개요는 같은 native dict 계약을 쓰�
 GIF/WebP는 첫 표시 프레임만 확인하며 움직임과 뒤 프레임은 확인하지 않았다고 안내한다.
 
 `plugins_loader.py`는 profile scope마다 다른 directory module 이름을 만들고 reload 때 그 하위 모듈도 지운다.
+`_get_plugin_toolset_keys()`는 현재 profile scope에 설치된 plugin의 toolset 이름을 읽는다.
 따라서 profile 상대 module의 전역 Semaphore를 프로세스 공유 한도로 사용하지 않는다.
 plugin 소유 FIFO는 별도 고정 module 이름에 완성된 객체를 게시해 profile과 reload 사이에 유지한다.
 `NATIVE_IMAGE_PLUGIN_LOADER`의 실제 함수를 실행하는 계약 검사가 namespace 분리와 공유 module 보존을 확인한다.
