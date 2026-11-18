@@ -24,7 +24,7 @@ export type QuestionScore = {
   latencyMs: number | null;
   tools: ToolCounts;
 };
-export type SetOutcome = "PASS" | "PASS_PENDING_COMPARE" | "FAIL" | "ERROR";
+export type SetOutcome = "PASS" | "PASS_PENDING_COMPARE" | "PARTIAL" | "FAIL" | "ERROR";
 export type SetScore = {
   outcome: SetOutcome;
   sourcePassed: number;
@@ -44,18 +44,37 @@ const SOURCE_PASS_RATIO = 15 / 17;
 const OPEN_LINK_RATIO = 0.9;
 /** 나란히 보는 여덟 문항 가운데 「비슷하다」 여야 하는 수의 비율이다(6/8). */
 const SIMILAR_RATIO = 6 / 8;
-const HEADING = /^\s{0,3}(?:#{1,6}\s*)?(?:\*\*|__)?\s*출처\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?\s*$/;
-const NEXT_HEADING = /^\s{0,3}#{1,6}\s+\S/;
+/** 「출처」 가 든 마크다운 제목 줄이다. `## 출처 목록`, `### 참고 출처`, 그림 문자가 앞에 붙은 제목을 받는다. */
+const HASH_HEADING = /^\s{0,3}#{1,6}\s.*출처/;
+/** 제목 표시 없이 「출처」 로 시작하는 줄이다. 목록 표시와 굵은 글 표시는 떼고 본다. 콜론 뒤 같은 줄의 글은 절의 본문이다. */
+const PLAIN_HEADING = /^(?:참고\s*)?출처(?:\s*목록)?\s*(?:\*\*|__)?\s*(?:[:：]\s*(?:\*\*|__)?(.*)|(?:\([^)]*\))?\s*)$/;
+const LEADING_MARKS = /^[\s>*_\-•·]+/;
+const NEXT_HEADING = /^\s{0,3}(?:#{1,6}\s+\S|(?:\*\*|__)[^*_]+(?:\*\*|__)\s*:?\s*$)/;
 const URL_PATTERN = /https?:\/\/[^\s<>()\[\]"'`]+/g;
-const MARKDOWN_LINK = /\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/g;
+/** 주소 안의 괄호 한 겹(`…/A_(B)`)까지 받는다. */
+const MARKDOWN_LINK = /\[[^\]]*\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g;
+
+/** 그 줄이 「출처」 절의 머리면 같은 줄에 이어진 본문(없으면 빈 글)을, 아니면 null 을 돌려준다. */
+function headingRest(line: string): string | null {
+  if (HASH_HEADING.test(line)) return "";
+  const match = PLAIN_HEADING.exec(line.replace(LEADING_MARKS, ""));
+  return match ? (match[1] ?? "") : null;
+}
 
 /** 답 끝의 「출처」 절에 든 주소다. 절이 없으면 빈 목록이다. 절 밖의 링크는 세지 않는다. */
 export function sourceLinks(answer: string): string[] {
   const lines = answer.split(/\r?\n/);
   let start = -1;
-  for (let index = 0; index < lines.length; index++) if (HEADING.test(lines[index])) start = index;
+  let rest = "";
+  for (let index = 0; index < lines.length; index++) {
+    const found = headingRest(lines[index]);
+    if (found !== null) {
+      start = index;
+      rest = found;
+    }
+  }
   if (start < 0) return [];
-  const body: string[] = [];
+  const body: string[] = [rest];
   for (const line of lines.slice(start + 1)) {
     if (NEXT_HEADING.test(line)) break;
     body.push(line);
@@ -67,14 +86,15 @@ export function sourceLinks(answer: string): string[] {
   return [...new Set(found.map((url) => url.replace(/[.,;:!?]+$/, "")))];
 }
 
-/** 그 시각의 한국 날짜가 답에 들었는가. 「11월 18일」, 「11/18」, 「11.18」, 「2026-11-18」 꼴을 받는다. */
+/** 그 시각의 한국 날짜가 답에 들었는가. 「11월 18일」 과 연도가 붙은 「2026-11-18」, 「2026.11.18」, 「2026/11/18」 꼴을 받는다. 연도 없는 「11/18」 은 버전 번호나 범위와 헷갈려 받지 않는다. */
 export function mentionsDate(answer: string, at: Date): boolean {
   const seoul = new Date(at.getTime() + 9 * 60 * 60 * 1000);
+  const year = seoul.getUTCFullYear();
   const month = seoul.getUTCMonth() + 1;
   const day = seoul.getUTCDate();
   const patterns = [
     new RegExp(`(?<!\\d)0?${month}\\s*월\\s*0?${day}\\s*일`),
-    new RegExp(`(?<!\\d)0?${month}\\s*[/.\\-]\\s*0?${day}(?!\\d)`),
+    new RegExp(`(?<!\\d)${year}\\s*[/.\\-]\\s*0?${month}\\s*[/.\\-]\\s*0?${day}(?!\\d)`),
   ];
   return patterns.some((pattern) => pattern.test(answer));
 }
@@ -152,12 +172,16 @@ export function failedQuestion(question: Question, error: string): QuestionScore
 /**
  * 세트 통과를 정한다. 출처 문항, 열린 링크, 날짜 문항은 자동 기준이고 사람 비교는 받은 값으로 본다.
  * 자동 기준을 넘었는데 사람 비교가 다 차지 않았으면 `PASS_PENDING_COMPARE` 다. 보내기나 읽기에 실패한 문항이 있으면 `ERROR` 다.
+ * 세트의 문항을 다 돌리지 않았으면 미달이 없어도 `PARTIAL` 이다. 일부만 돌린 결과를 세트 통과로 읽지 않게 한다.
+ *
+ * @param total 질문 세트의 문항 수. 주지 않으면 받은 문항이 세트 전체라고 본다
  */
-export function scoreSet(scores: QuestionScore[], comparisons: Comparison[]): SetScore {
+export function scoreSet(scores: QuestionScore[], comparisons: Comparison[], total = scores.length): SetScore {
   const sources = scores.filter((score) => score.check === "sources");
   const dates = scores.filter((score) => score.check === "date");
   const compareIds = new Set(scores.filter((score) => score.compare).map((score) => score.id));
-  const given = comparisons.filter((comparison) => compareIds.has(comparison.id));
+  // 같은 문항을 두 번 적었으면 마지막 것만 센다
+  const given = [...new Map(comparisons.filter((comparison) => compareIds.has(comparison.id)).map((item) => [item.id, item])).values()];
   const sourcePassed = sources.filter((score) => score.passed).length;
   const openLinks = scores.reduce((sum, score) => sum + score.openLinks, 0);
   const closedLinks = scores.reduce((sum, score) => sum + score.closedLinks, 0);
@@ -180,7 +204,10 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[]): Se
     outcome = "ERROR";
     reasons.unshift(`보내기나 읽기에 실패한 문항 ${errors}개`);
   } else if (reasons.length > 0) outcome = "FAIL";
-  else outcome = compareDone ? "PASS" : "PASS_PENDING_COMPARE";
+  else if (scores.length < total) {
+    outcome = "PARTIAL";
+    reasons.push(`세트 ${total}문항 중 ${scores.length}문항만 돌렸다`);
+  } else outcome = compareDone ? "PASS" : "PASS_PENDING_COMPARE";
   return {
     outcome,
     sourcePassed,
@@ -196,7 +223,7 @@ export function scoreSet(scores: QuestionScore[], comparisons: Comparison[]): Se
   };
 }
 
-/** 세트 통과와 사람 비교 대기는 0, 기준 미달은 1, 보내기나 읽기 오류는 2 다. */
+/** 세트 통과, 사람 비교 대기, 일부 문항만 돌린 것은 0, 기준 미달은 1, 보내기나 읽기 오류는 2 다. */
 export function exitCode(outcome: SetOutcome): number {
   if (outcome === "ERROR") return 2;
   return outcome === "FAIL" ? 1 : 0;
@@ -205,6 +232,7 @@ export function exitCode(outcome: SetOutcome): number {
 const OUTCOME_TEXT: Record<SetOutcome, string> = {
   PASS: "통과",
   PASS_PENDING_COMPARE: "자동 기준 통과, 사람 비교 대기",
+  PARTIAL: "일부 문항만 돌려 세트 결과를 내지 않는다",
   FAIL: "기준 미달",
   ERROR: "오류",
 };
@@ -226,7 +254,7 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     `- 열린 링크: ${set.openLinks}/${set.checkedLinks} (확인 못 함 ${set.unknownLinks}개는 뺐다)`,
     `- 오늘 날짜 문항: ${set.datePassed ? "통과" : "미달"}`,
     `- 사람 비교: 「비슷하다」 ${set.similar}/${set.compareTotal} (적은 것 ${set.compared}개)`,
-    ...set.reasons.map((reason) => `- 미달: ${reason}`),
+    ...set.reasons.map((reason) => `- ${set.outcome === "PARTIAL" ? "참고" : "미달"}: ${reason}`),
     "",
     "| 문항 | 범주 | 보는 것 | 결과 | 출처 링크 | 열림 | 닫힘 | 확인 못 함 | 걸린 시간 | 검색(실패) | 본문 읽기(실패) |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -238,7 +266,7 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     "",
     "## 사람 비교",
     "",
-    "아래 문항을 ChatGPT 에 같은 글로 묻고 두 답을 나란히 본 뒤, `--compare` 파일에 문항마다 `similar`(비슷하다)나 `lacking`(모자라다)과 한 줄 까닭을 적어 `score` 를 다시 돌린다.",
+    "아래 문항을 ChatGPT 에 같은 글로 묻고 두 답을 나란히 본 뒤, `--compare` 파일에 문항마다 `similar`(비슷하다)나 `lacking`(모자라다)과 한 줄 까닭을 적어 `score` 를 다시 돌린다. 다시 돌릴 때 이미 지운 대화의 문항은 앞 보고서의 결과를 그대로 쓴다.",
     "",
     "| 문항 | 결과 | 까닭 |",
     "| --- | --- | --- |",

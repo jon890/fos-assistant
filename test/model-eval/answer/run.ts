@@ -1,7 +1,7 @@
 // 답변 품질 평가의 명령이다. `send` 는 문항마다 새 대화를 만들어 보내고, `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다.
 // 계약은 docs/features/answer-quality.md 의 「답변 품질 평가」 가 갖는다.
 // 토큰과 기본 주소, 답 본문은 표준 출력과 결과 파일에 쓰지 않는다. 대화 공개 식별자와 실행 번호만 쓴다.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -38,7 +38,9 @@ const USAGE = `사용법:
 
 환경 변수: FOS_EVAL_BASE_URL, FOS_EVAL_TOKEN, FOS_EVAL_AGENT_CODE (send 는 셋 모두, score 는 앞의 둘)
 선택: FOS_EVAL_TIER (--tier 가 없을 때), FOS_EVAL_TURN_TIMEOUT_MS
-종료 코드: 0 통과나 사람 비교 대기, 1 기준 미달, 2 사용법 오류나 보내기·읽기 오류`;
+score 는 통과한 대화를 지운다(사람 비교 문항과 통과하지 못한 문항은 남긴다). --keep 은 모두 남긴다.
+사람 비교를 적어 score 를 다시 돌리면 지운 대화의 문항은 앞 보고서(report.json)의 결과를 쓴다.
+종료 코드: 0 통과, 사람 비교 대기, 일부 문항만 돌림. 1 기준 미달. 2 사용법 오류나 보내기·읽기 오류`;
 
 class UsageError extends Error {}
 
@@ -142,6 +144,13 @@ function loadComparisons(file: string | undefined): Comparison[] {
   });
 }
 
+function previousScores(out: string): QuestionScore[] {
+  const file = join(out, "report.json");
+  if (!existsSync(file)) return [];
+  const parsed = readJson<{ scores?: QuestionScore[] }>(file);
+  return Array.isArray(parsed.scores) ? parsed.scores : [];
+}
+
 async function score(values: Record<string, unknown>): Promise<number> {
   const env = requireEnv(["FOS_EVAL_BASE_URL", "FOS_EVAL_TOKEN"]);
   const out = resolve(values.out as string);
@@ -151,6 +160,8 @@ async function score(values: Record<string, unknown>): Promise<number> {
   const api = new ControlPlane(env.FOS_EVAL_BASE_URL, env.FOS_EVAL_TOKEN, turnTimeout());
   const links = new Map<string, LinkState>();
   const scores: QuestionScore[] = [];
+  // 사람 비교를 적어 다시 돌릴 때, 앞 실행이 지운 대화의 문항은 앞 보고서의 결과를 그대로 쓴다
+  const previous = new Map(previousScores(out).map((item) => [item.id, item]));
   for (const run of file.runs) {
     const question = questions.get(run.questionId);
     if (!question) throw new UsageError(`결과 파일의 문항이 질문 세트에 없다: ${run.questionId}`);
@@ -168,7 +179,8 @@ async function score(values: Record<string, unknown>): Promise<number> {
       result = scoreQuestion(question, answer.content, new Date(run.startedAt), links, tree.root);
     } catch (error) {
       if (error instanceof UsageError) throw error;
-      result = failedQuestion(question, errorText(error));
+      const earlier = previous.get(question.id);
+      result = earlier && !earlier.error && !run.error ? earlier : failedQuestion(question, errorText(error));
     }
     scores.push(result);
     // 사람이 답을 읽어야 하는 문항과 통과하지 못한 문항의 대화는 남긴다
@@ -181,7 +193,7 @@ async function score(values: Record<string, unknown>): Promise<number> {
     }
     console.log(`${question.id} ${result.error ? `오류 ${result.error}` : result.passed ? "통과" : "미달"}`);
   }
-  const set = scoreSet(scores, comparisons);
+  const set = scoreSet(scores, comparisons, questions.size);
   writeFileSync(join(out, "report.json"), `${JSON.stringify({ label: file.label, tier: file.tier, set, scores, comparisons }, null, 2)}\n`);
   writeFileSync(join(out, "report.md"), markdown(file.label, file.tier, scores, set, comparisons));
   console.log(`세트 결과: ${set.outcome}${set.reasons.length > 0 ? ` (${set.reasons.join("; ")})` : ""}`);

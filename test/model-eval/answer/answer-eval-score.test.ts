@@ -47,9 +47,29 @@ test("답 끝의 출처 절에서 마크다운 링크와 맨 주소를 뽑고 �
 });
 
 test("출처 절의 머리는 제목 줄, 굵은 글, 콜론 꼴을 모두 받는다", () => {
-  for (const heading of ["## 출처", "### 출처", "**출처**", "출처:", "**출처:**", "**출처**:"]) {
+  const headings = ["## 출처", "### 출처", "**출처**", "출처:", "**출처:**", "**출처**:", "## 출처 목록", "### 참고 출처", "## 📚 출처", "- 출처", "## 출처 (2026-11-18 기준)", "출처 목록"];
+  for (const heading of headings) {
     assert.deepEqual(sourceLinks(`본문\n\n${heading}\n- https://example.org/x`), ["https://example.org/x"], heading);
   }
+});
+
+test("출처 머리와 같은 줄에 이어 쓴 링크도 센다", () => {
+  assert.deepEqual(sourceLinks("본문\n\n출처: [한국은행](https://example.org/a)"), ["https://example.org/a"]);
+  assert.deepEqual(sourceLinks("본문\n\n**출처:** [한국은행](https://example.org/a), https://example.org/b"), [
+    "https://example.org/a",
+    "https://example.org/b",
+  ]);
+});
+
+test("출처로 시작하는 보통 문장은 절의 머리로 보지 않는다", () => {
+  assert.deepEqual(sourceLinks("출처는 따로 없지만 https://example.org/a 를 참고했다."), []);
+  assert.deepEqual(sourceLinks("출처를 확인하지 못했다.\nhttps://example.org/a"), []);
+});
+
+test("주소 안의 괄호를 자르지 않고 굵은 글로 된 다음 소제목 뒤의 링크는 세지 않는다", () => {
+  const answer = "## 출처\n- [위키](https://example.org/A_(B))\n\n**덧붙임**\n- https://example.org/c";
+
+  assert.deepEqual(sourceLinks(answer), ["https://example.org/A_(B)"]);
 });
 
 test("출처 절이 없으면 본문에 링크가 있어도 빈 목록이다", () => {
@@ -64,8 +84,11 @@ test("출처 절 뒤에 다른 제목이 오면 그 뒤의 링크는 세지 않�
 
 test("날짜 문항은 그 시각의 한국 날짜가 답에 들었는지로 본다", () => {
   assert.equal(mentionsDate("오늘은 2026년 11월 18일 수요일이에요.", NOON), true);
-  assert.equal(mentionsDate("오늘은 11/18 입니다.", NOON), true);
   assert.equal(mentionsDate("오늘은 2026-11-18 입니다.", NOON), true);
+  assert.equal(mentionsDate("오늘은 2026.11.18 입니다.", NOON), true);
+  // 연도 없는 숫자 꼴은 버전 번호나 범위와 헷갈려 받지 않는다
+  assert.equal(mentionsDate("오늘은 11/18 입니다.", NOON), false);
+  assert.equal(mentionsDate("버전 1.5 와 1-5명", new Date("2026-01-05T03:00:00Z")), false);
   assert.equal(mentionsDate("오늘은 11월 17일입니다.", NOON), false);
   assert.equal(mentionsDate("오늘은 1월 18일입니다.", NOON), false);
   // UTC 로는 18일이지만 한국 시간으로는 19일이다
@@ -176,6 +199,9 @@ test("사람 비교가 비었으면 대기이고 여덟 중 여섯이 비슷하�
   assert.equal(scoreSet(fullSet(17), comparisons(6).slice(0, 7)).outcome, "PASS_PENDING_COMPARE");
   assert.equal(scoreSet(fullSet(17), comparisons(6)).outcome, "PASS");
   assert.equal(scoreSet(fullSet(17), comparisons(5)).outcome, "FAIL");
+  // 같은 문항을 여러 번 적어도 한 번만 센다
+  const repeated = Array.from({ length: 8 }, () => ({ id: "s0", verdict: "similar" as const, note: "" }));
+  assert.deepEqual([scoreSet(fullSet(17), repeated).outcome, scoreSet(fullSet(17), repeated).compared], ["PASS_PENDING_COMPARE", 1]);
   // 사람 비교 대상이 아닌 문항의 값은 세지 않는다
   assert.equal(scoreSet(fullSet(17), [{ id: "s16", verdict: "similar", note: "" }]).compared, 0);
 });
@@ -186,7 +212,14 @@ test("보내기나 읽기에 실패한 문항이 있으면 오류이고 종료 �
   const set = scoreSet(scores, comparisons(8));
 
   assert.equal(set.outcome, "ERROR");
-  assert.deepEqual(["PASS", "PASS_PENDING_COMPARE", "FAIL", "ERROR"].map((outcome) => exitCode(outcome as never)), [0, 0, 1, 2]);
+  assert.deepEqual(["PASS", "PASS_PENDING_COMPARE", "PARTIAL", "FAIL", "ERROR"].map((outcome) => exitCode(outcome as never)), [0, 0, 0, 1, 2]);
+});
+
+test("세트의 문항을 다 돌리지 않았으면 미달이 없어도 통과가 아니라 일부 결과다", () => {
+  const one = fullSet(17).slice(0, 1);
+
+  assert.equal(scoreSet(one, [], 20).outcome, "PARTIAL");
+  assert.equal(scoreSet(fullSet(14).slice(0, 17), [], 20).outcome, "FAIL");
 });
 
 test("보고서는 문항 표와 사람 비교 표를 내고 적은 값을 옮긴다", () => {
