@@ -8,6 +8,7 @@ import com.bifos.assistant.context.application.dto.ContextFreshness;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.context.application.dto.ContextSource;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.dto.ContextTrust;
 import com.bifos.assistant.context.config.ContextProperties;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,7 +100,7 @@ class ContextAssemblerTest {
     @Test
     @DisplayName("Memory 없이도 GFM 표와 로컬 MCP 단건 호출 지침과 길이와 지문을 보낸다")
     void addsResponseInstructionsWithoutMemory() {
-        AssembledContext result = assembler.withResponseInstructions(AssembledContext.empty());
+        AssembledContext result = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.PROACTIVE);
 
         assertThat(result.instructions())
             .contains(
@@ -121,8 +122,8 @@ class ContextAssemblerTest {
     @Test
     @DisplayName("기억 여부와 관계없이 로컬 MCP 단건 호출 지침을 답변 형식 뒤에 싣는다")
     void addsMemoryInstructionsOnlyWhenRemembering() {
-        AssembledContext remembering = assembler.withResponseInstructions(AssembledContext.empty(), true);
-        AssembledContext plain = assembler.withResponseInstructions(AssembledContext.empty(), false);
+        AssembledContext remembering = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.SCHEDULED);
+        AssembledContext plain = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.PROACTIVE);
 
         assertThat(remembering.instructions())
             .startsWith("# 답변 형식")
@@ -147,8 +148,42 @@ class ContextAssemblerTest {
                 "별도 호출",
                 "connectors__... HTTP 원격 도구 서버")
             .doesNotContain("# 기억", "memory_remember");
-        assertThat(assembler.withResponseInstructions(AssembledContext.empty()).instructions())
-            .isEqualTo(plain.instructions());
+    }
+
+
+    @Test
+    @DisplayName("대화 실행에만 최신 정보와 출처 절을 넣고 예약과 살펴보기의 글은 그 절과 기억 지침을 뺀 것과 같다")
+    void addsSearchInstructionsOnlyToConversation() {
+        String conversation = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.CONVERSATION)
+            .instructions();
+        String scheduled = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.SCHEDULED)
+            .instructions();
+        String proactive = assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.PROACTIVE)
+            .instructions();
+
+        assertThat(conversation)
+            .contains(
+                "web_search 도구가 있으면",
+                "검색해 확인한다",
+                "검색하지 않는다",
+                "여러 번 찾고",
+                "마크다운 링크",
+                "「출처」",
+                "지어내지 않는다",
+                "이 목록을 두지 않는다",
+                "web_search 도구가 없으면",
+                "검색으로 확인하지 못했다는 것",
+                "기준 시점",
+                "다른 도구로 이번 실행에서 확인한 사실",
+                "주소를 함께 돌려받아")
+            .containsSubsequence("# 답변 형식", "# 도구 호출", "# 최신 정보와 출처", "# 기억");
+        assertThat(scheduled).doesNotContain("# 최신 정보와 출처", "web_search").contains("# 기억");
+        assertThat(proactive).doesNotContain("# 최신 정보와 출처", "web_search", "# 기억");
+        String search = conversation.substring(
+            conversation.indexOf("# 최신 정보와 출처"), conversation.indexOf("# 기억"));
+        assertThat(conversation.replace(search, "")).isEqualTo(scheduled);
+        assertThat(scheduled).startsWith(proactive);
+        assertThat(scheduled.substring(proactive.length()).strip()).startsWith("# 기억");
     }
 
 
@@ -171,7 +206,7 @@ class ContextAssemblerTest {
             body)));
         AssembledContext memory = new AssembledContext(body, body.length(), List.of(3L), bundle);
 
-        AssembledContext result = assembler.withResponseInstructions(memory);
+        AssembledContext result = assembler.withResponseInstructions(memory, InstructionScope.PROACTIVE);
 
         assertThat(result.instructions())
             .startsWith("# 답변 형식")

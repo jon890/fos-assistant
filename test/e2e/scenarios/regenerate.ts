@@ -54,10 +54,11 @@ export const regenerateScenario: Scenario = {
     expect(regenerated?.type === "done" && regenerated.messageId !== undefined,
       `다시 생성의 마지막 사건이 done 이 아니다: ${JSON.stringify(regenerated)}`);
     expect(
-      context.hermes.lastSubmittedInstructions()?.endsWith(
-        "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.",
+      // 대화 실행은 turn 전용 지시 끝에 오늘 날짜 줄이 한 줄 더 붙는다
+      context.hermes.lastSubmittedInstructions()?.includes(
+        "사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다.\n\n오늘은 ",
       ) === true,
-      "다시 생성 안내 문구를 Hermes instructions 끝에 붙이지 않았다",
+      "다시 생성 안내 문구와 오늘 날짜 줄을 Hermes instructions 끝에 붙이지 않았다",
     );
 
     const regeneratedHistory = expectStatus(await call(

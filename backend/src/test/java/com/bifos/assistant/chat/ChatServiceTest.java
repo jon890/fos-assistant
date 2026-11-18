@@ -67,6 +67,9 @@ import com.bifos.assistant.skill.usage.domain.ExecutionSkillUse;
 import com.bifos.assistant.skill.usage.domain.type.SkillUseSource;
 import com.bifos.assistant.skill.usage.infra.ExecutionSkillUseRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.context.application.TurnDate;
+import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
+import com.bifos.assistant.chat.turn.application.dto.TurnIntent;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.ExecutionContextSource;
@@ -393,7 +396,9 @@ class ChatServiceTest {
                         .findById(turn.conversationId())
                         .orElseThrow()) + "오늘 저녁 뭐 먹을까?");
             // Memory 가 없어도 묻는 형식 안내는 늘 붙는다.
-            assertThat(command.instructions()).contains("GFM", "| --- | --- |").endsWith(AskFormat.GUIDE);
+            assertThat(command.instructions())
+                .contains("GFM", "| --- | --- |")
+                .endsWith(AskFormat.GUIDE + "\n\n" + new TurnDate(clock).line());
             // 새 대화도 Control Plane 이 정한 session 으로 첫 turn 을 보낸다.
             assertThat(command.sessionId()).startsWith("fos-");
         });
@@ -441,10 +446,49 @@ class ChatServiceTest {
         ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
 
         String instructions = stub().received().getFirst().instructions();
-        assertThat(instructions).contains("국수는 맵지 않게 먹는다").endsWith("\n\n" + AskFormat.GUIDE);
+        String turnOnly = "\n\n" + AskFormat.GUIDE + "\n\n" + new TurnDate(clock).line();
+        assertThat(instructions).contains("국수는 맵지 않게 먹는다").endsWith(turnOnly);
         // 실행 기록은 공통 지침과 Memory를 세고, turn 전용 지침은 제외한다.
         assertThat(executions.findById(turn.executionId()).orElseThrow().contextChars())
-            .isEqualTo((long)(instructions.length() - ("\n\n" + AskFormat.GUIDE).length()));
+            .isEqualTo((long)(instructions.length() - turnOnly.length()));
+    }
+
+
+    @Test
+    @DisplayName("대화 turn 은 최신 정보와 출처 절과 오늘 날짜를 받고 날짜가 달라도 실행 기록의 지문은 같다")
+    void sendsSearchInstructionsAndDateWithoutChangingHash() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        clock.set(Instant.parse("2026-11-18T03:00:00Z"));
+
+        ChatTurn first = chat.send(dad, null, "오늘 원달러 환율이 얼마야?", "dad");
+        clock.set(Instant.parse("2026-11-19T03:00:00Z"));
+        ChatTurn second = chat.send(dad, null, "오늘 원달러 환율이 얼마야?", "dad");
+
+        List<HermesRunCommand> received = stub().received();
+        assertThat(received.get(0).instructions())
+            .contains("# 최신 정보와 출처", "web_search 도구가 있으면", "「출처」", "검색으로 확인하지 못했다는 것")
+            .endsWith("오늘은 2026년 11월 18일 수요일이다(한국 시간).");
+        assertThat(received.get(1).instructions()).endsWith("오늘은 2026년 11월 19일 목요일이다(한국 시간).");
+        assertThat(executions.findById(second.executionId()).orElseThrow().instructionsHash())
+            .isNotNull()
+            .isEqualTo(executions.findById(first.executionId()).orElseThrow().instructionsHash());
+    }
+
+
+    @Test
+    @DisplayName("예약 작업 turn 은 최신 정보와 출처 절과 날짜 줄을 받지 않는다")
+    void excludesSearchInstructionsAndDateFromScheduledTurn() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+        ChatTurn turn = chat.send(dad, null, "안녕", "dad");
+
+        chat.runScheduledTurn(dad, turn.conversationId(), null, "예약 작업", "오늘 원달러 환율이 얼마야?", event -> {
+        });
+
+        assertThat(stub().received().getLast().instructions())
+            .contains("GFM", "memory_remember", TurnIntent.SCHEDULED_INSTRUCTION)
+            .doesNotContain("# 최신 정보와 출처", "오늘은 ");
     }
 
 

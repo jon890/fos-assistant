@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.conversation.domain.ChatMessage;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.chat.conversation.infra.ChatMessageRepository;
+import com.bifos.assistant.context.application.TurnDate;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.hermes.application.dto.HermesImage;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
@@ -60,6 +61,7 @@ class ChatTurnLifecycle {
     private final ArtifactService artifacts;
     private final ArtifactAutoVault autoVault;
     private final Clock clock;
+    private final TurnDate turnDate;
     private final ApplicationEventPublisher events;
     private final ResultDeliveryRecorder resultDeliveries;
     private final ChatRunEvents chatRunEvents;
@@ -93,7 +95,7 @@ class ChatTurnLifecycle {
             agent.hermesProfile(),
             agent.apiBaseUrl(),
             text,
-            TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
+            turnInstructions(context.instructions(), intent),
             session.runtimeSessionId(),
             choice.provider(),
             choice.model(),
@@ -311,5 +313,14 @@ class ChatTurnLifecycle {
             autoVault.afterCompletedTurn(turn.conversationId(), turn.messageId());
         }
         return turn;
+    }
+
+
+    /**
+     * turn 전용 지시다. 실행 기록의 지문을 뜬 뒤에 붙는다. 질문 카드의 형식 안내, turn 종류의 지시, 대화 turn 이면 오늘 날짜 줄의 차례다.
+     */
+    private String turnInstructions(String instructions, TurnIntent intent) {
+        String appended = TurnIntent.appendTo(AskFormat.appendTo(instructions), intent);
+        return TurnIntent.scope(intent).conversation() ? turnDate.appendTo(appended) : appended;
     }
 }

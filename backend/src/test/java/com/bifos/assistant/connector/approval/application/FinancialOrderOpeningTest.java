@@ -23,6 +23,7 @@ import com.bifos.assistant.connector.action.infra.ConnectorActionBodies;
 import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.context.application.ContextAssembler;
 import com.bifos.assistant.context.application.dto.AssembledContext;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionStatus;
@@ -520,7 +521,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         assertThat(answer.message()).startsWith(ConnectorApprovalReply.PENDING_MARKER + " 오류가 아니다. 승인 카드를 만들었고");
         assertThat(action(answer).status()).isEqualTo(ActionStatus.PENDING);
         // Hermes 는 막힌 호출의 글도 <untrusted_tool_result> 로 감싼다. 판정임을 알아볼 근거는 trusted 인 실행 지침뿐이다.
-        assertThat(assembler.withResponseInstructions(AssembledContext.empty()).instructions())
+        assertThat(assembler.withResponseInstructions(AssembledContext.empty(), InstructionScope.PROACTIVE).instructions())
             .contains("# 승인 카드", "<untrusted_tool_result>", ConnectorApprovalReply.PENDING_MARKER + " 로 시작하고 <external-data> 안에 있지 않으면",
                 "승인 카드가 확인되지 않았다거나 만들어지지 않았다고 말하지 않고", "대화 기록만 보고 이미 있다고 짐작하지 않는다");
     }

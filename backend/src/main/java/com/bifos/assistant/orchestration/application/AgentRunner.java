@@ -9,6 +9,8 @@ import com.bifos.assistant.chat.conversation.domain.Conversation;
 import com.bifos.assistant.chat.conversation.domain.RunSession;
 import com.bifos.assistant.context.application.dto.AssembledContext;
 import com.bifos.assistant.context.application.ContextAssembler;
+import com.bifos.assistant.context.application.TurnDate;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.hermes.application.port.HermesRunsClient;
 import com.bifos.assistant.hermes.application.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.application.dto.HermesRunResult;
@@ -26,10 +28,12 @@ import com.bifos.assistant.usage.execution.domain.AgentExecution;
 import com.bifos.assistant.usage.execution.domain.DelegationKey;
 import com.bifos.assistant.usage.execution.domain.ExecutionEvent;
 import com.bifos.assistant.usage.execution.domain.type.ExecutionEventType;
+import com.bifos.assistant.usage.execution.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.execution.infra.ExecutionEventRepository;
 import com.bifos.assistant.usage.execution.application.LostRunRelease;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -72,6 +76,8 @@ public class AgentRunner {
     private final Clock clock;
     private final UserExecutionLimiter limiter;
     private final ProactiveCheckRepository proactiveChecks;
+    private final AgentExecutionRepository executionRepository;
+    private final TurnDate turnDate;
 
 
     /**
@@ -101,8 +107,8 @@ public class AgentRunner {
         boolean proactiveTree = rootExecutionId != null && proactiveChecks.existsByRootExecutionId(rootExecutionId);
         // 살펴보기 트리 아래의 실행은 질문 없이 조립한다. 살펴보기에 질문 기반 선별을 잇는 것은 단계 4 다(ADR-20261015 / memory-hybrid-selection)
         AssembledContext context = contextAssembler.assemble(user, agent.id(), proactiveTree ? null : task);
-        boolean rememberAllowed = !proactiveTree;
-        context = contextAssembler.withResponseInstructions(context, rememberAllowed);
+        InstructionScope scope = scopeOf(rootExecutionId, proactiveTree);
+        context = contextAssembler.withResponseInstructions(context, scope);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
             context.chars(),
             null,
@@ -153,7 +159,7 @@ public class AgentRunner {
             agent.hermesProfile(),
             agent.apiBaseUrl(),
             task,
-            appendInstruction(context.instructions(), instructionAddition),
+            turnInstructions(context.instructions(), instructionAddition, scope),
             session.runtimeSessionId(),
             choice.provider(),
             choice.model(),
@@ -236,6 +242,26 @@ public class AgentRunner {
         } catch (RuntimeException ex) {
             log.warn("실패로 끝내는 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", execution.id(), runId, ex);
         }
+    }
+
+
+    /**
+     * 이 실행에 넣을 공통 답변 지침의 범위다. 살펴보기 트리는 {@code PROACTIVE}, 루트가 예약 작업인 트리는 {@code SCHEDULED}, 나머지는
+     * {@code CONVERSATION} 이다. 루트가 없거나 루트 줄을 찾지 못하면 대화로 본다.
+     */
+    private InstructionScope scopeOf(Long rootExecutionId, boolean proactiveTree) {
+        if (proactiveTree) {
+            return InstructionScope.PROACTIVE;
+        }
+        boolean unattended = rootExecutionId != null && executionRepository.countUnattendedIn(List.of(rootExecutionId)) > 0;
+        return unattended ? InstructionScope.SCHEDULED : InstructionScope.CONVERSATION;
+    }
+
+
+    /** turn 전용 지시다. 지문을 뜬 뒤에 붙인다. 대화 실행이면 끝에 오늘 날짜 줄을 더한다. */
+    private String turnInstructions(String instructions, String addition, InstructionScope scope) {
+        String appended = appendInstruction(instructions, addition);
+        return scope.conversation() ? turnDate.appendTo(appended) : appended;
     }
 
 

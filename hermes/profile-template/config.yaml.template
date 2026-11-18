@@ -68,6 +68,17 @@ agent:
   browser_control:
     enabled: false
 
+# Web search and page extraction backends for the `web` toolset. Left unset on purpose: Hermes then
+# picks a keyed backend if one is configured and a keyless one otherwise. The value is chosen after
+# the answer-quality evaluation (docs/features/answer-quality.md in the fos-assistant repository).
+#   search_backend: openai-native   OpenAI's server-side search. Works only on the ChatGPT
+#                                   subscription (Codex) route, and the search is not reported as a
+#                                   tool event, so the Control Plane records no query for it.
+#   extract_backend: <name>         Page reads for web_extract. openai-native does not cover this.
+# web:
+#   search_backend:
+#   extract_backend:
+
 # Memory lives in the Control Plane database, which injects what the caller may see as
 # per-run instructions. See ADR-003 in the fos-assistant repository.
 memory:

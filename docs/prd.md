@@ -113,6 +113,7 @@
 | --- | --- | --- |
 | 지금 | Hermes v0.23.2 로 올리기 위한 Control Plane 과 플러그인 호환 | |
 | 지금 | 네이버 쇼핑 구매 에이전트 개선 | [네이버 쇼핑](features/naver-shopping.md) |
+| 지금 | 답변 품질: 최신 정보 검색과 출처, 조사 진행 표시, 품질 평가 | [답변 품질](features/answer-quality.md) |
 | 다음 | 실행 중 브라우저 함께 보기와 넘겨받기, 멈춘 단계부터 이어 가기의 남은 PR | [브라우저 함께 보기](features/browser-cowork.md) |
 | 다음 | Agent Runtime 추상화(Hermes 업그레이드 뒤) | |
 | 나중 | 알림을 웹 밖으로 보내는 채널(웹 푸시) | [먼저 알리기](features/attention.md) |

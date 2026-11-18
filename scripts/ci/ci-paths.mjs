@@ -59,7 +59,9 @@ export const RULES = [
 
   // 저장소 규칙 검사와 가짜 Hermes·테스트 부품의 단위 테스트, 스크립트 옆의 테스트는 언제나 도는 unit 에 있다.
   [/^test\/(?:repo|e2e\/unit)\//, NONE],
-  [/^(?:test\/(?:support|model-eval\/blog)|scripts\/(?:ci|checks|dev|pr))\/[^/]*\.test\.ts$/, NONE],
+  [/^(?:test\/support|scripts\/(?:ci|checks|dev|pr))\/[^/]*\.test\.ts$/, NONE],
+  // 운영에서 사람이 돌리는 평가의 판정 함수와 데이터 테스트다. 평가마다 폴더가 하나씩 있다.
+  [/^test\/model-eval\/(?:[^/]+\/)*[^/]*\.test\.ts$/, NONE],
   // 브라우저 검사가 E2E 의 가짜 Hermes 를, backend 와 hermes 테스트가 E2E 의 Python plugin 을 쓴다.
   [/^test\/e2e\//, ["e2e", "browser", "backend", "hermes"]],
   [/^test\/spotless-jdt\.test\.py$/, ["quality"]],

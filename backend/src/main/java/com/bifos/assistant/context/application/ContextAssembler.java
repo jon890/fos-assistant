@@ -7,6 +7,7 @@ import com.bifos.assistant.context.application.dto.ContextFreshness;
 import com.bifos.assistant.context.application.dto.ContextItem;
 import com.bifos.assistant.context.application.dto.ContextSelection;
 import com.bifos.assistant.context.application.dto.ContextSource;
+import com.bifos.assistant.context.application.dto.InstructionScope;
 import com.bifos.assistant.context.application.dto.MemorySearchPlacement;
 import com.bifos.assistant.context.config.ContextProperties;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -74,6 +75,21 @@ public class ContextAssembler implements OmittedMemories {
             같은 요청이 이미 승인을 기다리는지는 Control Plane 이 그 호출의 답으로 알려 준다. 대화 기록만 보고 이미 있다고 짐작하지 않는다.
             """.stripTrailing();
     /**
+     * 대화 실행에 넣는 검색과 출처 지침이다. 에이전트에 {@code web} 이 켜졌는지로 나누지 않고 한 벌의 글이 두 경우를 함께 말한다. 켜진 toolset 은 Hermes 만
+     * 알아, 나누려면 답마다 Hermes 조회가 하나 더 든다({@code docs/features/answer-quality.md} 의 「지침」).
+     */
+    static final String SEARCH_INSTRUCTIONS = """
+            # 최신 정보와 출처
+
+            web_search 도구가 있으면 가격, 재고, 영업시간, 일정, 뉴스, 시세, 날씨, 제품 사양과 출시, 제도와 법처럼 시간이 지나면 바뀌는 사실은 기억으로 답하지 않고 검색해 확인한다.
+            일반 상식, 글쓰기, 사용자의 개인 사정만으로 답할 수 있는 질문은 검색하지 않는다.
+            비교나 계획처럼 한 번 검색으로 모자란 질문은 여러 번 찾고 서로 맞춰 본다. 검색 결과의 요약만으로 모자라면 web_extract 로 페이지를 읽는다.
+            검색으로 확인한 문장 옆에 마크다운 링크를 달고, 답 끝에 「출처」 제목 아래 제목과 링크의 목록을 둔다. 이 목록에는 web_search 와 web_extract 가 돌려준 주소만 쓰고 주소를 지어내지 않는다. 검색하지 않았으면 이 목록을 두지 않는다.
+            바뀌는 사실을 물었는데 검색이 실패했거나 결과가 없거나 web_search 도구가 없으면, 답 첫머리에 검색으로 확인하지 못했다는 것과 아는 정보의 기준 시점을 밝히고 아는 만큼 답한다.
+            플러그인이나 브라우저 같은 다른 도구로 이번 실행에서 확인한 사실에는 확인하지 못했다는 말을 붙이지 않는다.
+            조사를 하위 작업에 맡기면 찾은 주소를 함께 돌려받아 출처로 쓴다.
+            """.stripTrailing();
+    /**
      * {@code memory_remember} 을 받는 에이전트에 싣는 기억 지침이다(ADR-20261007 / memory-remember). 기준과 예시는 도구 설명과 같은 뜻이다.
      */
     static final String MEMORY_INSTRUCTIONS = """
@@ -110,20 +126,18 @@ public class ContextAssembler implements OmittedMemories {
     private final MemorySearchSection searchSection;
 
 
-    /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. */
-    public AssembledContext withResponseInstructions(AssembledContext context) {
-        return withResponseInstructions(context, false);
-    }
-
-
     /**
-     * 공통 답변과 도구 호출 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
+     * Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. 대화 실행이면 검색과 출처 지침을, {@code memory_remember} 를 받는
+     * 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
      *
-     * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
+     * @param scope 실행을 여는 쪽이 정한 범위다. 먼저 살펴보기는 기억 지침도 받지 않는다
      */
-    public AssembledContext withResponseInstructions(AssembledContext context, boolean remembers) {
+    public AssembledContext withResponseInstructions(AssembledContext context, InstructionScope scope) {
         String instructions = RESPONSE_INSTRUCTIONS + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS;
-        if (remembers) {
+        if (scope.conversation()) {
+            instructions += ContextBudgetWriter.SEPARATOR + SEARCH_INSTRUCTIONS;
+        }
+        if (scope.remembers()) {
             instructions += ContextBudgetWriter.SEPARATOR + MEMORY_INSTRUCTIONS;
         }
         if (context.instructions() != null && !context.instructions().isBlank()) {
