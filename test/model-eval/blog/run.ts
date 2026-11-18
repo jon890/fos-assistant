@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { parseBackendPipelineEvents } from "../../support/media-pipeline-log.ts";
-import { ControlPlane, type ExecutionNode } from "./api.ts";
+import { ControlPlane, TIERS, type ExecutionNode } from "../control-plane.ts";
 import {
   exitCode,
   previewOf,
@@ -23,7 +23,6 @@ type Scenario = { id: string; messages: Message[] };
 type RunsFile = { version: 1; startedAt: string; repeat: number; private: boolean; runs: RunRecord[] };
 
 const DIR = dirname(fileURLToPath(import.meta.url));
-const TIERS = ["INSTANT", "MEDIUM", "HIGH"];
 const DEFAULT_TURN_TIMEOUT_MS = 900000;
 const BLOG_TOOL = "naver_blog";
 

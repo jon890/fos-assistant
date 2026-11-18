@@ -1,6 +1,10 @@
+/** 대화의 모델 칸이다. 두 평가가 함께 쓴다. */
+export const TIERS = ["INSTANT", "MEDIUM", "HIGH", "EXTRA_HIGH", "PRO"];
+
 /** 메시지 읽기 응답의 항목이다. 판정에 쓰는 칸만 적는다. */
 export type MessageView = {
   role: string;
+  content: string | null;
   executionId: number | null;
   status: string | null;
   artifacts: { path: string; deleted: boolean }[];
@@ -9,7 +13,8 @@ export type MessageView = {
 export type ExecutionNode = {
   executionId: number;
   status: string;
-  events: { toolName: string | null; failed: boolean | null }[];
+  latencyMs: number | null;
+  events: { eventType: string; toolName: string | null; failed: boolean | null }[];
   children: ExecutionNode[];
 };
 export type ExecutionTree = { root: ExecutionNode; truncated: boolean };
