@@ -233,3 +233,17 @@ test("보고서는 문항 표와 사람 비교 표를 내고 적은 값을 옮�
   assert.match(report, /\| s7 \|  \|  \|/);
   assert.doesNotMatch(report, /\| s8 \|  \|  \|/);
 });
+
+test("같은 문항을 두 번 적으면 보고서도 센 것과 같은 마지막 판정을 보인다", () => {
+  const scores = fullSet(17);
+  const given: Comparison[] = [
+    { id: "s0", verdict: "lacking", note: "처음" },
+    { id: "s0", verdict: "similar", note: "고쳐 적음" },
+  ];
+  const set = scoreSet(scores, given);
+  const report = markdown("", "", scores, set, given);
+
+  assert.equal(set.similar, 1);
+  assert.match(report, /\| s0 \| 비슷하다 \| 고쳐 적음 \|/);
+  assert.doesNotMatch(report, /처음/);
+});

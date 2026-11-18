@@ -273,7 +273,8 @@ export function markdown(label: string, tier: string, scores: QuestionScore[], s
     ...scores
       .filter((score) => score.compare)
       .map((score) => {
-        const comparison = comparisons.find((item) => item.id === score.id);
+        // 같은 문항을 두 번 적었으면 scoreSet 이 센 것과 같은 마지막 것을 보인다
+        const comparison = comparisons.findLast((item) => item.id === score.id);
         const verdict = comparison ? (comparison.verdict === "similar" ? "비슷하다" : "모자라다") : "";
         return `| ${score.id} | ${verdict} | ${comparison?.note.replaceAll("|", "/") ?? ""} |`;
       }),
