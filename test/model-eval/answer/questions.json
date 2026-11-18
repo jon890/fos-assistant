@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "id": "shop-vacuum",
+      "category": "쇼핑·가격",
+      "messages": [
+        "10만원대 무선 청소기 세 개를 비교해서 하나 추천해 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "shop-iphone",
+      "category": "쇼핑·가격",
+      "messages": [
+        "요즘 나온 아이폰 기본 모델의 국내 출고가가 얼마야?"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "shop-dishwasher",
+      "category": "쇼핑·가격",
+      "messages": [
+        "4인 가족이 쓸 식기세척기를 고를 때 볼 것과 지금 많이 팔리는 모델을 알려 줘"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "shop-tablet",
+      "category": "쇼핑·가격",
+      "messages": [
+        "초등학생 입문용 태블릿을 30만원 아래로 추천해 줘"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "shop-gasoline",
+      "category": "쇼핑·가격",
+      "messages": [
+        "지금 휘발유 전국 평균 가격이 얼마야?"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "trip-gangneung",
+      "category": "여행·장소",
+      "messages": [
+        "다음 달 주말에 초등학생과 갈 만한 강릉 1박 2일 일정을 짜 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "trip-seoul-events",
+      "category": "여행·장소",
+      "messages": [
+        "이번 주말 서울에서 열리는 아이와 갈 만한 전시나 행사를 알려 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "trip-jeju-indoor",
+      "category": "여행·장소",
+      "messages": [
+        "제주 동쪽에서 비 오는 날 갈 만한 실내 장소 다섯 곳과 운영 시간을 알려 줘"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "trip-busan-transit",
+      "category": "여행·장소",
+      "messages": [
+        "부산역에서 해운대까지 대중교통으로 가는 방법과 걸리는 시간을 알려 줘"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "trip-osaka-budget",
+      "category": "여행·장소",
+      "messages": [
+        "일본 오사카 3박 4일 가족 여행 예산을 항목별로 잡아 줘"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "news-usdkrw",
+      "category": "뉴스·시세",
+      "messages": [
+        "오늘 원달러 환율이 얼마야?"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "news-economy",
+      "category": "뉴스·시세",
+      "messages": [
+        "이번 주 한국 경제 뉴스에서 중요한 것 세 가지를 정리해 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "news-base-rate",
+      "category": "뉴스·시세",
+      "messages": [
+        "한국은행 기준금리가 지금 몇 퍼센트고 마지막으로 언제 바뀌었어?"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "news-weather",
+      "category": "뉴스·시세",
+      "messages": [
+        "내일 서울 날씨가 어때?"
+      ],
+      "check": "sources",
+      "compare": false
+    },
+    {
+      "id": "news-today",
+      "category": "뉴스·시세",
+      "messages": [
+        "오늘이 몇 월 며칠 무슨 요일이야?"
+      ],
+      "check": "date",
+      "compare": false
+    },
+    {
+      "id": "life-year-end-tax",
+      "category": "생활 지식",
+      "messages": [
+        "올해 연말정산에서 달라진 것을 정리해 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "life-fever",
+      "category": "생활 지식",
+      "messages": [
+        "아이가 38.5도 열이 날 때 집에서 할 수 있는 것과 병원에 가야 하는 때를 알려 줘"
+      ],
+      "check": "sources",
+      "compare": true
+    },
+    {
+      "id": "life-fraction",
+      "category": "생활 지식",
+      "messages": [
+        "초등 5학년 분수의 나눗셈을 아이에게 설명하는 방법을 알려 줘"
+      ],
+      "check": "none",
+      "compare": false
+    },
+    {
+      "id": "life-kimchi-stew",
+      "category": "생활 지식",
+      "messages": [
+        "돼지고기 김치찌개 4인분 만드는 법을 알려 줘"
+      ],
+      "check": "none",
+      "compare": false
+    },
+    {
+      "id": "life-flu-shot",
+      "category": "생활 지식",
+      "messages": [
+        "어린이 독감 예방접종을 올해는 언제까지 맞아야 해?"
+      ],
+      "check": "sources",
+      "compare": false
+    }
+  ]
+}

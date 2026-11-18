@@ -20,6 +20,19 @@ test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", (
   assert.deepEqual(running(docs), []);
 });
 
+test("운영 평가의 단위 테스트는 폴더 깊이와 상관없이 무거운 job 을 돌리지 않고 평가 스크립트는 모두 돌린다", () => {
+  assert.deepEqual(
+    running([
+      "test/model-eval/blog/blog-photo-eval-score.test.ts",
+      "test/model-eval/answer/answer-eval-score.test.ts",
+      "test/model-eval/answer/answer-eval-data.test.ts",
+    ]),
+    [],
+  );
+  assert.deepEqual(running(["test/model-eval/answer/run.ts"]), JOBS);
+  assert.deepEqual(running(["test/model-eval/control-plane.ts"]), JOBS);
+});
+
 test("플러그인 README 는 존재 여부를 확인하는 hermes 검사만 돌린다", () => {
   assert.deepEqual(running(["hermes/connectors/naver-blog/README.md"]), ["hermes"]);
   assert.deepEqual(running([".github/CODEOWNERS"]), ["hermes"]);
