@@ -257,6 +257,7 @@ Hermes wire의 상세 계약과 확인 범위는 [Hermes 계약](../../hermes/do
 
 형식 안내는 사용자가 직접 답하는 대화 실행에만 붙는다. 위임한 자식에게는 붙이지 않는다.
 실행 기록의 `context_chars` 와 `instructions_hash` 는 공통 답변 지침과 Memory 문맥을 대상으로 하고, 이 형식 안내는 제외한다.
+대화 실행에는 형식 안내와 turn 종류의 지시 뒤에 오늘 날짜 줄이 붙고, 그 줄도 제외한다([`answer-quality.md`](answer-quality.md) 의 「지침」).
 
 ### 질문 카드가 갈리는 지점
 

@@ -2653,6 +2653,19 @@ terminal backend 가 `local` 이면 이 도구는 같은 컨테이너 안의 다
 | `a2a`, `google_meet` | plugin 이 정한다 | plugin toolset. `a2a` 는 기본 꺼짐 | 없다 |
 | `project`, `desktop_ui`, `feishu_*`, `bot_room` | GUI 또는 해당 platform 전용 | API 경로와 관계없다 | 없다 |
 
+#### 웹 검색 서비스
+
+2026-11-18 에 v0.23.2 tag 소스로 확인했다. 운영 왕복으로는 확인하지 않았다.
+`web` toolset 의 `web_search` 와 `web_extract` 가 어느 서비스로 도는지는 profile 설정의 `web` 절이 정한다. 이 저장소가 어떻게 쓰는지는 [`docs/features/answer-quality.md`](../../docs/features/answer-quality.md) 의 「검색 서비스」 가 갖는다.
+
+| 무엇 | 동작 | 근거 |
+| --- | --- | --- |
+| 서비스 고르기 | `web` 절의 `search_backend` 가 검색을, `extract_backend` 가 본문 읽기를 정한다. 둘 다 없으면 같은 절의 `backend`, 그것도 없으면 key 가 있는 서비스, key 없이 되는 서비스 순으로 스스로 고른다 | `tools/web_tools.py` 의 `_get_search_backend`, `_get_extract_backend` |
+| OpenAI 내장 검색 | `search_backend` 가 `openai-native` 이고 요청이 ChatGPT 구독 경로(Codex backend)로 갈 때, 모델에 주는 `web_search` 함수를 OpenAI 서버가 실행하는 내장 검색 도구로 바꿔 보낸다. 검색만 맡고 본문 읽기는 다른 서비스가 맡는다 | `agent/transports/codex.py`, `plugins/web/openai_native/provider.py` |
+| 내장 검색의 사건 | 서버에서 돈 검색은 응답의 `web_search_call` 항목으로 오고 Hermes 는 이것을 도구 호출로 다루지 않는다. `tool.started` 와 `tool.completed` 가 오지 않아 Control Plane 의 실행 사건에 검색이 남지 않는다. 답의 출처 주석도 읽지 않아 출처는 모델이 답 글에 쓴 링크로만 남는다 | `agent/codex_responses_adapter.py` |
+| 내장 검색과 다른 경로 | 내장 검색을 고른 채 ChatGPT 구독 경로가 아닌 모델로 돌면 `web_search` 가 오류를 돌려준다. 다른 서비스로 넘어가지 않는다 | `plugins/web/openai_native/provider.py` |
+| 날짜 | 시스템 프롬프트에 대화를 시작한 날짜와, 문맥을 마지막으로 다시 만든 때의 오늘 날짜가 든다. turn 마다 갱신되지 않는다. 그래서 Control Plane 이 대화 turn 마다 날짜 줄을 따로 넣는다 | `agent/system_prompt.py` |
+
 `_get_platform_tools` 는 모든 활성화 규칙을 적용한 뒤 `agent.disabled_toolsets` 를 뺀다.
 없는 비활성화 이름은 집합에서 빠질 것이 없어 오류 없이 무시된다.
 허용 목록의 잘못된 이름은 목록 전체가 무효일 때만 마지막 검사에서 알린다.

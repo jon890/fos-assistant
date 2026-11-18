@@ -168,7 +168,7 @@ sequenceDiagram
 - **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 찾고 `memory_read` 로 읽을 수 있다
 - 질문이 있는 조립은 개인 사실 구역 뒤에 아래 「질문과 관련된 기억 구역」 을 싣고, 색인은 관련도가 있는 항목을 점수 순으로, 그 뒤에 나머지를 번호 순으로 싣는다. 질문이 없는 조립은 색인을 번호 순으로만 싣는다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
-- 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. turn 전용 지시는 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
+- 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. 대화 실행의 공통 지침에는 「최신 정보와 출처」 절이 함께 든다([`answer-quality.md`](answer-quality.md)). turn 전용 지시와 오늘 날짜 줄은 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
 - 본문이나 `retrieval` 을 고치면 고치기 전의 값을 `memory_revision` 에 남기고 버전 번호를 올린다. 지울 때도 마지막 값을 남긴다
 - Memory 목록은 에이전트가 남긴 줄에 남긴 에이전트를 함께 낸다. 이름은 요청자가 그 에이전트를 읽을 수 있을 때만 싣고, 지운 에이전트는 `sourceAgentDeleted` 만 낸다. 볼 수 없는 비공개 에이전트의 이름이 목록으로 새지 않게 하려는 것이다. 판정은 `MemorySources` 가 갖는다
 - 기존 개인 지식에서 들인 항목의 출처 칸(`source_type=brain`, `source_ref`, `source_date`)은 출처 기록으로 보존한다

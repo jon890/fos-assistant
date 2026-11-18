@@ -1,7 +1,132 @@
 # 답변 품질
 
-최신 정보를 검색해 확인하고 출처를 붙여 답하는 것, 조사 중 진행을 보이는 것, 답변 품질을 운영에서 재는 평가를 다룬다.
+최신 정보를 검색해 확인하고 출처를 붙여 답하게 하는 지침과, 답변 품질을 운영에서 재는 평가를 다룬다.
 
-covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java`
+covers: `backend/src/main/java/com/bifos/assistant/context/application/ContextAssembler.java`, `backend/src/main/java/com/bifos/assistant/context/application/TurnDate.java`, `backend/src/main/java/com/bifos/assistant/context/application/dto/InstructionScope.java`, `test/model-eval/answer/`, `test/model-eval/control-plane.ts`
 
-아직 구현 전이다. 요구와 결정은 스펙 [`answer-quality/spec.md`](answer-quality/spec.md)가 갖는다. 구현하는 PR 이 이 파일에 지금 동작을 적는다.
+요구와 결정은 스펙 [`answer-quality/spec.md`](answer-quality/spec.md), 구조는 설계 [`answer-quality/design.md`](answer-quality/design.md)가 갖는다.
+지금은 지침과 평가까지 들어갔다. 검색 서비스 값은 아직 정하지 않았고, 「깊이 조사」 와 조사 진행 표시, 맥락과 기억은 뒤 PR 이 한다.
+
+## 요구
+
+- 가격, 일정, 뉴스, 시세처럼 시간이 지나면 바뀌는 사실을 물으면 검색해 확인한 내용으로 답하고 출처 링크를 붙인다
+- 검색하지 못했으면 답 첫머리에 그 사실과 아는 정보의 기준 시점을 밝힌다
+- 비서가 오늘 날짜를 안다
+- 됐는지는 정해진 질문 세트를 운영에서 돌린 숫자와, 사용자가 같은 질문을 ChatGPT 와 나란히 본 결과로 본다
+
+하지 않는 것: 유료 검색 API, 출처를 카드로 그리는 화면, 다른 모델에게 답을 채점시키기, 질문 종류에 따라 모델 칸을 자동으로 바꾸기. 근거는 스펙의 「범위」 에 있다.
+
+## 지침
+
+Control Plane 이 실행마다 넣는 공통 답변 지침에 「최신 정보와 출처」 절이 든다. 글의 원본은 `ContextAssembler` 의 `SEARCH_INSTRUCTIONS` 다.
+실행을 여는 쪽이 범위(`InstructionScope`)를 정해 넘기고, 범위에 따라 넣는 것이 다르다.
+
+| 범위 | 넣는 것 | 드는 실행 |
+| --- | --- | --- |
+| `CONVERSATION` | 기억 지침, 「최신 정보와 출처」 절, 오늘 날짜 줄 | 사용자 대화 turn(새 질문, 다시 생성, 맡김), 사람이 있는 트리의 결과를 전하는 자동 turn, 그 트리에서 Control Plane 이 맡긴 자식 실행 |
+| `SCHEDULED` | 기억 지침 | 예약 작업 turn, 사람이 없는 트리의 결과를 전하는 turn, 예약 트리의 자식 실행 |
+| `PROACTIVE` | 없음 | 먼저 살펴보기 turn 과 그 트리의 자식, 살펴보기의 지문 다시 계산 |
+
+대화 turn 의 범위는 `TurnIntent.scope` 가, 자식 실행의 범위는 `AgentRunner` 가 트리의 루트 실행으로 정한다. 루트 줄을 찾지 못하면 대화로 본다.
+
+**절은 에이전트에 검색 도구가 켜졌는지로 나눠 넣지 않는다.** 켜진 toolset 은 Hermes 만 알아, 나누려면 답마다 Hermes 조회가 하나 더 든다.
+그래서 한 벌의 글이 「`web_search` 도구가 있으면」 과 「없으면」 을 함께 말한다. 플러그인이나 브라우저로 그 실행에서 확인한 사실에는 「확인하지 못했다」 를 붙이지 않게 한다.
+
+**오늘 날짜 줄은 turn 전용 지시에 붙는다.** `TurnDate` 가 그 turn 을 시작한 때의 한국 날짜와 요일을 한 줄로 만들고, 질문 카드의 형식 안내와 turn 종류의 지시 뒤에 붙는다.
+실행 기록의 `context_chars` 와 `instructions_hash` 는 이 줄 앞에서 뜨므로 날짜가 바뀌어도 지문이 같다. 공통 지침에 넣으면 지문이 날마다 바뀌어 지침 변경을 지문으로 찾지 못한다.
+
+**Hermes 가 스스로 띄운 하위 작업(`delegate_task`)은 이 지침을 받지 않는다.** Hermes 가 부모의 지시를 자식에게 넘기지 않기 때문이다.
+그래서 절이 「조사를 하위 작업에 맡기면 찾은 주소를 함께 돌려받아 출처로 쓴다」 를 시킨다.
+
+출처는 답 본문의 마크다운 링크와 답 끝의 「출처」 목록으로 보인다. 화면은 바뀌지 않았다. 답 아래의 원문 열람 목록([`execution.md`](execution.md) 의 「답에서 확인할 수 있는 원문 열람」)은 Control Plane 이 센 읽은 주소이고 그대로 있다.
+
+## 검색 서비스
+
+어느 검색 서비스를 쓸지는 코드가 아니라 Hermes profile 설정이 정한다. 설정 자리는 `hermes/profile-template/config.yaml.template` 의 주석이, Hermes 의 동작은 [`hermes-contract.md`](../../hermes/docs/hermes-contract.md#웹-검색-서비스) 의 「웹 검색 서비스」 가 갖는다.
+
+| 후보 | 차이 |
+| --- | --- |
+| Hermes 가 스스로 고르는 key 없는 서비스(지금) | 검색이 Hermes 의 도구로 돌아 검색어와 횟수가 실행 사건에 남고 작업 과정에 검색어가 보인다 |
+| OpenAI 내장 검색 | 검색이 OpenAI 서버에서 돌아 검색어와 횟수가 실행 사건에 남지 않고 화면에도 보이지 않는다. ChatGPT 구독 경로의 모델에서만 된다. 본문 읽기는 여전히 다른 서비스가 맡는다 |
+
+**값은 아직 정하지 않았다.** 아래 평가를 두 서비스로 각각 돌려 통과 기준에서 앞서는 쪽을 쓰고, 비슷하면 지금 서비스를 쓴다(스펙 DECISION2). 고른 값과 숫자는 그때 이 파일과 ADR 에 적는다.
+
+## 답변 품질 평가
+
+정해진 질문을 운영 Control Plane, Hermes, 모델을 그대로 거쳐 돌리고 규칙으로 센다. 틀과 근거는 블로그 사진 평가와 같다([ADR-20261020 / blog-photo-eval](../adr/ADR-20261020-blog-photo-eval.md)).
+CI 와 배포에서는 돌지 않는다. 지침이나 검색 서비스를 바꾸기 전과 바꾼 뒤에 사람이 돌린다.
+
+| 파일 | 갖는 것 |
+| --- | --- |
+| `test/model-eval/answer/questions.json` | 문항마다 범주, 보낼 글의 차례, 통과를 보는 방식, 사람 비교 대상인지 |
+| `test/model-eval/answer/run.ts` | `send` 는 문항마다 새 대화를 만들어 보낸다. `score` 는 답과 실행 트리를 읽어 판정하고 보고서를 쓴다 |
+| `test/model-eval/answer/score.ts` | 판정 규칙. 네트워크를 쓰지 않는 순수 함수이고 같은 폴더의 단위 테스트가 검사한다 |
+| `test/model-eval/control-plane.ts` | 블로그 사진 평가와 함께 쓰는 Control Plane 클라이언트 |
+
+문항은 개인 사정이 없는 일반 질문이다. 날짜에 따라 정답이 바뀌므로 정답 글자를 심지 않는다.
+
+### 세는 규칙
+
+| 무엇 | 규칙 |
+| --- | --- |
+| 답 | 마지막으로 보낸 turn 의 루트 실행에 묶인 비서 메시지. 위임 결과를 전하는 자동 turn 의 답은 보지 않는다 |
+| 검색했는가 | 답 끝의 「출처」 절에 링크가 하나 이상 있는가. 절 밖의 링크는 세지 않는다. 실행 사건으로 세지 않는 것은 OpenAI 내장 검색이 사건을 남기지 않아서다 |
+| 링크가 열리는가 | 평가를 돌리는 머신에서 주소마다 요청을 보낸다. 2xx 와 3xx 는 열림, 403 과 429 는 「확인 못 함」 으로 분모에서 빼고, 그 밖과 시간 초과는 닫힘이다 |
+| 날짜 문항 | 답에 그 문항을 보낸 날의 한국 날짜가 들었는가 |
+| 검색하지 않아도 되는 문항 | 늘 통과. 걸린 시간만 본다 |
+| 도구 수 | 실행 트리 전체의 끝 사건(`TOOL_COMPLETED`)만 센다. `web_search` 와 `web_extract` 의 수와 실패 수를 참고로 낸다 |
+| 걸린 시간 | 루트 실행의 `latencyMs` |
+
+세트의 통과 기준은 스펙 DECISION10 이 갖는다. 기준을 계산하는 코드는 `score.ts` 의 `scoreSet` 이다.
+사람 비교는 사용자가 표시된 문항을 ChatGPT 에 같은 글로 묻고 나란히 본 결과다. 자동 기준을 넘었는데 사람 비교가 비어 있으면 「사람 비교 대기」 로 끝난다.
+
+### 실행
+
+접속 값과 토큰을 만드는 방법은 운영 저장소가 갖는다. 이 저장소에는 적지 않는다.
+
+| 환경 변수 | 뜻 |
+| --- | --- |
+| `FOS_EVAL_BASE_URL` | Control Plane 의 기본 주소 |
+| `FOS_EVAL_TOKEN` | 평가를 돌릴 계정의 토큰 |
+| `FOS_EVAL_AGENT_CODE` | 문항을 보낼 에이전트. `send` 에만 필요하다 |
+| `FOS_EVAL_TIER` | 선택. `--tier` 가 없을 때 쓰는 모델 칸. 허용 값은 `control-plane.ts` 의 `TIERS` 가 갖는다 |
+| `FOS_EVAL_TURN_TIMEOUT_MS` | 선택. 메시지 하나를 기다리는 시간. 기본값은 `run.ts` 가 갖는다 |
+
+```bash
+# cwd: 저장소 root
+node test/model-eval/answer/run.ts send --out <결과 디렉터리> [--question <id>]... [--tier <칸>] [--label <이름표>]
+node test/model-eval/answer/run.ts score --out <결과 디렉터리> [--compare <사람 비교 파일>] [--keep]
+```
+
+`send` 는 `<결과 디렉터리>/runs.json` 에 문항, 대화 식별자, 실행 번호, 시작 시각, 이름표와 모델 칸을 쓴다. 답 본문은 쓰지 않는다.
+`score` 는 `report.json` 과 `report.md` 를 쓴다. 통과한 대화는 지우고, 통과하지 못한 대화와 사람이 답을 읽어야 하는 문항의 대화는 남긴다.
+`--compare` 파일은 문항마다 `id`, `verdict`(`similar` 나 `lacking`), `note` 를 담은 `results` 배열이다. 종료 코드와 인자의 뜻은 `run.ts --help` 가 낸다.
+결과 디렉터리는 저장소 밖에 둔다.
+
+### 측정 기록
+
+**고치기 전의 운영 사용**이다. 2026-11-18 에 최근 14일의 실행 기록을 셌다.
+
+| 무엇 | 값 |
+| --- | --- |
+| 사람이 보낸 질문 turn | 101개 |
+| `web_search` 를 부른 실행 | 2개(호출 3번, 실패 0) |
+| `web_extract` 호출 | 2번, 2번 모두 실패 |
+| 모델 칸 | 101개 모두 그룹 기본 칸 |
+
+평가 세트의 기준값과 배포 뒤 값은 운영 Hermes 가 v0.23.2 로 바뀐 뒤 돌려 아래 표에 적는다.
+
+| 날짜 | 이름표 | 모델 칸 | 출처가 붙은 문항 | 열린 링크 | 날짜 문항 | 「비슷하다」 | 결과 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| (아직 없음) | | | | | | | |
+
+## 배포 뒤 확인
+
+확인할 것만 적는다. 실행 방법은 `fos-home-infra` 가 갖는다.
+
+1. 모든 사용자의 기본 에이전트에 `web` 이 켜져 있다. 기존 사용자의 것은 관리자가 에이전트 도구 화면에서 켠다
+2. 검색 한 번을 왕복시켜 답의 문장 옆에 링크가, 끝에 「출처」 목록이 붙는다
+3. `web` 이 꺼진 에이전트에 시세를 물으면 답 첫머리에 확인하지 못했다는 것과 기준 시점이 있다
+4. 플러그인이 붙은 에이전트에서 그 플러그인으로 조회하는 가격을 물으면 답 첫머리에 「확인하지 못했다」 가 붙지 않는다
+5. 평가 세트를 두 검색 서비스로 각각 돌려 숫자를 위 표에 적고 앞서는 쪽을 운영 값으로 둔다. 평가 실행에서 `web_extract` 의 실패가 0 이다
+6. 사용자가 사람 비교 문항을 ChatGPT 와 나란히 보고 결과를 적는다

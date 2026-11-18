@@ -5,7 +5,7 @@
 
 ## upstream 소스로 확인한 사실
 
-2026-11-18 에 Hermes v0.23.2 tag 소스를 읽었다. 운영 왕복으로는 확인하지 않았다. PR1 이 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 로 옮긴다.
+2026-11-18 에 Hermes v0.23.2 tag 소스를 읽었다. 운영 왕복으로는 확인하지 않았다. 같은 내용을 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md#웹-검색-서비스) 의 「웹 검색 서비스」 로 옮겼고 원본은 그쪽이다.
 
 | 무엇 | v0.23.2 의 동작 | 근거 |
 | --- | --- | --- |
