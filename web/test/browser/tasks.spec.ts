@@ -86,7 +86,17 @@ test("모델 단계를 골라 저장하면 상세와 API 에 그 단계가 남�
   await page.getByLabel("에이전트", { exact: true }).selectOption("browser");
   await page.getByLabel("지시", { exact: true }).fill("이번 주 할 일을 정리해 줘");
   await page.getByLabel("시각(시:분)").fill("09:00");
-  await page.getByLabel("모델 단계", { exact: true }).selectOption({ label: "Medium" });
+  const tier = page.getByLabel("모델 단계", { exact: true });
+  // 관리자가 채운 단계는 모델과 강도를 함께 보이고, 비운 단계와 「기본값」 은 이름만 보인다.
+  await expect(tier.locator("option")).toHaveText([
+    "기본값",
+    "Instant · example-fast · low",
+    "Medium · example-balanced · medium",
+    "High · example-deep · high",
+    "Extra High",
+    "Pro",
+  ]);
+  await tier.selectOption("MEDIUM");
   await page.getByRole("button", { name: "저장" }).click();
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]{36}$/);
 
@@ -95,6 +105,24 @@ test("모델 단계를 골라 저장하면 상세와 API 에 그 단계가 남�
   const fetched = await page.request.get(`/api/tasks/${id}`);
   expect(fetched.ok()).toBeTruthy();
   expect(((await fetched.json()) as { modelTier: string | null }).modelTier).toBe("MEDIUM");
+});
+
+test("단계 목록을 읽지 못하면 모델 단계 선택지가 단계 이름만 보인다", async ({ page }) => {
+  await page.route(
+    (url) => url.pathname === "/api/chat/model-tiers",
+    (route) => route.fulfill({ status: 500, json: { code: "INTERNAL_ERROR" } }),
+  );
+  await page.goto("/tasks/new");
+  await expect(page.getByLabel("에이전트", { exact: true })).toHaveValue("browser");
+
+  await expect(page.getByLabel("모델 단계", { exact: true }).locator("option")).toHaveText([
+    "기본값",
+    "Instant",
+    "Medium",
+    "High",
+    "Extra High",
+    "Pro",
+  ]);
 });
 
 test("멈추기와 다시 켜기가 배지를 바꾼다", async ({ page }) => {
