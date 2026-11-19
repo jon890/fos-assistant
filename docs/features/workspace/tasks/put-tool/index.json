@@ -1,7 +1,7 @@
 {
   "name": "put-tool",
   "description": "에이전트가 「내 파일」 에 넣는 도구와 넓힌 형식·상한, 제목과 설명, 파일 공간 지침",
-  "pr_scope": "스펙 PR1(REQ1~REQ8): file_space_put 도구, 받는 형식과 25MiB 상한, 제목과 설명, 답 아래 파일 줄, 실행 입력의 파일 공간 단락을 완성한다. 운영 코드 변경은 1,500줄 안팎으로 추정한다(상한은 scripts/pr/pr-size.mjs 의 MAX_LINES). phase 마다 node scripts/pr/pr-size.mjs 로 재고, 상한을 넘으면 규모 예외 라벨을 스스로 붙이지 않고 phase 01 을 단계 PR 로 먼저 내는 선을 코디네이터에게 묻는다.",
+  "pr_scope": "스펙 PR1(REQ1~REQ8)을 둘로 나눠 낸다(스펙 DECISION28). PR1a 는 phase 01(보관함의 새 형식과 25MiB, 암호화한 제목과 설명)이고 PR1b 는 phase 02 와 phase 03(file_space_put 도구, 답 아래 파일 줄, 실행 입력의 파일 공간 단락)이다. PR1b 는 PR1a 가 main 에 머지된 뒤 연다. 계획 폴더는 PR1b 에서 지운다.",
   "deferred": [
     {
       "what": "PR2: 「내 파일」 화면(REQ9~REQ18)",
@@ -30,7 +30,7 @@
     "REQ8"
   ],
   "total_phases": 3,
-  "current_phase": 1,
+  "current_phase": 2,
   "phases": [
     {
       "number": 1,
