@@ -211,7 +211,10 @@ test("비서가 내 파일에 넣은 파일은 답 아래에 제목과 내려받
     "href",
     "/api/artifact-vault/31/content?download=1",
   );
-  await expect(rows.nth(0).getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute("href", "/files?tab=vault");
+  await expect(rows.nth(0).getByRole("link", { name: "내 파일에서 보기" })).toHaveAttribute(
+    "href",
+    "/files?tab=vault&item=31",
+  );
   await expect(rows.nth(1)).toHaveText(/내 파일에서 지운 파일이에요/);
   await expect(rows.nth(1).getByRole("link")).toHaveCount(0);
   // 넣은 파일은 결과물 패널로 여는 줄로 그리지 않는다.

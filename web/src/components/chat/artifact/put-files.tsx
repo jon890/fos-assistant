@@ -41,7 +41,7 @@ export function PutFiles({ files }: { files: MessageArtifact[] }) {
                 내려받기
               </a>
               <Link
-                href="/files?tab=vault"
+                href={`/files?tab=vault&item=${file.vaultItemId}`}
                 className="shrink-0 text-xs underline-offset-4 hover:underline"
               >
                 내 파일에서 보기
