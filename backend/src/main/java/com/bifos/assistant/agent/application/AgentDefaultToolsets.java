@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.application.dto.PendingToolsetOutcome;
 import com.bifos.assistant.agent.application.port.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.agent.domain.Agent;
@@ -57,6 +58,48 @@ public class AgentDefaultToolsets {
                 failure);
             return List.of();
         }
+    }
+
+
+    /**
+     * 기다리던 기본 도구를 지금 켜진 도구에 더해 실행 공간 안에서만 켠다(ADR-20261119 / image-gen-defaults).
+     *
+     * <p>{@link #apply} 와 달리 실행 공간이 없을 때 다른 도구만 켜는 쓰기를 하지 않고, 이미 켜져 있어도 쓴다. 나머지 기본 도구는 첫 로그인 때 이미 정했고,
+     * 여기서는 기다리는 이름만 본다. 지금 켜진 원본 조회 도구는 사람의 저장처럼 남긴다.
+     *
+     * @param names 켤 도구 이름. 비어 있지 않다
+     * @throws ApiException Hermes 가 답하지 않았거나 쓴 도구가 켜지지 않았을 때. 다음 차례에 다시 본다
+     */
+    public PendingToolsetOutcome enablePending(Agent agent, List<String> names) {
+        // Hermes 에 묻기 전에 정한다. Hermes 가 답하지 않아도 기다리지 않을 에이전트는 빠져야 한다.
+        if (agent.visibility() == AgentVisibility.GROUP || agent.ownerUserId() == null) {
+            return PendingToolsetOutcome.NOT_ALLOWED;
+        }
+        if (!skillFiles.uploadedRequestingSecrets(agent.hermesProfile()).isEmpty()) {
+            return PendingToolsetOutcome.SKILL_REQUESTS_SECRETS;
+        }
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+        LinkedHashSet<String> desired = new LinkedHashSet<>(
+            desired(
+                enabled.stream().filter(AgentToolPolicy::isKnown).toList(),
+                names,
+                connectorBindings.connectorServers(agent.id())));
+        if (enabled.contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
+            desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
+        }
+        try {
+            // 이미 켜져 있어도 한 번은 다시 쓴다. 도구만 켜져 있고 이미지 서비스 설정이 없는 profile 에 설정을 넣으려는 것이다.
+            toolsets.writeApiServerInSandbox(agent.hermesProfile(), List.copyOf(desired), agent.sandboxOwner());
+        } catch (ApiException rejected) {
+            if (rejected.code() != ErrorCode.AGENT_SANDBOX_UNAVAILABLE) {
+                throw rejected;
+            }
+            return PendingToolsetOutcome.SANDBOX_UNAVAILABLE;
+        }
+        if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).containsAll(names)) {
+            throw new ApiException(ErrorCode.AGENT_TOOLS_NOT_APPLIED, "Hermes did not apply the pending default toolsets");
+        }
+        return PendingToolsetOutcome.ENABLED;
     }
 
 

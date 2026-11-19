@@ -39,6 +39,7 @@ from .sandbox import (
     _sandbox_workspace,
 )
 from .sandbox_approvals import _with_sandbox_approvals
+from .image_service import IMAGE_TOOLSET, _with_image_service
 
 
 # 올린 스킬의 버전 디렉터리 이름이다. `.` 과 `..` 은 첫 글자 규칙에서 걸린다.
@@ -165,9 +166,9 @@ async def _check_config_update(request):
     조용히 지워지면 붙은 플러그인의 도구가 말없이 사라진다.
     """
     body = await _json_object(request)
-    if body is None or set(body) - {"sandbox_owner", "require_sandbox"} != {"profile", "config"}:
-        return _rejected("profile 과 config 와 sandbox_owner, require_sandbox 만 받는다")
-    # Hermes 처리기는 config 와 profile 만 읽으므로 sandbox_owner 와 require_sandbox 는 이 검사만 쓴다.
+    if body is None or set(body) - {"sandbox_owner", "require_sandbox", "ensure_image_service"} != {"profile", "config"}:
+        return _rejected("profile 과 config 와 sandbox_owner, require_sandbox, ensure_image_service 만 받는다")
+    # Hermes 처리기는 config 와 profile 만 읽으므로 나머지 칸은 이 검사만 쓴다.
     owner = body.get("sandbox_owner")
     if "sandbox_owner" in body and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
         return _rejected("sandbox_owner 형식이 올바르지 않다")
@@ -175,6 +176,10 @@ async def _check_config_update(request):
     require_sandbox = body.get("require_sandbox", False)
     if not isinstance(require_sandbox, bool):
         return _rejected("require_sandbox 는 참 거짓 값이다")
+    # 참이면 같은 쓰기에서 profile 설정에 이미지 서비스를 넣는다. Control Plane 이 「그림 만들기」 를 켜는 저장에 보낸다.
+    ensure_image_service = body.get("ensure_image_service", False)
+    if not isinstance(ensure_image_service, bool):
+        return _rejected("ensure_image_service 는 참 거짓 값이다")
     profile = body["profile"]
     rejected = _profile_rejection(profile, request)
     if rejected is not None:
@@ -191,6 +196,8 @@ async def _check_config_update(request):
         rejected = _toolset_rejection(platform["api_server"])
         if rejected is not None:
             return rejected
+    if ensure_image_service and (platform is None or IMAGE_TOOLSET not in platform["api_server"]):
+        return _rejected("ensure_image_service 는 image_gen 을 켜는 도구 저장에만 쓴다")
     sandbox = None
     local_execution = False
     if platform is not None and SANDBOX_TOOLSETS & set(platform["api_server"]):
@@ -285,6 +292,9 @@ async def _check_config_update(request):
             if _operator_skill_dirs(saved, profile, root):
                 return _rejected("Control Plane 이 게시하지 않은 스킬 경로가 이미 있다", 409)
             updated["skills"] = {**(saved.get("skills") or {}), "external_dirs": list(skill_dirs)}
+        if ensure_image_service:
+            # toolset 만 켜면 Hermes 가 `image_generate` 를 모델에 보이지 않는다. 이미 있는 서비스는 덮어쓰지 않는다.
+            updated = _with_image_service(saved, updated)
 
         existing_platforms = saved.get("platform_toolsets") or {}
         platforms = (set(PLATFORMS) | set(existing_platforms) |
@@ -304,10 +314,11 @@ async def _check_config_update(request):
             return _rejected("다른 platform 의 도구 목록이 바뀐다")
         if skill_dirs and "skills" not in effective:
             return _rejected("skills 도구가 꺼진 채로 스킬을 게시할 수 없다")
-        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal, approvals 는 plugin 이 먼저 쓴다.
+        # 처리기의 병합은 본문의 키만 쓴다. 본문에 없는 disabled_toolsets, 고정 목록, terminal, approvals, image_gen 은 plugin 이 먼저 쓴다.
         # terminal 이 그대로여도 approvals 만 바뀌면 쓴다. 이미 docker 인 profile 을 다시 저장해 승인 값을 넣는다.
         if (updated.get("agent") != saved.get("agent") or updated.get("terminal") != saved.get("terminal")
-                or updated.get("approvals") != saved.get("approvals")):
+                or updated.get("approvals") != saved.get("approvals")
+                or updated.get("image_gen") != saved.get("image_gen")):
             request.state.fos_checked_config = (config_path, original, updated)
     except Exception:
         logger.exception("dashboard-profile-api: profile 설정을 검증하지 못했다")

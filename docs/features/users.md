@@ -165,17 +165,19 @@ profile 을 만드는 경로가 에이전트 만들기와 같아 MCP 등록과 �
 이 에이전트가 그 사용자의 기본 비서이고, 이름 「비서」 와 고정 소개(`AgentIntroduction.PRIMARY_DESCRIPTION`)로 만든다. 사용자 표시 이름을 쓰면 답 이름표에 사람 이름이 뜨기 때문이다([에이전트 팀](agent-team/spec.md) 의 DECISION5).
 주인 등급이거나 실행 공간에서만 도는 도구가 아니면 기동하지 않는다.
 결정과 감당할 것은 [ADR-20261008 / default-toolsets](../adr/ADR-20261008-default-toolsets.md) 가 갖는다.
+기본 도구 가운데 `image_gen` 은 켜지 못했을 때 Control Plane 이 기억해 두고 스스로 다시 켠다([ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md)).
 
 `FirstAgentCreator` 가 첫 로그인의 트랜잭션이 커밋된 뒤 백그라운드 작업으로 `AgentDefaultToolsets` 를 부른다. 첫 요청은 Hermes 호출을 기다리지 않는다.
 실행 공간 주인 키 `u<사용자 번호>` 가 이때 처음 생기므로 profile 을 만들 때 켜지 않는다. 로그인이 되돌려지면 부르지 않는다.
 켤 때는 그룹 공개면 셸·파일·사진 계열을, 비밀 요청 스킬이 있으면 셸·파일·사진 도구를 빼고, 남은 셸·파일·사진 도구가 있으면 대시보드 plugin 에 `require_sandbox: true` 로 쓴다.
 쓴 뒤 공유 listener 로 다시 읽어 켜지지 않은 것이 있으면 경고 로그를 남긴다.
+에이전트를 저장하는 트랜잭션에서 `image_gen` 을 기다리는 목록(`agent.pending_default_toolsets`)에 적고, 기본 도구를 켠 뒤 `AgentPendingToolsets` 가 한 번 켜 본다. 켜졌으면 목록을 비운다.
 
 | 무엇 | 어떻게 되나 |
 | --- | --- |
 | 설정이 빈 목록이다 | Hermes 를 부르지 않는다 |
 | 기본 도구가 이미 다 켜져 있다 | 쓰지 않는다 |
-| profile 이 실행 공간 정책에 없다 | plugin 이 409 `sandbox_unavailable` 로 거절하면 셸·파일·사진 도구를 빼고 다시 쓴다. 경고 로그를 남긴다. 운영이 정책에 등록한 뒤 관리자가 에이전트 도구 화면에서 켠다 |
+| profile 이 실행 공간 정책에 없다 | plugin 이 409 `sandbox_unavailable` 로 거절하면 셸·파일·사진 도구를 빼고 다시 쓴다. 경고 로그를 남긴다. `image_gen` 은 기다리는 목록에 남아 관리자에게 알림이 가고, 운영이 정책에 등록하면 Control Plane 이 5분 안에 스스로 켠다. 나머지 셸·파일 도구는 관리자가 에이전트 도구 화면에서 켠다 |
 | 정책에 없는데 셸 계열이 이미 켜져 있다 | 쓰지 않는다. 그 쓰기가 셸을 local 로 확정하기 때문이다. 경고 로그를 남긴다 |
 | Hermes 가 답하지 않거나 다른 오류로 거절한다 | 경고 로그만 남긴다. 로그인은 그대로 끝난다 |
 | 옛 plugin 이 `require_sandbox` 를 몰라 400 으로 거절한다 | 같다. 아무 도구도 켜지 않는다. plugin 을 먼저 배포한다 |

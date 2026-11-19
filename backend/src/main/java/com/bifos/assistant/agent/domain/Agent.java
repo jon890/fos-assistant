@@ -124,6 +124,16 @@ public class Agent extends AuditedEntity {
     private AgentColor color;
 
     /**
+     * Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름을 쉼표로 이은 글이다(ADR-20261119 / image-gen-defaults).
+     *
+     * <p>엔티티 저장이 이 칸을 쓰지 않는다. 먼저 읽어 둔 에이전트를 나중에 저장해도 그 사이 비운 값을 되살리지 않게 하려는 것이다.
+     * 쓰기는 {@code AgentRepository} 의 전용 쿼리만 한다.
+     */
+    @Column(name = "pending_default_toolsets", insertable = false, updatable = false, length = 255)
+    @Getter(AccessLevel.NONE)
+    private String pendingDefaultToolsets;
+
+    /**
      * 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다.
      */
     @Transient
@@ -234,6 +244,15 @@ public class Agent extends AuditedEntity {
      */
     public String sandboxOwner() {
         return ownerUserId != null ? "u" + ownerUserId : "a" + id;
+    }
+
+
+    /** Control Plane 이 스스로 켜려고 기다리는 기본 도구 이름이다. 없으면 빈 목록이다. */
+    public List<String> pendingToolsets() {
+        if (pendingDefaultToolsets == null || pendingDefaultToolsets.isBlank()) {
+            return List.of();
+        }
+        return List.of(pendingDefaultToolsets.split(","));
     }
 
 

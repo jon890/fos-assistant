@@ -29,6 +29,10 @@ public final class AgentToolPolicy {
      */
     public static final String VISION = "vision";
     /**
+     * 「그림 만들기」 toolset 이다. 켜는 저장은 profile 에 이미지 서비스 설정을 함께 넣는다(ADR-20261119 / image-gen-defaults).
+     */
+    public static final String IMAGE_GEN = "image_gen";
+    /**
      * 실행 공간의 셸 toolset 이다. {@code scripts/} 가 든 스킬은 이것이 켜진 에이전트에만 저장한다(ADR-20261009-skill-package).
      */
     public static final String TERMINAL = "terminal";
@@ -70,6 +74,11 @@ public final class AgentToolPolicy {
      * 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086).
      */
     private static final Set<String> SANDBOX_TOOLSETS = Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
+
+    /**
+     * 기본 도구 가운데 켜지 못했을 때 Control Plane 이 기억해 두고 스스로 다시 켜는 것이다(스펙 generated-image REQ13).
+     */
+    private static final Set<String> RETRIED_DEFAULTS = Set.of(IMAGE_GEN);
 
     private static final Set<String> CONFIGURABLE_TOOLSETS;
 
@@ -201,6 +210,12 @@ public final class AgentToolPolicy {
      */
     public static boolean allowedAsDefault(String name) {
         return OWNER_TOOLSETS.contains(name) || SANDBOX_TOOLSETS.contains(name);
+    }
+
+
+    /** 기본 도구 가운데 켜지 못하면 Control Plane 이 스스로 다시 켜는 것만 고른다. */
+    public static List<String> retriedDefaults(List<String> defaults) {
+        return defaults.stream().filter(RETRIED_DEFAULTS::contains).toList();
     }
 
 
