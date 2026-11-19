@@ -2,12 +2,18 @@ package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactBundle;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactBundleFile;
+import com.bifos.assistant.chat.artifact.application.dto.ArtifactKept;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultContent;
 import com.bifos.assistant.chat.artifact.application.dto.ArtifactVaultItem;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.domain.ArtifactReferences;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
+import com.bifos.assistant.chat.artifact.domain.VaultLabel;
+import com.bifos.assistant.chat.artifact.domain.VaultFileType;
+import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultBodies;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMetaRow;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultPart;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultRow;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultWriter;
@@ -18,9 +24,14 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -56,6 +67,8 @@ public class ArtifactVaultService {
     private final ChatArtifactRepository rows;
     private final ArtifactVaultWriter writer;
     private final ArtifactVaultBodies bodies;
+    private final ArtifactVaultTitles titles;
+    private final ArtifactVaultMeta metas;
     private final ArtifactVaultProperties properties;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
@@ -72,7 +85,7 @@ public class ArtifactVaultService {
      * 대화 주인 확인은 호출하는 쪽이 한다.
      */
     public ArtifactVaultItem vault(Long ownerUserId, Long conversationId, String relativePath) {
-        return vault(ownerUserId, conversationId, relativePath, true).orElseThrow();
+        return vault(ownerUserId, conversationId, relativePath, true, null, null, null, null).orElseThrow().item();
     }
 
 
@@ -81,43 +94,150 @@ public class ArtifactVaultService {
      * 빈 값을 준다. 나머지는 {@link #vault(Long, Long, String)} 와 같다.
      */
     public Optional<ArtifactVaultItem> vaultAutomatically(Long ownerUserId, Long conversationId, String relativePath) {
-        return vault(ownerUserId, conversationId, relativePath, false);
+        return vault(ownerUserId, conversationId, relativePath, false, null, null, null, null).map(ArtifactKept::item);
     }
 
 
-    /** @param revive 사용자가 지운 같은 보관본이 있을 때 다시 만든다. 사용자가 직접 보관할 때만 참이다 */
-    private Optional<ArtifactVaultItem> vault(
-        Long ownerUserId, Long conversationId, String relativePath, boolean revive) {
+    /**
+     * 에이전트의 넣기 도구가 대화 폴더의 HTML, CSS, 사진을 부르는 파일과 함께 넣는다(ADR-20261119 / file-space-put).
+     *
+     * <p>사용자가 지운 같은 보관본도 다시 만든다. 넣어 달라는 말은 직접 「보관」 을 누른 것과 같은 뜻이다.
+     *
+     * @param wait 동시에 도는 보관이 꽉 찼을 때 자리를 기다릴 시간
+     */
+    public ArtifactKept keepBundle(
+        Long ownerUserId, Long conversationId, String relativePath, String title, String description, Duration wait) {
+        return vault(ownerUserId, conversationId, relativePath, true, VaultOrigin.PUT, title, description, wait)
+            .orElseThrow();
+    }
+
+
+    /**
+     * 바이트로 받은 파일 하나를 넣는다. 에이전트의 넣기 도구가 실행 공간의 파일과, 대화 폴더가 화면에 내주지 않는 형식을 이 길로 넣는다.
+     *
+     * <p>받는 형식은 {@link VaultFileType} 이 정한다. 한 번 읽은 바이트로 지문을 만들고 그대로 암호화하므로 다시 읽지 않는다.
+     *
+     * @param origin 읽은 곳. {@link VaultOrigin#PUT_WORKSPACE} 면 경로는 실행 공간 안의 상대 경로다
+     * @throws ApiException {@link ErrorCode#ARTIFACT_VAULT_UNSUPPORTED} 는 받지 않는 형식이거나 본문이 형식과 맞지 않거나 상한을 넘을 때,
+     * {@link ErrorCode#ARTIFACT_VAULT_FULL} 은 용량을 넘을 때다
+     */
+    public ArtifactKept keep(
+        Long ownerUserId, Long conversationId, VaultOrigin origin, String path, byte[] bytes, String title,
+        String description, Duration wait) {
+        String normalized = ArtifactReferences.normalize(path);
+        VaultFileType type = VaultFileType.of(normalized).orElseThrow(() -> unsupported("this kind of file is not kept"));
+        if (bytes.length == 0) {
+            throw unsupported("this file is empty");
+        }
+        if (bytes.length > properties.maxFileBytes()) {
+            throw unsupported("this file is larger than the vault limit");
+        }
+        if (!type.matches(bytes)) {
+            throw unsupported("this file does not match its kind");
+        }
+        // 실행 공간과 대화 폴더의 같은 상대 경로가 한 건으로 묶이지 않게 지문의 경로를 나눈다.
+        String fingerprint = ArtifactVaultBodies.fingerprint(
+            conversationId, origin == VaultOrigin.PUT_WORKSPACE ? "/workspace/" + normalized : normalized, bytes);
+        return withSlot(wait, () -> locked(ownerUserId, fingerprint, true, true, existing -> {
+            if (rows.sumVaultBytes(ownerUserId) + bytes.length > properties.userQuotaBytes()) {
+                throw new ApiException(ErrorCode.ARTIFACT_VAULT_FULL, "the vault of this user is full");
+            }
+            Optional<SealedText> meta = titles.sealFor(ownerUserId, conversationId, origin, normalized, title, description);
+            SealedText sealed = bodies.seal(ownerUserId, conversationId, normalized, fingerprint, null, bytes);
+            ChatArtifact root = ChatArtifact
+                .vaulted(conversationId, normalized, bytes.length, ownerUserId, sealed.keyId(), sealed.content(), fingerprint)
+                .withVaultMeta(origin, meta.map(SealedText::content).orElse(null), meta.map(SealedText::keyId).orElse(null));
+            Long id = writer.insertDetached(root);
+            log.info("artifact kept id={} origin={} bytes={}", id, origin, bytes.length);
+            return item(id, normalized, bytes.length, 1, root.createdAt(), ownerUserId, conversationId, meta);
+        }, existing -> item(
+            existing.getId(), existing.getPath(), bytes.length, 1, existing.getCreatedAt(), ownerUserId, conversationId,
+            existing)).orElseThrow());
+    }
+
+
+    /**
+     * @param revive 사용자가 지운 같은 보관본이 있을 때 다시 만든다. 사용자가 직접 보관하거나 에이전트에게 넣어 달라고 했을 때만 참이다
+     * @param origin 넣기 도구가 넣으면 {@link VaultOrigin#PUT}, 자동 보관과 「보관」 단추는 null
+     */
+    private Optional<ArtifactKept> vault(
+        Long ownerUserId, Long conversationId, String relativePath, boolean revive, VaultOrigin origin, String title,
+        String description, Duration wait) {
         String rootPath = ArtifactReferences.normalize(relativePath);
         ArtifactBundleReader.requireVaultable(rootPath);
-        if (!running.tryAcquire()) {
+        return withSlot(wait, () -> {
+            ArtifactBundle bundle = reader.scan(conversationId, rootPath, properties);
+            return locked(
+                ownerUserId, bundle.fingerprint(), revive, origin != null,
+                existing -> save(ownerUserId, bundle, origin, title, description),
+                existing -> item(
+                    existing.getId(), existing.getPath(), bundle.totalBytes(), bundle.fileCount(), existing.getCreatedAt(),
+                    ownerUserId, conversationId, existing));
+        });
+    }
+
+
+    /** 동시에 도는 보관의 자리를 잡고 돈다. {@code wait} 가 없으면 기다리지 않고 거절한다. */
+    private <T> T withSlot(Duration wait, Supplier<T> action) {
+        if (!acquire(wait)) {
             throw new ApiException(ErrorCode.ARTIFACT_VAULT_UNAVAILABLE, "too many files are being kept right now");
         }
         try {
-            ArtifactBundle bundle = reader.scan(conversationId, rootPath, properties);
-            ReentrantLock lock = lockOf(ownerUserId);
-            lock.lock();
-            try {
-                ChatArtifact existing = rows.findByVaultUserIdAndVaultFingerprint(ownerUserId, bundle.fingerprint()).orElse(null);
-                if (existing != null && !existing.isDeleted()) {
-                    return Optional.of(new ArtifactVaultItem(
-                        existing.id(), existing.path(), bundle.totalBytes(), bundle.fileCount(), existing.createdAt()));
-                }
-                if (existing != null && !revive) {
-                    return Optional.empty();
-                }
-                return Optional.of(new TransactionTemplate(transactionManager).execute(status -> {
-                    if (existing != null) {
-                        // 지우기 이력을 지우고 같은 지문으로 새로 넣는다. 같은 트랜잭션이라 중간에 실패하면 이력이 되살아난다.
-                        rows.deleteForgotten(existing.id(), ownerUserId);
-                    }
-                    return save(ownerUserId, bundle);
-                }));
-            } finally {
-                lock.unlock();
-            }
+            return action.get();
         } finally {
             running.release();
+        }
+    }
+
+
+    private boolean acquire(Duration wait) {
+        if (wait == null) {
+            return running.tryAcquire();
+        }
+        try {
+            return running.tryAcquire(wait.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+
+    /**
+     * 사용자별 잠금 안에서 같은 지문의 행을 보고 넣는다.
+     *
+     * <p>살아 있는 행이 있으면 새로 만들지 않는다. 넣기 도구가 다시 넣은 것이고({@code rebind}) 그 행도 넣기 도구로 넣은 것이면
+     * 답 번호를 비워 이번 답에 다시 묶이게 한다. 「보관」 단추와 자동 보관은 답 아래 줄을 옮기지 않는다.
+     * 지우기 이력이 있으면 {@code revive} 일 때만 이력을 지우고 같은 트랜잭션에서 새로 넣는다. 중간에 실패하면 이력이 되살아난다.
+     *
+     * @return 자동 보관이 사용자가 지운 보관본을 만나면 빈 값
+     */
+    private Optional<ArtifactKept> locked(
+        Long ownerUserId, String fingerprint, boolean revive, boolean rebind,
+        Function<ArtifactVaultMetaRow, ArtifactVaultItem> insert,
+        Function<ArtifactVaultMetaRow, ArtifactVaultItem> found) {
+        ReentrantLock lock = lockOf(ownerUserId);
+        lock.lock();
+        try {
+            ArtifactVaultMetaRow existing = rows.findVaultByFingerprint(ownerUserId, fingerprint).orElse(null);
+            TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+            if (existing != null && existing.getDeletedAt() == null) {
+                if (rebind) {
+                    transaction.executeWithoutResult(status -> rows.unbindPutFile(existing.getId(), ownerUserId));
+                }
+                return Optional.of(new ArtifactKept(found.apply(existing), true));
+            }
+            if (existing != null && !revive) {
+                return Optional.empty();
+            }
+            return Optional.of(new ArtifactKept(transaction.execute(status -> {
+                if (existing != null) {
+                    rows.deleteForgotten(existing.getId(), ownerUserId);
+                }
+                return insert.apply(existing);
+            }), false));
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -125,7 +245,7 @@ public class ArtifactVaultService {
     /** 주인의 보관 목록이다. 새로 보관한 것이 먼저다. 묶음은 한 줄이다. 본문은 풀지 않는다. */
     public List<ArtifactVaultItem> list(Long ownerUserId) {
         return rows.listVaulted(ownerUserId).stream()
-            .map(row -> toItem(row))
+            .map(row -> toItem(ownerUserId, row))
             .toList();
     }
 
@@ -224,7 +344,8 @@ public class ArtifactVaultService {
      *
      * <p>훑은 뒤 파일이 바뀌거나 지워졌으면 거절하고, 트랜잭션이 되돌려 일부만 남지 않는다.
      */
-    private ArtifactVaultItem save(Long ownerUserId, ArtifactBundle bundle) {
+    private ArtifactVaultItem save(
+        Long ownerUserId, ArtifactBundle bundle, VaultOrigin origin, String title, String description) {
         if (rows.sumVaultBytes(ownerUserId) + bundle.totalBytes() > properties.userQuotaBytes()) {
             throw new ApiException(ErrorCode.ARTIFACT_VAULT_FULL, "the vault of this user is full");
         }
@@ -233,9 +354,12 @@ public class ArtifactVaultService {
         byte[] rootBytes = reader.reread(conversationId, rootFile, properties.maxFileBytes());
         SealedText sealedRoot = bodies.seal(ownerUserId, conversationId, rootFile.path(), bundle.fingerprint(), null, rootBytes);
         // 같은 지문의 동시 요청은 사용자별 잠금이 막고, 남는 경쟁은 유일 인덱스가 거절한다. 같은 트랜잭션에서 다시 찾지 않는다.
-        ChatArtifact root = ChatArtifact.vaulted(
-            conversationId, rootFile.path(), rootFile.byteSize(), ownerUserId, sealedRoot.keyId(),
-            sealedRoot.content(), bundle.fingerprint());
+        Optional<SealedText> meta = titles.sealFor(ownerUserId, conversationId, origin, rootFile.path(), title, description);
+        ChatArtifact root = ChatArtifact
+            .vaulted(
+                conversationId, rootFile.path(), rootFile.byteSize(), ownerUserId, sealedRoot.keyId(),
+                sealedRoot.content(), bundle.fingerprint())
+            .withVaultMeta(origin, meta.map(SealedText::content).orElse(null), meta.map(SealedText::keyId).orElse(null));
         Long rootId = writer.insertDetached(root);
         for (ArtifactBundleFile file : bundle.parts()) {
             byte[] bytes = reader.reread(conversationId, file, properties.maxFileBytes());
@@ -246,8 +370,9 @@ public class ArtifactVaultService {
                 fingerprint, rootId));
         }
         log.info("artifact vaulted id={} files={} bytes={}", rootId, bundle.fileCount(), bundle.totalBytes());
-        return new ArtifactVaultItem(
-            rootId, rootFile.path(), bundle.totalBytes(), bundle.fileCount(), root.createdAt());
+        return item(
+            rootId, rootFile.path(), bundle.totalBytes(), bundle.fileCount(), root.createdAt(), ownerUserId,
+            conversationId, meta);
     }
 
 
@@ -259,7 +384,8 @@ public class ArtifactVaultService {
 
     private ArtifactVaultContent content(ChatArtifact row) {
         byte[] body = bodies.open(row);
-        return new ArtifactVaultContent(fileName(row.path()), ArtifactBundleReader.contentTypeOf(row.path()), body);
+        VaultFileType type = VaultFileType.of(row.path()).orElseThrow(ArtifactVaultService::missing);
+        return new ArtifactVaultContent(fileName(row.path()), type.contentType(), type.inline(), body);
     }
 
 
@@ -309,13 +435,47 @@ public class ArtifactVaultService {
     }
 
 
-    private static ArtifactVaultItem toItem(ArtifactVaultRow row) {
-        return new ArtifactVaultItem(
+    private ArtifactVaultItem toItem(Long ownerUserId, ArtifactVaultRow row) {
+        return item(
             row.getId(),
             row.getPath(),
             row.getByteSize() + row.getPartBytes(),
             Math.toIntExact(row.getPartCount() + 1),
-            row.getCreatedAt());
+            row.getCreatedAt(),
+            metas.open(ownerUserId, row.getConversationId(), row.getPath(), row.getVaultMeta(), row.getVaultMetaKeyId()));
+    }
+
+
+    /** 방금 넣은 보관본이다. 제목은 방금 암호화한 값을 다시 풀어 읽는다. */
+    private ArtifactVaultItem item(
+        Long id, String path, long byteSize, int fileCount, Instant vaultedAt, Long ownerUserId,
+        Long conversationId, Optional<SealedText> meta) {
+        return item(
+            id, path, byteSize, fileCount, vaultedAt,
+            meta.flatMap(sealed -> metas.open(ownerUserId, conversationId, path, sealed.content(), sealed.keyId())));
+    }
+
+
+    /** 이미 있던 보관본이다. */
+    private ArtifactVaultItem item(
+        Long id, String path, long byteSize, int fileCount, Instant vaultedAt, Long ownerUserId,
+        Long conversationId, ArtifactVaultMetaRow existing) {
+        return item(
+            id, path, byteSize, fileCount, vaultedAt,
+            metas.open(ownerUserId, conversationId, path, existing.getVaultMeta(), existing.getVaultMetaKeyId()));
+    }
+
+
+    private static ArtifactVaultItem item(
+        Long id, String path, long byteSize, int fileCount, Instant vaultedAt, Optional<VaultLabel> meta) {
+        return new ArtifactVaultItem(
+            id, path, byteSize, fileCount, vaultedAt, meta.map(VaultLabel::title).orElse(null),
+            meta.map(VaultLabel::description).orElse(null));
+    }
+
+
+    private static ApiException unsupported(String message) {
+        return new ApiException(ErrorCode.ARTIFACT_VAULT_UNSUPPORTED, message);
     }
 
 

@@ -81,7 +81,7 @@
 | 종류 | 확장자 | 머리 바이트 검사 |
 | --- | --- | --- |
 | `IMAGE` | png, jpg, jpeg, gif, webp | 한다 |
-| `DOCUMENT` | html, htm, css, md, txt | 하지 않는다. NUL 바이트가 있으면 거절한다 |
+| `DOCUMENT` | html, css, md, txt | 하지 않는다. NUL 바이트가 있으면 거절한다 |
 | `DOCUMENT` | pdf | `%PDF-` |
 | `DOCUMENT` | docx, pptx | zip 머리(`PK`) |
 | `TABLE` | csv, tsv | 하지 않는다. NUL 바이트가 있으면 거절한다 |
