@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.artifact.domain;
 
 import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
+import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -102,6 +103,30 @@ public class ChatArtifact extends CreatedAtEntity {
     @Getter
     private int autoVaultAttempts;
 
+    /**
+     * 제목과 설명의 JSON 을 주인의 데이터 key 로 암호화한 글(ADR-20261119 / file-space-put). 보관 뿌리 행과,
+     * {@code artifact_write} 가 제목을 받은 결과물 행에 있다.
+     */
+    @Column(name = "vault_meta", columnDefinition = "LONGTEXT")
+    @Getter
+    private String vaultMeta;
+
+    /** {@link #vaultMeta} 를 암호화한 데이터 key 의 번호. */
+    @Column(name = "vault_meta_key_id")
+    @Getter
+    private Long vaultMetaKeyId;
+
+    /** 보관 행이 들어온 길. 비어 있으면 자동 보관이나 「보관」 단추다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "vault_origin", length = 16)
+    @Getter
+    private VaultOrigin vaultOrigin;
+
+    /** 넣기 도구가 넣은 보관 뿌리 행을 내준 답 메시지. turn 이 끝날 때 채운다. */
+    @Column(name = "vault_message_id")
+    @Getter
+    private Long vaultMessageId;
+
     /** 비서가 이미지 도구에 넘긴 그림 지시문. {@link #generationPromptKeyId} 가 있으면 암호문이다. 만든 그림 행에만 있다. */
     @Column(name = "generation_prompt", columnDefinition = "LONGTEXT")
     @Getter
@@ -158,6 +183,32 @@ public class ChatArtifact extends CreatedAtEntity {
         ChatArtifact part = new ChatArtifact(conversationId, path, byteSize, ownerUserId, keyId, sealedBody, fingerprint);
         part.vaultBundleId = bundleId;
         return part;
+    }
+
+
+    /**
+     * 보관 뿌리 행에 들어온 길과 제목·설명의 암호문을 적는다. 행을 넣기 전에만 부른다.
+     *
+     * @param meta 암호화한 제목·설명. 없으면 null
+     */
+    public ChatArtifact withVaultMeta(VaultOrigin origin, String meta, Long metaKeyId) {
+        this.vaultOrigin = origin;
+        this.vaultMeta = meta;
+        this.vaultMetaKeyId = metaKeyId;
+        return this;
+    }
+
+
+    /**
+     * {@code artifact_write} 가 제목을 받은 HTML 의 결과물 행이다. 답 메시지는 turn 이 끝날 때 묶는다.
+     *
+     * @param meta 암호화한 제목·설명
+     */
+    public static ChatArtifact titled(Long conversationId, String path, long byteSize, String meta, Long metaKeyId) {
+        ChatArtifact titled = new ChatArtifact(conversationId, null, path, byteSize);
+        titled.vaultMeta = meta;
+        titled.vaultMetaKeyId = metaKeyId;
+        return titled;
     }
 
 

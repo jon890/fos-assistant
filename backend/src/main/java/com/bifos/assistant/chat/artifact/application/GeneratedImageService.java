@@ -5,7 +5,9 @@ import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageSaved;
 import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.GeneratedImageTitle;
+import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultPart;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
@@ -112,9 +114,9 @@ public class GeneratedImageService {
             return Map.of();
         }
         Map<String, Long> vaultIds = new HashMap<>();
-        for (ChatArtifact copy : artifacts.findLiveVaultCopies(
-            ownerUserId, conversationId, images.stream().map(ChatArtifact::path).toList())) {
-            vaultIds.put(copy.path(), copy.id());
+        for (ArtifactVaultPart copy : artifacts.findLiveVaultCopies(
+            ownerUserId, conversationId, images.stream().map(ChatArtifact::path).toList(), VaultOrigin.PUT_WORKSPACE)) {
+            vaultIds.put(copy.getPath(), copy.getId());
         }
         Map<Long, GeneratedImageDetail> details = new HashMap<>();
         for (ChatArtifact image : images) {

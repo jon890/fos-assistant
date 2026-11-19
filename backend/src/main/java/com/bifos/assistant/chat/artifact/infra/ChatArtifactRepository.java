@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.artifact.infra;
 
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
+import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -53,18 +54,25 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     int bindGeneratedImages(@Param("conversationId") Long conversationId, @Param("messageId") Long messageId);
 
 
-    /** 그 사용자가 이 대화의 이 경로들에서 보관한 살아 있는 뿌리 사본이다. 번호 순이라 같은 경로는 뒤의 것이 새것이다. */
+    /**
+     * 그 사용자가 이 대화의 이 경로들에서 보관한 살아 있는 뿌리 사본이다. 번호 순이라 같은 경로는 뒤의 것이 새것이다.
+     *
+     * <p>본문은 읽지 않는다. 부르는 쪽이 {@code excludedOrigin} 으로 실행 공간에서 넣은 행을 뺀다. 경로가 같아도 대화 폴더의 파일이 아니다.
+     */
     @Query("""
-            select a from ChatArtifact a
+            select a.id as id, a.path as path
+              from ChatArtifact a
              where a.vaultUserId = :userId
                and a.conversationId = :conversationId
                and a.path in :paths
                and a.deletedAt is null
                and a.vaultBundleId is null
+               and (a.vaultOrigin is null or a.vaultOrigin <> :excludedOrigin)
              order by a.id asc
             """)
-    List<ChatArtifact> findLiveVaultCopies(
-        @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("paths") Collection<String> paths);
+    List<ArtifactVaultPart> findLiveVaultCopies(
+        @Param("userId") Long userId, @Param("conversationId") Long conversationId,
+        @Param("paths") Collection<String> paths, @Param("excludedOrigin") VaultOrigin excludedOrigin);
 
 
     /** 없는 파일이 보관 기간이 지나 지워진 것인지 가릴 때만 쓴다. */
@@ -129,6 +137,7 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
      */
     @Query("""
             select a.id as id, a.path as path, a.byteSize as byteSize, a.createdAt as createdAt,
+                   a.conversationId as conversationId, a.vaultMeta as vaultMeta, a.vaultMetaKeyId as vaultMetaKeyId,
                    (select count(p.id) from ChatArtifact p where p.vaultBundleId = a.id) as partCount,
                    (select coalesce(sum(p.byteSize), 0) from ChatArtifact p where p.vaultBundleId = a.id) as partBytes
               from ChatArtifact a
@@ -162,7 +171,67 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     List<ArtifactVaultPart> listParts(@Param("bundleId") Long bundleId, @Param("userId") Long userId);
 
 
-    Optional<ChatArtifact> findByVaultUserIdAndVaultFingerprint(Long vaultUserId, String vaultFingerprint);
+    /** 같은 지문의 보관 뿌리 행이다. 지우기 이력도 준다. 본문은 읽지 않는다. */
+    @Query("""
+            select a.id as id, a.path as path, a.vaultOrigin as vaultOrigin, a.vaultMeta as vaultMeta,
+                   a.vaultMetaKeyId as vaultMetaKeyId, a.deletedAt as deletedAt, a.createdAt as createdAt
+              from ChatArtifact a
+             where a.vaultUserId = :userId
+               and a.vaultFingerprint = :fingerprint
+            """)
+    Optional<ArtifactVaultMetaRow> findVaultByFingerprint(
+        @Param("userId") Long userId, @Param("fingerprint") String fingerprint);
+
+
+    /** 그 사용자가 이 대화에서 보관한 살아 있는 뿌리 행이다. 제목이 겹치는지 볼 때 쓴다. 본문은 읽지 않는다. */
+    @Query("""
+            select a.id as id, a.path as path, a.vaultOrigin as vaultOrigin, a.vaultMeta as vaultMeta,
+                   a.vaultMetaKeyId as vaultMetaKeyId, a.deletedAt as deletedAt, a.createdAt as createdAt
+              from ChatArtifact a
+             where a.vaultUserId = :userId
+               and a.conversationId = :conversationId
+               and a.vaultBundleId is null
+               and a.deletedAt is null
+               and a.vaultMeta is not null
+            """)
+    List<ArtifactVaultMetaRow> findVaultTitles(
+        @Param("userId") Long userId, @Param("conversationId") Long conversationId);
+
+
+    /**
+     * 그 대화·경로의 결과물 행 가운데 제목을 가진 것을 새것부터 준다. {@code artifact_write} 가 받은 제목을 보관본으로 옮길 때 쓴다.
+     *
+     * <p>파일이 지워진 행도 준다. 제목은 파일보다 오래 남아도 된다.
+     */
+    @Query("""
+            select a.id as id, a.path as path, a.vaultOrigin as vaultOrigin, a.vaultMeta as vaultMeta,
+                   a.vaultMetaKeyId as vaultMetaKeyId, a.deletedAt as deletedAt, a.createdAt as createdAt
+              from ChatArtifact a
+             where a.conversationId = :conversationId
+               and a.path = :path
+               and a.vaultUserId is null
+               and a.vaultMeta is not null
+             order by a.id desc
+            """)
+    List<ArtifactVaultMetaRow> findTitledArtifacts(
+        @Param("conversationId") Long conversationId, @Param("path") String path);
+
+
+    /**
+     * 넣기 도구가 넣은 보관 뿌리 행에서 답 번호를 비운다. 같은 파일을 다시 넣었을 때 이번 답에 다시 묶이게 한다.
+     *
+     * <p>자동 보관이나 「보관」 단추로 들어온 행은 바꾸지 않는다. 트랜잭션은 {@code ArtifactVaultService} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.vaultMessageId = null
+             where a.id = :id
+               and a.vaultUserId = :userId
+               and a.vaultOrigin is not null
+               and a.deletedAt is null
+            """)
+    int unbindPutFile(@Param("id") Long id, @Param("userId") Long userId);
 
 
     /**
@@ -176,7 +245,7 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
 
 
     /**
-     * 주인의 보관본 뿌리 행을 지우기 이력으로 바꾼다. 본문과 key 번호, 경로, 크기를 비우고 지운 시각을 적는다.
+     * 주인의 보관본 뿌리 행을 지우기 이력으로 바꾼다. 본문과 key 번호, 경로, 크기, 제목과 설명을 비우고 지운 시각을 적는다.
      *
      * <p>지문은 남겨 자동 보관이 같은 대화·경로·본문을 다시 보관하지 못하게 한다. 지문은 해시라 본문을 되살리지 못한다.
      * 묶음 안 파일의 번호와 이미 지운 것은 바꾸지 않는다. 바꾼 줄 수가 0 이면 없거나 남의 것이다.
@@ -184,7 +253,8 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update ChatArtifact a
-               set a.vaultBody = null, a.vaultKeyId = null, a.path = '', a.byteSize = 0, a.deletedAt = :now
+               set a.vaultBody = null, a.vaultKeyId = null, a.path = '', a.byteSize = 0, a.deletedAt = :now,
+                   a.vaultMeta = null, a.vaultMetaKeyId = null
              where a.id = :id
                and a.vaultUserId = :userId
                and a.vaultBundleId is null

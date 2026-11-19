@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultBodies;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultWriter;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
@@ -111,6 +112,12 @@ class ArtifactVaultBundleTest {
 
     @Autowired
     ArtifactVaultBodies bodies;
+
+    @Autowired
+    ArtifactVaultTitles titles;
+
+    @Autowired
+    ArtifactVaultMeta metas;
 
     @Autowired
     AppUserRepository users;
@@ -459,7 +466,7 @@ class ArtifactVaultBundleTest {
 
 
     private ArtifactVaultService service(ArtifactVaultProperties limits) {
-        return new ArtifactVaultService(reader, rows, writer, bodies, limits, transactions, Clock.systemUTC());
+        return new ArtifactVaultService(reader, rows, writer, bodies, titles, metas, limits, transactions, Clock.systemUTC());
     }
 
 
@@ -474,7 +481,7 @@ class ArtifactVaultBundleTest {
                 return bundle;
             }
         };
-        return new ArtifactVaultService(hooked, rows, writer, bodies, limits, transactions, Clock.systemUTC());
+        return new ArtifactVaultService(hooked, rows, writer, bodies, titles, metas, limits, transactions, Clock.systemUTC());
     }
 
 

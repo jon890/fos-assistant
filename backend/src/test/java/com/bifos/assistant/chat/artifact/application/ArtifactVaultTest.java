@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.artifact.config.ArtifactProperties;
 import com.bifos.assistant.chat.artifact.config.ArtifactVaultProperties;
 import com.bifos.assistant.chat.artifact.infra.ArtifactStore;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultBodies;
+import com.bifos.assistant.chat.artifact.infra.ArtifactVaultMeta;
 import com.bifos.assistant.chat.artifact.infra.ArtifactVaultWriter;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import com.bifos.assistant.chat.conversation.application.ConversationWriter;
@@ -82,6 +83,12 @@ class ArtifactVaultTest {
 
     @Autowired
     ArtifactVaultBodies bodies;
+
+    @Autowired
+    ArtifactVaultTitles titles;
+
+    @Autowired
+    ArtifactVaultMeta metas;
 
     @Autowired
     AppUserRepository users;
@@ -211,7 +218,7 @@ class ArtifactVaultTest {
     @DisplayName("용량을 넘으면 새 보관만 거절하고 이미 보관한 것은 그대로이며 지우면 다시 보관할 수 있다")
     void rejectsOnlyNewVaultOverQuota() {
         ArtifactVaultService small = new ArtifactVaultService(
-            reader, rows, writer, bodies, new ArtifactVaultProperties(100L, null, null, null, null), transactions, Clock.systemUTC());
+            reader, rows, writer, bodies, titles, metas, new ArtifactVaultProperties(100L, null, null, null, null), transactions, Clock.systemUTC());
         write(dadConversation, "a.css", "a".repeat(60));
         write(dadConversation, "b.css", "b".repeat(60));
 
@@ -255,7 +262,8 @@ class ArtifactVaultTest {
         write(dadConversation, "withfe.html", "<svg><feImage href=\"a.png\"/></svg>");
         write(dadConversation, "withbg.html", "<body background=\"a.jpg\">");
         write(dadConversation, "withurl.css", "p{background:url(a.png)}");
-        write(dadConversation, "big.css", "x".repeat(6 * 1024 * 1024));
+        // 파일 하나의 상한은 25MiB 다(스펙 workspace REQ5). 대화 폴더에 직접 써서 쓰기 도구의 5MiB 상한을 지나게 한다.
+        write(dadConversation, "big.css", "x".repeat(26 * 1024 * 1024));
 
         for (String path : new String[] {"notes.txt", "withimg.html", "withfe.html", "withbg.html", "withurl.css", "big.css"}) {
             assertThatThrownBy(() -> vault.vault(dad.id(), dadConversation.id(), path))
