@@ -1,11 +1,13 @@
 package com.bifos.assistant.admin.model.presentation;
 
+import com.bifos.assistant.chat.modelchoice.application.dto.CatalogRefresh;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.application.dto.ReasoningCapability;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +35,19 @@ public final class ModelAdminDtos {
 
         static GroupModelCatalogView missing() {
             return new GroupModelCatalogView(null);
+        }
+    }
+
+    /**
+     * 모델 목록을 다시 읽은 결과다. 목록은 담지 않는다. 화면이 목록 조회를 다시 부른다.
+     *
+     * @param status {@code REFRESHED}, {@code REUSED}, {@code FAILED} 가운데 하나
+     * @param refreshedAt 켜진 profile 모두가 다시 읽기에 성공한 가장 이른 시각. 성공한 적 없는 profile 이 있으면 null 이다
+     */
+    public record CatalogRefreshView(String status, Instant refreshedAt) {
+
+        static CatalogRefreshView from(CatalogRefresh refresh) {
+            return new CatalogRefreshView(refresh.status().name(), refresh.refreshedAt());
         }
     }
 

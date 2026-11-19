@@ -20,6 +20,7 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.modelchoice.application.GroupModelCatalogService;
 import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
 import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.chat.modelchoice.application.dto.CatalogRefresh;
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelCatalog;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.hermes.application.dto.HermesModelCatalog;
@@ -103,6 +104,73 @@ class GroupModelCatalogServiceTest {
         assertThat(catalog.providers().getFirst().name()).isEqualTo("openai-codex 이름");
         assertThat(catalog.providers().getFirst().models()).containsExactly("b", "a");
         assertThat(catalog.reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);
+    }
+
+
+    private void refreshedCatalogOf(String profile, Provider... providers) {
+        when(hermes.readCatalog("http://agent-runtime.test/p/" + profile, profile, true))
+            .thenReturn(new HermesModelCatalog(null, null, List.of(providers)));
+    }
+
+
+    @Test
+    @DisplayName("Hermes 가 다시 읽기에만 주는 새 모델은 전체 다시 읽기 전에는 그룹 목록에 없고 뒤에는 있다")
+    void refreshAllBringsModelsOnlyRefreshReveals() {
+        agentOf("dad", "dad-profile");
+        agentOf("kid", "kid-profile");
+        catalogOf("dad-profile", provider("openai-codex", "old"));
+        catalogOf("kid-profile", provider("openai-codex", "old"));
+        refreshedCatalogOf("dad-profile", provider("openai-codex", "old", "new"));
+        refreshedCatalogOf("kid-profile", provider("openai-codex", "old", "new"));
+        assertThat(service.catalogFor(GROUP_ID).providers().getFirst().models()).containsExactly("old");
+
+        CatalogRefresh result = service.refreshAll();
+
+        assertThat(result.status()).isEqualTo(CatalogRefresh.Status.REFRESHED);
+        assertThat(result.refreshedAt()).isNotNull();
+        assertThat(service.catalogFor(GROUP_ID).providers().getFirst().models()).containsExactly("old", "new");
+    }
+
+
+    @Test
+    @DisplayName("한 profile 이 다시 읽기에 실패해도 나머지를 끝까지 읽어 새 목록을 들고 결과는 FAILED 다")
+    void refreshAllKeepsGoingAfterOneProfileFails() {
+        agentOf("dad", "dad-profile");
+        agentOf("kid", "kid-profile");
+        catalogOf("dad-profile", provider("openai-codex", "old"));
+        catalogOf("kid-profile", provider("openai-codex", "old"));
+        when(hermes.readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile", true))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        refreshedCatalogOf("kid-profile", provider("openai-codex", "old", "new"));
+
+        CatalogRefresh result = service.refreshAll();
+
+        assertThat(result).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.FAILED, null));
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile", true);
+        // 교집합이라 그룹 목록은 그대로지만, 성공한 profile 은 새 목록을 들고 있어 숨길 후보(합집합)에 새 모델이 보인다.
+        assertThat(service.catalogFor(GROUP_ID).providers().getFirst().models()).containsExactly("old");
+        assertThat(service.hideCandidates().providers().getFirst().models()).containsExactly("old", "new");
+    }
+
+
+    @Test
+    @DisplayName("바로 다시 부른 전체 다시 읽기는 Hermes 를 부르지 않고 REUSED 다")
+    void refreshAllRightAgainIsReused() {
+        agentOf("dad", "dad-profile");
+        refreshedCatalogOf("dad-profile", provider("openai-codex", "a"));
+        CatalogRefresh first = service.refreshAll();
+
+        CatalogRefresh second = service.refreshAll();
+
+        assertThat(second).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.REUSED, first.refreshedAt()));
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile", true);
+    }
+
+
+    @Test
+    @DisplayName("켜진 에이전트가 없으면 물을 profile 이 없어 REFRESHED 와 null 시각이다")
+    void refreshAllWithoutAgentsIsRefreshedWithoutTime() {
+        assertThat(service.refreshAll()).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.REFRESHED, null));
     }
 
 
