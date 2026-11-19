@@ -31,7 +31,7 @@
 
 ### 1. `ModelOptionsService` 에 결과를 돌려주는 다시 읽기를 더한다
 
-- `chat.modelchoice.application.dto` 에 profile 하나의 결과 타입을 둔다. 값은 새로 읽음, 새로 묻지 않음, 실패 셋과 마지막 성공 시각(`Instant`, 없으면 null)이다.
+- `chat.modelchoice.application.dto` 에 결과 타입 `CatalogRefresh` 를 둔다. 값은 `status`(`REFRESHED`, `REUSED`, `FAILED`)와 마지막 성공 시각 `refreshedAt`(`Instant`, 없으면 null)이다. profile 하나의 결과와 그룹으로 모은 결과가 같은 모양이라 타입 하나를 함께 쓴다.
 - `ModelOptionsService` 에 `Agent` 를 받아 그 결과를 돌려주는 메서드를 더한다. 판정은 설계 「다시 읽기 경로」 의 profile 결과 표(다섯 줄)를 따른다.
 - profile 마다 마지막 시도 시각, 마지막 성공 시각, 마지막으로 끝난 시도의 실패 여부, 진행 중 여부를 든다. 지금의 `refreshedAt` 지도를 이 상태로 바꾼다.
 - 읽기에서 난 `ApiException` 은 모두 실패다. 지금의 WARN 로그를 유지한다.
@@ -39,7 +39,7 @@
 
 ### 2. `GroupModelCatalogService` 에 그룹 전체 다시 읽기를 더한다
 
-- `chat.modelchoice.application.dto` 에 그룹 결과 타입을 둔다. `status`(`REFRESHED`, `REUSED`, `FAILED`)와 `refreshedAt` 이다.
+- 그룹 결과도 `CatalogRefresh` 다. 모으는 규칙은 그 타입의 정적 메서드에 둔다.
 - 켜진 에이전트의 profile 을 한 번씩, 실패해도 끝까지 돈다.
 - 모으는 규칙: 하나라도 실패면 `FAILED`, 아니고 하나라도 새로 묻지 않음이면 `REUSED`, 모두 새로 읽음이면 `REFRESHED`. `refreshedAt` 은 profile 들의 마지막 성공 시각 가운데 가장 이른 것이고 하나라도 없으면 null 이다. 켜진 에이전트가 없으면 `REFRESHED` 와 null 이다.
 
@@ -56,10 +56,11 @@
 
 ### 5. 테스트
 
-- `ModelOptionsServiceTest`: 새로 읽음, 30초 안의 새로 묻지 않음(Hermes 호출이 늘지 않는다), 실패, 한 번도 읽지 못한 profile 의 실패가 예외가 아닌 것, 실패 직후 30초 안의 재요청이 실패인 것, 앞 시도가 Hermes 를 기다리는 동안의 요청이 새로 묻지 않음인 것. 고정 시계를 쓰는 기존 사례의 방식을 따른다.
-- `GroupModelCatalogServiceTest`: 가짜 Hermes 가 `refresh=true` 에만 새 모델을 줄 때 다시 읽기 전후의 그룹 목록, 한 profile 이 실패해도 나머지가 새 목록을 드는 것과 `FAILED`, `REUSED` 와 `refreshedAt` 의 모으기, 켜진 에이전트가 없을 때.
+- `ModelOptionsServiceTest`: 새로 읽음, 30초 안의 새로 묻지 않음(Hermes 호출이 늘지 않는다), 실패, 한 번도 읽지 못한 profile 의 실패가 예외가 아닌 것, 실패 직후 30초 안의 재요청이 실패인 것, 앞 시도가 Hermes 를 기다리는 동안의 요청이 새로 묻지 않음인 것. 그 파일의 `MutableClock` 을 쓴다. 「기다리는 동안」 은 `readCatalog(.., true)` 의 대역이 답하기 전에 같은 메서드를 한 번 더 부르게 해 만든다.
+- `GroupModelCatalogServiceTest`: 가짜 Hermes 가 `refresh=true` 에만 새 모델을 줄 때 다시 읽기 전후의 그룹 목록, 한 profile 이 실패해도 나머지가 새 목록을 드는 것과 `FAILED`, 바로 다시 부르면 Hermes 를 부르지 않고 `REUSED` 이며 `refreshedAt` 이 앞 값과 같은 것, 켜진 에이전트가 없을 때. 3인자 `readCatalog(url, profile, true)` 를 따로 stub 한다. 이 테스트는 시계를 움직이지 않아도 된다. 바로 다시 부르면 30초 안이다.
+- 다시 읽은 뒤 그 모델로 단계를 저장할 수 있는지는 새 사례를 만들지 않는다. 단계 저장은 그룹 목록(`catalogFor`)과 비교하고 그 비교는 `ModelTierServiceTest.comparesOnlyChangedStopsWithGroupCatalog` 가 이미 본다. 위 사례가 다시 읽은 뒤 `catalogFor` 에 새 모델이 있는 것을 보면 둘이 이어진다.
 - `ModelTierServiceTest`: 기존 `memberGetsTiersWithoutProviderModelOrEffort` 를 새 기대(모델과 강도가 있고 provider 가 null)로 고치고 이름과 `@DisplayName` 도 맞춘다.
-- `ModelCatalogRefreshRouteTest`(신규): `MEMBER` 요청이 `FORBIDDEN` 이고 Hermes 를 부르지 않는 것, `ADMIN` 요청이 `status` 와 `refreshedAt` 을 받는 것. 같은 패키지 계열의 경로 테스트(`ModelTierRequestValidationTest`)의 구성 방식을 따른다.
+- `ModelCatalogRefreshRouteTest`(신규): `MEMBER` 요청이 403 `FORBIDDEN` 이고 `GroupModelCatalogService` 를 부르지 않는 것(Hermes 에 묻는 길은 그 서비스뿐이다), `ADMIN` 요청이 `status` 와 `refreshedAt` 을 받는 것, 실패가 200 의 `FAILED` 인 것. `MockMvcBuilders.standaloneSetup` 에 실제 `CurrentUserProvider` 와 mock 서비스를 주고, 역할은 `workspace/presentation/WorkspaceAdminControllerTest` 처럼 `SecurityContextHolder` 에 `CurrentUser` 를 넣어 만든다.
 
 ## 검증
 
@@ -75,8 +76,7 @@ cd backend && ./gradlew qualityCheck
 | `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/ModelOptionsService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/GroupModelCatalogService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/ModelTierService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/dto/ProfileCatalogRefresh.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/dto/GroupCatalogRefresh.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/chat/modelchoice/application/dto/CatalogRefresh.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/admin/model/presentation/ModelAdminController.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/admin/model/presentation/ModelAdminDtos.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/chat/ModelOptionsServiceTest.java` | 수정 |
