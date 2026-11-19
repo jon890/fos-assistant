@@ -77,6 +77,70 @@ test("후보를 읽지 못해도 관리자가 저장된 숨김을 풀 수 있다
   }
 });
 
+type Candidates = { catalog: { providers: { provider: string; name: string; models: string[]; reasoning: object }[]; reasoningEfforts: string[] } };
+
+/**
+ * 다시 읽기를 `REFRESHED` 로 답하게 하고, 그 뒤의 숨길 후보 응답을 `after` 가 정한다. 처음 화면은 실제 후보를 읽는다.
+ */
+async function stubRefreshedCandidates(page: Page, after: (first: Candidates) => Candidates | null): Promise<void> {
+  let refreshed = false;
+  await page.route(
+    (url) => url.pathname === "/api/admin/model-catalog/refresh",
+    (route) => {
+      refreshed = true;
+      return route.fulfill({ json: { status: "REFRESHED", refreshedAt: "2026-01-01T00:00:00Z" } });
+    },
+  );
+  await page.route(
+    (url) => url.pathname === "/api/admin/model-hidden/candidates",
+    async (route) => {
+      if (!refreshed) return route.fallback();
+      const response = await route.fetch();
+      const next = after((await response.json()) as Candidates);
+      return route.fulfill({ response, json: next ?? { catalog: null } });
+    },
+  );
+}
+
+test("목록을 다시 읽으면 숨길 후보에 새 모델이 생기고 저장 전에 고친 체크가 남는다", async ({ page }) => {
+  await clearHidden(page);
+  await stubRefreshedCandidates(page, (first) => ({
+    catalog: {
+      ...first.catalog,
+      providers: first.catalog.providers.map((row) =>
+        row.provider === "openai-codex" ? { ...row, models: [...row.models, "brand-new"] } : row,
+      ),
+    },
+  }));
+  await page.goto("/admin/models");
+  const section = page.getByRole("region", { name: "모델 숨김" });
+  const kept = section.getByRole("checkbox", { name: `${KEPT_MODEL} 숨기기` });
+  await kept.check();
+  await expect(section.getByRole("checkbox", { name: "brand-new 숨기기" })).toHaveCount(0);
+
+  await page.getByTestId("model-catalog-refresh").click();
+
+  await expect(section.getByRole("checkbox", { name: "brand-new 숨기기" })).toHaveCount(1);
+  await expect(kept).toBeChecked();
+});
+
+test("다시 읽은 뒤 후보를 불러오지 못하면 보이던 후보를 그대로 두고 알린다", async ({ page }) => {
+  await clearHidden(page);
+  await stubRefreshedCandidates(page, () => null);
+  await page.goto("/admin/models");
+  const section = page.getByRole("region", { name: "모델 숨김" });
+  const kept = section.getByRole("checkbox", { name: `${KEPT_MODEL} 숨기기` });
+  await expect(kept).toHaveCount(1);
+
+  await page.getByTestId("model-catalog-refresh").click();
+
+  await expect(page.getByTestId("model-catalog-refresh-notice")).toContainText(
+    "다시 읽은 목록을 불러오지 못했어요. 보이던 목록을 그대로 둬요.",
+  );
+  await expect(kept).toHaveCount(1);
+  await expect(section.getByTestId("model-hidden-catalog-missing")).toHaveCount(0);
+});
+
 test("후보에 없는 숨김 항목은 따로 보이고 저장해도 지워지지 않는다", async ({ page }) => {
   await page.route(
     (url) => url.pathname === "/api/admin/model-hidden",

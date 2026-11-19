@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.modelchoice.application.dto.CatalogRefresh;
 import com.bifos.assistant.chat.modelchoice.application.dto.HiddenModels;
 import com.bifos.assistant.chat.modelchoice.application.dto.ModelOptions;
 import com.bifos.assistant.chat.modelchoice.application.ModelOptionsService;
@@ -229,6 +231,82 @@ class ModelOptionsServiceTest {
         ModelOptions refreshed = service.refreshedOptionsForAgent(1L, agent);
 
         assertThat(refreshed.providers().get(0).models()).containsExactly("old");
+    }
+
+
+    @Test
+    @DisplayName("결과를 묻는 다시 읽기는 새로 읽으면 REFRESHED 와 그 시각을, 30초 안에는 Hermes 를 부르지 않고 REUSED 와 앞 시각을 답한다")
+    void refreshReportsRefreshedThenReusedWithinInterval() {
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        Instant first = clock.instant();
+
+        CatalogRefresh refreshed = service.refresh(agent);
+        clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL.minusSeconds(1));
+        CatalogRefresh reused = service.refresh(agent);
+
+        assertThat(refreshed).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.REFRESHED, first));
+        assertThat(reused).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.REUSED, first));
+        verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
+    }
+
+
+    @Test
+    @DisplayName("한 번도 읽지 못한 profile 의 다시 읽기가 실패해도 예외 없이 FAILED 와 null 시각을 답한다")
+    void refreshOfNeverReadProfileFailsWithoutThrowing() {
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+
+        CatalogRefresh result = service.refresh(agent);
+
+        assertThat(result).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.FAILED, null));
+    }
+
+
+    @Test
+    @DisplayName("실패한 직후 30초 안의 다시 읽기는 Hermes 를 부르지 않고 FAILED 를 답하며 앞서 성공한 시각을 지킨다")
+    void refreshRightAfterFailureStaysFailedAndKeepsLastSuccess() {
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Instant succeeded = clock.instant();
+        service.refresh(agent);
+        clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL);
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+
+        CatalogRefresh failed = service.refresh(agent);
+        clock.advance(Duration.ofSeconds(5));
+        CatalogRefresh again = service.refresh(agent);
+
+        assertThat(failed).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.FAILED, succeeded));
+        assertThat(again).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.FAILED, succeeded));
+        verify(hermes, times(2)).readCatalog(anyString(), anyString(), eq(true));
+    }
+
+
+    @Test
+    @DisplayName("앞 시도가 Hermes 의 답을 기다리는 동안 온 다시 읽기는 앞서 실패했더라도 REUSED 다")
+    void refreshDuringInFlightAttemptIsReused() {
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        service.refresh(agent);
+        clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL);
+        CatalogRefresh[] during = new CatalogRefresh[1];
+        // 앞 stub 이 예외를 던지므로 when(...) 으로 다시 걸면 거는 순간 예외가 난다.
+        doAnswer(invocation -> {
+            // Hermes 가 아직 답하지 않은 순간에 다른 요청이 들어온 것을 흉내 낸다.
+            during[0] = service.refresh(agent);
+            return catalog("openai-codex", provider("openai-codex", "a"));
+        }).when(hermes).readCatalog(anyString(), anyString(), eq(true));
+
+        CatalogRefresh outer = service.refresh(agent);
+
+        assertThat(during[0]).isEqualTo(new CatalogRefresh(CatalogRefresh.Status.REUSED, null));
+        assertThat(outer.status()).isEqualTo(CatalogRefresh.Status.REFRESHED);
     }
 
 

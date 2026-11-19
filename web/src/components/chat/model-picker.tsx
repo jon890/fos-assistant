@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Popover } from "radix-ui";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
   getModelTiers,
   MODEL_TIER_LABELS,
+  tierModelLine,
   type ModelSelectionMode,
   type ModelTier,
   type ModelTierCode,
@@ -51,10 +52,10 @@ function initialTier(
 }
 
 /**
- * 입력창 아래의 모델 단추다. 누르면 ChatGPT 의 Thinking 슬라이더처럼 칸을 고르는 조절 하나가 열린다.
+ * 입력창 아래의 모델 단추다. 누르면 칸을 고르는 세로 목록이 열린다.
  *
- * <p>관리자가 비운 칸은 보이지 않고, 칸이 하나도 없으면 단추를 그리지 않는다. 칸 뒤의 provider 와 모델, effort 는
- * 역할과 상관없이 그리지 않는다. 관리자 영역에만 그린다(ADR-063).
+ * <p>관리자가 비운 칸은 보이지 않고, 칸이 하나도 없으면 단추를 그리지 않는다. 줄마다 그 칸의 모델과 effort 를
+ * 역할과 상관없이 보인다(ADR-20261119 / tier-model-names). provider 는 그리지 않는다. 닫힌 단추는 칸 이름만 보인다.
  *
  * <p>칸은 radio 묶음으로 그린다. 방향키로 움직이면 고른 칸이 바로 저장되고, 앞 저장이 끝나기 전에 또 고르면 마지막
  * 칸만 이어서 저장한다. 저장이 겹쳐 늦게 끝난 요청이 마지막 선택을 덮지 않게 한다.
@@ -162,7 +163,7 @@ export function ModelTierPicker({
                 content.querySelector<HTMLInputElement>("input");
               target?.focus({ preventScroll: true });
             }}
-            data-testid="model-tier-slider"
+            data-testid="model-tier-list"
             className="z-50 w-[min(22rem,calc(100vw-1rem))] rounded-lg border bg-popover p-4 text-popover-foreground shadow-md outline-none"
           >
             <p
@@ -174,7 +175,7 @@ export function ModelTierPicker({
             <p className="mt-1 text-xs text-muted-foreground">
               고른 단계는 이 대화와 다음 새 대화에 쓰여요.
             </p>
-            <TierSlider
+            <TierList
               tiers={tiers}
               shown={shown}
               disabled={disabled}
@@ -198,7 +199,7 @@ export function ModelTierPicker({
   );
 }
 
-type SliderProps = {
+type ListProps = {
   tiers: ModelTier[];
   shown: ModelTierCode | null;
   disabled: boolean;
@@ -208,79 +209,74 @@ type SliderProps = {
 };
 
 /**
- * 칸을 고르는 조절이다. 같은 이름의 radio 묶음이라 방향키로 움직이고, 점을 잇는 선이 고른 칸까지 채워진다.
+ * 칸을 고르는 세로 목록이다. 같은 이름의 radio 묶음이라 방향키로 움직이고, 고른 줄에 체크 표시가 붙는다.
  *
- * <p>`input type="range"` 대신 radio 를 쓴다. 칸마다 이름이 보이고, 브라우저 테스트가 칸 이름으로 바로 고른다.
+ * <p>줄마다 칸 이름 아래에 모델과 effort 를 보인다. 가로 슬라이더는 휴대폰 폭에서 한 칸이 좁아 모델 이름이 들어가지
+ * 않는다. radio 의 이름은 칸 이름만으로 두고 모델 줄은 설명으로 붙인다. 브라우저 테스트가 칸 이름으로 바로 고른다.
  */
-function TierSlider({
+function TierList({
   tiers,
   shown,
   disabled,
   name,
   labelledBy,
   onPick,
-}: SliderProps) {
-  const selectedIndex = tiers.findIndex((item) => item.tier === shown);
+}: ListProps) {
   return (
     <div
       role="radiogroup"
       aria-labelledby={labelledBy}
-      className="relative mt-4 flex"
+      className="-mx-2 mt-3 -mb-2 grid gap-0.5"
     >
-      {tiers.length > 1 ? (
-        <>
-          {/* 칸의 점을 잇는 선이다. 양 끝 칸의 가운데에서 멈춘다. */}
-          <span
-            aria-hidden="true"
-            className="absolute top-[7px] h-0.5 rounded-full bg-border"
-            // 칸 수가 관리자가 채운 만큼 달라져 끝점을 클래스로 정할 수 없다.
-            style={{
-              left: `${50 / tiers.length}%`,
-              right: `${50 / tiers.length}%`,
-            }}
-          />
-          {selectedIndex > 0 ? (
-            <span
-              aria-hidden="true"
-              className="absolute top-[7px] h-0.5 rounded-full bg-primary"
-              // 고른 칸까지 채우는 길이도 칸 수와 고른 자리에 따라 이어지는 수다.
-              style={{
-                left: `${50 / tiers.length}%`,
-                width: `${(selectedIndex * 100) / tiers.length}%`,
-              }}
-            />
-          ) : null}
-        </>
-      ) : null}
-      {tiers.map((item) => (
-        <label
-          key={item.tier}
-          className="relative flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-2"
-        >
-          <input
-            type="radio"
-            name={name}
-            value={item.tier}
-            checked={shown === item.tier}
-            disabled={disabled}
-            onChange={() => onPick(item.tier)}
-            data-testid={`model-tier-${item.tier.toLowerCase()}`}
-            // 칸 전체를 덮는 투명한 radio 다. 점과 이름을 눌러도 radio 가 직접 받는다.
-            className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
-          />
-          <span
-            aria-hidden="true"
+      {tiers.map((item) => {
+        const line = tierModelLine(item);
+        const lineId = `${name}-${item.tier}-model`;
+        return (
+          <label
+            key={item.tier}
             className={cn(
-              "size-4 rounded-full border-2 border-border bg-background transition-colors",
-              "peer-checked:border-primary peer-checked:bg-primary",
-              "peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
+              "relative flex min-w-0 cursor-pointer items-center gap-3 rounded-md px-2 py-2",
+              "has-checked:bg-muted has-focus-visible:ring-2 has-focus-visible:ring-ring",
             )}
-          />
-          <span className="truncate text-xs text-muted-foreground peer-checked:font-medium peer-checked:text-foreground">
-            {item.label}
-          </span>
-        </label>
-      ))}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={item.tier}
+              checked={shown === item.tier}
+              disabled={disabled}
+              aria-label={item.label}
+              aria-describedby={line === null ? undefined : lineId}
+              onChange={() => onPick(item.tier)}
+              data-testid={`model-tier-${item.tier.toLowerCase()}`}
+              // 줄 전체를 덮는 투명한 radio 다. 줄 어디를 눌러도 radio 가 직접 받는다.
+              className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
+            />
+            <span className="grid min-w-0 flex-1">
+              <span
+                data-testid="model-tier-name"
+                className="text-sm font-medium whitespace-nowrap text-foreground"
+              >
+                {item.label}
+              </span>
+              {line === null ? null : (
+                <span
+                  id={lineId}
+                  data-testid="model-tier-model"
+                  className="truncate text-xs text-muted-foreground"
+                >
+                  {line}
+                </span>
+              )}
+            </span>
+            <Check
+              aria-hidden="true"
+              data-testid="model-tier-check"
+              className="invisible size-4 shrink-0 text-foreground peer-checked:visible"
+            />
+          </label>
+        );
+      })}
     </div>
   );
 }
