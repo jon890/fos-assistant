@@ -66,7 +66,10 @@ test("대역이 빼는 맡길 곳 구역의 제목과 안내 줄은 Control Plan
 });
 
 test("대화 실행의 최신 정보와 출처 절과 오늘 날짜 줄을 빼고 그 사이의 글은 보존한다", () => {
-  const search = "# 최신 정보와 출처\n\nweb_search 도구가 있으면 검색한다\n둘째 줄";
+  const source = readFileSync(CONTEXT_ASSEMBLER, "utf8");
+  const block = /SEARCH_INSTRUCTIONS = """([\s\S]*?)"""/.exec(source);
+  assert.ok(block, "검색 지침 상수를 찾지 못했다");
+  const search = block[1]!.split("\n").map((line) => line.trim()).join("\n").trim();
   const date = "오늘은 2026년 11월 18일 수요일이다(한국 시간).";
   const instructions = [RESPONSE_GUIDE, TOOL_CALL_GUIDE, APPROVAL_CARD_GUIDE, search, MEMORY_GUIDE, MEMORY_BODY, "다시 생성 지시", date].join("\n\n");
 
