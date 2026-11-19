@@ -116,7 +116,7 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", task_
         return _control_plane_context(tool_name, session_id, tool_call_id)
     if not isolated:
         # 바인딩 profile 이다. 플러그인 서버의 도구는 플러그인 정책에, 나머지는 도구 판정에 묻는다.
-        # `execute_code` 안의 플러그인 도구 호출은 session(v0.21)이나 tool_call_id(v0.23)가 없어 `connector_policy` 가 막는다.
+        # `execute_code` 안의 플러그인 도구 호출은 `tool_call_id` 가 없어 `connector_policy` 가 막는다.
         if not connector:
             return event_guard(tool_name, args, session_id, tool_call_id)
     elif tool_name == CODE_EXECUTION_TOOL:

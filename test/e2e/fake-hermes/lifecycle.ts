@@ -57,14 +57,13 @@ export function createLifecycle(state: FakeHermesState) {
     gate?.();
   };
   /**
-   * Hermes 가 다시 뜬 것을 흉내 낸다. v0.23 모양이면 도는 실행이 `unknown` 이 되어 같은 session 의 뒤 실행을 막고,
-   * v0.21 모양이면 메모리에 있던 실행 기록이 사라진다. 붙잡은 실행은 상태를 바꾸지 않고 푼다.
+   * Hermes 가 다시 뜬 것을 흉내 낸다. 도는 실행이 `unknown` 이 되어 같은 session 의 뒤 실행을 막는다.
+   * 붙잡은 실행은 상태를 바꾼 뒤 푼다.
    */
   const restartHermes = () => {
     for (const run of [...state.runs.values()]) {
       if (run.status !== "running") continue;
-      if (state.hermesShape === "v0.23") run.status = "unknown";
-      else state.runs.delete(run.run_id);
+      run.status = "unknown";
     }
     releaseHeldRun();
     state.slowActive.clear();

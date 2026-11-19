@@ -84,7 +84,7 @@ Control Plane 에 묻고 답대로 한다(fos-assistant ADR-049, ADR-083).
 바인딩 profile 에만 걸리는 것이다.
 
 - `execute_code`, 다른 MCP 서버의 도구, 내장 도구는 건드리지 않는다. 관리자가 켠 코드 실행을 플러그인 때문에 끄지 않는다.
-  `execute_code` 안에서 부른 플러그인 도구는 hook 에 session(v0.21)이나 tool_call_id(v0.23)가 오지 않아 위의 규칙으로 막힌다
+  `execute_code` 안에서 부른 플러그인 도구는 hook 에 tool_call_id가 오지 않아 위의 규칙으로 막힌다
 - 플러그인 도구의 결과가 글이면 `transform_tool_result` hook 이 `<external-data>` 로 감싼다. 모양은 Control Plane 의
   `ExternalData.wrap` 과 같다. 판정이 막은 호출은 이 hook 에 닿지 않으므로, 여기 닿은 오류 글은 플러그인 서버가 낸 외부 데이터다.
   글이 아닌 결과는 그대로 둔다. 예외는 잡아 None 을 돌려준다. Hermes 는 그때 원래 결과를 그대로 넘기고,
@@ -99,7 +99,7 @@ Control Plane 의 `tool-guard` 경로에 그 session 이 사건 실행 트리인
 - 주소는 `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `tool-guard` 로 바꾼 것이다. 없으면 막는다
 - 서명할 글은 `v1-tool-guard`, 등록 이름, 루트 session, session, tool_call_id 를 줄바꿈 하나로 잇는다
 - `vision_analyze` 는 이미지가 원격 주소나 data URL 일 때만 안전 목록이다. 로컬 경로면 묻는다
-- session 이 없으면 묻지 않고 통과한다. v0.21 의 코드 실행 안의 호출이고 그 코드를 연 `execute_code` 가 이미 판정을 받았다
+- 안전 목록 밖 호출에 session 이 없으면 권한을 확인할 수 없어 막는다
 - session 은 있고 tool_call_id 가 없으면 `code-exec:` 뒤에 무작위 16진수 32자를 붙인 번호로 묻는다. v0.23 의 코드 실행 안의 호출이다
 - 200 의 `allow` 만 통과한다. 404 는 그 경로가 없는 옛 Control Plane 이라 통과한다. 그 밖과 모든 예외는 막는다
 

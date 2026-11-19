@@ -151,7 +151,7 @@ class PluginFixture(unittest.TestCase):
         agent.secret_scope = secret_scope
         constants = types.ModuleType("hermes_constants")
         constants.get_hermes_home = lambda: pathlib.Path(self.tmp.name)
-        # Hermes 의 위험 명령 분류 대역이다. `rm -rf` 가 든 명령만 위험하다고 답한다. v0.21 모양이라 승인 파일 판정은 없다.
+        # Hermes 의 위험 명령 분류 대역이다. `rm -rf` 가 든 명령만 위험하다고 답한다.
         self.dangerous_calls = []
         detection = types.ModuleType("tools.approval_detection")
 
@@ -169,6 +169,11 @@ class PluginFixture(unittest.TestCase):
             sys.modules.pop(name, None)
         sys.modules.update({"agent": agent, "agent.secret_scope": secret_scope, "hermes_constants": constants,
                             "tools": tools, "tools.approval_detection": detection})
+        file_safety = types.ModuleType("agent.file_safety")
+        file_safety.write_approval_key = lambda path: None
+        write_guards = types.ModuleType("tools.file_tools_write_guards")
+        write_guards._resolved_or_raw = lambda path, task_id: path
+        sys.modules.update({"agent.file_safety": file_safety, "tools.file_tools_write_guards": write_guards})
         self.plugin = load_ctx(self.addCleanup)
 
     def tearDown(self):
@@ -204,8 +209,9 @@ class HookTest(PluginFixture):
         for args in ({}, {"images": []}, {"images": images},
                      {"tasks": [{"prompt": "사진", "images": images}, {"prompt": "글"}]}):
             with self.subTest(args=args):
-                # 이미지 검사를 지난 호출은 도구 판정으로 간다. session 없는 호출은 묻지 않고 통과한다.
-                self.assertIsNone(self.call("delegate_task", args=args, session=""))
+                # 이미지 검사를 지나도 실행 권한을 확인할 session 이 없으면 막는다.
+                self.assertEqual(self.call("delegate_task", args=args, session=""),
+                                 {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
 
     def test_delegate_invalid_image_shapes_fail_closed(self):
         for args in ({"images": "/photo.png"}, {"tasks": "invalid"}, {"tasks": ["invalid"]},
@@ -214,14 +220,15 @@ class HookTest(PluginFixture):
                 self.assertEqual(self.call("delegate_task", args=args),
                                  {"action": "block", "message": self.plugin.DELEGATE_IMAGE_MESSAGE})
 
-    def test_safe_and_sessionless_tools_are_untouched(self):
-        """안전 목록의 도구와 session 없는 호출(`execute_code` 안의 호출)은 묻지 않고 그대로 둔다."""
+    def test_safe_tools_pass_and_sessionless_unsafe_tools_block(self):
+        """안전 목록은 통과하고, 안전 목록 밖 호출에 session 이 없으면 막는다."""
         for tool in sorted(self.plugin.SAFE_TOOLS):
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool, args={"image_url": "https://images.example/a.png"}))
         for tool in ("terminal", "write_file", "mcp__other__agent_delegate"):
             with self.subTest(tool=tool, session=""):
-                self.assertIsNone(self.call(tool, session=""))
+                self.assertEqual(self.call(tool, session=""),
+                                 {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
 
     def test_other_tools_block_without_guard_url(self):
         """판정 주소가 없으면 안전 목록 밖의 도구를 막는다. 다른 MCP 서버의 도구도 같다."""
@@ -327,7 +334,8 @@ class HookTest(PluginFixture):
         self.assertEqual(result["message"],
                          "이 환경에서는 스킬을 대화로 만들거나 고칠 수 없다. 에이전트 관리 화면에서 올린다")
         # MCP 이름에 같은 글자가 들어가도 스킬 막기로 막지 않는다. 그 호출은 도구 판정으로 간다.
-        self.assertIsNone(self.call("mcp__other__skill_manage", session=""))
+        self.assertEqual(self.call("mcp__other__skill_manage", session=""),
+                         {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
 
     def test_missing_state_db_falls_back_to_session(self):
         """state DB 가 없으면 session 값으로 대신한다."""
@@ -1168,9 +1176,10 @@ class ToolGuardTest(GuardServerFixture):
                     self.assertEqual(request["body"]["sig"], self.plugin.sign_tool_guard(
                         VECTOR_KEY, "read_file", VECTOR_ROOT, VECTOR_SESSION, generated))
 
-    def test_code_execution_call_without_session_still_passes(self):
-        """v0.21 의 코드 실행 안 호출(session 없음)은 지금처럼 묻지 않고 통과한다."""
-        self.assertIsNone(self.call("read_file", session="", call_id=""))
+    def test_call_without_session_is_blocked(self):
+        """안전 목록 밖 호출에 session 이 없으면 권한을 확인할 수 없어 막는다."""
+        self.assertEqual(self.call("read_file", session="", call_id=""),
+                         {"action": "block", "message": self.plugin.GUARD_BLOCK_MESSAGE})
         self.assertEqual(self.requests, [])
 
     def test_exceptions_inside_hook_block(self):
@@ -1301,15 +1310,15 @@ class ApprovalGuardTest(GuardServerFixture):
                                  self.blocked(self.plugin.COMPUTER_USE_MESSAGE))
         self.assertEqual(self.requests, [])
 
-    def test_writes_without_approval_point_go_on_to_tool_guard(self):
-        """v0.21 처럼 `write_approval_key` 가 없는 Hermes 에서는 파일 판정을 건너뛴다. Hermes 가 승인 카드로 보낸다."""
+    def test_writes_without_approval_point_are_blocked(self):
+        """승인 파일 판정 함수가 없으면 안전한 쓰기인지 확인할 수 없어 막는다."""
         self.install("agent.file_safety")
         for tool, args in (("write_file", {"path": "~/.ssh/config", "content": "x"}),
                            ("patch", {"path": "~/.bashrc", "old_string": "a", "new_string": "b"})):
             with self.subTest(tool=tool):
                 self.requests.clear()
-                self.assertIsNone(self.call(tool, args=args))
-                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(self.call(tool, args=args), self.blocked(self.plugin.APPROVAL_WRITE_MESSAGE))
+                self.assertEqual(self.requests, [])
 
     def test_writes_to_approval_paths_are_blocked(self):
         """승인이 필요한 경로에 쓰는 `write_file` 과 `patch` 는 묻지 않고 막는다. V4A 머리줄의 경로도 본다."""

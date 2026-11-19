@@ -215,9 +215,6 @@ test("v0.23 모양은 재기동한 실행을 unknown 으로 두고, 해제 전�
   const read = async (runId: string) =>
     (await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}`, { headers })).json()) as Record<string, unknown>;
   try {
-    assert.equal((await fetch(`${hermes.baseUrl}/__test/hermes-shape`, {
-      method: "POST", body: JSON.stringify({ shape: "v0.23" }),
-    })).status, 204);
     hermes.holdNextRun();
     const lost = await submit("재기동 전 질문");
     hermes.restartHermes();
@@ -245,17 +242,15 @@ test("v0.23 모양은 재기동한 실행을 unknown 으로 두고, 해제 전�
     assert.equal((await read(behind)).status, "running");
 
     assert.equal((await fetch(`${hermes.baseUrl}/__test/reset-controls`, { method: "POST" })).status, 204);
-    assert.equal("admission_id" in (await read(behind)), false);
+    assert.equal("admission_id" in (await read(behind)), true);
   } finally {
     await hermes.close();
   }
 });
-
 test("v0.23 모양은 끝난 run 에 다시 연결하면 끝 사건 하나를 보내고 닫는다", async () => {
   const hermes = await startFakeHermes({ browser: "example-key" });
   const headers = { Authorization: "Bearer example-key" };
   try {
-    hermes.useHermesShape("v0.23");
     const response = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
       method: "POST", headers, body: JSON.stringify({ input: "보관분 검사" }),
     });
@@ -264,22 +259,6 @@ test("v0.23 모양은 끝난 run 에 다시 연결하면 끝 사건 하나를 �
     const replay = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}/events`, { headers })).text();
     const events = replay.split("\n").filter((line) => line.startsWith("data:")).map((line) => JSON.parse(line.slice(5)).event);
     assert.deepEqual(events, ["run.completed"]);
-  } finally {
-    await hermes.close();
-  }
-});
-
-test("v0.21 모양의 재기동은 도는 실행의 기록을 지워 404 로 답한다", async () => {
-  const hermes = await startFakeHermes({ browser: "example-key" });
-  const headers = { Authorization: "Bearer example-key" };
-  try {
-    hermes.holdNextRun();
-    const response = await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
-      method: "POST", headers, body: JSON.stringify({ input: "재기동 전 질문" }),
-    });
-    const runId = ((await response.json()) as { run_id: string }).run_id;
-    assert.equal((await fetch(`${hermes.baseUrl}/__test/restart-hermes`, { method: "POST" })).status, 204);
-    assert.equal((await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${runId}`, { headers })).status, 404);
   } finally {
     await hermes.close();
   }

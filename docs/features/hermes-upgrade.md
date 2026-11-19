@@ -8,9 +8,9 @@ covers: `hermes/tests/hermes_contract.py`, `scripts/checks/check-hermes-contract
 버전마다 달라지는 Hermes 의 동작은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「Hermes 를 올릴 때」 가 갖는다.
 
 v0.23.2 로 올리는 변경의 요구와 결정은 스펙 [`hermes-upgrade/spec.md`](hermes-upgrade/spec.md), 구조는 설계 [`hermes-upgrade/design.md`](hermes-upgrade/design.md)가 갖는다.
-지금은 Control Plane 이 두 버전의 실행 조회를 함께 읽는다(PR1). fos-ctx, 계약 테스트, 본문 없는 요청 진단은 아직 v0.21.6 에만 맞고, 운영 Hermes 는 v0.21.6 이다.
+운영은 v0.23.2 로 전환했고 답 왕복과 배포 검사를 통과했다. 연동 기준과 계약 테스트도 v0.23.2 하나를 쓰며, 이전 버전 전용 조회·승인 검사 예외는 제거했다. 이번 호환 제거 배포 뒤 실제 답 왕복은 코디네이터가 확인한다.
 
-## 두 버전의 실행 조회
+## 현재 실행 조회
 
 Hermes 의 상태와 사건 이름은 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 가 옮긴다. application 은 Hermes 문자열을 보지 않는다.
 

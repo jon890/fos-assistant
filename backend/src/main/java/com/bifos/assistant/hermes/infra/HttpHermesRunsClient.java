@@ -39,11 +39,8 @@ import tools.jackson.databind.JsonNode;
 @Component
 @Slf4j
 public class HttpHermesRunsClient implements HermesRunsClient {
-    /**
-     * 더 기다리지 않는 상태다. {@code interrupted} 는 v0.21.5 에서 생겼다. gateway 가 멈추거나 실행이 중간에
-     * 끊기면 그 상태로 끝나는데, 여기 없으면 실행 시간 한도까지 조회만 되풀이한다.
-     */
-    private static final Set<String> TERMINAL = Set.of("completed", "failed", "cancelled", "error", "interrupted");
+    /** session 대기열 조회가 답하는 종료 상태다. 끊긴 실행도 조회에서는 {@code cancelled} 다. */
+    private static final Set<String> TERMINAL = Set.of("completed", "failed", "cancelled");
 
     private final RestClient restClient;
     /** steer 전용이다. 읽기 제한 시간이 짧아 끼우기를 기다리는 동안 turn 의 끝이 오래 밀리지 않는다. */
@@ -407,11 +404,8 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         JsonNode runtime = run.path("runtime");
         String servedModel = text(runtime, "model");
         String servedProvider = text(runtime, "provider");
-        HermesRunEnding ending = new HermesRunEnding(status, text(run, "error"),
-            blankToNull(text(run, "pending_steer")), true, servedModel, servedProvider);
-        if (HermesSessionRuns.queuedBySession(run)) {
-            ending = sessionRuns.complete(apiBaseUrl, profileName, runId, ending);
-        }
+        HermesRunEnding ending = sessionRuns.complete(apiBaseUrl, profileName, runId,
+            new HermesRunEnding(status, null, null, false, servedModel, servedProvider));
         return new HermesRunResult(
             runId,
             text(run, "session_id"),
@@ -481,11 +475,6 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isTextual() ? value.asText() : null;
-    }
-
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
     }
 
 

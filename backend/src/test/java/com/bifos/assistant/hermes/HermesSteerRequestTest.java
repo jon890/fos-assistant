@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.hermes.application.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.application.dto.SteerOutcome;
 import com.bifos.assistant.hermes.config.HermesProperties;
 import com.bifos.assistant.hermes.infra.HermesProfileKeyStore;
@@ -22,7 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 도는 실행에 글을 끼워 넣는 요청과 그 판정, 끝난 결과의 {@code pending_steer} 읽기를 본다. */
+/** 도는 실행에 글을 끼워 넣는 요청과 응답을 본다. 남은 글은 종료 사건 계약 테스트가 확인한다. */
 class HermesSteerRequestTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -114,21 +113,6 @@ class HermesSteerRequestTest {
         steerDelayMillis = 1500;
 
         assertThat(client.steer(baseUrl, "dad", "run-1", "글")).isEqualTo(SteerOutcome.UNKNOWN);
-    }
-
-
-    @Test
-    @DisplayName("끝난 실행 조회에 pending_steer 가 있으면 결과에 싣고 없으면 비운다")
-    void readsPendingSteerFromFinishedRun() {
-        runBody = "{\"run_id\":\"run-1\",\"status\":\"completed\",\"output\":\"답\",\"pending_steer\":\"창가로\\n2만원 이하로\"}";
-
-        HermesRunLookup lookup = client.lookupRun(baseUrl, "dad", "run-1");
-
-        assertThat(lookup.state()).isEqualTo(HermesRunLookup.State.FINISHED);
-        assertThat(lookup.result().pendingSteer()).isEqualTo("창가로\n2만원 이하로");
-
-        runBody = "{\"run_id\":\"run-1\",\"status\":\"completed\",\"output\":\"답\"}";
-        assertThat(client.lookupRun(baseUrl, "dad", "run-1").result().pendingSteer()).isNull();
     }
 
 

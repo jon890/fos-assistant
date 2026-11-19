@@ -57,7 +57,6 @@ export function createFakeHermesState(
   const scripts = new Map<string, DemoScript>();
   let busy = false;
   /** 실행 조회와 해제 경로가 흉내 낼 Hermes 버전의 모양이다. */
-  let hermesShape: "v0.21" | "v0.23" = "v0.21";
   let readinessOutage: "busy" | "unavailable" | "timeout" | undefined;
   let submitCount = 0;
   let modelOptionsCalls = 0;
@@ -131,7 +130,6 @@ export function createFakeHermesState(
     blockedProviders,
     scripts,
     busy,
-    hermesShape: hermesShape as "v0.21" | "v0.23",
     readinessOutage: readinessOutage as "busy" | "unavailable" | "timeout" | undefined,
     submitCount,
     modelOptionsCalls,
@@ -382,7 +380,6 @@ export type FakeHermes = {
   /** 그 profile 에 바인딩 설치로 붙은 플러그인 id 들이다. 옛 설치는 담지 않는다. */
   boundConnectorsOf(profile: string): string[];
   /** 실행 조회와 해제 경로의 모양을 고른다. v0.23 은 조회에서 `error` 와 `pending_steer` 를 빼고 기록 번호를 싣는다. `reset-controls` 가 v0.21 로 되돌린다. */
-  useHermesShape(shape: "v0.21" | "v0.23"): void;
   /** Hermes 가 다시 뜬 것을 흉내 낸다. v0.23 이면 도는 실행이 `unknown` 이 되고, v0.21 이면 실행 기록이 사라진다. */
   restartHermes(): void;
   /** v0.23 모양에서 해제 요청을 받은 run 번호다. 받은 순서대로다. */

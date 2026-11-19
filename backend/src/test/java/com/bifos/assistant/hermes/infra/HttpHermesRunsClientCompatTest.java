@@ -31,7 +31,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Hermes v0.21.6 과 v0.23.2 의 실행 조회를 같은 뜻으로 읽는지 본다(docs/features/hermes-upgrade/design.md 의 「조회 응답 읽기」).
+ * Hermes 실행 조회를 Control Plane 의 실행 결과로 읽는지 본다(docs/features/hermes-upgrade/design.md 의 「조회 응답 읽기」).
  *
  * <p>대역 서버는 경로마다 정한 답을 차례로 내고, 다 쓰면 마지막 답을 되풀이한다. 받은 요청은 「메서드 경로 본문」 으로 남긴다.
  */
@@ -78,36 +78,10 @@ class HttpHermesRunsClientCompatTest {
 
 
     @Test
-    @DisplayName("v0.21.6 모양의 끝난 실행은 지금처럼 읽고 넘어간 steer 글을 안다")
-    void readsV021ShapeAsBefore() {
-        on("GET /v1/runs/run-1", 200, "{\"status\":\"interrupted\",\"error\":\"gateway stopped\",\"session_id\":\"s1\"}");
-
-        HermesRunLookup lookup = client.lookupRun(baseUrl, "dad", "run-1");
-
-        assertThat(lookup.result().status()).isEqualTo("interrupted");
-        assertThat(lookup.result().error()).isEqualTo("gateway stopped");
-        assertThat(lookup.result().pendingSteerKnown()).isTrue();
-        assertThat(requests).containsExactly("GET /v1/runs/run-1 ");
-    }
-
-
-    @Test
-    @DisplayName("v0.21.6 모양의 completed 와 cancelled 는 그대로 읽고, 404 는 모르는 실행이다")
-    void readsOtherV021ShapesAsBefore() {
-        on("GET /v1/runs/run-1", 200, "{\"status\":\"completed\",\"output\":\"답\",\"pending_steer\":\"남은 글\"}");
-        on("GET /v1/runs/run-2", 200, "{\"status\":\"cancelled\",\"output\":\"\"}");
-        on("GET /v1/runs/run-3", 404, "{\"error\":{\"code\":\"run_not_found\"}}");
-
-        HermesRunResult completed = client.lookupRun(baseUrl, "dad", "run-1").result();
-        HermesRunResult cancelled = client.lookupRun(baseUrl, "dad", "run-2").result();
-
-        assertThat(completed.succeeded()).isTrue();
-        assertThat(completed.pendingSteer()).isEqualTo("남은 글");
-        assertThat(completed.pendingSteerKnown()).isTrue();
-        assertThat(cancelled.status()).isEqualTo("cancelled");
-        assertThat(cancelled.pendingSteerKnown()).isTrue();
-        assertThat(client.lookupRun(baseUrl, "dad", "run-3").state()).isEqualTo(HermesRunLookup.State.NOT_FOUND);
-        assertThat(requests).noneMatch(request -> request.contains("/events") || request.contains("resolve-unknown"));
+    @DisplayName("없는 실행의 404 는 모르는 실행이다")
+    void readsMissingRun() {
+        on("GET /v1/runs/run-1", 404, "{}");
+        assertThat(client.lookupRun(baseUrl, "dad", "run-1").state()).isEqualTo(HermesRunLookup.State.NOT_FOUND);
     }
 
 

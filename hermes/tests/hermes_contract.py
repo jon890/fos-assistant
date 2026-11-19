@@ -16,13 +16,12 @@ plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한�
 """
 
 from dataclasses import dataclass
-import pathlib
 
 
 # 연동 기준 Hermes 버전이다. 상류 저장소의 tag 이름이다. CI 가 이 버전의 소스로 계약을 확인한다.
-HERMES_VERSION = "v0.21.6"
+HERMES_VERSION = "v0.23.2"
 # 그 tag 가 가리키는 commit 이다. 상류가 tag 를 옮기면 확인이 실패한다.
-HERMES_COMMIT = "818c13be1dc4fd28987e1e881a9408224afd4535"
+HERMES_COMMIT = "ae2a81ccc00e9b7c06301523e5bb09608397149c"
 HERMES_REPOSITORY = "https://github.com/NousResearch/hermes-agent"
 
 # plugin 이 import 하는 최상위 이름 중 Hermes 의 것이다. 이 이름으로 시작하는 import 는 모두 아래 표에 있어야 한다.
@@ -30,7 +29,7 @@ HERMES_PACKAGES = frozenset({"hermes_cli", "hermes_constants", "hermes_state", "
 # plugin 이 import 해도 되는 제3자 패키지다. 표준 라이브러리와 이것과 Hermes 밖의 import 가 생기면 시험이 실패한다.
 # Hermes 의 다른 최상위 패키지(`agent`, `tools` 등)를 쓰기 시작하면 HERMES_PACKAGES 에 더하고 지점을 선언한다.
 # GIF/WebP helper는 Hermes core가 이미 고정한 Pillow를 쓴다. 새 의존성을 추가하지 않는다.
-NATIVE_IMAGE_PILLOW_VERSION = "12.3.0"
+NATIVE_IMAGE_PILLOW_VERSION = "13.0.0"
 # profile별 적재와 reload가 공유 FIFO의 module 이름을 지우지 않는다는 경계다.
 NATIVE_IMAGE_PLUGIN_LOADER = ("hermes_cli/plugins_loader.py", "_directory_module_name", "_evict_modules")
 
@@ -91,7 +90,7 @@ SYMBOLS = {
     ("hermes_cli.dashboard_auth", "Session"): Value(),
     ("hermes_cli.dashboard_auth.token_auth", "token_auth_middleware"): Call(positional=2, is_async=True, exact=True),
     ("hermes_cli.dashboard_auth.token_auth", "authenticate_token"): Call(
-        positional=1, returns="Tuple[Optional[TokenPrincipal], Optional[str]]"),
+        positional=1, returns="tuple[Optional[TokenPrincipal], Optional[str]]"),
     ("hermes_cli.plugins", "PluginContext.register_dashboard_auth_provider"): Call(positional=1),
     ("plugins.dashboard_auth.drain", "assess_secret_strength"): Call(positional=1),
     # profile
@@ -107,7 +106,7 @@ SYMBOLS = {
     ("gateway.control_socket", "reload_gateway_plugins"): Call(
         positional=1, keywords=("profile_home",), returns="Optional[dict[str, Any]]"),
     # 도구와 실행 공간 설정
-    ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="Set[str]"),
+    ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="set[str]"),
     ("hermes_cli.tools_config", "_get_plugin_toolset_keys"): Call(),
     ("hermes_cli.tools_config", "PLATFORMS"): Value(),
     ("hermes_cli.web_server_profiles", "_config_profile_scope"): Call(positional=1),
@@ -115,8 +114,8 @@ SYMBOLS = {
 }
 
 # fos-ctx 원본 도구가 기대는 native 이미지 반환 경로다. 함수 본문을 분리 실행하는 검사가 판 변경을 거른다.
-NATIVE_ATTACHMENT_REGISTRATION = ("hermes_cli/plugins.py", "register_tool",
-                                Call(keywords=("name", "toolset", "schema", "handler")))
+NATIVE_ATTACHMENT_REGISTRATION = ("hermes_cli/plugins_context.py", "register_tool",
+                                   Call(keywords=("name", "toolset", "schema", "handler")))
 NATIVE_ATTACHMENT_FUNCTIONS = {
     "tools/registry.py": ("_normalize_handler_result",),
     "agent/tool_dispatch_helpers.py": ("_is_multimodal_tool_result", "_is_text_part", "_multimodal_text_summary"),
@@ -128,10 +127,10 @@ NATIVE_ATTACHMENT_FUNCTIONS = {
     "agent/tool_executor.py": ("_persist_multimodal_text_parts",),
 }
 # 셋째 칸이 있으면 그 상수의 lambda 가 부르는 같은 파일의 함수 이름이다.
-NATIVE_TOOL_EVENT_FIELDS = ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS")
-# 실패 판정이 JSON 객체의 모양(`status`, `results`)까지 보는 함수와 그 상수다. 기준 계열에는 없다.
+NATIVE_TOOL_EVENT_FIELDS = ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS", ("_call_id",))
+# 실패 판정이 JSON 객체의 모양(`status`, `results`)까지 보는 함수와 그 상수다. 현재 기준 버전이 쓰는 함수다.
 # 이 판정이 first-frame envelope 를 실패로 잘못 세지 않는지 실제 함수로 확인한다.
-NATIVE_FAILURE_SHAPE = None
+NATIVE_FAILURE_SHAPE = ("agent/tool_result_classification.py", "shape_failure_error", "_FAILED_STATUSES")
 
 # 관리 bootstrap이 교체하는 내부 writer다. 공식 upstream 확장 API가 아니다.
 BODYLESS_REQUEST_WRITER = ("agent/agent_runtime_helpers.py", "dump_api_request_debug",
@@ -151,10 +150,6 @@ BODYLESS_REQUEST_FILES = (
     *BODYLESS_REQUEST_CALLS,
 )
 
-# 본문 없는 요청 진단 계약을 맞춘 Hermes 계열과, 그 계열의 소스에만 있는 표지 파일이다(스펙 REQ7, REQ13).
-# 표지가 없는 소스(기준 버전 v0.21.6)에서는 `test_bodyless_*_contract.py` 의 source 검사를 건너뛴다.
-# addon 은 운영에 연결하지 않아 기준 버전을 올리는 PR 이 표지 검사를 지울 때까지 v0.23 계열에서만 맞춘다.
-BODYLESS_SOURCE_LINE = ("0.23", "agent/runtime_scope.py")
 
 # 관리 bootstrap의 추가 의존이다. writer 설치 API와 다섯 파일 지문에 합치지 않는다.
 # v0.23.2 공식 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
@@ -478,12 +473,12 @@ LIVE_RELOAD = {
                         "disabled", "cache_key"),
 }
 
-# docker profile 의 `approvals.unattended_mode: approve` 가 `execute_code` 만 열고 셸 위험 명령과 plugin 승인 요청은 승인 카드로 남는 데 기대는 지점이다.
-# 이 지점이 바뀌면 같은 설정이 셸과 플러그인 승인까지 사람 없이 여는데 Control Plane 은 알지 못한다.
+# docker profile 의 `approvals.unattended_mode: approve` 를 읽는 지점과 호출 경로다.
+# 셸 위험 명령과 승인 파일 쓰기, computer_use 는 APPROVAL_GUARD 를 써 fos-ctx 가 먼저 막는다.
 # 실패하면 ADR-20261008 execute-code-unattended 를 다시 본다.
 UNATTENDED_APPROVAL = {
     # gateway 가 프로세스 환경에 켜는 ask 표식이다
-    "exec_ask": ("gateway/run.py", "start_gateway", "HERMES_EXEC_ASK"),
+    "exec_ask": ("gateway/run_bootstrap.py", "_start_gateway_runtime", "HERMES_EXEC_ASK"),
     # ask 문맥에서는 unattended 모드를 보지 않는 판정 함수들이다
     "ask_first": ("tools/approval.py", ("check_all_command_guards", "_run_approval_gate"),
                   "_unattended_contexts", "is_ask"),
@@ -517,23 +512,20 @@ REVISIT_SIGNALS = {
 # 빠지면 `test_tool_guard_contract.py` 가 실패한다. 새 도구는 fos-ctx 의 안전 목록(`SAFE_TOOLS`)에 넣지 않는 한
 # 사건 실행에서 막히므로, 넣을지만 정하고 이 목록을 고친다.
 HERMES_BUILTIN_TOOLS = frozenset({
-    "annotate_preview", "browser_back", "browser_cdp", "browser_click", "browser_console", "browser_dialog",
-    "browser_exec", "browser_get_images", "browser_navigate", "browser_press", "browser_scroll", "browser_snapshot",
-    "browser_type", "browser_vault_enter_code", "browser_vault_fill", "browser_vault_list",
-    "browser_vault_save_login", "browser_vault_unlock", "browser_vision", "clarify", "close_terminal",
-    "computer_use", "cronjob_manage", "delegate_task", "desktop_preview", "desktop_project", "discord",
-    "discord_admin", "drive_preview", "execute_code", "feishu_doc_read", "feishu_drive_add_comment",
-    "feishu_drive_list_comment_replies", "feishu_drive_list_comments", "feishu_drive_reply_comment", "focus_pane",
-    "gui_tour", "image_generate", "kanban_attach", "kanban_attach_url", "kanban_attachments", "kanban_block",
-    "kanban_comment", "kanban_complete", "kanban_create", "kanban_heartbeat", "kanban_link", "kanban_list",
-    "kanban_request_changes", "kanban_request_review", "kanban_show", "kanban_unblock", "manage_catalog",
-    "manage_connections", "memory", "patch", "process_manage", "react_to_message", "read_file", "read_terminal",
-    "read_window_below", "search_files", "session_search", "setup_choose", "show_tip", "skill_manage", "skill_view",
-    "skills_list", "spotify_albums", "spotify_devices", "spotify_library", "spotify_playback", "spotify_playlists",
-    "spotify_queue", "spotify_search", "start_chat", "terminal", "text_to_speech", "todo_list", "video_analyze",
-    "video_generate", "vision_analyze", "web_extract", "web_search", "write_file", "x_search", "xai_video_edit",
-    "xai_video_extend", "yb_query_group_info", "yb_query_group_members", "yb_search_sticker", "yb_send_dm",
-    "yb_send_sticker",
+    "annotate_preview", "browser_cdp", "browser_dialog", "browser_exec", "browser_vault",
+    "clarify", "close_terminal", "computer_use", "cronjob_manage", "delegate_task",
+    "desktop_preview", "desktop_project", "discord", "discord_admin", "drive_preview",
+    "execute_code", "feishu_doc_read", "feishu_drive_add_comment", "feishu_drive_list_comment_replies", "feishu_drive_list_comments",
+    "feishu_drive_reply_comment", "focus_pane", "gui_tour", "image_generate", "kanban_attach",
+    "kanban_attach_url", "kanban_attachments", "kanban_block", "kanban_comment", "kanban_complete",
+    "kanban_create", "kanban_heartbeat", "kanban_link", "kanban_list", "kanban_request_changes",
+    "kanban_request_review", "kanban_show", "kanban_unblock", "manage_catalog", "manage_connections",
+    "memory", "patch", "process_manage", "react_to_message", "read_file",
+    "read_terminal", "read_window_below", "search_files", "session_search", "set_theme",
+    "setup_beat", "show_tip", "skill_manage", "skill_view", "skills_list",
+    "terminal", "text_to_speech", "todo_list", "video_analyze", "video_generate",
+    "vision_analyze", "web_extract", "web_search", "write_file", "x_search",
+    "xai_video_edit", "xai_video_extend",
 })
 # 안전 목록의 내장 도구가 든 기본 toolset 이다. 읽기 경계 toolset 밖으로 옮겨지면 안전한지 다시 본다.
 TOOL_GUARD_SAFE_TOOLSETS = {
@@ -542,8 +534,7 @@ TOOL_GUARD_SAFE_TOOLSETS = {
 }
 # 도구 찾기 중계 이름이다. `tool_call` 은 hook 에 안쪽 이름이 가므로 안전 목록에 넣지 않는다.
 TOOL_GUARD_BRIDGE = ("tools/tool_search_catalog.py", "BRIDGE_TOOL_NAMES", frozenset({"tool_search", "tool_describe", "tool_call"}))
-# 코드 실행 안의 도구 호출이 `handle_function_call` 을 부르는 자리다. 기준 계열은 session 없이 `task_id` 만 넘기고,
-# fos-ctx 는 session 없는 호출을 묻지 않는다. 넘기는 칸의 계열 차이는 `TOOL_GUARD_CODE_CALLS_HAVE_SESSION` 이 갖는다.
+# 코드 실행 안의 도구 호출이 session 을 달고 `handle_function_call` 을 부르는 자리다.
 TOOL_GUARD_CODE_CALLS = ("tools/code_execution_rpc.py", "tools/code_kernel.py")
 
 
@@ -566,76 +557,11 @@ APPROVAL_GUARD = {
         "_request_approval": "computer_use",
     },
 }
-# 승인이 필요한 파일 쓰기 판정이다. 기준 계열(v0.21)에는 `write_approval_key` 가 없어 fos-ctx 가 판정을 건너뛰고,
-# Hermes 가 승인 카드로 보내 시간 초과로 거절한다. 그 계열의 값은 `None` 이고 v0.23 의 값은 `HERMES_VARIANTS` 에 있다.
-APPROVAL_WRITE_POINTS = None
-# 플러그인 의존성 경고가 클래스 메서드 밖에서 부르는 모듈 함수다. 기준 계열은 메서드 안에서 끝난다.
-PLUGIN_DEPENDENCY_HELPERS = ()
-# 코드 실행 안의 도구 호출이 session 을 달고 오는가. 기준 계열은 `task_id` 만 넘긴다.
-TOOL_GUARD_CODE_CALLS_HAVE_SESSION = False
-
-# Hermes 버전 계열(major.minor)마다 기준 선언과 다른 기대값이다(스펙 hermes-upgrade REQ7, REQ12).
-# upstream 소스의 `pyproject.toml` 버전은 `0.0.0` 이라 계열을 알 수 없다. 계열마다 그 계열에만 있는 표지 파일로 고른다.
-# 표지가 없는 소스는 기준 계열(`HERMES_BASE_LINE`)로 본다. 모르는 계열이면 기준 기대값으로 실패를 보인다.
-# 값이 dict 이면 기준 dict 에 덮어 합치고, 아니면 통째로 바꾼다. PR3 이 기준 버전을 올리며 옛 계열을 지운다.
-HERMES_BASE_LINE = "0.21"
-HERMES_LINE_MARKERS = {"0.23": "gateway/platforms/api_server_authority_runs.py"}
-HERMES_VARIANTS = {
-    "0.23": {
-        "SYMBOLS": {
-            ("hermes_cli.dashboard_auth.token_auth", "authenticate_token"): Call(
-                positional=1, returns="tuple[Optional[TokenPrincipal], Optional[str]]"),
-            ("hermes_cli.tools_config", "_get_platform_tools"): Call(positional=2, returns="set[str]"),
-        },
-        # gateway 의 ask 표식을 켜는 자리가 옮겨졌다. v0.23 에서는 승인 알림 경로가 없으면 이 표식이 판정을 정하지
-        # 않으므로, 셸 위험 명령과 승인 파일 쓰기, computer_use 는 fos-ctx 가 먼저 막는다(APPROVAL_GUARD).
-        "UNATTENDED_APPROVAL": {"exec_ask": ("gateway/run_bootstrap.py", "_start_gateway_runtime", "HERMES_EXEC_ASK")},
-        "APPROVAL_WRITE_POINTS": {
-            "key": ("agent/file_safety.py", "write_approval_key", Call(positional=1)),
-            "v4a": ("tools/file_tools.py", "_collect_v4a_header_paths", Call(positional=1)),
-            "resolve": ("tools/file_tools_write_guards.py", "_resolved_or_raw", Call(positional=2)),
-        },
-        # 의존성 경고가 모듈 함수로 누락 의존성을 고른다.
-        "PLUGIN_DEPENDENCY_HELPERS": ("missing_python_dependencies", "_declared_requirements"),
-        "HERMES_BUILTIN_TOOLS": (HERMES_BUILTIN_TOOLS | {"browser_vault", "set_theme", "setup_beat"}) - {
-            "browser_back", "browser_click", "browser_console", "browser_get_images", "browser_navigate",
-            "browser_press", "browser_scroll", "browser_snapshot", "browser_type", "browser_vault_enter_code",
-            "browser_vault_fill", "browser_vault_list", "browser_vault_save_login", "browser_vault_unlock",
-            "browser_vision", "setup_choose", "spotify_albums", "spotify_devices", "spotify_library",
-            "spotify_playback", "spotify_playlists", "spotify_queue", "spotify_search", "start_chat",
-            "yb_query_group_info", "yb_query_group_members", "yb_search_sticker", "yb_send_dm", "yb_send_sticker"},
-        # 코드 실행 안의 호출이 session 을 달고 온다. `tool_call_id` 는 없다. fos-ctx 가 판정 요청용 번호를 만든다(REQ6).
-        "TOOL_GUARD_CODE_CALLS_HAVE_SESSION": True,
-        # `_detect_tool_failure` 가 결과 객체의 모양까지 보도록 바뀌었다. 같은 파일의 함수와 상수를 분리 실행한다.
-        "NATIVE_FAILURE_SHAPE": ("agent/tool_result_classification.py", "shape_failure_error", "_FAILED_STATUSES"),
-        # 사건 필드에 `_call_id` 가 `tool_call_id` 칸을 덧붙인다. 이 테스트의 호출에는 그 칸이 없어 결과가 같다.
-        "NATIVE_TOOL_EVENT_FIELDS": ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS", ("_call_id",)),
-        # core 의존성의 Pillow 가 13.0.0 으로 올랐다. 우리 helper 는 설치된 Pillow 를 쓰므로 코드 변경은 없다.
-        "NATIVE_IMAGE_PILLOW_VERSION": "13.0.0",
-        # `register_tool` 이 `PluginContext` 와 함께 `plugins_context.py` 로 옮겨졌다. 인자 모양은 같다.
-        "NATIVE_ATTACHMENT_REGISTRATION": ("hermes_cli/plugins_context.py", "register_tool",
-                                           Call(keywords=("name", "toolset", "schema", "handler"))),
-    },
+# 승인이 필요한 파일 쓰기 판정이다. 함수를 읽지 못하거나 판정하지 못하면 fos-ctx 가 막는다.
+APPROVAL_WRITE_POINTS = {
+    "key": ("agent/file_safety.py", "write_approval_key", Call(positional=1)),
+    "v4a": ("tools/file_tools.py", "_collect_v4a_header_paths", Call(positional=1)),
+    "resolve": ("tools/file_tools_write_guards.py", "_resolved_or_raw", Call(positional=2)),
 }
-
-
-def hermes_line(root) -> str:
-    """Hermes 소스 디렉터리의 버전 계열이다. 표지 파일이 있는 계열, 없으면 기준 계열이다."""
-    base = pathlib.Path(root)
-    for line, marker in HERMES_LINE_MARKERS.items():
-        if (base / marker).is_file():
-            return line
-    return HERMES_BASE_LINE
-
-
-def expected(name: str, root):
-    """그 소스의 계열에서 기대하는 `name` 의 값이다. 계열 차이가 없으면 기준 선언을 그대로 준다."""
-    value = globals()[name]
-    variant = HERMES_VARIANTS.get(hermes_line(root), {})
-    if name not in variant:
-        return value
-    override = variant[name]
-    if isinstance(value, dict) and isinstance(override, dict):
-        return {**value, **override}
-    return override
-
+# 플러그인 의존성 경고가 클래스 메서드 밖에서 부르는 모듈 함수다.
+PLUGIN_DEPENDENCY_HELPERS = ("missing_python_dependencies", "_declared_requirements")

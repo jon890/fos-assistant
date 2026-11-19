@@ -140,7 +140,7 @@ terminal:
 
 docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_mode: approve` 도 쓴다. `approvals` 의 다른 키는 그대로 둔다.
 `backend: local` 을 쓸 때는 `approvals.unattended_mode` 를 지운다. 남은 `approvals` 가 비면 블록째 지운다.
-그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 플러그인 승인은 그대로 승인 카드로 간다.
+그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령, 승인 파일 쓰기와 `computer_use` 는 fos-ctx 가 먼저 막는다. 플러그인 승인은 Control Plane 의 승인 경로를 쓴다.
 판정 경로는 [실행 공간](docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
 
 **기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다.**
@@ -182,4 +182,4 @@ scripts/checks/check-hermes-contract.sh <tag 또는 디렉터리>
 ```
 
 소스는 import 하지 않고 구문만 읽으므로 Hermes 의 의존성이 필요 없다. 실패한 항목이 Hermes 를 올리면 깨질 곳이다.
-본문 없는 요청 진단의 세 묶음은 `BODYLESS_SOURCE_LINE` 의 표지 파일이 있는 v0.23 계열 소스에서만 돌고, 기준 버전 v0.21.6 검사에서는 건너뛴다.
+본문 없는 요청 진단도 기준 버전 v0.23.2 의 소스로 검사한다. `HERMES_SOURCE` 를 주면 옛 소스나 없는 경로를 건너뛰지 않고 실패로 알린다.

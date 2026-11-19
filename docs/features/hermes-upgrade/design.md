@@ -251,3 +251,16 @@ writer 설치 경계(helper 시그니처와 code, lazy forward, 세 호출부, �
 | --- | --- | --- | --- |
 | 스펙 DECISION9, 이 문서 DECISION1 | 재기동 정리 | [ADR-061](../../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 의 Hermes 답 표에 `unknown` 줄과 해제를 더한다(PR1) | ADR-061 |
 | 스펙 DECISION8, 이 문서 DECISION4 | 승인 경계 | [ADR-20261008 / execute-code-unattended](../../../hermes/docs/adr/ADR-20261008-execute-code-unattended.md) 에 셸 위험 명령을 fos-ctx 가 먼저 막는다는 줄을 더한다(PR2) | `hermes/docs/hermes-contract.md` 의 「`execute_code` 의 승인 판정」 |
+
+## PR3: 기준 버전 전환 뒤 호환 제거
+
+운영 전환·답 왕복과 PR4 머지를 확인한 뒤 기준 버전을 v0.23.2 로 올린다(REQ9, REQ11).
+계약 선언은 현재 값 하나로 합치고 버전 선택 helper, 본문 없는 source 의 표지 검사와 옛 응답 전용 테스트를 제거한다.
+실행 조회는 `admission_id` 로 버전을 고르지 않고 항상 종료 사건으로 실패 사유·남은 steer 글을 채운다.
+승인 파일 판정 함수를 읽지 못하면 막고, 안전 목록 밖 호출에 session 이 없을 때 통과하던 예외도 제거한다.
+가짜 Hermes 의 구버전 선택을 제거해 모든 조회·재기동 검사에서 현재 계약을 쓴다. 범용 사건 parser 와 이전 fixture 기록은 보존한다.
+
+검증 계획은 v0.23.2 고정 소스 계약, fos-ctx 승인·도구 판정, backend Hermes HTTP·종료 사건 테스트,
+가짜 Hermes 단위 테스트와 `check-local.sh --fast` 다. 계약 문서와 README 를 코드와 대조한다.
+독립 verify 는 코디네이터에게 요청하고, 배포 뒤 실제 답 왕복도 코디네이터가 확인한다.
+이 절은 앞의 PR1·PR2·PR4 전환 설계를 대체하는 현재 상태이며, 과거 표의 두 버전 서술은 전환 당시 근거다.

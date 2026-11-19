@@ -119,14 +119,15 @@ class HermesRunLookupTest {
 
 
     @Test
-    @DisplayName("interrupted 는 끝났지만 성공이 아니다")
-    void interruptedIsFinishedButNotSucceeded() {
-        body.set("{\"status\":\"interrupted\",\"error\":\"x\"}");
+    @DisplayName("중지 근거 없는 cancelled 는 끊긴 실행으로 끝나고 성공이 아니다")
+    void cancelledWithoutEvidenceIsInterrupted() {
+        body.set("{\"status\":\"cancelled\"}");
 
         HermesRunLookup lookup = client.lookupRun(baseUrl, "dad", "run-1");
 
         assertThat(lookup.state()).isEqualTo(HermesRunLookup.State.FINISHED);
         assertThat(lookup.result().succeeded()).isFalse();
+        assertThat(lookup.result().status()).isEqualTo("interrupted");
     }
 
 
