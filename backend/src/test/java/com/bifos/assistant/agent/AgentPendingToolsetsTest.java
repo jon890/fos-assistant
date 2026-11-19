@@ -11,15 +11,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentPendingToolsets;
+import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.application.port.HermesToolsetClient;
+import com.bifos.assistant.hermes.application.port.HermesToolsetClient.ToolsetCatalogEntry;
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.infra.NotificationRepository;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -52,6 +55,9 @@ class AgentPendingToolsetsTest {
 
     @Autowired
     AgentPendingToolsets pending;
+
+    @Autowired
+    AgentToolService tools;
 
     @Autowired
     AgentRepository agents;
@@ -173,6 +179,38 @@ class AgentPendingToolsetsTest {
 
         assertThat(waiting()).isEmpty();
         verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("관리자가 도구 화면에서 「그림 만들기」 를 끄면 다음 차례가 그 비서를 다시 켜지 않는다")
+    void adminSaveTurningItOffStopsTheRetry() {
+        when(toolsets.readCatalog()).thenReturn(List.of(
+            new ToolsetCatalogEntry("web", "웹", "웹 검색"), new ToolsetCatalogEntry("image_gen", "그림 만들기", "그림")));
+        when(toolsets.readEnabled(anyString(), eq(PROFILE)))
+            .thenReturn(List.of("web", "image_gen"))
+            .thenReturn(List.of("web"));
+        CurrentUser adminUser = new CurrentUser(admin.id(), admin.email(), "관리자", GROUP, UserRole.ADMIN);
+
+        tools.writeAsAdmin(adminUser, PROFILE, List.of("web"));
+        pending.attemptAll();
+
+        assertThat(waiting()).isEmpty();
+        verify(toolsets).writeApiServer(eq(PROFILE), eq(List.of("web", "fos-assistant")), anyString());
+        verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("이미 켜져 있던 도구도 한 번은 다시 써서 이미지 서비스 설정이 들어가게 한다")
+    void rewritesAlreadyEnabledToolsetOnce() {
+        when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenReturn(List.of("web", "image_gen"));
+
+        pending.attemptAll();
+        pending.attemptAll();
+
+        verify(toolsets).writeApiServerInSandbox(PROFILE, List.of("web", "image_gen", "fos-assistant"), "u" + owner.id());
+        assertThat(waiting()).isEmpty();
     }
 
 

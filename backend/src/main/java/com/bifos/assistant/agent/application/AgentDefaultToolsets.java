@@ -64,7 +64,7 @@ public class AgentDefaultToolsets {
     /**
      * 기다리던 기본 도구를 지금 켜진 도구에 더해 실행 공간 안에서만 켠다(ADR-20261119 / image-gen-defaults).
      *
-     * <p>{@link #apply} 와 달리 실행 공간이 없을 때 다른 도구만 켜는 쓰기를 하지 않는다. 나머지 기본 도구는 첫 로그인 때 이미 정했고,
+     * <p>{@link #apply} 와 달리 실행 공간이 없을 때 다른 도구만 켜는 쓰기를 하지 않고, 이미 켜져 있어도 쓴다. 나머지 기본 도구는 첫 로그인 때 이미 정했고,
      * 여기서는 기다리는 이름만 본다. 지금 켜진 원본 조회 도구는 사람의 저장처럼 남긴다.
      *
      * @param names 켤 도구 이름. 비어 있지 않다
@@ -72,9 +72,7 @@ public class AgentDefaultToolsets {
      */
     public PendingToolsetOutcome enablePending(Agent agent, List<String> names) {
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        if (enabled.containsAll(names)) {
-            return PendingToolsetOutcome.ENABLED;
-        }
+        // 이미 켜져 있어도 한 번은 다시 쓴다. 도구만 켜져 있고 이미지 서비스 설정이 없는 profile 에 설정을 넣으려는 것이다.
         if (agent.visibility() == AgentVisibility.GROUP || agent.ownerUserId() == null) {
             return PendingToolsetOutcome.NOT_ALLOWED;
         }

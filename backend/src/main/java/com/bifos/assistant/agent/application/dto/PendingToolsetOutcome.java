@@ -2,7 +2,7 @@ package com.bifos.assistant.agent.application.dto;
 
 /** 기다리는 기본 도구를 한 번 켜 본 결과다(ADR-20261119 / image-gen-defaults). */
 public enum PendingToolsetOutcome {
-    /** 켰거나 이미 켜져 있다. 더 기다리지 않는다. */
+    /** 켰다. 이미 켜져 있던 도구도 다시 저장해 딸린 설정을 넣었다. 더 기다리지 않는다. */
     ENABLED,
     /** 그 profile 의 실행 공간이 준비되지 않았다. 운영이 정책에 등록하면 다음 차례에 켜진다. */
     SANDBOX_UNAVAILABLE,
