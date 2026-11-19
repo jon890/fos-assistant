@@ -17,11 +17,6 @@ import java.time.Instant;
 public record ArtifactVaultItem(
     Long id, String path, long byteSize, int fileCount, Instant vaultedAt, String title, String description) {
 
-    public ArtifactVaultItem(Long id, String path, long byteSize, int fileCount, Instant vaultedAt) {
-        this(id, path, byteSize, fileCount, vaultedAt, null, null);
-    }
-
-
     /** 화면이 종류로 나누는 값이다. 받는 형식이 아니면(옛 행) null 이다. */
     public String kind() {
         return VaultFileType.of(path).map(type -> type.kind().name()).orElse(null);
