@@ -81,10 +81,10 @@
 | 종류 | 확장자 | 머리 바이트 검사 |
 | --- | --- | --- |
 | `IMAGE` | png, jpg, jpeg, gif, webp | 한다 |
-| `DOCUMENT` | html, css, md, txt | 하지 않는다. NUL 바이트가 있으면 거절한다 |
+| `DOCUMENT` | html, css, md, txt | 하지 않는다. 앞 8KB 에 NUL 바이트가 있으면 거절한다 |
 | `DOCUMENT` | pdf | `%PDF-` |
 | `DOCUMENT` | docx, pptx | zip 머리(`PK`) |
-| `TABLE` | csv, tsv | 하지 않는다. NUL 바이트가 있으면 거절한다 |
+| `TABLE` | csv, tsv | 하지 않는다. 앞 8KB 에 NUL 바이트가 있으면 거절한다 |
 | `TABLE` | xlsx | zip 머리(`PK`) |
 
 대화 폴더에서 온 HTML, CSS, 사진은 지금처럼 `ArtifactBundleReader` 가 부르는 파일까지 묶음으로 훑는다. 그 밖의 형식과 실행 공간에서 온 파일은 파일 하나를 바이트로 받아 넣는다. 실행 공간의 HTML 은 부르는 파일을 따라가지 않고 한 파일로 넣는다.
@@ -108,7 +108,7 @@
 - 실행 공간에서 온 파일의 `path` 는 `/workspace/` 뒤의 상대 경로다. 대화 폴더의 같은 상대 경로와 섞이지 않게 둘을 `vault_origin` 으로 구분한다. 지문은 `/workspace/` 를 붙인 경로로 만들어 대화 폴더의 같은 경로·본문과 다른 건이 되게 한다. 대화 폴더의 경로로 보관본을 찾는 쿼리(`findLiveVaultCopies`)는 `PUT_WORKSPACE` 행을 뺀다
 - 제목이 같은 대화에서 그 사용자의 살아 있는 보관 뿌리 행의 제목과 겹치면 `<제목> 2`, `<제목> 3` 을 차례로 본다. 사용자별 잠금 안에서 정한다. 같은 경로와 같은 들어온 길의 앞 보관본은 겹침에서 뺀다. 같은 파일을 고쳐 다시 보관할 때마다 번호가 늘지 않게 한다. 제목이 없으면 `vault_meta` 를 비워 두고, 읽는 쪽이 지금 목록이 보이는 이름을 쓴다
 - 보관본을 지우면(`forgetVaulted`) 뿌리 행의 `vault_meta` 와 key 번호도 비운다. `vault_origin` 과 `vault_message_id` 는 남겨 답 아래 줄이 지운 파일이라고 보이게 한다. 지운 것을 도구로 다시 넣으면 이력 행을 지우고 새로 만들므로 옛 답의 「지운 파일」 줄은 사라지고 새 답에 줄이 생긴다
-- **보관 본문을 읽지 않는 조회.** `vault_body` 는 지연 로딩이 아닌 `LONGTEXT` 다. 25MiB 로 올리면 엔티티로 읽는 조회마다 약 34MB 가 따라온다. 새 조회(답별 파일 줄, 제목 겹침, 제목을 가진 결과물 행)와 기존의 `findLiveVaultCopies`, `findByVaultUserIdAndVaultFingerprint` 를 본문을 뺀 projection 으로 한다
+- **보관 본문을 읽지 않는 조회.** `vault_body` 는 지연 로딩이 아닌 `LONGTEXT` 다. 25MiB 로 올리면 엔티티로 읽는 조회마다 약 34MB 가 따라온다. 새 조회(답별 파일 줄, 제목 겹침, 제목을 가진 결과물 행)와 기존의 `findLiveVaultCopies` 와 지문으로 찾는 조회(`findVaultByFingerprint`)를 본문을 뺀 projection 으로 한다
 
 ### `artifact_write` 의 제목
 

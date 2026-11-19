@@ -91,7 +91,7 @@
 
 ```bash
 cd backend && ./gradlew test --tests '*VaultFileTypeTest' --tests '*ArtifactVaultFileTypeTest' --tests '*ArtifactVaultTest' --tests '*ArtifactVaultBundleTest' --tests '*ArtifactAutoVaultTest' --tests '*GeneratedImageTurnTest' --tests '*ArchitectureRules*'
-node --test test/repo
+node --test 'test/repo/*.test.ts'
 ```
 
 같은 맥에서 여러 worker 가 도므로 Gradle, 브라우저 테스트, `check-local.sh` 줄은 저장소 공통 지시서의 무거운 검사 대기열(`orch slot heavy -- <명령>`)로 감싸 실행한다. 기대값은 모두 통과다.

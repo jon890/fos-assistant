@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -219,6 +220,35 @@ class ArtifactVaultFileTypeTest {
         assertRejected(
             () -> small.keep(dad.id(), conversation.id(), VaultOrigin.PUT_WORKSPACE, "over.xlsx", zip(4097), null, null, null),
             "this file is larger than the vault limit");
+    }
+
+
+    @Test
+    @DisplayName("기본 상한인 25MiB 파일 하나가 실제로 들어가고 같은 바이트로 읽힌다")
+    void keepsFileOfDefaultLimit() {
+        byte[] body = zip(25 * 1024 * 1024);
+
+        ArtifactKept kept = keep(VaultOrigin.PUT_WORKSPACE, "big.xlsx", body, null, null);
+
+        assertThat(vault.read(dad.id(), kept.item().id()).body()).isEqualTo(body);
+    }
+
+
+    @Test
+    @DisplayName("대화 폴더의 경로로 보관본을 찾을 때 실행 공간에서 넣은 같은 경로는 잡히지 않는다")
+    void workspaceFileIsNotACopyOfTheFolderPath() {
+        byte[] png = {(byte)0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3};
+        ArtifactKept fromWorkspace = keep(VaultOrigin.PUT_WORKSPACE, "generated/고양이.png", png, null, null);
+
+        assertThat(rows.findLiveVaultCopies(
+            dad.id(), conversation.id(), List.of("generated/고양이.png"), VaultOrigin.PUT_WORKSPACE)).isEmpty();
+
+        ArtifactKept fromFolder = keep(VaultOrigin.PUT, "generated/고양이.png", png, null, null);
+        assertThat(rows.findLiveVaultCopies(
+            dad.id(), conversation.id(), List.of("generated/고양이.png"), VaultOrigin.PUT_WORKSPACE))
+                .extracting(copy -> copy.getId())
+                .containsExactly(fromFolder.item().id())
+                .doesNotContain(fromWorkspace.item().id());
     }
 
 

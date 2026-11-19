@@ -56,7 +56,7 @@ phase 02 뒤 서버는 `kind: "FILE"` 항목에 `title`, `vaultItemId`, `deleted
 cd web && pnpm typecheck && pnpm lint
 cd web && node --test test/unit/put-files.test.ts test/unit/tool-label.test.ts
 cd web && pnpm exec playwright test --config test/browser/playwright.config.ts test/browser/artifact.spec.ts test/browser/generated-image.spec.ts
-node --test test/repo
+node --test 'test/repo/*.test.ts'
 scripts/dev/check-local.sh --fast
 ```
 
