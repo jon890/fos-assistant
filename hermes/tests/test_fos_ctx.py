@@ -202,8 +202,8 @@ class HookTest(PluginFixture):
                     self.assertEqual(self.call("delegate_task", args=args),
                                      {"action": "block", "message": self.plugin.DELEGATE_IMAGE_MESSAGE})
 
-    def test_delegate_remote_and_inline_images_stay_available(self):
-        """이미지 없는 호출과 HTTP(S), image data URL 은 원래 도구로 전달한다."""
+    def test_delegate_valid_images_without_session_reach_guard_and_block(self):
+        """이미지 없는 호출과 원격·inline 이미지는 이미지 검사를 지나지만 session 이 없으면 도구 판정에서 막힌다."""
         images = ["https://images.example/photo.png", "http://images.example/photo.png",
                   "data:image/png;base64,cGhvdG8="]
         for args in ({}, {"images": []}, {"images": images},
@@ -1106,6 +1106,18 @@ class ToolGuardTest(GuardServerFixture):
         for tool in self.GUARDED:
             with self.subTest(tool=tool):
                 self.assertIsNone(self.call(tool))
+
+    def test_delegate_valid_images_pass_with_session_and_allow(self):
+        """session 이 있는 원격·inline 이미지 위임은 Control Plane 이 허용하면 통과한다."""
+        images = ["https://images.example/photo.png", "http://images.example/photo.png",
+                  "data:image/png;base64,cGhvdG8="]
+        for args in ({}, {"images": []}, {"images": images},
+                     {"tasks": [{"prompt": "사진", "images": images}, {"prompt": "글"}]}):
+            with self.subTest(args=args):
+                self.requests.clear()
+                self.assertIsNone(self.call("delegate_task", args=args))
+                self.assertEqual(len(self.requests), 1)
+                self.assertEqual(self.requests[0]["body"]["hermes_tool"], "delegate_task")
 
     def test_safe_tools_and_control_plane_tools_do_not_ask(self):
         """안전 목록과 Control Plane MCP 도구는 묻지 않는다."""
