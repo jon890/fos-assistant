@@ -39,7 +39,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# 실행은 node만 사용하므로 패키지 관리자와 그 의존성을 이미지에서 뺀다.
+# 실행은 node만 사용하므로 npm·corepack 본체와 캐시, 패키지 관리자 실행 링크를 뺀다.
+# Yarn 본체(/opt/yarn-*)는 유지한다.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
     /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
