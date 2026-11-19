@@ -54,6 +54,103 @@ public interface ChatArtifactRepository extends JpaRepository<ChatArtifact, Long
     int bindGeneratedImages(@Param("conversationId") Long conversationId, @Param("messageId") Long messageId);
 
 
+    /** 그 답에 묶인 결과물 행(HTML, 그림)의 경로다. 넣기 도구가 같은 파일을 넣었을 때 답 아래 줄이 겹치지 않게 할 때 쓴다. */
+    @Query("select a.path from ChatArtifact a where a.messageId = :messageId and a.vaultUserId is null")
+    List<String> findPathsByMessageId(@Param("messageId") Long messageId);
+
+
+    /**
+     * 그 대화에서 넣기 도구가 대화 폴더에서 넣고 아직 답에 묶이지 않은 보관 뿌리 행 가운데 이 경로의 것에서 들어온 길을 비운다.
+     *
+     * <p>같은 답에 같은 경로의 결과물 줄이 이미 있어 파일 줄을 하나 더 보이지 않게 한다. 트랜잭션은 {@code ChatArtifactWriter} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.vaultOrigin = null
+             where a.conversationId = :conversationId
+               and a.vaultUserId is not null
+               and a.vaultOrigin = :origin
+               and a.vaultMessageId is null
+               and a.vaultBundleId is null
+               and a.deletedAt is null
+               and a.path in :paths
+            """)
+    int dropPutOrigin(
+        @Param("conversationId") Long conversationId, @Param("origin") VaultOrigin origin,
+        @Param("paths") Collection<String> paths);
+
+
+    /**
+     * 그 대화에서 넣기 도구가 넣고 아직 답에 묶이지 않은 보관 뿌리 행을 이 답에 묶는다(ADR-20261119 / file-space-put).
+     *
+     * <p>turn 시작 시각으로 자르지 않는다. 맡긴 실행이 넣은 파일은 결과를 전하는 다음 답에 묶인다. 지운 행은 묶지 않는다.
+     * 트랜잭션은 {@code ChatArtifactWriter} 가 연다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.vaultMessageId = :messageId
+             where a.conversationId = :conversationId
+               and a.vaultUserId is not null
+               and a.vaultOrigin in :origins
+               and a.vaultMessageId is null
+               and a.vaultBundleId is null
+               and a.deletedAt is null
+            """)
+    int bindPutFiles(
+        @Param("conversationId") Long conversationId, @Param("messageId") Long messageId,
+        @Param("origins") Collection<VaultOrigin> origins);
+
+
+    /**
+     * 그 답들에 묶인 넣기 도구의 보관 뿌리 행이다. 지운 이력도 담아 답 아래에 지운 파일이라고 보이게 한다. 본문은 읽지 않는다.
+     */
+    @Query("""
+            select a.id as id, a.vaultMessageId as messageId, a.vaultUserId as ownerUserId,
+                   a.conversationId as conversationId, a.path as path, a.byteSize as byteSize, a.deletedAt as deletedAt,
+                   a.vaultMeta as vaultMeta, a.vaultMetaKeyId as vaultMetaKeyId,
+                   (select coalesce(sum(p.byteSize), 0) from ChatArtifact p where p.vaultBundleId = a.id) as partBytes
+              from ChatArtifact a
+             where a.vaultMessageId in :messageIds
+               and a.vaultUserId is not null
+               and a.vaultOrigin in :origins
+               and a.vaultBundleId is null
+             order by a.id asc
+            """)
+    List<ArtifactPutFileRow> findPutFiles(
+        @Param("messageIds") Collection<Long> messageIds, @Param("origins") Collection<VaultOrigin> origins);
+
+
+    /** {@code artifact_write} 가 제목을 받아 만든, 아직 답에 묶이지 않은 그 경로의 결과물 행이다. 새것이 먼저다. */
+    Optional<ChatArtifact> findFirstByConversationIdAndPathAndMessageIdIsNullAndVaultUserIdIsNullAndGenerationCallKeyIsNullOrderByIdDesc(
+        Long conversationId, String path);
+
+
+    /** 묶이지 않은 결과물 행을 답에 묶고 크기를 적는다. 트랜잭션은 {@code ChatArtifactWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.messageId = :messageId, a.byteSize = :byteSize
+             where a.id = :id
+               and a.messageId is null
+               and a.vaultUserId is null
+            """)
+    int bindTitled(@Param("id") Long id, @Param("messageId") Long messageId, @Param("byteSize") long byteSize);
+
+
+    /** 묶이지 않은 결과물 행의 제목·설명 암호문을 바꾼다. 트랜잭션은 {@code ChatArtifactWriter} 가 연다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatArtifact a
+               set a.vaultMeta = :meta, a.vaultMetaKeyId = :metaKeyId
+             where a.id = :id
+               and a.messageId is null
+               and a.vaultUserId is null
+            """)
+    int retitle(@Param("id") Long id, @Param("meta") String meta, @Param("metaKeyId") Long metaKeyId);
+
+
     /**
      * 그 사용자가 이 대화의 이 경로들에서 보관한 살아 있는 뿌리 사본이다. 번호 순이라 같은 경로는 뒤의 것이 새것이다.
      *

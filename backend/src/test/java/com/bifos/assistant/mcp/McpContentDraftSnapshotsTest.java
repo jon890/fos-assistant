@@ -35,7 +35,9 @@ import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.dto.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
+import com.bifos.assistant.mcp.presentation.McpArtifactCalls;
 import com.bifos.assistant.mcp.presentation.McpController;
+import com.bifos.assistant.mcp.presentation.McpFileSpaceCalls;
 import com.bifos.assistant.proactive.check.application.ProactiveCheckGuard;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -78,7 +80,7 @@ class McpContentDraftSnapshotsTest {
     void setUp() {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
-        controller = new McpController(tools, callers, mock(McpMediaObservationTools.class), drafts, tool,
+        controller = new McpController(tools, mock(McpArtifactCalls.class), mock(McpFileSpaceCalls.class), callers, mock(McpMediaObservationTools.class), drafts, tool,
             mock(McpFinancialLimitTools.class), mock(McpApprovalResumeTool.class), checks,
             mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);

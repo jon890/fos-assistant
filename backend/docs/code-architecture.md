@@ -642,6 +642,7 @@ MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션�
 사용자가 「파일 공간」 화면에서 자기 실행 공간 `/workspace` 를 보는 길이다.
 결정은 [ADR-20261009 / workspace-explorer](../../docs/adr/ADR-20261009-workspace-explorer.md), 실행 공간의 모양은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 공간」 이 갖는다.
 코드는 `backend` 의 최상위 패키지 `workspace` 에 둔다. 다른 패키지는 이 패키지를 쓰지 않는다.
+에이전트의 넣기 도구(`file_space_put`)가 실행 공간 파일을 읽는 길은 `mcp` 의 포트 `SandboxFiles` 를 `workspace` 가 구현한 `WorkspaceSandboxFiles` 다. 주인 디렉터리는 요청자가 아니라 origin 실행의 에이전트 주인 키(`Agent.sandboxOwner()`)로 고르고, 같은 루트와 링크 규칙으로 일반 파일 하나만 읽는다.
 
 ### 설정
 

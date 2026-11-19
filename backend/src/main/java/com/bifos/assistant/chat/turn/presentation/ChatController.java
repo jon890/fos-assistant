@@ -19,8 +19,10 @@ import com.bifos.assistant.chat.conversation.application.SourceReadSummaries;
 import com.bifos.assistant.chat.conversation.application.dto.SourceReadSummary;
 import com.bifos.assistant.chat.delivery.application.dto.DeliveryState;
 import com.bifos.assistant.chat.conversation.application.dto.TaskLabel;
+import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.artifact.application.dto.GeneratedImageDetail;
+import com.bifos.assistant.chat.artifact.application.dto.PutFileDetail;
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.MediaPathMask;
 import com.bifos.assistant.chat.attachment.domain.ChatAttachment;
@@ -55,6 +57,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -87,6 +90,7 @@ public class ChatController {
     private final SourceReadSummaries sourceReads;
     private final AutoTurnNoticeStatuses noticeStatuses;
     private final GeneratedImageService generatedImages;
+    private final ArtifactPutFiles putFiles;
 
 
     @Autowired
@@ -101,7 +105,8 @@ public class ChatController {
         List<ConversationTaskLabels> taskLabels,
         SourceReadSummaries sourceReads,
         AutoTurnNoticeStatuses noticeStatuses,
-        GeneratedImageService generatedImages) {
+        GeneratedImageService generatedImages,
+        ArtifactPutFiles putFiles) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -113,6 +118,7 @@ public class ChatController {
         this.sourceReads = sourceReads;
         this.noticeStatuses = noticeStatuses;
         this.generatedImages = generatedImages;
+        this.putFiles = putFiles;
     }
 
 
@@ -333,6 +339,7 @@ public class ChatController {
         Map<Long, List<ChatAttachment>> attached = chat.attachmentsByMessage(user, number);
         Map<Long, List<ChatArtifact>> produced = chat.artifactsByMessage(history);
         Map<Long, GeneratedImageDetail> images = generatedImages.details(user.id(), number, produced.values());
+        Map<Long, List<PutFileDetail>> put = putFiles.byMessage(history.stream().map(ChatMessage::id).toList());
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         Map<Long, List<DelegationLine>> delegations = chat.delegationsByAnswer(history);
@@ -355,8 +362,10 @@ public class ChatController {
                 attached.getOrDefault(it.id(), List.of()).stream()
                     .map(AttachmentView::from)
                     .toList(),
-                produced.getOrDefault(it.id(), List.of()).stream()
-                    .map(artifact -> ArtifactView.from(artifact, images.get(artifact.id())))
+                Stream.concat(
+                    produced.getOrDefault(it.id(), List.of()).stream()
+                        .map(artifact -> ArtifactView.from(artifact, images.get(artifact.id()))),
+                    put.getOrDefault(it.id(), List.of()).stream().map(ArtifactView::from))
                     .toList(),
                 it.executionId() == null ? null : activity.get(it.executionId()),
                 it.executionId() == null || statuses.get(it.executionId()) == null

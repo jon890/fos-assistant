@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 class McpToolServiceTest {
     private final CurrentUser user = new CurrentUser(7L, "user@example.com", "사용자", 1L, UserRole.MEMBER);
     private final ArtifactWriteRequest request = new ArtifactWriteRequest(
-        UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value");
+        UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value", null, null);
     private final ArtifactWriteService artifacts = mock(ArtifactWriteService.class);
     private final MemoryService memories = mock(MemoryService.class);
     private final McpToolService tools = new McpToolService(

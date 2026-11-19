@@ -63,6 +63,21 @@ final class ArtifactPathPolicy {
             || contentTypeOf(relativePath).isEmpty()) {
             return Optional.empty();
         }
+        return resolveRegularInside(conversationId, relativePath)
+            .filter(realFile -> contentTypeOf(realFile.getFileName().toString()).isPresent());
+    }
+
+
+    /** {@link #resolveInside} 와 같은 규칙으로 폴더 안의 일반 파일을 찾되 확장자를 보지 않는다. 형식은 부르는 쪽이 정한다. */
+    Optional<Path> resolveAnyInside(Long conversationId, String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return Optional.empty();
+        }
+        return resolveRegularInside(conversationId, relativePath);
+    }
+
+
+    private Optional<Path> resolveRegularInside(Long conversationId, String relativePath) {
         try {
             Path requested = Path.of(relativePath);
             if (requested.isAbsolute()) {
@@ -75,9 +90,7 @@ final class ArtifactPathPolicy {
             }
             Path realFolder = root.toRealPath().resolve(String.valueOf(conversationId));
             Path realFile = folder.resolve(requested).toRealPath();
-            if (!realFile.startsWith(realFolder)
-                || !Files.isRegularFile(realFile)
-                || contentTypeOf(realFile.getFileName().toString()).isEmpty()) {
+            if (!realFile.startsWith(realFolder) || !Files.isRegularFile(realFile)) {
                 return Optional.empty();
             }
             return Optional.of(realFile);

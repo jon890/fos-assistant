@@ -99,7 +99,16 @@ class ArtifactTest {
         + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
         + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
         + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
-        + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.";
+        + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.\n"
+        + "[파일 공간]\n"
+        + "「파일 공간」(「내 파일」)은 이 서비스가 사용자에게 준 파일을 모아 두는 화면이다."
+        + " 답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어간다.\n"
+        + "아래 네 줄은 file_space_put 도구가 있을 때만 따른다.\n"
+        + "- 사용자에게 줄 파일(엑셀, PDF, 문서, CSV 등)을 만들었거나 사용자가 파일 공간에 넣어 달라고 하면 file_space_put 으로 넣는다."
+        + " 짧은 한국어 제목과 한 줄 설명을 붙인다.\n"
+        + "- 이미 들어 있는 것(자동으로 들어가는 HTML 과 그림, 결과가 already 인 것)은 다시 넣지 않고 이미 있다고 답한다.\n"
+        + "- 도구가 실패하면 넣었다고 답하지 않고 까닭을 알린다.\n"
+        + "- 다른 에이전트에게 맡긴 일에서 만든 파일은 그 파일을 만든 에이전트가 직접 넣는다. 맡길 때 넣어 달라고 함께 적는다.";
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
         + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
         + "form-action 'none'";

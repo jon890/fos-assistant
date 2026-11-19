@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.artifact.application;
 
 import com.bifos.assistant.chat.artifact.domain.ChatArtifact;
 import com.bifos.assistant.chat.artifact.domain.type.AutoVaultState;
+import com.bifos.assistant.chat.artifact.domain.type.VaultOrigin;
 import com.bifos.assistant.chat.artifact.infra.ChatArtifactRepository;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +40,51 @@ public class ChatArtifactWriter {
     @Transactional
     public int bindGeneratedImages(Long conversationId, Long messageId) {
         return repository.bindGeneratedImages(conversationId, messageId);
+    }
+
+
+    /**
+     * 그 대화에서 넣기 도구가 넣고 아직 답에 묶이지 않은 보관본을 이 답에 묶는다(ADR-20261119 / file-space-put).
+     *
+     * <p>먼저 이 답에 같은 경로의 결과물 줄(HTML, 그림)이 있으면 대화 폴더에서 넣은 보관본은 묶지 않고 들어온 길을 비운다.
+     * 같은 파일이 답 아래에 두 줄로 보이지 않게 한다. HTML 을 묶은 뒤에 부른다.
+     */
+    @Transactional
+    public int bindPutFiles(Long conversationId, Long messageId) {
+        List<String> paths = repository.findPathsByMessageId(messageId);
+        if (!paths.isEmpty()) {
+            repository.dropPutOrigin(conversationId, VaultOrigin.PUT, paths);
+        }
+        return repository.bindPutFiles(conversationId, messageId, VaultOrigin.PUT_ORIGINS);
+    }
+
+
+    /**
+     * {@code artifact_write} 가 제목을 받은 그 경로의 묶이지 않은 결과물 행을 이 답에 묶는다.
+     *
+     * @return 묶을 행이 있었으면 참. 없으면 부르는 쪽이 새 행을 만든다
+     */
+    @Transactional
+    public boolean bindTitled(Long conversationId, String path, Long messageId, long byteSize) {
+        return repository
+            .findFirstByConversationIdAndPathAndMessageIdIsNullAndVaultUserIdIsNullAndGenerationCallKeyIsNullOrderByIdDesc(
+                conversationId, path)
+            .map(row -> repository.bindTitled(row.id(), messageId, byteSize) == 1)
+            .orElse(false);
+    }
+
+
+    /**
+     * {@code artifact_write} 가 받은 제목·설명의 암호문을 그 경로의 묶이지 않은 결과물 행에 둔다. 없으면 만들고 있으면 바꾼다.
+     */
+    @Transactional
+    public void putWrittenTitle(Long conversationId, String path, long byteSize, String meta, Long metaKeyId) {
+        repository
+            .findFirstByConversationIdAndPathAndMessageIdIsNullAndVaultUserIdIsNullAndGenerationCallKeyIsNullOrderByIdDesc(
+                conversationId, path)
+            .ifPresentOrElse(
+                row -> repository.retitle(row.id(), meta, metaKeyId),
+                () -> repository.save(ChatArtifact.titled(conversationId, path, byteSize, meta, metaKeyId)));
     }
 
 

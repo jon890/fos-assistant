@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.ArtifactPutFiles;
 import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -209,6 +210,6 @@ class NativeResultHistoryTest {
             List.of(),
             mock(SourceReadSummaries.class),
             noticeStatuses,
-            mock(GeneratedImageService.class));
+            mock(GeneratedImageService.class), mock(ArtifactPutFiles.class));
     }
 }

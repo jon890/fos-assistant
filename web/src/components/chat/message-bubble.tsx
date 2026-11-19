@@ -13,6 +13,7 @@ import { formatWhen } from "@/lib/format";
 import { artifactNames } from "@/lib/artifact-name";
 import { ArtifactVaultStatus } from "./artifact/artifact-vault-status";
 import { GeneratedImages } from "./artifact/generated-images";
+import { PutFiles } from "./artifact/put-files";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
@@ -354,9 +355,14 @@ export function MessageBubble({
         conversationId={conversationId}
         messageId={turn.id}
       />
+      <PutFiles
+        files={(turn.artifacts ?? []).filter(
+          (artifact) => artifact.kind === "FILE",
+        )}
+      />
       <ArtifactList
         artifacts={(turn.artifacts ?? []).filter(
-          (artifact) => artifact.kind !== "IMAGE",
+          (artifact) => artifact.kind !== "IMAGE" && artifact.kind !== "FILE",
         )}
         conversationId={conversationId}
         messageId={turn.id}

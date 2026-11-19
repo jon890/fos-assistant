@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.artifact.domain.type;
 
+import java.util.List;
+
 /**
  * 보관 행이 들어온 길이다(ADR-20261119 / file-space-put). 자동 보관과 「보관」 단추로 들어온 행은 값이 없다.
  *
@@ -11,5 +13,9 @@ public enum VaultOrigin {
     PUT,
 
     /** 에이전트의 넣기 도구가 실행 공간에서 읽어 넣었다. 경로는 실행 공간 안의 상대 경로다. */
-    PUT_WORKSPACE
+    PUT_WORKSPACE;
+
+
+    /** 넣기 도구가 넣은 길 모두다. 답 아래 파일 줄은 이 길로 들어온 행에서만 만든다. */
+    public static final List<VaultOrigin> PUT_ORIGINS = List.of(PUT, PUT_WORKSPACE);
 }
