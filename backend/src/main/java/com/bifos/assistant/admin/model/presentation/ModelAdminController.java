@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.modelchoice.application.GroupModelCatalogService
 import com.bifos.assistant.chat.modelchoice.application.dto.GroupModelTiers;
 import com.bifos.assistant.chat.modelchoice.application.ModelTierService;
 import com.bifos.assistant.chat.modelchoice.application.ModelVisibilityService;
+import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.CatalogRefreshView;
 import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.GroupModelCatalogView;
 import com.bifos.assistant.admin.model.presentation.ModelAdminDtos.HiddenModelsView;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,6 +57,18 @@ public class ModelAdminController {
             log.warn("그룹 모델 목록을 읽지 못해 목록 없이 돌려준다 code={}", ex.code());
             return GroupModelCatalogView.missing();
         }
+    }
+
+
+    /**
+     * 켜진 모든 profile 의 모델 목록을 Hermes 에 다시 묻는다. 새 모델이 목록에 아직 없을 때 관리자가 누른다.
+     *
+     * <p>실패해도 200 으로 {@code FAILED} 를 답한다. 화면은 그때 목록을 다시 읽지 않고 보이던 선택지를 둔다.
+     */
+    @PostMapping("/model-catalog/refresh")
+    public CatalogRefreshView refreshModelCatalog() {
+        currentUser.requireAdmin();
+        return CatalogRefreshView.from(groupCatalog.refreshAll());
     }
 
 

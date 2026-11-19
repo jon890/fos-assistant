@@ -86,8 +86,8 @@ class ModelTierServiceTest {
 
 
     @Test
-    @DisplayName("MEMBER 역할이 받는 칸에는 provider 와 모델과 effort 가 비고 칸과 이름과 기본값은 남는다")
-    void memberGetsTiersWithoutProviderModelOrEffort() {
+    @DisplayName("MEMBER 역할이 받는 칸에는 모델과 effort 가 있고 provider 만 빈다")
+    void memberGetsTiersWithModelAndEffortButNoProvider() {
         TierFixtures fixtures = tierFixtures();
         fixtures.store().defaultTier(ModelTier.MEDIUM);
         when(fixtures.users().findById(1L)).thenReturn(Optional.empty());
@@ -95,21 +95,21 @@ class ModelTierServiceTest {
         ModelTierOptions result = fixtures.service().optionsFor(fixtures.user(), fixtures.agent());
 
         assertThat(result.tiers())
-            .extracting(ModelTierOptions.Tier::tier, ModelTierOptions.Tier::label)
+            .extracting(
+                ModelTierOptions.Tier::tier,
+                ModelTierOptions.Tier::label,
+                ModelTierOptions.Tier::provider,
+                ModelTierOptions.Tier::model,
+                ModelTierOptions.Tier::reasoningEffort)
             .containsExactly(
-                tuple(ModelTier.INSTANT, "Instant"),
-                tuple(ModelTier.MEDIUM, "Medium"),
-                tuple(ModelTier.HIGH, "High"),
-                tuple(ModelTier.EXTRA_HIGH, "Extra High"),
-                tuple(ModelTier.PRO, "Pro"));
-        assertThat(result.tiers()).allSatisfy(tier -> {
-            assertThat(tier.provider()).as("provider").isNull();
-            assertThat(tier.model()).as("model").isNull();
-            assertThat(tier.reasoningEffort()).as("reasoningEffort").isNull();
-        });
+                tuple(ModelTier.INSTANT, "Instant", null, "example-fast", "low"),
+                tuple(ModelTier.MEDIUM, "Medium", null, "example-balanced", "medium"),
+                tuple(ModelTier.HIGH, "High", null, "example-deep", "high"),
+                tuple(ModelTier.EXTRA_HIGH, "Extra High", null, "example-deep", "xhigh"),
+                tuple(ModelTier.PRO, "Pro", null, "example-pro", "max"));
         assertThat(result.groupDefaultTier()).isEqualTo(ModelTier.MEDIUM);
         assertThat(result.admin()).isFalse();
-        // 싣지 않을 provider 를 알아내려고 Hermes 목록을 읽지 않는다.
+        // 주지 않을 provider 를 알아내려고 Hermes 목록을 읽지 않는다.
         verifyNoInteractions(fixtures.options());
     }
 
