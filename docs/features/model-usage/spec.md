@@ -91,4 +91,4 @@ PR1 을 운영에 배포한 뒤 코디네이터가 확인하고 결과만 남긴
 | 결정 | 종류 | 선택 이유를 남길 ADR | 현재 규칙의 원본 |
 | --- | --- | --- | --- |
 | DECISION3 | domain-policy | 새 ADR [ADR-20261119 / tier-model-names](../../adr/ADR-20261119-tier-model-names.md) 가 [ADR-20261101 / model-setting](../../adr/ADR-20261101-model-setting.md) 의 슬라이더 모양을 대체한다. 단계의 이름과 차례는 그대로다 | [`model-usage.md`](../model-usage.md) 의 「요구」 와 「모델을 고를 때」 |
-| DECISION4, DECISION5 | domain-policy | 같은 ADR 이 [ADR-063](../../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 의 「단계 목록의 모델과 강도를 뺀다」 를 대체한다 | [`chat.md`](../chat.md) 의 「역할에 따라 응답에서 빼는 값」 |
+| DECISION4, DECISION5 | domain-policy | 같은 ADR 이 [ADR-063](../../adr/ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) 에서 단계 목록의 모델과 강도를 빼던 부분을 대체한다 | [`chat.md`](../chat.md) 의 「역할에 따라 응답에서 빼는 값」 |
