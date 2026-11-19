@@ -2,12 +2,12 @@
 
 사용자가 대화로 부탁한 그림을 비서가 만들어 답 안에 보이고 「보관한 결과물」 에 남기는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `hermes/plugins/fos-ctx/generated_image.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
+covers: `backend/src/main/java/com/bifos/assistant/agent/**/AgentPendingToolsets*`, `backend/src/main/java/com/bifos/assistant/agent/**/PendingToolsetOutcome*`, `hermes/plugins/dashboard-profile-api/image_service.py`, `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPathMask*`, `backend/src/main/java/com/bifos/assistant/mcp/**/GeneratedImage*`, `hermes/plugins/fos-ctx/generated_image.py`, `web/src/components/chat/artifact/generated-images.tsx`, `web/src/lib/media-path.ts`
 
-요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md) 가 갖는다.
+요구와 결정은 스펙 [`generated-image/spec.md`](generated-image/spec.md), 구조는 설계 [`generated-image/design.md`](generated-image/design.md), 결정의 근거는 [ADR-20261119 / generated-image](../adr/ADR-20261119-generated-image.md) 와 [ADR-20261119 / image-gen-defaults](../adr/ADR-20261119-image-gen-defaults.md) 가 갖는다.
 
-**지금은 스펙의 PR1 까지다.** 이미지 서비스가 설정된 비서가 만든 그림이 답 안에 보이고 보관함에 남는다.
-가족의 기본 비서에 켜기와 이미지 서비스 자동 설정, 사람이 없는 실행에서 막기, 사진을 바탕으로 고치기, 블로그 원고에 넣기는 스펙의 뒤 PR 이 더한다.
+**지금은 스펙의 PR2 까지다.** 모든 사용자의 기본 비서에 「그림 만들기」 가 켜지고, 만든 그림이 답 안에 보이고 보관함에 남는다.
+사진을 바탕으로 고치기와 블로그 원고에 넣기는 스펙의 뒤 PR 이 더한다.
 
 ## 요구
 
@@ -15,6 +15,8 @@ covers: `backend/src/main/java/com/bifos/assistant/chat/**/GeneratedImage*`, `ba
 - 그림을 누르면 화면 가득 크게 보이고 원본을 내려받는다. 그림 아래의 접힌 칸에서 비서가 이미지 도구에 넘긴 지시문을 본다.
 - 그림은 요청자의 「보관한 결과물」 에 원본 그대로 자동 보관된다. 대화 쪽 원본이 보관 기간 정리로 지워지면 대화에는 안내와 「보관함에서 보기」 가 남는다.
 - 그림과 지시문은 그 대화의 주인만 본다.
+- 모든 사용자의 기본 비서에 「그림 만들기」 가 켜져 있다. 켜고 끄는 것은 관리자만 한다. 켜면 이미지 서비스 설정이 함께 들어간다.
+- 예약 작업과 먼저 살펴보기처럼 사람이 없는 실행에서는 그림을 만들지 않는다.
 
 ## 흐름
 
@@ -49,6 +51,26 @@ fos-ctx 가 올리는 계약은 [`fos-ctx` README](../../hermes/plugins/fos-ctx/
 저장 규칙(제목 정리와 번호, 되풀이 요청, 답에 묶기)과 실패 처리는 설계의 「인터페이스와 데이터」, 「실패와 일관성」 이 갖는다.
 행의 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 의 「chat_artifact」 가 갖는다.
 
+## 기본 비서에 켜기
+
+「그림 만들기」(`image_gen`)는 관리자 등급 도구다. Control Plane 이 기본 비서에 스스로 켜고, 사용자가 따로 만든 비서는 관리자가 켠다.
+
+| 때 | 어떻게 되나 |
+| --- | --- |
+| 새 사용자가 처음 로그인한다 | 기본 도구와 함께 켠다. 흐름은 [`users.md`](users.md) 의 「첫 에이전트의 기본 도구」 가 갖는다 |
+| 이 기능을 배포한다 | 이미 있던 기본 비서를 한 번 켠다. 배포 뒤 5분 안에 켜진다 |
+| 켜는 저장 | 대시보드 plugin 이 같은 쓰기에서 그 profile 에 이미지 서비스 설정을 넣는다. 이미 있는 설정은 그대로 둔다. 넣지 못하면 도구도 켜지지 않는다 |
+| 그 사용자의 실행 공간이 준비되지 않았다 | 켜지 못한 채 기다리고 관리자에게 사용자와 까닭을 알린다. 운영이 실행 공간 정책에 등록하면 다음 차례(5분 간격)에 스스로 켜고 알림을 읽음으로 바꾼다. 그동안 대화는 그대로 된다 |
+| 관리자가 끈다 | 꺼진 채 남는다. 배포와 재시작이 다시 켜지 않는다 |
+
+기다리는 목록과 켜 보는 순서, 알림은 설계의 「PR2」 가, 도구 저장의 실패는 [`agent-skill.md`](agent-skill.md) 의 「에이전트 도구를 고를 때」 가 갖는다.
+
+## 사람이 없는 실행
+
+예약 작업 turn, 먼저 살펴보기 turn(단추로 연 것 포함), 그 실행이 맡긴 일의 결과를 전하는 turn 과 그 하위 실행에서는 `image_generate` 호출이 막힌다. 장수 상한이 없어 사람이 직접 부탁할 때만 만든다.
+같은 예약 작업 대화나 점검 대화라도 사람이 보낸 메시지의 turn 에서는 만든다. 대화의 종류가 아니라 그 turn 을 누가 열었는지로 본다.
+막는 자리는 fos-ctx 가 이미 묻는 도구 판정이다. 비서는 그림을 만들 수 없다는 글을 받고 결과에 그렇게 적는다.
+
 ## 화면
 
 답 글 아래에 그림이 만든 순서대로 나란히 보인다. HTML 결과물은 지금처럼 그 아래의 파일 줄이다.
@@ -74,8 +96,10 @@ Control Plane 은 메시지 응답에서, 화면은 흐르는 답을 그릴 때 
 ## 배포 뒤 확인
 
 가짜 Hermes 는 올리기 본문을 fos-ctx 와 같은 모양으로 보내지만 실제 이미지 서비스와 실제 모델의 답은 흉내만 낸다.
-fos-ctx 와 Control Plane 을 배포한 뒤 이미지 서비스가 설정된 비서에서 그림 한 장을 만들어 아래를 본다. 절차는 운영 저장소가 갖는다.
+대시보드 plugin 과 fos-ctx, Control Plane 을 배포한 뒤 가족의 기본 비서에서 그림 한 장을 만들어 아래를 본다. 절차는 운영 저장소가 갖는다.
+대시보드 plugin 을 Control Plane 보다 먼저 배포한다. 옛 plugin 은 이미지 서비스를 넣으라는 칸을 거절한다.
 
+- 관리자가 아닌 사용자의 기본 비서에 「그림 만들기」 가 켜져 있고 그림이 만들어진다. 그 profile 에 ChatGPT 구독 로그인이 없으면 설정이 있어도 도구가 보이지 않는다
 - 답에 그림이 보이고 경로 글자가 없다
 - 제목이 비서가 붙인 것이고 지시문이 사용자의 부탁보다 자세하다
 - 「보관한 결과물」 에 그림이 남는다. 가로나 세로가 긴 그림에서 「보관 실패」 가 나오는지 본다(설계의 「검증 전략」)

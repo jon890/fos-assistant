@@ -2,8 +2,10 @@ package com.bifos.assistant.people.application;
 
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.application.AgentDefaultToolsets;
+import com.bifos.assistant.agent.application.AgentPendingToolsets;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentIntroduction;
+import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.hermes.config.HermesProperties;
@@ -26,6 +28,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>기본 도구는 그 트랜잭션이 커밋된 뒤에 백그라운드 작업으로 켠다. 실행 공간 주인 키({@code u<사용자 번호>})가 이때 처음
  * 생기므로 profile 을 만들 때가 아니라 여기서 켠다. 첫 요청이 Hermes 호출을 기다리지 않고, Hermes 가 실패해도 로그인은
  * 되돌리지 않는다(ADR-20261008-default-toolsets).
+ *
+ * <p>기본 도구 가운데 「그림 만들기」 는 만들 때 기다리는 목록에 적는다. 실행 공간이 준비되지 않아 지금 켜지 못해도
+ * {@link AgentPendingToolsets} 가 요청 밖에서 다시 켠다(ADR-20261119 / image-gen-defaults).
  */
 @Service
 @RequiredArgsConstructor
@@ -36,6 +41,7 @@ public class FirstAgentCreator implements FirstSignInListener {
     private final HermesProperties hermesProperties;
     private final PeopleProperties peopleProperties;
     private final AgentDefaultToolsets defaultToolsets;
+    private final AgentPendingToolsets pendingToolsets;
     private final BackgroundTasks backgroundTasks;
 
 
@@ -66,9 +72,14 @@ public class FirstAgentCreator implements FirstSignInListener {
         first.changeIntroduction(AgentIntroduction.of(
             AgentIntroduction.PRIMARY_NAME, AgentIntroduction.PRIMARY_DESCRIPTION, null, null));
         Agent saved = agents.save(first);
+        pendingToolsets.mark(saved.id(), AgentToolPolicy.retriedDefaults(peopleProperties.defaultToolsets()));
         afterCommit(() -> backgroundTasks.start(
             "default-toolsets-" + saved.code(),
-            () -> defaultToolsets.apply(saved, peopleProperties.defaultToolsets())));
+            () -> {
+                defaultToolsets.apply(saved, peopleProperties.defaultToolsets());
+                // 방금 켜졌으면 기다리는 목록을 비우고, 실행 공간이 없어 빠졌으면 관리자에게 알린다.
+                pendingToolsets.attempt(saved.id());
+            }));
     }
 
 

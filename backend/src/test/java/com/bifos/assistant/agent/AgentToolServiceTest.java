@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.application.port.ProfileSkillFiles;
 import com.bifos.assistant.agent.application.dto.AgentToolView;
 import com.bifos.assistant.agent.application.dto.AgentToolsetsView;
+import com.bifos.assistant.agent.application.AgentPendingToolsets;
 import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.agent.application.ToolsetVisibilityService;
 import com.bifos.assistant.agent.domain.Agent;
@@ -49,7 +50,8 @@ class AgentToolServiceTest {
         mock(AgentService.class),
         agents,
         connectorBindings,
-        mock(ToolsetVisibilityService.class));
+        mock(ToolsetVisibilityService.class),
+        mock(AgentPendingToolsets.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
         "tools",
@@ -131,7 +133,8 @@ class AgentToolServiceTest {
             mock(AgentService.class),
             mock(AgentRepository.class),
             mock(AgentConnectorBindings.class),
-            mock(ToolsetVisibilityService.class));
+            mock(ToolsetVisibilityService.class),
+            mock(AgentPendingToolsets.class));
         Agent groupAgent = Agent.of(
             "group-tools",
             "그룹 도구",
@@ -162,7 +165,8 @@ class AgentToolServiceTest {
             mock(AgentService.class),
             mock(AgentRepository.class),
             mock(AgentConnectorBindings.class),
-            mock(ToolsetVisibilityService.class));
+            mock(ToolsetVisibilityService.class),
+            mock(AgentPendingToolsets.class));
         Agent groupAgent = Agent.of(
             "group-read",
             "그룹 도구",
