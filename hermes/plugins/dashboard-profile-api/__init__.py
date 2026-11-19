@@ -62,7 +62,7 @@ from __future__ import annotations
 
 import os
 
-# Hermes v0.21.6은 PyYAML을 기본으로 설치하지 않는다. 관리 API를 열기 전에 확인한다.
+# Hermes core는 PyYAML을 기본으로 설치하지 않는다. 관리 API를 열기 전에 확인한다.
 try:
     import yaml
 except ModuleNotFoundError as exc:

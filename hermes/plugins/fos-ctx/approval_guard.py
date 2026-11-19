@@ -3,12 +3,11 @@
 Hermes v0.23 은 `/v1/runs` 실행에 승인 알림 경로가 없으면 셸 판정(`check_all_command_guards`)과 승인 관문
 (`_run_approval_gate`)을 profile 의 `approvals.unattended_mode` 로 바로 정한다. docker 실행 공간 profile 은 그 값이 `approve` 라
 셸 위험 명령, 승인이 필요한 파일 쓰기, `computer_use` 가 사람 없이 열린다. Control Plane 은 Hermes 승인 카드에
-답하지 않으므로 v0.21 에서도 이 동작들은 승인 시간을 기다린 뒤 거절된다. 그래서 두 버전 모두 hook 에서 먼저 막는다.
+답하지 않으므로 hook 에서 먼저 막는다.
 
 판정은 Hermes 의 함수를 그대로 부른다. 패턴을 복제하면 Hermes 를 올릴 때마다 어긋난다.
 기대는 지점은 `hermes/tests/hermes_contract.py` 의 `APPROVAL_GUARD` 와 `APPROVAL_WRITE_POINTS` 가 선언한다.
-판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다. 단 v0.21 처럼 승인 파일 판정 함수가 없는 Hermes 에서는
-파일 판정을 건너뛴다. 그 버전은 승인 카드로 가서 시간 초과로 거절된다.
+판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다.
 """
 
 from __future__ import annotations
@@ -66,14 +65,8 @@ def _terminal_blocked(args, _task_id) -> bool:
 
 def _write_blocked(tool_name: str, args, task_id: str) -> bool:
     """대상 경로 가운데 하나라도 Hermes 가 승인을 요구하는 경로인가. 경로를 모으는 방법은 Hermes 의 처리기와 같다."""
-    try:
-        file_safety = importlib.import_module("agent.file_safety")
-    except ImportError:
-        return False
-    approval_key = getattr(file_safety, "write_approval_key", None)
-    if approval_key is None:
-        # v0.21 이다. 승인 카드로 가서 시간 초과로 거절된다.
-        return False
+    file_safety = importlib.import_module("agent.file_safety")
+    approval_key = file_safety.write_approval_key
     if not isinstance(args, dict):
         return False
     paths = _write_paths(tool_name, args)

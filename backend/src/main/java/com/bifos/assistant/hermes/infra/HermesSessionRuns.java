@@ -17,7 +17,7 @@ import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Hermes v0.22 부터 생긴 session 대기열(session authority) 실행의 응답을 v0.21.6 과 같은 뜻으로 옮긴다.
+ * Hermes session 대기열(session authority) 실행의 응답을 Control Plane 의 실행 결과로 옮긴다.
  *
  * <p>상태 이름과 사건 이름은 이 class 와 {@link HttpHermesRunsClient} 안에만 둔다. 무엇을 어떻게 옮기는지는
  * docs/features/hermes-upgrade/design.md 의 「조회 응답 읽기」, 「{@code cancelled} 구분」, 「해제」, 「결과 칸 채우기」 가 갖는다.
@@ -48,12 +48,6 @@ final class HermesSessionRuns {
     /** 끝 사건과 중지 기록을 남기는 곳이다. 사건 스트림과 같은 것을 쓴다. */
     HermesRunTerminals terminals() {
         return terminals;
-    }
-
-
-    /** session 대기열의 응답인가. 이 응답만 실행 기록의 번호({@code admission_id})를 싣는다. */
-    static boolean queuedBySession(JsonNode run) {
-        return run != null && run.hasNonNull("admission_id");
     }
 
 

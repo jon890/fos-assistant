@@ -13,7 +13,7 @@
 | 쓰는 때 | 셸 계열 도구 저장과 사진 도구 옛 설치가 docker `terminal:` 을 쓰는 같은 설정 쓰기 안에서 |
 | 지우는 때 | 같은 두 경로가 `backend: local` 을 쓸 때. 운영자가 직접 넣은 값도 지운다 |
 | 그대로 두는 것 | `approvals` 의 다른 키(`mode`, `deny`, `timeout`, `cron_mode` 등)와 셸 계열 도구를 건드리지 않는 저장 |
-| 기대는 Hermes 동작 | v0.21.6 은 gateway 가 `HERMES_EXEC_ASK` 를 켜서, API 경로의 셸 위험 명령과 plugin 승인 요청이 `unattended_mode` 와 무관하게 승인 카드로 간다. v0.23.2 는 승인 알림 경로가 없는 실행에서 이 값이 그것들까지 연다. 그래서 fos-ctx 가 셸 위험 명령, 승인 경로 쓰기, `computer_use` 를 두 버전 모두 먼저 막는다(2026-11-17 갱신). 계약 시험이 두 버전의 지점을 확인한다 |
+| 기대는 Hermes 동작 | v0.23.2 는 승인 알림 경로가 없는 실행에서 이 값이 셸 위험 명령과 승인 관문까지 연다. fos-ctx 가 셸 위험 명령, 승인 경로 쓰기, `computer_use` 를 먼저 막는다. Hermes 업그레이드 PR3 에서 기준 버전과 계약 테스트를 v0.23.2 하나로 맞췄다 |
 
 Hermes 가 이 판정을 어떻게 하는지는 [실행 공간](../hermes-contract.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
 
@@ -66,14 +66,13 @@ ADR-086 의 실행 공간은 `/workspace` 부터 호스트 경로라서 격리�
 
 v0.23.2 는 `/v1/runs` 실행에 승인 알림 경로가 등록돼 있지 않으면 ask 문맥을 끈다. 그러면 셸 판정(`check_all_command_guards`)과 승인 관문(`_run_approval_gate`)이 `unattended_mode` 로 바로 정한다.
 그러면 이 결정이 쓰는 `approve` 가 셸 위험 명령, 승인이 필요한 경로의 파일 쓰기, `computer_use` 까지 사람 없이 연다.
-결정은 그대로 두고(`execute_code` 는 계속 연다), fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다(`docs/features/hermes-upgrade/spec.md` 의 REQ5, DECISION8).
+결정은 그대로 두고(`execute_code` 는 계속 연다), fos-ctx 의 `pre_tool_call` 이 그 셋을 먼저 막는다(`docs/features/hermes-upgrade/spec.md` 의 REQ5, DECISION8).
 
 | 조건 | `execute_code` | 셸 위험 명령 | 승인 경로 쓰기 | `computer_use` |
 | --- | --- | --- | --- | --- |
-| v0.21.6, `approve` | 승인 | fos-ctx 가 바로 거절 | 승인 대기 뒤 시간 초과로 거절 | fos-ctx 가 바로 거절 |
 | v0.23.2, `approve`, 알림 경로 없음 | 승인 | fos-ctx 가 바로 거절 | fos-ctx 가 바로 거절 | fos-ctx 가 바로 거절 |
 
-Control Plane 은 Hermes 승인 카드에 답하지 않으므로 v0.21.6 에서도 셋은 결국 거절됐다. 사용자에게 보이는 차이는 승인 시간을 기다리지 않는 것뿐이다.
+v0.21.6 전환 당시에는 승인 파일 판정을 생략해 승인 시간 초과로 거절했다. Hermes 업그레이드 PR3 은 이 예외를 제거했다. 현재 판정 함수를 읽지 못하거나 판정하지 못하면 fos-ctx 가 즉시 막는다.
 
 기각한 대안:
 

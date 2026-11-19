@@ -124,9 +124,6 @@ export function startFakeHermes(
           return judgeConnectorCalls(profile, token, sessionId, lines, `connector-direct-${state.directConnectorCalls}`);
         },
         boundConnectorsOf: (profile: string) => [...(state.boundConnectors.get(profile)?.keys() ?? [])],
-        useHermesShape: (shape: "v0.21" | "v0.23") => {
-          state.hermesShape = shape;
-        },
         restartHermes: () => restartHermes(),
         resolvedRuns: () => [...state.resolvedRuns],
         holdNextRun: () => {

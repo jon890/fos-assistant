@@ -134,8 +134,8 @@ class HermesBusyTest {
     @Test
     @DisplayName("중간에 끊긴 실행은 기다리지 않고 끝난 것으로 돌려준다")
     void returnsHalfwayCutRunAsEndedWithoutWaiting() {
-        // v0.21.5 의 종료 상태다. 기다리면 실행 시간 한도(여기서는 2초)까지 조회만 되풀이한다.
-        respondWith(200, "{\"run_id\":\"run-1\",\"status\":\"interrupted\",\"session_id\":\"sess-1\"}");
+        // gateway 가 끊은 실행도 조회에서는 cancelled 다. 중지 근거가 없으면 끊긴 실행으로 읽는다.
+        respondWith(200, "{\"run_id\":\"run-1\",\"status\":\"cancelled\",\"session_id\":\"sess-1\"}");
 
         HermesRunResult result = client.awaitCompletion(command(), "run-1");
 

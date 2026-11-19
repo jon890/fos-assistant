@@ -1,7 +1,7 @@
 # Hermes 의 동작 계약
 
 이 저장소가 기대는 Hermes 의 동작을 Hermes 표면마다 갖는다. 우리 코드가 아니라 upstream 의 동작이다.
-기준 버전은 `hermes/tests/hermes_contract.py`의 `HERMES_VERSION`이고, 이전 버전에서 확인한 대목은 버전을 함께 적는다.
+기준 버전은 v0.23.2이며 정본은 `hermes/tests/hermes_contract.py`의 `HERMES_VERSION`이다. 이전 버전의 조사·실측 기록은 그 버전을 함께 적어 보존한다.
 Hermes 내부 지점에 새로 기대면 같은 커밋에서 `hermes_contract.py` 에 선언한다.
 우리 plugin 의 계약은 [`hermes/plugins/fos-ctx/README.md`](../plugins/fos-ctx/README.md) 와 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 가 갖는다.
 
@@ -41,7 +41,7 @@ Control Plane은 `/v1/runs`의 `_make_run_event_callback`을 사용한다. 별�
 `_tool_progress`는 kwargs를 버리므로 그 경로에서는 같은 실패 사건을 보장하지 않는다.
 이 성공 envelope와 detail이 실제 provider에서 수용되는지는 배포 뒤 왕복으로 검증해야 한다.
 
-고정 core의 `pyproject.toml`은 Pillow를 이미 의존성으로 고정한다(v0.21.6은 12.3.0, v0.23.2는 13.0.0). GIF/WebP 변환 helper는
+고정 core의 `pyproject.toml`은 Pillow 13.0.0을 이미 의존성으로 고정한다. GIF/WebP 변환 helper는
 이 Pillow와 공개 Image·ImageOps API를 쓰며 WebP codec 가용성도 따로 확인한다.
 PNG 원본·crop과 명시적 축소 개요는 같은 native dict 계약을 쓰되 text와 fallback에서 서로 구분한다.
 GIF/WebP는 첫 표시 프레임만 확인하며 움직임과 뒤 프레임은 확인하지 않았다고 안내한다.
@@ -477,67 +477,49 @@ v2026.9.24 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousR
 | 슬롯 | agent 의 슬롯 하나에 받은 순서대로 줄바꿈으로 이어 붙인다 |
 | 모델에 들어가는 때 | 둘이다. 도구 한 묶음이 끝난 직후, 그리고 다음 API 호출 직전(가장 최근 `tool` 행 바로 뒤). 도구를 부르는 중이면 그 도구가 끝날 때까지 기다린다 |
 | 모양 | 별도 `role: user` 행, `display_kind: "steer"`, 본문은 `[OUT-OF-BAND USER MESSAGE …]` 표식이다. 시스템 프롬프트가 이 표식을 원래 요청과 같은 사용자 권한으로 따르라고 지시한다. session 에 저장된다 |
-| 넣지 못하고 끝났다 | 마지막 답을 쓰는 중에 받은 글처럼 슬롯에 남은 글은 모든 종료 사건과 `GET /v1/runs/{run_id}` 의 `pending_steer` 로 이어진 하나로 돌아온다. 다시 보내라는 뜻이다 |
+| 넣지 못하고 끝났다 | 마지막 답을 쓰는 중에 받은 글처럼 슬롯에 남은 글은 종료 사건의 `pending_steer` 로 이어진 하나로 돌아온다. 조회에는 이 칸이 없다. 끝 사건을 얻지 못하면 「전달됐는지 확인 못 함」 으로 둔다 |
 | 중단 | 운영 확인(2026-11-17): steer 직후 중지한 실행의 `GET /v1/runs/{run_id}` 가 `status: cancelled` 와 함께 넣지 못한 그 글을 `pending_steer` 로 돌려줬다. 소스만 읽었을 때는 hard interrupt 가 슬롯을 비워 버린다고 봤다. 넣은 글은 알리지 않는다. 중지의 종료 사건(`run.cancelled`)에 실리는지는 확인하지 못했다. Control Plane 은 실행 조회로 읽는다 |
 | 위임 자식 | 부모의 `steer` 는 자식에게 가지 않는다. 자식이 도는 동안 받은 글은 자식이 끝난 뒤 부모에 들어간다. 자식에 넣는 경로는 Hermes 자체 화면 전용이다 |
 
 **Control Plane 은 설정이 켜져 있을 때 답이 도는 중 대화 주인이 입력창에 쓴 글만 그 대화의 루트 run 에 `steer` 로 보낸다.**
 `steer` 글이 원래 요청과 같은 사용자 권한으로 들어가므로 위임 결과, 도구 결과, 알림 줄, 카드 답은 보내지 않는다.
 200 이면 받음, 4xx·5xx 면 거절, 응답이 없으면 받았는지 모르는 것으로 본다. 글은 넣기 전부터 Control Plane 의 대기 줄에 있고, 거절, `pending_steer`, 중단, 모름을 모두 대기 줄로 되돌린다. 중단한 결과에 `pending_steer` 가 있으면 그 글은 들어가지 않은 것으로 본다. 흐름은 [`docs/features/chat.md`](../../docs/features/chat.md) 의 「도는 실행에 끼워 넣기」, 결정은 [ADR-20261116 / run-steer](../../docs/adr/ADR-20261116-run-steer.md) 가 갖는다.
-Control Plane 의 시험 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)도 steer 경로, `run.steered`, 실행 조회와 완료·중지 종료 사건의 `pending_steer` 를 낸다. 중지 때도 슬롯에 남은 글을 `pending_steer` 로 돌려준다. 지금 대기열 검사가 흔들리지 않게 steer 검사 입력으로 연 실행만 받고 나머지는 409 `run_not_accepting_steer` 로 거절한다. 실제 Hermes 는 도는 실행이면 모두 받는다.
+Control Plane 의 테스트 대역(`StubHermesRunsClient`)은 `steer` 결과와 `pending_steer` 를 낸다. E2E 의 가짜 Hermes(`test/e2e/fake-hermes`)도 steer 경로, `run.steered`, 완료·중지 종료 사건의 `pending_steer` 를 낸다. 실행 조회에는 이 칸이 없다. 중지 때도 슬롯에 남은 글을 종료 사건으로 돌려준다. 지금 대기열 검사가 흔들리지 않게 steer 검사 입력으로 연 실행만 받고 나머지는 409 `run_not_accepting_steer` 로 거절한다. 실제 Hermes 는 도는 실행이면 모두 받는다.
+
+표의 「중단」 은 전환 전 운영 기록이다. 현재 기준은 조회 대신 종료 사건을 읽으며, 중단 규칙의 후속 변경은 별도 작업이 맡는다(업그레이드 스펙의 범위 밖).
 
 ### 실행 조회가 답하는 기간
 
-v0.21.5 의 [`gateway/platforms/api_server_runs.py`](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py) 와 `api_server.py` 를 소스로 읽었다. 운영 Hermes 에서 왕복으로 확인하지는 않았다.
-
-**실행 상태는 gateway 프로세스의 메모리에 있다.** `_run_statuses` 가 run 번호마다 상태 하나를 갖는다.
+v0.23.2 의 `gateway/platforms/api_server_runs.py`, `api_server_authority_runs.py`, `gateway/session_authority.py` 소스로 확인했다.
+모든 `/v1/runs` 는 session 대기열(session authority)에 들어가고 실행 기록을 디스크에 남긴다.
 
 | 때 | `GET /v1/runs/{run_id}` |
 | --- | --- |
-| 도는 중 | 200. `status` 는 `running`, `stopping`, `waiting_for_approval` 가운데 하나다. 종료 상태가 아닌 값은 모두 도는 중으로 읽는다 |
-| 끝난 뒤 1시간 안 | 200. 종료 `status` 와 `output`, `usage`, `session_id`, `runtime` 을 그대로 준다. 몇 번을 읽어도 같다 |
-| 끝난 뒤 1시간이 지났다 | 404 `run_not_found`. `_sweep_orphaned_runs_once` 가 1분마다 돌며 `_RUN_STATUS_TTL`(3600초)을 넘긴 `completed`, `failed`, `cancelled` 를 지운다 |
-| gateway 가 다시 떴다 | 404 `run_not_found`. 메모리가 비었다 |
-| 남의 profile 이나 key 로 물었다 | 404. 있는지 알리지 않는다([`hermes/docs/hermes-contract.md`](hermes-contract.md)) |
+| 대기·실행 중 | `queued`, `running`, `waiting_for_approval` 을 답한다 |
+| 끝난 뒤 | session 을 지우기 전까지 상태와 `output`, `usage` 를 답한다. gateway 재기동 뒤에도 남는다 |
+| 도는 중 gateway 가 다시 떴다 | `unknown`. 해제 전까지 같은 session 의 뒤 turn 은 `queued` 로 멈춘다 |
+| 사용자 중지·gateway 정상 종료·해제 | `cancelled`. 종료 사건과 Control Plane 의 중지 기록으로 사용자 중지와 끊긴 실행을 나눈다 |
+| 없는 실행·남의 profile 이나 key | 404. 남의 실행이 있는지 알리지 않는다 |
 
-**404 로는 「없는 run」 과 「끝난 지 오래된 run」 을 구분하지 못한다.** 어느 쪽이든 다시 물어도 답이 바뀌지 않는다.
-
-**클라이언트가 떠나도 실행은 계속 돈다.** 실행은 gateway 의 task 로 돌고 조회나 사건 스트림 연결에 묶이지 않는다.
-사건 스트림의 버퍼만 `_RUN_STREAM_TTL`(300초) 뒤에 치운다. 다시 구독해도 그 전의 조각은 오지 않는다.
-
-gateway 가 내려가며 끊은 실행은 `interrupted` 로 적힌다. 그 상태도 메모리에 있어 다시 뜬 뒤에는 읽지 못한다.
-
-제출할 때 `Idempotency-Key` 머리말을 주면 Hermes 가 그 run 의 상태를 디스크에 남기고, 다시 뜬 뒤에도 조회에 답한다. 도는 중에 gateway 가 죽은 run 은 `interrupted` 로 답한다.
-**Control Plane 은 이 머리말을 보내지 않는다.**
-
-Control Plane 이 다시 뜰 때 남은 실행을 이 조회로 다시 정한다([ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md)).
-
-**가짜 Hermes 의 실행 조회도 이 모양으로 둔다.** 도는 실행은 `running`, 끝난 실행은 같은 답을 되풀이하고, 지운 run 과 모르는 run 은 404 다.
+조회는 `session_id`, `admission_id`, `execution_generation`, `pending_controls` 를 주고 `error`, `pending_steer` 는 주지 않는다.
+`model`, `runtime` 은 같은 gateway 프로세스의 메모리에 남아 있을 때만 붙는다.
+사건 보관분은 끝난 뒤 5분 동안 남으며, 처음 다시 연결하면 보관분을 보내고 닫는다. 조회 기록의 보존 기간과는 다르다.
+클라이언트가 떠나도 실행은 계속 돈다. `unknown` 에 중지를 보내면 409 `unknown_execution` 이다.
 
 #### v0.23.2 의 session 대기열
 
-2026-11-17 에 v0.23.2(commit `ae2a81cc`)의 소스를 읽었다. 운영 왕복으로는 확인하지 않았다. 확인할 항목은 [`docs/features/hermes-upgrade/spec.md`](../../docs/features/hermes-upgrade/spec.md) 의 「배포 뒤 왕복 확인」 이 갖는다.
-
-**v0.22 부터 `/v1/runs` 실행은 profile 마다 디스크의 session 대기열(session authority)에 들어가고, 실행 조회는 그 기록으로 답한다.** 근거는 `gateway/platforms/api_server_authority_runs.py` 의 `run_projection` 과 `api_server_runs.py` 의 `_durable_run_status` 다.
-
-| 무엇 | v0.21.6 | v0.23.2 |
-| --- | --- | --- |
-| 상태 값 | `running`, `stopping`, `waiting_for_approval` 과 끝 상태 | `queued`, `running`, `waiting_for_approval`, `unknown` 과 끝 상태. `unknown` 은 끝 상태가 아니다 |
-| gateway 가 다시 떴다 | 404 | 도는 중이던 사람 turn 은 `unknown`. 같은 session 의 뒤 실행은 해제될 때까지 `queued`. 끝난 실행은 상태, `output`, `usage` 로 계속 답한다 |
-| 기록의 수명 | 끝나고 1시간 | session 을 지울 때까지 |
-| 조회 응답의 칸 | `error`, `pending_steer`, `runtime`, `model` 을 준다 | `error`, `pending_steer` 가 없다. `runtime`, `model` 은 같은 gateway 프로세스 메모리에 남아 있을 때만 붙는다. `admission_id`, `execution_generation`, `pending_controls` 를 더 준다 |
-| `cancelled` | 사용자 중지 | 사용자 중지, gateway 의 정상 종료로 끊긴 실행, 해제한 실행을 모두 담는다 |
-| 잃은 실행의 중지 | 해당 없음 | 409, `error.code` 가 `unknown_execution` |
+2026-11-18 에 운영을 v0.23.2 로 전환했고 실제 답 왕복과 배포 검사를 통과했다. 전환 후 실패한 실행이 없음을 2026-11-19 코디네이터가 확인했다.
+이번 호환 제거 배포 뒤 실제 답 왕복은 코디네이터가 다시 확인한다. 상세 확인 항목은 [업그레이드 스펙](../../docs/features/hermes-upgrade/spec.md)의 「배포 뒤 왕복 확인」 이 갖는다.
 
 해제는 `POST /v1/runs/{run_id}/resolve-unknown` 에 `{"admission_id", "execution_generation"}` 두 칸을 조회 응답의 값 그대로 보낸다. 이미 해제한 같은 실행을 다시 보내도 200 이다. 409 는 값이 어긋났거나(`stale_generation`) 기록이 없는 경우다.
 
-**Control Plane 은 이 차이를 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 안에서 옮긴다.** `queued` 는 도는 것으로 읽고, `unknown` 은 해제한 뒤 조회 경로에는 모르는 run 으로, 도는 turn 에는 `REMOTE_RUN_LOST` 로 알린다. 해제한 실행을 다시 읽으면 `cancelled` 라 사용자 중지로 읽히므로 다시 읽지 않는다.
+**Control Plane 은 이 차이를 `backend/src/main/java/com/bifos/assistant/hermes/infra/` 안에서 옮긴다.** `queued` 는 도는 것으로 읽고, `unknown` 은 해제한 뒤 조회 경로에는 모르는 run 으로, 도는 turn 에는 `REMOTE_RUN_LOST` 로 알린다. 해제한 실행은 처리 완료로 기억해 반복 조회하지 않는다.
 `cancelled` 는 끝 사건(`run.cancelled`, `run.interrupted`)과 그 프로세스가 중지를 보냈는지로 나누고, 근거가 없으면 `interrupted`(실패)로 적는다.
 조회에 없는 `error`, `pending_steer`, `runtime` 은 사건 스트림이 받은 끝 사건으로 채우고, 없으면 끝난 실행의 사건 보관분(끝나고 5분)을 한 번 다시 읽는다. 얻지 못하면 넘어간 steer 글을 모르는 것으로 보고 끼운 글을 「전달됐는지 확인 못 함」 으로 둔다.
 그 run 을 다시 묻는 쪽이 없어도 대화가 막히지 않게, 새 실행을 보내기 전에 같은 profile 에서 최근 연결 실패·시간 초과로 끝난 실행을 해제한다.
 흐름과 결정은 [`docs/features/hermes-upgrade/design.md`](../../docs/features/hermes-upgrade/design.md) 와 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 갖는다.
 
-**가짜 Hermes 는 `/__test/hermes-shape` 로 v0.23 모양을 켤 수 있다.** 켜면 조회에서 `error`, `pending_steer` 를 빼고 기록 번호를 넣고, `/__test/restart-hermes` 가 도는 실행을 `unknown` 으로 바꾼다. `/__test/reset-controls` 가 v0.21 모양으로 되돌린다.
+**가짜 Hermes 도 현재 조회 모양만 쓴다.** 조회에서 `error`, `pending_steer` 를 빼고 기록 번호를 넣으며, `/__test/restart-hermes` 가 도는 실행을 `unknown` 으로 바꾼다.
 
 ### `/v1/runs` 에 사진을 싣는 법
 
@@ -799,7 +781,7 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 | `run.failed`, `run.cancelled` | 끝 |
 | `run.interrupted` | `error`. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
 
-v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 소스로 보면 아래가 다르다. 운영 왕복으로는 확인하지 않았다.
+현재 v0.23.2 의 session 대기열 경로(모든 `/v1/runs`)는 아래와 같다. 앞의 범용 callback 표에는 이 경로가 등록하지 않는 사건도 포함한다. 개별 사건의 미수신 여부까지 운영에서 확인한 결과는 아직 없다.
 
 - `message.interim`, `reasoning.available`, `subagent.start`, `subagent.complete` 가 오지 않는다. `_execute_run` 이 답 조각과 도구 시작·완료 sink 만 등록한다(`gateway/session_api_turn.py` 의 `wire_api_observers`). Control Plane 은 오는 사건만 그린다(스펙 DECISION2)
 - `tool.started`, `tool.completed` 에 `tool_call_id` 가 붙고 `tool.completed` 의 `duration` 은 늘 0 이다. Control Plane 은 0 을 걸린 시간 모름으로 읽는다
@@ -922,8 +904,7 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 
 아래 계약은 private 관리 owner가 사용하는 일반 내부 경계다. 공개 writer 설치 API의 인자와
 `BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
-v0.23 계열의 runtime scope 경계로 선언하며, `BODYLESS_SOURCE_LINE`의 표지 파일이 없는 소스(기준 버전 v0.21.6)에서는 source 검사를 건너뛴다.
-운영에 연결하지 않아 기준 버전을 올리기 전까지 v0.23 계열에서만 맞춘다. 설계는 [Hermes 업그레이드 설계](../../docs/features/hermes-upgrade/design.md)의 「PR4」 가 갖는다.
+기준 버전의 runtime scope 경계로 선언한다. `HERMES_SOURCE` 를 주면 표지 파일 유무와 관계없이 source 검사를 수행하므로, 옛 소스나 잘못된 경로를 건너뛰지 않고 실패로 알린다. 설계는 [Hermes 업그레이드 설계](../../docs/features/hermes-upgrade/design.md)의 「PR4」 가 갖는다.
 `hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 v0.23.2 공식 commit의 정확한
 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
 `BODYLESS_MANAGED_MODULE_NODES`는 scope 상태의 저장소와 값 타입, `contextvars` import,
@@ -1652,7 +1633,7 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록한다.
 | `tool_search`, `tool_describe` | 그 이름 그대로. MCP `tools/call` 은 일어나지 않는다 | 소스 |
 | native `delegate_task` 의 자식 | 자식도 같은 executor 를 쓴다. `session_id` 는 자식의 것이다 | 소스 |
 | 공유 gateway 의 `/v1/runs` | 요청 profile 의 plugin manager 를 고른다 | 소스, profile 둘의 hook 문맥 실행 |
-| `execute_code` 안의 도구 호출 | hook 을 거친다. v0.21.6 은 넘어오는 식별자가 `task_id` 뿐이고, 상주 kernel(`tools/code_kernel.py`)도 같다. fos-ctx 의 도구 판정은 session 없는 호출을 코드 실행 안의 호출로 보고 묻지 않는다. v0.23.2 는 `session_id` 를 함께 넘기고 `tool_call_id` 는 비운다. fos-ctx 는 그 호출에 `code-exec:` 번호를 만들어 묻는다. `test_tool_guard_contract.py` 가 두 자리와 버전별 식별 칸을 고정한다 | 소스 |
+| `execute_code` 안의 도구 호출 | hook 을 거친다. RPC 와 상주 kernel 모두 `session_id` 를 넘기고 `tool_call_id` 는 비운다. fos-ctx 는 `code-exec:` 번호를 만들어 묻는다. 안전 목록 밖 호출에 session 이 없으면 막는다. `test_tool_guard_contract.py` 가 두 자리의 식별 칸을 고정한다 | 소스 |
 | plugin 의 `PluginContext.call_mcp` | **hook 을 거치지 않는다.** 서버 정의의 `mcp_allowlist` 만 본다 | 소스 |
 
 중계 한 건에 hook 이 두 번 걸리지 않는다. executor 가 중계를 먼저 풀고 hook 을 적용한 뒤 dispatcher 에는 hook 을 건너뛰라고 넘긴다.
@@ -1854,7 +1835,7 @@ fos-ctx 는 `approve` 를 돌려주지 않는다. 같은 관문을 쓰는 셸 �
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
 - `fos-ctx` 1.5.0 을 올린 profile 에서 안전 목록 밖의 도구가 `tool-guard` 를 묻는지. gateway 로그의 `fos-ctx:` 줄과 Control Plane 의 「도구 호출을 막았다」 로그로 본다. Hermes 가 plugin 을 불러오지 못하면 판정 없이 나가고 설치 상태의 `tool_guard` 는 이것을 알지 못한다
 - 사건 실행에서 막는 판정이 실제로 한 번 나오는지(Control Plane 의 「도구 호출을 막았다」 로그)와 gateway 에 `FOS_CTX_POLICY_URL` 이 있는지. Hermes 와 Control Plane 사이가 새 경로를 열지 않아 404 를 내면 hook 이 옛 Control Plane 으로 읽고 통과시킨다
-- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 없이 와서 통과하는지. v0.23.2 에서는 그 호출이 `code-exec:` 번호로 `tool-guard` 를 묻고 보통 대화에서 통과하는지
+- 사건 실행 트리에서 `execute_code` 안의 내장 도구 호출이 일어나지 않는지, 보통 대화의 `execute_code` 안 호출이 session 을 달고 와서 `code-exec:` 번호로 `tool-guard` 를 묻고 보통 대화에서 통과하는지
 - `fos-ctx` 1.11.0 을 올린 profile 에서 셸 위험 명령이 승인 시간을 기다리지 않고 「위험 명령으로 분류돼」 글로 바로 거절되는지
 - `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
 
@@ -2232,27 +2213,22 @@ plugin 이 쓰는 `/workspace` 부터 호스트 경로다.
 3번이 4번보다 앞이라, API 서버의 승인 다리(`/v1/runs/{id}/approval`)가 있어도 `execute_code` 는 승인 카드로 가지 않는다.
 그래서 plugin 은 docker 실행 공간을 쓰는 profile 에 `approve` 를 쓴다([ADR-20261008 / execute-code-unattended](adr/ADR-20261008-execute-code-unattended.md)).
 
-**v0.21.6 에서는 같은 모드가 셸 위험 명령과 plugin 승인 요청에 닿지 않는다.**
-`check_all_command_guards` 와 `_run_approval_gate` 는 CLI, gateway, ask 문맥이 모두 아닐 때만 사람이 없는 문맥의 모드를 본다.
-gateway 의 `start_gateway()` 가 `HERMES_EXEC_ASK=1` 을 프로세스 환경에 넣으므로 API 서버 실행은 ask 문맥이고, 두 판정은 승인 카드로 간다.
-Control Plane 은 Hermes 승인 카드에 답하지 않으므로 승인 시간(기본 300초)을 기다린 뒤 거절된다.
-
-**v0.23.2 에서는 닿는다.**
+**v0.23.2 는 승인 알림 경로가 없으면 같은 모드로 셸과 승인 관문도 정한다.**
 표식을 켜는 자리는 `gateway/run_bootstrap.py` 의 `_start_gateway_runtime` 으로 옮겼다. 그런데 `_presence` 는 `api_server` 실행에 승인 알림 경로(`_gateway_notify_cb`)가 없으면 ask 문맥을 끈다.
 그러면 셸 위험 명령은 `check_all_command_guards` 가, 승인이 필요한 경로의 파일 쓰기(`~/.ssh/config`, 셸 시작 파일)와 `computer_use` 는 `_run_approval_gate` 가 `unattended_mode` 로 바로 정해, docker profile 에서는 사람 없이 열린다.
 session 대기열의 turn 실행기는 turn 마다 알림 경로를 등록하지만, 그 session key 가 닿지 않는 스레드가 어디인지는 확인하지 못했다.
 
-**그래서 fos-ctx 의 `pre_tool_call` 이 그 셋을 두 버전 모두 먼저 막는다**(`docs/features/hermes-upgrade/spec.md` 의 REQ5).
+**그래서 fos-ctx 의 `pre_tool_call` 이 그 셋을 먼저 막는다**(`docs/features/hermes-upgrade/spec.md` 의 REQ5).
 
 | 도구 | 막는 조건 | 쓰는 Hermes 함수 |
 | --- | --- | --- |
 | `terminal` | `detect_dangerous_command(command)` 의 첫 값이 참이다. `command_allowlist` 는 보지 않는다 | `tools/approval_detection.py` |
-| `write_file`, `patch` | 대상 경로 가운데 하나라도 `write_approval_key` 가 값을 준다. V4A 머리줄의 경로도 보고, 상대 경로는 hook 이 받은 `task_id` 로 푼다. 이 함수가 없는 v0.21.6 은 건너뛴다 | `agent/file_safety.py`, `tools/file_tools.py` 의 `_collect_v4a_header_paths`, `tools/file_tools_write_guards.py` 의 `_resolved_or_raw` |
+| `write_file`, `patch` | 대상 경로 가운데 하나라도 `write_approval_key` 가 값을 준다. V4A 머리줄의 경로도 보고, 상대 경로는 hook 이 받은 `task_id` 로 푼다. 이 함수가 없거나 판정하지 못하면 막는다 | `agent/file_safety.py`, `tools/file_tools.py` 의 `_collect_v4a_header_paths`, `tools/file_tools_write_guards.py` 의 `_resolved_or_raw` |
 | `computer_use` | 모든 호출 | 없음 |
 
 판정 함수를 불러오지 못하거나 판정이 예외를 던지면 막는다.
 docker profile 의 `execute_code` 는 `unattended_mode: approve` 로 지금처럼 승인 없이 돈다.
-사람 없는 문맥의 모드를 보는 함수 목록(`check_all_command_guards` 포함)은 `test_unattended_approval_points` 가, `_run_approval_gate` 를 부르는 함수 목록과 위 함수의 위치, 시그니처는 `test_approval_guard_points` 가 두 버전에서 확인한다.
+사람 없는 문맥의 모드를 보는 함수 목록(`check_all_command_guards` 포함)은 `test_unattended_approval_points` 가, `_run_approval_gate` 를 부르는 함수 목록과 위 함수의 위치, 시그니처는 `test_approval_guard_points` 가 기준 버전에서 확인한다.
 어느 목록이든 함수가 늘면 시험이 실패하고, fos-ctx 가 그 동작을 막는지 본 뒤 선언을 고친다.
 
 모드는 판정할 때마다 그 실행의 profile 설정에서 읽는다(`tools/approval_context.py` 의 `_binary_approval_mode`).
@@ -2867,7 +2843,14 @@ ADR-088 의 `test_hermes_contract.py` 는 상류 소스에서 이름·시그니�
 
 ### 버전을 올릴 때 달라지는 계약
 
-#### v0.21.6의 연동 기준
+#### v0.23.2의 연동 기준
+
+2026-11-19 기준 버전을 v0.23.2(commit `ae2a81ccc00e9b7c06301523e5bb09608397149c`)로 올렸다.
+실행 조회는 항상 session 대기열 계약으로 읽고, 종료 사건에서 실패 사유와 남은 steer 글을 얻는다.
+계약 테스트의 버전 선택과 본문 없는 진단 source 건너뛰기, 승인 파일 판정 생략을 제거했다.
+기존 사건 처리기는 오는 사건을 계속 읽는다. 오지 않는 중간 안내·native 자식 사건을 새로 만들지는 않는다.
+
+#### v0.21.6 전환 당시 기록
 
 2026-10-12에 이전 기준 `v2026.9.24`와 `v0.21.6`의 공식 소스를 대조했다.
 tag가 가리키는 commit은 `hermes_contract.py`의 `HERMES_COMMIT`으로 고정한다.
@@ -2888,7 +2871,7 @@ Control Plane은 `id:`, `seq`와 `replay.truncated`를 무시하고 기존 사�
 이번 변경에 `Last-Event-ID` 재연결이나 누락 사건 복구를 더하지 않는다.
 느린 구독자로 닫히면 `: stream closed` 와 종료 사건 없이 스트림이 끝난다. Control Plane 은 이를 정상 EOF 로 읽고 결과 조회로 최종 답만 받는다.
 끊긴 뒤의 답 조각, 도구, 중간 안내 사건은 화면과 실행 기록에 남지 않으며, 다른 실패와 구분할 단서는 사건 관측이 완료되지 못했다는 플래그 하나뿐이다.
-v0.21.6 합성 fixture와 단일 사건 봉투 함수가 transport 차이를 갖고, 이전 버전 fixture도 남긴다.
+현재 기준 버전의 합성 fixture와 단일 사건 봉투 함수가 transport 차이를 갖고, 이전 버전 fixture는 당시 parser 회귀 기록으로 남긴다. 현재 fixture에도 범용 callback 사건을 넣어 parser를 검사하며, 그 사건이 session 대기열 실행에서 모두 온다는 뜻은 아니다.
 공식 SSE handler를 분리 실행해 `events.sse` 의 `id/seq` 를 대조하고, 첫 연결의 누락 안내는 같은 handler 가 만든 것을 손으로 쓴 사건과 따로 대조한다.
 `events.sse` 에는 누락 안내가 없고, 파서가 안내를 건너뛰는지는 `unknown.sse` 가 본다.
 녹화한 운영 본문은 사용하지 않는다.

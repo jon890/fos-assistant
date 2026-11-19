@@ -60,9 +60,7 @@ class RunsStreamContractTest(unittest.IsolatedAsyncioTestCase):
                 frames.append(frame.decode())
 
         self.namespace["web"] = SimpleNamespace(StreamResponse=Response)
-        # v0.23 은 인증을 `_check_run_auth` 로 한다. 기준 계열은 `_check_auth` 를 부른다.
-        owner = SimpleNamespace(_check_auth=lambda request: None,
-            _check_run_auth=lambda request, **kwargs: None,
+        owner = SimpleNamespace(_check_run_auth=lambda request, **kwargs: None,
             _request_owns_run=lambda request, run_id: True,
             _run_streams={"fixture-run": stream}, _sse_headers=lambda request: {},
             _release_run_owner_if_forgotten=lambda run_id: None)

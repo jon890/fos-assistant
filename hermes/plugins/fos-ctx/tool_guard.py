@@ -57,13 +57,13 @@ def is_safe(tool_name: str, args, remote_only) -> bool:
 def tool_guard(tool_name: str, args, session_id: str, tool_call_id: str, remote_only):
     """안전 목록 밖의 도구 호출을 Control Plane 에 묻는다. 통과면 None, 아니면 글이 든 `block` 이다.
 
-    코드 실행(`execute_code`, 상주 kernel) 안의 호출은 Hermes 버전마다 모양이 다르다.
-    v0.21 은 `task_id` 만 넘겨 session 이 없다. 그 코드를 연 `execute_code` 호출이 session 을 들고 판정을 받았고
-    사건 실행 트리에서는 막히므로 묻지 않고 통과시킨다. v0.23 은 session 을 넘기고 `tool_call_id` 는 비운다.
+    코드 실행(`execute_code`, 상주 kernel) 안의 호출도 session 을 넘기고 `tool_call_id` 는 비운다.
     그 호출은 `code-exec:` 번호를 만들어 묻는다(스펙 hermes-upgrade REQ6). 예외는 부르는 쪽(`hooks.event_guard`)이 잡는다.
     """
-    if is_safe(tool_name, args, remote_only) or not session_id:
+    if is_safe(tool_name, args, remote_only):
         return None
+    if not session_id:
+        return _block(GUARD_BLOCK_MESSAGE)
     url = guard_url()
     token = _read_token()
     if not url or not token:

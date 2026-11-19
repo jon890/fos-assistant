@@ -130,8 +130,7 @@ Hermes 는 실행마다 toolset 을 줄이는 칸이 없다(최신 main 도 같�
 
 **hook 이 막는 경우.** Control Plane 이 `allow` 로 답하지 않았다(404 만 예외, 아래 「실패와 일관성」 의 배포 순서), 주소나 토큰이 없다, tool_call_id 가 없다, 무엇이든 예외가 났다. 예외는 hook 안에서 잡아 정해 둔 글로 막는다. callback 예외도 Hermes 가 막지만 그때는 예외 본문 일부가 모델에게 간다. 새 Control Plane 은 이 경로에서 404 를 내지 않는다. 판정 중의 어떤 예외든 200 의 `block` 으로 답하고, 본문을 읽지 못하거나 서명이 틀리면 다른 거절과 같은 `TOOL_GUARD_REJECTED`(403)다.
 
-**v0.21.6 에서 session 이 없는 호출은 통과시킨다.** 코드 실행 안의 도구 호출(`execute_code` 의 RPC 와 상주 kernel)은 v0.21.6 에서 hook 에 `task_id` 만 넘긴다(계약 테스트가 고정). 그 코드를 연 `execute_code` 는 session 을 들고 와 판정을 받았고, 사건 실행 트리에서는 그 `execute_code` 가 막힌다. 보통 대화의 kernel 안 스레드가 cell 이 끝난 뒤에도 부를 수 있지만 그 kernel 은 사건 실행 트리에서 열리지 않는다. session 이 없는 호출을 막으면 보통 대화의 코드 실행이 깨진다.
-v0.23 은 그 호출에 `session_id` 를 함께 넘기고 `tool_call_id` 는 비운다. fos-ctx 가 `code-exec:` 번호를 만들어 일반 호출처럼 Control Plane 에 묻고, 아래 판정이 그 session 으로 사건 실행 트리의 호출을 막는다. 보통 대화는 통과한다. 버전별 차이는 [fos-ctx README](../../../hermes/plugins/fos-ctx/README.md) 의 표가 갖는다.
+**session 없는 호출의 예외는 Hermes 업그레이드 PR3 에서 제거했다.** v0.21.6 은 코드 실행 안 호출에 `task_id` 만 넘겨 통과시켰지만, 현재 기준은 RPC 와 상주 kernel 모두 `session_id` 를 넘긴다. `tool_call_id` 는 비므로 fos-ctx 가 `code-exec:` 번호를 만들어 Control Plane 에 묻는다. 보통 대화는 통과하고 사건 실행 트리는 막힌다. 안전 목록 밖 호출에 session 이 없으면 막는다. 현재 계약은 [fos-ctx README](../../../hermes/plugins/fos-ctx/README.md) 가 갖는다.
 
 **Control Plane 의 판정(`EventToolGuard.decide`).** 서명을 확인한 profile, 루트 session, session 으로 이 순서로 본다.
 
@@ -218,7 +217,7 @@ v0.23 은 그 호출에 `session_id` 를 함께 넘기고 `tool_call_id` 는 비
 | REQ11 | backend 통합 | 연결 문제만 실패 수를 늘리고 지점은 그대로이며, 성공하면 비운다. (PR2) 네 번째 연속 실패에서만 알림 한 건이고 다섯째에는 없으며, 성공 뒤 다시 네 번이면 한 건 더 |
 | REQ12 | backend 통합 | 대화가 바쁘면 지점이 그대로이고 다음 확인에서 깨운다 |
 
-| REQ9(PR3) | hermes 단위(가짜 Control Plane HTTP 서버) | 안전 목록 밖의 도구마다 `tool-guard` 를 부르고 `block` 이면 그 글로 막는다. 안전 목록, 플러그인 도구, Control Plane MCP 도구는 묻지 않는다. 답이 없거나 5xx, 예외, 주소 없음이면 막는다. session 이 없으면 묻지 않고 통과한다 |
+| REQ9(PR3) | hermes 단위(가짜 Control Plane HTTP 서버) | 안전 목록 밖의 도구마다 `tool-guard` 를 부르고 `block` 이면 그 글로 막는다. 안전 목록, 플러그인 도구, Control Plane MCP 도구는 묻지 않는다. 답이 없거나 5xx, 예외, 주소 없음이면 막는다. 안전 목록 밖 호출에 session 이 없으면 묻지 않고 막는다(Hermes 업그레이드 PR3 에서 변경) |
 | REQ9(PR3) | backend 통합 | 사건 살펴보기 트리의 session 과 그 등록된 자식, 압축 교체 session 은 `block`. 같은 에이전트의 보통 대화, 점검 대화의 사용자 turn, 단추 살펴보기는 `allow`. 점검 대화의 끝난 실행은 `block`. 모르는 session 은 그 profile 에 사건 살펴보기가 돌 때만 `block`. 판정 중 예외는 200 `block` 이고 404 가 아니다 |
 | REQ9(PR3) | 계약 테스트(Hermes 소스) | 내장 도구 이름 전체와 안전 목록 도구의 toolset, `execute_code` 안의 호출 지점이 고정한 값과 같다 |
 | REQ10(PR3) | backend 통합 | 셸·위임 toolset 이 켜진 에이전트도 켤 수 있고 깨운다. 설치 상태의 `tool_guard` 가 거짓이면 켜기가 `TOOL_GUARD_MISSING` 이고 깨우지 않는다 |
@@ -245,7 +244,7 @@ v0.23 은 그 호출에 `session_id` 를 함께 넘기고 `tool_call_id` 는 비
 | DECISION13 | (PR2) 입력 밖 발견 | 사건 실행에서 `topicKey` 가 입력 식별자가 아닌 발견을 `NOT_IN_EVENT` 의 「참고」 로 내린다 | 작성자 | 답의 「새로 알릴 것」 과 알림 수가 갈리지 않게 한다. 입력 밖 식별자는 알릴 항목으로 받지 않는다는 ADR-20261105 / event-watch 의 결정을 답에도 적용한다(독립 검토) |
 | DECISION14 | (PR3) 판정 자리 | 사건 실행의 위험 도구는 fos-ctx 의 `pre_tool_call` 이 Control Plane 에 물어 막는다 | 작성자 | 스펙 DECISION26. `subagent_start` hook 은 반환값을 버려 자식 생성을 막지 못하고, 실행마다 toolset 을 줄이는 칸은 Hermes 에 없다. `pre_tool_call` 의 `block` 은 이미 이미지 위임과 `skill_manage` 를 막는다 |
 | DECISION15 | (PR3) 묻는 범위 | 막을 목록이 아니라 안전 목록을 두고 그 밖을 모두 묻는다 | 작성자 | 스펙 DECISION28. 새 Hermes 도구가 판정 없이 열리지 않는다. 보통 대화의 호출마다 Control Plane 왕복이 하나 는다 |
-| DECISION16 | (PR3) session 없는 호출 | 통과시킨다 | 작성자 | 코드 실행(RPC 와 상주 kernel) 안의 호출만 session 이 없고, 그 코드를 연 `execute_code` 가 판정을 받는다. 사건 실행 트리에서는 `execute_code` 가 막힌다. 막으면 보통 대화의 코드 실행이 깨진다(독립 검토) |
+| DECISION16 | (PR3) session 없는 호출 | Hermes 업그레이드 PR3 에서 대체: 안전 목록 밖 호출은 막는다 | 작성자 | 이전 기준 v0.21.6 의 코드 실행에는 session 이 없어 통과시켰다. 현재 기준은 코드 실행도 session 을 주므로 그 예외를 제거했다 |
 | DECISION17 | (PR3) 판정하지 못한 session | 도는 실행이 없으면 점검 대화의 session 일 때 막고, Control Plane 이 모르면 그 profile 에 사건 살펴보기가 돌 때 막는다 | 작성자 | 사건 실행은 점검 대화에서만 돈다. 루트를 찾지 못한 자식과 잘린 사슬이 「모르는 session」 으로 새지 않게 하면서, 보통 대화의 압축 교체 뒤 호출과 다른 플랫폼 대화를 늘 막지는 않는다(독립 검토) |
 | DECISION18 | (PR3) 판정 plugin 확인 | 깨울 때마다 대시보드 설치 상태의 새 칸 `tool_guard` 를 읽는다 | 작성자 | 바인딩 `READY` 는 마지막 연결 확인 때의 값이다. 새 칸을 두면 옛 대시보드와 옛 `fos-ctx` 를 모두 거짓으로 읽는다 |
 | DECISION19 | (PR3) 판정 주소 | `FOS_CTX_POLICY_URL` 에서 만든다 | 작성자 | 같은 Control Plane 의 같은 인증 경로라 운영 환경 값을 늘리지 않는다 |

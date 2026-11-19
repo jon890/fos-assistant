@@ -292,7 +292,7 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
       }
       const run = state.runs.get(runId);
       if (!run) return send(response, 404, runNotFound(runId!));
-      return send(response, 200, state.hermesShape === "v0.23" ? sessionProjection(state, run) : run);
+      return send(response, 200, sessionProjection(state, run));
 
   };
 }
@@ -407,7 +407,7 @@ function sessionProjection(state: FakeHermesState, run: Run): Record<string, unk
   return {
     ...rest,
     object: "hermes.run",
-    status: blocked ? "queued" : run.status,
+    status: blocked ? "queued" : run.status === "interrupted" ? "cancelled" : run.status,
     admission_id: admissionOf(run.run_id),
     execution_generation: 1,
     pending_controls: [],

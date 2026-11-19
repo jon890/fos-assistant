@@ -296,7 +296,7 @@ class HermesSourceTest(unittest.TestCase):
     def test_shared_wire_matches_upstream_event_callback(self):
         """공유 사건 표본의 칸을 기준 버전 callback의 실제 출력과 대조한다."""
         source = self.root / "gateway/platforms/api_server_runs.py"
-        # `_call_id` 는 v0.23 이 도구 사건에 `tool_call_id` 를 붙이는 helper 다. 기준 계열에는 없다.
+        # `_call_id` 는 도구 사건에 `tool_call_id` 를 붙이는 helper 다.
         wanted = {"_run_event", "_tool_completed_preview", "_make_run_event_callback", "_call_id",
                   "_FIXED_EVENT_FIELDS", "_TOOL_COMPLETED_PREVIEW_MAX_CHARS",
                   "_SUBAGENT_EVENT_KEYS", "_SUBAGENT_TEXT_KEYS"}
@@ -381,7 +381,7 @@ class HermesSourceTest(unittest.TestCase):
         manager = next(node for node in loader.body if isinstance(node, ast.ClassDef) and node.name == "PluginLoaderMixin")
         function = next(node for node in manager.body if isinstance(node, ast.FunctionDef)
                         and node.name == "_warn_python_dependencies")
-        helper_names = contract.expected("PLUGIN_DEPENDENCY_HELPERS", self.root)
+        helper_names = contract.PLUGIN_DEPENDENCY_HELPERS
         helpers = [node for node in loader.body if isinstance(node, ast.FunctionDef) and node.name in helper_names]
         self.assertEqual(set(helper_names), {node.name for node in helpers}, "의존성 경고 helper 가 옮겨졌다")
         warnings = []
@@ -443,7 +443,7 @@ class HermesSourceTest(unittest.TestCase):
         return node
 
     def test_symbols(self):
-        for (module, name), shape in contract.expected("SYMBOLS", self.root).items():
+        for (module, name), shape in contract.SYMBOLS.items():
             with self.subTest(symbol="%s.%s" % (module, name)):
                 node = self.definition(module, name)
                 if isinstance(shape, contract.Value):
@@ -574,7 +574,7 @@ class HermesSourceTest(unittest.TestCase):
                         "%s 의 %s 에 %s 가 없다. %s" % (builder, key, result, revisit))
 
     def test_unattended_approval_points(self):
-        """unattended_mode 가 execute_code 만 열고 셸과 플러그인 승인은 승인 카드로 남는 데 기대는 지점이 그대로인지 본다."""
+        """unattended_mode 를 읽는 함수와 승인 알림 경로의 호출 관계가 선언과 같은지 본다."""
         revisit = ("plugin 의 approve 가 셸 위험 명령과 플러그인 승인까지 사람 없이 열 수 있다. "
                    "ADR-20261008 execute-code-unattended 를 다시 본다")
 
@@ -637,7 +637,7 @@ class HermesSourceTest(unittest.TestCase):
                     visit(self.tree(source), "<함수 밖>")
             return found
 
-        points = contract.expected("UNATTENDED_APPROVAL", self.root)
+        points = contract.UNATTENDED_APPROVAL
         relative, starter, variable = points["exec_ask"]
         node = function(self.tree(self.root / relative), starter)
         exports = [statement for statement in ast.walk(node) if isinstance(statement, ast.Assign)
@@ -737,11 +737,7 @@ class HermesSourceTest(unittest.TestCase):
         self.assertEqual(set(contract.APPROVAL_GUARD["gate_callers"]), callers,
                          "%s 를 부르는 함수가 선언과 다르다. %s" % (gate, revisit))
 
-        points = contract.expected("APPROVAL_WRITE_POINTS", self.root)
-        if points is None:
-            self.assertIsNone(self.resolve("agent.file_safety", "write_approval_key"),
-                              "이 계열에 write_approval_key 가 생겼다. APPROVAL_WRITE_POINTS 를 계열에 더한다")
-            return
+        points = contract.APPROVAL_WRITE_POINTS
         for key, (relative, name, shape) in points.items():
             with self.subTest(point=key):
                 self.assertIsNone(_accepts(top_function(relative, name), shape))

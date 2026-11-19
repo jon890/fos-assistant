@@ -20,7 +20,6 @@ import {
   TEST_LAST_SUBMITTED_RUNTIME_PATH,
   TEST_HOLD_NEXT_SOUL_PATH,
   TEST_RELEASE_HELD_SOUL_PATH,
-  TEST_HERMES_SHAPE_PATH,
   TEST_RESTART_HERMES_PATH,
 } from "./runtime-fixtures.ts";
 /** 다른 프로세스에서 시험 상태를 바꾸는 제어 경로다. */
@@ -49,14 +48,7 @@ export function createControlRoutes(state: FakeHermesState, { releaseHeldRun, re
         state.proactiveGate = undefined;
         state.openProactiveGate = undefined;
         state.lastSubmittedRuntime = {};
-        state.hermesShape = "v0.21";
         state.resolvedRuns.length = 0;
-        return send(response, 204, null);
-      }
-
-      if (request.method === "POST" && path === TEST_HERMES_SHAPE_PATH) {
-        const body = JSON.parse(await readBody(request)) as { shape?: string };
-        state.hermesShape = body.shape === "v0.23" ? "v0.23" : "v0.21";
         return send(response, 204, null);
       }
 

@@ -54,7 +54,7 @@ class HermesToolSourceTest(unittest.TestCase):
         names = set(self.toolsets["_HERMES_CORE_TOOLS"])
         for toolset in self.toolsets["TOOLSETS"].values():
             names |= set(toolset["tools"])
-        expected = contract.expected("HERMES_BUILTIN_TOOLS", self.root)
+        expected = contract.HERMES_BUILTIN_TOOLS
         self.assertEqual(sorted(names - expected), [], "계약에 없는 새 도구")
         self.assertEqual(sorted(expected - names), [], "Hermes 에서 빠진 도구")
 
@@ -85,10 +85,9 @@ class HermesToolSourceTest(unittest.TestCase):
     def test_code_execution_call_identity(self):
         """코드 실행 안의 도구 호출이 `handle_function_call` 에 넘기는 식별 칸이 계열의 기대와 같다.
 
-        기준 계열은 session 없이 `task_id` 만 넘긴다. v0.23 은 session 을 함께 넘긴다(키워드나 `**` 로 푼 dict 의
-        `"session_id"` 키). 두 계열 모두 `tool_call_id` 는 넘기지 않는다.
+        session 을 함께 넘긴다(키워드나 `**` 로 푼 dict 의 `"session_id"` 키).
+        `tool_call_id` 는 넘기지 않는다.
         """
-        with_session = contract.expected("TOOL_GUARD_CODE_CALLS_HAVE_SESSION", self.root)
         for path in contract.TOOL_GUARD_CODE_CALLS:
             with self.subTest(path=path):
                 tree = ast.parse((self.root / path).read_text(encoding="utf-8"))
@@ -105,7 +104,7 @@ class HermesToolSourceTest(unittest.TestCase):
                         keywords |= unpacked
                     self.assertIn("task_id", keywords)
                     self.assertNotIn("tool_call_id", keywords)
-                    self.assertEqual(with_session, "session_id" in keywords)
+                    self.assertIn("session_id", keywords)
 
 if __name__ == "__main__":
     unittest.main()

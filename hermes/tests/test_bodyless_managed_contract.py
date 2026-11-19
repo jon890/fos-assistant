@@ -55,7 +55,6 @@ class ManagedDeclarationTest(unittest.TestCase):
         self.assertIn("AIAgent.close", contract.BODYLESS_MANAGED_FUNCTIONS["run_agent.py"])
         self.assertIn("bind_profile_scope", contract.BODYLESS_MANAGED_FUNCTIONS["agent/runtime_scope.py"])
         self.assertIn("current_scope", contract.BODYLESS_MANAGED_FUNCTIONS["hermes_scope.py"])
-        self.assertEqual(contract.BODYLESS_SOURCE_LINE[1], "agent/runtime_scope.py")
 
     def test_legacy_setters_are_not_expected(self):
         # v0.23 의 옛 setter 는 묶인 scope 를 옮기거나 거절한다. 관리 owner 가 기대는 경계에 두지 않는다.
