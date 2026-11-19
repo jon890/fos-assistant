@@ -44,7 +44,7 @@ public class McpFileSpaceTools {
 
     /** 넣지 못한 까닭이다. 도구 결과에 이름 그대로 나간다. */
     private enum Reason {
-        UNSUPPORTED_TYPE("받지 않는 형식이거나 파일 내용이 형식과 맞지 않는다. 받는 형식은 그림, 문서(HTML, MD, TXT, PDF, DOCX, PPTX), 표(CSV, TSV, XLSX)다"),
+        UNSUPPORTED_TYPE("받지 않는 형식이거나 파일 내용이 형식과 맞지 않는다. 받는 형식은 그림, 문서(HTML, CSS, MD, TXT, PDF, DOCX, PPTX), 표(CSV, TSV, XLSX)다"),
         TOO_LARGE("파일이 25MB 상한을 넘는다"),
         QUOTA_FULL("사용자의 파일 공간 용량이 찼다. 사용자가 「내 파일」 에서 파일을 지워야 한다"),
         NOT_FOUND("파일을 찾지 못했다. 파일이 없거나 폴더, 링크이거나 경로가 틀렸다"),
@@ -64,6 +64,10 @@ public class McpFileSpaceTools {
         AgentExecution origin = caller.originExecution();
         Long conversationId = origin.conversationId();
         Long userId = caller.user().id();
+        if (conversationId == null) {
+            // 대화 밖 실행은 넣은 파일을 묶을 답이 없다. 다른 도구와 같은 맥락 오류로 답한다(설계의 「file_space_put 도구」).
+            return McpToolService.result(McpToolService.INVALID_CONTEXT, true);
+        }
         try {
             ArtifactKept kept = keep(origin, userId, conversationId, path, title, description);
             return McpToolService.result(success(kept), false);
@@ -81,9 +85,6 @@ public class McpFileSpaceTools {
     /** 경로를 이 대화의 결과물 폴더, 실행 공간, 그 밖으로 나눠 넣는다. 판정 순서는 설계의 「{@code file_space_put} 도구」 다. */
     private ArtifactKept keep(
         AgentExecution origin, Long userId, Long conversationId, String path, String title, String description) {
-        if (conversationId == null) {
-            throw notFound();
-        }
         Optional<String> folderPath = putFiles.folderPathOf(conversationId, path);
         if (folderPath.isPresent()) {
             return putFiles.putFromFolder(userId, conversationId, folderPath.get(), title, description, WAIT);
@@ -155,8 +156,8 @@ public class McpFileSpaceTools {
             "name", PUT,
             "description",
             "사용자의 파일 공간(내 파일)에 파일을 넣는다. path 가 /workspace/ 로 시작하면 작업 폴더(실행 공간)의 파일이고, 상대 경로나 "
-                + "이 대화의 결과물 폴더 경로면 그 폴더의 파일이다. 받는 형식은 그림(png, jpg, gif, webp), 문서(html, md, txt, pdf, docx, "
-                + "pptx), 표(csv, tsv, xlsx)이고 파일 하나는 25MB 까지다. title 에 짧은 한국어 제목, description 에 한 줄 설명을 붙인다. "
+                + "이 대화의 결과물 폴더 경로면 그 폴더의 파일이다. 받는 형식은 그림(png, jpg, jpeg, gif, webp), 문서(html, css, md, txt, pdf, "
+                + "docx, pptx), 표(csv, tsv, xlsx)이고 파일 하나는 25MB 까지다. title 에 짧은 한국어 제목, description 에 한 줄 설명을 붙인다. "
                 + "답에 묶인 HTML 과 image_generate 로 만든 그림은 자동으로 들어가므로 넣지 않는다.",
             "inputSchema",
             Map.of(
