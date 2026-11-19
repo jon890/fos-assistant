@@ -219,6 +219,30 @@ Hermes 가 보이는 도구 이름은 `mcp__fos_assistant__<도구>` 다. 서버
 
 확인 값: 위 「도구 판정」 의 key, 등록 이름 `mcp__demo__write_note`, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 코드 `DEMO_LOGIN_REQUIRED`, `login`, 탭 `TAB1` 의 서명은 `b335ba30659f0bc2396026c66f20ee5643e6fd7989e3a0fa8c7c601498befee3` 다. backend 의 `ConnectorHandoffRequestTest` 도 같은 값을 쓴다. 같은 칸에 코드 `DEMO_BROWSER_IN_USE`, `human_browser`, 탭 없음의 서명은 `19ead4bb3f5a9ae30dd75e7abf896c9fed9db0f4ee6939f58ce5d3a4ff7105a1` 이다.
 
+### 만든 그림을 올린다
+
+Hermes 의 `image_generate` 가 만든 그림을 Control Plane 에 올려 요청자의 대화에 보이게 한다. 1.13.0 부터다(fos-assistant [ADR-20261119 / generated-image](../../../docs/adr/ADR-20261119-generated-image.md)).
+Hermes 는 그림을 그 profile 의 캐시 폴더에 쓰고 모델에게 호스트 경로를 돌려준다. 그 경로가 답에 적히면 홈서버의 디렉터리 구조가 화면에 보인다.
+
+- `pre_tool_call` 은 도구 판정을 통과한 `image_generate` 호출에서 지시문 첫 줄의 `제목: <제목>` 줄을 뗀다. `{"action": "modify", "args": {"prompt": <나머지>}}` 를 돌려주고 뗀 제목은 결과 hook 이 꺼낼 때까지 프로세스 메모리에 둔다. 제목 줄이 없거나 그 줄뿐이면 고치지 않는다. 판정이 막은 호출은 그 결과를 그대로 돌려준다
+- `transform_tool_result` 는 결과가 `success` 이고 `image`(실행 공간이 있으면 `host_image`)가 Hermes 홈의 `cache/generated/images` 아래 일반 파일일 때만 올린다. 링크를 푼 실제 경로로 본다. 실패한 결과와 원격 주소, 그 폴더 밖의 경로는 건드리지 않는다
+- 올린 뒤 모델이 받는 결과에는 경로가 없다. 성공이면 `{"success": true, "saved": true, "title", "message"}`, 올리지 못했으면 `{"success": false, "error"}` 다. 성공하면 캐시의 원본을 지운다
+- hook 안의 모든 예외는 올리지 못한 결과로 바꾼다. 예외를 던지면 Hermes 가 경로가 든 원래 결과를 모델에게 준다
+
+| 칸 | 값 |
+| --- | --- |
+| 주소 | `FOS_CTX_POLICY_URL` 의 마지막 경로 조각을 `generated-image` 로 바꾼 것(`/internal/hermes/generated-image`). http(s) 가 아니거나 없으면 올리지 못한 결과로 바꾼다 |
+| 인증 | `Authorization: Bearer <그 profile 의 MCP 토큰>` |
+| 본문 | `multipart/form-data`. 조각 `meta` 는 JSON `{"v": 1, "root_session_id", "session_id", "tool_call_id", "title", "prompt", "sig"}`, 조각 `image` 는 그림 바이트 그대로다. 그림을 JSON 의 base64 로 보내지 않는다 |
+| 서명할 글 | `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256, 지시문의 SHA-256 을 `\n` 하나로 이은 UTF-8. 해시는 소문자 16진수이고 제목이 없으면 빈 글의 해시다. key 는 `_fos_ctx` 와 같다 |
+| 보내지 않는 것 | `tool_call_id` 나 session 이 빈 호출, `MAX_BYTES`(20MiB)를 넘는 그림. 올리지 못한 결과로 바꾼다 |
+| 답 | 200 의 `{"title"}` 이면 그 제목으로 성공 결과를 만든다 |
+| 404 | 이 경로가 없는 옛 Control Plane 이다. 결과를 바꾸지 않는다(rule-66). Control Plane 은 이 경로에서 404 를 내지 않는다 |
+| 그 밖의 답 | 올리지 못한 결과로 바꾼다. 그림 파일은 남긴다 |
+| 제한 시간 | `UPLOAD_TIMEOUT`(15초). 한 번만 부른다. Hermes 의 callback 제한(기본 30초)보다 짧다 |
+
+확인 값: 위 「도구 판정」 의 key, 루트 `fos-root-1`, session `fos-session-1`, 호출 `call_1`, 그림 바이트 `image-bytes`, 제목 `수채화 고양이`, 지시문 `창가에 앉은 고양이` 의 서명은 `d5c850a5926fcf396a1e87367d88573994150da200a6ce78a4270388394d69ee` 다. backend 의 `GeneratedImageEndpointTest` 도 같은 값을 쓴다.
+
 ### 승인 관문으로 가는 동작을 막는다
 
 Hermes 가 위험하다고 분류한 `terminal` 명령, Hermes 가 승인을 요구하는 경로(`~/.ssh/config`, 셸 시작 파일)의 `write_file` 과 `patch`, 모든 `computer_use` 호출을 맨 먼저 막는다(1.11.0 부터, fos-assistant [Hermes 업그레이드 스펙](../../../docs/features/hermes-upgrade/spec.md) 의 REQ5).

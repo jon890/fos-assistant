@@ -12,6 +12,7 @@ import { describeError } from "@/components/error-message";
 import { formatWhen } from "@/lib/format";
 import { artifactNames } from "@/lib/artifact-name";
 import { ArtifactVaultStatus } from "./artifact/artifact-vault-status";
+import { GeneratedImages } from "./artifact/generated-images";
 import { ActivityBlock } from "./activity/activity-block";
 import { MessageActions } from "./message-actions";
 import type { VersionSlot } from "@/lib/message-versions";
@@ -346,8 +347,17 @@ export function MessageBubble({
         conversationId={conversationId}
         attachments={attachments}
       />
+      <GeneratedImages
+        images={(turn.artifacts ?? []).filter(
+          (artifact) => artifact.kind === "IMAGE",
+        )}
+        conversationId={conversationId}
+        messageId={turn.id}
+      />
       <ArtifactList
-        artifacts={turn.artifacts ?? []}
+        artifacts={(turn.artifacts ?? []).filter(
+          (artifact) => artifact.kind !== "IMAGE",
+        )}
         conversationId={conversationId}
         messageId={turn.id}
         onOpen={

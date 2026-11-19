@@ -2276,9 +2276,26 @@ docker 백엔드는 셸과 파일 도구만 옮긴다. 아래는 Hermes 프로�
 | `browser_*` | Hermes 컨테이너의 브라우저가 돈다 | `file://` 은 막혔다(측정). toolset 은 profile 틀에서 꺼져 있다 |
 | `vision_analyze`, `image_generate` | 호스트 경로는 그 profile 의 media cache 안만 읽고, 나머지는 컨테이너 안에서 읽는다 | 첨부 경로를 컨테이너에 붙여야 사진을 읽는다 |
 | `text_to_speech` 의 `output_path` | 호스트 경로에 쓴다. `HERMES_WRITE_SAFE_ROOT` 가 상한이다 | |
-| `MEDIA:` 태그 | OpenAI 호환 경로는 그림 파일을 data URL 로 바꿔 싣는다 | `/v1/runs` 는 이 변환을 하지 않는다 |
+| `MEDIA:` 태그 | OpenAI 호환 경로는 그림 파일을 data URL 로 바꿔 싣는다 | `/v1/runs` 는 이 변환을 하지 않는다. 그림은 `fos-ctx` 가 Control Plane 에 올린다(아래 「`image_generate` 의 결과와 그림 파일」) |
 | 파일 도구의 존재 확인 | `os.path.exists` 같은 호출 몇 개가 호스트 경로를 본다. 내용은 읽지 않는다 | 남는다 |
 | `cronjob` 의 `workdir` | 호스트 경로의 문맥 파일을 읽는다(소스로만 판정) | toolset 은 꺼져 있다 |
+
+### `image_generate` 의 결과와 그림 파일
+
+2026-11-19 에 v0.23.2 tag 소스로 확인했다. ChatGPT 구독 이미지 서비스로 한 장을 만든 운영 왕복의 결과도 같았다.
+`fos-ctx` 가 이 동작에 기대어 그림을 Control Plane 에 올린다([ADR-20261119 / generated-image](../../docs/adr/ADR-20261119-generated-image.md)).
+
+| 무엇 | 동작 | 근거 |
+| --- | --- | --- |
+| 도구가 보이는 조건 | 그 profile 에 이미지 서비스 설정(`image_gen.provider`)이나 FAL key 가 있어야 `image_generate` 가 모델에 보인다. toolset 만 켜면 도구가 숨겨진다 | `tools/image_generation_tool.py` 의 `check_image_generation_requirements` |
+| 결과 | JSON 글이다. 성공이면 `{"success": true, "image": "<경로나 주소>", ...}`, 실패면 `{"success": false, "image": null, "error", "error_type"}` 다. 실행 공간이 있으면 `host_image` 와 `agent_visible_image` 가 더 온다 | `agent/image_gen_provider.py` 의 `success_response`, `tools/image_generation_tool.py` 의 `_postprocess_image_generate_result` |
+| 그림 파일 | base64 로 받은 그림은 그 profile 의 Hermes 홈 아래 `cache/generated/images/` 에 쓰고 `image` 에 그 호스트 경로를 준다. gateway 의 캐시 정리가 이 폴더를 지우지 않는다 | `agent/provider_media.py`, `agent/image_gen_provider.py` 의 `save_b64_image` |
+| 모델에게 주는 안내 | 도구 설명이 「결과의 `image` 를 지금 플랫폼의 파일 전달 방식으로 답에 적으라」 고 한다. API server 에서는 모델이 `MEDIA:<경로>` 나 경로를 그대로 적는다 | `tools/image_generation_tool.py` 의 `_build_dynamic_image_schema` |
+| 제목 인자 | 없다. 인자는 지시문과 비율, 이미지 서비스가 받는 것뿐이고 서비스의 능력에 따라 달라진다 | 같은 함수 |
+| `modify` 의 인자 병합 | `pre_tool_call` 이 돌려준 `args` 를 원래 인자 뒤에 얕게 병합한다. 내장 도구와 MCP 도구를 나누지 않는다 | `hermes_cli/plugins.py` |
+| 결과 hook 이 받는 인자 | `transform_tool_result` 는 도구 인자를 `args` 로 받는다 | `model_tools.py` 의 `_apply_transform_tool_result_hook` |
+
+Hermes 를 올릴 때 `hermes/tests/test_generated_image_contract.py` 가 이 표의 결과 모양, 그림 폴더, 인자 병합, hook 인자를 새 버전의 소스에서 다시 본다.
 
 ### 네트워크
 

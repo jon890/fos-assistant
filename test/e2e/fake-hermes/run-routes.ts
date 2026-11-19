@@ -24,6 +24,10 @@ import {
   splitArtifactPreamble,
   STARTER_MARK,
   ARTIFACT_PROBE,
+  IMAGE_GENERATE_PROBE,
+  IMAGE_GENERATE_TITLE,
+  IMAGE_GENERATE_PROMPT,
+  ONE_PIXEL_PNG,
   writeArtifactDraft,
   ARTIFACT_SAME_NAME_PROBE,
   writeSameNameArtifacts,
@@ -45,7 +49,7 @@ import {
   acceptsSteer,
 } from "./scenario-fixtures.ts";
 /** 실행 제출, 중지와 상태 조회를 처리한다. */
-export function createRunRoutes(state: FakeHermesState, { authorized, runNotFound, releaseHeldRun, finishSlowRun }: ReturnType<typeof createLifecycle>, { writeArtifactViaMcp, registerSubagent, readMemoryViaMcp, callControlPlaneToolViaMcp, judgeConnectorCalls }: ReturnType<typeof createMcp>) {
+export function createRunRoutes(state: FakeHermesState, { authorized, runNotFound, releaseHeldRun, finishSlowRun }: ReturnType<typeof createLifecycle>, { writeArtifactViaMcp, uploadGeneratedImage, registerSubagent, readMemoryViaMcp, callControlPlaneToolViaMcp, judgeConnectorCalls }: ReturnType<typeof createMcp>) {
   return async (request: IncomingMessage, response: ServerResponse, path: string): Promise<void> => {
       if (request.method === "POST") {
         const stopMatch = RUN_STOP_PATH.exec(path);
@@ -146,6 +150,9 @@ export function createRunRoutes(state: FakeHermesState, { authorized, runNotFoun
         if (input === ARTIFACT_PROBE && artifactFolder !== undefined) writeArtifactDraft(artifactFolder);
         if (input === ARTIFACT_SAME_NAME_PROBE && artifactFolder !== undefined) writeSameNameArtifacts(artifactFolder);
         if (input === ARTIFACT_WRITE_PROBE && artifactConversationId !== undefined) await writeArtifactViaMcp(artifactConversationId, submitted.session_id);
+        if (input === IMAGE_GENERATE_PROBE) {
+          await uploadGeneratedImage(submitted.session_id, IMAGE_GENERATE_TITLE, IMAGE_GENERATE_PROMPT, ONE_PIXEL_PNG);
+        }
         const registeredChild = input.startsWith(SUBAGENT_MEMORY_PROBE)
           ? await registerSubagent(submitted.session_id)
           : undefined;

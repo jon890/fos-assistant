@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -207,6 +208,7 @@ class NativeResultHistoryTest {
             mock(ModelTierService.class),
             List.of(),
             mock(SourceReadSummaries.class),
-            noticeStatuses);
+            noticeStatuses,
+            mock(GeneratedImageService.class));
     }
 }

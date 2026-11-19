@@ -106,3 +106,25 @@ export function signedPolicyRequest(
     sig,
   };
 }
+
+/**
+ * profile 플러그인이 만든 그림을 올릴 때 보내는 `meta` 조각이다(ADR-20261119 / generated-image).
+ *
+ * <p>서명할 글은 `v1-generated-image`, 루트 session, session, `tool_call_id`, 그림 바이트의 SHA-256, 제목의 SHA-256,
+ * 지시문의 SHA-256 을 `\n` 으로 이은 것이다. key 는 `_fos_ctx` 와 같다.
+ */
+export function signedGeneratedImage(
+  token: string,
+  rootSessionId: string,
+  sessionId: string,
+  toolCallId: string,
+  title: string,
+  prompt: string,
+  image: Buffer,
+): Record<string, unknown> {
+  const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+  const key = sha(token);
+  const signed = ["v1-generated-image", rootSessionId, sessionId, toolCallId, sha(image), sha(title), sha(prompt)].join("\n");
+  const sig = createHmac("sha256", Buffer.from(key, "utf8")).update(signed, "utf8").digest("hex");
+  return { v: 1, root_session_id: rootSessionId, session_id: sessionId, tool_call_id: toolCallId, title, prompt, sig };
+}

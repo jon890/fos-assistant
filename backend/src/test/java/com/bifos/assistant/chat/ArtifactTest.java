@@ -90,9 +90,16 @@ class ArtifactTest {
     private static final String PREAMBLE_GUIDE = "이 폴더는 사용자가 HTML 페이지나 이미지 같은 파일을 만들어 달라고 할 때만 쓴다. 그런 요청이 없으면 파일을 만들지 않고 답을 글로만 한다.\n"
         + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
         + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
-        + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
+        + "artifact_write 에서는 HTML 과 CSS 는 content, HTML 이 부를 인터넷의 사진은 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
         + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
-        + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.";
+        + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
+        + "아래 네 줄은 image_generate 도구가 있고 사용자가 그림을 만들어 달라고 했을 때만 따른다.\n"
+        + "- image_generate 로 만든 그림은 이 대화에 자동으로 저장되고 사용자의 화면에 보인다."
+        + " artifact_write 나 파일 도구로 옮기지 않고, 답에 파일 경로나 MEDIA: 를 쓰지 않는다.\n"
+        + "- 그림 지시문(prompt)은 사용자의 부탁을 그대로 넘기지 않는다."
+        + " 그릴 대상, 구도, 화풍, 조명, 바꾸지 말고 지킬 것을 담아 자세히 쓴다.\n"
+        + "- 지시문의 첫 줄에 「제목: <짧은 한국어 제목>」 을 적고 둘째 줄부터 지시문을 쓴다.\n"
+        + "- 그림을 만들지 못했으면 그림 없이 까닭과, 잠시 뒤 다시 부탁하면 된다는 것을 답한다.";
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
         + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
         + "form-action 'none'";

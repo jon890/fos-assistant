@@ -17,7 +17,7 @@ export type MessageAttachment = {
   expiresAt: string;
 };
 
-/** 답의 turn 이 결과물 폴더에 만든 HTML 하나다. `ChatDtos.ArtifactView` 를 그대로 받는다 */
+/** 답의 turn 이 결과물 폴더에 만든 HTML 하나나 비서가 만든 그림 하나다. `ChatDtos.ArtifactView` 를 그대로 받는다 */
 export type MessageArtifact = {
   /** 대화 결과물 폴더 안의 상대 경로다 */
   path: string;
@@ -28,6 +28,12 @@ export type MessageArtifact = {
   autoVault?: AutoVaultState | null;
   /** 자동 보관이 실패한 까닭의 오류 코드다 */
   autoVaultError?: string | null;
+  /** `IMAGE` 는 비서가 만든 그림이고 `HTML` 은 결과물 페이지다. 옛 서버 응답에는 없고, 없으면 `HTML` 로 본다 */
+  kind?: "IMAGE" | "HTML";
+  /** 비서가 이미지 도구에 넘긴 그림 지시문이다. 그림이 아니면 null 이다 */
+  prompt?: string | null;
+  /** 그 그림의 살아 있는 보관본 번호다. 없으면 null 이다 */
+  vaultItemId?: number | null;
 };
 
 /** 결과 전달 묶음의 상태다. `ChatDtos.DeliveryView` 를 그대로 받는다 */

@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.artifact.application.GeneratedImageService;
 import com.bifos.assistant.chat.delivery.application.AutoTurnNoticeStatuses;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.mock;
@@ -114,7 +115,8 @@ class ConversationMissingAgentTest {
             mock(ModelTierService.class),
             List.of(),
             mock(SourceReadSummaries.class),
-            new AutoTurnNoticeStatuses(List.of())))
+            new AutoTurnNoticeStatuses(List.of()),
+            mock(GeneratedImageService.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
         AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));

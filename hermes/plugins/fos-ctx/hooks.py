@@ -20,6 +20,7 @@ from .context import (
     logger,
 )
 from .handoff import report_handoff
+from .generated_image import TOOL as IMAGE_TOOL, _failed as image_upload_failed, publish as publish_image, strip_title
 from .tool_guard import GUARD_BLOCK_MESSAGE, tool_guard
 
 
@@ -84,6 +85,18 @@ def _delegate_images_allowed(args):
 
 
 def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", task_id="", **_):
+    decision = _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id)
+    if decision is None and tool_name == IMAGE_TOOL:
+        # 판정을 통과한 그림 만들기만 지시문의 제목 줄을 뗀다. 막힌 호출은 그 결과를 그대로 돌려준다.
+        try:
+            return strip_title(args, session_id or "", tool_call_id or "")
+        except Exception as exc:  # noqa: BLE001 - 제목을 떼지 못해도 그림은 만든다
+            logger.warning("fos-ctx: 그림 지시문의 제목 줄을 떼지 못했다: %s", type(exc).__name__)
+            return None
+    return decision
+
+
+def _pre_tool_call(tool_name, args, session_id, tool_call_id, task_id):
     if tool_name == SKILL_MANAGE_TOOL:
         return {"action": "block", "message": SKILL_MANAGE_MESSAGE}
     if not isinstance(tool_name, str):
@@ -156,13 +169,20 @@ def wrap_external_data(body: str) -> str:
     return EXTERNAL_DATA_NOTICE + "\n<external-data>\n" + escaped + "\n</external-data>"
 
 
-def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id="", **_):
-    """바인딩 profile 의 플러그인 도구 결과를 `<external-data>` 로 감싼 글로 바꾼다. 그 밖에는 None 이다.
+def transform_tool_result(tool_name="", result=None, session_id="", tool_call_id="", args=None, **_):
+    """`image_generate` 의 그림을 올리고, 바인딩 profile 의 플러그인 도구 결과를 `<external-data>` 로 감싼 글로 바꾼다. 그 밖에는 None 이다.
 
     Hermes 는 결과가 문맥에 들어가기 전에 이 hook 을 부르고, 처음 돌려준 글로 결과를 바꾼다.
     판정이 막은 호출은 여기 닿지 않는다. 그래서 여기 닿은 `{"error": ...}` 도 플러그인 서버가 낸 외부 데이터로 감싼다.
     대응 파일의 서버와 맞는 도구의 결과에 화면 넘기기 칸이 있으면 감싸기 전에 Control Plane 에 알린다(`handoff.py`).
     """
+    if tool_name == IMAGE_TOOL:
+        # 만든 그림을 Control Plane 에 올리고 경로 없는 결과로 바꾼다. 예외를 던지면 Hermes 가 경로가 든 원래 결과를 모델에게 준다.
+        try:
+            return publish_image(args, result, session_id or "", tool_call_id or "")
+        except Exception as exc:  # noqa: BLE001 - 경로가 모델에게 가지 않게 정해 둔 글로 바꾼다
+            logger.warning("fos-ctx: 만든 그림을 올리지 못했다: %s", type(exc).__name__)
+            return image_upload_failed()
     try:
         if not isinstance(tool_name, str) or not tool_name.startswith(MCP_PREFIX) or not isinstance(result, str):
             return None
