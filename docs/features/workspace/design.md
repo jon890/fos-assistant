@@ -90,7 +90,7 @@
 대화 폴더에서 온 HTML, CSS, 사진은 지금처럼 `ArtifactBundleReader` 가 부르는 파일까지 묶음으로 훑는다. 그 밖의 형식과 실행 공간에서 온 파일은 파일 하나를 바이트로 받아 넣는다. 실행 공간의 HTML 은 부르는 파일을 따라가지 않고 한 파일로 넣는다.
 대화 폴더의 새 형식(엑셀, PDF 등)은 `ArtifactStore` 에 형식을 보지 않는 읽기를 따로 두어 읽는다. 폴더 안인지 보는 규칙은 기존 `ArtifactPathPolicy` 그대로다(실제 경로가 그 대화 폴더 안이어야 한다). 대화 폴더가 화면에 내주는 형식(`CONTENT_TYPES`)은 넓히지 않는다.
 
-`VaultFileType` 을 쓰는 자리는 셋이다. 보관의 입구 검사(`ArtifactBundleReader.requireVaultable`), 보관본을 내줄 때의 형식(`ArtifactVaultService.content`), 내줄 때 `attachment` 를 강제할지(`ArtifactVaultController.body`)다.
+`VaultFileType` 을 쓰는 자리는 셋이다. 바이트로 받는 보관의 입구 검사(`ArtifactVaultService.keep`), 보관본을 내줄 때의 형식(`ArtifactVaultService.content`), 내줄 때 `attachment` 를 강제할지(`ArtifactVaultController.body`)다. 「보관」 단추와 자동 보관이 받는 형식은 지금처럼 대화 폴더가 내주는 형식이고, 파일 하나 상한만 함께 오른다.
 이 PR 에서 새 형식의 본문은 `download` 값과 상관없이 `application/octet-stream` 과 `attachment` 로만 준다. 미리보기 형식은 PR2 가 정한다.
 
 ### 데이터
@@ -163,7 +163,7 @@
 | 요구사항 | 경계와 환경 |
 | --- | --- |
 | REQ1, REQ2, REQ4, REQ5, REQ8 | `/mcp` 를 서명한 호출로 부르는 통합 테스트(H2, 임시 실행 공간과 대화 폴더). 엑셀 넣기와 바이트 일치, 그룹 공개 에이전트의 주인, 형식·크기·용량·없는 파일의 실패 결과, 링크 거절, 살펴보기 트리 |
-| REQ3 | `recordTurn` 뒤 메시지 응답의 `FILE` 항목, 지운 뒤의 `deleted`, 같은 경로 HTML 과 겹칠 때 한 줄, 넣기 도구 없이 대화 폴더에 쓴 엑셀이 묶이지 않음. 화면은 Vitest 로 파일 줄과 지운 안내를 본다 |
+| REQ3 | `recordTurn` 뒤 메시지 응답의 `FILE` 항목, 지운 뒤의 `deleted`, 같은 경로 HTML 과 겹칠 때 한 줄, 넣기 도구 없이 대화 폴더에 쓴 엑셀이 묶이지 않음. 화면은 브라우저 테스트(Playwright)로 파일 줄과 지운 안내를 본다 |
 | REQ6 | 제목 겹침의 번호, 제목 없는 파일, `artifact_write` 제목이 자동 보관본으로 옮겨짐, 목록 응답의 제목과 설명, 암호문이 평문 제목을 담지 않음 |
 | REQ7 | 실행 입력에 단락이 있음, 같은 파일을 두 번 넣어 한 건과 `already` |
 | 스키마 | Draft CI 의 `backend-mysql` 이 마이그레이션과 쿼리를 MySQL 에서 본다 |

@@ -28,18 +28,19 @@ phase 02 뒤 서버는 `kind: "FILE"` 항목에 `title`, `vaultItemId`, `deleted
 ### 1. `web/src/components/chat/artifact/put-files.tsx`(신규)와 `message-bubble.tsx`, `message-types.ts`
 
 - `MessageArtifact.kind` 에 `"FILE"` 을, 필드에 `title?: string | null` 을 더한다
-- `PutFiles` 는 `FILE` 항목마다 한 줄을 그린다. 제목(없으면 `artifactName(path)`), 종류 글자(확장자에서 「그림」, 「문서」, 「표」), 크기, 「내려받기」(`vaultContentUrl(vaultItemId, true)`), 「내 파일에서 보기」(`/files?tab=vault`)다. `deleted` 면 「내 파일에서 지운 파일이에요」 만 보인다. `data-testid` 는 `message-put-file` 이다
+- `web/src/lib/put-file.ts`(신규)에 순수 함수 둘을 둔다. `putFileKind(path)` 는 확장자에서 「그림」, 「문서」, 「표」 를, `putFileName(artifact)` 은 제목(없으면 `artifactName(path)`)을 준다. `.tsx` 는 `node --test` 가 값으로 가져오지 못하므로 `.ts` 에 둔다
+- `PutFiles` 는 `FILE` 항목마다 한 줄을 그린다. 이름, 종류 글자, 크기, 「내려받기」(`vaultContentUrl(vaultItemId, true)`), 「내 파일에서 보기」(`/files?tab=vault`)다. `deleted` 면 「내 파일에서 지운 파일이에요」 만 보인다. `data-testid` 는 `message-put-file` 이다
 - `message-bubble.tsx` 가 `ArtifactList` 에 `FILE` 을 넘기지 않고 `PutFiles` 를 `GeneratedImages` 와 같은 자리에 그린다
 
 ### 2. 보관함 목록과 문구
 
 - `web/src/lib/artifact-vault-api.ts`: `VaultItem` 에 `title`, `description`, `kind` 를 더하고 `VAULT_ERRORS` 의 「파일 하나 5MB」 를 25MB 로 고친다
 - `web/src/components/files/vault-list.tsx`: 제목이 있으면 제목을, 없으면 지금 이름을 보인다. 설명이 있으면 이름 아래 작은 글로 보인다. 빈 상태의 설명에서 HTML 만 가리키는 말을 「대화에서 에이전트가 만든 파일」 로 넓힌다
-- `web/src/lib/tool-label.ts` 에 `file_space_put` 의 이름표 「파일 공간에 넣기」 를 더하고 `web/test/unit/tool-label.test.ts` 에 사례를 더한다
+- `web/src/lib/tool-label.ts` 에 `file_space_put` 의 이름표 `{ running: "파일 공간에 넣는 중", done: "파일 공간에 넣음" }` 을 더하고 `web/test/unit/tool-label.test.ts` 에 사례를 더한다
 
 ### 3. 테스트
 
-- `web/test/unit/put-files.test.ts`(신규): 종류 글자를 정하는 순수 함수(xlsx 는 「표」, pdf 는 「문서」, png 는 「그림」)와 제목이 없을 때의 이름
+- `web/test/unit/put-files.test.ts`(신규): `put-file.ts` 의 두 함수. xlsx 는 「표」, pdf 는 「문서」, png 는 「그림」 이고, 제목이 없으면 파일 이름이다
 - `web/test/browser/artifact.spec.ts` 에 사례를 더한다. `FILE` 항목이 든 메시지 응답 대역으로 파일 줄의 제목, 내려받기 주소, 「내 파일에서 보기」, 지운 안내를 본다. 이 파일의 기존 대역 방식을 따른다
 
 ### 4. 기능 문서
@@ -66,6 +67,7 @@ scripts/dev/check-local.sh --fast
 | 파일 | 변경 |
 |---|---|
 | `web/src/components/chat/artifact/put-files.tsx` | 신규 |
+| `web/src/lib/put-file.ts` | 신규 |
 | `web/src/components/chat/message-bubble.tsx` | 수정 |
 | `web/src/components/chat/message-types.ts` | 수정 |
 | `web/src/components/files/vault-list.tsx` | 수정 |
