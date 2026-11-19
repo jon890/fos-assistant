@@ -121,9 +121,10 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     int writePendingDefaultToolsets(@Param("id") Long id, @Param("names") String names);
 
 
-    /** 기다리는 기본 도구가 있는 지우지 않은 에이전트의 번호를 번호 순으로 읽는다. */
+    /** 기다리는 기본 도구가 있는 지우지 않은 에이전트 가운데 {@code afterId} 보다 큰 번호를 번호 순으로 읽는다. */
     @Query(
-        value = "select id from agent where pending_default_toolsets is not null and deleted_at is null order by id",
+        value = "select id from agent where pending_default_toolsets is not null and deleted_at is null and id > :afterId"
+            + " order by id",
         nativeQuery = true)
-    List<Long> findIdsWithPendingDefaultToolsets(Pageable pageable);
+    List<Long> findIdsWithPendingDefaultToolsets(@Param("afterId") long afterId, Pageable pageable);
 }

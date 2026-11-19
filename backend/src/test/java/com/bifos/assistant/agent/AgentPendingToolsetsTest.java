@@ -228,16 +228,25 @@ class AgentPendingToolsetsTest {
 
 
     @Test
-    @DisplayName("그룹에 공개한 에이전트는 켜지 않고 더 기다리지 않는다")
+    @DisplayName("그룹에 공개한 에이전트는 Hermes 가 답하지 않아도 켜지 않고 더 기다리지 않는다")
     void dropsPendingForGroupAgent() {
         jdbc.update("UPDATE agent SET visibility = 'GROUP' WHERE id = ?", agent.id());
-        when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenReturn(List.of("web"));
+        when(toolsets.readEnabled(anyString(), eq(PROFILE))).thenThrow(new IllegalStateException("Hermes 응답 없음"));
 
         pending.attemptAll();
 
         assertThat(waiting()).isEmpty();
+        verify(toolsets, never()).readEnabled(anyString(), anyString());
         verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
-        assertThat(agents.findIdsWithPendingDefaultToolsets(PageRequest.of(0, 10))).doesNotContain(agent.id());
+        assertThat(agents.findIdsWithPendingDefaultToolsets(0L, PageRequest.of(0, 10))).doesNotContain(agent.id());
+    }
+
+
+    @Test
+    @DisplayName("기다리는 에이전트 번호는 마지막으로 본 번호 뒤부터 읽어 다음 쪽으로 넘어간다")
+    void readsPendingIdsAfterTheLastSeenId() {
+        assertThat(agents.findIdsWithPendingDefaultToolsets(agent.id() - 1, PageRequest.of(0, 10))).contains(agent.id());
+        assertThat(agents.findIdsWithPendingDefaultToolsets(agent.id(), PageRequest.of(0, 10))).doesNotContain(agent.id());
     }
 
 

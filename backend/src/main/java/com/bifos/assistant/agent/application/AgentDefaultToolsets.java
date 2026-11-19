@@ -71,14 +71,14 @@ public class AgentDefaultToolsets {
      * @throws ApiException Hermes 가 답하지 않았거나 쓴 도구가 켜지지 않았을 때. 다음 차례에 다시 본다
      */
     public PendingToolsetOutcome enablePending(Agent agent, List<String> names) {
-        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
-        // 이미 켜져 있어도 한 번은 다시 쓴다. 도구만 켜져 있고 이미지 서비스 설정이 없는 profile 에 설정을 넣으려는 것이다.
+        // Hermes 에 묻기 전에 정한다. Hermes 가 답하지 않아도 기다리지 않을 에이전트는 빠져야 한다.
         if (agent.visibility() == AgentVisibility.GROUP || agent.ownerUserId() == null) {
             return PendingToolsetOutcome.NOT_ALLOWED;
         }
         if (!skillFiles.uploadedRequestingSecrets(agent.hermesProfile()).isEmpty()) {
             return PendingToolsetOutcome.SKILL_REQUESTS_SECRETS;
         }
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         LinkedHashSet<String> desired = new LinkedHashSet<>(
             desired(
                 enabled.stream().filter(AgentToolPolicy::isKnown).toList(),
@@ -88,6 +88,7 @@ public class AgentDefaultToolsets {
             desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
         }
         try {
+            // 이미 켜져 있어도 한 번은 다시 쓴다. 도구만 켜져 있고 이미지 서비스 설정이 없는 profile 에 설정을 넣으려는 것이다.
             toolsets.writeApiServerInSandbox(agent.hermesProfile(), List.copyOf(desired), agent.sandboxOwner());
         } catch (ApiException rejected) {
             if (rejected.code() != ErrorCode.AGENT_SANDBOX_UNAVAILABLE) {

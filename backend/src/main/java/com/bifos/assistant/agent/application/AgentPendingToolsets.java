@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class AgentPendingToolsets {
 
-    /** 한 차례에 보는 에이전트 수다. */
+    /** 한 번에 읽는 에이전트 번호 수다. 한 차례는 쪽을 넘기며 모두 본다. */
     static final int BATCH = 50;
     /** Hermes 가 답하지 않는 실패가 이만큼 이어지면 관리자에게 알린다. 배포 중의 한두 번은 알리지 않는다. */
     static final int FAILURE_NOTICE_STREAK = 3;
@@ -62,11 +62,23 @@ public class AgentPendingToolsets {
     }
 
 
-    /** 기다리는 도구가 있는 에이전트를 차례로 켜 본다. */
+    /**
+     * 기다리는 도구가 있는 에이전트를 차례로 켜 본다.
+     *
+     * <p>마지막으로 본 번호 뒤부터 다음 쪽을 읽는다. 켜지 못해 남는 에이전트가 쪽 크기를 넘어도 번호가 큰 에이전트까지 매 차례 본다.
+     */
     public void attemptAll() {
-        for (Long agentId : agents.findIdsWithPendingDefaultToolsets(PageRequest.of(0, BATCH))) {
-            attempt(agentId);
-        }
+        long afterId = 0L;
+        List<Long> page;
+        do {
+            page = agents.findIdsWithPendingDefaultToolsets(afterId, PageRequest.of(0, BATCH));
+            for (Long agentId : page) {
+                attempt(agentId);
+            }
+            if (!page.isEmpty()) {
+                afterId = page.get(page.size() - 1);
+            }
+        } while (page.size() == BATCH);
     }
 
 
